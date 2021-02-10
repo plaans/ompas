@@ -1,0 +1,4 @@
+((r 10)
+ (loc ?r 10)
+ (at ?r rooma)
+ (at ?r2 roomb))

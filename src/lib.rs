@@ -1,2 +1,2 @@
-pub mod repl;
 pub mod facts;
+pub mod repl;

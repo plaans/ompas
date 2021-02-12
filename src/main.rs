@@ -1,16 +1,18 @@
-use structopt::StructOpt;
-use std::path::{PathBuf, Path};
+use aries_planning::parsing::sexpr::parse;
+use aries_utils::input::Input;
 use fact_base::repl::Repl;
 use std::collections::HashMap;
-use aries_planning::parsing::sexpr::parse;
 use std::convert::TryInto;
-use aries_utils::input::Input;
-
+use std::path::{Path, PathBuf};
+#[warn(unused_imports)]
+use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
-#[structopt(name = "FactBase", about = "A fact and belief database inside an acting and planning engine")]
+#[structopt(
+    name = "FactBase",
+    about = "A fact and belief database inside an acting and planning engine"
+)]
 struct Opt {
-
     #[structopt(short, long)]
     repl: bool,
 
@@ -21,12 +23,10 @@ struct Opt {
     test: bool,
 }
 
-
-
 fn main() {
     println!("uname fact base v1.0");
 
-    let opt : Opt = Opt::from_args();
+    let opt: Opt = Opt::from_args();
     println!("{:?}", opt);
 
     //test_lib_model(&opt);
@@ -40,23 +40,22 @@ fn main() {
 
 #[derive(Default, Debug)]
 struct Datas {
-    pub vars : HashMap<Vec<u32>, u32>
+    pub vars: HashMap<Vec<u32>, u32>,
 }
 
 #[allow(dead_code)]
 fn test() {
-    let mut datas:Datas = Datas::default();
-    let key = vec![1,2];
+    let mut datas: Datas = Datas::default();
+    let key = vec![1, 2];
     datas.vars.insert(key, 2);
-    datas.vars.insert(vec![1,2,3], 3);
+    datas.vars.insert(vec![1, 2, 3], 3);
     println!("{:?}", datas);
 
-    let key_find:Vec<u32> = vec![1,2,3];
-    let v = match datas.vars.get(&key_find){
+    let key_find: Vec<u32> = vec![1, 2, 3];
+    let v = match datas.vars.get(&key_find) {
         None => panic!("wrong key"),
-        Some(v) => println!("The value is : {}",*v)
+        Some(v) => println!("The value is : {}", *v),
     };
-
 }
 
 #[allow(dead_code)]

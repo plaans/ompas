@@ -1,3 +1,4 @@
+#[warn(unused_imports)]
 use std::collections::HashMap;
 use aries_model::Label;
 use std::fs::read;
@@ -5,7 +6,7 @@ use std::io::{self, Read, Write};
 use aries_planning::parsing::sexpr::{SExpr, parse, SAtom};
 use aries_utils::input::{Input, ErrLoc};
 use aries_planning::parsing::sexpr::SExpr::Atom;
-use crate::facts::FactBase;
+use crate::facts::{FactBase, FactBaseError};
 use std::convert::TryInto;
 use std::ops::Deref;
 
@@ -18,7 +19,32 @@ struct Function {
 pub struct Repl{
     commands: Vec<SExpr>,
     functions: Vec<Function>,
-    factBase: FactBase,
+    fact_base: FactBase,
+}
+
+enum ReplResult{
+    Sexpr(SExpr),
+    Error(FactBaseError),
+    Exit,
+    Ok
+}
+
+impl From<Result<(), FactBaseError>> for ReplResult {
+    fn from(r: Result<(), FactBaseError>) -> Self {
+        match r {
+            Ok(_) => ReplResult::Ok,
+            Err(e) => ReplResult::Error(e)
+        }
+    }
+}
+
+impl From<Result<SExpr, FactBaseError>> for ReplResult {
+    fn from(r: Result<SExpr, FactBaseError>) -> Self {
+        match r {
+            Ok(s) => ReplResult::Sexpr(s),
+            Err(e) => ReplResult::Error(e)
+        }
+    }
 }
 
 
@@ -35,50 +61,50 @@ impl Repl {
         }
     }
 
-    fn eval(&mut self, command: SExpr) -> Result<SExpr, ErrLoc> {
+    fn eval(&mut self, commands: SExpr) -> Result<SExpr, ErrLoc> {
         let mut evaluation = SExpr::Atom(SAtom::new("ok".to_string()));
-        let command = &mut command.as_list_iter().ok_or_else(|| command.invalid("Expected a list"))?;
+        let commands = &mut commands.as_list_iter().ok_or_else(|| commands.invalid("Expected a list"))?;
 
-        for current in command {
+        for current in commands {
             let mut command = current.as_list_iter().ok_or_else(|| current.invalid("Expected a command list"))?;
-            match command.pop_atom()?.as_str() {
+            let result = match command.pop_atom()?.as_str() {
                 "let" => {
-                    //println!("define a new variable");
-                    let len = command.len();
-                    let mut key: Vec<_> = vec![];
-                    for i in 0..len - 1 {
-                        key.push(command.pop_atom()?.clone());
-                    }
-                    let value = command.pop_atom()?.clone();
-                    self.factBase.add(key, value);
+                    self.fact_base.add_new_fact(command).into()
                 },
                 "set" => {
-                    let len = command.len();
-                    let mut key: Vec<_> = vec![];
-                    for i in 0..len - 1 {
-                        key.push(command.pop_atom()?.clone());
-                    }
-                    let value = command.pop_atom()?.clone();
-                    self.factBase.set(key, value).unwrap_or(println!("wrong key"));
-                    //println!("change the value of the variable")
+                    self.fact_base.set_fact(command).into()
                 },
                 "get" => {
-                    let mut key: Vec<SAtom> = vec![];
-                    for i in 0..command.len() {
-                        key.push(command.pop_atom()?.clone());
-                    }
-                    //println!("get the value");
-                    evaluation = SExpr::Atom(self.factBase.get(key));
+                    self.fact_base.get_fact(command).into()
+                }
+                "print" => {
+                    println!("print the sexpr");
+                    ReplResult::Ok
                 },
-                "print" => println!("print the sexpr"),
-                "help" => println!("print help"),
-                "exit" => println!("quit repl"),
+                "help" => {
+                    println!("print help");
+                    ReplResult::Ok
+                },
+                "exit" => {
+                    println!("quit repl");
+                    ReplResult::Ok
+                }
                 "getall" => {
-                    println!("{:?}", self.factBase);
+                    println!("{}", self.fact_base);
+                    ReplResult::Ok
                 },
-                _ => println!("unnamed command")
+                _ => {
+                    println!("unnamed command");
+                    ReplResult::Error(FactBaseError::Other)
+                }
+            };
+
+            match result {
+                ReplResult::Error(e) => println!("{}", e),
+                _ => {}
             };
         }
+
 
         Ok(evaluation)
 

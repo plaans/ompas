@@ -59,6 +59,7 @@ fn test() {
 
 }
 
+#[allow(dead_code)]
 fn test_lib_model(opt: &Opt) {
     let path: &Path = opt.input.as_ref().unwrap().as_path();
     let sexpr = parse(path);

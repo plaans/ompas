@@ -10,4 +10,5 @@ edition = "2018"
 aries_model = {git = "https://github.com/arthur-bit-monnot/aries/"}
 aries_planning = {git = "https://github.com/arthur-bit-monnot/aries/"}
 aries_utils = {git = "https://github.com/arthur-bit-monnot/aries/"}
+aries_collections = {git = "https://github.com/arthur-bit-monnot/aries/"}
 structopt = { version = "0.3", default-features = false }

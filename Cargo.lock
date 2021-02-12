@@ -117,6 +117,7 @@ dependencies = [
 name = "fact_base"
 version = "0.1.0"
 dependencies = [
+ "aries_collections",
  "aries_model",
  "aries_planning",
  "aries_utils",

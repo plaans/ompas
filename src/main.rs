@@ -1,8 +1,6 @@
 use aries_planning::parsing::sexpr::parse;
-use aries_utils::input::Input;
 use fact_base::repl::Repl;
 use std::collections::HashMap;
-use std::convert::TryInto;
 use std::path::{Path, PathBuf};
 #[warn(unused_imports)]
 use structopt::StructOpt;
@@ -52,7 +50,7 @@ fn test() {
     println!("{:?}", datas);
 
     let key_find: Vec<u32> = vec![1, 2, 3];
-    let v = match datas.vars.get(&key_find) {
+    let _v = match datas.vars.get(&key_find) {
         None => panic!("wrong key"),
         Some(v) => println!("The value is : {}", *v),
     };

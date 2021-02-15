@@ -1,19 +1,14 @@
 #[warn(unused_imports)]
-use crate::facts::FactBaseError::WrongCommand;
 use anyhow::*;
 use aries_model::symbols::SymId;
-use aries_model::types::TypeId;
-use aries_planning::chronicles::StateFun;
 use aries_planning::parsing::sexpr::SAtom;
 use aries_planning::parsing::sexpr::{ListIter, SExpr};
 use aries_utils::input::{ErrLoc, Sym};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::path::Path;
-use aries_model::lang::Type;
-use crate::facts::FactBaseError::{WrongNumberOfArgument, AlreadyDefined, UndefinedType};
+use crate::facts::FactBaseError::{WrongNumberOfArgument, AlreadyDefined};
 use crate::facts::language::*;
-use std::num::ParseIntError;
 
 static EMPTY: &str = "empty\n";
 //TODO: define static string for
@@ -26,6 +21,8 @@ pub mod language {
     pub const CONST_LONG: &str = "constant";
     pub const STATEVAR_SHORT: &str = "sv";
     pub const STATEVAR_LONG: &str = "state-variable";
+    pub const SYM_SHORT: &str = "sym";
+    pub const SYM_LONG: &str = "symbol";
     pub const TYPE: &str = "type";
 
     //TODO: define basic types;
@@ -48,29 +45,29 @@ pub enum FactType {
 
 #[derive(Debug)]
 pub enum FactBaseError {
-    WrongCommand(ErrLoc),
-    WrongFact(ErrLoc),
-    Other(String),
+    ErrLoc(ErrLoc),
     WrongNumberOfArgument(String),
     AlreadyDefined(String),
     UndefinedType(String),
     UndefinedEntry(String),
     MissExpectedSymbol(String),
+    Default(String),
 }
 
 impl From<ErrLoc> for FactBaseError {
     fn from(e: ErrLoc) -> Self {
-        WrongCommand(e)
+        FactBaseError::ErrLoc(e)
     }
 }
 
 impl Display for FactBaseError {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            FactBaseError::WrongCommand(e) => write!(f, "wrong command: {}", e),
-            FactBaseError::WrongFact(e) => write!(f, "wrong fact: {}", e),
-            FactBaseError::Other(e) => write!(f, "Unknown error at \"{}\"", e),
-            _ => write!(f, "Error"),
+            FactBaseError::ErrLoc(e) => write!(f,"{}", e),
+            FactBaseError::Default(s)=> write!(f, "Error in factBase: {}", s),
+            FactBaseError::AlreadyDefined(e)=>write!(f, "Already defined entry : {}", e),
+            FactBaseError::UndefinedEntry(e)=>write!(f, "Undefined symbol: {}", e),
+            _ => write!(f, "Not yet handled error"),
         }
     }
 }
@@ -142,6 +139,10 @@ impl FactBase {
                 println!("define a new state var");
                 Ok(())
             }
+            SYM_LONG | SYM_SHORT => {
+                println!("define a new symbol with a type");
+                self.add_symbol(fact)
+            }
             _ => {
                 println!("error");
                 Ok(())
@@ -176,7 +177,7 @@ impl FactBase {
                 let atom = t_type.pop_atom()?;
                 //TODO: change None to next atom to support parent type.
                 self.symbol_table
-                    .add_symbol(atom.clone(), None, &FactType::Type);
+                    .add_symbol(atom.clone(), None, FactType::Type);
             }
             _ => println!("wrong definition size"),
         }
@@ -189,49 +190,78 @@ impl FactBase {
         if predicate.len() >= 2 {
             let name: Sym = predicate.pop_atom()?.into();
             //check if the symbol is already defined.
-            //TODO: create a custom function to verify if a symbol has already been defined.
-            match self.symbol_table.ids.contains_key(&name) {
-                true => {
-                    return Err(FactBaseError::AlreadyDefined(format!(
-                        "{} is already defined",
-                        name
-                    )))
-                }
-                false => {}
-            };
+            if self.symbol_table.is_symbol_defined(&name){
+                return Err(FactBaseError::AlreadyDefined(name.to_string()));
+            }
             let mut params_id: Vec<SymId> = Vec::new();
             while predicate.len() > 0 {
                 let param: Sym = predicate.pop_atom()?.into();
+                let param_id = self.symbol_table.get_sym_id(&param)?;
 
-                //TODO: create a custom function to verify if a type exist.
-                match self.symbol_table.is_defined_type(&param){
+                match self.symbol_table.is_defined_type(&param_id){
                     Ok(true) => {},
                     Ok(false) => return Err(FactBaseError::UndefinedType(param.symbol)),
                     Err(e) => return Err(e)
                 };
                 let param_id = match self.symbol_table.get_sym_id(&param){
-                    None => panic!("Critical error in FactBase"),
-                    Some(id) => id.clone()
+                    Err(e) => return Err(e),
+                    Ok(id) => id.clone()
                 };
                 params_id.push(param_id);
             }
-            let sym_id = self.symbol_table.add_symbol(name, None, &FactType::SF);
+            let sym_id = self.symbol_table.add_symbol(name.clone(), None, FactType::SF);
             let sf : CustomStateFun = CustomStateFun {
                 sym: sym_id,
                 tpe: params_id
             };
-            self.symbol_table.stateFuns.insert(sym_id, sf);
+            self.symbol_table.state_funs.insert(sym_id, sf);
         } else {
             return Err(WrongNumberOfArgument(predicate.pop()?.to_string()));
         }
         Ok(())
     }
 
+    ///Add a new constant
+    ///can be a symbol, a variable or a state variable
     pub fn add_const(&mut self, mut constant: ListIter) -> Result<(), FactBaseError> {
         //check which const it is: pred or var.
         //Check if symbols have already been defined.
         let result = match constant.pop_atom()?.as_str() {
             STATEVAR_LONG | STATEVAR_SHORT => {
+                //TODO: Support undefined state var and infer types.
+                let predicate_name = constant.pop_atom()?.into();
+                let predicate_id = self.symbol_table.get_sym_id(&predicate_name)?;
+                let mut params: Vec<Sym> = Vec::new();
+                let mut params_id : Vec<SymId> = Vec::new();
+                let mut value: Sym = Sym::from("");
+                params_id.push(predicate_id);
+
+                if !(self.symbol_table.get_fact_type(&predicate_id) == FactType::SF) {
+                    return Err(FactBaseError::Default(format!("{} is not a State Function", predicate_name)))
+                }
+                let sf = self.symbol_table.get_state_function(&predicate_id);
+                //for each parameter we have to check if the type is good.
+                for (index, type_id) in sf.tpe.iter().enumerate() {
+                    let param : Sym = constant.pop_atom()?.into();
+                    let param_id = self.symbol_table.get_sym_id(&param)?;
+                    let param_type_id = self.symbol_table.get_type(&param_id);
+                    if  param_type_id != *type_id {
+                        return Err(FactBaseError::Default(
+                            format!("wrong type: expected {} got {}",
+                                    self.symbol_table.symbols[sf.tpe[index]],
+                                    self.symbol_table.symbols[param_type_id])))
+                    };
+                    if index < sf.tpe.len()-1 {
+                        params.push(param);
+                        params_id.push(param_id);
+                    }
+                    else {
+                        value = param
+                    }
+                }
+
+                self.constants_sf.insert(params_id, value);
+
                 Ok(())
             }
             VAR_LONG | VAR_SHORT =>  {
@@ -248,68 +278,44 @@ impl FactBase {
                 }
                 constant.pop_known_atom("-")?;
                 //get type_id here or exit function if error
-                let atom_type = constant.pop_atom()?.into();
-                match self.symbol_table.is_defined_type(atom_type) {
-                    Ok(true) => type_id = self.symbol_table.get_sym_id(atom_type).expect("Strong Error in FactBase: check get_symd_id()").clone(),
-                    Ok(false) => return Err(UndefinedType("It is not a type".to_string())),
-                    Err(e) => return Err(e)
-                };
+                let sym_type:&Sym = constant.pop_atom()?.into();
+                let type_id= self.symbol_table.get_sym_id(sym_type)?;
+                if !self.symbol_table.is_defined_type(&type_id)?{
+                    return Err(FactBaseError::UndefinedType(sym_type.to_string()));
+                }
                 constant.pop_known_atom("=")?;
                 //get value here.
-                let value = constant.pop_atom()?;
+                let value:&Sym = constant.pop_atom()?.into();
                 //check the type of the value
                 if !self.symbol_table.is_value_of_type(value, &type_id){
-                    return Err(FactBaseError::Other("wrong type".to_string()))
+                    return Err(FactBaseError::Default("wrong type".to_string()))
                 }
                 //...
 
-                let sym_id = self.symbol_table.add_symbol(name, Some(&type_id), &FactType::Constant);
+                let sym_id = self.symbol_table.add_symbol(name, Some(&type_id), FactType::Constant);
                 self.constants.insert(sym_id, value.into());
 
                 Ok(())
 
-                /*
-                match self.symbol_table.is_symbol_defined({
-                    true => Err(AlreadyDefined(name.to_string())),
-                    false => {
-                        constant.pop_known_atom("-")?;
-                        let const_type = constant.pop_atom()?.clone();
-                        match self.symbol_table.get_sym_id(&Sym::from(const_type.as_str())){
-                            Some(type_id) => {
-                                constant.pop_known_atom("=")?;
-                                let value = constant.pop_atom()?.clone();
-                                match const_type.as_str(){
-                                    INT => {
-                                        if self.is_number(&value) {
-                                            let sym_id = self.symbol_table.add_symbol(name.clone(), Some(type_id), &FactType::Constant);
-                                            self.constants.insert(sym_id, value.into());
-                                            Ok(())
-                                        } else {
-                                            Err(FactBaseError::Other("Expected an integer".to_string()))
-                                        }
-                                    }
-                                    BOOLEAN => {
-                                        if self.is_boolean(&value) {
-                                            Ok(())
-                                        } else {
-                                            Err(FactBaseError::Other("Expected a boolean".to_string()))
-                                        }
-                                    }
-                                    OBJECT => {Ok(())}
-                                    _ => {Ok(())}
-
-                                }
-                            }
-                            None =>  Err(FactBaseError::UndefinedType(const_type.as_str().to_string()))
-                        }
-                    }
-                }*/
-
             }
-            e => return Err(FactBaseError::WrongCommand(ErrLoc::from(e.to_string())))
+            e => return Err(FactBaseError::Default(format!("Expected var or sv, got {}", e)))
         };
         //TODO: remove the return
         result
+    }
+
+    pub fn add_symbol(&mut self, mut symbol: ListIter) -> Result<(), FactBaseError> {
+        if symbol.len() != 3 {
+            return Err(FactBaseError::WrongNumberOfArgument(symbol.pop()?.to_string()))
+        }
+        let sym: Sym = symbol.pop_atom()?.into();
+        symbol.pop_known_atom("-")?;
+        let _type:Sym = symbol.pop_atom()?.into();
+        let type_id = self.symbol_table.get_sym_id(&_type)?;
+        let sym_id = self.symbol_table
+            .add_symbol(sym, Some(&type_id), FactType::Constant);
+        self.constants.insert(sym_id, _type);
+        Ok(())
     }
 
     pub fn add(&mut self, key: Vec<Sym>, value: SymId) {
@@ -342,6 +348,7 @@ impl Display for FactBase {
         let mut r = String::new();
         r.push_str("\n#Constants: ");
         if !self.constants.is_empty() {
+            r.push('\n');
             for (id, value) in &self.constants {
                 let constant: Sym = self
                     .symbol_table
@@ -349,13 +356,26 @@ impl Display for FactBase {
                     .get(usize::from(*id))
                     .expect("wrong constant id")
                     .clone();
-                r.push_str(format!("-{} = {}", constant, value).as_str());
+                r.push_str(format!("-{} = {}\n", constant, value).as_str());
             }
         } else {
             r.push_str(EMPTY);
         }
         r.push_str("\n#Constants predicates: ");
         if !self.constants_sf.is_empty() {
+            r.push('\n');
+            for (params, value) in &self.constants_sf {
+                let mut params = params.clone();
+                let mut params : Vec<Sym> = params.iter().map(|&id| self.symbol_table.symbols[usize::from(id)].clone()).collect();
+                r.push_str(format!("-{}[", params.remove(0)).as_str());
+                for (index, param) in params.iter().enumerate() {
+                    if index > 0 {
+                        r.push(',');
+                    }
+                    r.push_str(param.as_str());
+                }
+                r.push_str(format!("] = {}\n", value).as_str());
+            }
         } else {
             r.push_str(EMPTY);
         }
@@ -381,8 +401,7 @@ impl Display for FactBase {
 
         r.push_str("\n#Symbol Table: ");
         r.push_str(format!("{}", self.symbol_table).as_str());
-        write!(f, "{}", r);
-        Ok(())
+        write!(f, "{}", r)
     }
 }
 
@@ -390,7 +409,7 @@ pub struct CustomSymbolTable {
     /// Set of state functions.
     /// A state function is a symbol that match a state function.
     /// A StateFun has a name (Sym) and a set of types, the last type is the return value
-    stateFuns: HashMap<SymId, CustomStateFun>,
+    state_funs: HashMap<SymId, CustomStateFun>,
     /// Set of types.
     types: HashMap<SymId, Sym>,
     ///Set of symbols that have been defined. We can access them with the SymId.
@@ -404,6 +423,7 @@ pub struct CustomSymbolTable {
     symbol_fact_type: HashMap<SymId, FactType>,
 }
 
+#[derive(Clone)]
 pub struct CustomStateFun {
     // Symbol of this state function
     pub sym: SymId,
@@ -422,16 +442,16 @@ impl Default for CustomSymbolTable {
         //define the basic types
 
         let mut st = CustomSymbolTable {
-            stateFuns: Default::default(),
+            state_funs: Default::default(),
             types: Default::default(),
             symbols: vec![],
             ids: Default::default(),
             symbol_types: Default::default(),
             symbol_fact_type: Default::default(),
         };
-        st.add_symbol(SAtom::new(INT), None, &FactType::Type);
-        st.add_symbol(SAtom::new(BOOLEAN), None, &FactType::Type);
-        st.add_symbol(SAtom::new(OBJECT), None, &FactType::Type);
+        st.add_symbol(SAtom::new(INT), None, FactType::Type);
+        st.add_symbol(SAtom::new(BOOLEAN), None, FactType::Type);
+        st.add_symbol(SAtom::new(OBJECT), None, FactType::Type);
 
         st
     }
@@ -449,8 +469,8 @@ impl Display for CustomSymbolTable {
             r.push_str(EMPTY);
         }
         r.push_str("\n\t#State Function: ");
-        if !self.stateFuns.is_empty() {
-            for k in self.stateFuns.values() {
+        if !self.state_funs.is_empty() {
+            for k in self.state_funs.values() {
                 r.push_str(format!("\n\t-{}", self.symbols[k.sym]).as_str());
                 r.push('[');
                 let mut counter = 0;
@@ -469,21 +489,20 @@ impl Display for CustomSymbolTable {
         } else {
             r.push_str(EMPTY);
         }
-        write!(f, "{}", r);
-        Ok(())
+        write!(f, "{}", r)
     }
 }
 
 impl CustomSymbolTable {
-    pub fn add_symbol(&mut self, new_symbol: SAtom, _type: Option<&SymId>, ft: &FactType) -> SymId {
+    pub fn add_symbol(&mut self, new_symbol: SAtom, _type: Option<&SymId>, ft: FactType) -> SymId {
         let sym: Sym = new_symbol.into();
         let sym_id: SymId = self.symbols.len().into();
         self.symbols.push(sym.clone());
         self.ids.insert(sym.clone(), sym_id);
-        self.symbol_fact_type.insert(sym_id, *ft);
+        self.symbol_fact_type.insert(sym_id, ft.clone());
         self.symbol_types
             .insert(sym_id, *_type.unwrap_or(&SymId::from(0)));
-        if *ft == FactType::Type {self.types.insert(sym_id, sym.clone());}
+        if ft == FactType::Type {self.types.insert(sym_id, sym.clone());}
         sym_id
     }
 
@@ -491,22 +510,31 @@ impl CustomSymbolTable {
         return self.ids.contains_key(symbol);
     }
 
-    pub fn get_sym_id(&self, symbol: &Sym) -> Option<&SymId> {
-        self.ids.get(symbol.into())
-    }
-
-    pub fn is_defined_type(&self, symbol: &Sym) -> Result<bool, FactBaseError> {
-        match self.get_sym_id(symbol) {
-            None => Err(FactBaseError::UndefinedEntry(symbol.clone().to_string())),
-            Some(id) => match self.symbol_fact_type.get(&id.clone()) {
-                None => panic!("corruption in the fact base, missing keys"),
-                Some(ft) => Ok(*ft == FactType::Type),
-            },
+    pub fn get_sym_id(&self, symbol: &Sym) -> Result<SymId, FactBaseError> {
+        match self.ids.get(symbol.into()) {
+            None => Err(FactBaseError::UndefinedEntry(symbol.to_string())),
+            Some(id) => Ok(*id)
         }
     }
 
-    pub fn get_type(&self, sym_id: &SymId) -> &SymId {
-        self.symbol_types.get(sym_id).unwrap()
+    pub fn is_defined_type(&self, symbol_id: &SymId) -> Result<bool, FactBaseError> {
+        match self.symbol_fact_type.get(symbol_id) {
+            None => panic!("corruption in the fact base, missing keys"),
+            Some(ft) => Ok(*ft == FactType::Type),
+        }
+
+    }
+
+    pub fn get_type(&self, sym_id: &SymId) -> SymId {
+        self.symbol_types.get(sym_id).unwrap().clone()
+    }
+
+    pub fn get_fact_type(&self, sym_id: &SymId) -> FactType {
+        self.symbol_fact_type.get(sym_id).unwrap().clone()
+    }
+
+    pub fn get_state_function(&self, sym_id: &SymId) -> CustomStateFun{
+        self.state_funs.get(sym_id).expect("sym_id does not correspond to a State Function").clone()
     }
 
     pub fn is_value_of_type(&self, value: &Sym, type_id: &SymId) -> bool {

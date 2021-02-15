@@ -3,7 +3,7 @@ use crate::facts::{FactBase, FactBaseError};
 use aries_model::Label;
 use aries_planning::parsing::sexpr::{parse, SAtom, SExpr};
 use aries_utils::input::{ErrLoc, Input};
-use std::io::{self, Read, Write};
+use std::io::{self, Write};
 
 struct Function {
     label: Label,
@@ -87,9 +87,9 @@ impl Repl {
                     println!("{}", self.fact_base);
                     ReplResult::Ok
                 }
-                _ => {
+                other_command => {
                     println!("unnamed command");
-                    ReplResult::Error(FactBaseError::Other("unknown command".to_string()))
+                    ReplResult::Error(FactBaseError::Default(format!("unknown command : {}", other_command)))
                 }
             };
 

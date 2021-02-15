@@ -89,7 +89,7 @@ impl Repl {
                 }
                 _ => {
                     println!("unnamed command");
-                    ReplResult::Error(FactBaseError::Other)
+                    ReplResult::Error(FactBaseError::Other("unknown command".to_string()))
                 }
             };
 

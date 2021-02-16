@@ -1,6 +1,5 @@
 use crate::facts::language::*;
 use crate::facts::FactBaseError::{AlreadyDefined, WrongNumberOfArgument};
-#[warn(unused_imports)]
 use anyhow::*;
 use aries_model::symbols::SymId;
 use aries_planning::parsing::sexpr::SAtom;
@@ -10,7 +9,9 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::path::Path;
 
-static EMPTY: &str = "empty\n";
+const EMPTY: &str = "empty\n";
+
+pub const FILE_EXTENSION: &str = "fb";
 //TODO: define static string for
 pub mod language {
     pub const PRED_SHORT: &str = "pred";
@@ -31,6 +32,25 @@ pub mod language {
     pub const OBJECT: &str = "object";
     pub const TRUE: &str = "true";
     pub const FALSE: &str = "false";
+}
+
+pub mod commands {
+    pub const COMMAND_HELP: &str = "help";
+    pub const COMMAND_PATH: &str = "path";
+    pub const COMMAND_DEFINE: &str = "let";
+    pub const COMMAND_MODIFY: &str = "set";
+    pub const COMMAND_GET: &str = "get";
+    pub const COMMAND_PRINT: &str = "print";
+
+    pub const COMMAND_EXIT: &str = "exit";
+    pub const COMMAND_CLOSE: &str = "close";
+    pub const COMMAND_GET_ALL: &str = "get-all";
+
+    pub const COMMAND_READ: &str = "read";
+    pub const COMMAND_WRITE: &str = "write";
+    pub const HIST_SHORT: &str = "hist";
+    pub const HIST_LONG: &str = "history";
+
 }
 
 #[derive(PartialEq, Copy, Clone)]
@@ -95,8 +115,15 @@ impl FactBase {
         unimplemented!()
     }
 
-    pub fn to_file(_path: &Path) -> Result<Self, FactBaseError> {
-        unimplemented!()
+    /// Transform the factbase into Lisp commands to reconstruct its states.
+    pub fn to_file(&self) -> Result<String, FactBaseError> {
+        let mut string = String::new();
+        string.push_str("(");
+        //...
+        string.push_str("(get-all)");
+
+        string.push_str(")");
+        Ok(string)
     }
 }
 

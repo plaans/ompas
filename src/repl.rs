@@ -6,7 +6,7 @@ use aries_utils::input::{ErrLoc, Input};
 use std::fmt::{Display, Formatter};
 use std::io::{self, Write, Read, Error};
 use std::fs::File;
-use crate::facts::FILE_EXTENSION;
+use crate::facts::{FILE_EXTENSION, FactBaseOk};
 use std::env;
 
 ///Set of commands for the repl of the FACTBASE
@@ -43,6 +43,27 @@ impl From<()> for ReplOk {
 impl From<SExpr> for ReplOk {
     fn from(s: SExpr) -> Self {
         ReplOk::SExpr(s)
+    }
+}
+
+impl From<FactBaseOk> for ReplOk {
+    fn from(ok: FactBaseOk) -> Self {
+        match ok{
+            FactBaseOk::Ok => ReplOk::Ok,
+            FactBaseOk::SExpr(s) => ReplOk::SExpr(s),
+            FactBaseOk::String(s) => ReplOk::String(s)
+        }
+    }
+}
+
+impl Into<FactBaseOk> for ReplOk {
+    fn into(self) -> FactBaseOk {
+        match self {
+            ReplOk::SExpr(s) => FactBaseOk::SExpr(s),
+            ReplOk::String(s) => FactBaseOk::String(s),
+            ReplOk::Exit => FactBaseOk::Ok,
+            ReplOk::Ok => FactBaseOk::Ok
+        }
     }
 }
 
@@ -99,7 +120,7 @@ impl Repl {
         let mut string = String::new();
         let len = self.commands.len();
         for (i, command) in self.commands.iter().enumerate() {
-            string.push_str(format!("{} - {}", len-i ,command ).as_str())
+            string.push_str(format!("{} - {}\n", len-i ,command ).as_str())
         }
         string
     }
@@ -124,7 +145,7 @@ impl Repl {
     }
 
     fn eval(&mut self, commands: SExpr) -> ReplResult {
-        let evaluation = SExpr::Atom(SAtom::new("ok".to_string()));
+        let evaluation = ReplOk::Ok;
         let commands = &mut commands
             .as_list_iter()
             .ok_or_else(|| commands.invalid("Expected a list"))?;
@@ -134,17 +155,17 @@ impl Repl {
                 .as_list_iter()
                 .ok_or_else(|| current.invalid("Expected a command list"))?;
             //TODO: unify the print in the print function of repl
-            let result: ReplOk = match command.pop_atom()?.as_str() {
-                COMMAND_DEFINE => self.fact_base.add_new_fact(command)?.into(),
-                COMMAND_MODIFY => self.fact_base.set_fact(command)?.into(),
-                COMMAND_GET => self.fact_base.get_fact(command)?.into(),
+            let result  = match command.pop_atom()?.as_str() {
+                COMMAND_DEFINE => self.fact_base.add_new_fact(command),
+                COMMAND_MODIFY => self.fact_base.set_fact(command),
+                COMMAND_GET => self.fact_base.get_fact(command),
                 COMMAND_PRINT => {
                     println!("print the sexpr");
-                    ReplOk::Ok
+                    Ok(FactBaseOk::Ok)
                 }
                 COMMAND_HELP => {
                     println!("print help");
-                    help()?
+                    Ok(help()?.into())
                 }
                 COMMAND_CLOSE | COMMAND_EXIT => {
                     println!("quit repl");
@@ -152,18 +173,19 @@ impl Repl {
                 }
                 COMMAND_GET_ALL => {
                     println!("{}", self.fact_base);
-                    ReplOk::Ok
+                    Ok(FactBaseOk::Ok)
                 }
 
                 COMMAND_READ => {
                     println!("get fact base from file");
                     let file_name = command.pop_atom()?.as_str();
+                    let file_name = format!("{}.{}", file_name, FILE_EXTENSION);
                     let mut file = File::open(file_name)?;
                     let mut buffer = String::new();
                     file.read_to_string(&mut buffer)?;
                     match parse(Input::from_string(buffer)) {
                         Ok(s) => {
-                            self.eval(s)?
+                            Ok(self.eval(s)?.into())
                         }
                         Err(e) => return Err(ReplError::Default(
                             format!("Error in command: {}", e.to_string()).to_string())),
@@ -176,16 +198,16 @@ impl Repl {
                     let string = self.fact_base.to_file()?;
                     file.write_all(string.as_bytes())?;
                     println!("write fact base to file");
-                    ReplOk::Ok
+                    Ok(FactBaseOk::Ok)
                 }
                 HIST_LONG | HIST_SHORT => {
                     println!("print history");
-                    ReplOk::String(self.commands_to_string())
+                    Ok(FactBaseOk::String(self.commands_to_string()))
                 }
 
                 COMMAND_PATH => {
                     let path = env::current_dir()?;
-                    ReplOk::String(format!("{}", path.display()))
+                    Ok(FactBaseOk::String(format!("{}", path.display())))
                 }
                 other_command => {
                     return Err(ReplError::Default(format!(
@@ -195,10 +217,13 @@ impl Repl {
                 }
             };
 
-            println!("{}", result)
+            match result {
+                Ok(_s) => {}
+                Err(e) => println!("{}", e)
+            }
         }
 
-        Ok(ReplOk::SExpr(evaluation))
+        Ok(evaluation)
     }
 
     fn print(&self, s: SExpr) {

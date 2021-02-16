@@ -4,8 +4,10 @@ use crate::repl::commands::*;
 use aries_planning::parsing::sexpr::{parse, SAtom, SExpr};
 use aries_utils::input::{ErrLoc, Input};
 use std::fmt::{Display, Formatter};
-use std::io::{self, Write};
+use std::io::{self, Write, Read, Error};
+use std::fs::File;
 
+///Set of commands for the repl of the FACTBASE
 mod commands {
     pub const COMMAND_HELP: &str = "help";
     pub const COMMAND_DEFINE: &str = "let";
@@ -16,6 +18,12 @@ mod commands {
     pub const COMMAND_EXIT: &str = "exit";
     pub const COMMAND_CLOSE: &str = "close";
     pub const COMMAND_GET_ALL: &str = "get-all";
+
+    pub const COMMAND_READ: &str = "read";
+    pub const COMMAND_WRITE: &str = "write";
+    pub const HIST_SHORT: &str = "hist";
+    pub const HIST_LONG: &str = "history";
+
 }
 
 #[derive(Default)]
@@ -68,6 +76,12 @@ impl From<ErrLoc> for ReplError {
 impl From<FactBaseError> for ReplError {
     fn from(e: FactBaseError) -> Self {
         ReplError::FactBaseError(e)
+    }
+}
+
+impl From<std::io::Error> for ReplError {
+    fn from(e: Error) -> Self {
+        ReplError::Default(e.to_string())
     }
 }
 
@@ -134,6 +148,31 @@ impl Repl {
                     println!("{}", self.fact_base);
                     ReplOk::Ok
                 }
+
+                COMMAND_READ => {
+                    println!("get fact base from file");
+                    let file = command.pop_atom()?.as_str();
+                    let mut file = File::open(file)?;
+                    let mut buffer = String::new();
+                    file.read_to_string(&mut buffer)?;
+                    match parse(Input::from_string(buffer)) {
+                        Ok(s) => {
+                            self.eval(s)?
+                        }
+                        Err(e) => return Err(ReplError::Default(
+                            format!("Error in command: {}", e.to_string()).to_string())),
+                    }
+                }
+
+                COMMAND_WRITE => {
+                    println!("write fact base to file");
+                    ReplOk::Ok
+                }
+                HIST_LONG | HIST_SHORT => {
+                    println!("print history");
+                    println!("{:?}", self.commands);
+                    ReplOk::Ok
+                }
                 other_command => {
                     println!("unnamed command");
                     return Err(ReplError::Default(format!(
@@ -142,6 +181,12 @@ impl Repl {
                     )));
                 }
             };
+
+            match _result {
+                ReplOk::SExpr(s) => println!("{}",s),
+                ReplOk::Exit => {}
+                ReplOk::Ok => {}
+            }
         }
 
         Ok(ReplOk::SExpr(evaluation))
@@ -170,6 +215,7 @@ impl Repl {
 }
 
 fn help() -> ReplResult {
+    //TODO: complete the help for the repl
     Ok(ReplOk::SExpr(SExpr::Atom(
         "This is the help of the repl".to_string().into(),
     )))

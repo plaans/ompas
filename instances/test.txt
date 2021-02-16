@@ -1,1 +1,7 @@
-((let (type robot)) (let (type location)) (let (symbol harry - robot)) (let (symbol kitchen - location)) (let (pred loc robot location)) (let (const sv loc harry kitchen)) (getall))
+((let (type robot))
+ (let (type location))
+ (let (symbol harry - robot))
+ (let (symbol kitchen - location))
+ (let (pred loc robot location))
+ (let (const sv loc harry kitchen))
+ (get-all))

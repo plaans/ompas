@@ -55,10 +55,9 @@ pub mod commands {
 
 #[derive(PartialEq, Copy, Clone)]
 pub enum FactType {
-    Constant,
-    ConstantSV,
     Variable,
-    VariableSV,
+    StateVariable,
+    Symbol,
     Type,
     SF,
 }
@@ -110,18 +109,19 @@ impl Into<std::fmt::Error> for FactBaseError {
 pub struct FactBase {
     ///List of constants and their value
     ///Example: number_room = 3
-    constants: HashMap<SymId, Option<Sym>>,
+    //constants: HashMap<SymId, Option<Sym>>,
     ///List of constants predicates and their value
     ///Example: door(rooma,roomb)= true
-    constants_sf: HashMap<Vec<SymId>, Sym>,
+    //constants_sf: HashMap<Vec<SymId>, Sym>,
     ///List of variables
     /// Example: counter_step = 3
-    variables: HashMap<SymId, Option<Sym>>,
+    variables: HashMap<SymId, (Option<Sym>, bool)>,
     /// List of variable state function
     /// loc(robota) = kitchen
-    variable_sf: HashMap<Vec<SymId>, Sym>,
+    state_variables: HashMap<Vec<SymId>, (Sym,bool)>,
     ///Contains all the symbols defined with let. A fact can have as a value an other symbol or an integer (or boolean) value.
     symbol_table: CustomSymbolTable,
+    //TODO: Use the same structs HashMap for const and var, but add a bool
 }
 
 impl FactBase {
@@ -150,46 +150,36 @@ impl FactBase {
             string.push_str("))\n");
         }
         //Define all constants variables
-        for (constant_id, value) in self.constants.clone() {
+        for (constant_id, value) in self.variables.clone() {
             let sym = self.symbol_table.get_sym(&constant_id)?;
             let type_id = self.symbol_table.get_type(&constant_id);
             let sym_type = self.get_sym(&type_id)?;
-            string.push_str(format!("(let (const var {} - {}",sym, sym_type).as_str());
-            match value {
-                Some(s) => string.push_str(format!("= {} ))\n ", s).as_str()),
+            string.push_str("(let (");
+            if value.1 {
+                string.push_str("const ");
+            }
+            string.push_str(format!("var {} - {}",sym, sym_type).as_str());
+            match value.0 {
+                Some(v) => {
+                    string.push_str(format!("= {} ))\n ", v).as_str())
+                },
                 None => string.push_str("))\n")
             };
 
         }
-        //Define all the variables
-        for (var_id, value) in self.variables.clone() {
-            let sym = self.symbol_table.get_sym(&var_id)?;
-            let type_id = self.symbol_table.get_type(&var_id);
-            let sym_type = self.get_sym(&type_id)?;
-            string.push_str(format!("(let (var {} - {}",sym, sym_type).as_str());
-            match value {
-                Some(s) => string.push_str(format!("= {} )) \n", s).as_str()),
-                None => string.push_str("))\n")
-            };
-        }
         //Define all const predicates
-        for (params_id, value) in self.constants_sf.clone() {
-            string.push_str("(let (const sv ");
-            for param_id in params_id {
-                string.push_str(self.get_sym(&param_id)?.as_str());
-                string.push(' ');
-            }
-            string.push_str(value.as_str());
-            string.push_str("))\n");
-        }
         //Define state variables
-        for (params_id, value) in self.variable_sf.clone() {
-            string.push_str("(let (sv ");
+        for (params_id, value) in self.state_variables.clone() {
+            string.push_str("(let ( ");
+            if value.1 {
+                string.push_str("const ");
+            }
+            string.push_str("sv ");
             for param_id in params_id {
                 string.push_str(self.get_sym(&param_id)?.as_str());
                 string.push(' ');
             }
-            string.push_str(value.as_str());
+            string.push_str(value.0.as_str());
             string.push_str("))\n");
         }
         //Define all the state variables
@@ -202,9 +192,7 @@ impl FactBase {
 impl FactBase {
     pub fn new(&mut self) -> Self {
         FactBase {
-            constants: Default::default(),
-            constants_sf: Default::default(),
-            variable_sf: Default::default(),
+            state_variables: Default::default(),
             variables: Default::default(),
             symbol_table: Default::default(),
         }
@@ -265,7 +253,9 @@ impl FactBase {
         // We can set a state variable or a variable
         // The constants and invariants of a world cannot be change and will raise an error.
         let sym: Sym = fact.pop_atom()?.as_str().into();
-        let _id = self.symbol_table.ids.get(&sym);
+
+        let id = self.symbol_table.get_sym_id(&sym)?;
+        let ft = self.symbol_table.get_fact_type(&id);
         Ok(FactBaseOk::Ok)
     }
 
@@ -332,6 +322,7 @@ impl FactBase {
 
     ///Add a new constant
     ///can be a symbol, a variable or a state variable
+    /// TODO:Add type inference
     pub fn add_var(&mut self, mut var: ListIter, is_const: bool) -> FactBaseResult {
         /* To define a const var we need a name for the symbol, a type and a value
           An example to define a variable:
@@ -386,12 +377,8 @@ impl FactBase {
 
         let sym_id = self
             .symbol_table
-            .add_symbol(name, option_type_id, FactType::Constant);
-        if is_const {
-            self.constants.insert(sym_id, value);
-        } else {
-            self.variables.insert(sym_id, value);
-        }
+            .add_symbol(name, option_type_id, FactType::Variable);
+        self.variables.insert(sym_id, (value, is_const));
 
         Ok(FactBaseOk::Ok)
     }
@@ -436,11 +423,8 @@ impl FactBase {
                 value = param
             }
         }
-        if is_const {
-            self.constants_sf.insert(params_id, value);
-        } else {
-            self.variable_sf.insert(params_id, value);
-        }
+
+        self.state_variables.insert(params_id, (value, is_const));
 
         Ok(FactBaseOk::Ok)
     }
@@ -457,8 +441,8 @@ impl FactBase {
         let type_id = self.symbol_table.get_sym_id(&_type)?;
         let sym_id = self
             .symbol_table
-            .add_symbol(sym, Some(type_id), FactType::Constant);
-        self.constants.insert(sym_id, None);
+            .add_symbol(sym, Some(type_id), FactType::Symbol);
+        self.variables.insert(sym_id, (None, true));
         Ok(FactBaseOk::Ok)
     }
 
@@ -478,44 +462,6 @@ impl FactBase {
 impl Display for FactBase {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         let mut r = String::new();
-        r.push_str("\n#Constants: ");
-        if !self.constants.is_empty() {
-            r.push('\n');
-            for (id, value) in &self.constants {
-                let constant= self.get_sym(id).unwrap();
-                let type_id =self.symbol_table.get_type(id);
-                let sym_type = self.get_sym(&type_id).unwrap();
-                r.push_str(format!("-{}({})", constant, sym_type).as_str());
-                match value {
-                    None => {}
-                    Some(s) => r.push_str(format!(" = {}", s).as_str())
-                };
-                r.push('\n');
-            }
-        } else {
-            r.push_str(EMPTY);
-        }
-        r.push_str("\n#Constants predicates: ");
-        if !self.constants_sf.is_empty() {
-            r.push('\n');
-            for (params, value) in &self.constants_sf {
-                let params = params.clone();
-                let mut params: Vec<Sym> = params
-                    .iter()
-                    .map(|&id| self.symbol_table.symbols[usize::from(id)].clone())
-                    .collect();
-                r.push_str(format!("-{}[", params.remove(0)).as_str());
-                for (index, param) in params.iter().enumerate() {
-                    if index > 0 {
-                        r.push(',');
-                    }
-                    r.push_str(param.as_str());
-                }
-                r.push_str(format!("] = {}\n", value).as_str());
-            }
-        } else {
-            r.push_str(EMPTY);
-        }
         r.push_str("\n#Variables: ");
         if !self.variables.is_empty() {
             r.push('\n');
@@ -524,19 +470,22 @@ impl Display for FactBase {
                 let type_id = self.symbol_table.get_type(id);
                 let sym_type = self.get_sym(&type_id).unwrap();
                 r.push_str(format!("-{}({})", var, sym_type).as_str());
-                match value {
+                match &value.0 {
                     None => {}
                     Some(s) => r.push_str(format!(" = {}", s).as_str())
                 };
+                if value.1 {
+                    r.push_str(" (const)")
+                }
                 r.push('\n');
             }
         } else {
             r.push_str(EMPTY);
         }
         r.push_str("\n#Variable predicates: ");
-        if !self.variable_sf.is_empty() {
+        if !self.state_variables.is_empty() {
             r.push('\n');
-            for (params, value) in &self.variable_sf {
+            for (params, value) in &self.state_variables {
                 let params = params.clone();
                 let mut params: Vec<Sym> = params
                     .iter()
@@ -549,7 +498,11 @@ impl Display for FactBase {
                     }
                     r.push_str(param.as_str());
                 }
-                r.push_str(format!("] = {}\n", value).as_str());
+                r.push_str(format!("]={}", value.0).as_str());
+                if value.1 {
+                    r.push_str("  (const)");
+                }
+                r.push('\n');
             }
         } else {
             r.push_str(EMPTY);

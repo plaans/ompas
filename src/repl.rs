@@ -1,7 +1,7 @@
 #[warn(unused_imports)]
 use crate::facts::{FactBase, FactBaseError};
 use crate::facts::commands::*;
-use aries_planning::parsing::sexpr::{parse, SAtom, SExpr};
+use aries_planning::parsing::sexpr::{parse, SExpr};
 use aries_utils::input::{ErrLoc, Input};
 use std::fmt::{Display, Formatter};
 use std::io::{self, Write, Read, Error};
@@ -138,9 +138,9 @@ impl Repl {
                 self.commands.push(s.clone());
                 Ok(ReplOk::SExpr(s))
             }
-            Err(e) => Err(ReplError::FactBaseError(FactBaseError::Default(
+            Err(e) => Err(ReplError::Default(
                 format!("Error in command: {}", e.to_string()).to_string(),
-            ))),
+            )),
         }
     }
 
@@ -156,7 +156,7 @@ impl Repl {
                 .ok_or_else(|| current.invalid("Expected a command list"))?;
             //TODO: unify the print in the print function of repl
             let result  = match command.pop_atom()?.as_str() {
-                COMMAND_DEFINE => self.fact_base.add_new_fact(command),
+                COMMAND_DEFINE => self.fact_base.add_fact(command),
                 COMMAND_MODIFY => self.fact_base.set_fact(command),
                 COMMAND_GET => self.fact_base.get_fact(command),
                 COMMAND_PRINT => {
@@ -218,7 +218,7 @@ impl Repl {
             };
 
             match result {
-                Ok(_s) => {}
+                Ok(ok) => println!("{}", ok),
                 Err(e) => println!("{}", e)
             }
         }

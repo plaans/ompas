@@ -10,6 +10,7 @@ pub const TYPE_INT_ID: usize = 0;
 pub const TYPE_BOOL_ID: usize = 1;
 pub const TYPE_OBJECT_ID: usize = 2;
 
+
 pub struct CustomSymbolTable {
     /// Set of state functions.
     /// A state function is a symbol that match a state function.
@@ -17,6 +18,8 @@ pub struct CustomSymbolTable {
     pub state_funs: HashMap<SymId, CustomStateFun>,
     /// Set of types.
     pub types: HashMap<SymId, Sym>,
+    ///
+    pub objects: HashMap<SymId, Sym>,
     ///Set of symbols that have been defined. We can access them with the SymId.
     pub symbols: Vec<Sym>,
     /// Match a symbol to an idea.
@@ -50,18 +53,15 @@ impl Default for CustomSymbolTable {
             state_funs: Default::default(),
             types: Default::default(),
             symbols: vec![],
+            objects: Default::default(),
             ids: Default::default(),
             symbol_types: Default::default(),
             symbol_fact_type: Default::default(),
         };
-        let int_id: usize = st.add_symbol(SAtom::new(INT), None, FactType::Type).into();
-        let bool_id: usize = st
-            .add_symbol(SAtom::new(BOOLEAN), None, FactType::Type)
-            .into();
-        let object_id: usize = st
-            .add_symbol(SAtom::new(OBJECT), None, FactType::Type)
-            .into();
-        if int_id != TYPE_INT_ID || bool_id != TYPE_BOOL_ID || object_id != TYPE_OBJECT_ID {
+        let int_id = st.add_symbol(SAtom::new(INT), None, FactType::Type);
+        let bool_id = st.add_symbol(SAtom::new(BOOLEAN), None, FactType::Type);
+        let object_id = st.add_symbol(SAtom::new(OBJECT), None, FactType::Type);
+        if int_id != SymId::from(TYPE_INT_ID) || bool_id != SymId::from(TYPE_BOOL_ID) || object_id != SymId::from(TYPE_OBJECT_ID) {
             panic!("Error in CustomSymbolTable")
         }
 
@@ -72,18 +72,37 @@ impl Default for CustomSymbolTable {
 impl Display for CustomSymbolTable {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         let mut r = String::new();
-        r.push_str("\n\t#types: ");
+        r.push_str("\n##Symbol Table##\n");
+        r.push_str("\n#TYPES: ");
         if !self.types.is_empty() {
-            for k in self.types.keys() {
-                r.push_str(format!("\n\t-{}", self.symbols[*k]).as_str());
+            r.push('\n');
+            for ty in &self.types {
+                r.push_str(format!("-{}", ty.1).as_str());
+                match self.get_type_id(ty.0) {
+                    Some(ty_id)=> r.push_str(format!("({})\n", self.get_type(&ty_id).to_string()).as_str()),
+                    _ => r.push('\n')
+                };
             }
         } else {
             r.push_str(EMPTY);
         }
-        r.push_str("\n\t#State Function: ");
+
+        r.push_str("\n#OBJECTS: ");
+        if !self.objects.is_empty() {
+            r.push('\n');
+            for obj in &self.objects {
+                let type_id = self.get_type_id(obj.0).unwrap();
+                let sym_type = self.get_sym(&type_id).unwrap();
+                r.push_str(format!("-{}({})\n", obj.1, sym_type).as_str());
+            }
+        } else {
+            r.push_str(EMPTY);
+        }
+        r.push_str("\n#STATE-FUNCTION: ");
         if !self.state_funs.is_empty() {
+            r.push('\n');
             for k in self.state_funs.values() {
-                r.push_str(format!("\n\t-{}", self.symbols[k.sym]).as_str());
+                r.push_str(format!("-{}", self.symbols[k.sym]).as_str());
                 r.push('[');
                 let mut counter = 0;
                 let max = k.tpe.len() - 2;
@@ -96,6 +115,7 @@ impl Display for CustomSymbolTable {
                 }
                 r.push_str("] <- ");
                 r.push_str(self.symbols[k.tpe[k.tpe.len() - 1]].as_str());
+                r.push('\n');
             }
         } else {
             r.push_str(EMPTY);
@@ -111,11 +131,15 @@ impl CustomSymbolTable {
         self.symbols.push(sym.clone());
         self.ids.insert(sym.clone(), sym_id);
         self.symbol_fact_type.insert(sym_id, ft.clone());
-        self.symbol_types
-            .insert(sym_id, _type.unwrap_or(SymId::from(0)));
-        if ft == FactType::Type {
-            self.types.insert(sym_id, sym.clone());
-        }
+        match _type {
+            None => {}
+            Some(t) =>  {self.symbol_types.insert(sym_id, t);}
+        };
+        match ft {
+            FactType::Type => {self.types.insert(sym_id, sym.clone());},
+            FactType::Object => {self.objects.insert(sym_id, sym.clone());},
+            _ => {}
+        };
         sym_id
     }
 }
@@ -133,8 +157,11 @@ impl CustomSymbolTable {
         Ok(self.symbols[*sym_id].clone())
     }
 
-    pub fn get_type_id(&self, sym_id: &SymId) -> SymId {
-        self.symbol_types.get(sym_id).unwrap().clone()
+    pub fn get_type_id(&self, sym_id: &SymId) -> Option<SymId> {
+        match self.symbol_types.get(sym_id) {
+            None => None,
+            Some(s) => Some(*s)
+        }
     }
 
     pub fn get_fact_type(&self, sym_id: &SymId) -> FactType {
@@ -186,8 +213,6 @@ impl CustomSymbolTable {
                 }
             }
             _ => {
-                //println!("is an object");
-                //TODO: define a way to declare new symbols
                 let sym_id = self.ids[value];
                 let sym_type = self
                     .symbol_types

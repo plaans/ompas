@@ -9,7 +9,29 @@ use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io::{self, Error, Read, Write};
 
-///Set of commands for the repl of the FACTBASE
+const STR_HELP:&str =
+"FactBase version 0.1.0
+Commands:
+-((hist))                       : Print a list of all commands.
+-((get-all))                    : Print all the fact-base in a pretty way.
+-((close)) | ((exit))           : Exit the repl.
+-((path))                       : Print the current repository.
+-((read x))                     : Read a factbase from a file x.fb.
+-((write x))                    : Write factbase to file x.fb.
+-((let (type t)))               : Define a new type.
+-((let (object o - t)))         : Define a new object of type t.
+-((let (pred sv t1 ... tn tv))) : Define a new predicate with n parmeters types and a value type.
+-((let (const{optional}         : Define a new var with a type and a value of the right type.
+        var x - type{optional}    Can be a constant.
+        = value{optional})))
+-((let (const{optional}         : Define a new state-variable with n parameters and a value.
+        sv n_sv p1...pn value)))  Types must match with predicate types.
+-((get (x)))                    : get a fact
+-((set (var value)))            : set a variable with a new value, must be previously defined.
+-((set (n_sv p1...pn value)))   : set a state-variable with a new value, must be previously defined";
+
+
+
 
 #[warn(unused_attributes)]
 pub struct Repl {
@@ -71,7 +93,7 @@ impl Display for ReplOk {
         match self {
             ReplOk::SExpr(s) => write!(f, "{}", s),
             ReplOk::Exit => write!(f, "EXIT REPL"),
-            ReplOk::Ok => write!(f, "OK"),
+            ReplOk::Ok => write!(f, "Ok"),
             ReplOk::String(s) => write!(f, "{}", s),
         }
     }
@@ -152,30 +174,28 @@ impl Repl {
             let mut command = current
                 .as_list_iter()
                 .ok_or_else(|| current.invalid("Expected a command list"))?;
-            //TODO: unify the print in the print function of repl
             let result = match command.pop_atom()?.as_str() {
                 COMMAND_DEFINE => self.fact_base.add_fact(command),
                 COMMAND_MODIFY => self.fact_base.set_fact(command),
                 COMMAND_GET => self.fact_base.get_fact(command),
                 COMMAND_PRINT => {
-                    println!("print the sexpr");
+                    //println!("print the sexpr");
                     Ok(FactBaseOk::Ok)
                 }
                 COMMAND_HELP => {
-                    println!("print help");
+                    //println!("print help");
                     Ok(help()?.into())
                 }
                 COMMAND_CLOSE | COMMAND_EXIT => {
-                    println!("quit repl");
+                    //println!("quit repl");
                     return Ok(ReplOk::Exit);
                 }
                 COMMAND_GET_ALL => {
-                    println!("{}", self.fact_base);
-                    Ok(FactBaseOk::Ok)
+                    Ok(FactBaseOk::String(self.fact_base.to_string()))
                 }
 
                 COMMAND_READ => {
-                    println!("get fact base from file");
+                   // println!("get fact base from file");
                     let file_name = command.pop_atom()?.as_str();
                     let file_name = format!("{}.{}", file_name, FILE_EXTENSION);
                     let mut file = File::open(file_name)?;
@@ -217,7 +237,7 @@ impl Repl {
             };
 
             match result {
-                Ok(ok) => println!("{}", ok),
+                Ok(ok) => self.print(ok.into()),
                 Err(e) => println!("{}", e),
             }
         }
@@ -225,8 +245,12 @@ impl Repl {
         Ok(evaluation)
     }
 
-    fn print(&self, s: SExpr) {
-        println!("{}", s);
+    fn print(&self, s: ReplOk) {
+        match s {
+            ReplOk::Ok => {},
+            _ => println!("{}",s)
+
+        };
     }
 
     pub fn run(&mut self) {
@@ -235,7 +259,6 @@ impl Repl {
             let command = self.read();
             match command {
                 Ok(ReplOk::SExpr(se)) => match self.eval(se) {
-                    Ok(ReplOk::SExpr(se)) => self.print(se),
                     Ok(ReplOk::Exit) => run = false,
                     Err(e) => println!("{}", e),
                     _ => {}
@@ -248,8 +271,5 @@ impl Repl {
 }
 
 fn help() -> ReplResult {
-    //TODO: complete the help for the repl
-    Ok(ReplOk::SExpr(SExpr::Atom(
-        "This is the help of the repl".to_string().into(),
-    )))
+    Ok(ReplOk::String(STR_HELP.to_string()))
 }

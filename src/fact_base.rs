@@ -306,35 +306,17 @@ impl FactBase {
             FactType::SF => {
                 //println!("Setting a state variable");
                 let mut sv: Vec<Sym> = vec![name_sym];
-                let mut value: Sym = Sym::from("");
                 let sf = self.get_sf(&sym_id);
-                let n_type = sf.tpe.len();
-                if fact.len() == n_type {
-                    let mut counter = 0;
-                    while !fact.is_empty() {
-                        let mut param_sym: Sym = fact.pop_atom()?.as_str().into();
-                        self.check_value_and_type(&mut param_sym, &sf.tpe[counter])?;
-                        if counter == n_type - 1 {
-                            value = param_sym;
-                        } else {
-                            sv.push(param_sym);
-                        }
-                        counter += 1;
-                    }
-                    let is_const = match self.is_const_state_variable(&sv) {
-                        Ok(v) => v,
-                        Err(_) => return Err(UndefinedEntry(vec_sym_to_string(sv))),
-                    };
-                    if !is_const {
-                        self.set_value_state_variable(sv, FactBaseValue(Some(value), false));
-                    } else {
-                        return Err(ChangingInvariant(vec_sym_to_string(sv)));
-                    }
+                self.check_value_and_type_sv(fact, &sf, &mut sv)?;
+                let is_const = match self.is_const_state_variable(&sv) {
+                    Ok(v) => v,
+                    Err(_) => return Err(UndefinedEntry(vec_sym_to_string(sv))),
+                };
+                let value = sv.pop().unwrap();
+                if !is_const {
+                    self.set_value_state_variable(sv, FactBaseValue(Some(value), false));
                 } else {
-                    return Err(WrongNumberOfArgument(
-                        list_iter_to_string(fact),
-                        sf.tpe.len() as u64,
-                    ));
+                    return Err(ChangingInvariant(vec_sym_to_string(sv)));
                 }
             }
             _ => return Err(ChangingInvariant(name_sym.to_string())),
@@ -359,22 +341,8 @@ impl FactBase {
                 //println!("Getting a state variable");
                 let mut sv: Vec<Sym> = vec![name_sym];
                 let sf = self.get_sf(&sym_id);
-                let n_param = sf.tpe.len() - 1;
-                if fact.len() == n_param {
-                    let mut counter = 0;
-                    while !fact.is_empty() {
-                        let mut param_sym: Sym = fact.pop_atom()?.as_str().into();
-                        self.check_value_and_type(&mut param_sym, &sf.tpe[counter])?;
-                        sv.push(param_sym);
-                        counter += 1;
-                    }
-                    result = self.get_value_state_variable(&sv).0
-                } else {
-                    return Err(WrongNumberOfArgument(
-                        list_iter_to_string(fact),
-                        sf.tpe.len() as u64,
-                    ));
-                }
+                self.check_value_and_type_sv(fact, &sf, &mut sv)?;
+                result = self.get_value_state_variable(&sv).0;
             }
             _ => result = Some(name_sym),
         };
@@ -398,7 +366,6 @@ impl FactBase {
                 //println!("getting a variable");
                 //Verify if the variable is const
                 self.variables.remove_entry(&name_sym);
-                //TODO: Add a function in factbase to delete symbol instead of accessing directly to the symbol table
                 self.delete_symbol(&name_sym)?;
                 return Ok(FactBaseOk::Ok)
             }
@@ -406,25 +373,11 @@ impl FactBase {
                 //println!("Getting a state variable");
                 let mut sv: Vec<Sym> = vec![name_sym];
                 let sf = self.get_sf(&sym_id);
-                let n_param = sf.tpe.len() - 1;
-                if fact.len() == n_param {
-                    let mut counter = 0;
-                    while !fact.is_empty() {
-                        let mut param_sym: Sym = fact.pop_atom()?.as_str().into();
-                        self.check_value_and_type(&mut param_sym, &sf.tpe[counter])?;
-                        sv.push(param_sym);
-                        counter += 1;
-                    }
-                    match self.state_variables.remove_entry(&sv){
-                        None => return Err(FactBaseError::UndefinedEntry("fact was not defined".to_string())),
-                        Some(_) => return Ok(FactBaseOk::Ok)
-                    };
-                } else {
-                    return Err(WrongNumberOfArgument(
-                        list_iter_to_string(fact),
-                        sf.tpe.len() as u64,
-                    ));
-                }
+                self.check_value_and_type_sv(fact, &sf, &mut sv)?;
+                return match self.state_variables.remove_entry(&sv) {
+                    None => Err(FactBaseError::UndefinedEntry("fact was not defined".to_string())),
+                    Some(_) => Ok(FactBaseOk::Ok)
+                };
             }
 
             _ => return Err(FactBaseError::ChangingInvariant(list_iter_to_string(fact)))
@@ -438,7 +391,7 @@ impl FactBase {
 
         let sym_id = self.get_sym_id(&name_sym)?;
         let ft = self.get_fact_type(&sym_id);
-        let mut test_value:Sym = Sym::from("");
+        let mut test_value;
         let real_value;
         match ft {
             FactType::Variable => {
@@ -454,26 +407,9 @@ impl FactBase {
                 //println!("Setting a state variable");
                 let mut sv: Vec<Sym> = vec![name_sym];
                 let sf = self.get_sf(&sym_id);
-                let n_type = sf.tpe.len();
-                if fact.len() == n_type {
-                    let mut counter = 0;
-                    while !fact.is_empty() {
-                        let mut param_sym: Sym = fact.pop_atom()?.as_str().into();
-                        self.check_value_and_type(&mut param_sym, &sf.tpe[counter])?;
-                        if counter == n_type - 1 {
-                            test_value = param_sym;
-                        } else {
-                            sv.push(param_sym);
-                        }
-                        counter += 1;
-                    }
-                    real_value = self.get_value_state_variable(&sv).0;
-                } else {
-                    return Err(WrongNumberOfArgument(
-                        list_iter_to_string(fact),
-                        sf.tpe.len() as u64,
-                    ));
-                }
+                self.check_value_and_type_sv(fact, &sf, &mut sv)?;
+                test_value = sv.last().unwrap().clone();
+                real_value = self.get_value_state_variable(&sv).0;
             }
             _ => return Err(ChangingInvariant(name_sym.to_string())),
         };
@@ -663,8 +599,6 @@ impl FactBase {
         if self.symbol_table.is_symbol_defined(&predicate_name) {
             let predicate_id = self.symbol_table.get_sym_id(&predicate_name)?;
             let mut sv: Vec<Sym> = vec![predicate_name.clone()];
-            let mut value: Sym = Sym::from("");
-
             if !(self.symbol_table.get_fact_type(&predicate_id) == FactType::SF) {
                 return Err(FactBaseError::WrongType(
                     predicate_name.to_string(),
@@ -673,17 +607,8 @@ impl FactBase {
             }
             let sf = self.get_sf(&predicate_id);
             //for each parameter we have to check if the type is good.
-            for (index, type_id) in sf.tpe.iter().enumerate() {
-                let mut param: Sym = state_var.pop_atom()?.into();
-                self.check_value_and_type(&mut param, type_id)?;
-
-                if index < sf.tpe.len() - 1 {
-                    sv.push(param);
-                } else {
-                    value = param
-                }
-            }
-
+            self.check_value_and_type_sv(state_var, &sf, &mut sv)?;
+            let value = sv.pop().unwrap();
             self.state_variables
                 .insert(sv, FactBaseValue(Some(value), is_const));
         }
@@ -700,6 +625,7 @@ impl FactBase {
                 params.push(param);
             }
 
+            //Construct list iter to add new predicate and new state variable
             let mut string = String::new();
             string.push_str(format!("({}", predicate_name).as_str());
             for sym_type in types {
@@ -794,6 +720,7 @@ impl FactBase {
         Ok(self.get_value_state_variable(params).1)
     }
 
+    #[allow(dead_code)]
     fn is_value_of_type(&self, value: &Sym, type_id: &SymId) -> bool {
         self.symbol_table.is_value_of_type(value, type_id)
     }
@@ -844,15 +771,13 @@ impl FactBase {
         }
     }
 
-    fn check_value_and_type_sv(&self, &mut fact: ListIter, sf: &CustomStateFun, ) -> Result<Vec<Sym>, FactBaseError> {
-        let mut sv:Vec<Sym> = Vec::new();
+    fn check_value_and_type_sv(&self, mut fact: ListIter, sf: &CustomStateFun, sv: &mut Vec<Sym>) -> Result<(), FactBaseError> {
         let n_type = sf.tpe.len();
         if fact.len() == n_type {
             for type_id in &sf.tpe {
                 let mut param_sym: Sym = fact.pop_atom()?.as_str().into();
                 self.check_value_and_type(&mut param_sym, type_id)?;
                 sv.push(param_sym);
-                counter += 1;
             }
         } else {
             return Err(WrongNumberOfArgument(
@@ -860,7 +785,7 @@ impl FactBase {
                 sf.tpe.len() as u64,
             ));
         }
-        Ok(sv)
+        Ok(())
     }
 
     fn infer_type(&self, sym: &Sym) -> Result<Option<SymId>, FactBaseError> {
@@ -895,7 +820,7 @@ impl FactBase {
 ///Deletters
 impl FactBase {
     fn delete_symbol(&mut self, sym: &Sym) -> FactBaseResult {
-        self.symbol_table.delete_symbol(&name_sym)
+        self.symbol_table.delete_symbol(sym)
     }
 }
 

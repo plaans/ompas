@@ -1,5 +1,5 @@
 use crate::fact_base::language::{BOOLEAN, FALSE, INT, OBJECT, TRUE};
-use crate::fact_base::{FactBaseError, FactType, EMPTY};
+use crate::fact_base::{FactBaseError, FactType, EMPTY, FactBaseResult, FactBaseOk};
 use aries_model::symbols::SymId;
 use aries_planning::parsing::sexpr::SAtom;
 use aries_utils::input::Sym;
@@ -18,7 +18,7 @@ pub struct CustomSymbolTable {
     pub state_funs: HashMap<SymId, CustomStateFun>,
     /// Set of types.
     pub types: HashMap<SymId, Sym>,
-    ///
+    ///objects of the problem with a type
     pub objects: HashMap<SymId, Sym>,
     ///Set of symbols that have been defined. We can access them with the SymId.
     pub symbols: Vec<Sym>,
@@ -141,6 +141,14 @@ impl CustomSymbolTable {
             _ => {}
         };
         sym_id
+    }
+
+    pub fn delete_symbol(&mut self, sym : &Sym) -> FactBaseResult {
+        let sym_id = self.ids.remove(sym).unwrap();
+        self.symbols.remove(usize::from(sym_id));
+        self.symbol_types.remove(&sym_id);
+        self.symbol_fact_type.remove(&sym_id);
+        Ok(FactBaseOk::Ok)
     }
 }
 

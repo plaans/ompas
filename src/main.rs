@@ -5,6 +5,9 @@ use std::path::{Path, PathBuf};
 #[warn(unused_imports)]
 use structopt::StructOpt;
 
+
+//TODO: write README of the project
+
 #[derive(Debug, StructOpt)]
 #[structopt(
     name = "FactBase",

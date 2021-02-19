@@ -153,7 +153,7 @@ impl Repl {
         stdin
             .read_line(&mut buffer)
             .expect("Something went wrong..");
-        match parse(Input::from_string(buffer)) {
+        match parse(buffer.as_str()) {
             Ok(s) => {
                 self.commands.push(s.clone());
                 Ok(ReplOk::SExpr(s))
@@ -178,6 +178,8 @@ impl Repl {
                 COMMAND_DEFINE => self.fact_base.add_fact(command),
                 COMMAND_MODIFY => self.fact_base.set_fact(command),
                 COMMAND_GET => self.fact_base.get_fact(command),
+                COMMAND_DEL => self.fact_base.del_fact(command),
+                COMMAND_TEST => self.fact_base.test_fact(command),
                 COMMAND_PRINT => {
                     //println!("print the sexpr");
                     Ok(FactBaseOk::Ok)

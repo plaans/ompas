@@ -6,12 +6,10 @@ use crate::fact_base::FactBaseError::{
 };
 use anyhow::*;
 use aries_model::symbols::SymId;
-use aries_planning::parsing::sexpr::{ListIter, SExpr, parse, SList};
-use aries_utils::input::{ErrLoc, Sym, Input, Span};
+use aries_planning::parsing::sexpr::{ListIter, SExpr, parse};
+use aries_utils::input::{ErrLoc, Sym};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
-use std::sync::Arc;
-use std::convert::TryFrom;
 
 
 pub const EMPTY: &str = "empty\n";
@@ -46,6 +44,8 @@ pub mod commands {
     pub const COMMAND_MODIFY: &str = "set";
     pub const COMMAND_GET: &str = "get";
     pub const COMMAND_PRINT: &str = "print";
+    pub const COMMAND_DEL : &str = "del";
+    pub const COMMAND_TEST: &str = "test";
 
     pub const COMMAND_EXIT: &str = "exit";
     pub const COMMAND_CLOSE: &str = "close";
@@ -154,8 +154,17 @@ impl FactBase {
         string.push('(');
 
         //Define all the types
-        for types in self.symbol_table.types.clone() {
-            string.push_str(format!("(let (type {}))\n", types.1).as_str())
+        let mut vec_types:Vec<_> = self.symbol_table.types.iter().collect();
+        vec_types.sort_by(|&x,&y| x.0.cmp(y.0));
+        for types in vec_types {
+            match usize::from(*types.0) {
+                TYPE_INT_ID | TYPE_BOOL_ID | TYPE_OBJECT_ID => {}
+                _ => {
+                    let sym_type = self.get_sym(&self.get_type_id(types.0).unwrap()).unwrap();
+                    string.push_str(format!("(let (type {} - {}))\n", types.1, sym_type).as_str());
+                }
+            }
+
         }
         //Define the predicates
         for pred in self.symbol_table.state_funs.clone() {
@@ -215,6 +224,7 @@ impl FactBase {
 
 ///Fact functions
 impl FactBase {
+    ///Create a new factbase with its default values
     pub fn new(&mut self) -> Self {
         FactBase {
             state_variables: Default::default(),
@@ -222,7 +232,8 @@ impl FactBase {
             symbol_table: Default::default(),
         }
     }
-
+    ///Add a fact to the fact base.
+    /// A fact can be a type, a symbol, a state-function (state-variable template), a variable or a state-variable
     pub fn add_fact(&mut self, mut fact: ListIter) -> FactBaseResult {
         //print!("evaluating which kind of fact we want to add...");
         let mut fact = fact.pop_list()?.iter();
@@ -257,7 +268,7 @@ impl FactBase {
                 self.add_object(fact)
             }
             s => {
-                return Err(FactBaseError::UndefinedEntry(s.to_string()))
+                return Err(FactBaseError::MissExpectedSymbol(s.to_string(),"a FactType (var, sv, const, symbol...)".to_string()))
             }
         }
         /*let mut key: Vec<_> = vec![];
@@ -268,6 +279,7 @@ impl FactBase {
         self.fact_base.add(key, value);*/
     }
 
+    ///Set the value of a previously defined fact. The fact must be mutable (i.e not defined as const)
     pub fn set_fact(&mut self, mut fact: ListIter) -> FactBaseResult {
         // We can set a state variable or a variable
         // The constants and invariants of a world cannot be change and will raise an error.
@@ -330,6 +342,7 @@ impl FactBase {
         Ok(FactBaseOk::Ok)
     }
 
+    ///Get the value of a defined fact.
     pub fn get_fact(&self, mut fact: ListIter) -> FactBaseResult {
         let result: Option<Sym>;
         let mut fact = fact.pop_list()?.iter();
@@ -355,10 +368,7 @@ impl FactBase {
                         sv.push(param_sym);
                         counter += 1;
                     }
-                    match self.get_value_state_variable(&sv) {
-                        Ok(v) => result = v.0,
-                        Err(_) => return Err(FactBaseError::UndefinedEntry(vec_sym_to_string(sv))),
-                    };
+                    result = self.get_value_state_variable(&sv).0
                 } else {
                     return Err(WrongNumberOfArgument(
                         list_iter_to_string(fact),
@@ -372,6 +382,109 @@ impl FactBase {
             None => Ok(FactBaseOk::String("None".to_string())),
             Some(r) => Ok(FactBaseOk::String(r.to_string())),
         }
+    }
+
+    ///Delete a fact as a state variable or a variable. Cannot delete a symbol or a state function.
+    pub fn del_fact(&mut self, mut fact: ListIter) -> FactBaseResult {
+        //println!("del fact");
+        //TODO: reconstruct the fact to have an explicit error
+        //TODO: Add an error when trying to deleter a const
+        let mut fact = fact.pop_list()?.iter();
+        let name_sym = fact.pop_atom()?.as_str().into();
+        let sym_id = self.get_sym_id(&name_sym)?;
+        let ft = self.get_fact_type(&sym_id);
+        match ft {
+            FactType::Variable => {
+                //println!("getting a variable");
+                //Verify if the variable is const
+                self.variables.remove_entry(&name_sym);
+                //TODO: Add a function in factbase to delete symbol instead of accessing directly to the symbol table
+                self.delete_symbol(&name_sym)?;
+                return Ok(FactBaseOk::Ok)
+            }
+            FactType::SF => {
+                //println!("Getting a state variable");
+                let mut sv: Vec<Sym> = vec![name_sym];
+                let sf = self.get_sf(&sym_id);
+                let n_param = sf.tpe.len() - 1;
+                if fact.len() == n_param {
+                    let mut counter = 0;
+                    while !fact.is_empty() {
+                        let mut param_sym: Sym = fact.pop_atom()?.as_str().into();
+                        self.check_value_and_type(&mut param_sym, &sf.tpe[counter])?;
+                        sv.push(param_sym);
+                        counter += 1;
+                    }
+                    match self.state_variables.remove_entry(&sv){
+                        None => return Err(FactBaseError::UndefinedEntry("fact was not defined".to_string())),
+                        Some(_) => return Ok(FactBaseOk::Ok)
+                    };
+                } else {
+                    return Err(WrongNumberOfArgument(
+                        list_iter_to_string(fact),
+                        sf.tpe.len() as u64,
+                    ));
+                }
+            }
+
+            _ => return Err(FactBaseError::ChangingInvariant(list_iter_to_string(fact)))
+        };
+    }
+
+    pub fn test_fact(&self, mut fact: ListIter) -> FactBaseResult{
+        println!("testing a fact");
+        let mut fact = fact.pop_list()?.iter();
+        let name_sym: Sym = fact.pop_atom()?.as_str().into();
+
+        let sym_id = self.get_sym_id(&name_sym)?;
+        let ft = self.get_fact_type(&sym_id);
+        let mut test_value:Sym = Sym::from("");
+        let real_value;
+        match ft {
+            FactType::Variable => {
+                //println!("setting a variable");
+                //Verify if the variable is const
+                let type_id = self.get_type_id(&sym_id).unwrap();
+                //Verify the type of the value
+                test_value = fact.pop_atom()?.as_str().into();
+                self.check_value_and_type(&mut test_value, &type_id)?;
+                real_value = self.get_value_variable(&name_sym).0;
+            }
+            FactType::SF => {
+                //println!("Setting a state variable");
+                let mut sv: Vec<Sym> = vec![name_sym];
+                let sf = self.get_sf(&sym_id);
+                let n_type = sf.tpe.len();
+                if fact.len() == n_type {
+                    let mut counter = 0;
+                    while !fact.is_empty() {
+                        let mut param_sym: Sym = fact.pop_atom()?.as_str().into();
+                        self.check_value_and_type(&mut param_sym, &sf.tpe[counter])?;
+                        if counter == n_type - 1 {
+                            test_value = param_sym;
+                        } else {
+                            sv.push(param_sym);
+                        }
+                        counter += 1;
+                    }
+                    real_value = self.get_value_state_variable(&sv).0;
+                } else {
+                    return Err(WrongNumberOfArgument(
+                        list_iter_to_string(fact),
+                        sf.tpe.len() as u64,
+                    ));
+                }
+            }
+            _ => return Err(ChangingInvariant(name_sym.to_string())),
+        };
+        match real_value {
+            None => Ok(FactBaseOk::String(FALSE.to_string())),
+            Some(rv) => match rv == test_value {
+                true => Ok(FactBaseOk::String(TRUE.to_string())),
+                false => Ok(FactBaseOk::String(FALSE.to_string()))
+            }
+        }
+
     }
 
     //ADDERS
@@ -545,7 +658,6 @@ impl FactBase {
     }
 
     pub fn add_state_var(&mut self, mut state_var: ListIter, is_const: bool) -> FactBaseResult {
-        //TODO: Support undefined state var and infer types.
 
         let predicate_name: Sym = state_var.pop_atom()?.into();
         if self.symbol_table.is_symbol_defined(&predicate_name) {
@@ -562,13 +674,8 @@ impl FactBase {
             let sf = self.get_sf(&predicate_id);
             //for each parameter we have to check if the type is good.
             for (index, type_id) in sf.tpe.iter().enumerate() {
-                let param: Sym = state_var.pop_atom()?.into();
-                if !self.is_value_of_type(&param, type_id) {
-                    return Err(FactBaseError::WrongType(
-                        param.to_string(),
-                        self.get_sym(type_id).unwrap().to_string(),
-                    ));
-                }
+                let mut param: Sym = state_var.pop_atom()?.into();
+                self.check_value_and_type(&mut param, type_id)?;
 
                 if index < sf.tpe.len() - 1 {
                     sv.push(param);
@@ -601,6 +708,9 @@ impl FactBase {
             string.push(')');
             let sexpr = parse(string.as_str()).unwrap();
             let list_iter = sexpr.as_list_iter().unwrap();
+            self.add_predicate(list_iter)?;
+
+
             let mut string2 = String::new();
             string2.push_str(format!("({}", predicate_name).as_str());
             for param in params {
@@ -609,10 +719,8 @@ impl FactBase {
             string2.push(')');
             let sexpr2 = parse(string2.as_str()).unwrap();
             let list_iter2 = sexpr2.as_list_iter().unwrap();
-            let sexpr = parse(string.as_str()).unwrap();
-            let list_iter = sexpr.as_list_iter().unwrap();
 
-            self.add_predicate(list_iter)?;
+
             self.add_state_var(list_iter2, is_const)?;
             //define a new predicate
             //Add state var with new predicat
@@ -668,10 +776,10 @@ impl FactBase {
             Some(r) => r.clone(),
         }
     }
-    fn get_value_state_variable(&self, params: &Vec<Sym>) -> Result<FactBaseValue, FactBaseError> {
+    fn get_value_state_variable(&self, params: &Vec<Sym>) -> FactBaseValue {
         match self.state_variables.get(params) {
-            None => Err(FactBaseError::Default),
-            Some(r) => Ok(r.clone()),
+            None => panic!("strong error in get_value_variable: id has no match in FactBase"),
+            Some(r) => r.clone(),
         }
     }
 }
@@ -683,7 +791,7 @@ impl FactBase {
     }
 
     fn is_const_state_variable(&self, params: &Vec<Sym>) -> Result<bool, FactBaseError> {
-        Ok(self.get_value_state_variable(params)?.1)
+        Ok(self.get_value_state_variable(params).1)
     }
 
     fn is_value_of_type(&self, value: &Sym, type_id: &SymId) -> bool {
@@ -708,15 +816,15 @@ impl FactBase {
                     false
                 }
             }
-            Err(_) => match usize::from(*type_id) {
-                0 => {
+            Err(e) => match usize::from(*type_id) {
+                TYPE_INT_ID => {
                     //println!("The symbol {} should be an int", value);
                     match value.clone().as_str().parse::<u64>() {
                         Ok(_) => true,
                         Err(_) => false,
                     }
                 }
-                1 => {
+                TYPE_BOOL_ID => {
                     //println!("The symbol {} should be a boolean", value);
                     match value.clone().as_str() {
                         TRUE | FALSE => true,
@@ -724,7 +832,7 @@ impl FactBase {
                     }
                 }
 
-                _ => false,
+                _ => return Err(e),
             },
         };
         match good_type {
@@ -734,6 +842,25 @@ impl FactBase {
                 self.get_sym(type_id).unwrap().to_string(),
             )),
         }
+    }
+
+    fn check_value_and_type_sv(&self, &mut fact: ListIter, sf: &CustomStateFun, ) -> Result<Vec<Sym>, FactBaseError> {
+        let mut sv:Vec<Sym> = Vec::new();
+        let n_type = sf.tpe.len();
+        if fact.len() == n_type {
+            for type_id in &sf.tpe {
+                let mut param_sym: Sym = fact.pop_atom()?.as_str().into();
+                self.check_value_and_type(&mut param_sym, type_id)?;
+                sv.push(param_sym);
+                counter += 1;
+            }
+        } else {
+            return Err(WrongNumberOfArgument(
+                list_iter_to_string(fact),
+                sf.tpe.len() as u64,
+            ));
+        }
+        Ok(sv)
     }
 
     fn infer_type(&self, sym: &Sym) -> Result<Option<SymId>, FactBaseError> {
@@ -762,6 +889,13 @@ impl FactBase {
 
     fn set_value_state_variable(&mut self, key: Vec<Sym>, value: FactBaseValue) {
         self.state_variables.insert(key, value);
+    }
+}
+
+///Deletters
+impl FactBase {
+    fn delete_symbol(&mut self, sym: &Sym) -> FactBaseResult {
+        self.symbol_table.delete_symbol(&name_sym)
     }
 }
 

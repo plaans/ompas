@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use structopt::StructOpt;
 
 
-//TODO: write README of the project
+//TODO: write README.md of the project
 
 #[derive(Debug, StructOpt)]
 #[structopt(

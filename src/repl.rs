@@ -30,9 +30,6 @@ Commands:
 -((set (var value)))            : set a variable with a new value, must be previously defined.
 -((set (n_sv p1...pn value)))   : set a state-variable with a new value, must be previously defined";
 
-
-
-
 #[warn(unused_attributes)]
 pub struct Repl {
     commands: Vec<SExpr>,

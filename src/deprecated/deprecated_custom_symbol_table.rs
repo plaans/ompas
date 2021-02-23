@@ -3,8 +3,8 @@ use aries_planning::parsing::sexpr::SAtom;
 use aries_utils::input::Sym;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
-use crate::fact_base::{FactType, EMPTY, FactBaseResult, FactBaseOk, FactBaseError};
-use crate::fact_base::language::*;
+use crate::deprecated::deprecated_fact_base::{FactType, EMPTY, FactBaseResult, FactBaseOk, FactBaseError};
+use crate::deprecated::deprecated_fact_base::language::*;
 
 pub const TYPE_INT_ID: usize = 0;
 pub const TYPE_BOOL_ID: usize = 1;

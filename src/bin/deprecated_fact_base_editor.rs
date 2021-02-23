@@ -1,6 +1,6 @@
 use aries_planning::parsing::sexpr::parse;
-use fact_base::repl::test_rustyline;
 use std::collections::HashMap;
+use fact_base::deprecated::deprecated_repl::*;
 use std::path::{Path, PathBuf};
 #[warn(unused_imports)]
 use structopt::StructOpt;
@@ -10,8 +10,8 @@ use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
 #[structopt(
-    name = "FactBase",
-    about = "A fact and belief database inside an acting and planning engine"
+name = "FactBase",
+about = "A fact and belief database inside an acting and planning engine"
 )]
 struct Opt {
     #[structopt(short, long)]
@@ -33,10 +33,9 @@ fn main() {
     //test_lib_model(&opt);
 
     if opt.repl == true {
-        //println!("Fact Base REPL");
-        //let mut repl = Repl::default();
-        //repl.run();
-        test_rustyline();
+        println!("Fact Base REPL");
+        let mut repl = Repl::default();
+        repl.run();
     }
 }
 

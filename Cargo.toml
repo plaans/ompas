@@ -4,6 +4,10 @@ version = "0.1.0"
 authors = ["Yirmandias <turi@etud.insa-toulouse.fr>"]
 edition = "2018"
 
+
+[features]
+deprecated=[]
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -15,3 +19,8 @@ anyhow = "1.0.38"
 rustyline = "7.1.0"
 im = "15.0.0"
 structopt = { version = "0.3", default-features = false }
+
+[[bin]]
+name = "deprecated_fact_base_editor"
+path = "src/bin/deprecated_fact_base_editor.rs"
+required-features = ["deprecated"]

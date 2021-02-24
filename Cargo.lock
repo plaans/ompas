@@ -9,12 +9,12 @@ checksum = "afddf7f520a80dbf76e6f50a35bca42a2331ef227a28b3b6dc5c2e2338d114b1"
 [[package]]
 name = "aries_backtrack"
 version = "0.1.0"
-source = "git+https://github.com/arthur-bit-monnot/aries/#5e33fc62071d4d590c42ce9c0ee6fdb103408c9a"
+source = "git+https://github.com/arthur-bit-monnot/aries/#e220567a6d490cfee68eb4e5c431734b3904fce5"
 
 [[package]]
 name = "aries_collections"
 version = "0.1.0"
-source = "git+https://github.com/arthur-bit-monnot/aries/#5e33fc62071d4d590c42ce9c0ee6fdb103408c9a"
+source = "git+https://github.com/arthur-bit-monnot/aries/#e220567a6d490cfee68eb4e5c431734b3904fce5"
 dependencies = [
  "bit-set",
  "itertools",
@@ -24,12 +24,11 @@ dependencies = [
 [[package]]
 name = "aries_model"
 version = "0.1.0"
-source = "git+https://github.com/arthur-bit-monnot/aries/#5e33fc62071d4d590c42ce9c0ee6fdb103408c9a"
+source = "git+https://github.com/arthur-bit-monnot/aries/#e220567a6d490cfee68eb4e5c431734b3904fce5"
 dependencies = [
  "anyhow",
  "aries_backtrack",
  "aries_collections",
- "aries_sat",
  "aries_utils",
  "streaming-iterator",
 ]
@@ -37,7 +36,7 @@ dependencies = [
 [[package]]
 name = "aries_planning"
 version = "0.1.0"
-source = "git+https://github.com/arthur-bit-monnot/aries/#5e33fc62071d4d590c42ce9c0ee6fdb103408c9a"
+source = "git+https://github.com/arthur-bit-monnot/aries/#e220567a6d490cfee68eb4e5c431734b3904fce5"
 dependencies = [
  "anyhow",
  "aries_collections",
@@ -50,18 +49,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "aries_sat"
-version = "0.1.0"
-source = "git+https://github.com/arthur-bit-monnot/aries/#5e33fc62071d4d590c42ce9c0ee6fdb103408c9a"
-dependencies = [
- "aries_collections",
- "itertools",
-]
-
-[[package]]
 name = "aries_utils"
 version = "0.1.0"
-source = "git+https://github.com/arthur-bit-monnot/aries/#5e33fc62071d4d590c42ce9c0ee6fdb103408c9a"
+source = "git+https://github.com/arthur-bit-monnot/aries/#e220567a6d490cfee68eb4e5c431734b3904fce5"
 dependencies = [
  "itertools",
  "streaming-iterator",
@@ -150,7 +140,7 @@ checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
 [[package]]
 name = "env_param"
 version = "0.1.0"
-source = "git+https://github.com/arthur-bit-monnot/aries/#5e33fc62071d4d590c42ce9c0ee6fdb103408c9a"
+source = "git+https://github.com/arthur-bit-monnot/aries/#e220567a6d490cfee68eb4e5c431734b3904fce5"
 dependencies = [
  "once_cell",
 ]
@@ -269,9 +259,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.5.2"
+version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13bd41f508810a131401606d54ac32a467c97172d74ba7662562ebba5ad07fa0"
+checksum = "4ad167a2f54e832b82dbe003a046280dceffe5227b5f79e08e363a29638cfddd"
 
 [[package]]
 name = "proc-macro-error"

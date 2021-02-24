@@ -1,14 +1,3 @@
-use crate::fact_base::commands::*;
-#[warn(unused_imports)]
-use crate::fact_base::{FactBase, FactBaseError};
-use crate::fact_base::{FactBaseOk, FILE_EXTENSION};
-use aries_planning::parsing::sexpr::{parse, SExpr};
-use aries_utils::input::{ErrLoc, Input};
-use std::env;
-use std::fmt::{Display, Formatter};
-use std::fs::File;
-use std::io::{self, Error, Read, Write};
-
 //imports for rustyline
 use rustyline::error::ReadlineError;
 use rustyline::Editor;

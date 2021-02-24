@@ -18,12 +18,12 @@ Commands:
 -((write x))                    : Write factbase to file x.fb.
 -((let (type t)))               : Define a new type.
 -((let (object o - t)))         : Define a new object of type t.
--((let (pred sv t1 ... tn tv))) : Define a new predicate with n parmeters types and a value type.
+-((let (sf sv t1 ... tn tv))) : Define a new predicate with n parameters types and a value type.
 -((let (const{optional}         : Define a new var with a type and a value of the right type.
         var x - type{optional}    Can be a constant.
         = value{optional})))
 -((let (const{optional}         : Define a new state-variable with n parameters and a value.
-        sv n_sv p1...pn value)))  Types must match with predicate types.
+        sv n_sv p1...pn value)))  Types must match with state-function types.
 -((get (x)))                    : get a fact
 -((set (var value)))            : set a variable with a new value, must be previously defined.
 -((set (n_sv p1...pn value)))   : set a state-variable with a new value, must be previously defined";

@@ -15,8 +15,8 @@ pub const EMPTY: &str = "empty\n";
 pub const FILE_EXTENSION: &str = "fb";
 
 pub mod language {
-    pub const PRED_SHORT: &str = "pred";
-    pub const PRED_LONG: &str = "predicate";
+    pub const PRED_SHORT: &str = "sf";
+    pub const PRED_LONG: &str = "state-function";
     pub const VAR_SHORT: &str = "var";
     pub const VAR_LONG: &str = "variable";
     pub const CONST_SHORT: &str = "const";

@@ -129,7 +129,7 @@ impl Default for LispEnv {
     fn default() -> Self {
         let mut hash_map : HashMap<String, LispValue> = HashMap::default();
         hash_map.insert("+".to_string(), LispValue::LispFn(Box::new(lisp_functions::add)));
-        hash_map.insert("begin".to_string(), LispValue::LispFn(Box::new(lisp_functions::default)));
+        hash_map.insert("begin".to_string(), LispValue::LispFn(Box::new(lisp_functions::begin)));
         hash_map.insert("pi".to_string(), LispValue::Number(LispNumber::Float(std::f64::consts::PI)));
         hash_map.insert("*".to_string(), LispValue::LispFn(Box::new(lisp_functions::multiply)));
         Self {
@@ -173,6 +173,10 @@ pub mod lisp_functions {
             }
         }
         Ok(LispValue::Number(LispNumber::Float(result)))
+    }
+
+    pub fn begin(values: Vec<LispValue>) -> Result<LispValue, LispError> {
+        Ok(values.last().unwrap().clone())
     }
 
     pub fn default(values: Vec<LispValue>) -> Result<LispValue, LispError> {

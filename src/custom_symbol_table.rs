@@ -1,15 +1,14 @@
+use crate::fact_base::language::*;
+use crate::fact_base::{FactBaseError, FactBaseOk, FactBaseResult, FactType, EMPTY};
 use aries_model::symbols::SymId;
 use aries_planning::parsing::sexpr::SAtom;
 use aries_utils::input::Sym;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
-use crate::fact_base::{FactType, EMPTY, FactBaseResult, FactBaseOk, FactBaseError};
-use crate::fact_base::language::*;
 
 pub const TYPE_INT_ID: usize = 0;
 pub const TYPE_BOOL_ID: usize = 1;
 pub const TYPE_OBJECT_ID: usize = 2;
-
 
 pub struct CustomSymbolTable {
     /// Set of state functions.
@@ -61,7 +60,10 @@ impl Default for CustomSymbolTable {
         let int_id = st.add_symbol(SAtom::new(INT), None, FactType::Type);
         let bool_id = st.add_symbol(SAtom::new(BOOLEAN), None, FactType::Type);
         let object_id = st.add_symbol(SAtom::new(OBJECT), None, FactType::Type);
-        if int_id != SymId::from(TYPE_INT_ID) || bool_id != SymId::from(TYPE_BOOL_ID) || object_id != SymId::from(TYPE_OBJECT_ID) {
+        if int_id != SymId::from(TYPE_INT_ID)
+            || bool_id != SymId::from(TYPE_BOOL_ID)
+            || object_id != SymId::from(TYPE_OBJECT_ID)
+        {
             panic!("Error in CustomSymbolTable")
         }
 
@@ -79,8 +81,10 @@ impl Display for CustomSymbolTable {
             for ty in &self.types {
                 r.push_str(format!("-{}", ty.1).as_str());
                 match self.get_type_id(ty.0) {
-                    Some(ty_id)=> r.push_str(format!("({})\n", self.get_type(&ty_id).to_string()).as_str()),
-                    _ => r.push('\n')
+                    Some(ty_id) => {
+                        r.push_str(format!("({})\n", self.get_type(&ty_id).to_string()).as_str())
+                    }
+                    _ => r.push('\n'),
                 };
             }
         } else {
@@ -133,17 +137,23 @@ impl CustomSymbolTable {
         self.symbol_fact_type.insert(sym_id, ft.clone());
         match _type {
             None => {}
-            Some(t) =>  {self.symbol_types.insert(sym_id, t);}
+            Some(t) => {
+                self.symbol_types.insert(sym_id, t);
+            }
         };
         match ft {
-            FactType::Type => {self.types.insert(sym_id, sym.clone());},
-            FactType::Object => {self.objects.insert(sym_id, sym.clone());},
+            FactType::Type => {
+                self.types.insert(sym_id, sym.clone());
+            }
+            FactType::Object => {
+                self.objects.insert(sym_id, sym.clone());
+            }
             _ => {}
         };
         sym_id
     }
 
-    pub fn delete_symbol(&mut self, sym : &Sym) -> FactBaseResult {
+    pub fn delete_symbol(&mut self, sym: &Sym) -> FactBaseResult {
         let sym_id = self.ids.remove(sym).unwrap();
         self.symbols.remove(usize::from(sym_id));
         self.symbol_types.remove(&sym_id);
@@ -168,7 +178,7 @@ impl CustomSymbolTable {
     pub fn get_type_id(&self, sym_id: &SymId) -> Option<SymId> {
         match self.symbol_types.get(sym_id) {
             None => None,
-            Some(s) => Some(*s)
+            Some(s) => Some(*s),
         }
     }
 

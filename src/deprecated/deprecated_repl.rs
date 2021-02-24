@@ -1,11 +1,11 @@
-use aries_planning::parsing::sexpr::{SExpr, parse};
-use crate::deprecated::deprecated_fact_base::*;
 use crate::deprecated::deprecated_fact_base::commands::*;
-use std::fmt::{Display, Formatter};
+use crate::deprecated::deprecated_fact_base::*;
+use aries_planning::parsing::sexpr::{parse, SExpr};
 use aries_utils::input::{ErrLoc, Input};
-use std::io::{Error, Write, Read};
-use std::{io, env};
+use std::fmt::{Display, Formatter};
 use std::fs::File;
+use std::io::{Error, Read, Write};
+use std::{env, io};
 
 const STR_HELP:&str =
     "FactBase version 0.1.0
@@ -187,9 +187,7 @@ impl Repl {
                     //println!("quit repl");
                     return Ok(ReplOk::Exit);
                 }
-                COMMAND_GET_ALL => {
-                    Ok(FactBaseOk::String(self.fact_base.to_string()))
-                }
+                COMMAND_GET_ALL => Ok(FactBaseOk::String(self.fact_base.to_string())),
 
                 COMMAND_READ => {
                     // println!("get fact base from file");
@@ -244,9 +242,8 @@ impl Repl {
 
     fn print(&self, s: ReplOk) {
         match s {
-            ReplOk::Ok => {},
-            _ => println!("{}",s)
-
+            ReplOk::Ok => {}
+            _ => println!("{}", s),
         };
     }
 

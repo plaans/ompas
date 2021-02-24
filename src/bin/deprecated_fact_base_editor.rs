@@ -1,17 +1,16 @@
 use aries_planning::parsing::sexpr::parse;
-use std::collections::HashMap;
 use fact_base::deprecated::deprecated_repl::*;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 #[warn(unused_imports)]
 use structopt::StructOpt;
-
 
 //TODO: write README.md of the project
 
 #[derive(Debug, StructOpt)]
 #[structopt(
-name = "FactBase",
-about = "A fact and belief database inside an acting and planning engine"
+    name = "FactBase",
+    about = "A fact and belief database inside an acting and planning engine"
 )]
 struct Opt {
     #[structopt(short, long)]

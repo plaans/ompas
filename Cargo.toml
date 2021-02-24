@@ -3,6 +3,7 @@ name = "fact_base"
 version = "0.1.0"
 authors = ["Yirmandias <turi@etud.insa-toulouse.fr>"]
 edition = "2018"
+default-run = "fact_base_editor"
 
 
 [features]
@@ -17,7 +18,7 @@ aries_utils = {git = "https://github.com/arthur-bit-monnot/aries/"}
 aries_collections = {git = "https://github.com/arthur-bit-monnot/aries/"}
 anyhow = "1.0.38"
 rustyline = "7.1.0"
-im = "15.0.0"
+#im = "15.0.0"
 structopt = { version = "0.3", default-features = false }
 
 [[bin]]

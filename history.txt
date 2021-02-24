@@ -1,3 +1,4 @@
 #V2
 test
 get value
+(begin (define r 10) (* pi (* r r)))

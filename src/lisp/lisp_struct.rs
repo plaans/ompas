@@ -263,9 +263,9 @@ impl PartialOrd for LispAtom {
     fn le(&self, other: &Self) -> bool {
         match (self, other) {
             (LispAtom::Number(LispNumber::Int(i1)), LispAtom::Number(LispNumber::Int(i2))) => *i1 <= *i2,
-            (LispAtom::Number(LispNumber::Float(f1)), LispAtom::Number(LispNumber::Float(f2))) => *f1 <= *f2,
-            (LispAtom::Number(LispNumber::Int(i1)), LispAtom::Number(LispNumber::Float(f2))) => *i1 <= (*f2 as i64),
-            (LispAtom::Number(LispNumber::Float(f1)), LispAtom::Number(LispNumber::Int(i2))) => (*f1 as i64) <= *i2,
+            (LispAtom::Number(LispNumber::Float(f1)), LispAtom::Number(LispNumber::Float(f2)))=> *f1 <= *f2,
+            (LispAtom::Number(LispNumber::Int(i1)), LispAtom::Number(LispNumber::Float(f2)))=> *i1 <= (*f2 as i64),
+            (LispAtom::Number(LispNumber::Float(f1)), LispAtom::Number(LispNumber::Int(i2)))=> (*f1 as i64) <= *i2,
             _ => false
         }
     }
@@ -317,28 +317,28 @@ impl PartialOrd for LispValue {
     }
 
     fn lt(&self, other: &Self) -> bool {
-        match (self, self) {
+        match (self, other) {
             (LispValue::Atom(a1), LispValue::Atom(a2)) => a1 < a2,
             _ => false
         }
     }
 
     fn le(&self, other: &Self) -> bool {
-        match (self, self) {
-            (LispValue::Atom(a1), LispValue::Atom(a2)) => a1 > a2,
-            _ => false
-        }
-    }
-
-    fn gt(&self, other: &Self) -> bool {
-        match (self, self) {
+        match (self, other) {
             (LispValue::Atom(a1), LispValue::Atom(a2)) => a1 <= a2,
             _ => false
         }
     }
 
+    fn gt(&self, other: &Self) -> bool {
+        match (self, other) {
+            (LispValue::Atom(a1), LispValue::Atom(a2)) => a1 > a2,
+            _ => false
+        }
+    }
+
     fn ge(&self, other: &Self) -> bool {
-        match (self, self) {
+        match (self, other) {
             (LispValue::Atom(a1), LispValue::Atom(a2)) => a1 >= a2,
             _ => false
         }

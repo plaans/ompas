@@ -2,14 +2,11 @@
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use aries_planning::parsing::sexpr::{parse, SExpr};
-use crate::lisp::{LispValue, LispEnv, LispError, lisp_functions, NameTypeLispValue, LispNumber};
-use crate::lisp::LispError::WrongType;
-use crate::lisp::lisp_functions::default;
-use crate::lisp::LispValue::LispFn;
-use crate::repl::language::*;
-use std::ops::Deref;
-use crate::lisp::NameTypeLispValue::Number;
-use crate::lisp::commands::*;
+use crate::lisp::LispEnv;
+use crate::lisp::lisp_struct::*;
+use crate::lisp::lisp_struct::LispError::*;
+use crate::lisp::lisp_struct::LispValue::*;
+use crate::lisp::lisp_language::*;
 
 pub fn test_rustyline() {
     // `()` can be used when no completer is required
@@ -61,16 +58,16 @@ pub fn eval(se: &SExpr, env: &mut LispEnv) -> Result<LispValue, LispError> {
             return match  r_int {
                 Ok(int) => {
                     //println!("atom is a number: {}", int);
-                    Ok(LispValue::Number(LispNumber::Int(int)))
+                    Ok(LispValue::Atom(LispAtom::Number(LispNumber::Int(int))))
                 },
                 Err(_) => match atom.as_str() {
                     TRUE => {
                         //println!("atom is boolean true");
-                        Ok(LispValue::Bool(true))
+                        Ok(LispValue::Atom(LispAtom::Bool(true)))
                     }
                     FALSE => {
                         //println!("atom is boolean false");
-                        Ok(LispValue::Bool(false))
+                        Ok(LispValue::Atom(LispAtom::Bool(false)))
                     }
                     s => {
                         //println!("atom is a symbol: {}", s);
@@ -113,9 +110,4 @@ pub fn eval(se: &SExpr, env: &mut LispEnv) -> Result<LispValue, LispError> {
         }
     };
     Ok(LispValue::None)
-}
-
-pub mod language{
-    pub const TRUE: &str = "true";
-    pub const FALSE: &str = "false";
 }

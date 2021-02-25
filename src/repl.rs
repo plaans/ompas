@@ -9,6 +9,7 @@ use crate::lisp::LispValue::LispFn;
 use crate::repl::language::*;
 use std::ops::Deref;
 use crate::lisp::NameTypeLispValue::Number;
+use crate::lisp::commands::*;
 
 pub fn test_rustyline() {
     // `()` can be used when no completer is required
@@ -73,7 +74,7 @@ pub fn eval(se: &SExpr, env: &mut LispEnv) -> Result<LispValue, LispError> {
                     }
                     s => {
                         //println!("atom is a symbol: {}", s);
-                        return env.get_symbol(atom.to_string())
+                        return env.get_symbol(s.to_string())
                     }
                 }
             }
@@ -84,14 +85,14 @@ pub fn eval(se: &SExpr, env: &mut LispEnv) -> Result<LispValue, LispError> {
             let first_atom = list_iter.pop_atom()?.clone();
             let mut is_first_atom_function:bool = false;
             match first_atom.as_str() {
-                "define" => {
+                DEFINE => {
                     //println!("define a new symbol");
                     let sym = list_iter.pop_atom()?.to_string();
                     let sexpr = list_iter.pop()?;
                     let exp = eval(sexpr, env)?;
                     env.symbols.insert(sym, exp);
                 },
-                "if" => {},//println!("conditional"),
+                IF => {},//println!("conditional"),
                 _ => is_first_atom_function = true,
             }
             if is_first_atom_function{

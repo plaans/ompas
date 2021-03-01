@@ -1,9 +1,9 @@
 //TODO: Vérifier si les fonctions ne doivent prendre que deux paramètres
-use crate::lisp::lisp_struct::LispError::*;
+use crate::lisp::lisp_struct::LError::*;
 use crate::lisp::lisp_struct::*;
 use crate::lisp::lisp_language::TYPE_OBJECT;
 
-pub fn get(values: Vec<LispValue>) -> Result<LispValue, LispError> {
+pub fn get(values: Vec<LValue>) -> Result<LValue, LError> {
     match values.len() {
         1 => Ok(values[0].clone()),
         len => Err(WrongNumerOfArgument(len, 1..1)),
@@ -13,41 +13,41 @@ pub fn get(values: Vec<LispValue>) -> Result<LispValue, LispError> {
 
 
 //Mathematical functions
-pub fn add(values: Vec<LispValue>) -> Result<LispValue, LispError> {
-    let mut result = LispValue::Atom(LispAtom::Number(LispNumber::Float(0.0)));
+pub fn add(values: Vec<LValue>) -> Result<LValue, LError> {
+    let mut result = LValue::Atom(LAtom::Number(LNumber::Float(0.0)));
     for value in values {
         result = (result + value)?;
     }
     Ok(result)
 }
 
-pub fn sub(values: Vec<LispValue>) -> Result<LispValue, LispError> {
+pub fn sub(values: Vec<LValue>) -> Result<LValue, LError> {
     match values.len() {
         2 => {
             let mut first_val: f64 = 0.0;
             let mut second_val: f64 = 0.0;
             for (i, val) in values.iter().enumerate() {
                 match val {
-                    LispValue::Atom(LispAtom::Number(LispNumber::Int(int))) => match i {
+                    LValue::Atom(LAtom::Number(LNumber::Int(int))) => match i {
                         0 => first_val = *int as f64,
                         1 => second_val = *int as f64,
                         _ => panic!("Strong error"),
                     },
-                    LispValue::Atom(LispAtom::Number(LispNumber::Float(float))) => match i {
+                    LValue::Atom(LAtom::Number(LNumber::Float(float))) => match i {
                         0 => first_val = *float,
                         1 => second_val = *float,
                         _ => panic!("Strong error"),
                     },
                     lv => {
-                        return Err(LispError::WrongType(
+                        return Err(LError::WrongType(
                             lv.clone().into(),
-                            NameTypeLispValue::NAtom,
+                            NameTypeLValue::NAtom,
                         ))
                     }
                 };
             }
 
-            Ok(LispValue::Atom(LispAtom::Number(LispNumber::Float(
+            Ok(LValue::Atom(LAtom::Number(LNumber::Float(
                 first_val - second_val,
             ))))
         }
@@ -55,45 +55,45 @@ pub fn sub(values: Vec<LispValue>) -> Result<LispValue, LispError> {
     }
 }
 
-pub fn mul(values: Vec<LispValue>) -> Result<LispValue, LispError> {
+pub fn mul(values: Vec<LValue>) -> Result<LValue, LError> {
     let mut result: f64 = 1.0;
     for value in values {
         match value {
-            LispValue::Atom(LispAtom::Number(LispNumber::Int(i))) => result *= i as f64,
-            LispValue::Atom(LispAtom::Number(LispNumber::Float(f))) => result *= f,
-            l => return Err(LispError::WrongType(l.into(), NameTypeLispValue::NAtom)),
+            LValue::Atom(LAtom::Number(LNumber::Int(i))) => result *= i as f64,
+            LValue::Atom(LAtom::Number(LNumber::Float(f))) => result *= f,
+            l => return Err(LError::WrongType(l.into(), NameTypeLValue::NAtom)),
         }
     }
-    Ok(LispValue::Atom(LispAtom::Number(LispNumber::Float(result))))
+    Ok(LValue::Atom(LAtom::Number(LNumber::Float(result))))
 }
 
-pub fn div(values: Vec<LispValue>) -> Result<LispValue, LispError> {
+pub fn div(values: Vec<LValue>) -> Result<LValue, LError> {
     match values.len() {
         2 => {
             let mut first_val: f64 = 0.0;
             let mut second_val: f64 = 0.0;
             for (i, val) in values.iter().enumerate() {
                 match val {
-                    LispValue::Atom(LispAtom::Number(LispNumber::Int(int))) => match i {
+                    LValue::Atom(LAtom::Number(LNumber::Int(int))) => match i {
                         0 => first_val = *int as f64,
                         1 => second_val = *int as f64,
                         _ => panic!("Strong error"),
                     },
-                    LispValue::Atom(LispAtom::Number(LispNumber::Float(float))) => match i {
+                    LValue::Atom(LAtom::Number(LNumber::Float(float))) => match i {
                         0 => first_val = *float,
                         1 => second_val = *float,
                         _ => panic!("Strong error"),
                     },
                     lv => {
-                        return Err(LispError::WrongType(
+                        return Err(LError::WrongType(
                             lv.clone().into(),
-                            NameTypeLispValue::NAtom,
+                            NameTypeLValue::NAtom,
                         ))
                     }
                 };
             }
 
-            Ok(LispValue::Atom(LispAtom::Number(LispNumber::Float(
+            Ok(LValue::Atom(LAtom::Number(LNumber::Float(
                 first_val / second_val,
             ))))
         }
@@ -102,108 +102,108 @@ pub fn div(values: Vec<LispValue>) -> Result<LispValue, LispError> {
 }
 
 //Comparison functions
-pub fn gt(values: Vec<LispValue>) -> Result<LispValue, LispError> {
+pub fn gt(values: Vec<LValue>) -> Result<LValue, LError> {
     match values.len() {
-        2 => Ok(LispValue::Atom(LispAtom::Bool(values[0] > values[1]))),
+        2 => Ok(LValue::Atom(LAtom::Bool(values[0] > values[1]))),
         i => Err(WrongNumerOfArgument(i, 2..2)),
     }
 }
 
-pub fn lt(values: Vec<LispValue>) -> Result<LispValue, LispError> {
+pub fn lt(values: Vec<LValue>) -> Result<LValue, LError> {
     match values.len() {
-        2 => Ok(LispValue::Atom(LispAtom::Bool(values[0] < values[1]))),
+        2 => Ok(LValue::Atom(LAtom::Bool(values[0] < values[1]))),
         i => Err(WrongNumerOfArgument(i, 2..2)),
     }
 }
 
-pub fn ge(values: Vec<LispValue>) -> Result<LispValue, LispError> {
+pub fn ge(values: Vec<LValue>) -> Result<LValue, LError> {
     match values.len() {
-        2 => Ok(LispValue::Atom(LispAtom::Bool(values[0] >= values[1]))),
+        2 => Ok(LValue::Atom(LAtom::Bool(values[0] >= values[1]))),
         i => Err(WrongNumerOfArgument(i, 2..2)),
     }
 }
 
-pub fn le(values: Vec<LispValue>) -> Result<LispValue, LispError> {
+pub fn le(values: Vec<LValue>) -> Result<LValue, LError> {
     match values.len() {
-        2 => Ok(LispValue::Atom(LispAtom::Bool(values[0] <= values[1]))),
+        2 => Ok(LValue::Atom(LAtom::Bool(values[0] <= values[1]))),
         i => Err(WrongNumerOfArgument(i, 2..2)),
     }
 }
 
-pub fn eq(values: Vec<LispValue>) -> Result<LispValue, LispError> {
+pub fn eq(values: Vec<LValue>) -> Result<LValue, LError> {
     match values.len() {
-        2 => Ok(LispValue::Atom(LispAtom::Bool(values[0] == values[1]))),
+        2 => Ok(LValue::Atom(LAtom::Bool(values[0] == values[1]))),
         i => Err(WrongNumerOfArgument(i, 2..2)),
     }
 }
 
 //Type verification
-pub fn is_none(values: Vec<LispValue>) -> Result<LispValue, LispError> {
+pub fn is_none(values: Vec<LValue>) -> Result<LValue, LError> {
     match values.len() {
-        1 => Ok(LispValue::Atom(LispAtom::Bool(
-            NameTypeLispValue::from(values[0].clone()) == NameTypeLispValue::None,
+        1 => Ok(LValue::Atom(LAtom::Bool(
+            NameTypeLValue::from(values[0].clone()) == NameTypeLValue::None,
         ))),
         i => Err(WrongNumerOfArgument(i, 1..1)),
     }
 }
 
-pub fn is_number(values: Vec<LispValue>) -> Result<LispValue, LispError> {
+pub fn is_number(values: Vec<LValue>) -> Result<LValue, LError> {
     match values.len() {
-        1 => Ok(LispValue::Atom(LispAtom::Bool(
-            NameTypeLispValue::from(values[0].clone()) == NameTypeLispValue::NAtom,
+        1 => Ok(LValue::Atom(LAtom::Bool(
+            NameTypeLValue::from(values[0].clone()) == NameTypeLValue::NAtom,
         ))),
         i => Err(WrongNumerOfArgument(i, 1..1)),
     }
 }
 
-pub fn is_bool(values: Vec<LispValue>) -> Result<LispValue, LispError> {
+pub fn is_bool(values: Vec<LValue>) -> Result<LValue, LError> {
     match values.len() {
-        1 => Ok(LispValue::Atom(LispAtom::Bool(
-            NameTypeLispValue::from(values[0].clone()) == NameTypeLispValue::BAtom,
+        1 => Ok(LValue::Atom(LAtom::Bool(
+            NameTypeLValue::from(values[0].clone()) == NameTypeLValue::BAtom,
         ))),
         i => Err(WrongNumerOfArgument(i, 1..1)),
     }
 }
 
-pub fn is_fn(values: Vec<LispValue>) -> Result<LispValue, LispError> {
+pub fn is_fn(values: Vec<LValue>) -> Result<LValue, LError> {
     match values.len() {
-        1 => Ok(LispValue::Atom(LispAtom::Bool(
-            NameTypeLispValue::from(values[0].clone()) == NameTypeLispValue::LispFn,
+        1 => Ok(LValue::Atom(LAtom::Bool(
+            NameTypeLValue::from(values[0].clone()) == NameTypeLValue::LFn,
         ))),
         i => Err(WrongNumerOfArgument(i, 1..1)),
     }
 }
 
-pub fn begin(values: Vec<LispValue>) -> Result<LispValue, LispError> {
+pub fn begin(values: Vec<LValue>) -> Result<LValue, LError> {
     Ok(values.last().unwrap().clone())
 }
 
-pub fn default(_values: Vec<LispValue>) -> Result<LispValue, LispError> {
-    Ok(LispValue::String("default function".to_string()))
+pub fn default(_values: Vec<LValue>) -> Result<LValue, LError> {
+    Ok(LValue::String("default function".to_string()))
 }
 
-pub fn var(values: Vec<LispValue>) -> Result<LispValue, LispError> {
+pub fn var(values: Vec<LValue>) -> Result<LValue, LError> {
     //println!("in function var");
     match values.len() {
         2 => {
             let atom_type = match values[0].clone() {
-                LispValue::Type(ltype) => ltype,
-                lv => return Err(WrongType(lv.into(), NameTypeLispValue::Type))
+                LValue::Type(ltype) => ltype,
+                lv => return Err(WrongType(lv.into(), NameTypeLValue::Type))
             };
-            let atom_value:LispAtom = match values[1].clone() {
-                LispValue::Variable(lvar) => {
+            let atom_value:LAtom = match values[1].clone() {
+                LValue::Variable(lvar) => {
                     if lvar.v_type == atom_type {
                         lvar.value
                     }else {
                         return Err(SpecialError(format!("Expected an atom of type {}, got {}", atom_type,lvar.v_type)))
                     }
                 },
-                LispValue::Atom(latom) => {
+                LValue::Atom(latom) => {
                     latom
                 }
-                lv => return Err(WrongType(lv.into(), NameTypeLispValue::Variable)),
+                lv => return Err(WrongType(lv.into(), NameTypeLValue::Variable)),
             };
-            Ok(LispValue::Variable(LispVariable {
+            Ok(LValue::Variable(LVariable {
                 v_type: atom_type,
                 value: atom_value,
             }))
@@ -212,17 +212,17 @@ pub fn var(values: Vec<LispValue>) -> Result<LispValue, LispError> {
     }
 }
 
-pub fn object(values: Vec<LispValue>) -> Result<LispValue, LispError> {
+pub fn object(values: Vec<LValue>) -> Result<LValue, LError> {
     match values.len() {
         1 => {
             //only the name of the symbol
             let l_value = values[0].clone();
-            let t_type = LispType::Symbol(TYPE_OBJECT.into());
+            let t_type = LType::Symbol(TYPE_OBJECT.into());
             let value = match l_value {
-                LispValue::Atom(LispAtom::Symbol(s)) => LispAtom::Symbol(s),
-                lv => return Err(WrongType(lv.into(), NameTypeLispValue::SAtom))
+                LValue::Atom(LAtom::Symbol(s)) => LAtom::Symbol(s),
+                lv => return Err(WrongType(lv.into(), NameTypeLValue::SAtom))
             };
-            Ok(LispValue::Variable(LispVariable {
+            Ok(LValue::Variable(LVariable {
                 v_type: t_type,
                 value
             }))
@@ -232,14 +232,14 @@ pub fn object(values: Vec<LispValue>) -> Result<LispValue, LispError> {
             let sym_type = values[0].clone();
             let sym_value = values[1].clone();
             let t_type = match sym_type {
-                LispValue::Type(LispType::Symbol(s)) => LispType::Symbol(s),
-                lv => return Err(WrongType(lv.into(), NameTypeLispValue::Type))
+                LValue::Type(LType::Symbol(s)) => LType::Symbol(s),
+                lv => return Err(WrongType(lv.into(), NameTypeLValue::Type))
             };
             let value = match sym_value {
-                LispValue::Atom(LispAtom::Symbol(s)) => LispAtom::Symbol(s),
-                lv => return Err(WrongType(lv.into(), NameTypeLispValue::SAtom))
+                LValue::Atom(LAtom::Symbol(s)) => LAtom::Symbol(s),
+                lv => return Err(WrongType(lv.into(), NameTypeLValue::SAtom))
             };
-            Ok(LispValue::Variable(LispVariable {
+            Ok(LValue::Variable(LVariable {
                 v_type: t_type,
                 value
             }))
@@ -248,12 +248,12 @@ pub fn object(values: Vec<LispValue>) -> Result<LispValue, LispError> {
     }
 }
 
-pub fn state_function(values: Vec<LispValue>) -> Result<LispValue, LispError> {
-    let mut vec_params:Vec<LispType> = Vec::new();
-    let mut t_value:LispType = LispType::Symbol(TYPE_OBJECT.into());
+pub fn state_function(values: Vec<LValue>) -> Result<LValue, LError> {
+    let mut vec_params:Vec<LType> = Vec::new();
+    let mut t_value:LType = LType::Symbol(TYPE_OBJECT.into());
     for (i,value) in values.iter().enumerate() {
         match value {
-            LispValue::Type(ltype) => {
+            LValue::Type(ltype) => {
                 if i == values.len()-1 {
                     t_value = ltype.clone();
                 }
@@ -261,11 +261,26 @@ pub fn state_function(values: Vec<LispValue>) -> Result<LispValue, LispError> {
                     vec_params.push(ltype.clone())
                 }
             }
-            lv => return Err(WrongType(lv.clone().into(), NameTypeLispValue::Type))
+            lv => return Err(WrongType(lv.clone().into(), NameTypeLValue::Type))
         }
     }
-    Ok(LispValue::StateFunction(LispStateFunction {
+    Ok(LValue::StateFunction(LStateFunction {
         t_params: vec_params,
         t_value: t_value
     }))
+}
+
+pub fn def_type(values: Vec<LValue>) -> Result<LValue, LError> {
+    match values.len() {
+        1 => {
+            //Just the label
+            match values[0].clone() {
+                LValue::Atom(LAtom::Symbol(s)) => {
+                    Ok(LValue::Type(LType::Symbol(s)))
+                }
+                lv => Err(WrongType(lv.into(), NameTypeLValue::SAtom))
+            }
+        }
+        len => Err(WrongNumerOfArgument(len, 1..1))
+    }
 }

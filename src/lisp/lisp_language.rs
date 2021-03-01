@@ -23,6 +23,7 @@ pub const IS_FN: &str = "fn?";
 pub const VARIABLE: &str = "var";
 pub const OBJECT: &str = "obj";
 pub const STATE_FUNCTION: &str = "sf";
+pub const TYPE: &str = "type";
 
 //basic types
 pub const TYPE_INT: &str = "int";

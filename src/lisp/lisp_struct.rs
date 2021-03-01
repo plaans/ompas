@@ -3,115 +3,116 @@ use aries_utils::input::{ErrLoc, Sym};
 use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Add, Range};
+use std::collections::HashMap;
 
-pub enum LispError {
-    WrongType(NameTypeLispValue, NameTypeLispValue),
+pub enum LError {
+    WrongType(NameTypeLValue, NameTypeLValue),
     WrongNumerOfArgument(usize, Range<usize>),
     ErrLoc(ErrLoc),
     UndefinedSymbol(String),
     SpecialError(String),
 }
 
-impl Display for LispError {
+impl Display for LError {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            LispError::WrongType(s1, s2) => write!(f, "Got {}, expected {}", s1, s2),
-            LispError::ErrLoc(e) => write!(f, "{}", e),
-            LispError::UndefinedSymbol(s) => write!(f, "{} is undefined", s),
-            LispError::WrongNumerOfArgument(s, r) => write!(f, "Got {}, expected {:?}", s, r),
-            LispError::SpecialError(s) => write!(f, "{}", s),
+            LError::WrongType(s1, s2) => write!(f, "Got {}, expected {}", s1, s2),
+            LError::ErrLoc(e) => write!(f, "{}", e),
+            LError::UndefinedSymbol(s) => write!(f, "{} is undefined", s),
+            LError::WrongNumerOfArgument(s, r) => write!(f, "Got {}, expected {:?}", s, r),
+            LError::SpecialError(s) => write!(f, "{}", s),
         }
     }
 }
 
-impl From<ErrLoc> for LispError {
+impl From<ErrLoc> for LError {
     fn from(e: ErrLoc) -> Self {
-        LispError::ErrLoc(e)
+        LError::ErrLoc(e)
     }
 }
 
 #[derive(Clone)]
-pub enum LispNumber {
+pub enum LNumber {
     Int(i64),
     Float(f64),
 }
 
-impl Display for LispNumber {
+impl Display for LNumber {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            LispNumber::Int(i) => write!(f, "{}", i),
-            LispNumber::Float(fl) => write!(f, "{}", fl),
+            LNumber::Int(i) => write!(f, "{}", i),
+            LNumber::Float(fl) => write!(f, "{}", fl),
         }
     }
 }
 
 #[derive(Clone)]
-pub enum LispType {
+pub enum LType {
     Int,
     Bool,
     Float,
     Symbol(Sym),
 }
 
-impl Display for LispType {
+impl Display for LType {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            LispType::Int => write!(f, "int"),
-            LispType::Bool => write!(f, "bool"),
-            LispType::Float => write!(f, "float"),
-            LispType::Symbol(s) => write!(f, "{}", s),
+            LType::Int => write!(f, "int"),
+            LType::Bool => write!(f, "bool"),
+            LType::Float => write!(f, "float"),
+            LType::Symbol(s) => write!(f, "{}", s),
         }
     }
 }
 
-impl PartialEq for LispType {
+impl PartialEq for LType {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (LispType::Int, LispType::Int) => true,
-            (LispType::Bool, LispType::Bool) => true,
-            (LispType::Float, LispType::Float) => true,
-            (LispType::Symbol(s1), LispType::Symbol(s2)) => s1 == s2,
+            (LType::Int, LType::Int) => true,
+            (LType::Bool, LType::Bool) => true,
+            (LType::Float, LType::Float) => true,
+            (LType::Symbol(s1), LType::Symbol(s2)) => s1 == s2,
             (_, _) => false,
         }
     }
 }
 
 #[derive(Clone)]
-pub enum LispAtom {
+pub enum LAtom {
     Symbol(Sym),
-    Number(LispNumber),
+    Number(LNumber),
     Bool(bool),
 }
 
-impl Display for LispAtom {
+impl Display for LAtom {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            LispAtom::Symbol(s) => write!(f, "{}", s),
-            LispAtom::Number(n) => write!(f, "{}", n),
-            LispAtom::Bool(b) => write!(f, "{}", b),
+            LAtom::Symbol(s) => write!(f, "{}", s),
+            LAtom::Number(n) => write!(f, "{}", n),
+            LAtom::Bool(b) => write!(f, "{}", b),
         }
     }
 }
 
 #[derive(Clone)]
-pub struct LispVariable {
-    pub v_type: LispType,
-    pub value: LispAtom,
+pub struct LVariable {
+    pub v_type: LType,
+    pub value: LAtom,
 }
 
-impl Display for LispVariable {
+impl Display for LVariable {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(f, "{} - {}", self.value, self.v_type)
     }
 }
 
 #[derive(Clone)]
-pub struct LispStateFunction {
-    pub t_params: Vec<LispType>,
-    pub t_value: LispType,
+pub struct LStateFunction {
+    pub t_params: Vec<LType>,
+    pub t_value: LType,
 }
 
-impl Display for LispStateFunction {
+impl Display for LStateFunction {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         let mut sr = String::new();
         sr.push('(');
@@ -127,12 +128,12 @@ impl Display for LispStateFunction {
 }
 
 #[derive(Clone)]
-pub struct LispStateVariable {
-    params: Vec<LispAtom>,
-    value: LispAtom,
+pub struct LStateVariable {
+    params: Vec<LAtom>,
+    value: LAtom,
 }
 
-impl Display for LispStateVariable {
+impl Display for LStateVariable {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         let mut sr = String::new();
         sr.push('(');
@@ -147,23 +148,46 @@ impl Display for LispStateVariable {
     }
 }
 
-pub type LispFn = Box<fn(Vec<LispValue>) -> Result<LispValue, LispError>>;
+pub type LFn = Box<fn(Vec<LValue>) -> Result<LValue, LError>>;
 
 #[derive(Clone)]
-pub enum LispValue {
-    Variable(LispVariable),
-    Type(LispType),
-    StateFunction(LispStateFunction),
-    StateVariable(LispStateVariable),
-    Atom(LispAtom),
+pub enum LValue {
+    FactBase(LFactBase),
+    Variable(LVariable),
+    Type(LType),
+    StateFunction(LStateFunction),
+    StateVariable(LStateVariable),
+    Atom(LAtom),
     String(String),
     SExpr(SExpr),
-    LispFn(LispFn),
+    LFn(LFn),
     None,
 }
 
 #[derive(Clone)]
-pub enum NameTypeLispValue {
+pub struct LFactBase {
+    facts : HashMap<Vec<LAtom>, LAtom>,
+}
+
+impl Display for LFactBase {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        let mut s = String::new();
+        for (key, value) in self.facts.clone() {
+            s.push('(');
+            for (i,k) in key.iter().enumerate() {
+                s.push_str(format!("{}", k).as_str());
+                if i < key.len()-1 {
+                    s.push(',')
+                }
+            }
+            s.push_str(format!(") = {}", value).as_str());
+        };
+        write!(f, "{}", s)
+    }
+}
+
+#[derive(Clone)]
+pub enum NameTypeLValue {
     Variable,
     Type,
     StateFunction,
@@ -173,114 +197,117 @@ pub enum NameTypeLispValue {
     SAtom,
     String,
     SExpr,
-    LispFn,
+    LFn,
     None,
+    FactBase
 }
 
-impl Display for NameTypeLispValue {
+impl Display for NameTypeLValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         let str = match self {
-            NameTypeLispValue::Type => "Type",
-            NameTypeLispValue::StateFunction => "StateFunction",
-            NameTypeLispValue::StateVariable => "StateVariable",
-            NameTypeLispValue::NAtom => "Number Atom",
-            NameTypeLispValue::BAtom => "Boolean Atom",
-            NameTypeLispValue::SAtom => "Symbol Atom",
-            NameTypeLispValue::String => "String",
-            NameTypeLispValue::SExpr => "SExpr",
-            NameTypeLispValue::LispFn => "LispFn",
-            NameTypeLispValue::None => "None",
-            NameTypeLispValue::Variable => "Variable",
+            NameTypeLValue::Type => "Type",
+            NameTypeLValue::StateFunction => "StateFunction",
+            NameTypeLValue::StateVariable => "StateVariable",
+            NameTypeLValue::NAtom => "Number Atom",
+            NameTypeLValue::BAtom => "Boolean Atom",
+            NameTypeLValue::SAtom => "Symbol Atom",
+            NameTypeLValue::String => "String",
+            NameTypeLValue::SExpr => "SExpr",
+            NameTypeLValue::LFn => "LFn",
+            NameTypeLValue::None => "None",
+            NameTypeLValue::Variable => "Variable",
+            NameTypeLValue::FactBase => "FactBase",
         };
         write!(f, "{}", str)
     }
 }
 
-impl PartialEq for NameTypeLispValue {
+impl PartialEq for NameTypeLValue {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (NameTypeLispValue::String, NameTypeLispValue::String) => true,
-            (NameTypeLispValue::SExpr, NameTypeLispValue::SExpr) => true,
-            (NameTypeLispValue::BAtom, NameTypeLispValue::BAtom) => true,
-            (NameTypeLispValue::NAtom, NameTypeLispValue::NAtom) => true,
-            (NameTypeLispValue::SAtom, NameTypeLispValue::SAtom) => true,
-            (NameTypeLispValue::LispFn, NameTypeLispValue::LispFn) => true,
-            (NameTypeLispValue::None, NameTypeLispValue::None) => true,
-            (NameTypeLispValue::StateFunction, NameTypeLispValue::StateFunction) => true,
-            (NameTypeLispValue::StateVariable, NameTypeLispValue::StateVariable) => true,
-            (NameTypeLispValue::Type, NameTypeLispValue::Type) => true,
+            (NameTypeLValue::String, NameTypeLValue::String) => true,
+            (NameTypeLValue::SExpr, NameTypeLValue::SExpr) => true,
+            (NameTypeLValue::BAtom, NameTypeLValue::BAtom) => true,
+            (NameTypeLValue::NAtom, NameTypeLValue::NAtom) => true,
+            (NameTypeLValue::SAtom, NameTypeLValue::SAtom) => true,
+            (NameTypeLValue::LFn, NameTypeLValue::LFn) => true,
+            (NameTypeLValue::None, NameTypeLValue::None) => true,
+            (NameTypeLValue::StateFunction, NameTypeLValue::StateFunction) => true,
+            (NameTypeLValue::StateVariable, NameTypeLValue::StateVariable) => true,
+            (NameTypeLValue::Type, NameTypeLValue::Type) => true,
             (_, _) => false,
         }
     }
 }
 
-impl From<LispValue> for NameTypeLispValue {
-    fn from(lv: LispValue) -> Self {
+impl From<LValue> for NameTypeLValue {
+    fn from(lv: LValue) -> Self {
         match lv {
-            LispValue::Type(_) => NameTypeLispValue::Type,
-            LispValue::StateFunction(_) => NameTypeLispValue::StateFunction,
-            LispValue::StateVariable(_) => NameTypeLispValue::StateVariable,
-            LispValue::Atom(LispAtom::Number(_)) => NameTypeLispValue::NAtom,
-            LispValue::Atom(LispAtom::Bool(_)) => NameTypeLispValue::BAtom,
-            LispValue::Atom(LispAtom::Symbol(_)) => NameTypeLispValue::SAtom,
-            LispValue::String(_) => NameTypeLispValue::String,
-            LispValue::SExpr(_) => NameTypeLispValue::SExpr,
-            LispValue::LispFn(_) => NameTypeLispValue::LispFn,
-            LispValue::None => NameTypeLispValue::None,
-            LispValue::Variable(_) => NameTypeLispValue::Variable,
+            LValue::Type(_) => NameTypeLValue::Type,
+            LValue::StateFunction(_) => NameTypeLValue::StateFunction,
+            LValue::StateVariable(_) => NameTypeLValue::StateVariable,
+            LValue::Atom(LAtom::Number(_)) => NameTypeLValue::NAtom,
+            LValue::Atom(LAtom::Bool(_)) => NameTypeLValue::BAtom,
+            LValue::Atom(LAtom::Symbol(_)) => NameTypeLValue::SAtom,
+            LValue::String(_) => NameTypeLValue::String,
+            LValue::SExpr(_) => NameTypeLValue::SExpr,
+            LValue::LFn(_) => NameTypeLValue::LFn,
+            LValue::None => NameTypeLValue::None,
+            LValue::Variable(_) => NameTypeLValue::Variable,
+            LValue::FactBase(_) => NameTypeLValue::FactBase,
         }
     }
 }
 
-impl From<LispAtom> for NameTypeLispValue {
-    fn from(la: LispAtom) -> Self {
+impl From<LAtom> for NameTypeLValue {
+    fn from(la: LAtom) -> Self {
         match la {
-            LispAtom::Symbol(_) => NameTypeLispValue::SAtom,
-            LispAtom::Number(_) => NameTypeLispValue::NAtom,
-            LispAtom::Bool(_) => NameTypeLispValue::BAtom,
+            LAtom::Symbol(_) => NameTypeLValue::SAtom,
+            LAtom::Number(_) => NameTypeLValue::NAtom,
+            LAtom::Bool(_) => NameTypeLValue::BAtom,
         }
     }
 }
 
-impl PartialEq for LispAtom {
+impl PartialEq for LAtom {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (LispAtom::Number(LispNumber::Int(i1)), LispAtom::Number(LispNumber::Int(i2))) => {
+            (LAtom::Number(LNumber::Int(i1)), LAtom::Number(LNumber::Int(i2))) => {
                 *i1 == *i2
             }
-            (LispAtom::Number(LispNumber::Float(f1)), LispAtom::Number(LispNumber::Float(f2))) => {
+            (LAtom::Number(LNumber::Float(f1)), LAtom::Number(LNumber::Float(f2))) => {
                 *f1 == *f2
             }
-            (LispAtom::Number(LispNumber::Int(i1)), LispAtom::Number(LispNumber::Float(f2))) => {
+            (LAtom::Number(LNumber::Int(i1)), LAtom::Number(LNumber::Float(f2))) => {
                 *i1 == *f2 as i64
             }
-            (LispAtom::Number(LispNumber::Float(f1)), LispAtom::Number(LispNumber::Int(i2))) => {
+            (LAtom::Number(LNumber::Float(f1)), LAtom::Number(LNumber::Int(i2))) => {
                 *f1 as i64 == *i2
             }
-            (LispAtom::Symbol(s1), LispAtom::Symbol(s2)) => *s1 == *s2,
-            (LispAtom::Bool(b1), LispAtom::Bool(b2)) => *b1 == *b2,
+            (LAtom::Symbol(s1), LAtom::Symbol(s2)) => *s1 == *s2,
+            (LAtom::Bool(b1), LAtom::Bool(b2)) => *b1 == *b2,
             _ => false,
         }
     }
 }
 
-impl PartialOrd for LispAtom {
+impl PartialOrd for LAtom {
     fn partial_cmp(&self, _other: &Self) -> Option<Ordering> {
         unimplemented!()
     }
 
     fn lt(&self, other: &Self) -> bool {
         match (self, other) {
-            (LispAtom::Number(LispNumber::Int(i1)), LispAtom::Number(LispNumber::Int(i2))) => {
+            (LAtom::Number(LNumber::Int(i1)), LAtom::Number(LNumber::Int(i2))) => {
                 *i1 < *i2
             }
-            (LispAtom::Number(LispNumber::Float(f1)), LispAtom::Number(LispNumber::Float(f2))) => {
+            (LAtom::Number(LNumber::Float(f1)), LAtom::Number(LNumber::Float(f2))) => {
                 *f1 < *f2
             }
-            (LispAtom::Number(LispNumber::Int(i1)), LispAtom::Number(LispNumber::Float(f2))) => {
+            (LAtom::Number(LNumber::Int(i1)), LAtom::Number(LNumber::Float(f2))) => {
                 *i1 < (*f2 as i64)
             }
-            (LispAtom::Number(LispNumber::Float(f1)), LispAtom::Number(LispNumber::Int(i2))) => {
+            (LAtom::Number(LNumber::Float(f1)), LAtom::Number(LNumber::Int(i2))) => {
                 (*f1 as i64) < *i2
             }
             _ => false,
@@ -289,16 +316,16 @@ impl PartialOrd for LispAtom {
 
     fn le(&self, other: &Self) -> bool {
         match (self, other) {
-            (LispAtom::Number(LispNumber::Int(i1)), LispAtom::Number(LispNumber::Int(i2))) => {
+            (LAtom::Number(LNumber::Int(i1)), LAtom::Number(LNumber::Int(i2))) => {
                 *i1 <= *i2
             }
-            (LispAtom::Number(LispNumber::Float(f1)), LispAtom::Number(LispNumber::Float(f2))) => {
+            (LAtom::Number(LNumber::Float(f1)), LAtom::Number(LNumber::Float(f2))) => {
                 *f1 <= *f2
             }
-            (LispAtom::Number(LispNumber::Int(i1)), LispAtom::Number(LispNumber::Float(f2))) => {
+            (LAtom::Number(LNumber::Int(i1)), LAtom::Number(LNumber::Float(f2))) => {
                 *i1 <= (*f2 as i64)
             }
-            (LispAtom::Number(LispNumber::Float(f1)), LispAtom::Number(LispNumber::Int(i2))) => {
+            (LAtom::Number(LNumber::Float(f1)), LAtom::Number(LNumber::Int(i2))) => {
                 (*f1 as i64) <= *i2
             }
             _ => false,
@@ -307,16 +334,16 @@ impl PartialOrd for LispAtom {
 
     fn gt(&self, other: &Self) -> bool {
         match (self, other) {
-            (LispAtom::Number(LispNumber::Int(i1)), LispAtom::Number(LispNumber::Int(i2))) => {
+            (LAtom::Number(LNumber::Int(i1)), LAtom::Number(LNumber::Int(i2))) => {
                 *i1 > *i2
             }
-            (LispAtom::Number(LispNumber::Float(f1)), LispAtom::Number(LispNumber::Float(f2))) => {
+            (LAtom::Number(LNumber::Float(f1)), LAtom::Number(LNumber::Float(f2))) => {
                 *f1 > *f2
             }
-            (LispAtom::Number(LispNumber::Int(i1)), LispAtom::Number(LispNumber::Float(f2))) => {
+            (LAtom::Number(LNumber::Int(i1)), LAtom::Number(LNumber::Float(f2))) => {
                 *i1 > (*f2 as i64)
             }
-            (LispAtom::Number(LispNumber::Float(f1)), LispAtom::Number(LispNumber::Int(i2))) => {
+            (LAtom::Number(LNumber::Float(f1)), LAtom::Number(LNumber::Int(i2))) => {
                 (*f1 as i64) > *i2
             }
             _ => false,
@@ -325,16 +352,16 @@ impl PartialOrd for LispAtom {
 
     fn ge(&self, other: &Self) -> bool {
         match (self, other) {
-            (LispAtom::Number(LispNumber::Int(i1)), LispAtom::Number(LispNumber::Int(i2))) => {
+            (LAtom::Number(LNumber::Int(i1)), LAtom::Number(LNumber::Int(i2))) => {
                 *i1 >= *i2
             }
-            (LispAtom::Number(LispNumber::Float(f1)), LispAtom::Number(LispNumber::Float(f2))) => {
+            (LAtom::Number(LNumber::Float(f1)), LAtom::Number(LNumber::Float(f2))) => {
                 *f1 >= *f2
             }
-            (LispAtom::Number(LispNumber::Int(i1)), LispAtom::Number(LispNumber::Float(f2))) => {
+            (LAtom::Number(LNumber::Int(i1)), LAtom::Number(LNumber::Float(f2))) => {
                 *i1 >= (*f2 as i64)
             }
-            (LispAtom::Number(LispNumber::Float(f1)), LispAtom::Number(LispNumber::Int(i2))) => {
+            (LAtom::Number(LNumber::Float(f1)), LAtom::Number(LNumber::Int(i2))) => {
                 (*f1 as i64) >= *i2
             }
             _ => false,
@@ -342,143 +369,144 @@ impl PartialOrd for LispAtom {
     }
 }
 
-impl PartialEq for LispValue {
+impl PartialEq for LValue {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             //bool comparison
             //Number comparison
-            (LispValue::Atom(a1), LispValue::Atom(a2)) => a1 == a2,
+            (LValue::Atom(a1), LValue::Atom(a2)) => a1 == a2,
             //Text comparison
-            (LispValue::String(s1), LispValue::String(s2)) => *s1 == *s2,
+            (LValue::String(s1), LValue::String(s2)) => *s1 == *s2,
             //function comparison
-            (LispValue::LispFn(fn_1), LispValue::LispFn(fn_2)) => fn_1 == fn_2,
+            (LValue::LFn(fn_1), LValue::LFn(fn_2)) => fn_1 == fn_2,
 
             _ => false,
         }
     }
 }
 
-impl PartialOrd for LispValue {
+impl PartialOrd for LValue {
     fn partial_cmp(&self, _other: &Self) -> Option<Ordering> {
         unimplemented!()
     }
 
     fn lt(&self, other: &Self) -> bool {
         match (self, other) {
-            (LispValue::Atom(a1), LispValue::Atom(a2)) => a1 < a2,
+            (LValue::Atom(a1), LValue::Atom(a2)) => a1 < a2,
             _ => false,
         }
     }
 
     fn le(&self, other: &Self) -> bool {
         match (self, other) {
-            (LispValue::Atom(a1), LispValue::Atom(a2)) => a1 <= a2,
+            (LValue::Atom(a1), LValue::Atom(a2)) => a1 <= a2,
             _ => false,
         }
     }
 
     fn gt(&self, other: &Self) -> bool {
         match (self, other) {
-            (LispValue::Atom(a1), LispValue::Atom(a2)) => a1 > a2,
+            (LValue::Atom(a1), LValue::Atom(a2)) => a1 > a2,
             _ => false,
         }
     }
 
     fn ge(&self, other: &Self) -> bool {
         match (self, other) {
-            (LispValue::Atom(a1), LispValue::Atom(a2)) => a1 >= a2,
+            (LValue::Atom(a1), LValue::Atom(a2)) => a1 >= a2,
             _ => false,
         }
     }
 }
 
-impl Debug for LispValue {
+impl Debug for LValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(f, "{}", self)
     }
 }
 
-impl Display for LispValue {
+impl Display for LValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            LispValue::String(s) => write!(f, "{}", s),
-            LispValue::SExpr(s) => write!(f, "{}", s),
-            LispValue::LispFn(_) => write!(f, "LispFunction"),
-            LispValue::None => write!(f, "None"),
-            LispValue::Variable(v) => write!(f, "{}", v),
-            LispValue::StateFunction(sf) => write!(f, "{}", sf),
-            LispValue::StateVariable(sv) => write!(f, "{}", sv),
-            LispValue::Atom(a) => write!(f, "{}", a),
-            LispValue::Type(t) => write!(f, "{}", t),
+            LValue::String(s) => write!(f, "{} - string", s),
+            LValue::SExpr(s) => write!(f, "{} - sexpr", s),
+            LValue::LFn(_) => write!(f, "LFunction"),
+            LValue::None => write!(f, "None"),
+            LValue::Variable(v) => write!(f, "{}", v),
+            LValue::StateFunction(sf) => write!(f, "{} - sf", sf),
+            LValue::StateVariable(sv) => write!(f, "{} - sv", sv),
+            LValue::Atom(a) => write!(f, "{} - atom", a),
+            LValue::Type(t) => write!(f, "{} - type", t),
+            LValue::FactBase(fb) => write!(f, "{} - fb", fb)
         }
     }
 }
 
-impl Add for LispAtom {
-    type Output = Result<LispAtom, LispError>;
+impl Add for LAtom {
+    type Output = Result<LAtom, LError>;
 
     fn add(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
-            (LispAtom::Number(LispNumber::Float(f1)), LispAtom::Number(LispNumber::Float(f2))) => {
-                Ok(LispAtom::Number(LispNumber::Float(f1 + f2)))
+            (LAtom::Number(LNumber::Float(f1)), LAtom::Number(LNumber::Float(f2))) => {
+                Ok(LAtom::Number(LNumber::Float(f1 + f2)))
             }
-            (LispAtom::Number(LispNumber::Int(i1)), LispAtom::Number(LispNumber::Int(i2))) => {
-                Ok(LispAtom::Number(LispNumber::Int(i1 + i2)))
+            (LAtom::Number(LNumber::Int(i1)), LAtom::Number(LNumber::Int(i2))) => {
+                Ok(LAtom::Number(LNumber::Int(i1 + i2)))
             }
-            (LispAtom::Number(LispNumber::Int(i1)), LispAtom::Number(LispNumber::Float(f2))) => {
-                Ok(LispAtom::Number(LispNumber::Float(i1 as f64 + f2)))
+            (LAtom::Number(LNumber::Int(i1)), LAtom::Number(LNumber::Float(f2))) => {
+                Ok(LAtom::Number(LNumber::Float(i1 as f64 + f2)))
             }
-            (LispAtom::Number(LispNumber::Float(f1)), LispAtom::Number(LispNumber::Int(i2))) => {
-                Ok(LispAtom::Number(LispNumber::Float(f1 + i2 as f64)))
+            (LAtom::Number(LNumber::Float(f1)), LAtom::Number(LNumber::Int(i2))) => {
+                Ok(LAtom::Number(LNumber::Float(f1 + i2 as f64)))
             }
-            (l, LispAtom::Number(_)) => {
-                Err(LispError::WrongType(l.into(), NameTypeLispValue::NAtom))
+            (l, LAtom::Number(_)) => {
+                Err(LError::WrongType(l.into(), NameTypeLValue::NAtom))
             }
-            (LispAtom::Number(_), l) => {
-                Err(LispError::WrongType(l.into(), NameTypeLispValue::NAtom))
+            (LAtom::Number(_), l) => {
+                Err(LError::WrongType(l.into(), NameTypeLValue::NAtom))
             }
-            (l1, l2) => Err(LispError::SpecialError(format!(
+            (l1, l2) => Err(LError::SpecialError(format!(
                 "{} and {} cannot be add",
-                NameTypeLispValue::from(l1),
-                NameTypeLispValue::from(l2)
+                NameTypeLValue::from(l1),
+                NameTypeLValue::from(l2)
             ))),
         }
     }
 }
 
-impl Add for LispValue {
-    type Output = Result<LispValue, LispError>;
+impl Add for LValue {
+    type Output = Result<LValue, LError>;
 
     fn add(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
-            (LispValue::Atom(a1), LispValue::Atom(a2)) => Ok(LispValue::Atom((a1 + a2)?)),
-            (LispValue::Atom(a1), LispValue::Variable(v2)) => {
+            (LValue::Atom(a1), LValue::Atom(a2)) => Ok(LValue::Atom((a1 + a2)?)),
+            (LValue::Atom(a1), LValue::Variable(v2)) => {
                 match v2.v_type {
-                    LispType::Int => Ok(LispValue::Atom((a1+v2.value)?)),
-                    LispType::Bool => Err(LispError::WrongType(NameTypeLispValue::BAtom, NameTypeLispValue::NAtom)),
-                    LispType::Float => Ok(LispValue::Atom((a1+v2.value)?)),
-                    LispType::Symbol(_) => Err(LispError::WrongType(NameTypeLispValue::SAtom, NameTypeLispValue::NAtom)),
+                    LType::Int => Ok(LValue::Atom((a1+v2.value)?)),
+                    LType::Bool => Err(LError::WrongType(NameTypeLValue::BAtom, NameTypeLValue::NAtom)),
+                    LType::Float => Ok(LValue::Atom((a1+v2.value)?)),
+                    LType::Symbol(_) => Err(LError::WrongType(NameTypeLValue::SAtom, NameTypeLValue::NAtom)),
                 }
             }
-            ( LispValue::Variable(v1), LispValue::Atom(a2)) => {
+            ( LValue::Variable(v1), LValue::Atom(a2)) => {
                 match v1.v_type {
-                    LispType::Int => Ok(LispValue::Atom((a2+v1.value)?)),
-                    LispType::Bool => Err(LispError::WrongType(NameTypeLispValue::BAtom, NameTypeLispValue::NAtom)),
-                    LispType::Float => Ok(LispValue::Atom((a2+v1.value)?)),
-                    LispType::Symbol(_) => Err(LispError::WrongType(NameTypeLispValue::SAtom, NameTypeLispValue::NAtom)),
+                    LType::Int => Ok(LValue::Atom((a2+v1.value)?)),
+                    LType::Bool => Err(LError::WrongType(NameTypeLValue::BAtom, NameTypeLValue::NAtom)),
+                    LType::Float => Ok(LValue::Atom((a2+v1.value)?)),
+                    LType::Symbol(_) => Err(LError::WrongType(NameTypeLValue::SAtom, NameTypeLValue::NAtom)),
                 }
             }
-            (LispValue::Atom(_), l) => {
-                Err(LispError::WrongType(l.into(), NameTypeLispValue::NAtom))
+            (LValue::Atom(_), l) => {
+                Err(LError::WrongType(l.into(), NameTypeLValue::NAtom))
             }
-            (l, LispValue::Atom(_)) => {
-                Err(LispError::WrongType(l.into(), NameTypeLispValue::NAtom))
+            (l, LValue::Atom(_)) => {
+                Err(LError::WrongType(l.into(), NameTypeLValue::NAtom))
             }
 
-            (l1, l2) => Err(LispError::SpecialError(format!(
+            (l1, l2) => Err(LError::SpecialError(format!(
                 "{} and {} cannot be add",
-                NameTypeLispValue::from(l1),
-                NameTypeLispValue::from(l2)
+                NameTypeLValue::from(l1),
+                NameTypeLValue::from(l2)
             ))),
         }
     }

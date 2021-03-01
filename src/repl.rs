@@ -1,12 +1,11 @@
 //imports for rustyline
 use crate::lisp::lisp_language::*;
-use crate::lisp::lisp_struct::LispError::*;
+use crate::lisp::lisp_struct::LError::*;
 use crate::lisp::lisp_struct::*;
-use crate::lisp::LispEnv;
+use crate::lisp::LEnv;
 use aries_planning::parsing::sexpr::{parse, SExpr};
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
-use std::num::ParseFloatError;
 
 pub fn test_rustyline() {
     // `()` can be used when no completer is required
@@ -14,7 +13,7 @@ pub fn test_rustyline() {
     if rl.load_history("history.txt").is_err() {
         println!("No previous history.");
     }
-    let mut env: LispEnv = Default::default();
+    let mut env: LEnv = Default::default();
     loop {
         let readline = rl.readline(">> ");
         match readline {
@@ -48,29 +47,29 @@ pub fn test_rustyline() {
     rl.save_history("history.txt").unwrap();
 }
 
-pub fn eval(se: &SExpr, env: &mut LispEnv) -> Result<LispValue, LispError> {
+pub fn eval(se: &SExpr, env: &mut LEnv) -> Result<LValue, LError> {
     match se {
         SExpr::Atom(atom) => {
             //println!("expression is an atom: {}", atom);
             //Test if its an int
             return match atom.as_str().parse::<i64>() {
-                Ok(int) => Ok(LispValue::Atom(LispAtom::Number(LispNumber::Int(int)))),
+                Ok(int) => Ok(LValue::Atom(LAtom::Number(LNumber::Int(int)))),
                 Err(_) => match atom.as_str().parse::<f64>() { //Test if its a float
-                    Ok(float) => Ok(LispValue::Atom(LispAtom::Number(LispNumber::Float(float)))),
+                    Ok(float) => Ok(LValue::Atom(LAtom::Number(LNumber::Float(float)))),
                     Err(_) => match atom.as_str() { //Test if its a Boolean
                         TRUE => {
                             //println!("atom is boolean true");
-                            Ok(LispValue::Atom(LispAtom::Bool(true)))
+                            Ok(LValue::Atom(LAtom::Bool(true)))
                         }
                         FALSE => {
                             //println!("atom is boolean false");
-                            Ok(LispValue::Atom(LispAtom::Bool(false)))
+                            Ok(LValue::Atom(LAtom::Bool(false)))
                         }
                         s => { //is a symbol, if it exist return it
                             //println!("atom is a symbol: {}", s);
                             return match env.get_symbol(s.to_string()) {
                                 Ok(s) => Ok(s),
-                                Err(_) => return Ok(LispValue::Atom(LispAtom::Symbol(s.into()))),
+                                Err(_) => return Ok(LValue::Atom(LAtom::Symbol(s.into()))),
                             }
                         }
                     }
@@ -95,13 +94,13 @@ pub fn eval(se: &SExpr, env: &mut LispEnv) -> Result<LispValue, LispError> {
                     let conseq = list_iter.pop()?;
                     let alt = list_iter.pop()?;
                     return match eval(test, env) {
-                        Ok(LispValue::Atom(LispAtom::Bool(true))) => {
+                        Ok(LValue::Atom(LAtom::Bool(true))) => {
                             eval(conseq, env)
                         }
-                        Ok(LispValue::Atom(LispAtom::Bool(false))) => {
+                        Ok(LValue::Atom(LAtom::Bool(false))) => {
                             eval(alt, env)
                         }
-                        Ok(lv) => Err(WrongType(lv.into(), NameTypeLispValue::BAtom)),
+                        Ok(lv) => Err(WrongType(lv.into(), NameTypeLValue::BAtom)),
                         Err(e) => Err(e)
                     }
 
@@ -111,10 +110,10 @@ pub fn eval(se: &SExpr, env: &mut LispEnv) -> Result<LispValue, LispError> {
             if is_first_atom_function {
                 //println!("{} is a function",first_atom);
                 let proc = match eval(&SExpr::Atom(first_atom.clone()), env)? {
-                    LispValue::LispFn(f) => f,
-                    lv => return Err(WrongType(lv.into(), NameTypeLispValue::LispFn)),
+                    LValue::LFn(f) => f,
+                    lv => return Err(WrongType(lv.into(), NameTypeLValue::LFn)),
                 };
-                let mut args: Vec<LispValue> = Vec::new();
+                let mut args: Vec<LValue> = Vec::new();
                 for arg in list_iter {
                     args.push(eval(arg, env)?)
                 }
@@ -123,5 +122,5 @@ pub fn eval(se: &SExpr, env: &mut LispEnv) -> Result<LispValue, LispError> {
             }
         }
     };
-    Ok(LispValue::None)
+    Ok(LValue::None)
 }

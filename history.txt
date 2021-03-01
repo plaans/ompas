@@ -66,3 +66,6 @@ get value
 (get alice)
 (define loc (sf object object))
 (get loc)
+(if (> (* 11 11) 120) (* 7 6) oops)
+(if true (* 7 6) oops)
+(if false (* 7 6) oops)

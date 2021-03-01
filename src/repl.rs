@@ -89,7 +89,22 @@ pub fn eval(se: &SExpr, env: &mut LispEnv) -> Result<LispValue, LispError> {
                     let exp = eval(sexpr, env)?;
                     env.symbols.insert(sym, exp);
                 }
-                IF => {} //println!("conditional"),
+                IF => {
+                    let test = list_iter.pop()?;
+                    let conseq = list_iter.pop()?;
+                    let alt = list_iter.pop()?;
+                    return match eval(test, env) {
+                        Ok(LispValue::Atom(LispAtom::Bool(true))) => {
+                            eval(conseq, env)
+                        }
+                        Ok(LispValue::Atom(LispAtom::Bool(false))) => {
+                            eval(alt, env)
+                        }
+                        Ok(lv) => Err(WrongType(lv.into(), NameTypeLispValue::BAtom)),
+                        Err(e) => Err(e)
+                    }
+
+                } //println!("conditional"),
                 _ => is_first_atom_function = true,
             }
             if is_first_atom_function {

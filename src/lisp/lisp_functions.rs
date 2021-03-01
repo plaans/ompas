@@ -2,7 +2,6 @@
 use crate::lisp::lisp_struct::LispError::*;
 use crate::lisp::lisp_struct::*;
 use crate::lisp::lisp_language::TYPE_OBJECT;
-use crate::fact_base::language::TYPE;
 
 pub fn get(values: Vec<LispValue>) -> Result<LispValue, LispError> {
     match values.len() {

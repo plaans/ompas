@@ -20,7 +20,7 @@ pub const IS_FN: &str = "fn?";
 //FactBase language
 pub const VARIABLE: &str = "var";
 pub const OBJECT: &str = "obj";
-pub const STATE_FUNCTION: &str ="sf";
+pub const STATE_FUNCTION: &str = "sf";
 
 //basic types
 pub const TYPE_INT: &str = "int";
@@ -28,13 +28,11 @@ pub const TYPE_FLOAT: &str = "float";
 pub const TYPE_OBJECT: &str = "object";
 pub const TYPE_BOOL: &str = "boolean";
 
-
 //Other
-pub const BEGIN:&str = "begin";
-pub const DEFINE:&str = "define";
+pub const BEGIN: &str = "begin";
+pub const DEFINE: &str = "define";
 pub const IF: &str = "if";
 pub const PI: &str = "pi";
 
 pub const TRUE: &str = "true";
 pub const FALSE: &str = "false";
-

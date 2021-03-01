@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 use crate::custom_symbol_table::{
     CustomStateFun, CustomSymbolTable, TYPE_BOOL_ID, TYPE_INT_ID, TYPE_OBJECT_ID,
 };
@@ -12,11 +13,11 @@ use aries_planning::parsing::sexpr::{parse, ListIter, SExpr};
 use aries_utils::input::{ErrLoc, Sym};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
-
+#[allow(dead_code)]
 pub const EMPTY: &str = "empty\n";
-
+#[allow(dead_code)]
 pub const FILE_EXTENSION: &str = "fb";
-
+#[allow(dead_code)]
 pub mod language {
     pub const PRED_SHORT: &str = "pred";
     pub const PRED_LONG: &str = "predicate";
@@ -37,7 +38,7 @@ pub mod language {
     pub const TRUE: &str = "true";
     pub const FALSE: &str = "false";
 }
-
+#[allow(dead_code)]
 pub mod commands {
     pub const COMMAND_HELP: &str = "help";
     pub const COMMAND_PATH: &str = "path";
@@ -57,7 +58,7 @@ pub mod commands {
     pub const HIST_SHORT: &str = "hist";
     pub const HIST_LONG: &str = "history";
 }
-
+#[allow(dead_code)]
 #[derive(PartialEq, Copy, Clone)]
 pub enum FactType {
     Variable,
@@ -66,14 +67,15 @@ pub enum FactType {
     Type,
     SF,
 }
-
+#[allow(dead_code)]
 pub enum FactBaseOk {
     Ok,
     SExpr(SExpr),
     String(String),
 }
-
+#[allow(dead_code)]
 impl Display for FactBaseOk {
+    #[allow(dead_code)]
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
             FactBaseOk::Ok => write!(f, "ok"),
@@ -82,7 +84,7 @@ impl Display for FactBaseOk {
         }
     }
 }
-
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum FactBaseError {
     ErrLoc(ErrLoc),
@@ -95,15 +97,15 @@ pub enum FactBaseError {
     WrongType(String, String),
     Default,
 }
-
+#[allow(dead_code)]
 pub type FactBaseResult = Result<FactBaseOk, FactBaseError>;
-
+#[allow(dead_code)]
 impl From<ErrLoc> for FactBaseError {
     fn from(e: ErrLoc) -> Self {
         FactBaseError::ErrLoc(e)
     }
 }
-
+#[allow(dead_code)]
 impl Display for FactBaseError {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
@@ -124,16 +126,16 @@ impl Display for FactBaseError {
         }
     }
 }
-
+#[allow(dead_code)]
 impl Into<std::fmt::Error> for FactBaseError {
     fn into(self) -> std::fmt::Error {
         std::fmt::Error::default()
     }
 }
-
+#[allow(dead_code)]
 #[derive(Clone)]
 pub struct FactBaseValue(Option<Sym>, bool);
-
+#[allow(dead_code)]
 #[derive(Default)]
 pub struct FactBase {
     ///List of variables
@@ -146,7 +148,7 @@ pub struct FactBase {
     ///Contains all the symbols defined with let. A fact can have as a value an other symbol or an integer (or boolean) value.
     symbol_table: CustomSymbolTable,
 }
-
+#[allow(dead_code)]
 impl FactBase {
     /// Transform the factbase into Lisp commands to reconstruct its states.
     pub fn to_commands(&self) -> Result<String, FactBaseError> {
@@ -221,7 +223,7 @@ impl FactBase {
         Ok(string)
     }
 }
-
+#[allow(dead_code)]
 ///Fact functions
 impl FactBase {
     ///Create a new factbase with its default values
@@ -675,7 +677,7 @@ impl FactBase {
         Ok(FactBaseOk::Ok)
     }
 }
-
+#[allow(dead_code)]
 ///Getters
 impl FactBase {
     fn get_fact_type(&self, sym_id: &SymId) -> FactType {
@@ -711,8 +713,8 @@ impl FactBase {
         }
     }
 }
-
-///Verificatiob
+#[allow(dead_code)]
+///Verification
 impl FactBase {
     fn is_const_variable(&self, sym: &Sym) -> bool {
         self.get_value_variable(sym).1
@@ -816,6 +818,7 @@ impl FactBase {
         }
     }
 }
+#[allow(dead_code)]
 ///Setters
 impl FactBase {
     fn set_value_variable(&mut self, key: Sym, value: FactBaseValue) {
@@ -826,14 +829,14 @@ impl FactBase {
         self.state_variables.insert(key, value);
     }
 }
-
+#[allow(dead_code)]
 ///Deletters
 impl FactBase {
     fn delete_symbol(&mut self, sym: &Sym) -> FactBaseResult {
         self.symbol_table.delete_symbol(sym)
     }
 }
-
+#[allow(dead_code)]
 fn vec_sym_to_string(sv: Vec<Sym>) -> String {
     let mut string = String::new();
     if sv.len() < 2 {
@@ -852,7 +855,7 @@ fn vec_sym_to_string(sv: Vec<Sym>) -> String {
     string.push_str("]");
     string
 }
-
+#[allow(dead_code)]
 fn list_iter_to_string(mut list: ListIter) -> String {
     let mut string = String::new();
     while !list.is_empty() {
@@ -863,7 +866,7 @@ fn list_iter_to_string(mut list: ListIter) -> String {
     }
     string
 }
-
+#[allow(dead_code)]
 impl Display for FactBase {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         let mut r = String::new();

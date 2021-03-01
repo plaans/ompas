@@ -6,6 +6,7 @@ use crate::lisp::LispEnv;
 use aries_planning::parsing::sexpr::{parse, SExpr};
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
+use std::num::ParseFloatError;
 
 pub fn test_rustyline() {
     // `()` can be used when no completer is required
@@ -51,26 +52,26 @@ pub fn eval(se: &SExpr, env: &mut LispEnv) -> Result<LispValue, LispError> {
     match se {
         SExpr::Atom(atom) => {
             //println!("expression is an atom: {}", atom);
-            let r_int = atom.as_str().parse::<i64>();
-            return match r_int {
-                Ok(int) => {
-                    //println!("atom is a number: {}", int);
-                    Ok(LispValue::Atom(LispAtom::Number(LispNumber::Int(int))))
-                }
-                Err(_) => match atom.as_str() {
-                    TRUE => {
-                        //println!("atom is boolean true");
-                        Ok(LispValue::Atom(LispAtom::Bool(true)))
-                    }
-                    FALSE => {
-                        //println!("atom is boolean false");
-                        Ok(LispValue::Atom(LispAtom::Bool(false)))
-                    }
-                    s => {
-                        //println!("atom is a symbol: {}", s);
-                        return match env.get_symbol(s.to_string()) {
-                            Ok(s) => Ok(s),
-                            Err(_) => return Ok(LispValue::Atom(LispAtom::Symbol(s.into()))),
+            //Test if its an int
+            return match atom.as_str().parse::<i64>() {
+                Ok(int) => Ok(LispValue::Atom(LispAtom::Number(LispNumber::Int(int)))),
+                Err(_) => match atom.as_str().parse::<f64>() { //Test if its a float
+                    Ok(float) => Ok(LispValue::Atom(LispAtom::Number(LispNumber::Float(float)))),
+                    Err(_) => match atom.as_str() { //Test if its a Boolean
+                        TRUE => {
+                            //println!("atom is boolean true");
+                            Ok(LispValue::Atom(LispAtom::Bool(true)))
+                        }
+                        FALSE => {
+                            //println!("atom is boolean false");
+                            Ok(LispValue::Atom(LispAtom::Bool(false)))
+                        }
+                        s => { //is a symbol, if it exist return it
+                            //println!("atom is a symbol: {}", s);
+                            return match env.get_symbol(s.to_string()) {
+                                Ok(s) => Ok(s),
+                                Err(_) => return Ok(LispValue::Atom(LispAtom::Symbol(s.into()))),
+                            }
                         }
                     }
                 },

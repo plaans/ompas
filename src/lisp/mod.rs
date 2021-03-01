@@ -14,6 +14,8 @@ pub struct LispEnv {
 impl Default for LispEnv {
     fn default() -> Self {
         let mut hash_map: HashMap<String, LispValue> = HashMap::default();
+        hash_map.insert(GET.to_string(), LispValue::LispFn(Box::new(get)));
+
         //Mathematical functions
         hash_map.insert(ADD.to_string(), LispValue::LispFn(Box::new(add)));
         hash_map.insert(SUB.to_string(), LispValue::LispFn(Box::new(sub)));
@@ -53,6 +55,8 @@ impl Default for LispEnv {
 
         //Functions for the factbase
         hash_map.insert(VARIABLE.to_string(), LispValue::LispFn(Box::new(var)));
+        hash_map.insert(STATE_FUNCTION.to_string(), LispValue::LispFn(Box::new(state_function)));
+        hash_map.insert(OBJECT.to_string(), LispValue::LispFn(Box::new(object)));
         Self { symbols: hash_map }
     }
 }

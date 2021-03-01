@@ -68,7 +68,10 @@ pub fn eval(se: &SExpr, env: &mut LispEnv) -> Result<LispValue, LispError> {
                     }
                     s => {
                         //println!("atom is a symbol: {}", s);
-                        return env.get_symbol(s.to_string());
+                        return match env.get_symbol(s.to_string()) {
+                            Ok(s) => Ok(s),
+                            Err(_) => return Ok(LispValue::Atom(LispAtom::Symbol(s.into()))),
+                        }
                     }
                 },
             };
@@ -93,7 +96,7 @@ pub fn eval(se: &SExpr, env: &mut LispEnv) -> Result<LispValue, LispError> {
                 //println!("{} is a function",first_atom);
                 let proc = match eval(&SExpr::Atom(first_atom.clone()), env)? {
                     LispValue::LispFn(f) => f,
-                    lv => return Err(WrongType(NameTypeLispValue::LispFn, lv.into())),
+                    lv => return Err(WrongType(lv.into(), NameTypeLispValue::LispFn)),
                 };
                 let mut args: Vec<LispValue> = Vec::new();
                 for arg in list_iter {

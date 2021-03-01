@@ -1,3 +1,5 @@
+pub const GET:&str = "get";
+
 //Mathematical functions
 pub const ADD: &str = "+";
 pub const SUB: &str = "-";

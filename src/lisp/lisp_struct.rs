@@ -64,6 +64,18 @@ impl Display for LispType {
     }
 }
 
+impl PartialEq for LispType {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (LispType::Int, LispType::Int) => true,
+            (LispType::Bool, LispType::Bool) => true,
+            (LispType::Float, LispType::Float) => true,
+            (LispType::Symbol(s1), LispType::Symbol(s2)) => s1 == s2,
+            (_, _) => false,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub enum LispAtom {
     Symbol(Sym),
@@ -95,8 +107,8 @@ impl Display for LispVariable {
 
 #[derive(Clone)]
 pub struct LispStateFunction {
-    t_params: Vec<LispType>,
-    t_value: LispType,
+    pub t_params: Vec<LispType>,
+    pub t_value: LispType,
 }
 
 impl Display for LispStateFunction {
@@ -440,12 +452,29 @@ impl Add for LispValue {
     fn add(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
             (LispValue::Atom(a1), LispValue::Atom(a2)) => Ok(LispValue::Atom((a1 + a2)?)),
+            (LispValue::Atom(a1), LispValue::Variable(v2)) => {
+                match v2.v_type {
+                    LispType::Int => Ok(LispValue::Atom((a1+v2.value)?)),
+                    LispType::Bool => Err(LispError::WrongType(NameTypeLispValue::BAtom, NameTypeLispValue::NAtom)),
+                    LispType::Float => Ok(LispValue::Atom((a1+v2.value)?)),
+                    LispType::Symbol(_) => Err(LispError::WrongType(NameTypeLispValue::SAtom, NameTypeLispValue::NAtom)),
+                }
+            }
+            ( LispValue::Variable(v1), LispValue::Atom(a2)) => {
+                match v1.v_type {
+                    LispType::Int => Ok(LispValue::Atom((a2+v1.value)?)),
+                    LispType::Bool => Err(LispError::WrongType(NameTypeLispValue::BAtom, NameTypeLispValue::NAtom)),
+                    LispType::Float => Ok(LispValue::Atom((a2+v1.value)?)),
+                    LispType::Symbol(_) => Err(LispError::WrongType(NameTypeLispValue::SAtom, NameTypeLispValue::NAtom)),
+                }
+            }
             (LispValue::Atom(_), l) => {
                 Err(LispError::WrongType(l.into(), NameTypeLispValue::NAtom))
             }
             (l, LispValue::Atom(_)) => {
                 Err(LispError::WrongType(l.into(), NameTypeLispValue::NAtom))
             }
+
             (l1, l2) => Err(LispError::SpecialError(format!(
                 "{} and {} cannot be add",
                 NameTypeLispValue::from(l1),

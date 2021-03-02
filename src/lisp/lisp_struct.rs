@@ -4,6 +4,9 @@ use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Add, Range};
 use std::collections::HashMap;
+use crate::lisp::lisp_language::{OBJECT, TYPE_OBJECT};
+use std::hash::Hash;
+use std::hash;
 
 pub enum LError {
     WrongType(NameTypeLValue, NameTypeLValue),
@@ -84,6 +87,17 @@ pub enum LAtom {
     Bool(bool),
 }
 
+impl Into<LType> for LAtom {
+    fn into(self) -> LType {
+        match self {
+            LAtom::Symbol(_) => LType::Symbol(TYPE_OBJECT.into()),
+            LAtom::Number(LNumber::Float(_)) => LType::Float,
+            LAtom::Number(LNumber::Int(_)) => LType::Int,
+            LAtom::Bool(_) => LType::Bool,
+        }
+    }
+}
+
 impl Display for LAtom {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
@@ -108,6 +122,7 @@ impl Display for LVariable {
 
 #[derive(Clone)]
 pub struct LStateFunction {
+    pub label : Sym,
     pub t_params: Vec<LType>,
     pub t_value: LType,
 }
@@ -115,7 +130,7 @@ pub struct LStateFunction {
 impl Display for LStateFunction {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         let mut sr = String::new();
-        sr.push('(');
+        sr.push_str(format!("{} (", self.label).as_str());
         for (i, t_param) in self.t_params.iter().enumerate() {
             sr.push_str(format!("{}", t_param).as_str());
             if i > 0 {
@@ -145,6 +160,19 @@ impl Display for LStateVariable {
         }
         sr.push_str(format!(") = {}", self.value).as_str());
         write!(f, "{}", sr)
+    }
+}
+
+impl LStateVariable {
+    pub fn new(params: Vec<LAtom>, value: LAtom) -> Self {
+        Self {
+            params,
+            value
+        }
+    }
+
+    pub fn get_key_value(&self) -> (Vec<LAtom>,LAtom){
+        (self.params.clone(), self.value.clone())
     }
 }
 
@@ -186,8 +214,17 @@ impl Display for LFactBase {
     }
 }
 
+impl LFactBase {
+    pub fn new(facts: HashMap<Vec<LAtom>, LAtom>) -> Self {
+        LFactBase {
+            facts
+        }
+    }
+}
+
 #[derive(Clone)]
 pub enum NameTypeLValue {
+    Atom,
     Variable,
     Type,
     StateFunction,
@@ -217,6 +254,7 @@ impl Display for NameTypeLValue {
             NameTypeLValue::None => "None",
             NameTypeLValue::Variable => "Variable",
             NameTypeLValue::FactBase => "FactBase",
+            NameTypeLValue::Atom => "Atom",
         };
         write!(f, "{}", str)
     }
@@ -289,6 +327,22 @@ impl PartialEq for LAtom {
             _ => false,
         }
     }
+}
+
+impl Hash for LAtom {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        match self {
+            LAtom::Symbol(s) => s.hash(state),
+            LAtom::Number(LNumber::Float(f)) => format!("{}",f).hash(state),
+            LAtom::Number(LNumber::Int(i)) => i.hash(state),
+            LAtom::Bool(b) => b.hash(state)
+        }
+
+    }
+}
+
+impl std::cmp::Eq for LAtom {
+
 }
 
 impl PartialOrd for LAtom {
@@ -428,16 +482,16 @@ impl Debug for LValue {
 impl Display for LValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            LValue::String(s) => write!(f, "{} - string", s),
-            LValue::SExpr(s) => write!(f, "{} - sexpr", s),
+            LValue::String(s) => write!(f, "string: {}", s),
+            LValue::SExpr(s) => write!(f, "sexpr: {}", s),
             LValue::LFn(_) => write!(f, "LFunction"),
             LValue::None => write!(f, "None"),
             LValue::Variable(v) => write!(f, "{}", v),
-            LValue::StateFunction(sf) => write!(f, "{} - sf", sf),
-            LValue::StateVariable(sv) => write!(f, "{} - sv", sv),
-            LValue::Atom(a) => write!(f, "{} - atom", a),
-            LValue::Type(t) => write!(f, "{} - type", t),
-            LValue::FactBase(fb) => write!(f, "{} - fb", fb)
+            LValue::StateFunction(sf) => write!(f, "sf: {}", sf),
+            LValue::StateVariable(sv) => write!(f, "sv: {}", sv),
+            LValue::Atom(a) => write!(f, "atom: {}", a),
+            LValue::Type(t) => write!(f, "type: {}", t),
+            LValue::FactBase(fb) => write!(f, "fb:\n{}", fb)
         }
     }
 }

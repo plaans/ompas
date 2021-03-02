@@ -104,7 +104,14 @@ pub fn eval(se: &SExpr, env: &mut LEnv) -> Result<LValue, LError> {
                         Err(e) => Err(e)
                     }
 
-                } //println!("conditional"),
+                }
+                READ => {
+                    unimplemented!()
+                }
+                WRITE => {
+                    unimplemented!()
+                }
+                //println!("conditional"),
                 _ => is_first_atom_function = true,
             }
             if is_first_atom_function {

@@ -23,6 +23,8 @@ pub const IS_FN: &str = "fn?";
 pub const VARIABLE: &str = "var";
 pub const OBJECT: &str = "obj";
 pub const STATE_FUNCTION: &str = "sf";
+pub const STATE_VARIABLE: &str = "sv";
+pub const FACTBASE: &str = "factbase";
 pub const TYPE: &str = "type";
 
 //basic types
@@ -34,8 +36,12 @@ pub const TYPE_BOOL: &str = "boolean";
 //Other
 pub const BEGIN: &str = "begin";
 pub const DEFINE: &str = "define";
+pub const SET: &str = "set";
 pub const IF: &str = "if";
+pub const READ: &str = "read";
+pub const WRITE: &str = "write";
 pub const PI: &str = "pi";
+
 
 pub const TRUE: &str = "true";
 pub const FALSE: &str = "false";

@@ -2,6 +2,9 @@
 use crate::lisp::lisp_struct::LError::*;
 use crate::lisp::lisp_struct::*;
 use crate::lisp::lisp_language::TYPE_OBJECT;
+use std::collections::HashMap;
+use aries_utils::input::Sym;
+use aries_model::Label;
 
 pub fn get(values: Vec<LValue>) -> Result<LValue, LError> {
     match values.len() {
@@ -251,20 +254,29 @@ pub fn object(values: Vec<LValue>) -> Result<LValue, LError> {
 pub fn state_function(values: Vec<LValue>) -> Result<LValue, LError> {
     let mut vec_params:Vec<LType> = Vec::new();
     let mut t_value:LType = LType::Symbol(TYPE_OBJECT.into());
+    let mut label= Sym::from("none");
     for (i,value) in values.iter().enumerate() {
-        match value {
-            LValue::Type(ltype) => {
-                if i == values.len()-1 {
-                    t_value = ltype.clone();
-                }
-                else {
-                    vec_params.push(ltype.clone())
-                }
+        if i == 0 {
+            match value {
+                LValue::Atom(LAtom::Symbol(s)) => label = s.clone(),
+                lv => return Err(WrongType(lv.clone().into(), NameTypeLValue::SAtom))
             }
-            lv => return Err(WrongType(lv.clone().into(), NameTypeLValue::Type))
+        }
+        else {
+            match value {
+                LValue::Type(ltype) => {
+                    if i == values.len() - 1 {
+                        t_value = ltype.clone();
+                    } else {
+                        vec_params.push(ltype.clone())
+                    }
+                }
+                lv => return Err(WrongType(lv.clone().into(), NameTypeLValue::Type))
+            }
         }
     }
     Ok(LValue::StateFunction(LStateFunction {
+        label: label.clone(),
         t_params: vec_params,
         t_value: t_value
     }))
@@ -283,4 +295,76 @@ pub fn def_type(values: Vec<LValue>) -> Result<LValue, LError> {
         }
         len => Err(WrongNumerOfArgument(len, 1..1))
     }
+}
+
+pub fn state_variable(values: Vec<LValue>) -> Result<LValue, LError> {
+    let mut params: Vec<LAtom> = vec![];
+    let mut value: LAtom = LAtom::Bool(true);
+    let mut sf : LStateFunction = LStateFunction {
+        label: "none".into(),
+        t_params: vec![],
+        t_value: LType::Int
+    };
+    for (i,val) in values.iter().enumerate() {
+        if i == 0 {
+            match val {
+                LValue::StateFunction(lsf) => {
+                    sf = lsf.clone();
+                    if sf.t_params.len()+1 != values.len() - 1 {
+                        return Err(WrongNumerOfArgument(values.len()-1, sf.t_params.len()+2..sf.t_params.len()+2))
+                    }
+                    params.push(LAtom::Symbol(sf.label));
+                }
+                lv => return Err(WrongType(lv.clone().into(), NameTypeLValue::StateFunction))
+            };
+        }
+        else {
+            let mut atom: LAtom;
+            match val {
+                LValue::Atom(la) => {
+                    atom = la.clone();
+                }
+                LValue::Variable(va) => {
+                    atom = va.value.clone();
+
+                }
+                lv => return Err(WrongType(lv.clone().into(), NameTypeLValue::Atom))
+            }
+            if i < values.len() - 1 {
+                let val_type:LType = atom.clone().into();
+                let expected_type = sf.t_params.get(i-1).unwrap().clone();
+                if val_type !=  expected_type {
+                    return Err(LError::SpecialError(format!("Got {}, expected {}", val_type, expected_type )))
+                }
+                params.push(atom.clone());
+            } else {
+                value = atom.clone();
+            }
+        }
+    }
+
+    Ok(LValue::StateVariable(LStateVariable::new(params.clone(), value)))
+}
+
+
+pub fn factbase(values: Vec<LValue>) -> Result<LValue, LError> {
+    let mut facts: HashMap<Vec<LAtom>, LAtom> = Default::default();
+    for value in values {
+        match value {
+            LValue::StateVariable(sv) => {
+                let (key,value) = sv.get_key_value();
+                facts.insert(key, value);
+            },
+            lv => return Err(WrongType(lv.into(), NameTypeLValue::StateVariable)),
+        }
+    };
+    Ok(LValue::FactBase(LFactBase::new(facts)))
+
+}
+
+pub fn read(values: Vec<LValue>) -> Result<LValue, LError> {
+    unimplemented!()
+}
+pub fn write(values: Vec<LValue>) -> Result<LValue, LError> {
+    unimplemented!()
 }

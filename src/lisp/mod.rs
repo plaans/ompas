@@ -58,6 +58,9 @@ impl Default for LEnv {
         hash_map.insert(STATE_FUNCTION.to_string(), LValue::LFn(Box::new(state_function)));
         hash_map.insert(OBJECT.to_string(), LValue::LFn(Box::new(object)));
         hash_map.insert(TYPE.to_string(), LValue::LFn(Box::new(def_type)));
+        hash_map.insert(STATE_VARIABLE.to_string(), LValue::LFn(Box::new(state_variable)));
+        hash_map.insert(FACTBASE.to_string(), LValue::LFn(Box::new(factbase)));
+
         Self { symbols: hash_map }
     }
 }

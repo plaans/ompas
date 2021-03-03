@@ -5,6 +5,7 @@ use crate::lisp::lisp_language::TYPE_OBJECT;
 use std::collections::HashMap;
 use aries_utils::input::Sym;
 use aries_model::Label;
+use crate::lisp::lisp_struct::NameTypeLValue::FactBase;
 
 pub fn get(values: Vec<LValue>) -> Result<LValue, LError> {
     match values.len() {
@@ -319,7 +320,7 @@ pub fn state_variable(values: Vec<LValue>) -> Result<LValue, LError> {
             };
         }
         else {
-            let mut atom: LAtom;
+            let atom: LAtom;
             match val {
                 LValue::Atom(la) => {
                     atom = la.clone();
@@ -367,4 +368,38 @@ pub fn read(values: Vec<LValue>) -> Result<LValue, LError> {
 }
 pub fn write(values: Vec<LValue>) -> Result<LValue, LError> {
     unimplemented!()
+}
+
+//TODO: Define set behaviour for other type of LValue
+pub fn set(values: Vec<LValue>) -> Result<LValue, LError> {
+    if values.len() < 2 {
+        return Err(WrongNumerOfArgument(values.len(), 2..std::usize::MAX));
+    }
+    let result = match values[0].clone() {
+        LValue::FactBase(fb) => {
+            let mut facts =fb.get_facts();
+            for value in &values[1..] {
+                match value {
+                    LValue::StateVariable(sv) => {
+                        let (key,value) = sv.get_key_value();
+                        facts.insert(key, value);
+                    },
+                    lv => return Err(WrongType(lv.clone().into(), NameTypeLValue::StateVariable)),
+                }
+            };
+            LValue::FactBase(LFactBase::new(facts))
+        }
+        LValue::Variable(_) => {LValue::None}
+        LValue::Type(_) => {LValue::None}
+        LValue::StateFunction(_) => {LValue::None}
+        LValue::StateVariable(_) => {LValue::None}
+        LValue::Atom(_) => {LValue::None}
+        LValue::String(_) => {LValue::None}
+        LValue::SExpr(_) => {LValue::None}
+        LValue::LFn(_) => {LValue::None}
+        LValue::None => {LValue::None}
+    };
+
+    Ok(result)
+
 }

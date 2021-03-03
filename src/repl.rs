@@ -87,7 +87,7 @@ pub fn eval(se: &SExpr, env: &mut LEnv) -> Result<LValue, LError> {
                     let sym = list_iter.pop_atom()?.to_string();
                     let sexpr = list_iter.pop()?;
                     let exp = eval(sexpr, env)?;
-                    env.symbols.insert(sym, exp);
+                    env.add_entry(sym, exp);
                 }
                 IF => {
                     let test = list_iter.pop()?;

@@ -220,6 +220,10 @@ impl LFactBase {
             facts
         }
     }
+
+    pub fn get_facts(&self) -> HashMap<Vec<LAtom>, LAtom> {
+        self.facts.clone()
+    }
 }
 
 #[derive(Clone)]

@@ -9,6 +9,7 @@ pub mod lisp_struct;
 
 pub struct LEnv {
     pub symbols: HashMap<String, LValue>,
+    new_entry: Vec<String>
 }
 
 impl Default for LEnv {
@@ -61,7 +62,9 @@ impl Default for LEnv {
         hash_map.insert(STATE_VARIABLE.to_string(), LValue::LFn(Box::new(state_variable)));
         hash_map.insert(FACTBASE.to_string(), LValue::LFn(Box::new(factbase)));
 
-        Self { symbols: hash_map }
+        hash_map.insert(SET.to_string(), LValue::LFn(Box::new(set)));
+
+        Self { symbols: hash_map, new_entry: vec![] }
     }
 }
 
@@ -71,6 +74,11 @@ impl LEnv {
             None => Err(LError::UndefinedSymbol(s)),
             Some(lv) => Ok(lv.clone()),
         }
+    }
+
+    pub fn add_entry(&mut self, sym: String, exp: LValue) {
+        self.symbols.insert(sym.clone(), exp);
+        self.new_entry.push(sym.clone());
     }
 }
 

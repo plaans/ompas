@@ -6,6 +6,9 @@ use crate::lisp::LEnv;
 use aries_planning::parsing::sexpr::{parse, SExpr};
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
+use std::fs::File;
+use std::io::Read;
+use aries_utils::input::Input;
 
 pub fn test_rustyline() {
     // `()` can be used when no completer is required
@@ -106,7 +109,14 @@ pub fn eval(se: &SExpr, env: &mut LEnv) -> Result<LValue, LError> {
 
                 }
                 READ => {
-                    unimplemented!()
+                    let file_name = list_iter.pop_atom()?.to_string();
+                    let mut file = File::open(file_name)?;
+                    let mut buffer = String::new();
+                    file.read_to_string(&mut buffer)?;
+                    match parse(Input::from_string(buffer)) {
+                        Ok(s) => eval(&s, env),
+                        Err(e) => { return Err(SpecialError(e.to_string())) }
+                    }
                 }
                 WRITE => {
                     unimplemented!()

@@ -1,12 +1,16 @@
+use crate::lisp::lisp_language::*;
 use aries_planning::parsing::sexpr::SExpr;
 use aries_utils::input::{ErrLoc, Sym};
 use std::cmp::Ordering;
-use std::fmt::{Debug, Display, Formatter};
-use std::ops::{Add, Range};
 use std::collections::HashMap;
-use crate::lisp::lisp_language::{OBJECT, TYPE_OBJECT};
-use std::hash::Hash;
+use std::fmt::{Debug, Display, Formatter};
 use std::hash;
+use std::hash::Hash;
+use std::ops::{Add, Range};
+
+pub trait AsCommand {
+    unsafe fn as_command(&self) -> String;
+}
 
 pub enum LError {
     WrongType(NameTypeLValue, NameTypeLValue),
@@ -122,7 +126,7 @@ impl Display for LVariable {
 
 #[derive(Clone)]
 pub struct LStateFunction {
-    pub label : Sym,
+    pub label: Sym,
     pub t_params: Vec<LType>,
     pub t_value: LType,
 }
@@ -165,13 +169,10 @@ impl Display for LStateVariable {
 
 impl LStateVariable {
     pub fn new(params: Vec<LAtom>, value: LAtom) -> Self {
-        Self {
-            params,
-            value
-        }
+        Self { params, value }
     }
 
-    pub fn get_key_value(&self) -> (Vec<LAtom>,LAtom){
+    pub fn get_key_value(&self) -> (Vec<LAtom>, LAtom) {
         (self.params.clone(), self.value.clone())
     }
 }
@@ -194,7 +195,7 @@ pub enum LValue {
 
 #[derive(Clone)]
 pub struct LFactBase {
-    facts : HashMap<Vec<LAtom>, LAtom>,
+    facts: HashMap<Vec<LAtom>, LAtom>,
 }
 
 impl Display for LFactBase {
@@ -202,23 +203,21 @@ impl Display for LFactBase {
         let mut s = String::new();
         for (key, value) in self.facts.clone() {
             s.push('(');
-            for (i,k) in key.iter().enumerate() {
+            for (i, k) in key.iter().enumerate() {
                 s.push_str(format!("{}", k).as_str());
-                if i < key.len()-1 {
+                if i < key.len() - 1 {
                     s.push(',')
                 }
             }
             s.push_str(format!(") = {}", value).as_str());
-        };
+        }
         write!(f, "{}", s)
     }
 }
 
 impl LFactBase {
     pub fn new(facts: HashMap<Vec<LAtom>, LAtom>) -> Self {
-        LFactBase {
-            facts
-        }
+        LFactBase { facts }
     }
 
     pub fn get_facts(&self) -> HashMap<Vec<LAtom>, LAtom> {
@@ -240,7 +239,7 @@ pub enum NameTypeLValue {
     SExpr,
     LFn,
     None,
-    FactBase
+    FactBase,
 }
 
 impl Display for NameTypeLValue {
@@ -314,12 +313,8 @@ impl From<LAtom> for NameTypeLValue {
 impl PartialEq for LAtom {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (LAtom::Number(LNumber::Int(i1)), LAtom::Number(LNumber::Int(i2))) => {
-                *i1 == *i2
-            }
-            (LAtom::Number(LNumber::Float(f1)), LAtom::Number(LNumber::Float(f2))) => {
-                *f1 == *f2
-            }
+            (LAtom::Number(LNumber::Int(i1)), LAtom::Number(LNumber::Int(i2))) => *i1 == *i2,
+            (LAtom::Number(LNumber::Float(f1)), LAtom::Number(LNumber::Float(f2))) => *f1 == *f2,
             (LAtom::Number(LNumber::Int(i1)), LAtom::Number(LNumber::Float(f2))) => {
                 *i1 == *f2 as i64
             }
@@ -337,17 +332,14 @@ impl Hash for LAtom {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         match self {
             LAtom::Symbol(s) => s.hash(state),
-            LAtom::Number(LNumber::Float(f)) => format!("{}",f).hash(state),
+            LAtom::Number(LNumber::Float(f)) => format!("{}", f).hash(state),
             LAtom::Number(LNumber::Int(i)) => i.hash(state),
-            LAtom::Bool(b) => b.hash(state)
+            LAtom::Bool(b) => b.hash(state),
         }
-
     }
 }
 
-impl std::cmp::Eq for LAtom {
-
-}
+impl std::cmp::Eq for LAtom {}
 
 impl PartialOrd for LAtom {
     fn partial_cmp(&self, _other: &Self) -> Option<Ordering> {
@@ -356,12 +348,8 @@ impl PartialOrd for LAtom {
 
     fn lt(&self, other: &Self) -> bool {
         match (self, other) {
-            (LAtom::Number(LNumber::Int(i1)), LAtom::Number(LNumber::Int(i2))) => {
-                *i1 < *i2
-            }
-            (LAtom::Number(LNumber::Float(f1)), LAtom::Number(LNumber::Float(f2))) => {
-                *f1 < *f2
-            }
+            (LAtom::Number(LNumber::Int(i1)), LAtom::Number(LNumber::Int(i2))) => *i1 < *i2,
+            (LAtom::Number(LNumber::Float(f1)), LAtom::Number(LNumber::Float(f2))) => *f1 < *f2,
             (LAtom::Number(LNumber::Int(i1)), LAtom::Number(LNumber::Float(f2))) => {
                 *i1 < (*f2 as i64)
             }
@@ -374,12 +362,8 @@ impl PartialOrd for LAtom {
 
     fn le(&self, other: &Self) -> bool {
         match (self, other) {
-            (LAtom::Number(LNumber::Int(i1)), LAtom::Number(LNumber::Int(i2))) => {
-                *i1 <= *i2
-            }
-            (LAtom::Number(LNumber::Float(f1)), LAtom::Number(LNumber::Float(f2))) => {
-                *f1 <= *f2
-            }
+            (LAtom::Number(LNumber::Int(i1)), LAtom::Number(LNumber::Int(i2))) => *i1 <= *i2,
+            (LAtom::Number(LNumber::Float(f1)), LAtom::Number(LNumber::Float(f2))) => *f1 <= *f2,
             (LAtom::Number(LNumber::Int(i1)), LAtom::Number(LNumber::Float(f2))) => {
                 *i1 <= (*f2 as i64)
             }
@@ -392,12 +376,8 @@ impl PartialOrd for LAtom {
 
     fn gt(&self, other: &Self) -> bool {
         match (self, other) {
-            (LAtom::Number(LNumber::Int(i1)), LAtom::Number(LNumber::Int(i2))) => {
-                *i1 > *i2
-            }
-            (LAtom::Number(LNumber::Float(f1)), LAtom::Number(LNumber::Float(f2))) => {
-                *f1 > *f2
-            }
+            (LAtom::Number(LNumber::Int(i1)), LAtom::Number(LNumber::Int(i2))) => *i1 > *i2,
+            (LAtom::Number(LNumber::Float(f1)), LAtom::Number(LNumber::Float(f2))) => *f1 > *f2,
             (LAtom::Number(LNumber::Int(i1)), LAtom::Number(LNumber::Float(f2))) => {
                 *i1 > (*f2 as i64)
             }
@@ -410,12 +390,8 @@ impl PartialOrd for LAtom {
 
     fn ge(&self, other: &Self) -> bool {
         match (self, other) {
-            (LAtom::Number(LNumber::Int(i1)), LAtom::Number(LNumber::Int(i2))) => {
-                *i1 >= *i2
-            }
-            (LAtom::Number(LNumber::Float(f1)), LAtom::Number(LNumber::Float(f2))) => {
-                *f1 >= *f2
-            }
+            (LAtom::Number(LNumber::Int(i1)), LAtom::Number(LNumber::Int(i2))) => *i1 >= *i2,
+            (LAtom::Number(LNumber::Float(f1)), LAtom::Number(LNumber::Float(f2))) => *f1 >= *f2,
             (LAtom::Number(LNumber::Int(i1)), LAtom::Number(LNumber::Float(f2))) => {
                 *i1 >= (*f2 as i64)
             }
@@ -495,7 +471,7 @@ impl Display for LValue {
             LValue::StateVariable(sv) => write!(f, "sv: {}", sv),
             LValue::Atom(a) => write!(f, "atom: {}", a),
             LValue::Type(t) => write!(f, "type: {}", t),
-            LValue::FactBase(fb) => write!(f, "fb:\n{}", fb)
+            LValue::FactBase(fb) => write!(f, "fb:\n{}", fb),
         }
     }
 }
@@ -517,12 +493,8 @@ impl Add for LAtom {
             (LAtom::Number(LNumber::Float(f1)), LAtom::Number(LNumber::Int(i2))) => {
                 Ok(LAtom::Number(LNumber::Float(f1 + i2 as f64)))
             }
-            (l, LAtom::Number(_)) => {
-                Err(LError::WrongType(l.into(), NameTypeLValue::NAtom))
-            }
-            (LAtom::Number(_), l) => {
-                Err(LError::WrongType(l.into(), NameTypeLValue::NAtom))
-            }
+            (l, LAtom::Number(_)) => Err(LError::WrongType(l.into(), NameTypeLValue::NAtom)),
+            (LAtom::Number(_), l) => Err(LError::WrongType(l.into(), NameTypeLValue::NAtom)),
             (l1, l2) => Err(LError::SpecialError(format!(
                 "{} and {} cannot be add",
                 NameTypeLValue::from(l1),
@@ -538,34 +510,120 @@ impl Add for LValue {
     fn add(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
             (LValue::Atom(a1), LValue::Atom(a2)) => Ok(LValue::Atom((a1 + a2)?)),
-            (LValue::Atom(a1), LValue::Variable(v2)) => {
-                match v2.v_type {
-                    LType::Int => Ok(LValue::Atom((a1+v2.value)?)),
-                    LType::Bool => Err(LError::WrongType(NameTypeLValue::BAtom, NameTypeLValue::NAtom)),
-                    LType::Float => Ok(LValue::Atom((a1+v2.value)?)),
-                    LType::Symbol(_) => Err(LError::WrongType(NameTypeLValue::SAtom, NameTypeLValue::NAtom)),
-                }
-            }
-            ( LValue::Variable(v1), LValue::Atom(a2)) => {
-                match v1.v_type {
-                    LType::Int => Ok(LValue::Atom((a2+v1.value)?)),
-                    LType::Bool => Err(LError::WrongType(NameTypeLValue::BAtom, NameTypeLValue::NAtom)),
-                    LType::Float => Ok(LValue::Atom((a2+v1.value)?)),
-                    LType::Symbol(_) => Err(LError::WrongType(NameTypeLValue::SAtom, NameTypeLValue::NAtom)),
-                }
-            }
-            (LValue::Atom(_), l) => {
-                Err(LError::WrongType(l.into(), NameTypeLValue::NAtom))
-            }
-            (l, LValue::Atom(_)) => {
-                Err(LError::WrongType(l.into(), NameTypeLValue::NAtom))
-            }
+            (LValue::Atom(a1), LValue::Variable(v2)) => match v2.v_type {
+                LType::Int => Ok(LValue::Atom((a1 + v2.value)?)),
+                LType::Bool => Err(LError::WrongType(
+                    NameTypeLValue::BAtom,
+                    NameTypeLValue::NAtom,
+                )),
+                LType::Float => Ok(LValue::Atom((a1 + v2.value)?)),
+                LType::Symbol(_) => Err(LError::WrongType(
+                    NameTypeLValue::SAtom,
+                    NameTypeLValue::NAtom,
+                )),
+            },
+            (LValue::Variable(v1), LValue::Atom(a2)) => match v1.v_type {
+                LType::Int => Ok(LValue::Atom((a2 + v1.value)?)),
+                LType::Bool => Err(LError::WrongType(
+                    NameTypeLValue::BAtom,
+                    NameTypeLValue::NAtom,
+                )),
+                LType::Float => Ok(LValue::Atom((a2 + v1.value)?)),
+                LType::Symbol(_) => Err(LError::WrongType(
+                    NameTypeLValue::SAtom,
+                    NameTypeLValue::NAtom,
+                )),
+            },
+            (LValue::Atom(_), l) => Err(LError::WrongType(l.into(), NameTypeLValue::NAtom)),
+            (l, LValue::Atom(_)) => Err(LError::WrongType(l.into(), NameTypeLValue::NAtom)),
 
             (l1, l2) => Err(LError::SpecialError(format!(
                 "{} and {} cannot be add",
                 NameTypeLValue::from(l1),
                 NameTypeLValue::from(l2)
             ))),
+        }
+    }
+}
+
+impl AsCommand for LType {
+    unsafe fn as_command(&self) -> String {
+        match self {
+            LType::Symbol(s) => format!("(define {} (type {}))\n", s, s),
+            _ => "".to_string(),
+        }
+    }
+}
+
+impl AsCommand for LStateFunction {
+    unsafe fn as_command(&self) -> String {
+        let mut result = String::new();
+        result.push_str(format!("(define {} (sf {}", self.label, self.label).as_str());
+        for t_param in &self.t_params {
+            result.push_str(format!(" {}", t_param.to_string()).as_str());
+        }
+        result.push_str(format!(" {}))\n", self.t_value.to_string()).as_str());
+        result
+    }
+}
+
+impl AsCommand for LVariable {
+    unsafe fn as_command(&self) -> String {
+        unimplemented!()
+    }
+}
+
+impl AsCommand for LStateVariable {
+    unsafe fn as_command(&self) -> String {
+        static mut COUNTER_SV: usize = 0;
+        let mut result = String::new();
+        result.push_str(format!("(define sv_{}, (sv", COUNTER_SV).as_str());
+        COUNTER_SV += 1;
+        for param in &self.params {
+            result.push_str(format!(" {}", param.to_string()).as_str());
+        }
+        result.push_str(format!(" {}))\n", self.value.to_string()).as_str());
+        result
+    }
+}
+
+impl AsCommand for LAtom {
+    unsafe fn as_command(&self) -> String {
+        unimplemented!()
+    }
+}
+
+impl AsCommand for LFactBase {
+    unsafe fn as_command(&self) -> String {
+        static mut COUNTER_FB: usize = 0;
+        let mut result = String::new();
+        result.push_str(format!("(define fb_{} (fb ", COUNTER_FB).as_str());
+        COUNTER_FB += 1;
+        for (keys, value) in self.facts.iter() {
+            result.push_str("(sv ");
+            for key in keys {
+                result.push_str(format!(" {} ", key).as_str())
+            }
+            result.push_str(format!(" {})", value).as_str());
+        }
+        result.push_str("))\n");
+        result
+    }
+}
+
+impl AsCommand for LValue {
+    unsafe fn as_command(&self) -> String {
+        match self {
+            LValue::FactBase(fb) => fb.as_command(),
+            LValue::Variable(v) => v.as_command(),
+            LValue::Type(t) => t.as_command(),
+            LValue::StateFunction(sf) => sf.as_command(),
+            LValue::StateVariable(sv) => sv.as_command(),
+            LValue::Atom(a) => a.as_command(),
+            LValue::String(s) => s.to_string(),
+            LValue::SExpr(s) => s.to_string(),
+            LValue::LFn(_) => "".to_string(),
+            LValue::None => "".to_string(),
         }
     }
 }

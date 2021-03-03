@@ -1,11 +1,9 @@
 //TODO: Vérifier si les fonctions ne doivent prendre que deux paramètres
+use crate::lisp::lisp_language::TYPE_OBJECT;
 use crate::lisp::lisp_struct::LError::*;
 use crate::lisp::lisp_struct::*;
-use crate::lisp::lisp_language::TYPE_OBJECT;
-use std::collections::HashMap;
 use aries_utils::input::Sym;
-use aries_model::Label;
-use crate::lisp::lisp_struct::NameTypeLValue::FactBase;
+use std::collections::HashMap;
 
 pub fn get(values: Vec<LValue>) -> Result<LValue, LError> {
     match values.len() {
@@ -13,8 +11,6 @@ pub fn get(values: Vec<LValue>) -> Result<LValue, LError> {
         len => Err(WrongNumerOfArgument(len, 1..1)),
     }
 }
-
-
 
 //Mathematical functions
 pub fn add(values: Vec<LValue>) -> Result<LValue, LError> {
@@ -42,12 +38,7 @@ pub fn sub(values: Vec<LValue>) -> Result<LValue, LError> {
                         1 => second_val = *float,
                         _ => panic!("Strong error"),
                     },
-                    lv => {
-                        return Err(LError::WrongType(
-                            lv.clone().into(),
-                            NameTypeLValue::NAtom,
-                        ))
-                    }
+                    lv => return Err(LError::WrongType(lv.clone().into(), NameTypeLValue::NAtom)),
                 };
             }
 
@@ -88,12 +79,7 @@ pub fn div(values: Vec<LValue>) -> Result<LValue, LError> {
                         1 => second_val = *float,
                         _ => panic!("Strong error"),
                     },
-                    lv => {
-                        return Err(LError::WrongType(
-                            lv.clone().into(),
-                            NameTypeLValue::NAtom,
-                        ))
-                    }
+                    lv => return Err(LError::WrongType(lv.clone().into(), NameTypeLValue::NAtom)),
                 };
             }
 
@@ -192,19 +178,20 @@ pub fn var(values: Vec<LValue>) -> Result<LValue, LError> {
         2 => {
             let atom_type = match values[0].clone() {
                 LValue::Type(ltype) => ltype,
-                lv => return Err(WrongType(lv.into(), NameTypeLValue::Type))
+                lv => return Err(WrongType(lv.into(), NameTypeLValue::Type)),
             };
-            let atom_value:LAtom = match values[1].clone() {
+            let atom_value: LAtom = match values[1].clone() {
                 LValue::Variable(lvar) => {
                     if lvar.v_type == atom_type {
                         lvar.value
-                    }else {
-                        return Err(SpecialError(format!("Expected an atom of type {}, got {}", atom_type,lvar.v_type)))
+                    } else {
+                        return Err(SpecialError(format!(
+                            "Expected an atom of type {}, got {}",
+                            atom_type, lvar.v_type
+                        )));
                     }
-                },
-                LValue::Atom(latom) => {
-                    latom
                 }
+                LValue::Atom(latom) => latom,
                 lv => return Err(WrongType(lv.into(), NameTypeLValue::Variable)),
             };
             Ok(LValue::Variable(LVariable {
@@ -212,7 +199,7 @@ pub fn var(values: Vec<LValue>) -> Result<LValue, LError> {
                 value: atom_value,
             }))
         }
-        len => Err(WrongNumerOfArgument(len, 2..2))
+        len => Err(WrongNumerOfArgument(len, 2..2)),
     }
 }
 
@@ -224,11 +211,11 @@ pub fn object(values: Vec<LValue>) -> Result<LValue, LError> {
             let t_type = LType::Symbol(TYPE_OBJECT.into());
             let value = match l_value {
                 LValue::Atom(LAtom::Symbol(s)) => LAtom::Symbol(s),
-                lv => return Err(WrongType(lv.into(), NameTypeLValue::SAtom))
+                lv => return Err(WrongType(lv.into(), NameTypeLValue::SAtom)),
             };
             Ok(LValue::Variable(LVariable {
                 v_type: t_type,
-                value
+                value,
             }))
         }
         2 => {
@@ -237,33 +224,32 @@ pub fn object(values: Vec<LValue>) -> Result<LValue, LError> {
             let sym_value = values[1].clone();
             let t_type = match sym_type {
                 LValue::Type(LType::Symbol(s)) => LType::Symbol(s),
-                lv => return Err(WrongType(lv.into(), NameTypeLValue::Type))
+                lv => return Err(WrongType(lv.into(), NameTypeLValue::Type)),
             };
             let value = match sym_value {
                 LValue::Atom(LAtom::Symbol(s)) => LAtom::Symbol(s),
-                lv => return Err(WrongType(lv.into(), NameTypeLValue::SAtom))
+                lv => return Err(WrongType(lv.into(), NameTypeLValue::SAtom)),
             };
             Ok(LValue::Variable(LVariable {
                 v_type: t_type,
-                value
+                value,
             }))
         }
-        len => Err(WrongNumerOfArgument(len, 1..2))
+        len => Err(WrongNumerOfArgument(len, 1..2)),
     }
 }
 
 pub fn state_function(values: Vec<LValue>) -> Result<LValue, LError> {
-    let mut vec_params:Vec<LType> = Vec::new();
-    let mut t_value:LType = LType::Symbol(TYPE_OBJECT.into());
-    let mut label= Sym::from("none");
-    for (i,value) in values.iter().enumerate() {
+    let mut vec_params: Vec<LType> = Vec::new();
+    let mut t_value: LType = LType::Symbol(TYPE_OBJECT.into());
+    let mut label = Sym::from("none");
+    for (i, value) in values.iter().enumerate() {
         if i == 0 {
             match value {
                 LValue::Atom(LAtom::Symbol(s)) => label = s.clone(),
-                lv => return Err(WrongType(lv.clone().into(), NameTypeLValue::SAtom))
+                lv => return Err(WrongType(lv.clone().into(), NameTypeLValue::SAtom)),
             }
-        }
-        else {
+        } else {
             match value {
                 LValue::Type(ltype) => {
                     if i == values.len() - 1 {
@@ -272,14 +258,14 @@ pub fn state_function(values: Vec<LValue>) -> Result<LValue, LError> {
                         vec_params.push(ltype.clone())
                     }
                 }
-                lv => return Err(WrongType(lv.clone().into(), NameTypeLValue::Type))
+                lv => return Err(WrongType(lv.clone().into(), NameTypeLValue::Type)),
             }
         }
     }
     Ok(LValue::StateFunction(LStateFunction {
         label: label.clone(),
         t_params: vec_params,
-        t_value: t_value
+        t_value: t_value,
     }))
 }
 
@@ -288,38 +274,38 @@ pub fn def_type(values: Vec<LValue>) -> Result<LValue, LError> {
         1 => {
             //Just the label
             match values[0].clone() {
-                LValue::Atom(LAtom::Symbol(s)) => {
-                    Ok(LValue::Type(LType::Symbol(s)))
-                }
-                lv => Err(WrongType(lv.into(), NameTypeLValue::SAtom))
+                LValue::Atom(LAtom::Symbol(s)) => Ok(LValue::Type(LType::Symbol(s))),
+                lv => Err(WrongType(lv.into(), NameTypeLValue::SAtom)),
             }
         }
-        len => Err(WrongNumerOfArgument(len, 1..1))
+        len => Err(WrongNumerOfArgument(len, 1..1)),
     }
 }
 
 pub fn state_variable(values: Vec<LValue>) -> Result<LValue, LError> {
     let mut params: Vec<LAtom> = vec![];
     let mut value: LAtom = LAtom::Bool(true);
-    let mut sf : LStateFunction = LStateFunction {
+    let mut sf: LStateFunction = LStateFunction {
         label: "none".into(),
         t_params: vec![],
-        t_value: LType::Int
+        t_value: LType::Int,
     };
-    for (i,val) in values.iter().enumerate() {
+    for (i, val) in values.iter().enumerate() {
         if i == 0 {
             match val {
                 LValue::StateFunction(lsf) => {
                     sf = lsf.clone();
-                    if sf.t_params.len()+1 != values.len() - 1 {
-                        return Err(WrongNumerOfArgument(values.len()-1, sf.t_params.len()+2..sf.t_params.len()+2))
+                    if sf.t_params.len() + 1 != values.len() - 1 {
+                        return Err(WrongNumerOfArgument(
+                            values.len() - 1,
+                            sf.t_params.len() + 2..sf.t_params.len() + 2,
+                        ));
                     }
                     params.push(LAtom::Symbol(sf.label));
                 }
-                lv => return Err(WrongType(lv.clone().into(), NameTypeLValue::StateFunction))
+                lv => return Err(WrongType(lv.clone().into(), NameTypeLValue::StateFunction)),
             };
-        }
-        else {
+        } else {
             let atom: LAtom;
             match val {
                 LValue::Atom(la) => {
@@ -327,15 +313,17 @@ pub fn state_variable(values: Vec<LValue>) -> Result<LValue, LError> {
                 }
                 LValue::Variable(va) => {
                     atom = va.value.clone();
-
                 }
-                lv => return Err(WrongType(lv.clone().into(), NameTypeLValue::Atom))
+                lv => return Err(WrongType(lv.clone().into(), NameTypeLValue::Atom)),
             }
             if i < values.len() - 1 {
-                let val_type:LType = atom.clone().into();
-                let expected_type = sf.t_params.get(i-1).unwrap().clone();
-                if val_type !=  expected_type {
-                    return Err(LError::SpecialError(format!("Got {}, expected {}", val_type, expected_type )))
+                let val_type: LType = atom.clone().into();
+                let expected_type = sf.t_params.get(i - 1).unwrap().clone();
+                if val_type != expected_type {
+                    return Err(LError::SpecialError(format!(
+                        "Got {}, expected {}",
+                        val_type, expected_type
+                    )));
                 }
                 params.push(atom.clone());
             } else {
@@ -344,30 +332,24 @@ pub fn state_variable(values: Vec<LValue>) -> Result<LValue, LError> {
         }
     }
 
-    Ok(LValue::StateVariable(LStateVariable::new(params.clone(), value)))
+    Ok(LValue::StateVariable(LStateVariable::new(
+        params.clone(),
+        value,
+    )))
 }
-
 
 pub fn factbase(values: Vec<LValue>) -> Result<LValue, LError> {
     let mut facts: HashMap<Vec<LAtom>, LAtom> = Default::default();
     for value in values {
         match value {
             LValue::StateVariable(sv) => {
-                let (key,value) = sv.get_key_value();
+                let (key, value) = sv.get_key_value();
                 facts.insert(key, value);
-            },
+            }
             lv => return Err(WrongType(lv.into(), NameTypeLValue::StateVariable)),
         }
-    };
+    }
     Ok(LValue::FactBase(LFactBase::new(facts)))
-
-}
-
-pub fn read(values: Vec<LValue>) -> Result<LValue, LError> {
-    unimplemented!()
-}
-pub fn write(values: Vec<LValue>) -> Result<LValue, LError> {
-    unimplemented!()
 }
 
 //TODO: Define set behaviour for other type of LValue
@@ -377,29 +359,28 @@ pub fn set(values: Vec<LValue>) -> Result<LValue, LError> {
     }
     let result = match values[0].clone() {
         LValue::FactBase(fb) => {
-            let mut facts =fb.get_facts();
+            let mut facts = fb.get_facts();
             for value in &values[1..] {
                 match value {
                     LValue::StateVariable(sv) => {
-                        let (key,value) = sv.get_key_value();
+                        let (key, value) = sv.get_key_value();
                         facts.insert(key, value);
-                    },
+                    }
                     lv => return Err(WrongType(lv.clone().into(), NameTypeLValue::StateVariable)),
                 }
-            };
+            }
             LValue::FactBase(LFactBase::new(facts))
         }
-        LValue::Variable(_) => {LValue::None}
-        LValue::Type(_) => {LValue::None}
-        LValue::StateFunction(_) => {LValue::None}
-        LValue::StateVariable(_) => {LValue::None}
-        LValue::Atom(_) => {LValue::None}
-        LValue::String(_) => {LValue::None}
-        LValue::SExpr(_) => {LValue::None}
-        LValue::LFn(_) => {LValue::None}
-        LValue::None => {LValue::None}
+        LValue::Variable(_) => LValue::None,
+        LValue::Type(_) => LValue::None,
+        LValue::StateFunction(_) => LValue::None,
+        LValue::StateVariable(_) => LValue::None,
+        LValue::Atom(_) => LValue::None,
+        LValue::String(_) => LValue::None,
+        LValue::SExpr(_) => LValue::None,
+        LValue::LFn(_) => LValue::None,
+        LValue::None => LValue::None,
     };
 
     Ok(result)
-
 }

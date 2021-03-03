@@ -2,14 +2,16 @@ use crate::lisp::lisp_functions::*;
 use crate::lisp::lisp_language::*;
 use crate::lisp::lisp_struct::*;
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::Write;
 
 pub mod lisp_functions;
 pub mod lisp_language;
 pub mod lisp_struct;
 
 pub struct LEnv {
-    pub symbols: HashMap<String, LValue>,
-    new_entry: Vec<String>
+    symbols: HashMap<String, LValue>,
+    new_entries: Vec<String>,
 }
 
 impl Default for LEnv {
@@ -31,10 +33,7 @@ impl Default for LEnv {
 
         //Type verification
         hash_map.insert(IS_NONE.to_string(), LValue::LFn(Box::new(is_none)));
-        hash_map.insert(
-            IS_NUMBER.to_string(),
-            LValue::LFn(Box::new(is_number)),
-        );
+        hash_map.insert(IS_NUMBER.to_string(), LValue::LFn(Box::new(is_number)));
         hash_map.insert(IS_BOOL.to_string(), LValue::LFn(Box::new(is_bool)));
         hash_map.insert(IS_FN.to_string(), LValue::LFn(Box::new(is_fn)));
 
@@ -56,15 +55,24 @@ impl Default for LEnv {
 
         //Functions for the factbase
         hash_map.insert(VARIABLE.to_string(), LValue::LFn(Box::new(var)));
-        hash_map.insert(STATE_FUNCTION.to_string(), LValue::LFn(Box::new(state_function)));
+        hash_map.insert(
+            STATE_FUNCTION.to_string(),
+            LValue::LFn(Box::new(state_function)),
+        );
         hash_map.insert(OBJECT.to_string(), LValue::LFn(Box::new(object)));
         hash_map.insert(TYPE.to_string(), LValue::LFn(Box::new(def_type)));
-        hash_map.insert(STATE_VARIABLE.to_string(), LValue::LFn(Box::new(state_variable)));
+        hash_map.insert(
+            STATE_VARIABLE.to_string(),
+            LValue::LFn(Box::new(state_variable)),
+        );
         hash_map.insert(FACTBASE.to_string(), LValue::LFn(Box::new(factbase)));
 
         hash_map.insert(SET.to_string(), LValue::LFn(Box::new(set)));
 
-        Self { symbols: hash_map, new_entry: vec![] }
+        Self {
+            symbols: hash_map,
+            new_entries: vec![],
+        }
     }
 }
 
@@ -78,7 +86,32 @@ impl LEnv {
 
     pub fn add_entry(&mut self, sym: String, exp: LValue) {
         self.symbols.insert(sym.clone(), exp);
-        self.new_entry.push(sym.clone());
+        self.new_entries.push(sym.clone());
+    }
+
+    pub fn get_new_entries(&self) -> Vec<String> {
+        self.new_entries.clone()
+    }
+
+    pub fn to_file(&self, name_file: String) {
+        let mut file = File::create(name_file).unwrap();
+        let mut new_entry: Vec<LValue> = vec![];
+        let mut string = String::new();
+        for entry in &self.new_entries {
+            new_entry.push(self.symbols.get(entry.as_str()).unwrap().clone())
+        }
+        string.push_str("(begin ");
+        unsafe {
+            for entry in new_entry {
+                string.push_str(entry.as_command().as_str())
+            }
+        }
+        string.push_str(")");
+        match file.write_all(string.as_bytes()) {
+            Ok(_) => {}
+            Err(e) => panic!("{}", e),
+        }
+        //eprintln!("write fact base to file");
     }
 }
 

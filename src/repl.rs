@@ -4,11 +4,11 @@ use crate::lisp::lisp_struct::LError::*;
 use crate::lisp::lisp_struct::*;
 use crate::lisp::LEnv;
 use aries_planning::parsing::sexpr::{parse, SExpr};
+use aries_utils::input::Input;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use std::fs::File;
 use std::io::Read;
-use aries_utils::input::Input;
 
 pub fn test_rustyline() {
     // `()` can be used when no completer is required
@@ -57,9 +57,11 @@ pub fn eval(se: &SExpr, env: &mut LEnv) -> Result<LValue, LError> {
             //Test if its an int
             return match atom.as_str().parse::<i64>() {
                 Ok(int) => Ok(LValue::Atom(LAtom::Number(LNumber::Int(int)))),
-                Err(_) => match atom.as_str().parse::<f64>() { //Test if its a float
+                Err(_) => match atom.as_str().parse::<f64>() {
+                    //Test if its a float
                     Ok(float) => Ok(LValue::Atom(LAtom::Number(LNumber::Float(float)))),
-                    Err(_) => match atom.as_str() { //Test if its a Boolean
+                    Err(_) => match atom.as_str() {
+                        //Test if its a Boolean
                         TRUE => {
                             //println!("atom is boolean true");
                             Ok(LValue::Atom(LAtom::Bool(true)))
@@ -68,14 +70,15 @@ pub fn eval(se: &SExpr, env: &mut LEnv) -> Result<LValue, LError> {
                             //println!("atom is boolean false");
                             Ok(LValue::Atom(LAtom::Bool(false)))
                         }
-                        s => { //is a symbol, if it exist return it
+                        s => {
+                            //is a symbol, if it exist return it
                             //println!("atom is a symbol: {}", s);
                             return match env.get_symbol(s.to_string()) {
                                 Ok(s) => Ok(s),
                                 Err(_) => return Ok(LValue::Atom(LAtom::Symbol(s.into()))),
-                            }
+                            };
                         }
-                    }
+                    },
                 },
             };
         }
@@ -97,29 +100,32 @@ pub fn eval(se: &SExpr, env: &mut LEnv) -> Result<LValue, LError> {
                     let conseq = list_iter.pop()?;
                     let alt = list_iter.pop()?;
                     return match eval(test, env) {
-                        Ok(LValue::Atom(LAtom::Bool(true))) => {
-                            eval(conseq, env)
-                        }
-                        Ok(LValue::Atom(LAtom::Bool(false))) => {
-                            eval(alt, env)
-                        }
+                        Ok(LValue::Atom(LAtom::Bool(true))) => eval(conseq, env),
+                        Ok(LValue::Atom(LAtom::Bool(false))) => eval(alt, env),
                         Ok(lv) => Err(WrongType(lv.into(), NameTypeLValue::BAtom)),
-                        Err(e) => Err(e)
-                    }
-
+                        Err(e) => Err(e),
+                    };
                 }
                 READ => {
                     let file_name = list_iter.pop_atom()?.to_string();
-                    let mut file = File::open(file_name)?;
+                    let mut file = match File::open(file_name) {
+                        Ok(f) => f,
+                        Err(e) => return Err(SpecialError(e.to_string())),
+                    };
                     let mut buffer = String::new();
-                    file.read_to_string(&mut buffer)?;
+                    match file.read_to_string(&mut buffer) {
+                        Ok(_) => {}
+                        Err(e) => return Err(SpecialError(e.to_string())),
+                    };
                     match parse(Input::from_string(buffer)) {
-                        Ok(s) => eval(&s, env),
-                        Err(e) => { return Err(SpecialError(e.to_string())) }
-                    }
+                        Ok(s) => return eval(&s, env),
+                        Err(e) => return Err(SpecialError(e.to_string())),
+                    };
                 }
                 WRITE => {
-                    unimplemented!()
+                    let name_file = list_iter.pop_atom()?.to_string();
+                    env.to_file(name_file);
+                    //eprintln!("new entries: {:?}", env.get_new_entries());
                 }
                 //println!("conditional"),
                 _ => is_first_atom_function = true,

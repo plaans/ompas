@@ -1,4 +1,4 @@
-pub const GET:&str = "get";
+pub const GET: &str = "get";
 
 //Mathematical functions
 pub const ADD: &str = "+";
@@ -41,7 +41,6 @@ pub const IF: &str = "if";
 pub const READ: &str = "read";
 pub const WRITE: &str = "write";
 pub const PI: &str = "pi";
-
 
 pub const TRUE: &str = "true";
 pub const FALSE: &str = "false";

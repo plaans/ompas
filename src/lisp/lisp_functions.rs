@@ -165,7 +165,10 @@ pub fn is_fn(values: Vec<LValue>) -> Result<LValue, LError> {
 }
 
 pub fn begin(values: Vec<LValue>) -> Result<LValue, LError> {
-    Ok(values.last().unwrap().clone())
+    match values.last(){
+        None => Err(LError::SpecialError("no SExpr after begin".to_string())),
+        Some(v) => Ok(v.clone())
+    }
 }
 
 pub fn default(_values: Vec<LValue>) -> Result<LValue, LError> {

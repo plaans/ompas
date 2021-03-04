@@ -1,7 +1,8 @@
 use crate::lisp::lisp_functions::*;
 use crate::lisp::lisp_language::*;
 use crate::lisp::lisp_struct::*;
-use std::collections::HashMap;
+//use std::collections::HashMap;
+use im::HashMap;
 use std::fs::File;
 use std::io::Write;
 

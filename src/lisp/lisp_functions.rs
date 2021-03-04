@@ -3,7 +3,8 @@ use crate::lisp::lisp_language::TYPE_OBJECT;
 use crate::lisp::lisp_struct::LError::*;
 use crate::lisp::lisp_struct::*;
 use aries_utils::input::Sym;
-use std::collections::HashMap;
+//use std::collections::HashMap;
+use im::HashMap;
 
 pub fn get(values: Vec<LValue>) -> Result<LValue, LError> {
     match values.len() {

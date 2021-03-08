@@ -14,10 +14,10 @@ pub fn get(values: Vec<LValue>) -> Result<LValue, LError> {
 }
 
 //Mathematical functions
-pub fn add(values: Vec<LValue>) -> Result<LValue, LError> {
+pub fn add(values: &[LValue]) -> Result<LValue, LError> {
     let mut result = LValue::Atom(LAtom::Number(LNumber::Float(0.0)));
     for value in values {
-        result = (result + value)?;
+        result = (result + *value)?;
     }
     Ok(result)
 }
@@ -166,6 +166,12 @@ pub fn is_fn(values: Vec<LValue>) -> Result<LValue, LError> {
 }
 
 pub fn begin(values: Vec<LValue>) -> Result<LValue, LError> {
+    match values.last(){
+        None => Err(LError::SpecialError("no SExpr after begin".to_string())),
+        Some(v) => Ok(v.clone())
+    }
+}
+pub fn begins(values: &[LValue]) -> Result<LValue, LError> {
     match values.last(){
         None => Err(LError::SpecialError("no SExpr after begin".to_string())),
         Some(v) => Ok(v.clone())

@@ -183,15 +183,18 @@ pub type LFn = Box<fn(Vec<LValue>) -> Result<LValue, LError>>;
 #[derive(Clone)]
 pub enum LValue {
     FactBase(LFactBase),
-    Variable(LVariable),
-    Type(LType),
-    StateFunction(LStateFunction),
-    StateVariable(LStateVariable),
     Atom(LAtom),
     String(String),
     SExpr(SExpr),
     LFn(LFn),
     None,
+}
+
+pub enum LValueType {
+    StateFunction(LStateFunction),
+    StateVariable(LStateVariable),
+    Type(LType),
+    Variable(LVariable),
 }
 
 #[derive(Clone)]

@@ -5,6 +5,8 @@ use crate::lisp::lisp_struct::*;
 use im::HashMap;
 use std::fs::File;
 use std::io::Write;
+use std::rc::Rc;
+use aries_utils::input::Sym;
 
 pub mod lisp_functions;
 pub mod lisp_language;
@@ -12,66 +14,69 @@ pub mod lisp_struct;
 
 pub struct LEnv {
     symbols: HashMap<String, LValue>,
+    sym_types: HashMap<Sym, LSymType>,
     new_entries: Vec<String>,
 }
 
 impl Default for LEnv {
     fn default() -> Self {
-        let mut hash_map: HashMap<String, LValue> = HashMap::default();
-        hash_map.insert(GET.to_string(), LValue::LFn(Box::new(get)));
+        let mut symbols: HashMap<String, LValue> = HashMap::default();
+        let mut sym_types : HashMap<Sym, LSymType> = HashMap::default();
+        symbols.insert(GET.to_string(), LValue::LFn(Rc::new(get)));
 
         //Mathematical functions
-        hash_map.insert(ADD.to_string(), LValue::LFn(Box::new(add)));
-        hash_map.insert(SUB.to_string(), LValue::LFn(Box::new(sub)));
-        hash_map.insert(MUL.to_string(), LValue::LFn(Box::new(mul)));
-        hash_map.insert(DIV.to_string(), LValue::LFn(Box::new(div)));
+        symbols.insert(ADD.to_string(), LValue::LFn(Rc::new(add)));
+        symbols.insert(SUB.to_string(), LValue::LFn(Rc::new(sub)));
+        symbols.insert(MUL.to_string(), LValue::LFn(Rc::new(mul)));
+        symbols.insert(DIV.to_string(), LValue::LFn(Rc::new(div)));
         //Comparison
-        hash_map.insert(GT.to_string(), LValue::LFn(Box::new(gt)));
-        hash_map.insert(LT.to_string(), LValue::LFn(Box::new(lt)));
-        hash_map.insert(GE.to_string(), LValue::LFn(Box::new(ge)));
-        hash_map.insert(LE.to_string(), LValue::LFn(Box::new(le)));
-        hash_map.insert(EQ.to_string(), LValue::LFn(Box::new(eq)));
+        symbols.insert(GT.to_string(), LValue::LFn(Rc::new(gt)));
+        symbols.insert(LT.to_string(), LValue::LFn(Rc::new(lt)));
+        symbols.insert(GE.to_string(), LValue::LFn(Rc::new(ge)));
+        symbols.insert(LE.to_string(), LValue::LFn(Rc::new(le)));
+        symbols.insert(EQ.to_string(), LValue::LFn(Rc::new(eq)));
 
         //Type verification
-        hash_map.insert(IS_NONE.to_string(), LValue::LFn(Box::new(is_none)));
-        hash_map.insert(IS_NUMBER.to_string(), LValue::LFn(Box::new(is_number)));
-        hash_map.insert(IS_BOOL.to_string(), LValue::LFn(Box::new(is_bool)));
-        hash_map.insert(IS_FN.to_string(), LValue::LFn(Box::new(is_fn)));
+        symbols.insert(IS_NONE.to_string(), LValue::LFn(Rc::new(is_none)));
+        symbols.insert(IS_NUMBER.to_string(), LValue::LFn(Rc::new(is_number)));
+        symbols.insert(IS_BOOL.to_string(), LValue::LFn(Rc::new(is_bool)));
+        symbols.insert(IS_FN.to_string(), LValue::LFn(Rc::new(is_fn)));
 
         //Special entry
-        hash_map.insert(BEGIN.to_string(), LValue::LFn(Box::new(begin)));
-        hash_map.insert(
+        symbols.insert(BEGIN.to_string(), LValue::LFn(Rc::new(begin)));
+        symbols.insert(
             PI.to_string(),
-            LValue::Atom(LAtom::Number(LNumber::Float(std::f64::consts::PI))),
+            LValue::Number(LNumber::Float(std::f64::consts::PI))
         );
 
         //Basic types
-        hash_map.insert(TYPE_INT.to_string(), LValue::Type(LType::Int));
-        hash_map.insert(TYPE_FLOAT.to_string(), LValue::Type(LType::Float));
-        hash_map.insert(TYPE_BOOL.to_string(), LValue::Type(LType::Bool));
-        hash_map.insert(
-            TYPE_OBJECT.to_string(),
-            LValue::Type(LType::Symbol(TYPE_OBJECT.into())),
-        );
 
         //Functions for the factbase
-        hash_map.insert(VARIABLE.to_string(), LValue::LFn(Box::new(var)));
-        hash_map.insert(
+        symbols.insert(VARIABLE.to_string(), LValue::LFn(Rc::new(var)));
+        symbols.insert(
             STATE_FUNCTION.to_string(),
-            LValue::LFn(Box::new(state_function)),
+            LValue::LFn(Rc::new(state_function)),
         );
-        hash_map.insert(OBJECT.to_string(), LValue::LFn(Box::new(object)));
-        hash_map.insert(TYPE.to_string(), LValue::LFn(Box::new(def_type)));
-        hash_map.insert(
+        symbols.insert(OBJECT.to_string(), LValue::LFn(Rc::new(object)));
+        symbols.insert(TYPE.to_string(), LValue::LFn(Rc::new(def_type)));
+        symbols.insert(
             STATE_VARIABLE.to_string(),
-            LValue::LFn(Box::new(state_variable)),
+            LValue::LFn(Rc::new(state_variable)),
         );
-        hash_map.insert(FACTBASE.to_string(), LValue::LFn(Box::new(factbase)));
+        symbols.insert(FACTBASE.to_string(), LValue::LFn(Rc::new(factbase)));
 
-        hash_map.insert(SET.to_string(), LValue::LFn(Box::new(set)));
+        symbols.insert(SET.to_string(), LValue::LFn(Rc::new(set)));
+
+        //Sym_types
+        sym_types.insert(TYPE_INT.into(), LSymType::Type(LType::Symbol(TYPE_ROOT.into())));
+        sym_types.insert(TYPE_FLOAT.into(), LSymType::Type(LType::Symbol(TYPE_ROOT.into())));
+        sym_types.insert(TYPE_BOOL.into(), LSymType::Type(LType::Symbol(TYPE_ROOT.into())));
+        sym_types.insert(TYPE_OBJECT.into(), LSymType::Type(LType::Symbol(TYPE_ROOT.into())));
+
 
         Self {
-            symbols: hash_map,
+            symbols,
+            sym_types,
             new_entries: vec![],
         }
     }
@@ -85,9 +90,20 @@ impl LEnv {
         }
     }
 
+    pub fn get_sym_type(&self, sym : &Sym) -> LSymType {
+        match self.sym_types.get(sym) {
+            None => LSymType::Object(LType::Object),
+            Some(lst) => lst.clone()
+        }
+    }
+
     pub fn add_entry(&mut self, sym: String, exp: LValue) {
         self.symbols.insert(sym.clone(), exp);
         self.new_entries.push(sym.clone());
+    }
+
+    pub fn add_sym_type(&mut self,sym: Sym,  sym_type: LSymType) {
+        self.sym_types.insert(sym, sym_type);
     }
 
     pub fn get_new_entries(&self) -> Vec<String> {
@@ -102,10 +118,8 @@ impl LEnv {
             new_entry.push(self.symbols.get(entry.as_str()).unwrap().clone())
         }
         string.push_str("(begin ");
-        unsafe {
-            for entry in new_entry {
-                string.push_str(entry.as_command().as_str())
-            }
+        for entry in new_entry {
+            string.push_str(entry.as_command().as_str())
         }
         string.push_str(")");
         match file.write_all(string.as_bytes()) {

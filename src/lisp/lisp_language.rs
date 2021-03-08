@@ -32,7 +32,7 @@ pub const TYPE_INT: &str = "int";
 pub const TYPE_FLOAT: &str = "float";
 pub const TYPE_OBJECT: &str = "object";
 pub const TYPE_BOOL: &str = "boolean";
-
+pub const TYPE_ROOT: &str = "root";
 //Other
 pub const BEGIN: &str = "begin";
 pub const DEFINE: &str = "define";

@@ -41,7 +41,7 @@ pub const TYPE_ROOT: &str = "root";
 //Other
 pub const BEGIN: &str = "begin";
 pub const DEFINE: &str = "define";
-pub const SET: &str = "set";
+pub const SET_FACTBASE: &str = "setfb";
 pub const IF: &str = "if";
 pub const READ: &str = "read";
 pub const WRITE: &str = "write";

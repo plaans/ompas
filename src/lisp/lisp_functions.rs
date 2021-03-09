@@ -467,11 +467,11 @@ pub fn factbase(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
 }
 
 //TODO: Define set behaviour for other type of LValue
-pub fn set(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
+pub fn set_factbase(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
     if values.len() < 2 {
         return Err(WrongNumerOfArgument(values.len(), 2..std::usize::MAX));
     }
-    let result = match values.get(0).unwrap() {
+    match values.get(0).unwrap() {
         LValue::FactBase(fb) => {
             let mut facts = fb.get_facts();
             for value in &values[1..] {
@@ -489,10 +489,8 @@ pub fn set(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
                     }
                 }
             }
-            LValue::FactBase(LFactBase::new(facts))
+            Ok(LValue::FactBase(LFactBase::new(facts)))
         }
-        _ => LValue::None,
-    };
-
-    Ok(result)
+        lv => Err(WrongType(lv.to_string(), lv.into(), NameTypeLValue::FactBase)),
+    }
 }

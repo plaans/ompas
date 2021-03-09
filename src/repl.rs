@@ -22,15 +22,15 @@ pub fn test_rustyline() {
         match readline {
             Ok(line) => {
                 rl.add_history_entry(line.as_str());
-                println!("Line: {}", line);
+                //println!("Line: {}", line);
                 match parse(line.as_str()) {
                     Ok(s) => {
                         match eval(&s, &mut env) {
                             Ok(lisp_value) => println!("{}", lisp_value),
-                            Err(e) => println!("{}", e),
+                            Err(e) => eprintln!("{}", e),
                         };
                     }
-                    Err(e) => println!("Error in command: {}", e.to_string()),
+                    Err(e) => eprintln!("Error in command: {}", e.to_string()),
                 };
             }
             Err(ReadlineError::Interrupted) => {

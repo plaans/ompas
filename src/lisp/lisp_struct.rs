@@ -610,7 +610,7 @@ impl AsCommand for LSymType {
             LSymType::Type(t) => t.as_command(),
             LSymType::Variable(v) => v.as_command(),
             LSymType::Object(o) => {
-                format!("(obj {})", o)
+                format!("({} {})", OBJECT, o)
             }
         }
     }
@@ -619,7 +619,7 @@ impl AsCommand for LSymType {
 impl AsCommand for LType {
     fn as_command(&self) -> String {
         match self {
-            LType::Symbol(s) => format!("(type {})\n", s),
+            LType::Symbol(s) => format!("({} {})\n", TYPE, s),
             _ => "".to_string(),
         }
     }
@@ -628,7 +628,7 @@ impl AsCommand for LType {
 impl AsCommand for LStateFunction {
     fn as_command(&self) -> String {
         let mut result = String::new();
-        result.push_str("(sf ");
+        result.push_str(format!("({} ", STATE_FUNCTION).as_str());
         for t_param in &self.t_params {
             result.push_str(format!("{} ", t_param.to_string()).as_str());
         }
@@ -639,14 +639,14 @@ impl AsCommand for LStateFunction {
 
 impl AsCommand for LVariable {
     fn as_command(&self) -> String {
-        format!("(var {} {})", self.v_type, self.value)
+        format!("({} {} {})", VARIABLE, self.v_type, self.value)
     }
 }
 
 impl AsCommand for LStateVariable {
     fn as_command(&self) -> String {
         let mut result = String::new();
-        result.push_str("(sv ");
+        result.push_str(format!("({} ", STATE_VARIABLE).as_str());
         for param in &self.params {
             result.push_str(format!("{} ", param.to_string()).as_str());
         }
@@ -658,7 +658,7 @@ impl AsCommand for LStateVariable {
 impl AsCommand for LFactBase {
     fn as_command(&self) -> String {
         let mut result = String::new();
-        result.push_str("(factbase ");
+        result.push_str(format!("({} ", FACTBASE).as_str());
         for (keys, value) in self.facts.iter() {
             result.push_str("(sv ");
             for key in keys {

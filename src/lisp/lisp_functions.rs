@@ -9,7 +9,7 @@ use im::HashMap;
 
 pub fn get(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
     match values.len() {
-        1 => Ok(values[0].clone()),
+        1 => Ok(values.get(0).unwrap_or(&LValue::None).clone()),
         len => Err(WrongNumerOfArgument(len, 1..1)),
     }
 }
@@ -201,6 +201,22 @@ pub fn is_symbol(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
         1 => match values.get(0).unwrap() {
             LValue::Symbol(_) => Ok(LValue::Bool(true)),
             _ => Ok(LValue::Bool(false)),
+        },
+        i => Err(WrongNumerOfArgument(i, 1..1)),
+    }
+}
+
+pub fn is_variable(values: &[LValue], env: &LEnv) -> Result<LValue, LError> {
+    match values.len() {
+        1 => match values.get(0).unwrap() {
+            LValue::Symbol(s) => match env.sym_types.get(s) {
+                None => panic!("symbol as no type"),
+                Some(sym_type) => match sym_type {
+                    LSymType::Variable(_) => Ok(LValue::Bool(true)),
+                    _ => Ok(LValue::Bool(false)),
+                },
+            },
+            lv => Err(WrongType(lv.to_string(), lv.into(), NameTypeLValue::Symbol)),
         },
         i => Err(WrongNumerOfArgument(i, 1..1)),
     }

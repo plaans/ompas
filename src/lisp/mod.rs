@@ -41,6 +41,18 @@ impl Default for LEnv {
         symbols.insert(IS_NUMBER.to_string(), LValue::LFn(Rc::new(is_number)));
         symbols.insert(IS_BOOL.to_string(), LValue::LFn(Rc::new(is_bool)));
         symbols.insert(IS_FN.to_string(), LValue::LFn(Rc::new(is_fn)));
+        symbols.insert(IS_FACTBASE.to_string(), LValue::LFn(Rc::new(is_fact_base)));
+        symbols.insert(
+            IS_STATE_FUNCTION.to_string(),
+            LValue::LFn(Rc::new(is_state_function)),
+        );
+        symbols.insert(
+            IS_STATE_VARIABLE.to_string(),
+            LValue::LFn(Rc::new(is_state_variable)),
+        );
+        symbols.insert(IS_OBJECT.to_string(), LValue::LFn(Rc::new(is_object)));
+        symbols.insert(IS_TYPE.to_string(), LValue::LFn(Rc::new(is_type)));
+        symbols.insert(IS_VARIABLE.to_string(), LValue::LFn(Rc::new(is_variable)));
 
         //Special entry
         symbols.insert(BEGIN.to_string(), LValue::LFn(Rc::new(begin)));

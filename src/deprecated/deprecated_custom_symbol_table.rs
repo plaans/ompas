@@ -110,14 +110,12 @@ impl Display for CustomSymbolTable {
             for k in self.state_funs.values() {
                 r.push_str(format!("-{}", self.symbols[k.sym]).as_str());
                 r.push('[');
-                let mut counter = 0;
                 let max = k.tpe.len() - 2;
-                for param in &k.tpe[0..k.tpe.len() - 1] {
+                for (counter, param) in k.tpe[0..k.tpe.len() - 1].iter().enumerate() {
                     r.push_str(self.symbols[*param].as_str());
                     if counter < max {
                         r.push(',');
                     }
-                    counter += 1;
                 }
                 r.push_str("] <- ");
                 r.push_str(self.symbols[k.tpe[k.tpe.len() - 1]].as_str());
@@ -132,11 +130,11 @@ impl Display for CustomSymbolTable {
 
 impl CustomSymbolTable {
     pub fn add_symbol(&mut self, new_symbol: SAtom, _type: Option<SymId>, ft: FactType) -> SymId {
-        let sym: Sym = new_symbol.into();
+        let sym: Sym = new_symbol;
         let sym_id: SymId = self.symbols.len().into();
         self.symbols.push(sym.clone());
         self.ids.insert(sym.clone(), sym_id);
-        self.symbol_fact_type.insert(sym_id, ft.clone());
+        self.symbol_fact_type.insert(sym_id, ft);
         match _type {
             None => {}
             Some(t) => {
@@ -145,10 +143,10 @@ impl CustomSymbolTable {
         };
         match ft {
             FactType::Type => {
-                self.types.insert(sym_id, sym.clone());
+                self.types.insert(sym_id, sym);
             }
             FactType::Object => {
-                self.objects.insert(sym_id, sym.clone());
+                self.objects.insert(sym_id, sym);
             }
             _ => {}
         };
@@ -167,7 +165,7 @@ impl CustomSymbolTable {
 ///Getters
 impl CustomSymbolTable {
     pub fn get_sym_id(&self, symbol: &Sym) -> Result<SymId, FactBaseError> {
-        match self.ids.get(symbol.into()) {
+        match self.ids.get(symbol) {
             None => Err(FactBaseError::UndefinedEntry(symbol.to_string())),
             Some(id) => Ok(*id),
         }
@@ -185,7 +183,7 @@ impl CustomSymbolTable {
     }
 
     pub fn get_fact_type(&self, sym_id: &SymId) -> FactType {
-        self.symbol_fact_type.get(sym_id).unwrap().clone()
+        *self.symbol_fact_type.get(sym_id).unwrap()
     }
 
     pub fn get_type(&self, type_id: &SymId) -> Sym {
@@ -203,7 +201,7 @@ impl CustomSymbolTable {
 //Verification
 impl CustomSymbolTable {
     pub fn is_symbol_defined(&self, symbol: &Sym) -> bool {
-        return self.ids.contains_key(symbol);
+        self.ids.contains_key(symbol)
     }
 
     pub fn is_defined_type(&self, symbol_id: &SymId) -> Result<bool, FactBaseError> {
@@ -220,17 +218,11 @@ impl CustomSymbolTable {
         match sym_type.as_str() {
             INT => {
                 //println!("is an int");
-                match value.clone().as_str().parse::<u64>() {
-                    Ok(_) => return true,
-                    Err(_) => return false,
-                }
+                value.clone().as_str().parse::<u64>().is_ok()
             }
             BOOLEAN => {
                 //println!("is a boolean");
-                match value.clone().as_str() {
-                    TRUE | FALSE => return true,
-                    _ => return false,
-                }
+                matches!(value.clone().as_str(), TRUE | FALSE)
             }
             _ => {
                 let sym_id = self.ids[value];
@@ -238,7 +230,7 @@ impl CustomSymbolTable {
                     .symbol_types
                     .get(&sym_id)
                     .expect("Strong error while getting a symbol type_id");
-                return sym_type == type_id;
+                sym_type == type_id
             }
         }
     }

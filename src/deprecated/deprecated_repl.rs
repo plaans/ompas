@@ -153,9 +153,7 @@ impl Repl {
                 self.commands.push(s.clone());
                 Ok(ReplOk::SExpr(s))
             }
-            Err(e) => Err(ReplError::Default(
-                format!("Error in command: {}", e.to_string()).to_string(),
-            )),
+            Err(e) => Err(ReplError::Default(format!("Error in command: {}", e))),
         }
     }
 
@@ -199,9 +197,7 @@ impl Repl {
                     match parse(Input::from_string(buffer)) {
                         Ok(s) => Ok(self.eval(s)?.into()),
                         Err(e) => {
-                            return Err(ReplError::Default(
-                                format!("Error in command: {}", e.to_string()).to_string(),
-                            ))
+                            return Err(ReplError::Default(format!("Error in command: {}", e)))
                         }
                     }
                 }

@@ -3,11 +3,11 @@ use aries_planning::parsing::sexpr::SExpr;
 use aries_utils::input::{ErrLoc, Sym};
 use std::cmp::Ordering;
 //use std::collections::HashMap;
+use crate::lisp::LEnv;
 use im::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Add, Range};
 use std::rc::Rc;
-use crate::lisp::LEnv;
 
 pub trait AsCommand {
     fn as_command(&self) -> String;
@@ -25,12 +25,12 @@ pub enum LError {
 impl Display for LError {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            LError::WrongType(s, s1, s2) => write!(f, "{}: Got {}, expected {}",s, s1, s2),
+            LError::WrongType(s, s1, s2) => write!(f, "{}: Got {}, expected {}", s, s1, s2),
             LError::ErrLoc(e) => write!(f, "{}", e),
             LError::UndefinedSymbol(s) => write!(f, "{} is undefined", s),
             LError::WrongNumerOfArgument(s, r) => write!(f, "Got {}, expected {:?}", s, r),
             LError::SpecialError(s) => write!(f, "{}", s),
-            LError::ConversionError(s1, s2) => write!(f, "Cannot convert {} into {}.", s1, s2)
+            LError::ConversionError(s1, s2) => write!(f, "Cannot convert {} into {}.", s1, s2),
         }
     }
 }
@@ -92,7 +92,7 @@ impl PartialEq for LNumber {
 }
 
 impl PartialOrd for LNumber {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+    fn partial_cmp(&self, _other: &Self) -> Option<Ordering> {
         unimplemented!()
     }
 
@@ -115,11 +115,21 @@ impl PartialOrd for LNumber {
     }
 
     fn gt(&self, other: &Self) -> bool {
-        !(self <= other)
+        match (self, other) {
+            (LNumber::Int(i1), LNumber::Int(i2)) => *i1 > *i2,
+            (LNumber::Float(f1), LNumber::Float(f2)) => *f1 > *f2,
+            (LNumber::Int(i1), LNumber::Float(f2)) => (*i1 as f64) > *f2,
+            (LNumber::Float(f1), LNumber::Int(i2)) => *f1 > *i2 as f64,
+        }
     }
 
     fn ge(&self, other: &Self) -> bool {
-        !(self < other)
+        match (self, other) {
+            (LNumber::Int(i1), LNumber::Int(i2)) => *i1 >= *i2,
+            (LNumber::Float(f1), LNumber::Float(f2)) => *f1 >= *f2,
+            (LNumber::Int(i1), LNumber::Float(f2)) => (*i1 as f64) >= *f2,
+            (LNumber::Float(f1), LNumber::Int(i2)) => *f1 >= *i2 as f64,
+        }
     }
 }
 
@@ -127,7 +137,7 @@ impl Add for &LNumber {
     type Output = LNumber;
 
     fn add(self, rhs: Self) -> Self::Output {
-        match (self,rhs) {
+        match (self, rhs) {
             (LNumber::Int(i1), LNumber::Int(i2)) => LNumber::Int(*i1 + *i2),
             (LNumber::Float(f1), LNumber::Float(f2)) => LNumber::Float(*f1 + *f2),
             (LNumber::Int(i1), LNumber::Float(f2)) => LNumber::Float(*i1 as f64 + *f2),
@@ -140,13 +150,11 @@ impl Add for LNumber {
     type Output = LNumber;
 
     fn add(self, rhs: Self) -> Self::Output {
-        self + rhs
+        &self + &rhs
     }
 }
 
-impl Eq for LNumber {
-
-}
+impl Eq for LNumber {}
 
 #[derive(Clone)]
 pub enum LType {
@@ -285,14 +293,18 @@ impl LValue {
             LValue::Symbol(s) => Ok(s.clone()),
             LValue::Bool(b) => Ok(b.to_string().into()),
             LValue::Number(n) => Ok(n.to_string().into()),
-            _ => Err(LError::SpecialError("cannot convert into symbol".to_string()))
+            _ => Err(LError::SpecialError(
+                "cannot convert into symbol".to_string(),
+            )),
         }
     }
 
     pub fn as_sym_ref(&self) -> Result<&Sym, LError> {
         match self {
             LValue::Symbol(s) => Ok(s),
-            _ => Err(LError::SpecialError("cannot convert into symbol ref".to_string()))
+            _ => Err(LError::SpecialError(
+                "cannot convert into symbol ref".to_string(),
+            )),
         }
     }
 
@@ -300,7 +312,7 @@ impl LValue {
         match self {
             LValue::Number(LNumber::Int(i)) => Ok(*i),
             LValue::Number(LNumber::Float(f)) => Ok(*f as i64),
-            _ => Err(LError::SpecialError("cannot convert into int".to_string()))
+            _ => Err(LError::SpecialError("cannot convert into int".to_string())),
         }
     }
 
@@ -308,14 +320,16 @@ impl LValue {
         match self {
             LValue::Number(LNumber::Int(i)) => Ok(*i as f64),
             LValue::Number(LNumber::Float(f)) => Ok(*f),
-            _ => Err(LError::SpecialError("cannot convert into float".to_string()))
+            _ => Err(LError::SpecialError(
+                "cannot convert into float".to_string(),
+            )),
         }
     }
 
     pub fn as_bool(&self) -> Result<bool, LError> {
         match self {
             LValue::Bool(b) => Ok(*b),
-            _ => Err(LError::SpecialError("cannot convert into int".to_string()))
+            _ => Err(LError::SpecialError("cannot convert into int".to_string())),
         }
     }
 }
@@ -325,7 +339,7 @@ pub enum LSymType {
     StateFunction(LStateFunction),
     Type(LType),
     Variable(LVariable),
-    Object(LType)
+    Object(LType),
 }
 
 impl From<&LSymType> for NameTypeLValue {
@@ -350,7 +364,10 @@ impl LSymType {
         match self {
             LSymType::StateFunction(sf) => Ok(sf.clone()),
             //TODO: Implement error
-            lst => Err(LError::ConversionError(lst.into(), NameTypeLValue::StateFunction))
+            lst => Err(LError::ConversionError(
+                lst.into(),
+                NameTypeLValue::StateFunction,
+            )),
         }
     }
 
@@ -358,7 +375,10 @@ impl LSymType {
         match self {
             LSymType::Variable(v) => Ok(v.clone()),
             //TODO: Implement error
-            lst => Err(LError::ConversionError(lst.into(), NameTypeLValue::Variable))
+            lst => Err(LError::ConversionError(
+                lst.into(),
+                NameTypeLValue::Variable,
+            )),
         }
     }
 }
@@ -500,8 +520,6 @@ impl PartialEq for LValue {
     }
 }
 
-
-
 impl PartialOrd for LValue {
     fn partial_cmp(&self, _other: &Self) -> Option<Ordering> {
         unimplemented!()
@@ -522,11 +540,17 @@ impl PartialOrd for LValue {
     }
 
     fn gt(&self, other: &Self) -> bool {
-        !(*self <= *other)
+        match (self, other) {
+            (LValue::Number(n1), LValue::Number(n2)) => *n1 > *n2,
+            _ => false,
+        }
     }
 
     fn ge(&self, other: &Self) -> bool {
-        !(*self < *other)
+        match (self, other) {
+            (LValue::Number(n1), LValue::Number(n2)) => *n1 >= *n2,
+            _ => false,
+        }
     }
 }
 
@@ -548,7 +572,7 @@ impl Display for LValue {
             LValue::Number(n) => write!(f, "number: {}", n),
             LValue::Bool(b) => write!(f, "bool: {}", b),
             LValue::SymType(st) => write!(f, "{}", st),
-            LValue::StateVariable(sv) => write!(f, "{}",sv )
+            LValue::StateVariable(sv) => write!(f, "{}", sv),
         }
     }
 }
@@ -559,8 +583,16 @@ impl Add for &LValue {
     fn add(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
             (LValue::Number(n1), LValue::Number(n2)) => Ok(LValue::Number(n1 + n2)),
-            (LValue::Number(_), l) => Err(LError::WrongType(l.to_string(), l.into(), NameTypeLValue::Number)),
-            (l, LValue::Number(_)) => Err(LError::WrongType(l.to_string(), l.into(), NameTypeLValue::Number)),
+            (LValue::Number(_), l) => Err(LError::WrongType(
+                l.to_string(),
+                l.into(),
+                NameTypeLValue::Number,
+            )),
+            (l, LValue::Number(_)) => Err(LError::WrongType(
+                l.to_string(),
+                l.into(),
+                NameTypeLValue::Number,
+            )),
 
             (l1, l2) => Err(LError::SpecialError(format!(
                 "{} and {} cannot be add",
@@ -573,7 +605,14 @@ impl Add for &LValue {
 
 impl AsCommand for LSymType {
     fn as_command(&self) -> String {
-        unimplemented!()
+        match self {
+            LSymType::StateFunction(sf) => sf.as_command(),
+            LSymType::Type(t) => t.as_command(),
+            LSymType::Variable(v) => v.as_command(),
+            LSymType::Object(o) => {
+                format!("(obj {})", o)
+            }
+        }
     }
 }
 
@@ -591,27 +630,27 @@ impl AsCommand for LStateFunction {
         let mut result = String::new();
         result.push_str("(sf ");
         for t_param in &self.t_params {
-            result.push_str(format!(" {}", t_param.to_string()).as_str());
+            result.push_str(format!("{} ", t_param.to_string()).as_str());
         }
-        result.push_str(format!(" {})\n", self.t_value.to_string()).as_str());
+        result.push_str(format!("{})\n", self.t_value.to_string()).as_str());
         result
     }
 }
 
 impl AsCommand for LVariable {
     fn as_command(&self) -> String {
-        unimplemented!()
+        format!("(var {} {})", self.v_type, self.value)
     }
 }
 
 impl AsCommand for LStateVariable {
     fn as_command(&self) -> String {
         let mut result = String::new();
-        result.push_str("(sv");
+        result.push_str("(sv ");
         for param in &self.params {
-            result.push_str(format!(" {}", param.to_string()).as_str());
+            result.push_str(format!("{} ", param.to_string()).as_str());
         }
-        result.push_str(format!(" {})\n", self.value.to_string()).as_str());
+        result.push_str(format!("{})\n", self.value.to_string()).as_str());
         result
     }
 }
@@ -619,15 +658,15 @@ impl AsCommand for LStateVariable {
 impl AsCommand for LFactBase {
     fn as_command(&self) -> String {
         let mut result = String::new();
-        result.push_str(format!("(fb ").as_str());
+        result.push_str("(factbase ");
         for (keys, value) in self.facts.iter() {
             result.push_str("(sv ");
             for key in keys {
-                result.push_str(format!(" {} ", key).as_str())
+                result.push_str(format!("{} ", key).as_str())
             }
             result.push_str(format!(" {})", value).as_str());
         }
-        result.push_str("))\n");
+        result.push_str(")\n");
         result
     }
 }

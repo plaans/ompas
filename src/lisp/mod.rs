@@ -2,11 +2,11 @@ use crate::lisp::lisp_functions::*;
 use crate::lisp::lisp_language::*;
 use crate::lisp::lisp_struct::*;
 //use std::collections::HashMap;
+use aries_utils::input::Sym;
 use im::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::rc::Rc;
-use aries_utils::input::Sym;
 
 pub mod lisp_functions;
 pub mod lisp_language;
@@ -21,7 +21,7 @@ pub struct LEnv {
 impl Default for LEnv {
     fn default() -> Self {
         let mut symbols: HashMap<String, LValue> = HashMap::default();
-        let mut sym_types : HashMap<Sym, LSymType> = HashMap::default();
+        let mut sym_types: HashMap<Sym, LSymType> = HashMap::default();
         symbols.insert(GET.to_string(), LValue::LFn(Rc::new(get)));
 
         //Mathematical functions
@@ -46,7 +46,7 @@ impl Default for LEnv {
         symbols.insert(BEGIN.to_string(), LValue::LFn(Rc::new(begin)));
         symbols.insert(
             PI.to_string(),
-            LValue::Number(LNumber::Float(std::f64::consts::PI))
+            LValue::Number(LNumber::Float(std::f64::consts::PI)),
         );
 
         //Basic types
@@ -68,11 +68,22 @@ impl Default for LEnv {
         symbols.insert(SET.to_string(), LValue::LFn(Rc::new(set)));
 
         //Sym_types
-        sym_types.insert(TYPE_INT.into(), LSymType::Type(LType::Symbol(TYPE_ROOT.into())));
-        sym_types.insert(TYPE_FLOAT.into(), LSymType::Type(LType::Symbol(TYPE_ROOT.into())));
-        sym_types.insert(TYPE_BOOL.into(), LSymType::Type(LType::Symbol(TYPE_ROOT.into())));
-        sym_types.insert(TYPE_OBJECT.into(), LSymType::Type(LType::Symbol(TYPE_ROOT.into())));
-
+        sym_types.insert(
+            TYPE_INT.into(),
+            LSymType::Type(LType::Symbol(TYPE_ROOT.into())),
+        );
+        sym_types.insert(
+            TYPE_FLOAT.into(),
+            LSymType::Type(LType::Symbol(TYPE_ROOT.into())),
+        );
+        sym_types.insert(
+            TYPE_BOOL.into(),
+            LSymType::Type(LType::Symbol(TYPE_ROOT.into())),
+        );
+        sym_types.insert(
+            TYPE_OBJECT.into(),
+            LSymType::Type(LType::Symbol(TYPE_ROOT.into())),
+        );
 
         Self {
             symbols,
@@ -83,26 +94,26 @@ impl Default for LEnv {
 }
 
 impl LEnv {
-    pub fn get_symbol(&self, s: String) -> Result<LValue, LError> {
-        match self.symbols.get(s.as_str()) {
-            None => Err(LError::UndefinedSymbol(s)),
+    pub fn get_symbol(&self, s: &str) -> Result<LValue, LError> {
+        match self.symbols.get(s) {
+            None => Err(LError::UndefinedSymbol(s.to_string())),
             Some(lv) => Ok(lv.clone()),
         }
     }
 
-    pub fn get_sym_type(&self, sym : &Sym) -> LSymType {
+    pub fn get_sym_type(&self, sym: &Sym) -> LSymType {
         match self.sym_types.get(sym) {
             None => LSymType::Object(LType::Object),
-            Some(lst) => lst.clone()
+            Some(lst) => lst.clone(),
         }
     }
 
     pub fn add_entry(&mut self, sym: String, exp: LValue) {
         self.symbols.insert(sym.clone(), exp);
-        self.new_entries.push(sym.clone());
+        self.new_entries.push(sym);
     }
 
-    pub fn add_sym_type(&mut self,sym: Sym,  sym_type: LSymType) {
+    pub fn add_sym_type(&mut self, sym: Sym, sym_type: LSymType) {
         self.sym_types.insert(sym, sym_type);
     }
 
@@ -112,16 +123,21 @@ impl LEnv {
 
     pub fn to_file(&self, name_file: String) {
         let mut file = File::create(name_file).unwrap();
-        let mut new_entry: Vec<LValue> = vec![];
         let mut string = String::new();
-        for entry in &self.new_entries {
-            new_entry.push(self.symbols.get(entry.as_str()).unwrap().clone())
+        string.push_str("(begin \n");
+        for key in &self.new_entries {
+            let value = self.get_symbol(key).unwrap_or(LValue::None);
+            match value {
+                LValue::Symbol(s) => {
+                    string.push_str(
+                        format!("(define {} {})", s, self.get_sym_type(&s).as_command()).as_str(),
+                    );
+                }
+                lv => string.push_str(format!("(define {} {})", key, lv.as_command()).as_str()),
+            }
         }
-        string.push_str("(begin ");
-        for entry in new_entry {
-            string.push_str(entry.as_command().as_str())
-        }
-        string.push_str(")");
+
+        string.push(')');
         match file.write_all(string.as_bytes()) {
             Ok(_) => {}
             Err(e) => panic!("{}", e),

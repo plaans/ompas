@@ -73,11 +73,10 @@ pub fn eval(se: &SExpr, env: &mut LEnv) -> Result<LValue, LError> {
                         s => {
                             //is a symbol, if it exist return it
                             //println!("atom is a symbol: {}", s);
-                            match env.get_symbol(s.to_string()) {
+                            match env.get_symbol(&s.to_string()) {
                                 Ok(lv) => Ok(lv),
-                                Err(_) => Ok(LValue::Symbol(s.into()))
+                                Err(_) => Ok(LValue::Symbol(s.into())),
                             }
-
                         }
                     },
                 },
@@ -91,7 +90,7 @@ pub fn eval(se: &SExpr, env: &mut LEnv) -> Result<LValue, LError> {
             match first_atom.as_str() {
                 DEFINE => {
                     //println!("define a new symbol");
-                    let sym:Sym = list_iter.pop_atom()?.into();
+                    let sym: Sym = list_iter.pop_atom()?.into();
                     let sexpr = list_iter.pop()?;
                     let exp = eval(sexpr, env)?;
                     match exp {
@@ -109,7 +108,7 @@ pub fn eval(se: &SExpr, env: &mut LEnv) -> Result<LValue, LError> {
                     return match eval(test, env) {
                         Ok(LValue::Bool(true)) => eval(conseq, env),
                         Ok(LValue::Bool(false)) => eval(alt, env),
-                        Ok(lv) => Err(WrongType(lv.to_string(),lv.into(), NameTypeLValue::Bool)),
+                        Ok(lv) => Err(WrongType(lv.to_string(), lv.into(), NameTypeLValue::Bool)),
                         Err(e) => Err(e),
                     };
                 }
@@ -139,7 +138,7 @@ pub fn eval(se: &SExpr, env: &mut LEnv) -> Result<LValue, LError> {
             }
             if is_first_atom_function {
                 //println!("{} is a function",first_atom);
-                let proc = match eval(&SExpr::Atom(first_atom.clone()), env)? {
+                let proc = match eval(&SExpr::Atom(first_atom), env)? {
                     LValue::LFn(f) => f,
                     lv => return Err(WrongType(lv.to_string(), lv.into(), NameTypeLValue::LFn)),
                 };

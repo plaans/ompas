@@ -31,7 +31,7 @@ fn main() {
 
     //test_lib_model(&opt);
 
-    if opt.repl == true {
+    if opt.repl {
         //println!("Fact Base REPL");
         //let mut repl = Repl::default();
         //repl.run();

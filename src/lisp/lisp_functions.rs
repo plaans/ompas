@@ -7,12 +7,6 @@ use aries_utils::input::Sym;
 use crate::lisp::LEnv;
 use im::HashMap;
 
-pub fn get(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
-    match values.len() {
-        1 => Ok(values.get(0).unwrap_or(&LValue::None).clone()),
-        len => Err(WrongNumerOfArgument(len, 1..1)),
-    }
-}
 
 //Mathematical functions
 pub fn add(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
@@ -238,7 +232,7 @@ pub fn var(values: &[LValue], env: &LEnv) -> Result<LValue, LError> {
     match values.len() {
         2 => {
             let sym_type = values.get(0).unwrap();
-            if !is_type(&values[0..0], env)?.as_bool()? {
+            if !is_type(&values[0..1], env)?.as_bool()? {
                 return Err(WrongType(
                     sym_type.to_string(),
                     sym_type.into(),
@@ -393,7 +387,7 @@ pub fn factbase(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
     for value in values {
         match value {
             LValue::StateVariable(sv) => {
-                let (key, value) = sv.get_key_value();
+                let (key, value) = sv.as_key_value();
                 facts.insert(key, value);
             }
             lv => {
@@ -407,13 +401,23 @@ pub fn factbase(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
     }
     Ok(LValue::FactBase(LFactBase::new(facts)))
 }
+/*
+pub fn list(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
+    let result = LValue::None;
+    let sexpr:SExpr;
+    for value in values {
+
+    }
+
+    Ok(result)
+}*/
 
 pub fn state(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
     let mut state_variables: HashMap<Vec<Sym>, Sym> = Default::default();
     for value in values {
         match value {
             LValue::StateVariable(sv) => {
-                let (key, value) = sv.get_key_value();
+                let (key, value) = sv.as_key_value();
                 state_variables.insert(key, value);
             }
             lv => {
@@ -429,7 +433,7 @@ pub fn state(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
 }
 
 //TODO: Define set behaviour for other type of LValue
-pub fn set_factbase(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
+pub fn set(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
     if values.len() < 2 {
         return Err(WrongNumerOfArgument(values.len(), 2..std::usize::MAX));
     }
@@ -439,7 +443,7 @@ pub fn set_factbase(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
             for value in &values[1..] {
                 match value {
                     LValue::StateVariable(sv) => {
-                        let (key, value) = sv.get_key_value();
+                        let (key, value) = sv.as_key_value();
                         facts.insert(key, value);
                     }
                     lv => {
@@ -453,6 +457,41 @@ pub fn set_factbase(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
             }
             Ok(LValue::FactBase(LFactBase::new(facts)))
         }
-        lv => Err(WrongType(lv.to_string(), lv.into(), NameTypeLValue::FactBase)),
+        lv => Err(LError::SpecialError(format!("Cannot set a {}",NameTypeLValue::from(lv)))),
+    }
+}
+
+pub fn get(values: &[LValue], env: &LEnv) -> Result<LValue, LError> {
+    if values.is_empty() {
+        return Err(WrongNumerOfArgument(0, 1..std::usize::MAX))
+    }
+
+    match values.get(0).unwrap() {
+        LValue::State(s) => {
+            if values.len() < 2 {
+                return Err(WrongNumerOfArgument(1, 2..std::usize::MAX))
+            }
+            let mut vec_sym = Vec::new();
+            for value in &values[1..] {
+                vec_sym.push(value.as_sym()?);
+            }
+            let s = s.get_state_variable(vec_sym.as_slice());
+            Ok(LValue::Symbol(s))
+        }
+        lv => {
+            if values.len() > 1 {
+                return Err(WrongNumerOfArgument(values.len(), 1..1))
+            }
+            match lv {
+                LValue::Symbol(s) => {
+                    match env.get_sym_type(s){
+                        LSymType::Variable(v) => Ok(v.value.into()),
+                        st => Ok(LValue::SymType(st))
+                    }
+                }
+                LValue::StateVariable(sv) => Ok(LValue::Symbol(sv.value())),
+                lv => Ok(lv.clone()),
+            }
+        }
     }
 }

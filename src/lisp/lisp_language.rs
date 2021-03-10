@@ -39,14 +39,17 @@ pub const TYPE_FLOAT: &str = "float";
 pub const TYPE_OBJECT: &str = "object";
 pub const TYPE_BOOL: &str = "boolean";
 pub const TYPE_ROOT: &str = "root";
+
 //Other
 pub const BEGIN: &str = "begin";
 pub const DEFINE: &str = "define";
+pub const SET: &str = "set";
 pub const SET_FACTBASE: &str = "setfb";
 pub const IF: &str = "if";
 pub const READ: &str = "read";
 pub const WRITE: &str = "write";
 pub const GET: &str = "get";
+pub const LIST: &str = "list";
 
 pub const TRUE: &str = "true";
 pub const FALSE: &str = "false";

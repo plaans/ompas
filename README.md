@@ -23,8 +23,8 @@ This project is part of the Thesis I am currently working on at LAAS-CNRS is RIS
     - `(var <type> <value>} ` : Define a new var with a type and a value that matches the type.
     - `(sv <p_1> ... <p_n> <value>)` : Define a new state-variable with n parameters and a value.
       Types must match with predicate types.
-    - `(factbase <sv_1>...<sv_n>)`: Define a factbase with n state variables
-- `(define ?fb_j (set ?fb_i <sv_1> ... <sv_n> )`: define a new factbase ?fb_j from the facts of ?fb_i and new facts.
+    - `(state <sv_1>...<sv_n>)`: Define a state with n state variables
+- `(define ?s_j (set ?s_i <sv_1> ... <sv_n> )`: define a new state ?s_j from the facts of ?s_i and new facts.
 - `(get <sym>)` : print the value of the symbol in a pretty way
 
 

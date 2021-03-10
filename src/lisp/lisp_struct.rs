@@ -267,8 +267,16 @@ impl LStateVariable {
         Self { params, value }
     }
 
-    pub fn get_key_value(&self) -> (Vec<Sym>, Sym) {
+    pub fn as_key_value(&self) -> (Vec<Sym>, Sym) {
         (self.params.clone(), self.value.clone())
+    }
+
+    pub fn key(&self) -> Vec<Sym>{
+        self.params.clone()
+    }
+
+    pub fn value(&self) -> Sym{
+        self.value.clone()
     }
 }
 
@@ -297,8 +305,15 @@ impl LState {
         LState { state_variables }
     }
 
-    pub fn get_state_variables(&self) -> HashMap<Vec<Sym>, Sym> {
+    pub fn get_all_state_variables(&self) -> HashMap<Vec<Sym>, Sym> {
         self.state_variables.clone()
+    }
+
+    pub fn get_state_variable(&self, key: &[Sym]) -> Sym {
+        match self.state_variables.get(key) {
+            None => Sym::from("none"),
+            Some(s) => s.clone()
+        }
     }
 }
 
@@ -673,6 +688,18 @@ impl From<&LSymType> for NameTypeLValue {
     }
 }
 
+impl From<&Sym> for LValue {
+    fn from(s: &Sym) -> Self {
+        LValue::Symbol(s.clone())
+    }
+}
+
+impl From<Sym> for LValue {
+    fn from(s: Sym) -> Self {
+        LValue::from(&s)
+    }
+}
+
 
 ///Transform an object in Lisp command to reconstuct itself.
 pub trait AsCommand {
@@ -869,10 +896,10 @@ impl Display for LState {
 impl Display for LSymType {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            LSymType::StateFunction(sf) => write!(f, "{}", sf),
-            LSymType::Type(t) => write!(f, "{}", t),
-            LSymType::Variable(v) => write!(f, "{}", v),
-            LSymType::Object(o) => write!(f, "{}", o),
+            LSymType::StateFunction(sf) => write!(f, "sf: {}", sf),
+            LSymType::Type(t) => write!(f, "type: child of {}", t),
+            LSymType::Variable(v) => write!(f, "variable: {}", v),
+            LSymType::Object(o) => write!(f, "object: type = {}", o),
         }
     }
 }

@@ -6,12 +6,9 @@ use std::cmp::Ordering;
 use crate::lisp::LEnv;
 use im::HashMap;
 use std::fmt::{Debug, Display, Formatter};
-use std::ops::{Add, Range};
+use std::ops::{Add, Range, Sub, Div, Mul};
 use std::rc::Rc;
 
-pub trait AsCommand {
-    fn as_command(&self) -> String;
-}
 
 pub enum LError {
     WrongType(String, NameTypeLValue, NameTypeLValue),
@@ -20,19 +17,6 @@ pub enum LError {
     UndefinedSymbol(String),
     SpecialError(String),
     ConversionError(NameTypeLValue, NameTypeLValue),
-}
-
-impl Display for LError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            LError::WrongType(s, s1, s2) => write!(f, "{}: Got {}, expected {}", s, s1, s2),
-            LError::ErrLoc(e) => write!(f, "{}", e),
-            LError::UndefinedSymbol(s) => write!(f, "{} is undefined", s),
-            LError::WrongNumerOfArgument(s, r) => write!(f, "Got {}, expected {:?}", s, r),
-            LError::SpecialError(s) => write!(f, "{}", s),
-            LError::ConversionError(s1, s2) => write!(f, "Cannot convert {} into {}.", s1, s2),
-        }
-    }
 }
 
 impl From<ErrLoc> for LError {
@@ -67,15 +51,6 @@ impl LNumber {
         match self {
             LNumber::Int(_) => TYPE_INT.into(),
             LNumber::Float(_) => TYPE_FLOAT.into(),
-        }
-    }
-}
-
-impl Display for LNumber {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            LNumber::Int(i) => write!(f, "{}", i),
-            LNumber::Float(fl) => write!(f, "{}", fl),
         }
     }
 }
@@ -146,11 +121,72 @@ impl Add for &LNumber {
     }
 }
 
+impl Sub for &LNumber {
+    type Output = LNumber;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (LNumber::Int(i1), LNumber::Int(i2)) => LNumber::Int(*i1 - *i2),
+            (LNumber::Float(f1), LNumber::Float(f2)) => LNumber::Float(*f1 - *f2),
+            (LNumber::Int(i1), LNumber::Float(f2)) => LNumber::Float(*i1 as f64 - *f2),
+            (LNumber::Float(f1), LNumber::Int(i2)) => LNumber::Float(*f1 - *i2 as f64),
+        }
+    }
+}
+
+impl Div for &LNumber {
+    type Output = LNumber;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (LNumber::Int(i1), LNumber::Int(i2)) => LNumber::Int(*i1 / *i2),
+            (LNumber::Float(f1), LNumber::Float(f2)) => LNumber::Float(*f1 / *f2),
+            (LNumber::Int(i1), LNumber::Float(f2)) => LNumber::Float(*i1 as f64 / *f2),
+            (LNumber::Float(f1), LNumber::Int(i2)) => LNumber::Float(*f1 / *i2 as f64),
+        }
+    }
+}
+
+impl Mul for &LNumber {
+    type Output = LNumber;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (LNumber::Int(i1), LNumber::Int(i2)) => LNumber::Int(*i1 * *i2),
+            (LNumber::Float(f1), LNumber::Float(f2)) => LNumber::Float(*f1 * *f2),
+            (LNumber::Int(i1), LNumber::Float(f2)) => LNumber::Float(*i1 as f64 * *f2),
+            (LNumber::Float(f1), LNumber::Int(i2)) => LNumber::Float(*f1 * *i2 as f64),
+        }
+    }
+}
+
 impl Add for LNumber {
     type Output = LNumber;
 
     fn add(self, rhs: Self) -> Self::Output {
         &self + &rhs
+    }
+}
+impl Sub for LNumber {
+    type Output = LNumber;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        &self - &rhs
+    }
+}
+impl Mul for LNumber {
+    type Output = LNumber;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        &self * &rhs
+    }
+}
+
+impl Div for LNumber {
+    type Output = LNumber;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        &self / &rhs
     }
 }
 
@@ -213,31 +249,10 @@ pub struct LVariable {
     pub value: Sym,
 }
 
-impl Display for LVariable {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{} - {}", self.value, self.v_type)
-    }
-}
-
 #[derive(Clone)]
 pub struct LStateFunction {
     pub t_params: Vec<Sym>,
     pub t_value: Sym,
-}
-
-impl Display for LStateFunction {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        let mut sr = String::new();
-        sr.push('(');
-        for (i, t_param) in self.t_params.iter().enumerate() {
-            sr.push_str(format!("{}", t_param).as_str());
-            if i > 0 {
-                sr.push(',');
-            }
-        }
-        sr.push_str(format!(") = {}", self.t_value).as_str());
-        write!(f, "{}", sr)
-    }
 }
 
 #[derive(Clone)]
@@ -246,20 +261,6 @@ pub struct LStateVariable {
     value: Sym,
 }
 
-impl Display for LStateVariable {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        let mut sr = String::new();
-        sr.push('(');
-        for (i, t_param) in self.params.iter().enumerate() {
-            sr.push_str(format!("{}", t_param).as_str());
-            if i > 0 {
-                sr.push(',');
-            }
-        }
-        sr.push_str(format!(") = {}", self.value).as_str());
-        write!(f, "{}", sr)
-    }
-}
 
 impl LStateVariable {
     pub fn new(params: Vec<Sym>, value: Sym) -> Self {
@@ -271,10 +272,73 @@ impl LStateVariable {
     }
 }
 
+#[derive(Clone)]
+pub struct LFactBase {
+    facts: HashMap<Vec<Sym>, Sym>,
+}
+
+impl LFactBase {
+    pub fn new(facts: HashMap<Vec<Sym>, Sym>) -> Self {
+        LFactBase { facts }
+    }
+
+    pub fn get_facts(&self) -> HashMap<Vec<Sym>, Sym> {
+        self.facts.clone()
+    }
+}
+
+#[derive(Clone)]
+pub struct LState {
+    state_variables: HashMap<Vec<Sym>, Sym>,
+}
+
+impl LState {
+    pub fn new(state_variables: HashMap<Vec<Sym>, Sym>) -> Self {
+        LState { state_variables }
+    }
+
+    pub fn get_state_variables(&self) -> HashMap<Vec<Sym>, Sym> {
+        self.state_variables.clone()
+    }
+}
+
+#[derive(Clone)]
+pub enum LSymType {
+    StateFunction(LStateFunction),
+    Type(LType),
+    Variable(LVariable),
+    Object(LType),
+}
+
+impl LSymType {
+    pub fn as_state_function(&self) -> Result<LStateFunction, LError> {
+        match self {
+            LSymType::StateFunction(sf) => Ok(sf.clone()),
+            //TODO: Implement error
+            lst => Err(LError::ConversionError(
+                lst.into(),
+                NameTypeLValue::StateFunction,
+            )),
+        }
+    }
+
+    pub fn as_variable(&self) -> Result<LVariable, LError> {
+        match self {
+            LSymType::Variable(v) => Ok(v.clone()),
+            //TODO: Implement error
+            lst => Err(LError::ConversionError(
+                lst.into(),
+                NameTypeLValue::Variable,
+            )),
+        }
+    }
+}
+
 pub type LFn = Rc<fn(&[LValue], &LEnv) -> Result<LValue, LError>>;
 
 #[derive(Clone)]
 pub enum LValue {
+    State(LState),
     Symbol(Sym),
     Number(LNumber),
     Bool(bool),
@@ -334,175 +398,6 @@ impl LValue {
     }
 }
 
-#[derive(Clone)]
-pub enum LSymType {
-    StateFunction(LStateFunction),
-    Type(LType),
-    Variable(LVariable),
-    Object(LType),
-}
-
-impl From<&LSymType> for NameTypeLValue {
-    fn from(lst: &LSymType) -> Self {
-        match lst {
-            LSymType::StateFunction(_) => NameTypeLValue::StateFunction,
-            LSymType::Type(_) => NameTypeLValue::Type,
-            LSymType::Variable(_) => NameTypeLValue::Variable,
-            LSymType::Object(_) => NameTypeLValue::Object,
-        }
-    }
-}
-
-impl From<LSymType> for NameTypeLValue {
-    fn from(lst: LSymType) -> Self {
-        (&lst).into()
-    }
-}
-
-impl LSymType {
-    pub fn as_state_function(&self) -> Result<LStateFunction, LError> {
-        match self {
-            LSymType::StateFunction(sf) => Ok(sf.clone()),
-            //TODO: Implement error
-            lst => Err(LError::ConversionError(
-                lst.into(),
-                NameTypeLValue::StateFunction,
-            )),
-        }
-    }
-
-    pub fn as_variable(&self) -> Result<LVariable, LError> {
-        match self {
-            LSymType::Variable(v) => Ok(v.clone()),
-            //TODO: Implement error
-            lst => Err(LError::ConversionError(
-                lst.into(),
-                NameTypeLValue::Variable,
-            )),
-        }
-    }
-}
-
-impl Display for LSymType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            LSymType::StateFunction(sf) => write!(f, "{}", sf),
-            LSymType::Type(t) => write!(f, "{}", t),
-            LSymType::Variable(v) => write!(f, "{}", v),
-            LSymType::Object(o) => write!(f, "{}", o),
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct LFactBase {
-    facts: HashMap<Vec<Sym>, Sym>,
-}
-
-impl Display for LFactBase {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        let mut s = String::new();
-        for (key, value) in self.facts.clone() {
-            s.push('(');
-            for (i, k) in key.iter().enumerate() {
-                s.push_str(format!("{}", k).as_str());
-                if i < key.len() - 1 {
-                    s.push(',')
-                }
-            }
-            s.push_str(format!(") = {}", value).as_str());
-        }
-        write!(f, "{}", s)
-    }
-}
-
-impl LFactBase {
-    pub fn new(facts: HashMap<Vec<Sym>, Sym>) -> Self {
-        LFactBase { facts }
-    }
-
-    pub fn get_facts(&self) -> HashMap<Vec<Sym>, Sym> {
-        self.facts.clone()
-    }
-}
-
-#[derive(Clone)]
-pub enum NameTypeLValue {
-    Variable,
-    Type,
-    StateFunction,
-    StateVariable,
-    Number,
-    Bool,
-    Symbol,
-    String,
-    SExpr,
-    LFn,
-    None,
-    FactBase,
-    Object,
-}
-
-impl Display for NameTypeLValue {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        let str = match self {
-            NameTypeLValue::Type => "Type",
-            NameTypeLValue::StateFunction => "StateFunction",
-            NameTypeLValue::StateVariable => "StateVariable",
-            NameTypeLValue::Number => "Number",
-            NameTypeLValue::Bool => "Boolean",
-            NameTypeLValue::Symbol => "Symbol",
-            NameTypeLValue::String => "String",
-            NameTypeLValue::SExpr => "SExpr",
-            NameTypeLValue::LFn => "LFn",
-            NameTypeLValue::None => "None",
-            NameTypeLValue::Variable => "Variable",
-            NameTypeLValue::FactBase => "FactBase",
-            NameTypeLValue::Object => "Object",
-        };
-        write!(f, "{}", str)
-    }
-}
-
-impl PartialEq for NameTypeLValue {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (NameTypeLValue::String, NameTypeLValue::String) => true,
-            (NameTypeLValue::SExpr, NameTypeLValue::SExpr) => true,
-            (NameTypeLValue::Bool, NameTypeLValue::Bool) => true,
-            (NameTypeLValue::Symbol, NameTypeLValue::Symbol) => true,
-            (NameTypeLValue::LFn, NameTypeLValue::LFn) => true,
-            (NameTypeLValue::None, NameTypeLValue::None) => true,
-            (NameTypeLValue::StateFunction, NameTypeLValue::StateFunction) => true,
-            (NameTypeLValue::StateVariable, NameTypeLValue::StateVariable) => true,
-            (NameTypeLValue::Type, NameTypeLValue::Type) => true,
-            (_, _) => false,
-        }
-    }
-}
-
-impl From<&LValue> for NameTypeLValue {
-    fn from(lv: &LValue) -> Self {
-        match lv {
-            LValue::Bool(_) => NameTypeLValue::Bool,
-            LValue::Number(_) => NameTypeLValue::Number,
-            LValue::Symbol(_) => NameTypeLValue::Symbol,
-            LValue::String(_) => NameTypeLValue::String,
-            LValue::SExpr(_) => NameTypeLValue::SExpr,
-            LValue::LFn(_) => NameTypeLValue::LFn,
-            LValue::None => NameTypeLValue::None,
-            LValue::FactBase(_) => NameTypeLValue::FactBase,
-            LValue::StateVariable(_) => NameTypeLValue::StateVariable,
-            LValue::SymType(st) => st.into(),
-        }
-    }
-}
-
-impl From<LValue> for NameTypeLValue {
-    fn from(lv: LValue) -> Self {
-        (&lv).into()
-    }
-}
 
 impl PartialEq for LValue {
     fn eq(&self, other: &Self) -> bool {
@@ -554,29 +449,6 @@ impl PartialOrd for LValue {
     }
 }
 
-impl Debug for LValue {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{}", self)
-    }
-}
-
-impl Display for LValue {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            LValue::String(s) => write!(f, "string: {}", s),
-            LValue::SExpr(s) => write!(f, "sexpr: {}", s),
-            LValue::LFn(_) => write!(f, "LFunction"),
-            LValue::None => write!(f, "None"),
-            LValue::FactBase(fb) => write!(f, "fb:\n{}", fb),
-            LValue::Symbol(s) => write!(f, "sym: {}", s),
-            LValue::Number(n) => write!(f, "number: {}", n),
-            LValue::Bool(b) => write!(f, "bool: {}", b),
-            LValue::SymType(st) => write!(f, "{}", st),
-            LValue::StateVariable(sv) => write!(f, "{}", sv),
-        }
-    }
-}
-
 impl Add for &LValue {
     type Output = Result<LValue, LError>;
 
@@ -601,6 +473,210 @@ impl Add for &LValue {
             ))),
         }
     }
+}
+
+impl Sub for &LValue {
+    type Output = Result<LValue, LError>;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (LValue::Number(n1), LValue::Number(n2)) => Ok(LValue::Number(n1 - n2)),
+            (LValue::Number(_), l) => Err(LError::WrongType(
+                l.to_string(),
+                l.into(),
+                NameTypeLValue::Number,
+            )),
+            (l, LValue::Number(_)) => Err(LError::WrongType(
+                l.to_string(),
+                l.into(),
+                NameTypeLValue::Number,
+            )),
+
+            (l1, l2) => Err(LError::SpecialError(format!(
+                "{} and {} cannot be add",
+                NameTypeLValue::from(l1),
+                NameTypeLValue::from(l2)
+            ))),
+        }
+    }
+}
+
+impl Mul for &LValue {
+    type Output = Result<LValue, LError>;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (LValue::Number(n1), LValue::Number(n2)) => Ok(LValue::Number(n1 * n2)),
+            (LValue::Number(_), l) => Err(LError::WrongType(
+                l.to_string(),
+                l.into(),
+                NameTypeLValue::Number,
+            )),
+            (l, LValue::Number(_)) => Err(LError::WrongType(
+                l.to_string(),
+                l.into(),
+                NameTypeLValue::Number,
+            )),
+
+            (l1, l2) => Err(LError::SpecialError(format!(
+                "{} and {} cannot be add",
+                NameTypeLValue::from(l1),
+                NameTypeLValue::from(l2)
+            ))),
+        }
+    }
+}
+
+impl Div for &LValue {
+    type Output = Result<LValue, LError>;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (LValue::Number(n1), LValue::Number(n2)) => Ok(LValue::Number(n1 / n2)),
+            (LValue::Number(_), l) => Err(LError::WrongType(
+                l.to_string(),
+                l.into(),
+                NameTypeLValue::Number,
+            )),
+            (l, LValue::Number(_)) => Err(LError::WrongType(
+                l.to_string(),
+                l.into(),
+                NameTypeLValue::Number,
+            )),
+
+            (l1, l2) => Err(LError::SpecialError(format!(
+                "{} and {} cannot be add",
+                NameTypeLValue::from(l1),
+                NameTypeLValue::from(l2)
+            ))),
+        }
+    }
+}
+
+
+
+impl Add for LValue {
+    type Output = Result<LValue, LError>;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        &self+&rhs
+    }
+}
+impl Sub for LValue {
+    type Output = Result<LValue, LError>;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        &self-&rhs
+    }
+}
+impl Mul for LValue {
+    type Output = Result<LValue, LError>;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        &self*&rhs
+    }
+}
+impl Div for LValue {
+    type Output = Result<LValue, LError>;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        &self/&rhs
+    }
+}
+
+
+#[derive(Clone)]
+pub enum NameTypeLValue {
+    State,
+    Variable,
+    Type,
+    StateFunction,
+    StateVariable,
+    Number,
+    Bool,
+    Symbol,
+    String,
+    SExpr,
+    LFn,
+    None,
+    FactBase,
+    Object,
+}
+
+
+
+impl PartialEq for NameTypeLValue {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (NameTypeLValue::String, NameTypeLValue::String) => true,
+            (NameTypeLValue::SExpr, NameTypeLValue::SExpr) => true,
+            (NameTypeLValue::Bool, NameTypeLValue::Bool) => true,
+            (NameTypeLValue::Symbol, NameTypeLValue::Symbol) => true,
+            (NameTypeLValue::LFn, NameTypeLValue::LFn) => true,
+            (NameTypeLValue::None, NameTypeLValue::None) => true,
+            (NameTypeLValue::StateFunction, NameTypeLValue::StateFunction) => true,
+            (NameTypeLValue::StateVariable, NameTypeLValue::StateVariable) => true,
+            (NameTypeLValue::Type, NameTypeLValue::Type) => true,
+            (NameTypeLValue::State, NameTypeLValue::State) => true,
+            (NameTypeLValue::Variable, NameTypeLValue::Variable) => true,
+            (NameTypeLValue::Number, NameTypeLValue::Number) => true,
+            (NameTypeLValue::FactBase, NameTypeLValue::FactBase) => true,
+            (NameTypeLValue::Object, NameTypeLValue::Object) => true,
+            (_,_) => false,
+        }
+    }
+}
+
+
+/**
+FROM IMPLEMENTATION
+**/
+
+impl From<LSymType> for NameTypeLValue {
+    fn from(lst: LSymType) -> Self {
+        (&lst).into()
+    }
+}
+
+impl From<&LValue> for NameTypeLValue {
+    fn from(lv: &LValue) -> Self {
+        match lv {
+            LValue::Bool(_) => NameTypeLValue::Bool,
+            LValue::Number(_) => NameTypeLValue::Number,
+            LValue::Symbol(_) => NameTypeLValue::Symbol,
+            LValue::String(_) => NameTypeLValue::String,
+            LValue::SExpr(_) => NameTypeLValue::SExpr,
+            LValue::LFn(_) => NameTypeLValue::LFn,
+            LValue::None => NameTypeLValue::None,
+            LValue::FactBase(_) => NameTypeLValue::FactBase,
+            LValue::StateVariable(_) => NameTypeLValue::StateVariable,
+            LValue::SymType(st) => st.into(),
+            LValue::State(_) => NameTypeLValue::State
+        }
+    }
+}
+
+impl From<LValue> for NameTypeLValue {
+    fn from(lv: LValue) -> Self {
+        (&lv).into()
+    }
+}
+
+impl From<&LSymType> for NameTypeLValue {
+    fn from(lst: &LSymType) -> Self {
+        match lst {
+            LSymType::StateFunction(_) => NameTypeLValue::StateFunction,
+            LSymType::Type(_) => NameTypeLValue::Type,
+            LSymType::Variable(_) => NameTypeLValue::Variable,
+            LSymType::Object(_) => NameTypeLValue::Object,
+        }
+    }
+}
+
+
+///Transform an object in Lisp command to reconstuct itself.
+pub trait AsCommand {
+    fn as_command(&self) -> String;
 }
 
 impl AsCommand for LSymType {
@@ -671,9 +747,26 @@ impl AsCommand for LFactBase {
     }
 }
 
+impl AsCommand for LState {
+    fn as_command(&self) -> String {
+        let mut result = String::new();
+        result.push_str(format!("({} ", STATE).as_str());
+        for (keys, value) in self.state_variables.iter() {
+            result.push_str("(sv ");
+            for key in keys {
+                result.push_str(format!("{} ", key).as_str())
+            }
+            result.push_str(format!(" {})", value).as_str());
+        }
+        result.push_str(")\n");
+        result
+    }
+}
+
 impl AsCommand for LValue {
     fn as_command(&self) -> String {
         match self {
+            LValue::State(state) => state.as_command(),
             LValue::FactBase(fb) => fb.as_command(),
             LValue::SymType(st) => st.as_command(),
             LValue::String(s) => s.to_string(),
@@ -687,3 +780,168 @@ impl AsCommand for LValue {
         }
     }
 }
+
+
+/**
+DISPLAY IMPLEMENTATION
+**/
+
+
+impl Display for LError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            LError::WrongType(s, s1, s2) => write!(f, "{}: Got {}, expected {}", s, s1, s2),
+            LError::ErrLoc(e) => write!(f, "{}", e),
+            LError::UndefinedSymbol(s) => write!(f, "{} is undefined", s),
+            LError::WrongNumerOfArgument(s, r) => write!(f, "Got {}, expected {:?}", s, r),
+            LError::SpecialError(s) => write!(f, "{}", s),
+            LError::ConversionError(s1, s2) => write!(f, "Cannot convert {} into {}.", s1, s2),
+        }
+    }
+}
+
+impl Display for LNumber {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            LNumber::Int(i) => write!(f, "{}", i),
+            LNumber::Float(fl) => write!(f, "{}", fl),
+        }
+    }
+}
+
+impl Display for LVariable {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "{} - {}", self.value, self.v_type)
+    }
+}
+
+impl Display for LStateFunction {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        let mut sr = String::new();
+        sr.push('(');
+        for (i, t_param) in self.t_params.iter().enumerate() {
+            sr.push_str(format!("{}", t_param).as_str());
+            if i > 0 {
+                sr.push(',');
+            }
+        }
+        sr.push_str(format!(") = {}", self.t_value).as_str());
+        write!(f, "{}", sr)
+    }
+}
+
+impl Display for LStateVariable {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        let mut sr = String::new();
+        sr.push('(');
+        for (i, t_param) in self.params.iter().enumerate() {
+            sr.push_str(format!("{}", t_param).as_str());
+            if i > 0 {
+                sr.push(',');
+            }
+        }
+        sr.push_str(format!(") = {}", self.value).as_str());
+        write!(f, "{}", sr)
+    }
+}
+
+
+impl Display for LState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        let mut result = String::new();
+        for (params, value) in self.state_variables.iter() {
+            let params = params.as_slice();
+            result.push_str(format!("{}(",params.get(0).unwrap()).as_str());
+            for (i,param) in params[1..].iter().enumerate() {
+                if i != 0 {
+                    result.push(',');
+                }
+                result.push_str(param.as_str());
+            }
+            result.push_str(format!(")={}\n", value).as_str());
+        }
+
+        write!(f, "{}",result)
+    }
+}
+
+
+impl Display for LSymType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            LSymType::StateFunction(sf) => write!(f, "{}", sf),
+            LSymType::Type(t) => write!(f, "{}", t),
+            LSymType::Variable(v) => write!(f, "{}", v),
+            LSymType::Object(o) => write!(f, "{}", o),
+        }
+    }
+}
+
+impl Display for LFactBase {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        let mut s = String::new();
+        for (key, value) in self.facts.clone() {
+            s.push('(');
+            for (i, k) in key.iter().enumerate() {
+                s.push_str(format!("{}", k).as_str());
+                if i < key.len() - 1 {
+                    s.push(',')
+                }
+            }
+            s.push_str(format!(") = {}", value).as_str());
+        }
+        write!(f, "{}", s)
+    }
+}
+
+impl Display for LValue {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            LValue::String(s) => write!(f, "string: {}", s),
+            LValue::SExpr(s) => write!(f, "sexpr: {}", s),
+            LValue::LFn(_) => write!(f, "LFunction"),
+            LValue::None => write!(f, "None"),
+            LValue::FactBase(fb) => write!(f, "fb:\n{}", fb),
+            LValue::Symbol(s) => write!(f, "sym: {}", s),
+            LValue::Number(n) => write!(f, "number: {}", n),
+            LValue::Bool(b) => write!(f, "bool: {}", b),
+            LValue::SymType(st) => write!(f, "{}", st),
+            LValue::StateVariable(sv) => write!(f, "{}", sv),
+            LValue::State(s) => write!(f, "{}", s),
+        }
+    }
+}
+
+impl Display for NameTypeLValue {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        let str = match self {
+            NameTypeLValue::Type => "Type",
+            NameTypeLValue::StateFunction => "StateFunction",
+            NameTypeLValue::StateVariable => "StateVariable",
+            NameTypeLValue::Number => "Number",
+            NameTypeLValue::Bool => "Boolean",
+            NameTypeLValue::Symbol => "Symbol",
+            NameTypeLValue::String => "String",
+            NameTypeLValue::SExpr => "SExpr",
+            NameTypeLValue::LFn => "LFn",
+            NameTypeLValue::None => "None",
+            NameTypeLValue::Variable => "Variable",
+            NameTypeLValue::FactBase => "FactBase",
+            NameTypeLValue::Object => "Object",
+            NameTypeLValue::State => "State",
+        };
+        write!(f, "{}", str)
+    }
+}
+
+/**
+DEBUG
+**/
+
+impl Debug for LValue {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "{}", self)
+    }
+}
+
+//TODO: Add tests

@@ -79,6 +79,8 @@ impl Default for LEnv {
 
         symbols.insert(SET_FACTBASE.to_string(), LValue::LFn(Rc::new(set_factbase)));
 
+        symbols.insert(STATE.to_string(), LValue::LFn(Rc::new(state)));
+
         //Sym_types
         sym_types.insert(
             TYPE_INT.into(),

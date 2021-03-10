@@ -26,82 +26,24 @@ pub fn add(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
 pub fn sub(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
     match values.len() {
         2 => {
-            let mut first_val: f64 = 0.0;
-            let mut second_val: f64 = 0.0;
-            for (i, val) in values.iter().enumerate() {
-                match val {
-                    LValue::Number(LNumber::Int(int)) => match i {
-                        0 => first_val = *int as f64,
-                        1 => second_val = *int as f64,
-                        _ => panic!("Strong error"),
-                    },
-                    LValue::Number(LNumber::Float(float)) => match i {
-                        0 => first_val = *float,
-                        1 => second_val = *float,
-                        _ => panic!("Strong error"),
-                    },
-                    lv => {
-                        return Err(LError::WrongType(
-                            lv.to_string(),
-                            lv.clone().into(),
-                            NameTypeLValue::Number,
-                        ))
-                    }
-                };
-            }
-
-            Ok(LValue::Number(LNumber::Float(first_val - second_val)))
+            values.get(0).unwrap() - values.get(0).unwrap()
         }
         i => Err(WrongNumerOfArgument(i, 2..2)),
     }
 }
 
 pub fn mul(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
-    let mut result: f64 = 1.0;
+    let mut result = LValue::Number(LNumber::Float(1.0));
     for value in values {
-        match value {
-            LValue::Number(LNumber::Int(i)) => result *= *i as f64,
-            LValue::Number(LNumber::Float(f)) => result *= *f,
-            l => {
-                return Err(LError::WrongType(
-                    l.to_string(),
-                    l.into(),
-                    NameTypeLValue::Number,
-                ))
-            }
-        }
+        result = (&result * value)?;
     }
-    Ok(LValue::Number(LNumber::Float(result)))
+    Ok(result)
 }
 
 pub fn div(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
     match values.len() {
         2 => {
-            let mut first_val: f64 = 0.0;
-            let mut second_val: f64 = 0.0;
-            for (i, val) in values.iter().enumerate() {
-                match val {
-                    LValue::Number(LNumber::Int(int)) => match i {
-                        0 => first_val = *int as f64,
-                        1 => second_val = *int as f64,
-                        _ => panic!("Strong error"),
-                    },
-                    LValue::Number(LNumber::Float(float)) => match i {
-                        0 => first_val = *float,
-                        1 => second_val = *float,
-                        _ => panic!("Strong error"),
-                    },
-                    lv => {
-                        return Err(LError::WrongType(
-                            lv.to_string(),
-                            lv.clone().into(),
-                            NameTypeLValue::Number,
-                        ))
-                    }
-                };
-            }
-
-            Ok(LValue::Number(LNumber::Float(first_val / second_val)))
+            values.get(0).unwrap() / values.get(0).unwrap()
         }
         i => Err(WrongNumerOfArgument(i, 2..2)),
     }
@@ -464,6 +406,26 @@ pub fn factbase(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
         }
     }
     Ok(LValue::FactBase(LFactBase::new(facts)))
+}
+
+pub fn state(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
+    let mut state_variables: HashMap<Vec<Sym>, Sym> = Default::default();
+    for value in values {
+        match value {
+            LValue::StateVariable(sv) => {
+                let (key, value) = sv.get_key_value();
+                state_variables.insert(key, value);
+            }
+            lv => {
+                return Err(WrongType(
+                    lv.to_string(),
+                    lv.into(),
+                    NameTypeLValue::StateVariable,
+                ))
+            }
+        }
+    }
+    Ok(LValue::State(LState::new(state_variables)))
 }
 
 //TODO: Define set behaviour for other type of LValue

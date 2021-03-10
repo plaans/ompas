@@ -31,6 +31,7 @@ pub const STATE_FUNCTION: &str = "sf";
 pub const STATE_VARIABLE: &str = "sv";
 pub const FACTBASE: &str = "fb";
 pub const TYPE: &str = "type";
+pub const STATE: &str = "state";
 
 //basic types
 pub const TYPE_INT: &str = "int";

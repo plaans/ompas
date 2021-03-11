@@ -112,6 +112,13 @@ pub fn eval(se: &SExpr, env: &mut LEnv) -> Result<LValue, LError> {
                         Err(e) => Err(e),
                     };
                 }
+                LAMBDA => {
+                    let mut args: Vec<LValue> = Vec::new();
+                    for arg in list_iter {
+                        args.push(LValue::SExpr(arg.clone()))
+                    }
+                    return env.create_lambda(args.as_slice())
+                }
                 READ => {
                     let file_name = list_iter.pop_atom()?.to_string();
                     let mut file = match File::open(file_name) {
@@ -139,7 +146,8 @@ pub fn eval(se: &SExpr, env: &mut LEnv) -> Result<LValue, LError> {
             if is_first_atom_function {
                 //println!("{} is a function",first_atom);
                 let proc = match eval(&SExpr::Atom(first_atom), env)? {
-                    LValue::LFn(f) => f,
+                    LValue::LFn(f) => LValue::LFn(f),
+                    LValue::Lambda(l)=> LValue::Lambda(l),
                     lv => return Err(WrongType(lv.to_string(), lv.into(), NameTypeLValue::LFn)),
                 };
                 let mut args: Vec<LValue> = Vec::new();
@@ -147,7 +155,11 @@ pub fn eval(se: &SExpr, env: &mut LEnv) -> Result<LValue, LError> {
                     args.push(eval(arg, env)?)
                 }
                 //println!("args:{:?}", args);
-                return proc(args.as_slice(), env);
+                match proc {
+                    LValue::LFn(f) => return f(args.as_slice(), env),
+                    LValue::Lambda(l) => return eval(&l(args.as_slice(), env)?.as_sexpr()?, env),
+                    lv => panic!("strong error, expected to have a function or a lambda function")
+                }
             }
         }
     };

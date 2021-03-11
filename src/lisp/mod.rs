@@ -7,6 +7,9 @@ use im::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::rc::Rc;
+use crate::lisp::lisp_struct::LError::{WrongNumerOfArgument, WrongType};
+use aries_planning::parsing::sexpr::{parse, SExpr};
+use anyhow::Error;
 
 pub mod lisp_functions;
 pub mod lisp_language;
@@ -82,6 +85,7 @@ impl Default for LEnv {
         symbols.insert(STATE.to_string(), LValue::LFn(Rc::new(state)));
 
         //symbols.insert(LIST.to_string(), LValue::LFn(Rc::new(list)));
+        //symbols.insert(LAMBDA.to_string(), LValue::LFn(Rc::new(lambda)));
 
         //Sym_types
         sym_types.insert(
@@ -159,6 +163,50 @@ impl LEnv {
             Err(e) => panic!("{}", e),
         }
         //eprintln!("write fact base to file");
+    }
+
+
+    pub fn create_lambda(&self, vals: &[LValue]) -> Result<LValue, LError> {
+
+        if !vals.len() == 2 {
+            return Err(WrongNumerOfArgument(vals.len(), 2..2))
+        }
+        let args = match vals.get(0).unwrap() {
+            LValue::SExpr(s) => {
+                let mut args = Vec::new();
+                for s in s.as_list_iter().unwrap(){
+                    args.push(s.to_string())
+                }
+                args
+            }
+            lv => return Err(WrongType(lv.to_string(), lv.into(), NameTypeLValue::SExpr))
+        };
+        let function = match vals.get(1).unwrap() {
+            LValue::SExpr(s) => s.to_string(),
+            lv => return Err(WrongType(lv.to_string(), lv.into(), NameTypeLValue::SExpr))
+        };
+
+        let lambda_function = Box::new(move |values : &[LValue], env: &LEnv| {
+            let function = function.clone();
+            let args = args.clone();
+            //println!("args of function {:?}", args);
+            let mut result: String = function;
+            if args.len() != values.len() {
+                return Err(WrongNumerOfArgument(values.len(), args.len()..args.len()))
+            }
+            for (i,val) in values.iter().enumerate() {
+                result = result.replace(args[i].as_str(), val.as_sym()?.as_str());
+            }
+
+            //Ok(LValue::Number(LNumber::Int(10)))
+            //Ok(LValue::String(result))
+            match parse(result.as_str()) {
+                Ok(s) => Ok(LValue::SExpr(s)),
+                Err(e) => Err(LError::SpecialError(e.to_string())),
+            }
+        });
+
+        Ok(LValue::Lambda(Rc::new(lambda_function)))
     }
 }
 

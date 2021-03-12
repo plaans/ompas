@@ -20,43 +20,45 @@ pub struct LEnv {
 
 impl Default for LEnv {
     fn default() -> Self {
-        let mut symbols: HashMap<String, LValue> = HashMap::default();
+        // let map = im::hashmap::HashMap::new();
+        // map.ins
+        let  symbols: HashMap<String, LValue> = HashMap::default();
         let mut sym_types: HashMap<Sym, LSymType> = HashMap::default();
-        symbols.insert(GET.to_string(), LValue::LFn(Rc::new(get)));
+        let symbols = symbols.update(GET.to_string(), LValue::LFn(Rc::new(get)));
 
         //Mathematical functions
-        symbols.insert(ADD.to_string(), LValue::LFn(Rc::new(add)));
-        symbols.insert(SUB.to_string(), LValue::LFn(Rc::new(sub)));
-        symbols.insert(MUL.to_string(), LValue::LFn(Rc::new(mul)));
-        symbols.insert(DIV.to_string(), LValue::LFn(Rc::new(div)));
+        let symbols = symbols.update(ADD.to_string(), LValue::LFn(Rc::new(add)));
+        let symbols = symbols.update(SUB.to_string(), LValue::LFn(Rc::new(sub)));
+        let symbols = symbols.update(MUL.to_string(), LValue::LFn(Rc::new(mul)));
+        let symbols = symbols.update(DIV.to_string(), LValue::LFn(Rc::new(div)));
         //Comparison
-        symbols.insert(GT.to_string(), LValue::LFn(Rc::new(gt)));
-        symbols.insert(LT.to_string(), LValue::LFn(Rc::new(lt)));
-        symbols.insert(GE.to_string(), LValue::LFn(Rc::new(ge)));
-        symbols.insert(LE.to_string(), LValue::LFn(Rc::new(le)));
-        symbols.insert(EQ.to_string(), LValue::LFn(Rc::new(eq)));
+        let symbols = symbols.update(GT.to_string(), LValue::LFn(Rc::new(gt)));
+        let symbols = symbols.update(LT.to_string(), LValue::LFn(Rc::new(lt)));
+        let symbols = symbols.update(GE.to_string(), LValue::LFn(Rc::new(ge)));
+        let symbols = symbols.update(LE.to_string(), LValue::LFn(Rc::new(le)));
+        let symbols = symbols.update(EQ.to_string(), LValue::LFn(Rc::new(eq)));
 
         //Type verification
-        symbols.insert(IS_NONE.to_string(), LValue::LFn(Rc::new(is_none)));
-        symbols.insert(IS_NUMBER.to_string(), LValue::LFn(Rc::new(is_number)));
-        symbols.insert(IS_BOOL.to_string(), LValue::LFn(Rc::new(is_bool)));
-        symbols.insert(IS_FN.to_string(), LValue::LFn(Rc::new(is_fn)));
-        symbols.insert(IS_FACTBASE.to_string(), LValue::LFn(Rc::new(is_fact_base)));
-        symbols.insert(
+        let symbols = symbols.update(IS_NONE.to_string(), LValue::LFn(Rc::new(is_none)));
+        let symbols = symbols.update(IS_NUMBER.to_string(), LValue::LFn(Rc::new(is_number)));
+        let symbols = symbols.update(IS_BOOL.to_string(), LValue::LFn(Rc::new(is_bool)));
+        let symbols = symbols.update(IS_FN.to_string(), LValue::LFn(Rc::new(is_fn)));
+        let symbols = symbols.update(IS_FACTBASE.to_string(), LValue::LFn(Rc::new(is_fact_base)));
+        let symbols = symbols.update(
             IS_STATE_FUNCTION.to_string(),
             LValue::LFn(Rc::new(is_state_function)),
         );
-        symbols.insert(
+        let symbols = symbols.update(
             IS_STATE_VARIABLE.to_string(),
             LValue::LFn(Rc::new(is_state_variable)),
         );
-        symbols.insert(IS_OBJECT.to_string(), LValue::LFn(Rc::new(is_object)));
-        symbols.insert(IS_TYPE.to_string(), LValue::LFn(Rc::new(is_type)));
-        symbols.insert(IS_VARIABLE.to_string(), LValue::LFn(Rc::new(is_variable)));
+        let symbols = symbols.update(IS_OBJECT.to_string(), LValue::LFn(Rc::new(is_object)));
+        let symbols = symbols.update(IS_TYPE.to_string(), LValue::LFn(Rc::new(is_type)));
+        let symbols = symbols.update(IS_VARIABLE.to_string(), LValue::LFn(Rc::new(is_variable)));
 
         //Special entry
-        symbols.insert(BEGIN.to_string(), LValue::LFn(Rc::new(begin)));
-        symbols.insert(
+        let symbols = symbols.update(BEGIN.to_string(), LValue::LFn(Rc::new(begin)));
+        let symbols = symbols.update(
             PI.to_string(),
             LValue::Number(LNumber::Float(std::f64::consts::PI)),
         );
@@ -64,22 +66,22 @@ impl Default for LEnv {
         //Basic types
 
         //Functions for the factbase
-        symbols.insert(VARIABLE.to_string(), LValue::LFn(Rc::new(var)));
-        symbols.insert(
+        let symbols = symbols.update(VARIABLE.to_string(), LValue::LFn(Rc::new(var)));
+        let symbols = symbols.update(
             STATE_FUNCTION.to_string(),
             LValue::LFn(Rc::new(state_function)),
         );
-        symbols.insert(OBJECT.to_string(), LValue::LFn(Rc::new(object)));
-        symbols.insert(TYPE.to_string(), LValue::LFn(Rc::new(def_type)));
-        symbols.insert(
+        let symbols = symbols.update(OBJECT.to_string(), LValue::LFn(Rc::new(object)));
+        let symbols = symbols.update(TYPE.to_string(), LValue::LFn(Rc::new(def_type)));
+        let symbols = symbols.update(
             STATE_VARIABLE.to_string(),
             LValue::LFn(Rc::new(state_variable)),
         );
-        symbols.insert(FACTBASE.to_string(), LValue::LFn(Rc::new(factbase)));
+        let symbols = symbols.update(FACTBASE.to_string(), LValue::LFn(Rc::new(factbase)));
 
-        symbols.insert(SET.to_string(), LValue::LFn(Rc::new(set)));
+        let symbols = symbols.update(SET.to_string(), LValue::LFn(Rc::new(set)));
 
-        symbols.insert(STATE.to_string(), LValue::LFn(Rc::new(state)));
+        let symbols = symbols.update(STATE.to_string(), LValue::LFn(Rc::new(state)));
 
         //symbols.insert(LIST.to_string(), LValue::LFn(Rc::new(list)));
 

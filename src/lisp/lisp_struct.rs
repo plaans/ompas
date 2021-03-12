@@ -353,17 +353,28 @@ pub type LFn = Rc<fn(&[LValue], &LEnv) -> Result<LValue, LError>>;
 
 #[derive(Clone)]
 pub enum LValue {
-    State(LState),
+    // symbol
     Symbol(Sym),
+    // literaux
     Number(LNumber),
     Bool(bool),
-    FactBase(LFactBase),
-    StateVariable(LStateVariable),
     String(String),
-    SExpr(SExpr),
-    LFn(LFn),
-    SymType(LSymType),
+
+    // data structure
+    Map(im::HashMap<LValue, LValue>),
+    List(Vec<LValue>),
+
+    Quote(Box<LValue>),
+
+    // error
     None,
+
+    LFn(LFn),
+
+    // ????
+    StateVariable(LStateVariable),
+    SymType(LSymType),
+
 }
 
 impl LValue {

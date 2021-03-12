@@ -25,9 +25,10 @@ pub struct LEnv {
 
 impl Default for LEnv {
     fn default() -> Self {
+        // let map = im::hashmap::HashMap::new();
+        // map.ins
         let mut symbols: HashMap<String, LValue> = HashMap::default();
         let mut sym_types: HashMap<Sym, LSymType> = HashMap::default();
-
         symbols.insert(GET.to_string(), LValue::LFn(Rc::new(get)));
 
         //Mathematical functions

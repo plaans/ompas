@@ -50,6 +50,7 @@ pub const READ: &str = "read";
 pub const WRITE: &str = "write";
 pub const GET: &str = "get";
 pub const LIST: &str = "list";
+pub const LAMBDA: &str = "lambda";
 
 pub const TRUE: &str = "true";
 pub const FALSE: &str = "false";

@@ -6,6 +6,7 @@ use aries_utils::input::Sym;
 //use std::collections::HashMap;
 use crate::lisp::LEnv;
 use im::HashMap;
+use std::rc::Rc;
 
 
 //Mathematical functions
@@ -495,3 +496,4 @@ pub fn get(values: &[LValue], env: &LEnv) -> Result<LValue, LError> {
         }
     }
 }
+

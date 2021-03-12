@@ -351,6 +351,8 @@ impl LSymType {
 
 pub type LFn = Rc<fn(&[LValue], &LEnv) -> Result<LValue, LError>>;
 
+pub type LLambda = Rc<Box<dyn Fn(&[LValue], &LEnv) -> Result<LValue, LError>>>;
+
 #[derive(Clone)]
 pub enum LValue {
     // symbol
@@ -370,9 +372,8 @@ pub enum LValue {
     None,
 
     LFn(LFn),
-
-    // ????
     StateVariable(LStateVariable),
+    Lambda(LLambda),
     SymType(LSymType),
 
 }
@@ -419,7 +420,14 @@ impl LValue {
     pub fn as_bool(&self) -> Result<bool, LError> {
         match self {
             LValue::Bool(b) => Ok(*b),
-            _ => Err(LError::SpecialError("cannot convert into int".to_string())),
+            _ => Err(LError::SpecialError("cannot convert into bool".to_string())),
+        }
+    }
+
+    pub fn as_sexpr(&self) -> Result<SExpr, LError> {
+        match self {
+            LValue::SExpr(s) => Ok(s.clone()),
+            _ => Err(LError::SpecialError("cannot convert into sexpr".to_string())),
         }
     }
 }
@@ -624,6 +632,7 @@ pub enum NameTypeLValue {
     String,
     SExpr,
     LFn,
+    Lambda,
     None,
     FactBase,
     Object,
@@ -677,7 +686,8 @@ impl From<&LValue> for NameTypeLValue {
             LValue::FactBase(_) => NameTypeLValue::FactBase,
             LValue::StateVariable(_) => NameTypeLValue::StateVariable,
             LValue::SymType(st) => st.into(),
-            LValue::State(_) => NameTypeLValue::State
+            LValue::State(_) => NameTypeLValue::State,
+            LValue::Lambda(_) => NameTypeLValue::Lambda,
         }
     }
 }
@@ -815,6 +825,7 @@ impl AsCommand for LValue {
             LValue::Number(n) => n.to_string(),
             LValue::Bool(b) => b.to_string(),
             LValue::StateVariable(sv) => sv.as_command(),
+            LValue::Lambda(l) => "".to_string(),
         }
     }
 }
@@ -946,6 +957,7 @@ impl Display for LValue {
             LValue::SymType(st) => write!(f, "{}", st),
             LValue::StateVariable(sv) => write!(f, "{}", sv),
             LValue::State(s) => write!(f, "{}", s),
+            LValue::Lambda(s) => write!(f,"Lambda")
         }
     }
 }
@@ -967,6 +979,7 @@ impl Display for NameTypeLValue {
             NameTypeLValue::FactBase => "FactBase",
             NameTypeLValue::Object => "Object",
             NameTypeLValue::State => "State",
+            NameTypeLValue::Lambda => "lambda",
         };
         write!(f, "{}", str)
     }

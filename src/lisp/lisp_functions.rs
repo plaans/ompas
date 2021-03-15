@@ -6,8 +6,6 @@ use aries_utils::input::Sym;
 //use std::collections::HashMap;
 use crate::lisp::LEnv;
 use im::HashMap;
-use std::hash::Hash;
-use std::collections::hash_map::RandomState;
 
 
 //Mathematical functions
@@ -176,16 +174,6 @@ pub fn is_object(values: &[LValue], env: &LEnv) -> Result<LValue, LError> {
     }
 }
 
-pub fn is_pair(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
-    match values.len() {
-        1 => match values.get(0).unwrap() {
-            LValue::Pair(_, _) => Ok(LValue::Bool(true)),
-            _ => Ok(LValue::Bool(false)),
-        },
-        i => Err(WrongNumberOfArgument(i, 1..1)),
-    }
-}
-
 //TODO: add verification functions for list, map, ref
 
 pub fn is_state_function(values: &[LValue], env: &LEnv) -> Result<LValue, LError> {
@@ -330,29 +318,24 @@ pub fn map(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
     let mut facts: HashMap<LValue, LValue> = Default::default();
     for value in values {
         match value {
-            LValue::Pair(key, value) => {
-                let key = *key.clone();
-                let value = *value.clone();
-                facts.insert(key, value);
+            LValue::List(l) => {
+                if l.len() != 2 {
+                   return Err(WrongNumberOfArgument(l.len(), 2..2));
+                }
+                let key = l.get(0).unwrap();
+                let value = l.get(1).unwrap();
+                facts.insert(key.clone(), value.clone());
             }
             lv => {
                 return Err(WrongType(
                     lv.to_string(),
                     lv.into(),
-                    NameTypeLValue::Pair,
+                    NameTypeLValue::List,
                 ))
             }
         }
     }
     Ok(LValue::Map(facts))
-}
-
-pub fn pair(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
-    if values.len() != 2 {
-        return Err(WrongNumberOfArgument(values.len(), 2..2))
-    }
-    Ok(LValue::Pair(Box::new(values.get(0).unwrap_or(&LValue::None).clone()),
-                    Box::new(values.get(1).unwrap_or(&LValue::None).clone())))
 }
 
 //TODO: Define set behaviour for other type of LValue
@@ -365,16 +348,19 @@ pub fn set(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
             let mut facts = s.clone();
             for value in &values[1..] {
                 match value {
-                    LValue::Pair(key, value) => {
-                        let key = *key.clone();
-                        let value = *value.clone();
-                        facts.insert(key, value);
+                    LValue::List(l) => {
+                        if l.len() != 2 {
+                            return Err(WrongNumberOfArgument(l.len(), 2..2));
+                        }
+                        let key = l.get(0).unwrap();
+                        let value = l.get(1).unwrap();
+                        facts.insert(key.clone(), value.clone());
                     }
                     lv => {
                         return Err(WrongType(
                             lv.to_string(),
                             lv.into(),
-                            NameTypeLValue::Pair,
+                            NameTypeLValue::List,
                         ))
                     }
                 }
@@ -532,20 +518,6 @@ mod tests
         map.insert(key,value);
         println!("get value: ");
         let search_key = LValue::Bool(true);
-        let value = *map.get(&search_key).unwrap_or(&-1);
-        assert_eq!(value, 4)
-    }
-
-    //#[test]
-    pub fn test_hash_with_LValue_Pair(){
-        let mut map: HashMap<LValue, i32> = HashMap::new();
-        let key = LValue::Pair(Box::new(LValue::Bool(true)), Box::new(LValue::Bool(true)));
-        let value = 4;
-
-        println!("insert value: ");
-        map.insert(key,value);
-        println!("get value: ");
-        let search_key = LValue::Pair(Box::new(LValue::Bool(true)), Box::new(LValue::Bool(true)));
         let value = *map.get(&search_key).unwrap_or(&-1);
         assert_eq!(value, 4)
     }

@@ -5,13 +5,11 @@ use std::cmp::Ordering;
 use crate::lisp::LEnv;
 use im::HashMap;
 use std::fmt::{Debug, Display, Formatter};
-use std::ops::{Add, Range, Sub, Div, Mul, Deref};
+use std::ops::{Add, Range, Sub, Div, Mul};
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 use aries_planning::parsing::sexpr::SExpr;
-use std::borrow::Borrow;
 use crate::lisp::lisp_struct::LError::WrongNumberOfArgument;
-use std::panic::resume_unwind;
 
 //TODO: Finish to implement the new kind in enum LValue
 
@@ -364,11 +362,9 @@ pub enum LValue {
     Map(im::HashMap<LValue, LValue>),
     List(Vec<LValue>),
     Quote(Box<LValue>),
-    Pair(Box<LValue>, Box<LValue>),
     // error
     None,
     LFn(LFn),
-    StateVariable(LStateVariable),
     Lambda(LLambda),
     SymType(LSymType),
 }
@@ -389,11 +385,6 @@ impl Hash for LValue {
                 let q = &**q;
                 q.hash(state);
             },
-            LValue::Pair(a,b) => {
-                let a = &**a;
-                let b = &**b;
-                a.hash(state); b.hash(state);
-            }
             lv => panic!("cannot hash {}", lv.to_string())
         };
         println!("value of the hash: {}", state.finish())
@@ -641,11 +632,9 @@ impl Div for LValue {
 
 #[derive(Clone)]
 pub enum NameTypeLValue {
-    State,
     Variable,
     Type,
     StateFunction,
-    Pair,
     Number,
     Bool,
     Symbol,
@@ -674,7 +663,6 @@ impl PartialEq for NameTypeLValue {
             (NameTypeLValue::None, NameTypeLValue::None) => true,
             (NameTypeLValue::StateFunction, NameTypeLValue::StateFunction) => true,
             (NameTypeLValue::Type, NameTypeLValue::Type) => true,
-            (NameTypeLValue::State, NameTypeLValue::State) => true,
             (NameTypeLValue::Variable, NameTypeLValue::Variable) => true,
             (NameTypeLValue::Number, NameTypeLValue::Number) => true,
             (NameTypeLValue::FactBase, NameTypeLValue::FactBase) => true,
@@ -682,7 +670,6 @@ impl PartialEq for NameTypeLValue {
             (NameTypeLValue::Map, NameTypeLValue::Map) => true,
             (NameTypeLValue::List, NameTypeLValue::List) => true,
             (NameTypeLValue::Quote, NameTypeLValue::Quote) => true,
-            (NameTypeLValue::Pair, NameTypeLValue::Pair) => true,
             (_,_) => false,
         }
     }
@@ -713,7 +700,6 @@ impl From<&LValue> for NameTypeLValue {
             LValue::Map(_) => NameTypeLValue::Map,
             LValue::List(_) => NameTypeLValue::List,
             LValue::Quote(_) => NameTypeLValue::Quote,
-            LValue::Pair(_, _) => NameTypeLValue::Pair,
         }
     }
 }
@@ -809,7 +795,7 @@ impl AsCommand for HashMap<LValue, LValue> {
         let mut result = String::new();
         result.push_str(format!("({} ", MAP).as_str());
         for (key, value) in self.iter() {
-            result.push_str("(pair ");
+            result.push_str("(list ");
             result.push_str(format!("{} {})", key.as_command(), value.as_command()).as_str())
         }
         result.push_str(")\n");
@@ -828,10 +814,9 @@ impl AsCommand for LValue {
             LValue::Symbol(s) => s.to_string(),
             LValue::Number(n) => n.to_string(),
             LValue::Bool(b) => b.to_string(),
-            LValue::Lambda(l) => "".to_string(),
+            LValue::Lambda(_) => "".to_string(),
             LValue::Map(m) => m.as_command(),
             LValue::Quote(q) => q.as_command(),
-            LValue::Pair(p, q) => format!("(pair {} {}", p.as_command(), q.as_command())
         }
     }
 }
@@ -909,7 +894,7 @@ impl Display for LValue {
             LValue::Bool(b) => write!(f, "{}", b),
             LValue::SymType(st) => write!(f, "{}", st),
             LValue::List(s) => write!(f, "{:?}", s),
-            LValue::Lambda(s) => write!(f,"Lambda"),
+            LValue::Lambda(_) => write!(f,"Lambda"),
             LValue::Map(m) => {
                 let mut result = String::new();
                 for (key, value) in m.iter() {
@@ -918,7 +903,6 @@ impl Display for LValue {
                 write!(f, "{}", result)
             }
             LValue::Quote(q) => write!(f, "{}", q),
-            LValue::Pair(a, b) => write!(f, "({},{})",a,b )
         }
     }
 }
@@ -938,12 +922,10 @@ impl Display for NameTypeLValue {
             NameTypeLValue::Variable => "Variable",
             NameTypeLValue::FactBase => "FactBase",
             NameTypeLValue::Object => "Object",
-            NameTypeLValue::State => "State",
             NameTypeLValue::Lambda => "lambda",
             NameTypeLValue::Map => "map",
             NameTypeLValue::List => "list",
             NameTypeLValue::Quote => "quote",
-            NameTypeLValue::Pair => "pair"
         };
         write!(f, "{}", str)
     }

@@ -163,7 +163,7 @@ pub fn eval(se: &SExpr, env: &mut LEnv) -> Result<LValue, LError> {
                         let mut env = l.get_new_env(args.as_slice())?;
                         return eval(&l.get_body(), &mut env);
                     },
-                    lv => panic!("strong error, expected to have a function or a lambda function")
+                    _ => panic!("strong error, expected to have a function or a lambda function")
                 }
             }
         }

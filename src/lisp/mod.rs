@@ -7,9 +7,6 @@ use im::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::rc::Rc;
-use crate::lisp::lisp_struct::LError::{WrongType};
-use aries_planning::parsing::sexpr::{parse, SExpr};
-use anyhow::Error;
 use std::borrow::Borrow;
 
 pub mod lisp_functions;
@@ -55,9 +52,6 @@ impl Default for LEnv {
             IS_STATE_FUNCTION.to_string(),
             LValue::LFn(Rc::new(is_state_function)),
         );
-        symbols.insert(
-            IS_PAIR.to_string(),
-            LValue::LFn(Rc::new(is_pair)));
         symbols.insert(IS_OBJECT.to_string(), LValue::LFn(Rc::new(is_object)));
         symbols.insert(IS_TYPE.to_string(), LValue::LFn(Rc::new(is_type)));
         symbols.insert(IS_VARIABLE.to_string(), LValue::LFn(Rc::new(is_variable)));
@@ -79,10 +73,6 @@ impl Default for LEnv {
         );
         symbols.insert(OBJECT.to_string(), LValue::LFn(Rc::new(object)));
         symbols.insert(TYPE.to_string(), LValue::LFn(Rc::new(def_type)));
-        symbols.insert(
-            PAIR.to_string(),
-            LValue::LFn(Rc::new(pair)),
-        );
 
         symbols.insert(MAP.to_string(), LValue::LFn(Rc::new(map)));
         symbols.insert(SET.to_string(), LValue::LFn(Rc::new(set)));

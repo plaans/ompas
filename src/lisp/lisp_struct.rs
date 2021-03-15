@@ -11,6 +11,7 @@ use std::rc::Rc;
 use aries_planning::parsing::sexpr::SExpr;
 use std::borrow::Borrow;
 use crate::lisp::lisp_struct::LError::WrongNumberOfArgument;
+use std::panic::resume_unwind;
 
 //TODO: Finish to implement the new kind in enum LValue
 
@@ -377,6 +378,7 @@ pub enum LValue {
 
 impl Hash for LValue {
     fn hash<H: Hasher>(&self, state: &mut H) {
+        println!("value to hash: {}", self);
         match self {
             LValue::Symbol(s) => (*s).hash(state),
             LValue::Number(n) => (*n).hash(state),
@@ -384,16 +386,21 @@ impl Hash for LValue {
             LValue::String(s) => (*s).hash(state),
             LValue::Map(m) => (*m).hash(state),
             LValue::List(l) => {
-                for val in l {
-                    (*val).hash(state)
-                }
-            }
-            LValue::Quote(q) => (*q).hash(state),
+                (*l).hash(state);
+            },
+            LValue::Quote(q) => {
+                let q = &**q;
+                q.hash(state);
+            },
             LValue::Pair(a,b) => {
-                (*a).hash(state); (*b).hash(state)
+                let a = &**a;
+                let b = &**b;
+                a.hash(state); b.hash(state);
             }
             lv => panic!("cannot hash {}", lv.to_string())
-        }
+        };
+        println!("value of the hash: {}", state.finish())
+
     }
 }
 
@@ -898,15 +905,8 @@ impl Display for LValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
             LValue::String(s) => write!(f, "{}", s),
-<<<<<<< HEAD
-            LValue::SExpr(s) => write!(f, "{}", s),
             LValue::LFn(_) => write!(f, "LFunction"),
             LValue::None => write!(f, "None"),
-            LValue::FactBase(fb) => write!(f, "{}", fb),
-=======
-            LValue::LFn(_) => write!(f, "LFunction"),
-            LValue::None => write!(f, "None"),
->>>>>>> add lambda+update LValue struct
             LValue::Symbol(s) => write!(f, "{}", s),
             LValue::Number(n) => write!(f, "{}", n),
             LValue::Bool(b) => write!(f, "{}", b),

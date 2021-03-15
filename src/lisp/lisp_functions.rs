@@ -459,13 +459,15 @@ mod tests
 
     }
 
-    #[test]
+    //#[test]
     pub fn test_hash(){
         let mut map : HashMap<LValue, LValue> = HashMap::new();
         let mut hasher1 = map.hasher().build_hasher();
         let key1 = LValue::List(vec![LValue::Symbol("a".into()), LValue::Symbol("b".into())]);
         let key2 = LValue::Bool(true);
         let value = LValue::Bool(true);
+
+
         key2.hash(&mut hasher1);
         println!("hash value : {}", hasher1.finish());
         map.insert(key2.clone(), value.clone());
@@ -479,14 +481,87 @@ mod tests
         key1.hash(&mut hasher3);
         println!("hash value : {}", hasher3.finish());
         map.insert(key1.clone(), value.clone());
-        let value =  map.get(&key1.clone()).unwrap_or(&LValue::None);
+        let value =  map.get(&key1).unwrap_or(&LValue::None);
         println!("value: {}", value);
-
         let mut hasher4 = map.hasher().build_hasher();
         key1.hash(&mut hasher4);
         println!("hash value : {}", hasher4.finish());
 
+        println!("hash map:");
+        for (key,value) in map.iter(){
+            println!("{} = {}", key, value);
+        }
 
+
+    }
+
+    //#[test]
+    pub fn test_hash_with_vec(){
+        let mut map: HashMap<Vec<LValue>, i32> = HashMap::new();
+        let key = vec![LValue::Bool(true), LValue::Bool(true)];
+        let value = 4;
+        println!("insert value: ");
+        map.insert(key,value);
+        let search_key = vec![LValue::Bool(true), LValue::Bool(true)];
+        println!("get value: ");
+        let value = *map.get(&search_key).unwrap_or(&-1);
+        assert_eq!(value, 4)
+
+    }
+    //#[test]
+    pub fn test_hash_with_LValue_List(){
+        let mut map: HashMap<LValue, i32> = HashMap::new();
+        let key = LValue::List(vec![LValue::Bool(true), LValue::Bool(true)]);
+        let value = 4;
+
+        println!("insert value: ");
+        map.insert(key,value);
+        println!("get value: ");
+        let search_key = LValue::List(vec![LValue::Bool(true), LValue::Bool(true)]);
+        let value = *map.get(&search_key).unwrap_or(&-1);
+        assert_eq!(value, 4)
+
+    }
+    //#[test]
+    pub fn test_hash_with_LValue_Bool(){
+        let mut map: HashMap<LValue, i32> = HashMap::new();
+        let key = LValue::Bool(true);
+        let value = 4;
+
+        println!("insert value: ");
+        map.insert(key,value);
+        println!("get value: ");
+        let search_key = LValue::Bool(true);
+        let value = *map.get(&search_key).unwrap_or(&-1);
+        assert_eq!(value, 4)
+    }
+
+    //#[test]
+    pub fn test_hash_with_LValue_Pair(){
+        let mut map: HashMap<LValue, i32> = HashMap::new();
+        let key = LValue::Pair(Box::new(LValue::Bool(true)), Box::new(LValue::Bool(true)));
+        let value = 4;
+
+        println!("insert value: ");
+        map.insert(key,value);
+        println!("get value: ");
+        let search_key = LValue::Pair(Box::new(LValue::Bool(true)), Box::new(LValue::Bool(true)));
+        let value = *map.get(&search_key).unwrap_or(&-1);
+        assert_eq!(value, 4)
+    }
+
+    #[test]
+    pub fn test_hash_with_LValue_Quote(){
+        let mut map: HashMap<LValue, i32> = HashMap::new();
+        let key = LValue::Quote(Box::new(LValue::Bool(true)));
+        let value = 4;
+
+        println!("insert value: ");
+        map.insert(key,value);
+        println!("get value: ");
+        let search_key = LValue::Quote(Box::new(LValue::Bool(true)));
+        let value = *map.get(&search_key).unwrap_or(&-1);
+        assert_eq!(value, 4)
     }
 
 }

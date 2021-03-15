@@ -7,13 +7,10 @@ use im::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::rc::Rc;
-<<<<<<< HEAD
-use crate::lisp::lisp_struct::LError::{WrongNumerOfArgument, WrongType};
+use crate::lisp::lisp_struct::LError::{WrongType};
 use aries_planning::parsing::sexpr::{parse, SExpr};
 use anyhow::Error;
 use std::borrow::Borrow;
-=======
->>>>>>> add lambda+update LValue struct
 
 pub mod lisp_functions;
 pub mod lisp_language;
@@ -27,7 +24,6 @@ pub struct LEnv {
     outer:  Option<Rc<LEnv>>,
 }
 
-//TODO: implement lambda
 //TODO: implement outer
 
 impl Default for LEnv {
@@ -55,23 +51,13 @@ impl Default for LEnv {
         symbols.insert(IS_NUMBER.to_string(), LValue::LFn(Rc::new(is_number)));
         symbols.insert(IS_BOOL.to_string(), LValue::LFn(Rc::new(is_bool)));
         symbols.insert(IS_FN.to_string(), LValue::LFn(Rc::new(is_fn)));
-<<<<<<< HEAD
-        symbols.insert(IS_FACTBASE.to_string(), LValue::LFn(Rc::new(is_fact_base)));
-=======
->>>>>>> add lambda+update LValue struct
         symbols.insert(
             IS_STATE_FUNCTION.to_string(),
             LValue::LFn(Rc::new(is_state_function)),
         );
         symbols.insert(
-<<<<<<< HEAD
-            IS_STATE_VARIABLE.to_string(),
-            LValue::LFn(Rc::new(is_state_variable)),
-=======
             IS_PAIR.to_string(),
-            LValue::LFn(Rc::new(is_pair)),
->>>>>>> add lambda+update LValue struct
-        );
+            LValue::LFn(Rc::new(is_pair)));
         symbols.insert(IS_OBJECT.to_string(), LValue::LFn(Rc::new(is_object)));
         symbols.insert(IS_TYPE.to_string(), LValue::LFn(Rc::new(is_type)));
         symbols.insert(IS_VARIABLE.to_string(), LValue::LFn(Rc::new(is_variable)));
@@ -94,25 +80,6 @@ impl Default for LEnv {
         symbols.insert(OBJECT.to_string(), LValue::LFn(Rc::new(object)));
         symbols.insert(TYPE.to_string(), LValue::LFn(Rc::new(def_type)));
         symbols.insert(
-<<<<<<< HEAD
-            STATE_VARIABLE.to_string(),
-            LValue::LFn(Rc::new(state_variable)),
-        );
-        symbols.insert(FACTBASE.to_string(), LValue::LFn(Rc::new(factbase)));
-
-        symbols.insert(SET.to_string(), LValue::LFn(Rc::new(set)));
-
-        symbols.insert(STATE.to_string(), LValue::LFn(Rc::new(state)));
-
-        //symbols.insert(LIST.to_string(), LValue::LFn(Rc::new(list)));
-        //symbols.insert(LAMBDA.to_string(), LValue::LFn(Rc::new(lambda)));
-
-        symbols.insert(TYPE_INT.to_string(), LValue::Symbol(TYPE_INT.into()));
-        symbols.insert(TYPE_FLOAT.to_string(), LValue::Symbol(TYPE_FLOAT.into()));
-        symbols.insert(TYPE_BOOL.to_string(), LValue::Symbol(TYPE_BOOL.into()));
-        symbols.insert(TYPE_OBJECT.to_string(), LValue::Symbol(TYPE_OBJECT.into()));
-
-=======
             PAIR.to_string(),
             LValue::LFn(Rc::new(pair)),
         );
@@ -120,7 +87,6 @@ impl Default for LEnv {
         symbols.insert(MAP.to_string(), LValue::LFn(Rc::new(map)));
         symbols.insert(SET.to_string(), LValue::LFn(Rc::new(set)));
         symbols.insert(LIST.to_string(), LValue::LFn(Rc::new(list)));
->>>>>>> add lambda+update LValue struct
         //Sym_types
         sym_types.insert(
             TYPE_INT.into(),

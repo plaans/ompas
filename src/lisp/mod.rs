@@ -10,6 +10,7 @@ use std::rc::Rc;
 use crate::lisp::lisp_struct::LError::{WrongNumerOfArgument, WrongType};
 use aries_planning::parsing::sexpr::{parse, SExpr};
 use anyhow::Error;
+use std::borrow::Borrow;
 
 pub mod lisp_functions;
 pub mod lisp_language;
@@ -19,12 +20,14 @@ pub struct LEnv {
     symbols: HashMap<String, LValue>,
     sym_types: HashMap<Sym, LSymType>,
     new_entries: Vec<String>,
+    outer:  Option<Rc<LEnv>>,
 }
 
 impl Default for LEnv {
     fn default() -> Self {
         let mut symbols: HashMap<String, LValue> = HashMap::default();
         let mut sym_types: HashMap<Sym, LSymType> = HashMap::default();
+
         symbols.insert(GET.to_string(), LValue::LFn(Rc::new(get)));
 
         //Mathematical functions
@@ -87,6 +90,11 @@ impl Default for LEnv {
         //symbols.insert(LIST.to_string(), LValue::LFn(Rc::new(list)));
         //symbols.insert(LAMBDA.to_string(), LValue::LFn(Rc::new(lambda)));
 
+        symbols.insert(TYPE_INT.to_string(), LValue::Symbol(TYPE_INT.into()));
+        symbols.insert(TYPE_FLOAT.to_string(), LValue::Symbol(TYPE_FLOAT.into()));
+        symbols.insert(TYPE_BOOL.to_string(), LValue::Symbol(TYPE_BOOL.into()));
+        symbols.insert(TYPE_OBJECT.to_string(), LValue::Symbol(TYPE_OBJECT.into()));
+
         //Sym_types
         sym_types.insert(
             TYPE_INT.into(),
@@ -109,11 +117,22 @@ impl Default for LEnv {
             symbols,
             sym_types,
             new_entries: vec![],
+            outer : None
         }
     }
 }
 
 impl LEnv {
+    pub fn find(&self, var: &Sym) -> Option<&Self> {
+        match self.symbols.get(var.as_str()) {
+            None => match self.outer.borrow() {
+                None => None,
+                Some(env) => env.find(var)
+            }
+            Some(_) => Some(self)
+        }
+    }
+
     pub fn get_symbol(&self, s: &str) -> Result<LValue, LError> {
         match self.symbols.get(s) {
             None => Err(LError::UndefinedSymbol(s.to_string())),

@@ -937,14 +937,14 @@ impl Display for LFactBase {
 impl Display for LValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            LValue::String(s) => write!(f, "string: {}", s),
-            LValue::SExpr(s) => write!(f, "sexpr: {}", s),
+            LValue::String(s) => write!(f, "{}", s),
+            LValue::SExpr(s) => write!(f, "{}", s),
             LValue::LFn(_) => write!(f, "LFunction"),
             LValue::None => write!(f, "None"),
-            LValue::FactBase(fb) => write!(f, "fb:\n{}", fb),
-            LValue::Symbol(s) => write!(f, "sym: {}", s),
-            LValue::Number(n) => write!(f, "number: {}", n),
-            LValue::Bool(b) => write!(f, "bool: {}", b),
+            LValue::FactBase(fb) => write!(f, "{}", fb),
+            LValue::Symbol(s) => write!(f, "{}", s),
+            LValue::Number(n) => write!(f, "{}", n),
+            LValue::Bool(b) => write!(f, "{}", b),
             LValue::SymType(st) => write!(f, "{}", st),
             LValue::StateVariable(sv) => write!(f, "{}", sv),
             LValue::State(s) => write!(f, "{}", s),

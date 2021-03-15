@@ -7,61 +7,64 @@ use im::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::rc::Rc;
-use crate::lisp::lisp_struct::LError::{WrongNumerOfArgument, WrongType};
+use crate::lisp::lisp_struct::LError::{WrongType};
 use aries_planning::parsing::sexpr::{parse, SExpr};
 use anyhow::Error;
+use std::borrow::Borrow;
 
 pub mod lisp_functions;
 pub mod lisp_language;
 pub mod lisp_struct;
 
+#[derive(Clone)]
 pub struct LEnv {
     symbols: HashMap<String, LValue>,
     sym_types: HashMap<Sym, LSymType>,
     new_entries: Vec<String>,
+    outer:  Option<Rc<LEnv>>,
 }
+
+//TODO: implement outer
 
 impl Default for LEnv {
     fn default() -> Self {
         // let map = im::hashmap::HashMap::new();
         // map.ins
-        let  symbols: HashMap<String, LValue> = HashMap::default();
+        let mut symbols: HashMap<String, LValue> = HashMap::default();
         let mut sym_types: HashMap<Sym, LSymType> = HashMap::default();
-        let symbols = symbols.update(GET.to_string(), LValue::LFn(Rc::new(get)));
+        symbols.insert(GET.to_string(), LValue::LFn(Rc::new(get)));
 
         //Mathematical functions
-        let symbols = symbols.update(ADD.to_string(), LValue::LFn(Rc::new(add)));
-        let symbols = symbols.update(SUB.to_string(), LValue::LFn(Rc::new(sub)));
-        let symbols = symbols.update(MUL.to_string(), LValue::LFn(Rc::new(mul)));
-        let symbols = symbols.update(DIV.to_string(), LValue::LFn(Rc::new(div)));
+        symbols.insert(ADD.to_string(), LValue::LFn(Rc::new(add)));
+        symbols.insert(SUB.to_string(), LValue::LFn(Rc::new(sub)));
+        symbols.insert(MUL.to_string(), LValue::LFn(Rc::new(mul)));
+        symbols.insert(DIV.to_string(), LValue::LFn(Rc::new(div)));
         //Comparison
-        let symbols = symbols.update(GT.to_string(), LValue::LFn(Rc::new(gt)));
-        let symbols = symbols.update(LT.to_string(), LValue::LFn(Rc::new(lt)));
-        let symbols = symbols.update(GE.to_string(), LValue::LFn(Rc::new(ge)));
-        let symbols = symbols.update(LE.to_string(), LValue::LFn(Rc::new(le)));
-        let symbols = symbols.update(EQ.to_string(), LValue::LFn(Rc::new(eq)));
+        symbols.insert(GT.to_string(), LValue::LFn(Rc::new(gt)));
+        symbols.insert(LT.to_string(), LValue::LFn(Rc::new(lt)));
+        symbols.insert(GE.to_string(), LValue::LFn(Rc::new(ge)));
+        symbols.insert(LE.to_string(), LValue::LFn(Rc::new(le)));
+        symbols.insert(EQ.to_string(), LValue::LFn(Rc::new(eq)));
 
         //Type verification
-        let symbols = symbols.update(IS_NONE.to_string(), LValue::LFn(Rc::new(is_none)));
-        let symbols = symbols.update(IS_NUMBER.to_string(), LValue::LFn(Rc::new(is_number)));
-        let symbols = symbols.update(IS_BOOL.to_string(), LValue::LFn(Rc::new(is_bool)));
-        let symbols = symbols.update(IS_FN.to_string(), LValue::LFn(Rc::new(is_fn)));
-        let symbols = symbols.update(IS_FACTBASE.to_string(), LValue::LFn(Rc::new(is_fact_base)));
-        let symbols = symbols.update(
+        symbols.insert(IS_NONE.to_string(), LValue::LFn(Rc::new(is_none)));
+        symbols.insert(IS_NUMBER.to_string(), LValue::LFn(Rc::new(is_number)));
+        symbols.insert(IS_BOOL.to_string(), LValue::LFn(Rc::new(is_bool)));
+        symbols.insert(IS_FN.to_string(), LValue::LFn(Rc::new(is_fn)));
+        symbols.insert(
             IS_STATE_FUNCTION.to_string(),
             LValue::LFn(Rc::new(is_state_function)),
         );
-        let symbols = symbols.update(
-            IS_STATE_VARIABLE.to_string(),
-            LValue::LFn(Rc::new(is_state_variable)),
-        );
-        let symbols = symbols.update(IS_OBJECT.to_string(), LValue::LFn(Rc::new(is_object)));
-        let symbols = symbols.update(IS_TYPE.to_string(), LValue::LFn(Rc::new(is_type)));
-        let symbols = symbols.update(IS_VARIABLE.to_string(), LValue::LFn(Rc::new(is_variable)));
+        symbols.insert(
+            IS_PAIR.to_string(),
+            LValue::LFn(Rc::new(is_pair)));
+        symbols.insert(IS_OBJECT.to_string(), LValue::LFn(Rc::new(is_object)));
+        symbols.insert(IS_TYPE.to_string(), LValue::LFn(Rc::new(is_type)));
+        symbols.insert(IS_VARIABLE.to_string(), LValue::LFn(Rc::new(is_variable)));
 
         //Special entry
-        let symbols = symbols.update(BEGIN.to_string(), LValue::LFn(Rc::new(begin)));
-        let symbols = symbols.update(
+        symbols.insert(BEGIN.to_string(), LValue::LFn(Rc::new(begin)));
+        symbols.insert(
             PI.to_string(),
             LValue::Number(LNumber::Float(std::f64::consts::PI)),
         );
@@ -69,26 +72,21 @@ impl Default for LEnv {
         //Basic types
 
         //Functions for the factbase
-        let symbols = symbols.update(VARIABLE.to_string(), LValue::LFn(Rc::new(var)));
-        let symbols = symbols.update(
+        symbols.insert(VARIABLE.to_string(), LValue::LFn(Rc::new(var)));
+        symbols.insert(
             STATE_FUNCTION.to_string(),
             LValue::LFn(Rc::new(state_function)),
         );
-        let symbols = symbols.update(OBJECT.to_string(), LValue::LFn(Rc::new(object)));
-        let symbols = symbols.update(TYPE.to_string(), LValue::LFn(Rc::new(def_type)));
-        let symbols = symbols.update(
-            STATE_VARIABLE.to_string(),
-            LValue::LFn(Rc::new(state_variable)),
+        symbols.insert(OBJECT.to_string(), LValue::LFn(Rc::new(object)));
+        symbols.insert(TYPE.to_string(), LValue::LFn(Rc::new(def_type)));
+        symbols.insert(
+            PAIR.to_string(),
+            LValue::LFn(Rc::new(pair)),
         );
-        let symbols = symbols.update(FACTBASE.to_string(), LValue::LFn(Rc::new(factbase)));
 
-        let symbols = symbols.update(SET.to_string(), LValue::LFn(Rc::new(set)));
-
-        let symbols = symbols.update(STATE.to_string(), LValue::LFn(Rc::new(state)));
-
-        //symbols.insert(LIST.to_string(), LValue::LFn(Rc::new(list)));
-        //symbols.insert(LAMBDA.to_string(), LValue::LFn(Rc::new(lambda)));
-
+        symbols.insert(MAP.to_string(), LValue::LFn(Rc::new(map)));
+        symbols.insert(SET.to_string(), LValue::LFn(Rc::new(set)));
+        symbols.insert(LIST.to_string(), LValue::LFn(Rc::new(list)));
         //Sym_types
         sym_types.insert(
             TYPE_INT.into(),
@@ -111,11 +109,22 @@ impl Default for LEnv {
             symbols,
             sym_types,
             new_entries: vec![],
+            outer : None
         }
     }
 }
 
 impl LEnv {
+    pub fn find(&self, var: &Sym) -> Option<&Self> {
+        match self.symbols.get(var.as_str()) {
+            None => match self.outer.borrow() {
+                None => None,
+                Some(env) => env.find(var)
+            }
+            Some(_) => Some(self)
+        }
+    }
+
     pub fn get_symbol(&self, s: &str) -> Result<LValue, LError> {
         match self.symbols.get(s) {
             None => Err(LError::UndefinedSymbol(s.to_string())),
@@ -167,49 +176,6 @@ impl LEnv {
         //eprintln!("write fact base to file");
     }
 
-
-    pub fn create_lambda(&self, vals: &[LValue]) -> Result<LValue, LError> {
-
-        if !vals.len() == 2 {
-            return Err(WrongNumerOfArgument(vals.len(), 2..2))
-        }
-        let args = match vals.get(0).unwrap() {
-            LValue::SExpr(s) => {
-                let mut args = Vec::new();
-                for s in s.as_list_iter().unwrap(){
-                    args.push(s.to_string())
-                }
-                args
-            }
-            lv => return Err(WrongType(lv.to_string(), lv.into(), NameTypeLValue::SExpr))
-        };
-        let function = match vals.get(1).unwrap() {
-            LValue::SExpr(s) => s.to_string(),
-            lv => return Err(WrongType(lv.to_string(), lv.into(), NameTypeLValue::SExpr))
-        };
-
-        let lambda_function = Box::new(move |values : &[LValue], env: &LEnv| {
-            let function = function.clone();
-            let args = args.clone();
-            //println!("args of function {:?}", args);
-            let mut result: String = function;
-            if args.len() != values.len() {
-                return Err(WrongNumerOfArgument(values.len(), args.len()..args.len()))
-            }
-            for (i,val) in values.iter().enumerate() {
-                result = result.replace(args[i].as_str(), val.as_sym()?.as_str());
-            }
-
-            //Ok(LValue::Number(LNumber::Int(10)))
-            //Ok(LValue::String(result))
-            match parse(result.as_str()) {
-                Ok(s) => Ok(LValue::SExpr(s)),
-                Err(e) => Err(LError::SpecialError(e.to_string())),
-            }
-        });
-
-        Ok(LValue::Lambda(Rc::new(lambda_function)))
-    }
 }
 
 //(begin (define ?v (var (:type object

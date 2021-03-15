@@ -1,12 +1,13 @@
 //TODO: Vérifier si les fonctions ne doivent prendre que deux paramètres
-use crate::lisp::lisp_language::{TYPE_BOOL, TYPE_OBJECT};
+use crate::lisp::lisp_language::{TYPE_OBJECT};
 use crate::lisp::lisp_struct::LError::*;
 use crate::lisp::lisp_struct::*;
 use aries_utils::input::Sym;
 //use std::collections::HashMap;
 use crate::lisp::LEnv;
 use im::HashMap;
-use std::rc::Rc;
+use std::hash::Hash;
+use std::collections::hash_map::RandomState;
 
 
 //Mathematical functions
@@ -23,7 +24,7 @@ pub fn sub(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
         2 => {
             values.get(0).unwrap() - values.get(0).unwrap()
         }
-        i => Err(WrongNumerOfArgument(i, 2..2)),
+        i => Err(WrongNumberOfArgument(i, 2..2)),
     }
 }
 
@@ -40,7 +41,7 @@ pub fn div(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
         2 => {
             values.get(0).unwrap() / values.get(0).unwrap()
         }
-        i => Err(WrongNumerOfArgument(i, 2..2)),
+        i => Err(WrongNumberOfArgument(i, 2..2)),
     }
 }
 
@@ -48,35 +49,35 @@ pub fn div(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
 pub fn gt(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
     match values.len() {
         2 => Ok(LValue::Bool(values[0] > values[1])),
-        i => Err(WrongNumerOfArgument(i, 2..2)),
+        i => Err(WrongNumberOfArgument(i, 2..2)),
     }
 }
 
 pub fn lt(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
     match values.len() {
         2 => Ok(LValue::Bool(values[0] < values[1])),
-        i => Err(WrongNumerOfArgument(i, 2..2)),
+        i => Err(WrongNumberOfArgument(i, 2..2)),
     }
 }
 
 pub fn ge(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
     match values.len() {
         2 => Ok(LValue::Bool(values[0] >= values[1])),
-        i => Err(WrongNumerOfArgument(i, 2..2)),
+        i => Err(WrongNumberOfArgument(i, 2..2)),
     }
 }
 
 pub fn le(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
     match values.len() {
         2 => Ok(LValue::Bool(values[0] <= values[1])),
-        i => Err(WrongNumerOfArgument(i, 2..2)),
+        i => Err(WrongNumberOfArgument(i, 2..2)),
     }
 }
 
 pub fn eq(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
     match values.len() {
         2 => Ok(LValue::Bool(values[0] == values[1])),
-        i => Err(WrongNumerOfArgument(i, 2..2)),
+        i => Err(WrongNumberOfArgument(i, 2..2)),
     }
 }
 
@@ -86,7 +87,7 @@ pub fn is_none(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
         1 => Ok(LValue::Bool(
             NameTypeLValue::from(values.get(0).unwrap()) == NameTypeLValue::None,
         )),
-        i => Err(WrongNumerOfArgument(i, 1..1)),
+        i => Err(WrongNumberOfArgument(i, 1..1)),
     }
 }
 
@@ -95,7 +96,7 @@ pub fn is_number(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
         1 => Ok(LValue::Bool(
             NameTypeLValue::from(values.get(0).unwrap()) == NameTypeLValue::Number,
         )),
-        i => Err(WrongNumerOfArgument(i, 1..1)),
+        i => Err(WrongNumberOfArgument(i, 1..1)),
     }
 }
 
@@ -104,7 +105,7 @@ pub fn is_bool(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
         1 => Ok(LValue::Bool(
             NameTypeLValue::from(values.get(0).unwrap()) == NameTypeLValue::Bool,
         )),
-        i => Err(WrongNumerOfArgument(i, 1..1)),
+        i => Err(WrongNumberOfArgument(i, 1..1)),
     }
 }
 
@@ -113,7 +114,7 @@ pub fn is_fn(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
         1 => Ok(LValue::Bool(
             NameTypeLValue::from(values.get(0).unwrap()) == NameTypeLValue::LFn,
         )),
-        i => Err(WrongNumerOfArgument(i, 1..1)),
+        i => Err(WrongNumberOfArgument(i, 1..1)),
     }
 }
 
@@ -129,7 +130,7 @@ pub fn is_type(values: &[LValue], env: &LEnv) -> Result<LValue, LError> {
             },
             lv => Err(WrongType(lv.to_string(), lv.into(), NameTypeLValue::Symbol)),
         },
-        i => Err(WrongNumerOfArgument(i, 1..1)),
+        i => Err(WrongNumberOfArgument(i, 1..1)),
     }
 }
 
@@ -139,7 +140,7 @@ pub fn is_symbol(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
             LValue::Symbol(_) => Ok(LValue::Bool(true)),
             _ => Ok(LValue::Bool(false)),
         },
-        i => Err(WrongNumerOfArgument(i, 1..1)),
+        i => Err(WrongNumberOfArgument(i, 1..1)),
     }
 }
 
@@ -155,7 +156,7 @@ pub fn is_variable(values: &[LValue], env: &LEnv) -> Result<LValue, LError> {
             },
             lv => Err(WrongType(lv.to_string(), lv.into(), NameTypeLValue::Symbol)),
         },
-        i => Err(WrongNumerOfArgument(i, 1..1)),
+        i => Err(WrongNumberOfArgument(i, 1..1)),
     }
 }
 
@@ -171,19 +172,21 @@ pub fn is_object(values: &[LValue], env: &LEnv) -> Result<LValue, LError> {
             },
             lv => Err(WrongType(lv.to_string(), lv.into(), NameTypeLValue::Symbol)),
         },
-        i => Err(WrongNumerOfArgument(i, 1..1)),
+        i => Err(WrongNumberOfArgument(i, 1..1)),
     }
 }
 
-pub fn is_state_variable(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
+pub fn is_pair(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
     match values.len() {
         1 => match values.get(0).unwrap() {
-            LValue::StateVariable(_) => Ok(LValue::Bool(true)),
+            LValue::Pair(_, _) => Ok(LValue::Bool(true)),
             _ => Ok(LValue::Bool(false)),
         },
-        i => Err(WrongNumerOfArgument(i, 1..1)),
+        i => Err(WrongNumberOfArgument(i, 1..1)),
     }
 }
+
+//TODO: add verification functions for list, map, ref
 
 pub fn is_state_function(values: &[LValue], env: &LEnv) -> Result<LValue, LError> {
     match values.len() {
@@ -197,17 +200,17 @@ pub fn is_state_function(values: &[LValue], env: &LEnv) -> Result<LValue, LError
             },
             lv => Err(WrongType(lv.to_string(), lv.into(), NameTypeLValue::Symbol)),
         },
-        i => Err(WrongNumerOfArgument(i, 1..1)),
+        i => Err(WrongNumberOfArgument(i, 1..1)),
     }
 }
 
-pub fn is_fact_base(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
+pub fn is_map(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
     match values.len() {
         1 => match values.get(0).unwrap() {
-            LValue::FactBase(_) => Ok(LValue::Bool(true)),
+            LValue::Map(_) => Ok(LValue::Bool(true)),
             _ => Ok(LValue::Bool(false)),
         },
-        i => Err(WrongNumerOfArgument(i, 1..1)),
+        i => Err(WrongNumberOfArgument(i, 1..1)),
     }
 }
 
@@ -246,7 +249,7 @@ pub fn var(values: &[LValue], env: &LEnv) -> Result<LValue, LError> {
                 value: sym_value.as_sym()?,
             })))
         }
-        len => Err(WrongNumerOfArgument(len, 2..2)),
+        len => Err(WrongNumberOfArgument(len, 2..2)),
     }
 }
 
@@ -262,7 +265,7 @@ pub fn object(values: &[LValue], env: &LEnv) -> Result<LValue, LError> {
                 Err(LError::SpecialError("".to_string()))
             }
         }
-        len => Err(WrongNumerOfArgument(len, 1..1)),
+        len => Err(WrongNumberOfArgument(len, 1..1)),
     }
 }
 
@@ -315,148 +318,68 @@ pub fn def_type(values: &[LValue], env: &LEnv) -> Result<LValue, LError> {
                 Err(SpecialError("".to_string()))
             }
         }
-        len => Err(WrongNumerOfArgument(len, 1..1)),
+        len => Err(WrongNumberOfArgument(len, 1..1)),
     }
 }
 
-pub fn state_variable(values: &[LValue], env: &LEnv) -> Result<LValue, LError> {
-    if values.len() < 2 {
-        return Err(WrongNumerOfArgument(values.len(), 2..std::usize::MAX));
-    }
-    let mut params: Vec<Sym> = vec![];
-    let mut value: Sym = Sym::from("");
-
-    let sym_sf = values.get(0).unwrap().as_sym_ref()?;
-    let sf = match env.sym_types.get(sym_sf) {
-        None => return Err(SpecialError("".to_string())),
-        Some(lst) => lst.as_state_function()?,
-    };
-    let n_expected_params = sf.t_params.len() + 2;
-    if n_expected_params != values.len() {
-        return Err(WrongNumerOfArgument(
-            values.len(),
-            n_expected_params..n_expected_params,
-        ));
-    }
-    params.push(sym_sf.clone());
-
-    for (i, val) in values[1..].iter().enumerate() {
-        if i < values.len() - 2 {
-            let sym_type: Sym;
-            let sym_value: Sym;
-            match val {
-                LValue::Symbol(s) => match env.get_sym_type(s) {
-                    LSymType::Variable(v) => {
-                        sym_value = v.value.clone();
-                        sym_type = v.v_type.clone();
-                    }
-                    LSymType::Object(o) => {
-                        sym_value = s.clone();
-                        sym_type = o.into();
-                    }
-                    lst => {
-                        return Err(WrongType(
-                            lst.to_string(),
-                            lst.into(),
-                            NameTypeLValue::Object,
-                        ))
-                    }
-                },
-                LValue::Number(n) => {
-                    sym_value = n.into();
-                    sym_type = n.get_sym_type();
-                }
-                LValue::Bool(b) => {
-                    sym_value = b.to_string().into();
-                    sym_type = Sym::from(TYPE_BOOL);
-                }
-                lv => return Err(WrongType(lv.to_string(), lv.into(), NameTypeLValue::Symbol)),
-            }
-            if sym_type == sf.t_params[i] {
-                params.push(sym_value);
-            }
-        } else {
-            value = val.as_sym()?;
-        }
-    }
-
-    Ok(LValue::StateVariable(LStateVariable::new(params, value)))
+pub fn list(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
+    Ok(LValue::List(values.to_vec()))
 }
 
-pub fn factbase(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
-    let mut facts: HashMap<Vec<Sym>, Sym> = Default::default();
+pub fn map(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
+    let mut facts: HashMap<LValue, LValue> = Default::default();
     for value in values {
         match value {
-            LValue::StateVariable(sv) => {
-                let (key, value) = sv.as_key_value();
+            LValue::Pair(key, value) => {
+                let key = *key.clone();
+                let value = *value.clone();
                 facts.insert(key, value);
             }
             lv => {
                 return Err(WrongType(
                     lv.to_string(),
                     lv.into(),
-                    NameTypeLValue::StateVariable,
+                    NameTypeLValue::Pair,
                 ))
             }
         }
     }
-    Ok(LValue::FactBase(LFactBase::new(facts)))
+    Ok(LValue::Map(facts))
 }
-/*
-pub fn list(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
-    let result = LValue::None;
-    let sexpr:SExpr;
-    for value in values {
 
+pub fn pair(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
+    if values.len() != 2 {
+        return Err(WrongNumberOfArgument(values.len(), 2..2))
     }
-
-    Ok(result)
-}*/
-
-pub fn state(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
-    let mut state_variables: HashMap<Vec<Sym>, Sym> = Default::default();
-    for value in values {
-        match value {
-            LValue::StateVariable(sv) => {
-                let (key, value) = sv.as_key_value();
-                state_variables.insert(key, value);
-            }
-            lv => {
-                return Err(WrongType(
-                    lv.to_string(),
-                    lv.into(),
-                    NameTypeLValue::StateVariable,
-                ))
-            }
-        }
-    }
-    Ok(LValue::State(LState::new(state_variables)))
+    Ok(LValue::Pair(Box::new(values.get(0).unwrap_or(&LValue::None).clone()),
+                    Box::new(values.get(1).unwrap_or(&LValue::None).clone())))
 }
 
 //TODO: Define set behaviour for other type of LValue
 pub fn set(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
     if values.len() < 2 {
-        return Err(WrongNumerOfArgument(values.len(), 2..std::usize::MAX));
+        return Err(WrongNumberOfArgument(values.len(), 2..std::usize::MAX));
     }
     match values.get(0).unwrap() {
-        LValue::FactBase(fb) => {
-            let mut facts = fb.get_facts();
+        LValue::Map(s) => {
+            let mut facts = s.clone();
             for value in &values[1..] {
                 match value {
-                    LValue::StateVariable(sv) => {
-                        let (key, value) = sv.as_key_value();
+                    LValue::Pair(key, value) => {
+                        let key = *key.clone();
+                        let value = *value.clone();
                         facts.insert(key, value);
                     }
                     lv => {
                         return Err(WrongType(
                             lv.to_string(),
                             lv.into(),
-                            NameTypeLValue::StateVariable,
+                            NameTypeLValue::Pair,
                         ))
                     }
                 }
             }
-            Ok(LValue::FactBase(LFactBase::new(facts)))
+            Ok(LValue::Map(facts))
         }
         lv => Err(LError::SpecialError(format!("Cannot set a {}",NameTypeLValue::from(lv)))),
     }
@@ -464,24 +387,29 @@ pub fn set(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
 
 pub fn get(values: &[LValue], env: &LEnv) -> Result<LValue, LError> {
     if values.is_empty() {
-        return Err(WrongNumerOfArgument(0, 1..std::usize::MAX))
+        return Err(WrongNumberOfArgument(0, 1..std::usize::MAX))
     }
 
     match values.get(0).unwrap() {
-        LValue::State(s) => {
-            if values.len() < 2 {
-                return Err(WrongNumerOfArgument(1, 2..std::usize::MAX))
+        LValue::Map(map) => {
+            if values.len() == 2  {
+                let key = values.get(1).unwrap();
+                println!("In get for map: key = {}", key);
+                let value = map.get(key).unwrap_or(&LValue::None);
+                println!("In get for map: value = {}", value);
+                Ok(value.clone())
             }
-            let mut vec_sym = Vec::new();
-            for value in &values[1..] {
-                vec_sym.push(value.as_sym()?);
+            else if values.len() == 1 {
+                Ok(LValue::Map(map.clone()))
             }
-            let s = s.get_state_variable(vec_sym.as_slice());
-            Ok(LValue::Symbol(s))
+            else {
+                return Err(WrongNumberOfArgument(values.len(), 1..2))
+            }
+
         }
         lv => {
             if values.len() > 1 {
-                return Err(WrongNumerOfArgument(values.len(), 1..1))
+                return Err(WrongNumberOfArgument(values.len(), 1..1))
             }
             match lv {
                 LValue::Symbol(s) => {
@@ -490,10 +418,151 @@ pub fn get(values: &[LValue], env: &LEnv) -> Result<LValue, LError> {
                         st => Ok(LValue::SymType(st))
                     }
                 }
-                LValue::StateVariable(sv) => Ok(LValue::Symbol(sv.value())),
                 lv => Ok(lv.clone()),
             }
         }
     }
+}
+
+#[cfg(test)]
+mod tests
+{
+    use im::HashMap;
+    use crate::lisp::lisp_struct::LValue;
+    use std::hash::{Hash, Hasher, BuildHasher};
+    use std::collections::hash_map::{DefaultHasher, RandomState};
+
+    //#[test]
+    pub fn test_hash_list(){
+        let mut map: HashMap<LValue, LValue> = HashMap::new();
+        let key = LValue::List(vec![LValue::Symbol("a".into()), LValue::Symbol("b".into())]);
+        let value = LValue::Bool(true);
+        map.insert(key.clone(), value);
+        println!("get value: ");
+        match map.get(&key) {
+            None => println!("None"),
+            Some(v) => println!("value: {}", v)
+        }
+    }
+
+    //#[test]
+    pub fn test_hasher(){
+        let map : HashMap<LValue, LValue> = HashMap::new();
+        let mut hasher1 = map.hasher().build_hasher();
+        let mut hasher2  = map.hasher().build_hasher();
+        let key = LValue::List(vec![LValue::Symbol("a".into()), LValue::Symbol("b".into())]);
+        let value = LValue::Bool(true);
+        key.hash(&mut hasher1);
+        println!("hash value : {}", hasher1.finish());
+        key.clone().hash(&mut hasher2);
+        println!("hash value : {}", hasher2.finish());
+
+    }
+
+    //#[test]
+    pub fn test_hash(){
+        let mut map : HashMap<LValue, LValue> = HashMap::new();
+        let mut hasher1 = map.hasher().build_hasher();
+        let key1 = LValue::List(vec![LValue::Symbol("a".into()), LValue::Symbol("b".into())]);
+        let key2 = LValue::Bool(true);
+        let value = LValue::Bool(true);
+
+
+        key2.hash(&mut hasher1);
+        println!("hash value : {}", hasher1.finish());
+        map.insert(key2.clone(), value.clone());
+        let result_value =  map.get(&key2.clone()).unwrap_or(&LValue::None);
+        println!("value: {}", result_value);
+        let mut hasher2 = map.hasher().build_hasher();
+        key2.hash(&mut hasher2);
+        println!("hash value : {}", hasher2.finish());
+
+        let mut hasher3 = map.hasher().build_hasher();
+        key1.hash(&mut hasher3);
+        println!("hash value : {}", hasher3.finish());
+        map.insert(key1.clone(), value.clone());
+        let value =  map.get(&key1).unwrap_or(&LValue::None);
+        println!("value: {}", value);
+        let mut hasher4 = map.hasher().build_hasher();
+        key1.hash(&mut hasher4);
+        println!("hash value : {}", hasher4.finish());
+
+        println!("hash map:");
+        for (key,value) in map.iter(){
+            println!("{} = {}", key, value);
+        }
+
+
+    }
+
+    //#[test]
+    pub fn test_hash_with_vec(){
+        let mut map: HashMap<Vec<LValue>, i32> = HashMap::new();
+        let key = vec![LValue::Bool(true), LValue::Bool(true)];
+        let value = 4;
+        println!("insert value: ");
+        map.insert(key,value);
+        let search_key = vec![LValue::Bool(true), LValue::Bool(true)];
+        println!("get value: ");
+        let value = *map.get(&search_key).unwrap_or(&-1);
+        assert_eq!(value, 4)
+
+    }
+    //#[test]
+    pub fn test_hash_with_LValue_List(){
+        let mut map: HashMap<LValue, i32> = HashMap::new();
+        let key = LValue::List(vec![LValue::Bool(true), LValue::Bool(true)]);
+        let value = 4;
+
+        println!("insert value: ");
+        map.insert(key,value);
+        println!("get value: ");
+        let search_key = LValue::List(vec![LValue::Bool(true), LValue::Bool(true)]);
+        let value = *map.get(&search_key).unwrap_or(&-1);
+        assert_eq!(value, 4)
+
+    }
+    //#[test]
+    pub fn test_hash_with_LValue_Bool(){
+        let mut map: HashMap<LValue, i32> = HashMap::new();
+        let key = LValue::Bool(true);
+        let value = 4;
+
+        println!("insert value: ");
+        map.insert(key,value);
+        println!("get value: ");
+        let search_key = LValue::Bool(true);
+        let value = *map.get(&search_key).unwrap_or(&-1);
+        assert_eq!(value, 4)
+    }
+
+    //#[test]
+    pub fn test_hash_with_LValue_Pair(){
+        let mut map: HashMap<LValue, i32> = HashMap::new();
+        let key = LValue::Pair(Box::new(LValue::Bool(true)), Box::new(LValue::Bool(true)));
+        let value = 4;
+
+        println!("insert value: ");
+        map.insert(key,value);
+        println!("get value: ");
+        let search_key = LValue::Pair(Box::new(LValue::Bool(true)), Box::new(LValue::Bool(true)));
+        let value = *map.get(&search_key).unwrap_or(&-1);
+        assert_eq!(value, 4)
+    }
+
+    #[test]
+    pub fn test_hash_with_LValue_Quote(){
+        let mut map: HashMap<LValue, i32> = HashMap::new();
+        let key = LValue::Quote(Box::new(LValue::Bool(true)));
+        let value = 4;
+
+        println!("insert value: ");
+        map.insert(key,value);
+        println!("get value: ");
+        let search_key = LValue::Quote(Box::new(LValue::Bool(true)));
+        let value = *map.get(&search_key).unwrap_or(&-1);
+        assert_eq!(value, 4)
+    }
+
 }
 

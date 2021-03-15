@@ -113,11 +113,13 @@ pub fn eval(se: &SExpr, env: &mut LEnv) -> Result<LValue, LError> {
                     };
                 }
                 LAMBDA => {
-                    let mut args: Vec<LValue> = Vec::new();
-                    for arg in list_iter {
-                        args.push(LValue::SExpr(arg.clone()))
+                    let mut params = list_iter.pop()?.as_list_iter().unwrap();
+                    let body = list_iter.pop()?;
+                    let mut vec_param:Vec<Sym> = Vec::new();
+                    while !params.is_empty() {
+                        vec_param.push(params.pop_atom()?.clone().into())
                     }
-                    return env.create_lambda(args.as_slice())
+                    return Ok(LValue::Lambda(LLambda::new(vec_param.as_slice(), body, env)))
                 }
                 READ => {
                     let file_name = list_iter.pop_atom()?.to_string();
@@ -157,7 +159,10 @@ pub fn eval(se: &SExpr, env: &mut LEnv) -> Result<LValue, LError> {
                 //println!("args:{:?}", args);
                 match proc {
                     LValue::LFn(f) => return f(args.as_slice(), env),
-                    LValue::Lambda(l) => return eval(&l(args.as_slice(), env)?.as_sexpr()?, env),
+                    LValue::Lambda(l) => {
+                        let mut env = l.get_new_env(args.as_slice())?;
+                        return eval(&l.get_body(), &mut env);
+                    },
                     lv => panic!("strong error, expected to have a function or a lambda function")
                 }
             }

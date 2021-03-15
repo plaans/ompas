@@ -365,15 +365,12 @@ pub enum LValue {
     List(Vec<LValue>),
     Quote(Box<LValue>),
     Pair(Box<LValue>, Box<LValue>),
-
     // error
     None,
-
-    //Other
     LFn(LFn),
+    StateVariable(LStateVariable),
     Lambda(LLambda),
     SymType(LSymType),
-
 }
 
 impl Hash for LValue {

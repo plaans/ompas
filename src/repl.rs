@@ -115,11 +115,15 @@ pub fn eval(se: &SExpr, env: &mut LEnv) -> Result<LValue, LError> {
                 LAMBDA => {
                     let mut params = list_iter.pop()?.as_list_iter().unwrap();
                     let body = list_iter.pop()?;
-                    let mut vec_param:Vec<Sym> = Vec::new();
+                    let mut vec_param: Vec<Sym> = Vec::new();
                     while !params.is_empty() {
-                        vec_param.push(params.pop_atom()?.clone().into())
+                        vec_param.push(params.pop_atom()?.clone())
                     }
-                    return Ok(LValue::Lambda(LLambda::new(vec_param.as_slice(), body, env)))
+                    return Ok(LValue::Lambda(LLambda::new(
+                        vec_param.as_slice(),
+                        body,
+                        env,
+                    )));
                 }
                 READ => {
                     let file_name = list_iter.pop_atom()?.to_string();
@@ -149,7 +153,7 @@ pub fn eval(se: &SExpr, env: &mut LEnv) -> Result<LValue, LError> {
                 //println!("{} is a function",first_atom);
                 let proc = match eval(&SExpr::Atom(first_atom), env)? {
                     LValue::LFn(f) => LValue::LFn(f),
-                    LValue::Lambda(l)=> LValue::Lambda(l),
+                    LValue::Lambda(l) => LValue::Lambda(l),
                     lv => return Err(WrongType(lv.to_string(), lv.into(), NameTypeLValue::LFn)),
                 };
                 let mut args: Vec<LValue> = Vec::new();
@@ -162,8 +166,8 @@ pub fn eval(se: &SExpr, env: &mut LEnv) -> Result<LValue, LError> {
                     LValue::Lambda(l) => {
                         let mut env = l.get_new_env(args.as_slice())?;
                         return eval(&l.get_body(), &mut env);
-                    },
-                    _ => panic!("strong error, expected to have a function or a lambda function")
+                    }
+                    _ => panic!("strong error, expected to have a function or a lambda function"),
                 }
             }
         }

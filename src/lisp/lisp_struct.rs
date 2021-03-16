@@ -2,14 +2,14 @@ use crate::lisp::lisp_language::*;
 use aries_utils::input::{ErrLoc, Sym};
 use std::cmp::Ordering;
 //use std::collections::HashMap;
+use crate::lisp::lisp_struct::LError::WrongNumberOfArgument;
 use crate::lisp::LEnv;
+use aries_planning::parsing::sexpr::SExpr;
 use im::HashMap;
 use std::fmt::{Debug, Display, Formatter};
-use std::ops::{Add, Range, Sub, Div, Mul};
 use std::hash::{Hash, Hasher};
+use std::ops::{Add, Div, Mul, Range, Sub};
 use std::rc::Rc;
-use aries_planning::parsing::sexpr::SExpr;
-use crate::lisp::lisp_struct::LError::WrongNumberOfArgument;
 
 //TODO: Finish to implement the new kind in enum LValue
 
@@ -324,18 +324,27 @@ pub struct LLambda {
     env: LEnv,
 }
 
+impl PartialEq for LLambda {
+    fn eq(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+
 impl LLambda {
     pub fn new(params: &[Sym], body: &SExpr, env: &LEnv) -> Self {
         LLambda {
             params: params.to_vec(),
-            body : body.clone(),
-            env : env.clone()
+            body: body.clone(),
+            env: env.clone(),
         }
     }
 
     pub fn get_new_env(&self, args: &[LValue]) -> Result<LEnv, LError> {
         if self.params.len() != args.len() {
-            return Err(WrongNumberOfArgument(args.len(), self.params.len()..self.params.len()))
+            return Err(WrongNumberOfArgument(
+                args.len(),
+                self.params.len()..self.params.len(),
+            ));
         }
         let mut env = self.env.clone();
         for arg in self.params.iter().zip(args) {
@@ -344,7 +353,7 @@ impl LLambda {
         Ok(env)
     }
 
-    pub fn get_body(&self) -> &SExpr{
+    pub fn get_body(&self) -> &SExpr {
         &self.body
     }
 }
@@ -371,7 +380,6 @@ pub enum LValue {
 
 impl Hash for LValue {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        println!("value to hash: {}", self);
         match self {
             LValue::Symbol(s) => (*s).hash(state),
             LValue::Number(n) => (*n).hash(state),
@@ -380,21 +388,17 @@ impl Hash for LValue {
             LValue::Map(m) => (*m).hash(state),
             LValue::List(l) => {
                 (*l).hash(state);
-            },
+            }
             LValue::Quote(q) => {
                 let q = &**q;
                 q.hash(state);
-            },
-            lv => panic!("cannot hash {}", lv.to_string())
+            }
+            lv => panic!("cannot hash {}", lv.to_string()),
         };
-        println!("value of the hash: {}", state.finish())
-
     }
 }
 
-impl Eq for LValue {
-
-}
+impl Eq for LValue {}
 
 impl LValue {
     pub fn as_sym(&self) -> Result<Sym, LError> {
@@ -443,7 +447,6 @@ impl LValue {
     }
 }
 
-
 impl PartialEq for LValue {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -454,8 +457,12 @@ impl PartialEq for LValue {
             (LValue::Bool(b1), LValue::Bool(b2)) => *b1 == *b2,
             //Text comparison
             (LValue::String(s1), LValue::String(s2)) => *s1 == *s2,
-            //function comparison
-            _ => false,
+            (LValue::None, LValue::None) => true,
+            (LValue::List(l1), LValue::List(l2)) => *l1 == *l2,
+            (LValue::Map(m1), LValue::Map(m2)) => *m1 == *m2,
+            (LValue::Lambda(l1), LValue::Lambda(l2)) => *l1 == *l2,
+            (LValue::Quote(q1), LValue::Quote(q2)) => q1 == q2, //function comparison
+            (_, _) => false,
         }
     }
 }
@@ -598,37 +605,34 @@ impl Div for &LValue {
     }
 }
 
-
-
 impl Add for LValue {
     type Output = Result<LValue, LError>;
 
     fn add(self, rhs: Self) -> Self::Output {
-        &self+&rhs
+        &self + &rhs
     }
 }
 impl Sub for LValue {
     type Output = Result<LValue, LError>;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        &self-&rhs
+        &self - &rhs
     }
 }
 impl Mul for LValue {
     type Output = Result<LValue, LError>;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        &self*&rhs
+        &self * &rhs
     }
 }
 impl Div for LValue {
     type Output = Result<LValue, LError>;
 
     fn div(self, rhs: Self) -> Self::Output {
-        &self/&rhs
+        &self / &rhs
     }
 }
-
 
 #[derive(Clone)]
 pub enum NameTypeLValue {
@@ -647,10 +651,8 @@ pub enum NameTypeLValue {
     Object,
     Map,
     List,
-    Quote
+    Quote,
 }
-
-
 
 impl PartialEq for NameTypeLValue {
     fn eq(&self, other: &Self) -> bool {
@@ -670,11 +672,10 @@ impl PartialEq for NameTypeLValue {
             (NameTypeLValue::Map, NameTypeLValue::Map) => true,
             (NameTypeLValue::List, NameTypeLValue::List) => true,
             (NameTypeLValue::Quote, NameTypeLValue::Quote) => true,
-            (_,_) => false,
+            (_, _) => false,
         }
     }
 }
-
 
 /**
 FROM IMPLEMENTATION
@@ -732,7 +733,6 @@ impl From<Sym> for LValue {
         LValue::from(&s)
     }
 }
-
 
 ///Transform an object in Lisp command to reconstuct itself.
 pub trait AsCommand {
@@ -821,11 +821,9 @@ impl AsCommand for LValue {
     }
 }
 
-
 /**
 DISPLAY IMPLEMENTATION
 **/
-
 
 impl Display for LError {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
@@ -870,7 +868,6 @@ impl Display for LStateFunction {
     }
 }
 
-
 impl Display for LSymType {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
@@ -894,7 +891,7 @@ impl Display for LValue {
             LValue::Bool(b) => write!(f, "{}", b),
             LValue::SymType(st) => write!(f, "{}", st),
             LValue::List(s) => write!(f, "{:?}", s),
-            LValue::Lambda(_) => write!(f,"Lambda"),
+            LValue::Lambda(_) => write!(f, "Lambda"),
             LValue::Map(m) => {
                 let mut result = String::new();
                 for (key, value) in m.iter() {
@@ -938,6 +935,126 @@ DEBUG
 impl Debug for LValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(f, "{}", self)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::lisp::lisp_struct::LValue;
+    use im::HashMap;
+    use std::collections::hash_map::{DefaultHasher, RandomState};
+    use std::hash::{BuildHasher, Hash, Hasher};
+
+    //#[test]
+    pub fn test_hash_list() {
+        let mut map: HashMap<LValue, LValue> = HashMap::new();
+        let key = LValue::List(vec![LValue::Symbol("a".into()), LValue::Symbol("b".into())]);
+        let value = LValue::Bool(true);
+        map.insert(key.clone(), value);
+        println!("get value: ");
+        match map.get(&key) {
+            None => println!("None"),
+            Some(v) => println!("value: {}", v),
+        }
+    }
+
+    //#[test]
+    pub fn test_hasher() {
+        let map: HashMap<LValue, LValue> = HashMap::new();
+        let mut hasher1 = map.hasher().build_hasher();
+        let mut hasher2 = map.hasher().build_hasher();
+        let key = LValue::List(vec![LValue::Symbol("a".into()), LValue::Symbol("b".into())]);
+        let value = LValue::Bool(true);
+        key.hash(&mut hasher1);
+        println!("hash value : {}", hasher1.finish());
+        key.clone().hash(&mut hasher2);
+        println!("hash value : {}", hasher2.finish());
+    }
+
+    #[test]
+    pub fn test_hash() {
+        let mut map: HashMap<LValue, LValue> = HashMap::new();
+        let mut hasher1 = map.hasher().build_hasher();
+        let key1 = LValue::List(vec![LValue::Symbol("a".into()), LValue::Symbol("b".into())]);
+        let key2 = LValue::Bool(true);
+        let value = LValue::Bool(true);
+
+        key2.hash(&mut hasher1);
+        println!("hash value : {}", hasher1.finish());
+        map.insert(key2.clone(), value.clone());
+        let result_value = map.get(&key2.clone()).unwrap_or(&LValue::None);
+        println!("value: {}", result_value);
+        let mut hasher2 = map.hasher().build_hasher();
+        key2.hash(&mut hasher2);
+        println!("hash value : {}", hasher2.finish());
+
+        let mut hasher3 = map.hasher().build_hasher();
+        key1.hash(&mut hasher3);
+        println!("hash value : {}", hasher3.finish());
+        map.insert(key1.clone(), value.clone());
+        let value = map.get(&key1).unwrap_or(&LValue::None);
+        println!("value: {}", value);
+        let mut hasher4 = map.hasher().build_hasher();
+        key1.hash(&mut hasher4);
+        println!("hash value : {}", hasher4.finish());
+
+        println!("hash map:");
+        for (key, value) in map.iter() {
+            println!("{} = {}", key, value);
+        }
+    }
+
+    #[test]
+    pub fn test_hash_with_vec() {
+        let mut map: HashMap<Vec<LValue>, i32> = HashMap::new();
+        let key = vec![LValue::Bool(true), LValue::Bool(true)];
+        let value = 4;
+        println!("insert value: ");
+        map.insert(key, value);
+        let search_key = vec![LValue::Bool(true), LValue::Bool(true)];
+        println!("get value: ");
+        let value = *map.get(&search_key).unwrap_or(&-1);
+        assert_eq!(value, 4)
+    }
+    #[test]
+    pub fn test_hash_with_LValue_List() {
+        let mut map: HashMap<LValue, i32> = HashMap::new();
+        let key = LValue::List(vec![LValue::Bool(true), LValue::Bool(true)]);
+        let value = 4;
+
+        println!("insert value: ");
+        map.insert(key, value);
+        println!("get value: ");
+        let search_key = LValue::List(vec![LValue::Bool(true), LValue::Bool(true)]);
+        let value = *map.get(&search_key).unwrap_or(&-1);
+        assert_eq!(value, 4)
+    }
+    #[test]
+    pub fn test_hash_with_LValue_Bool() {
+        let mut map: HashMap<LValue, i32> = HashMap::new();
+        let key = LValue::Bool(true);
+        let value = 4;
+
+        println!("insert value: ");
+        map.insert(key, value);
+        println!("get value: ");
+        let search_key = LValue::Bool(true);
+        let value = *map.get(&search_key).unwrap_or(&-1);
+        assert_eq!(value, 4)
+    }
+
+    #[test]
+    pub fn test_hash_with_LValue_Quote() {
+        let mut map: HashMap<LValue, i32> = HashMap::new();
+        let key = LValue::Quote(Box::new(LValue::Bool(true)));
+        let value = 4;
+
+        println!("insert value: ");
+        map.insert(key, value);
+        println!("get value: ");
+        let search_key = LValue::Quote(Box::new(LValue::Bool(true)));
+        let value = *map.get(&search_key).unwrap_or(&-1);
+        assert_eq!(value, 4)
     }
 }
 

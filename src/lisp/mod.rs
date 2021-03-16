@@ -4,10 +4,10 @@ use crate::lisp::lisp_struct::*;
 //use std::collections::HashMap;
 use aries_utils::input::Sym;
 use im::HashMap;
+use std::borrow::Borrow;
 use std::fs::File;
 use std::io::Write;
 use std::rc::Rc;
-use std::borrow::Borrow;
 
 pub mod lisp_functions;
 pub mod lisp_language;
@@ -18,7 +18,13 @@ pub struct LEnv {
     symbols: HashMap<String, LValue>,
     sym_types: HashMap<Sym, LSymType>,
     new_entries: Vec<String>,
-    outer:  Option<Rc<LEnv>>,
+    outer: Option<Rc<LEnv>>,
+}
+
+impl PartialEq for LEnv {
+    fn eq(&self, other: &Self) -> bool {
+        self == other
+    }
 }
 
 //TODO: implement outer
@@ -29,7 +35,6 @@ impl Default for LEnv {
         // map.ins
         let mut symbols: HashMap<String, LValue> = HashMap::default();
         let mut sym_types: HashMap<Sym, LSymType> = HashMap::default();
-        symbols.insert(GET.to_string(), LValue::LFn(Rc::new(get)));
 
         //Mathematical functions
         symbols.insert(ADD.to_string(), LValue::LFn(Rc::new(add)));
@@ -58,26 +63,26 @@ impl Default for LEnv {
 
         //Special entry
         symbols.insert(BEGIN.to_string(), LValue::LFn(Rc::new(begin)));
-        symbols.insert(
-            PI.to_string(),
-            LValue::Number(LNumber::Float(std::f64::consts::PI)),
-        );
+        symbols.insert(GET.to_string(), LValue::LFn(Rc::new(get)));
+        symbols.insert(SET.to_string(), LValue::LFn(Rc::new(set)));
 
         //Basic types
 
         //Functions for the factbase
+        //TODO: Deprecated function to transform in (typeof)
         symbols.insert(VARIABLE.to_string(), LValue::LFn(Rc::new(var)));
         symbols.insert(
             STATE_FUNCTION.to_string(),
             LValue::LFn(Rc::new(state_function)),
         );
-        symbols.insert(OBJECT.to_string(), LValue::LFn(Rc::new(object)));
         symbols.insert(TYPE.to_string(), LValue::LFn(Rc::new(def_type)));
 
         symbols.insert(MAP.to_string(), LValue::LFn(Rc::new(map)));
-        symbols.insert(SET.to_string(), LValue::LFn(Rc::new(set)));
         symbols.insert(LIST.to_string(), LValue::LFn(Rc::new(list)));
+        symbols.insert(STATE.to_string(), LValue::LFn(Rc::new(map)));
         //Sym_types
+
+        symbols.insert(OBJECT.to_string(), LValue::LFn(Rc::new(object)));
         sym_types.insert(
             TYPE_INT.into(),
             LSymType::Type(LType::Symbol(TYPE_ROOT.into())),
@@ -95,11 +100,16 @@ impl Default for LEnv {
             LSymType::Type(LType::Symbol(TYPE_ROOT.into())),
         );
 
+        symbols.insert(
+            PI.to_string(),
+            LValue::Number(LNumber::Float(std::f64::consts::PI)),
+        );
+
         Self {
             symbols,
             sym_types,
             new_entries: vec![],
-            outer : None
+            outer: None,
         }
     }
 }
@@ -109,9 +119,9 @@ impl LEnv {
         match self.symbols.get(var.as_str()) {
             None => match self.outer.borrow() {
                 None => None,
-                Some(env) => env.find(var)
-            }
-            Some(_) => Some(self)
+                Some(env) => env.find(var),
+            },
+            Some(_) => Some(self),
         }
     }
 
@@ -165,7 +175,6 @@ impl LEnv {
         }
         //eprintln!("write fact base to file");
     }
-
 }
 
 //(begin (define ?v (var (:type object

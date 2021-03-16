@@ -1,4 +1,3 @@
-
 //Mathematical functions
 pub const ADD: &str = "+";
 pub const SUB: &str = "-";
@@ -59,9 +58,7 @@ pub const READ: &str = "read";
 pub const WRITE: &str = "write";
 pub const GET: &str = "get";
 
-
 pub const TRUE: &str = "true";
 pub const FALSE: &str = "false";
 
 pub const PI: &str = "pi";
-

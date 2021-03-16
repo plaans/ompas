@@ -1,12 +1,11 @@
 //TODO: Vérifier si les fonctions ne doivent prendre que deux paramètres
-use crate::lisp::lisp_language::{TYPE_OBJECT};
+use crate::lisp::lisp_language::TYPE_OBJECT;
 use crate::lisp::lisp_struct::LError::*;
 use crate::lisp::lisp_struct::*;
 use aries_utils::input::Sym;
 //use std::collections::HashMap;
 use crate::lisp::LEnv;
 use im::HashMap;
-
 
 //Mathematical functions
 pub fn add(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
@@ -19,9 +18,7 @@ pub fn add(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
 
 pub fn sub(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
     match values.len() {
-        2 => {
-            values.get(0).unwrap() - values.get(0).unwrap()
-        }
+        2 => values.get(0).unwrap() - values.get(0).unwrap(),
         i => Err(WrongNumberOfArgument(i, 2..2)),
     }
 }
@@ -36,9 +33,7 @@ pub fn mul(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
 
 pub fn div(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
     match values.len() {
-        2 => {
-            values.get(0).unwrap() / values.get(0).unwrap()
-        }
+        2 => values.get(0).unwrap() / values.get(0).unwrap(),
         i => Err(WrongNumberOfArgument(i, 2..2)),
     }
 }
@@ -320,19 +315,13 @@ pub fn map(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
         match value {
             LValue::List(l) => {
                 if l.len() != 2 {
-                   return Err(WrongNumberOfArgument(l.len(), 2..2));
+                    return Err(WrongNumberOfArgument(l.len(), 2..2));
                 }
                 let key = l.get(0).unwrap();
                 let value = l.get(1).unwrap();
                 facts.insert(key.clone(), value.clone());
             }
-            lv => {
-                return Err(WrongType(
-                    lv.to_string(),
-                    lv.into(),
-                    NameTypeLValue::List,
-                ))
-            }
+            lv => return Err(WrongType(lv.to_string(), lv.into(), NameTypeLValue::List)),
         }
     }
     Ok(LValue::Map(facts))
@@ -356,185 +345,46 @@ pub fn set(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
                         let value = l.get(1).unwrap();
                         facts.insert(key.clone(), value.clone());
                     }
-                    lv => {
-                        return Err(WrongType(
-                            lv.to_string(),
-                            lv.into(),
-                            NameTypeLValue::List,
-                        ))
-                    }
+                    lv => return Err(WrongType(lv.to_string(), lv.into(), NameTypeLValue::List)),
                 }
             }
             Ok(LValue::Map(facts))
         }
-        lv => Err(LError::SpecialError(format!("Cannot set a {}",NameTypeLValue::from(lv)))),
+        lv => Err(LError::SpecialError(format!(
+            "Cannot set a {}",
+            NameTypeLValue::from(lv)
+        ))),
     }
 }
 
 pub fn get(values: &[LValue], env: &LEnv) -> Result<LValue, LError> {
     if values.is_empty() {
-        return Err(WrongNumberOfArgument(0, 1..std::usize::MAX))
+        return Err(WrongNumberOfArgument(0, 1..std::usize::MAX));
     }
 
     match values.get(0).unwrap() {
         LValue::Map(map) => {
-            if values.len() == 2  {
+            if values.len() == 2 {
                 let key = values.get(1).unwrap();
-                println!("In get for map: key = {}", key);
                 let value = map.get(key).unwrap_or(&LValue::None);
-                println!("In get for map: value = {}", value);
                 Ok(value.clone())
-            }
-            else if values.len() == 1 {
+            } else if values.len() == 1 {
                 Ok(LValue::Map(map.clone()))
+            } else {
+                Err(WrongNumberOfArgument(values.len(), 1..2))
             }
-            else {
-                return Err(WrongNumberOfArgument(values.len(), 1..2))
-            }
-
         }
         lv => {
             if values.len() > 1 {
-                return Err(WrongNumberOfArgument(values.len(), 1..1))
+                return Err(WrongNumberOfArgument(values.len(), 1..1));
             }
             match lv {
-                LValue::Symbol(s) => {
-                    match env.get_sym_type(s){
-                        LSymType::Variable(v) => Ok(v.value.into()),
-                        st => Ok(LValue::SymType(st))
-                    }
-                }
+                LValue::Symbol(s) => match env.get_sym_type(s) {
+                    LSymType::Variable(v) => Ok(v.value.into()),
+                    st => Ok(LValue::SymType(st)),
+                },
                 lv => Ok(lv.clone()),
             }
         }
     }
 }
-
-#[cfg(test)]
-mod tests
-{
-    use im::HashMap;
-    use crate::lisp::lisp_struct::LValue;
-    use std::hash::{Hash, Hasher, BuildHasher};
-    use std::collections::hash_map::{DefaultHasher, RandomState};
-
-    //#[test]
-    pub fn test_hash_list(){
-        let mut map: HashMap<LValue, LValue> = HashMap::new();
-        let key = LValue::List(vec![LValue::Symbol("a".into()), LValue::Symbol("b".into())]);
-        let value = LValue::Bool(true);
-        map.insert(key.clone(), value);
-        println!("get value: ");
-        match map.get(&key) {
-            None => println!("None"),
-            Some(v) => println!("value: {}", v)
-        }
-    }
-
-    //#[test]
-    pub fn test_hasher(){
-        let map : HashMap<LValue, LValue> = HashMap::new();
-        let mut hasher1 = map.hasher().build_hasher();
-        let mut hasher2  = map.hasher().build_hasher();
-        let key = LValue::List(vec![LValue::Symbol("a".into()), LValue::Symbol("b".into())]);
-        let value = LValue::Bool(true);
-        key.hash(&mut hasher1);
-        println!("hash value : {}", hasher1.finish());
-        key.clone().hash(&mut hasher2);
-        println!("hash value : {}", hasher2.finish());
-
-    }
-
-    //#[test]
-    pub fn test_hash(){
-        let mut map : HashMap<LValue, LValue> = HashMap::new();
-        let mut hasher1 = map.hasher().build_hasher();
-        let key1 = LValue::List(vec![LValue::Symbol("a".into()), LValue::Symbol("b".into())]);
-        let key2 = LValue::Bool(true);
-        let value = LValue::Bool(true);
-
-
-        key2.hash(&mut hasher1);
-        println!("hash value : {}", hasher1.finish());
-        map.insert(key2.clone(), value.clone());
-        let result_value =  map.get(&key2.clone()).unwrap_or(&LValue::None);
-        println!("value: {}", result_value);
-        let mut hasher2 = map.hasher().build_hasher();
-        key2.hash(&mut hasher2);
-        println!("hash value : {}", hasher2.finish());
-
-        let mut hasher3 = map.hasher().build_hasher();
-        key1.hash(&mut hasher3);
-        println!("hash value : {}", hasher3.finish());
-        map.insert(key1.clone(), value.clone());
-        let value =  map.get(&key1).unwrap_or(&LValue::None);
-        println!("value: {}", value);
-        let mut hasher4 = map.hasher().build_hasher();
-        key1.hash(&mut hasher4);
-        println!("hash value : {}", hasher4.finish());
-
-        println!("hash map:");
-        for (key,value) in map.iter(){
-            println!("{} = {}", key, value);
-        }
-
-
-    }
-
-    //#[test]
-    pub fn test_hash_with_vec(){
-        let mut map: HashMap<Vec<LValue>, i32> = HashMap::new();
-        let key = vec![LValue::Bool(true), LValue::Bool(true)];
-        let value = 4;
-        println!("insert value: ");
-        map.insert(key,value);
-        let search_key = vec![LValue::Bool(true), LValue::Bool(true)];
-        println!("get value: ");
-        let value = *map.get(&search_key).unwrap_or(&-1);
-        assert_eq!(value, 4)
-
-    }
-    //#[test]
-    pub fn test_hash_with_LValue_List(){
-        let mut map: HashMap<LValue, i32> = HashMap::new();
-        let key = LValue::List(vec![LValue::Bool(true), LValue::Bool(true)]);
-        let value = 4;
-
-        println!("insert value: ");
-        map.insert(key,value);
-        println!("get value: ");
-        let search_key = LValue::List(vec![LValue::Bool(true), LValue::Bool(true)]);
-        let value = *map.get(&search_key).unwrap_or(&-1);
-        assert_eq!(value, 4)
-
-    }
-    //#[test]
-    pub fn test_hash_with_LValue_Bool(){
-        let mut map: HashMap<LValue, i32> = HashMap::new();
-        let key = LValue::Bool(true);
-        let value = 4;
-
-        println!("insert value: ");
-        map.insert(key,value);
-        println!("get value: ");
-        let search_key = LValue::Bool(true);
-        let value = *map.get(&search_key).unwrap_or(&-1);
-        assert_eq!(value, 4)
-    }
-
-    #[test]
-    pub fn test_hash_with_LValue_Quote(){
-        let mut map: HashMap<LValue, i32> = HashMap::new();
-        let key = LValue::Quote(Box::new(LValue::Bool(true)));
-        let value = 4;
-
-        println!("insert value: ");
-        map.insert(key,value);
-        println!("get value: ");
-        let search_key = LValue::Quote(Box::new(LValue::Bool(true)));
-        let value = *map.get(&search_key).unwrap_or(&-1);
-        assert_eq!(value, 4)
-    }
-
-}
-

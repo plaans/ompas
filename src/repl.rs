@@ -10,7 +10,7 @@ use rustyline::Editor;
 use std::fs::File;
 use std::io::Read;
 
-pub fn test_rustyline() {
+pub fn repl() {
     // `()` can be used when no completer is required
     let mut rl = Editor::<()>::new();
     if rl.load_history("history.txt").is_err() {
@@ -73,9 +73,9 @@ pub fn eval(se: &SExpr, env: &mut LEnv) -> Result<LValue, LError> {
                         s => {
                             //is a symbol, if it exist return it
                             //println!("atom is a symbol: {}", s);
-                            match env.get_symbol(&s.to_string()) {
-                                Ok(lv) => Ok(lv),
-                                Err(_) => Ok(LValue::Symbol(s.into())),
+                            match env.get_symbol(&s) {
+                                None => Ok(LValue::Symbol(s.into())),
+                                Some(v) => Ok(v.clone()),
                             }
                         }
                     },
@@ -93,13 +93,39 @@ pub fn eval(se: &SExpr, env: &mut LEnv) -> Result<LValue, LError> {
                     let sym: Sym = list_iter.pop_atom()?.into();
                     let sexpr = list_iter.pop()?;
                     let exp = eval(sexpr, env)?;
-                    match exp {
-                        LValue::SymType(st) => {
-                            env.add_entry(sym.to_string(), LValue::Symbol(sym.clone()));
-                            env.add_sym_type(sym, st);
+                    env.add_entry(sym.to_string(), exp);
+                }
+
+                TYPEOF => {
+                    //Define a type for a sym
+                    let sym: Sym = list_iter.pop_atom()?.into();
+                    let sexpr = list_iter.pop()?;
+                    let exp = eval(sexpr, env)?;
+                    let sym_type = match &exp {
+                        LValue::SymType(lst) => lst.clone(),
+                        LValue::Symbol(s) => match env.get_sym_type(&s) {
+                            None => {
+                                return Err(WrongType(
+                                    exp.to_string(),
+                                    exp.into(),
+                                    NameTypeLValue::SymType,
+                                ))
+                            }
+                            Some(lst) => match lst {
+                                LSymType::Type(_) => LSymType::Object(s.into()),
+                                lst => return Err(WrongType(s.to_string(), lst.into(), NameTypeLValue::Type))
+                            }
+                        },
+                        lv => {
+                            return Err(WrongType(
+                                lv.to_string(),
+                                lv.into(),
+                                NameTypeLValue::SymType,
+                            ))
                         }
-                        lv => env.add_entry(sym.to_string(), lv),
                     };
+                    env.add_entry(sym.to_string(), LValue::Symbol(sym.clone()));
+                    env.add_sym_type(sym, sym_type);
                 }
                 IF => {
                     let test = list_iter.pop()?;
@@ -164,8 +190,8 @@ pub fn eval(se: &SExpr, env: &mut LEnv) -> Result<LValue, LError> {
                 match proc {
                     LValue::LFn(f) => return f(args.as_slice(), env),
                     LValue::Lambda(l) => {
-                        let mut env = l.get_new_env(args.as_slice())?;
-                        return eval(&l.get_body(), &mut env);
+                        let mut new_env = l.get_new_env(args.as_slice(), env)?;
+                        return eval(&l.get_body(), &mut new_env);
                     }
                     _ => panic!("strong error, expected to have a function or a lambda function"),
                 }

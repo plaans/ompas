@@ -350,8 +350,6 @@ impl FactBase {
     ///Delete a fact as a state variable or a variable. Cannot delete a symbol or a state function.
     pub fn del_fact(&mut self, mut fact: ListIter) -> FactBaseResult {
         //println!("del fact");
-        //TODO: reconstruct the fact to have an explicit error
-        //TODO: Add an error when trying to deleter a const
         let mut fact = fact.pop_list()?.iter();
         let name_sym = fact.pop_atom()?.as_str().into();
         let sym_id = self.get_sym_id(&name_sym)?;

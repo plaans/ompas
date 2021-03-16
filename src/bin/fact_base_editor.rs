@@ -1,11 +1,9 @@
 use aries_planning::parsing::sexpr::parse;
-use fact_base::repl::test_rustyline;
+use fact_base::repl::repl;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 #[warn(unused_imports)]
 use structopt::StructOpt;
-
-//TODO: write README.md of the project
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -35,7 +33,7 @@ fn main() {
         //println!("Fact Base REPL");
         //let mut repl = Repl::default();
         //repl.run();
-        test_rustyline();
+        repl();
     }
 }
 

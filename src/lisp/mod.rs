@@ -18,7 +18,7 @@ pub struct LEnv {
     symbols: HashMap<String, LValue>,
     sym_types: HashMap<Sym, LSymType>,
     new_entries: Vec<String>,
-    outer: Option<Rc<LEnv>>,
+    outer: Option<Box<LEnv>>,
 }
 
 impl PartialEq for LEnv {
@@ -26,8 +26,6 @@ impl PartialEq for LEnv {
         self == other
     }
 }
-
-//TODO: implement outer
 
 impl Default for LEnv {
     fn default() -> Self {
@@ -59,45 +57,46 @@ impl Default for LEnv {
         );
         symbols.insert(IS_OBJECT.to_string(), LValue::LFn(Rc::new(is_object)));
         symbols.insert(IS_TYPE.to_string(), LValue::LFn(Rc::new(is_type)));
-        symbols.insert(IS_VARIABLE.to_string(), LValue::LFn(Rc::new(is_variable)));
+        symbols.insert(IS_MAP.to_string(), LValue::LFn(Rc::new(is_map)));
+        symbols.insert(IS_LIST.to_string(), LValue::LFn(Rc::new(is_list)));
+        symbols.insert(IS_LAMBDA.to_string(), LValue::LFn(Rc::new(is_lambda)));
+        symbols.insert(IS_QUOTE.to_string(), LValue::LFn(Rc::new(is_quote)));
 
         //Special entry
         symbols.insert(BEGIN.to_string(), LValue::LFn(Rc::new(begin)));
         symbols.insert(GET.to_string(), LValue::LFn(Rc::new(get)));
         symbols.insert(SET.to_string(), LValue::LFn(Rc::new(set)));
+        symbols.insert(GET_TYPE.to_string(), LValue::LFn(Rc::new(get_type)));
 
         //Basic types
 
         //Functions for the factbase
-        //TODO: Deprecated function to transform in (typeof)
-        symbols.insert(VARIABLE.to_string(), LValue::LFn(Rc::new(var)));
         symbols.insert(
             STATE_FUNCTION.to_string(),
             LValue::LFn(Rc::new(state_function)),
         );
-        symbols.insert(TYPE.to_string(), LValue::LFn(Rc::new(def_type)));
+        symbols.insert(SUBTYPE.to_string(), LValue::LFn(Rc::new(subtype)));
 
         symbols.insert(MAP.to_string(), LValue::LFn(Rc::new(map)));
         symbols.insert(LIST.to_string(), LValue::LFn(Rc::new(list)));
         symbols.insert(STATE.to_string(), LValue::LFn(Rc::new(map)));
         //Sym_types
 
-        symbols.insert(OBJECT.to_string(), LValue::LFn(Rc::new(object)));
         sym_types.insert(
             TYPE_INT.into(),
-            LSymType::Type(LType::Symbol(TYPE_ROOT.into())),
+            LSymType::Type(None),
         );
         sym_types.insert(
             TYPE_FLOAT.into(),
-            LSymType::Type(LType::Symbol(TYPE_ROOT.into())),
+            LSymType::Type(None),
         );
         sym_types.insert(
             TYPE_BOOL.into(),
-            LSymType::Type(LType::Symbol(TYPE_ROOT.into())),
+            LSymType::Type(None),
         );
         sym_types.insert(
             TYPE_OBJECT.into(),
-            LSymType::Type(LType::Symbol(TYPE_ROOT.into())),
+            LSymType::Type(None),
         );
 
         symbols.insert(
@@ -125,23 +124,23 @@ impl LEnv {
         }
     }
 
-    pub fn get_symbol(&self, s: &str) -> Result<LValue, LError> {
+    pub fn get_symbol(&self, s: &str) -> Option<LValue> {
         match self.symbols.get(s) {
-            None => Err(LError::UndefinedSymbol(s.to_string())),
-            Some(lv) => Ok(lv.clone()),
+            None => match self.outer.borrow() {
+                None => None,
+                Some(env) => env.get_symbol(s),
+            },
+            Some(v) => Some(v.clone()),
         }
     }
 
-    pub fn get_sym_type(&self, sym: &Sym) -> LSymType {
-        match self.sym_types.get(sym) {
-            None => LSymType::Object(LType::Object),
-            Some(lst) => lst.clone(),
-        }
+    pub fn get_sym_type(&self, sym: &Sym) -> Option<&LSymType> {
+        self.sym_types.get(sym)
     }
 
-    pub fn add_entry(&mut self, sym: String, exp: LValue) {
-        self.symbols.insert(sym.clone(), exp);
-        self.new_entries.push(sym);
+    pub fn add_entry(&mut self, key: String, exp: LValue) {
+        self.symbols.insert(key.clone(), exp);
+        self.new_entries.push(key);
     }
 
     pub fn add_sym_type(&mut self, sym: Sym, sym_type: LSymType) {
@@ -159,11 +158,11 @@ impl LEnv {
         for key in &self.new_entries {
             let value = self.get_symbol(key).unwrap_or(LValue::None);
             match value {
-                LValue::Symbol(s) => {
-                    string.push_str(
-                        format!("(define {} {})", s, self.get_sym_type(&s).as_command()).as_str(),
-                    );
-                }
+                LValue::Symbol(s) => string.push_str(
+                    format!("(typeof {} {})",
+                            s,
+                            self.get_sym_type(&s).unwrap_or(&LSymType::Object(LType::Object)).as_command())
+                        .as_str()),
                 lv => string.push_str(format!("(define {} {})", key, lv.as_command()).as_str()),
             }
         }

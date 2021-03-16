@@ -20,14 +20,14 @@ pub const IS_TYPE: &str = "type?";
 pub const IS_STATE_VARIABLE: &str = "sv?";
 pub const IS_STATE_FUNCTION: &str = "sf?";
 pub const IS_FACTBASE: &str = "fb?";
-pub const IS_VARIABLE: &str = "var?";
 pub const IS_OBJECT: &str = "obj?";
 pub const IS_PAIR: &str = "pair?";
 pub const IS_LIST: &str = "list?";
-pub const IS_MAP: &str = "map";
+pub const IS_MAP: &str = "map?";
+pub const IS_LAMBDA: &str = "lambda?";
+pub const IS_QUOTE: &str = "quote?";
 
 //FactBase language
-pub const VARIABLE: &str = "var";
 pub const OBJECT: &str = "obj";
 pub const STATE_FUNCTION: &str = "sf";
 pub const STATE_VARIABLE: &str = "sv";
@@ -40,6 +40,7 @@ pub const PAIR: &str = "pair";
 pub const LAMBDA: &str = "lambda";
 pub const TYPEOF: &str = "typeof";
 pub const SUBTYPE: &str = "subtype";
+pub const GET_TYPE: &str = "get-type";
 
 //basic types
 pub const TYPE_INT: &str = "int";

@@ -11,8 +11,6 @@ use std::hash::{Hash, Hasher};
 use std::ops::{Add, Div, Mul, Range, Sub};
 use std::rc::Rc;
 
-//TODO: Finish to implement the new kind in enum LValue
-
 pub enum LError {
     WrongType(String, NameTypeLValue, NameTypeLValue),
     WrongNumberOfArgument(usize, Range<usize>),
@@ -73,7 +71,6 @@ impl Hash for LNumber {
     fn hash<H: Hasher>(&self, state: &mut H) {
         match self {
             LNumber::Int(i) => i.hash(state),
-            //TODO: verify the hash for the float
             LNumber::Float(f) => f.to_string().hash(state),
         }
     }
@@ -214,6 +211,30 @@ pub enum LType {
     Symbol(Sym),
 }
 
+impl From<&str> for LType {
+    fn from(s: &str) -> Self {
+        match s {
+            TYPE_INT => LType::Int,
+            TYPE_FLOAT => LType::Float,
+            TYPE_OBJECT => LType::Object,
+            TYPE_BOOL => LType::Bool,
+            other => LType::Symbol(other.into())
+        }
+    }
+}
+
+impl From<&Sym> for LType {
+    fn from(s: &Sym) -> Self {
+        s.as_str().into()
+    }
+}
+
+impl From<Sym> for LType {
+    fn from(s: Sym) -> Self {
+        (&s).into()
+    }
+}
+
 impl From<&LType> for Sym {
     fn from(lt: &LType) -> Self {
         match lt {
@@ -256,38 +277,16 @@ impl PartialEq for LType {
     }
 }
 
-#[derive(Clone)]
-pub struct LVariable {
-    pub v_type: Sym,
-    pub value: Sym,
-}
-
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct LStateFunction {
     pub t_params: Vec<Sym>,
     pub t_value: Sym,
 }
 
 #[derive(Clone)]
-pub struct LFactBase {
-    facts: HashMap<Vec<Sym>, Sym>,
-}
-
-impl LFactBase {
-    pub fn new(facts: HashMap<Vec<Sym>, Sym>) -> Self {
-        LFactBase { facts }
-    }
-
-    pub fn get_facts(&self) -> HashMap<Vec<Sym>, Sym> {
-        self.facts.clone()
-    }
-}
-
-#[derive(Clone)]
 pub enum LSymType {
     StateFunction(LStateFunction),
-    Type(LType),
-    Variable(LVariable),
+    Type(Option<LType>),
     Object(LType),
 }
 
@@ -295,22 +294,21 @@ impl LSymType {
     pub fn as_state_function(&self) -> Result<LStateFunction, LError> {
         match self {
             LSymType::StateFunction(sf) => Ok(sf.clone()),
-            //TODO: Implement error
             lst => Err(LError::ConversionError(
                 lst.into(),
                 NameTypeLValue::StateFunction,
             )),
         }
     }
+}
 
-    pub fn as_variable(&self) -> Result<LVariable, LError> {
-        match self {
-            LSymType::Variable(v) => Ok(v.clone()),
-            //TODO: Implement error
-            lst => Err(LError::ConversionError(
-                lst.into(),
-                NameTypeLValue::Variable,
-            )),
+impl PartialEq for &LSymType {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (LSymType::Object(o1), LSymType::Object(o2)) => o1 == o2,
+            (LSymType::Type(t1), LSymType::Type(t2)) => t1 == t2,
+            (LSymType::StateFunction(sf1), LSymType::StateFunction(sf2)) => sf1 == sf2,
+            _ => false,
         }
     }
 }
@@ -339,7 +337,7 @@ impl LLambda {
         }
     }
 
-    pub fn get_new_env(&self, args: &[LValue]) -> Result<LEnv, LError> {
+    pub fn get_new_env(&self, args: &[LValue], outer: &LEnv) -> Result<LEnv, LError> {
         if self.params.len() != args.len() {
             return Err(WrongNumberOfArgument(
                 args.len(),
@@ -350,6 +348,7 @@ impl LLambda {
         for arg in self.params.iter().zip(args) {
             env.symbols.insert(arg.0.to_string(), arg.1.clone());
         }
+        env.outer = Some(Box::new(outer.clone()));
         Ok(env)
     }
 
@@ -393,7 +392,9 @@ impl Hash for LValue {
                 let q = &**q;
                 q.hash(state);
             }
-            lv => panic!("cannot hash {}", lv.to_string()),
+
+            LValue::None => "none".hash(state),
+            _ => {}
         };
     }
 }
@@ -462,6 +463,8 @@ impl PartialEq for LValue {
             (LValue::Map(m1), LValue::Map(m2)) => *m1 == *m2,
             (LValue::Lambda(l1), LValue::Lambda(l2)) => *l1 == *l2,
             (LValue::Quote(q1), LValue::Quote(q2)) => q1 == q2, //function comparison
+            (LValue::LFn(f1), LValue::LFn(f2)) => Rc::ptr_eq(f1, f2),
+            (LValue::SymType(s1), LValue::SymType(s2)) => s1 == s2,
             (_, _) => false,
         }
     }
@@ -636,7 +639,9 @@ impl Div for LValue {
 
 #[derive(Clone)]
 pub enum NameTypeLValue {
-    Variable,
+    Atom,
+    SymType,
+    Object,
     Type,
     StateFunction,
     Number,
@@ -648,7 +653,6 @@ pub enum NameTypeLValue {
     Lambda,
     None,
     FactBase,
-    Object,
     Map,
     List,
     Quote,
@@ -665,13 +669,14 @@ impl PartialEq for NameTypeLValue {
             (NameTypeLValue::None, NameTypeLValue::None) => true,
             (NameTypeLValue::StateFunction, NameTypeLValue::StateFunction) => true,
             (NameTypeLValue::Type, NameTypeLValue::Type) => true,
-            (NameTypeLValue::Variable, NameTypeLValue::Variable) => true,
             (NameTypeLValue::Number, NameTypeLValue::Number) => true,
             (NameTypeLValue::FactBase, NameTypeLValue::FactBase) => true,
             (NameTypeLValue::Object, NameTypeLValue::Object) => true,
             (NameTypeLValue::Map, NameTypeLValue::Map) => true,
             (NameTypeLValue::List, NameTypeLValue::List) => true,
             (NameTypeLValue::Quote, NameTypeLValue::Quote) => true,
+            (NameTypeLValue::SymType, NameTypeLValue::SymType) => true,
+            (NameTypeLValue::Atom, NameTypeLValue::Atom) => true,
             (_, _) => false,
         }
     }
@@ -696,11 +701,11 @@ impl From<&LValue> for NameTypeLValue {
             LValue::String(_) => NameTypeLValue::String,
             LValue::LFn(_) => NameTypeLValue::LFn,
             LValue::None => NameTypeLValue::None,
-            LValue::SymType(st) => st.into(),
             LValue::Lambda(_) => NameTypeLValue::Lambda,
             LValue::Map(_) => NameTypeLValue::Map,
             LValue::List(_) => NameTypeLValue::List,
             LValue::Quote(_) => NameTypeLValue::Quote,
+            LValue::SymType(_) => NameTypeLValue::SymType,
         }
     }
 }
@@ -716,7 +721,6 @@ impl From<&LSymType> for NameTypeLValue {
         match lst {
             LSymType::StateFunction(_) => NameTypeLValue::StateFunction,
             LSymType::Type(_) => NameTypeLValue::Type,
-            LSymType::Variable(_) => NameTypeLValue::Variable,
             LSymType::Object(_) => NameTypeLValue::Object,
         }
     }
@@ -743,20 +747,15 @@ impl AsCommand for LSymType {
     fn as_command(&self) -> String {
         match self {
             LSymType::StateFunction(sf) => sf.as_command(),
-            LSymType::Type(t) => t.as_command(),
-            LSymType::Variable(v) => v.as_command(),
+            LSymType::Type(t) => match t {
+                None => "".to_string(),
+                Some(st) => {
+                    format!("(subtype {})", st)
+                }
+            },
             LSymType::Object(o) => {
-                format!("({} {})", OBJECT, o)
+                format!("{}", o)
             }
-        }
-    }
-}
-
-impl AsCommand for LType {
-    fn as_command(&self) -> String {
-        match self {
-            LType::Symbol(s) => format!("({} {})\n", TYPE, s),
-            _ => "".to_string(),
         }
     }
 }
@@ -770,12 +769,6 @@ impl AsCommand for LStateFunction {
         }
         result.push_str(format!("{})\n", self.t_value.to_string()).as_str());
         result
-    }
-}
-
-impl AsCommand for LVariable {
-    fn as_command(&self) -> String {
-        format!("({} {} {})", VARIABLE, self.v_type, self.value)
     }
 }
 
@@ -847,12 +840,6 @@ impl Display for LNumber {
     }
 }
 
-impl Display for LVariable {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{} - {}", self.value, self.v_type)
-    }
-}
-
 impl Display for LStateFunction {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         let mut sr = String::new();
@@ -871,15 +858,16 @@ impl Display for LStateFunction {
 impl Display for LSymType {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            LSymType::StateFunction(sf) => write!(f, "sf: {}", sf),
-            LSymType::Type(t) => write!(f, "type: child of {}", t),
-            LSymType::Variable(v) => write!(f, "variable: {}", v),
-            LSymType::Object(o) => write!(f, "object: type = {}", o),
+            LSymType::StateFunction(sf) => write!(f, "{}", sf),
+            LSymType::Type(t) => match t {
+                None => write!(f, "root type"),
+                Some(_type) => write!(f, "subtype of {}", _type),
+            },
+            LSymType::Object(o) => write!(f, "{}", o),
         }
     }
 }
 
-//TODO: impl Display for HashMap<LValue, LValue>
 impl Display for LValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
@@ -895,7 +883,7 @@ impl Display for LValue {
             LValue::Map(m) => {
                 let mut result = String::new();
                 for (key, value) in m.iter() {
-                    result.push_str(format!("{} = {}", key, value).as_str());
+                    result.push_str(format!("{} = {}\n", key, value).as_str());
                 }
                 write!(f, "{}", result)
             }
@@ -916,13 +904,14 @@ impl Display for NameTypeLValue {
             NameTypeLValue::SExpr => "SExpr",
             NameTypeLValue::LFn => "LFn",
             NameTypeLValue::None => "None",
-            NameTypeLValue::Variable => "Variable",
             NameTypeLValue::FactBase => "FactBase",
             NameTypeLValue::Object => "Object",
             NameTypeLValue::Lambda => "lambda",
             NameTypeLValue::Map => "map",
             NameTypeLValue::List => "list",
             NameTypeLValue::Quote => "quote",
+            NameTypeLValue::SymType => "symtype",
+            NameTypeLValue::Atom => "atom",
         };
         write!(f, "{}", str)
     }

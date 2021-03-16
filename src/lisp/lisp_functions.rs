@@ -1,9 +1,9 @@
-//TODO: Vérifier si les fonctions ne doivent prendre que deux paramètres
 use crate::lisp::lisp_language::TYPE_OBJECT;
 use crate::lisp::lisp_struct::LError::*;
 use crate::lisp::lisp_struct::*;
 use aries_utils::input::Sym;
 //use std::collections::HashMap;
+use crate::lisp::lisp_language::*;
 use crate::lisp::LEnv;
 use im::HashMap;
 
@@ -137,22 +137,6 @@ pub fn is_symbol(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
     }
 }
 
-pub fn is_variable(values: &[LValue], env: &LEnv) -> Result<LValue, LError> {
-    match values.len() {
-        1 => match values.get(0).unwrap() {
-            LValue::Symbol(s) => match env.sym_types.get(s) {
-                None => panic!("symbol as no type"),
-                Some(sym_type) => match sym_type {
-                    LSymType::Variable(_) => Ok(LValue::Bool(true)),
-                    _ => Ok(LValue::Bool(false)),
-                },
-            },
-            lv => Err(WrongType(lv.to_string(), lv.into(), NameTypeLValue::Symbol)),
-        },
-        i => Err(WrongNumberOfArgument(i, 1..1)),
-    }
-}
-
 pub fn is_object(values: &[LValue], env: &LEnv) -> Result<LValue, LError> {
     match values.len() {
         1 => match values.get(0).unwrap() {
@@ -168,8 +152,6 @@ pub fn is_object(values: &[LValue], env: &LEnv) -> Result<LValue, LError> {
         i => Err(WrongNumberOfArgument(i, 1..1)),
     }
 }
-
-//TODO: add verification functions for list, map, ref
 
 pub fn is_state_function(values: &[LValue], env: &LEnv) -> Result<LValue, LError> {
     match values.len() {
@@ -196,14 +178,37 @@ pub fn is_map(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
         i => Err(WrongNumberOfArgument(i, 1..1)),
     }
 }
-
-pub fn begin(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
-    match values.last() {
-        None => Err(LError::SpecialError("no SExpr after begin".to_string())),
-        Some(v) => Ok(v.clone()),
+pub fn is_list(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
+    match values.len() {
+        1 => match values.get(0).unwrap() {
+            LValue::List(_) => Ok(LValue::Bool(true)),
+            _ => Ok(LValue::Bool(false)),
+        },
+        i => Err(WrongNumberOfArgument(i, 1..1)),
     }
 }
-pub fn begins(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
+
+pub fn is_lambda(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
+    match values.len() {
+        1 => match values.get(0).unwrap() {
+            LValue::Lambda(_) => Ok(LValue::Bool(true)),
+            _ => Ok(LValue::Bool(false)),
+        },
+        i => Err(WrongNumberOfArgument(i, 1..1)),
+    }
+}
+
+pub fn is_quote(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
+    match values.len() {
+        1 => match values.get(0).unwrap() {
+            LValue::Quote(_) => Ok(LValue::Bool(true)),
+            _ => Ok(LValue::Bool(false)),
+        },
+        i => Err(WrongNumberOfArgument(i, 1..1)),
+    }
+}
+
+pub fn begin(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
     match values.last() {
         None => Err(LError::SpecialError("no SExpr after begin".to_string())),
         Some(v) => Ok(v.clone()),
@@ -214,42 +219,29 @@ pub fn default(_values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
     Ok(LValue::String("default function".to_string()))
 }
 
-pub fn var(values: &[LValue], env: &LEnv) -> Result<LValue, LError> {
-    //println!("in function var");
-    match values.len() {
-        2 => {
-            let sym_type = values.get(0).unwrap();
-            if !is_type(&values[0..1], env)?.as_bool()? {
-                return Err(WrongType(
-                    sym_type.to_string(),
-                    sym_type.into(),
-                    NameTypeLValue::Symbol,
-                ));
-            }
-            let sym_value = values.get(1).unwrap();
-            Ok(LValue::SymType(LSymType::Variable(LVariable {
-                v_type: sym_type.as_sym()?,
-                value: sym_value.as_sym()?,
-            })))
-        }
-        len => Err(WrongNumberOfArgument(len, 2..2)),
+pub fn subtype(values: &[LValue], env: &LEnv) -> Result<LValue, LError> {
+    if values.len() != 1 {
+        return Err(WrongNumberOfArgument(values.len(), 1..1));
     }
-}
-
-pub fn object(values: &[LValue], env: &LEnv) -> Result<LValue, LError> {
-    match values.len() {
-        1 => {
-            //TODO: Add binding to type for object
-            let sym_type = values.get(0).unwrap();
-            if is_type(values, env)?.as_bool()? {
-                let sym = sym_type.as_sym()?;
-                Ok(LValue::SymType(LSymType::Object(LType::Symbol(sym))))
-            } else {
-                Err(LError::SpecialError("".to_string()))
-            }
-        }
-        len => Err(WrongNumberOfArgument(len, 1..1)),
-    }
+    let parent_type: LType = match values.get(0).unwrap() {
+        LValue::Symbol(s) => match s.as_str() {
+            TYPE_INT => LType::Int,
+            TYPE_FLOAT => LType::Float,
+            TYPE_BOOL => LType::Object,
+            TYPE_OBJECT => LType::Object,
+            _str => match env.get_sym_type(s) {
+                None => return Err(SpecialError(format!("{} has no type",s))),
+                Some(lst) => match lst {
+                    LSymType::Type(_) => LType::Symbol(s.clone()),
+                    lst => {
+                        return Err(WrongType(lst.to_string(), lst.into(), NameTypeLValue::Type))
+                    }
+                },
+            },
+        },
+        lv => return Err(WrongType(lv.to_string(), lv.into(), NameTypeLValue::Symbol)),
+    };
+    Ok(LValue::SymType(LSymType::Type(Some(parent_type))))
 }
 
 pub fn state_function(values: &[LValue], env: &LEnv) -> Result<LValue, LError> {
@@ -264,15 +256,23 @@ pub fn state_function(values: &[LValue], env: &LEnv) -> Result<LValue, LError> {
                     } else {
                         vec_params.push(s.clone())
                     }
-                }
-                //TODO::Régler le problème avec les types des symboles
-                else {
-                    let sym_type = env.sym_types.get(s).unwrap();
-                    return Err(WrongType(
-                        sym_type.to_string(),
-                        sym_type.into(),
-                        NameTypeLValue::Type,
-                    ));
+                } else {
+                    match env.sym_types.get(s) {
+                        None => {
+                            return Err(WrongType(
+                                value.to_string(),
+                                value.into(),
+                                NameTypeLValue::Type,
+                            ))
+                        }
+                        Some(lst) => {
+                            return Err(WrongType(
+                                value.to_string(),
+                                lst.into(),
+                                NameTypeLValue::Type,
+                            ))
+                        }
+                    }
                 }
             }
             lv => {
@@ -288,21 +288,6 @@ pub fn state_function(values: &[LValue], env: &LEnv) -> Result<LValue, LError> {
         t_params: vec_params,
         t_value,
     })))
-}
-
-pub fn def_type(values: &[LValue], env: &LEnv) -> Result<LValue, LError> {
-    match values.len() {
-        1 => {
-            if is_type(values, env)?.as_bool()? {
-                Ok(LValue::SymType(LSymType::Type(LType::Symbol(
-                    values.get(0).unwrap().as_sym()?,
-                ))))
-            } else {
-                Err(SpecialError("".to_string()))
-            }
-        }
-        len => Err(WrongNumberOfArgument(len, 1..1)),
-    }
 }
 
 pub fn list(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
@@ -357,7 +342,7 @@ pub fn set(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
     }
 }
 
-pub fn get(values: &[LValue], env: &LEnv) -> Result<LValue, LError> {
+pub fn get(values: &[LValue], _env: &LEnv) -> Result<LValue, LError> {
     if values.is_empty() {
         return Err(WrongNumberOfArgument(0, 1..std::usize::MAX));
     }
@@ -378,13 +363,27 @@ pub fn get(values: &[LValue], env: &LEnv) -> Result<LValue, LError> {
             if values.len() > 1 {
                 return Err(WrongNumberOfArgument(values.len(), 1..1));
             }
-            match lv {
-                LValue::Symbol(s) => match env.get_sym_type(s) {
-                    LSymType::Variable(v) => Ok(v.value.into()),
-                    st => Ok(LValue::SymType(st)),
-                },
-                lv => Ok(lv.clone()),
-            }
+            Ok(lv.clone())
         }
     }
+}
+
+pub fn get_type(values: &[LValue], env: &LEnv) -> Result<LValue, LError> {
+    if values.len() != 1 {
+        return Err(WrongNumberOfArgument(values.len(), 1..1));
+    }
+    let sym_type = match values.get(0).unwrap() {
+        LValue::Symbol(s) => match env.get_sym_type(s) {
+            None => return Err(LError::SpecialError(format!("{} has no type", s))),
+            Some(lst) => lst.clone(),
+        },
+        LValue::Number(n) => match n {
+            LNumber::Int(_) => LSymType::Type(Some(LType::Int)),
+            LNumber::Float(_) => LSymType::Type(Some(LType::Float)),
+        },
+        LValue::Bool(_) => LSymType::Type(Some(LType::Bool)),
+        lv => return Err(WrongType(lv.to_string(), lv.into(), NameTypeLValue::Atom)),
+    };
+
+    Ok(LValue::SymType(sym_type))
 }

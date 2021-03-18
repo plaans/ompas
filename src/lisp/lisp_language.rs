@@ -41,6 +41,7 @@ pub const LAMBDA: &str = "lambda";
 pub const TYPEOF: &str = "typeof";
 pub const SUBTYPE: &str = "subtype";
 pub const GET_TYPE: &str = "get-type";
+pub const QUOTE: &str = "quote";
 
 //basic types
 pub const TYPE_INT: &str = "int";

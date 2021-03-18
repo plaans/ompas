@@ -151,6 +151,9 @@ pub fn eval(se: &SExpr, env: &mut LEnv) -> Result<LValue, LError> {
                         env,
                     )));
                 }
+                QUOTE => {
+                    return Ok(LValue::Quote(list_iter.pop()?.clone()));
+                }
                 READ => {
                     let file_name = list_iter.pop_atom()?.to_string();
                     let mut file = match File::open(file_name) {

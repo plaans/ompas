@@ -59,6 +59,7 @@ pub const IF: &str = "if";
 pub const READ: &str = "read";
 pub const WRITE: &str = "write";
 pub const GET: &str = "get";
+pub const PRINT: &str = "print";
 
 pub const TRUE: &str = "true";
 pub const FALSE: &str = "false";

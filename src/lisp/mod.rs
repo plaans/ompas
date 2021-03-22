@@ -8,6 +8,8 @@ use std::borrow::Borrow;
 use std::fs::File;
 use std::io::Write;
 use std::rc::Rc;
+use aries_planning::parsing::sexpr::SExpr;
+use crate::lisp::lisp_struct::LError::{SpecialError, WrongType, WrongNumberOfArgument};
 
 pub mod lisp_functions;
 pub mod lisp_language;
@@ -80,6 +82,13 @@ impl Default for LEnv {
         symbols.insert(MAP.to_string(), LValue::LFn(Rc::new(map)));
         symbols.insert(LIST.to_string(), LValue::LFn(Rc::new(list)));
         symbols.insert(STATE.to_string(), LValue::LFn(Rc::new(map)));
+        symbols.insert(DEFINE.to_ascii_lowercase(), LValue::LFn(Rc::new(define)));
+        symbols.insert(IF.to_string(), LValue::LFn(Rc::new(_if)));
+        symbols.insert(TYPEOF.to_string(), LValue::LFn(Rc::new(type_of)));
+        symbols.insert(READ.to_string(), LValue::LFn(Rc::new(read)));
+        symbols.insert(WRITE.to_string(), LValue::LFn(Rc::new(write)));
+        //symbols.insert(QUOTE.to_string(), LValue::LFn(Rc::new(quote)));
+        symbols.insert(PRINT.to_string(), LValue::LFn(Rc::new(print)));
         //Sym_types
 
         sym_types.insert(
@@ -173,6 +182,115 @@ impl LEnv {
             Err(e) => panic!("{}", e),
         }
         //eprintln!("write fact base to file");
+    }
+}
+
+pub fn parse(str : &str, env: &LEnv) -> Result<LValue, LError> {
+    match aries_planning::parsing::sexpr::parse(str) {
+        Ok(se) => {
+            parse_into_lvalue(&se, env)
+        }
+        Err(e) => Err(SpecialError(format!("Error in command: {}", e.to_string()))),
+    }
+}
+
+pub fn parse_into_lvalue(se: &SExpr, env: &LEnv) -> Result<LValue,LError> {
+    match se {
+        SExpr::Atom(atom) => {
+            //println!("expression is an atom: {}", atom);
+            //Test if its an int
+            return match atom.as_str().parse::<i64>() {
+                Ok(int) => Ok(LValue::Number(LNumber::Int(int))),
+                Err(_) => match atom.as_str().parse::<f64>() {
+                    //Test if its a float
+                    Ok(float) => Ok(LValue::Number(LNumber::Float(float))),
+                    Err(_) => match atom.as_str() {
+                        //Test if its a Boolean
+                        TRUE => {
+                            //println!("atom is boolean true");
+                            Ok(LValue::Bool(true))
+                        }
+                        FALSE => {
+                            //println!("atom is boolean false");
+                            Ok(LValue::Bool(false))
+                        }
+
+                        s => match env.get_symbol(s){
+                            None => Ok(LValue::Symbol(s.into())),
+                            Some(s) => Ok(s)
+                        }
+                    },
+                },
+            };
+        }
+        SExpr::List(list) => {
+            //println!("expression is a list");
+            let mut vec_lvalue = Vec::new();
+
+            for element in list.iter() {
+                vec_lvalue.push(parse_into_lvalue(element, env)?);
+            }
+            match vec_lvalue.get(0) {
+                None => {}
+                Some(lv)  => if let LValue::Symbol(s) = lv {
+                    match s.as_str() {
+                        QUOTE => return match vec_lvalue.get(1) {
+                            None => Err(SpecialError("expected a lvalue here".to_string())),
+                            Some(lv) => Ok(LValue::Quote(Box::new(lv.clone())))
+                        },
+                        LAMBDA => {
+                            if vec_lvalue.len() != 3 {
+                                return Err(WrongNumberOfArgument(format!("{:?}", vec_lvalue), vec_lvalue.len(), 3..3))
+                            }
+                            let mut vec_sym = Vec::new();
+                            if let LValue::List(list) = vec_lvalue.get(1).unwrap(){
+                                for val in list{
+                                    vec_sym.push(val.as_sym()?);
+                                }
+                            }else{
+                                return Err(WrongType(vec_lvalue.get(1).unwrap().to_string(),lv.into(), NameTypeLValue::List))
+                            }
+                            return Ok(LValue::Lambda(LLambda::new(vec_sym, vec_lvalue.get(2).unwrap().clone(), env.clone())))
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            Ok(LValue::List(vec_lvalue))
+        }
+    }
+}
+
+pub fn eval(lv: &LValue, env: &mut LEnv) -> Result<LValue, LError> {
+    match lv {
+        LValue::List(list) => {
+            //println!("expression is a list");
+            let list = list.as_slice();
+            let proc = list.get(0).unwrap();
+            let mut args = Vec::new();
+            for arg in &list[1..] {
+                args.push(eval(arg, env)?);
+            }
+            //println!("args:{:?}", args);
+            match proc {
+                LValue::LFn(f) => return f(args.as_slice(), env),
+                LValue::Lambda(l) => {
+                    let mut new_env = l.get_new_env(args.as_slice(), env)?;
+                    eval(&l.get_body(), &mut new_env)
+                }
+                lv => Err(WrongType(lv.to_string(), lv.into(), NameTypeLValue::LFn))
+            }
+        }
+        LValue::Quote(box_lv) => {
+            Ok(*box_lv.clone())
+        }
+        LValue::Symbol(s) => {
+            match env.get_symbol(s.as_str()) {
+                None => Ok(lv.clone()),
+                Some(lv) => Ok(lv)
+            }
+        }
+        lv => Ok(lv.clone())
     }
 }
 

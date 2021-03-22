@@ -1,14 +1,9 @@
 //imports for rustyline
-use crate::lisp::lisp_language::*;
-use crate::lisp::lisp_struct::LError::*;
 use crate::lisp::lisp_struct::*;
-use crate::lisp::LEnv;
-use aries_planning::parsing::sexpr::{parse, SExpr};
-use aries_utils::input::{Input, Sym};
-use rustyline::error::ReadlineError;
+use crate::lisp::{LEnv, eval};
 use rustyline::Editor;
-use std::fs::File;
-use std::io::Read;
+use crate::lisp;
+use rustyline::error::ReadlineError;
 
 pub fn repl() {
     // `()` can be used when no completer is required
@@ -20,18 +15,23 @@ pub fn repl() {
     loop {
         let readline = rl.readline(">> ");
         match readline {
-            Ok(line) => {
-                rl.add_history_entry(line.as_str());
-                //println!("Line: {}", line);
-                match parse(line.as_str()) {
-                    Ok(s) => {
-                        match eval(&s, &mut env) {
-                            Ok(lisp_value) => println!("{}", lisp_value),
-                            Err(e) => eprintln!("{}", e),
-                        };
+            Ok(string) => {
+                let str = string.as_str();
+                rl.add_history_entry(str);
+                let lvalue = match lisp::parse(str, &env) {
+                    Ok(lv) => lv,
+                    Err(e) => {
+                        eprintln!("{}", e);
+                        LValue::None
                     }
-                    Err(e) => eprintln!("Error in command: {}", e.to_string()),
                 };
+                match eval(&lvalue, &mut env) {
+                    Ok(lv) => println!("{}", lv),
+                    Err(e) => eprintln!("{}", e),
+                };
+
+                //println!("Line: {}", line);
+
             }
             Err(ReadlineError::Interrupted) => {
                 println!("CTRL-C");
@@ -50,156 +50,4 @@ pub fn repl() {
     rl.save_history("history.txt").unwrap();
 }
 
-pub fn eval(se: &SExpr, env: &mut LEnv) -> Result<LValue, LError> {
-    match se {
-        SExpr::Atom(atom) => {
-            //println!("expression is an atom: {}", atom);
-            //Test if its an int
-            return match atom.as_str().parse::<i64>() {
-                Ok(int) => Ok(LValue::Number(LNumber::Int(int))),
-                Err(_) => match atom.as_str().parse::<f64>() {
-                    //Test if its a float
-                    Ok(float) => Ok(LValue::Number(LNumber::Float(float))),
-                    Err(_) => match atom.as_str() {
-                        //Test if its a Boolean
-                        TRUE => {
-                            //println!("atom is boolean true");
-                            Ok(LValue::Bool(true))
-                        }
-                        FALSE => {
-                            //println!("atom is boolean false");
-                            Ok(LValue::Bool(false))
-                        }
-                        s => {
-                            //is a symbol, if it exist return it
-                            //println!("atom is a symbol: {}", s);
-                            match env.get_symbol(&s) {
-                                None => Ok(LValue::Symbol(s.into())),
-                                Some(v) => Ok(v.clone()),
-                            }
-                        }
-                    },
-                },
-            };
-        }
-        SExpr::List(list) => {
-            //println!("expression is a list");
-            let mut list_iter = list.iter();
-            let first_atom = list_iter.pop_atom()?.clone();
-            let mut is_first_atom_function: bool = false;
-            match first_atom.as_str() {
-                DEFINE => {
-                    //println!("define a new symbol");
-                    let sym: Sym = list_iter.pop_atom()?.into();
-                    let sexpr = list_iter.pop()?;
-                    let exp = eval(sexpr, env)?;
-                    env.add_entry(sym.to_string(), exp);
-                }
 
-                TYPEOF => {
-                    //Define a type for a sym
-                    let sym: Sym = list_iter.pop_atom()?.into();
-                    let sexpr = list_iter.pop()?;
-                    let exp = eval(sexpr, env)?;
-                    let sym_type = match &exp {
-                        LValue::SymType(lst) => lst.clone(),
-                        LValue::Symbol(s) => match env.get_sym_type(&s) {
-                            None => {
-                                return Err(WrongType(
-                                    exp.to_string(),
-                                    exp.into(),
-                                    NameTypeLValue::SymType,
-                                ))
-                            }
-                            Some(lst) => match lst {
-                                LSymType::Type(_) => LSymType::Object(s.into()),
-                                lst => return Err(WrongType(s.to_string(), lst.into(), NameTypeLValue::Type))
-                            }
-                        },
-                        lv => {
-                            return Err(WrongType(
-                                lv.to_string(),
-                                lv.into(),
-                                NameTypeLValue::SymType,
-                            ))
-                        }
-                    };
-                    env.add_entry(sym.to_string(), LValue::Symbol(sym.clone()));
-                    env.add_sym_type(sym, sym_type);
-                }
-                IF => {
-                    let test = list_iter.pop()?;
-                    let conseq = list_iter.pop()?;
-                    let alt = list_iter.pop()?;
-                    return match eval(test, env) {
-                        Ok(LValue::Bool(true)) => eval(conseq, env),
-                        Ok(LValue::Bool(false)) => eval(alt, env),
-                        Ok(lv) => Err(WrongType(lv.to_string(), lv.into(), NameTypeLValue::Bool)),
-                        Err(e) => Err(e),
-                    };
-                }
-                LAMBDA => {
-                    let mut params = list_iter.pop()?.as_list_iter().unwrap();
-                    let body = list_iter.pop()?;
-                    let mut vec_param: Vec<Sym> = Vec::new();
-                    while !params.is_empty() {
-                        vec_param.push(params.pop_atom()?.clone())
-                    }
-                    return Ok(LValue::Lambda(LLambda::new(
-                        vec_param.as_slice(),
-                        body,
-                        env,
-                    )));
-                }
-                QUOTE => {
-                    return Ok(LValue::Quote(list_iter.pop()?.clone()));
-                }
-                READ => {
-                    let file_name = list_iter.pop_atom()?.to_string();
-                    let mut file = match File::open(file_name) {
-                        Ok(f) => f,
-                        Err(e) => return Err(SpecialError(e.to_string())),
-                    };
-                    let mut buffer = String::new();
-                    match file.read_to_string(&mut buffer) {
-                        Ok(_) => {}
-                        Err(e) => return Err(SpecialError(e.to_string())),
-                    };
-                    match parse(Input::from_string(buffer)) {
-                        Ok(s) => return eval(&s, env),
-                        Err(e) => return Err(SpecialError(e.to_string())),
-                    };
-                }
-                WRITE => {
-                    let name_file = list_iter.pop_atom()?.to_string();
-                    env.to_file(name_file);
-                    //eprintln!("new entries: {:?}", env.get_new_entries());
-                }
-                //println!("conditional"),
-                _ => is_first_atom_function = true,
-            }
-            if is_first_atom_function {
-                //println!("{} is a function",first_atom);
-                let proc = match eval(&SExpr::Atom(first_atom), env)? {
-                    LValue::LFn(f) => LValue::LFn(f),
-                    LValue::Lambda(l) => LValue::Lambda(l),
-                    lv => return Err(WrongType(lv.to_string(), lv.into(), NameTypeLValue::LFn)),
-                };
-                let mut args: Vec<LValue> = Vec::new();
-                for arg in list_iter {
-                    args.push(eval(arg, env)?)
-                }
-                //println!("args:{:?}", args);
-                match proc {
-                    LValue::LFn(f) => return f(args.as_slice(), env),
-                    LValue::Lambda(l) => {
-                        let mut new_env = l.get_new_env(args.as_slice(), env)?;
-                        return eval(&l.get_body(), &mut new_env);
-                    }
-                    _ => panic!("strong error, expected to have a function or a lambda function"),
-                }
-            }
-        }
-    };
-    Ok(LValue::None)
-}

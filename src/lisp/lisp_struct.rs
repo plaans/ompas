@@ -4,16 +4,16 @@ use std::cmp::Ordering;
 //use std::collections::HashMap;
 use crate::lisp::lisp_struct::LError::WrongNumberOfArgument;
 use crate::lisp::LEnv;
-use aries_planning::parsing::sexpr::SExpr;
 use im::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::{Add, Div, Mul, Range, Sub};
 use std::rc::Rc;
+use std::ptr::write_bytes;
 
 pub enum LError {
     WrongType(String, NameTypeLValue, NameTypeLValue),
-    WrongNumberOfArgument(usize, Range<usize>),
+    WrongNumberOfArgument(String, usize, Range<usize>),
     ErrLoc(ErrLoc),
     UndefinedSymbol(String),
     SpecialError(String),
@@ -313,12 +313,12 @@ impl PartialEq for &LSymType {
     }
 }
 
-pub type LFn = Rc<fn(&[LValue], &LEnv) -> Result<LValue, LError>>;
+pub type LFn = Rc<fn(&[LValue], &mut LEnv) -> Result<LValue, LError>>;
 
 #[derive(Clone)]
 pub struct LLambda {
     params: Vec<Sym>,
-    body: SExpr,
+    body: Box<LValue>,
     env: LEnv,
 }
 
@@ -329,31 +329,32 @@ impl PartialEq for LLambda {
 }
 
 impl LLambda {
-    pub fn new(params: &[Sym], body: &SExpr, env: &LEnv) -> Self {
+    pub fn new(params: Vec<Sym>, body: LValue, env: LEnv) -> Self {
         LLambda {
-            params: params.to_vec(),
-            body: body.clone(),
-            env: env.clone(),
+            params,
+            body: Box::new(body),
+            env,
         }
     }
 
     pub fn get_new_env(&self, args: &[LValue], outer: &LEnv) -> Result<LEnv, LError> {
         if self.params.len() != args.len() {
             return Err(WrongNumberOfArgument(
+                format!("{:?}", args),
                 args.len(),
                 self.params.len()..self.params.len(),
             ));
         }
         let mut env = self.env.clone();
-        for arg in self.params.iter().zip(args) {
-            env.symbols.insert(arg.0.to_string(), arg.1.clone());
+        for (param, arg) in self.params.iter().zip(args) {
+            env.symbols.insert(param.to_string(), arg.clone());
         }
         env.outer = Some(Box::new(outer.clone()));
         Ok(env)
     }
 
-    pub fn get_body(&self) -> &SExpr {
-        &self.body
+    pub fn get_body(&self) -> LValue {
+        *self.body.clone()
     }
 }
 
@@ -369,7 +370,7 @@ pub enum LValue {
     // data structure
     Map(im::HashMap<LValue, LValue>),
     List(Vec<LValue>),
-    Quote(SExpr),
+    Quote(Box<LValue>),
     // error
     None,
     LFn(LFn),
@@ -823,7 +824,7 @@ impl Display for LError {
             LError::WrongType(s, s1, s2) => write!(f, "{}: Got {}, expected {}", s, s1, s2),
             LError::ErrLoc(e) => write!(f, "{}", e),
             LError::UndefinedSymbol(s) => write!(f, "{} is undefined", s),
-            LError::WrongNumberOfArgument(s, r) => write!(f, "Got {}, expected {:?}", s, r),
+            LError::WrongNumberOfArgument(s, g, e) => write!(f, "\"{}\": Got {}, expected {:?}", s, g, e),
             LError::SpecialError(s) => write!(f, "{}", s),
             LError::ConversionError(s1, s2) => write!(f, "Cannot convert {} into {}.", s1, s2),
         }
@@ -878,7 +879,7 @@ impl Display for LValue {
             LValue::Bool(b) => write!(f, "{}", b),
             LValue::SymType(st) => write!(f, "{}", st),
             LValue::List(s) => write!(f, "{:?}", s),
-            LValue::Lambda(_) => write!(f, "Lambda"),
+            LValue::Lambda(l) => write!(f, "{}", l),
             LValue::Map(m) => {
                 let mut result = String::new();
                 for (key, value) in m.iter() {
@@ -888,6 +889,12 @@ impl Display for LValue {
             }
             LValue::Quote(q) => write!(f, "{}", q),
         }
+    }
+}
+
+impl Display for LLambda {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "{:?} : {}", self.params, self.body)
     }
 }
 

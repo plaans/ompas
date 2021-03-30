@@ -1,7 +1,7 @@
 # Unnamed FactBase
 Author: Jérémy Turi
 
-Last update of the readme: 10/03/2021
+Last update of the readme: 30/03/2021
 
 ***
 
@@ -15,17 +15,15 @@ This project is part of the Thesis I am currently working on at LAAS-CNRS is RIS
 
 ### FactBase language
 - `(read <name>.txt)`: Read a list of lisp commands to reconstruct the factbase and the environment.
-- `((write <name>.txt))` : write the commands to reconstruct later the factbase and the environment.
+- `(write <name>.txt)` : write the commands to reconstruct later the factbase and the environment.
 - `(define <symbol> <body>)`  : Define a new symbol, the body is different in function of the kind.
-    - `(type <parent-type>)`: Define a new type with a parent type
-    - `(obj <type>)` : Define an object with a type.
-    - `(sf <t_p_1> ... <t_p_n> <t_value>))` : Define a new state function with n parameters types and a value type.
-    - `(var <type> <value>} ` : Define a new var with a type and a value that matches the type.
-    - `(sv <p_1> ... <p_n> <value>)` : Define a new state-variable with n parameters and a value.
+    - `(list <val_1> ... <val_n> )` : define a list of elements
+    - `(quote <value>)` : define a LValue that will not be evaluated during parsing.
+    - `(map (list <pair_value_1> ... <pair_value_2>)) : create a map with a list of pair of LValue.   
       Types must match with predicate types.
-    - `(state <sv_1>...<sv_n>)`: Define a state with n state variables
-- `(define ?s_j (set ?s_i <sv_1> ... <sv_n> )`: define a new state ?s_j from the facts of ?s_i and new facts.
-- `(get <sym>)` : print the value of the symbol in a pretty way
+- `(set <sym> <value>)` : set to a LValue a value and return a new LValue
+- `(get <sym>)` : return the LValue associated to the symbol
+- `(get map_1 <key>)` : return the value associated to the key in the map
 
 
 
@@ -49,7 +47,7 @@ You can find intallation instructions on [rust website](https://www.rust-lang.or
 - aries_utils
 - aries_collections
 - rustyline
--im-rs
+- im-rs
 
 ## TODO
 - add multiple world, multi context support.

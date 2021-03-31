@@ -70,6 +70,11 @@ impl Default for LEnv {
         symbols.insert(SET.to_string(), LValue::LFn(Rc::new(set)));
         symbols.insert(GET_TYPE.to_string(), LValue::LFn(Rc::new(get_type)));
 
+        //Logical functions
+        symbols.insert(AND.to_string(), LValue::LFn(Rc::new(and)));
+        symbols.insert(OR.to_string(), LValue::LFn(Rc::new(or)));
+        symbols.insert(NOT.to_string(), LValue::LFn(Rc::new(not)));
+
         //Basic types
 
         //Functions for the factbase

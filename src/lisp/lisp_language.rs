@@ -43,6 +43,10 @@ pub const SUBTYPE: &str = "subtype";
 pub const GET_TYPE: &str = "get-type";
 pub const QUOTE: &str = "quote";
 
+pub const AND : &str = "and";
+pub const OR: &str = "or";
+pub const NOT: &str = "not";
+
 //basic types
 pub const TYPE_INT: &str = "int";
 pub const TYPE_FLOAT: &str = "float";

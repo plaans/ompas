@@ -540,3 +540,22 @@ pub fn write(values: &[LValue], env: &mut LEnv) -> Result<LValue, LError> {
     env.to_file(file_name);
     Ok(LValue::None)
 }
+
+pub fn and(values: &[LValue], env: &mut LEnv) -> Result<LValue, LError> {
+    if values.len() != 2 {
+        return Err(WrongNumberOfArgument(format!("{:?}", values), values.len(), 2..2))
+    }
+    Ok(values.get(0).unwrap() & values.get(1).unwrap())
+}
+pub fn or(values: &[LValue], env: &mut LEnv) -> Result<LValue, LError> {
+    if values.len() != 2 {
+        return Err(WrongNumberOfArgument(format!("{:?}", values), values.len(), 2..2))
+    }
+    Ok(values.get(0).unwrap() & values.get(1).unwrap())
+}
+pub fn not(values: &[LValue], env: &mut LEnv) -> Result<LValue, LError> {
+    if values.len() != 1 {
+        return Err(WrongNumberOfArgument(format!("{:?}", values), values.len(), 1..1))
+    }
+    Ok(!values.get(0).unwrap())
+}

@@ -290,32 +290,23 @@ pub fn eval(lv: &LValue, env: &mut LEnv) -> Result<LValue, LError> {
                             }
                             return Ok(args.get(1).unwrap().clone())
                         }
-                        LCoreOperator::DEF_MACRO => {}
+                        LCoreOperator::DEF_MACRO => {
+                            //TODO: implement def_macro
+                        }
                     }
-                }
-                LValue::LFn(f) => return f(args.as_slice(), env),
+                LValue::LFn(f) => {
+                    let mut arg_evaluated = Vec::new();
+                    for arg in args {
+                        arg_evalued.push(eval(arg, env)?)
+                    }
+                    return f(arg_evaluated, env)
+                },
                 LValue::Lambda(l) => {
-                let mut new_env = l.get_new_env(args.as_slice(), env)?;
-                eval(&l.get_body(), &mut new_env)
-                }
-                lv => Err(WrongType(lv.to_string(), lv.into(), NameTypeLValue::LFn))
-            }
-            let mut args = Vec::new();
-            for arg in &list[1..] {
-                args.push(eval(arg, env)?);
-            }
-            //println!("args:{:?}", args);
-            match proc {
-                LValue::LFn(f) => return f(args.as_slice(), env),
-                LValue::Lambda(l) => {
-                    let mut new_env = l.get_new_env(args.as_slice(), env)?;
+                    let mut new_env = l.get_new_env(args, env)?;
                     eval(&l.get_body(), &mut new_env)
                 }
                 lv => Err(WrongType(lv.to_string(), lv.into(), NameTypeLValue::LFn))
             }
-        }
-        LValue::Quote(box_lv) => {
-            Ok(*box_lv.clone())
         }
         LValue::Symbol(s) => {
             match env.get_symbol(s.as_str()) {

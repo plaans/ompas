@@ -654,6 +654,7 @@ impl Div for LValue {
 
 #[derive(Clone)]
 pub enum NameTypeLValue {
+    CoreOperator,
     Atom,
     SymType,
     Object,
@@ -694,6 +695,7 @@ impl PartialEq for NameTypeLValue {
             (NameTypeLValue::SymType, NameTypeLValue::SymType) => true,
             (NameTypeLValue::Atom, NameTypeLValue::Atom) => true,
             (NameTypeLValue::Macro, NameTypeLValue::Macro) => true,
+            (NameTypeLValue::CoreOperator, NameTypeLValue::CoreOperator) => true,
             (_, _) => false,
         }
     }
@@ -724,6 +726,7 @@ impl From<&LValue> for NameTypeLValue {
             LValue::Quote(_) => NameTypeLValue::Quote,
             LValue::SymType(_) => NameTypeLValue::SymType,
             LValue::Macro(_) => NameTypeLValue::Macro,
+            LValue::CoreOperator(_) => NameTypeLValue::CoreOperator,
         }
     }
 }
@@ -835,6 +838,7 @@ impl AsCommand for LValue {
             LValue::Map(m) => m.as_command(),
             LValue::Quote(q) => q.to_string(),
             LValue::Macro(m) => m.as_command(),
+            LValue::CoreOperator(c) => "".to_string(),
         }
     }
 }
@@ -916,6 +920,9 @@ impl Display for LValue {
             LValue::Macro(m) => {
                 //TODO: implement Display for Macro
             }
+            LValue::CoreOperator(co) => {
+                //TODO: implement Display for CoreOperator
+            }
         }
     }
 }
@@ -947,6 +954,7 @@ impl Display for NameTypeLValue {
             NameTypeLValue::SymType => "symtype",
             NameTypeLValue::Atom => "atom",
             NameTypeLValue::Macro => "macro",
+            NameTypeLValue::CoreOperator => "core_operator"
         };
         write!(f, "{}", str)
     }

@@ -37,11 +37,9 @@ pub const STATE: &str = "state";
 pub const LIST: &str = "list";
 pub const MAP: &str = "map";
 pub const PAIR: &str = "pair";
-pub const LAMBDA: &str = "lambda";
 pub const TYPEOF: &str = "typeof";
 pub const SUBTYPE: &str = "subtype";
 pub const GET_TYPE: &str = "get-type";
-pub const QUOTE: &str = "quote";
 
 pub const AND : &str = "and";
 pub const OR: &str = "or";
@@ -56,15 +54,21 @@ pub const TYPE_ROOT: &str = "root";
 
 //Other
 pub const BEGIN: &str = "begin";
-pub const DEFINE: &str = "define";
 pub const SET: &str = "set";
 pub const SET_FACTBASE: &str = "setfb";
-pub const IF: &str = "if";
 pub const READ: &str = "read";
 pub const WRITE: &str = "write";
 pub const GET: &str = "get";
 pub const PRINT: &str = "print";
 
+//Core language
+pub const DEFINE: &str = "define";
+pub const DEF_MACRO: &str = "defmacro";
+pub const LAMBDA: &str = "lambda";
+pub const IF: &str = "if";
+pub const QUOTE: &str = "quote";
+
+//Boolean
 pub const TRUE: &str = "true";
 pub const FALSE: &str = "false";
 

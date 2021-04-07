@@ -358,6 +358,19 @@ impl LLambda {
     }
 }
 
+pub struct LMacro {
+    parameters : Vec<LValue>,
+    body: Box<LValue>,
+}
+
+pub enum LCoreOperator {
+    DEFINE,
+    DEF_LAMBDA,
+    IF,
+    QUOTE,
+    DEF_MACRO,
+}
+
 #[derive(Clone)]
 pub enum LValue {
     // symbol
@@ -375,6 +388,8 @@ pub enum LValue {
     None,
     LFn(LFn),
     Lambda(LLambda),
+    Macro(LMacro),
+    CoreOperator(LCoreOperator),
     SymType(LSymType),
 }
 
@@ -656,6 +671,7 @@ pub enum NameTypeLValue {
     Map,
     List,
     Quote,
+    Macro,
 }
 
 impl PartialEq for NameTypeLValue {
@@ -677,6 +693,7 @@ impl PartialEq for NameTypeLValue {
             (NameTypeLValue::Quote, NameTypeLValue::Quote) => true,
             (NameTypeLValue::SymType, NameTypeLValue::SymType) => true,
             (NameTypeLValue::Atom, NameTypeLValue::Atom) => true,
+            (NameTypeLValue::Macro, NameTypeLValue::Macro) => true,
             (_, _) => false,
         }
     }
@@ -706,6 +723,7 @@ impl From<&LValue> for NameTypeLValue {
             LValue::List(_) => NameTypeLValue::List,
             LValue::Quote(_) => NameTypeLValue::Quote,
             LValue::SymType(_) => NameTypeLValue::SymType,
+            LValue::Macro(_) => NameTypeLValue::Macro,
         }
     }
 }
@@ -796,6 +814,12 @@ impl AsCommand for HashMap<LValue, LValue> {
     }
 }
 
+impl AsCommand for LMacro {
+    fn as_command(&self) -> String {
+        "".to_string()
+    }
+}
+
 impl AsCommand for LValue {
     fn as_command(&self) -> String {
         match self {
@@ -810,6 +834,7 @@ impl AsCommand for LValue {
             LValue::Lambda(_) => "".to_string(),
             LValue::Map(m) => m.as_command(),
             LValue::Quote(q) => q.to_string(),
+            LValue::Macro(m) => m.as_command(),
         }
     }
 }
@@ -888,6 +913,9 @@ impl Display for LValue {
                 write!(f, "{}", result)
             }
             LValue::Quote(q) => write!(f, "{}", q),
+            LValue::Macro(m) => {
+                //TODO: implement Display for Macro
+            }
         }
     }
 }
@@ -918,6 +946,7 @@ impl Display for NameTypeLValue {
             NameTypeLValue::Quote => "quote",
             NameTypeLValue::SymType => "symtype",
             NameTypeLValue::Atom => "atom",
+            NameTypeLValue::Macro => "macro",
         };
         write!(f, "{}", str)
     }

@@ -557,5 +557,6 @@ pub fn not(values: &[LValue], env: &mut LEnv) -> Result<LValue, LError> {
     if values.len() != 1 {
         return Err(WrongNumberOfArgument(format!("{:?}", values), values.len(), 1..1))
     }
-    Ok(!values.get(0).unwrap())
+    Ok(LValue::None)
+    //Ok(!values.get(0).unwrap())
 }

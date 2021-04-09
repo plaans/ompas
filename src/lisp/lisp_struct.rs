@@ -3,17 +3,17 @@ use aries_utils::input::{ErrLoc, Sym};
 use std::cmp::Ordering;
 //use std::collections::HashMap;
 use crate::lisp::lisp_struct::LError::WrongNumberOfArgument;
-use crate::lisp::LEnv;
+use crate::lisp::{LEnv, eval};
 use im::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::{Add, Div, Mul, Range, Sub};
 use std::rc::Rc;
-use std::ptr::write_bytes;
 
 pub enum LError {
-    WrongType(String, NameTypeLValue, NameTypeLValue),
-    WrongNumberOfArgument(String, usize, Range<usize>),
+    WrongType(LValue, NameTypeLValue, NameTypeLValue),
+    NotInListOfExpectedTypes(LValue, NameTypeLValue, Vec<NameTypeLValue>),
+    WrongNumberOfArgument(LValue, usize, Range<usize>),
     ErrLoc(ErrLoc),
     UndefinedSymbol(String),
     SpecialError(String),
@@ -253,17 +253,6 @@ impl From<LType> for Sym {
     }
 }
 
-impl Display for LType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            LType::Int => write!(f, "int"),
-            LType::Bool => write!(f, "bool"),
-            LType::Float => write!(f, "float"),
-            LType::Symbol(s) => write!(f, "{}", s),
-            LType::Object => write!(f, "object"),
-        }
-    }
-}
 
 impl PartialEq for LType {
     fn eq(&self, other: &Self) -> bool {
@@ -313,7 +302,11 @@ impl PartialEq for &LSymType {
     }
 }
 
-pub type LFn = Rc<fn(&[LValue], &mut LEnv) -> Result<LValue, LError>>;
+#[derive(Clone)]
+pub struct LFn {
+    pub pointer : Rc<fn(&[LValue], &mut LEnv) -> Result<LValue, LError>>,
+    pub label: String,
+}
 
 #[derive(Clone)]
 pub struct LLambda {
@@ -340,7 +333,7 @@ impl LLambda {
     pub fn get_new_env(&self, args: &[LValue], outer: &LEnv) -> Result<LEnv, LError> {
         if self.params.len() != args.len() {
             return Err(WrongNumberOfArgument(
-                format!("{:?}", args),
+                LValue::List(args.to_vec()),
                 args.len(),
                 self.params.len()..self.params.len(),
             ));
@@ -353,22 +346,44 @@ impl LLambda {
         Ok(env)
     }
 
+    pub fn call(&self, args: &[LValue], outer: &LEnv) -> Result<LValue, LError> {
+        let mut new_env = self.get_new_env(args, outer)?;
+        eval(&*self.body, &mut new_env)
+    }
+
     pub fn get_body(&self) -> LValue {
         *self.body.clone()
     }
 }
 
+#[derive(Clone)]
 pub struct LMacro {
-    parameters : Vec<LValue>,
-    body: Box<LValue>,
+    pub parameters : Vec<LValue>,
+    pub body: Box<LValue>,
 }
 
+impl LMacro {
+    pub fn apply(&self, values: &[LValue]) -> Result<LValue, LError>  {
+        if values.len() != self.parameters.len() {
+            return Err(WrongNumberOfArgument(LValue::List(values.to_vec()),values.len(), self.parameters.len()..self.parameters.len()))
+        }
+        for value in self.parameters.iter().zip(values) {
+
+        }
+
+        Ok(LValue::None)
+    }
+}
+
+#[derive(Clone, PartialOrd, PartialEq, Eq)]
 pub enum LCoreOperator {
-    DEFINE,
-    DEF_LAMBDA,
-    IF,
-    QUOTE,
-    DEF_MACRO,
+    Define,
+    DefLambda,
+    If,
+    Quote,
+    DefMacro,
+    Set,
+    Begin,
 }
 
 #[derive(Clone)]
@@ -461,6 +476,20 @@ impl LValue {
             _ => Err(LError::SpecialError("cannot convert into bool".to_string())),
         }
     }
+
+    pub fn as_core_operator(&self) -> Result<LCoreOperator, LError> {
+        match self {
+            LValue::CoreOperator(co) => Ok(co.clone()),
+            _ => Err(LError::SpecialError("cannot convert into core operator".to_string())),
+        }
+    }
+
+    pub fn as_lambda(&self) -> Result<LLambda, LError> {
+        match self {
+            LValue::Lambda(l) => Ok(l.clone()),
+            _ => Err(LError::SpecialError("cannot convert into lambda".to_string())),
+        }
+    }
 }
 
 impl PartialEq for LValue {
@@ -478,7 +507,7 @@ impl PartialEq for LValue {
             (LValue::Map(m1), LValue::Map(m2)) => *m1 == *m2,
             (LValue::Lambda(l1), LValue::Lambda(l2)) => *l1 == *l2,
             (LValue::Quote(q1), LValue::Quote(q2)) => q1.to_string() == q2.to_string(), //function comparison
-            (LValue::LFn(f1), LValue::LFn(f2)) => Rc::ptr_eq(f1, f2),
+            (LValue::LFn(f1), LValue::LFn(f2)) => f1.label  == f2.label,
             (LValue::SymType(s1), LValue::SymType(s2)) => s1 == s2,
             (_, _) => false,
         }
@@ -526,12 +555,12 @@ impl Add for &LValue {
         match (self, rhs) {
             (LValue::Number(n1), LValue::Number(n2)) => Ok(LValue::Number(n1 + n2)),
             (LValue::Number(_), l) => Err(LError::WrongType(
-                l.to_string(),
+                l.clone(),
                 l.into(),
                 NameTypeLValue::Number,
             )),
             (l, LValue::Number(_)) => Err(LError::WrongType(
-                l.to_string(),
+                l.clone(),
                 l.into(),
                 NameTypeLValue::Number,
             )),
@@ -552,12 +581,12 @@ impl Sub for &LValue {
         match (self, rhs) {
             (LValue::Number(n1), LValue::Number(n2)) => Ok(LValue::Number(n1 - n2)),
             (LValue::Number(_), l) => Err(LError::WrongType(
-                l.to_string(),
+                l.clone(),
                 l.into(),
                 NameTypeLValue::Number,
             )),
             (l, LValue::Number(_)) => Err(LError::WrongType(
-                l.to_string(),
+                l.clone(),
                 l.into(),
                 NameTypeLValue::Number,
             )),
@@ -578,12 +607,12 @@ impl Mul for &LValue {
         match (self, rhs) {
             (LValue::Number(n1), LValue::Number(n2)) => Ok(LValue::Number(n1 * n2)),
             (LValue::Number(_), l) => Err(LError::WrongType(
-                l.to_string(),
+                l.clone(),
                 l.into(),
                 NameTypeLValue::Number,
             )),
             (l, LValue::Number(_)) => Err(LError::WrongType(
-                l.to_string(),
+                l.clone(),
                 l.into(),
                 NameTypeLValue::Number,
             )),
@@ -604,12 +633,12 @@ impl Div for &LValue {
         match (self, rhs) {
             (LValue::Number(n1), LValue::Number(n2)) => Ok(LValue::Number(n1 / n2)),
             (LValue::Number(_), l) => Err(LError::WrongType(
-                l.to_string(),
+                l.clone(),
                 l.into(),
                 NameTypeLValue::Number,
             )),
             (l, LValue::Number(_)) => Err(LError::WrongType(
-                l.to_string(),
+                l.clone(),
                 l.into(),
                 NameTypeLValue::Number,
             )),
@@ -652,7 +681,7 @@ impl Div for LValue {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum NameTypeLValue {
     CoreOperator,
     Atom,
@@ -759,6 +788,51 @@ impl From<Sym> for LValue {
     }
 }
 
+impl From<&[LValue]> for LValue {
+    fn from(lv: &[LValue]) -> Self {
+        return LValue::List(lv.to_vec())
+    }
+}
+
+impl From<&Vec<LValue>> for LValue {
+    fn from(vec: &Vec<LValue>) -> Self {
+        return LValue::List(vec.clone())
+    }
+}
+
+impl From<Vec<LValue>> for LValue {
+    fn from(vec: Vec<LValue>) -> Self {
+        (&vec).into()
+    }
+}
+
+impl From<&LSymType> for LValue {
+    fn from(lst: &LSymType) -> Self {
+        LValue::SymType(lst.clone())
+    }
+}
+
+impl From<LSymType> for LValue {
+    fn from(lst: LSymType) -> Self {
+        (&lst).into()
+    }
+}
+
+impl From<&LCoreOperator> for LValue {
+    fn from(co: &LCoreOperator) -> Self {
+        LValue::CoreOperator(co.clone())
+    }
+}
+impl From<LCoreOperator> for LValue {
+    fn from(co: LCoreOperator) -> Self {
+        (&co).into()
+    }
+}
+
+/**
+** AS COMMAND IMPLEMENTATION
+**/
+
 ///Transform an object in Lisp command to reconstuct itself.
 pub trait AsCommand {
     fn as_command(&self) -> String;
@@ -847,15 +921,42 @@ impl AsCommand for LValue {
 DISPLAY IMPLEMENTATION
 **/
 
+
+impl Display for LType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            LType::Int => write!(f, "int"),
+            LType::Bool => write!(f, "bool"),
+            LType::Float => write!(f, "float"),
+            LType::Symbol(s) => write!(f, "{}", s),
+            LType::Object => write!(f, "object"),
+        }
+    }
+}
+
 impl Display for LError {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
             LError::WrongType(s, s1, s2) => write!(f, "{}: Got {}, expected {}", s, s1, s2),
             LError::ErrLoc(e) => write!(f, "{}", e),
             LError::UndefinedSymbol(s) => write!(f, "{} is undefined", s),
-            LError::WrongNumberOfArgument(s, g, e) => write!(f, "\"{}\": Got {}, expected {:?}", s, g, e),
+            LError::WrongNumberOfArgument(s, g, r) => {
+                if r.len() == 0 {
+                    write!(f, "\"{}\": Got {} element(s), expected {}", s, g, r.start)
+                }
+                else if r.end == std::usize::MAX {
+                    write!(f, "\"{}\": Got {} element(s), expected at least {}", s, g, r.start)
+                }
+                else if r.start == std::usize::MIN {
+                    write!(f, "\"{}\": Got {} element(s), expected at most {}", s, g, r.end)
+                }
+                else {
+                    write!(f, "\"{}\": Got {} element(s), expected between {} and {}", s, g, r.start, r.end)
+                }
+            },
             LError::SpecialError(s) => write!(f, "{}", s),
             LError::ConversionError(s1, s2) => write!(f, "Cannot convert {} into {}.", s1, s2),
+            LError::NotInListOfExpectedTypes(lv, typ, list_types) => write!(f, "{}: Got {}, expected {:?}", lv, typ, list_types),
         }
     }
 }
@@ -901,26 +1002,37 @@ impl Display for LValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
             LValue::String(s) => write!(f, "{}", s),
-            LValue::LFn(_) => write!(f, "LFunction"),
+            LValue::LFn(fun) => write!(f, "{}", fun.label),
             LValue::None => write!(f, "None"),
             LValue::Symbol(s) => write!(f, "{}", s),
             LValue::Number(n) => write!(f, "{}", n),
             LValue::Bool(b) => write!(f, "{}", b),
             LValue::SymType(st) => write!(f, "{}", st),
-            LValue::List(s) => write!(f, "{:?}", s),
+            LValue::List(list) => {
+                let mut result = String::new();
+                result.push('(');
+                for element in list {
+                    result.push_str(element.to_string().as_str());
+                    result.push(' ');
+                }
+                result.push(')');
+                write!(f, "{}", result)
+            },
             LValue::Lambda(l) => write!(f, "{}", l),
             LValue::Map(m) => {
                 let mut result = String::new();
                 for (key, value) in m.iter() {
-                    result.push_str(format!("{} = {}\n", key, value).as_str());
+                    result.push_str(format!("{}: {}\n", key, value).as_str());
                 }
                 write!(f, "{}", result)
             }
             LValue::Quote(q) => write!(f, "{}", q),
             LValue::Macro(m) => {
+                Ok(())
                 //TODO: implement Display for Macro
             }
             LValue::CoreOperator(co) => {
+                Ok(())
                 //TODO: implement Display for CoreOperator
             }
         }

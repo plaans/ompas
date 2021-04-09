@@ -26,7 +26,10 @@ pub fn repl() {
                     }
                 };
                 match eval(&lvalue, &mut env) {
-                    Ok(lv) => println!("{}", lv),
+                    Ok(lv) => match lv {
+                        LValue::None => {},
+                        lv => println!("{}", lv),
+                    }
                     Err(e) => eprintln!("{}", e),
                 };
 

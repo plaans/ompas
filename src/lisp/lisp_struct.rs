@@ -381,6 +381,8 @@ pub enum LCoreOperator {
     DefLambda,
     If,
     Quote,
+    QuasiQuote,
+    UnQuote,
     DefMacro,
     Set,
     Begin,

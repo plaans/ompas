@@ -11,6 +11,7 @@ use std::rc::Rc;
 use aries_planning::parsing::sexpr::SExpr;
 use crate::lisp::lisp_struct::LError::{SpecialError, WrongType, WrongNumberOfArgument, NotInListOfExpectedTypes};
 use crate::lisp::lisp_struct::NameTypeLValue::{List, Symbol};
+use crate::lisp::lisp_struct::LCoreOperator::{Quote, UnQuote};
 
 pub mod lisp_functions;
 pub mod lisp_language;
@@ -41,13 +42,15 @@ impl Default for LEnv {
         let mut sym_types: HashMap<Sym, LSymType> = HashMap::default();
 
         //Core Operators
-        symbols.insert(DEFINE.to_string(), LValue::CoreOperator(LCoreOperator::Define));
-        symbols.insert(IF.to_string(), LValue::CoreOperator(LCoreOperator::If));
-        symbols.insert(LAMBDA.to_string(), LValue::CoreOperator(LCoreOperator::DefLambda));
-        symbols.insert(DEF_MACRO.to_string(), LValue::CoreOperator(LCoreOperator::DefMacro));
-        symbols.insert(QUOTE.to_string(), LValue::CoreOperator(LCoreOperator::Quote));
-        symbols.insert(SET.to_string(), LValue::CoreOperator(LCoreOperator::Set));
-        symbols.insert(BEGIN.to_string(), LValue::CoreOperator(LCoreOperator::Begin));
+        symbols.insert(DEFINE.to_string(), LCoreOperator::Define.into());
+        symbols.insert(IF.to_string(), LCoreOperator::If.into());
+        symbols.insert(LAMBDA.to_string(), LCoreOperator::DefLambda.into());
+        symbols.insert(DEF_MACRO.to_string(), LCoreOperator::DefMacro.into());
+        symbols.insert(QUOTE.to_string(), LCoreOperator::Quote.into());
+        symbols.insert(SET.to_string(), LCoreOperator::Set.into());
+        symbols.insert(BEGIN.to_string(), LCoreOperator::Begin.into());
+        symbols.insert(QUASI_QUOTE.to_string(), LCoreOperator::QuasiQuote.into());
+        symbols.insert(QUOTE.to_string(), LCoreOperator::UnQuote.into());
 
         //Mathematical functions
         symbols.insert(ADD.to_string(), LValue::LFn(LFn {
@@ -477,6 +480,8 @@ pub fn expand(x: &LValue, top_level: bool, env: &mut LEnv) -> Result<LValue, LEr
                             Ok(expanded_list.into())
                         }
                     }
+                    LCoreOperator::QuasiQuote => {}
+                    LCoreOperator::UnQuote => {}
                 }
                 LValue::Symbol(sym) => {
                     match env.get_macro(sym) {
@@ -502,6 +507,43 @@ pub fn expand(x: &LValue, top_level: bool, env: &mut LEnv) -> Result<LValue, LEr
         lv => return Ok(lv.clone())
     };
     Ok(LValue::None)
+}
+
+pub fn expand_quasi_quote(x: &LValue, env: &mut LEnv) -> Result<LValue, LError> {
+    /*"""Expand `x => 'x; `,x => x; `(,@x y) => (append x y) """
+    if not is_pair(x):
+    return [_quote, x]
+    require(x, x[0] is not _unquotesplicing, "can't splice here")
+    if x[0] is _unquote:
+        require(x, len(x)==2)
+    return x[1]
+
+    return [_append, x[0][1], expand_quasiquote(x[1:])]
+    else:
+    return [_cons, expand_quasiquote(x[0]), expand_quasiquote(x[1:])]*/
+
+    match x {
+        LValue::List(l) => {
+            if l.is_empty() {
+                Ok(vec![Quote.into(), x].into())
+            }else {
+                let first = l.first().unwrap();
+                if matches!(first, LValue::CoreOperator(LCoreOperator::UnQuote)) {
+                    if l.len() != 2 {
+                        return Err(WrongNumberOfArgument(x.clone(),l.len(),2..2))
+                    }
+                    return Ok(l.get(1).unwrap().clone())
+                }/*elif is_pair(x[0]) and x[0][0] is _unquotesplicing:
+                    require(x[0], len(x[0])==2)*/
+                else {
+                    /*return [_cons, expand_quasiquote(x[0]), expand_quasiquote(x[1:])]*/
+                }
+            }
+        }
+        _ => Ok(vec![Quote.into(), x].into())
+    }
+    //Verify if has unquotesplicing here
+
 }
 
 
@@ -571,7 +613,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv) -> Result<LValue, LError> {
                             match eval(test, env) {
                                 Ok(LValue::Bool(true)) => eval(conseq, env),
                                 Ok(LValue::Bool(false)) => eval(alt, env),
-                                Ok(lv) => Err(WrongType(lv, lv.into(), NameTypeLValue::Bool)),
+                                Ok(lv) => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Bool)),
                                 Err(e) => Err(e),
                             }
                         }
@@ -618,6 +660,10 @@ pub fn eval(lv: &LValue, env: &mut LEnv) -> Result<LValue, LError> {
                     LCoreOperator::Begin => {
                         Ok(LValue::None)
                     }
+                    LCoreOperator::QuasiQuote => {
+
+                    }
+                    LCoreOperator::UnQuote => {}
                 }
                 LValue::LFn(f) => {
                     let mut arg_evaluated = Vec::new();

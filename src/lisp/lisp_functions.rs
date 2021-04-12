@@ -540,3 +540,7 @@ pub fn write(values: &[LValue], env: &mut LEnv) -> Result<LValue, LError> {
     env.to_file(file_name);
     Ok(LValue::None)
 }
+
+pub fn cons(values: &[LValue], env: &mut LEnv) -> Result<LValue, LError> {
+
+}

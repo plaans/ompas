@@ -34,12 +34,24 @@ pub const STATE_VARIABLE: &str = "sv";
 pub const FACTBASE: &str = "fb";
 pub const TYPE: &str = "type";
 pub const STATE: &str = "state";
-pub const LIST: &str = "list";
+
 pub const MAP: &str = "map";
 pub const PAIR: &str = "pair";
 pub const TYPEOF: &str = "typeof";
 pub const SUBTYPE: &str = "subtype";
 pub const GET_TYPE: &str = "get-type";
+
+/*
+LIST FUNCTIONS
+ */
+pub const CAR: &str = "car";
+pub const CDR: &str = "cdr";
+pub const APPEND: &str = "append";
+pub const LAST: &str = "last";
+pub const MEMBER: &str = "member";
+pub const REVERSE:&str = "reverse";
+pub const LIST: &str = "list";
+pub const CONS: &str = "cons";
 
 pub const AND : &str = "and";
 pub const OR: &str = "or";
@@ -65,6 +77,8 @@ pub const DEF_MACRO: &str = "defmacro";
 pub const LAMBDA: &str = "lambda";
 pub const IF: &str = "if";
 pub const QUOTE: &str = "quote";
+pub const QUASI_QUOTE: &str = "quasi-quote";
+pub const UNQUOTE: &str= "unquote";
 pub const SET: &str = "set!";
 pub const BEGIN: &str = "begin";
 

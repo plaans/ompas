@@ -541,6 +541,137 @@ pub fn write(values: &[LValue], env: &mut LEnv) -> Result<LValue, LError> {
     Ok(LValue::None)
 }
 
-pub fn cons(values: &[LValue], env: &mut LEnv) -> Result<LValue, LError> {
+///It takes two arguments, an element and a list and returns a list with the element inserted at the first place.
+pub fn cons(values: &[LValue], _: &mut LEnv) -> Result<LValue, LError> {
+    if values.len() != 2 {
+        return Err(WrongNumberOfArgument(values.into(), values.len(), 2..2))
+    }
+    let first = values.first().unwrap();
+    let second = values.get(1).unwrap();
+    match (first, second) {
+        (lv_first, LValue::List(list)) => {
+            let mut new_list = vec![lv_first.clone()];
+            new_list.append(&mut list.clone());
+            Ok(new_list.into())
+        },
+        (lv_first, LValue::None) => {
+            Ok(lv_first.clone())
+        }
+        (lv_f, lv_s) => {
+            Ok(vec![lv_f.clone(), lv_s.clone()].into())
+        },
+    }
+}
 
+///It takes a list as argument, and returns its first element.
+pub fn car(values: &[LValue], _: &mut LEnv) -> Result<LValue, LError> {
+    if values.len() == 1 {
+        match values.first().unwrap() {
+            LValue::List(list) =>{
+                if list.len() >= 1 {
+                    Ok(list.first().unwrap().clone())
+                }else {
+                    Ok(LValue::None)
+                }
+            }
+            lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::List))
+        }
+    }
+    else {
+        return Err(WrongNumberOfArgument(values.into(), values.len(), 1..1))
+    }
+}
+
+///It takes a list as argument, and returns a list without the first element
+pub fn cdr(values: &[LValue], _: &mut LEnv) -> Result<LValue, LError> {
+    if values.len() == 1 {
+        match values.first().unwrap() {
+            LValue::List(list) =>{
+                return if list.len() > 2 {
+                    Ok(LValue::None)
+                }else {
+                    let mut new_list = list.clone();
+                    new_list.remove(0);
+                    Ok(new_list.into())
+                }
+            }
+            lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::List))
+        }
+    }
+    else {
+        return Err(WrongNumberOfArgument(values.into(), values.len(), 1..1))
+    }
+}
+
+///It merges two or more list into one.
+pub fn append(values: &[LValue], _: &mut LEnv) -> Result<LValue, LError> {
+    let mut new_list = Vec::new();
+    for element in values {
+        match element {
+            LValue::List(list) => {
+                new_list.append(&mut list.clone())
+            },
+            _ => return Err(WrongType(element.clone(), element.into(), NameTypeLValue::List))
+        }
+    }
+    Ok(new_list.into())
+}
+
+///It takes a list and returns the last element.
+pub fn last(values: &[LValue], _: &mut LEnv) -> Result<LValue, LError> {
+    if values.len() == 1 {
+        match values.first().unwrap() {
+            LValue::List(list) =>{
+                if list.len() >= 1 {
+                    Ok(list.last().unwrap().clone())
+                }else {
+                    Ok(LValue::None)
+                }
+            }
+            lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::List))
+        }
+    }
+    else {
+        return Err(WrongNumberOfArgument(values.into(), values.len(), 1..1))
+    }
+}
+
+///It takes two arguments of which the second must be a list,
+/// if the first argument is a member of the second argument,
+/// and then it returns the remainder of the list beginning with the first argument.
+pub fn member(values: &[LValue], _: &mut LEnv) -> Result<LValue, LError> {
+    if values.len() != 2 {
+        return Err(WrongNumberOfArgument(values.into(), values.len(), 2..2))
+    }
+    let value_to_find = values.get(1).unwrap();
+    match values.get(1).unwrap() {
+        LValue::List(list) => {
+            for (k,element) in list.iter().enumerate() {
+               if element == value_to_find {
+                   return Ok(list[k-1..].into())
+               }
+            }
+            Ok(LValue::None)
+        }
+        lv => {
+            Err(WrongType(lv.clone(), lv.into(),NameTypeLValue::List))
+        }
+    }
+}
+
+/// It takes a list and returns a list with the top elements in reverse order.
+pub fn reverse(values: &[LValue], _: &mut LEnv) -> Result<LValue, LError> {
+    if values.len() == 1 {
+        match values.first().unwrap() {
+            LValue::List(list) =>{
+                let mut new_list = list.clone();
+                new_list.reverse();
+                Ok(new_list.into())
+            }
+            lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::List))
+        }
+    }
+    else {
+        return Err(WrongNumberOfArgument(values.into(), values.len(), 1..1))
+    }
 }

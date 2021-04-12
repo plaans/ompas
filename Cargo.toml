@@ -12,11 +12,11 @@ deprecated=[]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-aries_model = {git = "https://github.com/arthur-bit-monnot/aries/"}
-aries_planning = {git = "https://github.com/arthur-bit-monnot/aries/"}
-aries_utils = {git = "https://github.com/arthur-bit-monnot/aries/"}
-aries_collections = {git = "https://github.com/arthur-bit-monnot/aries/"}
-anyhow = "1.0.38"
+aries_model = {git = "https://github.com/Yirmandias/aries/"}
+aries_planning = {git = "https://github.com/Yirmandias/aries/"}
+aries_utils = {git = "https://github.com/Yirmandias/aries/"}
+aries_collections = {git = "https://github.com/Yirmandias/aries/"}
+anyhow = "1.0.40"
 rustyline = "7.1.0"
 im = "15.0.0"
 structopt = { version = "0.3", default-features = false }

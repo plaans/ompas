@@ -356,25 +356,6 @@ impl LLambda {
     }
 }
 
-#[derive(Clone)]
-pub struct LMacro {
-    pub parameters : Vec<LValue>,
-    pub body: Box<LValue>,
-}
-
-impl LMacro {
-    pub fn apply(&self, values: &[LValue]) -> Result<LValue, LError>  {
-        if values.len() != self.parameters.len() {
-            return Err(WrongNumberOfArgument(LValue::List(values.to_vec()),values.len(), self.parameters.len()..self.parameters.len()))
-        }
-        for value in self.parameters.iter().zip(values) {
-
-        }
-
-        Ok(LValue::None)
-    }
-}
-
 #[derive(Clone, PartialOrd, PartialEq, Eq)]
 pub enum LCoreOperator {
     Define,
@@ -405,7 +386,6 @@ pub enum LValue {
     None,
     LFn(LFn),
     Lambda(LLambda),
-    Macro(LMacro),
     CoreOperator(LCoreOperator),
     SymType(LSymType),
 }
@@ -703,7 +683,6 @@ pub enum NameTypeLValue {
     Map,
     List,
     Quote,
-    Macro,
 }
 
 impl PartialEq for NameTypeLValue {
@@ -725,7 +704,6 @@ impl PartialEq for NameTypeLValue {
             (NameTypeLValue::Quote, NameTypeLValue::Quote) => true,
             (NameTypeLValue::SymType, NameTypeLValue::SymType) => true,
             (NameTypeLValue::Atom, NameTypeLValue::Atom) => true,
-            (NameTypeLValue::Macro, NameTypeLValue::Macro) => true,
             (NameTypeLValue::CoreOperator, NameTypeLValue::CoreOperator) => true,
             (_, _) => false,
         }
@@ -756,7 +734,6 @@ impl From<&LValue> for NameTypeLValue {
             LValue::List(_) => NameTypeLValue::List,
             LValue::Quote(_) => NameTypeLValue::Quote,
             LValue::SymType(_) => NameTypeLValue::SymType,
-            LValue::Macro(_) => NameTypeLValue::Macro,
             LValue::CoreOperator(_) => NameTypeLValue::CoreOperator,
         }
     }
@@ -893,12 +870,6 @@ impl AsCommand for HashMap<LValue, LValue> {
     }
 }
 
-impl AsCommand for LMacro {
-    fn as_command(&self) -> String {
-        "".to_string()
-    }
-}
-
 impl AsCommand for LValue {
     fn as_command(&self) -> String {
         match self {
@@ -913,7 +884,6 @@ impl AsCommand for LValue {
             LValue::Lambda(_) => "".to_string(),
             LValue::Map(m) => m.as_command(),
             LValue::Quote(q) => q.to_string(),
-            LValue::Macro(m) => m.as_command(),
             LValue::CoreOperator(c) => "".to_string(),
         }
     }
@@ -1029,13 +999,8 @@ impl Display for LValue {
                 write!(f, "{}", result)
             }
             LValue::Quote(q) => write!(f, "{}", q),
-            LValue::Macro(m) => {
-                Ok(())
-                //TODO: implement Display for Macro
-            }
             LValue::CoreOperator(co) => {
-                Ok(())
-                //TODO: implement Display for CoreOperator
+                write!(f, "{}", co)
             }
         }
     }
@@ -1067,10 +1032,25 @@ impl Display for NameTypeLValue {
             NameTypeLValue::Quote => "quote",
             NameTypeLValue::SymType => "symtype",
             NameTypeLValue::Atom => "atom",
-            NameTypeLValue::Macro => "macro",
             NameTypeLValue::CoreOperator => "core_operator"
         };
         write!(f, "{}", str)
+    }
+}
+
+impl Display for LCoreOperator {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            LCoreOperator::Define => write!(f, "{}", DEFINE.to_string()),
+            LCoreOperator::DefLambda => write!(f, "{}", LAMBDA.to_string()),
+            LCoreOperator::If => write!(f, "{}", IF.to_string()),
+            LCoreOperator::Quote => write!(f, "{}", QUOTE.to_string()),
+            LCoreOperator::QuasiQuote => write!(f,  "{}",QUASI_QUOTE.to_string()),
+            LCoreOperator::UnQuote => write!(f,  "{}",UNQUOTE.to_string()),
+            LCoreOperator::DefMacro => write!(f,  "{}",DEF_MACRO.to_string()),
+            LCoreOperator::Set => write!(f, "{}", SET.to_string()),
+            LCoreOperator::Begin => write!(f,  "{}",BEGIN.to_string()),
+        }
     }
 }
 

@@ -1,7 +1,7 @@
 # Unnamed FactBase
 Author: Jérémy Turi
 
-Last update of the readme: 30/03/2021
+Last update of the readme: 13/04/2021
 
 ***
 
@@ -24,6 +24,12 @@ This project is part of the Thesis I am currently working on at LAAS-CNRS is RIS
 - `(set <sym> <value>)` : set to a LValue a value and return a new LValue
 - `(get <sym>)` : return the LValue associated to the symbol
 - `(get map_1 <key>)` : return the value associated to the key in the map
+- `(lambda <params> <body>)`: create a lambda expression with a list of params, and a body that is a process.
+- `(def-macro <name> <body>)`: create a macro that will replace expression during parsing. The body is a lambda expression. 
+- quote keywords:
+    - `(quote <exp>)`: quote an expression that will not be evaluated.
+    - `(quasi-quote ( <exp> ... (unquote <exp_i>) ...))`: create an expression for which, some expression will be not evaluated.
+    and those with an unquote will be evaluated. *It is really useful to define macros*.
 
 
 

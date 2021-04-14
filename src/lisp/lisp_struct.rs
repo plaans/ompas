@@ -364,6 +364,16 @@ pub trait NativeContext {
 
 }
 
+impl NativeContext for () {
+    fn get_component(&self, type_id: TypeId) -> Option<&dyn Any> {
+        None
+    }
+
+    fn get_component_mut(&mut self, type_id: TypeId) -> Option<&mut dyn Any> {
+        None
+    }
+}
+
 pub type NativeFun = dyn Fn(&[LValue], &dyn NativeContext) -> Result<LValue, LError>;
 
 #[derive(Clone)]
@@ -423,6 +433,7 @@ pub enum LValue {
     LFn(LFn),
     Lambda(LLambda),
     NativeLambda(NativeLambda),
+    NativeMutLambda(NativeMutLambda),
     CoreOperator(LCoreOperator),
     SymType(LSymType),
 }
@@ -772,7 +783,7 @@ impl From<&LValue> for NameTypeLValue {
             LValue::Quote(_) => NameTypeLValue::Quote,
             LValue::SymType(_) => NameTypeLValue::SymType,
             LValue::CoreOperator(_) => NameTypeLValue::CoreOperator,
-            LValue::NativeLambda(_) => unimplemented!()
+            _ => unimplemented!()
         }
     }
 }
@@ -923,7 +934,7 @@ impl AsCommand for LValue {
             LValue::Map(m) => m.as_command(),
             LValue::Quote(q) => q.to_string(),
             LValue::CoreOperator(c) => "".to_string(),
-            LValue::NativeLambda(_) => unimplemented!()
+            _ => unimplemented!()
         }
     }
 }

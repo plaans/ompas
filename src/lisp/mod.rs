@@ -341,6 +341,10 @@ impl LEnv {
         }
         //eprintln!("write fact base to file");
     }
+
+    pub fn get_context(&self) -> &dyn NativeContext {
+        unimplemented!()
+    }
 }
 
 pub fn parse(str : &str, env: &mut LEnv) -> Result<LValue, LError> {
@@ -680,6 +684,10 @@ pub fn eval(lv: &LValue, env: &mut LEnv) -> Result<LValue, LError> {
                     l.call(args, env)
                     /*let mut new_env = l.get_new_env(args, env)?;
                     eval(&l.get_body(), &mut new_env)*/
+                }
+                LValue::NativeLambda(fun) => {
+                    let args :Vec<LValue> = args.iter().map(|a| eval(a, env)).collect::<Result<_,_>>()?;
+                    fun.call(&args, env.get_context())
                 }
                 lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::LFn))
             }

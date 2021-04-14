@@ -9,6 +9,7 @@ use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::{Add, Div, Mul, Range, Sub};
 use std::rc::Rc;
+use std::any::{TypeId, Any};
 
 pub enum LError {
     WrongType(LValue, NameTypeLValue, NameTypeLValue),
@@ -356,6 +357,41 @@ impl LLambda {
     }
 }
 
+pub trait NativeContext {
+    fn get_component(&self, type_id: TypeId) -> Option<&dyn Any>;
+
+    fn get_component_mut(&mut self, type_id: TypeId) -> Option<&mut dyn Any>;
+
+}
+
+pub type NativeFun = dyn Fn(&[LValue], &dyn NativeContext) -> Result<LValue, LError>;
+
+#[derive(Clone)]
+pub struct NativeLambda {
+    fun: Rc<NativeFun>
+}
+
+impl NativeLambda {
+
+    pub fn call(&self, args: &[LValue], ctx: &dyn NativeContext) -> Result<LValue, LError> {
+        (self.fun)(args, ctx)
+    }
+}
+
+pub type NativeMutFun = dyn Fn(&[LValue], &mut dyn NativeContext) -> Result<LValue, LError>;
+
+#[derive(Clone)]
+pub struct NativeMutLambda {
+    fun: Rc<NativeMutFun>
+}
+
+impl NativeMutLambda {
+
+    pub fn call(&self, args: &[LValue], ctx: &mut dyn NativeContext) -> Result<LValue, LError> {
+        (self.fun)(args, ctx)
+    }
+}
+
 #[derive(Clone, PartialOrd, PartialEq, Eq)]
 pub enum LCoreOperator {
     Define,
@@ -386,6 +422,7 @@ pub enum LValue {
     None,
     LFn(LFn),
     Lambda(LLambda),
+    NativeLambda(NativeLambda),
     CoreOperator(LCoreOperator),
     SymType(LSymType),
 }
@@ -735,6 +772,7 @@ impl From<&LValue> for NameTypeLValue {
             LValue::Quote(_) => NameTypeLValue::Quote,
             LValue::SymType(_) => NameTypeLValue::SymType,
             LValue::CoreOperator(_) => NameTypeLValue::CoreOperator,
+            LValue::NativeLambda(_) => unimplemented!()
         }
     }
 }
@@ -885,6 +923,7 @@ impl AsCommand for LValue {
             LValue::Map(m) => m.as_command(),
             LValue::Quote(q) => q.to_string(),
             LValue::CoreOperator(c) => "".to_string(),
+            LValue::NativeLambda(_) => unimplemented!()
         }
     }
 }
@@ -1002,6 +1041,7 @@ impl Display for LValue {
             LValue::CoreOperator(co) => {
                 write!(f, "{}", co)
             }
+            _ => unimplemented!()
         }
     }
 }
@@ -1066,10 +1106,12 @@ impl Debug for LValue {
 
 #[cfg(test)]
 mod tests {
-    use crate::lisp::lisp_struct::LValue;
+    use super::*;
     use im::HashMap;
-    use std::collections::hash_map::{DefaultHasher, RandomState};
+
     use std::hash::{BuildHasher, Hash, Hasher};
+    use std::any::{TypeId, Any};
+    use std::rc::Rc;
 
     //#[test]
     pub fn test_hash_list() {
@@ -1182,6 +1224,63 @@ mod tests {
         let value = *map.get(&search_key).unwrap_or(&-1);
         assert_eq!(value, 4)
     }*/
+
+
+    #[test]
+    fn test_native_lambda() {
+        struct Counter {
+            cnt: u32
+        };
+        impl NativeContext for Counter {
+            fn get_component(&self, type_id: TypeId) -> Option<&dyn Any> {
+                if type_id == TypeId::of::<u32>() {
+                    Some(&self.cnt)
+                } else {
+                    None
+                }
+            }
+            fn get_component_mut(&mut self, type_id: TypeId) -> Option<&mut dyn Any> {
+                if type_id == TypeId::of::<u32>() {
+                    Some(&mut self.cnt)
+                } else {
+                    None
+                }
+            }
+        }
+
+        let get_counter = |args: &[LValue], ctx: &dyn NativeContext| -> Result<LValue, LError> {
+            if let Some(cnt) = ctx.get_component(TypeId::of::<u32>()).and_then(|x| x.downcast_ref::<u32>()) {
+                Ok(LValue::Number(LNumber::Int(*cnt as i64)))
+            } else {
+                Err(LError::SpecialError("No such component".to_string()))
+            }
+        };
+        let set_counter = |args: &[LValue], ctx: &mut dyn NativeContext| -> Result<LValue, LError> {
+            if let Some(cnt) = ctx.get_component_mut(TypeId::of::<u32>()).and_then(|x| x.downcast_mut::<u32>()) {
+                *cnt = match args[0] {
+                    LValue::Number(LNumber::Int(x)) => x as u32,
+                    _ => panic!("type error"),
+                };
+                Ok(LValue::None)
+            } else {
+                Err(LError::SpecialError("No such component".to_string()))
+            }
+        };
+
+        let getter = NativeLambda {
+            fun: Rc::new(get_counter)
+        };
+        let setter = NativeMutLambda {
+            fun: Rc::new(set_counter)
+        };
+
+        let mut state = Counter {
+            cnt: 0
+        };
+        assert_eq!(getter.call(&[], &state).ok().unwrap(), LValue::Number(LNumber::Int(0)));
+        assert_eq!(setter.call(&[LValue::Number(LNumber::Int(5))], &mut state).ok().unwrap(), LValue::None);
+        assert_eq!(getter.call(&[], &state).ok().unwrap(), LValue::Number(LNumber::Int(5)));
+    }
 }
 
 //TODO: Add tests

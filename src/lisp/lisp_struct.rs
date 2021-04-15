@@ -425,7 +425,7 @@ pub struct NativeContextWrapper {
 
 impl NativeContextWrapper {
     pub fn get<T: Any>(&self) -> Option<&T> {
-        self.ctx.get_component(TypeId::of::T()).and_then(|x| x.downcast_ref())
+        self.ctx.get_component(TypeId::of::<T>()).and_then(|x| x.downcast_ref())
     }
 }
 
@@ -437,6 +437,20 @@ pub struct NativeLambda {
 }
 
 impl NativeLambda {
+
+    pub fn new<T: 'static, R: Into<LValue>, F :  Fn(&[LValue], &T) -> R + 'static >(lbd: Box<F>) -> Self {
+        let x = move |args: &[LValue], ctx: &dyn NativeContext| -> Result<LValue, LError> {
+            let ctx: Option<&T> = ctx.get_component(TypeId::of::<T>()).and_then(|x| x.downcast_ref::<T>());
+            if let Some(ctx) = ctx {
+                Ok(lbd(args, ctx).into())
+            } else {
+                Err(LError::SpecialError("oups".to_string()))
+            }
+        };
+        NativeLambda {
+            fun: Rc::new(x)
+        }
+    }
 
     pub fn call(&self, args: &[LValue], ctx: &dyn NativeContext) -> Result<LValue, LError> {
         (self.fun)(args, ctx)
@@ -763,6 +777,12 @@ impl Div for LValue {
 
     fn div(self, rhs: Self) -> Self::Output {
         &self / &rhs
+    }
+}
+
+impl From<u32> for LValue {
+    fn from(u: u32) -> Self {
+        LValue::Number(LNumber::Int(u as i64))
     }
 }
 
@@ -1336,6 +1356,7 @@ mod tests {
         let getter = NativeLambda {
             fun: Rc::new(get_counter)
         };
+        let getter = NativeLambda::new(Box::new(|args: &[LValue], ctx: &u32| *ctx));
         let setter = NativeMutLambda {
             fun: Rc::new(set_counter)
         };
@@ -1347,6 +1368,21 @@ mod tests {
         assert_eq!(setter.call(&[LValue::Number(LNumber::Int(5))], &mut state).ok().unwrap(), LValue::None);
         assert_eq!(getter.call(&[], &state).ok().unwrap(), LValue::Number(LNumber::Int(5)));
     }
+}
+
+type TypeNativeLambda<Ctx> = NativeLambda;
+
+struct Module<Ctx: Any> {
+    ctx: Ctx,
+    prelude: Vec<(Sym, TypedNativeLambda<Ctx>)>,
+}
+
+Module<()>
+Module<Simu>
+
+load_module() {
+  add mod.ctx to NativeContext
+  declare prelude
 }
 
 //TODO: Add tests

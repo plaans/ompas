@@ -523,7 +523,10 @@ pub fn expand(x: &LValue, top_level: bool, env: &mut LEnv) -> Result<LValue, LEr
                             expand_quasi_quote(list.get(1).unwrap(), env)
                         }
                     },
-                    LCoreOperator::UnQuote => {}
+                    LCoreOperator::UnQuote => {
+                        //TODO: Implémenter msg d'erreur
+                        panic!("unquote not at right place")
+                    }
                 }
                 LValue::Symbol(sym) => {
                     match env.get_macro(sym) {

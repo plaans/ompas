@@ -25,4 +25,4 @@ structopt = { version = "0.3", default-features = false }
 [[bin]]
 name = "robot_sim"
 path = "src/bin/robot_sim.rs"
-required-features = ["robot_sim"]
+#required-features = ["robot_sim"]

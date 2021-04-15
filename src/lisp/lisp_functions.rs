@@ -648,3 +648,8 @@ pub fn reverse(values: &[LValue], _: &mut LEnv) -> Result<LValue, LError> {
         Err(WrongNumberOfArgument(values.into(), values.len(), 1..1))
     }
 }
+
+/// return the length of the object if it is a table or a list.
+pub fn length(_values: &[LValue], _: &mut LEnv) -> Result<LValue, LError> {
+    unimplemented!()
+}

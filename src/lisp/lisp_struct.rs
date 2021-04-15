@@ -10,6 +10,8 @@ use std::hash::{Hash, Hasher};
 use std::ops::{Add, Div, Mul, Range, Sub};
 use std::rc::Rc;
 
+//TODO: define MutLfn
+
 pub enum LError {
     WrongType(LValue, NameTypeLValue, NameTypeLValue),
     NotInListOfExpectedTypes(LValue, NameTypeLValue, Vec<NameTypeLValue>),

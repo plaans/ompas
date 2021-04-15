@@ -1,3 +1,5 @@
+const START_MSG:&str = "|||SIMPLE ROBOT SIMULATOR|||";
+
 fn main() -> () {
-    println!("hello world!")
+    println!("{}",START_MSG)
 }

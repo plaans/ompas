@@ -27,7 +27,7 @@ pub struct LEnv {
     sym_types: HashMap<Sym, LSymType>,
     macro_table: HashMap<Sym, LLambda>,
     new_entries: Vec<String>,
-    outer: Option<Box<LEnv>>,
+    outer: Option<Box<LEnv>>, //TODO: prevent clone
 }
 
 impl PartialEq for LEnv {

@@ -357,7 +357,51 @@ impl LLambda {
     }
 }
 
+/// Trait is used to dynamically expose the data available in the context.
+///
+/// The context essentially provides a set of typed data and is available as an trait object `&dyn NativeContext`.
+/// The client can ask for data of a specific type. It will be given a pointer to the type as a reference to Any.
+/// This reference can then be downcasted to the expected type.
+///
+/// Note: in this trait, we cannot have generic parameters that would improve the ergonomics because it need to be
+///       representable as a trait object. See the NativeContextWrapper for a wrapper that would provide
+///       a more ergonomic view of the dynamic NativeContext.
+///
+/// # Example
+///
+/// ```
+/// use fact_base::lisp::lisp_struct::NativeContext;
+/// use std::any::{TypeId, Any};
+/// struct Ctx {
+///   int: u32,
+///   str: String,
+/// };
+/// impl NativeContext for Ctx {
+///     fn get_component(&self,type_id: TypeId) -> Option<&dyn Any> {
+///        if type_id == TypeId::of::<u32>() {
+///            Some(&self.int)
+///        } else if type_id == TypeId::of::<String>() {
+///            Some(&self.str)
+///        } else {
+///            None
+///        }
+///     }
+///
+/// fn get_component_mut(&mut self,type_id: TypeId) -> Option<&mut dyn Any> {
+///         todo!()
+///     }
+/// }
+///
+/// let ctx = Ctx { int: 0, str: "hi".to_string() };
+/// let dyn_ctx: &dyn NativeContext = &ctx;
+/// let str: &dyn Any = dyn_ctx.get_component(TypeId::of::<String>()).unwrap();
+/// let str = &String = str.downcast_ref().unwrap();
+/// ```
 pub trait NativeContext {
+
+    /// Extract a reference to the given type.
+    /// If the option is non-empty, the the reference can be downcasted to a reference of the type
+    /// that is represented by the `TypeId`
     fn get_component(&self, type_id: TypeId) -> Option<&dyn Any>;
 
     fn get_component_mut(&mut self, type_id: TypeId) -> Option<&mut dyn Any>;
@@ -371,6 +415,17 @@ impl NativeContext for () {
 
     fn get_component_mut(&mut self, type_id: TypeId) -> Option<&mut dyn Any> {
         None
+    }
+}
+
+
+pub struct NativeContextWrapper {
+    ctx: Box<dyn NativeContext>
+}
+
+impl NativeContextWrapper {
+    pub fn get<T: Any>(&self) -> Option<&T> {
+        self.ctx.get_component(TypeId::of::T()).and_then(|x| x.downcast_ref())
     }
 }
 

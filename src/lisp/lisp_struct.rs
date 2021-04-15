@@ -3,7 +3,7 @@ use aries_utils::input::{ErrLoc, Sym};
 use std::cmp::Ordering;
 //use std::collections::HashMap;
 use crate::lisp::lisp_struct::LError::WrongNumberOfArgument;
-use crate::lisp::{LEnv, eval};
+use crate::lisp::{eval, LEnv};
 use im::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
@@ -218,7 +218,7 @@ impl From<&str> for LType {
             TYPE_FLOAT => LType::Float,
             TYPE_OBJECT => LType::Object,
             TYPE_BOOL => LType::Bool,
-            other => LType::Symbol(other.into())
+            other => LType::Symbol(other.into()),
         }
     }
 }
@@ -252,7 +252,6 @@ impl From<LType> for Sym {
         (&lt).into()
     }
 }
-
 
 impl PartialEq for LType {
     fn eq(&self, other: &Self) -> bool {
@@ -302,9 +301,11 @@ impl PartialEq for &LSymType {
     }
 }
 
+type PLFn = Rc<fn(&[LValue], &mut LEnv) -> Result<LValue, LError>>;
+
 #[derive(Clone)]
 pub struct LFn {
-    pub pointer : Rc<fn(&[LValue], &mut LEnv) -> Result<LValue, LError>>,
+    pub pointer: PLFn,
     pub label: String,
 }
 
@@ -462,14 +463,18 @@ impl LValue {
     pub fn as_core_operator(&self) -> Result<LCoreOperator, LError> {
         match self {
             LValue::CoreOperator(co) => Ok(co.clone()),
-            _ => Err(LError::SpecialError("cannot convert into core operator".to_string())),
+            _ => Err(LError::SpecialError(
+                "cannot convert into core operator".to_string(),
+            )),
         }
     }
 
     pub fn as_lambda(&self) -> Result<LLambda, LError> {
         match self {
             LValue::Lambda(l) => Ok(l.clone()),
-            _ => Err(LError::SpecialError("cannot convert into lambda".to_string())),
+            _ => Err(LError::SpecialError(
+                "cannot convert into lambda".to_string(),
+            )),
         }
     }
 }
@@ -489,7 +494,7 @@ impl PartialEq for LValue {
             (LValue::Map(m1), LValue::Map(m2)) => *m1 == *m2,
             (LValue::Lambda(l1), LValue::Lambda(l2)) => *l1 == *l2,
             (LValue::Quote(q1), LValue::Quote(q2)) => q1.to_string() == q2.to_string(), //function comparison
-            (LValue::LFn(f1), LValue::LFn(f2)) => f1.label  == f2.label,
+            (LValue::LFn(f1), LValue::LFn(f2)) => f1.label == f2.label,
             (LValue::SymType(s1), LValue::SymType(s2)) => s1 == s2,
             (_, _) => false,
         }
@@ -769,13 +774,13 @@ impl From<Sym> for LValue {
 
 impl From<&[LValue]> for LValue {
     fn from(lv: &[LValue]) -> Self {
-        return LValue::List(lv.to_vec())
+        LValue::List(lv.to_vec())
     }
 }
 
 impl From<&Vec<LValue>> for LValue {
     fn from(vec: &Vec<LValue>) -> Self {
-        return LValue::List(vec.clone())
+        LValue::List(vec.clone())
     }
 }
 
@@ -876,15 +881,15 @@ impl AsCommand for LValue {
             LValue::List(l) => l.as_command(),
             LValue::SymType(st) => st.as_command(),
             LValue::String(s) => s.to_string(),
-            LValue::LFn(_) => "".to_string(),
-            LValue::None => "".to_string(),
+            LValue::LFn(f) => f.label.to_string(),
+            LValue::None => "none".to_string(),
             LValue::Symbol(s) => s.to_string(),
             LValue::Number(n) => n.to_string(),
             LValue::Bool(b) => b.to_string(),
             LValue::Lambda(_) => "".to_string(),
             LValue::Map(m) => m.as_command(),
             LValue::Quote(q) => q.to_string(),
-            LValue::CoreOperator(c) => "".to_string(),
+            LValue::CoreOperator(c) => c.to_string(),
         }
     }
 }
@@ -892,7 +897,6 @@ impl AsCommand for LValue {
 /**
 DISPLAY IMPLEMENTATION
 **/
-
 
 impl Display for LType {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
@@ -913,22 +917,33 @@ impl Display for LError {
             LError::ErrLoc(e) => write!(f, "{}", e),
             LError::UndefinedSymbol(s) => write!(f, "{} is undefined", s),
             LError::WrongNumberOfArgument(s, g, r) => {
-                if r.len() == 0 {
+                if r.is_empty() {
                     write!(f, "\"{}\": Got {} element(s), expected {}", s, g, r.start)
+                } else if r.end == std::usize::MAX {
+                    write!(
+                        f,
+                        "\"{}\": Got {} element(s), expected at least {}",
+                        s, g, r.start
+                    )
+                } else if r.start == std::usize::MIN {
+                    write!(
+                        f,
+                        "\"{}\": Got {} element(s), expected at most {}",
+                        s, g, r.end
+                    )
+                } else {
+                    write!(
+                        f,
+                        "\"{}\": Got {} element(s), expected between {} and {}",
+                        s, g, r.start, r.end
+                    )
                 }
-                else if r.end == std::usize::MAX {
-                    write!(f, "\"{}\": Got {} element(s), expected at least {}", s, g, r.start)
-                }
-                else if r.start == std::usize::MIN {
-                    write!(f, "\"{}\": Got {} element(s), expected at most {}", s, g, r.end)
-                }
-                else {
-                    write!(f, "\"{}\": Got {} element(s), expected between {} and {}", s, g, r.start, r.end)
-                }
-            },
+            }
             LError::SpecialError(s) => write!(f, "{}", s),
             LError::ConversionError(s1, s2) => write!(f, "Cannot convert {} into {}.", s1, s2),
-            LError::NotInListOfExpectedTypes(lv, typ, list_types) => write!(f, "{}: Got {}, expected {:?}", lv, typ, list_types),
+            LError::NotInListOfExpectedTypes(lv, typ, list_types) => {
+                write!(f, "{}: Got {}, expected {:?}", lv, typ, list_types)
+            }
         }
     }
 }
@@ -989,7 +1004,7 @@ impl Display for LValue {
                 }
                 result.push(')');
                 write!(f, "{}", result)
-            },
+            }
             LValue::Lambda(l) => write!(f, "{}", l),
             LValue::Map(m) => {
                 let mut result = String::new();
@@ -1032,7 +1047,7 @@ impl Display for NameTypeLValue {
             NameTypeLValue::Quote => "quote",
             NameTypeLValue::SymType => "symtype",
             NameTypeLValue::Atom => "atom",
-            NameTypeLValue::CoreOperator => "core_operator"
+            NameTypeLValue::CoreOperator => "core_operator",
         };
         write!(f, "{}", str)
     }
@@ -1045,11 +1060,11 @@ impl Display for LCoreOperator {
             LCoreOperator::DefLambda => write!(f, "{}", LAMBDA.to_string()),
             LCoreOperator::If => write!(f, "{}", IF.to_string()),
             LCoreOperator::Quote => write!(f, "{}", QUOTE.to_string()),
-            LCoreOperator::QuasiQuote => write!(f,  "{}",QUASI_QUOTE.to_string()),
-            LCoreOperator::UnQuote => write!(f,  "{}",UNQUOTE.to_string()),
-            LCoreOperator::DefMacro => write!(f,  "{}",DEF_MACRO.to_string()),
+            LCoreOperator::QuasiQuote => write!(f, "{}", QUASI_QUOTE.to_string()),
+            LCoreOperator::UnQuote => write!(f, "{}", UNQUOTE.to_string()),
+            LCoreOperator::DefMacro => write!(f, "{}", DEF_MACRO.to_string()),
             LCoreOperator::Set => write!(f, "{}", SET.to_string()),
-            LCoreOperator::Begin => write!(f,  "{}",BEGIN.to_string()),
+            LCoreOperator::Begin => write!(f, "{}", BEGIN.to_string()),
         }
     }
 }

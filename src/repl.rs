@@ -1,9 +1,9 @@
 //imports for rustyline
-use crate::lisp::lisp_struct::*;
-use crate::lisp::{LEnv, eval};
-use rustyline::Editor;
 use crate::lisp;
+use crate::lisp::lisp_struct::*;
+use crate::lisp::{eval, LEnv};
 use rustyline::error::ReadlineError;
+use rustyline::Editor;
 
 pub fn repl() {
     // `()` can be used when no completer is required
@@ -27,14 +27,13 @@ pub fn repl() {
                 };
                 match eval(&lvalue, &mut env) {
                     Ok(lv) => match lv {
-                        LValue::None => {},
+                        LValue::None => {}
                         lv => println!("{}", lv),
-                    }
+                    },
                     Err(e) => eprintln!("{}", e),
                 };
 
                 //println!("Line: {}", line);
-
             }
             Err(ReadlineError::Interrupted) => {
                 println!("CTRL-C");
@@ -52,5 +51,3 @@ pub fn repl() {
     }
     rl.save_history("history.txt").unwrap();
 }
-
-

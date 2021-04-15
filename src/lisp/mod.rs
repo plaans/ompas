@@ -2,16 +2,18 @@ use crate::lisp::lisp_functions::*;
 use crate::lisp::lisp_language::*;
 use crate::lisp::lisp_struct::*;
 //use std::collections::HashMap;
+use crate::lisp::lisp_struct::LCoreOperator::{Quote, UnQuote};
+use crate::lisp::lisp_struct::LError::{
+    NotInListOfExpectedTypes, SpecialError, WrongNumberOfArgument, WrongType,
+};
+use crate::lisp::lisp_struct::NameTypeLValue::{List, Symbol};
+use aries_planning::parsing::sexpr::SExpr;
 use aries_utils::input::Sym;
 use im::HashMap;
 use std::borrow::Borrow;
 use std::fs::File;
 use std::io::Write;
 use std::rc::Rc;
-use aries_planning::parsing::sexpr::SExpr;
-use crate::lisp::lisp_struct::LError::{SpecialError, WrongType, WrongNumberOfArgument, NotInListOfExpectedTypes};
-use crate::lisp::lisp_struct::NameTypeLValue::{List, Symbol};
-use crate::lisp::lisp_struct::LCoreOperator::{Quote, UnQuote};
 
 pub mod lisp_functions;
 pub mod lisp_language;
@@ -53,110 +55,171 @@ impl Default for LEnv {
         symbols.insert(UNQUOTE.to_string(), LCoreOperator::UnQuote.into());
 
         //Mathematical functions
-        symbols.insert(ADD.to_string(), LValue::LFn(LFn {
-            pointer: Rc::new(add),
-            label: ADD.to_string(),
-        }));
-        symbols.insert(SUB.to_string(), LValue::LFn(LFn {
-            pointer: Rc::new(sub),
-            label: SUB.to_string(),
-        }));
-        symbols.insert(MUL.to_string(), LValue::LFn(LFn {
-            pointer: Rc::new(mul),
-            label: MUL.to_string(),
-        }));
-        symbols.insert(DIV.to_string(), LValue::LFn(LFn {
-            pointer: Rc::new(div),
-            label: DIV.to_string(),
-        }));
+        symbols.insert(
+            ADD.to_string(),
+            LValue::LFn(LFn {
+                pointer: Rc::new(add),
+                label: ADD.to_string(),
+            }),
+        );
+        symbols.insert(
+            SUB.to_string(),
+            LValue::LFn(LFn {
+                pointer: Rc::new(sub),
+                label: SUB.to_string(),
+            }),
+        );
+        symbols.insert(
+            MUL.to_string(),
+            LValue::LFn(LFn {
+                pointer: Rc::new(mul),
+                label: MUL.to_string(),
+            }),
+        );
+        symbols.insert(
+            DIV.to_string(),
+            LValue::LFn(LFn {
+                pointer: Rc::new(div),
+                label: DIV.to_string(),
+            }),
+        );
         //Comparison
-        symbols.insert(GT.to_string(), LValue::LFn(LFn {
-            pointer: Rc::new(gt),
-            label: GT.to_string(),
-        }));
-        symbols.insert(LT.to_string(), LValue::LFn(LFn {
-            pointer: Rc::new(lt),
-            label: LT.to_string(),
-        }));
-        symbols.insert(GE.to_string(), LValue::LFn(LFn {
-            pointer: Rc::new(ge),
-            label: GE.to_string(),
-        }));
-        symbols.insert(LE.to_string(), LValue::LFn(LFn {
-            pointer: Rc::new(le),
-            label: LE.to_string(),
-        }));
-        symbols.insert(EQ.to_string(), LValue::LFn(LFn {
-            pointer: Rc::new(eq),
-            label: ADD.to_string(),
-        }));
+        symbols.insert(
+            GT.to_string(),
+            LValue::LFn(LFn {
+                pointer: Rc::new(gt),
+                label: GT.to_string(),
+            }),
+        );
+        symbols.insert(
+            LT.to_string(),
+            LValue::LFn(LFn {
+                pointer: Rc::new(lt),
+                label: LT.to_string(),
+            }),
+        );
+        symbols.insert(
+            GE.to_string(),
+            LValue::LFn(LFn {
+                pointer: Rc::new(ge),
+                label: GE.to_string(),
+            }),
+        );
+        symbols.insert(
+            LE.to_string(),
+            LValue::LFn(LFn {
+                pointer: Rc::new(le),
+                label: LE.to_string(),
+            }),
+        );
+        symbols.insert(
+            EQ.to_string(),
+            LValue::LFn(LFn {
+                pointer: Rc::new(eq),
+                label: ADD.to_string(),
+            }),
+        );
 
         //Type verification
-        symbols.insert(IS_NONE.to_string(), LValue::LFn(LFn {
-            pointer: Rc::new(is_none),
-            label: IS_NONE.to_string(),
-        }));
-        symbols.insert(IS_NUMBER.to_string(), LValue::LFn(LFn {
-            pointer: Rc::new(is_number),
-            label: IS_NUMBER.to_string(),
-        }));
-        symbols.insert(IS_BOOL.to_string(), LValue::LFn(LFn {
-            pointer: Rc::new(is_bool),
-            label: IS_BOOL.to_string(),
-        }));
-        symbols.insert(IS_FN.to_string(), LValue::LFn(LFn {
-            pointer: Rc::new(is_fn),
-            label: IS_FN.to_string(),
-        }));
+        symbols.insert(
+            IS_NONE.to_string(),
+            LValue::LFn(LFn {
+                pointer: Rc::new(is_none),
+                label: IS_NONE.to_string(),
+            }),
+        );
+        symbols.insert(
+            IS_NUMBER.to_string(),
+            LValue::LFn(LFn {
+                pointer: Rc::new(is_number),
+                label: IS_NUMBER.to_string(),
+            }),
+        );
+        symbols.insert(
+            IS_BOOL.to_string(),
+            LValue::LFn(LFn {
+                pointer: Rc::new(is_bool),
+                label: IS_BOOL.to_string(),
+            }),
+        );
+        symbols.insert(
+            IS_FN.to_string(),
+            LValue::LFn(LFn {
+                pointer: Rc::new(is_fn),
+                label: IS_FN.to_string(),
+            }),
+        );
         symbols.insert(
             IS_STATE_FUNCTION.to_string(),
             LValue::LFn(LFn {
                 pointer: Rc::new(is_state_function),
                 label: IS_STATE_FUNCTION.to_string(),
-            }));
+            }),
+        );
 
-        symbols.insert(IS_OBJECT.to_string(), LValue::LFn(LFn {
-            pointer: Rc::new(is_object),
-            label: IS_OBJECT.to_string(),
-        }));
-        symbols.insert(IS_TYPE.to_string(), LValue::LFn(LFn {
-            pointer: Rc::new(is_type),
-            label: IS_TYPE.to_string(),
-        }));
-        symbols.insert(IS_MAP.to_string(), LValue::LFn(LFn {
-            pointer: Rc::new(is_map),
-            label: IS_MAP.to_string(),
-        }));
-        symbols.insert(IS_LIST.to_string(), LValue::LFn(LFn {
-            pointer: Rc::new(is_list),
-            label: IS_LIST.to_string(),
-        }));
-        symbols.insert(IS_LAMBDA.to_string(), LValue::LFn(LFn {
-            pointer: Rc::new(is_lambda),
-            label: IS_LAMBDA.to_string(),
-        }));
-        symbols.insert(IS_QUOTE.to_string(), LValue::LFn(LFn {
-            pointer: Rc::new(is_quote),
-            label: IS_QUOTE.to_string(),
-        }));
+        symbols.insert(
+            IS_OBJECT.to_string(),
+            LValue::LFn(LFn {
+                pointer: Rc::new(is_object),
+                label: IS_OBJECT.to_string(),
+            }),
+        );
+        symbols.insert(
+            IS_TYPE.to_string(),
+            LValue::LFn(LFn {
+                pointer: Rc::new(is_type),
+                label: IS_TYPE.to_string(),
+            }),
+        );
+        symbols.insert(
+            IS_MAP.to_string(),
+            LValue::LFn(LFn {
+                pointer: Rc::new(is_map),
+                label: IS_MAP.to_string(),
+            }),
+        );
+        symbols.insert(
+            IS_LIST.to_string(),
+            LValue::LFn(LFn {
+                pointer: Rc::new(is_list),
+                label: IS_LIST.to_string(),
+            }),
+        );
+        symbols.insert(
+            IS_LAMBDA.to_string(),
+            LValue::LFn(LFn {
+                pointer: Rc::new(is_lambda),
+                label: IS_LAMBDA.to_string(),
+            }),
+        );
+        symbols.insert(
+            IS_QUOTE.to_string(),
+            LValue::LFn(LFn {
+                pointer: Rc::new(is_quote),
+                label: IS_QUOTE.to_string(),
+            }),
+        );
 
         //Special entry
-        symbols.insert(GET.to_string(), LValue::LFn(LFn {
-            pointer: Rc::new(get),
-            label: GET.to_string(),
-        }));
-        symbols.insert(GET_TYPE.to_string(), LValue::LFn(LFn {
-            pointer: Rc::new(get_type),
-            label: GET_TYPE.to_string(),
-        }));
-
+        symbols.insert(
+            GET.to_string(),
+            LValue::LFn(LFn {
+                pointer: Rc::new(get),
+                label: GET.to_string(),
+            }),
+        );
+        symbols.insert(
+            GET_TYPE.to_string(),
+            LValue::LFn(LFn {
+                pointer: Rc::new(get_type),
+                label: GET_TYPE.to_string(),
+            }),
+        );
 
         //Logical functions : will be added as macros
         //symbols.insert(AND.to_string(), LValue::LFn(Rc::new(and)));
         //symbols.insert(OR.to_string(), LValue::LFn(Rc::new(or)));
         //symbols.insert(NOT.to_string(), LValue::LFn(Rc::new(not)));
-
-
 
         //Basic types
 
@@ -166,94 +229,123 @@ impl Default for LEnv {
             LValue::LFn(LFn {
                 pointer: Rc::new(state_function),
                 label: STATE_FUNCTION.to_string(),
-            }));
-        symbols.insert(SUBTYPE.to_string(), LValue::LFn(LFn {
-            pointer: Rc::new(subtype),
-            label: SUBTYPE.to_string(),
-        }));
-        symbols.insert(MAP.to_string(), LValue::LFn(LFn {
-            pointer: Rc::new(map),
-            label: MAP.to_string(),
-        }));
-        symbols.insert(LIST.to_string(), LValue::LFn(LFn {
-            pointer: Rc::new(list),
-            label: LIST.to_string(),
-        }));
+            }),
+        );
+        symbols.insert(
+            SUBTYPE.to_string(),
+            LValue::LFn(LFn {
+                pointer: Rc::new(subtype),
+                label: SUBTYPE.to_string(),
+            }),
+        );
+        symbols.insert(
+            MAP.to_string(),
+            LValue::LFn(LFn {
+                pointer: Rc::new(map),
+                label: MAP.to_string(),
+            }),
+        );
+        symbols.insert(
+            LIST.to_string(),
+            LValue::LFn(LFn {
+                pointer: Rc::new(list),
+                label: LIST.to_string(),
+            }),
+        );
         //State is an alias for map
-        symbols.insert(STATE.to_string(), LValue::LFn(LFn {
-            pointer: Rc::new(map),
-            label: STATE.to_string(),
-        }));
-        symbols.insert(TYPEOF.to_string(), LValue::LFn(LFn {
-            pointer: Rc::new(type_of),
-            label: TYPEOF.to_string(),
-        }));
-        symbols.insert(READ.to_string(), LValue::LFn(LFn {
-            pointer: Rc::new(read),
-            label: READ.to_string(),
-        }));
-        symbols.insert(WRITE.to_string(), LValue::LFn(LFn {
-            pointer: Rc::new(write),
-            label: WRITE.to_string(),
-        }));
+        symbols.insert(
+            STATE.to_string(),
+            LValue::LFn(LFn {
+                pointer: Rc::new(map),
+                label: STATE.to_string(),
+            }),
+        );
+        symbols.insert(
+            TYPEOF.to_string(),
+            LValue::LFn(LFn {
+                pointer: Rc::new(type_of),
+                label: TYPEOF.to_string(),
+            }),
+        );
+        symbols.insert(
+            READ.to_string(),
+            LValue::LFn(LFn {
+                pointer: Rc::new(read),
+                label: READ.to_string(),
+            }),
+        );
+        symbols.insert(
+            WRITE.to_string(),
+            LValue::LFn(LFn {
+                pointer: Rc::new(write),
+                label: WRITE.to_string(),
+            }),
+        );
         //symbols.insert(QUOTE.to_string(), LValue::LFn(Rc::new(quote)));
-        symbols.insert(PRINT.to_string(), LValue::LFn(LFn {
-            pointer: Rc::new(print),
-            label: PRINT.to_string(),
-        }));
+        symbols.insert(
+            PRINT.to_string(),
+            LValue::LFn(LFn {
+                pointer: Rc::new(print),
+                label: PRINT.to_string(),
+            }),
+        );
         //Sym_types
 
         /*
-        * LIST FUNCTIONS
-        */
-        symbols.insert(CAR.to_string(), LValue::LFn( LFn{
-            pointer: Rc::new(car),
-            label: CAR.to_string(),
-        }));
-
-        symbols.insert(CDR.to_string(), LValue::LFn( LFn{
-            pointer: Rc::new(cdr),
-            label: CDR.to_string(),
-        }));
-
-        symbols.insert(CONS.to_string(), LValue::LFn( LFn{
-            pointer: Rc::new(cons),
-            label: CONS.to_string(),
-        }));
-
-        symbols.insert(APPEND.to_string(), LValue::LFn( LFn{
-            pointer: Rc::new(append),
-            label: APPEND.to_string(),
-        }));
-
-        symbols.insert(MEMBER.to_string(), LValue::LFn( LFn{
-            pointer: Rc::new(member),
-            label: MEMBER.to_string(),
-        }));
-
-        symbols.insert(REVERSE.to_string(), LValue::LFn( LFn{
-            pointer: Rc::new(reverse),
-            label: REVERSE.to_string(),
-        }));
-
-
-
-        sym_types.insert(
-            TYPE_INT.into(),
-            LSymType::Type(None),
+         * LIST FUNCTIONS
+         */
+        symbols.insert(
+            CAR.to_string(),
+            LValue::LFn(LFn {
+                pointer: Rc::new(car),
+                label: CAR.to_string(),
+            }),
         );
-        sym_types.insert(
-            TYPE_FLOAT.into(),
-            LSymType::Type(None),
+
+        symbols.insert(
+            CDR.to_string(),
+            LValue::LFn(LFn {
+                pointer: Rc::new(cdr),
+                label: CDR.to_string(),
+            }),
         );
-        sym_types.insert(
-            TYPE_BOOL.into(),
-            LSymType::Type(None),
+
+        symbols.insert(
+            CONS.to_string(),
+            LValue::LFn(LFn {
+                pointer: Rc::new(cons),
+                label: CONS.to_string(),
+            }),
         );
-        sym_types.insert(
-            TYPE_OBJECT.into(),
-            LSymType::Type(None),
+
+        symbols.insert(
+            APPEND.to_string(),
+            LValue::LFn(LFn {
+                pointer: Rc::new(append),
+                label: APPEND.to_string(),
+            }),
         );
+
+        symbols.insert(
+            MEMBER.to_string(),
+            LValue::LFn(LFn {
+                pointer: Rc::new(member),
+                label: MEMBER.to_string(),
+            }),
+        );
+
+        symbols.insert(
+            REVERSE.to_string(),
+            LValue::LFn(LFn {
+                pointer: Rc::new(reverse),
+                label: REVERSE.to_string(),
+            }),
+        );
+
+        sym_types.insert(TYPE_INT.into(), LSymType::Type(None));
+        sym_types.insert(TYPE_FLOAT.into(), LSymType::Type(None));
+        sym_types.insert(TYPE_BOOL.into(), LSymType::Type(None));
+        sym_types.insert(TYPE_OBJECT.into(), LSymType::Type(None));
 
         symbols.insert(
             PI.to_string(),
@@ -310,7 +402,7 @@ impl LEnv {
         self.macro_table.insert(key, _macro);
     }
 
-    pub fn get_macro(&self, key: &Sym) -> Option<&LLambda>  {
+    pub fn get_macro(&self, key: &Sym) -> Option<&LLambda> {
         self.macro_table.get(key)
     }
 
@@ -326,10 +418,15 @@ impl LEnv {
             let value = self.get_symbol(key).unwrap_or(LValue::None);
             match value {
                 LValue::Symbol(s) => string.push_str(
-                    format!("(typeof {} {})",
-                            s,
-                            self.get_sym_type(&s).unwrap_or(&LSymType::Object(LType::Object)).as_command())
-                        .as_str()),
+                    format!(
+                        "(typeof {} {})",
+                        s,
+                        self.get_sym_type(&s)
+                            .unwrap_or(&LSymType::Object(LType::Object))
+                            .as_command()
+                    )
+                    .as_str(),
+                ),
                 lv => string.push_str(format!("(define {} {})", key, lv.as_command()).as_str()),
             }
         }
@@ -343,16 +440,14 @@ impl LEnv {
     }
 }
 
-pub fn parse(str : &str, env: &mut LEnv) -> Result<LValue, LError> {
+pub fn parse(str: &str, env: &mut LEnv) -> Result<LValue, LError> {
     match aries_planning::parsing::sexpr::parse(str) {
-        Ok(se) => {
-            expand(&parse_into_lvalue(&se, env)?, true, env)
-        }
+        Ok(se) => expand(&parse_into_lvalue(&se, env)?, true, env),
         Err(e) => Err(SpecialError(format!("Error in command: {}", e.to_string()))),
     }
 }
 
-pub fn parse_into_lvalue(se: &SExpr, env: &mut LEnv) -> Result<LValue,LError> {
+pub fn parse_into_lvalue(se: &SExpr, env: &mut LEnv) -> Result<LValue, LError> {
     match se {
         SExpr::Atom(atom) => {
             //println!("expression is an atom: {}", atom);
@@ -373,10 +468,10 @@ pub fn parse_into_lvalue(se: &SExpr, env: &mut LEnv) -> Result<LValue,LError> {
                             Ok(LValue::Bool(false))
                         }
 
-                        s => match env.get_symbol(s){
+                        s => match env.get_symbol(s) {
                             None => Ok(LValue::Symbol(s.into())),
-                            Some(s) => Ok(s)
-                        }
+                            Some(s) => Ok(s),
+                        },
                     },
                 },
             };
@@ -401,7 +496,11 @@ pub fn expand(x: &LValue, top_level: bool, env: &mut LEnv) -> Result<LValue, LEr
                     LCoreOperator::Define | LCoreOperator::DefMacro => {
                         //eprintln!("expand: define: Ok!");
                         if list.len() < 3 {
-                            return Err(WrongNumberOfArgument(x.clone(), list.len(), 3..std::usize::MAX));
+                            return Err(WrongNumberOfArgument(
+                                x.clone(),
+                                list.len(),
+                                3..std::usize::MAX,
+                            ));
                         }
                         let def = list.get(0).unwrap().as_core_operator()?;
                         let v = list.get(1).unwrap();
@@ -415,36 +514,54 @@ pub fn expand(x: &LValue, top_level: bool, env: &mut LEnv) -> Result<LValue, LEr
                                     new_body.push(LCoreOperator::DefLambda.into());
                                     new_body.append(&mut args.to_vec());
                                     new_body.append(&mut body.to_vec());
-                                    return expand(&vec![def.into(), f.clone(), new_body.into()].into(), top_level, env);
+                                    return expand(
+                                        &vec![def.into(), f.clone(), new_body.into()].into(),
+                                        top_level,
+                                        env,
+                                    );
                                 }
-                            },
+                            }
                             LValue::Symbol(sym) => {
                                 if list.len() != 3 {
-                                    return Err(WrongNumberOfArgument(x.clone(), list.len(), 3..3))
+                                    return Err(WrongNumberOfArgument(x.clone(), list.len(), 3..3));
                                 }
                                 let exp = expand(list.get(2).unwrap(), top_level, env)?;
                                 if def == LCoreOperator::DefMacro {
                                     if !top_level {
-                                        return Err(SpecialError(format!("{}: defmacro only allowed at top level", x)))
+                                        return Err(SpecialError(format!(
+                                            "{}: defmacro only allowed at top level",
+                                            x
+                                        )));
                                     }
                                     let proc = eval(&exp, &mut LEnv::default())?;
                                     if !matches!(proc, LValue::Lambda(_)) {
-                                        return Err(SpecialError(format!("{}: macro must be a procedure", proc)))
+                                        return Err(SpecialError(format!(
+                                            "{}: macro must be a procedure",
+                                            proc
+                                        )));
                                     } else {
                                         env.add_macro(sym.clone(), proc.as_lambda()?);
                                     }
                                     //Add to macro_table
-                                    return Ok(LValue::None)
+                                    return Ok(LValue::None);
                                 }
                                 //We add to the list the expanded body
-                                return Ok(vec![LCoreOperator::Define.into(), v.clone(), exp.clone()].into())
+                                return Ok(
+                                    vec![LCoreOperator::Define.into(), v.clone(), exp].into()
+                                );
                             }
-                            lv => return Err(WrongType(x.clone(), x.into(), NameTypeLValue::Symbol))
+                            _ => {
+                                return Err(WrongType(x.clone(), x.into(), NameTypeLValue::Symbol))
+                            }
                         }
-                    },
+                    }
                     LCoreOperator::DefLambda => {
                         if list.len() < 3 {
-                            return Err(WrongNumberOfArgument(x.clone(), list.len(), 3..std::usize::MAX))
+                            return Err(WrongNumberOfArgument(
+                                x.clone(),
+                                list.len(),
+                                3..std::usize::MAX,
+                            ));
                         }
                         let vars = list.get(1).unwrap();
                         let body = &list[2..];
@@ -453,58 +570,71 @@ pub fn expand(x: &LValue, top_level: bool, env: &mut LEnv) -> Result<LValue, LEr
                             LValue::List(vars_list) => {
                                 for v in vars_list {
                                     if !matches!(v, LValue::Symbol(_)) {
-                                        return Err(SpecialError("illegal lambda argument list".to_string()))
+                                        return Err(SpecialError(
+                                            "illegal lambda argument list".to_string(),
+                                        ));
                                     }
                                 }
-                            },
+                            }
                             LValue::Symbol(_) => {}
-                            lv => return Err(NotInListOfExpectedTypes(lv.clone(), lv.into(), vec![List, Symbol]))
+                            lv => {
+                                return Err(NotInListOfExpectedTypes(
+                                    lv.clone(),
+                                    lv.into(),
+                                    vec![List, Symbol],
+                                ))
+                            }
                         }
                         let exp = if body.len() == 1 {
                             body.get(0).unwrap().clone()
                         } else {
                             let mut vec = vec![LCoreOperator::Begin.into()];
                             vec.append(&mut body.to_vec());
-                            LValue::List(vec).to_owned()
+                            LValue::List(vec)
                         };
-                        return Ok(vec![LCoreOperator::DefLambda.into(), vars.clone(), expand(&exp, top_level, env)?].into())
-                    },
+                        return Ok(vec![
+                            LCoreOperator::DefLambda.into(),
+                            vars.clone(),
+                            expand(&exp, top_level, env)?,
+                        ]
+                        .into());
+                    }
                     LCoreOperator::If => {
                         let mut list = list.clone();
                         if list.len() == 3 {
                             list.push(LValue::None);
                         }
                         if list.len() != 4 {
-                            return Err(WrongNumberOfArgument((&list).into(), list.len(), 4..4))
+                            return Err(WrongNumberOfArgument((&list).into(), list.len(), 4..4));
                         }
                         //return map(expand, x)
                         let mut list_expanded = Vec::new();
                         for element in list {
                             list_expanded.push(expand(&element, false, env)?)
                         }
-                        return Ok(list_expanded.into())
-                    },
+                        return Ok(list_expanded.into());
+                    }
                     LCoreOperator::Quote => {
                         eprintln!("expand: quote: Ok!");
                         if list.len() != 2 {
-                            return Err(WrongNumberOfArgument(list.into(), list.len(), 2..2))
+                            return Err(WrongNumberOfArgument(list.into(), list.len(), 2..2));
                         }
-                        return Ok(x.clone())
-                    },
+                        return Ok(x.clone());
+                    }
                     LCoreOperator::Set => {
                         if list.len() != 3 {
-                            return Err(WrongNumberOfArgument(list.into(), list.len(), 3..3))
+                            return Err(WrongNumberOfArgument(list.into(), list.len(), 3..3));
                         }
                         let var = list.get(1).unwrap();
                         //Can only set a symbol
                         if !matches!(var, LValue::Symbol(_s)) {
-                            return Err(WrongType(var.clone(), var.into(), NameTypeLValue::Symbol))
+                            return Err(WrongType(var.clone(), var.into(), NameTypeLValue::Symbol));
                         }
                         let mut return_list = list.clone();
                         //We expand only the last element
                         return_list[2] = expand(return_list.get(2).unwrap(), false, env)?;
-                        return Ok(return_list.into())
-                    },
+                        return Ok(return_list.into());
+                    }
                     LCoreOperator::Begin => {
                         return if list.len() == 1 {
                             Ok(LValue::None)
@@ -515,29 +645,27 @@ pub fn expand(x: &LValue, top_level: bool, env: &mut LEnv) -> Result<LValue, LEr
                             }
                             Ok(expanded_list.into())
                         }
-                    },
+                    }
                     LCoreOperator::QuasiQuote => {
                         return if list.len() != 2 {
                             Err(WrongNumberOfArgument(list.into(), list.len(), 2..2))
                         } else {
                             expand_quasi_quote(list.get(1).unwrap(), env)
                         }
-                    },
+                    }
                     LCoreOperator::UnQuote => {
                         //TODO: Implémenter msg d'erreur
                         panic!("unquote not at right place")
                     }
-                }
+                },
                 LValue::Symbol(sym) => {
                     match env.get_macro(sym) {
                         None => {}
-                        Some(m) => {
-                            return expand(&m.call(&list[1..], env)?, top_level, env)
-                        }
+                        Some(m) => return expand(&m.call(&list[1..], env)?, top_level, env),
                     }
                     /*elif isa(x[0], Symbol) and x[0] in macro_table:
-                        return expand(macro_table[x[0]](*x[1:]), toplevel) # (m arg...)
-                        */
+                    return expand(macro_table[x[0]](*x[1:]), toplevel) # (m arg...)
+                    */
                 }
                 _ => {}
             }
@@ -546,9 +674,9 @@ pub fn expand(x: &LValue, top_level: bool, env: &mut LEnv) -> Result<LValue, LEr
                 expanded_list.push(expand(val, false, env)?)
             }
             Ok(expanded_list.into())
-        },
-        LValue::None => Err(SpecialError(format!("Not expecting a none value"))),
-        lv => Ok(lv.clone())
+        }
+        LValue::None => Err(SpecialError("Not expecting a none value".to_string())),
+        lv => Ok(lv.clone()),
     }
 }
 
@@ -569,36 +697,29 @@ pub fn expand_quasi_quote(x: &LValue, env: &mut LEnv) -> Result<LValue, LError> 
         LValue::List(list) => {
             if list.is_empty() {
                 Ok(vec![Quote.into(), x.clone()].into())
-            }else {
+            } else {
                 let first = list.first().unwrap();
                 return if matches!(first, LValue::CoreOperator(LCoreOperator::UnQuote)) {
                     if list.len() != 2 {
-                        return Err(WrongNumberOfArgument(x.clone(),list.len(),2..2))
+                        return Err(WrongNumberOfArgument(x.clone(), list.len(), 2..2));
                     }
                     Ok(list.get(1).unwrap().clone())
-                }/*elif is_pair(x[0]) and x[0][0] is _unquotesplicing:
-                    require(x[0], len(x[0])==2)*/
-                else {
-                    Ok(vec![env.get_symbol(CONS).unwrap(), expand_quasi_quote(&first, env)?,
-                                   expand_quasi_quote(&list[1..].to_vec().into(),env)?].into())
                 }
+                /*elif is_pair(x[0]) and x[0][0] is _unquotesplicing:
+                require(x[0], len(x[0])==2)*/
+                else {
+                    Ok(vec![
+                        env.get_symbol(CONS).unwrap(),
+                        expand_quasi_quote(&first, env)?,
+                        expand_quasi_quote(&list[1..].to_vec().into(), env)?,
+                    ]
+                    .into())
+                };
             }
         }
-        _ => Ok(vec![Quote.into(), x.clone()].into())
+        _ => Ok(vec![Quote.into(), x.clone()].into()),
     }
     //Verify if has unquotesplicing here
-
-}
-
-
-///Signal a syntax error if predicate is false."
-pub fn require(x: &LValue, predicate: bool, msg: String) -> Result<(), LError> {
-    return if !predicate {
-        Err(SpecialError(format!("{}: {}", x.to_string(), msg)))
-    }
-    else {
-        Ok(())
-    }
 }
 
 pub fn eval(lv: &LValue, env: &mut LEnv) -> Result<LValue, LError> {
@@ -612,11 +733,17 @@ pub fn eval(lv: &LValue, env: &mut LEnv) -> Result<LValue, LError> {
                 LValue::CoreOperator(co) => match co {
                     LCoreOperator::Define => {
                         match args.get(0).unwrap() {
-                            LValue::Symbol(s) =>  {
+                            LValue::Symbol(s) => {
                                 let exp = eval(args.get(1).unwrap(), env)?;
                                 env.add_entry(s.to_string(), exp);
                             }
-                            lv => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol))
+                            lv => {
+                                return Err(WrongType(
+                                    lv.clone(),
+                                    lv.into(),
+                                    NameTypeLValue::Symbol,
+                                ))
+                            }
                         }
                         Ok(LValue::None)
                     }
@@ -627,12 +754,20 @@ pub fn eval(lv: &LValue, env: &mut LEnv) -> Result<LValue, LError> {
                                 for val in list {
                                     match val {
                                         LValue::Symbol(s) => vec_sym.push(s.clone()),
-                                        lv  => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol))
+                                        lv => {
+                                            return Err(WrongType(
+                                                lv.clone(),
+                                                lv.into(),
+                                                NameTypeLValue::Symbol,
+                                            ))
+                                        }
                                     }
                                 }
                                 vec_sym
                             }
-                            lv => return Err(WrongType(lv.clone(),lv.into(), NameTypeLValue::List))
+                            lv => {
+                                return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::List))
+                            }
                         };
                         let body = args.get(1).unwrap();
                         Ok(LValue::Lambda(LLambda::new(
@@ -652,18 +787,16 @@ pub fn eval(lv: &LValue, env: &mut LEnv) -> Result<LValue, LError> {
                             Err(e) => Err(e),
                         }
                     }
-                    LCoreOperator::Quote => {
-                        return Ok(args.first().unwrap().clone())
-                    }
+                    LCoreOperator::Quote => return Ok(args.first().unwrap().clone()),
                     LCoreOperator::Set => {
                         //TODO: implement set
                         Ok(LValue::None)
                     }
                     LCoreOperator::Begin => {
-                        for (k,exp) in args[1..].iter().enumerate() {
+                        for (k, exp) in args[1..].iter().enumerate() {
                             let result = eval(exp, env)?;
                             if k == args.len() {
-                                return Ok(result)
+                                return Ok(result);
                             }
                         }
                         Ok(LValue::None)
@@ -671,29 +804,27 @@ pub fn eval(lv: &LValue, env: &mut LEnv) -> Result<LValue, LError> {
                     LCoreOperator::QuasiQuote | UnQuote | LCoreOperator::DefMacro => {
                         Ok(LValue::None)
                     }
-                }
+                },
                 LValue::LFn(f) => {
                     let mut arg_evaluated = Vec::new();
                     for arg in args {
                         arg_evaluated.push(eval(arg, env)?)
                     }
-                    return (f.pointer)(arg_evaluated.as_slice(), env)
-                },
+                    return (f.pointer)(arg_evaluated.as_slice(), env);
+                }
                 LValue::Lambda(l) => {
                     l.call(args, env)
                     /*let mut new_env = l.get_new_env(args, env)?;
                     eval(&l.get_body(), &mut new_env)*/
                 }
-                lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::LFn))
+                lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::LFn)),
             }
         }
-        LValue::Symbol(s) => {
-            match env.get_symbol(s.as_str()) {
-                None => Ok(lv.clone()),
-                Some(lv) => Ok(lv)
-            }
-        }
-        lv => Ok(lv.clone())
+        LValue::Symbol(s) => match env.get_symbol(s.as_str()) {
+            None => Ok(lv.clone()),
+            Some(lv) => Ok(lv),
+        },
+        lv => Ok(lv.clone()),
     }
 }
 

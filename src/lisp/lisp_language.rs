@@ -49,11 +49,11 @@ pub const CDR: &str = "cdr";
 pub const APPEND: &str = "append";
 pub const LAST: &str = "last";
 pub const MEMBER: &str = "member";
-pub const REVERSE:&str = "reverse";
+pub const REVERSE: &str = "reverse";
 pub const LIST: &str = "list";
 pub const CONS: &str = "cons";
 
-pub const AND : &str = "and";
+pub const AND: &str = "and";
 pub const OR: &str = "or";
 pub const NOT: &str = "not";
 
@@ -78,11 +78,9 @@ pub const LAMBDA: &str = "lambda";
 pub const IF: &str = "if";
 pub const QUOTE: &str = "quote";
 pub const QUASI_QUOTE: &str = "quasiquote";
-pub const UNQUOTE: &str= "unquote";
+pub const UNQUOTE: &str = "unquote";
 pub const SET: &str = "set!";
 pub const BEGIN: &str = "begin";
-
-
 
 //Boolean
 pub const TRUE: &str = "true";

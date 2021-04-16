@@ -313,7 +313,6 @@ pub struct LFn {
 pub struct LLambda {
     params: Vec<Sym>,
     body: Box<LValue>,
-    env: Rc<LEnv>,
 }
 
 impl PartialEq for LLambda {
@@ -327,11 +326,10 @@ impl LLambda {
         LLambda {
             params,
             body: Box::new(body),
-            env: env.clone(),
         }
     }
 
-    pub fn get_new_env(&self, args: &[LValue], outer: &LEnv) -> Result<LEnv, LError> {
+    pub fn get_new_env(&self, args: &[LValue], outer: & Rc<LEnv>) -> Result<Rc<LEnv>, LError> {
         if self.params.len() != args.len() {
             return Err(WrongNumberOfArgument(
                 LValue::List(args.to_vec()),
@@ -339,15 +337,15 @@ impl LLambda {
                 self.params.len()..self.params.len(),
             ));
         }
-        let mut env = self.env.clone();
+        let mut env = LEnv::new_empty_ref_counter();
         for (param, arg) in self.params.iter().zip(args) {
             env.symbols.insert(param.to_string(), arg.clone());
         }
-        env.outer = Some(Rc::new(outer));
+        env.outer = Some(outer.clone());
         Ok(env)
     }
 
-    pub fn call(&self, args: &[LValue], outer: &LEnv) -> Result<LValue, LError> {
+    pub fn call(&self, args: &[LValue], outer: &Rc<LEnv>) -> Result<LValue, LError> {
         let mut new_env = self.get_new_env(args, outer)?;
         eval(&*self.body, &mut new_env)
     }

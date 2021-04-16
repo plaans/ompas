@@ -12,10 +12,13 @@ use crate::lisp_root::lisp_language::*;
 use crate::lisp_root::lisp_struct::LError::*;
 use crate::lisp_root::lisp_struct::NameTypeLValue::{List, Symbol};
 use crate::lisp_root::lisp_struct::LCoreOperator::Quote;
+use std::ops::{DerefMut, Deref};
 
 pub mod lisp_functions;
 pub mod lisp_language;
 pub mod lisp_struct;
+
+
 
 pub struct LEnv {
     symbols: HashMap<String, LValue>,
@@ -24,6 +27,28 @@ pub struct LEnv {
     new_entries: Vec<String>,
     outer: Option<Rc<LEnv>>,
     others: HashMap<Sym, Box<dyn Any>>
+}
+
+/*struct RefLEnv {
+    pointer: Rc<LEnv>,
+}*/
+
+struct RefLEnv(Rc<LEnv>);
+
+
+impl Deref for RefLEnv {
+    type Target = LEnv;
+
+    fn deref(&self) -> &Self::Target {
+        &(self.pointer)
+    }
+}
+
+impl DerefMut for RefLEnv {
+
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        Rc::get_mut(&mut self.pointer).unwrap_or(&mut LEnv::empty())
+    }
 }
 
 impl PartialEq for LEnv {
@@ -272,6 +297,17 @@ impl Default for LEnv {
 }
 
 impl LEnv {
+    pub fn empty() -> Self {
+        LEnv {
+            symbols: Default::default(),
+            sym_types: Default::default(),
+            macro_table: Default::default(),
+            new_entries: vec![],
+            outer: None,
+            others: Default::default()
+        }
+    }
+
     pub fn new_ref_counter() -> Rc<Self> {
         Rc::new(Self::default())
     }
@@ -288,14 +324,7 @@ impl LEnv {
     }
     
     pub fn new_empty_ref_counter() -> Rc<Self> {
-        Rc::new(LEnv {
-            symbols: Default::default(),
-            sym_types: Default::default(),
-            macro_table: Default::default(),
-            new_entries: vec![],
-            outer: None,
-            others: Default::default()
-        })
+        Rc::new(Self::empty())
     }
 
 
@@ -652,7 +681,7 @@ pub fn eval(lv: &LValue, env: &mut Rc<LEnv>) -> Result<LValue, LError> {
                         match args.get(0).unwrap() {
                             LValue::Symbol(s) =>  {
                                 let exp = eval(args.get(1).unwrap(), env)?;
-                                env.add_entry(s.to_string(), exp);
+                                Rc::get_mut(env).unwrap().add_entry(s.to_string(), exp);
                             }
                             lv => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol))
                         }

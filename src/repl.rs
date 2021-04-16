@@ -2,7 +2,6 @@
 use crate::lisp_root::lisp_struct::*;
 use crate::lisp_root::{LEnv, eval, parse};
 use rustyline::Editor;
-use crate::lisp_root;
 use rustyline::error::ReadlineError;
 
 pub fn repl() {

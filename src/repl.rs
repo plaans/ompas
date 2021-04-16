@@ -11,7 +11,8 @@ pub fn repl() {
     if rl.load_history("history.txt").is_err() {
         println!("No previous history.");
     }
-    let mut env: LEnv = Default::default();
+    let root_env= LEnv::new_ref_counter();
+    let mut env = LEnv::new_ref_counter_from_outer(&root_env);
     loop {
         let readline = rl.readline(">> ");
         match readline {

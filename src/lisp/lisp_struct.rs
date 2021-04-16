@@ -313,7 +313,7 @@ pub struct LFn {
 pub struct LLambda {
     params: Vec<Sym>,
     body: Box<LValue>,
-    env: LEnv,
+    env: Rc<LEnv>,
 }
 
 impl PartialEq for LLambda {
@@ -327,7 +327,7 @@ impl LLambda {
         LLambda {
             params,
             body: Box::new(body),
-            env,
+            Rc::new(env),
         }
     }
 
@@ -343,7 +343,7 @@ impl LLambda {
         for (param, arg) in self.params.iter().zip(args) {
             env.symbols.insert(param.to_string(), arg.clone());
         }
-        env.outer = Some(Box::new(outer.clone()));
+        env.outer = Some(Rc::new(outer));
         Ok(env)
     }
 
@@ -397,7 +397,7 @@ impl LLambda {
 /// let str: &dyn Any = dyn_ctx.get_component(TypeId::of::<String>()).unwrap();
 /// let str = &String = str.downcast_ref().unwrap();
 /// ```
-pub trait NativeContext {
+pub trait NativeContext:{
 
     /// Extract a reference to the given type.
     /// If the option is non-empty, the the reference can be downcasted to a reference of the type
@@ -418,7 +418,6 @@ impl NativeContext for () {
     }
 }
 
-
 pub struct NativeContextWrapper {
     ctx: Box<dyn NativeContext>
 }
@@ -431,12 +430,14 @@ impl NativeContextWrapper {
 
 pub type NativeFun = dyn Fn(&[LValue], &dyn NativeContext) -> Result<LValue, LError>;
 
+
 #[derive(Clone)]
-pub struct NativeLambda {
+pub struct LNativeLambda {
     fun: Rc<NativeFun>
 }
 
-impl NativeLambda {
+
+impl LNativeLambda {
 
     pub fn new<T: 'static, R: Into<LValue>, F :  Fn(&[LValue], &T) -> R + 'static >(lbd: Box<F>) -> Self {
         let x = move |args: &[LValue], ctx: &dyn NativeContext| -> Result<LValue, LError> {
@@ -447,11 +448,10 @@ impl NativeLambda {
                 Err(LError::SpecialError("oups".to_string()))
             }
         };
-        NativeLambda {
+        LNativeLambda {
             fun: Rc::new(x)
         }
     }
-
     pub fn call(&self, args: &[LValue], ctx: &dyn NativeContext) -> Result<LValue, LError> {
         (self.fun)(args, ctx)
     }
@@ -460,12 +460,11 @@ impl NativeLambda {
 pub type NativeMutFun = dyn Fn(&[LValue], &mut dyn NativeContext) -> Result<LValue, LError>;
 
 #[derive(Clone)]
-pub struct NativeMutLambda {
+pub struct LNativeMutLambda {
     fun: Rc<NativeMutFun>
 }
 
-impl NativeMutLambda {
-
+impl LNativeMutLambda {
     pub fn call(&self, args: &[LValue], ctx: &mut dyn NativeContext) -> Result<LValue, LError> {
         (self.fun)(args, ctx)
     }
@@ -501,8 +500,8 @@ pub enum LValue {
     None,
     LFn(LFn),
     Lambda(LLambda),
-    NativeLambda(NativeLambda),
-    NativeMutLambda(NativeMutLambda),
+    NativeLambda(LNativeLambda),
+    NativeMutLambda(LNativeMutLambda),
     CoreOperator(LCoreOperator),
     SymType(LSymType),
 }
@@ -1353,11 +1352,11 @@ mod tests {
             }
         };
 
-        let getter = NativeLambda {
+        let getter = LNativeLambda {
             fun: Rc::new(get_counter)
         };
-        let getter = NativeLambda::new(Box::new(|args: &[LValue], ctx: &u32| *ctx));
-        let setter = NativeMutLambda {
+        let getter = LNativeLambda::new(Box::new(|args: &[LValue], ctx: &u32| *ctx));
+        let setter = LNativeMutLambda {
             fun: Rc::new(set_counter)
         };
 
@@ -1368,21 +1367,23 @@ mod tests {
         assert_eq!(setter.call(&[LValue::Number(LNumber::Int(5))], &mut state).ok().unwrap(), LValue::None);
         assert_eq!(getter.call(&[], &state).ok().unwrap(), LValue::Number(LNumber::Int(5)));
     }
+
 }
 
-type TypeNativeLambda<Ctx> = NativeLambda;
-
-struct Module<Ctx: Any> {
-    ctx: Ctx,
-    prelude: Vec<(Sym, TypedNativeLambda<Ctx>)>,
+pub struct Module {
+    pub prelude: Vec<(Sym, LNativeLambdaEnum)>
 }
 
+pub trait AsModule {
+    fn get_module() -> Module;
+}
+/*
 Module<()>
 Module<Simu>
 
 load_module() {
   add mod.ctx to NativeContext
   declare prelude
-}
+}*/
 
 //TODO: Add tests

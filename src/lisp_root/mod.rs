@@ -1,7 +1,3 @@
-use crate::lisp::lisp_functions::*;
-use crate::lisp::lisp_language::*;
-use crate::lisp::lisp_struct::*;
-//use std::collections::HashMap;
 use aries_utils::input::Sym;
 use im::HashMap;
 use std::borrow::Borrow;
@@ -9,15 +5,17 @@ use std::fs::File;
 use std::io::Write;
 use std::rc::Rc;
 use aries_planning::parsing::sexpr::SExpr;
-use crate::lisp::lisp_struct::LError::{SpecialError, WrongType, WrongNumberOfArgument, NotInListOfExpectedTypes};
-use crate::lisp::lisp_struct::NameTypeLValue::{List, Symbol};
-use crate::lisp::lisp_struct::LCoreOperator::{Quote, UnQuote};
 use std::any::Any;
+use crate::lisp_root::lisp_struct::*;
+use crate::lisp_root::lisp_functions::*;
+use crate::lisp_root::lisp_language::*;
+use crate::lisp_root::lisp_struct::LError::*;
+use crate::lisp_root::lisp_struct::NameTypeLValue::{List, Symbol};
+use crate::lisp_root::lisp_struct::LCoreOperator::Quote;
 
 pub mod lisp_functions;
 pub mod lisp_language;
 pub mod lisp_struct;
-pub mod lisp_modules;
 
 pub struct LEnv {
     symbols: HashMap<String, LValue>,
@@ -288,6 +286,17 @@ impl LEnv {
             others: Default::default()
         })
     }
+    
+    pub fn new_empty_ref_counter() -> Rc<Self> {
+        Rc::new(LEnv {
+            symbols: Default::default(),
+            sym_types: Default::default(),
+            macro_table: Default::default(),
+            new_entries: vec![],
+            outer: None,
+            others: Default::default()
+        })
+    }
 
 
     pub fn find(&self, var: &Sym) -> Option<&Self> {
@@ -459,7 +468,7 @@ pub fn expand(x: &LValue, top_level: bool, env: &mut Rc<LEnv>) -> Result<LValue,
                                     if !top_level {
                                         return Err(SpecialError(format!("{}: defmacro only allowed at top level", x)))
                                     }
-                                    let proc = eval(&exp, &mut LEnv::default())?;
+                                    let proc = eval(&exp, &mut LEnv::new_empty_ref_counter())?;
                                     if !matches!(proc, LValue::Lambda(_)) {
                                         return Err(SpecialError(format!("{}: macro must be a procedure", proc)))
                                     } else {
@@ -697,7 +706,7 @@ pub fn eval(lv: &LValue, env: &mut Rc<LEnv>) -> Result<LValue, LError> {
                         }
                         Ok(LValue::None)
                     }
-                    LCoreOperator::QuasiQuote | UnQuote | LCoreOperator::DefMacro => {
+                    LCoreOperator::QuasiQuote | LCoreOperator::UnQuote | LCoreOperator::DefMacro => {
                         Ok(LValue::None)
                     }
                 }

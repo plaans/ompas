@@ -1,9 +1,9 @@
-use crate::lisp::lisp_language::*;
+use crate::lisp_root::lisp_language::*;
 use aries_utils::input::{ErrLoc, Sym};
 use std::cmp::Ordering;
 //use std::collections::HashMap;
-use crate::lisp::lisp_struct::LError::WrongNumberOfArgument;
-use crate::lisp::{LEnv, eval};
+use crate::lisp_root::lisp_struct::LError::WrongNumberOfArgument;
+use crate::lisp_root::{LEnv, eval};
 use im::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
@@ -305,7 +305,7 @@ impl PartialEq for &LSymType {
 
 #[derive(Clone)]
 pub struct LFn {
-    pub pointer : Rc<fn(&[LValue], &mut LEnv) -> Result<LValue, LError>>,
+    pub pointer : Rc<fn(&[LValue], &mut Rc<LEnv>) -> Result<LValue, LError>>,
     pub label: String,
 }
 
@@ -323,11 +323,11 @@ impl PartialEq for LLambda {
 }
 
 impl LLambda {
-    pub fn new(params: Vec<Sym>, body: LValue, env: LEnv) -> Self {
+    pub fn new(params: Vec<Sym>, body: LValue, env: &Rc<LEnv>) -> Self {
         LLambda {
             params,
             body: Box::new(body),
-            Rc::new(env),
+            env: env.clone(),
         }
     }
 
@@ -1371,7 +1371,7 @@ mod tests {
 }
 
 pub struct Module {
-    pub prelude: Vec<(Sym, LNativeLambdaEnum)>
+    pub prelude: Vec<(Sym, LNativeLambda)>
 }
 
 pub trait AsModule {

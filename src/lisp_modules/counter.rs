@@ -1,10 +1,6 @@
 /*
 LANGUAGE
 */
-
-use crate::lisp::lisp_struct::*;
-use crate::lisp::lisp_struct::LError::{WrongNumberOfArgument, WrongType};
-
 pub const COUNTER: &str= "counter";
 pub const SET_COUNTER: &str = "set-counter";
 pub const GET_COUNTER: &str = "get-counter";

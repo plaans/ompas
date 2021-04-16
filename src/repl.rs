@@ -1,8 +1,8 @@
 //imports for rustyline
-use crate::lisp::lisp_struct::*;
-use crate::lisp::{LEnv, eval};
+use crate::lisp_root::lisp_struct::*;
+use crate::lisp_root::{LEnv, eval, parse};
 use rustyline::Editor;
-use crate::lisp;
+use crate::lisp_root;
 use rustyline::error::ReadlineError;
 
 pub fn repl() {
@@ -19,7 +19,7 @@ pub fn repl() {
             Ok(string) => {
                 let str = string.as_str();
                 rl.add_history_entry(str);
-                let lvalue = match lisp::parse(str, &mut env) {
+                let lvalue = match parse(str, &mut env) {
                     Ok(lv) => lv,
                     Err(e) => {
                         eprintln!("{}", e);

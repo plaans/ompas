@@ -25,7 +25,7 @@ pub struct LEnv {
     sym_types: HashMap<Sym, LSymType>,
     macro_table: HashMap<Sym, LLambda>,
     new_entries: Vec<String>,
-    outer: Option<Rc<LEnv>>,
+    outer: Option<RefLEnv>,
     others: HashMap<Sym, Box<dyn Any>>
 }
 
@@ -33,21 +33,41 @@ pub struct LEnv {
     pointer: Rc<LEnv>,
 }*/
 
-struct RefLEnv(Rc<LEnv>);
+#[derive(Clone)]
+pub struct RefLEnv(Rc<LEnv>);
+
+impl Default for RefLEnv {
+    fn default() -> Self {
+        RefLEnv(Rc::new(LEnv::default()))    }
+}
+
+impl RefLEnv {
+    pub fn root() -> Self {
+        RefLEnv(Rc::new(LEnv::root()))
+    }
+
+    pub fn new(outer: Option<RefLEnv>) -> Self {
+        RefLEnv(Rc::new(LEnv::new(outer)))
+    }
+
+    pub fn empty() -> Self {
+        RefLEnv(Rc::new(LEnv::empty()))
+    }
+}
 
 
 impl Deref for RefLEnv {
     type Target = LEnv;
 
     fn deref(&self) -> &Self::Target {
-        &(self.pointer)
+        &(self.0)
     }
 }
 
 impl DerefMut for RefLEnv {
 
     fn deref_mut(&mut self) -> &mut Self::Target {
-        Rc::get_mut(&mut self.pointer).unwrap_or(&mut LEnv::empty())
+        Rc::get_mut(&mut self.0).unwrap()
     }
 }
 
@@ -59,6 +79,12 @@ impl PartialEq for LEnv {
 
 impl Default for LEnv {
     fn default() -> Self {
+        Self::empty()
+    }
+}
+
+impl LEnv {
+    pub fn root() -> Self {
         // let map = im::hashmap::HashMap::new();
         // map.ins
         let mut symbols: HashMap<String, LValue> = HashMap::default();
@@ -294,9 +320,9 @@ impl Default for LEnv {
             others: Default::default(),
         }
     }
-}
 
-impl LEnv {
+
+
     pub fn empty() -> Self {
         LEnv {
             symbols: Default::default(),
@@ -308,25 +334,16 @@ impl LEnv {
         }
     }
 
-    pub fn new_ref_counter() -> Rc<Self> {
-        Rc::new(Self::default())
-    }
-
-    pub fn new_ref_counter_from_outer(outer: &Rc<LEnv>) -> Rc<Self> {
-        Rc::new(LEnv {
+    pub fn new(outer: Option<RefLEnv>)-> Self{
+        LEnv {
             symbols: Default::default(),
             sym_types: Default::default(),
             macro_table: Default::default(),
             new_entries: vec![],
-            outer: Some(outer.clone()),
+            outer,
             others: Default::default()
-        })
+        }
     }
-    
-    pub fn new_empty_ref_counter() -> Rc<Self> {
-        Rc::new(Self::empty())
-    }
-
 
     pub fn find(&self, var: &Sym) -> Option<&Self> {
         match self.symbols.get(var.as_str()) {
@@ -413,7 +430,7 @@ impl LEnv {
     }
 }
 
-pub fn parse(str : &str, env: &mut Rc<LEnv>) -> Result<LValue, LError> {
+pub fn parse(str : &str, env: &mut RefLEnv) -> Result<LValue, LError> {
     match aries_planning::parsing::sexpr::parse(str) {
         Ok(se) => {
             expand(&parse_into_lvalue(&se, env)?, true, env)
@@ -422,7 +439,7 @@ pub fn parse(str : &str, env: &mut Rc<LEnv>) -> Result<LValue, LError> {
     }
 }
 
-pub fn parse_into_lvalue(se: &SExpr, env: &mut Rc<LEnv>) -> Result<LValue,LError> {
+pub fn parse_into_lvalue(se: &SExpr, env: &mut RefLEnv) -> Result<LValue,LError> {
     match se {
         SExpr::Atom(atom) => {
             //println!("expression is an atom: {}", atom);
@@ -463,7 +480,7 @@ pub fn parse_into_lvalue(se: &SExpr, env: &mut Rc<LEnv>) -> Result<LValue,LError
     }
 }
 
-pub fn expand(x: &LValue, top_level: bool, env: &mut Rc<LEnv>) -> Result<LValue, LError> {
+pub fn expand(x: &LValue, top_level: bool, env: &mut RefLEnv) -> Result<LValue, LError> {
     match x {
         LValue::List(list) => {
             match list.first().unwrap() {
@@ -497,7 +514,7 @@ pub fn expand(x: &LValue, top_level: bool, env: &mut Rc<LEnv>) -> Result<LValue,
                                     if !top_level {
                                         return Err(SpecialError(format!("{}: defmacro only allowed at top level", x)))
                                     }
-                                    let proc = eval(&exp, &mut LEnv::new_empty_ref_counter())?;
+                                    let proc = eval(&exp, &mut RefLEnv::new(Some(env.clone())))?;
                                     if !matches!(proc, LValue::Lambda(_)) {
                                         return Err(SpecialError(format!("{}: macro must be a procedure", proc)))
                                     } else {
@@ -619,7 +636,7 @@ pub fn expand(x: &LValue, top_level: bool, env: &mut Rc<LEnv>) -> Result<LValue,
     }
 }
 
-pub fn expand_quasi_quote(x: &LValue, env: &mut Rc<LEnv>) -> Result<LValue, LError> {
+pub fn expand_quasi_quote(x: &LValue, env: &mut RefLEnv) -> Result<LValue, LError> {
     /*"""Expand `x => 'x; `,x => x; `(,@x y) => (append x y) """
     if not is_pair(x):
     return [_quote, x]
@@ -668,7 +685,7 @@ pub fn require(x: &LValue, predicate: bool, msg: String) -> Result<(), LError> {
     }
 }
 
-pub fn eval(lv: &LValue, env: &mut Rc<LEnv>) -> Result<LValue, LError> {
+pub fn eval(lv: &LValue, env: &mut RefLEnv) -> Result<LValue, LError> {
     match lv {
         LValue::List(list) => {
             //println!("expression is a list");
@@ -681,7 +698,7 @@ pub fn eval(lv: &LValue, env: &mut Rc<LEnv>) -> Result<LValue, LError> {
                         match args.get(0).unwrap() {
                             LValue::Symbol(s) =>  {
                                 let exp = eval(args.get(1).unwrap(), env)?;
-                                Rc::get_mut(env).unwrap().add_entry(s.to_string(), exp);
+                                env.add_entry(s.to_string(), exp);
                             }
                             lv => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol))
                         }
@@ -705,7 +722,6 @@ pub fn eval(lv: &LValue, env: &mut Rc<LEnv>) -> Result<LValue, LError> {
                         Ok(LValue::Lambda(LLambda::new(
                             params,
                             body.clone(),
-                            env,
                         )))
                     }
                     LCoreOperator::If => {

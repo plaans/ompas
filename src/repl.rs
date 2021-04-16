@@ -1,6 +1,6 @@
 //imports for rustyline
 use crate::lisp_root::lisp_struct::*;
-use crate::lisp_root::{LEnv, eval, parse};
+use crate::lisp_root::{LEnv, eval, parse, RefLEnv};
 use rustyline::Editor;
 use rustyline::error::ReadlineError;
 
@@ -10,8 +10,8 @@ pub fn repl() {
     if rl.load_history("history.txt").is_err() {
         println!("No previous history.");
     }
-    let root_env= LEnv::new_ref_counter();
-    let mut env = LEnv::new_ref_counter_from_outer(&root_env);
+    let root_env= RefLEnv::root();
+    let mut env = RefLEnv::new(Some(root_env.clone()));
     loop {
         let readline = rl.readline(">> ");
         match readline {

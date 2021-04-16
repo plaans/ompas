@@ -3,7 +3,7 @@ use aries_utils::input::{ErrLoc, Sym};
 use std::cmp::Ordering;
 //use std::collections::HashMap;
 use crate::lisp_root::lisp_struct::LError::WrongNumberOfArgument;
-use crate::lisp_root::{LEnv, eval};
+use crate::lisp_root::{LEnv, eval, RefLEnv};
 use im::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
@@ -305,7 +305,7 @@ impl PartialEq for &LSymType {
 
 #[derive(Clone)]
 pub struct LFn {
-    pub pointer : Rc<fn(&[LValue], &mut Rc<LEnv>) -> Result<LValue, LError>>,
+    pub pointer : Rc<fn(&[LValue], &mut RefLEnv) -> Result<LValue, LError>>,
     pub label: String,
 }
 
@@ -322,14 +322,14 @@ impl PartialEq for LLambda {
 }
 
 impl LLambda {
-    pub fn new(params: Vec<Sym>, body: LValue, env: &Rc<LEnv>) -> Self {
+    pub fn new(params: Vec<Sym>, body: LValue) -> Self {
         LLambda {
             params,
             body: Box::new(body),
         }
     }
 
-    pub fn get_new_env(&self, args: &[LValue], outer: & Rc<LEnv>) -> Result<Rc<LEnv>, LError> {
+    pub fn get_new_env(&self, args: &[LValue], outer: &RefLEnv) -> Result<RefLEnv, LError> {
         if self.params.len() != args.len() {
             return Err(WrongNumberOfArgument(
                 LValue::List(args.to_vec()),
@@ -337,7 +337,7 @@ impl LLambda {
                 self.params.len()..self.params.len(),
             ));
         }
-        let mut env = LEnv::new_empty_ref_counter();
+        let mut env = RefLEnv::empty();
         for (param, arg) in self.params.iter().zip(args) {
             env.symbols.insert(param.to_string(), arg.clone());
         }
@@ -345,7 +345,7 @@ impl LLambda {
         Ok(env)
     }
 
-    pub fn call(&self, args: &[LValue], outer: &Rc<LEnv>) -> Result<LValue, LError> {
+    pub fn call(&self, args: &[LValue], outer: &RefLEnv) -> Result<LValue, LError> {
         let mut new_env = self.get_new_env(args, outer)?;
         eval(&*self.body, &mut new_env)
     }

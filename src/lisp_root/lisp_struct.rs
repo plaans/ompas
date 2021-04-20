@@ -3,7 +3,7 @@ use aries_utils::input::{ErrLoc, Sym};
 use std::cmp::Ordering;
 //use std::collections::HashMap;
 use crate::lisp_root::lisp_struct::LError::WrongNumberOfArgument;
-use crate::lisp_root::{LEnv, eval, RefLEnv};
+use crate::lisp_root::{eval, RefLEnv, CtxCollec};
 use im::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
@@ -305,7 +305,7 @@ impl PartialEq for &LSymType {
 
 #[derive(Clone)]
 pub struct LFn {
-    pub pointer : Rc<fn(&[LValue], &mut RefLEnv) -> Result<LValue, LError>>,
+    pub pointer : Rc<fn(&[LValue], &mut RefLEnv, &mut CtxCollec) -> Result<LValue, LError>>,
     pub label: String,
 }
 
@@ -345,9 +345,9 @@ impl LLambda {
         Ok(env)
     }
 
-    pub fn call(&self, args: &[LValue], outer: &RefLEnv) -> Result<LValue, LError> {
+    pub fn call(&self, args: &[LValue], outer: &RefLEnv, ctxs: &mut CtxCollec) -> Result<LValue, LError> {
         let mut new_env = self.get_new_env(args, outer)?;
-        eval(&*self.body, &mut new_env)
+        eval(&*self.body, &mut new_env, ctxs)
     }
 
     pub fn get_body(&self) -> LValue {
@@ -431,7 +431,7 @@ pub type NativeFun = dyn Fn(&[LValue], &dyn NativeContext) -> Result<LValue, LEr
 
 #[derive(Clone)]
 pub struct LNativeLambda {
-    fun: Rc<NativeFun>
+    pub fun: Rc<NativeFun>
 }
 
 
@@ -459,7 +459,7 @@ pub type NativeMutFun = dyn Fn(&[LValue], &mut dyn NativeContext) -> Result<LVal
 
 #[derive(Clone)]
 pub struct LNativeMutLambda {
-    fun: Rc<NativeMutFun>
+    pub(crate) fun: Rc<NativeMutFun>
 }
 
 impl LNativeMutLambda {
@@ -498,8 +498,8 @@ pub enum LValue {
     None,
     LFn(LFn),
     Lambda(LLambda),
-    NativeLambda(LNativeLambda),
-    NativeMutLambda(LNativeMutLambda),
+    NativeLambda((usize, LNativeLambda)),
+    NativeMutLambda((usize, LNativeMutLambda)),
     CoreOperator(LCoreOperator),
     SymType(LSymType),
 }
@@ -1369,7 +1369,9 @@ mod tests {
 }
 
 pub struct Module {
-    pub prelude: Vec<(Sym, LNativeLambda)>
+    pub ctx: Box<dyn NativeContext>,
+    pub prelude_unmut: Vec<(Sym, LNativeLambda)>,
+    pub prelude_mut: Vec<(Sym, LNativeMutLambda)>,
 }
 
 pub trait AsModule {

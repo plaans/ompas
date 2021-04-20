@@ -5,7 +5,6 @@ use std::fs::File;
 use std::io::Write;
 use std::rc::Rc;
 use aries_planning::parsing::sexpr::SExpr;
-use std::any::Any;
 use crate::lisp_root::lisp_struct::*;
 use crate::lisp_root::lisp_functions::*;
 use crate::lisp_root::lisp_language::*;
@@ -13,6 +12,7 @@ use crate::lisp_root::lisp_struct::LError::*;
 use crate::lisp_root::lisp_struct::NameTypeLValue::{List, Symbol};
 use crate::lisp_root::lisp_struct::LCoreOperator::Quote;
 use std::ops::{DerefMut, Deref};
+use crate::lisp_root::lisp_struct::LValue::{NativeLambda, NativeMutLambda};
 
 pub mod lisp_functions;
 pub mod lisp_language;
@@ -26,12 +26,33 @@ pub struct LEnv {
     macro_table: HashMap<Sym, LLambda>,
     new_entries: Vec<String>,
     outer: Option<RefLEnv>,
-    others: HashMap<Sym, Box<dyn Any>>
 }
 
-/*struct RefLEnv {
-    pointer: Rc<LEnv>,
-}*/
+
+pub struct ContextCollection(Vec<Box<dyn NativeContext>>);
+
+impl Default for ContextCollection {
+    fn default() -> Self {
+        Self(vec![])
+    }
+}
+
+type CtxCollec = ContextCollection;
+
+impl ContextCollection {
+    pub fn insert(&mut self, ctx: Box<dyn NativeContext>) -> usize {
+        self.0.push(ctx);
+        self.0.len() -1
+    }
+
+    pub fn get_context(&self, id: usize) -> &dyn NativeContext {
+        self.0.get(id).unwrap().deref()
+    }
+
+    pub fn get_mut_context(&mut self, id: usize) -> &mut dyn NativeContext {
+        self.0.get_mut(id).unwrap().deref_mut()
+    }
+}
 
 #[derive(Clone)]
 pub struct RefLEnv(Rc<LEnv>);
@@ -46,8 +67,18 @@ impl RefLEnv {
         RefLEnv(Rc::new(LEnv::root()))
     }
 
-    pub fn new(outer: Option<RefLEnv>) -> Self {
-        RefLEnv(Rc::new(LEnv::new(outer)))
+    pub fn new(env: LEnv) -> Self {
+        RefLEnv(Rc::new(env))
+    }
+
+    pub fn new_from_outer(outer: RefLEnv) -> Self {
+        RefLEnv(Rc::new( LEnv {
+            symbols: Default::default(),
+            sym_types: Default::default(),
+            macro_table: Default::default(),
+            new_entries: vec![],
+            outer : Some(outer)
+        }))
     }
 
     pub fn empty() -> Self {
@@ -317,11 +348,8 @@ impl LEnv {
             macro_table: Default::default(),
             new_entries: vec![],
             outer: None,
-            others: Default::default(),
         }
     }
-
-
 
     pub fn empty() -> Self {
         LEnv {
@@ -330,18 +358,16 @@ impl LEnv {
             macro_table: Default::default(),
             new_entries: vec![],
             outer: None,
-            others: Default::default()
         }
     }
 
-    pub fn new(outer: Option<RefLEnv>)-> Self{
+    pub fn new_with_outer(outer: Option<RefLEnv>)-> Self{
         LEnv {
             symbols: Default::default(),
             sym_types: Default::default(),
             macro_table: Default::default(),
             new_entries: vec![],
             outer,
-            others: Default::default()
         }
     }
 
@@ -414,32 +440,28 @@ impl LEnv {
         //eprintln!("write fact base to file");
     }
 
-    pub fn load_module(&mut self, module: Module) {
-        /*for (sym, nl) in module.prelude {
-            self.symbols.insert(sym.to_string(), LValue::(nl));
-        }*/
-        unimplemented!()
-    }
+}
 
-    pub fn get_context(&self) -> &dyn NativeContext {
-        unimplemented!()
+pub fn load_module(env: &mut RefLEnv, ctxs: &mut ContextCollection, module: Module) {
+    let id = ctxs.insert(module.ctx);
+    for (sym, nl) in module.prelude_unmut {
+        env.symbols.insert(sym.to_string(), NativeLambda((id, nl)));
     }
-
-    pub fn get_mut_context(&self) -> &mut dyn NativeContext {
-        unimplemented!()
+    for (sym, nml) in module.prelude_mut {
+        env.symbols.insert(sym.to_string(), NativeMutLambda((id, nml)));
     }
 }
 
-pub fn parse(str : &str, env: &mut RefLEnv) -> Result<LValue, LError> {
+pub fn parse(str : &str, env: &mut RefLEnv, ctxs: &mut CtxCollec) -> Result<LValue, LError> {
     match aries_planning::parsing::sexpr::parse(str) {
         Ok(se) => {
-            expand(&parse_into_lvalue(&se, env)?, true, env)
+            expand(&parse_into_lvalue(&se, env, ctxs)?, true, env, ctxs)
         }
         Err(e) => Err(SpecialError(format!("Error in command: {}", e.to_string()))),
     }
 }
 
-pub fn parse_into_lvalue(se: &SExpr, env: &mut RefLEnv) -> Result<LValue,LError> {
+pub fn parse_into_lvalue(se: &SExpr, env: &mut RefLEnv, ctxs: &mut CtxCollec) -> Result<LValue,LError> {
     match se {
         SExpr::Atom(atom) => {
             //println!("expression is an atom: {}", atom);
@@ -473,14 +495,14 @@ pub fn parse_into_lvalue(se: &SExpr, env: &mut RefLEnv) -> Result<LValue,LError>
             let mut vec_lvalue = Vec::new();
 
             for element in list.iter() {
-                vec_lvalue.push(parse_into_lvalue(element, env)?);
+                vec_lvalue.push(parse_into_lvalue(element, env, ctxs)?);
             }
             Ok(LValue::List(vec_lvalue))
         }
     }
 }
 
-pub fn expand(x: &LValue, top_level: bool, env: &mut RefLEnv) -> Result<LValue, LError> {
+pub fn expand(x: &LValue, top_level: bool, env: &mut RefLEnv, ctxs: &mut CtxCollec) -> Result<LValue, LError> {
     match x {
         LValue::List(list) => {
             match list.first().unwrap() {
@@ -502,19 +524,19 @@ pub fn expand(x: &LValue, top_level: bool, env: &mut RefLEnv) -> Result<LValue, 
                                     new_body.push(LCoreOperator::DefLambda.into());
                                     new_body.append(&mut args.to_vec());
                                     new_body.append(&mut body.to_vec());
-                                    return expand(&vec![def.into(), f.clone(), new_body.into()].into(), top_level, env);
+                                    return expand(&vec![def.into(), f.clone(), new_body.into()].into(), top_level, env,ctxs);
                                 }
                             },
                             LValue::Symbol(sym) => {
                                 if list.len() != 3 {
                                     return Err(WrongNumberOfArgument(x.clone(), list.len(), 3..3))
                                 }
-                                let exp = expand(list.get(2).unwrap(), top_level, env)?;
+                                let exp = expand(list.get(2).unwrap(), top_level, env, ctxs)?;
                                 if def == LCoreOperator::DefMacro {
                                     if !top_level {
                                         return Err(SpecialError(format!("{}: defmacro only allowed at top level", x)))
                                     }
-                                    let proc = eval(&exp, &mut RefLEnv::new(Some(env.clone())))?;
+                                    let proc = eval(&exp, &mut RefLEnv::new_from_outer(env.clone()), ctxs)?;
                                     if !matches!(proc, LValue::Lambda(_)) {
                                         return Err(SpecialError(format!("{}: macro must be a procedure", proc)))
                                     } else {
@@ -554,7 +576,7 @@ pub fn expand(x: &LValue, top_level: bool, env: &mut RefLEnv) -> Result<LValue, 
                             vec.append(&mut body.to_vec());
                             LValue::List(vec).to_owned()
                         };
-                        return Ok(vec![LCoreOperator::DefLambda.into(), vars.clone(), expand(&exp, top_level, env)?].into())
+                        return Ok(vec![LCoreOperator::DefLambda.into(), vars.clone(), expand(&exp, top_level, env, ctxs)?].into())
                     },
                     LCoreOperator::If => {
                         let mut list = list.clone();
@@ -567,7 +589,7 @@ pub fn expand(x: &LValue, top_level: bool, env: &mut RefLEnv) -> Result<LValue, 
                         //return map(expand, x)
                         let mut list_expanded = Vec::new();
                         for element in list {
-                            list_expanded.push(expand(&element, false, env)?)
+                            list_expanded.push(expand(&element, false, env, ctxs)?)
                         }
                         return Ok(list_expanded.into())
                     },
@@ -589,7 +611,7 @@ pub fn expand(x: &LValue, top_level: bool, env: &mut RefLEnv) -> Result<LValue, 
                         }
                         let mut return_list = list.clone();
                         //We expand only the last element
-                        return_list[2] = expand(return_list.get(2).unwrap(), false, env)?;
+                        return_list[2] = expand(return_list.get(2).unwrap(), false, env, ctxs)?;
                         return Ok(return_list.into())
                     },
                     LCoreOperator::Begin => {
@@ -598,7 +620,7 @@ pub fn expand(x: &LValue, top_level: bool, env: &mut RefLEnv) -> Result<LValue, 
                         } else {
                             let mut expanded_list = Vec::new();
                             for xi in list {
-                                expanded_list.push(expand(xi, top_level, env)?);
+                                expanded_list.push(expand(xi, top_level, env, ctxs)?);
                             }
                             Ok(expanded_list.into())
                         }
@@ -616,7 +638,7 @@ pub fn expand(x: &LValue, top_level: bool, env: &mut RefLEnv) -> Result<LValue, 
                     match env.get_macro(sym) {
                         None => {}
                         Some(m) => {
-                            return expand(&m.call(&list[1..], env)?, top_level, env)
+                            return expand(&m.call(&list[1..], env, ctxs)?, top_level, env, ctxs)
                         }
                     }
                     /*elif isa(x[0], Symbol) and x[0] in macro_table:
@@ -627,7 +649,7 @@ pub fn expand(x: &LValue, top_level: bool, env: &mut RefLEnv) -> Result<LValue, 
             }
             let mut expanded_list = Vec::new();
             for val in list {
-                expanded_list.push(expand(val, false, env)?)
+                expanded_list.push(expand(val, false, env, ctxs)?)
             }
             Ok(expanded_list.into())
         },
@@ -685,7 +707,7 @@ pub fn require(x: &LValue, predicate: bool, msg: String) -> Result<(), LError> {
     }
 }
 
-pub fn eval(lv: &LValue, env: &mut RefLEnv) -> Result<LValue, LError> {
+pub fn eval(lv: &LValue, env: &mut RefLEnv, ctxs: &mut CtxCollec) -> Result<LValue, LError> {
     match lv {
         LValue::List(list) => {
             //println!("expression is a list");
@@ -697,7 +719,7 @@ pub fn eval(lv: &LValue, env: &mut RefLEnv) -> Result<LValue, LError> {
                     LCoreOperator::Define => {
                         match args.get(0).unwrap() {
                             LValue::Symbol(s) =>  {
-                                let exp = eval(args.get(1).unwrap(), env)?;
+                                let exp = eval(args.get(1).unwrap(), env, ctxs)?;
                                 env.add_entry(s.to_string(), exp);
                             }
                             lv => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol))
@@ -728,9 +750,9 @@ pub fn eval(lv: &LValue, env: &mut RefLEnv) -> Result<LValue, LError> {
                         let test = args.get(0).unwrap();
                         let conseq = args.get(1).unwrap();
                         let alt = args.get(2).unwrap();
-                        match eval(test, env) {
-                            Ok(LValue::Bool(true)) => eval(conseq, env),
-                            Ok(LValue::Bool(false)) => eval(alt, env),
+                        match eval(test, env, ctxs) {
+                            Ok(LValue::Bool(true)) => eval(conseq, env, ctxs),
+                            Ok(LValue::Bool(false)) => eval(alt, env, ctxs),
                             Ok(lv) => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Bool)),
                             Err(e) => Err(e),
                         }
@@ -744,7 +766,7 @@ pub fn eval(lv: &LValue, env: &mut RefLEnv) -> Result<LValue, LError> {
                     }
                     LCoreOperator::Begin => {
                         for (k,exp) in args[1..].iter().enumerate() {
-                            let result = eval(exp, env)?;
+                            let result = eval(exp, env, ctxs)?;
                             if k == args.len() {
                                 return Ok(result)
                             }
@@ -758,18 +780,22 @@ pub fn eval(lv: &LValue, env: &mut RefLEnv) -> Result<LValue, LError> {
                 LValue::LFn(f) => {
                     let mut arg_evaluated = Vec::new();
                     for arg in args {
-                        arg_evaluated.push(eval(arg, env)?)
+                        arg_evaluated.push(eval(arg, env, ctxs)?)
                     }
-                    return (f.pointer)(arg_evaluated.as_slice(), env)
+                    return (f.pointer)(arg_evaluated.as_slice(), env, ctxs)
                 },
                 LValue::Lambda(l) => {
-                    l.call(args, env)
+                    l.call(args, env, ctxs)
                     /*let mut new_env = l.get_new_env(args, env)?;
                     eval(&l.get_body(), &mut new_env)*/
                 }
-                LValue::NativeLambda(fun) => {
-                    let args :Vec<LValue> = args.iter().map(|a| eval(a, env)).collect::<Result<_,_>>()?;
-                    fun.call(&args, env.get_context())
+                LValue::NativeLambda((mod_id, fun)) => {
+                    let args :Vec<LValue> = args.iter().map(|a| eval(a, env, ctxs)).collect::<Result<_,_>>()?;
+                    fun.call(&args, ctxs.get_context(*mod_id))
+                }
+                LValue::NativeMutLambda((mod_id, fun)) => {
+                    let args :Vec<LValue> = args.iter().map(|a| eval(a, env, ctxs)).collect::<Result<_,_>>()?;
+                    fun.call(&args, ctxs.get_mut_context(*mod_id))
                 }
                 lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::LFn))
             }

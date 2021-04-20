@@ -1,10 +1,11 @@
-use crate::lisp::lisp_language::*;
+use crate::lisp_root::lisp_language::*;
 use aries_utils::input::{ErrLoc, Sym};
 use std::cmp::Ordering;
 //use std::collections::HashMap;
-use crate::lisp::lisp_struct::LError::WrongNumberOfArgument;
-use crate::lisp::{eval, LEnv};
+use crate::lisp_root::lisp_struct::LError::WrongNumberOfArgument;
+use crate::lisp_root::{eval, CtxCollec, RefLEnv};
 use im::HashMap;
+use std::any::{Any, TypeId};
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::{Add, Div, Mul, Range, Sub};
@@ -303,7 +304,7 @@ impl PartialEq for &LSymType {
     }
 }
 
-type PLFn = Rc<fn(&[LValue], &mut LEnv) -> Result<LValue, LError>>;
+type PLFn = Rc<fn(&[LValue], &mut RefLEnv, &mut CtxCollec) -> Result<LValue, LError>>;
 
 #[derive(Clone)]
 pub struct LFn {
@@ -315,7 +316,6 @@ pub struct LFn {
 pub struct LLambda {
     params: Vec<Sym>,
     body: Box<LValue>,
-    env: LEnv,
 }
 
 impl PartialEq for LLambda {
@@ -325,15 +325,14 @@ impl PartialEq for LLambda {
 }
 
 impl LLambda {
-    pub fn new(params: Vec<Sym>, body: LValue, env: LEnv) -> Self {
+    pub fn new(params: Vec<Sym>, body: LValue) -> Self {
         LLambda {
             params,
             body: Box::new(body),
-            env,
         }
     }
 
-    pub fn get_new_env(&self, args: &[LValue], outer: &LEnv) -> Result<LEnv, LError> {
+    pub fn get_new_env(&self, args: &[LValue], outer: &RefLEnv) -> Result<RefLEnv, LError> {
         if self.params.len() != args.len() {
             return Err(WrongNumberOfArgument(
                 LValue::List(args.to_vec()),
@@ -341,21 +340,138 @@ impl LLambda {
                 self.params.len()..self.params.len(),
             ));
         }
-        let mut env = self.env.clone();
+        let mut env = RefLEnv::empty();
         for (param, arg) in self.params.iter().zip(args) {
             env.symbols.insert(param.to_string(), arg.clone());
         }
-        env.outer = Some(Box::new(outer.clone()));
+        env.outer = Some(outer.clone());
         Ok(env)
     }
 
-    pub fn call(&self, args: &[LValue], outer: &LEnv) -> Result<LValue, LError> {
+    pub fn call(
+        &self,
+        args: &[LValue],
+        outer: &RefLEnv,
+        ctxs: &mut CtxCollec,
+    ) -> Result<LValue, LError> {
         let mut new_env = self.get_new_env(args, outer)?;
-        eval(&*self.body, &mut new_env)
+        eval(&*self.body, &mut new_env, ctxs)
     }
 
     pub fn get_body(&self) -> LValue {
         *self.body.clone()
+    }
+}
+
+/// Trait is used to dynamically expose the data available in the context.
+///
+/// The context essentially provides a set of typed data and is available as an trait object `&dyn NativeContext`.
+/// The client can ask for data of a specific type. It will be given a pointer to the type as a reference to Any.
+/// This reference can then be downcasted to the expected type.
+///
+/// Note: in this trait, we cannot have generic parameters that would improve the ergonomics because it need to be
+///       representable as a trait object. See the NativeContextWrapper for a wrapper that would provide
+///       a more ergonomic view of the dynamic NativeContext.
+///
+/// # Example
+///
+/// ```
+/// use fact_base::lisp::lisp_struct::NativeContext;
+/// use std::any::{TypeId, Any};
+/// struct Ctx {
+///   int: u32,
+///   str: String,
+/// };
+/// impl NativeContext for Ctx {
+///     fn get_component(&self,type_id: TypeId) -> Option<&dyn Any> {
+///        if type_id == TypeId::of::<u32>() {
+///            Some(&self.int)
+///        } else if type_id == TypeId::of::<String>() {
+///            Some(&self.str)
+///        } else {
+///            None
+///        }
+///     }
+///
+/// fn get_component_mut(&mut self,type_id: TypeId) -> Option<&mut dyn Any> {
+///         todo!()
+///     }
+/// }
+///
+/// let ctx = Ctx { int: 0, str: "hi".to_string() };
+/// let dyn_ctx: &dyn NativeContext = &ctx;
+/// let str: &dyn Any = dyn_ctx.get_component(TypeId::of::<String>()).unwrap();
+/// let str = &String = str.downcast_ref().unwrap();
+/// ```
+pub trait NativeContext {
+    /// Extract a reference to the given type.
+    /// If the option is non-empty, the the reference can be downcasted to a reference of the type
+    /// that is represented by the `TypeId`
+    fn get_component(&self, _type_id: TypeId) -> Option<&dyn Any>;
+
+    fn get_component_mut(&mut self, _type_id: TypeId) -> Option<&mut dyn Any>;
+}
+
+impl NativeContext for () {
+    fn get_component(&self, _type_id: TypeId) -> Option<&dyn Any> {
+        None
+    }
+
+    fn get_component_mut(&mut self, _type_id: TypeId) -> Option<&mut dyn Any> {
+        None
+    }
+}
+
+pub struct NativeContextWrapper {
+    ctx: Box<dyn NativeContext>,
+}
+
+impl NativeContextWrapper {
+    pub fn get<T: Any>(&self) -> Option<&T> {
+        self.ctx
+            .get_component(TypeId::of::<T>())
+            .and_then(|x| x.downcast_ref())
+    }
+}
+
+pub type NativeFun = dyn Fn(&[LValue], &dyn NativeContext) -> Result<LValue, LError>;
+
+#[derive(Clone)]
+pub struct LNativeLambda {
+    pub fun: Rc<NativeFun>,
+}
+
+impl LNativeLambda {
+    pub fn new<T: 'static, R: Into<LValue>, F: Fn(&[LValue], &T) -> R + 'static>(
+        lbd: Box<F>,
+    ) -> Self {
+        let x = move |args: &[LValue], ctx: &dyn NativeContext| -> Result<LValue, LError> {
+            let ctx: Option<&T> = ctx
+                .get_component(TypeId::of::<T>())
+                .and_then(|x| x.downcast_ref::<T>());
+            if let Some(ctx) = ctx {
+                Ok(lbd(args, ctx).into())
+            } else {
+                Err(LError::SpecialError("oups".to_string()))
+            }
+        };
+        LNativeLambda { fun: Rc::new(x) }
+    }
+    pub fn call(&self, args: &[LValue], ctx: &dyn NativeContext) -> Result<LValue, LError> {
+        (self.fun)(args, ctx)
+    }
+}
+
+pub type NativeMutFun = dyn Fn(&[LValue], &mut dyn NativeContext) -> Result<LValue, LError>;
+
+#[derive(Clone)]
+pub struct LNativeMutLambda {
+    pub(crate) fun: Rc<NativeMutFun>,
+}
+
+impl LNativeMutLambda {
+    pub fn call(&self, args: &[LValue], ctx: &mut dyn NativeContext) -> Result<LValue, LError> {
+        (self.fun)(args, ctx)
     }
 }
 
@@ -389,6 +505,8 @@ pub enum LValue {
     None,
     LFn(LFn),
     Lambda(LLambda),
+    NativeLambda((usize, LNativeLambda)),
+    NativeMutLambda((usize, LNativeMutLambda)),
     CoreOperator(LCoreOperator),
     SymType(LSymType),
 }
@@ -670,6 +788,12 @@ impl Div for LValue {
     }
 }
 
+impl From<u32> for LValue {
+    fn from(u: u32) -> Self {
+        LValue::Number(LNumber::Int(u as i64))
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum NameTypeLValue {
     CoreOperator,
@@ -742,6 +866,7 @@ impl From<&LValue> for NameTypeLValue {
             LValue::Quote(_) => NameTypeLValue::Quote,
             LValue::SymType(_) => NameTypeLValue::SymType,
             LValue::CoreOperator(_) => NameTypeLValue::CoreOperator,
+            _ => unimplemented!(),
         }
     }
 }
@@ -892,6 +1017,7 @@ impl AsCommand for LValue {
             LValue::Map(m) => m.as_command(),
             LValue::Quote(q) => q.to_string(),
             LValue::CoreOperator(c) => c.to_string(),
+            _ => unimplemented!(),
         }
     }
 }
@@ -1019,6 +1145,7 @@ impl Display for LValue {
             LValue::CoreOperator(co) => {
                 write!(f, "{}", co)
             }
+            _ => unimplemented!(),
         }
     }
 }
@@ -1083,10 +1210,12 @@ impl Debug for LValue {
 
 #[cfg(test)]
 mod tests {
-    use crate::lisp::lisp_struct::LValue;
+    use super::*;
     use im::HashMap;
-    use std::collections::hash_map::{DefaultHasher, RandomState};
+
+    use std::any::{Any, TypeId};
     use std::hash::{BuildHasher, Hash, Hasher};
+    use std::rc::Rc;
 
     //#[test]
     pub fn test_hash_list() {
@@ -1199,6 +1328,98 @@ mod tests {
         let value = *map.get(&search_key).unwrap_or(&-1);
         assert_eq!(value, 4)
     }*/
+
+    #[test]
+    fn test_native_lambda() {
+        struct Counter {
+            cnt: u32,
+        };
+        impl NativeContext for Counter {
+            fn get_component(&self, type_id: TypeId) -> Option<&dyn Any> {
+                if type_id == TypeId::of::<u32>() {
+                    Some(&self.cnt)
+                } else {
+                    None
+                }
+            }
+            fn get_component_mut(&mut self, type_id: TypeId) -> Option<&mut dyn Any> {
+                if type_id == TypeId::of::<u32>() {
+                    Some(&mut self.cnt)
+                } else {
+                    None
+                }
+            }
+        }
+
+        let get_counter = |args: &[LValue], ctx: &dyn NativeContext| -> Result<LValue, LError> {
+            if let Some(cnt) = ctx
+                .get_component(TypeId::of::<u32>())
+                .and_then(|x| x.downcast_ref::<u32>())
+            {
+                Ok(LValue::Number(LNumber::Int(*cnt as i64)))
+            } else {
+                Err(LError::SpecialError("No such component".to_string()))
+            }
+        };
+        let set_counter =
+            |args: &[LValue], ctx: &mut dyn NativeContext| -> Result<LValue, LError> {
+                if let Some(cnt) = ctx
+                    .get_component_mut(TypeId::of::<u32>())
+                    .and_then(|x| x.downcast_mut::<u32>())
+                {
+                    *cnt = match args[0] {
+                        LValue::Number(LNumber::Int(x)) => x as u32,
+                        _ => panic!("type error"),
+                    };
+                    Ok(LValue::None)
+                } else {
+                    Err(LError::SpecialError("No such component".to_string()))
+                }
+            };
+
+        let getter = LNativeLambda {
+            fun: Rc::new(get_counter),
+        };
+        let getter = LNativeLambda::new(Box::new(|args: &[LValue], ctx: &u32| *ctx));
+        let setter = LNativeMutLambda {
+            fun: Rc::new(set_counter),
+        };
+
+        let mut state = Counter { cnt: 0 };
+        assert_eq!(
+            getter.call(&[], &state).ok().unwrap(),
+            LValue::Number(LNumber::Int(0))
+        );
+        assert_eq!(
+            setter
+                .call(&[LValue::Number(LNumber::Int(5))], &mut state)
+                .ok()
+                .unwrap(),
+            LValue::None
+        );
+        assert_eq!(
+            getter.call(&[], &state).ok().unwrap(),
+            LValue::Number(LNumber::Int(5))
+        );
+    }
 }
+
+pub struct Module {
+    pub ctx: Box<dyn NativeContext>,
+    pub prelude_unmut: Vec<(Sym, LNativeLambda)>,
+    pub prelude_mut: Vec<(Sym, LNativeMutLambda)>,
+}
+
+pub trait AsModule {
+    fn get_module() -> Module;
+}
+/*
+Module<()>
+Module<Simu>
+
+load_module() {
+  add mod.ctx to NativeContext
+  declare prelude
+}*/
 
 //TODO: Add tests

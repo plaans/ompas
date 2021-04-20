@@ -1,7 +1,6 @@
-//imports for rustyline
-use crate::lisp;
-use crate::lisp::lisp_struct::*;
-use crate::lisp::{eval, LEnv};
+use crate::lisp_modules::counter::Counter;
+use crate::lisp_root::lisp_struct::*;
+use crate::lisp_root::{eval, load_module, parse, ContextCollection, RefLEnv};
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
@@ -11,21 +10,25 @@ pub fn repl() {
     if rl.load_history("history.txt").is_err() {
         println!("No previous history.");
     }
-    let mut env: LEnv = Default::default();
+    let root_env =&mut RefLEnv::root();
+    let ctxs: &mut ContextCollection = &mut Default::default();
+    load_module(root_env, ctxs, Counter::get_module());
+    let env = &mut RefLEnv::new_from_outer(root_env.clone());
+
     loop {
         let readline = rl.readline(">> ");
         match readline {
             Ok(string) => {
                 let str = string.as_str();
                 rl.add_history_entry(str);
-                let lvalue = match lisp::parse(str, &mut env) {
+                let lvalue = match parse(str, env, ctxs) {
                     Ok(lv) => lv,
                     Err(e) => {
                         eprintln!("{}", e);
                         LValue::None
                     }
                 };
-                match eval(&lvalue, &mut env) {
+                match eval(&lvalue, env, ctxs) {
                     Ok(lv) => match lv {
                         LValue::None => {}
                         lv => println!("{}", lv),

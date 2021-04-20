@@ -1,5 +1,5 @@
-const START_MSG:&str = "|||SIMPLE ROBOT SIMULATOR|||";
+const START_MSG: &str = "|||SIMPLE ROBOT SIMULATOR|||";
 
-fn main() -> () {
-    println!("{}",START_MSG)
+fn main() {
+    println!("{}", START_MSG)
 }

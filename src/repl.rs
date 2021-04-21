@@ -1,4 +1,4 @@
-use crate::lisp_modules::counter::Counter;
+use crate::lisp_modules::counter::{CtxCounter};
 use crate::lisp_root::lisp_struct::*;
 use crate::lisp_root::{eval, load_module, parse, ContextCollection, RefLEnv};
 use rustyline::error::ReadlineError;
@@ -10,9 +10,10 @@ pub fn repl() {
     if rl.load_history("history.txt").is_err() {
         println!("No previous history.");
     }
-    let root_env =&mut RefLEnv::root();
+    let root_env = &mut RefLEnv::root();
     let ctxs: &mut ContextCollection = &mut Default::default();
-    load_module(root_env, ctxs, Counter::get_module());
+    load_module(root_env, ctxs, CtxCounter::get_module());
+    //load_module(root_env, ctxs, IO::get_module());
     let env = &mut RefLEnv::new_from_outer(root_env.clone());
 
     loop {

@@ -2,17 +2,17 @@ use crate::lisp_root::lisp_functions::*;
 use crate::lisp_root::lisp_language::*;
 use crate::lisp_root::lisp_struct::LCoreOperator::Quote;
 use crate::lisp_root::lisp_struct::LError::*;
-use crate::lisp_root::lisp_struct::LValue::{NativeLambda, NativeMutLambda};
 use crate::lisp_root::lisp_struct::NameTypeLValue::{List, Symbol};
 use crate::lisp_root::lisp_struct::*;
 use aries_planning::parsing::sexpr::SExpr;
 use aries_utils::input::Sym;
 use im::HashMap;
-use std::borrow::Borrow;
+use std::any::Any;
 use std::fs::File;
 use std::io::Write;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
+use std::borrow::Borrow;
 
 pub mod lisp_functions;
 pub mod lisp_language;
@@ -26,7 +26,7 @@ pub struct LEnv {
     outer: Option<RefLEnv>,
 }
 
-pub struct ContextCollection(Vec<Box<dyn NativeContext>>);
+pub struct ContextCollection(Vec<Box<dyn Any>>);
 
 impl Default for ContextCollection {
     fn default() -> Self {
@@ -37,16 +37,16 @@ impl Default for ContextCollection {
 type CtxCollec = ContextCollection;
 
 impl ContextCollection {
-    pub fn insert(&mut self, ctx: Box<dyn NativeContext>) -> usize {
+    pub fn insert(&mut self, ctx: Box<dyn Any>) -> usize {
         self.0.push(ctx);
         self.0.len() - 1
     }
 
-    pub fn get_context(&self, id: usize) -> &dyn NativeContext {
+    pub fn get_context(&self, id: usize) -> &dyn Any {
         self.0.get(id).unwrap().deref()
     }
 
-    pub fn get_mut_context(&mut self, id: usize) -> &mut dyn NativeContext {
+    pub fn get_mut_context(&mut self, id: usize) -> &mut dyn Any {
         self.0.get_mut(id).unwrap().deref_mut()
     }
 }
@@ -534,12 +534,14 @@ impl LEnv {
 
 pub fn load_module(env: &mut RefLEnv, ctxs: &mut ContextCollection, module: Module) {
     let id = ctxs.insert(module.ctx);
-    for (sym, nl) in module.prelude_unmut {
-        env.symbols.insert(sym.to_string(), NativeLambda((id, nl)));
-    }
-    for (sym, nml) in module.prelude_mut {
-        env.symbols
-            .insert(sym.to_string(), NativeMutLambda((id, nml)));
+    for (sym, lv) in module.prelude {
+        let mut lv = lv.clone();
+        match &mut lv {
+            LValue::NativeLambda(nl) => nl.set_index_mod(id),
+            LValue::NativeMutLambda(nml) => nml.set_index_mod(id),
+            _ => {}
+        }
+        env.symbols.insert(sym.to_string(), lv);
     }
 }
 
@@ -846,14 +848,15 @@ pub fn eval(lv: &LValue, env: &mut RefLEnv, ctxs: &mut CtxCollec) -> Result<LVal
         LValue::List(list) => {
             //println!("expression is a list");
             let list = list.as_slice();
-            let proc = list.get(0).unwrap();
+            let proc = &list[0];
             let args = &list[1..];
+            //assert!(args.len() >= 2, "Checked in expansion");
             match proc {
                 LValue::CoreOperator(co) => match co {
                     LCoreOperator::Define => {
                         match args.get(0).unwrap() {
                             LValue::Symbol(s) => {
-                                let exp = eval(args.get(1).unwrap(), env, ctxs)?;
+                                let exp = eval(&args[1], env, ctxs)?;
                                 env.add_entry(s.to_string(), exp);
                             }
                             lv => {
@@ -863,7 +866,7 @@ pub fn eval(lv: &LValue, env: &mut RefLEnv, ctxs: &mut CtxCollec) -> Result<LVal
                                     NameTypeLValue::Symbol,
                                 ))
                             }
-                        }
+                        };
                         Ok(LValue::None)
                     }
                     LCoreOperator::DefLambda => {
@@ -932,19 +935,29 @@ pub fn eval(lv: &LValue, env: &mut RefLEnv, ctxs: &mut CtxCollec) -> Result<LVal
                     /*let mut new_env = l.get_new_env(args, env)?;
                     eval(&l.get_body(), &mut new_env)*/
                 }
-                LValue::NativeLambda((mod_id, fun)) => {
+                LValue::NativeLambda(fun) => {
                     let args: Vec<LValue> = args
                         .iter()
                         .map(|a| eval(a, env, ctxs))
                         .collect::<Result<_, _>>()?;
-                    fun.call(&args, ctxs.get_context(*mod_id))
+                    fun.call(
+                        &args,
+                        env,
+                        ctxs.get_context(fun.get_index_mod().expect("Supposed to have a context")),
+                    )
                 }
-                LValue::NativeMutLambda((mod_id, fun)) => {
+                LValue::NativeMutLambda(fun) => {
                     let args: Vec<LValue> = args
                         .iter()
                         .map(|a| eval(a, env, ctxs))
                         .collect::<Result<_, _>>()?;
-                    fun.call(&args, ctxs.get_mut_context(*mod_id))
+                    fun.call(
+                        &args,
+                        env,
+                        ctxs.get_mut_context(
+                            fun.get_index_mod().expect("Supposed to have a context"),
+                        ),
+                    )
                 }
                 lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::LFn)),
             }

@@ -417,6 +417,7 @@ pub fn get_type(values: &[LValue], env: &mut RefLEnv, _: &mut CtxCollec) -> Resu
         LValue::Number(n) => match n {
             LNumber::Int(_) => LSymType::Type(Some(LType::Int)),
             LNumber::Float(_) => LSymType::Type(Some(LType::Float)),
+            LNumber::USize(_) => LSymType::Type(Some(LType::Usize)),
         },
         LValue::Bool(_) => LSymType::Type(Some(LType::Bool)),
         lv => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Atom)),

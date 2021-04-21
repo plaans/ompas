@@ -13,10 +13,10 @@ robot_sim = []
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-aries_model = {git = "https://github.com/Yirmandias/aries/"}
-aries_planning = {git = "https://github.com/Yirmandias/aries/"}
-aries_utils = {git = "https://github.com/Yirmandias/aries/"}
-aries_collections = {git = "https://github.com/Yirmandias/aries/"}
+aries_model = {git = "https://github.com/arbimo/aries/", rev = "e220567"}
+aries_planning = {git = "https://github.com/arbimo/aries/", rev = "e220567"}
+aries_utils = {git = "https://github.com/arbimo/aries/", rev = "e220567"}
+aries_collections = {git = "https://github.com/arbimo/aries/", rev = "e220567"}
 anyhow = "1.0.40"
 rustyline = "7.1.0"
 im = "15.0.0"

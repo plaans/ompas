@@ -5,7 +5,7 @@ use std::cmp::Ordering;
 use crate::lisp_root::lisp_struct::LError::WrongNumberOfArgument;
 use crate::lisp_root::{eval, CtxCollec, RefLEnv};
 use im::HashMap;
-use std::any::{Any, TypeId};
+use std::any::Any;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::{Add, Div, Mul, Range, Sub};
@@ -13,6 +13,7 @@ use std::rc::Rc;
 
 //TODO: define MutLfn
 
+#[derive(Debug)]
 pub enum LError {
     WrongType(LValue, NameTypeLValue, NameTypeLValue),
     NotInListOfExpectedTypes(LValue, NameTypeLValue, Vec<NameTypeLValue>),
@@ -29,10 +30,21 @@ impl From<ErrLoc> for LError {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum LNumber {
     Int(i64),
     Float(f64),
+    USize(usize),
+}
+
+impl Display for LNumber {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            LNumber::Int(i) => write!(f, "{}", i),
+            LNumber::Float(fl) => write!(f, "{}", fl),
+            LNumber::USize(u) => write!(f, "{}", u),
+        }
+    }
 }
 
 impl Into<Sym> for &LNumber {
@@ -40,6 +52,7 @@ impl Into<Sym> for &LNumber {
         match self {
             LNumber::Int(i) => i.to_string().into(),
             LNumber::Float(f) => f.to_string().into(),
+            LNumber::USize(u) => u.to_string().into(),
         }
     }
 }
@@ -55,17 +68,45 @@ impl LNumber {
         match self {
             LNumber::Int(_) => TYPE_INT.into(),
             LNumber::Float(_) => TYPE_FLOAT.into(),
+            LNumber::USize(_) => TYPE_USIZE.into(),
         }
     }
 }
 
 impl PartialEq for LNumber {
     fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (LNumber::Int(i1), LNumber::Int(i2)) => *i1 == *i2,
-            (LNumber::Float(f1), LNumber::Float(f2)) => *f1 == *f2,
-            (LNumber::Int(i1), LNumber::Float(f2)) => *i1 as f64 == *f2,
-            (LNumber::Float(f1), LNumber::Int(i2)) => *f1 == *i2 as f64,
+        let n1: f64 = self.into();
+        let n2: f64 = other.into();
+        n1 == n2
+    }
+}
+
+impl Into<usize> for &LNumber {
+    fn into(self) -> usize {
+        match self {
+            LNumber::Int(i) => *i as usize,
+            LNumber::Float(f) => *f as usize,
+            LNumber::USize(u) => *u,
+        }
+    }
+}
+
+impl Into<f64> for &LNumber {
+    fn into(self) -> f64 {
+        match self {
+            LNumber::Int(i) => *i as f64,
+            LNumber::Float(f) => *f,
+            LNumber::USize(u) => *u as f64,
+        }
+    }
+}
+
+impl Into<i64> for &LNumber {
+    fn into(self) -> i64 {
+        match self {
+            LNumber::Int(i) => *i,
+            LNumber::Float(f) => *f as i64,
+            LNumber::USize(u) => *u as i64,
         }
     }
 }
@@ -75,6 +116,7 @@ impl Hash for LNumber {
         match self {
             LNumber::Int(i) => i.hash(state),
             LNumber::Float(f) => f.to_string().hash(state),
+            LNumber::USize(u) => u.hash(state),
         }
     }
 }
@@ -85,39 +127,27 @@ impl PartialOrd for LNumber {
     }
 
     fn lt(&self, other: &Self) -> bool {
-        match (self, other) {
-            (LNumber::Int(i1), LNumber::Int(i2)) => *i1 < *i2,
-            (LNumber::Float(f1), LNumber::Float(f2)) => *f1 < *f2,
-            (LNumber::Int(i1), LNumber::Float(f2)) => (*i1 as f64) < *f2,
-            (LNumber::Float(f1), LNumber::Int(i2)) => *f1 < *i2 as f64,
-        }
+        let n1: f64 = self.into();
+        let n2: f64 = other.into();
+        n1 < n2
     }
 
     fn le(&self, other: &Self) -> bool {
-        match (self, other) {
-            (LNumber::Int(i1), LNumber::Int(i2)) => *i1 <= *i2,
-            (LNumber::Float(f1), LNumber::Float(f2)) => *f1 <= *f2,
-            (LNumber::Int(i1), LNumber::Float(f2)) => (*i1 as f64) <= *f2,
-            (LNumber::Float(f1), LNumber::Int(i2)) => *f1 <= *i2 as f64,
-        }
+        let n1: f64 = self.into();
+        let n2: f64 = other.into();
+        n1 <= n2
     }
 
     fn gt(&self, other: &Self) -> bool {
-        match (self, other) {
-            (LNumber::Int(i1), LNumber::Int(i2)) => *i1 > *i2,
-            (LNumber::Float(f1), LNumber::Float(f2)) => *f1 > *f2,
-            (LNumber::Int(i1), LNumber::Float(f2)) => (*i1 as f64) > *f2,
-            (LNumber::Float(f1), LNumber::Int(i2)) => *f1 > *i2 as f64,
-        }
+        let n1: f64 = self.into();
+        let n2: f64 = other.into();
+        n1 > n2
     }
 
     fn ge(&self, other: &Self) -> bool {
-        match (self, other) {
-            (LNumber::Int(i1), LNumber::Int(i2)) => *i1 >= *i2,
-            (LNumber::Float(f1), LNumber::Float(f2)) => *f1 >= *f2,
-            (LNumber::Int(i1), LNumber::Float(f2)) => (*i1 as f64) >= *f2,
-            (LNumber::Float(f1), LNumber::Int(i2)) => *f1 >= *i2 as f64,
-        }
+        let n1: f64 = self.into();
+        let n2: f64 = other.into();
+        n1 >= n2
     }
 }
 
@@ -130,6 +160,7 @@ impl Add for &LNumber {
             (LNumber::Float(f1), LNumber::Float(f2)) => LNumber::Float(*f1 + *f2),
             (LNumber::Int(i1), LNumber::Float(f2)) => LNumber::Float(*i1 as f64 + *f2),
             (LNumber::Float(f1), LNumber::Int(i2)) => LNumber::Float(*f1 + *i2 as f64),
+            (_, _) => unimplemented!(),
         }
     }
 }
@@ -143,6 +174,7 @@ impl Sub for &LNumber {
             (LNumber::Float(f1), LNumber::Float(f2)) => LNumber::Float(*f1 - *f2),
             (LNumber::Int(i1), LNumber::Float(f2)) => LNumber::Float(*i1 as f64 - *f2),
             (LNumber::Float(f1), LNumber::Int(i2)) => LNumber::Float(*f1 - *i2 as f64),
+            (_, _) => unimplemented!(),
         }
     }
 }
@@ -156,6 +188,7 @@ impl Div for &LNumber {
             (LNumber::Float(f1), LNumber::Float(f2)) => LNumber::Float(*f1 / *f2),
             (LNumber::Int(i1), LNumber::Float(f2)) => LNumber::Float(*i1 as f64 / *f2),
             (LNumber::Float(f1), LNumber::Int(i2)) => LNumber::Float(*f1 / *i2 as f64),
+            (_, _) => unimplemented!(),
         }
     }
 }
@@ -169,6 +202,7 @@ impl Mul for &LNumber {
             (LNumber::Float(f1), LNumber::Float(f2)) => LNumber::Float(*f1 * *f2),
             (LNumber::Int(i1), LNumber::Float(f2)) => LNumber::Float(*i1 as f64 * *f2),
             (LNumber::Float(f1), LNumber::Int(i2)) => LNumber::Float(*f1 * *i2 as f64),
+            (_, _) => unimplemented!(),
         }
     }
 }
@@ -209,6 +243,7 @@ impl Eq for LNumber {}
 pub enum LType {
     Int,
     Bool,
+    Usize,
     Float,
     Object,
     Symbol(Sym),
@@ -221,6 +256,7 @@ impl From<&str> for LType {
             TYPE_FLOAT => LType::Float,
             TYPE_OBJECT => LType::Object,
             TYPE_BOOL => LType::Bool,
+            TYPE_USIZE => LType::Usize,
             other => LType::Symbol(other.into()),
         }
     }
@@ -246,6 +282,7 @@ impl From<&LType> for Sym {
             LType::Float => TYPE_FLOAT.into(),
             LType::Symbol(s) => s.clone(),
             LType::Object => TYPE_OBJECT.into(),
+            LType::Usize => TYPE_USIZE.into(),
         }
     }
 }
@@ -362,7 +399,7 @@ impl LLambda {
         *self.body.clone()
     }
 }
-
+/*
 /// Trait is used to dynamically expose the data available in the context.
 ///
 /// The context essentially provides a set of typed data and is available as an trait object `&dyn NativeContext`.
@@ -432,46 +469,109 @@ impl NativeContextWrapper {
             .get_component(TypeId::of::<T>())
             .and_then(|x| x.downcast_ref())
     }
-}
+}*/
 
-pub type NativeFun = dyn Fn(&[LValue], &dyn NativeContext) -> Result<LValue, LError>;
+pub type NativeFun = dyn Fn(&[LValue], &mut RefLEnv, &dyn Any) -> Result<LValue, LError>;
 
 #[derive(Clone)]
 pub struct LNativeLambda {
     pub fun: Rc<NativeFun>,
+    index_mod: Option<usize>,
 }
 
 impl LNativeLambda {
-    pub fn new<T: 'static, R: Into<LValue>, F: Fn(&[LValue], &T) -> R + 'static>(
+    pub fn new<
+        T: 'static,
+        R: Into<Result<LValue, LError>>,
+        F: Fn(&[LValue], &mut RefLEnv, &T) -> R + 'static,
+    >(
         lbd: Box<F>,
     ) -> Self {
-        let x = move |args: &[LValue], ctx: &dyn NativeContext| -> Result<LValue, LError> {
-            let ctx: Option<&T> = ctx
-                .get_component(TypeId::of::<T>())
-                .and_then(|x| x.downcast_ref::<T>());
-            if let Some(ctx) = ctx {
-                Ok(lbd(args, ctx).into())
-            } else {
-                Err(LError::SpecialError("oups".to_string()))
-            }
-        };
-        LNativeLambda { fun: Rc::new(x) }
+        let x =
+            move |args: &[LValue], env: &mut RefLEnv, ctx: &dyn Any| -> Result<LValue, LError> {
+                let ctx: Option<&T> = ctx.downcast_ref::<T>();
+                if let Some(ctx) = ctx {
+                    lbd(args, env, ctx).into()
+                } else {
+                    Err(LError::SpecialError(
+                        "Impossible to downcast context".to_string(),
+                    ))
+                }
+            };
+        LNativeLambda {
+            fun: Rc::new(x),
+            index_mod: None,
+        }
     }
-    pub fn call(&self, args: &[LValue], ctx: &dyn NativeContext) -> Result<LValue, LError> {
-        (self.fun)(args, ctx)
+
+    pub fn call(
+        &self,
+        args: &[LValue],
+        env: &mut RefLEnv,
+        ctx: &dyn Any,
+    ) -> Result<LValue, LError> {
+        (self.fun)(args, env, ctx)
+    }
+
+    pub fn set_index_mod(&mut self, index_mod: usize) {
+        self.index_mod = Some(index_mod);
+    }
+
+    pub fn get_index_mod(&self) -> Option<usize> {
+        self.index_mod
     }
 }
 
-pub type NativeMutFun = dyn Fn(&[LValue], &mut dyn NativeContext) -> Result<LValue, LError>;
+pub type NativeMutFun = dyn Fn(&[LValue], &mut RefLEnv, &mut dyn Any) -> Result<LValue, LError>;
 
 #[derive(Clone)]
 pub struct LNativeMutLambda {
     pub(crate) fun: Rc<NativeMutFun>,
+    pub(crate) index_mod: Option<usize>,
 }
 
 impl LNativeMutLambda {
-    pub fn call(&self, args: &[LValue], ctx: &mut dyn NativeContext) -> Result<LValue, LError> {
-        (self.fun)(args, ctx)
+    pub fn new<
+        T: 'static,
+        R: Into<Result<LValue, LError>>,
+        F: Fn(&[LValue], &mut RefLEnv, &mut T) -> R + 'static,
+    >(
+        lbd: Box<F>,
+    ) -> Self {
+        let x = move |args: &[LValue],
+                      env: &mut RefLEnv,
+                      ctx: &mut dyn Any|
+              -> Result<LValue, LError> {
+            let ctx: Option<&mut T> = ctx.downcast_mut::<T>();
+            if let Some(ctx) = ctx {
+                lbd(args, env, ctx).into()
+            } else {
+                Err(LError::SpecialError(
+                    "Impossible to downcast context".to_string(),
+                ))
+            }
+        };
+        LNativeMutLambda {
+            fun: Rc::new(x),
+            index_mod: None,
+        }
+    }
+
+    pub fn set_index_mod(&mut self, index_mod: usize) {
+        self.index_mod = Some(index_mod);
+    }
+
+    pub fn get_index_mod(&self) -> Option<usize> {
+        self.index_mod
+    }
+
+    pub fn call(
+        &self,
+        args: &[LValue],
+        env: &mut RefLEnv,
+        ctx: &mut dyn Any,
+    ) -> Result<LValue, LError> {
+        (self.fun)(args, env, ctx)
     }
 }
 
@@ -503,10 +603,10 @@ pub enum LValue {
     Quote(Box<LValue>),
     // error
     None,
-    LFn(LFn),
+    LFn(LFn), // TODO: replace with NativeLambda ?
     Lambda(LLambda),
-    NativeLambda((usize, LNativeLambda)),
-    NativeMutLambda((usize, LNativeMutLambda)),
+    NativeLambda(LNativeLambda),
+    NativeMutLambda(LNativeMutLambda),
     CoreOperator(LCoreOperator),
     SymType(LSymType),
 }
@@ -814,6 +914,7 @@ pub enum NameTypeLValue {
     Map,
     List,
     Quote,
+    Other(String),
 }
 
 impl PartialEq for NameTypeLValue {
@@ -836,6 +937,7 @@ impl PartialEq for NameTypeLValue {
             (NameTypeLValue::SymType, NameTypeLValue::SymType) => true,
             (NameTypeLValue::Atom, NameTypeLValue::Atom) => true,
             (NameTypeLValue::CoreOperator, NameTypeLValue::CoreOperator) => true,
+            (NameTypeLValue::Other(s1), NameTypeLValue::Other(s2)) => *s1 == *s2,
             (_, _) => false,
         }
     }
@@ -1034,6 +1136,7 @@ impl Display for LType {
             LType::Float => write!(f, "float"),
             LType::Symbol(s) => write!(f, "{}", s),
             LType::Object => write!(f, "object"),
+            LType::Usize => write!(f, "usize"),
         }
     }
 }
@@ -1072,15 +1175,6 @@ impl Display for LError {
             LError::NotInListOfExpectedTypes(lv, typ, list_types) => {
                 write!(f, "{}: Got {}, expected {:?}", lv, typ, list_types)
             }
-        }
-    }
-}
-
-impl Display for LNumber {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            LNumber::Int(i) => write!(f, "{}", i),
-            LNumber::Float(fl) => write!(f, "{}", fl),
         }
     }
 }
@@ -1177,6 +1271,7 @@ impl Display for NameTypeLValue {
             NameTypeLValue::SymType => "symtype",
             NameTypeLValue::Atom => "atom",
             NameTypeLValue::CoreOperator => "core_operator",
+            NameTypeLValue::Other(s) => s.as_str(),
         };
         write!(f, "{}", str)
     }
@@ -1405,9 +1500,8 @@ mod tests {
 }
 
 pub struct Module {
-    pub ctx: Box<dyn NativeContext>,
-    pub prelude_unmut: Vec<(Sym, LNativeLambda)>,
-    pub prelude_mut: Vec<(Sym, LNativeMutLambda)>,
+    pub ctx: Box<dyn Any>,
+    pub prelude: Vec<(Sym, LValue)>,
 }
 
 pub trait AsModule {

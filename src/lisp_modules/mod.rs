@@ -1,2 +1,3 @@
-pub mod counter;
-pub mod io;
+pub(crate) mod counter;
+pub(crate) mod io;
+pub(crate) mod _type;

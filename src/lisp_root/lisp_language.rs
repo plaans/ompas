@@ -60,6 +60,7 @@ pub const NOT: &str = "not";
 //basic types
 pub const TYPE_INT: &str = "int";
 pub const TYPE_FLOAT: &str = "float";
+pub const TYPE_USIZE: &str = "usize";
 pub const TYPE_OBJECT: &str = "object";
 pub const TYPE_BOOL: &str = "boolean";
 pub const TYPE_ROOT: &str = "root";

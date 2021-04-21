@@ -1,83 +1,167 @@
 /*
 LANGUAGE
 */
+use crate::lisp_root::lisp_struct::LError::{SpecialError, WrongNumberOfArgument, WrongType};
 use crate::lisp_root::lisp_struct::*;
-use std::any::{Any, TypeId};
-use std::rc::Rc;
+use crate::lisp_root::RefLEnv;
 
-pub const COUNTER: &str = "counter";
+pub const TYPE_COUNTER: &str = "counter";
 pub const SET_COUNTER: &str = "set-counter";
 pub const GET_COUNTER: &str = "get-counter";
+pub const NEW_COUNTER: &str = "new_counter";
+pub const DECREMENT_COUNTER: &str = "decrement-counter";
+pub const INCREMENT_COUNTER: &str = "increment-counter";
 
 #[derive(Default)]
+pub struct CtxCounter {
+    pub(crate) counters: Vec<Counter>,
+}
+
+impl CtxCounter {
+    pub fn new_counter(&mut self) -> usize {
+        self.counters.push(Counter::default());
+        self.counters.len() - 1
+    }
+}
+
+#[derive(Default, Clone)]
 pub struct Counter {
-    v: u32,
+    val: u32,
 }
 
-impl NativeContext for Counter {
-    fn get_component(&self, type_id: TypeId) -> Option<&dyn Any> {
-        if type_id == TypeId::of::<u32>() {
-            Some(&self.v)
-        } else {
-            None
+pub fn get_counter(args: &[LValue], _: &mut RefLEnv, ctx: &CtxCounter) -> Result<LValue, LError> {
+    if args.len() != 1 {
+        return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1));
+    }
+
+    match &args[0] {
+        LValue::Number(LNumber::USize(u)) => match ctx.counters.get(*u) {
+            None => Err(SpecialError("index out of reach".to_string())),
+            Some(c) => Ok(LValue::Number(LNumber::Int(c.val as i64))),
+        },
+        lv => Err(WrongType(
+            lv.clone(),
+            lv.into(),
+            NameTypeLValue::Other(TYPE_COUNTER.to_string()),
+        )),
+    }
+}
+
+pub fn decrement_counter(
+    args: &[LValue],
+    _: &mut RefLEnv,
+    ctx: &mut CtxCounter,
+) -> Result<LValue, LError> {
+    if args.len() != 1 {
+        return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1));
+    }
+
+    match &args[0] {
+        LValue::Number(LNumber::USize(u)) => match ctx.counters.get_mut(*u) {
+            None => Err(SpecialError("index out of reach".to_string())),
+            Some(c) => {
+                if c.val > 0 {
+                    c.val -=1;
+                }
+                Ok(LValue::None)
+            }
         }
+        lv => Err(WrongType(
+            lv.clone(),
+            lv.into(),
+            NameTypeLValue::Other(TYPE_COUNTER.to_string()),
+        )),
     }
-    fn get_component_mut(&mut self, type_id: TypeId) -> Option<&mut dyn Any> {
-        if type_id == TypeId::of::<u32>() {
-            Some(&mut self.v)
-        } else {
-            None
+}
+
+pub fn increment_counter(
+    args: &[LValue],
+    _: &mut RefLEnv,
+    ctx: &mut CtxCounter,
+) -> Result<LValue, LError> {
+
+    if args.len() != 1 {
+        return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1));
+    }
+    match &args[0] {
+        LValue::Number(LNumber::USize(u)) => match ctx.counters.get_mut(*u) {
+            None => Err(SpecialError("index out of reach".to_string())),
+            Some(c) => {
+                c.val += 1;
+                Ok(LValue::None)
+            }
         }
+        lv => Err(WrongType(
+            lv.clone(),
+            lv.into(),
+            NameTypeLValue::Other(TYPE_COUNTER.to_string()),
+        )),
     }
 }
 
-pub fn get_counter(_: &[LValue], ctx: &dyn NativeContext) -> Result<LValue, LError> {
-    if let Some(cnt) = ctx
-        .get_component(TypeId::of::<u32>())
-        .and_then(|x| x.downcast_ref::<u32>())
-    {
-        Ok(LValue::Number(LNumber::Int(*cnt as i64)))
-    } else {
-        Err(LError::SpecialError("No such component".to_string()))
+pub fn set_counter(
+    args: &[LValue],
+    _: &mut RefLEnv,
+    ctx: &mut CtxCounter,
+) -> Result<LValue, LError> {
+    if args.len() != 2 {
+        return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
+    }
+
+    match &args[0] {
+        LValue::Number(LNumber::USize(u)) => match ctx.counters.get_mut(*u) {
+            None => Err(SpecialError("index out of reach".to_string())),
+            Some(c) => {
+                c.val = args[1].as_int()? as u32;
+                Ok(LValue::None)
+            }
+        },
+        lv => Err(WrongType(
+            lv.clone(),
+            lv.into(),
+            NameTypeLValue::Other(TYPE_COUNTER.to_string()),
+        )),
     }
 }
 
-pub fn set_counter(args: &[LValue], ctx: &mut dyn NativeContext) -> Result<LValue, LError> {
-    if let Some(cnt) = ctx
-        .get_component_mut(TypeId::of::<u32>())
-        .and_then(|x| x.downcast_mut::<u32>())
-    {
-        *cnt = match args[0] {
-            LValue::Number(LNumber::Int(x)) => x as u32,
-            _ => panic!("type error"),
-        };
-        Ok(LValue::None)
-    } else {
-        Err(LError::SpecialError("No such component".to_string()))
-    }
+pub fn new_counter(
+    _: &[LValue],
+    _: &mut RefLEnv,
+    ctx: &mut CtxCounter,
+) -> Result<LValue, LError> {
+    Ok(LValue::Number(LNumber::USize(ctx.new_counter())))
 }
 
-impl AsModule for Counter {
+impl AsModule for CtxCounter {
     fn get_module() -> Module {
-        let mut prelude_unmut = vec![];
-        let mut prelude_mut = vec![];
-        prelude_unmut.push((
+        let mut prelude = vec![];
+        prelude.push((
             GET_COUNTER.into(),
-            LNativeLambda {
-                fun: Rc::new(get_counter),
-            },
+            LValue::NativeLambda(LNativeLambda::new(Box::new(get_counter))),
         ));
-        prelude_mut.push((
+        prelude.push((
             SET_COUNTER.into(),
-            LNativeMutLambda {
-                fun: Rc::new(set_counter),
-            },
+            LValue::NativeMutLambda(LNativeMutLambda::new(Box::new(set_counter))),
+        ));
+
+        prelude.push((
+            NEW_COUNTER.into(),
+            LValue::NativeMutLambda(LNativeMutLambda::new(Box::new(new_counter))),
+        ));
+
+        prelude.push((
+            INCREMENT_COUNTER.into(),
+            LValue::NativeMutLambda(LNativeMutLambda::new(Box::new(increment_counter))),
+        ));
+
+        prelude.push((
+            DECREMENT_COUNTER.into(),
+            LValue::NativeMutLambda(LNativeMutLambda::new(Box::new(decrement_counter))),
         ));
 
         Module {
             ctx: Box::new(Self::default()),
-            prelude_unmut,
-            prelude_mut,
+            prelude,
         }
     }
 }

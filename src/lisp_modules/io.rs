@@ -6,55 +6,57 @@
 LANGUAGE
  */
 
-/*pub struct IO {}
-
 const PRINT: &str = "print";
 const READ: &str = "read";
 const WRITE: &str = "write";
-const LOAD: &str = "load";*/
+//const LOAD: &str = "load";
 
-/*pub fn print(values: &[LValue], ctx: &dyn NativeContext ) -> Result<LValue, LError> {
+use crate::lisp_root::lisp_struct::{AsModule, LError, LFn, LMutFn, LValue, Module};
+use crate::lisp_root::RefLEnv;
+
+#[derive(Default, Debug)]
+pub struct CtxIO {}
+
+pub fn print(_: &[LValue], _: &RefLEnv, _: &CtxIO) -> Result<LValue, LError> {
     println!("moudle IO: print");
     Ok(LValue::None)
-
 }
 
-pub fn read(values: &[LValue], ctx: &dyn NativeContext) -> Result<LValue, LError> {
+pub fn read(_: &[LValue], _: &mut RefLEnv, _: &mut CtxIO) -> Result<LValue, LError> {
     println!("moudle IO: read");
     Ok(LValue::None)
 }
 
-pub fn write(values: &[LValue], ctx: &dyn NativeContext) -> Result<LValue, LError> {
+pub fn write(_: &[LValue], _: &RefLEnv, _: &CtxIO) -> Result<LValue, LError> {
     println!("moudle IO: write");
     Ok(LValue::None)
 }
 
-pub fn load(values: &[LValue], ctx: &dyn NativeContext) -> Result<LValue, LError> {
+/*pub fn load(args: &[LValue], _: &RefLEnv, _: & CtxIO ) -> Result<LValue, LError> {
     println!("moudle IO: load");
     Ok(LValue::None)
-}
+}*/
 
-impl AsModule for IO {
+impl AsModule for CtxIO {
     fn get_module() -> Module {
-        let mut prelude_unmut = vec![];
-        let mut prelude_mut = vec![];
-        prelude_unmut.push((PRINT.into(), LNativeLambda {
-            fun: Rc::new(print)
-        }));
-        prelude_unmut.push((READ.into(), LNativeLambda {
-            fun: Rc::new(read)
-        }));
-        prelude_unmut.push((WRITE.into(), LNativeLambda {
-            fun: Rc::new(write)
-        }));
-        prelude_unmut.push((LOAD.into(), LNativeLambda {
-            fun: Rc::new(load)
-        }));
+        let mut prelude = vec![];
+        prelude.push((
+            PRINT.into(),
+            LValue::Fn(LFn::new(Box::new(print), PRINT.to_string())),
+        ));
+        prelude.push((
+            READ.into(),
+            LValue::MutFn(LMutFn::new(Box::new(read), READ.to_string())),
+        ));
+        prelude.push((
+            WRITE.into(),
+            LValue::Fn(LFn::new(Box::new(write), WRITE.to_string())),
+        ));
+        //prelude.push((LOAD.into(),LValue::Fn(LFn::new(Box::new(print), LOAD.to_string()))));
 
         Module {
-            ctx: Box::new(()),
-            prelude_mut,
-            prelude_unmut
+            ctx: Box::new(CtxIO::default()),
+            prelude,
         }
     }
-}*/
+}

@@ -1,4 +1,7 @@
-use crate::lisp_modules::counter::{CtxCounter};
+use crate::lisp_modules::_type::CtxType;
+use crate::lisp_modules::counter::CtxCounter;
+use crate::lisp_modules::io::CtxIO;
+use crate::lisp_modules::math::CtxMath;
 use crate::lisp_root::lisp_struct::*;
 use crate::lisp_root::{eval, load_module, parse, ContextCollection, RefLEnv};
 use rustyline::error::ReadlineError;
@@ -13,7 +16,9 @@ pub fn repl() {
     let root_env = &mut RefLEnv::root();
     let ctxs: &mut ContextCollection = &mut Default::default();
     load_module(root_env, ctxs, CtxCounter::get_module());
-    //load_module(root_env, ctxs, IO::get_module());
+    load_module(root_env, ctxs, CtxIO::get_module());
+    load_module(root_env, ctxs, CtxType::get_module());
+    load_module(root_env, ctxs, CtxMath::get_module());
     let env = &mut RefLEnv::new_from_outer(root_env.clone());
 
     loop {

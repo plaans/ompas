@@ -1,3 +1,4 @@
+use crate::lisp_root::lisp_as_literal::AsLiteral;
 use crate::lisp_root::lisp_functions::*;
 use crate::lisp_root::lisp_language::*;
 use crate::lisp_root::lisp_struct::LCoreOperator::Quote;
@@ -8,19 +9,19 @@ use aries_planning::parsing::sexpr::SExpr;
 use aries_utils::input::Sym;
 use im::HashMap;
 use std::any::Any;
+use std::borrow::Borrow;
 use std::fs::File;
 use std::io::Write;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
-use std::borrow::Borrow;
 
+pub mod lisp_as_literal;
 pub mod lisp_functions;
 pub mod lisp_language;
 pub mod lisp_struct;
 
 pub struct LEnv {
     symbols: HashMap<String, LValue>,
-    sym_types: HashMap<Sym, LSymType>,
     macro_table: HashMap<Sym, LLambda>,
     new_entries: Vec<String>,
     outer: Option<RefLEnv>,
@@ -72,7 +73,6 @@ impl RefLEnv {
     pub fn new_from_outer(outer: RefLEnv) -> Self {
         RefLEnv(Rc::new(LEnv {
             symbols: Default::default(),
-            sym_types: Default::default(),
             macro_table: Default::default(),
             new_entries: vec![],
             outer: Some(outer),
@@ -115,7 +115,6 @@ impl LEnv {
         // let map = im::hashmap::HashMap::new();
         // map.ins
         let mut symbols: HashMap<String, LValue> = HashMap::default();
-        let mut sym_types: HashMap<Sym, LSymType> = HashMap::default();
 
         //Core Operators
         symbols.insert(DEFINE.to_string(), LCoreOperator::Define.into());
@@ -131,164 +130,50 @@ impl LEnv {
         //Mathematical functions
         symbols.insert(
             ADD.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(add),
-                label: ADD.to_string(),
-            }),
+            LValue::Fn(LFn::new(Box::new(add), ADD.to_string())),
         );
         symbols.insert(
             SUB.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(sub),
-                label: SUB.to_string(),
-            }),
+            LValue::Fn(LFn::new(Box::new(sub), SUB.to_string())),
         );
         symbols.insert(
             MUL.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(mul),
-                label: MUL.to_string(),
-            }),
+            LValue::Fn(LFn::new(Box::new(mul), MUL.to_string())),
         );
         symbols.insert(
             DIV.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(div),
-                label: DIV.to_string(),
-            }),
+            LValue::Fn(LFn::new(Box::new(div), DIV.to_string())),
         );
         //Comparison
         symbols.insert(
             GT.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(gt),
-                label: GT.to_string(),
-            }),
+            LValue::Fn(LFn::new(Box::new(gt), GT.to_string())),
         );
         symbols.insert(
             LT.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(lt),
-                label: LT.to_string(),
-            }),
+            LValue::Fn(LFn::new(Box::new(lt), LT.to_string())),
         );
         symbols.insert(
             GE.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(ge),
-                label: GE.to_string(),
-            }),
+            LValue::Fn(LFn::new(Box::new(ge), GE.to_string())),
         );
         symbols.insert(
             LE.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(le),
-                label: LE.to_string(),
-            }),
+            LValue::Fn(LFn::new(Box::new(le), LE.to_string())),
         );
         symbols.insert(
             EQ.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(eq),
-                label: ADD.to_string(),
-            }),
-        );
-
-        //Type verification
-        symbols.insert(
-            IS_NONE.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(is_none),
-                label: IS_NONE.to_string(),
-            }),
-        );
-        symbols.insert(
-            IS_NUMBER.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(is_number),
-                label: IS_NUMBER.to_string(),
-            }),
-        );
-        symbols.insert(
-            IS_BOOL.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(is_bool),
-                label: IS_BOOL.to_string(),
-            }),
-        );
-        symbols.insert(
-            IS_FN.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(is_fn),
-                label: IS_FN.to_string(),
-            }),
-        );
-        symbols.insert(
-            IS_STATE_FUNCTION.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(is_state_function),
-                label: IS_STATE_FUNCTION.to_string(),
-            }),
-        );
-
-        symbols.insert(
-            IS_OBJECT.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(is_object),
-                label: IS_OBJECT.to_string(),
-            }),
-        );
-        symbols.insert(
-            IS_TYPE.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(is_type),
-                label: IS_TYPE.to_string(),
-            }),
-        );
-        symbols.insert(
-            IS_MAP.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(is_map),
-                label: IS_MAP.to_string(),
-            }),
-        );
-        symbols.insert(
-            IS_LIST.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(is_list),
-                label: IS_LIST.to_string(),
-            }),
-        );
-        symbols.insert(
-            IS_LAMBDA.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(is_lambda),
-                label: IS_LAMBDA.to_string(),
-            }),
-        );
-        symbols.insert(
-            IS_QUOTE.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(is_quote),
-                label: IS_QUOTE.to_string(),
-            }),
+            LValue::Fn(LFn::new(Box::new(div), EQ.to_string())),
         );
 
         //Special entry
         symbols.insert(
             GET.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(get),
-                label: GET.to_string(),
-            }),
+            LValue::Fn(LFn::new(Box::new(get), GET.to_string())),
         );
-        symbols.insert(
-            GET_TYPE.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(get_type),
-                label: GET_TYPE.to_string(),
-            }),
-        );
+        /*symbols.insert(
+        GET_TYPE.to_string(),
+        LValue::Fn(LFn::new(Box::new(get_type), GET_TYPE.to_string())));*/
 
         //Logical functions : will be added as macros
         //symbols.insert(AND.to_string(), LValue::LFn(Rc::new(and)));
@@ -298,71 +183,24 @@ impl LEnv {
         //Basic types
 
         //Functions for the factbase
-        symbols.insert(
+        /* symbols.insert(
             STATE_FUNCTION.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(state_function),
-                label: STATE_FUNCTION.to_string(),
-            }),
-        );
+            LValue::Fn(LFn::new(Box::new(state_function), STATE_FUNCTION.to_string())));
         symbols.insert(
             SUBTYPE.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(subtype),
-                label: SUBTYPE.to_string(),
-            }),
-        );
+            LValue::Fn(LFn::new(Box::new(subtype), SUBTYPE.to_string())));*/
         symbols.insert(
             MAP.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(map),
-                label: MAP.to_string(),
-            }),
+            LValue::Fn(LFn::new(Box::new(map), MAP.to_string())),
         );
         symbols.insert(
             LIST.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(list),
-                label: LIST.to_string(),
-            }),
+            LValue::Fn(LFn::new(Box::new(list), LIST.to_string())),
         );
         //State is an alias for map
-        symbols.insert(
-            STATE.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(map),
-                label: STATE.to_string(),
-            }),
-        );
-        symbols.insert(
-            TYPEOF.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(type_of),
-                label: TYPEOF.to_string(),
-            }),
-        );
-        symbols.insert(
-            READ.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(read),
-                label: READ.to_string(),
-            }),
-        );
-        symbols.insert(
-            WRITE.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(write),
-                label: WRITE.to_string(),
-            }),
-        );
-        //symbols.insert(QUOTE.to_string(), LValue::LFn(Rc::new(quote)));
-        symbols.insert(
-            PRINT.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(print),
-                label: PRINT.to_string(),
-            }),
-        );
+        /*symbols.insert(
+        STATE.to_string(),
+        LValue::Fn(LFn::new(Box::new(map), STATE.to_string())));*/
         //Sym_types
 
         /*
@@ -370,67 +208,38 @@ impl LEnv {
          */
         symbols.insert(
             CAR.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(car),
-                label: CAR.to_string(),
-            }),
+            LValue::Fn(LFn::new(Box::new(car), CAR.to_string())),
         );
 
         symbols.insert(
             CDR.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(cdr),
-                label: CDR.to_string(),
-            }),
+            LValue::Fn(LFn::new(Box::new(cdr), CDR.to_string())),
         );
 
         symbols.insert(
             CONS.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(cons),
-                label: CONS.to_string(),
-            }),
+            LValue::Fn(LFn::new(Box::new(cons), CONS.to_string())),
         );
 
         symbols.insert(
             APPEND.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(append),
-                label: APPEND.to_string(),
-            }),
+            LValue::Fn(LFn::new(Box::new(append), APPEND.to_string())),
         );
 
         symbols.insert(
             MEMBER.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(member),
-                label: MEMBER.to_string(),
-            }),
+            LValue::Fn(LFn::new(Box::new(member), MEMBER.to_string())),
         );
 
         symbols.insert(
             REVERSE.to_string(),
-            LValue::LFn(LFn {
-                pointer: Rc::new(reverse),
-                label: REVERSE.to_string(),
-            }),
-        );
-
-        sym_types.insert(TYPE_INT.into(), LSymType::Type(None));
-        sym_types.insert(TYPE_FLOAT.into(), LSymType::Type(None));
-        sym_types.insert(TYPE_BOOL.into(), LSymType::Type(None));
-        sym_types.insert(TYPE_OBJECT.into(), LSymType::Type(None));
-
-        symbols.insert(
-            PI.to_string(),
-            LValue::Number(LNumber::Float(std::f64::consts::PI)),
+            LValue::Fn(LFn::new(Box::new(reverse), REVERSE.to_string())),
         );
 
         //TODO: add the macros defined in a predefined file
 
         Self {
             symbols,
-            sym_types,
             macro_table: Default::default(),
             new_entries: vec![],
             outer: None,
@@ -440,7 +249,6 @@ impl LEnv {
     pub fn empty() -> Self {
         LEnv {
             symbols: Default::default(),
-            sym_types: Default::default(),
             macro_table: Default::default(),
             new_entries: vec![],
             outer: None,
@@ -450,7 +258,6 @@ impl LEnv {
     pub fn new_with_outer(outer: Option<RefLEnv>) -> Self {
         LEnv {
             symbols: Default::default(),
-            sym_types: Default::default(),
             macro_table: Default::default(),
             new_entries: vec![],
             outer,
@@ -477,17 +284,9 @@ impl LEnv {
         }
     }
 
-    pub fn get_sym_type(&self, sym: &Sym) -> Option<&LSymType> {
-        self.sym_types.get(sym)
-    }
-
     pub fn add_entry(&mut self, key: String, exp: LValue) {
         self.symbols.insert(key.clone(), exp);
         self.new_entries.push(key);
-    }
-
-    pub fn add_sym_type(&mut self, sym: Sym, sym_type: LSymType) {
-        self.sym_types.insert(sym, sym_type);
     }
 
     pub fn add_macro(&mut self, key: Sym, _macro: LLambda) {
@@ -508,19 +307,7 @@ impl LEnv {
         string.push_str("(begin \n");
         for key in &self.new_entries {
             let value = self.get_symbol(key).unwrap_or(LValue::None);
-            match value {
-                LValue::Symbol(s) => string.push_str(
-                    format!(
-                        "(typeof {} {})",
-                        s,
-                        self.get_sym_type(&s)
-                            .unwrap_or(&LSymType::Object(LType::Object))
-                            .as_command()
-                    )
-                    .as_str(),
-                ),
-                lv => string.push_str(format!("(define {} {})", key, lv.as_command()).as_str()),
-            }
+            string.push_str(format!("(define {} {})", key, value.as_command()).as_str());
         }
 
         string.push(')');
@@ -532,16 +319,15 @@ impl LEnv {
     }
 }
 
-pub fn load_module(env: &mut RefLEnv, ctxs: &mut ContextCollection, module: Module) {
+pub fn load_module(env: &mut RefLEnv, ctxs: &mut ContextCollection, mut module: Module) {
     let id = ctxs.insert(module.ctx);
-    for (sym, lv) in module.prelude {
-        let mut lv = lv.clone();
-        match &mut lv {
-            LValue::NativeLambda(nl) => nl.set_index_mod(id),
-            LValue::NativeMutLambda(nml) => nml.set_index_mod(id),
+    for (sym, lv) in &mut module.prelude {
+        match lv {
+            LValue::Fn(nl) => nl.set_index_mod(id),
+            LValue::MutFn(nml) => nml.set_index_mod(id),
             _ => {}
         }
-        env.symbols.insert(sym.to_string(), lv);
+        env.symbols.insert(sym.to_string(), lv.clone());
     }
 }
 
@@ -923,43 +709,33 @@ pub fn eval(lv: &LValue, env: &mut RefLEnv, ctxs: &mut CtxCollec) -> Result<LVal
                     | LCoreOperator::UnQuote
                     | LCoreOperator::DefMacro => Ok(LValue::None),
                 },
-                LValue::LFn(f) => {
-                    let mut arg_evaluated = Vec::new();
-                    for arg in args {
-                        arg_evaluated.push(eval(arg, env, ctxs)?)
-                    }
-                    return (f.pointer)(arg_evaluated.as_slice(), env, ctxs);
-                }
                 LValue::Lambda(l) => {
                     l.call(args, env, ctxs)
                     /*let mut new_env = l.get_new_env(args, env)?;
                     eval(&l.get_body(), &mut new_env)*/
                 }
-                LValue::NativeLambda(fun) => {
+                LValue::Fn(fun) => {
                     let args: Vec<LValue> = args
                         .iter()
                         .map(|a| eval(a, env, ctxs))
                         .collect::<Result<_, _>>()?;
-                    fun.call(
-                        &args,
-                        env,
-                        ctxs.get_context(fun.get_index_mod().expect("Supposed to have a context")),
-                    )
+                    let ctx: &dyn Any = match fun.get_index_mod() {
+                        None => &(),
+                        Some(u) => ctxs.get_context(u),
+                    };
+                    fun.call(&args, env, ctx)
                 }
-                LValue::NativeMutLambda(fun) => {
+                LValue::MutFn(fun) => {
                     let args: Vec<LValue> = args
                         .iter()
                         .map(|a| eval(a, env, ctxs))
                         .collect::<Result<_, _>>()?;
-                    fun.call(
-                        &args,
-                        env,
-                        ctxs.get_mut_context(
-                            fun.get_index_mod().expect("Supposed to have a context"),
-                        ),
-                    )
+                    match fun.get_index_mod() {
+                        None => fun.call(&args, env, &mut ()),
+                        Some(u) => fun.call(&args, env, ctxs.get_mut_context(u)),
+                    }
                 }
-                lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::LFn)),
+                lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Fn)),
             }
         }
         LValue::Symbol(s) => match env.get_symbol(s.as_str()) {

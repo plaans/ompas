@@ -1,16 +1,11 @@
-use crate::lisp_root::lisp_language::TYPE_OBJECT;
 use crate::lisp_root::lisp_struct::LError::*;
 use crate::lisp_root::lisp_struct::*;
+use crate::lisp_root::RefLEnv;
 use aries_utils::input::Sym;
-//use std::collections::HashMap;
-//use std::fs::File;
-//use std::io::Read;
-use crate::lisp_root::lisp_language::*;
-use crate::lisp_root::{eval, CtxCollec, RefLEnv};
 use im::HashMap;
 
 //Mathematical functions
-pub fn add(values: &[LValue], _env: &mut RefLEnv, _: &mut CtxCollec) -> Result<LValue, LError> {
+pub fn add(values: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     let mut result = LValue::Number(LNumber::Float(0.0));
     for value in values {
         result = (&result + value)?;
@@ -18,14 +13,14 @@ pub fn add(values: &[LValue], _env: &mut RefLEnv, _: &mut CtxCollec) -> Result<L
     Ok(result)
 }
 
-pub fn sub(values: &[LValue], _env: &mut RefLEnv, _: &mut CtxCollec) -> Result<LValue, LError> {
+pub fn sub(values: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     match values.len() {
         2 => values.get(0).unwrap() - values.get(1).unwrap(),
         i => Err(WrongNumberOfArgument(values.into(), i, 2..2)),
     }
 }
 
-pub fn mul(values: &[LValue], _env: &mut RefLEnv, _: &mut CtxCollec) -> Result<LValue, LError> {
+pub fn mul(values: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     let mut result = LValue::Number(LNumber::Float(1.0));
     for value in values {
         result = (&result * value)?;
@@ -33,7 +28,7 @@ pub fn mul(values: &[LValue], _env: &mut RefLEnv, _: &mut CtxCollec) -> Result<L
     Ok(result)
 }
 
-pub fn div(values: &[LValue], _env: &mut RefLEnv, _: &mut CtxCollec) -> Result<LValue, LError> {
+pub fn div(values: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     match values.len() {
         2 => values.get(0).unwrap() / values.get(0).unwrap(),
         i => Err(WrongNumberOfArgument(values.into(), i, 2..2)),
@@ -41,282 +36,57 @@ pub fn div(values: &[LValue], _env: &mut RefLEnv, _: &mut CtxCollec) -> Result<L
 }
 
 //Comparison functions
-pub fn gt(values: &[LValue], _env: &mut RefLEnv, _: &mut CtxCollec) -> Result<LValue, LError> {
+pub fn gt(values: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     match values.len() {
         2 => Ok(LValue::Bool(values[0] > values[1])),
         i => Err(WrongNumberOfArgument(values.into(), i, 2..2)),
     }
 }
 
-pub fn lt(values: &[LValue], _env: &mut RefLEnv, _: &mut CtxCollec) -> Result<LValue, LError> {
+pub fn lt(values: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     match values.len() {
         2 => Ok(LValue::Bool(values[0] < values[1])),
         i => Err(WrongNumberOfArgument(values.into(), i, 2..2)),
     }
 }
 
-pub fn ge(values: &[LValue], _env: &mut RefLEnv, _: &mut CtxCollec) -> Result<LValue, LError> {
+pub fn ge(values: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     match values.len() {
         2 => Ok(LValue::Bool(values[0] >= values[1])),
         i => Err(WrongNumberOfArgument(values.into(), i, 2..2)),
     }
 }
 
-pub fn le(values: &[LValue], _env: &mut RefLEnv, _: &mut CtxCollec) -> Result<LValue, LError> {
+pub fn le(values: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     match values.len() {
         2 => Ok(LValue::Bool(values[0] <= values[1])),
         i => Err(WrongNumberOfArgument(values.into(), i, 2..2)),
     }
 }
 
-pub fn eq(values: &[LValue], _env: &mut RefLEnv, _: &mut CtxCollec) -> Result<LValue, LError> {
+pub fn eq(values: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     match values.len() {
         2 => Ok(LValue::Bool(values[0] == values[1])),
         i => Err(WrongNumberOfArgument(values.into(), i, 2..2)),
     }
 }
 
-//Type verification
-pub fn is_none(values: &[LValue], _env: &mut RefLEnv, _: &mut CtxCollec) -> Result<LValue, LError> {
-    match values.len() {
-        1 => Ok(LValue::Bool(
-            NameTypeLValue::from(values.get(0).unwrap()) == NameTypeLValue::None,
-        )),
-        i => Err(WrongNumberOfArgument(values.into(), i, 1..1)),
-    }
-}
-
-pub fn is_number(
-    values: &[LValue],
-    _env: &mut RefLEnv,
-    _: &mut CtxCollec,
-) -> Result<LValue, LError> {
-    match values.len() {
-        1 => Ok(LValue::Bool(
-            NameTypeLValue::from(values.get(0).unwrap()) == NameTypeLValue::Number,
-        )),
-        i => Err(WrongNumberOfArgument(values.into(), i, 1..1)),
-    }
-}
-
-pub fn is_bool(values: &[LValue], _env: &mut RefLEnv, _: &mut CtxCollec) -> Result<LValue, LError> {
-    match values.len() {
-        1 => Ok(LValue::Bool(
-            NameTypeLValue::from(values.get(0).unwrap()) == NameTypeLValue::Bool,
-        )),
-        i => Err(WrongNumberOfArgument(values.into(), i, 1..1)),
-    }
-}
-
-pub fn is_fn(values: &[LValue], _env: &mut RefLEnv, _: &mut CtxCollec) -> Result<LValue, LError> {
-    match values.len() {
-        1 => Ok(LValue::Bool(
-            NameTypeLValue::from(values.get(0).unwrap()) == NameTypeLValue::LFn,
-        )),
-        i => Err(WrongNumberOfArgument(values.into(), i, 1..1)),
-    }
-}
-
-pub fn is_type(values: &[LValue], env: &mut RefLEnv, _: &mut CtxCollec) -> Result<LValue, LError> {
-    match values.len() {
-        1 => match values.get(0).unwrap() {
-            LValue::Symbol(s) => match env.sym_types.get(s) {
-                None => panic!("symbol as no type"),
-                Some(sym_type) => match sym_type {
-                    LSymType::Type(_) => Ok(LValue::Bool(true)),
-                    _ => Ok(LValue::Bool(false)),
-                },
-            },
-            lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
-        },
-        i => Err(WrongNumberOfArgument(values.into(), i, 1..1)),
-    }
-}
-
-pub fn is_symbol(
-    values: &[LValue],
-    _env: &mut RefLEnv,
-    _: &mut CtxCollec,
-) -> Result<LValue, LError> {
-    match values.len() {
-        1 => match values.get(0).unwrap() {
-            LValue::Symbol(_) => Ok(LValue::Bool(true)),
-            _ => Ok(LValue::Bool(false)),
-        },
-        i => Err(WrongNumberOfArgument(values.into(), i, 1..1)),
-    }
-}
-
-pub fn is_object(
-    values: &[LValue],
-    env: &mut RefLEnv,
-    _: &mut CtxCollec,
-) -> Result<LValue, LError> {
-    match values.len() {
-        1 => match values.get(0).unwrap() {
-            LValue::Symbol(s) => match env.sym_types.get(s) {
-                None => panic!("symbol as no type"),
-                Some(sym_type) => match sym_type {
-                    LSymType::Object(_) => Ok(LValue::Bool(true)),
-                    _ => Ok(LValue::Bool(false)),
-                },
-            },
-            lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
-        },
-        i => Err(WrongNumberOfArgument(values.into(), i, 1..1)),
-    }
-}
-
-pub fn is_state_function(
-    values: &[LValue],
-    env: &mut RefLEnv,
-    _: &mut CtxCollec,
-) -> Result<LValue, LError> {
-    match values.len() {
-        1 => match values.get(0).unwrap() {
-            LValue::Symbol(s) => match env.sym_types.get(s) {
-                None => panic!("symbol as no type"),
-                Some(sym_type) => match sym_type {
-                    LSymType::StateFunction(_) => Ok(LValue::Bool(true)),
-                    _ => Ok(LValue::Bool(false)),
-                },
-            },
-            lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
-        },
-        i => Err(WrongNumberOfArgument(values.into(), i, 1..1)),
-    }
-}
-
-pub fn is_map(values: &[LValue], _env: &mut RefLEnv, _: &mut CtxCollec) -> Result<LValue, LError> {
-    match values.len() {
-        1 => match values.get(0).unwrap() {
-            LValue::Map(_) => Ok(LValue::Bool(true)),
-            _ => Ok(LValue::Bool(false)),
-        },
-        i => Err(WrongNumberOfArgument(values.into(), i, 1..1)),
-    }
-}
-pub fn is_list(values: &[LValue], _env: &mut RefLEnv, _: &mut CtxCollec) -> Result<LValue, LError> {
-    match values.len() {
-        1 => match values.get(0).unwrap() {
-            LValue::List(_) => Ok(LValue::Bool(true)),
-            _ => Ok(LValue::Bool(false)),
-        },
-        i => Err(WrongNumberOfArgument(values.into(), i, 1..1)),
-    }
-}
-
-pub fn is_lambda(
-    values: &[LValue],
-    _env: &mut RefLEnv,
-    _: &mut CtxCollec,
-) -> Result<LValue, LError> {
-    match values.len() {
-        1 => match values.get(0).unwrap() {
-            LValue::Lambda(_) => Ok(LValue::Bool(true)),
-            _ => Ok(LValue::Bool(false)),
-        },
-        i => Err(WrongNumberOfArgument(values.into(), i, 1..1)),
-    }
-}
-
-pub fn is_quote(
-    values: &[LValue],
-    _env: &mut RefLEnv,
-    _: &mut CtxCollec,
-) -> Result<LValue, LError> {
-    match values.len() {
-        1 => match values.get(0).unwrap() {
-            LValue::Quote(_) => Ok(LValue::Bool(true)),
-            _ => Ok(LValue::Bool(false)),
-        },
-        i => Err(WrongNumberOfArgument(values.into(), i, 1..1)),
-    }
-}
-
-pub fn begin(values: &[LValue], _env: &mut RefLEnv, _: &mut CtxCollec) -> Result<LValue, LError> {
+pub fn begin(values: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     match values.last() {
         None => Err(LError::SpecialError("no SExpr after begin".to_string())),
         Some(v) => Ok(v.clone()),
     }
 }
 
-pub fn default(
-    _values: &[LValue],
-    _env: &mut RefLEnv,
-    _: &mut CtxCollec,
-) -> Result<LValue, LError> {
+pub fn default(_values: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     Ok(LValue::String("default function".to_string()))
 }
 
-pub fn subtype(values: &[LValue], env: &mut RefLEnv, _: &mut CtxCollec) -> Result<LValue, LError> {
-    if values.len() != 1 {
-        return Err(WrongNumberOfArgument(values.into(), values.len(), 1..1));
-    }
-    let parent_type: LType = match values.get(0).unwrap() {
-        LValue::Symbol(s) => match s.as_str() {
-            TYPE_INT => LType::Int,
-            TYPE_FLOAT => LType::Float,
-            TYPE_BOOL => LType::Object,
-            TYPE_OBJECT => LType::Object,
-            _str => match env.get_sym_type(s) {
-                None => return Err(SpecialError(format!("{} has no type", s))),
-                Some(lst) => match lst {
-                    LSymType::Type(_) => LType::Symbol(s.clone()),
-                    lst => return Err(WrongType(lst.into(), lst.into(), NameTypeLValue::Type)),
-                },
-            },
-        },
-        lv => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
-    };
-    Ok(LValue::SymType(LSymType::Type(Some(parent_type))))
-}
-
-pub fn state_function(
-    values: &[LValue],
-    env: &mut RefLEnv,
-    ctxs: &mut CtxCollec,
-) -> Result<LValue, LError> {
-    let mut vec_params: Vec<Sym> = Vec::new();
-    let mut t_value: Sym = Sym::from(TYPE_OBJECT);
-    for (i, value) in values.iter().enumerate() {
-        match value {
-            LValue::Symbol(s) => {
-                if is_type(&values[i..i + 1], env, ctxs)?.as_bool()? {
-                    if i == values.len() - 1 {
-                        t_value = s.clone();
-                    } else {
-                        vec_params.push(s.clone())
-                    }
-                } else {
-                    match env.sym_types.get(s) {
-                        None => {
-                            return Err(WrongType(
-                                value.clone(),
-                                value.into(),
-                                NameTypeLValue::Type,
-                            ))
-                        }
-                        Some(lst) => {
-                            return Err(WrongType(value.clone(), lst.into(), NameTypeLValue::Type))
-                        }
-                    }
-                }
-            }
-            lv => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Type)),
-        }
-    }
-    Ok(LValue::SymType(LSymType::StateFunction(LStateFunction {
-        t_params: vec_params,
-        t_value,
-    })))
-}
-
-pub fn list(values: &[LValue], _env: &mut RefLEnv, _: &mut CtxCollec) -> Result<LValue, LError> {
+pub fn list(values: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     Ok(LValue::List(values.to_vec()))
 }
 
-pub fn map(values: &[LValue], _env: &mut RefLEnv, _: &mut CtxCollec) -> Result<LValue, LError> {
+pub fn map(values: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     let mut facts: HashMap<LValue, LValue> = Default::default();
     if values.len() != 1 {
         return Err(WrongNumberOfArgument(values.into(), values.len(), 1..1));
@@ -354,7 +124,7 @@ pub fn map(values: &[LValue], _env: &mut RefLEnv, _: &mut CtxCollec) -> Result<L
 }
 
 //TODO: Define set behaviour for other type of LValue
-pub fn set(values: &[LValue], _env: &mut RefLEnv, _: &mut CtxCollec) -> Result<LValue, LError> {
+pub fn set(values: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     if values.len() != 2 {
         return Err(WrongNumberOfArgument(values.into(), values.len(), 2..2));
     }
@@ -379,7 +149,7 @@ pub fn set(values: &[LValue], _env: &mut RefLEnv, _: &mut CtxCollec) -> Result<L
     }
 }
 
-pub fn get(values: &[LValue], _env: &mut RefLEnv, _: &mut CtxCollec) -> Result<LValue, LError> {
+pub fn get(values: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     if values.is_empty() {
         return Err(WrongNumberOfArgument(values.into(), 0, 1..std::usize::MAX));
     }
@@ -405,102 +175,14 @@ pub fn get(values: &[LValue], _env: &mut RefLEnv, _: &mut CtxCollec) -> Result<L
     }
 }
 
-pub fn get_type(values: &[LValue], env: &mut RefLEnv, _: &mut CtxCollec) -> Result<LValue, LError> {
-    if values.len() != 1 {
-        return Err(WrongNumberOfArgument(values.into(), values.len(), 1..1));
-    }
-    let sym_type = match values.get(0).unwrap() {
-        LValue::Symbol(s) => match env.get_sym_type(s) {
-            None => return Err(LError::SpecialError(format!("{} has no type", s))),
-            Some(lst) => lst.clone(),
-        },
-        LValue::Number(n) => match n {
-            LNumber::Int(_) => LSymType::Type(Some(LType::Int)),
-            LNumber::Float(_) => LSymType::Type(Some(LType::Float)),
-            LNumber::USize(_) => LSymType::Type(Some(LType::Usize)),
-        },
-        LValue::Bool(_) => LSymType::Type(Some(LType::Bool)),
-        lv => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Atom)),
-    };
-
-    Ok(LValue::SymType(sym_type))
-}
-
-/*pub fn define(values: &[LValue], env: &mut RefLEnv, _ : &mut CtxCollec) -> Result<LValue, LError> {
-    if values.len() != 2 {
-        return Err(WrongNumberOfArgument(values.into(), values.len(), 2..2));
-    }
-    match values.get(0).unwrap() {
-        LValue::Symbol(s) => {
-            let exp = eval(values.get(1).unwrap(), env)?;
-            env.add_entry(s.to_string(), exp);
-        }
-        lv => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
-    }
-    Ok(LValue::None)
-}
-pub fn _if(values: &[LValue], env: &mut RefLEnv, _ : &mut CtxCollec) -> Result<LValue, LError> {
-    if values.len() != 3 {
-        return Err(WrongNumberOfArgument(values.into(), values.len(), 3..3));
-    }
-    let test = values.get(0).unwrap();
-    let conseq = values.get(1).unwrap();
-    let alt = values.get(2).unwrap();
-    match eval(test, env) {
-        Ok(LValue::Bool(true)) => eval(conseq, env),
-        Ok(LValue::Bool(false)) => eval(alt, env),
-        Ok(lv) => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Bool)),
-        Err(e) => Err(e),
-    }
-}*/
-pub fn type_of(
-    values: &[LValue],
-    env: &mut RefLEnv,
-    ctxs: &mut CtxCollec,
-) -> Result<LValue, LError> {
-    if values.len() != 2 {
-        return Err(WrongNumberOfArgument(values.into(), values.len(), 2..2));
-    }
-
-    match values.get(0).unwrap() {
-        LValue::Symbol(s) => {
-            let lv = values.get(1).unwrap();
-            let exp = eval(lv, env, ctxs)?;
-            let sym_type = match &exp {
-                LValue::SymType(lst) => lst.clone(),
-                LValue::Symbol(s) => match env.get_sym_type(&s) {
-                    None => {
-                        return Err(WrongType(exp.clone(), exp.into(), NameTypeLValue::SymType))
-                    }
-                    Some(lst) => match lst {
-                        LSymType::Type(_) => LSymType::Object(s.into()),
-                        lst => return Err(WrongType(s.into(), lst.into(), NameTypeLValue::Type)),
-                    },
-                },
-                lv => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::SymType)),
-            };
-            env.add_entry(s.to_string(), LValue::Symbol(s.clone()));
-            env.add_sym_type(s.clone(), sym_type);
-        }
-        lv => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
-    }
-    Ok(LValue::None)
-}
-pub fn print(values: &[LValue], _env: &mut RefLEnv, _: &mut CtxCollec) -> Result<LValue, LError> {
+/*pub fn print(values: &[LValue], _:& RefLEnv, _: & ()) -> Result<LValue, LError> {
     if values.is_empty() {
         return Err(WrongNumberOfArgument(values.into(), 0, 1..std::usize::MAX));
     }
     return Ok(values.get(0).unwrap().clone());
-}
+}*/
 
-pub fn quote(values: &[LValue], _env: &mut RefLEnv, _: &mut CtxCollec) -> Result<LValue, LError> {
-    if values.len() != 1 {
-        return Err(WrongNumberOfArgument(values.into(), values.len(), 1..1));
-    }
-    Ok(LValue::Quote(Box::new(values.get(0).unwrap().clone())))
-}
-
-pub fn read(_: &[LValue], _: &mut RefLEnv, _: &mut CtxCollec) -> Result<LValue, LError> {
+pub fn read(_: &[LValue], _: &mut RefLEnv, _: &()) -> Result<LValue, LError> {
     unimplemented!()
     /*if values.len() != 1 {
         return Err(WrongNumberOfArgument(values.into(), values.len(), 1..1))
@@ -522,7 +204,7 @@ pub fn read(_: &[LValue], _: &mut RefLEnv, _: &mut CtxCollec) -> Result<LValue, 
     eval(&lv, env)*/
 }
 
-pub fn write(values: &[LValue], env: &mut RefLEnv, _: &mut CtxCollec) -> Result<LValue, LError> {
+pub fn write(values: &[LValue], env: &RefLEnv, _: &()) -> Result<LValue, LError> {
     if values.len() != 1 {
         return Err(WrongNumberOfArgument(values.into(), values.len(), 1..1));
     }
@@ -535,7 +217,7 @@ pub fn write(values: &[LValue], env: &mut RefLEnv, _: &mut CtxCollec) -> Result<
 }
 
 ///It takes two arguments, an element and a list and returns a list with the element inserted at the first place.
-pub fn cons(values: &[LValue], _: &mut RefLEnv, _: &mut CtxCollec) -> Result<LValue, LError> {
+pub fn cons(values: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     if values.len() != 2 {
         return Err(WrongNumberOfArgument(values.into(), values.len(), 2..2));
     }
@@ -553,7 +235,7 @@ pub fn cons(values: &[LValue], _: &mut RefLEnv, _: &mut CtxCollec) -> Result<LVa
 }
 
 ///It takes a list as argument, and returns its first element.
-pub fn car(values: &[LValue], _: &mut RefLEnv, _: &mut CtxCollec) -> Result<LValue, LError> {
+pub fn car(values: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     if values.len() == 1 {
         match values.first().unwrap() {
             LValue::List(list) => {
@@ -571,7 +253,7 @@ pub fn car(values: &[LValue], _: &mut RefLEnv, _: &mut CtxCollec) -> Result<LVal
 }
 
 ///It takes a list as argument, and returns a list without the first element
-pub fn cdr(values: &[LValue], _: &mut RefLEnv, _: &mut CtxCollec) -> Result<LValue, LError> {
+pub fn cdr(values: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     if values.len() == 1 {
         match values.first().unwrap() {
             LValue::List(list) => {
@@ -591,7 +273,7 @@ pub fn cdr(values: &[LValue], _: &mut RefLEnv, _: &mut CtxCollec) -> Result<LVal
 }
 
 ///It merges two or more list into one.
-pub fn append(values: &[LValue], _: &mut RefLEnv, _: &mut CtxCollec) -> Result<LValue, LError> {
+pub fn append(values: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     let mut new_list = Vec::new();
     for element in values {
         match element {
@@ -609,7 +291,7 @@ pub fn append(values: &[LValue], _: &mut RefLEnv, _: &mut CtxCollec) -> Result<L
 }
 
 ///It takes a list and returns the last element.
-pub fn last(values: &[LValue], _: &mut RefLEnv, _: &mut CtxCollec) -> Result<LValue, LError> {
+pub fn last(values: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     if values.len() == 1 {
         match values.first().unwrap() {
             LValue::List(list) => {
@@ -629,7 +311,7 @@ pub fn last(values: &[LValue], _: &mut RefLEnv, _: &mut CtxCollec) -> Result<LVa
 ///It takes two arguments of which the second must be a list,
 /// if the first argument is a member of the second argument,
 /// and then it returns the remainder of the list beginning with the first argument.
-pub fn member(values: &[LValue], _: &mut RefLEnv, _: &mut CtxCollec) -> Result<LValue, LError> {
+pub fn member(values: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     if values.len() != 2 {
         return Err(WrongNumberOfArgument(values.into(), values.len(), 2..2));
     }
@@ -648,7 +330,7 @@ pub fn member(values: &[LValue], _: &mut RefLEnv, _: &mut CtxCollec) -> Result<L
 }
 
 /// It takes a list and returns a list with the top elements in reverse order.
-pub fn reverse(values: &[LValue], _: &mut RefLEnv, _: &mut CtxCollec) -> Result<LValue, LError> {
+pub fn reverse(values: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     if values.len() == 1 {
         match values.first().unwrap() {
             LValue::List(list) => {
@@ -664,6 +346,6 @@ pub fn reverse(values: &[LValue], _: &mut RefLEnv, _: &mut CtxCollec) -> Result<
 }
 
 /// return the length of the object if it is a table or a list.
-pub fn length(_values: &[LValue], _: &mut RefLEnv, _: &mut CtxCollec) -> Result<LValue, LError> {
+pub fn length(_values: &[LValue], _: &mut RefLEnv, _: &()) -> Result<LValue, LError> {
     unimplemented!()
 }

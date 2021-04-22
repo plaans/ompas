@@ -29,13 +29,13 @@ pub struct Counter {
     val: u32,
 }
 
-pub fn get_counter(args: &[LValue], _: &mut RefLEnv, ctx: &CtxCounter) -> Result<LValue, LError> {
+pub fn get_counter(args: &[LValue], _: &RefLEnv, ctx: &CtxCounter) -> Result<LValue, LError> {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1));
     }
 
     match &args[0] {
-        LValue::Number(LNumber::USize(u)) => match ctx.counters.get(*u) {
+        LValue::Number(LNumber::Usize(u)) => match ctx.counters.get(*u) {
             None => Err(SpecialError("index out of reach".to_string())),
             Some(c) => Ok(LValue::Number(LNumber::Int(c.val as i64))),
         },
@@ -57,15 +57,15 @@ pub fn decrement_counter(
     }
 
     match &args[0] {
-        LValue::Number(LNumber::USize(u)) => match ctx.counters.get_mut(*u) {
+        LValue::Number(LNumber::Usize(u)) => match ctx.counters.get_mut(*u) {
             None => Err(SpecialError("index out of reach".to_string())),
             Some(c) => {
                 if c.val > 0 {
-                    c.val -=1;
+                    c.val -= 1;
                 }
                 Ok(LValue::None)
             }
-        }
+        },
         lv => Err(WrongType(
             lv.clone(),
             lv.into(),
@@ -79,18 +79,17 @@ pub fn increment_counter(
     _: &mut RefLEnv,
     ctx: &mut CtxCounter,
 ) -> Result<LValue, LError> {
-
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1));
     }
     match &args[0] {
-        LValue::Number(LNumber::USize(u)) => match ctx.counters.get_mut(*u) {
+        LValue::Number(LNumber::Usize(u)) => match ctx.counters.get_mut(*u) {
             None => Err(SpecialError("index out of reach".to_string())),
             Some(c) => {
                 c.val += 1;
                 Ok(LValue::None)
             }
-        }
+        },
         lv => Err(WrongType(
             lv.clone(),
             lv.into(),
@@ -109,7 +108,7 @@ pub fn set_counter(
     }
 
     match &args[0] {
-        LValue::Number(LNumber::USize(u)) => match ctx.counters.get_mut(*u) {
+        LValue::Number(LNumber::Usize(u)) => match ctx.counters.get_mut(*u) {
             None => Err(SpecialError("index out of reach".to_string())),
             Some(c) => {
                 c.val = args[1].as_int()? as u32;
@@ -124,12 +123,8 @@ pub fn set_counter(
     }
 }
 
-pub fn new_counter(
-    _: &[LValue],
-    _: &mut RefLEnv,
-    ctx: &mut CtxCounter,
-) -> Result<LValue, LError> {
-    Ok(LValue::Number(LNumber::USize(ctx.new_counter())))
+pub fn new_counter(_: &[LValue], _: &mut RefLEnv, ctx: &mut CtxCounter) -> Result<LValue, LError> {
+    Ok(LValue::Number(LNumber::Usize(ctx.new_counter())))
 }
 
 impl AsModule for CtxCounter {
@@ -137,26 +132,32 @@ impl AsModule for CtxCounter {
         let mut prelude = vec![];
         prelude.push((
             GET_COUNTER.into(),
-            LValue::NativeLambda(LNativeLambda::new(Box::new(get_counter))),
+            LValue::Fn(LFn::new(Box::new(get_counter), GET_COUNTER.into())),
         ));
         prelude.push((
             SET_COUNTER.into(),
-            LValue::NativeMutLambda(LNativeMutLambda::new(Box::new(set_counter))),
+            LValue::MutFn(LMutFn::new(Box::new(set_counter), SET_COUNTER.into())),
         ));
 
         prelude.push((
             NEW_COUNTER.into(),
-            LValue::NativeMutLambda(LNativeMutLambda::new(Box::new(new_counter))),
+            LValue::MutFn(LMutFn::new(Box::new(new_counter), NEW_COUNTER.into())),
         ));
 
         prelude.push((
             INCREMENT_COUNTER.into(),
-            LValue::NativeMutLambda(LNativeMutLambda::new(Box::new(increment_counter))),
+            LValue::MutFn(LMutFn::new(
+                Box::new(increment_counter),
+                INCREMENT_COUNTER.into(),
+            )),
         ));
 
         prelude.push((
             DECREMENT_COUNTER.into(),
-            LValue::NativeMutLambda(LNativeMutLambda::new(Box::new(decrement_counter))),
+            LValue::MutFn(LMutFn::new(
+                Box::new(decrement_counter),
+                DECREMENT_COUNTER.into(),
+            )),
         ));
 
         Module {

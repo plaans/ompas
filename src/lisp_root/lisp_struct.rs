@@ -4,7 +4,6 @@ use std::cmp::Ordering;
 //use std::collections::HashMap;
 use crate::lisp_root::lisp_struct::LError::WrongNumberOfArgument;
 use crate::lisp_root::{eval, CtxCollec, RefLEnv};
-use im::HashMap;
 use std::any::Any;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
@@ -24,6 +23,44 @@ pub enum LError {
     ConversionError(NameTypeLValue, NameTypeLValue),
 }
 
+impl Display for LError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            LError::WrongType(s, s1, s2) => write!(f, "{}: Got {}, expected {}", s, s1, s2),
+            LError::ErrLoc(e) => write!(f, "{}", e),
+            LError::UndefinedSymbol(s) => write!(f, "{} is undefined", s),
+            LError::WrongNumberOfArgument(s, g, r) => {
+                if r.is_empty() {
+                    write!(f, "\"{}\": Got {} element(s), expected {}", s, g, r.start)
+                } else if r.end == std::usize::MAX {
+                    write!(
+                        f,
+                        "\"{}\": Got {} element(s), expected at least {}",
+                        s, g, r.start
+                    )
+                } else if r.start == std::usize::MIN {
+                    write!(
+                        f,
+                        "\"{}\": Got {} element(s), expected at most {}",
+                        s, g, r.end
+                    )
+                } else {
+                    write!(
+                        f,
+                        "\"{}\": Got {} element(s), expected between {} and {}",
+                        s, g, r.start, r.end
+                    )
+                }
+            }
+            LError::SpecialError(s) => write!(f, "{}", s),
+            LError::ConversionError(s1, s2) => write!(f, "Cannot convert {} into {}.", s1, s2),
+            LError::NotInListOfExpectedTypes(lv, typ, list_types) => {
+                write!(f, "{}: Got {}, expected {:?}", lv, typ, list_types)
+            }
+        }
+    }
+}
+
 impl From<ErrLoc> for LError {
     fn from(e: ErrLoc) -> Self {
         LError::ErrLoc(e)
@@ -34,7 +71,7 @@ impl From<ErrLoc> for LError {
 pub enum LNumber {
     Int(i64),
     Float(f64),
-    USize(usize),
+    Usize(usize),
 }
 
 impl Display for LNumber {
@@ -42,7 +79,7 @@ impl Display for LNumber {
         match self {
             LNumber::Int(i) => write!(f, "{}", i),
             LNumber::Float(fl) => write!(f, "{}", fl),
-            LNumber::USize(u) => write!(f, "{}", u),
+            LNumber::Usize(u) => write!(f, "{}", u),
         }
     }
 }
@@ -52,7 +89,7 @@ impl Into<Sym> for &LNumber {
         match self {
             LNumber::Int(i) => i.to_string().into(),
             LNumber::Float(f) => f.to_string().into(),
-            LNumber::USize(u) => u.to_string().into(),
+            LNumber::Usize(u) => u.to_string().into(),
         }
     }
 }
@@ -60,16 +97,6 @@ impl Into<Sym> for &LNumber {
 impl Into<Sym> for LNumber {
     fn into(self) -> Sym {
         (&self).into()
-    }
-}
-
-impl LNumber {
-    pub fn get_sym_type(&self) -> Sym {
-        match self {
-            LNumber::Int(_) => TYPE_INT.into(),
-            LNumber::Float(_) => TYPE_FLOAT.into(),
-            LNumber::USize(_) => TYPE_USIZE.into(),
-        }
     }
 }
 
@@ -86,7 +113,7 @@ impl Into<usize> for &LNumber {
         match self {
             LNumber::Int(i) => *i as usize,
             LNumber::Float(f) => *f as usize,
-            LNumber::USize(u) => *u,
+            LNumber::Usize(u) => *u,
         }
     }
 }
@@ -96,7 +123,7 @@ impl Into<f64> for &LNumber {
         match self {
             LNumber::Int(i) => *i as f64,
             LNumber::Float(f) => *f,
-            LNumber::USize(u) => *u as f64,
+            LNumber::Usize(u) => *u as f64,
         }
     }
 }
@@ -106,7 +133,7 @@ impl Into<i64> for &LNumber {
         match self {
             LNumber::Int(i) => *i,
             LNumber::Float(f) => *f as i64,
-            LNumber::USize(u) => *u as i64,
+            LNumber::Usize(u) => *u as i64,
         }
     }
 }
@@ -116,7 +143,7 @@ impl Hash for LNumber {
         match self {
             LNumber::Int(i) => i.hash(state),
             LNumber::Float(f) => f.to_string().hash(state),
-            LNumber::USize(u) => u.hash(state),
+            LNumber::Usize(u) => u.hash(state),
         }
     }
 }
@@ -240,119 +267,15 @@ impl Div for LNumber {
 impl Eq for LNumber {}
 
 #[derive(Clone)]
-pub enum LType {
-    Int,
-    Bool,
-    Usize,
-    Float,
-    Object,
-    Symbol(Sym),
-}
-
-impl From<&str> for LType {
-    fn from(s: &str) -> Self {
-        match s {
-            TYPE_INT => LType::Int,
-            TYPE_FLOAT => LType::Float,
-            TYPE_OBJECT => LType::Object,
-            TYPE_BOOL => LType::Bool,
-            TYPE_USIZE => LType::Usize,
-            other => LType::Symbol(other.into()),
-        }
-    }
-}
-
-impl From<&Sym> for LType {
-    fn from(s: &Sym) -> Self {
-        s.as_str().into()
-    }
-}
-
-impl From<Sym> for LType {
-    fn from(s: Sym) -> Self {
-        (&s).into()
-    }
-}
-
-impl From<&LType> for Sym {
-    fn from(lt: &LType) -> Self {
-        match lt {
-            LType::Int => TYPE_INT.into(),
-            LType::Bool => TYPE_BOOL.into(),
-            LType::Float => TYPE_FLOAT.into(),
-            LType::Symbol(s) => s.clone(),
-            LType::Object => TYPE_OBJECT.into(),
-            LType::Usize => TYPE_USIZE.into(),
-        }
-    }
-}
-
-impl From<LType> for Sym {
-    fn from(lt: LType) -> Self {
-        (&lt).into()
-    }
-}
-
-impl PartialEq for LType {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (LType::Int, LType::Int) => true,
-            (LType::Bool, LType::Bool) => true,
-            (LType::Float, LType::Float) => true,
-            (LType::Symbol(s1), LType::Symbol(s2)) => s1 == s2,
-            (_, _) => false,
-        }
-    }
-}
-
-#[derive(Clone, PartialEq)]
-pub struct LStateFunction {
-    pub t_params: Vec<Sym>,
-    pub t_value: Sym,
-}
-
-#[derive(Clone)]
-pub enum LSymType {
-    StateFunction(LStateFunction),
-    Type(Option<LType>),
-    Object(LType),
-}
-
-impl LSymType {
-    pub fn as_state_function(&self) -> Result<LStateFunction, LError> {
-        match self {
-            LSymType::StateFunction(sf) => Ok(sf.clone()),
-            lst => Err(LError::ConversionError(
-                lst.into(),
-                NameTypeLValue::StateFunction,
-            )),
-        }
-    }
-}
-
-impl PartialEq for &LSymType {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (LSymType::Object(o1), LSymType::Object(o2)) => o1 == o2,
-            (LSymType::Type(t1), LSymType::Type(t2)) => t1 == t2,
-            (LSymType::StateFunction(sf1), LSymType::StateFunction(sf2)) => sf1 == sf2,
-            _ => false,
-        }
-    }
-}
-
-type PLFn = Rc<fn(&[LValue], &mut RefLEnv, &mut CtxCollec) -> Result<LValue, LError>>;
-
-#[derive(Clone)]
-pub struct LFn {
-    pub pointer: PLFn,
-    pub label: String,
-}
-
-#[derive(Clone)]
 pub struct LLambda {
     params: Vec<Sym>,
     body: Box<LValue>,
+}
+
+impl Display for LLambda {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "{:?} : {}", self.params, self.body)
+    }
 }
 
 impl PartialEq for LLambda {
@@ -399,107 +322,38 @@ impl LLambda {
         *self.body.clone()
     }
 }
-/*
-/// Trait is used to dynamically expose the data available in the context.
-///
-/// The context essentially provides a set of typed data and is available as an trait object `&dyn NativeContext`.
-/// The client can ask for data of a specific type. It will be given a pointer to the type as a reference to Any.
-/// This reference can then be downcasted to the expected type.
-///
-/// Note: in this trait, we cannot have generic parameters that would improve the ergonomics because it need to be
-///       representable as a trait object. See the NativeContextWrapper for a wrapper that would provide
-///       a more ergonomic view of the dynamic NativeContext.
-///
-/// # Example
-///
-/// ```
-/// use fact_base::lisp::lisp_struct::NativeContext;
-/// use std::any::{TypeId, Any};
-/// struct Ctx {
-///   int: u32,
-///   str: String,
-/// };
-/// impl NativeContext for Ctx {
-///     fn get_component(&self,type_id: TypeId) -> Option<&dyn Any> {
-///        if type_id == TypeId::of::<u32>() {
-///            Some(&self.int)
-///        } else if type_id == TypeId::of::<String>() {
-///            Some(&self.str)
-///        } else {
-///            None
-///        }
-///     }
-///
-/// fn get_component_mut(&mut self,type_id: TypeId) -> Option<&mut dyn Any> {
-///         todo!()
-///     }
-/// }
-///
-/// let ctx = Ctx { int: 0, str: "hi".to_string() };
-/// let dyn_ctx: &dyn NativeContext = &ctx;
-/// let str: &dyn Any = dyn_ctx.get_component(TypeId::of::<String>()).unwrap();
-/// let str = &String = str.downcast_ref().unwrap();
-/// ```
-pub trait NativeContext {
-    /// Extract a reference to the given type.
-    /// If the option is non-empty, the the reference can be downcasted to a reference of the type
-    /// that is represented by the `TypeId`
-    fn get_component(&self, _type_id: TypeId) -> Option<&dyn Any>;
 
-    fn get_component_mut(&mut self, _type_id: TypeId) -> Option<&mut dyn Any>;
-}
-
-impl NativeContext for () {
-    fn get_component(&self, _type_id: TypeId) -> Option<&dyn Any> {
-        None
-    }
-
-    fn get_component_mut(&mut self, _type_id: TypeId) -> Option<&mut dyn Any> {
-        None
-    }
-}
-
-pub struct NativeContextWrapper {
-    ctx: Box<dyn NativeContext>,
-}
-
-impl NativeContextWrapper {
-    pub fn get<T: Any>(&self) -> Option<&T> {
-        self.ctx
-            .get_component(TypeId::of::<T>())
-            .and_then(|x| x.downcast_ref())
-    }
-}*/
-
-pub type NativeFun = dyn Fn(&[LValue], &mut RefLEnv, &dyn Any) -> Result<LValue, LError>;
+pub type NativeFn = dyn Fn(&[LValue], &RefLEnv, &dyn Any) -> Result<LValue, LError>;
 
 #[derive(Clone)]
-pub struct LNativeLambda {
-    pub fun: Rc<NativeFun>,
+pub struct LFn {
+    pub(crate) fun: Rc<NativeFn>,
+    pub(crate) debug_label: String,
     index_mod: Option<usize>,
 }
 
-impl LNativeLambda {
+impl LFn {
     pub fn new<
         T: 'static,
         R: Into<Result<LValue, LError>>,
-        F: Fn(&[LValue], &mut RefLEnv, &T) -> R + 'static,
+        F: Fn(&[LValue], &RefLEnv, &T) -> R + 'static,
     >(
         lbd: Box<F>,
+        debug_label: String,
     ) -> Self {
-        let x =
-            move |args: &[LValue], env: &mut RefLEnv, ctx: &dyn Any| -> Result<LValue, LError> {
-                let ctx: Option<&T> = ctx.downcast_ref::<T>();
-                if let Some(ctx) = ctx {
-                    lbd(args, env, ctx).into()
-                } else {
-                    Err(LError::SpecialError(
-                        "Impossible to downcast context".to_string(),
-                    ))
-                }
-            };
-        LNativeLambda {
+        let x = move |args: &[LValue], env: &RefLEnv, ctx: &dyn Any| -> Result<LValue, LError> {
+            let ctx: Option<&T> = ctx.downcast_ref::<T>();
+            if let Some(ctx) = ctx {
+                lbd(args, env, ctx).into()
+            } else {
+                Err(LError::SpecialError(
+                    "Impossible to downcast context".to_string(),
+                ))
+            }
+        };
+        LFn {
             fun: Rc::new(x),
+            debug_label,
             index_mod: None,
         }
     }
@@ -522,21 +376,23 @@ impl LNativeLambda {
     }
 }
 
-pub type NativeMutFun = dyn Fn(&[LValue], &mut RefLEnv, &mut dyn Any) -> Result<LValue, LError>;
+pub type NativeMutFn = dyn Fn(&[LValue], &mut RefLEnv, &mut dyn Any) -> Result<LValue, LError>;
 
 #[derive(Clone)]
-pub struct LNativeMutLambda {
-    pub(crate) fun: Rc<NativeMutFun>,
-    pub(crate) index_mod: Option<usize>,
+pub struct LMutFn {
+    pub(crate) fun: Rc<NativeMutFn>,
+    pub(crate) debug_label: String,
+    index_mod: Option<usize>,
 }
 
-impl LNativeMutLambda {
+impl LMutFn {
     pub fn new<
         T: 'static,
         R: Into<Result<LValue, LError>>,
         F: Fn(&[LValue], &mut RefLEnv, &mut T) -> R + 'static,
     >(
         lbd: Box<F>,
+        debug_label: String,
     ) -> Self {
         let x = move |args: &[LValue],
                       env: &mut RefLEnv,
@@ -551,8 +407,9 @@ impl LNativeMutLambda {
                 ))
             }
         };
-        LNativeMutLambda {
+        LMutFn {
             fun: Rc::new(x),
+            debug_label,
             index_mod: None,
         }
     }
@@ -575,7 +432,7 @@ impl LNativeMutLambda {
     }
 }
 
-#[derive(Clone, PartialOrd, PartialEq, Eq)]
+#[derive(Clone, PartialOrd, PartialEq, Eq, Debug)]
 pub enum LCoreOperator {
     Define,
     DefLambda,
@@ -586,6 +443,22 @@ pub enum LCoreOperator {
     DefMacro,
     Set,
     Begin,
+}
+
+impl Display for LCoreOperator {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            LCoreOperator::Define => write!(f, "{}", DEFINE.to_string()),
+            LCoreOperator::DefLambda => write!(f, "{}", LAMBDA.to_string()),
+            LCoreOperator::If => write!(f, "{}", IF.to_string()),
+            LCoreOperator::Quote => write!(f, "{}", QUOTE.to_string()),
+            LCoreOperator::QuasiQuote => write!(f, "{}", QUASI_QUOTE.to_string()),
+            LCoreOperator::UnQuote => write!(f, "{}", UNQUOTE.to_string()),
+            LCoreOperator::DefMacro => write!(f, "{}", DEF_MACRO.to_string()),
+            LCoreOperator::Set => write!(f, "{}", SET.to_string()),
+            LCoreOperator::Begin => write!(f, "{}", BEGIN.to_string()),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -603,12 +476,52 @@ pub enum LValue {
     Quote(Box<LValue>),
     // error
     None,
-    LFn(LFn), // TODO: replace with NativeLambda ?
+    Fn(LFn),
+    MutFn(LMutFn),
     Lambda(LLambda),
-    NativeLambda(LNativeLambda),
-    NativeMutLambda(LNativeMutLambda),
     CoreOperator(LCoreOperator),
-    SymType(LSymType),
+}
+
+impl Debug for LValue {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl Display for LValue {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            LValue::String(s) => write!(f, "{}", s),
+            LValue::Fn(fun) => write!(f, "{}", fun.debug_label),
+            LValue::MutFn(fun) => write!(f, "{}", fun.debug_label),
+            LValue::None => write!(f, "None"),
+            LValue::Symbol(s) => write!(f, "{}", s),
+            LValue::Number(n) => write!(f, "{}", n),
+            LValue::Bool(b) => write!(f, "{}", b),
+            LValue::List(list) => {
+                let mut result = String::new();
+                result.push('(');
+                for element in list {
+                    result.push_str(element.to_string().as_str());
+                    result.push(' ');
+                }
+                result.push(')');
+                write!(f, "{}", result)
+            }
+            LValue::Lambda(l) => write!(f, "{}", l),
+            LValue::Map(m) => {
+                let mut result = String::new();
+                for (key, value) in m.iter() {
+                    result.push_str(format!("{}: {}\n", key, value).as_str());
+                }
+                write!(f, "{}", result)
+            }
+            LValue::Quote(q) => write!(f, "{}", q),
+            LValue::CoreOperator(co) => {
+                write!(f, "{}", co)
+            }
+        }
+    }
 }
 
 impl Hash for LValue {
@@ -714,8 +627,8 @@ impl PartialEq for LValue {
             (LValue::Map(m1), LValue::Map(m2)) => *m1 == *m2,
             (LValue::Lambda(l1), LValue::Lambda(l2)) => *l1 == *l2,
             (LValue::Quote(q1), LValue::Quote(q2)) => q1.to_string() == q2.to_string(), //function comparison
-            (LValue::LFn(f1), LValue::LFn(f2)) => f1.label == f2.label,
-            (LValue::SymType(s1), LValue::SymType(s2)) => s1 == s2,
+            (LValue::Fn(f1), LValue::Fn(f2)) => f1.debug_label == f2.debug_label,
+            (LValue::MutFn(mf1), LValue::MutFn(mf2)) => mf1.debug_label == mf2.debug_label,
             (_, _) => false,
         }
     }
@@ -894,98 +807,9 @@ impl From<u32> for LValue {
     }
 }
 
-#[derive(Clone, Debug)]
-pub enum NameTypeLValue {
-    CoreOperator,
-    Atom,
-    SymType,
-    Object,
-    Type,
-    StateFunction,
-    Number,
-    Bool,
-    Symbol,
-    String,
-    SExpr,
-    LFn,
-    Lambda,
-    None,
-    FactBase,
-    Map,
-    List,
-    Quote,
-    Other(String),
-}
-
-impl PartialEq for NameTypeLValue {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (NameTypeLValue::String, NameTypeLValue::String) => true,
-            (NameTypeLValue::SExpr, NameTypeLValue::SExpr) => true,
-            (NameTypeLValue::Bool, NameTypeLValue::Bool) => true,
-            (NameTypeLValue::Symbol, NameTypeLValue::Symbol) => true,
-            (NameTypeLValue::LFn, NameTypeLValue::LFn) => true,
-            (NameTypeLValue::None, NameTypeLValue::None) => true,
-            (NameTypeLValue::StateFunction, NameTypeLValue::StateFunction) => true,
-            (NameTypeLValue::Type, NameTypeLValue::Type) => true,
-            (NameTypeLValue::Number, NameTypeLValue::Number) => true,
-            (NameTypeLValue::FactBase, NameTypeLValue::FactBase) => true,
-            (NameTypeLValue::Object, NameTypeLValue::Object) => true,
-            (NameTypeLValue::Map, NameTypeLValue::Map) => true,
-            (NameTypeLValue::List, NameTypeLValue::List) => true,
-            (NameTypeLValue::Quote, NameTypeLValue::Quote) => true,
-            (NameTypeLValue::SymType, NameTypeLValue::SymType) => true,
-            (NameTypeLValue::Atom, NameTypeLValue::Atom) => true,
-            (NameTypeLValue::CoreOperator, NameTypeLValue::CoreOperator) => true,
-            (NameTypeLValue::Other(s1), NameTypeLValue::Other(s2)) => *s1 == *s2,
-            (_, _) => false,
-        }
-    }
-}
-
-/**
-FROM IMPLEMENTATION
-**/
-
-impl From<LSymType> for NameTypeLValue {
-    fn from(lst: LSymType) -> Self {
-        (&lst).into()
-    }
-}
-
-impl From<&LValue> for NameTypeLValue {
-    fn from(lv: &LValue) -> Self {
-        match lv {
-            LValue::Bool(_) => NameTypeLValue::Bool,
-            LValue::Number(_) => NameTypeLValue::Number,
-            LValue::Symbol(_) => NameTypeLValue::Symbol,
-            LValue::String(_) => NameTypeLValue::String,
-            LValue::LFn(_) => NameTypeLValue::LFn,
-            LValue::None => NameTypeLValue::None,
-            LValue::Lambda(_) => NameTypeLValue::Lambda,
-            LValue::Map(_) => NameTypeLValue::Map,
-            LValue::List(_) => NameTypeLValue::List,
-            LValue::Quote(_) => NameTypeLValue::Quote,
-            LValue::SymType(_) => NameTypeLValue::SymType,
-            LValue::CoreOperator(_) => NameTypeLValue::CoreOperator,
-            _ => unimplemented!(),
-        }
-    }
-}
-
-impl From<LValue> for NameTypeLValue {
-    fn from(lv: LValue) -> Self {
-        (&lv).into()
-    }
-}
-
-impl From<&LSymType> for NameTypeLValue {
-    fn from(lst: &LSymType) -> Self {
-        match lst {
-            LSymType::StateFunction(_) => NameTypeLValue::StateFunction,
-            LSymType::Type(_) => NameTypeLValue::Type,
-            LSymType::Object(_) => NameTypeLValue::Object,
-        }
+impl From<usize> for LValue {
+    fn from(u: usize) -> Self {
+        LValue::Number(LNumber::Usize(u))
     }
 }
 
@@ -1019,18 +843,6 @@ impl From<Vec<LValue>> for LValue {
     }
 }
 
-impl From<&LSymType> for LValue {
-    fn from(lst: &LSymType) -> Self {
-        LValue::SymType(lst.clone())
-    }
-}
-
-impl From<LSymType> for LValue {
-    fn from(lst: LSymType) -> Self {
-        (&lst).into()
-    }
-}
-
 impl From<&LCoreOperator> for LValue {
     fn from(co: &LCoreOperator) -> Self {
         LValue::CoreOperator(co.clone())
@@ -1042,265 +854,149 @@ impl From<LCoreOperator> for LValue {
     }
 }
 
-/**
-** AS COMMAND IMPLEMENTATION
-**/
-
-///Transform an object in Lisp command to reconstuct itself.
-pub trait AsCommand {
-    fn as_command(&self) -> String;
-}
-
-impl AsCommand for LSymType {
-    fn as_command(&self) -> String {
-        match self {
-            LSymType::StateFunction(sf) => sf.as_command(),
-            LSymType::Type(t) => match t {
-                None => "".to_string(),
-                Some(st) => {
-                    format!("(subtype {})", st)
-                }
-            },
-            LSymType::Object(o) => {
-                format!("{}", o)
-            }
-        }
+impl From<f64> for LValue {
+    fn from(f: f64) -> Self {
+        LValue::Number(LNumber::Float(f))
     }
 }
 
-impl AsCommand for LStateFunction {
-    fn as_command(&self) -> String {
-        let mut result = String::new();
-        result.push_str(format!("({} ", STATE_FUNCTION).as_str());
-        for t_param in &self.t_params {
-            result.push_str(format!("{} ", t_param.to_string()).as_str());
-        }
-        result.push_str(format!("{})\n", self.t_value.to_string()).as_str());
-        result
+impl From<i64> for LValue {
+    fn from(i: i64) -> Self {
+        LValue::Number(LNumber::Int(i))
     }
 }
 
-impl AsCommand for Vec<LValue> {
-    fn as_command(&self) -> String {
-        let mut result = String::new();
-        result.push_str(format!("({} ", LIST).as_str());
-        for param in self {
-            result.push_str(format!("{} ", param.as_command()).as_str());
-        }
-        result
+impl From<f32> for LValue {
+    fn from(f: f32) -> Self {
+        LValue::Number(LNumber::Float(f as f64))
     }
 }
 
-impl AsCommand for HashMap<LValue, LValue> {
-    fn as_command(&self) -> String {
-        let mut result = String::new();
-        result.push_str(format!("({} ", MAP).as_str());
-        for (key, value) in self.iter() {
-            result.push_str("(list ");
-            result.push_str(format!("{} {})", key.as_command(), value.as_command()).as_str())
-        }
-        result.push_str(")\n");
-        result
+impl From<i32> for LValue {
+    fn from(i: i32) -> Self {
+        LValue::Number(LNumber::Int(i as i64))
     }
 }
 
-impl AsCommand for LValue {
-    fn as_command(&self) -> String {
-        match self {
-            LValue::List(l) => l.as_command(),
-            LValue::SymType(st) => st.as_command(),
-            LValue::String(s) => s.to_string(),
-            LValue::LFn(f) => f.label.to_string(),
-            LValue::None => "none".to_string(),
-            LValue::Symbol(s) => s.to_string(),
-            LValue::Number(n) => n.to_string(),
-            LValue::Bool(b) => b.to_string(),
-            LValue::Lambda(_) => "".to_string(),
-            LValue::Map(m) => m.as_command(),
-            LValue::Quote(q) => q.to_string(),
-            LValue::CoreOperator(c) => c.to_string(),
-            _ => unimplemented!(),
-        }
+impl From<bool> for LValue {
+    fn from(b: bool) -> Self {
+        LValue::Bool(b)
     }
 }
 
-/**
-DISPLAY IMPLEMENTATION
-**/
-
-impl Display for LType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            LType::Int => write!(f, "int"),
-            LType::Bool => write!(f, "bool"),
-            LType::Float => write!(f, "float"),
-            LType::Symbol(s) => write!(f, "{}", s),
-            LType::Object => write!(f, "object"),
-            LType::Usize => write!(f, "usize"),
-        }
+impl From<String> for LValue {
+    fn from(s: String) -> Self {
+        LValue::String(s)
     }
 }
 
-impl Display for LError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            LError::WrongType(s, s1, s2) => write!(f, "{}: Got {}, expected {}", s, s1, s2),
-            LError::ErrLoc(e) => write!(f, "{}", e),
-            LError::UndefinedSymbol(s) => write!(f, "{} is undefined", s),
-            LError::WrongNumberOfArgument(s, g, r) => {
-                if r.is_empty() {
-                    write!(f, "\"{}\": Got {} element(s), expected {}", s, g, r.start)
-                } else if r.end == std::usize::MAX {
-                    write!(
-                        f,
-                        "\"{}\": Got {} element(s), expected at least {}",
-                        s, g, r.start
-                    )
-                } else if r.start == std::usize::MIN {
-                    write!(
-                        f,
-                        "\"{}\": Got {} element(s), expected at most {}",
-                        s, g, r.end
-                    )
-                } else {
-                    write!(
-                        f,
-                        "\"{}\": Got {} element(s), expected between {} and {}",
-                        s, g, r.start, r.end
-                    )
-                }
-            }
-            LError::SpecialError(s) => write!(f, "{}", s),
-            LError::ConversionError(s1, s2) => write!(f, "Cannot convert {} into {}.", s1, s2),
-            LError::NotInListOfExpectedTypes(lv, typ, list_types) => {
-                write!(f, "{}: Got {}, expected {:?}", lv, typ, list_types)
-            }
-        }
-    }
-}
-
-impl Display for LStateFunction {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        let mut sr = String::new();
-        sr.push('(');
-        for (i, t_param) in self.t_params.iter().enumerate() {
-            sr.push_str(format!("{}", t_param).as_str());
-            if i > 0 {
-                sr.push(',');
-            }
-        }
-        sr.push_str(format!(") = {}", self.t_value).as_str());
-        write!(f, "{}", sr)
-    }
-}
-
-impl Display for LSymType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            LSymType::StateFunction(sf) => write!(f, "{}", sf),
-            LSymType::Type(t) => match t {
-                None => write!(f, "root type"),
-                Some(_type) => write!(f, "subtype of {}", _type),
-            },
-            LSymType::Object(o) => write!(f, "{}", o),
-        }
-    }
-}
-
-impl Display for LValue {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            LValue::String(s) => write!(f, "{}", s),
-            LValue::LFn(fun) => write!(f, "{}", fun.label),
-            LValue::None => write!(f, "None"),
-            LValue::Symbol(s) => write!(f, "{}", s),
-            LValue::Number(n) => write!(f, "{}", n),
-            LValue::Bool(b) => write!(f, "{}", b),
-            LValue::SymType(st) => write!(f, "{}", st),
-            LValue::List(list) => {
-                let mut result = String::new();
-                result.push('(');
-                for element in list {
-                    result.push_str(element.to_string().as_str());
-                    result.push(' ');
-                }
-                result.push(')');
-                write!(f, "{}", result)
-            }
-            LValue::Lambda(l) => write!(f, "{}", l),
-            LValue::Map(m) => {
-                let mut result = String::new();
-                for (key, value) in m.iter() {
-                    result.push_str(format!("{}: {}\n", key, value).as_str());
-                }
-                write!(f, "{}", result)
-            }
-            LValue::Quote(q) => write!(f, "{}", q),
-            LValue::CoreOperator(co) => {
-                write!(f, "{}", co)
-            }
-            _ => unimplemented!(),
-        }
-    }
-}
-
-impl Display for LLambda {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{:?} : {}", self.params, self.body)
-    }
+#[derive(Clone, Debug)]
+pub enum NameTypeLValue {
+    CoreOperator,
+    Atom,
+    Object,
+    Number,
+    Int,
+    Float,
+    Usize,
+    Bool,
+    Symbol,
+    String,
+    SExpr,
+    Fn,
+    MutFn,
+    Lambda,
+    None,
+    Map,
+    List,
+    Quote,
+    Other(String),
 }
 
 impl Display for NameTypeLValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         let str = match self {
-            NameTypeLValue::Type => "Type",
-            NameTypeLValue::StateFunction => "StateFunction",
             NameTypeLValue::Number => "Number",
             NameTypeLValue::Bool => "Boolean",
             NameTypeLValue::Symbol => "Symbol",
             NameTypeLValue::String => "String",
             NameTypeLValue::SExpr => "SExpr",
-            NameTypeLValue::LFn => "LFn",
+            NameTypeLValue::Fn => "Fn",
             NameTypeLValue::None => "None",
-            NameTypeLValue::FactBase => "FactBase",
             NameTypeLValue::Object => "Object",
             NameTypeLValue::Lambda => "lambda",
             NameTypeLValue::Map => "map",
             NameTypeLValue::List => "list",
             NameTypeLValue::Quote => "quote",
-            NameTypeLValue::SymType => "symtype",
             NameTypeLValue::Atom => "atom",
             NameTypeLValue::CoreOperator => "core_operator",
             NameTypeLValue::Other(s) => s.as_str(),
+            NameTypeLValue::MutFn => "LFn",
+            NameTypeLValue::Int => "int",
+            NameTypeLValue::Float => "float",
+            NameTypeLValue::Usize => "usize",
         };
         write!(f, "{}", str)
     }
 }
 
-impl Display for LCoreOperator {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            LCoreOperator::Define => write!(f, "{}", DEFINE.to_string()),
-            LCoreOperator::DefLambda => write!(f, "{}", LAMBDA.to_string()),
-            LCoreOperator::If => write!(f, "{}", IF.to_string()),
-            LCoreOperator::Quote => write!(f, "{}", QUOTE.to_string()),
-            LCoreOperator::QuasiQuote => write!(f, "{}", QUASI_QUOTE.to_string()),
-            LCoreOperator::UnQuote => write!(f, "{}", UNQUOTE.to_string()),
-            LCoreOperator::DefMacro => write!(f, "{}", DEF_MACRO.to_string()),
-            LCoreOperator::Set => write!(f, "{}", SET.to_string()),
-            LCoreOperator::Begin => write!(f, "{}", BEGIN.to_string()),
+impl PartialEq for NameTypeLValue {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (NameTypeLValue::String, NameTypeLValue::String) => true,
+            (NameTypeLValue::SExpr, NameTypeLValue::SExpr) => true,
+            (NameTypeLValue::Bool, NameTypeLValue::Bool) => true,
+            (NameTypeLValue::Symbol, NameTypeLValue::Symbol) => true,
+            (NameTypeLValue::Fn, NameTypeLValue::Fn) => true,
+            (NameTypeLValue::None, NameTypeLValue::None) => true,
+            (NameTypeLValue::Number, NameTypeLValue::Number) => true,
+            (NameTypeLValue::Object, NameTypeLValue::Object) => true,
+            (NameTypeLValue::Map, NameTypeLValue::Map) => true,
+            (NameTypeLValue::List, NameTypeLValue::List) => true,
+            (NameTypeLValue::Quote, NameTypeLValue::Quote) => true,
+            (NameTypeLValue::Atom, NameTypeLValue::Atom) => true,
+            (NameTypeLValue::CoreOperator, NameTypeLValue::CoreOperator) => true,
+            (NameTypeLValue::Int, NameTypeLValue::Int) => true,
+            (NameTypeLValue::Float, NameTypeLValue::Float) => true,
+            (NameTypeLValue::Usize, NameTypeLValue::Usize) => true,
+            (NameTypeLValue::Other(s1), NameTypeLValue::Other(s2)) => *s1 == *s2,
+            (_, _) => false,
         }
     }
 }
 
-/**
-DEBUG
-**/
-
-impl Debug for LValue {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{}", self)
+impl From<&LValue> for NameTypeLValue {
+    fn from(lv: &LValue) -> Self {
+        match lv {
+            LValue::Bool(_) => NameTypeLValue::Bool,
+            LValue::Number(_) => NameTypeLValue::Number,
+            LValue::Symbol(_) => NameTypeLValue::Symbol,
+            LValue::String(_) => NameTypeLValue::String,
+            LValue::Fn(_) => NameTypeLValue::Fn,
+            LValue::MutFn(_) => NameTypeLValue::MutFn,
+            LValue::None => NameTypeLValue::None,
+            LValue::Lambda(_) => NameTypeLValue::Lambda,
+            LValue::Map(_) => NameTypeLValue::Map,
+            LValue::List(_) => NameTypeLValue::List,
+            LValue::Quote(_) => NameTypeLValue::Quote,
+            LValue::CoreOperator(_) => NameTypeLValue::CoreOperator,
+        }
     }
+}
+
+impl From<LValue> for NameTypeLValue {
+    fn from(lv: LValue) -> Self {
+        (&lv).into()
+    }
+}
+
+pub struct Module {
+    pub ctx: Box<dyn Any>,
+    pub prelude: Vec<(Sym, LValue)>,
+}
+
+pub trait AsModule {
+    fn get_module() -> Module;
 }
 
 #[cfg(test)]
@@ -1499,14 +1195,6 @@ mod tests {
     }
 }
 
-pub struct Module {
-    pub ctx: Box<dyn Any>,
-    pub prelude: Vec<(Sym, LValue)>,
-}
-
-pub trait AsModule {
-    fn get_module() -> Module;
-}
 /*
 Module<()>
 Module<Simu>

@@ -4,7 +4,7 @@ use crate::lisp_root::lisp_struct::*;
 use crate::lisp_root::RefLEnv;
 use aries_utils::input::Sym;
 use im::HashMap;
-use std::fmt::{Display, Formatter, Debug};
+use std::fmt::{Debug, Display, Formatter};
 
 //pub const TYPE: &str = "type";
 //pub const STATE: &str = "state";
@@ -270,7 +270,7 @@ pub struct CtxType {
 //TODO: IMPROVE GET-TYPE and DEFAULT
 impl Default for CtxType {
     fn default() -> Self {
-        let types = vec![LSymType::Type(None);5];
+        let types = vec![LSymType::Type(None); 5];
 
         let mut map_sym_type_id: HashMap<Sym, usize> = Default::default();
         map_sym_type_id.insert(TYPE_INT.into(), INDEX_TYPE_INT);
@@ -651,15 +651,19 @@ pub fn new_state_function(
 }
 
 pub fn new_object(args: &[LValue], _: &mut RefLEnv, ctx: &mut CtxType) -> Result<LValue, LError> {
-    if args.len() !=1 {
-        return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1))
+    if args.len() != 1 {
+        return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1));
     }
     let type_id;
     let option_type = match &args[0] {
-        LValue::Symbol(s) =>  {
-            type_id = match ctx.get_type_id(s){
-                None => return Err(SpecialError("no type annotation corresponding to the symbol".to_string())),
-                Some(u) => *u
+        LValue::Symbol(s) => {
+            type_id = match ctx.get_type_id(s) {
+                None => {
+                    return Err(SpecialError(
+                        "no type annotation corresponding to the symbol".to_string(),
+                    ))
+                }
+                Some(u) => *u,
             };
             ctx.get_type(type_id)
         }
@@ -667,20 +671,32 @@ pub fn new_object(args: &[LValue], _: &mut RefLEnv, ctx: &mut CtxType) -> Result
             type_id = *u;
             ctx.get_type(type_id)
         }
-        lv => return Err(NotInListOfExpectedTypes(lv.clone(), lv.into(), vec![NameTypeLValue::Symbol, NameTypeLValue::Usize]))
+        lv => {
+            return Err(NotInListOfExpectedTypes(
+                lv.clone(),
+                lv.into(),
+                vec![NameTypeLValue::Symbol, NameTypeLValue::Usize],
+            ))
+        }
     };
 
     match option_type {
-        None => Err(WrongType((&args[0]).clone(), (&args[0]).into(), NameTypeLValue::Symbol)),
-        Some(lst) => {
-            match lst {
-                LSymType::Type(_) => {
-                    let type_id = ctx.add_type(LSymType::Object(type_id));
-                    Ok(type_id.into())
-                }
-                lst => Err(WrongType(lst.into(), lst.into(), NameTypeLValue::Other("type".to_string())))
+        None => Err(WrongType(
+            (&args[0]).clone(),
+            (&args[0]).into(),
+            NameTypeLValue::Symbol,
+        )),
+        Some(lst) => match lst {
+            LSymType::Type(_) => {
+                let type_id = ctx.add_type(LSymType::Object(type_id));
+                Ok(type_id.into())
             }
-        }
+            lst => Err(WrongType(
+                lst.into(),
+                lst.into(),
+                NameTypeLValue::Other("type".to_string()),
+            )),
+        },
     }
 }
 
@@ -695,10 +711,10 @@ pub fn get_type(args: &[LValue], _: &RefLEnv, ctx: &CtxType) -> Result<LValue, L
                 LSymType::Object(u) => ctx.get_sym(u).unwrap().to_string(),
                 LSymType::Type(parent_type) => match parent_type {
                     None => "root type".to_string(),
-                    Some(u) => format!("subtype of {}", ctx.get_sym(u).unwrap().to_string())
-                }
-                lst => lst.to_string()
-            }
+                    Some(u) => format!("subtype of {}", ctx.get_sym(u).unwrap().to_string()),
+                },
+                lst => lst.to_string(),
+            },
         },
         lv => NameTypeLValue::from(lv).to_string(),
     };

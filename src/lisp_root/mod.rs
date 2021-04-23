@@ -198,10 +198,6 @@ impl LEnv {
             LValue::Fn(LFn::new(Box::new(list), LIST.to_string())),
         );
         //State is an alias for map
-        /*symbols.insert(
-        STATE.to_string(),
-        LValue::Fn(LFn::new(Box::new(map), STATE.to_string())));*/
-        //Sym_types
 
         /*
          * LIST FUNCTIONS
@@ -236,8 +232,7 @@ impl LEnv {
             LValue::Fn(LFn::new(Box::new(reverse), REVERSE.to_string())),
         );
 
-        //TODO: add the macros defined in a predefined file
-
+        //TODO: Add a function to import files in a predefined file
         Self {
             symbols,
             macro_table: Default::default(),

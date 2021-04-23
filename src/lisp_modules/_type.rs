@@ -4,7 +4,7 @@ use crate::lisp_root::lisp_struct::*;
 use crate::lisp_root::RefLEnv;
 use aries_utils::input::Sym;
 use im::HashMap;
-use std::fmt::{Display, Formatter};
+use std::fmt::{Display, Formatter, Debug};
 
 //pub const TYPE: &str = "type";
 //pub const STATE: &str = "state";
@@ -35,6 +35,12 @@ pub const TYPE_USIZE: &str = "usize";
 pub const TYPE_OBJECT: &str = "object";
 pub const TYPE_BOOL: &str = "boolean";
 
+pub const INDEX_TYPE_INT: usize = 0;
+pub const INDEX_TYPE_FLOAT: usize = 1;
+pub const INDEX_TYPE_USIZE: usize = 2;
+pub const INDEX_TYPE_OBJECT: usize = 3;
+pub const INDEX_TYPE_BOOL: usize = 4;
+
 pub const TYPE_OF: &str = "type-of";
 pub const SUB_TYPE: &str = "sub-type";
 pub const GET_TYPE: &str = "get-type";
@@ -44,7 +50,7 @@ pub const NEW_OBJECT: &str = "new-obj";
 #[derive(Clone, Debug)]
 pub enum LSymType {
     StateFunction(LStateFunction),
-    Type(Option<LType>),
+    Type(Option<usize>),
     Object(usize),
 }
 
@@ -54,9 +60,9 @@ impl Display for LSymType {
             LSymType::StateFunction(sf) => write!(f, "{}", sf),
             LSymType::Type(t) => match t {
                 None => write!(f, "root type"),
-                Some(_type) => write!(f, "subtype of {}", _type),
+                Some(_type) => write!(f, "subtype of type_id : {}", _type),
             },
-            LSymType::Object(o) => write!(f, "{}", o),
+            LSymType::Object(o) => write!(f, "type_id: {}", o),
         }
     }
 }
@@ -257,22 +263,32 @@ impl AsLiteral for LStateFunction {
 #[derive(Debug)]
 pub struct CtxType {
     map_sym_type_id: HashMap<Sym, usize>,
+    map_type_id_sym: HashMap<usize, Sym>,
     types: Vec<LSymType>,
 }
 
 //TODO: IMPROVE GET-TYPE and DEFAULT
 impl Default for CtxType {
     fn default() -> Self {
-        let types = vec![LSymType::Type(None)];
+        let types = vec![LSymType::Type(None);5];
 
         let mut map_sym_type_id: HashMap<Sym, usize> = Default::default();
-        map_sym_type_id.insert(TYPE_INT.into(), 0);
-        map_sym_type_id.insert(TYPE_FLOAT.into(), 0);
-        map_sym_type_id.insert(TYPE_BOOL.into(), 0);
-        map_sym_type_id.insert(TYPE_OBJECT.into(), 0);
+        map_sym_type_id.insert(TYPE_INT.into(), INDEX_TYPE_INT);
+        map_sym_type_id.insert(TYPE_FLOAT.into(), INDEX_TYPE_FLOAT);
+        map_sym_type_id.insert(TYPE_USIZE.into(), INDEX_TYPE_USIZE);
+        map_sym_type_id.insert(TYPE_BOOL.into(), INDEX_TYPE_BOOL);
+        map_sym_type_id.insert(TYPE_OBJECT.into(), INDEX_TYPE_OBJECT);
+
+        let mut map_type_id_sym: HashMap<usize, Sym> = Default::default();
+        map_type_id_sym.insert(INDEX_TYPE_INT, TYPE_INT.into());
+        map_type_id_sym.insert(INDEX_TYPE_FLOAT, TYPE_FLOAT.into());
+        map_type_id_sym.insert(INDEX_TYPE_USIZE, TYPE_USIZE.into());
+        map_type_id_sym.insert(INDEX_TYPE_BOOL, TYPE_BOOL.into());
+        map_type_id_sym.insert(INDEX_TYPE_OBJECT, TYPE_OBJECT.into());
 
         Self {
             map_sym_type_id,
+            map_type_id_sym,
             types,
         }
     }
@@ -281,6 +297,10 @@ impl Default for CtxType {
 impl CtxType {
     pub fn get_type_id(&self, sym: &Sym) -> Option<&usize> {
         self.map_sym_type_id.get(sym)
+    }
+
+    pub fn get_sym(&self, type_id: &usize) -> Option<&Sym> {
+        self.map_type_id_sym.get(type_id)
     }
 
     pub fn get_type(&self, type_id: usize) -> Option<&LSymType> {
@@ -296,6 +316,7 @@ impl CtxType {
 
     pub fn bind_sym_type(&mut self, sym: &Sym, type_id: usize) {
         self.map_sym_type_id.insert(sym.clone(), type_id);
+        self.map_type_id_sym.insert(type_id, sym.clone());
     }
 
     pub fn add_type(&mut self, sym_type: LSymType) -> usize {
@@ -579,18 +600,12 @@ pub fn subtype(args: &[LValue], _: &mut RefLEnv, ctx: &mut CtxType) -> Result<LV
         return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1));
     }
     let expected_type = NameTypeLValue::Other("TYPE".to_string());
-    let parent_type: LType = match &args[0] {
-        LValue::Symbol(s) => match s.as_str() {
-            TYPE_INT => LType::Int,
-            TYPE_FLOAT => LType::Float,
-            TYPE_BOOL => LType::Object,
-            TYPE_OBJECT => LType::Object,
-            _str => match ctx.get_type_from_sym(s) {
-                None => return Err(SpecialError(format!("{} has no type annotations", s))),
-                Some(lst) => match lst {
-                    LSymType::Type(_) => LType::Symbol(s.clone()),
-                    lst => return Err(WrongType(lst.into(), lst.into(), expected_type)),
-                },
+    let parent_type: usize = match &args[0] {
+        LValue::Symbol(s) => match ctx.get_type_from_sym(s) {
+            None => return Err(SpecialError(format!("{} has no type annotations", s))),
+            Some(lst) => match lst {
+                LSymType::Type(_) => *ctx.get_type_id(s).unwrap(),
+                lst => return Err(WrongType(lst.into(), lst.into(), expected_type)),
             },
         },
         lv => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
@@ -673,22 +688,20 @@ pub fn get_type(args: &[LValue], _: &RefLEnv, ctx: &CtxType) -> Result<LValue, L
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1));
     }
-    let sym_type = match &args[0] {
+    let type_as_string = match &args[0] {
         LValue::Symbol(s) => match ctx.get_type_from_sym(s) {
             None => return Err(LError::SpecialError(format!("{} has no type", s))),
             Some(lst) => match lst {
-                LSymType::Object(u) => ctx.get_type(*u).unwrap().clone(),
-                lst => lst.clone()
+                LSymType::Object(u) => ctx.get_sym(u).unwrap().to_string(),
+                LSymType::Type(parent_type) => match parent_type {
+                    None => "root type".to_string(),
+                    Some(u) => format!("subtype of {}", ctx.get_sym(u).unwrap().to_string())
+                }
+                lst => lst.to_string()
             }
         },
-        LValue::Number(n) => match n {
-            LNumber::Int(_) => LSymType::Type(Some(LType::Int)),
-            LNumber::Float(_) => LSymType::Type(Some(LType::Float)),
-            LNumber::Usize(_) => LSymType::Type(Some(LType::Usize)),
-        },
-        LValue::Bool(_) => LSymType::Type(Some(LType::Bool)),
-        lv => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Atom)),
+        lv => NameTypeLValue::from(lv).to_string(),
     };
 
-    Ok(sym_type.into())
+    Ok(type_as_string.into())
 }

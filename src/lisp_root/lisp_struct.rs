@@ -10,8 +10,6 @@ use std::hash::{Hash, Hasher};
 use std::ops::{Add, Div, Mul, Range, Sub};
 use std::rc::Rc;
 
-//TODO: define MutLfn
-
 #[derive(Debug)]
 pub enum LError {
     WrongType(LValue, NameTypeLValue, NameTypeLValue),
@@ -969,7 +967,9 @@ impl From<&LValue> for NameTypeLValue {
     fn from(lv: &LValue) -> Self {
         match lv {
             LValue::Bool(_) => NameTypeLValue::Bool,
-            LValue::Number(_) => NameTypeLValue::Number,
+            LValue::Number(LNumber::Float(_)) => NameTypeLValue::Float,
+            LValue::Number(LNumber::Int(_)) => NameTypeLValue::Int,
+            LValue::Number(LNumber::Usize(_)) => NameTypeLValue::Usize,
             LValue::Symbol(_) => NameTypeLValue::Symbol,
             LValue::String(_) => NameTypeLValue::String,
             LValue::Fn(_) => NameTypeLValue::Fn,

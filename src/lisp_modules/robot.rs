@@ -1,5 +1,5 @@
 
-use crate::lisp_root::lisp_struct::{AsModule, Module, LError, LValue};
+use crate::lisp_root::lisp_struct::{AsModule, Module, LError, LValue, LNumber};
 use crate::lisp_root::{LEnv, RefLEnv};
 use std::thread;
 use std::time::Duration;
@@ -7,6 +7,7 @@ use std::thread::JoinHandle;
 use im::HashMap;
 use aries_utils::input::Sym;
 use std::sync::mpsc::{Sender, Receiver, RecvError, channel};
+use crate::lisp_root::lisp_struct::LError::{WrongNumberOfArgument, SpecialError};
 
 /*
 LANGUAGE
@@ -32,12 +33,16 @@ type RobotId = usize;
 pub struct CtxRobot {
     robots: Vec<VirtualRobot>,
     map_robot_id: HashMap<Sym, RobotId>,
-    robot_handler: RobotHandler,
+    robots_sender: Option<Sender<String>>,
 }
 
 impl Default for CtxRobot {
     fn default() -> Self {
-        todo!()
+        CtxRobot {
+            robots: vec![],
+            map_robot_id : Default::default(),
+            robots_sender: None,
+        }
     }
 }
 
@@ -53,9 +58,8 @@ struct RobotHandler {
     sender: Sender<String>,
 }
 
-
 pub const ROBOT_HANDLER_START_MSG: &str = "Robot handler started!!!\n\
-                                                Listening...";
+                                           Listening...";
 fn robot_handler(rx: Receiver<String>) {
     println!("{}", ROBOT_HANDLER_START_MSG);
 
@@ -101,7 +105,22 @@ impl AsModule for CtxRobot {
 }
 
 pub fn exec(args: &[LValue], env: &mut RefLEnv, ctx: &mut CtxRobot) -> Result<LValue, LError> {
-    unimplemented!()
+    if args.len() != 2 {
+        return Err(WrongNumberOfArgument(args.into(), args.len(), 2..std::usize::MAX))
+    }
+
+    match &args[0] {
+        LValue::Number(LNumber::Usize(u)) => {
+            let virtual_robot = match ctx.robots.get(*u) {
+                None => return Err(SpecialError("Not a valid RobotId".to_string())),
+                Some(vr) => vr,
+            };
+            virtual_robot.sender.send(args[1].to_string());
+            Ok(LValue::None)
+        }
+        _ => Err(SpecialError("Expected a RobotId(usize)".to_string()))
+    }
+
 }
 
 pub fn command_move(args: &[LValue], env: &mut RefLEnv, ctx: &mut CtxRobot) -> Result<LValue, LError> {
@@ -115,11 +134,14 @@ pub fn command_place(args: &[LValue], env: &mut RefLEnv, ctx: &mut CtxRobot) -> 
 }
 
 fn robot(arg_robot: ArgRobot) {
-    println!("Hi!! I'm a new robot\n");
+    println!("Hi!! I'm a new robot");
     loop {
         println!("waiting for order...");
         match arg_robot.receiver.recv() {
-            Ok(lv) => println!("{}", lv),
+            Ok(lv) => {
+                println!("{}", lv);
+                arg_robot.sender.send(format!("action {} OK!", lv));
+            },
             Err(e) => panic!(e),
         };
     }
@@ -130,7 +152,7 @@ pub fn new_robot(args: &[LValue], env: &mut RefLEnv, ctx: &mut CtxRobot) -> Resu
 
     let channel_sup_to_robot = channel();
     let arg_robot = ArgRobot {
-        sender: ctx.robot_handler.sender.clone(),
+        sender: ctx.robots_sender.as_ref().expect("robot handler missing").clone(),
         receiver: channel_sup_to_robot.1,
     };
 
@@ -151,7 +173,7 @@ pub fn new_robot(args: &[LValue], env: &mut RefLEnv, ctx: &mut CtxRobot) -> Resu
 
 pub fn start_robot_handler(args: &[LValue], env: &mut RefLEnv, ctx: &mut CtxRobot) -> Result<LValue, LError> {
     let (tx, rx) = channel();
-    ctx.robot_handler.sender = tx;
+    ctx.robots_sender = Some(tx);
     thread::spawn(move || {
         robot_handler(rx)
     });

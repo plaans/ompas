@@ -1,15 +1,4 @@
-//Mathematical functions
-pub const ADD: &str = "+";
-pub const SUB: &str = "-";
-pub const MUL: &str = "*";
-pub const DIV: &str = "/";
 
-//Comparison
-pub const GT: &str = ">";
-pub const LT: &str = "<";
-pub const GE: &str = ">=";
-pub const LE: &str = "<=";
-pub const EQ: &str = "=";
 
 pub const MAP: &str = "map";
 pub const PAIR: &str = "pair";

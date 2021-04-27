@@ -1,14 +1,15 @@
-use crate::lisp_root::lisp_language::*;
+use crate::core::language::*;
 use aries_utils::input::{ErrLoc, Sym};
 use std::cmp::Ordering;
 //use std::collections::HashMap;
-use crate::lisp_root::lisp_struct::LError::WrongNumberOfArgument;
-use crate::lisp_root::{eval, CtxCollec, RefLEnv};
+use crate::core::r#struct::LError::WrongNumberOfArgument;
+use crate::core::{eval, CtxCollec, RefLEnv};
 use std::any::Any;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::{Add, Div, Mul, Range, Sub};
 use std::rc::Rc;
+use std::ptr::write_bytes;
 
 #[derive(Debug)]
 pub enum LError {
@@ -65,7 +66,7 @@ impl From<ErrLoc> for LError {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum LNumber {
     Int(i64),
     Float(f64),
@@ -98,13 +99,13 @@ impl Into<Sym> for LNumber {
     }
 }
 
-impl PartialEq for LNumber {
+/*impl PartialEq for LNumber {
     fn eq(&self, other: &Self) -> bool {
         let n1: f64 = self.into();
         let n2: f64 = other.into();
         n1 == n2
     }
-}
+}*/
 
 impl Into<usize> for &LNumber {
     fn into(self) -> usize {
@@ -146,7 +147,7 @@ impl Hash for LNumber {
     }
 }
 
-impl PartialOrd for LNumber {
+/*impl PartialOrd for LNumber {
     fn partial_cmp(&self, _other: &Self) -> Option<Ordering> {
         unimplemented!()
     }
@@ -174,7 +175,7 @@ impl PartialOrd for LNumber {
         let n2: f64 = other.into();
         n1 >= n2
     }
-}
+}*/
 
 impl Add for &LNumber {
     type Output = LNumber;
@@ -264,7 +265,7 @@ impl Div for LNumber {
 
 impl Eq for LNumber {}
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct LLambda {
     params: Vec<Sym>,
     body: Box<LValue>,
@@ -330,6 +331,16 @@ pub struct LFn {
     index_mod: Option<usize>,
 }
 
+impl Debug for LFn {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "label: {:?}\nmod : {}", self.debug_label,
+            match self.index_mod {
+                None => "none".to_string(),
+                Some(u) => u.to_string(),
+            })
+    }
+}
+
 impl LFn {
     pub fn new<
         T: 'static,
@@ -381,6 +392,17 @@ pub struct LMutFn {
     pub(crate) fun: Rc<NativeMutFn>,
     pub(crate) debug_label: String,
     index_mod: Option<usize>,
+}
+
+
+impl Debug for LMutFn {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "label: {:?}\nmod : {}", self.debug_label,
+            match self.index_mod {
+                None => "none".to_string(),
+                Some(u) => u.to_string(),
+            })
+    }
 }
 
 impl LMutFn {
@@ -482,7 +504,22 @@ pub enum LValue {
 
 impl Debug for LValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{:?}", self)
+        let string = match self {
+            LValue::Symbol(s) => format!("Symbol: {:?}", s),
+            LValue::Number(n) => format!("Number: {:?}", n),
+            LValue::Bool(b) => format!("Boolean: {:?}", b),
+            LValue::String(s) => format!("String: {:?}", s),
+            LValue::Map(map) => format!("Map: {:?}", map),
+            LValue::List(list) => format!("List: {:?}", list),
+            LValue::Quote(q) => format!("Quote: {:?}", q),
+            LValue::None => "LValue::None".to_string(),
+            LValue::Fn(lfn) => format!("Function: {:?}", lfn),
+            LValue::MutFn(mutfn) => format!("Number: {:?}", mutfn),
+            LValue::Lambda(l) => format!("Lambda: {:?}", l),
+            LValue::CoreOperator(co) => format!("CoreOperator: {:?}", co),
+        };
+        write!(f, "{}", string)
+
     }
 }
 
@@ -1120,27 +1157,8 @@ mod tests {
         assert_eq!(value, 4)
     }*/
 
-    #[test]
+    /*#[test]
     fn test_native_lambda() {
-        struct Counter {
-            cnt: u32,
-        };
-        impl NativeContext for Counter {
-            fn get_component(&self, type_id: TypeId) -> Option<&dyn Any> {
-                if type_id == TypeId::of::<u32>() {
-                    Some(&self.cnt)
-                } else {
-                    None
-                }
-            }
-            fn get_component_mut(&mut self, type_id: TypeId) -> Option<&mut dyn Any> {
-                if type_id == TypeId::of::<u32>() {
-                    Some(&mut self.cnt)
-                } else {
-                    None
-                }
-            }
-        }
 
         let get_counter = |args: &[LValue], ctx: &dyn NativeContext| -> Result<LValue, LError> {
             if let Some(cnt) = ctx
@@ -1171,9 +1189,11 @@ mod tests {
         let getter = LNativeLambda {
             fun: Rc::new(get_counter),
         };
-        let getter = LNativeLambda::new(Box::new(|args: &[LValue], ctx: &u32| *ctx));
-        let setter = LNativeMutLambda {
+        let getter = LFn::new(Box::new(|args: &[LValue], ctx: &u32| *ctx), "getter".to_string());
+        let setter = LMutFn {
             fun: Rc::new(set_counter),
+            debug_label: "setter".to_string(),
+            index_mod: None
         };
 
         let mut state = Counter { cnt: 0 };
@@ -1192,7 +1212,7 @@ mod tests {
             getter.call(&[], &state).ok().unwrap(),
             LValue::Number(LNumber::Int(5))
         );
-    }
+    }*/
 }
 
 /*

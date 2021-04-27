@@ -1,4 +1,4 @@
-pub mod lisp_modules;
-pub mod lisp_root;
+pub mod modules;
+pub mod core;
 pub mod repl;
 pub mod rob_sim;

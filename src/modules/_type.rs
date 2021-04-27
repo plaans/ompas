@@ -1,7 +1,7 @@
-use crate::lisp_root::lisp_as_literal::AsLiteral;
-use crate::lisp_root::lisp_struct::LError::*;
-use crate::lisp_root::lisp_struct::*;
-use crate::lisp_root::RefLEnv;
+use crate::core::lisp_as_literal::AsLiteral;
+use crate::core::r#struct::LError::*;
+use crate::core::r#struct::*;
+use crate::core::RefLEnv;
 use aries_utils::input::Sym;
 use im::HashMap;
 use std::fmt::{Debug, Display, Formatter};

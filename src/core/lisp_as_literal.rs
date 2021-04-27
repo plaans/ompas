@@ -1,5 +1,5 @@
-use crate::lisp_root::lisp_language::*;
-use crate::lisp_root::lisp_struct::*;
+use crate::core::language::*;
+use crate::core::r#struct::*;
 use im::HashMap;
 
 ///Transform an object in Lisp command to reconstuct itself.

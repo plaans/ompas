@@ -3,8 +3,8 @@ name = "fact_base"
 version = "0.1.0"
 authors = ["Yirmandias <turi@etud.insa-toulouse.fr>"]
 edition = "2018"
-default-run = "fact_base_editor"
-#default-run = "test_im"
+#default-run = "fact_base_editor"
+default-run = "unnamed_supervisor"
 
 [features]
 deprecated= []
@@ -25,4 +25,8 @@ structopt = { version = "0.3", default-features = false }
 [[bin]]
 name = "virtual_robot"
 path = "src/bin/robot_sim.rs"
+
+[[bin]]
+name = "unnamed_supervisor"
+path = "src/bin/unnamed_supervisor.rs"
 #required-features = ["robot_sim"]

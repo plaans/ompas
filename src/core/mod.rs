@@ -1,10 +1,10 @@
-use crate::lisp_root::lisp_as_literal::AsLiteral;
-use crate::lisp_root::lisp_functions::*;
-use crate::lisp_root::lisp_language::*;
-use crate::lisp_root::lisp_struct::LCoreOperator::Quote;
-use crate::lisp_root::lisp_struct::LError::*;
-use crate::lisp_root::lisp_struct::NameTypeLValue::{List, Symbol};
-use crate::lisp_root::lisp_struct::*;
+use crate::core::lisp_as_literal::AsLiteral;
+use crate::core::functions::*;
+use crate::core::language::*;
+use crate::core::r#struct::LCoreOperator::Quote;
+use crate::core::r#struct::LError::*;
+use crate::core::r#struct::NameTypeLValue::{List, Symbol};
+use crate::core::r#struct::*;
 use aries_planning::parsing::sexpr::SExpr;
 use aries_utils::input::Sym;
 use im::HashMap;
@@ -16,9 +16,9 @@ use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
 pub mod lisp_as_literal;
-pub mod lisp_functions;
-pub mod lisp_language;
-pub mod lisp_struct;
+pub mod functions;
+pub mod language;
+pub mod r#struct;
 
 pub struct LEnv {
     symbols: HashMap<String, LValue>,
@@ -127,68 +127,13 @@ impl LEnv {
         symbols.insert(QUOTE.to_string(), LCoreOperator::Quote.into());
         symbols.insert(UNQUOTE.to_string(), LCoreOperator::UnQuote.into());
 
-        //Mathematical functions
-        symbols.insert(
-            ADD.to_string(),
-            LValue::Fn(LFn::new(Box::new(add), ADD.to_string())),
-        );
-        symbols.insert(
-            SUB.to_string(),
-            LValue::Fn(LFn::new(Box::new(sub), SUB.to_string())),
-        );
-        symbols.insert(
-            MUL.to_string(),
-            LValue::Fn(LFn::new(Box::new(mul), MUL.to_string())),
-        );
-        symbols.insert(
-            DIV.to_string(),
-            LValue::Fn(LFn::new(Box::new(div), DIV.to_string())),
-        );
-        //Comparison
-        symbols.insert(
-            GT.to_string(),
-            LValue::Fn(LFn::new(Box::new(gt), GT.to_string())),
-        );
-        symbols.insert(
-            LT.to_string(),
-            LValue::Fn(LFn::new(Box::new(lt), LT.to_string())),
-        );
-        symbols.insert(
-            GE.to_string(),
-            LValue::Fn(LFn::new(Box::new(ge), GE.to_string())),
-        );
-        symbols.insert(
-            LE.to_string(),
-            LValue::Fn(LFn::new(Box::new(le), LE.to_string())),
-        );
-        symbols.insert(
-            EQ.to_string(),
-            LValue::Fn(LFn::new(Box::new(div), EQ.to_string())),
-        );
 
         //Special entry
         symbols.insert(
             GET.to_string(),
             LValue::Fn(LFn::new(Box::new(get), GET.to_string())),
         );
-        /*symbols.insert(
-        GET_TYPE.to_string(),
-        LValue::Fn(LFn::new(Box::new(get_type), GET_TYPE.to_string())));*/
 
-        //Logical functions : will be added as macros
-        //symbols.insert(AND.to_string(), LValue::LFn(Rc::new(and)));
-        //symbols.insert(OR.to_string(), LValue::LFn(Rc::new(or)));
-        //symbols.insert(NOT.to_string(), LValue::LFn(Rc::new(not)));
-
-        //Basic types
-
-        //Functions for the factbase
-        /* symbols.insert(
-            STATE_FUNCTION.to_string(),
-            LValue::Fn(LFn::new(Box::new(state_function), STATE_FUNCTION.to_string())));
-        symbols.insert(
-            SUBTYPE.to_string(),
-            LValue::Fn(LFn::new(Box::new(subtype), SUBTYPE.to_string())));*/
         symbols.insert(
             MAP.to_string(),
             LValue::Fn(LFn::new(Box::new(map), MAP.to_string())),

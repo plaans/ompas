@@ -1,11 +1,13 @@
-use crate::lisp_modules::_type::CtxType;
-use crate::lisp_modules::counter::CtxCounter;
-use crate::lisp_modules::io::CtxIO;
-use crate::lisp_modules::math::CtxMath;
-use crate::lisp_root::lisp_struct::*;
-use crate::lisp_root::{eval, load_module, parse, ContextCollection, RefLEnv};
+use crate::modules::_type::CtxType;
+use crate::modules::counter::CtxCounter;
+use crate::modules::io::CtxIO;
+use crate::modules::math::CtxMath;
+use crate::modules::robot::CtxRobot;
+use crate::core::r#struct::*;
+use crate::core::{eval, load_module, parse, ContextCollection, RefLEnv};
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
+use std::sync::mpsc::{Receiver, Sender};
 
 pub fn repl() {
     // `()` can be used when no completer is required
@@ -19,6 +21,7 @@ pub fn repl() {
     load_module(root_env, ctxs, CtxIO::get_module());
     load_module(root_env, ctxs, CtxType::get_module());
     load_module(root_env, ctxs, CtxMath::get_module());
+    load_module(root_env, ctxs, CtxRobot::get_module());
     let env = &mut RefLEnv::new_from_outer(root_env.clone());
 
     loop {
@@ -43,6 +46,35 @@ pub fn repl() {
                 };
 
                 //println!("Line: {}", line);
+            }
+            Err(ReadlineError::Interrupted) => {
+                println!("CTRL-C");
+                break;
+            }
+            Err(ReadlineError::Eof) => {
+                println!("CTRL-D");
+                break;
+            }
+            Err(err) => {
+                println!("Error: {:?}", err);
+                break;
+            }
+        }
+    }
+    rl.save_history("history.txt").unwrap();
+}
+
+pub fn repl_2(sender: Sender<String>, _receiver: Receiver<String>) {
+    let mut rl = Editor::<()>::new();
+    if rl.load_history("history.txt").is_err() {
+        println!("No previous history.");
+    }
+
+    loop {
+        let readline = rl.readline(">> ");
+        match readline {
+            Ok(string) => {
+                sender.send(string);
             }
             Err(ReadlineError::Interrupted) => {
                 println!("CTRL-C");

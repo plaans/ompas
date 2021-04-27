@@ -1,75 +1,8 @@
-use crate::lisp_root::lisp_struct::LError::*;
-use crate::lisp_root::lisp_struct::*;
-use crate::lisp_root::RefLEnv;
+use crate::core::r#struct::LError::*;
+use crate::core::r#struct::*;
+use crate::core::RefLEnv;
 use aries_utils::input::Sym;
 use im::HashMap;
-
-//Mathematical functions
-pub fn add(values: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
-    let mut result = LValue::Number(LNumber::Float(0.0));
-    for value in values {
-        result = (&result + value)?;
-    }
-    Ok(result)
-}
-
-pub fn sub(values: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
-    match values.len() {
-        2 => values.get(0).unwrap() - values.get(1).unwrap(),
-        i => Err(WrongNumberOfArgument(values.into(), i, 2..2)),
-    }
-}
-
-pub fn mul(values: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
-    let mut result = LValue::Number(LNumber::Float(1.0));
-    for value in values {
-        result = (&result * value)?;
-    }
-    Ok(result)
-}
-
-pub fn div(values: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
-    match values.len() {
-        2 => values.get(0).unwrap() / values.get(0).unwrap(),
-        i => Err(WrongNumberOfArgument(values.into(), i, 2..2)),
-    }
-}
-
-//Comparison functions
-pub fn gt(values: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
-    match values.len() {
-        2 => Ok(LValue::Bool(values[0] > values[1])),
-        i => Err(WrongNumberOfArgument(values.into(), i, 2..2)),
-    }
-}
-
-pub fn lt(values: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
-    match values.len() {
-        2 => Ok(LValue::Bool(values[0] < values[1])),
-        i => Err(WrongNumberOfArgument(values.into(), i, 2..2)),
-    }
-}
-
-pub fn ge(values: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
-    match values.len() {
-        2 => Ok(LValue::Bool(values[0] >= values[1])),
-        i => Err(WrongNumberOfArgument(values.into(), i, 2..2)),
-    }
-}
-
-pub fn le(values: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
-    match values.len() {
-        2 => Ok(LValue::Bool(values[0] <= values[1])),
-        i => Err(WrongNumberOfArgument(values.into(), i, 2..2)),
-    }
-}
-
-pub fn eq(values: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
-    match values.len() {
-        2 => Ok(LValue::Bool(values[0] == values[1])),
-        i => Err(WrongNumberOfArgument(values.into(), i, 2..2)),
-    }
-}
 
 pub fn begin(values: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     match values.last() {

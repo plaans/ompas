@@ -11,8 +11,8 @@ const READ: &str = "read";
 const WRITE: &str = "write";
 //const LOAD: &str = "load";
 
-use crate::lisp_root::lisp_struct::{AsModule, LError, LFn, LMutFn, LValue, Module};
-use crate::lisp_root::RefLEnv;
+use crate::core::r#struct::{AsModule, LError, LFn, LMutFn, LValue, Module};
+use crate::core::RefLEnv;
 
 #[derive(Default, Debug)]
 pub struct CtxIO {}

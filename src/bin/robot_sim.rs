@@ -1,6 +1,6 @@
-use fact_base::modules::robot::{exec, new_robot, start_robot_handler, CtxRobot};
 use fact_base::core::r#struct::{LError, LValue};
 use fact_base::core::RefLEnv;
+use fact_base::modules::robot::{exec, new_robot, start_robot_handler, CtxRobot};
 use std::thread;
 use std::time::Duration;
 

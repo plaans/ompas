@@ -1,5 +1,7 @@
 use crate::core::r#struct::LError::{SpecialError, WrongNumberOfArgument, WrongType};
-use crate::core::r#struct::{AsModule, LError, LFn, LMutFn, LNumber, LValue, Module, NameTypeLValue};
+use crate::core::r#struct::{
+    AsModule, LError, LFn, LMutFn, LNumber, LValue, Module, NameTypeLValue,
+};
 use crate::core::RefLEnv;
 use aries_utils::input::Sym;
 use im::HashMap;
@@ -109,16 +111,15 @@ struct ArgRobot {
     receiver: Receiver<String>,
 }
 
-#[warn(dead_code)]
 pub struct VirtualRobot {
-    join_handle: JoinHandle<()>,
+    _join_handle: JoinHandle<()>,
     sender: Sender<String>,
 }
 
 impl VirtualRobot {
-    pub fn new(join_handle: JoinHandle<()>, sender: Sender<String>) -> Self {
+    pub fn new(_join_handle: JoinHandle<()>, sender: Sender<String>) -> Self {
         VirtualRobot {
-            join_handle,
+            _join_handle,
             sender,
         }
     }
@@ -143,7 +144,10 @@ pub fn exec(args: &[LValue], _: &RefLEnv, ctx: &CtxRobot) -> Result<LValue, LErr
                 None => return Err(SpecialError("Not a valid RobotId".to_string())),
                 Some(vr) => vr,
             };
-            virtual_robot.sender.send(args[1].to_string()).expect("couldn't send command to robot");
+            virtual_robot
+                .sender
+                .send(args[1].to_string())
+                .expect("couldn't send command to robot");
             Ok(LValue::None)
         }
         _ => Err(SpecialError("Expected a RobotId(usize)".to_string())),
@@ -157,7 +161,10 @@ fn robot(arg_robot: ArgRobot) {
         match arg_robot.receiver.recv() {
             Ok(lv) => {
                 println!("{}", lv);
-                arg_robot.sender.send(format!("action {} OK!", lv)).expect("couldn't send response");
+                arg_robot
+                    .sender
+                    .send(format!("action {} OK!", lv))
+                    .expect("couldn't send response");
             }
             Err(e) => panic!(e),
         };
@@ -166,12 +173,15 @@ fn robot(arg_robot: ArgRobot) {
 
 pub fn new_robot(args: &[LValue], _: &mut RefLEnv, ctx: &mut CtxRobot) -> Result<LValue, LError> {
     let (robot_label, thread_label) = match args.len() {
-        0 => (format!("unnamed_robot_{}", ctx.robots.len()).into(), format!("unnamed_robot_{}", ctx.robots.len())),
+        0 => (
+            format!("unnamed_robot_{}", ctx.robots.len()).into(),
+            format!("unnamed_robot_{}", ctx.robots.len()),
+        ),
         1 => match &args[0] {
             LValue::Symbol(s) => (s.clone(), format!("thread_{}", s)),
-            lv => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol))
+            lv => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
         },
-        _ => return Err(WrongNumberOfArgument(args.into(), args.len(), 0..1))
+        _ => return Err(WrongNumberOfArgument(args.into(), args.len(), 0..1)),
     };
 
     let channel_sup_to_robot = channel();
@@ -184,13 +194,13 @@ pub fn new_robot(args: &[LValue], _: &mut RefLEnv, ctx: &mut CtxRobot) -> Result
         receiver: channel_sup_to_robot.1,
     };
 
-    let join_handle: JoinHandle<()> = thread::Builder::new()
+    let _join_handle: JoinHandle<()> = thread::Builder::new()
         .name(thread_label)
         .spawn(move || robot(arg_robot))
         .expect("Error creating new-robot");
 
     let virtual_robot = VirtualRobot {
-        join_handle,
+        _join_handle,
         sender: channel_sup_to_robot.0,
     };
 

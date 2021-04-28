@@ -1,5 +1,3 @@
-
-
 pub const MAP: &str = "map";
 pub const PAIR: &str = "pair";
 

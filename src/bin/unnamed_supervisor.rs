@@ -1,16 +1,14 @@
-use fact_base::modules::_type::CtxType;
-use fact_base::modules::counter::CtxCounter;
-use fact_base::modules::io::CtxIO;
-use fact_base::modules::math::CtxMath;
-use fact_base::modules::robot::CtxRobot;
 use fact_base::core::r#struct::{AsModule, LValue};
 use fact_base::core::{eval, load_module, parse, ContextCollection, RefLEnv};
-use fact_base::repl::repl_2;
+use fact_base::modules::_type::CtxType;
+use fact_base::modules::counter::CtxCounter;
+use fact_base::modules::io::{repl, CtxIO};
+use fact_base::modules::math::CtxMath;
+use fact_base::modules::robot::CtxRobot;
 use std::path::PathBuf;
 use std::sync::mpsc::{channel, Receiver, Sender};
-use std::{thread, io};
+use std::thread;
 use structopt::StructOpt;
-use std::io::{Write, stdout};
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -33,62 +31,65 @@ fn main() {
 
     let opt: Opt = Opt::from_args();
     println!("{:?}", opt);
-
     //test_lib_model(&opt);
-
-    //Channel from X to Lisp Interpretor
-    let (tx1, rx1): (Sender<String>, Receiver<String>) = channel();
-    //Channel from Lisp Interpretor to repl
-    let (tx2, rx2): (Sender<String>, Receiver<String>) = channel();
-    let tx1_clone = tx1.clone();
-
-    let li_join_handle = thread::Builder::new()
-        .name("Lisp Interpreter".to_string())
-        .spawn(move|| {
-            lisp_interpreter(tx1_clone, tx2.clone(), rx1);
-        })
-        .expect("bug spawning lisp interpreter");
-
-
-    repl_2(tx1, rx2);
-    li_join_handle.join();
+    lisp_interpreter();
 }
 
-pub fn lisp_interpreter(sender_LI: Sender<String>, sender: Sender<String>, receiver: Receiver<String>) {
+pub fn lisp_interpreter() {
+    let (sender_li, receiver_li): (Sender<String>, Receiver<String>) = channel();
+    //Channel from Lisp Interpretor to repl
+    let (sender_repl, receiver_repl): (Sender<String>, Receiver<String>) = channel();
+
     let root_env = &mut RefLEnv::root();
     let ctxs: &mut ContextCollection = &mut Default::default();
     load_module(root_env, ctxs, CtxCounter::get_module());
     let id_io = load_module(root_env, ctxs, CtxIO::get_module());
     //Add the sender of the channel.
-    let mut ctx_io = ctxs.get_mut_context(id_io).downcast_mut::<CtxIO>().expect("couldn't downcast ref");
-    ctx_io.add_sender(sender_LI.clone());
+    let ctx_io = ctxs
+        .get_mut_context(id_io)
+        .downcast_mut::<CtxIO>()
+        .expect("couldn't downcast ref");
+    ctx_io.add_sender(sender_li.clone());
+
     load_module(root_env, ctxs, CtxType::get_module());
     load_module(root_env, ctxs, CtxMath::get_module());
     load_module(root_env, ctxs, CtxRobot::get_module());
     let env = &mut RefLEnv::new_from_outer(root_env.clone());
 
-    let mut stdout = io::stdout();
-    let mut stderr = io::stderr();
+    //let mut stdout = io::stdout();
+    //let mut stderr = io::stderr();
+
+    //Channel from X to Lisp Interpretor
+
+    //Launch the repl thread
+    let repl_join_handle = thread::Builder::new()
+        .name("repl".to_string())
+        .spawn(move || {
+            repl::run(sender_li, receiver_repl);
+        })
+        .expect("error spawning repl");
+
     loop {
-        let mut send_ACK = false;
-        let mut str_lvalue = receiver.recv().expect("bug in lisp interpretor");
+        let mut send_ack = false;
+        let mut str_lvalue = receiver_li.recv().expect("bug in lisp interpretor");
 
         if str_lvalue.contains("repl:") {
-            stdout.write_all(b"from repl\n");
-            send_ACK = true;
+            // stdout.write_all(b"from repl\n");
+            send_ack = true;
             str_lvalue = str_lvalue.replace("repl:", "");
         }
 
-        if str_lvalue == "exit".to_string() {
+        if str_lvalue == *"exit" {
             break;
         }
 
-        stdout.write_all(format!("receiving command: {}\n", str_lvalue).as_bytes());
+        //stdout.write_all(format!("receiving command: {}\n", str_lvalue).as_bytes());
 
         let lvalue = match parse(str_lvalue.as_str(), env, ctxs) {
             Ok(lv) => lv,
             Err(e) => {
-                stderr.write_all(format!("ELI>>{}\n", e).as_bytes());
+                //stderr.write_all(format!("ELI>>{}\n", e).as_bytes());
+                eprintln!("ELI>>{}", e);
                 LValue::None
             }
         };
@@ -97,16 +98,22 @@ pub fn lisp_interpreter(sender_LI: Sender<String>, sender: Sender<String>, recei
             Ok(lv) => match lv {
                 LValue::None => {}
                 lv => {
-                    stdout.write_all(format!("LI>> {}\n", lv).as_bytes());
-                },
+                    //stdout.write_all(format!("LI>> {}\n", lv).as_bytes()).expect("error stdout");
+                    println!("LI>> {}", lv);
+                }
             },
             Err(e) => {
-                stderr.write_all(format!("ELI>>{}\n", e).as_bytes());
-            },
+                //stderr.write_all(format!("ELI>>{}\n", e).as_bytes());
+                eprintln!("ELI>>{}", e);
+            }
         };
-        if send_ACK {
-            sender.send("ACK".to_string());
+        if send_ack {
+            sender_repl
+                .send("ACK".to_string())
+                .expect("error sending ack to repl");
         }
         //stdout.write_all(b"eval done\n");
     }
+
+    repl_join_handle.join().expect("error exiting repl");
 }

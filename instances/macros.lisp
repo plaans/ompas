@@ -11,7 +11,7 @@
                 true
                 (unquote b)
             ))))
-    (defmacro not (lambda a
+    (defmacro not (lambda (a)
         (quasiquote
             (if (unquote a)
                 false

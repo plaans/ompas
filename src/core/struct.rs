@@ -332,11 +332,15 @@ pub struct LFn {
 
 impl Debug for LFn {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "label: {:?}\nmod : {}", self.debug_label,
+        write!(
+            f,
+            "label: {:?}\nmod : {}",
+            self.debug_label,
             match self.index_mod {
                 None => "none".to_string(),
                 Some(u) => u.to_string(),
-            })
+            }
+        )
     }
 }
 
@@ -393,14 +397,17 @@ pub struct LMutFn {
     index_mod: Option<usize>,
 }
 
-
 impl Debug for LMutFn {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "label: {:?}\nmod : {}", self.debug_label,
+        write!(
+            f,
+            "label: {:?}\nmod : {}",
+            self.debug_label,
             match self.index_mod {
                 None => "none".to_string(),
                 Some(u) => u.to_string(),
-            })
+            }
+        )
     }
 }
 
@@ -518,7 +525,6 @@ impl Debug for LValue {
             LValue::CoreOperator(co) => format!("CoreOperator: {:?}", co),
         };
         write!(f, "{}", string)
-
     }
 }
 

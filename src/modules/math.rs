@@ -1,7 +1,5 @@
 use crate::core::r#struct::LError::{WrongNumberOfArgument, WrongType};
-use crate::core::r#struct::{
-    AsModule, LError, LFn, LNumber, LValue, Module, NameTypeLValue,
-};
+use crate::core::r#struct::{AsModule, LError, LFn, LNumber, LValue, Module, NameTypeLValue};
 use crate::core::RefLEnv;
 
 /*
@@ -30,7 +28,6 @@ pub const PI: &str = "pi";
 
 #[derive(Default, Debug)]
 pub struct CtxMath {}
-
 
 impl AsModule for CtxMath {
     /// Provides all the functions to make some basic computation.
@@ -71,7 +68,6 @@ impl AsModule for CtxMath {
         }
     }
 }
-
 
 ///Compute the sin of a LNumber
 /// Only takes one element in args
@@ -173,9 +169,9 @@ pub fn eq(args: &[LValue], _: &RefLEnv, _: &CtxMath) -> Result<LValue, LError> {
 
 //TODO: Add test
 #[cfg(test)]
-mod tests{
-    use crate::core::{RefLEnv, load_module, ContextCollection, eval};
+mod tests {
     use super::*;
+    use crate::core::{eval, load_module, ContextCollection, RefLEnv};
     /*fn generate_env() -> (RefLEnv, ContextCollection) {
         let env = RefLEnv::empty();
         let ctxs = ContextCollection::default();
@@ -188,7 +184,7 @@ mod tests{
         let env = RefLEnv::default();
         let ctx = CtxMath::default();
         let result = add(&[3.into(), 2.into()], &env, &ctx).unwrap();
-        assert_eq!(LValue::Number(LNumber::Float(5.0)),result);
+        assert_eq!(LValue::Number(LNumber::Float(5.0)), result);
     }
 
     #[test]
@@ -196,7 +192,7 @@ mod tests{
         let env = RefLEnv::default();
         let ctx = CtxMath::default();
         let result = sub(&[3.into(), 2.into()], &env, &ctx).unwrap();
-        assert_eq!(LValue::Number(LNumber::Int(1)),result);
+        assert_eq!(LValue::Number(LNumber::Int(1)), result);
     }
 
     #[test]
@@ -204,7 +200,7 @@ mod tests{
         let env = RefLEnv::default();
         let ctx = CtxMath::default();
         let result = mul(&[3.into(), 2.into()], &env, &ctx).unwrap();
-        assert_eq!(LValue::Number(LNumber::Float(6.0)),result);
+        assert_eq!(LValue::Number(LNumber::Float(6.0)), result);
     }
 
     #[test]
@@ -212,16 +208,25 @@ mod tests{
         let env = RefLEnv::default();
         let ctx = CtxMath::default();
         let result = div(&[3.0.into(), 2.0.into()], &env, &ctx).unwrap();
-        assert_eq!(LValue::Number(LNumber::Float(1.5)),result);
+        assert_eq!(LValue::Number(LNumber::Float(1.5)), result);
     }
 
     #[test]
     fn test_gt() {
         let env = RefLEnv::default();
         let ctx = CtxMath::default();
-        let result_true = gt(&[3.into(), 2.into()], &env, &ctx).unwrap().as_bool().unwrap();
-        let result_false = gt(&[2.into(), 3.into()], &env, &ctx).unwrap().as_bool().unwrap();
-        let result_false_2 = gt(&[3.into(), 3.into()], &env, &ctx).unwrap().as_bool().unwrap();
+        let result_true = gt(&[3.into(), 2.into()], &env, &ctx)
+            .unwrap()
+            .as_bool()
+            .unwrap();
+        let result_false = gt(&[2.into(), 3.into()], &env, &ctx)
+            .unwrap()
+            .as_bool()
+            .unwrap();
+        let result_false_2 = gt(&[3.into(), 3.into()], &env, &ctx)
+            .unwrap()
+            .as_bool()
+            .unwrap();
         assert!(result_true);
         assert!(!result_false);
         assert!(!result_false_2);
@@ -231,9 +236,18 @@ mod tests{
     fn test_ge() {
         let env = RefLEnv::default();
         let ctx = CtxMath::default();
-        let result_true = ge(&[3.into(), 2.into()], &env, &ctx).unwrap().as_bool().unwrap();
-        let result_false = ge(&[2.into(), 3.into()], &env, &ctx).unwrap().as_bool().unwrap();
-        let result_true_2 = ge(&[3.into(), 3.into()], &env, &ctx).unwrap().as_bool().unwrap();
+        let result_true = ge(&[3.into(), 2.into()], &env, &ctx)
+            .unwrap()
+            .as_bool()
+            .unwrap();
+        let result_false = ge(&[2.into(), 3.into()], &env, &ctx)
+            .unwrap()
+            .as_bool()
+            .unwrap();
+        let result_true_2 = ge(&[3.into(), 3.into()], &env, &ctx)
+            .unwrap()
+            .as_bool()
+            .unwrap();
         assert!(result_true);
         assert!(!result_false);
         assert!(result_true_2);
@@ -243,9 +257,18 @@ mod tests{
     fn test_lt() {
         let env = RefLEnv::default();
         let ctx = CtxMath::default();
-        let result_false = lt(&[3.into(), 2.into()], &env, &ctx).unwrap().as_bool().unwrap();
-        let result_true = lt(&[2.into(), 3.into()], &env, &ctx).unwrap().as_bool().unwrap();
-        let result_false_2 = lt(&[3.into(), 3.into()], &env, &ctx).unwrap().as_bool().unwrap();
+        let result_false = lt(&[3.into(), 2.into()], &env, &ctx)
+            .unwrap()
+            .as_bool()
+            .unwrap();
+        let result_true = lt(&[2.into(), 3.into()], &env, &ctx)
+            .unwrap()
+            .as_bool()
+            .unwrap();
+        let result_false_2 = lt(&[3.into(), 3.into()], &env, &ctx)
+            .unwrap()
+            .as_bool()
+            .unwrap();
         assert!(result_true);
         assert!(!result_false);
         assert!(!result_false_2);
@@ -255,23 +278,32 @@ mod tests{
     fn test_le() {
         let env = RefLEnv::default();
         let ctx = CtxMath::default();
-        let result_false = le(&[3.into(), 2.into()], &env, &ctx).unwrap().as_bool().unwrap();
-        let result_true = le(&[2.into(), 3.into()], &env, &ctx).unwrap().as_bool().unwrap();
-        let result_true_2 = le(&[3.into(), 3.into()], &env, &ctx).unwrap().as_bool().unwrap();
+        let result_false = le(&[3.into(), 2.into()], &env, &ctx)
+            .unwrap()
+            .as_bool()
+            .unwrap();
+        let result_true = le(&[2.into(), 3.into()], &env, &ctx)
+            .unwrap()
+            .as_bool()
+            .unwrap();
+        let result_true_2 = le(&[3.into(), 3.into()], &env, &ctx)
+            .unwrap()
+            .as_bool()
+            .unwrap();
         assert!(result_true);
         assert!(!result_false);
         assert!(result_true_2);
     }
 
     #[test]
-    fn test_cos(){
+    fn test_cos() {
         let env = RefLEnv::default();
         let ctx = CtxMath::default();
         assert_eq!(cos(&[0.0.into()], &env, &ctx).unwrap(), 1.0.into())
     }
 
     #[test]
-    fn test_sin(){
+    fn test_sin() {
         let env = RefLEnv::default();
         let ctx = CtxMath::default();
         assert_eq!(sin(&[0.0.into()], &env, &ctx).unwrap(), 0.0.into())

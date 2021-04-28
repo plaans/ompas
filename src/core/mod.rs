@@ -1,6 +1,6 @@
-use crate::core::lisp_as_literal::AsLiteral;
 use crate::core::functions::*;
 use crate::core::language::*;
+use crate::core::lisp_as_literal::AsLiteral;
 use crate::core::r#struct::LCoreOperator::Quote;
 use crate::core::r#struct::LError::*;
 use crate::core::r#struct::NameTypeLValue::{List, Symbol};
@@ -15,9 +15,9 @@ use std::io::Write;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
-pub mod lisp_as_literal;
 pub mod functions;
 pub mod language;
+pub mod lisp_as_literal;
 pub mod r#struct;
 
 pub struct LEnv {
@@ -126,7 +126,6 @@ impl LEnv {
         symbols.insert(QUASI_QUOTE.to_string(), LCoreOperator::QuasiQuote.into());
         symbols.insert(QUOTE.to_string(), LCoreOperator::Quote.into());
         symbols.insert(UNQUOTE.to_string(), LCoreOperator::UnQuote.into());
-
 
         //Special entry
         symbols.insert(
@@ -461,7 +460,7 @@ pub fn expand(
                         return Ok(list_expanded.into());
                     }
                     LCoreOperator::Quote => {
-                        eprintln!("expand: quote: Ok!");
+                        //eprintln!("expand: quote: Ok!");
                         if list.len() != 2 {
                             return Err(WrongNumberOfArgument(list.into(), list.len(), 2..2));
                         }

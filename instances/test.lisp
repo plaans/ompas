@@ -1,0 +1,1 @@
+(define number (* 3 3))

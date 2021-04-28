@@ -91,11 +91,6 @@ impl AsModule for CtxRobot {
     }
 }
 
-struct RobotHandler {
-    receiver: Receiver<String>,
-    sender: Sender<String>,
-}
-
 pub const ROBOT_HANDLER_START_MSG: &str = "Robot handler started!!!\n\
                                            Listening...";
 fn robot_handler(rx: Receiver<String>) {
@@ -114,6 +109,7 @@ struct ArgRobot {
     receiver: Receiver<String>,
 }
 
+#[warn(dead_code)]
 pub struct VirtualRobot {
     join_handle: JoinHandle<()>,
     sender: Sender<String>,
@@ -147,7 +143,7 @@ pub fn exec(args: &[LValue], _: &RefLEnv, ctx: &CtxRobot) -> Result<LValue, LErr
                 None => return Err(SpecialError("Not a valid RobotId".to_string())),
                 Some(vr) => vr,
             };
-            virtual_robot.sender.send(args[1].to_string());
+            virtual_robot.sender.send(args[1].to_string()).expect("couldn't send command to robot");
             Ok(LValue::None)
         }
         _ => Err(SpecialError("Expected a RobotId(usize)".to_string())),
@@ -161,7 +157,7 @@ fn robot(arg_robot: ArgRobot) {
         match arg_robot.receiver.recv() {
             Ok(lv) => {
                 println!("{}", lv);
-                arg_robot.sender.send(format!("action {} OK!", lv));
+                arg_robot.sender.send(format!("action {} OK!", lv)).expect("couldn't send response");
             }
             Err(e) => panic!(e),
         };

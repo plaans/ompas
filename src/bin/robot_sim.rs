@@ -7,10 +7,7 @@ use std::time::Duration;
 const START_MSG: &str = "|||SIMPLE ROBOT SIMULATOR|||";
 
 fn main() {
-    match test() {
-        Ok(_) => {}
-        Err(_) => {}
-    }
+    if test().is_ok() {}
 }
 
 pub fn test() -> Result<LValue, LError> {

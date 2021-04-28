@@ -9,7 +9,6 @@ use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::{Add, Div, Mul, Range, Sub};
 use std::rc::Rc;
-use std::ptr::write_bytes;
 
 #[derive(Debug)]
 pub enum LError {
@@ -66,7 +65,7 @@ impl From<ErrLoc> for LError {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone)]
 pub enum LNumber {
     Int(i64),
     Float(f64),
@@ -99,13 +98,13 @@ impl Into<Sym> for LNumber {
     }
 }
 
-/*impl PartialEq for LNumber {
+impl PartialEq for LNumber {
     fn eq(&self, other: &Self) -> bool {
         let n1: f64 = self.into();
         let n2: f64 = other.into();
         n1 == n2
     }
-}*/
+}
 
 impl Into<usize> for &LNumber {
     fn into(self) -> usize {
@@ -147,7 +146,7 @@ impl Hash for LNumber {
     }
 }
 
-/*impl PartialOrd for LNumber {
+impl PartialOrd for LNumber {
     fn partial_cmp(&self, _other: &Self) -> Option<Ordering> {
         unimplemented!()
     }
@@ -175,7 +174,7 @@ impl Hash for LNumber {
         let n2: f64 = other.into();
         n1 >= n2
     }
-}*/
+}
 
 impl Add for &LNumber {
     type Output = LNumber;

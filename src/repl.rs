@@ -64,7 +64,7 @@ pub fn repl() {
     rl.save_history("history.txt").unwrap();
 }
 
-pub fn repl_2(sender: Sender<String>, _receiver: Receiver<String>) {
+pub fn repl_2(sender: Sender<String>, receiver: Receiver<String>) {
     let mut rl = Editor::<()>::new();
     if rl.load_history("history.txt").is_err() {
         println!("No previous history.");
@@ -72,9 +72,13 @@ pub fn repl_2(sender: Sender<String>, _receiver: Receiver<String>) {
 
     loop {
         let readline = rl.readline(">> ");
+
         match readline {
             Ok(string) => {
-                sender.send(string);
+                rl.add_history_entry(string.clone());
+                sender.send(format!("repl:{}",string)).expect("couldn't send lisp command");
+                let mut buffer = receiver.recv().expect("error receiving");
+                println!("repl ack: {}", buffer);
             }
             Err(ReadlineError::Interrupted) => {
                 println!("CTRL-C");
@@ -90,5 +94,6 @@ pub fn repl_2(sender: Sender<String>, _receiver: Receiver<String>) {
             }
         }
     }
+    sender.send("exit".to_string()).expect("couldn't send exit msg");
     rl.save_history("history.txt").unwrap();
 }

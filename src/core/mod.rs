@@ -259,7 +259,7 @@ impl LEnv {
     }
 }
 
-pub fn load_module(env: &mut RefLEnv, ctxs: &mut ContextCollection, mut module: Module) {
+pub fn load_module(env: &mut RefLEnv, ctxs: &mut ContextCollection, mut module: Module) -> usize {
     let id = ctxs.insert(module.ctx);
     for (sym, lv) in &mut module.prelude {
         match lv {
@@ -269,6 +269,7 @@ pub fn load_module(env: &mut RefLEnv, ctxs: &mut ContextCollection, mut module: 
         }
         env.symbols.insert(sym.to_string(), lv.clone());
     }
+    id
 }
 
 pub fn parse(str: &str, env: &mut RefLEnv, ctxs: &mut CtxCollec) -> Result<LValue, LError> {

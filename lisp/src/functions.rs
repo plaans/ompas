@@ -1,8 +1,8 @@
-use aries_utils::input::Sym;
-use im::HashMap;
-use crate::structs::{LValue, LError, NameTypeLValue};
 use crate::core::RefLEnv;
 use crate::structs::LError::{WrongNumberOfArgument, WrongType};
+use crate::structs::{LError, LValue, NameTypeLValue};
+use aries_utils::input::Sym;
+use im::HashMap;
 
 pub fn begin(values: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     match values.last() {

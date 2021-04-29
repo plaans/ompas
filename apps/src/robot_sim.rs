@@ -1,8 +1,8 @@
+use ompas_lisp::core::RefLEnv;
+use ompas_lisp::structs::{LError, LValue};
+use ompas_modules::robot::{exec, new_robot, start_robot_handler, CtxRobot};
 use std::thread;
 use std::time::Duration;
-use ompas_lisp::structs::{LValue, LError};
-use ompas_modules::robot::{CtxRobot, start_robot_handler, new_robot, exec};
-use ompas_lisp::core::RefLEnv;
 
 const START_MSG: &str = "|||SIMPLE ROBOT SIMULATOR|||";
 

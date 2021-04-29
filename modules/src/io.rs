@@ -1,9 +1,9 @@
+use ompas_lisp::core::*;
+use ompas_lisp::structs::LError::*;
+use ompas_lisp::structs::*;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::sync::mpsc::Sender;
-use ompas_lisp::structs::*;
-use ompas_lisp::structs::LError::*;
-use ompas_lisp::core::*;
 /*
 LANGUAGE
  */
@@ -12,7 +12,6 @@ const PRINT: &str = "print";
 const READ: &str = "read";
 const WRITE: &str = "write";
 //const LOAD: &str = "load";
-
 
 /// Handles the channel to communicate with the Lisp Interpreter
 #[derive(Debug)]
@@ -31,7 +30,6 @@ impl CtxIO {
         self.sender = Some(sender);
     }
 }
-
 
 pub fn print(args: &[LValue], _: &RefLEnv, _: &CtxIO) -> Result<LValue, LError> {
     let lv: LValue = args.into();
@@ -75,7 +73,7 @@ pub fn read(args: &[LValue], _: &RefLEnv, ctx: &CtxIO) -> Result<LValue, LError>
 /// (write <file> <lvalue>)
 pub fn write(args: &[LValue], _: &RefLEnv, _: &CtxIO) -> Result<LValue, LError> {
     if args.len() != 2 {
-        return Err(WrongNumberOfArgument(args.into(),args.len(), 2..2))
+        return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
     }
 
     match &args[0] {
@@ -85,7 +83,7 @@ pub fn write(args: &[LValue], _: &RefLEnv, _: &CtxIO) -> Result<LValue, LError> 
             f.write_all(&args[1].to_string().as_bytes())?;
             Ok(LValue::None)
         }
-        lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol))
+        lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
     }
 
     //println!("module IO: write");
@@ -141,7 +139,10 @@ pub mod repl {
                         .send(format!("repl:{}", string))
                         .expect("couldn't send lisp command");
                     let buffer = receiver.recv().expect("error receiving");
-                    assert_eq!(buffer,"ACK", "should receive an ack from Lisp Intrepretor and nothing else");
+                    assert_eq!(
+                        buffer, "ACK",
+                        "should receive an ack from Lisp Intrepretor and nothing else"
+                    );
                     //println!("repl ack: {}", buffer);
                 }
                 Err(ReadlineError::Interrupted) => {
@@ -169,7 +170,7 @@ pub mod repl {
 #[cfg(test)]
 pub mod tests {
     #[test]
-    pub fn test_read(){
+    pub fn test_read() {
         unimplemented!()
     }
 

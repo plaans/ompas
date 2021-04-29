@@ -1,14 +1,14 @@
 use aries_utils::input::{ErrLoc, Sym};
 use std::cmp::Ordering;
 //use std::collections::HashMap;
+use crate::core::{eval, ContextCollection, RefLEnv};
+use crate::language::*;
+use crate::structs::LError::{SpecialError, WrongNumberOfArgument};
 use std::any::Any;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::{Add, Div, Mul, Range, Sub};
 use std::rc::Rc;
-use crate::core::{RefLEnv, eval,ContextCollection};
-use crate::structs::LError::{WrongNumberOfArgument, SpecialError};
-use crate::language::*;
 
 #[derive(Debug)]
 pub enum LError {
@@ -143,8 +143,6 @@ impl From<i32> for LNumber {
         LNumber::Int(i as i64)
     }
 }
-
-
 
 impl From<f64> for LNumber {
     fn from(f: f64) -> Self {
@@ -1088,43 +1086,43 @@ mod tests {
         use super::*;
 
         fn test_add() {
-            let i1:LNumber = 3.into();
-            let i2:LNumber = 5.into();
-            let f1:LNumber = 3.0.into();
-            let f2:LNumber = 5.0.into();
-            assert_eq!(LNumber::Int(8), &i1+&i2);
-            assert_eq!(LNumber::Float(8.0), &i1+&f2);
-            assert_eq!(LNumber::Float(8.0), &f1+&f2);
+            let i1: LNumber = 3.into();
+            let i2: LNumber = 5.into();
+            let f1: LNumber = 3.0.into();
+            let f2: LNumber = 5.0.into();
+            assert_eq!(LNumber::Int(8), &i1 + &i2);
+            assert_eq!(LNumber::Float(8.0), &i1 + &f2);
+            assert_eq!(LNumber::Float(8.0), &f1 + &f2);
         }
 
         fn test_sub() {
-            let i1:LNumber = 3.into();
-            let i2:LNumber = 5.into();
-            let f1:LNumber = 3.0.into();
-            let f2:LNumber = 5.0.into();
-            assert_eq!(LNumber::Int(-2), &i1-&i2);
-            assert_eq!(LNumber::Float(-2.0), &i1-&f2);
-            assert_eq!(LNumber::Float(-2.0), &f1-&f2);
+            let i1: LNumber = 3.into();
+            let i2: LNumber = 5.into();
+            let f1: LNumber = 3.0.into();
+            let f2: LNumber = 5.0.into();
+            assert_eq!(LNumber::Int(-2), &i1 - &i2);
+            assert_eq!(LNumber::Float(-2.0), &i1 - &f2);
+            assert_eq!(LNumber::Float(-2.0), &f1 - &f2);
         }
 
         fn test_mul() {
-            let i1:LNumber = 3.into();
-            let i2:LNumber = 5.into();
-            let f1:LNumber = 3.0.into();
-            let f2:LNumber = 5.0.into();
-            assert_eq!(LNumber::Int(15), &i1*&i2);
-            assert_eq!(LNumber::Float(15.0), &i1*&f2);
-            assert_eq!(LNumber::Float(15.0), &f1*&f2);
+            let i1: LNumber = 3.into();
+            let i2: LNumber = 5.into();
+            let f1: LNumber = 3.0.into();
+            let f2: LNumber = 5.0.into();
+            assert_eq!(LNumber::Int(15), &i1 * &i2);
+            assert_eq!(LNumber::Float(15.0), &i1 * &f2);
+            assert_eq!(LNumber::Float(15.0), &f1 * &f2);
         }
 
         fn test_div() {
-            let i1:LNumber = 3.into();
-            let i2:LNumber = 5.into();
-            let f1:LNumber = 3.0.into();
-            let f2:LNumber = 5.0.into();
-            assert_eq!(LNumber::Int(0), &i1/&i2);
-            assert_eq!(LNumber::Float(0.6), &i1/&f2);
-            assert_eq!(LNumber::Float(0.6), &f1/&f2);
+            let i1: LNumber = 3.into();
+            let i2: LNumber = 5.into();
+            let f1: LNumber = 3.0.into();
+            let f2: LNumber = 5.0.into();
+            assert_eq!(LNumber::Int(0), &i1 / &i2);
+            assert_eq!(LNumber::Float(0.6), &i1 / &f2);
+            assert_eq!(LNumber::Float(0.6), &f1 / &f2);
         }
 
         #[test]
@@ -1136,59 +1134,59 @@ mod tests {
         }
 
         fn test_gt() {
-            let i1:LNumber = 3.into();
-            let i2:LNumber = 5.into();
-            let f1:LNumber = 3.0.into();
-            let f2:LNumber = 5.0.into();
-            assert!(! (&i1 > &i2));
-            assert!( &i2 > &i1);
-            assert!( ! (&i2 > &i2));
-            assert!(! (&f1 > &f2));
-            assert!( &f2 > &f1);
-            assert!( ! (&f2 > &f2));
-            assert!( &i2 > &f1);
+            let i1: LNumber = 3.into();
+            let i2: LNumber = 5.into();
+            let f1: LNumber = 3.0.into();
+            let f2: LNumber = 5.0.into();
+            assert!(!(&i1 > &i2));
+            assert!(&i2 > &i1);
+            assert!(!(&i2 > &i2));
+            assert!(!(&f1 > &f2));
+            assert!(&f2 > &f1);
+            assert!(!(&f2 > &f2));
+            assert!(&i2 > &f1);
         }
 
         fn test_lt() {
-            let i1:LNumber = 3.into();
-            let i2:LNumber = 5.into();
-            let f1:LNumber = 3.0.into();
-            let f2:LNumber = 5.0.into();
+            let i1: LNumber = 3.into();
+            let i2: LNumber = 5.into();
+            let f1: LNumber = 3.0.into();
+            let f2: LNumber = 5.0.into();
             assert!(&i1 < &i2);
-            assert!( !(&i2 < &i1));
-            assert!( !(&i2 < &i2));
-            assert!( &f1 < &f2);
-            assert!( !(&f2 < &f1));
-            assert!( !(&f2 < &f2));
-            assert!( &i1 < &f2);
+            assert!(!(&i2 < &i1));
+            assert!(!(&i2 < &i2));
+            assert!(&f1 < &f2);
+            assert!(!(&f2 < &f1));
+            assert!(!(&f2 < &f2));
+            assert!(&i1 < &f2);
         }
 
         fn test_ge() {
-            let i1:LNumber = 3.into();
-            let i2:LNumber = 5.into();
-            let f1:LNumber = 3.0.into();
-            let f2:LNumber = 5.0.into();
-            assert!(! (&i1 >= &i2));
-            assert!( &i2 >= &i1);
-            assert!( &i2 >= &i2);
-            assert!( !(&f1 >= &f2));
-            assert!( &f2 >= &f1);
-            assert!( &f2 >= &f2);
-            assert!( &i2 >= &f2);
+            let i1: LNumber = 3.into();
+            let i2: LNumber = 5.into();
+            let f1: LNumber = 3.0.into();
+            let f2: LNumber = 5.0.into();
+            assert!(!(&i1 >= &i2));
+            assert!(&i2 >= &i1);
+            assert!(&i2 >= &i2);
+            assert!(!(&f1 >= &f2));
+            assert!(&f2 >= &f1);
+            assert!(&f2 >= &f2);
+            assert!(&i2 >= &f2);
         }
 
         fn test_le() {
-            let i1:LNumber = 3.into();
-            let i2:LNumber = 5.into();
-            let f1:LNumber = 3.0.into();
-            let f2:LNumber = 5.0.into();
+            let i1: LNumber = 3.into();
+            let i2: LNumber = 5.into();
+            let f1: LNumber = 3.0.into();
+            let f2: LNumber = 5.0.into();
             assert!(&i1 <= &i2);
-            assert!( !(&i2 <= &i1));
-            assert!( &i2 <= &i2);
-            assert!( &f1 <= &f2);
-            assert!( !(&f2 <= &f1));
-            assert!( &f2 <= &f2);
-            assert!( &i2 <= &f2);
+            assert!(!(&i2 <= &i1));
+            assert!(&i2 <= &i2);
+            assert!(&f1 <= &f2);
+            assert!(!(&f2 <= &f1));
+            assert!(&f2 <= &f2);
+            assert!(&i2 <= &f2);
         }
 
         #[test]
@@ -1198,49 +1196,48 @@ mod tests {
             test_lt();
             test_le();
         }
-
     }
 
     mod l_value {
 
         use super::*;
         fn test_add() {
-            let i1:LValue = 3.into();
-            let i2:LValue = 5.into();
-            let f1:LValue = 3.0.into();
-            let f2:LValue = 5.0.into();
-            assert_eq!(LValue::Number(LNumber::Int(8)), (&i1+&i2).unwrap());
-            assert_eq!(LValue::Number(LNumber::Float(8.0)), (&i1+&f2).unwrap());
-            assert_eq!(LValue::Number(LNumber::Float(8.0)), (&f1+&f2).unwrap());
+            let i1: LValue = 3.into();
+            let i2: LValue = 5.into();
+            let f1: LValue = 3.0.into();
+            let f2: LValue = 5.0.into();
+            assert_eq!(LValue::Number(LNumber::Int(8)), (&i1 + &i2).unwrap());
+            assert_eq!(LValue::Number(LNumber::Float(8.0)), (&i1 + &f2).unwrap());
+            assert_eq!(LValue::Number(LNumber::Float(8.0)), (&f1 + &f2).unwrap());
         }
         fn test_sub() {
-            let i1:LValue = 3.into();
-            let i2:LValue = 5.into();
-            let f1:LValue = 3.0.into();
-            let f2:LValue = 5.0.into();
-            assert_eq!(LValue::Number(LNumber::Int(-2)), (&i1-&i2).unwrap());
-            assert_eq!(LValue::Number(LNumber::Float(-2.0)), (&i1-&f2).unwrap());
-            assert_eq!(LValue::Number(LNumber::Float(-2.0)), (&f1-&f2).unwrap());
+            let i1: LValue = 3.into();
+            let i2: LValue = 5.into();
+            let f1: LValue = 3.0.into();
+            let f2: LValue = 5.0.into();
+            assert_eq!(LValue::Number(LNumber::Int(-2)), (&i1 - &i2).unwrap());
+            assert_eq!(LValue::Number(LNumber::Float(-2.0)), (&i1 - &f2).unwrap());
+            assert_eq!(LValue::Number(LNumber::Float(-2.0)), (&f1 - &f2).unwrap());
         }
 
         fn test_mul() {
-            let i1:LValue = 3.into();
-            let i2:LValue = 5.into();
-            let f1:LValue = 3.0.into();
-            let f2:LValue = 5.0.into();
-            assert_eq!(LValue::Number(LNumber::Int(15)), (&i1*&i2).unwrap());
-            assert_eq!(LValue::Number(LNumber::Float(15.0)), (&i1*&f2).unwrap());
-            assert_eq!(LValue::Number(LNumber::Float(15.0)), (&f1*&f2).unwrap());
+            let i1: LValue = 3.into();
+            let i2: LValue = 5.into();
+            let f1: LValue = 3.0.into();
+            let f2: LValue = 5.0.into();
+            assert_eq!(LValue::Number(LNumber::Int(15)), (&i1 * &i2).unwrap());
+            assert_eq!(LValue::Number(LNumber::Float(15.0)), (&i1 * &f2).unwrap());
+            assert_eq!(LValue::Number(LNumber::Float(15.0)), (&f1 * &f2).unwrap());
         }
 
         fn test_div() {
-            let i1:LValue = 3.into();
-            let i2:LValue = 5.into();
-            let f1:LValue = 3.0.into();
-            let f2:LValue = 5.0.into();
-            assert_eq!(LValue::Number(LNumber::Int(0)), (&i1/&i2).unwrap());
-            assert_eq!(LValue::Number(LNumber::Float(0.6)), (&i1/&f2).unwrap());
-            assert_eq!(LValue::Number(LNumber::Float(0.6)), (&f1/&f2).unwrap());
+            let i1: LValue = 3.into();
+            let i2: LValue = 5.into();
+            let f1: LValue = 3.0.into();
+            let f2: LValue = 5.0.into();
+            assert_eq!(LValue::Number(LNumber::Int(0)), (&i1 / &i2).unwrap());
+            assert_eq!(LValue::Number(LNumber::Float(0.6)), (&i1 / &f2).unwrap());
+            assert_eq!(LValue::Number(LNumber::Float(0.6)), (&f1 / &f2).unwrap());
         }
 
         #[test]
@@ -1252,10 +1249,10 @@ mod tests {
         }
 
         fn test_gt() {
-            let i1:LValue = 3.into();
+            let i1: LValue = 3.into();
             let f2: LValue = 5.0.into();
             assert!(!(&i1 > &f2));
-            assert!( &f2 > &i1);
+            assert!(&f2 > &i1);
             assert!(!(&f2 > &f2));
         }
 
@@ -1263,23 +1260,23 @@ mod tests {
             let i1: LValue = 3.into();
             let f2: LValue = 5.0.into();
             assert!(!(&i1 >= &f2));
-            assert!( &f2 >= &i1);
+            assert!(&f2 >= &i1);
             assert!(&f2 >= &f2);
         }
 
         fn test_lt() {
-            let i1:LValue = 3.into();
+            let i1: LValue = 3.into();
             let f2: LValue = 5.0.into();
             assert!(&i1 < &f2);
-            assert!( !(&f2 < &i1));
+            assert!(!(&f2 < &i1));
             assert!(!(&f2 < &f2));
         }
 
         fn test_le() {
-            let i1:LValue = 3.into();
+            let i1: LValue = 3.into();
             let f2: LValue = 5.0.into();
             assert!(&i1 <= &f2);
-            assert!( !(&f2 <= &i1));
+            assert!(!(&f2 <= &i1));
             assert!(&f2 <= &f2);
         }
 
@@ -1291,7 +1288,6 @@ mod tests {
             test_le();
         }
     }
-
 
     /*#[test]
     fn test_native_lambda() {

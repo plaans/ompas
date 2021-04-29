@@ -2,9 +2,9 @@
 LANGUAGE
 */
 
-use ompas_lisp::structs::*;
-use ompas_lisp::structs::LError::*;
 use ompas_lisp::core::*;
+use ompas_lisp::structs::LError::*;
+use ompas_lisp::structs::*;
 
 pub const TYPE_COUNTER: &str = "counter";
 pub const SET_COUNTER: &str = "set-counter";

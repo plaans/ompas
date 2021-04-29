@@ -1,14 +1,14 @@
+use ompas_lisp::core::*;
+use ompas_lisp::structs::{AsModule, LValue};
+use ompas_modules::_type::CtxType;
+use ompas_modules::counter::CtxCounter;
+use ompas_modules::io::{repl, CtxIO};
+use ompas_modules::math::CtxMath;
+use ompas_modules::robot::CtxRobot;
 use std::path::PathBuf;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 use structopt::StructOpt;
-use ompas_lisp::core::*;
-use ompas_modules::io::{CtxIO, repl};
-use ompas_modules::_type::CtxType;
-use ompas_lisp::structs::{AsModule, LValue};
-use ompas_modules::counter::CtxCounter;
-use ompas_modules::math::CtxMath;
-use ompas_modules::robot::CtxRobot;
 
 #[derive(Debug, StructOpt)]
 #[structopt(

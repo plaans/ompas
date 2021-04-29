@@ -1,7 +1,6 @@
-
-use im::HashMap;
-use crate::structs::LValue;
 use crate::language::{LIST, MAP};
+use crate::structs::LValue;
+use im::HashMap;
 
 ///Transform an object in Lisp command to reconstuct itself.
 pub trait AsLiteral {

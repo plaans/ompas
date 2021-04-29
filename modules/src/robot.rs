@@ -1,11 +1,10 @@
 use aries_utils::input::Sym;
-use im::HashMap;
+use ompas_lisp::core::RefLEnv;
+use ompas_lisp::structs::LError::*;
+use ompas_lisp::structs::*;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 use std::thread::JoinHandle;
-use ompas_lisp::structs::*;
-use ompas_lisp::core::RefLEnv;
-use ompas_lisp::structs::LError::*;
 
 /*
 LANGUAGE

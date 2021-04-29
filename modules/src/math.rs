@@ -1,6 +1,6 @@
-use ompas_lisp::structs::*;
-use ompas_lisp::structs::LError::*;
 use ompas_lisp::core::*;
+use ompas_lisp::structs::LError::*;
+use ompas_lisp::structs::*;
 
 /*
 LANGUAGE LITERALS

@@ -1,11 +1,9 @@
-
 use aries_utils::input::Sym;
-use im::HashMap;
-use std::fmt::{Debug, Display, Formatter};
-use ompas_lisp::structs::*;
-use ompas_lisp::lisp_as_literal::AsLiteral;
 use ompas_lisp::core::RefLEnv;
+use ompas_lisp::lisp_as_literal::AsLiteral;
 use ompas_lisp::structs::LError::*;
+use ompas_lisp::structs::*;
+use std::fmt::{Debug, Display, Formatter};
 
 //pub const TYPE: &str = "type";
 //pub const STATE: &str = "state";

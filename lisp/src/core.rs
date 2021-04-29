@@ -1,3 +1,10 @@
+use crate::functions::*;
+use crate::language::*;
+use crate::lisp_as_literal::AsLiteral;
+use crate::structs::LCoreOperator::Quote;
+use crate::structs::LError::*;
+use crate::structs::NameTypeLValue::{List, Symbol};
+use crate::structs::*;
 use aries_planning::parsing::sexpr::SExpr;
 use aries_utils::input::Sym;
 use im::HashMap;
@@ -7,13 +14,6 @@ use std::fs::File;
 use std::io::Write;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
-use crate::structs::LError::*;
-use crate::structs::*;
-use crate::language::*;
-use crate::functions::*;
-use crate::structs::NameTypeLValue::{List,Symbol};
-use crate::structs::LCoreOperator::Quote;
-use crate::lisp_as_literal::AsLiteral;
 
 pub struct LEnv {
     pub(crate) symbols: HashMap<String, LValue>,
@@ -435,7 +435,7 @@ pub fn expand(
                             vars.clone(),
                             expand(&exp, top_level, env, ctxs)?,
                         ]
-                            .into());
+                        .into());
                     }
                     LCoreOperator::If => {
                         let mut list = list.clone();
@@ -553,7 +553,7 @@ pub fn expand_quasi_quote(x: &LValue, env: &mut RefLEnv) -> Result<LValue, LErro
                         expand_quasi_quote(&first, env)?,
                         expand_quasi_quote(&list[1..].to_vec().into(), env)?,
                     ]
-                        .into())
+                    .into())
                 };
             }
         }
@@ -562,7 +562,11 @@ pub fn expand_quasi_quote(x: &LValue, env: &mut RefLEnv) -> Result<LValue, LErro
     //Verify if has unquotesplicing here
 }
 
-pub fn eval(lv: &LValue, env: &mut RefLEnv, ctxs: &mut ContextCollection) -> Result<LValue, LError> {
+pub fn eval(
+    lv: &LValue,
+    env: &mut RefLEnv,
+    ctxs: &mut ContextCollection,
+) -> Result<LValue, LError> {
     match lv {
         LValue::List(list) => {
             //println!("expression is a list");

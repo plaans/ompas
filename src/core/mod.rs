@@ -1,10 +1,10 @@
 use crate::core::functions::*;
 use crate::core::language::*;
 use crate::core::lisp_as_literal::AsLiteral;
-use crate::core::r#struct::LCoreOperator::Quote;
-use crate::core::r#struct::LError::*;
-use crate::core::r#struct::NameTypeLValue::{List, Symbol};
-use crate::core::r#struct::*;
+use crate::core::structs::LCoreOperator::Quote;
+use crate::core::structs::LError::*;
+use crate::core::structs::NameTypeLValue::{List, Symbol};
+use crate::core::structs::*;
 use aries_planning::parsing::sexpr::SExpr;
 use aries_utils::input::Sym;
 use im::HashMap;
@@ -18,7 +18,7 @@ use std::rc::Rc;
 pub mod functions;
 pub mod language;
 pub mod lisp_as_literal;
-pub mod r#struct;
+pub mod structs;
 
 pub struct LEnv {
     symbols: HashMap<String, LValue>,

@@ -2,7 +2,7 @@ use crate::core::language::*;
 use aries_utils::input::{ErrLoc, Sym};
 use std::cmp::Ordering;
 //use std::collections::HashMap;
-use crate::core::r#struct::LError::WrongNumberOfArgument;
+use crate::core::structs::LError::WrongNumberOfArgument;
 use crate::core::{eval, CtxCollec, RefLEnv};
 use std::any::Any;
 use std::fmt::{Debug, Display, Formatter};
@@ -123,6 +123,38 @@ impl Into<f64> for &LNumber {
             LNumber::Float(f) => *f,
             LNumber::Usize(u) => *u as f64,
         }
+    }
+}
+
+impl From<i64> for LNumber {
+    fn from(i: i64) -> Self {
+        LNumber::Int(i)
+    }
+}
+
+impl From<i32> for LNumber {
+    fn from(i: i32) -> Self {
+        LNumber::Int(i as i64)
+    }
+}
+
+
+
+impl From<f64> for LNumber {
+    fn from(f: f64) -> Self {
+        LNumber::Float(f)
+    }
+}
+
+impl From<f32> for LNumber {
+    fn from(f: f32) -> Self {
+        LNumber::Float(f as f64)
+    }
+}
+
+impl From<usize> for LNumber {
+    fn from(u: usize) -> Self {
+        LNumber::Usize(u)
     }
 }
 
@@ -1041,126 +1073,219 @@ pub trait AsModule {
     fn get_module() -> Module;
 }
 
+//TODO: Complete tests writing
 #[cfg(test)]
 mod tests {
     use super::*;
-    use im::HashMap;
 
-    use std::any::{Any, TypeId};
-    use std::hash::{BuildHasher, Hash, Hasher};
-    use std::rc::Rc;
+    mod l_number {
+        use super::*;
 
-    //#[test]
-    pub fn test_hash_list() {
-        let mut map: HashMap<LValue, LValue> = HashMap::new();
-        let key = LValue::List(vec![LValue::Symbol("a".into()), LValue::Symbol("b".into())]);
-        let value = LValue::Bool(true);
-        map.insert(key.clone(), value);
-        println!("get value: ");
-        match map.get(&key) {
-            None => println!("None"),
-            Some(v) => println!("value: {}", v),
+        fn test_add() {
+            let i1:LNumber = 3.into();
+            let i2:LNumber = 5.into();
+            let f1:LNumber = 3.0.into();
+            let f2:LNumber = 5.0.into();
+            assert_eq!(LNumber::Int(8), &i1+&i2);
+            assert_eq!(LNumber::Float(8.0), &i1+&f2);
+            assert_eq!(LNumber::Float(8.0), &f1+&f2);
+        }
+
+        fn test_sub() {
+            let i1:LNumber = 3.into();
+            let i2:LNumber = 5.into();
+            let f1:LNumber = 3.0.into();
+            let f2:LNumber = 5.0.into();
+            assert_eq!(LNumber::Int(-2), &i1-&i2);
+            assert_eq!(LNumber::Float(-2.0), &i1-&f2);
+            assert_eq!(LNumber::Float(-2.0), &f1-&f2);
+        }
+
+        fn test_mul() {
+            let i1:LNumber = 3.into();
+            let i2:LNumber = 5.into();
+            let f1:LNumber = 3.0.into();
+            let f2:LNumber = 5.0.into();
+            assert_eq!(LNumber::Int(15), &i1*&i2);
+            assert_eq!(LNumber::Float(15.0), &i1*&f2);
+            assert_eq!(LNumber::Float(15.0), &f1*&f2);
+        }
+
+        fn test_div() {
+            let i1:LNumber = 3.into();
+            let i2:LNumber = 5.into();
+            let f1:LNumber = 3.0.into();
+            let f2:LNumber = 5.0.into();
+            assert_eq!(LNumber::Int(0), &i1/&i2);
+            assert_eq!(LNumber::Float(0.6), &i1/&f2);
+            assert_eq!(LNumber::Float(0.6), &f1/&f2);
+        }
+
+        #[test]
+        fn test_math() {
+            test_add();
+            test_sub();
+            test_div();
+            test_mul();
+        }
+
+        fn test_gt() {
+            let i1:LNumber = 3.into();
+            let i2:LNumber = 5.into();
+            let f1:LNumber = 3.0.into();
+            let f2:LNumber = 5.0.into();
+            assert!(! (&i1 > &i2));
+            assert!( &i2 > &i1);
+            assert!( ! (&i2 > &i2));
+            assert!(! (&f1 > &f2));
+            assert!( &f2 > &f1);
+            assert!( ! (&f2 > &f2));
+            assert!( &i2 > &f1);
+        }
+
+        fn test_lt() {
+            let i1:LNumber = 3.into();
+            let i2:LNumber = 5.into();
+            let f1:LNumber = 3.0.into();
+            let f2:LNumber = 5.0.into();
+            assert!(&i1 < &i2);
+            assert!( !(&i2 < &i1));
+            assert!( !(&i2 < &i2));
+            assert!( &f1 < &f2);
+            assert!( !(&f2 < &f1));
+            assert!( !(&f2 < &f2));
+            assert!( &i1 < &f2);
+        }
+
+        fn test_ge() {
+            let i1:LNumber = 3.into();
+            let i2:LNumber = 5.into();
+            let f1:LNumber = 3.0.into();
+            let f2:LNumber = 5.0.into();
+            assert!(! (&i1 >= &i2));
+            assert!( &i2 >= &i1);
+            assert!( &i2 >= &i2);
+            assert!( !(&f1 >= &f2));
+            assert!( &f2 >= &f1);
+            assert!( &f2 >= &f2);
+            assert!( &i2 >= &f2);
+        }
+
+        fn test_le() {
+            let i1:LNumber = 3.into();
+            let i2:LNumber = 5.into();
+            let f1:LNumber = 3.0.into();
+            let f2:LNumber = 5.0.into();
+            assert!(&i1 <= &i2);
+            assert!( !(&i2 <= &i1));
+            assert!( &i2 <= &i2);
+            assert!( &f1 <= &f2);
+            assert!( !(&f2 <= &f1));
+            assert!( &f2 <= &f2);
+            assert!( &i2 <= &f2);
+        }
+
+        #[test]
+        fn test_ord() {
+            test_gt();
+            test_ge();
+            test_lt();
+            test_le();
+        }
+
+    }
+
+    mod l_value {
+
+        use super::*;
+        fn test_add() {
+            let i1:LValue = 3.into();
+            let i2:LValue = 5.into();
+            let f1:LValue = 3.0.into();
+            let f2:LValue = 5.0.into();
+            assert_eq!(LValue::Number(LNumber::Int(8)), (&i1+&i2).unwrap());
+            assert_eq!(LValue::Number(LNumber::Float(8.0)), (&i1+&f2).unwrap());
+            assert_eq!(LValue::Number(LNumber::Float(8.0)), (&f1+&f2).unwrap());
+        }
+        fn test_sub() {
+            let i1:LValue = 3.into();
+            let i2:LValue = 5.into();
+            let f1:LValue = 3.0.into();
+            let f2:LValue = 5.0.into();
+            assert_eq!(LValue::Number(LNumber::Int(-2)), (&i1-&i2).unwrap());
+            assert_eq!(LValue::Number(LNumber::Float(-2.0)), (&i1-&f2).unwrap());
+            assert_eq!(LValue::Number(LNumber::Float(-2.0)), (&f1-&f2).unwrap());
+        }
+
+        fn test_mul() {
+            let i1:LValue = 3.into();
+            let i2:LValue = 5.into();
+            let f1:LValue = 3.0.into();
+            let f2:LValue = 5.0.into();
+            assert_eq!(LValue::Number(LNumber::Int(15)), (&i1*&i2).unwrap());
+            assert_eq!(LValue::Number(LNumber::Float(15.0)), (&i1*&f2).unwrap());
+            assert_eq!(LValue::Number(LNumber::Float(15.0)), (&f1*&f2).unwrap());
+        }
+
+        fn test_div() {
+            let i1:LValue = 3.into();
+            let i2:LValue = 5.into();
+            let f1:LValue = 3.0.into();
+            let f2:LValue = 5.0.into();
+            assert_eq!(LValue::Number(LNumber::Int(0)), (&i1/&i2).unwrap());
+            assert_eq!(LValue::Number(LNumber::Float(0.6)), (&i1/&f2).unwrap());
+            assert_eq!(LValue::Number(LNumber::Float(0.6)), (&f1/&f2).unwrap());
+        }
+
+        #[test]
+        fn test_math() {
+            test_add();
+            test_sub();
+            test_mul();
+            test_div();
+        }
+
+        fn test_gt() {
+            let i1:LValue = 3.into();
+            let f2: LValue = 5.0.into();
+            assert!(!(&i1 > &f2));
+            assert!( &f2 > &i1);
+            assert!(!(&f2 > &f2));
+        }
+
+        fn test_ge() {
+            let i1: LValue = 3.into();
+            let f2: LValue = 5.0.into();
+            assert!(!(&i1 >= &f2));
+            assert!( &f2 >= &i1);
+            assert!(&f2 >= &f2);
+        }
+
+        fn test_lt() {
+            let i1:LValue = 3.into();
+            let f2: LValue = 5.0.into();
+            assert!(&i1 < &f2);
+            assert!( !(&f2 < &i1));
+            assert!(!(&f2 < &f2));
+        }
+
+        fn test_le() {
+            let i1:LValue = 3.into();
+            let f2: LValue = 5.0.into();
+            assert!(&i1 <= &f2);
+            assert!( !(&f2 <= &i1));
+            assert!(&f2 <= &f2);
+        }
+
+        #[test]
+        fn test_ord() {
+            test_gt();
+            test_ge();
+            test_lt();
+            test_le();
         }
     }
 
-    //#[test]
-    pub fn test_hasher() {
-        let map: HashMap<LValue, LValue> = HashMap::new();
-        let mut hasher1 = map.hasher().build_hasher();
-        let mut hasher2 = map.hasher().build_hasher();
-        let key = LValue::List(vec![LValue::Symbol("a".into()), LValue::Symbol("b".into())]);
-        let value = LValue::Bool(true);
-        key.hash(&mut hasher1);
-        println!("hash value : {}", hasher1.finish());
-        key.clone().hash(&mut hasher2);
-        println!("hash value : {}", hasher2.finish());
-    }
-
-    #[test]
-    pub fn test_hash() {
-        let mut map: HashMap<LValue, LValue> = HashMap::new();
-        let mut hasher1 = map.hasher().build_hasher();
-        let key1 = LValue::List(vec![LValue::Symbol("a".into()), LValue::Symbol("b".into())]);
-        let key2 = LValue::Bool(true);
-        let value = LValue::Bool(true);
-
-        key2.hash(&mut hasher1);
-        println!("hash value : {}", hasher1.finish());
-        map.insert(key2.clone(), value.clone());
-        let result_value = map.get(&key2.clone()).unwrap_or(&LValue::None);
-        println!("value: {}", result_value);
-        let mut hasher2 = map.hasher().build_hasher();
-        key2.hash(&mut hasher2);
-        println!("hash value : {}", hasher2.finish());
-
-        let mut hasher3 = map.hasher().build_hasher();
-        key1.hash(&mut hasher3);
-        println!("hash value : {}", hasher3.finish());
-        map.insert(key1.clone(), value.clone());
-        let value = map.get(&key1).unwrap_or(&LValue::None);
-        println!("value: {}", value);
-        let mut hasher4 = map.hasher().build_hasher();
-        key1.hash(&mut hasher4);
-        println!("hash value : {}", hasher4.finish());
-
-        println!("hash map:");
-        for (key, value) in map.iter() {
-            println!("{} = {}", key, value);
-        }
-    }
-
-    #[test]
-    pub fn test_hash_with_vec() {
-        let mut map: HashMap<Vec<LValue>, i32> = HashMap::new();
-        let key = vec![LValue::Bool(true), LValue::Bool(true)];
-        let value = 4;
-        println!("insert value: ");
-        map.insert(key, value);
-        let search_key = vec![LValue::Bool(true), LValue::Bool(true)];
-        println!("get value: ");
-        let value = *map.get(&search_key).unwrap_or(&-1);
-        assert_eq!(value, 4)
-    }
-    #[test]
-    pub fn test_hash_with_LValue_List() {
-        let mut map: HashMap<LValue, i32> = HashMap::new();
-        let key = LValue::List(vec![LValue::Bool(true), LValue::Bool(true)]);
-        let value = 4;
-
-        println!("insert value: ");
-        map.insert(key, value);
-        println!("get value: ");
-        let search_key = LValue::List(vec![LValue::Bool(true), LValue::Bool(true)]);
-        let value = *map.get(&search_key).unwrap_or(&-1);
-        assert_eq!(value, 4)
-    }
-    #[test]
-    pub fn test_hash_with_LValue_Bool() {
-        let mut map: HashMap<LValue, i32> = HashMap::new();
-        let key = LValue::Bool(true);
-        let value = 4;
-
-        println!("insert value: ");
-        map.insert(key, value);
-        println!("get value: ");
-        let search_key = LValue::Bool(true);
-        let value = *map.get(&search_key).unwrap_or(&-1);
-        assert_eq!(value, 4)
-    }
-
-    /*#[test]
-    pub fn test_hash_with_LValue_Quote() {
-        let mut map: HashMap<LValue, i32> = HashMap::new();
-        let key = LValue::Quote(Box::new(LValue::Bool(true)));
-        let value = 4;
-
-        println!("insert value: ");
-        map.insert(key, value);
-        println!("get value: ");
-        let search_key = LValue::Quote(Box::new(LValue::Bool(true)));
-        let value = *map.get(&search_key).unwrap_or(&-1);
-        assert_eq!(value, 4)
-    }*/
 
     /*#[test]
     fn test_native_lambda() {
@@ -1228,5 +1353,3 @@ load_module() {
   add mod.ctx to NativeContext
   declare prelude
 }*/
-
-//TODO: Add tests

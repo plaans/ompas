@@ -1,8 +1,8 @@
 /*
 LANGUAGE
 */
-use crate::core::r#struct::LError::{SpecialError, WrongNumberOfArgument, WrongType};
-use crate::core::r#struct::*;
+use crate::core::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
+use crate::core::structs::*;
 use crate::core::RefLEnv;
 
 pub const TYPE_COUNTER: &str = "counter";

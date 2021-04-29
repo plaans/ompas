@@ -11,8 +11,8 @@ const READ: &str = "read";
 const WRITE: &str = "write";
 //const LOAD: &str = "load";
 
-use crate::core::r#struct::LError::*;
-use crate::core::r#struct::{AsModule, LError, LFn, LValue, Module, NameTypeLValue};
+use crate::core::structs::LError::*;
+use crate::core::structs::{AsModule, LError, LFn, LValue, Module, NameTypeLValue};
 use crate::core::RefLEnv;
 use std::fs::File;
 use std::io::{Read, Write};

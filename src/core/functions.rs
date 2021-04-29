@@ -1,5 +1,5 @@
-use crate::core::r#struct::LError::*;
-use crate::core::r#struct::*;
+use crate::core::structs::LError::*;
+use crate::core::structs::*;
 use crate::core::RefLEnv;
 use aries_utils::input::Sym;
 use im::HashMap;
@@ -114,40 +114,6 @@ pub fn get(values: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     }
     return Ok(values.get(0).unwrap().clone());
 }*/
-
-pub fn read(_: &[LValue], _: &mut RefLEnv, _: &()) -> Result<LValue, LError> {
-    unimplemented!()
-    /*if values.len() != 1 {
-        return Err(WrongNumberOfArgument(values.into(), values.len(), 1..1))
-            }
-    let file_name = match values.get(0).unwrap() {
-        LValue::Symbol(s) => s.to_string(),
-        lv => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
-    };
-    let mut file = match File::open(file_name) {
-        Ok(f) => f,
-        Err(e) => return Err(SpecialError(e.to_string())),
-    };
-    let mut buffer = String::new();
-    match file.read_to_string(&mut buffer) {
-        Ok(_) => {}
-        Err(e) => return Err(SpecialError(e.to_string())),
-    };
-    let lv = parse(buffer.as_str(), env)?;
-    eval(&lv, env)*/
-}
-
-pub fn write(values: &[LValue], env: &RefLEnv, _: &()) -> Result<LValue, LError> {
-    if values.len() != 1 {
-        return Err(WrongNumberOfArgument(values.into(), values.len(), 1..1));
-    }
-    let file_name = match values.get(0).unwrap() {
-        LValue::Symbol(s) => s.to_string(),
-        lv => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
-    };
-    env.to_file(file_name);
-    Ok(LValue::None)
-}
 
 ///It takes two arguments, an element and a list and returns a list with the element inserted at the first place.
 pub fn cons(values: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {

@@ -13,10 +13,6 @@ pub const REVERSE: &str = "reverse";
 pub const LIST: &str = "list";
 pub const CONS: &str = "cons";
 
-pub const AND: &str = "and";
-pub const OR: &str = "or";
-pub const NOT: &str = "not";
-
 //Other
 pub const GET: &str = "get";
 

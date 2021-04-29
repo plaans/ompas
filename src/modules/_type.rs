@@ -1,6 +1,6 @@
 use crate::core::lisp_as_literal::AsLiteral;
-use crate::core::r#struct::LError::*;
-use crate::core::r#struct::*;
+use crate::core::structs::LError::*;
+use crate::core::structs::*;
 use crate::core::RefLEnv;
 use aries_utils::input::Sym;
 use im::HashMap;

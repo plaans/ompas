@@ -1,5 +1,5 @@
-use crate::core::r#struct::LError::{WrongNumberOfArgument, WrongType};
-use crate::core::r#struct::{AsModule, LError, LFn, LNumber, LValue, Module, NameTypeLValue};
+use crate::core::structs::LError::{WrongNumberOfArgument, WrongType};
+use crate::core::structs::{AsModule, LError, LFn, LNumber, LValue, Module, NameTypeLValue};
 use crate::core::RefLEnv;
 
 /*
@@ -167,7 +167,6 @@ pub fn eq(args: &[LValue], _: &RefLEnv, _: &CtxMath) -> Result<LValue, LError> {
     }
 }
 
-//TODO: Add test
 #[cfg(test)]
 mod tests {
     use super::*;

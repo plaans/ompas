@@ -1,4 +1,4 @@
-use fact_base::core::r#struct::{AsModule, LValue};
+use fact_base::core::structs::{AsModule, LValue};
 use fact_base::core::{eval, load_module, parse, ContextCollection, RefLEnv};
 use fact_base::modules::_type::CtxType;
 use fact_base::modules::counter::CtxCounter;

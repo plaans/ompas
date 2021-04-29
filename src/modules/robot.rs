@@ -1,5 +1,5 @@
-use crate::core::r#struct::LError::{SpecialError, WrongNumberOfArgument, WrongType};
-use crate::core::r#struct::{
+use crate::core::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
+use crate::core::structs::{
     AsModule, LError, LFn, LMutFn, LNumber, LValue, Module, NameTypeLValue,
 };
 use crate::core::RefLEnv;

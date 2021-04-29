@@ -1,6 +1,6 @@
-use crate::core::structs::LError::{WrongNumberOfArgument, WrongType};
-use crate::core::structs::{AsModule, LError, LFn, LNumber, LValue, Module, NameTypeLValue};
-use crate::core::RefLEnv;
+use ompas_lisp::structs::*;
+use ompas_lisp::structs::LError::*;
+use ompas_lisp::core::*;
 
 /*
 LANGUAGE LITERALS

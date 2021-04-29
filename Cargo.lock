@@ -146,20 +146,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fact_base"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aries_collections",
- "aries_model",
- "aries_planning",
- "aries_utils",
- "im",
- "rustyline",
- "structopt",
-]
-
-[[package]]
 name = "fixedbitset"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -255,6 +241,65 @@ dependencies = [
  "cc",
  "cfg-if",
  "libc",
+]
+
+[[package]]
+name = "ompas_apps"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aries_collections",
+ "aries_model",
+ "aries_planning",
+ "aries_utils",
+ "im",
+ "ompas_lisp",
+ "ompas_modules",
+ "rustyline",
+ "structopt",
+]
+
+[[package]]
+name = "ompas_lisp"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aries_collections",
+ "aries_model",
+ "aries_planning",
+ "aries_utils",
+ "im",
+ "rustyline",
+ "structopt",
+]
+
+[[package]]
+name = "ompas_modules"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aries_collections",
+ "aries_model",
+ "aries_planning",
+ "aries_utils",
+ "im",
+ "ompas_lisp",
+ "rustyline",
+ "structopt",
+]
+
+[[package]]
+name = "ompas_robot_sim"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aries_collections",
+ "aries_model",
+ "aries_planning",
+ "aries_utils",
+ "im",
+ "rustyline",
+ "structopt",
 ]
 
 [[package]]

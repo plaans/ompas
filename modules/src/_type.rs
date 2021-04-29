@@ -1,10 +1,11 @@
-use crate::core::lisp_as_literal::AsLiteral;
-use crate::core::structs::LError::*;
-use crate::core::structs::*;
-use crate::core::RefLEnv;
+
 use aries_utils::input::Sym;
 use im::HashMap;
 use std::fmt::{Debug, Display, Formatter};
+use ompas_lisp::structs::*;
+use ompas_lisp::lisp_as_literal::AsLiteral;
+use ompas_lisp::core::RefLEnv;
+use ompas_lisp::structs::LError::*;
 
 //pub const TYPE: &str = "type";
 //pub const STATE: &str = "state";
@@ -262,8 +263,8 @@ impl AsLiteral for LStateFunction {
 
 #[derive(Debug)]
 pub struct CtxType {
-    map_sym_type_id: HashMap<Sym, usize>,
-    map_type_id_sym: HashMap<usize, Sym>,
+    map_sym_type_id: im::HashMap<Sym, usize>,
+    map_type_id_sym: im::HashMap<usize, Sym>,
     types: Vec<LSymType>,
 }
 
@@ -272,14 +273,14 @@ impl Default for CtxType {
     fn default() -> Self {
         let types = vec![LSymType::Type(None); 5];
 
-        let mut map_sym_type_id: HashMap<Sym, usize> = Default::default();
+        let mut map_sym_type_id: im::HashMap<Sym, usize> = Default::default();
         map_sym_type_id.insert(TYPE_INT.into(), INDEX_TYPE_INT);
         map_sym_type_id.insert(TYPE_FLOAT.into(), INDEX_TYPE_FLOAT);
         map_sym_type_id.insert(TYPE_USIZE.into(), INDEX_TYPE_USIZE);
         map_sym_type_id.insert(TYPE_BOOL.into(), INDEX_TYPE_BOOL);
         map_sym_type_id.insert(TYPE_OBJECT.into(), INDEX_TYPE_OBJECT);
 
-        let mut map_type_id_sym: HashMap<usize, Sym> = Default::default();
+        let mut map_type_id_sym: im::HashMap<usize, Sym> = Default::default();
         map_type_id_sym.insert(INDEX_TYPE_INT, TYPE_INT.into());
         map_type_id_sym.insert(INDEX_TYPE_FLOAT, TYPE_FLOAT.into());
         map_type_id_sym.insert(INDEX_TYPE_USIZE, TYPE_USIZE.into());

@@ -1,14 +1,14 @@
-use fact_base::core::structs::{AsModule, LValue};
-use fact_base::core::{eval, load_module, parse, ContextCollection, RefLEnv};
-use fact_base::modules::_type::CtxType;
-use fact_base::modules::counter::CtxCounter;
-use fact_base::modules::io::{repl, CtxIO};
-use fact_base::modules::math::CtxMath;
-use fact_base::modules::robot::CtxRobot;
 use std::path::PathBuf;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 use structopt::StructOpt;
+use ompas_lisp::core::*;
+use ompas_modules::io::{CtxIO, repl};
+use ompas_modules::_type::CtxType;
+use ompas_lisp::structs::{AsModule, LValue};
+use ompas_modules::counter::CtxCounter;
+use ompas_modules::math::CtxMath;
+use ompas_modules::robot::CtxRobot;
 
 #[derive(Debug, StructOpt)]
 #[structopt(

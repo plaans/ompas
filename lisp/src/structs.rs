@@ -1,14 +1,14 @@
-use crate::core::language::*;
 use aries_utils::input::{ErrLoc, Sym};
 use std::cmp::Ordering;
 //use std::collections::HashMap;
-use crate::core::structs::LError::WrongNumberOfArgument;
-use crate::core::{eval, CtxCollec, RefLEnv};
 use std::any::Any;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::{Add, Div, Mul, Range, Sub};
 use std::rc::Rc;
+use crate::core::{RefLEnv, eval,ContextCollection};
+use crate::structs::LError::{WrongNumberOfArgument, SpecialError};
+use crate::language::*;
 
 #[derive(Debug)]
 pub enum LError {
@@ -56,6 +56,12 @@ impl Display for LError {
                 write!(f, "{}: Got {}, expected {:?}", lv, typ, list_types)
             }
         }
+    }
+}
+
+impl From<std::io::Error> for LError {
+    fn from(e: std::io::Error) -> Self {
+        SpecialError(e.to_string())
     }
 }
 
@@ -342,7 +348,7 @@ impl LLambda {
         &self,
         args: &[LValue],
         outer: &RefLEnv,
-        ctxs: &mut CtxCollec,
+        ctxs: &mut ContextCollection,
     ) -> Result<LValue, LError> {
         let mut new_env = self.get_new_env(args, outer)?;
         eval(&*self.body, &mut new_env, ctxs)

@@ -1,4 +1,4 @@
-# Unnamed FactBase
+# Operationnal Model Planning and Acting System (OMPAS)
 Author: Jérémy Turi
 
 Last update of the readme: 13/04/2021

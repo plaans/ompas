@@ -1,10 +1,3 @@
-use crate::core::functions::*;
-use crate::core::language::*;
-use crate::core::lisp_as_literal::AsLiteral;
-use crate::core::structs::LCoreOperator::Quote;
-use crate::core::structs::LError::*;
-use crate::core::structs::NameTypeLValue::{List, Symbol};
-use crate::core::structs::*;
 use aries_planning::parsing::sexpr::SExpr;
 use aries_utils::input::Sym;
 use im::HashMap;
@@ -14,17 +7,19 @@ use std::fs::File;
 use std::io::Write;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
-
-pub mod functions;
-pub mod language;
-pub mod lisp_as_literal;
-pub mod structs;
+use crate::structs::LError::*;
+use crate::structs::*;
+use crate::language::*;
+use crate::functions::*;
+use crate::structs::NameTypeLValue::{List,Symbol};
+use crate::structs::LCoreOperator::Quote;
+use crate::lisp_as_literal::AsLiteral;
 
 pub struct LEnv {
-    symbols: HashMap<String, LValue>,
-    macro_table: HashMap<Sym, LLambda>,
-    new_entries: Vec<String>,
-    outer: Option<RefLEnv>,
+    pub(crate) symbols: HashMap<String, LValue>,
+    pub(crate) macro_table: HashMap<Sym, LLambda>,
+    pub(crate) new_entries: Vec<String>,
+    pub(crate) outer: Option<RefLEnv>,
 }
 
 pub struct ContextCollection(Vec<Box<dyn Any>>);
@@ -34,8 +29,6 @@ impl Default for ContextCollection {
         Self(vec![])
     }
 }
-
-type CtxCollec = ContextCollection;
 
 impl ContextCollection {
     pub fn insert(&mut self, ctx: Box<dyn Any>) -> usize {
@@ -271,7 +264,7 @@ pub fn load_module(env: &mut RefLEnv, ctxs: &mut ContextCollection, mut module: 
     id
 }
 
-pub fn parse(str: &str, env: &mut RefLEnv, ctxs: &mut CtxCollec) -> Result<LValue, LError> {
+pub fn parse(str: &str, env: &mut RefLEnv, ctxs: &mut ContextCollection) -> Result<LValue, LError> {
     match aries_planning::parsing::sexpr::parse(str) {
         Ok(se) => expand(&parse_into_lvalue(&se, env, ctxs)?, true, env, ctxs),
         Err(e) => Err(SpecialError(format!("Error in command: {}", e.to_string()))),
@@ -281,7 +274,7 @@ pub fn parse(str: &str, env: &mut RefLEnv, ctxs: &mut CtxCollec) -> Result<LValu
 pub fn parse_into_lvalue(
     se: &SExpr,
     env: &mut RefLEnv,
-    ctxs: &mut CtxCollec,
+    ctxs: &mut ContextCollection,
 ) -> Result<LValue, LError> {
     match se {
         SExpr::Atom(atom) => {
@@ -327,7 +320,7 @@ pub fn expand(
     x: &LValue,
     top_level: bool,
     env: &mut RefLEnv,
-    ctxs: &mut CtxCollec,
+    ctxs: &mut ContextCollection,
 ) -> Result<LValue, LError> {
     match x {
         LValue::List(list) => {
@@ -442,7 +435,7 @@ pub fn expand(
                             vars.clone(),
                             expand(&exp, top_level, env, ctxs)?,
                         ]
-                        .into());
+                            .into());
                     }
                     LCoreOperator::If => {
                         let mut list = list.clone();
@@ -560,7 +553,7 @@ pub fn expand_quasi_quote(x: &LValue, env: &mut RefLEnv) -> Result<LValue, LErro
                         expand_quasi_quote(&first, env)?,
                         expand_quasi_quote(&list[1..].to_vec().into(), env)?,
                     ]
-                    .into())
+                        .into())
                 };
             }
         }
@@ -569,7 +562,7 @@ pub fn expand_quasi_quote(x: &LValue, env: &mut RefLEnv) -> Result<LValue, LErro
     //Verify if has unquotesplicing here
 }
 
-pub fn eval(lv: &LValue, env: &mut RefLEnv, ctxs: &mut CtxCollec) -> Result<LValue, LError> {
+pub fn eval(lv: &LValue, env: &mut RefLEnv, ctxs: &mut ContextCollection) -> Result<LValue, LError> {
     match lv {
         LValue::List(list) => {
             //println!("expression is a list");

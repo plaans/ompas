@@ -1,13 +1,11 @@
-use crate::core::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
-use crate::core::structs::{
-    AsModule, LError, LFn, LMutFn, LNumber, LValue, Module, NameTypeLValue,
-};
-use crate::core::RefLEnv;
 use aries_utils::input::Sym;
 use im::HashMap;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 use std::thread::JoinHandle;
+use ompas_lisp::structs::*;
+use ompas_lisp::core::RefLEnv;
+use ompas_lisp::structs::LError::*;
 
 /*
 LANGUAGE
@@ -36,7 +34,7 @@ type RobotId = usize;
 
 pub struct CtxRobot {
     robots: Vec<VirtualRobot>,
-    map_robot_id: HashMap<Sym, RobotId>,
+    map_robot_id: im::HashMap<Sym, RobotId>,
     robots_sender: Option<Sender<String>>,
 }
 

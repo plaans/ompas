@@ -1,9 +1,10 @@
 /*
 LANGUAGE
 */
-use crate::core::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
-use crate::core::structs::*;
-use crate::core::RefLEnv;
+
+use ompas_lisp::structs::*;
+use ompas_lisp::structs::LError::*;
+use ompas_lisp::core::*;
 
 pub const TYPE_COUNTER: &str = "counter";
 pub const SET_COUNTER: &str = "set-counter";

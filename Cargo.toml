@@ -1,32 +1,17 @@
-[package]
-name = "fact_base"
-version = "0.1.0"
-authors = ["Yirmandias <turi@etud.insa-toulouse.fr>"]
-edition = "2018"
-#default-run = "fact_base_editor"
-default-run = "unnamed_supervisor"
+[workspace]
 
-[features]
-deprecated= []
-robot_sim = []
+members = [
+    "apps", "lisp", "robot_sim", "modules",
+]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[profile.dev]
+opt-level = 2               # Use slightly better optimizations.
 
-[dependencies]
-aries_model = {git = "https://github.com/arbimo/aries/", rev = "e220567"}
-aries_planning = {git = "https://github.com/arbimo/aries/", rev = "e220567"}
-aries_utils = {git = "https://github.com/arbimo/aries/", rev = "e220567"}
-aries_collections = {git = "https://github.com/arbimo/aries/", rev = "e220567"}
-anyhow = "1.0.40"
-rustyline = "7.1.0"
-im = "15.0.0"
-structopt = { version = "0.3", default-features = false }
 
-[[bin]]
-name = "virtual_robot"
-path = "src/bin/robot_sim.rs"
-
-[[bin]]
-name = "unnamed_supervisor"
-path = "src/bin/unnamed_supervisor.rs"
-#required-features = ["robot_sim"]
+[profile.release]
+debug = true                # Debug symbols for benchmarking
+opt-level = 3
+lto = "thin"
+codegen-units = 8
+panic = "abort"
+incremental = true

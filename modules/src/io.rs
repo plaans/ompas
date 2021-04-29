@@ -1,7 +1,9 @@
-//use crate::lisp_root::lisp_struct::*;
-
-// ///Module that handles Input/Output treatment.
-
+use std::fs::File;
+use std::io::{Read, Write};
+use std::sync::mpsc::Sender;
+use ompas_lisp::structs::*;
+use ompas_lisp::structs::LError::*;
+use ompas_lisp::core::*;
 /*
 LANGUAGE
  */
@@ -11,12 +13,6 @@ const READ: &str = "read";
 const WRITE: &str = "write";
 //const LOAD: &str = "load";
 
-use crate::core::structs::LError::*;
-use crate::core::structs::{AsModule, LError, LFn, LValue, Module, NameTypeLValue};
-use crate::core::RefLEnv;
-use std::fs::File;
-use std::io::{Read, Write};
-use std::sync::mpsc::Sender;
 
 /// Handles the channel to communicate with the Lisp Interpreter
 #[derive(Debug)]
@@ -36,11 +32,6 @@ impl CtxIO {
     }
 }
 
-impl From<std::io::Error> for LError {
-    fn from(e: std::io::Error) -> Self {
-        SpecialError(e.to_string())
-    }
-}
 
 pub fn print(args: &[LValue], _: &RefLEnv, _: &CtxIO) -> Result<LValue, LError> {
     let lv: LValue = args.into();

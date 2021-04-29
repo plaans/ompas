@@ -88,9 +88,9 @@ impl Display for LNumber {
     }
 }
 
-impl Into<Sym> for &LNumber {
-    fn into(self) -> Sym {
-        match self {
+impl From<&LNumber> for Sym {
+    fn from(n: &LNumber) -> Self {
+        match n {
             LNumber::Int(i) => i.to_string().into(),
             LNumber::Float(f) => f.to_string().into(),
             LNumber::Usize(u) => u.to_string().into(),
@@ -98,11 +98,12 @@ impl Into<Sym> for &LNumber {
     }
 }
 
-impl Into<Sym> for LNumber {
-    fn into(self) -> Sym {
-        (&self).into()
+impl From<LNumber> for Sym {
+    fn from(n: LNumber) -> Self {
+        (&n).into()
     }
 }
+
 
 impl PartialEq for LNumber {
     fn eq(&self, other: &Self) -> bool {
@@ -112,9 +113,9 @@ impl PartialEq for LNumber {
     }
 }
 
-impl Into<usize> for &LNumber {
-    fn into(self) -> usize {
-        match self {
+impl From<&LNumber> for usize {
+    fn from(n: &LNumber) -> Self {
+        match n {
             LNumber::Int(i) => *i as usize,
             LNumber::Float(f) => *f as usize,
             LNumber::Usize(u) => *u,
@@ -122,12 +123,22 @@ impl Into<usize> for &LNumber {
     }
 }
 
-impl Into<f64> for &LNumber {
-    fn into(self) -> f64 {
-        match self {
+impl From<&LNumber> for f64 {
+    fn from(n: &LNumber) -> Self {
+        match n {
             LNumber::Int(i) => *i as f64,
             LNumber::Float(f) => *f,
             LNumber::Usize(u) => *u as f64,
+        }
+    }
+}
+
+impl From<&LNumber> for i64 {
+    fn from(n: &LNumber) -> Self {
+        match n {
+            LNumber::Int(i) => *i,
+            LNumber::Float(f) => *f as i64,
+            LNumber::Usize(u) => *u as i64,
         }
     }
 }
@@ -162,15 +173,6 @@ impl From<usize> for LNumber {
     }
 }
 
-impl Into<i64> for &LNumber {
-    fn into(self) -> i64 {
-        match self {
-            LNumber::Int(i) => *i,
-            LNumber::Float(f) => *f as i64,
-            LNumber::Usize(u) => *u as i64,
-        }
-    }
-}
 
 impl Hash for LNumber {
     fn hash<H: Hasher>(&self, state: &mut H) {

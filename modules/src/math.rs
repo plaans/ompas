@@ -170,7 +170,7 @@ pub fn eq(args: &[LValue], _: &RefLEnv, _: &CtxMath) -> Result<LValue, LError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::{eval, load_module, ContextCollection, RefLEnv};
+
     /*fn generate_env() -> (RefLEnv, ContextCollection) {
         let env = RefLEnv::empty();
         let ctxs = ContextCollection::default();

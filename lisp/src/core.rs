@@ -343,8 +343,7 @@ pub fn expand(
                                 if v_list.len() >= 2 {
                                     let f = v_list.get(0).unwrap();
                                     let args = &v_list[1..];
-                                    let mut new_body = Vec::new();
-                                    new_body.push(LCoreOperator::DefLambda.into());
+                                    let mut new_body = vec![LCoreOperator::DefLambda.into()];
                                     new_body.append(&mut args.to_vec());
                                     new_body.append(&mut body.to_vec());
                                     return expand(

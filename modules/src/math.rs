@@ -38,10 +38,7 @@ impl AsModule for CtxMath {
     /// -Trigonometry: "sin", "cos".
     /// -Constants: "pi".
     fn get_module() -> Module {
-        let mut prelude = vec![];
-
-        //Basic functions
-        prelude.push((ADD.into(), LValue::Fn(LFn::new(Box::new(add), ADD.into()))));
+        let mut prelude = vec![(ADD.into(), LValue::Fn(LFn::new(Box::new(add), ADD.into())))];
         prelude.push((SUB.into(), LValue::Fn(LFn::new(Box::new(sub), SUB.into()))));
         prelude.push((MUL.into(), LValue::Fn(LFn::new(Box::new(mul), MUL.into()))));
         prelude.push((DIV.into(), LValue::Fn(LFn::new(Box::new(mul), DIV.into()))));

@@ -104,7 +104,6 @@ impl From<LNumber> for Sym {
     }
 }
 
-
 impl PartialEq for LNumber {
     fn eq(&self, other: &Self) -> bool {
         let n1: f64 = self.into();
@@ -172,7 +171,6 @@ impl From<usize> for LNumber {
         LNumber::Usize(u)
     }
 }
-
 
 impl Hash for LNumber {
     fn hash<H: Hasher>(&self, state: &mut H) {

@@ -15,35 +15,35 @@ const WRITE: &str = "write";
 
 /// Handles the channel to communicate with the Lisp Interpreter
 #[derive(Debug)]
-pub struct CtxIO {
+pub struct CtxIo {
     sender: Option<Sender<String>>,
 }
 
-impl Default for CtxIO {
+impl Default for CtxIo {
     fn default() -> Self {
         Self { sender: None }
     }
 }
 
-impl CtxIO {
+impl CtxIo {
     pub fn add_sender(&mut self, sender: Sender<String>) {
         self.sender = Some(sender);
     }
 }
 
-pub fn print(args: &[LValue], _: &RefLEnv, _: &CtxIO) -> Result<LValue, LError> {
+pub fn print(args: &[LValue], _: &RefLEnv, _: &CtxIo) -> Result<LValue, LError> {
     let lv: LValue = args.into();
     println!("{}", lv);
     //let mut stdout = io::stdout();
-    //stdout.write_all(b"module IO: print\n");
+    //stdout.write_all(b"module Io: print\n");
     //stdout.write_all(format!("{}\n", lv).as_bytes());
 
     Ok(LValue::None)
 }
 
-pub fn read(args: &[LValue], _: &RefLEnv, ctx: &CtxIO) -> Result<LValue, LError> {
+pub fn read(args: &[LValue], _: &RefLEnv, ctx: &CtxIo) -> Result<LValue, LError> {
     //let mut stdout = io::stdout();
-    //stdout.write_all(b"module IO: read\n");
+    //stdout.write_all(b"module Io: read\n");
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1));
     }
@@ -71,7 +71,7 @@ pub fn read(args: &[LValue], _: &RefLEnv, ctx: &CtxIO) -> Result<LValue, LError>
 /// # Example:
 /// ```lisp
 /// (write <file> <lvalue>)
-pub fn write(args: &[LValue], _: &RefLEnv, _: &CtxIO) -> Result<LValue, LError> {
+pub fn write(args: &[LValue], _: &RefLEnv, _: &CtxIo) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
     }
@@ -86,21 +86,20 @@ pub fn write(args: &[LValue], _: &RefLEnv, _: &CtxIO) -> Result<LValue, LError> 
         lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
     }
 
-    //println!("module IO: write");
+    //println!("module Io: write");
 }
 
-/*pub fn load(args: &[LValue], _: &RefLEnv, _: & CtxIO ) -> Result<LValue, LError> {
-    println!("moudle IO: load");
+/*pub fn load(args: &[LValue], _: &RefLEnv, _: & CtxIo ) -> Result<LValue, LError> {
+    println!("moudle Io: load");
     Ok(LValue::None)
 }*/
 
-impl AsModule for CtxIO {
+impl AsModule for CtxIo {
     fn get_module() -> Module {
-        let mut prelude = vec![];
-        prelude.push((
+        let mut prelude = vec![(
             PRINT.into(),
             LValue::Fn(LFn::new(Box::new(print), PRINT.to_string())),
-        ));
+        )];
         prelude.push((
             READ.into(),
             LValue::Fn(LFn::new(Box::new(read), READ.to_string())),
@@ -112,7 +111,7 @@ impl AsModule for CtxIO {
         //prelude.push((LOAD.into(),LValue::Fn(LFn::new(Box::new(print), LOAD.to_string()))));
 
         Module {
-            ctx: Box::new(CtxIO::default()),
+            ctx: Box::new(CtxIo::default()),
             prelude,
         }
     }

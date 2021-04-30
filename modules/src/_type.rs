@@ -326,13 +326,10 @@ impl CtxType {
 
 impl AsModule for CtxType {
     fn get_module() -> Module {
-        let mut prelude = vec![];
-
-        //Type verification
-        prelude.push((
+        let mut prelude = vec![(
             IS_NONE.into(),
             LValue::Fn(LFn::new(Box::new(is_none), IS_NONE.to_string())),
-        ));
+        )];
         prelude.push((
             IS_NUMBER.into(),
             LValue::Fn(LFn::new(Box::new(is_number), IS_NUMBER.to_string())),

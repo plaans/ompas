@@ -56,12 +56,11 @@ impl CtxRobot {
 
 impl AsModule for CtxRobot {
     fn get_module() -> Module {
-        let mut prelude = vec![];
-
-        prelude.push((
+        let mut prelude = vec![(
             NEW_ROBOT.into(),
             LValue::MutFn(LMutFn::new(Box::new(new_robot), NEW_ROBOT.into())),
-        ));
+        )];
+
         prelude.push((
             STOP_ROBOT.into(),
             LValue::MutFn(LMutFn::new(Box::new(new_robot), STOP_ROBOT.into())),
@@ -98,7 +97,7 @@ fn robot_handler(rx: Receiver<String>) {
     loop {
         match rx.recv() {
             Ok(lv) => println!("{}", lv),
-            Err(e) => panic!(e),
+            Err(e) => panic!("{}", e),
         }
     }
 }
@@ -163,7 +162,7 @@ fn robot(arg_robot: ArgRobot) {
                     .send(format!("action {} OK!", lv))
                     .expect("couldn't send response");
             }
-            Err(e) => panic!(e),
+            Err(e) => panic!("{}", e),
         };
     }
 }

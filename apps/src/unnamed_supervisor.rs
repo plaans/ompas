@@ -2,7 +2,7 @@ use ompas_lisp::core::*;
 use ompas_lisp::structs::{AsModule, LValue};
 use ompas_modules::_type::CtxType;
 use ompas_modules::counter::CtxCounter;
-use ompas_modules::io::{repl, CtxIO};
+use ompas_modules::io::{repl, CtxIo};
 use ompas_modules::math::CtxMath;
 use ompas_modules::robot::CtxRobot;
 use std::path::PathBuf;
@@ -43,11 +43,11 @@ pub fn lisp_interpreter() {
     let root_env = &mut RefLEnv::root();
     let ctxs: &mut ContextCollection = &mut Default::default();
     load_module(root_env, ctxs, CtxCounter::get_module());
-    let id_io = load_module(root_env, ctxs, CtxIO::get_module());
+    let id_io = load_module(root_env, ctxs, CtxIo::get_module());
     //Add the sender of the channel.
     let ctx_io = ctxs
         .get_mut_context(id_io)
-        .downcast_mut::<CtxIO>()
+        .downcast_mut::<CtxIo>()
         .expect("couldn't downcast ref");
     ctx_io.add_sender(sender_li.clone());
 

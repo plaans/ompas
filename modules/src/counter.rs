@@ -130,11 +130,10 @@ pub fn new_counter(_: &[LValue], _: &mut RefLEnv, ctx: &mut CtxCounter) -> Resul
 
 impl AsModule for CtxCounter {
     fn get_module() -> Module {
-        let mut prelude = vec![];
-        prelude.push((
+        let mut prelude = vec![(
             GET_COUNTER.into(),
             LValue::Fn(LFn::new(Box::new(get_counter), GET_COUNTER.into())),
-        ));
+        )];
         prelude.push((
             SET_COUNTER.into(),
             LValue::MutFn(LMutFn::new(Box::new(set_counter), SET_COUNTER.into())),

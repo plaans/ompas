@@ -5,6 +5,7 @@ use ompas_lisp::structs::*;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 use std::thread::JoinHandle;
+use aries_planning::chronicles::Ctx;
 
 /*
 LANGUAGE
@@ -56,36 +57,23 @@ impl CtxRobot {
 
 impl AsModule for CtxRobot {
     fn get_module() -> Module {
-        let mut prelude = vec![(
-            NEW_ROBOT.into(),
-            LValue::MutFn(LMutFn::new(Box::new(new_robot), NEW_ROBOT.into())),
-        )];
+        let mut module = Module {
+            ctx: Box::new(CtxRobot::default()),
+            prelude: vec![]
+        };
 
-        prelude.push((
-            STOP_ROBOT.into(),
-            LValue::MutFn(LMutFn::new(Box::new(new_robot), STOP_ROBOT.into())),
-        ));
-        prelude.push((
-            EXEC.into(),
-            LValue::Fn(LFn::new(Box::new(exec), EXEC.into())),
-        ));
-        prelude.push((
-            START_ROBOT_HANDLER.into(),
-            LValue::MutFn(LMutFn::new(
-                Box::new(start_robot_handler),
-                START_ROBOT_HANDLER.into(),
-            )),
-        ));
+        module.add_mut_fn_prelude(NEW_ROBOT, Box::new(new_robot));
+        module.add_fn_prelude(EXEC, Box::new(exec));
+        module.add_mut_fn_prelude(START_ROBOT_HANDLER, Box::new(start_robot_handler));
+        module.add_mut_fn_prelude(NEW_ROBOT, Box::new(new_robot));
+
         /*
         NOT YET IMPLEMENTED
          */
-        //prelude.push((KILL_ROBOT.into(), LValue::MutFn(LMutFn::new(Box::new(kill_robot), KILL_ROBOT.into()))));
-        //prelude.push((START_ROBOT.into(), LValue::MutFn(LMutFn::new(Box::new(start_robot), START_ROBOT.into()))));
-
-        Module {
-            ctx: Box::new(CtxRobot::default()),
-            prelude,
-        }
+        //
+        //module.add_mut_fn_prelude(START_ROBOT_HANDLER, Box::new(start_robot_handler));
+        //module.add_mut_fn_prelude(NEW_ROBOT, Box::new(new_robot));
+        module
     }
 }
 

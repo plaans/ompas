@@ -38,31 +38,24 @@ impl AsModule for CtxMath {
     /// -Trigonometry: "sin", "cos".
     /// -Constants: "pi".
     fn get_module() -> Module {
-        let mut prelude = vec![(ADD.into(), LValue::Fn(LFn::new(Box::new(add), ADD.into())))];
-        prelude.push((SUB.into(), LValue::Fn(LFn::new(Box::new(sub), SUB.into()))));
-        prelude.push((MUL.into(), LValue::Fn(LFn::new(Box::new(mul), MUL.into()))));
-        prelude.push((DIV.into(), LValue::Fn(LFn::new(Box::new(mul), DIV.into()))));
-
-        //Comparisons
-        prelude.push((GT.into(), LValue::Fn(LFn::new(Box::new(gt), GT.into()))));
-        prelude.push((GE.into(), LValue::Fn(LFn::new(Box::new(ge), GE.into()))));
-        prelude.push((LT.into(), LValue::Fn(LFn::new(Box::new(lt), LT.into()))));
-        prelude.push((LE.into(), LValue::Fn(LFn::new(Box::new(le), LE.into()))));
-
-        //Trigonometry
-        prelude.push((COS.into(), LValue::Fn(LFn::new(Box::new(cos), COS.into()))));
-        prelude.push((SIN.into(), LValue::Fn(LFn::new(Box::new(sin), SIN.into()))));
-
-        //Constants
-        prelude.push((
-            PI.into(),
-            LValue::Number(LNumber::Float(std::f64::consts::PI)),
-        ));
-
-        Module {
+        let mut module = Module {
             ctx: Box::new(CtxMath::default()),
-            prelude,
-        }
+            prelude: vec![]
+        };
+
+        module.add_fn_prelude(ADD, Box::new(add));
+        module.add_fn_prelude(SUB, Box::new(sub));
+        module.add_fn_prelude(MUL, Box::new(mul));
+        module.add_fn_prelude(DIV, Box::new(div));
+        module.add_fn_prelude(GT, Box::new(gt));
+        module.add_fn_prelude(GE, Box::new(ge));
+        module.add_fn_prelude(LT, Box::new(lt));
+        module.add_fn_prelude(LE, Box::new(le));
+        module.add_fn_prelude(COS, Box::new(cos));
+        module.add_fn_prelude(SIN, Box::new(sin));
+        module.add_prelude(PI, std::f64::consts::PI.into());
+
+        module
     }
 }
 

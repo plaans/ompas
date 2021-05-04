@@ -130,39 +130,17 @@ pub fn new_counter(_: &[LValue], _: &mut RefLEnv, ctx: &mut CtxCounter) -> Resul
 
 impl AsModule for CtxCounter {
     fn get_module() -> Module {
-        let mut prelude = vec![(
-            GET_COUNTER.into(),
-            LValue::Fn(LFn::new(Box::new(get_counter), GET_COUNTER.into())),
-        )];
-        prelude.push((
-            SET_COUNTER.into(),
-            LValue::MutFn(LMutFn::new(Box::new(set_counter), SET_COUNTER.into())),
-        ));
+        let mut module = Module {
+            ctx: Box::new(CtxCounter::default()),
+            prelude: vec![]
+        };
 
-        prelude.push((
-            NEW_COUNTER.into(),
-            LValue::MutFn(LMutFn::new(Box::new(new_counter), NEW_COUNTER.into())),
-        ));
+        module.add_fn_prelude(GET_COUNTER, Box::new(get_counter));
+        module.add_mut_fn_prelude(SET_COUNTER, Box::new(set_counter));
+        module.add_mut_fn_prelude(NEW_COUNTER, Box::new(new_counter));
+        module.add_mut_fn_prelude(INCREMENT_COUNTER, Box::new(increment_counter));
+        module.add_mut_fn_prelude(DECREMENT_COUNTER, Box::new(decrement_counter));
 
-        prelude.push((
-            INCREMENT_COUNTER.into(),
-            LValue::MutFn(LMutFn::new(
-                Box::new(increment_counter),
-                INCREMENT_COUNTER.into(),
-            )),
-        ));
-
-        prelude.push((
-            DECREMENT_COUNTER.into(),
-            LValue::MutFn(LMutFn::new(
-                Box::new(decrement_counter),
-                DECREMENT_COUNTER.into(),
-            )),
-        ));
-
-        Module {
-            ctx: Box::new(Self::default()),
-            prelude,
-        }
+        module
     }
 }

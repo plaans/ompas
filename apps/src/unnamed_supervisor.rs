@@ -9,6 +9,7 @@ use std::path::PathBuf;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 use structopt::StructOpt;
+use ompas_modules::help::CtxHelp;
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -54,6 +55,7 @@ pub fn lisp_interpreter() {
     load_module(root_env, ctxs, CtxType::get_module());
     load_module(root_env, ctxs, CtxMath::get_module());
     load_module(root_env, ctxs, CtxRobot::get_module());
+    load_module(root_env, ctxs, CtxHelp::get_module());
     let env = &mut RefLEnv::new_from_outer(root_env.clone());
 
     //let mut stdout = io::stdout();

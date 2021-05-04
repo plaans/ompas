@@ -1073,6 +1073,28 @@ pub struct Module {
     pub prelude: Vec<(Sym, LValue)>,
 }
 
+impl Module {
+    pub fn add_fn_prelude<
+        T: 'static,
+        R: Into<Result<LValue, LError>>,
+        F: Fn(&[LValue], &RefLEnv, &T) -> R + 'static,
+    >(&mut self, label: &str, fun: Box<F>) {
+        self.prelude.push((label.into(), LValue::Fn(LFn::new(fun, label.to_string()))))
+    }
+
+    pub fn add_mut_fn_prelude<
+        T: 'static,
+        R: Into<Result<LValue, LError>>,
+        F: Fn(&[LValue], &mut RefLEnv, &mut T) -> R + 'static,
+    >(&mut self, label: &str, fun: Box<F>) {
+        self.prelude.push((label.into(), LValue::MutFn(LMutFn::new(fun, label.to_string()))))
+    }
+
+    pub fn add_prelude(&mut self, label: &str, lv: LValue) {
+        self.prelude.push((label.into(), lv));
+    }
+}
+
 pub trait AsModule {
     fn get_module() -> Module;
 }

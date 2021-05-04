@@ -96,24 +96,16 @@ pub fn write(args: &[LValue], _: &RefLEnv, _: &CtxIo) -> Result<LValue, LError> 
 
 impl AsModule for CtxIo {
     fn get_module() -> Module {
-        let mut prelude = vec![(
-            PRINT.into(),
-            LValue::Fn(LFn::new(Box::new(print), PRINT.to_string())),
-        )];
-        prelude.push((
-            READ.into(),
-            LValue::Fn(LFn::new(Box::new(read), READ.to_string())),
-        ));
-        prelude.push((
-            WRITE.into(),
-            LValue::Fn(LFn::new(Box::new(write), WRITE.to_string())),
-        ));
-        //prelude.push((LOAD.into(),LValue::Fn(LFn::new(Box::new(print), LOAD.to_string()))));
-
-        Module {
+        let mut module = Module {
             ctx: Box::new(CtxIo::default()),
-            prelude,
-        }
+            prelude: vec![]
+        };
+
+        module.add_fn_prelude(PRINT, Box::new(print));
+        module.add_fn_prelude(READ, Box::new(read));
+        module.add_fn_prelude(WRITE, Box::new(write));
+
+        module
     }
 }
 

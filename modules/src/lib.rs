@@ -3,3 +3,4 @@ pub mod counter;
 pub mod io;
 pub mod math;
 pub mod robot;
+pub mod help;

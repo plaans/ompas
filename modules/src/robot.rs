@@ -59,11 +59,11 @@ impl CtxRobot {
     }
 }
 
-impl AsModule for CtxRobot {
+impl GetModule for CtxRobot {
     //TODO: doc
-    fn as_module(self) -> Module {
+    fn get_module(self) -> Module {
         let mut module = Module {
-            ctx: Box::new(CtxRobot::default()),
+            ctx: Box::new(self),
             prelude: vec![],
             label: MOD_ROBOT,
         };

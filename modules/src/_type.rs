@@ -328,8 +328,8 @@ impl CtxType {
     }
 }
 
-impl AsModule for CtxType {
-    fn as_module(self) -> Module {
+impl GetModule for CtxType {
+    fn get_module(self) -> Module {
         let mut module = Module {
             ctx: Box::new(self),
             prelude: vec![],

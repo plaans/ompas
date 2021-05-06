@@ -98,8 +98,8 @@ pub fn write(args: &[LValue], _: &RefLEnv, _: &CtxIo) -> Result<LValue, LError> 
     Ok(LValue::None)
 }*/
 
-impl AsModule for CtxIo {
-    fn as_module(self) -> Module {
+impl GetModule for CtxIo {
+    fn get_module(self) -> Module {
         let mut module = Module {
             ctx: Box::new(self),
             prelude: vec![],

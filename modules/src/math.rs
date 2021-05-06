@@ -32,7 +32,7 @@ const PI: &str = "pi";
 #[derive(Default, Debug)]
 pub struct CtxMath {}
 
-impl AsModule for CtxMath {
+impl GetModule for CtxMath {
     /// Provides all the functions to make some basic computation.
     /// New functions and constants will be added in time, when needed.
     /// Here is a list of all the elements provided by this module
@@ -40,7 +40,7 @@ impl AsModule for CtxMath {
     /// -Comparisons: "<", ">", "<=", ">=".
     /// -Trigonometry: "sin", "cos".
     /// -Constants: "pi".
-    fn as_module(self) -> Module {
+    fn get_module(self) -> Module {
         let mut module = Module {
             ctx: Box::new(self),
             prelude: vec![],

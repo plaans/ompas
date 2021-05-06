@@ -7,7 +7,7 @@ use aries_utils::input::Sym;
 use im::HashMap;
 use ompas_lisp::core::RefLEnv;
 use ompas_lisp::structs::LError::{WrongNumberOfArgument, WrongType};
-use ompas_lisp::structs::{AsModule, LError, LValue, Module, NameTypeLValue};
+use ompas_lisp::structs::{LError, LValue, Module, NameTypeLValue, GetModule};
 use std::fmt::{Debug, Display, Formatter};
 
 /*
@@ -73,8 +73,8 @@ impl CtxDoc {
     }
 }
 
-impl AsModule for CtxDoc {
-    fn as_module(self) -> Module {
+impl GetModule for CtxDoc {
+    fn get_module(self) -> Module {
         let mut module = Module {
             ctx: Box::new(self),
             prelude: vec![],

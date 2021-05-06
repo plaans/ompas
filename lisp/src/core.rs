@@ -247,8 +247,8 @@ impl LEnv {
     }
 }
 
-pub fn load_module(env: &mut RefLEnv, ctxs: &mut ContextCollection, ctx: impl AsModule) -> usize {
-    let mut module = ctx.as_module();
+pub fn load_module(env: &mut RefLEnv, ctxs: &mut ContextCollection, ctx: impl GetModule) -> usize {
+    let mut module = ctx.get_module();
     let id = ctxs.insert(module.ctx);
     for (sym, lv) in &mut module.prelude {
         match lv {

@@ -1114,8 +1114,8 @@ impl Module {
     }
 }
 
-pub trait AsModule {
-    fn as_module(self) -> Module;
+pub trait GetModule {
+    fn get_module(self) -> Module;
 }
 
 //TODO: Complete tests writing

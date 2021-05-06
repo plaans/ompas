@@ -132,8 +132,8 @@ pub fn new_counter(_: &[LValue], _: &mut RefLEnv, ctx: &mut CtxCounter) -> Resul
     Ok(LValue::Number(LNumber::Usize(ctx.new_counter())))
 }
 
-impl AsModule for CtxCounter {
-    fn as_module(self) -> Module {
+impl GetModule for CtxCounter {
+    fn get_module(self) -> Module {
         let mut module = Module {
             ctx: Box::new(self),
             prelude: vec![],

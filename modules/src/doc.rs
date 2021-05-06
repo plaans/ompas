@@ -7,7 +7,7 @@ use aries_utils::input::Sym;
 use im::HashMap;
 use ompas_lisp::core::RefLEnv;
 use ompas_lisp::structs::LError::{WrongNumberOfArgument, WrongType};
-use ompas_lisp::structs::{LError, LValue, Module, NameTypeLValue, GetModule};
+use ompas_lisp::structs::{GetModule, LError, LValue, Module, NameTypeLValue};
 use std::fmt::{Debug, Display, Formatter};
 
 /*

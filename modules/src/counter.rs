@@ -1,10 +1,14 @@
+use crate::doc::{Documentation, LHelp};
+use ompas_lisp::core::*;
+use ompas_lisp::structs::LError::*;
+use ompas_lisp::structs::*;
+
 /*
 LANGUAGE
 */
 
-use ompas_lisp::core::*;
-use ompas_lisp::structs::LError::*;
-use ompas_lisp::structs::*;
+const MOD_COUNTER: &str = "mod-counter";
+const DOC_MOD_COUNTER: &str = "documentation of the module counter";
 
 pub const TYPE_COUNTER: &str = "counter";
 pub const SET_COUNTER: &str = "set-counter";
@@ -129,10 +133,11 @@ pub fn new_counter(_: &[LValue], _: &mut RefLEnv, ctx: &mut CtxCounter) -> Resul
 }
 
 impl AsModule for CtxCounter {
-    fn get_module() -> Module {
+    fn as_module(self) -> Module {
         let mut module = Module {
-            ctx: Box::new(CtxCounter::default()),
-            prelude: vec![]
+            ctx: Box::new(self),
+            prelude: vec![],
+            label: MOD_COUNTER,
         };
 
         module.add_fn_prelude(GET_COUNTER, Box::new(get_counter));
@@ -142,5 +147,28 @@ impl AsModule for CtxCounter {
         module.add_mut_fn_prelude(DECREMENT_COUNTER, Box::new(decrement_counter));
 
         module
+    }
+}
+
+/*
+DOCUMENTATION
+ */
+
+const DOC_GET_COUNTER: &str = "";
+const DOC_SET_COUNTER: &str = "";
+const DOC_NEW_COUNTER: &str = "";
+const DOC_INCREMENT_COUNTER: &str = "";
+const DOC_DECREMENT_COUNTER: &str = "";
+
+impl Documentation for CtxCounter {
+    fn documentation() -> Vec<LHelp> {
+        vec![
+            LHelp::new(MOD_COUNTER, DOC_MOD_COUNTER, None),
+            LHelp::new(GET_COUNTER, DOC_GET_COUNTER, None),
+            LHelp::new(SET_COUNTER, DOC_SET_COUNTER, None),
+            LHelp::new(NEW_COUNTER, DOC_NEW_COUNTER, None),
+            LHelp::new(INCREMENT_COUNTER, DOC_INCREMENT_COUNTER, None),
+            LHelp::new(DECREMENT_COUNTER, DOC_DECREMENT_COUNTER, None),
+        ]
     }
 }

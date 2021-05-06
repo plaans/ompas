@@ -1,7 +1,8 @@
 use ompas_lisp::core::*;
-use ompas_lisp::structs::{AsModule, LValue};
+use ompas_lisp::structs::LValue;
 use ompas_modules::_type::CtxType;
 use ompas_modules::counter::CtxCounter;
+use ompas_modules::doc::{CtxDoc, Documentation};
 use ompas_modules::io::{repl, CtxIo};
 use ompas_modules::math::CtxMath;
 use ompas_modules::robot::CtxRobot;
@@ -9,7 +10,6 @@ use std::path::PathBuf;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 use structopt::StructOpt;
-use ompas_modules::help::CtxHelp;
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -43,19 +43,27 @@ pub fn lisp_interpreter() {
 
     let root_env = &mut RefLEnv::root();
     let ctxs: &mut ContextCollection = &mut Default::default();
-    load_module(root_env, ctxs, CtxCounter::get_module());
-    let id_io = load_module(root_env, ctxs, CtxIo::get_module());
+    let mut ctx_doc = CtxDoc::default();
+    let mut ctx_io = CtxIo::default();
+    let ctx_math = CtxMath::default();
+    let ctx_robot = CtxRobot::default();
+    let ctx_type = CtxType::default();
+    let ctx_counter = CtxCounter::default();
+
+    ctx_doc.insert_doc(CtxIo::documentation());
+    ctx_doc.insert_doc(CtxMath::documentation());
+    ctx_doc.insert_doc(CtxRobot::documentation());
+    ctx_doc.insert_doc(CtxType::documentation());
+
     //Add the sender of the channel.
-    let ctx_io = ctxs
-        .get_mut_context(id_io)
-        .downcast_mut::<CtxIo>()
-        .expect("couldn't downcast ref");
     ctx_io.add_sender(sender_li.clone());
 
-    load_module(root_env, ctxs, CtxType::get_module());
-    load_module(root_env, ctxs, CtxMath::get_module());
-    load_module(root_env, ctxs, CtxRobot::get_module());
-    load_module(root_env, ctxs, CtxHelp::get_module());
+    load_module(root_env, ctxs, ctx_doc);
+    load_module(root_env, ctxs, ctx_io);
+    load_module(root_env, ctxs, ctx_math);
+    load_module(root_env, ctxs, ctx_robot);
+    load_module(root_env, ctxs, ctx_type);
+    load_module(root_env, ctxs, ctx_counter);
     let env = &mut RefLEnv::new_from_outer(root_env.clone());
 
     //let mut stdout = io::stdout();

@@ -1,3 +1,4 @@
+use crate::doc::{Documentation, LHelp};
 use ompas_lisp::core::*;
 use ompas_lisp::structs::LError::*;
 use ompas_lisp::structs::*;
@@ -7,6 +8,9 @@ use std::sync::mpsc::Sender;
 /*
 LANGUAGE
  */
+
+const MOD_IO: &str = "mod-io";
+const DOC_MOD_IO: &str = "Documentation of the IO module";
 
 const PRINT: &str = "print";
 const READ: &str = "read";
@@ -95,10 +99,11 @@ pub fn write(args: &[LValue], _: &RefLEnv, _: &CtxIo) -> Result<LValue, LError> 
 }*/
 
 impl AsModule for CtxIo {
-    fn get_module() -> Module {
+    fn as_module(self) -> Module {
         let mut module = Module {
-            ctx: Box::new(CtxIo::default()),
-            prelude: vec![]
+            ctx: Box::new(self),
+            prelude: vec![],
+            label: MOD_IO,
         };
 
         module.add_fn_prelude(PRINT, Box::new(print));
@@ -106,6 +111,25 @@ impl AsModule for CtxIo {
         module.add_fn_prelude(WRITE, Box::new(write));
 
         module
+    }
+}
+
+/*
+DOCUMENTATION
+ */
+
+const DOC_PRINT: &str = "";
+const DOC_READ: &str = "";
+const DOC_WRITE: &str = "";
+
+impl Documentation for CtxIo {
+    fn documentation() -> Vec<LHelp> {
+        vec![
+            LHelp::new(MOD_IO, DOC_MOD_IO, None),
+            LHelp::new(PRINT, DOC_PRINT, None),
+            LHelp::new(READ, DOC_READ, None),
+            LHelp::new(WRITE, DOC_WRITE, None),
+        ]
     }
 }
 

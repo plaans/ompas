@@ -362,7 +362,7 @@ pub type NativeFn = dyn Fn(&[LValue], &RefLEnv, &dyn Any) -> Result<LValue, LErr
 #[derive(Clone)]
 pub struct LFn {
     pub(crate) fun: Rc<NativeFn>,
-    pub(crate) debug_label: String,
+    pub(crate) debug_label: &'static str,
     index_mod: Option<usize>,
 }
 
@@ -387,7 +387,7 @@ impl LFn {
         F: Fn(&[LValue], &RefLEnv, &T) -> R + 'static,
     >(
         lbd: Box<F>,
-        debug_label: String,
+        debug_label: &'static str,
     ) -> Self {
         let x = move |args: &[LValue], env: &RefLEnv, ctx: &dyn Any| -> Result<LValue, LError> {
             let ctx: Option<&T> = ctx.downcast_ref::<T>();
@@ -422,6 +422,10 @@ impl LFn {
     pub fn get_index_mod(&self) -> Option<usize> {
         self.index_mod
     }
+
+    pub fn get_label(&self) -> &'static str {
+        self.debug_label
+    }
 }
 
 pub type NativeMutFn = dyn Fn(&[LValue], &mut RefLEnv, &mut dyn Any) -> Result<LValue, LError>;
@@ -429,7 +433,7 @@ pub type NativeMutFn = dyn Fn(&[LValue], &mut RefLEnv, &mut dyn Any) -> Result<L
 #[derive(Clone)]
 pub struct LMutFn {
     pub(crate) fun: Rc<NativeMutFn>,
-    pub(crate) debug_label: String,
+    pub(crate) debug_label: &'static str,
     index_mod: Option<usize>,
 }
 
@@ -454,7 +458,7 @@ impl LMutFn {
         F: Fn(&[LValue], &mut RefLEnv, &mut T) -> R + 'static,
     >(
         lbd: Box<F>,
-        debug_label: String,
+        debug_label: &'static str,
     ) -> Self {
         let x = move |args: &[LValue],
                       env: &mut RefLEnv,
@@ -491,6 +495,10 @@ impl LMutFn {
         ctx: &mut dyn Any,
     ) -> Result<LValue, LError> {
         (self.fun)(args, env, ctx)
+    }
+
+    pub fn get_label(&self) -> &'static str {
+        self.debug_label
     }
 }
 
@@ -1071,6 +1079,7 @@ impl From<LValue> for NameTypeLValue {
 pub struct Module {
     pub ctx: Box<dyn Any>,
     pub prelude: Vec<(Sym, LValue)>,
+    pub label: &'static str,
 }
 
 impl Module {
@@ -1078,16 +1087,26 @@ impl Module {
         T: 'static,
         R: Into<Result<LValue, LError>>,
         F: Fn(&[LValue], &RefLEnv, &T) -> R + 'static,
-    >(&mut self, label: &str, fun: Box<F>) {
-        self.prelude.push((label.into(), LValue::Fn(LFn::new(fun, label.to_string()))))
+    >(
+        &mut self,
+        label: &'static str,
+        fun: Box<F>,
+    ) {
+        self.prelude
+            .push((label.into(), LValue::Fn(LFn::new(fun, label))))
     }
 
     pub fn add_mut_fn_prelude<
         T: 'static,
         R: Into<Result<LValue, LError>>,
         F: Fn(&[LValue], &mut RefLEnv, &mut T) -> R + 'static,
-    >(&mut self, label: &str, fun: Box<F>) {
-        self.prelude.push((label.into(), LValue::MutFn(LMutFn::new(fun, label.to_string()))))
+    >(
+        &mut self,
+        label: &'static str,
+        fun: Box<F>,
+    ) {
+        self.prelude
+            .push((label.into(), LValue::MutFn(LMutFn::new(fun, label))))
     }
 
     pub fn add_prelude(&mut self, label: &str, lv: LValue) {
@@ -1096,7 +1115,7 @@ impl Module {
 }
 
 pub trait AsModule {
-    fn get_module() -> Module;
+    fn as_module(self) -> Module;
 }
 
 //TODO: Complete tests writing

@@ -36,8 +36,8 @@ impl AsLiteral for LValue {
         match self {
             LValue::List(l) => l.as_command(),
             LValue::String(s) => s.to_string(),
-            LValue::Fn(f) => f.debug_label.clone(),
-            LValue::MutFn(f) => f.debug_label.clone(),
+            LValue::Fn(f) => f.debug_label.to_string(),
+            LValue::MutFn(f) => f.debug_label.to_string(),
             LValue::None => "none".to_string(),
             LValue::Symbol(s) => s.to_string(),
             LValue::Number(n) => n.to_string(),

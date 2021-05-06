@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+use crate::doc::{Documentation, LHelp};
 use aries_utils::input::Sym;
 use ompas_lisp::core::RefLEnv;
 use ompas_lisp::structs::LError::*;
@@ -5,26 +7,28 @@ use ompas_lisp::structs::*;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 use std::thread::JoinHandle;
-use aries_planning::chronicles::Ctx;
 
 /*
 LANGUAGE
  */
 
-pub const NEW_ROBOT: &str = "new-robot";
-pub const KILL_ROBOT: &str = "kill-robot";
-pub const START_ROBOT: &str = "start-robot";
-pub const STOP_ROBOT: &str = "stop-robot";
-pub const EXEC: &str = "exec";
-pub const START_ROBOT_HANDLER: &str = "start-robot-handler";
+const MOD_ROBOT: &str = "mod-robot";
+const DOC_MOD_ROBOT: &str = "Documentation of the robot module";
+
+const NEW_ROBOT: &str = "new-robot";
+const KILL_ROBOT: &str = "kill-robot";
+const START_ROBOT: &str = "start-robot";
+const STOP_ROBOT: &str = "stop-robot";
+const EXEC: &str = "exec";
+const START_ROBOT_HANDLER: &str = "start-robot-handler";
 
 /*
 Name of the commands
  */
 
-pub const COMMAND_MOVE: &str = "move";
-pub const COMMAND_PICK: &str = "pick";
-pub const COMMAND_PLACE: &str = "place";
+const COMMAND_MOVE: &str = "move";
+const COMMAND_PICK: &str = "pick";
+const COMMAND_PLACE: &str = "place";
 
 /*
 OTHER
@@ -56,16 +60,17 @@ impl CtxRobot {
 }
 
 impl AsModule for CtxRobot {
-    fn get_module() -> Module {
+    //TODO: doc
+    fn as_module(self) -> Module {
         let mut module = Module {
             ctx: Box::new(CtxRobot::default()),
-            prelude: vec![]
+            prelude: vec![],
+            label: MOD_ROBOT,
         };
 
         module.add_mut_fn_prelude(NEW_ROBOT, Box::new(new_robot));
         module.add_fn_prelude(EXEC, Box::new(exec));
         module.add_mut_fn_prelude(START_ROBOT_HANDLER, Box::new(start_robot_handler));
-        module.add_mut_fn_prelude(NEW_ROBOT, Box::new(new_robot));
 
         /*
         NOT YET IMPLEMENTED
@@ -77,7 +82,26 @@ impl AsModule for CtxRobot {
     }
 }
 
-pub const ROBOT_HANDLER_START_MSG: &str = "Robot handler started!!!\n\
+/*
+DOCUMENTATION
+ */
+
+const DOC_NEW_ROBOT: &str = "";
+const DOC_EXEC: &str = "";
+const DOC_START_ROBOT_HANDLER: &str = "";
+
+impl Documentation for CtxRobot {
+    fn documentation() -> Vec<LHelp> {
+        vec![
+            LHelp::new(MOD_ROBOT, DOC_MOD_ROBOT, None),
+            LHelp::new(NEW_ROBOT, DOC_NEW_ROBOT, None),
+            LHelp::new(EXEC, DOC_EXEC, None),
+            LHelp::new(START_ROBOT_HANDLER, DOC_START_ROBOT_HANDLER, None),
+        ]
+    }
+}
+
+const ROBOT_HANDLER_START_MSG: &str = "Robot handler started!!!\n\
                                            Listening...";
 fn robot_handler(rx: Receiver<String>) {
     println!("{}", ROBOT_HANDLER_START_MSG);

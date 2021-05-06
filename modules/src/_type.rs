@@ -1,3 +1,4 @@
+use crate::doc::{Documentation, LHelp};
 use aries_utils::input::Sym;
 use ompas_lisp::core::RefLEnv;
 use ompas_lisp::lisp_as_literal::AsLiteral;
@@ -9,42 +10,45 @@ use std::fmt::{Debug, Display, Formatter};
 //pub const STATE: &str = "state";
 //pub const IS_PAIR: &str = "pair?";
 
+const MOD_TYPE: &str = "mod_type";
+const DOC_MOD_TYPE: &str = "documentation of the module type";
+
 //Verification
-pub const IS_NONE: &str = "none?";
-pub const IS_NUMBER: &str = "number?";
-pub const IS_BOOL: &str = "bool?";
-pub const IS_SYMBOL: &str = "sym?";
-pub const IS_FN: &str = "fn?";
-pub const IS_MUT_FN: &str = "mut-fn?";
-pub const IS_TYPE: &str = "type?";
-pub const IS_STATE_FUNCTION: &str = "sf?";
-pub const IS_OBJECT: &str = "obj?";
-pub const IS_LIST: &str = "list?";
-pub const IS_MAP: &str = "map?";
-pub const IS_LAMBDA: &str = "lambda?";
-pub const IS_QUOTE: &str = "quote?";
+const IS_NONE: &str = "none?";
+const IS_NUMBER: &str = "number?";
+const IS_BOOL: &str = "bool?";
+const IS_SYMBOL: &str = "sym?";
+const IS_FN: &str = "fn?";
+const IS_MUT_FN: &str = "mut-fn?";
+const IS_TYPE: &str = "type?";
+const IS_STATE_FUNCTION: &str = "sf?";
+const IS_OBJECT: &str = "obj?";
+const IS_LIST: &str = "list?";
+const IS_MAP: &str = "map?";
+const IS_LAMBDA: &str = "lambda?";
+const IS_QUOTE: &str = "quote?";
 
 //FactBase language
-pub const STATE_FUNCTION: &str = "state-function";
+const STATE_FUNCTION: &str = "state-function";
 
 //basic types
-pub const TYPE_INT: &str = "int";
-pub const TYPE_FLOAT: &str = "float";
-pub const TYPE_USIZE: &str = "usize";
-pub const TYPE_OBJECT: &str = "object";
-pub const TYPE_BOOL: &str = "boolean";
+const TYPE_INT: &str = "int";
+const TYPE_FLOAT: &str = "float";
+const TYPE_USIZE: &str = "usize";
+const TYPE_OBJECT: &str = "object";
+const TYPE_BOOL: &str = "boolean";
 
-pub const INDEX_TYPE_INT: usize = 0;
-pub const INDEX_TYPE_FLOAT: usize = 1;
-pub const INDEX_TYPE_USIZE: usize = 2;
-pub const INDEX_TYPE_OBJECT: usize = 3;
-pub const INDEX_TYPE_BOOL: usize = 4;
+const INDEX_TYPE_INT: usize = 0;
+const INDEX_TYPE_FLOAT: usize = 1;
+const INDEX_TYPE_USIZE: usize = 2;
+const INDEX_TYPE_OBJECT: usize = 3;
+const INDEX_TYPE_BOOL: usize = 4;
 
-pub const TYPE_OF: &str = "type-of";
-pub const SUB_TYPE: &str = "sub-type";
-pub const GET_TYPE: &str = "get-type";
-pub const NEW_STATE_FUNCTION: &str = "new-sf";
-pub const NEW_OBJECT: &str = "new-obj";
+const TYPE_OF: &str = "type-of";
+const SUB_TYPE: &str = "sub-type";
+const GET_TYPE: &str = "get-type";
+const NEW_STATE_FUNCTION: &str = "new-sf";
+const NEW_OBJECT: &str = "new-obj";
 
 #[derive(Clone, Debug)]
 pub enum LSymType {
@@ -325,98 +329,82 @@ impl CtxType {
 }
 
 impl AsModule for CtxType {
-    fn get_module() -> Module {
-        let mut prelude = vec![(
-            IS_NONE.into(),
-            LValue::Fn(LFn::new(Box::new(is_none), IS_NONE.to_string())),
-        )];
-        prelude.push((
-            IS_NUMBER.into(),
-            LValue::Fn(LFn::new(Box::new(is_number), IS_NUMBER.to_string())),
-        ));
-        prelude.push((
-            IS_BOOL.into(),
-            LValue::Fn(LFn::new(Box::new(is_bool), IS_BOOL.to_string())),
-        ));
-        prelude.push((
-            IS_SYMBOL.into(),
-            LValue::Fn(LFn::new(Box::new(is_symbol), IS_SYMBOL.to_string())),
-        ));
-        prelude.push((
-            IS_FN.into(),
-            LValue::Fn(LFn::new(Box::new(is_fn), IS_FN.to_string())),
-        ));
-        prelude.push((
-            IS_MUT_FN.into(),
-            LValue::Fn(LFn::new(Box::new(is_mut_fn), IS_MUT_FN.to_string())),
-        ));
-        prelude.push((
-            IS_STATE_FUNCTION.into(),
-            LValue::Fn(LFn::new(
-                Box::new(is_state_function),
-                IS_STATE_FUNCTION.to_string(),
-            )),
-        ));
-        prelude.push((
-            IS_OBJECT.into(),
-            LValue::Fn(LFn::new(Box::new(is_object), IS_OBJECT.to_string())),
-        ));
-        prelude.push((
-            IS_TYPE.into(),
-            LValue::Fn(LFn::new(Box::new(is_type), IS_TYPE.to_string())),
-        ));
-        prelude.push((
-            IS_MAP.into(),
-            LValue::Fn(LFn::new(Box::new(is_map), IS_MAP.to_string())),
-        ));
-        prelude.push((
-            IS_LIST.into(),
-            LValue::Fn(LFn::new(Box::new(is_list), IS_LIST.to_string())),
-        ));
-        prelude.push((
-            IS_LAMBDA.into(),
-            LValue::Fn(LFn::new(Box::new(is_lambda), IS_LAMBDA.to_string())),
-        ));
-        prelude.push((
-            IS_QUOTE.into(),
-            LValue::Fn(LFn::new(Box::new(is_quote), IS_QUOTE.to_string())),
-        ));
+    fn as_module(self) -> Module {
+        let mut module = Module {
+            ctx: Box::new(self),
+            prelude: vec![],
+            label: MOD_TYPE,
+        };
 
-        prelude.push((
-            GET_TYPE.into(),
-            LValue::Fn(LFn::new(Box::new(get_type), GET_TYPE.to_string())),
-        ));
+        module.add_fn_prelude(IS_NONE, Box::new(is_none));
+        module.add_fn_prelude(IS_NUMBER, Box::new(is_number));
+        module.add_fn_prelude(IS_BOOL, Box::new(is_bool));
+        module.add_fn_prelude(IS_SYMBOL, Box::new(is_symbol));
+        module.add_fn_prelude(IS_FN, Box::new(is_fn));
+        module.add_fn_prelude(IS_MUT_FN, Box::new(is_mut_fn));
+        module.add_fn_prelude(IS_STATE_FUNCTION, Box::new(is_state_function));
+        module.add_fn_prelude(IS_OBJECT, Box::new(is_object));
+        module.add_fn_prelude(IS_MAP, Box::new(is_map));
+        module.add_fn_prelude(IS_LIST, Box::new(is_list));
+        module.add_fn_prelude(IS_LAMBDA, Box::new(is_lambda));
+        module.add_fn_prelude(IS_TYPE, Box::new(is_type));
+        module.add_fn_prelude(IS_QUOTE, Box::new(is_quote));
+        module.add_fn_prelude(GET_TYPE, Box::new(get_type));
+        module.add_mut_fn_prelude(TYPE_OF, Box::new(type_of));
+        module.add_mut_fn_prelude(SUB_TYPE, Box::new(sub_type));
+        module.add_mut_fn_prelude(NEW_STATE_FUNCTION, Box::new(new_state_function));
+        module.add_mut_fn_prelude(NEW_OBJECT, Box::new(new_object));
 
-        prelude.push((
-            TYPE_OF.into(),
-            LValue::MutFn(LMutFn::new(Box::new(type_of), TYPE_OF.to_string())),
-        ));
+        module
+    }
+}
 
-        prelude.push((
-            SUB_TYPE.into(),
-            LValue::MutFn(LMutFn::new(Box::new(subtype), SUB_TYPE.to_string())),
-        ));
+/*
+DOCUMENTATION
+ */
+//TODO: write doc mod type
+const DOC_IS_NONE: &str = "";
+const DOC_IS_NUMBER: &str = "";
+const DOC_IS_BOOL: &str = "";
+const DOC_IS_SYMBOL: &str = "";
+const DOC_IS_FN: &str = "";
+const DOC_IS_MUT_FN: &str = "";
+const DOC_IS_STATE_FUNCTION: &str = "";
+const DOC_IS_OBJECT: &str = "";
+const DOC_IS_MAP: &str = "";
+const DOC_IS_LIST: &str = "";
+const DOC_IS_LAMBDA: &str = "";
+const DOC_IS_TYPE: &str = "";
+const DOC_IS_QUOTE: &str = "";
+const DOC_GET_TYPE: &str = "";
+const DOC_TYPE_OF: &str = "";
+const DOC_SUB_TYPE: &str = "";
+const DOC_NEW_STATE_FUNCTION: &str = "";
+const DOC_NEW_OBJECT: &str = "";
 
-        prelude.push((
-            NEW_STATE_FUNCTION.into(),
-            LValue::MutFn(LMutFn::new(
-                Box::new(new_state_function),
-                NEW_STATE_FUNCTION.to_string(),
-            )),
-        ));
-
-        prelude.push((
-            NEW_OBJECT.into(),
-            LValue::MutFn(LMutFn::new(
-                Box::new(new_object),
-                NEW_STATE_FUNCTION.to_string(),
-            )),
-        ));
-
-        Module {
-            ctx: Box::new(CtxType::default()),
-            prelude,
-        }
+impl Documentation for CtxType {
+    fn documentation() -> Vec<LHelp> {
+        vec![
+            LHelp::new(MOD_TYPE, DOC_MOD_TYPE, None),
+            LHelp::new(IS_NONE, DOC_IS_NONE, None),
+            LHelp::new(IS_NUMBER, DOC_IS_NUMBER, None),
+            LHelp::new(IS_BOOL, DOC_IS_BOOL, None),
+            LHelp::new(IS_SYMBOL, DOC_IS_SYMBOL, None),
+            LHelp::new(IS_FN, DOC_IS_FN, None),
+            LHelp::new(IS_MUT_FN, DOC_IS_MUT_FN, None),
+            LHelp::new(IS_STATE_FUNCTION, DOC_IS_STATE_FUNCTION, None),
+            LHelp::new(IS_OBJECT, DOC_IS_OBJECT, None),
+            LHelp::new(IS_MAP, DOC_IS_MAP, None),
+            LHelp::new(IS_LIST, DOC_IS_LIST, None),
+            LHelp::new(IS_LAMBDA, DOC_IS_LAMBDA, None),
+            LHelp::new(IS_TYPE, DOC_IS_TYPE, None),
+            LHelp::new(IS_QUOTE, DOC_IS_QUOTE, None),
+            LHelp::new(GET_TYPE, DOC_GET_TYPE, None),
+            LHelp::new(TYPE_OF, DOC_TYPE_OF, None),
+            LHelp::new(SUB_TYPE, DOC_SUB_TYPE, None),
+            LHelp::new(NEW_STATE_FUNCTION, DOC_NEW_STATE_FUNCTION, None),
+            LHelp::new(NEW_OBJECT, DOC_NEW_OBJECT, None),
+        ]
     }
 }
 
@@ -591,7 +579,7 @@ pub fn type_of(args: &[LValue], _: &mut RefLEnv, ctx: &mut CtxType) -> Result<LV
     }
 }
 
-pub fn subtype(args: &[LValue], _: &mut RefLEnv, ctx: &mut CtxType) -> Result<LValue, LError> {
+pub fn sub_type(args: &[LValue], _: &mut RefLEnv, ctx: &mut CtxType) -> Result<LValue, LError> {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1));
     }

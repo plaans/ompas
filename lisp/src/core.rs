@@ -22,26 +22,40 @@ pub struct LEnv {
     pub(crate) outer: Option<RefLEnv>,
 }
 
-pub struct ContextCollection(Vec<Box<dyn Any>>);
+pub struct ContextCollection {
+    inner: Vec<Box<dyn Any>>,
+    map_label_usize: HashMap<&'static str, usize>,
+}
 
 impl Default for ContextCollection {
     fn default() -> Self {
-        Self(vec![])
+        Self {
+            inner: vec![],
+            map_label_usize: Default::default(),
+        }
     }
 }
 
 impl ContextCollection {
     pub fn insert(&mut self, ctx: Box<dyn Any>) -> usize {
-        self.0.push(ctx);
-        self.0.len() - 1
+        self.inner.push(ctx);
+        self.inner.len() - 1
     }
 
     pub fn get_context(&self, id: usize) -> &dyn Any {
-        self.0.get(id).unwrap().deref()
+        self.inner.get(id).unwrap().deref()
+    }
+    pub fn get_context_with_label(&self, label: &str) -> &dyn Any {
+        let id = match self.map_label_usize.get(label) {
+            None => panic!("no context with such label"),
+            Some(s) => *s,
+        };
+
+        self.get_context(id)
     }
 
     pub fn get_mut_context(&mut self, id: usize) -> &mut dyn Any {
-        self.0.get_mut(id).unwrap().deref_mut()
+        self.inner.get_mut(id).unwrap().deref_mut()
     }
 }
 
@@ -121,52 +135,34 @@ impl LEnv {
         symbols.insert(UNQUOTE.to_string(), LCoreOperator::UnQuote.into());
 
         //Special entry
-        symbols.insert(
-            GET.to_string(),
-            LValue::Fn(LFn::new(Box::new(get), GET.to_string())),
-        );
+        symbols.insert(GET.to_string(), LValue::Fn(LFn::new(Box::new(get), GET)));
 
-        symbols.insert(
-            MAP.to_string(),
-            LValue::Fn(LFn::new(Box::new(map), MAP.to_string())),
-        );
-        symbols.insert(
-            LIST.to_string(),
-            LValue::Fn(LFn::new(Box::new(list), LIST.to_string())),
-        );
+        symbols.insert(MAP.to_string(), LValue::Fn(LFn::new(Box::new(map), MAP)));
+        symbols.insert(LIST.to_string(), LValue::Fn(LFn::new(Box::new(list), LIST)));
         //State is an alias for map
 
         /*
          * LIST FUNCTIONS
          */
-        symbols.insert(
-            CAR.to_string(),
-            LValue::Fn(LFn::new(Box::new(car), CAR.to_string())),
-        );
+        symbols.insert(CAR.to_string(), LValue::Fn(LFn::new(Box::new(car), CAR)));
 
-        symbols.insert(
-            CDR.to_string(),
-            LValue::Fn(LFn::new(Box::new(cdr), CDR.to_string())),
-        );
+        symbols.insert(CDR.to_string(), LValue::Fn(LFn::new(Box::new(cdr), CDR)));
 
-        symbols.insert(
-            CONS.to_string(),
-            LValue::Fn(LFn::new(Box::new(cons), CONS.to_string())),
-        );
+        symbols.insert(CONS.to_string(), LValue::Fn(LFn::new(Box::new(cons), CONS)));
 
         symbols.insert(
             APPEND.to_string(),
-            LValue::Fn(LFn::new(Box::new(append), APPEND.to_string())),
+            LValue::Fn(LFn::new(Box::new(append), APPEND)),
         );
 
         symbols.insert(
             MEMBER.to_string(),
-            LValue::Fn(LFn::new(Box::new(member), MEMBER.to_string())),
+            LValue::Fn(LFn::new(Box::new(member), MEMBER)),
         );
 
         symbols.insert(
             REVERSE.to_string(),
-            LValue::Fn(LFn::new(Box::new(reverse), REVERSE.to_string())),
+            LValue::Fn(LFn::new(Box::new(reverse), REVERSE)),
         );
 
         //TODO: Add a function to import files in a predefined file
@@ -251,7 +247,8 @@ impl LEnv {
     }
 }
 
-pub fn load_module(env: &mut RefLEnv, ctxs: &mut ContextCollection, mut module: Module) -> usize {
+pub fn load_module(env: &mut RefLEnv, ctxs: &mut ContextCollection, ctx: impl AsModule) -> usize {
+    let mut module = ctx.as_module();
     let id = ctxs.insert(module.ctx);
     for (sym, lv) in &mut module.prelude {
         match lv {

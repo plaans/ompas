@@ -1,3 +1,4 @@
+use crate::doc::{Documentation, LHelp};
 use ompas_lisp::core::*;
 use ompas_lisp::structs::LError::*;
 use ompas_lisp::structs::*;
@@ -5,26 +6,28 @@ use ompas_lisp::structs::*;
 /*
 LANGUAGE LITERALS
  */
+const MOD_MATH: &str = "MOD_MATH";
+const DOC_MOD_MATH: &str = "Documentation of the module math";
 
 //Mathematical functions
-pub const ADD: &str = "+";
-pub const SUB: &str = "-";
-pub const MUL: &str = "*";
-pub const DIV: &str = "/";
+const ADD: &str = "+";
+const SUB: &str = "-";
+const MUL: &str = "*";
+const DIV: &str = "/";
 
 //Comparison
-pub const GT: &str = ">";
-pub const LT: &str = "<";
-pub const GE: &str = ">=";
-pub const LE: &str = "<=";
-pub const EQ: &str = "=";
+const GT: &str = ">";
+const LT: &str = "<";
+const GE: &str = ">=";
+const LE: &str = "<=";
+const EQ: &str = "=";
 
 //Trigonometry
-pub const SIN: &str = "sin";
-pub const COS: &str = "cos";
+const SIN: &str = "sin";
+const COS: &str = "cos";
 
 //Constants
-pub const PI: &str = "pi";
+const PI: &str = "pi";
 
 #[derive(Default, Debug)]
 pub struct CtxMath {}
@@ -37,10 +40,11 @@ impl AsModule for CtxMath {
     /// -Comparisons: "<", ">", "<=", ">=".
     /// -Trigonometry: "sin", "cos".
     /// -Constants: "pi".
-    fn get_module() -> Module {
+    fn as_module(self) -> Module {
         let mut module = Module {
-            ctx: Box::new(CtxMath::default()),
-            prelude: vec![]
+            ctx: Box::new(self),
+            prelude: vec![],
+            label: MOD_MATH,
         };
 
         module.add_fn_prelude(ADD, Box::new(add));
@@ -53,9 +57,55 @@ impl AsModule for CtxMath {
         module.add_fn_prelude(LE, Box::new(le));
         module.add_fn_prelude(COS, Box::new(cos));
         module.add_fn_prelude(SIN, Box::new(sin));
+        module.add_fn_prelude(EQ, Box::new(eq));
         module.add_prelude(PI, std::f64::consts::PI.into());
 
         module
+    }
+}
+
+/*
+HELP
+ */
+
+const DOC_ADD: &str = "Takes 2+ arguments. Return the addition.\
+Return an error if inputs are not numbers or there is wrong numbers of arguments";
+const DOC_SUB: &str = "Takes 2 arguments. Return the substraction of the first by the second.\
+return an error if inputs are not numbers or there is wrong numbers of arguments";
+const DOC_MUL: &str = "Takes 2+ arguments. Return the multiplication.\
+Return an error if inputs are not numbers or there is wrong numbers of arguments";
+const DOC_DIV: &str = "Takes 2 arguments. Return the division of the first by the second.\
+Return an error if inputs are not numbers or there is wrong numbers of arguments";
+const DOC_GT: &str = "Takes 2 arguments. Return *true* if the first is greater than the second.\
+Return *false* otherwise. Return an error if args are not numbers of there is the wrong number of arguments";
+const DOC_GE: &str = "Takes 2 arguments. Return *true* if the first is greater or equal than the second.\
+Return *false* otherwise. Return an error if args are not numbers of there is the wrong number of arguments";
+const DOC_LT: &str = "Takes 2 arguments. Return *true* if the first is less than the second.\
+Return *false* otherwise. Return an error if args are not numbers of there is the wrong number of arguments";
+const DOC_LE: &str = "Takes 2 arguments. Return *true* if the first is less or equal than the second.\
+Return *false* otherwise. Return an error if args are not numbers of there is the wrong number of arguments";
+const DOC_COS: &str = "Takes 1 argument. Return the cosinus of it.\
+Return an error if args are not numbers of there is the wrong number of arguments";
+const DOC_SIN: &str = "Takes 1 argument. Return the sinus of it.\
+Return an error if args are not numbers of there is the wrong number of arguments";
+const DOC_EQ: &str = "Takes 2 arguments. Return true if two arguments are equal. False otherwise.";
+
+impl Documentation for CtxMath {
+    fn documentation() -> Vec<LHelp> {
+        vec![
+            LHelp::new(MOD_MATH, DOC_MOD_MATH, None),
+            LHelp::new(ADD, DOC_ADD, None),
+            LHelp::new(SUB, DOC_SUB, None),
+            LHelp::new(MUL, DOC_MUL, None),
+            LHelp::new(DIV, DOC_DIV, None),
+            LHelp::new(GT, DOC_GT, None),
+            LHelp::new(GE, DOC_GE, None),
+            LHelp::new(LT, DOC_LT, None),
+            LHelp::new(LE, DOC_LE, None),
+            LHelp::new(SIN, DOC_SIN, None),
+            LHelp::new(COS, DOC_COS, None),
+            LHelp::new(EQ, DOC_EQ, None),
+        ]
     }
 }
 

@@ -6,8 +6,14 @@ use ompas_lisp::structs::*;
 /*
 LANGUAGE LITERALS
  */
-const MOD_MATH: &str = "MOD_MATH";
-const DOC_MOD_MATH: &str = "Documentation of the module math";
+const MOD_MATH: &str = "mod-math";
+const DOC_MOD_MATH: &str =
+    "Module handling mathematical functions for basic arithmetic operations and comparisons.";
+const DOC_MOD_MATH_VERBOSE: &str = "functions:\n\
+                                    -arithmetic: '+', '-', '*','/'\n\
+                                    -comparison: '>', '>=', '<', '<='\n\
+                                    -trigonometry: cos, sin\n\
+                                    -constants: pi";
 
 //Mathematical functions
 const ADD: &str = "+";
@@ -93,7 +99,7 @@ const DOC_EQ: &str = "Takes 2 arguments. Return true if two arguments are equal.
 impl Documentation for CtxMath {
     fn documentation() -> Vec<LHelp> {
         vec![
-            LHelp::new(MOD_MATH, DOC_MOD_MATH, None),
+            LHelp::new(MOD_MATH, DOC_MOD_MATH, Some(DOC_MOD_MATH_VERBOSE)),
             LHelp::new(ADD, DOC_ADD, None),
             LHelp::new(SUB, DOC_SUB, None),
             LHelp::new(MUL, DOC_MUL, None),
@@ -125,7 +131,7 @@ pub fn sin(args: &[LValue], _: &RefLEnv, _: &CtxMath) -> Result<LValue, LError> 
     }
 }
 
-///Compute the cos of a LNumber
+/// Compute the cos of a LNumber
 /// Only takes one element in args
 pub fn cos(args: &[LValue], _: &RefLEnv, _: &CtxMath) -> Result<LValue, LError> {
     if args.len() != 1 {

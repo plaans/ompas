@@ -13,7 +13,11 @@ LANGUAGE
  */
 
 const MOD_ROBOT: &str = "mod-robot";
-const DOC_MOD_ROBOT: &str = "Documentation of the robot module";
+const DOC_MOD_ROBOT: &str = "module to handle functions to access robots";
+const DOC_MOD_ROBOT_VERBOSE: &str = "functions:\n\
+                                        - new-robot\n\
+                                        - start-robot-handler\n\
+                                        - exec";
 
 const NEW_ROBOT: &str = "new-robot";
 const KILL_ROBOT: &str = "kill-robot";
@@ -86,23 +90,38 @@ impl GetModule for CtxRobot {
 DOCUMENTATION
  */
 
-const DOC_NEW_ROBOT: &str = "";
-const DOC_EXEC: &str = "";
-const DOC_START_ROBOT_HANDLER: &str = "";
+const DOC_NEW_ROBOT: &str = "Creates a new-robot. Return its id";
+const DOC_NEW_ROBOT_VERBOSE: &str = "Takes no argument.\n
+                                     Example: (define bob (new-robot))";
+const DOC_EXEC: &str = "Execute a command on a robot";
+const DOC_EXEC_VERBOSE: &str = "Takes a robot and a list of symbol as arguments.\n
+                              Example: (exec bob move bedroom kitchen)";
+const DOC_START_ROBOT_HANDLER: &str = "Start the thread to handle messages from the robots";
+const DOC_START_ROBOT_HANDLER_VERBOSE: &str = "Only to do once at the beginning of the program. Creating a new-robot will fail if not ran before.";
 
 impl Documentation for CtxRobot {
+    /// Add to the CtxDoc the description of the functions added by CtxRobot
     fn documentation() -> Vec<LHelp> {
         vec![
-            LHelp::new(MOD_ROBOT, DOC_MOD_ROBOT, None),
-            LHelp::new(NEW_ROBOT, DOC_NEW_ROBOT, None),
-            LHelp::new(EXEC, DOC_EXEC, None),
-            LHelp::new(START_ROBOT_HANDLER, DOC_START_ROBOT_HANDLER, None),
+            LHelp::new(MOD_ROBOT, DOC_MOD_ROBOT, Some(DOC_MOD_ROBOT_VERBOSE)),
+            LHelp::new(NEW_ROBOT, DOC_NEW_ROBOT, Some(DOC_NEW_ROBOT_VERBOSE)),
+            LHelp::new(EXEC, DOC_EXEC, Some(DOC_EXEC_VERBOSE)),
+            LHelp::new(
+                START_ROBOT_HANDLER,
+                DOC_START_ROBOT_HANDLER,
+                Some(DOC_START_ROBOT_HANDLER_VERBOSE),
+            ),
         ]
     }
 }
 
 const ROBOT_HANDLER_START_MSG: &str = "Robot handler started!!!\n\
                                            Listening...";
+
+/// Handles the response of the robots.
+/// Should be deprecated in further updates.
+/// Takes as argument the channel object receiver that receives all response.
+/// Loops on it and exit at the end of the process.
 fn robot_handler(rx: Receiver<String>) {
     println!("{}", ROBOT_HANDLER_START_MSG);
 
@@ -137,6 +156,10 @@ impl VirtualRobot {
 MODULE FUNCTIONS
  */
 
+/// Execute a command on a given robot.
+/// Test if the robot exists and return an error if not.
+/// Send to the robot the command as a list of symbols.
+/// Return an error if there is an error while sending command via the channel.
 pub fn exec(args: &[LValue], _: &RefLEnv, ctx: &CtxRobot) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(
@@ -162,6 +185,9 @@ pub fn exec(args: &[LValue], _: &RefLEnv, ctx: &CtxRobot) -> Result<LValue, LErr
     }
 }
 
+/// Function executed in the thread of each robot.
+/// For the moment it only waits on an order and write it in stdout.
+/// Return a formatted message of the action to robot handler as an ack.
 fn robot(arg_robot: ArgRobot) {
     println!("Hi!! I'm a new robot");
     loop {
@@ -179,6 +205,14 @@ fn robot(arg_robot: ArgRobot) {
     }
 }
 
+/// Creates a new thread that runs the functions **robot**
+///
+/// Takes as optional argument a label for the robot.
+/// Takes CtxRobot as mutable the new robot to it.
+///
+/// A new thread and a channel to communicate with it is created.
+///
+/// Returns the robot id.
 pub fn new_robot(args: &[LValue], _: &mut RefLEnv, ctx: &mut CtxRobot) -> Result<LValue, LError> {
     let (robot_label, thread_label) = match args.len() {
         0 => (
@@ -217,6 +251,10 @@ pub fn new_robot(args: &[LValue], _: &mut RefLEnv, ctx: &mut CtxRobot) -> Result
     Ok(robot_id.into())
 }
 
+/// Starts the robot handler.
+/// Takes CtxRobot as mutable to add the sender object to the context.
+///
+/// Spawn a new thread running function **robot_handler**
 pub fn start_robot_handler(
     _: &[LValue],
     _: &mut RefLEnv,
@@ -235,12 +273,20 @@ pub fn start_robot_handler(
 ROBOTS COMMAND
  */
 
+/// Primitive of the robot to move between two places.
+/// Not yet implemented
 pub fn command_move(_: &[LValue], _: &mut RefLEnv, _: &mut CtxRobot) -> Result<LValue, LError> {
     unimplemented!()
 }
+
+/// Primitive of the robot to pick an object.
+/// Not yet implemented
 pub fn command_pick(_: &[LValue], _: &mut RefLEnv, _: &mut CtxRobot) -> Result<LValue, LError> {
     unimplemented!()
 }
+
+/// Primitive of the robot to place an object.
+/// Not yet implemented.
 pub fn command_place(_: &[LValue], _: &mut RefLEnv, _: &mut CtxRobot) -> Result<LValue, LError> {
     unimplemented!()
 }

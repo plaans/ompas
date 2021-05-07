@@ -363,24 +363,31 @@ impl GetModule for CtxType {
 DOCUMENTATION
  */
 //TODO: write doc mod type
-const DOC_IS_NONE: &str = "";
-const DOC_IS_NUMBER: &str = "";
-const DOC_IS_BOOL: &str = "";
-const DOC_IS_SYMBOL: &str = "";
-const DOC_IS_FN: &str = "";
-const DOC_IS_MUT_FN: &str = "";
-const DOC_IS_STATE_FUNCTION: &str = "";
-const DOC_IS_OBJECT: &str = "";
-const DOC_IS_MAP: &str = "";
-const DOC_IS_LIST: &str = "";
-const DOC_IS_LAMBDA: &str = "";
-const DOC_IS_TYPE: &str = "";
-const DOC_IS_QUOTE: &str = "";
-const DOC_GET_TYPE: &str = "";
-const DOC_TYPE_OF: &str = "";
-const DOC_SUB_TYPE: &str = "";
-const DOC_NEW_STATE_FUNCTION: &str = "";
-const DOC_NEW_OBJECT: &str = "";
+const DOC_IS_NONE: &str = "Return true if symbol is LValue::None.";
+const DOC_IS_NUMBER: &str = "Return true if symbol is LValue::Number";
+const DOC_IS_BOOL: &str = "Return true if symbol is LValue::Bool";
+const DOC_IS_SYMBOL: &str = "Return true if symbol is LValue::Symbol";
+const DOC_IS_FN: &str = "Return true if symbol is LValue::Fn";
+const DOC_IS_MUT_FN: &str = "Return true if symbol is LValue::MutFn";
+const DOC_IS_STATE_FUNCTION: &str = "Return true if symbol is state function";
+const DOC_IS_OBJECT: &str = "Return true if symbol is object";
+const DOC_IS_MAP: &str = "Return true if symbol is map";
+const DOC_IS_LIST: &str = "Return true if symbol is list";
+const DOC_IS_LAMBDA: &str = "Return true if symbol is lambda";
+const DOC_IS_TYPE: &str = "Return true if symbol is type";
+const DOC_IS_QUOTE: &str = "Return true if symbol is quote";
+const DOC_GET_TYPE: &str = "Return type of a typed symbol";
+const DOC_TYPE_OF: &str = "Associate a type to a symbol";
+const DOC_SUB_TYPE: &str = "Create a sub-type of a type.";
+const DOC_SUB_TYPE_VERBOSE: &str = "Takes one argument that is the type it inherits.\n\
+                                    Example: (typeof robot (subtype object))";
+const DOC_NEW_STATE_FUNCTION: &str =
+    "Create a new state-function with a list of parameters types a value type.";
+const DOC_NEW_STATE_FUNCTION_VERBOSE: &str = "Takes 2+ arguments.\
+                                       \nExample: (typeof loc (new-state-function robot place))";
+const DOC_NEW_OBJECT: &str = "Create a new typed object";
+const DOC_NEW_OBJECT_VERBOSE: &str = "Takes one argument that is the type of the object \n\
+                                      Example: (typeof bob robot)";
 
 impl Documentation for CtxType {
     fn documentation() -> Vec<LHelp> {
@@ -401,9 +408,13 @@ impl Documentation for CtxType {
             LHelp::new(IS_QUOTE, DOC_IS_QUOTE, None),
             LHelp::new(GET_TYPE, DOC_GET_TYPE, None),
             LHelp::new(TYPE_OF, DOC_TYPE_OF, None),
-            LHelp::new(SUB_TYPE, DOC_SUB_TYPE, None),
-            LHelp::new(NEW_STATE_FUNCTION, DOC_NEW_STATE_FUNCTION, None),
-            LHelp::new(NEW_OBJECT, DOC_NEW_OBJECT, None),
+            LHelp::new(SUB_TYPE, DOC_SUB_TYPE, Some(DOC_SUB_TYPE_VERBOSE)),
+            LHelp::new(
+                NEW_STATE_FUNCTION,
+                DOC_NEW_STATE_FUNCTION,
+                Some(DOC_NEW_STATE_FUNCTION_VERBOSE),
+            ),
+            LHelp::new(NEW_OBJECT, DOC_NEW_OBJECT, Some(DOC_NEW_OBJECT_VERBOSE)),
         ]
     }
 }

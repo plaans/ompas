@@ -15,11 +15,16 @@ LANGUAGE
  */
 
 const MOD_HELP: &str = "mod-help";
-const DOC_MOD_HELP: &str = "documentation of the module help";
+const DOC_MOD_HELP: &str = "Documentation of the module help.";
+const DOC_MOD_HELP_VERBOSE: &str = "functions:\n\
+                                    -help";
 
 const HELP: &str = "help";
-const DESCRIPTION_HELP: &str =
+const DOC_HELP: &str =
     "Give a list of all the available functions added by the modules and available in the core.";
+const DOC_HELP_VERBOSE: &str = "takes 0..1 arguments:\
+                                -no argument: give the list of all the functions\n\
+                                -1 argument: give the documentation of the function.";
 
 pub struct CtxDoc {
     map_help: HashMap<Sym, LHelp>,
@@ -50,8 +55,8 @@ pub trait Documentation {
 impl Documentation for CtxDoc {
     fn documentation() -> Vec<LHelp> {
         vec![
-            LHelp::new(MOD_HELP, DOC_MOD_HELP, None),
-            LHelp::new(HELP, DESCRIPTION_HELP, None),
+            LHelp::new(MOD_HELP, DOC_MOD_HELP, Some(DOC_MOD_HELP_VERBOSE)),
+            LHelp::new(HELP, DOC_HELP, Some(DOC_HELP_VERBOSE)),
         ]
     }
 }
@@ -106,19 +111,13 @@ impl LHelp {
 
 impl Debug for LHelp {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(
-            f,
-            "{:<20} : {}\n {}",
-            self.label,
-            self.short,
-            self.verbose.unwrap_or("")
-        )
+        write!(f, "{}\n{}", self.short, self.verbose.unwrap_or(""))
     }
 }
 
 impl Display for LHelp {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{:<20} : {}", self.label, self.short)
+        write!(f, "{:<20}: {}", self.label, self.short)
     }
 }
 

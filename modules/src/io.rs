@@ -10,7 +10,11 @@ LANGUAGE
  */
 
 const MOD_IO: &str = "mod-io";
-const DOC_MOD_IO: &str = "Documentation of the IO module";
+const DOC_MOD_IO: &str = "Module than handles input/output functions.";
+const DOC_MOD_IO_VERBOSE: &str = "functions:\n\
+                                    -print\n\
+                                    -read\n\
+                                    -write";
 
 const PRINT: &str = "print";
 const READ: &str = "read";
@@ -118,26 +122,43 @@ impl GetModule for CtxIo {
 DOCUMENTATION
  */
 
-const DOC_PRINT: &str = "";
-const DOC_READ: &str = "";
-const DOC_WRITE: &str = "";
+const DOC_PRINT: &str = "Print in stdout a LValue.";
+const DOC_PRINT_VERBOSE: &str = "Takes a list of arguments and print them in stdout.";
+const DOC_READ: &str = "Read a file an evaluate it";
+const DOC_READ_VERBOSE: &str = "Takes the name of the file as argument.\n\
+                                Note: The file path is relative to the path of the executable.\n\
+                                Return an error if the file is not found or there is a problem while parsing and evaluation.";
+const DOC_WRITE: &str = "Write a LValue to a file";
+const DOC_WRITE_VERBOSE: &str = "Takes two arguments: the name of the file and the LValue\n\
+                                 Note: The path of the file is relative to the path of the executable";
 
 impl Documentation for CtxIo {
     fn documentation() -> Vec<LHelp> {
         vec![
-            LHelp::new(MOD_IO, DOC_MOD_IO, None),
-            LHelp::new(PRINT, DOC_PRINT, None),
-            LHelp::new(READ, DOC_READ, None),
-            LHelp::new(WRITE, DOC_WRITE, None),
+            LHelp::new(MOD_IO, DOC_MOD_IO, Some(DOC_MOD_IO_VERBOSE)),
+            LHelp::new(PRINT, DOC_PRINT, Some(DOC_PRINT_VERBOSE)),
+            LHelp::new(READ, DOC_READ, Some(DOC_READ_VERBOSE)),
+            LHelp::new(WRITE, DOC_WRITE, Some(DOC_WRITE_VERBOSE)),
         ]
     }
 }
 
+/// Contains the function to handle the REPL of the project.
+/// The repl is based on the project rustyline.
+///
+/// It contains only one function (for the moment): run that takes two arguments.
 pub mod repl {
     use rustyline::error::ReadlineError;
     use rustyline::Editor;
     use std::sync::mpsc::{Receiver, Sender};
 
+    /// Function to handle the repl.
+    /// ### functioning:
+    /// loop waiting for an object on *stdin*
+    /// ### args
+    /// - sender: channel object to send string to lisp interpreter.
+    /// - receiver: channel object to receive ack from lisp interpreter after evaluation.
+    /// Used for synchronization.
     pub fn run(sender: Sender<String>, receiver: Receiver<String>) {
         let mut rl = Editor::<()>::new();
         if rl.load_history("history.txt").is_err() {

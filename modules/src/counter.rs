@@ -154,19 +154,23 @@ impl GetModule for CtxCounter {
 DOCUMENTATION
  */
 
-const DOC_GET_COUNTER: &str = "";
-const DOC_SET_COUNTER: &str = "";
-const DOC_NEW_COUNTER: &str = "";
-const DOC_INCREMENT_COUNTER: &str = "";
-const DOC_DECREMENT_COUNTER: &str = "";
+const DOC_GET_COUNTER: &str = "Get value of a counter.";
+const DOC_SET_COUNTER: &str = "Set value of a counter.";
+const DOC_SET_COUNTER_VERBOSE: &str = "Takes 2 arguments: the counter and the new value. Value must be a Natural.\n\
+                                        Example: (set-counter cnt 10) #sets the value of the counter cnt to one.";
+const DOC_NEW_COUNTER: &str = "Create a new counter.";
+const DOC_NEW_COUNTER_VERBOSE: &str = "Takes no arguments. Return the id of the counter.\n\
+                                        Example: (define cnt (new-counter))";
+const DOC_INCREMENT_COUNTER: &str = "Increment counter's value by one.";
+const DOC_DECREMENT_COUNTER: &str = "Decrement counter's value by one until it reaches 0.";
 
 impl Documentation for CtxCounter {
     fn documentation() -> Vec<LHelp> {
         vec![
             LHelp::new(MOD_COUNTER, DOC_MOD_COUNTER, None),
             LHelp::new(GET_COUNTER, DOC_GET_COUNTER, None),
-            LHelp::new(SET_COUNTER, DOC_SET_COUNTER, None),
-            LHelp::new(NEW_COUNTER, DOC_NEW_COUNTER, None),
+            LHelp::new(SET_COUNTER, DOC_SET_COUNTER, Some(DOC_SET_COUNTER_VERBOSE)),
+            LHelp::new(NEW_COUNTER, DOC_NEW_COUNTER, Some(DOC_NEW_COUNTER_VERBOSE)),
             LHelp::new(INCREMENT_COUNTER, DOC_INCREMENT_COUNTER, None),
             LHelp::new(DECREMENT_COUNTER, DOC_DECREMENT_COUNTER, None),
         ]

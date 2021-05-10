@@ -349,7 +349,12 @@ impl LLambda {
 
         match &self.params {
             LambdaArgs::Sym(param) => {
-                env.symbols.insert(param.to_string(), args.into());
+                let args = if args.len() == 1 {
+                    args[0].clone()
+                } else {
+                    args.into()
+                };
+                env.symbols.insert(param.to_string(), args);
             }
             LambdaArgs::List(params) => {
                 if params.len() != args.len() {

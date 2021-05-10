@@ -60,10 +60,10 @@ pub const MACRO_NEQ: &str = "(defmacro neq (lambda (a b)\
 pub const MACRO_NEQ_SHORT: &str = "(defmacro != (lambda (a b) \
                                                 (neq a b )))";
 
-pub const LAMBDA_AND: &str = "(define and (lambda l
-                                                (if (?none l)\
+pub const LAMBDA_AND: &str = " (define and (lambda x \
+                                               (if (none? x)\
                                                     true\
-                                                    (if (car l)\
-                                                        (and (cdr l))\
+                                                    (if (car x)\
+                                                        (and (cdr x))\
                                                         false))))";
 //Documentation

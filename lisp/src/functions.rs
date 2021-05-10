@@ -104,7 +104,7 @@ pub fn get(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
         lv => {
             if args.len() > 1 {
                 Err(WrongNumberOfArgument(args.into(), args.len(), 1..1))
-            }else {
+            } else {
                 Ok(lv.clone())
             }
         }
@@ -304,13 +304,11 @@ pub fn length(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     match &args[0] {
         LValue::List(l) => Ok(l.len().into()),
         LValue::Map(m) => Ok(m.len().into()),
-        lv => {
-            Err(NotInListOfExpectedTypes(
-                lv.clone(),
-                lv.into(),
-                vec![NameTypeLValue::List, NameTypeLValue::Map],
-            ))
-        }
+        lv => Err(NotInListOfExpectedTypes(
+            lv.clone(),
+            lv.into(),
+            vec![NameTypeLValue::List, NameTypeLValue::Map],
+        )),
     }
 }
 
@@ -323,17 +321,15 @@ pub fn empty(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
         LValue::List(l) => Ok(l.is_empty().into()),
         LValue::Map(m) => Ok(m.is_empty().into()),
         LValue::None => Ok(true.into()),
-        lv => {
-            Err(NotInListOfExpectedTypes(
-                lv.clone(),
-                lv.into(),
-                vec![
-                    NameTypeLValue::List,
-                    NameTypeLValue::Map,
-                    NameTypeLValue::None,
-                ],
-            ))
-        }
+        lv => Err(NotInListOfExpectedTypes(
+            lv.clone(),
+            lv.into(),
+            vec![
+                NameTypeLValue::List,
+                NameTypeLValue::Map,
+                NameTypeLValue::None,
+            ],
+        )),
     }
 }
 

@@ -47,10 +47,16 @@ impl CtxIo {
 }
 
 pub fn print(args: &[LValue], _: &RefLEnv, ctx: &CtxIo) -> Result<LValue, LError> {
-    let lv: LValue = args.into();
+    let lv: LValue = match args.len() {
+        0 => LValue::None,
+        1 => args[0].clone(),
+        _ => args.into(),
+    };
     match &ctx.sender_stdout {
         None => return Err(SpecialError("no channel for stdout".to_string())),
-        Some(sender) => sender.send(format!("{}", lv)).expect("error on channel to stdout"),
+        Some(sender) => sender
+            .send(format!("{}", lv))
+            .expect("error on channel to stdout"),
     };
 
     Ok(LValue::None)
@@ -208,9 +214,14 @@ pub mod repl {
         rl.save_history("history.txt").unwrap();
     }
 
+    pub const EXIT_CODE_STDOUT: &str = "EXIT";
+
     pub fn output(receiver: Receiver<String>) {
         loop {
             let str = receiver.recv().expect("error receiving stdout");
+            if str == EXIT_CODE_STDOUT {
+                break;
+            }
             println!("{}", str);
         }
     }

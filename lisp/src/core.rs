@@ -593,7 +593,7 @@ pub fn eval(
             match proc {
                 LValue::CoreOperator(co) => match co {
                     LCoreOperator::Define => {
-                        match args.get(0).unwrap() {
+                        match &args[0] {
                             LValue::Symbol(s) => {
                                 let exp = eval(&args[1], env, ctxs)?;
                                 env.add_entry(s.to_string(), exp);
@@ -666,7 +666,11 @@ pub fn eval(
                     | LCoreOperator::DefMacro => Ok(LValue::None),
                 },
                 LValue::Lambda(l) => {
-                    l.call(args, env, ctxs)
+                    let args: Vec<LValue> = args
+                        .iter()
+                        .map(|x| eval(x, env, ctxs))
+                        .collect::<Result<_, _>>()?;
+                    l.call(args.as_slice(), env, ctxs)
                     /*let mut new_env = l.get_new_env(args, env)?;
                     eval(&l.get_body(), &mut new_env)*/
                 }
@@ -691,6 +695,20 @@ pub fn eval(
                         Some(u) => fun.call(&args, env, ctxs.get_mut_context(u)),
                     }
                 }
+                LValue::Symbol(s) => match env.get_symbol(s.as_str()) {
+                    None => Err(SpecialError(format!(
+                        "function {} corresponds to nothing in environment.",
+                        s
+                    ))),
+                    Some(lv) => match lv {
+                        LValue::Fn(_) | LValue::MutFn(_) | LValue::Lambda(_) => {
+                            let mut new_args = args.to_vec();
+                            new_args.insert(0, lv);
+                            eval(&new_args.into(), env, ctxs)
+                        }
+                        _ => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Fn)),
+                    },
+                },
                 lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Fn)),
             }
         }

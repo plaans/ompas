@@ -3,6 +3,7 @@ use ompas_lisp::structs::LValue;
 use ompas_modules::_type::CtxType;
 use ompas_modules::counter::CtxCounter;
 use ompas_modules::doc::{CtxDoc, Documentation};
+use ompas_modules::io::repl::EXIT_CODE_STDOUT;
 use ompas_modules::io::{repl, CtxIo};
 use ompas_modules::math::CtxMath;
 use ompas_modules::robot::CtxRobot;
@@ -75,9 +76,9 @@ pub fn lisp_interpreter() {
     //Channel from X to Lisp Interpretor
 
     //Add core macros
-    /*sender_li
-    .send(core_macros())
-    .expect("error while sending message");*/
+    sender_li
+        .send(core_macros())
+        .expect("error while sending message");
 
     //Launch the repl thread
     let repl_input_join_handle = thread::Builder::new()
@@ -114,7 +115,9 @@ pub fn lisp_interpreter() {
             Ok(lv) => lv,
             Err(e) => {
                 //stderr.write_all(format!("ELI>>{}\n", e).as_bytes());
-                sender_stdout.send(format!("ELI>>{}", e)).expect("error on channel to stdout");
+                sender_stdout
+                    .send(format!("ELI>>{}", e))
+                    .expect("error on channel to stdout");
                 LValue::None
             }
         };
@@ -124,12 +127,16 @@ pub fn lisp_interpreter() {
                 LValue::None => {}
                 lv => {
                     //stdout.write_all(format!("LI>> {}\n", lv).as_bytes()).expect("error stdout");
-                    sender_stdout.send(format!("LI>> {}", lv)).expect("error on channel to stdout");
+                    sender_stdout
+                        .send(format!("LI>> {}", lv))
+                        .expect("error on channel to stdout");
                 }
             },
             Err(e) => {
                 //stderr.write_all(format!("ELI>>{}\n", e).as_bytes());
-                sender_stdout.send(format!("ELI>>{}", e)).expect("error on channel to stdout");
+                sender_stdout
+                    .send(format!("ELI>>{}", e))
+                    .expect("error on channel to stdout");
             }
         };
         if send_ack {
@@ -140,6 +147,14 @@ pub fn lisp_interpreter() {
         //stdout.write_all(b"eval done\n");
     }
 
-    repl_input_join_handle.join().expect("error exiting repl");
-    repl_output_join_handle.join().expect("error exiting repl");
+    sender_stdout
+        .send(EXIT_CODE_STDOUT.to_string())
+        .expect("error sending message to stdout");
+
+    repl_input_join_handle
+        .join()
+        .expect("error exiting repl input");
+    repl_output_join_handle
+        .join()
+        .expect("error exiting repl output");
 }

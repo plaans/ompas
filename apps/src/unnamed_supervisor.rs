@@ -41,6 +41,8 @@ pub fn lisp_interpreter() {
     //Channel from Lisp Interpretor to repl
     let (sender_repl, receiver_repl): (Sender<String>, Receiver<String>) = channel();
 
+    let (sender_stdout, receiver_stdout): (Sender<String>, Receiver<String>) = channel();
+
     let root_env = &mut RefLEnv::root();
     let ctxs: &mut ContextCollection = &mut Default::default();
     let mut ctx_doc = CtxDoc::default();
@@ -56,7 +58,8 @@ pub fn lisp_interpreter() {
     ctx_doc.insert_doc(CtxType::documentation());
 
     //Add the sender of the channel.
-    ctx_io.add_sender(sender_li.clone());
+    ctx_io.add_sender_li(sender_li.clone());
+    ctx_io.add_sender_stdout(sender_stdout.clone());
 
     load_module(root_env, ctxs, ctx_doc);
     load_module(root_env, ctxs, ctx_io);
@@ -71,13 +74,25 @@ pub fn lisp_interpreter() {
 
     //Channel from X to Lisp Interpretor
 
+    //Add core macros
+    /*sender_li
+    .send(core_macros())
+    .expect("error while sending message");*/
+
     //Launch the repl thread
-    let repl_join_handle = thread::Builder::new()
-        .name("repl".to_string())
+    let repl_input_join_handle = thread::Builder::new()
+        .name("repl_input".to_string())
         .spawn(move || {
-            repl::run(sender_li, receiver_repl);
+            repl::input(sender_li.clone(), receiver_repl);
         })
-        .expect("error spawning repl");
+        .expect("error spawning repl input");
+
+    let repl_output_join_handle = thread::Builder::new()
+        .name("repl_output".to_string())
+        .spawn(move || {
+            repl::output(receiver_stdout);
+        })
+        .expect("error spawning repl output");
 
     loop {
         let mut send_ack = false;
@@ -99,7 +114,7 @@ pub fn lisp_interpreter() {
             Ok(lv) => lv,
             Err(e) => {
                 //stderr.write_all(format!("ELI>>{}\n", e).as_bytes());
-                eprintln!("ELI>>{}", e);
+                sender_stdout.send(format!("ELI>>{}", e)).expect("error on channel to stdout");
                 LValue::None
             }
         };
@@ -109,12 +124,12 @@ pub fn lisp_interpreter() {
                 LValue::None => {}
                 lv => {
                     //stdout.write_all(format!("LI>> {}\n", lv).as_bytes()).expect("error stdout");
-                    println!("LI>> {}", lv);
+                    sender_stdout.send(format!("LI>> {}", lv)).expect("error on channel to stdout");
                 }
             },
             Err(e) => {
                 //stderr.write_all(format!("ELI>>{}\n", e).as_bytes());
-                eprintln!("ELI>>{}", e);
+                sender_stdout.send(format!("ELI>>{}", e)).expect("error on channel to stdout");
             }
         };
         if send_ack {
@@ -125,5 +140,6 @@ pub fn lisp_interpreter() {
         //stdout.write_all(b"eval done\n");
     }
 
-    repl_join_handle.join().expect("error exiting repl");
+    repl_input_join_handle.join().expect("error exiting repl");
+    repl_output_join_handle.join().expect("error exiting repl");
 }

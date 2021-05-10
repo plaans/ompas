@@ -260,6 +260,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "ompas_godot_simulation_client"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aries_collections",
+ "aries_model",
+ "aries_planning",
+ "aries_utils",
+ "im",
+ "rustyline",
+ "structopt",
+]
+
+[[package]]
 name = "ompas_lisp"
 version = "0.1.0"
 dependencies = [
@@ -284,20 +298,6 @@ dependencies = [
  "aries_utils",
  "im",
  "ompas_lisp",
- "rustyline",
- "structopt",
-]
-
-[[package]]
-name = "ompas_robot_sim"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aries_collections",
- "aries_model",
- "aries_planning",
- "aries_utils",
- "im",
  "rustyline",
  "structopt",
 ]

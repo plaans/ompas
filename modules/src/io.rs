@@ -24,27 +24,34 @@ const WRITE: &str = "write";
 /// Handles the channel to communicate with the Lisp Interpreter
 #[derive(Debug)]
 pub struct CtxIo {
-    sender: Option<Sender<String>>,
+    sender_li: Option<Sender<String>>,
+    sender_stdout: Option<Sender<String>>,
 }
 
 impl Default for CtxIo {
     fn default() -> Self {
-        Self { sender: None }
+        Self {
+            sender_li: None,
+            sender_stdout: None,
+        }
     }
 }
 
 impl CtxIo {
-    pub fn add_sender(&mut self, sender: Sender<String>) {
-        self.sender = Some(sender);
+    pub fn add_sender_li(&mut self, sender: Sender<String>) {
+        self.sender_li = Some(sender);
+    }
+    pub fn add_sender_stdout(&mut self, sender: Sender<String>) {
+        self.sender_stdout = Some(sender);
     }
 }
 
-pub fn print(args: &[LValue], _: &RefLEnv, _: &CtxIo) -> Result<LValue, LError> {
+pub fn print(args: &[LValue], _: &RefLEnv, ctx: &CtxIo) -> Result<LValue, LError> {
     let lv: LValue = args.into();
-    println!("{}", lv);
-    //let mut stdout = io::stdout();
-    //stdout.write_all(b"module Io: print\n");
-    //stdout.write_all(format!("{}\n", lv).as_bytes());
+    match &ctx.sender_stdout {
+        None => return Err(SpecialError("no channel for stdout".to_string())),
+        Some(sender) => sender.send(format!("{}", lv)).expect("error on channel to stdout"),
+    };
 
     Ok(LValue::None)
 }
@@ -65,7 +72,7 @@ pub fn read(args: &[LValue], _: &RefLEnv, ctx: &CtxIo) -> Result<LValue, LError>
     file.read_to_string(&mut contents)?;
 
     //stdout.write_all(format!("contents: {}\n", contents).as_bytes());
-    ctx.sender
+    ctx.sender_li
         .as_ref()
         .expect("missing a channel")
         .send(contents)
@@ -159,7 +166,7 @@ pub mod repl {
     /// - sender: channel object to send string to lisp interpreter.
     /// - receiver: channel object to receive ack from lisp interpreter after evaluation.
     /// Used for synchronization.
-    pub fn run(sender: Sender<String>, receiver: Receiver<String>) {
+    pub fn input(sender: Sender<String>, receiver: Receiver<String>) {
         let mut rl = Editor::<()>::new();
         if rl.load_history("history.txt").is_err() {
             println!("No previous history.");
@@ -199,6 +206,13 @@ pub mod repl {
             .send("exit".to_string())
             .expect("couldn't send exit msg");
         rl.save_history("history.txt").unwrap();
+    }
+
+    pub fn output(receiver: Receiver<String>) {
+        loop {
+            let str = receiver.recv().expect("error receiving stdout");
+            println!("{}", str);
+        }
     }
 }
 

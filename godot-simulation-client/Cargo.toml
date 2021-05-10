@@ -1,5 +1,5 @@
 [package]
-name = "ompas_robot_sim"
+name = "ompas_godot_simulation_client"
 version = "0.1.0"
 authors = ["Yirmandias <turi@insa-toulouse.fr>"]
 edition = "2018"

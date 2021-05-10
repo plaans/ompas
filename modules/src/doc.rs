@@ -15,7 +15,8 @@ LANGUAGE
  */
 
 const MOD_HELP: &str = "mod-help";
-const DOC_MOD_HELP: &str = "Documentation of the module help.";
+const DOC_MOD_HELP: &str =
+    "Documentation of the module help. Add Documentation for core functions aswell";
 const DOC_MOD_HELP_VERBOSE: &str = "functions:\n\
                                     -help";
 
@@ -26,6 +27,8 @@ const DOC_HELP_VERBOSE: &str = "takes 0..1 arguments:\
                                 -no argument: give the list of all the functions\n\
                                 -1 argument: give the documentation of the function.";
 
+/// Context of the module doc.
+/// Store the help objects.
 pub struct CtxDoc {
     map_help: HashMap<Sym, LHelp>,
 }
@@ -52,7 +55,13 @@ pub trait Documentation {
     fn documentation() -> Vec<LHelp>;
 }
 
+/// Trait to implement Lisp Documentation.
+/// Add symbols to help
 impl Documentation for CtxDoc {
+    /// Documentation for context CtxDoc
+    /// Two elements:
+    /// - mod-help
+    /// - help
     fn documentation() -> Vec<LHelp> {
         vec![
             LHelp::new(MOD_HELP, DOC_MOD_HELP, Some(DOC_MOD_HELP_VERBOSE)),

@@ -123,6 +123,8 @@ impl LEnv {
         // map.ins
         let mut symbols: HashMap<String, LValue> = HashMap::default();
 
+        symbols.insert(NONE.to_string(), LValue::None);
+
         //Core Operators
         symbols.insert(DEFINE.to_string(), LCoreOperator::Define.into());
         symbols.insert(IF.to_string(), LCoreOperator::If.into());
@@ -136,7 +138,6 @@ impl LEnv {
 
         //Special entry
         symbols.insert(GET.to_string(), LValue::Fn(LFn::new(Box::new(get), GET)));
-
         symbols.insert(MAP.to_string(), LValue::Fn(LFn::new(Box::new(map), MAP)));
         symbols.insert(LIST.to_string(), LValue::Fn(LFn::new(Box::new(list), LIST)));
         //State is an alias for map
@@ -145,10 +146,30 @@ impl LEnv {
          * LIST FUNCTIONS
          */
         symbols.insert(CAR.to_string(), LValue::Fn(LFn::new(Box::new(car), CAR)));
-
         symbols.insert(CDR.to_string(), LValue::Fn(LFn::new(Box::new(cdr), CDR)));
-
+        symbols.insert(LAST.to_string(), LValue::Fn(LFn::new(Box::new(last), LAST)));
         symbols.insert(CONS.to_string(), LValue::Fn(LFn::new(Box::new(cons), CONS)));
+        symbols.insert(LEN.to_string(), LValue::Fn(LFn::new(Box::new(length), LEN)));
+        symbols.insert(
+            EMPTY.to_string(),
+            LValue::Fn(LFn::new(Box::new(empty), EMPTY)),
+        );
+
+        //Map functions
+        symbols.insert(
+            GET_MAP.to_string(),
+            LValue::Fn(LFn::new(Box::new(get_map), GET_MAP)),
+        );
+        symbols.insert(
+            SET_MAP.to_string(),
+            LValue::Fn(LFn::new(Box::new(set_map), SET_MAP)),
+        );
+
+        symbols.insert(NOT.to_string(), LValue::Fn(LFn::new(Box::new(not), NOT)));
+        symbols.insert(
+            NOT_SHORT.to_string(),
+            LValue::Fn(LFn::new(Box::new(not), NOT_SHORT)),
+        );
 
         symbols.insert(
             APPEND.to_string(),
@@ -321,7 +342,7 @@ pub fn expand(
 ) -> Result<LValue, LError> {
     match x {
         LValue::List(list) => {
-            match list.first().unwrap() {
+            match &list[0] {
                 LValue::CoreOperator(co) => match co {
                     LCoreOperator::Define | LCoreOperator::DefMacro => {
                         //eprintln!("expand: define: Ok!");
@@ -332,13 +353,13 @@ pub fn expand(
                                 3..std::usize::MAX,
                             ));
                         }
-                        let def = list.get(0).unwrap().as_core_operator()?;
-                        let v = list.get(1).unwrap();
-                        let body = &list[1..];
+                        let def = list[0].as_core_operator()?;
+                        let v = &list[1];
+                        let body = &list[2..];
                         match v {
                             LValue::List(v_list) => {
                                 if v_list.len() >= 2 {
-                                    let f = v_list.get(0).unwrap();
+                                    let f = &v_list[0];
                                     let args = &v_list[1..];
                                     let mut new_body = vec![LCoreOperator::DefLambda.into()];
                                     new_body.append(&mut args.to_vec());
@@ -355,7 +376,7 @@ pub fn expand(
                                 if list.len() != 3 {
                                     return Err(WrongNumberOfArgument(x.clone(), list.len(), 3..3));
                                 }
-                                let exp = expand(list.get(2).unwrap(), top_level, env, ctxs)?;
+                                let exp = expand(&list[2], top_level, env, ctxs)?;
                                 if def == LCoreOperator::DefMacro {
                                     if !top_level {
                                         return Err(SpecialError(format!(
@@ -397,7 +418,7 @@ pub fn expand(
                                 3..std::usize::MAX,
                             ));
                         }
-                        let vars = list.get(1).unwrap();
+                        let vars = &list[1];
                         let body = &list[2..];
                         //Verification of the types of the arguments
                         match vars {
@@ -511,7 +532,6 @@ pub fn expand(
             }
             Ok(expanded_list.into())
         }
-        LValue::None => Err(SpecialError("Not expecting a none value".to_string())),
         lv => Ok(lv.clone()),
     }
 }
@@ -589,7 +609,7 @@ pub fn eval(
                         Ok(LValue::None)
                     }
                     LCoreOperator::DefLambda => {
-                        let params = match args.get(0).unwrap() {
+                        let params = match &args[0] {
                             LValue::List(list) => {
                                 let mut vec_sym = Vec::new();
                                 for val in list {
@@ -604,13 +624,18 @@ pub fn eval(
                                         }
                                     }
                                 }
-                                vec_sym
+                                vec_sym.into()
                             }
+                            LValue::Symbol(s) => s.clone().into(),
                             lv => {
-                                return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::List))
+                                return Err(NotInListOfExpectedTypes(
+                                    lv.clone(),
+                                    lv.into(),
+                                    vec![NameTypeLValue::List, NameTypeLValue::Symbol],
+                                ))
                             }
                         };
-                        let body = args.get(1).unwrap();
+                        let body = &args[1];
                         Ok(LValue::Lambda(LLambda::new(params, body.clone())))
                     }
                     LCoreOperator::If => {
@@ -630,13 +655,11 @@ pub fn eval(
                         Ok(LValue::None)
                     }
                     LCoreOperator::Begin => {
-                        for (k, exp) in args[1..].iter().enumerate() {
-                            let result = eval(exp, env, ctxs)?;
-                            if k == args.len() {
-                                return Ok(result);
-                            }
-                        }
-                        Ok(LValue::None)
+                        let results: Vec<LValue> = args
+                            .iter()
+                            .map(|x| eval(x, env, ctxs))
+                            .collect::<Result<_, _>>()?;
+                        Ok(results.last().unwrap_or(&LValue::None).clone())
                     }
                     LCoreOperator::QuasiQuote
                     | LCoreOperator::UnQuote
@@ -677,6 +700,17 @@ pub fn eval(
         },
         lv => Ok(lv.clone()),
     }
+}
+
+pub fn core_macros() -> String {
+    let mut string = "(begin".to_string();
+    string.push_str(LAMBDA_AND);
+    string.push_str(MACRO_AND2);
+    string.push_str(MACRO_OR2);
+    string.push_str(MACRO_NEQ);
+    string.push_str(MACRO_NEQ_SHORT);
+    string.push(')');
+    string
 }
 
 //(begin (define ?v (var (:type object

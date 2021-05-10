@@ -427,7 +427,7 @@ FUNCTIONS
 pub fn is_none(args: &[LValue], _: &RefLEnv, _: &CtxType) -> Result<LValue, LError> {
     match args.len() {
         1 => Ok(LValue::Bool(
-            NameTypeLValue::from(args.get(0).unwrap()) == NameTypeLValue::None,
+            NameTypeLValue::from(&args[0]) == NameTypeLValue::None,
         )),
         i => Err(WrongNumberOfArgument(args.into(), i, 1..1)),
     }

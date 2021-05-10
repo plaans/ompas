@@ -4,6 +4,7 @@ use std::cmp::Ordering;
 use crate::core::{eval, ContextCollection, RefLEnv};
 use crate::language::*;
 use crate::structs::LError::{SpecialError, WrongNumberOfArgument};
+use im::HashMap;
 use std::any::Any;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
@@ -301,8 +302,25 @@ impl Div for LNumber {
 impl Eq for LNumber {}
 
 #[derive(Clone, Debug)]
+pub enum LambdaArgs {
+    Sym(Sym),
+    List(Vec<Sym>),
+}
+
+impl From<Sym> for LambdaArgs {
+    fn from(s: Sym) -> Self {
+        LambdaArgs::Sym(s)
+    }
+}
+
+impl From<Vec<Sym>> for LambdaArgs {
+    fn from(vec_sym: Vec<Sym>) -> Self {
+        LambdaArgs::List(vec_sym)
+    }
+}
+#[derive(Clone, Debug)]
 pub struct LLambda {
-    params: Vec<Sym>,
+    params: LambdaArgs,
     body: Box<LValue>,
 }
 
@@ -319,7 +337,7 @@ impl PartialEq for LLambda {
 }
 
 impl LLambda {
-    pub fn new(params: Vec<Sym>, body: LValue) -> Self {
+    pub fn new(params: LambdaArgs, body: LValue) -> Self {
         LLambda {
             params,
             body: Box::new(body),
@@ -327,17 +345,26 @@ impl LLambda {
     }
 
     pub fn get_new_env(&self, args: &[LValue], outer: &RefLEnv) -> Result<RefLEnv, LError> {
-        if self.params.len() != args.len() {
-            return Err(WrongNumberOfArgument(
-                LValue::List(args.to_vec()),
-                args.len(),
-                self.params.len()..self.params.len(),
-            ));
-        }
         let mut env = RefLEnv::empty();
-        for (param, arg) in self.params.iter().zip(args) {
-            env.symbols.insert(param.to_string(), arg.clone());
-        }
+
+        match &self.params {
+            LambdaArgs::Sym(param) => {
+                env.symbols.insert(param.to_string(), args.into());
+            }
+            LambdaArgs::List(params) => {
+                if params.len() != args.len() {
+                    return Err(WrongNumberOfArgument(
+                        args.into(),
+                        args.len(),
+                        params.len()..params.len(),
+                    ));
+                }
+                for (param, arg) in params.iter().zip(args) {
+                    env.symbols.insert(param.to_string(), arg.clone());
+                }
+            }
+        };
+
         env.outer = Some(outer.clone());
         Ok(env)
     }
@@ -528,6 +555,12 @@ impl Display for LCoreOperator {
             LCoreOperator::Set => write!(f, "{}", SET.to_string()),
             LCoreOperator::Begin => write!(f, "{}", BEGIN.to_string()),
         }
+    }
+}
+
+impl From<im::HashMap<LValue, LValue>> for LValue {
+    fn from(map: HashMap<LValue, LValue>) -> Self {
+        LValue::Map(map)
     }
 }
 
@@ -911,7 +944,11 @@ impl From<Sym> for LValue {
 
 impl From<&[LValue]> for LValue {
     fn from(lv: &[LValue]) -> Self {
-        LValue::List(lv.to_vec())
+        if lv.is_empty() {
+            LValue::None
+        } else {
+            LValue::List(lv.to_vec())
+        }
     }
 }
 

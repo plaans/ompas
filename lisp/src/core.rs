@@ -720,13 +720,14 @@ pub fn eval(
     }
 }
 
-pub fn core_macros() -> String {
+pub fn core_macros_and_lambda() -> String {
     let mut string = "(begin".to_string();
-    string.push_str(LAMBDA_AND);
     string.push_str(MACRO_AND2);
     string.push_str(MACRO_OR2);
     string.push_str(MACRO_NEQ);
     string.push_str(MACRO_NEQ_SHORT);
+    string.push_str(LAMBDA_AND);
+    string.push_str(LAMBDA_OR);
     string.push(')');
     string
 }

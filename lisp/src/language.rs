@@ -38,11 +38,12 @@ pub const NOT: &str = "not";
 pub const NOT_SHORT: &str = "!";
 
 //MACRO
-pub const MACRO_AND: &str = "(define and (lambda l (quasiquote
-                                                (if (< (len (unquote l)) 1 )\
+///Problem during expansion
+pub const MACRO_AND: &str = "(defmacro and (lambda x \
+                                               (quasiquote (if (none? (unquote x))\
                                                     true\
-                                                    (if (car (unquote l))\
-                                                        (and (cdr (unquote l)))\
+                                                    (if (car (unquote x))\
+                                                        (and (cdr (unquote x)))\
                                                         false)))))";
 
 pub const MACRO_AND2: &str = "(defmacro and2 (lambda (a b) \
@@ -66,4 +67,10 @@ pub const LAMBDA_AND: &str = " (define and (lambda x \
                                                     (if (car x)\
                                                         (and (cdr x))\
                                                         false))))";
+pub const LAMBDA_OR: &str = " (define or (lambda x \
+                                               (if (none? x)\
+                                                    true\
+                                                    (if (car x)\
+                                                        true\
+                                                        (and (cdr x))))))";
 //Documentation

@@ -161,9 +161,38 @@ impl Documentation for CtxIo {
 ///
 /// It contains only one function (for the moment): run that takes two arguments.
 pub mod repl {
+
+    use crate::io::repl;
     use rustyline::error::ReadlineError;
     use rustyline::Editor;
-    use std::sync::mpsc::{Receiver, Sender};
+    use std::sync::mpsc::{channel, Receiver, Sender};
+    use std::thread;
+
+    pub fn spawn_stdin(sender: Sender<String>) -> Option<Sender<String>> {
+        let (sender_stdin, receiver_stdin): (Sender<String>, Receiver<String>) = channel();
+
+        thread::Builder::new()
+            .name("repl_stdin".to_string())
+            .spawn(move || {
+                repl::stdin(sender, receiver_stdin);
+            })
+            .expect("error spawning repl input");
+
+        Some(sender_stdin)
+    }
+
+    pub fn spawn_stdout() -> Option<Sender<String>> {
+        let (sender_stdout, receiver_stdout): (Sender<String>, Receiver<String>) = channel();
+
+        thread::Builder::new()
+            .name("repl_output".to_string())
+            .spawn(move || {
+                repl::output(receiver_stdout);
+            })
+            .expect("error spawning repl output");
+
+        Some(sender_stdout)
+    }
 
     /// Function to handle the repl.
     /// ### functioning:
@@ -172,7 +201,7 @@ pub mod repl {
     /// - sender: channel object to send string to lisp interpreter.
     /// - receiver: channel object to receive ack from lisp interpreter after evaluation.
     /// Used for synchronization.
-    pub fn input(sender: Sender<String>, receiver: Receiver<String>) {
+    fn stdin(sender: Sender<String>, receiver: Receiver<String>) {
         let mut rl = Editor::<()>::new();
         if rl.load_history("history.txt").is_err() {
             println!("No previous history.");
@@ -216,7 +245,7 @@ pub mod repl {
 
     pub const EXIT_CODE_STDOUT: &str = "EXIT";
 
-    pub fn output(receiver: Receiver<String>) {
+    fn output(receiver: Receiver<String>) {
         loop {
             let str = receiver.recv().expect("error receiving stdout");
             if str == EXIT_CODE_STDOUT {

@@ -3,13 +3,12 @@ use ompas_lisp::structs::LValue;
 use ompas_modules::_type::CtxType;
 use ompas_modules::counter::CtxCounter;
 use ompas_modules::doc::{CtxDoc, Documentation};
-use ompas_modules::io::repl::EXIT_CODE_STDOUT;
-use ompas_modules::io::{repl, CtxIo};
+use ompas_modules::io::repl::{spawn_stdin, spawn_stdout, EXIT_CODE_STDOUT};
+use ompas_modules::io::CtxIo;
 use ompas_modules::math::CtxMath;
 use ompas_modules::robot::CtxRobot;
 use std::path::PathBuf;
 use std::sync::mpsc::{channel, Receiver, Sender};
-use std::thread;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -40,9 +39,8 @@ fn main() {
 pub fn lisp_interpreter() {
     let (sender_li, receiver_li): (Sender<String>, Receiver<String>) = channel();
     //Channel from Lisp Interpretor to repl
-    let (sender_repl, receiver_repl): (Sender<String>, Receiver<String>) = channel();
-
-    let (sender_stdout, receiver_stdout): (Sender<String>, Receiver<String>) = channel();
+    let sender_stdin = spawn_stdin(sender_li.clone()).expect("error while spawning stdin");
+    let sender_stdout = spawn_stdout().expect("error while spawning stdout");
 
     let root_env = &mut RefLEnv::root();
     let ctxs: &mut ContextCollection = &mut Default::default();
@@ -59,7 +57,7 @@ pub fn lisp_interpreter() {
     ctx_doc.insert_doc(CtxType::documentation());
 
     //Add the sender of the channel.
-    ctx_io.add_sender_li(sender_li.clone());
+    ctx_io.add_sender_li(sender_li);
     ctx_io.add_sender_stdout(sender_stdout.clone());
 
     load_module(root_env, ctxs, ctx_doc);
@@ -70,30 +68,10 @@ pub fn lisp_interpreter() {
     load_module(root_env, ctxs, ctx_counter);
     let env = &mut RefLEnv::new_from_outer(root_env.clone());
 
-    //let mut stdout = io::stdout();
-    //let mut stderr = io::stderr();
-
-    //Channel from X to Lisp Interpretor
-
     //Add core macros
-    sender_li
-        .send(core_macros())
-        .expect("error while sending message");
-
-    //Launch the repl thread
-    let repl_input_join_handle = thread::Builder::new()
-        .name("repl_input".to_string())
-        .spawn(move || {
-            repl::input(sender_li.clone(), receiver_repl);
-        })
-        .expect("error spawning repl input");
-
-    let repl_output_join_handle = thread::Builder::new()
-        .name("repl_output".to_string())
-        .spawn(move || {
-            repl::output(receiver_stdout);
-        })
-        .expect("error spawning repl output");
+    /*sender_li
+    .send(core_macros())
+    .expect("error while sending message");*/
 
     loop {
         let mut send_ack = false;
@@ -106,6 +84,9 @@ pub fn lisp_interpreter() {
         }
 
         if str_lvalue == *"exit" {
+            sender_stdout
+                .send(EXIT_CODE_STDOUT.to_string())
+                .expect("error sending message to stdout");
             break;
         }
 
@@ -140,21 +121,10 @@ pub fn lisp_interpreter() {
             }
         };
         if send_ack {
-            sender_repl
+            sender_stdin
                 .send("ACK".to_string())
                 .expect("error sending ack to repl");
         }
         //stdout.write_all(b"eval done\n");
     }
-
-    sender_stdout
-        .send(EXIT_CODE_STDOUT.to_string())
-        .expect("error sending message to stdout");
-
-    repl_input_join_handle
-        .join()
-        .expect("error exiting repl input");
-    repl_output_join_handle
-        .join()
-        .expect("error exiting repl output");
 }

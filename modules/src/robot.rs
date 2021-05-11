@@ -179,7 +179,7 @@ pub fn exec(args: &[LValue], _: &RefLEnv, ctx: &CtxRobot) -> Result<LValue, LErr
                 .sender
                 .send(args[1].to_string())
                 .expect("couldn't send command to robot");
-            Ok(LValue::None)
+            Ok(LValue::Nil)
         }
         _ => Err(SpecialError("Expected a RobotId(usize)".to_string())),
     }
@@ -266,7 +266,7 @@ pub fn start_robot_handler(
         .name("robot_handler".to_string())
         .spawn(move || robot_handler(rx))
         .expect("error creating robot handler");
-    Ok(LValue::None)
+    Ok(LValue::Nil)
 }
 
 /*

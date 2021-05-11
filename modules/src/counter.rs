@@ -68,7 +68,7 @@ pub fn decrement_counter(
                 if c.val > 0 {
                     c.val -= 1;
                 }
-                Ok(LValue::None)
+                Ok(LValue::Nil)
             }
         },
         lv => Err(WrongType(
@@ -92,7 +92,7 @@ pub fn increment_counter(
             None => Err(SpecialError("index out of reach".to_string())),
             Some(c) => {
                 c.val += 1;
-                Ok(LValue::None)
+                Ok(LValue::Nil)
             }
         },
         lv => Err(WrongType(
@@ -117,7 +117,7 @@ pub fn set_counter(
             None => Err(SpecialError("index out of reach".to_string())),
             Some(c) => {
                 c.val = args[1].as_int()? as u32;
-                Ok(LValue::None)
+                Ok(LValue::Nil)
             }
         },
         lv => Err(WrongType(

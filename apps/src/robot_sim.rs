@@ -26,5 +26,5 @@ pub fn test() -> Result<LValue, LError> {
         thread::sleep(Duration::from_secs(1));
     }
 
-    Ok(LValue::None)
+    Ok(LValue::Nil)
 }

@@ -180,35 +180,35 @@ pub fn div(args: &[LValue], _: &RefLEnv, _: &CtxMath) -> Result<LValue, LError> 
 //Comparison functions
 pub fn gt(args: &[LValue], _: &RefLEnv, _: &CtxMath) -> Result<LValue, LError> {
     match args.len() {
-        2 => Ok(LValue::Bool(args[0] > args[1])),
+        2 => Ok((args[0] > args[1]).into()),
         i => Err(WrongNumberOfArgument(args.into(), i, 2..2)),
     }
 }
 
 pub fn lt(args: &[LValue], _: &RefLEnv, _: &CtxMath) -> Result<LValue, LError> {
     match args.len() {
-        2 => Ok(LValue::Bool(args[0] < args[1])),
+        2 => Ok((args[0] < args[1]).into()),
         i => Err(WrongNumberOfArgument(args.into(), i, 2..2)),
     }
 }
 
 pub fn ge(args: &[LValue], _: &RefLEnv, _: &CtxMath) -> Result<LValue, LError> {
     match args.len() {
-        2 => Ok(LValue::Bool(args[0] >= args[1])),
+        2 => Ok((args[0] >= args[1]).into()),
         i => Err(WrongNumberOfArgument(args.into(), i, 2..2)),
     }
 }
 
 pub fn le(args: &[LValue], _: &RefLEnv, _: &CtxMath) -> Result<LValue, LError> {
     match args.len() {
-        2 => Ok(LValue::Bool(args[0] <= args[1])),
+        2 => Ok((args[0] <= args[1]).into()),
         i => Err(WrongNumberOfArgument(args.into(), i, 2..2)),
     }
 }
 
 pub fn eq(args: &[LValue], _: &RefLEnv, _: &CtxMath) -> Result<LValue, LError> {
     match args.len() {
-        2 => Ok(LValue::Bool(args[0] == args[1])),
+        2 => Ok((args[0] == args[1]).into()),
         i => Err(WrongNumberOfArgument(args.into(), i, 2..2)),
     }
 }

@@ -17,7 +17,6 @@ pub const GET: &str = "get";
 pub const GET_MAP: &str = "get-map";
 pub const SET_MAP: &str = "set-map";
 pub const MAP: &str = "map";
-pub const PAIR: &str = "pair";
 
 //Core language
 pub const DEFINE: &str = "define";
@@ -32,8 +31,8 @@ pub const BEGIN: &str = "begin";
 
 //Boolean
 pub const TRUE: &str = "true";
-pub const FALSE: &str = "false";
-pub const NONE: &str = "none";
+pub const NIL: &str = "nil";
+pub const FALSE: &str = "FALSE";
 pub const NOT: &str = "not";
 pub const NOT_SHORT: &str = "!";
 
@@ -74,3 +73,29 @@ pub const LAMBDA_OR: &str = " (define or (lambda x \
                                                         true\
                                                         (and (cdr x))))))";
 //Documentation
+
+//TODO: Write the doc for the basic functions
+pub const DOC_CAR: &str = "";
+pub const DOC_CDR: &str = "";
+pub const DOC_APPEND: &str = "";
+pub const DOC_MEMBER: &str = "";
+pub const DOC_LAST: &str = "";
+pub const DOC_EMPTY: &str = "";
+pub const DOC_LEN: &str = "";
+pub const DOC_REVERSE: &str = "";
+pub const DOC_LIST: &str = "";
+pub const DOC_CONS: &str = "";
+pub const DOC_MAP: &str = "";
+pub const DOC_GET: &str = "";
+pub const DOC_GET_MAP: &str = "";
+pub const DOC_SET_MAP: &str = "";
+
+pub const DOC_DEFINE: &str = "";
+pub const DOC_DEF_MACRO: &str = "";
+pub const DOC_LAMBDA: &str = "";
+pub const DOC_IF: &str = "";
+pub const DOC_QUOTE: &str = "";
+pub const DOC_QUASI_QUOTE: &str = "";
+pub const DOC_UNQUOTE: &str = "";
+pub const DOC_SET: &str = "";
+pub const DOC_BEGIN: &str = "";

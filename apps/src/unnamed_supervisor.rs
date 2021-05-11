@@ -38,7 +38,8 @@ fn main() {
 
 pub fn lisp_interpreter() {
     let (sender_li, receiver_li): (Sender<String>, Receiver<String>) = channel();
-    //Channel from Lisp Interpretor to repl
+
+    //Spawn the stdin and stdout threads
     let sender_stdin = spawn_stdin(sender_li.clone()).expect("error while spawning stdin");
     let sender_stdout = spawn_stdout().expect("error while spawning stdout");
 
@@ -51,6 +52,7 @@ pub fn lisp_interpreter() {
     let ctx_type = CtxType::default();
     let ctx_counter = CtxCounter::default();
 
+    //Insert the doc for the different contexts.
     ctx_doc.insert_doc(CtxIo::documentation());
     ctx_doc.insert_doc(CtxMath::documentation());
     ctx_doc.insert_doc(CtxRobot::documentation());
@@ -99,13 +101,13 @@ pub fn lisp_interpreter() {
                 sender_stdout
                     .send(format!("ELI>>{}", e))
                     .expect("error on channel to stdout");
-                LValue::None
+                LValue::Nil
             }
         };
         //stdout.write_all(b"parsing done\n");
         match eval(&lvalue, env, ctxs) {
             Ok(lv) => match lv {
-                LValue::None => {}
+                LValue::Nil => {}
                 lv => {
                     //stdout.write_all(format!("LI>> {}\n", lv).as_bytes()).expect("error stdout");
                     sender_stdout

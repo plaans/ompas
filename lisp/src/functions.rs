@@ -93,7 +93,7 @@ pub fn get(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
         LValue::Map(map) => {
             if args.len() == 2 {
                 let key = &args[1];
-                let value = map.get(key).unwrap_or(&LValue::None);
+                let value = map.get(key).unwrap_or(&LValue::Nil);
                 Ok(value.clone())
             } else if args.len() == 1 {
                 Ok(LValue::Map(map.clone()))
@@ -119,7 +119,7 @@ pub fn get_map(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     match &args[0] {
         LValue::Map(map) => {
             let key = &args[1];
-            let value = map.get(key).unwrap_or(&LValue::None);
+            let value = map.get(key).unwrap_or(&LValue::Nil);
             Ok(value.clone())
         }
         lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Map)),
@@ -179,7 +179,7 @@ pub fn cons(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
             new_list.append(&mut list.clone());
             Ok(new_list.into())
         }
-        (lv_first, LValue::None) => Ok(lv_first.clone()),
+        (lv_first, LValue::Nil) => Ok(lv_first.clone()),
         (lv_f, lv_s) => Ok(vec![lv_f.clone(), lv_s.clone()].into()),
     }
 }
@@ -192,7 +192,7 @@ pub fn car(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
                 if !list.is_empty() {
                     Ok(list.first().unwrap().clone())
                 } else {
-                    Ok(LValue::None)
+                    Ok(LValue::Nil)
                 }
             }
             lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::List)),
@@ -208,7 +208,7 @@ pub fn cdr(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
         match &args[0] {
             LValue::List(list) => {
                 if list.len() < 2 {
-                    Ok(LValue::None)
+                    Ok(LValue::Nil)
                 } else {
                     let mut new_list = list.clone();
                     new_list.remove(0);
@@ -248,7 +248,7 @@ pub fn last(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
                 if !list.is_empty() {
                     Ok(list.last().unwrap().clone())
                 } else {
-                    Ok(LValue::None)
+                    Ok(LValue::Nil)
                 }
             }
             lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::List)),
@@ -273,7 +273,7 @@ pub fn member(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
                     return Ok(list[k - 1..].into());
                 }
             }
-            Ok(LValue::None)
+            Ok(LValue::Nil)
         }
         lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::List)),
     }
@@ -320,14 +320,14 @@ pub fn empty(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     match &args[0] {
         LValue::List(l) => Ok(l.is_empty().into()),
         LValue::Map(m) => Ok(m.is_empty().into()),
-        LValue::None => Ok(true.into()),
+        LValue::Nil => Ok(true.into()),
         lv => Err(NotInListOfExpectedTypes(
             lv.clone(),
             lv.into(),
             vec![
                 NameTypeLValue::List,
                 NameTypeLValue::Map,
-                NameTypeLValue::None,
+                NameTypeLValue::Nil,
             ],
         )),
     }
@@ -339,7 +339,7 @@ pub fn not(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     }
 
     match &args[0] {
-        LValue::Bool(b) => Ok((!b).into()),
-        _ => Ok(false.into()),
+        LValue::Nil => Ok(LValue::True),
+        _ => Ok(LValue::Nil),
     }
 }

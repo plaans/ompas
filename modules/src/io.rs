@@ -48,7 +48,7 @@ impl CtxIo {
 
 pub fn print(args: &[LValue], _: &RefLEnv, ctx: &CtxIo) -> Result<LValue, LError> {
     let lv: LValue = match args.len() {
-        0 => LValue::None,
+        0 => LValue::Nil,
         1 => args[0].clone(),
         _ => args.into(),
     };
@@ -59,7 +59,7 @@ pub fn print(args: &[LValue], _: &RefLEnv, ctx: &CtxIo) -> Result<LValue, LError
             .expect("error on channel to stdout"),
     };
 
-    Ok(LValue::None)
+    Ok(LValue::Nil)
 }
 
 pub fn read(args: &[LValue], _: &RefLEnv, ctx: &CtxIo) -> Result<LValue, LError> {
@@ -84,7 +84,7 @@ pub fn read(args: &[LValue], _: &RefLEnv, ctx: &CtxIo) -> Result<LValue, LError>
         .send(contents)
         .expect("couldn't send string via channel");
 
-    Ok(LValue::None)
+    Ok(LValue::Nil)
 }
 
 /// Write an lvalue to a given file
@@ -102,7 +102,7 @@ pub fn write(args: &[LValue], _: &RefLEnv, _: &CtxIo) -> Result<LValue, LError> 
             //got our file name
             let mut f = File::create(s.to_string())?;
             f.write_all(&args[1].to_string().as_bytes())?;
-            Ok(LValue::None)
+            Ok(LValue::Nil)
         }
         lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
     }

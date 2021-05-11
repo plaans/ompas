@@ -575,19 +575,20 @@ pub enum LValue {
     Symbol(Sym),
     // literaux
     Number(LNumber),
-    Bool(bool),
     String(String),
+
+    Fn(LFn),
+    MutFn(LMutFn),
+    Lambda(LLambda),
+    CoreOperator(LCoreOperator),
 
     // data structure
     Map(im::HashMap<LValue, LValue>),
     List(Vec<LValue>),
     Quote(Box<LValue>),
-    // error
-    None,
-    Fn(LFn),
-    MutFn(LMutFn),
-    Lambda(LLambda),
-    CoreOperator(LCoreOperator),
+    //Refers to boolean 'false and empty list in lisp
+    True,
+    Nil,
 }
 
 impl Debug for LValue {
@@ -595,12 +596,12 @@ impl Debug for LValue {
         let string = match self {
             LValue::Symbol(s) => format!("Symbol: {:?}", s),
             LValue::Number(n) => format!("Number: {:?}", n),
-            LValue::Bool(b) => format!("Boolean: {:?}", b),
+            LValue::True => "true".to_string(),
             LValue::String(s) => format!("String: {:?}", s),
             LValue::Map(map) => format!("Map: {:?}", map),
             LValue::List(list) => format!("List: {:?}", list),
             LValue::Quote(q) => format!("Quote: {:?}", q),
-            LValue::None => "LValue::None".to_string(),
+            LValue::Nil => "LValue::None".to_string(),
             LValue::Fn(lfn) => format!("Function: {:?}", lfn),
             LValue::MutFn(mutfn) => format!("Number: {:?}", mutfn),
             LValue::Lambda(l) => format!("Lambda: {:?}", l),
@@ -616,10 +617,10 @@ impl Display for LValue {
             LValue::String(s) => write!(f, "{}", s),
             LValue::Fn(fun) => write!(f, "{}", fun.debug_label),
             LValue::MutFn(fun) => write!(f, "{}", fun.debug_label),
-            LValue::None => write!(f, "None"),
+            LValue::Nil => write!(f, "nil"),
             LValue::Symbol(s) => write!(f, "{}", s),
             LValue::Number(n) => write!(f, "{}", n),
-            LValue::Bool(b) => write!(f, "{}", b),
+            LValue::True => write!(f, "true"),
             LValue::List(list) => {
                 let mut result = String::new();
                 result.push('(');
@@ -651,7 +652,7 @@ impl Hash for LValue {
         match self {
             LValue::Symbol(s) => (*s).hash(state),
             LValue::Number(n) => (*n).hash(state),
-            LValue::Bool(b) => (*b).hash(state),
+            LValue::True => true.hash(state),
             LValue::String(s) => (*s).hash(state),
             LValue::Map(m) => (*m).hash(state),
             LValue::List(l) => {
@@ -661,7 +662,7 @@ impl Hash for LValue {
                 s.to_string().hash(state);
             }
 
-            LValue::None => "none".hash(state),
+            LValue::Nil => false.hash(state),
             _ => {}
         };
     }
@@ -673,7 +674,8 @@ impl LValue {
     pub fn as_sym(&self) -> Result<Sym, LError> {
         match self {
             LValue::Symbol(s) => Ok(s.clone()),
-            LValue::Bool(b) => Ok(b.to_string().into()),
+            LValue::True => Ok(TRUE.into()),
+            LValue::Nil => Ok(NIL.into()),
             LValue::Number(n) => Ok(n.to_string().into()),
             _ => Err(LError::SpecialError(
                 "cannot convert into symbol".to_string(),
@@ -710,7 +712,8 @@ impl LValue {
 
     pub fn as_bool(&self) -> Result<bool, LError> {
         match self {
-            LValue::Bool(b) => Ok(*b),
+            LValue::True => Ok(true),
+            LValue::Nil => Ok(false),
             _ => Err(LError::SpecialError("cannot convert into bool".to_string())),
         }
     }
@@ -741,10 +744,10 @@ impl PartialEq for LValue {
             //Number comparison
             (LValue::Number(n1), LValue::Number(n2)) => *n1 == *n2,
             (LValue::Symbol(s1), LValue::Symbol(s2)) => *s1 == *s2,
-            (LValue::Bool(b1), LValue::Bool(b2)) => *b1 == *b2,
+            (LValue::True, LValue::True) => true,
+            (LValue::Nil, LValue::Nil) => true,
             //Text comparison
             (LValue::String(s1), LValue::String(s2)) => *s1 == *s2,
-            (LValue::None, LValue::None) => true,
             (LValue::List(l1), LValue::List(l2)) => *l1 == *l2,
             (LValue::Map(m1), LValue::Map(m2)) => *m1 == *m2,
             (LValue::Lambda(l1), LValue::Lambda(l2)) => *l1 == *l2,
@@ -950,7 +953,7 @@ impl From<Sym> for LValue {
 impl From<&[LValue]> for LValue {
     fn from(lv: &[LValue]) -> Self {
         if lv.is_empty() {
-            LValue::None
+            LValue::Nil
         } else {
             LValue::List(lv.to_vec())
         }
@@ -1006,7 +1009,10 @@ impl From<i32> for LValue {
 
 impl From<bool> for LValue {
     fn from(b: bool) -> Self {
-        LValue::Bool(b)
+        match b {
+            true => LValue::True,
+            false => LValue::Nil,
+        }
     }
 }
 
@@ -1018,6 +1024,7 @@ impl From<String> for LValue {
 
 #[derive(Clone, Debug)]
 pub enum NameTypeLValue {
+    Bool,
     CoreOperator,
     Atom,
     Object,
@@ -1025,14 +1032,14 @@ pub enum NameTypeLValue {
     Int,
     Float,
     Usize,
-    Bool,
+    True,
     Symbol,
     String,
     SExpr,
     Fn,
     MutFn,
     Lambda,
-    None,
+    Nil,
     Map,
     List,
     Quote,
@@ -1043,12 +1050,12 @@ impl Display for NameTypeLValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         let str = match self {
             NameTypeLValue::Number => "Number",
-            NameTypeLValue::Bool => "Boolean",
+            NameTypeLValue::True => "True",
             NameTypeLValue::Symbol => "Symbol",
             NameTypeLValue::String => "String",
             NameTypeLValue::SExpr => "SExpr",
             NameTypeLValue::Fn => "Fn",
-            NameTypeLValue::None => "None",
+            NameTypeLValue::Nil => "Nil",
             NameTypeLValue::Object => "Object",
             NameTypeLValue::Lambda => "lambda",
             NameTypeLValue::Map => "map",
@@ -1061,6 +1068,7 @@ impl Display for NameTypeLValue {
             NameTypeLValue::Int => "int",
             NameTypeLValue::Float => "float",
             NameTypeLValue::Usize => "usize",
+            NameTypeLValue::Bool => "bool",
         };
         write!(f, "{}", str)
     }
@@ -1071,10 +1079,10 @@ impl PartialEq for NameTypeLValue {
         match (self, other) {
             (NameTypeLValue::String, NameTypeLValue::String) => true,
             (NameTypeLValue::SExpr, NameTypeLValue::SExpr) => true,
-            (NameTypeLValue::Bool, NameTypeLValue::Bool) => true,
+            (NameTypeLValue::True, NameTypeLValue::True) => true,
             (NameTypeLValue::Symbol, NameTypeLValue::Symbol) => true,
             (NameTypeLValue::Fn, NameTypeLValue::Fn) => true,
-            (NameTypeLValue::None, NameTypeLValue::None) => true,
+            (NameTypeLValue::Nil, NameTypeLValue::Nil) => true,
             (NameTypeLValue::Number, NameTypeLValue::Number) => true,
             (NameTypeLValue::Object, NameTypeLValue::Object) => true,
             (NameTypeLValue::Map, NameTypeLValue::Map) => true,
@@ -1094,7 +1102,7 @@ impl PartialEq for NameTypeLValue {
 impl From<&LValue> for NameTypeLValue {
     fn from(lv: &LValue) -> Self {
         match lv {
-            LValue::Bool(_) => NameTypeLValue::Bool,
+            LValue::True => NameTypeLValue::True,
             LValue::Number(LNumber::Float(_)) => NameTypeLValue::Float,
             LValue::Number(LNumber::Int(_)) => NameTypeLValue::Int,
             LValue::Number(LNumber::Usize(_)) => NameTypeLValue::Usize,
@@ -1102,7 +1110,7 @@ impl From<&LValue> for NameTypeLValue {
             LValue::String(_) => NameTypeLValue::String,
             LValue::Fn(_) => NameTypeLValue::Fn,
             LValue::MutFn(_) => NameTypeLValue::MutFn,
-            LValue::None => NameTypeLValue::None,
+            LValue::Nil => NameTypeLValue::Nil,
             LValue::Lambda(_) => NameTypeLValue::Lambda,
             LValue::Map(_) => NameTypeLValue::Map,
             LValue::List(_) => NameTypeLValue::List,

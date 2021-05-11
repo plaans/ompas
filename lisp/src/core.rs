@@ -1,6 +1,5 @@
 use crate::functions::*;
 use crate::language::*;
-use crate::lisp_as_literal::AsLiteral;
 use crate::structs::LCoreOperator::Quote;
 use crate::structs::LError::*;
 use crate::structs::NameTypeLValue::{List, Symbol};
@@ -10,8 +9,6 @@ use aries_utils::input::Sym;
 use im::HashMap;
 use std::any::Any;
 use std::borrow::Borrow;
-use std::fs::File;
-use std::io::Write;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
@@ -123,7 +120,7 @@ impl LEnv {
         // map.ins
         let mut symbols: HashMap<String, LValue> = HashMap::default();
 
-        symbols.insert(NONE.to_string(), LValue::None);
+        symbols.insert(NIL.to_string(), LValue::Nil);
 
         //Core Operators
         symbols.insert(DEFINE.to_string(), LCoreOperator::Define.into());
@@ -250,12 +247,14 @@ impl LEnv {
         self.new_entries.clone()
     }
 
+    //TODO: remove this function
+    /*
     pub fn to_file(&self, name_file: String) {
         let mut file = File::create(name_file).unwrap();
         let mut string = String::new();
         string.push_str("(begin \n");
         for key in &self.new_entries {
-            let value = self.get_symbol(key).unwrap_or(LValue::None);
+            let value = self.get_symbol(key).unwrap_or(LValue::Nil);
             string.push_str(format!("(define {} {})", key, value.as_command()).as_str());
         }
 
@@ -265,7 +264,7 @@ impl LEnv {
             Err(e) => panic!("{}", e),
         }
         //eprintln!("write fact base to file");
-    }
+    }*/
 }
 
 pub fn load_module(env: &mut RefLEnv, ctxs: &mut ContextCollection, ctx: impl GetModule) -> usize {
@@ -307,11 +306,11 @@ pub fn parse_into_lvalue(
                         //Test if its a Boolean
                         TRUE => {
                             //println!("atom is boolean true");
-                            Ok(LValue::Bool(true))
+                            Ok(LValue::True)
                         }
-                        FALSE => {
+                        FALSE | NIL => {
                             //println!("atom is boolean false");
-                            Ok(LValue::Bool(false))
+                            Ok(LValue::Nil)
                         }
 
                         s => match env.get_symbol(s) {
@@ -324,12 +323,15 @@ pub fn parse_into_lvalue(
         }
         SExpr::List(list) => {
             //println!("expression is a list");
-            let mut vec_lvalue = Vec::new();
-
-            for element in list.iter() {
-                vec_lvalue.push(parse_into_lvalue(element, env, ctxs)?);
+            let list_iter = list.iter();
+            if list_iter.is_empty() {
+                Ok(LValue::Nil)
+            } else {
+                let vec: Vec<LValue> = list_iter
+                    .map(|x| parse_into_lvalue(x, env, ctxs))
+                    .collect::<Result<_, _>>()?;
+                Ok(LValue::List(vec))
             }
-            Ok(LValue::List(vec_lvalue))
         }
     }
 }
@@ -398,7 +400,7 @@ pub fn expand(
                                         env.add_macro(sym.clone(), proc.as_lambda()?);
                                     }
                                     //Add to macro_table
-                                    return Ok(LValue::None);
+                                    return Ok(LValue::Nil);
                                 }
                                 //We add to the list the expanded body
                                 return Ok(
@@ -457,7 +459,7 @@ pub fn expand(
                     LCoreOperator::If => {
                         let mut list = list.clone();
                         if list.len() == 3 {
-                            list.push(LValue::None);
+                            list.push(LValue::Nil);
                         }
                         if list.len() != 4 {
                             return Err(WrongNumberOfArgument((&list).into(), list.len(), 4..4));
@@ -492,7 +494,7 @@ pub fn expand(
                     }
                     LCoreOperator::Begin => {
                         return if list.len() == 1 {
-                            Ok(LValue::None)
+                            Ok(LValue::Nil)
                         } else {
                             let mut expanded_list = Vec::new();
                             for xi in list {
@@ -606,7 +608,7 @@ pub fn eval(
                                 ))
                             }
                         };
-                        Ok(LValue::None)
+                        Ok(LValue::Nil)
                     }
                     LCoreOperator::DefLambda => {
                         let params = match &args[0] {
@@ -643,8 +645,8 @@ pub fn eval(
                         let conseq = args.get(1).unwrap();
                         let alt = args.get(2).unwrap();
                         match eval(test, env, ctxs) {
-                            Ok(LValue::Bool(true)) => eval(conseq, env, ctxs),
-                            Ok(LValue::Bool(false)) => eval(alt, env, ctxs),
+                            Ok(LValue::True) => eval(conseq, env, ctxs),
+                            Ok(LValue::Nil) => eval(alt, env, ctxs),
                             Ok(lv) => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Bool)),
                             Err(e) => Err(e),
                         }
@@ -652,18 +654,18 @@ pub fn eval(
                     LCoreOperator::Quote => return Ok(args.first().unwrap().clone()),
                     LCoreOperator::Set => {
                         //TODO: implement set
-                        Ok(LValue::None)
+                        Ok(LValue::Nil)
                     }
                     LCoreOperator::Begin => {
                         let results: Vec<LValue> = args
                             .iter()
                             .map(|x| eval(x, env, ctxs))
                             .collect::<Result<_, _>>()?;
-                        Ok(results.last().unwrap_or(&LValue::None).clone())
+                        Ok(results.last().unwrap_or(&LValue::Nil).clone())
                     }
                     LCoreOperator::QuasiQuote
                     | LCoreOperator::UnQuote
-                    | LCoreOperator::DefMacro => Ok(LValue::None),
+                    | LCoreOperator::DefMacro => Ok(LValue::Nil),
                 },
                 LValue::Lambda(l) => {
                     let args: Vec<LValue> = args

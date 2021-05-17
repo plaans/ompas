@@ -1,11 +1,11 @@
-use aries_utils::input::{ErrLoc, Sym};
-use std::cmp::Ordering;
-//use std::collections::HashMap;
 use crate::core::{eval, ContextCollection, RefLEnv};
 use crate::language::*;
 use crate::structs::LError::{SpecialError, WrongNumberOfArgument};
+use aries_utils::input::{ErrLoc, Sym};
 use im::HashMap;
+use serde::{Deserialize, Serialize, Serializer};
 use std::any::Any;
+use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::{Add, Div, Mul, Range, Sub};
@@ -72,7 +72,7 @@ impl From<ErrLoc> for LError {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum LNumber {
     Int(i64),
     Float(f64),
@@ -396,6 +396,15 @@ pub struct LFn {
     pub(crate) fun: Rc<NativeFn>,
     pub(crate) debug_label: &'static str,
     index_mod: Option<usize>,
+}
+
+impl Serialize for LFn {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(self.debug_label)
+    }
 }
 
 impl Debug for LFn {

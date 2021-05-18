@@ -1,5 +1,4 @@
 use crate::doc::{Documentation, LHelp};
-use aries_utils::input::Sym;
 use ompas_lisp::core::RefLEnv;
 use ompas_lisp::structs::LError::*;
 use ompas_lisp::structs::*;
@@ -120,7 +119,7 @@ pub enum LType {
     Usize,
     Float,
     Object,
-    Symbol(Sym),
+    Symbol(String),
 }
 
 impl Display for LType {
@@ -160,19 +159,19 @@ impl PartialEq for &LSymType {
     }
 }
 
-impl From<&Sym> for LType {
-    fn from(s: &Sym) -> Self {
+impl From<&String> for LType {
+    fn from(s: &String) -> Self {
         s.as_str().into()
     }
 }
 
-impl From<Sym> for LType {
-    fn from(s: Sym) -> Self {
+impl From<String> for LType {
+    fn from(s: String) -> Self {
         (&s).into()
     }
 }
 
-impl From<&LType> for Sym {
+impl From<&LType> for String {
     fn from(lt: &LType) -> Self {
         match lt {
             LType::Int => TYPE_INT.into(),
@@ -185,6 +184,14 @@ impl From<&LType> for Sym {
     }
 }
 
+
+impl From<LType> for String {
+    fn from(lt: LType) -> Self {
+        (&lt).into()
+    }
+}
+
+
 impl From<LSymType> for NameTypeLValue {
     fn from(lst: LSymType) -> Self {
         (&lst).into()
@@ -193,7 +200,7 @@ impl From<LSymType> for NameTypeLValue {
 
 impl From<&LSymType> for LValue {
     fn from(lst: &LSymType) -> Self {
-        LValue::String(lst.to_string())
+        LValue::Symbol(lst.to_string())
     }
 }
 
@@ -213,12 +220,6 @@ impl From<&LSymType> for NameTypeLValue {
     }
 }
 
-impl From<LType> for Sym {
-    fn from(lt: LType) -> Self {
-        (&lt).into()
-    }
-}
-
 impl PartialEq for LType {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -233,8 +234,8 @@ impl PartialEq for LType {
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct LStateFunction {
-    pub t_params: Vec<Sym>,
-    pub t_value: Sym,
+    pub t_params: Vec<String>,
+    pub t_value: String,
 }
 
 impl Display for LStateFunction {
@@ -267,8 +268,8 @@ impl Display for LStateFunction {
 
 #[derive(Debug)]
 pub struct CtxType {
-    map_sym_type_id: im::HashMap<Sym, usize>,
-    map_type_id_sym: im::HashMap<usize, Sym>,
+    map_sym_type_id: im::HashMap<String,usize>,
+    map_type_id_sym: im::HashMap<usize, String>,
     types: Vec<LSymType>,
 }
 
@@ -277,14 +278,14 @@ impl Default for CtxType {
     fn default() -> Self {
         let types = vec![LSymType::Type(None); 5];
 
-        let mut map_sym_type_id: im::HashMap<Sym, usize> = Default::default();
+        let mut map_sym_type_id: im::HashMap<String, usize> = Default::default();
         map_sym_type_id.insert(TYPE_INT.into(), INDEX_TYPE_INT);
         map_sym_type_id.insert(TYPE_FLOAT.into(), INDEX_TYPE_FLOAT);
         map_sym_type_id.insert(TYPE_USIZE.into(), INDEX_TYPE_USIZE);
         map_sym_type_id.insert(TYPE_BOOL.into(), INDEX_TYPE_BOOL);
         map_sym_type_id.insert(TYPE_OBJECT.into(), INDEX_TYPE_OBJECT);
 
-        let mut map_type_id_sym: im::HashMap<usize, Sym> = Default::default();
+        let mut map_type_id_sym: im::HashMap<usize, String> = Default::default();
         map_type_id_sym.insert(INDEX_TYPE_INT, TYPE_INT.into());
         map_type_id_sym.insert(INDEX_TYPE_FLOAT, TYPE_FLOAT.into());
         map_type_id_sym.insert(INDEX_TYPE_USIZE, TYPE_USIZE.into());
@@ -300,11 +301,11 @@ impl Default for CtxType {
 }
 
 impl CtxType {
-    pub fn get_type_id(&self, sym: &Sym) -> Option<&usize> {
+    pub fn get_type_id(&self, sym: &String) -> Option<&usize> {
         self.map_sym_type_id.get(sym)
     }
 
-    pub fn get_sym(&self, type_id: &usize) -> Option<&Sym> {
+    pub fn get_sym(&self, type_id: &usize) -> Option<&String> {
         self.map_type_id_sym.get(type_id)
     }
 
@@ -312,14 +313,14 @@ impl CtxType {
         self.types.get(type_id)
     }
 
-    pub fn get_type_from_sym(&self, sym: &Sym) -> Option<&LSymType> {
+    pub fn get_type_from_sym(&self, sym: &String) -> Option<&LSymType> {
         match self.get_type_id(sym) {
             None => None,
             Some(type_id) => self.get_type(*type_id),
         }
     }
 
-    pub fn bind_sym_type(&mut self, sym: &Sym, type_id: usize) {
+    pub fn bind_sym_type(&mut self, sym: &String, type_id: usize) {
         self.map_sym_type_id.insert(sym.clone(), type_id);
         self.map_type_id_sym.insert(type_id, sym.clone());
     }
@@ -607,8 +608,8 @@ pub fn new_state_function(
     env: &mut RefLEnv,
     ctx: &mut CtxType,
 ) -> Result<LValue, LError> {
-    let mut t_params: Vec<Sym> = Vec::new();
-    let mut t_value: Sym = Sym::from(TYPE_OBJECT);
+    let mut t_params: Vec<String> = Vec::new();
+    let mut t_value: String = String::from(TYPE_OBJECT);
     let expected_type = NameTypeLValue::Other("TYPE".to_string());
     for (i, arg) in args.iter().enumerate() {
         match arg {

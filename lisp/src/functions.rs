@@ -3,7 +3,6 @@ use crate::structs::LError::{
     NotInListOfExpectedTypes, SpecialError, WrongNumberOfArgument, WrongType,
 };
 use crate::structs::{LError, LValue, NameTypeLValue};
-use aries_utils::input::Sym;
 use im::HashMap;
 
 pub fn begin(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
@@ -14,7 +13,7 @@ pub fn begin(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
 }
 
 pub fn default(_args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
-    Ok(LValue::String("default function".to_string()))
+    Ok(LValue::Symbol("default function".to_string()))
 }
 
 pub fn list(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
@@ -37,7 +36,7 @@ pub fn map(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
                             .get(1)
                             .unwrap()
                             .as_sym()
-                            .unwrap_or_else(|_| Sym::from(""))
+                            .unwrap_or_else(|_| String::from(""))
                             .as_str()
                             .eq(".")
                         {
@@ -137,7 +136,7 @@ pub fn set_map(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
                 if val_sv.len() == 3 {
                     if val_sv[1]
                         .as_sym()
-                        .unwrap_or_else(|_| Sym::from(""))
+                        .unwrap_or_else(|_| String::from(""))
                         .as_str()
                         .eq(".")
                     {

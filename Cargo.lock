@@ -339,6 +339,7 @@ dependencies = [
  "aries_planning",
  "aries_utils",
  "im",
+ "ompas_godot_simulation_client",
  "ompas_lisp",
  "ompas_modules",
  "rustyline",
@@ -358,7 +359,11 @@ dependencies = [
  "aries_planning",
  "aries_utils",
  "im",
+ "ompas_lisp",
+ "ompas_modules",
  "rustyline",
+ "serde",
+ "serde_json",
  "structopt",
 ]
 

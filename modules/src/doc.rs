@@ -3,7 +3,6 @@ Module to add an help module to the project.
 It provides a struct for the help
  */
 
-use aries_utils::input::Sym;
 use im::HashMap;
 use ompas_lisp::core::RefLEnv;
 use ompas_lisp::language::*;
@@ -31,7 +30,7 @@ const DOC_HELP_VERBOSE: &str = "takes 0..1 arguments:\
 /// Context of the module doc.
 /// Store the help objects.
 pub struct CtxDoc {
-    map_help: HashMap<Sym, LHelp>,
+    map_help: HashMap<String, LHelp>,
 }
 
 impl Default for CtxDoc {
@@ -103,7 +102,7 @@ impl CtxDoc {
         string
     }
 
-    pub fn get(&self, sym: &Sym) -> String {
+    pub fn get(&self, sym: &String) -> String {
         match self.map_help.get(sym) {
             None => "no such function".to_string(),
             Some(h) => format!("{:?}", h),

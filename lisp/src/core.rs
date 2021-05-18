@@ -5,7 +5,6 @@ use crate::structs::LError::*;
 use crate::structs::NameTypeLValue::{List, Symbol};
 use crate::structs::*;
 use aries_planning::parsing::sexpr::SExpr;
-use aries_utils::input::Sym;
 use im::HashMap;
 use std::any::Any;
 use std::borrow::Borrow;
@@ -14,7 +13,7 @@ use std::rc::Rc;
 
 pub struct LEnv {
     pub(crate) symbols: HashMap<String, LValue>,
-    pub(crate) macro_table: HashMap<Sym, LLambda>,
+    pub(crate) macro_table: HashMap<String, LLambda>,
     pub(crate) new_entries: Vec<String>,
     pub(crate) outer: Option<RefLEnv>,
 }
@@ -210,7 +209,7 @@ impl LEnv {
         }
     }
 
-    pub fn find(&self, var: &Sym) -> Option<&Self> {
+    pub fn find(&self, var: &String) -> Option<&Self> {
         match self.symbols.get(var.as_str()) {
             None => match self.outer.borrow() {
                 None => None,
@@ -235,11 +234,11 @@ impl LEnv {
         self.new_entries.push(key);
     }
 
-    pub fn add_macro(&mut self, key: Sym, _macro: LLambda) {
+    pub fn add_macro(&mut self, key: String, _macro: LLambda) {
         self.macro_table.insert(key, _macro);
     }
 
-    pub fn get_macro(&self, key: &Sym) -> Option<&LLambda> {
+    pub fn get_macro(&self, key: &String) -> Option<&LLambda> {
         self.macro_table.get(key)
     }
 

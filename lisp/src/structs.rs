@@ -1,9 +1,9 @@
 use crate::core::{eval, ContextCollection, RefLEnv};
 use crate::language::*;
 use crate::structs::LError::{SpecialError, WrongNumberOfArgument};
-use aries_utils::input::{ErrLoc, Sym};
+use aries_utils::input::{ErrLoc};
 use im::HashMap;
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter};
@@ -73,6 +73,7 @@ impl From<ErrLoc> for LError {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum LNumber {
     Int(i64),
     Float(f64),
@@ -89,19 +90,19 @@ impl Display for LNumber {
     }
 }
 
-impl From<&LNumber> for Sym {
+impl From<&LNumber> for String {
     fn from(n: &LNumber) -> Self {
         match n {
-            LNumber::Int(i) => i.to_string().into(),
-            LNumber::Float(f) => f.to_string().into(),
-            LNumber::Usize(u) => u.to_string().into(),
+            LNumber::Int(i) => i.to_string(),
+            LNumber::Float(f) => f.to_string(),
+            LNumber::Usize(u) => u.to_string(),
         }
     }
 }
 
-impl From<LNumber> for Sym {
+impl From<LNumber> for String {
     fn from(n: LNumber) -> Self {
-        (&n).into()
+        (&n).to_string()
     }
 }
 
@@ -303,18 +304,18 @@ impl Eq for LNumber {}
 
 #[derive(Clone, Debug)]
 pub enum LambdaArgs {
-    Sym(Sym),
-    List(Vec<Sym>),
+    Sym(String),
+    List(Vec<String>),
 }
 
-impl From<Sym> for LambdaArgs {
-    fn from(s: Sym) -> Self {
+impl From<String> for LambdaArgs {
+    fn from(s: String) -> Self {
         LambdaArgs::Sym(s)
     }
 }
 
-impl From<Vec<Sym>> for LambdaArgs {
-    fn from(vec_sym: Vec<Sym>) -> Self {
+impl From<Vec<String>> for LambdaArgs {
+    fn from(vec_sym: Vec<String>) -> Self {
         LambdaArgs::List(vec_sym)
     }
 }
@@ -396,15 +397,6 @@ pub struct LFn {
     pub(crate) fun: Rc<NativeFn>,
     pub(crate) debug_label: &'static str,
     index_mod: Option<usize>,
-}
-
-impl Serialize for LFn {
-    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(self.debug_label)
-    }
 }
 
 impl Debug for LFn {
@@ -543,7 +535,8 @@ impl LMutFn {
     }
 }
 
-#[derive(Clone, PartialOrd, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialOrd, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[serde(untagged, rename_all = "lowercase")]
 pub enum LCoreOperator {
     Define,
     DefLambda,
@@ -578,20 +571,29 @@ impl From<im::HashMap<LValue, LValue>> for LValue {
     }
 }
 
-#[derive(Clone)]
+/*
+
+ */
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+#[serde(untagged,rename_all = "lowercase")]
 pub enum LValue {
     // symbol
-    Symbol(Sym),
+    Symbol(String),
     // literaux
     Number(LNumber),
-    String(String),
-
+    #[serde(skip)]
     Fn(LFn),
+    #[serde(skip)]
     MutFn(LMutFn),
+    #[serde(skip)]
     Lambda(LLambda),
+    #[serde(skip)]
     CoreOperator(LCoreOperator),
 
     // data structure
+    #[serde(skip)]
+    //TODO: Implement serde for mirror struct of im::hashmap
     Map(im::HashMap<LValue, LValue>),
     List(Vec<LValue>),
     Quote(Box<LValue>),
@@ -600,17 +602,16 @@ pub enum LValue {
     Nil,
 }
 
-impl Debug for LValue {
+/*impl Debug for LValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         let string = match self {
-            LValue::Symbol(s) => format!("Symbol: {:?}", s),
+            LValue::Symbol(s) => format!("LValue::Symbol: {:?}", s),
             LValue::Number(n) => format!("Number: {:?}", n),
-            LValue::True => "true".to_string(),
-            LValue::String(s) => format!("String: {:?}", s),
-            LValue::Map(map) => format!("Map: {:?}", map),
+            LValue::True => "LValue::True".to_string(),
+            LValue::Map(map) => format!("LValue::Map: {:?}", map),
             LValue::List(list) => format!("List: {:?}", list),
             LValue::Quote(q) => format!("Quote: {:?}", q),
-            LValue::Nil => "LValue::None".to_string(),
+            LValue::Nil => "LValue::Nil".to_string(),
             LValue::Fn(lfn) => format!("Function: {:?}", lfn),
             LValue::MutFn(mutfn) => format!("Number: {:?}", mutfn),
             LValue::Lambda(l) => format!("Lambda: {:?}", l),
@@ -618,12 +619,11 @@ impl Debug for LValue {
         };
         write!(f, "{}", string)
     }
-}
+}*/
 
 impl Display for LValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            LValue::String(s) => write!(f, "{}", s),
             LValue::Fn(fun) => write!(f, "{}", fun.debug_label),
             LValue::MutFn(fun) => write!(f, "{}", fun.debug_label),
             LValue::Nil => write!(f, "nil"),
@@ -662,7 +662,6 @@ impl Hash for LValue {
             LValue::Symbol(s) => (*s).hash(state),
             LValue::Number(n) => (*n).hash(state),
             LValue::True => true.hash(state),
-            LValue::String(s) => (*s).hash(state),
             LValue::Map(m) => (*m).hash(state),
             LValue::List(l) => {
                 (*l).hash(state);
@@ -680,7 +679,7 @@ impl Hash for LValue {
 impl Eq for LValue {}
 
 impl LValue {
-    pub fn as_sym(&self) -> Result<Sym, LError> {
+    pub fn as_sym(&self) -> Result<String, LError> {
         match self {
             LValue::Symbol(s) => Ok(s.clone()),
             LValue::True => Ok(TRUE.into()),
@@ -692,7 +691,7 @@ impl LValue {
         }
     }
 
-    pub fn as_sym_ref(&self) -> Result<&Sym, LError> {
+    pub fn as_sym_ref(&self) -> Result<&String, LError> {
         match self {
             LValue::Symbol(s) => Ok(s),
             _ => Err(LError::SpecialError(
@@ -756,7 +755,6 @@ impl PartialEq for LValue {
             (LValue::True, LValue::True) => true,
             (LValue::Nil, LValue::Nil) => true,
             //Text comparison
-            (LValue::String(s1), LValue::String(s2)) => *s1 == *s2,
             (LValue::List(l1), LValue::List(l2)) => *l1 == *l2,
             (LValue::Map(m1), LValue::Map(m2)) => *m1 == *m2,
             (LValue::Lambda(l1), LValue::Lambda(l2)) => *l1 == *l2,
@@ -947,14 +945,14 @@ impl From<usize> for LValue {
     }
 }
 
-impl From<&Sym> for LValue {
-    fn from(s: &Sym) -> Self {
+impl From<&String> for LValue {
+    fn from(s: &String) -> Self {
         LValue::Symbol(s.clone())
     }
 }
 
-impl From<Sym> for LValue {
-    fn from(s: Sym) -> Self {
+impl From<String> for LValue {
+    fn from(s: String) -> Self {
         LValue::from(&s)
     }
 }
@@ -1022,12 +1020,6 @@ impl From<bool> for LValue {
             true => LValue::True,
             false => LValue::Nil,
         }
-    }
-}
-
-impl From<String> for LValue {
-    fn from(s: String) -> Self {
-        LValue::String(s)
     }
 }
 
@@ -1116,7 +1108,6 @@ impl From<&LValue> for NameTypeLValue {
             LValue::Number(LNumber::Int(_)) => NameTypeLValue::Int,
             LValue::Number(LNumber::Usize(_)) => NameTypeLValue::Usize,
             LValue::Symbol(_) => NameTypeLValue::Symbol,
-            LValue::String(_) => NameTypeLValue::String,
             LValue::Fn(_) => NameTypeLValue::Fn,
             LValue::MutFn(_) => NameTypeLValue::MutFn,
             LValue::Nil => NameTypeLValue::Nil,
@@ -1137,7 +1128,7 @@ impl From<LValue> for NameTypeLValue {
 
 pub struct Module {
     pub ctx: Box<dyn Any>,
-    pub prelude: Vec<(Sym, LValue)>,
+    pub prelude: Vec<(String, LValue)>,
     pub label: &'static str,
 }
 

@@ -11,6 +11,7 @@ default-run = "serde_test"
 [dependencies]
 ompas_lisp = {path = "../lisp"}
 ompas_modules = {path = "../modules"}
+ompas_godot_simulation_client = {path = "../godot-simulation-client"}
 
 aries_model = {git = "https://github.com/arbimo/aries/", rev = "e220567"}
 aries_planning = {git = "https://github.com/arbimo/aries/", rev = "e220567"}
@@ -37,8 +38,8 @@ path = "src/bin/unnamed_supervisor.rs"
 
 [[bin]]
 name = "godot_test"
-path = "src/test/godot_test.rs"
+path = "src/bin/godot_test.rs"
 
 [[bin]]
 name = "serde_test"
-path = "src/test/serde_test.rs"
+path = "src/bin/serde_test.rs"

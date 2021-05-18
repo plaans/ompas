@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 use crate::doc::{Documentation, LHelp};
-use aries_utils::input::Sym;
 use ompas_lisp::core::RefLEnv;
 use ompas_lisp::structs::LError::*;
 use ompas_lisp::structs::*;
@@ -42,7 +41,7 @@ type RobotId = usize;
 
 pub struct CtxRobot {
     robots: Vec<VirtualRobot>,
-    map_robot_id: im::HashMap<Sym, RobotId>,
+    map_robot_id: im::HashMap<String, RobotId>,
     robots_sender: Option<Sender<String>>,
 }
 
@@ -216,7 +215,7 @@ fn robot(arg_robot: ArgRobot) {
 pub fn new_robot(args: &[LValue], _: &mut RefLEnv, ctx: &mut CtxRobot) -> Result<LValue, LError> {
     let (robot_label, thread_label) = match args.len() {
         0 => (
-            format!("unnamed_robot_{}", ctx.robots.len()).into(),
+            format!("unnamed_robot_{}", ctx.robots.len()),
             format!("unnamed_robot_{}", ctx.robots.len()),
         ),
         1 => match &args[0] {

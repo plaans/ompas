@@ -2,6 +2,7 @@ use crate::doc::{Documentation, LHelp};
 use ompas_lisp::core::*;
 use ompas_lisp::structs::LError::*;
 use ompas_lisp::structs::*;
+use std::convert::{TryFrom, TryInto};
 
 /*
 LANGUAGE
@@ -116,7 +117,7 @@ pub fn set_counter(
         LValue::Number(LNumber::Usize(u)) => match ctx.counters.get_mut(*u) {
             None => Err(SpecialError("index out of reach".to_string())),
             Some(c) => {
-                c.val = args[1].as_int()? as u32;
+                c.val = i64::try_from(&args[1])? as u32;
                 Ok(LValue::Nil)
             }
         },

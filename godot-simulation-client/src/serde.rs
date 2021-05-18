@@ -1,8 +1,10 @@
 use aries_planning::parsing::sexpr::SExpr;
+use ompas_lisp::structs::LError::WrongType;
+use ompas_lisp::structs::{LError, LNumber, LValue, NameTypeLValue};
 use serde::{Deserialize, Serialize, Serializer};
-use std::fmt::{Display, Formatter};
-use ompas_lisp::structs::{LValue, LNumber};
 use std::borrow::Borrow;
+use std::convert::TryInto;
+use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 
 #[derive(Debug, Clone, Deserialize)]
@@ -23,8 +25,8 @@ impl Display for GodotMessageType {
 
 impl Serialize for GodotMessageType {
     fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
-        where
-            S: Serializer,
+    where
+        S: Serializer,
     {
         match self {
             GodotMessageType::Static => serializer.serialize_str("static"),
@@ -43,7 +45,7 @@ pub struct GodotStateS {
 impl From<&GodotStateS> for GodotState {
     fn from(gss: &GodotStateS) -> Self {
         Self {
-            _type : gss._type.clone(),
+            _type: gss._type.clone(),
             data: gss.data.borrow().into(),
         }
     }
@@ -58,8 +60,8 @@ impl From<GodotStateS> for GodotState {
 impl From<&GodotState> for GodotStateS {
     fn from(gs: &GodotState) -> Self {
         Self {
-            _type : gs._type.clone(),
-            data : gs.data.borrow().into()
+            _type: gs._type.clone(),
+            data: gs.data.borrow().into(),
         }
     }
 }
@@ -76,6 +78,34 @@ pub struct GodotState {
     #[serde(rename = "type")]
     pub _type: GodotMessageType,
     pub data: LValue,
+}
+
+impl GodotState {
+    pub fn transform_data_into_lisp(&self) -> Result<String, LError> {
+        // Example of string that should be sent
+        // (map (quote ((ten . 10) (vingt . 20)))))
+        match &self.data {
+            LValue::List(l) => {
+                let mut lisp = String::from("(map (quote (");
+                for e in l {
+                    let list: Vec<LValue> = e.try_into()?;
+                    let list = list.as_slice();
+                    let len = list.len();
+                    lisp.push_str(
+                        format!(
+                            "({} . {})",
+                            LValue::from(&list[0..len - 1]),
+                            &list.last().unwrap()
+                        )
+                        .as_str(),
+                    )
+                }
+                lisp.push_str(")))");
+                Ok(lisp)
+            }
+            lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::List)),
+        }
+    }
 }
 
 impl Display for GodotState {
@@ -109,18 +139,16 @@ impl From<&LValue> for LValueSerde {
                 LNumber::Int(i) => LValueSerde::Int(*i),
                 LNumber::Float(f) => LValueSerde::Float(*f),
                 LNumber::Usize(u) => LValueSerde::Int(*u as i64),
-            }
+            },
             LValue::Fn(f) => LValueSerde::Symbol(f.get_label().to_string()),
             LValue::MutFn(f) => LValueSerde::Symbol(f.get_label().to_string()),
             LValue::Lambda(_) => LValue::Nil.into(),
             LValue::CoreOperator(co) => LValueSerde::Symbol(co.to_string()),
             LValue::Map(m) => {
-                LValueSerde::Map(m.iter().map(|(k,v)| (k.into(), v.into())).collect())
+                LValueSerde::Map(m.iter().map(|(k, v)| (k.into(), v.into())).collect())
             }
-            LValue::List(l) => {
-                LValueSerde::List(l.iter().map(|lv| lv.into()).collect())
-            }
-            LValue::Quote(l) => {l.deref().into()}
+            LValue::List(l) => LValueSerde::List(l.iter().map(|lv| lv.into()).collect()),
+            LValue::Quote(l) => l.deref().into(),
             LValue::True => LValueSerde::Symbol("true".to_string()),
             LValue::Nil => LValueSerde::Symbol("nil".to_string()),
         }
@@ -139,26 +167,24 @@ impl From<&LValueSerde> for LValue {
             LValueSerde::Symbol(s) => LValue::Symbol(s.clone()),
             LValueSerde::Int(i) => LValue::Number(LNumber::Int(*i)),
             LValueSerde::Float(f) => LValue::Number(LNumber::Float(*f)),
-            LValueSerde::Bool(b) => {
-                match b {
-                    true => LValue::True,
-                    false => LValue::Nil,
-                }
-            }
+            LValueSerde::Bool(b) => match b {
+                true => LValue::True,
+                false => LValue::Nil,
+            },
             LValueSerde::List(l) => {
                 if l.is_empty() {
                     LValue::Nil
-                }else {
+                } else {
                     LValue::List(l.iter().map(|x| x.into()).collect())
                 }
             }
             LValueSerde::Map(m) => {
                 if m.is_empty() {
                     LValue::Nil
-                }else {
-                    let mut map:im::HashMap<LValue, LValue> = Default::default();
-                    for (k,v) in m {
-                        map.insert(k.into(),v.into());
+                } else {
+                    let mut map: im::HashMap<LValue, LValue> = Default::default();
+                    for (k, v) in m {
+                        map.insert(k.into(), v.into());
                     }
                     LValue::Map(map)
                 }
@@ -238,3 +264,6 @@ pub fn parse_into_lvalue(se: &SExpr) -> Result<LValueSerde, ()> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {}

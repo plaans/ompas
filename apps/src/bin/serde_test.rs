@@ -1,6 +1,8 @@
 use aries_planning::parsing::sexpr::parse;
+use ompas_godot_simulation_client::serde::{
+    parse_into_lvalue, GodotMessageType, GodotState, GodotStateS,
+};
 use ompas_lisp::core::{ContextCollection, RefLEnv};
-use ompas_godot_simulation_client::serde::{parse_into_lvalue, GodotStateS, GodotMessageType, GodotState};
 
 const TEST: &str = "(robot (test of robot) (1 1 1.0) ((1 2) (3 4)) () true nil)";
 

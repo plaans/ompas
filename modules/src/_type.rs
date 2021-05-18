@@ -2,6 +2,7 @@ use crate::doc::{Documentation, LHelp};
 use ompas_lisp::core::RefLEnv;
 use ompas_lisp::structs::LError::*;
 use ompas_lisp::structs::*;
+use std::convert::TryInto;
 use std::fmt::{Debug, Display, Formatter};
 
 //pub const TYPE: &str = "type";
@@ -184,13 +185,11 @@ impl From<&LType> for String {
     }
 }
 
-
 impl From<LType> for String {
     fn from(lt: LType) -> Self {
         (&lt).into()
     }
 }
-
 
 impl From<LSymType> for NameTypeLValue {
     fn from(lst: LSymType) -> Self {
@@ -268,7 +267,7 @@ impl Display for LStateFunction {
 
 #[derive(Debug)]
 pub struct CtxType {
-    map_sym_type_id: im::HashMap<String,usize>,
+    map_sym_type_id: im::HashMap<String, usize>,
     map_type_id_sym: im::HashMap<usize, String>,
     types: Vec<LSymType>,
 }
@@ -614,7 +613,7 @@ pub fn new_state_function(
     for (i, arg) in args.iter().enumerate() {
         match arg {
             LValue::Symbol(s) => {
-                if is_type(&args[i..i + 1], env, ctx)?.as_bool()? {
+                if is_type(&args[i..i + 1], env, ctx)?.try_into()? {
                     if i == args.len() - 1 {
                         t_value = s.clone();
                     } else {

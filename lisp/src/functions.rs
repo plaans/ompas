@@ -4,6 +4,7 @@ use crate::structs::LError::{
 };
 use crate::structs::{LError, LValue, NameTypeLValue};
 use im::HashMap;
+use std::convert::{TryFrom, TryInto};
 
 pub fn begin(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     match args.last() {
@@ -32,17 +33,13 @@ pub fn map(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
                 match sv {
                     LValue::List(val_sv) => {
                         //println!("sv: {:?}", val_sv);
-                        if val_sv
-                            .get(1)
-                            .unwrap()
-                            .as_sym()
-                            .unwrap_or_else(|_| String::from(""))
-                            .as_str()
-                            .eq(".")
-                        {
+                        if val_sv.len() != 3 {
+                            return Err(WrongNumberOfArgument(val_sv.into(), val_sv.len(), 3..3));
+                        }
+                        if String::try_from(&val_sv[1])?.as_str().eq(".") {
                             //println!("insert a new fact");
-                            let key = val_sv.get(0).unwrap().clone();
-                            let value = val_sv.get(2).unwrap().clone();
+                            let key = val_sv[0].clone();
+                            let value = val_sv[2].clone();
                             facts.insert(key, value);
                         } else {
                             //println!("doesn't match pattern")
@@ -134,8 +131,7 @@ pub fn set_map(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
         LValue::Map(m) => match &args[0] {
             LValue::List(val_sv) => {
                 if val_sv.len() == 3 {
-                    if val_sv[1]
-                        .as_sym()
+                    if String::try_from(&val_sv[1])
                         .unwrap_or_else(|_| String::from(""))
                         .as_str()
                         .eq(".")

@@ -8,6 +8,7 @@ use aries_planning::parsing::sexpr::SExpr;
 use im::HashMap;
 use std::any::Any;
 use std::borrow::Borrow;
+use std::convert::{TryFrom, TryInto};
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
@@ -354,7 +355,7 @@ pub fn expand(
                                 3..std::usize::MAX,
                             ));
                         }
-                        let def = list[0].as_core_operator()?;
+                        let def = LCoreOperator::try_from(&list[0])?;
                         let v = &list[1];
                         let body = &list[2..];
                         match v {
@@ -396,7 +397,7 @@ pub fn expand(
                                             proc
                                         )));
                                     } else {
-                                        env.add_macro(sym.clone(), proc.as_lambda()?);
+                                        env.add_macro(sym.clone(), proc.try_into()?);
                                     }
                                     //Add to macro_table
                                     return Ok(LValue::Nil);

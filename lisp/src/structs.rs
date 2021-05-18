@@ -1,11 +1,12 @@
 use crate::core::{eval, ContextCollection, RefLEnv};
 use crate::language::*;
-use crate::structs::LError::{SpecialError, WrongNumberOfArgument};
-use aries_utils::input::{ErrLoc};
+use crate::structs::LError::{ConversionError, SpecialError, WrongNumberOfArgument};
+use aries_utils::input::ErrLoc;
 use im::HashMap;
 use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::cmp::Ordering;
+use std::convert::{TryFrom, TryInto};
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::{Add, Div, Mul, Range, Sub};
@@ -573,10 +574,10 @@ impl From<im::HashMap<LValue, LValue>> for LValue {
 
 /*
 
- */
+*/
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-#[serde(untagged,rename_all = "lowercase")]
+#[serde(untagged, rename_all = "lowercase")]
 pub enum LValue {
     // symbol
     Symbol(String),
@@ -678,70 +679,141 @@ impl Hash for LValue {
 
 impl Eq for LValue {}
 
-impl LValue {
-    pub fn as_sym(&self) -> Result<String, LError> {
-        match self {
+impl TryFrom<&LValue> for String {
+    type Error = LError;
+
+    fn try_from(value: &LValue) -> Result<Self, Self::Error> {
+        match value {
             LValue::Symbol(s) => Ok(s.clone()),
             LValue::True => Ok(TRUE.into()),
             LValue::Nil => Ok(NIL.into()),
             LValue::Number(n) => Ok(n.to_string().into()),
-            _ => Err(LError::SpecialError(
-                "cannot convert into symbol".to_string(),
-            )),
+            LValue::Fn(f) => Ok(f.debug_label.to_string()),
+            LValue::MutFn(f) => Ok(f.debug_label.to_string()),
+            lv => Err(ConversionError(lv.into(), NameTypeLValue::Symbol)),
         }
     }
+}
 
-    pub fn as_sym_ref(&self) -> Result<&String, LError> {
-        match self {
-            LValue::Symbol(s) => Ok(s),
-            _ => Err(LError::SpecialError(
-                "cannot convert into symbol ref".to_string(),
-            )),
+impl TryFrom<LValue> for String {
+    type Error = LError;
+
+    fn try_from(value: LValue) -> Result<Self, Self::Error> {
+        (&value).try_into()
+    }
+}
+
+impl TryFrom<&LValue> for Vec<LValue> {
+    type Error = LError;
+
+    fn try_from(value: &LValue) -> Result<Self, Self::Error> {
+        match value {
+            LValue::List(l) => Ok(l.clone()),
+            lv => Err(ConversionError(lv.into(), NameTypeLValue::List)),
         }
     }
+}
+impl TryFrom<LValue> for Vec<LValue> {
+    type Error = LError;
 
-    pub fn as_int(&self) -> Result<i64, LError> {
-        match self {
-            LValue::Number(LNumber::Int(i)) => Ok(*i),
-            LValue::Number(LNumber::Float(f)) => Ok(*f as i64),
-            _ => Err(LError::SpecialError("cannot convert into int".to_string())),
+    fn try_from(value: LValue) -> Result<Self, Self::Error> {
+        (&value).try_into()
+    }
+}
+
+impl TryFrom<&LValue> for i64 {
+    type Error = LError;
+
+    fn try_from(value: &LValue) -> Result<Self, Self::Error> {
+        match value {
+            LValue::Number(n) => Ok(n.into()),
+            lv => Err(ConversionError(lv.into(), NameTypeLValue::Number)),
         }
     }
+}
 
-    pub fn as_float(&self) -> Result<f64, LError> {
-        match self {
-            LValue::Number(LNumber::Int(i)) => Ok(*i as f64),
-            LValue::Number(LNumber::Float(f)) => Ok(*f),
-            _ => Err(LError::SpecialError(
-                "cannot convert into float".to_string(),
-            )),
+impl TryFrom<LValue> for i64 {
+    type Error = LError;
+
+    fn try_from(value: LValue) -> Result<Self, Self::Error> {
+        (&value).try_into()
+    }
+}
+
+impl TryFrom<&LValue> for f64 {
+    type Error = LError;
+
+    fn try_from(value: &LValue) -> Result<Self, Self::Error> {
+        match value {
+            LValue::Number(n) => Ok(n.into()),
+            lv => Err(ConversionError(lv.into(), NameTypeLValue::Number)),
         }
     }
+}
 
-    pub fn as_bool(&self) -> Result<bool, LError> {
-        match self {
+impl TryFrom<LValue> for f64 {
+    type Error = LError;
+
+    fn try_from(value: LValue) -> Result<Self, Self::Error> {
+        (&value).try_into()
+    }
+}
+
+impl TryFrom<&LValue> for bool {
+    type Error = LError;
+
+    fn try_from(value: &LValue) -> Result<Self, Self::Error> {
+        match value {
             LValue::True => Ok(true),
             LValue::Nil => Ok(false),
-            _ => Err(LError::SpecialError("cannot convert into bool".to_string())),
+            lv => Err(ConversionError(lv.into(), NameTypeLValue::Bool)),
         }
     }
+}
 
-    pub fn as_core_operator(&self) -> Result<LCoreOperator, LError> {
-        match self {
+impl TryFrom<LValue> for bool {
+    type Error = LError;
+
+    fn try_from(value: LValue) -> Result<Self, Self::Error> {
+        (&value).try_into()
+    }
+}
+
+impl TryFrom<&LValue> for LCoreOperator {
+    type Error = LError;
+
+    fn try_from(value: &LValue) -> Result<Self, Self::Error> {
+        match value {
             LValue::CoreOperator(co) => Ok(co.clone()),
-            _ => Err(LError::SpecialError(
-                "cannot convert into core operator".to_string(),
-            )),
+            lv => Err(ConversionError(lv.into(), NameTypeLValue::CoreOperator)),
         }
     }
+}
 
-    pub fn as_lambda(&self) -> Result<LLambda, LError> {
-        match self {
+impl TryFrom<LValue> for LCoreOperator {
+    type Error = LError;
+
+    fn try_from(value: LValue) -> Result<Self, Self::Error> {
+        (&value).try_into()
+    }
+}
+
+impl TryFrom<&LValue> for LLambda {
+    type Error = LError;
+
+    fn try_from(value: &LValue) -> Result<Self, Self::Error> {
+        match value {
             LValue::Lambda(l) => Ok(l.clone()),
-            _ => Err(LError::SpecialError(
-                "cannot convert into lambda".to_string(),
-            )),
+            lv => Err(ConversionError(lv.into(), NameTypeLValue::Lambda)),
         }
+    }
+}
+
+impl TryFrom<LValue> for LLambda {
+    type Error = LError;
+
+    fn try_from(value: LValue) -> Result<Self, Self::Error> {
+        (&value).try_into()
     }
 }
 

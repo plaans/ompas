@@ -1,3 +1,6 @@
+use aries_planning::chronicles::Ctx;
+use ompas_godot_simulation_client::state::CtxState;
+use ompas_godot_simulation_client::CtxGodot;
 use ompas_lisp::core::*;
 use ompas_lisp::structs::LValue;
 use ompas_modules::_type::CtxType;
@@ -51,16 +54,23 @@ pub fn lisp_interpreter() {
     let ctx_robot = CtxRobot::default();
     let ctx_type = CtxType::default();
     let ctx_counter = CtxCounter::default();
+    let mut ctx_godot = CtxGodot::default();
+    let mut ctx_state = CtxState::default();
 
     //Insert the doc for the different contexts.
     ctx_doc.insert_doc(CtxIo::documentation());
     ctx_doc.insert_doc(CtxMath::documentation());
     ctx_doc.insert_doc(CtxRobot::documentation());
     ctx_doc.insert_doc(CtxType::documentation());
+    ctx_doc.insert_doc(CtxGodot::documentation());
+    ctx_doc.insert_doc(CtxState::documentation());
 
     //Add the sender of the channel.
-    ctx_io.add_sender_li(sender_li);
+    ctx_io.add_sender_li(sender_li.clone());
     ctx_io.add_sender_stdout(sender_stdout.clone());
+
+    ctx_state.set_sender_stdout(sender_stdout.clone());
+    ctx_godot.set_sender_li(sender_li);
 
     load_module(root_env, ctxs, ctx_doc);
     load_module(root_env, ctxs, ctx_io);
@@ -68,6 +78,8 @@ pub fn lisp_interpreter() {
     load_module(root_env, ctxs, ctx_robot);
     load_module(root_env, ctxs, ctx_type);
     load_module(root_env, ctxs, ctx_counter);
+    load_module(root_env, ctxs, ctx_godot);
+    load_module(root_env, ctxs, ctx_state);
     let env = &mut RefLEnv::new_from_outer(root_env.clone());
 
     //Add core macros

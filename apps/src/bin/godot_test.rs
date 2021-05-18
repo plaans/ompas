@@ -1,7 +1,9 @@
+use ompas_godot_simulation_client::serde::GodotState;
+use ompas_lisp::structs::LError;
 use serde_json::from_str;
+use std::convert::TryFrom;
 use tokio::io::{AsyncReadExt, BufReader};
 use tokio::net::TcpStream;
-use ompas_godot_simulation_client::serde::GodotState;
 
 //const MESSAGE_TO_SEND: &str = "ACK";
 const SIZE_BUFFER: usize = 65_536; //65KB should be enough for the moment
@@ -18,21 +20,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //let mut buf = Vec::new();
     let mut count: usize = 0;
     loop {
+        println!("message {} ", count);
         let mut buf = [0; SIZE_BUFFER];
-        buf_reader.read(&mut buf).await?;
         let mut size = [0; 4];
+        let size_read = buf_reader.read(&mut buf).await?;
+        //TODO: do the case where only the size has been received.
         size.clone_from_slice(&buf[0..4]);
-        let size = u32::from_le_bytes(size);
-        let msg_slice = &buf[4..4 + size as usize];
+        println!("\tsize: {:?}", size);
+        let mut size = usize::try_from(u32::from_le_bytes(size)).unwrap();
+        size = size.min(SIZE_BUFFER - 4);
+        println!("\tmessage_size: {:?}", size);
+        let msg_slice = &buf[4..4 + size];
         let msg = String::from_utf8_lossy(&msg_slice).to_string();
-        println!("message_size: {:?}", size);
-        println!("string length: {}", msg.len());
-        println!("{}: {}", count, msg);
-        let godot_state: GodotState = from_str(&msg).expect("error while deserializing");
+        //println!("string length: {}", msg.len());
+        println!("\tcontent: {}", msg);
+        let godot_state: Result<GodotState, _> = serde_json::from_str(&msg);
+        if let Ok(gs) = godot_state {
+            //println!("deserialized:\n {}", gs);
+            if let Ok(lisp) = gs.transform_data_into_lisp() {
+                //println!(">>>>>>lisp: {}", lisp);
+            }
+        };
 
-        println!("deserialized:\n {}", godot_state);
+        //println!("deserialized:\n {}", godot_state);
         count += 1;
-        if count == 2 {
+        if count == 20 {
             break;
         }
     }

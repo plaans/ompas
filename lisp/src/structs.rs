@@ -687,7 +687,7 @@ impl TryFrom<&LValue> for String {
             LValue::Symbol(s) => Ok(s.clone()),
             LValue::True => Ok(TRUE.into()),
             LValue::Nil => Ok(NIL.into()),
-            LValue::Number(n) => Ok(n.to_string().into()),
+            LValue::Number(n) => Ok(n.to_string()),
             LValue::Fn(f) => Ok(f.debug_label.to_string()),
             LValue::MutFn(f) => Ok(f.debug_label.to_string()),
             lv => Err(ConversionError(lv.into(), NameTypeLValue::Symbol)),

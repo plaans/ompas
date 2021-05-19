@@ -2,7 +2,7 @@ use crate::doc::{Documentation, LHelp};
 use ompas_lisp::core::*;
 use ompas_lisp::structs::LError::*;
 use ompas_lisp::structs::*;
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 
 /*
 LANGUAGE

@@ -1,9 +1,7 @@
 use std::io::{BufReader, Read};
-use std::net::{SocketAddrV4, TcpStream};
+use std::net::TcpStream;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
-
-use serde_json::from_str;
 
 use ompas_lisp::core::RefLEnv;
 use ompas_lisp::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
@@ -11,11 +9,12 @@ use ompas_lisp::structs::{GetModule, LError, LValue, Module, NameTypeLValue};
 use ompas_modules::doc::{Documentation, LHelp};
 
 use crate::serde::GodotState;
-use std::borrow::Borrow;
+use crate::tcp::{read_msg_from_buf, read_size_from_buf, TypeMessage, BUFFER_SIZE};
 
 //modules of the crate
 pub mod serde;
 pub mod state;
+pub mod tcp;
 
 /*
 LANGUAGE
@@ -35,7 +34,6 @@ const EXEC_GODOT: &str = "exec-godot";
 const DOC_MOD_GODOT: &str = "todo";
 const DOC_OPEN_COM: &str = "todo";
 const DOC_LAUNCH_GODOT: &str = "todo";
-const DOC_GET_STATE: &str = "todo";
 const DOC_EXEC_GODOT: &str = "todo";
 const DOC_EXEC_GODOT_VERBOSE: &str = "todo";
 
@@ -78,7 +76,7 @@ impl GetModule for CtxGodot {
             label: MOD_GODOT,
         };
 
-        module.add_fn_prelude(OPEN_COM, Box::new(open_com));
+        module.add_mut_fn_prelude(OPEN_COM, Box::new(open_com));
         module.add_fn_prelude(LAUNCH_GODOT, Box::new(launch_godot));
         module.add_fn_prelude(EXEC_GODOT, Box::new(exec_godot));
 
@@ -103,38 +101,55 @@ Functions
 
 const NAME_THREAD_TCP_SOCKET_GODOT: &str = "thread_tcp_connection_godot";
 
-const BUFFER_SIZE: usize = 65536;
-
 fn thread_tcp_connection(
-    socket_info: SocketInfo,
-    receiver: Receiver<String>,
+    _socket_info: SocketInfo,
+    _receiver: Receiver<String>,
     sender: Sender<String>,
 ) {
-    let stream = TcpStream::connect("127.0.0.1:10000").expect("error connecting to socket");
+    let stream = TcpStream::connect("127.0.0.1:10000").unwrap();
 
     let mut buf_reader = BufReader::new(stream);
 
+    let mut buf = [0; BUFFER_SIZE];
+    let mut next_type_msg = TypeMessage::Unknown;
+    let mut size: usize = 0;
+
     loop {
-        let mut buf = [0; BUFFER_SIZE];
-        buf_reader.read(&mut buf);
-        let mut size = [0; 4];
-        size.clone_from_slice(&buf[0..4]);
-        let size = u32::from_le_bytes(size);
-        let msg_slice = &buf[4..4 + size as usize];
-        let msg = String::from_utf8_lossy(&msg_slice).to_string();
-        let godot_state: Result<GodotState, _> = serde_json::from_str(&msg);
-        match godot_state {
-            Ok(gs) => {
-                if let Ok(lisp) = gs.transform_data_into_lisp() {
-                    sender.send(format!("(set-state {})", lisp));
+        let mut msg = String::new();
+        let size_read = buf_reader.read(&mut buf).unwrap_or(0);
+        match next_type_msg {
+            TypeMessage::Unknown => match size_read {
+                0..=3 => {}
+                4 => {
+                    next_type_msg = TypeMessage::Content;
+                    size = read_size_from_buf(&buf);
                 }
+                _ => {
+                    size = read_size_from_buf(&buf);
+                    msg = read_msg_from_buf(&buf[4..], size);
+                }
+            },
+            TypeMessage::Content => {
+                msg = read_msg_from_buf(&buf, size);
+                next_type_msg = TypeMessage::Unknown;
             }
-            Err(_) => {}
-        };
+            _ => {}
+        }
+
+        if !msg.is_empty() {
+            let godot_state: Result<GodotState, _> = serde_json::from_str(&msg);
+            if let Ok(gs) = godot_state {
+                if let Ok(lisp) = gs.transform_data_into_lisp() {
+                    sender
+                        .send(format!("(set-state {})", lisp))
+                        .expect("could not send via channel");
+                }
+            };
+        }
     }
 }
 
-fn open_com(args: &[LValue], _: &RefLEnv, ctx: &CtxGodot) -> Result<LValue, LError> {
+fn open_com(args: &[LValue], _: &mut RefLEnv, ctx: &mut CtxGodot) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
     }
@@ -152,6 +167,7 @@ fn open_com(args: &[LValue], _: &RefLEnv, ctx: &CtxGodot) -> Result<LValue, LErr
     let socket_info = SocketInfo { addr, port };
 
     let (tx, rx) = channel();
+    ctx.sender_socket = Some(tx);
     let sender = match ctx.get_sender_li() {
         None => {
             return Err(SpecialError(
@@ -164,23 +180,26 @@ fn open_com(args: &[LValue], _: &RefLEnv, ctx: &CtxGodot) -> Result<LValue, LErr
         .name(NAME_THREAD_TCP_SOCKET_GODOT.to_string())
         .spawn(move || {
             thread_tcp_connection(socket_info, rx, sender);
-        });
+        })
+        .expect("couldn't spawn thread for tcp connection");
 
     Ok(LValue::Nil)
 }
 
-fn launch_godot(args: &[LValue], _: &RefLEnv, ctx: &CtxGodot) -> Result<LValue, LError> {
+fn launch_godot(_: &[LValue], _: &RefLEnv, ctx: &CtxGodot) -> Result<LValue, LError> {
     ctx.get_sender_li()
         .as_ref()
         .expect("ctx godot has no sender to l.i.")
-        .send("(print (quote (launch godot not implemented yet)))".to_string());
+        .send("(print (quote (launch godot not implemented yet)))".to_string())
+        .expect("couldn't send via channel");
     Ok(LValue::Nil)
 }
 
-fn exec_godot(args: &[LValue], _: &RefLEnv, ctx: &CtxGodot) -> Result<LValue, LError> {
+fn exec_godot(_: &[LValue], _: &RefLEnv, ctx: &CtxGodot) -> Result<LValue, LError> {
     ctx.get_sender_li()
         .as_ref()
         .expect("ctx godot has no sender to l.i.")
-        .send("(print (quote (exec godot not implemented yet)))".to_string());
+        .send("(print (quote (exec godot not implemented yet)))".to_string())
+        .expect("couldn't send via channel");
     Ok(LValue::Nil)
 }

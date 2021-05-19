@@ -216,6 +216,7 @@ pub fn eq(args: &[LValue], _: &RefLEnv, _: &CtxMath) -> Result<LValue, LError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::convert::TryInto;
 
     /*fn generate_env() -> (RefLEnv, ContextCollection) {
         let env = RefLEnv::empty();
@@ -260,17 +261,17 @@ mod tests {
     fn test_gt() {
         let env = RefLEnv::default();
         let ctx = CtxMath::default();
-        let result_true = gt(&[3.into(), 2.into()], &env, &ctx)
+        let result_true: bool = gt(&[3.into(), 2.into()], &env, &ctx)
             .unwrap()
-            .as_bool()
+            .try_into()
             .unwrap();
-        let result_false = gt(&[2.into(), 3.into()], &env, &ctx)
+        let result_false: bool = gt(&[2.into(), 3.into()], &env, &ctx)
             .unwrap()
-            .as_bool()
+            .try_into()
             .unwrap();
-        let result_false_2 = gt(&[3.into(), 3.into()], &env, &ctx)
+        let result_false_2: bool = gt(&[3.into(), 3.into()], &env, &ctx)
             .unwrap()
-            .as_bool()
+            .try_into()
             .unwrap();
         assert!(result_true);
         assert!(!result_false);
@@ -281,17 +282,17 @@ mod tests {
     fn test_ge() {
         let env = RefLEnv::default();
         let ctx = CtxMath::default();
-        let result_true = ge(&[3.into(), 2.into()], &env, &ctx)
+        let result_true: bool = ge(&[3.into(), 2.into()], &env, &ctx)
             .unwrap()
-            .as_bool()
+            .try_into()
             .unwrap();
-        let result_false = ge(&[2.into(), 3.into()], &env, &ctx)
+        let result_false: bool = ge(&[2.into(), 3.into()], &env, &ctx)
             .unwrap()
-            .as_bool()
+            .try_into()
             .unwrap();
-        let result_true_2 = ge(&[3.into(), 3.into()], &env, &ctx)
+        let result_true_2: bool = ge(&[3.into(), 3.into()], &env, &ctx)
             .unwrap()
-            .as_bool()
+            .try_into()
             .unwrap();
         assert!(result_true);
         assert!(!result_false);
@@ -302,17 +303,17 @@ mod tests {
     fn test_lt() {
         let env = RefLEnv::default();
         let ctx = CtxMath::default();
-        let result_false = lt(&[3.into(), 2.into()], &env, &ctx)
+        let result_false: bool = lt(&[3.into(), 2.into()], &env, &ctx)
             .unwrap()
-            .as_bool()
+            .try_into()
             .unwrap();
-        let result_true = lt(&[2.into(), 3.into()], &env, &ctx)
+        let result_true: bool = lt(&[2.into(), 3.into()], &env, &ctx)
             .unwrap()
-            .as_bool()
+            .try_into()
             .unwrap();
-        let result_false_2 = lt(&[3.into(), 3.into()], &env, &ctx)
+        let result_false_2: bool = lt(&[3.into(), 3.into()], &env, &ctx)
             .unwrap()
-            .as_bool()
+            .try_into()
             .unwrap();
         assert!(result_true);
         assert!(!result_false);
@@ -323,17 +324,17 @@ mod tests {
     fn test_le() {
         let env = RefLEnv::default();
         let ctx = CtxMath::default();
-        let result_false = le(&[3.into(), 2.into()], &env, &ctx)
+        let result_false: bool = le(&[3.into(), 2.into()], &env, &ctx)
             .unwrap()
-            .as_bool()
+            .try_into()
             .unwrap();
-        let result_true = le(&[2.into(), 3.into()], &env, &ctx)
+        let result_true: bool = le(&[2.into(), 3.into()], &env, &ctx)
             .unwrap()
-            .as_bool()
+            .try_into()
             .unwrap();
-        let result_true_2 = le(&[3.into(), 3.into()], &env, &ctx)
+        let result_true_2: bool = le(&[3.into(), 3.into()], &env, &ctx)
             .unwrap()
-            .as_bool()
+            .try_into()
             .unwrap();
         assert!(result_true);
         assert!(!result_false);

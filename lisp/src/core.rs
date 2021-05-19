@@ -210,8 +210,8 @@ impl LEnv {
         }
     }
 
-    pub fn find(&self, var: &String) -> Option<&Self> {
-        match self.symbols.get(var.as_str()) {
+    pub fn find(&self, var: &str) -> Option<&Self> {
+        match self.symbols.get(var) {
             None => match self.outer.borrow() {
                 None => None,
                 Some(env) => env.find(var),
@@ -239,7 +239,7 @@ impl LEnv {
         self.macro_table.insert(key, _macro);
     }
 
-    pub fn get_macro(&self, key: &String) -> Option<&LLambda> {
+    pub fn get_macro(&self, key: &str) -> Option<&LLambda> {
         self.macro_table.get(key)
     }
 

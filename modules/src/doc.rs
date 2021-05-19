@@ -102,7 +102,7 @@ impl CtxDoc {
         string
     }
 
-    pub fn get(&self, sym: &String) -> String {
+    pub fn get(&self, sym: &str) -> String {
         match self.map_help.get(sym) {
             None => "no such function".to_string(),
             Some(h) => format!("{:?}", h),
@@ -161,8 +161,8 @@ pub fn help(args: &[LValue], _: &RefLEnv, ctx: &CtxDoc) -> Result<LValue, LError
     match args.len() {
         0 => Ok(ctx.get_all().into()),
         1 => match &args[0] {
-            LValue::Fn(fun) => Ok(ctx.get(&fun.get_label().into()).into()),
-            LValue::MutFn(fun) => Ok(ctx.get(&fun.get_label().into()).into()),
+            LValue::Fn(fun) => Ok(ctx.get(&fun.get_label()).into()),
+            LValue::MutFn(fun) => Ok(ctx.get(&fun.get_label()).into()),
             LValue::Symbol(s) => Ok(ctx.get(s).into()),
             lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
         },

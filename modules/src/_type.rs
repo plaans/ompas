@@ -160,15 +160,9 @@ impl PartialEq for &LSymType {
     }
 }
 
-impl From<&String> for LType {
-    fn from(s: &String) -> Self {
-        s.as_str().into()
-    }
-}
-
 impl From<String> for LType {
     fn from(s: String) -> Self {
-        (&s).into()
+        s.as_str().into()
     }
 }
 
@@ -242,7 +236,7 @@ impl Display for LStateFunction {
         let mut sr = String::new();
         sr.push('(');
         for (i, t_param) in self.t_params.iter().enumerate() {
-            sr.push_str(format!("{}", t_param).as_str());
+            sr.push_str(t_param.to_string().as_str());
             if i > 0 {
                 sr.push(',');
             }
@@ -300,7 +294,7 @@ impl Default for CtxType {
 }
 
 impl CtxType {
-    pub fn get_type_id(&self, sym: &String) -> Option<&usize> {
+    pub fn get_type_id(&self, sym: &str) -> Option<&usize> {
         self.map_sym_type_id.get(sym)
     }
 
@@ -312,16 +306,16 @@ impl CtxType {
         self.types.get(type_id)
     }
 
-    pub fn get_type_from_sym(&self, sym: &String) -> Option<&LSymType> {
+    pub fn get_type_from_sym(&self, sym: &str) -> Option<&LSymType> {
         match self.get_type_id(sym) {
             None => None,
             Some(type_id) => self.get_type(*type_id),
         }
     }
 
-    pub fn bind_sym_type(&mut self, sym: &String, type_id: usize) {
-        self.map_sym_type_id.insert(sym.clone(), type_id);
-        self.map_type_id_sym.insert(type_id, sym.clone());
+    pub fn bind_sym_type(&mut self, sym: &str, type_id: usize) {
+        self.map_sym_type_id.insert(sym.to_string(), type_id);
+        self.map_type_id_sym.insert(type_id, sym.to_string());
     }
 
     pub fn add_type(&mut self, sym_type: LSymType) -> usize {

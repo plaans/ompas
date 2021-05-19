@@ -4,7 +4,7 @@ use crate::structs::LError::{
 };
 use crate::structs::{LError, LValue, NameTypeLValue};
 use im::HashMap;
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 
 pub fn begin(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     match args.last() {

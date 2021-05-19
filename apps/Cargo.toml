@@ -1,0 +1,45 @@
+[package]
+name = "ompas_apps"
+version = "0.1.0"
+authors = ["Yirmandias <turi@insa-toulouse.fr>"]
+edition = "2018"
+default-run = "lisp"
+
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ompas_lisp = {path = "../lisp"}
+ompas_modules = {path = "../modules"}
+ompas_godot_simulation_client = {path = "../godot-simulation-client"}
+
+aries_model = {git = "https://github.com/arbimo/aries/", rev = "e220567"}
+aries_planning = {git = "https://github.com/arbimo/aries/", rev = "e220567"}
+aries_utils = {git = "https://github.com/arbimo/aries/", rev = "e220567"}
+aries_collections = {git = "https://github.com/arbimo/aries/", rev = "e220567"}
+anyhow = "1.0.40"
+rustyline = "7.1.0"
+im = "15.0.0"
+structopt = { version = "0.3", default-features = false }
+tokio = { version = "1.5.0", features = ["full", "time"] }
+serde = { version = "1.0", features = ["derive"]}
+serde_json = "1.0.64"
+
+
+
+
+[[bin]]
+name = "virtual_robot"
+path = "src/bin/robot_sim.rs"
+
+[[bin]]
+name = "lisp"
+path = "src/bin/unnamed_supervisor.rs"
+
+[[bin]]
+name = "godot_test"
+path = "src/bin/godot_test.rs"
+
+[[bin]]
+name = "serde_test"
+path = "src/bin/serde_test.rs"

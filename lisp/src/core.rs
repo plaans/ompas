@@ -1,54 +1,58 @@
-use crate::lisp_root::lisp_as_literal::AsLiteral;
-use crate::lisp_root::lisp_functions::*;
-use crate::lisp_root::lisp_language::*;
-use crate::lisp_root::lisp_struct::LCoreOperator::Quote;
-use crate::lisp_root::lisp_struct::LError::*;
-use crate::lisp_root::lisp_struct::NameTypeLValue::{List, Symbol};
-use crate::lisp_root::lisp_struct::*;
+use crate::functions::*;
+use crate::language::*;
+use crate::structs::LCoreOperator::Quote;
+use crate::structs::LError::*;
+use crate::structs::NameTypeLValue::{List, Symbol};
+use crate::structs::*;
 use aries_planning::parsing::sexpr::SExpr;
-use aries_utils::input::Sym;
 use im::HashMap;
 use std::any::Any;
 use std::borrow::Borrow;
-use std::fs::File;
-use std::io::Write;
+use std::convert::{TryFrom, TryInto};
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
-pub mod lisp_as_literal;
-pub mod lisp_functions;
-pub mod lisp_language;
-pub mod lisp_struct;
-
 pub struct LEnv {
-    symbols: HashMap<String, LValue>,
-    macro_table: HashMap<Sym, LLambda>,
-    new_entries: Vec<String>,
-    outer: Option<RefLEnv>,
+    pub(crate) symbols: HashMap<String, LValue>,
+    pub(crate) macro_table: HashMap<String, LLambda>,
+    pub(crate) new_entries: Vec<String>,
+    pub(crate) outer: Option<RefLEnv>,
 }
 
-pub struct ContextCollection(Vec<Box<dyn Any>>);
+pub struct ContextCollection {
+    inner: Vec<Box<dyn Any>>,
+    map_label_usize: HashMap<&'static str, usize>,
+}
 
 impl Default for ContextCollection {
     fn default() -> Self {
-        Self(vec![])
+        Self {
+            inner: vec![],
+            map_label_usize: Default::default(),
+        }
     }
 }
 
-type CtxCollec = ContextCollection;
-
 impl ContextCollection {
     pub fn insert(&mut self, ctx: Box<dyn Any>) -> usize {
-        self.0.push(ctx);
-        self.0.len() - 1
+        self.inner.push(ctx);
+        self.inner.len() - 1
     }
 
     pub fn get_context(&self, id: usize) -> &dyn Any {
-        self.0.get(id).unwrap().deref()
+        self.inner.get(id).unwrap().deref()
+    }
+    pub fn get_context_with_label(&self, label: &str) -> &dyn Any {
+        let id = match self.map_label_usize.get(label) {
+            None => panic!("no context with such label"),
+            Some(s) => *s,
+        };
+
+        self.get_context(id)
     }
 
     pub fn get_mut_context(&mut self, id: usize) -> &mut dyn Any {
-        self.0.get_mut(id).unwrap().deref_mut()
+        self.inner.get_mut(id).unwrap().deref_mut()
     }
 }
 
@@ -116,6 +120,8 @@ impl LEnv {
         // map.ins
         let mut symbols: HashMap<String, LValue> = HashMap::default();
 
+        symbols.insert(NIL.to_string(), LValue::Nil);
+
         //Core Operators
         symbols.insert(DEFINE.to_string(), LCoreOperator::Define.into());
         symbols.insert(IF.to_string(), LCoreOperator::If.into());
@@ -127,109 +133,54 @@ impl LEnv {
         symbols.insert(QUOTE.to_string(), LCoreOperator::Quote.into());
         symbols.insert(UNQUOTE.to_string(), LCoreOperator::UnQuote.into());
 
-        //Mathematical functions
-        symbols.insert(
-            ADD.to_string(),
-            LValue::Fn(LFn::new(Box::new(add), ADD.to_string())),
-        );
-        symbols.insert(
-            SUB.to_string(),
-            LValue::Fn(LFn::new(Box::new(sub), SUB.to_string())),
-        );
-        symbols.insert(
-            MUL.to_string(),
-            LValue::Fn(LFn::new(Box::new(mul), MUL.to_string())),
-        );
-        symbols.insert(
-            DIV.to_string(),
-            LValue::Fn(LFn::new(Box::new(div), DIV.to_string())),
-        );
-        //Comparison
-        symbols.insert(
-            GT.to_string(),
-            LValue::Fn(LFn::new(Box::new(gt), GT.to_string())),
-        );
-        symbols.insert(
-            LT.to_string(),
-            LValue::Fn(LFn::new(Box::new(lt), LT.to_string())),
-        );
-        symbols.insert(
-            GE.to_string(),
-            LValue::Fn(LFn::new(Box::new(ge), GE.to_string())),
-        );
-        symbols.insert(
-            LE.to_string(),
-            LValue::Fn(LFn::new(Box::new(le), LE.to_string())),
-        );
-        symbols.insert(
-            EQ.to_string(),
-            LValue::Fn(LFn::new(Box::new(div), EQ.to_string())),
-        );
-
         //Special entry
-        symbols.insert(
-            GET.to_string(),
-            LValue::Fn(LFn::new(Box::new(get), GET.to_string())),
-        );
-        /*symbols.insert(
-        GET_TYPE.to_string(),
-        LValue::Fn(LFn::new(Box::new(get_type), GET_TYPE.to_string())));*/
-
-        //Logical functions : will be added as macros
-        //symbols.insert(AND.to_string(), LValue::LFn(Rc::new(and)));
-        //symbols.insert(OR.to_string(), LValue::LFn(Rc::new(or)));
-        //symbols.insert(NOT.to_string(), LValue::LFn(Rc::new(not)));
-
-        //Basic types
-
-        //Functions for the factbase
-        /* symbols.insert(
-            STATE_FUNCTION.to_string(),
-            LValue::Fn(LFn::new(Box::new(state_function), STATE_FUNCTION.to_string())));
-        symbols.insert(
-            SUBTYPE.to_string(),
-            LValue::Fn(LFn::new(Box::new(subtype), SUBTYPE.to_string())));*/
-        symbols.insert(
-            MAP.to_string(),
-            LValue::Fn(LFn::new(Box::new(map), MAP.to_string())),
-        );
-        symbols.insert(
-            LIST.to_string(),
-            LValue::Fn(LFn::new(Box::new(list), LIST.to_string())),
-        );
+        symbols.insert(GET.to_string(), LValue::Fn(LFn::new(Box::new(get), GET)));
+        symbols.insert(MAP.to_string(), LValue::Fn(LFn::new(Box::new(map), MAP)));
+        symbols.insert(LIST.to_string(), LValue::Fn(LFn::new(Box::new(list), LIST)));
         //State is an alias for map
 
         /*
          * LIST FUNCTIONS
          */
+        symbols.insert(CAR.to_string(), LValue::Fn(LFn::new(Box::new(car), CAR)));
+        symbols.insert(CDR.to_string(), LValue::Fn(LFn::new(Box::new(cdr), CDR)));
+        symbols.insert(LAST.to_string(), LValue::Fn(LFn::new(Box::new(last), LAST)));
+        symbols.insert(CONS.to_string(), LValue::Fn(LFn::new(Box::new(cons), CONS)));
+        symbols.insert(LEN.to_string(), LValue::Fn(LFn::new(Box::new(length), LEN)));
         symbols.insert(
-            CAR.to_string(),
-            LValue::Fn(LFn::new(Box::new(car), CAR.to_string())),
+            EMPTY.to_string(),
+            LValue::Fn(LFn::new(Box::new(empty), EMPTY)),
         );
 
+        //Map functions
         symbols.insert(
-            CDR.to_string(),
-            LValue::Fn(LFn::new(Box::new(cdr), CDR.to_string())),
+            GET_MAP.to_string(),
+            LValue::Fn(LFn::new(Box::new(get_map), GET_MAP)),
+        );
+        symbols.insert(
+            SET_MAP.to_string(),
+            LValue::Fn(LFn::new(Box::new(set_map), SET_MAP)),
         );
 
+        symbols.insert(NOT.to_string(), LValue::Fn(LFn::new(Box::new(not), NOT)));
         symbols.insert(
-            CONS.to_string(),
-            LValue::Fn(LFn::new(Box::new(cons), CONS.to_string())),
+            NOT_SHORT.to_string(),
+            LValue::Fn(LFn::new(Box::new(not), NOT_SHORT)),
         );
 
         symbols.insert(
             APPEND.to_string(),
-            LValue::Fn(LFn::new(Box::new(append), APPEND.to_string())),
+            LValue::Fn(LFn::new(Box::new(append), APPEND)),
         );
 
         symbols.insert(
             MEMBER.to_string(),
-            LValue::Fn(LFn::new(Box::new(member), MEMBER.to_string())),
+            LValue::Fn(LFn::new(Box::new(member), MEMBER)),
         );
 
         symbols.insert(
             REVERSE.to_string(),
-            LValue::Fn(LFn::new(Box::new(reverse), REVERSE.to_string())),
+            LValue::Fn(LFn::new(Box::new(reverse), REVERSE)),
         );
 
         //TODO: Add a function to import files in a predefined file
@@ -259,8 +210,8 @@ impl LEnv {
         }
     }
 
-    pub fn find(&self, var: &Sym) -> Option<&Self> {
-        match self.symbols.get(var.as_str()) {
+    pub fn find(&self, var: &str) -> Option<&Self> {
+        match self.symbols.get(var) {
             None => match self.outer.borrow() {
                 None => None,
                 Some(env) => env.find(var),
@@ -284,11 +235,11 @@ impl LEnv {
         self.new_entries.push(key);
     }
 
-    pub fn add_macro(&mut self, key: Sym, _macro: LLambda) {
+    pub fn add_macro(&mut self, key: String, _macro: LLambda) {
         self.macro_table.insert(key, _macro);
     }
 
-    pub fn get_macro(&self, key: &Sym) -> Option<&LLambda> {
+    pub fn get_macro(&self, key: &str) -> Option<&LLambda> {
         self.macro_table.get(key)
     }
 
@@ -296,12 +247,14 @@ impl LEnv {
         self.new_entries.clone()
     }
 
+    //TODO: remove this function
+    /*
     pub fn to_file(&self, name_file: String) {
         let mut file = File::create(name_file).unwrap();
         let mut string = String::new();
         string.push_str("(begin \n");
         for key in &self.new_entries {
-            let value = self.get_symbol(key).unwrap_or(LValue::None);
+            let value = self.get_symbol(key).unwrap_or(LValue::Nil);
             string.push_str(format!("(define {} {})", key, value.as_command()).as_str());
         }
 
@@ -311,10 +264,11 @@ impl LEnv {
             Err(e) => panic!("{}", e),
         }
         //eprintln!("write fact base to file");
-    }
+    }*/
 }
 
-pub fn load_module(env: &mut RefLEnv, ctxs: &mut ContextCollection, mut module: Module) {
+pub fn load_module(env: &mut RefLEnv, ctxs: &mut ContextCollection, ctx: impl GetModule) -> usize {
+    let mut module = ctx.get_module();
     let id = ctxs.insert(module.ctx);
     for (sym, lv) in &mut module.prelude {
         match lv {
@@ -324,9 +278,10 @@ pub fn load_module(env: &mut RefLEnv, ctxs: &mut ContextCollection, mut module: 
         }
         env.symbols.insert(sym.to_string(), lv.clone());
     }
+    id
 }
 
-pub fn parse(str: &str, env: &mut RefLEnv, ctxs: &mut CtxCollec) -> Result<LValue, LError> {
+pub fn parse(str: &str, env: &mut RefLEnv, ctxs: &mut ContextCollection) -> Result<LValue, LError> {
     match aries_planning::parsing::sexpr::parse(str) {
         Ok(se) => expand(&parse_into_lvalue(&se, env, ctxs)?, true, env, ctxs),
         Err(e) => Err(SpecialError(format!("Error in command: {}", e.to_string()))),
@@ -336,7 +291,7 @@ pub fn parse(str: &str, env: &mut RefLEnv, ctxs: &mut CtxCollec) -> Result<LValu
 pub fn parse_into_lvalue(
     se: &SExpr,
     env: &mut RefLEnv,
-    ctxs: &mut CtxCollec,
+    ctxs: &mut ContextCollection,
 ) -> Result<LValue, LError> {
     match se {
         SExpr::Atom(atom) => {
@@ -351,11 +306,11 @@ pub fn parse_into_lvalue(
                         //Test if its a Boolean
                         TRUE => {
                             //println!("atom is boolean true");
-                            Ok(LValue::Bool(true))
+                            Ok(LValue::True)
                         }
-                        FALSE => {
+                        FALSE | NIL => {
                             //println!("atom is boolean false");
-                            Ok(LValue::Bool(false))
+                            Ok(LValue::Nil)
                         }
 
                         s => match env.get_symbol(s) {
@@ -368,12 +323,15 @@ pub fn parse_into_lvalue(
         }
         SExpr::List(list) => {
             //println!("expression is a list");
-            let mut vec_lvalue = Vec::new();
-
-            for element in list.iter() {
-                vec_lvalue.push(parse_into_lvalue(element, env, ctxs)?);
+            let list_iter = list.iter();
+            if list_iter.is_empty() {
+                Ok(LValue::Nil)
+            } else {
+                let vec: Vec<LValue> = list_iter
+                    .map(|x| parse_into_lvalue(x, env, ctxs))
+                    .collect::<Result<_, _>>()?;
+                Ok(LValue::List(vec))
             }
-            Ok(LValue::List(vec_lvalue))
         }
     }
 }
@@ -382,11 +340,11 @@ pub fn expand(
     x: &LValue,
     top_level: bool,
     env: &mut RefLEnv,
-    ctxs: &mut CtxCollec,
+    ctxs: &mut ContextCollection,
 ) -> Result<LValue, LError> {
     match x {
         LValue::List(list) => {
-            match list.first().unwrap() {
+            match &list[0] {
                 LValue::CoreOperator(co) => match co {
                     LCoreOperator::Define | LCoreOperator::DefMacro => {
                         //eprintln!("expand: define: Ok!");
@@ -397,16 +355,15 @@ pub fn expand(
                                 3..std::usize::MAX,
                             ));
                         }
-                        let def = list.get(0).unwrap().as_core_operator()?;
-                        let v = list.get(1).unwrap();
-                        let body = &list[1..];
+                        let def = LCoreOperator::try_from(&list[0])?;
+                        let v = &list[1];
+                        let body = &list[2..];
                         match v {
                             LValue::List(v_list) => {
                                 if v_list.len() >= 2 {
-                                    let f = v_list.get(0).unwrap();
+                                    let f = &v_list[0];
                                     let args = &v_list[1..];
-                                    let mut new_body = Vec::new();
-                                    new_body.push(LCoreOperator::DefLambda.into());
+                                    let mut new_body = vec![LCoreOperator::DefLambda.into()];
                                     new_body.append(&mut args.to_vec());
                                     new_body.append(&mut body.to_vec());
                                     return expand(
@@ -421,7 +378,7 @@ pub fn expand(
                                 if list.len() != 3 {
                                     return Err(WrongNumberOfArgument(x.clone(), list.len(), 3..3));
                                 }
-                                let exp = expand(list.get(2).unwrap(), top_level, env, ctxs)?;
+                                let exp = expand(&list[2], top_level, env, ctxs)?;
                                 if def == LCoreOperator::DefMacro {
                                     if !top_level {
                                         return Err(SpecialError(format!(
@@ -440,10 +397,10 @@ pub fn expand(
                                             proc
                                         )));
                                     } else {
-                                        env.add_macro(sym.clone(), proc.as_lambda()?);
+                                        env.add_macro(sym.clone(), proc.try_into()?);
                                     }
                                     //Add to macro_table
-                                    return Ok(LValue::None);
+                                    return Ok(LValue::Nil);
                                 }
                                 //We add to the list the expanded body
                                 return Ok(
@@ -463,7 +420,7 @@ pub fn expand(
                                 3..std::usize::MAX,
                             ));
                         }
-                        let vars = list.get(1).unwrap();
+                        let vars = &list[1];
                         let body = &list[2..];
                         //Verification of the types of the arguments
                         match vars {
@@ -502,7 +459,7 @@ pub fn expand(
                     LCoreOperator::If => {
                         let mut list = list.clone();
                         if list.len() == 3 {
-                            list.push(LValue::None);
+                            list.push(LValue::Nil);
                         }
                         if list.len() != 4 {
                             return Err(WrongNumberOfArgument((&list).into(), list.len(), 4..4));
@@ -515,7 +472,7 @@ pub fn expand(
                         return Ok(list_expanded.into());
                     }
                     LCoreOperator::Quote => {
-                        eprintln!("expand: quote: Ok!");
+                        //eprintln!("expand: quote: Ok!");
                         if list.len() != 2 {
                             return Err(WrongNumberOfArgument(list.into(), list.len(), 2..2));
                         }
@@ -537,7 +494,7 @@ pub fn expand(
                     }
                     LCoreOperator::Begin => {
                         return if list.len() == 1 {
-                            Ok(LValue::None)
+                            Ok(LValue::Nil)
                         } else {
                             let mut expanded_list = Vec::new();
                             for xi in list {
@@ -577,7 +534,6 @@ pub fn expand(
             }
             Ok(expanded_list.into())
         }
-        LValue::None => Err(SpecialError("Not expecting a none value".to_string())),
         lv => Ok(lv.clone()),
     }
 }
@@ -624,7 +580,11 @@ pub fn expand_quasi_quote(x: &LValue, env: &mut RefLEnv) -> Result<LValue, LErro
     //Verify if has unquotesplicing here
 }
 
-pub fn eval(lv: &LValue, env: &mut RefLEnv, ctxs: &mut CtxCollec) -> Result<LValue, LError> {
+pub fn eval(
+    lv: &LValue,
+    env: &mut RefLEnv,
+    ctxs: &mut ContextCollection,
+) -> Result<LValue, LError> {
     match lv {
         LValue::List(list) => {
             //println!("expression is a list");
@@ -635,7 +595,7 @@ pub fn eval(lv: &LValue, env: &mut RefLEnv, ctxs: &mut CtxCollec) -> Result<LVal
             match proc {
                 LValue::CoreOperator(co) => match co {
                     LCoreOperator::Define => {
-                        match args.get(0).unwrap() {
+                        match &args[0] {
                             LValue::Symbol(s) => {
                                 let exp = eval(&args[1], env, ctxs)?;
                                 env.add_entry(s.to_string(), exp);
@@ -648,10 +608,10 @@ pub fn eval(lv: &LValue, env: &mut RefLEnv, ctxs: &mut CtxCollec) -> Result<LVal
                                 ))
                             }
                         };
-                        Ok(LValue::None)
+                        Ok(LValue::Nil)
                     }
                     LCoreOperator::DefLambda => {
-                        let params = match args.get(0).unwrap() {
+                        let params = match &args[0] {
                             LValue::List(list) => {
                                 let mut vec_sym = Vec::new();
                                 for val in list {
@@ -666,13 +626,18 @@ pub fn eval(lv: &LValue, env: &mut RefLEnv, ctxs: &mut CtxCollec) -> Result<LVal
                                         }
                                     }
                                 }
-                                vec_sym
+                                vec_sym.into()
                             }
+                            LValue::Symbol(s) => s.clone().into(),
                             lv => {
-                                return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::List))
+                                return Err(NotInListOfExpectedTypes(
+                                    lv.clone(),
+                                    lv.into(),
+                                    vec![NameTypeLValue::List, NameTypeLValue::Symbol],
+                                ))
                             }
                         };
-                        let body = args.get(1).unwrap();
+                        let body = &args[1];
                         Ok(LValue::Lambda(LLambda::new(params, body.clone())))
                     }
                     LCoreOperator::If => {
@@ -680,8 +645,8 @@ pub fn eval(lv: &LValue, env: &mut RefLEnv, ctxs: &mut CtxCollec) -> Result<LVal
                         let conseq = args.get(1).unwrap();
                         let alt = args.get(2).unwrap();
                         match eval(test, env, ctxs) {
-                            Ok(LValue::Bool(true)) => eval(conseq, env, ctxs),
-                            Ok(LValue::Bool(false)) => eval(alt, env, ctxs),
+                            Ok(LValue::True) => eval(conseq, env, ctxs),
+                            Ok(LValue::Nil) => eval(alt, env, ctxs),
                             Ok(lv) => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Bool)),
                             Err(e) => Err(e),
                         }
@@ -689,23 +654,25 @@ pub fn eval(lv: &LValue, env: &mut RefLEnv, ctxs: &mut CtxCollec) -> Result<LVal
                     LCoreOperator::Quote => return Ok(args.first().unwrap().clone()),
                     LCoreOperator::Set => {
                         //TODO: implement set
-                        Ok(LValue::None)
+                        Ok(LValue::Nil)
                     }
                     LCoreOperator::Begin => {
-                        for (k, exp) in args[1..].iter().enumerate() {
-                            let result = eval(exp, env, ctxs)?;
-                            if k == args.len() {
-                                return Ok(result);
-                            }
-                        }
-                        Ok(LValue::None)
+                        let results: Vec<LValue> = args
+                            .iter()
+                            .map(|x| eval(x, env, ctxs))
+                            .collect::<Result<_, _>>()?;
+                        Ok(results.last().unwrap_or(&LValue::Nil).clone())
                     }
                     LCoreOperator::QuasiQuote
                     | LCoreOperator::UnQuote
-                    | LCoreOperator::DefMacro => Ok(LValue::None),
+                    | LCoreOperator::DefMacro => Ok(LValue::Nil),
                 },
                 LValue::Lambda(l) => {
-                    l.call(args, env, ctxs)
+                    let args: Vec<LValue> = args
+                        .iter()
+                        .map(|x| eval(x, env, ctxs))
+                        .collect::<Result<_, _>>()?;
+                    l.call(args.as_slice(), env, ctxs)
                     /*let mut new_env = l.get_new_env(args, env)?;
                     eval(&l.get_body(), &mut new_env)*/
                 }
@@ -730,6 +697,20 @@ pub fn eval(lv: &LValue, env: &mut RefLEnv, ctxs: &mut CtxCollec) -> Result<LVal
                         Some(u) => fun.call(&args, env, ctxs.get_mut_context(u)),
                     }
                 }
+                LValue::Symbol(s) => match env.get_symbol(s.as_str()) {
+                    None => Err(SpecialError(format!(
+                        "function {} corresponds to nothing in environment.",
+                        s
+                    ))),
+                    Some(lv) => match lv {
+                        LValue::Fn(_) | LValue::MutFn(_) | LValue::Lambda(_) => {
+                            let mut new_args = args.to_vec();
+                            new_args.insert(0, lv);
+                            eval(&new_args.into(), env, ctxs)
+                        }
+                        _ => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Fn)),
+                    },
+                },
                 lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Fn)),
             }
         }
@@ -739,6 +720,18 @@ pub fn eval(lv: &LValue, env: &mut RefLEnv, ctxs: &mut CtxCollec) -> Result<LVal
         },
         lv => Ok(lv.clone()),
     }
+}
+
+pub fn core_macros_and_lambda() -> String {
+    let mut string = "(begin".to_string();
+    string.push_str(MACRO_AND2);
+    string.push_str(MACRO_OR2);
+    string.push_str(MACRO_NEQ);
+    string.push_str(MACRO_NEQ_SHORT);
+    string.push_str(LAMBDA_AND);
+    string.push_str(LAMBDA_OR);
+    string.push(')');
+    string
 }
 
 //(begin (define ?v (var (:type object

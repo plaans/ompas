@@ -1,9 +1,15 @@
+use crate::doc::{Documentation, LHelp};
+use ompas_lisp::core::*;
+use ompas_lisp::structs::LError::*;
+use ompas_lisp::structs::*;
+use std::convert::TryFrom;
+
 /*
 LANGUAGE
 */
-use crate::lisp_root::lisp_struct::LError::{SpecialError, WrongNumberOfArgument, WrongType};
-use crate::lisp_root::lisp_struct::*;
-use crate::lisp_root::RefLEnv;
+
+const MOD_COUNTER: &str = "mod-counter";
+const DOC_MOD_COUNTER: &str = "documentation of the module counter";
 
 pub const TYPE_COUNTER: &str = "counter";
 pub const SET_COUNTER: &str = "set-counter";
@@ -63,7 +69,7 @@ pub fn decrement_counter(
                 if c.val > 0 {
                     c.val -= 1;
                 }
-                Ok(LValue::None)
+                Ok(LValue::Nil)
             }
         },
         lv => Err(WrongType(
@@ -87,7 +93,7 @@ pub fn increment_counter(
             None => Err(SpecialError("index out of reach".to_string())),
             Some(c) => {
                 c.val += 1;
-                Ok(LValue::None)
+                Ok(LValue::Nil)
             }
         },
         lv => Err(WrongType(
@@ -111,8 +117,8 @@ pub fn set_counter(
         LValue::Number(LNumber::Usize(u)) => match ctx.counters.get_mut(*u) {
             None => Err(SpecialError("index out of reach".to_string())),
             Some(c) => {
-                c.val = args[1].as_int()? as u32;
-                Ok(LValue::None)
+                c.val = i64::try_from(&args[1])? as u32;
+                Ok(LValue::Nil)
             }
         },
         lv => Err(WrongType(
@@ -127,42 +133,47 @@ pub fn new_counter(_: &[LValue], _: &mut RefLEnv, ctx: &mut CtxCounter) -> Resul
     Ok(LValue::Number(LNumber::Usize(ctx.new_counter())))
 }
 
-impl AsModule for CtxCounter {
-    fn get_module() -> Module {
-        let mut prelude = vec![];
-        prelude.push((
-            GET_COUNTER.into(),
-            LValue::Fn(LFn::new(Box::new(get_counter), GET_COUNTER.into())),
-        ));
-        prelude.push((
-            SET_COUNTER.into(),
-            LValue::MutFn(LMutFn::new(Box::new(set_counter), SET_COUNTER.into())),
-        ));
+impl GetModule for CtxCounter {
+    fn get_module(self) -> Module {
+        let mut module = Module {
+            ctx: Box::new(self),
+            prelude: vec![],
+            label: MOD_COUNTER,
+        };
 
-        prelude.push((
-            NEW_COUNTER.into(),
-            LValue::MutFn(LMutFn::new(Box::new(new_counter), NEW_COUNTER.into())),
-        ));
+        module.add_fn_prelude(GET_COUNTER, Box::new(get_counter));
+        module.add_mut_fn_prelude(SET_COUNTER, Box::new(set_counter));
+        module.add_mut_fn_prelude(NEW_COUNTER, Box::new(new_counter));
+        module.add_mut_fn_prelude(INCREMENT_COUNTER, Box::new(increment_counter));
+        module.add_mut_fn_prelude(DECREMENT_COUNTER, Box::new(decrement_counter));
 
-        prelude.push((
-            INCREMENT_COUNTER.into(),
-            LValue::MutFn(LMutFn::new(
-                Box::new(increment_counter),
-                INCREMENT_COUNTER.into(),
-            )),
-        ));
+        module
+    }
+}
 
-        prelude.push((
-            DECREMENT_COUNTER.into(),
-            LValue::MutFn(LMutFn::new(
-                Box::new(decrement_counter),
-                DECREMENT_COUNTER.into(),
-            )),
-        ));
+/*
+DOCUMENTATION
+ */
 
-        Module {
-            ctx: Box::new(Self::default()),
-            prelude,
-        }
+const DOC_GET_COUNTER: &str = "Get value of a counter.";
+const DOC_SET_COUNTER: &str = "Set value of a counter.";
+const DOC_SET_COUNTER_VERBOSE: &str = "Takes 2 arguments: the counter and the new value. Value must be a Natural.\n\
+                                        Example: (set-counter cnt 10) #sets the value of the counter cnt to one.";
+const DOC_NEW_COUNTER: &str = "Create a new counter.";
+const DOC_NEW_COUNTER_VERBOSE: &str = "Takes no arguments. Return the id of the counter.\n\
+                                        Example: (define cnt (new-counter))";
+const DOC_INCREMENT_COUNTER: &str = "Increment counter's value by one.";
+const DOC_DECREMENT_COUNTER: &str = "Decrement counter's value by one until it reaches 0.";
+
+impl Documentation for CtxCounter {
+    fn documentation() -> Vec<LHelp> {
+        vec![
+            LHelp::new(MOD_COUNTER, DOC_MOD_COUNTER, None),
+            LHelp::new(GET_COUNTER, DOC_GET_COUNTER, None),
+            LHelp::new(SET_COUNTER, DOC_SET_COUNTER, Some(DOC_SET_COUNTER_VERBOSE)),
+            LHelp::new(NEW_COUNTER, DOC_NEW_COUNTER, Some(DOC_NEW_COUNTER_VERBOSE)),
+            LHelp::new(INCREMENT_COUNTER, DOC_INCREMENT_COUNTER, None),
+            LHelp::new(DECREMENT_COUNTER, DOC_DECREMENT_COUNTER, None),
+        ]
     }
 }

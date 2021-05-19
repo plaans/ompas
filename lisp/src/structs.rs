@@ -1,10 +1,12 @@
-use crate::lisp_root::lisp_language::*;
-use aries_utils::input::{ErrLoc, Sym};
-use std::cmp::Ordering;
-//use std::collections::HashMap;
-use crate::lisp_root::lisp_struct::LError::WrongNumberOfArgument;
-use crate::lisp_root::{eval, CtxCollec, RefLEnv};
+use crate::core::{eval, ContextCollection, RefLEnv};
+use crate::language::*;
+use crate::structs::LError::{ConversionError, SpecialError, WrongNumberOfArgument};
+use aries_utils::input::ErrLoc;
+use im::HashMap;
+use serde::{Deserialize, Serialize};
 use std::any::Any;
+use std::cmp::Ordering;
+use std::convert::{TryFrom, TryInto};
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::{Add, Div, Mul, Range, Sub};
@@ -59,13 +61,20 @@ impl Display for LError {
     }
 }
 
+impl From<std::io::Error> for LError {
+    fn from(e: std::io::Error) -> Self {
+        SpecialError(e.to_string())
+    }
+}
+
 impl From<ErrLoc> for LError {
     fn from(e: ErrLoc) -> Self {
         LError::ErrLoc(e)
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum LNumber {
     Int(i64),
     Float(f64),
@@ -82,19 +91,19 @@ impl Display for LNumber {
     }
 }
 
-impl Into<Sym> for &LNumber {
-    fn into(self) -> Sym {
-        match self {
-            LNumber::Int(i) => i.to_string().into(),
-            LNumber::Float(f) => f.to_string().into(),
-            LNumber::Usize(u) => u.to_string().into(),
+impl From<&LNumber> for String {
+    fn from(n: &LNumber) -> Self {
+        match n {
+            LNumber::Int(i) => i.to_string(),
+            LNumber::Float(f) => f.to_string(),
+            LNumber::Usize(u) => u.to_string(),
         }
     }
 }
 
-impl Into<Sym> for LNumber {
-    fn into(self) -> Sym {
-        (&self).into()
+impl From<LNumber> for String {
+    fn from(n: LNumber) -> Self {
+        (&n).to_string()
     }
 }
 
@@ -106,9 +115,9 @@ impl PartialEq for LNumber {
     }
 }
 
-impl Into<usize> for &LNumber {
-    fn into(self) -> usize {
-        match self {
+impl From<&LNumber> for usize {
+    fn from(n: &LNumber) -> Self {
+        match n {
             LNumber::Int(i) => *i as usize,
             LNumber::Float(f) => *f as usize,
             LNumber::Usize(u) => *u,
@@ -116,9 +125,9 @@ impl Into<usize> for &LNumber {
     }
 }
 
-impl Into<f64> for &LNumber {
-    fn into(self) -> f64 {
-        match self {
+impl From<&LNumber> for f64 {
+    fn from(n: &LNumber) -> Self {
+        match n {
             LNumber::Int(i) => *i as f64,
             LNumber::Float(f) => *f,
             LNumber::Usize(u) => *u as f64,
@@ -126,13 +135,43 @@ impl Into<f64> for &LNumber {
     }
 }
 
-impl Into<i64> for &LNumber {
-    fn into(self) -> i64 {
-        match self {
+impl From<&LNumber> for i64 {
+    fn from(n: &LNumber) -> Self {
+        match n {
             LNumber::Int(i) => *i,
             LNumber::Float(f) => *f as i64,
             LNumber::Usize(u) => *u as i64,
         }
+    }
+}
+
+impl From<i64> for LNumber {
+    fn from(i: i64) -> Self {
+        LNumber::Int(i)
+    }
+}
+
+impl From<i32> for LNumber {
+    fn from(i: i32) -> Self {
+        LNumber::Int(i as i64)
+    }
+}
+
+impl From<f64> for LNumber {
+    fn from(f: f64) -> Self {
+        LNumber::Float(f)
+    }
+}
+
+impl From<f32> for LNumber {
+    fn from(f: f32) -> Self {
+        LNumber::Float(f as f64)
+    }
+}
+
+impl From<usize> for LNumber {
+    fn from(u: usize) -> Self {
+        LNumber::Usize(u)
     }
 }
 
@@ -264,9 +303,26 @@ impl Div for LNumber {
 
 impl Eq for LNumber {}
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
+pub enum LambdaArgs {
+    Sym(String),
+    List(Vec<String>),
+}
+
+impl From<String> for LambdaArgs {
+    fn from(s: String) -> Self {
+        LambdaArgs::Sym(s)
+    }
+}
+
+impl From<Vec<String>> for LambdaArgs {
+    fn from(vec_sym: Vec<String>) -> Self {
+        LambdaArgs::List(vec_sym)
+    }
+}
+#[derive(Clone, Debug)]
 pub struct LLambda {
-    params: Vec<Sym>,
+    params: LambdaArgs,
     body: Box<LValue>,
 }
 
@@ -283,7 +339,7 @@ impl PartialEq for LLambda {
 }
 
 impl LLambda {
-    pub fn new(params: Vec<Sym>, body: LValue) -> Self {
+    pub fn new(params: LambdaArgs, body: LValue) -> Self {
         LLambda {
             params,
             body: Box::new(body),
@@ -291,17 +347,31 @@ impl LLambda {
     }
 
     pub fn get_new_env(&self, args: &[LValue], outer: &RefLEnv) -> Result<RefLEnv, LError> {
-        if self.params.len() != args.len() {
-            return Err(WrongNumberOfArgument(
-                LValue::List(args.to_vec()),
-                args.len(),
-                self.params.len()..self.params.len(),
-            ));
-        }
         let mut env = RefLEnv::empty();
-        for (param, arg) in self.params.iter().zip(args) {
-            env.symbols.insert(param.to_string(), arg.clone());
-        }
+
+        match &self.params {
+            LambdaArgs::Sym(param) => {
+                let args = if args.len() == 1 {
+                    args[0].clone()
+                } else {
+                    args.into()
+                };
+                env.symbols.insert(param.to_string(), args);
+            }
+            LambdaArgs::List(params) => {
+                if params.len() != args.len() {
+                    return Err(WrongNumberOfArgument(
+                        args.into(),
+                        args.len(),
+                        params.len()..params.len(),
+                    ));
+                }
+                for (param, arg) in params.iter().zip(args) {
+                    env.symbols.insert(param.to_string(), arg.clone());
+                }
+            }
+        };
+
         env.outer = Some(outer.clone());
         Ok(env)
     }
@@ -310,7 +380,7 @@ impl LLambda {
         &self,
         args: &[LValue],
         outer: &RefLEnv,
-        ctxs: &mut CtxCollec,
+        ctxs: &mut ContextCollection,
     ) -> Result<LValue, LError> {
         let mut new_env = self.get_new_env(args, outer)?;
         eval(&*self.body, &mut new_env, ctxs)
@@ -326,8 +396,22 @@ pub type NativeFn = dyn Fn(&[LValue], &RefLEnv, &dyn Any) -> Result<LValue, LErr
 #[derive(Clone)]
 pub struct LFn {
     pub(crate) fun: Rc<NativeFn>,
-    pub(crate) debug_label: String,
+    pub(crate) debug_label: &'static str,
     index_mod: Option<usize>,
+}
+
+impl Debug for LFn {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(
+            f,
+            "label: {:?}\nmod : {}",
+            self.debug_label,
+            match self.index_mod {
+                None => "none".to_string(),
+                Some(u) => u.to_string(),
+            }
+        )
+    }
 }
 
 impl LFn {
@@ -337,7 +421,7 @@ impl LFn {
         F: Fn(&[LValue], &RefLEnv, &T) -> R + 'static,
     >(
         lbd: Box<F>,
-        debug_label: String,
+        debug_label: &'static str,
     ) -> Self {
         let x = move |args: &[LValue], env: &RefLEnv, ctx: &dyn Any| -> Result<LValue, LError> {
             let ctx: Option<&T> = ctx.downcast_ref::<T>();
@@ -372,6 +456,10 @@ impl LFn {
     pub fn get_index_mod(&self) -> Option<usize> {
         self.index_mod
     }
+
+    pub fn get_label(&self) -> &'static str {
+        self.debug_label
+    }
 }
 
 pub type NativeMutFn = dyn Fn(&[LValue], &mut RefLEnv, &mut dyn Any) -> Result<LValue, LError>;
@@ -379,8 +467,22 @@ pub type NativeMutFn = dyn Fn(&[LValue], &mut RefLEnv, &mut dyn Any) -> Result<L
 #[derive(Clone)]
 pub struct LMutFn {
     pub(crate) fun: Rc<NativeMutFn>,
-    pub(crate) debug_label: String,
+    pub(crate) debug_label: &'static str,
     index_mod: Option<usize>,
+}
+
+impl Debug for LMutFn {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(
+            f,
+            "label: {:?}\nmod : {}",
+            self.debug_label,
+            match self.index_mod {
+                None => "none".to_string(),
+                Some(u) => u.to_string(),
+            }
+        )
+    }
 }
 
 impl LMutFn {
@@ -390,7 +492,7 @@ impl LMutFn {
         F: Fn(&[LValue], &mut RefLEnv, &mut T) -> R + 'static,
     >(
         lbd: Box<F>,
-        debug_label: String,
+        debug_label: &'static str,
     ) -> Self {
         let x = move |args: &[LValue],
                       env: &mut RefLEnv,
@@ -428,9 +530,14 @@ impl LMutFn {
     ) -> Result<LValue, LError> {
         (self.fun)(args, env, ctx)
     }
+
+    pub fn get_label(&self) -> &'static str {
+        self.debug_label
+    }
 }
 
-#[derive(Clone, PartialOrd, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialOrd, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[serde(untagged, rename_all = "lowercase")]
 pub enum LCoreOperator {
     Define,
     DefLambda,
@@ -459,43 +566,71 @@ impl Display for LCoreOperator {
     }
 }
 
-#[derive(Clone)]
+impl From<im::HashMap<LValue, LValue>> for LValue {
+    fn from(map: HashMap<LValue, LValue>) -> Self {
+        LValue::Map(map)
+    }
+}
+
+/*
+
+*/
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+#[serde(untagged, rename_all = "lowercase")]
 pub enum LValue {
     // symbol
-    Symbol(Sym),
+    Symbol(String),
     // literaux
     Number(LNumber),
-    Bool(bool),
-    String(String),
+    #[serde(skip)]
+    Fn(LFn),
+    #[serde(skip)]
+    MutFn(LMutFn),
+    #[serde(skip)]
+    Lambda(LLambda),
+    #[serde(skip)]
+    CoreOperator(LCoreOperator),
 
     // data structure
+    #[serde(skip)]
+    //TODO: Implement serde for mirror struct of im::hashmap
     Map(im::HashMap<LValue, LValue>),
     List(Vec<LValue>),
     Quote(Box<LValue>),
-    // error
-    None,
-    Fn(LFn),
-    MutFn(LMutFn),
-    Lambda(LLambda),
-    CoreOperator(LCoreOperator),
+    //Refers to boolean 'false and empty list in lisp
+    True,
+    Nil,
 }
 
-impl Debug for LValue {
+/*impl Debug for LValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{:?}", self)
+        let string = match self {
+            LValue::Symbol(s) => format!("LValue::Symbol: {:?}", s),
+            LValue::Number(n) => format!("Number: {:?}", n),
+            LValue::True => "LValue::True".to_string(),
+            LValue::Map(map) => format!("LValue::Map: {:?}", map),
+            LValue::List(list) => format!("List: {:?}", list),
+            LValue::Quote(q) => format!("Quote: {:?}", q),
+            LValue::Nil => "LValue::Nil".to_string(),
+            LValue::Fn(lfn) => format!("Function: {:?}", lfn),
+            LValue::MutFn(mutfn) => format!("Number: {:?}", mutfn),
+            LValue::Lambda(l) => format!("Lambda: {:?}", l),
+            LValue::CoreOperator(co) => format!("CoreOperator: {:?}", co),
+        };
+        write!(f, "{}", string)
     }
-}
+}*/
 
 impl Display for LValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            LValue::String(s) => write!(f, "{}", s),
             LValue::Fn(fun) => write!(f, "{}", fun.debug_label),
             LValue::MutFn(fun) => write!(f, "{}", fun.debug_label),
-            LValue::None => write!(f, "None"),
+            LValue::Nil => write!(f, "nil"),
             LValue::Symbol(s) => write!(f, "{}", s),
             LValue::Number(n) => write!(f, "{}", n),
-            LValue::Bool(b) => write!(f, "{}", b),
+            LValue::True => write!(f, "true"),
             LValue::List(list) => {
                 let mut result = String::new();
                 result.push('(');
@@ -527,8 +662,7 @@ impl Hash for LValue {
         match self {
             LValue::Symbol(s) => (*s).hash(state),
             LValue::Number(n) => (*n).hash(state),
-            LValue::Bool(b) => (*b).hash(state),
-            LValue::String(s) => (*s).hash(state),
+            LValue::True => true.hash(state),
             LValue::Map(m) => (*m).hash(state),
             LValue::List(l) => {
                 (*l).hash(state);
@@ -537,7 +671,7 @@ impl Hash for LValue {
                 s.to_string().hash(state);
             }
 
-            LValue::None => "none".hash(state),
+            LValue::Nil => false.hash(state),
             _ => {}
         };
     }
@@ -545,68 +679,141 @@ impl Hash for LValue {
 
 impl Eq for LValue {}
 
-impl LValue {
-    pub fn as_sym(&self) -> Result<Sym, LError> {
-        match self {
+impl TryFrom<&LValue> for String {
+    type Error = LError;
+
+    fn try_from(value: &LValue) -> Result<Self, Self::Error> {
+        match value {
             LValue::Symbol(s) => Ok(s.clone()),
-            LValue::Bool(b) => Ok(b.to_string().into()),
-            LValue::Number(n) => Ok(n.to_string().into()),
-            _ => Err(LError::SpecialError(
-                "cannot convert into symbol".to_string(),
-            )),
+            LValue::True => Ok(TRUE.into()),
+            LValue::Nil => Ok(NIL.into()),
+            LValue::Number(n) => Ok(n.to_string()),
+            LValue::Fn(f) => Ok(f.debug_label.to_string()),
+            LValue::MutFn(f) => Ok(f.debug_label.to_string()),
+            lv => Err(ConversionError(lv.into(), NameTypeLValue::Symbol)),
         }
     }
+}
 
-    pub fn as_sym_ref(&self) -> Result<&Sym, LError> {
-        match self {
-            LValue::Symbol(s) => Ok(s),
-            _ => Err(LError::SpecialError(
-                "cannot convert into symbol ref".to_string(),
-            )),
+impl TryFrom<LValue> for String {
+    type Error = LError;
+
+    fn try_from(value: LValue) -> Result<Self, Self::Error> {
+        (&value).try_into()
+    }
+}
+
+impl TryFrom<&LValue> for Vec<LValue> {
+    type Error = LError;
+
+    fn try_from(value: &LValue) -> Result<Self, Self::Error> {
+        match value {
+            LValue::List(l) => Ok(l.clone()),
+            lv => Err(ConversionError(lv.into(), NameTypeLValue::List)),
         }
     }
+}
+impl TryFrom<LValue> for Vec<LValue> {
+    type Error = LError;
 
-    pub fn as_int(&self) -> Result<i64, LError> {
-        match self {
-            LValue::Number(LNumber::Int(i)) => Ok(*i),
-            LValue::Number(LNumber::Float(f)) => Ok(*f as i64),
-            _ => Err(LError::SpecialError("cannot convert into int".to_string())),
+    fn try_from(value: LValue) -> Result<Self, Self::Error> {
+        (&value).try_into()
+    }
+}
+
+impl TryFrom<&LValue> for i64 {
+    type Error = LError;
+
+    fn try_from(value: &LValue) -> Result<Self, Self::Error> {
+        match value {
+            LValue::Number(n) => Ok(n.into()),
+            lv => Err(ConversionError(lv.into(), NameTypeLValue::Number)),
         }
     }
+}
 
-    pub fn as_float(&self) -> Result<f64, LError> {
-        match self {
-            LValue::Number(LNumber::Int(i)) => Ok(*i as f64),
-            LValue::Number(LNumber::Float(f)) => Ok(*f),
-            _ => Err(LError::SpecialError(
-                "cannot convert into float".to_string(),
-            )),
+impl TryFrom<LValue> for i64 {
+    type Error = LError;
+
+    fn try_from(value: LValue) -> Result<Self, Self::Error> {
+        (&value).try_into()
+    }
+}
+
+impl TryFrom<&LValue> for f64 {
+    type Error = LError;
+
+    fn try_from(value: &LValue) -> Result<Self, Self::Error> {
+        match value {
+            LValue::Number(n) => Ok(n.into()),
+            lv => Err(ConversionError(lv.into(), NameTypeLValue::Number)),
         }
     }
+}
 
-    pub fn as_bool(&self) -> Result<bool, LError> {
-        match self {
-            LValue::Bool(b) => Ok(*b),
-            _ => Err(LError::SpecialError("cannot convert into bool".to_string())),
+impl TryFrom<LValue> for f64 {
+    type Error = LError;
+
+    fn try_from(value: LValue) -> Result<Self, Self::Error> {
+        (&value).try_into()
+    }
+}
+
+impl TryFrom<&LValue> for bool {
+    type Error = LError;
+
+    fn try_from(value: &LValue) -> Result<Self, Self::Error> {
+        match value {
+            LValue::True => Ok(true),
+            LValue::Nil => Ok(false),
+            lv => Err(ConversionError(lv.into(), NameTypeLValue::Bool)),
         }
     }
+}
 
-    pub fn as_core_operator(&self) -> Result<LCoreOperator, LError> {
-        match self {
+impl TryFrom<LValue> for bool {
+    type Error = LError;
+
+    fn try_from(value: LValue) -> Result<Self, Self::Error> {
+        (&value).try_into()
+    }
+}
+
+impl TryFrom<&LValue> for LCoreOperator {
+    type Error = LError;
+
+    fn try_from(value: &LValue) -> Result<Self, Self::Error> {
+        match value {
             LValue::CoreOperator(co) => Ok(co.clone()),
-            _ => Err(LError::SpecialError(
-                "cannot convert into core operator".to_string(),
-            )),
+            lv => Err(ConversionError(lv.into(), NameTypeLValue::CoreOperator)),
         }
     }
+}
 
-    pub fn as_lambda(&self) -> Result<LLambda, LError> {
-        match self {
+impl TryFrom<LValue> for LCoreOperator {
+    type Error = LError;
+
+    fn try_from(value: LValue) -> Result<Self, Self::Error> {
+        (&value).try_into()
+    }
+}
+
+impl TryFrom<&LValue> for LLambda {
+    type Error = LError;
+
+    fn try_from(value: &LValue) -> Result<Self, Self::Error> {
+        match value {
             LValue::Lambda(l) => Ok(l.clone()),
-            _ => Err(LError::SpecialError(
-                "cannot convert into lambda".to_string(),
-            )),
+            lv => Err(ConversionError(lv.into(), NameTypeLValue::Lambda)),
         }
+    }
+}
+
+impl TryFrom<LValue> for LLambda {
+    type Error = LError;
+
+    fn try_from(value: LValue) -> Result<Self, Self::Error> {
+        (&value).try_into()
     }
 }
 
@@ -617,10 +824,9 @@ impl PartialEq for LValue {
             //Number comparison
             (LValue::Number(n1), LValue::Number(n2)) => *n1 == *n2,
             (LValue::Symbol(s1), LValue::Symbol(s2)) => *s1 == *s2,
-            (LValue::Bool(b1), LValue::Bool(b2)) => *b1 == *b2,
+            (LValue::True, LValue::True) => true,
+            (LValue::Nil, LValue::Nil) => true,
             //Text comparison
-            (LValue::String(s1), LValue::String(s2)) => *s1 == *s2,
-            (LValue::None, LValue::None) => true,
             (LValue::List(l1), LValue::List(l2)) => *l1 == *l2,
             (LValue::Map(m1), LValue::Map(m2)) => *m1 == *m2,
             (LValue::Lambda(l1), LValue::Lambda(l2)) => *l1 == *l2,
@@ -811,21 +1017,25 @@ impl From<usize> for LValue {
     }
 }
 
-impl From<&Sym> for LValue {
-    fn from(s: &Sym) -> Self {
+impl From<&String> for LValue {
+    fn from(s: &String) -> Self {
         LValue::Symbol(s.clone())
     }
 }
 
-impl From<Sym> for LValue {
-    fn from(s: Sym) -> Self {
+impl From<String> for LValue {
+    fn from(s: String) -> Self {
         LValue::from(&s)
     }
 }
 
 impl From<&[LValue]> for LValue {
     fn from(lv: &[LValue]) -> Self {
-        LValue::List(lv.to_vec())
+        if lv.is_empty() {
+            LValue::Nil
+        } else {
+            LValue::List(lv.to_vec())
+        }
     }
 }
 
@@ -878,18 +1088,16 @@ impl From<i32> for LValue {
 
 impl From<bool> for LValue {
     fn from(b: bool) -> Self {
-        LValue::Bool(b)
-    }
-}
-
-impl From<String> for LValue {
-    fn from(s: String) -> Self {
-        LValue::String(s)
+        match b {
+            true => LValue::True,
+            false => LValue::Nil,
+        }
     }
 }
 
 #[derive(Clone, Debug)]
 pub enum NameTypeLValue {
+    Bool,
     CoreOperator,
     Atom,
     Object,
@@ -897,14 +1105,14 @@ pub enum NameTypeLValue {
     Int,
     Float,
     Usize,
-    Bool,
+    True,
     Symbol,
     String,
     SExpr,
     Fn,
     MutFn,
     Lambda,
-    None,
+    Nil,
     Map,
     List,
     Quote,
@@ -915,12 +1123,12 @@ impl Display for NameTypeLValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         let str = match self {
             NameTypeLValue::Number => "Number",
-            NameTypeLValue::Bool => "Boolean",
+            NameTypeLValue::True => "True",
             NameTypeLValue::Symbol => "Symbol",
             NameTypeLValue::String => "String",
             NameTypeLValue::SExpr => "SExpr",
             NameTypeLValue::Fn => "Fn",
-            NameTypeLValue::None => "None",
+            NameTypeLValue::Nil => "Nil",
             NameTypeLValue::Object => "Object",
             NameTypeLValue::Lambda => "lambda",
             NameTypeLValue::Map => "map",
@@ -933,6 +1141,7 @@ impl Display for NameTypeLValue {
             NameTypeLValue::Int => "int",
             NameTypeLValue::Float => "float",
             NameTypeLValue::Usize => "usize",
+            NameTypeLValue::Bool => "bool",
         };
         write!(f, "{}", str)
     }
@@ -943,10 +1152,10 @@ impl PartialEq for NameTypeLValue {
         match (self, other) {
             (NameTypeLValue::String, NameTypeLValue::String) => true,
             (NameTypeLValue::SExpr, NameTypeLValue::SExpr) => true,
-            (NameTypeLValue::Bool, NameTypeLValue::Bool) => true,
+            (NameTypeLValue::True, NameTypeLValue::True) => true,
             (NameTypeLValue::Symbol, NameTypeLValue::Symbol) => true,
             (NameTypeLValue::Fn, NameTypeLValue::Fn) => true,
-            (NameTypeLValue::None, NameTypeLValue::None) => true,
+            (NameTypeLValue::Nil, NameTypeLValue::Nil) => true,
             (NameTypeLValue::Number, NameTypeLValue::Number) => true,
             (NameTypeLValue::Object, NameTypeLValue::Object) => true,
             (NameTypeLValue::Map, NameTypeLValue::Map) => true,
@@ -966,15 +1175,14 @@ impl PartialEq for NameTypeLValue {
 impl From<&LValue> for NameTypeLValue {
     fn from(lv: &LValue) -> Self {
         match lv {
-            LValue::Bool(_) => NameTypeLValue::Bool,
+            LValue::True => NameTypeLValue::True,
             LValue::Number(LNumber::Float(_)) => NameTypeLValue::Float,
             LValue::Number(LNumber::Int(_)) => NameTypeLValue::Int,
             LValue::Number(LNumber::Usize(_)) => NameTypeLValue::Usize,
             LValue::Symbol(_) => NameTypeLValue::Symbol,
-            LValue::String(_) => NameTypeLValue::String,
             LValue::Fn(_) => NameTypeLValue::Fn,
             LValue::MutFn(_) => NameTypeLValue::MutFn,
-            LValue::None => NameTypeLValue::None,
+            LValue::Nil => NameTypeLValue::Nil,
             LValue::Lambda(_) => NameTypeLValue::Lambda,
             LValue::Map(_) => NameTypeLValue::Map,
             LValue::List(_) => NameTypeLValue::List,
@@ -992,155 +1200,260 @@ impl From<LValue> for NameTypeLValue {
 
 pub struct Module {
     pub ctx: Box<dyn Any>,
-    pub prelude: Vec<(Sym, LValue)>,
+    pub prelude: Vec<(String, LValue)>,
+    pub label: &'static str,
 }
 
-pub trait AsModule {
-    fn get_module() -> Module;
+impl Module {
+    pub fn add_fn_prelude<
+        T: 'static,
+        R: Into<Result<LValue, LError>>,
+        F: Fn(&[LValue], &RefLEnv, &T) -> R + 'static,
+    >(
+        &mut self,
+        label: &'static str,
+        fun: Box<F>,
+    ) {
+        self.prelude
+            .push((label.into(), LValue::Fn(LFn::new(fun, label))))
+    }
+
+    pub fn add_mut_fn_prelude<
+        T: 'static,
+        R: Into<Result<LValue, LError>>,
+        F: Fn(&[LValue], &mut RefLEnv, &mut T) -> R + 'static,
+    >(
+        &mut self,
+        label: &'static str,
+        fun: Box<F>,
+    ) {
+        self.prelude
+            .push((label.into(), LValue::MutFn(LMutFn::new(fun, label))))
+    }
+
+    pub fn add_prelude(&mut self, label: &str, lv: LValue) {
+        self.prelude.push((label.into(), lv));
+    }
 }
 
+pub trait GetModule {
+    fn get_module(self) -> Module;
+}
+
+//TODO: Complete tests writing
 #[cfg(test)]
 mod tests {
     use super::*;
-    use im::HashMap;
 
-    use std::any::{Any, TypeId};
-    use std::hash::{BuildHasher, Hash, Hasher};
-    use std::rc::Rc;
+    mod l_number {
+        use super::*;
 
-    //#[test]
-    pub fn test_hash_list() {
-        let mut map: HashMap<LValue, LValue> = HashMap::new();
-        let key = LValue::List(vec![LValue::Symbol("a".into()), LValue::Symbol("b".into())]);
-        let value = LValue::Bool(true);
-        map.insert(key.clone(), value);
-        println!("get value: ");
-        match map.get(&key) {
-            None => println!("None"),
-            Some(v) => println!("value: {}", v),
+        fn test_add() {
+            let i1: LNumber = 3.into();
+            let i2: LNumber = 5.into();
+            let f1: LNumber = 3.0.into();
+            let f2: LNumber = 5.0.into();
+            assert_eq!(LNumber::Int(8), &i1 + &i2);
+            assert_eq!(LNumber::Float(8.0), &i1 + &f2);
+            assert_eq!(LNumber::Float(8.0), &f1 + &f2);
+        }
+
+        fn test_sub() {
+            let i1: LNumber = 3.into();
+            let i2: LNumber = 5.into();
+            let f1: LNumber = 3.0.into();
+            let f2: LNumber = 5.0.into();
+            assert_eq!(LNumber::Int(-2), &i1 - &i2);
+            assert_eq!(LNumber::Float(-2.0), &i1 - &f2);
+            assert_eq!(LNumber::Float(-2.0), &f1 - &f2);
+        }
+
+        fn test_mul() {
+            let i1: LNumber = 3.into();
+            let i2: LNumber = 5.into();
+            let f1: LNumber = 3.0.into();
+            let f2: LNumber = 5.0.into();
+            assert_eq!(LNumber::Int(15), &i1 * &i2);
+            assert_eq!(LNumber::Float(15.0), &i1 * &f2);
+            assert_eq!(LNumber::Float(15.0), &f1 * &f2);
+        }
+
+        fn test_div() {
+            let i1: LNumber = 3.into();
+            let i2: LNumber = 5.into();
+            let f1: LNumber = 3.0.into();
+            let f2: LNumber = 5.0.into();
+            assert_eq!(LNumber::Int(0), &i1 / &i2);
+            assert_eq!(LNumber::Float(0.6), &i1 / &f2);
+            assert_eq!(LNumber::Float(0.6), &f1 / &f2);
+        }
+
+        #[test]
+        fn test_math() {
+            test_add();
+            test_sub();
+            test_div();
+            test_mul();
+        }
+
+        fn test_gt() {
+            let i1: LNumber = 3.into();
+            let i2: LNumber = 5.into();
+            let f1: LNumber = 3.0.into();
+            let f2: LNumber = 5.0.into();
+            assert!(!(&i1 > &i2));
+            assert!(&i2 > &i1);
+            assert!(!(&i2 > &i2));
+            assert!(!(&f1 > &f2));
+            assert!(&f2 > &f1);
+            assert!(!(&f2 > &f2));
+            assert!(&i2 > &f1);
+        }
+
+        fn test_lt() {
+            let i1: LNumber = 3.into();
+            let i2: LNumber = 5.into();
+            let f1: LNumber = 3.0.into();
+            let f2: LNumber = 5.0.into();
+            assert!(&i1 < &i2);
+            assert!(!(&i2 < &i1));
+            assert!(!(&i2 < &i2));
+            assert!(&f1 < &f2);
+            assert!(!(&f2 < &f1));
+            assert!(!(&f2 < &f2));
+            assert!(&i1 < &f2);
+        }
+
+        fn test_ge() {
+            let i1: LNumber = 3.into();
+            let i2: LNumber = 5.into();
+            let f1: LNumber = 3.0.into();
+            let f2: LNumber = 5.0.into();
+            assert!(!(&i1 >= &i2));
+            assert!(&i2 >= &i1);
+            assert!(&i2 >= &i2);
+            assert!(!(&f1 >= &f2));
+            assert!(&f2 >= &f1);
+            assert!(&f2 >= &f2);
+            assert!(&i2 >= &f2);
+        }
+
+        fn test_le() {
+            let i1: LNumber = 3.into();
+            let i2: LNumber = 5.into();
+            let f1: LNumber = 3.0.into();
+            let f2: LNumber = 5.0.into();
+            assert!(&i1 <= &i2);
+            assert!(!(&i2 <= &i1));
+            assert!(&i2 <= &i2);
+            assert!(&f1 <= &f2);
+            assert!(!(&f2 <= &f1));
+            assert!(&f2 <= &f2);
+            assert!(&i2 <= &f2);
+        }
+
+        #[test]
+        fn test_ord() {
+            test_gt();
+            test_ge();
+            test_lt();
+            test_le();
         }
     }
 
-    //#[test]
-    pub fn test_hasher() {
-        let map: HashMap<LValue, LValue> = HashMap::new();
-        let mut hasher1 = map.hasher().build_hasher();
-        let mut hasher2 = map.hasher().build_hasher();
-        let key = LValue::List(vec![LValue::Symbol("a".into()), LValue::Symbol("b".into())]);
-        let value = LValue::Bool(true);
-        key.hash(&mut hasher1);
-        println!("hash value : {}", hasher1.finish());
-        key.clone().hash(&mut hasher2);
-        println!("hash value : {}", hasher2.finish());
-    }
+    mod l_value {
 
-    #[test]
-    pub fn test_hash() {
-        let mut map: HashMap<LValue, LValue> = HashMap::new();
-        let mut hasher1 = map.hasher().build_hasher();
-        let key1 = LValue::List(vec![LValue::Symbol("a".into()), LValue::Symbol("b".into())]);
-        let key2 = LValue::Bool(true);
-        let value = LValue::Bool(true);
-
-        key2.hash(&mut hasher1);
-        println!("hash value : {}", hasher1.finish());
-        map.insert(key2.clone(), value.clone());
-        let result_value = map.get(&key2.clone()).unwrap_or(&LValue::None);
-        println!("value: {}", result_value);
-        let mut hasher2 = map.hasher().build_hasher();
-        key2.hash(&mut hasher2);
-        println!("hash value : {}", hasher2.finish());
-
-        let mut hasher3 = map.hasher().build_hasher();
-        key1.hash(&mut hasher3);
-        println!("hash value : {}", hasher3.finish());
-        map.insert(key1.clone(), value.clone());
-        let value = map.get(&key1).unwrap_or(&LValue::None);
-        println!("value: {}", value);
-        let mut hasher4 = map.hasher().build_hasher();
-        key1.hash(&mut hasher4);
-        println!("hash value : {}", hasher4.finish());
-
-        println!("hash map:");
-        for (key, value) in map.iter() {
-            println!("{} = {}", key, value);
+        use super::*;
+        fn test_add() {
+            let i1: LValue = 3.into();
+            let i2: LValue = 5.into();
+            let f1: LValue = 3.0.into();
+            let f2: LValue = 5.0.into();
+            assert_eq!(LValue::Number(LNumber::Int(8)), (&i1 + &i2).unwrap());
+            assert_eq!(LValue::Number(LNumber::Float(8.0)), (&i1 + &f2).unwrap());
+            assert_eq!(LValue::Number(LNumber::Float(8.0)), (&f1 + &f2).unwrap());
         }
-    }
+        fn test_sub() {
+            let i1: LValue = 3.into();
+            let i2: LValue = 5.into();
+            let f1: LValue = 3.0.into();
+            let f2: LValue = 5.0.into();
+            assert_eq!(LValue::Number(LNumber::Int(-2)), (&i1 - &i2).unwrap());
+            assert_eq!(LValue::Number(LNumber::Float(-2.0)), (&i1 - &f2).unwrap());
+            assert_eq!(LValue::Number(LNumber::Float(-2.0)), (&f1 - &f2).unwrap());
+        }
 
-    #[test]
-    pub fn test_hash_with_vec() {
-        let mut map: HashMap<Vec<LValue>, i32> = HashMap::new();
-        let key = vec![LValue::Bool(true), LValue::Bool(true)];
-        let value = 4;
-        println!("insert value: ");
-        map.insert(key, value);
-        let search_key = vec![LValue::Bool(true), LValue::Bool(true)];
-        println!("get value: ");
-        let value = *map.get(&search_key).unwrap_or(&-1);
-        assert_eq!(value, 4)
-    }
-    #[test]
-    pub fn test_hash_with_LValue_List() {
-        let mut map: HashMap<LValue, i32> = HashMap::new();
-        let key = LValue::List(vec![LValue::Bool(true), LValue::Bool(true)]);
-        let value = 4;
+        fn test_mul() {
+            let i1: LValue = 3.into();
+            let i2: LValue = 5.into();
+            let f1: LValue = 3.0.into();
+            let f2: LValue = 5.0.into();
+            assert_eq!(LValue::Number(LNumber::Int(15)), (&i1 * &i2).unwrap());
+            assert_eq!(LValue::Number(LNumber::Float(15.0)), (&i1 * &f2).unwrap());
+            assert_eq!(LValue::Number(LNumber::Float(15.0)), (&f1 * &f2).unwrap());
+        }
 
-        println!("insert value: ");
-        map.insert(key, value);
-        println!("get value: ");
-        let search_key = LValue::List(vec![LValue::Bool(true), LValue::Bool(true)]);
-        let value = *map.get(&search_key).unwrap_or(&-1);
-        assert_eq!(value, 4)
-    }
-    #[test]
-    pub fn test_hash_with_LValue_Bool() {
-        let mut map: HashMap<LValue, i32> = HashMap::new();
-        let key = LValue::Bool(true);
-        let value = 4;
+        fn test_div() {
+            let i1: LValue = 3.into();
+            let i2: LValue = 5.into();
+            let f1: LValue = 3.0.into();
+            let f2: LValue = 5.0.into();
+            assert_eq!(LValue::Number(LNumber::Int(0)), (&i1 / &i2).unwrap());
+            assert_eq!(LValue::Number(LNumber::Float(0.6)), (&i1 / &f2).unwrap());
+            assert_eq!(LValue::Number(LNumber::Float(0.6)), (&f1 / &f2).unwrap());
+        }
 
-        println!("insert value: ");
-        map.insert(key, value);
-        println!("get value: ");
-        let search_key = LValue::Bool(true);
-        let value = *map.get(&search_key).unwrap_or(&-1);
-        assert_eq!(value, 4)
+        #[test]
+        fn test_math() {
+            test_add();
+            test_sub();
+            test_mul();
+            test_div();
+        }
+
+        fn test_gt() {
+            let i1: LValue = 3.into();
+            let f2: LValue = 5.0.into();
+            assert!(!(&i1 > &f2));
+            assert!(&f2 > &i1);
+            assert!(!(&f2 > &f2));
+        }
+
+        fn test_ge() {
+            let i1: LValue = 3.into();
+            let f2: LValue = 5.0.into();
+            assert!(!(&i1 >= &f2));
+            assert!(&f2 >= &i1);
+            assert!(&f2 >= &f2);
+        }
+
+        fn test_lt() {
+            let i1: LValue = 3.into();
+            let f2: LValue = 5.0.into();
+            assert!(&i1 < &f2);
+            assert!(!(&f2 < &i1));
+            assert!(!(&f2 < &f2));
+        }
+
+        fn test_le() {
+            let i1: LValue = 3.into();
+            let f2: LValue = 5.0.into();
+            assert!(&i1 <= &f2);
+            assert!(!(&f2 <= &i1));
+            assert!(&f2 <= &f2);
+        }
+
+        #[test]
+        fn test_ord() {
+            test_gt();
+            test_ge();
+            test_lt();
+            test_le();
+        }
     }
 
     /*#[test]
-    pub fn test_hash_with_LValue_Quote() {
-        let mut map: HashMap<LValue, i32> = HashMap::new();
-        let key = LValue::Quote(Box::new(LValue::Bool(true)));
-        let value = 4;
-
-        println!("insert value: ");
-        map.insert(key, value);
-        println!("get value: ");
-        let search_key = LValue::Quote(Box::new(LValue::Bool(true)));
-        let value = *map.get(&search_key).unwrap_or(&-1);
-        assert_eq!(value, 4)
-    }*/
-
-    #[test]
     fn test_native_lambda() {
-        struct Counter {
-            cnt: u32,
-        };
-        impl NativeContext for Counter {
-            fn get_component(&self, type_id: TypeId) -> Option<&dyn Any> {
-                if type_id == TypeId::of::<u32>() {
-                    Some(&self.cnt)
-                } else {
-                    None
-                }
-            }
-            fn get_component_mut(&mut self, type_id: TypeId) -> Option<&mut dyn Any> {
-                if type_id == TypeId::of::<u32>() {
-                    Some(&mut self.cnt)
-                } else {
-                    None
-                }
-            }
-        }
 
         let get_counter = |args: &[LValue], ctx: &dyn NativeContext| -> Result<LValue, LError> {
             if let Some(cnt) = ctx
@@ -1171,9 +1484,11 @@ mod tests {
         let getter = LNativeLambda {
             fun: Rc::new(get_counter),
         };
-        let getter = LNativeLambda::new(Box::new(|args: &[LValue], ctx: &u32| *ctx));
-        let setter = LNativeMutLambda {
+        let getter = LFn::new(Box::new(|args: &[LValue], ctx: &u32| *ctx), "getter".to_string());
+        let setter = LMutFn {
             fun: Rc::new(set_counter),
+            debug_label: "setter".to_string(),
+            index_mod: None
         };
 
         let mut state = Counter { cnt: 0 };
@@ -1192,7 +1507,7 @@ mod tests {
             getter.call(&[], &state).ok().unwrap(),
             LValue::Number(LNumber::Int(5))
         );
-    }
+    }*/
 }
 
 /*
@@ -1203,5 +1518,3 @@ load_module() {
   add mod.ctx to NativeContext
   declare prelude
 }*/
-
-//TODO: Add tests

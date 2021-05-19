@@ -41,6 +41,34 @@ pub struct GodotStateS {
     pub _type: GodotMessageType,
     pub data: LValueSerde,
 }
+/*
+impl GodotStateS {
+    pub fn transform_data_into_lisp(&self) -> Result<String, LError> {
+        // Example of string that should be sent
+        // (map (quote ((ten . 10) (vingt . 20)))))
+        match &self.data {
+            LValueSerde::List(l) => {
+                let mut lisp = String::from("(map (quote (");
+                for e in l {
+                    let list: Vec<LValueSerde> = e.try_into()?;
+                    let list = list.as_slice();
+                    let len = list.len();
+                    lisp.push_str(
+                        format!(
+                            "({} . {})",
+                            LValueSerde::from(&list[0..len - 1]),
+                            &list.last().unwrap()
+                        )
+                            .as_str(),
+                    )
+                }
+                lisp.push_str(")))");
+                Ok(lisp)
+            }
+            lv => Err(WrongType(lv.into(), LValue::from(lv).into(), NameTypeLValue::List)),
+        }
+    }
+}*/
 
 impl From<&GodotStateS> for GodotState {
     fn from(gss: &GodotStateS) -> Self {

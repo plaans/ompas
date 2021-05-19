@@ -365,6 +365,7 @@ dependencies = [
  "serde",
  "serde_json",
  "structopt",
+ "tokio",
 ]
 
 [[package]]
@@ -395,6 +396,7 @@ dependencies = [
  "ompas_lisp",
  "rustyline",
  "structopt",
+ "tokio",
 ]
 
 [[package]]

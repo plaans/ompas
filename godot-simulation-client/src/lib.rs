@@ -1,15 +1,17 @@
-use std::io::{BufReader, Read};
-use std::net::TcpStream;
-use std::sync::mpsc::{channel, Receiver, Sender};
-use std::thread;
+use tokio::sync::mpsc::{Sender, Receiver};
+use tokio::sync::mpsc;
 
 use ompas_lisp::core::RefLEnv;
 use ompas_lisp::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
 use ompas_lisp::structs::{GetModule, LError, LValue, Module, NameTypeLValue};
 use ompas_modules::doc::{Documentation, LHelp};
 
-use crate::serde::GodotState;
+use crate::serde::{GodotState, GodotStateS, GodotMessageType};
 use crate::tcp::{read_msg_from_buf, read_size_from_buf, TypeMessage, BUFFER_SIZE};
+use tokio::net::TcpStream;
+use tokio::io::{BufReader, AsyncReadExt};
+use std::net::SocketAddr;
+use ompas_modules::io::TOKIO_CHANNEL_SIZE;
 
 //modules of the crate
 pub mod serde;
@@ -99,74 +101,67 @@ impl Documentation for CtxGodot {
 Functions
  */
 
-const NAME_THREAD_TCP_SOCKET_GODOT: &str = "thread_tcp_connection_godot";
+const NAME_TASK_TCP_SOCKET_GODOT: &str = "thread_tcp_connection_godot";
 
-fn thread_tcp_connection(
-    _socket_info: SocketInfo,
+async fn task_tcp_connection(
+    socket_addr: &SocketAddr,
     _receiver: Receiver<String>,
     sender: Sender<String>,
 ) {
-    let stream = TcpStream::connect("127.0.0.1:10000").unwrap();
+    let stream = TcpStream::connect(socket_addr).await.unwrap();
 
     let mut buf_reader = BufReader::new(stream);
 
     let mut buf = [0; BUFFER_SIZE];
-    let mut next_type_msg = TypeMessage::Unknown;
-    let mut size: usize = 0;
+    let mut size_buf= [0;4];
 
     loop {
-        let mut msg = String::new();
-        let size_read = buf_reader.read(&mut buf).unwrap_or(0);
-        match next_type_msg {
-            TypeMessage::Unknown => match size_read {
-                0..=3 => {}
-                4 => {
-                    next_type_msg = TypeMessage::Content;
-                    size = read_size_from_buf(&buf);
-                }
-                _ => {
-                    size = read_size_from_buf(&buf);
-                    msg = read_msg_from_buf(&buf[4..], size);
-                }
-            },
-            TypeMessage::Content => {
-                msg = read_msg_from_buf(&buf, size);
-                next_type_msg = TypeMessage::Unknown;
-            }
-            _ => {}
-        }
+        buf_reader.read_exact(&mut size_buf).await;
+        let size = read_size_from_buf(&size_buf);
+        buf_reader.read_exact(&mut buf[0..size]).await;
+
+        let msg = read_msg_from_buf(&buf, size);
 
         if !msg.is_empty() {
-            let godot_state: Result<GodotState, _> = serde_json::from_str(&msg);
-            if let Ok(gs) = godot_state {
-                if let Ok(lisp) = gs.transform_data_into_lisp() {
-                    sender
-                        .send(format!("(set-state {})", lisp))
-                        .expect("could not send via channel");
-                }
+            let gs: GodotState = serde_json::from_str(&msg).unwrap();
+            let state_type = match gs._type {
+                GodotMessageType::Static => "static",
+                GodotMessageType::Dynamic => "dynamic",
             };
+            let lisp = gs.transform_data_into_lisp().unwrap();
+            let sender_temp = sender.clone();
+            tokio::spawn(async move {
+               sender_temp
+                   .send(format!("(update-state {} {})", state_type, lisp)).await
+                   .expect("could not send via channel");
+            });
         }
     }
 }
 
 fn open_com(args: &[LValue], _: &mut RefLEnv, ctx: &mut CtxGodot) -> Result<LValue, LError> {
-    if args.len() != 2 {
-        return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
-    }
+    let socket_addr:SocketAddr  = match args.len() {
+        0 => {
+            "127.0.0.1:10000".parse().unwrap()
+        }
+        2 => {
+            let addr = match &args[0] {
+                LValue::Symbol(s) => s.clone(),
+                lv => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
+            };
 
-    let addr = match &args[0] {
-        LValue::Symbol(s) => s.clone(),
-        lv => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
+            let port: usize = match &args[1] {
+                LValue::Number(n) => n.into(),
+                lv => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Usize)),
+            };
+
+            format!("{}:{}", addr, port).parse().unwrap()
+        }
+        _ => return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2)),
     };
 
-    let port: usize = match &args[1] {
-        LValue::Number(n) => n.into(),
-        lv => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Usize)),
-    };
 
-    let socket_info = SocketInfo { addr, port };
-
-    let (tx, rx) = channel();
+    let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
     ctx.sender_socket = Some(tx);
     let sender = match ctx.get_sender_li() {
         None => {
@@ -176,30 +171,37 @@ fn open_com(args: &[LValue], _: &mut RefLEnv, ctx: &mut CtxGodot) -> Result<LVal
         }
         Some(s) => s.clone(),
     };
-    thread::Builder::new()
-        .name(NAME_THREAD_TCP_SOCKET_GODOT.to_string())
-        .spawn(move || {
-            thread_tcp_connection(socket_info, rx, sender);
-        })
-        .expect("couldn't spawn thread for tcp connection");
+
+    tokio::spawn(async move {
+        task_tcp_connection(&socket_addr, rx, sender).await
+    });
 
     Ok(LValue::Nil)
 }
 
 fn launch_godot(_: &[LValue], _: &RefLEnv, ctx: &CtxGodot) -> Result<LValue, LError> {
-    ctx.get_sender_li()
-        .as_ref()
-        .expect("ctx godot has no sender to l.i.")
-        .send("(print (quote (launch godot not implemented yet)))".to_string())
-        .expect("couldn't send via channel");
+    let sender = match ctx.get_sender_li() {
+        None => return Err(SpecialError("ctx godot has no sender to l.i.".to_string())),
+        Some(s) => s.clone()
+    };
+    tokio::spawn(async move {
+        sender
+            .send("(print (quote (exec godot not implemented yet)))".to_string()).await
+            .expect("couldn't send via channel");
+    });
     Ok(LValue::Nil)
 }
 
 fn exec_godot(_: &[LValue], _: &RefLEnv, ctx: &CtxGodot) -> Result<LValue, LError> {
-    ctx.get_sender_li()
-        .as_ref()
-        .expect("ctx godot has no sender to l.i.")
-        .send("(print (quote (exec godot not implemented yet)))".to_string())
-        .expect("couldn't send via channel");
+    let sender = match ctx.get_sender_li() {
+        None => return Err(SpecialError("ctx godot has no sender to l.i.".to_string())),
+        Some(s) => s.clone()
+    };
+    tokio::spawn(async move {
+        sender
+            .send("(print (quote (exec godot not implemented yet)))".to_string()).await
+            .expect("couldn't send via channel");
+    });
     Ok(LValue::Nil)
+
 }

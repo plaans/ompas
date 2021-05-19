@@ -4,10 +4,13 @@ use ompas_lisp::structs::LError::*;
 use ompas_lisp::structs::*;
 use std::fs::File;
 use std::io::{Read, Write};
-use std::sync::mpsc::Sender;
+use tokio::sync::mpsc::{Sender, Receiver};
 /*
 LANGUAGE
  */
+
+pub const TOKIO_CHANNEL_SIZE: usize = 16_384;
+
 
 const MOD_IO: &str = "mod-io";
 const DOC_MOD_IO: &str = "Module than handles input/output functions.";
@@ -53,13 +56,18 @@ pub fn print(args: &[LValue], _: &RefLEnv, ctx: &CtxIo) -> Result<LValue, LError
         _ => args.into(),
     };
     match &ctx.sender_stdout {
-        None => return Err(SpecialError("no channel for stdout".to_string())),
-        Some(sender) => sender
-            .send(format!("{}", lv))
-            .expect("error on channel to stdout"),
-    };
+        None => Err(SpecialError("no channel for stdout".to_string())),
+        Some(sender) => {
+            let sender = sender.clone();
+            let string = format!("{}", lv);
 
-    Ok(LValue::Nil)
+            tokio::spawn(async move {
+                sender.send(string).await.expect("error printing");
+            });
+            Ok(LValue::Nil)
+        }
+    }
+
 }
 
 pub fn read(args: &[LValue], _: &RefLEnv, ctx: &CtxIo) -> Result<LValue, LError> {
@@ -78,11 +86,13 @@ pub fn read(args: &[LValue], _: &RefLEnv, ctx: &CtxIo) -> Result<LValue, LError>
     file.read_to_string(&mut contents)?;
 
     //stdout.write_all(format!("contents: {}\n", contents).as_bytes());
-    ctx.sender_li
-        .as_ref()
-        .expect("missing a channel")
-        .send(contents)
-        .expect("couldn't send string via channel");
+    let sender = ctx.sender_li.clone();
+    tokio::spawn(async move {
+        sender
+            .expect("missing a channel")
+            .send(contents).await
+            .expect("couldn't send string via channel");
+    });
 
     Ok(LValue::Nil)
 }
@@ -162,34 +172,28 @@ impl Documentation for CtxIo {
 /// It contains only one function (for the moment): run that takes two arguments.
 pub mod repl {
 
-    use crate::io::repl;
+    use crate::io::{repl, TOKIO_CHANNEL_SIZE};
     use rustyline::error::ReadlineError;
     use rustyline::Editor;
-    use std::sync::mpsc::{channel, Receiver, Sender};
     use std::thread;
+    use tokio::sync::mpsc;
+    use tokio::sync::mpsc::{Sender, Receiver};
 
-    pub fn spawn_stdin(sender: Sender<String>) -> Option<Sender<String>> {
-        let (sender_stdin, receiver_stdin): (Sender<String>, Receiver<String>) = channel();
-
-        thread::Builder::new()
-            .name("repl_stdin".to_string())
-            .spawn(move || {
-                repl::stdin(sender, receiver_stdin);
-            })
-            .expect("error spawning repl input");
+    pub async fn spawn_stdin(sender: Sender<String>) -> Option<Sender<String>> {
+        let (sender_stdin, mut receiver_stdin) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+        tokio::spawn(async move {
+            repl::stdin(sender, receiver_stdin).await;
+        });
 
         Some(sender_stdin)
     }
 
-    pub fn spawn_stdout() -> Option<Sender<String>> {
-        let (sender_stdout, receiver_stdout): (Sender<String>, Receiver<String>) = channel();
+    pub async fn spawn_stdout() -> Option<Sender<String>> {
+        let (sender_stdout, receiver_stdout): (Sender<String>, Receiver<String>) = mpsc::channel(TOKIO_CHANNEL_SIZE);
 
-        thread::Builder::new()
-            .name("repl_output".to_string())
-            .spawn(move || {
-                repl::output(receiver_stdout);
-            })
-            .expect("error spawning repl output");
+        tokio::spawn(async move {
+            repl::output(receiver_stdout).await;
+        });
 
         Some(sender_stdout)
     }
@@ -201,7 +205,7 @@ pub mod repl {
     /// - sender: channel object to send string to lisp interpreter.
     /// - receiver: channel object to receive ack from lisp interpreter after evaluation.
     /// Used for synchronization.
-    fn stdin(sender: Sender<String>, receiver: Receiver<String>) {
+    async fn stdin(sender: Sender<String>, mut receiver: Receiver<String>) {
         let mut rl = Editor::<()>::new();
         if rl.load_history("history.txt").is_err() {
             println!("No previous history.");
@@ -214,9 +218,9 @@ pub mod repl {
                 Ok(string) => {
                     rl.add_history_entry(string.clone());
                     sender
-                        .send(format!("repl:{}", string))
+                        .send(format!("repl:{}", string)).await
                         .expect("couldn't send lisp command");
-                    let buffer = receiver.recv().expect("error receiving");
+                    let buffer = receiver.recv().await.expect("error receiving");
                     assert_eq!(
                         buffer, "ACK",
                         "should receive an ack from Lisp Intrepretor and nothing else"
@@ -238,16 +242,16 @@ pub mod repl {
             }
         }
         sender
-            .send("exit".to_string())
+            .send("exit".to_string()).await
             .expect("couldn't send exit msg");
         rl.save_history("history.txt").unwrap();
     }
 
     pub const EXIT_CODE_STDOUT: &str = "EXIT";
 
-    fn output(receiver: Receiver<String>) {
+    async fn output(mut receiver: Receiver<String>) {
         loop {
-            let str = receiver.recv().expect("error receiving stdout");
+            let str = receiver.recv().await.expect("error receiving stdout");
             if str == EXIT_CODE_STDOUT {
                 break;
             }

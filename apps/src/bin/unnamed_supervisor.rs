@@ -1,5 +1,5 @@
+use ompas_godot_simulation_client::godot::CtxGodot;
 use ompas_godot_simulation_client::state::CtxState;
-use ompas_godot_simulation_client::CtxGodot;
 use ompas_lisp::core::*;
 use ompas_lisp::structs::LValue;
 use ompas_modules::_type::CtxType;
@@ -12,7 +12,7 @@ use ompas_modules::robot::CtxRobot;
 use std::path::PathBuf;
 use structopt::StructOpt;
 use tokio::sync::mpsc;
-use tokio::sync::mpsc::{Sender, Receiver};
+use tokio::sync::mpsc::{Receiver, Sender};
 
 pub const CHANNEL_SIZE: usize = 16_384;
 
@@ -43,10 +43,13 @@ async fn main() {
 }
 
 pub async fn lisp_interpreter() {
-    let (sender_li, mut receiver_li): (Sender<String>, Receiver<String>) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+    let (sender_li, mut receiver_li): (Sender<String>, Receiver<String>) =
+        mpsc::channel(TOKIO_CHANNEL_SIZE);
 
     //Spawn the stdin and stdout threads
-    let sender_stdin = spawn_stdin(sender_li.clone()).await.expect("error while spawning stdin");
+    let sender_stdin = spawn_stdin(sender_li.clone())
+        .await
+        .expect("error while spawning stdin");
     let sender_stdout = spawn_stdout().await.expect("error while spawning stdout");
 
     let root_env = &mut RefLEnv::root();
@@ -102,7 +105,8 @@ pub async fn lisp_interpreter() {
 
         if str_lvalue == *"exit" {
             sender_stdout
-                .send(EXIT_CODE_STDOUT.to_string()).await
+                .send(EXIT_CODE_STDOUT.to_string())
+                .await
                 .expect("error sending message to stdout");
             break;
         }
@@ -114,7 +118,8 @@ pub async fn lisp_interpreter() {
             Err(e) => {
                 //stderr.write_all(format!("ELI>>{}\n", e).as_bytes());
                 sender_stdout
-                    .send(format!("ELI>>{}", e)).await
+                    .send(format!("ELI>>{}", e))
+                    .await
                     .expect("error on channel to stdout");
                 LValue::Nil
             }
@@ -126,20 +131,23 @@ pub async fn lisp_interpreter() {
                 lv => {
                     //stdout.write_all(format!("LI>> {}\n", lv).as_bytes()).expect("error stdout");
                     sender_stdout
-                        .send(format!("LI>> {}", lv)).await
+                        .send(format!("LI>> {}", lv))
+                        .await
                         .expect("error on channel to stdout");
                 }
             },
             Err(e) => {
                 //stderr.write_all(format!("ELI>>{}\n", e).as_bytes());
                 sender_stdout
-                    .send(format!("ELI>>{}", e)).await
+                    .send(format!("ELI>>{}", e))
+                    .await
                     .expect("error on channel to stdout");
             }
         };
         if send_ack {
             sender_stdin
-                .send("ACK".to_string()).await
+                .send("ACK".to_string())
+                .await
                 .expect("error sending ack to repl");
         }
         //stdout.write_all(b"eval done\n");

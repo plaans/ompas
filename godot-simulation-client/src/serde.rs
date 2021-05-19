@@ -12,6 +12,7 @@ use std::ops::Deref;
 pub enum GodotMessageType {
     Static,
     Dynamic,
+    RobotCommand,
 }
 
 impl Display for GodotMessageType {
@@ -19,6 +20,7 @@ impl Display for GodotMessageType {
         match self {
             GodotMessageType::Static => write!(f, "static"),
             GodotMessageType::Dynamic => write!(f, "dynamic"),
+            GodotMessageType::RobotCommand => write!(f, "robot_command"),
         }
     }
 }
@@ -31,6 +33,7 @@ impl Serialize for GodotMessageType {
         match self {
             GodotMessageType::Static => serializer.serialize_str("static"),
             GodotMessageType::Dynamic => serializer.serialize_str("dynamic"),
+            GodotMessageType::RobotCommand => serializer.serialize_str("robot_command"),
         }
     }
 }

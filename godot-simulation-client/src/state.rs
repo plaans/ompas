@@ -4,14 +4,14 @@ use im::ordmap::DiffItem::Update;
 use im::HashMap;
 use ompas_lisp::core::RefLEnv;
 use ompas_lisp::functions::map;
-use ompas_lisp::structs::LError::{WrongNumberOfArgument, WrongType, SpecialError};
+use ompas_lisp::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
 use ompas_lisp::structs::{GetModule, LError, LValue, Module, NameTypeLValue};
 use ompas_modules::doc::{Documentation, LHelp};
-use tokio::sync::mpsc::Sender;
-use std::mem;
+use serde_json::ser::State;
 use std::borrow::Borrow;
 use std::convert::TryFrom;
-use serde_json::ser::State;
+use std::mem;
+use tokio::sync::mpsc::Sender;
 
 /*
 LANGUAGE
@@ -49,10 +49,9 @@ pub struct CtxState {
 }
 
 enum StateType {
-    STATIC,
-    DYNAMIC,
+    Static,
+    Dynamic,
 }
-
 
 impl CtxState {
     pub fn set_sender_stdout(&mut self, sender: Sender<String>) {
@@ -65,25 +64,28 @@ impl CtxState {
 
     fn set_state(&mut self, s: LState, st: &StateType) {
         match st {
-            StateType::STATIC => self.static_state = s,
-            StateType::DYNAMIC => self.dynamic_state = s,
+            StateType::Static => self.static_state = s,
+            StateType::Dynamic => self.dynamic_state = s,
         };
     }
 
     fn update_state(&mut self, s: LState, st: &StateType) {
-        let _old = mem::replace(match st {
-            StateType::STATIC => &mut self.static_state,
-            StateType::DYNAMIC => &mut self.dynamic_state,
-        }, s.into());
+        let _old = mem::replace(
+            match st {
+                StateType::Static => &mut self.static_state,
+                StateType::Dynamic => &mut self.dynamic_state,
+            },
+            s,
+        );
     }
 
     fn get_state(&self, st: Option<StateType>) -> LState {
         match st {
             None => self.static_state.union(&self.dynamic_state),
             Some(st) => match st {
-                StateType::STATIC => self.static_state.clone(),
-                StateType::DYNAMIC => self.dynamic_state.clone(),
-            }
+                StateType::Static => self.static_state.clone(),
+                StateType::Dynamic => self.dynamic_state.clone(),
+            },
         }
     }
 }
@@ -129,7 +131,7 @@ impl LState {
     }
 
     pub fn append(&mut self, other: &LState) {
-        self.inner.clone().union(other.inner.clone());
+        let _ = self.inner.clone().union(other.inner.clone());
     }
 }
 
@@ -166,8 +168,6 @@ impl From<LState> for LValue {
     }
 }
 
-
-
 fn set_state(args: &[LValue], _: &mut RefLEnv, ctx: &mut CtxState) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
@@ -176,11 +176,22 @@ fn set_state(args: &[LValue], _: &mut RefLEnv, ctx: &mut CtxState) -> Result<LVa
     let first_arg = &args[0];
     let state_type = match String::try_from(first_arg) {
         Ok(s) => match s.as_str() {
-            KEY_DYNAMIC => StateType::DYNAMIC,
-            KEY_STATIC => StateType::STATIC,
-            _ => return Err(SpecialError(format!("Expected keywords {} or {}", KEY_STATIC, KEY_DYNAMIC)))
+            KEY_DYNAMIC => StateType::Dynamic,
+            KEY_STATIC => StateType::Static,
+            _ => {
+                return Err(SpecialError(format!(
+                    "Expected keywords {} or {}",
+                    KEY_STATIC, KEY_DYNAMIC
+                )))
+            }
         },
-        Err(_) => return Err(WrongType(first_arg.clone(), first_arg.into(), NameTypeLValue::String)),
+        Err(_) => {
+            return Err(WrongType(
+                first_arg.clone(),
+                first_arg.into(),
+                NameTypeLValue::String,
+            ))
+        }
     };
 
     match &args[1] {
@@ -194,17 +205,18 @@ fn set_state(args: &[LValue], _: &mut RefLEnv, ctx: &mut CtxState) -> Result<LVa
 
 fn get_state(args: &[LValue], _: &RefLEnv, ctx: &CtxState) -> Result<LValue, LError> {
     match args.len() {
-        0 => {
-            Ok(LValue::Map(ctx.get_state(None).into()))
-        }
+        0 => Ok(LValue::Map(ctx.get_state(None).into())),
         1 => match &args[0] {
             LValue::Symbol(s) => match s.as_str() {
-                KEY_STATIC => Ok(ctx.get_state(Some(StateType::STATIC)).into()),
-                KEY_DYNAMIC => Ok(ctx.get_state(Some(StateType::DYNAMIC)).into()),
-                _ => Err(SpecialError(format!("Expected keywords {} or {}", KEY_STATIC, KEY_DYNAMIC)))
-            }
-            lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol))
-        }
+                KEY_STATIC => Ok(ctx.get_state(Some(StateType::Static)).into()),
+                KEY_DYNAMIC => Ok(ctx.get_state(Some(StateType::Dynamic)).into()),
+                _ => Err(SpecialError(format!(
+                    "Expected keywords {} or {}",
+                    KEY_STATIC, KEY_DYNAMIC
+                ))),
+            },
+            lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
+        },
         _ => Err(WrongNumberOfArgument(args.into(), args.len(), 0..1)),
     }
 }
@@ -218,11 +230,22 @@ fn update_state(args: &[LValue], _: &mut RefLEnv, ctx: &mut CtxState) -> Result<
     let first_arg = &args[0];
     let state_type = match String::try_from(first_arg) {
         Ok(s) => match s.as_str() {
-            KEY_DYNAMIC => StateType::DYNAMIC,
-            KEY_STATIC => StateType::STATIC,
-            _ => return Err(SpecialError(format!("Expected keywords {} or {}", KEY_STATIC, KEY_DYNAMIC)))
+            KEY_DYNAMIC => StateType::Dynamic,
+            KEY_STATIC => StateType::Static,
+            _ => {
+                return Err(SpecialError(format!(
+                    "Expected keywords {} or {}",
+                    KEY_STATIC, KEY_DYNAMIC
+                )))
+            }
         },
-        Err(_) => return Err(WrongType(first_arg.clone(), first_arg.into(), NameTypeLValue::String)),
+        Err(_) => {
+            return Err(WrongType(
+                first_arg.clone(),
+                first_arg.into(),
+                NameTypeLValue::String,
+            ))
+        }
     };
 
     match &args[1] {

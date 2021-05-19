@@ -4,13 +4,12 @@ use ompas_lisp::structs::LError::*;
 use ompas_lisp::structs::*;
 use std::fs::File;
 use std::io::{Read, Write};
-use tokio::sync::mpsc::{Sender, Receiver};
+use tokio::sync::mpsc::Sender;
 /*
 LANGUAGE
  */
 
 pub const TOKIO_CHANNEL_SIZE: usize = 16_384;
-
 
 const MOD_IO: &str = "mod-io";
 const DOC_MOD_IO: &str = "Module than handles input/output functions.";
@@ -67,7 +66,6 @@ pub fn print(args: &[LValue], _: &RefLEnv, ctx: &CtxIo) -> Result<LValue, LError
             Ok(LValue::Nil)
         }
     }
-
 }
 
 pub fn read(args: &[LValue], _: &RefLEnv, ctx: &CtxIo) -> Result<LValue, LError> {
@@ -90,7 +88,8 @@ pub fn read(args: &[LValue], _: &RefLEnv, ctx: &CtxIo) -> Result<LValue, LError>
     tokio::spawn(async move {
         sender
             .expect("missing a channel")
-            .send(contents).await
+            .send(contents)
+            .await
             .expect("couldn't send string via channel");
     });
 
@@ -175,12 +174,10 @@ pub mod repl {
     use crate::io::{repl, TOKIO_CHANNEL_SIZE};
     use rustyline::error::ReadlineError;
     use rustyline::Editor;
-    use std::thread;
-    use tokio::sync::mpsc;
-    use tokio::sync::mpsc::{Sender, Receiver};
+    use tokio::sync::mpsc::{self, Receiver, Sender};
 
     pub async fn spawn_stdin(sender: Sender<String>) -> Option<Sender<String>> {
-        let (sender_stdin, mut receiver_stdin) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+        let (sender_stdin, receiver_stdin) = mpsc::channel(TOKIO_CHANNEL_SIZE);
         tokio::spawn(async move {
             repl::stdin(sender, receiver_stdin).await;
         });
@@ -189,7 +186,8 @@ pub mod repl {
     }
 
     pub async fn spawn_stdout() -> Option<Sender<String>> {
-        let (sender_stdout, receiver_stdout): (Sender<String>, Receiver<String>) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+        let (sender_stdout, receiver_stdout): (Sender<String>, Receiver<String>) =
+            mpsc::channel(TOKIO_CHANNEL_SIZE);
 
         tokio::spawn(async move {
             repl::output(receiver_stdout).await;
@@ -218,7 +216,8 @@ pub mod repl {
                 Ok(string) => {
                     rl.add_history_entry(string.clone());
                     sender
-                        .send(format!("repl:{}", string)).await
+                        .send(format!("repl:{}", string))
+                        .await
                         .expect("couldn't send lisp command");
                     let buffer = receiver.recv().await.expect("error receiving");
                     assert_eq!(
@@ -242,7 +241,8 @@ pub mod repl {
             }
         }
         sender
-            .send("exit".to_string()).await
+            .send("exit".to_string())
+            .await
             .expect("couldn't send exit msg");
         rl.save_history("history.txt").unwrap();
     }

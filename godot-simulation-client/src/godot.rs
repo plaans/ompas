@@ -27,9 +27,53 @@ const EXEC_GODOT: &str = "exec-godot";
 //Lambda functions that will be added natively to the environment
 //Depends on module state and function get-state.
 //Robot
-const COORDINATES: &str = "coordinates";
 const LAMBDA_COORDINATES: &str = "(define coordinates (lambda (x)\
-                                                        (get-map (get-state dynamic) (list coordinates x)))))";
+                                                        (get-map (get-state dynamic) ((quote coordinates) x))))";
+
+const LAMBDA_BATTERY: &str = "(define battery (lambda (x)\
+                                                        (get-map (get-state dynamic) ((quote battery) x))))";
+
+const LAMBDA_ROTATION: &str = "(define rotation (lambda (x)\
+                                                        (get-map (get-state dynamic) ((quote rotation) x))))";
+
+const LAMBDA_VELOCITY: &str = "(define velocity (lambda (x)\
+                                                        (get-map (get-state dynamic) ((quote velocity) x))))";
+
+const LAMBDA_ROTATION_SPEED: &str = "(define rotation_speed (lambda (x)\
+                                                        (get-map (get-state dynamic) ((quote rotation_speed) x))))";
+
+const LAMBDA_IN_STATION: &str = "(define in_station (lambda (x)\
+                                                        (get-map (get-state dynamic) ((quote in_station) x))))";
+
+const LAMBDA_IN_INTERACT: &str = "(define in_interact (lambda (x)\
+                                                        (get-map (get-state dynamic) ((quote in_interact) x))))";
+
+const LAMBDA_INPUT_BELT: &str = "(define input_belt (lambda (x)\
+                                                        (get-map (get-state dynamic) ((quote input_belt) x))))";
+
+const LAMBDA_OUTPUT_BELT: &str = "(define output_belt (lambda (x)\
+                                                        (get-map (get-state dynamic) ((quote output_belt) x))))";
+
+const LAMBDA_PROCESSES: &str = "(define processes (lambda (x)\
+                                                        (get-map (get-state dynamic) ((quote processes_list) x))))";
+
+const LAMBDA_PROGRESS_RATE: &str =  "(define progress (lambda (x)\
+                                                        (get-map (get-state dynamic) ((quote progress_rate) x))))";
+
+const LAMBDA_LOCATION: &str = "(define location (lambda (x)\
+                                                  (get-map (get-state dynamic) ((quote location) x))))";
+
+const LAMBDA_BELT_TYPE: &str = "(define belt_type (lambda (x)\
+                                                    (get-map (get-state dynamic) ((quote belt_type) x)))))";
+
+const LAMBDA_POLYGONS: &str = "(define polygon (lambda (x)\
+                                                    (get-map (get-state dynamic) ((quote polygon) x)))))";
+
+const LAMBDA_PACKAGES_LIST: &str = "(define packages_list (lambda (x)\
+                                                (get-map (get-state dynamic) ((quote packages_list) x)))))";
+
+//TODO: doc for each lambda
+
 //Constants
 
 //Documentation
@@ -76,7 +120,16 @@ impl CtxGodot {
 
 impl GetModule for CtxGodot {
     fn get_module(self) -> Module {
-        let raw_lisp = vec![LAMBDA_COORDINATES].into();
+        let raw_lisp = vec![
+            LAMBDA_BATTERY,
+            LAMBDA_COORDINATES,
+            LAMBDA_IN_INTERACT,
+            LAMBDA_IN_STATION,
+            LAMBDA_ROTATION,
+            LAMBDA_ROTATION_SPEED,
+            LAMBDA_VELOCITY,
+        ]
+        .into();
 
         let mut module = Module {
             ctx: Box::new(self),

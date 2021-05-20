@@ -32,9 +32,11 @@ pub const BEGIN: &str = "begin";
 //Boolean
 pub const TRUE: &str = "true";
 pub const NIL: &str = "nil";
-pub const FALSE: &str = "FALSE";
+pub const FALSE: &str = "false";
 pub const NOT: &str = "not";
 pub const NOT_SHORT: &str = "!";
+
+pub const ENV: &str = "env"; //return a list of keys of the environment
 
 //MACRO
 ///Problem during expansion

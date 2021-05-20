@@ -6,6 +6,15 @@ use crate::structs::{LError, LValue, NameTypeLValue};
 use im::HashMap;
 use std::convert::TryFrom;
 
+pub fn env(_: &[LValue], env: &RefLEnv, _: &()) -> Result<LValue, LError> {
+    Ok(env
+        .keys()
+        .iter()
+        .map(|x| LValue::from(x.clone()))
+        .collect::<Vec<LValue>>()
+        .into())
+}
+
 pub fn begin(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     match args.last() {
         None => Err(LError::SpecialError("no SExpr after begin".to_string())),

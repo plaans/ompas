@@ -440,12 +440,7 @@ impl LFn {
         }
     }
 
-    pub fn call(
-        &self,
-        args: &[LValue],
-        env: &RefLEnv,
-        ctx: &dyn Any,
-    ) -> Result<LValue, LError> {
+    pub fn call(&self, args: &[LValue], env: &RefLEnv, ctx: &dyn Any) -> Result<LValue, LError> {
         (self.fun)(args, env, ctx)
     }
 

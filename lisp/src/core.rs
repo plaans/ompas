@@ -8,10 +8,10 @@ use aries_planning::parsing::sexpr::SExpr;
 use im::HashMap;
 use std::any::Any;
 use std::borrow::Borrow;
-use std::convert::{TryFrom, TryInto, Infallible};
+use std::cell::Ref;
+use std::convert::{Infallible, TryFrom, TryInto};
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
-use std::cell::Ref;
 
 pub struct LEnv {
     pub(crate) symbols: HashMap<String, LValue>,
@@ -67,6 +67,15 @@ impl Default for RefLEnv {
 }
 
 impl RefLEnv {
+    pub fn keys(&self) -> Vec<String> {
+        let mut keys: Vec<String> = self.symbols.keys().map(|x| x.clone()).collect();
+        keys.append(&mut self.macro_table.keys().map(|x| x.clone()).collect());
+        if let Some(outer) = self.outer.clone() {
+            keys.append(&mut outer.keys())
+        }
+        keys
+    }
+
     pub fn root() -> Self {
         RefLEnv(Rc::new(LEnv::root()))
     }
@@ -133,6 +142,8 @@ impl LEnv {
         symbols.insert(QUASI_QUOTE.to_string(), LCoreOperator::QuasiQuote.into());
         symbols.insert(QUOTE.to_string(), LCoreOperator::Quote.into());
         symbols.insert(UNQUOTE.to_string(), LCoreOperator::UnQuote.into());
+
+        symbols.insert(ENV.to_string(), LValue::Fn(LFn::new(Box::new(env), ENV)));
 
         //Special entry
         symbols.insert(GET.to_string(), LValue::Fn(LFn::new(Box::new(get), GET)));
@@ -503,7 +514,7 @@ pub fn expand(
                             vars.clone(),
                             expand(&exp, top_level, env, ctxs)?,
                         ]
-                            .into());
+                        .into());
                     }
                     LCoreOperator::If => {
                         let mut list = list.clone();
@@ -514,11 +525,11 @@ pub fn expand(
                             return Err(WrongNumberOfArgument((&list).into(), list.len(), 4..4));
                         }
                         //return map(expand, x)
-                        let mut list_expanded = Vec::new();
-                        for element in list {
-                            list_expanded.push(expand(&element, false, env, ctxs)?)
+                        let mut expanded_list = vec![LCoreOperator::If.into()];
+                        for x in &list[1..] {
+                            expanded_list.push(expand(x, false, env, ctxs)?)
                         }
-                        return Ok(list_expanded.into());
+                        return Ok(expanded_list.into());
                     }
                     LCoreOperator::Quote => {
                         //println!("expand: quote: Ok!");
@@ -545,9 +556,9 @@ pub fn expand(
                         return if list.len() == 1 {
                             Ok(LValue::Nil)
                         } else {
-                            let mut expanded_list = Vec::new();
-                            for xi in list {
-                                expanded_list.push(expand(xi, top_level, env, ctxs)?);
+                            let mut expanded_list = vec![LCoreOperator::Begin.into()];
+                            for x in &list[1..] {
+                                expanded_list.push(expand(x, top_level, env, ctxs)?)
                             }
                             Ok(expanded_list.into())
                         }
@@ -564,23 +575,19 @@ pub fn expand(
                         panic!("unquote not at right place")
                     }
                 }
-            }
-            else if let LValue::Symbol(sym) = &list[0]{
+            } else if let LValue::Symbol(sym) = &list[0] {
                 match env.get_macro(sym) {
                     None => {}
                     Some(m) => {
-                        return expand(
-                            &m.call(&list[1..], env, ctxs)?,
-                            top_level,
-                            env,
-                            ctxs,
-                        )
+                        return expand(&m.call(&list[1..], env, ctxs)?, top_level, env, ctxs)
                     }
                 }
-
             }
 
-            let expanded_list: Vec<LValue> = list.iter().map(|x| expand(x, false, env, ctxs)).collect::<Result<_,_>>()?;
+            let expanded_list: Vec<LValue> = list
+                .iter()
+                .map(|x| expand(x, false, env, ctxs))
+                .collect::<Result<_, _>>()?;
             Ok(expanded_list.into())
         }
         lv => Ok(lv.clone()),
@@ -605,26 +612,26 @@ pub fn expand_quasi_quote(x: &LValue, env: &mut RefLEnv) -> Result<LValue, LErro
             if list.is_empty() {
                 Ok(vec![Quote.into(), x.clone()].into())
             } else {
-                let first= &list[0];
+                let first = &list[0];
                 if let LValue::Symbol(s) = first {
                     if let Ok(co) = LCoreOperator::try_from(s.as_str()) {
                         if co == LCoreOperator::UnQuote {
                             if list.len() != 2 {
                                 return Err(WrongNumberOfArgument(x.clone(), list.len(), 2..2));
                             }
-                            return Ok(list[1].clone())
+                            return Ok(list[1].clone());
                         }
                     }
                 }
                 return Ok(vec![
-                        env.get_symbol(CONS).unwrap(),
-                        expand_quasi_quote(&first, env)?,
-                        expand_quasi_quote(&list[1..].to_vec().into(), env)?,
-                    ].into())
+                    env.get_symbol(CONS).unwrap(),
+                    expand_quasi_quote(&first, env)?,
+                    expand_quasi_quote(&list[1..].to_vec().into(), env)?,
+                ]
+                .into());
                 /*elif is_pair(x[0]) and x[0][0] is _unquotesplicing:
                 require(x[0], len(x[0])==2)*/
             }
-
         }
         _ => Ok(vec![Quote.into(), x.clone()].into()),
     }
@@ -765,11 +772,10 @@ pub fn eval(
     env: &mut RefLEnv,
     ctxs: &mut ContextCollection,
 ) -> Result<LValue, LError> {
-
     let mut lv = lv.clone();
     //TODO: Voir avec arthur une manière plus élégante de faire
     let mut temp_env = RefLEnv::default();
-    let mut env= env;
+    let mut env = env;
 
     loop {
         //println!("lv: {}", lv);
@@ -777,9 +783,8 @@ pub fn eval(
             return match env.get_symbol(s.as_str()) {
                 None => Ok(lv.clone()),
                 Some(lv) => Ok(lv),
-            }
-        }
-        else if let LValue::List(list) = &lv {
+            };
+        } else if let LValue::List(list) = &lv {
             //println!("expression is a list");
             let list = list.as_slice();
             let proc = &list[0];
@@ -801,7 +806,7 @@ pub fn eval(
                                 ))
                             }
                         };
-                        return Ok(LValue::Nil)
+                        return Ok(LValue::Nil);
                     }
                     LCoreOperator::DefLambda => {
                         let params = match &args[0] {
@@ -831,7 +836,7 @@ pub fn eval(
                             }
                         };
                         let body = &args[1];
-                        return Ok(LValue::Lambda(LLambda::new(params, body.clone())))
+                        return Ok(LValue::Lambda(LLambda::new(params, body.clone())));
                     }
                     LCoreOperator::If => {
                         let test = args.get(0).unwrap();
@@ -840,14 +845,16 @@ pub fn eval(
                         lv = match eval(test, &mut env, ctxs) {
                             Ok(LValue::True) => eval(conseq, &mut env, ctxs)?,
                             Ok(LValue::Nil) => eval(alt, &mut env, ctxs)?,
-                            Ok(lv) => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Bool)),
-                            Err(e) => return Err(e)
+                            Ok(lv) => {
+                                return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Bool))
+                            }
+                            Err(e) => return Err(e),
                         };
                     }
                     LCoreOperator::Quote => return Ok(args[0].clone()),
                     LCoreOperator::Set => {
                         //TODO: implement set
-                        return Ok(LValue::Nil)
+                        return Ok(LValue::Nil);
                     }
                     LCoreOperator::Begin => {
                         let results: Vec<LValue> = args
@@ -860,14 +867,15 @@ pub fn eval(
                     | LCoreOperator::UnQuote
                     | LCoreOperator::DefMacro => return Ok(LValue::Nil),
                 }
-            }
-            else {
-                let exps = list.iter().map(|x| eval(x, &mut env, ctxs)).collect::<Result<Vec<LValue>,_>>()?;
+            } else {
+                let exps = list
+                    .iter()
+                    .map(|x| eval(x, &mut env, ctxs))
+                    .collect::<Result<Vec<LValue>, _>>()?;
                 let proc = &exps[0];
                 let args = &exps[1..];
                 match proc {
                     LValue::Lambda(l) => {
-
                         lv = l.get_body();
                         //TODO: A voir avec Arthur
                         temp_env = l.get_new_env(args, &env)?;
@@ -888,7 +896,7 @@ pub fn eval(
                             None => &(),
                             Some(u) => ctxs.get_context(u),
                         };
-                        return fun.call(args, &env, ctx)
+                        return fun.call(args, &env, ctx);
                     }
                     LValue::MutFn(fun) => {
                         return match fun.get_index_mod() {
@@ -896,11 +904,11 @@ pub fn eval(
                             Some(u) => fun.call(&args, &mut env, ctxs.get_mut_context(u)),
                         }
                     }
-                    _ => return Ok(exps.into()) //Cas particulier lorsqu'il n'y a aucune procédure à faire de renvoyer une liste
+                    _ => return Ok(exps.into()), //Cas particulier lorsqu'il n'y a aucune procédure à faire de renvoyer une liste
                 }
             }
         } else {
-            return Ok(lv)
+            return Ok(lv);
         }
     }
 }

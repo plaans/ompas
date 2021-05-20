@@ -896,7 +896,7 @@ pub fn eval(
                             Some(u) => fun.call(&args, &mut env, ctxs.get_mut_context(u)),
                         }
                     }
-                    _ => return Ok(list.into()) //Cas particulier lorsqu'il n'y a aucune procédure à faire de renvoyer une liste
+                    _ => return Ok(exps.into()) //Cas particulier lorsqu'il n'y a aucune procédure à faire de renvoyer une liste
                 }
             }
         } else {

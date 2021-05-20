@@ -8,8 +8,7 @@ use aries_planning::parsing::sexpr::SExpr;
 use im::HashMap;
 use std::any::Any;
 use std::borrow::Borrow;
-use std::cell::Ref;
-use std::convert::{Infallible, TryFrom, TryInto};
+use std::convert::{TryFrom, TryInto};
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
@@ -68,8 +67,8 @@ impl Default for RefLEnv {
 
 impl RefLEnv {
     pub fn keys(&self) -> Vec<String> {
-        let mut keys: Vec<String> = self.symbols.keys().map(|x| x.clone()).collect();
-        keys.append(&mut self.macro_table.keys().map(|x| x.clone()).collect());
+        let mut keys: Vec<String> = self.symbols.keys().cloned().collect();
+        keys.append(&mut self.macro_table.keys().cloned().collect());
         if let Some(outer) = self.outer.clone() {
             keys.append(&mut outer.keys())
         }
@@ -623,12 +622,12 @@ pub fn expand_quasi_quote(x: &LValue, env: &mut RefLEnv) -> Result<LValue, LErro
                         }
                     }
                 }
-                return Ok(vec![
+                Ok(vec![
                     env.get_symbol(CONS).unwrap(),
                     expand_quasi_quote(&first, env)?,
                     expand_quasi_quote(&list[1..].to_vec().into(), env)?,
                 ]
-                .into());
+                .into())
                 /*elif is_pair(x[0]) and x[0][0] is _unquotesplicing:
                 require(x[0], len(x[0])==2)*/
             }
@@ -774,7 +773,7 @@ pub fn eval(
 ) -> Result<LValue, LError> {
     let mut lv = lv.clone();
     //TODO: Voir avec arthur une manière plus élégante de faire
-    let mut temp_env = RefLEnv::default();
+    let mut temp_env: RefLEnv;
     let mut env = env;
 
     loop {

@@ -8,7 +8,7 @@ use ompas_modules::doc::{CtxDoc, Documentation};
 use ompas_modules::io::repl::{spawn_stdin, spawn_stdout, EXIT_CODE_STDOUT};
 use ompas_modules::io::{CtxIo, TOKIO_CHANNEL_SIZE};
 use ompas_modules::math::CtxMath;
-use ompas_modules::robot::CtxRobot;
+//use ompas_modules::robot::CtxRobot;
 use std::path::PathBuf;
 use structopt::StructOpt;
 use tokio::sync::mpsc;

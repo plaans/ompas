@@ -128,6 +128,14 @@ impl GetModule for CtxGodot {
             LAMBDA_ROTATION,
             LAMBDA_ROTATION_SPEED,
             LAMBDA_VELOCITY,
+            LAMBDA_BELT_TYPE,
+            LAMBDA_PACKAGES_LIST,
+            LAMBDA_POLYGONS,
+            LAMBDA_LOCATION,
+            LAMBDA_PROGRESS_RATE,
+            LAMBDA_PROCESSES,
+            LAMBDA_OUTPUT_BELT,
+            LAMBDA_INPUT_BELT,
         ]
         .into();
 

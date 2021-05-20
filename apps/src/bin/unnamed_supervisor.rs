@@ -1,7 +1,7 @@
 use ompas_godot_simulation_client::godot::CtxGodot;
 use ompas_godot_simulation_client::state::CtxState;
 use ompas_lisp::core::*;
-use ompas_lisp::structs::LValue;
+use ompas_lisp::structs::{InitLisp, LValue};
 use ompas_modules::_type::CtxType;
 use ompas_modules::counter::CtxCounter;
 use ompas_modules::doc::{CtxDoc, Documentation};
@@ -57,7 +57,7 @@ pub async fn lisp_interpreter() {
     let mut ctx_doc = CtxDoc::default();
     let mut ctx_io = CtxIo::default();
     let ctx_math = CtxMath::default();
-    let ctx_robot = CtxRobot::default();
+    //let ctx_robot = CtxRobot::default();
     let ctx_type = CtxType::default();
     let ctx_counter = CtxCounter::default();
     let mut ctx_godot = CtxGodot::default();
@@ -66,7 +66,7 @@ pub async fn lisp_interpreter() {
     //Insert the doc for the different contexts.
     ctx_doc.insert_doc(CtxIo::documentation());
     ctx_doc.insert_doc(CtxMath::documentation());
-    ctx_doc.insert_doc(CtxRobot::documentation());
+    //ctx_doc.insert_doc(CtxRobot::documentation());
     ctx_doc.insert_doc(CtxType::documentation());
     ctx_doc.insert_doc(CtxGodot::documentation());
     ctx_doc.insert_doc(CtxState::documentation());
@@ -76,21 +76,24 @@ pub async fn lisp_interpreter() {
     ctx_io.add_sender_stdout(sender_stdout.clone());
 
     ctx_state.set_sender_stdout(sender_stdout.clone());
-    ctx_godot.set_sender_li(sender_li);
+    ctx_godot.set_sender_li(sender_li.clone());
 
-    load_module(root_env, ctxs, ctx_doc);
-    load_module(root_env, ctxs, ctx_io);
-    load_module(root_env, ctxs, ctx_math);
-    load_module(root_env, ctxs, ctx_robot);
-    load_module(root_env, ctxs, ctx_type);
-    load_module(root_env, ctxs, ctx_counter);
-    load_module(root_env, ctxs, ctx_godot);
-    load_module(root_env, ctxs, ctx_state);
+    let lisp_init = &mut InitLisp::core();
+
+    load_module(root_env, ctxs, ctx_doc, lisp_init);
+    load_module(root_env, ctxs, ctx_io, lisp_init);
+    load_module(root_env, ctxs, ctx_math, lisp_init);
+    //load_module(root_env, ctxs, ctx_robot,lisp_init);
+    load_module(root_env, ctxs, ctx_type, lisp_init);
+    load_module(root_env, ctxs, ctx_counter, lisp_init);
+    load_module(root_env, ctxs, ctx_godot, lisp_init);
+    load_module(root_env, ctxs, ctx_state, lisp_init);
     let env = &mut RefLEnv::new_from_outer(root_env.clone());
+    //println!("{}", lisp_init.begin_lisp());
 
     //Add core macros
     /*sender_li
-    .send(core_macros())
+    .send(lisp_init.begin_lisp()).await
     .expect("error while sending message");*/
 
     loop {

@@ -68,6 +68,7 @@ impl GetModule for CtxRobot {
         let mut module = Module {
             ctx: Box::new(self),
             prelude: vec![],
+            raw_lisp: Default::default(),
             label: MOD_ROBOT,
         };
 

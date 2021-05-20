@@ -115,6 +115,7 @@ impl GetModule for CtxDoc {
         let mut module = Module {
             ctx: Box::new(self),
             prelude: vec![],
+            raw_lisp: Default::default(),
             label: MOD_HELP,
         };
 

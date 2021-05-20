@@ -23,6 +23,13 @@ const OPEN_COM: &str = "open-com-godot";
 const LAUNCH_GODOT: &str = "launch-godot";
 const EXEC_GODOT: &str = "exec-godot";
 
+//State variables
+//Lambda functions that will be added natively to the environment
+//Depends on module state and function get-state.
+//Robot
+const COORDINATES: &str = "coordinates";
+const LAMBDA_COORDINATES: &str = "(define coordinates (lambda (x)\
+                                                        (get-map (get-state dynamic) (list coordinates x)))))";
 //Constants
 
 //Documentation
@@ -69,9 +76,12 @@ impl CtxGodot {
 
 impl GetModule for CtxGodot {
     fn get_module(self) -> Module {
+        let raw_lisp = vec![LAMBDA_COORDINATES].into();
+
         let mut module = Module {
             ctx: Box::new(self),
             prelude: vec![],
+            raw_lisp,
             label: MOD_GODOT,
         };
 
@@ -215,7 +225,7 @@ fn launch_godot(_: &[LValue], _: &RefLEnv, ctx: &CtxGodot) -> Result<LValue, LEr
     };
     tokio::spawn(async move {
         sender
-            .send("(print (quote (exec godot not implemented yet)))".to_string())
+            .send("(print (quote (launch-godot not implemented yet)))".to_string())
             .await
             .expect("couldn't send via channel");
     });
@@ -236,7 +246,11 @@ fn exec_godot(args: &[LValue], _: &RefLEnv, ctx: &CtxGodot) -> Result<LValue, LE
     let command = serde_json::to_string(&gs).unwrap();
 
     let sender = match ctx.get_sender_socket() {
-        None => return Err(SpecialError("ctx godot has no sender to l.i.".to_string())),
+        None => {
+            return Err(SpecialError(
+                "ctx godot has no sender to simulation, try first to (open-com-godot)".to_string(),
+            ))
+        }
         Some(s) => s.clone(),
     };
     tokio::spawn(async move {

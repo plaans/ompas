@@ -8,9 +8,10 @@ use aries_planning::parsing::sexpr::SExpr;
 use im::HashMap;
 use std::any::Any;
 use std::borrow::Borrow;
-use std::convert::{TryFrom, TryInto};
+use std::convert::{TryFrom, TryInto, Infallible};
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
+use std::cell::Ref;
 
 pub struct LEnv {
     pub(crate) symbols: HashMap<String, LValue>,
@@ -267,9 +268,15 @@ impl LEnv {
     }*/
 }
 
-pub fn load_module(env: &mut RefLEnv, ctxs: &mut ContextCollection, ctx: impl GetModule) -> usize {
+pub fn load_module(
+    env: &mut RefLEnv,
+    ctxs: &mut ContextCollection,
+    ctx: impl GetModule,
+    lisp_init: &mut InitLisp,
+) -> usize {
     let mut module = ctx.get_module();
     let id = ctxs.insert(module.ctx);
+    lisp_init.append(&mut module.raw_lisp);
     for (sym, lv) in &mut module.prelude {
         match lv {
             LValue::Fn(nl) => nl.set_index_mod(id),
@@ -289,6 +296,48 @@ pub fn parse(str: &str, env: &mut RefLEnv, ctxs: &mut ContextCollection) -> Resu
 }
 
 pub fn parse_into_lvalue(
+    se: &SExpr,
+    env: &mut RefLEnv,
+    ctxs: &mut ContextCollection,
+) -> Result<LValue, LError> {
+    match se {
+        SExpr::Atom(atom) => {
+            return match atom.as_str().parse::<i64>() {
+                Ok(int) => Ok(LValue::Number(LNumber::Int(int))),
+                Err(_) => match atom.as_str().parse::<f64>() {
+                    //Test if its a float
+                    Ok(float) => Ok(LValue::Number(LNumber::Float(float))),
+                    Err(_) => match atom.as_str() {
+                        //Test if its a Boolean
+                        TRUE => {
+                            //println!("atom is boolean true");
+                            Ok(LValue::True)
+                        }
+                        FALSE | NIL => {
+                            //println!("atom is boolean false");
+                            Ok(LValue::Nil)
+                        }
+                        s => Ok(s.into()),
+                    },
+                },
+            };
+        }
+        SExpr::List(list) => {
+            //println!("expression is a list");
+            let list_iter = list.iter();
+            if list_iter.is_empty() {
+                Ok(LValue::Nil)
+            } else {
+                let vec: Vec<LValue> = list_iter
+                    .map(|x| parse_into_lvalue(x, env, ctxs))
+                    .collect::<Result<_, _>>()?;
+                Ok(LValue::List(vec))
+            }
+        }
+    }
+}
+
+/*pub fn parse_into_lvalue(
     se: &SExpr,
     env: &mut RefLEnv,
     ctxs: &mut ContextCollection,
@@ -334,7 +383,7 @@ pub fn parse_into_lvalue(
             }
         }
     }
-}
+}*/
 
 pub fn expand(
     x: &LValue,
@@ -344,8 +393,8 @@ pub fn expand(
 ) -> Result<LValue, LError> {
     match x {
         LValue::List(list) => {
-            match &list[0] {
-                LValue::CoreOperator(co) => match co {
+            if let Ok(co) = LCoreOperator::try_from(&list[0]) {
+                match co {
                     LCoreOperator::Define | LCoreOperator::DefMacro => {
                         //eprintln!("expand: define: Ok!");
                         if list.len() < 3 {
@@ -454,7 +503,7 @@ pub fn expand(
                             vars.clone(),
                             expand(&exp, top_level, env, ctxs)?,
                         ]
-                        .into());
+                            .into());
                     }
                     LCoreOperator::If => {
                         let mut list = list.clone();
@@ -472,11 +521,11 @@ pub fn expand(
                         return Ok(list_expanded.into());
                     }
                     LCoreOperator::Quote => {
-                        //eprintln!("expand: quote: Ok!");
+                        //println!("expand: quote: Ok!");
                         if list.len() != 2 {
                             return Err(WrongNumberOfArgument(list.into(), list.len(), 2..2));
                         }
-                        return Ok(x.clone());
+                        return Ok(vec![LCoreOperator::Quote.into(), list[1].clone()].into());
                     }
                     LCoreOperator::Set => {
                         if list.len() != 3 {
@@ -507,31 +556,31 @@ pub fn expand(
                         return if list.len() != 2 {
                             Err(WrongNumberOfArgument(list.into(), list.len(), 2..2))
                         } else {
-                            expand_quasi_quote(list.get(1).unwrap(), env)
+                            expand_quasi_quote(&list[1], env)
                         }
                     }
                     LCoreOperator::UnQuote => {
                         //TODO: Implémenter msg d'erreur
                         panic!("unquote not at right place")
                     }
-                },
-                LValue::Symbol(sym) => {
-                    match env.get_macro(sym) {
-                        None => {}
-                        Some(m) => {
-                            return expand(&m.call(&list[1..], env, ctxs)?, top_level, env, ctxs)
-                        }
-                    }
-                    /*elif isa(x[0], Symbol) and x[0] in macro_table:
-                    return expand(macro_table[x[0]](*x[1:]), toplevel) # (m arg...)
-                    */
                 }
-                _ => {}
             }
-            let mut expanded_list = Vec::new();
-            for val in list {
-                expanded_list.push(expand(val, false, env, ctxs)?)
+            else if let LValue::Symbol(sym) = &list[0]{
+                match env.get_macro(sym) {
+                    None => {}
+                    Some(m) => {
+                        return expand(
+                            &m.call(&list[1..], env, ctxs)?,
+                            top_level,
+                            env,
+                            ctxs,
+                        )
+                    }
+                }
+
             }
+
+            let expanded_list: Vec<LValue> = list.iter().map(|x| expand(x, false, env, ctxs)).collect::<Result<_,_>>()?;
             Ok(expanded_list.into())
         }
         lv => Ok(lv.clone()),
@@ -556,31 +605,33 @@ pub fn expand_quasi_quote(x: &LValue, env: &mut RefLEnv) -> Result<LValue, LErro
             if list.is_empty() {
                 Ok(vec![Quote.into(), x.clone()].into())
             } else {
-                let first = list.first().unwrap();
-                return if matches!(first, LValue::CoreOperator(LCoreOperator::UnQuote)) {
-                    if list.len() != 2 {
-                        return Err(WrongNumberOfArgument(x.clone(), list.len(), 2..2));
+                let first= &list[0];
+                if let LValue::Symbol(s) = first {
+                    if let Ok(co) = LCoreOperator::try_from(s.as_str()) {
+                        if co == LCoreOperator::UnQuote {
+                            if list.len() != 2 {
+                                return Err(WrongNumberOfArgument(x.clone(), list.len(), 2..2));
+                            }
+                            return Ok(list[1].clone())
+                        }
                     }
-                    Ok(list.get(1).unwrap().clone())
                 }
-                /*elif is_pair(x[0]) and x[0][0] is _unquotesplicing:
-                require(x[0], len(x[0])==2)*/
-                else {
-                    Ok(vec![
+                return Ok(vec![
                         env.get_symbol(CONS).unwrap(),
                         expand_quasi_quote(&first, env)?,
                         expand_quasi_quote(&list[1..].to_vec().into(), env)?,
-                    ]
-                    .into())
-                };
+                    ].into())
+                /*elif is_pair(x[0]) and x[0][0] is _unquotesplicing:
+                require(x[0], len(x[0])==2)*/
             }
+
         }
         _ => Ok(vec![Quote.into(), x.clone()].into()),
     }
     //Verify if has unquotesplicing here
 }
 
-pub fn eval(
+/*pub fn eval(
     lv: &LValue,
     env: &mut RefLEnv,
     ctxs: &mut ContextCollection,
@@ -697,21 +748,7 @@ pub fn eval(
                         Some(u) => fun.call(&args, env, ctxs.get_mut_context(u)),
                     }
                 }
-                LValue::Symbol(s) => match env.get_symbol(s.as_str()) {
-                    None => Err(SpecialError(format!(
-                        "function {} corresponds to nothing in environment.",
-                        s
-                    ))),
-                    Some(lv) => match lv {
-                        LValue::Fn(_) | LValue::MutFn(_) | LValue::Lambda(_) => {
-                            let mut new_args = args.to_vec();
-                            new_args.insert(0, lv);
-                            eval(&new_args.into(), env, ctxs)
-                        }
-                        _ => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Fn)),
-                    },
-                },
-                lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Fn)),
+                lv => Ok(list.into()),
             }
         }
         LValue::Symbol(s) => match env.get_symbol(s.as_str()) {
@@ -720,18 +757,164 @@ pub fn eval(
         },
         lv => Ok(lv.clone()),
     }
+}*/
+
+//Better version of eval
+pub fn eval(
+    lv: &LValue,
+    env: &mut RefLEnv,
+    ctxs: &mut ContextCollection,
+) -> Result<LValue, LError> {
+
+    let mut lv = lv.clone();
+    //TODO: Voir avec arthur une manière plus élégante de faire
+    let mut temp_env = RefLEnv::default();
+    let mut env= env;
+
+    loop {
+        //println!("lv: {}", lv);
+        if let LValue::Symbol(s) = &lv {
+            return match env.get_symbol(s.as_str()) {
+                None => Ok(lv.clone()),
+                Some(lv) => Ok(lv),
+            }
+        }
+        else if let LValue::List(list) = &lv {
+            //println!("expression is a list");
+            let list = list.as_slice();
+            let proc = &list[0];
+            let args = &list[1..];
+            //assert!(args.len() >= 2, "Checked in expansion");
+            if let LValue::CoreOperator(co) = proc {
+                match co {
+                    LCoreOperator::Define => {
+                        match &args[0] {
+                            LValue::Symbol(s) => {
+                                let exp = eval(&args[1], &mut env, ctxs)?;
+                                env.add_entry(s.to_string(), exp);
+                            }
+                            lv => {
+                                return Err(WrongType(
+                                    lv.clone(),
+                                    lv.into(),
+                                    NameTypeLValue::Symbol,
+                                ))
+                            }
+                        };
+                        return Ok(LValue::Nil)
+                    }
+                    LCoreOperator::DefLambda => {
+                        let params = match &args[0] {
+                            LValue::List(list) => {
+                                let mut vec_sym = Vec::new();
+                                for val in list {
+                                    match val {
+                                        LValue::Symbol(s) => vec_sym.push(s.clone()),
+                                        lv => {
+                                            return Err(WrongType(
+                                                lv.clone(),
+                                                lv.into(),
+                                                NameTypeLValue::Symbol,
+                                            ))
+                                        }
+                                    }
+                                }
+                                vec_sym.into()
+                            }
+                            LValue::Symbol(s) => s.clone().into(),
+                            lv => {
+                                return Err(NotInListOfExpectedTypes(
+                                    lv.clone(),
+                                    lv.into(),
+                                    vec![NameTypeLValue::List, NameTypeLValue::Symbol],
+                                ))
+                            }
+                        };
+                        let body = &args[1];
+                        return Ok(LValue::Lambda(LLambda::new(params, body.clone())))
+                    }
+                    LCoreOperator::If => {
+                        let test = args.get(0).unwrap();
+                        let conseq = args.get(1).unwrap();
+                        let alt = args.get(2).unwrap();
+                        lv = match eval(test, &mut env, ctxs) {
+                            Ok(LValue::True) => eval(conseq, &mut env, ctxs)?,
+                            Ok(LValue::Nil) => eval(alt, &mut env, ctxs)?,
+                            Ok(lv) => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Bool)),
+                            Err(e) => return Err(e)
+                        };
+                    }
+                    LCoreOperator::Quote => return Ok(args[0].clone()),
+                    LCoreOperator::Set => {
+                        //TODO: implement set
+                        return Ok(LValue::Nil)
+                    }
+                    LCoreOperator::Begin => {
+                        let results: Vec<LValue> = args
+                            .iter()
+                            .map(|x| eval(x, &mut env, ctxs))
+                            .collect::<Result<_, _>>()?;
+                        lv = results.last().unwrap_or(&LValue::Nil).clone();
+                    }
+                    LCoreOperator::QuasiQuote
+                    | LCoreOperator::UnQuote
+                    | LCoreOperator::DefMacro => return Ok(LValue::Nil),
+                }
+            }
+            else {
+                let exps = list.iter().map(|x| eval(x, &mut env, ctxs)).collect::<Result<Vec<LValue>,_>>()?;
+                let proc = &exps[0];
+                let args = &exps[1..];
+                match proc {
+                    LValue::Lambda(l) => {
+
+                        lv = l.get_body();
+                        //TODO: A voir avec Arthur
+                        temp_env = l.get_new_env(args, &env)?;
+                        env = &mut temp_env;
+
+                        //l.call(args, env, ctxs)
+
+                        //Change the way of doing lambda
+                        //Python example
+                        /*
+                        if isa(proc, Procedure):
+                            x = proc.exp
+                            env = Env(proc.parms, exps, proc.env)
+                         */
+                    }
+                    LValue::Fn(fun) => {
+                        let ctx: &dyn Any = match fun.get_index_mod() {
+                            None => &(),
+                            Some(u) => ctxs.get_context(u),
+                        };
+                        return fun.call(args, &env, ctx)
+                    }
+                    LValue::MutFn(fun) => {
+                        return match fun.get_index_mod() {
+                            None => fun.call(&args, &mut env, &mut ()),
+                            Some(u) => fun.call(&args, &mut env, ctxs.get_mut_context(u)),
+                        }
+                    }
+                    _ => return Ok(list.into()) //Cas particulier lorsqu'il n'y a aucune procédure à faire de renvoyer une liste
+                }
+            }
+        } else {
+            return Ok(lv)
+        }
+    }
 }
 
-pub fn core_macros_and_lambda() -> String {
-    let mut string = "(begin".to_string();
-    string.push_str(MACRO_AND2);
-    string.push_str(MACRO_OR2);
-    string.push_str(MACRO_NEQ);
-    string.push_str(MACRO_NEQ_SHORT);
-    string.push_str(LAMBDA_AND);
-    string.push_str(LAMBDA_OR);
-    string.push(')');
-    string
+pub fn core_macros_and_lambda() -> InitLisp {
+    vec![
+        MACRO_AND2,
+        MACRO_OR2,
+        MACRO_NEQ,
+        MACRO_NEQ_SHORT,
+        LAMBDA_AND,
+        LAMBDA_OR,
+    ]
+    .into()
 }
 
 //(begin (define ?v (var (:type object

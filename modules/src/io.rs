@@ -129,6 +129,7 @@ impl GetModule for CtxIo {
         let mut module = Module {
             ctx: Box::new(self),
             prelude: vec![],
+            raw_lisp: Default::default(),
             label: MOD_IO,
         };
 

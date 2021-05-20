@@ -1,4 +1,4 @@
-use crate::core::{eval, ContextCollection, RefLEnv};
+use crate::core::{core_macros_and_lambda, eval, ContextCollection, RefLEnv};
 use crate::language::*;
 use crate::structs::LError::{ConversionError, SpecialError, WrongNumberOfArgument};
 use aries_utils::input::ErrLoc;
@@ -443,7 +443,7 @@ impl LFn {
     pub fn call(
         &self,
         args: &[LValue],
-        env: &mut RefLEnv,
+        env: &RefLEnv,
         ctx: &dyn Any,
     ) -> Result<LValue, LError> {
         (self.fun)(args, env, ctx)
@@ -562,6 +562,27 @@ impl Display for LCoreOperator {
             LCoreOperator::DefMacro => write!(f, "{}", DEF_MACRO.to_string()),
             LCoreOperator::Set => write!(f, "{}", SET.to_string()),
             LCoreOperator::Begin => write!(f, "{}", BEGIN.to_string()),
+        }
+    }
+}
+
+impl TryFrom<&str> for LCoreOperator {
+    type Error = LError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            DEFINE => Ok(LCoreOperator::Define),
+            LAMBDA => Ok(LCoreOperator::DefLambda),
+            IF => Ok(LCoreOperator::If),
+            QUOTE => Ok(LCoreOperator::Quote),
+            QUASI_QUOTE => Ok(LCoreOperator::QuasiQuote),
+            UNQUOTE => Ok(LCoreOperator::UnQuote),
+            DEF_MACRO => Ok(LCoreOperator::DefMacro),
+            SET => Ok(LCoreOperator::Set),
+            BEGIN => Ok(LCoreOperator::Begin),
+            _ => Err(SpecialError(
+                "string does not correspond to core operator".to_string(),
+            )),
         }
     }
 }
@@ -785,6 +806,7 @@ impl TryFrom<&LValue> for LCoreOperator {
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
         match value {
             LValue::CoreOperator(co) => Ok(co.clone()),
+            LValue::Symbol(s) => Ok(s.as_str().try_into()?),
             lv => Err(ConversionError(lv.into(), NameTypeLValue::CoreOperator)),
         }
     }
@@ -1017,15 +1039,15 @@ impl From<usize> for LValue {
     }
 }
 
-impl From<&String> for LValue {
-    fn from(s: &String) -> Self {
-        LValue::Symbol(s.clone())
+impl From<&str> for LValue {
+    fn from(s: &str) -> Self {
+        LValue::Symbol(s.to_string())
     }
 }
 
 impl From<String> for LValue {
     fn from(s: String) -> Self {
-        LValue::from(&s)
+        LValue::Symbol(s)
     }
 }
 
@@ -1198,9 +1220,35 @@ impl From<LValue> for NameTypeLValue {
     }
 }
 
+#[derive(Default)]
+pub struct InitLisp(Vec<&'static str>);
+
+impl From<Vec<&'static str>> for InitLisp {
+    fn from(vec: Vec<&'static str>) -> Self {
+        InitLisp(vec.clone())
+    }
+}
+
+impl InitLisp {
+    pub fn core() -> InitLisp {
+        core_macros_and_lambda()
+    }
+    pub fn append(&mut self, other: &mut Self) {
+        self.0.append(&mut other.0)
+    }
+
+    pub fn begin_lisp(&self) -> String {
+        let mut str = "(begin ".to_string();
+        self.0.iter().for_each(|&x| str.push_str(x));
+        str.push(')');
+        str
+    }
+}
+
 pub struct Module {
     pub ctx: Box<dyn Any>,
     pub prelude: Vec<(String, LValue)>,
+    pub raw_lisp: InitLisp,
     pub label: &'static str,
 }
 

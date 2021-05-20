@@ -336,6 +336,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "ompas_acting"
+version = "0.1.0"
+
+[[package]]
 name = "ompas_apps"
 version = "0.1.0"
 dependencies = [

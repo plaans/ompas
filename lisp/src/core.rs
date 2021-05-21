@@ -12,11 +12,18 @@ use std::convert::{TryFrom, TryInto};
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
+#[derive(Clone)]
 pub struct LEnv {
     pub(crate) symbols: HashMap<String, LValue>,
     pub(crate) macro_table: HashMap<String, LLambda>,
     pub(crate) new_entries: Vec<String>,
     pub(crate) outer: Option<RefLEnv>,
+}
+
+impl LEnv {
+    pub fn merge_by_symbols(&mut self, other: &Self) {
+        self.symbols = self.symbols.clone().union(other.symbols.clone());
+    }
 }
 
 pub struct ContextCollection {
@@ -62,6 +69,24 @@ pub struct RefLEnv(Rc<LEnv>);
 impl Default for RefLEnv {
     fn default() -> Self {
         RefLEnv(Rc::new(LEnv::default()))
+    }
+}
+
+impl From<LEnv> for RefLEnv {
+    fn from(e: LEnv) -> Self {
+        RefLEnv(Rc::new(e))
+    }
+}
+
+impl RefLEnv {
+    pub fn clone_from_root(&self) -> LEnv {
+        let mut env = self.0.deref().clone();
+        let outer = env.outer.clone();
+        match outer {
+            None => {}
+            Some(s) => env.merge_by_symbols(& s.clone().clone_from_root())
+        };
+        env.into()
     }
 }
 
@@ -835,7 +860,7 @@ pub fn eval(
                             }
                         };
                         let body = &args[1];
-                        return Ok(LValue::Lambda(LLambda::new(params, body.clone())));
+                        return Ok(LValue::Lambda(LLambda::new(params, body.clone(), env.clone_from_root())));
                     }
                     LCoreOperator::If => {
                         let test = args.get(0).unwrap();

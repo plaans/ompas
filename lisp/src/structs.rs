@@ -1,4 +1,4 @@
-use crate::core::{core_macros_and_lambda, eval, ContextCollection, RefLEnv};
+use crate::core::{core_macros_and_lambda, eval, ContextCollection, RefLEnv, LEnv};
 use crate::language::*;
 use crate::structs::LError::{ConversionError, SpecialError, WrongNumberOfArgument};
 use aries_utils::input::ErrLoc;
@@ -320,10 +320,17 @@ impl From<Vec<String>> for LambdaArgs {
         LambdaArgs::List(vec_sym)
     }
 }
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct LLambda {
     params: LambdaArgs,
     body: Box<LValue>,
+    env: LEnv,
+}
+
+impl Debug for LLambda {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "{:?} : {:?}", self.params, self.body)
+    }
 }
 
 impl Display for LLambda {
@@ -339,15 +346,17 @@ impl PartialEq for LLambda {
 }
 
 impl LLambda {
-    pub fn new(params: LambdaArgs, body: LValue) -> Self {
+    pub fn new(params: LambdaArgs, body: LValue, env: LEnv) -> Self {
         LLambda {
             params,
             body: Box::new(body),
+            env,
         }
     }
 
     pub fn get_new_env(&self, args: &[LValue], outer: &RefLEnv) -> Result<RefLEnv, LError> {
-        let mut env = RefLEnv::empty();
+
+        let mut env = self.env.clone();
 
         match &self.params {
             LambdaArgs::Sym(param) => {
@@ -373,7 +382,7 @@ impl LLambda {
         };
 
         env.outer = Some(outer.clone());
-        Ok(env)
+        Ok(env.into())
     }
 
     pub fn call(

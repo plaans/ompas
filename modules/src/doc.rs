@@ -67,16 +67,16 @@ impl Documentation for CtxDoc {
             LHelp::new(MOD_HELP, DOC_MOD_HELP, Some(DOC_MOD_HELP_VERBOSE)),
             LHelp::new(HELP, DOC_HELP, Some(DOC_HELP_VERBOSE)),
             LHelp::new(DEFINE, DOC_DEFINE, None),
-            LHelp::new(LAMBDA, DOC_LAMBDA, None),
+            LHelp::new(LAMBDA, DOC_LAMBDA, Some(DOC_LAMBDA_VEBROSE)),
             LHelp::new(DEF_MACRO, DOC_DEF_MACRO, None),
             LHelp::new(IF, DOC_IF, None),
             LHelp::new(QUOTE, DOC_QUOTE, None),
             LHelp::new(QUASI_QUOTE, QUASI_QUOTE, None),
             LHelp::new(UNQUOTE, DOC_UNQUOTE, None),
             LHelp::new(SET, DOC_SET, None),
-            LHelp::new(BEGIN, DOC_BEGIN, None),
+            LHelp::new(BEGIN, DOC_BEGIN, Some(DOC_BEGIN_VERBOSE)),
             LHelp::new(LIST, DOC_LIST, None),
-            LHelp::new(MAP, DOC_MAP, None),
+            LHelp::new(MAP, DOC_MAP, Some(DOC_MAP_VERBOSE)),
             LHelp::new(GET, DOC_GET, None),
             LHelp::new(CAR, DOC_CAR, None),
             LHelp::new(CDR, DOC_CDR, None),
@@ -87,8 +87,8 @@ impl Documentation for CtxDoc {
             LHelp::new(LEN, DOC_LEN, None),
             LHelp::new(REVERSE, DOC_REVERSE, None),
             LHelp::new(CONS, DOC_CONS, None),
-            LHelp::new(GET_MAP, DOC_GET_MAP, None),
-            LHelp::new(SET_MAP, DOC_SET_MAP, None),
+            LHelp::new(GET_MAP, DOC_GET_MAP, Some(DOC_GET_MAP_VERBOSE)),
+            LHelp::new(SET_MAP, DOC_SET_MAP, Some(DOC_SET_MAP_VERBOSE)),
         ]
     }
 }
@@ -105,7 +105,7 @@ impl CtxDoc {
     pub fn get(&self, sym: &str) -> String {
         match self.map_help.get(sym) {
             None => "no such function".to_string(),
-            Some(h) => format!("{:?}", h),
+            Some(h) => format!("{:?}\n", h),
         }
     }
 }

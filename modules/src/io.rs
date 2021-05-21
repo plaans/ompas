@@ -176,6 +176,7 @@ pub mod repl {
     use rustyline::error::ReadlineError;
     use rustyline::Editor;
     use tokio::sync::mpsc::{self, Receiver, Sender};
+    use std::io::Write;
 
     pub async fn spawn_stdin(sender: Sender<String>) -> Option<Sender<String>> {
         let (sender_stdin, receiver_stdin) = mpsc::channel(TOKIO_CHANNEL_SIZE);
@@ -256,7 +257,12 @@ pub mod repl {
             if str == EXIT_CODE_STDOUT {
                 break;
             }
-            println!("{}", str);
+            let mut stdout = std::io::stdout();
+            stdout.lock();
+            stdout.write_all(format!("{}\n",str).as_bytes());
+            drop(stdout);
+            //TODO: check if it always works.
+            //print!("{}\n", str);
         }
     }
 }

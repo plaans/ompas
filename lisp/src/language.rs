@@ -77,27 +77,51 @@ pub const LAMBDA_OR: &str = " (define or (lambda x \
 //Documentation
 
 //TODO: Write the doc for the basic functions
-pub const DOC_CAR: &str = "";
-pub const DOC_CDR: &str = "";
-pub const DOC_APPEND: &str = "";
-pub const DOC_MEMBER: &str = "";
-pub const DOC_LAST: &str = "";
-pub const DOC_EMPTY: &str = "";
-pub const DOC_LEN: &str = "";
-pub const DOC_REVERSE: &str = "";
-pub const DOC_LIST: &str = "";
-pub const DOC_CONS: &str = "";
-pub const DOC_MAP: &str = "";
-pub const DOC_GET: &str = "";
-pub const DOC_GET_MAP: &str = "";
-pub const DOC_SET_MAP: &str = "";
+pub const DOC_CAR: &str = "Takes a list of at least one element, and return the first element. Nil otherwise.";
+pub const DOC_CDR: &str = "Takes a list of at least one element, and return a list without the first element.";
+pub const DOC_APPEND: &str = "Takes two list and return a list merging both.";
+pub const DOC_MEMBER: &str = "Takes two arguments of which the second must be a list. \
+if the first argument is a member of the second argument,\
+and then it returns the remainder of the list beginning with the first argument.";
+pub const DOC_LAST: &str = "Takes a list of at least one element and return the last element. Nil otherwise";
+pub const DOC_EMPTY: &str = "Return true if the a list or map is empty.";
+pub const DOC_LEN: &str = "Return the len of a list or a map";
+pub const DOC_REVERSE: &str = "Takes a list and return a list with all elements reversed in order";
+pub const DOC_LIST: &str = "Return a list of the LValues given is argument";
+pub const DOC_CONS: &str = "Takes two objects and merges into a list.";
+pub const DOC_MAP: &str = "Return a map from from a list of pairs.";
+pub const DOC_MAP_VERBOSE: &str= "Example: (map (quote ((ten . 10) (twenty . 20))))";
+pub const DOC_GET: &str = "Takes a key as argument and return the binding if defined in the environment. Return the key otherwise.";
+pub const DOC_GET_MAP: &str = "Takes a map and a key as argument, and return the value associated.";
+pub const DOC_GET_MAP_VERBOSE: &str = "Example: Here is an example in the repl\n\
+                                        \t>> (define m (map (quote ((ten . 10) (twenty . 20)))))\n\
+                                        \t>> (get-map m ten)\n\
+                                        \tLI>> 10";
+pub const DOC_SET_MAP: &str = "Takes a map and and a list of pairs (key . value) to set in the map. Return a new map with the new bindings";
+pub const DOC_SET_MAP_VERBOSE: &str = "Example: Here is an example in the repl\n\
+                                        \t>> (define m (map (quote ((ten . 10) (twenty . 20)))))\n\
+                                        \t>> (get m)\n\
+                                        \tLI>> ten: 10 \n\
+                                        \ttwenty: 20 \n\
+                                        \t>> (define m (set-map m (three . 3 )))\n\
+                                        \tLI>> (get m)\n\
+                                        \tLI>> ten: 10 \n\
+                                        \tthree: 3\n\
+                                        \ttwenty: 20";
 
-pub const DOC_DEFINE: &str = "";
-pub const DOC_DEF_MACRO: &str = "";
-pub const DOC_LAMBDA: &str = "";
-pub const DOC_IF: &str = "";
-pub const DOC_QUOTE: &str = "";
-pub const DOC_QUASI_QUOTE: &str = "";
-pub const DOC_UNQUOTE: &str = "";
-pub const DOC_SET: &str = "";
-pub const DOC_BEGIN: &str = "";
+pub const DOC_DEFINE: &str = "Defines a new entry in the environment/";
+pub const DOC_DEF_MACRO: &str = "Define a new macro, can only be done at the top level";
+pub const DOC_LAMBDA: &str = "Define a new lambda function";
+pub const DOC_LAMBDA_VEBROSE: &str ="Example:\n\
+                                    \t>> (define square (lambda (x) (* x x)))\n\
+                                    \t>> (square 10)\n\
+                                    \tLI>> 100";
+pub const DOC_IF: &str = "Condition block";
+pub const DOC_QUOTE: &str = "Prevent the LValue to be evaluated";
+pub const DOC_QUASI_QUOTE: &str = "Begins a context mixing quoting and unquoting";
+pub const DOC_UNQUOTE: &str = "Evaluated an expression present inside a quasi-quote statement";
+pub const DOC_SET: &str = "Set the value of an entry of the environment";
+pub const DOC_BEGIN: &str = "Evaluated a list LValue and returns the last one.";
+pub const DOC_BEGIN_VERBOSE: &str = "Example: \n\
+                                     \t>>(begin 10 (* 3 3))\n\
+                                     \tLI>> 9";

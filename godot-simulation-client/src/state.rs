@@ -21,25 +21,29 @@ const MOD_STATE: &str = "mod-state";
 
 //functions
 const SET_STATE: &str = "set-state";
-const SET_STATIC_STATE: &str = "set-static-state";
-const SET_DYNAMIC_STATE: &str = "set-dynamic-state";
 const GET_STATE: &str = "get-state";
-const GET_STATE_STATIC: &str = "get-state-static";
-const GET_STATE_DYNAMIC: &str = "get-state-dynamic";
-//const GET_LAST_STATE: &str = "get-last-state";
 const UPDATE_STATE: &str = "update-state";
 
 const KEY_DYNAMIC: &str = "dynamic";
 const KEY_STATIC: &str = "static";
 
 //Documentation
-const DOC_MOD_STATE: &str = "Documentation for mod-state.";
-const DOC_MOD_STATE_VERBOSE: &str = "functions:";
+const DOC_MOD_STATE: &str = "Module to handle state. Contains a map with all the facts.";
+const DOC_MOD_STATE_VERBOSE: &str = "functions:\n\
+                                     \t- set-state\n\
+                                     \t- get-state\n\
+                                     \t- update-state";
 
-const DOC_SET_STATE: &str = "todo";
-const DOC_GET_STATE: &str = "todo";
-const DOC_GET_LAST_STATE: &str = "todo";
-const DOC_UPDATE_STATE: &str = "todo";
+const DOC_SET_STATE: &str = "Set a map as a the new state";
+const DOC_SET_VERBOSE: &str = "Takes 2 arguments:\n\
+                                \t- the type of state to set: {static, dynamic}\n\
+                                \t- the map that will overwrite the current state";
+const DOC_GET_STATE: &str = "Return the current state.";
+const DOC_GET_STATE_VERBOSE: &str = "Takes an optional argument: {static, dynamic}";
+const DOC_UPDATE_STATE: &str = "Update the current state with facts of a map";
+const DOC_UPDATE_VERBOSE: &str = "Takes 2 arguments:\n\
+                                \t- the type of state to set: {static, dynamic}\n\
+                                \t- the map that will overwrite the current state";
 
 #[derive(Default)]
 pub struct CtxState {

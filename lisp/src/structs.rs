@@ -686,7 +686,6 @@ impl Hash for LValue {
             LValue::Quote(s) => {
                 s.to_string().hash(state);
             }
-
             LValue::Nil => false.hash(state),
             _ => {}
         };

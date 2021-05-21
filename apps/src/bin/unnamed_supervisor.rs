@@ -89,7 +89,7 @@ pub async fn lisp_interpreter() {
     load_module(root_env, ctxs, ctx_godot, lisp_init);
     load_module(root_env, ctxs, ctx_state, lisp_init);
     let env = &mut RefLEnv::new_from_outer(root_env.clone());
-    println!("{}", lisp_init.begin_lisp());
+    //println!("{}", lisp_init.begin_lisp());
 
     //Add core macros
     sender_li

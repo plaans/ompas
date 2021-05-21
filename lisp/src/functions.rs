@@ -137,7 +137,7 @@ pub fn set_map(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     }
 
     match &args[0] {
-        LValue::Map(m) => match &args[0] {
+        LValue::Map(m) => match &args[1] {
             LValue::List(val_sv) => {
                 if val_sv.len() == 3 {
                     if String::try_from(&val_sv[1])
@@ -269,12 +269,12 @@ pub fn member(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
     }
-    let value_to_find = args.get(1).unwrap();
-    match args.get(1).unwrap() {
+    let value_to_find = &args[0];
+    match &args[1] {
         LValue::List(list) => {
             for (k, element) in list.iter().enumerate() {
                 if element == value_to_find {
-                    return Ok(list[k - 1..].into());
+                    return Ok(list[k..].into());
                 }
             }
             Ok(LValue::Nil)

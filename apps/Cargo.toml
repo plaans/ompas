@@ -5,6 +5,9 @@ authors = ["Yirmandias <turi@insa-toulouse.fr>"]
 edition = "2018"
 default-run = "lisp"
 
+[features]
+lisp_test = []
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

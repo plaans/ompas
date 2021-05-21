@@ -30,7 +30,8 @@ const EXEC_GODOT: &str = "exec-godot";
 const LAMBDA_COORDINATES: &str = "(define coordinates (lambda (x)\
                                                         (get-map (get-state dynamic) ((quote coordinates) x))))";
 const SF_COORDINATES: &str = "coordinates";
-const DOC_SF_COORDINATES: &str = "Return the coordinates (float float) of a robot, a machine or a belt.";
+const DOC_SF_COORDINATES: &str =
+    "Return the coordinates (float float) of a robot, a machine or a belt.";
 const DOC_SF_COORDINATES_VERBOSE: &str = "Example: (coordinates robot0)";
 
 const LAMBDA_BATTERY: &str = "(define battery (lambda (x)\
@@ -52,7 +53,6 @@ const SF_VELOCITY: &str = "velocity";
 const DOC_SF_VELOCITY: &str = "Return the velocity value (float float) in x and y of a robot.";
 const DOC_SF_VELOCITY_VERBOSE: &str = "Example: (velocity robot0)";
 
-
 const LAMBDA_ROTATION_SPEED: &str = "(define rotation_speed (lambda (x)\
                                                         (get-map (get-state dynamic) ((quote rotation_speed) x))))";
 const SF_ROTATION_SPEED: &str = "rotation_speed";
@@ -69,27 +69,27 @@ const DOC_SF_IN_STATION_VERBOSE: &str = "Example: (in_station robot0)";
 const LAMBDA_IN_INTERACT: &str = "(define in_interact (lambda (x)\
                                                         (get-map (get-state dynamic) ((quote in_interact) x))))";
 
-const SF_IN_INTERACT:  &str = "in_interact";
+const SF_IN_INTERACT: &str = "in_interact";
 const DOC_SF_IN_INTERACT: &str = "Return true if a robot is in an interact zone.";
 const DOC_SF_IN_INTERACT_VERBOSE: &str = "Example: (in_interact robot0)";
 
 const LAMBDA_INPUT_BELT: &str = "(define input_belt (lambda (x)\
                                                         (get-map (get-state dynamic) ((quote input_belt) x))))";
 
-const SF_INPUT_BELT:  &str = "input_belt";
+const SF_INPUT_BELT: &str = "input_belt";
 const DOC_SF_INPUT_BELT: &str = "Return the name (symbol) of the input belt of a machine.";
 const DOC_SF_INPUT_BELT_VERBOSE: &str = "Example: (input_belt machine0)";
 
 const LAMBDA_OUTPUT_BELT: &str = "(define output_belt (lambda (x)\
                                                         (get-map (get-state dynamic) ((quote output_belt) x))))";
 
-const SF_OUTPUT_BELT:  &str = "output_belt";
+const SF_OUTPUT_BELT: &str = "output_belt";
 const DOC_SF_OUTPUT_BELT: &str = "Return the name (symbol) of the output belt of a machine.";
 const DOC_SF_OUTPUT_BELT_VERBOSE: &str = "Example: (output_belt machine0)";
 
 const LAMBDA_PROCESSES: &str = "(define processes (lambda (x)\
                                                         (get-map (get-state dynamic) ((quote processes_list) x))))";
-const SF_PROCESSES:  &str = "processes";
+const SF_PROCESSES: &str = "processes";
 const DOC_SF_PROCESSES: &str = "Return the list of processes (id0 id1 ...) of a machine, or return the list of pair (process_id, duration) for a package.";
 const DOC_SF_PROCESSES_VERBOSE: &str = "Example:\n
                                         \t- for a machine: (processes machine0) \n\
@@ -98,39 +98,38 @@ const DOC_SF_PROCESSES_VERBOSE: &str = "Example:\n
 const LAMBDA_PROGRESS_RATE: &str =  "(define progress (lambda (x)\
                                                         (get-map (get-state dynamic) ((quote progress_rate) x))))";
 
-const SF_PROGRESS_RATE:  &str = "progress";
+const SF_PROGRESS_RATE: &str = "progress";
 const DOC_SF_PROGRESS_RATE: &str = "Return the progress rate (float) in [0;1] of a machine. If no task is in progress, the value is 0";
 const DOC_SF_PROGRESS_RATE_VERBOSE: &str = "Example: (progress machine0)";
 
 const LAMBDA_LOCATION: &str = "(define location (lambda (x)\
                                                   (get-map (get-state dynamic) ((quote location) x))))";
 
-const SF_LOCATION:  &str = "location";
+const SF_LOCATION: &str = "location";
 const DOC_SF_LOCATION: &str = "Return the location (symbol) of a package.";
 const DOC_SF_LOCATION_VERBOSE: &str = "Example: (location package0)";
 
 const LAMBDA_BELT_TYPE: &str = "(define belt_type (lambda (x)\
                                                     (get-map (get-state dynamic) ((quote belt_type) x)))))";
 
-const SF_BELT_TYPE:  &str = "belt_type";
+const SF_BELT_TYPE: &str = "belt_type";
 const DOC_SF_BELT_TYPE: &str = "Return the belt type (symbol) in {input, output} of a belt.";
 const DOC_SF_BELT_TYPE_VERBOSE: &str = "Example: (belt_type belt0)";
-
 
 const LAMBDA_POLYGONS: &str = "(define polygon (lambda (x)\
                                                     (get-map (get-state dynamic) ((quote polygon) x)))))";
 
-const SF_POLYGONS:  &str = "polygons";
-const DOC_SF_POLYGONS: &str = "Return the coordinates of the polygon [(float float)] that represent the parking area";
+const SF_POLYGONS: &str = "polygons";
+const DOC_SF_POLYGONS: &str =
+    "Return the coordinates of the polygon [(float float)] that represent the parking area";
 const DOC_SF_POLYGONS_VERBOSE: &str = "Example: (polygons parking_area0)"; //TODO: check the name of the parking are
 
 const LAMBDA_PACKAGES_LIST: &str = "(define packages_list (lambda (x)\
                                                 (get-map (get-state dynamic) ((quote packages_list) x)))))";
 
-const SF_PACKAGES_LIST:  &str = "packages_list";
+const SF_PACKAGES_LIST: &str = "packages_list";
 const DOC_SF_PACKAGES_LIST: &str = "Return the package list [symbol] on a belt.";
 const DOC_SF_PACKAGES_LIST_VERBOSE: &str = "Example: (location package0)";
-
 
 //Constants
 
@@ -238,19 +237,59 @@ impl Documentation for CtxGodot {
             LHelp::new(EXEC_GODOT, DOC_EXEC_GODOT, Some(DOC_EXEC_GODOT_VERBOSE)),
             //Add doc for state functions
             LHelp::new(SF_BATTERY, DOC_SF_BATTERY, Some(DOC_SF_BATTERY_VERBOSE)),
-            LHelp::new(SF_BELT_TYPE, DOC_SF_BELT_TYPE, Some(DOC_SF_BELT_TYPE_VERBOSE)),
-            LHelp::new(SF_COORDINATES, DOC_SF_COORDINATES, Some(DOC_SF_COORDINATES_VERBOSE)),
-            LHelp::new(SF_IN_INTERACT, DOC_SF_IN_INTERACT, Some(DOC_SF_IN_INTERACT_VERBOSE)),
-            LHelp::new(SF_IN_STATION, DOC_SF_IN_STATION, Some(DOC_SF_IN_STATION_VERBOSE)),
-            LHelp::new(SF_INPUT_BELT, DOC_SF_INPUT_BELT, Some(DOC_SF_INPUT_BELT_VERBOSE)),
+            LHelp::new(
+                SF_BELT_TYPE,
+                DOC_SF_BELT_TYPE,
+                Some(DOC_SF_BELT_TYPE_VERBOSE),
+            ),
+            LHelp::new(
+                SF_COORDINATES,
+                DOC_SF_COORDINATES,
+                Some(DOC_SF_COORDINATES_VERBOSE),
+            ),
+            LHelp::new(
+                SF_IN_INTERACT,
+                DOC_SF_IN_INTERACT,
+                Some(DOC_SF_IN_INTERACT_VERBOSE),
+            ),
+            LHelp::new(
+                SF_IN_STATION,
+                DOC_SF_IN_STATION,
+                Some(DOC_SF_IN_STATION_VERBOSE),
+            ),
+            LHelp::new(
+                SF_INPUT_BELT,
+                DOC_SF_INPUT_BELT,
+                Some(DOC_SF_INPUT_BELT_VERBOSE),
+            ),
             LHelp::new(SF_LOCATION, DOC_SF_LOCATION, Some(DOC_SF_LOCATION_VERBOSE)),
-            LHelp::new(SF_OUTPUT_BELT, DOC_SF_OUTPUT_BELT, Some(DOC_SF_OUTPUT_BELT_VERBOSE)),
-            LHelp::new(SF_PACKAGES_LIST, DOC_SF_PACKAGES_LIST, Some(DOC_SF_PACKAGES_LIST_VERBOSE)),
+            LHelp::new(
+                SF_OUTPUT_BELT,
+                DOC_SF_OUTPUT_BELT,
+                Some(DOC_SF_OUTPUT_BELT_VERBOSE),
+            ),
+            LHelp::new(
+                SF_PACKAGES_LIST,
+                DOC_SF_PACKAGES_LIST,
+                Some(DOC_SF_PACKAGES_LIST_VERBOSE),
+            ),
             LHelp::new(SF_POLYGONS, DOC_SF_POLYGONS, Some(DOC_SF_POLYGONS_VERBOSE)),
-            LHelp::new(SF_PROCESSES, DOC_SF_PROCESSES, Some(DOC_SF_PROCESSES_VERBOSE)),
-            LHelp::new(SF_PROGRESS_RATE, DOC_SF_PROGRESS_RATE, Some(DOC_SF_PROGRESS_RATE_VERBOSE)),
+            LHelp::new(
+                SF_PROCESSES,
+                DOC_SF_PROCESSES,
+                Some(DOC_SF_PROCESSES_VERBOSE),
+            ),
+            LHelp::new(
+                SF_PROGRESS_RATE,
+                DOC_SF_PROGRESS_RATE,
+                Some(DOC_SF_PROGRESS_RATE_VERBOSE),
+            ),
             LHelp::new(SF_ROTATION, DOC_SF_ROTATION, Some(DOC_SF_ROTATION_VERBOSE)),
-            LHelp::new(SF_ROTATION_SPEED, DOC_SF_ROTATION_SPEED, Some(DOC_SF_ROTATION_SPEED_VERBOSE)),
+            LHelp::new(
+                SF_ROTATION_SPEED,
+                DOC_SF_ROTATION_SPEED,
+                Some(DOC_SF_ROTATION_SPEED_VERBOSE),
+            ),
             LHelp::new(SF_VELOCITY, DOC_SF_VELOCITY, Some(DOC_SF_VELOCITY_VERBOSE)),
         ]
     }

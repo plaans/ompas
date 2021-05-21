@@ -77,20 +77,23 @@ pub const LAMBDA_OR: &str = " (define or (lambda x \
 //Documentation
 
 //TODO: Write the doc for the basic functions
-pub const DOC_CAR: &str = "Takes a list of at least one element, and return the first element. Nil otherwise.";
-pub const DOC_CDR: &str = "Takes a list of at least one element, and return a list without the first element.";
+pub const DOC_CAR: &str =
+    "Takes a list of at least one element, and return the first element. Nil otherwise.";
+pub const DOC_CDR: &str =
+    "Takes a list of at least one element, and return a list without the first element.";
 pub const DOC_APPEND: &str = "Takes two list and return a list merging both.";
 pub const DOC_MEMBER: &str = "Takes two arguments of which the second must be a list. \
 if the first argument is a member of the second argument,\
 and then it returns the remainder of the list beginning with the first argument.";
-pub const DOC_LAST: &str = "Takes a list of at least one element and return the last element. Nil otherwise";
+pub const DOC_LAST: &str =
+    "Takes a list of at least one element and return the last element. Nil otherwise";
 pub const DOC_EMPTY: &str = "Return true if the a list or map is empty.";
 pub const DOC_LEN: &str = "Return the len of a list or a map";
 pub const DOC_REVERSE: &str = "Takes a list and return a list with all elements reversed in order";
 pub const DOC_LIST: &str = "Return a list of the LValues given is argument";
 pub const DOC_CONS: &str = "Takes two objects and merges into a list.";
 pub const DOC_MAP: &str = "Return a map from from a list of pairs.";
-pub const DOC_MAP_VERBOSE: &str= "Example: (map (quote ((ten . 10) (twenty . 20))))";
+pub const DOC_MAP_VERBOSE: &str = "Example: (map (quote ((ten . 10) (twenty . 20))))";
 pub const DOC_GET: &str = "Takes a key as argument and return the binding if defined in the environment. Return the key otherwise.";
 pub const DOC_GET_MAP: &str = "Takes a map and a key as argument, and return the value associated.";
 pub const DOC_GET_MAP_VERBOSE: &str = "Example: Here is an example in the repl\n\
@@ -112,7 +115,7 @@ pub const DOC_SET_MAP_VERBOSE: &str = "Example: Here is an example in the repl\n
 pub const DOC_DEFINE: &str = "Defines a new entry in the environment/";
 pub const DOC_DEF_MACRO: &str = "Define a new macro, can only be done at the top level";
 pub const DOC_LAMBDA: &str = "Define a new lambda function";
-pub const DOC_LAMBDA_VEBROSE: &str ="Example:\n\
+pub const DOC_LAMBDA_VEBROSE: &str = "Example:\n\
                                     \t>> (define square (lambda (x) (* x x)))\n\
                                     \t>> (square 10)\n\
                                     \tLI>> 100";

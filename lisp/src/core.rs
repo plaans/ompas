@@ -86,6 +86,7 @@ impl RefLEnv {
             None => {}
             Some(s) => env.merge_by_symbols(& s.clone().clone_from_root())
         };
+        env.outer = None;
         env.into()
     }
 }
@@ -269,6 +270,16 @@ impl LEnv {
     pub fn add_entry(&mut self, key: String, exp: LValue) {
         self.symbols.insert(key.clone(), exp);
         self.new_entries.push(key);
+    }
+
+    pub fn set_entry(&mut self, key: String, exp: LValue) -> Result<(), LError> {
+        match self.find(key.as_str()) {
+            None => Err(UndefinedSymbol(key)),
+            Some(_) => {
+                self.symbols.insert(key.clone(), exp);
+                Ok(())
+            }
+        }
     }
 
     pub fn add_macro(&mut self, key: String, _macro: LLambda) {
@@ -566,15 +577,13 @@ pub fn expand(
                         if list.len() != 3 {
                             return Err(WrongNumberOfArgument(list.into(), list.len(), 3..3));
                         }
-                        let var = list.get(1).unwrap();
+                        let var = &list[1];
                         //Can only set a symbol
                         if !matches!(var, LValue::Symbol(_s)) {
                             return Err(WrongType(var.clone(), var.into(), NameTypeLValue::Symbol));
                         }
-                        let mut return_list = list.clone();
-                        //We expand only the last element
-                        return_list[2] = expand(return_list.get(2).unwrap(), false, env, ctxs)?;
-                        return Ok(return_list.into());
+
+                        return Ok(vec![LCoreOperator::Set.into(), var.clone(), expand(&list[2], false, env, ctxs)?].into());
                     }
                     LCoreOperator::Begin => {
                         return if list.len() == 1 {
@@ -877,8 +886,20 @@ pub fn eval(
                     }
                     LCoreOperator::Quote => return Ok(args[0].clone()),
                     LCoreOperator::Set => {
-                        //TODO: implement set
-                        return Ok(LValue::Nil);
+                        return match &args[0] {
+                            LValue::Symbol(s) => {
+                                let exp = eval(&args[1], &mut env, ctxs)?;
+                                env.set_entry(s.to_string(), exp)?;
+                                Ok(LValue::Nil)
+                            }
+                            lv => {
+                                Err(WrongType(
+                                    lv.clone(),
+                                    lv.into(),
+                                    NameTypeLValue::Symbol,
+                                ))
+                            }
+                        }
                     }
                     LCoreOperator::Begin => {
                         let results: Vec<LValue> = args

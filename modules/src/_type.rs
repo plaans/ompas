@@ -13,7 +13,7 @@ const MOD_TYPE: &str = "mod_type";
 const DOC_MOD_TYPE: &str = "documentation of the module type";
 
 //Verification
-const IS_NONE: &str = "none?";
+const IS_NONE: &str = "null?";
 const IS_NUMBER: &str = "number?";
 const IS_BOOL: &str = "bool?";
 const IS_SYMBOL: &str = "sym?";

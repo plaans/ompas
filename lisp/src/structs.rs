@@ -252,7 +252,7 @@ impl Div for &LNumber {
             (LNumber::Float(f1), LNumber::Float(f2)) => LNumber::Float(*f1 / *f2),
             (LNumber::Int(i1), LNumber::Float(f2)) => LNumber::Float(*i1 as f64 / *f2),
             (LNumber::Float(f1), LNumber::Int(i2)) => LNumber::Float(*f1 / *i2 as f64),
-            (_, _) => unimplemented!(),
+            (n1, n2) => panic!("attempted rare case of division with {:?} and {:?}", n1, n2),
         }
     }
 }
@@ -1064,7 +1064,19 @@ impl From<&[LValue]> for LValue {
     }
 }
 
-impl From<&Vec<LValue>> for LValue {
+impl<T: Clone+Into<LValue>> From<&Vec<T>> for LValue  {
+    fn from(vec: &Vec<T>) -> Self {
+        LValue::List(vec.iter().map(|x|x.clone().into()).collect())
+    }
+}
+
+/*impl From<&LValue> for LValue {
+    fn from(lv: &LValue) -> Self {
+        lv.clone()
+    }
+}*/
+
+/*impl From<&Vec<LValue>> for LValue {
     fn from(vec: &Vec<LValue>) -> Self {
         LValue::List(vec.clone())
     }
@@ -1072,6 +1084,12 @@ impl From<&Vec<LValue>> for LValue {
 
 impl From<Vec<LValue>> for LValue {
     fn from(vec: Vec<LValue>) -> Self {
+        (&vec).into()
+    }
+}*/
+
+impl<T: Clone+Into<LValue>> From<Vec<T>> for LValue {
+    fn from(vec: Vec<T>) -> Self {
         (&vec).into()
     }
 }

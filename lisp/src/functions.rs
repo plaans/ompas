@@ -171,20 +171,23 @@ pub fn set_map(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
 }*/
 
 ///It takes two arguments, an element and a list and returns a list with the element inserted at the first place.
+//TODO: implement all the cases
 pub fn cons(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
     }
-    let first = args.first().unwrap();
-    let second = args.get(1).unwrap();
-    match (first, second) {
-        (lv_first, LValue::List(list)) => {
-            let mut new_list = vec![lv_first.clone()];
+    let first = &args[0];
+    let second = &args[1];
+    match second {
+        LValue::List(list) => {
+            let mut new_list = vec![first.clone()];
             new_list.append(&mut list.clone());
             Ok(new_list.into())
         }
-        (lv_first, LValue::Nil) => Ok(lv_first.clone()),
-        (lv_f, lv_s) => Ok(vec![lv_f.clone(), lv_s.clone()].into()),
+        LValue::Nil => {
+            Ok(vec![first.clone()].into())
+        }
+        _ => Ok(vec![first.clone(), second.clone()].into())
     }
 }
 

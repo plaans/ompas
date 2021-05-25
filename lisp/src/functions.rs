@@ -171,7 +171,7 @@ pub fn set_map(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
 }*/
 
 ///It takes two arguments, an element and a list and returns a list with the element inserted at the first place.
-//TODO: implement all the cases
+//TODO: implement all the casesn
 pub fn cons(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
@@ -184,17 +184,15 @@ pub fn cons(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
             new_list.append(&mut list.clone());
             Ok(new_list.into())
         }
-        LValue::Nil => {
-            Ok(vec![first.clone()].into())
-        }
-        _ => Ok(vec![first.clone(), second.clone()].into())
+        LValue::Nil => Ok(vec![first.clone()].into()),
+        _ => Ok(vec![first.clone(), second.clone()].into()),
     }
 }
 
 ///It takes a list as argument, and returns its first element.
 pub fn car(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
-    if args.len() == 1 {
-        match args.first().unwrap() {
+    match args.len()  {
+        1 => match &args[0] {
             LValue::List(list) => {
                 if !list.is_empty() {
                     Ok(list.first().unwrap().clone())
@@ -202,10 +200,10 @@ pub fn car(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
                     Ok(LValue::Nil)
                 }
             }
+            LValue::Nil => Ok(LValue::Nil),
             lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::List)),
-        }
-    } else {
-        Err(WrongNumberOfArgument(args.into(), args.len(), 1..1))
+        },
+        _ => Err(WrongNumberOfArgument(args.into(), args.len(), 1..1))
     }
 }
 
@@ -222,6 +220,7 @@ pub fn cdr(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
                     Ok(new_list.into())
                 }
             }
+            LValue::Nil => Ok(LValue::Nil),
             lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::List)),
         }
     } else {

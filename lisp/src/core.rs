@@ -84,7 +84,7 @@ impl RefLEnv {
         let outer = env.outer.clone();
         match outer {
             None => {}
-            Some(s) => env.merge_by_symbols(& s.clone().clone_from_root())
+            Some(s) => env.merge_by_symbols(&s.clone().clone_from_root()),
         };
         env.outer = None;
         env.into()
@@ -583,7 +583,12 @@ pub fn expand(
                             return Err(WrongType(var.clone(), var.into(), NameTypeLValue::Symbol));
                         }
 
-                        return Ok(vec![LCoreOperator::Set.into(), var.clone(), expand(&list[2], false, env, ctxs)?].into());
+                        return Ok(vec![
+                            LCoreOperator::Set.into(),
+                            var.clone(),
+                            expand(&list[2], false, env, ctxs)?,
+                        ]
+                        .into());
                     }
                     LCoreOperator::Begin => {
                         return if list.len() == 1 {
@@ -869,7 +874,11 @@ pub fn eval(
                             }
                         };
                         let body = &args[1];
-                        return Ok(LValue::Lambda(LLambda::new(params, body.clone(), env.clone_from_root())));
+                        return Ok(LValue::Lambda(LLambda::new(
+                            params,
+                            body.clone(),
+                            env.clone_from_root(),
+                        )));
                     }
                     LCoreOperator::If => {
                         let test = args.get(0).unwrap();
@@ -892,13 +901,7 @@ pub fn eval(
                                 env.set_entry(s.to_string(), exp)?;
                                 Ok(LValue::Nil)
                             }
-                            lv => {
-                                Err(WrongType(
-                                    lv.clone(),
-                                    lv.into(),
-                                    NameTypeLValue::Symbol,
-                                ))
-                            }
+                            lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
                         }
                     }
                     LCoreOperator::Begin => {

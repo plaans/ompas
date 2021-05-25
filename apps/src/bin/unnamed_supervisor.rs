@@ -93,9 +93,9 @@ pub async fn lisp_interpreter() {
 
     //Add core macros
     /*sender_li
-        .send(lisp_init.begin_lisp())
-        .await
-        .expect("error while sending message");*/
+    .send(lisp_init.begin_lisp())
+    .await
+    .expect("error while sending message");*/
 
     loop {
         let mut send_ack = false;

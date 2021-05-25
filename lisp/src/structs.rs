@@ -1,4 +1,4 @@
-use crate::core::{core_macros_and_lambda, eval, ContextCollection, RefLEnv, LEnv};
+use crate::core::{core_macros_and_lambda, eval, ContextCollection, LEnv, RefLEnv};
 use crate::language::*;
 use crate::structs::LError::{ConversionError, SpecialError, WrongNumberOfArgument};
 use aries_utils::input::ErrLoc;
@@ -249,9 +249,10 @@ impl Div for &LNumber {
     fn div(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
             (LNumber::Int(i1), LNumber::Int(i2)) => LNumber::Int(*i1 / *i2),
-            (LNumber::Float(f1), LNumber::Float(f2)) => LNumber::Float(*f1 / *f2),
-            (LNumber::Int(i1), LNumber::Float(f2)) => LNumber::Float(*i1 as f64 / *f2),
-            (LNumber::Float(f1), LNumber::Int(i2)) => LNumber::Float(*f1 / *i2 as f64),
+            (n1, LNumber::Float(f2)) => LNumber::Float(f64::from(n1) / *f2),
+            (LNumber::Float(f1), n2) => LNumber::Float(*f1 / f64::from(n2)),
+            (n1, LNumber::Int(i2)) => LNumber::Int(i64::from(n1) / *i2),
+            (LNumber::Int(i1), n2) => LNumber::Int(*i1 / i64::from(n2)),
             (n1, n2) => panic!("attempted rare case of division with {:?} and {:?}", n1, n2),
         }
     }
@@ -355,7 +356,6 @@ impl LLambda {
     }
 
     pub fn get_new_env(&self, args: &[LValue], outer: &RefLEnv) -> Result<RefLEnv, LError> {
-
         let mut env = self.env.clone();
 
         match &self.params {
@@ -1064,9 +1064,9 @@ impl From<&[LValue]> for LValue {
     }
 }
 
-impl<T: Clone+Into<LValue>> From<&Vec<T>> for LValue  {
+impl<T: Clone + Into<LValue>> From<&Vec<T>> for LValue {
     fn from(vec: &Vec<T>) -> Self {
-        LValue::List(vec.iter().map(|x|x.clone().into()).collect())
+        LValue::List(vec.iter().map(|x| x.clone().into()).collect())
     }
 }
 
@@ -1088,7 +1088,7 @@ impl From<Vec<LValue>> for LValue {
     }
 }*/
 
-impl<T: Clone+Into<LValue>> From<Vec<T>> for LValue {
+impl<T: Clone + Into<LValue>> From<Vec<T>> for LValue {
     fn from(vec: Vec<T>) -> Self {
         (&vec).into()
     }

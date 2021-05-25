@@ -2,7 +2,6 @@ use aries_planning::parsing::sexpr::parse;
 use ompas_godot_simulation_client::serde::{
     parse_into_lvalue, GodotMessageType, GodotState, GodotStateS,
 };
-use ompas_lisp::core::{ContextCollection, RefLEnv};
 
 const TEST: &str = "(robot (test of robot) (1 1 1.0) ((1 2) (3 4)) () true nil)";
 
@@ -36,14 +35,8 @@ fn test_lvalues() {
 fn test_lvalue() {
     println!("Hello, World!");
 
-    let mut ctxs = ContextCollection::default();
-    let mut root = RefLEnv::root();
-
     let sexpr = parse(TEST).expect("couldn't parse test");
-    let data = match ompas_lisp::core::parse_into_lvalue(&sexpr, &mut root, &mut ctxs) {
-        Ok(s) => s,
-        Err(_) => panic!("couldn't transform into lvalue"),
-    };
+    let data = ompas_lisp::core::parse_into_lvalue(&sexpr);
 
     let godot_state = GodotState {
         _type: GodotMessageType::Static,

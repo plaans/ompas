@@ -4,7 +4,7 @@ It provides a struct for the help
  */
 
 use im::HashMap;
-use ompas_lisp::core::RefLEnv;
+use ompas_lisp::core::LEnv;
 use ompas_lisp::language::*;
 use ompas_lisp::structs::LError::{WrongNumberOfArgument, WrongType};
 use ompas_lisp::structs::{GetModule, LError, LValue, Module, NameTypeLValue};
@@ -158,7 +158,7 @@ impl Display for LHelp {
 /// Takes 0 or 1 parameter.
 /// 0 parameter: gives the list of all the functions
 /// 1 parameter: write the help of
-pub fn help(args: &[LValue], _: &RefLEnv, ctx: &CtxDoc) -> Result<LValue, LError> {
+pub fn help(args: &[LValue], _: &LEnv, ctx: &CtxDoc) -> Result<LValue, LError> {
     match args.len() {
         0 => Ok(ctx.get_all().into()),
         1 => match &args[0] {

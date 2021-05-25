@@ -1,4 +1,4 @@
-use crate::core::RefLEnv;
+use crate::core::LEnv;
 use crate::structs::LError::{
     NotInListOfExpectedTypes, SpecialError, WrongNumberOfArgument, WrongType,
 };
@@ -6,7 +6,7 @@ use crate::structs::{LError, LValue, NameTypeLValue};
 use im::HashMap;
 use std::convert::TryFrom;
 
-pub fn env(_: &[LValue], env: &RefLEnv, _: &()) -> Result<LValue, LError> {
+pub fn env(_: &[LValue], env: &LEnv, _: &()) -> Result<LValue, LError> {
     Ok(env
         .keys()
         .iter()
@@ -15,22 +15,22 @@ pub fn env(_: &[LValue], env: &RefLEnv, _: &()) -> Result<LValue, LError> {
         .into())
 }
 
-pub fn begin(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
+pub fn begin(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     match args.last() {
         None => Err(LError::SpecialError("no SExpr after begin".to_string())),
         Some(v) => Ok(v.clone()),
     }
 }
 
-pub fn default(_args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
+pub fn default(_args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     Ok(LValue::Symbol("default function".to_string()))
 }
 
-pub fn list(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
+pub fn list(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     Ok(LValue::List(args.to_vec()))
 }
 
-pub fn map(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
+pub fn map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     let mut facts: HashMap<LValue, LValue> = Default::default();
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1));
@@ -64,7 +64,7 @@ pub fn map(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
 }
 
 //TODO: Define set behaviour for other type of LValue
-pub fn set(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
+pub fn set(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
     }
@@ -89,7 +89,7 @@ pub fn set(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     }
 }
 
-pub fn get(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
+pub fn get(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.is_empty() {
         return Err(WrongNumberOfArgument(args.into(), 0, 1..std::usize::MAX));
     }
@@ -116,7 +116,7 @@ pub fn get(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     }
 }
 
-pub fn get_map(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
+pub fn get_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(args.into(), 0, 1..std::usize::MAX));
     }
@@ -131,7 +131,7 @@ pub fn get_map(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     }
 }
 
-pub fn set_map(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
+pub fn set_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
     }
@@ -163,7 +163,7 @@ pub fn set_map(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     }
 }
 
-/*pub fn print(args: &[LValue], _:& RefLEnv, _: & ()) -> Result<LValue, LError> {
+/*pub fn print(args: &[LValue], _:& LEnv, _: & ()) -> Result<LValue, LError> {
     if args.is_empty() {
         return Err(WrongNumberOfArgument(args.into(), 0, 1..std::usize::MAX));
     }
@@ -172,7 +172,7 @@ pub fn set_map(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
 
 ///It takes two arguments, an element and a list and returns a list with the element inserted at the first place.
 //TODO: implement all the casesn
-pub fn cons(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
+pub fn cons(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
     }
@@ -190,8 +190,8 @@ pub fn cons(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
 }
 
 ///It takes a list as argument, and returns its first element.
-pub fn car(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
-    match args.len()  {
+pub fn car(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    match args.len() {
         1 => match &args[0] {
             LValue::List(list) => {
                 if !list.is_empty() {
@@ -203,12 +203,12 @@ pub fn car(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
             LValue::Nil => Ok(LValue::Nil),
             lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::List)),
         },
-        _ => Err(WrongNumberOfArgument(args.into(), args.len(), 1..1))
+        _ => Err(WrongNumberOfArgument(args.into(), args.len(), 1..1)),
     }
 }
 
 ///It takes a list as argument, and returns a list without the first element
-pub fn cdr(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
+pub fn cdr(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() == 1 {
         match &args[0] {
             LValue::List(list) => {
@@ -229,7 +229,7 @@ pub fn cdr(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
 }
 
 ///It merges two or more list into one.
-pub fn append(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
+pub fn append(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     let mut new_list = Vec::new();
     for element in args {
         match element {
@@ -247,7 +247,7 @@ pub fn append(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
 }
 
 ///It takes a list and returns the last element.
-pub fn last(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
+pub fn last(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() == 1 {
         match args.first().unwrap() {
             LValue::List(list) => {
@@ -267,7 +267,7 @@ pub fn last(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
 ///It takes two arguments of which the second must be a list,
 /// if the first argument is a member of the second argument,
 /// and then it returns the remainder of the list beginning with the first argument.
-pub fn member(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
+pub fn member(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
     }
@@ -286,7 +286,7 @@ pub fn member(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
 }
 
 /// It takes a list and returns a list with the top elements in reverse order.
-pub fn reverse(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
+pub fn reverse(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() == 1 {
         match args.first().unwrap() {
             LValue::List(list) => {
@@ -302,7 +302,7 @@ pub fn reverse(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
 }
 
 /// return the length of the object if it is a table or a list.
-pub fn length(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
+pub fn length(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1));
     }
@@ -318,7 +318,7 @@ pub fn length(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     }
 }
 
-pub fn empty(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
+pub fn empty(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1));
     }
@@ -339,7 +339,7 @@ pub fn empty(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
     }
 }
 
-pub fn not(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
+pub fn not(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1));
     }

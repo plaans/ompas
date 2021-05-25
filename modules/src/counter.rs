@@ -35,7 +35,7 @@ pub struct Counter {
     val: u32,
 }
 
-pub fn get_counter(args: &[LValue], _: &RefLEnv, ctx: &CtxCounter) -> Result<LValue, LError> {
+pub fn get_counter(args: &[LValue], _: &LEnv, ctx: &CtxCounter) -> Result<LValue, LError> {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1));
     }
@@ -55,7 +55,7 @@ pub fn get_counter(args: &[LValue], _: &RefLEnv, ctx: &CtxCounter) -> Result<LVa
 
 pub fn decrement_counter(
     args: &[LValue],
-    _: &mut RefLEnv,
+    _: &mut LEnv,
     ctx: &mut CtxCounter,
 ) -> Result<LValue, LError> {
     if args.len() != 1 {
@@ -82,7 +82,7 @@ pub fn decrement_counter(
 
 pub fn increment_counter(
     args: &[LValue],
-    _: &mut RefLEnv,
+    _: &mut LEnv,
     ctx: &mut CtxCounter,
 ) -> Result<LValue, LError> {
     if args.len() != 1 {
@@ -104,11 +104,7 @@ pub fn increment_counter(
     }
 }
 
-pub fn set_counter(
-    args: &[LValue],
-    _: &mut RefLEnv,
-    ctx: &mut CtxCounter,
-) -> Result<LValue, LError> {
+pub fn set_counter(args: &[LValue], _: &mut LEnv, ctx: &mut CtxCounter) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
     }
@@ -129,7 +125,7 @@ pub fn set_counter(
     }
 }
 
-pub fn new_counter(_: &[LValue], _: &mut RefLEnv, ctx: &mut CtxCounter) -> Result<LValue, LError> {
+pub fn new_counter(_: &[LValue], _: &mut LEnv, ctx: &mut CtxCounter) -> Result<LValue, LError> {
     Ok(LValue::Number(LNumber::Usize(ctx.new_counter())))
 }
 

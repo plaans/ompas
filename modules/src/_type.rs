@@ -1,5 +1,5 @@
 use crate::doc::{Documentation, LHelp};
-use ompas_lisp::core::RefLEnv;
+use ompas_lisp::core::LEnv;
 use ompas_lisp::structs::LError::*;
 use ompas_lisp::structs::*;
 use std::convert::TryInto;
@@ -421,42 +421,42 @@ FUNCTIONS
  */
 
 //Type verification
-pub fn is_none(args: &[LValue], _: &RefLEnv, _: &CtxType) -> Result<LValue, LError> {
+pub fn is_none(args: &[LValue], _: &LEnv, _: &CtxType) -> Result<LValue, LError> {
     match args.len() {
         1 => Ok((NameTypeLValue::from(&args[0]) == NameTypeLValue::Nil).into()),
         i => Err(WrongNumberOfArgument(args.into(), i, 1..1)),
     }
 }
 
-pub fn is_number(args: &[LValue], _: &RefLEnv, _: &()) -> Result<LValue, LError> {
+pub fn is_number(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     match args.len() {
         1 => Ok((NameTypeLValue::from(args.get(0).unwrap()) == NameTypeLValue::Number).into()),
         i => Err(WrongNumberOfArgument(args.into(), i, 1..1)),
     }
 }
 
-pub fn is_bool(args: &[LValue], _: &RefLEnv, _: &CtxType) -> Result<LValue, LError> {
+pub fn is_bool(args: &[LValue], _: &LEnv, _: &CtxType) -> Result<LValue, LError> {
     match args.len() {
         1 => Ok((NameTypeLValue::from(args.get(0).unwrap()) == NameTypeLValue::Bool).into()),
         i => Err(WrongNumberOfArgument(args.into(), i, 1..1)),
     }
 }
 
-pub fn is_fn(args: &[LValue], _: &RefLEnv, _: &CtxType) -> Result<LValue, LError> {
+pub fn is_fn(args: &[LValue], _: &LEnv, _: &CtxType) -> Result<LValue, LError> {
     match args.len() {
         1 => Ok((NameTypeLValue::from(args.get(0).unwrap()) == NameTypeLValue::Fn).into()),
         i => Err(WrongNumberOfArgument(args.into(), i, 1..1)),
     }
 }
 
-pub fn is_mut_fn(args: &[LValue], _: &RefLEnv, _: &CtxType) -> Result<LValue, LError> {
+pub fn is_mut_fn(args: &[LValue], _: &LEnv, _: &CtxType) -> Result<LValue, LError> {
     match args.len() {
         1 => Ok((NameTypeLValue::from(args.get(0).unwrap()) == NameTypeLValue::MutFn).into()),
         i => Err(WrongNumberOfArgument(args.into(), i, 1..1)),
     }
 }
 
-pub fn is_type(args: &[LValue], _: &RefLEnv, ctx: &CtxType) -> Result<LValue, LError> {
+pub fn is_type(args: &[LValue], _: &LEnv, ctx: &CtxType) -> Result<LValue, LError> {
     match args.len() {
         1 => match &args[0] {
             LValue::Symbol(s) => match ctx.get_type_from_sym(s) {
@@ -472,7 +472,7 @@ pub fn is_type(args: &[LValue], _: &RefLEnv, ctx: &CtxType) -> Result<LValue, LE
     }
 }
 
-pub fn is_symbol(args: &[LValue], _: &RefLEnv, _: &CtxType) -> Result<LValue, LError> {
+pub fn is_symbol(args: &[LValue], _: &LEnv, _: &CtxType) -> Result<LValue, LError> {
     match args.len() {
         1 => match args.get(0).unwrap() {
             LValue::Symbol(_) => Ok(LValue::True),
@@ -482,7 +482,7 @@ pub fn is_symbol(args: &[LValue], _: &RefLEnv, _: &CtxType) -> Result<LValue, LE
     }
 }
 
-pub fn is_object(args: &[LValue], _: &RefLEnv, ctx: &CtxType) -> Result<LValue, LError> {
+pub fn is_object(args: &[LValue], _: &LEnv, ctx: &CtxType) -> Result<LValue, LError> {
     match args.len() {
         1 => match args.get(0).unwrap() {
             LValue::Symbol(s) => match ctx.get_type_from_sym(s) {
@@ -498,7 +498,7 @@ pub fn is_object(args: &[LValue], _: &RefLEnv, ctx: &CtxType) -> Result<LValue, 
     }
 }
 
-pub fn is_state_function(args: &[LValue], _: &RefLEnv, ctx: &CtxType) -> Result<LValue, LError> {
+pub fn is_state_function(args: &[LValue], _: &LEnv, ctx: &CtxType) -> Result<LValue, LError> {
     match args.len() {
         1 => match args.get(0).unwrap() {
             LValue::Symbol(s) => match ctx.get_type_from_sym(s) {
@@ -514,7 +514,7 @@ pub fn is_state_function(args: &[LValue], _: &RefLEnv, ctx: &CtxType) -> Result<
     }
 }
 
-pub fn is_map(args: &[LValue], _: &RefLEnv, _: &CtxType) -> Result<LValue, LError> {
+pub fn is_map(args: &[LValue], _: &LEnv, _: &CtxType) -> Result<LValue, LError> {
     match args.len() {
         1 => match args.get(0).unwrap() {
             LValue::Map(_) => Ok(LValue::True),
@@ -523,7 +523,7 @@ pub fn is_map(args: &[LValue], _: &RefLEnv, _: &CtxType) -> Result<LValue, LErro
         i => Err(WrongNumberOfArgument(args.into(), i, 1..1)),
     }
 }
-pub fn is_list(args: &[LValue], _: &RefLEnv, _: &CtxType) -> Result<LValue, LError> {
+pub fn is_list(args: &[LValue], _: &LEnv, _: &CtxType) -> Result<LValue, LError> {
     match args.len() {
         1 => match args.get(0).unwrap() {
             LValue::List(_) => Ok(LValue::True),
@@ -533,7 +533,7 @@ pub fn is_list(args: &[LValue], _: &RefLEnv, _: &CtxType) -> Result<LValue, LErr
     }
 }
 
-pub fn is_lambda(args: &[LValue], _: &RefLEnv, _: &CtxType) -> Result<LValue, LError> {
+pub fn is_lambda(args: &[LValue], _: &LEnv, _: &CtxType) -> Result<LValue, LError> {
     match args.len() {
         1 => match args.get(0).unwrap() {
             LValue::Lambda(_) => Ok(LValue::True),
@@ -543,7 +543,7 @@ pub fn is_lambda(args: &[LValue], _: &RefLEnv, _: &CtxType) -> Result<LValue, LE
     }
 }
 
-pub fn is_quote(args: &[LValue], _: &RefLEnv, _: &CtxType) -> Result<LValue, LError> {
+pub fn is_quote(args: &[LValue], _: &LEnv, _: &CtxType) -> Result<LValue, LError> {
     match args.len() {
         1 => match args.get(0).unwrap() {
             LValue::Quote(_) => Ok(LValue::True),
@@ -553,7 +553,7 @@ pub fn is_quote(args: &[LValue], _: &RefLEnv, _: &CtxType) -> Result<LValue, LEr
     }
 }
 
-pub fn type_of(args: &[LValue], _: &mut RefLEnv, ctx: &mut CtxType) -> Result<LValue, LError> {
+pub fn type_of(args: &[LValue], _: &mut LEnv, ctx: &mut CtxType) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
     }
@@ -577,7 +577,7 @@ pub fn type_of(args: &[LValue], _: &mut RefLEnv, ctx: &mut CtxType) -> Result<LV
     }
 }
 
-pub fn sub_type(args: &[LValue], _: &mut RefLEnv, ctx: &mut CtxType) -> Result<LValue, LError> {
+pub fn sub_type(args: &[LValue], _: &mut LEnv, ctx: &mut CtxType) -> Result<LValue, LError> {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1));
     }
@@ -599,7 +599,7 @@ pub fn sub_type(args: &[LValue], _: &mut RefLEnv, ctx: &mut CtxType) -> Result<L
 
 pub fn new_state_function(
     args: &[LValue],
-    env: &mut RefLEnv,
+    env: &mut LEnv,
     ctx: &mut CtxType,
 ) -> Result<LValue, LError> {
     let mut t_params: Vec<String> = Vec::new();
@@ -632,7 +632,7 @@ pub fn new_state_function(
     Ok(type_id.into())
 }
 
-pub fn new_object(args: &[LValue], _: &mut RefLEnv, ctx: &mut CtxType) -> Result<LValue, LError> {
+pub fn new_object(args: &[LValue], _: &mut LEnv, ctx: &mut CtxType) -> Result<LValue, LError> {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1));
     }
@@ -682,7 +682,7 @@ pub fn new_object(args: &[LValue], _: &mut RefLEnv, ctx: &mut CtxType) -> Result
     }
 }
 
-pub fn get_type(args: &[LValue], _: &RefLEnv, ctx: &CtxType) -> Result<LValue, LError> {
+pub fn get_type(args: &[LValue], _: &LEnv, ctx: &CtxType) -> Result<LValue, LError> {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1));
     }

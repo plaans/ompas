@@ -48,7 +48,7 @@ impl CtxIo {
     }
 }
 
-pub fn print(args: &[LValue], _: &RefLEnv, ctx: &CtxIo) -> Result<LValue, LError> {
+pub fn print(args: &[LValue], _: &LEnv, ctx: &CtxIo) -> Result<LValue, LError> {
     let lv: LValue = match args.len() {
         0 => LValue::Nil,
         1 => args[0].clone(),
@@ -68,7 +68,7 @@ pub fn print(args: &[LValue], _: &RefLEnv, ctx: &CtxIo) -> Result<LValue, LError
     }
 }
 
-pub fn read(args: &[LValue], _: &RefLEnv, ctx: &CtxIo) -> Result<LValue, LError> {
+pub fn read(args: &[LValue], _: &LEnv, ctx: &CtxIo) -> Result<LValue, LError> {
     //let mut stdout = io::stdout();
     //stdout.write_all(b"module Io: read\n");
     if args.len() != 1 {
@@ -101,7 +101,7 @@ pub fn read(args: &[LValue], _: &RefLEnv, ctx: &CtxIo) -> Result<LValue, LError>
 /// # Example:
 /// ```lisp
 /// (write <file> <lvalue>)
-pub fn write(args: &[LValue], _: &RefLEnv, _: &CtxIo) -> Result<LValue, LError> {
+pub fn write(args: &[LValue], _: &LEnv, _: &CtxIo) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
     }
@@ -119,7 +119,7 @@ pub fn write(args: &[LValue], _: &RefLEnv, _: &CtxIo) -> Result<LValue, LError> 
     //println!("module Io: write");
 }
 
-/*pub fn load(args: &[LValue], _: &RefLEnv, _: & CtxIo ) -> Result<LValue, LError> {
+/*pub fn load(args: &[LValue], _: &LEnv, _: & CtxIo ) -> Result<LValue, LError> {
     println!("moudle Io: load");
     Ok(LValue::None)
 }*/

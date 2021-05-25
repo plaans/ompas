@@ -52,7 +52,7 @@ pub async fn lisp_interpreter() {
         .expect("error while spawning stdin");
     let sender_stdout = spawn_stdout().await.expect("error while spawning stdout");
 
-    let root_env = &mut RefLEnv::root();
+    let root_env = &mut LEnv::root();
     let ctxs: &mut ContextCollection = &mut Default::default();
     let mut ctx_doc = CtxDoc::default();
     let mut ctx_io = CtxIo::default();
@@ -88,7 +88,7 @@ pub async fn lisp_interpreter() {
     load_module(root_env, ctxs, ctx_counter, lisp_init);
     load_module(root_env, ctxs, ctx_godot, lisp_init);
     load_module(root_env, ctxs, ctx_state, lisp_init);
-    let env = &mut RefLEnv::new_from_outer(root_env.clone());
+    let env = &mut root_env.clone();
     //println!("{}", lisp_init.begin_lisp());
 
     //Add core macros

@@ -1,6 +1,6 @@
 use crate::serde::{GodotMessageType, GodotState};
 use crate::tcp::{read_msg_from_buf, read_size_from_buf, BUFFER_SIZE};
-use ompas_lisp::core::RefLEnv;
+use ompas_lisp::core::LEnv;
 use ompas_lisp::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
 use ompas_lisp::structs::{GetModule, LError, LValue, Module, NameTypeLValue};
 use ompas_modules::doc::{Documentation, LHelp};
@@ -374,7 +374,7 @@ async fn async_read_socket(stream: ReadHalf<TcpStream>, sender: Sender<String>) 
     }
 }
 
-fn open_com(args: &[LValue], _: &mut RefLEnv, ctx: &mut CtxGodot) -> Result<LValue, LError> {
+fn open_com(args: &[LValue], _: &mut LEnv, ctx: &mut CtxGodot) -> Result<LValue, LError> {
     let socket_addr: SocketAddr = match args.len() {
         0 => "127.0.0.1:10000".parse().unwrap(),
         2 => {
@@ -409,7 +409,7 @@ fn open_com(args: &[LValue], _: &mut RefLEnv, ctx: &mut CtxGodot) -> Result<LVal
     Ok(LValue::Nil)
 }
 
-fn launch_godot(_: &[LValue], _: &RefLEnv, ctx: &CtxGodot) -> Result<LValue, LError> {
+fn launch_godot(_: &[LValue], _: &LEnv, ctx: &CtxGodot) -> Result<LValue, LError> {
     let sender = match ctx.get_sender_li() {
         None => return Err(SpecialError("ctx godot has no sender to l.i.".to_string())),
         Some(s) => s.clone(),
@@ -428,7 +428,7 @@ fn launch_godot(_: &[LValue], _: &RefLEnv, ctx: &CtxGodot) -> Result<LValue, LEr
 ///- Place : ['place', robot_name]
 ///- Rotation : ['do_rotation', robot_name, angle, speed]
 
-fn exec_godot(args: &[LValue], _: &RefLEnv, ctx: &CtxGodot) -> Result<LValue, LError> {
+fn exec_godot(args: &[LValue], _: &LEnv, ctx: &CtxGodot) -> Result<LValue, LError> {
     let gs = GodotState {
         _type: GodotMessageType::RobotCommand,
         data: args.into(),

@@ -118,7 +118,7 @@ impl Documentation for CtxMath {
 
 ///Compute the sin of a LNumber
 /// Only takes one element in args
-pub fn sin(args: &[LValue], _: &RefLEnv, _: &CtxMath) -> Result<LValue, LError> {
+pub fn sin(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValue, LError> {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1));
     }
@@ -134,7 +134,7 @@ pub fn sin(args: &[LValue], _: &RefLEnv, _: &CtxMath) -> Result<LValue, LError> 
 
 /// Compute the cos of a LNumber
 /// Only takes one element in args
-pub fn cos(args: &[LValue], _: &RefLEnv, _: &CtxMath) -> Result<LValue, LError> {
+pub fn cos(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValue, LError> {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1));
     }
@@ -148,7 +148,7 @@ pub fn cos(args: &[LValue], _: &RefLEnv, _: &CtxMath) -> Result<LValue, LError> 
     }
 }
 
-pub fn add(args: &[LValue], _: &RefLEnv, _: &CtxMath) -> Result<LValue, LError> {
+pub fn add(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValue, LError> {
     let mut result = LValue::Number(LNumber::Float(0.0));
     for value in args {
         result = (&result + value)?;
@@ -156,14 +156,14 @@ pub fn add(args: &[LValue], _: &RefLEnv, _: &CtxMath) -> Result<LValue, LError> 
     Ok(result)
 }
 
-pub fn sub(args: &[LValue], _: &RefLEnv, _: &CtxMath) -> Result<LValue, LError> {
+pub fn sub(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValue, LError> {
     match args.len() {
         2 => &args[0] - &args[1],
         i => Err(WrongNumberOfArgument(args.into(), i, 2..2)),
     }
 }
 
-pub fn mul(args: &[LValue], _: &RefLEnv, _: &CtxMath) -> Result<LValue, LError> {
+pub fn mul(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValue, LError> {
     let mut result = LValue::Number(LNumber::Float(1.0));
     for value in args {
         result = (&result * value)?;
@@ -171,7 +171,7 @@ pub fn mul(args: &[LValue], _: &RefLEnv, _: &CtxMath) -> Result<LValue, LError> 
     Ok(result)
 }
 
-pub fn div(args: &[LValue], _: &RefLEnv, _: &CtxMath) -> Result<LValue, LError> {
+pub fn div(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValue, LError> {
     match args.len() {
         2 => &args[0] / &args[1],
         i => Err(WrongNumberOfArgument(args.into(), i, 2..2)),
@@ -179,35 +179,35 @@ pub fn div(args: &[LValue], _: &RefLEnv, _: &CtxMath) -> Result<LValue, LError> 
 }
 
 //Comparison functions
-pub fn gt(args: &[LValue], _: &RefLEnv, _: &CtxMath) -> Result<LValue, LError> {
+pub fn gt(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValue, LError> {
     match args.len() {
         2 => Ok((args[0] > args[1]).into()),
         i => Err(WrongNumberOfArgument(args.into(), i, 2..2)),
     }
 }
 
-pub fn lt(args: &[LValue], _: &RefLEnv, _: &CtxMath) -> Result<LValue, LError> {
+pub fn lt(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValue, LError> {
     match args.len() {
         2 => Ok((args[0] < args[1]).into()),
         i => Err(WrongNumberOfArgument(args.into(), i, 2..2)),
     }
 }
 
-pub fn ge(args: &[LValue], _: &RefLEnv, _: &CtxMath) -> Result<LValue, LError> {
+pub fn ge(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValue, LError> {
     match args.len() {
         2 => Ok((args[0] >= args[1]).into()),
         i => Err(WrongNumberOfArgument(args.into(), i, 2..2)),
     }
 }
 
-pub fn le(args: &[LValue], _: &RefLEnv, _: &CtxMath) -> Result<LValue, LError> {
+pub fn le(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValue, LError> {
     match args.len() {
         2 => Ok((args[0] <= args[1]).into()),
         i => Err(WrongNumberOfArgument(args.into(), i, 2..2)),
     }
 }
 
-pub fn eq(args: &[LValue], _: &RefLEnv, _: &CtxMath) -> Result<LValue, LError> {
+pub fn eq(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValue, LError> {
     match args.len() {
         2 => Ok((args[0] == args[1]).into()),
         i => Err(WrongNumberOfArgument(args.into(), i, 2..2)),
@@ -219,8 +219,8 @@ mod tests {
     use super::*;
     use std::convert::TryInto;
 
-    /*fn generate_env() -> (RefLEnv, ContextCollection) {
-        let env = RefLEnv::empty();
+    /*fn generate_env() -> (LEnv, ContextCollection) {
+        let env = LEnv::empty();
         let ctxs = ContextCollection::default();
         load_module(&mut env, &mut ctxs, CtxMath::get_module());
         (env, ctxs)
@@ -228,7 +228,7 @@ mod tests {
 
     #[test]
     fn test_add() {
-        let env = RefLEnv::default();
+        let env = LEnv::default();
         let ctx = CtxMath::default();
         let result = add(&[3.into(), 2.into()], &env, &ctx).unwrap();
         assert_eq!(LValue::Number(LNumber::Float(5.0)), result);
@@ -236,7 +236,7 @@ mod tests {
 
     #[test]
     fn test_sub() {
-        let env = RefLEnv::default();
+        let env = LEnv::default();
         let ctx = CtxMath::default();
         let result = sub(&[3.into(), 2.into()], &env, &ctx).unwrap();
         assert_eq!(LValue::Number(LNumber::Int(1)), result);
@@ -244,7 +244,7 @@ mod tests {
 
     #[test]
     fn test_mul() {
-        let env = RefLEnv::default();
+        let env = LEnv::default();
         let ctx = CtxMath::default();
         let result = mul(&[3.into(), 2.into()], &env, &ctx).unwrap();
         assert_eq!(LValue::Number(LNumber::Float(6.0)), result);
@@ -252,7 +252,7 @@ mod tests {
 
     #[test]
     fn test_div() {
-        let env = RefLEnv::default();
+        let env = LEnv::default();
         let ctx = CtxMath::default();
         let result = div(&[3.0.into(), 2.0.into()], &env, &ctx).unwrap();
         assert_eq!(LValue::Number(LNumber::Float(1.5)), result);
@@ -260,7 +260,7 @@ mod tests {
 
     #[test]
     fn test_gt() {
-        let env = RefLEnv::default();
+        let env = LEnv::default();
         let ctx = CtxMath::default();
         let result_true: bool = gt(&[3.into(), 2.into()], &env, &ctx)
             .unwrap()
@@ -281,7 +281,7 @@ mod tests {
 
     #[test]
     fn test_ge() {
-        let env = RefLEnv::default();
+        let env = LEnv::default();
         let ctx = CtxMath::default();
         let result_true: bool = ge(&[3.into(), 2.into()], &env, &ctx)
             .unwrap()
@@ -302,7 +302,7 @@ mod tests {
 
     #[test]
     fn test_lt() {
-        let env = RefLEnv::default();
+        let env = LEnv::default();
         let ctx = CtxMath::default();
         let result_false: bool = lt(&[3.into(), 2.into()], &env, &ctx)
             .unwrap()
@@ -323,7 +323,7 @@ mod tests {
 
     #[test]
     fn test_le() {
-        let env = RefLEnv::default();
+        let env = LEnv::default();
         let ctx = CtxMath::default();
         let result_false: bool = le(&[3.into(), 2.into()], &env, &ctx)
             .unwrap()
@@ -344,14 +344,14 @@ mod tests {
 
     #[test]
     fn test_cos() {
-        let env = RefLEnv::default();
+        let env = LEnv::default();
         let ctx = CtxMath::default();
         assert_eq!(cos(&[0.0.into()], &env, &ctx).unwrap(), 1.0.into())
     }
 
     #[test]
     fn test_sin() {
-        let env = RefLEnv::default();
+        let env = LEnv::default();
         let ctx = CtxMath::default();
         assert_eq!(sin(&[0.0.into()], &env, &ctx).unwrap(), 0.0.into())
     }

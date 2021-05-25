@@ -1,4 +1,4 @@
-use ompas_lisp::core::RefLEnv;
+use ompas_lisp::core::LEnv;
 use ompas_lisp::structs::{LError, LValue};
 use ompas_modules::robot::{exec, new_robot, start_robot_handler, CtxRobot};
 use std::thread;
@@ -13,7 +13,7 @@ fn main() {
 pub fn test() -> Result<LValue, LError> {
     println!("{}", START_MSG);
     let ctx_robot = &mut CtxRobot::default();
-    let env = &mut RefLEnv::root();
+    let env = &mut LEnv::root();
     let _robot_handler = start_robot_handler(&[], env, ctx_robot);
     let robot1 = new_robot(&[], env, ctx_robot)?;
     let robot2 = new_robot(&[], env, ctx_robot)?;

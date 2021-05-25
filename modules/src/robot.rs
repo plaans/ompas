@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 use crate::doc::{Documentation, LHelp};
-use ompas_lisp::core::RefLEnv;
+use ompas_lisp::core::LEnv;
 use ompas_lisp::structs::LError::*;
 use ompas_lisp::structs::*;
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -160,7 +160,7 @@ MODULE FUNCTIONS
 /// Test if the robot exists and return an error if not.
 /// Send to the robot the command as a list of symbols.
 /// Return an error if there is an error while sending command via the channel.
-pub fn exec(args: &[LValue], _: &RefLEnv, ctx: &CtxRobot) -> Result<LValue, LError> {
+pub fn exec(args: &[LValue], _: &LEnv, ctx: &CtxRobot) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(
             args.into(),
@@ -213,7 +213,7 @@ fn robot(arg_robot: ArgRobot) {
 /// A new thread and a channel to communicate with it is created.
 ///
 /// Returns the robot id.
-pub fn new_robot(args: &[LValue], _: &mut RefLEnv, ctx: &mut CtxRobot) -> Result<LValue, LError> {
+pub fn new_robot(args: &[LValue], _: &mut LEnv, ctx: &mut CtxRobot) -> Result<LValue, LError> {
     let (robot_label, thread_label) = match args.len() {
         0 => (
             format!("unnamed_robot_{}", ctx.robots.len()),
@@ -257,7 +257,7 @@ pub fn new_robot(args: &[LValue], _: &mut RefLEnv, ctx: &mut CtxRobot) -> Result
 /// Spawn a new thread running function **robot_handler**
 pub fn start_robot_handler(
     _: &[LValue],
-    _: &mut RefLEnv,
+    _: &mut LEnv,
     ctx: &mut CtxRobot,
 ) -> Result<LValue, LError> {
     let (tx, rx) = channel();
@@ -275,18 +275,18 @@ ROBOTS COMMAND
 
 /// Primitive of the robot to move between two places.
 /// Not yet implemented
-pub fn command_move(_: &[LValue], _: &mut RefLEnv, _: &mut CtxRobot) -> Result<LValue, LError> {
+pub fn command_move(_: &[LValue], _: &mut LEnv, _: &mut CtxRobot) -> Result<LValue, LError> {
     unimplemented!()
 }
 
 /// Primitive of the robot to pick an object.
 /// Not yet implemented
-pub fn command_pick(_: &[LValue], _: &mut RefLEnv, _: &mut CtxRobot) -> Result<LValue, LError> {
+pub fn command_pick(_: &[LValue], _: &mut LEnv, _: &mut CtxRobot) -> Result<LValue, LError> {
     unimplemented!()
 }
 
 /// Primitive of the robot to place an object.
 /// Not yet implemented.
-pub fn command_place(_: &[LValue], _: &mut RefLEnv, _: &mut CtxRobot) -> Result<LValue, LError> {
+pub fn command_place(_: &[LValue], _: &mut LEnv, _: &mut CtxRobot) -> Result<LValue, LError> {
     unimplemented!()
 }

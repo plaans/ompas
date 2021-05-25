@@ -1,4 +1,4 @@
-use crate::core::{core_macros_and_lambda, eval, ContextCollection, LEnv, RefLEnv};
+use crate::core::{core_macros_and_lambda, eval, ContextCollection, LEnv};
 use crate::language::*;
 use crate::structs::LError::{ConversionError, SpecialError, WrongNumberOfArgument};
 use aries_utils::input::ErrLoc;
@@ -355,8 +355,9 @@ impl LLambda {
         }
     }
 
-    pub fn get_new_env(&self, args: &[LValue], outer: &RefLEnv) -> Result<RefLEnv, LError> {
+    pub fn get_new_env(&self, args: &[LValue], outer: LEnv) -> Result<LEnv, LError> {
         let mut env = self.env.clone();
+        env.set_outer(outer);
 
         match &self.params {
             LambdaArgs::Sym(param) => {
@@ -365,7 +366,7 @@ impl LLambda {
                 } else {
                     args.into()
                 };
-                env.symbols.insert(param.to_string(), args);
+                env.insert(param.to_string(), args);
             }
             LambdaArgs::List(params) => {
                 if params.len() != args.len() {
@@ -376,22 +377,20 @@ impl LLambda {
                     ));
                 }
                 for (param, arg) in params.iter().zip(args) {
-                    env.symbols.insert(param.to_string(), arg.clone());
+                    env.insert(param.to_string(), arg.clone());
                 }
             }
         };
-
-        env.outer = Some(outer.clone());
-        Ok(env.into())
+        Ok(env)
     }
 
     pub fn call(
         &self,
         args: &[LValue],
-        outer: &RefLEnv,
+        env: &LEnv,
         ctxs: &mut ContextCollection,
     ) -> Result<LValue, LError> {
-        let mut new_env = self.get_new_env(args, outer)?;
+        let mut new_env = self.get_new_env(args, env.clone())?;
         eval(&*self.body, &mut new_env, ctxs)
     }
 
@@ -400,7 +399,7 @@ impl LLambda {
     }
 }
 
-pub type NativeFn = dyn Fn(&[LValue], &RefLEnv, &dyn Any) -> Result<LValue, LError>;
+pub type NativeFn = dyn Fn(&[LValue], &LEnv, &dyn Any) -> Result<LValue, LError>;
 
 #[derive(Clone)]
 pub struct LFn {
@@ -427,12 +426,12 @@ impl LFn {
     pub fn new<
         T: 'static,
         R: Into<Result<LValue, LError>>,
-        F: Fn(&[LValue], &RefLEnv, &T) -> R + 'static,
+        F: Fn(&[LValue], &LEnv, &T) -> R + 'static,
     >(
         lbd: Box<F>,
         debug_label: &'static str,
     ) -> Self {
-        let x = move |args: &[LValue], env: &RefLEnv, ctx: &dyn Any| -> Result<LValue, LError> {
+        let x = move |args: &[LValue], env: &LEnv, ctx: &dyn Any| -> Result<LValue, LError> {
             let ctx: Option<&T> = ctx.downcast_ref::<T>();
             if let Some(ctx) = ctx {
                 lbd(args, env, ctx).into()
@@ -449,7 +448,7 @@ impl LFn {
         }
     }
 
-    pub fn call(&self, args: &[LValue], env: &RefLEnv, ctx: &dyn Any) -> Result<LValue, LError> {
+    pub fn call(&self, args: &[LValue], env: &LEnv, ctx: &dyn Any) -> Result<LValue, LError> {
         (self.fun)(args, env, ctx)
     }
 
@@ -466,7 +465,7 @@ impl LFn {
     }
 }
 
-pub type NativeMutFn = dyn Fn(&[LValue], &mut RefLEnv, &mut dyn Any) -> Result<LValue, LError>;
+pub type NativeMutFn = dyn Fn(&[LValue], &mut LEnv, &mut dyn Any) -> Result<LValue, LError>;
 
 #[derive(Clone)]
 pub struct LMutFn {
@@ -493,24 +492,22 @@ impl LMutFn {
     pub fn new<
         T: 'static,
         R: Into<Result<LValue, LError>>,
-        F: Fn(&[LValue], &mut RefLEnv, &mut T) -> R + 'static,
+        F: Fn(&[LValue], &mut LEnv, &mut T) -> R + 'static,
     >(
         lbd: Box<F>,
         debug_label: &'static str,
     ) -> Self {
-        let x = move |args: &[LValue],
-                      env: &mut RefLEnv,
-                      ctx: &mut dyn Any|
-              -> Result<LValue, LError> {
-            let ctx: Option<&mut T> = ctx.downcast_mut::<T>();
-            if let Some(ctx) = ctx {
-                lbd(args, env, ctx).into()
-            } else {
-                Err(LError::SpecialError(
-                    "Impossible to downcast context".to_string(),
-                ))
-            }
-        };
+        let x =
+            move |args: &[LValue], env: &mut LEnv, ctx: &mut dyn Any| -> Result<LValue, LError> {
+                let ctx: Option<&mut T> = ctx.downcast_mut::<T>();
+                if let Some(ctx) = ctx {
+                    lbd(args, env, ctx).into()
+                } else {
+                    Err(LError::SpecialError(
+                        "Impossible to downcast context".to_string(),
+                    ))
+                }
+            };
         LMutFn {
             fun: Rc::new(x),
             debug_label,
@@ -529,7 +526,7 @@ impl LMutFn {
     pub fn call(
         &self,
         args: &[LValue],
-        env: &mut RefLEnv,
+        env: &mut LEnv,
         ctx: &mut dyn Any,
     ) -> Result<LValue, LError> {
         (self.fun)(args, env, ctx)
@@ -1277,7 +1274,7 @@ impl Module {
     pub fn add_fn_prelude<
         T: 'static,
         R: Into<Result<LValue, LError>>,
-        F: Fn(&[LValue], &RefLEnv, &T) -> R + 'static,
+        F: Fn(&[LValue], &LEnv, &T) -> R + 'static,
     >(
         &mut self,
         label: &'static str,
@@ -1290,7 +1287,7 @@ impl Module {
     pub fn add_mut_fn_prelude<
         T: 'static,
         R: Into<Result<LValue, LError>>,
-        F: Fn(&[LValue], &mut RefLEnv, &mut T) -> R + 'static,
+        F: Fn(&[LValue], &mut LEnv, &mut T) -> R + 'static,
     >(
         &mut self,
         label: &'static str,

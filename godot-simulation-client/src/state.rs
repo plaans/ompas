@@ -2,7 +2,7 @@
 #![allow(unused_imports)]
 use im::ordmap::DiffItem::Update;
 use im::HashMap;
-use ompas_lisp::core::RefLEnv;
+use ompas_lisp::core::LEnv;
 use ompas_lisp::functions::map;
 use ompas_lisp::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
 use ompas_lisp::structs::{GetModule, LError, LValue, Module, NameTypeLValue};
@@ -173,7 +173,7 @@ impl From<LState> for LValue {
     }
 }
 
-fn set_state(args: &[LValue], _: &mut RefLEnv, ctx: &mut CtxState) -> Result<LValue, LError> {
+fn set_state(args: &[LValue], _: &mut LEnv, ctx: &mut CtxState) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
     }
@@ -208,7 +208,7 @@ fn set_state(args: &[LValue], _: &mut RefLEnv, ctx: &mut CtxState) -> Result<LVa
     }
 }
 
-fn get_state(args: &[LValue], _: &RefLEnv, ctx: &CtxState) -> Result<LValue, LError> {
+fn get_state(args: &[LValue], _: &LEnv, ctx: &CtxState) -> Result<LValue, LError> {
     match args.len() {
         0 => Ok(LValue::Map(ctx.get_state(None).into())),
         1 => match &args[0] {
@@ -227,7 +227,7 @@ fn get_state(args: &[LValue], _: &RefLEnv, ctx: &CtxState) -> Result<LValue, LEr
 }
 
 ///Update the last state with the new facts of the map.
-fn update_state(args: &[LValue], _: &mut RefLEnv, ctx: &mut CtxState) -> Result<LValue, LError> {
+fn update_state(args: &[LValue], _: &mut LEnv, ctx: &mut CtxState) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
     }

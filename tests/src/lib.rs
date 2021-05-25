@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use ompas_lisp::core::{eval, load_module, parse, ContextCollection, RefLEnv};
+    use ompas_lisp::core::{eval, load_module, parse, ContextCollection, LEnv};
     use ompas_lisp::structs::LError::SpecialError;
     use ompas_lisp::structs::{LError, LValue};
     use ompas_modules::_type::CtxType;
@@ -11,14 +11,13 @@ mod tests {
         assert_eq!(2 + 2, 4);
     }
 
-    fn create_env_and_ctxs() -> (RefLEnv, ContextCollection) {
-        let mut root_env: RefLEnv = RefLEnv::root();
+    fn create_env_and_ctxs() -> (LEnv, ContextCollection) {
+        let mut env: LEnv = LEnv::root();
         let mut ctxs: ContextCollection = Default::default();
         let lisp_init = &mut Default::default();
-        load_module(&mut root_env, &mut ctxs, CtxMath::default(), lisp_init);
-        load_module(&mut root_env, &mut ctxs, CtxType::default(), lisp_init);
+        load_module(&mut env, &mut ctxs, CtxMath::default(), lisp_init);
+        load_module(&mut env, &mut ctxs, CtxType::default(), lisp_init);
 
-        let env = RefLEnv::new_from_outer(root_env.clone());
         (env, ctxs)
     }
 

@@ -5,7 +5,7 @@ use ompas_lisp::structs::{InitLisp, LValue};
 use ompas_modules::_type::CtxType;
 use ompas_modules::counter::CtxCounter;
 use ompas_modules::doc::{CtxDoc, Documentation};
-use ompas_modules::io::repl::{spawn_stdin, spawn_stdout, EXIT_CODE_STDOUT};
+use ompas_modules::io::repl::{spawn_stdin, spawn_stdout, EXIT_CODE_STDOUT, spawn_repl};
 use ompas_modules::io::{CtxIo, TOKIO_CHANNEL_SIZE};
 use ompas_modules::math::CtxMath;
 //use ompas_modules::robot::CtxRobot;
@@ -47,10 +47,12 @@ pub async fn lisp_interpreter() {
         mpsc::channel(TOKIO_CHANNEL_SIZE);
 
     //Spawn the stdin and stdout threads
-    let sender_stdin = spawn_stdin(sender_li.clone())
+    /*let sender_stdin = spawn_stdin(sender_li.clone())
         .await
         .expect("error while spawning stdin");
-    let sender_stdout = spawn_stdout().await.expect("error while spawning stdout");
+    let sender_stdout = spawn_stdout().await.expect("error while spawning stdout");*/
+
+    let sender_repl = spawn_repl(sender_li.clone()).await.expect("error while spawning repl");
 
     let root_env = &mut LEnv::root();
     let ctxs: &mut ContextCollection = &mut Default::default();
@@ -72,10 +74,10 @@ pub async fn lisp_interpreter() {
     ctx_doc.insert_doc(CtxState::documentation());
 
     //Add the sender of the channel.
-    ctx_io.add_sender_li(sender_li.clone());
-    ctx_io.add_sender_stdout(sender_stdout.clone());
+    //ctx_io.add_sender_li(sender_li.clone());
+    //ctx_io.add_sender_stdout(sender_stdout.clone());
 
-    ctx_state.set_sender_stdout(sender_stdout.clone());
+    //ctx_state.set_sender_stdout(sender_stdout.clone());
     ctx_godot.set_sender_li(sender_li.clone());
 
     let lisp_init = &mut InitLisp::core();
@@ -98,6 +100,8 @@ pub async fn lisp_interpreter() {
     .expect("error while sending message");*/
 
     loop {
+        //TODO: handle response to multi user.
+
         let mut send_ack = false;
         let mut str_lvalue = receiver_li.recv().await.expect("bug in lisp interpretor");
 
@@ -108,7 +112,7 @@ pub async fn lisp_interpreter() {
         }
 
         if str_lvalue == *"exit" {
-            sender_stdout
+            sender_repl
                 .send(EXIT_CODE_STDOUT.to_string())
                 .await
                 .expect("error sending message to stdout");
@@ -121,7 +125,7 @@ pub async fn lisp_interpreter() {
             Ok(lv) => lv,
             Err(e) => {
                 //stderr.write_all(format!("ELI>>{}\n", e).as_bytes());
-                sender_stdout
+                sender_repl
                     .send(format!("ELI>>{}", e))
                     .await
                     .expect("error on channel to stdout");
@@ -130,30 +134,26 @@ pub async fn lisp_interpreter() {
         };
         //stdout.write_all(b"parsing done\n");
         match eval(&lvalue, env, ctxs) {
-            Ok(lv) => match lv {
-                LValue::Nil => {}
-                lv => {
-                    //stdout.write_all(format!("LI>> {}\n", lv).as_bytes()).expect("error stdout");
-                    sender_stdout
-                        .send(format!("LI>> {}", lv))
-                        .await
-                        .expect("error on channel to stdout");
-                }
+            Ok(lv) => {
+                sender_repl
+                    .send(format!("LI>> {}", lv))
+                    .await
+                    .expect("error on channel to stdout");
             },
             Err(e) => {
                 //stderr.write_all(format!("ELI>>{}\n", e).as_bytes());
-                sender_stdout
+                sender_repl
                     .send(format!("ELI>>{}", e))
                     .await
                     .expect("error on channel to stdout");
             }
         };
-        if send_ack {
-            sender_stdin
+        /*if send_ack {
+            sender_repl
                 .send("ACK".to_string())
                 .await
                 .expect("error sending ack to repl");
-        }
+        }*/
         //stdout.write_all(b"eval done\n");
     }
 }

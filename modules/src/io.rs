@@ -9,6 +9,8 @@ use tokio::sync::mpsc::Sender;
 LANGUAGE
  */
 
+//TODO: [mod] add the possibility to redirect log output to a file or any type of input
+
 pub const TOKIO_CHANNEL_SIZE: usize = 16_384;
 
 const MOD_IO: &str = "mod-io";
@@ -48,13 +50,15 @@ impl CtxIo {
     }
 }
 
-pub fn print(args: &[LValue], _: &LEnv, ctx: &CtxIo) -> Result<LValue, LError> {
+pub fn print(args: &[LValue], _: &LEnv, _: &CtxIo) -> Result<LValue, LError> {
     let lv: LValue = match args.len() {
         0 => LValue::Nil,
         1 => args[0].clone(),
         _ => args.into(),
     };
-    match &ctx.sender_stdout {
+    print!("{}\n", lv);
+    Ok(LValue::Nil)
+    /*match &ctx.sender_stdout {
         None => Err(SpecialError("no channel for stdout".to_string())),
         Some(sender) => {
             let sender = sender.clone();
@@ -65,7 +69,7 @@ pub fn print(args: &[LValue], _: &LEnv, ctx: &CtxIo) -> Result<LValue, LError> {
             });
             Ok(LValue::Nil)
         }
-    }
+    }*/
 }
 
 pub fn read(args: &[LValue], _: &LEnv, ctx: &CtxIo) -> Result<LValue, LError> {
@@ -177,6 +181,16 @@ pub mod repl {
     use rustyline::Editor;
     use std::io::Write;
     use tokio::sync::mpsc::{self, Receiver, Sender};
+    use ompas_lisp::language::NIL;
+
+    pub async fn spawn_repl(sender: Sender<String>) -> Option<Sender<String>> {
+        let (sender_repl, receiver_repl) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+        tokio::spawn(async move {
+            repl::repl(sender, receiver_repl).await;
+        });
+
+        Some(sender_repl)
+    }
 
     pub async fn spawn_stdin(sender: Sender<String>) -> Option<Sender<String>> {
         let (sender_stdin, receiver_stdin) = mpsc::channel(TOKIO_CHANNEL_SIZE);
@@ -226,6 +240,61 @@ pub mod repl {
                         buffer, "ACK",
                         "should receive an ack from Lisp Intrepretor and nothing else"
                     );
+                    //println!("repl ack: {}", buffer);
+                }
+                Err(ReadlineError::Interrupted) => {
+                    println!("CTRL-C");
+                    break;
+                }
+                Err(ReadlineError::Eof) => {
+                    println!("CTRL-D");
+                    break;
+                }
+                Err(err) => {
+                    println!("Error: {:?}", err);
+                    break;
+                }
+            }
+        }
+        sender
+            .send("exit".to_string())
+            .await
+            .expect("couldn't send exit msg");
+        rl.save_history("history.txt").unwrap();
+    }
+
+    /// Function to handle the repl.
+    /// ### functioning:
+    /// loop waiting for an object on *stdin*
+    /// ### args
+    /// - sender: channel object to send string to lisp interpreter.
+    /// - receiver: channel object to receive ack from lisp interpreter after evaluation.
+    /// Used for synchronization.
+    async fn repl(sender: Sender<String>, mut receiver: Receiver<String>) {
+        let mut rl = Editor::<()>::new();
+        if rl.load_history("history.txt").is_err() {
+            println!("No previous history.");
+        }
+
+        loop {
+            let readline = rl.readline(">> ");
+
+            match readline {
+                Ok(string) => {
+                    rl.add_history_entry(string.clone());
+                    sender
+                        .send(format!("repl:{}", string))
+                        .await
+                        .expect("couldn't send lisp command");
+                    let buffer = receiver.recv().await.expect("error receiving");
+                    //TODO: to handle side effects when other user wants to connect to lisp.
+                    if buffer != NIL {
+                        println!("{}", buffer);
+                    }
+                    /*assert_eq!(
+                        buffer, "ACK",
+                        "should receive an ack from Lisp Intrepretor and nothing else"
+                    );*/
                     //println!("repl ack: {}", buffer);
                 }
                 Err(ReadlineError::Interrupted) => {

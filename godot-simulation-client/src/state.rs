@@ -49,7 +49,7 @@ const DOC_UPDATE_VERBOSE: &str = "Takes 2 arguments:\n\
 pub struct CtxState {
     static_state: LState,
     dynamic_state: LState,
-    sender_stdout: Option<Sender<String>>,
+    //sender_stdout: Option<Sender<String>>,
 }
 
 enum StateType {
@@ -58,13 +58,13 @@ enum StateType {
 }
 
 impl CtxState {
-    pub fn set_sender_stdout(&mut self, sender: Sender<String>) {
+    /*pub fn set_sender_stdout(&mut self, sender: Sender<String>) {
         self.sender_stdout = Some(sender)
     }
 
     pub fn get_sender_stdout(&mut self) -> &Option<Sender<String>> {
         &self.sender_stdout
-    }
+    }*/
 
     fn set_state(&mut self, s: LState, st: &StateType) {
         match st {

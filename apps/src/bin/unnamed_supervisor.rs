@@ -5,7 +5,7 @@ use ompas_lisp::structs::{InitLisp, LValue};
 use ompas_modules::_type::CtxType;
 use ompas_modules::counter::CtxCounter;
 use ompas_modules::doc::{CtxDoc, Documentation};
-use ompas_modules::io::repl::{spawn_stdin, spawn_stdout, EXIT_CODE_STDOUT, spawn_repl};
+use ompas_modules::io::repl::{spawn_repl, EXIT_CODE_STDOUT};
 use ompas_modules::io::{CtxIo, TOKIO_CHANNEL_SIZE};
 use ompas_modules::math::CtxMath;
 //use ompas_modules::robot::CtxRobot;
@@ -52,18 +52,20 @@ pub async fn lisp_interpreter() {
         .expect("error while spawning stdin");
     let sender_stdout = spawn_stdout().await.expect("error while spawning stdout");*/
 
-    let sender_repl = spawn_repl(sender_li.clone()).await.expect("error while spawning repl");
+    let sender_repl = spawn_repl(sender_li.clone())
+        .await
+        .expect("error while spawning repl");
 
     let root_env = &mut LEnv::root();
     let ctxs: &mut ContextCollection = &mut Default::default();
     let mut ctx_doc = CtxDoc::default();
-    let mut ctx_io = CtxIo::default();
+    let ctx_io = CtxIo::default();
     let ctx_math = CtxMath::default();
     //let ctx_robot = CtxRobot::default();
     let ctx_type = CtxType::default();
     let ctx_counter = CtxCounter::default();
     let mut ctx_godot = CtxGodot::default();
-    let mut ctx_state = CtxState::default();
+    let ctx_state = CtxState::default();
 
     //Insert the doc for the different contexts.
     ctx_doc.insert_doc(CtxIo::documentation());
@@ -102,12 +104,12 @@ pub async fn lisp_interpreter() {
     loop {
         //TODO: handle response to multi user.
 
-        let mut send_ack = false;
+        //let mut send_ack = false;
         let mut str_lvalue = receiver_li.recv().await.expect("bug in lisp interpretor");
 
         if str_lvalue.contains("repl:") {
             // stdout.write_all(b"from repl\n");
-            send_ack = true;
+            //send_ack = true;
             str_lvalue = str_lvalue.replace("repl:", "");
         }
 
@@ -139,7 +141,7 @@ pub async fn lisp_interpreter() {
                     .send(format!("LI>> {}", lv))
                     .await
                     .expect("error on channel to stdout");
-            },
+            }
             Err(e) => {
                 //stderr.write_all(format!("ELI>>{}\n", e).as_bytes());
                 sender_repl

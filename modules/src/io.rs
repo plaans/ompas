@@ -56,20 +56,8 @@ pub fn print(args: &[LValue], _: &LEnv, _: &CtxIo) -> Result<LValue, LError> {
         1 => args[0].clone(),
         _ => args.into(),
     };
-    print!("{}\n", lv);
+    println!("{}", lv);
     Ok(LValue::Nil)
-    /*match &ctx.sender_stdout {
-        None => Err(SpecialError("no channel for stdout".to_string())),
-        Some(sender) => {
-            let sender = sender.clone();
-            let string = format!("{}", lv);
-
-            tokio::spawn(async move {
-                sender.send(string).await.expect("error printing");
-            });
-            Ok(LValue::Nil)
-        }
-    }*/
 }
 
 pub fn read(args: &[LValue], _: &LEnv, ctx: &CtxIo) -> Result<LValue, LError> {
@@ -177,11 +165,11 @@ impl Documentation for CtxIo {
 pub mod repl {
 
     use crate::io::{repl, TOKIO_CHANNEL_SIZE};
+    use ompas_lisp::language::NIL;
     use rustyline::error::ReadlineError;
     use rustyline::Editor;
     use std::io::Write;
     use tokio::sync::mpsc::{self, Receiver, Sender};
-    use ompas_lisp::language::NIL;
 
     pub async fn spawn_repl(sender: Sender<String>) -> Option<Sender<String>> {
         let (sender_repl, receiver_repl) = mpsc::channel(TOKIO_CHANNEL_SIZE);

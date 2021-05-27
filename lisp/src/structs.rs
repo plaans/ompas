@@ -1,5 +1,5 @@
-use crate::core::{core_macros_and_lambda, eval, ContextCollection, LEnv};
-use crate::language::*;
+use crate::core::{eval, ContextCollection, LEnv};
+use crate::language::scheme_primitives::*;
 use crate::structs::LError::{ConversionError, SpecialError, WrongNumberOfArgument};
 use aries_utils::input::ErrLoc;
 use im::HashMap;
@@ -543,6 +543,8 @@ pub enum LCoreOperator {
     Define,
     DefLambda,
     If,
+    Let,
+    LetStar,
     Quote,
     QuasiQuote,
     UnQuote,
@@ -563,6 +565,8 @@ impl Display for LCoreOperator {
             LCoreOperator::DefMacro => write!(f, "{}", DEF_MACRO.to_string()),
             LCoreOperator::Set => write!(f, "{}", SET.to_string()),
             LCoreOperator::Begin => write!(f, "{}", BEGIN.to_string()),
+            LCoreOperator::Let => write!(f, "{}", LET.to_string()),
+            LCoreOperator::LetStar => write!(f, "{}", LET_STAR.to_string()),
         }
     }
 }
@@ -598,12 +602,17 @@ impl From<im::HashMap<LValue, LValue>> for LValue {
 
 */
 
+type Sym = String;
+type Char = u8;
+
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(untagged, rename_all = "lowercase")]
 pub enum LValue {
     // symbol
-    Symbol(String),
+    Symbol(Sym),
     // literaux
+    String(String),
+    Character(Char),
     Number(LNumber),
     #[serde(skip)]
     Fn(LFn),
@@ -650,7 +659,7 @@ impl Display for LValue {
             LValue::Fn(fun) => write!(f, "{}", fun.debug_label),
             LValue::MutFn(fun) => write!(f, "{}", fun.debug_label),
             LValue::Nil => write!(f, "nil"),
-            LValue::Symbol(s) => write!(f, "{}", s),
+            LValue::Symbol(s) | LValue::String(s) => write!(f, "{}", s),
             LValue::Number(n) => write!(f, "{}", n),
             LValue::True => write!(f, "true"),
             LValue::List(list) => {
@@ -675,6 +684,7 @@ impl Display for LValue {
             LValue::CoreOperator(co) => {
                 write!(f, "{}", co)
             }
+            LValue::Character(c) => write!(f, "{}", c),
         }
     }
 }
@@ -1148,6 +1158,7 @@ pub enum NameTypeLValue {
     True,
     Symbol,
     String,
+    Character,
     SExpr,
     Fn,
     MutFn,
@@ -1182,6 +1193,7 @@ impl Display for NameTypeLValue {
             NameTypeLValue::Float => "float",
             NameTypeLValue::Usize => "usize",
             NameTypeLValue::Bool => "bool",
+            NameTypeLValue::Character => "character",
         };
         write!(f, "{}", str)
     }
@@ -1228,6 +1240,8 @@ impl From<&LValue> for NameTypeLValue {
             LValue::List(_) => NameTypeLValue::List,
             LValue::Quote(_) => NameTypeLValue::Quote,
             LValue::CoreOperator(_) => NameTypeLValue::CoreOperator,
+            LValue::String(_) => NameTypeLValue::String,
+            LValue::Character(_) => NameTypeLValue::Character,
         }
     }
 }
@@ -1248,9 +1262,6 @@ impl From<Vec<&'static str>> for InitLisp {
 }
 
 impl InitLisp {
-    pub fn core() -> InitLisp {
-        core_macros_and_lambda()
-    }
     pub fn append(&mut self, other: &mut Self) {
         self.0.append(&mut other.0)
     }

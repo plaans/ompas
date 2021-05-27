@@ -182,6 +182,8 @@ impl From<&LValue> for LValueSerde {
             LValue::Quote(l) => l.deref().into(),
             LValue::True => LValueSerde::Symbol("true".to_string()),
             LValue::Nil => LValueSerde::Symbol("nil".to_string()),
+            LValue::String(s) => LValueSerde::Symbol(s.clone()),
+            LValue::Character(c) => LValueSerde::Symbol(c.to_string()),
         }
     }
 }

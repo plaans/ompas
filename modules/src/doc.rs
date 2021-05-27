@@ -5,7 +5,8 @@ It provides a struct for the help
 
 use im::HashMap;
 use ompas_lisp::core::LEnv;
-use ompas_lisp::language::*;
+use ompas_lisp::language::doc::*;
+use ompas_lisp::language::scheme_primitives::*;
 use ompas_lisp::structs::LError::{WrongNumberOfArgument, WrongType};
 use ompas_lisp::structs::{GetModule, LError, LValue, Module, NameTypeLValue};
 use std::fmt::{Debug, Display, Formatter};
@@ -89,6 +90,27 @@ impl Documentation for CtxDoc {
             LHelp::new(CONS, DOC_CONS, None),
             LHelp::new(GET_MAP, DOC_GET_MAP, Some(DOC_GET_MAP_VERBOSE)),
             LHelp::new(SET_MAP, DOC_SET_MAP, Some(DOC_SET_MAP_VERBOSE)),
+            LHelp::new(ADD, DOC_ADD, None),
+            LHelp::new(SUB, DOC_SUB, None),
+            LHelp::new(MUL, DOC_MUL, None),
+            LHelp::new(DIV, DOC_DIV, None),
+            LHelp::new(GT, DOC_GT, None),
+            LHelp::new(GE, DOC_GE, None),
+            LHelp::new(LT, DOC_LT, None),
+            LHelp::new(LE, DOC_LE, None),
+            LHelp::new(EQ, DOC_EQ, None),
+            LHelp::new(IS_NIL, DOC_IS_NIL, None),
+            LHelp::new(IS_NUMBER, DOC_IS_NUMBER, None),
+            LHelp::new(IS_BOOL, DOC_IS_BOOL, None),
+            LHelp::new(IS_SYMBOL, DOC_IS_SYMBOL, None),
+            LHelp::new(IS_FN, DOC_IS_FN, None),
+            LHelp::new(IS_MUT_FN, DOC_IS_MUT_FN, None),
+            LHelp::new(IS_MAP, DOC_IS_MAP, None),
+            LHelp::new(IS_LIST, DOC_IS_LIST, None),
+            LHelp::new(IS_LAMBDA, DOC_IS_LAMBDA, None),
+            LHelp::new(IS_QUOTE, DOC_IS_QUOTE, None),
+            LHelp::new(IS_PAIR, DOC_IS_PAIR, None),
+            LHelp::new(IS_EQUAL, DOC_IS_EQUAL, None),
         ]
     }
 }
@@ -162,9 +184,9 @@ pub fn help(args: &[LValue], _: &LEnv, ctx: &CtxDoc) -> Result<LValue, LError> {
     match args.len() {
         0 => Ok(ctx.get_all().into()),
         1 => match &args[0] {
-            LValue::Fn(fun) => Ok(ctx.get(&fun.get_label()).into()),
-            LValue::MutFn(fun) => Ok(ctx.get(&fun.get_label()).into()),
-            LValue::Symbol(s) => Ok(ctx.get(s).into()),
+            LValue::Fn(fun) => Ok(LValue::String(ctx.get(&fun.get_label()))),
+            LValue::MutFn(fun) => Ok(LValue::String(ctx.get(&fun.get_label()))),
+            LValue::Symbol(s) => Ok(LValue::String(ctx.get(s))),
             lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
         },
         _ => Err(WrongNumberOfArgument(args.into(), args.len(), 0..1)),

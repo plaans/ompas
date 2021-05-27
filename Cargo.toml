@@ -1,7 +1,7 @@
 [workspace]
 
 members = [
-    "apps", "lisp", "godot-simulation-client", "modules", "acting", "tests"
+    "apps", "lisp", "godot-simulation-client", "modules", "acting",
 ]
 
 [profile.release]

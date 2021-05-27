@@ -13,19 +13,10 @@ const MOD_TYPE: &str = "mod_type";
 const DOC_MOD_TYPE: &str = "documentation of the module type";
 
 //Verification
-const IS_NONE: &str = "null?";
-const IS_NUMBER: &str = "number?";
-const IS_BOOL: &str = "bool?";
-const IS_SYMBOL: &str = "sym?";
-const IS_FN: &str = "fn?";
-const IS_MUT_FN: &str = "mut-fn?";
+
 const IS_TYPE: &str = "type?";
 const IS_STATE_FUNCTION: &str = "sf?";
 const IS_OBJECT: &str = "obj?";
-const IS_LIST: &str = "list?";
-const IS_MAP: &str = "map?";
-const IS_LAMBDA: &str = "lambda?";
-const IS_QUOTE: &str = "quote?";
 
 //FactBase language
 const STATE_FUNCTION: &str = "state-function";
@@ -333,19 +324,9 @@ impl GetModule for CtxType {
             label: MOD_TYPE,
         };
 
-        module.add_fn_prelude(IS_NONE, Box::new(is_none));
-        module.add_fn_prelude(IS_NUMBER, Box::new(is_number));
-        module.add_fn_prelude(IS_BOOL, Box::new(is_bool));
-        module.add_fn_prelude(IS_SYMBOL, Box::new(is_symbol));
-        module.add_fn_prelude(IS_FN, Box::new(is_fn));
-        module.add_fn_prelude(IS_MUT_FN, Box::new(is_mut_fn));
         module.add_fn_prelude(IS_STATE_FUNCTION, Box::new(is_state_function));
         module.add_fn_prelude(IS_OBJECT, Box::new(is_object));
-        module.add_fn_prelude(IS_MAP, Box::new(is_map));
-        module.add_fn_prelude(IS_LIST, Box::new(is_list));
-        module.add_fn_prelude(IS_LAMBDA, Box::new(is_lambda));
         module.add_fn_prelude(IS_TYPE, Box::new(is_type));
-        module.add_fn_prelude(IS_QUOTE, Box::new(is_quote));
         module.add_fn_prelude(GET_TYPE, Box::new(get_type));
         module.add_mut_fn_prelude(TYPE_OF, Box::new(type_of));
         module.add_mut_fn_prelude(SUB_TYPE, Box::new(sub_type));
@@ -360,19 +341,12 @@ impl GetModule for CtxType {
 DOCUMENTATION
  */
 //TODO: write doc mod type
-const DOC_IS_NONE: &str = "Return true if symbol is LValue::None.";
-const DOC_IS_NUMBER: &str = "Return true if symbol is LValue::Number";
-const DOC_IS_BOOL: &str = "Return true if symbol is LValue::Bool";
-const DOC_IS_SYMBOL: &str = "Return true if symbol is LValue::Symbol";
-const DOC_IS_FN: &str = "Return true if symbol is LValue::Fn";
-const DOC_IS_MUT_FN: &str = "Return true if symbol is LValue::MutFn";
+
 const DOC_IS_STATE_FUNCTION: &str = "Return true if symbol is state function";
 const DOC_IS_OBJECT: &str = "Return true if symbol is object";
-const DOC_IS_MAP: &str = "Return true if symbol is map";
-const DOC_IS_LIST: &str = "Return true if symbol is list";
-const DOC_IS_LAMBDA: &str = "Return true if symbol is lambda";
+
 const DOC_IS_TYPE: &str = "Return true if symbol is type";
-const DOC_IS_QUOTE: &str = "Return true if symbol is quote";
+
 const DOC_GET_TYPE: &str = "Return type of a typed symbol";
 const DOC_TYPE_OF: &str = "Associate a type to a symbol";
 const DOC_SUB_TYPE: &str = "Create a sub-type of a type.";
@@ -390,19 +364,9 @@ impl Documentation for CtxType {
     fn documentation() -> Vec<LHelp> {
         vec![
             LHelp::new(MOD_TYPE, DOC_MOD_TYPE, None),
-            LHelp::new(IS_NONE, DOC_IS_NONE, None),
-            LHelp::new(IS_NUMBER, DOC_IS_NUMBER, None),
-            LHelp::new(IS_BOOL, DOC_IS_BOOL, None),
-            LHelp::new(IS_SYMBOL, DOC_IS_SYMBOL, None),
-            LHelp::new(IS_FN, DOC_IS_FN, None),
-            LHelp::new(IS_MUT_FN, DOC_IS_MUT_FN, None),
             LHelp::new(IS_STATE_FUNCTION, DOC_IS_STATE_FUNCTION, None),
             LHelp::new(IS_OBJECT, DOC_IS_OBJECT, None),
-            LHelp::new(IS_MAP, DOC_IS_MAP, None),
-            LHelp::new(IS_LIST, DOC_IS_LIST, None),
-            LHelp::new(IS_LAMBDA, DOC_IS_LAMBDA, None),
             LHelp::new(IS_TYPE, DOC_IS_TYPE, None),
-            LHelp::new(IS_QUOTE, DOC_IS_QUOTE, None),
             LHelp::new(GET_TYPE, DOC_GET_TYPE, None),
             LHelp::new(TYPE_OF, DOC_TYPE_OF, None),
             LHelp::new(SUB_TYPE, DOC_SUB_TYPE, Some(DOC_SUB_TYPE_VERBOSE)),
@@ -420,42 +384,6 @@ impl Documentation for CtxType {
 FUNCTIONS
  */
 
-//Type verification
-pub fn is_none(args: &[LValue], _: &LEnv, _: &CtxType) -> Result<LValue, LError> {
-    match args.len() {
-        1 => Ok((NameTypeLValue::from(&args[0]) == NameTypeLValue::Nil).into()),
-        i => Err(WrongNumberOfArgument(args.into(), i, 1..1)),
-    }
-}
-
-pub fn is_number(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
-    match args.len() {
-        1 => Ok((NameTypeLValue::from(args.get(0).unwrap()) == NameTypeLValue::Number).into()),
-        i => Err(WrongNumberOfArgument(args.into(), i, 1..1)),
-    }
-}
-
-pub fn is_bool(args: &[LValue], _: &LEnv, _: &CtxType) -> Result<LValue, LError> {
-    match args.len() {
-        1 => Ok((NameTypeLValue::from(args.get(0).unwrap()) == NameTypeLValue::Bool).into()),
-        i => Err(WrongNumberOfArgument(args.into(), i, 1..1)),
-    }
-}
-
-pub fn is_fn(args: &[LValue], _: &LEnv, _: &CtxType) -> Result<LValue, LError> {
-    match args.len() {
-        1 => Ok((NameTypeLValue::from(args.get(0).unwrap()) == NameTypeLValue::Fn).into()),
-        i => Err(WrongNumberOfArgument(args.into(), i, 1..1)),
-    }
-}
-
-pub fn is_mut_fn(args: &[LValue], _: &LEnv, _: &CtxType) -> Result<LValue, LError> {
-    match args.len() {
-        1 => Ok((NameTypeLValue::from(args.get(0).unwrap()) == NameTypeLValue::MutFn).into()),
-        i => Err(WrongNumberOfArgument(args.into(), i, 1..1)),
-    }
-}
-
 pub fn is_type(args: &[LValue], _: &LEnv, ctx: &CtxType) -> Result<LValue, LError> {
     match args.len() {
         1 => match &args[0] {
@@ -467,16 +395,6 @@ pub fn is_type(args: &[LValue], _: &LEnv, ctx: &CtxType) -> Result<LValue, LErro
                 },
             },
             lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
-        },
-        i => Err(WrongNumberOfArgument(args.into(), i, 1..1)),
-    }
-}
-
-pub fn is_symbol(args: &[LValue], _: &LEnv, _: &CtxType) -> Result<LValue, LError> {
-    match args.len() {
-        1 => match args.get(0).unwrap() {
-            LValue::Symbol(_) => Ok(LValue::True),
-            _ => Ok(LValue::Nil),
         },
         i => Err(WrongNumberOfArgument(args.into(), i, 1..1)),
     }
@@ -509,45 +427,6 @@ pub fn is_state_function(args: &[LValue], _: &LEnv, ctx: &CtxType) -> Result<LVa
                 },
             },
             lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
-        },
-        i => Err(WrongNumberOfArgument(args.into(), i, 1..1)),
-    }
-}
-
-pub fn is_map(args: &[LValue], _: &LEnv, _: &CtxType) -> Result<LValue, LError> {
-    match args.len() {
-        1 => match args.get(0).unwrap() {
-            LValue::Map(_) => Ok(LValue::True),
-            _ => Ok(LValue::Nil),
-        },
-        i => Err(WrongNumberOfArgument(args.into(), i, 1..1)),
-    }
-}
-pub fn is_list(args: &[LValue], _: &LEnv, _: &CtxType) -> Result<LValue, LError> {
-    match args.len() {
-        1 => match args.get(0).unwrap() {
-            LValue::List(_) => Ok(LValue::True),
-            _ => Ok(LValue::Nil),
-        },
-        i => Err(WrongNumberOfArgument(args.into(), i, 1..1)),
-    }
-}
-
-pub fn is_lambda(args: &[LValue], _: &LEnv, _: &CtxType) -> Result<LValue, LError> {
-    match args.len() {
-        1 => match args.get(0).unwrap() {
-            LValue::Lambda(_) => Ok(LValue::True),
-            _ => Ok(LValue::Nil),
-        },
-        i => Err(WrongNumberOfArgument(args.into(), i, 1..1)),
-    }
-}
-
-pub fn is_quote(args: &[LValue], _: &LEnv, _: &CtxType) -> Result<LValue, LError> {
-    match args.len() {
-        1 => match args.get(0).unwrap() {
-            LValue::Quote(_) => Ok(LValue::True),
-            _ => Ok(LValue::Nil),
         },
         i => Err(WrongNumberOfArgument(args.into(), i, 1..1)),
     }

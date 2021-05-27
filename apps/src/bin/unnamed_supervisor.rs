@@ -1,7 +1,7 @@
 use ompas_godot_simulation_client::godot::CtxGodot;
 use ompas_godot_simulation_client::state::CtxState;
 use ompas_lisp::core::*;
-use ompas_lisp::structs::{InitLisp, LValue};
+use ompas_lisp::structs::LValue;
 use ompas_modules::_type::CtxType;
 use ompas_modules::counter::CtxCounter;
 use ompas_modules::doc::{CtxDoc, Documentation};
@@ -23,6 +23,9 @@ pub const CHANNEL_SIZE: usize = 16_384;
 )]
 struct Opt {
     #[structopt(short, long)]
+    log: Option<PathBuf>,
+
+    #[structopt(short, long)]
     repl: bool,
 
     #[structopt(short = "f", long = "file")]
@@ -39,10 +42,10 @@ async fn main() {
     let opt: Opt = Opt::from_args();
     println!("{:?}", opt);
     //test_lib_model(&opt);
-    lisp_interpreter().await;
+    lisp_interpreter(opt.log).await;
 }
 
-pub async fn lisp_interpreter() {
+pub async fn lisp_interpreter(log: Option<PathBuf>) {
     let (sender_li, mut receiver_li): (Sender<String>, Receiver<String>) =
         mpsc::channel(TOKIO_CHANNEL_SIZE);
 
@@ -56,10 +59,9 @@ pub async fn lisp_interpreter() {
         .await
         .expect("error while spawning repl");
 
-    let root_env = &mut LEnv::root();
-    let ctxs: &mut ContextCollection = &mut Default::default();
+    let (mut root_env, mut ctxs, mut lisp_init) = LEnv::root();
     let mut ctx_doc = CtxDoc::default();
-    let ctx_io = CtxIo::default();
+    let mut ctx_io = CtxIo::default();
     let ctx_math = CtxMath::default();
     //let ctx_robot = CtxRobot::default();
     let ctx_type = CtxType::default();
@@ -76,22 +78,21 @@ pub async fn lisp_interpreter() {
     ctx_doc.insert_doc(CtxState::documentation());
 
     //Add the sender of the channel.
-    //ctx_io.add_sender_li(sender_li.clone());
-    //ctx_io.add_sender_stdout(sender_stdout.clone());
-
+    ctx_io.add_sender_li(sender_li.clone());
+    if let Some(pb) = log {
+        ctx_io.set_log_output(pb.into());
+    }
     //ctx_state.set_sender_stdout(sender_stdout.clone());
     ctx_godot.set_sender_li(sender_li.clone());
 
-    let lisp_init = &mut InitLisp::core();
-
-    load_module(root_env, ctxs, ctx_doc, lisp_init);
-    load_module(root_env, ctxs, ctx_io, lisp_init);
-    load_module(root_env, ctxs, ctx_math, lisp_init);
+    load_module(&mut root_env, &mut ctxs, ctx_doc, &mut lisp_init);
+    load_module(&mut root_env, &mut ctxs, ctx_io, &mut lisp_init);
+    load_module(&mut root_env, &mut ctxs, ctx_math, &mut lisp_init);
     //load_module(root_env, ctxs, ctx_robot,lisp_init);
-    load_module(root_env, ctxs, ctx_type, lisp_init);
-    load_module(root_env, ctxs, ctx_counter, lisp_init);
-    load_module(root_env, ctxs, ctx_godot, lisp_init);
-    load_module(root_env, ctxs, ctx_state, lisp_init);
+    load_module(&mut root_env, &mut ctxs, ctx_type, &mut lisp_init);
+    load_module(&mut root_env, &mut ctxs, ctx_counter, &mut lisp_init);
+    load_module(&mut root_env, &mut ctxs, ctx_godot, &mut lisp_init);
+    load_module(&mut root_env, &mut ctxs, ctx_state, &mut lisp_init);
     let env = &mut root_env.clone();
     //println!("{}", lisp_init.begin_lisp());
 
@@ -123,7 +124,7 @@ pub async fn lisp_interpreter() {
 
         //stdout.write_all(format!("receiving command: {}\n", str_lvalue).as_bytes());
 
-        let lvalue = match parse(str_lvalue.as_str(), env, ctxs) {
+        let lvalue = match parse(str_lvalue.as_str(), env, &mut ctxs) {
             Ok(lv) => lv,
             Err(e) => {
                 //stderr.write_all(format!("ELI>>{}\n", e).as_bytes());
@@ -135,7 +136,7 @@ pub async fn lisp_interpreter() {
             }
         };
         //stdout.write_all(b"parsing done\n");
-        match eval(&lvalue, env, ctxs) {
+        match eval(&lvalue, env, &mut ctxs) {
             Ok(lv) => {
                 sender_repl
                     .send(format!("LI>> {}", lv))

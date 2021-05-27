@@ -1,4 +1,7 @@
 use crate::functions::*;
+use crate::language::scheme_lambda::*;
+use crate::language::scheme_macro::*;
+use crate::language::scheme_primitives::*;
 use crate::language::*;
 use crate::structs::LCoreOperator::Quote;
 use crate::structs::LError::*;
@@ -147,85 +150,111 @@ impl Default for LEnv {
         Self::empty()
     }
 }
+#[derive(Default)]
+struct CtxRoot(());
 
-impl LEnv {
-    pub fn root() -> Self {
-        // let map = im::hashmap::HashMap::new();
-        // map.ins
-        let mut symbols: HashMap<String, LValue> = HashMap::default();
+impl GetModule for CtxRoot {
+    fn get_module(self) -> Module {
+        let mut module = Module {
+            ctx: Box::new(()),
+            prelude: vec![],
+            raw_lisp: vec![
+                MACRO_AND2,
+                MACRO_OR2,
+                MACRO_NEQ,
+                MACRO_NEQ_SHORT,
+                LAMBDA_AND,
+                LAMBDA_OR,
+            ]
+            .into(),
+            label: MOD_ROOT,
+        };
 
-        symbols.insert(NIL.to_string(), LValue::Nil);
+        module.add_prelude(DEFINE, LCoreOperator::Define.into());
+        module.add_prelude(NIL, LValue::Nil);
 
         //Core Operators
-        symbols.insert(DEFINE.to_string(), LCoreOperator::Define.into());
-        symbols.insert(IF.to_string(), LCoreOperator::If.into());
-        symbols.insert(LAMBDA.to_string(), LCoreOperator::DefLambda.into());
-        symbols.insert(DEF_MACRO.to_string(), LCoreOperator::DefMacro.into());
-        symbols.insert(SET.to_string(), LCoreOperator::Set.into());
-        symbols.insert(BEGIN.to_string(), LCoreOperator::Begin.into());
-        symbols.insert(QUASI_QUOTE.to_string(), LCoreOperator::QuasiQuote.into());
-        symbols.insert(QUOTE.to_string(), LCoreOperator::Quote.into());
-        symbols.insert(UNQUOTE.to_string(), LCoreOperator::UnQuote.into());
+        module.add_prelude(DEFINE, LCoreOperator::Define.into());
+        module.add_prelude(IF, LCoreOperator::If.into());
+        module.add_prelude(LAMBDA, LCoreOperator::DefLambda.into());
+        module.add_prelude(DEF_MACRO, LCoreOperator::DefMacro.into());
+        module.add_prelude(SET, LCoreOperator::Set.into());
+        module.add_prelude(BEGIN, LCoreOperator::Begin.into());
+        module.add_prelude(QUASI_QUOTE, LCoreOperator::QuasiQuote.into());
+        module.add_prelude(QUOTE, LCoreOperator::Quote.into());
+        module.add_prelude(UNQUOTE, LCoreOperator::UnQuote.into());
 
-        symbols.insert(ENV.to_string(), LValue::Fn(LFn::new(Box::new(env), ENV)));
+        module.add_fn_prelude(ENV, Box::new(env));
 
         //Special entry
-        symbols.insert(GET.to_string(), LValue::Fn(LFn::new(Box::new(get), GET)));
-        symbols.insert(MAP.to_string(), LValue::Fn(LFn::new(Box::new(map), MAP)));
-        symbols.insert(LIST.to_string(), LValue::Fn(LFn::new(Box::new(list), LIST)));
+        module.add_fn_prelude(GET, Box::new(get));
+        module.add_fn_prelude(MAP, Box::new(map));
+        module.add_fn_prelude(LIST, Box::new(list));
         //State is an alias for map
 
         /*
          * LIST FUNCTIONS
          */
-        symbols.insert(CAR.to_string(), LValue::Fn(LFn::new(Box::new(car), CAR)));
-        symbols.insert(CDR.to_string(), LValue::Fn(LFn::new(Box::new(cdr), CDR)));
-        symbols.insert(LAST.to_string(), LValue::Fn(LFn::new(Box::new(last), LAST)));
-        symbols.insert(CONS.to_string(), LValue::Fn(LFn::new(Box::new(cons), CONS)));
-        symbols.insert(LEN.to_string(), LValue::Fn(LFn::new(Box::new(length), LEN)));
-        symbols.insert(
-            EMPTY.to_string(),
-            LValue::Fn(LFn::new(Box::new(empty), EMPTY)),
-        );
+        module.add_fn_prelude(CAR, Box::new(car));
+        module.add_fn_prelude(CDR, Box::new(cdr));
+        module.add_fn_prelude(LAST, Box::new(last));
+        module.add_fn_prelude(CONS, Box::new(cons));
+        module.add_fn_prelude(LEN, Box::new(length));
+        module.add_fn_prelude(EMPTY, Box::new(empty));
 
         //Map functions
-        symbols.insert(
-            GET_MAP.to_string(),
-            LValue::Fn(LFn::new(Box::new(get_map), GET_MAP)),
-        );
-        symbols.insert(
-            SET_MAP.to_string(),
-            LValue::Fn(LFn::new(Box::new(set_map), SET_MAP)),
-        );
+        module.add_fn_prelude(GET_MAP, Box::new(get_map));
+        module.add_fn_prelude(SET_MAP, Box::new(set_map));
 
-        symbols.insert(NOT.to_string(), LValue::Fn(LFn::new(Box::new(not), NOT)));
-        symbols.insert(
-            NOT_SHORT.to_string(),
-            LValue::Fn(LFn::new(Box::new(not), NOT_SHORT)),
-        );
+        module.add_fn_prelude(NOT, Box::new(not));
+        //module.add_fn_prelude(NOT_SHORT, Box::new(not), NOT_SHORT));
 
-        symbols.insert(
-            APPEND.to_string(),
-            LValue::Fn(LFn::new(Box::new(append), APPEND)),
-        );
+        module.add_fn_prelude(APPEND, Box::new(append));
 
-        symbols.insert(
-            MEMBER.to_string(),
-            LValue::Fn(LFn::new(Box::new(member), MEMBER)),
-        );
+        module.add_fn_prelude(MEMBER, Box::new(member));
 
-        symbols.insert(
-            REVERSE.to_string(),
-            LValue::Fn(LFn::new(Box::new(reverse), REVERSE)),
-        );
+        module.add_fn_prelude(REVERSE, Box::new(reverse));
 
-        //TODO: Add a function to import files in a predefined file
-        Self {
-            symbols,
-            macro_table: Default::default(),
-            //new_entries: vec![],
-            outer: None,
-        }
+        module.add_fn_prelude(ADD, Box::new(add));
+        module.add_fn_prelude(SUB, Box::new(sub));
+        module.add_fn_prelude(MUL, Box::new(mul));
+        module.add_fn_prelude(DIV, Box::new(div));
+        module.add_fn_prelude(GT, Box::new(gt));
+        module.add_fn_prelude(GE, Box::new(ge));
+        module.add_fn_prelude(LT, Box::new(lt));
+        module.add_fn_prelude(LE, Box::new(le));
+        module.add_fn_prelude(EQ, Box::new(eq));
+
+        //predicates
+        module.add_fn_prelude(IS_NUMBER, Box::new(is_number));
+        module.add_fn_prelude(IS_INTEGER, Box::new(is_integer));
+        module.add_fn_prelude(IS_FLOAT, Box::new(is_float));
+        module.add_fn_prelude(IS_NIL, Box::new(is_nil));
+        module.add_fn_prelude(IS_NUMBER, Box::new(is_number));
+        module.add_fn_prelude(IS_BOOL, Box::new(is_bool));
+        module.add_fn_prelude(IS_SYMBOL, Box::new(is_symbol));
+        module.add_fn_prelude(IS_FN, Box::new(is_fn));
+        module.add_fn_prelude(IS_MUT_FN, Box::new(is_mut_fn));
+        module.add_fn_prelude(IS_QUOTE, Box::new(is_quote));
+        module.add_fn_prelude(IS_MAP, Box::new(is_map));
+        module.add_fn_prelude(IS_LIST, Box::new(is_list));
+        module.add_fn_prelude(IS_LAMBDA, Box::new(is_lambda));
+
+        module.add_fn_prelude(IS_PAIR, Box::new(is_pair));
+        module.add_fn_prelude(IS_EQUAL, Box::new(is_equal));
+        module
+    }
+}
+
+impl LEnv {
+    pub fn root() -> (Self, ContextCollection, InitLisp) {
+        // let map = im::hashmap::HashMap::new();
+        // map.ins
+        let mut env = LEnv::default();
+        let mut ctxs = ContextCollection::default();
+        let mut lisp_init = InitLisp::default();
+        load_module(&mut env, &mut ctxs, CtxRoot::default(), &mut lisp_init);
+        (env, ctxs, lisp_init)
     }
 
     pub fn empty() -> Self {
@@ -527,6 +556,8 @@ pub fn expand(
                         //TODO: Implémenter msg d'erreur
                         panic!("unquote not at right place")
                     }
+                    LCoreOperator::Let => {}
+                    LCoreOperator::LetStar => {}
                 }
             } else if let LValue::Symbol(sym) = &list[0] {
                 match env.get_macro(sym) {
@@ -697,6 +728,8 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                     LCoreOperator::QuasiQuote
                     | LCoreOperator::UnQuote
                     | LCoreOperator::DefMacro => return Ok(LValue::Nil),
+                    LCoreOperator::Let => {}
+                    LCoreOperator::LetStar => {}
                 }
             } else {
                 let exps = list
@@ -724,7 +757,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                             Some(u) => fun.call(&args, &mut env, ctxs.get_mut_context(u)),
                         }
                     }
-                    _ => return Ok(exps.into()), //Cas particulier lorsqu'il n'y a aucune procédure à faire de renvoyer une liste
+                    lv => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Fn)),
                 }
             }
         } else {
@@ -733,7 +766,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
     }
 }
 
-pub fn core_macros_and_lambda() -> InitLisp {
+/*pub fn core_macros_and_lambda() -> InitLisp {
     vec![
         MACRO_AND2,
         MACRO_OR2,
@@ -743,7 +776,7 @@ pub fn core_macros_and_lambda() -> InitLisp {
         LAMBDA_OR,
     ]
     .into()
-}
+}*/
 
 //(begin (define ?v (var (:type object
 //                        :value bob))

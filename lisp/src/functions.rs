@@ -2,7 +2,7 @@ use crate::core::LEnv;
 use crate::structs::LError::{
     NotInListOfExpectedTypes, SpecialError, WrongNumberOfArgument, WrongType,
 };
-use crate::structs::{LError, LValue, NameTypeLValue};
+use crate::structs::{LError, LNumber, LValue, NameTypeLValue};
 use im::HashMap;
 use std::convert::TryFrom;
 
@@ -347,5 +347,389 @@ pub fn not(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     match &args[0] {
         LValue::Nil => Ok(LValue::True),
         _ => Ok(LValue::Nil),
+    }
+}
+
+pub fn add(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    let mut result = LValue::Number(LNumber::Float(0.0));
+    for value in args {
+        result = (&result + value)?;
+    }
+    Ok(result)
+}
+
+pub fn sub(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    match args.len() {
+        2 => &args[0] - &args[1],
+        i => Err(WrongNumberOfArgument(args.into(), i, 2..2)),
+    }
+}
+
+pub fn mul(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    let mut result = LValue::Number(LNumber::Float(1.0));
+    for value in args {
+        result = (&result * value)?;
+    }
+    Ok(result)
+}
+
+pub fn div(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    match args.len() {
+        2 => &args[0] / &args[1],
+        i => Err(WrongNumberOfArgument(args.into(), i, 2..2)),
+    }
+}
+
+//Comparison functions
+pub fn gt(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    match args.len() {
+        2 => Ok((args[0] > args[1]).into()),
+        i => Err(WrongNumberOfArgument(args.into(), i, 2..2)),
+    }
+}
+
+pub fn lt(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    match args.len() {
+        2 => Ok((args[0] < args[1]).into()),
+        i => Err(WrongNumberOfArgument(args.into(), i, 2..2)),
+    }
+}
+
+pub fn ge(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    match args.len() {
+        2 => Ok((args[0] >= args[1]).into()),
+        i => Err(WrongNumberOfArgument(args.into(), i, 2..2)),
+    }
+}
+
+pub fn le(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    match args.len() {
+        2 => Ok((args[0] <= args[1]).into()),
+        i => Err(WrongNumberOfArgument(args.into(), i, 2..2)),
+    }
+}
+
+pub fn eq(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    match args.len() {
+        2 => Ok((args[0] == args[1]).into()),
+        i => Err(WrongNumberOfArgument(args.into(), i, 2..2)),
+    }
+}
+
+//Predicates
+
+//Type verification
+pub fn is_nil(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    match args.len() {
+        1 => Ok((NameTypeLValue::from(&args[0]) == NameTypeLValue::Nil).into()),
+        i => Err(WrongNumberOfArgument(args.into(), i, 1..1)),
+    }
+}
+
+pub fn is_number(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    match args.len() {
+        1 => Ok((NameTypeLValue::from(&args[0]) == NameTypeLValue::Number).into()),
+        i => Err(WrongNumberOfArgument(args.into(), i, 1..1)),
+    }
+}
+
+pub fn is_integer(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    match args.len() {
+        1 => {
+            if let LValue::Number(LNumber::Int(_)) = &args[0] {
+                Ok(true.into())
+            } else {
+                Ok(false.into())
+            }
+        }
+        i => Err(WrongNumberOfArgument(args.into(), i, 1..1)),
+    }
+}
+pub fn is_float(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    match args.len() {
+        1 => {
+            if let LValue::Number(LNumber::Float(_)) = &args[0] {
+                Ok(true.into())
+            } else {
+                Ok(false.into())
+            }
+        }
+        i => Err(WrongNumberOfArgument(args.into(), i, 1..1)),
+    }
+}
+
+pub fn is_bool(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    match args.len() {
+        1 => Ok((NameTypeLValue::from(args.get(0).unwrap()) == NameTypeLValue::Bool).into()),
+        i => Err(WrongNumberOfArgument(args.into(), i, 1..1)),
+    }
+}
+
+pub fn is_fn(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    match args.len() {
+        1 => Ok((NameTypeLValue::from(args.get(0).unwrap()) == NameTypeLValue::Fn).into()),
+        i => Err(WrongNumberOfArgument(args.into(), i, 1..1)),
+    }
+}
+
+pub fn is_mut_fn(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    match args.len() {
+        1 => Ok((NameTypeLValue::from(args.get(0).unwrap()) == NameTypeLValue::MutFn).into()),
+        i => Err(WrongNumberOfArgument(args.into(), i, 1..1)),
+    }
+}
+
+pub fn is_symbol(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    match args.len() {
+        1 => match args.get(0).unwrap() {
+            LValue::Symbol(_) => Ok(LValue::True),
+            _ => Ok(LValue::Nil),
+        },
+        i => Err(WrongNumberOfArgument(args.into(), i, 1..1)),
+    }
+}
+
+pub fn is_list(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    match args.len() {
+        1 => match args.get(0).unwrap() {
+            LValue::List(_) => Ok(LValue::True),
+            _ => Ok(LValue::Nil),
+        },
+        i => Err(WrongNumberOfArgument(args.into(), i, 1..1)),
+    }
+}
+
+pub fn is_lambda(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    match args.len() {
+        1 => match args.get(0).unwrap() {
+            LValue::Lambda(_) => Ok(LValue::True),
+            _ => Ok(LValue::Nil),
+        },
+        i => Err(WrongNumberOfArgument(args.into(), i, 1..1)),
+    }
+}
+
+pub fn is_quote(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    match args.len() {
+        1 => match args.get(0).unwrap() {
+            LValue::Quote(_) => Ok(LValue::True),
+            _ => Ok(LValue::Nil),
+        },
+        i => Err(WrongNumberOfArgument(args.into(), i, 1..1)),
+    }
+}
+
+pub fn is_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    match args.len() {
+        1 => match args.get(0).unwrap() {
+            LValue::Map(_) => Ok(LValue::True),
+            _ => Ok(LValue::Nil),
+        },
+        i => Err(WrongNumberOfArgument(args.into(), i, 1..1)),
+    }
+}
+
+pub fn is_equal(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    if args.len() != 2 {
+        return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
+    }
+    if let LValue::List(l1) = &args[0] {
+        if let LValue::List(l2) = &args[1] {
+            Ok((l1 == l2).into())
+        } else {
+            Err(WrongType(
+                args[1].clone(),
+                (&args[1]).into(),
+                NameTypeLValue::List,
+            ))
+        }
+    } else {
+        Err(WrongType(
+            args[0].clone(),
+            (&args[0]).into(),
+            NameTypeLValue::List,
+        ))
+    }
+}
+
+pub fn is_pair(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    if args.len() != 1 {
+        return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1));
+    }
+
+    if let LValue::List(l) = &args[0] {
+        Ok((!l.is_empty()).into())
+    } else {
+        Err(WrongType(
+            args[0].clone(),
+            (&args[0]).into(),
+            NameTypeLValue::List,
+        ))
+    }
+}
+/*
+def let(*args):
+    args = list(args)
+    x = cons(_let, args)
+    require(x, len(args)>1)
+    bindings, body = args[0], args[1:]
+    require(x, all(isa(b, list) and len(b)==2 and isa(b[0], Symbol)
+                   for b in bindings), "illegal binding list")
+    vars, vals = zip(*bindings)
+    return [[_lambda, list(vars)]+map(expand, body)] + map(expand, vals)
+ */
+pub fn _let(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    if args.len() < 2 {
+        return Err(WrongNumberOfArgument(
+            args.into(),
+            args.len(),
+            2..std::usize::MAX,
+        ));
+    }
+    let (bindings, _body) = (&args[0], &args[1..]);
+
+    //Verification of the bindings
+    if let LValue::List(bindings) = bindings {
+        for b in bindings {
+            if let LValue::List(binding) = b {
+                if binding.len() == 2 {
+                    if matches!(&args[0], LValue::Symbol(_)) {
+                    } else {
+                        return Err(SpecialError("Illegal binding list".to_string()));
+                    }
+                } else {
+                    return Err(SpecialError("Illegal binding list".to_string()));
+                }
+            } else {
+                return Err(SpecialError("Illegal binding list".to_string()));
+            }
+        }
+    } else {
+        return Err(SpecialError("Illegal binding list".to_string()));
+    }
+
+    Ok(LValue::Nil)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::core::LEnv;
+    use crate::functions::*;
+    use std::convert::TryInto;
+
+    #[test]
+    fn test_add() {
+        let env = LEnv::default();
+        let ctx = CtxMath::default();
+        let result = add(&[3.into(), 2.into()], &env, &ctx).unwrap();
+        assert_eq!(LValue::Number(LNumber::Float(5.0)), result);
+    }
+
+    #[test]
+    fn test_sub() {
+        let env = LEnv::default();
+        let ctx = CtxMath::default();
+        let result = sub(&[3.into(), 2.into()], &env, &ctx).unwrap();
+        assert_eq!(LValue::Number(LNumber::Int(1)), result);
+    }
+
+    #[test]
+    fn test_mul() {
+        let env = LEnv::default();
+        let ctx = CtxMath::default();
+        let result = mul(&[3.into(), 2.into()], &env, &ctx).unwrap();
+        assert_eq!(LValue::Number(LNumber::Float(6.0)), result);
+    }
+
+    #[test]
+    fn test_div() {
+        let env = LEnv::default();
+        let ctx = CtxMath::default();
+        let result = div(&[3.0.into(), 2.0.into()], &env, &ctx).unwrap();
+        assert_eq!(LValue::Number(LNumber::Float(1.5)), result);
+    }
+
+    #[test]
+    fn test_gt() {
+        let env = LEnv::default();
+        let ctx = CtxMath::default();
+        let result_true: bool = gt(&[3.into(), 2.into()], &env, &ctx)
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let result_false: bool = gt(&[2.into(), 3.into()], &env, &ctx)
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let result_false_2: bool = gt(&[3.into(), 3.into()], &env, &ctx)
+            .unwrap()
+            .try_into()
+            .unwrap();
+        assert!(result_true);
+        assert!(!result_false);
+        assert!(!result_false_2);
+    }
+
+    #[test]
+    fn test_ge() {
+        let env = LEnv::default();
+        let ctx = CtxMath::default();
+        let result_true: bool = ge(&[3.into(), 2.into()], &env, &ctx)
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let result_false: bool = ge(&[2.into(), 3.into()], &env, &ctx)
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let result_true_2: bool = ge(&[3.into(), 3.into()], &env, &ctx)
+            .unwrap()
+            .try_into()
+            .unwrap();
+        assert!(result_true);
+        assert!(!result_false);
+        assert!(result_true_2);
+    }
+
+    #[test]
+    fn test_lt() {
+        let env = LEnv::default();
+        let ctx = CtxMath::default();
+        let result_false: bool = lt(&[3.into(), 2.into()], &env, &ctx)
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let result_true: bool = lt(&[2.into(), 3.into()], &env, &ctx)
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let result_false_2: bool = lt(&[3.into(), 3.into()], &env, &ctx)
+            .unwrap()
+            .try_into()
+            .unwrap();
+        assert!(result_true);
+        assert!(!result_false);
+        assert!(!result_false_2);
+    }
+
+    #[test]
+    fn test_le() {
+        let env = LEnv::default();
+        let ctx = CtxMath::default();
+        let result_false: bool = le(&[3.into(), 2.into()], &env, &ctx)
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let result_true: bool = le(&[2.into(), 3.into()], &env, &ctx)
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let result_true_2: bool = le(&[3.into(), 3.into()], &env, &ctx)
+            .unwrap()
+            .try_into()
+            .unwrap();
+        assert!(result_true);
+        assert!(!result_false);
+        assert!(result_true_2);
     }
 }

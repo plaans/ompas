@@ -5,22 +5,12 @@ mod tests {
     use ompas_lisp::structs::{LError, LValue};
     use ompas_modules::_type::CtxType;
     use ompas_modules::math::CtxMath;
+    use ompas_lisp::language::scheme_primitives::LE;
 
     #[test]
     fn it_works() {
         assert_eq!(2 + 2, 4);
     }
-
-    fn create_env_and_ctxs() -> (LEnv, ContextCollection) {
-        let mut env: LEnv = LEnv::root();
-        let mut ctxs: ContextCollection = Default::default();
-        let lisp_init = &mut Default::default();
-        load_module(&mut env, &mut ctxs, CtxMath::default(), lisp_init);
-        load_module(&mut env, &mut ctxs, CtxType::default(), lisp_init);
-
-        (env, ctxs)
-    }
-
     fn create_list_test() -> Vec<(&'static str, LValue)> {
         let is_tests = vec![
             (
@@ -82,7 +72,7 @@ mod tests {
 
     #[test]
     fn test_lisp_integration() -> Result<(), LError> {
-        let (mut env, mut ctxs) = create_env_and_ctxs();
+        let (mut env, mut ctxs, _) = LEnv::root();
         for element in create_list_test() {
             let lvalue = parse(element.0, &mut env, &mut ctxs).unwrap();
             //stdout.write_all(b"parsing done\n");

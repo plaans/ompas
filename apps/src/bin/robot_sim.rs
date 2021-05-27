@@ -13,7 +13,7 @@ fn main() {
 pub fn test() -> Result<LValue, LError> {
     println!("{}", START_MSG);
     let ctx_robot = &mut CtxRobot::default();
-    let env = &mut LEnv::root();
+    let (env, _, _) = &mut LEnv::root();
     let _robot_handler = start_robot_handler(&[], env, ctx_robot);
     let robot1 = new_robot(&[], env, ctx_robot)?;
     let robot2 = new_robot(&[], env, ctx_robot)?;

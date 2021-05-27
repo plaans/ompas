@@ -4,6 +4,7 @@ use ompas_lisp::structs::LError::*;
 use ompas_lisp::structs::*;
 use std::fs::File;
 use std::io::{Read, Write};
+use std::path::PathBuf;
 use tokio::sync::mpsc::Sender;
 /*
 LANGUAGE
@@ -25,18 +26,30 @@ const READ: &str = "read";
 const WRITE: &str = "write";
 //const LOAD: &str = "load";
 
+#[derive(Debug)]
+pub enum LogOutput {
+    Stdout,
+    File(PathBuf),
+}
+
+impl From<PathBuf> for LogOutput {
+    fn from(pb: PathBuf) -> Self {
+        Self::File(pb)
+    }
+}
+
 /// Handles the channel to communicate with the Lisp Interpreter
 #[derive(Debug)]
 pub struct CtxIo {
     sender_li: Option<Sender<String>>,
-    sender_stdout: Option<Sender<String>>,
+    log: LogOutput,
 }
 
 impl Default for CtxIo {
     fn default() -> Self {
         Self {
             sender_li: None,
-            sender_stdout: None,
+            log: LogOutput::Stdout,
         }
     }
 }
@@ -45,18 +58,28 @@ impl CtxIo {
     pub fn add_sender_li(&mut self, sender: Sender<String>) {
         self.sender_li = Some(sender);
     }
-    pub fn add_sender_stdout(&mut self, sender: Sender<String>) {
-        self.sender_stdout = Some(sender);
+    pub fn set_log_output(&mut self, output: LogOutput) {
+        self.log = output
     }
 }
 
-pub fn print(args: &[LValue], _: &LEnv, _: &CtxIo) -> Result<LValue, LError> {
+pub fn print(args: &[LValue], _: &LEnv, ctx: &CtxIo) -> Result<LValue, LError> {
     let lv: LValue = match args.len() {
         0 => LValue::Nil,
         1 => args[0].clone(),
         _ => args.into(),
     };
-    println!("{}", lv);
+    match &ctx.log {
+        LogOutput::Stdout => println!("{}", lv),
+        LogOutput::File(pb) => match File::open(pb) {
+            Ok(_) => {}
+            Err(_) => {
+                let mut file = File::create(pb)?;
+                file.write_all(format!("{}\n", lv).as_bytes())?;
+            }
+        },
+    };
+
     Ok(LValue::Nil)
 }
 
@@ -165,7 +188,7 @@ impl Documentation for CtxIo {
 pub mod repl {
 
     use crate::io::{repl, TOKIO_CHANNEL_SIZE};
-    use ompas_lisp::language::NIL;
+    use ompas_lisp::language::scheme_primitives::NIL;
     use rustyline::error::ReadlineError;
     use rustyline::Editor;
     use std::io::Write;

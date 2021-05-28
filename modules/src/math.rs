@@ -103,7 +103,6 @@ pub fn cos(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValue, LError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::convert::TryInto;
 
     /*fn generate_env() -> (LEnv, ContextCollection) {
         let env = LEnv::empty();

@@ -80,7 +80,7 @@ lispy_tests = [
     ("(let ((a 1) (b 2 3)) (+ a b))", SyntaxError),
     ("(and 1 2 3)", 3), ("(and (> 2 1) 2 3)", 3), ("(and)", True),
     ("(and (> 2 1) (> 2 3))", False),
-    ("(define-macro unless (lambda args `(if (not ,(car args)) (begin ,@(cdr args))))) ; test `", None),
+    ("(define-macro unless (lambda args `(if (not ,(car args)) (begin ,@(cdr args))))) ; tests `", None),
     ("(unless (= 2 (+ 1 1)) (display 2) 3 4)", None),
     (r'(unless (= 4 (+ 1 1)) (display 2) (display "\n") 3 4)', 4),
     ("(quote x)", 'x'), 
@@ -91,14 +91,14 @@ lispy_tests = [
     ("`(testing ,@L testing)", ['testing',1,2,3,'testing']),
     ("`(testing ,L testing)", ['testing',[1,2,3],'testing']),
     ("`,@L", SyntaxError),
-    ("""'(1 ;test comments '
+    ("""'(1 ;tests comments '
      ;skip this line
      2 ; more ; comments ; ) )
      3) ; final comment""", [1,2,3]),
     ]
 
 def test(tests, name=''):
-    "For each (exp, expected) test case, see if eval(parse(exp)) == expected."
+    "For each (exp, expected) tests case, see if eval(parse(exp)) == expected."
     fails = 0
     for (x, expected) in tests:
         try:

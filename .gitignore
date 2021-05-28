@@ -4,3 +4,4 @@ target/
 *.fb
 *.txt
 venv/
+lisp_logs/

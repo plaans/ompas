@@ -620,48 +620,43 @@ mod tests {
     #[test]
     fn test_add() {
         let env = LEnv::default();
-        let ctx = CtxMath::default();
-        let result = add(&[3.into(), 2.into()], &env, &ctx).unwrap();
+        let result = add(&[3.into(), 2.into()], &env, &()).unwrap();
         assert_eq!(LValue::Number(LNumber::Float(5.0)), result);
     }
 
     #[test]
     fn test_sub() {
         let env = LEnv::default();
-        let ctx = CtxMath::default();
-        let result = sub(&[3.into(), 2.into()], &env, &ctx).unwrap();
+        let result = sub(&[3.into(), 2.into()], &env, &()).unwrap();
         assert_eq!(LValue::Number(LNumber::Int(1)), result);
     }
 
     #[test]
     fn test_mul() {
         let env = LEnv::default();
-        let ctx = CtxMath::default();
-        let result = mul(&[3.into(), 2.into()], &env, &ctx).unwrap();
+        let result = mul(&[3.into(), 2.into()], &env, &()).unwrap();
         assert_eq!(LValue::Number(LNumber::Float(6.0)), result);
     }
 
     #[test]
     fn test_div() {
         let env = LEnv::default();
-        let ctx = CtxMath::default();
-        let result = div(&[3.0.into(), 2.0.into()], &env, &ctx).unwrap();
+        let result = div(&[3.0.into(), 2.0.into()], &env, &()).unwrap();
         assert_eq!(LValue::Number(LNumber::Float(1.5)), result);
     }
 
     #[test]
     fn test_gt() {
         let env = LEnv::default();
-        let ctx = CtxMath::default();
-        let result_true: bool = gt(&[3.into(), 2.into()], &env, &ctx)
+        let result_true: bool = gt(&[3.into(), 2.into()], &env, &())
             .unwrap()
             .try_into()
             .unwrap();
-        let result_false: bool = gt(&[2.into(), 3.into()], &env, &ctx)
+        let result_false: bool = gt(&[2.into(), 3.into()], &env, &())
             .unwrap()
             .try_into()
             .unwrap();
-        let result_false_2: bool = gt(&[3.into(), 3.into()], &env, &ctx)
+        let result_false_2: bool = gt(&[3.into(), 3.into()], &env, &())
             .unwrap()
             .try_into()
             .unwrap();
@@ -673,16 +668,15 @@ mod tests {
     #[test]
     fn test_ge() {
         let env = LEnv::default();
-        let ctx = CtxMath::default();
-        let result_true: bool = ge(&[3.into(), 2.into()], &env, &ctx)
+        let result_true: bool = ge(&[3.into(), 2.into()], &env, &())
             .unwrap()
             .try_into()
             .unwrap();
-        let result_false: bool = ge(&[2.into(), 3.into()], &env, &ctx)
+        let result_false: bool = ge(&[2.into(), 3.into()], &env, &())
             .unwrap()
             .try_into()
             .unwrap();
-        let result_true_2: bool = ge(&[3.into(), 3.into()], &env, &ctx)
+        let result_true_2: bool = ge(&[3.into(), 3.into()], &env, &())
             .unwrap()
             .try_into()
             .unwrap();
@@ -694,16 +688,15 @@ mod tests {
     #[test]
     fn test_lt() {
         let env = LEnv::default();
-        let ctx = CtxMath::default();
-        let result_false: bool = lt(&[3.into(), 2.into()], &env, &ctx)
+        let result_false: bool = lt(&[3.into(), 2.into()], &env, &())
             .unwrap()
             .try_into()
             .unwrap();
-        let result_true: bool = lt(&[2.into(), 3.into()], &env, &ctx)
+        let result_true: bool = lt(&[2.into(), 3.into()], &env, &())
             .unwrap()
             .try_into()
             .unwrap();
-        let result_false_2: bool = lt(&[3.into(), 3.into()], &env, &ctx)
+        let result_false_2: bool = lt(&[3.into(), 3.into()], &env, &())
             .unwrap()
             .try_into()
             .unwrap();
@@ -715,16 +708,15 @@ mod tests {
     #[test]
     fn test_le() {
         let env = LEnv::default();
-        let ctx = CtxMath::default();
-        let result_false: bool = le(&[3.into(), 2.into()], &env, &ctx)
+        let result_false: bool = le(&[3.into(), 2.into()], &env, &())
             .unwrap()
             .try_into()
             .unwrap();
-        let result_true: bool = le(&[2.into(), 3.into()], &env, &ctx)
+        let result_true: bool = le(&[2.into(), 3.into()], &env, &())
             .unwrap()
             .try_into()
             .unwrap();
-        let result_true_2: bool = le(&[3.into(), 3.into()], &env, &ctx)
+        let result_true_2: bool = le(&[3.into(), 3.into()], &env, &())
             .unwrap()
             .try_into()
             .unwrap();

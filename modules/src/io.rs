@@ -188,9 +188,12 @@ impl Documentation for CtxIo {
 pub mod repl {
 
     use crate::io::{repl, TOKIO_CHANNEL_SIZE};
+    use chrono::{DateTime, Utc};
     use ompas_lisp::language::scheme_primitives::NIL;
     use rustyline::error::ReadlineError;
     use rustyline::Editor;
+    use std::fs;
+    use std::fs::OpenOptions;
     use std::io::Write;
     use tokio::sync::mpsc::{self, Receiver, Sender};
 
@@ -221,6 +224,16 @@ pub mod repl {
         });
 
         Some(sender_stdout)
+    }
+
+    pub async fn spawn_log() -> Option<Sender<String>> {
+        let (sender_log, receiver_log) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+
+        tokio::spawn(async move {
+            repl::log(receiver_log).await;
+        });
+
+        Some(sender_log)
     }
 
     /// Function to handle the repl.
@@ -274,6 +287,24 @@ pub mod repl {
         rl.save_history("history.txt").unwrap();
     }
 
+    async fn log(mut receiver: Receiver<String>) {
+        let date: DateTime<Utc> = Utc::now();
+        let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
+        fs::create_dir_all("lisp_logs").expect("could not create logs directory");
+        let mut file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(format!("lisp_logs/log_{}", string_date))
+            .expect("error creating log file");
+
+        loop {
+            let buffer = receiver.recv().await.expect("error receiving");
+            file.write_all(format!("{}\n", buffer).as_bytes())
+                .expect("could not write to log file");
+        }
+    }
+
     /// Function to handle the repl.
     /// ### functioning:
     /// loop waiting for an object on *stdin*
@@ -288,6 +319,8 @@ pub mod repl {
         }
 
         loop {
+            //TODO: to handle side effects when other user wants to connect to lisp.
+
             let readline = rl.readline(">> ");
 
             match readline {
@@ -298,10 +331,10 @@ pub mod repl {
                         .await
                         .expect("couldn't send lisp command");
                     let buffer = receiver.recv().await.expect("error receiving");
-                    //TODO: to handle side effects when other user wants to connect to lisp.
                     if buffer != NIL {
-                        println!("{}", buffer);
+                        println!("LI>> {}", buffer);
                     }
+
                     /*assert_eq!(
                         buffer, "ACK",
                         "should receive an ack from Lisp Intrepretor and nothing else"

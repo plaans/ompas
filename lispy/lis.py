@@ -126,7 +126,7 @@ def eval(x, env=global_env):
     elif x[0] == 'quote':          # (quote exp)
         (_, exp) = x
         return exp
-    elif x[0] == 'if':             # (if test conseq alt)
+    elif x[0] == 'if':             # (if tests conseq alt)
         (_, test, conseq, alt) = x
         exp = (conseq if eval(test, env) else alt)
         return eval(exp, env)

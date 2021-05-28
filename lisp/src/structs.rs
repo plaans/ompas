@@ -310,6 +310,26 @@ pub enum LambdaArgs {
     List(Vec<String>),
 }
 
+impl Display for LambdaArgs {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            LambdaArgs::Sym(x) => write!(f, "{}", x),
+            LambdaArgs::List(l) => {
+                let mut s = String::from("(");
+                for (i, e) in l.iter().enumerate() {
+                    s.push_str(e);
+                    if i != l.len() - 1 {
+                        s.push(' ');
+                    } else {
+                        s.push(')');
+                    }
+                }
+                write!(f, "{}", s)
+            }
+        }
+    }
+}
+
 impl From<String> for LambdaArgs {
     fn from(s: String) -> Self {
         LambdaArgs::Sym(s)
@@ -336,7 +356,7 @@ impl Debug for LLambda {
 
 impl Display for LLambda {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{:?} : {}", self.params, self.body)
+        write!(f, "(lambda {} {})", self.params, self.body)
     }
 }
 
@@ -361,12 +381,15 @@ impl LLambda {
 
         match &self.params {
             LambdaArgs::Sym(param) => {
-                let args = if args.len() == 1 {
-                    args[0].clone()
+                let arg = if args.len() == 1 {
+                    match &args[0] {
+                        LValue::List(_) | LValue::Nil => args[0].clone(),
+                        _ => vec![args[0].clone()].into(),
+                    }
                 } else {
                     args.into()
                 };
-                env.insert(param.to_string(), args);
+                env.insert(param.to_string(), arg);
             }
             LambdaArgs::List(params) => {
                 if params.len() != args.len() {
@@ -543,8 +566,6 @@ pub enum LCoreOperator {
     Define,
     DefLambda,
     If,
-    Let,
-    LetStar,
     Quote,
     QuasiQuote,
     UnQuote,
@@ -565,8 +586,6 @@ impl Display for LCoreOperator {
             LCoreOperator::DefMacro => write!(f, "{}", DEF_MACRO.to_string()),
             LCoreOperator::Set => write!(f, "{}", SET.to_string()),
             LCoreOperator::Begin => write!(f, "{}", BEGIN.to_string()),
-            LCoreOperator::Let => write!(f, "{}", LET.to_string()),
-            LCoreOperator::LetStar => write!(f, "{}", LET_STAR.to_string()),
         }
     }
 }
@@ -665,9 +684,11 @@ impl Display for LValue {
             LValue::List(list) => {
                 let mut result = String::new();
                 result.push('(');
-                for element in list {
+                for (i, element) in list.iter().enumerate() {
                     result.push_str(element.to_string().as_str());
-                    result.push(' ');
+                    if i != list.len() - 1 {
+                        result.push(' ');
+                    }
                 }
                 result.push(')');
                 write!(f, "{}", result)
@@ -1254,7 +1275,7 @@ impl From<LValue> for NameTypeLValue {
 
 #[derive(Default)]
 pub struct InitLisp(Vec<&'static str>);
-
+//TODO: simplify to use only Vec<&'static str> instead of custom struct
 impl From<Vec<&'static str>> for InitLisp {
     fn from(vec: Vec<&'static str>) -> Self {
         InitLisp(vec.clone())
@@ -1266,10 +1287,17 @@ impl InitLisp {
         self.0.append(&mut other.0)
     }
 
+    pub fn inner(&self) -> Vec<&'static str> {
+        self.0.clone()
+    }
+
     pub fn begin_lisp(&self) -> String {
-        let mut str = "(begin ".to_string();
-        self.0.iter().for_each(|&x| str.push_str(x));
-        str.push(')');
+        let mut str = String::new(); //"(begin ".to_string();
+        self.0.iter().for_each(|&x| {
+            str.push_str(x);
+            str.push('\n');
+        });
+        //str.push(')');
         str
     }
 }
@@ -1529,7 +1557,7 @@ mod tests {
         }
     }
 
-    /*#[test]
+    /*#[tests]
     fn test_native_lambda() {
 
         let get_counter = |args: &[LValue], ctx: &dyn NativeContext| -> Result<LValue, LError> {

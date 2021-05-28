@@ -3,7 +3,7 @@ use ompas_godot_simulation_client::serde::{
     parse_into_lvalue, GodotMessageType, GodotState, GodotStateS,
 };
 
-const TEST: &str = "(robot (test of robot) (1 1 1.0) ((1 2) (3 4)) () true nil)";
+const TEST: &str = "(robot (tests of robot) (1 1 1.0) ((1 2) (3 4)) () true nil)";
 
 fn main() {
     test_lvalues();
@@ -12,7 +12,7 @@ fn main() {
 
 fn test_lvalues() {
     println!("Hello, World!");
-    let data = match parse_into_lvalue(&parse(TEST).expect("couldn't parse test")) {
+    let data = match parse_into_lvalue(&parse(TEST).expect("couldn't parse tests")) {
         Ok(s) => s,
         Err(_) => panic!("couldn't transform into lvalue"),
     };
@@ -35,7 +35,7 @@ fn test_lvalues() {
 fn test_lvalue() {
     println!("Hello, World!");
 
-    let sexpr = parse(TEST).expect("couldn't parse test");
+    let sexpr = parse(TEST).expect("couldn't parse tests");
     let data = ompas_lisp::core::parse_into_lvalue(&sexpr);
 
     let godot_state = GodotState {

@@ -9,7 +9,7 @@ use tokio::net::TcpStream;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("test of the tcp connection with godot");
+    println!("tests of the tcp connection with godot");
 
     let stream = TcpStream::connect("127.0.0.1:10000").await?;
     println!("receiver successfully bound to godot");
@@ -78,7 +78,7 @@ use std::net::TcpStream;
 use std::io::{BufReader, Read};
 
 fn main() -> std::io::Result<()> {
-    println!("Welcome in test connection with godot classic");
+    println!("Welcome in tests connection with godot classic");
     let mut stream = TcpStream::connect("127.0.0.1:10000")?;
     let mut buf_reader = BufReader::new(stream);
     println!("Succesfully connects with godot");

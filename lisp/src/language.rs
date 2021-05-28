@@ -86,12 +86,20 @@ pub mod scheme_primitives {
 //MACRO
 ///Problem during expansion
 pub mod scheme_macro {
-    pub const MACRO_AND: &str = "(defmacro and (lambda x \
-                                               (quasiquote (if (none? (unquote x))\
-                                                    true\
-                                                    (if (car (unquote x))\
-                                                        (and (cdr (unquote x)))\
-                                                        false)))))";
+    /*pub const MACRO_AND: &str = "(defmacro and (lambda x \
+    (quasiquote (if (null? (unquote x))\
+         true\
+         (if (car (unquote x))\
+             (and (cdr (unquote x)))\
+             false)))))";*/
+
+    pub const MACRO_LET: &str = "(defmacro let \
+                                           (lambda (bindings body) \
+                                                   (begin (define unzipped (unzip bindings)) \
+                                                          (define keys (car unzipped)) \
+                                                          (define values (cadr unzipped)) \
+                                                          (cons (quasiquote (lambda (unquote keys) \
+                                                                                    (unquote body))) values))))";
 
     pub const MACRO_AND2: &str = "(defmacro and2 (lambda (a b) \
                                                 (quasiquote (if (unquote a) \
@@ -110,35 +118,61 @@ pub mod scheme_macro {
 }
 
 pub mod scheme_lambda {
-    pub const LAMBDA_AND: &str = " (define and (lambda x \
-                                               (if (none? x)\
-                                                    true\
-                                                    (if (car x)\
-                                                        (and (cdr x))\
-                                                        false))))";
-    pub const LAMBDA_OR: &str = " (define or (lambda x \
-                                               (if (none? x)\
-                                                    true\
-                                                    (if (car x)\
-                                                        true\
-                                                        (and (cdr x))))))";
+    pub const LAMBDA_AND: &str = "(define and (lambda args \
+                                                   (if (null? args) true \
+                                                       (if (= (length args) 1) (car args)
+                                                           (if (car args) (and (cdr args)) nil)))))";
+    pub const LAMBDA_OR: &str = "(define or (lambda args \
+                                                   (if (null? args) true \
+                                                       (if (= (length args) 1) (car args)
+                                                           (if (car args) true (or (cdr args)))))))";
 
     pub const LAMBDA_COND: &str = "(define cond (lambda x \
                                             (if (null? x)\
                                                 nil\
                                                 (let ((a (car x))\
-                                                       (test (car a))\
+                                                       (tests (car a))\
                                                        (expr (cdr a)))\
-                                                      (if test expr (cond (cdr x))))))";
+                                                      (if tests expr (cond (cdr x))))))";
 
     pub const LAMBDA_COMBINE:  &str = "(define combine (lambda (f)
                                                                 (lambda (x y)
                                                                         (if (null? x) (quote ())
                                                                             (f (list (car x) (car y))
                                                                             ((combine f) (cdr x) (cdr y)))))))";
-    pub const LAMBDA_ZIP: &str = "(define zip (combine cons))";
+    pub const LAMBDA_ZIP: &str = " (define zip (lambda (l1 l2)\
+                                                        (if (or (null? l1)\
+                                                                (null? l2))\
+                                                             nil\
+                                                             (cons (list (car l1)\
+                                                                         (car l2))\
+                                                                   (zip (cdr l1)\
+                                                                        (cdr l2)))))))";
 
-    pub const LAMBDA_UNZIP: &str = "";
+    pub const LAMBDA_CAAR: &str = "(define caar (lambda (l1) (car (car l1))))";
+
+    pub const LAMBDA_CADR: &str = "(define cadr (lambda (l1) (car (cdr l1))))";
+
+    pub const LAMBDA_CDAR: &str = "(define cdar (lambda (l1) (cdr (car l1))))";
+
+    pub const LAMBDA_CDDR: &str = "(define cddr (lambda (l1) (cdr (cdr l1))))";
+
+    pub const LAMBDA_CADAR: &str = "(define cadar (lambda (l1) (car (cdr (car l1)))))";
+
+    pub const LAMBDA_UNZIP: &str = "(define unzip
+        (lambda lists
+                (begin
+                    (define firsts (lambda lists
+                                            (if (null? lists)
+                                                nil
+                                                (cons (caar lists)
+                                                      (firsts (cdr lists))))))
+                    (define seconds (lambda lists
+                                            (if (null? lists)
+                                            nil
+                                            (cons (cadar lists)
+                                                  (seconds (cdr lists))))))
+                    (list (firsts lists) (seconds lists)))))";
 
     pub const LAMBDA_LET: &str = "(define let (lambda (args body)";
 }

@@ -12,7 +12,6 @@ use im::hashmap::HashMap;
 use std::any::Any;
 use std::convert::{TryFrom, TryInto};
 use std::ops::{Deref, DerefMut};
-//use std::rc::Rc;
 
 #[derive(Clone)]
 pub struct LEnv {
@@ -163,7 +162,14 @@ impl GetModule for CtxRoot {
                 MACRO_OR2,
                 MACRO_NEQ,
                 MACRO_NEQ_SHORT,
+                MACRO_LET,
                 LAMBDA_AND,
+                LAMBDA_CAAR,
+                LAMBDA_CDDR,
+                LAMBDA_CDAR,
+                LAMBDA_CADR,
+                LAMBDA_CADAR,
+                LAMBDA_UNZIP,
                 LAMBDA_OR,
             ]
             .into(),
@@ -207,7 +213,7 @@ impl GetModule for CtxRoot {
         module.add_fn_prelude(SET_MAP, Box::new(set_map));
 
         module.add_fn_prelude(NOT, Box::new(not));
-        //module.add_fn_prelude(NOT_SHORT, Box::new(not), NOT_SHORT));
+        module.add_fn_prelude(NOT_SHORT, Box::new(not));
 
         module.add_fn_prelude(APPEND, Box::new(append));
 
@@ -556,8 +562,6 @@ pub fn expand(
                         //TODO: Implémenter msg d'erreur
                         panic!("unquote not at right place")
                     }
-                    LCoreOperator::Let => {}
-                    LCoreOperator::LetStar => {}
                 }
             } else if let LValue::Symbol(sym) = &list[0] {
                 match env.get_macro(sym) {
@@ -579,22 +583,11 @@ pub fn expand(
 }
 
 pub fn expand_quasi_quote(x: &LValue, env: &LEnv) -> Result<LValue, LError> {
-    /*"""Expand `x => 'x; `,x => x; `(,@x y) => (append x y) """
-    if not is_pair(x):
-    return [_quote, x]
-    require(x, x[0] is not _unquotesplicing, "can't splice here")
-    if x[0] is _unquote:
-        require(x, len(x)==2)
-    return x[1]
-
-    return [_append, x[0][1], expand_quasiquote(x[1:])]
-    else:
-    return [_cons, expand_quasiquote(x[0]), expand_quasiquote(x[1:])]*/
-
     match x {
         LValue::List(list) => {
             if list.is_empty() {
-                Ok(vec![Quote.into(), x.clone()].into())
+                Ok(LValue::Nil)
+                //Ok(vec![Quote.into(), x.clone()].into())
             } else {
                 let first = &list[0];
                 if let LValue::Symbol(s) = first {
@@ -613,8 +606,6 @@ pub fn expand_quasi_quote(x: &LValue, env: &LEnv) -> Result<LValue, LError> {
                     expand_quasi_quote(&list[1..].to_vec().into(), env)?,
                 ]
                 .into())
-                /*elif is_pair(x[0]) and x[0][0] is _unquotesplicing:
-                require(x[0], len(x[0])==2)*/
             }
         }
         _ => Ok(vec![Quote.into(), x.clone()].into()),
@@ -699,8 +690,8 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                         let conseq = &args[1];
                         let alt = &args[2];
                         lv = match eval(test, &mut env, ctxs) {
-                            Ok(LValue::True) => eval(conseq, &mut env, ctxs)?,
-                            Ok(LValue::Nil) => eval(alt, &mut env, ctxs)?,
+                            Ok(LValue::True) => conseq.clone(),
+                            Ok(LValue::Nil) => alt.clone(),
                             Ok(lv) => {
                                 return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Bool))
                             }
@@ -723,13 +714,11 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                             .iter()
                             .map(|x| eval(x, &mut env, ctxs))
                             .collect::<Result<_, _>>()?;
-                        lv = results.last().unwrap_or(&LValue::Nil).clone();
+                        return Ok(results.last().unwrap_or(&LValue::Nil).clone());
                     }
                     LCoreOperator::QuasiQuote
                     | LCoreOperator::UnQuote
                     | LCoreOperator::DefMacro => return Ok(LValue::Nil),
-                    LCoreOperator::Let => {}
-                    LCoreOperator::LetStar => {}
                 }
             } else {
                 let exps = list
@@ -757,8 +746,14 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                             Some(u) => fun.call(&args, &mut env, ctxs.get_mut_context(u)),
                         }
                     }
-                    lv => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Fn)),
-                }
+                    lv => {
+                        println!(
+                            "Expecting here a list with a function as first argument: {:?}",
+                            exps
+                        );
+                        return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Fn));
+                    }
+                };
             }
         } else {
             return Ok(lv);

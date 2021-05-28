@@ -189,7 +189,7 @@ def eval(x, env=global_env):
         elif x[0] is _quote:     # (quote exp)
             (_, exp) = x
             return exp
-        elif x[0] is _if:        # (if test conseq alt)
+        elif x[0] is _if:        # (if tests conseq alt)
             (_, test, conseq, alt) = x
             x = (conseq if eval(test, env) else alt)
         elif x[0] is _set:       # (set! var exp)
@@ -206,7 +206,7 @@ def eval(x, env=global_env):
         elif x[0] is _begin:     # (begin exp+)
             for exp in x[1:-1]:
                 eval(exp, env)
-            x = x[-1]
+            x = x[-1] #The begin is weird
         else:                    # (proc exp*)
             exps = [eval(exp, env) for exp in x]
             proc = exps.pop(0)

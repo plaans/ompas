@@ -5,7 +5,7 @@ use ompas_lisp::structs::LValue;
 use ompas_modules::_type::CtxType;
 use ompas_modules::counter::CtxCounter;
 use ompas_modules::doc::{CtxDoc, Documentation};
-use ompas_modules::io::repl::{spawn_repl, EXIT_CODE_STDOUT};
+use ompas_modules::io::repl::{spawn_log, spawn_repl, EXIT_CODE_STDOUT};
 use ompas_modules::io::{CtxIo, TOKIO_CHANNEL_SIZE};
 use ompas_modules::math::CtxMath;
 //use ompas_modules::robot::CtxRobot;
@@ -31,7 +31,7 @@ struct Opt {
     #[structopt(short = "f", long = "file")]
     input: Option<PathBuf>,
 
-    #[structopt(short = "t", long = "test")]
+    #[structopt(short = "t", long = "tests")]
     test: bool,
 }
 
@@ -58,6 +58,8 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     let sender_repl = spawn_repl(sender_li.clone())
         .await
         .expect("error while spawning repl");
+
+    let sender_log = spawn_log().await.expect("error while spawning log task");
 
     let (mut root_env, mut ctxs, mut lisp_init) = LEnv::root();
     let mut ctx_doc = CtxDoc::default();
@@ -96,26 +98,29 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     let env = &mut root_env.clone();
     //println!("{}", lisp_init.begin_lisp());
 
-    //Add core macros
-    /*sender_li
-    .send(lisp_init.begin_lisp())
-    .await
-    .expect("error while sending message");*/
+    for def in lisp_init.inner() {
+        sender_li
+            .send(def.to_string())
+            .await
+            .expect("error while sending message");
+    }
 
     loop {
         //TODO: handle response to multi user.
+        let mut sender: Sender<String> = sender_log.clone();
 
         //let mut send_ack = false;
         let mut str_lvalue = receiver_li.recv().await.expect("bug in lisp interpretor");
+        //println!("expr: {}", str_lvalue);
 
         if str_lvalue.contains("repl:") {
             // stdout.write_all(b"from repl\n");
-            //send_ack = true;
+            sender = sender_repl.clone();
             str_lvalue = str_lvalue.replace("repl:", "");
         }
 
         if str_lvalue == *"exit" {
-            sender_repl
+            sender
                 .send(EXIT_CODE_STDOUT.to_string())
                 .await
                 .expect("error sending message to stdout");
@@ -128,8 +133,8 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
             Ok(lv) => lv,
             Err(e) => {
                 //stderr.write_all(format!("ELI>>{}\n", e).as_bytes());
-                sender_repl
-                    .send(format!("ELI>>{}", e))
+                sender
+                    .send(format!("error: {}", e))
                     .await
                     .expect("error on channel to stdout");
                 LValue::Nil
@@ -138,25 +143,18 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
         //stdout.write_all(b"parsing done\n");
         match eval(&lvalue, env, &mut ctxs) {
             Ok(lv) => {
-                sender_repl
-                    .send(format!("LI>> {}", lv))
+                sender
+                    .send(format!("{}", lv))
                     .await
                     .expect("error on channel to stdout");
             }
             Err(e) => {
                 //stderr.write_all(format!("ELI>>{}\n", e).as_bytes());
-                sender_repl
-                    .send(format!("ELI>>{}", e))
+                sender
+                    .send(format!("error: {}", e))
                     .await
                     .expect("error on channel to stdout");
             }
         };
-        /*if send_ack {
-            sender_repl
-                .send("ACK".to_string())
-                .await
-                .expect("error sending ack to repl");
-        }*/
-        //stdout.write_all(b"eval done\n");
     }
 }

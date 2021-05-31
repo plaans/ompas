@@ -623,7 +623,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
     let mut env = env;
 
     loop {
-        println!("lv: {}", lv);
+        //println!("lv: {}", lv);
         if let LValue::Symbol(s) = &lv {
             return match env.get_symbol(s.as_str()) {
                 None => Ok(lv.clone()),
@@ -651,7 +651,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                                 ))
                             }
                         };
-                        println!("=> {}", LValue::Nil);
+                        //println!("=> {}", LValue::Nil);
                         return Ok(LValue::Nil);
                     }
                     LCoreOperator::DefLambda => {
@@ -682,11 +682,8 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                             }
                         };
                         let body = &args[1];
-                        let r_lvalue = LValue::Lambda(LLambda::new(
-                            params,
-                            body.clone(),
-                            env.clone(),
-                        ));
+                        let r_lvalue =
+                            LValue::Lambda(LLambda::new(params, body.clone(), env.clone()));
                         println!("=> {}", r_lvalue);
                         return Ok(r_lvalue);
                     }
@@ -704,26 +701,26 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                         };
                     }
                     LCoreOperator::Quote => {
-                        println!("=> {}", &args[0]);
-                        return Ok(args[0].clone())
-                    },
+                        //println!("=> {}", &args[0]);
+                        return Ok(args[0].clone());
+                    }
                     LCoreOperator::Set => {
                         return match &args[0] {
                             LValue::Symbol(s) => {
                                 let exp = eval(&args[1], &mut env, ctxs)?;
                                 env.set(s.to_string(), exp)?;
-                                println!("=> {}", LValue::Nil);
+                                //println!("=> {}", LValue::Nil);
                                 Ok(LValue::Nil)
                             }
                             lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
-                        }
+                        };
                     }
                     LCoreOperator::Begin => {
                         let results: Vec<LValue> = args
                             .iter()
                             .map(|x| eval(x, &mut env, ctxs))
                             .collect::<Result<_, _>>()?;
-                        println!("=> {}", results.last().unwrap_or(&LValue::Nil));
+                        //println!("=> {}", results.last().unwrap_or(&LValue::Nil));
                         return Ok(results.last().unwrap_or(&LValue::Nil).clone());
                     }
                     LCoreOperator::QuasiQuote
@@ -749,51 +746,36 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                             Some(u) => ctxs.get_context(u),
                         };
                         let r_lvalue = fun.call(args, &env, ctx)?;
-                        println!("=> {}", r_lvalue);
+                        //println!("=> {}", r_lvalue);
                         return Ok(r_lvalue);
                     }
                     LValue::MutFn(fun) => {
                         return match fun.get_index_mod() {
                             None => {
                                 let r_lvalue = fun.call(&args, &mut env, &mut ())?;
-                                println!("=> {}", r_lvalue);
-                                return Ok(r_lvalue);
-                            },
+                                //println!("=> {}", r_lvalue);
+                                Ok(r_lvalue)
+                            }
                             Some(u) => {
-
-                                let r_lvalue = fun.call(&args, &mut env, ctxs.get_mut_context(u))?;
-                                println!("=> {}", r_lvalue);
-                                return Ok(r_lvalue);
-                            },
-                        }
+                                let r_lvalue =
+                                    fun.call(&args, &mut env, ctxs.get_mut_context(u))?;
+                                //println!("=> {}", r_lvalue);
+                                Ok(r_lvalue)
+                            }
+                        };
                     }
                     lv => {
-                        println!(
+                        /*println!(
                             "Expecting here a list with a function as first argument: {:?}",
                             exps
-                        );
+                        );*/
                         return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Fn));
                     }
                 };
             }
         } else {
-            println!("=> {}", lv);
+            //println!("=> {}", lv);
             return Ok(lv);
         }
     }
 }
-
-/*pub fn core_macros_and_lambda() -> InitLisp {
-    vec![
-        MACRO_AND2,
-        MACRO_OR2,
-        MACRO_NEQ,
-        MACRO_NEQ_SHORT,
-        LAMBDA_AND,
-        LAMBDA_OR,
-    ]
-    .into()
-}*/
-
-//(begin (define ?v (var (:type object
-//                        :value bob))

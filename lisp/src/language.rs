@@ -86,12 +86,6 @@ pub mod scheme_primitives {
 //MACRO
 ///Problem during expansion
 pub mod scheme_macro {
-    /*pub const MACRO_AND: &str = "(defmacro and (lambda x \
-    (quasiquote (if (null? (unquote x))\
-         true\
-         (if (car (unquote x))\
-             (and (cdr (unquote x)))\
-             false)))))";*/
 
     pub const MACRO_LET: &str = "(defmacro let \
                                            (lambda (bindings body) \
@@ -113,11 +107,11 @@ pub mod scheme_macro {
                                                                   (cdar bindings)))))";
 
     //TODO: find a way to make it a lambda
-    pub const MACRO_APPLY : &str = "(defmacro apply\
+    pub const MACRO_APPLY: &str = "(defmacro apply\
                                               (lambda (f args)\
                                                       (cons f args)))";
 
-    pub const MACRO_AND: &str= "(defmacro and (lambda args\
+    pub const MACRO_AND: &str = "(defmacro and (lambda args\
                                                 (if (null? args)\
                                                     nil\
                                                     (if (= (length args) 1)\
@@ -134,8 +128,6 @@ pub mod scheme_macro {
                                                         (quasiquote (if (unquote (car args))\
                                                                         true \
                                                                         (or (unquote (cdr args)))))))))";
-
-
 
     pub const MACRO_NEQ: &str = "(defmacro neq (lambda (a b)\
                                             (! (= a b))))";

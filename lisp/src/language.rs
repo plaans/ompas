@@ -101,6 +101,16 @@ pub mod scheme_macro {
                                                           (cons (quasiquote (lambda (unquote keys) \
                                                                                     (unquote body))) values))))";
 
+    pub const MACRO_LET_STAR: &str = "(defmacro let* \
+                                                (lambda (bindings body) \
+                                                        (if (= (length bindings) 1) \
+                                                            (cons (quasiquote (lambda (unquote (list (caar bindings))) \
+                                                                                      (unquote body))) \
+                                                                  (cdar bindings)) \
+                                                            (cons (quasiquote (lambda (unquote (list (caar bindings))) \
+                                                                                      (let* (unquote (cdr bindings)) \
+                                                                                            (unquote body)))) \
+                                                                  (cdar bindings)))))";
 
     pub const MACRO_AND: &str= "(defmacro and (lambda args\
                                                 (if (null? args)\

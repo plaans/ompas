@@ -164,6 +164,7 @@ impl GetModule for CtxRoot {
                 MACRO_NEQ_SHORT,
                 MACRO_LET,
                 MACRO_LET_STAR,
+                MACRO_APPLY,
                 MACRO_COND,
                 LAMBDA_CAAR,
                 LAMBDA_CDDR,

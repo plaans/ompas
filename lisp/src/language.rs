@@ -112,6 +112,11 @@ pub mod scheme_macro {
                                                                                             (unquote body)))) \
                                                                   (cdar bindings)))))";
 
+    //TODO: find a way to make it a lambda
+    pub const MACRO_APPLY : &str = "(defmacro apply\
+                                              (lambda (f args)\
+                                                      (cons f args)))";
+
     pub const MACRO_AND: &str= "(defmacro and (lambda args\
                                                 (if (null? args)\
                                                     nil\

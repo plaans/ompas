@@ -101,20 +101,42 @@ pub mod scheme_macro {
                                                           (cons (quasiquote (lambda (unquote keys) \
                                                                                     (unquote body))) values))))";
 
-    pub const MACRO_AND2: &str = "(defmacro and2 (lambda (a b) \
-                                                (quasiquote (if (unquote a) \
-                                                                (unquote b) \
-                                                                false))))";
-    pub const MACRO_OR2: &str = "(defmacro or2  (lambda (a b) \
-                                                (quasiquote (if (unquote a) \
-                                                                true \
-                                                                (unquote b)))))";
+
+    pub const MACRO_AND: &str= "(defmacro and (lambda args\
+                                                (if (null? args)\
+                                                    nil\
+                                                    (if (= (length args) 1)\
+                                                        (car args)\
+                                                        (quasiquote (if (unquote (car args))\
+                                                                        (and (unquote (cdr args)))\
+                                                                        nil))))))";
+
+    pub const MACRO_OR: &str= "(defmacro or (lambda args\
+                                                (if (null? args)\
+                                                    nil\
+                                                    (if (= (length args) 1)\
+                                                        (car args)\
+                                                        (quasiquote (if (unquote (car args))\
+                                                                        true \
+                                                                        (or (unquote (cdr args)))))))))";
+
+
 
     pub const MACRO_NEQ: &str = "(defmacro neq (lambda (a b)\
                                             (! (= a b))))";
 
     pub const MACRO_NEQ_SHORT: &str = "(defmacro != (lambda (a b) \
                                                 (neq a b )))";
+
+    pub const MACRO_COND: &str = "(defmacro cond (lambda exprs \
+                                                (if (null? exprs) \
+                                                    nil \
+                                                    (if (= (caar exprs) (quote else)) \
+                                                        (cadar exprs) \
+                                                        (quasiquote \
+                                                            (if (unquote (caar exprs)) \
+                                                                (unquote (cadar exprs)) \
+                                                                (cond (unquote (cdr exprs)))))))))";
 }
 
 pub mod scheme_lambda {
@@ -174,7 +196,10 @@ pub mod scheme_lambda {
                                                   (seconds (cdr lists))))))
                     (list (firsts lists) (seconds lists)))))";
 
-    pub const LAMBDA_LET: &str = "(define let (lambda (args body)";
+    pub const LAMBDA_MAPF : &str = "(define mapf (lambda (f seq)\
+                                                         (if (null? seq)\
+                                                         nil\
+                                                         (cons (f (car seq)) (mapf f (cdr seq))))))";
 }
 //Documentation
 pub mod doc {

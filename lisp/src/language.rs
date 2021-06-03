@@ -86,7 +86,6 @@ pub mod scheme_primitives {
 //MACRO
 ///Problem during expansion
 pub mod scheme_macro {
-
     pub const MACRO_LET: &str = "(defmacro let \
                                            (lambda (bindings body) \
                                                    (begin (define unzipped (unzip bindings)) \

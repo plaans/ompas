@@ -2,10 +2,11 @@ use aries_planning::parsing::sexpr::SExpr;
 use ompas_lisp::structs::LError::WrongType;
 use ompas_lisp::structs::{LError, LNumber, LValue, NameTypeLValue};
 use serde::{Deserialize, Serialize, Serializer};
-use std::borrow::Borrow;
-use std::convert::TryInto;
+use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
+use crate::state::{LState, StateType};
+use std::hash::{Hash, Hasher};
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -39,113 +40,40 @@ impl Serialize for GodotMessageType {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GodotStateS {
+pub struct GodotMessageSerde {
     #[serde(rename = "type")]
     pub _type: GodotMessageType,
     pub data: LValueSerde,
 }
-/*
-impl GodotStateS {
-    pub fn transform_data_into_lisp(&self) -> Result<String, LError> {
-        // Example of string that should be sent
-        // (map (quote ((ten . 10) (vingt . 20)))))
-        match &self.data {
+
+impl TryFrom<GodotMessageSerde> for LState {
+    type Error = LError;
+
+    fn try_from(value: GodotMessageSerde) -> Result<Self, Self::Error> {
+        let mut state: LState = Default::default();
+        match value._type {
+            GodotMessageType::Static => state.set_type(StateType::Static),
+            GodotMessageType::Dynamic => state.set_type(StateType::Dynamic),
+            GodotMessageType::RobotCommand => return Err(LError::SpecialError("Was not expecting a robot command".to_string()))
+        }
+        match &value.data {
             LValueSerde::List(l) => {
-                let mut lisp = String::from("(map (quote (");
                 for e in l {
-                    let list: Vec<LValueSerde> = e.try_into()?;
-                    let list = list.as_slice();
-                    let len = list.len();
-                    lisp.push_str(
-                        format!(
-                            "({} . {})",
-                            LValueSerde::from(&list[0..len - 1]),
-                            &list.last().unwrap()
-                        )
-                            .as_str(),
-                    )
+                    match e {
+                        LValueSerde::List(list) => {
+                            state.insert(LValueSerde::List(list[0..list.len() - 1].to_vec()), list.last().unwrap().clone());
+                        }
+                        lv => panic!("there should be a list")
+                    }
                 }
-                lisp.push_str(")))");
-                Ok(lisp)
             }
-            lv => Err(WrongType(lv.into(), LValue::from(lv).into(), NameTypeLValue::List)),
+            lv => return Err(WrongType(lv.into(), LValue::from(lv).into(), NameTypeLValue::List)),
         }
-    }
-}*/
-
-impl From<&GodotStateS> for GodotState {
-    fn from(gss: &GodotStateS) -> Self {
-        Self {
-            _type: gss._type.clone(),
-            data: gss.data.borrow().into(),
-        }
+        Ok(state)
     }
 }
 
-impl From<GodotStateS> for GodotState {
-    fn from(gss: GodotStateS) -> Self {
-        (&gss).into()
-    }
-}
-
-impl From<&GodotState> for GodotStateS {
-    fn from(gs: &GodotState) -> Self {
-        Self {
-            _type: gs._type.clone(),
-            data: gs.data.borrow().into(),
-        }
-    }
-}
-
-impl From<GodotState> for GodotStateS {
-    fn from(gs: GodotState) -> Self {
-        (&gs).into()
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(from = "GodotStateS", into = "GodotStateS")]
-pub struct GodotState {
-    #[serde(rename = "type")]
-    pub _type: GodotMessageType,
-    pub data: LValue,
-}
-
-impl GodotState {
-    pub fn transform_data_into_lisp(&self) -> Result<String, LError> {
-        // Example of string that should be sent
-        // (map (quote ((ten . 10) (vingt . 20)))))
-        match &self.data {
-            LValue::List(l) => {
-                let mut lisp = String::from("(map (quote (");
-                for e in l {
-                    let list: Vec<LValue> = e.try_into()?;
-                    let list = list.as_slice();
-                    let len = list.len();
-                    lisp.push_str(
-                        format!(
-                            "({} . {})",
-                            LValue::from(&list[0..len - 1]),
-                            &list.last().unwrap()
-                        )
-                        .as_str(),
-                    )
-                }
-                lisp.push_str(")))");
-                Ok(lisp)
-            }
-            lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::List)),
-        }
-    }
-}
-
-impl Display for GodotState {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "type: {}\ndata: {}", self._type, self.data)
-    }
-}
-
-impl Display for GodotStateS {
+impl Display for GodotMessageSerde {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(f, "type: {}\ndata: {}", self._type, self.data)
     }
@@ -160,6 +88,39 @@ pub enum LValueSerde {
     Bool(bool),
     List(Vec<LValueSerde>),
     Map(Vec<(LValueSerde, LValueSerde)>),
+}
+
+impl Hash for LValueSerde {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            LValueSerde::Symbol(s) => (*s).hash(state),
+            LValueSerde::Int(i) => (*i).hash(state),
+            LValueSerde::Float(f) => (*f).to_string().hash(state),
+            LValueSerde::Bool(b) => b.hash(state),
+            LValueSerde::Map(m) => (*m).hash(state),
+            LValueSerde::List(l) => {
+                (*l).hash(state);
+            }
+        };
+    }
+}
+
+impl PartialEq for LValueSerde {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (LValueSerde::Int(i1), LValueSerde::Int(i2)) => *i1 == *i2,
+            (LValueSerde::Symbol(s1), LValueSerde::Symbol(s2)) => *s1 == *s2,
+            (LValueSerde::Bool(b1), LValueSerde::Bool(b2)) => b1 == b2,
+            (LValueSerde::Float(f1), LValueSerde::Float(f2)) => *f1 == *f2,
+            (LValueSerde::List(l1), LValueSerde::List(l2)) => *l1 == *l2,
+            (LValueSerde::Map(m1), LValueSerde::Map(m2)) => *m1 == *m2,
+            (_,_) => false,
+        }
+    }
+}
+
+impl Eq for LValueSerde {
+
 }
 
 impl From<&LValue> for LValueSerde {

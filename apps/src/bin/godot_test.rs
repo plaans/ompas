@@ -1,8 +1,5 @@
-use ompas_godot_simulation_client::serde::GodotState;
-use ompas_godot_simulation_client::tcp::{
-    read_msg_from_buf, read_size_from_buf, TypeMessage, BUFFER_SIZE,
-};
-use tokio::io::{AsyncReadExt, BufReader};
+use ompas_godot_simulation_client::godot::BUFFER_SIZE;
+use tokio::io::BufReader;
 use tokio::net::TcpStream;
 
 //const MESSAGE_TO_SEND: &str = "ACK";
@@ -14,13 +11,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let stream = TcpStream::connect("127.0.0.1:10000").await?;
     println!("receiver successfully bound to godot");
 
-    let mut buf_reader = BufReader::new(stream);
+    let mut _buf_reader = BufReader::new(stream);
 
     //let mut buf = String::new();
     //let mut buf = Vec::new();
-    let mut count: usize = 0;
-    let mut buf = [0; BUFFER_SIZE];
-    let mut next_type_msg = TypeMessage::Unknown;
+    let mut _count: usize = 0;
+    let mut _buf = [0; BUFFER_SIZE];
+    /*let mut next_type_msg = TypeMessage::Unknown;
     let mut size: usize = 0;
     loop {
         let mut msg = String::new();
@@ -54,13 +51,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         //println!("\tcontent: {}", msg);
 
         if !msg.is_empty() {
-            let godot_state: Result<GodotState, _> = serde_json::from_str(&msg);
+            /*let godot_state: Result<GodotState, _> = serde_json::from_str(&msg);
             if let Ok(gs) = godot_state {
-                println!("deserialized:\n {}", gs);
+                println!("deserialized:\n {:?}", gs);
                 if let Ok(lisp) = gs.transform_data_into_lisp() {
                     println!(">>>>>>lisp: {}", lisp);
                 }
-            };
+            };*/
         }
 
         //println!("deserialized:\n {}", godot_state);
@@ -68,7 +65,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         if count == 20 {
             break;
         }
-    }
+    }*/
+
     Ok(())
 }
 

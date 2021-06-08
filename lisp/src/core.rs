@@ -684,7 +684,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                         let body = &args[1];
                         let r_lvalue =
                             LValue::Lambda(LLambda::new(params, body.clone(), env.clone()));
-                        println!("=> {}", r_lvalue);
+                        //println!("=> {}", r_lvalue);
                         return Ok(r_lvalue);
                     }
                     LCoreOperator::If => {

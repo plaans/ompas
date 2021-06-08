@@ -1,11 +1,11 @@
-use tokio::io::{self, ReadHalf, BufReader, AsyncReadExt, WriteHalf, AsyncWriteExt};
-use tokio::net::TcpStream;
-use tokio::sync::mpsc::{Sender, Receiver};
-use std::net::SocketAddr;
 use crate::serde::GodotMessageSerde;
-use std::convert::TryInto;
 use crate::state::{GodotState, LState};
+use std::convert::TryInto;
+use std::net::SocketAddr;
 use std::sync::Arc;
+use tokio::io::{self, AsyncReadExt, AsyncWriteExt, BufReader, ReadHalf, WriteHalf};
+use tokio::net::TcpStream;
+use tokio::sync::mpsc::Receiver;
 use tokio::sync::Mutex;
 
 pub const BUFFER_SIZE: usize = 65_536; //65KB should be enough for the moment
@@ -13,14 +13,13 @@ pub const BUFFER_SIZE: usize = 65_536; //65KB should be enough for the moment
 pub async fn task_tcp_connection(
     socket_addr: &SocketAddr,
     receiver: Receiver<String>,
-    sender: Sender<String>,
-    state: Arc<Mutex<GodotState>>
+    state: Arc<Mutex<GodotState>>,
 ) {
     let stream = TcpStream::connect(socket_addr).await.unwrap();
 
     let (rd, wr) = io::split(stream);
 
-    tokio::spawn(async move { async_read_socket(rd, sender, state).await });
+    tokio::spawn(async move { async_read_socket(rd, state).await });
 
     tokio::spawn(async move { async_send_socket(wr, receiver).await });
 }
@@ -46,7 +45,7 @@ fn u32_to_u8_array(x: u32) -> [u8; 4] {
     [b4, b3, b2, b1]
 }
 
-async fn async_read_socket(stream: ReadHalf<TcpStream>, sender: Sender<String>, state: Arc<Mutex<GodotState>>) {
+async fn async_read_socket(stream: ReadHalf<TcpStream>, state: Arc<Mutex<GodotState>>) {
     let mut buf_reader = BufReader::new(stream);
 
     let mut buf = [0; BUFFER_SIZE];
@@ -66,18 +65,9 @@ async fn async_read_socket(stream: ReadHalf<TcpStream>, sender: Sender<String>, 
         let msg = read_msg_from_buf(&buf, size);
 
         if !msg.is_empty() {
-            let message : GodotMessageSerde = serde_json::from_str(&msg).unwrap();
+            let message: GodotMessageSerde = serde_json::from_str(&msg).unwrap();
             let temp_state: LState = message.try_into().unwrap();
             state.lock().await.set_state(temp_state);
-
-
-            /*let sender_temp = sender.clone();
-            tokio::spawn(async move {
-                sender_temp
-                    .send(format!("(update-state {} {})", state_type, lisp))
-                    .await
-                    .expect("could not send via channel");
-            });*/
         }
     }
 }
@@ -91,4 +81,3 @@ pub fn read_size_from_buf(buf: &[u8]) -> usize {
 pub fn read_msg_from_buf(buf: &[u8], size: usize) -> String {
     String::from_utf8_lossy(&buf[0..size]).to_string()
 }
-

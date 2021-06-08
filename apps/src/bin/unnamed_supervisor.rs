@@ -1,5 +1,3 @@
-use ompas_godot_simulation_client::godot::CtxGodot;
-use ompas_godot_simulation_client::state::CtxState;
 use ompas_lisp::core::*;
 use ompas_lisp::structs::LValue;
 use ompas_modules::_type::CtxType;
@@ -9,6 +7,7 @@ use ompas_modules::io::repl::{spawn_log, spawn_repl, EXIT_CODE_STDOUT};
 use ompas_modules::io::{CtxIo, TOKIO_CHANNEL_SIZE};
 use ompas_modules::math::CtxMath;
 //use ompas_modules::robot::CtxRobot;
+use ompas_godot_simulation_client::simu::CtxGodot;
 use std::path::PathBuf;
 use structopt::StructOpt;
 use tokio::sync::mpsc;
@@ -69,7 +68,6 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     let ctx_type = CtxType::default();
     let ctx_counter = CtxCounter::default();
     let mut ctx_godot = CtxGodot::default();
-    let ctx_state = CtxState::default();
 
     //Insert the doc for the different contexts.
     ctx_doc.insert_doc(CtxIo::documentation());
@@ -77,7 +75,6 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     //ctx_doc.insert_doc(CtxRobot::documentation());
     ctx_doc.insert_doc(CtxType::documentation());
     ctx_doc.insert_doc(CtxGodot::documentation());
-    ctx_doc.insert_doc(CtxState::documentation());
 
     //Add the sender of the channel.
     ctx_io.add_sender_li(sender_li.clone());
@@ -94,7 +91,6 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     load_module(&mut root_env, &mut ctxs, ctx_type, &mut lisp_init);
     load_module(&mut root_env, &mut ctxs, ctx_counter, &mut lisp_init);
     load_module(&mut root_env, &mut ctxs, ctx_godot, &mut lisp_init);
-    load_module(&mut root_env, &mut ctxs, ctx_state, &mut lisp_init);
     let env = &mut root_env.clone();
     //println!("{}", lisp_init.begin_lisp());
 

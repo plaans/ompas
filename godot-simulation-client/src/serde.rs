@@ -1,12 +1,12 @@
+use crate::state::{LState, StateType};
 use aries_planning::parsing::sexpr::SExpr;
 use ompas_lisp::structs::LError::WrongType;
 use ompas_lisp::structs::{LError, LNumber, LValue, NameTypeLValue};
 use serde::{Deserialize, Serialize, Serializer};
 use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
-use std::ops::Deref;
-use crate::state::{LState, StateType};
 use std::hash::{Hash, Hasher};
+use std::ops::Deref;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -54,20 +54,33 @@ impl TryFrom<GodotMessageSerde> for LState {
         match value._type {
             GodotMessageType::Static => state.set_type(StateType::Static),
             GodotMessageType::Dynamic => state.set_type(StateType::Dynamic),
-            GodotMessageType::RobotCommand => return Err(LError::SpecialError("Was not expecting a robot command".to_string()))
+            GodotMessageType::RobotCommand => {
+                return Err(LError::SpecialError(
+                    "Was not expecting a robot command".to_string(),
+                ))
+            }
         }
         match &value.data {
             LValueSerde::List(l) => {
                 for e in l {
                     match e {
                         LValueSerde::List(list) => {
-                            state.insert(LValueSerde::List(list[0..list.len() - 1].to_vec()), list.last().unwrap().clone());
+                            state.insert(
+                                LValueSerde::List(list[0..list.len() - 1].to_vec()),
+                                list.last().unwrap().clone(),
+                            );
                         }
-                        lv => panic!("there should be a list")
+                        _ => panic!("there should be a list"),
                     }
                 }
             }
-            lv => return Err(WrongType(lv.into(), LValue::from(lv).into(), NameTypeLValue::List)),
+            lv => {
+                return Err(WrongType(
+                    lv.into(),
+                    LValue::from(lv).into(),
+                    NameTypeLValue::List,
+                ))
+            }
         }
         Ok(state)
     }
@@ -114,14 +127,12 @@ impl PartialEq for LValueSerde {
             (LValueSerde::Float(f1), LValueSerde::Float(f2)) => *f1 == *f2,
             (LValueSerde::List(l1), LValueSerde::List(l2)) => *l1 == *l2,
             (LValueSerde::Map(m1), LValueSerde::Map(m2)) => *m1 == *m2,
-            (_,_) => false,
+            (_, _) => false,
         }
     }
 }
 
-impl Eq for LValueSerde {
-
-}
+impl Eq for LValueSerde {}
 
 impl From<&LValue> for LValueSerde {
     fn from(lv: &LValue) -> Self {

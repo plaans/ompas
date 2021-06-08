@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
+use crate::serde::LValueSerde;
 use im::ordmap::DiffItem::Update;
 use im::HashMap;
 use ompas_lisp::core::LEnv;
@@ -12,25 +13,22 @@ use std::borrow::Borrow;
 use std::convert::TryFrom;
 use std::mem;
 use tokio::sync::mpsc::Sender;
-use crate::serde::LValueSerde;
-
 
 pub const KEY_DYNAMIC: &str = "dynamic";
 pub const KEY_STATIC: &str = "static";
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct GodotState {
     static_state: LState,
     dynamic_state: LState,
 }
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum StateType {
     Static,
     Dynamic,
 }
 
 impl GodotState {
-
     pub fn set_state(&mut self, s: LState) {
         match s._type {
             Some(StateType::Static) => self.static_state = s,
@@ -44,7 +42,7 @@ impl GodotState {
             match s._type {
                 Some(StateType::Static) => &mut self.static_state,
                 Some(StateType::Dynamic) => &mut self.dynamic_state,
-                None => panic!("there should be a state type")
+                None => panic!("there should be a state type"),
             },
             s,
         );
@@ -61,7 +59,7 @@ impl GodotState {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct LState {
     inner: im::HashMap<LValueSerde, LValueSerde>,
     _type: Option<StateType>,
@@ -88,9 +86,9 @@ impl LState {
         let _ = self.inner.clone().union(other.inner.clone());
     }
 
-    pub fn into_map(&self) -> LValue {
-        let mut map: im::HashMap<LValue, LValue>;
-        for e in self.inner {
+    pub fn into_map(self) -> LValue {
+        let mut map: im::HashMap<LValue, LValue> = Default::default();
+        for e in &self.inner {
             map.insert(e.0.into(), e.1.into());
         }
         map.into()
@@ -109,7 +107,10 @@ impl From<LState> for im::HashMap<LValueSerde, LValueSerde> {
 }
 impl From<&im::HashMap<LValueSerde, LValueSerde>> for LState {
     fn from(m: &HashMap<LValueSerde, LValueSerde>) -> Self {
-        Self { inner: m.clone(), _type: None }
+        Self {
+            inner: m.clone(),
+            _type: None,
+        }
     }
 }
 impl From<im::HashMap<LValueSerde, LValueSerde>> for LState {

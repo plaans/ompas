@@ -1,15 +1,16 @@
-use crate::serde::*;
 use crate::godot::*;
+use crate::serde::*;
+use crate::state::*;
 use ompas_lisp::core::LEnv;
 use ompas_lisp::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
 use ompas_lisp::structs::{GetModule, LError, LValue, Module, NameTypeLValue};
 use ompas_modules::doc::{Documentation, LHelp};
 use ompas_modules::io::TOKIO_CHANNEL_SIZE;
 use std::net::SocketAddr;
-use tokio::sync::{mpsc, Mutex};
-use tokio::sync::mpsc::Sender;
-use crate::state::*;
 use std::sync::Arc;
+use std::thread;
+use tokio::sync::mpsc::Sender;
+use tokio::sync::{mpsc, Mutex};
 
 /*
 LANGUAGE
@@ -138,7 +139,8 @@ const DOC_MOD_GODOT: &str = "Module to use the simulator developped in godot. It
 const DOC_MOD_GODOT_VERBOSE: &str = "functions:\n\
                                      \t- open-com-godot\n\
                                      \t- launch-godot (not implemented yet)\n\
-                                     \t- exec-godot\n\n\
+                                     \t- exec-godot\n\
+                                     \t- get-state\n\n\
                                      lambdas for the state functions:\n\
                                      \t- for a robot: coordinates, battery, rotation, velocity, rotation_speed, in_station, in_interact\n\
                                      \t- for a machine: coordinates, input_belt, output_belt, processes, progress_rate\n\
@@ -158,27 +160,22 @@ const DOC_EXEC_GODOT_VERBOSE: &str = "Available commands:\n\
                                        Example: (exec-godot navigate_to robot0 2 3)";
 
 //functions
-const SET_STATE: &str = "set-state";
+//const SET_STATE: &str = "set-state";
 const GET_STATE: &str = "get-state";
-const UPDATE_STATE: &str = "update-state";
+//const UPDATE_STATE: &str = "update-state";
 
 //Documentation
-const DOC_MOD_STATE: &str = "Module to handle state. Contains a map with all the facts.";
-const DOC_MOD_STATE_VERBOSE: &str = "functions:\n\
-                                     \t- set-state\n\
-                                     \t- get-state\n\
-                                     \t- update-state";
 
-const DOC_SET_STATE: &str = "Set a map as a the new state";
+/*const DOC_SET_STATE: &str = "Set a map as a the new state";
 const DOC_SET_VERBOSE: &str = "Takes 2 arguments:\n\
                                 \t- the type of state to set: {static, dynamic}\n\
-                                \t- the map that will overwrite the current state";
+                                \t- the map that will overwrite the current state";*/
 const DOC_GET_STATE: &str = "Return the current state.";
 const DOC_GET_STATE_VERBOSE: &str = "Takes an optional argument: {static, dynamic}";
-const DOC_UPDATE_STATE: &str = "Update the current state with facts of a map";
+/*const DOC_UPDATE_STATE: &str = "Update the current state with facts of a map";
 const DOC_UPDATE_VERBOSE: &str = "Takes 2 arguments:\n\
                                 \t- the type of state to set: {static, dynamic}\n\
-                                \t- the map that will overwrite the current state";
+                                \t- the map that will overwrite the current state";*/
 
 #[derive(Default)]
 pub struct SocketInfo {
@@ -218,6 +215,10 @@ impl CtxGodot {
     pub async fn get_state(&self, _type: Option<StateType>) -> LState {
         self.state.lock().await.get_state(_type)
     }
+
+    pub fn get_ref_state(&self) -> Arc<Mutex<GodotState>> {
+        self.state.clone()
+    }
 }
 
 impl GetModule for CtxGodot {
@@ -239,7 +240,7 @@ impl GetModule for CtxGodot {
             LAMBDA_OUTPUT_BELT,
             LAMBDA_INPUT_BELT,
         ]
-            .into();
+        .into();
 
         let mut module = Module {
             ctx: Box::new(self),
@@ -322,9 +323,9 @@ impl Documentation for CtxGodot {
                 Some(DOC_SF_ROTATION_SPEED_VERBOSE),
             ),
             LHelp::new(SF_VELOCITY, DOC_SF_VELOCITY, Some(DOC_SF_VELOCITY_VERBOSE)),
-            LHelp::new(GET_STATE, DOC_GET_STATE, None),
-            LHelp::new(SET_STATE, DOC_SET_STATE, None),
-            LHelp::new(UPDATE_STATE, DOC_UPDATE_STATE, None),
+            LHelp::new(GET_STATE, DOC_GET_STATE, Some(DOC_GET_STATE_VERBOSE)),
+            //LHelp::new(SET_STATE, DOC_SET_STATE, None),
+            //LHelp::new(UPDATE_STATE, DOC_UPDATE_STATE, None),
         ]
     }
 }
@@ -354,17 +355,9 @@ fn open_com(args: &[LValue], _: &mut LEnv, ctx: &mut CtxGodot) -> Result<LValue,
 
     let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
     ctx.sender_socket = Some(tx);
-    let sender = match ctx.get_sender_li() {
-        None => {
-            return Err(SpecialError(
-                "ctx godot has no sender to lisp interpreter".to_string(),
-            ))
-        }
-        Some(s) => s.clone(),
-    };
 
     let state = ctx.state.clone();
-    tokio::spawn(async move { task_tcp_connection(&socket_addr, rx, sender, state).await });
+    tokio::spawn(async move { task_tcp_connection(&socket_addr, rx, state).await });
 
     Ok(LValue::Nil)
 }
@@ -413,7 +406,6 @@ fn exec_godot(args: &[LValue], _: &LEnv, ctx: &CtxGodot) -> Result<LValue, LErro
     Ok(LValue::Nil)
 }
 
-
 /*pub fn set_state(args: &[LValue], _: &mut LEnv, ctx: &mut CtxGodot) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
@@ -450,30 +442,32 @@ fn exec_godot(args: &[LValue], _: &LEnv, ctx: &CtxGodot) -> Result<LValue, LErro
 }*/
 
 pub fn get_state(args: &[LValue], _: &LEnv, ctx: &CtxGodot) -> Result<LValue, LError> {
-
     let _type = match args.len() {
         0 => None,
         1 => match &args[0] {
             LValue::Symbol(s) => match s.as_str() {
                 KEY_STATIC => Some(StateType::Static),
                 KEY_DYNAMIC => Some(StateType::Dynamic),
-                _ => return Err(SpecialError(format!(
-                    "Expected keywords {} or {}",
-                    KEY_STATIC, KEY_DYNAMIC
-                ))),
+                _ => {
+                    return Err(SpecialError(format!(
+                        "Expected keywords {} or {}",
+                        KEY_STATIC, KEY_DYNAMIC
+                    )))
+                }
             },
             lv => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
         },
         _ => return Err(WrongNumberOfArgument(args.into(), args.len(), 0..1)),
     };
 
+    let handle = tokio::runtime::Handle::current();
+    let state = ctx.get_ref_state();
+    let result =
+        thread::spawn(move || handle.block_on(async move { state.lock().await.get_state(_type) }))
+            .join()
+            .unwrap();
 
-    let join_handle = tokio::spawn( async {
-        ctx.get_state(_type).await
-    });
-    async {
-        Ok(join_handle.await.unwrap().into_map())
-    }
+    Ok(result.into_map())
 }
 
 /*///Update the last state with the new facts of the map.

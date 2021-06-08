@@ -2,6 +2,7 @@ use crate::doc::{Documentation, LHelp};
 use ompas_lisp::core::*;
 use ompas_lisp::structs::LError::*;
 use ompas_lisp::structs::*;
+use rand::Rng;
 
 /*
 LANGUAGE LITERALS
@@ -18,6 +19,8 @@ const DOC_MOD_MATH_VERBOSE: &str = "functions:\n\
 //Trigonometry
 const SIN: &str = "sin";
 const COS: &str = "cos";
+const RAND_INT_IN_RANGE: &str = "rand-int-in-range";
+const RAND_FLOAT_IN_RANGE: &str = "rand-float-in-range";
 
 //Constants
 const PI: &str = "pi";
@@ -43,6 +46,8 @@ impl GetModule for CtxMath {
 
         module.add_fn_prelude(COS, Box::new(cos));
         module.add_fn_prelude(SIN, Box::new(sin));
+        module.add_fn_prelude(RAND_INT_IN_RANGE, Box::new(rand_int_in_range));
+        module.add_fn_prelude(RAND_FLOAT_IN_RANGE, Box::new(rand_float_in_range));
         module.add_prelude(PI, std::f64::consts::PI.into());
 
         module
@@ -58,12 +63,17 @@ Return an error if args are not numbers of there is the wrong number of argument
 const DOC_SIN: &str = "Takes 1 argument. Return the sinus of it.\
 Return an error if args are not numbers of there is the wrong number of arguments";
 
+const DOC_RAND_INT_IN_RANGE: &str = "todo!";
+const DOC_RAND_FLOAT_IN_RANGE: &str = "todo!";
+
 impl Documentation for CtxMath {
     fn documentation() -> Vec<LHelp> {
         vec![
             LHelp::new(MOD_MATH, DOC_MOD_MATH, Some(DOC_MOD_MATH_VERBOSE)),
             LHelp::new(SIN, DOC_SIN, None),
             LHelp::new(COS, DOC_COS, None),
+            LHelp::new(RAND_INT_IN_RANGE, DOC_RAND_INT_IN_RANGE, None),
+            LHelp::new(RAND_FLOAT_IN_RANGE, DOC_RAND_FLOAT_IN_RANGE, None),
         ]
     }
 }
@@ -97,6 +107,40 @@ pub fn cos(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValue, LError> {
             Ok(f.cos().into())
         }
         lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Number)),
+    }
+}
+
+pub fn rand_int_in_range(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValue, LError> {
+    if args.len() != 2 {
+        return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
+    }
+
+    if let LValue::Number(n1) = &args[0] {
+        if let LValue::Number(n2) = &args[1] {
+            let value: i64 = rand::thread_rng().gen_range(n1.into()..n2.into());
+            Ok(value.into())
+        } else {
+            Err(WrongType(args[1].clone(), (&args[1]).into(), NameTypeLValue::Number))
+        }
+    } else {
+        Err(WrongType(args[0].clone(), (&args[0]).into(), NameTypeLValue::Number))
+    }
+}
+
+pub fn rand_float_in_range(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValue, LError> {
+    if args.len() != 2 {
+        return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
+    }
+
+    if let LValue::Number(n1) = &args[0] {
+        if let LValue::Number(n2) = &args[1] {
+            let value : f64 = rand::thread_rng().gen_range(n1.into()..n2.into());
+            Ok(value.into())
+        }else {
+            Err(WrongType(args[1].clone(), (&args[1]).into(), NameTypeLValue::Number))
+        }
+    }else {
+        Err(WrongType(args[0].clone(), (&args[0]).into(), NameTypeLValue::Number))
     }
 }
 

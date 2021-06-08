@@ -15,6 +15,7 @@ lisp_test = []
 ompas_lisp = {path = "../lisp"}
 ompas_modules = {path = "../modules"}
 ompas_godot_simulation_client = {path = "../godot-simulation-client"}
+ompas_acting = {path = "../acting"}
 
 aries_model = {git = "https://github.com/arbimo/aries/", rev = "e220567"}
 aries_planning = {git = "https://github.com/arbimo/aries/", rev = "e220567"}

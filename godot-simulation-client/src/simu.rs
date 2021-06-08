@@ -28,109 +28,212 @@ const EXEC_GODOT: &str = "exec-godot";
 //Lambda functions that will be added natively to the environment
 //Depends on module state and function get-state.
 //Robot
-const LAMBDA_COORDINATES: &str = "(define coordinates (lambda (x)\
-                                                        (get-map (get-state dynamic) ((quote coordinates) x))))";
-const SF_COORDINATES: &str = "coordinates";
-const DOC_SF_COORDINATES: &str =
-    "Return the coordinates (float float) of a robot, a machine or a belt.";
-const DOC_SF_COORDINATES_VERBOSE: &str = "Example: (coordinates robot0)";
 
-const LAMBDA_BATTERY: &str = "(define battery (lambda (x)\
-                                                        (get-map (get-state dynamic) ((quote battery) x))))";
-const SF_BATTERY: &str = "battery";
-const DOC_SF_BATTERY: &str = "Return the battery level (float) in [0;1] of a robot.";
-const DOC_SF_BATTERY_VERBOSE: &str = "Example: (battery robot0)";
+//Lambdas for robots.
 
-const LAMBDA_ROTATION: &str = "(define rotation (lambda (x)\
-                                                        (get-map (get-state dynamic) ((quote rotation) x))))";
-const SF_ROTATION: &str = "rotation";
-const DOC_SF_ROTATION: &str = "Return the rotation value (float) of a robot."; //TODO: Check the interval of the rotation
-const DOC_SF_ROTATION_VERBOSE: &str = "Example: (rotation robot0)";
+//coordinates
+const LAMBDA_ROBOT_COORDINATES: &str = "(define robot.coordinates (lambda (x)\
+                                                        (get-map (get-state dynamic) ((quote robot.coordinates) x))))";
+const SF_ROBOT_COORDINATES: &str = "robot.coordinates";
+const DOC_SF_COORDINATES: &str = "Return the coordinates (float float) of a robot";
+const DOC_SF_ROBOT_COORDINATES_VERBOSE: &str = "Example: (robot.coordinates robot0)";
 
-const LAMBDA_VELOCITY: &str = "(define velocity (lambda (x)\
-                                                        (get-map (get-state dynamic) ((quote velocity) x))))";
+//battery
+const LAMBDA_ROBOT_BATTERY: &str = "(define robot.battery (lambda (x)\
+                                                        (get-map (get-state dynamic) (list (quote robot.battery) x))))";
+const SF_ROBOT_BATTERY: &str = "battery";
+const DOC_SF_ROBOT_BATTERY: &str = "Return the battery level (float) in [0;1] of a robot.";
+const DOC_SF_ROBOT_BATTERY_VERBOSE: &str = "Example: (robot.battery robot0)";
 
-const SF_VELOCITY: &str = "velocity";
-const DOC_SF_VELOCITY: &str = "Return the velocity value (float float) in x and y of a robot.";
-const DOC_SF_VELOCITY_VERBOSE: &str = "Example: (velocity robot0)";
+//rotation
+const LAMBDA_ROBOT_ROTATION: &str = "(define robot.rotation (lambda (x)\
+                                                        (get-map (get-state dynamic) (list (quote robot.rotation) x))))";
+const SF_ROBOT_ROTATION: &str = "robot.rotation";
+const DOC_SF_ROBOT_ROTATION: &str = "Return the rotation value (float) of a robot."; //TODO: Check the interval of the rotation
+const DOC_SF_ROBOT_ROTATION_VERBOSE: &str = "Example: (robot.rotation robot0)";
 
-const LAMBDA_ROTATION_SPEED: &str = "(define rotation_speed (lambda (x)\
-                                                        (get-map (get-state dynamic) ((quote rotation_speed) x))))";
-const SF_ROTATION_SPEED: &str = "rotation_speed";
-const DOC_SF_ROTATION_SPEED: &str = "Return the rotation speed value (float) of a robot.";
-const DOC_SF_ROTATION_SPEED_VERBOSE: &str = "Example: (rotation_speed robot0)";
+//velocity
+const LAMBDA_ROBOT_VELOCITY: &str = "(define robot.velocity (lambda (x)\
+                                                        (get-map (get-state dynamic) (list (quote robot.velocity) x))))";
+const SF_ROBOT_VELOCITY: &str = "robot.velocity";
+const DOC_SF_ROBOT_VELOCITY: &str =
+    "Return the velocity value (float float) in x and y of a robot.";
+const DOC_SF_ROBOT_VELOCITY_VERBOSE: &str = "Example: (robot.velocity robot0)";
 
-const LAMBDA_IN_STATION: &str = "(define in_station (lambda (x)\
-                                                        (get-map (get-state dynamic) ((quote in_station) x))))";
+//rotation speed
+const LAMBDA_ROBOT_ROTATION_SPEED: &str = "(define robot.rotation_speed (lambda (x)\
+                                                        (get-map (get-state dynamic) (list (quote robot.rotation_speed) x))))";
+const SF_ROBOT_ROTATION_SPEED: &str = "robot.rotation_speed";
+const DOC_SF_ROBOT_ROTATION_SPEED: &str = "Return the rotation speed value (float) of a robot.";
+const DOC_SF_ROBOT_ROTATION_SPEED_VERBOSE: &str = "Example: (robot.rotation_speed robot0)";
 
-const SF_IN_STATION: &str = "in_station";
-const DOC_SF_IN_STATION: &str = "Return true if a robot is in a station.";
-const DOC_SF_IN_STATION_VERBOSE: &str = "Example: (in_station robot0)";
+//in station
+const LAMBDA_ROBOT_IN_STATION: &str = "(define robot.in_station (lambda (x)\
+                                                        (get-map (get-state dynamic) (list (quote robot.in_station) x))))";
+const SF_ROBOT_IN_STATION: &str = "robot.in_station";
+const DOC_SF_ROBOT_IN_STATION: &str = "Return true if a robot is in a station.";
+const DOC_SF_ROBOT_IN_STATION_VERBOSE: &str = "Example: (in_station robot0)";
 
-const LAMBDA_IN_INTERACT: &str = "(define in_interact (lambda (x)\
-                                                        (get-map (get-state dynamic) ((quote in_interact) x))))";
+//in interact areas
+const LAMBDA_ROBOT_IN_INTERACT_AREAS: &str = "(define robot.in_interact_areas (lambda (x)\
+                                                        (get-map (get-state dynamic) (list (quote robot.in_interact_areas) x))))";
+const SF_ROBOT_IN_INTERACT_AREAS: &str = "robot.in_interact_areas";
+const DOC_SF_ROBOT_IN_INTERACT_AREAS: &str = "Return true if a robot is in an interact zone.";
+const DOC_SF_ROBOT_IN_INTERACT_AREAS_VERBOSE: &str = "Example: (robot.in_interact_areas robot0)";
 
-const SF_IN_INTERACT: &str = "in_interact";
-const DOC_SF_IN_INTERACT: &str = "Return true if a robot is in an interact zone.";
-const DOC_SF_IN_INTERACT_VERBOSE: &str = "Example: (in_interact robot0)";
+//Lambdas for machines.
 
-const LAMBDA_INPUT_BELT: &str = "(define input_belt (lambda (x)\
-                                                        (get-map (get-state dynamic) ((quote input_belt) x))))";
+//coordinates
+const LAMBDA_MACHINE_COORDINATES: &str = "(define machine.coordinates (lambda (x)\
+                                                          (get-map (get-state static) (list (quote machine.coordinates) x))))";
+const SF_MACHINE_COORDINATES: &str = "machine.coordinates";
+const DOC_SF_MACHINE_COORDINATES: &str = "todo!";
 
-const SF_INPUT_BELT: &str = "input_belt";
-const DOC_SF_INPUT_BELT: &str = "Return the name (symbol) of the input belt of a machine.";
-const DOC_SF_INPUT_BELT_VERBOSE: &str = "Example: (input_belt machine0)";
+//coordinates tile
+const LAMBDA_MACHINE_COORDINATES_TILE: &str = "(define machine.coordinates_tile (lambda (x)\
+                                                          (get-map (get-state static) (list (quote machine.coordinates_tile) x))))";
+const SF_MACHINE_COORDINATES_TILE: &str = "machine.coordinates_tile";
+const DOC_SF_MACHINE_COORDINATES_TILE: &str = "todo!";
 
-const LAMBDA_OUTPUT_BELT: &str = "(define output_belt (lambda (x)\
-                                                        (get-map (get-state dynamic) ((quote output_belt) x))))";
+//input belt
+const LAMBDA_MACHINE_INPUT_BELT: &str = "(define machine.input_belt (lambda (x)\
+                                                        (get-map (get-state static) (list (quote machine.input_belt) x))))";
+const SF_MACHINE_INPUT_BELT: &str = "machine.input_belt";
+const DOC_SF_MACHINE_INPUT_BELT: &str = "Return the name (symbol) of the input belt of a machine.";
+const DOC_SF_MACHINE_INPUT_BELT_VERBOSE: &str = "Example: (machine.input_belt machine0)";
 
-const SF_OUTPUT_BELT: &str = "output_belt";
-const DOC_SF_OUTPUT_BELT: &str = "Return the name (symbol) of the output belt of a machine.";
-const DOC_SF_OUTPUT_BELT_VERBOSE: &str = "Example: (output_belt machine0)";
+//output belt
+const LAMBDA_MACHINE_OUTPUT_BELT: &str = "(define machine.output_belt (lambda (x)\
+                                                        (get-map (get-state static) (list (quote machine.output_belt) x))))";
+const SF_MACHINE_OUTPUT_BELT: &str = "machine.output_belt";
+const DOC_SF_MACHINE_OUTPUT_BELT: &str =
+    "Return the name (symbol) of the output belt of a machine.";
+const DOC_SF_MACHINE_OUTPUT_BELT_VERBOSE: &str = "Example: (machine.output_belt machine0)";
 
-const LAMBDA_PROCESSES: &str = "(define processes (lambda (x)\
-                                                        (get-map (get-state dynamic) ((quote processes_list) x))))";
-const SF_PROCESSES: &str = "processes";
-const DOC_SF_PROCESSES: &str = "Return the list of processes (id0 id1 ...) of a machine, or return the list of pair (process_id, duration) for a package.";
-const DOC_SF_PROCESSES_VERBOSE: &str = "Example:\n
+//processes
+const LAMBDA_MACHINE_PROCESSES: &str = "(define machine.processes_list (lambda (x)\
+                                                        (get-map (get-state static) (list (quote machine.processes_list) x))))";
+const SF_MACHINE_PROCESSES: &str = "machine.processes_list";
+const DOC_SF_MACHINE_PROCESSES: &str = "Return the list of processes (id0 id1 ...) of a machine, or return the list of pair (process_id, duration) for a package.";
+const DOC_SF_MACHINE_PROCESSES_VERBOSE: &str = "Example:\n
                                         \t- for a machine: (processes machine0) \n\
                                         \t- for a package: (processes package0)";
 
-const LAMBDA_PROGRESS_RATE: &str =  "(define progress (lambda (x)\
-                                                        (get-map (get-state dynamic) ((quote progress_rate) x))))";
+//progress rate
+const LAMBDA_MACHINE_PROGRESS_RATE: &str =  "(define machine.progress_rate (lambda (x)\
+                                                        (get-map (get-state dynamic) (list (quote machine.progress_rate) x))))";
+const SF_MACHINE_PROGRESS_RATE: &str = "machine.progress_rate";
+const DOC_SF_MACHINE_PROGRESS_RATE: &str = "Return the progress rate (float) in [0;1] of a machine. If no task is in progress, the value is 0";
+const DOC_SF_MACHINE_PROGRESS_RATE_VERBOSE: &str = "Example: (machine.progress_rate machine0)";
 
-const SF_PROGRESS_RATE: &str = "progress";
-const DOC_SF_PROGRESS_RATE: &str = "Return the progress rate (float) in [0;1] of a machine. If no task is in progress, the value is 0";
-const DOC_SF_PROGRESS_RATE_VERBOSE: &str = "Example: (progress machine0)";
+//Lambdas for packages.
 
-const LAMBDA_LOCATION: &str = "(define location (lambda (x)\
-                                                  (get-map (get-state dynamic) ((quote location) x))))";
+//location
+const LAMBDA_PACKAGE_LOCATION: &str = "(define package.location (lambda (x)\
+                                                  (get-map (get-state dynamic) (list (quote package.location) x))))";
+const SF_PACKAGE_LOCATION: &str = "package.location";
+const DOC_SF_PACKAGE_LOCATION: &str = "Return the location (symbol) of a package.";
+const DOC_SF_PACKAGE_LOCATION_VERBOSE: &str = "Example: (package.location package0)";
 
-const SF_LOCATION: &str = "location";
-const DOC_SF_LOCATION: &str = "Return the location (symbol) of a package.";
-const DOC_SF_LOCATION_VERBOSE: &str = "Example: (location package0)";
+//processes list
+const LAMBDA_PACKAGE_PROCESSES_LIST: &str = "(define package.processes_list (lambda (x)\
+                                                  (get-map (get-state dynamic) (list (quote package.processes_list) x))))";
+const SF_PACKAGE_PROCESSES_LIST: &str = "package.processes_list";
+const DOC_SF_PACKAGE_PROCESSES_LIST: &str = "Return the location (symbol) of a package.";
+const DOC_SF_PACKAGE_PROCESSES_LIST_VERBOSE: &str = "Example: (package.processes_list package0)";
 
-const LAMBDA_BELT_TYPE: &str = "(define belt_type (lambda (x)\
-                                                    (get-map (get-state dynamic) ((quote belt_type) x)))))";
+//Lambdas for belts.
 
-const SF_BELT_TYPE: &str = "belt_type";
-const DOC_SF_BELT_TYPE: &str = "Return the belt type (symbol) in {input, output} of a belt.";
-const DOC_SF_BELT_TYPE_VERBOSE: &str = "Example: (belt_type belt0)";
+//belt type
+const LAMBDA_BELT_BELT_TYPE: &str = "(define belt.belt_type (lambda (x)\
+                                                    (get-map (get-state static) (list (quote belt.belt_type) x)))))";
+const SF_BELT_BELT_TYPE: &str = "belt_type";
+const DOC_SF_BELT_BELT_TYPE: &str = "Return the belt type (symbol) in {input, output} of a belt.";
+const DOC_SF_BELT_BELT_TYPE_VERBOSE: &str = "Example: (belt_type belt0)";
 
-const LAMBDA_POLYGONS: &str = "(define polygon (lambda (x)\
-                                                    (get-map (get-state dynamic) ((quote polygon) x)))))";
-
-const SF_POLYGONS: &str = "polygons";
-const DOC_SF_POLYGONS: &str =
+//polygons
+const LAMBDA_BELT_POLYGONS: &str = "(define belt.polygons (lambda (x)\
+                                                    (get-map (get-state static) (list (quote belt.polygons) x)))))";
+const SF_BELT_POLYGONS: &str = "belt.polygons";
+const DOC_SF_BELT_POLYGONS: &str =
     "Return the coordinates of the polygon [(float float)] that represent the parking area";
-const DOC_SF_POLYGONS_VERBOSE: &str = "Example: (polygons parking_area0)"; //TODO: check the name of the parking are
+const DOC_SF_BELT_POLYGONS_VERBOSE: &str = "Example: (belt.polygons parking_area0)"; //TODO: check the name of the parking are
 
-const LAMBDA_PACKAGES_LIST: &str = "(define packages_list (lambda (x)\
-                                                (get-map (get-state dynamic) ((quote packages_list) x)))))";
+//cells
+const LAMBDA_BELT_CELLS: &str =
+    "(define belt.cells (lambda (b) (get-map (get-state static) (list (quote belt.cells) b))))";
+const SF_BELT_CELLS: &str = "belt.cells";
+const DOC_SF_BELT_CELLS: &str = "todo!";
 
-const SF_PACKAGES_LIST: &str = "packages_list";
-const DOC_SF_PACKAGES_LIST: &str = "Return the package list [symbol] on a belt.";
-const DOC_SF_PACKAGES_LIST_VERBOSE: &str = "Example: (location package0)";
+//interact areas
+const LAMBDA_BELT_INTERACT_AREAS: &str = "(define belt.interact_areas (lambda (b) (get-map (get-state static) (list (quote belt.interact_areas) b))))";
+const SF_BELT_INTERACT_AREAS: &str = "belt.interact_ares";
+const DOC_SF_BELT_INTERACT_AREAS: &str = "todo!";
+
+//packages list
+const LAMBDA_BELT_PACKAGES_LIST: &str = "(define belt.packages_list (lambda (x)\
+                                                (get-map (get-state dynamic) (list (quote belt.packages_list) x)))))";
+const SF_BELT_PACKAGES_LIST: &str = "belt.packages_list";
+const DOC_SF_BELT_PACKAGES_LIST: &str = "Return the package list [symbol] on a belt.";
+const DOC_SF_BELT_PACKAGES_LIST_VERBOSE: &str = "Example: (belt.packages_list package0)";
+
+//Lambdas for parking areas.
+
+//polygons
+const LAMBDA_PARKING_AREA_POLYGONS: &str = "(define parking_area.polygons (lambda (x)\
+                                                                         (get-map (get-state static) (list (quote parking_area.polygons) x)))))";
+const SF_PARKING_AREA_POLYGONS: &str = "parking_area.polygons";
+const DOC_SF_PARKING_AREA_POLYGONS: &str = "todo!";
+
+//cells
+const LAMBDA_PARKING_AREA_CELLS: &str = "(define parking_area.cells (lambda (x)\
+                                                                         (get-map (get-state static) (list (quote parking_area.cells) x)))))";
+const SF_PARKING_AREA_CELLS: &str = "parking_area.cells";
+const DOC_SF_PARKING_AREA_CELLS: &str = "todo!";
+
+//Lambdas interact areas.
+
+//polygons
+const LAMBDA_INTERACT_AREA_POLYGONS: &str = "(define interact_area.polygons (lambda (x)\
+                                                           (get-map (get-state static) (list (quote interact_area.polygons) x)))))";
+const SF_INTERACT_AREA_POLYGONS: &str = "interact_area.polygons";
+const DOC_SF_INTERACT_AREA_POLYGONS: &str = "todo!";
+
+//cells
+const LAMBDA_INTERACT_AREA_CELLS: &str = "(define interact_area.cells (lambda (x)\
+                                                           (get-map (get-state static) (list (quote interact_area.cells) x)))))";
+const SF_INTERACT_AREA_CELLS: &str = "interact_area.cells";
+const DOC_SF_INTERACT_AREA_CELLS: &str = "todo!";
+
+//belt
+const LAMBDA_INTERACT_AREA_BELT: &str = "(define interact_area.belt (lambda (x)\
+                                                           (get-map (get-state static) (list (quote interact_area.belt) x)))))";
+const SF_INTERACT_AREA_BELT: &str = "interact_area.belt";
+const DOC_SF_INTERACT_AREA_BELT: &str = "todo!";
+
+//Lambdas for actions.
+
+//rotation
+const LAMBDA_DO_ROTATION: &str =
+    "(define robot.do_rotation (lambda (r a w) (exec-godot do_rotation r a w)))";
+const ACTION_DO_ROTATION: &str = "robot.do_rotation";
+const DOC_ACTION_DO_ROTATION: &str = "todo!";
+
+//pick
+const LAMBDA_PICK: &str = "(define robot.pick (lambda (r a w) (exec-godot pick r a w)))";
+const ACTION_PICK: &str = "robot.pick";
+const DOC_ACTION_PICK: &str = "todo!";
+
+//place
+const LAMBDA_PLACE: &str = "(define robot.place (lambda (r a w) (exec-godot place r a w)))";
+const ACTION_PLACE: &str = "robot.place";
+const DOC_ACTION_PLACE: &str = "todo!";
+
+//navigate_to
+const LAMBDA_NAVIGATE_TO: &str =
+    "(define robot.navigate_to (lambda (r a w) (exec-godot navigate_to r a w)))";
+const ACTION_NAVIGATE_TO: &str = "robot.navigate_to";
+const DOC_ACTION_NAVIGATE_TO: &str = "todo!";
 
 //Constants
 
@@ -224,21 +327,35 @@ impl CtxGodot {
 impl GetModule for CtxGodot {
     fn get_module(self) -> Module {
         let raw_lisp = vec![
-            LAMBDA_BATTERY,
-            LAMBDA_COORDINATES,
-            LAMBDA_IN_INTERACT,
-            LAMBDA_IN_STATION,
-            LAMBDA_ROTATION,
-            LAMBDA_ROTATION_SPEED,
-            LAMBDA_VELOCITY,
-            LAMBDA_BELT_TYPE,
-            LAMBDA_PACKAGES_LIST,
-            LAMBDA_POLYGONS,
-            LAMBDA_LOCATION,
-            LAMBDA_PROGRESS_RATE,
-            LAMBDA_PROCESSES,
-            LAMBDA_OUTPUT_BELT,
-            LAMBDA_INPUT_BELT,
+            LAMBDA_ROBOT_BATTERY,
+            LAMBDA_ROBOT_COORDINATES,
+            LAMBDA_ROBOT_IN_INTERACT_AREAS,
+            LAMBDA_ROBOT_IN_STATION,
+            LAMBDA_ROBOT_ROTATION,
+            LAMBDA_ROBOT_ROTATION_SPEED,
+            LAMBDA_ROBOT_VELOCITY,
+            LAMBDA_BELT_BELT_TYPE,
+            LAMBDA_BELT_PACKAGES_LIST,
+            LAMBDA_BELT_POLYGONS,
+            LAMBDA_BELT_INTERACT_AREAS,
+            LAMBDA_BELT_CELLS,
+            LAMBDA_PACKAGE_LOCATION,
+            LAMBDA_MACHINE_PROGRESS_RATE,
+            LAMBDA_MACHINE_PROCESSES,
+            LAMBDA_MACHINE_OUTPUT_BELT,
+            LAMBDA_MACHINE_INPUT_BELT,
+            LAMBDA_MACHINE_COORDINATES,
+            LAMBDA_MACHINE_COORDINATES_TILE,
+            LAMBDA_PARKING_AREA_POLYGONS,
+            LAMBDA_PARKING_AREA_CELLS,
+            LAMBDA_PACKAGE_PROCESSES_LIST,
+            LAMBDA_INTERACT_AREA_BELT,
+            LAMBDA_INTERACT_AREA_CELLS,
+            LAMBDA_INTERACT_AREA_POLYGONS,
+            LAMBDA_DO_ROTATION,
+            LAMBDA_NAVIGATE_TO,
+            LAMBDA_PICK,
+            LAMBDA_PLACE,
         ]
         .into();
 
@@ -268,64 +385,108 @@ impl Documentation for CtxGodot {
             LHelp::new(LAUNCH_GODOT, DOC_LAUNCH_GODOT, None),
             LHelp::new(EXEC_GODOT, DOC_EXEC_GODOT, Some(DOC_EXEC_GODOT_VERBOSE)),
             //Add doc for state functions
-            LHelp::new(SF_BATTERY, DOC_SF_BATTERY, Some(DOC_SF_BATTERY_VERBOSE)),
             LHelp::new(
-                SF_BELT_TYPE,
-                DOC_SF_BELT_TYPE,
-                Some(DOC_SF_BELT_TYPE_VERBOSE),
+                SF_ROBOT_BATTERY,
+                DOC_SF_ROBOT_BATTERY,
+                Some(DOC_SF_ROBOT_BATTERY_VERBOSE),
             ),
             LHelp::new(
-                SF_COORDINATES,
+                SF_ROBOT_COORDINATES,
                 DOC_SF_COORDINATES,
-                Some(DOC_SF_COORDINATES_VERBOSE),
+                Some(DOC_SF_ROBOT_COORDINATES_VERBOSE),
             ),
             LHelp::new(
-                SF_IN_INTERACT,
-                DOC_SF_IN_INTERACT,
-                Some(DOC_SF_IN_INTERACT_VERBOSE),
+                SF_ROBOT_IN_INTERACT_AREAS,
+                DOC_SF_ROBOT_IN_INTERACT_AREAS,
+                Some(DOC_SF_ROBOT_IN_INTERACT_AREAS_VERBOSE),
             ),
             LHelp::new(
-                SF_IN_STATION,
-                DOC_SF_IN_STATION,
-                Some(DOC_SF_IN_STATION_VERBOSE),
+                SF_ROBOT_IN_STATION,
+                DOC_SF_ROBOT_IN_STATION,
+                Some(DOC_SF_ROBOT_IN_STATION_VERBOSE),
             ),
             LHelp::new(
-                SF_INPUT_BELT,
-                DOC_SF_INPUT_BELT,
-                Some(DOC_SF_INPUT_BELT_VERBOSE),
-            ),
-            LHelp::new(SF_LOCATION, DOC_SF_LOCATION, Some(DOC_SF_LOCATION_VERBOSE)),
-            LHelp::new(
-                SF_OUTPUT_BELT,
-                DOC_SF_OUTPUT_BELT,
-                Some(DOC_SF_OUTPUT_BELT_VERBOSE),
+                SF_ROBOT_ROTATION,
+                DOC_SF_ROBOT_ROTATION,
+                Some(DOC_SF_ROBOT_ROTATION_VERBOSE),
             ),
             LHelp::new(
-                SF_PACKAGES_LIST,
-                DOC_SF_PACKAGES_LIST,
-                Some(DOC_SF_PACKAGES_LIST_VERBOSE),
-            ),
-            LHelp::new(SF_POLYGONS, DOC_SF_POLYGONS, Some(DOC_SF_POLYGONS_VERBOSE)),
-            LHelp::new(
-                SF_PROCESSES,
-                DOC_SF_PROCESSES,
-                Some(DOC_SF_PROCESSES_VERBOSE),
+                SF_ROBOT_ROTATION_SPEED,
+                DOC_SF_ROBOT_ROTATION_SPEED,
+                Some(DOC_SF_ROBOT_ROTATION_SPEED_VERBOSE),
             ),
             LHelp::new(
-                SF_PROGRESS_RATE,
-                DOC_SF_PROGRESS_RATE,
-                Some(DOC_SF_PROGRESS_RATE_VERBOSE),
+                SF_ROBOT_VELOCITY,
+                DOC_SF_ROBOT_VELOCITY,
+                Some(DOC_SF_ROBOT_VELOCITY_VERBOSE),
             ),
-            LHelp::new(SF_ROTATION, DOC_SF_ROTATION, Some(DOC_SF_ROTATION_VERBOSE)),
+            LHelp::new(SF_MACHINE_COORDINATES, DOC_SF_MACHINE_COORDINATES, None),
             LHelp::new(
-                SF_ROTATION_SPEED,
-                DOC_SF_ROTATION_SPEED,
-                Some(DOC_SF_ROTATION_SPEED_VERBOSE),
+                SF_MACHINE_COORDINATES_TILE,
+                DOC_SF_MACHINE_COORDINATES_TILE,
+                None,
             ),
-            LHelp::new(SF_VELOCITY, DOC_SF_VELOCITY, Some(DOC_SF_VELOCITY_VERBOSE)),
+            LHelp::new(
+                SF_MACHINE_INPUT_BELT,
+                DOC_SF_MACHINE_INPUT_BELT,
+                Some(DOC_SF_MACHINE_INPUT_BELT_VERBOSE),
+            ),
+            LHelp::new(
+                SF_PACKAGE_LOCATION,
+                DOC_SF_PACKAGE_LOCATION,
+                Some(DOC_SF_PACKAGE_LOCATION_VERBOSE),
+            ),
+            LHelp::new(
+                SF_BELT_PACKAGES_LIST,
+                DOC_SF_BELT_PACKAGES_LIST,
+                Some(DOC_SF_BELT_PACKAGES_LIST_VERBOSE),
+            ),
+            LHelp::new(
+                SF_PACKAGE_PROCESSES_LIST,
+                DOC_SF_PACKAGE_PROCESSES_LIST,
+                Some(DOC_SF_PACKAGE_PROCESSES_LIST_VERBOSE),
+            ),
+            LHelp::new(
+                SF_MACHINE_OUTPUT_BELT,
+                DOC_SF_MACHINE_OUTPUT_BELT,
+                Some(DOC_SF_MACHINE_OUTPUT_BELT_VERBOSE),
+            ),
+            LHelp::new(
+                SF_MACHINE_PROCESSES,
+                DOC_SF_MACHINE_PROCESSES,
+                Some(DOC_SF_MACHINE_PROCESSES_VERBOSE),
+            ),
+            LHelp::new(
+                SF_MACHINE_PROGRESS_RATE,
+                DOC_SF_MACHINE_PROGRESS_RATE,
+                Some(DOC_SF_MACHINE_PROGRESS_RATE_VERBOSE),
+            ),
+            LHelp::new(
+                SF_BELT_POLYGONS,
+                DOC_SF_BELT_POLYGONS,
+                Some(DOC_SF_BELT_POLYGONS_VERBOSE),
+            ),
+            LHelp::new(
+                SF_BELT_BELT_TYPE,
+                DOC_SF_BELT_BELT_TYPE,
+                Some(DOC_SF_BELT_BELT_TYPE_VERBOSE),
+            ),
+            LHelp::new(SF_BELT_CELLS, DOC_SF_BELT_CELLS, None),
+            LHelp::new(SF_BELT_INTERACT_AREAS, DOC_SF_BELT_INTERACT_AREAS, None),
+            LHelp::new(SF_INTERACT_AREA_BELT, DOC_SF_INTERACT_AREA_BELT, None),
+            LHelp::new(SF_INTERACT_AREA_CELLS, DOC_SF_INTERACT_AREA_CELLS, None),
+            LHelp::new(
+                SF_INTERACT_AREA_POLYGONS,
+                DOC_SF_INTERACT_AREA_POLYGONS,
+                None,
+            ),
+            LHelp::new(SF_PARKING_AREA_POLYGONS, DOC_SF_PARKING_AREA_POLYGONS, None),
+            LHelp::new(SF_PARKING_AREA_CELLS, DOC_SF_PARKING_AREA_CELLS, None),
             LHelp::new(GET_STATE, DOC_GET_STATE, Some(DOC_GET_STATE_VERBOSE)),
-            //LHelp::new(SET_STATE, DOC_SET_STATE, None),
-            //LHelp::new(UPDATE_STATE, DOC_UPDATE_STATE, None),
+            LHelp::new(ACTION_DO_ROTATION, DOC_ACTION_DO_ROTATION, None),
+            LHelp::new(ACTION_NAVIGATE_TO, DOC_ACTION_NAVIGATE_TO, None),
+            LHelp::new(ACTION_PICK, DOC_ACTION_PICK, None),
+            LHelp::new(ACTION_PLACE, DOC_ACTION_PLACE, None),
         ]
     }
 }

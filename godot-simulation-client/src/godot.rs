@@ -65,7 +65,7 @@ async fn async_read_socket(stream: ReadHalf<TcpStream>, state: Arc<Mutex<GodotSt
         let msg = read_msg_from_buf(&buf, size);
 
         if !msg.is_empty() {
-            let message: GodotMessageSerde = serde_json::from_str(&msg).unwrap();
+            let message: GodotMessageSerde = serde_json::from_str(&msg.to_lowercase()).unwrap();
             let temp_state: LState = message.try_into().unwrap();
             state.lock().await.set_state(temp_state);
         }

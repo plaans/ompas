@@ -120,10 +120,18 @@ pub fn rand_int_in_range(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValu
             let value: i64 = rand::thread_rng().gen_range(n1.into()..n2.into());
             Ok(value.into())
         } else {
-            Err(WrongType(args[1].clone(), (&args[1]).into(), NameTypeLValue::Number))
+            Err(WrongType(
+                args[1].clone(),
+                (&args[1]).into(),
+                NameTypeLValue::Number,
+            ))
         }
     } else {
-        Err(WrongType(args[0].clone(), (&args[0]).into(), NameTypeLValue::Number))
+        Err(WrongType(
+            args[0].clone(),
+            (&args[0]).into(),
+            NameTypeLValue::Number,
+        ))
     }
 }
 
@@ -134,13 +142,21 @@ pub fn rand_float_in_range(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LVa
 
     if let LValue::Number(n1) = &args[0] {
         if let LValue::Number(n2) = &args[1] {
-            let value : f64 = rand::thread_rng().gen_range(n1.into()..n2.into());
+            let value: f64 = rand::thread_rng().gen_range(n1.into()..n2.into());
             Ok(value.into())
-        }else {
-            Err(WrongType(args[1].clone(), (&args[1]).into(), NameTypeLValue::Number))
+        } else {
+            Err(WrongType(
+                args[1].clone(),
+                (&args[1]).into(),
+                NameTypeLValue::Number,
+            ))
         }
-    }else {
-        Err(WrongType(args[0].clone(), (&args[0]).into(), NameTypeLValue::Number))
+    } else {
+        Err(WrongType(
+            args[0].clone(),
+            (&args[0]).into(),
+            NameTypeLValue::Number,
+        ))
     }
 }
 

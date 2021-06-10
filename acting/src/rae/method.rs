@@ -11,6 +11,7 @@ pub enum MethodStep {
 
 pub enum ActionStatus {
     Running,
+    RetrialFailure,
     Failure,
     Done
 }
@@ -30,5 +31,9 @@ pub struct Method {
 impl Method {
     pub fn get_step(&self, i: usize) -> Option<MethodStep> {
         self.core.get(i).cloned()
+    }
+
+    pub fn len(&self) -> usize {
+        self.core.len()
     }
 }

@@ -1,11 +1,10 @@
 pub type ActionId = usize;
 
-pub struct Primitive {
-
-}
-
+pub type Primitive = String; //Lisp code;
 
 pub struct Action {
-    primitive: Primitive,
-    id: ActionId,
+    pub primitive: Primitive,
+    pub id: ActionId,
 }
+
+

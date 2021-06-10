@@ -7,3 +7,4 @@ mod tests {
 }
 
 pub mod controller;
+pub mod rae;

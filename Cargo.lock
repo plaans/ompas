@@ -373,6 +373,7 @@ version = "0.1.0"
 dependencies = [
  "ompas_lisp",
  "ompas_modules",
+ "tokio",
 ]
 
 [[package]]

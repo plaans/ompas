@@ -1,25 +1,36 @@
-
-use std::sync::atomic::AtomicBool;
 use std::collections::{VecDeque, HashMap};
-use std::sync::{Arc, Mutex};
-use crate::rae::structs::{ReactiveTrigger, RAETask, ActionStatus};
+use std::sync::{Arc};
 use crate::rae::action::{Action, ActionId};
-use crate::rae::method::{ActionStatus, Method};
+use crate::rae::method::{ActionStatus, RefinementStack};
 use crate::rae::task::{TaskId, Task};
 use ompas_lisp::structs::{Module, GetModule};
 use ompas_modules::doc::{Documentation, LHelp};
+use tokio::sync::Mutex;
+use tokio::sync::mpsc::Receiver;
 
 pub struct Agenda {
-    pub task_set: Vec<TaskId>,
+    pub tasks: Vec<TaskId>,
     map: HashMap<TaskId, Task>,
     next_id: usize
 }
 
 impl Agenda {
+    pub fn remove_by_id(&mut self, task_id: &TaskId) {
+        todo!()
+    }
+
+    pub fn remove(&mut self, index: usize) {
+        let task_id = self.tasks[index];
+        self.tasks.remove(index);
+        self.map.remove(&task_id);
+
+    }
+
+
     pub fn add_task(&mut self, task: Task) -> usize {
         let id = self.get_new_id();
         self.map.insert(id, task);
-        self.task_set.push(id);
+        self.tasks.push(id);
         id
     }
 
@@ -27,6 +38,32 @@ impl Agenda {
         let result = self.next_id;
         self.next_id+=1;
         result
+    }
+
+    pub fn set_task_refinement_stack(&mut self, task_id: &TaskId, rs: RefinementStack) {
+        self.map.get_mut(task_id).unwrap().refinement_stack = rs;
+    }
+
+    pub fn get_stacks(&self) -> Vec<RefinementStack> {
+        let result = self.map.values();
+        let mut vec = vec![];
+        for e in result {
+            vec.push(e.refinement_stack.clone())
+        }
+        vec
+    }
+
+    pub fn get_task(&self, task_id: &TaskId) -> Option<&Task> {
+        self.map.get(task_id)
+    }
+
+    pub fn get_stack(&self, task_id: &TaskId) -> Option<&RefinementStack> {
+        match self.get_task(task_id) {
+            None => None,
+            Some(task) => {
+                Some(&task.refinement_stack)
+            }
+        }
     }
 
 }
@@ -46,11 +83,11 @@ impl ActionsProgress {
         id
     }
 
-    pub fn update_status_action(&mut self, action_id: id, status: ActionStatus) {
-        self.status.insert(action_id, status);
+    pub fn update_status_action(&mut self, action_id: &ActionId, status: ActionStatus) {
+        self.status.insert(*action_id, status);
     }
 
-    pub fn get_action_status(&self, action_id: id) -> &ActionStatus {
+    pub fn get_action_status(&self, action_id: &ActionId) -> &ActionStatus {
         self.status.get(action_id).unwrap()
     }
 
@@ -67,7 +104,7 @@ pub struct RAEOptions {
 
 
 pub struct CtxRAE {
-    pub stream: Stream,
+    pub stream: Receiver<Task>,
     pub log: String,
     pub actions_progress : ActionsProgress,
     pub agenda: Agenda,
@@ -92,7 +129,7 @@ pub struct SelectOption {
 }
 
 //methods to access attributes
-impl CtxRAE {
+/*impl CtxRAE {
     pub fn get_ref_mut_agenda(&mut self) -> &mut Agenda {
         &mut self.agenda
     }
@@ -100,17 +137,17 @@ impl CtxRAE {
     pub fn get_ref_mut_stream(&mut self) -> &mut Stream {
         &mut self.stream
     }
-}
+}*/
 
 impl CtxRAE {
     pub fn get_execution_status(&self, action_id : &ActionId) -> Option<&ActionStatus> {
-        self.status.get(action_id)
+        self.actions_progress.status.get(action_id)
     }
 }
 
 pub type ReactiveTriggerId = usize;
 
-#[derive(Default, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub enum TaskType {
     Task,
     Event,
@@ -121,84 +158,28 @@ pub struct RAEEvent {
 
 }
 
+/*pub struct Stream {
+    inner: tokio::stream;
+}*/
 
-#[derive(Default, Debug, Clone)]
+/*#[derive(Default, Debug, Clone)]
 pub struct Stream {
-    inner : Arc<Mutex<VecDeque<ReactiveTrigger>>>,
+    inner : Arc<Mutex<VecDeque<Task>>>,
 }
 
 impl Stream {
-    pub async fn push(&self, rt: ReactiveTrigger) {
+    pub async fn push(&self, task: Task) {
 
     }
-}
 
-
-#[derive(Default, Debug, Clone)]
-pub struct RefinementStack {
-    inner: VecDeque<RefinementTuple>
-}
-
-impl RefinementStack {
-    pub fn new(rt: RefinementTuple) -> Self {
-        let mut inner = VecDeque::new();
-        inner.push_back(rt);
-        Self {
-            inner,
-        }
-    }
-}
-
-#[derive(Default, Debug, Clone)]
-pub struct RefinementTuple {
-    pub task_id : TaskId,
-    pub method: Method,
-    pub step : MethodStepId,
-    pub tried: Vec<Method>
-}
-
-impl RefinementTuple {
-    pub fn increment_step(&mut self) {
-        self.step+=1;
-    }
-
-    pub fn is_last_step(&self) -> bool{
-        self.step == self.method.len()
-    }
-}
-
-#[derive(Default, Debug, Clone)]
-pub struct RefinementMethodInstance {
-
-}
-
-pub type MethodStepId = usize;
-
-impl RefinementStack {
-    pub fn is_empty(&self) -> bool {
-        false
-    }
-
-    pub fn is_retrial_failure(&self) -> bool  {
-        false
-    }
-
-    pub fn push(&mut self, rt: RefinementTuple) {
-        self.inner.push_front(rt);
-    }
-
-    pub fn top(&self) -> Option<&RefinementTuple> {
-        self.inner.front()
-    }
-
-    pub fn pop(&mut self) -> Option<RefinementTuple> {
-        self.inner.pop_front()
+    pub async fn pop(&self) -> Option<Task> {
+        self.inner.lock().await.pop_front()
     }
 }
 
 impl Stream {
-    pub fn is_empty(&self) -> bool {
-        self.inner.is_empty()
+    pub async fn is_empty(&self) -> bool {
+        self.inner.lock().await.is_empty()
     }
 }
 
@@ -208,7 +189,7 @@ pub struct StreamIterator<'a> {
 }
 
 impl<'a> IntoIterator for &'a Stream {
-    type Item = ReactiveTrigger;
+    type Item = Task;
     type IntoIter = StreamIterator<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -220,15 +201,15 @@ impl<'a> IntoIterator for &'a Stream {
 }
 
 impl<'a> Iterator for StreamIterator<'a> {
-    type Item = ReactiveTrigger;
+    type Item = Task;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let result = if self.stream.inner.len() < self.index {
-            Some(self.stream.inner[self.index].clone())
+        let result = if self.stream.inner.lock().await.len() < self.index {
+            Some(self.stream.inner.lock().await[self.index].clone())
         }else {
             None
         };
         self.index +=1;
         result
     }
-}
+}*/

@@ -1,13 +1,14 @@
-use crate::rae::structs::{Agenda, Stream, ActionStatus, RAEStatus, RefinementStack, RAEState, Method, RAETask, RAEMethod, RefinementTuple, MethodProgress};
-use ompas_lisp::structs::LCoreOperator::DefMacro;
-use ompas_lisp::structs::GetModule;
-use ompas_modules::doc::Documentation;
-use crate::rae::context::{Stream, Agenda, RefinementStack, RefinementTuple, MethodProgress, Progress, CtxRAE, SelectOption};
-use crate::rae::state::{RAEState, State};
+use crate::rae::context::{CtxRAE, SelectOption};
+use crate::rae::state::State;
 use crate::rae::log::RAEStatus;
-use crate::rae::method::{MethodStep, ActionStatus, Method};
+use crate::rae::method::{MethodStep, ActionStatus, Method, RefinementStack, RefinementTuple};
 use crate::rae::action::Action;
-use crate::rae::task::TaskId;
+use crate::rae::task::{TaskId, Task};
+use tokio_stream::StreamExt;
+use tokio::sync::mpsc::{Sender, Receiver};
+use tokio::sync::mpsc;
+use async_recursion::async_recursion;
+
 
 pub mod structs;
 pub mod method;
@@ -20,93 +21,119 @@ pub mod log;
 
 pub type Lisp = String;
 
+pub enum RAEError {
+    RetryFailure,
+    Other(String),
+}
+
+pub const TOKIO_CHANNEL_SIZE: usize = 65_536; //=2^16
+
 pub async fn rae_run(context: &mut CtxRAE, select_option: &SelectOption, log: String) {
 
-    let agenda = context.get_ref_mut_agenda();
-    let stream = context.get_ref_mut_stream();
+
     //infinite loop
     //Maybe we can add a system to interrupt, or it stops itself when there is nothing to process
     //We can imagine a system monitoring the stream.
     loop {
-
         //For each new event or task to be addressed, we search for the best method a create a new refinement stack
-        for t in stream.into_iter() {
+
+        //let (sender, mut receiver): (Sender<Task>, Receiver<Task>) =
+        //    mpsc::channel(TOKIO_CHANNEL_SIZE);
+
+        //let mut stream  = tokio_stream::iter(receiver);
+
+        //let mut stream = tokio_stream::iter(vec![Task::default()]);
+        //tokio::pin!(stream); //was important for streams
+
+        //Note: The whole block could be in an async block
+        while let Some(task) = context.stream.recv().await {
+            let task_id = &context.agenda.add_task(task);
             let state = get_state().await;
-            let m = select(state, t, RefinementTuple, &context.select_option).await;
+            let m = select(state, task_id, &context.agenda.get_stack(task_id).unwrap(), &context.options.select_option).await;
             if m.is_none() {
                 output(RAEStatus {
                     task: Default::default(),
                     msg: "failed: no method found in the current state".to_string()
                 }, log.clone()).await;
             }else {
-                let ra = RefinementStack::new(RefinementTuple {
-                    task_id: 0,//to change
-                    method: m.unwrap(),
-                    step: 0,
+                let rs = RefinementStack::new(RefinementTuple {
+                    task_id: task_id.clone(),//to change
+                    method: Some(m.unwrap()),
+                    step: 1,
                     tried: vec![]
                 });
-                //Add the refinement stack to the agenda
-                agenda.push(ra);
+                context.agenda.set_task_refinement_stack(task_id, rs);
             }
         }
         //For each stack we progress until there is a success or failure.
-        for (i,ra) in agenda.iter_mut().enumerate() {
+        for (i,task_id) in context.agenda.tasks.clone().iter().enumerate() {
             let state = get_state().await;
-            Progress(ra, state, progress).await;
-            if ra.is_empty() {
-                agenda.remove(i);
-                output(RAEStatus {
-                    task: Default::default(),
-                    msg: "succedded".to_string()
-                }, log.clone()).await;
-            }else if ra.is_retrial_failure() {
-                agenda.remove(i);
-                output(RAEStatus {
-                    task: Default::default(),
-                    msg: "failed".to_string()
-                }, log.clone()).await;
+            let result = progress(context.agenda.get_stack(task_id).unwrap().clone(), state, context).await;
+            match result {
+                Ok(optional_stack) => {
+                    match optional_stack {
+                        None => {
+                            context.agenda.remove(i);
+                            output(RAEStatus {
+                                task: Default::default(),
+                                msg: "succedded".to_string()
+                            }, log.clone()).await;
+                        }
+                        Some(new_stack) => {
+                            context.agenda.set_task_refinement_stack(task_id, new_stack);
+                        }
+                    }
+                }
+                Err(e) => if let RAEError::RetryFailure = e {
+                    context.agenda.remove(i);
+                    output(RAEStatus {
+                        task: Default::default(),
+                        msg: "failed".to_string()
+                    }, log.clone()).await;
+                }
             }
         }
-
     }
-
 }
 
 ///Progress a given refinement stack
-pub async fn progress(mut rs: RefinementStack, mut state: State, context : &mut CtxRAE) -> Option<RefinementStack> {
+pub async fn progress(mut rs: RefinementStack, mut state: State, context : &mut CtxRAE) -> Result<Option<RefinementStack>, RAEError> {
     let tuple = rs.top();
     match tuple {
         None => panic!("stack should not be empty!"),
-        Some(rt) => match rt.method.get_step(rt.step) {
+        Some(rt) => match rt.method.as_ref().unwrap().get_step(rt.step) {
             None => panic!("Step should not be empty"),
             Some(step) => match step {
-                MethodStep::Action(a) => match progress.get_execution_status(&a.id) {
+                MethodStep::Action(a) => match context.get_execution_status(&a.id) {
                         None => {
                             //trigger the action
                             trigger_action(a, context);
-                            return Some(rs)
+                            return Ok(Some(rs))
                         }
                         Some(status) => match status {
                             ActionStatus::Running => {
-                                return Some(rs)
+                                return Ok(Some(rs))
                             }
                             ActionStatus::Failure => {
-                                return retry(rs, state, context)
+                                return retry(rs, state, context).await
                             }
                             ActionStatus::Done => {
-                                return next(rs, state, context)
+                                return next(rs, state, context).await
+                            }
+                            ActionStatus::NotTriggered => {
+                                todo!();
                             }
                         }
                     }
                 MethodStep::Assignment(a) => {
                     state.update_state(a);
-                    return next(rs, state, context)
+                    return next(rs, state, context).await
                 }
                 MethodStep::Task(task) => {
                     let state = get_state().await;
-                    let method = select(state.clone(), &task.id, &rs, &context.select_option).await;
+                    let method = select(state.clone(), &task.id, &rs, &context.options.select_option).await;
                     match method {
-                        None => return retry(ra, state, context),
+                        None => return retry(rs, state, context).await,
                         Some(_) => {
                             rs.push(RefinementTuple {
                                 task_id: task.id,
@@ -130,39 +157,43 @@ pub struct RetryFailure {
 }
 
 ///Retry a method
-pub async fn retry(mut rs: RefinementStack, state: State, context: &mut CtxRAE) -> Result<RefinementStack, RetryFailure> {
+#[async_recursion]
+pub async fn retry(mut rs: RefinementStack, state: State, context: &mut CtxRAE) -> Result<Option<RefinementStack>, RAEError> {
     let mut tuple = rs.pop().unwrap(); //we assume that if we retry the stack, it is not empty
-    tuple.tried.push(tuple.method);
+    tuple.tried.push(tuple.method.unwrap());
     let state = get_state().await;
     let method = select(state.clone(), &tuple.task_id, &rs, &context.options.select_option).await;
-    match method {
+    match &method {
         None => if !rs.is_empty() {
-            retry(rs, state, context)
+            retry(rs, state, context).await
         } else {
-            Err(RetryFailure::default())
+            Err(RAEError::RetryFailure)
         },
         Some(m) => {
             rs.push(RefinementTuple {
                 task_id: tuple.task_id,
-                method: m,
+                method: Some(m.clone()),
                 step: 1,
                 tried: vec![]
             });
-            return Ok(rs)
+            return Ok(Some(rs))
         }
     }
 }
 
-pub async fn next(mut ra: RefinementStack, state: State, context: &CtxRAE) -> Option<RefinementStack> {
-    let mut tuple = ra.pop().unwrap();
+pub async fn next(mut rs: RefinementStack, state: State, context: &CtxRAE) -> Result<Option<RefinementStack>, RAEError> {
+    let mut tuple = rs.pop().unwrap();
     return if !tuple.is_last_step() {
         tuple.increment_step();
-        ra.push(tuple);
-        Some(ra)
+        rs.push(tuple);
+        Ok(Some(rs))
     }
-    else if ra.is_empty() {
-        None
-    }}
+    else if rs.is_empty() {
+        Ok(None)
+    }else {
+        panic!("error searching the next step in the method")
+    }
+}
 
 ///Return the actual state
 pub async fn get_state() -> State {
@@ -171,7 +202,8 @@ pub async fn get_state() -> State {
 
 
 ///Select the best method to refine a task
-pub async fn select(state: State, task_id: & TaskId, rs: &RefinementStack, select_option: &SelectOption) -> Option<Method> {
+/// It can use either RAEPlan, UPOM or an other planner
+pub async fn select(state: State, task_id: &TaskId, rs: &RefinementStack, select_option: &SelectOption) -> Option<Method> {
     None
 }
 
@@ -182,7 +214,7 @@ pub async fn output(status: RAEStatus, log: String) {
     //writes formatted message to log
 }
 
-pub fn trigger_action(action: Action, context: &mut Progress) {
+pub fn trigger_action(action: Action, context: &mut CtxRAE) {
     //execute the action
     //Add action to list and put status as running
 }

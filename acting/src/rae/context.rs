@@ -1,36 +1,43 @@
 use std::collections::{VecDeque, HashMap};
-use std::sync::{Arc};
-use crate::rae::action::{Action, ActionId};
-use crate::rae::method::{ActionStatus, RefinementStack};
-use crate::rae::task::{TaskId, Task};
-use ompas_lisp::structs::{Module, GetModule};
-use ompas_modules::doc::{Documentation, LHelp};
-use tokio::sync::Mutex;
-use tokio::sync::mpsc::Receiver;
+use ompas_lisp::structs::{LLambda, LError};
+use crate::rae::job::{Job, JobId};
+use ompas_lisp::structs::LError::SpecialError;
+use std::fmt::{Display, Formatter};
+use crate::rae::method::{RefinementStack, StackFrame};
 
+#[derive(Default, Debug)]
 pub struct Agenda {
-    pub tasks: Vec<TaskId>,
-    map: HashMap<TaskId, Task>,
+    pub jobs: Vec<JobId>,
+    pub stacks : HashMap<JobId, RefinementStack>,
     next_id: usize
 }
 
 impl Agenda {
-    pub fn remove_by_id(&mut self, task_id: &TaskId) {
+    pub fn remove_by_id(&mut self, task_id: &JobId) {
         todo!()
     }
 
     pub fn remove(&mut self, index: usize) {
-        let task_id = self.tasks[index];
-        self.tasks.remove(index);
-        self.map.remove(&task_id);
+        let job_id = self.jobs[index];
+        self.jobs.remove(index);
+        self.stacks.remove(&job_id);
 
     }
 
-
-    pub fn add_task(&mut self, task: Task) -> usize {
+    pub fn add_job(&mut self, job: Job) -> usize {
         let id = self.get_new_id();
-        self.map.insert(id, task);
-        self.tasks.push(id);
+        let mut inner = VecDeque::new();
+        inner.push_front(StackFrame {
+            job_id: id,
+            method: None,
+            step: 1,
+            tried: vec![]
+        });
+        self.stacks.insert(id, RefinementStack {
+            job,
+            inner,
+        });
+        self.jobs.push(id);
         id
     }
 
@@ -40,54 +47,295 @@ impl Agenda {
         result
     }
 
-    pub fn set_task_refinement_stack(&mut self, task_id: &TaskId, rs: RefinementStack) {
-        self.map.get_mut(task_id).unwrap().refinement_stack = rs;
+    pub fn set_refinement_stack(&mut self, job_id: &JobId, rs: RefinementStack) {
+        self.stacks.insert(*job_id, rs);
     }
 
-    pub fn get_stacks(&self) -> Vec<RefinementStack> {
-        let result = self.map.values();
+    pub fn get_stacks(&self) -> Vec<&RefinementStack> {
         let mut vec = vec![];
-        for e in result {
-            vec.push(e.refinement_stack.clone())
+        for e in &self.stacks {
+            vec.push(e.1)
         }
         vec
     }
 
-    pub fn get_task(&self, task_id: &TaskId) -> Option<&Task> {
-        self.map.get(task_id)
+    pub fn get_stack(&self, job_id: &JobId) -> Option<&RefinementStack> {
+        self.stacks.get(job_id)
+    }
+}
+
+
+#[derive(Default, Debug, Clone)]
+pub struct RAEEnv {
+    actions: ActionCollection,
+    methods: MethodCollection,
+    tasks: TaskCollection,
+}
+
+impl RAEEnv {
+    pub fn get_env(&self, label: Option<String>) -> String {
+        let mut string = String::new();
+        if let Some(label) = label {
+            todo!()
+        }else {
+            string.push_str("RAEEnv: \n\n");
+            string.push_str("\t*Actions: \n\n");
+            for e in &self.actions.inner {
+                string.push_str(format!("\t\t- {}\n", e.1).as_str());
+            }
+            string.push_str("\t*Tasks: \n\n");
+            for e in &self.tasks.inner{
+                string.push_str(format!("\t\t- {}\n", e.1).as_str());
+                string.push_str("\t\t*Methods: \n");
+                for m in self.tasks.get_methods(&e.0).cloned().unwrap().iter().map(|id| self.methods.get_method_by_id(id).unwrap()){
+                    string.push_str(format!("\t\t\t- {}\n,", m).as_str())
+                }
+            }
+        }
+        string
     }
 
-    pub fn get_stack(&self, task_id: &TaskId) -> Option<&RefinementStack> {
-        match self.get_task(task_id) {
+    pub fn add_action(&mut self, label: ActionLabel, body: LLambda) {
+        self.actions.add_action(label, body);
+    }
+
+    pub fn add_task(&mut self, label: TaskLabel, body: LLambda) {
+        self.tasks.add_task(label, body);
+    }
+
+    pub fn add_method(&mut self, method_label: MethodLabel, task_label: &TaskLabel, body: LLambda) -> Result<(), LError> {
+        let method_id = self.methods.add_method(method_label, body);
+        self.tasks.add_method_to_task(task_label, method_id)
+    }
+
+    pub fn get_methods(&mut self, task_label: &TaskLabel) -> Vec<MethodId> {
+        self.tasks.methods.get(self.tasks.get_id(task_label).unwrap()).cloned().unwrap()
+    }
+}
+
+pub type ActionLabel = String;
+pub type ActionId = usize;
+
+
+#[derive(Default, Debug, Clone)]
+pub struct ActionCollection {
+    labels : HashMap<ActionLabel, ActionId>,
+    inner: HashMap<ActionId, Action>,
+    next_id: usize,
+}
+
+impl ActionCollection {
+    pub fn get_id(&self, label: &ActionLabel) -> Option<&ActionId> {
+        self.labels.get(label)
+    }
+
+    pub fn get_action_by_id(&self, id: &ActionId) -> Option<&Action> {
+        self.inner.get(id)
+    }
+
+    pub fn get_action_by_label(&self, label: &ActionLabel) -> Option<&Action> {
+        match self.get_id(label) {
             None => None,
-            Some(task) => {
-                Some(&task.refinement_stack)
+            Some(id) => {
+                self.inner.get(id)
             }
         }
     }
 
-}
-
-//struct to handle actions trigger, status and updates by other modules as godot
-pub struct ActionsProgress {
-    stack: VecDeque<ActionId>,
-    map : HashMap<ActionId, Action>,
-    status: HashMap<ActionId, ActionStatus>,
-    next_id : usize,
-}
-
-impl ActionsProgress {
-    pub fn add_action(&mut self, action: Action) -> usize {
-        let id = self.get_new_id();
-        self.map.insert(id, action);
+    pub fn add_action(&mut self, label: ActionLabel, action: LLambda) -> usize {
+        let id = self.get_next_id();
+        let action = Action {
+            id,
+            lambda: action
+        };
+        self.inner.insert(id, action);
+        self.labels.insert(label, id);
         id
     }
 
-    pub fn update_status_action(&mut self, action_id: &ActionId, status: ActionStatus) {
+    fn get_next_id(&mut self) -> ActionId {
+        let id = self.next_id;
+        self.next_id+=1;
+        id
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Action {
+    pub id: ActionId,
+    pub lambda: LLambda,
+}
+
+impl Display for Action {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "id: {}\n body: {}", self.id, self.lambda)
+    }
+}
+
+pub type MethodLabel = String;
+pub type MethodId = usize;
+
+#[derive(Default, Debug, Clone)]
+pub struct MethodCollection {
+    labels: HashMap<MethodLabel, MethodId>,
+    inner: HashMap<MethodId, Method>,
+    next_id: usize,
+}
+
+impl MethodCollection {
+    pub fn get_id(&self, label: &MethodLabel) -> Option<&MethodId> {
+        self.labels.get(label)
+    }
+
+    pub fn get_method_by_id(&self, id: &MethodId) -> Option<&Method> {
+        self.inner.get(id)
+    }
+
+    pub fn get_action_by_label(&self, label: &MethodLabel) -> Option<&Method> {
+        match self.get_id(label) {
+            None => None,
+            Some(id) => {
+                self.inner.get(id)
+            }
+        }
+    }
+
+    pub fn add_method(&mut self, label: MethodLabel, method: LLambda) -> usize {
+        let id = self.get_next_id();
+        let method = Method {
+            id,
+            lambda: method
+        };
+        self.inner.insert(id, method);
+        self.labels.insert(label, id);
+        id
+    }
+
+    fn get_next_id(&mut self) -> MethodId {
+        let id = self.next_id;
+        self.next_id+=1;
+        id
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Method {
+    id: MethodId,
+    lambda : LLambda
+}
+
+impl Display for Method {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "id: {}\n body: {}", self.id, self.lambda)
+    }
+}
+
+pub type TaskLabel = String;
+pub type TaskId = usize;
+
+#[derive(Default, Debug, Clone)]
+pub struct TaskCollection {
+    labels: HashMap<TaskLabel, TaskId>,
+    inner: HashMap<TaskId, Task>,
+    methods: HashMap<TaskId, Vec<MethodId>>,
+    next_id: usize,
+}
+
+impl TaskCollection {
+    pub fn get_id(&self, label: &TaskLabel) -> Option<&TaskId> {
+        self.labels.get(label)
+    }
+
+    pub fn get_task_by_id(&self, id: &TaskId) -> Option<&Task> {
+        self.inner.get(id)
+    }
+
+    pub fn get_task_by_label(&self, label: &TaskLabel) -> Option<&Task> {
+        match self.get_id(label) {
+            None => None,
+            Some(id) => {
+                self.inner.get(id)
+            }
+        }
+    }
+
+    pub fn add_method_to_task(&mut self, label: &TaskLabel, method_id: MethodId) -> Result<(), LError> {
+        let id = self.get_id(label).cloned();
+        match id {
+            None => Err(SpecialError("task label corresponds to nothing in the environment".to_string())),
+            Some(id) => {
+                self.methods.get_mut(&id).expect("should not panic").push(method_id);
+                Ok(())
+            }
+        }
+    }
+
+    pub fn get_methods(&self, id: &TaskId) -> Option<&Vec<MethodId>> {
+        self.methods.get(id)
+    }
+
+    pub fn add_task(&mut self, label: TaskLabel, task: LLambda) -> usize {
+        let id = self.get_next_id();
+        let task = Task {
+            id,
+            lambda: task
+        };
+        self.inner.insert(id, task);
+        self.methods.insert(id, vec![]);
+        self.labels.insert(label, id);
+        id
+    }
+
+    fn get_next_id(&mut self) -> TaskId {
+        let id = self.next_id;
+        self.next_id+=1;
+        id
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Task {
+    pub id: TaskId,
+    pub lambda: LLambda,
+}
+
+impl Display for Task {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "id: {}\n body: {}", self.id, self.lambda)
+    }
+}
+
+//struct to handle actions trigger, status and updates by other modules as godot
+#[derive(Default, Debug)]
+pub struct ActionsProgress {
+    status: HashMap<ActionId, Status>,
+    next_id : usize,
+}
+
+#[derive(Clone, Debug)]
+pub enum Status {
+    NotTriggered,
+    Running,
+    Failure,
+    Done
+}
+
+impl ActionsProgress {
+    pub fn get_status(&self, id: &ActionId) -> Option<&Status> {
+        self.status.get(id)
+    }
+
+    pub fn add_action(&mut self) -> usize {
+        let id = self.get_new_id();
+        self.status.insert(id, Status::NotTriggered);
+        id
+    }
+
+    pub fn update_status_action(&mut self, action_id: &ActionId, status: Status) {
         self.status.insert(*action_id, status);
     }
 
-    pub fn get_action_status(&self, action_id: &ActionId) -> &ActionStatus {
+    pub fn get_action_status(&self, action_id: &ActionId) -> &Status {
         self.status.get(action_id).unwrap()
     }
 
@@ -102,30 +350,9 @@ pub struct RAEOptions {
     pub select_option: SelectOption,
 }
 
-
-pub struct CtxRAE {
-    pub stream: Receiver<Task>,
-    pub log: String,
-    pub actions_progress : ActionsProgress,
-    pub agenda: Agenda,
-    pub options: RAEOptions,
-}
-
-impl GetModule for CtxRAE {
-    fn get_module(self) -> Module {
-        todo!()
-    }
-}
-
-impl Documentation for CtxRAE {
-    fn documentation() -> Vec<LHelp> {
-        todo!()
-    }
-}
-
 pub struct SelectOption {
-    dr0: usize,
-    nro: usize,
+    pub dr0: usize,
+    pub nro: usize,
 }
 
 //methods to access attributes
@@ -139,11 +366,6 @@ pub struct SelectOption {
     }
 }*/
 
-impl CtxRAE {
-    pub fn get_execution_status(&self, action_id : &ActionId) -> Option<&ActionStatus> {
-        self.actions_progress.status.get(action_id)
-    }
-}
 
 pub type ReactiveTriggerId = usize;
 

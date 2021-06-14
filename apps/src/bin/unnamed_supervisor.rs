@@ -13,6 +13,7 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Receiver, Sender};
+use ompas_acting::rae::lisp::CtxRAE;
 
 pub const CHANNEL_SIZE: usize = 16_384;
 
@@ -70,7 +71,7 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     let ctx_counter = CtxCounter::default();
     let ctx_dumber = CtxDumber::default();
     let mut ctx_godot = CtxGodot::default();
-
+    let ctx_rae = CtxRAE::default();
     //Insert the doc for the different contexts.
     ctx_doc.insert_doc(CtxIo::documentation());
     ctx_doc.insert_doc(CtxMath::documentation());
@@ -78,6 +79,7 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     ctx_doc.insert_doc(CtxType::documentation());
     ctx_doc.insert_doc(CtxGodot::documentation());
     ctx_doc.insert_doc(CtxDumber::documentation());
+    ctx_doc.insert_doc(CtxRAE::documentation());
 
     //Add the sender of the channel.
     ctx_io.add_sender_li(sender_li.clone());
@@ -95,6 +97,7 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     load_module(&mut root_env, &mut ctxs, ctx_type, &mut lisp_init);
     load_module(&mut root_env, &mut ctxs, ctx_counter, &mut lisp_init);
     load_module(&mut root_env, &mut ctxs, ctx_godot, &mut lisp_init);
+    load_module(&mut root_env, &mut ctxs, ctx_rae, &mut lisp_init);
     let env = &mut root_env.clone();
     //println!("{}", lisp_init.begin_lisp());
 

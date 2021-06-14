@@ -1,35 +1,21 @@
-use crate::rae::action::Action;
-use crate::rae::task::{Task, TaskId};
 use std::collections::VecDeque;
+use crate::rae::Lisp;
+use crate::rae::context::Status;
+use crate::rae::job::{Job, JobId};
 
 #[derive(Debug, Clone)]
-pub enum MethodStep {
-    Action(Action),
-    Assignment(Assignment),
-    Task(Task)
-}
-
-#[derive(Clone, Debug)]
-pub enum ActionStatus {
-    NotTriggered,
-    Running,
-    Failure,
-    Done
-}
-
-#[derive(Default, Debug, Clone)]
 pub struct Assignment {
-
+    pub core: Lisp,
 }
 
 #[derive(Debug, Clone)]
 pub struct Method {
-    status: ActionStatus,
-    core: Vec<MethodStep> //here this is some lisp
+    status: Status,
+    core: Vec<String> //here this is some lisp
 }
 
 impl Method {
-    pub fn get_step(&self, i: usize) -> Option<MethodStep> {
+    pub fn get_step(&self, i: usize) -> Option<String> {
         self.core.get(i).cloned()
     }
 
@@ -39,30 +25,21 @@ impl Method {
 }
 
 
-#[derive(Default, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct RefinementStack {
-    inner: VecDeque<RefinementTuple>
-}
-
-impl RefinementStack {
-    pub fn new(rt: RefinementTuple) -> Self {
-        let mut inner = VecDeque::new();
-        inner.push_back(rt);
-        Self {
-            inner,
-        }
-    }
+    pub job : Job,
+    pub inner: VecDeque<StackFrame>
 }
 
 #[derive(Default, Debug, Clone)]
-pub struct RefinementTuple {
-    pub task_id : TaskId,
+pub struct StackFrame {
+    pub job_id : JobId,
     pub method: Option<Method>,
     pub step : MethodStepId,
     pub tried: Vec<Method>
 }
 
-impl RefinementTuple {
+impl StackFrame {
     pub fn increment_step(&mut self) {
         self.step+=1;
     }
@@ -91,15 +68,15 @@ impl RefinementStack {
         false
     }
 
-    pub fn push(&mut self, rt: RefinementTuple) {
+    pub fn push(&mut self, rt: StackFrame) {
         self.inner.push_front(rt);
     }
 
-    pub fn top(&self) -> Option<&RefinementTuple> {
+    pub fn top(&self) -> Option<&StackFrame> {
         self.inner.front()
     }
 
-    pub fn pop(&mut self) -> Option<RefinementTuple> {
+    pub fn pop(&mut self) -> Option<StackFrame> {
         self.inner.pop_front()
     }
 }

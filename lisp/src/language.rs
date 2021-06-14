@@ -187,6 +187,12 @@ pub mod scheme_lambda {
 
     pub const LAMBDA_CADAR: &str = "(define cadar (lambda (l1) (car (cdr (car l1)))))";
 
+    pub const LAMBDA_CADADR: &str = "(define cadadr (lambda (l1) (car (cdr (car (cdr l1))))))";
+
+    pub const LAMBDA_CDADR: &str = "(define cdadr (lambda (l1) (cdr (car (cdr l1)))))";
+
+    pub const LAMBDA_CADADDR: &str = "(define cadaddr (lambda (l1) (car (cdr (car (cdr (cdr l1)))))))";
+
     pub const LAMBDA_UNZIP: &str = "(define unzip
         (lambda lists
                 (begin

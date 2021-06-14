@@ -171,6 +171,9 @@ impl GetModule for CtxRoot {
                 LAMBDA_CDAR,
                 LAMBDA_CADR,
                 LAMBDA_CADAR,
+                LAMBDA_CADADDR,
+                LAMBDA_CDADR,
+                LAMBDA_CADADR,
                 LAMBDA_UNZIP,
                 LAMBDA_MAPF,
             ]
@@ -623,14 +626,14 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
     let mut env = env;
 
     loop {
-        //println!("lv: {}", lv);
+        println!("lv: {}", lv);
         if let LValue::Symbol(s) = &lv {
             return match env.get_symbol(s.as_str()) {
                 None => Ok(lv.clone()),
                 Some(lv) => Ok(lv),
             };
         } else if let LValue::List(list) = &lv {
-            //println!("expression is a list");
+            println!("expression is a list");
             let list = list.as_slice();
             let proc = &list[0];
             let args = &list[1..];
@@ -651,7 +654,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                                 ))
                             }
                         };
-                        //println!("=> {}", LValue::Nil);
+                        println!("=> {}", LValue::Nil);
                         return Ok(LValue::Nil);
                     }
                     LCoreOperator::DefLambda => {
@@ -684,7 +687,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                         let body = &args[1];
                         let r_lvalue =
                             LValue::Lambda(LLambda::new(params, body.clone(), env.clone()));
-                        //println!("=> {}", r_lvalue);
+                        println!("=> {}", r_lvalue);
                         return Ok(r_lvalue);
                     }
                     LCoreOperator::If => {
@@ -701,7 +704,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                         };
                     }
                     LCoreOperator::Quote => {
-                        //println!("=> {}", &args[0]);
+                        println!("=> {}", &args[0]);
                         return Ok(args[0].clone());
                     }
                     LCoreOperator::Set => {
@@ -720,7 +723,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                             .iter()
                             .map(|x| eval(x, &mut env, ctxs))
                             .collect::<Result<_, _>>()?;
-                        //println!("=> {}", results.last().unwrap_or(&LValue::Nil));
+                        println!("=> {}", results.last().unwrap_or(&LValue::Nil));
                         return Ok(results.last().unwrap_or(&LValue::Nil).clone());
                     }
                     LCoreOperator::QuasiQuote
@@ -746,7 +749,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                             Some(u) => ctxs.get_context(u),
                         };
                         let r_lvalue = fun.call(args, &env, ctx)?;
-                        //println!("=> {}", r_lvalue);
+                        println!("=> {}", r_lvalue);
                         return Ok(r_lvalue);
                     }
                     LValue::MutFn(fun) => {
@@ -759,7 +762,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                             Some(u) => {
                                 let r_lvalue =
                                     fun.call(&args, &mut env, ctxs.get_mut_context(u))?;
-                                //println!("=> {}", r_lvalue);
+                                println!("=> {}", r_lvalue);
                                 Ok(r_lvalue)
                             }
                         };
@@ -774,7 +777,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                 };
             }
         } else {
-            //println!("=> {}", lv);
+            println!("=> {}", lv);
             return Ok(lv);
         }
     }

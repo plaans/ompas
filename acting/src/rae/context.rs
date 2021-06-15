@@ -1,7 +1,8 @@
 use crate::rae::job::{Job, JobId};
 use crate::rae::method::{RefinementStack, StackFrame};
+use ompas_lisp::core::LEnv;
 use ompas_lisp::structs::LError::SpecialError;
-use ompas_lisp::structs::{LError, LLambda};
+use ompas_lisp::structs::{LError, LLambda, LValue};
 use std::collections::{HashMap, VecDeque};
 use std::fmt::{Display, Formatter};
 
@@ -57,6 +58,37 @@ impl Agenda {
 
     pub fn get_stack(&self, job_id: &JobId) -> Option<&RefinementStack> {
         self.stacks.get(job_id)
+    }
+}
+
+pub struct RAEEnvBis {
+    inner: LEnv,
+}
+
+pub const METHODS_MAP: &str = "rae-methods-map";
+
+impl RAEEnvBis {
+    pub fn add_element(&mut self, label: String, value: LValue) {
+        self.inner.insert(label, value);
+    }
+
+    pub fn add_method_to_task(&mut self, task_label: String, method_label: String) {
+        let map = self.inner.get_symbol(METHODS_MAP).unwrap();
+        if let LValue::Map(mut m) = map {
+            let list = m.get_mut(&LValue::Symbol(task_label.clone())).unwrap();
+            let new_list: LValue = match list {
+                LValue::List(l) => {
+                    l.push(method_label.into());
+                    l.clone().into()
+                }
+                LValue::Nil => vec![method_label].into(),
+                _ => panic!("should be a list or nothing"),
+            };
+            m.insert(LValue::Symbol(task_label), new_list);
+            self.inner
+                .set(METHODS_MAP.into(), m.into())
+                .expect("should not return an error");
+        }
     }
 }
 

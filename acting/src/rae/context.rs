@@ -4,8 +4,8 @@ use ompas_lisp::core::LEnv;
 use ompas_lisp::structs::LError::SpecialError;
 use ompas_lisp::structs::{LError, LLambda, LValue};
 use std::collections::{HashMap, VecDeque};
+use std::convert::{TryFrom, TryInto};
 use std::fmt::{Display, Formatter};
-use std::convert::{TryInto, TryFrom};
 
 #[derive(Default, Debug)]
 pub struct Agenda {
@@ -70,7 +70,7 @@ pub const RAE_TASK_METHODS_MAP: &str = "rae-task-methods-map";
 pub const RAE_TASK_LIST: &str = "rae-task-list";
 pub const RAE_METHOD_LIST: &str = "rae_methods_list";
 pub const RAE_ACTION_LIST: &str = "rae_actions_list";
-pub const RAE_EXEC_COMMAND:&str = "rae-exec-command";
+pub const RAE_EXEC_COMMAND: &str = "rae-exec-command";
 
 impl Default for RAEEnvBis {
     fn default() -> Self {
@@ -78,14 +78,14 @@ impl Default for RAEEnvBis {
         env.insert(RAE_ACTION_LIST.to_string(), LValue::List(vec![]));
         env.insert(RAE_METHOD_LIST.to_string(), LValue::List(vec![]));
         env.insert(RAE_TASK_LIST.to_string(), LValue::List(vec![]));
-        env.insert(RAE_TASK_METHODS_MAP.to_string(), LValue::Map(Default::default()));
+        env.insert(
+            RAE_TASK_METHODS_MAP.to_string(),
+            LValue::Map(Default::default()),
+        );
         env.insert(RAE_EXEC_COMMAND.to_string(), LValue::Nil);
-        Self {
-            inner: env,
-        }
+        Self { inner: env }
     }
 }
-
 
 impl RAEEnvBis {
     pub fn add_action(&mut self, label: String, value: LValue) -> Result<(), LError> {
@@ -93,30 +93,46 @@ impl RAEEnvBis {
         let action_list = self.inner.get_symbol(RAE_ACTION_LIST).unwrap();
         if let LValue::List(mut list) = action_list {
             list.push(LValue::Symbol(label));
-            self.inner.set(RAE_ACTION_LIST.to_string(), list.into()).expect("list of action should be already defined in environment");
+            self.inner
+                .set(RAE_ACTION_LIST.to_string(), list.into())
+                .expect("list of action should be already defined in environment");
         }
         Ok(())
     }
 
-    pub fn add_task(&mut self, label: String, value: LValue) -> Result<(), LError>  {
+    pub fn add_task(&mut self, label: String, value: LValue) -> Result<(), LError> {
         self.insert(label.clone(), value)?;
         let task_list = self.inner.get_symbol(RAE_TASK_LIST).unwrap();
         if let LValue::List(mut list) = task_list {
             list.push(LValue::Symbol(label.clone()));
-            self.inner.set(RAE_TASK_LIST.to_string(), list.into()).expect("list of task should be already defined in environment");
+            self.inner
+                .set(RAE_TASK_LIST.to_string(), list.into())
+                .expect("list of task should be already defined in environment");
         }
-        let mut map: im::HashMap<LValue, LValue> = self.get_element(RAE_TASK_METHODS_MAP).unwrap().try_into().unwrap();
-        map.insert(LValue::Symbol(label.clone()), LValue::Nil);
-        self.inner.set(RAE_TASK_METHODS_MAP.to_string(), map.into());
+        let mut map: im::HashMap<LValue, LValue> = self
+            .get_element(RAE_TASK_METHODS_MAP)
+            .unwrap()
+            .try_into()
+            .unwrap();
+        map.insert(LValue::Symbol(label), LValue::Nil);
+        self.inner
+            .set(RAE_TASK_METHODS_MAP.to_string(), map.into())?;
         Ok(())
     }
 
-    pub fn add_method(&mut self, method_label: String, task_label: String, value: LValue) -> Result<(), LError> {
-        self.insert(method_label.clone(), value);
+    pub fn add_method(
+        &mut self,
+        method_label: String,
+        task_label: String,
+        value: LValue,
+    ) -> Result<(), LError> {
+        self.insert(method_label.clone(), value)?;
         let method_list = self.inner.get_symbol(RAE_METHOD_LIST).unwrap();
         if let LValue::List(mut list) = method_list {
             list.push(LValue::Symbol(method_label.clone()));
-            self.inner.set(RAE_METHOD_LIST.to_string(), list.into()).expect("list of method should be already defined in environment");
+            self.inner
+                .set(RAE_METHOD_LIST.to_string(), list.into())
+                .expect("list of method should be already defined in environment");
 
             self.add_method_to_task(task_label, method_label)?;
         }
@@ -128,17 +144,34 @@ impl RAEEnvBis {
             None => {
                 self.inner.insert(label, value);
                 Ok(())
-            },
-            Some(_) => Err(SpecialError(format!("Symbol \"{}\" already defined.", label)))
+            }
+            Some(_) => Err(SpecialError(format!(
+                "Symbol \"{}\" already defined.",
+                label
+            ))),
         }
     }
 
-    pub fn add_method_to_task(&mut self, task_label: String, method_label: String) -> Result<(), LError> {
-        let mut map: im::HashMap<LValue, LValue> = self.inner.get_symbol(RAE_TASK_METHODS_MAP).unwrap().try_into().unwrap();
+    pub fn add_method_to_task(
+        &mut self,
+        task_label: String,
+        method_label: String,
+    ) -> Result<(), LError> {
+        let mut map: im::HashMap<LValue, LValue> = self
+            .inner
+            .get_symbol(RAE_TASK_METHODS_MAP)
+            .unwrap()
+            .try_into()
+            .unwrap();
 
         let list = match map.get(&LValue::Symbol(task_label.clone())) {
-            None => return Err(SpecialError(format!("task \"{}\" is not defined, cannot add method to it.", task_label))),
-            Some(l) => l
+            None => {
+                return Err(SpecialError(format!(
+                    "task \"{}\" is not defined, cannot add method to it.",
+                    task_label
+                )))
+            }
+            Some(l) => l,
         };
         let new_list: LValue = match list {
             LValue::List(l) => {
@@ -159,15 +192,17 @@ impl RAEEnvBis {
         self.inner.get_symbol(label)
     }
 
-    pub fn set_exec_command(&mut self, exec_command : LValue) {
-        self.inner.set(RAE_EXEC_COMMAND.to_string(), exec_command).expect("entry rae-exec-command should be in the env");
+    pub fn set_exec_command(&mut self, exec_command: LValue) {
+        self.inner
+            .set(RAE_EXEC_COMMAND.to_string(), exec_command)
+            .expect("entry rae-exec-command should be in the env");
     }
 
     pub fn get_exec_command(&self) -> LValue {
         self.inner.get_symbol(RAE_EXEC_COMMAND).unwrap()
     }
 
-    pub fn pretty_debug(&self, key : Option<String>) -> String {
+    pub fn pretty_debug(&self, key: Option<String>) -> String {
         let mut string = String::new();
         if let Some(_label) = key {
             todo!()
@@ -175,8 +210,13 @@ impl RAEEnvBis {
             let action_list_symbol = self.inner.get_symbol(RAE_ACTION_LIST).unwrap();
             let action_list: Vec<LValue> = action_list_symbol.try_into().unwrap();
             let task_list_symbol = self.inner.get_symbol(RAE_TASK_LIST).unwrap();
-            let task_list : Vec<LValue> = task_list_symbol.try_into().unwrap();
-            let map_task_method: im::HashMap<LValue, LValue> = self.inner.get_symbol(RAE_TASK_METHODS_MAP).unwrap().try_into().unwrap();
+            let task_list: Vec<LValue> = task_list_symbol.try_into().unwrap();
+            let map_task_method: im::HashMap<LValue, LValue> = self
+                .inner
+                .get_symbol(RAE_TASK_METHODS_MAP)
+                .unwrap()
+                .try_into()
+                .unwrap();
             string.push_str("RAEEnv: \n\n");
             string.push_str("\t*Action(s): \n\n");
             for action in action_list {
@@ -189,20 +229,18 @@ impl RAEEnvBis {
             for task in task_list {
                 let task_label: String = task.clone().try_into().unwrap();
                 let task_body = self.inner.get_symbol(&task_label).unwrap();
-                string.push_str(
-                    format!("\t\t-{}: {}\n", task_label, task_body).as_str(),
-                );
+                string.push_str(format!("\t\t-{}: {}\n", task_label, task_body).as_str());
                 string.push_str("\t\t*Method(s): \n");
                 let methods = map_task_method.get(&task);
                 match methods {
                     None => string.push_str("\t\t\t nil\n"),
                     Some(methods) => {
-                        let methods : Vec<LValue> = methods.try_into().unwrap();
+                        let methods: Vec<LValue> = methods.try_into().unwrap();
                         for m in methods {
                             let method_label: String = m.try_into().unwrap();
                             let method = self.inner.get_symbol(&method_label).unwrap();
-                            string.push_str(format!("\t\t\t-{}: {}\n", method_label, method)
-                                .as_str())
+                            string
+                                .push_str(format!("\t\t\t-{}: {}\n", method_label, method).as_str())
                         }
                     }
                 }

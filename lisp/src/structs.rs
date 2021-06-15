@@ -737,12 +737,12 @@ impl TryFrom<&LValue> for im::HashMap<LValue, LValue> {
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
         match value {
             LValue::Map(m) => Ok(m.clone()),
-            _ => Err(ConversionError(value.into(), NameTypeLValue::Map))
+            _ => Err(ConversionError(value.into(), NameTypeLValue::Map)),
         }
     }
 }
 
-impl TryFrom<LValue> for im::HashMap<LValue,LValue> {
+impl TryFrom<LValue> for im::HashMap<LValue, LValue> {
     type Error = LError;
 
     fn try_from(value: LValue) -> Result<Self, Self::Error> {

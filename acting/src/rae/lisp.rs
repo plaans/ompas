@@ -1,4 +1,7 @@
-use crate::rae::context::{ActionId, ActionsProgress, Agenda, RAEEnv, RAEOptions, SelectOption, Status, RAEEnvBis, RAE_METHOD_LIST, RAE_ACTION_LIST, RAE_TASK_LIST};
+use crate::rae::context::{
+    ActionId, ActionsProgress, Agenda, RAEEnv, RAEEnvBis, RAEOptions, SelectOption, Status,
+    RAE_ACTION_LIST, RAE_METHOD_LIST, RAE_TASK_LIST,
+};
 use crate::rae::job::Job;
 use ompas_lisp::core::LEnv;
 use ompas_lisp::structs::LError::{WrongNumberOfArgument, WrongType};
@@ -177,7 +180,8 @@ pub fn add_action(args: &[LValue], _env: &mut LEnv, ctx: &mut CtxRAE) -> Result<
 
     if let LValue::Symbol(action_label) = &args[0] {
         if let LValue::Lambda(_) = &args[1] {
-            ctx.env.add_action(action_label.to_string(), args[1].clone())?;
+            ctx.env
+                .add_action(action_label.to_string(), args[1].clone())?;
         } else {
             return Err(WrongType(
                 args[1].clone(),

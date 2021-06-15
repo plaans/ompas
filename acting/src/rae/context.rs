@@ -1,19 +1,19 @@
-use std::collections::{VecDeque, HashMap};
-use ompas_lisp::structs::{LLambda, LError};
 use crate::rae::job::{Job, JobId};
-use ompas_lisp::structs::LError::SpecialError;
-use std::fmt::{Display, Formatter};
 use crate::rae::method::{RefinementStack, StackFrame};
+use ompas_lisp::structs::LError::SpecialError;
+use ompas_lisp::structs::{LError, LLambda};
+use std::collections::{HashMap, VecDeque};
+use std::fmt::{Display, Formatter};
 
 #[derive(Default, Debug)]
 pub struct Agenda {
     pub jobs: Vec<JobId>,
-    pub stacks : HashMap<JobId, RefinementStack>,
-    next_id: usize
+    pub stacks: HashMap<JobId, RefinementStack>,
+    next_id: usize,
 }
 
 impl Agenda {
-    pub fn remove_by_id(&mut self, task_id: &JobId) {
+    pub fn remove_by_id(&mut self, _task_id: &JobId) {
         todo!()
     }
 
@@ -21,7 +21,6 @@ impl Agenda {
         let job_id = self.jobs[index];
         self.jobs.remove(index);
         self.stacks.remove(&job_id);
-
     }
 
     pub fn add_job(&mut self, job: Job) -> usize {
@@ -31,19 +30,16 @@ impl Agenda {
             job_id: id,
             method: None,
             step: 1,
-            tried: vec![]
+            tried: vec![],
         });
-        self.stacks.insert(id, RefinementStack {
-            job,
-            inner,
-        });
+        self.stacks.insert(id, RefinementStack { job, inner });
         self.jobs.push(id);
         id
     }
 
     fn get_new_id(&mut self) -> usize {
         let result = self.next_id;
-        self.next_id+=1;
+        self.next_id += 1;
         result
     }
 
@@ -64,7 +60,6 @@ impl Agenda {
     }
 }
 
-
 #[derive(Default, Debug, Clone)]
 pub struct RAEEnv {
     actions: ActionCollection,
@@ -75,20 +70,33 @@ pub struct RAEEnv {
 impl RAEEnv {
     pub fn get_env(&self, label: Option<String>) -> String {
         let mut string = String::new();
-        if let Some(label) = label {
+        if let Some(_label) = label {
             todo!()
-        }else {
+        } else {
             string.push_str("RAEEnv: \n\n");
             string.push_str("\t*Actions: \n\n");
             for e in &self.actions.inner {
                 string.push_str(format!("\t\t- {}\n", e.1).as_str());
             }
+            string.push('\n');
             string.push_str("\t*Tasks: \n\n");
-            for e in &self.tasks.inner{
-                string.push_str(format!("\t\t- {}\n", e.1).as_str());
+            for e in &self.tasks.inner {
+                string.push_str(
+                    format!("\t\t-{}: {}\n", self.tasks.get_label(e.0).unwrap(), e.1).as_str(),
+                );
                 string.push_str("\t\t*Methods: \n");
-                for m in self.tasks.get_methods(&e.0).cloned().unwrap().iter().map(|id| self.methods.get_method_by_id(id).unwrap()){
-                    string.push_str(format!("\t\t\t- {}\n,", m).as_str())
+                for m in self
+                    .tasks
+                    .get_methods(&e.0)
+                    .cloned()
+                    .unwrap()
+                    .iter()
+                    .map(|id| self.methods.get_method_by_id(id).unwrap())
+                {
+                    string.push_str(
+                        format!("\t\t\t-{}: {}\n", self.methods.get_label(&m.id).unwrap(), m)
+                            .as_str(),
+                    )
                 }
             }
         }
@@ -103,29 +111,37 @@ impl RAEEnv {
         self.tasks.add_task(label, body);
     }
 
-    pub fn add_method(&mut self, method_label: MethodLabel, task_label: &TaskLabel, body: LLambda) -> Result<(), LError> {
+    pub fn add_method(
+        &mut self,
+        method_label: MethodLabel,
+        task_label: &str,
+        body: LLambda,
+    ) -> Result<(), LError> {
         let method_id = self.methods.add_method(method_label, body);
         self.tasks.add_method_to_task(task_label, method_id)
     }
 
-    pub fn get_methods(&mut self, task_label: &TaskLabel) -> Vec<MethodId> {
-        self.tasks.methods.get(self.tasks.get_id(task_label).unwrap()).cloned().unwrap()
+    pub fn get_methods(&mut self, task_label: &str) -> Vec<MethodId> {
+        self.tasks
+            .methods
+            .get(self.tasks.get_id(task_label).unwrap())
+            .cloned()
+            .unwrap()
     }
 }
 
 pub type ActionLabel = String;
 pub type ActionId = usize;
 
-
 #[derive(Default, Debug, Clone)]
 pub struct ActionCollection {
-    labels : HashMap<ActionLabel, ActionId>,
+    labels: HashMap<ActionLabel, ActionId>,
     inner: HashMap<ActionId, Action>,
     next_id: usize,
 }
 
 impl ActionCollection {
-    pub fn get_id(&self, label: &ActionLabel) -> Option<&ActionId> {
+    pub fn get_id(&self, label: &str) -> Option<&ActionId> {
         self.labels.get(label)
     }
 
@@ -133,21 +149,16 @@ impl ActionCollection {
         self.inner.get(id)
     }
 
-    pub fn get_action_by_label(&self, label: &ActionLabel) -> Option<&Action> {
+    pub fn get_action_by_label(&self, label: &str) -> Option<&Action> {
         match self.get_id(label) {
             None => None,
-            Some(id) => {
-                self.inner.get(id)
-            }
+            Some(id) => self.inner.get(id),
         }
     }
 
     pub fn add_action(&mut self, label: ActionLabel, action: LLambda) -> usize {
         let id = self.get_next_id();
-        let action = Action {
-            id,
-            lambda: action
-        };
+        let action = Action { id, lambda: action };
         self.inner.insert(id, action);
         self.labels.insert(label, id);
         id
@@ -155,7 +166,7 @@ impl ActionCollection {
 
     fn get_next_id(&mut self) -> ActionId {
         let id = self.next_id;
-        self.next_id+=1;
+        self.next_id += 1;
         id
     }
 }
@@ -178,12 +189,13 @@ pub type MethodId = usize;
 #[derive(Default, Debug, Clone)]
 pub struct MethodCollection {
     labels: HashMap<MethodLabel, MethodId>,
+    reverse_map_labels: HashMap<MethodId, MethodLabel>,
     inner: HashMap<MethodId, Method>,
     next_id: usize,
 }
 
 impl MethodCollection {
-    pub fn get_id(&self, label: &MethodLabel) -> Option<&MethodId> {
+    pub fn get_id(&self, label: &str) -> Option<&MethodId> {
         self.labels.get(label)
     }
 
@@ -191,29 +203,29 @@ impl MethodCollection {
         self.inner.get(id)
     }
 
-    pub fn get_action_by_label(&self, label: &MethodLabel) -> Option<&Method> {
+    pub fn get_action_by_label(&self, label: &str) -> Option<&Method> {
         match self.get_id(label) {
             None => None,
-            Some(id) => {
-                self.inner.get(id)
-            }
+            Some(id) => self.inner.get(id),
         }
     }
 
     pub fn add_method(&mut self, label: MethodLabel, method: LLambda) -> usize {
         let id = self.get_next_id();
-        let method = Method {
-            id,
-            lambda: method
-        };
+        let method = Method { id, lambda: method };
         self.inner.insert(id, method);
-        self.labels.insert(label, id);
+        self.labels.insert(label.clone(), id);
+        self.reverse_map_labels.insert(id, label);
         id
+    }
+
+    pub fn get_label(&self, id: &MethodId) -> Option<&MethodLabel> {
+        self.reverse_map_labels.get(id)
     }
 
     fn get_next_id(&mut self) -> MethodId {
         let id = self.next_id;
-        self.next_id+=1;
+        self.next_id += 1;
         id
     }
 }
@@ -221,7 +233,7 @@ impl MethodCollection {
 #[derive(Debug, Clone)]
 pub struct Method {
     id: MethodId,
-    lambda : LLambda
+    lambda: LLambda,
 }
 
 impl Display for Method {
@@ -236,13 +248,18 @@ pub type TaskId = usize;
 #[derive(Default, Debug, Clone)]
 pub struct TaskCollection {
     labels: HashMap<TaskLabel, TaskId>,
+    reverse_map_labels: HashMap<TaskId, TaskLabel>,
     inner: HashMap<TaskId, Task>,
     methods: HashMap<TaskId, Vec<MethodId>>,
     next_id: usize,
 }
 
 impl TaskCollection {
-    pub fn get_id(&self, label: &TaskLabel) -> Option<&TaskId> {
+    pub fn get_label(&self, id: &TaskId) -> Option<&TaskLabel> {
+        self.reverse_map_labels.get(id)
+    }
+
+    pub fn get_id(&self, label: &str) -> Option<&TaskId> {
         self.labels.get(label)
     }
 
@@ -250,21 +267,24 @@ impl TaskCollection {
         self.inner.get(id)
     }
 
-    pub fn get_task_by_label(&self, label: &TaskLabel) -> Option<&Task> {
+    pub fn get_task_by_label(&self, label: &str) -> Option<&Task> {
         match self.get_id(label) {
             None => None,
-            Some(id) => {
-                self.inner.get(id)
-            }
+            Some(id) => self.inner.get(id),
         }
     }
 
-    pub fn add_method_to_task(&mut self, label: &TaskLabel, method_id: MethodId) -> Result<(), LError> {
+    pub fn add_method_to_task(&mut self, label: &str, method_id: MethodId) -> Result<(), LError> {
         let id = self.get_id(label).cloned();
         match id {
-            None => Err(SpecialError("task label corresponds to nothing in the environment".to_string())),
+            None => Err(SpecialError(
+                "task label corresponds to nothing in the environment".to_string(),
+            )),
             Some(id) => {
-                self.methods.get_mut(&id).expect("should not panic").push(method_id);
+                self.methods
+                    .get_mut(&id)
+                    .expect("should not panic")
+                    .push(method_id);
                 Ok(())
             }
         }
@@ -276,19 +296,17 @@ impl TaskCollection {
 
     pub fn add_task(&mut self, label: TaskLabel, task: LLambda) -> usize {
         let id = self.get_next_id();
-        let task = Task {
-            id,
-            lambda: task
-        };
+        let task = Task { id, lambda: task };
         self.inner.insert(id, task);
         self.methods.insert(id, vec![]);
-        self.labels.insert(label, id);
+        self.labels.insert(label.clone(), id);
+        self.reverse_map_labels.insert(id, label);
         id
     }
 
     fn get_next_id(&mut self) -> TaskId {
         let id = self.next_id;
-        self.next_id+=1;
+        self.next_id += 1;
         id
     }
 }
@@ -309,7 +327,7 @@ impl Display for Task {
 #[derive(Default, Debug)]
 pub struct ActionsProgress {
     status: HashMap<ActionId, Status>,
-    next_id : usize,
+    next_id: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -317,7 +335,7 @@ pub enum Status {
     NotTriggered,
     Running,
     Failure,
-    Done
+    Done,
 }
 
 impl ActionsProgress {
@@ -341,18 +359,67 @@ impl ActionsProgress {
 
     fn get_new_id(&mut self) -> usize {
         let result = self.next_id;
-        self.next_id+=1;
+        self.next_id += 1;
         result
     }
 }
 
 pub struct RAEOptions {
-    pub select_option: SelectOption,
+    select_option: SelectOption,
+    exec_command: String,
+}
+
+impl RAEOptions {
+    pub fn new(option: SelectOption, exec: String) -> Self {
+        Self {
+            select_option: option,
+            exec_command: exec,
+        }
+    }
+
+    pub fn set_select_option(&mut self, dr0: usize, nro: usize) {
+        self.select_option.set_dr0(dr0);
+        self.select_option.set_nr0(nro);
+    }
+
+    pub fn get_select_option(&self) -> &SelectOption {
+        &self.select_option
+    }
+
+    pub fn set_exec_command(&mut self, sym: String) {
+        self.exec_command = sym;
+    }
+
+    pub fn get_exec_command(&self) -> &String {
+        &self.exec_command
+    }
 }
 
 pub struct SelectOption {
-    pub dr0: usize,
-    pub nro: usize,
+    dr0: usize,
+    nro: usize,
+}
+
+impl SelectOption {
+    pub fn new(dr0: usize, nro: usize) -> Self {
+        SelectOption { dr0, nro }
+    }
+
+    pub fn set_dr0(&mut self, dr0: usize) {
+        self.dr0 = dr0;
+    }
+
+    pub fn set_nr0(&mut self, nro: usize) {
+        self.nro = nro;
+    }
+
+    pub fn get_dr0(&self) -> usize {
+        self.dr0
+    }
+
+    pub fn get_nro(&self) -> usize {
+        self.nro
+    }
 }
 
 //methods to access attributes
@@ -366,7 +433,6 @@ pub struct SelectOption {
     }
 }*/
 
-
 pub type ReactiveTriggerId = usize;
 
 #[derive(Debug, Clone)]
@@ -376,9 +442,7 @@ pub enum TaskType {
 }
 
 #[derive(Default, Debug, Clone)]
-pub struct RAEEvent {
-
-}
+pub struct RAEEvent {}
 
 /*pub struct Stream {
     inner: tokio::stream;

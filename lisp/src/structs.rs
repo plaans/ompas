@@ -731,6 +731,25 @@ impl Hash for LValue {
 
 impl Eq for LValue {}
 
+impl TryFrom<&LValue> for im::HashMap<LValue, LValue> {
+    type Error = LError;
+
+    fn try_from(value: &LValue) -> Result<Self, Self::Error> {
+        match value {
+            LValue::Map(m) => Ok(m.clone()),
+            _ => Err(ConversionError(value.into(), NameTypeLValue::Map))
+        }
+    }
+}
+
+impl TryFrom<LValue> for im::HashMap<LValue,LValue> {
+    type Error = LError;
+
+    fn try_from(value: LValue) -> Result<Self, Self::Error> {
+        (&value).try_into()
+    }
+}
+
 impl TryFrom<&LValue> for String {
     type Error = LError;
 

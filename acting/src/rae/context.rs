@@ -71,6 +71,7 @@ pub const RAE_TASK_LIST: &str = "rae-task-list";
 pub const RAE_METHOD_LIST: &str = "rae_methods_list";
 pub const RAE_ACTION_LIST: &str = "rae_actions_list";
 pub const RAE_EXEC_COMMAND: &str = "rae-exec-command";
+//pub const RAE_MAP_TYPE:&str = "rae-map-type";
 
 impl Default for RAEEnvBis {
     fn default() -> Self {

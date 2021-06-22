@@ -26,7 +26,7 @@ pub const RAE_ADD_STATE_FUNCTION: &str = "rae-add-state-function";
 pub const RAE_GET_METHODS: &str = "rae-get-methods";
 pub const RAE_GET_ACTIONS: &str = "rae-get-actions";
 pub const RAE_GET_TASKS: &str = "rae-get-tasks";
-pub const RAE_GET_STATE_FUNCTION: &str ="rae-get-state-function";
+pub const RAE_GET_STATE_FUNCTION: &str = "rae-get-state-function";
 
 pub const RAE_GET_ENV: &str = "rae-get-env";
 pub const RAE_TRIGGER_EVENT: &str = "rae-trigger-event";
@@ -235,7 +235,11 @@ pub fn trigger_task(_: &[LValue], _env: &LEnv, _: &CtxRAE) -> Result<LValue, LEr
     todo!()
 }
 
-pub fn add_state_function(args: &[LValue], _env: &mut LEnv, ctx: &mut CtxRAE) -> Result<LValue, LError> {
+pub fn add_state_function(
+    args: &[LValue],
+    _env: &mut LEnv,
+    ctx: &mut CtxRAE,
+) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
     }

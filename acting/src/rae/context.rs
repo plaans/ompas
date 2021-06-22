@@ -229,7 +229,9 @@ impl RAEEnvBis {
             for state_function in state_function_list {
                 let state_function_label: String = state_function.try_into().unwrap();
                 let state_function_body = self.inner.get_symbol(&state_function_label).unwrap();
-                string.push_str(format!("\t\t- {}: {}\n", state_function_label, state_function_body).as_str());
+                string.push_str(
+                    format!("\t\t- {}: {}\n", state_function_label, state_function_body).as_str(),
+                );
             }
             string.push('\n');
             string.push_str("\t*Action(s): \n");

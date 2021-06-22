@@ -569,49 +569,6 @@ pub fn is_pair(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
         ))
     }
 }
-/*
-def let(*args):
-    args = list(args)
-    x = cons(_let, args)
-    require(x, len(args)>1)
-    bindings, body = args[0], args[1:]
-    require(x, all(isa(b, list) and len(b)==2 and isa(b[0], Symbol)
-                   for b in bindings), "illegal binding list")
-    vars, vals = zip(*bindings)
-    return [[_lambda, list(vars)]+map(expand, body)] + map(expand, vals)
- */
-pub fn _let(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
-    if args.len() < 2 {
-        return Err(WrongNumberOfArgument(
-            args.into(),
-            args.len(),
-            2..std::usize::MAX,
-        ));
-    }
-    let (bindings, _body) = (&args[0], &args[1..]);
-
-    //Verification of the bindings
-    if let LValue::List(bindings) = bindings {
-        for b in bindings {
-            if let LValue::List(binding) = b {
-                if binding.len() == 2 {
-                    if matches!(&args[0], LValue::Symbol(_)) {
-                    } else {
-                        return Err(SpecialError("Illegal binding list".to_string()));
-                    }
-                } else {
-                    return Err(SpecialError("Illegal binding list".to_string()));
-                }
-            } else {
-                return Err(SpecialError("Illegal binding list".to_string()));
-            }
-        }
-    } else {
-        return Err(SpecialError("Illegal binding list".to_string()));
-    }
-
-    Ok(LValue::Nil)
-}
 
 #[cfg(test)]
 mod tests {
@@ -727,3 +684,47 @@ mod tests {
         assert!(result_true_2);
     }
 }
+
+/*
+def let(*args):
+    args = list(args)
+    x = cons(_let, args)
+    require(x, len(args)>1)
+    bindings, body = args[0], args[1:]
+    require(x, all(isa(b, list) and len(b)==2 and isa(b[0], Symbol)
+                   for b in bindings), "illegal binding list")
+    vars, vals = zip(*bindings)
+    return [[_lambda, list(vars)]+map(expand, body)] + map(expand, vals)
+ */
+/*pub fn _let(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    if args.len() < 2 {
+        return Err(WrongNumberOfArgument(
+            args.into(),
+            args.len(),
+            2..std::usize::MAX,
+        ));
+    }
+    let (bindings, _body) = (&args[0], &args[1..]);
+
+    //Verification of the bindings
+    if let LValue::List(bindings) = bindings {
+        for b in bindings {
+            if let LValue::List(binding) = b {
+                if binding.len() == 2 {
+                    if matches!(&args[0], LValue::Symbol(_)) {
+                    } else {
+                        return Err(SpecialError("Illegal binding list".to_string()));
+                    }
+                } else {
+                    return Err(SpecialError("Illegal binding list".to_string()));
+                }
+            } else {
+                return Err(SpecialError("Illegal binding list".to_string()));
+            }
+        }
+    } else {
+        return Err(SpecialError("Illegal binding list".to_string()));
+    }
+
+    Ok(LValue::Nil)
+}*/

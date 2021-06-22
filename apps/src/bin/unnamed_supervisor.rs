@@ -71,7 +71,7 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     let ctx_counter = CtxCounter::default();
     let ctx_dumber = CtxDumber::default();
     let ctx_godot = CtxGodot::default();
-    let ctx_godot_2 = CtxGodot::default();
+    let _ctx_godot_2 = CtxGodot::default();
     let mut ctx_rae = CtxRAE::default();
     //Insert the doc for the different contexts.
     ctx_doc.insert_doc(CtxIo::documentation());
@@ -97,7 +97,7 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     load_module(&mut root_env, &mut ctxs, ctx_dumber, &mut lisp_init);
     load_module(&mut root_env, &mut ctxs, ctx_type, &mut lisp_init);
     load_module(&mut root_env, &mut ctxs, ctx_counter, &mut lisp_init);
-    load_module(&mut root_env, &mut ctxs, ctx_godot_2, &mut lisp_init);
+    //load_module(&mut root_env, &mut ctxs, ctx_godot_2, &mut lisp_init);
     load_module(&mut root_env, &mut ctxs, ctx_rae, &mut lisp_init);
     let env = &mut root_env.clone();
     //println!("{}", lisp_init.begin_lisp());

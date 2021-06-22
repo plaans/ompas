@@ -33,6 +33,7 @@ pub mod scheme_primitives {
     pub const BEGIN: &str = "begin";
     pub const LET: &str = "let";
     pub const LET_STAR: &str = "let*";
+    pub const MACRO_EXPAND: &str = "macro-expand";
 
     //Boolean
     pub const TRUE: &str = "true";
@@ -305,4 +306,5 @@ Return *false* otherwise. Return an error if args are not numbers of there is th
     //TODO: complete documentation
     pub const DOC_IS_PAIR: &str = "todo!";
     pub const DOC_IS_EQUAL: &str = "todo!";
+    pub const DOC_MACRO_EXPAND: &str = "todo!";
 }

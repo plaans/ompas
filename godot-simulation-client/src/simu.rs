@@ -1,3 +1,4 @@
+use crate::rae_domain::GODOT_DOMAIN;
 use crate::serde::*;
 use crate::state::*;
 use crate::tcp::*;
@@ -492,15 +493,19 @@ impl RAEInterface for CtxGodot {
         let key: LValue = args.into();
         let key: LValueS = key.into();
 
+        //println!("key: {}", key);
         let handle = tokio::runtime::Handle::current();
         let state = self.get_ref_state();
-        let result = thread::spawn(move || {
+        let state = thread::spawn(move || {
             handle.block_on(async move { state.lock().await.get_state(None) })
         })
         .join()
         .unwrap();
 
-        let value = result.inner.get(&key).unwrap_or(&LValueS::Bool(false));
+        //println!("state: {:?}", state);
+
+        let value = state.inner.get(&key).unwrap_or(&LValueS::Bool(false));
+        //println!("value: {}", value);
 
         Ok(value.into())
     }
@@ -569,6 +574,10 @@ impl RAEInterface for CtxGodot {
 
     fn set_status(&self, _: usize, _: ActionStatus) {
         todo!()
+    }
+
+    fn domain(&self) -> &'static str {
+        GODOT_DOMAIN
     }
 }
 

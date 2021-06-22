@@ -767,6 +767,18 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                             }
                         };
                     }
+                    //Special case for macro_expand that needs ctxs to work
+                    LValue::Symbol(s) => {
+                        return if s == MACRO_EXPAND {
+                            macro_expand(args, env, ctxs)
+                        } else {
+                            Err(WrongType(
+                                lv.clone(),
+                                NameTypeLValue::Symbol,
+                                NameTypeLValue::Fn,
+                            ))
+                        }
+                    }
                     lv => {
                         /*println!(
                             "Expecting here a list with a function as first argument: {:?}",
@@ -780,5 +792,33 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
             //dbg!("=> {}", lv);
             return Ok(lv);
         }
+    }
+}
+
+pub fn macro_expand(
+    args: &[LValue],
+    env: &LEnv,
+    ctxs: &mut ContextCollection,
+) -> Result<LValue, LError> {
+    let env = &mut env.clone();
+    if args.len() < 2 {
+        return Err(WrongNumberOfArgument(
+            args.into(),
+            args.len(),
+            2..std::usize::MAX,
+        ));
+    }
+    if let LValue::Symbol(sym) = &args[0] {
+        let _macro = env.get_macro(sym).cloned();
+        match _macro {
+            None => Err(SpecialError("{} is not a defined macro".to_string())),
+            Some(m) => expand(&m.call(&args[1..], env, ctxs)?, true, env, ctxs),
+        }
+    } else {
+        Err(WrongType(
+            args[0].clone(),
+            (&args[0]).into(),
+            NameTypeLValue::Symbol,
+        ))
     }
 }

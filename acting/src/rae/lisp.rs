@@ -1,4 +1,5 @@
 use crate::rae::context::*;
+use crate::rae::domain::*;
 use crate::rae::job::Job;
 use crate::rae::state::{ActionStatus, RAEState};
 use ompas_lisp::core::LEnv;
@@ -38,35 +39,6 @@ pub const RAE_GET_STATE_VARIBALE: &str = "rae-get-state-variable";
 pub const RAE_LAUNCH_PLATFORM: &str = "rae-launch-platform";
 pub const RAE_GET_STATUS: &str = "rae-get-status";
 pub const RAE_CANCEL_COMMAND: &str = "rae-cancel-command";
-
-pub const LAMBDA_DEF_TASK: &str = "(defmacro deftask \
-                                        (lambda (l body) \
-                                            (quasiquote (rae-add-task (unquote l) (lambda (unquote (cdar body)) \
-                                                (if (unquote (cadadr body)) \
-                                                    (unquote (cadaddr body)) \
-                                                    (quote (task is not applicable in the given state))))))))";
-pub const DEF_TASK: &str = "deftask";
-
-pub const LAMBDA_DEF_METHOD: &str = "(defmacro defmethod \
-                                          (lambda (l body) \
-                                            (let ((task-label (cadar body)) \
-                                                  (params (cdadr body)) \
-                                                  (body (cadaddr body))) \
-                                                 (quasiquote (rae-add-method (unquote l) \
-                                                                    (unquote task-label) \
-                                                                    (lambda (unquote params) \
-                                                                            (unquote body)))))))";
-pub const DEF_METHOD: &str = "defmethod";
-
-pub const LAMBDA_DEF_ACTION: &str ="(defmacro defaction \
-                                        (lambda args \
-                                            (let ((label (car args)) \
-                                                  (params (cdr args))) \
-                                                 (quasiquote (rae-add-action (unquote label) \
-                                                                    (lambda (unquote params) \
-                                                                            (unquote (cons (rae-get-exec-command) \
-                                                                                     (cons label params)))))))))";
-pub const DEF_ACTION: &str = "defmethod";
 
 /*
 DOCUMENTATION
@@ -133,6 +105,8 @@ pub trait RAEInterface: Any {
 
     fn get_action_status(&self, action_id: usize) -> ActionStatus;
     fn set_status(&self, action_id: usize, status: ActionStatus);
+
+    fn domain(&self) -> &'static str;
 }
 
 impl RAEInterface for () {
@@ -167,6 +141,10 @@ impl RAEInterface for () {
     fn set_status(&self, _action_id: usize, _status: ActionStatus) {
         todo!()
     }
+
+    fn domain(&self) -> &'static str {
+        todo!()
+    }
 }
 impl CtxRAE {
     pub fn get_execution_status(&self, action_id: &ActionId) -> Option<&Status> {
@@ -180,10 +158,18 @@ impl CtxRAE {
 
 impl GetModule for CtxRAE {
     fn get_module(self) -> Module {
+        let domain = self.platform_interface.domain();
         let mut module = Module {
             ctx: Box::new(self),
             prelude: vec![],
-            raw_lisp: vec![LAMBDA_DEF_TASK, LAMBDA_DEF_ACTION, LAMBDA_DEF_METHOD].into(),
+            raw_lisp: vec![
+                MACRO_DEF_STATE_FUNCTION,
+                MACRO_DEF_TASK,
+                MACRO_DEF_ACTION,
+                MACRO_DEF_METHOD,
+                domain,
+            ]
+            .into(),
             label: MOD_RAE,
         };
 
@@ -196,13 +182,12 @@ impl GetModule for CtxRAE {
         module.add_fn_prelude(RAE_GET_ACTIONS, Box::new(get_actions));
         module.add_fn_prelude(RAE_GET_TASKS, Box::new(get_tasks));
         module.add_fn_prelude(RAE_GET_ENV, Box::new(rae_get_env));
-        module.add_mut_fn_prelude(RAE_SET_EXEC_COMMAND, Box::new(set_exec_command));
-        module.add_fn_prelude(RAE_GET_EXEC_COMMAND, Box::new(get_exec_command));
         module.add_fn_prelude(RAE_TRIGGER_EVENT, Box::new(trigger_event));
         module.add_fn_prelude(RAE_TRIGGER_TASK, Box::new(trigger_task));
 
         //Interface with platform
         module.add_fn_prelude(RAE_GET_STATE, Box::new(get_state));
+        module.add_fn_prelude(RAE_GET_STATE_VARIBALE, Box::new(get_state_variable));
         module.add_fn_prelude(RAE_TRIGGER_TASK, Box::new(get_state_variable));
         module.add_mut_fn_prelude(RAE_EXEC_COMMAND, Box::new(exec_command));
         module.add_mut_fn_prelude(RAE_LAUNCH_PLATFORM, Box::new(launch_platform));
@@ -527,25 +512,6 @@ pub fn rae_get_env(args: &[LValue], _env: &LEnv, ctx: &CtxRAE) -> Result<LValue,
 
     Ok(ctx.env.get_env(key).into())
 }*/
-
-///Add a task to RAE env
-pub fn set_exec_command(
-    args: &[LValue],
-    _env: &mut LEnv,
-    ctx: &mut CtxRAE,
-) -> Result<LValue, LError> {
-    if args.len() != 1 {
-        return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1));
-    }
-    if let LValue::Symbol(_) = &args[0] {
-        ctx.env.set_exec_command(args[0].clone());
-    }
-    Ok(LValue::Nil)
-}
-
-pub fn get_exec_command(_: &[LValue], _env: &LEnv, ctx: &CtxRAE) -> Result<LValue, LError> {
-    Ok(ctx.env.get_exec_command())
-}
 
 pub fn rae_get_env(args: &[LValue], _env: &LEnv, ctx: &CtxRAE) -> Result<LValue, LError> {
     let key = match args.len() {

@@ -8,6 +8,7 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio_stream::StreamExt;
 
 pub mod context;
+pub mod domain;
 pub mod job;
 pub mod lisp;
 pub mod log;

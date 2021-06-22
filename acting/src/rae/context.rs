@@ -1,12 +1,12 @@
 use crate::rae::job::{Job, JobId};
 use crate::rae::refinement::{RefinementStack, StackFrame};
+use crate::rae::state::{ActionStatus, LState};
 use ompas_lisp::core::LEnv;
 use ompas_lisp::structs::LError::SpecialError;
-use ompas_lisp::structs::{LError, LLambda, LValue, LFn};
+use ompas_lisp::structs::{LError, LFn, LLambda, LValue};
 use std::collections::{HashMap, VecDeque};
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{Display, Formatter};
-use crate::rae::state::{LState, ActionStatus};
 
 #[derive(Default, Debug)]
 pub struct Agenda {
@@ -14,7 +14,6 @@ pub struct Agenda {
     pub stacks: HashMap<JobId, RefinementStack>,
     next_id: usize,
 }
-
 
 impl Agenda {
     pub fn remove_by_id(&mut self, _task_id: &JobId) {

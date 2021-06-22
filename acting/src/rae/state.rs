@@ -1,6 +1,6 @@
 use crate::rae::refinement::Assignment;
-use ompas_lisp::structs::{LValue, LValueS};
 use im::HashMap;
+use ompas_lisp::structs::{LValue, LValueS};
 use std::fmt::{Display, Formatter};
 use std::ptr::write_bytes;
 
@@ -16,8 +16,6 @@ pub struct LState {
     pub inner: im::HashMap<LValueS, LValueS>,
     pub _type: Option<StateType>,
 }
-
-
 
 impl From<&LState> for im::HashMap<LValueS, LValueS> {
     fn from(ls: &LState) -> Self {
@@ -43,7 +41,6 @@ impl From<im::HashMap<LValueS, LValueS>> for LState {
     }
 }
 
-
 impl LState {
     pub fn set_type(&mut self, _type: StateType) {
         self._type = Some(_type)
@@ -60,7 +57,7 @@ impl LState {
     pub fn union(&self, other: &Self) -> Self {
         LState {
             inner: self.inner.clone().union(other.inner.clone()),
-            _type: None
+            _type: None,
         }
     }
 
@@ -77,21 +74,19 @@ impl LState {
     }
 }
 
-
 #[derive(Default, Debug, Clone)]
 pub struct RAEState {
-    _static : LState,
+    _static: LState,
     dynamic: LState,
     inner_world: LState,
 }
-
 
 #[derive(Debug, Clone, Copy)]
 pub enum ActionStatus {
     ActionPending,
     ActionResponse(usize),
     ActionFeedback(f64), //Progress of the action
-    ActionResult(bool), //True the action is a success, false the action is a failure
+    ActionResult(bool),  //True the action is a success, false the action is a failure
     ActionPreempt,
     ActionCancel(bool), //True the action has been successfully stopped, false it was a failure to cancel
 }
@@ -104,7 +99,7 @@ impl Display for ActionStatus {
             ActionStatus::ActionFeedback(fl) => write!(f, "action feedback: {}", fl),
             ActionStatus::ActionResult(r) => write!(f, "action result: {}", r),
             ActionStatus::ActionPreempt => write!(f, "action preempt"),
-            ActionStatus::ActionCancel(r) => write!(f, "action cancel {}", r)
+            ActionStatus::ActionCancel(r) => write!(f, "action cancel {}", r),
         }
     }
 }
@@ -112,7 +107,7 @@ impl Display for ActionStatus {
 #[derive(Default, Debug, Clone)]
 pub struct ActionStatusSet {
     pub server_id_interal_id: im::HashMap<usize, usize>,
-    pub status: im::HashMap<usize, ActionStatus>
+    pub status: im::HashMap<usize, ActionStatus>,
 }
 
 impl ActionStatusSet {
@@ -120,7 +115,7 @@ impl ActionStatusSet {
         self.status.insert(internal_id, status);
     }
 
-    pub fn set_status_from_server(&mut self, server_id: usize,status: ActionStatus) {
+    pub fn set_status_from_server(&mut self, server_id: usize, status: ActionStatus) {
         let id = self.server_id_interal_id.get(&server_id).unwrap();
         self.status.insert(*id, status);
     }
@@ -132,7 +127,7 @@ impl ActionStatusSet {
     pub fn get_status_from_server(&self, server_id: usize) -> Option<&ActionStatus> {
         match self.server_id_interal_id.get(&server_id) {
             None => None,
-            Some(id) => self.status.get(id)
+            Some(id) => self.status.get(id),
         }
     }
 
@@ -140,7 +135,9 @@ impl ActionStatusSet {
         let mut str = String::new();
         str.push_str("Action(s) Status:\n");
         for e in &self.server_id_interal_id {
-            str.push_str(format!("- {}({}): {:?}\n", e.1, e.0, self.status.get(&e.1).unwrap()).as_str());
+            str.push_str(
+                format!("- {}({}): {:?}\n", e.1, e.0, self.status.get(&e.1).unwrap()).as_str(),
+            );
         }
         str
     }

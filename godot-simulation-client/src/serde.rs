@@ -1,19 +1,10 @@
 use aries_planning::parsing::sexpr::SExpr;
-use ompas_lisp::structs::LError::{WrongType, SpecialError};
-use ompas_lisp::structs::{LError, LNumber, LValue, NameTypeLValue, LValueS};
-use serde::{Deserialize, Serialize, Serializer, Deserializer};
-use std::convert::{TryFrom, TryInto};
+use ompas_acting::rae::state::ActionStatus::{ActionCancel, ActionPreempt, ActionResponse};
+use ompas_acting::rae::state::{ActionStatus, LState, StateType};
+use ompas_lisp::structs::{LError, LValueS};
+use serde::{Deserialize, Serialize, Serializer};
+use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
-use std::hash::{Hash, Hasher};
-use std::ops::Deref;
-use serde::ser::SerializeStruct;
-use serde::de::Visitor;
-use serde_json::ser::State;
-use im::HashMap;
-use ompas_acting::rae::state::{LState, StateType, ActionStatus};
-use ompas_acting::rae::context::Action;
-use ompas_acting::rae::state::ActionStatus::{ActionResponse, ActionPreempt, ActionCancel};
-use crate::serde::GodotMessageType::ActionFeedback;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -37,7 +28,6 @@ pub enum GodotMessageType {
     #[serde(rename = "action_cancel")]
     ActionCancel,
 }
-
 
 impl Display for GodotMessageType {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
@@ -83,18 +73,18 @@ pub struct GodotMessageSerde {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SerdeRobotCommand {
     pub command_info: LValueS,
-    pub temp_id : usize,
+    pub temp_id: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SerdeActionResponse {
-    pub temp_id : usize,
+    pub temp_id: usize,
     pub action_id: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SerdeActionFeedback {
-    pub action_id : usize,
+    pub action_id: usize,
     pub feedback: f64,
 }
 
@@ -114,7 +104,7 @@ pub type SerdeCancelRequest = SerdeActionId;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SerdeActionCancel {
-    pub temp_id : usize,
+    pub temp_id: usize,
     pub cancelled: bool,
 }
 
@@ -142,22 +132,18 @@ impl TryFrom<GodotMessageSerde> for LState {
             GodotMessageType::DynamicState => {
                 state.set_type(StateType::Dynamic);
             }
-            _ => return Err(LError::SpecialError(
-                "Was expecting a state".to_string(),
-            ))
+            _ => return Err(LError::SpecialError("Was expecting a state".to_string())),
         }
-        if let GodotMessageSerdeData::LValue(lvs) = value.data {
-            if let LValueS::List(l) = lvs {
-                for e in l {
-                    match e {
-                        LValueS::List(list) => {
-                            state.insert(
-                                LValueS::List(list[0..list.len() - 1].to_vec()),
-                                list.last().unwrap().clone(),
-                            );
-                        }
-                        _ => panic!("there should be a list"),
+        if let GodotMessageSerdeData::LValue(LValueS::List(l)) = value.data {
+            for e in l {
+                match e {
+                    LValueS::List(list) => {
+                        state.insert(
+                            LValueS::List(list[0..list.len() - 1].to_vec()),
+                            list.last().unwrap().clone(),
+                        );
                     }
+                    _ => panic!("there should be a list"),
                 }
             }
         }
@@ -170,12 +156,11 @@ impl TryFrom<GodotMessageSerde> for (usize, ActionStatus) {
     type Error = LError;
 
     fn try_from(value: GodotMessageSerde) -> Result<Self, Self::Error> {
-        let mut id = 0;
-        let mut status = ActionStatus::ActionPreempt;
+        let id;
+        let status: ActionStatus;
 
         match value._type {
             GodotMessageType::ActionResponse => {
-
                 if let GodotMessageSerdeData::ActionResponse(ar) = value.data {
                     id = ar.temp_id;
                     status = ActionResponse(ar.action_id)
@@ -184,8 +169,7 @@ impl TryFrom<GodotMessageSerde> for (usize, ActionStatus) {
                 }
             }
             GodotMessageType::ActionFeedback => {
-
-                if let GodotMessageSerdeData::ActionFeedback(af)  = value.data {
+                if let GodotMessageSerdeData::ActionFeedback(af) = value.data {
                     id = af.action_id;
                     status = ActionStatus::ActionFeedback(af.feedback);
                 } else {
@@ -193,7 +177,6 @@ impl TryFrom<GodotMessageSerde> for (usize, ActionStatus) {
                 }
             }
             GodotMessageType::ActionResult => {
-
                 if let GodotMessageSerdeData::ActionResult(ar) = value.data {
                     id = ar.action_id;
                     status = ActionStatus::ActionResult(ar.result);
@@ -202,7 +185,6 @@ impl TryFrom<GodotMessageSerde> for (usize, ActionStatus) {
                 }
             }
             GodotMessageType::ActionPreempt => {
-
                 if let GodotMessageSerdeData::ActionId(ai) = value.data {
                     id = ai.action_id;
                     status = ActionPreempt;
@@ -211,7 +193,6 @@ impl TryFrom<GodotMessageSerde> for (usize, ActionStatus) {
                 }
             }
             GodotMessageType::ActionCancel => {
-
                 if let GodotMessageSerdeData::ActionCancel(ac) = value.data {
                     id = ac.temp_id;
                     status = ActionCancel(ac.cancelled);
@@ -219,21 +200,20 @@ impl TryFrom<GodotMessageSerde> for (usize, ActionStatus) {
                     todo!()
                 }
             }
-            _ => {todo!()}
-        }
+            _ => {
+                todo!()
+            }
+        };
 
-        Ok((id,status))
+        Ok((id, status))
     }
 }
-
 
 impl Display for GodotMessageSerde {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(f, "type: {}\ndata: {:?}", self._type, self.data)
     }
 }
-
-
 
 #[allow(clippy::result_unit_err)]
 pub fn parse_into_lvalue(se: &SExpr) -> Result<LValueS, ()> {

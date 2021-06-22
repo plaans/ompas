@@ -2,6 +2,7 @@
 #![allow(unused_imports)]
 use im::ordmap::DiffItem::Update;
 use im::HashMap;
+use ompas_acting::rae::state::{LState, StateType};
 use ompas_lisp::core::LEnv;
 use ompas_lisp::functions::map;
 use ompas_lisp::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
@@ -11,7 +12,6 @@ use std::borrow::Borrow;
 use std::convert::TryFrom;
 use std::mem;
 use tokio::sync::mpsc::Sender;
-use ompas_acting::rae::state::{LState, StateType};
 
 pub const KEY_DYNAMIC: &str = "dynamic";
 pub const KEY_STATIC: &str = "static";
@@ -23,7 +23,6 @@ pub struct GodotState {
 }
 
 pub type ActionId = usize;
-
 
 impl GodotState {
     pub fn set_state(&mut self, s: LState) {
@@ -49,13 +48,11 @@ impl GodotState {
             Some(st) => match st {
                 StateType::Static => self.static_state.clone(),
                 StateType::Dynamic => self.dynamic_state.clone(),
-                _ => todo!()
+                _ => todo!(),
             },
         }
     }
 }
-
-
 
 /*impl From<&LState> for LValueSerde {
     fn from(ls: &LState) -> Self {

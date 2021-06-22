@@ -9,7 +9,7 @@ use std::cmp::Ordering;
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
-use std::ops::{Add, Div, Mul, Range, Sub, Deref};
+use std::ops::{Add, Deref, Div, Mul, Range, Sub};
 use std::rc::Rc;
 
 #[derive(Debug)]
@@ -1229,9 +1229,7 @@ impl From<&LValue> for LValueS {
             LValue::MutFn(f) => LValueS::Symbol(f.get_label().to_string()),
             LValue::Lambda(_) => LValue::Nil.into(),
             LValue::CoreOperator(co) => LValueS::Symbol(co.to_string()),
-            LValue::Map(m) => {
-                LValueS::Map(m.iter().map(|(k, v)| (k.into(), v.into())).collect())
-            }
+            LValue::Map(m) => LValueS::Map(m.iter().map(|(k, v)| (k.into(), v.into())).collect()),
             LValue::List(l) => LValueS::List(l.iter().map(|lv| lv.into()).collect()),
             LValue::Quote(l) => l.deref().into(),
             LValue::True => LValueS::Symbol("true".to_string()),
@@ -1324,7 +1322,6 @@ pub enum LValueS {
     List(Vec<LValueS>),
     Map(Vec<(LValueS, LValueS)>),
 }
-
 
 #[derive(Clone, Debug)]
 pub enum NameTypeLValue {

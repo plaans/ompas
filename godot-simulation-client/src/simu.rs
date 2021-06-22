@@ -1,9 +1,11 @@
 use crate::godot::*;
 use crate::serde::*;
 use crate::state::*;
+use ompas_acting::rae::lisp::RAEInterface;
+use ompas_acting::rae::state::{ActionStatus, ActionStatusSet, LState, StateType};
 use ompas_lisp::core::LEnv;
 use ompas_lisp::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
-use ompas_lisp::structs::{GetModule, LError, LValue, Module, NameTypeLValue, LValueS};
+use ompas_lisp::structs::{GetModule, LError, LValue, LValueS, Module, NameTypeLValue};
 use ompas_modules::doc::{Documentation, LHelp};
 use ompas_modules::io::TOKIO_CHANNEL_SIZE;
 use std::net::SocketAddr;
@@ -11,9 +13,6 @@ use std::sync::Arc;
 use std::thread;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{mpsc, Mutex};
-use ompas_acting::rae::state::{StateType, LState, ActionStatus, ActionStatusSet};
-use ompas_acting::rae::lisp::RAEInterface;
-use std::ops::Deref;
 
 /*
 LANGUAGE
@@ -295,7 +294,7 @@ pub struct CtxGodot {
     sender_li: Option<Sender<String>>,
     sender_socket: Option<Sender<String>>,
     state: Arc<Mutex<GodotState>>,
-    action_status: Arc<Mutex<ActionStatusSet>>
+    action_status: Arc<Mutex<ActionStatusSet>>,
 }
 
 impl CtxGodot {
@@ -332,17 +331,25 @@ impl RAEInterface for CtxGodot {
     fn exec_command(&self, args: &[LValue], command_id: usize) -> Result<LValue, LError> {
         let gs = GodotMessageSerde {
             _type: GodotMessageType::RobotCommand,
-            data: GodotMessageSerdeData::RobotCommand(
-                SerdeRobotCommand {
-                    command_info: LValue::List(args.to_vec()).into(),
-                    temp_id: command_id
-                }
-            )};
+            data: GodotMessageSerdeData::RobotCommand(SerdeRobotCommand {
+                command_info: LValue::List(args.to_vec()).into(),
+                temp_id: command_id,
+            }),
+        };
 
         let handle = tokio::runtime::Handle::current();
         let status = self.action_status.clone();
-        thread::spawn(move || handle.block_on(async move { status.lock().await.status.insert(command_id, ActionStatus::ActionPending)}))
-                .join();
+        thread::spawn(move || {
+            handle.block_on(async move {
+                status
+                    .lock()
+                    .await
+                    .status
+                    .insert(command_id, ActionStatus::ActionPending)
+            })
+        })
+        .join()
+        .expect("insertion of new action failed");
 
         let command = serde_json::to_string(&gs).unwrap();
 
@@ -351,7 +358,8 @@ impl RAEInterface for CtxGodot {
         let sender = match self.get_sender_socket() {
             None => {
                 return Err(SpecialError(
-                    "ctx godot has no sender to simulation, try first to (open-com-godot)".to_string(),
+                    "ctx godot has no sender to simulation, try first to (open-com-godot)"
+                        .to_string(),
                 ))
             }
             Some(s) => s.clone(),
@@ -368,38 +376,40 @@ impl RAEInterface for CtxGodot {
     fn get_state(&self) -> Result<LValue, LError> {
         let handle = tokio::runtime::Handle::current();
         let state = self.get_ref_state();
-        let result =
-            thread::spawn(move || handle.block_on(async move { state.lock().await.get_state(None) }))
-                .join()
-                .unwrap();
+        let result = thread::spawn(move || {
+            handle.block_on(async move { state.lock().await.get_state(None) })
+        })
+        .join()
+        .unwrap();
 
         Ok(result.into_map())
     }
 
     fn get_state_variable(&self, args: &[LValue]) -> Result<LValue, LError> {
-
-        let key:LValue = args.into();
+        let key: LValue = args.into();
         let key: LValueS = key.into();
 
         let handle = tokio::runtime::Handle::current();
         let state = self.get_ref_state();
-        let result =
-            thread::spawn(move || handle.block_on(async move { state.lock().await.get_state(None) }))
-                .join()
-                .unwrap();
+        let result = thread::spawn(move || {
+            handle.block_on(async move { state.lock().await.get_state(None) })
+        })
+        .join()
+        .unwrap();
 
         let value = result.inner.get(&key).unwrap_or(&LValueS::Bool(false));
 
         Ok(value.into())
     }
 
-    fn get_status(&self, args: &[LValue]) -> Result<LValue, LError> {
+    fn get_status(&self, _: &[LValue]) -> Result<LValue, LError> {
         let handle = tokio::runtime::Handle::current();
         let status = self.action_status.clone();
-        let status =
-            thread::spawn(move || handle.block_on(async move { status.lock().await.status.clone() }))
-                .join()
-                .unwrap();
+        let status = thread::spawn(move || {
+            handle.block_on(async move { status.lock().await.status.clone() })
+        })
+        .join()
+        .unwrap();
 
         let mut string = "Action(s) Status\n".to_string();
 
@@ -440,17 +450,17 @@ impl RAEInterface for CtxGodot {
     }
 
     fn get_action_status(&self, action_id: usize) -> ActionStatus {
-
         let handle = tokio::runtime::Handle::current();
         let status = self.action_status.clone();
-        let result =
-            thread::spawn(move || handle.block_on(async move { status.lock().await.get_status(action_id)}))
-                .join()
-                .unwrap();
+        let result = thread::spawn(move || {
+            handle.block_on(async move { status.lock().await.get_status(action_id) })
+        })
+        .join()
+        .unwrap();
         result.unwrap()
     }
 
-    fn set_status(&self, action_id: usize, status: ActionStatus) {
+    fn set_status(&self, _: usize, _: ActionStatus) {
         todo!()
     }
 }

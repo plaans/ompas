@@ -762,7 +762,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                             Some(u) => {
                                 let r_lvalue =
                                     fun.call(&args, &mut env, ctxs.get_mut_context(u))?;
-                                println!("=> {}", r_lvalue);
+                                //println!("=> {}", r_lvalue);
                                 Ok(r_lvalue)
                             }
                         };

@@ -71,7 +71,7 @@ pub const RAE_TASK_METHODS_MAP: &str = "rae-task-methods-map";
 pub const RAE_TASK_LIST: &str = "rae-task-list";
 pub const RAE_METHOD_LIST: &str = "rae_methods_list";
 pub const RAE_ACTION_LIST: &str = "rae_actions_list";
-pub const RAE_EXEC_COMMAND: &str = "rae-exec-command";
+pub const RAE_STATE_FUNCTION_LIST: &str = "rae-state-function-list";
 //pub const RAE_MAP_TYPE:&str = "rae-map-type";
 
 impl Default for RAEEnvBis {
@@ -80,11 +80,11 @@ impl Default for RAEEnvBis {
         env.insert(RAE_ACTION_LIST.to_string(), LValue::List(vec![]));
         env.insert(RAE_METHOD_LIST.to_string(), LValue::List(vec![]));
         env.insert(RAE_TASK_LIST.to_string(), LValue::List(vec![]));
+        env.insert(RAE_STATE_FUNCTION_LIST.to_string(), LValue::List(vec![]));
         env.insert(
             RAE_TASK_METHODS_MAP.to_string(),
             LValue::Map(Default::default()),
         );
-        env.insert(RAE_EXEC_COMMAND.to_string(), LValue::Nil);
         Self { inner: env }
     }
 }
@@ -98,6 +98,18 @@ impl RAEEnvBis {
             self.inner
                 .set(RAE_ACTION_LIST.to_string(), list.into())
                 .expect("list of action should be already defined in environment");
+        }
+        Ok(())
+    }
+
+    pub fn add_state_function(&mut self, label: String, value: LValue) -> Result<(), LError> {
+        self.insert(label.clone(), value)?;
+        let state_function_list = self.inner.get_symbol(RAE_STATE_FUNCTION_LIST).unwrap();
+        if let LValue::List(mut list) = state_function_list {
+            list.push(LValue::Symbol(label));
+            self.inner
+                .set(RAE_STATE_FUNCTION_LIST.to_string(), list.into())
+                .expect("list of state function should be already defined in environment");
         }
         Ok(())
     }
@@ -194,21 +206,14 @@ impl RAEEnvBis {
         self.inner.get_symbol(label)
     }
 
-    pub fn set_exec_command(&mut self, exec_command: LValue) {
-        self.inner
-            .set(RAE_EXEC_COMMAND.to_string(), exec_command)
-            .expect("entry rae-exec-command should be in the env");
-    }
-
-    pub fn get_exec_command(&self) -> LValue {
-        self.inner.get_symbol(RAE_EXEC_COMMAND).unwrap()
-    }
-
     pub fn pretty_debug(&self, key: Option<String>) -> String {
         let mut string = String::new();
         if let Some(_label) = key {
             todo!()
         } else {
+            let state_function_symbol = self.inner.get_symbol(RAE_STATE_FUNCTION_LIST).unwrap();
+            let state_function_list: Vec<LValue> = state_function_symbol.try_into().unwrap();
+
             let action_list_symbol = self.inner.get_symbol(RAE_ACTION_LIST).unwrap();
             let action_list: Vec<LValue> = action_list_symbol.try_into().unwrap();
             let task_list_symbol = self.inner.get_symbol(RAE_TASK_LIST).unwrap();
@@ -219,15 +224,22 @@ impl RAEEnvBis {
                 .unwrap()
                 .try_into()
                 .unwrap();
-            string.push_str("RAEEnv: \n\n");
-            string.push_str("\t*Action(s): \n\n");
+            string.push_str("RAEEnv: \n");
+            string.push_str("\tState Function(s)\n");
+            for state_function in state_function_list {
+                let state_function_label: String = state_function.try_into().unwrap();
+                let state_function_body = self.inner.get_symbol(&state_function_label).unwrap();
+                string.push_str(format!("\t\t- {}: {}\n", state_function_label, state_function_body).as_str());
+            }
+            string.push('\n');
+            string.push_str("\t*Action(s): \n");
             for action in action_list {
                 let action_label: String = action.try_into().unwrap();
                 let action_body = self.inner.get_symbol(&action_label).unwrap();
                 string.push_str(format!("\t\t- {}: {}\n", action_label, action_body).as_str());
             }
             string.push('\n');
-            string.push_str("\t*Task(s): \n\n");
+            string.push_str("\t*Task(s): \n");
             for task in task_list {
                 let task_label: String = task.clone().try_into().unwrap();
                 let task_body = self.inner.get_symbol(&task_label).unwrap();

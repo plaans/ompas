@@ -22,13 +22,13 @@ pub const RAE_LAUNCH: &str = "rae-launch";
 pub const RAE_ADD_ACTION: &str = "rae-add-action";
 pub const RAE_ADD_METHOD: &str = "rae-add-method";
 pub const RAE_ADD_TASK: &str = "rae-add-task";
+pub const RAE_ADD_STATE_FUNCTION: &str = "rae-add-state-function";
 pub const RAE_GET_METHODS: &str = "rae-get-methods";
 pub const RAE_GET_ACTIONS: &str = "rae-get-actions";
 pub const RAE_GET_TASKS: &str = "rae-get-tasks";
+pub const RAE_GET_STATE_FUNCTION: &str ="rae-get-state-function";
 
 pub const RAE_GET_ENV: &str = "rae-get-env";
-pub const RAE_SET_EXEC_COMMAND: &str = "rae-set-exec-command";
-pub const RAE_GET_EXEC_COMMAND: &str = "rae-get-exec-command";
 pub const RAE_TRIGGER_EVENT: &str = "rae-trigger-event";
 pub const RAE_TRIGGER_TASK: &str = "rae-trigger-task";
 
@@ -176,9 +176,11 @@ impl GetModule for CtxRAE {
         //primitives for RAE Domain
         module.add_fn_prelude(RAE_LAUNCH, Box::new(launch_rae));
         module.add_mut_fn_prelude(RAE_ADD_ACTION, Box::new(add_action));
+        module.add_mut_fn_prelude(RAE_ADD_STATE_FUNCTION, Box::new(add_state_function));
         module.add_mut_fn_prelude(RAE_ADD_TASK, Box::new(add_task));
         module.add_mut_fn_prelude(RAE_ADD_METHOD, Box::new(add_method));
         module.add_fn_prelude(RAE_GET_METHODS, Box::new(get_methods));
+        module.add_fn_prelude(RAE_GET_STATE_FUNCTION, Box::new(get_state_function));
         module.add_fn_prelude(RAE_GET_ACTIONS, Box::new(get_actions));
         module.add_fn_prelude(RAE_GET_TASKS, Box::new(get_tasks));
         module.add_fn_prelude(RAE_GET_ENV, Box::new(rae_get_env));
@@ -207,8 +209,6 @@ impl Documentation for CtxRAE {
             LHelp::new(RAE_ADD_METHOD, DOC_RAE_ADD_METHOD, None),
             LHelp::new(RAE_GET_METHODS, DOC_RAE_GET_METHODS, None),
             LHelp::new(RAE_GET_ENV, DOC_RAE_GET_ENV, None),
-            LHelp::new(RAE_SET_EXEC_COMMAND, DOC_RAE_SET_EXEC_COMMAND, None),
-            LHelp::new(RAE_GET_EXEC_COMMAND, DOC_RAE_GET_EXEC_COMMAND, None),
             LHelp::new(RAE_TRIGGER_TASK, DOC_RAE_TRIGGER_TASK, None),
             LHelp::new(RAE_TRIGGER_EVENT, DOC_RAE_TRIGGER_EVENT, None),
             LHelp::new(DEF_ACTION, DOC_DEF_ACTION, None),
@@ -233,6 +233,33 @@ pub fn trigger_event(_: &[LValue], _env: &LEnv, _: &CtxRAE) -> Result<LValue, LE
 
 pub fn trigger_task(_: &[LValue], _env: &LEnv, _: &CtxRAE) -> Result<LValue, LError> {
     todo!()
+}
+
+pub fn add_state_function(args: &[LValue], _env: &mut LEnv, ctx: &mut CtxRAE) -> Result<LValue, LError> {
+    if args.len() != 2 {
+        return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
+    }
+
+    if let LValue::Symbol(action_label) = &args[0] {
+        if let LValue::Lambda(_) = &args[1] {
+            ctx.env
+                .add_state_function(action_label.to_string(), args[1].clone())?;
+        } else {
+            return Err(WrongType(
+                args[1].clone(),
+                args[1].clone().into(),
+                NameTypeLValue::Lambda,
+            ));
+        }
+    } else {
+        return Err(WrongType(
+            args[0].clone(),
+            args[0].clone().into(),
+            NameTypeLValue::Symbol,
+        ));
+    }
+
+    Ok(Nil)
 }
 
 ///Add an action to RAE env
@@ -469,6 +496,10 @@ pub fn get_actions(_: &[LValue], _env: &LEnv, ctx: &CtxRAE) -> Result<LValue, LE
 
 pub fn get_tasks(_: &[LValue], _env: &LEnv, ctx: &CtxRAE) -> Result<LValue, LError> {
     Ok(ctx.env.get_element(RAE_TASK_LIST).unwrap())
+}
+
+pub fn get_state_function(_: &[LValue], _env: &LEnv, ctx: &CtxRAE) -> Result<LValue, LError> {
+    Ok(ctx.env.get_element(RAE_STATE_FUNCTION_LIST).unwrap())
 }
 
 ///Add a task to RAE env

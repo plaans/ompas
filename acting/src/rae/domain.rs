@@ -1,7 +1,7 @@
 pub const MACRO_DEF_STATE_FUNCTION: &str = "(defmacro def-state-function (lambda args
     (let ((label (car args))
            (params (cdr args)))
-        (quasiquote (rae-add-to-env (unquote label)
+        (quasiquote (rae-add-state-function (unquote label)
          (lambda (unquote params)
           (unquote (cons rae-get-state-variable (cons label params)))))
             ))))";

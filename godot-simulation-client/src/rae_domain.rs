@@ -7,5 +7,6 @@ pub const GODOT_DOMAIN: &str = "\
     (defaction place ?r)
     (defaction rotate_to ?r ?a ?w)
     (defaction face_object ?node_name ?speed)
+    (def-state-function robot.coordinates ?r)
 )\
 ";

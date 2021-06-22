@@ -37,6 +37,7 @@ pub const RAE_GET_STATE: &str = "rae-get-state";
 pub const RAE_GET_STATE_VARIBALE: &str = "rae-get-state-variable";
 pub const RAE_LAUNCH_PLATFORM: &str = "rae-launch-platform";
 pub const RAE_GET_STATUS: &str = "rae-get-status";
+pub const RAE_CANCEL_COMMAND: &str = "rae-cancel-command";
 
 pub const LAMBDA_DEF_TASK: &str = "(defmacro deftask \
                                         (lambda (l body) \
@@ -116,8 +117,10 @@ pub trait RAEInterface: Any {
     ///Execute a command on the platform
     fn exec_command(&self, args: &[LValue], command_id: usize) -> Result<LValue, LError>;
 
+    fn cancel_command(&self, args: &[LValue]) -> Result<LValue, LError>;
+
     ///Get the whole state of the platform
-    fn get_state(&self) -> Result<LValue, LError>;
+    fn get_state(&self, args: &[LValue]) -> Result<LValue, LError>;
 
     ///Get a specific state variable
     fn get_state_variable(&self, args: &[LValue]) -> Result<LValue, LError>;
@@ -137,7 +140,11 @@ impl RAEInterface for () {
         todo!()
     }
 
-    fn get_state(&self) -> Result<LValue, LError> {
+    fn cancel_command(&self, _: &[LValue]) -> Result<LValue, LError> {
+        todo!()
+    }
+
+    fn get_state(&self, _: &[LValue]) -> Result<LValue, LError> {
         todo!()
     }
 
@@ -180,6 +187,7 @@ impl GetModule for CtxRAE {
             label: MOD_RAE,
         };
 
+        //primitives for RAE Domain
         module.add_fn_prelude(RAE_LAUNCH, Box::new(launch_rae));
         module.add_mut_fn_prelude(RAE_ADD_ACTION, Box::new(add_action));
         module.add_mut_fn_prelude(RAE_ADD_TASK, Box::new(add_task));
@@ -193,11 +201,13 @@ impl GetModule for CtxRAE {
         module.add_fn_prelude(RAE_TRIGGER_EVENT, Box::new(trigger_event));
         module.add_fn_prelude(RAE_TRIGGER_TASK, Box::new(trigger_task));
 
+        //Interface with platform
         module.add_fn_prelude(RAE_GET_STATE, Box::new(get_state));
         module.add_fn_prelude(RAE_TRIGGER_TASK, Box::new(get_state_variable));
         module.add_mut_fn_prelude(RAE_EXEC_COMMAND, Box::new(exec_command));
         module.add_mut_fn_prelude(RAE_LAUNCH_PLATFORM, Box::new(launch_platform));
         module.add_fn_prelude(RAE_GET_STATUS, Box::new(get_status));
+        module.add_fn_prelude(RAE_CANCEL_COMMAND, Box::new(cancel_command));
 
         module
     }
@@ -350,8 +360,8 @@ pub fn exec_command(args: &[LValue], _env: &mut LEnv, ctx: &mut CtxRAE) -> Resul
     ctx.platform_interface.exec_command(args, command_id)
 }
 
-pub fn get_state(_: &[LValue], _env: &LEnv, ctx: &CtxRAE) -> Result<LValue, LError> {
-    ctx.platform_interface.get_state()
+pub fn get_state(args: &[LValue], _env: &LEnv, ctx: &CtxRAE) -> Result<LValue, LError> {
+    ctx.platform_interface.get_state(args)
 }
 
 pub fn get_state_variable(args: &[LValue], _env: &LEnv, ctx: &CtxRAE) -> Result<LValue, LError> {
@@ -362,9 +372,13 @@ pub fn get_status(args: &[LValue], _env: &LEnv, ctx: &CtxRAE) -> Result<LValue, 
     ctx.platform_interface.get_status(args)
 }
 
-pub fn get_action_status(_: &[LValue], _env: &LEnv, _: &CtxRAE) -> Result<LValue, LError> {
-    todo!()
+pub fn cancel_command(args: &[LValue], _env: &LEnv, ctx: &CtxRAE) -> Result<LValue, LError> {
+    ctx.platform_interface.cancel_command(args)
 }
+
+/*pub fn get_action_status(args: &[LValue], _env: &LEnv, ctx: &CtxRAE) -> Result<LValue, LError> {
+    ctx.platform_interface.get_action_status()
+}*/
 
 /*
 pub fn add_action(args: &[LValue], _env: &mut LEnv, ctx: &mut CtxRAE) -> Result<LValue, LError> {

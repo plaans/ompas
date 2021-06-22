@@ -1,4 +1,4 @@
-use ompas_godot_simulation_client::godot::BUFFER_SIZE;
+use ompas_godot_simulation_client::tcp::BUFFER_SIZE;
 use tokio::io::BufReader;
 use tokio::net::TcpStream;
 

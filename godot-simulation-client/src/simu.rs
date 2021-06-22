@@ -1,16 +1,17 @@
-use crate::godot::*;
 use crate::serde::*;
 use crate::state::*;
+use crate::tcp::*;
 use ompas_acting::rae::lisp::RAEInterface;
-use ompas_acting::rae::state::{ActionStatus, ActionStatusSet, LState, StateType};
+use ompas_acting::rae::state::{ActionStatus, ActionStatusSet, StateType};
 use ompas_lisp::core::LEnv;
 use ompas_lisp::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
 use ompas_lisp::structs::{GetModule, LError, LValue, LValueS, Module, NameTypeLValue};
 use ompas_modules::doc::{Documentation, LHelp};
 use ompas_modules::io::TOKIO_CHANNEL_SIZE;
 use std::net::SocketAddr;
+use std::process::Command;
 use std::sync::Arc;
-use std::thread;
+use std::{thread, time};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{mpsc, Mutex};
 
@@ -23,7 +24,7 @@ const MOD_GODOT: &str = "mod-godot";
 //commands
 
 const OPEN_COM: &str = "open-com-godot";
-const LAUNCH_GODOT: &str = "launch-godot";
+const START_GODOT: &str = "launch-godot";
 const EXEC_GODOT: &str = "exec-godot";
 
 //State variables
@@ -291,23 +292,23 @@ pub struct SocketInfo {
 #[derive(Default)]
 pub struct CtxGodot {
     socket_info: SocketInfo,
-    sender_li: Option<Sender<String>>,
     sender_socket: Option<Sender<String>>,
     state: Arc<Mutex<GodotState>>,
     action_status: Arc<Mutex<ActionStatusSet>>,
+    //godot_handler : JoinHandle<Output>
 }
 
 impl CtxGodot {
-    pub fn set_sender_li(&mut self, sender: Sender<String>) {
-        self.sender_li = Some(sender);
+    /* pub fn set_godot_handler(&mut self, handler : JoinHandle<Output>) {
+        self.godot_handler = handler;
     }
+
+    pub fn get_godot_handler(&mut self) -> &JoinHandle<Output> {
+        &self.godot_handler
+    }*/
 
     pub fn set_socket_info(&mut self, socket_info: SocketInfo) {
         self.socket_info = socket_info;
-    }
-
-    pub fn get_sender_li(&self) -> &Option<Sender<String>> {
-        &self.sender_li
     }
 
     pub fn get_socket_info(&self) -> &SocketInfo {
@@ -318,12 +319,52 @@ impl CtxGodot {
         &self.sender_socket
     }
 
-    pub async fn get_state(&self, _type: Option<StateType>) -> LState {
+    /*pub async fn get_state(&self, _type: Option<StateType>) -> LState {
         self.state.lock().await.get_state(_type)
-    }
+    }*/
 
     pub fn get_ref_state(&self) -> Arc<Mutex<GodotState>> {
         self.state.clone()
+    }
+}
+
+impl CtxGodot {
+    pub fn start_godot(&self, args: &[LValue]) -> Result<LValue, LError> {
+        match args.len() {
+            0 => {
+                thread::spawn(|| {
+                    Command::new("godot3")
+                        .arg("--path")
+                        .arg(DEFAULT_PATH_PROJECT_GODOT)
+                        .output()
+                        .expect("failed to execute process");
+                });
+            } //default settings
+            1 => {
+                if let LValue::Symbol(s) = &args[0] {
+                    let s = s.clone();
+                    thread::spawn(move || {
+                        Command::new("godot3")
+                            .arg("--path")
+                            .arg(s)
+                            .output()
+                            .expect("failed to execute process");
+                    });
+                } else {
+                    return Err(WrongType(
+                        args[0].clone(),
+                        (&args[0]).into(),
+                        NameTypeLValue::Symbol,
+                    ));
+                }
+            } //path of the project (absolute path)
+            5 => {
+                todo!()
+            } //path + options
+            _ => return Err(WrongNumberOfArgument(args.into(), args.len(), 0..5)), //Unexpected number of arguments
+        }
+
+        Ok(LValue::Nil)
     }
 }
 
@@ -373,11 +414,73 @@ impl RAEInterface for CtxGodot {
         Ok(LValue::Nil)
     }
 
-    fn get_state(&self) -> Result<LValue, LError> {
+    fn cancel_command(&self, args: &[LValue]) -> Result<LValue, LError> {
+        if args.len() != 1 {
+            return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1));
+        }
+
+        let id: usize = if let LValue::Number(n) = &args[0] {
+            n.into()
+        } else {
+            return Err(WrongType(
+                args[0].clone(),
+                (&args[0]).into(),
+                NameTypeLValue::Number,
+            ));
+        };
+
+        let gs = GodotMessageSerde {
+            _type: GodotMessageType::CancelRequest,
+            data: GodotMessageSerdeData::ActionId(SerdeActionId { action_id: id }),
+        };
+
+        let command = serde_json::to_string(&gs).unwrap();
+
+        //println!("(in exec-command) : {}", command);
+
+        let sender = match self.get_sender_socket() {
+            None => {
+                return Err(SpecialError(
+                    "ctx godot has no sender to simulation, try first to (open-com-godot)"
+                        .to_string(),
+                ))
+            }
+            Some(s) => s.clone(),
+        };
+        tokio::spawn(async move {
+            sender
+                .send(command)
+                .await
+                .expect("couldn't send via channel");
+        });
+        Ok(LValue::Nil)
+    }
+
+    fn get_state(&self, args: &[LValue]) -> Result<LValue, LError> {
+        let _type = match args.len() {
+            0 => None,
+            1 => match &args[0] {
+                LValue::Symbol(s) => match s.as_str() {
+                    KEY_STATIC => Some(StateType::Static),
+                    KEY_DYNAMIC => Some(StateType::Dynamic),
+                    _ => {
+                        return Err(SpecialError(format!(
+                            "Expected keywords {} or {}",
+                            KEY_STATIC, KEY_DYNAMIC
+                        )))
+                    }
+                },
+                lv => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
+            },
+            _ => return Err(WrongNumberOfArgument(args.into(), args.len(), 0..1)),
+        };
+
+        //println!("state type: {:?}", _type);
+
         let handle = tokio::runtime::Handle::current();
-        let state = self.get_ref_state();
+        let state = self.state.clone();
         let result = thread::spawn(move || {
-            handle.block_on(async move { state.lock().await.get_state(None) })
+            handle.block_on(async move { state.lock().await.get_state(_type) })
         })
         .join()
         .unwrap();
@@ -442,6 +545,10 @@ impl RAEInterface for CtxGodot {
         let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
         self.sender_socket = Some(tx);
 
+        //println!("godot launching...");
+        self.start_godot(&[])?;
+        thread::sleep(time::Duration::from_secs(3));
+        //println!("godot launched!");
         let state = self.state.clone();
         let status = self.action_status.clone();
         tokio::spawn(async move { task_tcp_connection(&socket_addr, rx, state, status).await });
@@ -508,7 +615,7 @@ impl GetModule for CtxGodot {
         };
 
         module.add_mut_fn_prelude(OPEN_COM, Box::new(open_com));
-        module.add_fn_prelude(LAUNCH_GODOT, Box::new(launch_godot));
+        module.add_fn_prelude(START_GODOT, Box::new(start_godot));
         module.add_fn_prelude(EXEC_GODOT, Box::new(exec_godot));
         module.add_fn_prelude(GET_STATE, Box::new(get_state));
         //module.add_mut_fn_prelude(SET_STATE, Box::new(set_state));
@@ -523,7 +630,7 @@ impl Documentation for CtxGodot {
         vec![
             LHelp::new(MOD_GODOT, DOC_MOD_GODOT, Some(DOC_MOD_GODOT_VERBOSE)),
             LHelp::new(OPEN_COM, DOC_OPEN_COM, Some(DOC_OPEN_COM_VERBOSE)),
-            LHelp::new(LAUNCH_GODOT, DOC_LAUNCH_GODOT, None),
+            LHelp::new(START_GODOT, DOC_LAUNCH_GODOT, None),
             LHelp::new(EXEC_GODOT, DOC_EXEC_GODOT, Some(DOC_EXEC_GODOT_VERBOSE)),
             //Add doc for state functions
             LHelp::new(
@@ -637,46 +744,14 @@ Functions
  */
 
 fn open_com(args: &[LValue], _: &mut LEnv, ctx: &mut CtxGodot) -> Result<LValue, LError> {
-    let socket_addr: SocketAddr = match args.len() {
-        0 => "127.0.0.1:10000".parse().unwrap(),
-        2 => {
-            let addr = match &args[0] {
-                LValue::Symbol(s) => s.clone(),
-                lv => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
-            };
-
-            let port: usize = match &args[1] {
-                LValue::Number(n) => n.into(),
-                lv => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Usize)),
-            };
-
-            format!("{}:{}", addr, port).parse().unwrap()
-        }
-        _ => return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2)),
-    };
-
-    let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
-    ctx.sender_socket = Some(tx);
-
-    let state = ctx.state.clone();
-    let status = ctx.action_status.clone();
-    tokio::spawn(async move { task_tcp_connection(&socket_addr, rx, state, status).await });
-
-    Ok(LValue::Nil)
+    ctx.launch_platform(args)
 }
 
-fn launch_godot(_: &[LValue], _: &LEnv, ctx: &CtxGodot) -> Result<LValue, LError> {
-    let sender = match ctx.get_sender_li() {
-        None => return Err(SpecialError("ctx godot has no sender to l.i.".to_string())),
-        Some(s) => s.clone(),
-    };
-    tokio::spawn(async move {
-        sender
-            .send("(print (quote (launch-godot not implemented yet)))".to_string())
-            .await
-            .expect("couldn't send via channel");
-    });
-    Ok(LValue::Nil)
+pub const DEFAULT_PATH_PROJECT_GODOT: &str = "/home/jeremy/godot/Simulation-Factory-Godot/simu";
+
+///Launch godot
+fn start_godot(args: &[LValue], _: &LEnv, ctx: &CtxGodot) -> Result<LValue, LError> {
+    ctx.start_godot(args)
 }
 /// Commands available
 ///- Navigate to : ['navigate_to', robot_name, destination_x, destination_y]
@@ -688,102 +763,6 @@ fn exec_godot(args: &[LValue], _: &LEnv, ctx: &CtxGodot) -> Result<LValue, LErro
     ctx.exec_command(args, 0)
 }
 
-/*pub fn set_state(args: &[LValue], _: &mut LEnv, ctx: &mut CtxGodot) -> Result<LValue, LError> {
-    if args.len() != 2 {
-        return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
-    }
-
-    let first_arg = &args[0];
-    let state_type = match String::try_from(first_arg) {
-        Ok(s) => match s.as_str() {
-            KEY_DYNAMIC => StateType::Dynamic,
-            KEY_STATIC => StateType::Static,
-            _ => {
-                return Err(SpecialError(format!(
-                    "Expected keywords {} or {}",
-                    KEY_STATIC, KEY_DYNAMIC
-                )))
-            }
-        },
-        Err(_) => {
-            return Err(WrongType(
-                first_arg.clone(),
-                first_arg.into(),
-                NameTypeLValue::String,
-            ))
-        }
-    };
-
-    match &args[1] {
-        LValue::Map(m) => {
-            ctx.set_state(m.into(), &state_type);
-            Ok(LValue::Nil)
-        }
-        lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Map)),
-    }
-}*/
-
 pub fn get_state(args: &[LValue], _: &LEnv, ctx: &CtxGodot) -> Result<LValue, LError> {
-    let _type = match args.len() {
-        0 => None,
-        1 => match &args[0] {
-            LValue::Symbol(s) => match s.as_str() {
-                KEY_STATIC => Some(StateType::Static),
-                KEY_DYNAMIC => Some(StateType::Dynamic),
-                _ => {
-                    return Err(SpecialError(format!(
-                        "Expected keywords {} or {}",
-                        KEY_STATIC, KEY_DYNAMIC
-                    )))
-                }
-            },
-            lv => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
-        },
-        _ => return Err(WrongNumberOfArgument(args.into(), args.len(), 0..1)),
-    };
-
-    let handle = tokio::runtime::Handle::current();
-    let state = ctx.get_ref_state();
-    let result =
-        thread::spawn(move || handle.block_on(async move { state.lock().await.get_state(_type) }))
-            .join()
-            .unwrap();
-
-    Ok(result.into_map())
+    ctx.get_state(args)
 }
-
-/*///Update the last state with the new facts of the map.
-pub fn update_state(args: &[LValue], _: &mut LEnv, ctx: &mut CtxGodot) -> Result<LValue, LError> {
-    if args.len() != 2 {
-        return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
-    }
-
-    let first_arg = &args[0];
-    let state_type = match String::try_from(first_arg) {
-        Ok(s) => match s.as_str() {
-            KEY_DYNAMIC => StateType::Dynamic,
-            KEY_STATIC => StateType::Static,
-            _ => {
-                return Err(SpecialError(format!(
-                    "Expected keywords {} or {}",
-                    KEY_STATIC, KEY_DYNAMIC
-                )))
-            }
-        },
-        Err(_) => {
-            return Err(WrongType(
-                first_arg.clone(),
-                first_arg.into(),
-                NameTypeLValue::String,
-            ))
-        }
-    };
-
-    match &args[1] {
-        LValue::Map(m) => {
-            ctx.update_state(m.into(), &state_type);
-            Ok(LValue::Nil)
-        }
-        lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Map)),
-    }
-}*/

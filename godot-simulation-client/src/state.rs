@@ -44,10 +44,19 @@ impl GodotState {
 
     pub fn get_state(&self, st: Option<StateType>) -> LState {
         match st {
-            None => self.static_state.union(&self.dynamic_state),
+            None => {
+                //println!("get whole state");
+                self.static_state.union(&self.dynamic_state)
+            }
             Some(st) => match st {
-                StateType::Static => self.static_state.clone(),
-                StateType::Dynamic => self.dynamic_state.clone(),
+                StateType::Static => {
+                    //println!("get static state");
+                    self.static_state.clone()
+                }
+                StateType::Dynamic => {
+                    //println!("get dynamic state");
+                    self.dynamic_state.clone()
+                }
                 _ => todo!(),
             },
         }

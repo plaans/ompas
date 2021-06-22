@@ -47,3 +47,7 @@ path = "src/bin/godot_test.rs"
 [[bin]]
 name = "serde_test"
 path = "src/bin/serde_test.rs"
+
+[[bin]]
+name = "command_line_godot"
+path = "src/bin/command_line_godot.rs"

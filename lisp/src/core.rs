@@ -626,14 +626,14 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
     let mut env = env;
 
     loop {
-        println!("lv: {}", lv);
+        //dbg!("lv: {}", lv);
         if let LValue::Symbol(s) = &lv {
             return match env.get_symbol(s.as_str()) {
                 None => Ok(lv.clone()),
                 Some(lv) => Ok(lv),
             };
         } else if let LValue::List(list) = &lv {
-            println!("expression is a list");
+            //dbg!("expression is a list");
             let list = list.as_slice();
             let proc = &list[0];
             let args = &list[1..];
@@ -654,7 +654,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                                 ))
                             }
                         };
-                        println!("=> {}", LValue::Nil);
+                        //dbg!("=> {}", LValue::Nil);
                         return Ok(LValue::Nil);
                     }
                     LCoreOperator::DefLambda => {
@@ -687,7 +687,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                         let body = &args[1];
                         let r_lvalue =
                             LValue::Lambda(LLambda::new(params, body.clone(), env.clone()));
-                        println!("=> {}", r_lvalue);
+                        //dbg!("=> {}", r_lvalue);
                         return Ok(r_lvalue);
                     }
                     LCoreOperator::If => {
@@ -704,7 +704,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                         };
                     }
                     LCoreOperator::Quote => {
-                        println!("=> {}", &args[0]);
+                        //dbg!("=> {}", &args[0]);
                         return Ok(args[0].clone());
                     }
                     LCoreOperator::Set => {
@@ -723,7 +723,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                             .iter()
                             .map(|x| eval(x, &mut env, ctxs))
                             .collect::<Result<_, _>>()?;
-                        println!("=> {}", results.last().unwrap_or(&LValue::Nil));
+                        //dbg!("=> {}", results.last().unwrap_or(&LValue::Nil));
                         return Ok(results.last().unwrap_or(&LValue::Nil).clone());
                     }
                     LCoreOperator::QuasiQuote
@@ -749,7 +749,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                             Some(u) => ctxs.get_context(u),
                         };
                         let r_lvalue = fun.call(args, &env, ctx)?;
-                        println!("=> {}", r_lvalue);
+                        ////dbg!("=> {}", r_lvalue);
                         return Ok(r_lvalue);
                     }
                     LValue::MutFn(fun) => {
@@ -777,7 +777,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                 };
             }
         } else {
-            println!("=> {}", lv);
+            //dbg!("=> {}", lv);
             return Ok(lv);
         }
     }

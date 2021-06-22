@@ -428,6 +428,7 @@ dependencies = [
  "aries_utils",
  "byteorder",
  "im",
+ "ompas_acting",
  "ompas_lisp",
  "ompas_modules",
  "rustyline",

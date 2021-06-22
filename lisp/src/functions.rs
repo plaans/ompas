@@ -215,6 +215,8 @@ pub fn cdr(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
                 if list.len() < 2 {
                     Ok(LValue::Nil)
                 } else {
+                    //let slice = &list[1..];
+                    //let vec = slice.to_vec();
                     let mut new_list = list.clone();
                     new_list.remove(0);
                     Ok(new_list.into())

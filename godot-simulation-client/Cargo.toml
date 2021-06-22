@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 ompas_lisp = {path = "../lisp"}
 ompas_modules = {path = "../modules"}
+ompas_acting = {path = "../acting"}
 aries_model = {git = "https://github.com/arbimo/aries/", rev = "e220567"}
 aries_planning = {git = "https://github.com/arbimo/aries/", rev = "e220567"}
 aries_utils = {git = "https://github.com/arbimo/aries/", rev = "e220567"}

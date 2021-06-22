@@ -1,5 +1,4 @@
-use crate::serde::GodotMessageSerde;
-use crate::state::{GodotState, LState};
+use crate::state::{GodotState};
 use std::convert::TryInto;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -7,6 +6,8 @@ use tokio::io::{self, AsyncReadExt, AsyncWriteExt, BufReader, ReadHalf, WriteHal
 use tokio::net::TcpStream;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::Mutex;
+use crate::serde::{GodotMessageSerde, GodotMessageType};
+use ompas_acting::rae::state::{LState, ActionStatus, ActionStatusSet};
 
 pub const BUFFER_SIZE: usize = 65_536; //65KB should be enough for the moment
 
@@ -14,12 +15,13 @@ pub async fn task_tcp_connection(
     socket_addr: &SocketAddr,
     receiver: Receiver<String>,
     state: Arc<Mutex<GodotState>>,
+    status: Arc<Mutex<ActionStatusSet>>,
 ) {
     let stream = TcpStream::connect(socket_addr).await.unwrap();
 
     let (rd, wr) = io::split(stream);
 
-    tokio::spawn(async move { async_read_socket(rd, state).await });
+    tokio::spawn(async move { async_read_socket(rd, state, status).await });
 
     tokio::spawn(async move { async_send_socket(wr, receiver).await });
 }
@@ -45,7 +47,7 @@ fn u32_to_u8_array(x: u32) -> [u8; 4] {
     [b4, b3, b2, b1]
 }
 
-async fn async_read_socket(stream: ReadHalf<TcpStream>, state: Arc<Mutex<GodotState>>) {
+async fn async_read_socket(stream: ReadHalf<TcpStream>, state: Arc<Mutex<GodotState>>, status: Arc<Mutex<ActionStatusSet>>) {
     let mut buf_reader = BufReader::new(stream);
 
     let mut buf = [0; BUFFER_SIZE];
@@ -66,8 +68,33 @@ async fn async_read_socket(stream: ReadHalf<TcpStream>, state: Arc<Mutex<GodotSt
 
         if !msg.is_empty() {
             let message: GodotMessageSerde = serde_json::from_str(&msg.to_lowercase()).unwrap();
-            let temp_state: LState = message.try_into().unwrap();
-            state.lock().await.set_state(temp_state);
+            match message._type {
+                GodotMessageType::StaticState | GodotMessageType::DynamicState => {
+                    let temp_state: LState = message.try_into().unwrap();
+                    state.lock().await.set_state(temp_state);
+                }
+                GodotMessageType::ActionResponse => {
+
+                    let action_status: (usize, ActionStatus) = message.try_into().unwrap();
+                    //println!("{:?}", action_status.1);
+                    if let ActionStatus::ActionResponse(server_id) = action_status.1 {
+                        //println!("yey in action response");
+                        status.lock().await.server_id_interal_id.insert(server_id, action_status.0);
+                        status.lock().await.status.insert(action_status.0, action_status.1);
+                    }
+                }
+                GodotMessageType::ActionFeedback |
+                GodotMessageType::ActionResult |
+                GodotMessageType::ActionPreempt |
+                GodotMessageType ::ActionCancel => {
+                    //println!("the action status is updated");
+                    let action_status: (usize, ActionStatus) = message.try_into().unwrap();
+                    status.lock().await.set_status_from_server(action_status.0, action_status.1);
+                }
+                _ => panic!("should not receive this kind of message")
+
+            }
+
         }
     }
 }

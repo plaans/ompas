@@ -71,7 +71,7 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     let ctx_counter = CtxCounter::default();
     let ctx_dumber = CtxDumber::default();
     let mut ctx_godot = CtxGodot::default();
-    let ctx_rae = CtxRAE::default();
+    let mut ctx_rae = CtxRAE::default();
     //Insert the doc for the different contexts.
     ctx_doc.insert_doc(CtxIo::documentation());
     ctx_doc.insert_doc(CtxMath::documentation());
@@ -89,6 +89,8 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     //ctx_state.set_sender_stdout(sender_stdout.clone());
     ctx_godot.set_sender_li(sender_li.clone());
 
+    ctx_rae.platform_interface = Box::new(ctx_godot);
+
     load_module(&mut root_env, &mut ctxs, ctx_doc, &mut lisp_init);
     load_module(&mut root_env, &mut ctxs, ctx_io, &mut lisp_init);
     load_module(&mut root_env, &mut ctxs, ctx_math, &mut lisp_init);
@@ -96,7 +98,7 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     load_module(&mut root_env, &mut ctxs, ctx_dumber, &mut lisp_init);
     load_module(&mut root_env, &mut ctxs, ctx_type, &mut lisp_init);
     load_module(&mut root_env, &mut ctxs, ctx_counter, &mut lisp_init);
-    load_module(&mut root_env, &mut ctxs, ctx_godot, &mut lisp_init);
+    //load_module(&mut root_env, &mut ctxs, ctx_godot, &mut lisp_init);
     load_module(&mut root_env, &mut ctxs, ctx_rae, &mut lisp_init);
     let env = &mut root_env.clone();
     //println!("{}", lisp_init.begin_lisp());

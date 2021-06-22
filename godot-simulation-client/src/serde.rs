@@ -1,27 +1,56 @@
-use crate::state::{LState, StateType};
 use aries_planning::parsing::sexpr::SExpr;
-use ompas_lisp::structs::LError::WrongType;
-use ompas_lisp::structs::{LError, LNumber, LValue, NameTypeLValue};
-use serde::{Deserialize, Serialize, Serializer};
-use std::convert::TryFrom;
+use ompas_lisp::structs::LError::{WrongType, SpecialError};
+use ompas_lisp::structs::{LError, LNumber, LValue, NameTypeLValue, LValueS};
+use serde::{Deserialize, Serialize, Serializer, Deserializer};
+use std::convert::{TryFrom, TryInto};
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
+use serde::ser::SerializeStruct;
+use serde::de::Visitor;
+use serde_json::ser::State;
+use im::HashMap;
+use ompas_acting::rae::state::{LState, StateType, ActionStatus};
+use ompas_acting::rae::context::Action;
+use ompas_acting::rae::state::ActionStatus::{ActionResponse, ActionPreempt, ActionCancel};
+use crate::serde::GodotMessageType::ActionFeedback;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum GodotMessageType {
-    Static,
-    Dynamic,
+    #[serde(rename = "static")]
+    StaticState,
+    #[serde(rename = "dynamic")]
+    DynamicState,
+    #[serde(rename = "robot_command")]
     RobotCommand,
+    #[serde(rename = "action_response")]
+    ActionResponse,
+    #[serde(rename = "action_feedback")]
+    ActionFeedback,
+    #[serde(rename = "action_result")]
+    ActionResult,
+    #[serde(rename = "action_preempt")]
+    ActionPreempt,
+    #[serde(rename = "cancel_request")]
+    CancelRequest,
+    #[serde(rename = "action_cancel")]
+    ActionCancel,
 }
+
 
 impl Display for GodotMessageType {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            GodotMessageType::Static => write!(f, "static"),
-            GodotMessageType::Dynamic => write!(f, "dynamic"),
+            GodotMessageType::StaticState => write!(f, "static"),
+            GodotMessageType::DynamicState => write!(f, "dynamic"),
             GodotMessageType::RobotCommand => write!(f, "robot_command"),
+            GodotMessageType::ActionResponse => write!(f, "action_response"),
+            GodotMessageType::ActionFeedback => write!(f, "action_feedback"),
+            GodotMessageType::ActionResult => write!(f, "action_result"),
+            GodotMessageType::ActionPreempt => write!(f, "action_preempt"),
+            GodotMessageType::CancelRequest => write!(f, "cancel_request"),
+            GodotMessageType::ActionCancel => write!(f, "action_cancel"),
         }
     }
 }
@@ -32,9 +61,15 @@ impl Serialize for GodotMessageType {
         S: Serializer,
     {
         match self {
-            GodotMessageType::Static => serializer.serialize_str("static"),
-            GodotMessageType::Dynamic => serializer.serialize_str("dynamic"),
+            GodotMessageType::StaticState => serializer.serialize_str("static"),
+            GodotMessageType::DynamicState => serializer.serialize_str("dynamic"),
             GodotMessageType::RobotCommand => serializer.serialize_str("robot_command"),
+            GodotMessageType::ActionResponse => serializer.serialize_str("action_response"),
+            GodotMessageType::ActionFeedback => serializer.serialize_str("action_feedback"),
+            GodotMessageType::ActionResult => serializer.serialize_str("action_result"),
+            GodotMessageType::ActionPreempt => serializer.serialize_str("action_preempt"),
+            GodotMessageType::CancelRequest => serializer.serialize_str("cancel_request"),
+            GodotMessageType::ActionCancel => serializer.serialize_str("action_cancel"),
         }
     }
 }
@@ -43,7 +78,56 @@ impl Serialize for GodotMessageType {
 pub struct GodotMessageSerde {
     #[serde(rename = "type")]
     pub _type: GodotMessageType,
-    pub data: LValueSerde,
+    pub data: GodotMessageSerdeData,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SerdeRobotCommand {
+    pub command_info: LValueS,
+    pub temp_id : usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SerdeActionResponse {
+    pub temp_id : usize,
+    pub action_id: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SerdeActionFeedback {
+    pub action_id : usize,
+    pub feedback: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SerdeActionResult {
+    pub action_id: usize,
+    pub result: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SerdeActionId {
+    pub action_id: usize,
+}
+
+pub type SerdeActionPreempt = SerdeActionId;
+pub type SerdeCancelRequest = SerdeActionId;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SerdeActionCancel {
+    pub temp_id : usize,
+    pub cancelled: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum GodotMessageSerdeData {
+    LValue(LValueS),
+    RobotCommand(SerdeRobotCommand),
+    ActionResponse(SerdeActionResponse),
+    ActionFeedback(SerdeActionFeedback),
+    ActionResult(SerdeActionResult),
+    ActionId(SerdeActionId),
+    ActionCancel(SerdeActionCancel),
 }
 
 impl TryFrom<GodotMessageSerde> for LState {
@@ -52,21 +136,23 @@ impl TryFrom<GodotMessageSerde> for LState {
     fn try_from(value: GodotMessageSerde) -> Result<Self, Self::Error> {
         let mut state: LState = Default::default();
         match value._type {
-            GodotMessageType::Static => state.set_type(StateType::Static),
-            GodotMessageType::Dynamic => state.set_type(StateType::Dynamic),
-            GodotMessageType::RobotCommand => {
-                return Err(LError::SpecialError(
-                    "Was not expecting a robot command".to_string(),
-                ))
+            GodotMessageType::StaticState => {
+                state.set_type(StateType::Static);
             }
+            GodotMessageType::DynamicState => {
+                state.set_type(StateType::Dynamic);
+            }
+            _ => return Err(LError::SpecialError(
+                "Was expecting a state".to_string(),
+            ))
         }
-        match &value.data {
-            LValueSerde::List(l) => {
+        if let GodotMessageSerdeData::LValue(lvs) = value.data {
+            if let LValueS::List(l) = lvs {
                 for e in l {
                     match e {
-                        LValueSerde::List(list) => {
+                        LValueS::List(list) => {
                             state.insert(
-                                LValueSerde::List(list[0..list.len() - 1].to_vec()),
+                                LValueS::List(list[0..list.len() - 1].to_vec()),
                                 list.last().unwrap().clone(),
                             );
                         }
@@ -74,187 +160,104 @@ impl TryFrom<GodotMessageSerde> for LState {
                     }
                 }
             }
-            lv => {
-                return Err(WrongType(
-                    lv.into(),
-                    LValue::from(lv).into(),
-                    NameTypeLValue::List,
-                ))
-            }
         }
+
         Ok(state)
     }
 }
 
+impl TryFrom<GodotMessageSerde> for (usize, ActionStatus) {
+    type Error = LError;
+
+    fn try_from(value: GodotMessageSerde) -> Result<Self, Self::Error> {
+        let mut id = 0;
+        let mut status = ActionStatus::ActionPreempt;
+
+        match value._type {
+            GodotMessageType::ActionResponse => {
+
+                if let GodotMessageSerdeData::ActionResponse(ar) = value.data {
+                    id = ar.temp_id;
+                    status = ActionResponse(ar.action_id)
+                } else {
+                    todo!()
+                }
+            }
+            GodotMessageType::ActionFeedback => {
+
+                if let GodotMessageSerdeData::ActionFeedback(af)  = value.data {
+                    id = af.action_id;
+                    status = ActionStatus::ActionFeedback(af.feedback);
+                } else {
+                    todo!()
+                }
+            }
+            GodotMessageType::ActionResult => {
+
+                if let GodotMessageSerdeData::ActionResult(ar) = value.data {
+                    id = ar.action_id;
+                    status = ActionStatus::ActionResult(ar.result);
+                } else {
+                    todo!()
+                }
+            }
+            GodotMessageType::ActionPreempt => {
+
+                if let GodotMessageSerdeData::ActionId(ai) = value.data {
+                    id = ai.action_id;
+                    status = ActionPreempt;
+                } else {
+                    todo!()
+                }
+            }
+            GodotMessageType::ActionCancel => {
+
+                if let GodotMessageSerdeData::ActionCancel(ac) = value.data {
+                    id = ac.temp_id;
+                    status = ActionCancel(ac.cancelled);
+                } else {
+                    todo!()
+                }
+            }
+            _ => {todo!()}
+        }
+
+        Ok((id,status))
+    }
+}
+
+
 impl Display for GodotMessageSerde {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "type: {}\ndata: {}", self._type, self.data)
+        write!(f, "type: {}\ndata: {:?}", self._type, self.data)
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum LValueSerde {
-    Symbol(String),
-    Int(i64),
-    Float(f64),
-    Bool(bool),
-    List(Vec<LValueSerde>),
-    Map(Vec<(LValueSerde, LValueSerde)>),
-}
 
-impl Hash for LValueSerde {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        match self {
-            LValueSerde::Symbol(s) => (*s).hash(state),
-            LValueSerde::Int(i) => (*i).hash(state),
-            LValueSerde::Float(f) => (*f).to_string().hash(state),
-            LValueSerde::Bool(b) => b.hash(state),
-            LValueSerde::Map(m) => (*m).hash(state),
-            LValueSerde::List(l) => {
-                (*l).hash(state);
-            }
-        };
-    }
-}
-
-impl PartialEq for LValueSerde {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (LValueSerde::Int(i1), LValueSerde::Int(i2)) => *i1 == *i2,
-            (LValueSerde::Symbol(s1), LValueSerde::Symbol(s2)) => *s1 == *s2,
-            (LValueSerde::Bool(b1), LValueSerde::Bool(b2)) => b1 == b2,
-            (LValueSerde::Float(f1), LValueSerde::Float(f2)) => *f1 == *f2,
-            (LValueSerde::List(l1), LValueSerde::List(l2)) => *l1 == *l2,
-            (LValueSerde::Map(m1), LValueSerde::Map(m2)) => *m1 == *m2,
-            (_, _) => false,
-        }
-    }
-}
-
-impl Eq for LValueSerde {}
-
-impl From<&LValue> for LValueSerde {
-    fn from(lv: &LValue) -> Self {
-        match lv {
-            LValue::Symbol(s) => LValueSerde::Symbol(s.clone()),
-            LValue::Number(n) => match n {
-                LNumber::Int(i) => LValueSerde::Int(*i),
-                LNumber::Float(f) => LValueSerde::Float(*f),
-                LNumber::Usize(u) => LValueSerde::Int(*u as i64),
-            },
-            LValue::Fn(f) => LValueSerde::Symbol(f.get_label().to_string()),
-            LValue::MutFn(f) => LValueSerde::Symbol(f.get_label().to_string()),
-            LValue::Lambda(_) => LValue::Nil.into(),
-            LValue::CoreOperator(co) => LValueSerde::Symbol(co.to_string()),
-            LValue::Map(m) => {
-                LValueSerde::Map(m.iter().map(|(k, v)| (k.into(), v.into())).collect())
-            }
-            LValue::List(l) => LValueSerde::List(l.iter().map(|lv| lv.into()).collect()),
-            LValue::Quote(l) => l.deref().into(),
-            LValue::True => LValueSerde::Symbol("true".to_string()),
-            LValue::Nil => LValueSerde::Symbol("nil".to_string()),
-            LValue::String(s) => LValueSerde::Symbol(s.clone()),
-            LValue::Character(c) => LValueSerde::Symbol(c.to_string()),
-        }
-    }
-}
-
-impl From<LValue> for LValueSerde {
-    fn from(lv: LValue) -> Self {
-        (&lv).into()
-    }
-}
-
-impl From<&LValueSerde> for LValue {
-    fn from(lvs: &LValueSerde) -> Self {
-        match lvs {
-            LValueSerde::Symbol(s) => LValue::Symbol(s.clone()),
-            LValueSerde::Int(i) => LValue::Number(LNumber::Int(*i)),
-            LValueSerde::Float(f) => LValue::Number(LNumber::Float(*f)),
-            LValueSerde::Bool(b) => match b {
-                true => LValue::True,
-                false => LValue::Nil,
-            },
-            LValueSerde::List(l) => {
-                if l.is_empty() {
-                    LValue::Nil
-                } else {
-                    LValue::List(l.iter().map(|x| x.into()).collect())
-                }
-            }
-            LValueSerde::Map(m) => {
-                if m.is_empty() {
-                    LValue::Nil
-                } else {
-                    let mut map: im::HashMap<LValue, LValue> = Default::default();
-                    for (k, v) in m {
-                        map.insert(k.into(), v.into());
-                    }
-                    LValue::Map(map)
-                }
-            }
-        }
-    }
-}
-
-impl From<LValueSerde> for LValue {
-    fn from(lvs: LValueSerde) -> Self {
-        (&lvs).into()
-    }
-}
-impl Display for LValueSerde {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            LValueSerde::Symbol(s) => write!(f, "{}", s),
-            LValueSerde::Int(i) => write!(f, "{}", *i),
-            LValueSerde::Float(fl) => write!(f, "{}", fl),
-            LValueSerde::Bool(b) => {
-                write!(f, "{}", *b)
-            }
-            LValueSerde::List(l) => {
-                let mut str = String::from("(");
-                for e in l {
-                    str.push_str(format!("{} ", e).as_str())
-                }
-                str.push(')');
-                write!(f, "{}", str)
-            }
-            LValueSerde::Map(m) => {
-                let mut str = String::from("(");
-                for e in m {
-                    str.push_str(format!("{} . {} ", e.0, e.1).as_str())
-                }
-                str.push(')');
-                write!(f, "{}", str)
-            }
-        }
-    }
-}
 
 #[allow(clippy::result_unit_err)]
-pub fn parse_into_lvalue(se: &SExpr) -> Result<LValueSerde, ()> {
+pub fn parse_into_lvalue(se: &SExpr) -> Result<LValueS, ()> {
     match se {
         SExpr::Atom(atom) => {
             //println!("expression is an atom: {}", atom);
             //Test if its an int
             return match atom.as_str().parse::<i64>() {
-                Ok(int) => Ok(LValueSerde::Int(int)),
+                Ok(int) => Ok(LValueS::Int(int)),
                 Err(_) => match atom.as_str().parse::<f64>() {
                     //Test if its a float
-                    Ok(float) => Ok(LValueSerde::Float(float)),
+                    Ok(float) => Ok(LValueS::Float(float)),
                     Err(_) => match atom.as_str() {
                         //Test if its a Boolean
                         "true" => {
                             //println!("atom is boolean true");
-                            Ok(LValueSerde::Bool(true))
+                            Ok(LValueS::Bool(true))
                         }
                         "false" => {
                             //println!("atom is boolean false");
-                            Ok(LValueSerde::Bool(false))
+                            Ok(LValueS::Bool(false))
                         }
 
-                        s => Ok(LValueSerde::Symbol(s.to_string())),
+                        s => Ok(LValueS::Symbol(s.to_string())),
                     },
                 },
             };
@@ -262,10 +265,10 @@ pub fn parse_into_lvalue(se: &SExpr) -> Result<LValueSerde, ()> {
         SExpr::List(list) => {
             //println!("expression is a list");
             let list_iter = list.iter();
-            let vec: Vec<LValueSerde> = list_iter
+            let vec: Vec<LValueS> = list_iter
                 .map(|x| parse_into_lvalue(x))
                 .collect::<Result<_, _>>()?;
-            Ok(LValueSerde::List(vec))
+            Ok(LValueS::List(vec))
         }
     }
 }

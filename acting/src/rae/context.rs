@@ -1,11 +1,12 @@
 use crate::rae::job::{Job, JobId};
-use crate::rae::method::{RefinementStack, StackFrame};
+use crate::rae::refinement::{RefinementStack, StackFrame};
 use ompas_lisp::core::LEnv;
 use ompas_lisp::structs::LError::SpecialError;
-use ompas_lisp::structs::{LError, LLambda, LValue};
+use ompas_lisp::structs::{LError, LLambda, LValue, LFn};
 use std::collections::{HashMap, VecDeque};
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{Display, Formatter};
+use crate::rae::state::{LState, ActionStatus};
 
 #[derive(Default, Debug)]
 pub struct Agenda {
@@ -13,6 +14,7 @@ pub struct Agenda {
     pub stacks: HashMap<JobId, RefinementStack>,
     next_id: usize,
 }
+
 
 impl Agenda {
     pub fn remove_by_id(&mut self, _task_id: &JobId) {
@@ -548,7 +550,7 @@ impl ActionsProgress {
         self.status.get(action_id).unwrap()
     }
 
-    fn get_new_id(&mut self) -> usize {
+    pub fn get_new_id(&mut self) -> usize {
         let result = self.next_id;
         self.next_id += 1;
         result
@@ -557,14 +559,12 @@ impl ActionsProgress {
 
 pub struct RAEOptions {
     select_option: SelectOption,
-    exec_command: String,
 }
 
 impl RAEOptions {
-    pub fn new(option: SelectOption, exec: String) -> Self {
+    pub fn new(option: SelectOption) -> Self {
         Self {
             select_option: option,
-            exec_command: exec,
         }
     }
 
@@ -575,14 +575,6 @@ impl RAEOptions {
 
     pub fn get_select_option(&self) -> &SelectOption {
         &self.select_option
-    }
-
-    pub fn set_exec_command(&mut self, sym: String) {
-        self.exec_command = sym;
-    }
-
-    pub fn get_exec_command(&self) -> &String {
-        &self.exec_command
     }
 }
 

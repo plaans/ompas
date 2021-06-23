@@ -3,7 +3,7 @@ pub const MACRO_DEF_STATE_FUNCTION: &str = "(defmacro def-state-function (lambda
            (params (cdr args)))
         (quasiquote (rae-add-state-function (unquote label)
          (lambda (unquote params)
-          (unquote (cons rae-get-state-variable (cons (quasiquote (quote (unquote label)) params))))))))))";
+          (unquote (cons rae-get-state-variable (cons (quasiquote (quote (unquote label))) params)))))))))";
 
 pub const MACRO_DEF_TASK: &str = "(defmacro def-task \
                                         (lambda (l body) \

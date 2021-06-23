@@ -560,7 +560,11 @@ pub fn expand(
                         return if list.len() != 2 {
                             Err(WrongNumberOfArgument(list.into(), list.len(), 2..2))
                         } else {
-                            expand_quasi_quote(&list[1], env)
+                            let expanded = expand_quasi_quote(&list[1], env)?;
+                            println!("{}", expanded);
+                            //to expand quasiquote recursively
+                            expand(&expanded, top_level, env, ctxs)
+                            //Ok(expanded)
                         }
                     }
                     LCoreOperator::UnQuote => {

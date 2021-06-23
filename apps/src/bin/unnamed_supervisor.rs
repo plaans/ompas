@@ -145,20 +145,22 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
             }
         };
         //stdout.write_all(b"parsing done\n");
-        match eval(&lvalue, env, &mut ctxs) {
-            Ok(lv) => {
-                sender
-                    .send(format!("{}", lv))
-                    .await
-                    .expect("error on channel to stdout");
-            }
-            Err(e) => {
-                //stderr.write_all(format!("ELI>>{}\n", e).as_bytes());
-                sender
-                    .send(format!("error: {}", e))
-                    .await
-                    .expect("error on channel to stdout");
-            }
-        };
+        if lvalue != LValue::Nil {
+            match eval(&lvalue, env, &mut ctxs) {
+                Ok(lv) => {
+                    sender
+                        .send(format!("{}", lv))
+                        .await
+                        .expect("error on channel to stdout");
+                }
+                Err(e) => {
+                    //stderr.write_all(format!("ELI>>{}\n", e).as_bytes());
+                    sender
+                        .send(format!("error: {}", e))
+                        .await
+                        .expect("error on channel to stdout");
+                }
+            };
+        }
     }
 }

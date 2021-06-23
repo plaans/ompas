@@ -811,7 +811,7 @@ pub fn macro_expand(
     if let LValue::Symbol(sym) = &args[0] {
         let _macro = env.get_macro(sym).cloned();
         match _macro {
-            None => Err(SpecialError("{} is not a defined macro".to_string())),
+            None => Err(SpecialError(format!("{} is not a defined macro", sym))),
             Some(m) => expand(&m.call(&args[1..], env, ctxs)?, true, env, ctxs),
         }
     } else {

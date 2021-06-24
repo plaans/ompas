@@ -1,22 +1,21 @@
 #![allow(unused_imports)]
-//use crate::rae::context::{Action, Method, SelectOption, Status, TaskId};
-use crate::rae::lisp::CtxRAE;
-use crate::rae::log::RAEStatus;
+
+use std::sync::Arc;
+
 use async_recursion::async_recursion;
 use tokio::sync::{mpsc, Mutex};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio_stream::StreamExt;
-use crate::rae::context::SelectOption;
-use std::sync::Arc;
+
+use crate::rae::context::{SelectOption, RAEEnv};
+//use crate::rae::context::{Action, Method, SelectOption, Status, TaskId};
+use crate::rae::log::RAEStatus;
 
 pub mod context;
-pub mod domain;
-pub mod job;
-pub mod lisp;
 pub mod log;
 pub mod refinement;
 pub mod state;
-pub mod monitor;
+pub mod module;
 
 pub type Lisp = String;
 
@@ -28,7 +27,7 @@ pub enum RAEError {
 pub const TOKIO_CHANNEL_SIZE: usize = 65_536; //=2^16
 
 
-pub fn rae_run(context: Arc<Mutex<&CtxRAE>>, select_option: &SelectOption, log: String) {
+pub fn rae_run(context: RAEEnv, select_option: &SelectOption, log: String) {
 
     println!("in rae run!");
 //infinite loop

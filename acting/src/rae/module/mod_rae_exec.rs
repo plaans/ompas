@@ -1,0 +1,314 @@
+use ompas_lisp::structs::*;
+use std::sync::Arc;
+use crate::rae::context::{Status, Agenda, ActionsProgress, SelectOption, ActionId};
+use crate::rae::state::RAEState;
+use std::fmt::{Display, Formatter};
+use tokio::sync::mpsc::{Sender, Receiver};
+use ompas_lisp::core::LEnv;
+use ompas_lisp::functions::union_map;
+use ompas_lisp::structs::LError::*;
+use tokio::sync::Mutex;
+use ompas_lisp::structs::LValue::*;
+use ompas_modules::doc::{Documentation, LHelp};
+use std::any::Any;
+
+/*
+LANGUAGE
+ */
+
+//manage facts
+pub const RAE_ASSERT: &str = "assert";
+pub const RAE_ASSERT_SHORT: &str = "+>";
+pub const RAE_RETRACT: &str = "retract";
+pub const RAE_RETRACT_SHORT: &str ="->";
+pub const RAE_DO: &str ="rae-do";
+
+//RAE Interface with a platform
+pub const RAE_EXEC_COMMAND: &str = "rae-exec-command";
+pub const RAE_GET_STATE: &str = "rae-get-state";
+pub const RAE_GET_STATE_VARIBALE: &str = "rae-get-state-variable";
+pub const RAE_LAUNCH_PLATFORM: &str = "rae-launch-platform";
+pub const RAE_GET_STATUS: &str = "rae-get-status";
+pub const RAE_CANCEL_COMMAND: &str = "rae-cancel-command";
+
+
+///Context that will contains primitives for the RAE executive
+pub struct CtxRaeExec {
+    //pub stream: JobStream,
+    pub receiver: Option<Receiver<Job>>,
+    pub actions_progress: ActionsProgress,
+    pub agenda: Agenda,
+    pub state: RAEState,
+    pub platform_interface: Box<dyn RAEInterface>,
+}
+
+impl Default for CtxRaeExec {
+    fn default() -> Self {
+        Self {
+            receiver: None,
+            actions_progress: Default::default(),
+            agenda: Default::default(),
+            state: Default::default(),
+            platform_interface: Box::new(())
+        }
+    }
+}
+
+impl GetModule for CtxRaeExec {
+    fn get_module(self) -> Module {
+        let mut module = Module {
+            ctx: Arc::new(()),
+            prelude: vec![],
+            raw_lisp: Default::default(),
+            label: ""
+        };
+
+        module.add_fn_prelude(RAE_GET_STATE, get_state);
+        module.add_fn_prelude(RAE_GET_STATE_VARIBALE, get_state_variable);
+        module.add_mut_fn_prelude(RAE_EXEC_COMMAND, exec_command);
+        module.add_mut_fn_prelude(RAE_LAUNCH_PLATFORM, launch_platform);
+        module.add_fn_prelude(RAE_GET_STATUS, get_status);
+        module.add_fn_prelude(RAE_CANCEL_COMMAND, cancel_command);
+        //Manage facts:
+        module.add_mut_fn_prelude(RAE_ASSERT, assert_fact);
+        module.add_mut_fn_prelude(RAE_ASSERT_SHORT, assert_fact);
+        module.add_mut_fn_prelude(RAE_RETRACT, retract_fact);
+        module.add_mut_fn_prelude(RAE_RETRACT_SHORT, retract_fact);
+        module.add_fn_prelude(RAE_DO, fn_do);
+
+        module
+    }
+}
+
+
+impl CtxRaeExec {
+    pub fn get_execution_status(&self, action_id: &ActionId) -> Option<&Status> {
+        self.actions_progress.get_status(action_id)
+    }
+
+    pub fn add_platform(&mut self, platform: Box<dyn RAEInterface>) {
+        self.platform_interface = platform;
+    }
+}
+
+impl Documentation for CtxRaeExec {
+    fn documentation() -> Vec<LHelp> {
+        todo!()
+    }
+}
+
+pub struct JobStream {
+    sender : Sender<Job>,
+    receiver: Receiver<Job>,
+}
+
+impl JobStream {
+    pub fn new(sender: Sender<Job>, receiver: Receiver<Job>) -> Self{
+        Self {
+            sender,
+            receiver
+        }
+    }
+
+    pub fn get_sender(&self) -> Sender<Job> {
+        self.sender.clone()
+    }
+
+    pub fn get_ref_receiver(&mut self) -> &mut Receiver<Job> {
+        &mut self.receiver
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Job {
+    _type: JobType,
+    core: LValueS,
+}
+
+impl Display for Job {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "{} : {}", self._type, self.core)
+    }
+}
+
+impl Job {
+    pub fn new(value: LValue, _type: JobType)-> Self {
+        Self {
+            _type,
+            core: value.into()
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum JobType {
+    Task,
+    Event,
+}
+
+impl Display for JobType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            JobType::Task => write!(f, "task"),
+            JobType::Event => write!(f, "event"),
+        }
+    }
+}
+pub type JobId = usize;
+
+
+pub trait RAEInterface: Any+Send+Sync {
+    ///Execute a command on the platform
+    fn exec_command(&self, args: &[LValue], command_id: usize) -> Result<LValue, LError>;
+
+    fn cancel_command(&self, args: &[LValue]) -> Result<LValue, LError>;
+
+    ///Get the whole state of the platform
+    fn get_state(&self, args: &[LValue]) -> Result<LValue, LError>;
+
+    ///Get a specific state variable
+    fn get_state_variable(&self, args: &[LValue]) -> Result<LValue, LError>;
+
+    ///Return the status of all the actions
+    fn get_status(&self, args: &[LValue]) -> Result<LValue, LError>;
+
+    ///Launch the platform (such as the simulation in godot)
+    fn launch_platform(&mut self, args: &[LValue]) -> Result<LValue, LError>;
+
+    fn get_action_status(&self, action_id: &usize) -> Status;
+    fn set_status(&self, action_id: usize, status: Status);
+
+    fn domain(&self) -> &'static str;
+}
+
+impl RAEInterface for () {
+    fn exec_command(&self, _args: &[LValue], _: usize) -> Result<LValue, LError> {
+        todo!()
+    }
+
+    fn cancel_command(&self, _: &[LValue]) -> Result<LValue, LError> {
+        todo!()
+    }
+
+    fn get_state(&self, _: &[LValue]) -> Result<LValue, LError> {
+        todo!()
+    }
+
+    fn get_state_variable(&self, _args: &[LValue]) -> Result<LValue, LError> {
+        todo!()
+    }
+
+    fn get_status(&self, _args: &[LValue]) -> Result<LValue, LError> {
+        todo!()
+    }
+
+    fn launch_platform(&mut self, _: &[LValue]) -> Result<LValue, LError> {
+        todo!()
+    }
+
+    fn get_action_status(&self, _action_id: &usize) -> Status {
+        todo!()
+    }
+
+    fn set_status(&self, _action_id: usize, _status: Status) {
+        todo!()
+    }
+
+    fn domain(&self) -> &'static str {
+        todo!()
+    }
+}
+
+
+pub fn exec_command(args: &[LValue], _env: &LEnv, ctx: &mut CtxRaeExec) -> Result<LValue, LError> {
+    let command_id = ctx.actions_progress.get_new_id();
+    ctx.platform_interface.exec_command(args, command_id)?;
+    Ok(command_id.into())
+}
+
+///Retract a fact to state
+pub fn retract_fact(args: &[LValue], _env: &LEnv, ctx: &mut CtxRaeExec) -> Result<LValue, LError> {
+    if args.len() != 2 {
+        return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2))
+    }
+    let key = args[0].clone().into();
+    let value = args[1].clone().into();
+    ctx.state.retract_fact(key, value)?;
+    Ok(Nil)
+}
+
+///Add a fact to fact state
+pub fn assert_fact(args: &[LValue], _env: &LEnv, ctx: &mut CtxRaeExec) -> Result<LValue, LError> {
+    if args.len() != 2 {
+        return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2))
+    }
+    let key = args[0].clone().into();
+    let value = args[1].clone().into();
+    ctx.state.add_fact(key, value);
+    Ok(Nil)
+}
+
+
+
+///Monitor the status of an action that has been triggered
+/// Return true if the action is a success, false otherwise
+pub fn fn_do(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
+    if args.len() != 1 {
+        return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1))
+    }
+
+    let action_id = &args[0];
+
+    if let LValue::Number(LNumber::Usize(action_id)) = action_id {
+        loop {
+            let status = ctx.platform_interface.get_action_status(action_id);
+            match status {
+                Status::NotTriggered => {
+                    //println!("not triggered");
+                }
+                Status::Running => {
+                    //println!("running");
+                }
+                Status::Failure => {
+                    println!("command is a failure");
+                    return Ok(false.into())
+                }
+                Status::Done => {
+                    println!("command is a success");
+                    return Ok(true.into())
+                }
+            }
+        }
+    }else {
+        return Err(WrongType(action_id.clone(), action_id.into(), NameTypeLValue::Usize))
+    }
+}
+
+
+pub fn launch_platform(
+    args: &[LValue],
+    _env: &LEnv,
+    ctx: &mut CtxRaeExec,
+) -> Result<LValue, LError> {
+    ctx.platform_interface.launch_platform(args)
+}
+
+
+pub fn get_state(args: &[LValue], env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
+    //TODO: à revoir
+    let platform_state = ctx.platform_interface.get_state(args).unwrap();
+    let state = ctx.state.get_state().into_map();
+    union_map(&[platform_state, state], env, &())
+}
+
+pub fn get_state_variable(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
+    ctx.platform_interface.get_state_variable(args)
+}
+
+pub fn get_status(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
+    ctx.platform_interface.get_status(args)
+}
+
+pub fn cancel_command(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
+    ctx.platform_interface.cancel_command(args)
+}

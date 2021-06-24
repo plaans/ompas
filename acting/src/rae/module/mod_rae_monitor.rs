@@ -1,21 +1,25 @@
 use tokio::sync::mpsc::Sender;
-use crate::rae::job::*;
 use ompas_lisp::structs::{GetModule, Module, LValue, LError, LValueS};
 use ompas_lisp::core::LEnv;
-use crate::rae::lisp::CtxRAE;
 use ompas_lisp::structs::LValue::Nil;
 use crate::rae::context::RAEEnv;
 use std::sync::Arc;
+use crate::rae::module::mod_rae_exec::{Job, JobType};
+use ompas_modules::doc::{Documentation, LHelp};
 
-pub struct CtxRAEMonitor {
-    sender_to_rae: Sender<Job>,
-    env: RAEEnv
+#[derive(Default)]
+pub struct CtxRaeMonitor {
+    pub sender_to_rae: Option<Sender<Job>>,
+    pub env: RAEEnv
 }
 
 pub const RAE_TRIGGER_EVENT: &str = "rae-trigger-event";
 pub const RAE_TRIGGER_TASK: &str = "rae-trigger-task";
 
-impl GetModule for CtxRAEMonitor {
+pub const DOC_RAE_TRIGGER_EVENT: &str = "todo!";
+pub const DOC_RAE_TRIGGER_TASK: &str = "todo!";
+
+impl GetModule for CtxRaeMonitor {
     fn get_module(self) -> Module {
         let mut module = Module {
             ctx: Arc::new(self),
@@ -32,15 +36,24 @@ impl GetModule for CtxRAEMonitor {
     }
 }
 
+impl Documentation for CtxRaeMonitor {
+    fn documentation() -> Vec<LHelp> {
+        vec![
+            LHelp::new(RAE_TRIGGER_TASK, DOC_RAE_TRIGGER_TASK, None),
+            LHelp::new(RAE_TRIGGER_EVENT, DOC_RAE_TRIGGER_EVENT, None),
+        ]
+    }
+}
+
 //Add an event to the stream of RAE
 //access asynchronously to the stream
-pub fn trigger_event(_: &[LValue], _env: &LEnv, _: &CtxRAEMonitor) -> Result<LValue, LError> {
+pub fn trigger_event(_: &[LValue], _env: &LEnv, _: &CtxRaeMonitor) -> Result<LValue, LError> {
     Ok(LValue::String("trigger event not yet implemented".to_string()))
 }
 
-pub fn trigger_task(args: &[LValue], _env: &LEnv, ctx: &CtxRAE) -> Result<LValue, LError> {
+pub fn trigger_task(args: &[LValue], _env: &LEnv, ctx: &CtxRaeMonitor) -> Result<LValue, LError> {
     let job = Job::new(args.into(), JobType::Task);
-    let mut sender = ctx.stream.get_sender();
+    let sender = ctx.sender_to_rae.clone().unwrap();
     tokio::spawn(async move {
         sender.send(job).await.unwrap();
     });

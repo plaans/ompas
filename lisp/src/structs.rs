@@ -1441,7 +1441,7 @@ impl From<LValue> for NameTypeLValue {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct InitLisp(Vec<&'static str>);
 //TODO: simplify to use only Vec<&'static str> instead of custom struct
 impl From<Vec<&'static str>> for InitLisp {

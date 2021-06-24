@@ -1,4 +1,3 @@
-use crate::rae::job::{Job, JobId};
 use crate::rae::refinement::{RefinementStack, StackFrame};
 use crate::rae::state::{ActionStatus, LState};
 use ompas_lisp::core::{LEnv, ContextCollection};
@@ -9,6 +8,7 @@ use std::convert::{TryFrom, TryInto};
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use crate::rae::module::mod_rae_exec::{JobId, Job};
 
 #[derive(Default, Debug)]
 pub struct Agenda {
@@ -66,8 +66,8 @@ impl Agenda {
 }
 
 pub struct RAEEnv {
-    env: LEnv,
-    ctxs: ContextCollection,
+    pub env: LEnv,
+    pub ctxs: ContextCollection,
 }
 
 pub const RAE_TASK_METHODS_MAP: &str = "rae-task-methods-map";

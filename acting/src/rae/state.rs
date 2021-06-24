@@ -1,8 +1,10 @@
 use crate::rae::refinement::Assignment;
 use im::HashMap;
-use ompas_lisp::structs::{LValue, LValueS};
+use ompas_lisp::structs::{LValue, LValueS, LError};
 use std::fmt::{Display, Formatter};
 use std::ptr::write_bytes;
+use ompas_lisp::structs::LError::SpecialError;
+use crate::rae::context::Status;
 
 #[derive(Clone, Debug)]
 pub enum StateType {
@@ -42,6 +44,10 @@ impl From<im::HashMap<LValueS, LValueS>> for LState {
 }
 
 impl LState {
+    pub fn get(&self, key: &LValueS) -> Option<&LValueS> {
+        self.inner.get(key)
+    }
+
     pub fn set_type(&mut self, _type: StateType) {
         self._type = Some(_type)
     }
@@ -52,6 +58,10 @@ impl LState {
 
     pub fn insert(&mut self, key: LValueS, value: LValueS) {
         self.inner.insert(key, value);
+    }
+
+    pub fn remove(&mut self, key: &LValueS) -> Option<LValueS> {
+        self.inner.remove(&key)
     }
 
     pub fn union(&self, other: &Self) -> Self {
@@ -81,6 +91,29 @@ pub struct RAEState {
     inner_world: LState,
 }
 
+impl RAEState {
+    pub fn get_state(&self) -> LState {
+        self.inner_world.union(&self._static.union(&self.dynamic))
+    }
+
+    pub fn add_fact(&mut self, key: LValueS, value: LValueS) {
+        self.inner_world.insert(key, value)
+    }
+
+    pub fn retract_fact(&mut self, key: LValueS, value: LValueS) -> Result<(), LError> {
+        let old_value = self.inner_world.get(&key);
+        match old_value {
+            None => Err(SpecialError("key is not in state".to_string())),
+            Some(old_value) => if *old_value == value {
+                self.inner_world.remove(&key);
+                Ok(())
+            }else {
+                Err(SpecialError("there is no such fact in state".to_string()))
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum ActionStatus {
     ActionPending,
@@ -89,6 +122,25 @@ pub enum ActionStatus {
     ActionResult(bool),  //True the action is a success, false the action is a failure
     ActionPreempt,
     ActionCancel(bool), //True the action has been successfully stopped, false it was a failure to cancel
+}
+
+impl From<ActionStatus> for Status {
+    fn from(_as: ActionStatus) -> Self {
+        match _as {
+            ActionStatus::ActionPending => Status::Running,
+            ActionStatus::ActionResponse(_) => Status::Running,
+            ActionStatus::ActionFeedback(_) => Status::Running,
+            ActionStatus::ActionResult(b) => match b {
+                true => Status::Done,
+                false => Status::Failure,
+            }
+            ActionStatus::ActionPreempt => Status::Running,
+            ActionStatus::ActionCancel(b) => match b {
+                true => Status::Done,
+                false => Status::Failure,
+            }
+        }
+    }
 }
 
 impl Display for ActionStatus {
@@ -120,8 +172,8 @@ impl ActionStatusSet {
         self.status.insert(*id, status);
     }
 
-    pub fn get_status(&self, internal_id: usize) -> Option<ActionStatus> {
-        self.status.get(&internal_id).cloned()
+    pub fn get_status(&self, internal_id: &usize) -> Option<ActionStatus> {
+        self.status.get(internal_id).cloned()
     }
 
     pub fn get_status_from_server(&self, server_id: usize) -> Option<&ActionStatus> {

@@ -4,6 +4,7 @@ use ompas_lisp::structs::LError::*;
 use ompas_lisp::structs::*;
 use std::convert::TryInto;
 use std::fmt::{Debug, Display, Formatter};
+use std::sync::Arc;
 
 //pub const TYPE: &str = "type";
 //pub const STATE: &str = "state";
@@ -318,20 +319,20 @@ impl CtxType {
 impl GetModule for CtxType {
     fn get_module(self) -> Module {
         let mut module = Module {
-            ctx: Box::new(self),
+            ctx: Arc::new(self),
             prelude: vec![],
             raw_lisp: Default::default(),
             label: MOD_TYPE,
         };
 
-        module.add_fn_prelude(IS_STATE_FUNCTION, Box::new(is_state_function));
-        module.add_fn_prelude(IS_OBJECT, Box::new(is_object));
-        module.add_fn_prelude(IS_TYPE, Box::new(is_type));
-        module.add_fn_prelude(GET_TYPE, Box::new(get_type));
-        module.add_mut_fn_prelude(TYPE_OF, Box::new(type_of));
-        module.add_mut_fn_prelude(SUB_TYPE, Box::new(sub_type));
-        module.add_mut_fn_prelude(NEW_STATE_FUNCTION, Box::new(new_state_function));
-        module.add_mut_fn_prelude(NEW_OBJECT, Box::new(new_object));
+        module.add_fn_prelude(IS_STATE_FUNCTION, is_state_function);
+        module.add_fn_prelude(IS_OBJECT, is_object);
+        module.add_fn_prelude(IS_TYPE, is_type);
+        module.add_fn_prelude(GET_TYPE, get_type);
+        module.add_mut_fn_prelude(TYPE_OF, type_of);
+        module.add_mut_fn_prelude(SUB_TYPE, sub_type);
+        module.add_mut_fn_prelude(NEW_STATE_FUNCTION, new_state_function);
+        module.add_mut_fn_prelude(NEW_OBJECT, new_object);
 
         module
     }
@@ -432,7 +433,7 @@ pub fn is_state_function(args: &[LValue], _: &LEnv, ctx: &CtxType) -> Result<LVa
     }
 }
 
-pub fn type_of(args: &[LValue], _: &mut LEnv, ctx: &mut CtxType) -> Result<LValue, LError> {
+pub fn type_of(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
     }
@@ -456,7 +457,7 @@ pub fn type_of(args: &[LValue], _: &mut LEnv, ctx: &mut CtxType) -> Result<LValu
     }
 }
 
-pub fn sub_type(args: &[LValue], _: &mut LEnv, ctx: &mut CtxType) -> Result<LValue, LError> {
+pub fn sub_type(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> Result<LValue, LError> {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1));
     }
@@ -478,7 +479,7 @@ pub fn sub_type(args: &[LValue], _: &mut LEnv, ctx: &mut CtxType) -> Result<LVal
 
 pub fn new_state_function(
     args: &[LValue],
-    env: &mut LEnv,
+    env: &LEnv,
     ctx: &mut CtxType,
 ) -> Result<LValue, LError> {
     let mut t_params: Vec<String> = Vec::new();
@@ -511,7 +512,7 @@ pub fn new_state_function(
     Ok(type_id.into())
 }
 
-pub fn new_object(args: &[LValue], _: &mut LEnv, ctx: &mut CtxType) -> Result<LValue, LError> {
+pub fn new_object(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> Result<LValue, LError> {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1));
     }

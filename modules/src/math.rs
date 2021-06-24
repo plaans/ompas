@@ -3,6 +3,7 @@ use ompas_lisp::core::*;
 use ompas_lisp::structs::LError::*;
 use ompas_lisp::structs::*;
 use rand::Rng;
+use std::sync::Arc;
 
 /*
 LANGUAGE LITERALS
@@ -38,16 +39,16 @@ impl GetModule for CtxMath {
     /// -Constants: "pi".
     fn get_module(self) -> Module {
         let mut module = Module {
-            ctx: Box::new(self),
+            ctx: Arc::new(self),
             prelude: vec![],
             raw_lisp: Default::default(),
             label: MOD_MATH,
         };
 
-        module.add_fn_prelude(COS, Box::new(cos));
-        module.add_fn_prelude(SIN, Box::new(sin));
-        module.add_fn_prelude(RAND_INT_IN_RANGE, Box::new(rand_int_in_range));
-        module.add_fn_prelude(RAND_FLOAT_IN_RANGE, Box::new(rand_float_in_range));
+        module.add_fn_prelude(COS, cos);
+        module.add_fn_prelude(SIN, sin);
+        module.add_fn_prelude(RAND_INT_IN_RANGE, rand_int_in_range);
+        module.add_fn_prelude(RAND_FLOAT_IN_RANGE, rand_float_in_range);
         module.add_prelude(PI, std::f64::consts::PI.into());
 
         module

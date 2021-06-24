@@ -163,6 +163,24 @@ pub fn set_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     }
 }
 
+pub fn union_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    if args.len() != 2 {
+        return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
+    }
+    let map1 = &args[0];
+    let map2 = &args[1];
+
+    if let LValue::Map(map1) = map1.clone() {
+        if let LValue::Map(map2) = map2.clone() {
+            Ok(map1.union(map2).into())
+        }else {
+            Err(WrongType(map2.clone(), map2.into(), NameTypeLValue::Map))
+        }
+    }else {
+        Err(WrongType(map1.clone(), map1.into(), NameTypeLValue::Map))
+    }
+}
+
 /*pub fn print(args: &[LValue], _:& LEnv, _: & ()) -> Result<LValue, LError> {
     if args.is_empty() {
         return Err(WrongNumberOfArgument(args.into(), 0, 1..std::usize::MAX));

@@ -1,12 +1,14 @@
 use crate::rae::job::{Job, JobId};
 use crate::rae::refinement::{RefinementStack, StackFrame};
 use crate::rae::state::{ActionStatus, LState};
-use ompas_lisp::core::LEnv;
+use ompas_lisp::core::{LEnv, ContextCollection};
 use ompas_lisp::structs::LError::SpecialError;
 use ompas_lisp::structs::{LError, LFn, LLambda, LValue};
 use std::collections::{HashMap, VecDeque};
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{Display, Formatter};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 #[derive(Default, Debug)]
 pub struct Agenda {
@@ -63,8 +65,9 @@ impl Agenda {
     }
 }
 
-pub struct RAEEnvBis {
-    inner: LEnv,
+pub struct RAEEnv {
+    env: LEnv,
+    ctxs: ContextCollection,
 }
 
 pub const RAE_TASK_METHODS_MAP: &str = "rae-task-methods-map";
@@ -72,54 +75,74 @@ pub const RAE_TASK_LIST: &str = "rae-task-list";
 pub const RAE_METHOD_LIST: &str = "rae_methods_list";
 pub const RAE_ACTION_LIST: &str = "rae_actions_list";
 pub const RAE_STATE_FUNCTION_LIST: &str = "rae-state-function-list";
+pub const RAE_SYMBOL_TYPE: &str = "rae-symbol-type";
+pub const ACTION_TYPE: &str = "action_type";
+pub const TASK_TYPE: &str = "task_type";
+pub const METHOD_TYPE:&str = "method_type";
+pub const STATE_FUNCTION_TYPE: &str = "state_function_type";
 //pub const RAE_MAP_TYPE:&str = "rae-map-type";
 
-impl Default for RAEEnvBis {
+impl Default for RAEEnv {
     fn default() -> Self {
         let mut env = LEnv::empty();
         env.insert(RAE_ACTION_LIST.to_string(), LValue::List(vec![]));
         env.insert(RAE_METHOD_LIST.to_string(), LValue::List(vec![]));
         env.insert(RAE_TASK_LIST.to_string(), LValue::List(vec![]));
         env.insert(RAE_STATE_FUNCTION_LIST.to_string(), LValue::List(vec![]));
+        env.insert(RAE_SYMBOL_TYPE.to_string(), LValue::Map(Default::default()));
         env.insert(
             RAE_TASK_METHODS_MAP.to_string(),
             LValue::Map(Default::default()),
         );
-        Self { inner: env }
+        Self {
+            env,
+            ctxs: Default::default() }
     }
 }
 
-impl RAEEnvBis {
+impl RAEEnv {
     pub fn add_action(&mut self, label: String, value: LValue) -> Result<(), LError> {
         self.insert(label.clone(), value)?;
-        let action_list = self.inner.get_symbol(RAE_ACTION_LIST).unwrap();
+        let action_list = self.env.get_symbol(RAE_ACTION_LIST).unwrap();
         if let LValue::List(mut list) = action_list {
-            list.push(LValue::Symbol(label));
-            self.inner
+            list.push(LValue::Symbol(label.clone()));
+            self.env
                 .set(RAE_ACTION_LIST.to_string(), list.into())
                 .expect("list of action should be already defined in environment");
+        }
+
+        let symbol_type = self.env.get_symbol(RAE_SYMBOL_TYPE).unwrap();
+        if let LValue::Map(mut map) = symbol_type {
+            map.insert(LValue::Symbol(label),LValue::Symbol(ACTION_TYPE.to_string()));
+            self.env.set(RAE_SYMBOL_TYPE.to_string(), map.into()).expect("map of symbol type should be already defined in environment")
         }
         Ok(())
     }
 
     pub fn add_state_function(&mut self, label: String, value: LValue) -> Result<(), LError> {
         self.insert(label.clone(), value)?;
-        let state_function_list = self.inner.get_symbol(RAE_STATE_FUNCTION_LIST).unwrap();
+        let state_function_list = self.env.get_symbol(RAE_STATE_FUNCTION_LIST).unwrap();
         if let LValue::List(mut list) = state_function_list {
-            list.push(LValue::Symbol(label));
-            self.inner
+            list.push(LValue::Symbol(label.clone()));
+            self.env
                 .set(RAE_STATE_FUNCTION_LIST.to_string(), list.into())
                 .expect("list of state function should be already defined in environment");
+        }
+
+        let symbol_type = self.env.get_symbol(RAE_SYMBOL_TYPE).unwrap();
+        if let LValue::Map(mut map) = symbol_type {
+            map.insert(LValue::Symbol(label),LValue::Symbol(STATE_FUNCTION_TYPE.to_string()));
+            self.env.set(RAE_SYMBOL_TYPE.to_string(), map.into()).expect("map of symbol type should be already defined in environment")
         }
         Ok(())
     }
 
     pub fn add_task(&mut self, label: String, value: LValue) -> Result<(), LError> {
         self.insert(label.clone(), value)?;
-        let task_list = self.inner.get_symbol(RAE_TASK_LIST).unwrap();
+        let task_list = self.env.get_symbol(RAE_TASK_LIST).unwrap();
         if let LValue::List(mut list) = task_list {
             list.push(LValue::Symbol(label.clone()));
-            self.inner
+            self.env
                 .set(RAE_TASK_LIST.to_string(), list.into())
                 .expect("list of task should be already defined in environment");
         }
@@ -128,9 +151,16 @@ impl RAEEnvBis {
             .unwrap()
             .try_into()
             .unwrap();
-        map.insert(LValue::Symbol(label), LValue::Nil);
-        self.inner
+        map.insert(LValue::Symbol(label.clone()), LValue::Nil);
+
+        self.env
             .set(RAE_TASK_METHODS_MAP.to_string(), map.into())?;
+
+        let symbol_type = self.env.get_symbol(RAE_SYMBOL_TYPE).unwrap();
+        if let LValue::Map(mut map) = symbol_type {
+            map.insert(LValue::Symbol(label),LValue::Symbol(TASK_TYPE.to_string()));
+            self.env.set(RAE_SYMBOL_TYPE.to_string(), map.into()).expect("map of symbol type should be already defined in environment")
+        }
         Ok(())
     }
 
@@ -141,22 +171,29 @@ impl RAEEnvBis {
         value: LValue,
     ) -> Result<(), LError> {
         self.insert(method_label.clone(), value)?;
-        let method_list = self.inner.get_symbol(RAE_METHOD_LIST).unwrap();
+        let method_list = self.env.get_symbol(RAE_METHOD_LIST).unwrap();
         if let LValue::List(mut list) = method_list {
             list.push(LValue::Symbol(method_label.clone()));
-            self.inner
+            self.env
                 .set(RAE_METHOD_LIST.to_string(), list.into())
                 .expect("list of method should be already defined in environment");
 
-            self.add_method_to_task(task_label, method_label)?;
+            self.add_method_to_task(task_label, method_label.clone())?;
+            let symbol_type = self.env.get_symbol(RAE_SYMBOL_TYPE).unwrap();
+            if let LValue::Map(mut map) = symbol_type {
+                map.insert(LValue::Symbol(method_label),LValue::Symbol(METHOD_TYPE.to_string()));
+                self.env.set(RAE_SYMBOL_TYPE.to_string(), map.into()).expect("map of symbol type should be already defined in environment")
+            }
         }
+
+
         Ok(())
     }
 
     pub fn insert(&mut self, label: String, value: LValue) -> Result<(), LError> {
-        match self.inner.get_symbol(&label) {
+        match self.env.get_symbol(&label) {
             None => {
-                self.inner.insert(label, value);
+                self.env.insert(label, value);
                 Ok(())
             }
             Some(_) => Err(SpecialError(format!(
@@ -172,7 +209,7 @@ impl RAEEnvBis {
         method_label: String,
     ) -> Result<(), LError> {
         let mut map: im::HashMap<LValue, LValue> = self
-            .inner
+            .env
             .get_symbol(RAE_TASK_METHODS_MAP)
             .unwrap()
             .try_into()
@@ -196,14 +233,14 @@ impl RAEEnvBis {
             _ => panic!("should be a list or nothing"),
         };
         map.insert(LValue::Symbol(task_label), new_list);
-        self.inner
+        self.env
             .set(RAE_TASK_METHODS_MAP.into(), map.into())
             .expect("should not return an error");
         Ok(())
     }
 
     pub fn get_element(&self, label: &str) -> Option<LValue> {
-        self.inner.get_symbol(label)
+        self.env.get_symbol(label)
     }
 
     pub fn pretty_debug(&self, key: Option<String>) -> String {
@@ -211,15 +248,15 @@ impl RAEEnvBis {
         if let Some(_label) = key {
             todo!()
         } else {
-            let state_function_symbol = self.inner.get_symbol(RAE_STATE_FUNCTION_LIST).unwrap();
+            let state_function_symbol = self.env.get_symbol(RAE_STATE_FUNCTION_LIST).unwrap();
             let state_function_list: Vec<LValue> = state_function_symbol.try_into().unwrap();
 
-            let action_list_symbol = self.inner.get_symbol(RAE_ACTION_LIST).unwrap();
+            let action_list_symbol = self.env.get_symbol(RAE_ACTION_LIST).unwrap();
             let action_list: Vec<LValue> = action_list_symbol.try_into().unwrap();
-            let task_list_symbol = self.inner.get_symbol(RAE_TASK_LIST).unwrap();
+            let task_list_symbol = self.env.get_symbol(RAE_TASK_LIST).unwrap();
             let task_list: Vec<LValue> = task_list_symbol.try_into().unwrap();
             let map_task_method: im::HashMap<LValue, LValue> = self
-                .inner
+                .env
                 .get_symbol(RAE_TASK_METHODS_MAP)
                 .unwrap()
                 .try_into()
@@ -228,7 +265,7 @@ impl RAEEnvBis {
             string.push_str("\tState Function(s)\n");
             for state_function in state_function_list {
                 let state_function_label: String = state_function.try_into().unwrap();
-                let state_function_body = self.inner.get_symbol(&state_function_label).unwrap();
+                let state_function_body = self.env.get_symbol(&state_function_label).unwrap();
                 string.push_str(
                     format!("\t\t- {}: {}\n", state_function_label, state_function_body).as_str(),
                 );
@@ -237,14 +274,14 @@ impl RAEEnvBis {
             string.push_str("\t*Action(s): \n");
             for action in action_list {
                 let action_label: String = action.try_into().unwrap();
-                let action_body = self.inner.get_symbol(&action_label).unwrap();
+                let action_body = self.env.get_symbol(&action_label).unwrap();
                 string.push_str(format!("\t\t- {}: {}\n", action_label, action_body).as_str());
             }
             string.push('\n');
             string.push_str("\t*Task(s): \n");
             for task in task_list {
                 let task_label: String = task.clone().try_into().unwrap();
-                let task_body = self.inner.get_symbol(&task_label).unwrap();
+                let task_body = self.env.get_symbol(&task_label).unwrap();
                 string.push_str(format!("\t\t-{}: {}\n", task_label, task_body).as_str());
                 string.push_str("\t\t*Method(s): \n");
                 let methods = map_task_method.get(&task);
@@ -254,7 +291,7 @@ impl RAEEnvBis {
                         let methods: Vec<LValue> = methods.try_into().unwrap();
                         for m in methods {
                             let method_label: String = m.try_into().unwrap();
-                            let method = self.inner.get_symbol(&method_label).unwrap();
+                            let method = self.env.get_symbol(&method_label).unwrap();
                             string
                                 .push_str(format!("\t\t\t-{}: {}\n", method_label, method).as_str())
                         }
@@ -266,268 +303,13 @@ impl RAEEnvBis {
     }
 }
 
-#[derive(Default, Debug, Clone)]
-pub struct RAEEnv {
-    actions: ActionCollection,
-    methods: MethodCollection,
-    tasks: TaskCollection,
-}
-
-impl RAEEnv {
-    pub fn get_env(&self, label: Option<String>) -> String {
-        let mut string = String::new();
-        if let Some(_label) = label {
-            todo!()
-        } else {
-            string.push_str("RAEEnv: \n\n");
-            string.push_str("\t*Actions: \n\n");
-            for e in &self.actions.inner {
-                string.push_str(format!("\t\t- {}\n", e.1).as_str());
-            }
-            string.push('\n');
-            string.push_str("\t*Tasks: \n\n");
-            for e in &self.tasks.inner {
-                string.push_str(
-                    format!("\t\t-{}: {}\n", self.tasks.get_label(e.0).unwrap(), e.1).as_str(),
-                );
-                string.push_str("\t\t*Methods: \n");
-                for m in self
-                    .tasks
-                    .get_methods(&e.0)
-                    .cloned()
-                    .unwrap()
-                    .iter()
-                    .map(|id| self.methods.get_method_by_id(id).unwrap())
-                {
-                    string.push_str(
-                        format!("\t\t\t-{}: {}\n", self.methods.get_label(&m.id).unwrap(), m)
-                            .as_str(),
-                    )
-                }
-            }
-        }
-        string
-    }
-
-    pub fn add_action(&mut self, label: ActionLabel, body: LLambda) {
-        self.actions.add_action(label, body);
-    }
-
-    pub fn add_task(&mut self, label: TaskLabel, body: LLambda) {
-        self.tasks.add_task(label, body);
-    }
-
-    pub fn add_method(
-        &mut self,
-        method_label: MethodLabel,
-        task_label: &str,
-        body: LLambda,
-    ) -> Result<(), LError> {
-        let method_id = self.methods.add_method(method_label, body);
-        self.tasks.add_method_to_task(task_label, method_id)
-    }
-
-    pub fn get_methods(&mut self, task_label: &str) -> Vec<MethodId> {
-        self.tasks
-            .methods
-            .get(self.tasks.get_id(task_label).unwrap())
-            .cloned()
-            .unwrap()
-    }
-}
 
 pub type ActionLabel = String;
 pub type ActionId = usize;
-
-#[derive(Default, Debug, Clone)]
-pub struct ActionCollection {
-    labels: HashMap<ActionLabel, ActionId>,
-    inner: HashMap<ActionId, Action>,
-    next_id: usize,
-}
-
-impl ActionCollection {
-    pub fn get_id(&self, label: &str) -> Option<&ActionId> {
-        self.labels.get(label)
-    }
-
-    pub fn get_action_by_id(&self, id: &ActionId) -> Option<&Action> {
-        self.inner.get(id)
-    }
-
-    pub fn get_action_by_label(&self, label: &str) -> Option<&Action> {
-        match self.get_id(label) {
-            None => None,
-            Some(id) => self.inner.get(id),
-        }
-    }
-
-    pub fn add_action(&mut self, label: ActionLabel, action: LLambda) -> usize {
-        let id = self.get_next_id();
-        let action = Action { id, lambda: action };
-        self.inner.insert(id, action);
-        self.labels.insert(label, id);
-        id
-    }
-
-    fn get_next_id(&mut self) -> ActionId {
-        let id = self.next_id;
-        self.next_id += 1;
-        id
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Action {
-    pub id: ActionId,
-    pub lambda: LLambda,
-}
-
-impl Display for Action {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "id: {}\n body: {}", self.id, self.lambda)
-    }
-}
-
 pub type MethodLabel = String;
 pub type MethodId = usize;
-
-#[derive(Default, Debug, Clone)]
-pub struct MethodCollection {
-    labels: HashMap<MethodLabel, MethodId>,
-    reverse_map_labels: HashMap<MethodId, MethodLabel>,
-    inner: HashMap<MethodId, Method>,
-    next_id: usize,
-}
-
-impl MethodCollection {
-    pub fn get_id(&self, label: &str) -> Option<&MethodId> {
-        self.labels.get(label)
-    }
-
-    pub fn get_method_by_id(&self, id: &MethodId) -> Option<&Method> {
-        self.inner.get(id)
-    }
-
-    pub fn get_action_by_label(&self, label: &str) -> Option<&Method> {
-        match self.get_id(label) {
-            None => None,
-            Some(id) => self.inner.get(id),
-        }
-    }
-
-    pub fn add_method(&mut self, label: MethodLabel, method: LLambda) -> usize {
-        let id = self.get_next_id();
-        let method = Method { id, lambda: method };
-        self.inner.insert(id, method);
-        self.labels.insert(label.clone(), id);
-        self.reverse_map_labels.insert(id, label);
-        id
-    }
-
-    pub fn get_label(&self, id: &MethodId) -> Option<&MethodLabel> {
-        self.reverse_map_labels.get(id)
-    }
-
-    fn get_next_id(&mut self) -> MethodId {
-        let id = self.next_id;
-        self.next_id += 1;
-        id
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Method {
-    id: MethodId,
-    lambda: LLambda,
-}
-
-impl Display for Method {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "id: {}\n body: {}", self.id, self.lambda)
-    }
-}
-
 pub type TaskLabel = String;
 pub type TaskId = usize;
-
-#[derive(Default, Debug, Clone)]
-pub struct TaskCollection {
-    labels: HashMap<TaskLabel, TaskId>,
-    reverse_map_labels: HashMap<TaskId, TaskLabel>,
-    inner: HashMap<TaskId, Task>,
-    methods: HashMap<TaskId, Vec<MethodId>>,
-    next_id: usize,
-}
-
-impl TaskCollection {
-    pub fn get_label(&self, id: &TaskId) -> Option<&TaskLabel> {
-        self.reverse_map_labels.get(id)
-    }
-
-    pub fn get_id(&self, label: &str) -> Option<&TaskId> {
-        self.labels.get(label)
-    }
-
-    pub fn get_task_by_id(&self, id: &TaskId) -> Option<&Task> {
-        self.inner.get(id)
-    }
-
-    pub fn get_task_by_label(&self, label: &str) -> Option<&Task> {
-        match self.get_id(label) {
-            None => None,
-            Some(id) => self.inner.get(id),
-        }
-    }
-
-    pub fn add_method_to_task(&mut self, label: &str, method_id: MethodId) -> Result<(), LError> {
-        let id = self.get_id(label).cloned();
-        match id {
-            None => Err(SpecialError(
-                "task label corresponds to nothing in the environment".to_string(),
-            )),
-            Some(id) => {
-                self.methods
-                    .get_mut(&id)
-                    .expect("should not panic")
-                    .push(method_id);
-                Ok(())
-            }
-        }
-    }
-
-    pub fn get_methods(&self, id: &TaskId) -> Option<&Vec<MethodId>> {
-        self.methods.get(id)
-    }
-
-    pub fn add_task(&mut self, label: TaskLabel, task: LLambda) -> usize {
-        let id = self.get_next_id();
-        let task = Task { id, lambda: task };
-        self.inner.insert(id, task);
-        self.methods.insert(id, vec![]);
-        self.labels.insert(label.clone(), id);
-        self.reverse_map_labels.insert(id, label);
-        id
-    }
-
-    fn get_next_id(&mut self) -> TaskId {
-        let id = self.next_id;
-        self.next_id += 1;
-        id
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Task {
-    pub id: TaskId,
-    pub lambda: LLambda,
-}
-
-impl Display for Task {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "id: {}\n body: {}", self.id, self.lambda)
-    }
-}
 
 //struct to handle actions trigger, status and updates by other modules as godot
 #[derive(Default, Debug)]
@@ -570,6 +352,7 @@ impl ActionsProgress {
     }
 }
 
+#[derive(Debug, Default)]
 pub struct RAEOptions {
     select_option: SelectOption,
 }
@@ -591,6 +374,7 @@ impl RAEOptions {
     }
 }
 
+#[derive(Default, Debug, Copy, Clone)]
 pub struct SelectOption {
     dr0: usize,
     nro: usize,
@@ -618,17 +402,6 @@ impl SelectOption {
     }
 }
 
-//methods to access attributes
-/*impl CtxRAE {
-    pub fn get_ref_mut_agenda(&mut self) -> &mut Agenda {
-        &mut self.agenda
-    }
-
-    pub fn get_ref_mut_stream(&mut self) -> &mut Stream {
-        &mut self.stream
-    }
-}*/
-
 pub type ReactiveTriggerId = usize;
 
 #[derive(Debug, Clone)]
@@ -639,59 +412,3 @@ pub enum TaskType {
 
 #[derive(Default, Debug, Clone)]
 pub struct RAEEvent {}
-
-/*pub struct Stream {
-    inner: tokio::stream;
-}*/
-
-/*#[derive(Default, Debug, Clone)]
-pub struct Stream {
-    inner : Arc<Mutex<VecDeque<Task>>>,
-}
-
-impl Stream {
-    pub async fn push(&self, task: Task) {
-
-    }
-
-    pub async fn pop(&self) -> Option<Task> {
-        self.inner.lock().await.pop_front()
-    }
-}
-
-impl Stream {
-    pub async fn is_empty(&self) -> bool {
-        self.inner.lock().await.is_empty()
-    }
-}
-
-pub struct StreamIterator<'a> {
-    stream : &'a Stream,
-    index: usize
-}
-
-impl<'a> IntoIterator for &'a Stream {
-    type Item = Task;
-    type IntoIter = StreamIterator<'a>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        StreamIterator {
-            stream: self,
-            index: 0,
-        }
-    }
-}
-
-impl<'a> Iterator for StreamIterator<'a> {
-    type Item = Task;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let result = if self.stream.inner.lock().await.len() < self.index {
-            Some(self.stream.inner.lock().await[self.index].clone())
-        }else {
-            None
-        };
-        self.index +=1;
-        result
-    }
-}*/

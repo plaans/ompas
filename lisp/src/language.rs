@@ -19,6 +19,7 @@ pub mod scheme_primitives {
     pub const GET: &str = "get";
     pub const GET_MAP: &str = "get-map";
     pub const SET_MAP: &str = "set-map";
+    pub const UNION_MAP: &str = "union-map";
     pub const MAP: &str = "map";
 
     //Core language

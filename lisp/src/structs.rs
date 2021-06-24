@@ -10,7 +10,7 @@ use std::convert::{TryFrom, TryInto};
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::{Add, Deref, Div, Mul, Range, Sub};
-use std::rc::Rc;
+use std::sync::Arc;
 
 #[derive(Debug)]
 pub enum LError {
@@ -422,12 +422,14 @@ impl LLambda {
     }
 }
 
-pub type NativeFn = dyn Fn(&[LValue], &LEnv, &dyn Any) -> Result<LValue, LError>;
+pub type NativeFn<T> = fn(&[LValue], &LEnv, &T) -> Result<LValue, LError>;
+pub type DowncastCall =  fn(&[LValue], &LEnv, &dyn Any, &Arc<dyn Any+Send+Sync>) -> Result<LValue, LError>;
 
 #[derive(Clone)]
 pub struct LFn {
-    pub(crate) fun: Rc<NativeFn>,
+    pub(crate) fun: Arc<dyn Any+'static+Send+Sync>,
     pub(crate) debug_label: &'static str,
+    downcast: Arc<DowncastCall>,
     index_mod: Option<usize>,
 }
 
@@ -447,14 +449,12 @@ impl Debug for LFn {
 
 impl LFn {
     pub fn new<
-        T: 'static,
-        R: Into<Result<LValue, LError>>,
-        F: Fn(&[LValue], &LEnv, &T) -> R + 'static,
+        T: 'static+Sync+Send,
     >(
-        lbd: Box<F>,
+        lbd: NativeFn<T>,
         debug_label: &'static str,
     ) -> Self {
-        let x = move |args: &[LValue], env: &LEnv, ctx: &dyn Any| -> Result<LValue, LError> {
+        /*let x = move |args: &[LValue], env: &LEnv, ctx: &dyn Any| -> Result<LValue, LError> {
             let ctx: Option<&T> = ctx.downcast_ref::<T>();
             if let Some(ctx) = ctx {
                 lbd(args, env, ctx).into()
@@ -463,16 +463,37 @@ impl LFn {
                     "Impossible to downcast context".to_string(),
                 ))
             }
+        };*/
+        let downcast_call =|args: &[LValue], env: &LEnv, ctx: &dyn Any, fun: &Arc<dyn Any+Send+Sync>| -> Result<LValue, LError> {
+            let ctx: Option<&T> = ctx.downcast_ref::<T>();
+            let fun : Option<& NativeFn<T>> = fun.downcast_ref::<NativeFn<T>>();
+            if let Some(ctx) = ctx {
+                if let Some(fun) = fun {
+                    fun(args, env, ctx)
+                }else {
+                    Err(LError::SpecialError(
+                        "Impossible to downcast function".to_string(),
+                    ))
+                }
+            } else {
+                Err(LError::SpecialError(
+                    "Impossible to downcast context".to_string(),
+                ))
+            }
         };
         LFn {
-            fun: Rc::new(x),
+            fun: Arc::new(lbd),
             debug_label,
+            downcast: Arc::new(downcast_call),
             index_mod: None,
         }
     }
 
     pub fn call(&self, args: &[LValue], env: &LEnv, ctx: &dyn Any) -> Result<LValue, LError> {
-        (self.fun)(args, env, ctx)
+
+        (self.downcast)(args, env, ctx, &self.fun)
+
+        //(self.fun)(args, env, ctx)
     }
 
     pub fn set_index_mod(&mut self, index_mod: usize) {
@@ -488,12 +509,14 @@ impl LFn {
     }
 }
 
-pub type NativeMutFn = dyn Fn(&[LValue], &mut LEnv, &mut dyn Any) -> Result<LValue, LError>;
+pub type NativeMutFn<T> = fn(&[LValue], &LEnv, &mut T) -> Result<LValue, LError>;
+pub type DowncastCallMut =  fn(&[LValue], &LEnv, &mut dyn Any, &Arc<dyn Any+'static+Send+Sync>) -> Result<LValue, LError>;
 
 #[derive(Clone)]
 pub struct LMutFn {
-    pub(crate) fun: Rc<NativeMutFn>,
+    pub(crate) fun: Arc<dyn Any+'static+Send+Sync>,
     pub(crate) debug_label: &'static str,
+    downcast : Arc<DowncastCallMut>,
     index_mod: Option<usize>,
 }
 
@@ -514,26 +537,32 @@ impl Debug for LMutFn {
 impl LMutFn {
     pub fn new<
         T: 'static,
-        R: Into<Result<LValue, LError>>,
-        F: Fn(&[LValue], &mut LEnv, &mut T) -> R + 'static,
     >(
-        lbd: Box<F>,
+        lbd: NativeMutFn<T>,
         debug_label: &'static str,
     ) -> Self {
-        let x =
-            move |args: &[LValue], env: &mut LEnv, ctx: &mut dyn Any| -> Result<LValue, LError> {
-                let ctx: Option<&mut T> = ctx.downcast_mut::<T>();
-                if let Some(ctx) = ctx {
-                    lbd(args, env, ctx).into()
-                } else {
+
+        let downcast_call =|args: &[LValue], env: &LEnv, ctx: &mut dyn Any, fun: &Arc<dyn Any+Send+Sync>| -> Result<LValue, LError> {
+            let ctx: Option<&mut T> = ctx.downcast_mut::<T>();
+            let fun : Option<& NativeMutFn<T>> = fun.downcast_ref::<NativeMutFn<T>>();
+            if let Some(ctx) = ctx {
+                if let Some(fun) = fun {
+                    fun(args, env, ctx)
+                }else {
                     Err(LError::SpecialError(
-                        "Impossible to downcast context".to_string(),
+                        "Impossible to downcast function".to_string(),
                     ))
                 }
-            };
+            } else {
+                Err(LError::SpecialError(
+                    "Impossible to downcast context".to_string(),
+                ))
+            }
+        };
         LMutFn {
-            fun: Rc::new(x),
+            fun: Arc::new(lbd),
             debug_label,
+            downcast : Arc::new(downcast_call),
             index_mod: None,
         }
     }
@@ -549,10 +578,10 @@ impl LMutFn {
     pub fn call(
         &self,
         args: &[LValue],
-        env: &mut LEnv,
+        env: &LEnv,
         ctx: &mut dyn Any,
     ) -> Result<LValue, LError> {
-        (self.fun)(args, env, ctx)
+        (self.downcast)(args, env, ctx, &self.fun)
     }
 
     pub fn get_label(&self) -> &'static str {
@@ -1117,24 +1146,6 @@ impl<T: Clone + Into<LValue>> From<&Vec<T>> for LValue {
     }
 }
 
-/*impl From<&LValue> for LValue {
-    fn from(lv: &LValue) -> Self {
-        lv.clone()
-    }
-}*/
-
-/*impl From<&Vec<LValue>> for LValue {
-    fn from(vec: &Vec<LValue>) -> Self {
-        LValue::List(vec.clone())
-    }
-}
-
-impl From<Vec<LValue>> for LValue {
-    fn from(vec: Vec<LValue>) -> Self {
-        (&vec).into()
-    }
-}*/
-
 impl<T: Clone + Into<LValue>> From<Vec<T>> for LValue {
     fn from(vec: Vec<T>) -> Self {
         (&vec).into()
@@ -1459,22 +1470,23 @@ impl InitLisp {
     }
 }
 
+pub type AsyncLTrait = dyn Any+Send+Sync;
+
 pub struct Module {
-    pub ctx: Box<dyn Any>,
+    pub ctx: Arc<AsyncLTrait>,
     pub prelude: Vec<(String, LValue)>,
     pub raw_lisp: InitLisp,
     pub label: &'static str,
 }
 
+
 impl Module {
     pub fn add_fn_prelude<
-        T: 'static,
-        R: Into<Result<LValue, LError>>,
-        F: Fn(&[LValue], &LEnv, &T) -> R + 'static,
+        T: 'static+Send+Sync,
     >(
         &mut self,
         label: &'static str,
-        fun: Box<F>,
+        fun: NativeFn<T>,
     ) {
         self.prelude
             .push((label.into(), LValue::Fn(LFn::new(fun, label))))
@@ -1482,12 +1494,12 @@ impl Module {
 
     pub fn add_mut_fn_prelude<
         T: 'static,
-        R: Into<Result<LValue, LError>>,
-        F: Fn(&[LValue], &mut LEnv, &mut T) -> R + 'static,
+        //R: Into<Result<LValue, LError>>,
+        //F: Fn(&[LValue], &LEnv, &mut T) -> R + 'static,
     >(
         &mut self,
         label: &'static str,
-        fun: Box<F>,
+        fun: NativeMutFn<T>,
     ) {
         self.prelude
             .push((label.into(), LValue::MutFn(LMutFn::new(fun, label))))

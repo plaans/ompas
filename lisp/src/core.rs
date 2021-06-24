@@ -11,9 +11,10 @@ use aries_planning::parsing::sexpr::SExpr;
 use im::hashmap::HashMap;
 use std::any::Any;
 use std::convert::{TryFrom, TryInto};
-use std::ops::{Deref, DerefMut};
+use std::ops::{Deref};
+use std::sync::Arc;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct LEnv {
     symbols: im::HashMap<String, LValue>,
     macro_table: im::HashMap<String, LLambda>,
@@ -27,8 +28,9 @@ impl LEnv {
     }
 }
 
+#[derive(Clone)]
 pub struct ContextCollection {
-    inner: Vec<Box<dyn Any>>,
+    inner: Vec<Arc<dyn Any+Send+Sync>>,
     map_label_usize: HashMap<&'static str, usize>,
 }
 
@@ -42,12 +44,12 @@ impl Default for ContextCollection {
 }
 
 impl ContextCollection {
-    pub fn insert(&mut self, ctx: Box<dyn Any>) -> usize {
+    pub fn insert(&mut self, ctx: Arc<dyn Any+Send+Sync>) -> usize {
         self.inner.push(ctx);
         self.inner.len() - 1
     }
 
-    pub fn get_context(&self, id: usize) -> &dyn Any {
+    pub fn get_context(&self, id: usize) -> &(dyn Any+Send+Sync) {
         self.inner.get(id).unwrap().deref()
     }
     pub fn get_context_with_label(&self, label: &str) -> &dyn Any {
@@ -59,8 +61,10 @@ impl ContextCollection {
         self.get_context(id)
     }
 
-    pub fn get_mut_context(&mut self, id: usize) -> &mut dyn Any {
-        self.inner.get_mut(id).unwrap().deref_mut()
+    pub fn get_mut_context(&mut self, id: usize) -> &mut (dyn Any+Send+Sync) {
+        let ctx = self.inner.get_mut(id).unwrap();
+        let ctx = Arc::get_mut(ctx).unwrap();
+        ctx
     }
 }
 /*
@@ -155,7 +159,7 @@ struct CtxRoot(());
 impl GetModule for CtxRoot {
     fn get_module(self) -> Module {
         let mut module = Module {
-            ctx: Box::new(()),
+            ctx: Arc::new(()),
             prelude: vec![],
             raw_lisp: vec![
                 MACRO_AND,
@@ -195,64 +199,65 @@ impl GetModule for CtxRoot {
         module.add_prelude(QUOTE, LCoreOperator::Quote.into());
         module.add_prelude(UNQUOTE, LCoreOperator::UnQuote.into());
 
-        module.add_fn_prelude(ENV, Box::new(env));
+        module.add_fn_prelude(ENV, env);
 
         //Special entry
-        module.add_fn_prelude(GET, Box::new(get));
-        module.add_fn_prelude(MAP, Box::new(map));
-        module.add_fn_prelude(LIST, Box::new(list));
+        module.add_fn_prelude(GET, get);
+        module.add_fn_prelude(MAP, map);
+        module.add_fn_prelude(LIST, list);
         //State is an alias for map
 
         /*
          * LIST FUNCTIONS
          */
-        module.add_fn_prelude(CAR, Box::new(car));
-        module.add_fn_prelude(CDR, Box::new(cdr));
-        module.add_fn_prelude(LAST, Box::new(last));
-        module.add_fn_prelude(CONS, Box::new(cons));
-        module.add_fn_prelude(LEN, Box::new(length));
-        module.add_fn_prelude(EMPTY, Box::new(empty));
+        module.add_fn_prelude(CAR, car);
+        module.add_fn_prelude(CDR, cdr);
+        module.add_fn_prelude(LAST, last);
+        module.add_fn_prelude(CONS, cons);
+        module.add_fn_prelude(LEN, length);
+        module.add_fn_prelude(EMPTY, empty);
 
         //Map functions
-        module.add_fn_prelude(GET_MAP, Box::new(get_map));
-        module.add_fn_prelude(SET_MAP, Box::new(set_map));
+        module.add_fn_prelude(GET_MAP, get_map);
+        module.add_fn_prelude(SET_MAP, set_map);
+        module.add_fn_prelude(UNION_MAP, union_map);
 
-        module.add_fn_prelude(NOT, Box::new(not));
-        module.add_fn_prelude(NOT_SHORT, Box::new(not));
+        module.add_fn_prelude(NOT, not);
+        module.add_fn_prelude(NOT_SHORT, not);
 
-        module.add_fn_prelude(APPEND, Box::new(append));
+        module.add_fn_prelude(APPEND, append);
 
-        module.add_fn_prelude(MEMBER, Box::new(member));
+        module.add_fn_prelude(MEMBER, member);
 
-        module.add_fn_prelude(REVERSE, Box::new(reverse));
+        module.add_fn_prelude(REVERSE, reverse);
 
-        module.add_fn_prelude(ADD, Box::new(add));
-        module.add_fn_prelude(SUB, Box::new(sub));
-        module.add_fn_prelude(MUL, Box::new(mul));
-        module.add_fn_prelude(DIV, Box::new(div));
-        module.add_fn_prelude(GT, Box::new(gt));
-        module.add_fn_prelude(GE, Box::new(ge));
-        module.add_fn_prelude(LT, Box::new(lt));
-        module.add_fn_prelude(LE, Box::new(le));
-        module.add_fn_prelude(EQ, Box::new(eq));
+        module.add_fn_prelude(ADD, add);
+        module.add_fn_prelude(SUB, sub);
+        module.add_fn_prelude(MUL, mul);
+        module.add_fn_prelude(DIV, div);
+        module.add_fn_prelude(GT, gt);
+        module.add_fn_prelude(GE, ge);
+        module.add_fn_prelude(LT, lt);
+        module.add_fn_prelude(LE, le);
+        module.add_fn_prelude(EQ, eq);
 
         //predicates
-        module.add_fn_prelude(IS_NUMBER, Box::new(is_number));
-        module.add_fn_prelude(IS_INTEGER, Box::new(is_integer));
-        module.add_fn_prelude(IS_FLOAT, Box::new(is_float));
-        module.add_fn_prelude(IS_NIL, Box::new(is_nil));
-        module.add_fn_prelude(IS_NUMBER, Box::new(is_number));
-        module.add_fn_prelude(IS_BOOL, Box::new(is_bool));
-        module.add_fn_prelude(IS_SYMBOL, Box::new(is_symbol));
-        module.add_fn_prelude(IS_FN, Box::new(is_fn));
-        module.add_fn_prelude(IS_MUT_FN, Box::new(is_mut_fn));
-        module.add_fn_prelude(IS_QUOTE, Box::new(is_quote));
-        module.add_fn_prelude(IS_MAP, Box::new(is_map));
-        module.add_fn_prelude(IS_LIST, Box::new(is_list));
-        module.add_fn_prelude(IS_LAMBDA, Box::new(is_lambda));
+        module.add_fn_prelude(IS_NUMBER, is_number);
+        module.add_fn_prelude(IS_INTEGER, is_integer);
+        module.add_fn_prelude(IS_FLOAT, is_float);
+        module.add_fn_prelude(IS_NIL, is_nil);
+        module.add_fn_prelude(IS_NUMBER, is_number);
+        module.add_fn_prelude(IS_BOOL, is_bool);
+        module.add_fn_prelude(IS_SYMBOL, is_symbol);
+        module.add_fn_prelude(IS_FN, is_fn);
+        module.add_fn_prelude(IS_MUT_FN, is_mut_fn);
+        module.add_fn_prelude(IS_QUOTE, is_quote);
+        module.add_fn_prelude(IS_MAP, is_map);
+        module.add_fn_prelude(IS_LIST, is_list);
+        module.add_fn_prelude(IS_LAMBDA, is_lambda);
 
-        module.add_fn_prelude(IS_PAIR, Box::new(is_pair));
-        module.add_fn_prelude(IS_EQUAL, Box::new(is_equal));
+        module.add_fn_prelude(IS_PAIR, is_pair);
+        module.add_fn_prelude(IS_EQUAL, is_equal);
         module
     }
 }
@@ -288,6 +293,16 @@ impl LEnv {
                 Some(outer) => outer.get_symbol(s),
             },
             Some(s) => Some(s.clone()),
+        }
+    }
+
+    pub fn get_ref_symbol(&self, s: &str) -> Option<&LValue> {
+        match self.symbols.get(s) {
+            None => match &self.outer {
+                None => None,
+                Some(outer) => outer.get_ref_symbol(s),
+            },
+            Some(s) => Some(s),
         }
     }
 
@@ -560,10 +575,11 @@ pub fn expand(
                         return if list.len() != 2 {
                             Err(WrongNumberOfArgument(list.into(), list.len(), 2..2))
                         } else {
-                            let expanded = expand_quasi_quote(&list[1], env)?;
-                            println!("{}", expanded);
+                            /*let expanded = expand_quasi_quote(&list[1], env)?;
+                            //println!("{}", expanded);
                             //to expand quasiquote recursively
-                            expand(&expanded, top_level, env, ctxs)
+                            expand(&expanded, top_level, env, ctxs);*/
+                            expand(&expand_quasi_quote(&list[1], env)?, top_level, env, ctxs)
                             //Ok(expanded)
                         }
                     }
@@ -759,13 +775,13 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                     LValue::MutFn(fun) => {
                         return match fun.get_index_mod() {
                             None => {
-                                let r_lvalue = fun.call(&args, &mut env, &mut ())?;
+                                let r_lvalue = fun.call(&args, &env, &mut ())?;
                                 //println!("=> {}", r_lvalue);
                                 Ok(r_lvalue)
                             }
                             Some(u) => {
                                 let r_lvalue =
-                                    fun.call(&args, &mut env, ctxs.get_mut_context(u))?;
+                                    fun.call(&args, &env, ctxs.get_mut_context(u))?;
                                 //println!("=> {}", r_lvalue);
                                 Ok(r_lvalue)
                             }

@@ -1,5 +1,6 @@
 use ompas_lisp::structs::{GetModule, Module};
 use ompas_modules::doc::{Documentation, LHelp};
+use std::sync::Arc;
 
 //LANGUAGE
 
@@ -26,7 +27,7 @@ pub struct CtxDumber {}
 impl GetModule for CtxDumber {
     fn get_module(self) -> Module {
         Module {
-            ctx: Box::new(self),
+            ctx: Arc::new(self),
             prelude: vec![],
             raw_lisp: vec![LAMBDA_DUMBER_ROBOT].into(),
             label: MOD_DUMBER,

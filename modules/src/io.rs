@@ -6,6 +6,7 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use tokio::sync::mpsc::Sender;
+use std::sync::Arc;
 /*
 LANGUAGE
  */
@@ -142,15 +143,15 @@ pub fn write(args: &[LValue], _: &LEnv, _: &CtxIo) -> Result<LValue, LError> {
 impl GetModule for CtxIo {
     fn get_module(self) -> Module {
         let mut module = Module {
-            ctx: Box::new(self),
+            ctx: Arc::new(self),
             prelude: vec![],
             raw_lisp: Default::default(),
             label: MOD_IO,
         };
 
-        module.add_fn_prelude(PRINT, Box::new(print));
-        module.add_fn_prelude(READ, Box::new(read));
-        module.add_fn_prelude(WRITE, Box::new(write));
+        module.add_fn_prelude(PRINT, print);
+        module.add_fn_prelude(READ, read);
+        module.add_fn_prelude(WRITE, write);
 
         module
     }

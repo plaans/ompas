@@ -3,6 +3,7 @@ use ompas_lisp::core::*;
 use ompas_lisp::structs::LError::*;
 use ompas_lisp::structs::*;
 use std::convert::TryFrom;
+use std::sync::Arc;
 
 /*
 LANGUAGE
@@ -55,7 +56,7 @@ pub fn get_counter(args: &[LValue], _: &LEnv, ctx: &CtxCounter) -> Result<LValue
 
 pub fn decrement_counter(
     args: &[LValue],
-    _: &mut LEnv,
+    _: &LEnv,
     ctx: &mut CtxCounter,
 ) -> Result<LValue, LError> {
     if args.len() != 1 {
@@ -82,7 +83,7 @@ pub fn decrement_counter(
 
 pub fn increment_counter(
     args: &[LValue],
-    _: &mut LEnv,
+    _: &LEnv,
     ctx: &mut CtxCounter,
 ) -> Result<LValue, LError> {
     if args.len() != 1 {
@@ -104,7 +105,7 @@ pub fn increment_counter(
     }
 }
 
-pub fn set_counter(args: &[LValue], _: &mut LEnv, ctx: &mut CtxCounter) -> Result<LValue, LError> {
+pub fn set_counter(args: &[LValue], _: &LEnv, ctx: &mut CtxCounter) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
     }
@@ -125,24 +126,24 @@ pub fn set_counter(args: &[LValue], _: &mut LEnv, ctx: &mut CtxCounter) -> Resul
     }
 }
 
-pub fn new_counter(_: &[LValue], _: &mut LEnv, ctx: &mut CtxCounter) -> Result<LValue, LError> {
+pub fn new_counter(_: &[LValue], _: &LEnv, ctx: &mut CtxCounter) -> Result<LValue, LError> {
     Ok(LValue::Number(LNumber::Usize(ctx.new_counter())))
 }
 
 impl GetModule for CtxCounter {
     fn get_module(self) -> Module {
         let mut module = Module {
-            ctx: Box::new(self),
+            ctx: Arc::new(self),
             prelude: vec![],
             raw_lisp: Default::default(),
             label: MOD_COUNTER,
         };
 
-        module.add_fn_prelude(GET_COUNTER, Box::new(get_counter));
-        module.add_mut_fn_prelude(SET_COUNTER, Box::new(set_counter));
-        module.add_mut_fn_prelude(NEW_COUNTER, Box::new(new_counter));
-        module.add_mut_fn_prelude(INCREMENT_COUNTER, Box::new(increment_counter));
-        module.add_mut_fn_prelude(DECREMENT_COUNTER, Box::new(decrement_counter));
+        module.add_fn_prelude(GET_COUNTER, get_counter);
+        module.add_mut_fn_prelude(SET_COUNTER, set_counter);
+        module.add_mut_fn_prelude(NEW_COUNTER, new_counter);
+        module.add_mut_fn_prelude(INCREMENT_COUNTER, increment_counter);
+        module.add_mut_fn_prelude(DECREMENT_COUNTER, decrement_counter);
 
         module
     }

@@ -15,6 +15,7 @@ use std::sync::Arc;
 use std::{thread, time};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{mpsc, Mutex};
+use ompas_acting::rae::context::Status;
 
 /*
 LANGUAGE
@@ -552,7 +553,7 @@ impl RAEInterface for CtxGodot {
 
         //println!("godot launching...");
         self.start_godot(&[])?;
-        thread::sleep(time::Duration::from_secs(3));
+        thread::sleep(time::Duration::from_millis(500));
         //println!("godot launched!");
         let state = self.state.clone();
         let status = self.action_status.clone();
@@ -561,18 +562,19 @@ impl RAEInterface for CtxGodot {
         Ok(LValue::Nil)
     }
 
-    fn get_action_status(&self, action_id: usize) -> ActionStatus {
+    fn get_action_status(&self, action_id: &usize) -> Status {
         let handle = tokio::runtime::Handle::current();
         let status = self.action_status.clone();
+        let action_id = *action_id;
         let result = thread::spawn(move || {
-            handle.block_on(async move { status.lock().await.get_status(action_id) })
+            handle.block_on(async move { status.lock().await.get_status(&action_id) })
         })
         .join()
         .unwrap();
-        result.unwrap()
+        result.unwrap().into()
     }
 
-    fn set_status(&self, _: usize, _: ActionStatus) {
+    fn set_status(&self, _: usize, _: Status) {
         todo!()
     }
 
@@ -617,18 +619,18 @@ impl GetModule for CtxGodot {
         .into();
 
         let mut module = Module {
-            ctx: Box::new(self),
+            ctx: Arc::new(self),
             prelude: vec![],
             raw_lisp,
             label: MOD_GODOT,
         };
 
-        module.add_mut_fn_prelude(OPEN_COM, Box::new(open_com));
-        module.add_fn_prelude(START_GODOT, Box::new(start_godot));
-        module.add_fn_prelude(EXEC_GODOT, Box::new(exec_godot));
-        module.add_fn_prelude(GET_STATE, Box::new(get_state));
-        //module.add_mut_fn_prelude(SET_STATE, Box::new(set_state));
-        //module.add_mut_fn_prelude(UPDATE_STATE, Box::new(update_state));
+        module.add_mut_fn_prelude(OPEN_COM, open_com);
+        module.add_fn_prelude(START_GODOT, start_godot);
+        module.add_fn_prelude(EXEC_GODOT, exec_godot);
+        module.add_fn_prelude(GET_STATE, get_state);
+        //module.add_mut_fn_prelude(SET_STATE, set_state);
+        //module.add_mut_fn_prelude(UPDATE_STATE, update_state);
 
         module
     }
@@ -752,7 +754,7 @@ impl Documentation for CtxGodot {
 Functions
  */
 
-fn open_com(args: &[LValue], _: &mut LEnv, ctx: &mut CtxGodot) -> Result<LValue, LError> {
+fn open_com(args: &[LValue], _: &LEnv, ctx: &mut CtxGodot) -> Result<LValue, LError> {
     ctx.launch_platform(args)
 }
 

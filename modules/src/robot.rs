@@ -1,11 +1,12 @@
-#![allow(dead_code)]
+/*#![allow(dead_code)]
 use crate::doc::{Documentation, LHelp};
 use ompas_lisp::core::LEnv;
 use ompas_lisp::structs::LError::*;
 use ompas_lisp::structs::*;
-use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 use std::thread::JoinHandle;
+use std::sync::Arc;
+use tokio::sync::mpsc::{Sender, Receiver};
 
 /*
 LANGUAGE
@@ -66,15 +67,15 @@ impl GetModule for CtxRobot {
     //TODO: doc
     fn get_module(self) -> Module {
         let mut module = Module {
-            ctx: Box::new(self),
+            ctx: Arc::new(self),
             prelude: vec![],
             raw_lisp: Default::default(),
             label: MOD_ROBOT,
         };
 
-        module.add_mut_fn_prelude(NEW_ROBOT, Box::new(new_robot));
-        module.add_fn_prelude(EXEC, Box::new(exec));
-        module.add_mut_fn_prelude(START_ROBOT_HANDLER, Box::new(start_robot_handler));
+        /*module.add_mut_fn_prelude(NEW_ROBOT, Box::new(new_robot));
+        //module.add_fn_prelude(EXEC, Box::new(exec));
+        module.add_mut_fn_prelude(START_ROBOT_HANDLER, Box::new(start_robot_handler));*/
 
         /*
         NOT YET IMPLEMENTED
@@ -122,7 +123,7 @@ const ROBOT_HANDLER_START_MSG: &str = "Robot handler started!!!\n\
 /// Should be deprecated in further updates.
 /// Takes as argument the channel object receiver that receives all response.
 /// Loops on it and exit at the end of the process.
-fn robot_handler(rx: Receiver<String>) {
+fn robot_handler(mut rx: Receiver<String>) {
     println!("{}", ROBOT_HANDLER_START_MSG);
 
     loop {
@@ -213,7 +214,7 @@ fn robot(arg_robot: ArgRobot) {
 /// A new thread and a channel to communicate with it is created.
 ///
 /// Returns the robot id.
-pub fn new_robot(args: &[LValue], _: &mut LEnv, ctx: &mut CtxRobot) -> Result<LValue, LError> {
+pub fn new_robot(args: &[LValue], _: &LEnv, ctx: &mut CtxRobot) -> Result<LValue, LError> {
     let (robot_label, thread_label) = match args.len() {
         0 => (
             format!("unnamed_robot_{}", ctx.robots.len()),
@@ -257,7 +258,7 @@ pub fn new_robot(args: &[LValue], _: &mut LEnv, ctx: &mut CtxRobot) -> Result<LV
 /// Spawn a new thread running function **robot_handler**
 pub fn start_robot_handler(
     _: &[LValue],
-    _: &mut LEnv,
+    _: &LEnv,
     ctx: &mut CtxRobot,
 ) -> Result<LValue, LError> {
     let (tx, rx) = channel();
@@ -275,18 +276,18 @@ ROBOTS COMMAND
 
 /// Primitive of the robot to move between two places.
 /// Not yet implemented
-pub fn command_move(_: &[LValue], _: &mut LEnv, _: &mut CtxRobot) -> Result<LValue, LError> {
+pub fn command_move(_: &[LValue], _: &LEnv, _: &mut CtxRobot) -> Result<LValue, LError> {
     unimplemented!()
 }
 
 /// Primitive of the robot to pick an object.
 /// Not yet implemented
-pub fn command_pick(_: &[LValue], _: &mut LEnv, _: &mut CtxRobot) -> Result<LValue, LError> {
+pub fn command_pick(_: &[LValue], _: &LEnv, _: &mut CtxRobot) -> Result<LValue, LError> {
     unimplemented!()
 }
 
 /// Primitive of the robot to place an object.
 /// Not yet implemented.
-pub fn command_place(_: &[LValue], _: &mut LEnv, _: &mut CtxRobot) -> Result<LValue, LError> {
+pub fn command_place(_: &[LValue], _: &LEnv, _: &mut CtxRobot) -> Result<LValue, LError> {
     unimplemented!()
-}
+}*/

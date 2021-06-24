@@ -10,6 +10,7 @@ use ompas_lisp::language::scheme_primitives::*;
 use ompas_lisp::structs::LError::{WrongNumberOfArgument, WrongType};
 use ompas_lisp::structs::{GetModule, LError, LValue, Module, NameTypeLValue};
 use std::fmt::{Debug, Display, Formatter};
+use std::sync::Arc;
 
 /*
 LANGUAGE
@@ -135,13 +136,13 @@ impl CtxDoc {
 impl GetModule for CtxDoc {
     fn get_module(self) -> Module {
         let mut module = Module {
-            ctx: Box::new(self),
+            ctx: Arc::new(self),
             prelude: vec![],
             raw_lisp: Default::default(),
             label: MOD_HELP,
         };
 
-        module.add_fn_prelude(HELP, Box::new(help));
+        module.add_fn_prelude(HELP, help);
         module
     }
 }

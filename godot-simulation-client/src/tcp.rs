@@ -29,6 +29,7 @@ pub async fn task_tcp_connection(
 async fn async_send_socket(mut stream: WriteHalf<TcpStream>, mut receiver: Receiver<String>) {
     loop {
         let command = receiver.recv().await.unwrap();
+        println!("new command to send: {}", command);
         let size = u32_to_u8_array(command.len() as u32);
         let msg: &[u8] = &[&size[0..4], &command.as_bytes()].concat();
         match stream.write_all(msg).await {

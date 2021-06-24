@@ -9,6 +9,8 @@ use crate::rae::module::domain::{MACRO_DEF_STATE_FUNCTION, MACRO_DEF_TASK, MACRO
 use crate::rae::module::mod_rae_exec::{ RAEInterface, CtxRaeExec};
 use ompas_modules::math::CtxMath;
 use tokio::sync::Mutex;
+use std::mem;
+use crate::rae::rae_run;
 
 /*
 LANGUAGE
@@ -49,7 +51,15 @@ pub struct CtxRae {
 
 impl GetModule for CtxRae {
     fn get_module(self) -> Module {
-        let init = self.init.clone();
+        let mut init:InitLisp = vec![
+            MACRO_DEF_ACTION,
+            MACRO_DEF_METHOD,
+            MACRO_DEF_TASK,
+            MACRO_DEF_STATE_FUNCTION,
+        ].into();
+
+        init.append(&mut self.init.clone());
+
         let mut module = Module {
             ctx: Arc::new(self),
             prelude: vec![],
@@ -57,7 +67,7 @@ impl GetModule for CtxRae {
             label: MOD_RAE,
         };
 
-        module.add_fn_prelude(RAE_LAUNCH, launch_rae);
+        module.add_mut_fn_prelude(RAE_LAUNCH, launch_rae);
 
         module.add_mut_fn_prelude(RAE_ADD_ACTION, add_action);
         module.add_mut_fn_prelude(RAE_ADD_STATE_FUNCTION, add_state_function);
@@ -259,11 +269,13 @@ pub fn add_task(args: &[LValue], _env: &LEnv, ctx: &mut CtxRae) -> Result<LValue
 /*
 launch the main in a thread
  */
-pub fn launch_rae(_: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
+pub fn launch_rae(_: &[LValue], _env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
     let options = SelectOption::new(0,0);
-    //let mutex = Arc::new(Mutex::new(ctx));
-    /*tokio::spawn(async move {
-        rae_run(mutex, &options, "rae-log.txt".to_string());
-    });*/
+    let mut rae_env = RAEEnv::default();
+    rae_env.env = ctx.env.env.clone();
+    let context = mem::replace(&mut ctx.env, rae_env);
+    tokio::spawn(async move {
+        rae_run(context, &options, "rae-log.txt".to_string()).await;
+    });
     Ok(LValue::String("rae launched succesfully".to_string()))
 }

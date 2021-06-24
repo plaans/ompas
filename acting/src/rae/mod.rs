@@ -27,12 +27,14 @@ pub enum RAEError {
 pub const TOKIO_CHANNEL_SIZE: usize = 65_536; //=2^16
 
 
-pub fn rae_run(context: RAEEnv, select_option: &SelectOption, log: String) {
+pub async fn rae_run(mut context: RAEEnv, select_option: &SelectOption, log: String) {
 
     println!("in rae run!");
 //infinite loop
 //Maybe we can add a system to interrupt, or it stops itself when there is nothing to process
 //We can imagine a system monitoring the stream.
+
+    let mut receiver = context.receiver.unwrap();
     loop {
         //For each new event or task to be addressed, we search for the best method a create a new refinement stack
 
@@ -45,12 +47,12 @@ pub fn rae_run(context: RAEEnv, select_option: &SelectOption, log: String) {
         //tokio::pin!(stream); //was important for streams
 
         //Note: The whole block could be in an async block
-
+        while let Some(job) = receiver.recv().await {
+            println!("new job received: {}", job)
+        }
         /*tokio::spawn(async move {
             let receiver = context.lock().await.stream.get_ref_receiver();
-            while let Some(job) = receiver.recv().await {
-                println!("new job received: {}", job)
-            }
+
         });*/
     }
 }

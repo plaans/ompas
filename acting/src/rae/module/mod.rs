@@ -7,6 +7,7 @@ use crate::rae::module::mod_rae_monitor::CtxRaeMonitor;
 use crate::rae::TOKIO_CHANNEL_SIZE;
 use tokio::sync::mpsc;
 use ompas_lisp::structs::InitLisp;
+use std::sync::Arc;
 
 pub mod mod_rae_exec;
 pub mod mod_rae_monitor;
@@ -21,17 +22,17 @@ pub fn init_ctx_rae(platform: Box<dyn RAEInterface>) -> (CtxRae, CtxRaeMonitor){
         sender_to_rae: Some(sender),
         env: Default::default()
     };
-    let mut ctx_rae_exec = CtxRaeExec {
-        receiver : Some(receiver),
-        actions_progress: Default::default(),
-        agenda: Default::default(),
-        state: Default::default(),
-        platform_interface: Box::new(())
-    };
+
     let domain = platform.domain();
-    ctx_rae_exec.add_platform(platform);
 
     let mut rae_env = RAEEnv::default();
+    rae_env.receiver = Some(receiver);
+
+    let mut ctx_rae_exec = CtxRaeExec {
+        actions_progress: rae_env.actions_progress.clone(),
+        state: rae_env.state.clone(),
+        platform_interface: platform
+    };
 
     let mut rae_init_lisp = vec![
         domain

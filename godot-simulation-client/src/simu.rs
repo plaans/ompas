@@ -26,7 +26,8 @@ const MOD_GODOT: &str = "mod-godot";
 //commands
 
 const OPEN_COM: &str = "open-com-godot";
-const START_GODOT: &str = "launch-godot";
+const START_GODOT: &str = "start-godot";
+const LAUNCH_GODOT: &str ="launch-godot";
 const EXEC_GODOT: &str = "exec-godot";
 
 //State variables
@@ -330,48 +331,11 @@ impl CtxGodot {
     }
 }
 
-impl CtxGodot {
-    pub fn start_godot(&self, args: &[LValue]) -> Result<LValue, LError> {
-        match args.len() {
-            0 => {
-                thread::spawn(|| {
-                    Command::new("godot3")
-                        .arg("--path")
-                        .arg(DEFAULT_PATH_PROJECT_GODOT)
-                        .output()
-                        .expect("failed to execute process");
-                });
-            } //default settings
-            1 => {
-                if let LValue::Symbol(s) = &args[0] {
-                    let s = s.clone();
-                    thread::spawn(move || {
-                        Command::new("godot3")
-                            .arg("--path")
-                            .arg(s)
-                            .output()
-                            .expect("failed to execute process");
-                    });
-                } else {
-                    return Err(WrongType(
-                        args[0].clone(),
-                        (&args[0]).into(),
-                        NameTypeLValue::Symbol,
-                    ));
-                }
-            } //path of the project (absolute path)
-            5 => {
-                todo!()
-            } //path + options
-            _ => return Err(WrongNumberOfArgument(args.into(), args.len(), 0..5)), //Unexpected number of arguments
-        }
-
-        Ok(LValue::Nil)
-    }
-}
-
 impl RAEInterface for CtxGodot {
     fn exec_command(&self, args: &[LValue], command_id: usize) -> Result<LValue, LError> {
+
+        //println!("in exec command godot");
+
         let gs = GodotMessageSerde {
             _type: GodotMessageType::RobotCommand,
             data: GodotMessageSerdeData::RobotCommand(SerdeRobotCommand {
@@ -530,6 +494,51 @@ impl RAEInterface for CtxGodot {
     }
 
     fn launch_platform(&mut self, args: &[LValue]) -> Result<LValue, LError> {
+
+        self.start_platform(&[])?;
+        thread::sleep(time::Duration::from_millis(500));
+        self.open_com(args)
+    }
+
+    fn start_platform(&self, args: &[LValue]) -> Result<LValue, LError> {
+        match args.len() {
+            0 => {
+                thread::spawn(|| {
+                    Command::new("godot3")
+                        .arg("--path")
+                        .arg(DEFAULT_PATH_PROJECT_GODOT)
+                        .output()
+                        .expect("failed to execute process");
+                });
+            } //default settings
+            1 => {
+                if let LValue::Symbol(s) = &args[0] {
+                    let s = s.clone();
+                    thread::spawn(move || {
+                        Command::new("godot3")
+                            .arg("--path")
+                            .arg(s)
+                            .output()
+                            .expect("failed to execute process");
+                    });
+                } else {
+                    return Err(WrongType(
+                        args[0].clone(),
+                        (&args[0]).into(),
+                        NameTypeLValue::Symbol,
+                    ));
+                }
+            } //path of the project (absolute path)
+            5 => {
+                todo!()
+            } //path + options
+            _ => return Err(WrongNumberOfArgument(args.into(), args.len(), 0..5)), //Unexpected number of arguments
+        }
+
+        Ok(LValue::Nil)
+    }
+
+    fn open_com(&mut self, args: &[LValue]) -> Result<LValue, LError> {
         let socket_addr: SocketAddr = match args.len() {
             0 => "127.0.0.1:10000".parse().unwrap(),
             2 => {
@@ -552,13 +561,10 @@ impl RAEInterface for CtxGodot {
         self.sender_socket = Some(tx);
 
         //println!("godot launching...");
-        self.start_godot(&[])?;
-        thread::sleep(time::Duration::from_millis(500));
         //println!("godot launched!");
         let state = self.state.clone();
         let status = self.action_status.clone();
         tokio::spawn(async move { task_tcp_connection(&socket_addr, rx, state, status).await });
-
         Ok(LValue::Nil)
     }
 
@@ -626,6 +632,7 @@ impl GetModule for CtxGodot {
         };
 
         module.add_mut_fn_prelude(OPEN_COM, open_com);
+        module.add_mut_fn_prelude(LAUNCH_GODOT, launch_godot);
         module.add_fn_prelude(START_GODOT, start_godot);
         module.add_fn_prelude(EXEC_GODOT, exec_godot);
         module.add_fn_prelude(GET_STATE, get_state);
@@ -754,15 +761,19 @@ impl Documentation for CtxGodot {
 Functions
  */
 
-fn open_com(args: &[LValue], _: &LEnv, ctx: &mut CtxGodot) -> Result<LValue, LError> {
+fn launch_godot(args: &[LValue], _: &LEnv, ctx: &mut CtxGodot) -> Result<LValue, LError> {
     ctx.launch_platform(args)
+}
+
+fn open_com(args: &[LValue], _: &LEnv, ctx: &mut CtxGodot) -> Result<LValue, LError> {
+    ctx.open_com(args)
 }
 
 pub const DEFAULT_PATH_PROJECT_GODOT: &str = "/home/jeremy/godot/Simulation-Factory-Godot/simu";
 
 ///Launch godot
 fn start_godot(args: &[LValue], _: &LEnv, ctx: &CtxGodot) -> Result<LValue, LError> {
-    ctx.start_godot(args)
+    ctx.start_platform(args)
 }
 /// Commands available
 ///- Navigate to : ['navigate_to', robot_name, destination_x, destination_y]

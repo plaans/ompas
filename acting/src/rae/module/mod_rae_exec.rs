@@ -1,6 +1,6 @@
 use ompas_lisp::structs::*;
 use std::sync::Arc;
-use crate::rae::context::{Status, Agenda, ActionsProgress, SelectOption, ActionId};
+use crate::rae::context::{Status, Agenda, ActionsProgress, SelectOption, ActionId, RAE_STATE_FUNCTION_LIST};
 use crate::rae::state::RAEState;
 use std::fmt::{Display, Formatter};
 use tokio::sync::mpsc::{Sender, Receiver};
@@ -11,6 +11,7 @@ use tokio::sync::Mutex;
 use ompas_lisp::structs::LValue::*;
 use ompas_modules::doc::{Documentation, LHelp};
 use std::any::Any;
+use std::thread;
 
 /*
 LANGUAGE
@@ -28,6 +29,8 @@ pub const RAE_EXEC_COMMAND: &str = "rae-exec-command";
 pub const RAE_GET_STATE: &str = "rae-get-state";
 pub const RAE_GET_STATE_VARIBALE: &str = "rae-get-state-variable";
 pub const RAE_LAUNCH_PLATFORM: &str = "rae-launch-platform";
+pub const RAE_OPEN_COM_PLATFORM: &str ="rae-open-com-platform";
+pub const RAE_START_PLATFORM: &str = "rae-start-platform";
 pub const RAE_GET_STATUS: &str = "rae-get-status";
 pub const RAE_CANCEL_COMMAND: &str = "rae-cancel-command";
 
@@ -35,9 +38,7 @@ pub const RAE_CANCEL_COMMAND: &str = "rae-cancel-command";
 ///Context that will contains primitives for the RAE executive
 pub struct CtxRaeExec {
     //pub stream: JobStream,
-    pub receiver: Option<Receiver<Job>>,
     pub actions_progress: ActionsProgress,
-    pub agenda: Agenda,
     pub state: RAEState,
     pub platform_interface: Box<dyn RAEInterface>,
 }
@@ -45,9 +46,7 @@ pub struct CtxRaeExec {
 impl Default for CtxRaeExec {
     fn default() -> Self {
         Self {
-            receiver: None,
             actions_progress: Default::default(),
-            agenda: Default::default(),
             state: Default::default(),
             platform_interface: Box::new(())
         }
@@ -57,7 +56,7 @@ impl Default for CtxRaeExec {
 impl GetModule for CtxRaeExec {
     fn get_module(self) -> Module {
         let mut module = Module {
-            ctx: Arc::new(()),
+            ctx: Arc::new(self),
             prelude: vec![],
             raw_lisp: Default::default(),
             label: ""
@@ -75,15 +74,16 @@ impl GetModule for CtxRaeExec {
         module.add_mut_fn_prelude(RAE_RETRACT, retract_fact);
         module.add_mut_fn_prelude(RAE_RETRACT_SHORT, retract_fact);
         module.add_fn_prelude(RAE_DO, fn_do);
-
+        module.add_mut_fn_prelude(RAE_OPEN_COM_PLATFORM, open_com);
+        module.add_mut_fn_prelude(RAE_START_PLATFORM, start_platform);
         module
     }
 }
 
 
 impl CtxRaeExec {
-    pub fn get_execution_status(&self, action_id: &ActionId) -> Option<&Status> {
-        self.actions_progress.get_status(action_id)
+    pub fn get_execution_status(&self, action_id: &ActionId) -> Option<Status> {
+        self.actions_progress.get_status(&action_id)
     }
 
     pub fn add_platform(&mut self, platform: Box<dyn RAEInterface>) {
@@ -175,6 +175,10 @@ pub trait RAEInterface: Any+Send+Sync {
     ///Launch the platform (such as the simulation in godot)
     fn launch_platform(&mut self, args: &[LValue]) -> Result<LValue, LError>;
 
+    fn start_platform(&self, args: &[LValue]) -> Result<LValue, LError>;
+
+    fn open_com(&mut self, args: &[LValue]) -> Result<LValue, LError>;
+
     fn get_action_status(&self, action_id: &usize) -> Status;
     fn set_status(&self, action_id: usize, status: Status);
 
@@ -206,6 +210,14 @@ impl RAEInterface for () {
         todo!()
     }
 
+    fn start_platform(&self, _: &[LValue]) -> Result<LValue, LError> {
+        todo!()
+    }
+
+    fn open_com(&mut self, _: &[LValue]) -> Result<LValue, LError> {
+        todo!()
+    }
+
     fn get_action_status(&self, _action_id: &usize) -> Status {
         todo!()
     }
@@ -233,8 +245,7 @@ pub fn retract_fact(args: &[LValue], _env: &LEnv, ctx: &mut CtxRaeExec) -> Resul
     }
     let key = args[0].clone().into();
     let value = args[1].clone().into();
-    ctx.state.retract_fact(key, value)?;
-    Ok(Nil)
+    ctx.state.retract_fact(key, value)
 }
 
 ///Add a fact to fact state
@@ -244,7 +255,9 @@ pub fn assert_fact(args: &[LValue], _env: &LEnv, ctx: &mut CtxRaeExec) -> Result
     }
     let key = args[0].clone().into();
     let value = args[1].clone().into();
-    ctx.state.add_fact(key, value);
+    let handle = tokio::runtime::Handle::current();
+    let state = ctx.state.add_fact(key, value);
+
     Ok(Nil)
 }
 
@@ -293,11 +306,23 @@ pub fn launch_platform(
     ctx.platform_interface.launch_platform(args)
 }
 
+pub fn start_platform(
+    args: &[LValue],
+    _env: &LEnv,
+    ctx: &mut CtxRaeExec,) -> Result<LValue, LError> {
+    ctx.platform_interface.start_platform(args)
+}
+
+pub fn open_com(args: &[LValue],
+_env: &LEnv,
+ctx: &mut CtxRaeExec,) -> Result<LValue, LError> {
+    ctx.platform_interface.open_com(args)
+}
+
 
 pub fn get_state(args: &[LValue], env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
-    //TODO: à revoir
     let platform_state = ctx.platform_interface.get_state(args).unwrap();
-    let state = ctx.state.get_state().into_map();
+    let state= ctx.state.get_state().into_map();
     union_map(&[platform_state, state], env, &())
 }
 

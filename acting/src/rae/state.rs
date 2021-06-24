@@ -5,6 +5,7 @@ use std::fmt::{Display, Formatter};
 use std::ptr::write_bytes;
 use ompas_lisp::structs::LError::SpecialError;
 use crate::rae::context::Status;
+use std::sync::{RwLock, Arc};
 
 #[derive(Clone, Debug)]
 pub enum StateType {
@@ -86,27 +87,27 @@ impl LState {
 
 #[derive(Default, Debug, Clone)]
 pub struct RAEState {
-    _static: LState,
-    dynamic: LState,
-    inner_world: LState,
+    _static: Arc<RwLock<LState>>,
+    dynamic: Arc<RwLock<LState>>,
+    inner_world: Arc<RwLock<LState>>,
 }
 
 impl RAEState {
     pub fn get_state(&self) -> LState {
-        self.inner_world.union(&self._static.union(&self.dynamic))
+        self.inner_world.read().unwrap().union(&self._static.read().unwrap().union(&self.dynamic.read().unwrap()))
     }
 
     pub fn add_fact(&mut self, key: LValueS, value: LValueS) {
-        self.inner_world.insert(key, value)
+        self.inner_world.write().unwrap().insert(key, value)
     }
 
-    pub fn retract_fact(&mut self, key: LValueS, value: LValueS) -> Result<(), LError> {
-        let old_value = self.inner_world.get(&key);
+    pub fn retract_fact(&mut self, key: LValueS, value: LValueS) -> Result<LValue, LError> {
+        let old_value = self.inner_world.read().unwrap().get(&key).cloned();
         match old_value {
             None => Err(SpecialError("key is not in state".to_string())),
-            Some(old_value) => if *old_value == value {
-                self.inner_world.remove(&key);
-                Ok(())
+            Some(old_value) => if old_value == value {
+                self.inner_world.write().unwrap().remove(&key);
+                Ok(LValue::Nil)
             }else {
                 Err(SpecialError("there is no such fact in state".to_string()))
             }

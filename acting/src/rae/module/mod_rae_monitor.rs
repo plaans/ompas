@@ -55,7 +55,7 @@ pub fn trigger_task(args: &[LValue], _env: &LEnv, ctx: &CtxRaeMonitor) -> Result
     let job = Job::new(args.into(), JobType::Task);
     let sender = ctx.sender_to_rae.clone().unwrap();
     tokio::spawn(async move {
-        sender.send(job).await.unwrap();
+        sender.send(job).await.expect("could not task job to rae");
     });
     Ok(Nil)
 }

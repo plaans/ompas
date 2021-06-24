@@ -1,14 +1,16 @@
 use crate::rae::refinement::{RefinementStack, StackFrame};
-use crate::rae::state::{ActionStatus, LState};
+use crate::rae::state::{ActionStatus, LState, RAEState};
 use ompas_lisp::core::{LEnv, ContextCollection};
 use ompas_lisp::structs::LError::SpecialError;
 use ompas_lisp::structs::{LError, LFn, LLambda, LValue};
 use std::collections::{HashMap, VecDeque};
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{Display, Formatter};
-use std::sync::Arc;
-use tokio::sync::Mutex;
+use std::sync::{Arc, RwLock};
 use crate::rae::module::mod_rae_exec::{JobId, Job};
+use tokio::sync::mpsc::Receiver;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::thread;
 
 #[derive(Default, Debug)]
 pub struct Agenda {
@@ -66,6 +68,10 @@ impl Agenda {
 }
 
 pub struct RAEEnv {
+    pub receiver: Option<Receiver<Job>>,
+    pub agenda: Agenda,
+    pub actions_progress: ActionsProgress,
+    pub state: RAEState,
     pub env: LEnv,
     pub ctxs: ContextCollection,
 }
@@ -95,6 +101,10 @@ impl Default for RAEEnv {
             LValue::Map(Default::default()),
         );
         Self {
+            receiver: None,
+            agenda: Default::default(),
+            actions_progress: Default::default(),
+            state: Default::default(),
             env,
             ctxs: Default::default() }
     }
@@ -312,10 +322,10 @@ pub type TaskLabel = String;
 pub type TaskId = usize;
 
 //struct to handle actions trigger, status and updates by other modules as godot
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct ActionsProgress {
-    status: HashMap<ActionId, Status>,
-    next_id: usize,
+    pub status: Arc<RwLock<HashMap<ActionId, Status>>>,
+    next_id: Arc<AtomicUsize>,
 }
 
 #[derive(Clone, Debug)]
@@ -327,27 +337,29 @@ pub enum Status {
 }
 
 impl ActionsProgress {
-    pub fn get_status(&self, id: &ActionId) -> Option<&Status> {
-        self.status.get(id)
+    pub fn get_status(&self, id: &ActionId) -> Option<Status> {
+        self.status.read().unwrap().get(id).cloned()
     }
 
     pub fn add_action(&mut self) -> usize {
         let id = self.get_new_id();
-        self.status.insert(id, Status::NotTriggered);
+        self.status.write().unwrap().insert(id, Status::NotTriggered);
         id
     }
 
     pub fn update_status_action(&mut self, action_id: &ActionId, status: Status) {
-        self.status.insert(*action_id, status);
+        self.status.write().unwrap().insert(*action_id, status);
     }
 
-    pub fn get_action_status(&self, action_id: &ActionId) -> &Status {
-        self.status.get(action_id).unwrap()
+    pub fn get_action_status(&self, action_id: &ActionId) -> Status {
+        self.status.read().unwrap().get(action_id).unwrap().clone()
+
     }
 
     pub fn get_new_id(&mut self) -> usize {
-        let result = self.next_id;
-        self.next_id += 1;
+        let result = self.next_id.load(Ordering::Relaxed);
+        let new_value = result+1;
+        self.next_id.store(new_value, Ordering::Relaxed);
         result
     }
 }

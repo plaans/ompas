@@ -74,7 +74,10 @@ async fn async_read_socket(
         if !msg.is_empty() {
             let message: GodotMessageSerde = match serde_json::from_str(&msg.to_lowercase()) {
                 Ok(m) => m,
-                Err(e) => panic!("Error while casting message in GodotMessageSerde:\n msg: {}", msg),
+                Err(e) => panic!(
+                    "Error while casting message in GodotMessageSerde:\n msg: {}",
+                    msg
+                ),
             };
             match message._type {
                 GodotMessageType::StaticState | GodotMessageType::DynamicState => {

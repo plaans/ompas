@@ -1,16 +1,18 @@
-use ompas_lisp::structs::*;
-use std::sync::Arc;
-use ompas_modules::doc::{Documentation, LHelp};
 use crate::rae::context::*;
-use ompas_lisp::core::{LEnv, load_module};
+use crate::rae::module::domain::{
+    MACRO_DEF_ACTION, MACRO_DEF_METHOD, MACRO_DEF_STATE_FUNCTION, MACRO_DEF_TASK,
+};
+use crate::rae::module::mod_rae_exec::{CtxRaeExec, RAEInterface};
+use crate::rae::rae_run;
+use ompas_lisp::core::{load_module, LEnv};
 use ompas_lisp::structs::LError::*;
 use ompas_lisp::structs::LValue::Nil;
-use crate::rae::module::domain::{MACRO_DEF_STATE_FUNCTION, MACRO_DEF_TASK, MACRO_DEF_ACTION, MACRO_DEF_METHOD};
-use crate::rae::module::mod_rae_exec::{ RAEInterface, CtxRaeExec};
+use ompas_lisp::structs::*;
+use ompas_modules::doc::{Documentation, LHelp};
 use ompas_modules::math::CtxMath;
-use tokio::sync::Mutex;
 use std::mem;
-use crate::rae::rae_run;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 /*
 LANGUAGE
@@ -40,7 +42,6 @@ pub const DOC_DEF_TASK: &str = "todo!";
 pub const DOC_DEF_METHOD: &str = "todo!";
 pub const DOC_DEF_ACTION: &str = "todo!";
 
-
 #[derive(Default)]
 pub struct CtxRae {
     pub log: String,
@@ -51,12 +52,13 @@ pub struct CtxRae {
 
 impl GetModule for CtxRae {
     fn get_module(self) -> Module {
-        let mut init:InitLisp = vec![
+        let mut init: InitLisp = vec![
             MACRO_DEF_ACTION,
             MACRO_DEF_METHOD,
             MACRO_DEF_TASK,
             MACRO_DEF_STATE_FUNCTION,
-        ].into();
+        ]
+        .into();
 
         init.append(&mut self.init.clone());
 
@@ -90,10 +92,6 @@ impl Documentation for CtxRae {
         vec![]
     }
 }
-
-
-
-
 
 ///Get the methods of a given task
 pub fn get_methods(_: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
@@ -138,7 +136,6 @@ pub fn get_env(args: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LEr
 
     Ok(LValue::String(ctx.env.pretty_debug(key)))
 }
-
 
 pub fn add_state_function(
     args: &[LValue],
@@ -265,12 +262,11 @@ pub fn add_task(args: &[LValue], _env: &LEnv, ctx: &mut CtxRae) -> Result<LValue
     Ok(Nil)
 }
 
-
 /*
 launch the main in a thread
  */
 pub fn launch_rae(_: &[LValue], _env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
-    let options = SelectOption::new(0,0);
+    let options = SelectOption::new(0, 0);
     let mut rae_env = RAEEnv::default();
     rae_env.env = ctx.env.env.clone();
     let context = mem::replace(&mut ctx.env, rae_env);

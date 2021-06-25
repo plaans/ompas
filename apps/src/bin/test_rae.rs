@@ -1,4 +1,4 @@
-use ompas_lisp::core::{LEnv, ContextCollection, load_module};
+use ompas_lisp::core::{load_module, ContextCollection, LEnv};
 use ompas_lisp::structs::InitLisp;
 use ompas_modules::math::CtxMath;
 
@@ -17,5 +17,4 @@ async fn main() {
         let mut init_lisp = InitLisp::default();
         load_module(&mut env, &mut ctxs, ctx_math, &mut init_lisp)
     });
-
 }

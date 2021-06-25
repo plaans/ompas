@@ -1,17 +1,19 @@
-use ompas_lisp::structs::*;
-use std::sync::Arc;
-use crate::rae::context::{Status, Agenda, ActionsProgress, SelectOption, ActionId, RAE_STATE_FUNCTION_LIST};
+use crate::rae::context::{
+    ActionId, ActionsProgress, Agenda, SelectOption, Status, RAE_STATE_FUNCTION_LIST,
+};
 use crate::rae::state::RAEState;
-use std::fmt::{Display, Formatter};
-use tokio::sync::mpsc::{Sender, Receiver};
 use ompas_lisp::core::LEnv;
 use ompas_lisp::functions::union_map;
 use ompas_lisp::structs::LError::*;
-use tokio::sync::Mutex;
 use ompas_lisp::structs::LValue::*;
+use ompas_lisp::structs::*;
 use ompas_modules::doc::{Documentation, LHelp};
 use std::any::Any;
+use std::fmt::{Display, Formatter};
+use std::sync::Arc;
 use std::thread;
+use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::Mutex;
 
 /*
 LANGUAGE
@@ -21,19 +23,18 @@ LANGUAGE
 pub const RAE_ASSERT: &str = "assert";
 pub const RAE_ASSERT_SHORT: &str = "+>";
 pub const RAE_RETRACT: &str = "retract";
-pub const RAE_RETRACT_SHORT: &str ="->";
-pub const RAE_DO: &str ="rae-do";
+pub const RAE_RETRACT_SHORT: &str = "->";
+pub const RAE_DO: &str = "rae-do";
 
 //RAE Interface with a platform
 pub const RAE_EXEC_COMMAND: &str = "rae-exec-command";
 pub const RAE_GET_STATE: &str = "rae-get-state";
 pub const RAE_GET_STATE_VARIBALE: &str = "rae-get-state-variable";
 pub const RAE_LAUNCH_PLATFORM: &str = "rae-launch-platform";
-pub const RAE_OPEN_COM_PLATFORM: &str ="rae-open-com-platform";
+pub const RAE_OPEN_COM_PLATFORM: &str = "rae-open-com-platform";
 pub const RAE_START_PLATFORM: &str = "rae-start-platform";
 pub const RAE_GET_STATUS: &str = "rae-get-status";
 pub const RAE_CANCEL_COMMAND: &str = "rae-cancel-command";
-
 
 ///Context that will contains primitives for the RAE executive
 pub struct CtxRaeExec {
@@ -48,7 +49,7 @@ impl Default for CtxRaeExec {
         Self {
             actions_progress: Default::default(),
             state: Default::default(),
-            platform_interface: Box::new(())
+            platform_interface: Box::new(()),
         }
     }
 }
@@ -59,7 +60,7 @@ impl GetModule for CtxRaeExec {
             ctx: Arc::new(self),
             prelude: vec![],
             raw_lisp: Default::default(),
-            label: ""
+            label: "",
         };
 
         module.add_fn_prelude(RAE_GET_STATE, get_state);
@@ -80,7 +81,6 @@ impl GetModule for CtxRaeExec {
     }
 }
 
-
 impl CtxRaeExec {
     pub fn get_execution_status(&self, action_id: &ActionId) -> Option<Status> {
         self.actions_progress.get_status(&action_id)
@@ -98,16 +98,13 @@ impl Documentation for CtxRaeExec {
 }
 
 pub struct JobStream {
-    sender : Sender<Job>,
+    sender: Sender<Job>,
     receiver: Receiver<Job>,
 }
 
 impl JobStream {
-    pub fn new(sender: Sender<Job>, receiver: Receiver<Job>) -> Self{
-        Self {
-            sender,
-            receiver
-        }
+    pub fn new(sender: Sender<Job>, receiver: Receiver<Job>) -> Self {
+        Self { sender, receiver }
     }
 
     pub fn get_sender(&self) -> Sender<Job> {
@@ -132,10 +129,10 @@ impl Display for Job {
 }
 
 impl Job {
-    pub fn new(value: LValue, _type: JobType)-> Self {
+    pub fn new(value: LValue, _type: JobType) -> Self {
         Self {
             _type,
-            core: value.into()
+            core: value.into(),
         }
     }
 }
@@ -156,8 +153,7 @@ impl Display for JobType {
 }
 pub type JobId = usize;
 
-
-pub trait RAEInterface: Any+Send+Sync {
+pub trait RAEInterface: Any + Send + Sync {
     ///Execute a command on the platform
     fn exec_command(&self, args: &[LValue], command_id: usize) -> Result<LValue, LError>;
 
@@ -231,7 +227,6 @@ impl RAEInterface for () {
     }
 }
 
-
 pub fn exec_command(args: &[LValue], _env: &LEnv, ctx: &mut CtxRaeExec) -> Result<LValue, LError> {
     let command_id = ctx.actions_progress.get_new_id();
     ctx.platform_interface.exec_command(args, command_id)?;
@@ -241,7 +236,7 @@ pub fn exec_command(args: &[LValue], _env: &LEnv, ctx: &mut CtxRaeExec) -> Resul
 ///Retract a fact to state
 pub fn retract_fact(args: &[LValue], _env: &LEnv, ctx: &mut CtxRaeExec) -> Result<LValue, LError> {
     if args.len() != 2 {
-        return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2))
+        return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
     }
     let key = args[0].clone().into();
     let value = args[1].clone().into();
@@ -251,7 +246,7 @@ pub fn retract_fact(args: &[LValue], _env: &LEnv, ctx: &mut CtxRaeExec) -> Resul
 ///Add a fact to fact state
 pub fn assert_fact(args: &[LValue], _env: &LEnv, ctx: &mut CtxRaeExec) -> Result<LValue, LError> {
     if args.len() != 2 {
-        return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2))
+        return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
     }
     let key = args[0].clone().into();
     let value = args[1].clone().into();
@@ -261,13 +256,11 @@ pub fn assert_fact(args: &[LValue], _env: &LEnv, ctx: &mut CtxRaeExec) -> Result
     Ok(Nil)
 }
 
-
-
 ///Monitor the status of an action that has been triggered
 /// Return true if the action is a success, false otherwise
 pub fn fn_do(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
     if args.len() != 1 {
-        return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1))
+        return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1));
     }
 
     let action_id = &args[0];
@@ -284,19 +277,22 @@ pub fn fn_do(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, L
                 }
                 Status::Failure => {
                     println!("command is a failure");
-                    return Ok(false.into())
+                    return Ok(false.into());
                 }
                 Status::Done => {
                     println!("command is a success");
-                    return Ok(true.into())
+                    return Ok(true.into());
                 }
             }
         }
-    }else {
-        return Err(WrongType(action_id.clone(), action_id.into(), NameTypeLValue::Usize))
+    } else {
+        return Err(WrongType(
+            action_id.clone(),
+            action_id.into(),
+            NameTypeLValue::Usize,
+        ));
     }
 }
-
 
 pub fn launch_platform(
     args: &[LValue],
@@ -309,24 +305,26 @@ pub fn launch_platform(
 pub fn start_platform(
     args: &[LValue],
     _env: &LEnv,
-    ctx: &mut CtxRaeExec,) -> Result<LValue, LError> {
+    ctx: &mut CtxRaeExec,
+) -> Result<LValue, LError> {
     ctx.platform_interface.start_platform(args)
 }
 
-pub fn open_com(args: &[LValue],
-_env: &LEnv,
-ctx: &mut CtxRaeExec,) -> Result<LValue, LError> {
+pub fn open_com(args: &[LValue], _env: &LEnv, ctx: &mut CtxRaeExec) -> Result<LValue, LError> {
     ctx.platform_interface.open_com(args)
 }
 
-
 pub fn get_state(args: &[LValue], env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
     let platform_state = ctx.platform_interface.get_state(args).unwrap();
-    let state= ctx.state.get_state().into_map();
+    let state = ctx.state.get_state().into_map();
     union_map(&[platform_state, state], env, &())
 }
 
-pub fn get_state_variable(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
+pub fn get_state_variable(
+    args: &[LValue],
+    _env: &LEnv,
+    ctx: &CtxRaeExec,
+) -> Result<LValue, LError> {
     ctx.platform_interface.get_state_variable(args)
 }
 

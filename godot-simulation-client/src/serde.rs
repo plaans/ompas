@@ -157,8 +157,8 @@ impl TryFrom<GodotMessageSerde> for (usize, ActionStatus) {
     type Error = LError;
 
     fn try_from(value: GodotMessageSerde) -> Result<Self, Self::Error> {
-        let mut id=0;
-        let mut status: ActionStatus=ActionStatus::ActionPending;
+        let mut id = 0;
+        let mut status: ActionStatus = ActionStatus::ActionPending;
 
         match value._type {
             GodotMessageType::ActionResponse => {

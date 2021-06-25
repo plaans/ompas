@@ -173,10 +173,10 @@ pub fn union_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if let LValue::Map(map1) = map1.clone() {
         if let LValue::Map(map2) = map2.clone() {
             Ok(map1.union(map2).into())
-        }else {
+        } else {
             Err(WrongType(map2.clone(), map2.into(), NameTypeLValue::Map))
         }
-    }else {
+    } else {
         Err(WrongType(map1.clone(), map1.into(), NameTypeLValue::Map))
     }
 }

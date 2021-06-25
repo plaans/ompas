@@ -2,6 +2,8 @@ use crate::rae_domain::GODOT_DOMAIN;
 use crate::serde::*;
 use crate::state::*;
 use crate::tcp::*;
+use ompas_acting::rae::context::Status;
+use ompas_acting::rae::module::mod_rae_exec::RAEInterface;
 use ompas_acting::rae::state::{ActionStatus, ActionStatusSet, StateType};
 use ompas_lisp::core::LEnv;
 use ompas_lisp::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
@@ -14,8 +16,6 @@ use std::sync::Arc;
 use std::{thread, time};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{mpsc, Mutex};
-use ompas_acting::rae::context::Status;
-use ompas_acting::rae::module::mod_rae_exec::RAEInterface;
 
 /*
 LANGUAGE
@@ -27,7 +27,7 @@ const MOD_GODOT: &str = "mod-godot";
 
 const OPEN_COM: &str = "open-com-godot";
 const START_GODOT: &str = "start-godot";
-const LAUNCH_GODOT: &str ="launch-godot";
+const LAUNCH_GODOT: &str = "launch-godot";
 const EXEC_GODOT: &str = "exec-godot";
 
 //State variables
@@ -333,7 +333,6 @@ impl CtxGodot {
 
 impl RAEInterface for CtxGodot {
     fn exec_command(&self, args: &[LValue], command_id: usize) -> Result<LValue, LError> {
-
         //println!("in exec command godot");
 
         let gs = GodotMessageSerde {
@@ -494,7 +493,6 @@ impl RAEInterface for CtxGodot {
     }
 
     fn launch_platform(&mut self, args: &[LValue]) -> Result<LValue, LError> {
-
         self.start_platform(&[])?;
         thread::sleep(time::Duration::from_millis(500));
         self.open_com(args)

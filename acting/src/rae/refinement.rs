@@ -1,7 +1,7 @@
 use crate::rae::context::Status;
+use crate::rae::module::mod_rae_exec::{Job, JobId};
 use crate::rae::Lisp;
 use std::collections::VecDeque;
-use crate::rae::module::mod_rae_exec::{Job, JobId};
 
 #[derive(Debug, Clone)]
 pub struct Assignment {

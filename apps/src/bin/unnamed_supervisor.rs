@@ -8,15 +8,15 @@ use ompas_modules::io::{CtxIo, TOKIO_CHANNEL_SIZE};
 use ompas_modules::math::CtxMath;
 //use ompas_modules::robot::CtxRobot;
 use ompas_acting::controller::dumber::CtxDumber;
+use ompas_acting::rae::module::init_ctx_rae;
+use ompas_acting::rae::module::mod_rae::CtxRae;
+use ompas_acting::rae::module::mod_rae_exec::CtxRaeExec;
+use ompas_acting::rae::module::mod_rae_monitor::CtxRaeMonitor;
 use ompas_godot_simulation_client::simu::CtxGodot;
 use std::path::PathBuf;
 use structopt::StructOpt;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Receiver, Sender};
-use ompas_acting::rae::module::mod_rae::CtxRae;
-use ompas_acting::rae::module::init_ctx_rae;
-use ompas_acting::rae::module::mod_rae_monitor::{CtxRaeMonitor};
-use ompas_acting::rae::module::mod_rae_exec::CtxRaeExec;
 
 pub const CHANNEL_SIZE: usize = 16_384;
 

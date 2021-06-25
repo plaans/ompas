@@ -5,8 +5,8 @@ use ompas_lisp::structs::*;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::PathBuf;
-use tokio::sync::mpsc::Sender;
 use std::sync::Arc;
+use tokio::sync::mpsc::Sender;
 /*
 LANGUAGE
  */
@@ -300,12 +300,12 @@ pub mod repl {
             .expect("error creating log file");
 
         loop {
-            let buffer = match receiver.recv().await{
+            let buffer = match receiver.recv().await {
                 None => {
                     eprintln!("log task stopped working");
                     break;
                 }
-                Some(b) => b
+                Some(b) => b,
             };
             file.write_all(format!("{}\n", buffer).as_bytes())
                 .expect("could not write to log file");
@@ -342,7 +342,7 @@ pub mod repl {
                             eprintln!("repl task stopped working");
                             break;
                         }
-                        Some(b) => b
+                        Some(b) => b,
                     };
                     if buffer != NIL {
                         println!("LI>> {}", buffer);

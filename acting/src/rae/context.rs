@@ -1,16 +1,16 @@
+use crate::rae::module::mod_rae_exec::{Job, JobId};
 use crate::rae::refinement::{RefinementStack, StackFrame};
 use crate::rae::state::{ActionStatus, LState, RAEState};
-use ompas_lisp::core::{LEnv, ContextCollection};
+use ompas_lisp::core::{ContextCollection, LEnv};
 use ompas_lisp::structs::LError::SpecialError;
 use ompas_lisp::structs::{LError, LFn, LLambda, LValue};
 use std::collections::{HashMap, VecDeque};
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{Display, Formatter};
-use std::sync::{Arc, RwLock};
-use crate::rae::module::mod_rae_exec::{JobId, Job};
-use tokio::sync::mpsc::Receiver;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, RwLock};
 use std::thread;
+use tokio::sync::mpsc::Receiver;
 
 #[derive(Default, Debug)]
 pub struct Agenda {
@@ -84,7 +84,7 @@ pub const RAE_STATE_FUNCTION_LIST: &str = "rae-state-function-list";
 pub const RAE_SYMBOL_TYPE: &str = "rae-symbol-type";
 pub const ACTION_TYPE: &str = "action_type";
 pub const TASK_TYPE: &str = "task_type";
-pub const METHOD_TYPE:&str = "method_type";
+pub const METHOD_TYPE: &str = "method_type";
 pub const STATE_FUNCTION_TYPE: &str = "state_function_type";
 //pub const RAE_MAP_TYPE:&str = "rae-map-type";
 
@@ -106,7 +106,8 @@ impl Default for RAEEnv {
             actions_progress: Default::default(),
             state: Default::default(),
             env,
-            ctxs: Default::default() }
+            ctxs: Default::default(),
+        }
     }
 }
 
@@ -123,8 +124,13 @@ impl RAEEnv {
 
         let symbol_type = self.env.get_symbol(RAE_SYMBOL_TYPE).unwrap();
         if let LValue::Map(mut map) = symbol_type {
-            map.insert(LValue::Symbol(label),LValue::Symbol(ACTION_TYPE.to_string()));
-            self.env.set(RAE_SYMBOL_TYPE.to_string(), map.into()).expect("map of symbol type should be already defined in environment")
+            map.insert(
+                LValue::Symbol(label),
+                LValue::Symbol(ACTION_TYPE.to_string()),
+            );
+            self.env
+                .set(RAE_SYMBOL_TYPE.to_string(), map.into())
+                .expect("map of symbol type should be already defined in environment")
         }
         Ok(())
     }
@@ -141,8 +147,13 @@ impl RAEEnv {
 
         let symbol_type = self.env.get_symbol(RAE_SYMBOL_TYPE).unwrap();
         if let LValue::Map(mut map) = symbol_type {
-            map.insert(LValue::Symbol(label),LValue::Symbol(STATE_FUNCTION_TYPE.to_string()));
-            self.env.set(RAE_SYMBOL_TYPE.to_string(), map.into()).expect("map of symbol type should be already defined in environment")
+            map.insert(
+                LValue::Symbol(label),
+                LValue::Symbol(STATE_FUNCTION_TYPE.to_string()),
+            );
+            self.env
+                .set(RAE_SYMBOL_TYPE.to_string(), map.into())
+                .expect("map of symbol type should be already defined in environment")
         }
         Ok(())
     }
@@ -163,13 +174,14 @@ impl RAEEnv {
             .unwrap();
         map.insert(LValue::Symbol(label.clone()), LValue::Nil);
 
-        self.env
-            .set(RAE_TASK_METHODS_MAP.to_string(), map.into())?;
+        self.env.set(RAE_TASK_METHODS_MAP.to_string(), map.into())?;
 
         let symbol_type = self.env.get_symbol(RAE_SYMBOL_TYPE).unwrap();
         if let LValue::Map(mut map) = symbol_type {
-            map.insert(LValue::Symbol(label),LValue::Symbol(TASK_TYPE.to_string()));
-            self.env.set(RAE_SYMBOL_TYPE.to_string(), map.into()).expect("map of symbol type should be already defined in environment")
+            map.insert(LValue::Symbol(label), LValue::Symbol(TASK_TYPE.to_string()));
+            self.env
+                .set(RAE_SYMBOL_TYPE.to_string(), map.into())
+                .expect("map of symbol type should be already defined in environment")
         }
         Ok(())
     }
@@ -191,11 +203,15 @@ impl RAEEnv {
             self.add_method_to_task(task_label, method_label.clone())?;
             let symbol_type = self.env.get_symbol(RAE_SYMBOL_TYPE).unwrap();
             if let LValue::Map(mut map) = symbol_type {
-                map.insert(LValue::Symbol(method_label),LValue::Symbol(METHOD_TYPE.to_string()));
-                self.env.set(RAE_SYMBOL_TYPE.to_string(), map.into()).expect("map of symbol type should be already defined in environment")
+                map.insert(
+                    LValue::Symbol(method_label),
+                    LValue::Symbol(METHOD_TYPE.to_string()),
+                );
+                self.env
+                    .set(RAE_SYMBOL_TYPE.to_string(), map.into())
+                    .expect("map of symbol type should be already defined in environment")
             }
         }
-
 
         Ok(())
     }
@@ -313,7 +329,6 @@ impl RAEEnv {
     }
 }
 
-
 pub type ActionLabel = String;
 pub type ActionId = usize;
 pub type MethodLabel = String;
@@ -343,7 +358,10 @@ impl ActionsProgress {
 
     pub fn add_action(&mut self) -> usize {
         let id = self.get_new_id();
-        self.status.write().unwrap().insert(id, Status::NotTriggered);
+        self.status
+            .write()
+            .unwrap()
+            .insert(id, Status::NotTriggered);
         id
     }
 
@@ -353,12 +371,11 @@ impl ActionsProgress {
 
     pub fn get_action_status(&self, action_id: &ActionId) -> Status {
         self.status.read().unwrap().get(action_id).unwrap().clone()
-
     }
 
     pub fn get_new_id(&mut self) -> usize {
         let result = self.next_id.load(Ordering::Relaxed);
-        let new_value = result+1;
+        let new_value = result + 1;
         self.next_id.store(new_value, Ordering::Relaxed);
         result
     }

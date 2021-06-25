@@ -3,19 +3,19 @@
 use std::sync::Arc;
 
 use async_recursion::async_recursion;
-use tokio::sync::{mpsc, Mutex};
 use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::{mpsc, Mutex};
 use tokio_stream::StreamExt;
 
-use crate::rae::context::{SelectOption, RAEEnv};
+use crate::rae::context::{RAEEnv, SelectOption};
 //use crate::rae::context::{Action, Method, SelectOption, Status, TaskId};
 use crate::rae::log::RAEStatus;
 
 pub mod context;
 pub mod log;
+pub mod module;
 pub mod refinement;
 pub mod state;
-pub mod module;
 
 pub type Lisp = String;
 
@@ -26,13 +26,11 @@ pub enum RAEError {
 
 pub const TOKIO_CHANNEL_SIZE: usize = 65_536; //=2^16
 
-
 pub async fn rae_run(mut context: RAEEnv, select_option: &SelectOption, log: String) {
-
     println!("in rae run!");
-//infinite loop
-//Maybe we can add a system to interrupt, or it stops itself when there is nothing to process
-//We can imagine a system monitoring the stream.
+    //infinite loop
+    //Maybe we can add a system to interrupt, or it stops itself when there is nothing to process
+    //We can imagine a system monitoring the stream.
 
     let mut receiver = context.receiver.unwrap();
     loop {
@@ -56,7 +54,7 @@ pub async fn rae_run(mut context: RAEEnv, select_option: &SelectOption, log: Str
         });*/
     }
 }
-    /*
+/*
       let job_id = &context.agenda.add_job(job);
       //let state = get_state().await;
       let m = select(state, job_id, &context.agenda.get_stack(job_id).unwrap(), &context.options.select_option).await;

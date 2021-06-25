@@ -11,7 +11,7 @@ use aries_planning::parsing::sexpr::SExpr;
 use im::hashmap::HashMap;
 use std::any::Any;
 use std::convert::{TryFrom, TryInto};
-use std::ops::{Deref};
+use std::ops::Deref;
 use std::sync::Arc;
 
 #[derive(Clone, Debug)]
@@ -30,7 +30,7 @@ impl LEnv {
 
 #[derive(Clone)]
 pub struct ContextCollection {
-    inner: Vec<Arc<dyn Any+Send+Sync>>,
+    inner: Vec<Arc<dyn Any + Send + Sync>>,
     map_label_usize: HashMap<&'static str, usize>,
 }
 
@@ -44,12 +44,12 @@ impl Default for ContextCollection {
 }
 
 impl ContextCollection {
-    pub fn insert(&mut self, ctx: Arc<dyn Any+Send+Sync>) -> usize {
+    pub fn insert(&mut self, ctx: Arc<dyn Any + Send + Sync>) -> usize {
         self.inner.push(ctx);
         self.inner.len() - 1
     }
 
-    pub fn get_context(&self, id: usize) -> &(dyn Any+Send+Sync) {
+    pub fn get_context(&self, id: usize) -> &(dyn Any + Send + Sync) {
         self.inner.get(id).unwrap().deref()
     }
     pub fn get_context_with_label(&self, label: &str) -> &dyn Any {
@@ -61,7 +61,7 @@ impl ContextCollection {
         self.get_context(id)
     }
 
-    pub fn get_mut_context(&mut self, id: usize) -> &mut (dyn Any+Send+Sync) {
+    pub fn get_mut_context(&mut self, id: usize) -> &mut (dyn Any + Send + Sync) {
         let ctx = self.inner.get_mut(id).unwrap();
         let ctx = Arc::get_mut(ctx).unwrap();
         ctx
@@ -581,7 +581,7 @@ pub fn expand(
                             expand(&expanded, top_level, env, ctxs);*/
                             expand(&expand_quasi_quote(&list[1], env)?, top_level, env, ctxs)
                             //Ok(expanded)
-                        }
+                        };
                     }
                     LCoreOperator::UnQuote => {
                         //TODO: Implémenter msg d'erreur
@@ -780,8 +780,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                                 Ok(r_lvalue)
                             }
                             Some(u) => {
-                                let r_lvalue =
-                                    fun.call(&args, &env, ctxs.get_mut_context(u))?;
+                                let r_lvalue = fun.call(&args, &env, ctxs.get_mut_context(u))?;
                                 //println!("=> {}", r_lvalue);
                                 Ok(r_lvalue)
                             }

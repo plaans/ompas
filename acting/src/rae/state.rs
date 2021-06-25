@@ -1,11 +1,11 @@
+use crate::rae::context::Status;
 use crate::rae::refinement::Assignment;
 use im::HashMap;
-use ompas_lisp::structs::{LValue, LValueS, LError};
+use ompas_lisp::structs::LError::SpecialError;
+use ompas_lisp::structs::{LError, LValue, LValueS};
 use std::fmt::{Display, Formatter};
 use std::ptr::write_bytes;
-use ompas_lisp::structs::LError::SpecialError;
-use crate::rae::context::Status;
-use std::sync::{RwLock, Arc};
+use std::sync::{Arc, RwLock};
 
 #[derive(Clone, Debug)]
 pub enum StateType {
@@ -94,7 +94,13 @@ pub struct RAEState {
 
 impl RAEState {
     pub fn get_state(&self) -> LState {
-        self.inner_world.read().unwrap().union(&self._static.read().unwrap().union(&self.dynamic.read().unwrap()))
+        self.inner_world.read().unwrap().union(
+            &self
+                ._static
+                .read()
+                .unwrap()
+                .union(&self.dynamic.read().unwrap()),
+        )
     }
 
     pub fn add_fact(&mut self, key: LValueS, value: LValueS) {
@@ -105,11 +111,13 @@ impl RAEState {
         let old_value = self.inner_world.read().unwrap().get(&key).cloned();
         match old_value {
             None => Err(SpecialError("key is not in state".to_string())),
-            Some(old_value) => if old_value == value {
-                self.inner_world.write().unwrap().remove(&key);
-                Ok(LValue::Nil)
-            }else {
-                Err(SpecialError("there is no such fact in state".to_string()))
+            Some(old_value) => {
+                if old_value == value {
+                    self.inner_world.write().unwrap().remove(&key);
+                    Ok(LValue::Nil)
+                } else {
+                    Err(SpecialError("there is no such fact in state".to_string()))
+                }
             }
         }
     }
@@ -134,12 +142,12 @@ impl From<ActionStatus> for Status {
             ActionStatus::ActionResult(b) => match b {
                 true => Status::Done,
                 false => Status::Failure,
-            }
+            },
             ActionStatus::ActionPreempt => Status::Running,
             ActionStatus::ActionCancel(b) => match b {
                 true => Status::Done,
                 false => Status::Failure,
-            }
+            },
         }
     }
 }

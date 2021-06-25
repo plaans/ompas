@@ -74,8 +74,8 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     let ctx_counter = CtxCounter::default();
     let ctx_dumber = CtxDumber::default();
     let ctx_godot = CtxGodot::default();
-    //let ctx_godot_2 = CtxGodot::default();
-    //let (mut ctx_rae, mut ctx_rae_monitor) = init_ctx_rae(Box::new(_ctx_godot_2));
+    let ctx_godot_2 = CtxGodot::default();
+    let (mut ctx_rae, mut ctx_rae_monitor) = init_ctx_rae(Box::new(ctx_godot_2));
     //Insert the doc for the different contexts.
     ctx_doc.insert_doc(CtxIo::documentation());
     ctx_doc.insert_doc(CtxMath::documentation());
@@ -103,8 +103,8 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     load_module(&mut root_env, &mut ctxs, ctx_type, &mut lisp_init);
     load_module(&mut root_env, &mut ctxs, ctx_counter, &mut lisp_init);
     load_module(&mut root_env, &mut ctxs, ctx_godot, &mut lisp_init);
-    //load_module(&mut root_env, &mut ctxs, ctx_rae, &mut lisp_init);
-    //load_module(&mut root_env, &mut ctxs, ctx_rae_monitor, &mut lisp_init);
+    load_module(&mut root_env, &mut ctxs, ctx_rae, &mut lisp_init);
+    load_module(&mut root_env, &mut ctxs, ctx_rae_monitor, &mut lisp_init);
     load_module(&mut root_env, &mut ctxs, ctx_rae_exec, &mut lisp_init);
     let env = &mut root_env.clone();
     //println!("{}", lisp_init.begin_lisp());

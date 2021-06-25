@@ -300,7 +300,13 @@ pub mod repl {
             .expect("error creating log file");
 
         loop {
-            let buffer = receiver.recv().await.expect("error receiving");
+            let buffer = match receiver.recv().await{
+                None => {
+                    eprintln!("log task stopped working");
+                    break;
+                }
+                Some(b) => b
+            };
             file.write_all(format!("{}\n", buffer).as_bytes())
                 .expect("could not write to log file");
         }
@@ -331,7 +337,13 @@ pub mod repl {
                         .send(format!("repl:{}", string))
                         .await
                         .expect("couldn't send lisp command");
-                    let buffer = receiver.recv().await.expect("error receiving");
+                    let buffer = match receiver.recv().await {
+                        None => {
+                            eprintln!("repl task stopped working");
+                            break;
+                        }
+                        Some(b) => b
+                    };
                     if buffer != NIL {
                         println!("LI>> {}", buffer);
                     }

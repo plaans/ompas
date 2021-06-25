@@ -80,6 +80,7 @@ pub struct SerdeRobotCommand {
 pub struct SerdeActionResponse {
     pub temp_id: usize,
     pub action_id: usize,
+    //TODO: take in account case when command is refused (ie action_id = -1)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -156,8 +157,8 @@ impl TryFrom<GodotMessageSerde> for (usize, ActionStatus) {
     type Error = LError;
 
     fn try_from(value: GodotMessageSerde) -> Result<Self, Self::Error> {
-        let id;
-        let status: ActionStatus;
+        let mut id=0;
+        let mut status: ActionStatus=ActionStatus::ActionPending;
 
         match value._type {
             GodotMessageType::ActionResponse => {

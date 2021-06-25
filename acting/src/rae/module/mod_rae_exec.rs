@@ -1,6 +1,7 @@
 use crate::rae::context::{
     ActionId, ActionsProgress, Agenda, SelectOption, Status, RAE_STATE_FUNCTION_LIST,
 };
+use crate::rae::module::domain::*;
 use crate::rae::state::RAEState;
 use ompas_lisp::core::LEnv;
 use ompas_lisp::functions::union_map;
@@ -56,24 +57,31 @@ impl Default for CtxRaeExec {
 
 impl GetModule for CtxRaeExec {
     fn get_module(self) -> Module {
+        let mut init: InitLisp = vec![
+            MACRO_GENERATE_ACTION,
+            MACRO_GENERATE_METHOD,
+            MACRO_GENERATE_TASK,
+            MACRO_GENERATE_STATE_FUNCTION,
+        ]
+        .into();
         let mut module = Module {
             ctx: Arc::new(self),
             prelude: vec![],
-            raw_lisp: Default::default(),
+            raw_lisp: init,
             label: "",
         };
 
         module.add_fn_prelude(RAE_GET_STATE, get_state);
         module.add_fn_prelude(RAE_GET_STATE_VARIBALE, get_state_variable);
-        module.add_mut_fn_prelude(RAE_EXEC_COMMAND, exec_command);
+        module.add_fn_prelude(RAE_EXEC_COMMAND, exec_command);
         module.add_mut_fn_prelude(RAE_LAUNCH_PLATFORM, launch_platform);
         module.add_fn_prelude(RAE_GET_STATUS, get_status);
         module.add_fn_prelude(RAE_CANCEL_COMMAND, cancel_command);
         //Manage facts:
-        module.add_mut_fn_prelude(RAE_ASSERT, assert_fact);
-        module.add_mut_fn_prelude(RAE_ASSERT_SHORT, assert_fact);
-        module.add_mut_fn_prelude(RAE_RETRACT, retract_fact);
-        module.add_mut_fn_prelude(RAE_RETRACT_SHORT, retract_fact);
+        module.add_fn_prelude(RAE_ASSERT, assert_fact);
+        module.add_fn_prelude(RAE_ASSERT_SHORT, assert_fact);
+        module.add_fn_prelude(RAE_RETRACT, retract_fact);
+        module.add_fn_prelude(RAE_RETRACT_SHORT, retract_fact);
         module.add_fn_prelude(RAE_DO, fn_do);
         module.add_mut_fn_prelude(RAE_OPEN_COM_PLATFORM, open_com);
         module.add_mut_fn_prelude(RAE_START_PLATFORM, start_platform);
@@ -118,8 +126,8 @@ impl JobStream {
 
 #[derive(Debug, Clone)]
 pub struct Job {
-    _type: JobType,
-    core: LValueS,
+    pub _type: JobType,
+    pub core: LValue,
 }
 
 impl Display for Job {
@@ -227,14 +235,16 @@ impl RAEInterface for () {
     }
 }
 
-pub fn exec_command(args: &[LValue], _env: &LEnv, ctx: &mut CtxRaeExec) -> Result<LValue, LError> {
+pub fn exec_command(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
     let command_id = ctx.actions_progress.get_new_id();
+    let debug : LValue = args.into();
+    println!("exec command {}: {}", command_id, debug);
     ctx.platform_interface.exec_command(args, command_id)?;
     Ok(command_id.into())
 }
 
 ///Retract a fact to state
-pub fn retract_fact(args: &[LValue], _env: &LEnv, ctx: &mut CtxRaeExec) -> Result<LValue, LError> {
+pub fn retract_fact(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
     }
@@ -244,7 +254,7 @@ pub fn retract_fact(args: &[LValue], _env: &LEnv, ctx: &mut CtxRaeExec) -> Resul
 }
 
 ///Add a fact to fact state
-pub fn assert_fact(args: &[LValue], _env: &LEnv, ctx: &mut CtxRaeExec) -> Result<LValue, LError> {
+pub fn assert_fact(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
     }
@@ -264,6 +274,7 @@ pub fn fn_do(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, L
     }
 
     let action_id = &args[0];
+    println!("monitor {}", action_id);
 
     if let LValue::Number(LNumber::Usize(action_id)) = action_id {
         loop {

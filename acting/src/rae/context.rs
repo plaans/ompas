@@ -3,10 +3,11 @@ use crate::rae::refinement::{RefinementStack, StackFrame};
 use crate::rae::state::{ActionStatus, LState, RAEState};
 use ompas_lisp::core::{ContextCollection, LEnv};
 use ompas_lisp::structs::LError::SpecialError;
-use ompas_lisp::structs::{LError, LFn, LLambda, LValue};
+use ompas_lisp::structs::{InitLisp, LError, LFn, LLambda, LValue};
 use std::collections::{HashMap, VecDeque};
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{Display, Formatter};
+use std::panic::panic_any;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, RwLock};
 use std::thread;
@@ -36,7 +37,6 @@ impl Agenda {
         inner.push_front(StackFrame {
             job_id: id,
             method: None,
-            step: 1,
             tried: vec![],
         });
         self.stacks.insert(id, RefinementStack { job, inner });
@@ -74,6 +74,7 @@ pub struct RAEEnv {
     pub state: RAEState,
     pub env: LEnv,
     pub ctxs: ContextCollection,
+    pub init_lisp: InitLisp,
 }
 
 pub const RAE_TASK_METHODS_MAP: &str = "rae-task-methods-map";
@@ -90,7 +91,7 @@ pub const STATE_FUNCTION_TYPE: &str = "state_function_type";
 
 impl Default for RAEEnv {
     fn default() -> Self {
-        let mut env = LEnv::empty();
+        let (mut env, mut ctxs, init_lisp) = LEnv::root();
         env.insert(RAE_ACTION_LIST.to_string(), LValue::List(vec![]));
         env.insert(RAE_METHOD_LIST.to_string(), LValue::List(vec![]));
         env.insert(RAE_TASK_LIST.to_string(), LValue::List(vec![]));
@@ -106,7 +107,8 @@ impl Default for RAEEnv {
             actions_progress: Default::default(),
             state: Default::default(),
             env,
-            ctxs: Default::default(),
+            ctxs,
+            init_lisp,
         }
     }
 }
@@ -265,6 +267,16 @@ impl RAEEnv {
         Ok(())
     }
 
+    pub fn get_methods_from_task(&self, task: &LValue) -> LValue {
+        let task_method_map = self.env.get_ref_symbol(RAE_TASK_METHODS_MAP).unwrap();
+        if let LValue::Map(map) = task_method_map {
+            let methods = map.get(task).unwrap().clone();
+            methods
+        } else {
+            panic!("this should be a LValue::Map")
+        }
+    }
+
     pub fn get_element(&self, label: &str) -> Option<LValue> {
         self.env.get_symbol(label)
     }
@@ -356,7 +368,7 @@ impl ActionsProgress {
         self.status.read().unwrap().get(id).cloned()
     }
 
-    pub fn add_action(&mut self) -> usize {
+    pub fn add_action(&self) -> usize {
         let id = self.get_new_id();
         self.status
             .write()
@@ -365,7 +377,7 @@ impl ActionsProgress {
         id
     }
 
-    pub fn update_status_action(&mut self, action_id: &ActionId, status: Status) {
+    pub fn update_status_action(&self, action_id: &ActionId, status: Status) {
         self.status.write().unwrap().insert(*action_id, status);
     }
 
@@ -373,7 +385,7 @@ impl ActionsProgress {
         self.status.read().unwrap().get(action_id).unwrap().clone()
     }
 
-    pub fn get_new_id(&mut self) -> usize {
+    pub fn get_new_id(&self) -> usize {
         let result = self.next_id.load(Ordering::Relaxed);
         let new_value = result + 1;
         self.next_id.store(new_value, Ordering::Relaxed);

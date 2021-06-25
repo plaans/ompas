@@ -105,7 +105,7 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     load_module(&mut root_env, &mut ctxs, ctx_godot, &mut lisp_init);
     load_module(&mut root_env, &mut ctxs, ctx_rae, &mut lisp_init);
     load_module(&mut root_env, &mut ctxs, ctx_rae_monitor, &mut lisp_init);
-    load_module(&mut root_env, &mut ctxs, ctx_rae_exec, &mut lisp_init);
+    //load_module(&mut root_env, &mut ctxs, ctx_rae_exec, &mut lisp_init);
     let env = &mut root_env.clone();
     //println!("{}", lisp_init.begin_lisp());
 
@@ -115,6 +115,8 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
             .await
             .expect("error while sending message");
     }
+
+    //println!("global ctxs: {}", ctxs);
 
     loop {
         //TODO: handle response to multi user.

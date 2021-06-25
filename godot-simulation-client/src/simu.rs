@@ -345,7 +345,8 @@ impl RAEInterface for CtxGodot {
 
         let handle = tokio::runtime::Handle::current();
         let status = self.action_status.clone();
-        thread::spawn(move || {
+        //todo: handle this lock that is blocking
+        /*thread::spawn(move || {
             handle.block_on(async move {
                 status
                     .lock()
@@ -355,7 +356,7 @@ impl RAEInterface for CtxGodot {
             })
         })
         .join()
-        .expect("insertion of new action failed");
+        .expect("insertion of new action failed");*/
 
         let command = serde_json::to_string(&gs).unwrap();
 
@@ -563,6 +564,7 @@ impl RAEInterface for CtxGodot {
         let state = self.state.clone();
         let status = self.action_status.clone();
         tokio::spawn(async move { task_tcp_connection(&socket_addr, rx, state, status).await });
+        println!("com opened with godot");
         Ok(LValue::Nil)
     }
 
@@ -590,7 +592,7 @@ impl RAEInterface for CtxGodot {
 impl GetModule for CtxGodot {
     fn get_module(self) -> Module {
         let raw_lisp = vec![
-            LAMBDA_ROBOT_BATTERY,
+            /*LAMBDA_ROBOT_BATTERY,
             LAMBDA_ROBOT_COORDINATES,
             LAMBDA_ROBOT_IN_INTERACT_AREAS,
             LAMBDA_ROBOT_IN_STATION,
@@ -618,7 +620,7 @@ impl GetModule for CtxGodot {
             LAMBDA_DO_ROTATION,
             LAMBDA_NAVIGATE_TO,
             LAMBDA_PICK,
-            LAMBDA_PLACE,
+            LAMBDA_PLACE,*/
         ]
         .into();
 

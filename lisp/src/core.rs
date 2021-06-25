@@ -11,6 +11,7 @@ use aries_planning::parsing::sexpr::SExpr;
 use im::hashmap::HashMap;
 use std::any::Any;
 use std::convert::{TryFrom, TryInto};
+use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -28,7 +29,7 @@ impl LEnv {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ContextCollection {
     inner: Vec<Arc<dyn Any + Send + Sync>>,
     map_label_usize: HashMap<&'static str, usize>,
@@ -43,6 +44,13 @@ impl Default for ContextCollection {
     }
 }
 
+impl Display for ContextCollection {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        let mut string = String::new();
+        write!(f, "{}", string)
+    }
+}
+
 impl ContextCollection {
     pub fn insert(&mut self, ctx: Arc<dyn Any + Send + Sync>) -> usize {
         self.inner.push(ctx);
@@ -50,7 +58,10 @@ impl ContextCollection {
     }
 
     pub fn get_context(&self, id: usize) -> &(dyn Any + Send + Sync) {
-        self.inner.get(id).unwrap().deref()
+        match self.inner.get(id) {
+            None => panic!("id {} corresponds to no ctx:\n {:?}", id, self),
+            Some(some) => some.deref(),
+        }
     }
     pub fn get_context_with_label(&self, label: &str) -> &dyn Any {
         let id = match self.map_label_usize.get(label) {
@@ -350,6 +361,7 @@ pub fn load_module(
 ) -> usize {
     let mut module = ctx.get_module();
     let id = ctxs.insert(module.ctx);
+    //println!("id: {}", id);
     lisp_init.append(&mut module.raw_lisp);
     for (sym, lv) in &mut module.prelude {
         match lv {
@@ -646,14 +658,14 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
     let mut env = env;
 
     loop {
-        //dbg!("lv: {}", lv);
+        //println!("lv: {}", lv.clone());
         if let LValue::Symbol(s) = &lv {
             return match env.get_symbol(s.as_str()) {
                 None => Ok(lv.clone()),
                 Some(lv) => Ok(lv),
             };
         } else if let LValue::List(list) = &lv {
-            //dbg!("expression is a list");
+            //println!("expression is a list");
             let list = list.as_slice();
             let proc = &list[0];
             let args = &list[1..];
@@ -674,7 +686,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                                 ))
                             }
                         };
-                        //dbg!("=> {}", LValue::Nil);
+                        //println!("=> {}", LValue::Nil);
                         return Ok(LValue::Nil);
                     }
                     LCoreOperator::DefLambda => {
@@ -707,7 +719,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                         let body = &args[1];
                         let r_lvalue =
                             LValue::Lambda(LLambda::new(params, body.clone(), env.clone()));
-                        //dbg!("=> {}", r_lvalue);
+                        //println!("=> {}", r_lvalue.clone());
                         return Ok(r_lvalue);
                     }
                     LCoreOperator::If => {
@@ -724,7 +736,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                         };
                     }
                     LCoreOperator::Quote => {
-                        //dbg!("=> {}", &args[0]);
+                        //println!("=> {}", &args[0].clone());
                         return Ok(args[0].clone());
                     }
                     LCoreOperator::Set => {
@@ -743,7 +755,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                             .iter()
                             .map(|x| eval(x, &mut env, ctxs))
                             .collect::<Result<_, _>>()?;
-                        //dbg!("=> {}", results.last().unwrap_or(&LValue::Nil));
+                        //println!("=> {}", results.last().unwrap_or(&LValue::Nil).clone());
                         return Ok(results.last().unwrap_or(&LValue::Nil).clone());
                     }
                     LCoreOperator::QuasiQuote
@@ -769,7 +781,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                             Some(u) => ctxs.get_context(u),
                         };
                         let r_lvalue = fun.call(args, &env, ctx)?;
-                        ////dbg!("=> {}", r_lvalue);
+                        //println!("=> {}", r_lvalue.clone());
                         return Ok(r_lvalue);
                     }
                     LValue::MutFn(fun) => {
@@ -781,7 +793,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                             }
                             Some(u) => {
                                 let r_lvalue = fun.call(&args, &env, ctxs.get_mut_context(u))?;
-                                //println!("=> {}", r_lvalue);
+                                //println!("=> {}", r_lvalue.clone());
                                 Ok(r_lvalue)
                             }
                         };
@@ -808,7 +820,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                 };
             }
         } else {
-            //dbg!("=> {}", lv);
+            //println!("=> {}", lv.clone());
             return Ok(lv);
         }
     }

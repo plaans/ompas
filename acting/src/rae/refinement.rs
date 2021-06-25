@@ -1,6 +1,7 @@
 use crate::rae::context::Status;
 use crate::rae::module::mod_rae_exec::{Job, JobId};
 use crate::rae::Lisp;
+use ompas_lisp::structs::LValue;
 use std::collections::VecDeque;
 
 #[derive(Debug, Clone)]
@@ -37,13 +38,12 @@ pub struct RefinementStack {
 #[derive(Default, Debug, Clone)]
 pub struct StackFrame {
     pub job_id: JobId,
-    pub method: Option<Method>,
-    pub step: MethodStepId,
-    pub tried: Vec<Method>,
+    pub method: Option<LValue>,
+    pub tried: Vec<LValue>,
 }
 
 impl StackFrame {
-    pub fn increment_step(&mut self) {
+    /*pub fn increment_step(&mut self) {
         self.step += 1;
     }
 
@@ -53,7 +53,7 @@ impl StackFrame {
                 None => 0,
                 Some(m) => m.len(),
             }
-    }
+    }*/
 }
 
 #[derive(Default, Debug, Clone)]

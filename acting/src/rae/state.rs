@@ -103,11 +103,11 @@ impl RAEState {
         )
     }
 
-    pub fn add_fact(&mut self, key: LValueS, value: LValueS) {
+    pub fn add_fact(&self, key: LValueS, value: LValueS) {
         self.inner_world.write().unwrap().insert(key, value)
     }
 
-    pub fn retract_fact(&mut self, key: LValueS, value: LValueS) -> Result<LValue, LError> {
+    pub fn retract_fact(&self, key: LValueS, value: LValueS) -> Result<LValue, LError> {
         let old_value = self.inner_world.read().unwrap().get(&key).cloned();
         match old_value {
             None => Err(SpecialError("key is not in state".to_string())),

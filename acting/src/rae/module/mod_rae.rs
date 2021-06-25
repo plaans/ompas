@@ -4,7 +4,8 @@ use crate::rae::module::domain::{
 };
 use crate::rae::module::mod_rae_exec::{CtxRaeExec, RAEInterface};
 use crate::rae::rae_run;
-use ompas_lisp::core::{load_module, LEnv};
+use ompas_lisp::core::{eval, expand, load_module, LEnv};
+use ompas_lisp::functions::cons;
 use ompas_lisp::structs::LError::*;
 use ompas_lisp::structs::LValue::Nil;
 use ompas_lisp::structs::*;
@@ -42,30 +43,26 @@ pub const DOC_DEF_TASK: &str = "todo!";
 pub const DOC_DEF_METHOD: &str = "todo!";
 pub const DOC_DEF_ACTION: &str = "todo!";
 
+pub const RAE_DEF_STATE_FUNCTION: &str = "def-state-function";
+pub const RAE_DEF_ACTION: &str = "def-action";
+pub const RAE_DEF_TASK: &str = "def-task";
+pub const RAE_DEF_METHOD: &str = "def-method";
+
 #[derive(Default)]
 pub struct CtxRae {
     pub log: String,
     pub options: RAEOptions,
-    pub init: InitLisp,
     pub env: RAEEnv,
+    pub domain: InitLisp,
 }
 
 impl GetModule for CtxRae {
     fn get_module(self) -> Module {
-        let mut init: InitLisp = vec![
-            MACRO_DEF_ACTION,
-            MACRO_DEF_METHOD,
-            MACRO_DEF_TASK,
-            MACRO_DEF_STATE_FUNCTION,
-        ]
-        .into();
-
-        init.append(&mut self.init.clone());
-
+        let domain = self.domain.clone();
         let mut module = Module {
             ctx: Arc::new(self),
             prelude: vec![],
-            raw_lisp: init,
+            raw_lisp: domain,
             label: MOD_RAE,
         };
 
@@ -81,6 +78,11 @@ impl GetModule for CtxRae {
         module.add_fn_prelude(RAE_GET_TASKS, get_tasks);
         module.add_fn_prelude(RAE_GET_SYMBOL_TYPE, get_symbol_type);
         module.add_fn_prelude(RAE_GET_ENV, get_env);
+
+        module.add_mut_fn_prelude(RAE_DEF_STATE_FUNCTION, def_state_function);
+        module.add_mut_fn_prelude(RAE_DEF_ACTION, def_action);
+        module.add_mut_fn_prelude(RAE_DEF_TASK, def_task);
+        module.add_mut_fn_prelude(RAE_DEF_METHOD, def_method);
 
         module
     }
@@ -137,13 +139,56 @@ pub fn get_env(args: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LEr
     Ok(LValue::String(ctx.env.pretty_debug(key)))
 }
 
+pub fn def_state_function(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
+    if args.len() < 1 {
+        return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
+    }
+
+    let lvalue = cons(&["generate-state-function".into(), args.into()], &env, &())?;
+
+    let lvalue = eval(
+        &expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs)?,
+        &mut ctx.env.env,
+        &mut ctx.env.ctxs,
+    )?;
+
+    //println!("lvalue: {}", lvalue);
+
+    if let LValue::List(list) = &lvalue {
+        if list.len() != 2 {
+            return Err(WrongNumberOfArgument(lvalue.clone(), list.len(), 2..2));
+        } else {
+            if let LValue::Symbol(action_label) = &list[0] {
+                if let LValue::Lambda(_) = &list[1] {
+                    ctx.env
+                        .add_state_function(action_label.to_string(), list[1].clone())?;
+                } else {
+                    return Err(WrongType(
+                        list[1].clone(),
+                        list[1].clone().into(),
+                        NameTypeLValue::Lambda,
+                    ));
+                }
+            } else {
+                return Err(WrongType(
+                    list[0].clone(),
+                    list[0].clone().into(),
+                    NameTypeLValue::Symbol,
+                ));
+            }
+        }
+    }
+
+    Ok(Nil)
+}
+
 pub fn add_state_function(
     args: &[LValue],
     _env: &LEnv,
     ctx: &mut CtxRae,
 ) -> Result<LValue, LError> {
-    if args.len() != 2 {
-        return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
+    if args.len() < 1 {
+        return Err(WrongNumberOfArgument(args.into(), args.len(), 1..std::usize::MAX));
     }
 
     if let LValue::Symbol(action_label) = &args[0] {
@@ -163,6 +208,50 @@ pub fn add_state_function(
             args[0].clone().into(),
             NameTypeLValue::Symbol,
         ));
+    }
+
+    Ok(Nil)
+}
+
+
+pub fn def_action(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
+    if args.len() < 1 {
+        return Err(WrongNumberOfArgument(args.into(), args.len(), 1..std::usize::MAX));
+    }
+
+    let lvalue = cons(&["generate-action".into(), args.into()], &env, &())?;
+
+    let lvalue = eval(
+        &expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs)?,
+        &mut ctx.env.env,
+        &mut ctx.env.ctxs,
+    )?;
+
+    //println!("lvalue: {}", lvalue);
+
+    if let LValue::List(list) = &lvalue {
+        if list.len() != 2 {
+            return Err(WrongNumberOfArgument(lvalue.clone(), list.len(), 2..2));
+        } else {
+            if let LValue::Symbol(action_label) = &list[0] {
+                if let LValue::Lambda(_) = &list[1] {
+                    ctx.env
+                        .add_action(action_label.to_string(), list[1].clone())?;
+                } else {
+                    return Err(WrongType(
+                        list[1].clone(),
+                        list[1].clone().into(),
+                        NameTypeLValue::Lambda,
+                    ));
+                }
+            } else {
+                return Err(WrongType(
+                    list[0].clone(),
+                    list[0].clone().into(),
+                    NameTypeLValue::Symbol,
+                ));
+            }
+        }
     }
 
     Ok(Nil)
@@ -195,6 +284,63 @@ pub fn add_action(args: &[LValue], _env: &LEnv, ctx: &mut CtxRae) -> Result<LVal
 
     Ok(Nil)
 }
+
+
+pub fn def_method(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
+    if args.len() < 1 {
+        return Err(WrongNumberOfArgument(args.into(), args.len(), 1..std::usize::MAX));
+    }
+
+    let lvalue = cons(&["generate-method".into(), args.into()], &env, &())?;
+
+    let lvalue = eval(
+        &expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs)?,
+        &mut ctx.env.env,
+        &mut ctx.env.ctxs,
+    )?;
+
+    //println!("lvalue: {}", lvalue);
+
+    if let LValue::List(list) = &lvalue {
+        if list.len() != 3 {
+            return Err(WrongNumberOfArgument(lvalue.clone(), list.len(), 2..2));
+        } else {
+            if let LValue::Symbol(method_label) = &list[0] {
+                if let LValue::Symbol(task_label) = &list[1] {
+                    if let LValue::Lambda(_) = &list[2] {
+                        ctx.env.add_method(
+                            method_label.to_string(),
+                            task_label.to_string(),
+                            list[2].clone(),
+                        )?;
+                    } else {
+                        return Err(WrongType(
+                            list[2].clone(),
+                            list[2].clone().into(),
+                            NameTypeLValue::Lambda,
+                        ));
+                    }
+                } else {
+                    return Err(WrongType(
+                        list[1].clone(),
+                        list[1].clone().into(),
+                        NameTypeLValue::Symbol,
+                    ));
+                }
+            } else {
+                return Err(WrongType(
+                    list[0].clone(),
+                    list[0].clone().into(),
+                    NameTypeLValue::Symbol,
+                ));
+            }
+        }
+    }
+
+    Ok(Nil)
+}
+
+
 
 ///Add a method to RAE env
 pub fn add_method(args: &[LValue], _env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
@@ -230,6 +376,49 @@ pub fn add_method(args: &[LValue], _env: &LEnv, ctx: &mut CtxRae) -> Result<LVal
             args[0].clone().into(),
             NameTypeLValue::Symbol,
         ));
+    }
+
+    Ok(Nil)
+}
+
+
+pub fn def_task(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
+    if args.len() < 1 {
+        return Err(WrongNumberOfArgument(args.into(), args.len(), 1..std::usize::MAX));
+    }
+
+    let lvalue = cons(&["generate-task".into(), args.into()], &env, &())?;
+
+    let lvalue = eval(
+        &expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs)?,
+        &mut ctx.env.env,
+        &mut ctx.env.ctxs,
+    )?;
+
+    //println!("lvalue: {}", lvalue);
+
+    if let LValue::List(list) = &lvalue {
+        if list.len() != 2 {
+            return Err(WrongNumberOfArgument(lvalue.clone(), list.len(), 2..2));
+        } else {
+            if let LValue::Symbol(task_label) = &list[0] {
+                if let LValue::Lambda(_) = &list[1] {
+                    ctx.env.add_task(task_label.to_string(), list[1].clone())?;
+                } else {
+                    return Err(WrongType(
+                        list[1].clone(),
+                        list[1].clone().into(),
+                        NameTypeLValue::Lambda,
+                    ));
+                }
+            } else {
+                return Err(WrongType(
+                    list[0].clone(),
+                    list[0].clone().into(),
+                    NameTypeLValue::Symbol,
+                ));
+            }
+        }
     }
 
     Ok(Nil)

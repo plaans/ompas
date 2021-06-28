@@ -32,7 +32,7 @@ pub enum RAEError {
 
 pub const TOKIO_CHANNEL_SIZE: usize = 65_536; //=2^16
 
-pub async fn rae_run(mut context: RAEEnv, select_option: &SelectOption, log: String) {
+pub async fn rae_run(mut context: RAEEnv, _select_option: &SelectOption, _log: String) {
     //println!("in rae run!");
     //infinite loop
     //Maybe we can add a system to interrupt, or it stops itself when there is nothing to process
@@ -77,9 +77,12 @@ pub async fn rae_run(mut context: RAEEnv, select_option: &SelectOption, log: Str
      */
     let mut receiver = mem::replace(&mut context.receiver, None).unwrap();
 
-    let result = eval(&vec![LValue::Symbol("rae-open-com-platform".to_string())].into(), &mut context.env, &mut context.ctxs);
+    //Ubuntu::
+    let result = eval(&vec![LValue::Symbol("rae-launch-platform".to_string())].into(), &mut context.env, &mut context.ctxs);
+    //Windows::
+    //let result = eval(&vec![LValue::Symbol("rae-open-com-platform".to_string())].into(), &mut context.env, &mut context.ctxs);
     match result {
-        Ok(lv) => println!("successfully open com with platform"),
+        Ok(_) => println!("successfully open com with platform"),
         Err(e) => eprintln!("{}", e),
     }
 
@@ -102,7 +105,7 @@ pub async fn rae_run(mut context: RAEEnv, select_option: &SelectOption, log: Str
                     None => {
                         println!("task \"{}\" not defined in env", label)
                     }
-                    Some(task) => {
+                    Some(_task) => {
                         println!("task \"{}\" found.", label);
                         let method = select_greedy(&context, label, params);
                         match &method {
@@ -204,7 +207,7 @@ pub async fn rae_run(mut context: RAEEnv, select_option: &SelectOption, log: Str
     }
 }
 
-fn select_greedy(env: &RAEEnv, task: &LValue, params: &[LValue]) -> LValue {
+fn select_greedy(env: &RAEEnv, task: &LValue, _params: &[LValue]) -> LValue {
     let methods = env.get_methods_from_task(task);
     println!("methods: {}", methods);
     if let LValue::List(list) = methods {
@@ -217,7 +220,7 @@ fn select_greedy(env: &RAEEnv, task: &LValue, params: &[LValue]) -> LValue {
 pub async fn progress(mut env: LEnv, mut ctxs: ContextCollection, mut rs: RefinementStack) {
     let method = rs.pop().unwrap().method.unwrap();
     println!("method: {}", method);
-    let args = rs.job.core.clone();
+    let args = rs.job.core;
     println!("job core: {}", args);
     let slice_args = if let LValue::List(list) = &args {
         &list[1..]
@@ -371,7 +374,7 @@ pub fn RAEPlan(state: State, job: Job) {
 
 ///Output the status of the task/event
 /// Could be in a terminal, or a log file
-pub async fn output(status: RAEStatus, log: String) {
+pub async fn output(_status: RAEStatus, _log: String) {
 
     //writes formatted message to log
 }

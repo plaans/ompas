@@ -91,7 +91,7 @@ pub const STATE_FUNCTION_TYPE: &str = "state_function_type";
 
 impl Default for RAEEnv {
     fn default() -> Self {
-        let (mut env, mut ctxs, init_lisp) = LEnv::root();
+        let (mut env, ctxs, init_lisp) = LEnv::root();
         env.insert(RAE_ACTION_LIST.to_string(), LValue::List(vec![]));
         env.insert(RAE_METHOD_LIST.to_string(), LValue::List(vec![]));
         env.insert(RAE_TASK_LIST.to_string(), LValue::List(vec![]));
@@ -103,6 +103,30 @@ impl Default for RAEEnv {
         );
         Self {
             receiver: None,
+            agenda: Default::default(),
+            actions_progress: Default::default(),
+            state: Default::default(),
+            env,
+            ctxs,
+            init_lisp,
+        }
+    }
+}
+
+impl RAEEnv {
+    pub fn new(receiver: Option<Receiver<Job>>) -> Self {
+        let (mut env, ctxs, init_lisp) = LEnv::root();
+        env.insert(RAE_ACTION_LIST.to_string(), LValue::List(vec![]));
+        env.insert(RAE_METHOD_LIST.to_string(), LValue::List(vec![]));
+        env.insert(RAE_TASK_LIST.to_string(), LValue::List(vec![]));
+        env.insert(RAE_STATE_FUNCTION_LIST.to_string(), LValue::List(vec![]));
+        env.insert(RAE_SYMBOL_TYPE.to_string(), LValue::Map(Default::default()));
+        env.insert(
+            RAE_TASK_METHODS_MAP.to_string(),
+            LValue::Map(Default::default()),
+        );
+        Self {
+            receiver,
             agenda: Default::default(),
             actions_progress: Default::default(),
             state: Default::default(),

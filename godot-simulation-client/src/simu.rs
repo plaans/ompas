@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use crate::rae_domain::GODOT_DOMAIN;
 use crate::serde::*;
 use crate::state::*;
@@ -12,10 +13,10 @@ use ompas_modules::doc::{Documentation, LHelp};
 use ompas_modules::io::TOKIO_CHANNEL_SIZE;
 use std::net::SocketAddr;
 use std::process::Command;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::{thread, time};
 use tokio::sync::mpsc::Sender;
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{mpsc};
 
 /*
 LANGUAGE
@@ -296,8 +297,8 @@ pub struct SocketInfo {
 pub struct CtxGodot {
     socket_info: SocketInfo,
     sender_socket: Option<Sender<String>>,
-    state: Arc<Mutex<GodotState>>,
-    action_status: Arc<Mutex<ActionStatusSet>>,
+    state: Arc<RwLock<GodotState>>,
+    action_status: Arc<RwLock<ActionStatusSet>>,
     //godot_handler : JoinHandle<Output>
 }
 
@@ -326,7 +327,7 @@ impl CtxGodot {
         self.state.lock().await.get_state(_type)
     }*/
 
-    pub fn get_ref_state(&self) -> Arc<Mutex<GodotState>> {
+    pub fn get_ref_state(&self) -> Arc<RwLock<GodotState>> {
         self.state.clone()
     }
 }
@@ -343,20 +344,7 @@ impl RAEInterface for CtxGodot {
             }),
         };
 
-        let handle = tokio::runtime::Handle::current();
-        let status = self.action_status.clone();
-        //todo: handle this lock that is blocking
-        /*thread::spawn(move || {
-            handle.block_on(async move {
-                status
-                    .lock()
-                    .await
-                    .status
-                    .insert(command_id, ActionStatus::ActionPending)
-            })
-        })
-        .join()
-        .expect("insertion of new action failed");*/
+        self.action_status.write().unwrap().status.insert(command_id, ActionStatus::ActionPending);
 
         let command = serde_json::to_string(&gs).unwrap();
 
@@ -371,11 +359,14 @@ impl RAEInterface for CtxGodot {
             }
             Some(s) => s.clone(),
         };
-        tokio::spawn(async move {
+        println!("trying to send command");
+        tokio::runtime::Handle::current().spawn(async move {
+            println!("command in sending!");
             sender
                 .send(command)
                 .await
                 .expect("couldn't send via channel");
+            println!("command sent!");
         });
         Ok(LValue::Nil)
     }
@@ -446,7 +437,7 @@ impl RAEInterface for CtxGodot {
         let handle = tokio::runtime::Handle::current();
         let state = self.state.clone();
         let result = thread::spawn(move || {
-            handle.block_on(async move { state.lock().await.get_state(_type) })
+            handle.block_on(async move { state.write().unwrap().get_state(_type) })
         })
         .join()
         .unwrap();
@@ -459,13 +450,8 @@ impl RAEInterface for CtxGodot {
         let key: LValueS = key.into();
 
         //println!("key: {}", key);
-        let handle = tokio::runtime::Handle::current();
         let state = self.get_ref_state();
-        let state = thread::spawn(move || {
-            handle.block_on(async move { state.lock().await.get_state(None) })
-        })
-        .join()
-        .unwrap();
+        let state = state.read().unwrap().get_state(None);
 
         //println!("state: {:?}", state);
 
@@ -476,13 +462,8 @@ impl RAEInterface for CtxGodot {
     }
 
     fn get_status(&self, _: &[LValue]) -> Result<LValue, LError> {
-        let handle = tokio::runtime::Handle::current();
         let status = self.action_status.clone();
-        let status = thread::spawn(move || {
-            handle.block_on(async move { status.lock().await.status.clone() })
-        })
-        .join()
-        .unwrap();
+        let status = status.read().unwrap().status.clone();
 
         let mut string = "Action(s) Status\n".to_string();
 
@@ -557,7 +538,11 @@ impl RAEInterface for CtxGodot {
         };
 
         let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
-        self.sender_socket = Some(tx);
+        self.sender_socket = Some(tx.clone());
+
+        tokio::spawn(async move {
+            tx.send(TEST_TCP.to_string()).await
+        });
 
         //println!("godot launching...");
         //println!("godot launched!");
@@ -569,14 +554,10 @@ impl RAEInterface for CtxGodot {
     }
 
     fn get_action_status(&self, action_id: &usize) -> Status {
-        let handle = tokio::runtime::Handle::current();
         let status = self.action_status.clone();
         let action_id = *action_id;
-        let result = thread::spawn(move || {
-            handle.block_on(async move { status.lock().await.get_status(&action_id) })
-        })
-        .join()
-        .unwrap();
+        let result = status.read().unwrap().get_status(&action_id);
+        //println!("status: {}", result.unwrap());
         result.unwrap().into()
     }
 

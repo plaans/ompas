@@ -21,17 +21,16 @@ pub fn init_ctx_rae(platform: Box<dyn RAEInterface>) -> (CtxRae, CtxRaeMonitor) 
     let mut ctx_rae = CtxRae::default();
     let (sender, receiver) = mpsc::channel(TOKIO_CHANNEL_SIZE);
 
-    let mut ctx_rae_monitor = CtxRaeMonitor {
+    let ctx_rae_monitor = CtxRaeMonitor {
         sender_to_rae: Some(sender),
         env: Default::default(),
     };
 
     let domain = platform.domain();
 
-    let mut rae_env = RAEEnv::default();
-    rae_env.receiver = Some(receiver);
+    let mut rae_env = RAEEnv::new(Some(receiver));
 
-    let mut ctx_rae_exec = CtxRaeExec {
+    let ctx_rae_exec = CtxRaeExec {
         actions_progress: rae_env.actions_progress.clone(),
         state: rae_env.state.clone(),
         platform_interface: platform,
@@ -61,7 +60,7 @@ pub fn init_ctx_rae(platform: Box<dyn RAEInterface>) -> (CtxRae, CtxRaeMonitor) 
         //stdout.write_all(b"parsing done\n");
         if lvalue != LValue::Nil {
             match eval(&lvalue, &mut rae_env.env, &mut rae_env.ctxs) {
-                Ok(lv) => {}
+                Ok(_lv) => {}
                 Err(e) => {
                     //stderr.write_all(format!("ELI>>{}\n", e).as_bytes());
                     panic!("error: {}", e)

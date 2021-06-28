@@ -8,10 +8,10 @@ async fn main() {
 
     let ctx_math = CtxMath::default();
     let mut env = LEnv::default();
-    let mut second_env = env.clone();
+    //let mut second_env = env.clone();
 
     let mut ctxs = ContextCollection::default();
-    let mut new_ctxs = ctxs.clone();
+    //let mut new_ctxs = ctxs.clone();
 
     tokio::spawn(async move {
         let mut init_lisp = InitLisp::default();

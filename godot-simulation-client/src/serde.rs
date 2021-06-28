@@ -157,6 +157,7 @@ impl TryFrom<GodotMessageSerde> for (usize, ActionStatus) {
     type Error = LError;
 
     fn try_from(value: GodotMessageSerde) -> Result<Self, Self::Error> {
+        #![allow(unused_assignments)]
         let mut id = 0;
         let mut status: ActionStatus = ActionStatus::ActionPending;
 

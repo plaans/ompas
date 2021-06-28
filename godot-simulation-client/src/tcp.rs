@@ -3,19 +3,20 @@ use crate::state::GodotState;
 use ompas_acting::rae::state::{ActionStatus, ActionStatusSet, LState};
 use std::convert::TryInto;
 use std::net::SocketAddr;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use tokio::io::{self, AsyncReadExt, AsyncWriteExt, BufReader, ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
 use tokio::sync::mpsc::Receiver;
-use tokio::sync::Mutex;
 
 pub const BUFFER_SIZE: usize = 65_536; //65KB should be enough for the moment
+
+pub const TEST_TCP: &str ="test_tcp";
 
 pub async fn task_tcp_connection(
     socket_addr: &SocketAddr,
     receiver: Receiver<String>,
-    state: Arc<Mutex<GodotState>>,
-    status: Arc<Mutex<ActionStatusSet>>,
+    state: Arc<RwLock<GodotState>>,
+    status: Arc<RwLock<ActionStatusSet>>,
 ) {
     let stream = TcpStream::connect(socket_addr).await.unwrap();
 
@@ -27,6 +28,11 @@ pub async fn task_tcp_connection(
 }
 
 async fn async_send_socket(mut stream: WriteHalf<TcpStream>, mut receiver: Receiver<String>) {
+
+    let test = receiver.recv().await.unwrap();
+    assert_eq!(test, TEST_TCP);
+    println!("socket ready to receive command !");
+
     loop {
         let command = receiver.recv().await.unwrap();
         println!("new command to send: {}", command);
@@ -50,8 +56,8 @@ fn u32_to_u8_array(x: u32) -> [u8; 4] {
 
 async fn async_read_socket(
     stream: ReadHalf<TcpStream>,
-    state: Arc<Mutex<GodotState>>,
-    status: Arc<Mutex<ActionStatusSet>>,
+    state: Arc<RwLock<GodotState>>,
+    status: Arc<RwLock<ActionStatusSet>>,
 ) {
     let mut buf_reader = BufReader::new(stream);
 
@@ -59,6 +65,7 @@ async fn async_read_socket(
     let mut size_buf = [0; 4];
 
     loop {
+        //println!("update...");
         match buf_reader.read_exact(&mut size_buf).await {
             Ok(_) => {}
             Err(_) => panic!("Error while reading buffer"),
@@ -75,29 +82,24 @@ async fn async_read_socket(
             let message: GodotMessageSerde = match serde_json::from_str(&msg.to_lowercase()) {
                 Ok(m) => m,
                 Err(e) => panic!(
-                    "Error while casting message in GodotMessageSerde:\n msg: {}",
-                    msg
+                    "Error while casting message in GodotMessageSerde:\n msg: {},\n error: {}",
+                    msg, e
                 ),
             };
             match message._type {
                 GodotMessageType::StaticState | GodotMessageType::DynamicState => {
                     let temp_state: LState = message.try_into().unwrap();
-                    state.lock().await.set_state(temp_state);
+                    state.write().unwrap().set_state(temp_state);
                 }
                 GodotMessageType::ActionResponse => {
                     let action_status: (usize, ActionStatus) = message.try_into().unwrap();
                     //println!("{:?}", action_status.1);
                     if let ActionStatus::ActionResponse(server_id) = action_status.1 {
                         //println!("yey in action response");
-                        status
-                            .lock()
-                            .await
-                            .server_id_interal_id
-                            .insert(server_id, action_status.0);
-                        status
-                            .lock()
-                            .await
-                            .status
+
+                        status.write().unwrap().server_id_interal_id.insert(server_id, action_status.0);
+
+                        status.write().unwrap().status
                             .insert(action_status.0, action_status.1);
                     }
                 }
@@ -107,9 +109,7 @@ async fn async_read_socket(
                 | GodotMessageType::ActionCancel => {
                     //println!("the action status is updated");
                     let action_status: (usize, ActionStatus) = message.try_into().unwrap();
-                    status
-                        .lock()
-                        .await
+                    status.write().unwrap()
                         .set_status_from_server(action_status.0, action_status.1);
                 }
                 _ => panic!("should not receive this kind of message"),

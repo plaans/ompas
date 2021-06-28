@@ -39,8 +39,11 @@ pub const GODOT_DOMAIN: &str = "\
     (def-state-function interact_area.cells ?ia)
     (def-state-function interact_area.belt ?ia)
     (def-task task_navigate_to (quote ((:params ?r ?x ?y) (:preconditions true))))
-    (def-method m_task_navigate_to (quote ((:task task_navigate_to)(:params ?r ?x ?y)(:body (rae-do (navigate_to ?r ?x ?y))))))
+    (def-method m_task_navigate_to (quote ((:task task_navigate_to)(:params ?r ?x ?y)(:body (navigate_to ?r ?x ?y)))))
 )";
+
+//(def-method m_task_navigate_to (quote ((:task task_navigate_to)(:params ?r ?x ?y)(:body (rae-do (navigate_to ?r ?x ?y))))))
+
 /*pub const GODOT_DOMAIN: &str = "\
 (begin \
     (def-state-function robot.coordinates ?r)

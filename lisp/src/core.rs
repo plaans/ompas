@@ -11,7 +11,6 @@ use aries_planning::parsing::sexpr::SExpr;
 use im::hashmap::HashMap;
 use std::any::Any;
 use std::convert::{TryFrom, TryInto};
-use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -41,13 +40,6 @@ impl Default for ContextCollection {
             inner: vec![],
             map_label_usize: Default::default(),
         }
-    }
-}
-
-impl Display for ContextCollection {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        let mut string = String::new();
-        write!(f, "{}", string)
     }
 }
 
@@ -638,7 +630,7 @@ pub fn expand_quasi_quote(x: &LValue, env: &LEnv) -> Result<LValue, LError> {
                     }
                 }
                 Ok(vec![
-                    env.get_symbol(CONS).unwrap(),
+                    env.get_symbol(CONS).expect("problem in the definition of the root env"),
                     expand_quasi_quote(&first, env)?,
                     expand_quasi_quote(&list[1..].to_vec().into(), env)?,
                 ]

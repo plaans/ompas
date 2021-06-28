@@ -57,7 +57,7 @@ impl Default for CtxRaeExec {
 
 impl GetModule for CtxRaeExec {
     fn get_module(self) -> Module {
-        let mut init: InitLisp = vec![
+        let init: InitLisp = vec![
             MACRO_GENERATE_ACTION,
             MACRO_GENERATE_METHOD,
             MACRO_GENERATE_TASK,
@@ -140,7 +140,7 @@ impl Job {
     pub fn new(value: LValue, _type: JobType) -> Self {
         Self {
             _type,
-            core: value.into(),
+            core: value,
         }
     }
 }
@@ -260,8 +260,7 @@ pub fn assert_fact(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LVa
     }
     let key = args[0].clone().into();
     let value = args[1].clone().into();
-    let handle = tokio::runtime::Handle::current();
-    let state = ctx.state.add_fact(key, value);
+    ctx.state.add_fact(key, value);
 
     Ok(Nil)
 }
@@ -297,11 +296,11 @@ pub fn fn_do(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, L
             }
         }
     } else {
-        return Err(WrongType(
+        Err(WrongType(
             action_id.clone(),
             action_id.into(),
             NameTypeLValue::Usize,
-        ));
+        ))
     }
 }
 

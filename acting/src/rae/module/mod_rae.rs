@@ -186,7 +186,11 @@ pub fn add_state_function(
     ctx: &mut CtxRae,
 ) -> Result<LValue, LError> {
     if args.is_empty() {
-        return Err(WrongNumberOfArgument(args.into(), args.len(), 1..std::usize::MAX));
+        return Err(WrongNumberOfArgument(
+            args.into(),
+            args.len(),
+            1..std::usize::MAX,
+        ));
     }
 
     if let LValue::Symbol(action_label) = &args[0] {
@@ -211,10 +215,13 @@ pub fn add_state_function(
     Ok(Nil)
 }
 
-
 pub fn def_action(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
     if args.is_empty() {
-        return Err(WrongNumberOfArgument(args.into(), args.len(), 1..std::usize::MAX));
+        return Err(WrongNumberOfArgument(
+            args.into(),
+            args.len(),
+            1..std::usize::MAX,
+        ));
     }
 
     let lvalue = cons(&["generate-action".into(), args.into()], &env, &())?;
@@ -281,10 +288,13 @@ pub fn add_action(args: &[LValue], _env: &LEnv, ctx: &mut CtxRae) -> Result<LVal
     Ok(Nil)
 }
 
-
 pub fn def_method(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
     if args.is_empty() {
-        return Err(WrongNumberOfArgument(args.into(), args.len(), 1..std::usize::MAX));
+        return Err(WrongNumberOfArgument(
+            args.into(),
+            args.len(),
+            1..std::usize::MAX,
+        ));
     }
 
     let lvalue = cons(&["generate-method".into(), args.into()], &env, &())?;
@@ -334,8 +344,6 @@ pub fn def_method(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValu
     Ok(Nil)
 }
 
-
-
 ///Add a method to RAE env
 pub fn add_method(args: &[LValue], _env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
     if args.len() != 3 {
@@ -375,10 +383,13 @@ pub fn add_method(args: &[LValue], _env: &LEnv, ctx: &mut CtxRae) -> Result<LVal
     Ok(Nil)
 }
 
-
 pub fn def_task(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
     if args.is_empty() {
-        return Err(WrongNumberOfArgument(args.into(), args.len(), 1..std::usize::MAX));
+        return Err(WrongNumberOfArgument(
+            args.into(),
+            args.len(),
+            1..std::usize::MAX,
+        ));
     }
 
     let lvalue = cons(&["generate-task".into(), args.into()], &env, &())?;
@@ -449,13 +460,14 @@ launch the main in a thread
 pub fn launch_rae(_: &[LValue], _env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
     let options = SelectOption::new(0, 0);
     let rae_env = RAEEnv {
-        receiver: None,
+        job_receiver: None,
+        status_watcher: None,
         agenda: Default::default(),
         actions_progress: Default::default(),
         state: Default::default(),
         env: ctx.env.env.clone(),
         ctxs: Default::default(),
-        init_lisp: Default::default()
+        init_lisp: Default::default(),
     };
     let context = mem::replace(&mut ctx.env, rae_env);
     tokio::spawn(async move {

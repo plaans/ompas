@@ -98,7 +98,6 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
         platform_interface: Box::new(CtxGodot::default()),
     };
 
-
     load_module(&mut root_env, &mut ctxs, ctx_doc, &mut lisp_init);
     load_module(&mut root_env, &mut ctxs, ctx_io, &mut lisp_init);
     load_module(&mut root_env, &mut ctxs, ctx_math, &mut lisp_init);

@@ -21,6 +21,8 @@ pub fn init_ctx_rae(platform: Box<dyn RAEInterface>) -> (CtxRae, CtxRaeMonitor) 
     let mut ctx_rae = CtxRae::default();
     let (sender, receiver) = mpsc::channel(TOKIO_CHANNEL_SIZE);
 
+    let (sender_sync, receiver_sync) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+
     let ctx_rae_monitor = CtxRaeMonitor {
         sender_to_rae: Some(sender),
         env: Default::default(),
@@ -28,7 +30,8 @@ pub fn init_ctx_rae(platform: Box<dyn RAEInterface>) -> (CtxRae, CtxRaeMonitor) 
 
     let domain = platform.domain();
 
-    let mut rae_env = RAEEnv::new(Some(receiver));
+    let mut rae_env = RAEEnv::new(Some(receiver), Some(receiver_sync));
+    rae_env.actions_progress.sync.sender = Some(sender_sync);
 
     let ctx_rae_exec = CtxRaeExec {
         actions_progress: rae_env.actions_progress.clone(),
@@ -71,7 +74,7 @@ pub fn init_ctx_rae(platform: Box<dyn RAEInterface>) -> (CtxRae, CtxRaeMonitor) 
     //We can add other modules if we want
 
     ctx_rae.env = rae_env;
-    ctx_rae.domain  = vec![domain].into();
+    ctx_rae.domain = vec![domain].into();
     //println!("end init rae");
     (ctx_rae, ctx_rae_monitor)
 }

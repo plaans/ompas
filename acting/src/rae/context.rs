@@ -12,6 +12,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, RwLock};
 use std::thread;
 use tokio::sync::mpsc::Receiver;
+use crate::rae::status::ActionStatusSync;
+use tokio::sync::mpsc;
+use crate::rae::TOKIO_CHANNEL_SIZE;
 
 #[derive(Default, Debug)]
 pub struct Agenda {
@@ -68,7 +71,8 @@ impl Agenda {
 }
 
 pub struct RAEEnv {
-    pub receiver: Option<Receiver<Job>>,
+    pub job_receiver: Option<Receiver<Job>>,
+    pub status_watcher: Option<Receiver<usize>>,
     pub agenda: Agenda,
     pub actions_progress: ActionsProgress,
     pub state: RAEState,
@@ -102,19 +106,20 @@ impl Default for RAEEnv {
             LValue::Map(Default::default()),
         );
         Self {
-            receiver: None,
+            job_receiver: None,
             agenda: Default::default(),
             actions_progress: Default::default(),
             state: Default::default(),
             env,
             ctxs,
             init_lisp,
+            status_watcher: None
         }
     }
 }
 
 impl RAEEnv {
-    pub fn new(receiver: Option<Receiver<Job>>) -> Self {
+    pub fn new(job_receiver: Option<Receiver<Job>>, status_watcher: Option<Receiver<usize>>) -> Self {
         let (mut env, ctxs, init_lisp) = LEnv::root();
         env.insert(RAE_ACTION_LIST.to_string(), LValue::List(vec![]));
         env.insert(RAE_METHOD_LIST.to_string(), LValue::List(vec![]));
@@ -126,13 +131,14 @@ impl RAEEnv {
             LValue::Map(Default::default()),
         );
         Self {
-            receiver,
+            job_receiver,
             agenda: Default::default(),
             actions_progress: Default::default(),
             state: Default::default(),
             env,
             ctxs,
             init_lisp,
+            status_watcher,
         }
     }
 }
@@ -376,12 +382,21 @@ pub type TaskId = usize;
 #[derive(Default, Debug, Clone)]
 pub struct ActionsProgress {
     pub status: Arc<RwLock<HashMap<ActionId, Status>>>,
+    pub sync: ActionStatusSync,
     next_id: Arc<AtomicUsize>,
+}
+
+impl ActionsProgress {
+    pub fn declare_new_watcher(&self, action_id: &usize) -> Receiver<bool> {
+        let (sender, receiver) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+        self.sync.add_action_to_watch(*action_id, sender);
+        receiver
+    }
 }
 
 #[derive(Clone, Debug)]
 pub enum Status {
-    NotTriggered,
+    Pending,
     Running,
     Failure,
     Done,
@@ -397,7 +412,7 @@ impl ActionsProgress {
         self.status
             .write()
             .unwrap()
-            .insert(id, Status::NotTriggered);
+            .insert(id, Status::Pending);
         id
     }
 

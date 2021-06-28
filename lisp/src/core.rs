@@ -630,7 +630,8 @@ pub fn expand_quasi_quote(x: &LValue, env: &LEnv) -> Result<LValue, LError> {
                     }
                 }
                 Ok(vec![
-                    env.get_symbol(CONS).expect("problem in the definition of the root env"),
+                    env.get_symbol(CONS)
+                        .expect("problem in the definition of the root env"),
                     expand_quasi_quote(&first, env)?,
                     expand_quasi_quote(&list[1..].to_vec().into(), env)?,
                 ]

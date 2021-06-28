@@ -16,12 +16,14 @@ use ompas_lisp::core::{eval, ContextCollection, LEnv};
 use ompas_lisp::functions::cons;
 use ompas_lisp::structs::{LError, LValue};
 use std::mem;
+use crate::rae::status::async_status_watcher_run;
 
 pub mod context;
 pub mod log;
 pub mod module;
 pub mod refinement;
 pub mod state;
+pub mod status;
 
 pub type Lisp = String;
 
@@ -75,10 +77,24 @@ pub async fn rae_run(mut context: RAEEnv, _select_option: &SelectOption, _log: S
             if Ra is empty then remove it from Agenda
         }
      */
-    let mut receiver = mem::replace(&mut context.receiver, None).unwrap();
+
+    let async_action_status = context.actions_progress.sync.clone();
+    let receiver_sync = mem::replace(&mut context.status_watcher, None).unwrap();
+    tokio::spawn(async move {
+        println!("starting status watcher");
+        async_status_watcher_run(async_action_status, receiver_sync).await;
+    });
+
+    println!("async status watcher");
+
+    let mut receiver = mem::replace(&mut context.job_receiver, None).unwrap();
 
     //Ubuntu::
-    let result = eval(&vec![LValue::Symbol("rae-launch-platform".to_string())].into(), &mut context.env, &mut context.ctxs);
+    let result = eval(
+        &vec![LValue::Symbol("rae-launch-platform".to_string())].into(),
+        &mut context.env,
+        &mut context.ctxs,
+    );
     //Windows::
     //let result = eval(&vec![LValue::Symbol("rae-open-com-platform".to_string())].into(), &mut context.env, &mut context.ctxs);
     match result {
@@ -106,12 +122,12 @@ pub async fn rae_run(mut context: RAEEnv, _select_option: &SelectOption, _log: S
                         println!("task \"{}\" not defined in env", label)
                     }
                     Some(_task) => {
-                        println!("task \"{}\" found.", label);
+                        //println!("task \"{}\" found.", label);
                         let method = select_greedy(&context, label, params);
                         match &method {
                             LValue::Nil => println!("no method available"),
                             LValue::Symbol(sym) => {
-                                println!("method \"{}\" choosed", sym);
+                                //println!("method \"{}\" choosed", sym);
 
                                 let mut rs = context.agenda.get_stack(job_id).unwrap().clone();
                                 let mut frame = rs.pop().unwrap();
@@ -209,7 +225,7 @@ pub async fn rae_run(mut context: RAEEnv, _select_option: &SelectOption, _log: S
 
 fn select_greedy(env: &RAEEnv, task: &LValue, _params: &[LValue]) -> LValue {
     let methods = env.get_methods_from_task(task);
-    println!("methods: {}", methods);
+    //println!("methods: {}", methods);
     if let LValue::List(list) = methods {
         list.first().unwrap_or(&LValue::Nil).clone()
     } else {
@@ -219,17 +235,17 @@ fn select_greedy(env: &RAEEnv, task: &LValue, _params: &[LValue]) -> LValue {
 
 pub async fn progress(mut env: LEnv, mut ctxs: ContextCollection, mut rs: RefinementStack) {
     let method = rs.pop().unwrap().method.unwrap();
-    println!("method: {}", method);
+    //println!("method: {}", method);
     let args = rs.job.core;
-    println!("job core: {}", args);
+    //println!("job core: {}", args);
     let slice_args = if let LValue::List(list) = &args {
         &list[1..]
     } else {
         panic!("")
     };
-    println!("args: {:?}", slice_args);
+    //println!("args: {:?}", slice_args);
     let body = cons(&[method, slice_args.into()], &env, &()).unwrap();
-    println!("body: {}", body);
+    //println!("body: {}", body);
     let result = eval(&body, &mut env, &mut ctxs);
     match result {
         Ok(ok) => println!("{}", ok),

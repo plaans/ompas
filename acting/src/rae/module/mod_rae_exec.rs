@@ -2,7 +2,7 @@ use crate::rae::context::{
     ActionId, ActionsProgress, Agenda, SelectOption, Status, RAE_STATE_FUNCTION_LIST,
 };
 use crate::rae::module::domain::*;
-use crate::rae::state::RAEState;
+use crate::rae::state::{RAEState, ActionStatus};
 use ompas_lisp::core::LEnv;
 use ompas_lisp::functions::union_map;
 use ompas_lisp::structs::LError::*;
@@ -11,10 +11,12 @@ use ompas_lisp::structs::*;
 use ompas_modules::doc::{Documentation, LHelp};
 use std::any::Any;
 use std::fmt::{Display, Formatter};
-use std::sync::Arc;
+use std::sync::{Arc, PoisonError, RwLockReadGuard, RwLock};
 use std::thread;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::Mutex;
+use std::collections::hash_map::RandomState;
+use std::collections::HashMap;
 
 /*
 LANGUAGE
@@ -25,7 +27,7 @@ pub const RAE_ASSERT: &str = "assert";
 pub const RAE_ASSERT_SHORT: &str = "+>";
 pub const RAE_RETRACT: &str = "retract";
 pub const RAE_RETRACT_SHORT: &str = "->";
-pub const RAE_DO: &str = "rae-do";
+pub const RAE_AWAIT: &str = "rae-await";
 
 //RAE Interface with a platform
 pub const RAE_EXEC_COMMAND: &str = "rae-exec-command";
@@ -82,7 +84,7 @@ impl GetModule for CtxRaeExec {
         module.add_fn_prelude(RAE_ASSERT_SHORT, assert_fact);
         module.add_fn_prelude(RAE_RETRACT, retract_fact);
         module.add_fn_prelude(RAE_RETRACT_SHORT, retract_fact);
-        module.add_fn_prelude(RAE_DO, fn_do);
+        module.add_fn_prelude(RAE_AWAIT, fn_await);
         module.add_mut_fn_prelude(RAE_OPEN_COM_PLATFORM, open_com);
         module.add_mut_fn_prelude(RAE_START_PLATFORM, start_platform);
         module
@@ -138,10 +140,7 @@ impl Display for Job {
 
 impl Job {
     pub fn new(value: LValue, _type: JobType) -> Self {
-        Self {
-            _type,
-            core: value,
-        }
+        Self { _type, core: value }
     }
 }
 
@@ -177,11 +176,11 @@ pub trait RAEInterface: Any + Send + Sync {
     fn get_status(&self, args: &[LValue]) -> Result<LValue, LError>;
 
     ///Launch the platform (such as the simulation in godot)
-    fn launch_platform(&mut self, args: &[LValue]) -> Result<LValue, LError>;
+    fn launch_platform(&mut self, args: &[LValue], state: RAEState, status: ActionsProgress) -> Result<LValue, LError>;
 
     fn start_platform(&self, args: &[LValue]) -> Result<LValue, LError>;
 
-    fn open_com(&mut self, args: &[LValue]) -> Result<LValue, LError>;
+    fn open_com(&mut self, args: &[LValue],  state: RAEState, status: ActionsProgress) -> Result<LValue, LError>;
 
     fn get_action_status(&self, action_id: &usize) -> Status;
     fn set_status(&self, action_id: usize, status: Status);
@@ -210,7 +209,7 @@ impl RAEInterface for () {
         todo!()
     }
 
-    fn launch_platform(&mut self, _: &[LValue]) -> Result<LValue, LError> {
+    fn launch_platform(&mut self, _: &[LValue], _: RAEState, _: ActionsProgress) -> Result<LValue, LError> {
         todo!()
     }
 
@@ -218,7 +217,7 @@ impl RAEInterface for () {
         todo!()
     }
 
-    fn open_com(&mut self, _: &[LValue]) -> Result<LValue, LError> {
+    fn open_com(&mut self, _: &[LValue], _: RAEState, _: ActionsProgress) -> Result<LValue, LError> {
         todo!()
     }
 
@@ -237,7 +236,7 @@ impl RAEInterface for () {
 
 pub fn exec_command(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
     let command_id = ctx.actions_progress.get_new_id();
-    let debug : LValue = args.into();
+    let debug: LValue = args.into();
     println!("exec command {}: {}", command_id, debug);
     ctx.platform_interface.exec_command(args, command_id)?;
     Ok(command_id.into())
@@ -267,34 +266,53 @@ pub fn assert_fact(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LVa
 
 ///Monitor the status of an action that has been triggered
 /// Return true if the action is a success, false otherwise
-pub fn fn_do(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
+pub fn fn_await(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1));
     }
 
-    let action_id = &args[0];
-    println!("monitor {}", action_id);
+    let action_id = args[0].clone();
+    println!("await on action (id={})", action_id);
 
     if let LValue::Number(LNumber::Usize(action_id)) = action_id {
-        loop {
-            let status = ctx.platform_interface.get_action_status(action_id);
-            match status {
-                Status::NotTriggered => {
-                    //println!("not triggered");
+        let mut receiver = ctx.actions_progress.declare_new_watcher(&action_id);
+        let action_progress= ctx.actions_progress.clone();
+        let handle = tokio::runtime::Handle::current();
+        thread::spawn(move || {
+            handle.block_on(async move {
+                loop {
+                    println!("waiting on status:");
+                    match receiver.recv().await.unwrap() {
+                        true =>
+                            {
+                                println!("status updated!");
+                                match action_progress.status.read().unwrap().get(&action_id) {
+                                    Some(s) => match s {
+                                        Status::Pending => {
+                                            println!("not triggered");
+                                        }
+                                        Status::Running => {
+                                            println!("running");
+                                        }
+                                        Status::Failure => {
+                                            println!("command is a failure");
+                                            return Ok(false.into());
+                                        }
+                                        Status::Done => {
+                                            println!("command is a success");
+                                            return Ok(true.into());
+                                        }
+                                    }
+                                    None => {
+                                        panic!("no action status")
+                                    }
+                                };
+                            }
+                        false => panic!("sync to watch action status should not be false"),
+                    }
                 }
-                Status::Running => {
-                    //println!("running");
-                }
-                Status::Failure => {
-                    println!("command is a failure");
-                    return Ok(false.into());
-                }
-                Status::Done => {
-                    println!("command is a success");
-                    return Ok(true.into());
-                }
-            }
-        }
+            })
+        }).join().unwrap()
     } else {
         Err(WrongType(
             action_id.clone(),
@@ -309,7 +327,11 @@ pub fn launch_platform(
     _env: &LEnv,
     ctx: &mut CtxRaeExec,
 ) -> Result<LValue, LError> {
-    ctx.platform_interface.launch_platform(args)
+    match &ctx.actions_progress.sync.sender {
+        None => Err(SpecialError("sender to actions status watcher missing.".to_string())),
+        Some(sender) => ctx.platform_interface.launch_platform(args, ctx.state.clone(), ctx.actions_progress.clone())
+    }
+
 }
 
 pub fn start_platform(
@@ -321,7 +343,11 @@ pub fn start_platform(
 }
 
 pub fn open_com(args: &[LValue], _env: &LEnv, ctx: &mut CtxRaeExec) -> Result<LValue, LError> {
-    ctx.platform_interface.open_com(args)
+    match &ctx.actions_progress.sync.sender {
+        None => Err(SpecialError("sender to actions status watcher missing.".to_string())),
+        Some(sender) => ctx.platform_interface.open_com(args, ctx.state.clone(), ctx.actions_progress.clone())
+    }
+
 }
 
 pub fn get_state(args: &[LValue], env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {

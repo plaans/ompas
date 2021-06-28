@@ -3,9 +3,9 @@ use crate::rae_domain::GODOT_DOMAIN;
 use crate::serde::*;
 use crate::state::*;
 use crate::tcp::*;
-use ompas_acting::rae::context::Status;
+use ompas_acting::rae::context::{Status, ActionsProgress};
 use ompas_acting::rae::module::mod_rae_exec::RAEInterface;
-use ompas_acting::rae::state::{ActionStatus, ActionStatusSet, StateType};
+use ompas_acting::rae::state::{ActionStatus, ActionStatusSet, StateType, RAEState};
 use ompas_lisp::core::LEnv;
 use ompas_lisp::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
 use ompas_lisp::structs::{GetModule, LError, LValue, LValueS, Module, NameTypeLValue};
@@ -15,8 +15,8 @@ use std::net::SocketAddr;
 use std::process::Command;
 use std::sync::{Arc, RwLock};
 use std::{thread, time};
+use tokio::sync::mpsc;
 use tokio::sync::mpsc::Sender;
-use tokio::sync::{mpsc};
 
 /*
 LANGUAGE
@@ -334,7 +334,6 @@ impl CtxGodot {
 
 impl RAEInterface for CtxGodot {
     fn exec_command(&self, args: &[LValue], command_id: usize) -> Result<LValue, LError> {
-        //println!("in exec command godot");
 
         let gs = GodotMessageSerde {
             _type: GodotMessageType::RobotCommand,
@@ -344,7 +343,13 @@ impl RAEInterface for CtxGodot {
             }),
         };
 
-        self.action_status.write().unwrap().status.insert(command_id, ActionStatus::ActionPending);
+        self.action_status
+            .write()
+            .unwrap()
+            .status
+            .insert(command_id, ActionStatus::ActionPending);
+
+        //println!("action status created");
 
         let command = serde_json::to_string(&gs).unwrap();
 
@@ -360,14 +365,17 @@ impl RAEInterface for CtxGodot {
             Some(s) => s.clone(),
         };
         println!("trying to send command");
-        tokio::runtime::Handle::current().spawn(async move {
-            println!("command in sending!");
-            sender
-                .send(command)
-                .await
-                .expect("couldn't send via channel");
-            println!("command sent!");
-        });
+        let handle = tokio::runtime::Handle::current();
+        thread::spawn( move || {
+            handle.block_on(async move {
+                println!("command in sending!");
+                sender
+                    .send(command)
+                    .await
+                    .expect("couldn't send via channel");
+                println!("command sent!");
+            })
+        }).join();
         Ok(LValue::Nil)
     }
 
@@ -474,10 +482,10 @@ impl RAEInterface for CtxGodot {
         Ok(LValue::String(string))
     }
 
-    fn launch_platform(&mut self, args: &[LValue]) -> Result<LValue, LError> {
+    fn launch_platform(&mut self, args: &[LValue], state: RAEState, ref_status: ActionsProgress) -> Result<LValue, LError> {
         self.start_platform(&[])?;
         thread::sleep(time::Duration::from_millis(500));
-        self.open_com(args)
+        self.open_com(args, state, ref_status)
     }
 
     fn start_platform(&self, args: &[LValue]) -> Result<LValue, LError> {
@@ -518,7 +526,7 @@ impl RAEInterface for CtxGodot {
         Ok(LValue::Nil)
     }
 
-    fn open_com(&mut self, args: &[LValue]) -> Result<LValue, LError> {
+    fn open_com(&mut self, args: &[LValue], ref_state: RAEState, ref_status: ActionsProgress) -> Result<LValue, LError> {
         let socket_addr: SocketAddr = match args.len() {
             0 => "127.0.0.1:10000".parse().unwrap(),
             2 => {
@@ -540,15 +548,13 @@ impl RAEInterface for CtxGodot {
         let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
         self.sender_socket = Some(tx.clone());
 
-        tokio::spawn(async move {
-            tx.send(TEST_TCP.to_string()).await
-        });
+        tokio::spawn(async move { tx.send(TEST_TCP.to_string()).await });
 
         //println!("godot launching...");
         //println!("godot launched!");
-        let state = self.state.clone();
-        let status = self.action_status.clone();
-        tokio::spawn(async move { task_tcp_connection(&socket_addr, rx, state, status).await });
+        //let state = self.state.clone();
+        //let status = self.action_status.clone();
+        tokio::spawn(async move { task_tcp_connection(&socket_addr, rx, ref_state, ref_status).await });
         println!("com opened with godot");
         Ok(LValue::Nil)
     }
@@ -743,11 +749,13 @@ Functions
  */
 
 fn launch_godot(args: &[LValue], _: &LEnv, ctx: &mut CtxGodot) -> Result<LValue, LError> {
-    ctx.launch_platform(args)
+    //ctx.launch_platform(args, Arc::new(Default::default()), )
+    todo!()
 }
 
 fn open_com(args: &[LValue], _: &LEnv, ctx: &mut CtxGodot) -> Result<LValue, LError> {
-    ctx.open_com(args)
+    //ctx.open_com(args, None)
+    todo!()
 }
 
 pub const DEFAULT_PATH_PROJECT_GODOT: &str = "/home/jeremy/godot/Simulation-Factory-Godot/simu";

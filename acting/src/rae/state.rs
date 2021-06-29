@@ -13,7 +13,7 @@ pub const KEY_DYNAMIC: &str = "dynamic";
 pub const KEY_STATIC: &str = "static";
 pub const KEY_INNER_WORLD: &str = "inner-world";
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialOrd, PartialEq, Eq)]
 pub enum StateType {
     Static,
     Dynamic,

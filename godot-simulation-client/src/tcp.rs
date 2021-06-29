@@ -1,6 +1,6 @@
 use crate::serde::{GodotMessageSerde, GodotMessageType};
 use ompas_acting::rae::context::ActionsProgress;
-use ompas_acting::rae::state::{ActionStatus, LState, RAEState};
+use ompas_acting::rae::state::{ActionStatus, LState, RAEState, StateType};
 use std::convert::TryInto;
 use std::net::SocketAddr;
 use tokio::io::{self, AsyncReadExt, AsyncWriteExt, BufReader, ReadHalf, WriteHalf};
@@ -85,6 +85,9 @@ async fn async_read_socket(stream: ReadHalf<TcpStream>, state: RAEState, status:
             match message._type {
                 GodotMessageType::StaticState | GodotMessageType::DynamicState => {
                     let temp_state: LState = message.try_into().unwrap();
+                    /*if temp_state._type == Some(StateType::Static) {
+                        println!("updating static state: {:?}", temp_state)
+                    }*/
                     state.set_state(temp_state);
                 }
                 GodotMessageType::ActionResponse => {

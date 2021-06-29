@@ -1,6 +1,8 @@
 use crate::rae::module::mod_rae_exec::{Job, JobId};
 use crate::rae::refinement::{RefinementStack, StackFrame};
 use crate::rae::state::{ActionStatus, LState, RAEState};
+use crate::rae::status::ActionStatusSync;
+use crate::rae::TOKIO_CHANNEL_SIZE;
 use ompas_lisp::core::{ContextCollection, LEnv};
 use ompas_lisp::structs::LError::SpecialError;
 use ompas_lisp::structs::{InitLisp, LError, LFn, LLambda, LValue};
@@ -8,13 +10,12 @@ use std::collections::{HashMap, VecDeque};
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{Display, Formatter};
 use std::panic::panic_any;
+use std::ptr::write_bytes;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, RwLock};
 use std::thread;
-use tokio::sync::mpsc::Receiver;
-use crate::rae::status::ActionStatusSync;
 use tokio::sync::mpsc;
-use crate::rae::TOKIO_CHANNEL_SIZE;
+use tokio::sync::mpsc::Receiver;
 
 #[derive(Default, Debug)]
 pub struct Agenda {
@@ -113,13 +114,16 @@ impl Default for RAEEnv {
             env,
             ctxs,
             init_lisp,
-            status_watcher: None
+            status_watcher: None,
         }
     }
 }
 
 impl RAEEnv {
-    pub fn new(job_receiver: Option<Receiver<Job>>, status_watcher: Option<Receiver<usize>>) -> Self {
+    pub fn new(
+        job_receiver: Option<Receiver<Job>>,
+        status_watcher: Option<Receiver<usize>>,
+    ) -> Self {
         let (mut env, ctxs, init_lisp) = LEnv::root();
         env.insert(RAE_ACTION_LIST.to_string(), LValue::List(vec![]));
         env.insert(RAE_METHOD_LIST.to_string(), LValue::List(vec![]));
@@ -381,7 +385,7 @@ pub type TaskId = usize;
 //struct to handle actions trigger, status and updates by other modules as godot
 #[derive(Default, Debug, Clone)]
 pub struct ActionsProgress {
-    pub status: Arc<RwLock<HashMap<ActionId, Status>>>,
+    pub status: Arc<RwLock<im::HashMap<ActionId, Status>>>,
     pub sync: ActionStatusSync,
     next_id: Arc<AtomicUsize>,
 }
@@ -402,6 +406,17 @@ pub enum Status {
     Done,
 }
 
+impl Display for Status {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            Status::Pending => write!(f, "pending"),
+            Status::Running => write!(f, "running"),
+            Status::Failure => write!(f, "failure"),
+            Status::Done => write!(f, "done"),
+        }
+    }
+}
+
 impl ActionsProgress {
     pub fn get_status(&self, id: &ActionId) -> Option<Status> {
         self.status.read().unwrap().get(id).cloned()
@@ -409,10 +424,7 @@ impl ActionsProgress {
 
     pub fn add_action(&self) -> usize {
         let id = self.get_new_id();
-        self.status
-            .write()
-            .unwrap()
-            .insert(id, Status::Pending);
+        self.status.write().unwrap().insert(id, Status::Pending);
         id
     }
 

@@ -13,7 +13,7 @@ LANGUAGE
 
 //TODO: [mod] add the possibility to redirect log output to a file or any type of input
 
-pub const TOKIO_CHANNEL_SIZE: usize = 16_384;
+const TOKIO_CHANNEL_SIZE: usize = 16_384;
 
 const MOD_IO: &str = "mod-io";
 const DOC_MOD_IO: &str = "Module than handles input/output functions.";

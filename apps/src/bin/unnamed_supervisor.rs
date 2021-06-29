@@ -4,7 +4,7 @@ use ompas_modules::_type::CtxType;
 use ompas_modules::counter::CtxCounter;
 use ompas_modules::doc::{CtxDoc, Documentation};
 use ompas_modules::io::repl::{spawn_log, spawn_repl, EXIT_CODE_STDOUT};
-use ompas_modules::io::{CtxIo, TOKIO_CHANNEL_SIZE};
+use ompas_modules::io::CtxIo;
 use ompas_modules::math::CtxMath;
 //use ompas_modules::robot::CtxRobot;
 use ompas_acting::controller::dumber::CtxDumber;
@@ -12,13 +12,14 @@ use ompas_acting::rae::module::init_ctx_rae;
 use ompas_acting::rae::module::mod_rae::CtxRae;
 use ompas_acting::rae::module::mod_rae_exec::CtxRaeExec;
 use ompas_acting::rae::module::mod_rae_monitor::CtxRaeMonitor;
-use ompas_godot_simulation_client::simu::CtxGodot;
+use ompas_godot_simulation_client::mod_godot::CtxGodot;
+use ompas_godot_simulation_client::rae_interface::PlatformGodot;
 use std::path::PathBuf;
 use structopt::StructOpt;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Receiver, Sender};
 
-pub const CHANNEL_SIZE: usize = 16_384;
+pub const TOKIO_CHANNEL_SIZE: usize = 65_384;
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -74,8 +75,7 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     let ctx_counter = CtxCounter::default();
     let ctx_dumber = CtxDumber::default();
     let ctx_godot = CtxGodot::default();
-    let ctx_godot_2 = CtxGodot::default();
-    let (ctx_rae, ctx_rae_monitor) = init_ctx_rae(Box::new(ctx_godot_2));
+    let (ctx_rae, ctx_rae_monitor) = init_ctx_rae(Box::new(PlatformGodot::default()));
     //Insert the doc for the different contexts.
     ctx_doc.insert_doc(CtxIo::documentation());
     ctx_doc.insert_doc(CtxMath::documentation());
@@ -95,7 +95,7 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     let mut _ctx_rae_exec = CtxRaeExec {
         actions_progress: Default::default(),
         state: Default::default(),
-        platform_interface: Box::new(CtxGodot::default()),
+        platform_interface: Box::new(PlatformGodot::default()),
     };
 
     load_module(&mut root_env, &mut ctxs, ctx_doc, &mut lisp_init);

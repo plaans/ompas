@@ -1,9 +1,7 @@
 use crate::rae::context::*;
-use crate::rae::module::domain::{
-    MACRO_DEF_ACTION, MACRO_DEF_METHOD, MACRO_DEF_STATE_FUNCTION, MACRO_DEF_TASK,
-};
 use crate::rae::module::mod_rae_exec::{CtxRaeExec, RAEInterface};
 use crate::rae::rae_run;
+use crate::rae::state::{StateType, KEY_DYNAMIC, KEY_INNER_WORLD, KEY_STATIC};
 use ompas_lisp::core::{eval, expand, load_module, LEnv};
 use ompas_lisp::functions::cons;
 use ompas_lisp::structs::LError::*;
@@ -31,6 +29,8 @@ pub const RAE_GET_TASKS: &str = "rae-get-tasks";
 pub const RAE_GET_STATE_FUNCTION: &str = "rae-get-state-function";
 pub const RAE_GET_ENV: &str = "rae-get-env";
 pub const RAE_LAUNCH: &str = "rae-launch";
+pub const RAE_GET_STATE: &str = "rae-get-state";
+pub const RAE_GET_STATUS: &str = "rae-get-status";
 
 pub const DOC_RAE_LAUNCH: &str = "todo!";
 pub const DOC_RAE_ADD_ACTION: &str = "todo!";
@@ -68,10 +68,10 @@ impl GetModule for CtxRae {
 
         module.add_mut_fn_prelude(RAE_LAUNCH, launch_rae);
 
-        module.add_mut_fn_prelude(RAE_ADD_ACTION, add_action);
+        /*module.add_mut_fn_prelude(RAE_ADD_ACTION, add_action);
         module.add_mut_fn_prelude(RAE_ADD_STATE_FUNCTION, add_state_function);
         module.add_mut_fn_prelude(RAE_ADD_TASK, add_task);
-        module.add_mut_fn_prelude(RAE_ADD_METHOD, add_method);
+        module.add_mut_fn_prelude(RAE_ADD_METHOD, add_method);*/
         module.add_fn_prelude(RAE_GET_METHODS, get_methods);
         module.add_fn_prelude(RAE_GET_STATE_FUNCTION, get_state_function);
         module.add_fn_prelude(RAE_GET_ACTIONS, get_actions);
@@ -83,6 +83,10 @@ impl GetModule for CtxRae {
         module.add_mut_fn_prelude(RAE_DEF_ACTION, def_action);
         module.add_mut_fn_prelude(RAE_DEF_TASK, def_task);
         module.add_mut_fn_prelude(RAE_DEF_METHOD, def_method);
+
+        //functions to debug the functionnement of rae
+        module.add_fn_prelude(RAE_GET_STATE, get_state);
+        module.add_fn_prelude(RAE_GET_STATUS, get_status);
 
         module
     }
@@ -180,41 +184,6 @@ pub fn def_state_function(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Resu
     Ok(Nil)
 }
 
-pub fn add_state_function(
-    args: &[LValue],
-    _env: &LEnv,
-    ctx: &mut CtxRae,
-) -> Result<LValue, LError> {
-    if args.is_empty() {
-        return Err(WrongNumberOfArgument(
-            args.into(),
-            args.len(),
-            1..std::usize::MAX,
-        ));
-    }
-
-    if let LValue::Symbol(action_label) = &args[0] {
-        if let LValue::Lambda(_) = &args[1] {
-            ctx.env
-                .add_state_function(action_label.to_string(), args[1].clone())?;
-        } else {
-            return Err(WrongType(
-                args[1].clone(),
-                args[1].clone().into(),
-                NameTypeLValue::Lambda,
-            ));
-        }
-    } else {
-        return Err(WrongType(
-            args[0].clone(),
-            args[0].clone().into(),
-            NameTypeLValue::Symbol,
-        ));
-    }
-
-    Ok(Nil)
-}
-
 pub fn def_action(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
     if args.is_empty() {
         return Err(WrongNumberOfArgument(
@@ -255,34 +224,6 @@ pub fn def_action(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValu
                 NameTypeLValue::Symbol,
             ));
         }
-    }
-
-    Ok(Nil)
-}
-
-///Add an action to RAE env
-pub fn add_action(args: &[LValue], _env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
-    if args.len() != 2 {
-        return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
-    }
-
-    if let LValue::Symbol(action_label) = &args[0] {
-        if let LValue::Lambda(_) = &args[1] {
-            ctx.env
-                .add_action(action_label.to_string(), args[1].clone())?;
-        } else {
-            return Err(WrongType(
-                args[1].clone(),
-                args[1].clone().into(),
-                NameTypeLValue::Lambda,
-            ));
-        }
-    } else {
-        return Err(WrongType(
-            args[0].clone(),
-            args[0].clone().into(),
-            NameTypeLValue::Symbol,
-        ));
     }
 
     Ok(Nil)
@@ -344,45 +285,6 @@ pub fn def_method(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValu
     Ok(Nil)
 }
 
-///Add a method to RAE env
-pub fn add_method(args: &[LValue], _env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
-    if args.len() != 3 {
-        return Err(WrongNumberOfArgument(args.into(), args.len(), 3..3));
-    }
-
-    if let LValue::Symbol(method_label) = &args[0] {
-        if let LValue::Symbol(task_label) = &args[1] {
-            if let LValue::Lambda(_) = &args[2] {
-                ctx.env.add_method(
-                    method_label.to_string(),
-                    task_label.to_string(),
-                    args[2].clone(),
-                )?;
-            } else {
-                return Err(WrongType(
-                    args[2].clone(),
-                    args[2].clone().into(),
-                    NameTypeLValue::Lambda,
-                ));
-            }
-        } else {
-            return Err(WrongType(
-                args[1].clone(),
-                args[1].clone().into(),
-                NameTypeLValue::Symbol,
-            ));
-        }
-    } else {
-        return Err(WrongType(
-            args[0].clone(),
-            args[0].clone().into(),
-            NameTypeLValue::Symbol,
-        ));
-    }
-
-    Ok(Nil)
-}
-
 pub fn def_task(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
     if args.is_empty() {
         return Err(WrongNumberOfArgument(
@@ -427,6 +329,137 @@ pub fn def_task(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValue,
     Ok(Nil)
 }
 
+pub fn get_status(_: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
+    let status = ctx.env.actions_progress.status.read().unwrap().clone();
+    let mut string = "Actions Status:\n".to_string();
+    for element in status {
+        string.push_str(format!("{}:{}\n", element.0, element.1).as_str())
+    }
+
+    Ok(string.into())
+}
+
+pub fn get_state(args: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
+    let _type = match args.len() {
+        0 => None,
+        1 => {
+            if let LValue::Symbol(sym) = &args[0] {
+                match sym.as_str() {
+                    KEY_STATIC => Some(StateType::Static),
+                    KEY_DYNAMIC => Some(StateType::Dynamic),
+                    KEY_INNER_WORLD => Some(StateType::InnerWorld),
+                    _ => {
+                        return Err(SpecialError(format!(
+                            "was expecting keys {}, {}, {}",
+                            KEY_STATIC, KEY_DYNAMIC, KEY_INNER_WORLD
+                        )))
+                    }
+                }
+            } else {
+                return Err(WrongType(
+                    args[0].clone(),
+                    (&args[0]).into(),
+                    NameTypeLValue::Symbol,
+                ));
+            }
+        }
+        _ => return Err(WrongNumberOfArgument(args.into(), args.len(), 0..1)),
+    };
+
+    let state = ctx.env.state.get_state(_type);
+    Ok(state.into_map())
+}
+
+/*
+launch the main in a thread
+ */
+pub fn launch_rae(_: &[LValue], _env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
+    let options = SelectOption::new(0, 0);
+    let rae_env = RAEEnv {
+        job_receiver: None,
+        status_watcher: None,
+        agenda: Default::default(),
+        actions_progress: ctx.env.actions_progress.clone(),
+        state: ctx.env.state.clone(),
+        env: ctx.env.env.clone(),
+        ctxs: Default::default(),
+        init_lisp: Default::default(),
+    };
+    let context = mem::replace(&mut ctx.env, rae_env);
+    tokio::spawn(async move {
+        rae_run(context, &options, "rae-log.txt".to_string()).await;
+    });
+    Ok(LValue::String("rae launched succesfully".to_string()))
+}
+
+/*
+///Add an action to RAE env
+pub fn add_action(args: &[LValue], _env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
+    if args.len() != 2 {
+        return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
+    }
+
+    if let LValue::Symbol(action_label) = &args[0] {
+        if let LValue::Lambda(_) = &args[1] {
+            ctx.env
+                .add_action(action_label.to_string(), args[1].clone())?;
+        } else {
+            return Err(WrongType(
+                args[1].clone(),
+                args[1].clone().into(),
+                NameTypeLValue::Lambda,
+            ));
+        }
+    } else {
+        return Err(WrongType(
+            args[0].clone(),
+            args[0].clone().into(),
+            NameTypeLValue::Symbol,
+        ));
+    }
+
+    Ok(Nil)
+}
+
+///Add a method to RAE env
+pub fn add_method(args: &[LValue], _env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
+    if args.len() != 3 {
+        return Err(WrongNumberOfArgument(args.into(), args.len(), 3..3));
+    }
+
+    if let LValue::Symbol(method_label) = &args[0] {
+        if let LValue::Symbol(task_label) = &args[1] {
+            if let LValue::Lambda(_) = &args[2] {
+                ctx.env.add_method(
+                    method_label.to_string(),
+                    task_label.to_string(),
+                    args[2].clone(),
+                )?;
+            } else {
+                return Err(WrongType(
+                    args[2].clone(),
+                    args[2].clone().into(),
+                    NameTypeLValue::Lambda,
+                ));
+            }
+        } else {
+            return Err(WrongType(
+                args[1].clone(),
+                args[1].clone().into(),
+                NameTypeLValue::Symbol,
+            ));
+        }
+    } else {
+        return Err(WrongType(
+            args[0].clone(),
+            args[0].clone().into(),
+            NameTypeLValue::Symbol,
+        ));
+    }
+
+    Ok(Nil)
+}
+
 ///Add a task to RAE env
 pub fn add_task(args: &[LValue], _env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
     if args.len() != 2 {
@@ -454,24 +487,39 @@ pub fn add_task(args: &[LValue], _env: &LEnv, ctx: &mut CtxRae) -> Result<LValue
     Ok(Nil)
 }
 
-/*
-launch the main in a thread
- */
-pub fn launch_rae(_: &[LValue], _env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
-    let options = SelectOption::new(0, 0);
-    let rae_env = RAEEnv {
-        job_receiver: None,
-        status_watcher: None,
-        agenda: Default::default(),
-        actions_progress: Default::default(),
-        state: Default::default(),
-        env: ctx.env.env.clone(),
-        ctxs: Default::default(),
-        init_lisp: Default::default(),
-    };
-    let context = mem::replace(&mut ctx.env, rae_env);
-    tokio::spawn(async move {
-        rae_run(context, &options, "rae-log.txt".to_string()).await;
-    });
-    Ok(LValue::String("rae launched succesfully".to_string()))
-}
+
+
+pub fn add_state_function(
+    args: &[LValue],
+    _env: &LEnv,
+    ctx: &mut CtxRae,
+) -> Result<LValue, LError> {
+    if args.is_empty() {
+        return Err(WrongNumberOfArgument(
+            args.into(),
+            args.len(),
+            1..std::usize::MAX,
+        ));
+    }
+
+    if let LValue::Symbol(action_label) = &args[0] {
+        if let LValue::Lambda(_) = &args[1] {
+            ctx.env
+                .add_state_function(action_label.to_string(), args[1].clone())?;
+        } else {
+            return Err(WrongType(
+                args[1].clone(),
+                args[1].clone().into(),
+                NameTypeLValue::Lambda,
+            ));
+        }
+    } else {
+        return Err(WrongType(
+            args[0].clone(),
+            args[0].clone().into(),
+            NameTypeLValue::Symbol,
+        ));
+    }
+
+    Ok(Nil)
+}*/

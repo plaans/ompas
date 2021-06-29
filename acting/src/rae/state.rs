@@ -4,8 +4,14 @@ use im::HashMap;
 use ompas_lisp::structs::LError::SpecialError;
 use ompas_lisp::structs::{LError, LValue, LValueS};
 use std::fmt::{Display, Formatter};
+use std::ops::Deref;
 use std::ptr::write_bytes;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, RwLock};
+
+pub const KEY_DYNAMIC: &str = "dynamic";
+pub const KEY_STATIC: &str = "static";
+pub const KEY_INNER_WORLD: &str = "inner-world";
 
 #[derive(Clone, Debug)]
 pub enum StateType {
@@ -93,14 +99,41 @@ pub struct RAEState {
 }
 
 impl RAEState {
-    pub fn get_state(&self) -> LState {
-        self.inner_world.read().unwrap().union(
-            &self
-                ._static
-                .read()
-                .unwrap()
-                .union(&self.dynamic.read().unwrap()),
-        )
+    pub fn get_state(&self, _type: Option<StateType>) -> LState {
+        match _type {
+            None => self.inner_world.read().unwrap().union(
+                &self
+                    ._static
+                    .read()
+                    .unwrap()
+                    .union(&self.dynamic.read().unwrap()),
+            ),
+            Some(_type) => match _type {
+                StateType::Static => self._static.read().unwrap().deref().clone(),
+                StateType::Dynamic => self.dynamic.read().unwrap().deref().clone(),
+                StateType::InnerWorld => self.inner_world.read().unwrap().deref().clone(),
+            },
+        }
+    }
+
+    pub fn set_state(&self, state: LState) {
+        match &state._type {
+            None => {}
+            Some(_type) => match _type {
+                StateType::Static => {
+                    let mut _ref = self._static.write().unwrap();
+                    _ref.inner = state.inner;
+                }
+                StateType::Dynamic => {
+                    let mut _ref = self.dynamic.write().unwrap();
+                    _ref.inner = state.inner;
+                }
+                StateType::InnerWorld => {
+                    let mut _ref = self.inner_world.write().unwrap();
+                    _ref.inner = state.inner;
+                }
+            },
+        }
     }
 
     pub fn add_fact(&self, key: LValueS, value: LValueS) {
@@ -167,38 +200,51 @@ impl Display for ActionStatus {
 
 #[derive(Default, Debug, Clone)]
 pub struct ActionStatusSet {
-    pub server_id_interal_id: im::HashMap<usize, usize>,
-    pub status: im::HashMap<usize, ActionStatus>,
+    pub server_id_internal_id: Arc<RwLock<im::HashMap<usize, usize>>>,
+    pub status: Arc<RwLock<im::HashMap<usize, ActionStatus>>>,
+    next_id: Arc<AtomicUsize>,
 }
 
 impl ActionStatusSet {
+    pub fn get_new_id(&self) -> usize {
+        let result = self.next_id.load(Ordering::Relaxed);
+        let new_value = result + 1;
+        self.next_id.store(new_value, Ordering::Relaxed);
+        result
+    }
+
     pub fn set_status(&mut self, internal_id: usize, status: ActionStatus) {
-        self.status.insert(internal_id, status);
+        self.status.write().unwrap().insert(internal_id, status);
     }
 
     pub fn set_status_from_server(&mut self, server_id: usize, status: ActionStatus) {
-        let id = self.server_id_interal_id.get(&server_id).unwrap();
-        self.status.insert(*id, status);
+        let id = *self
+            .server_id_internal_id
+            .read()
+            .unwrap()
+            .get(&server_id)
+            .unwrap();
+        self.status.write().unwrap().insert(id, status);
     }
 
     pub fn get_status(&self, internal_id: &usize) -> Option<ActionStatus> {
-        self.status.get(internal_id).cloned()
+        self.status.read().unwrap().get(internal_id).cloned()
     }
 
-    pub fn get_status_from_server(&self, server_id: usize) -> Option<&ActionStatus> {
-        match self.server_id_interal_id.get(&server_id) {
+    pub fn get_status_from_server(&self, server_id: usize) -> Option<ActionStatus> {
+        match self.server_id_internal_id.read().unwrap().get(&server_id) {
             None => None,
-            Some(id) => self.status.get(id),
+            Some(id) => self.status.read().unwrap().get(id).cloned(),
         }
     }
 
     pub fn pretty_print(&self) -> String {
         let mut str = String::new();
         str.push_str("Action(s) Status:\n");
-        for e in &self.server_id_interal_id {
-            str.push_str(
-                format!("- {}({}): {:?}\n", e.1, e.0, self.status.get(&e.1).unwrap()).as_str(),
-            );
+        let status = self.status.read().unwrap().clone();
+        let server_id_internal_id = self.server_id_internal_id.read().unwrap().clone();
+        for e in &server_id_internal_id {
+            str.push_str(format!("- {}({}): {:?}\n", e.1, e.0, status.get(&e.1).unwrap()).as_str());
         }
         str
     }

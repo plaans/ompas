@@ -12,11 +12,11 @@ use crate::rae::context::{RAEEnv, SelectOption};
 use crate::rae::log::RAEStatus;
 use crate::rae::module::mod_rae_exec::Job;
 use crate::rae::refinement::{RefinementStack, StackFrame};
+use crate::rae::status::async_status_watcher_run;
 use ompas_lisp::core::{eval, ContextCollection, LEnv};
 use ompas_lisp::functions::cons;
 use ompas_lisp::structs::{LError, LValue};
 use std::mem;
-use crate::rae::status::async_status_watcher_run;
 
 pub mod context;
 pub mod log;
@@ -32,7 +32,7 @@ pub enum RAEError {
     Other(String),
 }
 
-pub const TOKIO_CHANNEL_SIZE: usize = 65_536; //=2^16
+const TOKIO_CHANNEL_SIZE: usize = 65_536; //=2^16
 
 pub async fn rae_run(mut context: RAEEnv, _select_option: &SelectOption, _log: String) {
     //println!("in rae run!");
@@ -81,11 +81,11 @@ pub async fn rae_run(mut context: RAEEnv, _select_option: &SelectOption, _log: S
     let async_action_status = context.actions_progress.sync.clone();
     let receiver_sync = mem::replace(&mut context.status_watcher, None).unwrap();
     tokio::spawn(async move {
-        println!("starting status watcher");
+        //println!("starting status watcher");
         async_status_watcher_run(async_action_status, receiver_sync).await;
     });
 
-    println!("async status watcher");
+    //println!("async status watcher");
 
     let mut receiver = mem::replace(&mut context.job_receiver, None).unwrap();
 
@@ -98,7 +98,7 @@ pub async fn rae_run(mut context: RAEEnv, _select_option: &SelectOption, _log: S
     //Windows::
     //let result = eval(&vec![LValue::Symbol("rae-open-com-platform".to_string())].into(), &mut context.env, &mut context.ctxs);
     match result {
-        Ok(_) => println!("successfully open com with platform"),
+        Ok(_) => {} //println!("successfully open com with platform"),
         Err(e) => eprintln!("{}", e),
     }
 
@@ -107,7 +107,7 @@ pub async fn rae_run(mut context: RAEEnv, _select_option: &SelectOption, _log: S
 
         //Note: The whole block could be in an async block
         while let Some(job) = receiver.recv().await {
-            println!("new job received: {}", job);
+            //println!("new job received: {}", job);
 
             let job_id = &context.agenda.add_job(job.clone());
 
@@ -126,7 +126,7 @@ pub async fn rae_run(mut context: RAEEnv, _select_option: &SelectOption, _log: S
                         let method = select_greedy(&context, label, params);
                         match &method {
                             LValue::Nil => println!("no method available"),
-                            LValue::Symbol(sym) => {
+                            LValue::Symbol(_) => {
                                 //println!("method \"{}\" choosed", sym);
 
                                 let mut rs = context.agenda.get_stack(job_id).unwrap().clone();

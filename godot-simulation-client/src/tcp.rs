@@ -1,13 +1,11 @@
 use crate::serde::{GodotMessageSerde, GodotMessageType};
-use crate::state::GodotState;
-use ompas_acting::rae::state::{ActionStatus, ActionStatusSet, LState, RAEState};
+use ompas_acting::rae::context::ActionsProgress;
+use ompas_acting::rae::state::{ActionStatus, LState, RAEState};
 use std::convert::TryInto;
 use std::net::SocketAddr;
-use std::sync::{Arc, RwLock};
 use tokio::io::{self, AsyncReadExt, AsyncWriteExt, BufReader, ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
-use tokio::sync::mpsc::{Receiver, Sender};
-use ompas_acting::rae::context::ActionsProgress;
+use tokio::sync::mpsc::Receiver;
 
 pub const BUFFER_SIZE: usize = 65_536; //65KB should be enough for the moment
 
@@ -31,11 +29,11 @@ pub async fn task_tcp_connection(
 async fn async_send_socket(mut stream: WriteHalf<TcpStream>, mut receiver: Receiver<String>) {
     let test = receiver.recv().await.unwrap();
     assert_eq!(test, TEST_TCP);
-    println!("socket ready to receive command !");
+    //println!("socket ready to receive command !");
 
     loop {
         let command = receiver.recv().await.unwrap();
-        println!("new command to send: {}", command);
+        //println!("new command to send: {}", command);
         let size = u32_to_u8_array(command.len() as u32);
         let msg: &[u8] = &[&size[0..4], &command.as_bytes()].concat();
         match stream.write_all(msg).await {
@@ -54,11 +52,7 @@ fn u32_to_u8_array(x: u32) -> [u8; 4] {
     [b4, b3, b2, b1]
 }
 
-async fn async_read_socket(
-    stream: ReadHalf<TcpStream>,
-    state: RAEState,
-    status: ActionsProgress,
-) {
+async fn async_read_socket(stream: ReadHalf<TcpStream>, state: RAEState, status: ActionsProgress) {
     let mut buf_reader = BufReader::new(stream);
 
     let mut buf = [0; BUFFER_SIZE];
@@ -91,7 +85,7 @@ async fn async_read_socket(
             match message._type {
                 GodotMessageType::StaticState | GodotMessageType::DynamicState => {
                     let temp_state: LState = message.try_into().unwrap();
-                    //.write().unwrap().set_state(temp_state);
+                    state.set_state(temp_state);
                 }
                 GodotMessageType::ActionResponse => {
                     let action_status: (usize, ActionStatus) = message.try_into().unwrap();
@@ -101,7 +95,8 @@ async fn async_read_socket(
 
                         map_server_id_action_id.insert(server_id, action_status.0);
 
-                        status.status
+                        status
+                            .status
                             .write()
                             .unwrap()
                             .insert(action_status.0, action_status.1.into());
@@ -109,8 +104,11 @@ async fn async_read_socket(
                     match &status.sync.sender {
                         None => {}
                         Some(sender) => {
-                            sender.send(action_status.0).await.expect("fail to send to status watcher!");
-                        },
+                            sender
+                                .send(action_status.0)
+                                .await
+                                .expect("fail to send to status watcher!");
+                        }
                     };
                 }
                 GodotMessageType::ActionFeedback
@@ -121,7 +119,8 @@ async fn async_read_socket(
                     let action_status: (usize, ActionStatus) = message.try_into().unwrap();
                     let id = map_server_id_action_id.get(&action_status.0).unwrap();
 
-                    status.status
+                    status
+                        .status
                         .write()
                         .unwrap()
                         .insert(*id, action_status.1.into());
@@ -129,8 +128,11 @@ async fn async_read_socket(
                     match &status.sync.sender {
                         None => {}
                         Some(sender) => {
-                            sender.send(*id).await.expect("fail to send to status watcher!");
-                        },
+                            sender
+                                .send(*id)
+                                .await
+                                .expect("fail to send to status watcher!");
+                        }
                     };
                 }
                 _ => panic!("should not receive this kind of message"),

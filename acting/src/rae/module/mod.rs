@@ -15,23 +15,25 @@ pub mod mod_rae;
 pub mod mod_rae_exec;
 pub mod mod_rae_monitor;
 
-pub fn init_ctx_rae(platform: Box<dyn RAEInterface>) -> (CtxRae, CtxRaeMonitor) {
+pub fn init_ctx_rae(mut platform: Box<dyn RAEInterface>) -> (CtxRae, CtxRaeMonitor) {
     //println!("in init ctx_rae");
 
     let mut ctx_rae = CtxRae::default();
-    let (sender, receiver) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+    let (sender_job, receiver_job) = mpsc::channel(TOKIO_CHANNEL_SIZE);
 
     let (sender_sync, receiver_sync) = mpsc::channel(TOKIO_CHANNEL_SIZE);
 
     let ctx_rae_monitor = CtxRaeMonitor {
-        sender_to_rae: Some(sender),
+        sender_to_rae: Some(sender_job),
         env: Default::default(),
     };
 
     let domain = platform.domain();
 
-    let mut rae_env = RAEEnv::new(Some(receiver), Some(receiver_sync));
+    let mut rae_env = RAEEnv::new(Some(receiver_job), Some(receiver_sync));
     rae_env.actions_progress.sync.sender = Some(sender_sync);
+
+    platform.init(rae_env.state.clone(), rae_env.actions_progress.clone());
 
     let ctx_rae_exec = CtxRaeExec {
         actions_progress: rae_env.actions_progress.clone(),
@@ -56,16 +58,14 @@ pub fn init_ctx_rae(platform: Box<dyn RAEInterface>) -> (CtxRae, CtxRaeMonitor) 
         let lvalue = match parse(element, &mut rae_env.env, &mut rae_env.ctxs) {
             Ok(lv) => lv,
             Err(e) => {
-                //stderr.write_all(format!("ELI>>{}\n", e).as_bytes());
                 panic!("error: {}", e)
             }
         };
-        //stdout.write_all(b"parsing done\n");
+
         if lvalue != LValue::Nil {
             match eval(&lvalue, &mut rae_env.env, &mut rae_env.ctxs) {
                 Ok(_lv) => {}
                 Err(e) => {
-                    //stderr.write_all(format!("ELI>>{}\n", e).as_bytes());
                     panic!("error: {}", e)
                 }
             };
@@ -75,6 +75,5 @@ pub fn init_ctx_rae(platform: Box<dyn RAEInterface>) -> (CtxRae, CtxRaeMonitor) 
 
     ctx_rae.env = rae_env;
     ctx_rae.domain = vec![domain].into();
-    //println!("end init rae");
     (ctx_rae, ctx_rae_monitor)
 }

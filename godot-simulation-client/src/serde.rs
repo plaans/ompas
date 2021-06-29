@@ -1,7 +1,7 @@
 use aries_planning::parsing::sexpr::SExpr;
 use ompas_acting::rae::state::ActionStatus::{ActionCancel, ActionPreempt, ActionResponse};
 use ompas_acting::rae::state::{ActionStatus, LState, StateType};
-use ompas_lisp::structs::{LError, LValueS};
+use ompas_lisp::structs::{LError, LValue, LValueS};
 use serde::{Deserialize, Serialize, Serializer};
 use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
@@ -70,6 +70,11 @@ pub struct GodotMessageSerde {
     pub _type: GodotMessageType,
     pub data: GodotMessageSerdeData,
 }
+
+impl GodotMessageSerde {
+    pub fn new_robot_command(_args: &[LValue], _command_id: usize) {}
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SerdeRobotCommand {
     pub command_info: LValueS,

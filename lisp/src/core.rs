@@ -3,7 +3,7 @@ use crate::language::scheme_lambda::*;
 use crate::language::scheme_macro::*;
 use crate::language::scheme_primitives::*;
 use crate::language::*;
-use crate::structs::LCoreOperator::Quote;
+use crate::structs::LCoreOperator::{Quote, DefMacro};
 use crate::structs::LError::*;
 use crate::structs::NameTypeLValue::{List, Symbol};
 use crate::structs::*;
@@ -12,7 +12,16 @@ use im::hashmap::HashMap;
 use std::any::Any;
 use std::convert::{TryFrom, TryInto};
 use std::ops::Deref;
-use std::sync::Arc;
+use std::sync::{Arc};
+use tokio::sync::{RwLock, Mutex, mpsc, oneshot};
+use tokio::task::JoinHandle;
+use std::hash::Hash;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::{thread, mem};
+use aries_planning::chronicles::Task;
+use tokio::sync::oneshot::Receiver;
+use crate::async_await::{TaskHandler, AwaitResponse};
+use aries_utils::StreamingIterator;
 
 #[derive(Clone, Debug)]
 pub struct LEnv {
@@ -20,7 +29,11 @@ pub struct LEnv {
     macro_table: im::HashMap<String, LLambda>,
     //pub(crate) new_entries: Vec<String>, Used to export new entries, but not really important in the end
     outer: Option<Box<LEnv>>,
+    task_handler: TaskHandler
 }
+
+
+
 
 impl LEnv {
     pub fn merge_by_symbols(&mut self, other: &Self) {
@@ -65,9 +78,13 @@ impl ContextCollection {
     }
 
     pub fn get_mut_context(&mut self, id: usize) -> &mut (dyn Any + Send + Sync) {
-        let ctx = self.inner.get_mut(id).unwrap();
-        let ctx = Arc::get_mut(ctx).unwrap();
-        ctx
+        match self.inner.get_mut(id) {
+            None => panic!("no context with such label"),
+            Some(ctx) => match Arc::get_mut(ctx) {
+                None => panic!("Could no get mut ref from Arc. This is probably because the reference to the context is shared"),
+                Some(ctx) => ctx
+            }
+        }
     }
 }
 /*
@@ -282,6 +299,7 @@ impl LEnv {
             macro_table: Default::default(),
             //new_entries: vec![],
             outer: None,
+            task_handler: Default::default(),
         }
     }
 
@@ -592,6 +610,8 @@ pub fn expand(
                         //TODO: Implémenter msg d'erreur
                         panic!("unquote not at right place")
                     }
+                    LCoreOperator::Async => {}
+                    LCoreOperator::Await => {}
                 }
             } else if let LValue::Symbol(sym) = &list[0] {
                 match env.get_macro(sym) {
@@ -758,6 +778,43 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                     LCoreOperator::QuasiQuote
                     | LCoreOperator::UnQuote
                     | LCoreOperator::DefMacro => return Ok(LValue::Nil),
+                    LCoreOperator::Async => {
+                        let task_handler = env.task_handler.clone();
+                        let handle = tokio::runtime::Handle::current();
+                        let (task_id, sender_result)  = thread::spawn(move || {
+                            handle.block_on(async move {
+                                task_handler.declare_new_task().await
+                            })
+                        }).join().unwrap();
+                        let lvalue = args.into();
+                        let mut new_env = env.clone();
+                        let mut ctxs = ctxs.clone();
+                        tokio::spawn(async move {
+                            let result = eval(&lvalue, &mut new_env, &mut ctxs);
+                            sender_result.send((task_id, result)).await;
+                        });
+
+                        return Ok(task_id.into())
+                    }
+                    LCoreOperator::Await => {
+                        if let LValue::Number(LNumber::Usize(id)) = args[0].clone() {
+                            let handle = tokio::runtime::Handle::current();
+                            let task_handler = env.task_handler.clone();
+                            let result = thread::spawn(move || {
+                                handle.block_on(async move {
+                                    match task_handler.get_response_await(&id).await {
+                                        AwaitResponse::Result(result ) => result,
+                                        AwaitResponse::Receiver(mut r ) => {
+                                            r.recv().await.unwrap()
+                                        }
+                                    }
+                                })
+                            }).join().unwrap()?;
+
+                            return Ok(result)
+
+                        }
+                    }
                 }
             } else {
                 let exps = list

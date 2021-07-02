@@ -11,13 +11,14 @@ use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::{Add, Deref, Div, Mul, Range, Sub};
 use std::sync::Arc;
+use crate::structs::LCoreOperator::Async;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LError {
     WrongType(&'static str, LValue, NameTypeLValue, NameTypeLValue),
     NotInListOfExpectedTypes(&'static str, LValue, NameTypeLValue, Vec<NameTypeLValue>),
     WrongNumberOfArgument(&'static str, LValue, usize, Range<usize>),
-    ErrLoc(ErrLoc),
+    //ErrLoc(ErrLoc),
     UndefinedSymbol(&'static str, String),
     SpecialError(&'static str, String),
     ConversionError(&'static str, NameTypeLValue, NameTypeLValue),
@@ -27,7 +28,7 @@ impl Display for LError {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
             LError::WrongType(f_name ,s, s1, s2) => write!(f, "In {}, {}: Got {}, expected {}", f_name, s, s1, s2),
-            LError::ErrLoc(e) => write!(f, "{}",e),
+            //LError::ErrLoc(e) => write!(f, "{}",e),
             LError::UndefinedSymbol(f_name, s) => write!(f, "In {}: {} is undefined",f_name, s),
             LError::WrongNumberOfArgument(f_name, s, g, r) => {
                 if r.is_empty() {
@@ -67,11 +68,11 @@ impl From<std::io::Error> for LError {
     }
 }
 
-impl From<ErrLoc> for LError {
+/*impl From<ErrLoc> for LError {
     fn from(e: ErrLoc) -> Self {
         LError::ErrLoc(e)
     }
-}
+}*/
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -603,20 +604,24 @@ pub enum LCoreOperator {
     DefMacro,
     Set,
     Begin,
+    Async,
+    Await
 }
 
 impl Display for LCoreOperator {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            LCoreOperator::Define => write!(f, "{}", DEFINE.to_string()),
-            LCoreOperator::DefLambda => write!(f, "{}", LAMBDA.to_string()),
-            LCoreOperator::If => write!(f, "{}", IF.to_string()),
-            LCoreOperator::Quote => write!(f, "{}", QUOTE.to_string()),
-            LCoreOperator::QuasiQuote => write!(f, "{}", QUASI_QUOTE.to_string()),
-            LCoreOperator::UnQuote => write!(f, "{}", UNQUOTE.to_string()),
-            LCoreOperator::DefMacro => write!(f, "{}", DEF_MACRO.to_string()),
-            LCoreOperator::Set => write!(f, "{}", SET.to_string()),
-            LCoreOperator::Begin => write!(f, "{}", BEGIN.to_string()),
+            LCoreOperator::Define => write!(f, "{}", DEFINE),
+            LCoreOperator::DefLambda => write!(f, "{}", LAMBDA),
+            LCoreOperator::If => write!(f, "{}", IF),
+            LCoreOperator::Quote => write!(f, "{}", QUOTE),
+            LCoreOperator::QuasiQuote => write!(f, "{}", QUASI_QUOTE),
+            LCoreOperator::UnQuote => write!(f, "{}", UNQUOTE),
+            LCoreOperator::DefMacro => write!(f, "{}", DEF_MACRO),
+            LCoreOperator::Set => write!(f, "{}", SET),
+            LCoreOperator::Begin => write!(f, "{}", BEGIN),
+            LCoreOperator::Async =>  write!(f, "{}", ASYNC),
+            LCoreOperator::Await =>  write!(f, "{}", AWAIT),
         }
     }
 }

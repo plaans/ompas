@@ -451,6 +451,8 @@ dependencies = [
  "rustyline",
  "serde",
  "structopt",
+ "tokio",
+ "tokio-stream",
 ]
 
 [[package]]

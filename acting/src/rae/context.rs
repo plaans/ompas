@@ -258,7 +258,7 @@ impl RAEEnv {
                 self.env.insert(label, value);
                 Ok(())
             }
-            Some(_) => Err(SpecialError(format!(
+            Some(_) => Err(SpecialError("RAEEnv::insert", format!(
                 "Symbol \"{}\" already defined.",
                 label
             ))),
@@ -279,7 +279,7 @@ impl RAEEnv {
 
         let list = match map.get(&LValue::Symbol(task_label.clone())) {
             None => {
-                return Err(SpecialError(format!(
+                return Err(SpecialError("RAEEnv::add_method_to_task", format!(
                     "task \"{}\" is not defined, cannot add method to it.",
                     task_label
                 )))

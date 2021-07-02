@@ -14,48 +14,48 @@ use std::sync::Arc;
 
 #[derive(Debug)]
 pub enum LError {
-    WrongType(LValue, NameTypeLValue, NameTypeLValue),
-    NotInListOfExpectedTypes(LValue, NameTypeLValue, Vec<NameTypeLValue>),
-    WrongNumberOfArgument(LValue, usize, Range<usize>),
+    WrongType(&'static str, LValue, NameTypeLValue, NameTypeLValue),
+    NotInListOfExpectedTypes(&'static str, LValue, NameTypeLValue, Vec<NameTypeLValue>),
+    WrongNumberOfArgument(&'static str, LValue, usize, Range<usize>),
     ErrLoc(ErrLoc),
-    UndefinedSymbol(String),
-    SpecialError(String),
-    ConversionError(NameTypeLValue, NameTypeLValue),
+    UndefinedSymbol(&'static str, String),
+    SpecialError(&'static str, String),
+    ConversionError(&'static str, NameTypeLValue, NameTypeLValue),
 }
 
 impl Display for LError {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            LError::WrongType(s, s1, s2) => write!(f, "{}: Got {}, expected {}", s, s1, s2),
-            LError::ErrLoc(e) => write!(f, "{}", e),
-            LError::UndefinedSymbol(s) => write!(f, "{} is undefined", s),
-            LError::WrongNumberOfArgument(s, g, r) => {
+            LError::WrongType(f_name ,s, s1, s2) => write!(f, "In {}, {}: Got {}, expected {}", f_name, s, s1, s2),
+            LError::ErrLoc(e) => write!(f, "{}",e),
+            LError::UndefinedSymbol(f_name, s) => write!(f, "In {}: {} is undefined",f_name, s),
+            LError::WrongNumberOfArgument(f_name, s, g, r) => {
                 if r.is_empty() {
-                    write!(f, "\"{}\": Got {} element(s), expected {}", s, g, r.start)
+                    write!(f, "In {}, \"{}\": Got {} element(s), expected {}", f_name, s, g, r.start)
                 } else if r.end == std::usize::MAX {
                     write!(
                         f,
-                        "\"{}\": Got {} element(s), expected at least {}",
-                        s, g, r.start
+                        "In {}, \"{}\": Got {} element(s), expected at least {}",
+                        f_name, s, g, r.start
                     )
                 } else if r.start == std::usize::MIN {
                     write!(
                         f,
-                        "\"{}\": Got {} element(s), expected at most {}",
-                        s, g, r.end
+                        "In {}, \"{}\": Got {} element(s), expected at most {}",
+                        f_name, s, g, r.end
                     )
                 } else {
                     write!(
                         f,
-                        "\"{}\": Got {} element(s), expected between {} and {}",
-                        s, g, r.start, r.end
+                        "In {}, \"{}\": Got {} element(s), expected between {} and {}",
+                        f_name, s, g, r.start, r.end
                     )
                 }
             }
-            LError::SpecialError(s) => write!(f, "{}", s),
-            LError::ConversionError(s1, s2) => write!(f, "Cannot convert {} into {}.", s1, s2),
-            LError::NotInListOfExpectedTypes(lv, typ, list_types) => {
-                write!(f, "{}: Got {}, expected {:?}", lv, typ, list_types)
+            LError::SpecialError(f_name, s) => write!(f, "In {}, {}",f_name, s),
+            LError::ConversionError(f_name, s1, s2) => write!(f, "In {}, Cannot convert {} into {}.", f_name, s1, s2),
+            LError::NotInListOfExpectedTypes(f_name, lv, typ, list_types) => {
+                write!(f, "In {}, {}: Got {}, expected {:?}", f_name, lv, typ, list_types)
             }
         }
     }
@@ -63,7 +63,7 @@ impl Display for LError {
 
 impl From<std::io::Error> for LError {
     fn from(e: std::io::Error) -> Self {
-        SpecialError(e.to_string())
+        SpecialError("io", e.to_string())
     }
 }
 
@@ -394,6 +394,7 @@ impl LLambda {
             LambdaArgs::List(params) => {
                 if params.len() != args.len() {
                     return Err(WrongNumberOfArgument(
+                        "get_new_env",
                         args.into(),
                         args.len(),
                         params.len()..params.len(),
@@ -472,11 +473,13 @@ impl LFn {
                     fun(args, env, ctx)
                 } else {
                     Err(LError::SpecialError(
+                        "LFn::new",
                         "Impossible to downcast function".to_string(),
                     ))
                 }
             } else {
                 Err(LError::SpecialError(
+                    "LFn::new",
                     "Impossible to downcast context".to_string(),
                 ))
             }
@@ -552,11 +555,13 @@ impl LMutFn {
                     fun(args, env, ctx)
                 } else {
                     Err(LError::SpecialError(
+                        "LMutFn::new",
                         "Impossible to downcast function".to_string(),
                     ))
                 }
             } else {
                 Err(LError::SpecialError(
+                    "LMutFn::new",
                     "Impossible to downcast context".to_string(),
                 ))
             }
@@ -631,6 +636,7 @@ impl TryFrom<&str> for LCoreOperator {
             SET => Ok(LCoreOperator::Set),
             BEGIN => Ok(LCoreOperator::Begin),
             _ => Err(SpecialError(
+                "LCoreOperator::TryFrom<str>" ,
                 "string does not correspond to core operator".to_string(),
             )),
         }
@@ -763,7 +769,7 @@ impl TryFrom<&LValue> for im::HashMap<LValue, LValue> {
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
         match value {
             LValue::Map(m) => Ok(m.clone()),
-            _ => Err(ConversionError(value.into(), NameTypeLValue::Map)),
+            _ => Err(ConversionError("hashmap::tryfrom<&LValue>",value.into(), NameTypeLValue::Map)),
         }
     }
 }
@@ -787,7 +793,7 @@ impl TryFrom<&LValue> for String {
             LValue::Number(n) => Ok(n.to_string()),
             LValue::Fn(f) => Ok(f.debug_label.to_string()),
             LValue::MutFn(f) => Ok(f.debug_label.to_string()),
-            lv => Err(ConversionError(lv.into(), NameTypeLValue::Symbol)),
+            lv => Err(ConversionError("String::tryfrom<&LValue>",lv.into(), NameTypeLValue::Symbol)),
         }
     }
 }
@@ -806,7 +812,7 @@ impl TryFrom<&LValue> for Vec<LValue> {
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
         match value {
             LValue::List(l) => Ok(l.clone()),
-            lv => Err(ConversionError(lv.into(), NameTypeLValue::List)),
+            lv => Err(ConversionError("Vec<LValue>::tryfrom<&LValue>",lv.into(), NameTypeLValue::List)),
         }
     }
 }
@@ -824,7 +830,7 @@ impl TryFrom<&LValue> for i64 {
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
         match value {
             LValue::Number(n) => Ok(n.into()),
-            lv => Err(ConversionError(lv.into(), NameTypeLValue::Number)),
+            lv => Err(ConversionError("i64::tryfrom<&LValue>",lv.into(), NameTypeLValue::Number)),
         }
     }
 }
@@ -843,7 +849,7 @@ impl TryFrom<&LValue> for f64 {
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
         match value {
             LValue::Number(n) => Ok(n.into()),
-            lv => Err(ConversionError(lv.into(), NameTypeLValue::Number)),
+            lv => Err(ConversionError("f64::tryfrom<&LValue>",lv.into(), NameTypeLValue::Number)),
         }
     }
 }
@@ -863,7 +869,7 @@ impl TryFrom<&LValue> for bool {
         match value {
             LValue::True => Ok(true),
             LValue::Nil => Ok(false),
-            lv => Err(ConversionError(lv.into(), NameTypeLValue::Bool)),
+            lv => Err(ConversionError("bool::tryfrom<&LValue>",lv.into(), NameTypeLValue::Bool)),
         }
     }
 }
@@ -883,7 +889,7 @@ impl TryFrom<&LValue> for LCoreOperator {
         match value {
             LValue::CoreOperator(co) => Ok(co.clone()),
             LValue::Symbol(s) => Ok(s.as_str().try_into()?),
-            lv => Err(ConversionError(lv.into(), NameTypeLValue::CoreOperator)),
+            lv => Err(ConversionError("LCoreOperator::tryfrom<&LValue>",lv.into(), NameTypeLValue::CoreOperator)),
         }
     }
 }
@@ -902,7 +908,7 @@ impl TryFrom<&LValue> for LLambda {
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
         match value {
             LValue::Lambda(l) => Ok(l.clone()),
-            lv => Err(ConversionError(lv.into(), NameTypeLValue::Lambda)),
+            lv => Err(ConversionError("LLambda::tryfrom<&LValue>",lv.into(), NameTypeLValue::Lambda)),
         }
     }
 }
@@ -977,17 +983,20 @@ impl Add for &LValue {
         match (self, rhs) {
             (LValue::Number(n1), LValue::Number(n2)) => Ok(LValue::Number(n1 + n2)),
             (LValue::Number(_), l) => Err(LError::WrongType(
+                "LValue::Add",
                 l.clone(),
                 l.into(),
                 NameTypeLValue::Number,
             )),
             (l, LValue::Number(_)) => Err(LError::WrongType(
+                "LValue::Add",
                 l.clone(),
                 l.into(),
                 NameTypeLValue::Number,
             )),
 
-            (l1, l2) => Err(LError::SpecialError(format!(
+            (l1, l2) => Err(LError::SpecialError("LValue::Add",
+                 format!(
                 "{} and {} cannot be add",
                 NameTypeLValue::from(l1),
                 NameTypeLValue::from(l2)
@@ -1003,17 +1012,20 @@ impl Sub for &LValue {
         match (self, rhs) {
             (LValue::Number(n1), LValue::Number(n2)) => Ok(LValue::Number(n1 - n2)),
             (LValue::Number(_), l) => Err(LError::WrongType(
+                "LValue::sub",
                 l.clone(),
                 l.into(),
                 NameTypeLValue::Number,
             )),
             (l, LValue::Number(_)) => Err(LError::WrongType(
+                "LValue::sub",
                 l.clone(),
                 l.into(),
                 NameTypeLValue::Number,
             )),
 
-            (l1, l2) => Err(LError::SpecialError(format!(
+            (l1, l2) => Err(LError::SpecialError("LValue::sub",
+                                                 format!(
                 "{} and {} cannot be add",
                 NameTypeLValue::from(l1),
                 NameTypeLValue::from(l2)
@@ -1029,17 +1041,21 @@ impl Mul for &LValue {
         match (self, rhs) {
             (LValue::Number(n1), LValue::Number(n2)) => Ok(LValue::Number(n1 * n2)),
             (LValue::Number(_), l) => Err(LError::WrongType(
+                "LValue::mul",
                 l.clone(),
                 l.into(),
                 NameTypeLValue::Number,
             )),
             (l, LValue::Number(_)) => Err(LError::WrongType(
+                "LValue::mul",
                 l.clone(),
                 l.into(),
                 NameTypeLValue::Number,
             )),
 
-            (l1, l2) => Err(LError::SpecialError(format!(
+            (l1, l2) => Err(LError::SpecialError(
+                "LValue::mul",
+                format!(
                 "{} and {} cannot be add",
                 NameTypeLValue::from(l1),
                 NameTypeLValue::from(l2)
@@ -1055,17 +1071,21 @@ impl Div for &LValue {
         match (self, rhs) {
             (LValue::Number(n1), LValue::Number(n2)) => Ok(LValue::Number(n1 / n2)),
             (LValue::Number(_), l) => Err(LError::WrongType(
+                "LValue::div",
                 l.clone(),
                 l.into(),
                 NameTypeLValue::Number,
             )),
-            (l, LValue::Number(_)) => Err(LError::WrongType(
-                l.clone(),
+            (l, LValue::Number(_)) => Err(LError::WrongType(                "LValue::div",
+
+                                                                            l.clone(),
                 l.into(),
                 NameTypeLValue::Number,
             )),
 
-            (l1, l2) => Err(LError::SpecialError(format!(
+            (l1, l2) => Err(LError::SpecialError(                "LValue::div",
+
+                                                                 format!(
                 "{} and {} cannot be add",
                 NameTypeLValue::from(l1),
                 NameTypeLValue::from(l2)

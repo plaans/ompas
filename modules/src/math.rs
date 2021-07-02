@@ -22,6 +22,7 @@ const SIN: &str = "sin";
 const COS: &str = "cos";
 const RAND_INT_IN_RANGE: &str = "rand-int-in-range";
 const RAND_FLOAT_IN_RANGE: &str = "rand-float-in-range";
+const RAND_ELEMENT: &str = "rand-element";
 
 //Constants
 const PI: &str = "pi";
@@ -49,6 +50,7 @@ impl GetModule for CtxMath {
         module.add_fn_prelude(SIN, sin);
         module.add_fn_prelude(RAND_INT_IN_RANGE, rand_int_in_range);
         module.add_fn_prelude(RAND_FLOAT_IN_RANGE, rand_float_in_range);
+        module.add_fn_prelude(RAND_ELEMENT, rand_element);
         module.add_prelude(PI, std::f64::consts::PI.into());
 
         module
@@ -83,7 +85,7 @@ impl Documentation for CtxMath {
 /// Only takes one element in args
 pub fn sin(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValue, LError> {
     if args.len() != 1 {
-        return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1));
+        return Err(WrongNumberOfArgument(SIN, args.into(), args.len(), 1..1));
     }
 
     match &args[0] {
@@ -91,7 +93,7 @@ pub fn sin(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValue, LError> {
             let f: f64 = n.into();
             Ok(f.sin().into())
         }
-        lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Number)),
+        lv => Err(WrongType(SIN, lv.clone(), lv.into(), NameTypeLValue::Number)),
     }
 }
 
@@ -99,7 +101,7 @@ pub fn sin(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValue, LError> {
 /// Only takes one element in args
 pub fn cos(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValue, LError> {
     if args.len() != 1 {
-        return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1));
+        return Err(WrongNumberOfArgument(COS, args.into(), args.len(), 1..1));
     }
 
     match &args[0] {
@@ -107,13 +109,13 @@ pub fn cos(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValue, LError> {
             let f: f64 = n.into();
             Ok(f.cos().into())
         }
-        lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Number)),
+        lv => Err(WrongType(COS, lv.clone(), lv.into(), NameTypeLValue::Number)),
     }
 }
 
 pub fn rand_int_in_range(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValue, LError> {
     if args.len() != 2 {
-        return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
+        return Err(WrongNumberOfArgument(RAND_INT_IN_RANGE, args.into(), args.len(), 2..2));
     }
 
     if let LValue::Number(n1) = &args[0] {
@@ -122,6 +124,7 @@ pub fn rand_int_in_range(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValu
             Ok(value.into())
         } else {
             Err(WrongType(
+                RAND_INT_IN_RANGE,
                 args[1].clone(),
                 (&args[1]).into(),
                 NameTypeLValue::Number,
@@ -129,6 +132,7 @@ pub fn rand_int_in_range(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValu
         }
     } else {
         Err(WrongType(
+            RAND_INT_IN_RANGE,
             args[0].clone(),
             (&args[0]).into(),
             NameTypeLValue::Number,
@@ -138,7 +142,7 @@ pub fn rand_int_in_range(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValu
 
 pub fn rand_float_in_range(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValue, LError> {
     if args.len() != 2 {
-        return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
+        return Err(WrongNumberOfArgument(RAND_FLOAT_IN_RANGE, args.into(), args.len(), 2..2));
     }
 
     if let LValue::Number(n1) = &args[0] {
@@ -147,6 +151,7 @@ pub fn rand_float_in_range(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LVa
             Ok(value.into())
         } else {
             Err(WrongType(
+                RAND_FLOAT_IN_RANGE,
                 args[1].clone(),
                 (&args[1]).into(),
                 NameTypeLValue::Number,
@@ -154,10 +159,27 @@ pub fn rand_float_in_range(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LVa
         }
     } else {
         Err(WrongType(
+            RAND_FLOAT_IN_RANGE,
             args[0].clone(),
             (&args[0]).into(),
             NameTypeLValue::Number,
         ))
+    }
+}
+
+pub fn rand_element(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValue, LError> {
+    match args.len() {
+        1 => {
+            if let LValue::List(list) = &args[0] {
+                let index = rand::thread_rng().gen_range(0..list.len());
+                Ok(list[index].clone())
+            }else {
+                Err(WrongType(RAND_ELEMENT, args[0].clone(), (&args[0]).into(), NameTypeLValue::Symbol))
+            }
+        },
+        _ => {
+            Err(WrongNumberOfArgument(RAND_ELEMENT, args.into(), args.len(), 1..1))
+        },
     }
 }
 

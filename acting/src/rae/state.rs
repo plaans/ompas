@@ -8,10 +8,14 @@ use std::ops::Deref;
 use std::ptr::write_bytes;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, RwLock};
+use ompas_lisp::functions::cons;
+use ompas_lisp::core::LEnv;
 
 pub const KEY_DYNAMIC: &str = "dynamic";
 pub const KEY_STATIC: &str = "static";
 pub const KEY_INNER_WORLD: &str = "inner-world";
+const INSTANCE: &str = "instance";
+
 
 #[derive(Clone, Debug, PartialOrd, PartialEq, Eq)]
 pub enum StateType {
@@ -116,6 +120,27 @@ impl RAEState {
         }
     }
 
+    pub fn update_state(&self, state: LState) {
+        match &state._type {
+            None => {}
+            Some(_type) => match _type {
+                StateType::Static => {
+                    let new_state = self._static.write().unwrap().union(&state).inner;
+                    let inner_wolrd = self.check_for_instance_declaration(&state);
+                    self._static.write().unwrap().inner = new_state;
+                }
+                StateType::Dynamic => {
+                    let new_state = self.dynamic.write().unwrap().union(&state).inner;
+                    self.dynamic.write().unwrap().inner = new_state;
+                }
+                StateType::InnerWorld => {
+                    let new_state = self.dynamic.write().unwrap().union(&state).inner;
+                    self.dynamic.write().unwrap().inner = new_state;
+                }
+            },
+        }
+    }
+
     pub fn set_state(&self, state: LState) {
         match &state._type {
             None => {}
@@ -143,16 +168,65 @@ impl RAEState {
     pub fn retract_fact(&self, key: LValueS, value: LValueS) -> Result<LValue, LError> {
         let old_value = self.inner_world.read().unwrap().get(&key).cloned();
         match old_value {
-            None => Err(SpecialError("key is not in state".to_string())),
+            None => Err(SpecialError("RAEState::retract_fact", "key is not in state".to_string())),
             Some(old_value) => {
                 if old_value == value {
                     self.inner_world.write().unwrap().remove(&key);
                     Ok(LValue::Nil)
                 } else {
-                    Err(SpecialError("there is no such fact in state".to_string()))
+                    Err(SpecialError("RAEState::retract_fact", "there is no such fact in state".to_string()))
                 }
             }
         }
+    }
+
+
+    fn check_for_instance_declaration(&self, state: &LState) -> Option<LState> {
+        for element in &state.inner {
+            let string_key = element.0.to_string();
+            //println!("{}", string_key);
+            let lvalue: LValue = element.0.into();
+
+            if let LValue::List(list) = lvalue {
+                if list.len() == 2 {
+                    let first = &list[0];
+                    let second = &list[1];
+                    if let LValue::Symbol(string_key) = first {
+                        match string_key.find(".instance") {
+                            None => {}
+                            Some(index) => {
+                                let string = &string_key[..index];
+                                //println!("found new declaration of instance: {}", string);
+                                let list_name = format!("{}s",string);
+                                let list_name= LValue::from(list_name).into();
+                                let list_instance = self.inner_world.read().unwrap().get(&list_name).cloned();
+                                let value = match list_instance {
+                                    None => {
+                                        //println!("list of instance not yet created");
+                                        let value: LValue = vec![second.clone()].into();
+                                        value.into()
+                                    }
+                                    Some(list_instance) => {
+                                        //println!("list of instance found");
+                                        let lvalue: LValue = list_instance.into();
+                                        let list = cons(&[second.clone(), lvalue], &LEnv::default(), &()).unwrap();
+                                        list.into()
+                                    }
+                                };
+                                let key: LValue = list_name.into();
+                                self.inner_world.write().unwrap().insert(key.into(), value);
+                            }
+                        }
+                    }
+                }
+            }
+
+
+
+
+        }
+
+        None
     }
 }
 

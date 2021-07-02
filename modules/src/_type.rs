@@ -66,6 +66,7 @@ impl LSymType {
         match self {
             LSymType::StateFunction(sf) => Ok(sf.clone()),
             lst => Err(LError::ConversionError(
+                "as_state_function",
                 lst.into(),
                 NameTypeLValue::Other(STATE_FUNCTION.to_string()),
             )),
@@ -389,15 +390,15 @@ pub fn is_type(args: &[LValue], _: &LEnv, ctx: &CtxType) -> Result<LValue, LErro
     match args.len() {
         1 => match &args[0] {
             LValue::Symbol(s) => match ctx.get_type_from_sym(s) {
-                None => Err(SpecialError("symbol has no type".to_string())),
+                None => Err(SpecialError(IS_TYPE, "symbol has no type".to_string())),
                 Some(sym_type) => match sym_type {
                     LSymType::Type(_) => Ok(LValue::True),
                     _ => Ok(LValue::Nil),
                 },
             },
-            lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
+            lv => Err(WrongType(IS_TYPE, lv.clone(), lv.into(), NameTypeLValue::Symbol)),
         },
-        i => Err(WrongNumberOfArgument(args.into(), i, 1..1)),
+        i => Err(WrongNumberOfArgument(IS_TYPE, args.into(), i, 1..1)),
     }
 }
 
@@ -411,9 +412,9 @@ pub fn is_object(args: &[LValue], _: &LEnv, ctx: &CtxType) -> Result<LValue, LEr
                     _ => Ok(LValue::Nil),
                 },
             },
-            lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
+            lv => Err(WrongType(IS_OBJECT, lv.clone(), lv.into(), NameTypeLValue::Symbol)),
         },
-        i => Err(WrongNumberOfArgument(args.into(), i, 1..1)),
+        i => Err(WrongNumberOfArgument(IS_OBJECT,args.into(), i, 1..1)),
     }
 }
 
@@ -427,15 +428,15 @@ pub fn is_state_function(args: &[LValue], _: &LEnv, ctx: &CtxType) -> Result<LVa
                     _ => Ok(LValue::Nil),
                 },
             },
-            lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
+            lv => Err(WrongType(IS_STATE_FUNCTION, lv.clone(), lv.into(), NameTypeLValue::Symbol)),
         },
-        i => Err(WrongNumberOfArgument(args.into(), i, 1..1)),
+        i => Err(WrongNumberOfArgument(IS_STATE_FUNCTION, args.into(), i, 1..1)),
     }
 }
 
 pub fn type_of(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> Result<LValue, LError> {
     if args.len() != 2 {
-        return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
+        return Err(WrongNumberOfArgument(TYPE_OF, args.into(), args.len(), 2..2));
     }
 
     match &args[0] {
@@ -447,30 +448,31 @@ pub fn type_of(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> Result<LValue, L
                     Ok(LValue::Nil)
                 }
                 lv => Err(WrongType(
+                    TYPE_OF,
                     lv.clone(),
                     lv.into(),
                     NameTypeLValue::Other("type_id(usize)".to_string()),
                 )),
             }
         }
-        lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
+        lv => Err(WrongType(TYPE_OF, lv.clone(), lv.into(), NameTypeLValue::Symbol)),
     }
 }
 
 pub fn sub_type(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> Result<LValue, LError> {
     if args.len() != 1 {
-        return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1));
+        return Err(WrongNumberOfArgument(SUB_TYPE, args.into(), args.len(), 1..1));
     }
     let expected_type = NameTypeLValue::Other("TYPE".to_string());
     let parent_type: usize = match &args[0] {
         LValue::Symbol(s) => match ctx.get_type_from_sym(s) {
-            None => return Err(SpecialError(format!("{} has no type annotations", s))),
+            None => return Err(SpecialError(SUB_TYPE, format!("{} has no type annotations", s))),
             Some(lst) => match lst {
                 LSymType::Type(_) => *ctx.get_type_id(s).unwrap(),
-                lst => return Err(WrongType(lst.into(), lst.into(), expected_type)),
+                lst => return Err(WrongType(SUB_TYPE,lst.into(), lst.into(), expected_type)),
             },
         },
-        lv => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
+        lv => return Err(WrongType(SUB_TYPE, lv.clone(), lv.into(), NameTypeLValue::Symbol)),
     };
 
     let type_id = ctx.add_type(LSymType::Type(Some(parent_type)));
@@ -496,12 +498,12 @@ pub fn new_state_function(
                     }
                 } else {
                     return match ctx.get_type_from_sym(s) {
-                        None => Err(WrongType(arg.clone(), arg.into(), expected_type)),
-                        Some(lst) => Err(WrongType(arg.clone(), lst.into(), expected_type)),
+                        None => Err(WrongType(NEW_STATE_FUNCTION, arg.clone(), arg.into(), expected_type)),
+                        Some(lst) => Err(WrongType(NEW_STATE_FUNCTION, arg.clone(), lst.into(), expected_type)),
                     };
                 }
             }
-            lv => return Err(WrongType(lv.clone(), lv.into(), expected_type)),
+            lv => return Err(WrongType(NEW_STATE_FUNCTION, lv.clone(), lv.into(), expected_type)),
         }
     }
 
@@ -514,7 +516,7 @@ pub fn new_state_function(
 
 pub fn new_object(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> Result<LValue, LError> {
     if args.len() != 1 {
-        return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1));
+        return Err(WrongNumberOfArgument(NEW_OBJECT, args.into(), args.len(), 1..1));
     }
     let type_id;
     let option_type = match &args[0] {
@@ -522,6 +524,7 @@ pub fn new_object(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> Result<LValue
             type_id = match ctx.get_type_id(s) {
                 None => {
                     return Err(SpecialError(
+                        NEW_OBJECT,
                         "no type annotation corresponding to the symbol".to_string(),
                     ))
                 }
@@ -535,6 +538,7 @@ pub fn new_object(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> Result<LValue
         }
         lv => {
             return Err(NotInListOfExpectedTypes(
+                NEW_OBJECT,
                 lv.clone(),
                 lv.into(),
                 vec![NameTypeLValue::Symbol, NameTypeLValue::Usize],
@@ -544,6 +548,7 @@ pub fn new_object(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> Result<LValue
 
     match option_type {
         None => Err(WrongType(
+            NEW_OBJECT,
             (&args[0]).clone(),
             (&args[0]).into(),
             NameTypeLValue::Symbol,
@@ -554,6 +559,7 @@ pub fn new_object(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> Result<LValue
                 Ok(type_id.into())
             }
             lst => Err(WrongType(
+                NEW_OBJECT,
                 lst.into(),
                 lst.into(),
                 NameTypeLValue::Other("type".to_string()),
@@ -564,11 +570,11 @@ pub fn new_object(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> Result<LValue
 
 pub fn get_type(args: &[LValue], _: &LEnv, ctx: &CtxType) -> Result<LValue, LError> {
     if args.len() != 1 {
-        return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1));
+        return Err(WrongNumberOfArgument(GET_TYPE,args.into(), args.len(), 1..1));
     }
     let type_as_string = match &args[0] {
         LValue::Symbol(s) => match ctx.get_type_from_sym(s) {
-            None => return Err(LError::SpecialError(format!("{} has no type", s))),
+            None => return Err(LError::SpecialError(GET_TYPE, format!("{} has no type", s))),
             Some(lst) => match lst {
                 LSymType::Object(u) => ctx.get_sym(u).unwrap().to_string(),
                 LSymType::Type(parent_type) => match parent_type {

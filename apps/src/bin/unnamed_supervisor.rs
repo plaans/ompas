@@ -83,8 +83,8 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     ctx_doc.insert_doc(CtxType::documentation());
     ctx_doc.insert_doc(CtxGodot::documentation());
     ctx_doc.insert_doc(CtxDumber::documentation());
-    ctx_doc.insert_doc(CtxRae::documentation());
-    ctx_doc.insert_doc(CtxRaeMonitor::documentation());
+    //ctx_doc.insert_doc(CtxRae::documentation());
+    //ctx_doc.insert_doc(CtxRaeMonitor::documentation());
 
     //Add the sender of the channel.
     ctx_io.add_sender_li(sender_li.clone());
@@ -105,7 +105,7 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     load_module(&mut root_env, &mut ctxs, ctx_dumber, &mut lisp_init);
     load_module(&mut root_env, &mut ctxs, ctx_type, &mut lisp_init);
     load_module(&mut root_env, &mut ctxs, ctx_counter, &mut lisp_init);
-    load_module(&mut root_env, &mut ctxs, ctx_godot, &mut lisp_init);
+    //load_module(&mut root_env, &mut ctxs, ctx_godot, &mut lisp_init);
     load_module(&mut root_env, &mut ctxs, ctx_rae, &mut lisp_init);
     load_module(&mut root_env, &mut ctxs, ctx_rae_monitor, &mut lisp_init);
     //load_module(&mut root_env, &mut ctxs, ctx_rae_exec, &mut lisp_init);

@@ -47,6 +47,7 @@ pub const RAE_DEF_STATE_FUNCTION: &str = "def-state-function";
 pub const RAE_DEF_ACTION: &str = "def-action";
 pub const RAE_DEF_TASK: &str = "def-task";
 pub const RAE_DEF_METHOD: &str = "def-method";
+pub const RAE_DEF_LAMBDA: &str = "def-lambda";
 
 #[derive(Default)]
 pub struct CtxRae {
@@ -83,6 +84,7 @@ impl GetModule for CtxRae {
         module.add_mut_fn_prelude(RAE_DEF_ACTION, def_action);
         module.add_mut_fn_prelude(RAE_DEF_TASK, def_task);
         module.add_mut_fn_prelude(RAE_DEF_METHOD, def_method);
+        module.add_mut_fn_prelude(RAE_DEF_LAMBDA, def_lambda);
 
         //functions to debug the functionnement of rae
         module.add_fn_prelude(RAE_GET_STATE, get_state);
@@ -131,21 +133,45 @@ pub fn get_env(args: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LEr
                 Some(key)
             } else {
                 return Err(WrongType(
+                    RAE_GET_ENV,
                     args[0].clone(),
                     args[0].clone().into(),
                     NameTypeLValue::Symbol,
                 ));
             }
         }
-        _ => return Err(WrongNumberOfArgument(args.into(), args.len(), 0..1)),
+        _ => return Err(WrongNumberOfArgument(RAE_GET_ENV, args.into(), args.len(), 0..1)),
     };
 
     Ok(LValue::String(ctx.env.pretty_debug(key)))
 }
 
+pub fn def_lambda(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
+    //println!("def_lambda");
+    if args.len() != 1 {
+        return Err(WrongNumberOfArgument(RAE_DEF_LAMBDA, args.into(), args.len(), 1..1))
+    }
+    let list: LValue = args[0].clone();
+    //println!("list: {}", list);
+    let lvalue = cons(&["define".into(), list], &env, &())?;
+    //println!("lvalue: {}", lvalue);
+    let expanded = expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs)?;
+    /*match &expanded {
+        Ok(l) => println!("ok: {}",l),
+        Err(e) => println!("err: {}", e),
+    }*/
+    let result =  eval(
+        &expanded,
+        &mut ctx.env.env,
+        &mut ctx.env.ctxs,
+    );
+    //println!("result: {:?}", result);
+    result
+}
+
 pub fn def_state_function(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
     if args.is_empty() {
-        return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
+        return Err(WrongNumberOfArgument(RAE_DEF_STATE_FUNCTION, args.into(), args.len(), 2..2));
     }
 
     let lvalue = cons(&["generate-state-function".into(), args.into()], &env, &())?;
@@ -160,13 +186,14 @@ pub fn def_state_function(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Resu
 
     if let LValue::List(list) = &lvalue {
         if list.len() != 2 {
-            return Err(WrongNumberOfArgument(lvalue.clone(), list.len(), 2..2));
+            return Err(WrongNumberOfArgument(RAE_DEF_STATE_FUNCTION, lvalue.clone(), list.len(), 2..2));
         } else if let LValue::Symbol(action_label) = &list[0] {
             if let LValue::Lambda(_) = &list[1] {
                 ctx.env
                     .add_state_function(action_label.to_string(), list[1].clone())?;
             } else {
                 return Err(WrongType(
+                    RAE_DEF_STATE_FUNCTION,
                     list[1].clone(),
                     list[1].clone().into(),
                     NameTypeLValue::Lambda,
@@ -174,6 +201,7 @@ pub fn def_state_function(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Resu
             }
         } else {
             return Err(WrongType(
+                RAE_DEF_STATE_FUNCTION,
                 list[0].clone(),
                 list[0].clone().into(),
                 NameTypeLValue::Symbol,
@@ -187,6 +215,7 @@ pub fn def_state_function(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Resu
 pub fn def_action(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
     if args.is_empty() {
         return Err(WrongNumberOfArgument(
+            RAE_DEF_ACTION,
             args.into(),
             args.len(),
             1..std::usize::MAX,
@@ -205,13 +234,14 @@ pub fn def_action(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValu
 
     if let LValue::List(list) = &lvalue {
         if list.len() != 2 {
-            return Err(WrongNumberOfArgument(lvalue.clone(), list.len(), 2..2));
+            return Err(WrongNumberOfArgument(RAE_DEF_ACTION,lvalue.clone(), list.len(), 2..2));
         } else if let LValue::Symbol(action_label) = &list[0] {
             if let LValue::Lambda(_) = &list[1] {
                 ctx.env
                     .add_action(action_label.to_string(), list[1].clone())?;
             } else {
                 return Err(WrongType(
+                    RAE_DEF_ACTION,
                     list[1].clone(),
                     list[1].clone().into(),
                     NameTypeLValue::Lambda,
@@ -219,6 +249,7 @@ pub fn def_action(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValu
             }
         } else {
             return Err(WrongType(
+                RAE_DEF_ACTION,
                 list[0].clone(),
                 list[0].clone().into(),
                 NameTypeLValue::Symbol,
@@ -232,6 +263,7 @@ pub fn def_action(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValu
 pub fn def_method(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
     if args.is_empty() {
         return Err(WrongNumberOfArgument(
+            RAE_DEF_METHOD,
             args.into(),
             args.len(),
             1..std::usize::MAX,
@@ -250,7 +282,7 @@ pub fn def_method(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValu
 
     if let LValue::List(list) = &lvalue {
         if list.len() != 3 {
-            return Err(WrongNumberOfArgument(lvalue.clone(), list.len(), 2..2));
+            return Err(WrongNumberOfArgument(RAE_DEF_METHOD,lvalue.clone(), list.len(), 2..2));
         } else if let LValue::Symbol(method_label) = &list[0] {
             if let LValue::Symbol(task_label) = &list[1] {
                 if let LValue::Lambda(_) = &list[2] {
@@ -261,6 +293,7 @@ pub fn def_method(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValu
                     )?;
                 } else {
                     return Err(WrongType(
+                        RAE_DEF_METHOD,
                         list[2].clone(),
                         list[2].clone().into(),
                         NameTypeLValue::Lambda,
@@ -268,6 +301,7 @@ pub fn def_method(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValu
                 }
             } else {
                 return Err(WrongType(
+                    RAE_DEF_METHOD,
                     list[1].clone(),
                     list[1].clone().into(),
                     NameTypeLValue::Symbol,
@@ -275,6 +309,7 @@ pub fn def_method(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValu
             }
         } else {
             return Err(WrongType(
+                RAE_DEF_METHOD,
                 list[0].clone(),
                 list[0].clone().into(),
                 NameTypeLValue::Symbol,
@@ -288,6 +323,7 @@ pub fn def_method(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValu
 pub fn def_task(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
     if args.is_empty() {
         return Err(WrongNumberOfArgument(
+            RAE_DEF_TASK,
             args.into(),
             args.len(),
             1..std::usize::MAX,
@@ -306,12 +342,13 @@ pub fn def_task(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValue,
 
     if let LValue::List(list) = &lvalue {
         if list.len() != 2 {
-            return Err(WrongNumberOfArgument(lvalue.clone(), list.len(), 2..2));
+            return Err(WrongNumberOfArgument(RAE_DEF_TASK,lvalue.clone(), list.len(), 2..2));
         } else if let LValue::Symbol(task_label) = &list[0] {
             if let LValue::Lambda(_) = &list[1] {
                 ctx.env.add_task(task_label.to_string(), list[1].clone())?;
             } else {
                 return Err(WrongType(
+                    RAE_DEF_TASK,
                     list[1].clone(),
                     list[1].clone().into(),
                     NameTypeLValue::Lambda,
@@ -319,6 +356,7 @@ pub fn def_task(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValue,
             }
         } else {
             return Err(WrongType(
+                RAE_DEF_TASK,
                 list[0].clone(),
                 list[0].clone().into(),
                 NameTypeLValue::Symbol,
@@ -349,7 +387,7 @@ pub fn get_state(args: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, L
                     KEY_DYNAMIC => Some(StateType::Dynamic),
                     KEY_INNER_WORLD => Some(StateType::InnerWorld),
                     _ => {
-                        return Err(SpecialError(format!(
+                        return Err(SpecialError(RAE_GET_STATE,format!(
                             "was expecting keys {}, {}, {}",
                             KEY_STATIC, KEY_DYNAMIC, KEY_INNER_WORLD
                         )))
@@ -357,13 +395,14 @@ pub fn get_state(args: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, L
                 }
             } else {
                 return Err(WrongType(
+                    RAE_GET_STATE,
                     args[0].clone(),
                     (&args[0]).into(),
                     NameTypeLValue::Symbol,
                 ));
             }
         }
-        _ => return Err(WrongNumberOfArgument(args.into(), args.len(), 0..1)),
+        _ => return Err(WrongNumberOfArgument(RAE_GET_STATE,args.into(), args.len(), 0..1)),
     };
 
     let state = ctx.env.state.get_state(_type);

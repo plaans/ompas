@@ -88,11 +88,11 @@ pub fn read(args: &[LValue], _: &LEnv, ctx: &CtxIo) -> Result<LValue, LError> {
     //let mut stdout = io::stdout();
     //stdout.write_all(b"module Io: read\n");
     if args.len() != 1 {
-        return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1));
+        return Err(WrongNumberOfArgument(READ, args.into(), args.len(), 1..1));
     }
     let file_name = match &args[0] {
         LValue::Symbol(s) => s.to_string(),
-        lv => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
+        lv => return Err(WrongType(READ, lv.clone(), lv.into(), NameTypeLValue::Symbol)),
     };
 
     let mut file = File::open(file_name)?;
@@ -119,7 +119,7 @@ pub fn read(args: &[LValue], _: &LEnv, ctx: &CtxIo) -> Result<LValue, LError> {
 /// (write <file> <lvalue>)
 pub fn write(args: &[LValue], _: &LEnv, _: &CtxIo) -> Result<LValue, LError> {
     if args.len() != 2 {
-        return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
+        return Err(WrongNumberOfArgument(WRITE, args.into(), args.len(), 2..2));
     }
 
     match &args[0] {
@@ -129,7 +129,7 @@ pub fn write(args: &[LValue], _: &LEnv, _: &CtxIo) -> Result<LValue, LError> {
             f.write_all(&args[1].to_string().as_bytes())?;
             Ok(LValue::Nil)
         }
-        lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
+        lv => Err(WrongType(WRITE, lv.clone(), lv.into(), NameTypeLValue::Symbol)),
     }
 
     //println!("module Io: write");

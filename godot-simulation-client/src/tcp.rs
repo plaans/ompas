@@ -85,10 +85,19 @@ async fn async_read_socket(stream: ReadHalf<TcpStream>, state: RAEState, status:
             match message._type {
                 GodotMessageType::StaticState | GodotMessageType::DynamicState => {
                     let temp_state: LState = message.try_into().unwrap();
-                    /*if temp_state._type == Some(StateType::Static) {
-                        println!("updating static state: {:?}", temp_state)
-                    }*/
-                    state.set_state(temp_state);
+
+                    match &temp_state._type {
+                        None => panic!("state should have a type"),
+                        Some(_type) => match _type {
+                            StateType::Static => {
+                                //println!("updating static state: {:?}", temp_state);
+                                state.update_state(temp_state);
+                            },
+                            StateType::Dynamic => state.set_state(temp_state),
+                            StateType::InnerWorld => panic!("should not receive inner world fact from godot")
+                        }
+                    };
+
                 }
                 GodotMessageType::ActionResponse => {
                     let action_status: (usize, ActionStatus) = message.try_into().unwrap();

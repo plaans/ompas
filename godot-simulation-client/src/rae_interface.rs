@@ -12,10 +12,11 @@ use ompas_acting::rae::state::{RAEState, StateType, KEY_DYNAMIC, KEY_STATIC};
 use ompas_lisp::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
 use ompas_lisp::structs::*;
 use std::net::SocketAddr;
-use std::process::Command;
+use std::process::{Command, Child};
 use std::thread;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Sender;
+use std::time::Duration;
 
 #[derive(Default, Clone)]
 pub struct PlatformGodot {
@@ -69,6 +70,7 @@ impl RAEInterface for PlatformGodot {
         let sender = match self.get_sender_socket() {
             None => {
                 return Err(SpecialError(
+                    "PlatformGodot::exec_command",
                     "ctx godot has no sender to simulation, try first to (open-com-godot)"
                         .to_string(),
                 ))
@@ -94,13 +96,15 @@ impl RAEInterface for PlatformGodot {
 
     fn cancel_command(&self, args: &[LValue]) -> Result<LValue, LError> {
         if args.len() != 1 {
-            return Err(WrongNumberOfArgument(args.into(), args.len(), 1..1));
+            return Err(WrongNumberOfArgument(                    "PlatformGodot::cancel_command",
+                                                                 args.into(), args.len(), 1..1));
         }
 
         let id: usize = if let LValue::Number(n) = &args[0] {
             n.into()
         } else {
             return Err(WrongType(
+                "PlatformGodot::cancel_command",
                 args[0].clone(),
                 (&args[0]).into(),
                 NameTypeLValue::Number,
@@ -119,6 +123,7 @@ impl RAEInterface for PlatformGodot {
         let sender = match self.get_sender_socket() {
             None => {
                 return Err(SpecialError(
+                    "PlatformGodot::cancel_command",
                     "ctx godot has no sender to simulation, try first to (open-com-godot)"
                         .to_string(),
                 ))
@@ -142,16 +147,20 @@ impl RAEInterface for PlatformGodot {
                     KEY_STATIC => Some(StateType::Static),
                     KEY_DYNAMIC => Some(StateType::Dynamic),
                     _ => {
-                        let result1 = Err(SpecialError(format!(
+                        let result1 = Err(SpecialError(
+                            "PlatformGodot::get_state",
+                            format!(
                             "Expected keywords {} or {}",
                             KEY_STATIC, KEY_DYNAMIC
                         )));
                         return result1;
                     }
                 },
-                lv => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
+                lv => return Err(WrongType(                            "PlatformGodot::get_state",
+                                                                       lv.clone(), lv.into(), NameTypeLValue::Symbol)),
             },
-            _ => return Err(WrongNumberOfArgument(args.into(), args.len(), 0..1)),
+            _ => return Err(WrongNumberOfArgument(                            "PlatformGodot::get_state",
+                                                                              args.into(), args.len(), 0..1)),
         };
 
         //println!("state type: {:?}", _type);
@@ -197,33 +206,31 @@ impl RAEInterface for PlatformGodot {
 
     fn launch_platform(&mut self, args: &[LValue]) -> Result<LValue, LError> {
         self.start_platform(&[])?;
-        thread::sleep(time::Duration::from_millis(500));
+        thread::sleep(time::Duration::from_millis(1000));
         self.open_com(args)
     }
 
     fn start_platform(&self, args: &[LValue]) -> Result<LValue, LError> {
-        match args.len() {
+        let mut child = match args.len() {
             0 => {
-                thread::spawn(|| {
-                    Command::new("godot3")
+                Command::new("godot3")
                         .arg("--path")
                         .arg(DEFAULT_PATH_PROJECT_GODOT)
-                        .output()
-                        .expect("failed to execute process");
-                });
+                        .spawn()
+                        .expect("failed to execute process")
             } //default settings
             1 => {
                 if let LValue::Symbol(s) = &args[0] {
                     let s = s.clone();
-                    thread::spawn(move || {
-                        Command::new("godot3")
-                            .arg("--path")
-                            .arg(s)
-                            .output()
-                            .expect("failed to execute process");
-                    });
-                } else {
+                    Command::new("godot3")
+                        .arg("--path")
+                        .arg(s)
+                        .spawn()
+                        .expect("failed to execute process")
+                }
+                else {
                     return Err(WrongType(
+                        "PlatformGodot::start_platform",
                         args[0].clone(),
                         (&args[0]).into(),
                         NameTypeLValue::Symbol,
@@ -233,9 +240,15 @@ impl RAEInterface for PlatformGodot {
             5 => {
                 todo!()
             } //path + options
-            _ => return Err(WrongNumberOfArgument(args.into(), args.len(), 0..5)), //Unexpected number of arguments
-        }
+            _ => return Err(WrongNumberOfArgument(                        "PlatformGodot::start_platform",
+                                                                          args.into(), args.len(), 0..5)), //Unexpected number of arguments
+        };
 
+        //self.child = child;
+        /*thread::spawn(move || {
+            thread::sleep(Duration::from_secs(2));
+            child.kill().expect("!kill process of godot")
+        });*/
         Ok(LValue::Nil)
     }
 
@@ -245,17 +258,18 @@ impl RAEInterface for PlatformGodot {
             2 => {
                 let addr = match &args[0] {
                     LValue::Symbol(s) => s.clone(),
-                    lv => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
+                    lv => return Err(WrongType(                        "PlatformGodot::open_com",
+                                                                       lv.clone(), lv.into(), NameTypeLValue::Symbol)),
                 };
 
                 let port: usize = match &args[1] {
                     LValue::Number(n) => n.into(),
-                    lv => return Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Usize)),
+                    lv => return Err(WrongType("PlatformGodot::open_com",lv.clone(), lv.into(), NameTypeLValue::Usize)),
                 };
 
                 format!("{}:{}", addr, port).parse().unwrap()
             }
-            _ => return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2)),
+            _ => return Err(WrongNumberOfArgument("PlatformGodot::open_com",args.into(), args.len(), 2..2)),
         };
 
         let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
@@ -285,6 +299,8 @@ impl RAEInterface for PlatformGodot {
     }
 
     fn domain(&self) -> &'static str {
-        GODOT_DOMAIN
+        //GODOT_DOMAIN
+        //TODO: choose a way to charge domain
+        ""
     }
 }

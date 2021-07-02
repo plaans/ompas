@@ -188,8 +188,8 @@ pub fn help(args: &[LValue], _: &LEnv, ctx: &CtxDoc) -> Result<LValue, LError> {
             LValue::Fn(fun) => Ok(LValue::String(ctx.get(&fun.get_label()))),
             LValue::MutFn(fun) => Ok(LValue::String(ctx.get(&fun.get_label()))),
             LValue::Symbol(s) => Ok(LValue::String(ctx.get(s))),
-            lv => Err(WrongType(lv.clone(), lv.into(), NameTypeLValue::Symbol)),
+            lv => Err(WrongType(HELP, lv.clone(), lv.into(), NameTypeLValue::Symbol)),
         },
-        _ => Err(WrongNumberOfArgument(args.into(), args.len(), 0..1)),
+        _ => Err(WrongNumberOfArgument(HELP, args.into(), args.len(), 0..1)),
     }
 }

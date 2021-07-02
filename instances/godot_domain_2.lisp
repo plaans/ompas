@@ -1,0 +1,18 @@
+(begin
+    (def-lambda (quote (go_random (lambda (?r ?l ?u)
+                     (let ((x (rand-int-in-range ?l ?u))
+                           (y (rand-int-in-range ?l ?u)))
+                           (rae-await (navigate_to ?r x y)))))))
+
+    (def-task dumber (quote ((:params ?r) (:preconditions true))))
+    (def-method m_dumber (quote ((:task dumber)
+        (:params ?r )
+        (:body (if (! (robot.in_station ?r))
+                   (if (<= 0.4 (robot.battery ?r))
+                       (let*  ((areas (get-map (rae-get-state) parking_areas))
+                               (area (rand-element areas)))
+                               (rae-await (navigate_to_area ?r area)))
+                       (go_random ?r 1 5))
+                   (if (>= (robot.battery ?r))
+                       (go_random ?r 1 5)))))))
+)

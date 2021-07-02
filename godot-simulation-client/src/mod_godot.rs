@@ -316,7 +316,7 @@ impl CtxGodot {
 impl GetModule for CtxGodot {
     fn get_module(self) -> Module {
         let raw_lisp = vec![
-            /*LAMBDA_ROBOT_BATTERY,
+            LAMBDA_ROBOT_BATTERY,
             LAMBDA_ROBOT_COORDINATES,
             LAMBDA_ROBOT_IN_INTERACT_AREAS,
             LAMBDA_ROBOT_IN_STATION,
@@ -344,7 +344,7 @@ impl GetModule for CtxGodot {
             LAMBDA_DO_ROTATION,
             LAMBDA_NAVIGATE_TO,
             LAMBDA_PICK,
-            LAMBDA_PLACE,*/
+            LAMBDA_PLACE,
         ]
         .into();
 

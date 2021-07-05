@@ -38,7 +38,12 @@ pub struct Counter {
 
 pub fn get_counter(args: &[LValue], _: &LEnv, ctx: &CtxCounter) -> Result<LValue, LError> {
     if args.len() != 1 {
-        return Err(WrongNumberOfArgument(GET_COUNTER, args.into(), args.len(), 1..1));
+        return Err(WrongNumberOfArgument(
+            GET_COUNTER,
+            args.into(),
+            args.len(),
+            1..1,
+        ));
     }
 
     match &args[0] {
@@ -61,12 +66,20 @@ pub fn decrement_counter(
     ctx: &mut CtxCounter,
 ) -> Result<LValue, LError> {
     if args.len() != 1 {
-        return Err(WrongNumberOfArgument(DECREMENT_COUNTER, args.into(), args.len(), 1..1));
+        return Err(WrongNumberOfArgument(
+            DECREMENT_COUNTER,
+            args.into(),
+            args.len(),
+            1..1,
+        ));
     }
 
     match &args[0] {
         LValue::Number(LNumber::Usize(u)) => match ctx.counters.get_mut(*u) {
-            None => Err(SpecialError(DECREMENT_COUNTER, "index out of reach".to_string())),
+            None => Err(SpecialError(
+                DECREMENT_COUNTER,
+                "index out of reach".to_string(),
+            )),
             Some(c) => {
                 if c.val > 0 {
                     c.val -= 1;
@@ -89,11 +102,19 @@ pub fn increment_counter(
     ctx: &mut CtxCounter,
 ) -> Result<LValue, LError> {
     if args.len() != 1 {
-        return Err(WrongNumberOfArgument(INCREMENT_COUNTER, args.into(), args.len(), 1..1));
+        return Err(WrongNumberOfArgument(
+            INCREMENT_COUNTER,
+            args.into(),
+            args.len(),
+            1..1,
+        ));
     }
     match &args[0] {
         LValue::Number(LNumber::Usize(u)) => match ctx.counters.get_mut(*u) {
-            None => Err(SpecialError(INCREMENT_COUNTER, "index out of reach".to_string())),
+            None => Err(SpecialError(
+                INCREMENT_COUNTER,
+                "index out of reach".to_string(),
+            )),
             Some(c) => {
                 c.val += 1;
                 Ok(LValue::Nil)
@@ -110,7 +131,12 @@ pub fn increment_counter(
 
 pub fn set_counter(args: &[LValue], _: &LEnv, ctx: &mut CtxCounter) -> Result<LValue, LError> {
     if args.len() != 2 {
-        return Err(WrongNumberOfArgument(SET_COUNTER, args.into(), args.len(), 2..2));
+        return Err(WrongNumberOfArgument(
+            SET_COUNTER,
+            args.into(),
+            args.len(),
+            2..2,
+        ));
     }
 
     match &args[0] {

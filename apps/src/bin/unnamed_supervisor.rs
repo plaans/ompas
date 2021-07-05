@@ -9,9 +9,7 @@ use ompas_modules::math::CtxMath;
 //use ompas_modules::robot::CtxRobot;
 use ompas_acting::controller::dumber::CtxDumber;
 use ompas_acting::rae::module::init_ctx_rae;
-use ompas_acting::rae::module::mod_rae::CtxRae;
 use ompas_acting::rae::module::mod_rae_exec::CtxRaeExec;
-use ompas_acting::rae::module::mod_rae_monitor::CtxRaeMonitor;
 use ompas_godot_simulation_client::mod_godot::CtxGodot;
 use ompas_godot_simulation_client::rae_interface::PlatformGodot;
 use std::path::PathBuf;
@@ -74,7 +72,7 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     let ctx_type = CtxType::default();
     let ctx_counter = CtxCounter::default();
     let ctx_dumber = CtxDumber::default();
-    let ctx_godot = CtxGodot::default();
+    let _ctx_godot = CtxGodot::default();
     let (ctx_rae, ctx_rae_monitor) = init_ctx_rae(Box::new(PlatformGodot::default()));
     //Insert the doc for the different contexts.
     ctx_doc.insert_doc(CtxIo::documentation());

@@ -138,7 +138,12 @@ impl TryFrom<GodotMessageSerde> for LState {
             GodotMessageType::DynamicState => {
                 state.set_type(StateType::Dynamic);
             }
-            _ => return Err(LError::SpecialError("LState::TryFrom<GodotMessageSerde>","Was expecting a state".to_string())),
+            _ => {
+                return Err(LError::SpecialError(
+                    "LState::TryFrom<GodotMessageSerde>",
+                    "Was expecting a state".to_string(),
+                ))
+            }
         }
         if let GodotMessageSerdeData::LValue(LValueS::List(l)) = value.data {
             for e in l {

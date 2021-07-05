@@ -93,7 +93,12 @@ pub fn sin(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValue, LError> {
             let f: f64 = n.into();
             Ok(f.sin().into())
         }
-        lv => Err(WrongType(SIN, lv.clone(), lv.into(), NameTypeLValue::Number)),
+        lv => Err(WrongType(
+            SIN,
+            lv.clone(),
+            lv.into(),
+            NameTypeLValue::Number,
+        )),
     }
 }
 
@@ -109,13 +114,23 @@ pub fn cos(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValue, LError> {
             let f: f64 = n.into();
             Ok(f.cos().into())
         }
-        lv => Err(WrongType(COS, lv.clone(), lv.into(), NameTypeLValue::Number)),
+        lv => Err(WrongType(
+            COS,
+            lv.clone(),
+            lv.into(),
+            NameTypeLValue::Number,
+        )),
     }
 }
 
 pub fn rand_int_in_range(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValue, LError> {
     if args.len() != 2 {
-        return Err(WrongNumberOfArgument(RAND_INT_IN_RANGE, args.into(), args.len(), 2..2));
+        return Err(WrongNumberOfArgument(
+            RAND_INT_IN_RANGE,
+            args.into(),
+            args.len(),
+            2..2,
+        ));
     }
 
     if let LValue::Number(n1) = &args[0] {
@@ -142,7 +157,12 @@ pub fn rand_int_in_range(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValu
 
 pub fn rand_float_in_range(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValue, LError> {
     if args.len() != 2 {
-        return Err(WrongNumberOfArgument(RAND_FLOAT_IN_RANGE, args.into(), args.len(), 2..2));
+        return Err(WrongNumberOfArgument(
+            RAND_FLOAT_IN_RANGE,
+            args.into(),
+            args.len(),
+            2..2,
+        ));
     }
 
     if let LValue::Number(n1) = &args[0] {
@@ -173,13 +193,21 @@ pub fn rand_element(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValue, LE
             if let LValue::List(list) = &args[0] {
                 let index = rand::thread_rng().gen_range(0..list.len());
                 Ok(list[index].clone())
-            }else {
-                Err(WrongType(RAND_ELEMENT, args[0].clone(), (&args[0]).into(), NameTypeLValue::Symbol))
+            } else {
+                Err(WrongType(
+                    RAND_ELEMENT,
+                    args[0].clone(),
+                    (&args[0]).into(),
+                    NameTypeLValue::Symbol,
+                ))
             }
-        },
-        _ => {
-            Err(WrongNumberOfArgument(RAND_ELEMENT, args.into(), args.len(), 1..1))
-        },
+        }
+        _ => Err(WrongNumberOfArgument(
+            RAND_ELEMENT,
+            args.into(),
+            args.len(),
+            1..1,
+        )),
     }
 }
 

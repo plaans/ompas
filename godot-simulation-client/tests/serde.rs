@@ -1,5 +1,5 @@
 use ompas_godot_simulation_client::serde::*;
-use ompas_lisp::structs::{LError, LValue, LValueS};
+use ompas_lisp::structs::{LError, LValue};
 
 #[test]
 #[test]

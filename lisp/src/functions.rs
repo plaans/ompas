@@ -1,12 +1,11 @@
 use crate::core::LEnv;
+use crate::language::scheme_primitives::*;
 use crate::structs::LError::{
     NotInListOfExpectedTypes, SpecialError, WrongNumberOfArgument, WrongType,
 };
 use crate::structs::{LError, LNumber, LValue, NameTypeLValue};
 use im::HashMap;
 use std::convert::TryFrom;
-use crate::language::scheme_primitives::*;
-use crate::structs::LCoreOperator::Set;
 
 pub fn env(_: &[LValue], env: &LEnv, _: &()) -> Result<LValue, LError> {
     Ok(env
@@ -19,7 +18,10 @@ pub fn env(_: &[LValue], env: &LEnv, _: &()) -> Result<LValue, LError> {
 
 pub fn begin(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     match args.last() {
-        None => Err(LError::SpecialError("begin","no SExpr after begin".to_string())),
+        None => Err(LError::SpecialError(
+            "begin",
+            "no SExpr after begin".to_string(),
+        )),
         Some(v) => Ok(v.clone()),
     }
 }
@@ -35,7 +37,7 @@ pub fn list(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
 pub fn map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     let mut facts: HashMap<LValue, LValue> = Default::default();
     if args.len() != 1 {
-        return Err(WrongNumberOfArgument(MAP,  args.into(), args.len(), 1..1));
+        return Err(WrongNumberOfArgument(MAP, args.into(), args.len(), 1..1));
     }
     match args.get(0).unwrap() {
         LValue::List(list_sv) => {
@@ -45,7 +47,12 @@ pub fn map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
                     LValue::List(val_sv) => {
                         //println!("sv: {:?}", val_sv);
                         if val_sv.len() != 3 {
-                            return Err(WrongNumberOfArgument(MAP, val_sv.into(), val_sv.len(), 3..3));
+                            return Err(WrongNumberOfArgument(
+                                MAP,
+                                val_sv.into(),
+                                val_sv.len(),
+                                3..3,
+                            ));
                         }
                         if String::try_from(&val_sv[1])?.as_str().eq(".") {
                             //println!("insert a new fact");
@@ -84,16 +91,21 @@ pub fn set(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
             }
             Ok(LValue::Map(facts))
         }
-        lv => Err(LError::SpecialError(SET, format!(
-            "Cannot set a {}",
-            NameTypeLValue::from(lv)
-        ))),
+        lv => Err(LError::SpecialError(
+            SET,
+            format!("Cannot set a {}", NameTypeLValue::from(lv)),
+        )),
     }
 }
 
 pub fn get(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.is_empty() {
-        return Err(WrongNumberOfArgument(GET, args.into(), 0, 1..std::usize::MAX));
+        return Err(WrongNumberOfArgument(
+            GET,
+            args.into(),
+            0,
+            1..std::usize::MAX,
+        ));
     }
     let lv = args.get(0).unwrap();
     match lv {
@@ -120,7 +132,12 @@ pub fn get(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
 
 pub fn get_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() != 2 {
-        return Err(WrongNumberOfArgument(GET_MAP, args.into(), 0, 1..std::usize::MAX));
+        return Err(WrongNumberOfArgument(
+            GET_MAP,
+            args.into(),
+            0,
+            1..std::usize::MAX,
+        ));
     }
 
     match &args[0] {
@@ -129,13 +146,23 @@ pub fn get_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
             let value = map.get(key).unwrap_or(&LValue::Nil);
             Ok(value.clone())
         }
-        lv => Err(WrongType(GET_MAP, lv.clone(), lv.into(), NameTypeLValue::Map)),
+        lv => Err(WrongType(
+            GET_MAP,
+            lv.clone(),
+            lv.into(),
+            NameTypeLValue::Map,
+        )),
     }
 }
 
 pub fn set_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() != 2 {
-        return Err(WrongNumberOfArgument(SET_MAP, args.into(), args.len(), 2..2));
+        return Err(WrongNumberOfArgument(
+            SET_MAP,
+            args.into(),
+            args.len(),
+            2..2,
+        ));
     }
 
     match &args[0] {
@@ -157,18 +184,38 @@ pub fn set_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
                         ))
                     }
                 } else {
-                    Err(WrongNumberOfArgument(SET_MAP, val_sv.into(), val_sv.len(), 3..3))
+                    Err(WrongNumberOfArgument(
+                        SET_MAP,
+                        val_sv.into(),
+                        val_sv.len(),
+                        3..3,
+                    ))
                 }
             }
-            lv => Err(WrongType(SET_MAP, lv.clone(), lv.into(), NameTypeLValue::List)),
+            lv => Err(WrongType(
+                SET_MAP,
+                lv.clone(),
+                lv.into(),
+                NameTypeLValue::List,
+            )),
         },
-        lv => Err(WrongType(SET_MAP, lv.clone(), lv.into(), NameTypeLValue::Map)),
+        lv => Err(WrongType(
+            SET_MAP,
+            lv.clone(),
+            lv.into(),
+            NameTypeLValue::Map,
+        )),
     }
 }
 
 pub fn union_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() != 2 {
-        return Err(WrongNumberOfArgument(UNION_MAP, args.into(), args.len(), 2..2));
+        return Err(WrongNumberOfArgument(
+            UNION_MAP,
+            args.into(),
+            args.len(),
+            2..2,
+        ));
     }
     let map1 = &args[0];
     let map2 = &args[1];
@@ -177,10 +224,20 @@ pub fn union_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
         if let LValue::Map(map2) = map2.clone() {
             Ok(map1.union(map2).into())
         } else {
-            Err(WrongType(UNION_MAP,map2.clone(), map2.into(), NameTypeLValue::Map))
+            Err(WrongType(
+                UNION_MAP,
+                map2.clone(),
+                map2.into(),
+                NameTypeLValue::Map,
+            ))
         }
     } else {
-        Err(WrongType(UNION_MAP, map1.clone(), map1.into(), NameTypeLValue::Map))
+        Err(WrongType(
+            UNION_MAP,
+            map1.clone(),
+            map1.into(),
+            NameTypeLValue::Map,
+        ))
     }
 }
 
@@ -305,7 +362,12 @@ pub fn member(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
             }
             Ok(LValue::Nil)
         }
-        lv => Err(WrongType(MEMBER, lv.clone(), lv.into(), NameTypeLValue::List)),
+        lv => Err(WrongType(
+            MEMBER,
+            lv.clone(),
+            lv.into(),
+            NameTypeLValue::List,
+        )),
     }
 }
 
@@ -318,17 +380,32 @@ pub fn reverse(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
                 new_list.reverse();
                 Ok(new_list.into())
             }
-            lv => Err(WrongType(REVERSE, lv.clone(), lv.into(), NameTypeLValue::List)),
+            lv => Err(WrongType(
+                REVERSE,
+                lv.clone(),
+                lv.into(),
+                NameTypeLValue::List,
+            )),
         }
     } else {
-        Err(WrongNumberOfArgument(REVERSE , args.into(), args.len(), 1..1))
+        Err(WrongNumberOfArgument(
+            REVERSE,
+            args.into(),
+            args.len(),
+            1..1,
+        ))
     }
 }
 
 /// return the length of the object if it is a table or a list.
 pub fn length(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() != 1 {
-        return Err(WrongNumberOfArgument(REVERSE, args.into(), args.len(), 1..1));
+        return Err(WrongNumberOfArgument(
+            REVERSE,
+            args.into(),
+            args.len(),
+            1..1,
+        ));
     }
 
     match &args[0] {
@@ -424,7 +501,7 @@ pub fn lt(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
 pub fn ge(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     match args.len() {
         2 => Ok((args[0] >= args[1]).into()),
-        i => Err(WrongNumberOfArgument(GE,args.into(), i, 2..2)),
+        i => Err(WrongNumberOfArgument(GE, args.into(), i, 2..2)),
     }
 }
 
@@ -557,7 +634,12 @@ pub fn is_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
 
 pub fn is_equal(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() != 2 {
-        return Err(WrongNumberOfArgument(IS_EQUAL, args.into(), args.len(), 2..2));
+        return Err(WrongNumberOfArgument(
+            IS_EQUAL,
+            args.into(),
+            args.len(),
+            2..2,
+        ));
     }
     if let LValue::List(l1) = &args[0] {
         if let LValue::List(l2) = &args[1] {
@@ -582,7 +664,12 @@ pub fn is_equal(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
 
 pub fn is_pair(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() != 1 {
-        return Err(WrongNumberOfArgument(IS_PAIR, args.into(), args.len(), 1..1));
+        return Err(WrongNumberOfArgument(
+            IS_PAIR,
+            args.into(),
+            args.len(),
+            1..1,
+        ));
     }
 
     if let LValue::List(l) = &args[0] {

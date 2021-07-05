@@ -1,5 +1,4 @@
 use crate::mod_godot::{SocketInfo, DEFAULT_PATH_PROJECT_GODOT};
-use crate::rae_domain::GODOT_DOMAIN;
 use crate::serde::{
     GodotMessageSerde, GodotMessageSerdeData, GodotMessageType, SerdeActionId, SerdeRobotCommand,
 };
@@ -12,11 +11,10 @@ use ompas_acting::rae::state::{RAEState, StateType, KEY_DYNAMIC, KEY_STATIC};
 use ompas_lisp::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
 use ompas_lisp::structs::*;
 use std::net::SocketAddr;
-use std::process::{Command, Child};
+use std::process::Command;
 use std::thread;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Sender;
-use std::time::Duration;
 
 #[derive(Default, Clone)]
 pub struct PlatformGodot {
@@ -96,8 +94,12 @@ impl RAEInterface for PlatformGodot {
 
     fn cancel_command(&self, args: &[LValue]) -> Result<LValue, LError> {
         if args.len() != 1 {
-            return Err(WrongNumberOfArgument(                    "PlatformGodot::cancel_command",
-                                                                 args.into(), args.len(), 1..1));
+            return Err(WrongNumberOfArgument(
+                "PlatformGodot::cancel_command",
+                args.into(),
+                args.len(),
+                1..1,
+            ));
         }
 
         let id: usize = if let LValue::Number(n) = &args[0] {
@@ -149,18 +151,28 @@ impl RAEInterface for PlatformGodot {
                     _ => {
                         let result1 = Err(SpecialError(
                             "PlatformGodot::get_state",
-                            format!(
-                            "Expected keywords {} or {}",
-                            KEY_STATIC, KEY_DYNAMIC
-                        )));
+                            format!("Expected keywords {} or {}", KEY_STATIC, KEY_DYNAMIC),
+                        ));
                         return result1;
                     }
                 },
-                lv => return Err(WrongType(                            "PlatformGodot::get_state",
-                                                                       lv.clone(), lv.into(), NameTypeLValue::Symbol)),
+                lv => {
+                    return Err(WrongType(
+                        "PlatformGodot::get_state",
+                        lv.clone(),
+                        lv.into(),
+                        NameTypeLValue::Symbol,
+                    ))
+                }
             },
-            _ => return Err(WrongNumberOfArgument(                            "PlatformGodot::get_state",
-                                                                              args.into(), args.len(), 0..1)),
+            _ => {
+                return Err(WrongNumberOfArgument(
+                    "PlatformGodot::get_state",
+                    args.into(),
+                    args.len(),
+                    0..1,
+                ))
+            }
         };
 
         //println!("state type: {:?}", _type);
@@ -211,14 +223,13 @@ impl RAEInterface for PlatformGodot {
     }
 
     fn start_platform(&self, args: &[LValue]) -> Result<LValue, LError> {
-        let mut child = match args.len() {
-            0 => {
-                Command::new("godot3")
-                        .arg("--path")
-                        .arg(DEFAULT_PATH_PROJECT_GODOT)
-                        .spawn()
-                        .expect("failed to execute process")
-            } //default settings
+        //TODO: handle child to handle clean kill of godot process
+        let mut _child = match args.len() {
+            0 => Command::new("godot3")
+                .arg("--path")
+                .arg(DEFAULT_PATH_PROJECT_GODOT)
+                .spawn()
+                .expect("failed to execute process"), //default settings
             1 => {
                 if let LValue::Symbol(s) = &args[0] {
                     let s = s.clone();
@@ -227,8 +238,7 @@ impl RAEInterface for PlatformGodot {
                         .arg(s)
                         .spawn()
                         .expect("failed to execute process")
-                }
-                else {
+                } else {
                     return Err(WrongType(
                         "PlatformGodot::start_platform",
                         args[0].clone(),
@@ -240,8 +250,14 @@ impl RAEInterface for PlatformGodot {
             5 => {
                 todo!()
             } //path + options
-            _ => return Err(WrongNumberOfArgument(                        "PlatformGodot::start_platform",
-                                                                          args.into(), args.len(), 0..5)), //Unexpected number of arguments
+            _ => {
+                return Err(WrongNumberOfArgument(
+                    "PlatformGodot::start_platform",
+                    args.into(),
+                    args.len(),
+                    0..5,
+                ))
+            } //Unexpected number of arguments
         };
 
         //self.child = child;
@@ -258,18 +274,38 @@ impl RAEInterface for PlatformGodot {
             2 => {
                 let addr = match &args[0] {
                     LValue::Symbol(s) => s.clone(),
-                    lv => return Err(WrongType(                        "PlatformGodot::open_com",
-                                                                       lv.clone(), lv.into(), NameTypeLValue::Symbol)),
+                    lv => {
+                        return Err(WrongType(
+                            "PlatformGodot::open_com",
+                            lv.clone(),
+                            lv.into(),
+                            NameTypeLValue::Symbol,
+                        ))
+                    }
                 };
 
                 let port: usize = match &args[1] {
                     LValue::Number(n) => n.into(),
-                    lv => return Err(WrongType("PlatformGodot::open_com",lv.clone(), lv.into(), NameTypeLValue::Usize)),
+                    lv => {
+                        return Err(WrongType(
+                            "PlatformGodot::open_com",
+                            lv.clone(),
+                            lv.into(),
+                            NameTypeLValue::Usize,
+                        ))
+                    }
                 };
 
                 format!("{}:{}", addr, port).parse().unwrap()
             }
-            _ => return Err(WrongNumberOfArgument("PlatformGodot::open_com",args.into(), args.len(), 2..2)),
+            _ => {
+                return Err(WrongNumberOfArgument(
+                    "PlatformGodot::open_com",
+                    args.into(),
+                    args.len(),
+                    2..2,
+                ))
+            }
         };
 
         let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);

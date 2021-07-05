@@ -1,5 +1,4 @@
 use ompas_acting::rae::state::LState;
-use ompas_lisp::structs::LCoreOperator::DefMacro;
 use ompas_lisp::structs::LValueS;
 
 #[test]
@@ -7,7 +6,7 @@ fn test_union() {
     let mut s1: LState = Default::default();
     s1.insert(LValueS::Int(10), LValueS::Symbol("dix".to_string()));
 
-    let mut s2: LState = Default::default();
+    let s2: LState = Default::default();
     s1.insert(LValueS::Int(20), LValueS::Symbol("vingt".to_string()));
 
     let s3 = s1.union(&s2);

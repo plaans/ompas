@@ -92,7 +92,14 @@ pub fn read(args: &[LValue], _: &LEnv, ctx: &CtxIo) -> Result<LValue, LError> {
     }
     let file_name = match &args[0] {
         LValue::Symbol(s) => s.to_string(),
-        lv => return Err(WrongType(READ, lv.clone(), lv.into(), NameTypeLValue::Symbol)),
+        lv => {
+            return Err(WrongType(
+                READ,
+                lv.clone(),
+                lv.into(),
+                NameTypeLValue::Symbol,
+            ))
+        }
     };
 
     let mut file = File::open(file_name)?;
@@ -129,7 +136,12 @@ pub fn write(args: &[LValue], _: &LEnv, _: &CtxIo) -> Result<LValue, LError> {
             f.write_all(&args[1].to_string().as_bytes())?;
             Ok(LValue::Nil)
         }
-        lv => Err(WrongType(WRITE, lv.clone(), lv.into(), NameTypeLValue::Symbol)),
+        lv => Err(WrongType(
+            WRITE,
+            lv.clone(),
+            lv.into(),
+            NameTypeLValue::Symbol,
+        )),
     }
 
     //println!("module Io: write");

@@ -1,9 +1,11 @@
+use crate::async_await;
+use crate::async_await::AwaitResponse;
 use crate::functions::*;
 use crate::language::scheme_lambda::*;
 use crate::language::scheme_macro::*;
 use crate::language::scheme_primitives::*;
 use crate::language::*;
-use crate::structs::LCoreOperator::{Quote, DefMacro};
+use crate::structs::LCoreOperator::Quote;
 use crate::structs::LError::*;
 use crate::structs::NameTypeLValue::{List, Symbol};
 use crate::structs::*;
@@ -12,16 +14,8 @@ use im::hashmap::HashMap;
 use std::any::Any;
 use std::convert::{TryFrom, TryInto};
 use std::ops::Deref;
-use std::sync::{Arc};
-use tokio::sync::{RwLock, Mutex, mpsc, oneshot};
-use tokio::task::JoinHandle;
-use std::hash::Hash;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::{thread, mem};
-use aries_planning::chronicles::Task;
-use tokio::sync::oneshot::Receiver;
-use crate::async_await::{TaskHandler, AwaitResponse};
-use aries_utils::StreamingIterator;
+use std::sync::Arc;
+use std::thread;
 
 #[derive(Clone, Debug)]
 pub struct LEnv {
@@ -29,11 +23,8 @@ pub struct LEnv {
     macro_table: im::HashMap<String, LLambda>,
     //pub(crate) new_entries: Vec<String>, Used to export new entries, but not really important in the end
     outer: Option<Box<LEnv>>,
-    task_handler: TaskHandler
+    //task_handler: TaskHandler
 }
-
-
-
 
 impl LEnv {
     pub fn merge_by_symbols(&mut self, other: &Self) {
@@ -299,7 +290,6 @@ impl LEnv {
             macro_table: Default::default(),
             //new_entries: vec![],
             outer: None,
-            task_handler: Default::default(),
         }
     }
 
@@ -387,7 +377,10 @@ pub fn load_module(
 pub fn parse(str: &str, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result<LValue, LError> {
     match aries_planning::parsing::sexpr::parse(str) {
         Ok(se) => expand(&parse_into_lvalue(&se), true, env, ctxs),
-        Err(e) => Err(SpecialError("parse", format!("Error in command: {}", e.to_string()))),
+        Err(e) => Err(SpecialError(
+            "parse",
+            format!("Error in command: {}", e.to_string()),
+        )),
     }
 }
 
@@ -440,7 +433,8 @@ pub fn expand(
                     LCoreOperator::Define | LCoreOperator::DefMacro => {
                         //eprintln!("expand: define: Ok!");
                         if list.len() < 3 {
-                            return Err(WrongNumberOfArgument("expand",
+                            return Err(WrongNumberOfArgument(
+                                "expand",
                                 x.clone(),
                                 list.len(),
                                 3..std::usize::MAX,
@@ -467,22 +461,27 @@ pub fn expand(
                             }
                             LValue::Symbol(sym) => {
                                 if list.len() != 3 {
-                                    return Err(WrongNumberOfArgument("expand", x.clone(), list.len(), 3..3));
+                                    return Err(WrongNumberOfArgument(
+                                        "expand",
+                                        x.clone(),
+                                        list.len(),
+                                        3..3,
+                                    ));
                                 }
                                 let exp = expand(&list[2], top_level, env, ctxs)?;
                                 if def == LCoreOperator::DefMacro {
                                     if !top_level {
-                                        return Err(SpecialError("expand", format!(
-                                            "{}: defmacro only allowed at top level",
-                                            x
-                                        )));
+                                        return Err(SpecialError(
+                                            "expand",
+                                            format!("{}: defmacro only allowed at top level", x),
+                                        ));
                                     }
                                     let proc = eval(&exp, &mut env.clone(), ctxs)?;
                                     if !matches!(proc, LValue::Lambda(_)) {
-                                        return Err(SpecialError("expand", format!(
-                                            "{}: macro must be a procedure",
-                                            proc
-                                        )));
+                                        return Err(SpecialError(
+                                            "expand",
+                                            format!("{}: macro must be a procedure", proc),
+                                        ));
                                     } else {
                                         env.add_macro(sym.clone(), proc.try_into()?);
                                     }
@@ -495,13 +494,19 @@ pub fn expand(
                                 );
                             }
                             _ => {
-                                return Err(WrongType("expand", x.clone(), x.into(), NameTypeLValue::Symbol))
+                                return Err(WrongType(
+                                    "expand",
+                                    x.clone(),
+                                    x.into(),
+                                    NameTypeLValue::Symbol,
+                                ))
                             }
                         }
                     }
                     LCoreOperator::DefLambda => {
                         if list.len() < 3 {
-                            return Err(WrongNumberOfArgument("expand",
+                            return Err(WrongNumberOfArgument(
+                                "expand",
                                 x.clone(),
                                 list.len(),
                                 3..std::usize::MAX,
@@ -514,7 +519,8 @@ pub fn expand(
                             LValue::List(vars_list) => {
                                 for v in vars_list {
                                     if !matches!(v, LValue::Symbol(_)) {
-                                        return Err(SpecialError("expand",
+                                        return Err(SpecialError(
+                                            "expand",
                                             "illegal lambda argument list".to_string(),
                                         ));
                                     }
@@ -550,7 +556,12 @@ pub fn expand(
                             list.push(LValue::Nil);
                         }
                         if list.len() != 4 {
-                            return Err(WrongNumberOfArgument("expand", (&list).into(), list.len(), 4..4));
+                            return Err(WrongNumberOfArgument(
+                                "expand",
+                                (&list).into(),
+                                list.len(),
+                                4..4,
+                            ));
                         }
                         //return map(expand, x)
                         let mut expanded_list = vec![LCoreOperator::If.into()];
@@ -562,18 +573,33 @@ pub fn expand(
                     LCoreOperator::Quote => {
                         //println!("expand: quote: Ok!");
                         if list.len() != 2 {
-                            return Err(WrongNumberOfArgument("expand", list.into(), list.len(), 2..2));
+                            return Err(WrongNumberOfArgument(
+                                "expand",
+                                list.into(),
+                                list.len(),
+                                2..2,
+                            ));
                         }
                         return Ok(vec![LCoreOperator::Quote.into(), list[1].clone()].into());
                     }
                     LCoreOperator::Set => {
                         if list.len() != 3 {
-                            return Err(WrongNumberOfArgument("expand", list.into(), list.len(), 3..3));
+                            return Err(WrongNumberOfArgument(
+                                "expand",
+                                list.into(),
+                                list.len(),
+                                3..3,
+                            ));
                         }
                         let var = &list[1];
                         //Can only set a symbol
                         if !matches!(var, LValue::Symbol(_s)) {
-                            return Err(WrongType("expand", var.clone(), var.into(), NameTypeLValue::Symbol));
+                            return Err(WrongType(
+                                "expand",
+                                var.clone(),
+                                var.into(),
+                                NameTypeLValue::Symbol,
+                            ));
                         }
 
                         return Ok(vec![
@@ -596,7 +622,12 @@ pub fn expand(
                     }
                     LCoreOperator::QuasiQuote => {
                         return if list.len() != 2 {
-                            Err(WrongNumberOfArgument("expand", list.into(), list.len(), 2..2))
+                            Err(WrongNumberOfArgument(
+                                "expand",
+                                list.into(),
+                                list.len(),
+                                2..2,
+                            ))
                         } else {
                             /*let expanded = expand_quasi_quote(&list[1], env)?;
                             //println!("{}", expanded);
@@ -610,8 +641,34 @@ pub fn expand(
                         //TODO: Implémenter msg d'erreur
                         panic!("unquote not at right place")
                     }
-                    LCoreOperator::Async => {}
-                    LCoreOperator::Await => {}
+                    LCoreOperator::Async => {
+                        return if list.len() != 2 {
+                            Err(WrongNumberOfArgument(
+                                "expand",
+                                list.into(),
+                                list.len(),
+                                2..2,
+                            ))
+                        } else {
+                            let mut expanded = vec![LCoreOperator::Async.into()];
+                            expanded.push(expand(&list[1], top_level, env, ctxs)?);
+                            Ok(expanded.into())
+                        }
+                    }
+                    LCoreOperator::Await => {
+                        return if list.len() != 2 {
+                            Err(WrongNumberOfArgument(
+                                "expand",
+                                list.into(),
+                                list.len(),
+                                2..2,
+                            ))
+                        } else {
+                            let mut expanded = vec![LCoreOperator::Await.into()];
+                            expanded.push(expand(&list[1], top_level, env, ctxs)?);
+                            Ok(expanded.into())
+                        }
+                    }
                 }
             } else if let LValue::Symbol(sym) = &list[0] {
                 match env.get_macro(sym) {
@@ -644,7 +701,12 @@ pub fn expand_quasi_quote(x: &LValue, env: &LEnv) -> Result<LValue, LError> {
                     if let Ok(co) = LCoreOperator::try_from(s.as_str()) {
                         if co == LCoreOperator::UnQuote {
                             if list.len() != 2 {
-                                return Err(WrongNumberOfArgument("expand_quasi_quote", x.clone(), list.len(), 2..2));
+                                return Err(WrongNumberOfArgument(
+                                    "expand_quasi_quote",
+                                    x.clone(),
+                                    list.len(),
+                                    2..2,
+                                ));
                             }
                             return Ok(list[1].clone());
                         }
@@ -747,7 +809,12 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                             Ok(LValue::True) => conseq.clone(),
                             Ok(LValue::Nil) => alt.clone(),
                             Ok(lv) => {
-                                return Err(WrongType("eval", lv.clone(), lv.into(), NameTypeLValue::Bool))
+                                return Err(WrongType(
+                                    "eval",
+                                    lv.clone(),
+                                    lv.into(),
+                                    NameTypeLValue::Bool,
+                                ))
                             }
                             Err(e) => return Err(e),
                         };
@@ -764,7 +831,12 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                                 //println!("=> {}", LValue::Nil);
                                 Ok(LValue::Nil)
                             }
-                            lv => Err(WrongType("eval", lv.clone(), lv.into(), NameTypeLValue::Symbol)),
+                            lv => Err(WrongType(
+                                "eval",
+                                lv.clone(),
+                                lv.into(),
+                                NameTypeLValue::Symbol,
+                            )),
                         };
                     }
                     LCoreOperator::Begin => {
@@ -779,40 +851,47 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                     | LCoreOperator::UnQuote
                     | LCoreOperator::DefMacro => return Ok(LValue::Nil),
                     LCoreOperator::Async => {
-                        let task_handler = env.task_handler.clone();
+                        //println!("async evaluation");
+
                         let handle = tokio::runtime::Handle::current();
-                        let (task_id, sender_result)  = thread::spawn(move || {
+                        let (task_id, sender_result) = thread::spawn(move || {
                             handle.block_on(async move {
-                                task_handler.declare_new_task().await
+                                async_await::current().declare_new_task().await
                             })
-                        }).join().unwrap();
-                        let lvalue = args.into();
+                        })
+                        .join()
+                        .unwrap();
+                        let lvalue = args[0].clone();
                         let mut new_env = env.clone();
                         let mut ctxs = ctxs.clone();
                         tokio::spawn(async move {
                             let result = eval(&lvalue, &mut new_env, &mut ctxs);
-                            sender_result.send((task_id, result)).await;
+                            sender_result
+                                .send((task_id, result))
+                                .await
+                                .expect("could not send result to task handler.");
                         });
 
-                        return Ok(task_id.into())
+                        return Ok(task_id.into());
                     }
                     LCoreOperator::Await => {
-                        if let LValue::Number(LNumber::Usize(id)) = args[0].clone() {
+                        //println!("awaiting on async evaluation");
+                        let pid = eval(&args[0], env, ctxs)?;
+
+                        if let LValue::Number(LNumber::Usize(id)) = pid {
                             let handle = tokio::runtime::Handle::current();
-                            let task_handler = env.task_handler.clone();
                             let result = thread::spawn(move || {
                                 handle.block_on(async move {
-                                    match task_handler.get_response_await(&id).await {
-                                        AwaitResponse::Result(result ) => result,
-                                        AwaitResponse::Receiver(mut r ) => {
-                                            r.recv().await.unwrap()
-                                        }
+                                    match async_await::current().get_response_await(&id).await {
+                                        AwaitResponse::Result(result) => result,
+                                        AwaitResponse::Receiver(mut r) => r.recv().await.unwrap(),
                                     }
                                 })
-                            }).join().unwrap()?;
+                            })
+                            .join()
+                            .unwrap()?;
 
-                            return Ok(result)
-
+                            return Ok(result);
                         }
                     }
                 }
@@ -857,8 +936,9 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                         return if s == MACRO_EXPAND {
                             macro_expand(args, env, ctxs)
                         } else {
-                            Err(WrongType("eval",
-                                          lv.clone(),
+                            Err(WrongType(
+                                "eval",
+                                lv.clone(),
                                 NameTypeLValue::Symbol,
                                 NameTypeLValue::Fn,
                             ))
@@ -897,7 +977,10 @@ pub fn macro_expand(
     if let LValue::Symbol(sym) = &args[0] {
         let _macro = env.get_macro(sym).cloned();
         match _macro {
-            None => Err(SpecialError("eval", format!("{} is not a defined macro", sym))),
+            None => Err(SpecialError(
+                "eval",
+                format!("{} is not a defined macro", sym),
+            )),
             Some(m) => expand(&m.call(&args[1..], env, ctxs)?, true, env, ctxs),
         }
     } else {

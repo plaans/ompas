@@ -92,12 +92,13 @@ async fn async_read_socket(stream: ReadHalf<TcpStream>, state: RAEState, status:
                             StateType::Static => {
                                 //println!("updating static state: {:?}", temp_state);
                                 state.update_state(temp_state);
-                            },
+                            }
                             StateType::Dynamic => state.set_state(temp_state),
-                            StateType::InnerWorld => panic!("should not receive inner world fact from godot")
-                        }
+                            StateType::InnerWorld => {
+                                panic!("should not receive inner world fact from godot")
+                            }
+                        },
                     };
-
                 }
                 GodotMessageType::ActionResponse => {
                     let action_status: (usize, ActionStatus) = message.try_into().unwrap();

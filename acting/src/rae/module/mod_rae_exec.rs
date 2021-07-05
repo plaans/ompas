@@ -256,7 +256,12 @@ pub fn exec_command(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LV
 ///Retract a fact to state
 pub fn retract_fact(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
     if args.len() != 2 {
-        return Err(WrongNumberOfArgument(RAE_RETRACT, args.into(), args.len(), 2..2));
+        return Err(WrongNumberOfArgument(
+            RAE_RETRACT,
+            args.into(),
+            args.len(),
+            2..2,
+        ));
     }
     let key = args[0].clone().into();
     let value = args[1].clone().into();
@@ -266,7 +271,12 @@ pub fn retract_fact(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LV
 ///Add a fact to fact state
 pub fn assert_fact(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
     if args.len() != 2 {
-        return Err(WrongNumberOfArgument(RAE_ASSERT, args.into(), args.len(), 2..2));
+        return Err(WrongNumberOfArgument(
+            RAE_ASSERT,
+            args.into(),
+            args.len(),
+            2..2,
+        ));
     }
     let key = args[0].clone().into();
     let value = args[1].clone().into();
@@ -279,7 +289,12 @@ pub fn assert_fact(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LVa
 /// Return true if the action is a success, false otherwise
 pub fn fn_await(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
     if args.len() != 1 {
-        return Err(WrongNumberOfArgument(RAE_AWAIT, args.into(), args.len(), 1..1));
+        return Err(WrongNumberOfArgument(
+            RAE_AWAIT,
+            args.into(),
+            args.len(),
+            1..1,
+        ));
     }
 
     let action_id = args[0].clone();
@@ -341,7 +356,8 @@ pub fn launch_platform(
     ctx: &mut CtxRaeExec,
 ) -> Result<LValue, LError> {
     match &ctx.actions_progress.sync.sender {
-        None => Err(SpecialError(RAE_LAUNCH_PLATFORM,
+        None => Err(SpecialError(
+            RAE_LAUNCH_PLATFORM,
             "sender to actions status watcher missing.".to_string(),
         )),
         Some(_) => ctx.platform_interface.launch_platform(args),
@@ -358,7 +374,8 @@ pub fn start_platform(
 
 pub fn open_com(args: &[LValue], _env: &LEnv, ctx: &mut CtxRaeExec) -> Result<LValue, LError> {
     match &ctx.actions_progress.sync.sender {
-        None => Err(SpecialError(RAE_START_PLATFORM,
+        None => Err(SpecialError(
+            RAE_START_PLATFORM,
             "sender to actions status watcher missing.".to_string(),
         )),
         Some(_) => ctx.platform_interface.open_com(args),
@@ -378,9 +395,10 @@ pub fn get_state(args: &[LValue], env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue
                         return Err(SpecialError(
                             RAE_GET_STATE,
                             format!(
-                            "was expecting keys {}, {}, {}",
-                            KEY_STATIC, KEY_DYNAMIC, KEY_INNER_WORLD
-                        )))
+                                "was expecting keys {}, {}, {}",
+                                KEY_STATIC, KEY_DYNAMIC, KEY_INNER_WORLD
+                            ),
+                        ))
                     }
                 }
             } else {
@@ -392,7 +410,14 @@ pub fn get_state(args: &[LValue], env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue
                 ));
             }
         }
-        _ => return Err(WrongNumberOfArgument(RAE_GET_STATE,args.into(), args.len(), 0..1)),
+        _ => {
+            return Err(WrongNumberOfArgument(
+                RAE_GET_STATE,
+                args.into(),
+                args.len(),
+                0..1,
+            ))
+        }
     };
 
     let platform_state = ctx.platform_interface.get_state(args).unwrap();

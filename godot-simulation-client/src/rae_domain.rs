@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 pub const GODOT_DOMAIN: &str = "\
 (begin \
     (def-action navigate_to ?r ?x ?y)\

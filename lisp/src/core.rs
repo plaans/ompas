@@ -840,12 +840,13 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                         };
                     }
                     LCoreOperator::Begin => {
-                        let results: Vec<LValue> = args
-                            .iter()
-                            .map(|x| eval(x, &mut env, ctxs))
-                            .collect::<Result<_, _>>()?;
-                        //println!("=> {}", results.last().unwrap_or(&LValue::Nil).clone());
-                        return Ok(results.last().unwrap_or(&LValue::Nil).clone());
+                        let firsts = &args[0..args.len() - 1];
+                        let last = args.last().unwrap();
+
+                        for e in firsts {
+                            eval(e, &mut env, ctxs)?;
+                        }
+                        lv = last.clone();
                     }
                     LCoreOperator::QuasiQuote
                     | LCoreOperator::UnQuote

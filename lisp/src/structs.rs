@@ -477,23 +477,13 @@ impl LFn {
                              ctx: &dyn Any,
                              fun: &Arc<dyn Any + Send + Sync>|
          -> Result<LValue, LError> {
-            let ctx: Option<&T> = ctx.downcast_ref::<T>();
-            let fun: Option<&NativeFn<T>> = fun.downcast_ref::<NativeFn<T>>();
-            if let Some(ctx) = ctx {
-                if let Some(fun) = fun {
-                    fun(args, env, ctx)
-                } else {
-                    Err(LError::SpecialError(
-                        "LFn::new",
-                        "Impossible to downcast function".to_string(),
-                    ))
-                }
-            } else {
-                Err(LError::SpecialError(
-                    "LFn::new",
-                    "Impossible to downcast context".to_string(),
-                ))
-            }
+            let ctx: &T = ctx.downcast_ref::<T>().ok_or_else(|| {
+                LError::SpecialError("LFn::new", "Impossible to downcast context".to_string())
+            })?;
+            let fun: &NativeFn<T> = fun.downcast_ref::<NativeFn<T>>().ok_or_else(|| {
+                LError::SpecialError("LFn::new", "Impossible to downcast function".to_string())
+            })?;
+            fun(args, env, ctx)
         };
         LFn {
             fun: Arc::new(lbd),
@@ -559,23 +549,14 @@ impl LMutFn {
                              ctx: &mut dyn Any,
                              fun: &Arc<dyn Any + Send + Sync>|
          -> Result<LValue, LError> {
-            let ctx: Option<&mut T> = ctx.downcast_mut::<T>();
-            let fun: Option<&NativeMutFn<T>> = fun.downcast_ref::<NativeMutFn<T>>();
-            if let Some(ctx) = ctx {
-                if let Some(fun) = fun {
-                    fun(args, env, ctx)
-                } else {
-                    Err(LError::SpecialError(
-                        "LMutFn::new",
-                        "Impossible to downcast function".to_string(),
-                    ))
-                }
-            } else {
-                Err(LError::SpecialError(
-                    "LMutFn::new",
-                    "Impossible to downcast context".to_string(),
-                ))
-            }
+            let ctx: &mut T = ctx.downcast_mut::<T>().ok_or_else(|| {
+                LError::SpecialError("LMutFn::new", "Impossible to downcast context".to_string())
+            })?;
+            let fun: &NativeMutFn<T> = fun.downcast_ref::<NativeMutFn<T>>().ok_or_else(|| {
+                LError::SpecialError("LMutFn::new", "Impossible to downcast function".to_string())
+            })?;
+
+            fun(args, env, ctx)
         };
         LMutFn {
             fun: Arc::new(lbd),

@@ -16,6 +16,7 @@ ompas_lisp = {path = "../lisp"}
 ompas_modules = {path = "../modules"}
 ompas_godot_simulation_client = {path = "../godot-simulation-client"}
 ompas_acting = {path = "../acting"}
+ompas_utils = {path = "../utils"}
 
 aries_model = {git = "https://github.com/arbimo/aries/", rev = "e220567"}
 aries_planning = {git = "https://github.com/arbimo/aries/", rev = "e220567"}
@@ -32,6 +33,7 @@ serde_json = "1.0.64"
 
 
 
+
 [[bin]]
 name = "virtual_robot"
 path = "src/bin/robot_sim.rs"
@@ -42,12 +44,20 @@ path = "src/bin/unnamed_supervisor.rs"
 
 [[bin]]
 name = "godot_test"
-path = "src/bin/godot_test.rs"
+path = "src/bin/sandbox/godot_test.rs"
 
 [[bin]]
 name = "serde_test"
-path = "src/bin/serde_test.rs"
+path = "src/bin/sandbox/serde_test.rs"
 
 [[bin]]
 name = "command_line_godot"
 path = "src/bin/command_line_godot.rs"
+
+[[bin]]
+name = "test_end_tasks"
+path = "src/bin/sandbox/test_end_tasks.rs"
+
+[[bin]]
+name = "test_spawn_terminal"
+path = "src/bin/sandbox/test_spawn_terminal.rs"

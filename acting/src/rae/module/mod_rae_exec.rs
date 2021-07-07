@@ -1,5 +1,6 @@
 use crate::rae::context::{
     ActionId, ActionsProgress, Agenda, SelectOption, Status, RAE_STATE_FUNCTION_LIST,
+    RAE_TASK_METHODS_MAP,
 };
 use crate::rae::module::domain::*;
 use crate::rae::state::{
@@ -40,6 +41,7 @@ pub const RAE_OPEN_COM_PLATFORM: &str = "rae-open-com-platform";
 pub const RAE_START_PLATFORM: &str = "rae-start-platform";
 pub const RAE_GET_STATUS: &str = "rae-get-status";
 pub const RAE_CANCEL_COMMAND: &str = "rae-cancel-command";
+pub const RAE_GET_METHOD: &str = "rae-get-method";
 
 ///Context that will contains primitives for the RAE executive
 pub struct CtxRaeExec {
@@ -348,6 +350,27 @@ pub fn fn_await(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue
             NameTypeLValue::Usize,
         ))
     }
+}
+
+fn _get_methods(args: &[LValue], env: &LEnv, _ctx: &CtxRaeExec) -> Result<LValue, LError> {
+    if args.is_empty() {
+        return Err(WrongNumberOfArgument(
+            RAE_GET_METHOD,
+            args.into(),
+            args.len(),
+            1..std::usize::MAX,
+        ));
+    }
+    let task_name = &args[0];
+    let task_method_map = env.get_ref_symbol(RAE_TASK_METHODS_MAP).unwrap();
+    let methods = if let LValue::Map(map) = task_method_map {
+        let methods = map.get(task_name).unwrap().clone();
+        methods
+    } else {
+        panic!("this should be a LValue::Map")
+    };
+
+    Ok(methods)
 }
 
 pub fn launch_platform(

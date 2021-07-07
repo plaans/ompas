@@ -1,6 +1,7 @@
 use crate::serde::{GodotMessageSerde, GodotMessageType};
 use ompas_acting::rae::context::ActionsProgress;
 use ompas_acting::rae::state::{ActionStatus, LState, RAEState, StateType};
+use ompas_utils::task_handler;
 use std::convert::TryInto;
 use std::net::SocketAddr;
 use tokio::io::{self, AsyncReadExt, AsyncWriteExt, BufReader, ReadHalf, WriteHalf};
@@ -30,15 +31,26 @@ async fn async_send_socket(mut stream: WriteHalf<TcpStream>, mut receiver: Recei
     let test = receiver.recv().await.unwrap();
     assert_eq!(test, TEST_TCP);
     //println!("socket ready to receive command !");
-
+    let mut end_receiver = task_handler::subscribe_new_task();
     loop {
-        let command = receiver.recv().await.unwrap();
-        //println!("new command to send: {}", command);
-        let size = u32_to_u8_array(command.len() as u32);
-        let msg: &[u8] = &[&size[0..4], &command.as_bytes()].concat();
-        match stream.write_all(msg).await {
-            Ok(_) => {}
-            Err(_) => panic!("error sending via socket"),
+        tokio::select! {
+            command = receiver.recv() => {
+                let command = match command {
+                    None => break,
+                    Some(s) => s
+                };
+                    //println!("new command to send: {}", command);
+                let size = u32_to_u8_array(command.len() as u32);
+                let msg: &[u8] = &[&size[0..4], &command.as_bytes()].concat();
+                match stream.write_all(msg).await {
+                    Ok(_) => {}
+                    Err(_) => panic!("error sending via socket"),
+                }
+            }
+            _ = end_receiver.recv() => {
+                println!("godot sender task ended");
+                break;
+            }
         }
     }
 }
@@ -60,9 +72,12 @@ async fn async_read_socket(stream: ReadHalf<TcpStream>, state: RAEState, status:
 
     let mut map_server_id_action_id: im::HashMap<usize, usize> = Default::default();
 
+    let mut end_receiver = task_handler::subscribe_new_task();
+
     loop {
-        //println!("update...");
-        match buf_reader.read_exact(&mut size_buf).await {
+        tokio::select! {
+            msg = buf_reader.read_exact(&mut size_buf) => {
+                match msg {
             Ok(_) => {}
             Err(_) => panic!("Error while reading buffer"),
         };
@@ -149,6 +164,12 @@ async fn async_read_socket(stream: ReadHalf<TcpStream>, state: RAEState, status:
                     };
                 }
                 _ => panic!("should not receive this kind of message"),
+            }
+        }
+                }
+            _ = end_receiver.recv() => {
+                println!("godot tcp receiver task ended.");
+                break;
             }
         }
     }

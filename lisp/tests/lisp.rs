@@ -1,4 +1,3 @@
-use ompas_lisp::async_await;
 use ompas_lisp::core::{eval, parse, LEnv};
 use ompas_lisp::structs::LError::SpecialError;
 use ompas_lisp::structs::{LError, LValue};

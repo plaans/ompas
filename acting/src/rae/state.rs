@@ -251,14 +251,14 @@ pub enum ActionStatus {
 impl From<ActionStatus> for Status {
     fn from(_as: ActionStatus) -> Self {
         match _as {
-            ActionStatus::ActionPending => Status::Running,
+            ActionStatus::ActionPending => Status::Pending,
             ActionStatus::ActionResponse(_) => Status::Running,
             ActionStatus::ActionFeedback(_) => Status::Running,
             ActionStatus::ActionResult(b) => match b {
                 true => Status::Done,
                 false => Status::Failure,
             },
-            ActionStatus::ActionPreempt => Status::Running,
+            ActionStatus::ActionPreempt => Status::Pending,
             ActionStatus::ActionCancel(b) => match b {
                 true => Status::Done,
                 false => Status::Failure,

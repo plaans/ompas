@@ -49,7 +49,7 @@
     (def-method m_dumber (quote ((:task dumber)
         (:params ?r )
         (:body (begin
-                (if (! (robot.in_station ?r))
+                (if (not (robot.in_station ?r))
                    (if (<= (robot.battery ?r) 0.4)
                        (let*  ((areas (get-map (rae-get-state) parking_areas))
                                (area (rand-element areas)))

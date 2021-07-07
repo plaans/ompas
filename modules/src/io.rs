@@ -203,6 +203,7 @@ pub mod repl {
     use crate::io::{repl, TOKIO_CHANNEL_SIZE};
     use chrono::{DateTime, Utc};
     use ompas_lisp::language::scheme_primitives::NIL;
+    use ompas_utils::task_handler::subscribe_new_task;
     use rustyline::error::ReadlineError;
     use rustyline::Editor;
     use std::fs;
@@ -311,16 +312,26 @@ pub mod repl {
             .open(format!("lisp_logs/log_{}", string_date))
             .expect("error creating log file");
 
+        let mut end_receiver = subscribe_new_task();
+
         loop {
-            let buffer = match receiver.recv().await {
-                None => {
-                    eprintln!("log task stopped working");
+            tokio::select! {
+                buffer = receiver.recv() => {
+                    let buffer = match buffer {
+                        None => {
+                            eprintln!("log task stopped working");
+                            break;
+                        }
+                        Some(b) => b,
+                    };
+                file.write_all(format!("{}\n", buffer).as_bytes())
+                    .expect("could not write to log file");
+                }
+                _ = end_receiver.recv() => {
+                    println!("log task ended");
                     break;
                 }
-                Some(b) => b,
-            };
-            file.write_all(format!("{}\n", buffer).as_bytes())
-                .expect("could not write to log file");
+            }
         }
     }
 
@@ -390,17 +401,26 @@ pub mod repl {
     pub const EXIT_CODE_STDOUT: &str = "EXIT";
 
     async fn output(mut receiver: Receiver<String>) {
+        let mut end_receiver = ompas_utils::task_handler::subscribe_new_task();
+        println!("output launched");
         loop {
-            let str = receiver.recv().await.expect("error receiving stdout");
-            if str == EXIT_CODE_STDOUT {
-                break;
+            tokio::select! {
+                str = receiver.recv() => {
+                    let str = str.expect("could not receive");
+
+                    let mut stdout = std::io::stdout();
+                    stdout.lock();
+                    stdout
+                        .write_all(format!("{}\n", str).as_bytes())
+                        .expect("could not print to stdout");
+                    drop(stdout);
+                }
+                _ = end_receiver.recv() => {
+                    println!("output task ended");
+                    break;
+                }
             }
-            let mut stdout = std::io::stdout();
-            stdout.lock();
-            stdout
-                .write_all(format!("{}\n", str).as_bytes())
-                .expect("could not print to stdout");
-            drop(stdout);
+
             //TODO: check if it always works.
             //print!("{}\n", str);
         }

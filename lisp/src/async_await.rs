@@ -1,5 +1,6 @@
 #![allow(deprecated)]
 use crate::structs::{LError, LValue};
+//use log::info;
 use std::borrow::Borrow;
 use std::ops::Deref;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -39,7 +40,8 @@ pub enum AwaitResponse {
 
 impl TaskHandler {
     pub async fn declare_new_task(&self) -> (usize, mpsc::Sender<TaskResult>) {
-        println!("new task declared!");
+        println!("new task declared");
+        //println!("new task declared!");
         let id = self.next_id.load(Ordering::Relaxed);
         self.next_id.store(id + 1, Ordering::Relaxed);
         self.map_result.lock().await.insert(id, None);

@@ -1,21 +1,24 @@
-use ompas_lisp::core::*;
-use ompas_lisp::structs::LValue;
-use ompas_modules::_type::CtxType;
-use ompas_modules::counter::CtxCounter;
-use ompas_modules::doc::{CtxDoc, Documentation};
-use ompas_modules::io::repl::{spawn_log, spawn_repl, EXIT_CODE_STDOUT};
-use ompas_modules::io::CtxIo;
-use ompas_modules::math::CtxMath;
+use std::path::PathBuf;
+
+use structopt::StructOpt;
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::{Receiver, Sender};
+
 //use ompas_modules::robot::CtxRobot;
 use ompas_acting::controller::dumber::CtxDumber;
 use ompas_acting::rae::module::init_ctx_rae;
 use ompas_acting::rae::module::mod_rae_exec::CtxRaeExec;
 use ompas_godot_simulation_client::mod_godot::CtxGodot;
 use ompas_godot_simulation_client::rae_interface::PlatformGodot;
-use std::path::PathBuf;
-use structopt::StructOpt;
-use tokio::sync::mpsc;
-use tokio::sync::mpsc::{Receiver, Sender};
+use ompas_lisp::core::*;
+use ompas_lisp::structs::LValue;
+use ompas_modules::_type::CtxType;
+use ompas_modules::counter::CtxCounter;
+use ompas_modules::doc::{CtxDoc, Documentation};
+use ompas_modules::io::repl::{spawn_log, spawn_repl};
+use ompas_modules::io::CtxIo;
+use ompas_modules::math::CtxMath;
+use ompas_utils::task_handler;
 
 pub const TOKIO_CHANNEL_SIZE: usize = 65_384;
 
@@ -134,10 +137,11 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
         }
 
         if str_lvalue == *"exit" {
-            sender
-                .send(EXIT_CODE_STDOUT.to_string())
-                .await
-                .expect("error sending message to stdout");
+            task_handler::end_all();
+            /*sender
+            .send(EXIT_CODE_STDOUT.to_string())
+            .await
+            .expect("error sending message to stdout");*/
             break;
         }
 

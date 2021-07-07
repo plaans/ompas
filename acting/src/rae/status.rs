@@ -12,6 +12,7 @@ pub struct ActionStatusSync {
 
 impl ActionStatusSync {
     pub async fn trigger_event_update(&self, id: &usize) {
+        //TODO: resolve bug that we have sometimes.
         let sender = self.map.read().unwrap().get(id).unwrap().clone();
         sender
             .send(true)

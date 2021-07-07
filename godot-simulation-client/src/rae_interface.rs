@@ -10,6 +10,7 @@ use ompas_acting::rae::module::mod_rae_exec::RAEInterface;
 use ompas_acting::rae::state::{RAEState, StateType, KEY_DYNAMIC, KEY_STATIC};
 use ompas_lisp::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
 use ompas_lisp::structs::*;
+use ompas_utils::task_handler;
 use std::net::SocketAddr;
 use std::process::Command;
 use std::thread;
@@ -77,6 +78,7 @@ impl RAEInterface for PlatformGodot {
         };
         //println!("trying to send command");
         let handle = tokio::runtime::Handle::current();
+
         thread::spawn(move || {
             handle.block_on(async move {
                 //println!("command in sending!");
@@ -224,7 +226,7 @@ impl RAEInterface for PlatformGodot {
 
     fn start_platform(&self, args: &[LValue]) -> Result<LValue, LError> {
         //TODO: handle child to handle clean kill of godot process
-        let mut _child = match args.len() {
+        let mut child = match args.len() {
             0 => Command::new("godot3")
                 .arg("--path")
                 .arg(DEFAULT_PATH_PROJECT_GODOT)
@@ -260,11 +262,14 @@ impl RAEInterface for PlatformGodot {
             } //Unexpected number of arguments
         };
 
-        //self.child = child;
-        /*thread::spawn(move || {
-            thread::sleep(Duration::from_secs(2));
-            child.kill().expect("!kill process of godot")
-        });*/
+        tokio::spawn(async move {
+            task_handler::subscribe_new_task()
+                .recv()
+                .await
+                .expect("could not receive from task handler");
+            child.kill().expect("!kill process of godot");
+            println!("process godot killed")
+        });
         Ok(LValue::Nil)
     }
 
@@ -337,6 +342,6 @@ impl RAEInterface for PlatformGodot {
     fn domain(&self) -> &'static str {
         //GODOT_DOMAIN
         //TODO: choose a way to charge domain
-        ""
+        "(read instances/godot_domain.lisp)"
     }
 }

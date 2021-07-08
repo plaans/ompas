@@ -61,3 +61,11 @@ path = "src/bin/sandbox/test_end_tasks.rs"
 [[bin]]
 name = "test_spawn_terminal"
 path = "src/bin/sandbox/test_spawn_terminal.rs"
+
+[[bin]]
+name = "test_enumerate"
+path = "src/bin/sandbox/test_enumerate.rs"
+
+[[bin]]
+name = "test_logger"
+path = "src/bin/sandbox/test_logger.rs"

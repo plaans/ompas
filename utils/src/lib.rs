@@ -1,5 +1,6 @@
 #[macro_use]
 extern crate lazy_static;
+pub mod log;
 pub mod task_handler;
 
 #[cfg(test)]

@@ -7,6 +7,7 @@ fn main() {
     println!("hello, world!");
 
     let terminal = Command::new("gnome-terminal")
+        .arg("echo test")
         .stdin(Stdio::piped())
         .spawn()
         .expect("could not spawn terminal");

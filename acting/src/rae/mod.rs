@@ -396,3 +396,16 @@ pub async fn output(_status: RAEStatus, _log: String) {
 
     //writes formatted message to log
 }
+
+///Takes a task in argument and return the methods
+pub fn get_methods() {
+    todo!()
+}
+
+///Taks an instantiated task as argument and return a set of applicable methods
+pub fn get_instantiated_methods() {
+    todo!()
+}
+
+///Select the method that will be run in the RAE
+pub fn select_method() {}

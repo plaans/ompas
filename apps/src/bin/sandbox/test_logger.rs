@@ -1,8 +1,4 @@
 use ompas_utils::log;
-use ompas_utils::log::send;
-use std::io::Write;
-use std::process::{Command, Stdio};
-use std::thread;
 use std::time::Duration;
 
 #[tokio::main]

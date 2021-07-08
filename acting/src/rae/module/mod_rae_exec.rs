@@ -12,6 +12,7 @@ use ompas_lisp::structs::LError::*;
 use ompas_lisp::structs::LValue::*;
 use ompas_lisp::structs::*;
 use ompas_modules::doc::{Documentation, LHelp};
+use ompas_utils::log;
 use std::any::Any;
 use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
@@ -322,11 +323,11 @@ pub fn fn_await(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue
                                         //println!("running");
                                     }
                                     Status::Failure => {
-                                        println!("command is a failure");
+                                        log::send("command is a failure".to_string());
                                         return Ok(false.into());
                                     }
                                     Status::Done => {
-                                        println!("command is a success");
+                                        log::send("command is a success".to_string());
                                         return Ok(true.into());
                                     }
                                 },

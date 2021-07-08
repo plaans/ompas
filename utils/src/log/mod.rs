@@ -1,12 +1,9 @@
 use crate::task_handler::subscribe_new_task;
-use std::borrow::Borrow;
-use std::ops::Deref;
 use std::process::Command;
-use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::mpsc;
 
 const RAE_LOG_IP_ADDR: &str = "127.0.0.1:10001";
 const TOKIO_CHANNEL_SIZE: usize = 16_384;
@@ -50,12 +47,6 @@ fn init() -> Logger {
 }
 
 async fn run_logger(mut rx: mpsc::Receiver<String>, mut o_rx: mpsc::Receiver<bool>) {
-    /*let run = o_rx
-    .recv()
-    .await
-    .expect("run logger failed to receive signal");*/
-    //println!("received msg to open tcp connection");
-
     Command::new("gnome-terminal")
         .args(&["--", "python3", "utils/src/log/logger.py", "&"])
         .spawn()
@@ -83,6 +74,7 @@ async fn run_logger(mut rx: mpsc::Receiver<String>, mut o_rx: mpsc::Receiver<boo
             }
             end = end_receiver.recv() => {
                 println!("logger ended");
+                stream.write_all(END_MSG.as_bytes()).await;
                 break;
             }
         }

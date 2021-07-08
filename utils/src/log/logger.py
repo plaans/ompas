@@ -24,4 +24,4 @@ while True:
             print("terminating terminal")
             break
         else:
-            print(log_data.decode())
+            print('>> '+log_data.decode())

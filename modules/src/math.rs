@@ -22,7 +22,6 @@ const SIN: &str = "sin";
 const COS: &str = "cos";
 const RAND_INT_IN_RANGE: &str = "rand-int-in-range";
 const RAND_FLOAT_IN_RANGE: &str = "rand-float-in-range";
-const RAND_ELEMENT: &str = "rand-element";
 
 //Constants
 const PI: &str = "pi";
@@ -50,7 +49,7 @@ impl GetModule for CtxMath {
         module.add_fn_prelude(SIN, sin);
         module.add_fn_prelude(RAND_INT_IN_RANGE, rand_int_in_range);
         module.add_fn_prelude(RAND_FLOAT_IN_RANGE, rand_float_in_range);
-        module.add_fn_prelude(RAND_ELEMENT, rand_element);
+
         module.add_prelude(PI, std::f64::consts::PI.into());
 
         module
@@ -184,30 +183,6 @@ pub fn rand_float_in_range(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LVa
             (&args[0]).into(),
             NameTypeLValue::Number,
         ))
-    }
-}
-
-pub fn rand_element(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValue, LError> {
-    match args.len() {
-        1 => {
-            if let LValue::List(list) = &args[0] {
-                let index = rand::thread_rng().gen_range(0..list.len());
-                Ok(list[index].clone())
-            } else {
-                Err(WrongType(
-                    RAND_ELEMENT,
-                    args[0].clone(),
-                    (&args[0]).into(),
-                    NameTypeLValue::Symbol,
-                ))
-            }
-        }
-        _ => Err(WrongNumberOfArgument(
-            RAND_ELEMENT,
-            args.into(),
-            args.len(),
-            1..1,
-        )),
     }
 }
 

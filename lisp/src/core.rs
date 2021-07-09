@@ -469,6 +469,7 @@ pub fn expand(
                                     ));
                                 }
                                 let exp = expand(&list[2], top_level, env, ctxs)?;
+                                //println!("after expansion: {}", exp);
                                 if def == LCoreOperator::DefMacro {
                                     if !top_level {
                                         return Err(SpecialError(
@@ -477,6 +478,7 @@ pub fn expand(
                                         ));
                                     }
                                     let proc = eval(&exp, &mut env.clone(), ctxs)?;
+                                    //println!("new macro: {}", proc);
                                     if !matches!(proc, LValue::Lambda(_)) {
                                         return Err(SpecialError(
                                             "expand",
@@ -485,6 +487,7 @@ pub fn expand(
                                     } else {
                                         env.add_macro(sym.clone(), proc.try_into()?);
                                     }
+                                    //println!("macro added");
                                     //Add to macro_table
                                     return Ok(LValue::Nil);
                                 }
@@ -767,6 +770,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                         return Ok(LValue::Nil);
                     }
                     LCoreOperator::DefLambda => {
+                        //println!("it is a lambda");
                         let params = match &args[0] {
                             LValue::List(list) => {
                                 let mut vec_sym = Vec::new();

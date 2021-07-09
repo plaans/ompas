@@ -11,13 +11,13 @@ use ompas_acting::rae::module::mod_rae_exec::CtxRaeExec;
 use ompas_godot_simulation_client::mod_godot::CtxGodot;
 use ompas_godot_simulation_client::rae_interface::PlatformGodot;
 use ompas_lisp::core::*;
-use ompas_lisp::structs::LValue;
 use ompas_modules::_type::CtxType;
 use ompas_modules::counter::CtxCounter;
 use ompas_modules::doc::{CtxDoc, Documentation};
 use ompas_modules::io::repl::{spawn_log, spawn_repl};
 use ompas_modules::io::CtxIo;
 use ompas_modules::math::CtxMath;
+use ompas_modules::utils::CtxUtils;
 use ompas_utils::task_handler;
 
 pub const TOKIO_CHANNEL_SIZE: usize = 65_384;
@@ -76,6 +76,7 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     let ctx_counter = CtxCounter::default();
     let ctx_dumber = CtxDumber::default();
     let _ctx_godot = CtxGodot::default();
+    let ctx_utils = CtxUtils::default();
     let (ctx_rae, ctx_rae_monitor) = init_ctx_rae(Box::new(PlatformGodot::default()));
     //Insert the doc for the different contexts.
     ctx_doc.insert_doc(CtxIo::documentation());
@@ -109,6 +110,7 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     //load_module(&mut root_env, &mut ctxs, ctx_godot, &mut lisp_init);
     load_module(&mut root_env, &mut ctxs, ctx_rae, &mut lisp_init);
     load_module(&mut root_env, &mut ctxs, ctx_rae_monitor, &mut lisp_init);
+    load_module(&mut root_env, &mut ctxs, ctx_utils, &mut lisp_init);
     //load_module(&mut root_env, &mut ctxs, ctx_rae_exec, &mut lisp_init);
     let env = &mut root_env.clone();
     //println!("{}", lisp_init.begin_lisp());
@@ -147,20 +149,8 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
 
         //stdout.write_all(format!("receiving command: {}\n", str_lvalue).as_bytes());
 
-        let lvalue = match parse(str_lvalue.as_str(), env, &mut ctxs) {
-            Ok(lv) => lv,
-            Err(e) => {
-                //stderr.write_all(format!("ELI>>{}\n", e).as_bytes());
-                sender
-                    .send(format!("error: {}", e))
-                    .await
-                    .expect("error on channel to stdout");
-                LValue::Nil
-            }
-        };
-        //stdout.write_all(b"parsing done\n");
-        if lvalue != LValue::Nil {
-            match eval(&lvalue, env, &mut ctxs) {
+        match parse(str_lvalue.as_str(), env, &mut ctxs) {
+            Ok(lv) => match eval(&lv, env, &mut ctxs) {
                 Ok(lv) => {
                     sender
                         .send(format!("{}", lv))
@@ -174,7 +164,15 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
                         .await
                         .expect("error on channel to stdout");
                 }
-            };
-        }
+            },
+            Err(e) => {
+                //stderr.write_all(format!("ELI>>{}\n", e).as_bytes());
+                sender
+                    .send(format!("error: {}", e))
+                    .await
+                    .expect("error on channel to stdout");
+            }
+        };
+        //stdout.write_all(b"parsing done\n");
     }
 }

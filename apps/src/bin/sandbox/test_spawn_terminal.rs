@@ -14,7 +14,7 @@ fn main() {
 
     let mut stdin = terminal.stdin.expect("no stdin");
     for _ in 1..5 {
-        stdin.write_all("echo test ".as_bytes());
+        stdin.write_all("echo test ".as_bytes()).expect("");
         thread::sleep(Duration::from_millis(500));
     }
 }

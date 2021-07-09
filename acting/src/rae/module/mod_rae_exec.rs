@@ -42,7 +42,8 @@ pub const RAE_OPEN_COM_PLATFORM: &str = "rae-open-com-platform";
 pub const RAE_START_PLATFORM: &str = "rae-start-platform";
 pub const RAE_GET_STATUS: &str = "rae-get-status";
 pub const RAE_CANCEL_COMMAND: &str = "rae-cancel-command";
-pub const RAE_GET_METHOD: &str = "rae-get-method";
+pub const RAE_GET_METHODS: &str = "rae-get-methods";
+pub const RAE_GET_BEST_METHOD: &str = "rae-get-best-method";
 
 ///Context that will contains primitives for the RAE executive
 pub struct CtxRaeExec {
@@ -92,6 +93,8 @@ impl GetModule for CtxRaeExec {
         module.add_fn_prelude(RAE_AWAIT, fn_await);
         module.add_mut_fn_prelude(RAE_OPEN_COM_PLATFORM, open_com);
         module.add_mut_fn_prelude(RAE_START_PLATFORM, start_platform);
+        module.add_fn_prelude(RAE_GET_METHODS, get_methods);
+        module.add_fn_prelude(RAE_GET_BEST_METHOD, get_best_method);
         module
     }
 }
@@ -353,17 +356,19 @@ pub fn fn_await(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue
     }
 }
 
-fn _get_methods(args: &[LValue], env: &LEnv, _ctx: &CtxRaeExec) -> Result<LValue, LError> {
+fn get_methods(args: &[LValue], env: &LEnv, _ctx: &CtxRaeExec) -> Result<LValue, LError> {
     if args.is_empty() {
         return Err(WrongNumberOfArgument(
-            RAE_GET_METHOD,
+            RAE_GET_METHODS,
             args.into(),
             args.len(),
             1..std::usize::MAX,
         ));
     }
     let task_name = &args[0];
+    log::send(format!("searching methods for {}", task_name));
     let task_method_map = env.get_ref_symbol(RAE_TASK_METHODS_MAP).unwrap();
+    println!("method_map: {}", task_method_map);
     let methods = if let LValue::Map(map) = task_method_map {
         let methods = map.get(task_name).unwrap().clone();
         methods
@@ -371,7 +376,30 @@ fn _get_methods(args: &[LValue], env: &LEnv, _ctx: &CtxRaeExec) -> Result<LValue
         panic!("this should be a LValue::Map")
     };
 
+    log::send(format!("{}", methods));
     Ok(methods)
+}
+
+fn get_best_method(args: &[LValue], env: &LEnv, _ctx: &CtxRaeExec) -> Result<LValue, LError> {
+    let methods = get_methods(args, env, _ctx)?;
+    let best_method = if let LValue::List(methods) = methods {
+        if methods.is_empty() {
+            return Err(SpecialError(
+                RAE_GET_BEST_METHOD,
+                "task has no applicable method".to_string(),
+            ));
+        }
+        methods[1].clone()
+    } else {
+        return Err(WrongType(
+            RAE_GET_BEST_METHOD,
+            methods.clone(),
+            methods.into(),
+            NameTypeLValue::List,
+        ));
+    };
+
+    Ok(best_method)
 }
 
 pub fn launch_platform(

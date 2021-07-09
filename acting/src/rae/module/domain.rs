@@ -12,6 +12,8 @@ pub const MACRO_GENERATE_TASK: &str = "(defmacro generate-task \
                                                     (unquote (cadaddr body)) \
                                                     (quote (task is not applicable in the given state))))))))";
 
+pub const MACRO_GENERATE_TASK_SIMPE: &str = "(defmacro generate-task-simple";
+
 pub const MACRO_GENERATE_METHOD: &str = "(defmacro generate-method \
                                           (lambda (l body) \
                                             (let ((task-label (cadar body)) \

@@ -121,7 +121,7 @@ pub async fn rae_run(mut context: RAEEnv, _select_option: &SelectOption, _log: S
                 let task_lambda = context.env.get_symbol(&label.to_string());
                 match task_lambda {
                     None => {
-                        println!("task \"{}\" not defined in env", label)
+                        ompas_utils::log::send(format!("task \"{}\" not defined in env", label));
                     }
                     Some(_task) => {
                         //println!("task \"{}\" found.", label);

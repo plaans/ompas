@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 use crate::task_handler::subscribe_new_task;
 use std::process::Command;
 use std::time::Duration;
@@ -15,7 +16,6 @@ lazy_static! {
 
 pub struct Logger {
     tx: mpsc::Sender<String>,
-    launch: mpsc::Sender<bool>,
 }
 
 impl Logger {}
@@ -28,25 +28,16 @@ pub fn send(string: String) {
     });
 }
 
-///Initiate the tcp connection with the logger and wait on msgs to send to logger
-pub fn launch() {
-    tokio::spawn(async move {
-        println!("trying to launch logger");
-        LOGGER.launch.send(true).await.expect("no sender to logger");
-    });
-}
-
 ///Initiate new terminal and logger
 fn init() -> Logger {
     let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
-    let (o_tx, o_rx) = mpsc::channel(64);
 
-    tokio::spawn(async move { run_logger(rx, o_rx).await });
+    tokio::spawn(async move { run_logger(rx).await });
 
-    Logger { tx, launch: o_tx }
+    Logger { tx }
 }
 
-async fn run_logger(mut rx: mpsc::Receiver<String>, mut o_rx: mpsc::Receiver<bool>) {
+async fn run_logger(mut rx: mpsc::Receiver<String>) {
     Command::new("gnome-terminal")
         .args(&["--", "python3", "utils/src/log/logger.py", "&"])
         .spawn()
@@ -68,13 +59,13 @@ async fn run_logger(mut rx: mpsc::Receiver<String>, mut o_rx: mpsc::Receiver<boo
                         break;
                     }
                     Some(str) => {
-                        stream.write_all(str.as_bytes()).await;
+                        stream.write_all(str.as_bytes()).await.expect("could not send to RAE Logger");
                     }
                 }
             }
-            end = end_receiver.recv() => {
+            _ = end_receiver.recv() => {
                 println!("logger ended");
-                stream.write_all(END_MSG.as_bytes()).await;
+                stream.write_all(END_MSG.as_bytes()).await.expect("could not send to RAE Logger");
                 break;
             }
         }

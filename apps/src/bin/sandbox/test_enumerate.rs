@@ -25,20 +25,15 @@ fn main() {
 
     let mut iter_params = enumerate(vec![vec_robot.iter(), vec_places.iter()]);
 
-    while let params = iter_params.next() {
-        match params {
-            None => break,
-            Some(params) => {
-                let mut str = "(".to_string();
-                for param in params {
-                    str.push_str(format!("{},", param).as_str())
-                }
-
-                str.push(')');
-
-                println!("param instantiation: {}", str)
-            }
+    while let Some(params) = iter_params.next() {
+        let mut str = "(".to_string();
+        for param in params {
+            str.push_str(format!("{},", param).as_str())
         }
+
+        str.push(')');
+
+        println!("param instantiation: {}", str)
     }
 
     /*let params =

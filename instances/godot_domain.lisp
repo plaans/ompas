@@ -45,8 +45,8 @@
     (def-method m_task_navigate_to (quote ((:task task_navigate_to)(:params ?r ?x ?y)(:body (begin
         (rae-await (navigate_to ?r ?x ?y))
         (rae-await (navigate_to ?r (+ ?x 1) (+ ?y 1))))))))
-    (def-task dumber (quote ((:params ?r) (:preconditions true))))
-    (def-method m_dumber (quote ((:task dumber)
+    (def-task task_dumber (quote ((:params ?r) (:preconditions true))))
+    (def-method m_dumber (quote ((:task task_dumber)
         (:params ?r )
         (:body (begin
                 (if (not (robot.in_station ?r))
@@ -57,6 +57,6 @@
                        (go_random ?r 2 5))
                    (if (>= (robot.battery ?r) 0.9)
                        (go_random ?r 2 5)))
-                (m_dumber ?r))))))
+                ((rae-get-best-method (quote task_dumber)) ?r))))))
 
 );

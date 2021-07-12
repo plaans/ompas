@@ -69,3 +69,12 @@ path = "src/bin/sandbox/test_enumerate.rs"
 [[bin]]
 name = "test_logger"
 path = "src/bin/sandbox/test_logger.rs"
+
+
+[[bin]]
+name = "lisp_interpreter"
+path = "src/bin/sandbox/lisp_interpreter.rs"
+
+[[bin]]
+name = "test_lenv"
+path = "src/bin/sandbox/test_recursive_search_of_symbol.rs"

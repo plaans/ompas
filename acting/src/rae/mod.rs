@@ -7,7 +7,7 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, Mutex};
 use tokio_stream::StreamExt;
 
-use crate::rae::context::{RAEEnv, SelectOption};
+use crate::rae::context::{RAEEnv, SelectOption, RAE_TASK_METHODS_MAP};
 //use crate::rae::context::{Action, Method, SelectOption, Status, TaskId};
 use crate::rae::log::RAEStatus;
 use crate::rae::module::mod_rae_exec::Job;
@@ -90,7 +90,6 @@ pub async fn rae_run(mut context: RAEEnv, _select_option: &SelectOption, _log: S
     //println!("async status watcher");
 
     let mut receiver = mem::replace(&mut context.job_receiver, None).unwrap();
-
     //Ubuntu::
     let result = eval(
         &vec![LValue::Symbol("rae-launch-platform".to_string())].into(),
@@ -101,21 +100,28 @@ pub async fn rae_run(mut context: RAEEnv, _select_option: &SelectOption, _log: S
     //let result = eval(&vec![LValue::Symbol("rae-open-com-platform".to_string())].into(), &mut context.env, &mut context.ctxs);
     match result {
         Ok(_) => {} //println!("successfully open com with platform"),
-        Err(e) => eprintln!("{}", e),
+        Err(e) => ompas_utils::log::send(e.to_string()),
     }
 
     loop {
         //For each new event or task to be addressed, we search for the best method a create a new refinement stack
-
         //Note: The whole block could be in an async block
         while let Some(job) = receiver.recv().await {
             //println!("new job received: {}", job);
 
-            let job_id = &context.agenda.add_job(job.clone());
+            let _job_id = &context.agenda.add_job(job.clone());
+            ompas_utils::log::send("new job received!".to_string());
 
-            let job_core = job.core.clone();
-            if let LValue::List(list) = job_core {
+            let new_env = context.get_eval_env();
+            let new_ctxs = context.ctxs.clone();
+
+            tokio::spawn(async move {
+                progress_2(job.core.clone(), new_env, new_ctxs).await;
+            });
+
+            /*if let LValue::List(list) = job_core {
                 //We make the assumption that the job is an instantiated task
+
                 let label = &list[0];
                 let params = &list[1..];
                 let task_lambda = context.env.get_symbol(&label.to_string());
@@ -150,82 +156,28 @@ pub async fn rae_run(mut context: RAEEnv, _select_option: &SelectOption, _log: S
                 }
             } else {
                 panic!("Job core should be a LValue::List")
-            }
+            }*/
         }
-        /*tokio::spawn(async move {
-            let receiver = context.lock().await.stream.get_ref_receiver();
-        });
-
-        let job_id = &context.agenda.add_job(job);
-        //let state = get_state().await;
-        let m = select(
-            state,
-            job_id,
-            &context.agenda.get_stack(job_id).unwrap(),
-            &context.options.select_option,
-        )
-        .await;
-        if m.is_none() {
-            output(
-                RAEStatus {
-                    task: Default::default(),
-                    msg: "failed: no method found in the current state".to_string(),
-                },
-                log.clone(),
-            )
-            .await;
-        } else {
-            let mut rs = context.agenda.get_stack(job_id).unwrap().clone();
-            let mut frame = rs.pop().unwrap();
-            frame.method = m;
-            rs.push(frame);
-            context.agenda.set_refinement_stack(job_id, rs);
-        }*/
-        //For each stack we progress until there is a success or failure.
-        /*for (i, job_id) in context.agenda.jobs.clone().iter().enumerate() {
-            //let state = get_state().await;
-            let result = progress(
-                context.agenda.get_stack(job_id).unwrap().clone(),
-                state,
-                context,
-            )
-            .await;
-            match result {
-                Ok(optional_stack) => match optional_stack {
-                    None => {
-                        context.agenda.remove(i);
-                        output(
-                            RAEStatus {
-                                task: Default::default(),
-                                msg: "succedded".to_string(),
-                            },
-                            log.clone(),
-                        )
-                        .await;
-                    }
-                    Some(new_stack) => {
-                        context.agenda.set_refinement_stack(job_id, new_stack);
-                    }
-                },
-                Err(e) => {
-                    if let RAEError::RetryFailure = e {
-                        context.agenda.remove(i);
-                        output(
-                            RAEStatus {
-                                task: Default::default(),
-                                msg: "failed".to_string(),
-                            },
-                            log.clone(),
-                        )
-                        .await;
-                    }
-                }
-            }
-        }*/
     }
 }
 
-fn select_greedy(env: &RAEEnv, task: &LValue, _params: &[LValue]) -> LValue {
+async fn progress_2(job_lvalue: LValue, mut env: LEnv, mut ctxs: ContextCollection) {
+    ompas_utils::log::send(format!("new triggered task: {}", job_lvalue));
+    /*let task_methods_map = env.get_symbol(RAE_TASK_METHODS_MAP).unwrap();
+    ompas_utils::log::send(format!(
+        "task_methods_map before eval: {}\n",
+        task_methods_map
+    ));
+    ompas_utils::log::send(format!("env before eval: {}\n", env));
+    ompas_utils::log::send(format!("env:\n{}", env));*/
+    let job_lvalue = LValue::List(vec![job_lvalue]);
+    match eval(&job_lvalue, &mut env, &mut ctxs) {
+        Ok(lv) => ompas_utils::log::send(format!("result of task {}: {}", job_lvalue, lv)),
+        Err(e) => ompas_utils::log::send(e.to_string()),
+    }
+}
+
+fn _select_greedy(env: &RAEEnv, task: &LValue, _params: &[LValue]) -> LValue {
     let methods = env.get_methods_from_task(task);
     //println!("methods: {}", methods);
     if let LValue::List(list) = methods {

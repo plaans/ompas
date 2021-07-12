@@ -34,6 +34,7 @@ pub mod scheme_primitives {
     pub const BEGIN: &str = "begin";
     pub const ASYNC: &str = "async";
     pub const AWAIT: &str = "await";
+    pub const EVAL: &str = "eval";
     pub const LET: &str = "let";
     pub const LET_STAR: &str = "let*";
     pub const MACRO_EXPAND: &str = "macro-expand";

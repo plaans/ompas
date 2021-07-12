@@ -14,7 +14,7 @@ client, adrClient = serveur.accept()
 print("client connected!")
 
 while True:
-    log_data = client.recv(1024)
+    log_data = client.recv(16384)
     if not log_data:
         print("Error on reception")
         break

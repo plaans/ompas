@@ -9,6 +9,7 @@ use ompas_lisp::core::{eval, load_module, parse, LEnv};
 use ompas_lisp::functions::env;
 use ompas_lisp::structs::{InitLisp, LValue};
 use ompas_modules::math::CtxMath;
+use ompas_modules::utils::CtxUtils;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
@@ -53,6 +54,12 @@ pub fn init_ctx_rae(mut platform: Box<dyn RAEInterface>) -> (CtxRae, CtxRaeMonit
         &mut rae_env.env,
         &mut rae_env.ctxs,
         CtxMath::default(),
+        &mut rae_env.init_lisp,
+    );
+    load_module(
+        &mut rae_env.env,
+        &mut rae_env.ctxs,
+        CtxUtils::default(),
         &mut rae_env.init_lisp,
     );
 

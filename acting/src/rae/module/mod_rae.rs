@@ -1,4 +1,5 @@
 use crate::rae::context::*;
+use crate::rae::module::domain::GENERATE_TASK_SIMPLE;
 use crate::rae::module::mod_rae_exec::{CtxRaeExec, RAEInterface};
 use crate::rae::rae_run;
 use crate::rae::state::{StateType, KEY_DYNAMIC, KEY_INNER_WORLD, KEY_STATIC};
@@ -11,6 +12,7 @@ use ompas_lisp::structs::LValue::Nil;
 use ompas_lisp::structs::*;
 use ompas_modules::doc::{Documentation, LHelp};
 use ompas_modules::math::CtxMath;
+use ompas_utils::log;
 use std::mem;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -361,7 +363,7 @@ pub fn def_task(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValue,
         ));
     }
 
-    let lvalue = cons(&["generate-task".into(), args.into()], &env, &())?;
+    let lvalue = cons(&[GENERATE_TASK_SIMPLE.into(), args.into()], &env, &())?;
 
     let lvalue = eval(
         &expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs)?,
@@ -369,7 +371,7 @@ pub fn def_task(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValue,
         &mut ctx.env.ctxs,
     )?;
 
-    //println!("lvalue: {}", lvalue);
+    //log::send(format!("new_task: {}", lvalue));
 
     if let LValue::List(list) = &lvalue {
         if list.len() != 2 {
@@ -398,6 +400,13 @@ pub fn def_task(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValue,
                 NameTypeLValue::Symbol,
             ));
         }
+    } else {
+        return Err(WrongType(
+            RAE_DEF_TASK,
+            lvalue.clone(),
+            lvalue.into(),
+            NameTypeLValue::List,
+        ));
     }
 
     Ok(Nil)
@@ -467,6 +476,7 @@ pub fn launch_rae(_: &[LValue], _env: &LEnv, ctx: &mut CtxRae) -> Result<LValue,
         actions_progress: ctx.env.actions_progress.clone(),
         state: ctx.env.state.clone(),
         env: ctx.env.env.clone(),
+        domain_env: ctx.env.domain_env.clone(),
         ctxs: Default::default(),
         init_lisp: Default::default(),
     };

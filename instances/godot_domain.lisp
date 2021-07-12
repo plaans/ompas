@@ -41,12 +41,12 @@
     (def-state-function interact_area.polygons ?ia)
     (def-state-function interact_area.cells ?ia)
     (def-state-function interact_area.belt ?ia)
-    (def-task task_navigate_to (quote ((:params ?r ?x ?y) (:preconditions true))))
-    (def-method m_task_navigate_to (quote ((:task task_navigate_to)(:params ?r ?x ?y)(:body (begin
+    (def-task t_navigate_to ?r ?x ?y)
+    (def-method m_navigate_to (quote ((:task t_navigate_to)(:params ?r ?x ?y)(:body (begin
         (rae-await (navigate_to ?r ?x ?y))
         (rae-await (navigate_to ?r (+ ?x 1) (+ ?y 1))))))))
-    (def-task task_dumber (quote ((:params ?r) (:preconditions true))))
-    (def-method m_dumber (quote ((:task task_dumber)
+    (def-task t_dumber ?r)
+    (def-method m_dumber (quote ((:task t_dumber)
         (:params ?r )
         (:body (begin
                 (if (not (robot.in_station ?r))
@@ -57,6 +57,6 @@
                        (go_random ?r 2 5))
                    (if (>= (robot.battery ?r) 0.9)
                        (go_random ?r 2 5)))
-                ((rae-get-best-method (quote task_dumber)) ?r))))))
+                (t_dumber ?r))))))
 
 );

@@ -13,6 +13,7 @@ use aries_planning::parsing::sexpr::SExpr;
 use im::hashmap::HashMap;
 use std::any::Any;
 use std::convert::{TryFrom, TryInto};
+use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 use std::sync::Arc;
 use std::thread;
@@ -24,6 +25,19 @@ pub struct LEnv {
     //pub(crate) new_entries: Vec<String>, Used to export new entries, but not really important in the end
     outer: Option<Box<LEnv>>,
     //task_handler: TaskHandler
+}
+
+impl Display for LEnv {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut str = "".to_string();
+        for s in &self.symbols {
+            str.push_str(format!("{}: {}\n", s.0, s.1).as_str())
+        }
+        if let Some(outer) = &self.outer {
+            str.push_str(outer.to_string().as_str());
+        }
+        writeln!(f, "{}", str)
+    }
 }
 
 impl LEnv {
@@ -672,6 +686,20 @@ pub fn expand(
                             Ok(expanded.into())
                         }
                     }
+                    LCoreOperator::Eval => {
+                        return if list.len() != 2 {
+                            Err(WrongNumberOfArgument(
+                                "expand",
+                                list.into(),
+                                list.len(),
+                                2..2,
+                            ))
+                        } else {
+                            let mut expanded = vec![LCoreOperator::Eval.into()];
+                            expanded.push(expand(&list[1], top_level, env, ctxs)?);
+                            Ok(expanded.into())
+                        }
+                    }
                 }
             } else if let LValue::Symbol(sym) = &list[0] {
                 match env.get_macro(sym) {
@@ -898,6 +926,10 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
 
                             return Ok(result);
                         }
+                    }
+                    LCoreOperator::Eval => {
+                        let arg = &args[0];
+                        lv = eval(arg, env, ctxs)?;
                     }
                 }
             } else {

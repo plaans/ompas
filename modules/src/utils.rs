@@ -62,9 +62,8 @@ pub fn enumerate(args: &[LValue], _: &LEnv, _: &CtxUtils) -> Result<LValue, LErr
     let mut vec_result: Vec<LValue> = vec![];
 
     while let Some(val) = iter_params.next() {
-        let mut iter = val.iter();
         let mut enumeration = vec![];
-        while let Some(val) = iter.next() {
+        for val in val {
             enumeration.push(val.deref().clone())
         }
         vec_result.push(enumeration.into())

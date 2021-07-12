@@ -7,7 +7,7 @@ use crate::rae::state::{
     ActionStatus, RAEState, StateType, KEY_DYNAMIC, KEY_INNER_WORLD, KEY_STATIC,
 };
 use ompas_lisp::core::LEnv;
-use ompas_lisp::functions::union_map;
+use ompas_lisp::functions::{cons, union_map};
 use ompas_lisp::structs::LError::*;
 use ompas_lisp::structs::LValue::*;
 use ompas_lisp::structs::*;
@@ -70,6 +70,7 @@ impl GetModule for CtxRaeExec {
             MACRO_GENERATE_METHOD,
             MACRO_GENERATE_TASK,
             MACRO_GENERATE_STATE_FUNCTION,
+            MACRO_GENERATE_TASK_SIMPLE,
         ]
         .into();
         let mut module = Module {
@@ -366,22 +367,39 @@ fn get_methods(args: &[LValue], env: &LEnv, _ctx: &CtxRaeExec) -> Result<LValue,
         ));
     }
     let task_name = &args[0];
-    log::send(format!("searching methods for {}", task_name));
-    let task_method_map = env.get_ref_symbol(RAE_TASK_METHODS_MAP).unwrap();
-    println!("method_map: {}", task_method_map);
+    //log::send(format!("searching methods for {}\n", task_name));
+    let task_method_map = env.get_symbol(RAE_TASK_METHODS_MAP).unwrap();
+    //log::send(format!("method_map: {}\n", task_method_map));
     let methods = if let LValue::Map(map) = task_method_map {
-        let methods = map.get(task_name).unwrap().clone();
+        let methods = match map.get(task_name) {
+            None => {
+                return Err(SpecialError(
+                    RAE_GET_METHODS,
+                    format!("no methods for {}", task_name),
+                ))
+            }
+            Some(methods) => methods.clone(),
+        };
         methods
     } else {
         panic!("this should be a LValue::Map")
     };
 
-    log::send(format!("{}", methods));
+    //log::send(format!("{}", methods));
     Ok(methods)
 }
 
-fn get_best_method(args: &[LValue], env: &LEnv, _ctx: &CtxRaeExec) -> Result<LValue, LError> {
-    let methods = get_methods(args, env, _ctx)?;
+fn get_best_method(args: &[LValue], env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
+    /*ompas_utils::log::send(format!("env in get_best_method :\n {}", env));
+    let task_methods_map = env.get_symbol(RAE_TASK_METHODS_MAP);
+    ompas_utils::log::send(format!(
+        "In get-best-method, task_methods_map: {:?}\n",
+        task_methods_map
+    ));*/
+
+    let methods = get_methods(args, env, ctx)?;
+    let task_args = &args[1..];
+    //log::send(format!("methods for {}: {}\n", LValue::from(args), methods));
     let best_method = if let LValue::List(methods) = methods {
         if methods.is_empty() {
             return Err(SpecialError(
@@ -389,7 +407,7 @@ fn get_best_method(args: &[LValue], env: &LEnv, _ctx: &CtxRaeExec) -> Result<LVa
                 "task has no applicable method".to_string(),
             ));
         }
-        methods[1].clone()
+        methods[0].clone()
     } else {
         return Err(WrongType(
             RAE_GET_BEST_METHOD,
@@ -399,7 +417,10 @@ fn get_best_method(args: &[LValue], env: &LEnv, _ctx: &CtxRaeExec) -> Result<LVa
         ));
     };
 
-    Ok(best_method)
+    let method_instance = cons(&[best_method, task_args.into()], env, &())?;
+    //log::send(format!("instance of the method: {}\n", method_instance));
+
+    Ok(method_instance)
 }
 
 pub fn launch_platform(

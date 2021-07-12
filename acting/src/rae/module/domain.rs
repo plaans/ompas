@@ -1,3 +1,8 @@
+pub const GENERATE_TASK_SIMPLE: &str = "generate-task-simple";
+pub const GENERATE_STATE_FUNCTION: &str = "generate-state-function";
+pub const GENERATE_TASK: &str = "generate-task";
+pub const GENERATE_METHOD: &str = "generate-method";
+
 pub const MACRO_GENERATE_STATE_FUNCTION: &str = "(defmacro generate-state-function (lambda args
     (let ((label (car args))
            (params (cdr args)))
@@ -12,7 +17,13 @@ pub const MACRO_GENERATE_TASK: &str = "(defmacro generate-task \
                                                     (unquote (cadaddr body)) \
                                                     (quote (task is not applicable in the given state))))))))";
 
-pub const MACRO_GENERATE_TASK_SIMPE: &str = "(defmacro generate-task-simple";
+pub const MACRO_GENERATE_TASK_SIMPLE: &str = "(defmacro generate-task-simple 
+    (lambda args
+    (let ((label (car args))
+            (params (cdr args)))
+            (quasiquote (list (unquote label) (lambda (unquote params)
+                    (eval (unquote (cons (quote rae-get-best-method)
+                        (cons (quasiquote (quote (unquote label))) params))))))))))";
 
 pub const MACRO_GENERATE_METHOD: &str = "(defmacro generate-method \
                                           (lambda (l body) \

@@ -597,6 +597,7 @@ pub enum LCoreOperator {
     Begin,
     Async,
     Await,
+    Eval,
 }
 
 impl Display for LCoreOperator {
@@ -613,6 +614,7 @@ impl Display for LCoreOperator {
             LCoreOperator::Begin => write!(f, "{}", BEGIN),
             LCoreOperator::Async => write!(f, "{}", ASYNC),
             LCoreOperator::Await => write!(f, "{}", AWAIT),
+            LCoreOperator::Eval => write!(f, "{}", EVAL),
         }
     }
 }
@@ -633,6 +635,7 @@ impl TryFrom<&str> for LCoreOperator {
             BEGIN => Ok(LCoreOperator::Begin),
             ASYNC => Ok(LCoreOperator::Async),
             AWAIT => Ok(LCoreOperator::Await),
+            EVAL => Ok(LCoreOperator::Eval),
             _ => Err(SpecialError(
                 "LCoreOperator::TryFrom<str>",
                 "string does not correspond to core operator".to_string(),
@@ -652,7 +655,6 @@ impl From<im::HashMap<LValue, LValue>> for LValue {
 */
 
 type Sym = String;
-type Char = u8;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(untagged, rename_all = "lowercase")]
@@ -661,7 +663,7 @@ pub enum LValue {
     Symbol(Sym),
     // literaux
     String(String),
-    Character(Char),
+    Character(char),
     Number(LNumber),
     #[serde(skip)]
     Fn(LFn),

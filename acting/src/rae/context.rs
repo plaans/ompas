@@ -78,8 +78,17 @@ pub struct RAEEnv {
     pub actions_progress: ActionsProgress,
     pub state: RAEState,
     pub env: LEnv,
+    pub domain_env: LEnv,
     pub ctxs: ContextCollection,
     pub init_lisp: InitLisp,
+}
+
+impl RAEEnv {
+    pub fn get_eval_env(&self) -> LEnv {
+        let mut env = self.domain_env.clone();
+        env.set_outer(self.env.clone());
+        env
+    }
 }
 
 pub const RAE_TASK_METHODS_MAP: &str = "rae-task-methods-map";
@@ -96,13 +105,14 @@ pub const STATE_FUNCTION_TYPE: &str = "state_function_type";
 
 impl Default for RAEEnv {
     fn default() -> Self {
-        let (mut env, ctxs, init_lisp) = LEnv::root();
-        env.insert(RAE_ACTION_LIST.to_string(), LValue::List(vec![]));
-        env.insert(RAE_METHOD_LIST.to_string(), LValue::List(vec![]));
-        env.insert(RAE_TASK_LIST.to_string(), LValue::List(vec![]));
-        env.insert(RAE_STATE_FUNCTION_LIST.to_string(), LValue::List(vec![]));
-        env.insert(RAE_SYMBOL_TYPE.to_string(), LValue::Map(Default::default()));
-        env.insert(
+        let (env, ctxs, init_lisp) = LEnv::root();
+        let mut domain_env = LEnv::empty();
+        domain_env.insert(RAE_ACTION_LIST.to_string(), LValue::List(vec![]));
+        domain_env.insert(RAE_METHOD_LIST.to_string(), LValue::List(vec![]));
+        domain_env.insert(RAE_TASK_LIST.to_string(), LValue::List(vec![]));
+        domain_env.insert(RAE_STATE_FUNCTION_LIST.to_string(), LValue::List(vec![]));
+        domain_env.insert(RAE_SYMBOL_TYPE.to_string(), LValue::Map(Default::default()));
+        domain_env.insert(
             RAE_TASK_METHODS_MAP.to_string(),
             LValue::Map(Default::default()),
         );
@@ -112,6 +122,7 @@ impl Default for RAEEnv {
             actions_progress: Default::default(),
             state: Default::default(),
             env,
+            domain_env,
             ctxs,
             init_lisp,
             status_watcher: None,
@@ -124,13 +135,14 @@ impl RAEEnv {
         job_receiver: Option<Receiver<Job>>,
         status_watcher: Option<Receiver<usize>>,
     ) -> Self {
-        let (mut env, ctxs, init_lisp) = LEnv::root();
-        env.insert(RAE_ACTION_LIST.to_string(), LValue::List(vec![]));
-        env.insert(RAE_METHOD_LIST.to_string(), LValue::List(vec![]));
-        env.insert(RAE_TASK_LIST.to_string(), LValue::List(vec![]));
-        env.insert(RAE_STATE_FUNCTION_LIST.to_string(), LValue::List(vec![]));
-        env.insert(RAE_SYMBOL_TYPE.to_string(), LValue::Map(Default::default()));
-        env.insert(
+        let (env, ctxs, init_lisp) = LEnv::root();
+        let mut domain_env = LEnv::empty();
+        domain_env.insert(RAE_ACTION_LIST.to_string(), LValue::List(vec![]));
+        domain_env.insert(RAE_METHOD_LIST.to_string(), LValue::List(vec![]));
+        domain_env.insert(RAE_TASK_LIST.to_string(), LValue::List(vec![]));
+        domain_env.insert(RAE_STATE_FUNCTION_LIST.to_string(), LValue::List(vec![]));
+        domain_env.insert(RAE_SYMBOL_TYPE.to_string(), LValue::Map(Default::default()));
+        domain_env.insert(
             RAE_TASK_METHODS_MAP.to_string(),
             LValue::Map(Default::default()),
         );
@@ -140,6 +152,7 @@ impl RAEEnv {
             actions_progress: Default::default(),
             state: Default::default(),
             env,
+            domain_env,
             ctxs,
             init_lisp,
             status_watcher,
@@ -150,21 +163,21 @@ impl RAEEnv {
 impl RAEEnv {
     pub fn add_action(&mut self, label: String, value: LValue) -> Result<(), LError> {
         self.insert(label.clone(), value)?;
-        let action_list = self.env.get_symbol(RAE_ACTION_LIST).unwrap();
+        let action_list = self.domain_env.get_symbol(RAE_ACTION_LIST).unwrap();
         if let LValue::List(mut list) = action_list {
             list.push(LValue::Symbol(label.clone()));
-            self.env
+            self.domain_env
                 .set(RAE_ACTION_LIST.to_string(), list.into())
                 .expect("list of action should be already defined in environment");
         }
 
-        let symbol_type = self.env.get_symbol(RAE_SYMBOL_TYPE).unwrap();
+        let symbol_type = self.domain_env.get_symbol(RAE_SYMBOL_TYPE).unwrap();
         if let LValue::Map(mut map) = symbol_type {
             map.insert(
                 LValue::Symbol(label),
                 LValue::Symbol(ACTION_TYPE.to_string()),
             );
-            self.env
+            self.domain_env
                 .set(RAE_SYMBOL_TYPE.to_string(), map.into())
                 .expect("map of symbol type should be already defined in environment")
         }
@@ -173,21 +186,21 @@ impl RAEEnv {
 
     pub fn add_state_function(&mut self, label: String, value: LValue) -> Result<(), LError> {
         self.insert(label.clone(), value)?;
-        let state_function_list = self.env.get_symbol(RAE_STATE_FUNCTION_LIST).unwrap();
+        let state_function_list = self.domain_env.get_symbol(RAE_STATE_FUNCTION_LIST).unwrap();
         if let LValue::List(mut list) = state_function_list {
             list.push(LValue::Symbol(label.clone()));
-            self.env
+            self.domain_env
                 .set(RAE_STATE_FUNCTION_LIST.to_string(), list.into())
                 .expect("list of state function should be already defined in environment");
         }
 
-        let symbol_type = self.env.get_symbol(RAE_SYMBOL_TYPE).unwrap();
+        let symbol_type = self.domain_env.get_symbol(RAE_SYMBOL_TYPE).unwrap();
         if let LValue::Map(mut map) = symbol_type {
             map.insert(
                 LValue::Symbol(label),
                 LValue::Symbol(STATE_FUNCTION_TYPE.to_string()),
             );
-            self.env
+            self.domain_env
                 .set(RAE_SYMBOL_TYPE.to_string(), map.into())
                 .expect("map of symbol type should be already defined in environment")
         }
@@ -196,26 +209,28 @@ impl RAEEnv {
 
     pub fn add_task(&mut self, label: String, value: LValue) -> Result<(), LError> {
         self.insert(label.clone(), value)?;
-        let task_list = self.env.get_symbol(RAE_TASK_LIST).unwrap();
+        let task_list = self.domain_env.get_symbol(RAE_TASK_LIST).unwrap();
         if let LValue::List(mut list) = task_list {
             list.push(LValue::Symbol(label.clone()));
-            self.env
+            self.domain_env
                 .set(RAE_TASK_LIST.to_string(), list.into())
                 .expect("list of task should be already defined in environment");
         }
         let mut map: im::HashMap<LValue, LValue> = self
-            .get_element(RAE_TASK_METHODS_MAP)
+            .domain_env
+            .get_symbol(RAE_TASK_METHODS_MAP)
             .unwrap()
             .try_into()
             .unwrap();
         map.insert(LValue::Symbol(label.clone()), LValue::Nil);
 
-        self.env.set(RAE_TASK_METHODS_MAP.to_string(), map.into())?;
+        self.domain_env
+            .set(RAE_TASK_METHODS_MAP.to_string(), map.into())?;
 
-        let symbol_type = self.env.get_symbol(RAE_SYMBOL_TYPE).unwrap();
+        let symbol_type = self.domain_env.get_symbol(RAE_SYMBOL_TYPE).unwrap();
         if let LValue::Map(mut map) = symbol_type {
             map.insert(LValue::Symbol(label), LValue::Symbol(TASK_TYPE.to_string()));
-            self.env
+            self.domain_env
                 .set(RAE_SYMBOL_TYPE.to_string(), map.into())
                 .expect("map of symbol type should be already defined in environment")
         }
@@ -229,21 +244,21 @@ impl RAEEnv {
         value: LValue,
     ) -> Result<(), LError> {
         self.insert(method_label.clone(), value)?;
-        let method_list = self.env.get_symbol(RAE_METHOD_LIST).unwrap();
+        let method_list = self.domain_env.get_symbol(RAE_METHOD_LIST).unwrap();
         if let LValue::List(mut list) = method_list {
             list.push(LValue::Symbol(method_label.clone()));
-            self.env
+            self.domain_env
                 .set(RAE_METHOD_LIST.to_string(), list.into())
                 .expect("list of method should be already defined in environment");
 
             self.add_method_to_task(task_label, method_label.clone())?;
-            let symbol_type = self.env.get_symbol(RAE_SYMBOL_TYPE).unwrap();
+            let symbol_type = self.domain_env.get_symbol(RAE_SYMBOL_TYPE).unwrap();
             if let LValue::Map(mut map) = symbol_type {
                 map.insert(
                     LValue::Symbol(method_label),
                     LValue::Symbol(METHOD_TYPE.to_string()),
                 );
-                self.env
+                self.domain_env
                     .set(RAE_SYMBOL_TYPE.to_string(), map.into())
                     .expect("map of symbol type should be already defined in environment")
             }
@@ -253,9 +268,9 @@ impl RAEEnv {
     }
 
     pub fn insert(&mut self, label: String, value: LValue) -> Result<(), LError> {
-        match self.env.get_symbol(&label) {
+        match self.domain_env.get_symbol(&label) {
             None => {
-                self.env.insert(label, value);
+                self.domain_env.insert(label, value);
                 Ok(())
             }
             Some(_) => Err(SpecialError(
@@ -271,7 +286,7 @@ impl RAEEnv {
         method_label: String,
     ) -> Result<(), LError> {
         let mut map: im::HashMap<LValue, LValue> = self
-            .env
+            .domain_env
             .get_symbol(RAE_TASK_METHODS_MAP)
             .unwrap()
             .try_into()
@@ -298,14 +313,17 @@ impl RAEEnv {
             _ => panic!("should be a list or nothing"),
         };
         map.insert(LValue::Symbol(task_label), new_list);
-        self.env
+        self.domain_env
             .set(RAE_TASK_METHODS_MAP.into(), map.into())
             .expect("should not return an error");
         Ok(())
     }
 
     pub fn get_methods_from_task(&self, task: &LValue) -> LValue {
-        let task_method_map = self.env.get_ref_symbol(RAE_TASK_METHODS_MAP).unwrap();
+        let task_method_map = self
+            .domain_env
+            .get_ref_symbol(RAE_TASK_METHODS_MAP)
+            .unwrap();
         if let LValue::Map(map) = task_method_map {
             let methods = map.get(task).unwrap().clone();
             methods
@@ -323,15 +341,16 @@ impl RAEEnv {
         if let Some(_label) = key {
             todo!()
         } else {
-            let state_function_symbol = self.env.get_symbol(RAE_STATE_FUNCTION_LIST).unwrap();
+            let state_function_symbol =
+                self.domain_env.get_symbol(RAE_STATE_FUNCTION_LIST).unwrap();
             let state_function_list: Vec<LValue> = state_function_symbol.try_into().unwrap();
 
-            let action_list_symbol = self.env.get_symbol(RAE_ACTION_LIST).unwrap();
+            let action_list_symbol = self.domain_env.get_symbol(RAE_ACTION_LIST).unwrap();
             let action_list: Vec<LValue> = action_list_symbol.try_into().unwrap();
-            let task_list_symbol = self.env.get_symbol(RAE_TASK_LIST).unwrap();
+            let task_list_symbol = self.domain_env.get_symbol(RAE_TASK_LIST).unwrap();
             let task_list: Vec<LValue> = task_list_symbol.try_into().unwrap();
             let map_task_method: im::HashMap<LValue, LValue> = self
-                .env
+                .domain_env
                 .get_symbol(RAE_TASK_METHODS_MAP)
                 .unwrap()
                 .try_into()
@@ -340,7 +359,8 @@ impl RAEEnv {
             string.push_str("\tState Function(s)\n");
             for state_function in state_function_list {
                 let state_function_label: String = state_function.try_into().unwrap();
-                let state_function_body = self.env.get_symbol(&state_function_label).unwrap();
+                let state_function_body =
+                    self.domain_env.get_symbol(&state_function_label).unwrap();
                 string.push_str(
                     format!("\t\t- {}: {}\n", state_function_label, state_function_body).as_str(),
                 );
@@ -349,14 +369,14 @@ impl RAEEnv {
             string.push_str("\t*Action(s): \n");
             for action in action_list {
                 let action_label: String = action.try_into().unwrap();
-                let action_body = self.env.get_symbol(&action_label).unwrap();
+                let action_body = self.domain_env.get_symbol(&action_label).unwrap();
                 string.push_str(format!("\t\t- {}: {}\n", action_label, action_body).as_str());
             }
             string.push('\n');
             string.push_str("\t*Task(s): \n");
             for task in task_list {
                 let task_label: String = task.clone().try_into().unwrap();
-                let task_body = self.env.get_symbol(&task_label).unwrap();
+                let task_body = self.domain_env.get_symbol(&task_label).unwrap();
                 string.push_str(format!("\t\t-{}: {}\n", task_label, task_body).as_str());
                 string.push_str("\t\t*Method(s): \n");
                 let methods = map_task_method.get(&task);
@@ -366,7 +386,7 @@ impl RAEEnv {
                         let methods: Vec<LValue> = methods.try_into().unwrap();
                         for m in methods {
                             let method_label: String = m.try_into().unwrap();
-                            let method = self.env.get_symbol(&method_label).unwrap();
+                            let method = self.domain_env.get_symbol(&method_label).unwrap();
                             string
                                 .push_str(format!("\t\t\t-{}: {}\n", method_label, method).as_str())
                         }

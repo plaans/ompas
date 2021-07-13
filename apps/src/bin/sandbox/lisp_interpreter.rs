@@ -36,16 +36,23 @@ struct Opt {
     #[structopt(short = "f", long = "file")]
     input: Option<PathBuf>,
 
+    #[structopt(short = "d", long = "debug")]
+    debug: bool,
+
     #[structopt(short = "t", long = "tests")]
     test: bool,
 }
 
 #[tokio::main]
 async fn main() {
-    println!("uname fact base v1.0");
+    println!("Scheme console v0.1");
 
     let opt: Opt = Opt::from_args();
     println!("{:?}", opt);
+    if opt.debug {
+        activate_debug();
+    }
+
     //test_lib_model(&opt);
     lisp_interpreter(opt.log).await;
 }

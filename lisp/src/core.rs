@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 use crate::async_await;
 use crate::async_await::AwaitResponse;
 use crate::functions::*;
@@ -15,8 +16,21 @@ use std::any::Any;
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
+
+lazy_static! {
+    static ref DEBUG: AtomicBool = AtomicBool::new(false);
+}
+
+pub fn activate_debug() {
+    DEBUG.store(true, Ordering::Relaxed);
+}
+
+pub fn get_debug() -> bool {
+    DEBUG.load(Ordering::Relaxed)
+}
 
 #[derive(Clone, Debug)]
 pub struct LEnv {
@@ -187,6 +201,16 @@ impl GetModule for CtxRoot {
             ctx: Arc::new(()),
             prelude: vec![],
             raw_lisp: vec![
+                MACRO_CAAR,
+                MACRO_CADR,
+                MACRO_CDAR,
+                MACRO_CDDR,
+                MACRO_CADAR,
+                MACRO_CADDR,
+                MACRO_CADADR,
+                MACRO_CDADR,
+                MACRO_CADADDR,
+                MACRO_CAADR,
                 MACRO_AND,
                 MACRO_OR,
                 MACRO_NEQ,
@@ -195,14 +219,6 @@ impl GetModule for CtxRoot {
                 MACRO_LET_STAR,
                 MACRO_APPLY,
                 MACRO_COND,
-                LAMBDA_CAAR,
-                LAMBDA_CDDR,
-                LAMBDA_CDAR,
-                LAMBDA_CADR,
-                LAMBDA_CADAR,
-                LAMBDA_CADADDR,
-                LAMBDA_CDADR,
-                LAMBDA_CADADR,
                 LAMBDA_UNZIP,
                 LAMBDA_MAPF,
             ]
@@ -765,7 +781,9 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
     let mut env = env;
 
     loop {
-        //println!("lv: {}", lv.clone());
+        if get_debug() {
+            println!("lv: {}", lv.clone());
+        }
         if let LValue::Symbol(s) = &lv {
             return match env.get_symbol(s.as_str()) {
                 None => Ok(lv.clone()),
@@ -794,7 +812,9 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                                 ))
                             }
                         };
-                        //println!("=> {}", LValue::Nil);
+                        if get_debug() {
+                            println!("=> {}", LValue::Nil);
+                        }
                         return Ok(LValue::Nil);
                     }
                     LCoreOperator::DefLambda => {
@@ -830,7 +850,9 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                         let body = &args[1];
                         let r_lvalue =
                             LValue::Lambda(LLambda::new(params, body.clone(), env.clone()));
-                        //println!("=> {}", r_lvalue.clone());
+                        if get_debug() {
+                            println!("=> {}", r_lvalue.clone());
+                        }
                         return Ok(r_lvalue);
                     }
                     LCoreOperator::If => {
@@ -852,7 +874,9 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                         };
                     }
                     LCoreOperator::Quote => {
-                        //println!("=> {}", &args[0].clone());
+                        if get_debug() {
+                            println!("=> {}", &args[0].clone());
+                        }
                         return Ok(args[0].clone());
                     }
                     LCoreOperator::Set => {
@@ -951,14 +975,18 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                             Some(u) => ctxs.get_context(u),
                         };
                         let r_lvalue = fun.call(args, &env, ctx)?;
-                        //println!("=> {}", r_lvalue.clone());
+                        if DEBUG.load(Ordering::Relaxed) {
+                            println!("=> {}", r_lvalue.clone());
+                        }
                         return Ok(r_lvalue);
                     }
                     LValue::MutFn(fun) => {
                         return match fun.get_index_mod() {
                             None => {
                                 let r_lvalue = fun.call(&args, &env, &mut ())?;
-                                //println!("=> {}", r_lvalue);
+                                if get_debug() {
+                                    println!("=> {}", r_lvalue);
+                                }
                                 Ok(r_lvalue)
                             }
                             Some(u) => {
@@ -991,7 +1019,9 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                 };
             }
         } else {
-            //println!("=> {}", lv.clone());
+            if get_debug() {
+                println!("=> {}", lv.clone());
+            }
             return Ok(lv);
         }
     }

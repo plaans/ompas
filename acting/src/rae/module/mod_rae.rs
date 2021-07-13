@@ -52,6 +52,8 @@ pub const RAE_DEF_ACTION: &str = "def-action";
 pub const RAE_DEF_TASK: &str = "def-task";
 pub const RAE_DEF_METHOD: &str = "def-method";
 pub const RAE_DEF_LAMBDA: &str = "def-lambda";
+pub const RAE_DEF_METHOD_PARAMETERS: &str = "def-method-parameters";
+pub const RAE_DEF_INITIAL_STATE: &str = "def-initial-state";
 
 #[derive(Default)]
 pub struct CtxRae {
@@ -89,6 +91,8 @@ impl GetModule for CtxRae {
         module.add_mut_fn_prelude(RAE_DEF_TASK, def_task);
         module.add_mut_fn_prelude(RAE_DEF_METHOD, def_method);
         module.add_mut_fn_prelude(RAE_DEF_LAMBDA, def_lambda);
+        module.add_mut_fn_prelude(RAE_DEF_METHOD_PARAMETERS, def_method_parameters);
+        module.add_mut_fn_prelude(RAE_DEF_INITIAL_STATE, def_initial_state);
 
         //functions to debug the functionnement of rae
         module.add_fn_prelude(RAE_GET_STATE, get_state);
@@ -353,6 +357,14 @@ pub fn def_method(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValu
     Ok(Nil)
 }
 
+pub fn def_method_parameters(
+    args: &[LValue],
+    env: &LEnv,
+    ctx: &mut CtxRae,
+) -> Result<LValue, LError> {
+    todo!()
+}
+
 pub fn def_task(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
     if args.is_empty() {
         return Err(WrongNumberOfArgument(
@@ -410,6 +422,10 @@ pub fn def_task(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValue,
     }
 
     Ok(Nil)
+}
+
+pub fn def_initial_state(_: &[LValue], _: &LEnv, _: &mut CtxRae) -> Result<LValue, LError> {
+    todo!()
 }
 
 pub fn get_status(_: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {

@@ -182,7 +182,7 @@ pub mod scheme_lambda {
                                                                    (zip (cdr l1)\
                                                                         (cdr l2)))))))";
 
-    pub const LAMBDA_CAAR: &str = "(define caar (lambda (l1) (car (car l1))))";
+    /*pub const LAMBDA_CAAR: &str = "(define caar (lambda (l1) (car (car l1))))";
 
     pub const LAMBDA_CADR: &str = "(define cadr (lambda (l1) (car (cdr l1))))";
 
@@ -197,7 +197,28 @@ pub mod scheme_lambda {
     pub const LAMBDA_CDADR: &str = "(define cdadr (lambda (l1) (cdr (car (cdr l1)))))";
 
     pub const LAMBDA_CADADDR: &str =
-        "(define cadaddr (lambda (l1) (car (cdr (car (cdr (cdr l1)))))))";
+        "(define cadaddr (lambda (l1) (car (cdr (car (cdr (cdr l1)))))))";*/
+
+    pub const MACRO_CAAR: &str =
+        "(defmacro caar (lambda (x) (quasiquote (car (car (unquote x))))))";
+    pub const MACRO_CADR: &str =
+        "(defmacro cadr (lambda (x) (quasiquote (car (cdr (unquote x))))))";
+    pub const MACRO_CDAR: &str =
+        "(defmacro cdar (lambda (x) (quasiquote (cdr (car (unquote x))))))";
+    pub const MACRO_CDDR: &str =
+        "(defmacro cddr (lambda (x) (quasiquote (cdr (cdr (unquote x))))))";
+    pub const MACRO_CAADR: &str =
+        "(defmacro caadr (lambda (x) (quasiquote (car (car (cdr(unquote x)))))))";
+    pub const MACRO_CADDR: &str =
+        "(defmacro caddr (lambda (x) (quasiquote (car (cdr (cdr (unquote x)))))))";
+    pub const MACRO_CADAR: &str =
+        "(defmacro cadar (lambda (x) (quasiquote (car (cdr (car (unquote x)))))))";
+    pub const MACRO_CADADR: &str =
+        "(defmacro cadadr (lambda (x) (quasiquote (car (cdr (car (cdr (unquote x))))))))";
+    pub const MACRO_CDADR: &str =
+        "(defmacro cdadr (lambda (x) (quasiquote (cdr (car (cdr (unquote x)))))))";
+    pub const MACRO_CADADDR: &str =
+        "(defmacro cadaddr (lambda (x) (quasiquote (car (cdr (car (cdr (cdr (unquote x)))))))))";
 
     pub const LAMBDA_UNZIP: &str = "(define unzip
         (lambda lists

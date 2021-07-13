@@ -97,6 +97,7 @@ pub const RAE_METHOD_LIST: &str = "rae_methods_list";
 pub const RAE_ACTION_LIST: &str = "rae_actions_list";
 pub const RAE_STATE_FUNCTION_LIST: &str = "rae-state-function-list";
 pub const RAE_SYMBOL_TYPE: &str = "rae-symbol-type";
+pub const RAE_METHOD_PARAMETERS_MAP: &str = "rae-method-parameters-map";
 pub const ACTION_TYPE: &str = "action_type";
 pub const TASK_TYPE: &str = "task_type";
 pub const METHOD_TYPE: &str = "method_type";
@@ -112,6 +113,10 @@ impl Default for RAEEnv {
         domain_env.insert(RAE_TASK_LIST.to_string(), LValue::List(vec![]));
         domain_env.insert(RAE_STATE_FUNCTION_LIST.to_string(), LValue::List(vec![]));
         domain_env.insert(RAE_SYMBOL_TYPE.to_string(), LValue::Map(Default::default()));
+        domain_env.insert(
+            RAE_METHOD_PARAMETERS_MAP.to_string(),
+            LValue::Map(Default::default()),
+        );
         domain_env.insert(
             RAE_TASK_METHODS_MAP.to_string(),
             LValue::Map(Default::default()),
@@ -135,28 +140,10 @@ impl RAEEnv {
         job_receiver: Option<Receiver<Job>>,
         status_watcher: Option<Receiver<usize>>,
     ) -> Self {
-        let (env, ctxs, init_lisp) = LEnv::root();
-        let mut domain_env = LEnv::empty();
-        domain_env.insert(RAE_ACTION_LIST.to_string(), LValue::List(vec![]));
-        domain_env.insert(RAE_METHOD_LIST.to_string(), LValue::List(vec![]));
-        domain_env.insert(RAE_TASK_LIST.to_string(), LValue::List(vec![]));
-        domain_env.insert(RAE_STATE_FUNCTION_LIST.to_string(), LValue::List(vec![]));
-        domain_env.insert(RAE_SYMBOL_TYPE.to_string(), LValue::Map(Default::default()));
-        domain_env.insert(
-            RAE_TASK_METHODS_MAP.to_string(),
-            LValue::Map(Default::default()),
-        );
-        Self {
-            job_receiver,
-            agenda: Default::default(),
-            actions_progress: Default::default(),
-            state: Default::default(),
-            env,
-            domain_env,
-            ctxs,
-            init_lisp,
-            status_watcher,
-        }
+        let mut env = RAEEnv::default();
+        env.job_receiver = job_receiver;
+        env.status_watcher = status_watcher;
+        env
     }
 }
 
@@ -315,6 +302,25 @@ impl RAEEnv {
         map.insert(LValue::Symbol(task_label), new_list);
         self.domain_env
             .set(RAE_TASK_METHODS_MAP.into(), map.into())
+            .expect("should not return an error");
+        Ok(())
+    }
+
+    pub fn add_parameters_to_method(
+        &mut self,
+        method_label: LValue,
+        parameters: LValue,
+    ) -> Result<(), LError> {
+        let mut map: im::HashMap<LValue, LValue> = self
+            .domain_env
+            .get_symbol(RAE_METHOD_PARAMETERS_MAP)
+            .unwrap()
+            .try_into()
+            .unwrap();
+
+        map.insert(method_label, parameters);
+        self.domain_env
+            .set(RAE_METHOD_PARAMETERS_MAP.into(), map.into())
             .expect("should not return an error");
         Ok(())
     }

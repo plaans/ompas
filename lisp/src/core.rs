@@ -721,7 +721,12 @@ pub fn expand(
                 match env.get_macro(sym) {
                     None => {}
                     Some(m) => {
-                        return expand(&m.call(&list[1..], env, ctxs)?, top_level, env, ctxs)
+                        let expanded =
+                            expand(&m.call(&list[1..], env, ctxs)?, top_level, env, ctxs)?;
+                        if get_debug() {
+                            println!("In expand: macro expanded: {:?}", expanded);
+                        }
+                        return Ok(expanded);
                     }
                 }
             }
@@ -953,7 +958,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                     }
                     LCoreOperator::Eval => {
                         let arg = &args[0];
-                        lv = eval(arg, env, ctxs)?;
+                        lv = expand(&eval(arg, env, ctxs)?, true, env, ctxs)?;
                     }
                 }
             } else {

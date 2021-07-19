@@ -39,6 +39,9 @@ struct Opt {
 
     #[structopt(short = "t", long = "tests")]
     test: bool,
+
+    #[structopt(short = "d", long = "debug")]
+    debug: bool,
 }
 
 #[tokio::main]
@@ -47,6 +50,9 @@ async fn main() {
 
     let opt: Opt = Opt::from_args();
     println!("{:?}", opt);
+    if opt.debug {
+        activate_debug();
+    }
     //test_lib_model(&opt);
     lisp_interpreter(opt.log).await;
 }

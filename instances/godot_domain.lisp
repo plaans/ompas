@@ -46,6 +46,7 @@
     (def-method m_navigate_to (quote ((:task t_navigate_to)(:params ?r ?x ?y)(:body (begin
         (rae-await (navigate_to ?r ?x ?y))
         (rae-await (navigate_to ?r (+ ?x 1) (+ ?y 1))))))))
+    (def-method-parameters m_navigate_to (quote (() ( _ nil))))
     (def-task t_dumber ?r)
     (def-method m_dumber (quote ((:task t_dumber)
         (:params ?r )

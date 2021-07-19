@@ -311,6 +311,7 @@ impl RAEEnv {
         method_label: LValue,
         parameters: LValue,
     ) -> Result<(), LError> {
+        println!("setting parameters to method");
         let mut map: im::HashMap<LValue, LValue> = self
             .domain_env
             .get_symbol(RAE_METHOD_PARAMETERS_MAP)
@@ -361,6 +362,12 @@ impl RAEEnv {
                 .unwrap()
                 .try_into()
                 .unwrap();
+            let method_parameters_map: im::HashMap<LValue, LValue> = self
+                .domain_env
+                .get_symbol(RAE_METHOD_PARAMETERS_MAP)
+                .unwrap()
+                .try_into()
+                .unwrap();
             string.push_str("RAEEnv: \n");
             string.push_str("\tState Function(s)\n");
             for state_function in state_function_list {
@@ -393,8 +400,18 @@ impl RAEEnv {
                         for m in methods {
                             let method_label: String = m.try_into().unwrap();
                             let method = self.domain_env.get_symbol(&method_label).unwrap();
-                            string
-                                .push_str(format!("\t\t\t-{}: {}\n", method_label, method).as_str())
+                            let parameters =
+                                match method_parameters_map.get(&method_label.clone().into()) {
+                                    None => LValue::Nil,
+                                    Some(s) => s.clone(),
+                                };
+                            string.push_str(
+                                format!(
+                                    "\t\t\t-{}: \n -body: {}\n -parameters: {}\n",
+                                    method_label, method, parameters
+                                )
+                                .as_str(),
+                            )
                         }
                     }
                 }

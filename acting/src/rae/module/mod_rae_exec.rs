@@ -71,6 +71,8 @@ impl GetModule for CtxRaeExec {
             MACRO_GENERATE_TASK,
             MACRO_GENERATE_STATE_FUNCTION,
             MACRO_GENERATE_TASK_SIMPLE,
+            MACRO_GENERATE_METHOD_PARAMETERS,
+            MACRO_ENUMERATE_PARAMS,
         ]
         .into();
         let mut module = Module {

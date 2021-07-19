@@ -1,5 +1,5 @@
 use crate::rae::context::*;
-use crate::rae::module::domain::GENERATE_TASK_SIMPLE;
+use crate::rae::module::domain::{GENERATE_TASK_SIMPLE, LABEL_GENERATE_METHOD_PARAMETERS};
 use crate::rae::module::mod_rae_exec::{CtxRaeExec, RAEInterface};
 use crate::rae::rae_run;
 use crate::rae::state::{LState, StateType, KEY_DYNAMIC, KEY_INNER_WORLD, KEY_STATIC};
@@ -31,6 +31,7 @@ pub const RAE_GET_ACTIONS: &str = "rae-get-actions";
 pub const RAE_GET_SYMBOL_TYPE: &str = "rae-get-symbol-type";
 pub const RAE_GET_TASKS: &str = "rae-get-tasks";
 pub const RAE_GET_STATE_FUNCTION: &str = "rae-get-state-function";
+pub const RAE_GET_METHODS_PARAMETERS: &str = "rae-get-methods-parameters";
 pub const RAE_GET_ENV: &str = "rae-get-env";
 pub const RAE_LAUNCH: &str = "rae-launch";
 pub const RAE_GET_STATE: &str = "rae-get-state";
@@ -83,6 +84,7 @@ impl GetModule for CtxRae {
         module.add_fn_prelude(RAE_GET_STATE_FUNCTION, get_state_function);
         module.add_fn_prelude(RAE_GET_ACTIONS, get_actions);
         module.add_fn_prelude(RAE_GET_TASKS, get_tasks);
+        module.add_fn_prelude(RAE_GET_METHODS_PARAMETERS, get_methods_parameters);
         module.add_fn_prelude(RAE_GET_SYMBOL_TYPE, get_symbol_type);
         module.add_fn_prelude(RAE_GET_ENV, get_env);
 
@@ -111,26 +113,38 @@ impl Documentation for CtxRae {
 
 ///Get the methods of a given task
 pub fn get_methods(_: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
-    Ok(ctx.env.get_element(RAE_METHOD_LIST).unwrap())
+    Ok(ctx.env.domain_env.get_symbol(RAE_METHOD_LIST).unwrap())
 }
 
 ///Get the list of actions in the environment
 pub fn get_actions(_: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
-    Ok(ctx.env.get_element(RAE_ACTION_LIST).unwrap())
+    Ok(ctx.env.domain_env.get_symbol(RAE_ACTION_LIST).unwrap())
 }
 
 ///Get the list of tasks in the environment
 pub fn get_tasks(_: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
-    Ok(ctx.env.get_element(RAE_TASK_LIST).unwrap())
+    Ok(ctx.env.domain_env.get_symbol(RAE_TASK_LIST).unwrap())
 }
 
 ///Get the list of state functions in the environment
 pub fn get_state_function(_: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
-    Ok(ctx.env.get_element(RAE_STATE_FUNCTION_LIST).unwrap())
+    Ok(ctx
+        .env
+        .domain_env
+        .get_symbol(RAE_STATE_FUNCTION_LIST)
+        .unwrap())
+}
+
+pub fn get_methods_parameters(_: &[LValue], _: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
+    Ok(ctx
+        .env
+        .domain_env
+        .get_symbol(RAE_METHOD_PARAMETERS_MAP)
+        .unwrap())
 }
 
 pub fn get_symbol_type(_: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
-    Ok(ctx.env.get_element(RAE_SYMBOL_TYPE).unwrap())
+    Ok(ctx.env.domain_env.get_symbol(RAE_SYMBOL_TYPE).unwrap())
 }
 
 pub fn get_env(args: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
@@ -358,14 +372,59 @@ pub fn def_method(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValu
 }
 
 pub fn def_method_parameters(
-    _args: &[LValue],
-    _env: &LEnv,
-    _ctx: &mut CtxRae,
+    args: &[LValue],
+    env: &LEnv,
+    ctx: &mut CtxRae,
 ) -> Result<LValue, LError> {
-    todo!()
+    println!("in {}", RAE_DEF_METHOD_PARAMETERS);
+    if args.len() != 2 {
+        return Err(WrongNumberOfArgument(
+            RAE_DEF_METHOD_PARAMETERS,
+            args.into(),
+            args.len(),
+            2..2,
+        ));
+    }
+
+    let lv = cons(args, env, &())?;
+    let lv = cons(&[LABEL_GENERATE_METHOD_PARAMETERS.into(), lv], env, &())?;
+    println!("In {}: lv before eval: {}", RAE_DEF_METHOD_PARAMETERS, lv);
+    let lv = expand(&lv, true, &mut ctx.env.env, &mut ctx.env.ctxs)?;
+    println!("In {}: lv after expand: {}", RAE_DEF_METHOD_PARAMETERS, lv);
+    let lv = eval(&lv, &mut ctx.env.env, &mut ctx.env.ctxs)?;
+    println!(
+        "In {}: result of the macro: {}",
+        RAE_DEF_METHOD_PARAMETERS, lv
+    );
+
+    if let LValue::List(list) = &lv {
+        if list.len() != 2 {
+            return Err(WrongNumberOfArgument(
+                RAE_DEF_METHOD_PARAMETERS,
+                lv.clone(),
+                list.len(),
+                2..2,
+            ));
+        } else if let LValue::Symbol(_) = &list[0] {
+            ctx.env
+                .add_parameters_to_method(list[0].clone(), list[1].clone())?;
+        } else {
+            return Err(WrongType(
+                RAE_DEF_METHOD_PARAMETERS,
+                list[0].clone(),
+                list[0].clone().into(),
+                NameTypeLValue::Symbol,
+            ));
+        }
+    } else {
+        panic!("{:?} should be a list", lv)
+    };
+
+    Ok(Nil)
 }
 
 pub fn def_task(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
+    //println!("in {}", RAE_DEF_TASK);
     if args.is_empty() {
         return Err(WrongNumberOfArgument(
             RAE_DEF_TASK,

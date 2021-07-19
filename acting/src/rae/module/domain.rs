@@ -43,13 +43,31 @@ pub const MACRO_GENERATE_ACTION: &str ="(defmacro generate-action \
                                                                     (lambda (unquote params) (unquote (cons (quote rae-exec-command)\
                                                                             (cons (quasiquote (quote (unquote label))) params)))))))))";
 
-pub const MACRO_GENERATE_METHOD_PARAMETERS: &str ="(defmacro generate-method-parameter (lambda args
+pub const MACRO_GENERATE_METHOD_PARAMETERS: &str =
+    "(defmacro generate-method-parameters (lambda args
     (let ((label (car args))
-            (args_enumerate (cdr args)))
+            (args_enum (cdr args)))
 
-        (quasiquote (quote (unquote (list label (cons (quote enumerate_params) args_enumerate))))))))";
+        (quasiquote (quote (unquote 
+            (list label 
+            (let ((p_enum (car args_enum))
+                (p_labels (caadr args_enum))
+                (conds (cadadr args_enum)))
 
-pub const MACRO_ENUMERATE_PARAMS: &str = "(defmacro enumerate_params (lambda args
+                (quasiquote 
+                    ((unquote begin) 
+                        (define eval_params ((unquote lambda) args
+                            (let ((params (car args)))
+                                (if (not (null? params))
+                                    (if (eval (cons ((unquote lambda) (unquote p_labels) (unquote conds)) params))
+                                        (cons params (eval_params (cdr args)))
+                                        (eval_params (cdr args)))
+                                    nil))))
+                        (eval_params (unquote (cons enumerate p_enum)))))))))))))";
+
+pub const LABEL_GENERATE_METHOD_PARAMETERS: &str = "generate-method-parameters";
+
+pub const MACRO_ENUMERATE_PARAMS: &str = "(defmacro enumerate-params (lambda args
     (let ((p_enum (car args))
         (p_labels (caadr args))
         (conds (cadadr args)))
@@ -64,6 +82,8 @@ pub const MACRO_ENUMERATE_PARAMS: &str = "(defmacro enumerate_params (lambda arg
                                 (eval_params (cdr args)))
                             nil))))
                 (eval_params (unquote (cons enumerate p_enum))))))))";
+
+pub const LABEL_ENUMERATE_PARAMS: &str = "enumerate-params";
 
 /*pub const MACRO_DEF_STATE_FUNCTION: &str = "(defmacro def-state-function (lambda args
     (let ((label (car args))

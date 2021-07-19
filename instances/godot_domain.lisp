@@ -1,5 +1,6 @@
 (begin
-   (def-lambda (quote (go_random (lambda (?r ?l ?u)
+    (def-initial-state (quote ((robots . ())(machines . ())(packages . ()))))
+    (def-lambda (quote (go_random (lambda (?r ?l ?u)
                             (let ((x (rand-int-in-range ?l ?u))
                                   (y (rand-int-in-range ?l ?u)))
                                   (rae-await (navigate_to ?r x y)))))))

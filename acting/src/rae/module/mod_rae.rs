@@ -2,7 +2,7 @@ use crate::rae::context::*;
 use crate::rae::module::domain::GENERATE_TASK_SIMPLE;
 use crate::rae::module::mod_rae_exec::{CtxRaeExec, RAEInterface};
 use crate::rae::rae_run;
-use crate::rae::state::{StateType, KEY_DYNAMIC, KEY_INNER_WORLD, KEY_STATIC};
+use crate::rae::state::{LState, StateType, KEY_DYNAMIC, KEY_INNER_WORLD, KEY_STATIC};
 use ompas_lisp::async_await;
 use ompas_lisp::async_await::task_watcher;
 use ompas_lisp::core::{eval, expand, load_module, LEnv};
@@ -358,9 +358,9 @@ pub fn def_method(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValu
 }
 
 pub fn def_method_parameters(
-    args: &[LValue],
-    env: &LEnv,
-    ctx: &mut CtxRae,
+    _args: &[LValue],
+    _env: &LEnv,
+    _ctx: &mut CtxRae,
 ) -> Result<LValue, LError> {
     todo!()
 }
@@ -424,8 +424,49 @@ pub fn def_task(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValue,
     Ok(Nil)
 }
 
-pub fn def_initial_state(_: &[LValue], _: &LEnv, _: &mut CtxRae) -> Result<LValue, LError> {
-    todo!()
+///Takes in input a list of initial facts that will be stored in the inner world part of the State.
+pub fn def_initial_state(args: &[LValue], _: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
+    if args.len() != 1 {
+        return Err(WrongNumberOfArgument(
+            RAE_DEF_INITIAL_STATE,
+            args.into(),
+            args.len(),
+            1..1,
+        ));
+    }
+
+    if let LValue::List(list) = &args[0] {
+        let mut state: LState = LState {
+            inner: Default::default(),
+            _type: Some(StateType::InnerWorld),
+        };
+        for fact in list {
+            if let LValue::List(k_v) = fact {
+                if k_v.len() == 3 {
+                    if k_v[1] == LValue::Symbol(".".to_string()) {
+                        state.insert((&k_v[0]).into(), (&k_v[2]).into())
+                    }
+                }
+            } else {
+                return Err(WrongType(
+                    RAE_DEF_INITIAL_STATE,
+                    fact.clone(),
+                    fact.into(),
+                    NameTypeLValue::List,
+                ));
+            }
+        }
+        ctx.env.state.update_state(state);
+    } else {
+        return Err(WrongType(
+            RAE_DEF_INITIAL_STATE,
+            args[0].clone(),
+            args[0].clone().into(),
+            NameTypeLValue::List,
+        ));
+    }
+
+    Ok(Nil)
 }
 
 pub fn get_status(_: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {

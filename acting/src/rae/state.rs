@@ -289,10 +289,16 @@ pub struct ActionStatusSet {
 
 impl ActionStatusSet {
     pub fn get_new_id(&self) -> usize {
-        let result = self.next_id.load(Ordering::Relaxed);
-        let new_value = result + 1;
-        self.next_id.store(new_value, Ordering::Relaxed);
-        result
+        loop {
+            let id = self.next_id.load(Ordering::Relaxed);
+            if self
+                .next_id
+                .compare_exchange(id, id + 1, Ordering::Acquire, Ordering::Relaxed) //Equivalent to compare_and_swap
+                .is_ok()
+            {
+                return id;
+            }
+        }
     }
 
     pub fn set_status(&mut self, internal_id: usize, status: ActionStatus) {

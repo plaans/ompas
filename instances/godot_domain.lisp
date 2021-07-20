@@ -1,9 +1,9 @@
 (begin
-    (def-initial-state (quote ((robots . ())(machines . ())(packages . ()))))
-    (def-lambda (quote (go_random (lambda (?r ?l ?u)
+    (def-initial-state '((robots . ())(machines . ())(packages . ())))
+    (def-lambda '(go_random (lambda (?r ?l ?u)
                             (let ((x (rand-int-in-range ?l ?u))
                                   (y (rand-int-in-range ?l ?u)))
-                                  (rae-await (navigate_to ?r x y)))))))
+                                  (rae-await (navigate_to ?r x y))))))
     (def-action navigate_to ?r ?x ?y)
     (def-action navigate_to_cell ?r ?cx ?cy)
     (def-action navigate_to_area ?r ?area)
@@ -43,12 +43,12 @@
     (def-state-function interact_area.cells ?ia)
     (def-state-function interact_area.belt ?ia)
     (def-task t_navigate_to ?r ?x ?y)
-    (def-method m_navigate_to (quote ((:task t_navigate_to)(:params ?r ?x ?y)(:body (begin
+    (def-method m_navigate_to '((:task t_navigate_to)(:params ?r ?x ?y)(:body (begin
         (rae-await (navigate_to ?r ?x ?y))
-        (rae-await (navigate_to ?r (+ ?x 1) (+ ?y 1))))))))
-    (def-method-parameters m_navigate_to (quote (() ( _ nil))))
+        (rae-await (navigate_to ?r (+ ?x 1) (+ ?y 1)))))))
+    (def-method-parameters m_navigate_to '(() ( _ nil)))
     (def-task t_dumber ?r)
-    (def-method m_dumber (quote ((:task t_dumber)
+    (def-method m_dumber '((:task t_dumber)
         (:params ?r )
         (:body (begin
                 (if (not (robot.in_station ?r))
@@ -59,6 +59,6 @@
                        (go_random ?r 2 5))
                    (if (>= (robot.battery ?r) 0.9)
                        (go_random ?r 2 5)))
-                (t_dumber ?r))))))
+                (t_dumber ?r)))))
 
 );

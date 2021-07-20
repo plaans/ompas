@@ -414,6 +414,7 @@ dependencies = [
  "aries_model",
  "aries_planning",
  "aries_utils",
+ "chrono",
  "im",
  "ompas_acting",
  "ompas_godot_simulation_client",
@@ -490,6 +491,7 @@ dependencies = [
 name = "ompas_utils"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "lazy_static 0.1.16",
  "tokio",
  "tokio-stream",

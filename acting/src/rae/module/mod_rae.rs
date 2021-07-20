@@ -376,7 +376,7 @@ pub fn def_method_parameters(
     env: &LEnv,
     ctx: &mut CtxRae,
 ) -> Result<LValue, LError> {
-    println!("in {}", RAE_DEF_METHOD_PARAMETERS);
+    //println!("in {}", RAE_DEF_METHOD_PARAMETERS);
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(
             RAE_DEF_METHOD_PARAMETERS,
@@ -388,14 +388,14 @@ pub fn def_method_parameters(
 
     let lv = cons(args, env, &())?;
     let lv = cons(&[LABEL_GENERATE_METHOD_PARAMETERS.into(), lv], env, &())?;
-    println!("In {}: lv before eval: {}", RAE_DEF_METHOD_PARAMETERS, lv);
+    //println!("In {}: lv before eval: {}", RAE_DEF_METHOD_PARAMETERS, lv);
     let lv = expand(&lv, true, &mut ctx.env.env, &mut ctx.env.ctxs)?;
-    println!("In {}: lv after expand: {}", RAE_DEF_METHOD_PARAMETERS, lv);
+    //println!("In {}: lv after expand: {}", RAE_DEF_METHOD_PARAMETERS, lv);
     let lv = eval(&lv, &mut ctx.env.env, &mut ctx.env.ctxs)?;
-    println!(
+    /*println!(
         "In {}: result of the macro: {}",
         RAE_DEF_METHOD_PARAMETERS, lv
-    );
+    );*/
 
     if let LValue::List(list) = &lv {
         if list.len() != 2 {
@@ -501,10 +501,8 @@ pub fn def_initial_state(args: &[LValue], _: &LEnv, ctx: &mut CtxRae) -> Result<
         };
         for fact in list {
             if let LValue::List(k_v) = fact {
-                if k_v.len() == 3 {
-                    if k_v[1] == LValue::Symbol(".".to_string()) {
-                        state.insert((&k_v[0]).into(), (&k_v[2]).into())
-                    }
+                if k_v.len() == 3 && k_v[1] == LValue::Symbol(".".to_string()) {
+                    state.insert((&k_v[0]).into(), (&k_v[2]).into())
                 }
             } else {
                 return Err(WrongType(

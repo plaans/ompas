@@ -1,6 +1,9 @@
-use ompas_lisp::core::{eval, parse, LEnv};
+use ompas_lisp::core::{eval, expand_quotting, parse, LEnv};
 use ompas_lisp::structs::LError::SpecialError;
 use ompas_lisp::structs::{LError, LValue};
+use std::convert::TryInto;
+
+// To run tests with println, use cargo test -- --nocapture
 
 fn create_list_test() -> Vec<(&'static str, LValue)> {
     let is_tests = vec![
@@ -77,6 +80,31 @@ fn test_lisp_integration() -> Result<(), LError> {
             }
         };
         assert_eq!(result, element.1);
+    }
+    Ok(())
+}
+
+fn create_list_quotting() -> Vec<(&'static str, &'static str)> {
+    vec![
+        ("('x)", "((quote x))"),
+        ("(`x)", "((quasiquote x))"),
+        ("(,x)", "((unquote x))"),
+        ("('(x))", "((quote (x)))"),
+        ("(`(x))", "((quasiquote (x)))"),
+        ("(,(x))", "((unquote (x)))"),
+    ]
+}
+
+#[test]
+fn test_expand_quotting() -> Result<(), LError> {
+    let (mut env, mut ctxs, _) = LEnv::root();
+    for element in create_list_quotting() {
+        let lvalue = parse(element.0, &mut env, &mut ctxs)?;
+        //let result = parse(element.1, &mut env, &mut ctxs).unwrap();
+        println!("lvalue before expand_quotting: {}", lvalue);
+        let lvalue = expand_quotting(lvalue.try_into()?);
+        //assert_eq!(lvalue.to_string(), result.to_string());
+        println!("lvalue after expand_quotting: {}", lvalue);
     }
     Ok(())
 }

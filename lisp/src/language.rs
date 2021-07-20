@@ -30,6 +30,9 @@ pub mod scheme_primitives {
     pub const QUOTE: &str = "quote";
     pub const QUASI_QUOTE: &str = "quasiquote";
     pub const UNQUOTE: &str = "unquote";
+    pub const QUOTE_CHAR: char = '\'';
+    pub const UNQUOTE_CHAR: char = ',';
+    pub const QUASI_QUOTE_CHAR: char = '`';
     pub const SET: &str = "set!";
     pub const BEGIN: &str = "begin";
     pub const ASYNC: &str = "async";

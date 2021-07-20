@@ -136,6 +136,7 @@ impl Default for RAEEnv {
 }
 
 impl RAEEnv {
+    #[allow(clippy::field_reassign_with_default)]
     pub fn new(
         job_receiver: Option<Receiver<Job>>,
         status_watcher: Option<Receiver<usize>>,
@@ -311,7 +312,7 @@ impl RAEEnv {
         method_label: LValue,
         parameters: LValue,
     ) -> Result<(), LError> {
-        println!("setting parameters to method");
+        //println!("setting parameters to method");
         let mut map: im::HashMap<LValue, LValue> = self
             .domain_env
             .get_symbol(RAE_METHOD_PARAMETERS_MAP)
@@ -483,10 +484,16 @@ impl ActionsProgress {
     }
 
     pub fn get_new_id(&self) -> usize {
-        let result = self.next_id.load(Ordering::Relaxed);
-        let new_value = result + 1;
-        self.next_id.store(new_value, Ordering::Relaxed);
-        result
+        loop {
+            let id = self.next_id.load(Ordering::Relaxed);
+            if self
+                .next_id
+                .compare_exchange(id, id + 1, Ordering::Acquire, Ordering::Relaxed)
+                .is_ok()
+            {
+                return id;
+            }
+        }
     }
 }
 

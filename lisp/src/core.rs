@@ -414,6 +414,64 @@ pub fn parse(str: &str, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result<
     }
 }
 
+///Expand possible short quotting
+/// Returns a LValue::List
+pub fn expand_quotting(args: Vec<LValue>) -> LValue {
+    let mut vec = args.clone();
+    let mut i_point = 0;
+    while i_point < vec.len() {
+        for lv in &args[i_point..] {
+            if let LValue::Symbol(s) = lv {
+                let first: char = s.chars().next().unwrap();
+                if s.len() == 1 {
+                    if first == QUOTE_CHAR || first == QUASI_QUOTE_CHAR || first == UNQUOTE_CHAR {
+                        let new_lv: LValue = vec![
+                            match first {
+                                QUOTE_CHAR => QUOTE.into(),
+                                QUASI_QUOTE_CHAR => QUASI_QUOTE.into(),
+                                UNQUOTE_CHAR => UNQUOTE.into(),
+                                _ => panic!(
+                                    "Should be {}, {} or {}.",
+                                    QUOTE_CHAR, QUASI_QUOTE_CHAR, UNQUOTE_CHAR
+                                ),
+                            },
+                            vec.remove(i_point + 1),
+                        ]
+                        .into();
+                        vec[i_point] = new_lv;
+                        i_point += 1;
+                        break;
+                    }
+                } else if s.starts_with(|c| c == '\'' || c == '`' || c == ',') {
+                    let new_symbol: LValue = s.as_str()[1..].into();
+                    vec[i_point] = vec![
+                        match first {
+                            QUOTE_CHAR => QUOTE.into(),
+                            QUASI_QUOTE_CHAR => QUASI_QUOTE.into(),
+                            UNQUOTE_CHAR => UNQUOTE.into(),
+                            _ => panic!(
+                                "Should be {}, {} or {}.",
+                                QUOTE_CHAR, QUASI_QUOTE_CHAR, UNQUOTE_CHAR
+                            ),
+                        },
+                        new_symbol,
+                    ]
+                    .into();
+                }
+            }
+            i_point += 1;
+        }
+    }
+
+    vec.into()
+}
+
+/// Transform literals into LValue of types Symbol, Float, Integer or Boolean
+/// New version:
+/// Supports short name of quotting:
+/// - 'x => (quote x)
+/// - `x => (quasiquote x)
+/// - ,x => (unquote x)
 pub fn parse_into_lvalue(se: &SExpr) -> LValue {
     match se {
         SExpr::Atom(atom) => {
@@ -444,7 +502,9 @@ pub fn parse_into_lvalue(se: &SExpr) -> LValue {
                 LValue::Nil
             } else {
                 let vec: Vec<LValue> = list_iter.map(|x| parse_into_lvalue(x)).collect();
-                LValue::List(vec)
+                //Expand possible quotting
+                expand_quotting(vec)
+                //LValue::List(vec)
             }
         }
     }
@@ -856,7 +916,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                         let r_lvalue =
                             LValue::Lambda(LLambda::new(params, body.clone(), env.clone()));
                         if get_debug() {
-                            println!("=> {}", r_lvalue.clone());
+                            println!("=> {}", r_lvalue);
                         }
                         return Ok(r_lvalue);
                     }
@@ -981,7 +1041,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                         };
                         let r_lvalue = fun.call(args, &env, ctx)?;
                         if DEBUG.load(Ordering::Relaxed) {
-                            println!("=> {}", r_lvalue.clone());
+                            println!("=> {}", r_lvalue);
                         }
                         return Ok(r_lvalue);
                     }

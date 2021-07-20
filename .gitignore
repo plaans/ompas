@@ -5,3 +5,4 @@ target/
 *.txt
 venv/
 lisp_logs/
+rae_logs/

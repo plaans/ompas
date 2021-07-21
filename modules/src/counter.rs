@@ -1,3 +1,5 @@
+//! Example Module
+//! Gives an example on how to code a rust library to be bound in Scheme.
 use crate::doc::{Documentation, LHelp};
 use ompas_lisp::core::*;
 use ompas_lisp::structs::LError::*;

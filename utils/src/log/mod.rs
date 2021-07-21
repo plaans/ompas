@@ -1,3 +1,15 @@
+//! This module add some features to monitor logs in a different terminal from the one in which the program is running.
+//! It proposes two implementations:
+//!     - One using logger.py, a python script received logs via TCP
+//!     - The other using *tail -f* to monitor logs written to a file
+//! # Examples
+//! The logger will be automatically built when methods using it are called
+//! ```rust
+//! ompas_utils::log::send("new log string".to_string());
+//! /*This will send via a channel the string to be passed
+//! then to the task handling writing to the socket or the file.*/
+//! ```
+
 #![allow(deprecated)]
 use crate::task_handler::subscribe_new_task;
 use chrono::{DateTime, Utc};
@@ -18,6 +30,7 @@ lazy_static! {
     static ref LOGGER: Logger = init();
 }
 
+/// Struct to wrap a tokio::sync::mpsc tx channel
 pub struct Logger {
     tx: mpsc::Sender<String>,
 }
@@ -25,6 +38,10 @@ pub struct Logger {
 impl Logger {}
 
 ///Send a msg to the Logger
+/// # Example
+/// ``` no_run
+/// ompas_utils::log::send("test".to_string());
+/// ```
 pub fn send(string: String) {
     //println!("sending: {}", string);
     tokio::spawn(async move {
@@ -32,7 +49,8 @@ pub fn send(string: String) {
     });
 }
 
-///Initiate new terminal and logger
+/// Initiate new terminal and logger
+/// Build the global object
 fn init() -> Logger {
     let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
 
@@ -42,8 +60,14 @@ fn init() -> Logger {
     Logger { tx }
 }
 
+/// Task that is running asynchronously
+/// It receives string to log via a channel and write it to the log file of the session
+///
+/// Log files are stored in the <current>/rae_logs.
+/// Files names are formatted in function of the date and time at which the script is launched.
+///
 async fn run_logger_file(mut rx: mpsc::Receiver<String>) {
-    let date: DateTime<Utc> = Utc::now();
+    let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
     let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
     fs::create_dir_all("rae_logs").expect("could not create rae logs directory");
     let name_file = format!("rae_logs/rae_{}", string_date);
@@ -85,6 +109,8 @@ async fn run_logger_file(mut rx: mpsc::Receiver<String>) {
         }
     }
 }
+/// Sends via tcp to logger.py strings that need to be logged.
+/// run_logger is an asynchronous task that await a message to send via tcp.
 #[allow(unused)]
 async fn run_logger(mut rx: mpsc::Receiver<String>) {
     Command::new("gnome-terminal")

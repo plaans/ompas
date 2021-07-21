@@ -13,6 +13,7 @@ lazy_static! {
     static ref TASK_HANDLER: TaskHandler = launch_task_handler();
 }
 
+/// Returns a copy of the TaskHandler shared between all the threads.
 pub fn current() -> TaskHandler {
     TASK_HANDLER.borrow().deref().clone()
 }
@@ -33,22 +34,39 @@ pub struct TaskHandler {
     pub(crate) next_id: Arc<AtomicUsize>,
 }
 
+/// Type of response an await can get:
+/// - If the result has already been computed by the asynchronous evaluation, then it returns the a Result.
+/// - Otherwise it returns a channel on which it can wait to get the result.
 pub enum AwaitResponse {
     Result(Result<LValue, LError>),
     Receiver(mpsc::Receiver<Result<LValue, LError>>),
 }
 
 impl TaskHandler {
+    /// Declare a new task
+    /// Returns the id of the task and the sender to the TaskHandler that will process the result.
     pub async fn declare_new_task(&self) -> (usize, mpsc::Sender<TaskResult>) {
         println!("new task declared");
         //println!("new task declared!");
-        let id = self.next_id.load(Ordering::Relaxed);
-        self.next_id.store(id + 1, Ordering::Relaxed);
+        let id;
+        loop {
+            let temp_id = self.next_id.load(Ordering::Relaxed);
+            if self
+                .next_id
+                .compare_exchange(temp_id, temp_id + 1, Ordering::Acquire, Ordering::Relaxed)
+                .is_ok()
+            {
+                id = temp_id;
+                break;
+            }
+        }
         self.map_result.lock().await.insert(id, None);
         self.map_waiter.lock().await.insert(id, None);
         (id, self.sender.clone().unwrap())
     }
 
+    /// Returns an AwaitResponse.
+    /// The Kind of AwaitResponse depends on the progress of the asynchronous evaluation.
     pub async fn get_response_await(&self, id: &usize) -> AwaitResponse {
         println!("get response!");
         let clean: bool;
@@ -75,7 +93,7 @@ impl TaskHandler {
     }
 }
 
-pub fn launch_task_handler() -> TaskHandler {
+fn launch_task_handler() -> TaskHandler {
     let mut task_handler = TaskHandler::default();
     let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
     task_handler.sender = Some(tx);
@@ -86,7 +104,7 @@ pub fn launch_task_handler() -> TaskHandler {
     task_handler
 }
 
-pub async fn task_watcher(task_handler: TaskHandler, mut receiver: mpsc::Receiver<TaskResult>) {
+async fn task_watcher(task_handler: TaskHandler, mut receiver: mpsc::Receiver<TaskResult>) {
     println!("Task watcher launched");
     loop {
         let clean: bool;

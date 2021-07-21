@@ -1,6 +1,15 @@
 import socket
 from time import sleep
 
+'''
+This script is used to log string received via tcp by the rae process.
+No special format is applied to the string.
+It ends when it received the string "END" (unsafe but easiest way to terminate the script)
+
+A simpler version is used using tail -f <log-file>.
+The option -f enable following, printing in real time updates on the file.
+The drawback of the simpler version is that we have to check process to kill the terminals process.
+'''
 HOST = '127.0.0.1'
 PORT = 10001
 

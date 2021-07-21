@@ -1,3 +1,5 @@
+//! Scheme module implementing symbol typing.
+//! Development in standby. Some features might not be completely working...
 use crate::doc::{Documentation, LHelp};
 use ompas_lisp::core::LEnv;
 use ompas_lisp::structs::LError::*;

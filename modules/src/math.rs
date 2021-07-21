@@ -5,23 +5,31 @@ use ompas_lisp::structs::*;
 use rand::Rng;
 use std::sync::Arc;
 
-/*
-LANGUAGE LITERALS
- */
+//LANGUAGE
 const MOD_MATH: &str = "mod-math";
 const DOC_MOD_MATH: &str =
     "Module handling mathematical functions for basic arithmetic operations and comparisons.";
 const DOC_MOD_MATH_VERBOSE: &str = "functions:\n\
-                                    -arithmetic: '+', '-', '*','/'\n\
-                                    -comparison: '>', '>=', '<', '<='\n\
-                                    -trigonometry: cos, sin\n\
-                                    -constants: pi";
+                                    - random: rand-int-in-range, rand-float-in-range\n\
+                                    - trigonometry: cos, sin\n\
+                                    - constants: pi";
 
 //Trigonometry
 const SIN: &str = "sin";
 const COS: &str = "cos";
 const RAND_INT_IN_RANGE: &str = "rand-int-in-range";
 const RAND_FLOAT_IN_RANGE: &str = "rand-float-in-range";
+
+//DOCUMENTATION
+const DOC_COS: &str = "Takes 1 argument. Return the cosinus of it.\
+Return an error if args are not numbers of there is the wrong number of arguments";
+const DOC_SIN: &str = "Takes 1 argument. Return the sinus of it.\
+Return an error if args are not numbers of there is the wrong number of arguments";
+const DOC_RAND_INT_IN_RANGE: &str = "Returns a random int between two numbers";
+const DOC_RAND_FLOAT_IN_RANGE: &str = "Returns a random float between two numbers";
+const DOC_RAND_INT_IN_RANGE_VERBOSE: &str = "Example:\n(rand-int-in-range 1 10)\n=> 2";
+const DOC_RAND_FLOAT_IN_RANGE_VERBOSE: &str =
+    "Example:\n(rand-float-in-range 1 10)\n=> 2.32511455...";
 
 //Constants
 const PI: &str = "pi";
@@ -33,8 +41,7 @@ impl GetModule for CtxMath {
     /// Provides all the functions to make some basic computation.
     /// New functions and constants will be added in time, when needed.
     /// Here is a list of all the elements provided by this module
-    /// -Basic functions: "+", "-", "*", "/".
-    /// -Comparisons: "<", ">", "<=", ">=".
+    /// -Random: "rand-int-in-range", "rand-float-in-range".
     /// -Trigonometry: "sin", "cos".
     /// -Constants: "pi".
     fn get_module(self) -> Module {
@@ -56,26 +63,22 @@ impl GetModule for CtxMath {
     }
 }
 
-/*
-HELP
- */
-
-const DOC_COS: &str = "Takes 1 argument. Return the cosinus of it.\
-Return an error if args are not numbers of there is the wrong number of arguments";
-const DOC_SIN: &str = "Takes 1 argument. Return the sinus of it.\
-Return an error if args are not numbers of there is the wrong number of arguments";
-
-const DOC_RAND_INT_IN_RANGE: &str = "todo!";
-const DOC_RAND_FLOAT_IN_RANGE: &str = "todo!";
-
 impl Documentation for CtxMath {
     fn documentation() -> Vec<LHelp> {
         vec![
             LHelp::new(MOD_MATH, DOC_MOD_MATH, Some(DOC_MOD_MATH_VERBOSE)),
             LHelp::new(SIN, DOC_SIN, None),
             LHelp::new(COS, DOC_COS, None),
-            LHelp::new(RAND_INT_IN_RANGE, DOC_RAND_INT_IN_RANGE, None),
-            LHelp::new(RAND_FLOAT_IN_RANGE, DOC_RAND_FLOAT_IN_RANGE, None),
+            LHelp::new(
+                RAND_INT_IN_RANGE,
+                DOC_RAND_INT_IN_RANGE,
+                Some(DOC_RAND_INT_IN_RANGE_VERBOSE),
+            ),
+            LHelp::new(
+                RAND_FLOAT_IN_RANGE,
+                DOC_RAND_FLOAT_IN_RANGE,
+                Some(DOC_RAND_FLOAT_IN_RANGE_VERBOSE),
+            ),
         ]
     }
 }
@@ -122,6 +125,7 @@ pub fn cos(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValue, LError> {
     }
 }
 
+/// Returns an integer randomly picked between two numbers.
 pub fn rand_int_in_range(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(
@@ -154,6 +158,7 @@ pub fn rand_int_in_range(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValu
     }
 }
 
+/// Returns a float randomly picked between two numbers.
 pub fn rand_float_in_range(args: &[LValue], _: &LEnv, _: &CtxMath) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(

@@ -334,5 +334,12 @@ Return *false* otherwise. Return an error if args are not numbers of there is th
     //TODO: complete documentation
     pub const DOC_IS_PAIR: &str = "todo!";
     pub const DOC_IS_EQUAL: &str = "todo!";
-    pub const DOC_MACRO_EXPAND: &str = "todo!";
+    pub const DOC_ASYNC: &str =
+        "Evaluate asynchronously a LValue. Returns the pid(usize) of the task";
+    pub const DOC_AWAIT: &str = "Await on a pid to get the result of the evaluation.";
+    pub const DOC_EVAL: &str = "Eval a LValue.";
+    pub const DOC_LET: &str = "Macro used to abstract variable binding in functional programming.";
+    pub const DOC_LET_STAR: &str = "Macro used to abstract variable binding in functional programming.\
+    The difference with let is that you can bind variables in function of previously bound variables.";
+    pub const DOC_MACRO_EXPAND: &str = "Expand a macro. Used mainly for debug";
 }

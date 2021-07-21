@@ -1,7 +1,5 @@
-/*
-Module to add an help module to the project.
-It provides a struct for the help
- */
+//! Module to add an help module to the project.
+//! It provides a struct for the help in Scheme
 
 use im::HashMap;
 use ompas_lisp::core::LEnv;
@@ -18,7 +16,7 @@ LANGUAGE
 
 const MOD_HELP: &str = "mod-help";
 const DOC_MOD_HELP: &str =
-    "Documentation of the module help. Add Documentation for core functions aswell";
+    "Documentation of the module help. Add Documentation for core functions aswell.";
 const DOC_MOD_HELP_VERBOSE: &str = "functions:\n\
                                     -help";
 
@@ -112,6 +110,12 @@ impl Documentation for CtxDoc {
             LHelp::new(IS_QUOTE, DOC_IS_QUOTE, None),
             LHelp::new(IS_PAIR, DOC_IS_PAIR, None),
             LHelp::new(IS_EQUAL, DOC_IS_EQUAL, None),
+            LHelp::new(AWAIT, DOC_AWAIT, None),
+            LHelp::new(ASYNC, DOC_ASYNC, None),
+            LHelp::new(EVAL, DOC_EVAL, None),
+            LHelp::new(LET, DOC_LET, None),
+            LHelp::new(LET_STAR, DOC_LET_STAR, None),
+            LHelp::new(MACRO_EXPAND, DOC_MACRO_EXPAND, None),
         ]
     }
 }

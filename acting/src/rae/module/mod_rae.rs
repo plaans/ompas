@@ -4,7 +4,6 @@ use crate::rae::module::mod_rae_exec::{CtxRaeExec, RAEInterface};
 use crate::rae::rae_run;
 use crate::rae::state::{LState, StateType, KEY_DYNAMIC, KEY_INNER_WORLD, KEY_STATIC};
 use ompas_lisp::async_await;
-use ompas_lisp::async_await::task_watcher;
 use ompas_lisp::core::{eval, expand, load_module, LEnv};
 use ompas_lisp::functions::cons;
 use ompas_lisp::structs::LError::*;

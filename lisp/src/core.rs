@@ -21,17 +21,26 @@ use std::sync::Arc;
 use std::thread;
 
 lazy_static! {
+    ///Global variable used to enable debug println.
+    /// Mainly used during development.
     static ref DEBUG: AtomicBool = AtomicBool::new(false);
 }
 
+/// Enables debugging
+/// DEBUG <- true
 pub fn activate_debug() {
     DEBUG.store(true, Ordering::Relaxed);
 }
 
+/// Returns the value of debug
 pub fn get_debug() -> bool {
     DEBUG.load(Ordering::Relaxed)
 }
 
+/// Structs used to store the Scheme Environment
+/// - It contains a mapping of <symbol(String), LValue>
+/// - It also contains macros, special LLambdas used to format LValue expressions.
+/// - A LEnv can inherits from an outer environment. It can use symbols from it, but not modify them.
 #[derive(Clone, Debug)]
 pub struct LEnv {
     symbols: im::HashMap<String, LValue>,
@@ -60,6 +69,7 @@ impl LEnv {
     }
 }
 
+/// Struct Wrapping contexts (modules) for each library.
 #[derive(Clone, Debug)]
 pub struct ContextCollection {
     inner: Vec<Arc<dyn Any + Send + Sync>>,
@@ -76,17 +86,21 @@ impl Default for ContextCollection {
 }
 
 impl ContextCollection {
+    ///Insert a new context
     pub fn insert(&mut self, ctx: Arc<dyn Any + Send + Sync>) -> usize {
         self.inner.push(ctx);
         self.inner.len() - 1
     }
 
+    /// Returns a reference to the context with the corresponding id
     pub fn get_context(&self, id: usize) -> &(dyn Any + Send + Sync) {
         match self.inner.get(id) {
             None => panic!("id {} corresponds to no ctx:\n {:?}", id, self),
             Some(some) => some.deref(),
         }
     }
+
+    /// Returns the context corresponding to the label.
     pub fn get_context_with_label(&self, label: &str) -> &dyn Any {
         let id = match self.map_label_usize.get(label) {
             None => panic!("no context with such label"),
@@ -96,6 +110,7 @@ impl ContextCollection {
         self.get_context(id)
     }
 
+    /// Returns a mutable reference to the context with corresponding id
     pub fn get_mut_context(&mut self, id: usize) -> &mut (dyn Any + Send + Sync) {
         match self.inner.get_mut(id) {
             None => panic!("no context with such label"),
@@ -196,6 +211,8 @@ impl Default for LEnv {
 struct CtxRoot(());
 
 impl GetModule for CtxRoot {
+    /// Returns all basic functions, macros, and lambdas
+    ///
     fn get_module(self) -> Module {
         let mut module = Module {
             ctx: Arc::new(()),
@@ -290,6 +307,7 @@ impl GetModule for CtxRoot {
         module.add_fn_prelude(IS_NUMBER, is_number);
         module.add_fn_prelude(IS_BOOL, is_bool);
         module.add_fn_prelude(IS_SYMBOL, is_symbol);
+        module.add_fn_prelude(IS_STRING, is_string);
         module.add_fn_prelude(IS_FN, is_fn);
         module.add_fn_prelude(IS_MUT_FN, is_mut_fn);
         module.add_fn_prelude(IS_QUOTE, is_quote);
@@ -304,6 +322,8 @@ impl GetModule for CtxRoot {
 }
 
 impl LEnv {
+    /// Returns the env with all the basic functions, the ContextCollection with CtxRoot
+    /// and InitialLisp containing the definition of macros and lambdas,
     pub fn root() -> (Self, ContextCollection, InitLisp) {
         // let map = im::hashmap::HashMap::new();
         // map.ins
@@ -383,6 +403,8 @@ impl LEnv {
     }
 }
 
+/// Load a library (module) into the environment so it can be used.
+/// *ctx* is moved into *ctxs*.
 pub fn load_module(
     env: &mut LEnv,
     ctxs: &mut ContextCollection,
@@ -404,6 +426,7 @@ pub fn load_module(
     id
 }
 
+/// Parse an str and returns an expanded LValue
 pub fn parse(str: &str, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result<LValue, LError> {
     match aries_planning::parsing::sexpr::parse(str) {
         Ok(se) => expand(&parse_into_lvalue(&se), true, env, ctxs),
@@ -414,8 +437,16 @@ pub fn parse(str: &str, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result<
     }
 }
 
-///Expand possible short quotting
-/// Returns a LValue::List
+/// Transform LValue containing short version of quotations:
+/// - quote *'*,
+/// - quasiquote *`*,
+/// - unquote *,*
+/// Returns a LValue::List containing the expansion of quotation.
+/// # Examples
+/// ``` lisp
+/// 'x => (quote x)
+/// `x => (qusiquote x)
+/// ,x => (unquote x)
 pub fn expand_quotting(args: Vec<LValue>) -> LValue {
     let mut vec = args.clone();
     let mut i_point = 0;
@@ -467,11 +498,6 @@ pub fn expand_quotting(args: Vec<LValue>) -> LValue {
 }
 
 /// Transform literals into LValue of types Symbol, Float, Integer or Boolean
-/// New version:
-/// Supports short name of quotting:
-/// - 'x => (quote x)
-/// - `x => (quasiquote x)
-/// - ,x => (unquote x)
 pub fn parse_into_lvalue(se: &SExpr) -> LValue {
     match se {
         SExpr::Atom(atom) => {
@@ -510,6 +536,7 @@ pub fn parse_into_lvalue(se: &SExpr) -> LValue {
     }
 }
 
+/// Expand LValues Expressions as Macros
 pub fn expand(
     x: &LValue,
     top_level: bool,
@@ -801,6 +828,7 @@ pub fn expand(
     }
 }
 
+/// Expand quasiquote expressions
 pub fn expand_quasi_quote(x: &LValue, env: &LEnv) -> Result<LValue, LError> {
     match x {
         LValue::List(list) => {
@@ -838,7 +866,8 @@ pub fn expand_quasi_quote(x: &LValue, env: &LEnv) -> Result<LValue, LError> {
     //Verify if has unquotesplicing here
 }
 
-//Better version of eval
+/// Evaluate a LValue
+/// Main function of the Scheme Interpreter
 pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result<LValue, LError> {
     let mut lv = lv.clone();
     //TODO: Voir avec arthur une manière plus élégante de faire
@@ -1092,6 +1121,8 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
     }
 }
 
+/// Expand a macro without evaluating it
+/// Used mainly for debug.
 pub fn macro_expand(
     args: &[LValue],
     env: &LEnv,

@@ -1,3 +1,7 @@
+'''
+Script to test logger.py
+It sends 5 messages 'test log ' before closing the socket
+'''
 import socket
 import time
 

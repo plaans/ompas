@@ -7,6 +7,13 @@ use crate::structs::{LError, LNumber, LValue, NameTypeLValue};
 use im::HashMap;
 use std::convert::TryFrom;
 
+/// Default function of the Lisp Environement.
+/// Does nothing outside returning a string.
+pub fn default(_args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    Ok(LValue::String("default function".to_string()))
+}
+
+/// Returns a list of all the keys present in the environment
 pub fn env(_: &[LValue], env: &LEnv, _: &()) -> Result<LValue, LError> {
     Ok(env
         .keys()
@@ -16,6 +23,7 @@ pub fn env(_: &[LValue], env: &LEnv, _: &()) -> Result<LValue, LError> {
         .into())
 }
 
+#[deprecated]
 pub fn begin(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     match args.last() {
         None => Err(LError::SpecialError(
@@ -26,14 +34,12 @@ pub fn begin(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     }
 }
 
-pub fn default(_args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
-    Ok(LValue::Symbol("default function".to_string()))
-}
-
+/// Returns a list
 pub fn list(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     Ok(LValue::List(args.to_vec()))
 }
 
+/// Construct a map
 pub fn map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     let mut facts: HashMap<LValue, LValue> = Default::default();
     if args.len() != 1 {
@@ -72,7 +78,7 @@ pub fn map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     Ok(LValue::Map(facts))
 }
 
-//TODO: Define set behaviour for other type of LValue
+#[deprecated]
 pub fn set(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(SET, args.into(), args.len(), 2..2));
@@ -208,6 +214,7 @@ pub fn set_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     }
 }
 
+/// Merges two hashmap tables
 pub fn union_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(
@@ -419,7 +426,7 @@ pub fn length(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
         )),
     }
 }
-
+/// Returns true if a hashmap or list is empty
 pub fn empty(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(EMPTY, args.into(), args.len(), 1..1));
@@ -442,6 +449,9 @@ pub fn empty(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     }
 }
 
+/// Logical functional not
+/// true => nil
+/// nil => true
 pub fn not(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(NOT, args.into(), args.len(), 1..1));
@@ -461,6 +471,10 @@ pub fn add(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     Ok(result)
 }
 
+/// Substract function. Only takes two args.
+/// # Example
+/// ``` lisp
+/// (- 10 2) => 8
 pub fn sub(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     match args.len() {
         2 => &args[0] - &args[1],
@@ -475,7 +489,10 @@ pub fn mul(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     }
     Ok(result)
 }
-
+/// Division function. Only takes two args.
+/// # Example
+/// ``` lisp
+/// (/ 10 2) => 5
 pub fn div(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     match args.len() {
         2 => &args[0] / &args[1],
@@ -483,28 +500,28 @@ pub fn div(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     }
 }
 
-//Comparison functions
+/// Compares two values. Returns true if the first arg is greater than the second. Nil Otherwise
 pub fn gt(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     match args.len() {
         2 => Ok((args[0] > args[1]).into()),
         i => Err(WrongNumberOfArgument(GT, args.into(), i, 2..2)),
     }
 }
-
+/// Compares two values. Returns true if the first arg is less than the second. Nil Otherwise
 pub fn lt(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     match args.len() {
         2 => Ok((args[0] < args[1]).into()),
         i => Err(WrongNumberOfArgument(GT, args.into(), i, 2..2)),
     }
 }
-
+/// Compares two values. Returns true if the first arg is greater or equal to the second. Nil Otherwise
 pub fn ge(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     match args.len() {
         2 => Ok((args[0] >= args[1]).into()),
         i => Err(WrongNumberOfArgument(GE, args.into(), i, 2..2)),
     }
 }
-
+/// Compares two values. Returns true if the first arg is less or equal to the second. Nil Otherwise
 pub fn le(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     match args.len() {
         2 => Ok((args[0] <= args[1]).into()),
@@ -512,6 +529,7 @@ pub fn le(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     }
 }
 
+/// Compares two values. Returns true if the first and second args are equal. Nil Otherwise
 pub fn eq(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     match args.len() {
         2 => Ok((args[0] == args[1]).into()),
@@ -522,6 +540,7 @@ pub fn eq(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
 //Predicates
 
 //Type verification
+/// Returns true if LValue is Nil
 pub fn is_nil(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     match args.len() {
         1 => Ok((NameTypeLValue::from(&args[0]) == NameTypeLValue::Nil).into()),
@@ -529,6 +548,7 @@ pub fn is_nil(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     }
 }
 
+/// Returns true is LValue is number
 pub fn is_number(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     match args.len() {
         1 => Ok((NameTypeLValue::from(&args[0]) == NameTypeLValue::Number).into()),
@@ -536,6 +556,7 @@ pub fn is_number(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     }
 }
 
+/// Returns true if LValue is integer
 pub fn is_integer(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     match args.len() {
         1 => {
@@ -548,6 +569,8 @@ pub fn is_integer(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
         i => Err(WrongNumberOfArgument(IS_INTEGER, args.into(), i, 1..1)),
     }
 }
+
+/// Returns true if LValue is float
 pub fn is_float(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     match args.len() {
         1 => {
@@ -560,21 +583,21 @@ pub fn is_float(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
         i => Err(WrongNumberOfArgument(IS_FLOAT, args.into(), i, 1..1)),
     }
 }
-
+/// Returns true if LValue is boolean
 pub fn is_bool(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     match args.len() {
         1 => Ok((NameTypeLValue::from(args.get(0).unwrap()) == NameTypeLValue::Bool).into()),
         i => Err(WrongNumberOfArgument(IS_BOOL, args.into(), i, 1..1)),
     }
 }
-
+/// Returns true if LValue is a function
 pub fn is_fn(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     match args.len() {
         1 => Ok((NameTypeLValue::from(args.get(0).unwrap()) == NameTypeLValue::Fn).into()),
         i => Err(WrongNumberOfArgument(IS_FN, args.into(), i, 1..1)),
     }
 }
-
+/// Returns true if LValue is a mut function
 pub fn is_mut_fn(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     match args.len() {
         1 => Ok((NameTypeLValue::from(args.get(0).unwrap()) == NameTypeLValue::MutFn).into()),
@@ -582,6 +605,7 @@ pub fn is_mut_fn(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     }
 }
 
+/// Returns true if LValue is a symbol
 pub fn is_symbol(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     match args.len() {
         1 => match args.get(0).unwrap() {
@@ -592,6 +616,17 @@ pub fn is_symbol(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     }
 }
 
+/// Returns true if LValue is a string
+pub fn is_string(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    match args.len() {
+        1 => match args.get(0).unwrap() {
+            LValue::String(_) => Ok(LValue::True),
+            _ => Ok(LValue::Nil),
+        },
+        i => Err(WrongNumberOfArgument(IS_SYMBOL, args.into(), i, 1..1)),
+    }
+}
+/// Returns true if LValue is a list
 pub fn is_list(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     match args.len() {
         1 => match args.get(0).unwrap() {
@@ -602,6 +637,7 @@ pub fn is_list(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     }
 }
 
+/// Returns true if LValue is a lambda
 pub fn is_lambda(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     match args.len() {
         1 => match args.get(0).unwrap() {
@@ -612,6 +648,7 @@ pub fn is_lambda(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     }
 }
 
+/// Returns true if LValue is a quote
 pub fn is_quote(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     match args.len() {
         1 => match args.get(0).unwrap() {
@@ -622,6 +659,7 @@ pub fn is_quote(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     }
 }
 
+/// Returns true if LValue is a hashmap
 pub fn is_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     match args.len() {
         1 => match args.get(0).unwrap() {
@@ -632,6 +670,8 @@ pub fn is_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     }
 }
 
+/// Returns true if two LValues are equals.
+/// The difference with eq is that it compares all kind of LValue.
 pub fn is_equal(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(
@@ -662,6 +702,7 @@ pub fn is_equal(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     }
 }
 
+/// Returns true if a list is not empty
 pub fn is_pair(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(

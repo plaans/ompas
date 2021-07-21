@@ -1,3 +1,5 @@
+//!
+
 use crate::doc::{Documentation, LHelp};
 use ompas_lisp::core::*;
 use ompas_lisp::structs::LError::*;
@@ -56,14 +58,21 @@ impl Default for CtxIo {
 }
 
 impl CtxIo {
+    ///Set the sender to lisp interpreter
+    /// Used to send commands to execute
     pub fn add_sender_li(&mut self, sender: Sender<String>) {
         self.sender_li = Some(sender);
     }
+    ///Set the log output
     pub fn set_log_output(&mut self, output: LogOutput) {
         self.log = output
     }
 }
 
+/// Prints in a the LogOutput the LValue.
+/// If it is stdout, it is printed in the terminal
+/// Otherwise in the configured file.
+/// If the file is missing, it prints nothing.
 pub fn print(args: &[LValue], _: &LEnv, ctx: &CtxIo) -> Result<LValue, LError> {
     let lv: LValue = match args.len() {
         0 => LValue::Nil,
@@ -84,6 +93,8 @@ pub fn print(args: &[LValue], _: &LEnv, ctx: &CtxIo) -> Result<LValue, LError> {
     Ok(LValue::Nil)
 }
 
+/// Read the content of a file and sends the content to the lisp interpreter.
+/// The name of the file is given via args.
 pub fn read(args: &[LValue], _: &LEnv, ctx: &CtxIo) -> Result<LValue, LError> {
     //let mut stdout = io::stdout();
     //stdout.write_all(b"module Io: read\n");
@@ -194,11 +205,11 @@ impl Documentation for CtxIo {
     }
 }
 
-/// Contains the function to handle the REPL of the project.
-/// The repl is based on the project rustyline.
-///
-/// It contains only one function (for the moment): run that takes two arguments.
 pub mod repl {
+    //! Contains the function to handle the REPL of the project.
+    //! The repl is based on the project rustyline.
+    //!
+    //! It contains only one function (for the moment): run that takes two arguments.
 
     use crate::io::{repl, TOKIO_CHANNEL_SIZE};
     use chrono::{DateTime, Utc};
@@ -211,6 +222,7 @@ pub mod repl {
     use std::io::Write;
     use tokio::sync::mpsc::{self, Receiver, Sender};
 
+    ///Spawn repl task
     pub async fn spawn_repl(sender: Sender<String>) -> Option<Sender<String>> {
         let (sender_repl, receiver_repl) = mpsc::channel(TOKIO_CHANNEL_SIZE);
         tokio::spawn(async move {
@@ -220,6 +232,8 @@ pub mod repl {
         Some(sender_repl)
     }
 
+    /// Spawn stdin task.
+    /// Not used anymore.
     pub async fn spawn_stdin(sender: Sender<String>) -> Option<Sender<String>> {
         let (sender_stdin, receiver_stdin) = mpsc::channel(TOKIO_CHANNEL_SIZE);
         tokio::spawn(async move {
@@ -229,6 +243,8 @@ pub mod repl {
         Some(sender_stdin)
     }
 
+    /// Spawn stdout task
+    /// Not used anymore.
     pub async fn spawn_stdout() -> Option<Sender<String>> {
         let (sender_stdout, receiver_stdout): (Sender<String>, Receiver<String>) =
             mpsc::channel(TOKIO_CHANNEL_SIZE);
@@ -240,6 +256,7 @@ pub mod repl {
         Some(sender_stdout)
     }
 
+    /// Spawn the log task
     pub async fn spawn_log() -> Option<Sender<String>> {
         let (sender_log, receiver_log) = mpsc::channel(TOKIO_CHANNEL_SIZE);
 
@@ -302,7 +319,7 @@ pub mod repl {
     }
 
     async fn log(mut receiver: Receiver<String>) {
-        let date: DateTime<Utc> = Utc::now();
+        let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
         let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
         fs::create_dir_all("lisp_logs").expect("could not create logs directory");
         let mut file = OpenOptions::new()

@@ -1,3 +1,19 @@
+//! Scheme module to load in the environment to add the following functions:
+//! - rand-element: returns a random element of a list
+//! # Example
+//! ``` lisp
+//! (rand-element (list 1 2 3 4))
+//! => 1
+//! (rand-element (list 1 2 3 4))
+//! => 3
+//! ```
+//! - enumerate: returns a list of all combinations of elements of several lists
+//!# Example:
+//! ``` lisp
+//! (enumerate (list 1 2) (list 3 4))
+//! => ((1 3)(1 4)(2 3)(2 4))
+//! ```
+
 use crate::doc::{Documentation, LHelp};
 use aries_utils::StreamingIterator;
 use ompas_lisp::core::LEnv;
@@ -7,13 +23,19 @@ use rand::Rng;
 use std::ops::Deref;
 use std::sync::Arc;
 
-/*
-LANGUAGE
- */
+//LANGUAGE
 
 const MOD_UTILS: &str = "mod-utils";
 const RAND_ELEMENT: &str = "rand-element";
 const ENUMERATE: &str = "enumerate";
+
+// Documentation
+const DOC_RAND_ELEMENT: &str = "Return a random element of a list";
+const DOC_RAND_ELEMENT_VERBOSE: &str = "Example: \n(rand-element (list 1 2 3 4))\n=> 1";
+const DOC_ENUMERATE: &str =
+    "Return a enumeration of all possible combinations of elements of 1+ lists";
+const DOC_ENUMERATE_VERBOSE: &str =
+    "Example: \n(enumerate (list 1 2) (list 3 4))\n=> ((1 3)(1 4)(2 3)(2 4))";
 
 #[derive(Default, Copy, Clone, Debug)]
 pub struct CtxUtils {}
@@ -36,12 +58,27 @@ impl GetModule for CtxUtils {
 
 impl Documentation for CtxUtils {
     fn documentation() -> Vec<LHelp> {
-        todo!()
+        vec![
+            LHelp::new(
+                RAND_ELEMENT,
+                DOC_RAND_ELEMENT,
+                Some(DOC_RAND_ELEMENT_VERBOSE),
+            ),
+            LHelp::new(ENUMERATE, DOC_ENUMERATE, Some(DOC_ENUMERATE_VERBOSE)),
+        ]
     }
 }
 
 ///Return enumeration from a list of list
-/// uses function from aries_utils
+///uses function from aries_utils
+/// # Example:
+///``` rust
+/// use ompas_modules::utils::{enumerate, CtxUtils};
+/// use ompas_lisp::structs::LValue;
+/// use ompas_lisp::core::LEnv;
+/// let lists: &[LValue] = &[vec![1,2,3].into(), vec![4,5,6].into()];
+/// let enumeration = enumerate(lists, &LEnv::default(), &CtxUtils::default());
+/// ```
 pub fn enumerate(args: &[LValue], _: &LEnv, _: &CtxUtils) -> Result<LValue, LError> {
     let mut vec_iter = vec![];
     for arg in args {
@@ -73,6 +110,7 @@ pub fn enumerate(args: &[LValue], _: &LEnv, _: &CtxUtils) -> Result<LValue, LErr
 }
 
 ///Return an element randomly chosen from a list
+/// Takes a LValue::List as arg.
 pub fn rand_element(args: &[LValue], _: &LEnv, _: &CtxUtils) -> Result<LValue, LError> {
     match args.len() {
         1 => {

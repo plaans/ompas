@@ -197,10 +197,10 @@ const DOC_WRITE_VERBOSE: &str = "Takes two arguments: the name of the file and t
 impl Documentation for CtxIo {
     fn documentation() -> Vec<LHelp> {
         vec![
-            LHelp::new(MOD_IO, DOC_MOD_IO, Some(DOC_MOD_IO_VERBOSE)),
-            LHelp::new(PRINT, DOC_PRINT, Some(DOC_PRINT_VERBOSE)),
-            LHelp::new(READ, DOC_READ, Some(DOC_READ_VERBOSE)),
-            LHelp::new(WRITE, DOC_WRITE, Some(DOC_WRITE_VERBOSE)),
+            LHelp::new_verbose(MOD_IO, DOC_MOD_IO, DOC_MOD_IO_VERBOSE),
+            LHelp::new_verbose(PRINT, DOC_PRINT, DOC_PRINT_VERBOSE),
+            LHelp::new_verbose(READ, DOC_READ, DOC_READ_VERBOSE),
+            LHelp::new_verbose(WRITE, DOC_WRITE, DOC_WRITE_VERBOSE),
         ]
     }
 }

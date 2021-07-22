@@ -11,6 +11,23 @@ use std::hash::{Hash, Hasher};
 use std::ops::{Add, Deref, Div, Mul, Range, Sub};
 use std::sync::Arc;
 
+/// Error struct for Scheme
+/// Different kinds of errors are proposed, to have better explanation when one occurs:
+/// - WrongType: the LValue kind is not the one expected
+/// - NotInListOfExpectedTypes: a list of kind of LValue was expected.
+/// - WrongNumberOfArgument: the number of args is not in expected range
+/// - SpecialError: Other types of errors
+/// - ConversionError: Error when trying a conversion that could fail.
+/// # Example:
+/// ```
+/// use ompas_lisp::structs::LValue;
+/// //The conversion will success if lv is of kind LValue::Map
+/// let map: im::hashmap<LValue, LValue>  = lv.try_into()?;
+///
+/// ```
+/// # Note:
+/// The first argument of each kind is supposed to be an explanation of where the error occurred.
+/// It can be the name of the function.
 #[derive(Debug, Clone)]
 pub enum LError {
     WrongType(&'static str, LValue, NameTypeLValue, NameTypeLValue),
@@ -84,6 +101,10 @@ impl From<std::io::Error> for LError {
     }
 }*/
 
+/// Representation of numbers il LValue:
+/// - Int(i64)
+/// - Float(f64)
+/// - Usize(usize)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum LNumber {
@@ -315,6 +336,19 @@ impl Div for LNumber {
 
 impl Eq for LNumber {}
 
+/// Kinds of args a LValue::LLambda could receive.
+/// The parameters of a lambda function can be defined in two ways:
+/// - a unique symbol considered as a list:
+/// ``` lisp
+/// (lambda args <body>)
+/// ;args will be considered as a LValue::List
+/// ;This lambda is expected to receive a list of arbitrary length.
+/// ```
+/// - a list of bound symbols :
+/// ``` lisp
+/// (lambda (x y z) <body>)
+/// ;here each symbol will be bound to a LValue.
+/// ;This lambda is expected to receive exactly three arguments.
 #[derive(Clone, Debug)]
 pub enum LambdaArgs {
     Sym(String),
@@ -352,6 +386,8 @@ impl From<Vec<String>> for LambdaArgs {
         LambdaArgs::List(vec_sym)
     }
 }
+
+/// Struct to define a lambda in Scheme.
 #[derive(Clone)]
 pub struct LLambda {
     params: LambdaArgs,
@@ -378,6 +414,7 @@ impl PartialEq for LLambda {
 }
 
 impl LLambda {
+    ///Constructs a new lambda, capturing the environment in which it has been created.
     pub fn new(params: LambdaArgs, body: LValue, env: LEnv) -> Self {
         LLambda {
             params,
@@ -386,6 +423,7 @@ impl LLambda {
         }
     }
 
+    /// Returns a new env containing the environment of the lambda and the current environment in which the lambda is called.
     pub fn get_new_env(&self, args: &[LValue], outer: LEnv) -> Result<LEnv, LError> {
         let mut env = self.env.clone();
         env.set_outer(outer);
@@ -419,6 +457,7 @@ impl LLambda {
         Ok(env)
     }
 
+    /// Method to call a lambda and execute it.
     pub fn call(
         &self,
         args: &[LValue],
@@ -429,6 +468,7 @@ impl LLambda {
         eval(&*self.body, &mut new_env, ctxs)
     }
 
+    /// Returns the body of the lambda
     pub fn get_body(&self) -> LValue {
         *self.body.clone()
     }
@@ -438,6 +478,8 @@ pub type NativeFn<T> = fn(&[LValue], &LEnv, &T) -> Result<LValue, LError>;
 pub type DowncastCall =
     fn(&[LValue], &LEnv, &dyn Any, &Arc<dyn Any + Send + Sync>) -> Result<LValue, LError>;
 
+/// Struct to define a pointer to a function.
+/// Contains attributes used to downcast the pointer to the right type.
 #[derive(Clone)]
 pub struct LFn {
     pub(crate) fun: Arc<dyn Any + 'static + Send + Sync>,
@@ -461,6 +503,7 @@ impl Debug for LFn {
 }
 
 impl LFn {
+    /// Constructs a new LFn from a pointer to a function
     pub fn new<T: 'static + Sync + Send>(lbd: NativeFn<T>, debug_label: &'static str) -> Self {
         /*let x = move |args: &[LValue], env: &LEnv, ctx: &dyn Any| -> Result<LValue, LError> {
             let ctx: Option<&T> = ctx.downcast_ref::<T>();
@@ -493,20 +536,25 @@ impl LFn {
         }
     }
 
+    ///Calls the function
     pub fn call(&self, args: &[LValue], env: &LEnv, ctx: &dyn Any) -> Result<LValue, LError> {
         (self.downcast)(args, env, ctx, &self.fun)
 
         //(self.fun)(args, env, ctx)
     }
 
+    /// Set the index of the module that is used by the function.
+    /// Mandatory to use the right context when called.
     pub fn set_index_mod(&mut self, index_mod: usize) {
         self.index_mod = Some(index_mod);
     }
 
+    /// Return the index_mod of the function.
     pub fn get_index_mod(&self) -> Option<usize> {
         self.index_mod
     }
 
+    /// Returns the label of the function
     pub fn get_label(&self) -> &'static str {
         self.debug_label
     }
@@ -520,6 +568,7 @@ pub type DowncastCallMut = fn(
     &Arc<dyn Any + 'static + Send + Sync>,
 ) -> Result<LValue, LError>;
 
+/// Struct wrapping a pointer to a function that can mutate its context.
 #[derive(Clone)]
 pub struct LMutFn {
     pub(crate) fun: Arc<dyn Any + 'static + Send + Sync>,
@@ -583,6 +632,20 @@ impl LMutFn {
     }
 }
 
+/// The core operators are Scheme operators that can modify the environment directly,
+/// or have special behaviour that could not be done inside classical Scheme functions.
+/// - Define: insert a new entry in the environment. A symbol can only be defined once.
+/// - DefLambda: creates a new lambda object.
+/// - If : basic conditional structure
+/// - Quote : operator preventing from evaluating an expression
+/// - QuasiQuote: operator preventing from evaluating an expression except unquote expression inside of it.
+/// - Unquote : used only inside a QuasiQuote block to still evaluate an expression.
+/// - DefMacro: insert a new macro in the environment. A macro must be a lambda.
+/// - Set: modify the value of an entry in the environment. Cannot set an undefined symbol
+/// - Begin: block that evaluates a list of expression and returns the last result.
+/// - Async: Evaluates in an asynchronous task a LValue.
+/// - Await: Wait on a pid the result of an async.
+/// - Eval: Evaluates an expression.
 #[derive(Clone, PartialOrd, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[serde(untagged, rename_all = "lowercase")]
 pub enum LCoreOperator {
@@ -655,7 +718,8 @@ impl From<im::HashMap<LValue, LValue>> for LValue {
 */
 
 type Sym = String;
-
+/// Object used in Scheme for every kind.
+/// todo: complete documentation
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(untagged, rename_all = "lowercase")]
 pub enum LValue {
@@ -676,7 +740,6 @@ pub enum LValue {
 
     // data structure
     #[serde(skip)]
-    //TODO: Implement serde for mirror struct of im::hashmap
     Map(im::HashMap<LValue, LValue>),
     List(Vec<LValue>),
     Quote(Box<LValue>),
@@ -684,25 +747,6 @@ pub enum LValue {
     True,
     Nil,
 }
-
-/*impl Debug for LValue {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        let string = match self {
-            LValue::Symbol(s) => format!("LValue::Symbol: {:?}", s),
-            LValue::Number(n) => format!("Number: {:?}", n),
-            LValue::True => "LValue::True".to_string(),
-            LValue::Map(map) => format!("LValue::Map: {:?}", map),
-            LValue::List(list) => format!("List: {:?}", list),
-            LValue::Quote(q) => format!("Quote: {:?}", q),
-            LValue::Nil => "LValue::Nil".to_string(),
-            LValue::Fn(lfn) => format!("Function: {:?}", lfn),
-            LValue::MutFn(mutfn) => format!("Number: {:?}", mutfn),
-            LValue::Lambda(l) => format!("Lambda: {:?}", l),
-            LValue::CoreOperator(co) => format!("CoreOperator: {:?}", co),
-        };
-        write!(f, "{}", string)
-    }
-}*/
 
 impl Display for LValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
@@ -828,6 +872,7 @@ impl TryFrom<&LValue> for Vec<LValue> {
         }
     }
 }
+
 impl TryFrom<LValue> for Vec<LValue> {
     type Error = LError;
 
@@ -1139,6 +1184,7 @@ impl Add for LValue {
         &self + &rhs
     }
 }
+
 impl Sub for LValue {
     type Output = Result<LValue, LError>;
 
@@ -1146,6 +1192,7 @@ impl Sub for LValue {
         &self - &rhs
     }
 }
+
 impl Mul for LValue {
     type Output = Result<LValue, LError>;
 
@@ -1153,6 +1200,7 @@ impl Mul for LValue {
         &self * &rhs
     }
 }
+
 impl Div for LValue {
     type Output = Result<LValue, LError>;
 
@@ -1212,6 +1260,7 @@ impl From<&LCoreOperator> for LValue {
         LValue::CoreOperator(co.clone())
     }
 }
+
 impl From<LCoreOperator> for LValue {
     fn from(co: LCoreOperator) -> Self {
         (&co).into()
@@ -1349,6 +1398,7 @@ impl From<LValueS> for LValue {
         (&lvs).into()
     }
 }
+
 impl Display for LValueS {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
@@ -1378,6 +1428,7 @@ impl Display for LValueS {
     }
 }
 
+/// Enum used to serialize LValue.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum LValueS {
@@ -1389,6 +1440,8 @@ pub enum LValueS {
     Map(Vec<(LValueS, LValueS)>),
 }
 
+/// Enum of kinds of LValue
+/// Mainly used for debug and errors.
 #[derive(Clone, Debug)]
 pub enum NameTypeLValue {
     Bool,
@@ -1527,6 +1580,7 @@ impl InitLisp {
 
 pub type AsyncLTrait = dyn Any + Send + Sync;
 
+/// Struct to define a Module, Library that will be loaded inside the Scheme Environment.
 pub struct Module {
     pub ctx: Arc<AsyncLTrait>,
     pub prelude: Vec<(String, LValue)>,
@@ -1535,6 +1589,7 @@ pub struct Module {
 }
 
 impl Module {
+    /// Add a function to the module.
     pub fn add_fn_prelude<T: 'static + Send + Sync>(
         &mut self,
         label: &'static str,
@@ -1544,6 +1599,7 @@ impl Module {
             .push((label.into(), LValue::Fn(LFn::new(fun, label))))
     }
 
+    /// Add a mutate function to the module.
     pub fn add_mut_fn_prelude<
         T: 'static,
         //R: Into<Result<LValue, LError>>,
@@ -1557,11 +1613,14 @@ impl Module {
             .push((label.into(), LValue::MutFn(LMutFn::new(fun, label))))
     }
 
+    /// Add a LValue to the prelude.
     pub fn add_prelude(&mut self, label: &str, lv: LValue) {
         self.prelude.push((label.into(), lv));
     }
 }
 
+/// Trait that must be implemented by a context to build a Module object
+/// that will be loaded into the LEnv and ContextCollection.
 pub trait GetModule {
     fn get_module(self) -> Module;
 }

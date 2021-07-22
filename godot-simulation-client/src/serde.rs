@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize, Serializer};
 use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
 
+/// Different kinds of messages that can be exchanged with the simulation.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum GodotMessageType {

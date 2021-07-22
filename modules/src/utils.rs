@@ -59,12 +59,8 @@ impl GetModule for CtxUtils {
 impl Documentation for CtxUtils {
     fn documentation() -> Vec<LHelp> {
         vec![
-            LHelp::new(
-                RAND_ELEMENT,
-                DOC_RAND_ELEMENT,
-                Some(DOC_RAND_ELEMENT_VERBOSE),
-            ),
-            LHelp::new(ENUMERATE, DOC_ENUMERATE, Some(DOC_ENUMERATE_VERBOSE)),
+            LHelp::new_verbose(RAND_ELEMENT, DOC_RAND_ELEMENT, DOC_RAND_ELEMENT_VERBOSE),
+            LHelp::new_verbose(ENUMERATE, DOC_ENUMERATE, DOC_ENUMERATE_VERBOSE),
         ]
     }
 }

@@ -1,3 +1,5 @@
+//! Module containing the Scheme library to setup RAE environment
+
 use crate::rae::context::*;
 use crate::rae::module::domain::{GENERATE_TASK_SIMPLE, LABEL_GENERATE_METHOD_PARAMETERS};
 use crate::rae::module::mod_rae_exec::{CtxRaeExec, RAEInterface};
@@ -12,48 +14,68 @@ use ompas_lisp::structs::*;
 use ompas_modules::doc::{Documentation, LHelp};
 use ompas_modules::math::CtxMath;
 use ompas_utils::log;
+use std::convert::TryInto;
 use std::mem;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-/*
-LANGUAGE
- */
-pub const MOD_RAE: &str = "mod-rae";
+//LANGUAGE
+const MOD_RAE: &str = "mod-rae";
 
-pub const RAE_ADD_ACTION: &str = "rae-add-action";
-pub const RAE_ADD_METHOD: &str = "rae-add-method";
-pub const RAE_ADD_TASK: &str = "rae-add-task";
-pub const RAE_ADD_STATE_FUNCTION: &str = "rae-add-state-function";
-pub const RAE_GET_METHODS: &str = "rae-get-methods";
-pub const RAE_GET_ACTIONS: &str = "rae-get-actions";
-pub const RAE_GET_SYMBOL_TYPE: &str = "rae-get-symbol-type";
-pub const RAE_GET_TASKS: &str = "rae-get-tasks";
-pub const RAE_GET_STATE_FUNCTION: &str = "rae-get-state-function";
-pub const RAE_GET_METHODS_PARAMETERS: &str = "rae-get-methods-parameters";
-pub const RAE_GET_ENV: &str = "rae-get-env";
-pub const RAE_LAUNCH: &str = "rae-launch";
-pub const RAE_GET_STATE: &str = "rae-get-state";
-pub const RAE_GET_STATUS: &str = "rae-get-status";
+//const RAE_ADD_ACTION: &str = "rae-add-action";
+//const RAE_ADD_METHOD: &str = "rae-add-method";
+//const RAE_ADD_TASK: &str = "rae-add-task";
+//const RAE_ADD_STATE_FUNCTION: &str = "rae-add-state-function";
+const RAE_GET_METHODS: &str = "rae-get-methods";
+const RAE_GET_ACTIONS: &str = "rae-get-actions";
+const RAE_GET_SYMBOL_TYPE: &str = "rae-get-symbol-type";
+const RAE_GET_TASKS: &str = "rae-get-tasks";
+const RAE_GET_STATE_FUNCTIONS: &str = "rae-get-state-functions";
+const RAE_GET_METHODS_PARAMETERS: &str = "rae-get-methods-parameters";
+const RAE_GET_ENV: &str = "rae-get-env";
+const RAE_LAUNCH: &str = "rae-launch";
+const RAE_GET_STATE: &str = "rae-get-state";
+const RAE_GET_STATUS: &str = "rae-get-status";
 
-pub const DOC_RAE_LAUNCH: &str = "todo!";
-pub const DOC_RAE_ADD_ACTION: &str = "todo!";
-pub const DOC_RAE_ADD_METHOD: &str = "todo!";
-pub const DOC_RAE_ADD_TASK: &str = "todo!";
-pub const DOC_RAE_GET_METHODS: &str = "todo!";
-pub const DOC_RAE_GET_ENV: &str = "todo!";
+const RAE_DEF_STATE_FUNCTION: &str = "def-state-function";
+const RAE_DEF_ACTION: &str = "def-action";
+const RAE_DEF_TASK: &str = "def-task";
+const RAE_DEF_METHOD: &str = "def-method";
+const RAE_DEF_LAMBDA: &str = "def-lambda";
+const RAE_DEF_METHOD_PARAMETERS: &str = "def-method-parameters";
+const RAE_DEF_INITIAL_STATE: &str = "def-initial-state";
 
-pub const DOC_DEF_TASK: &str = "todo!";
-pub const DOC_DEF_METHOD: &str = "todo!";
-pub const DOC_DEF_ACTION: &str = "todo!";
+//DOCUMENTATION
+const DOC_RAE_GET_METHODS: &str = "Returns the list of all defined methods in RAE environment";
+const DOC_RAE_GET_ACTIONS: &str = "Returns the list of all defined actions in RAE environment";
+const DOC_RAE_GET_SYMBOL_TYPE: &str =
+    "Returns the type of the symbol as defined in RAE environment";
+const DOC_RAE_GET_SYMBOL_TYPE_VERBOSE: &str = "Types:\n\
+                                           \t-state-function\n\
+                                           \t-action\n\
+                                           \t-task\n\
+                                           \t-method";
+const DOC_RAE_GET_TASKS: &str = "Returns the list of all defined tasks in RAE environment";
+const DOC_RAE_GET_STATE_FUNCTIONS: &str =
+    "Returns the list of all defined state-functions in RAE environment";
+const DOC_RAE_GET_ENV: &str = "Returns the whole environment.";
+const DOC_RAE_LAUNCH: &str = "Launch the main rae loop in an asynchronous task.";
+const DOC_RAE_GET_STATE: &str = "Returns the current state";
+const DOC_RAE_GET_STATUS: &str = "Returns the current status of actions";
 
-pub const RAE_DEF_STATE_FUNCTION: &str = "def-state-function";
-pub const RAE_DEF_ACTION: &str = "def-action";
-pub const RAE_DEF_TASK: &str = "def-task";
-pub const RAE_DEF_METHOD: &str = "def-method";
-pub const RAE_DEF_LAMBDA: &str = "def-lambda";
-pub const RAE_DEF_METHOD_PARAMETERS: &str = "def-method-parameters";
-pub const RAE_DEF_INITIAL_STATE: &str = "def-initial-state";
+const DOC_DEF_STATE_FUNCTION: &str = "Insert a state function in RAE environment.";
+const DOC_DEF_STATE_FUNCTION_VERBOSE: &str = "Example:\n(def-state-function robot.coordinates ?r)";
+const DOC_DEF_ACTION: &str = "Insert an action in RAE environment.";
+const DOC_DEF_ACTION_VERBOSE: &str = "Example:\n(def-action pick ?r)";
+const DOC_DEF_TASK: &str = "Insert a task in RAE environment";
+const DOC_DEF_TASK_VERBOSE: &str = "Example:\n(def-task t_navigate_to ?r ?x ?y)";
+const DOC_DEF_METHOD: &str = "Insert a method in RAE environment.";
+const DOC_DEF_METHOD_VERBOSE: &str =
+    "Example:\n(def-method m_navigate_to '((:task t_navigate_to)(:params ?r ?x ?y)(:body (begin\n\
+        \t(rae-await (navigate_to ?r ?x ?y))\n\
+        \t(rae-await (navigate_to ?r (+ ?x 1) (+ ?y 1)))))))";
+const DOC_DEF_LAMBDA: &str = "Add a lambda to RAE environment";
+const DOC_DEF_INITIAL_STATE: &str = "Add initial facts in the state. Most of the time it is general knowledge and not initialisation of facts.";
 
 #[derive(Default)]
 pub struct CtxRae {
@@ -80,7 +102,7 @@ impl GetModule for CtxRae {
         module.add_mut_fn_prelude(RAE_ADD_TASK, add_task);
         module.add_mut_fn_prelude(RAE_ADD_METHOD, add_method);*/
         module.add_fn_prelude(RAE_GET_METHODS, get_methods);
-        module.add_fn_prelude(RAE_GET_STATE_FUNCTION, get_state_function);
+        module.add_fn_prelude(RAE_GET_STATE_FUNCTIONS, get_state_function);
         module.add_fn_prelude(RAE_GET_ACTIONS, get_actions);
         module.add_fn_prelude(RAE_GET_TASKS, get_tasks);
         module.add_fn_prelude(RAE_GET_METHODS_PARAMETERS, get_methods_parameters);
@@ -103,10 +125,33 @@ impl GetModule for CtxRae {
     }
 }
 
-//TODO: doc ctx rae
 impl Documentation for CtxRae {
     fn documentation() -> Vec<LHelp> {
-        vec![]
+        vec![
+            LHelp::new(RAE_GET_METHODS, DOC_RAE_GET_METHODS),
+            LHelp::new(RAE_GET_ACTIONS, DOC_RAE_GET_ACTIONS),
+            LHelp::new_verbose(
+                RAE_GET_SYMBOL_TYPE,
+                DOC_RAE_GET_SYMBOL_TYPE,
+                DOC_RAE_GET_SYMBOL_TYPE_VERBOSE,
+            ),
+            LHelp::new(RAE_GET_TASKS, DOC_RAE_GET_TASKS),
+            LHelp::new(RAE_GET_STATE_FUNCTIONS, DOC_RAE_GET_STATE_FUNCTIONS),
+            LHelp::new(RAE_GET_ENV, DOC_RAE_GET_ENV),
+            LHelp::new(RAE_LAUNCH, DOC_RAE_LAUNCH),
+            LHelp::new(RAE_GET_STATE, DOC_RAE_GET_STATE),
+            LHelp::new(RAE_GET_STATUS, DOC_RAE_GET_STATUS),
+            LHelp::new_verbose(
+                RAE_DEF_STATE_FUNCTION,
+                DOC_DEF_STATE_FUNCTION,
+                DOC_DEF_STATE_FUNCTION_VERBOSE,
+            ),
+            LHelp::new_verbose(RAE_DEF_ACTION, DOC_DEF_ACTION, DOC_DEF_ACTION_VERBOSE),
+            LHelp::new_verbose(RAE_DEF_TASK, DOC_DEF_TASK, DOC_DEF_TASK_VERBOSE),
+            LHelp::new_verbose(RAE_DEF_METHOD, DOC_DEF_METHOD, DOC_DEF_METHOD_VERBOSE),
+            LHelp::new(RAE_DEF_LAMBDA, DOC_DEF_LAMBDA),
+            LHelp::new(RAE_DEF_INITIAL_STATE, DOC_DEF_INITIAL_STATE),
+        ]
     }
 }
 
@@ -134,6 +179,7 @@ pub fn get_state_function(_: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LVa
         .unwrap())
 }
 
+/// Returns a map method: parameters
 pub fn get_methods_parameters(_: &[LValue], _: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
     Ok(ctx
         .env
@@ -142,10 +188,38 @@ pub fn get_methods_parameters(_: &[LValue], _: &LEnv, ctx: &CtxRae) -> Result<LV
         .unwrap())
 }
 
-pub fn get_symbol_type(_: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
-    Ok(ctx.env.domain_env.get_symbol(RAE_SYMBOL_TYPE).unwrap())
+/// Returns the map of symbol: type or the type of the symbol in args.
+pub fn get_symbol_type(args: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
+    match args.len() {
+        0 => Ok(ctx.env.domain_env.get_symbol(RAE_SYMBOL_TYPE).unwrap()),
+        1 => {
+            if let LValue::Symbol(_) = &args[0] {
+                let map: im::HashMap<LValue, LValue> = ctx
+                    .env
+                    .domain_env
+                    .get_symbol(RAE_SYMBOL_TYPE)
+                    .unwrap()
+                    .try_into()?;
+                Ok(map.get(&args[0]).unwrap_or(&LValue::Nil).clone())
+            } else {
+                Err(WrongType(
+                    RAE_GET_SYMBOL_TYPE,
+                    args[0].clone(),
+                    args[0].clone().into(),
+                    NameTypeLValue::Symbol,
+                ))
+            }
+        }
+        _ => Err(WrongNumberOfArgument(
+            RAE_GET_SYMBOL_TYPE,
+            args.into(),
+            args.len(),
+            0..1,
+        )),
+    }
 }
 
+/// Returns the whole RAE environment if no arg et the entry corresponding to the symbol passed in args.
 pub fn get_env(args: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
     let key = match args.len() {
         0 => None,
@@ -174,6 +248,7 @@ pub fn get_env(args: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LEr
     Ok(LValue::String(ctx.env.pretty_debug(key)))
 }
 
+/// Defines a lambda in RAE environment.
 pub fn def_lambda(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
     //println!("def_lambda");
     if args.len() != 1 {
@@ -199,6 +274,7 @@ pub fn def_lambda(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValu
     //println!("result: {:?}", result);
 }
 
+/// Defines a state function in RAE environment.
 pub fn def_state_function(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
     if args.is_empty() {
         return Err(WrongNumberOfArgument(
@@ -252,6 +328,7 @@ pub fn def_state_function(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Resu
     Ok(Nil)
 }
 
+/// Defines an action in RAE environment.
 pub fn def_action(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
     if args.is_empty() {
         return Err(WrongNumberOfArgument(
@@ -305,6 +382,7 @@ pub fn def_action(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValu
     Ok(Nil)
 }
 
+/// Defines a method in RAE environment.
 pub fn def_method(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
     if args.is_empty() {
         return Err(WrongNumberOfArgument(
@@ -370,6 +448,7 @@ pub fn def_method(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValu
     Ok(Nil)
 }
 
+/// Defines a method parameter in RAE environment.
 pub fn def_method_parameters(
     args: &[LValue],
     env: &LEnv,
@@ -525,6 +604,7 @@ pub fn def_initial_state(args: &[LValue], _: &LEnv, ctx: &mut CtxRae) -> Result<
     Ok(Nil)
 }
 
+/// Returns all the status of the actions pretty printed
 pub fn get_status(_: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
     let status = ctx.env.actions_progress.status.read().unwrap().clone();
     let mut string = "Actions Status:\n".to_string();
@@ -535,6 +615,7 @@ pub fn get_status(_: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LEr
     Ok(string.into())
 }
 
+/// Returns the whole state if no args, or specific part of it ('static', 'dynamic', 'inner world')
 pub fn get_state(args: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
     let _type = match args.len() {
         0 => None,
@@ -577,9 +658,7 @@ pub fn get_state(args: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, L
     Ok(state.into_map())
 }
 
-/*
-launch the main in a thread
- */
+/// Launch main loop of rae in an other asynchronous task.
 pub fn launch_rae(_: &[LValue], _env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
     let options = SelectOption::new(0, 0);
     let rae_env = RAEEnv {

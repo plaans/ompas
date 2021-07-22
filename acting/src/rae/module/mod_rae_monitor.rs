@@ -16,8 +16,10 @@ pub struct CtxRaeMonitor {
 pub const RAE_TRIGGER_EVENT: &str = "rae-trigger-event";
 pub const RAE_TRIGGER_TASK: &str = "rae-trigger-task";
 
-pub const DOC_RAE_TRIGGER_EVENT: &str = "todo!";
-pub const DOC_RAE_TRIGGER_TASK: &str = "todo!";
+pub const DOC_RAE_TRIGGER_EVENT: &str = "Sends to RAE an event to handle";
+pub const DOC_RAE_TRIGGER_EVENT_VERBOSE: &str = "";
+pub const DOC_RAE_TRIGGER_TASK: &str = "Sends to RAE a task to execute";
+pub const DOC_RAE_TRIGGER_TASK_VERBOSE: &str = "Example: (rae-trigger-task t_dumber robot0)";
 
 impl GetModule for CtxRaeMonitor {
     fn get_module(self) -> Module {
@@ -38,20 +40,29 @@ impl GetModule for CtxRaeMonitor {
 impl Documentation for CtxRaeMonitor {
     fn documentation() -> Vec<LHelp> {
         vec![
-            LHelp::new(RAE_TRIGGER_TASK, DOC_RAE_TRIGGER_TASK, None),
-            LHelp::new(RAE_TRIGGER_EVENT, DOC_RAE_TRIGGER_EVENT, None),
+            LHelp::new_verbose(
+                RAE_TRIGGER_TASK,
+                DOC_RAE_TRIGGER_TASK,
+                DOC_RAE_TRIGGER_EVENT_VERBOSE,
+            ),
+            LHelp::new_verbose(
+                RAE_TRIGGER_EVENT,
+                DOC_RAE_TRIGGER_EVENT,
+                DOC_RAE_TRIGGER_TASK_VERBOSE,
+            ),
         ]
     }
 }
 
-//Add an event to the stream of RAE
-//access asynchronously to the stream
+/// Add an event to the stream of RAE
+/// access asynchronously to the stream
 pub fn trigger_event(_: &[LValue], _env: &LEnv, _: &CtxRaeMonitor) -> Result<LValue, LError> {
     Ok(LValue::String(
         "trigger event not yet implemented".to_string(),
     ))
 }
 
+/// Sends via a channel a task to execute.
 pub fn trigger_task(args: &[LValue], _env: &LEnv, ctx: &CtxRaeMonitor) -> Result<LValue, LError> {
     let job = Job::new(args.into(), JobType::Task);
     let sender = ctx.sender_to_rae.clone().unwrap();

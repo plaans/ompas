@@ -17,6 +17,7 @@ use std::thread;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Sender;
 
+/// Struct used to bind RAE and Godot.
 #[derive(Default, Clone)]
 pub struct PlatformGodot {
     pub socket_info: SocketInfo,
@@ -40,11 +41,14 @@ impl PlatformGodot {
 }
 
 impl RAEInterface for PlatformGodot {
+    /// Initiliaze the godot platform of a the state (contains Arc to structs)
+    /// and ActionsProgress (contains also Arc to structs)
     fn init(&mut self, state: RAEState, status: ActionsProgress) {
         self.state = state;
         self.status = status;
     }
 
+    /// Executes a command on the platform. The command is sent via tcp.
     fn exec_command(&self, args: &[LValue], command_id: usize) -> Result<LValue, LError> {
         let gs = GodotMessageSerde {
             _type: GodotMessageType::RobotCommand,
@@ -94,6 +98,7 @@ impl RAEInterface for PlatformGodot {
         Ok(LValue::Nil)
     }
 
+    /// Sends to godot a cancel command.
     fn cancel_command(&self, args: &[LValue]) -> Result<LValue, LError> {
         if args.len() != 1 {
             return Err(WrongNumberOfArgument(
@@ -143,6 +148,7 @@ impl RAEInterface for PlatformGodot {
         Ok(LValue::Nil)
     }
 
+    /// Returns the state of godot. Arg is either 'static' or 'dynamic'
     fn get_state(&self, args: &[LValue]) -> Result<LValue, LError> {
         let _type = match args.len() {
             0 => None,
@@ -191,6 +197,8 @@ impl RAEInterface for PlatformGodot {
         Ok(result.into_map())
     }
 
+    /// Returns the value of a state variable.
+    /// args contains the key of the state variable.
     fn get_state_variable(&self, args: &[LValue]) -> Result<LValue, LError> {
         let key: LValue = args.into();
         let key: LValueS = key.into();
@@ -206,6 +214,7 @@ impl RAEInterface for PlatformGodot {
         Ok(value.into())
     }
 
+    /// Return the status of all the actions.
     fn get_status(&self, _: &[LValue]) -> Result<LValue, LError> {
         let status = self.status.status.read().unwrap().clone();
 
@@ -218,12 +227,14 @@ impl RAEInterface for PlatformGodot {
         Ok(LValue::String(string))
     }
 
+    /// Launch the platform godot and open the tcp communication
     fn launch_platform(&mut self, args: &[LValue]) -> Result<LValue, LError> {
         self.start_platform(&[])?;
         thread::sleep(time::Duration::from_millis(1000));
         self.open_com(args)
     }
 
+    /// Start the platform (start the godot process and launch the simulation)
     fn start_platform(&self, args: &[LValue]) -> Result<LValue, LError> {
         //TODO: handle child to handle clean kill of godot process
         let mut child = match args.len() {
@@ -273,6 +284,7 @@ impl RAEInterface for PlatformGodot {
         Ok(LValue::Nil)
     }
 
+    /// Open the tcp communication on the right address:port
     fn open_com(&mut self, args: &[LValue]) -> Result<LValue, LError> {
         let socket_addr: SocketAddr = match args.len() {
             0 => "127.0.0.1:10000".parse().unwrap(),
@@ -328,6 +340,7 @@ impl RAEInterface for PlatformGodot {
         Ok(LValue::Nil)
     }
 
+    /// Return the status of a specific action.
     fn get_action_status(&self, action_id: &usize) -> Status {
         //let status = self.status.clone();
         //let action_id = *action_id;
@@ -339,6 +352,8 @@ impl RAEInterface for PlatformGodot {
         todo!()
     }
 
+    /// Function returning the domain of the simulation.
+    /// The domain is hardcoded.
     fn domain(&self) -> &'static str {
         //GODOT_DOMAIN
         //TODO: choose a way to charge domain

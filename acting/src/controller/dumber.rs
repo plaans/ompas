@@ -1,3 +1,6 @@
+//! [Deprecated]
+//! Previous work to develop a dumb controller to test lisp integration
+
 use ompas_lisp::structs::{GetModule, Module};
 use ompas_modules::doc::{Documentation, LHelp};
 use std::sync::Arc;
@@ -37,6 +40,6 @@ impl GetModule for CtxDumber {
 
 impl Documentation for CtxDumber {
     fn documentation() -> Vec<LHelp> {
-        vec![LHelp::new(MOD_DUMBER, DOC_MOD_DUMBER, None)]
+        vec![LHelp::new(MOD_DUMBER, DOC_MOD_DUMBER)]
     }
 }

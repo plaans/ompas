@@ -36,6 +36,8 @@ pub enum RAEError {
 
 const TOKIO_CHANNEL_SIZE: usize = 65_536; //=2^16
 
+/// Main RAE Loop:
+/// Receives Job to handle in separate tasks.
 pub async fn rae_run(mut context: RAEEnv, _select_option: &SelectOption, _log: String) {
     //println!("in rae run!");
     //infinite loop

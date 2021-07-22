@@ -171,13 +171,12 @@ impl Display for JobType {
 }
 pub type JobId = usize;
 
+/// Trait that a platform needs to implement to be able to be used as execution platform in RAE.
 pub trait RAEInterface: Any + Send + Sync {
-    ///Execute a command on the platform
-    ///TODO: Store the command id in the args?
-    ///
-
+    /// Initial what needs to be.
     fn init(&mut self, state: RAEState, status: ActionsProgress);
 
+    /// Executes a command on the platform
     fn exec_command(&self, args: &[LValue], command_id: usize) -> Result<LValue, LError>;
 
     fn cancel_command(&self, args: &[LValue]) -> Result<LValue, LError>;
@@ -191,16 +190,22 @@ pub trait RAEInterface: Any + Send + Sync {
     ///Return the status of all the actions
     fn get_status(&self, args: &[LValue]) -> Result<LValue, LError>;
 
-    ///Launch the platform (such as the simulation in godot)
+    ///Launch the platform (such as the simulation in godot) and open communication
     fn launch_platform(&mut self, args: &[LValue]) -> Result<LValue, LError>;
 
+    /// Start the platform process
     fn start_platform(&self, args: &[LValue]) -> Result<LValue, LError>;
 
+    /// Open communication with the platform
     fn open_com(&mut self, args: &[LValue]) -> Result<LValue, LError>;
 
+    /// Returns the status of a given action
     fn get_action_status(&self, action_id: &usize) -> Status;
+
+    /// Set the status of a given action
     fn set_status(&self, action_id: usize, status: Status);
 
+    /// Returns the RAE domain of the platform.
     fn domain(&self) -> &'static str;
 }
 

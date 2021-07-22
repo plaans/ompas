@@ -1,12 +1,12 @@
 //! Module to add an help module to the project.
 //! It provides a struct for the help in Scheme
 
-use im::HashMap;
 use ompas_lisp::core::LEnv;
 use ompas_lisp::language::doc::*;
 use ompas_lisp::language::scheme_primitives::*;
 use ompas_lisp::structs::LError::{WrongNumberOfArgument, WrongType};
 use ompas_lisp::structs::{GetModule, LError, LValue, Module, NameTypeLValue};
+use std::collections::BTreeMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 
@@ -30,7 +30,9 @@ const DOC_HELP_VERBOSE: &str = "takes 0..1 arguments:\
 /// Context of the module doc.
 /// Store the help objects.
 pub struct CtxDoc {
-    map_help: HashMap<String, LHelp>,
+    map_help: BTreeMap<String, LHelp>,
+    //BTreeMap is preferred to a simple HashMap, because entries will be ordered, and it will be easier to debug.
+    //map_help: HashMap<String, LHelp>,
 }
 
 impl Default for CtxDoc {
@@ -64,58 +66,58 @@ impl Documentation for CtxDoc {
     /// - help
     fn documentation() -> Vec<LHelp> {
         vec![
-            LHelp::new(MOD_HELP, DOC_MOD_HELP, Some(DOC_MOD_HELP_VERBOSE)),
-            LHelp::new(HELP, DOC_HELP, Some(DOC_HELP_VERBOSE)),
-            LHelp::new(DEFINE, DOC_DEFINE, None),
-            LHelp::new(LAMBDA, DOC_LAMBDA, Some(DOC_LAMBDA_VEBROSE)),
-            LHelp::new(DEF_MACRO, DOC_DEF_MACRO, None),
-            LHelp::new(IF, DOC_IF, None),
-            LHelp::new(QUOTE, DOC_QUOTE, None),
-            LHelp::new(QUASI_QUOTE, QUASI_QUOTE, None),
-            LHelp::new(UNQUOTE, DOC_UNQUOTE, None),
-            LHelp::new(SET, DOC_SET, None),
-            LHelp::new(BEGIN, DOC_BEGIN, Some(DOC_BEGIN_VERBOSE)),
-            LHelp::new(LIST, DOC_LIST, None),
-            LHelp::new(MAP, DOC_MAP, Some(DOC_MAP_VERBOSE)),
-            LHelp::new(GET, DOC_GET, None),
-            LHelp::new(CAR, DOC_CAR, None),
-            LHelp::new(CDR, DOC_CDR, None),
-            LHelp::new(APPEND, DOC_APPEND, None),
-            LHelp::new(MEMBER, DOC_MEMBER, None),
-            LHelp::new(LAST, DOC_LAST, None),
-            LHelp::new(EMPTY, DOC_EMPTY, None),
-            LHelp::new(LEN, DOC_LEN, None),
-            LHelp::new(REVERSE, DOC_REVERSE, None),
-            LHelp::new(CONS, DOC_CONS, None),
-            LHelp::new(GET_MAP, DOC_GET_MAP, Some(DOC_GET_MAP_VERBOSE)),
-            LHelp::new(SET_MAP, DOC_SET_MAP, Some(DOC_SET_MAP_VERBOSE)),
-            LHelp::new(ADD, DOC_ADD, None),
-            LHelp::new(SUB, DOC_SUB, None),
-            LHelp::new(MUL, DOC_MUL, None),
-            LHelp::new(DIV, DOC_DIV, None),
-            LHelp::new(GT, DOC_GT, None),
-            LHelp::new(GE, DOC_GE, None),
-            LHelp::new(LT, DOC_LT, None),
-            LHelp::new(LE, DOC_LE, None),
-            LHelp::new(EQ, DOC_EQ, None),
-            LHelp::new(IS_NIL, DOC_IS_NIL, None),
-            LHelp::new(IS_NUMBER, DOC_IS_NUMBER, None),
-            LHelp::new(IS_BOOL, DOC_IS_BOOL, None),
-            LHelp::new(IS_SYMBOL, DOC_IS_SYMBOL, None),
-            LHelp::new(IS_FN, DOC_IS_FN, None),
-            LHelp::new(IS_MUT_FN, DOC_IS_MUT_FN, None),
-            LHelp::new(IS_MAP, DOC_IS_MAP, None),
-            LHelp::new(IS_LIST, DOC_IS_LIST, None),
-            LHelp::new(IS_LAMBDA, DOC_IS_LAMBDA, None),
-            LHelp::new(IS_QUOTE, DOC_IS_QUOTE, None),
-            LHelp::new(IS_PAIR, DOC_IS_PAIR, None),
-            LHelp::new(IS_EQUAL, DOC_IS_EQUAL, None),
-            LHelp::new(AWAIT, DOC_AWAIT, None),
-            LHelp::new(ASYNC, DOC_ASYNC, None),
-            LHelp::new(EVAL, DOC_EVAL, None),
-            LHelp::new(LET, DOC_LET, None),
-            LHelp::new(LET_STAR, DOC_LET_STAR, None),
-            LHelp::new(MACRO_EXPAND, DOC_MACRO_EXPAND, None),
+            LHelp::new_verbose(MOD_HELP, DOC_MOD_HELP, DOC_MOD_HELP_VERBOSE),
+            LHelp::new_verbose(HELP, DOC_HELP, DOC_HELP_VERBOSE),
+            LHelp::new(DEFINE, DOC_DEFINE),
+            LHelp::new_verbose(LAMBDA, DOC_LAMBDA, DOC_LAMBDA_VEBROSE),
+            LHelp::new(DEF_MACRO, DOC_DEF_MACRO),
+            LHelp::new(IF, DOC_IF),
+            LHelp::new(QUOTE, DOC_QUOTE),
+            LHelp::new(QUASI_QUOTE, QUASI_QUOTE),
+            LHelp::new(UNQUOTE, DOC_UNQUOTE),
+            LHelp::new(SET, DOC_SET),
+            LHelp::new_verbose(BEGIN, DOC_BEGIN, DOC_BEGIN_VERBOSE),
+            LHelp::new(LIST, DOC_LIST),
+            LHelp::new_verbose(MAP, DOC_MAP, DOC_MAP_VERBOSE),
+            LHelp::new(GET, DOC_GET),
+            LHelp::new(CAR, DOC_CAR),
+            LHelp::new(CDR, DOC_CDR),
+            LHelp::new(APPEND, DOC_APPEND),
+            LHelp::new(MEMBER, DOC_MEMBER),
+            LHelp::new(LAST, DOC_LAST),
+            LHelp::new(EMPTY, DOC_EMPTY),
+            LHelp::new(LEN, DOC_LEN),
+            LHelp::new(REVERSE, DOC_REVERSE),
+            LHelp::new(CONS, DOC_CONS),
+            LHelp::new_verbose(GET_MAP, DOC_GET_MAP, DOC_GET_MAP_VERBOSE),
+            LHelp::new_verbose(SET_MAP, DOC_SET_MAP, DOC_SET_MAP_VERBOSE),
+            LHelp::new(ADD, DOC_ADD),
+            LHelp::new(SUB, DOC_SUB),
+            LHelp::new(MUL, DOC_MUL),
+            LHelp::new(DIV, DOC_DIV),
+            LHelp::new(GT, DOC_GT),
+            LHelp::new(GE, DOC_GE),
+            LHelp::new(LT, DOC_LT),
+            LHelp::new(LE, DOC_LE),
+            LHelp::new(EQ, DOC_EQ),
+            LHelp::new(IS_NIL, DOC_IS_NIL),
+            LHelp::new(IS_NUMBER, DOC_IS_NUMBER),
+            LHelp::new(IS_BOOL, DOC_IS_BOOL),
+            LHelp::new(IS_SYMBOL, DOC_IS_SYMBOL),
+            LHelp::new(IS_FN, DOC_IS_FN),
+            LHelp::new(IS_MUT_FN, DOC_IS_MUT_FN),
+            LHelp::new(IS_MAP, DOC_IS_MAP),
+            LHelp::new(IS_LIST, DOC_IS_LIST),
+            LHelp::new(IS_LAMBDA, DOC_IS_LAMBDA),
+            LHelp::new(IS_QUOTE, DOC_IS_QUOTE),
+            LHelp::new(IS_PAIR, DOC_IS_PAIR),
+            LHelp::new(IS_EQUAL, DOC_IS_EQUAL),
+            LHelp::new(AWAIT, DOC_AWAIT),
+            LHelp::new(ASYNC, DOC_ASYNC),
+            LHelp::new(EVAL, DOC_EVAL),
+            LHelp::new(LET, DOC_LET),
+            LHelp::new(LET_STAR, DOC_LET_STAR),
+            LHelp::new(MACRO_EXPAND, DOC_MACRO_EXPAND),
         ]
     }
 }
@@ -160,11 +162,19 @@ pub struct LHelp {
 }
 
 impl LHelp {
-    pub fn new(label: &'static str, short: &'static str, verbose: Option<&'static str>) -> LHelp {
+    pub fn new(label: &'static str, short: &'static str) -> LHelp {
         LHelp {
             label,
             short,
-            verbose,
+            verbose: None,
+        }
+    }
+
+    pub fn new_verbose(label: &'static str, short: &'static str, verbose: &'static str) -> LHelp {
+        LHelp {
+            label,
+            short,
+            verbose: Some(verbose),
         }
     }
 }

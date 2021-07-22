@@ -7,7 +7,9 @@ use tokio::sync::mpsc::{Receiver, Sender};
 //use ompas_modules::robot::CtxRobot;
 use ompas_acting::controller::dumber::CtxDumber;
 use ompas_acting::rae::module::init_ctx_rae;
+use ompas_acting::rae::module::mod_rae::CtxRae;
 use ompas_acting::rae::module::mod_rae_exec::CtxRaeExec;
+use ompas_acting::rae::module::mod_rae_monitor::CtxRaeMonitor;
 use ompas_godot_simulation_client::mod_godot::CtxGodot;
 use ompas_godot_simulation_client::rae_interface::PlatformGodot;
 use ompas_lisp::core::*;
@@ -77,22 +79,19 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     let mut ctx_doc = CtxDoc::default();
     let mut ctx_io = CtxIo::default();
     let ctx_math = CtxMath::default();
-    //let ctx_robot = CtxRobot::default();
     let ctx_type = CtxType::default();
     let ctx_counter = CtxCounter::default();
-    let ctx_dumber = CtxDumber::default();
     let _ctx_godot = CtxGodot::default();
     let ctx_utils = CtxUtils::default();
     let (ctx_rae, ctx_rae_monitor) = init_ctx_rae(Box::new(PlatformGodot::default()));
     //Insert the doc for the different contexts.
     ctx_doc.insert_doc(CtxIo::documentation());
     ctx_doc.insert_doc(CtxMath::documentation());
-    //ctx_doc.insert_doc(CtxRobot::documentation());
     ctx_doc.insert_doc(CtxType::documentation());
-    ctx_doc.insert_doc(CtxGodot::documentation());
     ctx_doc.insert_doc(CtxDumber::documentation());
-    //ctx_doc.insert_doc(CtxRae::documentation());
-    //ctx_doc.insert_doc(CtxRaeMonitor::documentation());
+    ctx_doc.insert_doc(CtxRae::documentation());
+    ctx_doc.insert_doc(CtxRaeMonitor::documentation());
+    ctx_doc.insert_doc(CtxUtils::documentation());
 
     //Add the sender of the channel.
     ctx_io.add_sender_li(sender_li.clone());
@@ -109,15 +108,12 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     load_module(&mut root_env, &mut ctxs, ctx_doc, &mut lisp_init);
     load_module(&mut root_env, &mut ctxs, ctx_io, &mut lisp_init);
     load_module(&mut root_env, &mut ctxs, ctx_math, &mut lisp_init);
-    //load_module(root_env, ctxs, ctx_robot,lisp_init);
-    load_module(&mut root_env, &mut ctxs, ctx_dumber, &mut lisp_init);
     load_module(&mut root_env, &mut ctxs, ctx_type, &mut lisp_init);
     load_module(&mut root_env, &mut ctxs, ctx_counter, &mut lisp_init);
-    //load_module(&mut root_env, &mut ctxs, ctx_godot, &mut lisp_init);
     load_module(&mut root_env, &mut ctxs, ctx_rae, &mut lisp_init);
     load_module(&mut root_env, &mut ctxs, ctx_rae_monitor, &mut lisp_init);
     load_module(&mut root_env, &mut ctxs, ctx_utils, &mut lisp_init);
-    //load_module(&mut root_env, &mut ctxs, ctx_rae_exec, &mut lisp_init);
+
     let env = &mut root_env.clone();
     //println!("{}", lisp_init.begin_lisp());
 

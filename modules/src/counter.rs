@@ -198,12 +198,12 @@ const DOC_DECREMENT_COUNTER: &str = "Decrement counter's value by one until it r
 impl Documentation for CtxCounter {
     fn documentation() -> Vec<LHelp> {
         vec![
-            LHelp::new(MOD_COUNTER, DOC_MOD_COUNTER, None),
-            LHelp::new(GET_COUNTER, DOC_GET_COUNTER, None),
-            LHelp::new(SET_COUNTER, DOC_SET_COUNTER, Some(DOC_SET_COUNTER_VERBOSE)),
-            LHelp::new(NEW_COUNTER, DOC_NEW_COUNTER, Some(DOC_NEW_COUNTER_VERBOSE)),
-            LHelp::new(INCREMENT_COUNTER, DOC_INCREMENT_COUNTER, None),
-            LHelp::new(DECREMENT_COUNTER, DOC_DECREMENT_COUNTER, None),
+            LHelp::new(MOD_COUNTER, DOC_MOD_COUNTER),
+            LHelp::new(GET_COUNTER, DOC_GET_COUNTER),
+            LHelp::new_verbose(SET_COUNTER, DOC_SET_COUNTER, DOC_SET_COUNTER_VERBOSE),
+            LHelp::new_verbose(NEW_COUNTER, DOC_NEW_COUNTER, DOC_NEW_COUNTER_VERBOSE),
+            LHelp::new(INCREMENT_COUNTER, DOC_INCREMENT_COUNTER),
+            LHelp::new(DECREMENT_COUNTER, DOC_DECREMENT_COUNTER),
         ]
     }
 }

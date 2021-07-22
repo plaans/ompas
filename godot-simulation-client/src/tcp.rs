@@ -12,6 +12,7 @@ pub const BUFFER_SIZE: usize = 65_536; //65KB should be enough for the moment
 
 pub const TEST_TCP: &str = "test_tcp";
 
+/// Opens the tcp connection with godot
 pub async fn task_tcp_connection(
     socket_addr: &SocketAddr,
     receiver: Receiver<String>,
@@ -20,10 +21,13 @@ pub async fn task_tcp_connection(
 ) {
     let stream = TcpStream::connect(socket_addr).await.unwrap();
 
+    // splits the tcp connection into a read and write stream.
     let (rd, wr) = io::split(stream);
 
+    // Starts the task to read data from socket.
     tokio::spawn(async move { async_read_socket(rd, state, status).await });
 
+    // Starts the task that awaits on data from inner process, and sends it to godot via tcp.
     tokio::spawn(async move { async_send_socket(wr, receiver).await });
 }
 
@@ -55,6 +59,8 @@ async fn async_send_socket(mut stream: WriteHalf<TcpStream>, mut receiver: Recei
     }
 }
 
+/// converts a u32 into a array of u8.
+/// Used to send size of the data via tcp.
 fn u32_to_u8_array(x: u32) -> [u8; 4] {
     let b1: u8 = ((x >> 24) & 0xff) as u8;
     let b2: u8 = ((x >> 16) & 0xff) as u8;
@@ -175,12 +181,14 @@ async fn async_read_socket(stream: ReadHalf<TcpStream>, state: RAEState, status:
     }
 }
 
+/// Transforms slice of u8 (received characters) into a usize giving the size of the following message.
 pub fn read_size_from_buf(buf: &[u8]) -> usize {
     let mut size = [0; 4];
     size.clone_from_slice(&buf[0..4]);
     u32::from_le_bytes(size) as usize
 }
 
+/// Reads the number of character from a slice.
 pub fn read_msg_from_buf(buf: &[u8], size: usize) -> String {
     String::from_utf8_lossy(&buf[0..size]).to_string()
 }

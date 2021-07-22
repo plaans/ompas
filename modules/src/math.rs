@@ -66,18 +66,18 @@ impl GetModule for CtxMath {
 impl Documentation for CtxMath {
     fn documentation() -> Vec<LHelp> {
         vec![
-            LHelp::new(MOD_MATH, DOC_MOD_MATH, Some(DOC_MOD_MATH_VERBOSE)),
-            LHelp::new(SIN, DOC_SIN, None),
-            LHelp::new(COS, DOC_COS, None),
-            LHelp::new(
+            LHelp::new_verbose(MOD_MATH, DOC_MOD_MATH, DOC_MOD_MATH_VERBOSE),
+            LHelp::new(SIN, DOC_SIN),
+            LHelp::new(COS, DOC_COS),
+            LHelp::new_verbose(
                 RAND_INT_IN_RANGE,
                 DOC_RAND_INT_IN_RANGE,
-                Some(DOC_RAND_INT_IN_RANGE_VERBOSE),
+                DOC_RAND_INT_IN_RANGE_VERBOSE,
             ),
-            LHelp::new(
+            LHelp::new_verbose(
                 RAND_FLOAT_IN_RANGE,
                 DOC_RAND_FLOAT_IN_RANGE,
-                Some(DOC_RAND_FLOAT_IN_RANGE_VERBOSE),
+                DOC_RAND_FLOAT_IN_RANGE_VERBOSE,
             ),
         ]
     }

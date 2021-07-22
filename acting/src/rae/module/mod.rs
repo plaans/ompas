@@ -17,6 +17,8 @@ pub mod mod_rae;
 pub mod mod_rae_exec;
 pub mod mod_rae_monitor;
 
+/// Initialize the libraries to load inside Scheme env.
+/// Takes as argument the execution platform.
 pub fn init_ctx_rae(mut platform: Box<dyn RAEInterface>) -> (CtxRae, CtxRaeMonitor) {
     //println!("in init ctx_rae");
 

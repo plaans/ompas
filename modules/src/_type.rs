@@ -367,19 +367,19 @@ const DOC_NEW_OBJECT_VERBOSE: &str = "Takes one argument that is the type of the
 impl Documentation for CtxType {
     fn documentation() -> Vec<LHelp> {
         vec![
-            LHelp::new(MOD_TYPE, DOC_MOD_TYPE, None),
-            LHelp::new(IS_STATE_FUNCTION, DOC_IS_STATE_FUNCTION, None),
-            LHelp::new(IS_OBJECT, DOC_IS_OBJECT, None),
-            LHelp::new(IS_TYPE, DOC_IS_TYPE, None),
-            LHelp::new(GET_TYPE, DOC_GET_TYPE, None),
-            LHelp::new(TYPE_OF, DOC_TYPE_OF, None),
-            LHelp::new(SUB_TYPE, DOC_SUB_TYPE, Some(DOC_SUB_TYPE_VERBOSE)),
-            LHelp::new(
+            LHelp::new(MOD_TYPE, DOC_MOD_TYPE),
+            LHelp::new(IS_STATE_FUNCTION, DOC_IS_STATE_FUNCTION),
+            LHelp::new(IS_OBJECT, DOC_IS_OBJECT),
+            LHelp::new(IS_TYPE, DOC_IS_TYPE),
+            LHelp::new(GET_TYPE, DOC_GET_TYPE),
+            LHelp::new(TYPE_OF, DOC_TYPE_OF),
+            LHelp::new_verbose(SUB_TYPE, DOC_SUB_TYPE, DOC_SUB_TYPE_VERBOSE),
+            LHelp::new_verbose(
                 NEW_STATE_FUNCTION,
                 DOC_NEW_STATE_FUNCTION,
-                Some(DOC_NEW_STATE_FUNCTION_VERBOSE),
+                DOC_NEW_STATE_FUNCTION_VERBOSE,
             ),
-            LHelp::new(NEW_OBJECT, DOC_NEW_OBJECT, Some(DOC_NEW_OBJECT_VERBOSE)),
+            LHelp::new_verbose(NEW_OBJECT, DOC_NEW_OBJECT, DOC_NEW_OBJECT_VERBOSE),
         ]
     }
 }

@@ -368,113 +368,105 @@ impl GetModule for CtxGodot {
 impl Documentation for CtxGodot {
     fn documentation() -> Vec<LHelp> {
         vec![
-            LHelp::new(MOD_GODOT, DOC_MOD_GODOT, Some(DOC_MOD_GODOT_VERBOSE)),
-            LHelp::new(OPEN_COM, DOC_OPEN_COM, Some(DOC_OPEN_COM_VERBOSE)),
-            LHelp::new(START_GODOT, DOC_LAUNCH_GODOT, None),
-            LHelp::new(EXEC_GODOT, DOC_EXEC_GODOT, Some(DOC_EXEC_GODOT_VERBOSE)),
+            LHelp::new_verbose(MOD_GODOT, DOC_MOD_GODOT, DOC_MOD_GODOT_VERBOSE),
+            LHelp::new_verbose(OPEN_COM, DOC_OPEN_COM, DOC_OPEN_COM_VERBOSE),
+            LHelp::new(START_GODOT, DOC_LAUNCH_GODOT),
+            LHelp::new_verbose(EXEC_GODOT, DOC_EXEC_GODOT, DOC_EXEC_GODOT_VERBOSE),
             //Add doc for state functions
-            LHelp::new(
+            LHelp::new_verbose(
                 SF_ROBOT_BATTERY,
                 DOC_SF_ROBOT_BATTERY,
-                Some(DOC_SF_ROBOT_BATTERY_VERBOSE),
+                DOC_SF_ROBOT_BATTERY_VERBOSE,
             ),
-            LHelp::new(
+            LHelp::new_verbose(
                 SF_ROBOT_COORDINATES,
                 DOC_SF_COORDINATES,
-                Some(DOC_SF_ROBOT_COORDINATES_VERBOSE),
+                DOC_SF_ROBOT_COORDINATES_VERBOSE,
             ),
-            LHelp::new(
+            LHelp::new_verbose(
                 SF_ROBOT_IN_INTERACT_AREAS,
                 DOC_SF_ROBOT_IN_INTERACT_AREAS,
-                Some(DOC_SF_ROBOT_IN_INTERACT_AREAS_VERBOSE),
+                DOC_SF_ROBOT_IN_INTERACT_AREAS_VERBOSE,
             ),
-            LHelp::new(
+            LHelp::new_verbose(
                 SF_ROBOT_IN_STATION,
                 DOC_SF_ROBOT_IN_STATION,
-                Some(DOC_SF_ROBOT_IN_STATION_VERBOSE),
+                DOC_SF_ROBOT_IN_STATION_VERBOSE,
             ),
-            LHelp::new(
+            LHelp::new_verbose(
                 SF_ROBOT_ROTATION,
                 DOC_SF_ROBOT_ROTATION,
-                Some(DOC_SF_ROBOT_ROTATION_VERBOSE),
+                DOC_SF_ROBOT_ROTATION_VERBOSE,
             ),
-            LHelp::new(
+            LHelp::new_verbose(
                 SF_ROBOT_ROTATION_SPEED,
                 DOC_SF_ROBOT_ROTATION_SPEED,
-                Some(DOC_SF_ROBOT_ROTATION_SPEED_VERBOSE),
+                DOC_SF_ROBOT_ROTATION_SPEED_VERBOSE,
             ),
-            LHelp::new(
+            LHelp::new_verbose(
                 SF_ROBOT_VELOCITY,
                 DOC_SF_ROBOT_VELOCITY,
-                Some(DOC_SF_ROBOT_VELOCITY_VERBOSE),
+                DOC_SF_ROBOT_VELOCITY_VERBOSE,
             ),
-            LHelp::new(SF_MACHINE_COORDINATES, DOC_SF_MACHINE_COORDINATES, None),
-            LHelp::new(
-                SF_MACHINE_COORDINATES_TILE,
-                DOC_SF_MACHINE_COORDINATES_TILE,
-                None,
-            ),
-            LHelp::new(
+            LHelp::new(SF_MACHINE_COORDINATES, DOC_SF_MACHINE_COORDINATES),
+            LHelp::new(SF_MACHINE_COORDINATES_TILE, DOC_SF_MACHINE_COORDINATES_TILE),
+            LHelp::new_verbose(
                 SF_MACHINE_INPUT_BELT,
                 DOC_SF_MACHINE_INPUT_BELT,
-                Some(DOC_SF_MACHINE_INPUT_BELT_VERBOSE),
+                DOC_SF_MACHINE_INPUT_BELT_VERBOSE,
             ),
-            LHelp::new(
+            LHelp::new_verbose(
                 SF_PACKAGE_LOCATION,
                 DOC_SF_PACKAGE_LOCATION,
-                Some(DOC_SF_PACKAGE_LOCATION_VERBOSE),
+                DOC_SF_PACKAGE_LOCATION_VERBOSE,
             ),
-            LHelp::new(
+            LHelp::new_verbose(
                 SF_BELT_PACKAGES_LIST,
                 DOC_SF_BELT_PACKAGES_LIST,
-                Some(DOC_SF_BELT_PACKAGES_LIST_VERBOSE),
+                DOC_SF_BELT_PACKAGES_LIST_VERBOSE,
             ),
-            LHelp::new(
+            LHelp::new_verbose(
                 SF_PACKAGE_PROCESSES_LIST,
                 DOC_SF_PACKAGE_PROCESSES_LIST,
-                Some(DOC_SF_PACKAGE_PROCESSES_LIST_VERBOSE),
+                DOC_SF_PACKAGE_PROCESSES_LIST_VERBOSE,
             ),
-            LHelp::new(
+            LHelp::new_verbose(
                 SF_MACHINE_OUTPUT_BELT,
                 DOC_SF_MACHINE_OUTPUT_BELT,
-                Some(DOC_SF_MACHINE_OUTPUT_BELT_VERBOSE),
+                DOC_SF_MACHINE_OUTPUT_BELT_VERBOSE,
             ),
-            LHelp::new(
+            LHelp::new_verbose(
                 SF_MACHINE_PROCESSES,
                 DOC_SF_MACHINE_PROCESSES,
-                Some(DOC_SF_MACHINE_PROCESSES_VERBOSE),
+                DOC_SF_MACHINE_PROCESSES_VERBOSE,
             ),
-            LHelp::new(
+            LHelp::new_verbose(
                 SF_MACHINE_PROGRESS_RATE,
                 DOC_SF_MACHINE_PROGRESS_RATE,
-                Some(DOC_SF_MACHINE_PROGRESS_RATE_VERBOSE),
+                DOC_SF_MACHINE_PROGRESS_RATE_VERBOSE,
             ),
-            LHelp::new(
+            LHelp::new_verbose(
                 SF_BELT_POLYGONS,
                 DOC_SF_BELT_POLYGONS,
-                Some(DOC_SF_BELT_POLYGONS_VERBOSE),
+                DOC_SF_BELT_POLYGONS_VERBOSE,
             ),
-            LHelp::new(
+            LHelp::new_verbose(
                 SF_BELT_BELT_TYPE,
                 DOC_SF_BELT_BELT_TYPE,
-                Some(DOC_SF_BELT_BELT_TYPE_VERBOSE),
+                DOC_SF_BELT_BELT_TYPE_VERBOSE,
             ),
-            LHelp::new(SF_BELT_CELLS, DOC_SF_BELT_CELLS, None),
-            LHelp::new(SF_BELT_INTERACT_AREAS, DOC_SF_BELT_INTERACT_AREAS, None),
-            LHelp::new(SF_INTERACT_AREA_BELT, DOC_SF_INTERACT_AREA_BELT, None),
-            LHelp::new(SF_INTERACT_AREA_CELLS, DOC_SF_INTERACT_AREA_CELLS, None),
-            LHelp::new(
-                SF_INTERACT_AREA_POLYGONS,
-                DOC_SF_INTERACT_AREA_POLYGONS,
-                None,
-            ),
-            LHelp::new(SF_PARKING_AREA_POLYGONS, DOC_SF_PARKING_AREA_POLYGONS, None),
-            LHelp::new(SF_PARKING_AREA_CELLS, DOC_SF_PARKING_AREA_CELLS, None),
-            LHelp::new(GET_STATE, DOC_GET_STATE, Some(DOC_GET_STATE_VERBOSE)),
-            LHelp::new(ACTION_DO_ROTATION, DOC_ACTION_DO_ROTATION, None),
-            LHelp::new(ACTION_NAVIGATE_TO, DOC_ACTION_NAVIGATE_TO, None),
-            LHelp::new(ACTION_PICK, DOC_ACTION_PICK, None),
-            LHelp::new(ACTION_PLACE, DOC_ACTION_PLACE, None),
+            LHelp::new(SF_BELT_CELLS, DOC_SF_BELT_CELLS),
+            LHelp::new(SF_BELT_INTERACT_AREAS, DOC_SF_BELT_INTERACT_AREAS),
+            LHelp::new(SF_INTERACT_AREA_BELT, DOC_SF_INTERACT_AREA_BELT),
+            LHelp::new(SF_INTERACT_AREA_CELLS, DOC_SF_INTERACT_AREA_CELLS),
+            LHelp::new(SF_INTERACT_AREA_POLYGONS, DOC_SF_INTERACT_AREA_POLYGONS),
+            LHelp::new(SF_PARKING_AREA_POLYGONS, DOC_SF_PARKING_AREA_POLYGONS),
+            LHelp::new(SF_PARKING_AREA_CELLS, DOC_SF_PARKING_AREA_CELLS),
+            LHelp::new_verbose(GET_STATE, DOC_GET_STATE, DOC_GET_STATE_VERBOSE),
+            LHelp::new(ACTION_DO_ROTATION, DOC_ACTION_DO_ROTATION),
+            LHelp::new(ACTION_NAVIGATE_TO, DOC_ACTION_NAVIGATE_TO),
+            LHelp::new(ACTION_PICK, DOC_ACTION_PICK),
+            LHelp::new(ACTION_PLACE, DOC_ACTION_PLACE),
         ]
     }
 }
@@ -483,10 +475,12 @@ impl Documentation for CtxGodot {
 Functions
  */
 
+/// Launch the godot process the simulation and opens the com
 fn launch_godot(args: &[LValue], _: &LEnv, ctx: &mut CtxGodot) -> Result<LValue, LError> {
     ctx.platform.launch_platform(args)
 }
 
+/// Opens the tcp communication to receive state and status update and send commands.
 fn open_com(args: &[LValue], _: &LEnv, ctx: &mut CtxGodot) -> Result<LValue, LError> {
     ctx.platform.open_com(args)
 }
@@ -503,11 +497,13 @@ fn start_godot(args: &[LValue], _: &LEnv, ctx: &CtxGodot) -> Result<LValue, LErr
 ///- Place : ['place', robot_name]
 ///- Rotation : ['do_rotation', robot_name, angle, speed]
 
+/// Sends a command to godot
 fn exec_godot(args: &[LValue], _: &LEnv, ctx: &CtxGodot) -> Result<LValue, LError> {
     let id = ctx.status.get_new_id();
     ctx.platform.exec_command(args, id)
 }
 
+/// Returns the whole state if no args and a particular entry corresponding to the arg.
 pub fn get_state(args: &[LValue], _: &LEnv, ctx: &CtxGodot) -> Result<LValue, LError> {
     ctx.platform.get_state(args)
 }

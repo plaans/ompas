@@ -1,6 +1,7 @@
 #![allow(deprecated)]
 use crate::structs::{LError, LValue};
 //use log::info;
+use crate::core::get_debug;
 use std::borrow::Borrow;
 use std::ops::Deref;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -46,7 +47,9 @@ impl TaskHandler {
     /// Declare a new task
     /// Returns the id of the task and the sender to the TaskHandler that will process the result.
     pub async fn declare_new_task(&self) -> (usize, mpsc::Sender<TaskResult>) {
-        println!("new task declared");
+        if get_debug() {
+            println!("new task declared");
+        }
         //println!("new task declared!");
         let id;
         loop {
@@ -68,18 +71,24 @@ impl TaskHandler {
     /// Returns an AwaitResponse.
     /// The Kind of AwaitResponse depends on the progress of the asynchronous evaluation.
     pub async fn get_response_await(&self, id: &usize) -> AwaitResponse {
-        println!("get response!");
+        if get_debug() {
+            println!("get response!");
+        }
         let clean: bool;
         let result = match self.map_result.lock().await.get(id).unwrap() {
             None => {
-                println!("result not yet available");
+                if get_debug() {
+                    println!("result not yet available");
+                }
                 clean = false;
                 let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
                 self.map_waiter.lock().await.insert(*id, Some(tx));
                 AwaitResponse::Receiver(rx)
             }
             Some(result) => {
-                println!("the result is already available");
+                if get_debug() {
+                    println!("the result is already available");
+                }
                 clean = true;
                 AwaitResponse::Result(result.clone())
             }
@@ -105,7 +114,9 @@ fn launch_task_handler() -> TaskHandler {
 }
 
 async fn task_watcher(task_handler: TaskHandler, mut receiver: mpsc::Receiver<TaskResult>) {
-    println!("Task watcher launched");
+    if get_debug() {
+        println!("Task watcher launched");
+    }
     loop {
         let clean: bool;
         let (id, result) = match receiver.recv().await {
@@ -115,7 +126,9 @@ async fn task_watcher(task_handler: TaskHandler, mut receiver: mpsc::Receiver<Ta
 
         match task_handler.map_waiter.lock().await.get(&id).unwrap() {
             None => {
-                println!("new result received and no waiter");
+                if get_debug() {
+                    println!("new result received and no waiter");
+                }
                 task_handler
                     .map_result
                     .lock()
@@ -124,7 +137,9 @@ async fn task_watcher(task_handler: TaskHandler, mut receiver: mpsc::Receiver<Ta
                 clean = false;
             }
             Some(sender) => {
-                println!("new result received and a waiter is waiting on the result");
+                if get_debug() {
+                    println!("new result received and a waiter is waiting on the result");
+                }
                 clean = true;
                 sender
                     .send(result)

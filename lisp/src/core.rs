@@ -236,6 +236,7 @@ impl GetModule for CtxRoot {
                 MACRO_LET_STAR,
                 MACRO_APPLY,
                 MACRO_COND,
+                MACRO_AWAIT_ASYNC,
                 LAMBDA_UNZIP,
                 LAMBDA_MAPF,
             ]
@@ -1021,8 +1022,14 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                                 .send((task_id, result))
                                 .await
                                 .expect("could not send result to task handler.");
+                            if get_debug() {
+                                println!("end of async")
+                            }
                         });
 
+                        if get_debug() {
+                            println!("task_id: {}", task_id);
+                        }
                         return Ok(task_id.into());
                     }
                     LCoreOperator::Await => {

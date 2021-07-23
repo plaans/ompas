@@ -152,7 +152,7 @@ pub mod scheme_macro {
                                                                 (unquote (cadar exprs)) \
                                                                 (cond (unquote (cdr exprs)))))))))";
 
-    pub const ASYNC_AWAIT: &str = "(defmacro await-async (lambda (x) `(await (async ,x))))";
+    pub const MACRO_AWAIT_ASYNC: &str = "(defmacro await-async (lambda (x) `(await (async ,x))))";
 }
 
 pub mod scheme_lambda {

@@ -19,6 +19,7 @@ use std::ops::Deref;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
+use std::time::Duration;
 
 lazy_static! {
     ///Global variable used to enable debug println.
@@ -1017,13 +1018,14 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                         let mut new_env = env.clone();
                         let mut ctxs = ctxs.clone();
                         tokio::spawn(async move {
+                            //tokio::time::sleep(Duration::from_millis(10)).await;
                             let result = eval(&lvalue, &mut new_env, &mut ctxs);
                             sender_result
                                 .send((task_id, result))
                                 .await
                                 .expect("could not send result to task handler.");
                             if get_debug() {
-                                println!("end of async")
+                                println!("async>>end")
                             }
                         });
 
@@ -1042,13 +1044,20 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                                 handle.block_on(async move {
                                     match async_await::current().get_response_await(&id).await {
                                         AwaitResponse::Result(result) => result,
-                                        AwaitResponse::Receiver(mut r) => r.recv().await.unwrap(),
+                                        AwaitResponse::Receiver(mut r) => {
+                                            if get_debug() {
+                                                println!("await>>waiting result on channel")
+                                            }
+                                            r.recv().await.unwrap()
+                                        }
                                     }
                                 })
                             })
                             .join()
                             .unwrap()?;
-
+                            if get_debug() {
+                                println!("await>> result received : {}", result);
+                            }
                             return Ok(result);
                         }
                     }

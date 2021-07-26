@@ -88,6 +88,7 @@ pub struct CtxRae {
 impl GetModule for CtxRae {
     fn get_module(self) -> Module {
         let domain = self.domain.clone();
+        //let domain = Default::default();
         let mut module = Module {
             ctx: Arc::new(self),
             prelude: vec![],
@@ -97,10 +98,6 @@ impl GetModule for CtxRae {
 
         module.add_mut_fn_prelude(RAE_LAUNCH, launch_rae);
 
-        /*module.add_mut_fn_prelude(RAE_ADD_ACTION, add_action);
-        module.add_mut_fn_prelude(RAE_ADD_STATE_FUNCTION, add_state_function);
-        module.add_mut_fn_prelude(RAE_ADD_TASK, add_task);
-        module.add_mut_fn_prelude(RAE_ADD_METHOD, add_method);*/
         module.add_fn_prelude(RAE_GET_METHODS, get_methods);
         module.add_fn_prelude(RAE_GET_STATE_FUNCTIONS, get_state_function);
         module.add_fn_prelude(RAE_GET_ACTIONS, get_actions);
@@ -120,6 +117,11 @@ impl GetModule for CtxRae {
         //functions to debug the functionnement of rae
         module.add_fn_prelude(RAE_GET_STATE, get_state);
         module.add_fn_prelude(RAE_GET_STATUS, get_status);
+
+        /*module.add_mut_fn_prelude(RAE_ADD_ACTION, add_action);
+        module.add_mut_fn_prelude(RAE_ADD_STATE_FUNCTION, add_state_function);
+        module.add_mut_fn_prelude(RAE_ADD_TASK, add_task);
+        module.add_mut_fn_prelude(RAE_ADD_METHOD, add_method);*/
 
         module
     }

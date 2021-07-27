@@ -449,11 +449,11 @@ pub fn parse(str: &str, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result<
 /// 'x => (quote x)
 /// `x => (qusiquote x)
 /// ,x => (unquote x)
-pub fn expand_quotting(args: Vec<LValue>) -> LValue {
-    let mut vec = args.clone();
+pub fn expand_quotting(mut vec: Vec<LValue>) -> LValue {
     let mut i_point = 0;
     while i_point < vec.len() {
-        for lv in &args[i_point..] {
+        let temp = vec.clone();
+        for lv in &temp[i_point..] {
             if let LValue::Symbol(s) = lv {
                 let first: char = s.chars().next().unwrap();
                 if s.len() == 1 {
@@ -472,7 +472,7 @@ pub fn expand_quotting(args: Vec<LValue>) -> LValue {
                         ]
                         .into();
                         vec[i_point] = new_lv;
-                        i_point += 1;
+                        i_point+=1;
                         break;
                     }
                 } else if s.starts_with(|c| c == '\'' || c == '`' || c == ',') {
@@ -820,10 +820,15 @@ pub fn expand(
                 }
             }
 
-            let expanded_list: Vec<LValue> = list
+            let mut expanded_list : Vec<LValue> = vec![];
+            for e in list {
+                expanded_list.push(expand(e, false, env,ctxs)?);
+            }
+
+            /*let expanded_list: Vec<LValue> = list
                 .iter()
                 .map(|x| expand(x, false, env, ctxs))
-                .collect::<Result<_, _>>()?;
+                .collect::<Result<_, _>>()?;*/
             Ok(expanded_list.into())
         }
         lv => Ok(lv.clone()),

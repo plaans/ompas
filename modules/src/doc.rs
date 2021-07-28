@@ -202,6 +202,7 @@ pub fn help(args: &[LValue], _: &LEnv, ctx: &CtxDoc) -> Result<LValue, LError> {
             LValue::Fn(fun) => Ok(LValue::String(ctx.get(&fun.get_label()))),
             LValue::MutFn(fun) => Ok(LValue::String(ctx.get(&fun.get_label()))),
             LValue::Symbol(s) => Ok(LValue::String(ctx.get(s))),
+            LValue::CoreOperator(co)=>Ok(LValue::String(ctx.get(&co.to_string()))),
             lv => Err(WrongType(
                 HELP,
                 lv.clone(),

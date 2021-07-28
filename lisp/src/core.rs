@@ -19,7 +19,6 @@ use std::ops::Deref;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
-use std::time::Duration;
 
 lazy_static! {
     ///Global variable used to enable debug println.
@@ -239,6 +238,7 @@ impl GetModule for CtxRoot {
                 MACRO_COND,
                 MACRO_AWAIT_ASYNC,
                 LAMBDA_UNZIP,
+                LAMBDA_ZIP,
                 LAMBDA_MAPF,
             ]
             .into(),

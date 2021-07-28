@@ -398,6 +398,7 @@ version = "0.1.0"
 dependencies = [
  "async-recursion",
  "im",
+ "log",
  "ompas_lisp",
  "ompas_modules",
  "ompas_utils",
@@ -493,6 +494,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "lazy_static 0.1.16",
+ "log",
  "tokio",
  "tokio-stream",
 ]

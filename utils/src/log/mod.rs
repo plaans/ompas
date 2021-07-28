@@ -21,43 +21,65 @@ use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
+use log::{Log, Metadata, Record, Level, LevelFilter, SetLoggerError};
 
 const RAE_LOG_IP_ADDR: &str = "127.0.0.1:10001";
 const TOKIO_CHANNEL_SIZE: usize = 16_384;
 pub const END_MSG: &str = "END";
-
-lazy_static! {
-    static ref LOGGER: Logger = init();
-}
 
 /// Struct to wrap a tokio::sync::mpsc tx channel
 pub struct Logger {
     tx: mpsc::Sender<String>,
 }
 
-impl Logger {}
+impl Logger {
+    fn new() -> Logger {
+        let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+
+        tokio::spawn(async move { run_logger_file(rx).await });
+        //tokio::spawn(async move { run_logger(rx).await });
+
+        Logger { tx }
+    }
+}
+
+impl Log for Logger {
+    fn enabled(&self, metadata: &Metadata) -> bool {
+        metadata.level() <= Level::Info
+    }
+
+    fn log(& self, record: &Record) {
+        if self.enabled(record.metadata()) {
+            let string = format!("{} - {}", record.level(), record.args());
+            let tx = self.tx.clone();
+            tokio::spawn(async move {
+                tx.send(string).await.expect("no sender to logger");
+            });
+        }
+    }
+
+    fn flush(&self) {
+        todo!()
+    }
+}
 
 ///Send a msg to the Logger
 /// # Example
 /// ``` no_run
 /// ompas_utils::log::send("test".to_string());
 /// ```
-pub fn send(string: String) {
+/*fn send(string: String) {
     //println!("sending: {}", string);
     tokio::spawn(async move {
         LOGGER.tx.send(string).await.expect("no sender to logger");
     });
-}
+}*/
 
 /// Initiate new terminal and logger
 /// Build the global object
-fn init() -> Logger {
-    let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
-
-    tokio::spawn(async move { run_logger_file(rx).await });
-    //tokio::spawn(async move { run_logger(rx).await });
-
-    Logger { tx }
+pub fn init() -> Result<(), SetLoggerError> {
+    log::set_boxed_logger(Box::new(Logger::new()))
+        .map(|()| log::set_max_level(LevelFilter::Info))
 }
 
 /// Task that is running asynchronously

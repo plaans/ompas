@@ -4,7 +4,7 @@ use crate::structs::{LError, LValue};
 use crate::core::get_debug;
 use std::borrow::Borrow;
 use std::ops::Deref;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
 

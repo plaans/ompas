@@ -9,8 +9,7 @@ use tokio_stream::StreamExt;
 
 use crate::rae::context::{RAEEnv, SelectOption, RAE_TASK_METHODS_MAP};
 //use crate::rae::context::{Action, Method, SelectOption, Status, TaskId};
-use crate::rae::log::RAEStatus;
-use crate::rae::module::mod_rae_exec::Job;
+use crate::rae::module::mod_rae_exec::{Job, JobId};
 use crate::rae::refinement::{RefinementStack, StackFrame};
 use crate::rae::status::async_status_watcher_run;
 use ompas_lisp::async_await;
@@ -19,9 +18,8 @@ use ompas_lisp::core::{eval, ContextCollection, LEnv};
 use ompas_lisp::functions::cons;
 use ompas_lisp::structs::{LError, LValue};
 use std::mem;
-
+use log::{error, info, warn};
 pub mod context;
-pub mod log;
 pub mod module;
 pub mod refinement;
 pub mod state;
@@ -102,7 +100,7 @@ pub async fn rae_run(mut context: RAEEnv, _select_option: &SelectOption, _log: S
     //let result = eval(&vec![LValue::Symbol("rae-open-com-platform".to_string())].into(), &mut context.env, &mut context.ctxs);
     match result {
         Ok(_) => {} //println!("successfully open com with platform"),
-        Err(e) => ompas_utils::log::send(e.to_string()),
+        Err(e) => error!("{}", e),
     }
 
     loop {
@@ -112,7 +110,7 @@ pub async fn rae_run(mut context: RAEEnv, _select_option: &SelectOption, _log: S
             //println!("new job received: {}", job);
 
             let _job_id = &context.agenda.add_job(job.clone());
-            ompas_utils::log::send("new job received!".to_string());
+            log::info!("new job received!");
 
             let new_env = context.get_eval_env();
             let new_ctxs = context.ctxs.clone();
@@ -164,7 +162,7 @@ pub async fn rae_run(mut context: RAEEnv, _select_option: &SelectOption, _log: S
 }
 
 async fn progress_2(job_lvalue: LValue, mut env: LEnv, mut ctxs: ContextCollection) {
-    ompas_utils::log::send(format!("new triggered task: {}", job_lvalue));
+    info!("new triggered task: {}", job_lvalue);
     /*let task_methods_map = env.get_symbol(RAE_TASK_METHODS_MAP).unwrap();
     ompas_utils::log::send(format!(
         "task_methods_map before eval: {}\n",
@@ -174,8 +172,8 @@ async fn progress_2(job_lvalue: LValue, mut env: LEnv, mut ctxs: ContextCollecti
     ompas_utils::log::send(format!("env:\n{}", env));*/
     let job_lvalue = LValue::List(vec![job_lvalue]);
     match eval(&job_lvalue, &mut env, &mut ctxs) {
-        Ok(lv) => ompas_utils::log::send(format!("result of task {}: {}", job_lvalue, lv)),
-        Err(e) => ompas_utils::log::send(e.to_string()),
+        Ok(lv) => info!("result of task {}: {}", job_lvalue, lv),
+        Err(e) => error!("{}", e),
     }
 }
 
@@ -363,3 +361,8 @@ pub fn get_instantiated_methods() {
 
 ///Select the method that will be run in the RAE
 pub fn select_method() {}
+
+pub struct RAEStatus {
+    pub task: JobId,
+    pub msg: String,
+}

@@ -12,7 +12,6 @@ use ompas_lisp::structs::LError::*;
 use ompas_lisp::structs::LValue::*;
 use ompas_lisp::structs::*;
 use ompas_modules::doc::{Documentation, LHelp};
-use ompas_utils::log;
 use std::any::Any;
 use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
@@ -21,6 +20,7 @@ use std::sync::{Arc, PoisonError, RwLock, RwLockReadGuard};
 use std::thread;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::Mutex;
+use log::{error, warn,info};
 
 /*
 LANGUAGE
@@ -334,11 +334,11 @@ pub fn fn_await(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue
                                         //println!("running");
                                     }
                                     Status::Failure => {
-                                        log::send("command is a failure".to_string());
+                                        warn!("command is a failure");
                                         return Ok(false.into());
                                     }
                                     Status::Done => {
-                                        log::send("command is a success".to_string());
+                                        info!("command is a success");
                                         return Ok(true.into());
                                     }
                                 },

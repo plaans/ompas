@@ -20,7 +20,7 @@ checksum = "28b2cd92db5cbd74e8e5028f7e27dd7aa3090e89e4f2a197cc7c8dfb69c7063b"
 [[package]]
 name = "aries_backtrack"
 version = "0.1.0"
-source = "git+https://github.com/Yirmandias/aries/?branch=parse_quote#c48dbd75eda1ce3506488554427a5499a3e58538"
+source = "git+https://github.com/Yirmandias/aries/?branch=parse_string#84c8ab242d34eb0c30408da5c41710c52e3ac2a2"
 
 [[package]]
 name = "aries_backtrack"
@@ -30,7 +30,7 @@ source = "git+https://github.com/arbimo/aries/?rev=e220567#e220567a6d490cfee68eb
 [[package]]
 name = "aries_collections"
 version = "0.1.0"
-source = "git+https://github.com/Yirmandias/aries/?branch=parse_quote#c48dbd75eda1ce3506488554427a5499a3e58538"
+source = "git+https://github.com/Yirmandias/aries/?branch=parse_string#84c8ab242d34eb0c30408da5c41710c52e3ac2a2"
 dependencies = [
  "bit-set",
  "itertools",
@@ -50,12 +50,12 @@ dependencies = [
 [[package]]
 name = "aries_model"
 version = "0.1.0"
-source = "git+https://github.com/Yirmandias/aries/?branch=parse_quote#c48dbd75eda1ce3506488554427a5499a3e58538"
+source = "git+https://github.com/Yirmandias/aries/?branch=parse_string#84c8ab242d34eb0c30408da5c41710c52e3ac2a2"
 dependencies = [
  "anyhow",
- "aries_backtrack 0.1.0 (git+https://github.com/Yirmandias/aries/?branch=parse_quote)",
- "aries_collections 0.1.0 (git+https://github.com/Yirmandias/aries/?branch=parse_quote)",
- "aries_utils 0.1.0 (git+https://github.com/Yirmandias/aries/?branch=parse_quote)",
+ "aries_backtrack 0.1.0 (git+https://github.com/Yirmandias/aries/?branch=parse_string)",
+ "aries_collections 0.1.0 (git+https://github.com/Yirmandias/aries/?branch=parse_string)",
+ "aries_utils 0.1.0 (git+https://github.com/Yirmandias/aries/?branch=parse_string)",
  "streaming-iterator",
 ]
 
@@ -74,13 +74,13 @@ dependencies = [
 [[package]]
 name = "aries_planning"
 version = "0.1.0"
-source = "git+https://github.com/Yirmandias/aries/?branch=parse_quote#c48dbd75eda1ce3506488554427a5499a3e58538"
+source = "git+https://github.com/Yirmandias/aries/?branch=parse_string#84c8ab242d34eb0c30408da5c41710c52e3ac2a2"
 dependencies = [
  "anyhow",
- "aries_collections 0.1.0 (git+https://github.com/Yirmandias/aries/?branch=parse_quote)",
- "aries_model 0.1.0 (git+https://github.com/Yirmandias/aries/?branch=parse_quote)",
- "aries_utils 0.1.0 (git+https://github.com/Yirmandias/aries/?branch=parse_quote)",
- "env_param 0.1.0 (git+https://github.com/Yirmandias/aries/?branch=parse_quote)",
+ "aries_collections 0.1.0 (git+https://github.com/Yirmandias/aries/?branch=parse_string)",
+ "aries_model 0.1.0 (git+https://github.com/Yirmandias/aries/?branch=parse_string)",
+ "aries_utils 0.1.0 (git+https://github.com/Yirmandias/aries/?branch=parse_string)",
+ "env_param 0.1.0 (git+https://github.com/Yirmandias/aries/?branch=parse_string)",
  "fixedbitset",
  "itertools",
  "regex",
@@ -105,7 +105,7 @@ dependencies = [
 [[package]]
 name = "aries_utils"
 version = "0.1.0"
-source = "git+https://github.com/Yirmandias/aries/?branch=parse_quote#c48dbd75eda1ce3506488554427a5499a3e58538"
+source = "git+https://github.com/Yirmandias/aries/?branch=parse_string#84c8ab242d34eb0c30408da5c41710c52e3ac2a2"
 dependencies = [
  "itertools",
  "streaming-iterator",
@@ -245,7 +245,7 @@ checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
 [[package]]
 name = "env_param"
 version = "0.1.0"
-source = "git+https://github.com/Yirmandias/aries/?branch=parse_quote#c48dbd75eda1ce3506488554427a5499a3e58538"
+source = "git+https://github.com/Yirmandias/aries/?branch=parse_string#84c8ab242d34eb0c30408da5c41710c52e3ac2a2"
 dependencies = [
  "once_cell",
 ]
@@ -525,10 +525,10 @@ name = "ompas_lisp"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aries_collections 0.1.0 (git+https://github.com/Yirmandias/aries/?branch=parse_quote)",
- "aries_model 0.1.0 (git+https://github.com/Yirmandias/aries/?branch=parse_quote)",
- "aries_planning 0.1.0 (git+https://github.com/Yirmandias/aries/?branch=parse_quote)",
- "aries_utils 0.1.0 (git+https://github.com/Yirmandias/aries/?branch=parse_quote)",
+ "aries_collections 0.1.0 (git+https://github.com/Yirmandias/aries/?branch=parse_string)",
+ "aries_model 0.1.0 (git+https://github.com/Yirmandias/aries/?branch=parse_string)",
+ "aries_planning 0.1.0 (git+https://github.com/Yirmandias/aries/?branch=parse_string)",
+ "aries_utils 0.1.0 (git+https://github.com/Yirmandias/aries/?branch=parse_string)",
  "im",
  "lazy_static 0.1.16",
  "rustyline",

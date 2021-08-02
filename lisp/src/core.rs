@@ -518,7 +518,13 @@ pub fn parse_into_lvalue(se: &SExpr) -> LValue {
                             //println!("atom is boolean false");
                             LValue::Nil
                         }
-                        s => s.into(),
+                        s => {
+                            if s.starts_with("\"") && s.ends_with("\"") {
+                                LValue::String(s[1..s.len() - 1].to_string())
+                            } else {
+                                LValue::Symbol(s.to_string())
+                            }
+                        }
                     },
                 },
             };

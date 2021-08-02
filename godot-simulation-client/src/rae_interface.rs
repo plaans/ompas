@@ -229,7 +229,7 @@ impl RAEInterface for PlatformGodot {
 
     /// Launch the platform godot and open the tcp communication
     fn launch_platform(&mut self, args: &[LValue]) -> Result<LValue, LError> {
-        self.start_platform(&[])?;
+        self.start_platform(args)?;
         thread::sleep(time::Duration::from_millis(1000));
         self.open_com(args)
     }

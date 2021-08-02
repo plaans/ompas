@@ -45,7 +45,7 @@ async fn async_send_socket(mut stream: WriteHalf<TcpStream>, mut receiver: Recei
                 };
                     //println!("new command to send: {}", command);
                 let size = u32_to_u8_array(command.len() as u32);
-                let msg: &[u8] = &[&size[0..4], &command.as_bytes()].concat();
+                let msg: &[u8] = &[&size[0..4], command.as_bytes()].concat();
                 match stream.write_all(msg).await {
                     Ok(_) => {}
                     Err(_) => panic!("error sending via socket"),

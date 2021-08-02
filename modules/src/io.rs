@@ -144,7 +144,7 @@ pub fn write(args: &[LValue], _: &LEnv, _: &CtxIo) -> Result<LValue, LError> {
         LValue::Symbol(s) => {
             //got our file name
             let mut f = File::create(s.to_string())?;
-            f.write_all(&args[1].to_string().as_bytes())?;
+            f.write_all(args[1].to_string().as_bytes())?;
             Ok(LValue::Nil)
         }
         lv => Err(WrongType(

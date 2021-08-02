@@ -6,6 +6,7 @@ use crate::rae::module::domain::*;
 use crate::rae::state::{
     ActionStatus, RAEState, StateType, KEY_DYNAMIC, KEY_INNER_WORLD, KEY_STATIC,
 };
+use log::{error, info, warn};
 use ompas_lisp::core::LEnv;
 use ompas_lisp::functions::{cons, union_map};
 use ompas_lisp::structs::LError::*;
@@ -20,7 +21,6 @@ use std::sync::{Arc, PoisonError, RwLock, RwLockReadGuard};
 use std::thread;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::Mutex;
-use log::{error, warn,info};
 
 /*
 LANGUAGE
@@ -104,7 +104,7 @@ impl GetModule for CtxRaeExec {
 
 impl CtxRaeExec {
     pub fn get_execution_status(&self, action_id: &ActionId) -> Option<Status> {
-        self.actions_progress.get_status(&action_id)
+        self.actions_progress.get_status(action_id)
     }
 
     pub fn add_platform(&mut self, platform: Box<dyn RAEInterface>) {

@@ -449,7 +449,7 @@ pub fn parse(str: &str, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result<
 /// 'x => (quote x)
 /// `x => (qusiquote x)
 /// ,x => (unquote x)
-pub fn expand_quotting(mut vec: Vec<LValue>) -> LValue {
+pub fn _expand_quoting(mut vec: Vec<LValue>) -> LValue {
     let mut i_point = 0;
     while i_point < vec.len() {
         let temp = vec.clone();
@@ -472,7 +472,7 @@ pub fn expand_quotting(mut vec: Vec<LValue>) -> LValue {
                         ]
                         .into();
                         vec[i_point] = new_lv;
-                        i_point+=1;
+                        i_point += 1;
                         break;
                     }
                 } else if s.starts_with(|c| c == '\'' || c == '`' || c == ',') {
@@ -531,8 +531,8 @@ pub fn parse_into_lvalue(se: &SExpr) -> LValue {
             } else {
                 let vec: Vec<LValue> = list_iter.map(|x| parse_into_lvalue(x)).collect();
                 //Expand possible quotting
-                expand_quotting(vec)
-                //LValue::List(vec)
+                //expand_quoting(vec)
+                LValue::List(vec)
             }
         }
     }
@@ -820,15 +820,15 @@ pub fn expand(
                 }
             }
 
-            let mut expanded_list : Vec<LValue> = vec![];
+            let mut expanded_list: Vec<LValue> = vec![];
             for e in list {
-                expanded_list.push(expand(e, false, env,ctxs)?);
+                expanded_list.push(expand(e, false, env, ctxs)?);
             }
 
             /*let expanded_list: Vec<LValue> = list
-                .iter()
-                .map(|x| expand(x, false, env, ctxs))
-                .collect::<Result<_, _>>()?;*/
+            .iter()
+            .map(|x| expand(x, false, env, ctxs))
+            .collect::<Result<_, _>>()?;*/
             Ok(expanded_list.into())
         }
         lv => Ok(lv.clone()),
@@ -862,7 +862,7 @@ pub fn expand_quasi_quote(x: &LValue, env: &LEnv) -> Result<LValue, LError> {
                 Ok(vec![
                     env.get_symbol(CONS)
                         .expect("problem in the definition of the root env"),
-                    expand_quasi_quote(&first, env)?,
+                    expand_quasi_quote(first, env)?,
                     expand_quasi_quote(&list[1..].to_vec().into(), env)?,
                 ]
                 .into())
@@ -1089,7 +1089,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                             None => &(),
                             Some(u) => ctxs.get_context(u),
                         };
-                        let r_lvalue = fun.call(args, &env, ctx)?;
+                        let r_lvalue = fun.call(args, env, ctx)?;
                         if DEBUG.load(Ordering::Relaxed) {
                             println!("=> {}", r_lvalue);
                         }
@@ -1098,14 +1098,14 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                     LValue::MutFn(fun) => {
                         return match fun.get_index_mod() {
                             None => {
-                                let r_lvalue = fun.call(&args, &env, &mut ())?;
+                                let r_lvalue = fun.call(args, env, &mut ())?;
                                 if get_debug() {
                                     println!("=> {}", r_lvalue);
                                 }
                                 Ok(r_lvalue)
                             }
                             Some(u) => {
-                                let r_lvalue = fun.call(&args, &env, ctxs.get_mut_context(u))?;
+                                let r_lvalue = fun.call(args, env, ctxs.get_mut_context(u))?;
                                 //println!("=> {}", r_lvalue.clone());
                                 Ok(r_lvalue)
                             }

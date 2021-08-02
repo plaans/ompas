@@ -20,7 +20,7 @@ use ompas_modules::io::repl::{spawn_log, spawn_repl};
 use ompas_modules::io::CtxIo;
 use ompas_modules::math::CtxMath;
 use ompas_modules::utils::CtxUtils;
-use ompas_utils::{task_handler, log};
+use ompas_utils::{log, task_handler};
 
 pub const TOKIO_CHANNEL_SIZE: usize = 65_384;
 
@@ -55,7 +55,7 @@ async fn main() {
     if opt.debug {
         activate_debug();
     }
-    log::init();
+    log::init().expect("Error while initiating logger.");
     //test_lib_model(&opt);
     lisp_interpreter(opt.log).await;
 }

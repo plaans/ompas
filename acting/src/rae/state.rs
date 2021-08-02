@@ -71,7 +71,7 @@ impl LState {
     }
 
     pub fn remove(&mut self, key: &LValueS) -> Option<LValueS> {
-        self.inner.remove(&key)
+        self.inner.remove(key)
     }
 
     pub fn union(&self, other: &Self) -> Self {
@@ -332,7 +332,7 @@ impl ActionStatusSet {
         let status = self.status.read().unwrap().clone();
         let server_id_internal_id = self.server_id_internal_id.read().unwrap().clone();
         for e in &server_id_internal_id {
-            str.push_str(format!("- {}({}): {:?}\n", e.1, e.0, status.get(&e.1).unwrap()).as_str());
+            str.push_str(format!("- {}({}): {:?}\n", e.1, e.0, status.get(e.1).unwrap()).as_str());
         }
         str
     }

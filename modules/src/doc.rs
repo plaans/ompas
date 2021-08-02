@@ -199,10 +199,10 @@ pub fn help(args: &[LValue], _: &LEnv, ctx: &CtxDoc) -> Result<LValue, LError> {
     match args.len() {
         0 => Ok(ctx.get_all().into()),
         1 => match &args[0] {
-            LValue::Fn(fun) => Ok(LValue::String(ctx.get(&fun.get_label()))),
-            LValue::MutFn(fun) => Ok(LValue::String(ctx.get(&fun.get_label()))),
+            LValue::Fn(fun) => Ok(LValue::String(ctx.get(fun.get_label()))),
+            LValue::MutFn(fun) => Ok(LValue::String(ctx.get(fun.get_label()))),
             LValue::Symbol(s) => Ok(LValue::String(ctx.get(s))),
-            LValue::CoreOperator(co)=>Ok(LValue::String(ctx.get(&co.to_string()))),
+            LValue::CoreOperator(co) => Ok(LValue::String(ctx.get(&co.to_string()))),
             lv => Err(WrongType(
                 HELP,
                 lv.clone(),

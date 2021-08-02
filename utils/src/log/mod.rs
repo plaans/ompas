@@ -13,6 +13,7 @@
 #![allow(deprecated)]
 use crate::task_handler::subscribe_new_task;
 use chrono::{DateTime, Utc};
+use log::{Level, LevelFilter, Log, Metadata, Record, SetLoggerError};
 use std::fs;
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -21,7 +22,6 @@ use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
-use log::{Log, Metadata, Record, Level, LevelFilter, SetLoggerError};
 
 const RAE_LOG_IP_ADDR: &str = "127.0.0.1:10001";
 const TOKIO_CHANNEL_SIZE: usize = 16_384;
@@ -48,7 +48,7 @@ impl Log for Logger {
         metadata.level() <= Level::Info
     }
 
-    fn log(& self, record: &Record) {
+    fn log(&self, record: &Record) {
         if self.enabled(record.metadata()) {
             let string = format!("{} - {}", record.level(), record.args());
             let tx = self.tx.clone();
@@ -78,8 +78,7 @@ impl Log for Logger {
 /// Initiate new terminal and logger
 /// Build the global object
 pub fn init() -> Result<(), SetLoggerError> {
-    log::set_boxed_logger(Box::new(Logger::new()))
-        .map(|()| log::set_max_level(LevelFilter::Info))
+    log::set_boxed_logger(Box::new(Logger::new())).map(|()| log::set_max_level(LevelFilter::Info))
 }
 
 /// Task that is running asynchronously

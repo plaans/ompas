@@ -265,7 +265,7 @@ pub fn def_lambda(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValu
     tokio::runtime::Handle::current();
     let list: LValue = args[0].clone();
     //println!("list: {}", list);
-    let lvalue = cons(&["define".into(), list], &env, &())?;
+    let lvalue = cons(&["define".into(), list], env, &())?;
     //println!("lvalue: {}", lvalue);
     let expanded = expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs)?;
     /*match &expanded {
@@ -287,7 +287,7 @@ pub fn def_state_function(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Resu
         ));
     }
 
-    let lvalue = cons(&["generate-state-function".into(), args.into()], &env, &())?;
+    let lvalue = cons(&["generate-state-function".into(), args.into()], env, &())?;
 
     let lvalue = eval(
         &expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs)?,
@@ -341,7 +341,7 @@ pub fn def_action(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValu
         ));
     }
 
-    let lvalue = cons(&["generate-action".into(), args.into()], &env, &())?;
+    let lvalue = cons(&["generate-action".into(), args.into()], env, &())?;
 
     let lvalue = eval(
         &expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs)?,
@@ -395,7 +395,7 @@ pub fn def_method(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValu
         ));
     }
 
-    let lvalue = cons(&["generate-method".into(), args.into()], &env, &())?;
+    let lvalue = cons(&["generate-method".into(), args.into()], env, &())?;
 
     let lvalue = eval(
         &expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs)?,
@@ -514,7 +514,7 @@ pub fn def_task(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValue,
         ));
     }
 
-    let lvalue = cons(&[GENERATE_TASK_SIMPLE.into(), args.into()], &env, &())?;
+    let lvalue = cons(&[GENERATE_TASK_SIMPLE.into(), args.into()], env, &())?;
 
     let lvalue = eval(
         &expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs)?,

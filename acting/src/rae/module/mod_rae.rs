@@ -44,6 +44,8 @@ const RAE_DEF_METHOD: &str = "def-method";
 const RAE_DEF_LAMBDA: &str = "def-lambda";
 const RAE_DEF_METHOD_PARAMETERS: &str = "def-method-parameters";
 const RAE_DEF_INITIAL_STATE: &str = "def-initial-state";
+const RAE_CONFIGURE_PLATFORM: &str = "rae-configure-platform";
+const RAE_GET_CONFIG_PLATFORM: &str = "rae-get-config-platform";
 
 //DOCUMENTATION
 const DOC_RAE_GET_METHODS: &str = "Returns the list of all defined methods in RAE environment";
@@ -76,6 +78,8 @@ const DOC_DEF_METHOD_VERBOSE: &str =
         \t(rae-await (navigate_to ?r (+ ?x 1) (+ ?y 1)))))))";
 const DOC_DEF_LAMBDA: &str = "Add a lambda to RAE environment";
 const DOC_DEF_INITIAL_STATE: &str = "Add initial facts in the state. Most of the time it is general knowledge and not initialisation of facts.";
+const DOC_RAE_CONFIGURE_PLATFROM: &str = "Set the options of the platform when it will be runned";
+const DOC_RAE_GET_CONFIG_PLATFORM: &str = "Get the actual value of the config of the platform";
 
 #[derive(Default)]
 pub struct CtxRae {
@@ -105,6 +109,8 @@ impl GetModule for CtxRae {
         module.add_fn_prelude(RAE_GET_METHODS_PARAMETERS, get_methods_parameters);
         module.add_fn_prelude(RAE_GET_SYMBOL_TYPE, get_symbol_type);
         module.add_fn_prelude(RAE_GET_ENV, get_env);
+        module.add_mut_fn_prelude(RAE_CONFIGURE_PLATFORM, configure_platform);
+        module.add_fn_prelude(RAE_GET_CONFIG_PLATFORM, get_config_platform);
 
         module.add_mut_fn_prelude(RAE_DEF_STATE_FUNCTION, def_state_function);
         module.add_mut_fn_prelude(RAE_DEF_ACTION, def_action);
@@ -153,6 +159,8 @@ impl Documentation for CtxRae {
             LHelp::new_verbose(RAE_DEF_METHOD, DOC_DEF_METHOD, DOC_DEF_METHOD_VERBOSE),
             LHelp::new(RAE_DEF_LAMBDA, DOC_DEF_LAMBDA),
             LHelp::new(RAE_DEF_INITIAL_STATE, DOC_DEF_INITIAL_STATE),
+            LHelp::new(RAE_CONFIGURE_PLATFORM, DOC_RAE_CONFIGURE_PLATFROM),
+            LHelp::new(RAE_GET_CONFIG_PLATFORM, DOC_RAE_GET_CONFIG_PLATFORM),
         ]
     }
 }
@@ -662,7 +670,7 @@ pub fn get_state(args: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, L
 
 /// Launch main loop of rae in an other asynchronous task.
 pub fn launch_rae(_: &[LValue], _env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
-    let options = SelectOption::new(0, 0);
+    let options = ctx.options.clone();
     let rae_env = RAEEnv {
         job_receiver: None,
         status_watcher: None,
@@ -681,6 +689,38 @@ pub fn launch_rae(_: &[LValue], _env: &LEnv, ctx: &mut CtxRae) -> Result<LValue,
     Ok(LValue::String("rae launched succesfully".to_string()))
 }
 
+pub fn configure_platform(args: &[LValue], _: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
+    if args.is_empty() {
+        return Err(WrongNumberOfArgument(
+            RAE_CONFIGURE_PLATFORM,
+            args.into(),
+            args.len(),
+            1..std::usize::MAX,
+        ));
+    }
+    let mut string = String::default();
+    for arg in args {
+        string.push_str(format!("{} ", arg).as_str())
+    }
+    ctx.options.set_platform_config(string);
+    Ok(LValue::Nil)
+}
+
+pub fn get_config_platform(args: &[LValue], _: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
+    if !args.is_empty() {
+        return Err(WrongNumberOfArgument(
+            RAE_GET_CONFIG_PLATFORM,
+            args.into(),
+            args.len(),
+            0..0,
+        ));
+    }
+    Ok(LValue::String(
+        ctx.options
+            .get_platfrom_config()
+            .unwrap_or(String::from("no options")),
+    ))
+}
 /*
 ///Add an action to RAE env
 pub fn add_action(args: &[LValue], _env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {

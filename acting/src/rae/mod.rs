@@ -7,9 +7,9 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, Mutex};
 use tokio_stream::StreamExt;
 
-use crate::rae::context::{RAEEnv, SelectOption, RAE_TASK_METHODS_MAP};
+use crate::rae::context::{RAEEnv, RAEOptions, SelectOption, RAE_TASK_METHODS_MAP};
 //use crate::rae::context::{Action, Method, SelectOption, Status, TaskId};
-use crate::rae::module::mod_rae_exec::{Job, JobId};
+use crate::rae::module::mod_rae_exec::{Job, JobId, RAE_LAUNCH_PLATFORM};
 use crate::rae::refinement::{RefinementStack, StackFrame};
 use crate::rae::status::async_status_watcher_run;
 use log::{error, info, warn};
@@ -36,7 +36,7 @@ const TOKIO_CHANNEL_SIZE: usize = 65_536; //=2^16
 
 /// Main RAE Loop:
 /// Receives Job to handle in separate tasks.
-pub async fn rae_run(mut context: RAEEnv, _select_option: &SelectOption, _log: String) {
+pub async fn rae_run(mut context: RAEEnv, options: &RAEOptions, _log: String) {
     //println!("in rae run!");
     //infinite loop
     //Maybe we can add a system to interrupt, or it stops itself when there is nothing to process
@@ -91,11 +91,14 @@ pub async fn rae_run(mut context: RAEEnv, _select_option: &SelectOption, _log: S
 
     let mut receiver = mem::replace(&mut context.job_receiver, None).unwrap();
     //Ubuntu::
-    let result = eval(
-        &vec![LValue::Symbol("rae-launch-platform".to_string())].into(),
-        &mut context.env,
-        &mut context.ctxs,
-    );
+    let lvalue: LValue = match options.get_platfrom_config() {
+        None => vec![RAE_LAUNCH_PLATFORM].into(),
+        Some(string) => {
+            info!("Platform config: {}", string);
+            vec![RAE_LAUNCH_PLATFORM.to_string(), string].into()
+        }
+    };
+    let result = eval(&lvalue, &mut context.env, &mut context.ctxs);
     //Windows::
     //let result = eval(&vec![LValue::Symbol("rae-open-com-platform".to_string())].into(), &mut context.env, &mut context.ctxs);
     match result {

@@ -107,6 +107,24 @@ async fn run_logger_file(mut rx: mpsc::Receiver<String>) {
         .spawn()
         .expect("could not spawn terminal");
 
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    let result = Command::new("pidof")
+        .arg("tail")
+        .output()
+        .expect("could not run command.");
+    let pids = String::from_utf8(result.stdout).expect("could not convert into string");
+    //println!("tail pids: {}", pids);
+    let logger_pid = if !pids.is_empty() {
+        let logger_pid = pids
+            .split_whitespace()
+            .next()
+            .expect("could not get first pid")
+            .to_string();
+        //println!("logger pid: {}", logger_pid);
+        Some(logger_pid)
+    } else {
+        None
+    };
     let mut end_receiver = subscribe_new_task();
 
     loop {
@@ -124,6 +142,11 @@ async fn run_logger_file(mut rx: mpsc::Receiver<String>) {
             }
             _ = end_receiver.recv() => {
                 println!("logger ended");
+                if let Some(pid) = logger_pid {
+                    Command::new("kill")
+                    .args(&["-9", pid.as_str()]).spawn()
+                    .expect("could not spawn terminal");
+                }
                 file.write_all(END_MSG.as_bytes()).expect("could not write to RAE log file");
                 break;
             }

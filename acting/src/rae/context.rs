@@ -497,15 +497,17 @@ impl ActionsProgress {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct RAEOptions {
     select_option: SelectOption,
+    platform_config: Option<String>,
 }
 
 impl RAEOptions {
     pub fn new(option: SelectOption) -> Self {
         Self {
             select_option: option,
+            platform_config: None,
         }
     }
 
@@ -516,6 +518,14 @@ impl RAEOptions {
 
     pub fn get_select_option(&self) -> &SelectOption {
         &self.select_option
+    }
+
+    pub fn set_platform_config(&mut self, str: String) {
+        self.platform_config = Some(str);
+    }
+
+    pub fn get_platfrom_config(&self) -> Option<String> {
+        self.platform_config.clone()
     }
 }
 

@@ -229,14 +229,13 @@ impl RAEInterface for PlatformGodot {
 
     /// Launch the platform godot and open the tcp communication
     fn launch_platform(&mut self, args: &[LValue]) -> Result<LValue, LError> {
-        self.start_platform(args)?;
+        self.start_platform(&args[0..0])?;
         thread::sleep(time::Duration::from_millis(1000));
-        self.open_com(args)
+        self.open_com(&args[1..])
     }
 
     /// Start the platform (start the godot process and launch the simulation)
     fn start_platform(&self, args: &[LValue]) -> Result<LValue, LError> {
-        //TODO: handle child to handle clean kill of godot process
         let mut child = match args.len() {
             0 => Command::new("godot3")
                 .arg("--path")
@@ -247,7 +246,6 @@ impl RAEInterface for PlatformGodot {
                 if let LValue::Symbol(s) = &args[0] {
                     let s = s.clone();
                     Command::new("godot3")
-                        .arg("--path")
                         .arg(s)
                         .spawn()
                         .expect("failed to execute process")
@@ -260,15 +258,12 @@ impl RAEInterface for PlatformGodot {
                     ));
                 }
             } //path of the project (absolute path)
-            5 => {
-                todo!()
-            } //path + options
             _ => {
                 return Err(WrongNumberOfArgument(
                     "PlatformGodot::start_platform",
                     args.into(),
                     args.len(),
-                    0..5,
+                    0..1,
                 ))
             } //Unexpected number of arguments
         };
@@ -320,7 +315,7 @@ impl RAEInterface for PlatformGodot {
                     "PlatformGodot::open_com",
                     args.into(),
                     args.len(),
-                    2..2,
+                    0..2,
                 ))
             }
         };
@@ -357,6 +352,6 @@ impl RAEInterface for PlatformGodot {
     fn domain(&self) -> &'static str {
         //GODOT_DOMAIN
         //TODO: choose a way to charge domain
-        "(read instances/godot_domain.lisp)"
+        "(read instances/godot_init.lisp)"
     }
 }

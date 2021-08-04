@@ -301,7 +301,8 @@ pub fn assert_fact(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LVa
     }
     let key = args[0].clone().into();
     let value = args[1].clone().into();
-    ctx.state.add_fact(key, value);
+    let c_state = ctx.state.clone();
+    blocking_async!(c_state.add_fact(key, value).await).expect("todo!");
 
     Ok(Nil)
 }
@@ -543,16 +544,13 @@ pub fn wait_on(args: &[LValue], _env: &LEnv, _: &CtxRaeExec) -> Result<LValue, L
     println!("New wait on {}", args[0]);
     let mut rx = add_waiter(args[0].clone());
     println!("receiver ok");
-    let handle = tokio::runtime::Handle::current();
-    thread::spawn(move || {
-        handle.block_on(async move {
-            if let false = rx.recv().await.expect("could not receive msg from waiters") {
-                unreachable!("should not receive false from waiters")
-            }
-            println!("end of wait on");
-        });
+    blocking_async!({
+        if let false = rx.recv().await.expect("could not receive msg from waiters") {
+            unreachable!("should not receive false from waiters")
+        }
+        println!("end of wait on");
     })
-    .join();
+    .expect("todo!");
     println!("end wait on");
     Ok(LValue::Nil)
 }

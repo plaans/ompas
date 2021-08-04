@@ -1,8 +1,8 @@
 pub mod wait_on {
     use crate::rae::context::RAEEnv;
-    use log::info;
+    use log::{info, warn};
     use ompas_lisp::core::{eval, ContextCollection, LEnv};
-    use ompas_lisp::structs::LValue;
+    use ompas_lisp::structs::{LError, LValue};
     use ompas_utils::task_handler;
     use std::sync::Arc;
     use std::thread;
@@ -43,16 +43,23 @@ pub mod wait_on {
             let mut item_to_remove = vec![];
             let mut waiters = self.inner.lock().await;
             for (id, waiter) in waiters.iter().enumerate() {
-                if let LValue::True =
-                    eval(&waiter.lambda, &mut env, &mut ctxs).unwrap_or(LValue::Nil)
-                {
-                    info!("Wait on {} is now true.", waiter.lambda);
-                    waiter
-                        .channel
-                        .send(true)
-                        .await
-                        .expect("could not send true message to waiter");
-                    item_to_remove.push(id);
+                let result = eval(&waiter.lambda, &mut env, &mut ctxs);
+                match result {
+                    Ok(lv) => {
+                        info!("{} => {}", waiter.lambda, lv);
+                        if let LValue::True = lv {
+                            info!("Wait on {} is now true.", waiter.lambda);
+                            waiter
+                                .channel
+                                .send(true)
+                                .await
+                                .expect("could not send true message to waiter");
+                            item_to_remove.push(id);
+                        } else {
+                            info!("{} is still false", waiter.lambda)
+                        }
+                    }
+                    Err(e) => warn!("error checking wait on: {}", e),
                 }
             }
             item_to_remove.iter().rev().for_each(|&i| {

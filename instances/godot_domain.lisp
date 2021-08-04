@@ -67,7 +67,7 @@
             (:body (begin
                     (if (robot.in_station ?r)
                         (begin
-                            (wait-on '(>= (robot.battery ?r) 0.9))
+                            (wait-on `(>= (robot.battery ,?r) 0.9))
                             (go_random ?r 2 5))
                         (if (<= (robot.battery ?r) 0.4)
                             (rae-await (go_charge ?r))

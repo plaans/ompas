@@ -5,7 +5,6 @@ use ompas_lisp::core::LEnv;
 use ompas_lisp::functions::cons;
 use ompas_lisp::structs::LError::SpecialError;
 use ompas_lisp::structs::{LError, LValue, LValueS};
-use ompas_utils::event::{EventId, EventRaiser};
 use std::fmt::{Display, Formatter};
 use std::ops::{Deref, DerefMut};
 use std::ptr::write_bytes;
@@ -119,7 +118,7 @@ impl RAEState {
 
     async fn trigger_update_event(&self) {
         if let Some(b) = self.sem_update.lock().await.deref() {
-            b.send(true);
+            b.send(true).expect("todo!");
         }
     }
 
@@ -164,7 +163,7 @@ impl RAEState {
                 }
             },
         }
-        self.trigger_update_event();
+        self.trigger_update_event().await;
     }
 
     pub async fn set_state(&self, state: LState) {
@@ -185,6 +184,7 @@ impl RAEState {
                 }
             },
         }
+        self.trigger_update_event().await;
     }
 
     pub async fn add_fact(&self, key: LValueS, value: LValueS) {

@@ -603,7 +603,8 @@ pub fn def_initial_state(args: &[LValue], _: &LEnv, ctx: &mut CtxRae) -> Result<
                 ));
             }
         }
-        ctx.env.state.update_state(state);
+        let c_state = ctx.env.state.clone();
+        blocking_async!(c_state.update_state(state).await).expect("todo!");
     } else {
         return Err(WrongType(
             RAE_DEF_INITIAL_STATE,

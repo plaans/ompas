@@ -112,9 +112,9 @@ async fn async_read_socket(stream: ReadHalf<TcpStream>, state: RAEState, status:
                         Some(_type) => match _type {
                             StateType::Static => {
                                 //println!("updating static state: {:?}", temp_state);
-                                state.update_state(temp_state);
+                                state.update_state(temp_state).await;
                             }
-                            StateType::Dynamic => state.set_state(temp_state),
+                            StateType::Dynamic => state.set_state(temp_state).await,
                             StateType::InnerWorld => {
                                 panic!("should not receive inner world fact from godot")
                             }

@@ -21,8 +21,10 @@ use std::sync::Arc;
 /// # Example:
 /// ```
 /// use ompas_lisp::structs::LValue;
+/// use std::convert::TryInto;
 /// //The conversion will success if lv is of kind LValue::Map
-/// let map: im::hashmap<LValue, LValue>  = lv.try_into()?;
+/// let lv = LValue::Map(Default::default());
+/// let map: im::HashMap<LValue, LValue>  = lv.try_into().expect("Could not convert LValue into HashMap");
 ///
 /// ```
 /// # Note:

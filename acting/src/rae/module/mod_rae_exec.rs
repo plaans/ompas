@@ -3,6 +3,7 @@ use crate::rae::context::{
     RAE_TASK_METHODS_MAP,
 };
 use crate::rae::module::domain::*;
+use crate::rae::ressource_access::wait_on::add_waiter;
 use crate::rae::state::{
     ActionStatus, RAEState, StateType, KEY_DYNAMIC, KEY_INNER_WORLD, KEY_STATIC,
 };
@@ -13,6 +14,7 @@ use ompas_lisp::structs::LError::*;
 use ompas_lisp::structs::LValue::*;
 use ompas_lisp::structs::*;
 use ompas_modules::doc::{Documentation, LHelp};
+use ompas_utils::blocking_async;
 use std::any::Any;
 use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
@@ -26,12 +28,15 @@ use tokio::sync::Mutex;
 LANGUAGE
  */
 
+const MOD_RAE_EXEC: &str = "mod-rae-exec";
+
 //manage facts
 pub const RAE_ASSERT: &str = "assert";
 pub const RAE_ASSERT_SHORT: &str = "+>";
 pub const RAE_RETRACT: &str = "retract";
 pub const RAE_RETRACT_SHORT: &str = "->";
 pub const RAE_AWAIT: &str = "rae-await";
+pub const WAIT_ON: &str = "wait-on";
 
 //RAE Interface with a platform
 pub const RAE_EXEC_COMMAND: &str = "rae-exec-command";
@@ -79,7 +84,7 @@ impl GetModule for CtxRaeExec {
             ctx: Arc::new(self),
             prelude: vec![],
             raw_lisp: init,
-            label: "",
+            label: MOD_RAE_EXEC,
         };
 
         module.add_fn_prelude(RAE_GET_STATE, get_state);
@@ -98,6 +103,7 @@ impl GetModule for CtxRaeExec {
         module.add_mut_fn_prelude(RAE_START_PLATFORM, start_platform);
         module.add_fn_prelude(RAE_GET_METHODS, get_methods);
         module.add_fn_prelude(RAE_GET_BEST_METHOD, get_best_method);
+        module.add_fn_prelude(WAIT_ON, wait_on);
         module
     }
 }
@@ -279,7 +285,8 @@ pub fn retract_fact(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LV
     }
     let key = args[0].clone().into();
     let value = args[1].clone().into();
-    ctx.state.retract_fact(key, value)
+    let c_state = ctx.state.clone();
+    blocking_async!(c_state.retract_fact(key, value).await).expect("todo!")
 }
 
 ///Add a fact to fact state
@@ -501,7 +508,8 @@ pub fn get_state(args: &[LValue], env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue
     };
 
     let platform_state = ctx.platform_interface.get_state(args).unwrap();
-    let state = ctx.state.get_state(_type).into_map();
+    let c_state = ctx.state.clone();
+    let state = blocking_async!(c_state.get_state(_type).await.into_map()).expect("todo!");
     union_map(&[platform_state, state], env, &())
 }
 
@@ -519,4 +527,32 @@ pub fn get_status(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LVal
 
 pub fn cancel_command(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
     ctx.platform_interface.cancel_command(args)
+}
+
+pub fn wait_on(args: &[LValue], _env: &LEnv, _: &CtxRaeExec) -> Result<LValue, LError> {
+    info!("wait on function");
+    println!("wait on function with {} args", args.len());
+    if args.len() != 1 {
+        return Err(WrongNumberOfArgument(
+            WAIT_ON,
+            args.into(),
+            args.len(),
+            1..1,
+        ));
+    }
+    println!("New wait on {}", args[0]);
+    let mut rx = add_waiter(args[0].clone());
+    println!("receiver ok");
+    let handle = tokio::runtime::Handle::current();
+    thread::spawn(move || {
+        handle.block_on(async move {
+            if let false = rx.recv().await.expect("could not receive msg from waiters") {
+                unreachable!("should not receive false from waiters")
+            }
+            println!("end of wait on");
+        });
+    })
+    .join();
+    println!("end wait on");
+    Ok(LValue::Nil)
 }

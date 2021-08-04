@@ -13,11 +13,13 @@ use ompas_lisp::structs::LValue::Nil;
 use ompas_lisp::structs::*;
 use ompas_modules::doc::{Documentation, LHelp};
 use ompas_modules::math::CtxMath;
+use ompas_utils::blocking_async;
 use ompas_utils::log;
 use std::convert::TryInto;
 use std::mem;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use tokio::task::block_in_place;
 
 //LANGUAGE
 const MOD_RAE: &str = "mod-rae";
@@ -663,8 +665,8 @@ pub fn get_state(args: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, L
             ))
         }
     };
-
-    let state = ctx.env.state.get_state(_type);
+    let c_state = ctx.env.state.clone();
+    let state = blocking_async!(c_state.get_state(_type).await).unwrap();
     Ok(state.into_map())
 }
 

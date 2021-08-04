@@ -11,6 +11,7 @@ use crate::rae::context::{RAEEnv, RAEOptions, SelectOption, RAE_TASK_METHODS_MAP
 //use crate::rae::context::{Action, Method, SelectOption, Status, TaskId};
 use crate::rae::module::mod_rae_exec::{Job, JobId, RAE_LAUNCH_PLATFORM};
 use crate::rae::refinement::{RefinementStack, StackFrame};
+use crate::rae::ressource_access::wait_on::task_check_wait_on;
 use crate::rae::status::async_status_watcher_run;
 use log::{error, info, warn};
 use ompas_lisp::async_await;
@@ -19,9 +20,11 @@ use ompas_lisp::core::{eval, ContextCollection, LEnv};
 use ompas_lisp::functions::cons;
 use ompas_lisp::structs::{LError, LValue};
 use std::mem;
+
 pub mod context;
 pub mod module;
 pub mod refinement;
+pub mod ressource_access;
 pub mod state;
 pub mod status;
 
@@ -105,6 +108,18 @@ pub async fn rae_run(mut context: RAEEnv, options: &RAEOptions, _log: String) {
         Ok(_) => {} //println!("successfully open com with platform"),
         Err(e) => error!("{}", e),
     }
+
+    let receiver_event_update_state = context.state.subscribe_on_update().await;
+    let env_check_wait_on = context.get_eval_env();
+    let ctxs_check_wait_on = context.ctxs.clone();
+    tokio::spawn(async move {
+        task_check_wait_on(
+            receiver_event_update_state,
+            env_check_wait_on,
+            ctxs_check_wait_on,
+        )
+        .await
+    });
 
     loop {
         //For each new event or task to be addressed, we search for the best method a create a new refinement stack

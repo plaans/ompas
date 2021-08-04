@@ -2,7 +2,8 @@
 //! To use TaskEndHandler to shutdown a task, it needs to subscribe.
 //! It will receive a channel on which it can await the signal *true*.
 //! # Example
-//! ``` rust
+//! ```ignore
+//! #[tokio::main]
 //! async fn main(){
 //!     use std::time::Duration;
 //!     use ompas_utils::task_handler::end_all;
@@ -12,7 +13,6 @@
 //! }
 //!
 //! async fn task() {
-//!
 //!     use ompas_utils::task_handler::subscribe_new_task;
 //!     let end_receiver = subscribe_new_task();
 //!     loop {

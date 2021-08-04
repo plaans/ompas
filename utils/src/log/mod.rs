@@ -4,24 +4,27 @@
 //!     - The other using *tail -f* to monitor logs written to a file
 //! # Examples
 //! The logger will be automatically built when methods using it are called
-//! ```rust
-//! ompas_utils::log::send("new log string".to_string());
+//! ```ignore
+//! info!("new log string");
 //! /*This will send via a channel the string to be passed
 //! then to the task handling writing to the socket or the file.*/
 //! ```
 
 #![allow(deprecated)]
-use crate::task_handler::subscribe_new_task;
-use chrono::{DateTime, Utc};
-use log::{Level, LevelFilter, Log, Metadata, Record, SetLoggerError};
+
 use std::fs;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::process::Command;
 use std::time::Duration;
+
+use chrono::{DateTime, Utc};
+use log::{Level, LevelFilter, Log, Metadata, Record, SetLoggerError};
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
+
+use crate::task_handler::subscribe_new_task;
 
 const RAE_LOG_IP_ADDR: &str = "127.0.0.1:10001";
 const TOKIO_CHANNEL_SIZE: usize = 16_384;
@@ -65,8 +68,8 @@ impl Log for Logger {
 
 ///Send a msg to the Logger
 /// # Example
-/// ``` no_run
-/// ompas_utils::log::send("test".to_string());
+/// ```ignore
+/// warn!("test");
 /// ```
 /*fn send(string: String) {
     //println!("sending: {}", string);
@@ -136,7 +139,7 @@ async fn run_logger_file(mut rx: mpsc::Receiver<String>) {
                         break;
                     }
                     Some(str) => {
-                        file.write_all(format!("[rae] {}\n", str).as_bytes()).expect("could not write to RAE log file");
+                        file.write_all(format!("{}\n", str).as_bytes()).expect("could not write to RAE log file");
                     }
                 }
             }
@@ -145,7 +148,7 @@ async fn run_logger_file(mut rx: mpsc::Receiver<String>) {
                 if let Some(pid) = logger_pid {
                     Command::new("kill")
                     .args(&["-9", pid.as_str()]).spawn()
-                    .expect("could not spawn terminal");
+                    .expect("Command failed.");
                 }
                 file.write_all(END_MSG.as_bytes()).expect("could not write to RAE log file");
                 break;

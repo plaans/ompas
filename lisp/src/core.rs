@@ -74,6 +74,7 @@ impl LEnv {
 pub struct ContextCollection {
     inner: Vec<Arc<dyn Any + Send + Sync>>,
     map_label_usize: HashMap<&'static str, usize>,
+    reverse_map: HashMap<usize, &'static str>,
 }
 
 impl Default for ContextCollection {
@@ -81,15 +82,19 @@ impl Default for ContextCollection {
         Self {
             inner: vec![],
             map_label_usize: Default::default(),
+            reverse_map: Default::default(),
         }
     }
 }
 
 impl ContextCollection {
     ///Insert a new context
-    pub fn insert(&mut self, ctx: Arc<dyn Any + Send + Sync>) -> usize {
+    pub fn insert(&mut self, ctx: Arc<dyn Any + Send + Sync>, label: &'static str) -> usize {
         self.inner.push(ctx);
-        self.inner.len() - 1
+        let id = self.inner.len() - 1;
+        self.map_label_usize.insert(label, id);
+        self.reverse_map.insert(id, label);
+        id
     }
 
     /// Returns a reference to the context with the corresponding id
@@ -113,9 +118,9 @@ impl ContextCollection {
     /// Returns a mutable reference to the context with corresponding id
     pub fn get_mut_context(&mut self, id: usize) -> &mut (dyn Any + Send + Sync) {
         match self.inner.get_mut(id) {
-            None => panic!("no context with such label"),
+            None => panic!("no context with id {}", 1),
             Some(ctx) => match Arc::get_mut(ctx) {
-                None => panic!("Could no get mut ref from Arc. This is probably because the reference to the context is shared"),
+                None => panic!("Could no get mut ref from Arc of mod {}. This is probably because the reference to the context is shared", self.reverse_map.get(&id).unwrap()),
                 Some(ctx) => ctx
             }
         }
@@ -414,7 +419,7 @@ pub fn load_module(
     lisp_init: &mut InitLisp,
 ) -> usize {
     let mut module = ctx.get_module();
-    let id = ctxs.insert(module.ctx);
+    let id = ctxs.insert(module.ctx, module.label);
     //println!("id: {}", id);
     lisp_init.append(&mut module.raw_lisp);
     for (sym, lv) in &mut module.prelude {

@@ -5,11 +5,13 @@ use ompas_lisp::core::LEnv;
 use ompas_lisp::functions::cons;
 use ompas_lisp::structs::LError::SpecialError;
 use ompas_lisp::structs::{LError, LValue, LValueS};
+use ompas_utils::event::{EventId, EventRaiser};
 use std::fmt::{Display, Formatter};
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 use std::ptr::write_bytes;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+use tokio::sync::{broadcast, Mutex, RwLock};
 
 pub const KEY_DYNAMIC: &str = "dynamic";
 pub const KEY_STATIC: &str = "static";
@@ -99,78 +101,98 @@ pub struct RAEState {
     _static: Arc<RwLock<LState>>,
     dynamic: Arc<RwLock<LState>>,
     inner_world: Arc<RwLock<LState>>,
+    sem_update: Arc<Mutex<Option<broadcast::Sender<bool>>>>,
 }
 
+const RAE_STATE_SEM_UPDATE_CHANNEL_SIZE: usize = 64;
+
 impl RAEState {
-    pub fn get_state(&self, _type: Option<StateType>) -> LState {
+    pub async fn subscribe_on_update(&mut self) -> broadcast::Receiver<bool> {
+        let mut sem_update = self.sem_update.lock().await;
+        let (tx, rx) = match sem_update.deref() {
+            None => broadcast::channel(RAE_STATE_SEM_UPDATE_CHANNEL_SIZE),
+            Some(b) => return b.subscribe(),
+        };
+        sem_update.insert(tx);
+        rx
+    }
+
+    async fn trigger_update_event(&self) {
+        if let Some(b) = self.sem_update.lock().await.deref() {
+            b.send(true);
+        }
+    }
+
+    pub async fn get_state(&self, _type: Option<StateType>) -> LState {
         match _type {
-            None => self.inner_world.read().unwrap().union(
+            None => self.inner_world.read().await.union(
                 &self
                     ._static
                     .read()
-                    .unwrap()
-                    .union(&self.dynamic.read().unwrap()),
+                    .await
+                    .union(&self.dynamic.read().await.deref()),
             ),
             Some(_type) => match _type {
-                StateType::Static => self._static.read().unwrap().deref().clone(),
-                StateType::Dynamic => self.dynamic.read().unwrap().deref().clone(),
-                StateType::InnerWorld => self.inner_world.read().unwrap().deref().clone(),
+                StateType::Static => self._static.read().await.clone(),
+                StateType::Dynamic => self.dynamic.read().await.clone(),
+                StateType::InnerWorld => self.inner_world.read().await.clone(),
             },
         }
     }
 
-    pub fn update_state(&self, state: LState) {
+    pub async fn update_state(&self, state: LState) {
         match &state._type {
             None => {}
             Some(_type) => match _type {
                 StateType::Static => {
-                    let new_state = self._static.write().unwrap().union(&state).inner;
-                    match self.check_for_instance_declaration(&state) {
+                    let new_state = self._static.write().await.union(&state).inner;
+                    match self.check_for_instance_declaration(&state).await {
                         None => {}
                         Some(inner_world) => {
-                            self.inner_world.write().unwrap().inner = inner_world.inner;
+                            self.inner_world.write().await.inner = inner_world.inner;
                         }
                     }
-                    self._static.write().unwrap().inner = new_state;
+                    self._static.write().await.inner = new_state;
                 }
                 StateType::Dynamic => {
-                    let new_state = self.dynamic.write().unwrap().union(&state).inner;
-                    self.dynamic.write().unwrap().inner = new_state;
+                    let new_state = self.dynamic.write().await.union(&state).inner;
+                    self.dynamic.write().await.inner = new_state;
                 }
                 StateType::InnerWorld => {
-                    let new_state = self.dynamic.write().unwrap().union(&state).inner;
-                    self.dynamic.write().unwrap().inner = new_state;
+                    let new_state = self.dynamic.write().await.union(&state).inner;
+                    self.dynamic.write().await.inner = new_state;
                 }
             },
         }
+        self.trigger_update_event();
     }
 
-    pub fn set_state(&self, state: LState) {
+    pub async fn set_state(&self, state: LState) {
         match &state._type {
             None => {}
             Some(_type) => match _type {
                 StateType::Static => {
-                    let mut _ref = self._static.write().unwrap();
+                    let mut _ref = self._static.write().await;
                     _ref.inner = state.inner;
                 }
                 StateType::Dynamic => {
-                    let mut _ref = self.dynamic.write().unwrap();
+                    let mut _ref = self.dynamic.write().await;
                     _ref.inner = state.inner;
                 }
                 StateType::InnerWorld => {
-                    let mut _ref = self.inner_world.write().unwrap();
+                    let mut _ref = self.inner_world.write().await;
                     _ref.inner = state.inner;
                 }
             },
         }
     }
 
-    pub fn add_fact(&self, key: LValueS, value: LValueS) {
-        self.inner_world.write().unwrap().insert(key, value)
+    pub async fn add_fact(&self, key: LValueS, value: LValueS) {
+        self.inner_world.write().await.insert(key, value)
     }
 
-    pub fn retract_fact(&self, key: LValueS, value: LValueS) -> Result<LValue, LError> {
-        let old_value = self.inner_world.read().unwrap().get(&key).cloned();
+    pub async fn retract_fact(&self, key: LValueS, value: LValueS) -> Result<LValue, LError> {
+        let old_value = self.inner_world.read().await.get(&key).cloned();
         match old_value {
             None => Err(SpecialError(
                 "RAEState::retract_fact",
@@ -178,7 +200,7 @@ impl RAEState {
             )),
             Some(old_value) => {
                 if old_value == value {
-                    self.inner_world.write().unwrap().remove(&key);
+                    self.inner_world.write().await.remove(&key);
                     Ok(LValue::Nil)
                 } else {
                     Err(SpecialError(
@@ -190,7 +212,7 @@ impl RAEState {
         }
     }
 
-    fn check_for_instance_declaration(&self, state: &LState) -> Option<LState> {
+    async fn check_for_instance_declaration(&self, state: &LState) -> Option<LState> {
         for element in &state.inner {
             //let string_key = element.0.to_string();
             //println!("{}", string_key);
@@ -209,7 +231,7 @@ impl RAEState {
                                 let list_name = format!("{}s", string);
                                 let list_name = LValue::from(list_name).into();
                                 let list_instance =
-                                    self.inner_world.read().unwrap().get(&list_name).cloned();
+                                    self.inner_world.read().await.get(&list_name).cloned();
                                 let value = match list_instance {
                                     None => {
                                         //println!("list of instance not yet created");
@@ -226,7 +248,7 @@ impl RAEState {
                                     }
                                 };
                                 let key: LValue = list_name.into();
-                                self.inner_world.write().unwrap().insert(key.into(), value);
+                                self.inner_world.write().await.insert(key.into(), value);
                             }
                         }
                     }
@@ -301,36 +323,36 @@ impl ActionStatusSet {
         }
     }
 
-    pub fn set_status(&mut self, internal_id: usize, status: ActionStatus) {
-        self.status.write().unwrap().insert(internal_id, status);
+    pub async fn set_status(&mut self, internal_id: usize, status: ActionStatus) {
+        self.status.write().await.insert(internal_id, status);
     }
 
-    pub fn set_status_from_server(&mut self, server_id: usize, status: ActionStatus) {
+    pub async fn set_status_from_server(&mut self, server_id: usize, status: ActionStatus) {
         let id = *self
             .server_id_internal_id
             .read()
-            .unwrap()
+            .await
             .get(&server_id)
             .unwrap();
-        self.status.write().unwrap().insert(id, status);
+        self.status.write().await.insert(id, status);
     }
 
-    pub fn get_status(&self, internal_id: &usize) -> Option<ActionStatus> {
-        self.status.read().unwrap().get(internal_id).cloned()
+    pub async fn get_status(&self, internal_id: &usize) -> Option<ActionStatus> {
+        self.status.read().await.get(internal_id).cloned()
     }
 
-    pub fn get_status_from_server(&self, server_id: usize) -> Option<ActionStatus> {
-        match self.server_id_internal_id.read().unwrap().get(&server_id) {
+    pub async fn get_status_from_server(&self, server_id: usize) -> Option<ActionStatus> {
+        match self.server_id_internal_id.read().await.get(&server_id) {
             None => None,
-            Some(id) => self.status.read().unwrap().get(id).cloned(),
+            Some(id) => self.status.read().await.get(id).cloned(),
         }
     }
 
-    pub fn pretty_print(&self) -> String {
+    pub async fn pretty_print(&self) -> String {
         let mut str = String::new();
         str.push_str("Action(s) Status:\n");
-        let status = self.status.read().unwrap().clone();
-        let server_id_internal_id = self.server_id_internal_id.read().unwrap().clone();
+        let status = self.status.read().await.clone();
+        let server_id_internal_id = self.server_id_internal_id.read().await.clone();
         for e in &server_id_internal_id {
             str.push_str(format!("- {}({}): {:?}\n", e.1, e.0, status.get(e.1).unwrap()).as_str());
         }

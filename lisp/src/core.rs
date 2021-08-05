@@ -12,6 +12,7 @@ use crate::structs::NameTypeLValue::{List, Symbol};
 use crate::structs::*;
 use aries_planning::parsing::sexpr::SExpr;
 use im::hashmap::HashMap;
+use im::HashSet;
 use std::any::Any;
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{Display, Formatter};
@@ -265,7 +266,9 @@ impl GetModule for CtxRoot {
         module.add_prelude(QUOTE, LCoreOperator::Quote.into());
         module.add_prelude(UNQUOTE, LCoreOperator::UnQuote.into());
 
-        module.add_fn_prelude(ENV, env);
+        module.add_fn_prelude(ENV_GET_KEYS, env_get_keys);
+        module.add_fn_prelude(ENV_GET_MACROS, env_get_macros);
+        module.add_fn_prelude(ENV_GET_MACRO, env_get_macro);
 
         //Special entry
         module.add_fn_prelude(GET, get);
@@ -406,10 +409,21 @@ impl LEnv {
         self.macro_table.get(key)
     }
 
-    pub fn keys(&self) -> Vec<String> {
-        let mut keys: Vec<String> = self.symbols.keys().cloned().collect();
-        keys.append(&mut self.macro_table.keys().cloned().collect());
+    pub fn keys(&self) -> HashSet<String> {
+        let mut keys: HashSet<String> = self.symbols.keys().cloned().collect();
+        keys = keys.union(self.macro_table.keys().cloned().collect());
+        if let Some(outer) = &self.outer {
+            keys = keys.union(outer.keys());
+        }
         keys
+    }
+
+    pub fn macros(&self) -> HashSet<String> {
+        let mut macros: HashSet<String> = self.macro_table.keys().cloned().collect();
+        if let Some(outer) = &self.outer {
+            macros = macros.union(outer.macros());
+        }
+        macros
     }
 }
 

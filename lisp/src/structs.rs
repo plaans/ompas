@@ -476,6 +476,18 @@ impl LLambda {
     }
 }
 
+impl From<&LLambda> for LValue {
+    fn from(l: &LLambda) -> Self {
+        LValue::Lambda(l.clone())
+    }
+}
+
+impl From<LLambda> for LValue {
+    fn from(l: LLambda) -> Self {
+        (&l).into()
+    }
+}
+
 pub type NativeFn<T> = fn(&[LValue], &LEnv, &T) -> Result<LValue, LError>;
 pub type DowncastCall =
     fn(&[LValue], &LEnv, &dyn Any, &Arc<dyn Any + Send + Sync>) -> Result<LValue, LError>;

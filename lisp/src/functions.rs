@@ -14,13 +14,46 @@ pub fn default(_args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
 }
 
 /// Returns a list of all the keys present in the environment
-pub fn env(_: &[LValue], env: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn env_get_keys(_: &[LValue], env: &LEnv, _: &()) -> Result<LValue, LError> {
     Ok(env
         .keys()
         .iter()
         .map(|x| LValue::from(x.clone()))
         .collect::<Vec<LValue>>()
         .into())
+}
+
+pub fn env_get_macros(_: &[LValue], env: &LEnv, _: &()) -> Result<LValue, LError> {
+    Ok(env
+        .macros()
+        .iter()
+        .map(|x| LValue::from(x.clone()))
+        .collect::<Vec<LValue>>()
+        .into())
+}
+
+pub fn env_get_macro(args: &[LValue], env: &LEnv, _: &()) -> Result<LValue, LError> {
+    if args.len() != 1 {
+        return Err(WrongNumberOfArgument(
+            ENV_GET_MACRO,
+            args.into(),
+            args.len(),
+            1..1,
+        ));
+    }
+    if let LValue::Symbol(s) = &args[0] {
+        Ok(match env.get_macro(s).cloned() {
+            Some(l) => l.into(),
+            None => LValue::Nil,
+        })
+    } else {
+        Err(WrongType(
+            ENV_GET_MACRO,
+            args[0].clone(),
+            (&args[0]).into(),
+            NameTypeLValue::Symbol,
+        ))
+    }
 }
 
 #[deprecated]

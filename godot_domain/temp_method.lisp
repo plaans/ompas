@@ -78,7 +78,17 @@
                 (wait-on (= (robot.battery ?r) 1))
                 nil))))
 
-(def-lambda '(find_machines_for_process (lambda (?process)
-                
-                )))
+(def-lambda 
+    '(find_machines_for_process 
+        (lambda (?process)
+            (begin    
+                (define __process__
+                    (lambda (?p list)
+                        (if (null? list)
+                            nil
+                            (if (contains (machine.processes_list (car list)) ?p)
+                                (cons (car list) (__process__ ?p (cdr list))
+                                (__process__ (cdr list))))))
+                (__process__ ?process (get-map (get-state) machines))
+                )))))
 

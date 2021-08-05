@@ -37,7 +37,8 @@
         (:params ?r ?b)
         (:body (begin 
             (rae-await (navigate_to_area ?r (car (belt.interact_areas ?b))))
-            (rae-await (face_belt ?r ?b 5))))))
+            (rae-await (face_belt ?r ?b 5))
+            nil))))
 
 (def-task t_carry_to_machine ?r ?p ?m)
 (def-method m_carry_to_machine 

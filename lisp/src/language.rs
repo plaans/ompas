@@ -64,7 +64,9 @@ pub mod scheme_primitives {
     pub const LE: &str = "<=";
     pub const EQ: &str = "=";
 
-    pub const ENV: &str = "env"; //return a list of keys of the environment
+    pub const ENV_GET_KEYS: &str = "env.get_keys"; //return a list of keys of the environment
+    pub const ENV_GET_MACROS: &str = "env.get_macros";
+    pub const ENV_GET_MACRO: &str = "env.get_macro";
 
     //predicates
     pub const IS_NUMBER: &str = "number?";

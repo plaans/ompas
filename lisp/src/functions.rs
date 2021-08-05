@@ -378,6 +378,84 @@ pub fn member(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     }
 }
 
+pub fn get_list(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    if args.len() != 2 {
+        return Err(WrongNumberOfArgument(
+            GET_LIST,
+            args.into(),
+            args.len(),
+            2..2,
+        ));
+    }
+
+    if let LValue::List(vec) = &args[0] {
+        if let LValue::Number(LNumber::Int(i)) = &args[1] {
+            if vec.len() > *i as usize {
+                Ok(vec[*i as usize].clone())
+            } else {
+                Err(SpecialError(
+                    GET_LIST,
+                    format!("index out of bound, must be in [{};{}]", 0, vec.len() - 1),
+                ))
+            }
+        } else {
+            Err(WrongType(
+                GET_LIST,
+                args[1].clone(),
+                (&args[1]).into(),
+                NameTypeLValue::Int,
+            ))
+        }
+    } else {
+        Err(WrongType(
+            GET_LIST,
+            args[0].clone(),
+            (&args[0]).into(),
+            NameTypeLValue::List,
+        ))
+    }
+}
+
+pub fn set_list(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    if args.len() != 3 {
+        return Err(WrongNumberOfArgument(
+            GET_LIST,
+            args.into(),
+            args.len(),
+            3..3,
+        ));
+    }
+
+    if let LValue::List(vec) = &args[0] {
+        if let LValue::Number(LNumber::Int(i)) = &args[2] {
+            if vec.len() > *i as usize {
+                let mut vec = vec.clone();
+                vec[*i as usize] = args[1].clone();
+                Ok(vec.into())
+            } else {
+                Err(SpecialError(
+                    GET_LIST,
+                    format!("index out of bound, must be in [{};{}]", 0, vec.len() - 1),
+                ))
+            }
+        } else {
+            Err(WrongType(
+                GET_LIST,
+                args[1].clone(),
+                (&args[1]).into(),
+                NameTypeLValue::Int,
+            ))
+        }
+    } else {
+        Err(WrongType(
+            GET_LIST,
+            args[0].clone(),
+            (&args[0]).into(),
+            NameTypeLValue::List,
+        ))
+    }
+}
+
 /// It takes a list and returns a list with the top elements in reverse order.
 pub fn reverse(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() == 1 {

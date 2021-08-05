@@ -13,6 +13,8 @@ pub mod scheme_primitives {
     pub const MEMBER: &str = "member";
     pub const REVERSE: &str = "reverse";
     pub const LIST: &str = "list";
+    pub const GET_LIST: &str = "get-list";
+    pub const SET_LIST: &str = "set-list";
     pub const CONS: &str = "cons";
 
     //Other
@@ -153,6 +155,19 @@ pub mod scheme_macro {
                                                                 (cond (unquote (cdr exprs)))))))))";
 
     pub const MACRO_AWAIT_ASYNC: &str = "(defmacro await-async (lambda (x) `(await (async ,x))))";
+
+    pub const MACRO_FOR: &str = "(defmacro for (lambda args \
+    (let ((_i_ (get-list args 0)) \
+            (_list_ (get-list args 2)) \
+            (_body_ (get-list args 3))) \
+        `(let ((_f_loop_ (lambda args \
+            (if (null? args) \
+                nil \
+                (let ((,_i_ (car args))) \
+                    (begin \
+                        ,_body_ \
+                        (_f_loop_ (cdr args)))))))) \
+            (_f_loop_ ,_list_)))))";
 }
 
 pub mod scheme_lambda {
@@ -263,6 +278,8 @@ and then it returns the remainder of the list beginning with the first argument.
     pub const DOC_REVERSE: &str =
         "Takes a list and return a list with all elements reversed in order";
     pub const DOC_LIST: &str = "Return a list of the LValues given is argument";
+    pub const DOC_GET_LIST: &str = "todo!";
+    pub const DOC_SET_LIST: &str = "todo!";
     pub const DOC_CONS: &str = "Takes two objects and merges into a list.";
     pub const DOC_MAP: &str = "Return a map from from a list of pairs.";
     pub const DOC_MAP_VERBOSE: &str = "Example: (map (quote ((ten . 10) (twenty . 20))))";

@@ -64,5 +64,34 @@
                    (if (>= (robot.battery ?r) 0.9)
                        (go_random ?r 2 5)))
                 (t_dumber ?r)))))
-
-);
+    (def-task t_process_package ?p)
+    (def-task t_process_on_machine ?p ?m)
+    ;robot ?r takes the package ?p and place it a the machine ?m
+    (def-task t_pick_and_place ?r ?p ?m)
+    ;(def-lambda '(available_robots (lambda ...)))
+    (def-method m_process_package
+        '((:task t_process_package)
+        (:params ?p)
+        (:body (mapf t_process_on_machine (enumerate (list ?p) (car (unzip (package.process_list ?p))))))))
+    (def-method m_process_on_machine
+        '((:task t_process_on_machine)
+        (:params ?p ?m)
+        (:body (let ((robot (car (available_robots))))
+                (t_pick_and_place robot ?p ?m)))))
+    (def-method m_pick_and_place
+        '((:task t_pick_and_place)
+         (:params ?r ?p ?m)
+         (:body (begin
+            ;check that the location of the package is
+            (let ((?l (package.location ?p )))
+                (if (!= (belt.instance ?l) nil)
+                    (begin
+                        (rae-await (navigate_to_area ?r (car (belt.interact_areas ?l))))
+                        (rae-await (face_belt ?r ?l))
+                        ;pick the right package on the belt
+                        (rae-await (pick_package ?r ?p))
+                        (rae-await (navigate_to_area ?r (car (belt.interact_areas (machine.input_belt ?m)))))
+                        (rae-await (face_belt ?r (machine.input_belt ?m)))
+                        (rae-await (place ?r)))
+                    nil))))))
+)

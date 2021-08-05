@@ -245,6 +245,7 @@ impl GetModule for CtxRoot {
                 LAMBDA_UNZIP,
                 LAMBDA_ZIP,
                 LAMBDA_MAPF,
+                MACRO_FOR,
             ]
             .into(),
             label: MOD_ROOT,
@@ -281,6 +282,8 @@ impl GetModule for CtxRoot {
         module.add_fn_prelude(CONS, cons);
         module.add_fn_prelude(LEN, length);
         module.add_fn_prelude(EMPTY, empty);
+        module.add_fn_prelude(GET_LIST, get_list);
+        module.add_fn_prelude(SET_LIST, set_list);
 
         //Map functions
         module.add_fn_prelude(GET_MAP, get_map);

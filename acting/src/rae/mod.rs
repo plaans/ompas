@@ -181,13 +181,6 @@ pub async fn rae_run(mut context: RAEEnv, options: &RAEOptions, _log: String) {
 
 async fn progress_2(job_lvalue: LValue, mut env: LEnv, mut ctxs: ContextCollection) {
     info!("new triggered task: {}", job_lvalue);
-    /*let task_methods_map = env.get_symbol(RAE_TASK_METHODS_MAP).unwrap();
-    ompas_utils::log::send(format!(
-        "task_methods_map before eval: {}\n",
-        task_methods_map
-    ));
-    ompas_utils::log::send(format!("env before eval: {}\n", env));
-    ompas_utils::log::send(format!("env:\n{}", env));*/
     let job_lvalue = LValue::List(vec![job_lvalue]);
     match eval(&job_lvalue, &mut env, &mut ctxs) {
         Ok(lv) => info!("result of task {}: {}", job_lvalue, lv),

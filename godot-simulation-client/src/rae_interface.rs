@@ -404,6 +404,6 @@ impl RAEInterface for PlatformGodot {
     fn domain(&self) -> &'static str {
         //GODOT_DOMAIN
         //TODO: choose a way to charge domain
-        "(read instances/godot_init.lisp)"
+        "(read godot_domain/init.lisp)"
     }
 }

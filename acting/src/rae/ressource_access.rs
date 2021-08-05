@@ -78,19 +78,19 @@ pub mod wait_on {
         env: LEnv,
         ctxs: ContextCollection,
     ) {
-        println!("task check wait on active");
+        //println!("task check wait on active");
         let mut end_receiver = task_handler::subscribe_new_task();
         loop {
             tokio::select! {
                 _ = receiver.recv() => {
                     let n_wait_on = WAIT_ON_COLLECTION.inner.lock().await.len();
                     if n_wait_on != 0 {
-                        println!("{} wait ons to check!", n_wait_on);
+                        //println!("{} wait ons to check!", n_wait_on);
                         WAIT_ON_COLLECTION.check_wait_on(env.clone(), ctxs.clone()).await;
                     }
                 }
                 _ = end_receiver.recv() => {
-                    println!("Task \"task_check_wait_on\" killed.");
+                    //println!("Task \"task_check_wait_on\" killed.");
                     break;
                 }
             }

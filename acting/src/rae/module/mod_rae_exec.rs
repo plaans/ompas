@@ -531,8 +531,8 @@ pub fn cancel_command(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<
 }
 
 pub fn wait_on(args: &[LValue], _env: &LEnv, _: &CtxRaeExec) -> Result<LValue, LError> {
-    info!("wait on function");
-    println!("wait on function with {} args", args.len());
+    //info!("wait on function");
+    //println!("wait on function with {} args", args.len());
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(
             WAIT_ON,
@@ -541,16 +541,16 @@ pub fn wait_on(args: &[LValue], _env: &LEnv, _: &CtxRaeExec) -> Result<LValue, L
             1..1,
         ));
     }
-    println!("New wait on {}", args[0]);
+    //println!("New wait on {}", args[0]);
     let mut rx = add_waiter(args[0].clone());
-    println!("receiver ok");
+    //println!("receiver ok");
     blocking_async!({
         if let false = rx.recv().await.expect("could not receive msg from waiters") {
             unreachable!("should not receive false from waiters")
         }
-        println!("end of wait on");
+        //println!("end of wait on");
     })
     .expect("todo!");
-    println!("end wait on");
+    //println!("end wait on");
     Ok(LValue::Nil)
 }

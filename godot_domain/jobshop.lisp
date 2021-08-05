@@ -14,7 +14,7 @@
     (def-action navigate_to_area ?r ?area)
     (def-action go_charge ?r)
     (def-action do_rotation ?r ?a ?w)
-    (def-action face_belt ?belt_name ?speed)
+    (def-action face_belt ?r ?b ?w)
     (def-state-function robot.coordinates ?r)
     (def-state-function robot.instance ?r)
     (def-state-function robot.coordinates_tile ?r)
@@ -87,11 +87,11 @@
                 (if (!= (belt.instance ?l) nil)
                     (begin
                         (rae-await (navigate_to_area ?r (car (belt.interact_areas ?l))))
-                        (rae-await (face_belt ?r ?l))
+                        (rae-await (face_belt ?r ?l 5))
                         ;pick the right package on the belt
                         (rae-await (pick_package ?r ?p))
                         (rae-await (navigate_to_area ?r (car (belt.interact_areas (machine.input_belt ?m)))))
-                        (rae-await (face_belt ?r (machine.input_belt ?m)))
+                        (rae-await (face_belt ?r (machine.input_belt ?m) 5))
                         (rae-await (place ?r)))
                     nil))))))
 )

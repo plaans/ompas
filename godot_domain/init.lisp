@@ -1,4 +1,4 @@
 (begin
-    (read instances/godot_domain_jobshop.lisp)
-    (read instances/godot_config.lisp)
+    (read godot_domain/jobshop.lisp)
+    (read godot_domain/config.lisp)
    )

@@ -676,7 +676,7 @@ pub fn expand(
                                     }
                                 }
                             }
-                            LValue::Symbol(_) => {}
+                            LValue::Symbol(_) | LValue::Nil => {}
                             lv => {
                                 return Err(NotInListOfExpectedTypes(
                                     "expand",
@@ -967,6 +967,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                                 vec_sym.into()
                             }
                             LValue::Symbol(s) => s.clone().into(),
+                            LValue::Nil => LambdaArgs::Nil,
                             lv => {
                                 return Err(NotInListOfExpectedTypes(
                                     "eval",

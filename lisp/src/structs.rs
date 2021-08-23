@@ -355,6 +355,7 @@ impl Eq for LNumber {}
 pub enum LambdaArgs {
     Sym(String),
     List(Vec<String>),
+    Nil,
 }
 
 impl Display for LambdaArgs {
@@ -373,6 +374,7 @@ impl Display for LambdaArgs {
                 }
                 write!(f, "{}", s)
             }
+            LambdaArgs::Nil => write!(f, "nil"),
         }
     }
 }
@@ -453,6 +455,14 @@ impl LLambda {
                 }
                 for (param, arg) in params.iter().zip(args) {
                     env.insert(param.to_string(), arg.clone());
+                }
+            }
+            LambdaArgs::Nil => {
+                if !args.is_empty() {
+                    return Err(SpecialError(
+                        "Lambda.get_env",
+                        "Lambda was expecting no args.".to_string(),
+                    ));
                 }
             }
         };

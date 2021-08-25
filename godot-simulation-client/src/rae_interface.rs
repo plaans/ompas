@@ -6,7 +6,9 @@ use crate::tcp::{task_tcp_connection, TEST_TCP};
 use crate::TOKIO_CHANNEL_SIZE;
 use core::time;
 use ompas_acting::rae::context::{ActionsProgress, Status};
-use ompas_acting::rae::module::mod_rae_exec::{RAEInterface, RAE_LAUNCH_PLATFORM};
+use ompas_acting::rae::module::mod_rae_exec::{
+    RAEInterface, RAE_GET_STATE_VARIBALE, RAE_LAUNCH_PLATFORM,
+};
 use ompas_acting::rae::state::{RAEState, StateType, KEY_DYNAMIC, KEY_STATIC};
 use ompas_lisp::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
 use ompas_lisp::structs::*;
@@ -203,8 +205,19 @@ impl RAEInterface for PlatformGodot {
     /// Returns the value of a state variable.
     /// args contains the key of the state variable.
     fn get_state_variable(&self, args: &[LValue]) -> Result<LValue, LError> {
-        let key: LValue = args.into();
-        let key: LValueS = key.into();
+        if args.is_empty() {
+            return Err(WrongNumberOfArgument(
+                RAE_GET_STATE_VARIBALE,
+                args.into(),
+                0,
+                1..std::usize::MAX,
+            ));
+        }
+        let key: LValueS = if args.len() > 1 {
+            LValue::from(args).into()
+        } else {
+            args[0].clone().into()
+        };
 
         //println!("key: {}", key);
         let c_state = self.state.clone();

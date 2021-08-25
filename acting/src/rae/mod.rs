@@ -94,7 +94,7 @@ pub async fn rae_run(mut context: RAEEnv, options: &RAEOptions, _log: String) {
 
     let mut receiver = mem::replace(&mut context.job_receiver, None).unwrap();
     //Ubuntu::
-    let lvalue: LValue = match options.get_platfrom_config() {
+    let lvalue: LValue = match options.get_platform_config() {
         None => vec![RAE_LAUNCH_PLATFORM].into(),
         Some(string) => {
             info!("Platform config: {}", string);

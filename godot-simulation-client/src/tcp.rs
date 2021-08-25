@@ -132,7 +132,7 @@ async fn async_read_socket(stream: ReadHalf<TcpStream>, state: RAEState, status:
                         status
                             .status
                             .write()
-                            .unwrap()
+                            .await
                             .insert(action_status.0, action_status.1.into());
                     }
                     match &status.sync.sender {
@@ -156,7 +156,7 @@ async fn async_read_socket(stream: ReadHalf<TcpStream>, state: RAEState, status:
                     status
                         .status
                         .write()
-                        .unwrap()
+                        .await
                         .insert(*id, action_status.1.into());
 
                     match &status.sync.sender {

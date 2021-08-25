@@ -114,8 +114,8 @@ impl GetModule for CtxRaeExec {
 }
 
 impl CtxRaeExec {
-    pub fn get_execution_status(&self, action_id: &ActionId) -> Option<Status> {
-        self.actions_progress.get_status(action_id)
+    pub async fn get_execution_status(&self, action_id: &ActionId) -> Option<Status> {
+        self.actions_progress.get_status(action_id).await
     }
 
     pub fn add_platform(&mut self, platform: Box<dyn RAEInterface>) {
@@ -272,8 +272,8 @@ impl RAEInterface for () {
 
 pub fn exec_command(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
     let command_id = ctx.actions_progress.get_new_id();
-    //let debug: LValue = args.into();
-    //println!("exec command {}: {}", command_id, debug);
+    let debug: LValue = args.into();
+    info!("exec command {}: {}", command_id, debug);
     ctx.platform_interface.exec_command(args, command_id)?;
     Ok(command_id.into())
 }
@@ -331,6 +331,7 @@ pub fn fn_await(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue
         let mut receiver = ctx.actions_progress.declare_new_watcher(&action_id);
         let action_progress = ctx.actions_progress.clone();
         let handle = tokio::runtime::Handle::current();
+        info!("waiting on action {}", action_id);
         thread::spawn(move || {
             handle.block_on(async move {
                 loop {
@@ -338,7 +339,7 @@ pub fn fn_await(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue
                     match receiver.recv().await.unwrap() {
                         true => {
                             //println!("status updated!");
-                            match action_progress.status.read().unwrap().get(&action_id) {
+                            match action_progress.status.read().await.get(&action_id) {
                                 Some(s) => match s {
                                     Status::Pending => {
                                         //println!("not triggered");
@@ -347,11 +348,11 @@ pub fn fn_await(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue
                                         //println!("running");
                                     }
                                     Status::Failure => {
-                                        warn!("command is a failure");
+                                        warn!("Command {} is a failure.", action_id);
                                         return Ok(false.into());
                                     }
                                     Status::Done => {
-                                        info!("command is a success");
+                                        info!("Command {} is a success.", action_id);
                                         return Ok(true.into());
                                     }
                                 },

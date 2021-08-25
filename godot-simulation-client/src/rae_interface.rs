@@ -62,11 +62,8 @@ impl RAEInterface for PlatformGodot {
             }),
         };
 
-        self.status
-            .status
-            .write()
-            .unwrap()
-            .insert(command_id, Status::Pending);
+        let status = self.status.status.clone();
+        blocking_async!(status.write().await.insert(command_id, Status::Pending));
 
         //println!("action status created");
 
@@ -233,7 +230,9 @@ impl RAEInterface for PlatformGodot {
 
     /// Return the status of all the actions.
     fn get_status(&self, _: &[LValue]) -> Result<LValue, LError> {
-        let status = self.status.status.read().unwrap().clone();
+        let status = self.status.status.clone();
+
+        let status = blocking_async!(status.read().await.clone()).unwrap();
 
         let mut string = "Action(s) Status\n".to_string();
 
@@ -404,7 +403,10 @@ impl RAEInterface for PlatformGodot {
     fn get_action_status(&self, action_id: &usize) -> Status {
         //let status = self.status.clone();
         //let action_id = *action_id;
-        self.status.get_action_status(action_id)
+        let status = self.status.clone();
+        let c_action_id = action_id.clone();
+        let result = blocking_async!(status.get_action_status(&c_action_id).await).unwrap();
+        result
         //println!("status: {}", result.unwrap());
     }
 

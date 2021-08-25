@@ -619,7 +619,8 @@ pub fn def_initial_state(args: &[LValue], _: &LEnv, ctx: &mut CtxRae) -> Result<
 
 /// Returns all the status of the actions pretty printed
 pub fn get_status(_: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
-    let status = ctx.env.actions_progress.status.read().unwrap().clone();
+    let status = ctx.env.actions_progress.status.clone();
+    let status = blocking_async!(status.read().await.clone()).unwrap();
     let mut string = "Actions Status:\n".to_string();
     for element in status {
         string.push_str(format!("{}:{}\n", element.0, element.1).as_str())
@@ -720,7 +721,7 @@ pub fn get_config_platform(args: &[LValue], _: &LEnv, ctx: &CtxRae) -> Result<LV
     }
     Ok(LValue::String(
         ctx.options
-            .get_platfrom_config()
+            .get_platform_config()
             .unwrap_or(String::from("no options")),
     ))
 }

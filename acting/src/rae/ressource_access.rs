@@ -46,9 +46,9 @@ pub mod wait_on {
                 let result = eval(&waiter.lambda, &mut env, &mut ctxs);
                 match result {
                     Ok(lv) => {
-                        info!("{} => {}", waiter.lambda, lv);
+                        //info!("{} => {}", waiter.lambda, lv);
                         if let LValue::True = lv {
-                            info!("Wait on {} is now true.", waiter.lambda);
+                            //info!("Wait on {} is now true.", waiter.lambda);
                             waiter
                                 .channel
                                 .send(true)
@@ -56,7 +56,7 @@ pub mod wait_on {
                                 .expect("could not send true message to waiter");
                             item_to_remove.push(id);
                         } else {
-                            info!("{} is still false", waiter.lambda)
+                            //info!("{} is still false", waiter.lambda)
                         }
                     }
                     Err(e) => warn!("error checking wait on: {}", e),

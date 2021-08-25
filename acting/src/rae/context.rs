@@ -6,16 +6,17 @@ use crate::rae::TOKIO_CHANNEL_SIZE;
 use ompas_lisp::core::{ContextCollection, LEnv};
 use ompas_lisp::structs::LError::SpecialError;
 use ompas_lisp::structs::{InitLisp, LError, LFn, LLambda, LValue};
+use ompas_utils::blocking_async;
 use std::collections::{HashMap, VecDeque};
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{Display, Formatter};
 use std::panic::panic_any;
 use std::ptr::write_bytes;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::thread;
-use tokio::sync::mpsc;
 use tokio::sync::mpsc::Receiver;
+use tokio::sync::{mpsc, RwLock};
 
 #[derive(Default, Debug)]
 pub struct Agenda {
@@ -440,7 +441,9 @@ pub struct ActionsProgress {
 impl ActionsProgress {
     pub fn declare_new_watcher(&self, action_id: &usize) -> Receiver<bool> {
         let (sender, receiver) = mpsc::channel(TOKIO_CHANNEL_SIZE);
-        self.sync.add_action_to_watch(*action_id, sender);
+        let c_sync = self.sync.clone();
+        let c_action_id = action_id.clone();
+        blocking_async!(c_sync.add_action_to_watch(c_action_id, sender).await);
         receiver
     }
 }
@@ -465,22 +468,22 @@ impl Display for Status {
 }
 
 impl ActionsProgress {
-    pub fn get_status(&self, id: &ActionId) -> Option<Status> {
-        self.status.read().unwrap().get(id).cloned()
+    pub async fn get_status(&self, id: &ActionId) -> Option<Status> {
+        self.status.read().await.get(id).cloned()
     }
 
-    pub fn add_action(&self) -> usize {
+    pub async fn add_action(&self) -> usize {
         let id = self.get_new_id();
-        self.status.write().unwrap().insert(id, Status::Pending);
+        self.status.write().await.insert(id, Status::Pending);
         id
     }
 
-    pub fn update_status_action(&self, action_id: &ActionId, status: Status) {
-        self.status.write().unwrap().insert(*action_id, status);
+    pub async fn update_status_action(&self, action_id: &ActionId, status: Status) {
+        self.status.write().await.insert(*action_id, status);
     }
 
-    pub fn get_action_status(&self, action_id: &ActionId) -> Status {
-        self.status.read().unwrap().get(action_id).unwrap().clone()
+    pub async fn get_action_status(&self, action_id: &ActionId) -> Status {
+        self.status.read().await.get(action_id).unwrap().clone()
     }
 
     pub fn get_new_id(&self) -> usize {
@@ -524,7 +527,7 @@ impl RAEOptions {
         self.platform_config = Some(str);
     }
 
-    pub fn get_platfrom_config(&self) -> Option<String> {
+    pub fn get_platform_config(&self) -> Option<String> {
         self.platform_config.clone()
     }
 }

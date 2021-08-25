@@ -128,8 +128,12 @@
                             (car (unzip (package.processes_list ?p)))))
                     (rae-log "list_machines:" list_machines)
                     (enumerate (list ?p) (take_first list_machines))))
-            (t_carry_to_machine ?p (find_output_machine))
-                    ))))
+
+            (let ((?r (car (available_robots))))
+                (begin
+                    (mutex.lock ?r)
+                    (t_carry_to_machine ?r ?p (find_output_machine))
+                    (mutex.release ?r)))))))
     (def-method m_process_on_machine
         '((:task t_process_on_machine)
         (:params ?p ?m)
@@ -202,6 +206,6 @@
             (:body
                 (begin
                     (rae-await (go_charge ?r))
-                    (wait-on (= (robot.battery ?r) 1))
+                    (wait-on `(= (robot.battery ,?r) 1))
                     nil))))
 )

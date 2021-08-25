@@ -260,7 +260,7 @@ pub mod scheme_lambda {
     pub const LAMBDA_MAPF : &str = "(define mapf (lambda (f seq)\
                                                          (if (null? seq)\
                                                          nil\
-                                                         (cons (f (car seq)) (mapf f (cdr seq))))))";
+                                                         (cons (eval (cons f (car seq))) (mapf f (cdr seq))))))";
 }
 //Documentation
 pub mod doc {

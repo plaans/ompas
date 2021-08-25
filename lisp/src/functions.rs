@@ -622,7 +622,7 @@ pub fn gt(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
 pub fn lt(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     match args.len() {
         2 => Ok((args[0] < args[1]).into()),
-        i => Err(WrongNumberOfArgument(GT, args.into(), i, 2..2)),
+        i => Err(WrongNumberOfArgument(LT, args.into(), i, 2..2)),
     }
 }
 /// Compares two values. Returns true if the first arg is greater or equal to the second. Nil Otherwise

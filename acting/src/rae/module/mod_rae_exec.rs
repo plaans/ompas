@@ -49,6 +49,7 @@ pub const RAE_GET_STATUS: &str = "rae-get-status";
 pub const RAE_CANCEL_COMMAND: &str = "rae-cancel-command";
 pub const RAE_GET_METHODS: &str = "rae-get-methods";
 pub const RAE_GET_BEST_METHOD: &str = "rae-get-best-method";
+pub const RAE_LOG: &str = "rae-log";
 
 ///Context that will contains primitives for the RAE executive
 pub struct CtxRaeExec {
@@ -78,6 +79,9 @@ impl GetModule for CtxRaeExec {
             MACRO_GENERATE_TASK_SIMPLE,
             MACRO_GENERATE_METHOD_PARAMETERS,
             MACRO_ENUMERATE_PARAMS,
+            LAMBDA_MUTEX_LOCK,
+            LAMBDA_MUTEX_IS_LOCKED,
+            LAMBDA_MUTEX_RELEASE,
         ]
         .into();
         let mut module = Module {
@@ -104,6 +108,7 @@ impl GetModule for CtxRaeExec {
         module.add_fn_prelude(RAE_GET_METHODS, get_methods);
         module.add_fn_prelude(RAE_GET_BEST_METHOD, get_best_method);
         module.add_fn_prelude(WAIT_ON, wait_on);
+        module.add_fn_prelude(RAE_LOG, log);
         module
     }
 }
@@ -552,5 +557,10 @@ pub fn wait_on(args: &[LValue], _env: &LEnv, _: &CtxRaeExec) -> Result<LValue, L
     })
     .expect("todo!");
     //println!("end wait on");
+    Ok(LValue::Nil)
+}
+
+fn log(args: &[LValue], _env: &LEnv, _: &CtxRaeExec) -> Result<LValue, LError> {
+    info!("{}", LValue::from(args));
     Ok(LValue::Nil)
 }

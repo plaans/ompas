@@ -13,11 +13,13 @@ use ompas_lisp::structs::LValue::Nil;
 use ompas_lisp::structs::*;
 use ompas_modules::doc::{Documentation, LHelp};
 use ompas_modules::math::CtxMath;
+use ompas_utils::blocking_async;
 use ompas_utils::log;
 use std::convert::TryInto;
 use std::mem;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use tokio::task::block_in_place;
 
 //LANGUAGE
 const MOD_RAE: &str = "mod-rae";
@@ -601,7 +603,8 @@ pub fn def_initial_state(args: &[LValue], _: &LEnv, ctx: &mut CtxRae) -> Result<
                 ));
             }
         }
-        ctx.env.state.update_state(state);
+        let c_state = ctx.env.state.clone();
+        blocking_async!(c_state.update_state(state).await).expect("todo!");
     } else {
         return Err(WrongType(
             RAE_DEF_INITIAL_STATE,
@@ -616,7 +619,8 @@ pub fn def_initial_state(args: &[LValue], _: &LEnv, ctx: &mut CtxRae) -> Result<
 
 /// Returns all the status of the actions pretty printed
 pub fn get_status(_: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
-    let status = ctx.env.actions_progress.status.read().unwrap().clone();
+    let status = ctx.env.actions_progress.status.clone();
+    let status = blocking_async!(status.read().await.clone()).unwrap();
     let mut string = "Actions Status:\n".to_string();
     for element in status {
         string.push_str(format!("{}:{}\n", element.0, element.1).as_str())
@@ -663,8 +667,8 @@ pub fn get_state(args: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, L
             ))
         }
     };
-
-    let state = ctx.env.state.get_state(_type);
+    let c_state = ctx.env.state.clone();
+    let state = blocking_async!(c_state.get_state(_type).await).unwrap();
     Ok(state.into_map())
 }
 
@@ -717,7 +721,7 @@ pub fn get_config_platform(args: &[LValue], _: &LEnv, ctx: &CtxRae) -> Result<LV
     }
     Ok(LValue::String(
         ctx.options
-            .get_platfrom_config()
+            .get_platform_config()
             .unwrap_or(String::from("no options")),
     ))
 }

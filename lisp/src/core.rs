@@ -12,6 +12,7 @@ use crate::structs::NameTypeLValue::{List, Symbol};
 use crate::structs::*;
 use aries_planning::parsing::sexpr::SExpr;
 use im::hashmap::HashMap;
+use im::HashSet;
 use std::any::Any;
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{Display, Formatter};
@@ -74,6 +75,7 @@ impl LEnv {
 pub struct ContextCollection {
     inner: Vec<Arc<dyn Any + Send + Sync>>,
     map_label_usize: HashMap<&'static str, usize>,
+    reverse_map: HashMap<usize, &'static str>,
 }
 
 impl Default for ContextCollection {
@@ -81,15 +83,19 @@ impl Default for ContextCollection {
         Self {
             inner: vec![],
             map_label_usize: Default::default(),
+            reverse_map: Default::default(),
         }
     }
 }
 
 impl ContextCollection {
     ///Insert a new context
-    pub fn insert(&mut self, ctx: Arc<dyn Any + Send + Sync>) -> usize {
+    pub fn insert(&mut self, ctx: Arc<dyn Any + Send + Sync>, label: &'static str) -> usize {
         self.inner.push(ctx);
-        self.inner.len() - 1
+        let id = self.inner.len() - 1;
+        self.map_label_usize.insert(label, id);
+        self.reverse_map.insert(id, label);
+        id
     }
 
     /// Returns a reference to the context with the corresponding id
@@ -113,9 +119,9 @@ impl ContextCollection {
     /// Returns a mutable reference to the context with corresponding id
     pub fn get_mut_context(&mut self, id: usize) -> &mut (dyn Any + Send + Sync) {
         match self.inner.get_mut(id) {
-            None => panic!("no context with such label"),
+            None => panic!("no context with id {}", 1),
             Some(ctx) => match Arc::get_mut(ctx) {
-                None => panic!("Could no get mut ref from Arc. This is probably because the reference to the context is shared"),
+                None => panic!("Could no get mut ref from Arc of mod {}. This is probably because the reference to the context is shared", self.reverse_map.get(&id).unwrap()),
                 Some(ctx) => ctx
             }
         }
@@ -240,6 +246,7 @@ impl GetModule for CtxRoot {
                 LAMBDA_UNZIP,
                 LAMBDA_ZIP,
                 LAMBDA_MAPF,
+                MACRO_FOR,
             ]
             .into(),
             label: MOD_ROOT,
@@ -259,7 +266,9 @@ impl GetModule for CtxRoot {
         module.add_prelude(QUOTE, LCoreOperator::Quote.into());
         module.add_prelude(UNQUOTE, LCoreOperator::UnQuote.into());
 
-        module.add_fn_prelude(ENV, env);
+        module.add_fn_prelude(ENV_GET_KEYS, env_get_keys);
+        module.add_fn_prelude(ENV_GET_MACROS, env_get_macros);
+        module.add_fn_prelude(ENV_GET_MACRO, env_get_macro);
 
         //Special entry
         module.add_fn_prelude(GET, get);
@@ -276,6 +285,8 @@ impl GetModule for CtxRoot {
         module.add_fn_prelude(CONS, cons);
         module.add_fn_prelude(LEN, length);
         module.add_fn_prelude(EMPTY, empty);
+        module.add_fn_prelude(GET_LIST, get_list);
+        module.add_fn_prelude(SET_LIST, set_list);
 
         //Map functions
         module.add_fn_prelude(GET_MAP, get_map);
@@ -398,10 +409,21 @@ impl LEnv {
         self.macro_table.get(key)
     }
 
-    pub fn keys(&self) -> Vec<String> {
-        let mut keys: Vec<String> = self.symbols.keys().cloned().collect();
-        keys.append(&mut self.macro_table.keys().cloned().collect());
+    pub fn keys(&self) -> HashSet<String> {
+        let mut keys: HashSet<String> = self.symbols.keys().cloned().collect();
+        keys = keys.union(self.macro_table.keys().cloned().collect());
+        if let Some(outer) = &self.outer {
+            keys = keys.union(outer.keys());
+        }
         keys
+    }
+
+    pub fn macros(&self) -> HashSet<String> {
+        let mut macros: HashSet<String> = self.macro_table.keys().cloned().collect();
+        if let Some(outer) = &self.outer {
+            macros = macros.union(outer.macros());
+        }
+        macros
     }
 }
 
@@ -414,7 +436,7 @@ pub fn load_module(
     lisp_init: &mut InitLisp,
 ) -> usize {
     let mut module = ctx.get_module();
-    let id = ctxs.insert(module.ctx);
+    let id = ctxs.insert(module.ctx, module.label);
     //println!("id: {}", id);
     lisp_init.append(&mut module.raw_lisp);
     for (sym, lv) in &mut module.prelude {
@@ -654,7 +676,7 @@ pub fn expand(
                                     }
                                 }
                             }
-                            LValue::Symbol(_) => {}
+                            LValue::Symbol(_) | LValue::Nil => {}
                             lv => {
                                 return Err(NotInListOfExpectedTypes(
                                     "expand",
@@ -945,6 +967,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                                 vec_sym.into()
                             }
                             LValue::Symbol(s) => s.clone().into(),
+                            LValue::Nil => LambdaArgs::Nil,
                             lv => {
                                 return Err(NotInListOfExpectedTypes(
                                     "eval",

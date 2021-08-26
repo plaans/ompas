@@ -14,13 +14,46 @@ pub fn default(_args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
 }
 
 /// Returns a list of all the keys present in the environment
-pub fn env(_: &[LValue], env: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn env_get_keys(_: &[LValue], env: &LEnv, _: &()) -> Result<LValue, LError> {
     Ok(env
         .keys()
         .iter()
         .map(|x| LValue::from(x.clone()))
         .collect::<Vec<LValue>>()
         .into())
+}
+
+pub fn env_get_macros(_: &[LValue], env: &LEnv, _: &()) -> Result<LValue, LError> {
+    Ok(env
+        .macros()
+        .iter()
+        .map(|x| LValue::from(x.clone()))
+        .collect::<Vec<LValue>>()
+        .into())
+}
+
+pub fn env_get_macro(args: &[LValue], env: &LEnv, _: &()) -> Result<LValue, LError> {
+    if args.len() != 1 {
+        return Err(WrongNumberOfArgument(
+            ENV_GET_MACRO,
+            args.into(),
+            args.len(),
+            1..1,
+        ));
+    }
+    if let LValue::Symbol(s) = &args[0] {
+        Ok(match env.get_macro(s).cloned() {
+            Some(l) => l.into(),
+            None => LValue::Nil,
+        })
+    } else {
+        Err(WrongType(
+            ENV_GET_MACRO,
+            args[0].clone(),
+            (&args[0]).into(),
+            NameTypeLValue::Symbol,
+        ))
+    }
 }
 
 #[deprecated]
@@ -378,6 +411,84 @@ pub fn member(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     }
 }
 
+pub fn get_list(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    if args.len() != 2 {
+        return Err(WrongNumberOfArgument(
+            GET_LIST,
+            args.into(),
+            args.len(),
+            2..2,
+        ));
+    }
+
+    if let LValue::List(vec) = &args[0] {
+        if let LValue::Number(LNumber::Int(i)) = &args[1] {
+            if vec.len() > *i as usize {
+                Ok(vec[*i as usize].clone())
+            } else {
+                Err(SpecialError(
+                    GET_LIST,
+                    format!("index out of bound, must be in [{};{}]", 0, vec.len() - 1),
+                ))
+            }
+        } else {
+            Err(WrongType(
+                GET_LIST,
+                args[1].clone(),
+                (&args[1]).into(),
+                NameTypeLValue::Int,
+            ))
+        }
+    } else {
+        Err(WrongType(
+            GET_LIST,
+            args[0].clone(),
+            (&args[0]).into(),
+            NameTypeLValue::List,
+        ))
+    }
+}
+
+pub fn set_list(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    if args.len() != 3 {
+        return Err(WrongNumberOfArgument(
+            GET_LIST,
+            args.into(),
+            args.len(),
+            3..3,
+        ));
+    }
+
+    if let LValue::List(vec) = &args[0] {
+        if let LValue::Number(LNumber::Int(i)) = &args[2] {
+            if vec.len() > *i as usize {
+                let mut vec = vec.clone();
+                vec[*i as usize] = args[1].clone();
+                Ok(vec.into())
+            } else {
+                Err(SpecialError(
+                    GET_LIST,
+                    format!("index out of bound, must be in [{};{}]", 0, vec.len() - 1),
+                ))
+            }
+        } else {
+            Err(WrongType(
+                GET_LIST,
+                args[1].clone(),
+                (&args[1]).into(),
+                NameTypeLValue::Int,
+            ))
+        }
+    } else {
+        Err(WrongType(
+            GET_LIST,
+            args[0].clone(),
+            (&args[0]).into(),
+            NameTypeLValue::List,
+        ))
+    }
+}
+
 /// It takes a list and returns a list with the top elements in reverse order.
 pub fn reverse(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() == 1 {
@@ -511,7 +622,7 @@ pub fn gt(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
 pub fn lt(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     match args.len() {
         2 => Ok((args[0] < args[1]).into()),
-        i => Err(WrongNumberOfArgument(GT, args.into(), i, 2..2)),
+        i => Err(WrongNumberOfArgument(LT, args.into(), i, 2..2)),
     }
 }
 /// Compares two values. Returns true if the first arg is greater or equal to the second. Nil Otherwise

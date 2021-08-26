@@ -11,6 +11,7 @@ use crate::rae::context::{RAEEnv, RAEOptions, SelectOption, RAE_TASK_METHODS_MAP
 //use crate::rae::context::{Action, Method, SelectOption, Status, TaskId};
 use crate::rae::module::mod_rae_exec::{Job, JobId, RAE_LAUNCH_PLATFORM};
 use crate::rae::refinement::{RefinementStack, StackFrame};
+use crate::rae::ressource_access::wait_on::task_check_wait_on;
 use crate::rae::status::async_status_watcher_run;
 use log::{error, info, warn};
 use ompas_lisp::async_await;
@@ -19,9 +20,11 @@ use ompas_lisp::core::{eval, ContextCollection, LEnv};
 use ompas_lisp::functions::cons;
 use ompas_lisp::structs::{LError, LValue};
 use std::mem;
+
 pub mod context;
 pub mod module;
 pub mod refinement;
+pub mod ressource_access;
 pub mod state;
 pub mod status;
 
@@ -91,7 +94,7 @@ pub async fn rae_run(mut context: RAEEnv, options: &RAEOptions, _log: String) {
 
     let mut receiver = mem::replace(&mut context.job_receiver, None).unwrap();
     //Ubuntu::
-    let lvalue: LValue = match options.get_platfrom_config() {
+    let lvalue: LValue = match options.get_platform_config() {
         None => vec![RAE_LAUNCH_PLATFORM].into(),
         Some(string) => {
             info!("Platform config: {}", string);
@@ -105,6 +108,18 @@ pub async fn rae_run(mut context: RAEEnv, options: &RAEOptions, _log: String) {
         Ok(_) => {} //println!("successfully open com with platform"),
         Err(e) => error!("{}", e),
     }
+
+    let receiver_event_update_state = context.state.subscribe_on_update().await;
+    let env_check_wait_on = context.get_eval_env();
+    let ctxs_check_wait_on = context.ctxs.clone();
+    tokio::spawn(async move {
+        task_check_wait_on(
+            receiver_event_update_state,
+            env_check_wait_on,
+            ctxs_check_wait_on,
+        )
+        .await
+    });
 
     loop {
         //For each new event or task to be addressed, we search for the best method a create a new refinement stack
@@ -166,13 +181,6 @@ pub async fn rae_run(mut context: RAEEnv, options: &RAEOptions, _log: String) {
 
 async fn progress_2(job_lvalue: LValue, mut env: LEnv, mut ctxs: ContextCollection) {
     info!("new triggered task: {}", job_lvalue);
-    /*let task_methods_map = env.get_symbol(RAE_TASK_METHODS_MAP).unwrap();
-    ompas_utils::log::send(format!(
-        "task_methods_map before eval: {}\n",
-        task_methods_map
-    ));
-    ompas_utils::log::send(format!("env before eval: {}\n", env));
-    ompas_utils::log::send(format!("env:\n{}", env));*/
     let job_lvalue = LValue::List(vec![job_lvalue]);
     match eval(&job_lvalue, &mut env, &mut ctxs) {
         Ok(lv) => info!("result of task {}: {}", job_lvalue, lv),

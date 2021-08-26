@@ -5,7 +5,6 @@ use crate::rae::module::mod_rae_monitor::CtxRaeMonitor;
 use crate::rae::TOKIO_CHANNEL_SIZE;
 use ompas_lisp::async_await;
 use ompas_lisp::core::{eval, load_module, parse, LEnv};
-use ompas_lisp::functions::env;
 use ompas_lisp::structs::{InitLisp, LValue};
 use ompas_modules::math::CtxMath;
 use ompas_modules::utils::CtxUtils;

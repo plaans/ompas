@@ -6,14 +6,18 @@ use crate::tcp::{task_tcp_connection, TEST_TCP};
 use crate::TOKIO_CHANNEL_SIZE;
 use core::time;
 use ompas_acting::rae::context::{ActionsProgress, Status};
-use ompas_acting::rae::module::mod_rae_exec::RAEInterface;
+use ompas_acting::rae::module::mod_rae_exec::{
+    RAEInterface, RAE_GET_STATE_VARIBALE, RAE_LAUNCH_PLATFORM,
+};
 use ompas_acting::rae::state::{RAEState, StateType, KEY_DYNAMIC, KEY_STATIC};
 use ompas_lisp::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
 use ompas_lisp::structs::*;
+use ompas_utils::blocking_async;
 use ompas_utils::task_handler;
 use std::net::SocketAddr;
 use std::process::Command;
 use std::thread;
+use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Sender;
 
@@ -58,11 +62,8 @@ impl RAEInterface for PlatformGodot {
             }),
         };
 
-        self.status
-            .status
-            .write()
-            .unwrap()
-            .insert(command_id, Status::Pending);
+        let status = self.status.status.clone();
+        blocking_async!(status.write().await.insert(command_id, Status::Pending));
 
         //println!("action status created");
 
@@ -187,7 +188,8 @@ impl RAEInterface for PlatformGodot {
 
         //let handle = tokio::runtime::Handle::current();
         //let state = self.state.clone();
-        let result = self.state.get_state(_type);
+        let c_state = self.state.clone();
+        let result = blocking_async!(c_state.get_state(_type).await).expect("todo!");
         /*let result = thread::spawn(move || {
             handle.block_on(async move { self.state.get_state() })
         })
@@ -200,11 +202,23 @@ impl RAEInterface for PlatformGodot {
     /// Returns the value of a state variable.
     /// args contains the key of the state variable.
     fn get_state_variable(&self, args: &[LValue]) -> Result<LValue, LError> {
-        let key: LValue = args.into();
-        let key: LValueS = key.into();
+        if args.is_empty() {
+            return Err(WrongNumberOfArgument(
+                RAE_GET_STATE_VARIBALE,
+                args.into(),
+                0,
+                1..std::usize::MAX,
+            ));
+        }
+        let key: LValueS = if args.len() > 1 {
+            LValue::from(args).into()
+        } else {
+            args[0].clone().into()
+        };
 
         //println!("key: {}", key);
-        let state = self.state.get_state(None);
+        let c_state = self.state.clone();
+        let state = blocking_async!(c_state.get_state(None).await).expect("todo!");
 
         //println!("state: {:?}", state);
 
@@ -216,7 +230,9 @@ impl RAEInterface for PlatformGodot {
 
     /// Return the status of all the actions.
     fn get_status(&self, _: &[LValue]) -> Result<LValue, LError> {
-        let status = self.status.status.read().unwrap().clone();
+        let status = self.status.status.clone();
+
+        let status = blocking_async!(status.read().await.clone()).unwrap();
 
         let mut string = "Action(s) Status\n".to_string();
 
@@ -229,26 +245,50 @@ impl RAEInterface for PlatformGodot {
 
     /// Launch the platform godot and open the tcp communication
     fn launch_platform(&mut self, args: &[LValue]) -> Result<LValue, LError> {
-        self.start_platform(&args[0..0])?;
+        let (args_start, args_open) = match args.len() {
+            0 => (&args[0..0], &args[0..0]),
+            1 => (&args[0..1], &args[0..0]),
+            2 => (&args[0..1], &args[1..2]),
+            _ => {
+                return Err(WrongNumberOfArgument(
+                    RAE_LAUNCH_PLATFORM,
+                    args.into(),
+                    args.len(),
+                    0..2,
+                ))
+            }
+        };
+        self.start_platform(&args_start)?;
         thread::sleep(time::Duration::from_millis(1000));
-        self.open_com(&args[1..])
+        self.open_com(&args_open)
     }
 
     /// Start the platform (start the godot process and launch the simulation)
     fn start_platform(&self, args: &[LValue]) -> Result<LValue, LError> {
-        let mut child = match args.len() {
-            0 => Command::new("godot3")
-                .arg("--path")
-                .arg(DEFAULT_PATH_PROJECT_GODOT)
-                .spawn()
-                .expect("failed to execute process"), //default settings
+        match args.len() {
+            //default settings
+            0 => {
+                Command::new("gnome-terminal")
+                    .arg("--")
+                    .arg("godot3")
+                    .arg("--path")
+                    .arg(DEFAULT_PATH_PROJECT_GODOT)
+                    .spawn()
+                    .expect("failed to execute process");
+            }
             1 => {
                 if let LValue::Symbol(s) = &args[0] {
-                    let s = s.clone();
-                    Command::new("godot3")
-                        .arg(s)
+                    /*println!(
+                        "PlatformGodot::start_platfrom: start godot with config {}({} args)",
+                        s,
+                        s.split_whitespace().count()
+                    );*/
+                    Command::new("gnome-terminal")
+                        .arg("--")
+                        .arg("godot3")
+                        .args(s.split_whitespace())
                         .spawn()
-                        .expect("failed to execute process")
+                        .expect("failed to execute process");
                 } else {
                     return Err(WrongType(
                         "PlatformGodot::start_platform",
@@ -268,12 +308,36 @@ impl RAEInterface for PlatformGodot {
             } //Unexpected number of arguments
         };
 
-        tokio::spawn(async move {
+        tokio::spawn(async {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            let result = Command::new("pidof")
+                .arg("godot3")
+                .output()
+                .expect("could not run command.");
+            let pids = String::from_utf8(result.stdout).expect("could not convert into string");
+            //println!("tail pids: {}", pids);
+            let logger_pid = if !pids.is_empty() {
+                let logger_pid = pids
+                    .split_whitespace()
+                    .next()
+                    .expect("could not get first pid")
+                    .to_string();
+                //println!("logger pid: {}", logger_pid);
+                Some(logger_pid)
+            } else {
+                None
+            };
             task_handler::subscribe_new_task()
                 .recv()
                 .await
                 .expect("could not receive from task handler");
-            child.kill().expect("!kill process of godot");
+
+            if let Some(pid) = logger_pid {
+                Command::new("kill")
+                    .args(&["-9", pid.as_str()])
+                    .spawn()
+                    .expect("Command failed.");
+            }
             println!("process godot killed")
         });
         Ok(LValue::Nil)
@@ -339,7 +403,10 @@ impl RAEInterface for PlatformGodot {
     fn get_action_status(&self, action_id: &usize) -> Status {
         //let status = self.status.clone();
         //let action_id = *action_id;
-        self.status.get_action_status(action_id)
+        let status = self.status.clone();
+        let c_action_id = action_id.clone();
+        let result = blocking_async!(status.get_action_status(&c_action_id).await).unwrap();
+        result
         //println!("status: {}", result.unwrap());
     }
 
@@ -352,6 +419,6 @@ impl RAEInterface for PlatformGodot {
     fn domain(&self) -> &'static str {
         //GODOT_DOMAIN
         //TODO: choose a way to charge domain
-        "(read instances/godot_init.lisp)"
+        "(read godot_domain/init.lisp)"
     }
 }

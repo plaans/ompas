@@ -92,6 +92,17 @@ pub const MACRO_ENUMERATE_PARAMS: &str = "(defmacro enumerate-params (lambda arg
 
 pub const LABEL_ENUMERATE_PARAMS: &str = "enumerate-params";
 
+pub const LAMBDA_MUTEX_LOCK: &str = "(define mutex.lock (lambda (__symbol__)
+                                        (begin
+                                            (wait-on `(not (mutex.locked? ,__symbol__)))
+                                            (assert `(locked ,__symbol__) true))))";
+
+pub const LAMBDA_MUTEX_IS_LOCKED: &str = "(define mutex.locked? (lambda (__symbol__)
+                                        (rae-get-state-variable `(locked ,__symbol__))))";
+
+pub const LAMBDA_MUTEX_RELEASE: &str = "(define mutex.release (lambda (__symbol__)
+                                        (retract `(locked ,__symbol__) true)))";
+
 /*pub const MACRO_DEF_STATE_FUNCTION: &str = "(defmacro def-state-function (lambda args
     (let ((label (car args))
            (params (cdr args)))

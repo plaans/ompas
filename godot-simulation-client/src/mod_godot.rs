@@ -485,7 +485,7 @@ fn open_com(args: &[LValue], _: &LEnv, ctx: &mut CtxGodot) -> Result<LValue, LEr
     ctx.platform.open_com(args)
 }
 
-pub const DEFAULT_PATH_PROJECT_GODOT: &str = "/home/jeremy/godot/Simulation-Factory-Godot/simu";
+pub const DEFAULT_PATH_PROJECT_GODOT: &str = "/home/jeremy/godot/simulation-factory-godot/simu";
 
 ///Launch godot
 fn start_godot(args: &[LValue], _: &LEnv, ctx: &CtxGodot) -> Result<LValue, LError> {

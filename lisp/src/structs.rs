@@ -21,8 +21,10 @@ use std::sync::Arc;
 /// # Example:
 /// ```
 /// use ompas_lisp::structs::LValue;
+/// use std::convert::TryInto;
 /// //The conversion will success if lv is of kind LValue::Map
-/// let map: im::hashmap<LValue, LValue>  = lv.try_into()?;
+/// let lv = LValue::Map(Default::default());
+/// let map: im::HashMap<LValue, LValue>  = lv.try_into().expect("Could not convert LValue into HashMap");
 ///
 /// ```
 /// # Note:
@@ -353,6 +355,7 @@ impl Eq for LNumber {}
 pub enum LambdaArgs {
     Sym(String),
     List(Vec<String>),
+    Nil,
 }
 
 impl Display for LambdaArgs {
@@ -371,6 +374,7 @@ impl Display for LambdaArgs {
                 }
                 write!(f, "{}", s)
             }
+            LambdaArgs::Nil => write!(f, "nil"),
         }
     }
 }
@@ -453,6 +457,14 @@ impl LLambda {
                     env.insert(param.to_string(), arg.clone());
                 }
             }
+            LambdaArgs::Nil => {
+                if !args.is_empty() {
+                    return Err(SpecialError(
+                        "Lambda.get_env",
+                        "Lambda was expecting no args.".to_string(),
+                    ));
+                }
+            }
         };
         Ok(env)
     }
@@ -471,6 +483,18 @@ impl LLambda {
     /// Returns the body of the lambda
     pub fn get_body(&self) -> LValue {
         *self.body.clone()
+    }
+}
+
+impl From<&LLambda> for LValue {
+    fn from(l: &LLambda) -> Self {
+        LValue::Lambda(l.clone())
+    }
+}
+
+impl From<LLambda> for LValue {
+    fn from(l: LLambda) -> Self {
+        (&l).into()
     }
 }
 

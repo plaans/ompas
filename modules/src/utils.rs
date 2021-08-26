@@ -28,6 +28,7 @@ use std::sync::Arc;
 const MOD_UTILS: &str = "mod-utils";
 const RAND_ELEMENT: &str = "rand-element";
 const ENUMERATE: &str = "enumerate";
+const CONTAINS: &str = "contains";
 
 // Documentation
 const DOC_RAND_ELEMENT: &str = "Return a random element of a list";
@@ -51,6 +52,7 @@ impl GetModule for CtxUtils {
 
         module.add_fn_prelude(RAND_ELEMENT, rand_element);
         module.add_fn_prelude(ENUMERATE, enumerate);
+        module.add_fn_prelude(CONTAINS, contains);
 
         module
     }
@@ -129,4 +131,31 @@ pub fn rand_element(args: &[LValue], _: &LEnv, _: &CtxUtils) -> Result<LValue, L
             1..1,
         )),
     }
+}
+
+///Takes a list or map and search if it contains a LValue inside
+pub fn contains(args: &[LValue], _: &LEnv, _: &CtxUtils) -> Result<LValue, LError> {
+    if args.len() != 2 {
+        return Err(WrongNumberOfArgument(
+            CONTAINS,
+            args.into(),
+            args.len(),
+            2..2,
+        ));
+    }
+
+    if let LValue::List(vec) = &args[0] {
+        for e in vec {
+            if e == &args[1] {
+                return Ok(LValue::True);
+            }
+        }
+    } else if let LValue::Map(m) = &args[0] {
+        for e in m.keys() {
+            if e == &args[1] {
+                return Ok(LValue::True);
+            }
+        }
+    }
+    Ok(LValue::Nil)
 }

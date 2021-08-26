@@ -21,6 +21,7 @@ use ompas_lisp::functions::cons;
 use ompas_lisp::structs::{LError, LValue};
 use std::mem;
 
+pub mod agenda;
 pub mod context;
 pub mod module;
 pub mod refinement;

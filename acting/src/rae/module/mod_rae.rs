@@ -722,7 +722,7 @@ pub fn get_config_platform(args: &[LValue], _: &LEnv, ctx: &CtxRae) -> Result<LV
     Ok(LValue::String(
         ctx.options
             .get_platform_config()
-            .unwrap_or(String::from("no options")),
+            .unwrap_or_else(|| String::from("no options")),
     ))
 }
 /*

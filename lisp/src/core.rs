@@ -541,7 +541,7 @@ pub fn parse_into_lvalue(se: &SExpr) -> LValue {
                             LValue::Nil
                         }
                         s => {
-                            if s.starts_with("\"") && s.ends_with("\"") {
+                            if s.starts_with('\"') && s.ends_with('\"') {
                                 LValue::String(s[1..s.len() - 1].to_string())
                             } else {
                                 LValue::Symbol(s.to_string())

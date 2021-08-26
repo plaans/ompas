@@ -63,7 +63,8 @@ impl RAEInterface for PlatformGodot {
         };
 
         let status = self.status.status.clone();
-        blocking_async!(status.write().await.insert(command_id, Status::Pending));
+        blocking_async!(status.write().await.insert(command_id, Status::Pending))
+            .expect("fail adding status for new action.");
 
         //println!("action status created");
 
@@ -258,9 +259,9 @@ impl RAEInterface for PlatformGodot {
                 ))
             }
         };
-        self.start_platform(&args_start)?;
+        self.start_platform(args_start)?;
         thread::sleep(time::Duration::from_millis(1000));
-        self.open_com(&args_open)
+        self.open_com(args_open)
     }
 
     /// Start the platform (start the godot process and launch the simulation)
@@ -404,7 +405,7 @@ impl RAEInterface for PlatformGodot {
         //let status = self.status.clone();
         //let action_id = *action_id;
         let status = self.status.clone();
-        let c_action_id = action_id.clone();
+        let c_action_id = *action_id;
         let result = blocking_async!(status.get_action_status(&c_action_id).await).unwrap();
         result
         //println!("status: {}", result.unwrap());

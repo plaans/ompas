@@ -129,7 +129,7 @@ impl RAEState {
                     ._static
                     .read()
                     .await
-                    .union(&self.dynamic.read().await.deref()),
+                    .union(self.dynamic.read().await.deref()),
             ),
             Some(_type) => match _type {
                 StateType::Static => self._static.read().await.clone(),

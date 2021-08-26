@@ -442,8 +442,9 @@ impl ActionsProgress {
     pub fn declare_new_watcher(&self, action_id: &usize) -> Receiver<bool> {
         let (sender, receiver) = mpsc::channel(TOKIO_CHANNEL_SIZE);
         let c_sync = self.sync.clone();
-        let c_action_id = action_id.clone();
-        blocking_async!(c_sync.add_action_to_watch(c_action_id, sender).await);
+        let c_action_id = *action_id;
+        blocking_async!(c_sync.add_action_to_watch(c_action_id, sender).await)
+            .expect("fail adding action to watch");
         receiver
     }
 }

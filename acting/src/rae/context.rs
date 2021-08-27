@@ -1,5 +1,5 @@
+use crate::rae::agenda::Agenda;
 use crate::rae::module::mod_rae_exec::{Job, JobId};
-use crate::rae::refinement::{RefinementStack, StackFrame};
 use crate::rae::state::{ActionStatus, LState, RAEState};
 use crate::rae::status::ActionStatusSync;
 use crate::rae::TOKIO_CHANNEL_SIZE;
@@ -17,60 +17,6 @@ use std::sync::Arc;
 use std::thread;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{mpsc, RwLock};
-
-#[derive(Default, Debug)]
-pub struct Agenda {
-    pub jobs: Vec<JobId>,
-    pub stacks: HashMap<JobId, RefinementStack>,
-    next_id: usize,
-}
-
-impl Agenda {
-    pub fn remove_by_id(&mut self, _task_id: &JobId) {
-        todo!()
-    }
-
-    pub fn remove(&mut self, index: usize) {
-        let job_id = self.jobs[index];
-        self.jobs.remove(index);
-        self.stacks.remove(&job_id);
-    }
-
-    pub fn add_job(&mut self, job: Job) -> usize {
-        let id = self.get_new_id();
-        let mut inner = VecDeque::new();
-        inner.push_front(StackFrame {
-            job_id: id,
-            method: None,
-            tried: vec![],
-        });
-        self.stacks.insert(id, RefinementStack { job, inner });
-        self.jobs.push(id);
-        id
-    }
-
-    fn get_new_id(&mut self) -> usize {
-        let result = self.next_id;
-        self.next_id += 1;
-        result
-    }
-
-    pub fn set_refinement_stack(&mut self, job_id: &JobId, rs: RefinementStack) {
-        self.stacks.insert(*job_id, rs);
-    }
-
-    pub fn get_stacks(&self) -> Vec<&RefinementStack> {
-        let mut vec = vec![];
-        for e in &self.stacks {
-            vec.push(e.1)
-        }
-        vec
-    }
-
-    pub fn get_stack(&self, job_id: &JobId) -> Option<&RefinementStack> {
-        self.stacks.get(job_id)
-    }
-}
 
 pub struct RAEEnv {
     pub job_receiver: Option<Receiver<Job>>,

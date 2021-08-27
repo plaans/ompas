@@ -103,6 +103,27 @@ pub const LAMBDA_MUTEX_IS_LOCKED: &str = "(define mutex.locked? (lambda (__symbo
 pub const LAMBDA_MUTEX_RELEASE: &str = "(define mutex.release (lambda (__symbol__)
                                         (retract `(locked ,__symbol__) true)))";
 
+pub const LAMBDA_PROGRESS: &str = "
+(define progress (lambda args
+    (let* ((result (eval (cons 'select args)))
+            (first_m (car result))
+            (task_id (cadr result)))
+            
+            (if (null? first_m)
+                nil
+                (if (eval first_m)
+                    (set-success-for-task task_id)
+                    (retry task_id))))))";
+
+pub const LAMBDA_RETRY: &str = "
+(define retry (lambda (task_id)
+    (let ((new_method (get-next-method task_id)))
+        (if (null? new_method) ; if there is no method applicable
+            nil
+            (if (eval new_method)
+                (set-success-for-task task_id)
+                (retry task_id))))))";
+
 /*pub const MACRO_DEF_STATE_FUNCTION: &str = "(defmacro def-state-function (lambda args
     (let ((label (car args))
            (params (cdr args)))

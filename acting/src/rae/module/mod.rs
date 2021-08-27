@@ -42,6 +42,7 @@ pub fn init_ctx_rae(mut platform: Box<dyn RAEInterface>) -> (CtxRae, CtxRaeMonit
         actions_progress: rae_env.actions_progress.clone(),
         state: rae_env.state.clone(),
         platform_interface: platform,
+        agenda: rae_env.agenda.clone(),
     };
 
     load_module(

@@ -38,6 +38,7 @@ const RAE_GET_ENV: &str = "rae-get-env";
 const RAE_LAUNCH: &str = "rae-launch";
 const RAE_GET_STATE: &str = "rae-get-state";
 const RAE_GET_STATUS: &str = "rae-get-status";
+const RAE_GET_AGENDA: &str = "rae-get-agenda";
 
 const RAE_DEF_STATE_FUNCTION: &str = "def-state-function";
 const RAE_DEF_ACTION: &str = "def-action";
@@ -82,6 +83,8 @@ const DOC_DEF_LAMBDA: &str = "Add a lambda to RAE environment";
 const DOC_DEF_INITIAL_STATE: &str = "Add initial facts in the state. Most of the time it is general knowledge and not initialisation of facts.";
 const DOC_RAE_CONFIGURE_PLATFROM: &str = "Set the options of the platform when it will be runned";
 const DOC_RAE_GET_CONFIG_PLATFORM: &str = "Get the actual value of the config of the platform";
+const DOC_RAE_GET_AGENDA: &str =
+    "Get the actual agenda with for each task the current refinement stack.";
 
 #[derive(Default)]
 pub struct CtxRae {
@@ -163,6 +166,7 @@ impl Documentation for CtxRae {
             LHelp::new(RAE_DEF_INITIAL_STATE, DOC_DEF_INITIAL_STATE),
             LHelp::new(RAE_CONFIGURE_PLATFORM, DOC_RAE_CONFIGURE_PLATFROM),
             LHelp::new(RAE_GET_CONFIG_PLATFORM, DOC_RAE_GET_CONFIG_PLATFORM),
+            LHelp::new(RAE_GET_AGENDA, DOC_RAE_GET_AGENDA),
         ]
     }
 }
@@ -725,134 +729,15 @@ pub fn get_config_platform(args: &[LValue], _: &LEnv, ctx: &CtxRae) -> Result<LV
             .unwrap_or_else(|| String::from("no options")),
     ))
 }
-/*
-///Add an action to RAE env
-pub fn add_action(args: &[LValue], _env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
-    if args.len() != 2 {
-        return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
+
+pub fn get_agenda(_: &[LValue], _: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
+    let agenda = ctx.env.agenda.clone();
+    let agenda = blocking_async!(agenda.get_inner().await).unwrap();
+    let mut string: String = "Agenda: ".to_string();
+
+    for (id, rs) in agenda {
+        string.push_str(format!("{}: {}", id, rs).as_str());
     }
 
-    if let LValue::Symbol(action_label) = &args[0] {
-        if let LValue::Lambda(_) = &args[1] {
-            ctx.env
-                .add_action(action_label.to_string(), args[1].clone())?;
-        } else {
-            return Err(WrongType(
-                args[1].clone(),
-                args[1].clone().into(),
-                NameTypeLValue::Lambda,
-            ));
-        }
-    } else {
-        return Err(WrongType(
-            args[0].clone(),
-            args[0].clone().into(),
-            NameTypeLValue::Symbol,
-        ));
-    }
-
-    Ok(Nil)
+    Ok(string.into())
 }
-
-///Add a method to RAE env
-pub fn add_method(args: &[LValue], _env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
-    if args.len() != 3 {
-        return Err(WrongNumberOfArgument(args.into(), args.len(), 3..3));
-    }
-
-    if let LValue::Symbol(method_label) = &args[0] {
-        if let LValue::Symbol(task_label) = &args[1] {
-            if let LValue::Lambda(_) = &args[2] {
-                ctx.env.add_method(
-                    method_label.to_string(),
-                    task_label.to_string(),
-                    args[2].clone(),
-                )?;
-            } else {
-                return Err(WrongType(
-                    args[2].clone(),
-                    args[2].clone().into(),
-                    NameTypeLValue::Lambda,
-                ));
-            }
-        } else {
-            return Err(WrongType(
-                args[1].clone(),
-                args[1].clone().into(),
-                NameTypeLValue::Symbol,
-            ));
-        }
-    } else {
-        return Err(WrongType(
-            args[0].clone(),
-            args[0].clone().into(),
-            NameTypeLValue::Symbol,
-        ));
-    }
-
-    Ok(Nil)
-}
-
-///Add a task to RAE env
-pub fn add_task(args: &[LValue], _env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
-    if args.len() != 2 {
-        return Err(WrongNumberOfArgument(args.into(), args.len(), 2..2));
-    }
-
-    if let LValue::Symbol(task_label) = &args[0] {
-        if let LValue::Lambda(_) = &args[1] {
-            ctx.env.add_task(task_label.to_string(), args[1].clone())?;
-        } else {
-            return Err(WrongType(
-                args[1].clone(),
-                args[1].clone().into(),
-                NameTypeLValue::Lambda,
-            ));
-        }
-    } else {
-        return Err(WrongType(
-            args[0].clone(),
-            args[0].clone().into(),
-            NameTypeLValue::Symbol,
-        ));
-    }
-
-    Ok(Nil)
-}
-
-
-
-pub fn add_state_function(
-    args: &[LValue],
-    _env: &LEnv,
-    ctx: &mut CtxRae,
-) -> Result<LValue, LError> {
-    if args.is_empty() {
-        return Err(WrongNumberOfArgument(
-            args.into(),
-            args.len(),
-            1..std::usize::MAX,
-        ));
-    }
-
-    if let LValue::Symbol(action_label) = &args[0] {
-        if let LValue::Lambda(_) = &args[1] {
-            ctx.env
-                .add_state_function(action_label.to_string(), args[1].clone())?;
-        } else {
-            return Err(WrongType(
-                args[1].clone(),
-                args[1].clone().into(),
-                NameTypeLValue::Lambda,
-            ));
-        }
-    } else {
-        return Err(WrongType(
-            args[0].clone(),
-            args[0].clone().into(),
-            NameTypeLValue::Symbol,
-        ));
-    }
-
-    Ok(Nil)
-}*/

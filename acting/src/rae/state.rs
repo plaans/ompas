@@ -1,5 +1,4 @@
 use crate::rae::context::Status;
-use crate::rae::refinement::Assignment;
 use im::HashMap;
 use ompas_lisp::core::LEnv;
 use ompas_lisp::functions::cons;

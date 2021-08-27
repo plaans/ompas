@@ -104,6 +104,7 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
         actions_progress: Default::default(),
         state: Default::default(),
         platform_interface: Box::new(PlatformGodot::default()),
+        agenda: Default::default(),
     };
 
     load_module(&mut root_env, &mut ctxs, ctx_doc, &mut lisp_init);

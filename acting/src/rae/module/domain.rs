@@ -24,9 +24,16 @@ pub const MACRO_GENERATE_TASK_SIMPLE: &str = "(defmacro generate-task-simple
     (lambda args
     (let ((label (car args))
             (params (cdr args)))
-            (quasiquote (list (unquote label) (lambda (unquote params)
-                    (eval (unquote (cons (quote rae-get-best-method)
-                        (cons (quasiquote (quote (unquote label))) params))))))))))";
+            (quasiquote (list ,label (lambda ,params
+                    ,(cons 'progress (cons `(quote ,label) params))))))))";
+
+/*pub const MACRO_GENERATE_TASK_SIMPLE: &str = "(defmacro generate-task-simple
+(lambda args
+(let ((label (car args))
+        (params (cdr args)))
+        (quasiquote (list (unquote label) (lambda (unquote params)
+                (eval (unquote (cons (quote rae-get-best-method)
+                    (cons (quasiquote (quote (unquote label))) params))))))))))";*/
 
 /// Macro used to generate code to define a method in REA environment.
 pub const MACRO_GENERATE_METHOD: &str = "(defmacro generate-method \
@@ -105,24 +112,24 @@ pub const LAMBDA_MUTEX_RELEASE: &str = "(define mutex.release (lambda (__symbol_
 
 pub const LAMBDA_PROGRESS: &str = "
 (define progress (lambda args
-    (let* ((result (eval (cons 'select args)))
+    (let* ((result (eval (cons 'rae-select args)))
             (first_m (car result))
             (task_id (cadr result)))
             
             (if (null? first_m)
                 nil
                 (if (eval first_m)
-                    (set-success-for-task task_id)
-                    (retry task_id))))))";
+                    (rae-set-success-for-task task_id)
+                    (rae-retry task_id))))))";
 
 pub const LAMBDA_RETRY: &str = "
 (define retry (lambda (task_id)
-    (let ((new_method (get-next-method task_id)))
+    (let ((new_method (rae-get-next-method task_id)))
         (if (null? new_method) ; if there is no method applicable
             nil
             (if (eval new_method)
-                (set-success-for-task task_id)
-                (retry task_id))))))";
+                (rae-set-success-for-task task_id)
+                (rae-retry task_id))))))";
 
 /*pub const MACRO_DEF_STATE_FUNCTION: &str = "(defmacro def-state-function (lambda args
     (let ((label (car args))

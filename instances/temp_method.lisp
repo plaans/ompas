@@ -55,3 +55,17 @@
                 (rae-await (go_charge ?r))
                 (wait-on ))))
 
+(defmacro generate-task-simple 
+    (lambda args
+    (let ((label (car args))
+            (params (cdr args)))
+            (quasiquote (list ,label (lambda ,params
+                    (progress (quote ,label) ,params)))))))
+
+
+(defmacro generate-task-simple 
+    (lambda args
+    (let ((label (car args))
+            (params (cdr args)))
+            (quasiquote (list ,label (lambda ,params
+                    ,(cons 'progress (cons (quote label) params))))))))

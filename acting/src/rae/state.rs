@@ -200,7 +200,7 @@ impl RAEState {
             Some(old_value) => {
                 if old_value == value {
                     self.inner_world.write().await.remove(&key);
-                    Ok(LValue::Nil)
+                    Ok(LValue::True)
                 } else {
                     Err(SpecialError(
                         "RAEState::retract_fact",

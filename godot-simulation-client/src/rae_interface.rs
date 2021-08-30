@@ -270,6 +270,7 @@ impl RAEInterface for PlatformGodot {
             //default settings
             0 => {
                 Command::new("gnome-terminal")
+                    .args(&["--title", "GODOT 3 Terminal"])
                     .arg("--")
                     .arg("godot3")
                     .arg("--path")

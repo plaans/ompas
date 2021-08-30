@@ -68,4 +68,16 @@
     (let ((label (car args))
             (params (cdr args)))
             (quasiquote (list ,label (lambda ,params
-                    ,(cons 'progress (cons (quote label) params))))))))
+                    ,(cons 'progress (cons `(quote ,label) params))))))))
+
+
+                    (define progress (lambda args
+    (let* ((result (eval (cons rae-select (cons `(quote ,(car args)) (cdr args)))))
+            (first_m (car result))
+            (task_id (cadr result)))
+            
+            (if (null? first_m)
+                nil
+                (if (eval first_m)
+                    (rae-set-success-for-task task_id)
+                    (rae-retry task_id))))))

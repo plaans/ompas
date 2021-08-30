@@ -106,6 +106,7 @@ async fn run_logger_file(mut rx: mpsc::Receiver<String>) {
         .expect("could not write to RAE log file.");
 
     Command::new("gnome-terminal")
+        .args(&["--title", "RAE LOG"])
         .args(&["--", "tail", "-f", name_file.as_str()])
         .spawn()
         .expect("could not spawn terminal");

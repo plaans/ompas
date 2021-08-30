@@ -157,8 +157,7 @@
                         (rae-await (pick_package ?r ?p))
                         (rae-await (navigate_to_area ?r (car (belt.interact_areas (machine.input_belt ?m)))))
                         (rae-await (face_belt ?r (machine.input_belt ?m)))
-                        (rae-await (place ?r))
-                        nil)
+                        (rae-await (place ?r)))
                     nil))))))
 
     (def-task t_position_robot_to_belt ?r ?b)
@@ -178,8 +177,7 @@
                     (if (< (robot.battery ?r) 0.4)
                         (t_charge ?r))
                     (t_take_package ?r ?p)
-                    (t_deliver_package ?r ?m)
-                nil))))
+                    (t_deliver_package ?r ?m)))))
 
     (def-task t_take_package ?r ?p)
     (def-method m_take_package
@@ -187,8 +185,7 @@
           (:params ?r ?p)
           (:body (begin
             (t_position_robot_to_belt ?r (package.location ?p))
-            (rae-await (pick_package ?r ?p))
-            nil))))
+            (rae-await (pick_package ?r ?p))))))
 
     (def-task t_deliver_package ?r ?m)
     (def-method m_deliver_package
@@ -196,8 +193,7 @@
             (:params ?r ?m)
             (:body (begin
                 (t_position_robot_to_belt ?r (machine.input_belt ?m))
-                (rae-await (place ?r))
-                nil))))
+                (rae-await (place ?r))))))
 
     (def-task t_charge ?r)
     (def-method m_charge
@@ -206,6 +202,5 @@
             (:body
                 (begin
                     (rae-await (go_charge ?r))
-                    (wait-on `(= (robot.battery ,?r) 1))
-                    nil))))
+                    (wait-on `(= (robot.battery ,?r) 1))))))
 )

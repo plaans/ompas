@@ -323,7 +323,7 @@ pub fn assert_fact(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LVa
     let c_state = ctx.state.clone();
     blocking_async!(c_state.add_fact(key, value).await).expect("todo!");
 
-    Ok(Nil)
+    Ok(True)
 }
 
 ///Monitor the status of an action that has been triggered
@@ -588,35 +588,33 @@ pub fn wait_on(args: &[LValue], _env: &LEnv, _: &CtxRaeExec) -> Result<LValue, L
     })
     .expect("todo!");
     //println!("end wait on");
-    Ok(LValue::Nil)
+    Ok(LValue::True)
 }
 
 fn log(args: &[LValue], _env: &LEnv, _: &CtxRaeExec) -> Result<LValue, LError> {
     info!("{}", LValue::from(args));
-    Ok(LValue::Nil)
+    Ok(LValue::True)
 }
 
 //Takes an instantiated task to refine and return the best applicable method and a task_id.
 fn select(args: &[LValue], env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
     let task: LValue = args.into();
 
-    let agenda = ctx.agenda.clone();
-    let task_id = agenda.add_task(task);
-
+    info!("Add task {} to agenda", task);
+    let task_id = ctx.agenda.add_task(task);
     let methods = get_methods(args, env, ctx)?;
 
     //Here we choose different way to choose the best method.
     //TODO: Implement a way to configure select
 
     let methods: Vec<LValue> = sort_greedy(methods)?.try_into()?;
-    let agenda = ctx.agenda.clone();
-    let mut stack = agenda.get_stack(task_id).unwrap();
+    let mut stack = ctx.agenda.get_stack(task_id).unwrap();
     stack.set_current_method(methods[0].clone());
     stack.set_applicable_methods(methods[1..].into());
 
-    let agenda = ctx.agenda.clone();
+    ctx.agenda.update_stack(stack)?;
 
-    agenda.update_stack(stack)?;
+    //info!("agenda: {}", ctx.agenda);
 
     Ok(vec![methods[0].clone(), task_id.into()].into())
 

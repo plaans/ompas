@@ -128,6 +128,7 @@ impl GetModule for CtxRae {
         //functions to debug the functionnement of rae
         module.add_fn_prelude(RAE_GET_STATE, get_state);
         module.add_fn_prelude(RAE_GET_STATUS, get_status);
+        module.add_fn_prelude(RAE_GET_AGENDA, get_agenda);
 
         /*module.add_mut_fn_prelude(RAE_ADD_ACTION, add_action);
         module.add_mut_fn_prelude(RAE_ADD_STATE_FUNCTION, add_state_function);
@@ -682,7 +683,7 @@ pub fn launch_rae(_: &[LValue], _env: &LEnv, ctx: &mut CtxRae) -> Result<LValue,
     let rae_env = RAEEnv {
         job_receiver: None,
         status_watcher: None,
-        agenda: Default::default(),
+        agenda: ctx.env.agenda.clone(),
         actions_progress: ctx.env.actions_progress.clone(),
         state: ctx.env.state.clone(),
         env: ctx.env.env.clone(),
@@ -731,13 +732,6 @@ pub fn get_config_platform(args: &[LValue], _: &LEnv, ctx: &CtxRae) -> Result<LV
 }
 
 pub fn get_agenda(_: &[LValue], _: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
-    let agenda = ctx.env.agenda.clone();
-    let agenda = blocking_async!(agenda.get_inner().await).unwrap();
-    let mut string: String = "Agenda: ".to_string();
-
-    for (id, rs) in agenda {
-        string.push_str(format!("{}: {}", id, rs).as_str());
-    }
-
+    let string = format!("{}", ctx.env.agenda);
     Ok(string.into())
 }

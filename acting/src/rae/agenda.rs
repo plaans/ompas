@@ -4,14 +4,60 @@ use ompas_lisp::structs::{LError, LValue};
 use ompas_utils::blocking_async;
 use ompas_utils::other::get_and_update_id_counter;
 use std::fmt::{Debug, Display, Formatter};
-use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-#[derive(Debug, Default, Clone)]
+#[derive(Default, Clone)]
 pub struct Agenda {
     inner: Arc<RwLock<im::HashMap<usize, RefinementStack>>>,
     next_id: Arc<AtomicUsize>,
+}
+
+impl Debug for Agenda {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut str = String::new();
+        str.push_str(
+            format!(
+                "Agenda:\n\t-number of task: {}\n\t-Actual agenda:\n",
+                self.next_id.load(Ordering::Relaxed)
+            )
+            .as_str(),
+        );
+        let clone = self.clone();
+        let inner = blocking_async!(clone.get_inner().await).unwrap();
+        if inner.is_empty() {
+            str.push_str("\t\tIs empty...");
+        } else {
+            for (id, rs) in inner {
+                str.push_str(format!("\t\t{}: {:?}", id, rs).as_str())
+            }
+        }
+        write!(f, "{}", str)
+    }
+}
+
+impl Display for Agenda {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut str = String::new();
+        str.push_str(
+            format!(
+                "Agenda:\n\t-number of task declared: {}\n\t-Actual agenda:\n",
+                self.next_id.load(Ordering::Relaxed)
+            )
+            .as_str(),
+        );
+        let clone = self.clone();
+        let inner = blocking_async!(clone.get_inner().await).unwrap();
+        if inner.is_empty() {
+            str.push_str("\t\tIs empty...");
+        } else {
+            for (id, rs) in inner {
+                str.push_str(format!("\t\t{}: {}", id, rs).as_str())
+            }
+        }
+        write!(f, "{}", str)
+    }
 }
 
 impl Agenda {

@@ -112,7 +112,7 @@ pub const LAMBDA_MUTEX_RELEASE: &str = "(define mutex.release (lambda (__symbol_
 
 pub const LAMBDA_PROGRESS: &str = "
 (define progress (lambda args
-    (let* ((result (eval (cons 'rae-select args)))
+    (let* ((result (eval (cons rae-select (cons `(quote ,(car args)) (cdr args)))))
             (first_m (car result))
             (task_id (cadr result)))
             
@@ -120,16 +120,18 @@ pub const LAMBDA_PROGRESS: &str = "
                 nil
                 (if (eval first_m)
                     (rae-set-success-for-task task_id)
-                    (rae-retry task_id))))))";
+                    (retry task_id))))))";
 
 pub const LAMBDA_RETRY: &str = "
 (define retry (lambda (task_id)
     (let ((new_method (rae-get-next-method task_id)))
-        (if (null? new_method) ; if there is no method applicable
+        (begin 
+            (rae-log \"Retrying task \" task_id)
+            (if (null? new_method) ; if there is no method applicable
             nil
             (if (eval new_method)
                 (rae-set-success-for-task task_id)
-                (rae-retry task_id))))))";
+                (rae-retry task_id)))))))";
 
 /*pub const MACRO_DEF_STATE_FUNCTION: &str = "(defmacro def-state-function (lambda args
     (let ((label (car args))

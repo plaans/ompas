@@ -38,6 +38,7 @@ pub fn init_ctx_rae(mut platform: Box<dyn RAEInterface>) -> (CtxRae, CtxRaeMonit
 
     platform.init(rae_env.state.clone(), rae_env.actions_progress.clone());
 
+    //Clone all structs that need to be shared to monitor action status, state and agenda.
     let ctx_rae_exec = CtxRaeExec {
         actions_progress: rae_env.actions_progress.clone(),
         state: rae_env.state.clone(),

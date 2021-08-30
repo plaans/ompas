@@ -129,7 +129,7 @@
                     (rae-log "list_machines:" list_machines)
                     (enumerate (list ?p) (take_first list_machines))))
 
-            (let ((?r (car (available_robots))))
+            (let ((?r (rand-element (available_robots))))
                 (begin
                     (mutex.lock ?r)
                     (t_carry_to_machine ?r ?p (find_output_machine))
@@ -137,7 +137,7 @@
     (def-method m_process_on_machine
         '((:task t_process_on_machine)
         (:params ?p ?m)
-        (:body (let ((?r (car (available_robots))))
+        (:body (let ((?r (rand-element (available_robots))))
                 (begin
                     (mutex.lock ?r)
                     (t_carry_to_machine ?r ?p ?m)

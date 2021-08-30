@@ -68,7 +68,8 @@
     (let ((label (car args))
             (params (cdr args)))
             (quasiquote (list ,label (lambda ,params
-                    ,(cons 'progress (cons `(quote ,label) params))))))))
+                     
+                    (rae-log ,(cons 'progress (cons `(quote ,label) params)))))))))
 
 
                     (define progress (lambda args

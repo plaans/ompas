@@ -99,10 +99,10 @@ pub async fn rae_run(mut context: RAEEnv, options: &RAEOptions, _log: String) {
 
 async fn progress_2(job_lvalue: LValue, mut env: LEnv, mut ctxs: ContextCollection) {
     info!("new triggered task: {}", job_lvalue);
-    let job_lvalue = LValue::List(vec![job_lvalue]);
+    //info!("LValue to be evaluated: {}", job_lvalue);
     match eval(&job_lvalue, &mut env, &mut ctxs) {
         Ok(lv) => info!("result of task {}: {}", job_lvalue, lv),
-        Err(e) => error!("{}", e),
+        Err(e) => error!("End of progress_2: {}", e),
     }
 }
 

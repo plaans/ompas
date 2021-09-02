@@ -1,5 +1,4 @@
 pub mod wait_on {
-    use crate::rae::context::RAEEnv;
     use log::{info, warn};
     use ompas_lisp::core::{eval, ContextCollection, LEnv};
     use ompas_lisp::structs::{LError, LValue};

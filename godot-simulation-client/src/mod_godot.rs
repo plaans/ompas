@@ -1,11 +1,11 @@
 #![allow(dead_code)]
 use crate::rae_interface::PlatformGodot;
-use ompas_acting::rae::context::ActionsProgress;
+use ompas_acting::rae::context::actions_progress::ActionsProgress;
+use ompas_acting::rae::context::rae_state::RAEState;
 use ompas_acting::rae::module::mod_rae_exec::RAEInterface;
-use ompas_acting::rae::state::RAEState;
 use ompas_lisp::core::LEnv;
+use ompas_lisp::modules::doc::{Documentation, LHelp};
 use ompas_lisp::structs::{GetModule, LError, LValue, Module};
-use ompas_modules::doc::{Documentation, LHelp};
 use std::sync::Arc;
 
 /*

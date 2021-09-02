@@ -8,7 +8,6 @@ edition = "2018"
 
 [dependencies]
 ompas_lisp = {path = "../lisp"}
-ompas_modules = {path = "../modules"}
 ompas_utils = {path= "../utils"}
 tokio = { version = "1.5.0", features = ["full", "time"] }
 tokio-stream = "0.1.6"

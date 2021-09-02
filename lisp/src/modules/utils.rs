@@ -14,11 +14,11 @@
 //! => ((1 3)(1 4)(2 3)(2 4))
 //! ```
 
-use crate::doc::{Documentation, LHelp};
+use crate::core::LEnv;
+use crate::modules::doc::{Documentation, LHelp};
+use crate::structs::LError::{WrongNumberOfArgument, WrongType};
+use crate::structs::{GetModule, LError, LValue, Module, NameTypeLValue};
 use aries_utils::StreamingIterator;
-use ompas_lisp::core::LEnv;
-use ompas_lisp::structs::LError::{WrongNumberOfArgument, WrongType};
-use ompas_lisp::structs::{GetModule, LError, LValue, Module, NameTypeLValue};
 use rand::Rng;
 use std::ops::Deref;
 use std::sync::Arc;
@@ -29,6 +29,7 @@ const MOD_UTILS: &str = "mod-utils";
 const RAND_ELEMENT: &str = "rand-element";
 const ENUMERATE: &str = "enumerate";
 const CONTAINS: &str = "contains";
+const TRANSFORM_IN_SINGLETON_LIST: &str = "transform-in-singleton-list";
 
 // Documentation
 const DOC_RAND_ELEMENT: &str = "Return a random element of a list";
@@ -53,6 +54,7 @@ impl GetModule for CtxUtils {
         module.add_fn_prelude(RAND_ELEMENT, rand_element);
         module.add_fn_prelude(ENUMERATE, enumerate);
         module.add_fn_prelude(CONTAINS, contains);
+        module.add_fn_prelude(TRANSFORM_IN_SINGLETON_LIST, transform_in_singleton_list);
 
         module
     }
@@ -72,6 +74,7 @@ impl Documentation for CtxUtils {
 /// # Example:
 ///``` rust
 /// use ompas_modules::utils::{enumerate, CtxUtils};
+/// use ompas_lisp::modules::utils::{CtxUtils, enumerate};
 /// use ompas_lisp::structs::LValue;
 /// use ompas_lisp::core::LEnv;
 /// let lists: &[LValue] = &[vec![1,2,3].into(), vec![4,5,6].into()];
@@ -79,16 +82,19 @@ impl Documentation for CtxUtils {
 /// ```
 pub fn enumerate(args: &[LValue], _: &LEnv, _: &CtxUtils) -> Result<LValue, LError> {
     let mut vec_iter = vec![];
+    let mut new_args = vec![];
+
     for arg in args {
+        if let LValue::List(_) = arg {
+            new_args.push(arg.clone())
+        } else {
+            new_args.push(LValue::List(vec![arg.clone()]))
+        }
+    }
+
+    for arg in &new_args {
         if let LValue::List(iter) = arg {
             vec_iter.push(iter.iter())
-        } else {
-            return Err(WrongType(
-                ENUMERATE,
-                arg.clone(),
-                arg.into(),
-                NameTypeLValue::List,
-            ));
         }
     }
 
@@ -158,4 +164,25 @@ pub fn contains(args: &[LValue], _: &LEnv, _: &CtxUtils) -> Result<LValue, LErro
         }
     }
     Ok(LValue::Nil)
+}
+
+pub fn transform_in_singleton_list(
+    args: &[LValue],
+    _: &LEnv,
+    _: &CtxUtils,
+) -> Result<LValue, LError> {
+    if args.is_empty() {
+        return Err(WrongNumberOfArgument(
+            TRANSFORM_IN_SINGLETON_LIST,
+            args.into(),
+            0,
+            1..std::usize::MAX,
+        ));
+    }
+
+    Ok(args
+        .iter()
+        .map(|lv| LValue::List(vec![lv.clone()]))
+        .collect::<Vec<LValue>>()
+        .into())
 }

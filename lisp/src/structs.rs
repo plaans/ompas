@@ -1253,7 +1253,13 @@ impl From<&str> for LValue {
 
 impl From<String> for LValue {
     fn from(s: String) -> Self {
-        LValue::Symbol(s)
+        (&s).into()
+    }
+}
+
+impl From<&String> for LValue {
+    fn from(s: &String) -> Self {
+        LValue::Symbol(s.clone())
     }
 }
 

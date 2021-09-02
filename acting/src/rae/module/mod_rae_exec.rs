@@ -1,20 +1,17 @@
-use crate::rae::agenda::Agenda;
-use crate::rae::context::{
-    ActionId, ActionsProgress, SelectOption, Status, RAE_STATE_FUNCTION_LIST, RAE_TASK_METHODS_MAP,
-};
+use crate::rae::context::actions_progress::{ActionId, ActionsProgress, Status};
+use crate::rae::context::agenda::Agenda;
+use crate::rae::context::rae_env::RAE_TASK_METHODS_MAP;
+use crate::rae::context::rae_state::*;
+use crate::rae::context::ressource_access::wait_on::add_waiter;
 use crate::rae::module::domain::*;
-use crate::rae::ressource_access::wait_on::add_waiter;
 use crate::rae::select_methods::sort_greedy;
-use crate::rae::state::{
-    ActionStatus, RAEState, StateType, KEY_DYNAMIC, KEY_INNER_WORLD, KEY_STATIC,
-};
 use log::{error, info, warn};
 use ompas_lisp::core::LEnv;
 use ompas_lisp::functions::{cons, union_map};
+use ompas_lisp::modules::doc::{Documentation, LHelp};
 use ompas_lisp::structs::LError::*;
 use ompas_lisp::structs::LValue::*;
 use ompas_lisp::structs::*;
-use ompas_modules::doc::{Documentation, LHelp};
 use ompas_utils::blocking_async;
 use std::any::Any;
 use std::collections::hash_map::RandomState;
@@ -49,7 +46,7 @@ pub const RAE_OPEN_COM_PLATFORM: &str = "rae-open-com-platform";
 pub const RAE_START_PLATFORM: &str = "rae-start-platform";
 pub const RAE_GET_STATUS: &str = "rae-get-status";
 pub const RAE_CANCEL_COMMAND: &str = "rae-cancel-command";
-pub const RAE_GET_METHODS: &str = "rae-get-methods";
+pub const RAE_GET_INSTANTIATED_METHODS: &str = "rae-get-instantiated-methods";
 pub const RAE_GET_BEST_METHOD: &str = "rae-get-best-method";
 pub const RAE_LOG: &str = "rae-log";
 pub const RAE_SELECT: &str = "rae-select";
@@ -93,6 +90,9 @@ impl GetModule for CtxRaeExec {
             LAMBDA_MUTEX_RELEASE,
             LAMBDA_PROGRESS,
             LAMBDA_RETRY,
+            LAMBDA_GET_METHODS,
+            LAMBDA_GET_PARAMETERS_GENERATOR,
+            LAMBDA_GET_SCORE_GENERATOR,
         ]
         .into();
         let mut module = Module {
@@ -116,7 +116,7 @@ impl GetModule for CtxRaeExec {
         module.add_fn_prelude(RAE_AWAIT, fn_await);
         module.add_mut_fn_prelude(RAE_OPEN_COM_PLATFORM, open_com);
         module.add_mut_fn_prelude(RAE_START_PLATFORM, start_platform);
-        module.add_fn_prelude(RAE_GET_METHODS, get_methods);
+        module.add_fn_prelude(RAE_GET_INSTANTIATED_METHODS, get_instantiated_methods);
         module.add_fn_prelude(RAE_GET_BEST_METHOD, get_best_method);
         module.add_fn_prelude(WAIT_ON, wait_on);
         module.add_fn_prelude(RAE_LOG, log);
@@ -392,10 +392,16 @@ pub fn fn_await(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue
     }
 }
 
-fn get_methods(args: &[LValue], env: &LEnv, _ctx: &CtxRaeExec) -> Result<LValue, LError> {
+//Return the labels of the methods
+
+fn get_instantiated_methods(
+    args: &[LValue],
+    env: &LEnv,
+    _ctx: &CtxRaeExec,
+) -> Result<LValue, LError> {
     if args.is_empty() {
         return Err(WrongNumberOfArgument(
-            RAE_GET_METHODS,
+            RAE_GET_INSTANTIATED_METHODS,
             args.into(),
             args.len(),
             1..std::usize::MAX,
@@ -410,7 +416,7 @@ fn get_methods(args: &[LValue], env: &LEnv, _ctx: &CtxRaeExec) -> Result<LValue,
         let methods = match map.get(task_name) {
             None => {
                 return Err(SpecialError(
-                    RAE_GET_METHODS,
+                    RAE_GET_INSTANTIATED_METHODS,
                     format!("no methods for {}", task_name),
                 ))
             }
@@ -448,7 +454,7 @@ fn get_best_method(args: &[LValue], env: &LEnv, ctx: &CtxRaeExec) -> Result<LVal
         task_methods_map
     ));*/
 
-    let methods = get_methods(args, env, ctx)?;
+    let methods = get_instantiated_methods(args, env, ctx)?;
     let task_args = &args[1..];
     //log::send(format!("methods for {}: {}\n", LValue::from(args), methods));
     let best_method = if let LValue::List(methods) = methods {
@@ -602,7 +608,7 @@ fn select(args: &[LValue], env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LErro
 
     info!("Add task {} to agenda", task);
     let task_id = ctx.agenda.add_task(task);
-    let methods = get_methods(args, env, ctx)?;
+    let methods = get_instantiated_methods(args, env, ctx)?;
 
     //Here we choose different way to choose the best method.
     //TODO: Implement a way to configure select

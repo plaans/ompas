@@ -428,7 +428,13 @@ pub fn get_list(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
             } else {
                 Err(SpecialError(
                     GET_LIST,
-                    format!("index out of bound, must be in [{};{}]", 0, vec.len() - 1),
+                    format!(
+                        "list: {}. {} is out of bound, must be in [{};{}]",
+                        LValue::from(args),
+                        i,
+                        0,
+                        vec.len() - 1
+                    ),
                 ))
             }
         } else {

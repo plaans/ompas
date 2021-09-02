@@ -1,14 +1,15 @@
 //!
 
-use crate::doc::{Documentation, LHelp};
-use ompas_lisp::core::*;
-use ompas_lisp::structs::LError::*;
-use ompas_lisp::structs::*;
+use crate::core::LEnv;
+use crate::modules::doc::{Documentation, LHelp};
+use crate::structs::LError::{WrongNumberOfArgument, WrongType};
+use crate::structs::{GetModule, LError, LValue, Module, NameTypeLValue};
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::mpsc::Sender;
+
 /*
 LANGUAGE
  */
@@ -210,23 +211,22 @@ pub mod repl {
     //! The repl is based on the project rustyline.
     //!
     //! It contains only one function (for the moment): run that takes two arguments.
-
-    use crate::io::{repl, TOKIO_CHANNEL_SIZE};
+    use crate::language::scheme_primitives::NIL;
+    use crate::modules::io::TOKIO_CHANNEL_SIZE;
     use chrono::{DateTime, Utc};
-    use ompas_lisp::language::scheme_primitives::NIL;
     use ompas_utils::task_handler::subscribe_new_task;
     use rustyline::error::ReadlineError;
     use rustyline::Editor;
-    use std::fs;
     use std::fs::OpenOptions;
     use std::io::Write;
+    use std::{env, fs};
     use tokio::sync::mpsc::{self, Receiver, Sender};
 
     ///Spawn repl task
     pub async fn spawn_repl(sender: Sender<String>) -> Option<Sender<String>> {
         let (sender_repl, receiver_repl) = mpsc::channel(TOKIO_CHANNEL_SIZE);
         tokio::spawn(async move {
-            repl::repl(sender, receiver_repl).await;
+            repl(sender, receiver_repl).await;
         });
 
         Some(sender_repl)
@@ -237,7 +237,7 @@ pub mod repl {
     pub async fn spawn_stdin(sender: Sender<String>) -> Option<Sender<String>> {
         let (sender_stdin, receiver_stdin) = mpsc::channel(TOKIO_CHANNEL_SIZE);
         tokio::spawn(async move {
-            repl::stdin(sender, receiver_stdin).await;
+            stdin(sender, receiver_stdin).await;
         });
 
         Some(sender_stdin)
@@ -250,7 +250,7 @@ pub mod repl {
             mpsc::channel(TOKIO_CHANNEL_SIZE);
 
         tokio::spawn(async move {
-            repl::output(receiver_stdout).await;
+            output(receiver_stdout).await;
         });
 
         Some(sender_stdout)
@@ -261,7 +261,7 @@ pub mod repl {
         let (sender_log, receiver_log) = mpsc::channel(TOKIO_CHANNEL_SIZE);
 
         tokio::spawn(async move {
-            repl::log(receiver_log).await;
+            log(receiver_log).await;
         });
 
         Some(sender_log)
@@ -321,12 +321,18 @@ pub mod repl {
     async fn log(mut receiver: Receiver<String>) {
         let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
         let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
-        fs::create_dir_all("lisp_logs").expect("could not create logs directory");
+        let home_dir = match env::var("HOME") {
+            Ok(val) => val,
+            Err(_) => ".".to_string(),
+        };
+        let dir_path = format!("{}/ompas/lisp_logs", home_dir);
+
+        fs::create_dir_all(&dir_path).expect("could not create logs directory");
         let mut file = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
-            .open(format!("lisp_logs/log_{}", string_date))
+            .open(format!("{}/log_{}", &dir_path, string_date))
             .expect("error creating log file");
 
         let mut end_receiver = subscribe_new_task();

@@ -5,11 +5,11 @@ use crate::serde::{
 use crate::tcp::{task_tcp_connection, TEST_TCP};
 use crate::TOKIO_CHANNEL_SIZE;
 use core::time;
-use ompas_acting::rae::context::{ActionsProgress, Status};
+use ompas_acting::rae::context::actions_progress::{ActionsProgress, Status};
+use ompas_acting::rae::context::rae_state::{RAEState, StateType, KEY_DYNAMIC, KEY_STATIC};
 use ompas_acting::rae::module::mod_rae_exec::{
     RAEInterface, RAE_GET_STATE_VARIBALE, RAE_LAUNCH_PLATFORM,
 };
-use ompas_acting::rae::state::{RAEState, StateType, KEY_DYNAMIC, KEY_STATIC};
 use ompas_lisp::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
 use ompas_lisp::structs::*;
 use ompas_utils::blocking_async;

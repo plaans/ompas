@@ -1,18 +1,17 @@
 //! Module containing the Scheme library to setup RAE environment
 
-use crate::rae::context::*;
+use crate::rae::context::rae_env::RAEEnv;
+use crate::rae::context::rae_state::{LState, StateType, KEY_DYNAMIC, KEY_INNER_WORLD, KEY_STATIC};
 use crate::rae::module::domain::{GENERATE_TASK_SIMPLE, LABEL_GENERATE_METHOD_PARAMETERS};
 use crate::rae::module::mod_rae_exec::{CtxRaeExec, RAEInterface};
-use crate::rae::rae_run;
-use crate::rae::state::{LState, StateType, KEY_DYNAMIC, KEY_INNER_WORLD, KEY_STATIC};
+use crate::rae::{rae_run, RAEOptions};
 use ompas_lisp::async_await;
 use ompas_lisp::core::{eval, expand, load_module, LEnv};
 use ompas_lisp::functions::cons;
+use ompas_lisp::modules::doc::{Documentation, LHelp};
 use ompas_lisp::structs::LError::*;
 use ompas_lisp::structs::LValue::Nil;
 use ompas_lisp::structs::*;
-use ompas_modules::doc::{Documentation, LHelp};
-use ompas_modules::math::CtxMath;
 use ompas_utils::blocking_async;
 use ompas_utils::log;
 use std::convert::TryInto;
@@ -33,7 +32,6 @@ const RAE_GET_ACTIONS: &str = "rae-get-actions";
 const RAE_GET_SYMBOL_TYPE: &str = "rae-get-symbol-type";
 const RAE_GET_TASKS: &str = "rae-get-tasks";
 const RAE_GET_STATE_FUNCTIONS: &str = "rae-get-state-functions";
-const RAE_GET_METHODS_PARAMETERS: &str = "rae-get-methods-parameters";
 const RAE_GET_ENV: &str = "rae-get-env";
 const RAE_LAUNCH: &str = "rae-launch";
 const RAE_GET_STATE: &str = "rae-get-state";
@@ -45,7 +43,6 @@ const RAE_DEF_ACTION: &str = "def-action";
 const RAE_DEF_TASK: &str = "def-task";
 const RAE_DEF_METHOD: &str = "def-method";
 const RAE_DEF_LAMBDA: &str = "def-lambda";
-const RAE_DEF_METHOD_PARAMETERS: &str = "def-method-parameters";
 const RAE_DEF_INITIAL_STATE: &str = "def-initial-state";
 const RAE_CONFIGURE_PLATFORM: &str = "rae-configure-platform";
 const RAE_GET_CONFIG_PLATFORM: &str = "rae-get-config-platform";
@@ -111,8 +108,8 @@ impl GetModule for CtxRae {
         module.add_fn_prelude(RAE_GET_STATE_FUNCTIONS, get_state_function);
         module.add_fn_prelude(RAE_GET_ACTIONS, get_actions);
         module.add_fn_prelude(RAE_GET_TASKS, get_tasks);
-        module.add_fn_prelude(RAE_GET_METHODS_PARAMETERS, get_methods_parameters);
-        module.add_fn_prelude(RAE_GET_SYMBOL_TYPE, get_symbol_type);
+        //module.add_fn_prelude(RAE_GET_METHODS_PARAMETERS, get_methods_parameters);
+        //module.add_fn_prelude(RAE_GET_SYMBOL_TYPE, get_symbol_type);
         module.add_fn_prelude(RAE_GET_ENV, get_env);
         module.add_mut_fn_prelude(RAE_CONFIGURE_PLATFORM, configure_platform);
         module.add_fn_prelude(RAE_GET_CONFIG_PLATFORM, get_config_platform);
@@ -122,7 +119,7 @@ impl GetModule for CtxRae {
         module.add_mut_fn_prelude(RAE_DEF_TASK, def_task);
         module.add_mut_fn_prelude(RAE_DEF_METHOD, def_method);
         module.add_mut_fn_prelude(RAE_DEF_LAMBDA, def_lambda);
-        module.add_mut_fn_prelude(RAE_DEF_METHOD_PARAMETERS, def_method_parameters);
+        //module.add_mut_fn_prelude(RAE_DEF_METHOD_PARAMETERS, def_method_parameters);
         module.add_mut_fn_prelude(RAE_DEF_INITIAL_STATE, def_initial_state);
 
         //functions to debug the functionnement of rae
@@ -174,39 +171,35 @@ impl Documentation for CtxRae {
 
 ///Get the methods of a given task
 pub fn get_methods(_: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
-    Ok(ctx.env.domain_env.get_symbol(RAE_METHOD_LIST).unwrap())
+    Ok(ctx.env.domain_env.get_list_methods())
 }
 
 ///Get the list of actions in the environment
 pub fn get_actions(_: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
-    Ok(ctx.env.domain_env.get_symbol(RAE_ACTION_LIST).unwrap())
+    Ok(ctx.env.domain_env.get_list_actions())
 }
 
 ///Get the list of tasks in the environment
 pub fn get_tasks(_: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
-    Ok(ctx.env.domain_env.get_symbol(RAE_TASK_LIST).unwrap())
+    Ok(ctx.env.domain_env.get_list_tasks())
 }
 
 ///Get the list of state functions in the environment
 pub fn get_state_function(_: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
-    Ok(ctx
-        .env
-        .domain_env
-        .get_symbol(RAE_STATE_FUNCTION_LIST)
-        .unwrap())
+    Ok(ctx.env.domain_env.get_list_state_functions())
 }
 
 /// Returns a map method: parameters
-pub fn get_methods_parameters(_: &[LValue], _: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
+/*pub fn get_methods_parameters(_: &[LValue], _: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
     Ok(ctx
         .env
         .domain_env
-        .get_symbol(RAE_METHOD_PARAMETERS_MAP)
+        .get_symbol(RAE_METHOD_PARAMETERS_GENERATOR_MAP)
         .unwrap())
-}
+}*/
 
 /// Returns the map of symbol: type or the type of the symbol in args.
-pub fn get_symbol_type(args: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
+/*pub fn get_symbol_type(args: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
     match args.len() {
         0 => Ok(ctx.env.domain_env.get_symbol(RAE_SYMBOL_TYPE).unwrap()),
         1 => {
@@ -234,7 +227,7 @@ pub fn get_symbol_type(args: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LVa
             0..1,
         )),
     }
-}
+}*/
 
 /// Returns the whole RAE environment if no arg et the entry corresponding to the symbol passed in args.
 pub fn get_env(args: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
@@ -262,7 +255,7 @@ pub fn get_env(args: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LEr
         }
     };
 
-    Ok(LValue::String(ctx.env.pretty_debug(key)))
+    Ok(format!("{}", ctx.env.domain_env).into())
 }
 
 /// Defines a lambda in RAE environment.
@@ -421,21 +414,51 @@ pub fn def_method(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValu
     //println!("lvalue: {}", lvalue);
 
     if let LValue::List(list) = &lvalue {
-        if list.len() != 3 {
+        if list.len() != 6 {
             return Err(WrongNumberOfArgument(
                 RAE_DEF_METHOD,
                 lvalue.clone(),
                 list.len(),
-                2..2,
+                6..6,
             ));
         } else if let LValue::Symbol(method_label) = &list[0] {
             if let LValue::Symbol(task_label) = &list[1] {
                 if let LValue::Lambda(_) = &list[2] {
-                    ctx.env.add_method(
-                        method_label.to_string(),
-                        task_label.to_string(),
-                        list[2].clone(),
-                    )?;
+                    if let LValue::Lambda(_) = &list[3] {
+                        if let LValue::Lambda(_) = &list[4] {
+                            if let LValue::Lambda(_) = &list[5] {
+                                ctx.env.add_method(
+                                    method_label.to_string(),
+                                    task_label.to_string(),
+                                    list[2].clone(),
+                                    list[3].clone(),
+                                    list[4].clone(),
+                                    list[5].clone(),
+                                )?;
+                            } else {
+                                return Err(WrongType(
+                                    RAE_DEF_METHOD,
+                                    list[5].clone(),
+                                    list[5].clone().into(),
+                                    NameTypeLValue::Lambda,
+                                ));
+                            }
+                        } else {
+                            return Err(WrongType(
+                                RAE_DEF_METHOD,
+                                list[4].clone(),
+                                list[4].clone().into(),
+                                NameTypeLValue::Lambda,
+                            ));
+                        }
+                    } else {
+                        return Err(WrongType(
+                            RAE_DEF_METHOD,
+                            list[3].clone(),
+                            list[3].clone().into(),
+                            NameTypeLValue::Lambda,
+                        ));
+                    }
                 } else {
                     return Err(WrongType(
                         RAE_DEF_METHOD,
@@ -466,7 +489,7 @@ pub fn def_method(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValu
 }
 
 /// Defines a method parameter in RAE environment.
-pub fn def_method_parameters(
+/*pub fn def_method_parameters(
     args: &[LValue],
     env: &LEnv,
     ctx: &mut CtxRae,
@@ -502,7 +525,7 @@ pub fn def_method_parameters(
             ));
         } else if let LValue::Symbol(_) = &list[0] {
             ctx.env
-                .add_parameters_to_method(list[0].clone(), list[1].clone())?;
+                .add_parameter_generator_to_method(list[0].clone(), list[1].clone())?;
         } else {
             return Err(WrongType(
                 RAE_DEF_METHOD_PARAMETERS,
@@ -516,7 +539,7 @@ pub fn def_method_parameters(
     };
 
     Ok(Nil)
-}
+}*/
 
 pub fn def_task(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
     //println!("in {}", RAE_DEF_TASK);

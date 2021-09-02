@@ -82,3 +82,102 @@
                 (if (eval first_m)
                     (rae-set-success-for-task task_id)
                     (rae-retry task_id))))))
+
+
+(generate-evaluator ((:task pick)
+                     (:params ?r)
+                     (:parameters-generator (robots) ((?r) (robot.is_available ?r)))
+                     (:score-generator 10)
+                     (:body )))
+
+(lambda args 
+    (begin 
+        (define eval_params 
+            (lambda args 
+                ((lambda (params) 
+                    (if (null? params)
+                        nil
+                        (if (eval (cons (lambda (?r) (robot.is_available ?r)) params))
+                            (cons (list params ((lamdba (?r)) 10)) (eval_params (cdr args))) (eval_params (cdr args))))) (car args)))) (eval_params (enumerate append args (quote (robots))))))
+
+
+(lambda args
+    (begin 
+        (define eval_params
+            (lambda args 
+                ((lambda (params)
+                    (if (null? params)
+                        nil
+                        (if (eval (cons (lambda (?r) (robot.is_available ?r)) params))
+                            (cons (list params 
+                                        ((lamdba (?r) 10) params))
+                                (eval_params (cdr args)))
+                            (eval_params (cdr args))))) (car args))))
+    (eval_params (enumerate (append args (quote (robots)))))))
+
+(begin 
+    (defmacro generate-evaluator 
+        (lambda (method)
+            (let* ((parameter-generator (get-list method 2))
+                (list-element (get-list parameter-generator 1))
+                (params-symbols (car (get-list parameter-generator 2)))
+                (body-generator (cadr (get-list parameter-generator 2)))
+                (score-generator (cadr (get-list method 3))))
+                    
+                    `(lambda args
+                        (begin
+                            (define eval_params
+                                (lambda args
+                                    (let ((params (car args)))
+                                        (if (null? params)
+                                            nil
+                                            (if (eval (cons (lambda ,params-symbols ,body-generator) params))
+                                                (cons (list params ((lamdba ,params-symbols ,score-generator) params))
+                                                    (eval_params (cdr args)))
+                                                (eval_params (cdr args)))))))
+                            (eval_params (enumerate (append args (quote ,list-element)))))))))
+(defmacro generate-method
+    (lambda (label m-def)
+        (let* ((task-label (cadr (get-list m-def 0)))
+                (params (cdr (get-list m-def 1)))
+                (body (cadr (get-list m-def 4)))
+                (parameter-generator (get-list m-def 2))
+                (list-element (get-list parameter-generator 1))
+                (params-symbols (car (get-list parameter-generator 2)))
+                (body-generator (cadr (get-list parameter-generator 2)))
+                (score-generator (cadr (get-list m-def 3))))
+                `(list ,label
+                        (quote ,task-label)
+                        (lambda ,params ,body)
+                        (lambda args
+                            (begin
+                                (define eval_params
+                                    (lambda args
+                                        (let ((params (car args)))
+                                            (if (null? params)
+                                                nil
+                                                (if (eval (cons (lambda ,params-symbols ,body-generator) params))
+                                                    (cons (list params ((lamdba ,params-symbols ,score-generator) params))
+                                                        (eval_params (cdr args)))
+                                                    (eval_params (cdr args)))))))
+                                (eval_params (enumerate (append args (quote ,list-element))))))))))
+)
+
+(generate-method m1 ((:task pick)
+                     (:params ?r ?m)
+                     (:parameters-generator (robots machines) ((?r ?m) (robot.is_available ?r)))
+                     (:score-generator 10)
+                     (:body (+ 3 3))))
+(m1 pick 
+    (lambda (?r) (+ 3 3))
+    (lambda args
+        (begin
+            (define eval_params
+                (lambda args
+                    ((lambda (params)
+                        (if (null? params)
+                            nil
+                            (if (eval (cons (lambda (?r) (robot.is_available ?r)) params))
+                                (cons (list params ((lamdba (?r) 10) params)) (eval_params (cdr args)))
+                                (eval_params (cdr args))))) (car args))))
+            (eval_params (enumerate (append args (quote (robots))))))))

@@ -1,6 +1,6 @@
 use crate::serde::{GodotMessageSerde, GodotMessageType};
-use ompas_acting::rae::context::ActionsProgress;
-use ompas_acting::rae::state::{ActionStatus, LState, RAEState, StateType};
+use ompas_acting::rae::context::actions_progress::ActionsProgress;
+use ompas_acting::rae::context::rae_state::*;
 use ompas_utils::task_handler;
 use std::convert::TryInto;
 use std::net::SocketAddr;

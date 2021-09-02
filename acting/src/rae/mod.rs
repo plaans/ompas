@@ -7,26 +7,20 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, Mutex};
 use tokio_stream::StreamExt;
 
-use crate::rae::context::{RAEEnv, RAEOptions, SelectOption, RAE_TASK_METHODS_MAP};
 //use crate::rae::context::{Action, Method, SelectOption, Status, TaskId};
+use crate::rae::context::actions_progress::async_status_watcher_run;
+use crate::rae::context::rae_env::RAEEnv;
+use crate::rae::context::ressource_access::wait_on::task_check_wait_on;
 use crate::rae::module::mod_rae_exec::{Job, JobId, RAE_LAUNCH_PLATFORM};
-use crate::rae::ressource_access::wait_on::task_check_wait_on;
-use crate::rae::status::async_status_watcher_run;
 use log::{error, info, warn};
-use ompas_lisp::async_await;
-use ompas_lisp::async_await::TaskHandler;
 use ompas_lisp::core::{eval, ContextCollection, LEnv};
 use ompas_lisp::functions::cons;
 use ompas_lisp::structs::{LError, LValue};
 use std::mem;
 
-pub mod agenda;
 pub mod context;
 pub mod module;
-pub mod ressource_access;
 mod select_methods;
-pub mod state;
-pub mod status;
 
 pub type Lisp = String;
 
@@ -34,6 +28,77 @@ pub enum RAEError {
     RetryFailure,
     Other(String),
 }
+
+#[derive(Debug, Default, Clone)]
+pub struct RAEOptions {
+    select_option: SelectOption,
+    platform_config: Option<String>,
+}
+
+impl RAEOptions {
+    pub fn new(option: SelectOption) -> Self {
+        Self {
+            select_option: option,
+            platform_config: None,
+        }
+    }
+
+    pub fn set_select_option(&mut self, dr0: usize, nro: usize) {
+        self.select_option.set_dr0(dr0);
+        self.select_option.set_nr0(nro);
+    }
+
+    pub fn get_select_option(&self) -> &SelectOption {
+        &self.select_option
+    }
+
+    pub fn set_platform_config(&mut self, str: String) {
+        self.platform_config = Some(str);
+    }
+
+    pub fn get_platform_config(&self) -> Option<String> {
+        self.platform_config.clone()
+    }
+}
+
+#[derive(Default, Debug, Copy, Clone)]
+pub struct SelectOption {
+    dr0: usize,
+    nro: usize,
+}
+
+impl SelectOption {
+    pub fn new(dr0: usize, nro: usize) -> Self {
+        SelectOption { dr0, nro }
+    }
+
+    pub fn set_dr0(&mut self, dr0: usize) {
+        self.dr0 = dr0;
+    }
+
+    pub fn set_nr0(&mut self, nro: usize) {
+        self.nro = nro;
+    }
+
+    pub fn get_dr0(&self) -> usize {
+        self.dr0
+    }
+
+    pub fn get_nro(&self) -> usize {
+        self.nro
+    }
+}
+
+pub type ReactiveTriggerId = usize;
+
+#[derive(Debug, Clone)]
+pub enum TaskType {
+    Task,
+    Event,
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct RAEEvent {}
 
 const TOKIO_CHANNEL_SIZE: usize = 65_536; //=2^16
 
@@ -106,11 +171,11 @@ async fn progress_2(job_lvalue: LValue, mut env: LEnv, mut ctxs: ContextCollecti
     }
 }
 
-fn _select_greedy(env: &RAEEnv, task: &LValue, _params: &[LValue]) -> LValue {
-    let methods = env.get_methods_from_task(task);
+fn _select_greedy(env: &RAEEnv, task: &LValue, _params: &[LValue]) -> Result<LValue, LError> {
+    let methods = env.get_methods_from_task(task)?;
     //println!("methods: {}", methods);
     if let LValue::List(list) = methods {
-        list.first().unwrap_or(&LValue::Nil).clone()
+        Ok(list.first().unwrap_or(&LValue::Nil).clone())
     } else {
         panic!("methods should be a list of methods")
     }

@@ -28,7 +28,7 @@ pub const MACRO_GENERATE_TASK_SIMPLE: &str = "(defmacro generate-task-simple
                     ,(cons 'progress (cons `(quote ,label) params))))))))";
 
 /// Macro used to generate code to define a method in REA environment.
-pub const MACRO_GENERATE_METHOD: &str = "(defmacro generate-method \
+pub const MACRO_GENERATE_METHOD_DEPRECATED: &str = "(defmacro generate-method \
                                           (lambda (l body) \
                                             (let ((task-label (cadar body)) \
                                                   (params (cdadr body)) \
@@ -37,6 +37,39 @@ pub const MACRO_GENERATE_METHOD: &str = "(defmacro generate-method \
                                                                     (quote (unquote task-label)) \
                                                                     (lambda (unquote params) \
                                                                             (unquote body)))))))";
+
+pub const MACRO_GENERATE_METHOD: &str=
+"(defmacro generate-method;-final-till-there-is-a-new-one
+    (lambda (label m-def)
+        (let* ((task-label (cadr (get-list m-def 0)))
+                (params (cdr (get-list m-def 1)))
+                (pre-conditions (cadr (get-list m-def 2)))
+                (effects (cadr (get-list m-def 3)))
+                (body (cadr (get-list m-def 6)))
+                (parameter-generator (cdr (get-list m-def 4)))
+                (list-element (car parameter-generator))
+                (body-generator (cadr parameter-generator))
+                (score-generator (cadr (get-list m-def 5))))
+                `(list ,label
+                        ;label of the task
+                        (quote ,task-label)
+                        ;body of the method
+                        (lambda ,params ,pre-conditions)
+                        (lambda ,params ,effects)
+                        ;lambda to generate instances
+                        (lambda args
+                            (begin
+                                (define eval_params
+                                    (lambda args
+                                        (let ((params (car args)))
+                                            (if (null? params)
+                                                nil
+                                                (if (eval (cons (lambda ,params ,body-generator) params))
+                                                    (cons (list params ((lamdba ,params-symbols ,score-generator) params))
+                                                        (eval_params (cdr args)))
+                                                    (eval_params (cdr args)))))))
+                                (eval_params (enumerate (append args (quote ,list-element))))))
+                        (lambda ,params ,body)))))";
 
 /// Macro used to generate code to define an action in RAE environment.
 pub const MACRO_GENERATE_ACTION: &str ="(defmacro generate-action \
@@ -124,3 +157,20 @@ pub const LAMBDA_RETRY: &str = "
             (if (eval new_method)
                 (rae-set-success-for-task task_id)
                 (rae-retry task_id)))))))";
+
+//Access part of the environment
+
+pub const LAMBDA_GET_METHODS: &str = "\
+(define get-methods\
+    (lambda (label)\
+        (get-map rae-task-methods-map label)))";
+
+pub const LAMBDA_GET_SCORE_GENERATOR: &str = "\
+(define get-score-generator \
+    (lambda (label)\
+        (get-map rae-method-score-generator-map label)))";
+
+pub const LAMBDA_GET_PARAMETERS_GENERATOR: &str = "\
+(define get-parameters-generator
+    (lambda (label)
+        (get-map rae-method-parameters-generator-map label)))";

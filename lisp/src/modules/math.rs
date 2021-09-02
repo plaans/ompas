@@ -1,7 +1,7 @@
-use crate::doc::{Documentation, LHelp};
-use ompas_lisp::core::*;
-use ompas_lisp::structs::LError::*;
-use ompas_lisp::structs::*;
+use crate::core::LEnv;
+use crate::modules::doc::{Documentation, LHelp};
+use crate::structs::LError::{WrongNumberOfArgument, WrongType};
+use crate::structs::{GetModule, LError, LValue, Module, NameTypeLValue};
 use rand::Rng;
 use std::sync::Arc;
 

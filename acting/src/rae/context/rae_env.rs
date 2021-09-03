@@ -26,7 +26,7 @@ pub const RAE_METHOD_LIST: &str = "rae_methods_list";
 pub const RAE_ACTION_LIST: &str = "rae_actions_list";
 pub const RAE_STATE_FUNCTION_LIST: &str = "rae-state-function-list";
 pub const RAE_SYMBOL_TYPE: &str = "rae-symbol-type";
-pub const RAE_METHOD_PARAMETERS_GENERATOR_MAP: &str = "rae-method-instances-generator-map";
+pub const RAE_METHOD_GENERATOR_MAP: &str = "rae-method-generator-map";
 pub const RAE_METHOD_PRE_CONDITIONS_MAP: &str = "rae-method-pre-conditions-map";
 pub const RAE_METHODS_EFFECTS_MAP: &str = "rae-method-effects-map";
 pub const ACTION_TYPE: &str = "action_type";
@@ -130,6 +130,30 @@ pub struct DomainEnv {
     actions: HashMap<String, LValue>,
     lambdas: HashMap<String, LValue>,
     map_symbol_type: HashMap<LValue, LValue>,
+}
+
+impl DomainEnv {
+    pub fn get_element_description(&self, label: String) -> String {
+        match self.map_symbol_type.get(&label.clone().into()) {
+            None => format!("Keyword {} is not defined in the domain.", label),
+            Some(symbol_type) => {
+                if let LValue::Symbol(s) = symbol_type {
+                    match s.as_str() {
+                        TASK_TYPE => self.tasks.get(&label).unwrap().to_string(),
+                        METHOD_TYPE => self.methods.get(&label).unwrap().to_string(),
+                        STATE_FUNCTION_TYPE => {
+                            self.state_functions.get(&label).unwrap().to_string()
+                        }
+                        LAMBDA_TYPE => self.lambdas.get(&label).unwrap().to_string(),
+                        ACTION_TYPE => self.actions.get(&label).unwrap().to_string(),
+                        _ => panic!("There should no other type of symbol_type"),
+                    }
+                } else {
+                    panic!("A symbol_type must be LValue::Symbol")
+                }
+            }
+        }
+    }
 }
 
 //Getter
@@ -252,7 +276,7 @@ impl DomainEnv {
     pub fn print_tasks(&self) -> String {
         let mut str = "*Tasks:\n".to_string();
         for (label, value) in &self.tasks {
-            str.push_str(format!("\t-{}: {}\n", label, value).as_str())
+            str.push_str(format!("\t-{}:\n{}\n", label, value).as_str())
         }
         str
     }
@@ -260,7 +284,7 @@ impl DomainEnv {
     pub fn print_methods(&self) -> String {
         let mut str = "*Methods:\n".to_string();
         for (label, value) in &self.methods {
-            str.push_str(format!("\t-{}: {}\n", label, value).as_str())
+            str.push_str(format!("\t-{}:\n{}\n", label, value).as_str())
         }
         str
     }
@@ -268,7 +292,7 @@ impl DomainEnv {
     pub fn print_state_functions(&self) -> String {
         let mut str = "*State-Functions:\n".to_string();
         for (label, value) in &self.state_functions {
-            str.push_str(format!("\t-{}: {}\n", label, value).as_str())
+            str.push_str(format!("\t-{}:\n{}\n", label, value).as_str())
         }
         str
     }
@@ -276,7 +300,7 @@ impl DomainEnv {
     pub fn print_actions(&self) -> String {
         let mut str = "*Actions:\n".to_string();
         for (label, value) in &self.actions {
-            str.push_str(format!("\t-{}: \n{}\n", label, value).as_str())
+            str.push_str(format!("\t-{}:\n{}\n", label, value).as_str())
         }
         str
     }
@@ -284,7 +308,7 @@ impl DomainEnv {
     pub fn print_lambdas(&self) -> String {
         let mut str = "*Lambdas:\n".to_string();
         for (label, value) in &self.lambdas {
-            str.push_str(format!("\t-{}: {}\n", label, value).as_str())
+            str.push_str(format!("\t-{}:\n{}\n", label, value).as_str())
         }
         str
     }
@@ -338,6 +362,9 @@ impl From<DomainEnv> for LEnv {
         }
 
         //Add all lambdas to env:
+        for (label, lambda) in domain_env.get_lambdas() {
+            env.insert(label.clone(), lambda.clone())
+        }
 
         env.insert(RAE_ACTION_LIST.to_string(), domain_env.get_list_actions());
         env.insert(RAE_METHOD_LIST.to_string(), domain_env.get_list_methods());
@@ -351,7 +378,7 @@ impl From<DomainEnv> for LEnv {
             domain_env.get_map_symbol_type(),
         );
         env.insert(
-            RAE_METHOD_PARAMETERS_GENERATOR_MAP.to_string(),
+            RAE_METHOD_GENERATOR_MAP.to_string(),
             map_method_generator.into(),
         );
         env.insert(RAE_TASK_METHODS_MAP.to_string(), map_task_method.into());
@@ -395,24 +422,6 @@ impl RAEEnv {
 impl Default for RAEEnv {
     fn default() -> Self {
         let (env, ctxs, init_lisp) = LEnv::root();
-        /*let mut domain_env = LEnv::empty();
-        domain_env.insert(RAE_ACTION_LIST.to_string(), LValue::List(vec![]));
-        domain_env.insert(RAE_METHOD_LIST.to_string(), LValue::List(vec![]));
-        domain_env.insert(RAE_TASK_LIST.to_string(), LValue::List(vec![]));
-        domain_env.insert(RAE_STATE_FUNCTION_LIST.to_string(), LValue::List(vec![]));
-        domain_env.insert(RAE_SYMBOL_TYPE.to_string(), LValue::Map(Default::default()));
-        domain_env.insert(
-            RAE_METHOD_PARAMETERS_GENERATOR_MAP.to_string(),
-            LValue::Map(Default::default()),
-        );
-        domain_env.insert(
-            RAE_TASK_METHODS_MAP.to_string(),
-            LValue::Map(Default::default()),
-        );
-        domain_env.insert(
-            RAE_METHOD_SCORE_GENERATOR_MAP.to_string(),
-            LValue::Map(Default::default()),
-        );*/
         Self {
             job_receiver: None,
             agenda: Default::default(),
@@ -534,123 +543,14 @@ impl RAEEnv {
     ) -> Result<(), LError> {
         let method = Method::new(task_label, conds, effects, generator, body);
 
-        self.domain_env.add_method(method_label, method);
-
-        /*
-        self.insert(method_label.clone(), value)?;
-        let method_list = self.domain_env.get_symbol(RAE_METHOD_LIST).unwrap();
-        if let LValue::List(mut list) = method_list {
-            list.push(LValue::Symbol(method_label.clone()));
-            self.domain_env
-                .set(RAE_METHOD_LIST.to_string(), list.into())
-                .expect("list of method should be already defined in environment");
-
-            self.add_method_to_task(task_label, method_label.clone())?;
-            let symbol_type = self.domain_env.get_symbol(RAE_SYMBOL_TYPE).unwrap();
-            if let LValue::Map(mut map) = symbol_type {
-                map.insert(
-                    LValue::Symbol(method_label),
-                    LValue::Symbol(METHOD_TYPE.to_string()),
-                );
-                self.domain_env
-                    .set(RAE_SYMBOL_TYPE.to_string(), map.into())
-                    .expect("map of symbol type should be already defined in environment")
-            }
-        }*/
+        self.domain_env.add_method(method_label, method)?;
 
         Ok(())
     }
 
-    /*pub fn insert(&mut self, label: String, value: LValue) -> Result<(), LError> {
-        match self.domain_env.get_symbol(&label) {
-            None => {
-                self.domain_env.insert(label, value);
-                Ok(())
-            }
-            Some(_) => Err(SpecialError(
-                "RAEEnv::insert",
-                format!("Symbol \"{}\" already defined.", label),
-            )),
-        }
-    }*/
-
-    /*pub fn add_method_to_task(
-        &mut self,
-        task_label: String,
-        method_label: String,
-    ) -> Result<(), LError> {
-        let mut map: im::HashMap<LValue, LValue> = self
-            .domain_env
-            .get_symbol(RAE_TASK_METHODS_MAP)
-            .unwrap()
-            .try_into()
-            .unwrap();
-
-        let list = match map.get(&LValue::Symbol(task_label.clone())) {
-            None => {
-                return Err(SpecialError(
-                    "RAEEnv::add_method_to_task",
-                    format!(
-                        "task \"{}\" is not defined, cannot add method to it.",
-                        task_label
-                    ),
-                ))
-            }
-            Some(l) => l,
-        };
-        let new_list: LValue = match list {
-            LValue::List(l) => {
-                l.clone().push(method_label.into());
-                l.into()
-            }
-            LValue::Nil => vec![method_label].into(),
-            _ => panic!("should be a list or nothing"),
-        };
-        map.insert(LValue::Symbol(task_label), new_list);
-        self.domain_env
-            .set(RAE_TASK_METHODS_MAP.into(), map.into())
-            .expect("should not return an error");
-        Ok(())
+    pub fn add_lambda(&mut self, label: String, value: LValue) {
+        self.domain_env.add_lambda(label, value);
     }
-
-    pub fn add_parameter_generator_to_method(
-        &mut self,
-        method_label: LValue,
-        lambda_generator: LValue,
-    ) -> Result<(), LError> {
-        //println!("setting parameters to method");
-        let mut map: im::HashMap<LValue, LValue> = self
-            .domain_env
-            .get_symbol(RAE_METHOD_PARAMETERS_GENERATOR_MAP)
-            .unwrap()
-            .try_into()
-            .unwrap();
-
-        map.insert(method_label, lambda_generator);
-        self.domain_env
-            .set(RAE_METHOD_PARAMETERS_GENERATOR_MAP.into(), map.into())
-            .expect("should not return an error");
-        Ok(())
-    }
-
-    pub fn add_score_generator_to_task(
-        &mut self,
-        method_label: LValue,
-        lambda_generator: LValue,
-    ) -> Result<(), LError> {
-        let mut map: im::HashMap<LValue, LValue> = self
-            .domain_env
-            .get_symbol(RAE_METHOD_SCORE_GENERATOR_MAP)
-            .unwrap()
-            .try_into()
-            .unwrap();
-
-        map.insert(method_label, lambda_generator);
-        self.domain_env
-            .set(RAE_METHOD_SCORE_GENERATOR_MAP.into(), map.into())
-            .expect("should not return an error");
-        Ok(())
-    }*/
 
     pub fn get_methods_from_task(&self, task: &LValue) -> Result<LValue, LError> {
         let label: String = task.try_into()?;
@@ -659,85 +559,4 @@ impl RAEEnv {
             Some(task) => Ok(task.methods.clone().into()),
         }
     }
-
-    /*pub fn get_element(&self, label: &str) -> Option<LValue> {
-        self.env.get_symbol(label)
-    }
-
-    pub fn pretty_debug(&self, key: Option<String>) -> String {
-        let mut string = String::new();
-        if let Some(_label) = key {
-            todo!()
-        } else {
-            let state_function_symbol =
-                self.domain_env.get_symbol(RAE_STATE_FUNCTION_LIST).unwrap();
-            let state_function_list: Vec<LValue> = state_function_symbol.try_into().unwrap();
-
-            let action_list_symbol = self.domain_env.get_symbol(RAE_ACTION_LIST).unwrap();
-            let action_list: Vec<LValue> = action_list_symbol.try_into().unwrap();
-            let task_list_symbol = self.domain_env.get_symbol(RAE_TASK_LIST).unwrap();
-            let task_list: Vec<LValue> = task_list_symbol.try_into().unwrap();
-            let map_task_method: im::HashMap<LValue, LValue> = self
-                .domain_env
-                .get_symbol(RAE_TASK_METHODS_MAP)
-                .unwrap()
-                .try_into()
-                .unwrap();
-            let method_parameters_map: im::HashMap<LValue, LValue> = self
-                .domain_env
-                .get_symbol(RAE_METHOD_PARAMETERS_GENERATOR_MAP)
-                .unwrap()
-                .try_into()
-                .unwrap();
-            string.push_str("RAEEnv: \n");
-            string.push_str("\tState Function(s)\n");
-            for state_function in state_function_list {
-                let state_function_label: String = state_function.try_into().unwrap();
-                let state_function_body =
-                    self.domain_env.get_symbol(&state_function_label).unwrap();
-                string.push_str(
-                    format!("\t\t- {}: {}\n", state_function_label, state_function_body).as_str(),
-                );
-            }
-            string.push('\n');
-            string.push_str("\t*Action(s): \n");
-            for action in action_list {
-                let action_label: String = action.try_into().unwrap();
-                let action_body = self.domain_env.get_symbol(&action_label).unwrap();
-                string.push_str(format!("\t\t- {}: {}\n", action_label, action_body).as_str());
-            }
-            string.push('\n');
-            string.push_str("\t*Task(s): \n");
-            for task in task_list {
-                let task_label: String = task.clone().try_into().unwrap();
-                let task_body = self.domain_env.get_symbol(&task_label).unwrap();
-                string.push_str(format!("\t\t-{}: {}\n", task_label, task_body).as_str());
-                string.push_str("\t\t*Method(s): \n");
-                let methods = map_task_method.get(&task);
-                match methods {
-                    None => string.push_str("\t\t\t nil\n"),
-                    Some(methods) => {
-                        let methods: Vec<LValue> = methods.try_into().unwrap();
-                        for m in methods {
-                            let method_label: String = m.try_into().unwrap();
-                            let method = self.domain_env.get_symbol(&method_label).unwrap();
-                            let parameters =
-                                match method_parameters_map.get(&method_label.clone().into()) {
-                                    None => LValue::Nil,
-                                    Some(s) => s.clone(),
-                                };
-                            string.push_str(
-                                format!(
-                                    "\t\t\t-{}: \n -body: {}\n -parameters: {}\n",
-                                    method_label, method, parameters
-                                )
-                                .as_str(),
-                            )
-                        }
-                    }
-                }
-            }
-        }
-        string
-    }*/
 }

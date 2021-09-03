@@ -40,7 +40,7 @@ pub const MACRO_GENERATE_METHOD_DEPRECATED: &str = "(defmacro generate-method \
 
 pub const MACRO_GENERATE_METHOD: &str=
 "(defmacro generate-method;-final-till-there-is-a-new-one
-    (lambda (label m-def)
+        (lambda (method-label m-def)
         (let* ((task-label (cadr (get-list m-def 0)))
                 (params (cdr (get-list m-def 1)))
                 (pre-conditions (cadr (get-list m-def 2)))
@@ -50,7 +50,7 @@ pub const MACRO_GENERATE_METHOD: &str=
                 (list-element (car parameter-generator))
                 (body-generator (cadr parameter-generator))
                 (score-generator (cadr (get-list m-def 5))))
-                `(list ,label
+                `(list ,method-label
                         ;label of the task
                         (quote ,task-label)
                         ;body of the method
@@ -65,10 +65,10 @@ pub const MACRO_GENERATE_METHOD: &str=
                                             (if (null? params)
                                                 nil
                                                 (if (eval (cons (lambda ,params ,body-generator) params))
-                                                    (cons (list params ((lamdba ,params-symbols ,score-generator) params))
+                                                    (cons (list (cons (quote ,method-label) params) (eval (cons (lambda ,params ,score-generator) params)))
                                                         (eval_params (cdr args)))
                                                     (eval_params (cdr args)))))))
-                                (eval_params (enumerate (append args (quote ,list-element))))))
+                                (eval_params (eval (cons enumerate (append args (quote ,list-element)))))))
                         (lambda ,params ,body)))))";
 
 /// Macro used to generate code to define an action in RAE environment.
@@ -137,7 +137,7 @@ pub const LAMBDA_MUTEX_RELEASE: &str = "(define mutex.release (lambda (__symbol_
 
 pub const LAMBDA_PROGRESS: &str = "
 (define progress (lambda args
-    (let* ((result (eval (cons rae-select (cons `(quote ,(car args)) (cdr args)))))
+    (let* ((result (eval (cons select (cons `(quote ,(car args)) (cdr args)))))
             (first_m (car result))
             (task_id (cadr result)))
             
@@ -146,6 +146,11 @@ pub const LAMBDA_PROGRESS: &str = "
                 (if (eval first_m)
                     (rae-set-success-for-task task_id)
                     (retry task_id))))))";
+
+pub const LAMBDA_SELECT: &str = "
+(define select
+  (lambda args
+    (rae-select args (eval (cons generate-instances (cons `(quote ,(car args)) (cdr args)))))))";
 
 pub const LAMBDA_RETRY: &str = "
 (define retry (lambda (task_id)
@@ -165,12 +170,25 @@ pub const LAMBDA_GET_METHODS: &str = "\
     (lambda (label)\
         (get-map rae-task-methods-map label)))";
 
-pub const LAMBDA_GET_SCORE_GENERATOR: &str = "\
-(define get-score-generator \
-    (lambda (label)\
-        (get-map rae-method-score-generator-map label)))";
+pub const LAMBDA_GET_METHOD_GENERATOR: &str = "\
+(define get-method-generator
+       (lambda (label)
+            (get-map rae-method-generator-map label)))";
 
-pub const LAMBDA_GET_PARAMETERS_GENERATOR: &str = "\
-(define get-parameters-generator
-    (lambda (label)
-        (get-map rae-method-parameters-generator-map label)))";
+pub const LAMBDA_GENERATE_INSTANCES: &str = "
+(define generate-instances (lambda args
+    (let* ((label (car args))
+            (i_params (cdr args))
+            (methods (get-methods label)))
+
+            (begin
+                (define __generate__
+                    (lambda (methods)
+                        (if (null? methods)
+                            nil
+                            (append
+                                (eval
+                                    (append (list (get-method-generator (car methods)))
+                                        i_params))
+                                (__generate__ (cdr methods))))))
+                (__generate__ methods)))))";

@@ -98,7 +98,7 @@
                 (:params ?r ?x ?y)
                 (:pre-conditions true)
                 (:effects nil)
-                (:parameters-generator nil nil)
+                (:parameters-generator nil true)
                 (:score-generator 0)
                 (:body 
                 (begin
@@ -110,7 +110,7 @@
           (:params ?r)
           (:pre-conditions true)
           (:effects nil)
-          (:parameters-generator nil nil)
+          (:parameters-generator nil true)
           (:score-generator 0)
           (:body (begin
                 (if (not (robot.in_station ?r))
@@ -132,7 +132,7 @@
             (:params ?p)
             (:pre-conditions true)
             (:effects nil)
-            (:parameters-generator nil nil)
+            (:parameters-generator nil true)
             (:score-generator 0)
         (:body 
         (begin 
@@ -154,7 +154,7 @@
         (:params ?p ?m)
         (:pre-conditions true)
         (:effects nil)
-        (:parameters-generator nil nil)
+        (:parameters-generator nil true)
         (:score-generator 0)
         (:body (let ((?r (rand-element (available_robots))))
                 (begin
@@ -167,7 +167,7 @@
          (:params ?r ?p ?m)
          (:pre-conditions true)
          (:effects nil)
-         (:parameters-generator nil nil)
+         (:parameters-generator nil true)
          (:score-generator 0)
          (:body (begin
             ;check that the location of the package is
@@ -189,7 +189,7 @@
             (:params ?r ?b)
             (:pre-conditions true)
             (:effects nil)
-            (:parameters-generator nil nil)
+            (:parameters-generator nil true)
             (:score-generator 0)
             (:body (begin
                 (rae-await (navigate_to_area ?r (car (belt.interact_areas ?b))))
@@ -201,7 +201,7 @@
             (:params ?r ?p ?m)
             (:pre-conditions true)
             (:effects nil)
-            (:parameters-generator nil nil)
+            (:parameters-generator nil true)
             (:score-generator 0)
             (:body
                 (begin
@@ -216,7 +216,7 @@
           (:params ?r ?p)
           (:pre-conditions true)
           (:effects nil)
-          (:parameters-generator nil nil)
+          (:parameters-generator nil true)
           (:score-generator 0)
           (:body (begin
             (t_position_robot_to_belt ?r (package.location ?p))
@@ -228,7 +228,7 @@
             (:params ?r ?m)
             (:pre-conditions true)
             (:effects nil)
-            (:parameters-generator nil nil)
+            (:parameters-generator nil true)
             (:score-generator 0)
             (:body (begin
                 (t_position_robot_to_belt ?r (machine.input_belt ?m))
@@ -240,7 +240,7 @@
             (:params ?r)
             (:pre-conditions true)
             (:effects nil)
-            (:parameters-generator nil nil)
+            (:parameters-generator nil true)
             (:score-generator 0)
             (:body
                 (begin

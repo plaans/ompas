@@ -255,11 +255,14 @@ pub fn get_env(args: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LEr
         }
     };
 
-    Ok(format!("{}", ctx.env.domain_env).into())
+    match key {
+        None => Ok(ctx.env.domain_env.to_string().into()),
+        Some(key) => Ok(ctx.env.domain_env.get_element_description(key).into()),
+    }
 }
 
 /// Defines a lambda in RAE environment.
-pub fn def_lambda(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
+pub fn def_lambda(args: &[LValue], _: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
     //println!("def_lambda");
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(
@@ -270,18 +273,17 @@ pub fn def_lambda(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValu
         ));
     }
 
-    tokio::runtime::Handle::current();
-    let list: LValue = args[0].clone();
-    //println!("list: {}", list);
-    let lvalue = cons(&["define".into(), list], env, &())?;
-    //println!("lvalue: {}", lvalue);
-    let expanded = expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs)?;
-    /*match &expanded {
-        Ok(l) => println!("ok: {}",l),
-        Err(e) => println!("err: {}", e),
-    }*/
-    eval(&expanded, &mut ctx.env.env, &mut ctx.env.ctxs)
-    //println!("result: {:?}", result);
+    if let LValue::List(list) = &args[0] {
+        if let LValue::Symbol(label) = &list[0] {
+            let expanded = expand(&list[1], true, &mut ctx.env.env, &mut ctx.env.ctxs)?;
+            let result = eval(&expanded, &mut ctx.env.env, &mut ctx.env.ctxs)?;
+            //println!("result {}", result);
+            if let LValue::Lambda(_) = &result {
+                ctx.env.add_lambda(label.clone(), result)
+            }
+        }
+    }
+    Ok(LValue::Nil)
 }
 
 /// Defines a state function in RAE environment.

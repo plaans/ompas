@@ -89,10 +89,11 @@ impl GetModule for CtxRaeExec {
             LAMBDA_MUTEX_IS_LOCKED,
             LAMBDA_MUTEX_RELEASE,
             LAMBDA_PROGRESS,
+            LAMBDA_SELECT,
             LAMBDA_RETRY,
             LAMBDA_GET_METHODS,
-            LAMBDA_GET_PARAMETERS_GENERATOR,
-            LAMBDA_GET_SCORE_GENERATOR,
+            LAMBDA_GET_METHOD_GENERATOR,
+            LAMBDA_GENERATE_INSTANCES,
         ]
         .into();
         let mut module = Module {
@@ -603,27 +604,32 @@ fn log(args: &[LValue], _env: &LEnv, _: &CtxRaeExec) -> Result<LValue, LError> {
 }
 
 //Takes an instantiated task to refine and return the best applicable method and a task_id.
+//TODO: Implement a way to configure select
 fn select(args: &[LValue], env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
-    let task: LValue = args.into();
+    let task = args[0].clone();
 
-    info!("Add task {} to agenda", task);
-    let task_id = ctx.agenda.add_task(task);
-    let methods = get_instantiated_methods(args, env, ctx)?;
+    if let LValue::List(list) = &args[1] {
+        let methods = args[1].clone();
+        info!("Add task {} to agenda", task);
+        let task_id = ctx.agenda.add_task(task);
+        info!("methods with their score found: {}", args[1]);
+        let methods: Vec<LValue> = sort_greedy(methods)?.try_into()?; //Handle the case where there is no methods
+        info!("sorted_methods: {}", LValue::from(&methods));
+        let mut stack = ctx.agenda.get_stack(task_id).unwrap();
+        stack.set_current_method(methods[0].clone());
+        stack.set_applicable_methods(methods[1..].into());
 
-    //Here we choose different way to choose the best method.
-    //TODO: Implement a way to configure select
+        ctx.agenda.update_stack(stack)?;
 
-    let methods: Vec<LValue> = sort_greedy(methods)?.try_into()?;
-    let mut stack = ctx.agenda.get_stack(task_id).unwrap();
-    stack.set_current_method(methods[0].clone());
-    stack.set_applicable_methods(methods[1..].into());
+        //info!("agenda: {}", ctx.agenda);
 
-    ctx.agenda.update_stack(stack)?;
-
-    //info!("agenda: {}", ctx.agenda);
-
-    Ok(vec![methods[0].clone(), task_id.into()].into())
-
+        Ok(vec![methods[0].clone(), task_id.into()].into())
+    } else {
+        return Err(SpecialError(
+            "rae-select",
+            format!("Task {} has no applicable method", task),
+        ));
+    }
     /*
     Steps:
     - Create a new entry in the agenda

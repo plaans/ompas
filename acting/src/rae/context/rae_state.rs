@@ -1,5 +1,4 @@
-use crate::rae::context::Status;
-use crate::rae::refinement::Assignment;
+use crate::rae::context::actions_progress::Status;
 use im::HashMap;
 use ompas_lisp::core::LEnv;
 use ompas_lisp::functions::cons;
@@ -129,7 +128,7 @@ impl RAEState {
                     ._static
                     .read()
                     .await
-                    .union(&self.dynamic.read().await.deref()),
+                    .union(self.dynamic.read().await.deref()),
             ),
             Some(_type) => match _type {
                 StateType::Static => self._static.read().await.clone(),
@@ -201,7 +200,7 @@ impl RAEState {
             Some(old_value) => {
                 if old_value == value {
                     self.inner_world.write().await.remove(&key);
-                    Ok(LValue::Nil)
+                    Ok(LValue::True)
                 } else {
                     Err(SpecialError(
                         "RAEState::retract_fact",

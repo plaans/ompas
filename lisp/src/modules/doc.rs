@@ -1,11 +1,11 @@
 //! Module to add an help module to the project.
 //! It provides a struct for the help in Scheme
 
-use ompas_lisp::core::LEnv;
-use ompas_lisp::language::doc::*;
-use ompas_lisp::language::scheme_primitives::*;
-use ompas_lisp::structs::LError::{WrongNumberOfArgument, WrongType};
-use ompas_lisp::structs::{GetModule, LError, LValue, Module, NameTypeLValue};
+use crate::core::LEnv;
+use crate::language::doc::*;
+use crate::language::scheme_primitives::*;
+use crate::structs::LError::{WrongNumberOfArgument, WrongType};
+use crate::structs::{GetModule, LError, LValue, Module, NameTypeLValue};
 use std::collections::BTreeMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;

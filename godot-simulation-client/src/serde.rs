@@ -1,6 +1,6 @@
 use aries_planning::parsing::sexpr::SExpr;
-use ompas_acting::rae::state::ActionStatus::{ActionCancel, ActionPreempt, ActionResponse};
-use ompas_acting::rae::state::{ActionStatus, LState, StateType};
+use ompas_acting::rae::context::rae_state::ActionStatus::*;
+use ompas_acting::rae::context::rae_state::{ActionStatus, LState, StateType};
 use ompas_lisp::structs::{LError, LValue, LValueS};
 use serde::{Deserialize, Serialize, Serializer};
 use std::convert::TryFrom;

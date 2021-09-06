@@ -17,9 +17,9 @@
                                     (cons (car seq) (__process__ ?p (cdr seq)))
                                     (__process__ ?p (cdr seq))))))
                     (define machines (rae-get-state-variable machines))
-                    ;(rae-log "machines:" machines)
+                    ;(print "machines:" machines)
                     (define result (__process__ ?process machines))
-                    ;(rae-log "result of find_machines_for_process: " result)
+                    ;(print "result of find_machines_for_process: " result)
                     result))))
     (def-lambda '(available_robots
         (lambda nil
@@ -94,14 +94,25 @@
     (def-state-function interact_area.cells ?ia)
     (def-state-function interact_area.belt ?ia)
     (def-task t_navigate_to ?r ?x ?y)
-    (def-method m_navigate_to '((:task t_navigate_to)(:params ?r ?x ?y)(:body (begin
+    (def-method m_navigate_to '((:task t_navigate_to)
+                (:params ?r ?x ?y)
+                (:pre-conditions true)
+                (:effects nil)
+                (:parameters-generator nil true)
+                (:score-generator 0)
+                (:body 
+                (begin
         (rae-await (navigate_to ?r ?x ?y))
         (rae-await (navigate_to ?r (+ ?x 1) (+ ?y 1)))))))
-    (def-method-parameters m_navigate_to '(() ( _ nil)))
     (def-task t_dumber ?r)
-    (def-method m_dumber '((:task t_dumber)
-        (:params ?r )
-        (:body (begin
+    (def-method m_dumber
+        '((:task t_dumber)
+          (:params ?r)
+          (:pre-conditions true)
+          (:effects nil)
+          (:parameters-generator nil true)
+          (:score-generator 0)
+          (:body (begin
                 (if (not (robot.in_station ?r))
                    (if (<= (robot.battery ?r) 0.4)
                        (let*  ((areas (get-map (rae-get-state) parking_areas))
@@ -118,7 +129,11 @@
 
     (def-method m_process_package
         '((:task t_process_package)
-        (:params ?p)
+            (:params ?p)
+            (:pre-conditions true)
+            (:effects nil)
+            (:parameters-generator nil true)
+            (:score-generator 0)
         (:body 
         (begin 
             (mapf t_process_on_machine
@@ -126,10 +141,10 @@
                     (define list_machines
                         (mapf find_machines_for_process
                             (car (unzip (package.processes_list ?p)))))
-                    (rae-log "list_machines:" list_machines)
+                    (print "list_machines:" list_machines)
                     (enumerate (list ?p) (take_first list_machines))))
 
-            (let ((?r (car (available_robots))))
+            (let ((?r (rand-element (available_robots))))
                 (begin
                     (mutex.lock ?r)
                     (t_carry_to_machine ?r ?p (find_output_machine))
@@ -137,7 +152,11 @@
     (def-method m_process_on_machine
         '((:task t_process_on_machine)
         (:params ?p ?m)
-        (:body (let ((?r (car (available_robots))))
+        (:pre-conditions true)
+        (:effects nil)
+        (:parameters-generator nil true)
+        (:score-generator 0)
+        (:body (let ((?r (rand-element (available_robots))))
                 (begin
                     (mutex.lock ?r)
                     (t_carry_to_machine ?r ?p ?m)
@@ -146,6 +165,10 @@
     (def-method m_pick_and_place
         '((:task t_pick_and_place)
          (:params ?r ?p ?m)
+         (:pre-conditions true)
+         (:effects nil)
+         (:parameters-generator nil true)
+         (:score-generator 0)
          (:body (begin
             ;check that the location of the package is
             (let ((?l (package.location ?p )))
@@ -157,14 +180,17 @@
                         (rae-await (pick_package ?r ?p))
                         (rae-await (navigate_to_area ?r (car (belt.interact_areas (machine.input_belt ?m)))))
                         (rae-await (face_belt ?r (machine.input_belt ?m)))
-                        (rae-await (place ?r))
-                        nil)
+                        (rae-await (place ?r)))
                     nil))))))
 
     (def-task t_position_robot_to_belt ?r ?b)
     (def-method m_position_robot_to_belt
         '((:task t_position_robot_to_belt)
             (:params ?r ?b)
+            (:pre-conditions true)
+            (:effects nil)
+            (:parameters-generator nil true)
+            (:score-generator 0)
             (:body (begin
                 (rae-await (navigate_to_area ?r (car (belt.interact_areas ?b))))
                 (rae-await (face_belt ?r ?b 5))))))
@@ -173,39 +199,51 @@
     (def-method m_carry_to_machine
         '((:task t_carry_to_machine)
             (:params ?r ?p ?m)
+            (:pre-conditions true)
+            (:effects nil)
+            (:parameters-generator nil true)
+            (:score-generator 0)
             (:body
                 (begin
                     (if (< (robot.battery ?r) 0.4)
                         (t_charge ?r))
                     (t_take_package ?r ?p)
-                    (t_deliver_package ?r ?m)
-                nil))))
+                    (t_deliver_package ?r ?m)))))
 
     (def-task t_take_package ?r ?p)
     (def-method m_take_package
         '((:task t_take_package)
           (:params ?r ?p)
+          (:pre-conditions true)
+          (:effects nil)
+          (:parameters-generator nil true)
+          (:score-generator 0)
           (:body (begin
             (t_position_robot_to_belt ?r (package.location ?p))
-            (rae-await (pick_package ?r ?p))
-            nil))))
+            (rae-await (pick_package ?r ?p))))))
 
     (def-task t_deliver_package ?r ?m)
     (def-method m_deliver_package
         '((:task t_deliver_package)
             (:params ?r ?m)
+            (:pre-conditions true)
+            (:effects nil)
+            (:parameters-generator nil true)
+            (:score-generator 0)
             (:body (begin
                 (t_position_robot_to_belt ?r (machine.input_belt ?m))
-                (rae-await (place ?r))
-                nil))))
+                (rae-await (place ?r))))))
 
     (def-task t_charge ?r)
     (def-method m_charge
         '((:task t_charge)
             (:params ?r)
+            (:pre-conditions true)
+            (:effects nil)
+            (:parameters-generator nil true)
+            (:score-generator 0)
             (:body
                 (begin
                     (rae-await (go_charge ?r))
-                    (wait-on `(= (robot.battery ,?r) 1))
-                    nil))))
+                    (wait-on `(= (robot.battery ,?r) 1))))))
 )

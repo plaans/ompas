@@ -10,13 +10,13 @@ use ompas_acting::rae::module::mod_rae_exec::CtxRaeExec;
 use ompas_godot_simulation_client::mod_godot::CtxGodot;
 use ompas_godot_simulation_client::rae_interface::PlatformGodot;
 use ompas_lisp::core::*;
-use ompas_modules::_type::CtxType;
-use ompas_modules::counter::CtxCounter;
-use ompas_modules::doc::{CtxDoc, Documentation};
-use ompas_modules::io::repl::{spawn_log, spawn_repl};
-use ompas_modules::io::CtxIo;
-use ompas_modules::math::CtxMath;
-use ompas_modules::utils::CtxUtils;
+use ompas_lisp::modules::_type::CtxType;
+use ompas_lisp::modules::counter::CtxCounter;
+use ompas_lisp::modules::doc::{CtxDoc, Documentation};
+use ompas_lisp::modules::io::CtxIo;
+use ompas_lisp::modules::math::CtxMath;
+use ompas_lisp::modules::utils::CtxUtils;
+use ompas_lisp::repl::{spawn_log, spawn_repl};
 use ompas_utils::task_handler;
 
 pub const TOKIO_CHANNEL_SIZE: usize = 65_384;
@@ -71,7 +71,9 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
         .await
         .expect("error while spawning repl");
 
-    let sender_log = spawn_log().await.expect("error while spawning log task");
+    let (sender_log, log_handle) = spawn_log(log.clone())
+        .await
+        .expect("error while spawning log task");
 
     let (mut root_env, mut ctxs, mut lisp_init) = LEnv::root();
     let mut ctx_doc = CtxDoc::default();
@@ -104,6 +106,7 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
         actions_progress: Default::default(),
         state: Default::default(),
         platform_interface: Box::new(PlatformGodot::default()),
+        agenda: Default::default(),
     };
 
     load_module(&mut root_env, &mut ctxs, ctx_doc, &mut lisp_init);
@@ -181,4 +184,6 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
         };
         //stdout.write_all(b"parsing done\n");
     }
+
+    log_handle.await.expect("Failed to kill log task");
 }

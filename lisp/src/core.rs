@@ -2,8 +2,6 @@
 use crate::async_await;
 use crate::async_await::AwaitResponse;
 use crate::functions::*;
-use crate::language::scheme_lambda::*;
-use crate::language::scheme_macro::*;
 use crate::language::scheme_primitives::*;
 use crate::language::*;
 use crate::structs::LCoreOperator::Quote;
@@ -223,32 +221,7 @@ impl GetModule for CtxRoot {
         let mut module = Module {
             ctx: Arc::new(()),
             prelude: vec![],
-            raw_lisp: vec![
-                MACRO_CAAR,
-                MACRO_CADR,
-                MACRO_CDAR,
-                MACRO_CDDR,
-                MACRO_CADAR,
-                MACRO_CADDR,
-                MACRO_CADADR,
-                MACRO_CDADR,
-                MACRO_CADADDR,
-                MACRO_CAADR,
-                MACRO_AND,
-                MACRO_OR,
-                MACRO_NEQ,
-                MACRO_NEQ_SHORT,
-                MACRO_LET,
-                MACRO_LET_STAR,
-                MACRO_APPLY,
-                MACRO_COND,
-                MACRO_AWAIT_ASYNC,
-                LAMBDA_UNZIP,
-                LAMBDA_ZIP,
-                LAMBDA_MAPF,
-                MACRO_FOR,
-            ]
-            .into(),
+            raw_lisp: Default::default(),
             label: MOD_ROOT,
         };
 
@@ -541,7 +514,7 @@ pub fn parse_into_lvalue(se: &SExpr) -> LValue {
                             LValue::Nil
                         }
                         s => {
-                            if s.starts_with("\"") && s.ends_with("\"") {
+                            if s.starts_with('\"') && s.ends_with('\"') {
                                 LValue::String(s[1..s.len() - 1].to_string())
                             } else {
                                 LValue::Symbol(s.to_string())

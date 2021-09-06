@@ -2,6 +2,7 @@
 use crate::structs::{LError, LValue};
 //use log::info;
 use crate::core::get_debug;
+use crate::TOKIO_CHANNEL_SIZE;
 use std::borrow::Borrow;
 use std::ops::Deref;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -18,8 +19,6 @@ lazy_static! {
 pub fn current() -> ArcTaskHandler {
     TASK_HANDLER.borrow().deref().clone()
 }
-
-pub const TOKIO_CHANNEL_SIZE: usize = 16_384;
 
 pub type TaskResult = (usize, Result<LValue, LError>);
 

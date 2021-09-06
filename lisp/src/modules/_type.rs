@@ -1,9 +1,11 @@
 //! Scheme module implementing symbol typing.
 //! Development in standby. Some features might not be completely working...
-use crate::doc::{Documentation, LHelp};
-use ompas_lisp::core::LEnv;
-use ompas_lisp::structs::LError::*;
-use ompas_lisp::structs::*;
+use crate::core::LEnv;
+use crate::modules::doc::{Documentation, LHelp};
+use crate::structs::LError::{
+    NotInListOfExpectedTypes, SpecialError, WrongNumberOfArgument, WrongType,
+};
+use crate::structs::{GetModule, LError, LNumber, LValue, Module, NameTypeLValue};
 use std::convert::TryInto;
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;

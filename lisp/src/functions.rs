@@ -354,6 +354,7 @@ pub fn append(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     for element in args {
         match element {
             LValue::List(list) => new_list.append(&mut list.clone()),
+            LValue::Nil => {}
             _ => {
                 return Err(WrongType(
                     APPEND,
@@ -428,7 +429,13 @@ pub fn get_list(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
             } else {
                 Err(SpecialError(
                     GET_LIST,
-                    format!("index out of bound, must be in [{};{}]", 0, vec.len() - 1),
+                    format!(
+                        "list: {}. {} is out of bound, must be in [{};{}]",
+                        LValue::from(args),
+                        i,
+                        0,
+                        vec.len() - 1
+                    ),
                 ))
             }
         } else {

@@ -1,23 +1,22 @@
-use crate::rae::context::{
-    ActionId, ActionsProgress, Agenda, SelectOption, Status, RAE_STATE_FUNCTION_LIST,
-    RAE_TASK_METHODS_MAP,
-};
+use crate::rae::context::actions_progress::{ActionId, ActionsProgress, Status};
+use crate::rae::context::agenda::Agenda;
+use crate::rae::context::rae_env::RAE_TASK_METHODS_MAP;
+use crate::rae::context::rae_state::*;
+use crate::rae::context::ressource_access::wait_on::add_waiter;
 use crate::rae::module::domain::*;
-use crate::rae::ressource_access::wait_on::add_waiter;
-use crate::rae::state::{
-    ActionStatus, RAEState, StateType, KEY_DYNAMIC, KEY_INNER_WORLD, KEY_STATIC,
-};
+use crate::rae::select_methods::sort_greedy;
 use log::{error, info, warn};
 use ompas_lisp::core::LEnv;
 use ompas_lisp::functions::{cons, union_map};
+use ompas_lisp::modules::doc::{Documentation, LHelp};
 use ompas_lisp::structs::LError::*;
 use ompas_lisp::structs::LValue::*;
 use ompas_lisp::structs::*;
-use ompas_modules::doc::{Documentation, LHelp};
 use ompas_utils::blocking_async;
 use std::any::Any;
 use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
+use std::convert::TryInto;
 use std::fmt::{Display, Formatter};
 use std::sync::{Arc, PoisonError, RwLock, RwLockReadGuard};
 use std::thread;
@@ -47,9 +46,13 @@ pub const RAE_OPEN_COM_PLATFORM: &str = "rae-open-com-platform";
 pub const RAE_START_PLATFORM: &str = "rae-start-platform";
 pub const RAE_GET_STATUS: &str = "rae-get-status";
 pub const RAE_CANCEL_COMMAND: &str = "rae-cancel-command";
-pub const RAE_GET_METHODS: &str = "rae-get-methods";
+pub const RAE_GET_INSTANTIATED_METHODS: &str = "rae-get-instantiated-methods";
 pub const RAE_GET_BEST_METHOD: &str = "rae-get-best-method";
-pub const RAE_LOG: &str = "rae-log";
+pub const RAE_SELECT: &str = "rae-select";
+pub const RAE_GET_NEXT_METHOD: &str = "rae-get-next-method";
+pub const RAE_SET_SUCCESS_FOR_TASK: &str = "rae-set-success-for-task";
+
+//TODO: write doc
 
 ///Context that will contains primitives for the RAE executive
 pub struct CtxRaeExec {
@@ -57,6 +60,7 @@ pub struct CtxRaeExec {
     pub actions_progress: ActionsProgress,
     pub state: RAEState,
     pub platform_interface: Box<dyn RAEInterface>,
+    pub agenda: Agenda,
 }
 
 impl Default for CtxRaeExec {
@@ -65,6 +69,7 @@ impl Default for CtxRaeExec {
             actions_progress: Default::default(),
             state: Default::default(),
             platform_interface: Box::new(()),
+            agenda: Default::default(),
         }
     }
 }
@@ -82,6 +87,12 @@ impl GetModule for CtxRaeExec {
             LAMBDA_MUTEX_LOCK,
             LAMBDA_MUTEX_IS_LOCKED,
             LAMBDA_MUTEX_RELEASE,
+            LAMBDA_PROGRESS,
+            LAMBDA_SELECT,
+            LAMBDA_RETRY,
+            LAMBDA_GET_METHODS,
+            LAMBDA_GET_METHOD_GENERATOR,
+            LAMBDA_GENERATE_INSTANCES,
         ]
         .into();
         let mut module = Module {
@@ -105,10 +116,12 @@ impl GetModule for CtxRaeExec {
         module.add_fn_prelude(RAE_AWAIT, fn_await);
         module.add_mut_fn_prelude(RAE_OPEN_COM_PLATFORM, open_com);
         module.add_mut_fn_prelude(RAE_START_PLATFORM, start_platform);
-        module.add_fn_prelude(RAE_GET_METHODS, get_methods);
+        module.add_fn_prelude(RAE_GET_INSTANTIATED_METHODS, get_instantiated_methods);
         module.add_fn_prelude(RAE_GET_BEST_METHOD, get_best_method);
         module.add_fn_prelude(WAIT_ON, wait_on);
-        module.add_fn_prelude(RAE_LOG, log);
+        module.add_fn_prelude(RAE_SELECT, select);
+        module.add_fn_prelude(RAE_SET_SUCCESS_FOR_TASK, set_success_for_task);
+        module.add_fn_prelude(RAE_GET_NEXT_METHOD, get_next_method);
         module
     }
 }
@@ -309,7 +322,7 @@ pub fn assert_fact(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LVa
     let c_state = ctx.state.clone();
     blocking_async!(c_state.add_fact(key, value).await).expect("todo!");
 
-    Ok(Nil)
+    Ok(True)
 }
 
 ///Monitor the status of an action that has been triggered
@@ -378,16 +391,23 @@ pub fn fn_await(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue
     }
 }
 
-fn get_methods(args: &[LValue], env: &LEnv, _ctx: &CtxRaeExec) -> Result<LValue, LError> {
+//Return the labels of the methods
+
+fn get_instantiated_methods(
+    args: &[LValue],
+    env: &LEnv,
+    _ctx: &CtxRaeExec,
+) -> Result<LValue, LError> {
     if args.is_empty() {
         return Err(WrongNumberOfArgument(
-            RAE_GET_METHODS,
+            RAE_GET_INSTANTIATED_METHODS,
             args.into(),
             args.len(),
             1..std::usize::MAX,
         ));
     }
     let task_name = &args[0];
+    let task_args: LValue = (&args[1..]).into();
     //log::send(format!("searching methods for {}\n", task_name));
     let task_method_map = env.get_symbol(RAE_TASK_METHODS_MAP).unwrap();
     //log::send(format!("method_map: {}\n", task_method_map));
@@ -395,11 +415,26 @@ fn get_methods(args: &[LValue], env: &LEnv, _ctx: &CtxRaeExec) -> Result<LValue,
         let methods = match map.get(task_name) {
             None => {
                 return Err(SpecialError(
-                    RAE_GET_METHODS,
+                    RAE_GET_INSTANTIATED_METHODS,
                     format!("no methods for {}", task_name),
                 ))
             }
-            Some(methods) => methods.clone(),
+            Some(methods) => {
+                //Got here the list of the symbol of the methods
+                let mut instantiated_method = vec![];
+                if let LValue::List(methods) = methods {
+                    for method in methods {
+                        //Handle here the case where it is needed to generate all instantiation of methods where several parameters are possible.
+                        instantiated_method
+                            .push(cons(&[method.clone(), task_args.clone()], env, &()).unwrap());
+                    }
+                    instantiated_method.into()
+                } else if let LValue::Nil = methods {
+                    LValue::Nil
+                } else {
+                    panic!("The list of methods should be a LValue::List or Nil and nothing else")
+                }
+            }
         };
         methods
     } else {
@@ -418,7 +453,7 @@ fn get_best_method(args: &[LValue], env: &LEnv, ctx: &CtxRaeExec) -> Result<LVal
         task_methods_map
     ));*/
 
-    let methods = get_methods(args, env, ctx)?;
+    let methods = get_instantiated_methods(args, env, ctx)?;
     let task_args = &args[1..];
     //log::send(format!("methods for {}: {}\n", LValue::from(args), methods));
     let best_method = if let LValue::List(methods) = methods {
@@ -558,10 +593,94 @@ pub fn wait_on(args: &[LValue], _env: &LEnv, _: &CtxRaeExec) -> Result<LValue, L
     })
     .expect("todo!");
     //println!("end wait on");
-    Ok(LValue::Nil)
+    Ok(LValue::True)
 }
 
-fn log(args: &[LValue], _env: &LEnv, _: &CtxRaeExec) -> Result<LValue, LError> {
-    info!("{}", LValue::from(args));
-    Ok(LValue::Nil)
+//Takes an instantiated task to refine and return the best applicable method and a task_id.
+//TODO: Implement a way to configure select
+fn select(args: &[LValue], _: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
+    let task = args[0].clone();
+
+    if let LValue::List(_) = &args[1] {
+        let methods = args[1].clone();
+        info!("Add task {} to agenda", task);
+        let task_id = ctx.agenda.add_task(task);
+        info!("methods with their score found: {}", args[1]);
+        let methods: Vec<LValue> = sort_greedy(methods)?.try_into()?; //Handle the case where there is no methods
+        info!("sorted_methods: {}", LValue::from(&methods));
+        let mut stack = ctx.agenda.get_stack(task_id).unwrap();
+        stack.set_current_method(methods[0].clone());
+        stack.set_applicable_methods(methods[1..].into());
+
+        ctx.agenda.update_stack(stack)?;
+
+        //info!("agenda: {}", ctx.agenda);
+
+        Ok(vec![methods[0].clone(), task_id.into()].into())
+    } else {
+        return Err(SpecialError(
+            "rae-select",
+            format!("Task {} has no applicable method", task),
+        ));
+    }
+    /*
+    Steps:
+    - Create a new entry in the agenda
+    - Generate all instances of applicable methods
+    - Select the best method
+    - Store the stack
+    - Return (task_id, best_method)
+     */
+}
+
+fn get_next_method(args: &[LValue], _: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
+    if args.len() != 1 {
+        return Err(WrongNumberOfArgument(
+            RAE_GET_NEXT_METHOD,
+            args.into(),
+            args.len(),
+            1..1,
+        ));
+    }
+
+    if let LValue::Number(LNumber::Usize(task_id)) = &args[0] {
+        let next_method = ctx.agenda.get_next_applicable_method(task_id);
+        Ok(next_method)
+    } else {
+        Err(WrongType(
+            RAE_GET_NEXT_METHOD,
+            args[0].clone(),
+            (&args[0]).into(),
+            NameTypeLValue::Usize,
+        ))
+    }
+}
+
+fn set_success_for_task(args: &[LValue], _: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
+    /*
+    Steps:
+    - Remove the stack from the agenda
+    - Return true
+     */
+
+    if args.len() != 1 {
+        return Err(WrongNumberOfArgument(
+            RAE_SET_SUCCESS_FOR_TASK,
+            args.into(),
+            args.len(),
+            1..1,
+        ));
+    }
+
+    if let LValue::Number(LNumber::Usize(task_id)) = &args[0] {
+        ctx.agenda.remove_task(task_id)?;
+        Ok(LValue::True)
+    } else {
+        Err(WrongType(
+            RAE_SET_SUCCESS_FOR_TASK,
+            args[0].clone(),
+            (&args[0]).into(),
+            NameTypeLValue::Usize,
+        ))
+    }
 }

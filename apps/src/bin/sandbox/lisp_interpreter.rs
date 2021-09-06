@@ -71,7 +71,7 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
         .await
         .expect("error while spawning repl");
 
-    let sender_log = spawn_log(log.clone())
+    let (sender_log, log_handle) = spawn_log(log.clone())
         .await
         .expect("error while spawning log task");
 
@@ -184,4 +184,6 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
         };
         //stdout.write_all(b"parsing done\n");
     }
+
+    log_handle.await.expect("Failed to kill log task");
 }

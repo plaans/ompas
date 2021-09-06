@@ -5,14 +5,16 @@
 use crate::language::scheme_primitives::NIL;
 use crate::TOKIO_CHANNEL_SIZE;
 use chrono::{DateTime, Utc};
-use ompas_utils::task_handler::subscribe_new_task;
+use ompas_utils::task_handler::{subscribe_new_task, EndSignal};
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
 use std::{env, fs};
+use tokio::sync::broadcast;
 use tokio::sync::mpsc::{self, Receiver, Sender};
+use tokio::task::JoinHandle;
 
 ///Spawn repl task
 pub async fn spawn_repl(sender: Sender<String>) -> Option<Sender<String>> {
@@ -56,14 +58,15 @@ pub async fn spawn_repl(sender: Sender<String>) -> Option<Sender<String>> {
 }*/
 
 /// Spawn the log task
-pub async fn spawn_log(log_path: Option<PathBuf>) -> Option<Sender<String>> {
+pub async fn spawn_log(log_path: Option<PathBuf>) -> Option<(Sender<String>, JoinHandle<()>)> {
     let (sender_log, receiver_log) = mpsc::channel(TOKIO_CHANNEL_SIZE);
 
-    tokio::spawn(async move {
-        log(receiver_log, log_path).await;
+    let end_receiver = subscribe_new_task();
+    let handle = tokio::spawn(async move {
+        log(receiver_log, log_path, end_receiver).await;
     });
 
-    Some(sender_log)
+    Some((sender_log, handle))
 }
 
 /// Function to handle the repl.
@@ -117,7 +120,11 @@ pub async fn spawn_log(log_path: Option<PathBuf>) -> Option<Sender<String>> {
     rl.save_history("history.txt").unwrap();
 }*/
 
-async fn log(mut receiver: Receiver<String>, working_dir: Option<PathBuf>) {
+async fn log(
+    mut receiver: Receiver<String>,
+    working_dir: Option<PathBuf>,
+    mut end_receiver: broadcast::Receiver<EndSignal>,
+) {
     let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
     let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
 
@@ -147,8 +154,6 @@ async fn log(mut receiver: Receiver<String>, working_dir: Option<PathBuf>) {
         .open(&file_path)
         .expect("error creating log file");
 
-    let mut end_receiver = subscribe_new_task();
-
     loop {
         tokio::select! {
             buffer = receiver.recv() => {
@@ -163,11 +168,17 @@ async fn log(mut receiver: Receiver<String>, working_dir: Option<PathBuf>) {
                 .expect("could not write to log file");
             }
             _ = end_receiver.recv() => {
-                println!("log task ended");
+                receiver.close();
                 break;
             }
         }
     }
+    println!("Draining log queue...");
+    while let Some(msg) = receiver.recv().await {
+        file.write_all(format!("{}\n", msg).as_bytes())
+            .expect("could not write to log file");
+    }
+    println!("log task ended");
 }
 
 /// Function to handle the repl.

@@ -17,9 +17,9 @@
                                     (cons (car seq) (__process__ ?p (cdr seq)))
                                     (__process__ ?p (cdr seq))))))
                     (define machines (rae-get-state-variable machines))
-                    ;(rae-log "machines:" machines)
+                    ;(print "machines:" machines)
                     (define result (__process__ ?process machines))
-                    ;(rae-log "result of find_machines_for_process: " result)
+                    ;(print "result of find_machines_for_process: " result)
                     result))))
     (def-lambda '(available_robots
         (lambda nil
@@ -141,7 +141,7 @@
                     (define list_machines
                         (mapf find_machines_for_process
                             (car (unzip (package.processes_list ?p)))))
-                    (rae-log "list_machines:" list_machines)
+                    (print "list_machines:" list_machines)
                     (enumerate (list ?p) (take_first list_machines))))
 
             (let ((?r (rand-element (available_robots))))

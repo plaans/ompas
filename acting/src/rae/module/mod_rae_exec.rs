@@ -48,7 +48,6 @@ pub const RAE_GET_STATUS: &str = "rae-get-status";
 pub const RAE_CANCEL_COMMAND: &str = "rae-cancel-command";
 pub const RAE_GET_INSTANTIATED_METHODS: &str = "rae-get-instantiated-methods";
 pub const RAE_GET_BEST_METHOD: &str = "rae-get-best-method";
-pub const RAE_LOG: &str = "rae-log";
 pub const RAE_SELECT: &str = "rae-select";
 pub const RAE_GET_NEXT_METHOD: &str = "rae-get-next-method";
 pub const RAE_SET_SUCCESS_FOR_TASK: &str = "rae-set-success-for-task";
@@ -120,7 +119,6 @@ impl GetModule for CtxRaeExec {
         module.add_fn_prelude(RAE_GET_INSTANTIATED_METHODS, get_instantiated_methods);
         module.add_fn_prelude(RAE_GET_BEST_METHOD, get_best_method);
         module.add_fn_prelude(WAIT_ON, wait_on);
-        module.add_fn_prelude(RAE_LOG, log);
         module.add_fn_prelude(RAE_SELECT, select);
         module.add_fn_prelude(RAE_SET_SUCCESS_FOR_TASK, set_success_for_task);
         module.add_fn_prelude(RAE_GET_NEXT_METHOD, get_next_method);
@@ -598,17 +596,12 @@ pub fn wait_on(args: &[LValue], _env: &LEnv, _: &CtxRaeExec) -> Result<LValue, L
     Ok(LValue::True)
 }
 
-fn log(args: &[LValue], _env: &LEnv, _: &CtxRaeExec) -> Result<LValue, LError> {
-    info!("{}", LValue::from(args));
-    Ok(LValue::True)
-}
-
 //Takes an instantiated task to refine and return the best applicable method and a task_id.
 //TODO: Implement a way to configure select
-fn select(args: &[LValue], env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
+fn select(args: &[LValue], _: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
     let task = args[0].clone();
 
-    if let LValue::List(list) = &args[1] {
+    if let LValue::List(_) = &args[1] {
         let methods = args[1].clone();
         info!("Add task {} to agenda", task);
         let task_id = ctx.agenda.add_task(task);

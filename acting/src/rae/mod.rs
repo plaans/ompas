@@ -12,7 +12,7 @@ use crate::rae::context::actions_progress::async_status_watcher_run;
 use crate::rae::context::rae_env::RAEEnv;
 use crate::rae::context::ressource_access::wait_on::task_check_wait_on;
 use crate::rae::module::mod_rae_exec::{Job, JobId, RAE_LAUNCH_PLATFORM};
-use log::{error, info, warn};
+use log::{error, info};
 use ompas_lisp::core::{eval, ContextCollection, LEnv};
 use ompas_lisp::functions::cons;
 use ompas_lisp::structs::{LError, LValue};
@@ -20,6 +20,7 @@ use std::mem;
 
 pub mod context;
 pub mod module;
+mod rae_log;
 mod select_methods;
 
 pub type Lisp = String;
@@ -150,7 +151,7 @@ pub async fn rae_run(mut context: RAEEnv, options: &RAEOptions, _log: String) {
             //println!("new job received: {}", job);
 
             //let _job_id = &context.agenda.add_job(job.clone());
-            log::info!("new job received!");
+            info!("new job received!");
 
             let new_env = context.get_eval_env();
             let new_ctxs = context.ctxs.clone();

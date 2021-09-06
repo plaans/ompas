@@ -1,4 +1,4 @@
-use ompas_acting::rae::state::LState;
+use ompas_acting::rae::context::rae_state::LState;
 use ompas_lisp::structs::LValueS;
 
 #[test]

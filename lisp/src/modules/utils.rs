@@ -240,7 +240,6 @@ impl Documentation for CtxUtils {
 ///uses function from aries_utils
 /// # Example:
 ///``` rust
-/// use ompas_modules::utils::{enumerate, CtxUtils};
 /// use ompas_lisp::modules::utils::{CtxUtils, enumerate};
 /// use ompas_lisp::structs::LValue;
 /// use ompas_lisp::core::LEnv;

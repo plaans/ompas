@@ -4,7 +4,7 @@ use crate::rae::context::rae_env::RAEEnv;
 use crate::rae::context::rae_state::{LState, StateType, KEY_DYNAMIC, KEY_INNER_WORLD, KEY_STATIC};
 use crate::rae::module::domain::{GENERATE_TASK_SIMPLE, LABEL_GENERATE_METHOD_PARAMETERS};
 use crate::rae::module::mod_rae_exec::{CtxRaeExec, RAEInterface};
-use crate::rae::{rae_run, RAEOptions};
+use crate::rae::{rae_log, rae_run, RAEOptions};
 use ompas_lisp::async_await;
 use ompas_lisp::core::{eval, expand, load_module, LEnv};
 use ompas_lisp::functions::cons;
@@ -13,9 +13,9 @@ use ompas_lisp::structs::LError::*;
 use ompas_lisp::structs::LValue::Nil;
 use ompas_lisp::structs::*;
 use ompas_utils::blocking_async;
-use ompas_utils::log;
 use std::convert::TryInto;
 use std::mem;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::task::block_in_place;
@@ -85,7 +85,7 @@ const DOC_RAE_GET_AGENDA: &str =
 
 #[derive(Default)]
 pub struct CtxRae {
-    pub log: String,
+    pub log: Option<PathBuf>,
     pub options: RAEOptions,
     pub env: RAEEnv,
     pub domain: InitLisp,
@@ -102,7 +102,7 @@ impl GetModule for CtxRae {
             label: MOD_RAE,
         };
 
-        module.add_mut_fn_prelude(RAE_LAUNCH, launch_rae);
+        module.add_mut_fn_prelude(RAE_LAUNCH, rae_launch);
 
         module.add_fn_prelude(RAE_GET_METHODS, get_methods);
         module.add_fn_prelude(RAE_GET_STATE_FUNCTIONS, get_state_function);
@@ -351,6 +351,8 @@ pub fn def_action(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValu
         ));
     }
 
+    //println!("define action: {}", LValue::from(args));
+
     let lvalue = cons(&["generate-action".into(), args.into()], env, &())?;
 
     let lvalue = eval(
@@ -490,59 +492,6 @@ pub fn def_method(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValu
     Ok(Nil)
 }
 
-/// Defines a method parameter in RAE environment.
-/*pub fn def_method_parameters(
-    args: &[LValue],
-    env: &LEnv,
-    ctx: &mut CtxRae,
-) -> Result<LValue, LError> {
-    //println!("in {}", RAE_DEF_METHOD_PARAMETERS);
-    if args.len() != 2 {
-        return Err(WrongNumberOfArgument(
-            RAE_DEF_METHOD_PARAMETERS,
-            args.into(),
-            args.len(),
-            2..2,
-        ));
-    }
-
-    let lv = cons(args, env, &())?;
-    let lv = cons(&[LABEL_GENERATE_METHOD_PARAMETERS.into(), lv], env, &())?;
-    //println!("In {}: lv before eval: {}", RAE_DEF_METHOD_PARAMETERS, lv);
-    let lv = expand(&lv, true, &mut ctx.env.env, &mut ctx.env.ctxs)?;
-    //println!("In {}: lv after expand: {}", RAE_DEF_METHOD_PARAMETERS, lv);
-    let lv = eval(&lv, &mut ctx.env.env, &mut ctx.env.ctxs)?;
-    /*println!(
-        "In {}: result of the macro: {}",
-        RAE_DEF_METHOD_PARAMETERS, lv
-    );*/
-
-    if let LValue::List(list) = &lv {
-        if list.len() != 2 {
-            return Err(WrongNumberOfArgument(
-                RAE_DEF_METHOD_PARAMETERS,
-                lv.clone(),
-                list.len(),
-                2..2,
-            ));
-        } else if let LValue::Symbol(_) = &list[0] {
-            ctx.env
-                .add_parameter_generator_to_method(list[0].clone(), list[1].clone())?;
-        } else {
-            return Err(WrongType(
-                RAE_DEF_METHOD_PARAMETERS,
-                list[0].clone(),
-                list[0].clone().into(),
-                NameTypeLValue::Symbol,
-            ));
-        }
-    } else {
-        panic!("{:?} should be a list", lv)
-    };
-
-    Ok(Nil)
-}*/
-
 pub fn def_task(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
     //println!("in {}", RAE_DEF_TASK);
     if args.is_empty() {
@@ -562,7 +511,7 @@ pub fn def_task(args: &[LValue], env: &LEnv, ctx: &mut CtxRae) -> Result<LValue,
         &mut ctx.env.ctxs,
     )?;
 
-    //log::send(format!("new_task: {}", lvalue));
+    //println!("new_task: {}", lvalue);
 
     if let LValue::List(list) = &lvalue {
         if list.len() != 2 {
@@ -703,7 +652,7 @@ pub fn get_state(args: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, L
 }
 
 /// Launch main loop of rae in an other asynchronous task.
-pub fn launch_rae(_: &[LValue], _env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
+pub fn rae_launch(_: &[LValue], _env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
     let options = ctx.options.clone();
     let rae_env = RAEEnv {
         job_receiver: None,
@@ -717,6 +666,8 @@ pub fn launch_rae(_: &[LValue], _env: &LEnv, ctx: &mut CtxRae) -> Result<LValue,
         init_lisp: Default::default(),
     };
     let context = mem::replace(&mut ctx.env, rae_env);
+    rae_log::init(ctx.log.clone()).expect("Error while initiating logger.");
+
     tokio::spawn(async move {
         rae_run(context, &options, "rae-log.txt".to_string()).await;
     });

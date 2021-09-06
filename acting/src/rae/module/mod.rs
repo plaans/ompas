@@ -5,9 +5,11 @@ use crate::rae::module::mod_rae_monitor::CtxRaeMonitor;
 use crate::rae::TOKIO_CHANNEL_SIZE;
 use ompas_lisp::async_await;
 use ompas_lisp::core::{eval, load_module, parse, LEnv};
+use ompas_lisp::modules::io::CtxIo;
 use ompas_lisp::modules::math::CtxMath;
 use ompas_lisp::modules::utils::CtxUtils;
 use ompas_lisp::structs::{InitLisp, LValue};
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
@@ -18,7 +20,10 @@ pub mod mod_rae_monitor;
 
 /// Initialize the libraries to load inside Scheme env.
 /// Takes as argument the execution platform.
-pub fn init_ctx_rae(mut platform: Box<dyn RAEInterface>) -> (CtxRae, CtxRaeMonitor) {
+pub fn init_ctx_rae(
+    mut platform: Box<dyn RAEInterface>,
+    working_directory: Option<PathBuf>,
+) -> (CtxRae, CtxRaeMonitor) {
     //println!("in init ctx_rae");
 
     let mut ctx_rae = CtxRae::default();
@@ -49,23 +54,39 @@ pub fn init_ctx_rae(mut platform: Box<dyn RAEInterface>) -> (CtxRae, CtxRaeMonit
     load_module(
         &mut rae_env.env,
         &mut rae_env.ctxs,
-        ctx_rae_exec,
+        CtxUtils::default(),
         &mut rae_env.init_lisp,
     );
+
     load_module(
         &mut rae_env.env,
         &mut rae_env.ctxs,
         CtxMath::default(),
         &mut rae_env.init_lisp,
     );
+
+    let mut ctx_io = CtxIo::default();
+    if let Some(ref path) = working_directory {
+        ctx_io.set_log_output(path.clone().into());
+        ctx_rae.log = working_directory;
+    }
+
     load_module(
         &mut rae_env.env,
         &mut rae_env.ctxs,
-        CtxUtils::default(),
+        ctx_rae_exec,
+        &mut rae_env.init_lisp,
+    );
+
+    load_module(
+        &mut rae_env.env,
+        &mut rae_env.ctxs,
+        ctx_io,
         &mut rae_env.init_lisp,
     );
 
     for element in rae_env.init_lisp.inner() {
+        //println!("Adding {} to rae_env", element);
         let lvalue = match parse(element, &mut rae_env.env, &mut rae_env.ctxs) {
             Ok(lv) => lv,
             Err(e) => {

@@ -13,10 +13,10 @@ use ompas_lisp::core::*;
 use ompas_lisp::modules::_type::CtxType;
 use ompas_lisp::modules::counter::CtxCounter;
 use ompas_lisp::modules::doc::{CtxDoc, Documentation};
-use ompas_lisp::modules::io::repl::{spawn_log, spawn_repl};
 use ompas_lisp::modules::io::CtxIo;
 use ompas_lisp::modules::math::CtxMath;
 use ompas_lisp::modules::utils::CtxUtils;
+use ompas_lisp::repl::{spawn_log, spawn_repl};
 use ompas_utils::task_handler;
 
 pub const TOKIO_CHANNEL_SIZE: usize = 65_384;
@@ -71,7 +71,9 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
         .await
         .expect("error while spawning repl");
 
-    let sender_log = spawn_log().await.expect("error while spawning log task");
+    let sender_log = spawn_log(log.clone())
+        .await
+        .expect("error while spawning log task");
 
     let (mut root_env, mut ctxs, mut lisp_init) = LEnv::root();
     let mut ctx_doc = CtxDoc::default();

@@ -156,7 +156,7 @@ pub const LAMBDA_RETRY: &str = "
 (define retry (lambda (task_id)
     (let ((new_method (rae-get-next-method task_id)))
         (begin 
-            (rae-log \"Retrying task \" task_id)
+            (print \"Retrying task \" task_id)
             (if (null? new_method) ; if there is no method applicable
             nil
             (if (eval new_method)

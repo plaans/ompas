@@ -131,7 +131,7 @@ async fn log(
     let dir_path: PathBuf = match working_dir {
         Some(wd) => {
             let mut dir_path = wd;
-            dir_path.push("/lisp_logs");
+            dir_path.push("lisp_logs");
             dir_path
         }
         None => format!(

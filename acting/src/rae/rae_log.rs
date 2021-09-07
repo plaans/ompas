@@ -100,7 +100,7 @@ async fn run_logger_file(mut rx: mpsc::Receiver<String>, working_directory: Opti
     let dir_path: PathBuf = match working_directory {
         Some(wd) => {
             let mut dir_path = wd;
-            dir_path.push("/rae_logs");
+            dir_path.push("rae_logs");
             dir_path
         }
         None => format!(

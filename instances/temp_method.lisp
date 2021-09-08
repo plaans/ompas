@@ -69,7 +69,7 @@
             (params (cdr args)))
             (quasiquote (list ,label (lambda ,params
                      
-                    (rae-log ,(cons 'progress (cons `(quote ,label) params)))))))))
+                    (print ,(cons 'progress (cons `(quote ,label) params)))))))))
 
 
                     (define progress (lambda args

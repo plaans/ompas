@@ -13,3 +13,5 @@ lazy_static = "1.4.0"
 im = "15.0.0"
 chrono = "0.4.19"
 log =  { version = "0.4", features = ["std"] }
+aries_planning = {git = "https://github.com/Yirmandias/aries/", branch = "parse_string"}
+

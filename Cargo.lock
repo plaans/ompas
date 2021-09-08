@@ -23,24 +23,9 @@ version = "0.1.0"
 source = "git+https://github.com/Yirmandias/aries/?branch=parse_string#84c8ab242d34eb0c30408da5c41710c52e3ac2a2"
 
 [[package]]
-name = "aries_backtrack"
-version = "0.1.0"
-source = "git+https://github.com/arbimo/aries/?rev=e220567#e220567a6d490cfee68eb4e5c431734b3904fce5"
-
-[[package]]
 name = "aries_collections"
 version = "0.1.0"
 source = "git+https://github.com/Yirmandias/aries/?branch=parse_string#84c8ab242d34eb0c30408da5c41710c52e3ac2a2"
-dependencies = [
- "bit-set",
- "itertools",
- "vec_map",
-]
-
-[[package]]
-name = "aries_collections"
-version = "0.1.0"
-source = "git+https://github.com/arbimo/aries/?rev=e220567#e220567a6d490cfee68eb4e5c431734b3904fce5"
 dependencies = [
  "bit-set",
  "itertools",
@@ -53,21 +38,9 @@ version = "0.1.0"
 source = "git+https://github.com/Yirmandias/aries/?branch=parse_string#84c8ab242d34eb0c30408da5c41710c52e3ac2a2"
 dependencies = [
  "anyhow",
- "aries_backtrack 0.1.0 (git+https://github.com/Yirmandias/aries/?branch=parse_string)",
- "aries_collections 0.1.0 (git+https://github.com/Yirmandias/aries/?branch=parse_string)",
- "aries_utils 0.1.0 (git+https://github.com/Yirmandias/aries/?branch=parse_string)",
- "streaming-iterator",
-]
-
-[[package]]
-name = "aries_model"
-version = "0.1.0"
-source = "git+https://github.com/arbimo/aries/?rev=e220567#e220567a6d490cfee68eb4e5c431734b3904fce5"
-dependencies = [
- "anyhow",
- "aries_backtrack 0.1.0 (git+https://github.com/arbimo/aries/?rev=e220567)",
- "aries_collections 0.1.0 (git+https://github.com/arbimo/aries/?rev=e220567)",
- "aries_utils 0.1.0 (git+https://github.com/arbimo/aries/?rev=e220567)",
+ "aries_backtrack",
+ "aries_collections",
+ "aries_utils",
  "streaming-iterator",
 ]
 
@@ -77,10 +50,10 @@ version = "0.1.0"
 source = "git+https://github.com/Yirmandias/aries/?branch=parse_string#84c8ab242d34eb0c30408da5c41710c52e3ac2a2"
 dependencies = [
  "anyhow",
- "aries_collections 0.1.0 (git+https://github.com/Yirmandias/aries/?branch=parse_string)",
- "aries_model 0.1.0 (git+https://github.com/Yirmandias/aries/?branch=parse_string)",
- "aries_utils 0.1.0 (git+https://github.com/Yirmandias/aries/?branch=parse_string)",
- "env_param 0.1.0 (git+https://github.com/Yirmandias/aries/?branch=parse_string)",
+ "aries_collections",
+ "aries_model",
+ "aries_utils",
+ "env_param",
  "fixedbitset",
  "itertools",
  "regex",
@@ -88,33 +61,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "aries_planning"
-version = "0.1.0"
-source = "git+https://github.com/arbimo/aries/?rev=e220567#e220567a6d490cfee68eb4e5c431734b3904fce5"
-dependencies = [
- "anyhow",
- "aries_collections 0.1.0 (git+https://github.com/arbimo/aries/?rev=e220567)",
- "aries_model 0.1.0 (git+https://github.com/arbimo/aries/?rev=e220567)",
- "aries_utils 0.1.0 (git+https://github.com/arbimo/aries/?rev=e220567)",
- "env_param 0.1.0 (git+https://github.com/arbimo/aries/?rev=e220567)",
- "fixedbitset",
- "itertools",
- "streaming-iterator",
-]
-
-[[package]]
 name = "aries_utils"
 version = "0.1.0"
 source = "git+https://github.com/Yirmandias/aries/?branch=parse_string#84c8ab242d34eb0c30408da5c41710c52e3ac2a2"
-dependencies = [
- "itertools",
- "streaming-iterator",
-]
-
-[[package]]
-name = "aries_utils"
-version = "0.1.0"
-source = "git+https://github.com/arbimo/aries/?rev=e220567#e220567a6d490cfee68eb4e5c431734b3904fce5"
 dependencies = [
  "itertools",
  "streaming-iterator",
@@ -251,14 +200,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "env_param"
-version = "0.1.0"
-source = "git+https://github.com/arbimo/aries/?rev=e220567#e220567a6d490cfee68eb4e5c431734b3904fce5"
-dependencies = [
- "once_cell",
-]
-
-[[package]]
 name = "fixedbitset"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -384,6 +325,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "macro_rules_attribute"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "641c64af6cd80b81cf9c2f2f6ee382b1050c71ce63e20800499971a4a4195005"
+dependencies = [
+ "macro_rules_attribute-proc_macro",
+]
+
+[[package]]
+name = "macro_rules_attribute-proc_macro"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eb246ada5a8c47b8b6e90c9f9a0f84f294939cdf558f1bc8d17fbb30f9706598"
+
+[[package]]
 name = "memchr"
 version = "2.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -481,10 +437,10 @@ name = "ompas_apps"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aries_collections 0.1.0 (git+https://github.com/arbimo/aries/?rev=e220567)",
- "aries_model 0.1.0 (git+https://github.com/arbimo/aries/?rev=e220567)",
- "aries_planning 0.1.0 (git+https://github.com/arbimo/aries/?rev=e220567)",
- "aries_utils 0.1.0 (git+https://github.com/arbimo/aries/?rev=e220567)",
+ "aries_collections",
+ "aries_model",
+ "aries_planning",
+ "aries_utils",
  "chrono",
  "im",
  "ompas_acting",
@@ -503,10 +459,10 @@ name = "ompas_godot_simulation_client"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aries_collections 0.1.0 (git+https://github.com/arbimo/aries/?rev=e220567)",
- "aries_model 0.1.0 (git+https://github.com/arbimo/aries/?rev=e220567)",
- "aries_planning 0.1.0 (git+https://github.com/arbimo/aries/?rev=e220567)",
- "aries_utils 0.1.0 (git+https://github.com/arbimo/aries/?rev=e220567)",
+ "aries_collections",
+ "aries_model",
+ "aries_planning",
+ "aries_utils",
  "byteorder",
  "im",
  "ompas_acting",
@@ -524,13 +480,14 @@ name = "ompas_lisp"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aries_collections 0.1.0 (git+https://github.com/Yirmandias/aries/?branch=parse_string)",
- "aries_model 0.1.0 (git+https://github.com/Yirmandias/aries/?branch=parse_string)",
- "aries_planning 0.1.0 (git+https://github.com/Yirmandias/aries/?branch=parse_string)",
- "aries_utils 0.1.0 (git+https://github.com/Yirmandias/aries/?branch=parse_string)",
+ "aries_collections",
+ "aries_model",
+ "aries_planning",
+ "aries_utils",
  "chrono",
  "im",
  "lazy_static 0.1.16",
+ "macro_rules_attribute",
  "ompas_utils",
  "rand",
  "rustyline",
@@ -544,6 +501,7 @@ dependencies = [
 name = "ompas_utils"
 version = "0.1.0"
 dependencies = [
+ "aries_planning",
  "chrono",
  "im",
  "lazy_static 1.4.0",

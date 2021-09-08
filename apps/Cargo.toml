@@ -17,10 +17,10 @@ ompas_godot_simulation_client = {path = "../godot-simulation-client"}
 ompas_acting = {path = "../acting"}
 ompas_utils = {path = "../utils"}
 
-aries_model = {git = "https://github.com/arbimo/aries/", rev = "e220567"}
-aries_planning = {git = "https://github.com/arbimo/aries/", rev = "e220567"}
-aries_utils = {git = "https://github.com/arbimo/aries/", rev = "e220567"}
-aries_collections = {git = "https://github.com/arbimo/aries/", rev = "e220567"}
+aries_model = {git = "https://github.com/Yirmandias/aries/", branch = "parse_string"}
+aries_planning = {git = "https://github.com/Yirmandias/aries/", branch = "parse_string"}
+aries_utils = {git = "https://github.com/Yirmandias/aries/", branch = "parse_string"}
+aries_collections = {git = "https://github.com/Yirmandias/aries/", branch = "parse_string"}
 anyhow = "1.0.40"
 rustyline = "7.1.0"
 im = "15.0.0"

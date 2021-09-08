@@ -7,6 +7,7 @@ use std::any::Any;
 use std::cmp::Ordering;
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{Debug, Display, Formatter};
+use std::future::Future;
 use std::hash::{Hash, Hasher};
 use std::ops::{Add, Deref, Div, Mul, Range, Sub};
 use std::sync::Arc;
@@ -656,6 +657,154 @@ impl LMutFn {
     }
 }
 
+macro_rules! dyn_async {(
+    $( #[$attr:meta] )* // includes doc strings
+    $pub:vis
+    async
+    fn $fname:ident<$lt:lifetime> ( $($args:tt)* ) $(-> $Ret:ty)?
+    {
+        $($body:tt)*
+    }
+) => (
+    $( #[$attr] )*
+    #[allow(unused_parens)]
+    $pub
+    fn $fname<$lt> ( $($args)* ) -> ::std::pin::Pin<::std::boxed::Box<
+        dyn ::std::future::Future<Output = ($($Ret)?)>
+            + ::std::marker::Send + $lt
+    >>
+    {
+        ::std::boxed::Box::pin(async move { $($body)* })
+    }
+)}
+
+pub type DynFut<'a> =
+    ::std::pin::Pin<Box<dyn 'a + Send + ::std::future::Future<Output = Result<LValue, LError>>>>;
+pub type AsyncNativeFn<T> = for<'a> fn(&'a [LValue], &'a LEnv, &'a T) -> DynFut<'a>;
+pub type AsyncDowncastCall =
+    for<'a> fn(&'a [LValue], &'a LEnv, &'a dyn Any, &'a Arc<dyn Any + Send + Sync>) -> DynFut<'a>;
+
+/*pub struct LAsyncFn {
+    pub(crate) fun: Arc<dyn Any + 'static + Send + Sync>,
+    pub(crate) debug_label: &'static str,
+    downcast: Arc<AsyncDowncastCall>,
+    index_mod: Option<usize>,
+}*/
+
+/*impl<'a> LAsyncFn<'a> {
+    pub fn new<'lt, T: 'static>(lbd: AsyncNativeFn<'lt, T>, debug_label: &'static str) -> Self {
+        let downcast_call = |args: &'a [LValue],
+                             env: &'lt LEnv,
+                             ctx: &'lt dyn Any,
+                             fun: &'lt Arc<dyn Any + Send + Sync>|
+         -> DynFut<'lt> {
+            let ctx: &mut T = ctx.downcast::<T>().ok_or_else(|| {
+                LError::SpecialError(
+                    "LAsyncFn::new",
+                    "Impossible to downcast context".to_string(),
+                )
+            })?;
+            let fun: &AsyncNativeFn<T> =
+                fun.downcast_ref::<AsyncNativeFn<T>>().ok_or_else(|| {
+                    LError::SpecialError(
+                        "LMutFn::new",
+                        "Impossible to downcast function".to_string(),
+                    )
+                })?;
+
+            fun(args, env, ctx)
+        };
+        LAsyncFn {
+            fun: Arc::new(lbd),
+            debug_label,
+            downcast: Arc::new(downcast_call),
+            index_mod: None,
+        }
+    }
+
+    pub fn set_index_mod(&mut self, index_mod: usize) {
+        self.index_mod = Some(index_mod);
+    }
+
+    pub fn get_index_mod(&self) -> Option<usize> {
+        self.index_mod
+    }
+
+    pub async fn call<'lt>(
+        &'a self,
+        args: &[LValue],
+        env: &LEnv,
+        ctx: &mut dyn Any,
+    ) -> DynFut<'lt> {
+        (self.downcast)(args, env, ctx, &self.fun)
+    }
+
+    pub fn get_label(&self) -> &'static str {
+        self.debug_label
+    }
+}*/
+
+#[cfg(test)]
+mod test_async {
+    use crate::core::LEnv;
+    use crate::structs::{AsyncNativeFn, DynFut, LError, LValue};
+    use ::macro_rules_attribute::macro_rules_attribute;
+    use std::any::Any;
+    use std::sync::Arc;
+
+    fn fun(i: u32) -> u32 {
+        i * i
+    }
+
+    #[test]
+    fn test_downcast() {
+        let val: u32 = 5;
+
+        let arc2: Arc<dyn Any> = Arc::new(val);
+
+        let val = arc2.downcast_ref::<u32>().unwrap();
+    }
+
+    #[test]
+    fn test_downcast_fn() {
+        let p_fun = fun;
+
+        assert_eq!(p_fun(5), 25);
+        let arc: Arc<dyn Any + 'static> = Arc::new(fun as fn(u32) -> u32);
+
+        let p_fun: &fn(u32) -> u32 = arc.downcast_ref::<fn(u32) -> u32>().unwrap();
+
+        //assert_eq!(fun(5), 25)
+    }
+
+    fn test<'a>(_: &'a [LValue], _: &'a LEnv, _: &'a ()) -> DynFut<'a> {
+        Box::pin(async move { Ok(LValue::Nil) })
+    }
+    #[macro_rules_attribute(dyn_async!)]
+    async fn test_2<'a>(_: &'a [LValue], _: &'a LEnv, _: &'a ()) -> Result<LValue, LError> {
+        Ok(LValue::Nil)
+    }
+
+    #[tokio::test]
+    async fn test_pointer_async() {
+        let p_test = test;
+        let result = p_test(&[LValue::Nil], &LEnv::empty(), &()).await;
+    }
+
+    #[tokio::test]
+    async fn test_arc_downcast_pointer_async() {
+        let fun: Arc<dyn Any + 'static + Send + Sync> = Arc::new(test as AsyncNativeFn<()>);
+
+        let fun: &AsyncNativeFn<()> = fun.downcast_ref::<AsyncNativeFn<()>>().unwrap();
+
+        let env = &LEnv::empty();
+        let args = &[LValue::Nil];
+        let ctx = &();
+
+        let result = fun(args, env, ctx).await;
+    }
+}
+
 /// The core operators are Scheme operators that can modify the environment directly,
 /// or have special behaviour that could not be done inside classical Scheme functions.
 /// - Define: insert a new entry in the environment. A symbol can only be defined once.
@@ -770,6 +919,170 @@ pub enum LValue {
     //Refers to boolean 'false and empty list in lisp
     True,
     Nil,
+}
+const TAB_SIZE: usize = 3;
+const MAX_LENGTH: usize = 80;
+
+impl LValue {
+    fn pretty_print_list_aligned(keyword: &str, list: &[LValue], mut indent: usize) -> String {
+        let mut string: String = format!("({}", keyword);
+        indent += string.len() + 1;
+        let mut first = true;
+        for element in list {
+            if first {
+                first = false;
+                string.push(' ');
+                string.push_str(element.pretty_print(indent).as_str());
+            } else {
+                string.push_str(
+                    format!("\n{}{}", " ".repeat(indent), element.pretty_print(indent)).as_str(),
+                );
+            }
+        }
+        string.push(')');
+        string
+    }
+
+    fn pretty_print_list(list: &[LValue], indent: usize) -> String {
+        let mut string = '('.to_string();
+
+        let mut global_size = 0;
+        let mut vec_pretty_printed = vec![];
+        for element in list {
+            let pretty_printed = element.pretty_print(indent + TAB_SIZE);
+            global_size += pretty_printed.len();
+            vec_pretty_printed.push(element.pretty_print(indent + TAB_SIZE));
+        }
+
+        if global_size < MAX_LENGTH {
+            for (i, element) in vec_pretty_printed.iter().enumerate() {
+                if i > 0 {
+                    string.push(' ');
+                }
+                string.push_str(element.as_str());
+            }
+        } else {
+            for (i, element) in vec_pretty_printed.iter().enumerate() {
+                match i {
+                    0 => {
+                        string.push_str(element.as_str());
+                    }
+                    1 => {
+                        string.push(' ');
+                        string.push_str(element.as_str());
+                    }
+                    _ => string.push_str(
+                        format!("\n{}{}", " ".repeat(indent + TAB_SIZE), element).as_str(),
+                    ),
+                }
+            }
+        }
+
+        string.push(')');
+        string
+    }
+
+    pub fn pretty_print(&self, indent: usize) -> String {
+        match self {
+            LValue::Lambda(l) => {
+                format!(
+                    "(lambda {}\n{}{}",
+                    l.params,
+                    " ".repeat(indent + TAB_SIZE),
+                    l.body.pretty_print(indent + TAB_SIZE)
+                )
+            }
+            LValue::List(list) => {
+                if !list.is_empty() {
+                    match &list[0] {
+                        LValue::CoreOperator(LCoreOperator::Begin) => {
+                            let indent = indent + TAB_SIZE;
+                            let mut string = "(begin".to_string();
+                            for element in &list[1..] {
+                                string.push_str(
+                                    format!(
+                                        "\n{}{}",
+                                        " ".repeat(indent),
+                                        element.pretty_print(indent + TAB_SIZE)
+                                    )
+                                    .as_str(),
+                                );
+                            }
+                            string.push(')');
+                            string
+                        }
+                        LValue::CoreOperator(LCoreOperator::If) => {
+                            LValue::pretty_print_list_aligned(IF, &list[1..], indent)
+                        }
+                        LValue::Symbol(s) => match s.as_str() {
+                            LET | LET_STAR => {
+                                let (mut string, indent) = match s.as_str() {
+                                    LET =>  ("(let ".to_string(), indent + 5),
+                                    LET_STAR => ("(let* ".to_string(), indent + 6),
+                                    _ => unreachable!("The value of the atom has been checked before and should be let or let*.")
+                                };
+                                let bindings = &list[1];
+                                let body = &list[2];
+
+                                if let LValue::List(bindings) = bindings {
+                                    string.push('(');
+                                    for (i, binding) in bindings.iter().enumerate() {
+                                        if i == 0 {
+                                            string.push_str(
+                                                binding
+                                                    .pretty_print(indent + 1 + TAB_SIZE)
+                                                    .as_str(),
+                                            );
+                                        } else {
+                                            string.push_str(
+                                                format!(
+                                                    "\n{}{}",
+                                                    " ".repeat(indent + 1),
+                                                    binding.pretty_print(indent + 1 + TAB_SIZE)
+                                                )
+                                                .as_str(),
+                                            );
+                                        }
+                                    }
+                                    string.push(')')
+                                } else {
+                                    panic!("should be a list")
+                                }
+                                string.push_str(
+                                    format!(
+                                        "\n{}{}",
+                                        " ".repeat(indent),
+                                        body.pretty_print(indent + TAB_SIZE)
+                                    )
+                                    .as_str(),
+                                );
+                                string.push(')');
+                                string
+                            }
+                            LAMBDA => {
+                                let args = &list[1];
+                                let body = &list[2];
+
+                                format!(
+                                    "(lambda {}\n{}{}",
+                                    args.pretty_print(indent + TAB_SIZE),
+                                    " ".repeat(indent + TAB_SIZE),
+                                    body.pretty_print(indent + TAB_SIZE)
+                                )
+                            }
+                            COND => LValue::pretty_print_list_aligned(COND, &list[1..], indent),
+                            _ => LValue::pretty_print_list(list.as_slice(), indent),
+                        },
+                        _ => LValue::pretty_print_list(list.as_slice(), indent),
+                    }
+                } else {
+                    NIL.to_string()
+                }
+            }
+            LValue::Quote(lv) => format!("'{}", lv.pretty_print(indent)),
+            lv => lv.to_string(),
+        }
+    }
 }
 
 impl Display for LValue {

@@ -72,10 +72,12 @@ impl Display for Method {
             -generator: {}\n\
             -body: {}\n",
             self.task_label,
-            self.lambda_pre_conditions,
-            self.lambda_effects,
-            self.lambda_instances_generator,
-            self.lambda_body
+            self.lambda_pre_conditions
+                .pretty_print("pre-conditions: ".len()),
+            self.lambda_effects.pretty_print("effects: ".len()),
+            self.lambda_instances_generator
+                .pretty_print("generator: ".len()),
+            self.lambda_body.pretty_print("body: ".len())
         )
     }
 }
@@ -117,7 +119,8 @@ impl Display for Task {
             f,
             "-body: {}\n\
              -methods: {}\n",
-            self.body, str_methods
+            self.body.pretty_print("body: ".len()),
+            str_methods
         )
     }
 }
@@ -292,7 +295,7 @@ impl DomainEnv {
     pub fn print_state_functions(&self) -> String {
         let mut str = "*State-Functions:\n".to_string();
         for (label, value) in &self.state_functions {
-            str.push_str(format!("\t-{}:\n{}\n", label, value).as_str())
+            str.push_str(format!("\t-{}:\n{}\n", label, value.pretty_print(0)).as_str())
         }
         str
     }
@@ -300,7 +303,7 @@ impl DomainEnv {
     pub fn print_actions(&self) -> String {
         let mut str = "*Actions:\n".to_string();
         for (label, value) in &self.actions {
-            str.push_str(format!("\t-{}:\n{}\n", label, value).as_str())
+            str.push_str(format!("\t-{}:\n{}\n", label, value.pretty_print(0)).as_str())
         }
         str
     }
@@ -308,7 +311,7 @@ impl DomainEnv {
     pub fn print_lambdas(&self) -> String {
         let mut str = "*Lambdas:\n".to_string();
         for (label, value) in &self.lambdas {
-            str.push_str(format!("\t-{}:\n{}\n", label, value).as_str())
+            str.push_str(format!("\t-{}:\n{}\n", label, value.pretty_print(0)).as_str())
         }
         str
     }
@@ -453,82 +456,18 @@ impl RAEEnv {
     pub fn add_action(&mut self, label: String, value: LValue) -> Result<(), LError> {
         self.domain_env.add_action(label, value);
 
-        /*self.insert(label.clone(), value)?;
-        let action_list = self.domain_env.get_symbol(RAE_ACTION_LIST).unwrap();
-        if let LValue::List(mut list) = action_list {
-            list.push(LValue::Symbol(label.clone()));
-            self.domain_env
-                .set(RAE_ACTION_LIST.to_string(), list.into())
-                .expect("list of action should be already defined in environment");
-        }
-
-        let symbol_type = self.domain_env.get_symbol(RAE_SYMBOL_TYPE).unwrap();
-        if let LValue::Map(mut map) = symbol_type {
-            map.insert(
-                LValue::Symbol(label),
-                LValue::Symbol(ACTION_TYPE.to_string()),
-            );
-            self.domain_env
-                .set(RAE_SYMBOL_TYPE.to_string(), map.into())
-                .expect("map of symbol type should be already defined in environment")
-        }*/
         Ok(())
     }
 
     pub fn add_state_function(&mut self, label: String, value: LValue) -> Result<(), LError> {
         self.domain_env.add_state_function(label, value);
 
-        /*self.insert(label.clone(), value)?;
-        let state_function_list = self.domain_env.get_symbol(RAE_STATE_FUNCTION_LIST).unwrap();
-        if let LValue::List(mut list) = state_function_list {
-            list.push(LValue::Symbol(label.clone()));
-            self.domain_env
-                .set(RAE_STATE_FUNCTION_LIST.to_string(), list.into())
-                .expect("list of state function should be already defined in environment");
-        }
-
-        let symbol_type = self.domain_env.get_symbol(RAE_SYMBOL_TYPE).unwrap();
-        if let LValue::Map(mut map) = symbol_type {
-            map.insert(
-                LValue::Symbol(label),
-                LValue::Symbol(STATE_FUNCTION_TYPE.to_string()),
-            );
-            self.domain_env
-                .set(RAE_SYMBOL_TYPE.to_string(), map.into())
-                .expect("map of symbol type should be already defined in environment")
-        }*/
         Ok(())
     }
 
     pub fn add_task(&mut self, label: String, body: LValue) -> Result<(), LError> {
         self.domain_env.add_task(label, Task::new(body));
 
-        /*self.insert(label.clone(), value)?;
-        let task_list = self.domain_env.get_symbol(RAE_TASK_LIST).unwrap();
-        if let LValue::List(mut list) = task_list {
-            list.push(LValue::Symbol(label.clone()));
-            self.domain_env
-                .set(RAE_TASK_LIST.to_string(), list.into())
-                .expect("list of task should be already defined in environment");
-        }
-        let mut map: im::HashMap<LValue, LValue> = self
-            .domain_env
-            .get_symbol(RAE_TASK_METHODS_MAP)
-            .unwrap()
-            .try_into()
-            .unwrap();
-        map.insert(LValue::Symbol(label.clone()), LValue::Nil);
-
-        self.domain_env
-            .set(RAE_TASK_METHODS_MAP.to_string(), map.into())?;
-
-        let symbol_type = self.domain_env.get_symbol(RAE_SYMBOL_TYPE).unwrap();
-        if let LValue::Map(mut map) = symbol_type {
-            map.insert(LValue::Symbol(label), LValue::Symbol(TASK_TYPE.to_string()));
-            self.domain_env
-                .set(RAE_SYMBOL_TYPE.to_string(), map.into())
-                .expect("map of symbol type should be already defined in environment")
-        }*/
         Ok(())
     }
 

@@ -42,6 +42,7 @@ pub mod scheme_primitives {
     pub const EVAL: &str = "eval";
     pub const LET: &str = "let";
     pub const LET_STAR: &str = "let*";
+    pub const COND: &str = "cond";
     pub const MACRO_EXPAND: &str = "macro-expand";
 
     //Boolean

@@ -5,6 +5,7 @@
 use crate::language::scheme_primitives::NIL;
 use crate::TOKIO_CHANNEL_SIZE;
 use chrono::{DateTime, Utc};
+use ompas_utils::pretty_print::pretty_print;
 use ompas_utils::task_handler::{subscribe_new_task, EndSignal};
 use rustyline::error::ReadlineError;
 use rustyline::Editor;

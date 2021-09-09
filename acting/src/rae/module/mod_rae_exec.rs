@@ -101,7 +101,7 @@ impl GetModule for CtxRaeExec {
             ctx: Arc::new(self),
             prelude: vec![],
             raw_lisp: init,
-            label: MOD_RAE_EXEC,
+            label: MOD_RAE_EXEC.to_string(),
         };
 
         module.add_async_fn_prelude(RAE_GET_STATE, get_state);

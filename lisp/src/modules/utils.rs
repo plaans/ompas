@@ -215,7 +215,7 @@ impl GetModule for CtxUtils {
                 MACRO_FOR,
             ]
             .into(),
-            label: MOD_UTILS,
+            label: MOD_UTILS.into(),
         };
 
         module.add_fn_prelude(RAND_ELEMENT, rand_element);

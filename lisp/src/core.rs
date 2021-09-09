@@ -72,8 +72,8 @@ impl LEnv {
 #[derive(Clone, Debug)]
 pub struct ContextCollection {
     inner: Vec<Arc<dyn Any + Send + Sync>>,
-    map_label_usize: HashMap<&'static str, usize>,
-    reverse_map: HashMap<usize, &'static str>,
+    map_label_usize: HashMap<String, usize>,
+    reverse_map: HashMap<usize, String>,
 }
 
 impl Default for ContextCollection {
@@ -88,10 +88,10 @@ impl Default for ContextCollection {
 
 impl ContextCollection {
     ///Insert a new context
-    pub fn insert(&mut self, ctx: Arc<dyn Any + Send + Sync>, label: &'static str) -> usize {
+    pub fn insert(&mut self, ctx: Arc<dyn Any + Send + Sync>, label: String) -> usize {
         self.inner.push(ctx);
         let id = self.inner.len() - 1;
-        self.map_label_usize.insert(label, id);
+        self.map_label_usize.insert(label.clone(), id);
         self.reverse_map.insert(id, label);
         id
     }
@@ -222,7 +222,7 @@ impl GetModule for CtxRoot {
             ctx: Arc::new(()),
             prelude: vec![],
             raw_lisp: Default::default(),
-            label: MOD_ROOT,
+            label: MOD_ROOT.into(),
         };
 
         module.add_prelude(DEFINE, LCoreOperator::Define.into());

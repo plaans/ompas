@@ -33,7 +33,7 @@ impl GetModule for CtxDumber {
             ctx: Arc::new(self),
             prelude: vec![],
             raw_lisp: vec![LAMBDA_DUMBER_ROBOT].into(),
-            label: MOD_DUMBER,
+            label: MOD_DUMBER.to_string(),
         }
     }
 }

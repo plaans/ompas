@@ -354,7 +354,7 @@ impl GetModule for CtxGodot {
             ctx: Arc::new(self),
             prelude: vec![],
             raw_lisp,
-            label: MOD_GODOT,
+            label: MOD_GODOT.to_string(),
         };
 
         module.add_async_mut_fn_prelude(OPEN_COM, open_com);

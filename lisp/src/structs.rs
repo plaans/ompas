@@ -507,7 +507,7 @@ pub type DowncastCall =
 #[derive(Clone)]
 pub struct LFn {
     pub(crate) fun: Arc<dyn Any + 'static + Send + Sync>,
-    pub(crate) debug_label: &'static str,
+    pub(crate) debug_label: String,
     downcast: Arc<DowncastCall>,
     index_mod: Option<usize>,
 }
@@ -528,7 +528,7 @@ impl Debug for LFn {
 
 impl LFn {
     /// Constructs a new LFn from a pointer to a function
-    pub fn new<T: 'static + Sync + Send>(lbd: NativeFn<T>, debug_label: &'static str) -> Self {
+    pub fn new<T: 'static + Sync + Send>(lbd: NativeFn<T>, debug_label: String) -> Self {
         /*let x = move |args: &[LValue], env: &LEnv, ctx: &dyn Any| -> Result<LValue, LError> {
             let ctx: Option<&T> = ctx.downcast_ref::<T>();
             if let Some(ctx) = ctx {
@@ -579,8 +579,8 @@ impl LFn {
     }
 
     /// Returns the label of the function
-    pub fn get_label(&self) -> &'static str {
-        self.debug_label
+    pub fn get_label(&self) -> &'_ str {
+        self.debug_label.as_str()
     }
 }
 
@@ -596,7 +596,7 @@ pub type DowncastCallMut = fn(
 #[derive(Clone)]
 pub struct LMutFn {
     pub(crate) fun: Arc<dyn Any + 'static + Send + Sync>,
-    pub(crate) debug_label: &'static str,
+    pub(crate) debug_label: String,
     downcast: Arc<DowncastCallMut>,
     index_mod: Option<usize>,
 }
@@ -616,7 +616,7 @@ impl Debug for LMutFn {
 }
 
 impl LMutFn {
-    pub fn new<T: 'static>(lbd: NativeMutFn<T>, debug_label: &'static str) -> Self {
+    pub fn new<T: 'static>(lbd: NativeMutFn<T>, debug_label: String) -> Self {
         let downcast_call = |args: &[LValue],
                              env: &LEnv,
                              ctx: &mut dyn Any,
@@ -651,8 +651,8 @@ impl LMutFn {
         (self.downcast)(args, env, ctx, &self.fun)
     }
 
-    pub fn get_label(&self) -> &'static str {
-        self.debug_label
+    pub fn get_label(&self) -> &'_ str {
+        self.debug_label.as_str()
     }
 }
 
@@ -665,7 +665,7 @@ pub type AsyncDowncastCall =
 #[derive(Clone)]
 pub struct LAsyncFn {
     pub(crate) fun: Arc<dyn Any + 'static + Send + Sync>,
-    pub(crate) debug_label: &'static str,
+    pub(crate) debug_label: String,
     downcast: Arc<AsyncDowncastCall>,
     index_mod: Option<usize>,
 }
@@ -681,7 +681,7 @@ impl Debug for LAsyncFn {
 }
 
 impl LAsyncFn {
-    pub fn new<T: 'static>(lbd: AsyncNativeFn<T>, debug_label: &'static str) -> Self {
+    pub fn new<T: 'static>(lbd: AsyncNativeFn<T>, debug_label: String) -> Self {
         let downcast_call: AsyncDowncastCall = |args: &[LValue],
                                                 env: &LEnv,
                                                 ctx: &dyn Any,
@@ -719,8 +719,8 @@ impl LAsyncFn {
         (self.downcast)(args, env, ctx, &self.fun)
     }
 
-    pub fn get_label(&self) -> &'static str {
-        self.debug_label
+    pub fn get_label(&self) -> &str {
+        self.debug_label.as_str()
     }
 }
 
@@ -735,7 +735,7 @@ pub type AsyncDowncastCallMut = for<'a> fn(
 #[derive(Clone)]
 pub struct LAsyncMutFn {
     pub(crate) fun: Arc<dyn Any + 'static + Send + Sync>,
-    pub(crate) debug_label: &'static str,
+    pub(crate) debug_label: String,
     downcast: Arc<AsyncDowncastCallMut>,
     index_mod: Option<usize>,
 }
@@ -751,7 +751,7 @@ impl Debug for LAsyncMutFn {
 }
 
 impl LAsyncMutFn {
-    pub fn new<T: 'static>(lbd: AsyncNativeMutFn<T>, debug_label: &'static str) -> Self {
+    pub fn new<T: 'static>(lbd: AsyncNativeMutFn<T>, debug_label: String) -> Self {
         let downcast_call: AsyncDowncastCallMut = |args: &[LValue],
                                                    env: &LEnv,
                                                    ctx: &mut dyn Any,
@@ -789,8 +789,8 @@ impl LAsyncMutFn {
         (self.downcast)(args, env, ctx, &self.fun)
     }
 
-    pub fn get_label(&self) -> &'static str {
-        self.debug_label
+    pub fn get_label(&self) -> &'_ str {
+        self.debug_label.as_str()
     }
 }
 
@@ -998,7 +998,10 @@ mod test_async {
 
     #[tokio::test]
     async fn test_l_async_fn() {
-        let fun = LAsyncFn::new(test_computation_square, "test_computation_square");
+        let fun = LAsyncFn::new(
+            test_computation_square,
+            "test_computation_square".to_string(),
+        );
 
         let env = &LEnv::empty();
         let args: &[LValue] = &[5.into()];
@@ -2145,11 +2148,12 @@ impl From<LValue> for NameTypeLValue {
 }
 
 #[derive(Default, Clone)]
-pub struct InitLisp(Vec<&'static str>);
+pub struct InitLisp(Vec<String>);
+
 //TODO: simplify to use only Vec<&'static str> instead of custom struct
-impl From<Vec<&'static str>> for InitLisp {
-    fn from(vec: Vec<&'static str>) -> Self {
-        InitLisp(vec.clone())
+impl<T: ToString> From<Vec<T>> for InitLisp {
+    fn from(vec: Vec<T>) -> Self {
+        InitLisp(vec.iter().map(|x| x.to_string()).collect())
     }
 }
 
@@ -2158,17 +2162,16 @@ impl InitLisp {
         self.0.append(&mut other.0)
     }
 
-    pub fn inner(&self) -> Vec<&'static str> {
-        self.0.clone()
+    pub fn inner(&self) -> Vec<&str> {
+        self.0.iter().map(|x| x.as_str()).collect()
     }
 
     pub fn begin_lisp(&self) -> String {
         let mut str = String::new(); //"(begin ".to_string();
-        self.0.iter().for_each(|&x| {
-            str.push_str(x);
+        self.0.iter().for_each(|x| {
+            str.push_str(x.as_str());
             str.push('\n');
         });
-        //str.push(')');
         str
     }
 }
@@ -2180,18 +2183,20 @@ pub struct Module {
     pub ctx: Arc<AsyncLTrait>,
     pub prelude: Vec<(String, LValue)>,
     pub raw_lisp: InitLisp,
-    pub label: &'static str,
+    pub label: String,
 }
 
 impl Module {
     /// Add a function to the module.
-    pub fn add_fn_prelude<T: 'static + Send + Sync>(
+    pub fn add_fn_prelude<T: 'static + Send + Sync, L: ToString>(
         &mut self,
-        label: &'static str,
+        label: L,
         fun: NativeFn<T>,
     ) {
-        self.prelude
-            .push((label.into(), LValue::Fn(LFn::new(fun, label))))
+        self.prelude.push((
+            label.to_string(),
+            LValue::Fn(LFn::new(fun, label.to_string())),
+        ))
     }
 
     /// Add a mutate function to the module.
@@ -2199,39 +2204,46 @@ impl Module {
         T: 'static,
         //R: Into<Result<LValue, LError>>,
         //F: Fn(&[LValue], &LEnv, &mut T) -> R + 'static,
+        L: ToString,
     >(
         &mut self,
-        label: &'static str,
+        label: L,
         fun: NativeMutFn<T>,
     ) {
-        self.prelude
-            .push((label.into(), LValue::MutFn(LMutFn::new(fun, label))))
+        self.prelude.push((
+            label.to_string(),
+            LValue::MutFn(LMutFn::new(fun, label.to_string())),
+        ))
     }
 
     pub fn add_async_fn_prelude<
         T: 'static,
         //R: Into<Result<LValue, LError>>,
         //F: Fn(&[LValue], &LEnv, &mut T) -> R + 'static,
+        L: ToString,
     >(
         &mut self,
-        label: &'static str,
+        label: L,
         fun: AsyncNativeFn<T>,
     ) {
-        self.prelude
-            .push((label.into(), LValue::AsyncFn(LAsyncFn::new(fun, label))))
+        self.prelude.push((
+            label.to_string(),
+            LValue::AsyncFn(LAsyncFn::new(fun, label.to_string())),
+        ))
     }
     pub fn add_async_mut_fn_prelude<
         T: 'static,
         //R: Into<Result<LValue, LError>>,
         //F: Fn(&[LValue], &LEnv, &mut T) -> R + 'static,
+        L: ToString,
     >(
         &mut self,
-        label: &'static str,
+        label: L,
         fun: AsyncNativeMutFn<T>,
     ) {
         self.prelude.push((
-            label.into(),
-            LValue::AsyncMutFn(LAsyncMutFn::new(fun, label)),
+            label.to_string(),
+            LValue::AsyncMutFn(LAsyncMutFn::new(fun, label.to_string())),
         ))
     }
 

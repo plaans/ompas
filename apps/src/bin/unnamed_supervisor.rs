@@ -85,7 +85,8 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     let ctx_counter = CtxCounter::default();
     let _ctx_godot = CtxGodot::default();
     let ctx_utils = CtxUtils::default();
-    let (ctx_rae, ctx_rae_monitor) = init_ctx_rae(Box::new(PlatformGodot::default()), log.clone());
+    let (ctx_rae, ctx_rae_monitor) =
+        init_ctx_rae(Box::new(PlatformGodot::default()), log.clone()).await;
     //Insert the doc for the different contexts.
     ctx_doc.insert_doc(CtxIo::documentation());
     ctx_doc.insert_doc(CtxMath::documentation());
@@ -154,8 +155,8 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
 
         //stdout.write_all(format!("receiving command: {}\n", str_lvalue).as_bytes());
 
-        match parse(str_lvalue.as_str(), env, &mut ctxs) {
-            Ok(lv) => match eval(&lv, env, &mut ctxs) {
+        match parse(str_lvalue.as_str(), env, &mut ctxs).await {
+            Ok(lv) => match eval(&lv, env, &mut ctxs).await {
                 Ok(lv) => {
                     sender
                         .send(format!("{}", lv))

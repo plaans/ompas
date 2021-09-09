@@ -1,11 +1,13 @@
 #![allow(dead_code)]
 use crate::rae_interface::PlatformGodot;
+use ::macro_rules_attribute::macro_rules_attribute;
 use ompas_acting::rae::context::actions_progress::ActionsProgress;
 use ompas_acting::rae::context::rae_state::RAEState;
 use ompas_acting::rae::module::mod_rae_exec::RAEInterface;
 use ompas_lisp::core::LEnv;
 use ompas_lisp::modules::doc::{Documentation, LHelp};
 use ompas_lisp::structs::{GetModule, LError, LValue, Module};
+use ompas_utils::dyn_async;
 use std::sync::Arc;
 
 /*
@@ -355,11 +357,11 @@ impl GetModule for CtxGodot {
             label: MOD_GODOT,
         };
 
-        module.add_mut_fn_prelude(OPEN_COM, open_com);
-        module.add_mut_fn_prelude(LAUNCH_GODOT, launch_godot);
-        module.add_fn_prelude(START_GODOT, start_godot);
-        module.add_fn_prelude(EXEC_GODOT, exec_godot);
-        module.add_fn_prelude(GET_STATE, get_state);
+        module.add_async_mut_fn_prelude(OPEN_COM, open_com);
+        module.add_async_mut_fn_prelude(LAUNCH_GODOT, launch_godot);
+        module.add_async_fn_prelude(START_GODOT, start_godot);
+        module.add_async_fn_prelude(EXEC_GODOT, exec_godot);
+        module.add_async_fn_prelude(GET_STATE, get_state);
 
         module
     }
@@ -476,20 +478,35 @@ Functions
  */
 
 /// Launch the godot process the simulation and opens the com
-fn launch_godot(args: &[LValue], _: &LEnv, ctx: &mut CtxGodot) -> Result<LValue, LError> {
-    ctx.platform.launch_platform(args)
+#[macro_rules_attribute(dyn_async!)]
+async fn launch_godot<'a>(
+    args: &'a [LValue],
+    _: &'a LEnv,
+    ctx: &'a mut CtxGodot,
+) -> Result<LValue, LError> {
+    ctx.platform.launch_platform(args).await
 }
 
 /// Opens the tcp communication to receive state and status update and send commands.
-fn open_com(args: &[LValue], _: &LEnv, ctx: &mut CtxGodot) -> Result<LValue, LError> {
-    ctx.platform.open_com(args)
+#[macro_rules_attribute(dyn_async!)]
+async fn open_com<'a>(
+    args: &'a [LValue],
+    _: &'a LEnv,
+    ctx: &'a mut CtxGodot,
+) -> Result<LValue, LError> {
+    ctx.platform.open_com(args).await
 }
 
 pub const DEFAULT_PATH_PROJECT_GODOT: &str = "/home/jeremy/godot/simulation-factory-godot/simu";
 
 ///Launch godot
-fn start_godot(args: &[LValue], _: &LEnv, ctx: &CtxGodot) -> Result<LValue, LError> {
-    ctx.platform.start_platform(args)
+#[macro_rules_attribute(dyn_async!)]
+async fn start_godot<'a>(
+    args: &'a [LValue],
+    _: &'a LEnv,
+    ctx: &'a CtxGodot,
+) -> Result<LValue, LError> {
+    ctx.platform.start_platform(args).await
 }
 /// Commands available
 ///- Navigate to : ['navigate_to', robot_name, destination_x, destination_y]
@@ -498,12 +515,22 @@ fn start_godot(args: &[LValue], _: &LEnv, ctx: &CtxGodot) -> Result<LValue, LErr
 ///- Rotation : ['do_rotation', robot_name, angle, speed]
 
 /// Sends a command to godot
-fn exec_godot(args: &[LValue], _: &LEnv, ctx: &CtxGodot) -> Result<LValue, LError> {
+#[macro_rules_attribute(dyn_async!)]
+async fn exec_godot<'a>(
+    args: &'a [LValue],
+    _: &'a LEnv,
+    ctx: &'a CtxGodot,
+) -> Result<LValue, LError> {
     let id = ctx.status.get_new_id();
-    ctx.platform.exec_command(args, id)
+    ctx.platform.exec_command(args, id).await
 }
 
 /// Returns the whole state if no args and a particular entry corresponding to the arg.
-pub fn get_state(args: &[LValue], _: &LEnv, ctx: &CtxGodot) -> Result<LValue, LError> {
-    ctx.platform.get_state(args)
+#[macro_rules_attribute(dyn_async!)]
+async fn get_state<'a>(
+    args: &'a [LValue],
+    _: &'a LEnv,
+    ctx: &'a CtxGodot,
+) -> Result<LValue, LError> {
+    ctx.platform.get_state(args).await
 }

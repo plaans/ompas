@@ -4,6 +4,7 @@ use crate::serde::{
 };
 use crate::tcp::{task_tcp_connection, TEST_TCP};
 use crate::TOKIO_CHANNEL_SIZE;
+use async_trait::async_trait;
 use core::time;
 use ompas_acting::rae::context::actions_progress::{ActionsProgress, Status};
 use ompas_acting::rae::context::rae_state::{RAEState, StateType, KEY_DYNAMIC, KEY_STATIC};
@@ -12,7 +13,6 @@ use ompas_acting::rae::module::mod_rae_exec::{
 };
 use ompas_lisp::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
 use ompas_lisp::structs::*;
-use ompas_utils::blocking_async;
 use ompas_utils::task_handler;
 use std::net::SocketAddr;
 use std::process::Command;
@@ -44,16 +44,17 @@ impl PlatformGodot {
     }
 }
 
+#[async_trait]
 impl RAEInterface for PlatformGodot {
     /// Initiliaze the godot platform of a the state (contains Arc to structs)
     /// and ActionsProgress (contains also Arc to structs)
-    fn init(&mut self, state: RAEState, status: ActionsProgress) {
+    async fn init(&mut self, state: RAEState, status: ActionsProgress) {
         self.state = state;
         self.status = status;
     }
 
     /// Executes a command on the platform. The command is sent via tcp.
-    fn exec_command(&self, args: &[LValue], command_id: usize) -> Result<LValue, LError> {
+    async fn exec_command(&self, args: &[LValue], command_id: usize) -> Result<LValue, LError> {
         let gs = GodotMessageSerde {
             _type: GodotMessageType::RobotCommand,
             data: GodotMessageSerdeData::RobotCommand(SerdeRobotCommand {
@@ -62,9 +63,11 @@ impl RAEInterface for PlatformGodot {
             }),
         };
 
-        let status = self.status.status.clone();
-        blocking_async!(status.write().await.insert(command_id, Status::Pending))
-            .expect("fail adding status for new action.");
+        self.status
+            .status
+            .write()
+            .await
+            .insert(command_id, Status::Pending);
 
         //println!("action status created");
 
@@ -82,26 +85,18 @@ impl RAEInterface for PlatformGodot {
             }
             Some(s) => s.clone(),
         };
-        //println!("trying to send command");
-        let handle = tokio::runtime::Handle::current();
 
-        thread::spawn(move || {
-            handle.block_on(async move {
-                //println!("command in sending!");
-                sender
-                    .send(command)
-                    .await
-                    .expect("couldn't send via channel");
-                //println!("command sent!");
-            })
-        })
-        .join()
-        .expect("error sending command");
+        sender
+            .send(command)
+            .await
+            .expect("couldn't send via channel");
+        //println!("command sent!");
+
         Ok(LValue::Nil)
     }
 
     /// Sends to godot a cancel command.
-    fn cancel_command(&self, args: &[LValue]) -> Result<LValue, LError> {
+    async fn cancel_command(&self, args: &[LValue]) -> Result<LValue, LError> {
         if args.len() != 1 {
             return Err(WrongNumberOfArgument(
                 "PlatformGodot::cancel_command",
@@ -141,17 +136,17 @@ impl RAEInterface for PlatformGodot {
             }
             Some(s) => s.clone(),
         };
-        tokio::spawn(async move {
-            sender
-                .send(command)
-                .await
-                .expect("couldn't send via channel");
-        });
+
+        sender
+            .send(command)
+            .await
+            .expect("couldn't send via channel");
+
         Ok(LValue::Nil)
     }
 
     /// Returns the state of godot. Arg is either 'static' or 'dynamic'
-    fn get_state(&self, args: &[LValue]) -> Result<LValue, LError> {
+    async fn get_state(&self, args: &[LValue]) -> Result<LValue, LError> {
         let _type = match args.len() {
             0 => None,
             1 => match &args[0] {
@@ -189,20 +184,14 @@ impl RAEInterface for PlatformGodot {
 
         //let handle = tokio::runtime::Handle::current();
         //let state = self.state.clone();
-        let c_state = self.state.clone();
-        let result = blocking_async!(c_state.get_state(_type).await).expect("todo!");
-        /*let result = thread::spawn(move || {
-            handle.block_on(async move { self.state.get_state() })
-        })
-            .join()
-            .unwrap();*/
 
+        let result = self.state.get_state(_type).await;
         Ok(result.into_map())
     }
 
     /// Returns the value of a state variable.
     /// args contains the key of the state variable.
-    fn get_state_variable(&self, args: &[LValue]) -> Result<LValue, LError> {
+    async fn get_state_variable(&self, args: &[LValue]) -> Result<LValue, LError> {
         if args.is_empty() {
             return Err(WrongNumberOfArgument(
                 RAE_GET_STATE_VARIBALE,
@@ -219,7 +208,7 @@ impl RAEInterface for PlatformGodot {
 
         //println!("key: {}", key);
         let c_state = self.state.clone();
-        let state = blocking_async!(c_state.get_state(None).await).expect("todo!");
+        let state = c_state.get_state(None).await;
 
         //println!("state: {:?}", state);
 
@@ -230,14 +219,14 @@ impl RAEInterface for PlatformGodot {
     }
 
     /// Return the status of all the actions.
-    fn get_status(&self, _: &[LValue]) -> Result<LValue, LError> {
+    async fn get_status(&self, _: &[LValue]) -> Result<LValue, LError> {
         let status = self.status.status.clone();
 
-        let status = blocking_async!(status.read().await.clone()).unwrap();
+        let status = status.read().await;
 
         let mut string = "Action(s) Status\n".to_string();
 
-        for e in status {
+        for e in status.iter() {
             string.push_str(format!("- {}: {}\n", e.0, e.1).as_str())
         }
 
@@ -245,7 +234,7 @@ impl RAEInterface for PlatformGodot {
     }
 
     /// Launch the platform godot and open the tcp communication
-    fn launch_platform(&mut self, args: &[LValue]) -> Result<LValue, LError> {
+    async fn launch_platform(&mut self, args: &[LValue]) -> Result<LValue, LError> {
         let (args_start, args_open) = match args.len() {
             0 => (&args[0..0], &args[0..0]),
             1 => (&args[0..1], &args[0..0]),
@@ -259,13 +248,13 @@ impl RAEInterface for PlatformGodot {
                 ))
             }
         };
-        self.start_platform(args_start)?;
+        self.start_platform(args_start).await?;
         thread::sleep(time::Duration::from_millis(1000));
-        self.open_com(args_open)
+        self.open_com(args_open).await
     }
 
     /// Start the platform (start the godot process and launch the simulation)
-    fn start_platform(&self, args: &[LValue]) -> Result<LValue, LError> {
+    async fn start_platform(&self, args: &[LValue]) -> Result<LValue, LError> {
         match args.len() {
             //default settings
             0 => {
@@ -346,7 +335,7 @@ impl RAEInterface for PlatformGodot {
     }
 
     /// Open the tcp communication on the right address:port
-    fn open_com(&mut self, args: &[LValue]) -> Result<LValue, LError> {
+    async fn open_com(&mut self, args: &[LValue]) -> Result<LValue, LError> {
         let socket_addr: SocketAddr = match args.len() {
             0 => "127.0.0.1:10000".parse().unwrap(),
             2 => {
@@ -402,23 +391,17 @@ impl RAEInterface for PlatformGodot {
     }
 
     /// Return the status of a specific action.
-    fn get_action_status(&self, action_id: &usize) -> Status {
-        //let status = self.status.clone();
-        //let action_id = *action_id;
-        let status = self.status.clone();
-        let c_action_id = *action_id;
-        let result = blocking_async!(status.get_action_status(&c_action_id).await).unwrap();
-        result
-        //println!("status: {}", result.unwrap());
+    async fn get_action_status(&self, action_id: &usize) -> Status {
+        self.status.get_action_status(action_id).await
     }
 
-    fn set_status(&self, _: usize, _: Status) {
+    async fn set_status(&self, _: usize, _: Status) {
         todo!()
     }
 
     /// Function returning the domain of the simulation.
     /// The domain is hardcoded.
-    fn domain(&self) -> &'static str {
+    async fn domain(&self) -> &'static str {
         //GODOT_DOMAIN
         //TODO: choose a way to charge domain
         "(read godot_domain/init.lisp)"

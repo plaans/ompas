@@ -81,6 +81,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-trait"
+version = "0.1.51"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "44318e776df68115a881de9a8fd1b9e53368d7a4a5ce4cc48517da3393233a5e"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -422,10 +433,12 @@ name = "ompas_acting"
 version = "0.1.0"
 dependencies = [
  "async-recursion",
+ "async-trait",
  "chrono",
  "im",
  "lazy_static 1.4.0",
  "log",
+ "macro_rules_attribute",
  "ompas_lisp",
  "ompas_utils",
  "tokio",
@@ -463,8 +476,10 @@ dependencies = [
  "aries_model",
  "aries_planning",
  "aries_utils",
+ "async-trait",
  "byteorder",
  "im",
+ "macro_rules_attribute",
  "ompas_acting",
  "ompas_lisp",
  "ompas_utils",
@@ -484,6 +499,7 @@ dependencies = [
  "aries_model",
  "aries_planning",
  "aries_utils",
+ "async-recursion",
  "chrono",
  "im",
  "lazy_static 0.1.16",
@@ -814,9 +830,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "1.0.60"
+version = "1.0.67"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c700597eca8a5a762beb35753ef6b94df201c81cca676604f547495a0d7f0081"
+checksum = "6498a9efc342871f91cc2d0d694c674368b4ceb40f62b65a7a08c3792935e702"
 dependencies = [
  "proc-macro2",
  "quote",

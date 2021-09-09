@@ -8,6 +8,7 @@ edition = "2018"
 
 [dependencies]
 ompas_utils = {path = "../utils"}
+async-recursion = "0.3.2"
 aries_model = {git = "https://github.com/Yirmandias/aries/", branch = "parse_string"}
 aries_planning = {git = "https://github.com/Yirmandias/aries/", branch = "parse_string"}
 aries_utils = {git = "https://github.com/Yirmandias/aries/", branch = "parse_string"}

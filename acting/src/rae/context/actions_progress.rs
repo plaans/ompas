@@ -2,7 +2,6 @@ use crate::rae::context::rae_state::{ActionStatus, ActionStatusSet};
 use crate::rae::TOKIO_CHANNEL_SIZE;
 use im::HashMap;
 use log::{error, info, warn};
-use ompas_utils::blocking_async;
 use std::fmt::{Display, Formatter};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -25,12 +24,9 @@ pub struct ActionsProgress {
 }
 
 impl ActionsProgress {
-    pub fn declare_new_watcher(&self, action_id: &usize) -> Receiver<bool> {
+    pub async fn declare_new_watcher(&self, action_id: &usize) -> Receiver<bool> {
         let (sender, receiver) = mpsc::channel(TOKIO_CHANNEL_SIZE);
-        let c_sync = self.sync.clone();
-        let c_action_id = *action_id;
-        blocking_async!(c_sync.add_action_to_watch(c_action_id, sender).await)
-            .expect("fail adding action to watch");
+        self.sync.add_action_to_watch(*action_id, sender).await;
         receiver
     }
 }

@@ -12,11 +12,3 @@ pub fn get_and_update_id_counter(aau: Arc<AtomicUsize>) -> usize {
         }
     }
 }
-#[macro_export]
-macro_rules! blocking_async {
-    ($expression:expr) => {{
-        use std::thread;
-        let handle = tokio::runtime::Handle::current();
-        thread::spawn(move || handle.block_on(async move { $expression })).join()
-    }};
-}

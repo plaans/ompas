@@ -9,6 +9,7 @@ use crate::structs::LError::*;
 use crate::structs::NameTypeLValue::{List, Symbol};
 use crate::structs::*;
 use aries_planning::parsing::sexpr::SExpr;
+use async_recursion::async_recursion;
 use im::hashmap::HashMap;
 use im::HashSet;
 use std::any::Any;
@@ -17,7 +18,6 @@ use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::thread;
 
 lazy_static! {
     ///Global variable used to enable debug println.
@@ -414,8 +414,10 @@ pub fn load_module(
     lisp_init.append(&mut module.raw_lisp);
     for (sym, lv) in &mut module.prelude {
         match lv {
-            LValue::Fn(nl) => nl.set_index_mod(id),
-            LValue::MutFn(nml) => nml.set_index_mod(id),
+            LValue::Fn(fun) => fun.set_index_mod(id),
+            LValue::MutFn(fun) => fun.set_index_mod(id),
+            LValue::AsyncFn(fun) => fun.set_index_mod(id),
+            LValue::AsyncMutFn(fun) => fun.set_index_mod(id),
             _ => {}
         }
         env.insert(sym.to_string(), lv.clone());
@@ -424,9 +426,13 @@ pub fn load_module(
 }
 
 /// Parse an str and returns an expanded LValue
-pub fn parse(str: &str, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result<LValue, LError> {
+pub async fn parse(
+    str: &str,
+    env: &mut LEnv,
+    ctxs: &mut ContextCollection,
+) -> Result<LValue, LError> {
     match aries_planning::parsing::sexpr::parse(str) {
-        Ok(se) => expand(&parse_into_lvalue(&se), true, env, ctxs),
+        Ok(se) => expand(&parse_into_lvalue(&se), true, env, ctxs).await,
         Err(e) => Err(SpecialError(
             "parse",
             format!("Error in command: {}", e.to_string()),
@@ -540,7 +546,8 @@ pub fn parse_into_lvalue(se: &SExpr) -> LValue {
 }
 
 /// Expand LValues Expressions as Macros
-pub fn expand(
+#[async_recursion]
+pub async fn expand(
     x: &LValue,
     top_level: bool,
     env: &mut LEnv,
@@ -576,7 +583,8 @@ pub fn expand(
                                         top_level,
                                         env,
                                         ctxs,
-                                    );
+                                    )
+                                    .await;
                                 }
                             }
                             LValue::Symbol(sym) => {
@@ -588,7 +596,7 @@ pub fn expand(
                                         3..3,
                                     ));
                                 }
-                                let exp = expand(&list[2], top_level, env, ctxs)?;
+                                let exp = expand(&list[2], top_level, env, ctxs).await?;
                                 //println!("after expansion: {}", exp);
                                 if def == LCoreOperator::DefMacro {
                                     if !top_level {
@@ -597,7 +605,7 @@ pub fn expand(
                                             format!("{}: defmacro only allowed at top level", x),
                                         ));
                                     }
-                                    let proc = eval(&exp, &mut env.clone(), ctxs)?;
+                                    let proc = eval(&exp, &mut env.clone(), ctxs).await?;
                                     //println!("new macro: {}", proc);
                                     if !matches!(proc, LValue::Lambda(_)) {
                                         return Err(SpecialError(
@@ -669,7 +677,7 @@ pub fn expand(
                         return Ok(vec![
                             LCoreOperator::DefLambda.into(),
                             vars.clone(),
-                            expand(&exp, top_level, env, ctxs)?,
+                            expand(&exp, top_level, env, ctxs).await?,
                         ]
                         .into());
                     }
@@ -689,7 +697,7 @@ pub fn expand(
                         //return map(expand, x)
                         let mut expanded_list = vec![LCoreOperator::If.into()];
                         for x in &list[1..] {
-                            expanded_list.push(expand(x, false, env, ctxs)?)
+                            expanded_list.push(expand(x, false, env, ctxs).await?)
                         }
                         return Ok(expanded_list.into());
                     }
@@ -728,7 +736,7 @@ pub fn expand(
                         return Ok(vec![
                             LCoreOperator::Set.into(),
                             var.clone(),
-                            expand(&list[2], false, env, ctxs)?,
+                            expand(&list[2], false, env, ctxs).await?,
                         ]
                         .into());
                     }
@@ -738,7 +746,7 @@ pub fn expand(
                         } else {
                             let mut expanded_list = vec![LCoreOperator::Begin.into()];
                             for x in &list[1..] {
-                                expanded_list.push(expand(x, top_level, env, ctxs)?)
+                                expanded_list.push(expand(x, top_level, env, ctxs).await?)
                             }
                             Ok(expanded_list.into())
                         }
@@ -756,7 +764,7 @@ pub fn expand(
                             //println!("{}", expanded);
                             //to expand quasiquote recursively
                             expand(&expanded, top_level, env, ctxs);*/
-                            expand(&expand_quasi_quote(&list[1], env)?, top_level, env, ctxs)
+                            expand(&expand_quasi_quote(&list[1], env)?, top_level, env, ctxs).await
                             //Ok(expanded)
                         };
                     }
@@ -774,7 +782,7 @@ pub fn expand(
                             ))
                         } else {
                             let mut expanded = vec![LCoreOperator::Async.into()];
-                            expanded.push(expand(&list[1], top_level, env, ctxs)?);
+                            expanded.push(expand(&list[1], top_level, env, ctxs).await?);
                             Ok(expanded.into())
                         }
                     }
@@ -788,7 +796,7 @@ pub fn expand(
                             ))
                         } else {
                             let mut expanded = vec![LCoreOperator::Await.into()];
-                            expanded.push(expand(&list[1], top_level, env, ctxs)?);
+                            expanded.push(expand(&list[1], top_level, env, ctxs).await?);
                             Ok(expanded.into())
                         }
                     }
@@ -802,7 +810,7 @@ pub fn expand(
                             ))
                         } else {
                             let mut expanded = vec![LCoreOperator::Eval.into()];
-                            expanded.push(expand(&list[1], top_level, env, ctxs)?);
+                            expanded.push(expand(&list[1], top_level, env, ctxs).await?);
                             Ok(expanded.into())
                         }
                     }
@@ -812,7 +820,8 @@ pub fn expand(
                     None => {}
                     Some(m) => {
                         let expanded =
-                            expand(&m.call(&list[1..], env, ctxs)?, top_level, env, ctxs)?;
+                            expand(&m.call(&list[1..], env, ctxs).await?, top_level, env, ctxs)
+                                .await?;
                         if get_debug() {
                             println!("In expand: macro expanded: {:?}", expanded);
                         }
@@ -823,7 +832,7 @@ pub fn expand(
 
             let mut expanded_list: Vec<LValue> = vec![];
             for e in list {
-                expanded_list.push(expand(e, false, env, ctxs)?);
+                expanded_list.push(expand(e, false, env, ctxs).await?);
             }
 
             /*let expanded_list: Vec<LValue> = list
@@ -876,7 +885,12 @@ pub fn expand_quasi_quote(x: &LValue, env: &LEnv) -> Result<LValue, LError> {
 
 /// Evaluate a LValue
 /// Main function of the Scheme Interpreter
-pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result<LValue, LError> {
+#[async_recursion]
+pub async fn eval(
+    lv: &LValue,
+    env: &mut LEnv,
+    ctxs: &mut ContextCollection,
+) -> Result<LValue, LError> {
     let mut lv = lv.clone();
     //TODO: Voir avec arthur une manière plus élégante de faire
     let mut temp_env: LEnv;
@@ -902,7 +916,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                     LCoreOperator::Define => {
                         match &args[0] {
                             LValue::Symbol(s) => {
-                                let exp = eval(&args[1], &mut env, ctxs)?;
+                                let exp = eval(&args[1], &mut env, ctxs).await?;
                                 env.insert(s.to_string(), exp);
                             }
                             lv => {
@@ -962,7 +976,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                         let test = &args[0];
                         let conseq = &args[1];
                         let alt = &args[2];
-                        lv = match eval(test, &mut env, ctxs) {
+                        lv = match eval(test, &mut env, ctxs).await {
                             Ok(LValue::True) => conseq.clone(),
                             Ok(LValue::Nil) => alt.clone(),
                             Ok(lv) => {
@@ -985,7 +999,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                     LCoreOperator::Set => {
                         return match &args[0] {
                             LValue::Symbol(s) => {
-                                let exp = eval(&args[1], &mut env, ctxs)?;
+                                let exp = eval(&args[1], &mut env, ctxs).await?;
                                 env.set(s.to_string(), exp)?;
                                 //println!("=> {}", LValue::Nil);
                                 Ok(LValue::Nil)
@@ -1003,7 +1017,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                         let last = args.last().unwrap();
 
                         for e in firsts {
-                            eval(e, &mut env, ctxs)?;
+                            eval(e, &mut env, ctxs).await?;
                         }
                         lv = last.clone();
                     }
@@ -1013,20 +1027,15 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                     LCoreOperator::Async => {
                         //println!("async evaluation");
 
-                        let handle = tokio::runtime::Handle::current();
-                        let (task_id, sender_result) = thread::spawn(move || {
-                            handle.block_on(async move {
-                                async_await::current().declare_new_task().await
-                            })
-                        })
-                        .join()
-                        .unwrap();
+                        let (task_id, sender_result) =
+                            async_await::current().declare_new_task().await;
+
                         let lvalue = args[0].clone();
                         let mut new_env = env.clone();
                         let mut ctxs = ctxs.clone();
                         tokio::spawn(async move {
                             //tokio::time::sleep(Duration::from_millis(10)).await;
-                            let result = eval(&lvalue, &mut new_env, &mut ctxs);
+                            let result = eval(&lvalue, &mut new_env, &mut ctxs).await;
                             sender_result
                                 .send((task_id, result))
                                 .await
@@ -1043,25 +1052,20 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                     }
                     LCoreOperator::Await => {
                         //println!("awaiting on async evaluation");
-                        let pid = eval(&args[0], env, ctxs)?;
+                        let pid = eval(&args[0], env, ctxs).await?;
 
                         if let LValue::Number(LNumber::Usize(id)) = pid {
-                            let handle = tokio::runtime::Handle::current();
-                            let result = thread::spawn(move || {
-                                handle.block_on(async move {
-                                    match async_await::current().get_response_await(&id).await {
-                                        AwaitResponse::Result(result) => result,
-                                        AwaitResponse::Receiver(mut r) => {
-                                            if get_debug() {
-                                                println!("await>>waiting result on channel")
-                                            }
-                                            r.recv().await.unwrap()
-                                        }
+                            let result = match async_await::current().get_response_await(&id).await
+                            {
+                                AwaitResponse::Result(result) => result,
+                                AwaitResponse::Receiver(mut r) => {
+                                    if get_debug() {
+                                        println!("await>>waiting result on channel")
                                     }
-                                })
-                            })
-                            .join()
-                            .unwrap()?;
+                                    r.recv().await.unwrap()
+                                }
+                            }?;
+
                             if get_debug() {
                                 println!("await>> result received : {}", result);
                             }
@@ -1070,14 +1074,20 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                     }
                     LCoreOperator::Eval => {
                         let arg = &args[0];
-                        lv = expand(&eval(arg, env, ctxs)?, true, env, ctxs)?;
+                        lv = expand(&eval(arg, env, ctxs).await?, true, env, ctxs).await?;
                     }
                 }
             } else {
-                let exps = list
-                    .iter()
-                    .map(|x| eval(x, &mut env, ctxs))
-                    .collect::<Result<Vec<LValue>, _>>()?;
+                let mut exps: Vec<LValue> = vec![];
+
+                for x in list {
+                    exps.push(eval(x, &mut env, ctxs).await?)
+                }
+
+                /*let exps = list
+                .iter()
+                .map(|x| eval(x, &mut env, ctxs).await)
+                .collect::<Result<Vec<LValue>, _>>()?;*/
                 let proc = &exps[0];
                 let args = &exps[1..];
                 match proc {
@@ -1099,15 +1109,30 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                     }
                     LValue::MutFn(fun) => {
                         return match fun.get_index_mod() {
-                            None => {
-                                let r_lvalue = fun.call(args, env, &mut ())?;
-                                if get_debug() {
-                                    println!("=> {}", r_lvalue);
-                                }
-                                Ok(r_lvalue)
-                            }
+                            None => unreachable!("{} should have a module index", fun.debug_label),
                             Some(u) => {
                                 let r_lvalue = fun.call(args, env, ctxs.get_mut_context(u))?;
+                                //println!("=> {}", r_lvalue.clone());
+                                Ok(r_lvalue)
+                            }
+                        };
+                    }
+                    LValue::AsyncFn(fun) => {
+                        let ctx: &AsyncLTrait = match fun.get_index_mod() {
+                            None => &(),
+                            Some(u) => ctxs.get_context(u),
+                        };
+                        let r_lvalue = fun.call(args, env, ctx).await?;
+                        if DEBUG.load(Ordering::Relaxed) {
+                            println!("=> {}", r_lvalue);
+                        }
+                        return Ok(r_lvalue);
+                    }
+                    LValue::AsyncMutFn(fun) => {
+                        return match fun.get_index_mod() {
+                            None => unreachable!("{} should have a module index", fun.debug_label),
+                            Some(u) => {
+                                let r_lvalue = fun.call(args, env, ctxs.get_mut_context(u)).await?;
                                 //println!("=> {}", r_lvalue.clone());
                                 Ok(r_lvalue)
                             }
@@ -1116,7 +1141,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
                     //Special case for macro_expand that needs ctxs to work
                     LValue::Symbol(s) => {
                         return if s == MACRO_EXPAND {
-                            macro_expand(args, env, ctxs)
+                            macro_expand(args, env, ctxs).await
                         } else {
                             Err(WrongType(
                                 "eval",
@@ -1146,7 +1171,7 @@ pub fn eval(lv: &LValue, env: &mut LEnv, ctxs: &mut ContextCollection) -> Result
 
 /// Expand a macro without evaluating it
 /// Used mainly for debug.
-pub fn macro_expand(
+pub async fn macro_expand(
     args: &[LValue],
     env: &LEnv,
     ctxs: &mut ContextCollection,
@@ -1167,7 +1192,7 @@ pub fn macro_expand(
                 "eval",
                 format!("{} is not a defined macro", sym),
             )),
-            Some(m) => expand(&m.call(&args[1..], env, ctxs)?, true, env, ctxs),
+            Some(m) => expand(&m.call(&args[1..], env, ctxs).await?, true, env, ctxs).await,
         }
     } else {
         Err(WrongType(

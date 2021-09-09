@@ -9,7 +9,6 @@ use ompas_lisp::core::{ContextCollection, LEnv};
 use ompas_lisp::structs::LCoreOperator::Define;
 use ompas_lisp::structs::LError::SpecialError;
 use ompas_lisp::structs::{InitLisp, LError, LFn, LLambda, LValue};
-use ompas_utils::blocking_async;
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{Display, Formatter};
 use std::panic::panic_any;

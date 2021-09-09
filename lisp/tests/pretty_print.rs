@@ -10,12 +10,12 @@ fn list_of_example() -> Vec<&'static str> {
     vec![EXAMPLE, EXAMPLE_2, EXAMPLE_3, EXAMPLE_4]
 }
 
-#[test]
-fn test_pretty_print_lvalue() -> Result<(), LError> {
-    let (mut env, mut ctxs, lisp_init) = LEnv::root();
+#[tokio::test]
+async fn test_pretty_print_lvalue() -> Result<(), LError> {
+    let (mut env, mut ctxs, _) = LEnv::root();
 
     for element in list_of_example() {
-        let lvalue = parse(element, &mut env, &mut ctxs)?;
+        let lvalue = parse(element, &mut env, &mut ctxs).await?;
         println!("string: {}", element);
         println!("lvalue: {}", lvalue);
         println!("pretty: {}", lvalue.pretty_print("pretty: ".len()))

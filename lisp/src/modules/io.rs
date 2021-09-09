@@ -168,7 +168,7 @@ impl GetModule for CtxIo {
             ctx: Arc::new(self),
             prelude: vec![],
             raw_lisp: Default::default(),
-            label: MOD_IO,
+            label: MOD_IO.into(),
         };
 
         module.add_fn_prelude(PRINT, print);

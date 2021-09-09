@@ -15,6 +15,7 @@ pub struct CtxRaeMonitor {
 
 pub const RAE_TRIGGER_EVENT: &str = "rae-trigger-event";
 pub const RAE_TRIGGER_TASK: &str = "rae-trigger-task";
+pub const MOD_RAE_CTX_MONITOR: &str = "rae-context-monitor";
 
 pub const DOC_RAE_TRIGGER_EVENT: &str = "Sends to RAE an event to handle";
 pub const DOC_RAE_TRIGGER_EVENT_VERBOSE: &str = "";
@@ -27,7 +28,7 @@ impl GetModule for CtxRaeMonitor {
             ctx: Arc::new(self),
             prelude: vec![],
             raw_lisp: Default::default(),
-            label: "",
+            label: MOD_RAE_CTX_MONITOR.to_string(),
         };
 
         module.add_fn_prelude(RAE_TRIGGER_EVENT, trigger_event);

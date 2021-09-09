@@ -49,7 +49,7 @@ impl GetModule for CtxMath {
             ctx: Arc::new(self),
             prelude: vec![],
             raw_lisp: Default::default(),
-            label: MOD_MATH,
+            label: MOD_MATH.into(),
         };
 
         module.add_fn_prelude(COS, cos);

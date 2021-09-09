@@ -327,7 +327,7 @@ impl GetModule for CtxType {
             ctx: Arc::new(self),
             prelude: vec![],
             raw_lisp: Default::default(),
-            label: MOD_TYPE,
+            label: MOD_TYPE.into(),
         };
 
         module.add_fn_prelude(IS_STATE_FUNCTION, is_state_function);

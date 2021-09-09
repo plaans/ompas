@@ -168,7 +168,7 @@ impl GetModule for CtxCounter {
             ctx: Arc::new(self),
             prelude: vec![],
             raw_lisp: Default::default(),
-            label: MOD_COUNTER,
+            label: MOD_COUNTER.into(),
         };
 
         module.add_fn_prelude(GET_COUNTER, get_counter);

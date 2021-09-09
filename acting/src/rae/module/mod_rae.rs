@@ -100,7 +100,7 @@ impl GetModule for CtxRae {
             ctx: Arc::new(self),
             prelude: vec![],
             raw_lisp: domain,
-            label: MOD_RAE,
+            label: MOD_RAE.to_string(),
         };
 
         module.add_mut_fn_prelude(RAE_LAUNCH, rae_launch);

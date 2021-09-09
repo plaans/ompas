@@ -145,7 +145,7 @@ impl GetModule for CtxDoc {
             ctx: Arc::new(self),
             prelude: vec![],
             raw_lisp: Default::default(),
-            label: MOD_HELP,
+            label: MOD_HELP.into(),
         };
 
         module.add_fn_prelude(HELP, help);

@@ -684,33 +684,24 @@ pub type AsyncNativeFn<T> = for<'a> fn(&'a [LValue], &'a LEnv, &'a T) -> DynFut<
 pub type AsyncDowncastCall =
     for<'a> fn(&'a [LValue], &'a LEnv, &'a dyn Any, &'a Arc<dyn Any + Send + Sync>) -> DynFut<'a>;
 
-/*pub struct LAsyncFn {
+pub struct LAsyncFn {
     pub(crate) fun: Arc<dyn Any + 'static + Send + Sync>,
     pub(crate) debug_label: &'static str,
     downcast: Arc<AsyncDowncastCall>,
     index_mod: Option<usize>,
-}*/
+}
 
-/*impl<'a> LAsyncFn<'a> {
-    pub fn new<'lt, T: 'static>(lbd: AsyncNativeFn<'lt, T>, debug_label: &'static str) -> Self {
-        let downcast_call = |args: &'a [LValue],
-                             env: &'lt LEnv,
-                             ctx: &'lt dyn Any,
-                             fun: &'lt Arc<dyn Any + Send + Sync>|
-         -> DynFut<'lt> {
-            let ctx: &mut T = ctx.downcast::<T>().ok_or_else(|| {
-                LError::SpecialError(
-                    "LAsyncFn::new",
-                    "Impossible to downcast context".to_string(),
-                )
-            })?;
-            let fun: &AsyncNativeFn<T> =
-                fun.downcast_ref::<AsyncNativeFn<T>>().ok_or_else(|| {
-                    LError::SpecialError(
-                        "LMutFn::new",
-                        "Impossible to downcast function".to_string(),
-                    )
-                })?;
+impl LAsyncFn {
+    pub fn new<T: 'static>(lbd: AsyncNativeFn<T>, debug_label: &'static str) -> Self {
+        let downcast_call: AsyncDowncastCall = |args: &[LValue],
+                                                env: &LEnv,
+                                                ctx: &dyn Any,
+                                                fun: &Arc<dyn Any + Send + Sync>|
+         -> DynFut {
+            let ctx: &T = ctx.downcast_ref::<T>().expect("could not downcast ctx");
+            let fun: &AsyncNativeFn<T> = fun
+                .downcast_ref::<AsyncNativeFn<T>>()
+                .expect("could not downcast ctx");
 
             fun(args, env, ctx)
         };
@@ -730,24 +721,23 @@ pub type AsyncDowncastCall =
         self.index_mod
     }
 
-    pub async fn call<'lt>(
-        &'a self,
-        args: &[LValue],
-        env: &LEnv,
-        ctx: &mut dyn Any,
-    ) -> DynFut<'lt> {
+    fn call<'a>(&'a self, args: &'a [LValue], env: &'a LEnv, ctx: &'a dyn Any) -> DynFut<'a> {
         (self.downcast)(args, env, ctx, &self.fun)
     }
 
     pub fn get_label(&self) -> &'static str {
         self.debug_label
     }
-}*/
+}
 
 #[cfg(test)]
 mod test_async {
     use crate::core::LEnv;
-    use crate::structs::{AsyncNativeFn, DynFut, LError, LValue};
+    use crate::structs::LError::{WrongNumberOfArgument, WrongType};
+    use crate::structs::{
+        AsyncDowncastCall, AsyncLTrait, AsyncNativeFn, DynFut, LAsyncFn, LError, LValue,
+        NameTypeLValue,
+    };
     use ::macro_rules_attribute::macro_rules_attribute;
     use std::any::Any;
     use std::sync::Arc;
@@ -785,6 +775,33 @@ mod test_async {
         Ok(LValue::Nil)
     }
 
+    #[macro_rules_attribute(dyn_async!)]
+    async fn test_computation_square<'a>(
+        args: &'a [LValue],
+        _: &'a LEnv,
+        _: &'a (),
+    ) -> Result<LValue, LError> {
+        if args.len() != 1 {
+            return Err(WrongNumberOfArgument(
+                "test_computation_square",
+                args.into(),
+                args.len(),
+                1..1,
+            ));
+        }
+
+        if let LValue::Number(n) = &args[0] {
+            Ok((n * n).into())
+        } else {
+            Err(WrongType(
+                "test_computation_square",
+                args[0].clone(),
+                (&args[0]).into(),
+                NameTypeLValue::Number,
+            ))
+        }
+    }
+
     #[tokio::test]
     async fn test_pointer_async() {
         let p_test = test;
@@ -802,6 +819,90 @@ mod test_async {
         let ctx = &();
 
         let result = fun(args, env, ctx).await;
+    }
+
+    #[tokio::test]
+    async fn test_arc_downcast_pointer_async_with_macro_def() {
+        let fun: Arc<dyn Any + 'static + Send + Sync> = Arc::new(test_2 as AsyncNativeFn<()>);
+
+        let fun: &AsyncNativeFn<()> = fun.downcast_ref::<AsyncNativeFn<()>>().unwrap();
+
+        let env = &LEnv::empty();
+        let args = &[LValue::Nil];
+        let ctx = &();
+
+        let result = fun(args, env, ctx).await;
+    }
+
+    #[tokio::test]
+    async fn test_downcast_call() {
+        let fun: Arc<dyn Any + 'static + Send + Sync> = Arc::new(test_2 as AsyncNativeFn<()>);
+
+        let downcast_call: AsyncDowncastCall = |args: &[LValue],
+                                                env: &LEnv,
+                                                ctx: &dyn Any,
+                                                fun: &Arc<dyn Any + Send + Sync>|
+         -> DynFut {
+            let ctx: &() = ctx.downcast_ref::<()>().expect("could not downcast ctx");
+            let fun: &AsyncNativeFn<()> = fun
+                .downcast_ref::<AsyncNativeFn<()>>()
+                .expect("could not downcast ctx");
+
+            fun(args, env, ctx)
+        };
+
+        let env = &LEnv::empty();
+        let args = &[LValue::Nil];
+        let ctx = &();
+
+        let result = downcast_call(args, env, ctx, &fun).await;
+        if let Ok(result) = result {
+            assert_eq!(result, LValue::Nil);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_downcast_call_with_computation() {
+        let fun: Arc<dyn Any + 'static + Send + Sync> =
+            Arc::new(test_computation_square as AsyncNativeFn<()>);
+
+        let downcast_call: AsyncDowncastCall = |args: &[LValue],
+                                                env: &LEnv,
+                                                ctx: &dyn Any,
+                                                fun: &Arc<dyn Any + Send + Sync>|
+         -> DynFut {
+            let ctx: &() = ctx.downcast_ref::<()>().expect("could not downcast ctx");
+            let fun: &AsyncNativeFn<()> = fun
+                .downcast_ref::<AsyncNativeFn<()>>()
+                .expect("could not downcast ctx");
+
+            fun(args, env, ctx)
+        };
+
+        let env = &LEnv::empty();
+        let args: &[LValue] = &[5.into()];
+        let ctx = &();
+
+        let result = downcast_call(args, env, ctx, &fun).await;
+        if let Ok(result) = result {
+            println!("result: {}", result);
+            assert_eq!(result, LValue::from(25));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_L_async_fn() {
+        let fun = LAsyncFn::new(test_computation_square, "test_computation_square");
+
+        let env = &LEnv::empty();
+        let args: &[LValue] = &[5.into()];
+        let ctx: &AsyncLTrait = &();
+
+        let result = fun.call(args, env, ctx).await;
+        if let Ok(result) = result {
+            println!("result: {}", result);
+            assert_eq!(result, LValue::from(25));
+        }
     }
 }
 
@@ -1543,6 +1644,18 @@ impl Div for LValue {
 
     fn div(self, rhs: Self) -> Self::Output {
         &self / &rhs
+    }
+}
+
+impl From<&LNumber> for LValue {
+    fn from(n: &LNumber) -> Self {
+        LValue::Number(n.clone())
+    }
+}
+
+impl From<LNumber> for LValue {
+    fn from(n: LNumber) -> Self {
+        (&n).into()
     }
 }
 

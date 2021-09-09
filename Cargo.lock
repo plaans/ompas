@@ -508,6 +508,7 @@ dependencies = [
  "log",
  "tokio",
  "tokio-stream",
+ "utils",
 ]
 
 [[package]]
@@ -540,6 +541,12 @@ dependencies = [
  "smallvec",
  "winapi",
 ]
+
+[[package]]
+name = "paste"
+version = "1.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "acbf547ad0c65e31259204bd90935776d1c693cec2f4ff7abb7a1bbbd40dfe58"
 
 [[package]]
 name = "pin-project-lite"
@@ -906,6 +913,15 @@ name = "utf8parse"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "936e4b492acfd135421d8dca4b1aa80a7bfc26e702ef3af710e0752684df5372"
+
+[[package]]
+name = "utils"
+version = "0.1.0"
+dependencies = [
+ "itertools",
+ "log",
+ "paste",
+]
 
 [[package]]
 name = "vec_map"

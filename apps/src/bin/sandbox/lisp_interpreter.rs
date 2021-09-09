@@ -158,8 +158,8 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
 
         //stdout.write_all(format!("receiving command: {}\n", str_lvalue).as_bytes());
 
-        match parse(str_lvalue.as_str(), env, &mut ctxs) {
-            Ok(lv) => match eval(&lv, env, &mut ctxs) {
+        match parse(str_lvalue.as_str(), env, &mut ctxs).await {
+            Ok(lv) => match eval(&lv, env, &mut ctxs).await {
                 Ok(lv) => {
                     sender
                         .send(format!("{}", lv))

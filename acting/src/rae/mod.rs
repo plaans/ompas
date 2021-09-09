@@ -124,7 +124,7 @@ pub async fn rae_run(mut context: RAEEnv, options: &RAEOptions, _log: String) {
             vec![RAE_LAUNCH_PLATFORM.to_string(), string].into()
         }
     };
-    let result = eval(&lvalue, &mut context.env, &mut context.ctxs);
+    let result = eval(&lvalue, &mut context.env, &mut context.ctxs).await;
     //Windows::
     //let result = eval(&vec![LValue::Symbol("rae-open-com-platform".to_string())].into(), &mut context.env, &mut context.ctxs);
     match result {
@@ -166,7 +166,7 @@ pub async fn rae_run(mut context: RAEEnv, options: &RAEOptions, _log: String) {
 async fn progress_2(job_lvalue: LValue, mut env: LEnv, mut ctxs: ContextCollection) {
     info!("new triggered task: {}", job_lvalue);
     //info!("LValue to be evaluated: {}", job_lvalue);
-    match eval(&job_lvalue, &mut env, &mut ctxs) {
+    match eval(&job_lvalue, &mut env, &mut ctxs).await {
         Ok(lv) => info!("result of task {}: {}", job_lvalue, lv),
         Err(e) => error!("End of progress_2: {}", e),
     }

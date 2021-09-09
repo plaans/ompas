@@ -20,7 +20,7 @@ pub mod mod_rae_monitor;
 
 /// Initialize the libraries to load inside Scheme env.
 /// Takes as argument the execution platform.
-pub fn init_ctx_rae(
+pub async fn init_ctx_rae(
     mut platform: Box<dyn RAEInterface>,
     working_directory: Option<PathBuf>,
 ) -> (CtxRae, CtxRaeMonitor) {
@@ -36,12 +36,14 @@ pub fn init_ctx_rae(
         env: Default::default(),
     };
 
-    let domain = platform.domain();
+    let domain = platform.domain().await;
 
     let mut rae_env = RAEEnv::new(Some(receiver_job), Some(receiver_sync));
     rae_env.actions_progress.sync.sender = Some(sender_sync);
 
-    platform.init(rae_env.state.clone(), rae_env.actions_progress.clone());
+    platform
+        .init(rae_env.state.clone(), rae_env.actions_progress.clone())
+        .await;
 
     //Clone all structs that need to be shared to monitor action status, state and agenda.
     let ctx_rae_exec = CtxRaeExec {
@@ -87,7 +89,7 @@ pub fn init_ctx_rae(
 
     for element in rae_env.init_lisp.inner() {
         //println!("Adding {} to rae_env", element);
-        let lvalue = match parse(element, &mut rae_env.env, &mut rae_env.ctxs) {
+        let lvalue = match parse(element, &mut rae_env.env, &mut rae_env.ctxs).await {
             Ok(lv) => lv,
             Err(e) => {
                 panic!("error: {}", e)
@@ -95,7 +97,7 @@ pub fn init_ctx_rae(
         };
 
         if lvalue != LValue::Nil {
-            match eval(&lvalue, &mut rae_env.env, &mut rae_env.ctxs) {
+            match eval(&lvalue, &mut rae_env.env, &mut rae_env.ctxs).await {
                 Ok(_lv) => {}
                 Err(e) => {
                     panic!("error: {}", e)

@@ -39,6 +39,7 @@ pub mod scheme_primitives {
     pub const BEGIN: &str = "begin";
     pub const ASYNC: &str = "async";
     pub const AWAIT: &str = "await";
+    pub const RACE: &str = "race";
     pub const EVAL: &str = "eval";
     pub const LET: &str = "let";
     pub const LET_STAR: &str = "let*";

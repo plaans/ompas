@@ -1,14 +1,18 @@
 use crate::core::{eval, ContextCollection, LEnv};
 use crate::language::scheme_primitives::*;
 use crate::structs::LError::{ConversionError, SpecialError, WrongNumberOfArgument};
+use futures::future::Shared;
+use futures::FutureExt;
 use im::HashMap;
 use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::cmp::Ordering;
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{Debug, Display, Formatter};
+use std::future::Future;
 use std::hash::{Hash, Hasher};
 use std::ops::{Add, Deref, Div, Mul, Range, Sub};
+use std::pin::Pin;
 use std::sync::Arc;
 
 /// Error struct for Scheme
@@ -1018,7 +1022,7 @@ mod test_async {
     async fn test_async_mut_fn() {
         let fun = LAsyncMutFn::new(
             test_computation_square_with_mut_ctx,
-            "test_computation_square",
+            "test_computation_square".to_string(),
         );
 
         let env = &LEnv::empty();
@@ -1079,6 +1083,7 @@ impl Display for LCoreOperator {
             LCoreOperator::Async => write!(f, "{}", ASYNC),
             LCoreOperator::Await => write!(f, "{}", AWAIT),
             LCoreOperator::Eval => write!(f, "{}", EVAL),
+            //LCoreOperator::Race => write!(f, "{}", RACE),
         }
     }
 }
@@ -1100,6 +1105,7 @@ impl TryFrom<&str> for LCoreOperator {
             ASYNC => Ok(LCoreOperator::Async),
             AWAIT => Ok(LCoreOperator::Await),
             EVAL => Ok(LCoreOperator::Eval),
+            //RACE => Ok(LCoreOperator::Race),
             _ => Err(SpecialError(
                 "LCoreOperator::TryFrom<str>",
                 "string does not correspond to core operator".to_string(),
@@ -1121,6 +1127,70 @@ impl From<im::HashMap<LValue, LValue>> for LValue {
 type Sym = String;
 /// Object used in Scheme for every kind.
 /// todo: complete documentation
+///
+
+//pub type LFuture = for<'a> Shared<DynFut<'a>>;
+
+pub type FutureResult = Pin<Box<dyn Send + Future<Output = Result<LValue, LError>>>>;
+
+pub type LFuture = Shared<FutureResult>;
+
+/*impl From<Shared<Pin<Box<dyn futures::Future>>>> for LValue {
+    fn from(lf: Shared<Pin<Box<dyn futures::Future>>>) -> Self {
+        LValue::Future(lf)
+    }
+}
+
+impl From<Pin<Box<dyn futures::Future>>> for LValue {
+    fn from(lf: Pin<Box<dyn futures::Future>>) -> Self {
+        LValue::Future(lf.shared())
+    }
+}*/
+
+impl From<LFuture> for LValue {
+    fn from(lf: LFuture) -> Self {
+        LValue::Future(lf)
+    }
+}
+
+impl From<FutureResult> for LValue {
+    fn from(fr: FutureResult) -> Self {
+        LValue::Future(fr.shared())
+    }
+}
+
+#[cfg(test)]
+mod test_lfuture {
+    use crate::core::{eval, LEnv};
+    use crate::structs::{FutureResult, LError, LValue};
+
+    #[tokio::test]
+    async fn create_lvalue_future() -> Result<(), LError> {
+        let (mut env, mut ctxs, mut _init) = LEnv::root();
+        let args = LValue::Nil;
+
+        let future: LValue = (Box::pin(async move { eval(&args, &mut env, &mut ctxs).await })
+            as FutureResult)
+            .into();
+
+        //let future: LValue = future.into();
+
+        let result: LValue = if let LValue::Future(ft) = future {
+            ft.await?
+        } else {
+            LValue::Nil
+        };
+
+        println!("LValue: {}", result);
+
+        Ok(())
+    }
+}
+
+/*pub struct LFuture {
+    inner: Pin<Box>,
+}*/
+
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(untagged, rename_all = "lowercase")]
 pub enum LValue {
@@ -1142,6 +1212,8 @@ pub enum LValue {
     Lambda(LLambda),
     #[serde(skip)]
     CoreOperator(LCoreOperator),
+    #[serde(skip)]
+    Future(LFuture),
 
     // data structure
     #[serde(skip)]
@@ -1186,7 +1258,7 @@ impl LValue {
             vec_pretty_printed.push(element.pretty_print(indent + TAB_SIZE));
         }
 
-        if global_size < MAX_LENGTH {
+        if global_size < MAX_LENGTH + indent {
             for (i, element) in vec_pretty_printed.iter().enumerate() {
                 if i > 0 {
                     string.push(' ');
@@ -1218,7 +1290,7 @@ impl LValue {
         match self {
             LValue::Lambda(l) => {
                 format!(
-                    "(lambda {}\n{}{}",
+                    "(lambda {}\n{}{})",
                     l.params,
                     " ".repeat(indent + TAB_SIZE),
                     l.body.pretty_print(indent + TAB_SIZE)
@@ -1353,6 +1425,7 @@ impl Display for LValue {
             LValue::Character(c) => write!(f, "{}", c),
             LValue::AsyncFn(fun) => write!(f, "{}", fun.debug_label),
             LValue::AsyncMutFn(fun) => write!(f, "{}", fun.debug_label),
+            LValue::Future(_) => write!(f, "future"),
         }
     }
 }
@@ -1942,6 +2015,7 @@ impl From<&LValue> for LValueS {
             LValue::Character(c) => LValueS::Symbol(c.to_string()),
             LValue::AsyncFn(fun) => LValueS::Symbol(fun.debug_label.to_string()),
             LValue::AsyncMutFn(fun) => LValueS::Symbol(fun.debug_label.to_string()),
+            LValue::Future(_) => LValueS::Bool(false),
         }
     }
 }
@@ -2058,6 +2132,7 @@ pub enum NameTypeLValue {
     List,
     Quote,
     Other(String),
+    Future,
 }
 
 impl Display for NameTypeLValue {
@@ -2086,6 +2161,7 @@ impl Display for NameTypeLValue {
             NameTypeLValue::Character => "character",
             NameTypeLValue::AsyncFn => "AsyncFn",
             NameTypeLValue::AsyncMutFn => "AsyncMutFn",
+            NameTypeLValue::Future => "Future",
         };
         write!(f, "{}", str)
     }
@@ -2137,6 +2213,7 @@ impl From<&LValue> for NameTypeLValue {
             LValue::Character(_) => NameTypeLValue::Character,
             LValue::AsyncFn(_) => NameTypeLValue::AsyncFn,
             LValue::AsyncMutFn(_) => NameTypeLValue::AsyncMutFn,
+            LValue::Future(_) => NameTypeLValue::Future,
         }
     }
 }

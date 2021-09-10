@@ -1,6 +1,4 @@
 #![allow(deprecated)]
-use crate::async_await;
-use crate::async_await::AwaitResponse;
 use crate::functions::*;
 use crate::language::scheme_primitives::*;
 use crate::language::*;
@@ -1026,8 +1024,17 @@ pub async fn eval(
                     | LCoreOperator::DefMacro => return Ok(LValue::Nil),
                     LCoreOperator::Async => {
                         //println!("async evaluation");
+                        let lvalue = args[0].clone();
+                        let mut new_env = env.clone();
+                        let mut ctxs = ctxs.clone();
+                        let future: LValue =
+                            (Box::pin(async move { eval(&lvalue, &mut new_env, &mut ctxs).await })
+                                as FutureResult)
+                                .into();
 
-                        let (task_id, sender_result) =
+                        return Ok(future);
+
+                        /*let (task_id, sender_result) =
                             async_await::current().declare_new_task().await;
 
                         let lvalue = args[0].clone();
@@ -1048,11 +1055,24 @@ pub async fn eval(
                         if get_debug() {
                             println!("task_id: {}", task_id);
                         }
-                        return Ok(task_id.into());
+                        //return Ok(task_id.into());*/
                     }
                     LCoreOperator::Await => {
                         //println!("awaiting on async evaluation");
-                        let pid = eval(&args[0], env, ctxs).await?;
+                        let future = eval(&args[0], env, ctxs).await?;
+
+                        return if let LValue::Future(future) = future {
+                            future.await
+                        } else {
+                            Err(WrongType(
+                                EVAL,
+                                future.clone(),
+                                (&future).into(),
+                                NameTypeLValue::Future,
+                            ))
+                        };
+
+                        /*let pid = eval(&args[0], env, ctxs).await?;
 
                         if let LValue::Number(LNumber::Usize(id)) = pid {
                             let result = match async_await::current().get_response_await(&id).await
@@ -1070,7 +1090,7 @@ pub async fn eval(
                                 println!("await>> result received : {}", result);
                             }
                             return Ok(result);
-                        }
+                        }*/
                     }
                     LCoreOperator::Eval => {
                         let arg = &args[0];

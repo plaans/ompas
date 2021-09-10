@@ -1,14 +1,15 @@
 //!
-
 use crate::core::LEnv;
+use crate::lisp_interpreter::ChannelToLispInterpreter;
 use crate::modules::doc::{Documentation, LHelp};
 use crate::structs::LError::{WrongNumberOfArgument, WrongType};
 use crate::structs::{GetModule, LError, LValue, Module, NameTypeLValue};
+use ::macro_rules_attribute::macro_rules_attribute;
+use ompas_utils::dyn_async;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::sync::mpsc::Sender;
 
 /*
 LANGUAGE
@@ -41,9 +42,10 @@ impl From<PathBuf> for LogOutput {
 }
 
 /// Handles the channel to communicate with the Lisp Interpreter
+/// Note: Be careful when there is response on the receiver
 #[derive(Debug)]
 pub struct CtxIo {
-    sender_li: Option<Sender<String>>,
+    sender_li: Option<ChannelToLispInterpreter>,
     log: LogOutput,
 }
 
@@ -59,12 +61,59 @@ impl Default for CtxIo {
 impl CtxIo {
     ///Set the sender to lisp interpreter
     /// Used to send commands to execute
-    pub fn add_sender_li(&mut self, sender: Sender<String>) {
-        self.sender_li = Some(sender);
+    pub fn add_communication(&mut self, com: ChannelToLispInterpreter) {
+        self.sender_li = Some(com);
     }
     ///Set the log output
     pub fn set_log_output(&mut self, output: LogOutput) {
         self.log = output
+    }
+}
+
+/*pub fn load(args: &[LValue], _: &LEnv, _: & CtxIo ) -> Result<LValue, LError> {
+    println!("moudle Io: load");
+    Ok(LValue::None)
+}*/
+
+impl GetModule for CtxIo {
+    fn get_module(self) -> Module {
+        let mut module = Module {
+            ctx: Arc::new(self),
+            prelude: vec![],
+            raw_lisp: Default::default(),
+            label: MOD_IO.into(),
+        };
+
+        module.add_fn_prelude(PRINT, print);
+        module.add_async_fn_prelude(READ, read);
+        module.add_fn_prelude(WRITE, write);
+
+        module
+    }
+}
+
+/*
+DOCUMENTATION
+ */
+
+const DOC_PRINT: &str = "Print in stdout a LValue.";
+const DOC_PRINT_VERBOSE: &str = "Takes a list of arguments and print them in stdout.";
+const DOC_READ: &str = "Read a file an evaluate it";
+const DOC_READ_VERBOSE: &str = "Takes the name of the file as argument.\n\
+                                Note: The file path is relative to the path of the executable.\n\
+                                Return an error if the file is not found or there is a problem while parsing and evaluation.";
+const DOC_WRITE: &str = "Write a LValue to a file";
+const DOC_WRITE_VERBOSE: &str = "Takes two arguments: the name of the file and the LValue\n\
+                                 Note: The path of the file is relative to the path of the executable";
+
+impl Documentation for CtxIo {
+    fn documentation() -> Vec<LHelp> {
+        vec![
+            LHelp::new_verbose(MOD_IO, DOC_MOD_IO, DOC_MOD_IO_VERBOSE),
+            LHelp::new_verbose(PRINT, DOC_PRINT, DOC_PRINT_VERBOSE),
+            LHelp::new_verbose(READ, DOC_READ, DOC_READ_VERBOSE),
+            LHelp::new_verbose(WRITE, DOC_WRITE, DOC_WRITE_VERBOSE),
+        ]
     }
 }
 
@@ -94,7 +143,8 @@ pub fn print(args: &[LValue], _: &LEnv, ctx: &CtxIo) -> Result<LValue, LError> {
 
 /// Read the content of a file and sends the content to the lisp interpreter.
 /// The name of the file is given via args.
-pub fn read(args: &[LValue], _: &LEnv, ctx: &CtxIo) -> Result<LValue, LError> {
+#[macro_rules_attribute(dyn_async!)]
+pub async fn read<'a>(args: &'a [LValue], _: &'a LEnv, ctx: &'a CtxIo) -> Result<LValue, LError> {
     //let mut stdout = io::stdout();
     //stdout.write_all(b"module Io: read\n");
     if args.len() != 1 {
@@ -117,14 +167,13 @@ pub fn read(args: &[LValue], _: &LEnv, ctx: &CtxIo) -> Result<LValue, LError> {
     file.read_to_string(&mut contents)?;
 
     //stdout.write_all(format!("contents: {}\n", contents).as_bytes());
-    let sender = ctx.sender_li.clone();
-    tokio::spawn(async move {
-        sender
-            .expect("missing a channel")
-            .send(contents)
-            .await
-            .expect("couldn't send string via channel");
-    });
+
+    ctx.sender_li
+        .as_ref()
+        .expect("missing a channel")
+        .send(contents)
+        .await
+        .expect("couldn't send string via channel");
 
     Ok(LValue::Nil)
 }
@@ -155,53 +204,6 @@ pub fn write(args: &[LValue], _: &LEnv, _: &CtxIo) -> Result<LValue, LError> {
     }
 
     //println!("module Io: write");
-}
-
-/*pub fn load(args: &[LValue], _: &LEnv, _: & CtxIo ) -> Result<LValue, LError> {
-    println!("moudle Io: load");
-    Ok(LValue::None)
-}*/
-
-impl GetModule for CtxIo {
-    fn get_module(self) -> Module {
-        let mut module = Module {
-            ctx: Arc::new(self),
-            prelude: vec![],
-            raw_lisp: Default::default(),
-            label: MOD_IO.into(),
-        };
-
-        module.add_fn_prelude(PRINT, print);
-        module.add_fn_prelude(READ, read);
-        module.add_fn_prelude(WRITE, write);
-
-        module
-    }
-}
-
-/*
-DOCUMENTATION
- */
-
-const DOC_PRINT: &str = "Print in stdout a LValue.";
-const DOC_PRINT_VERBOSE: &str = "Takes a list of arguments and print them in stdout.";
-const DOC_READ: &str = "Read a file an evaluate it";
-const DOC_READ_VERBOSE: &str = "Takes the name of the file as argument.\n\
-                                Note: The file path is relative to the path of the executable.\n\
-                                Return an error if the file is not found or there is a problem while parsing and evaluation.";
-const DOC_WRITE: &str = "Write a LValue to a file";
-const DOC_WRITE_VERBOSE: &str = "Takes two arguments: the name of the file and the LValue\n\
-                                 Note: The path of the file is relative to the path of the executable";
-
-impl Documentation for CtxIo {
-    fn documentation() -> Vec<LHelp> {
-        vec![
-            LHelp::new_verbose(MOD_IO, DOC_MOD_IO, DOC_MOD_IO_VERBOSE),
-            LHelp::new_verbose(PRINT, DOC_PRINT, DOC_PRINT_VERBOSE),
-            LHelp::new_verbose(READ, DOC_READ, DOC_READ_VERBOSE),
-            LHelp::new_verbose(WRITE, DOC_WRITE, DOC_WRITE_VERBOSE),
-        ]
-    }
 }
 
 //TODO: finish writing tests for io

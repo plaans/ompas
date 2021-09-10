@@ -77,6 +77,7 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
 
     let (mut root_env, mut ctxs, mut lisp_init) = LEnv::root();
     let mut ctx_doc = CtxDoc::default();
+    #[allow(unused_mut)]
     let mut ctx_io = CtxIo::default();
     let ctx_math = CtxMath::default();
     //let ctx_robot = CtxRobot::default();
@@ -97,10 +98,10 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     //ctx_doc.insert_doc(CtxRaeMonitor::documentation());
 
     //Add the sender of the channel.
-    ctx_io.add_sender_li(sender_li.clone());
+    /*ctx_io.add_sender_li(sender_li.clone());
     if let Some(pb) = log {
         ctx_io.set_log_output(pb.into());
-    }
+    }*/
 
     let mut _ctx_rae_exec = CtxRaeExec {
         actions_progress: Default::default(),

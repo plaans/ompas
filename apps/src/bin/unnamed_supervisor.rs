@@ -97,7 +97,7 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     ctx_doc.insert_doc(CtxUtils::documentation());
 
     //Add the sender of the channel.
-    ctx_io.add_sender_li(sender_li.clone());
+    //ctx_io.add_sender_li(sender_li.clone());
     if let Some(pb) = log {
         ctx_io.set_log_output(pb.into());
     }
@@ -179,7 +179,6 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
                     .expect("error on channel to stdout");
             }
         };
-        //stdout.write_all(b"parsing done\n");
     }
 
     log_handle.await.expect("Failed to kill log task");

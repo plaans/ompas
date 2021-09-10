@@ -3,7 +3,7 @@ name = "ompas_apps"
 version = "0.1.0"
 authors = ["Yirmandias <turi@insa-toulouse.fr>"]
 edition = "2018"
-default-run = "lisp"
+default-run = "ompas"
 
 [features]
 lisp_test = []
@@ -41,6 +41,10 @@ path = "src/bin/robot_sim.rs"
 [[bin]]
 name = "lisp"
 path = "src/bin/unnamed_supervisor.rs"
+
+[[bin]]
+name = "ompas"
+path = "src/bin/ompas.rs"
 
 [[bin]]
 name = "godot_test"

@@ -11,6 +11,7 @@ const IS_ERR: &str = "err?";
 
 const MOD_ERROR: &str = "error";
 
+#[derive(Default)]
 pub struct CtxError {}
 
 impl GetModule for CtxError {

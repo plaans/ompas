@@ -159,7 +159,7 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
             Ok(lv) => match eval(&lv, env, &mut ctxs).await {
                 Ok(lv) => {
                     sender
-                        .send(format!("{}", lv))
+                        .send(lv.pretty_print(0))
                         .await
                         .expect("error on channel to stdout");
                 }

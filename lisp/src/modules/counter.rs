@@ -11,7 +11,7 @@ use std::sync::Arc;
 LANGUAGE
 */
 
-const MOD_COUNTER: &str = "mod-counter";
+const MOD_COUNTER: &str = "counter";
 const DOC_MOD_COUNTER: &str = "documentation of the module counter";
 
 pub const TYPE_COUNTER: &str = "counter";

@@ -25,7 +25,7 @@ use std::sync::Arc;
 
 //LANGUAGE
 
-const MOD_UTILS: &str = "mod-utils";
+const MOD_UTILS: &str = "utils";
 const RAND_ELEMENT: &str = "rand-element";
 const ENUMERATE: &str = "enumerate";
 const CONTAINS: &str = "contains";

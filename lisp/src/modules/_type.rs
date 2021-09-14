@@ -14,7 +14,7 @@ use std::sync::Arc;
 //pub const STATE: &str = "state";
 //pub const IS_PAIR: &str = "pair?";
 
-const MOD_TYPE: &str = "mod_type";
+const MOD_TYPE: &str = "type";
 const DOC_MOD_TYPE: &str = "documentation of the module type";
 
 //Verification

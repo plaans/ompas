@@ -17,7 +17,7 @@ LANGUAGE
 
 //TODO: [mod] add the possibility to redirect log output to a file or any type of input
 
-const MOD_IO: &str = "mod-io";
+const MOD_IO: &str = "io";
 const DOC_MOD_IO: &str = "Module than handles input/output functions.";
 const DOC_MOD_IO_VERBOSE: &str = "functions:\n\
                                     -print\n\

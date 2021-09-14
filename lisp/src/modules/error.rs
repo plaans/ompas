@@ -8,6 +8,7 @@ use std::sync::Arc;
 const OK: &str = "ok";
 const ERR: &str = "err";
 const IS_ERR: &str = "err?";
+const IS_OK: &str = "ok?";
 
 const MOD_ERROR: &str = "error";
 
@@ -26,6 +27,7 @@ impl GetModule for CtxError {
         module.add_fn_prelude(OK, ok);
         module.add_fn_prelude(ERR, err);
         module.add_fn_prelude(IS_ERR, is_err);
+        module.add_fn_prelude(IS_OK, is_ok);
 
         module
     }
@@ -55,6 +57,41 @@ pub fn is_err(args: &[LValue], _: &LEnv, _: &CtxError) -> Result<LValue, LError>
             match s.as_str() {
                 OK => Ok(false.into()),
                 ERR => Ok(true.into()),
+                _ => Err(WrongType(
+                    IS_ERR,
+                    list[0].clone(),
+                    (&list[0]).into(),
+                    NameTypeLValue::Other("{ok,err}".to_string()),
+                )),
+            }
+        } else {
+            Err(WrongType(
+                IS_ERR,
+                list[0].clone(),
+                (&list[0]).into(),
+                NameTypeLValue::Other("{ok,err}".to_string()),
+            ))
+        }
+    } else {
+        Err(WrongType(
+            IS_ERR,
+            args[0].clone(),
+            (&args[0]).into(),
+            NameTypeLValue::List,
+        ))
+    }
+}
+
+pub fn is_ok(args: &[LValue], _: &LEnv, _: &CtxError) -> Result<LValue, LError> {
+    if args.len() != 1 {
+        return Err(WrongNumberOfArgument(IS_ERR, args.into(), args.len(), 1..1));
+    }
+
+    if let LValue::List(list) = &args[0] {
+        if let LValue::Symbol(s) = &list[0] {
+            match s.as_str() {
+                OK => Ok(true.into()),
+                ERR => Ok(false.into()),
                 _ => Err(WrongType(
                     IS_ERR,
                     list[0].clone(),

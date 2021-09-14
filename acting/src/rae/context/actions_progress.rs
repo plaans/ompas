@@ -92,12 +92,13 @@ pub struct ActionStatusSync {
 impl ActionStatusSync {
     pub async fn trigger_event_update(&self, id: &usize) {
         //TODO: resolve bug that we have sometimes.
-        let sender = self.map.read().await.get(id).unwrap().clone();
-        if let Err(e) = sender.send(true).await {
-            warn!(
+        if let Some(sender) = self.map.read().await.get(id) {
+            if let Err(e) = sender.send(true).await {
+                warn!(
                 "trigger_event_update failed to send signal to receiver for update on action status: {}",
                 e
             )
+            }
         }
     }
 

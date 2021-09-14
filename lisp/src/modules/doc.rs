@@ -14,7 +14,7 @@ use std::sync::Arc;
 LANGUAGE
  */
 
-const MOD_HELP: &str = "mod-help";
+const MOD_HELP: &str = "help";
 const DOC_MOD_HELP: &str =
     "Documentation of the module help. Add Documentation for core functions aswell.";
 const DOC_MOD_HELP_VERBOSE: &str = "functions:\n\

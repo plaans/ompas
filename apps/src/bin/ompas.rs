@@ -91,13 +91,13 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
         agenda: Default::default(),
     };
 
-    li.import(CtxError::default());
-    li.import(ctx_utils);
-    li.import(ctx_doc);
-    li.import(ctx_io);
-    li.import(ctx_math);
-    li.import(ctx_type);
-    li.import(ctx_counter);
+    li.import_namespace(CtxError::default());
+    li.import_namespace(ctx_utils);
+    li.import_namespace(ctx_doc);
+    li.import_namespace(ctx_io);
+    li.import_namespace(ctx_math);
+    li.import_namespace(ctx_type);
+    li.import_namespace(ctx_counter);
     li.import_namespace(ctx_rae);
     li.import_namespace(ctx_rae_monitor);
 

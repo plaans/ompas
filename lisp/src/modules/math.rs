@@ -6,7 +6,7 @@ use rand::Rng;
 use std::sync::Arc;
 
 //LANGUAGE
-const MOD_MATH: &str = "mod-math";
+const MOD_MATH: &str = "math";
 const DOC_MOD_MATH: &str =
     "Module handling mathematical functions for basic arithmetic operations and comparisons.";
 const DOC_MOD_MATH_VERBOSE: &str = "functions:\n\

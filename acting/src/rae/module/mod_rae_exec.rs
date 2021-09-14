@@ -115,7 +115,7 @@ impl GetModule for CtxRaeExec {
         module.add_async_fn_prelude(RAE_ASSERT_SHORT, assert_fact);
         module.add_async_fn_prelude(RAE_RETRACT, retract_fact);
         module.add_async_fn_prelude(RAE_RETRACT_SHORT, retract_fact);
-        module.add_async_fn_prelude(RAE_AWAIT, fn_await);
+        //module.add_async_fn_prelude(RAE_AWAIT, fn_await);
         module.add_async_mut_fn_prelude(RAE_OPEN_COM_PLATFORM, open_com);
         module.add_async_mut_fn_prelude(RAE_START_PLATFORM, start_platform);
         module.add_fn_prelude(RAE_GET_INSTANTIATED_METHODS, get_instantiated_methods);
@@ -298,7 +298,51 @@ async fn exec_command<'a>(
     ctx.platform_interface
         .exec_command(args, command_id)
         .await?;
-    Ok(command_id.into())
+
+    //println!("await on action (id={})", action_id);
+
+    let mut receiver = ctx.actions_progress.declare_new_watcher(&command_id).await;
+    info!("waiting on action {}", command_id);
+
+    let mut action_status = ctx
+        .actions_progress
+        .status
+        .read()
+        .await
+        .get(&command_id)
+        .unwrap()
+        .clone();
+
+    loop {
+        //println!("waiting on status:");
+        match action_status {
+            Status::Pending => {
+                //println!("not triggered");
+            }
+            Status::Running => {
+                //println!("running");
+            }
+            Status::Failure => {
+                warn!("Command {} is a failure.", command_id);
+                return Ok(false.into());
+            }
+            Status::Done => {
+                info!("Command {} is a success.", command_id);
+                return Ok(true.into());
+            }
+        }
+        action_status = if let true = receiver.recv().await.unwrap() {
+            ctx.actions_progress
+                .status
+                .read()
+                .await
+                .get(&command_id)
+                .unwrap()
+                .clone()
+        } else {
+            unreachable!("the signal for an update should always be true")
+        }
+    }
 }
 
 ///Retract a fact to state

@@ -3,7 +3,7 @@
     (def-lambda '(go_random (lambda (?r ?l ?u)
                             (let ((x (rand-int-in-range ?l ?u))
                                   (y (rand-int-in-range ?l ?u)))
-                                  (rae-await (navigate_to ?r x y))))))
+                                  (navigate_to ?r x y)))))
 
     (def-lambda
         '(find_machines_for_process
@@ -102,8 +102,8 @@
                 (:score-generator 0)
                 (:body 
                 (begin
-        (rae-await (navigate_to ?r ?x ?y))
-        (rae-await (navigate_to ?r (+ ?x 1) (+ ?y 1)))))))
+        (navigate_to ?r ?x ?y)
+        (navigate_to ?r (+ ?x 1) (+ ?y 1))))))
     (def-task t_dumber ?r)
     (def-method m_dumber
         '((:task t_dumber)
@@ -117,7 +117,7 @@
                    (if (<= (robot.battery ?r) 0.4)
                        (let*  ((areas (get-map (rae-get-state) parking_areas))
                                (area (rand-element areas)))
-                               (rae-await (navigate_to_area ?r area)))
+                               (navigate_to_area ?r area))
                        (go_random ?r 2 5))
                    (if (>= (robot.battery ?r) 0.9)
                        (go_random ?r 2 5)))
@@ -174,13 +174,13 @@
             (let ((?l (package.location ?p )))
                 (if (!= (belt.instance ?l) nil)
                     (begin
-                        (rae-await (navigate_to_area ?r (car (belt.interact_areas ?l))))
-                        (rae-await (face_belt ?r ?l))
+                        (navigate_to_area ?r (car (belt.interact_areas ?l)))
+                        (face_belt ?r ?l)
                         ;pick the right package on the belt
-                        (rae-await (pick_package ?r ?p))
-                        (rae-await (navigate_to_area ?r (car (belt.interact_areas (machine.input_belt ?m)))))
-                        (rae-await (face_belt ?r (machine.input_belt ?m)))
-                        (rae-await (place ?r)))
+                        (pick_package ?r ?p)
+                        (navigate_to_area ?r (car (belt.interact_areas (machine.input_belt ?m))))
+                        (face_belt ?r (machine.input_belt ?m))
+                        (place ?r))
                     nil))))))
 
     (def-task t_position_robot_to_belt ?r ?b)
@@ -192,8 +192,8 @@
             (:parameters-generator nil true)
             (:score-generator 0)
             (:body (begin
-                (rae-await (navigate_to_area ?r (car (belt.interact_areas ?b))))
-                (rae-await (face_belt ?r ?b 5))))))
+                (navigate_to_area ?r (car (belt.interact_areas ?b)))
+                (face_belt ?r ?b 5)))))
 
     (def-task t_carry_to_machine ?r ?p ?m)
     (def-method m_carry_to_machine
@@ -220,7 +220,7 @@
           (:score-generator 0)
           (:body (begin
             (t_position_robot_to_belt ?r (package.location ?p))
-            (rae-await (pick_package ?r ?p))))))
+            (pick_package ?r ?p)))))
 
     (def-task t_deliver_package ?r ?m)
     (def-method m_deliver_package
@@ -232,7 +232,7 @@
             (:score-generator 0)
             (:body (begin
                 (t_position_robot_to_belt ?r (machine.input_belt ?m))
-                (rae-await (place ?r))))))
+                (place ?r)))))
 
     (def-task t_charge ?r)
     (def-method m_charge
@@ -244,6 +244,6 @@
             (:score-generator 0)
             (:body
                 (begin
-                    (rae-await (go_charge ?r))
+                    (go_charge ?r)
                     (wait-on `(= (robot.battery ,?r) 1))))))
 )

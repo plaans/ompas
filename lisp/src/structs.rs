@@ -806,6 +806,8 @@ mod test_async {
         AsyncDowncastCall, AsyncLTrait, AsyncNativeFn, DynFut, LAsyncFn, LAsyncMutFn, LError,
         LValue, NameTypeLValue,
     };
+    use ::macro_rules_attribute::macro_rules_attribute;
+    use ompas_utils::dyn_async;
 
     use std::any::Any;
     use std::sync::Arc;

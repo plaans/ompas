@@ -17,9 +17,7 @@
                                     (cons (car seq) (__process__ ?p (cdr seq)))
                                     (__process__ ?p (cdr seq))))))
                     (define machines (rae-get-state-variable machines))
-                    ;(print "machines:" machines)
                     (define result (__process__ ?process machines))
-                    ;(print "result of find_machines_for_process: " result)
                     result))))
     (def-lambda '(available_robots
         (lambda nil
@@ -94,6 +92,7 @@
     (def-state-function interact_area.cells ?ia)
     (def-state-function interact_area.belt ?ia)
     (def-task t_navigate_to ?r ?x ?y)
+
     (def-method m_navigate_to '((:task t_navigate_to)
                 (:params ?r ?x ?y)
                 (:pre-conditions true)
@@ -102,8 +101,7 @@
                 (:score-generator 0)
                 (:body 
                 (begin
-        (navigate_to ?r ?x ?y)
-        (navigate_to ?r (+ ?x 1) (+ ?y 1))))))
+        (navigate_to ?r ?x ?y)))))
     (def-task t_dumber ?r)
     (def-method m_dumber
         '((:task t_dumber)
@@ -113,15 +111,10 @@
           (:parameters-generator nil true)
           (:score-generator 0)
           (:body (begin
-                (if (not (robot.in_station ?r))
-                   (if (<= (robot.battery ?r) 0.4)
-                       (let*  ((areas (get-map (rae-get-state) parking_areas))
-                               (area (rand-element areas)))
-                               (navigate_to_area ?r area))
-                       (go_random ?r 2 5))
-                   (if (>= (robot.battery ?r) 0.9)
-                       (go_random ?r 2 5)))
-                (t_dumber ?r)))))
+                     (loop
+                         (mutex::lock-and-do ?r (go_random ?r 2 5)))))))
+
+
     (def-task t_process_package ?p)
     (def-task t_process_on_machine ?p ?m)
     ;robot ?r takes the package ?p and place it a the machine ?m
@@ -246,4 +239,21 @@
                 (begin
                     (go_charge ?r)
                     (wait-on `(= (robot.battery ,?r) 1))))))
+
+    (def-task t_check_battery ?r)
+    (def-method m_check_battery
+        '((:task t_check_battery)
+         (:params ?r)
+         (:pre-conditions true)
+         (:effects nil)
+         (:parameters-generator nil true)
+         (:score-generator 0)
+         (:body
+            (loop
+                (begin
+                    (wait-on `(< (robot.battery ?r) 0.4))
+                    (mutex::lock-and-do ?r
+                        (begin
+                           (go_charge ?r)
+                           (wait-on `(> (robot.battery ,?r) 0.9)))))))))
 )

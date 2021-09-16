@@ -129,6 +129,28 @@ pub const MACRO_CDADR: &str =
 pub const MACRO_CADADDR: &str =
     "(defmacro cadaddr (lambda (x) (quasiquote (car (cdr (car (cdr (cdr (unquote x)))))))))";
 
+pub const MACRO_WHILE: &str = "(defmacro while
+    (lambda (c b)
+        `(begin
+            (define __loop__
+                (lambda nil
+                    (if ,c
+                        (begin
+                            ,b
+                            (__loop__))
+                    nil)))
+            (__loop__))))";
+
+pub const MACRO_LOOP: &str = "(defmacro loop 
+    (lambda (b)
+        `(begin 
+            (define __loop__
+                (lambda nil 
+                    (begin 
+                        ,b
+                        (__loop__))))
+            (__loop__))))";
+
 //LAMBDAS
 pub const LAMBDA_AND: &str = "(define and (lambda args \
                                                    (if (null? args) true \
@@ -209,6 +231,8 @@ impl GetModule for CtxUtils {
                 MACRO_APPLY,
                 MACRO_COND,
                 MACRO_AWAIT_ASYNC,
+                MACRO_WHILE,
+                MACRO_LOOP,
                 LAMBDA_UNZIP,
                 LAMBDA_ZIP,
                 LAMBDA_MAPF,

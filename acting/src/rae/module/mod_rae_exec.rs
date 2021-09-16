@@ -86,6 +86,7 @@ impl GetModule for CtxRaeExec {
             MACRO_GENERATE_TASK_SIMPLE,
             MACRO_GENERATE_METHOD_PARAMETERS,
             MACRO_ENUMERATE_PARAMS,
+            MACRO_MUTEX_LOCK_AND_DO,
             LAMBDA_MUTEX_LOCK,
             LAMBDA_MUTEX_IS_LOCKED,
             LAMBDA_MUTEX_RELEASE,

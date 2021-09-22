@@ -536,6 +536,7 @@ pub fn length(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     match &args[0] {
         LValue::List(l) => Ok(l.len().into()),
         LValue::Map(m) => Ok(m.len().into()),
+        LValue::Nil => Ok(0.into()),
         lv => Err(NotInListOfExpectedTypes(
             LEN,
             lv.clone(),

@@ -181,3 +181,8 @@
                                 (cons (list params ((lamdba (?r) 10) params)) (eval_params (cdr args)))
                                 (eval_params (cdr args))))) (car args))))
             (eval_params (enumerate (append args (quote (robots))))))))
+
+
+(defmacro wait-on (lambda (expr)
+    `(if (not ,expr)
+        (check (quote ,expr)))))

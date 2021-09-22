@@ -1,5 +1,7 @@
 use crate::rae::context::actions_progress::{ActionId, ActionsProgress, Status};
 use crate::rae::context::agenda::Agenda;
+use crate::rae::context::mutex;
+use crate::rae::context::mutex::MutexResponse;
 use crate::rae::context::rae_env::RAE_TASK_METHODS_MAP;
 use crate::rae::context::rae_state::*;
 use crate::rae::context::ressource_access::wait_on::add_waiter;
@@ -37,8 +39,10 @@ pub const RAE_ASSERT_SHORT: &str = "+>";
 pub const RAE_RETRACT: &str = "retract";
 pub const RAE_RETRACT_SHORT: &str = "->";
 pub const RAE_AWAIT: &str = "rae-await";
-pub const WAIT_ON: &str = "wait-on";
-
+pub const WAIT_ON: &str = "check";
+pub const LOCK: &str = "lock";
+pub const RELEASE: &str = "release";
+pub const IS_LOCKED: &str = "locked?";
 //RAE Interface with a platform
 pub const RAE_EXEC_COMMAND: &str = "rae-exec-command";
 pub const RAE_GET_STATE: &str = "rae-get-state";
@@ -87,9 +91,10 @@ impl GetModule for CtxRaeExec {
             MACRO_GENERATE_METHOD_PARAMETERS,
             MACRO_ENUMERATE_PARAMS,
             MACRO_MUTEX_LOCK_AND_DO,
-            LAMBDA_MUTEX_LOCK,
-            LAMBDA_MUTEX_IS_LOCKED,
-            LAMBDA_MUTEX_RELEASE,
+            MACRO_WAIT_ON,
+            //LAMBDA_MUTEX_LOCK,
+            //LAMBDA_MUTEX_IS_LOCKED,
+            //LAMBDA_MUTEX_RELEASE,
             LAMBDA_PROGRESS,
             LAMBDA_SELECT,
             LAMBDA_RETRY,
@@ -125,6 +130,11 @@ impl GetModule for CtxRaeExec {
         module.add_async_fn_prelude(RAE_SELECT, select);
         module.add_async_fn_prelude(RAE_SET_SUCCESS_FOR_TASK, set_success_for_task);
         module.add_async_fn_prelude(RAE_GET_NEXT_METHOD, get_next_method);
+
+        //mutex
+        module.add_async_fn_prelude(LOCK, lock);
+        module.add_async_fn_prelude(RELEASE, release);
+        module.add_async_fn_prelude(IS_LOCKED, is_locked);
         module
     }
 }
@@ -361,10 +371,9 @@ async fn retract_fact<'a>(
             2..2,
         ));
     }
-    let key = args[0].clone().into();
-    let value = args[1].clone().into();
-    let c_state = ctx.state.clone();
-    c_state.retract_fact(key, value).await
+    let key = (&args[0]).into();
+    let value = (&args[1]).into();
+    ctx.state.retract_fact(key, value).await
 }
 
 ///Add a fact to fact state
@@ -382,10 +391,9 @@ async fn assert_fact<'a>(
             2..2,
         ));
     }
-    let key = args[0].clone().into();
-    let value = args[1].clone().into();
-    let c_state = ctx.state.clone();
-    c_state.add_fact(key, value).await;
+    let key = (&args[0]).into();
+    let value = (&args[1]).into();
+    ctx.state.add_fact(key, value).await;
 
     Ok(True)
 }
@@ -671,7 +679,7 @@ async fn wait_on<'a>(
         ));
     }
     //println!("New wait on {}", args[0]);
-    let mut rx = add_waiter(args[0].clone());
+    let mut rx = add_waiter(args[0].clone()).await;
     //println!("receiver ok");
 
     if let false = rx.recv().await.expect("could not receive msg from waiters") {
@@ -783,4 +791,34 @@ async fn set_success_for_task<'a>(
             NameTypeLValue::Usize,
         ))
     }
+}
+
+/*
+MUTEXES
+ */
+
+#[macro_rules_attribute(dyn_async!)]
+async fn lock<'a>(args: &'a [LValue], _: &'a LEnv, _: &'a CtxRaeExec) -> Result<LValue, LError> {
+    match mutex::lock(args[0].clone()).await {
+        MutexResponse::Ok => Ok(Nil),
+        MutexResponse::Wait(mut rx) => {
+            rx.recv().await;
+            Ok(True)
+        }
+    }
+}
+
+#[macro_rules_attribute(dyn_async!)]
+async fn release<'a>(args: &'a [LValue], _: &'a LEnv, _: &'a CtxRaeExec) -> Result<LValue, LError> {
+    mutex::release(args[0].clone()).await;
+    Ok(True)
+}
+
+#[macro_rules_attribute(dyn_async!)]
+async fn is_locked<'a>(
+    args: &'a [LValue],
+    _: &'a LEnv,
+    _: &'a CtxRaeExec,
+) -> Result<LValue, LError> {
+    Ok(mutex::is_locked(args[0].clone()).await.into())
 }

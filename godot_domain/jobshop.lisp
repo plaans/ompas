@@ -26,7 +26,7 @@
                     (lambda args
                         (if (null? args)
                             nil
-                            (if (not (mutex.locked? (car args)))
+                            (if (not (locked? (car args)))
                                 (cons (car args) (__l_available_robots__ (cdr args)))
                                 (__l_available_robots__ (cdr args))))))
                 (__l_available_robots__ (rae-get-state-variable robots))))))
@@ -49,48 +49,6 @@
                 nil
                 (cons (caar seq) (take_first (cdr seq)))))))
 
-    (def-action pick ?r)
-    (def-action pick_package ?r ?p)
-    (def-action place ?r)
-    (def-action do_move ?r ?a ?s ?d)
-    (def-action navigate_to ?r ?x ?y)
-    (def-action navigate_to_cell ?r ?cx ?cy)
-    (def-action navigate_to_area ?r ?area)
-    (def-action go_charge ?r)
-    (def-action do_rotation ?r ?a ?w)
-    (def-action face_belt ?r ?b ?w)
-    (def-state-function robot.coordinates ?r)
-    (def-state-function robot.instance ?r)
-    (def-state-function robot.coordinates_tile ?r)
-    (def-state-function robot.battery ?r)
-    (def-state-function robot.velocity ?r)
-    (def-state-function robot.rotation_speed ?r)
-    (def-state-function robot.in_station ?r)
-    (def-state-function robot.in_interact_areas ?r)
-    (def-state-function machine.instance ?m)
-    (def-state-function machine.coordinates ?m)
-    (def-state-function machine.coordinates_tile ?m)
-    (def-state-function machine.input_belt ?m)
-    (def-state-function machine.output_belt ?m)
-    (def-state-function machine.processes_list ?m)
-    (def-state-function machine.type ?m)
-    (def-state-function machine.progress_rate ?m)
-    (def-state-function package.instance ?p)
-    (def-state-function package.location ?p)
-    (def-state-function package.processes_list ?p)
-    (def-state-function belt.instance ?b)
-    (def-state-function belt.belt_type ?b)
-    (def-state-function belt.polygons ?b)
-    (def-state-function belt.cells ?b)
-    (def-state-function belt.interact_areas ?b)
-    (def-state-function belt.packages_list ?b)
-    (def-state-function parking_area.instance ?pa)
-    (def-state-function parking_area.polygons ?pa)
-    (def-state-function parking_area.cells ?pa)
-    (def-state-function interact_area.instance ?ia)
-    (def-state-function interact_area.polygons ?ia)
-    (def-state-function interact_area.cells ?ia)
-    (def-state-function interact_area.belt ?ia)
     (def-task t_navigate_to ?r ?x ?y)
 
     (def-method m_navigate_to '((:task t_navigate_to)
@@ -134,14 +92,14 @@
                     (define list_machines
                         (mapf find_machines_for_process
                             (car (unzip (package.processes_list ?p)))))
-                    (print "list_machines:" list_machines)
+                    ;(print "list_machines:" list_machines)
                     (enumerate (list ?p) (take_first list_machines))))
 
-            (let ((?r (rand-element (available_robots))))
+            (let ((?r (rand-element (rae-get-state-variable robots))))
                 (begin
-                    (mutex.lock ?r)
-                    (t_carry_to_machine ?r ?p (find_output_machine))
-                    (mutex.release ?r)))))))
+                    (mutex::lock-and-do ?r
+                        (t_carry_to_machine ?r ?p (find_output_machine))
+                    )))))))
     (def-method m_process_on_machine
         '((:task t_process_on_machine)
         (:params ?p ?m)
@@ -149,12 +107,13 @@
         (:effects nil)
         (:parameters-generator nil true)
         (:score-generator 0)
-        (:body (let ((?r (rand-element (available_robots))))
+        (:body (let ((?r (rand-element (rae-get-state-variable robots))))
                 (begin
-                    (mutex.lock ?r)
-                    (t_carry_to_machine ?r ?p ?m)
-                    (mutex.release ?r)
+                    (mutex::lock-and-do ?r
+                        (t_carry_to_machine ?r ?p ?m))
                     (wait-on `(= (package.location ,?p) (machine.output_belt ,?m))))))))
+
+
     (def-method m_pick_and_place
         '((:task t_pick_and_place)
          (:params ?r ?p ?m)
@@ -198,8 +157,6 @@
             (:score-generator 0)
             (:body
                 (begin
-                    (if (< (robot.battery ?r) 0.4)
-                        (t_charge ?r))
                     (t_take_package ?r ?p)
                     (t_deliver_package ?r ?m)))))
 
@@ -223,9 +180,12 @@
             (:effects nil)
             (:parameters-generator nil true)
             (:score-generator 0)
-            (:body (begin
-                (t_position_robot_to_belt ?r (machine.input_belt ?m))
-                (place ?r)))))
+            (:body
+                (let ((?b (machine.input_belt ?m)))
+                    (begin
+                        (t_position_robot_to_belt ?r ?b)
+                        (wait-on `(< (length (belt.packages_list ,?b)) (length (belt.cells ,?b))))
+                        (place ?r))))))
 
     (def-task t_charge ?r)
     (def-method m_charge
@@ -242,18 +202,18 @@
 
     (def-task t_check_battery ?r)
     (def-method m_check_battery
-        '((:task t_check_battery)
-         (:params ?r)
-         (:pre-conditions true)
-         (:effects nil)
-         (:parameters-generator nil true)
-         (:score-generator 0)
-         (:body
-            (loop
-                (begin
-                    (wait-on `(< (robot.battery ?r) 0.4))
-                    (mutex::lock-and-do ?r
+         '((:task t_check_battery)
+          (:params ?r)
+          (:pre-conditions true)
+          (:effects nil)
+          (:parameters-generator nil true)
+          (:score-generator 0)
+          (:body
+             (loop
+                 (begin
+                     (wait-on `(< (robot.battery ,?r) 0.4))
+                     (mutex::lock-and-do ?r
                         (begin
-                           (go_charge ?r)
-                           (wait-on `(> (robot.battery ,?r) 0.9)))))))))
+                            (go_charge ?r)
+                            (wait-on `(> (robot.battery ,?r) 0.9)))))))))
 )

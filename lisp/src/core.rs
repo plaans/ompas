@@ -1027,10 +1027,24 @@ pub async fn eval(
                         let lvalue = args[0].clone();
                         let mut new_env = env.clone();
                         let mut ctxs = ctxs.clone();
+
+                        /*let future: LValue =
+                        tokio::spawn(
+                            async move { eval(&lvalue, &mut new_env, &mut ctxs).await },
+                        )
+                        .await
+                        .unwrap()?;*/
+
                         let future: LValue =
                             (Box::pin(async move { eval(&lvalue, &mut new_env, &mut ctxs).await })
                                 as FutureResult)
                                 .into();
+                        let future_2 = future.clone();
+                        tokio::spawn(async move {
+                            if let LValue::Future(future_2) = future_2 {
+                                future_2.await;
+                            }
+                        });
 
                         return Ok(future);
 

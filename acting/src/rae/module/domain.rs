@@ -125,13 +125,15 @@ pub const MACRO_ENUMERATE_PARAMS: &str = "(defmacro enumerate-params (lambda arg
 pub const MACRO_MUTEX_LOCK_AND_DO: &str = "(defmacro mutex::lock-and-do 
     (lambda (r b)
         `(begin
-            (mutex::lock ,r)
+            (lock ,r)
             ,b
-            (mutex::release ,r))))";
-
+            (release ,r))))";
+pub const MACRO_WAIT_ON: &str = "(defmacro wait-on (lambda (expr)
+    `(if (not (eval ,expr))
+        (check ,expr))))";
 pub const LABEL_ENUMERATE_PARAMS: &str = "enumerate-params";
 
-pub const LAMBDA_MUTEX_LOCK: &str = "(define mutex::lock (lambda (__symbol__)
+/*pub const LAMBDA_MUTEX_LOCK: &str = "(define mutex::lock (lambda (__symbol__)
                                         (begin
                                             (wait-on `(not (mutex::locked? ,__symbol__)))
                                             (assert `(locked ,__symbol__) true))))";
@@ -140,7 +142,7 @@ pub const LAMBDA_MUTEX_IS_LOCKED: &str = "(define mutex::locked? (lambda (__symb
                                         (rae-get-state-variable `(locked ,__symbol__))))";
 
 pub const LAMBDA_MUTEX_RELEASE: &str = "(define mutex::release (lambda (__symbol__)
-                                        (retract `(locked ,__symbol__) true)))";
+                                        (retract `(locked ,__symbol__) true)))";*/
 
 pub const LAMBDA_PROGRESS: &str = "
 (define progress (lambda args

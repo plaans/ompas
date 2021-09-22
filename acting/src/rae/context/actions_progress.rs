@@ -117,7 +117,7 @@ pub async fn async_status_watcher_run(asw: ActionStatusSync, mut receiver: Recei
                 panic!("error from receiver")
             }
             Some(id) => {
-                info!("action status of {} is updated", id);
+                //info!("action status of {} is updated", id);
                 asw.trigger_event_update(&id).await;
             }
         }

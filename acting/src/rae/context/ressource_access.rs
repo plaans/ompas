@@ -7,7 +7,6 @@ pub mod wait_on {
     use std::thread;
     use tokio::sync::{broadcast, mpsc, Mutex};
 
-    #[allow(deprecated)]
     lazy_static! {
         pub static ref WAIT_ON_COLLECTION: WaitOnCollection = Default::default();
     }
@@ -19,13 +18,8 @@ pub mod wait_on {
 
     const TOKIO_CHANNEL_SIZE: usize = 64;
 
-    pub fn add_waiter(lambda: LValue) -> mpsc::Receiver<bool> {
-        let handle = tokio::runtime::Handle::current();
-        thread::spawn(move || {
-            handle.block_on(async move { WAIT_ON_COLLECTION.add_waiter(lambda).await })
-        })
-        .join()
-        .expect("")
+    pub async fn add_waiter(lambda: LValue) -> mpsc::Receiver<bool> {
+        WAIT_ON_COLLECTION.add_waiter(lambda).await
     }
 
     impl WaitOnCollection {
@@ -47,7 +41,7 @@ pub mod wait_on {
                     Ok(lv) => {
                         //info!("{} => {}", waiter.lambda, lv);
                         if let LValue::True = lv {
-                            //info!("Wait on {} is now true.", waiter.lambda);
+                            info!("Wait on {} is now true.", waiter.lambda);
                             waiter
                                 .channel
                                 .send(true)
@@ -84,12 +78,12 @@ pub mod wait_on {
                 _ = receiver.recv() => {
                     let n_wait_on = WAIT_ON_COLLECTION.inner.lock().await.len();
                     if n_wait_on != 0 {
-                        //println!("{} wait ons to check!", n_wait_on);
+                        //info!("{} wait ons to check!", n_wait_on);
                         WAIT_ON_COLLECTION.check_wait_on(env.clone(), ctxs.clone()).await;
                     }
                 }
                 _ = end_receiver.recv() => {
-                    //println!("Task \"task_check_wait_on\" killed.");
+                    info!("Task \"task_check_wait_on\" killed.");
                     break;
                 }
             }

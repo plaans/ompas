@@ -24,7 +24,7 @@ impl RaeMutex {
 
     pub async fn release(&mut self) -> bool {
         if let Some(waiter) = self.fifo.pop_front() {
-            waiter.send(true).await;
+            waiter.send(true).await.expect("error releasing the mutex");
             false
         } else {
             true

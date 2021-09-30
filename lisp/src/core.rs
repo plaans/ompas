@@ -243,13 +243,13 @@ impl GetModule for CtxRoot {
 
         //Special entry
         module.add_fn_prelude(GET, get);
-        module.add_fn_prelude(MAP, map);
-        module.add_fn_prelude(LIST, list);
+        module.add_fn_prelude(SET, set);
         //State is an alias for map
 
         /*
          * LIST FUNCTIONS
          */
+        module.add_fn_prelude(LIST, list);
         module.add_fn_prelude(CAR, car);
         module.add_fn_prelude(CDR, cdr);
         module.add_fn_prelude(LAST, last);
@@ -260,9 +260,12 @@ impl GetModule for CtxRoot {
         module.add_fn_prelude(SET_LIST, set_list);
 
         //Map functions
+        module.add_fn_prelude(MAP, map);
         module.add_fn_prelude(GET_MAP, get_map);
         module.add_fn_prelude(SET_MAP, set_map);
         module.add_fn_prelude(UNION_MAP, union_map);
+        module.add_fn_prelude(REMOVE_MAP, remove_map);
+        module.add_fn_prelude(REMOVE_KEY_VALUE_MAP, remove_key_value_map);
 
         module.add_fn_prelude(NOT, not);
         module.add_fn_prelude(NOT_SHORT, not);
@@ -1042,7 +1045,7 @@ pub async fn eval(
                         let future_2 = future.clone();
                         tokio::spawn(async move {
                             if let LValue::Future(future_2) = future_2 {
-                                future_2.await;
+                                future_2.await.expect("future lvalue computation failed");
                             }
                         });
 

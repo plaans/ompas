@@ -1,6 +1,6 @@
 //! Module containing the Scheme library to setup RAE environment
 
-use crate::rae::context::rae_env::RAEEnv;
+use crate::rae::context::rae_env::{Action, RAEEnv, StateFunction};
 use crate::rae::context::rae_state::{LState, StateType, KEY_DYNAMIC, KEY_INNER_WORLD, KEY_STATIC};
 use crate::rae::module::domain::{GENERATE_TASK_SIMPLE, LABEL_GENERATE_METHOD_PARAMETERS};
 use crate::rae::module::mod_rae_exec::{CtxRaeExec, RAEInterface};
@@ -329,8 +329,10 @@ async fn def_state_function<'a>(
             ));
         } else if let LValue::Symbol(action_label) = &list[0] {
             if let LValue::Lambda(_) = &list[1] {
-                ctx.env
-                    .add_state_function(action_label.to_string(), list[1].clone())?;
+                ctx.env.add_state_function(
+                    action_label.to_string(),
+                    StateFunction::new(list[1].clone(), list[1].clone()),
+                )?;
             } else {
                 return Err(WrongType(
                     RAE_DEF_STATE_FUNCTION,
@@ -391,8 +393,10 @@ async fn def_action<'a>(
             ));
         } else if let LValue::Symbol(action_label) = &list[0] {
             if let LValue::Lambda(_) = &list[1] {
-                ctx.env
-                    .add_action(action_label.to_string(), list[1].clone())?;
+                ctx.env.add_action(
+                    action_label.to_string(),
+                    Action::new(list[1].clone(), list[1].clone()),
+                )?;
             } else {
                 return Err(WrongType(
                     RAE_DEF_ACTION,

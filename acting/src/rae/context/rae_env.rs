@@ -124,12 +124,38 @@ impl Display for Task {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct DualExpression {
+    exec: LValue,
+    sim: LValue,
+}
+
+impl DualExpression {
+    pub fn new(exec: LValue, sim: LValue) -> Self {
+        Self { exec, sim }
+    }
+}
+
+impl Display for DualExpression {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "exec: {}\nsimu: {}",
+            self.exec.pretty_print("exec: ".len()),
+            self.sim.pretty_print("simu: ".len())
+        )
+    }
+}
+
+pub type Action = DualExpression;
+pub type StateFunction = DualExpression;
+
 #[derive(Default, Debug, Clone)]
 pub struct DomainEnv {
     tasks: HashMap<String, Task>,
     methods: HashMap<String, Method>,
-    state_functions: HashMap<String, LValue>,
-    actions: HashMap<String, LValue>,
+    state_functions: HashMap<String, StateFunction>,
+    actions: HashMap<String, Action>,
     lambdas: HashMap<String, LValue>,
     map_symbol_type: HashMap<LValue, LValue>,
 }
@@ -168,11 +194,11 @@ impl DomainEnv {
         &self.methods
     }
 
-    pub fn get_state_functions(&self) -> &HashMap<String, LValue> {
+    pub fn get_state_functions(&self) -> &HashMap<String, StateFunction> {
         &self.state_functions
     }
 
-    pub fn get_actions(&self) -> &HashMap<String, LValue> {
+    pub fn get_actions(&self) -> &HashMap<String, Action> {
         &self.actions
     }
 
@@ -207,13 +233,13 @@ impl DomainEnv {
         }
     }
 
-    pub fn add_state_function(&mut self, label: String, value: LValue) {
+    pub fn add_state_function(&mut self, label: String, value: StateFunction) {
         self.state_functions.insert(label.clone(), value);
         self.map_symbol_type
             .insert(label.into(), STATE_FUNCTION_TYPE.into());
     }
 
-    pub fn add_action(&mut self, label: String, value: LValue) {
+    pub fn add_action(&mut self, label: String, value: Action) {
         self.actions.insert(label.clone(), value);
         self.map_symbol_type
             .insert(label.into(), ACTION_TYPE.into());
@@ -294,7 +320,7 @@ impl DomainEnv {
     pub fn print_state_functions(&self) -> String {
         let mut str = "*State-Functions:\n".to_string();
         for (label, value) in &self.state_functions {
-            str.push_str(format!("\t-{}:\n{}\n", label, value.pretty_print(0)).as_str())
+            str.push_str(format!("\t-{}:\n{}\n", label, value).as_str())
         }
         str
     }
@@ -302,7 +328,7 @@ impl DomainEnv {
     pub fn print_actions(&self) -> String {
         let mut str = "*Actions:\n".to_string();
         for (label, value) in &self.actions {
-            str.push_str(format!("\t-{}:\n{}\n", label, value.pretty_print(0)).as_str())
+            str.push_str(format!("\t-{}:\n{}\n", label, value).as_str())
         }
         str
     }
@@ -330,7 +356,135 @@ impl Display for DomainEnv {
     }
 }
 
-impl From<DomainEnv> for LEnv {
+impl DomainEnv {
+    pub fn get_exec_env(&self) -> LEnv {
+        let mut env = LEnv::empty();
+        let mut map_task_method: HashMap<LValue, LValue> = Default::default();
+        let mut map_method_pre_conditions: HashMap<LValue, LValue> = Default::default();
+        let mut map_method_effects: HashMap<LValue, LValue> = Default::default();
+        let mut map_method_generator: HashMap<LValue, LValue> = Default::default();
+
+        //Add all tasks to env:
+        for (label, task) in self.get_tasks() {
+            env.insert(label.clone(), task.get_body().clone());
+            map_task_method.insert(label.into(), task.get_methods().into());
+        }
+
+        //Add all methods to env:
+
+        for (label, method) in self.get_methods() {
+            env.insert(label.clone(), method.lambda_body.clone());
+            map_method_pre_conditions.insert(label.into(), method.lambda_pre_conditions.clone());
+            map_method_effects.insert(label.into(), method.lambda_effects.clone());
+            map_method_generator.insert(label.into(), method.lambda_instances_generator.clone());
+        }
+
+        //Add all actions to env:
+        for (label, action) in self.get_actions() {
+            env.insert(label.clone(), action.exec.clone());
+        }
+
+        //Add all state functions to env:
+        for (label, state_function) in self.get_state_functions() {
+            env.insert(label.clone(), state_function.exec.clone());
+        }
+
+        //Add all lambdas to env:
+        for (label, lambda) in self.get_lambdas() {
+            env.insert(label.clone(), lambda.clone())
+        }
+
+        env.insert(RAE_ACTION_LIST.to_string(), self.get_list_actions());
+        env.insert(RAE_METHOD_LIST.to_string(), self.get_list_methods());
+        env.insert(RAE_TASK_LIST.to_string(), self.get_list_tasks());
+        env.insert(
+            RAE_STATE_FUNCTION_LIST.to_string(),
+            self.get_list_state_functions(),
+        );
+        env.insert(RAE_SYMBOL_TYPE.to_string(), self.get_map_symbol_type());
+        env.insert(
+            RAE_METHOD_GENERATOR_MAP.to_string(),
+            map_method_generator.into(),
+        );
+        env.insert(RAE_TASK_METHODS_MAP.to_string(), map_task_method.into());
+
+        env.insert(
+            RAE_METHOD_PRE_CONDITIONS_MAP.to_string(),
+            map_method_pre_conditions.into(),
+        );
+        env.insert(
+            RAE_METHODS_EFFECTS_MAP.to_string(),
+            map_method_effects.into(),
+        );
+
+        env
+    }
+
+    pub fn get_sim_env(&self) -> LEnv {
+        let mut env = LEnv::empty();
+        let mut map_task_method: HashMap<LValue, LValue> = Default::default();
+        let mut map_method_pre_conditions: HashMap<LValue, LValue> = Default::default();
+        let mut map_method_effects: HashMap<LValue, LValue> = Default::default();
+        let mut map_method_generator: HashMap<LValue, LValue> = Default::default();
+
+        //Add all tasks to env:
+        for (label, task) in self.get_tasks() {
+            env.insert(label.clone(), task.get_body().clone());
+            map_task_method.insert(label.into(), task.get_methods().into());
+        }
+
+        //Add all methods to env:
+
+        for (label, method) in self.get_methods() {
+            env.insert(label.clone(), method.lambda_body.clone());
+            map_method_pre_conditions.insert(label.into(), method.lambda_pre_conditions.clone());
+            map_method_effects.insert(label.into(), method.lambda_effects.clone());
+            map_method_generator.insert(label.into(), method.lambda_instances_generator.clone());
+        }
+
+        //Add all actions to env:
+        for (label, action) in self.get_actions() {
+            env.insert(label.clone(), action.sim.clone());
+        }
+
+        //Add all state functions to env:
+        for (label, state_function) in self.get_state_functions() {
+            env.insert(label.clone(), state_function.sim.clone());
+        }
+
+        //Add all lambdas to env:
+        for (label, lambda) in self.get_lambdas() {
+            env.insert(label.clone(), lambda.clone())
+        }
+
+        env.insert(RAE_ACTION_LIST.to_string(), self.get_list_actions());
+        env.insert(RAE_METHOD_LIST.to_string(), self.get_list_methods());
+        env.insert(RAE_TASK_LIST.to_string(), self.get_list_tasks());
+        env.insert(
+            RAE_STATE_FUNCTION_LIST.to_string(),
+            self.get_list_state_functions(),
+        );
+        env.insert(RAE_SYMBOL_TYPE.to_string(), self.get_map_symbol_type());
+        env.insert(
+            RAE_METHOD_GENERATOR_MAP.to_string(),
+            map_method_generator.into(),
+        );
+        env.insert(RAE_TASK_METHODS_MAP.to_string(), map_task_method.into());
+
+        env.insert(
+            RAE_METHOD_PRE_CONDITIONS_MAP.to_string(),
+            map_method_pre_conditions.into(),
+        );
+        env.insert(
+            RAE_METHODS_EFFECTS_MAP.to_string(),
+            map_method_effects.into(),
+        );
+
+        env
+    }
+}
+
+/*impl From<DomainEnv> for LEnv {
     fn from(domain_env: DomainEnv) -> Self {
         let mut env = LEnv::empty();
         let mut map_task_method: HashMap<LValue, LValue> = Default::default();
@@ -355,12 +509,12 @@ impl From<DomainEnv> for LEnv {
 
         //Add all actions to env:
         for (label, action) in domain_env.get_actions() {
-            env.insert(label.clone(), action.clone());
+            env.insert(label.clone(), action.exec.clone());
         }
 
         //Add all state functions to env:
         for (label, state_function) in domain_env.get_state_functions() {
-            env.insert(label.clone(), state_function.clone());
+            env.insert(label.clone(), state_function.exec.clone());
         }
 
         //Add all lambdas to env:
@@ -396,7 +550,7 @@ impl From<DomainEnv> for LEnv {
 
         env
     }
-}
+}*/
 
 pub struct RAEEnv {
     pub job_receiver: Option<Receiver<Job>>,
@@ -411,9 +565,16 @@ pub struct RAEEnv {
 }
 
 impl RAEEnv {
-    pub fn get_eval_env(&self) -> LEnv {
+    pub fn get_exec_env(&self) -> LEnv {
         //TODO: modify it to build the env from methods structs and other structs
-        let mut env: LEnv = self.domain_env.clone().into();
+        let mut env: LEnv = self.domain_env.get_exec_env();
+        env.set_outer(self.env.clone());
+        env
+    }
+
+    pub fn get_sim_env(&self) -> LEnv {
+        //TODO: modify it to build the env from methods structs and other structs
+        let mut env: LEnv = self.domain_env.get_sim_env();
         env.set_outer(self.env.clone());
         env
     }
@@ -452,13 +613,17 @@ impl RAEEnv {
 }
 
 impl RAEEnv {
-    pub fn add_action(&mut self, label: String, value: LValue) -> Result<(), LError> {
+    pub fn add_action(&mut self, label: String, value: Action) -> Result<(), LError> {
         self.domain_env.add_action(label, value);
 
         Ok(())
     }
 
-    pub fn add_state_function(&mut self, label: String, value: LValue) -> Result<(), LError> {
+    pub fn add_state_function(
+        &mut self,
+        label: String,
+        value: StateFunction,
+    ) -> Result<(), LError> {
         self.domain_env.add_state_function(label, value);
 
         Ok(())

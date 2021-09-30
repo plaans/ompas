@@ -133,7 +133,7 @@ pub async fn rae_run(mut context: RAEEnv, options: &RAEOptions, _log: String) {
     }
 
     let receiver_event_update_state = context.state.subscribe_on_update().await;
-    let env_check_wait_on = context.get_eval_env();
+    let env_check_wait_on = context.get_exec_env();
     let ctxs_check_wait_on = context.ctxs.clone();
     tokio::spawn(async move {
         task_check_wait_on(
@@ -153,7 +153,7 @@ pub async fn rae_run(mut context: RAEEnv, options: &RAEOptions, _log: String) {
             //let _job_id = &context.agenda.add_job(job.clone());
             info!("new job received!");
 
-            let new_env = context.get_eval_env();
+            let new_env = context.get_exec_env();
             let new_ctxs = context.ctxs.clone();
 
             tokio::spawn(async move {

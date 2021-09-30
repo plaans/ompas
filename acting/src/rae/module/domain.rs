@@ -7,9 +7,9 @@ pub const GENERATE_METHOD: &str = "generate-method";
 pub const MACRO_GENERATE_STATE_FUNCTION: &str = "(defmacro generate-state-function (lambda args
     (let ((label (car args))
            (params (cdr args)))
-        (quasiquote (list (unquote label)
-         (lambda (unquote params)
-          (unquote (cons (quote rae-get-state-variable) (cons (quasiquote (quote (unquote label))) params)))))))))";
+        `(list ,label
+         (lambda ,params
+          ,(cons 'rae-get-state-variable (cons `(quote ,label) params)))))))";
 
 /// Macro used to generate code to define a task in RAE environment.
 pub const MACRO_GENERATE_TASK: &str = "(defmacro generate-task \
@@ -23,9 +23,9 @@ pub const MACRO_GENERATE_TASK: &str = "(defmacro generate-task \
 pub const MACRO_GENERATE_TASK_SIMPLE: &str = "(defmacro generate-task-simple 
     (lambda args
     (let ((label (car args))
-            (params (cdr args)))
-            (quasiquote (list ,label (lambda ,params
-                    ,(cons 'progress (cons `(quote ,label) params))))))))";
+          (params (cdr args)))
+         `(list ,label (lambda ,params
+                    ,(cons 'progress (cons `(quote ,label) params)))))))";
 
 /// Macro used to generate code to define a method in REA environment.
 pub const MACRO_GENERATE_METHOD_DEPRECATED: &str = "(defmacro generate-method \
@@ -72,13 +72,13 @@ pub const MACRO_GENERATE_METHOD: &str=
                         (lambda ,params ,body)))))";
 
 /// Macro used to generate code to define an action in RAE environment.
-pub const MACRO_GENERATE_ACTION: &str ="(defmacro generate-action \
-                                        (lambda args \
-                                            (let ((label (car args)) \
-                                                  (params (cdr args))) \
-                                                 (quasiquote (list (unquote label) \
-                                                                    (lambda (unquote params) (unquote (cons (quote rae-exec-command)\
-                                                                            (cons (quasiquote (quote (unquote label))) params)))))))))";
+pub const MACRO_GENERATE_ACTION: &str = "(defmacro generate-action
+    (lambda args
+        (let ((label (car args))
+              (params (cdr args)))
+             `(list ,label
+                 (lambda ,params ,(cons 'rae-exec-command
+                     (cons `(quote ,label)) params))))))";
 
 /// Macro used to generate code to define a method in RAE environment.
 pub const MACRO_GENERATE_METHOD_PARAMETERS: &str =

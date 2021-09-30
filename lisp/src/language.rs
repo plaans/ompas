@@ -21,6 +21,8 @@ pub mod scheme_primitives {
     pub const GET: &str = "get";
     pub const GET_MAP: &str = "get-map";
     pub const SET_MAP: &str = "set-map";
+    pub const REMOVE_MAP: &str = "remove-map";
+    pub const REMOVE_KEY_VALUE_MAP: &str = "remove-key-value-map";
     pub const UNION_MAP: &str = "union-map";
     pub const MAP: &str = "map";
 

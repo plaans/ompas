@@ -17,6 +17,7 @@ pub mod domain;
 pub mod mod_rae;
 pub mod mod_rae_exec;
 pub mod mod_rae_monitor;
+mod mod_rae_sim;
 
 /// Initialize the libraries to load inside Scheme env.
 /// Takes as argument the execution platform.

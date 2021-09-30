@@ -815,6 +815,34 @@ pub async fn expand(
                             Ok(expanded.into())
                         }
                     }
+                    LCoreOperator::Parse => {
+                        return if list.len() != 2 {
+                            Err(WrongNumberOfArgument(
+                                "expand",
+                                list.into(),
+                                list.len(),
+                                2..2,
+                            ))
+                        } else {
+                            let mut expanded = vec![LCoreOperator::Parse.into()];
+                            expanded.push(expand(&list[1], top_level, env, ctxs).await?);
+                            Ok(expanded.into())
+                        }
+                    }
+                    LCoreOperator::Expand => {
+                        return if list.len() != 2 {
+                            Err(WrongNumberOfArgument(
+                                "expand",
+                                list.into(),
+                                list.len(),
+                                2..2,
+                            ))
+                        } else {
+                            let mut expanded = vec![LCoreOperator::Expand.into()];
+                            expanded.push(expand(&list[1], top_level, env, ctxs).await?);
+                            Ok(expanded.into())
+                        }
+                    }
                 }
             } else if let LValue::Symbol(sym) = &list[0] {
                 match env.get_macro(sym) {
@@ -977,10 +1005,10 @@ pub async fn eval(
                         let test = &args[0];
                         let conseq = &args[1];
                         let alt = &args[2];
-                        lv = match eval(test, &mut env, ctxs).await {
-                            Ok(LValue::True) => conseq.clone(),
-                            Ok(LValue::Nil) => alt.clone(),
-                            Ok(lv) => {
+                        lv = match eval(test, &mut env, ctxs).await? {
+                            LValue::True => conseq.clone(),
+                            LValue::Nil => alt.clone(),
+                            lv => {
                                 return Err(WrongType(
                                     "eval",
                                     lv.clone(),
@@ -988,7 +1016,6 @@ pub async fn eval(
                                     NameTypeLValue::Bool,
                                 ))
                             }
-                            Err(e) => return Err(e),
                         };
                     }
                     LCoreOperator::Quote => {
@@ -1045,34 +1072,11 @@ pub async fn eval(
                         let future_2 = future.clone();
                         tokio::spawn(async move {
                             if let LValue::Future(future_2) = future_2 {
-                                future_2.await.expect("future lvalue computation failed");
+                                future_2.await;
                             }
                         });
 
                         return Ok(future);
-
-                        /*let (task_id, sender_result) =
-                            async_await::current().declare_new_task().await;
-
-                        let lvalue = args[0].clone();
-                        let mut new_env = env.clone();
-                        let mut ctxs = ctxs.clone();
-                        tokio::spawn(async move {
-                            //tokio::time::sleep(Duration::from_millis(10)).await;
-                            let result = eval(&lvalue, &mut new_env, &mut ctxs).await;
-                            sender_result
-                                .send((task_id, result))
-                                .await
-                                .expect("could not send result to task handler.");
-                            if get_debug() {
-                                println!("async>>end")
-                            }
-                        });
-
-                        if get_debug() {
-                            println!("task_id: {}", task_id);
-                        }
-                        //return Ok(task_id.into());*/
                     }
                     LCoreOperator::Await => {
                         //println!("awaiting on async evaluation");
@@ -1088,30 +1092,26 @@ pub async fn eval(
                                 NameTypeLValue::Future,
                             ))
                         };
-
-                        /*let pid = eval(&args[0], env, ctxs).await?;
-
-                        if let LValue::Number(LNumber::Usize(id)) = pid {
-                            let result = match async_await::current().get_response_await(&id).await
-                            {
-                                AwaitResponse::Result(result) => result,
-                                AwaitResponse::Receiver(mut r) => {
-                                    if get_debug() {
-                                        println!("await>>waiting result on channel")
-                                    }
-                                    r.recv().await.unwrap()
-                                }
-                            }?;
-
-                            if get_debug() {
-                                println!("await>> result received : {}", result);
-                            }
-                            return Ok(result);
-                        }*/
                     }
                     LCoreOperator::Eval => {
                         let arg = &args[0];
                         lv = expand(&eval(arg, env, ctxs).await?, true, env, ctxs).await?;
+                    }
+                    LCoreOperator::Parse => {
+                        return if let LValue::String(s) = eval(&args[0], env, ctxs).await? {
+                            parse(s.as_str(), env, ctxs).await
+                        } else {
+                            Err(WrongType(
+                                "eval",
+                                args[0].clone(),
+                                (&args[0]).into(),
+                                NameTypeLValue::Symbol,
+                            ))
+                        }
+                    }
+                    LCoreOperator::Expand => {
+                        let arg = &args[0];
+                        return expand(&eval(arg, env, ctxs).await?, true, env, ctxs).await;
                     }
                 }
             } else {

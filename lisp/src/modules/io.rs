@@ -4,8 +4,6 @@ use crate::lisp_interpreter::ChannelToLispInterpreter;
 use crate::modules::doc::{Documentation, LHelp};
 use crate::structs::LError::{WrongNumberOfArgument, WrongType};
 use crate::structs::{GetModule, LError, LValue, Module, NameTypeLValue};
-use ::macro_rules_attribute::macro_rules_attribute;
-use ompas_utils::dyn_async;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::PathBuf;
@@ -25,9 +23,14 @@ const DOC_MOD_IO_VERBOSE: &str = "functions:\n\
                                     -write";
 
 const PRINT: &str = "print";
-const READ: &str = "read";
+const READ: &str = "__read__";
 const WRITE: &str = "write";
 //const LOAD: &str = "load";
+
+const MACRO_READ: &str = "(defmacro read \
+    (lambda (x)\
+        `(eval (parse (__read__ ,x)))))\
+";
 
 #[derive(Debug)]
 pub enum LogOutput {
@@ -80,12 +83,12 @@ impl GetModule for CtxIo {
         let mut module = Module {
             ctx: Arc::new(self),
             prelude: vec![],
-            raw_lisp: Default::default(),
+            raw_lisp: vec![MACRO_READ].into(),
             label: MOD_IO.into(),
         };
 
         module.add_fn_prelude(PRINT, print);
-        module.add_async_fn_prelude(READ, read);
+        module.add_fn_prelude(READ, read);
         module.add_fn_prelude(WRITE, write);
 
         module
@@ -143,8 +146,7 @@ pub fn print(args: &[LValue], _: &LEnv, ctx: &CtxIo) -> Result<LValue, LError> {
 
 /// Read the content of a file and sends the content to the lisp interpreter.
 /// The name of the file is given via args.
-#[macro_rules_attribute(dyn_async!)]
-pub async fn read<'a>(args: &'a [LValue], _: &'a LEnv, ctx: &'a CtxIo) -> Result<LValue, LError> {
+pub fn read(args: &[LValue], _: &LEnv, _: &CtxIo) -> Result<LValue, LError> {
     //let mut stdout = io::stdout();
     //stdout.write_all(b"module Io: read\n");
     if args.len() != 1 {
@@ -168,14 +170,9 @@ pub async fn read<'a>(args: &'a [LValue], _: &'a LEnv, ctx: &'a CtxIo) -> Result
 
     //stdout.write_all(format!("contents: {}\n", contents).as_bytes());
 
-    ctx.sender_li
-        .as_ref()
-        .expect("missing a channel")
-        .send(contents)
-        .await
-        .expect("couldn't send string via channel");
+    //TODO: no check of the response to read
 
-    Ok(LValue::Nil)
+    Ok(LValue::String(contents))
 }
 
 /// Write an lvalue to a given file

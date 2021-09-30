@@ -56,3 +56,17 @@
 (defmacro retract
     (lambda args
         `(set! state (remove-key-value-map state (quote ,args)))))
+
+(defmacro generate-state-function (lambda args
+    (let ((label (car args))
+           (params (cdr args)))
+        `(list ,label
+         (lambda ,params
+          ,(cons 'rae-get-state-variable (cons `(quote ,label) params))))))
+          
+          
+          
+          
+          (cons (cons (quote quote) (cons label nil)))
+
+

@@ -6,10 +6,12 @@ pub const GENERATE_METHOD: &str = "generate-method";
 /// Macro used to generate code to define a state function in RAE environment.
 pub const MACRO_GENERATE_STATE_FUNCTION: &str = "(defmacro generate-state-function (lambda args
     (let ((label (car args))
-           (params (cdr args)))
+          (params (cdr args)))
         `(list ,label
-         (lambda ,params
-          ,(cons 'rae-get-state-variable (cons `(quote ,label) params)))))))";
+            (lambda ,params
+                ,(cons 'rae-get-state-variable (cons `(quote ,label) params)))
+            (lambda ,params
+                (get-map state ,(cons `(quote ,label) params)))))))";
 
 /// Macro used to generate code to define a task in RAE environment.
 pub const MACRO_GENERATE_TASK: &str = "(defmacro generate-task \
@@ -78,7 +80,7 @@ pub const MACRO_GENERATE_ACTION: &str = "(defmacro generate-action
               (params (cdr args)))
              `(list ,label
                  (lambda ,params ,(cons 'rae-exec-command
-                     (cons `(quote ,label)) params))))))";
+                     (cons `(quote ,label) params)))))))";
 
 /// Macro used to generate code to define a method in RAE environment.
 pub const MACRO_GENERATE_METHOD_PARAMETERS: &str =

@@ -7,7 +7,7 @@ use crate::rae::module::mod_rae_exec::{CtxRaeExec, RAEInterface};
 use crate::rae::{rae_log, rae_run, RAEOptions};
 use ::macro_rules_attribute::macro_rules_attribute;
 use ompas_lisp::async_await;
-use ompas_lisp::core::{eval, expand, load_module, LEnv};
+use ompas_lisp::core::{eval, expand, load_module, parse, LEnv};
 use ompas_lisp::functions::cons;
 use ompas_lisp::modules::doc::{Documentation, LHelp};
 use ompas_lisp::structs::LError::*;
@@ -304,7 +304,7 @@ async fn def_state_function<'a>(
             RAE_DEF_STATE_FUNCTION,
             args.into(),
             args.len(),
-            2..2,
+            1..1,
         ));
     }
 
@@ -320,19 +320,28 @@ async fn def_state_function<'a>(
     //println!("lvalue: {}", lvalue);
 
     if let LValue::List(list) = &lvalue {
-        if list.len() != 2 {
+        if list.len() != 3 {
             return Err(WrongNumberOfArgument(
                 RAE_DEF_STATE_FUNCTION,
                 lvalue.clone(),
                 list.len(),
-                2..2,
+                3..3,
             ));
         } else if let LValue::Symbol(action_label) = &list[0] {
             if let LValue::Lambda(_) = &list[1] {
-                ctx.env.add_state_function(
-                    action_label.to_string(),
-                    StateFunction::new(list[1].clone(), list[1].clone()),
-                )?;
+                if let LValue::Lambda(_) = &list[2] {
+                    ctx.env.add_state_function(
+                        action_label.to_string(),
+                        StateFunction::new(list[1].clone(), list[2].clone()),
+                    )?;
+                } else {
+                    return Err(WrongType(
+                        RAE_DEF_STATE_FUNCTION,
+                        list[2].clone(),
+                        list[2].clone().into(),
+                        NameTypeLValue::Lambda,
+                    ));
+                }
             } else {
                 return Err(WrongType(
                     RAE_DEF_STATE_FUNCTION,
@@ -381,7 +390,7 @@ async fn def_action<'a>(
     )
     .await?;
 
-    //println!("lvalue: {}", lvalue);
+    println!("def-action: lvalue: {}", lvalue);
 
     if let LValue::List(list) = &lvalue {
         if list.len() != 2 {

@@ -1066,6 +1066,8 @@ pub enum LCoreOperator {
     Begin,
     Async,
     Await,
+    Parse,
+    Expand,
     Eval,
 }
 
@@ -1084,7 +1086,8 @@ impl Display for LCoreOperator {
             LCoreOperator::Async => write!(f, "{}", ASYNC),
             LCoreOperator::Await => write!(f, "{}", AWAIT),
             LCoreOperator::Eval => write!(f, "{}", EVAL),
-            //LCoreOperator::Race => write!(f, "{}", RACE),
+            LCoreOperator::Expand => write!(f, "{}", EXPAND),
+            LCoreOperator::Parse => write!(f, "{}", PARSE),
         }
     }
 }
@@ -1106,7 +1109,8 @@ impl TryFrom<&str> for LCoreOperator {
             ASYNC => Ok(LCoreOperator::Async),
             AWAIT => Ok(LCoreOperator::Await),
             EVAL => Ok(LCoreOperator::Eval),
-            //RACE => Ok(LCoreOperator::Race),
+            PARSE => Ok(LCoreOperator::Parse),
+            EXPAND => Ok(LCoreOperator::Expand),
             _ => Err(SpecialError(
                 "LCoreOperator::TryFrom<str>",
                 "string does not correspond to core operator".to_string(),

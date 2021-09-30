@@ -302,7 +302,7 @@ impl DomainEnv {
 //Displayer
 impl DomainEnv {
     pub fn print_tasks(&self) -> String {
-        let mut str = "*Tasks:\n".to_string();
+        let mut str = "*TASKS:\n".to_string();
         for (label, value) in &self.tasks {
             str.push_str(format!("\t-{}:\n{}\n", label, value).as_str())
         }
@@ -310,7 +310,7 @@ impl DomainEnv {
     }
 
     pub fn print_methods(&self) -> String {
-        let mut str = "*Methods:\n".to_string();
+        let mut str = "*METHODS:\n".to_string();
         for (label, value) in &self.methods {
             str.push_str(format!("\t-{}:\n{}\n", label, value).as_str())
         }
@@ -318,23 +318,23 @@ impl DomainEnv {
     }
 
     pub fn print_state_functions(&self) -> String {
-        let mut str = "*State-Functions:\n".to_string();
+        let mut str = "*STATE-FUNCTIONS:\n\n".to_string();
         for (label, value) in &self.state_functions {
-            str.push_str(format!("\t-{}:\n{}\n", label, value).as_str())
+            str.push_str(format!("\t-{}:\n{}\n\n", label, value).as_str())
         }
         str
     }
 
     pub fn print_actions(&self) -> String {
-        let mut str = "*Actions:\n".to_string();
+        let mut str = "*ACTIONS:\n".to_string();
         for (label, value) in &self.actions {
-            str.push_str(format!("\t-{}:\n{}\n", label, value).as_str())
+            str.push_str(format!("\t-{}:\n{}\n\n", label, value).as_str())
         }
         str
     }
 
     pub fn print_lambdas(&self) -> String {
-        let mut str = "*Lambdas:\n".to_string();
+        let mut str = "*LAMBDAS:\n".to_string();
         for (label, value) in &self.lambdas {
             str.push_str(format!("\t-{}:\n{}\n", label, value.pretty_print(0)).as_str())
         }
@@ -344,7 +344,7 @@ impl DomainEnv {
 
 impl Display for DomainEnv {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut str = "Domain defined in RAE:\n".to_string();
+        let mut str = "*** Domain defined in RAE ***\n".to_string();
 
         str.push_str(format!("\n{}", self.print_tasks()).as_str());
         str.push_str(format!("\n{}", self.print_methods()).as_str());

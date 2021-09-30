@@ -376,7 +376,7 @@ pub fn union_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
 }*/
 
 ///It takes two arguments, an element and a list and returns a list with the element inserted at the first place.
-//TODO: implement all the casesn
+//TODO: implement all the cases
 pub fn cons(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(CONS, args.into(), args.len(), 2..2));

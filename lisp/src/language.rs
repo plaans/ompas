@@ -49,7 +49,7 @@ pub mod scheme_primitives {
     pub const LET: &str = "let";
     pub const LET_STAR: &str = "let*";
     pub const COND: &str = "cond";
-    pub const MACRO_EXPAND: &str = "macro-expand";
+    pub const TEST_MACRO: &str = "test-macro";
 
     //Boolean
     pub const TRUE: &str = "true";
@@ -204,5 +204,5 @@ Return *false* otherwise. Return an error if args are not numbers of there is th
     pub const DOC_LET: &str = "Macro used to abstract variable binding in functional programming.";
     pub const DOC_LET_STAR: &str = "Macro used to abstract variable binding in functional programming.\
     The difference with let is that you can bind variables in function of previously bound variables.";
-    pub const DOC_MACRO_EXPAND: &str = "Expand a macro. Used mainly for debug";
+    pub const DOC_MACRO_TEST_MACRO: &str = "Test the macro expansion. Used mainly for debug";
 }

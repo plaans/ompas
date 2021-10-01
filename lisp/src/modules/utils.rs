@@ -129,6 +129,10 @@ pub const MACRO_CDADR: &str =
 pub const MACRO_CADADDR: &str =
     "(defmacro cadaddr (lambda (x) (quasiquote (car (cdr (car (cdr (cdr (unquote x)))))))))";
 
+pub const MACRO_TEST_MACRO: &str = "(defmacro test-macro \
+   (lambda (x)\
+    `(expand (parse ,x))))";
+
 pub const MACRO_WHILE: &str = "(defmacro while
     (lambda (c b)
         `(begin
@@ -233,6 +237,7 @@ impl GetModule for CtxUtils {
                 MACRO_AWAIT_ASYNC,
                 MACRO_WHILE,
                 MACRO_LOOP,
+                MACRO_TEST_MACRO,
                 LAMBDA_UNZIP,
                 LAMBDA_ZIP,
                 LAMBDA_MAPF,

@@ -1175,19 +1175,6 @@ pub async fn eval(
                             }
                         };
                     }
-                    //Special case for macro_expand that needs ctxs to work
-                    LValue::Symbol(s) => {
-                        return if s == MACRO_EXPAND {
-                            macro_expand(args, env, ctxs).await
-                        } else {
-                            Err(WrongType(
-                                "eval",
-                                lv.clone(),
-                                NameTypeLValue::Symbol,
-                                NameTypeLValue::Fn,
-                            ))
-                        }
-                    }
                     lv => {
                         /*println!(
                             "Expecting here a list with a function as first argument: {:?}",
@@ -1208,6 +1195,7 @@ pub async fn eval(
 
 /// Expand a macro without evaluating it
 /// Used mainly for debug.
+#[allow(unused)]
 pub async fn macro_expand(
     args: &[LValue],
     env: &LEnv,

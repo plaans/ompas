@@ -117,7 +117,7 @@ impl Documentation for CtxDoc {
             LHelp::new(EVAL, DOC_EVAL),
             LHelp::new(LET, DOC_LET),
             LHelp::new(LET_STAR, DOC_LET_STAR),
-            LHelp::new(MACRO_EXPAND, DOC_MACRO_EXPAND),
+            LHelp::new(TEST_MACRO, DOC_MACRO_TEST_MACRO),
         ]
     }
 }

@@ -14,6 +14,7 @@ pub const MACRO_GENERATE_STATE_FUNCTION: &str = "(defmacro generate-state-functi
                 (get-map state ,(cons `(quote ,label) params)))))))";
 
 /// Macro used to generate code to define a task in RAE environment.
+
 pub const MACRO_GENERATE_TASK: &str = "(defmacro generate-task \
                                         (lambda (l body) \
                                             (quasiquote (list (unquote l) (lambda (unquote (cdar body)) \
@@ -81,6 +82,28 @@ pub const MACRO_GENERATE_ACTION: &str = "(defmacro generate-action
              `(list ,label
                  (lambda ,params ,(cons 'rae-exec-command
                      (cons `(quote ,label) params)))))))";
+
+pub const GENERATE_ACTION_MODEL: &str = "generate-action-model";
+pub const MACRO_GENERATE_ACTION_MODEL: &str = "
+(defmacro generate-action-model
+    (lambda (label def)
+        (let ((params (cdar def))
+               (conds (cadr (get def 1)))
+               (effs (cadr (get def 2))))
+              `(list ,label (lambda ,params
+                    (begin
+                        (if ,conds
+                            ,effs)
+                        state))))))";
+pub const GENERATE_ACTION_OPERATIONAL_MODEL: &str = "generate-action-operational-model";
+pub const MACRO_GENERATE_OPERATIONAL_MODEL: &str = "(defmacro generate-action-operational-model
+    (lambda (label def)
+        (let ((params (cdar def))
+              (body (cadr (get def 1))))
+              `(list ,label (lambda ,params
+                    (begin
+                        ,body
+                        state))))))";
 
 /// Macro used to generate code to define a method in RAE environment.
 pub const MACRO_GENERATE_METHOD_PARAMETERS: &str =

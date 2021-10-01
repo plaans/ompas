@@ -84,6 +84,8 @@ impl GetModule for CtxRaeExec {
     fn get_module(self) -> Module {
         let init: InitLisp = vec![
             MACRO_GENERATE_ACTION,
+            MACRO_GENERATE_ACTION_MODEL,
+            MACRO_GENERATE_OPERATIONAL_MODEL,
             MACRO_GENERATE_METHOD,
             MACRO_GENERATE_TASK,
             MACRO_GENERATE_STATE_FUNCTION,

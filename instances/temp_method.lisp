@@ -70,3 +70,98 @@
           (cons (cons (quote quote) (cons label nil)))
 
 
+(defmacro generate-action
+    (lambda args
+        (let ((label (car args))
+              (params (cdr args)))
+             `(list ,label
+                 (lambda ,params ,(cons 'rae-exec-command
+                     (cons `(quote ,label) params)))))))
+
+
+(defmacro generate-action-model
+    (lambda (label def)
+        (let ((params (cdar def))
+               (conds (cadr (get def 1)))
+               (effs (cadr (get def 2))))
+              `(lambda ,params
+                    (begin
+                        (if ,conds
+                            ,effs)
+                        state)))))
+
+
+(defmacro generate-action-operational-model
+    (lambda (label def)
+        (let ((params (cdar def))
+              (body (cadr (get def 1))))
+              `(lambda ,params
+                    (begin
+                        ,body
+                        state)))))
+
+(test-macro "(generate-action-operational-model pick 
+	((:params ?r)
+		(:body
+        (if (> (robot.battery ?r) 0.15)
+            (begin
+                (assert (robot.hand ?r) empty)
+                (assert (robot.available ?r) true))))))")
+
+(lambda (?r)
+    (begin 
+        (if (> (robot.battery ?r) 0.15)
+            (begin 
+                (assert (robot.hand ?r) empty) 
+                (assert (robot.available ?r) true))
+            nil)
+        state))
+
+(generate-action-model pick 
+    '((:params ?r)
+      (:pre-conditions (> (robot.battery ?r) 0.15))
+      (:effects (begin
+	       (assert (robot.hand ?r) empty)
+        (assert (robot.available ?r) true)))))
+
+(test-macro "(generate-action-model pick 
+    '((:params ?r)
+      (:pre-conditions (> (robot.battery ?r) 0.15))
+      (:effects (begin
+	       (assert (robot.hand ?r) empty)
+        (assert (robot.available ?r) true)))))")
+
+(defmacro test-macro
+   (lambda (x)
+    `(expand (parse ,x))))
+
+
+(lambda (?r)
+    (begin 
+        (if (> (robot.battery ?r) 0.15)
+            (begin 
+                (assert (robot.hand ?r) empty)
+                (assert (robot.available ?r) true))
+            nil)
+    state))
+
+
+(def-action-model pick 
+    '((:params ?r)
+      (:pre-conditions (> (robot.battery ?r) 0.15))
+      (:effects (begin
+	       (assert (robot.hand ?r) empty)
+        (assert (robot.available ?r) true)))))
+>> (lambda (?r)
+		(begin 
+            (define result
+                (if (> (robot.battery ?r) 0.15)
+                    (begin
+                        (assert (robot.hand ?r) empty)
+                        (assert (robot.available ?r) true))
+                    (failure)))
+            (if (null? result)
+			    (success state)
+                result)))
+
+

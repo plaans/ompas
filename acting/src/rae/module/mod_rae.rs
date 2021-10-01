@@ -41,6 +41,8 @@ const RAE_GET_AGENDA: &str = "rae-get-agenda";
 
 const RAE_DEF_STATE_FUNCTION: &str = "def-state-function";
 const RAE_DEF_ACTION: &str = "def-action";
+const RAE_DEF_ACTION_MODEL: &str = "def-action-model";
+const RAE_DEF_ACTION_OPERATIONAL_MODEL: &str = "def-action-operational-model";
 const RAE_DEF_TASK: &str = "def-task";
 const RAE_DEF_METHOD: &str = "def-method";
 const RAE_DEF_LAMBDA: &str = "def-lambda";
@@ -79,7 +81,7 @@ const DOC_DEF_METHOD_VERBOSE: &str =
         \t(rae-await (navigate_to ?r (+ ?x 1) (+ ?y 1)))))))";
 const DOC_DEF_LAMBDA: &str = "Add a lambda to RAE environment";
 const DOC_DEF_INITIAL_STATE: &str = "Add initial facts in the state. Most of the time it is general knowledge and not initialisation of facts.";
-const DOC_RAE_CONFIGURE_PLATFROM: &str = "Set the options of the platform when it will be runned";
+const DOC_RAE_CONFIGURE_PLATFORM: &str = "Set the options of the platform when it will be runned";
 const DOC_RAE_GET_CONFIG_PLATFORM: &str = "Get the actual value of the config of the platform";
 const DOC_RAE_GET_AGENDA: &str =
     "Get the actual agenda with for each task the current refinement stack.";
@@ -117,6 +119,11 @@ impl GetModule for CtxRae {
 
         module.add_async_mut_fn_prelude(RAE_DEF_STATE_FUNCTION, def_state_function);
         module.add_async_mut_fn_prelude(RAE_DEF_ACTION, def_action);
+        module.add_async_mut_fn_prelude(RAE_DEF_ACTION_MODEL, def_action_model);
+        module.add_async_mut_fn_prelude(
+            RAE_DEF_ACTION_OPERATIONAL_MODEL,
+            def_action_operational_model,
+        );
         module.add_async_mut_fn_prelude(RAE_DEF_TASK, def_task);
         module.add_async_mut_fn_prelude(RAE_DEF_METHOD, def_method);
         module.add_async_mut_fn_prelude(RAE_DEF_LAMBDA, def_lambda);
@@ -163,7 +170,7 @@ impl Documentation for CtxRae {
             LHelp::new_verbose(RAE_DEF_METHOD, DOC_DEF_METHOD, DOC_DEF_METHOD_VERBOSE),
             LHelp::new(RAE_DEF_LAMBDA, DOC_DEF_LAMBDA),
             LHelp::new(RAE_DEF_INITIAL_STATE, DOC_DEF_INITIAL_STATE),
-            LHelp::new(RAE_CONFIGURE_PLATFORM, DOC_RAE_CONFIGURE_PLATFROM),
+            LHelp::new(RAE_CONFIGURE_PLATFORM, DOC_RAE_CONFIGURE_PLATFORM),
             LHelp::new(RAE_GET_CONFIG_PLATFORM, DOC_RAE_GET_CONFIG_PLATFORM),
             LHelp::new(RAE_GET_AGENDA, DOC_RAE_GET_AGENDA),
         ]
@@ -365,6 +372,134 @@ async fn def_state_function<'a>(
 
 /// Defines an action in RAE environment.
 #[macro_rules_attribute(dyn_async!)]
+async fn def_action_model<'a>(
+    args: &'a [LValue],
+    env: &'a LEnv,
+    ctx: &'a mut CtxRae,
+) -> Result<LValue, LError> {
+    if args.is_empty() {
+        return Err(WrongNumberOfArgument(
+            RAE_DEF_ACTION_MODEL,
+            args.into(),
+            args.len(),
+            1..std::usize::MAX,
+        ));
+    }
+
+    //println!("define action: {}", LValue::from(args));
+
+    let lvalue = cons(&["generate-action-model".into(), args.into()], env, &())?;
+
+    let lvalue = eval(
+        &expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs).await?,
+        &mut ctx.env.env,
+        &mut ctx.env.ctxs,
+    )
+    .await?;
+
+    //println!("def-action-model: lvalue: {}", lvalue);
+
+    if let LValue::List(list) = &lvalue {
+        if list.len() != 2 {
+            return Err(WrongNumberOfArgument(
+                RAE_DEF_ACTION_MODEL,
+                lvalue.clone(),
+                list.len(),
+                2..2,
+            ));
+        } else if let LValue::Symbol(action_label) = &list[0] {
+            if let LValue::Lambda(_) = &list[1] {
+                ctx.env
+                    .add_action_sample_fn(action_label.into(), list[1].clone())?;
+            } else {
+                return Err(WrongType(
+                    RAE_DEF_ACTION_MODEL,
+                    list[1].clone(),
+                    list[1].clone().into(),
+                    NameTypeLValue::Lambda,
+                ));
+            }
+        } else {
+            return Err(WrongType(
+                RAE_DEF_ACTION_MODEL,
+                list[0].clone(),
+                list[0].clone().into(),
+                NameTypeLValue::Symbol,
+            ));
+        }
+    }
+
+    Ok(Nil)
+}
+
+/// Defines an action in RAE environment.
+#[macro_rules_attribute(dyn_async!)]
+async fn def_action_operational_model<'a>(
+    args: &'a [LValue],
+    env: &'a LEnv,
+    ctx: &'a mut CtxRae,
+) -> Result<LValue, LError> {
+    if args.is_empty() {
+        return Err(WrongNumberOfArgument(
+            RAE_DEF_ACTION_OPERATIONAL_MODEL,
+            args.into(),
+            args.len(),
+            1..std::usize::MAX,
+        ));
+    }
+
+    //println!("define action: {}", LValue::from(args));
+
+    let lvalue = cons(
+        &["generate-action-operational-model".into(), args.into()],
+        env,
+        &(),
+    )?;
+
+    let lvalue = eval(
+        &expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs).await?,
+        &mut ctx.env.env,
+        &mut ctx.env.ctxs,
+    )
+    .await?;
+
+    //println!("def-action-operational-model: lvalue: {}", lvalue);
+
+    if let LValue::List(list) = &lvalue {
+        if list.len() != 2 {
+            return Err(WrongNumberOfArgument(
+                RAE_DEF_ACTION_OPERATIONAL_MODEL,
+                lvalue.clone(),
+                list.len(),
+                2..2,
+            ));
+        } else if let LValue::Symbol(action_label) = &list[0] {
+            if let LValue::Lambda(_) = &list[1] {
+                ctx.env
+                    .add_action_sample_fn(action_label.into(), list[1].clone())?;
+            } else {
+                return Err(WrongType(
+                    RAE_DEF_ACTION_OPERATIONAL_MODEL,
+                    list[1].clone(),
+                    list[1].clone().into(),
+                    NameTypeLValue::Lambda,
+                ));
+            }
+        } else {
+            return Err(WrongType(
+                RAE_DEF_ACTION_OPERATIONAL_MODEL,
+                list[0].clone(),
+                list[0].clone().into(),
+                NameTypeLValue::Symbol,
+            ));
+        }
+    }
+
+    Ok(Nil)
+}
+
+/// Defines an action in RAE environment.
+#[macro_rules_attribute(dyn_async!)]
 async fn def_action<'a>(
     args: &'a [LValue],
     env: &'a LEnv,
@@ -390,7 +525,7 @@ async fn def_action<'a>(
     )
     .await?;
 
-    println!("def-action: lvalue: {}", lvalue);
+    //println!("def-action: lvalue: {}", lvalue);
 
     if let LValue::List(list) = &lvalue {
         if list.len() != 2 {
@@ -402,10 +537,8 @@ async fn def_action<'a>(
             ));
         } else if let LValue::Symbol(action_label) = &list[0] {
             if let LValue::Lambda(_) = &list[1] {
-                ctx.env.add_action(
-                    action_label.to_string(),
-                    Action::new(list[1].clone(), list[1].clone()),
-                )?;
+                ctx.env
+                    .add_action(action_label.to_string(), Action::new(list[1].clone(), Nil))?;
             } else {
                 return Err(WrongType(
                     RAE_DEF_ACTION,

@@ -245,6 +245,20 @@ impl DomainEnv {
             .insert(label.into(), ACTION_TYPE.into());
     }
 
+    pub fn add_action_sample_fn(&mut self, label: String, value: LValue) -> Result<(), LError> {
+        match self.actions.get_mut(&label) {
+            None => Err(SpecialError(
+                "add_action_sample_fn",
+                format!("Action {} is not defined", label),
+            )),
+            Some(action) => {
+                //println!("updating sim of {} with {}", label, value);
+                action.sim = value;
+                Ok(())
+            }
+        }
+    }
+
     pub fn add_lambda(&mut self, label: String, value: LValue) {
         self.lambdas.insert(label.clone(), value);
         self.map_symbol_type
@@ -617,6 +631,10 @@ impl RAEEnv {
         self.domain_env.add_action(label, value);
 
         Ok(())
+    }
+
+    pub fn add_action_sample_fn(&mut self, label: String, value: LValue) -> Result<(), LError> {
+        self.domain_env.add_action_sample_fn(label, value)
     }
 
     pub fn add_state_function(

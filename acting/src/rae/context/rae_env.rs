@@ -1,11 +1,14 @@
 use crate::rae::context::actions_progress::ActionsProgress;
 use crate::rae::context::agenda::Agenda;
 use crate::rae::context::rae_state::RAEState;
+use crate::rae::module::init_simu_env;
 use crate::rae::module::mod_rae_exec::{Job, JobId};
+use crate::rae::module::mod_rae_sim_interface::CtxRaeSimInterface;
 use crate::rae::TOKIO_CHANNEL_SIZE;
 use im::HashMap;
 use log::Level::Debug;
-use ompas_lisp::core::{ContextCollection, LEnv};
+use ompas_lisp::core::ImportType::WithoutPrefix;
+use ompas_lisp::core::{import, ContextCollection, LEnv};
 use ompas_lisp::structs::LCoreOperator::Define;
 use ompas_lisp::structs::LError::SpecialError;
 use ompas_lisp::structs::{InitLisp, LError, LFn, LLambda, LValue};
@@ -575,19 +578,32 @@ pub struct RAEEnv {
     pub env: LEnv,
     pub domain_env: DomainEnv,
     pub ctxs: ContextCollection,
-    pub init_lisp: InitLisp,
 }
 
 impl RAEEnv {
-    pub fn get_exec_env(&self) -> LEnv {
-        //TODO: modify it to build the env from methods structs and other structs
-        let mut env: LEnv = self.domain_env.get_exec_env();
-        env.set_outer(self.env.clone());
-        env
+    pub async fn get_exec_env(&self) -> (LEnv, ContextCollection) {
+        let mut domain_exec_env: LEnv = self.domain_env.get_exec_env();
+        let domain_sim_env = self.domain_env.get_sim_env();
+        let mut exec_env = self.env.clone();
+        let mut exec_ctxs = self.ctxs.clone();
+        let (sim_env, sim_ctxs) = init_simu_env(None).await;
+        let mut ctx_rae_sim_interface = CtxRaeSimInterface::new(sim_env, sim_ctxs);
+        ctx_rae_sim_interface.add_domain_sim(domain_sim_env);
+
+        import(
+            &mut exec_env,
+            &mut exec_ctxs,
+            ctx_rae_sim_interface,
+            WithoutPrefix,
+        )
+        .await
+        .expect("error loading ctx_rae_sim_interface");
+
+        domain_exec_env.set_outer(exec_env);
+        (domain_exec_env, exec_ctxs)
     }
 
     pub fn get_sim_env(&self) -> LEnv {
-        //TODO: modify it to build the env from methods structs and other structs
         let mut env: LEnv = self.domain_env.get_sim_env();
         env.set_outer(self.env.clone());
         env
@@ -596,33 +612,23 @@ impl RAEEnv {
 
 //pub const RAE_MAP_TYPE:&str = "rae-map-type";
 
-impl Default for RAEEnv {
-    fn default() -> Self {
-        let (env, ctxs, init_lisp) = LEnv::root();
+impl RAEEnv {
+    #[allow(clippy::field_reassign_with_default)]
+    pub async fn new(
+        job_receiver: Option<Receiver<Job>>,
+        status_watcher: Option<Receiver<usize>>,
+    ) -> Self {
+        let (env, ctxs) = LEnv::root().await;
         Self {
-            job_receiver: None,
+            job_receiver,
             agenda: Default::default(),
             actions_progress: Default::default(),
             state: Default::default(),
             env,
             domain_env: Default::default(),
             ctxs,
-            init_lisp,
-            status_watcher: None,
+            status_watcher,
         }
-    }
-}
-
-impl RAEEnv {
-    #[allow(clippy::field_reassign_with_default)]
-    pub fn new(
-        job_receiver: Option<Receiver<Job>>,
-        status_watcher: Option<Receiver<usize>>,
-    ) -> Self {
-        let mut env = RAEEnv::default();
-        env.job_receiver = job_receiver;
-        env.status_watcher = status_watcher;
-        env
     }
 }
 

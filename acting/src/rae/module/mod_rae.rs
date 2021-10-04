@@ -7,7 +7,7 @@ use crate::rae::module::mod_rae_exec::{CtxRaeExec, RAEInterface};
 use crate::rae::{rae_log, rae_run, RAEOptions};
 use ::macro_rules_attribute::macro_rules_attribute;
 use ompas_lisp::async_await;
-use ompas_lisp::core::{eval, expand, load_module, parse, LEnv};
+use ompas_lisp::core::{eval, expand, parse, LEnv};
 use ompas_lisp::functions::cons;
 use ompas_lisp::modules::doc::{Documentation, LHelp};
 use ompas_lisp::structs::LError::*;
@@ -86,12 +86,31 @@ const DOC_RAE_GET_CONFIG_PLATFORM: &str = "Get the actual value of the config of
 const DOC_RAE_GET_AGENDA: &str =
     "Get the actual agenda with for each task the current refinement stack.";
 
-#[derive(Default)]
 pub struct CtxRae {
     pub log: Option<PathBuf>,
     pub options: RAEOptions,
     pub env: RAEEnv,
     pub domain: InitLisp,
+}
+
+impl Default for CtxRae {
+    fn default() -> Self {
+        Self {
+            log: None,
+            options: Default::default(),
+            env: RAEEnv {
+                job_receiver: None,
+                status_watcher: None,
+                agenda: Default::default(),
+                actions_progress: Default::default(),
+                state: Default::default(),
+                env: Default::default(),
+                domain_env: Default::default(),
+                ctxs: Default::default(),
+            },
+            domain: Default::default(),
+        }
+    }
 }
 
 impl GetModule for CtxRae {
@@ -852,7 +871,6 @@ pub fn rae_launch(_: &[LValue], _env: &LEnv, ctx: &mut CtxRae) -> Result<LValue,
         env: ctx.env.env.clone(),
         domain_env: ctx.env.domain_env.clone(),
         ctxs: Default::default(),
-        init_lisp: Default::default(),
     };
     let context = mem::replace(&mut ctx.env, rae_env);
     rae_log::init(ctx.log.clone()).expect("Error while initiating logger.");

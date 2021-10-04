@@ -39,12 +39,16 @@ name = "virtual_robot"
 path = "src/bin/robot_sim.rs"
 
 [[bin]]
-name = "lisp"
+name = "supervisor"
 path = "src/bin/unnamed_supervisor.rs"
 
 [[bin]]
 name = "ompas"
 path = "src/bin/ompas.rs"
+
+[[bin]]
+name = "scheme"
+path = "src/bin/sandbox/lisp_interpreter.rs"
 
 [[bin]]
 name = "godot_test"
@@ -75,9 +79,6 @@ name = "test_logger"
 path = "src/bin/sandbox/test_logger.rs"
 
 
-[[bin]]
-name = "lisp_interpreter"
-path = "src/bin/sandbox/lisp_interpreter.rs"
 
 [[bin]]
 name = "test_lenv"

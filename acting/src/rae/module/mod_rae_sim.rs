@@ -18,6 +18,7 @@ pub const MACRO_RETRACT: &str = "(defmacro retract
     (lambda args
         `(set! state (remove-key-value-map state (quote ,args)))))";
 
+#[derive(Default)]
 pub struct CtxRaeSim {}
 
 impl GetModule for CtxRaeSim {

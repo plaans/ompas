@@ -10,7 +10,7 @@ use crate::rae::select_methods::sort_greedy;
 use ::macro_rules_attribute::macro_rules_attribute;
 use async_trait::async_trait;
 use log::{error, info, warn};
-use ompas_lisp::core::LEnv;
+use ompas_lisp::core::{ContextCollection, LEnv};
 use ompas_lisp::functions::{cons, union_map};
 use ompas_lisp::modules::doc::{Documentation, LHelp};
 use ompas_lisp::structs::LError::*;

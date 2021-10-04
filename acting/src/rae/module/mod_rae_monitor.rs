@@ -7,7 +7,6 @@ use ompas_lisp::structs::{GetModule, LError, LValue, LValueS, Module};
 use std::sync::Arc;
 use tokio::sync::mpsc::Sender;
 
-#[derive(Default)]
 pub struct CtxRaeMonitor {
     pub sender_to_rae: Option<Sender<Job>>,
     pub env: RAEEnv,

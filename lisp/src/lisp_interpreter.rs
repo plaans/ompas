@@ -1,6 +1,6 @@
-use crate::core::{eval, parse, ContextCollection, LEnv};
+use crate::core::{eval, parse, ContextCollection, ImportType, LEnv};
 use crate::language::scheme_primitives::NIL;
-use crate::structs::{GetModule, InitLisp, LValue};
+use crate::structs::{GetModule, LError};
 use crate::TOKIO_CHANNEL_SIZE;
 use chrono::{DateTime, Utc};
 use im::HashMap;
@@ -103,7 +103,6 @@ impl LispInterpreterConfig {
 pub struct LispInterpreter {
     env: LEnv,
     ctxs: ContextCollection,
-    init: InitLisp,
     li_channel: LispInterpreterChannel,
     config: LispInterpreterConfig,
 }
@@ -114,45 +113,19 @@ impl LispInterpreter {
     }
 }
 
-#[derive(Debug)]
-pub enum ImportType {
-    WithPrefix,
-    WithoutPrefix,
-}
-
 impl LispInterpreter {
-    pub fn import_namespace(&mut self, ctx: impl GetModule) -> usize {
-        self._import(ctx, ImportType::WithoutPrefix)
+    pub async fn import_namespace(&mut self, ctx: impl GetModule) -> Result<(), LError> {
+        crate::core::import(
+            &mut self.env,
+            &mut self.ctxs,
+            ctx,
+            ImportType::WithoutPrefix,
+        )
+        .await
     }
 
-    pub fn import(&mut self, ctx: impl GetModule) -> usize {
-        self._import(ctx, ImportType::WithPrefix)
-    }
-
-    fn _import(&mut self, ctx: impl GetModule, type_import: ImportType) -> usize {
-        let mut module = ctx.get_module();
-        let id = self.ctxs.insert(module.ctx, module.label.clone());
-        //println!("id: {}", id);
-        self.init.append(&mut module.raw_lisp);
-        for (sym, lv) in &mut module.prelude {
-            match lv {
-                LValue::Fn(fun) => fun.set_index_mod(id),
-                LValue::MutFn(fun) => fun.set_index_mod(id),
-                LValue::AsyncFn(fun) => fun.set_index_mod(id),
-                LValue::AsyncMutFn(fun) => fun.set_index_mod(id),
-                _ => {}
-            }
-            match type_import {
-                ImportType::WithPrefix => {
-                    self.env
-                        .insert(format!("{}::{}", module.label, sym.to_string()), lv.clone());
-                }
-                ImportType::WithoutPrefix => {
-                    self.env.insert(sym.to_string(), lv.clone());
-                }
-            }
-        }
-        id
+    pub async fn import(&mut self, ctx: impl GetModule) -> Result<(), LError> {
+        crate::core::import(&mut self.env, &mut self.ctxs, ctx, ImportType::WithPrefix).await
     }
 
     pub async fn recv(&mut self) -> Option<String> {
@@ -161,13 +134,6 @@ impl LispInterpreter {
 
     pub async fn run(mut self, log: Option<PathBuf>) {
         let channel_with_log = self.subscribe();
-
-        for element in self.init.inner() {
-            channel_with_log
-                .send(element.to_string())
-                .await
-                .expect("Error sending sexpr to LI.");
-        }
 
         let handle_log = spawn_log(channel_with_log, log).await;
         let handle_repl = if self.config.repl {
@@ -231,14 +197,13 @@ impl LispInterpreter {
     }
 }
 
-impl Default for LispInterpreter {
-    fn default() -> Self {
-        let (env, ctxs, init) = LEnv::root();
+impl LispInterpreter {
+    pub async fn new() -> Self {
+        let (env, ctxs) = LEnv::root().await;
 
         Self {
             env,
             ctxs,
-            init,
             li_channel: Default::default(),
             config: Default::default(),
         }

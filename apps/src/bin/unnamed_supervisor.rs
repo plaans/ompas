@@ -8,10 +8,10 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use ompas_acting::controller::dumber::CtxDumber;
 use ompas_acting::rae::module::init_ctx_rae;
 use ompas_acting::rae::module::mod_rae::CtxRae;
-use ompas_acting::rae::module::mod_rae_exec::CtxRaeExec;
 use ompas_acting::rae::module::mod_rae_monitor::CtxRaeMonitor;
 use ompas_godot_simulation_client::mod_godot::CtxGodot;
 use ompas_godot_simulation_client::rae_interface::PlatformGodot;
+use ompas_lisp::core::ImportType::WithoutPrefix;
 use ompas_lisp::core::*;
 use ompas_lisp::modules::_type::CtxType;
 use ompas_lisp::modules::counter::CtxCounter;
@@ -77,7 +77,7 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
         .await
         .expect("error while spawning log task");
 
-    let (mut root_env, mut ctxs, mut lisp_init) = LEnv::root();
+    let (mut root_env, mut ctxs) = LEnv::root().await;
     let mut ctx_doc = CtxDoc::default();
     let mut ctx_io = CtxIo::default();
     let ctx_math = CtxMath::default();
@@ -102,33 +102,39 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
         ctx_io.set_log_output(pb.into());
     }
 
-    let mut _ctx_rae_exec = CtxRaeExec {
+    /*let mut _ctx_rae_exec = CtxRaeExec {
         actions_progress: Default::default(),
         state: Default::default(),
         platform_interface: Box::new(PlatformGodot::default()),
         agenda: Default::default(),
-    };
+    };*/
 
-    load_module(&mut root_env, &mut ctxs, ctx_utils, &mut lisp_init);
-    load_module(&mut root_env, &mut ctxs, ctx_doc, &mut lisp_init);
-    load_module(&mut root_env, &mut ctxs, ctx_io, &mut lisp_init);
-    load_module(&mut root_env, &mut ctxs, ctx_math, &mut lisp_init);
-    load_module(&mut root_env, &mut ctxs, ctx_type, &mut lisp_init);
-    load_module(&mut root_env, &mut ctxs, ctx_counter, &mut lisp_init);
-    load_module(&mut root_env, &mut ctxs, ctx_rae, &mut lisp_init);
-    load_module(&mut root_env, &mut ctxs, ctx_rae_monitor, &mut lisp_init);
+    import(&mut root_env, &mut ctxs, ctx_utils, WithoutPrefix)
+        .await
+        .expect("error loading utils");
+    import(&mut root_env, &mut ctxs, ctx_doc, WithoutPrefix)
+        .await
+        .expect("error loading doc");
+    import(&mut root_env, &mut ctxs, ctx_io, WithoutPrefix)
+        .await
+        .expect("error loading io");
+    import(&mut root_env, &mut ctxs, ctx_math, WithoutPrefix)
+        .await
+        .expect("error loading math");
+    import(&mut root_env, &mut ctxs, ctx_type, WithoutPrefix)
+        .await
+        .expect("error loading type");
+    import(&mut root_env, &mut ctxs, ctx_counter, WithoutPrefix)
+        .await
+        .expect("error loading counter");
+    import(&mut root_env, &mut ctxs, ctx_rae, WithoutPrefix)
+        .await
+        .expect("error loading rae");
+    import(&mut root_env, &mut ctxs, ctx_rae_monitor, WithoutPrefix)
+        .await
+        .expect("error loading monitor");
 
     let env = &mut root_env.clone();
-    //println!("{}", lisp_init.begin_lisp());
-
-    for def in lisp_init.inner() {
-        sender_li
-            .send(def.to_string())
-            .await
-            .expect("error while sending message");
-    }
-
-    //println!("global ctxs: {}", ctxs);
 
     loop {
         //TODO: handle response to multi user.

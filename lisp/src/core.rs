@@ -311,14 +311,20 @@ impl GetModule for CtxRoot {
 impl LEnv {
     /// Returns the env with all the basic functions, the ContextCollection with CtxRoot
     /// and InitialLisp containing the definition of macros and lambdas,
-    pub fn root() -> (Self, ContextCollection, InitLisp) {
+    pub async fn root() -> (Self, ContextCollection) {
         // let map = im::hashmap::HashMap::new();
         // map.ins
         let mut env = LEnv::default();
         let mut ctxs = ContextCollection::default();
-        let mut lisp_init = InitLisp::default();
-        load_module(&mut env, &mut ctxs, CtxRoot::default(), &mut lisp_init);
-        (env, ctxs, lisp_init)
+        import(
+            &mut env,
+            &mut ctxs,
+            CtxRoot::default(),
+            ImportType::WithoutPrefix,
+        )
+        .await
+        .expect("error while loading module root");
+        (env, ctxs)
     }
 
     pub fn empty() -> Self {
@@ -403,16 +409,14 @@ impl LEnv {
 
 /// Load a library (module) into the environment so it can be used.
 /// *ctx* is moved into *ctxs*.
-pub fn load_module(
+/*pub async fn load_module(
     env: &mut LEnv,
     ctxs: &mut ContextCollection,
     ctx: impl GetModule,
-    lisp_init: &mut InitLisp,
-) -> usize {
+) -> Result<LValue, LError> {
     let mut module = ctx.get_module();
     let id = ctxs.insert(module.ctx, module.label);
     //println!("id: {}", id);
-    lisp_init.append(&mut module.raw_lisp);
     for (sym, lv) in &mut module.prelude {
         match lv {
             LValue::Fn(fun) => fun.set_index_mod(id),
@@ -423,7 +427,59 @@ pub fn load_module(
         }
         env.insert(sym.to_string(), lv.clone());
     }
-    id
+
+    for element in module.raw_lisp.inner() {
+        //println!("Adding {} to rae_env", element);
+        let lvalue = parse(element, env, ctxs).await?;
+
+        if lvalue != LValue::Nil {
+            eval(&lvalue, env, ctxs).await?;
+        }
+    }
+    Ok(Nil)
+}*/
+
+#[derive(Debug)]
+pub enum ImportType {
+    WithPrefix,
+    WithoutPrefix,
+}
+
+pub async fn import(
+    env: &mut LEnv,
+    ctxs: &mut ContextCollection,
+    ctx: impl GetModule,
+    import_type: ImportType,
+) -> Result<(), LError> {
+    let mut module = ctx.get_module();
+    let id = ctxs.insert(module.ctx, module.label.clone());
+    //println!("id: {}", id);
+    for (sym, lv) in &mut module.prelude {
+        match lv {
+            LValue::Fn(fun) => fun.set_index_mod(id),
+            LValue::MutFn(fun) => fun.set_index_mod(id),
+            LValue::AsyncFn(fun) => fun.set_index_mod(id),
+            LValue::AsyncMutFn(fun) => fun.set_index_mod(id),
+            _ => {}
+        }
+        match import_type {
+            ImportType::WithPrefix => {
+                env.insert(format!("{}::{}", module.label, sym.to_string()), lv.clone());
+            }
+            ImportType::WithoutPrefix => {
+                env.insert(sym.to_string(), lv.clone());
+            }
+        }
+    }
+
+    for element in module.raw_lisp.inner() {
+        let lvalue = parse(element, env, ctxs).await?;
+
+        if lvalue != LValue::Nil {
+            eval(&lvalue, env, ctxs).await?;
+        }
+    }
+    Ok(())
 }
 
 /// Parse an str and returns an expanded LValue
@@ -1071,6 +1127,7 @@ pub async fn eval(
                                 .into();
                         let future_2 = future.clone();
                         tokio::spawn(async move {
+                            #[allow(unused_must_use)]
                             if let LValue::Future(future_2) = future_2 {
                                 future_2.await;
                             }

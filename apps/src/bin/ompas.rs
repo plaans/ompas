@@ -2,11 +2,9 @@ use std::path::PathBuf;
 
 use structopt::StructOpt;
 
-//use ompas_modules::robot::CtxRobot;
 use ompas_acting::controller::dumber::CtxDumber;
 use ompas_acting::rae::module::init_ctx_rae;
 use ompas_acting::rae::module::mod_rae::CtxRae;
-use ompas_acting::rae::module::mod_rae_exec::CtxRaeExec;
 use ompas_acting::rae::module::mod_rae_monitor::CtxRaeMonitor;
 use ompas_godot_simulation_client::mod_godot::CtxGodot;
 use ompas_godot_simulation_client::rae_interface::PlatformGodot;
@@ -58,7 +56,7 @@ async fn main() {
 }
 
 pub async fn lisp_interpreter(log: Option<PathBuf>) {
-    let mut li = LispInterpreter::default();
+    let mut li = LispInterpreter::new().await;
 
     let mut ctx_doc = CtxDoc::default();
     let mut ctx_io = CtxIo::default();
@@ -84,24 +82,31 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
         ctx_io.set_log_output(pb.clone().into());
     }
 
-    let mut _ctx_rae_exec = CtxRaeExec {
-        actions_progress: Default::default(),
-        state: Default::default(),
-        platform_interface: Box::new(PlatformGodot::default()),
-        agenda: Default::default(),
-    };
-
-    li.import_namespace(CtxError::default());
-    li.import_namespace(ctx_utils);
-    li.import_namespace(ctx_doc);
-    li.import_namespace(ctx_io);
-    li.import_namespace(ctx_math);
-    li.import_namespace(ctx_type);
-    li.import_namespace(ctx_counter);
-    li.import_namespace(ctx_rae);
-    li.import_namespace(ctx_rae_monitor);
-
-    //println!("global ctxs: {}", ctxs);
+    li.import_namespace(CtxError::default())
+        .await
+        .expect("error loading error");
+    li.import_namespace(ctx_utils)
+        .await
+        .expect("error loading utils");
+    li.import_namespace(ctx_doc)
+        .await
+        .expect("error loading doc");
+    li.import_namespace(ctx_io).await.expect("error loading io");
+    li.import_namespace(ctx_math)
+        .await
+        .expect("error loading math");
+    li.import_namespace(ctx_type)
+        .await
+        .expect("error loading type");
+    li.import_namespace(ctx_counter)
+        .await
+        .expect("error loading counter");
+    li.import_namespace(ctx_rae)
+        .await
+        .expect("error loading rae");
+    li.import_namespace(ctx_rae_monitor)
+        .await
+        .expect("error loading rae monitor");
 
     li.set_config(LispInterpreterConfig::new(true));
 

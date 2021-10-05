@@ -2,7 +2,7 @@
 
 use crate::rae::context::rae_env::{Action, RAEEnv, StateFunction};
 use crate::rae::context::rae_state::{LState, StateType, KEY_DYNAMIC, KEY_INNER_WORLD, KEY_STATIC};
-use crate::rae::module::domain::{GENERATE_TASK_SIMPLE, LABEL_GENERATE_METHOD_PARAMETERS};
+use crate::rae::module::mod_rae_description::GENERATE_TASK_SIMPLE;
 use crate::rae::module::mod_rae_exec::{CtxRaeExec, RAEInterface};
 use crate::rae::{rae_log, rae_run, RAEOptions};
 use ::macro_rules_attribute::macro_rules_attribute;

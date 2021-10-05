@@ -10,13 +10,21 @@ const FAILURE: &str = "failure";
 const IS_SUCCESS: &str = "success?";
 const IS_FAILURE: &str = "failure?";
 
-pub const MACRO_ASSERT: &str = "(defmacro assert
+const MACRO_ASSERT: &str = "(defmacro assert
     (lambda args
         `(set! state (set-map state (quote ,args)))))";
 
-pub const MACRO_RETRACT: &str = "(defmacro retract
+const MACRO_RETRACT: &str = "(defmacro retract
     (lambda args
         `(set! state (remove-key-value-map state (quote ,args)))))";
+
+const LAMBDA_GET_PRECONDITIONS: &str = "(define get-preconditions\
+        (lambda (label)\
+            (get rae-method-pre-conditions-map label))";
+
+const LAMBDA_EVAL_PRE_CONDITIONS: &str = "(define eval-pre-conditions\
+(lambda args\
+    ((get-preconditions (car args)) args)))";
 
 #[derive(Default)]
 pub struct CtxRaeSim {}
@@ -26,7 +34,13 @@ impl GetModule for CtxRaeSim {
         let mut module = Module {
             ctx: Arc::new(self),
             prelude: vec![],
-            raw_lisp: vec![MACRO_ASSERT, MACRO_RETRACT].into(),
+            raw_lisp: vec![
+                MACRO_ASSERT,
+                MACRO_RETRACT,
+                LAMBDA_GET_PRECONDITIONS,
+                LAMBDA_EVAL_PRE_CONDITIONS,
+            ]
+            .into(),
             label: MOD_RAE_SIM.to_string(),
         };
 

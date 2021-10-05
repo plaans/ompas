@@ -58,6 +58,68 @@ pub const RAE_SELECT: &str = "rae-select";
 pub const RAE_GET_NEXT_METHOD: &str = "rae-get-next-method";
 pub const RAE_SET_SUCCESS_FOR_TASK: &str = "rae-set-success-for-task";
 
+pub const MACRO_MUTEX_LOCK_AND_DO: &str = "(defmacro mutex::lock-and-do 
+    (lambda (r b)
+        `(begin
+            (lock ,r)
+            ,b
+            (release ,r))))";
+pub const MACRO_WAIT_ON: &str = "(defmacro wait-on (lambda (expr)
+    `(if (not (eval ,expr))
+        (check ,expr))))";
+pub const LABEL_ENUMERATE_PARAMS: &str = "enumerate-params";
+
+/*pub const LAMBDA_MUTEX_LOCK: &str = "(define mutex::lock (lambda (__symbol__)
+                                        (begin
+                                            (wait-on `(not (mutex::locked? ,__symbol__)))
+                                            (assert `(locked ,__symbol__) true))))";
+
+pub const LAMBDA_MUTEX_IS_LOCKED: &str = "(define mutex::locked? (lambda (__symbol__)
+                                        (rae-get-state-variable `(locked ,__symbol__))))";
+
+pub const LAMBDA_MUTEX_RELEASE: &str = "(define mutex::release (lambda (__symbol__)
+                                        (retract `(locked ,__symbol__) true)))";*/
+
+pub const LAMBDA_PROGRESS: &str = "
+(define progress (lambda args
+    (let* ((result (eval (cons select (cons `(quote ,(car args)) (cdr args)))))
+            (first_m (car result))
+            (task_id (cadr result)))
+            
+            (if (null? first_m)
+                nil
+                (if (eval first_m)
+                    (rae-set-success-for-task task_id)
+                    (retry task_id))))))";
+
+pub const LAMBDA_SELECT: &str = "
+(define select
+  (lambda args
+    (rae-select args (eval (cons generate-instances (cons `(quote ,(car args)) (cdr args)))))))";
+
+pub const LAMBDA_RETRY: &str = "
+(define retry (lambda (task_id)
+    (let ((new_method (rae-get-next-method task_id)))
+        (begin 
+            (print \"Retrying task \" task_id)
+            (if (null? new_method) ; if there is no method applicable
+            nil
+            (if (eval new_method)
+                (rae-set-success-for-task task_id)
+                (rae-retry task_id)))))))";
+
+//Access part of the environment
+
+pub const LAMBDA_GET_METHODS: &str = "\
+(define get-methods\
+    (lambda (label)\
+        (get-map rae-task-methods-map label)))";
+
+pub const LAMBDA_GET_METHOD_GENERATOR: &str = "\
+(define get-method-generator
+       (lambda (label)
+            (get-map rae-method-generator-map label)))";
+
 //TODO: write doc
 
 ///Context that will contains primitives for the RAE executive
@@ -83,15 +145,6 @@ impl Default for CtxRaeExec {
 impl GetModule for CtxRaeExec {
     fn get_module(self) -> Module {
         let init: InitLisp = vec![
-            MACRO_GENERATE_ACTION,
-            MACRO_GENERATE_ACTION_MODEL,
-            MACRO_GENERATE_OPERATIONAL_MODEL,
-            MACRO_GENERATE_METHOD,
-            MACRO_GENERATE_TASK,
-            MACRO_GENERATE_STATE_FUNCTION,
-            MACRO_GENERATE_TASK_SIMPLE,
-            MACRO_GENERATE_METHOD_PARAMETERS,
-            MACRO_ENUMERATE_PARAMS,
             MACRO_MUTEX_LOCK_AND_DO,
             MACRO_WAIT_ON,
             //LAMBDA_MUTEX_LOCK,
@@ -102,7 +155,6 @@ impl GetModule for CtxRaeExec {
             LAMBDA_RETRY,
             LAMBDA_GET_METHODS,
             LAMBDA_GET_METHOD_GENERATOR,
-            LAMBDA_GENERATE_INSTANCES,
         ]
         .into();
         let mut module = Module {

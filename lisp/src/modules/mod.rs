@@ -5,4 +5,5 @@ pub mod error;
 pub mod io;
 pub mod math;
 pub mod robot;
+pub mod string;
 pub mod utils;

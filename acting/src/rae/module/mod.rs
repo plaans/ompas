@@ -1,5 +1,6 @@
 use crate::rae::context::rae_env::RAEEnv;
 use crate::rae::module::mod_rae::CtxRae;
+use crate::rae::module::mod_rae_description::CtxRaeDescription;
 use crate::rae::module::mod_rae_exec::{CtxRaeExec, RAEInterface};
 use crate::rae::module::mod_rae_monitor::CtxRaeMonitor;
 use crate::rae::module::mod_rae_sim::CtxRaeSim;
@@ -17,6 +18,7 @@ use tokio::sync::mpsc;
 
 pub mod domain;
 pub mod mod_rae;
+pub(crate) mod mod_rae_description;
 pub mod mod_rae_exec;
 pub mod mod_rae_monitor;
 pub(crate) mod mod_rae_sim;
@@ -90,6 +92,15 @@ pub async fn init_ctx_rae(
     )
     .await
     .expect("error loading rae exec");
+
+    import(
+        &mut rae_env.env,
+        &mut rae_env.ctxs,
+        CtxRaeDescription::default(),
+        WithoutPrefix,
+    )
+    .await
+    .expect("error loading rae description");
 
     import(&mut rae_env.env, &mut rae_env.ctxs, ctx_io, WithoutPrefix)
         .await

@@ -6,16 +6,15 @@ use ompas_acting::controller::dumber::CtxDumber;
 use ompas_acting::rae::module::init_ctx_rae;
 use ompas_acting::rae::module::mod_rae::CtxRae;
 use ompas_acting::rae::module::mod_rae_monitor::CtxRaeMonitor;
-use ompas_godot_simulation_client::mod_godot::CtxGodot;
 use ompas_godot_simulation_client::rae_interface::PlatformGodot;
 use ompas_lisp::core::*;
 use ompas_lisp::lisp_interpreter::{LispInterpreter, LispInterpreterConfig};
 use ompas_lisp::modules::_type::CtxType;
-use ompas_lisp::modules::counter::CtxCounter;
 use ompas_lisp::modules::doc::{CtxDoc, Documentation};
 use ompas_lisp::modules::error::CtxError;
 use ompas_lisp::modules::io::CtxIo;
 use ompas_lisp::modules::math::CtxMath;
+use ompas_lisp::modules::string::CtxString;
 use ompas_lisp::modules::utils::CtxUtils;
 
 pub const TOKIO_CHANNEL_SIZE: usize = 65_384;
@@ -62,9 +61,8 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     let mut ctx_io = CtxIo::default();
     let ctx_math = CtxMath::default();
     let ctx_type = CtxType::default();
-    let ctx_counter = CtxCounter::default();
-    let _ctx_godot = CtxGodot::default();
     let ctx_utils = CtxUtils::default();
+    let ctx_string = CtxString::default();
     let (ctx_rae, ctx_rae_monitor) =
         init_ctx_rae(Box::new(PlatformGodot::default()), log.clone()).await;
     //Insert the doc for the different contexts.
@@ -75,6 +73,7 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     ctx_doc.insert_doc(CtxRae::documentation());
     ctx_doc.insert_doc(CtxRaeMonitor::documentation());
     ctx_doc.insert_doc(CtxUtils::documentation());
+    ctx_doc.insert_doc(CtxString::documentation());
 
     //Add the sender of the channel.
     ctx_io.add_communication(li.subscribe());
@@ -98,15 +97,16 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     li.import_namespace(ctx_type)
         .await
         .expect("error loading type");
-    li.import_namespace(ctx_counter)
-        .await
-        .expect("error loading counter");
     li.import_namespace(ctx_rae)
         .await
         .expect("error loading rae");
     li.import_namespace(ctx_rae_monitor)
         .await
         .expect("error loading rae monitor");
+
+    li.import(ctx_string)
+        .await
+        .expect("error loading ctx string");
 
     li.set_config(LispInterpreterConfig::new(true));
 

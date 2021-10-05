@@ -165,3 +165,88 @@
                 result)))
 
 
+Definition partielle d'une méthode:
+
+(
+ (:task label)
+ (:params (?r robot) (?p package))); utilisation de unzip pour séparer les paramètres de leurs types
+ (:pre-conditions ( = (robot.ready ?r) true)))
+ (:score 0))
+
+
+
+ ((:task t_navigate_to)
+    (:params ?r ?x ?y)
+    (:pre-conditions true)
+    (:effects nil)
+    ;(:parameters-generator nil true) removed
+    (:score-generator 0)
+    (:body )
+
+
+-> 
+(lambda (?r ?p)
+    (if 
+        (and
+            (!= (robot.instance ?r) nil)
+            (!= (pacakge.instance ?p) nil)) ;test des types
+        (if (robot.ready ?r) true nil) ;test des 
+        nil
+    ))
+
+
+(defmacro generate-preconditions
+    (lambda (m_label df)
+        (let ((t_label (cadar def))
+              (p_expr (cdr (get def 1)))
+              (conds (cadr (get def 2)))
+              (effs (cadr (get def 3)))
+              (score (cadr (get def 4)))
+              (body (cadr (get def 5))))
+
+            (let* ((p_unzip (unzip p_expr))
+                   (params (car p_unzip))
+                   (types (cadr p_unzip)))
+    
+            `(list ,m_label 
+                (quote ,t_label)
+                ;lambda for preconditons
+                (lambda ,params
+                    (if "type are good"
+                        (if ,conds true)))
+                (lambda ,params ,effs)
+                (lambda ,params score)
+                (lambda ,params body))))))
+
+
+(defmacro generate-method;-final-till-there-is-a-new-one
+    (lambda (method-label m-def)
+    (let* ((task-label (cadr (get-list m-def 0)))
+            (params (cdr (get-list m-def 1)))
+            (pre-conditions (cadr (get-list m-def 2)))
+            (effects (cadr (get-list m-def 3)))
+            (body (cadr (get-list m-def 6)))
+            (parameter-generator (cdr (get-list m-def 4)))
+            (list-element (car parameter-generator))
+            (body-generator (cadr parameter-generator))
+            (score-generator (cadr (get-list m-def 5))))
+            `(list ,method-label
+                    ;label of the task
+                    (quote ,task-label)
+                    ;body of the method
+                    (lambda ,params ,pre-conditions)
+                    (lambda ,params ,effects)
+                    ;lambda to generate instances
+                    (lambda args
+                        (begin
+                            (define eval_params
+                                (lambda args
+                                    (let ((params (car args)))
+                                        (if (null? params)
+                                            nil
+                                            (if (eval (cons (lambda ,params ,body-generator) params))
+                                                (cons (list (cons (quote ,method-label) params) (eval (cons (lambda ,params ,score-generator) params)))
+                                                    (eval_params (cdr args)))
+                                                (eval_params (cdr args)))))))
+                            (eval_params (eval (cons enumerate (append args (quote ,list-element)))))))
+                    (lambda ,params ,body)))))

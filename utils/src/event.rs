@@ -83,7 +83,7 @@ impl EventRaiser {
     fn subscribe(&self) -> broadcast::Receiver<EventSignal> {
         let id = self.id;
         let dispatcher = blocking_async!(EVENT_HANDLER.get_dispatcher(id).await)
-            .expect("todo!")
+            .expect()
             .unwrap();
         dispatcher.broadcast.subscribe()
     }

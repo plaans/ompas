@@ -288,7 +288,7 @@ impl GetModule for CtxRoot {
 
         //predicates
         module.add_fn_prelude(IS_NUMBER, is_number);
-        module.add_fn_prelude(IS_INTEGER, is_integer);
+        module.add_fn_prelude(IS_INT, is_integer);
         module.add_fn_prelude(IS_FLOAT, is_float);
         module.add_fn_prelude(IS_NIL, is_nil);
         module.add_fn_prelude(IS_NUMBER, is_number);
@@ -826,8 +826,10 @@ pub async fn expand(
                         };
                     }
                     LCoreOperator::UnQuote => {
-                        //TODO: Implémenter msg d'erreur
-                        panic!("unquote not at right place")
+                        return Err(SpecialError(
+                            "expand",
+                            "unquote must be inside a quasiquote expression".to_string(),
+                        ))
                     }
                     LCoreOperator::Async => {
                         return if list.len() != 2 {
@@ -977,7 +979,6 @@ pub async fn eval(
     ctxs: &mut ContextCollection,
 ) -> Result<LValue, LError> {
     let mut lv = lv.clone();
-    //TODO: Voir avec arthur une manière plus élégante de faire
     let mut temp_env: LEnv;
     let mut env = env;
 
@@ -1162,7 +1163,7 @@ pub async fn eval(
                                 "eval",
                                 args[0].clone(),
                                 (&args[0]).into(),
-                                NameTypeLValue::Symbol,
+                                NameTypeLValue::String,
                             ))
                         }
                     }

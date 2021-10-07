@@ -153,7 +153,8 @@ impl GetModule for CtxDoc {
     }
 }
 
-//TODO: doc
+/// Struct that contain information to define a documentation for a Lisp function
+/// It has the label of the function and its short description. An optional longer description can also be provided.
 #[derive(Clone)]
 pub struct LHelp {
     label: &'static str,

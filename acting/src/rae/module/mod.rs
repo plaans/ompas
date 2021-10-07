@@ -16,9 +16,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
-pub mod domain;
 pub mod mod_rae;
-pub(crate) mod mod_rae_description;
+pub mod mod_rae_description;
 pub mod mod_rae_exec;
 pub mod mod_rae_monitor;
 pub(crate) mod mod_rae_sim;

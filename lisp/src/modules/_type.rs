@@ -1,6 +1,7 @@
 //! Scheme module implementing symbol typing.
 //! Development in standby. Some features might not be completely working...
 use crate::core::LEnv;
+use crate::language::scheme_primitives::{BOOL, FLOAT, INT, OBJECT, USIZE};
 use crate::modules::doc::{Documentation, LHelp};
 use crate::structs::LError::{
     NotInListOfExpectedTypes, SpecialError, WrongNumberOfArgument, WrongType,
@@ -15,7 +16,17 @@ use std::sync::Arc;
 //pub const IS_PAIR: &str = "pair?";
 
 const MOD_TYPE: &str = "type";
-const DOC_MOD_TYPE: &str = "documentation of the module type";
+const DOC_MOD_TYPE: &str = "Module to define types for symbols. You can define state functions, or custom types and sub-types.";
+const DOC_MOD_TYPE_VERBOSE: &str = "functions: \n\
+                                   \t-type?\n
+                                   \t-sf?\n\
+                                   \t-obj?\n\
+                                   \t-state-function\n\
+                                   \t-type-of\n\
+                                   \t-sub-type\n\
+                                   \t-get-type\n\
+                                   \t-new-sf\n\
+                                   \t-new-obj\n";
 
 //Verification
 
@@ -27,12 +38,6 @@ const IS_OBJECT: &str = "obj?";
 const STATE_FUNCTION: &str = "state-function";
 
 //basic types
-const TYPE_INT: &str = "int";
-const TYPE_FLOAT: &str = "float";
-const TYPE_USIZE: &str = "usize";
-const TYPE_OBJECT: &str = "object";
-const TYPE_BOOL: &str = "boolean";
-
 const INDEX_TYPE_INT: usize = 0;
 const INDEX_TYPE_FLOAT: usize = 1;
 const INDEX_TYPE_USIZE: usize = 2;
@@ -78,38 +83,6 @@ impl LSymType {
     }
 }
 
-//TODO: remove this function
-/*
-impl AsLiteral for LSymType {
-    fn as_command(&self) -> String {
-        match self {
-            LSymType::StateFunction(sf) => sf.as_command(),
-            LSymType::Type(t) => match t {
-                None => "".to_string(),
-                Some(st) => {
-                    format!("(subtype {})", st)
-                }
-            },
-            LSymType::Object(o) => {
-                format!("{}", o)
-            }
-        }
-    }
-}*/
-
-//TODO: Finish implementation
-/*impl Into<LValue> for LSymType {
-    fn into(self) -> LValue {
-        let string: String = match self {
-            LSymType::StateFunction(sf) => sf.to_string(),
-            LSymType::Type(t) => t.to_string(),
-            LSymType::Object(o) => t.to_string(),
-        };
-
-        LValue::String(s)
-    }
-}*/
-
 #[derive(Clone, Debug)]
 pub enum LType {
     Int,
@@ -136,11 +109,11 @@ impl Display for LType {
 impl From<&str> for LType {
     fn from(s: &str) -> Self {
         match s {
-            TYPE_INT => LType::Int,
-            TYPE_FLOAT => LType::Float,
-            TYPE_OBJECT => LType::Object,
-            TYPE_BOOL => LType::Bool,
-            TYPE_USIZE => LType::Usize,
+            INT => LType::Int,
+            FLOAT => LType::Float,
+            OBJECT => LType::Object,
+            BOOL => LType::Bool,
+            USIZE => LType::Usize,
             str => LType::Symbol(str.into()),
         }
     }
@@ -166,12 +139,12 @@ impl From<String> for LType {
 impl From<&LType> for String {
     fn from(lt: &LType) -> Self {
         match lt {
-            LType::Int => TYPE_INT.into(),
-            LType::Bool => TYPE_BOOL.into(),
-            LType::Float => TYPE_FLOAT.into(),
+            LType::Int => INT.into(),
+            LType::Bool => BOOL.into(),
+            LType::Float => FLOAT.into(),
             LType::Symbol(s) => s.clone(),
-            LType::Object => TYPE_OBJECT.into(),
-            LType::Usize => TYPE_USIZE.into(),
+            LType::Object => OBJECT.into(),
+            LType::Usize => USIZE.into(),
         }
     }
 }
@@ -243,19 +216,6 @@ impl Display for LStateFunction {
     }
 }
 
-//TODO: remove this function
-/*impl AsLiteral for LStateFunction {
-    fn as_command(&self) -> String {
-        let mut result = String::new();
-        result.push_str(format!("({} ", STATE_FUNCTION).as_str());
-        for t_param in &self.t_params {
-            result.push_str(format!("{} ", t_param.to_string()).as_str());
-        }
-        result.push_str(format!("{})\n", self.t_value.to_string()).as_str());
-        result
-    }
-}*/
-
 #[derive(Debug)]
 pub struct CtxType {
     map_sym_type_id: im::HashMap<String, usize>,
@@ -263,24 +223,23 @@ pub struct CtxType {
     types: Vec<LSymType>,
 }
 
-//TODO: IMPROVE GET-TYPE and DEFAULT
 impl Default for CtxType {
     fn default() -> Self {
         let types = vec![LSymType::Type(None); 5];
 
         let mut map_sym_type_id: im::HashMap<String, usize> = Default::default();
-        map_sym_type_id.insert(TYPE_INT.into(), INDEX_TYPE_INT);
-        map_sym_type_id.insert(TYPE_FLOAT.into(), INDEX_TYPE_FLOAT);
-        map_sym_type_id.insert(TYPE_USIZE.into(), INDEX_TYPE_USIZE);
-        map_sym_type_id.insert(TYPE_BOOL.into(), INDEX_TYPE_BOOL);
-        map_sym_type_id.insert(TYPE_OBJECT.into(), INDEX_TYPE_OBJECT);
+        map_sym_type_id.insert(INT.into(), INDEX_TYPE_INT);
+        map_sym_type_id.insert(FLOAT.into(), INDEX_TYPE_FLOAT);
+        map_sym_type_id.insert(USIZE.into(), INDEX_TYPE_USIZE);
+        map_sym_type_id.insert(BOOL.into(), INDEX_TYPE_BOOL);
+        map_sym_type_id.insert(OBJECT.into(), INDEX_TYPE_OBJECT);
 
         let mut map_type_id_sym: im::HashMap<usize, String> = Default::default();
-        map_type_id_sym.insert(INDEX_TYPE_INT, TYPE_INT.into());
-        map_type_id_sym.insert(INDEX_TYPE_FLOAT, TYPE_FLOAT.into());
-        map_type_id_sym.insert(INDEX_TYPE_USIZE, TYPE_USIZE.into());
-        map_type_id_sym.insert(INDEX_TYPE_BOOL, TYPE_BOOL.into());
-        map_type_id_sym.insert(INDEX_TYPE_OBJECT, TYPE_OBJECT.into());
+        map_type_id_sym.insert(INDEX_TYPE_INT, INT.into());
+        map_type_id_sym.insert(INDEX_TYPE_FLOAT, FLOAT.into());
+        map_type_id_sym.insert(INDEX_TYPE_USIZE, USIZE.into());
+        map_type_id_sym.insert(INDEX_TYPE_BOOL, BOOL.into());
+        map_type_id_sym.insert(INDEX_TYPE_OBJECT, OBJECT.into());
 
         Self {
             map_sym_type_id,
@@ -346,7 +305,6 @@ impl GetModule for CtxType {
 /*
 DOCUMENTATION
  */
-//TODO: write doc mod type
 
 const DOC_IS_STATE_FUNCTION: &str = "Return true if symbol is state function";
 const DOC_IS_OBJECT: &str = "Return true if symbol is object";
@@ -382,6 +340,7 @@ impl Documentation for CtxType {
                 DOC_NEW_STATE_FUNCTION_VERBOSE,
             ),
             LHelp::new_verbose(NEW_OBJECT, DOC_NEW_OBJECT, DOC_NEW_OBJECT_VERBOSE),
+            LHelp::new_verbose(MOD_TYPE, DOC_MOD_TYPE, DOC_MOD_TYPE_VERBOSE),
         ]
     }
 }
@@ -536,7 +495,7 @@ pub fn new_state_function(
     ctx: &mut CtxType,
 ) -> Result<LValue, LError> {
     let mut t_params: Vec<String> = Vec::new();
-    let mut t_value: String = String::from(TYPE_OBJECT);
+    let mut t_value: String = String::from(OBJECT);
     let expected_type = NameTypeLValue::Other("TYPE".to_string());
     for (i, arg) in args.iter().enumerate() {
         match arg {

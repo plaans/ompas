@@ -48,7 +48,7 @@ const DOC_SF_ROBOT_BATTERY_VERBOSE: &str = "Example: (robot.battery robot0)";
 const LAMBDA_ROBOT_ROTATION: &str = "(define robot.rotation (lambda (x)\
                                                         (get-map (get-state dynamic) (list (quote robot.rotation) x))))";
 const SF_ROBOT_ROTATION: &str = "robot.rotation";
-const DOC_SF_ROBOT_ROTATION: &str = "Return the rotation value (float) of a robot."; //TODO: Check the interval of the rotation
+const DOC_SF_ROBOT_ROTATION: &str = "Return the rotation value (float) of a robot.";
 const DOC_SF_ROBOT_ROTATION_VERBOSE: &str = "Example: (robot.rotation robot0)";
 
 //velocity
@@ -156,7 +156,7 @@ const LAMBDA_BELT_POLYGONS: &str = "(define belt.polygons (lambda (x)\
 const SF_BELT_POLYGONS: &str = "belt.polygons";
 const DOC_SF_BELT_POLYGONS: &str =
     "Return the coordinates of the polygon [(float float)] that represent the parking area";
-const DOC_SF_BELT_POLYGONS_VERBOSE: &str = "Example: (belt.polygons parking_area0)"; //TODO: check the name of the parking are
+const DOC_SF_BELT_POLYGONS_VERBOSE: &str = "Example: (belt.polygons parking_area0)";
 
 //cells
 const LAMBDA_BELT_CELLS: &str =

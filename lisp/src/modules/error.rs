@@ -10,7 +10,21 @@ const ERR: &str = "err";
 const IS_ERR: &str = "err?";
 const IS_OK: &str = "ok?";
 
+const DOC_OK: &str = "Return an LValue (ok <expr>)";
+const DOC_ERR: &str = "Return an LValue (err <expr>)";
+const DOC_IS_OK: &str =
+    "Return true if the argument is an lvalue of the form (ok <expr>), false otherwise.";
+const DOC_IS_ERR: &str =
+    "Return true if the argument is an lvalue of the form (err <expr>), false otherwise.";
+
 const MOD_ERROR: &str = "error";
+const DOC_MOD_ERROR: &str =
+    "Module that contain functions to define enums ok(lvalue) and err(lvalue)";
+const DOC_MOD_ERROR_VERBOSE: &str = "functions:\n\
+                                \t-ok\n
+                                \t-err\n\
+                                \t-ok?\n\
+                                \t-err?\n";
 
 #[derive(Default)]
 pub struct CtxError {}
@@ -35,7 +49,13 @@ impl GetModule for CtxError {
 
 impl Documentation for CtxError {
     fn documentation() -> Vec<LHelp> {
-        todo!()
+        vec![
+            LHelp::new(OK, DOC_OK),
+            LHelp::new(ERR, DOC_ERR),
+            LHelp::new(IS_OK, DOC_IS_OK),
+            LHelp::new(IS_ERR, DOC_IS_ERR),
+            LHelp::new_verbose(MOD_ERROR, DOC_MOD_ERROR, DOC_MOD_ERROR_VERBOSE),
+        ]
     }
 }
 

@@ -26,20 +26,8 @@ pub const TOKIO_CHANNEL_SIZE: usize = 65_384;
     about = "A fact and belief database inside an acting and planning engine"
 )]
 struct Opt {
-    #[structopt(short, long)]
-    log: Option<PathBuf>,
-
-    #[structopt(short, long)]
-    repl: bool,
-
-    #[structopt(short = "f", long = "file")]
-    input: Option<PathBuf>,
-
     #[structopt(short = "d", long = "debug")]
     debug: bool,
-
-    #[structopt(short = "t", long = "tests")]
-    test: bool,
 }
 
 #[tokio::main]
@@ -111,7 +99,6 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     //println!("global ctxs: {}", ctxs);
 
     loop {
-        //TODO: handle response to multi user.
         let mut sender: Sender<String> = sender_log.clone();
 
         //let mut send_ack = false;

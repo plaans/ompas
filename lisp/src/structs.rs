@@ -1134,10 +1134,10 @@ type Sym = String;
 /// todo: complete documentation
 ///
 
-//pub type LFuture = for<'a> Shared<DynFut<'a>>;
-
+/// Internal type of future returned by an async
 pub type FutureResult = Pin<Box<dyn Send + Future<Output = Result<LValue, LError>>>>;
 
+/// Type returned by an async and clonable.
 pub type LFuture = Shared<FutureResult>;
 
 /*impl From<Shared<Pin<Box<dyn futures::Future>>>> for LValue {
@@ -1399,10 +1399,10 @@ impl Display for LValue {
         match self {
             LValue::Fn(fun) => write!(f, "{}", fun.debug_label),
             LValue::MutFn(fun) => write!(f, "{}", fun.debug_label),
-            LValue::Nil => write!(f, "nil"),
+            LValue::Nil => write!(f, "{}", NIL),
             LValue::Symbol(s) | LValue::String(s) => write!(f, "{}", s),
             LValue::Number(n) => write!(f, "{}", n),
-            LValue::True => write!(f, "true"),
+            LValue::True => write!(f, "{}", TRUE),
             LValue::List(list) => {
                 let mut result = String::new();
                 result.push('(');
@@ -1430,7 +1430,7 @@ impl Display for LValue {
             LValue::Character(c) => write!(f, "{}", c),
             LValue::AsyncFn(fun) => write!(f, "{}", fun.debug_label),
             LValue::AsyncMutFn(fun) => write!(f, "{}", fun.debug_label),
-            LValue::Future(_) => write!(f, "future"),
+            LValue::Future(_) => write!(f, "{}", FUTURE),
         }
     }
 }
@@ -2014,8 +2014,8 @@ impl From<&LValue> for LValueS {
             LValue::Map(m) => LValueS::Map(m.iter().map(|(k, v)| (k.into(), v.into())).collect()),
             LValue::List(l) => LValueS::List(l.iter().map(|lv| lv.into()).collect()),
             LValue::Quote(l) => l.deref().into(),
-            LValue::True => LValueS::Symbol("true".to_string()),
-            LValue::Nil => LValueS::Symbol("nil".to_string()),
+            LValue::True => LValueS::Symbol(TRUE.to_string()),
+            LValue::Nil => LValueS::Symbol(NIL.to_string()),
             LValue::String(s) => LValueS::Symbol(s.clone()),
             LValue::Character(c) => LValueS::Symbol(c.to_string()),
             LValue::AsyncFn(fun) => LValueS::Symbol(fun.debug_label.to_string()),
@@ -2143,30 +2143,30 @@ pub enum NameTypeLValue {
 impl Display for NameTypeLValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         let str = match self {
-            NameTypeLValue::Number => "Number",
-            NameTypeLValue::True => "True",
-            NameTypeLValue::Symbol => "Symbol",
-            NameTypeLValue::String => "String",
-            NameTypeLValue::SExpr => "SExpr",
-            NameTypeLValue::Fn => "Fn",
-            NameTypeLValue::Nil => "Nil",
-            NameTypeLValue::Object => "Object",
-            NameTypeLValue::Lambda => "lambda",
-            NameTypeLValue::Map => "map",
-            NameTypeLValue::List => "list",
-            NameTypeLValue::Quote => "quote",
-            NameTypeLValue::Atom => "atom",
-            NameTypeLValue::CoreOperator => "core_operator",
+            NameTypeLValue::Number => NUMBER,
+            NameTypeLValue::True => TRUE,
+            NameTypeLValue::Symbol => SYMBOL,
+            NameTypeLValue::String => STRING,
+            NameTypeLValue::SExpr => SEXPR,
+            NameTypeLValue::Fn => FN,
+            NameTypeLValue::Nil => NIL,
+            NameTypeLValue::Object => OBJECT,
+            NameTypeLValue::Lambda => LAMBDA,
+            NameTypeLValue::Map => MAP,
+            NameTypeLValue::List => LIST,
+            NameTypeLValue::Quote => QUOTE,
+            NameTypeLValue::Atom => ATOM,
+            NameTypeLValue::CoreOperator => CORE_OPERATOR,
             NameTypeLValue::Other(s) => s.as_str(),
-            NameTypeLValue::MutFn => "MutFn",
-            NameTypeLValue::Int => "int",
-            NameTypeLValue::Float => "float",
-            NameTypeLValue::Usize => "usize",
-            NameTypeLValue::Bool => "bool",
-            NameTypeLValue::Character => "character",
-            NameTypeLValue::AsyncFn => "AsyncFn",
-            NameTypeLValue::AsyncMutFn => "AsyncMutFn",
-            NameTypeLValue::Future => "Future",
+            NameTypeLValue::MutFn => MUT_FN,
+            NameTypeLValue::Int => INT,
+            NameTypeLValue::Float => FLOAT,
+            NameTypeLValue::Usize => USIZE,
+            NameTypeLValue::Bool => BOOL,
+            NameTypeLValue::Character => CHARACTER,
+            NameTypeLValue::AsyncFn => ASYNC_FN,
+            NameTypeLValue::AsyncMutFn => ASYNC_MUT_FN,
+            NameTypeLValue::Future => FUTURE,
         };
         write!(f, "{}", str)
     }
@@ -2232,7 +2232,6 @@ impl From<LValue> for NameTypeLValue {
 #[derive(Debug, Default, Clone)]
 pub struct InitLisp(Vec<String>);
 
-//TODO: simplify to use only Vec<&'static str> instead of custom struct
 impl<T: ToString> From<Vec<T>> for InitLisp {
     fn from(vec: Vec<T>) -> Self {
         InitLisp(vec.iter().map(|x| x.to_string()).collect())

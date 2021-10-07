@@ -92,8 +92,6 @@ pub fn init(working_directory: Option<PathBuf>) -> Result<(), SetLoggerError> {
 /// Log files are stored in the <current>/rae_logs.
 /// Files names are formatted in function of the date and time at which the script is launched.
 async fn run_logger_file(mut rx: mpsc::Receiver<String>, working_directory: Option<PathBuf>) {
-    //TODO: configure working_directory
-
     let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
     let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
 

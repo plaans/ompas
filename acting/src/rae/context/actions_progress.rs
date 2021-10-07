@@ -91,7 +91,6 @@ pub struct ActionStatusSync {
 
 impl ActionStatusSync {
     pub async fn trigger_event_update(&self, id: &usize) {
-        //TODO: resolve bug that we have sometimes.
         if let Some(sender) = self.map.read().await.get(id) {
             if let Err(e) = sender.send(true).await {
                 warn!(

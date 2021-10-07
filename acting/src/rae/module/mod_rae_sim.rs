@@ -1,3 +1,4 @@
+use crate::rae::module::mod_rae_exec::LAMBDA_GET_METHOD_GENERATOR;
 use ompas_lisp::core::LEnv;
 use ompas_lisp::structs::LError::{WrongNumberOfArgument, WrongType};
 use ompas_lisp::structs::{GetModule, LError, LValue, Module, NameTypeLValue};
@@ -22,9 +23,20 @@ const LAMBDA_GET_PRECONDITIONS: &str = "(define get-preconditions\
         (lambda (label)\
             (get rae-method-pre-conditions-map label))";
 
+const LAMBDA_GET_SCORE: &str = "(define get-preconditions\
+    (lambda (label)\
+        (get rae-method-score-map label))";
+
 const LAMBDA_EVAL_PRE_CONDITIONS: &str = "(define eval-pre-conditions\
 (lambda args\
-    ((get-preconditions (car args)) args)))";
+    (eval (cons (get-preconditions (car args)) (cdr args)))))";
+
+const LAMBDA_COMPUTE_SCORE: &str = "(define compute-score 
+    (lambda args
+        (eval (cons (get-score (car args)) (cdr args))))";
+
+pub const EVAL_PRE_CONDITIONS: &str = "eval-pre-conditions";
+pub const COMPUTE_SCORE: &str = "compute-score";
 
 #[derive(Default)]
 pub struct CtxRaeSim {}
@@ -38,7 +50,9 @@ impl GetModule for CtxRaeSim {
                 MACRO_ASSERT,
                 MACRO_RETRACT,
                 LAMBDA_GET_PRECONDITIONS,
+                LAMBDA_GET_SCORE,
                 LAMBDA_EVAL_PRE_CONDITIONS,
+                LAMBDA_COMPUTE_SCORE,
             ]
             .into(),
             label: MOD_RAE_SIM.to_string(),

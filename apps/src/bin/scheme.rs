@@ -2,11 +2,8 @@ use std::path::PathBuf;
 
 use structopt::StructOpt;
 
-use ompas_acting::controller::dumber::CtxDumber;
-use ompas_acting::rae::module::init_ctx_rae;
-use ompas_acting::rae::module::mod_rae::CtxRae;
-use ompas_acting::rae::module::mod_rae_monitor::CtxRaeMonitor;
-use ompas_godot_simulation_client::rae_interface::PlatformGodot;
+//use ompas_modules::robot::CtxRobot;
+use ompas_acting::rae::module::mod_rae_description::CtxRaeDescription;
 use ompas_lisp::core::*;
 use ompas_lisp::lisp_interpreter::{LispInterpreter, LispInterpreterConfig};
 use ompas_lisp::modules::_type::CtxType;
@@ -20,23 +17,25 @@ use ompas_lisp::modules::utils::CtxUtils;
 pub const TOKIO_CHANNEL_SIZE: usize = 65_384;
 
 #[derive(Debug, StructOpt)]
-#[structopt(name = "OMPAS", about = "An acting engine based on RAE.")]
+#[structopt(name = "Scheme", about = "A Scheme REPL")]
 struct Opt {
     #[structopt(short = "d", long = "debug")]
     debug: bool,
+
     #[structopt(short = "p", long = "log-path")]
     log: Option<PathBuf>,
 }
 
 #[tokio::main]
 async fn main() {
-    println!("OMPAS v0.1");
+    println!("Scheme console v0.1");
 
     let opt: Opt = Opt::from_args();
     println!("{:?}", opt);
     if opt.debug {
         activate_debug();
     }
+
     //test_lib_model(&opt);
     lisp_interpreter(opt.log).await;
 }
@@ -50,15 +49,11 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     let ctx_type = CtxType::default();
     let ctx_utils = CtxUtils::default();
     let ctx_string = CtxString::default();
-    let (ctx_rae, ctx_rae_monitor) =
-        init_ctx_rae(Box::new(PlatformGodot::default()), log.clone()).await;
+
     //Insert the doc for the different contexts.
     ctx_doc.insert_doc(CtxIo::documentation());
     ctx_doc.insert_doc(CtxMath::documentation());
     ctx_doc.insert_doc(CtxType::documentation());
-    ctx_doc.insert_doc(CtxDumber::documentation());
-    ctx_doc.insert_doc(CtxRae::documentation());
-    ctx_doc.insert_doc(CtxRaeMonitor::documentation());
     ctx_doc.insert_doc(CtxUtils::documentation());
     ctx_doc.insert_doc(CtxString::documentation());
 
@@ -84,16 +79,14 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     li.import_namespace(ctx_type)
         .await
         .expect("error loading type");
-    li.import_namespace(ctx_rae)
-        .await
-        .expect("error loading rae");
-    li.import_namespace(ctx_rae_monitor)
-        .await
-        .expect("error loading rae monitor");
 
     li.import(ctx_string)
         .await
         .expect("error loading ctx string");
+
+    li.import_namespace(CtxRaeDescription::default())
+        .await
+        .expect("error loading rae description");
 
     li.set_config(LispInterpreterConfig::new(true));
 

@@ -376,7 +376,6 @@ pub fn union_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
 }*/
 
 ///It takes two arguments, an element and a list and returns a list with the element inserted at the first place.
-//TODO: implement all the cases
 pub fn cons(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(CONS, args.into(), args.len(), 2..2));
@@ -772,7 +771,7 @@ pub fn is_integer(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
                 Ok(false.into())
             }
         }
-        i => Err(WrongNumberOfArgument(IS_INTEGER, args.into(), i, 1..1)),
+        i => Err(WrongNumberOfArgument(IS_INT, args.into(), i, 1..1)),
     }
 }
 

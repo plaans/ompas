@@ -26,7 +26,28 @@ pub mod scheme_primitives {
     pub const UNION_MAP: &str = "union-map";
     pub const MAP: &str = "map";
 
+    //Types of variables
+    pub const INT: &str = "int";
+    pub const BOOL: &str = "bool";
+    pub const FLOAT: &str = "float";
+    pub const NUMBER: &str = "number";
+    pub const SYMBOL: &str = "symbol";
+    pub const STRING: &str = "string";
+    pub const CHARACTER: &str = "character";
+    pub const FUTURE: &str = "future";
+    pub const TRUE: &str = "true";
+    pub const NIL: &str = "nil";
+    pub const SEXPR: &str = "sexpr";
+    pub const FN: &str = "fn";
+    pub const OBJECT: &str = "object";
+    pub const ATOM: &str = "atom";
+    pub const CORE_OPERATOR: &str = "core-operator";
+    pub const MUT_FN: &str = "mut-fn";
+    pub const USIZE: &str = "USIZE";
+    pub const ASYNC_FN: &str = "async-fn";
+    pub const ASYNC_MUT_FN: &str = "async-mut-fn";
     //Core language
+
     pub const DEFINE: &str = "define";
     pub const DEF_MACRO: &str = "defmacro";
     pub const LAMBDA: &str = "lambda";
@@ -52,8 +73,7 @@ pub mod scheme_primitives {
     pub const TEST_MACRO: &str = "test-macro";
 
     //Boolean
-    pub const TRUE: &str = "true";
-    pub const NIL: &str = "nil";
+
     pub const FALSE: &str = "false";
     pub const NOT: &str = "not";
     pub const NOT_SHORT: &str = "!";
@@ -78,8 +98,8 @@ pub mod scheme_primitives {
     //predicates
     pub const IS_NUMBER: &str = "number?";
     pub const IS_FLOAT: &str = "float?";
-    pub const IS_INTEGER: &str = "integer";
-    pub const IS_BOOL: &str = "boolean?";
+    pub const IS_INT: &str = "int?";
+    pub const IS_BOOL: &str = "bool?";
     pub const IS_SYMBOL: &str = "symbol?";
     pub const IS_STRING: &str = "string?";
     pub const IS_FN: &str = "fn?";
@@ -88,11 +108,10 @@ pub mod scheme_primitives {
     pub const IS_MAP: &str = "map?";
     pub const IS_LAMBDA: &str = "lambda?";
     pub const IS_QUOTE: &str = "quote?";
-
-    //TODO: implement following functions
-    //Not yet implemented
-    pub const IS_EQUAL: &str = "equal?";
     pub const IS_PAIR: &str = "pair?";
+    pub const IS_EQUAL: &str = "equal?";
+
+    //Not yet implemented
     pub const IS_NIL: &str = "null?";
 
     pub const FN_MAP: &str = "map";
@@ -106,7 +125,6 @@ pub mod scheme_primitives {
 ///Problem during expansion
 //Documentation
 pub mod doc {
-    //TODO: Write the doc for the basic functions
     pub const DOC_CAR: &str =
         "Takes a list of at least one element, and return the first element. Nil otherwise.";
     pub const DOC_CDR: &str =
@@ -194,9 +212,9 @@ Return *false* otherwise. Return an error if args are not numbers of there is th
     pub const DOC_IS_FN: &str = "Return true if symbol is LValue::Fn";
     pub const DOC_IS_MUT_FN: &str = "Return true if symbol is LValue::MutFn";
 
-    //TODO: complete documentation
-    pub const DOC_IS_PAIR: &str = "todo!";
-    pub const DOC_IS_EQUAL: &str = "todo!";
+    pub const DOC_IS_PAIR: &str = "Return true if the list is not empty, false otherwise.";
+    pub const DOC_IS_EQUAL: &str = "Return true if the 2 LValues are equal, false otherwise.";
+
     pub const DOC_ASYNC: &str =
         "Evaluate asynchronously a LValue. Returns the pid(usize) of the task";
     pub const DOC_AWAIT: &str = "Await on a pid to get the result of the evaluation.";

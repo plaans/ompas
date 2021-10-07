@@ -403,7 +403,6 @@ impl RAEInterface for PlatformGodot {
     /// The domain is hardcoded.
     async fn domain(&self) -> &'static str {
         //GODOT_DOMAIN
-        //TODO: choose a way to charge domain
         "(read godot_domain/init.lisp)"
     }
 }

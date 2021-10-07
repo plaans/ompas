@@ -195,7 +195,11 @@ Definition partielle d'une méthode:
     ))
 
 
-(defmacro generate-preconditions
+(generate-types test (?r ?p) (robot package)) 
+-> (and (! (null? (robot.instance ?r)))
+        (! (null? (pacakge.instance ?r))))
+
+(defmacro generate-method
     (lambda (m_label df)
         (let ((t_label (cadar def))
               (p_expr (cdr (get def 1)))
@@ -212,12 +216,54 @@ Definition partielle d'une méthode:
                 (quote ,t_label)
                 ;lambda for preconditons
                 (lambda ,params
-                    (if "type are good"
+                    (if ,(gtpc p_expr)
                         (if ,conds true)))
                 (lambda ,params ,effs)
                 (lambda ,params score)
                 (lambda ,params body))))))
+(begin
+    (defmacro generate-method
+        (lambda (m_label df)
+            (let ((t_label (cadar def))
+                (p_expr (cdr (get def 1)))
+                (conds (cadr (get def 2)))
+                (effs (cadr (get def 3)))
+                (score (cadr (get def 4)))
+                (body (cadr (get def 5))))
 
+                (let* ((p_unzip (unzip p_expr))
+                    (params (car p_unzip))
+                    (types (cadr p_unzip)))
+        
+                `(list ,m_label 
+                    (quote ,t_label)
+                    (quote ,types)
+                    ;lambda for preconditons
+                    (lambda ,params
+                        (if ,(gtpc p_expr)
+                            (if ,conds true)))
+                    (lambda ,params ,effs)
+                    (lambda ,params ,score)
+                    (lambda ,params ,body))))))
+    (test-macro 
+        "(generate_method m_navigate_to '((:task t_navigate_to)
+            (:params (?r robot) (?x float) (?y float))
+            (:pre-conditions (and (robot.available ?r) (< ?x 10) (< ?y 10))
+            (:effects (assert (robot.position ?r) '(?x ?y)))
+            (:score 0)
+            (:body
+            (begin
+                (navigate_to ?r ?x ?y)))))")
+)
+
+(generate-method m_navigate_to ((:task t_navigate_to)
+            (:params (?r robot) (?x float) (?y float))
+            (:pre-conditions (and (robot.available ?r) (< ?x 10) (< ?y 10)))
+            (:effects (assert (robot.position ?r) '(?x ?y)))
+            (:score 0)
+            (:body
+            (begin
+                (navigate_to ?r ?x ?y)))))
 
 (defmacro generate-method;-final-till-there-is-a-new-one
     (lambda (method-label m-def)
@@ -250,3 +296,26 @@ Definition partielle d'une méthode:
                                                 (eval_params (cdr args)))))))
                             (eval_params (eval (cons enumerate (append args (quote ,list-element)))))))
                     (lambda ,params ,body)))))
+
+
+(generate-type-test-expr ((?r robot) (?x float) (?y float)))
+
+
+(defmacro and (lambda args
+    (if (null? args)
+        nil
+        (if (= (length args) 1)
+            (car args)
+            `(if ,(car args)
+                 (and ,(cdr args))
+                 nil)))))
+
+
+(defmacro or (lambda args
+                                                (if (null? args)
+                                                    nil
+                                                    (if (= (length args) 1)
+                                                        (car args)
+                                                        `(if ,(car args))
+                                                              true
+                                                              (or ,(cdr args))))))

@@ -36,11 +36,11 @@ chrono = "0.4.19"
 
 [[bin]]
 name = "virtual_robot"
-path = "src/bin/robot_sim.rs"
+path = "src/bin/sandbox/robot_sim.rs"
 
 [[bin]]
 name = "supervisor"
-path = "src/bin/unnamed_supervisor.rs"
+path = "src/bin/sandbox/unnamed_supervisor.rs"
 
 [[bin]]
 name = "ompas"
@@ -48,7 +48,7 @@ path = "src/bin/ompas.rs"
 
 [[bin]]
 name = "scheme"
-path = "src/bin/sandbox/lisp_interpreter.rs"
+path = "src/bin/scheme.rs"
 
 [[bin]]
 name = "godot_test"
@@ -60,7 +60,7 @@ path = "src/bin/sandbox/serde_test.rs"
 
 [[bin]]
 name = "command_line_godot"
-path = "src/bin/command_line_godot.rs"
+path = "src/bin/sandbox/command_line_godot.rs"
 
 [[bin]]
 name = "test_end_tasks"

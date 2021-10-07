@@ -1,4 +1,5 @@
 use ompas_lisp::core::LEnv;
+use ompas_lisp::language::scheme_primitives::*;
 use ompas_lisp::structs::LError::{WrongNumberOfArgument, WrongType};
 use ompas_lisp::structs::{GetModule, LError, LValue, Module, NameTypeLValue};
 use std::convert::TryInto;
@@ -12,6 +13,7 @@ const MOD_RAE_DESCRIPTION: &str = "rae-description";
 
 pub const GENERATE_TASK_SIMPLE: &str = "generate-task-simple";
 pub const GENERATE_STATE_FUNCTION: &str = "generate-state-function";
+pub const GENERATE_ACTION: &str = "generate-action";
 pub const GENERATE_TASK: &str = "generate-task";
 pub const GENERATE_METHOD: &str = "generate-method";
 
@@ -53,38 +55,62 @@ pub const MACRO_GENERATE_METHOD_DEPRECATED: &str = "(defmacro generate-method \
                                                                     (lambda (unquote params) \
                                                                             (unquote body)))))))";
 
-pub const MACRO_GENERATE_METHOD: &str=
-    "(defmacro generate-method;-final-till-there-is-a-new-one
-        (lambda (method-label m-def)
-        (let* ((task-label (cadr (get-list m-def 0)))
-                (params (cdr (get-list m-def 1)))
-                (pre-conditions (cadr (get-list m-def 2)))
-                (effects (cadr (get-list m-def 3)))
-                (body (cadr (get-list m-def 6)))
-                (parameter-generator (cdr (get-list m-def 4)))
-                (list-element (car parameter-generator))
-                (body-generator (cadr parameter-generator))
-                (score-generator (cadr (get-list m-def 5))))
-                `(list ,method-label
-                        ;label of the task
-                        (quote ,task-label)
-                        ;body of the method
-                        (lambda ,params ,pre-conditions)
-                        (lambda ,params ,effects)
-                        ;lambda to generate instances
-                        (lambda args
-                            (begin
-                                (define eval_params
-                                    (lambda args
-                                        (let ((params (car args)))
-                                            (if (null? params)
-                                                nil
-                                                (if (eval (cons (lambda ,params ,body-generator) params))
-                                                    (cons (list (cons (quote ,method-label) params) (eval (cons (lambda ,params ,score-generator) params)))
-                                                        (eval_params (cdr args)))
-                                                    (eval_params (cdr args)))))))
-                                (eval_params (eval (cons enumerate (append args (quote ,list-element)))))))
-                        (lambda ,params ,body)))))";
+pub const MACRO_GENERATE_METHOD: &str = "(defmacro generate-method
+    (lambda (m_label def)
+        (let ((t_label (cadar def))
+            (p_expr (cdr (get def 1)))
+            (conds (cadr (get def 2)))
+            (effs (cadr (get def 3)))
+            (score (cadr (get def 4)))
+            (body (cadr (get def 5))))
+
+            (let* ((p_unzip (unzip p_expr))
+                (params (car p_unzip))
+                (types (cadr p_unzip)))
+    
+            `(list ,m_label 
+                (quote ,t_label)
+                (quote ,types)
+                ;lambda for preconditons
+                (lambda ,params
+                    (if ,(gtpc p_expr)
+                        (if ,conds true)))
+                (lambda ,params ,effs)
+                (lambda ,params ,score)
+                (lambda ,params ,body))))))";
+
+/*pub const MACRO_GENERATE_METHOD: &str=
+"(defmacro generate-method;-final-till-there-is-a-new-one
+    (lambda (method-label m-def)
+    (let* ((task-label (cadr (get-list m-def 0)))
+            (params (cdr (get-list m-def 1)))
+            (pre-conditions (cadr (get-list m-def 2)))
+            (effects (cadr (get-list m-def 3)))
+            (body (cadr (get-list m-def 6)))
+            (parameter-generator (cdr (get-list m-def 4)))
+            (list-element (car parameter-generator))
+            (body-generator (cadr parameter-generator))
+            (score-generator (cadr (get-list m-def 5))))
+            `(list ,method-label
+                    ;label of the task
+                    (quote ,task-label)
+                    ;body of the method
+                    (lambda ,params ,pre-conditions)
+                    (lambda ,params ,effects)
+                    ;lambda to generate instances
+                    (lambda args
+                        (begin
+                            (define eval_params
+                                (lambda args
+                                    (let ((params (car args)))
+                                        (if (null? params)
+                                            nil
+                                            (if (eval (cons (lambda ,params ,body-generator) params))
+                                                (cons (list (cons (quote ,method-label) params) (eval (cons (lambda ,params ,score-generator) params)))
+                                                    (eval_params (cdr args)))
+                                                (eval_params (cdr args)))))))
+                            (eval_params (eval (cons enumerate (append args (quote ,list-element)))))))
+                    (lambda ,params ,body)))))";*/
 
 /// Macro used to generate code to define an action in RAE environment.
 pub const MACRO_GENERATE_ACTION: &str = "(defmacro generate-action
@@ -140,7 +166,7 @@ pub const MACRO_GENERATE_METHOD_PARAMETERS: &str =
                                     nil))))
                         (eval_params (unquote (cons enumerate p_enum)))))))))))))";
 
-pub const LABEL_GENERATE_METHOD_PARAMETERS: &str = "generate-method-parameters";
+pub const GENERATE_METHOD_PARAMETERS: &str = "generate-method-parameters";
 
 /// Macro to define lambda that will evaluates set of parameters that can instantiate a method in a given state.
 pub const MACRO_ENUMERATE_PARAMS: &str = "(defmacro enumerate-params (lambda args
@@ -159,28 +185,10 @@ pub const MACRO_ENUMERATE_PARAMS: &str = "(defmacro enumerate-params (lambda arg
                             nil))))
                 (eval_params (unquote (cons enumerate p_enum))))))))";
 
-pub const LAMBDA_GENERATE_INSTANCES: &str = "
-(define generate-instances (lambda args
-    (let* ((label (car args))
-            (i_params (cdr args))
-            (methods (get-methods label)))
-
-            (begin
-                (define __generate__
-                    (lambda (methods)
-                        (if (null? methods)
-                            nil
-                            (append
-                                (eval
-                                    (append (list (get-method-generator (car methods)))
-                                        i_params))
-                                (__generate__ (cdr methods))))))
-                (__generate__ methods)))))";
-
 const GENERATE_TYPE_TEST_EXPR: &str = "generate-type-test-expr";
 
 const LAMBDA_GENERATE_TYPE_PRE_CONDITIONS: &str =
-    "(define gtpc (lambda (l) (eval (parse (generate-type-test-expr l)))))";
+    "(define gtpc (lambda (l) (parse (generate-type-test-expr l))))";
 
 #[derive(Default)]
 pub struct CtxRaeDescription {}
@@ -211,6 +219,7 @@ impl GetModule for CtxRaeDescription {
     }
 }
 
+/// Takes as input a p_expr of the form ((p1 p1_type) ... (p_n pn_type))
 pub fn generate_type_test_expr(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(
@@ -222,31 +231,58 @@ pub fn generate_type_test_expr(args: &[LValue], _: &LEnv, _: &()) -> Result<LVal
     }
 
     if let LValue::List(params) = &args[0] {
-        if params.len() == 2 {
-            let list_params: Vec<LValue> = params[0]
-                .clone()
-                .try_into()
-                .expect("error converting what is supposed to be a list");
-            let list_types: Vec<LValue> = params[1]
-                .clone()
-                .try_into()
-                .expect("error converting what is supposed to be a list");
-            let mut str = "(and ".to_string();
+        let mut str = "(and ".to_string();
 
-            for (p, t) in list_params.iter().zip(list_types) {
-                str.push_str(format!("(!= ({}.instance {}) nil)", t, p).as_str())
+        for param in params {
+            if let LValue::List(param) = &param {
+                if param.len() == 2 {
+                    if let LValue::Symbol(p) = &param[0] {
+                        if let LValue::Symbol(t) = &param[1] {
+                            match t.as_str() {
+                                BOOL => str.push_str(format!("({} {})", IS_BOOL, p).as_str()),
+                                INT => str.push_str(format!("({} {})", IS_INT, p).as_str()),
+                                FLOAT => str.push_str(format!("({} {})", IS_FLOAT, p).as_str()),
+                                NUMBER => str.push_str(format!("({} {})", IS_NUMBER, p).as_str()),
+                                SYMBOL => str.push_str(format!("({} {})", IS_SYMBOL, p).as_str()),
+                                _ => str
+                                    .push_str(format!("(!= ({}.instance {}) nil)", t, p).as_str()),
+                            }
+                        } else {
+                            return Err(WrongType(
+                                GENERATE_TYPE_TEST_EXPR,
+                                param[1].clone(),
+                                (&param[1]).into(),
+                                NameTypeLValue::Symbol,
+                            ));
+                        }
+                    } else {
+                        return Err(WrongType(
+                            GENERATE_TYPE_TEST_EXPR,
+                            param[0].clone(),
+                            (&param[0]).into(),
+                            NameTypeLValue::Symbol,
+                        ));
+                    }
+                } else {
+                    return Err(WrongNumberOfArgument(
+                        GENERATE_TYPE_TEST_EXPR,
+                        param.into(),
+                        param.len(),
+                        2..2,
+                    ));
+                }
+            } else {
+                return Err(WrongType(
+                    GENERATE_TYPE_TEST_EXPR,
+                    param.clone(),
+                    param.into(),
+                    NameTypeLValue::List,
+                ));
             }
-            str.push(')');
-
-            Ok(str.into())
-        } else {
-            Err(WrongNumberOfArgument(
-                GENERATE_TYPE_TEST_EXPR,
-                params.into(),
-                params.len(),
-                2..2,
-            ))
         }
+        str.push(')');
+
+        Ok(LValue::String(str))
     } else {
         Err(WrongType(
             GENERATE_TYPE_TEST_EXPR,
@@ -256,3 +292,6 @@ pub fn generate_type_test_expr(args: &[LValue], _: &LEnv, _: &()) -> Result<LVal
         ))
     }
 }
+/// TODO: Test des macros
+#[cfg(test)]
+mod test {}

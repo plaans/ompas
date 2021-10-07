@@ -2,7 +2,7 @@
 
 use crate::rae::context::rae_env::{Action, RAEEnv, StateFunction};
 use crate::rae::context::rae_state::{LState, StateType, KEY_DYNAMIC, KEY_INNER_WORLD, KEY_STATIC};
-use crate::rae::module::mod_rae_description::GENERATE_TASK_SIMPLE;
+use crate::rae::module::mod_rae_description::*;
 use crate::rae::module::mod_rae_exec::{CtxRaeExec, RAEInterface};
 use crate::rae::{rae_log, rae_run, RAEOptions};
 use ::macro_rules_attribute::macro_rules_attribute;
@@ -334,7 +334,7 @@ async fn def_state_function<'a>(
         ));
     }
 
-    let lvalue = cons(&["generate-state-function".into(), args.into()], env, &())?;
+    let lvalue = cons(&[GENERATE_STATE_FUNCTION.into(), args.into()], env, &())?;
 
     let lvalue = eval(
         &expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs).await?,
@@ -407,7 +407,7 @@ async fn def_action_model<'a>(
 
     //println!("define action: {}", LValue::from(args));
 
-    let lvalue = cons(&["generate-action-model".into(), args.into()], env, &())?;
+    let lvalue = cons(&[GENERATE_ACTION_MODEL.into(), args.into()], env, &())?;
 
     let lvalue = eval(
         &expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs).await?,
@@ -470,7 +470,7 @@ async fn def_action_operational_model<'a>(
     //println!("define action: {}", LValue::from(args));
 
     let lvalue = cons(
-        &["generate-action-operational-model".into(), args.into()],
+        &[GENERATE_ACTION_OPERATIONAL_MODEL.into(), args.into()],
         env,
         &(),
     )?;
@@ -535,7 +535,7 @@ async fn def_action<'a>(
 
     //println!("define action: {}", LValue::from(args));
 
-    let lvalue = cons(&["generate-action".into(), args.into()], env, &())?;
+    let lvalue = cons(&[GENERATE_ACTION.into(), args.into()], env, &())?;
 
     let lvalue = eval(
         &expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs).await?,
@@ -595,7 +595,7 @@ async fn def_method<'a>(
         ));
     }
 
-    let lvalue = cons(&["generate-method".into(), args.into()], env, &())?;
+    let lvalue = cons(&[GENERATE_METHOD.into(), args.into()], env, &())?;
 
     let lvalue = eval(
         &expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs).await?,
@@ -607,27 +607,50 @@ async fn def_method<'a>(
     //println!("lvalue: {}", lvalue);
 
     if let LValue::List(list) = &lvalue {
-        if list.len() != 6 {
+        if list.len() != 7 {
             return Err(WrongNumberOfArgument(
                 RAE_DEF_METHOD,
                 lvalue.clone(),
                 list.len(),
-                6..6,
+                7..7,
             ));
         } else if let LValue::Symbol(method_label) = &list[0] {
             if let LValue::Symbol(task_label) = &list[1] {
-                if let LValue::Lambda(_) = &list[2] {
+                if let LValue::List(lv_types) = &list[2] {
+                    let mut types = vec![];
+                    for e in lv_types {
+                        if let LValue::Symbol(s) = e {
+                            types.push(s.clone());
+                        } else {
+                            return Err(WrongType(
+                                RAE_DEF_METHOD,
+                                e.clone(),
+                                e.into(),
+                                NameTypeLValue::Symbol,
+                            ));
+                        }
+                    }
                     if let LValue::Lambda(_) = &list[3] {
                         if let LValue::Lambda(_) = &list[4] {
                             if let LValue::Lambda(_) = &list[5] {
-                                ctx.env.add_method(
-                                    method_label.to_string(),
-                                    task_label.to_string(),
-                                    list[2].clone(),
-                                    list[3].clone(),
-                                    list[4].clone(),
-                                    list[5].clone(),
-                                )?;
+                                if let LValue::Lambda(_) = &list[6] {
+                                    ctx.env.add_method(
+                                        method_label.to_string(),
+                                        task_label.to_string(),
+                                        types,
+                                        list[3].clone(),
+                                        list[4].clone(),
+                                        list[5].clone(),
+                                        list[6].clone(),
+                                    )?;
+                                } else {
+                                    return Err(WrongType(
+                                        RAE_DEF_METHOD,
+                                        list[6].clone(),
+                                        list[6].clone().into(),
+                                        NameTypeLValue::Lambda,
+                                    ));
+                                }
                             } else {
                                 return Err(WrongType(
                                     RAE_DEF_METHOD,
@@ -656,8 +679,8 @@ async fn def_method<'a>(
                     return Err(WrongType(
                         RAE_DEF_METHOD,
                         list[2].clone(),
-                        list[2].clone().into(),
-                        NameTypeLValue::Lambda,
+                        (&list[2]).into(),
+                        NameTypeLValue::List,
                     ));
                 }
             } else {

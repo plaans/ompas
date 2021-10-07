@@ -5,7 +5,6 @@ use crate::rae::context::mutex::MutexResponse;
 use crate::rae::context::rae_env::RAE_TASK_METHODS_MAP;
 use crate::rae::context::rae_state::*;
 use crate::rae::context::ressource_access::wait_on::add_waiter;
-use crate::rae::module::domain::*;
 use crate::rae::select_methods::sort_greedy;
 use ::macro_rules_attribute::macro_rules_attribute;
 use async_trait::async_trait;
@@ -113,14 +112,30 @@ pub const LAMBDA_RETRY: &str = "
 pub const LAMBDA_GET_METHODS: &str = "\
 (define get-methods\
     (lambda (label)\
-        (get-map rae-task-methods-map label)))";
+        (get rae-task-methods-map label)))";
 
 pub const LAMBDA_GET_METHOD_GENERATOR: &str = "\
 (define get-method-generator
        (lambda (label)
-            (get-map rae-method-generator-map label)))";
+            (get rae-method-generator-map label)))";
 
-//TODO: write doc
+pub const LAMBDA_GENERATE_INSTANCES: &str = "
+(define generate-instances (lambda args
+    (let* ((label (car args))
+            (i_params (cdr args))
+            (methods (get-methods label)))
+
+            (begin
+                (define __generate__
+                    (lambda (methods)
+                        (if (null? methods)
+                            nil
+                            (append
+                                (eval
+                                    (append (list (get-method-generator (car methods)))
+                                        i_params))
+                                (__generate__ (cdr methods))))))
+                (__generate__ methods)))))";
 
 ///Context that will contains primitives for the RAE executive
 pub struct CtxRaeExec {
@@ -303,52 +318,48 @@ pub trait RAEInterface: Any + Send + Sync {
 
 #[async_trait]
 impl RAEInterface for () {
-    async fn init(&mut self, _: RAEState, _: ActionsProgress) {
-        todo!()
-    }
+    async fn init(&mut self, _: RAEState, _: ActionsProgress) {}
 
     async fn exec_command(&self, _args: &[LValue], _: usize) -> Result<LValue, LError> {
-        todo!()
+        Ok(Nil)
     }
 
     async fn cancel_command(&self, _: &[LValue]) -> Result<LValue, LError> {
-        todo!()
+        Ok(Nil)
     }
 
     async fn get_state(&self, _: &[LValue]) -> Result<LValue, LError> {
-        todo!()
+        Ok(Nil)
     }
 
     async fn get_state_variable(&self, _args: &[LValue]) -> Result<LValue, LError> {
-        todo!()
+        Ok(Nil)
     }
 
     async fn get_status(&self, _args: &[LValue]) -> Result<LValue, LError> {
-        todo!()
+        Ok(Nil)
     }
 
     async fn launch_platform(&mut self, _: &[LValue]) -> Result<LValue, LError> {
-        todo!()
+        Ok(Nil)
     }
 
     async fn start_platform(&self, _: &[LValue]) -> Result<LValue, LError> {
-        todo!()
+        Ok(Nil)
     }
 
     async fn open_com(&mut self, _: &[LValue]) -> Result<LValue, LError> {
-        todo!()
+        Ok(Nil)
     }
 
     async fn get_action_status(&self, _action_id: &usize) -> Status {
-        todo!()
+        Status::Pending
     }
 
-    async fn set_status(&self, _action_id: usize, _status: Status) {
-        todo!()
-    }
+    async fn set_status(&self, _action_id: usize, _status: Status) {}
 
     async fn domain(&self) -> &'static str {
-        todo!()
+        ""
     }
 }
 #[macro_rules_attribute(dyn_async!)]

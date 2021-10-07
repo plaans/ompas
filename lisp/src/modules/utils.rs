@@ -58,34 +58,37 @@ pub const MACRO_LET_STAR: &str = "(defmacro let* \
                                                                                             (unquote body)))) \
                                                                   (cdar bindings)))))";
 
-//TODO: find a way to make it a lambda
 pub const MACRO_APPLY: &str = "(defmacro apply\
                                               (lambda (f args)\
                                                       (cons f args)))";
 
-pub const MACRO_AND: &str = "(defmacro and (lambda args\
-                                                (if (null? args)\
-                                                    nil\
-                                                    (if (= (length args) 1)\
-                                                        (car args)\
-                                                        (quasiquote (if (unquote (car args))\
-                                                                        (and (unquote (cdr args)))\
-                                                                        nil))))))";
+pub const MACRO_AND: &str = "(defmacro and 
+                                (lambda args
+                                    (if (null? args)
+                                        nil
+                                        (if (= (length args) 1)
+                                            (car args)
+                                            `(if ,(car args)
+                                                 (and ,(cdr args))
+                                                 nil)))))";
 
-pub const MACRO_OR: &str= "(defmacro or (lambda args\
-                                                (if (null? args)\
-                                                    nil\
-                                                    (if (= (length args) 1)\
-                                                        (car args)\
-                                                        (quasiquote (if (unquote (car args))\
-                                                                        true \
-                                                                        (or (unquote (cdr args)))))))))";
+pub const MACRO_OR: &str = "(defmacro or 
+                                (lambda args
+                                    (if (null? args)
+                                        nil
+                                        (if (= (length args) 1)
+                                            (car args)
+                                            `(if ,(car args)
+                                                  true
+                                                  (or ,(cdr args)))))))";
 
-pub const MACRO_NEQ: &str = "(defmacro neq (lambda (a b)\
-                                            (! (= a b))))";
+pub const MACRO_NEQ: &str = "(defmacro neq \
+                                (lambda (a b)\
+                                    `(! (= ,a ,b))))";
 
-pub const MACRO_NEQ_SHORT: &str = "(defmacro != (lambda (a b) \
-                                                (neq a b )))";
+pub const MACRO_NEQ_SHORT: &str = "(defmacro != \
+                                        (lambda (a b) \
+                                            `(neq ,a ,b)))";
 
 pub const MACRO_COND: &str = "(defmacro cond (lambda exprs \
                                                 (if (null? exprs) \
@@ -213,7 +216,7 @@ pub struct CtxUtils {}
 impl GetModule for CtxUtils {
     fn get_module(self) -> Module {
         let mut module = Module {
-            ctx: Arc::new(self),
+            ctx: Arc::new(()),
             prelude: vec![],
             raw_lisp: vec![
                 MACRO_CAAR,
@@ -273,9 +276,9 @@ impl Documentation for CtxUtils {
 /// use ompas_lisp::structs::LValue;
 /// use ompas_lisp::core::LEnv;
 /// let lists: &[LValue] = &[vec![1,2,3].into(), vec![4,5,6].into()];
-/// let enumeration = enumerate(lists, &LEnv::default(), &CtxUtils::default());
+/// let enumeration = enumerate(lists, &LEnv::default(), &());
 /// ```
-pub fn enumerate(args: &[LValue], _: &LEnv, _: &CtxUtils) -> Result<LValue, LError> {
+pub fn enumerate(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     let mut vec_iter = vec![];
     let mut new_args = vec![];
 
@@ -310,7 +313,7 @@ pub fn enumerate(args: &[LValue], _: &LEnv, _: &CtxUtils) -> Result<LValue, LErr
 
 ///Return an element randomly chosen from a list
 /// Takes a LValue::List as arg.
-pub fn rand_element(args: &[LValue], _: &LEnv, _: &CtxUtils) -> Result<LValue, LError> {
+pub fn rand_element(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     match args.len() {
         1 => {
             if let LValue::List(list) = &args[0] {
@@ -335,7 +338,7 @@ pub fn rand_element(args: &[LValue], _: &LEnv, _: &CtxUtils) -> Result<LValue, L
 }
 
 ///Takes a list or map and search if it contains a LValue inside
-pub fn contains(args: &[LValue], _: &LEnv, _: &CtxUtils) -> Result<LValue, LError> {
+pub fn contains(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(
             CONTAINS,
@@ -361,11 +364,7 @@ pub fn contains(args: &[LValue], _: &LEnv, _: &CtxUtils) -> Result<LValue, LErro
     Ok(LValue::Nil)
 }
 
-pub fn transform_in_singleton_list(
-    args: &[LValue],
-    _: &LEnv,
-    _: &CtxUtils,
-) -> Result<LValue, LError> {
+pub fn transform_in_singleton_list(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.is_empty() {
         return Err(WrongNumberOfArgument(
             TRANSFORM_IN_SINGLETON_LIST,

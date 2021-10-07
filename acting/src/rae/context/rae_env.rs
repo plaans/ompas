@@ -28,6 +28,8 @@ pub const RAE_METHOD_LIST: &str = "rae_methods_list";
 pub const RAE_ACTION_LIST: &str = "rae_actions_list";
 pub const RAE_STATE_FUNCTION_LIST: &str = "rae-state-function-list";
 pub const RAE_SYMBOL_TYPE: &str = "rae-symbol-type";
+pub const RAE_METHOD_TYPES_MAP: &str = "rae-method-types-map";
+pub const RAE_METHOD_SCORE_MAP: &str = "rae-method-score-map";
 pub const RAE_METHOD_GENERATOR_MAP: &str = "rae-method-generator-map";
 pub const RAE_METHOD_PRE_CONDITIONS_MAP: &str = "rae-method-pre-conditions-map";
 pub const RAE_METHODS_EFFECTS_MAP: &str = "rae-method-effects-map";
@@ -42,23 +44,26 @@ pub struct Method {
     task_label: String,
     lambda_pre_conditions: LValue,
     lambda_effects: LValue,
-    lambda_instances_generator: LValue,
+    lambda_score: LValue,
+    types: Vec<String>,
     lambda_body: LValue,
 }
 
 impl Method {
     pub fn new(
         task_label: String,
+        types: Vec<String>,
         conds: LValue,
         effects: LValue,
-        generator: LValue,
+        score: LValue,
         body: LValue,
     ) -> Self {
         Self {
             task_label,
             lambda_pre_conditions: conds,
             lambda_effects: effects,
-            lambda_instances_generator: generator,
+            lambda_score: score,
+            types,
             lambda_body: body,
         }
     }
@@ -69,16 +74,27 @@ impl Display for Method {
         write!(
             f,
             "-task: {}\n\
+            -types: {}\n\
             -pre-conditions: {}\n\
             -effects: {}\n\
-            -generator: {}\n\
+            -score: {}\n\
             -body: {}\n",
             self.task_label,
+            {
+                let mut str = '('.to_string();
+                for (i, t) in self.types.iter().enumerate() {
+                    if i != 0 {
+                        str.push(',');
+                    }
+                    str.push_str(t);
+                }
+                str.push(')');
+                str
+            },
             self.lambda_pre_conditions
                 .pretty_print("pre-conditions: ".len()),
             self.lambda_effects.pretty_print("effects: ".len()),
-            self.lambda_instances_generator
-                .pretty_print("generator: ".len()),
+            self.lambda_score.pretty_print("score: ".len()),
             self.lambda_body.pretty_print("body: ".len())
         )
     }
@@ -379,7 +395,8 @@ impl DomainEnv {
         let mut map_task_method: HashMap<LValue, LValue> = Default::default();
         let mut map_method_pre_conditions: HashMap<LValue, LValue> = Default::default();
         let mut map_method_effects: HashMap<LValue, LValue> = Default::default();
-        let mut map_method_generator: HashMap<LValue, LValue> = Default::default();
+        let mut map_method_score: HashMap<LValue, LValue> = Default::default();
+        let mut map_method_types: HashMap<LValue, LValue> = Default::default();
 
         //Add all tasks to env:
         for (label, task) in self.get_tasks() {
@@ -393,7 +410,8 @@ impl DomainEnv {
             env.insert(label.clone(), method.lambda_body.clone());
             map_method_pre_conditions.insert(label.into(), method.lambda_pre_conditions.clone());
             map_method_effects.insert(label.into(), method.lambda_effects.clone());
-            map_method_generator.insert(label.into(), method.lambda_instances_generator.clone());
+            map_method_score.insert(label.into(), method.lambda_score.clone());
+            map_method_types.insert(label.into(), method.types.clone().into());
         }
 
         //Add all actions to env:
@@ -419,12 +437,12 @@ impl DomainEnv {
             self.get_list_state_functions(),
         );
         env.insert(RAE_SYMBOL_TYPE.to_string(), self.get_map_symbol_type());
-        env.insert(
+        /*env.insert(
             RAE_METHOD_GENERATOR_MAP.to_string(),
             map_method_generator.into(),
-        );
+        );*/
         env.insert(RAE_TASK_METHODS_MAP.to_string(), map_task_method.into());
-
+        env.insert(RAE_METHOD_TYPES_MAP.to_string(), map_method_types.into());
         env.insert(
             RAE_METHOD_PRE_CONDITIONS_MAP.to_string(),
             map_method_pre_conditions.into(),
@@ -442,7 +460,8 @@ impl DomainEnv {
         let mut map_task_method: HashMap<LValue, LValue> = Default::default();
         let mut map_method_pre_conditions: HashMap<LValue, LValue> = Default::default();
         let mut map_method_effects: HashMap<LValue, LValue> = Default::default();
-        let mut map_method_generator: HashMap<LValue, LValue> = Default::default();
+        let mut map_method_score: HashMap<LValue, LValue> = Default::default();
+        let mut map_method_types: HashMap<LValue, LValue> = Default::default();
 
         //Add all tasks to env:
         for (label, task) in self.get_tasks() {
@@ -456,7 +475,8 @@ impl DomainEnv {
             env.insert(label.clone(), method.lambda_body.clone());
             map_method_pre_conditions.insert(label.into(), method.lambda_pre_conditions.clone());
             map_method_effects.insert(label.into(), method.lambda_effects.clone());
-            map_method_generator.insert(label.into(), method.lambda_instances_generator.clone());
+            map_method_score.insert(label.into(), method.lambda_score.clone());
+            map_method_types.insert(label.into(), method.types.clone().into());
         }
 
         //Add all actions to env:
@@ -482,11 +502,12 @@ impl DomainEnv {
             self.get_list_state_functions(),
         );
         env.insert(RAE_SYMBOL_TYPE.to_string(), self.get_map_symbol_type());
-        env.insert(
+        /*env.insert(
             RAE_METHOD_GENERATOR_MAP.to_string(),
             map_method_generator.into(),
-        );
+        );*/
         env.insert(RAE_TASK_METHODS_MAP.to_string(), map_task_method.into());
+        env.insert(RAE_METHOD_TYPES_MAP.to_string(), map_method_types.into());
 
         env.insert(
             RAE_METHOD_PRE_CONDITIONS_MAP.to_string(),
@@ -496,6 +517,8 @@ impl DomainEnv {
             RAE_METHODS_EFFECTS_MAP.to_string(),
             map_method_effects.into(),
         );
+
+        env.insert(RAE_METHOD_SCORE_MAP.to_string(), map_method_score.into());
 
         env
     }
@@ -659,16 +682,18 @@ impl RAEEnv {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn add_method(
         &mut self,
         method_label: String,
         task_label: String,
+        types: Vec<String>,
         conds: LValue,
         effects: LValue,
-        generator: LValue,
+        score: LValue,
         body: LValue,
     ) -> Result<(), LError> {
-        let method = Method::new(task_label, conds, effects, generator, body);
+        let method = Method::new(task_label, types, conds, effects, score, body);
 
         self.domain_env.add_method(method_label, method)?;
 

@@ -452,6 +452,8 @@ impl DomainEnv {
             map_method_effects.into(),
         );
 
+        env.insert(RAE_METHOD_SCORE_MAP.to_string(), map_method_score.into());
+
         env
     }
 

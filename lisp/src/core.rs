@@ -297,7 +297,7 @@ impl GetModule for CtxRoot {
         module.add_fn_prelude(IS_STRING, is_string);
         module.add_fn_prelude(IS_FN, is_fn);
         module.add_fn_prelude(IS_MUT_FN, is_mut_fn);
-        module.add_fn_prelude(IS_QUOTE, is_quote);
+        //module.add_fn_prelude(IS_QUOTE, is_quote);
         module.add_fn_prelude(IS_MAP, is_map);
         module.add_fn_prelude(IS_LIST, is_list);
         module.add_fn_prelude(IS_LAMBDA, is_lambda);
@@ -709,7 +709,7 @@ pub async fn expand(
                                     if !matches!(v, LValue::Symbol(_)) {
                                         return Err(SpecialError(
                                             "expand",
-                                            "illegal lambda argument list".to_string(),
+                                            format!("illegal lambda argument list: {}", x),
                                         ));
                                     }
                                 }
@@ -987,10 +987,14 @@ pub async fn eval(
             println!("lv: {}", lv.clone());
         }
         if let LValue::Symbol(s) = &lv {
-            return match env.get_symbol(s.as_str()) {
-                None => Ok(lv.clone()),
-                Some(lv) => Ok(lv),
+            let result = match env.get_symbol(s.as_str()) {
+                None => lv.clone(),
+                Some(lv) => lv,
             };
+            if get_debug() {
+                println!("=> {}", result)
+            }
+            return Ok(result);
         } else if let LValue::List(list) = &lv {
             //println!("expression is a list");
             let list = list.as_slice();
@@ -1086,7 +1090,9 @@ pub async fn eval(
                             LValue::Symbol(s) => {
                                 let exp = eval(&args[1], &mut env, ctxs).await?;
                                 env.set(s.to_string(), exp)?;
-                                //println!("=> {}", LValue::Nil);
+                                if get_debug() {
+                                    println!("=> {}", LValue::Nil);
+                                }
                                 Ok(LValue::Nil)
                             }
                             lv => Err(WrongType(
@@ -1193,11 +1199,11 @@ pub async fn eval(
                     }
                     LValue::Fn(fun) => {
                         let ctx: &dyn Any = match fun.get_index_mod() {
-                            None => &(),
+                            None => unreachable!("{} should have a module index", fun.debug_label),
                             Some(u) => ctxs.get_context(u),
                         };
                         let r_lvalue = fun.call(args, env, ctx)?;
-                        if DEBUG.load(Ordering::Relaxed) {
+                        if get_debug() {
                             println!("=> {}", r_lvalue);
                         }
                         return Ok(r_lvalue);
@@ -1207,18 +1213,20 @@ pub async fn eval(
                             None => unreachable!("{} should have a module index", fun.debug_label),
                             Some(u) => {
                                 let r_lvalue = fun.call(args, env, ctxs.get_mut_context(u))?;
-                                //println!("=> {}", r_lvalue.clone());
+                                if get_debug() {
+                                    println!("=> {}", r_lvalue);
+                                }
                                 Ok(r_lvalue)
                             }
                         };
                     }
                     LValue::AsyncFn(fun) => {
                         let ctx: &AsyncLTrait = match fun.get_index_mod() {
-                            None => &(),
+                            None => unreachable!("{} should have a module index", fun.debug_label),
                             Some(u) => ctxs.get_context(u),
                         };
                         let r_lvalue = fun.call(args, env, ctx).await?;
-                        if DEBUG.load(Ordering::Relaxed) {
+                        if get_debug() {
                             println!("=> {}", r_lvalue);
                         }
                         return Ok(r_lvalue);
@@ -1228,16 +1236,14 @@ pub async fn eval(
                             None => unreachable!("{} should have a module index", fun.debug_label),
                             Some(u) => {
                                 let r_lvalue = fun.call(args, env, ctxs.get_mut_context(u)).await?;
-                                //println!("=> {}", r_lvalue.clone());
+                                if get_debug() {
+                                    println!("=> {}", r_lvalue);
+                                }
                                 Ok(r_lvalue)
                             }
                         };
                     }
                     lv => {
-                        /*println!(
-                            "Expecting here a list with a function as first argument: {:?}",
-                            exps
-                        );*/
                         return Err(WrongType("eval", lv.clone(), lv.into(), NameTypeLValue::Fn));
                     }
                 };

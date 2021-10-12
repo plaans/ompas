@@ -9,6 +9,7 @@ use ompas_lisp::core::{eval, ContextCollection, LEnv};
 use ompas_lisp::functions::{append, cons};
 use ompas_lisp::modules::doc::{Documentation, LHelp};
 use ompas_lisp::modules::utils::enumerate;
+use ompas_lisp::structs::LCoreOperator::Quote;
 use ompas_lisp::structs::LError::{WrongNumberOfArgument, WrongType};
 use ompas_lisp::structs::LValue::{Nil, True};
 use ompas_lisp::structs::{GetModule, LError, LValue, Module, NameTypeLValue};
@@ -127,9 +128,10 @@ pub async fn generate_applicable_instances<'a>(
 
     let state = &args[0];
     let map_state: HashMap<LValue, LValue> = state.try_into()?;
-    let task_label = &args[1];
-    let n_params = args.len() - 2;
-    let mut params: Vec<LValue> = args[2..].into();
+    let task: Vec<LValue> = (&args[1]).try_into()?;
+    let task_label = &task[0];
+    let n_params = task.len() - 1;
+    let mut params: Vec<LValue> = task[1..].into();
 
     let map_task_methods: HashMap<LValue, LValue> = env
         .get_symbol(RAE_TASK_METHODS_MAP)
@@ -147,6 +149,7 @@ pub async fn generate_applicable_instances<'a>(
     };
 
     for m in methods {
+        println!("method for the task: {}", m);
         let types = map_methods_types.get(&m).expect("Entry should be defined");
         let vec_types: Vec<LValue> = types.try_into()?;
         if vec_types.len() > n_params {
@@ -164,7 +167,14 @@ pub async fn generate_applicable_instances<'a>(
                 enumerate(params.as_slice(), env, &())?.try_into()?;
 
             for element in instances_of_params {
-                let lv = cons(&[m.clone(), element.clone()], env, &())?;
+                let lv = cons(
+                    &[
+                        vec![LValue::CoreOperator(Quote), m.clone()].into(),
+                        element.clone(),
+                    ],
+                    env,
+                    &(),
+                )?;
                 match check_preconditions(&[lv.clone(), state.clone()], env, ctx).await? {
                     LValue::True => {
                         let score = compute_score(&[lv.clone(), state.clone()], env, ctx).await?;
@@ -175,7 +185,14 @@ pub async fn generate_applicable_instances<'a>(
                 }
             }
         } else {
-            let lv = cons(&[m.clone(), args[2..].into()], env, &())?;
+            let lv = cons(
+                &[
+                    vec![LValue::CoreOperator(Quote), m.clone()].into(),
+                    params.clone().into(),
+                ],
+                env,
+                &(),
+            )?;
             match check_preconditions(&[lv.clone(), state.clone()], env, ctx).await? {
                 LValue::True => {
                     let score = compute_score(&[lv.clone(), state.clone()], env, ctx).await?;

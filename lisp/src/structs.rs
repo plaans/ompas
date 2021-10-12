@@ -11,7 +11,7 @@ use std::convert::{TryFrom, TryInto};
 use std::fmt::{Debug, Display, Formatter};
 use std::future::Future;
 use std::hash::{Hash, Hasher};
-use std::ops::{Add, Deref, Div, Mul, Range, Sub};
+use std::ops::{Add, Div, Mul, Range, Sub};
 use std::pin::Pin;
 use std::sync::Arc;
 
@@ -417,7 +417,7 @@ impl Display for LLambda {
 
 impl PartialEq for LLambda {
     fn eq(&self, other: &Self) -> bool {
-        self == other
+        self.to_string() == other.to_string()
     }
 }
 
@@ -440,7 +440,7 @@ impl LLambda {
             LambdaArgs::Sym(param) => {
                 let arg = if args.len() == 1 {
                     match &args[0] {
-                        LValue::List(_) | LValue::Nil => args[0].clone(),
+                        LValue::Nil => LValue::Nil,
                         _ => vec![args[0].clone()].into(),
                     }
                 } else {
@@ -450,11 +450,17 @@ impl LLambda {
             }
             LambdaArgs::List(params) => {
                 if params.len() != args.len() {
-                    return Err(WrongNumberOfArgument(
+                    return Err(SpecialError(
                         "get_new_env",
-                        args.into(),
-                        args.len(),
-                        params.len()..params.len(),
+                        format!(
+                            "in lambda {}: ",
+                            WrongNumberOfArgument(
+                                "get_new_env",
+                                args.into(),
+                                args.len(),
+                                params.len()..params.len(),
+                            )
+                        ),
                     ));
                 }
                 for (param, arg) in params.iter().zip(args) {
@@ -1171,7 +1177,7 @@ mod test_lfuture {
 
     #[tokio::test]
     async fn create_lvalue_future() -> Result<(), LError> {
-        let (mut env, mut ctxs, mut _init) = LEnv::root();
+        let (mut env, mut ctxs) = LEnv::root().await;
         let args = LValue::Nil;
 
         let future: LValue = (Box::pin(async move { eval(&args, &mut env, &mut ctxs).await })
@@ -1224,7 +1230,7 @@ pub enum LValue {
     #[serde(skip)]
     Map(im::HashMap<LValue, LValue>),
     List(Vec<LValue>),
-    Quote(Box<LValue>),
+    //Quote(Box<LValue>),
     //Refers to boolean 'false and empty list in lisp
     True,
     Nil,
@@ -1388,7 +1394,7 @@ impl LValue {
                     NIL.to_string()
                 }
             }
-            LValue::Quote(lv) => format!("'{}", lv.pretty_print(indent)),
+            //LValue::Quote(lv) => format!("'{}", lv.pretty_print(indent)),
             lv => lv.to_string(),
         }
     }
@@ -1423,7 +1429,7 @@ impl Display for LValue {
                 }
                 write!(f, "{}", result)
             }
-            LValue::Quote(q) => write!(f, "{}", q),
+            //LValue::Quote(q) => write!(f, "{}", q),
             LValue::CoreOperator(co) => {
                 write!(f, "{}", co)
             }
@@ -1445,9 +1451,9 @@ impl Hash for LValue {
             LValue::List(l) => {
                 (*l).hash(state);
             }
-            LValue::Quote(s) => {
+            /*LValue::Quote(s) => {
                 s.to_string().hash(state);
-            }
+            }*/
             LValue::Nil => false.hash(state),
             _ => {}
         };
@@ -1654,15 +1660,21 @@ impl PartialEq for LValue {
             //Number comparison
             (LValue::Number(n1), LValue::Number(n2)) => *n1 == *n2,
             (LValue::Symbol(s1), LValue::Symbol(s2)) => *s1 == *s2,
+            (LValue::String(s1), LValue::String(s2)) => s1 == s2,
+            (LValue::Character(c1), LValue::Character(c2)) => c1 == c2,
             (LValue::True, LValue::True) => true,
             (LValue::Nil, LValue::Nil) => true,
             //Text comparison
             (LValue::List(l1), LValue::List(l2)) => *l1 == *l2,
             (LValue::Map(m1), LValue::Map(m2)) => *m1 == *m2,
             (LValue::Lambda(l1), LValue::Lambda(l2)) => *l1 == *l2,
-            (LValue::Quote(q1), LValue::Quote(q2)) => q1.to_string() == q2.to_string(), //function comparison
             (LValue::Fn(f1), LValue::Fn(f2)) => f1.debug_label == f2.debug_label,
             (LValue::MutFn(mf1), LValue::MutFn(mf2)) => mf1.debug_label == mf2.debug_label,
+            (LValue::CoreOperator(c1), LValue::CoreOperator(c2)) => c1 == c2,
+            (LValue::AsyncFn(af1), LValue::AsyncFn(af2)) => af1.get_label() == af2.get_label(),
+            (LValue::AsyncMutFn(amf1), LValue::AsyncMutFn(amf2)) => {
+                amf1.get_label() == amf2.get_label()
+            }
             (_, _) => false,
         }
     }
@@ -2013,7 +2025,7 @@ impl From<&LValue> for LValueS {
             LValue::CoreOperator(co) => LValueS::Symbol(co.to_string()),
             LValue::Map(m) => LValueS::Map(m.iter().map(|(k, v)| (k.into(), v.into())).collect()),
             LValue::List(l) => LValueS::List(l.iter().map(|lv| lv.into()).collect()),
-            LValue::Quote(l) => l.deref().into(),
+            //LValue::Quote(l) => l.deref().into(),
             LValue::True => LValueS::Symbol(TRUE.to_string()),
             LValue::Nil => LValueS::Symbol(NIL.to_string()),
             LValue::String(s) => LValueS::Symbol(s.clone()),
@@ -2212,7 +2224,7 @@ impl From<&LValue> for NameTypeLValue {
             LValue::Lambda(_) => NameTypeLValue::Lambda,
             LValue::Map(_) => NameTypeLValue::Map,
             LValue::List(_) => NameTypeLValue::List,
-            LValue::Quote(_) => NameTypeLValue::Quote,
+            //LValue::Quote(_) => NameTypeLValue::Quote,
             LValue::CoreOperator(_) => NameTypeLValue::CoreOperator,
             LValue::String(_) => NameTypeLValue::String,
             LValue::Character(_) => NameTypeLValue::Character,

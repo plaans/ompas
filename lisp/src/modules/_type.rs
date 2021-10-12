@@ -1,7 +1,7 @@
 //! Scheme module implementing symbol typing.
 //! Development in standby. Some features might not be completely working...
 use crate::core::LEnv;
-use crate::language::scheme_primitives::{BOOL, FLOAT, INT, OBJECT, USIZE};
+use crate::language::scheme_primitives::{BOOL, FLOAT, INT, OBJECT, SYMBOL, USIZE};
 use crate::modules::doc::{Documentation, LHelp};
 use crate::structs::LError::{
     NotInListOfExpectedTypes, SpecialError, WrongNumberOfArgument, WrongType,
@@ -611,7 +611,7 @@ pub fn get_type(args: &[LValue], _: &LEnv, ctx: &CtxType) -> Result<LValue, LErr
     }
     let type_as_string = match &args[0] {
         LValue::Symbol(s) => match ctx.get_type_from_sym(s) {
-            None => return Err(LError::SpecialError(GET_TYPE, format!("{} has no type", s))),
+            None => SYMBOL.to_string(),
             Some(lst) => match lst {
                 LSymType::Object(u) => ctx.get_sym(u).unwrap().to_string(),
                 LSymType::Type(parent_type) => match parent_type {

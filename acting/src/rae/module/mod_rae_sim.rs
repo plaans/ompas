@@ -20,12 +20,14 @@ const MACRO_RETRACT: &str = "(defmacro retract
         `(set! state (remove-key-value-map state (quote ,args)))))";
 
 const LAMBDA_GET_PRECONDITIONS: &str = "(define get-preconditions\
-        (lambda (label)\
-            (get rae-method-pre-conditions-map label))";
-
-const LAMBDA_GET_SCORE: &str = "(define get-preconditions\
     (lambda (label)\
-        (get rae-method-score-map label))";
+        (begin
+            (get-type label)
+            (get rae-method-pre-conditions-map label))))";
+
+const LAMBDA_GET_SCORE: &str = "(define get-score\
+    (lambda (label)\
+        (get rae-method-score-map label)))";
 
 const LAMBDA_EVAL_PRE_CONDITIONS: &str = "(define eval-pre-conditions\
 (lambda args\
@@ -33,7 +35,7 @@ const LAMBDA_EVAL_PRE_CONDITIONS: &str = "(define eval-pre-conditions\
 
 const LAMBDA_COMPUTE_SCORE: &str = "(define compute-score 
     (lambda args
-        (eval (cons (get-score (car args)) (cdr args))))";
+        (eval (cons (get-score (car args)) (cdr args)))))";
 
 pub const EVAL_PRE_CONDITIONS: &str = "eval-pre-conditions";
 pub const COMPUTE_SCORE: &str = "compute-score";
@@ -44,7 +46,7 @@ pub struct CtxRaeSim {}
 impl GetModule for CtxRaeSim {
     fn get_module(self) -> Module {
         let mut module = Module {
-            ctx: Arc::new(self),
+            ctx: Arc::new(()),
             prelude: vec![],
             raw_lisp: vec![
                 MACRO_ASSERT,
@@ -67,15 +69,15 @@ impl GetModule for CtxRaeSim {
     }
 }
 
-pub fn success(args: &[LValue], _: &LEnv, _: &CtxRaeSim) -> Result<LValue, LError> {
+pub fn success(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     Ok(vec![LValue::from(SUCCESS), args.into()].into())
 }
 
-pub fn failure(args: &[LValue], _: &LEnv, _: &CtxRaeSim) -> Result<LValue, LError> {
+pub fn failure(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     Ok(vec![LValue::from(FAILURE), args.into()].into())
 }
 
-pub fn is_failure(args: &[LValue], _: &LEnv, _: &CtxRaeSim) -> Result<LValue, LError> {
+pub fn is_failure(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(
             IS_FAILURE,
@@ -115,7 +117,7 @@ pub fn is_failure(args: &[LValue], _: &LEnv, _: &CtxRaeSim) -> Result<LValue, LE
     }
 }
 
-pub fn is_success(args: &[LValue], _: &LEnv, _: &CtxRaeSim) -> Result<LValue, LError> {
+pub fn is_success(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(
             IS_SUCCESS,

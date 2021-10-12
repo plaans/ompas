@@ -12,7 +12,7 @@ fn list_of_example() -> Vec<&'static str> {
 
 #[tokio::test]
 async fn test_pretty_print_lvalue() -> Result<(), LError> {
-    let (mut env, mut ctxs, _) = LEnv::root();
+    let (mut env, mut ctxs) = LEnv::root().await;
 
     for element in list_of_example() {
         let lvalue = parse(element, &mut env, &mut ctxs).await?;

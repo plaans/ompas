@@ -94,7 +94,7 @@ pub const LAMBDA_PROGRESS: &str = "
 pub const LAMBDA_SELECT: &str = "
 (define select
   (lambda args
-    (rae-select args (eval (cons generate-instances (cons `(quote ,(car args)) (cdr args)))))))";
+    (rae-select args (generate-applicable-instances (rae-get-state) args ))))";
 
 pub const LAMBDA_RETRY: &str = "
 (define retry (lambda (task_id)

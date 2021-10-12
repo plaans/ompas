@@ -854,7 +854,7 @@ pub fn is_lambda(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
 }
 
 /// Returns true if LValue is a quote
-pub fn is_quote(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+/*pub fn is_quote(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     match args.len() {
         1 => match args.get(0).unwrap() {
             LValue::Quote(_) => Ok(LValue::True),
@@ -862,7 +862,7 @@ pub fn is_quote(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
         },
         i => Err(WrongNumberOfArgument(IS_QUOTE, args.into(), i, 1..1)),
     }
-}
+}*/
 
 /// Returns true if LValue is a hashmap
 pub fn is_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {

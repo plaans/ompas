@@ -65,7 +65,7 @@ fn create_list_test() -> Vec<(&'static str, LValue)> {
 
 #[tokio::test]
 async fn test_lisp_integration() -> Result<(), LError> {
-    let (mut env, mut ctxs, _) = LEnv::root();
+    let (mut env, mut ctxs) = LEnv::root().await;
     for element in create_list_test() {
         let lvalue = parse(element.0, &mut env, &mut ctxs).await?;
         //stdout.write_all(b"parsing done\n");

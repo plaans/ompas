@@ -11,24 +11,15 @@ LANGUAGE
 
 const MOD_RAE_DESCRIPTION: &str = "rae-description";
 
+pub const GENERATE_TASK: &str = "generate-task";
 pub const GENERATE_TASK_SIMPLE: &str = "generate-task-simple";
 pub const GENERATE_STATE_FUNCTION: &str = "generate-state-function";
 pub const GENERATE_ACTION: &str = "generate-action";
-pub const GENERATE_TASK: &str = "generate-task";
+pub const GENERATE_ACTION_MODEL: &str = "generate-action-model";
+pub const GENERATE_ACTION_OPERATIONAL_MODEL: &str = "generate-action-operational-model";
 pub const GENERATE_METHOD: &str = "generate-method";
 
-/// Macro used to generate code to define a state function in RAE environment.
-pub const MACRO_GENERATE_STATE_FUNCTION: &str = "(defmacro generate-state-function (lambda args
-    (let ((label (car args))
-          (params (cdr args)))
-        `(list ,label
-            (lambda ,params
-                ,(cons 'rae-get-state-variable (cons `(quote ,label) params)))
-            (lambda ,params
-                (get-map state ,(cons `(quote ,label) params)))))))";
-
 /// Macro used to generate code to define a task in RAE environment.
-
 pub const MACRO_GENERATE_TASK: &str = "(defmacro generate-task \
                                         (lambda (l body) \
                                             (quasiquote (list (unquote l) (lambda (unquote (cdar body)) \
@@ -44,17 +35,48 @@ pub const MACRO_GENERATE_TASK_SIMPLE: &str = "(defmacro generate-task-simple
          `(list ,label (lambda ,params
                     ,(cons 'progress (cons `(quote ,label) params)))))))";
 
-/// Macro used to generate code to define a method in REA environment.
-pub const MACRO_GENERATE_METHOD_DEPRECATED: &str = "(defmacro generate-method \
-                                          (lambda (l body) \
-                                            (let ((task-label (cadar body)) \
-                                                  (params (cdadr body)) \
-                                                  (body (cadaddr body))) \
-                                                 (quasiquote (list (unquote l) \
-                                                                    (quote (unquote task-label)) \
-                                                                    (lambda (unquote params) \
-                                                                            (unquote body)))))))";
+/// Macro used to generate code to define a state function in RAE environment.
+pub const MACRO_GENERATE_STATE_FUNCTION: &str = "(defmacro generate-state-function (lambda args
+    (let ((label (car args))
+          (params (cdr args)))
+        `(list ,label
+            (lambda ,params
+                ,(cons 'rae-get-state-variable (cons `(quote ,label) params)))
+            (lambda ,params
+                (get-map state ,(cons `(quote ,label) params)))))))";
 
+/// Macro used to generate code to define an action in RAE environment.
+pub const MACRO_GENERATE_ACTION: &str = "(defmacro generate-action
+    (lambda args
+        (let ((label (car args))
+              (params (cdr args)))
+             `(list ,label
+                 (lambda ,params ,(cons 'rae-exec-command
+                     (cons `(quote ,label) params)))))))";
+
+pub const MACRO_GENERATE_ACTION_MODEL: &str = "
+(defmacro generate-action-model
+    (lambda (label def)
+        (let ((params (cdar def))
+               (conds (cadr (get def 1)))
+               (effs (cadr (get def 2))))
+              `(list ,label (lambda ,params
+                    (begin
+                        (if ,conds
+                            ,effs
+                            )
+                        state))))))";
+pub const MACRO_GENERATE_ACTION_OPERATIONAL_MODEL: &str =
+    "(defmacro generate-action-operational-model
+    (lambda (label def)
+        (let ((params (cdar def))
+              (body (cadr (get def 1))))
+              `(list ,label (lambda ,params
+                    (begin
+                        ,body
+                        state))))))";
+
+/// Macro used to generate code to define a method in REA environment.
 pub const MACRO_GENERATE_METHOD: &str = "(defmacro generate-method
     (lambda (m_label def)
         (let ((t_label (cadar def))
@@ -112,37 +134,6 @@ pub const MACRO_GENERATE_METHOD: &str = "(defmacro generate-method
                             (eval_params (eval (cons enumerate (append args (quote ,list-element)))))))
                     (lambda ,params ,body)))))";*/
 
-/// Macro used to generate code to define an action in RAE environment.
-pub const MACRO_GENERATE_ACTION: &str = "(defmacro generate-action
-    (lambda args
-        (let ((label (car args))
-              (params (cdr args)))
-             `(list ,label
-                 (lambda ,params ,(cons 'rae-exec-command
-                     (cons `(quote ,label) params)))))))";
-
-pub const GENERATE_ACTION_MODEL: &str = "generate-action-model";
-pub const MACRO_GENERATE_ACTION_MODEL: &str = "
-(defmacro generate-action-model
-    (lambda (label def)
-        (let ((params (cdar def))
-               (conds (cadr (get def 1)))
-               (effs (cadr (get def 2))))
-              `(list ,label (lambda ,params
-                    (begin
-                        (if ,conds
-                            ,effs)
-                        state))))))";
-pub const GENERATE_ACTION_OPERATIONAL_MODEL: &str = "generate-action-operational-model";
-pub const MACRO_GENERATE_OPERATIONAL_MODEL: &str = "(defmacro generate-action-operational-model
-    (lambda (label def)
-        (let ((params (cdar def))
-              (body (cadr (get def 1))))
-              `(list ,label (lambda ,params
-                    (begin
-                        ,body
-                        state))))))";
-
 /// Macro used to generate code to define a method in RAE environment.
 pub const MACRO_GENERATE_METHOD_PARAMETERS: &str =
     "(defmacro generate-method-parameters (lambda args
@@ -199,14 +190,12 @@ impl GetModule for CtxRaeDescription {
             ctx: Arc::new(()),
             prelude: vec![],
             raw_lisp: vec![
+                MACRO_GENERATE_TASK_SIMPLE,
+                MACRO_GENERATE_STATE_FUNCTION,
                 MACRO_GENERATE_ACTION,
                 MACRO_GENERATE_ACTION_MODEL,
-                MACRO_GENERATE_OPERATIONAL_MODEL,
+                MACRO_GENERATE_ACTION_OPERATIONAL_MODEL,
                 MACRO_GENERATE_METHOD,
-                MACRO_GENERATE_TASK,
-                MACRO_GENERATE_STATE_FUNCTION,
-                MACRO_GENERATE_TASK_SIMPLE,
-                MACRO_GENERATE_METHOD_PARAMETERS,
                 MACRO_ENUMERATE_PARAMS,
                 LAMBDA_GENERATE_TYPE_PRE_CONDITIONS,
             ]
@@ -294,4 +283,225 @@ pub fn generate_type_test_expr(args: &[LValue], _: &LEnv, _: &()) -> Result<LVal
 }
 /// TODO: Test des macros
 #[cfg(test)]
-mod test {}
+mod test {
+    use crate::rae::module::mod_rae_description::*;
+    use crate::rae::module::mod_rae_exec::CtxRaeExec;
+    use ompas_lisp::core::ImportType::WithoutPrefix;
+    use ompas_lisp::core::{activate_debug, import, ContextCollection, LEnv};
+    use ompas_lisp::modules::io::CtxIo;
+    use ompas_lisp::modules::math::CtxMath;
+    use ompas_lisp::modules::utils::CtxUtils;
+    use ompas_lisp::structs::LError;
+    use ompas_lisp::test_utils::{test_expression, test_expression_with_env, TestExpression};
+
+    async fn init_env_and_ctxs() -> (LEnv, ContextCollection) {
+        let (mut env, mut ctxs) = LEnv::root().await;
+
+        import(&mut env, &mut ctxs, CtxUtils::default(), WithoutPrefix)
+            .await
+            .expect("error loading utils");
+
+        import(&mut env, &mut ctxs, CtxMath::default(), WithoutPrefix)
+            .await
+            .expect("error loading math");
+
+        import(&mut env, &mut ctxs, CtxRaeExec::default(), WithoutPrefix)
+            .await
+            .expect("error loading rae exec");
+
+        import(
+            &mut env,
+            &mut ctxs,
+            CtxRaeDescription::default(),
+            WithoutPrefix,
+        )
+        .await
+        .expect("error loading rae description");
+
+        import(&mut env, &mut ctxs, CtxIo::default(), WithoutPrefix)
+            .await
+            .expect("error loading io");
+
+        (env, ctxs)
+    }
+
+    #[tokio::test]
+    async fn test_macro_generate_task_simple() -> Result<(), LError> {
+        let macro_to_test = TestExpression {
+            inner: MACRO_GENERATE_TASK_SIMPLE,
+            dependencies: vec![],
+            expression: "(generate-task-simple t_navigate_to ?r ?x ?y)",
+            expanded: "(list t_navigate_to (lambda (?r ?x ?y) (progress 't_navigate_to ?r ?x ?y)))",
+            result: "(list t_navigate_to (lambda (?r ?x ?y) (progress 't_navigate_to ?r ?x ?y)))",
+        };
+
+        let (mut env, mut ctxs) = init_env_and_ctxs().await;
+        test_expression_with_env(macro_to_test, &mut env, &mut ctxs, true).await
+    }
+
+    #[tokio::test]
+    async fn test_macro_generate_state_function() -> Result<(), LError> {
+        let macro_to_test = TestExpression {
+            inner: MACRO_GENERATE_STATE_FUNCTION,
+            dependencies: vec![],
+            expression: "(generate-state-function robot.coordinates ?r)",
+            expanded: "(list robot.coordinates
+                            (lambda (?r) (rae-get-state-variable 'robot.coordinates ?r))
+                            (lambda (?r) (get-map state ( 'robot.coordinates ?r) )))",
+            result: "(list robot.coordinates
+                            (lambda (?r) (rae-get-state-variable 'robot.coordinates ?r))
+                            (lambda (?r) (get-map state ( 'robot.coordinates ?r) )))",
+        };
+
+        let (mut env, mut ctxs) = init_env_and_ctxs().await;
+        test_expression_with_env(macro_to_test, &mut env, &mut ctxs, true).await
+    }
+
+    #[tokio::test]
+    async fn test_macro_generate_action() -> Result<(), LError> {
+        let macro_to_test = TestExpression {
+            inner: MACRO_GENERATE_ACTION,
+            dependencies: vec![],
+            expression: "(generate-action pick_package ?r ?p)",
+            expanded: "(list pick_package
+                            (lambda (?r ?p) (rae-exec-command 'pick_package ?r ?p)))",
+            result: "(list pick_package
+                            (lambda (?r ?p) (rae-exec-command 'pick_package ?r ?p)))",
+        };
+
+        let (mut env, mut ctxs) = init_env_and_ctxs().await;
+        test_expression_with_env(macro_to_test, &mut env, &mut ctxs, true).await
+    }
+
+    #[tokio::test]
+    async fn test_macro_generate_action_model() -> Result<(), LError> {
+        let macro_to_test = TestExpression {
+            inner: MACRO_GENERATE_ACTION_MODEL,
+            dependencies: vec![],
+            expression: "(generate-action-model pick
+                ((:params ?r)
+                  (:pre-conditions (> (robot.battery ?r) 0.4))
+                  (:effects
+                        (assert (robot.busy ?r) true))))",
+            expanded: "(list pick
+                            (lambda (?r)
+                                (begin
+                                    (if (> (robot.battery ?r) 0.4)
+                                        (assert (robot.busy ?r) true))
+                                    state))))",
+            result: "(list pick
+                            (lambda (?r)
+                                (begin
+                                    (if (> (robot.battery ?r) 0.4)
+                                        (assert (robot.busy ?r) true))
+                                    state))))",
+        };
+
+        let (mut env, mut ctxs) = init_env_and_ctxs().await;
+        test_expression_with_env(macro_to_test, &mut env, &mut ctxs, true).await
+    }
+
+    #[tokio::test]
+    async fn test_macro_generate_action_operational_model() -> Result<(), LError> {
+        let macro_to_test = TestExpression {
+            inner: MACRO_GENERATE_ACTION_OPERATIONAL_MODEL,
+            dependencies: vec![],
+            expression: "(generate-action-operational-model place
+                        ((:params ?r)
+                          (:body
+                            (if (> (robot.battery ?r) 0.4)
+                                (assert (robot.busy ?r) false)
+                                (failure)))))",
+            expanded: "(list place
+                            (lambda (?r)
+                                (begin
+                                    (if (> (robot.battery ?r) 0.4)
+                                        (assert (robot.busy ?r) false)
+                                        (failure))
+                                    state)))",
+            result: "(list place
+                            (lambda (?r)
+                                (begin
+                                    (if (> (robot.battery ?r) 0.4)
+                                        (assert (robot.busy ?r) false)
+                                        (failure))
+                                    state)))",
+        };
+
+        let (mut env, mut ctxs) = init_env_and_ctxs().await;
+        test_expression_with_env(macro_to_test, &mut env, &mut ctxs, true).await
+    }
+
+    #[tokio::test]
+    async fn test_lambda_generate_type_pre_conditions() -> Result<(), LError> {
+        let lambda_test = TestExpression {
+            inner: LAMBDA_GENERATE_TYPE_PRE_CONDITIONS,
+            dependencies: vec![],
+            expression:
+                "(gtpc '((?r robot) (?f float ) (?i int) (?b bool) (?s symbol)(?n number)))",
+            expanded: "(gtpc '((?r robot) (?f float ) (?i int) (?b bool) (?s symbol)(?n number)))",
+            result: "(if (! (= (robot.instance ?r) nil))
+                        (if (float? ?f)
+                            (if (int? ?i)
+                                (if (bool? ?b)
+                                    (if (symbol? ?s)
+                                        (number? ?n))))))",
+        };
+        let (mut env, mut ctxs) = init_env_and_ctxs().await;
+
+        test_expression_with_env(lambda_test, &mut env, &mut ctxs, false).await
+    }
+
+    #[tokio::test]
+    async fn test_macro_generate_method() -> Result<(), LError> {
+        let macro_to_test = TestExpression {
+            inner: MACRO_GENERATE_METHOD,
+            dependencies: vec![LAMBDA_GENERATE_TYPE_PRE_CONDITIONS],
+            expression: "(generate-method m_navigate_to ((:task t_navigate_to)
+            (:params (?r robot) (?x float) (?y float))
+            (:pre-conditions (and (robot.available ?r) (< ?x 10) (< ?y 10)))
+            (:effects (assert (robot.position ?r) (list ?x ?y)))
+            (:score 0)
+            (:body
+            (begin
+                (navigate_to ?r ?x ?y)))))",
+            expanded: "(list m_navigate_to
+    't_navigate_to
+    '(robot float float)
+    (lambda (?r ?x ?y)
+        (if (if (! (= (robot.instance ?r) nil))
+                (if (float? ?x)
+                    (float? ?y)))
+            (if (if (robot.available ?r)
+                    (if (< ?x 10)
+                        (< ?y 10)))
+                true)))
+    (lambda (?r ?x ?y)
+        (assert (robot.position ?r) (list ?x ?y)))
+    (lambda (?r ?x ?y) 0 )
+    (lambda (?r ?x ?y)
+        (begin
+            (navigate_to ?r ?x ?y))))",
+            result: "(list m_navigate_to
+    't_navigate_to
+    '(robot float float)
+    (lambda (?r ?x ?y)
+        (if (if (! (= (robot.instance ?r) nil))
+                (if (float? ?x)
+                    (float? ?y)))
+            (if (if (robot.available ?r)
+                    (if (< ?x 10)
+                        (< ?y 10)))
+                true)))
+    (lambda (?r ?x ?y)
+        (assert (robot.position ?r) (list ?x ?y)))
+    (lambda (?r ?x ?y) 0 )
+    (lambda (?r ?x ?y)
+        (begin
+            (navigate_to ?r ?x ?y))))",
+        };
+
+        let (mut env, mut ctxs) = init_env_and_ctxs().await;
+        test_expression_with_env(macro_to_test, &mut env, &mut ctxs, true).await
+    }
+}

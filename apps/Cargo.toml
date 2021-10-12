@@ -30,9 +30,17 @@ serde = { version = "1.0", features = ["derive"]}
 serde_json = "1.0.64"
 chrono = "0.4.19"
 
+[[bin]]
+name = "ompas"
+path = "src/bin/ompas.rs"
 
+[[bin]]
+name = "scheme"
+path = "src/bin/scheme.rs"
 
-
+[[bin]]
+name = "root_scheme"
+path = "src/bin/sandbox/root_scheme.rs"
 
 [[bin]]
 name = "virtual_robot"
@@ -41,14 +49,6 @@ path = "src/bin/sandbox/robot_sim.rs"
 [[bin]]
 name = "supervisor"
 path = "src/bin/sandbox/unnamed_supervisor.rs"
-
-[[bin]]
-name = "ompas"
-path = "src/bin/ompas.rs"
-
-[[bin]]
-name = "scheme"
-path = "src/bin/scheme.rs"
 
 [[bin]]
 name = "godot_test"

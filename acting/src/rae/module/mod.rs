@@ -8,6 +8,7 @@ use crate::rae::TOKIO_CHANNEL_SIZE;
 use ompas_lisp::async_await;
 use ompas_lisp::core::ImportType::WithoutPrefix;
 use ompas_lisp::core::{eval, import, parse, ContextCollection, LEnv};
+use ompas_lisp::modules::_type::CtxType;
 use ompas_lisp::modules::io::CtxIo;
 use ompas_lisp::modules::math::CtxMath;
 use ompas_lisp::modules::utils::CtxUtils;
@@ -139,6 +140,10 @@ pub(crate) async fn init_simu_env(working_directory: Option<PathBuf>) -> (LEnv, 
     import(&mut env, &mut ctxs, CtxRaeSim::default(), WithoutPrefix)
         .await
         .expect("error loading raesim");
+
+    import(&mut env, &mut ctxs, CtxType::default(), WithoutPrefix)
+        .await
+        .expect("error loading type");
 
     (env, ctxs)
 }

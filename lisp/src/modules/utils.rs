@@ -39,37 +39,19 @@ const DOC_ENUMERATE: &str =
 const DOC_ENUMERATE_VERBOSE: &str =
     "Example: \n(enumerate (list 1 2) (list 3 4))\n=> ((1 3)(1 4)(2 3)(2 4))";
 //MACROS
-pub const MACRO_LET: &str = "(defmacro let \
-                                           (lambda (bindings body) \
-                                                   (begin (define unzipped (unzip bindings)) \
-                                                          (define keys (car unzipped)) \
-                                                          (define values (cadr unzipped)) \
-                                                          (cons (quasiquote (lambda (unquote keys) \
-                                                                                    (unquote body))) values))))";
 
-pub const MACRO_LET_STAR: &str = "(defmacro let* \
-                                                (lambda (bindings body) \
-                                                        (if (= (length bindings) 1) \
-                                                            (cons (quasiquote (lambda (unquote (list (caar bindings))) \
-                                                                                      (unquote body))) \
-                                                                  (cdar bindings)) \
-                                                            (cons (quasiquote (lambda (unquote (list (caar bindings))) \
-                                                                                      (let* (unquote (cdr bindings)) \
-                                                                                            (unquote body)))) \
-                                                                  (cdar bindings)))))";
+pub const MACRO_TEST_MACRO: &str = "(defmacro test-macro
+   (lambda (x)
+    `(expand (parse ,x))))";
 
-pub const MACRO_APPLY: &str = "(defmacro apply\
-                                              (lambda (f args)\
-                                                      (cons f args)))";
-
-pub const MACRO_AND: &str = "(defmacro and 
+pub const MACRO_AND: &str = "(defmacro and
                                 (lambda args
                                     (if (null? args)
                                         nil
                                         (if (= (length args) 1)
                                             (car args)
                                             `(if ,(car args)
-                                                 (and ,(cdr args))
+                                                 ,(cons 'and (cdr args))
                                                  nil)))))";
 
 pub const MACRO_OR: &str = "(defmacro or 
@@ -80,61 +62,55 @@ pub const MACRO_OR: &str = "(defmacro or
                                             (car args)
                                             `(if ,(car args)
                                                   true
-                                                  (or ,(cdr args)))))))";
+                                                  ,(cons 'or (cdr args)))))))";
 
-pub const MACRO_NEQ: &str = "(defmacro neq \
-                                (lambda (a b)\
+pub const MACRO_CAAR: &str = "(defmacro caar (lambda (x) `(car (car ,x))))";
+pub const MACRO_CADR: &str = "(defmacro cadr (lambda (x) `(car (cdr ,x))))";
+pub const MACRO_CDAR: &str = "(defmacro cdar (lambda (x) `(cdr (car ,x))))";
+pub const MACRO_CDDR: &str = "(defmacro cddr (lambda (x) `(cdr (cdr ,x))))";
+
+pub const MACRO_CAADR: &str = "(defmacro caadr (lambda (x) `(car (car (cdr ,x)))))";
+pub const MACRO_CADDR: &str = "(defmacro caddr (lambda (x) `(car (cdr (cdr ,x)))))";
+pub const MACRO_CADAR: &str = "(defmacro cadar (lambda (x) `(car (cdr (car ,x)))))";
+pub const MACRO_CADADR: &str = "(defmacro cadadr (lambda (x) `(car (cdr (car (cdr ,x))))))";
+pub const MACRO_CDADR: &str = "(defmacro cdadr (lambda (x) `(cdr (car (cdr ,x)))))";
+pub const MACRO_CADADDR: &str = "(defmacro cadaddr (lambda (x) `(car (cdr (car (cdr (cdr ,x)))))))";
+
+pub const MACRO_NEQ: &str = "(defmacro neq
+                                (lambda (a b)
                                     `(! (= ,a ,b))))";
 
-pub const MACRO_NEQ_SHORT: &str = "(defmacro != \
-                                        (lambda (a b) \
+pub const MACRO_NEQ_SHORT: &str = "(defmacro !=
+                                        (lambda (a b)
                                             `(neq ,a ,b)))";
-
-pub const MACRO_COND: &str = "(defmacro cond (lambda exprs \
-                                                (if (null? exprs) \
-                                                    nil \
-                                                    (if (= (caar exprs) (quote else)) \
-                                                        (cadar exprs) \
-                                                        (quasiquote \
-                                                            (if (unquote (caar exprs)) \
-                                                                (unquote (cadar exprs)) \
-                                                                (cond (unquote (cdr exprs)))))))))";
 
 pub const MACRO_AWAIT_ASYNC: &str = "(defmacro await-async (lambda (x) `(await (async ,x))))";
 
+pub const MACRO_APPLY: &str = "(defmacro apply
+                                  (lambda (f args)
+                                          (cons f args)))";
+
+pub const MACRO_COND: &str = "(defmacro cond (lambda exprs
+    (if (null? exprs)
+        nil
+        (if (= (caar exprs) 'else)
+            (cadar exprs)
+            `(if ,(caar exprs)
+                ,(cadar exprs)
+                ,(cons cond (cdr exprs)))))))";
+
 pub const MACRO_FOR: &str = "(defmacro for (lambda args \
-    (let ((_i_ (get-list args 0)) \
-            (_list_ (get-list args 2)) \
-            (_body_ (get-list args 3))) \
-        `(let ((_f_loop_ (lambda args \
-            (if (null? args) \
-                nil \
-                (let ((,_i_ (car args))) \
-                    (begin \
-                        ,_body_ \
-                        (_f_loop_ (cdr args)))))))) \
-            (_f_loop_ ,_list_)))))";
-
-pub const MACRO_CAAR: &str = "(defmacro caar (lambda (x) (quasiquote (car (car (unquote x))))))";
-pub const MACRO_CADR: &str = "(defmacro cadr (lambda (x) (quasiquote (car (cdr (unquote x))))))";
-pub const MACRO_CDAR: &str = "(defmacro cdar (lambda (x) (quasiquote (cdr (car (unquote x))))))";
-pub const MACRO_CDDR: &str = "(defmacro cddr (lambda (x) (quasiquote (cdr (cdr (unquote x))))))";
-pub const MACRO_CAADR: &str =
-    "(defmacro caadr (lambda (x) (quasiquote (car (car (cdr(unquote x)))))))";
-pub const MACRO_CADDR: &str =
-    "(defmacro caddr (lambda (x) (quasiquote (car (cdr (cdr (unquote x)))))))";
-pub const MACRO_CADAR: &str =
-    "(defmacro cadar (lambda (x) (quasiquote (car (cdr (car (unquote x)))))))";
-pub const MACRO_CADADR: &str =
-    "(defmacro cadadr (lambda (x) (quasiquote (car (cdr (car (cdr (unquote x))))))))";
-pub const MACRO_CDADR: &str =
-    "(defmacro cdadr (lambda (x) (quasiquote (cdr (car (cdr (unquote x)))))))";
-pub const MACRO_CADADDR: &str =
-    "(defmacro cadaddr (lambda (x) (quasiquote (car (cdr (car (cdr (cdr (unquote x)))))))))";
-
-pub const MACRO_TEST_MACRO: &str = "(defmacro test-macro \
-   (lambda (x)\
-    `(expand (parse ,x))))";
+(let ((_i_ (get-list args 0)) \
+        (_list_ (get args 2)) \
+        (_body_ (get args 3))) \
+    `(let ((_f_loop_ (lambda args \
+        (if (null? args) \
+            nil \
+            (let ((,_i_ (car args))) \
+                (begin \
+                    ,_body_ \
+                    (_f_loop_ (cdr args)))))))) \
+        (_f_loop_ ,_list_)))))";
 
 pub const MACRO_WHILE: &str = "(defmacro while
     (lambda (c b)
@@ -158,15 +134,35 @@ pub const MACRO_LOOP: &str = "(defmacro loop
                         (__loop__))))
             (__loop__))))";
 
+pub const MACRO_LET: &str = "(defmacro let
+    (lambda (bindings body)
+        (begin
+            (define unzipped (unzip bindings))
+            (define keys (car unzipped))
+            (define values (cadr unzipped))
+            (cons `(lambda ,keys
+                        ,body)
+                    values))))";
+
+pub const MACRO_LET_STAR: &str = "(defmacro let*
+    (lambda (bindings body)
+        (if (= (length bindings) 1)
+            (cons `(lambda ,(list (caar bindings))
+                           ,body)
+                    (cdar bindings))
+            (cons `(lambda ,(list (caar bindings))
+                            (let* ,(cdr bindings) ,body))
+                        (cdar bindings)))))";
+
 //LAMBDAS
-pub const LAMBDA_AND: &str = "(define and (lambda args \
+/*pub const LAMBDA_AND: &str = "(define and (lambda args \
                                                    (if (null? args) true \
                                                        (if (= (length args) 1) (car args)
                                                            (if (car args) (and (cdr args)) nil)))))";
 pub const LAMBDA_OR: &str = "(define or (lambda args \
                                                    (if (null? args) true \
                                                        (if (= (length args) 1) (car args)
-                                                           (if (car args) true (or (cdr args)))))))";
+                                                           (if (car args) true (or (cdr args)))))))";*/
 
 pub const LAMBDA_COND: &str = "(define cond (lambda x \
                                             (if (null? x)\
@@ -191,24 +187,27 @@ pub const LAMBDA_ZIP: &str = " (define zip (lambda (l1 l2)\
                                                                         (cdr l2)))))))";
 
 pub const LAMBDA_UNZIP: &str = "(define unzip
-        (lambda lists
+        (lambda (lists)
                 (begin
-                    (define firsts (lambda lists
-                                            (if (null? lists)
-                                                nil
-                                                (cons (caar lists)
-                                                      (firsts (cdr lists))))))
-                    (define seconds (lambda lists
-                                            (if (null? lists)
-                                            nil
-                                            (cons (cadar lists)
-                                                  (seconds (cdr lists))))))
+                    (define firsts 
+                        (lambda (lists)
+                            (if (null? lists)
+                                nil
+                                (cons (caar lists)
+                                        (firsts (cdr lists))))))
+                    (define seconds 
+                        (lambda (lists)
+                            (if (null? lists)
+                            nil
+                            (cons (cadar lists)
+                                    (seconds (cdr lists))))))
                     (list (firsts lists) (seconds lists)))))";
 
-pub const LAMBDA_MAPF : &str = "(define mapf (lambda (f seq)\
-                                                         (if (null? seq)\
-                                                         nil\
-                                                         (cons (eval (cons f (car seq))) (mapf f (cdr seq))))))";
+pub const LAMBDA_MAPF: &str = "(define mapf 
+    (lambda (f seq)
+         (if (null? seq)
+         nil
+         (cons (eval (cons f (car seq))) (mapf f (cdr seq))))))";
 
 #[derive(Default, Copy, Clone, Debug)]
 pub struct CtxUtils {}
@@ -219,32 +218,32 @@ impl GetModule for CtxUtils {
             ctx: Arc::new(()),
             prelude: vec![],
             raw_lisp: vec![
+                MACRO_TEST_MACRO,
+                MACRO_AND,
+                MACRO_OR,
                 MACRO_CAAR,
                 MACRO_CADR,
                 MACRO_CDAR,
                 MACRO_CDDR,
                 MACRO_CADAR,
                 MACRO_CADDR,
-                MACRO_CADADR,
                 MACRO_CDADR,
-                MACRO_CADADDR,
                 MACRO_CAADR,
-                MACRO_AND,
-                MACRO_OR,
+                MACRO_CADADR,
+                MACRO_CADADDR,
                 MACRO_NEQ,
                 MACRO_NEQ_SHORT,
-                MACRO_LET,
-                MACRO_LET_STAR,
+                MACRO_AWAIT_ASYNC,
                 MACRO_APPLY,
                 MACRO_COND,
-                MACRO_AWAIT_ASYNC,
-                MACRO_WHILE,
+                //MACRO_WHILE,
                 MACRO_LOOP,
-                MACRO_TEST_MACRO,
                 LAMBDA_UNZIP,
                 LAMBDA_ZIP,
                 LAMBDA_MAPF,
-                MACRO_FOR,
+                MACRO_LET,
+                MACRO_LET_STAR,
+                //MACRO_FOR,
             ]
             .into(),
             label: MOD_UTILS.into(),
@@ -379,4 +378,370 @@ pub fn transform_in_singleton_list(args: &[LValue], _: &LEnv, _: &()) -> Result<
         .map(|lv| LValue::List(vec![lv.clone()]))
         .collect::<Vec<LValue>>()
         .into())
+}
+
+#[cfg(test)]
+mod test {
+    use crate::core::{parse, LEnv};
+    use crate::modules::utils::*;
+    use crate::structs::LError;
+    use crate::test_utils::{test_expression, TestExpression};
+
+    #[tokio::test]
+    async fn test_macro_test_macro() -> Result<(), LError> {
+        let macro_to_test = TestExpression {
+            inner: MACRO_TEST_MACRO,
+            dependencies: vec![],
+            expression: "(test-macro \"(if (= 1 2) true nil)\")",
+            expanded: "(expand (parse \"(if (= 1 2) true nil)\"))",
+            result: "(if (= 1 2) true nil)",
+        };
+
+        test_expression(macro_to_test).await
+    }
+
+    #[tokio::test]
+    async fn test_macro_and() -> Result<(), LError> {
+        let macro_to_test = TestExpression {
+            inner: MACRO_AND,
+            dependencies: vec![],
+            expression: "(and (= (+ 1 1) 2) (< 3 4))",
+            expanded: "(if (= (+ 1 1) 2) (< 3 4) nil)",
+            result: "true",
+        };
+
+        test_expression(macro_to_test).await
+    }
+
+    #[tokio::test]
+    async fn test_macro_or() -> Result<(), LError> {
+        let macro_to_test = TestExpression {
+            inner: MACRO_OR,
+            dependencies: vec![],
+            expression: "(or (= (+ 1 1) 2) (< 3 4))",
+            expanded: "(if (= (+ 1 1) 2) true (< 3 4))",
+            result: "true",
+        };
+
+        test_expression(macro_to_test).await
+    }
+
+    #[tokio::test]
+    async fn test_macro_caar() -> Result<(), LError> {
+        let macro_to_test = TestExpression {
+            inner: MACRO_CAAR,
+            dependencies: vec![],
+            expression: "(caar '((1 2) (3 4)))",
+            expanded: "(car (car (quote ((1 2) (3 4)))))",
+            result: "1",
+        };
+
+        test_expression(macro_to_test).await
+    }
+
+    #[tokio::test]
+    async fn test_macro_cadr() -> Result<(), LError> {
+        let macro_to_test = TestExpression {
+            inner: MACRO_CADR,
+            dependencies: vec![],
+            expression: "(cadr '((1 2) (3 4)))",
+            expanded: "(car (cdr (quote ((1 2) (3 4)))))",
+            result: "(3 4)",
+        };
+
+        test_expression(macro_to_test).await
+    }
+
+    #[tokio::test]
+    async fn test_macro_cdar() -> Result<(), LError> {
+        let macro_to_test = TestExpression {
+            inner: MACRO_CDAR,
+            dependencies: vec![],
+            expression: "(cdar '((1 2) (3 4)))",
+            expanded: "(cdr (car (quote ((1 2) (3 4)))))",
+            result: "(2)",
+        };
+
+        test_expression(macro_to_test).await
+    }
+
+    #[tokio::test]
+    async fn test_macro_cddr() -> Result<(), LError> {
+        let macro_to_test = TestExpression {
+            inner: MACRO_CDDR,
+            dependencies: vec![],
+            expression: "(cddr '((1 2) (3 4) 5))",
+            expanded: "(cdr (cdr (quote ((1 2) (3 4) 5))))",
+            result: "(5)",
+        };
+
+        test_expression(macro_to_test).await
+    }
+
+    #[tokio::test]
+    async fn test_macro_cadar() -> Result<(), LError> {
+        let macro_to_test = TestExpression {
+            inner: MACRO_CADAR,
+            dependencies: vec![],
+            expression: "(cadar '((1 2) (3 4) 5))",
+            expanded: "(car (cdr (car '((1 2) (3 4) 5))))",
+            result: "2",
+        };
+
+        test_expression(macro_to_test).await
+    }
+
+    #[tokio::test]
+    async fn test_macro_caddr() -> Result<(), LError> {
+        let macro_to_test = TestExpression {
+            inner: MACRO_CADDR,
+            dependencies: vec![],
+            expression: "(caddr '((1 2) (3 4) 5))",
+            expanded: "(car (cdr (cdr '((1 2) (3 4) 5))))",
+            result: "5",
+        };
+
+        test_expression(macro_to_test).await
+    }
+
+    #[tokio::test]
+    async fn test_macro_cdadr() -> Result<(), LError> {
+        let macro_to_test = TestExpression {
+            inner: MACRO_CDADR,
+            dependencies: vec![],
+            expression: "(cdadr '((1 2) (3 4) 5))",
+            expanded: "(cdr (car (cdr '((1 2) (3 4) 5))))",
+            result: "(4)",
+        };
+
+        test_expression(macro_to_test).await
+    }
+
+    #[tokio::test]
+    async fn test_macro_caadr() -> Result<(), LError> {
+        let macro_to_test = TestExpression {
+            inner: MACRO_CAADR,
+            dependencies: vec![],
+            expression: "(caadr '((1 2) (3 4) 5))",
+            expanded: "(car (car (cdr '((1 2) (3 4) 5))))",
+            result: "3",
+        };
+
+        test_expression(macro_to_test).await
+    }
+
+    #[tokio::test]
+    async fn test_macro_cadadr() -> Result<(), LError> {
+        let macro_to_test = TestExpression {
+            inner: MACRO_CADADR,
+            dependencies: vec![],
+            expression: "(cadadr '((1 2) (3 4) 5))",
+            expanded: "(car (cdr (car (cdr '((1 2) (3 4) 5)))))",
+            result: "4",
+        };
+
+        test_expression(macro_to_test).await
+    }
+
+    #[tokio::test]
+    async fn test_macro_cadaddr() -> Result<(), LError> {
+        let macro_to_test = TestExpression {
+            inner: MACRO_CADADDR,
+            dependencies: vec![],
+            expression: "(cadaddr '((1 2) (3 4) ((5 6) 7)))",
+            expanded: "(car (cdr (car (cdr (cdr '((1 2) (3 4) ((5 6) 7)))))))",
+            result: "7",
+        };
+
+        test_expression(macro_to_test).await
+    }
+
+    #[tokio::test]
+    async fn test_macro_neq() -> Result<(), LError> {
+        let macro_to_test = TestExpression {
+            inner: MACRO_NEQ,
+            dependencies: vec![],
+            expression: "(neq 1 4)",
+            expanded: "(! (= 1 4))",
+            result: "true",
+        };
+
+        test_expression(macro_to_test).await
+    }
+
+    #[tokio::test]
+    async fn test_macro_neq_short() -> Result<(), LError> {
+        let macro_to_test = TestExpression {
+            inner: MACRO_NEQ_SHORT,
+            dependencies: vec![MACRO_NEQ],
+            expression: "(!= 1 4)",
+            expanded: "(! (= 1 4))",
+            result: "true",
+        };
+
+        test_expression(macro_to_test).await
+    }
+
+    #[tokio::test]
+    async fn test_macro_await_async() -> Result<(), LError> {
+        let macro_to_test = TestExpression {
+            inner: MACRO_AWAIT_ASYNC,
+            dependencies: vec![],
+            expression: "(await-async (+ 1 4))",
+            expanded: "(await (async (+ 1 4)))",
+            result: "5",
+        };
+
+        test_expression(macro_to_test).await
+    }
+
+    #[tokio::test]
+    async fn test_macro_apply() -> Result<(), LError> {
+        let macro_to_test = TestExpression {
+            inner: MACRO_APPLY,
+            dependencies: vec![],
+            expression: "(apply + (1 4))",
+            expanded: "(+ 1 4)",
+            result: "5",
+        };
+
+        test_expression(macro_to_test).await
+    }
+
+    #[tokio::test]
+    async fn test_macro_cond() -> Result<(), LError> {
+        let macro_to_test = TestExpression {
+            inner: MACRO_COND,
+            dependencies: vec![MACRO_CAAR, MACRO_CADAR],
+            expression: "(begin
+                    (define weather (lambda (t) 
+                        (cond ((< t 0) cold)
+                            ((< t 10) cool)
+                            ((< t 20) ok)
+                            ((< t 30) warm)
+                            (else hot))))
+
+                    (weather 15))",
+            expanded: "(begin
+                    (define weather (lambda (t) (if (< t 0)
+                        cold
+                        (if (< t 10)
+                            cool
+                            (if (< t 20)
+                                ok
+                                (if (< t 30)
+                                    warm
+                                    hot))))))
+                    (weather 15))",
+            result: "ok",
+        };
+
+        test_expression(macro_to_test).await
+    }
+    #[tokio::test]
+    async fn test_macro_loop() -> Result<(), LError> {
+        let expression = "(loop (+ 1 1))";
+        let expected = "(begin
+            (define __loop__
+                (lambda nil
+                    (begin
+                        (+ 1 1)
+                        (__loop__))))
+            (__loop__))))";
+
+        let (mut env, mut ctxs) = LEnv::root().await;
+
+        //Load macro
+        parse(MACRO_LOOP, &mut env, &mut ctxs).await?;
+
+        //Expand expression
+        let expanded = parse(expression, &mut env, &mut ctxs).await?;
+
+        let expected = parse(expected, &mut env, &mut ctxs).await?;
+
+        println!(
+            "test_macro:\n\
+        \t-expression: {}\n\
+        \t-extended: {}\n\
+        \t-expected: {}",
+            expression, expanded, expected
+        );
+
+        assert_eq!(expanded, expected);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_lambda_zip() -> Result<(), LError> {
+        let test_lambda = TestExpression {
+            inner: LAMBDA_ZIP,
+            dependencies: vec![MACRO_OR],
+            expression: "(zip '(1 2 3 4) '(5 6 7 8))",
+            expanded: "(zip '(1 2 3 4) '(5 6 7 8))",
+            result: "((1 5) (2 6) (3 7) (4 8))",
+        };
+
+        test_expression(test_lambda).await
+    }
+
+    #[tokio::test]
+    async fn test_lambda_unzip() -> Result<(), LError> {
+        let test_lambda = TestExpression {
+            inner: LAMBDA_UNZIP,
+            dependencies: vec![MACRO_CAAR, MACRO_CADAR, MACRO_APPLY],
+            expression: "(unzip '((1 5) (2 6) (3 7) (4 8)))",
+            expanded: "(unzip '((1 5) (2 6) (3 7) (4 8)))",
+            result: "((1 2 3 4) (5 6 7 8))",
+        };
+
+        test_expression(test_lambda).await
+    }
+
+    #[tokio::test]
+    async fn test_lambda_mapf() -> Result<(), LError> {
+        let test_lambda = TestExpression {
+            inner: LAMBDA_MAPF,
+            dependencies: vec![],
+            expression: "(begin
+                            (define square (lambda (x)  (* x x)))
+                            (mapf square '(1 2 3 4 5)))",
+            expanded: "(begin
+                            (define square (lambda (x)  (* x x)))
+                            (mapf square '(1 2 3 4 5)))",
+            result: "(1 4 9 16 25)",
+        };
+
+        test_expression(test_lambda).await
+    }
+
+    #[tokio::test]
+    async fn test_macro_let() -> Result<(), LError> {
+        let test_lambda = TestExpression {
+            inner: MACRO_LET,
+            dependencies: vec![MACRO_CAAR, MACRO_CADAR, MACRO_CADR, LAMBDA_UNZIP],
+            expression: "(let ((x 1)
+                               (y 2))
+                              (+ x y))",
+            expanded: "((lambda (x y) (+ x y)) 1 2)",
+            result: "3",
+        };
+
+        test_expression(test_lambda).await
+    }
+
+    #[tokio::test]
+    async fn test_macro_let_star() -> Result<(), LError> {
+        let test_lambda = TestExpression {
+            inner: MACRO_LET_STAR,
+            dependencies: vec![MACRO_CAAR, MACRO_CDAR],
+            expression: "(let* ((x 1)\
+                               (y (+ x 1)))\
+                              (+ x y))",
+            expanded: "((lambda (x) ((lambda (y) (+ x y)) (+ x 1))) 1)",
+            result: "3",
+        };
+
+        test_expression(test_lambda).await
+    }
 }

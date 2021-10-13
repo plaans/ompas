@@ -10,8 +10,8 @@ fn list_of_example() -> Vec<&'static str> {
     vec![EXAMPLE, EXAMPLE_2, EXAMPLE_3, EXAMPLE_4]
 }
 
-#[tokio::test]
-async fn test_pretty_print_lvalue() -> Result<(), LError> {
+#[tokio::main]
+async fn main() -> Result<(), LError> {
     let (mut env, mut ctxs) = LEnv::root().await;
 
     for element in list_of_example() {

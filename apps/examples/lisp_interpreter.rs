@@ -28,6 +28,9 @@ pub const TOKIO_CHANNEL_SIZE: usize = 65_384;
 struct Opt {
     #[structopt(short = "d", long = "debug")]
     debug: bool,
+
+    #[structopt(short = "p", long = "log-path")]
+    log: Option<PathBuf>,
 }
 
 #[tokio::main]

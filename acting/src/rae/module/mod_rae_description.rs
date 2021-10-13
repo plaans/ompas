@@ -43,7 +43,7 @@ pub const MACRO_GENERATE_STATE_FUNCTION: &str = "(defmacro generate-state-functi
             (lambda ,params
                 ,(cons 'rae-get-state-variable (cons `(quote ,label) params)))
             (lambda ,params
-                (get-map state ,(cons `(quote ,label) params)))))))";
+                (get-map state ,(cons 'list (cons `(quote ,label) params))))))))";
 
 /// Macro used to generate code to define an action in RAE environment.
 pub const MACRO_GENERATE_ACTION: &str = "(defmacro generate-action
@@ -344,13 +344,13 @@ mod test {
         let macro_to_test = TestExpression {
             inner: MACRO_GENERATE_STATE_FUNCTION,
             dependencies: vec![],
-            expression: "(generate-state-function robot.coordinates ?r)",
-            expanded: "(list robot.coordinates
-                            (lambda (?r) (rae-get-state-variable 'robot.coordinates ?r))
-                            (lambda (?r) (get-map state ( 'robot.coordinates ?r) )))",
-            result: "(list robot.coordinates
-                            (lambda (?r) (rae-get-state-variable 'robot.coordinates ?r))
-                            (lambda (?r) (get-map state ( 'robot.coordinates ?r) )))",
+            expression: "(generate-state-function sf ?a ?b ?c)",
+            expanded: "(list sf
+                            (lambda (?a ?b ?c) (rae-get-state-variable 'sf ?a ?b ?c))
+                            (lambda (?a ?b ?c) (get-map state (list 'sf ?a ?b ?c))))",
+            result: "(list sf
+                            (lambda (?a ?b ?c) (rae-get-state-variable 'sf ?a ?b ?c))
+                            (lambda (?a ?b ?c) (get-map state (list 'sf ?a ?b ?c))))",
         };
 
         let (mut env, mut ctxs) = init_env_and_ctxs().await;

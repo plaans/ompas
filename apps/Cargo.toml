@@ -40,46 +40,44 @@ path = "src/bin/scheme.rs"
 
 [[bin]]
 name = "root_scheme"
-path = "src/bin/sandbox/root_scheme.rs"
+path = "src/bin/root_scheme.rs"
 
-[[bin]]
+[[example]]
 name = "virtual_robot"
-path = "src/bin/sandbox/robot_sim.rs"
+path = "examples/robot_sim.rs"
 
-[[bin]]
+[[example]]
 name = "supervisor"
-path = "src/bin/sandbox/unnamed_supervisor.rs"
+path = "examples/unnamed_supervisor.rs"
 
-[[bin]]
+[[example]]
 name = "godot_test"
-path = "src/bin/sandbox/godot_test.rs"
+path = "examples/godot.rs"
 
-[[bin]]
+[[example]]
 name = "serde_test"
-path = "src/bin/sandbox/serde_test.rs"
+path = "examples/serde.rs"
 
-[[bin]]
+[[example]]
 name = "command_line_godot"
-path = "src/bin/sandbox/command_line_godot.rs"
+path = "examples/command_line_godot.rs"
 
-[[bin]]
+[[example]]
 name = "test_end_tasks"
-path = "src/bin/sandbox/test_end_tasks.rs"
+path = "examples/end_tasks.rs"
 
-[[bin]]
+[[example]]
 name = "test_spawn_terminal"
-path = "src/bin/sandbox/test_spawn_terminal.rs"
+path = "examples/spawn_terminal.rs"
 
-[[bin]]
+[[example]]
 name = "test_enumerate"
-path = "src/bin/sandbox/test_enumerate.rs"
+path = "examples/enumerate.rs"
 
-[[bin]]
+[[example]]
 name = "test_logger"
-path = "src/bin/sandbox/test_logger.rs"
+path = "examples/logger.rs"
 
-
-
-[[bin]]
+[[example]]
 name = "test_lenv"
-path = "src/bin/sandbox/test_recursive_search_of_symbol.rs"
+path = "examples/recursive_search_of_symbol.rs"

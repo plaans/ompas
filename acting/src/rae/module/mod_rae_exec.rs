@@ -120,7 +120,7 @@ pub const LAMBDA_GET_METHOD_GENERATOR: &str = "\
             (get rae-method-generator-map label)))";
 
 pub const LAMBDA_GENERATE_INSTANCES: &str = "
-(define generate-instances (lambda args
+(define generate-œ (lambda args
     (let* ((label (car args))
             (i_params (cdr args))
             (methods (get-methods label)))

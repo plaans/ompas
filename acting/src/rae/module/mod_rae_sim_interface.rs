@@ -175,10 +175,13 @@ pub async fn generate_applicable_instances<'a>(
                     env,
                     &(),
                 )?;
+
+                let method = cons(&[m.clone(), element.clone()], env, &())?;
+
                 match check_preconditions(&[lv.clone(), state.clone()], env, ctx).await? {
                     LValue::True => {
                         let score = compute_score(&[lv.clone(), state.clone()], env, ctx).await?;
-                        list_applicable_methods.push(vec![lv, score].into())
+                        list_applicable_methods.push(vec![method, score].into())
                     }
                     LValue::Nil => {}
                     _ => unreachable!(),
@@ -193,10 +196,11 @@ pub async fn generate_applicable_instances<'a>(
                 env,
                 &(),
             )?;
+            let method = cons(&[m.clone(), params.clone().into()], env, &())?;
             match check_preconditions(&[lv.clone(), state.clone()], env, ctx).await? {
                 LValue::True => {
                     let score = compute_score(&[lv.clone(), state.clone()], env, ctx).await?;
-                    list_applicable_methods.push(vec![lv, score].into())
+                    list_applicable_methods.push(vec![method, score].into())
                 }
                 LValue::Nil => {}
                 _ => unreachable!(),

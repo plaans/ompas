@@ -111,7 +111,7 @@ impl RAEState {
             None => broadcast::channel(RAE_STATE_SEM_UPDATE_CHANNEL_SIZE),
             Some(b) => return b.subscribe(),
         };
-        sem_update.insert(tx);
+        let _ = sem_update.insert(tx);
         rx
     }
 

@@ -154,24 +154,6 @@ pub const MACRO_LET_STAR: &str = "(defmacro let*
                             (let* ,(cdr bindings) ,body))
                         (cdar bindings)))))";
 
-//LAMBDAS
-/*pub const LAMBDA_AND: &str = "(define and (lambda args \
-                                                   (if (null? args) true \
-                                                       (if (= (length args) 1) (car args)
-                                                           (if (car args) (and (cdr args)) nil)))))";
-pub const LAMBDA_OR: &str = "(define or (lambda args \
-                                                   (if (null? args) true \
-                                                       (if (= (length args) 1) (car args)
-                                                           (if (car args) true (or (cdr args)))))))";*/
-
-pub const LAMBDA_COND: &str = "(define cond (lambda x \
-                                            (if (null? x)\
-                                                nil\
-                                                (let ((a (car x))\
-                                                       (tests (car a))\
-                                                       (expr (cdr a)))\
-                                                      (if tests expr (cond (cdr x))))))";
-
 pub const LAMBDA_COMBINE:  &str = "(define combine (lambda (f)
                                                                 (lambda (x y)
                                                                         (if (null? x) (quote ())
@@ -209,6 +191,16 @@ pub const LAMBDA_MAPF: &str = "(define mapf
          nil
          (cons (eval (cons f (car seq))) (mapf f (cdr seq))))))";
 
+pub const LAMBDA_ARBITRARY: &str = "(define arbitrary
+    (lambda args
+        (cond ((= (length args) 1) ; default case
+               (car (first args)))
+              ((= (length args) 2) ; specific function
+               (let ((l (first args))
+                     (f (second args)))
+                    (f l)))
+              (else nil)))) ; error cases";
+
 #[derive(Default, Copy, Clone, Debug)]
 pub struct CtxUtils {}
 
@@ -244,6 +236,7 @@ impl GetModule for CtxUtils {
                 MACRO_LET,
                 MACRO_LET_STAR,
                 //MACRO_FOR,
+                LAMBDA_ARBITRARY,
             ]
             .into(),
             label: MOD_UTILS.into(),
@@ -744,4 +737,58 @@ mod test {
 
         test_expression(test_lambda).await
     }
+
+    #[tokio::test]
+    async fn test_lambda_arbitrary() -> Result<(), LError> {
+        let test_lambda = TestExpression {
+            inner: LAMBDA_ARBITRARY,
+            dependencies: vec![
+                MACRO_CAAR,
+                MACRO_CADAR,
+                MACRO_CADR,
+                LAMBDA_UNZIP,
+                MACRO_LET,
+                MACRO_COND,
+            ],
+            expression: "(arbitrary '(1 2 3))",
+            expanded: "(arbitrary '(1 2 3))",
+            result: "1",
+        };
+
+        let test_lambda_2 = TestExpression {
+            inner: LAMBDA_ARBITRARY,
+            dependencies: vec![
+                MACRO_CAAR,
+                MACRO_CADAR,
+                MACRO_CADR,
+                LAMBDA_UNZIP,
+                MACRO_LET,
+                MACRO_COND,
+            ],
+            expression: "(arbitrary '(1 2 3) second)",
+            expanded: "(arbitrary '(1 2 3) second)",
+            result: "2",
+        };
+
+        test_expression(test_lambda).await?;
+        test_expression(test_lambda_2).await
+    }
 }
+
+//LAMBDAS
+/*pub const LAMBDA_AND: &str = "(define and (lambda args \
+                                                   (if (null? args) true \
+                                                       (if (= (length args) 1) (car args)
+                                                           (if (car args) (and (cdr args)) nil)))))";
+pub const LAMBDA_OR: &str = "(define or (lambda args \
+                                                   (if (null? args) true \
+                                                       (if (= (length args) 1) (car args)
+                                                           (if (car args) true (or (cdr args)))))))";*/
+
+/*pub const LAMBDA_COND: &str = "(define cond (lambda x \
+(if (null? x)\
+    nil\
+    (let ((a (car x))\
+           (tests (car a))\
+           (expr (cdr a)))\
+          (if tests expr (cond (cdr x))))))";*/

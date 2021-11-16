@@ -149,7 +149,7 @@ pub async fn generate_applicable_instances<'a>(
     };
 
     for m in methods {
-        println!("method for the task: {}", m);
+        //println!("method for the task: {}", m);
         let types = map_methods_types.get(&m).expect("Entry should be defined");
         let vec_types: Vec<LValue> = types.try_into()?;
         if vec_types.len() > n_params {

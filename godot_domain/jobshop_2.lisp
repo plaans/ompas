@@ -49,55 +49,37 @@
                 nil
                 (cons (caar seq) (take_first (cdr seq)))))))
 
-    (def-task t_navigate_to ?r ?x ?y)
-
-    (def-method m_navigate_to
-        '((:task t_navigate_to)
-            (:params (?r robot) (?x float) (?y float))
-            (:pre-conditions true)
-            (:effects nil)
-            (:score 0)
-            (:body
-                (begin
-                    (navigate_to ?r ?x ?y)))))
-    (def-task t_dumber ?r)
-    (def-method m_dumber
-        '((:task t_dumber)
-          (:params (?r robot))
-          (:pre-conditions true)
-          (:effects nil)
-          (:score 0)
-          (:body (begin
-                     (loop
-                         (mutex::lock-and-do ?r (go_random ?r 2 5)))))))
-
 
     (def-task t_process_package ?p)
-    (def-task t_process_on_machine ?p ?m)
-    ;robot ?r takes the package ?p and place it a the machine ?m
-    (def-task t_pick_and_place ?r ?p ?m)
 
-    (def-method m_process_package
+    (def-method m_process_to_do_r
         '((:task t_process_package)
             (:params (?p package))
-            (:pre-conditions true)
+            (:pre-conditions (!= (package.processes_list ?p) nil))
             (:effects nil)
             (:score 0)
             (:body
                 (begin
-                    (mapf t_process_on_machine
-                        (begin
-                            (define list_machines
-                                (mapf find_machines_for_process
-                                    (car (unzip (package.processes_list ?p)))))
-                            ;(print "list_machines:" list_machines)
-                            (enumerate (list ?p) (take_first list_machines))))
+                    (define ?m
+                        (arbitrary (find_machines_for_process
+                            (caar (unzip (package.processes_list ?p))))))
+                    (t_process_on_machine ?p ?m)
+                    (t_process_package ?p)))))                         
 
-                    (let ((?r (rand-element (rae-get-state-variable robots))))
-                        (begin
-                            (mutex::lock-and-do ?r
-                                (t_carry_to_machine ?r ?p (find_output_machine))
-                            )))))))
+    (def-method m_no_more_process
+        '((:task t_process_package)
+            (:params (?p package))
+            (:pre-conditions (= (package.processes_list ?p) nil))
+            (:effects nil)
+            (:score 0)
+            (:body
+                (let ((?r (rand-element (available_robots))))
+                    (begin
+                        (mutex::lock-and-do ?r
+                            (t_carry_to_machine ?r ?p (find_output_machine))
+                        ))))))
+    
+    (def-task t_process_on_machine ?p ?m)
     (def-method m_process_on_machine
         '((:task t_process_on_machine)
         (:params (?p package) (?m machine))
@@ -109,27 +91,6 @@
                     (mutex::lock-and-do ?r
                         (t_carry_to_machine ?r ?p ?m))
                     (wait-on `(= (package.location ,?p) (machine.output_belt ,?m))))))))
-
-
-    (def-method m_pick_and_place
-        '((:task t_pick_and_place)
-         (:params (?r robot) (?p package) (?m machine))
-         (:pre-conditions true)
-         (:effects nil)
-         (:score 0)
-         (:body (begin
-            ;check that the location of the package is
-            (let ((?l (package.location ?p )))
-                (if (!= (belt.instance ?l) nil)
-                    (begin
-                        (navigate_to_area ?r (car (belt.interact_areas ?l)))
-                        (face_belt ?r ?l)
-                        ;pick the right package on the belt
-                        (pick_package ?r ?p)
-                        (navigate_to_area ?r (car (belt.interact_areas (machine.input_belt ?m))))
-                        (face_belt ?r (machine.input_belt ?m))
-                        (place ?r))
-                    nil))))))
 
     (def-task t_position_robot_to_belt ?r ?b)
     (def-method m_position_robot_to_belt

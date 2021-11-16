@@ -137,6 +137,14 @@ pub const LAMBDA_GENERATE_INSTANCES: &str = "
                                 (__generate__ (cdr methods))))))
                 (__generate__ methods)))))";
 
+pub const LAMBDA_ARBITRARY: &str = "(define arbitrary
+	(lambda args
+		(if (= (length args) 1)
+				(caar args)
+				(let ((elements (car args))
+							(f (cadr args)))
+						 (f elements)))))";
+
 ///Context that will contains primitives for the RAE executive
 pub struct CtxRaeExec {
     //pub stream: JobStream,
@@ -170,6 +178,7 @@ impl GetModule for CtxRaeExec {
             LAMBDA_RETRY,
             LAMBDA_GET_METHODS,
             LAMBDA_GET_METHOD_GENERATOR,
+            LAMBDA_ARBITRARY,
         ]
         .into();
         let mut module = Module {

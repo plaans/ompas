@@ -20,7 +20,12 @@
 (test-macro "(generate-state-function robot.coordinates ?r ?i)")
 
 
-`List([Symbol("list"), Symbol("sf"), List([CoreOperator(DefLambda), List([Symbol("?a"), Symbol("?b"), Symbol("?c")]), List([Symbol("rae-get-state-variable"), List([CoreOperator(Quote), Symbol("sf")]), Symbol("?a"), Symbol("?b"), Symbol("?c")])]), List([CoreOperator(DefLambda), List([Symbol("?a"), Symbol("?b"), Symbol("?c")]), List([Symbol("get-map"), Symbol("state"), List([Fn(label: "list"mod : 0), List([CoreOperator(Quote), Symbol("sf")]), Symbol("?a"), Symbol("?b"), Symbol("?c")])])])])
-
-
-`List([Symbol("list"), Symbol("sf"), List([CoreOperator(DefLambda), List([Symbol("?a"), Symbol("?b"), Symbol("?c")]), List([Symbol("rae-get-state-variable"), List([CoreOperator(Quote), Symbol("sf")]), Symbol("?a"), Symbol("?b"), Symbol("?c")])]), List([CoreOperator(DefLambda), List([Symbol("?a"), Symbol("?b"), Symbol("?c")]), List([Symbol("get-map"), Symbol("state"), List([Symbol("list"), List([CoreOperator(Quote), Symbol("sf")]), Symbol("?a"), Symbol("?b"), Symbol("?c")])])])])`
+(define arbitrary
+    (lambda args
+        (cond ((= (length args) 1) ; default case
+               (car (first args)))
+              ((= (length args) 2) ; specific function
+               (let ((l (first args))
+                     (f (second args)))
+                    (f l)))
+              (else nil)))) ; error cases

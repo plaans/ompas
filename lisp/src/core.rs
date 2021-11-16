@@ -250,6 +250,10 @@ impl GetModule for CtxRoot {
          * LIST FUNCTIONS
          */
         module.add_fn_prelude(LIST, list);
+        module.add_fn_prelude(FIRST, first);
+        module.add_fn_prelude(SECOND, second);
+        module.add_fn_prelude(THIRD, third);
+        module.add_fn_prelude(REST, rest);
         module.add_fn_prelude(CAR, car);
         module.add_fn_prelude(CDR, cdr);
         module.add_fn_prelude(LAST, last);

@@ -4,6 +4,10 @@ pub mod scheme_primitives {
     /*
     LIST FUNCTIONS
      */
+    pub const FIRST: &str = "first";
+    pub const SECOND: &str = "second";
+    pub const THIRD: &str = "third";
+    pub const REST: &str = "rest";
     pub const CAR: &str = "car";
     pub const CDR: &str = "cdr";
     pub const APPEND: &str = "append";
@@ -125,6 +129,10 @@ pub mod scheme_primitives {
 ///Problem during expansion
 //Documentation
 pub mod doc {
+    pub const DOC_FIRST: &str = "Return the first element of a list or nil.";
+    pub const DOC_SECOND: &str = "Return the second element of a list or nil.";
+    pub const DOC_THIRD: &str = "Return the third element of a list or nil.";
+    pub const DOC_REST: &str = "Same as cdr";
     pub const DOC_CAR: &str =
         "Takes a list of at least one element, and return the first element. Nil otherwise.";
     pub const DOC_CDR: &str =

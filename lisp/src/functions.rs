@@ -393,6 +393,72 @@ pub fn cons(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     }
 }
 
+pub fn first(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    match args.len() {
+        1 => match &args[0] {
+            LValue::List(list) => {
+                if !list.is_empty() {
+                    Ok(list.first().unwrap().clone())
+                } else {
+                    Ok(LValue::Nil)
+                }
+            }
+            LValue::Nil => Ok(LValue::Nil),
+            lv => Err(WrongType(
+                FIRST,
+                lv.clone(),
+                lv.into(),
+                NameTypeLValue::List,
+            )),
+        },
+        _ => Err(WrongNumberOfArgument(FIRST, args.into(), args.len(), 1..1)),
+    }
+}
+
+pub fn second(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    match args.len() {
+        1 => match &args[0] {
+            LValue::List(list) => {
+                if list.len() >= 2 {
+                    Ok(list[1].clone())
+                } else {
+                    Ok(LValue::Nil)
+                }
+            }
+            LValue::Nil => Ok(LValue::Nil),
+            lv => Err(WrongType(
+                SECOND,
+                lv.clone(),
+                lv.into(),
+                NameTypeLValue::List,
+            )),
+        },
+        _ => Err(WrongNumberOfArgument(SECOND, args.into(), args.len(), 1..1)),
+    }
+}
+
+pub fn third(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    match args.len() {
+        1 => match &args[0] {
+            LValue::List(list) => {
+                if list.len() >= 3 {
+                    Ok(list[2].clone())
+                } else {
+                    Ok(LValue::Nil)
+                }
+            }
+            LValue::Nil => Ok(LValue::Nil),
+            lv => Err(WrongType(
+                THIRD,
+                lv.clone(),
+                lv.into(),
+                NameTypeLValue::List,
+            )),
+        },
+        _ => Err(WrongNumberOfArgument(THIRD, args.into(), args.len(), 1..1)),
+    }
+}
+
 ///It takes a list as argument, and returns its first element.
 pub fn car(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     match args.len() {
@@ -431,6 +497,29 @@ pub fn cdr(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
         }
     } else {
         Err(WrongNumberOfArgument(CDR, args.into(), args.len(), 1..1))
+    }
+}
+
+///It takes a list as argument, and returns a list without the first element
+pub fn rest(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    if args.len() == 1 {
+        match &args[0] {
+            LValue::List(list) => {
+                if list.len() < 2 {
+                    Ok(LValue::Nil)
+                } else {
+                    //let slice = &list[1..];
+                    //let vec = slice.to_vec();
+                    let mut new_list = list.clone();
+                    new_list.remove(0);
+                    Ok(new_list.into())
+                }
+            }
+            LValue::Nil => Ok(LValue::Nil),
+            lv => Err(WrongType(REST, lv.clone(), lv.into(), NameTypeLValue::List)),
+        }
+    } else {
+        Err(WrongNumberOfArgument(REST, args.into(), args.len(), 1..1))
     }
 }
 

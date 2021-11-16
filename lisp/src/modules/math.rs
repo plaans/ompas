@@ -216,7 +216,7 @@ pub fn abs(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
         LValue::Number(n) => Ok(match n {
             LNumber::Int(i) => LNumber::Int(i.abs()),
             LNumber::Float(f) => LNumber::Float(f.abs()),
-            LNumber::Usize(u) => LNumber::Usize(u.clone()),
+            LNumber::Usize(u) => LNumber::Usize(*u),
         }
         .into()),
         lv => Err(WrongType(

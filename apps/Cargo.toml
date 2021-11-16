@@ -3,7 +3,7 @@ name = "ompas_apps"
 version = "0.1.0"
 authors = ["Yirmandias <turi@insa-toulouse.fr>"]
 edition = "2018"
-default-run = "lisp"
+default-run = "ompas"
 
 [features]
 lisp_test = []
@@ -30,51 +30,54 @@ serde = { version = "1.0", features = ["derive"]}
 serde_json = "1.0.64"
 chrono = "0.4.19"
 
-
-
-
+[[bin]]
+name = "ompas"
+path = "src/bin/ompas.rs"
 
 [[bin]]
+name = "scheme"
+path = "src/bin/scheme.rs"
+
+[[bin]]
+name = "root_scheme"
+path = "src/bin/root_scheme.rs"
+
+[[example]]
 name = "virtual_robot"
-path = "src/bin/robot_sim.rs"
+path = "examples/robot_sim.rs"
 
-[[bin]]
-name = "lisp"
-path = "src/bin/unnamed_supervisor.rs"
+[[example]]
+name = "supervisor"
+path = "examples/unnamed_supervisor.rs"
 
-[[bin]]
+[[example]]
 name = "godot_test"
-path = "src/bin/sandbox/godot_test.rs"
+path = "examples/godot.rs"
 
-[[bin]]
+[[example]]
 name = "serde_test"
-path = "src/bin/sandbox/serde_test.rs"
+path = "examples/serde.rs"
 
-[[bin]]
+[[example]]
 name = "command_line_godot"
-path = "src/bin/command_line_godot.rs"
+path = "examples/command_line_godot.rs"
 
-[[bin]]
+[[example]]
 name = "test_end_tasks"
-path = "src/bin/sandbox/test_end_tasks.rs"
+path = "examples/end_tasks.rs"
 
-[[bin]]
+[[example]]
 name = "test_spawn_terminal"
-path = "src/bin/sandbox/test_spawn_terminal.rs"
+path = "examples/spawn_terminal.rs"
 
-[[bin]]
+[[example]]
 name = "test_enumerate"
-path = "src/bin/sandbox/test_enumerate.rs"
+path = "examples/enumerate.rs"
 
-[[bin]]
+[[example]]
 name = "test_logger"
-path = "src/bin/sandbox/test_logger.rs"
+path = "examples/logger.rs"
 
-
-[[bin]]
-name = "lisp_interpreter"
-path = "src/bin/sandbox/lisp_interpreter.rs"
-
-[[bin]]
+[[example]]
 name = "test_lenv"
-path = "src/bin/sandbox/test_recursive_search_of_symbol.rs"
+path = "examples/recursive_search_of_symbol.rs"

@@ -1,6 +1,8 @@
 use crate::core::{eval, ContextCollection, LEnv};
 use crate::language::scheme_primitives::*;
 use crate::structs::LError::{ConversionError, SpecialError, WrongNumberOfArgument};
+use futures::future::Shared;
+use futures::FutureExt;
 use im::HashMap;
 use serde::{Deserialize, Serialize};
 use std::any::Any;
@@ -9,7 +11,8 @@ use std::convert::{TryFrom, TryInto};
 use std::fmt::{Debug, Display, Formatter};
 use std::future::Future;
 use std::hash::{Hash, Hasher};
-use std::ops::{Add, Deref, Div, Mul, Range, Sub};
+use std::ops::{Add, Div, Mul, Range, Sub};
+use std::pin::Pin;
 use std::sync::Arc;
 
 /// Error struct for Scheme
@@ -414,7 +417,7 @@ impl Display for LLambda {
 
 impl PartialEq for LLambda {
     fn eq(&self, other: &Self) -> bool {
-        self == other
+        self.to_string() == other.to_string()
     }
 }
 
@@ -437,7 +440,7 @@ impl LLambda {
             LambdaArgs::Sym(param) => {
                 let arg = if args.len() == 1 {
                     match &args[0] {
-                        LValue::List(_) | LValue::Nil => args[0].clone(),
+                        LValue::Nil => LValue::Nil,
                         _ => vec![args[0].clone()].into(),
                     }
                 } else {
@@ -447,11 +450,17 @@ impl LLambda {
             }
             LambdaArgs::List(params) => {
                 if params.len() != args.len() {
-                    return Err(WrongNumberOfArgument(
+                    return Err(SpecialError(
                         "get_new_env",
-                        args.into(),
-                        args.len(),
-                        params.len()..params.len(),
+                        format!(
+                            "in lambda {}: ",
+                            WrongNumberOfArgument(
+                                "get_new_env",
+                                args.into(),
+                                args.len(),
+                                params.len()..params.len(),
+                            )
+                        ),
                     ));
                 }
                 for (param, arg) in params.iter().zip(args) {
@@ -471,14 +480,14 @@ impl LLambda {
     }
 
     /// Method to call a lambda and execute it.
-    pub fn call(
+    pub async fn call(
         &self,
         args: &[LValue],
         env: &LEnv,
         ctxs: &mut ContextCollection,
     ) -> Result<LValue, LError> {
         let mut new_env = self.get_new_env(args, env.clone())?;
-        eval(&*self.body, &mut new_env, ctxs)
+        eval(&*self.body, &mut new_env, ctxs).await
     }
 
     /// Returns the body of the lambda
@@ -508,7 +517,7 @@ pub type DowncastCall =
 #[derive(Clone)]
 pub struct LFn {
     pub(crate) fun: Arc<dyn Any + 'static + Send + Sync>,
-    pub(crate) debug_label: &'static str,
+    pub(crate) debug_label: String,
     downcast: Arc<DowncastCall>,
     index_mod: Option<usize>,
 }
@@ -529,7 +538,7 @@ impl Debug for LFn {
 
 impl LFn {
     /// Constructs a new LFn from a pointer to a function
-    pub fn new<T: 'static + Sync + Send>(lbd: NativeFn<T>, debug_label: &'static str) -> Self {
+    pub fn new<T: 'static + Sync + Send>(lbd: NativeFn<T>, debug_label: String) -> Self {
         /*let x = move |args: &[LValue], env: &LEnv, ctx: &dyn Any| -> Result<LValue, LError> {
             let ctx: Option<&T> = ctx.downcast_ref::<T>();
             if let Some(ctx) = ctx {
@@ -580,8 +589,8 @@ impl LFn {
     }
 
     /// Returns the label of the function
-    pub fn get_label(&self) -> &'static str {
-        self.debug_label
+    pub fn get_label(&self) -> &'_ str {
+        self.debug_label.as_str()
     }
 }
 
@@ -597,7 +606,7 @@ pub type DowncastCallMut = fn(
 #[derive(Clone)]
 pub struct LMutFn {
     pub(crate) fun: Arc<dyn Any + 'static + Send + Sync>,
-    pub(crate) debug_label: &'static str,
+    pub(crate) debug_label: String,
     downcast: Arc<DowncastCallMut>,
     index_mod: Option<usize>,
 }
@@ -617,7 +626,7 @@ impl Debug for LMutFn {
 }
 
 impl LMutFn {
-    pub fn new<T: 'static>(lbd: NativeMutFn<T>, debug_label: &'static str) -> Self {
+    pub fn new<T: 'static>(lbd: NativeMutFn<T>, debug_label: String) -> Self {
         let downcast_call = |args: &[LValue],
                              env: &LEnv,
                              ctx: &mut dyn Any,
@@ -652,31 +661,10 @@ impl LMutFn {
         (self.downcast)(args, env, ctx, &self.fun)
     }
 
-    pub fn get_label(&self) -> &'static str {
-        self.debug_label
+    pub fn get_label(&self) -> &'_ str {
+        self.debug_label.as_str()
     }
 }
-
-macro_rules! dyn_async {(
-    $( #[$attr:meta] )* // includes doc strings
-    $pub:vis
-    async
-    fn $fname:ident<$lt:lifetime> ( $($args:tt)* ) $(-> $Ret:ty)?
-    {
-        $($body:tt)*
-    }
-) => (
-    $( #[$attr] )*
-    #[allow(unused_parens)]
-    $pub
-    fn $fname<$lt> ( $($args)* ) -> ::std::pin::Pin<::std::boxed::Box<
-        dyn ::std::future::Future<Output = ($($Ret)?)>
-            + ::std::marker::Send + $lt
-    >>
-    {
-        ::std::boxed::Box::pin(async move { $($body)* })
-    }
-)}
 
 pub type DynFut<'a> =
     ::std::pin::Pin<Box<dyn 'a + Send + ::std::future::Future<Output = Result<LValue, LError>>>>;
@@ -684,33 +672,35 @@ pub type AsyncNativeFn<T> = for<'a> fn(&'a [LValue], &'a LEnv, &'a T) -> DynFut<
 pub type AsyncDowncastCall =
     for<'a> fn(&'a [LValue], &'a LEnv, &'a dyn Any, &'a Arc<dyn Any + Send + Sync>) -> DynFut<'a>;
 
-/*pub struct LAsyncFn {
+#[derive(Clone)]
+pub struct LAsyncFn {
     pub(crate) fun: Arc<dyn Any + 'static + Send + Sync>,
-    pub(crate) debug_label: &'static str,
+    pub(crate) debug_label: String,
     downcast: Arc<AsyncDowncastCall>,
     index_mod: Option<usize>,
-}*/
+}
 
-/*impl<'a> LAsyncFn<'a> {
-    pub fn new<'lt, T: 'static>(lbd: AsyncNativeFn<'lt, T>, debug_label: &'static str) -> Self {
-        let downcast_call = |args: &'a [LValue],
-                             env: &'lt LEnv,
-                             ctx: &'lt dyn Any,
-                             fun: &'lt Arc<dyn Any + Send + Sync>|
-         -> DynFut<'lt> {
-            let ctx: &mut T = ctx.downcast::<T>().ok_or_else(|| {
-                LError::SpecialError(
-                    "LAsyncFn::new",
-                    "Impossible to downcast context".to_string(),
-                )
-            })?;
-            let fun: &AsyncNativeFn<T> =
-                fun.downcast_ref::<AsyncNativeFn<T>>().ok_or_else(|| {
-                    LError::SpecialError(
-                        "LMutFn::new",
-                        "Impossible to downcast function".to_string(),
-                    )
-                })?;
+impl Debug for LAsyncFn {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "LAsyncFn: {}\nindex_mod: {:?}\n",
+            self.debug_label, self.index_mod
+        )
+    }
+}
+
+impl LAsyncFn {
+    pub fn new<T: 'static>(lbd: AsyncNativeFn<T>, debug_label: String) -> Self {
+        let downcast_call: AsyncDowncastCall = |args: &[LValue],
+                                                env: &LEnv,
+                                                ctx: &dyn Any,
+                                                fun: &Arc<dyn Any + Send + Sync>|
+         -> DynFut {
+            let ctx: &T = ctx.downcast_ref::<T>().expect("could not downcast ctx");
+            let fun: &AsyncNativeFn<T> = fun
+                .downcast_ref::<AsyncNativeFn<T>>()
+                .expect("could not downcast ctx");
 
             fun(args, env, ctx)
         };
@@ -730,25 +720,101 @@ pub type AsyncDowncastCall =
         self.index_mod
     }
 
-    pub async fn call<'lt>(
+    pub fn call<'a>(
         &'a self,
-        args: &[LValue],
-        env: &LEnv,
-        ctx: &mut dyn Any,
-    ) -> DynFut<'lt> {
+        args: &'a [LValue],
+        env: &'a LEnv,
+        ctx: &'a AsyncLTrait,
+    ) -> DynFut<'a> {
         (self.downcast)(args, env, ctx, &self.fun)
     }
 
-    pub fn get_label(&self) -> &'static str {
-        self.debug_label
+    pub fn get_label(&self) -> &str {
+        self.debug_label.as_str()
     }
-}*/
+}
+
+pub type AsyncNativeMutFn<T> = for<'a> fn(&'a [LValue], &'a LEnv, &'a mut T) -> DynFut<'a>;
+pub type AsyncDowncastCallMut = for<'a> fn(
+    &'a [LValue],
+    &'a LEnv,
+    &'a mut dyn Any,
+    &'a Arc<dyn Any + Send + Sync>,
+) -> DynFut<'a>;
+
+#[derive(Clone)]
+pub struct LAsyncMutFn {
+    pub(crate) fun: Arc<dyn Any + 'static + Send + Sync>,
+    pub(crate) debug_label: String,
+    downcast: Arc<AsyncDowncastCallMut>,
+    index_mod: Option<usize>,
+}
+
+impl Debug for LAsyncMutFn {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "LAsyncFn: {}\nindex_mod: {:?}\n",
+            self.debug_label, self.index_mod
+        )
+    }
+}
+
+impl LAsyncMutFn {
+    pub fn new<T: 'static>(lbd: AsyncNativeMutFn<T>, debug_label: String) -> Self {
+        let downcast_call: AsyncDowncastCallMut = |args: &[LValue],
+                                                   env: &LEnv,
+                                                   ctx: &mut dyn Any,
+                                                   fun: &Arc<dyn Any + Send + Sync>|
+         -> DynFut {
+            let ctx: &mut T = ctx.downcast_mut::<T>().expect("could not downcast mut ctx");
+            let fun: &AsyncNativeMutFn<T> = fun
+                .downcast_ref::<AsyncNativeMutFn<T>>()
+                .expect("could not downcast asyncNativeMutFn");
+
+            fun(args, env, ctx)
+        };
+        LAsyncMutFn {
+            fun: Arc::new(lbd),
+            debug_label,
+            downcast: Arc::new(downcast_call),
+            index_mod: None,
+        }
+    }
+
+    pub fn set_index_mod(&mut self, index_mod: usize) {
+        self.index_mod = Some(index_mod);
+    }
+
+    pub fn get_index_mod(&self) -> Option<usize> {
+        self.index_mod
+    }
+
+    pub fn call<'a>(
+        &'a self,
+        args: &'a [LValue],
+        env: &'a LEnv,
+        ctx: &'a mut AsyncLTrait,
+    ) -> DynFut<'a> {
+        (self.downcast)(args, env, ctx, &self.fun)
+    }
+
+    pub fn get_label(&self) -> &'_ str {
+        self.debug_label.as_str()
+    }
+}
 
 #[cfg(test)]
 mod test_async {
     use crate::core::LEnv;
-    use crate::structs::{AsyncNativeFn, DynFut, LError, LValue};
+    use crate::structs::LError::{WrongNumberOfArgument, WrongType};
+    use crate::structs::{
+        AsyncDowncastCall, AsyncLTrait, AsyncNativeFn, DynFut, LAsyncFn, LAsyncMutFn, LError,
+        LValue, NameTypeLValue,
+    };
     use ::macro_rules_attribute::macro_rules_attribute;
+    use ompas_utils::dyn_async;
+
     use std::any::Any;
     use std::sync::Arc;
 
@@ -762,7 +828,9 @@ mod test_async {
 
         let arc2: Arc<dyn Any> = Arc::new(val);
 
-        let val = arc2.downcast_ref::<u32>().unwrap();
+        let val_2 = arc2.downcast_ref::<u32>().unwrap();
+
+        assert_eq!(val, *val_2)
     }
 
     #[test]
@@ -774,7 +842,7 @@ mod test_async {
 
         let p_fun: &fn(u32) -> u32 = arc.downcast_ref::<fn(u32) -> u32>().unwrap();
 
-        //assert_eq!(fun(5), 25)
+        assert_eq!(p_fun(5), 25)
     }
 
     fn test<'a>(_: &'a [LValue], _: &'a LEnv, _: &'a ()) -> DynFut<'a> {
@@ -785,14 +853,72 @@ mod test_async {
         Ok(LValue::Nil)
     }
 
-    #[tokio::test]
-    async fn test_pointer_async() {
-        let p_test = test;
-        let result = p_test(&[LValue::Nil], &LEnv::empty(), &()).await;
+    #[macro_rules_attribute(dyn_async!)]
+    async fn test_computation_square<'a>(
+        args: &'a [LValue],
+        _: &'a LEnv,
+        _: &'a (),
+    ) -> Result<LValue, LError> {
+        if args.len() != 1 {
+            return Err(WrongNumberOfArgument(
+                "test_computation_square",
+                args.into(),
+                args.len(),
+                1..1,
+            ));
+        }
+
+        if let LValue::Number(n) = &args[0] {
+            Ok((n * n).into())
+        } else {
+            Err(WrongType(
+                "test_computation_square",
+                args[0].clone(),
+                (&args[0]).into(),
+                NameTypeLValue::Number,
+            ))
+        }
+    }
+
+    #[macro_rules_attribute(dyn_async!)]
+    async fn test_computation_square_with_mut_ctx<'a>(
+        args: &'a [LValue],
+        _: &'a LEnv,
+        _: &'a mut (),
+    ) -> Result<LValue, LError> {
+        if args.len() != 1 {
+            return Err(WrongNumberOfArgument(
+                "test_computation_square",
+                args.into(),
+                args.len(),
+                1..1,
+            ));
+        }
+
+        if let LValue::Number(n) = &args[0] {
+            Ok((n * n).into())
+        } else {
+            Err(WrongType(
+                "test_computation_square",
+                args[0].clone(),
+                (&args[0]).into(),
+                NameTypeLValue::Number,
+            ))
+        }
     }
 
     #[tokio::test]
-    async fn test_arc_downcast_pointer_async() {
+    async fn test_pointer_async() -> Result<(), LError> {
+        let p_test = test;
+        let result = p_test(&[LValue::Nil], &LEnv::empty(), &()).await?;
+
+        assert_eq!(result, LValue::Nil);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_arc_downcast_pointer_async() -> Result<(), LError> {
         let fun: Arc<dyn Any + 'static + Send + Sync> = Arc::new(test as AsyncNativeFn<()>);
 
         let fun: &AsyncNativeFn<()> = fun.downcast_ref::<AsyncNativeFn<()>>().unwrap();
@@ -801,7 +927,120 @@ mod test_async {
         let args = &[LValue::Nil];
         let ctx = &();
 
-        let result = fun(args, env, ctx).await;
+        let result = fun(args, env, ctx).await?;
+
+        assert_eq!(result, LValue::Nil);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_arc_downcast_pointer_async_with_macro_def() -> Result<(), LError> {
+        let fun: Arc<dyn Any + 'static + Send + Sync> = Arc::new(test_2 as AsyncNativeFn<()>);
+
+        let fun: &AsyncNativeFn<()> = fun.downcast_ref::<AsyncNativeFn<()>>().unwrap();
+
+        let env = &LEnv::empty();
+        let args = &[LValue::Nil];
+        let ctx = &();
+
+        let result = fun(args, env, ctx).await?;
+
+        assert_eq!(result, LValue::Nil);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_downcast_call() {
+        let fun: Arc<dyn Any + 'static + Send + Sync> = Arc::new(test_2 as AsyncNativeFn<()>);
+
+        let downcast_call: AsyncDowncastCall = |args: &[LValue],
+                                                env: &LEnv,
+                                                ctx: &dyn Any,
+                                                fun: &Arc<dyn Any + Send + Sync>|
+         -> DynFut {
+            let ctx: &() = ctx.downcast_ref::<()>().expect("could not downcast ctx");
+            let fun: &AsyncNativeFn<()> = fun
+                .downcast_ref::<AsyncNativeFn<()>>()
+                .expect("could not downcast ctx");
+
+            fun(args, env, ctx)
+        };
+
+        let env = &LEnv::empty();
+        let args = &[LValue::Nil];
+        let ctx = &();
+
+        let result = downcast_call(args, env, ctx, &fun).await;
+        if let Ok(result) = result {
+            assert_eq!(result, LValue::Nil);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_downcast_call_with_computation() {
+        let fun: Arc<dyn Any + 'static + Send + Sync> =
+            Arc::new(test_computation_square as AsyncNativeFn<()>);
+
+        let downcast_call: AsyncDowncastCall = |args: &[LValue],
+                                                env: &LEnv,
+                                                ctx: &dyn Any,
+                                                fun: &Arc<dyn Any + Send + Sync>|
+         -> DynFut {
+            let ctx: &() = ctx.downcast_ref::<()>().expect("could not downcast ctx");
+            let fun: &AsyncNativeFn<()> = fun
+                .downcast_ref::<AsyncNativeFn<()>>()
+                .expect("could not downcast ctx");
+
+            fun(args, env, ctx)
+        };
+
+        let env = &LEnv::empty();
+        let args: &[LValue] = &[5.into()];
+        let ctx = &();
+
+        let result = downcast_call(args, env, ctx, &fun).await;
+        if let Ok(result) = result {
+            println!("result: {}", result);
+            assert_eq!(result, LValue::from(25));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_l_async_fn() {
+        let fun = LAsyncFn::new(
+            test_computation_square,
+            "test_computation_square".to_string(),
+        );
+
+        let env = &LEnv::empty();
+        let args: &[LValue] = &[5.into()];
+        let ctx: &AsyncLTrait = &();
+
+        let result = fun.call(args, env, ctx).await;
+        if let Ok(result) = result {
+            println!("result: {}", result);
+            assert_eq!(result, LValue::from(25));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_async_mut_fn() {
+        let fun = LAsyncMutFn::new(
+            test_computation_square_with_mut_ctx,
+            "test_computation_square".to_string(),
+        );
+
+        let env = &LEnv::empty();
+        let args: &[LValue] = &[5.into()];
+        let ctx: &mut AsyncLTrait = &mut ();
+
+        let result = fun.call(args, env, ctx).await;
+        if let Ok(result) = result {
+            println!("result: {}", result);
+            assert_eq!(result, LValue::from(25));
+        }
     }
 }
 
@@ -833,6 +1072,8 @@ pub enum LCoreOperator {
     Begin,
     Async,
     Await,
+    Parse,
+    Expand,
     Eval,
 }
 
@@ -851,6 +1092,8 @@ impl Display for LCoreOperator {
             LCoreOperator::Async => write!(f, "{}", ASYNC),
             LCoreOperator::Await => write!(f, "{}", AWAIT),
             LCoreOperator::Eval => write!(f, "{}", EVAL),
+            LCoreOperator::Expand => write!(f, "{}", EXPAND),
+            LCoreOperator::Parse => write!(f, "{}", PARSE),
         }
     }
 }
@@ -872,6 +1115,8 @@ impl TryFrom<&str> for LCoreOperator {
             ASYNC => Ok(LCoreOperator::Async),
             AWAIT => Ok(LCoreOperator::Await),
             EVAL => Ok(LCoreOperator::Eval),
+            PARSE => Ok(LCoreOperator::Parse),
+            EXPAND => Ok(LCoreOperator::Expand),
             _ => Err(SpecialError(
                 "LCoreOperator::TryFrom<str>",
                 "string does not correspond to core operator".to_string(),
@@ -893,6 +1138,70 @@ impl From<im::HashMap<LValue, LValue>> for LValue {
 type Sym = String;
 /// Object used in Scheme for every kind.
 /// todo: complete documentation
+///
+
+/// Internal type of future returned by an async
+pub type FutureResult = Pin<Box<dyn Send + Future<Output = Result<LValue, LError>>>>;
+
+/// Type returned by an async and clonable.
+pub type LFuture = Shared<FutureResult>;
+
+/*impl From<Shared<Pin<Box<dyn futures::Future>>>> for LValue {
+    fn from(lf: Shared<Pin<Box<dyn futures::Future>>>) -> Self {
+        LValue::Future(lf)
+    }
+}
+
+impl From<Pin<Box<dyn futures::Future>>> for LValue {
+    fn from(lf: Pin<Box<dyn futures::Future>>) -> Self {
+        LValue::Future(lf.shared())
+    }
+}*/
+
+impl From<LFuture> for LValue {
+    fn from(lf: LFuture) -> Self {
+        LValue::Future(lf)
+    }
+}
+
+impl From<FutureResult> for LValue {
+    fn from(fr: FutureResult) -> Self {
+        LValue::Future(fr.shared())
+    }
+}
+
+#[cfg(test)]
+mod test_lfuture {
+    use crate::core::{eval, LEnv};
+    use crate::structs::{FutureResult, LError, LValue};
+
+    #[tokio::test]
+    async fn create_lvalue_future() -> Result<(), LError> {
+        let (mut env, mut ctxs) = LEnv::root().await;
+        let args = LValue::Nil;
+
+        let future: LValue = (Box::pin(async move { eval(&args, &mut env, &mut ctxs).await })
+            as FutureResult)
+            .into();
+
+        //let future: LValue = future.into();
+
+        let result: LValue = if let LValue::Future(ft) = future {
+            ft.await?
+        } else {
+            LValue::Nil
+        };
+
+        println!("LValue: {}", result);
+
+        Ok(())
+    }
+}
+
+/*pub struct LFuture {
+    inner: Pin<Box>,
+}*/
+
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(untagged, rename_all = "lowercase")]
 pub enum LValue {
@@ -907,15 +1216,21 @@ pub enum LValue {
     #[serde(skip)]
     MutFn(LMutFn),
     #[serde(skip)]
+    AsyncFn(LAsyncFn),
+    #[serde(skip)]
+    AsyncMutFn(LAsyncMutFn),
+    #[serde(skip)]
     Lambda(LLambda),
     #[serde(skip)]
     CoreOperator(LCoreOperator),
+    #[serde(skip)]
+    Future(LFuture),
 
     // data structure
     #[serde(skip)]
     Map(im::HashMap<LValue, LValue>),
     List(Vec<LValue>),
-    Quote(Box<LValue>),
+    //Quote(Box<LValue>),
     //Refers to boolean 'false and empty list in lisp
     True,
     Nil,
@@ -954,7 +1269,7 @@ impl LValue {
             vec_pretty_printed.push(element.pretty_print(indent + TAB_SIZE));
         }
 
-        if global_size < MAX_LENGTH {
+        if global_size < MAX_LENGTH + indent {
             for (i, element) in vec_pretty_printed.iter().enumerate() {
                 if i > 0 {
                     string.push(' ');
@@ -986,7 +1301,7 @@ impl LValue {
         match self {
             LValue::Lambda(l) => {
                 format!(
-                    "(lambda {}\n{}{}",
+                    "(lambda {}\n{}{})",
                     l.params,
                     " ".repeat(indent + TAB_SIZE),
                     l.body.pretty_print(indent + TAB_SIZE)
@@ -1079,7 +1394,7 @@ impl LValue {
                     NIL.to_string()
                 }
             }
-            LValue::Quote(lv) => format!("'{}", lv.pretty_print(indent)),
+            //LValue::Quote(lv) => format!("'{}", lv.pretty_print(indent)),
             lv => lv.to_string(),
         }
     }
@@ -1090,10 +1405,10 @@ impl Display for LValue {
         match self {
             LValue::Fn(fun) => write!(f, "{}", fun.debug_label),
             LValue::MutFn(fun) => write!(f, "{}", fun.debug_label),
-            LValue::Nil => write!(f, "nil"),
+            LValue::Nil => write!(f, "{}", NIL),
             LValue::Symbol(s) | LValue::String(s) => write!(f, "{}", s),
             LValue::Number(n) => write!(f, "{}", n),
-            LValue::True => write!(f, "true"),
+            LValue::True => write!(f, "{}", TRUE),
             LValue::List(list) => {
                 let mut result = String::new();
                 result.push('(');
@@ -1114,11 +1429,14 @@ impl Display for LValue {
                 }
                 write!(f, "{}", result)
             }
-            LValue::Quote(q) => write!(f, "{}", q),
+            //LValue::Quote(q) => write!(f, "{}", q),
             LValue::CoreOperator(co) => {
                 write!(f, "{}", co)
             }
             LValue::Character(c) => write!(f, "{}", c),
+            LValue::AsyncFn(fun) => write!(f, "{}", fun.debug_label),
+            LValue::AsyncMutFn(fun) => write!(f, "{}", fun.debug_label),
+            LValue::Future(_) => write!(f, "{}", FUTURE),
         }
     }
 }
@@ -1133,9 +1451,9 @@ impl Hash for LValue {
             LValue::List(l) => {
                 (*l).hash(state);
             }
-            LValue::Quote(s) => {
+            /*LValue::Quote(s) => {
                 s.to_string().hash(state);
-            }
+            }*/
             LValue::Nil => false.hash(state),
             _ => {}
         };
@@ -1342,15 +1660,21 @@ impl PartialEq for LValue {
             //Number comparison
             (LValue::Number(n1), LValue::Number(n2)) => *n1 == *n2,
             (LValue::Symbol(s1), LValue::Symbol(s2)) => *s1 == *s2,
+            (LValue::String(s1), LValue::String(s2)) => s1 == s2,
+            (LValue::Character(c1), LValue::Character(c2)) => c1 == c2,
             (LValue::True, LValue::True) => true,
             (LValue::Nil, LValue::Nil) => true,
             //Text comparison
             (LValue::List(l1), LValue::List(l2)) => *l1 == *l2,
             (LValue::Map(m1), LValue::Map(m2)) => *m1 == *m2,
             (LValue::Lambda(l1), LValue::Lambda(l2)) => *l1 == *l2,
-            (LValue::Quote(q1), LValue::Quote(q2)) => q1.to_string() == q2.to_string(), //function comparison
             (LValue::Fn(f1), LValue::Fn(f2)) => f1.debug_label == f2.debug_label,
             (LValue::MutFn(mf1), LValue::MutFn(mf2)) => mf1.debug_label == mf2.debug_label,
+            (LValue::CoreOperator(c1), LValue::CoreOperator(c2)) => c1 == c2,
+            (LValue::AsyncFn(af1), LValue::AsyncFn(af2)) => af1.get_label() == af2.get_label(),
+            (LValue::AsyncMutFn(amf1), LValue::AsyncMutFn(amf2)) => {
+                amf1.get_label() == amf2.get_label()
+            }
             (_, _) => false,
         }
     }
@@ -1546,6 +1870,18 @@ impl Div for LValue {
     }
 }
 
+impl From<&LNumber> for LValue {
+    fn from(n: &LNumber) -> Self {
+        LValue::Number(n.clone())
+    }
+}
+
+impl From<LNumber> for LValue {
+    fn from(n: LNumber) -> Self {
+        (&n).into()
+    }
+}
+
 impl From<u32> for LValue {
     fn from(u: u32) -> Self {
         LValue::Number(LNumber::Int(u as i64))
@@ -1689,11 +2025,14 @@ impl From<&LValue> for LValueS {
             LValue::CoreOperator(co) => LValueS::Symbol(co.to_string()),
             LValue::Map(m) => LValueS::Map(m.iter().map(|(k, v)| (k.into(), v.into())).collect()),
             LValue::List(l) => LValueS::List(l.iter().map(|lv| lv.into()).collect()),
-            LValue::Quote(l) => l.deref().into(),
-            LValue::True => LValueS::Symbol("true".to_string()),
-            LValue::Nil => LValueS::Symbol("nil".to_string()),
+            //LValue::Quote(l) => l.deref().into(),
+            LValue::True => LValueS::Symbol(TRUE.to_string()),
+            LValue::Nil => LValueS::Symbol(NIL.to_string()),
             LValue::String(s) => LValueS::Symbol(s.clone()),
             LValue::Character(c) => LValueS::Symbol(c.to_string()),
+            LValue::AsyncFn(fun) => LValueS::Symbol(fun.debug_label.to_string()),
+            LValue::AsyncMutFn(fun) => LValueS::Symbol(fun.debug_label.to_string()),
+            LValue::Future(_) => LValueS::Bool(false),
         }
     }
 }
@@ -1802,38 +2141,44 @@ pub enum NameTypeLValue {
     SExpr,
     Fn,
     MutFn,
+    AsyncFn,
+    AsyncMutFn,
     Lambda,
     Nil,
     Map,
     List,
     Quote,
     Other(String),
+    Future,
 }
 
 impl Display for NameTypeLValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         let str = match self {
-            NameTypeLValue::Number => "Number",
-            NameTypeLValue::True => "True",
-            NameTypeLValue::Symbol => "Symbol",
-            NameTypeLValue::String => "String",
-            NameTypeLValue::SExpr => "SExpr",
-            NameTypeLValue::Fn => "Fn",
-            NameTypeLValue::Nil => "Nil",
-            NameTypeLValue::Object => "Object",
-            NameTypeLValue::Lambda => "lambda",
-            NameTypeLValue::Map => "map",
-            NameTypeLValue::List => "list",
-            NameTypeLValue::Quote => "quote",
-            NameTypeLValue::Atom => "atom",
-            NameTypeLValue::CoreOperator => "core_operator",
+            NameTypeLValue::Number => NUMBER,
+            NameTypeLValue::True => TRUE,
+            NameTypeLValue::Symbol => SYMBOL,
+            NameTypeLValue::String => STRING,
+            NameTypeLValue::SExpr => SEXPR,
+            NameTypeLValue::Fn => FN,
+            NameTypeLValue::Nil => NIL,
+            NameTypeLValue::Object => OBJECT,
+            NameTypeLValue::Lambda => LAMBDA,
+            NameTypeLValue::Map => MAP,
+            NameTypeLValue::List => LIST,
+            NameTypeLValue::Quote => QUOTE,
+            NameTypeLValue::Atom => ATOM,
+            NameTypeLValue::CoreOperator => CORE_OPERATOR,
             NameTypeLValue::Other(s) => s.as_str(),
-            NameTypeLValue::MutFn => "LFn",
-            NameTypeLValue::Int => "int",
-            NameTypeLValue::Float => "float",
-            NameTypeLValue::Usize => "usize",
-            NameTypeLValue::Bool => "bool",
-            NameTypeLValue::Character => "character",
+            NameTypeLValue::MutFn => MUT_FN,
+            NameTypeLValue::Int => INT,
+            NameTypeLValue::Float => FLOAT,
+            NameTypeLValue::Usize => USIZE,
+            NameTypeLValue::Bool => BOOL,
+            NameTypeLValue::Character => CHARACTER,
+            NameTypeLValue::AsyncFn => ASYNC_FN,
+            NameTypeLValue::AsyncMutFn => ASYNC_MUT_FN,
+            NameTypeLValue::Future => FUTURE,
         };
         write!(f, "{}", str)
     }
@@ -1858,6 +2203,7 @@ impl PartialEq for NameTypeLValue {
             (NameTypeLValue::Int, NameTypeLValue::Int) => true,
             (NameTypeLValue::Float, NameTypeLValue::Float) => true,
             (NameTypeLValue::Usize, NameTypeLValue::Usize) => true,
+            (NameTypeLValue::AsyncFn, NameTypeLValue::AsyncFn) => true,
             (NameTypeLValue::Other(s1), NameTypeLValue::Other(s2)) => *s1 == *s2,
             (_, _) => false,
         }
@@ -1878,10 +2224,13 @@ impl From<&LValue> for NameTypeLValue {
             LValue::Lambda(_) => NameTypeLValue::Lambda,
             LValue::Map(_) => NameTypeLValue::Map,
             LValue::List(_) => NameTypeLValue::List,
-            LValue::Quote(_) => NameTypeLValue::Quote,
+            //LValue::Quote(_) => NameTypeLValue::Quote,
             LValue::CoreOperator(_) => NameTypeLValue::CoreOperator,
             LValue::String(_) => NameTypeLValue::String,
             LValue::Character(_) => NameTypeLValue::Character,
+            LValue::AsyncFn(_) => NameTypeLValue::AsyncFn,
+            LValue::AsyncMutFn(_) => NameTypeLValue::AsyncMutFn,
+            LValue::Future(_) => NameTypeLValue::Future,
         }
     }
 }
@@ -1892,12 +2241,12 @@ impl From<LValue> for NameTypeLValue {
     }
 }
 
-#[derive(Default, Clone)]
-pub struct InitLisp(Vec<&'static str>);
-//TODO: simplify to use only Vec<&'static str> instead of custom struct
-impl From<Vec<&'static str>> for InitLisp {
-    fn from(vec: Vec<&'static str>) -> Self {
-        InitLisp(vec.clone())
+#[derive(Debug, Default, Clone)]
+pub struct InitLisp(Vec<String>);
+
+impl<T: ToString> From<Vec<T>> for InitLisp {
+    fn from(vec: Vec<T>) -> Self {
+        InitLisp(vec.iter().map(|x| x.to_string()).collect())
     }
 }
 
@@ -1906,17 +2255,16 @@ impl InitLisp {
         self.0.append(&mut other.0)
     }
 
-    pub fn inner(&self) -> Vec<&'static str> {
-        self.0.clone()
+    pub fn inner(&self) -> Vec<&str> {
+        self.0.iter().map(|x| x.as_str()).collect()
     }
 
     pub fn begin_lisp(&self) -> String {
         let mut str = String::new(); //"(begin ".to_string();
-        self.0.iter().for_each(|&x| {
-            str.push_str(x);
+        self.0.iter().for_each(|x| {
+            str.push_str(x.as_str());
             str.push('\n');
         });
-        //str.push(')');
         str
     }
 }
@@ -1928,18 +2276,20 @@ pub struct Module {
     pub ctx: Arc<AsyncLTrait>,
     pub prelude: Vec<(String, LValue)>,
     pub raw_lisp: InitLisp,
-    pub label: &'static str,
+    pub label: String,
 }
 
 impl Module {
     /// Add a function to the module.
-    pub fn add_fn_prelude<T: 'static + Send + Sync>(
+    pub fn add_fn_prelude<T: 'static + Send + Sync, L: ToString>(
         &mut self,
-        label: &'static str,
+        label: L,
         fun: NativeFn<T>,
     ) {
-        self.prelude
-            .push((label.into(), LValue::Fn(LFn::new(fun, label))))
+        self.prelude.push((
+            label.to_string(),
+            LValue::Fn(LFn::new(fun, label.to_string())),
+        ))
     }
 
     /// Add a mutate function to the module.
@@ -1947,13 +2297,47 @@ impl Module {
         T: 'static,
         //R: Into<Result<LValue, LError>>,
         //F: Fn(&[LValue], &LEnv, &mut T) -> R + 'static,
+        L: ToString,
     >(
         &mut self,
-        label: &'static str,
+        label: L,
         fun: NativeMutFn<T>,
     ) {
-        self.prelude
-            .push((label.into(), LValue::MutFn(LMutFn::new(fun, label))))
+        self.prelude.push((
+            label.to_string(),
+            LValue::MutFn(LMutFn::new(fun, label.to_string())),
+        ))
+    }
+
+    pub fn add_async_fn_prelude<
+        T: 'static,
+        //R: Into<Result<LValue, LError>>,
+        //F: Fn(&[LValue], &LEnv, &mut T) -> R + 'static,
+        L: ToString,
+    >(
+        &mut self,
+        label: L,
+        fun: AsyncNativeFn<T>,
+    ) {
+        self.prelude.push((
+            label.to_string(),
+            LValue::AsyncFn(LAsyncFn::new(fun, label.to_string())),
+        ))
+    }
+    pub fn add_async_mut_fn_prelude<
+        T: 'static,
+        //R: Into<Result<LValue, LError>>,
+        //F: Fn(&[LValue], &LEnv, &mut T) -> R + 'static,
+        L: ToString,
+    >(
+        &mut self,
+        label: L,
+        fun: AsyncNativeMutFn<T>,
+    ) {
+        self.prelude.push((
+            label.to_string(),
+            LValue::AsyncMutFn(LAsyncMutFn::new(fun, label.to_string())),
+        ))
     }
 
     /// Add a LValue to the prelude.

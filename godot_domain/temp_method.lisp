@@ -155,3 +155,14 @@
             (__lambda__ (get-map (rae-get-state) machines)))))
 
 (find_output_machine)
+
+
+(begin
+    (rae-trigger-task t_check_battery robot0)
+    (rae-trigger-task t_check_battery robot1)
+    (rae-trigger-task t_process_package package0)
+    (rae-trigger-task t_process_package package1)
+    (rae-trigger-task t_process_package package2)
+    (rae-trigger-task t_process_package package3)
+    (rae-trigger-task t_process_package package4)
+    (rae-trigger-task t_process_package package5))

@@ -178,7 +178,7 @@ impl TryFrom<GodotMessageSerde> for (usize, ActionStatus) {
                     id = ar.temp_id;
                     status = ActionResponse(ar.action_id)
                 } else {
-                    todo!()
+                    unreachable!()
                 }
             }
             GodotMessageType::ActionFeedback => {
@@ -186,7 +186,7 @@ impl TryFrom<GodotMessageSerde> for (usize, ActionStatus) {
                     id = af.action_id;
                     status = ActionStatus::ActionFeedback(af.feedback);
                 } else {
-                    todo!()
+                    unreachable!()
                 }
             }
             GodotMessageType::ActionResult => {
@@ -194,7 +194,7 @@ impl TryFrom<GodotMessageSerde> for (usize, ActionStatus) {
                     id = ar.action_id;
                     status = ActionStatus::ActionResult(ar.result);
                 } else {
-                    todo!()
+                    unreachable!()
                 }
             }
             GodotMessageType::ActionPreempt => {
@@ -202,7 +202,7 @@ impl TryFrom<GodotMessageSerde> for (usize, ActionStatus) {
                     id = ai.action_id;
                     status = ActionPreempt;
                 } else {
-                    todo!()
+                    unreachable!()
                 }
             }
             GodotMessageType::ActionCancel => {
@@ -210,11 +210,11 @@ impl TryFrom<GodotMessageSerde> for (usize, ActionStatus) {
                     id = ac.temp_id;
                     status = ActionCancel(ac.cancelled);
                 } else {
-                    todo!()
+                    unreachable!()
                 }
             }
             _ => {
-                todo!()
+                unreachable!()
             }
         };
 

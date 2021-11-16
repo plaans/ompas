@@ -1,6 +1,6 @@
 //!
-
 use crate::core::LEnv;
+use crate::lisp_interpreter::ChannelToLispInterpreter;
 use crate::modules::doc::{Documentation, LHelp};
 use crate::structs::LError::{WrongNumberOfArgument, WrongType};
 use crate::structs::{GetModule, LError, LValue, Module, NameTypeLValue};
@@ -8,15 +8,12 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::sync::mpsc::Sender;
 
 /*
 LANGUAGE
  */
 
-//TODO: [mod] add the possibility to redirect log output to a file or any type of input
-
-const MOD_IO: &str = "mod-io";
+const MOD_IO: &str = "io";
 const DOC_MOD_IO: &str = "Module than handles input/output functions.";
 const DOC_MOD_IO_VERBOSE: &str = "functions:\n\
                                     -print\n\
@@ -24,9 +21,14 @@ const DOC_MOD_IO_VERBOSE: &str = "functions:\n\
                                     -write";
 
 const PRINT: &str = "print";
-const READ: &str = "read";
+const READ: &str = "__read__";
 const WRITE: &str = "write";
 //const LOAD: &str = "load";
+
+const MACRO_READ: &str = "(defmacro read \
+    (lambda (x)\
+        `(eval (parse (__read__ ,x)))))\
+";
 
 #[derive(Debug)]
 pub enum LogOutput {
@@ -41,9 +43,10 @@ impl From<PathBuf> for LogOutput {
 }
 
 /// Handles the channel to communicate with the Lisp Interpreter
+/// Note: Be careful when there is response on the receiver
 #[derive(Debug)]
 pub struct CtxIo {
-    sender_li: Option<Sender<String>>,
+    sender_li: Option<ChannelToLispInterpreter>,
     log: LogOutput,
 }
 
@@ -59,102 +62,13 @@ impl Default for CtxIo {
 impl CtxIo {
     ///Set the sender to lisp interpreter
     /// Used to send commands to execute
-    pub fn add_sender_li(&mut self, sender: Sender<String>) {
-        self.sender_li = Some(sender);
+    pub fn add_communication(&mut self, com: ChannelToLispInterpreter) {
+        self.sender_li = Some(com);
     }
     ///Set the log output
     pub fn set_log_output(&mut self, output: LogOutput) {
         self.log = output
     }
-}
-
-/// Prints in a the LogOutput the LValue.
-/// If it is stdout, it is printed in the terminal
-/// Otherwise in the configured file.
-/// If the file is missing, it prints nothing.
-pub fn print(args: &[LValue], _: &LEnv, ctx: &CtxIo) -> Result<LValue, LError> {
-    let lv: LValue = match args.len() {
-        0 => LValue::Nil,
-        1 => args[0].clone(),
-        _ => args.into(),
-    };
-    match &ctx.log {
-        LogOutput::Stdout => println!("{}", lv),
-        LogOutput::File(pb) => match File::open(pb) {
-            Ok(_) => {}
-            Err(_) => {
-                let mut file = File::create(pb)?;
-                file.write_all(format!("{}\n", lv).as_bytes())?;
-            }
-        },
-    };
-
-    Ok(LValue::Nil)
-}
-
-/// Read the content of a file and sends the content to the lisp interpreter.
-/// The name of the file is given via args.
-pub fn read(args: &[LValue], _: &LEnv, ctx: &CtxIo) -> Result<LValue, LError> {
-    //let mut stdout = io::stdout();
-    //stdout.write_all(b"module Io: read\n");
-    if args.len() != 1 {
-        return Err(WrongNumberOfArgument(READ, args.into(), args.len(), 1..1));
-    }
-    let file_name = match &args[0] {
-        LValue::Symbol(s) => s.to_string(),
-        lv => {
-            return Err(WrongType(
-                READ,
-                lv.clone(),
-                lv.into(),
-                NameTypeLValue::Symbol,
-            ))
-        }
-    };
-
-    let mut file = File::open(file_name)?;
-    let mut contents = String::new();
-    file.read_to_string(&mut contents)?;
-
-    //stdout.write_all(format!("contents: {}\n", contents).as_bytes());
-    let sender = ctx.sender_li.clone();
-    tokio::spawn(async move {
-        sender
-            .expect("missing a channel")
-            .send(contents)
-            .await
-            .expect("couldn't send string via channel");
-    });
-
-    Ok(LValue::Nil)
-}
-
-/// Write an lvalue to a given file
-///
-/// # Example:
-/// ```lisp
-/// (write <file> <lvalue>)
-pub fn write(args: &[LValue], _: &LEnv, _: &CtxIo) -> Result<LValue, LError> {
-    if args.len() != 2 {
-        return Err(WrongNumberOfArgument(WRITE, args.into(), args.len(), 2..2));
-    }
-
-    match &args[0] {
-        LValue::Symbol(s) => {
-            //got our file name
-            let mut f = File::create(s.to_string())?;
-            f.write_all(args[1].to_string().as_bytes())?;
-            Ok(LValue::Nil)
-        }
-        lv => Err(WrongType(
-            WRITE,
-            lv.clone(),
-            lv.into(),
-            NameTypeLValue::Symbol,
-        )),
-    }
-
-    //println!("module Io: write");
 }
 
 /*pub fn load(args: &[LValue], _: &LEnv, _: & CtxIo ) -> Result<LValue, LError> {
@@ -167,8 +81,8 @@ impl GetModule for CtxIo {
         let mut module = Module {
             ctx: Arc::new(self),
             prelude: vec![],
-            raw_lisp: Default::default(),
-            label: MOD_IO,
+            raw_lisp: vec![MACRO_READ].into(),
+            label: MOD_IO.into(),
         };
 
         module.add_fn_prelude(PRINT, print);
@@ -202,6 +116,89 @@ impl Documentation for CtxIo {
             LHelp::new_verbose(WRITE, DOC_WRITE, DOC_WRITE_VERBOSE),
         ]
     }
+}
+
+/// Prints in a the LogOutput the LValue.
+/// If it is stdout, it is printed in the terminal
+/// Otherwise in the configured file.
+/// If the file is missing, it prints nothing.
+pub fn print(args: &[LValue], _: &LEnv, ctx: &CtxIo) -> Result<LValue, LError> {
+    let lv: LValue = match args.len() {
+        0 => LValue::Nil,
+        1 => args[0].clone(),
+        _ => args.into(),
+    };
+    match &ctx.log {
+        LogOutput::Stdout => println!("{}", lv),
+        LogOutput::File(pb) => match File::open(pb) {
+            Ok(_) => {}
+            Err(_) => {
+                let mut file = File::create(pb)?;
+                file.write_all(format!("{}\n", lv).as_bytes())?;
+            }
+        },
+    };
+
+    Ok(LValue::Nil)
+}
+
+/// Read the content of a file and sends the content to the lisp interpreter.
+/// The name of the file is given via args.
+pub fn read(args: &[LValue], _: &LEnv, _: &CtxIo) -> Result<LValue, LError> {
+    //let mut stdout = io::stdout();
+    //stdout.write_all(b"module Io: read\n");
+    if args.len() != 1 {
+        return Err(WrongNumberOfArgument(READ, args.into(), args.len(), 1..1));
+    }
+    let file_name = match &args[0] {
+        LValue::Symbol(s) => s.to_string(),
+        lv => {
+            return Err(WrongType(
+                READ,
+                lv.clone(),
+                lv.into(),
+                NameTypeLValue::Symbol,
+            ))
+        }
+    };
+
+    let mut file = File::open(file_name)?;
+    let mut contents = String::new();
+    file.read_to_string(&mut contents)?;
+
+    //stdout.write_all(format!("contents: {}\n", contents).as_bytes());
+
+    //TODO: no check of the response to read
+
+    Ok(LValue::String(contents))
+}
+
+/// Write an lvalue to a given file
+///
+/// # Example:
+/// ```lisp
+/// (write <file> <lvalue>)
+pub fn write(args: &[LValue], _: &LEnv, _: &CtxIo) -> Result<LValue, LError> {
+    if args.len() != 2 {
+        return Err(WrongNumberOfArgument(WRITE, args.into(), args.len(), 2..2));
+    }
+
+    match &args[0] {
+        LValue::Symbol(s) => {
+            //got our file name
+            let mut f = File::create(s.to_string())?;
+            f.write_all(args[1].to_string().as_bytes())?;
+            Ok(LValue::Nil)
+        }
+        lv => Err(WrongType(
+            WRITE,
+            lv.clone(),
+            lv.into(),
+            NameTypeLValue::Symbol,
+        )),
+    }
+
+    //println!("module Io: write");
 }
 
 //TODO: finish writing tests for io

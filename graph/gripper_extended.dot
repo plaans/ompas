@@ -1,0 +1,68 @@
+
+digraph Hierarchy_1_Orig {
+    ordering="out"
+    // splines=ortho
+    edge [headport="n"]
+    node [fixedsize="true",width="1.2",height=".4"]
+    node [shape="rectangle"]
+
+    subgraph cluster_PickPlaceGraph {
+        color=lightgray;
+        subgraph actions {
+            node [shape="ellipse", fixedsize="false",width="1",height=".5"]
+            pick [label = "pick"]
+            drop [label = "drop"]
+            move [label = "move"]
+            move_2 [label = "move"]
+            //open [label = "open"]
+            //close [label = "close"]
+
+        }
+
+        subgraph methods {
+            node [shape="parallelogram", fixedsize="false",width="1",height=".5"]
+            m1_place_object
+            m1_pick_in_room
+            m2_move_and_pick
+            t_move_to
+            m1_move_already_there
+            m2_move_to_direct
+            m3_move_recursively
+        }
+        subgraph tasks {
+            node [shape="rect", fixedsize="false",width="1",height=".5"]
+            t_place_object [label = "t_place_object"]
+            t_pick [label = "t_pick"]
+            t_move_to [label = "t_move_to"]
+            t_move_to_2 [label = "t_move_to..."]
+            t_move_to_3 [label = "t_move_to..."]
+            t_pick_2 [label = "t_pick..."]
+
+        }
+
+        
+        t_place_object -> m1_place_object
+        m1_place_object -> t_pick
+        m1_place_object -> t_move_to
+        m1_place_object -> drop
+
+        t_pick -> m1_pick_in_room
+        m1_pick_in_room -> pick
+        t_pick -> m2_move_and_pick
+        m2_move_and_pick -> t_move_to_2
+        m2_move_and_pick -> t_pick_2
+        
+        t_move_to -> m1_move_already_there
+        nil [shape = "plaintext"]
+        m1_move_already_there -> nil
+        t_move_to -> m2_move_to_direct
+        m2_move_to_direct -> move
+
+        t_move_to -> m3_move_recursively
+        m3_move_recursively -> move_2
+        m3_move_recursively -> t_move_to_3
+
+
+    }
+
+}

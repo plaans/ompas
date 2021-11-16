@@ -33,7 +33,7 @@ async fn main() {
 async fn logger_with_file() {
     let date: DateTime<Utc> = Utc::now();
     let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
-    fs::create_dir_all("rae_logs").expect("could not create rae logs directory");
+    fs::create_dir_all("../../rae_logs").expect("could not create rae logs directory");
     let name_file = format!("rae_logs/rae_{}", string_date);
     let mut file = OpenOptions::new()
         .read(true)

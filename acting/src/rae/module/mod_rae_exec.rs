@@ -1,18 +1,21 @@
 use crate::rae::context::actions_progress::{ActionId, ActionsProgress, Status};
 use crate::rae::context::agenda::Agenda;
+use crate::rae::context::mutex;
+use crate::rae::context::mutex::MutexResponse;
 use crate::rae::context::rae_env::RAE_TASK_METHODS_MAP;
 use crate::rae::context::rae_state::*;
 use crate::rae::context::ressource_access::wait_on::add_waiter;
-use crate::rae::module::domain::*;
 use crate::rae::select_methods::sort_greedy;
+use ::macro_rules_attribute::macro_rules_attribute;
+use async_trait::async_trait;
 use log::{error, info, warn};
-use ompas_lisp::core::LEnv;
+use ompas_lisp::core::{ContextCollection, LEnv};
 use ompas_lisp::functions::{cons, union_map};
 use ompas_lisp::modules::doc::{Documentation, LHelp};
 use ompas_lisp::structs::LError::*;
 use ompas_lisp::structs::LValue::*;
 use ompas_lisp::structs::*;
-use ompas_utils::blocking_async;
+use ompas_utils::dyn_async;
 use std::any::Any;
 use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
@@ -35,8 +38,10 @@ pub const RAE_ASSERT_SHORT: &str = "+>";
 pub const RAE_RETRACT: &str = "retract";
 pub const RAE_RETRACT_SHORT: &str = "->";
 pub const RAE_AWAIT: &str = "rae-await";
-pub const WAIT_ON: &str = "wait-on";
-
+pub const WAIT_ON: &str = "check";
+pub const LOCK: &str = "lock";
+pub const RELEASE: &str = "release";
+pub const IS_LOCKED: &str = "locked?";
 //RAE Interface with a platform
 pub const RAE_EXEC_COMMAND: &str = "rae-exec-command";
 pub const RAE_GET_STATE: &str = "rae-get-state";
@@ -52,7 +57,93 @@ pub const RAE_SELECT: &str = "rae-select";
 pub const RAE_GET_NEXT_METHOD: &str = "rae-get-next-method";
 pub const RAE_SET_SUCCESS_FOR_TASK: &str = "rae-set-success-for-task";
 
-//TODO: write doc
+pub const MACRO_MUTEX_LOCK_AND_DO: &str = "(defmacro mutex::lock-and-do 
+    (lambda (r b)
+        `(begin
+            (lock ,r)
+            ,b
+            (release ,r))))";
+pub const MACRO_WAIT_ON: &str = "(defmacro wait-on (lambda (expr)
+    `(if (not (eval ,expr))
+        (check ,expr))))";
+pub const LABEL_ENUMERATE_PARAMS: &str = "enumerate-params";
+
+/*pub const LAMBDA_MUTEX_LOCK: &str = "(define mutex::lock (lambda (__symbol__)
+                                        (begin
+                                            (wait-on `(not (mutex::locked? ,__symbol__)))
+                                            (assert `(locked ,__symbol__) true))))";
+
+pub const LAMBDA_MUTEX_IS_LOCKED: &str = "(define mutex::locked? (lambda (__symbol__)
+                                        (rae-get-state-variable `(locked ,__symbol__))))";
+
+pub const LAMBDA_MUTEX_RELEASE: &str = "(define mutex::release (lambda (__symbol__)
+                                        (retract `(locked ,__symbol__) true)))";*/
+
+pub const LAMBDA_PROGRESS: &str = "
+(define progress (lambda args
+    (let* ((result (eval (cons select (cons `(quote ,(car args)) (cdr args)))))
+            (first_m (car result))
+            (task_id (cadr result)))
+            
+            (if (null? first_m)
+                nil
+                (if (eval first_m)
+                    (rae-set-success-for-task task_id)
+                    (retry task_id))))))";
+
+pub const LAMBDA_SELECT: &str = "
+(define select
+  (lambda args
+    (rae-select args (generate-applicable-instances (rae-get-state) args ))))";
+
+pub const LAMBDA_RETRY: &str = "
+(define retry (lambda (task_id)
+    (let ((new_method (rae-get-next-method task_id)))
+        (begin 
+            (print \"Retrying task \" task_id)
+            (if (null? new_method) ; if there is no method applicable
+            nil
+            (if (eval new_method)
+                (rae-set-success-for-task task_id)
+                (rae-retry task_id)))))))";
+
+//Access part of the environment
+
+pub const LAMBDA_GET_METHODS: &str = "\
+(define get-methods\
+    (lambda (label)\
+        (get rae-task-methods-map label)))";
+
+pub const LAMBDA_GET_METHOD_GENERATOR: &str = "\
+(define get-method-generator
+       (lambda (label)
+            (get rae-method-generator-map label)))";
+
+pub const LAMBDA_GENERATE_INSTANCES: &str = "
+(define generate-œ (lambda args
+    (let* ((label (car args))
+            (i_params (cdr args))
+            (methods (get-methods label)))
+
+            (begin
+                (define __generate__
+                    (lambda (methods)
+                        (if (null? methods)
+                            nil
+                            (append
+                                (eval
+                                    (append (list (get-method-generator (car methods)))
+                                        i_params))
+                                (__generate__ (cdr methods))))))
+                (__generate__ methods)))))";
+
+pub const LAMBDA_ARBITRARY: &str = "(define arbitrary
+	(lambda args
+		(if (= (length args) 1)
+				(caar args)
+				(let ((elements (car args))
+							(f (cadr args)))
+						 (f elements)))))";
 
 ///Context that will contains primitives for the RAE executive
 pub struct CtxRaeExec {
@@ -77,51 +168,51 @@ impl Default for CtxRaeExec {
 impl GetModule for CtxRaeExec {
     fn get_module(self) -> Module {
         let init: InitLisp = vec![
-            MACRO_GENERATE_ACTION,
-            MACRO_GENERATE_METHOD,
-            MACRO_GENERATE_TASK,
-            MACRO_GENERATE_STATE_FUNCTION,
-            MACRO_GENERATE_TASK_SIMPLE,
-            MACRO_GENERATE_METHOD_PARAMETERS,
-            MACRO_ENUMERATE_PARAMS,
-            LAMBDA_MUTEX_LOCK,
-            LAMBDA_MUTEX_IS_LOCKED,
-            LAMBDA_MUTEX_RELEASE,
+            MACRO_MUTEX_LOCK_AND_DO,
+            MACRO_WAIT_ON,
+            //LAMBDA_MUTEX_LOCK,
+            //LAMBDA_MUTEX_IS_LOCKED,
+            //LAMBDA_MUTEX_RELEASE,
             LAMBDA_PROGRESS,
             LAMBDA_SELECT,
             LAMBDA_RETRY,
             LAMBDA_GET_METHODS,
             LAMBDA_GET_METHOD_GENERATOR,
-            LAMBDA_GENERATE_INSTANCES,
+            LAMBDA_ARBITRARY,
         ]
         .into();
         let mut module = Module {
             ctx: Arc::new(self),
             prelude: vec![],
             raw_lisp: init,
-            label: MOD_RAE_EXEC,
+            label: MOD_RAE_EXEC.to_string(),
         };
 
-        module.add_fn_prelude(RAE_GET_STATE, get_state);
-        module.add_fn_prelude(RAE_GET_STATE_VARIBALE, get_state_variable);
-        module.add_fn_prelude(RAE_EXEC_COMMAND, exec_command);
-        module.add_mut_fn_prelude(RAE_LAUNCH_PLATFORM, launch_platform);
-        module.add_fn_prelude(RAE_GET_STATUS, get_status);
-        module.add_fn_prelude(RAE_CANCEL_COMMAND, cancel_command);
+        module.add_async_fn_prelude(RAE_GET_STATE, get_state);
+        module.add_async_fn_prelude(RAE_GET_STATE_VARIBALE, get_state_variable);
+        module.add_async_fn_prelude(RAE_EXEC_COMMAND, exec_command);
+        module.add_async_mut_fn_prelude(RAE_LAUNCH_PLATFORM, launch_platform);
+        module.add_async_fn_prelude(RAE_GET_STATUS, get_status);
+        module.add_async_fn_prelude(RAE_CANCEL_COMMAND, cancel_command);
         //Manage facts:
-        module.add_fn_prelude(RAE_ASSERT, assert_fact);
-        module.add_fn_prelude(RAE_ASSERT_SHORT, assert_fact);
-        module.add_fn_prelude(RAE_RETRACT, retract_fact);
-        module.add_fn_prelude(RAE_RETRACT_SHORT, retract_fact);
-        module.add_fn_prelude(RAE_AWAIT, fn_await);
-        module.add_mut_fn_prelude(RAE_OPEN_COM_PLATFORM, open_com);
-        module.add_mut_fn_prelude(RAE_START_PLATFORM, start_platform);
+        module.add_async_fn_prelude(RAE_ASSERT, assert_fact);
+        module.add_async_fn_prelude(RAE_ASSERT_SHORT, assert_fact);
+        module.add_async_fn_prelude(RAE_RETRACT, retract_fact);
+        module.add_async_fn_prelude(RAE_RETRACT_SHORT, retract_fact);
+        //module.add_async_fn_prelude(RAE_AWAIT, fn_await);
+        module.add_async_mut_fn_prelude(RAE_OPEN_COM_PLATFORM, open_com);
+        module.add_async_mut_fn_prelude(RAE_START_PLATFORM, start_platform);
         module.add_fn_prelude(RAE_GET_INSTANTIATED_METHODS, get_instantiated_methods);
         module.add_fn_prelude(RAE_GET_BEST_METHOD, get_best_method);
-        module.add_fn_prelude(WAIT_ON, wait_on);
-        module.add_fn_prelude(RAE_SELECT, select);
-        module.add_fn_prelude(RAE_SET_SUCCESS_FOR_TASK, set_success_for_task);
-        module.add_fn_prelude(RAE_GET_NEXT_METHOD, get_next_method);
+        module.add_async_fn_prelude(WAIT_ON, wait_on);
+        module.add_async_fn_prelude(RAE_SELECT, select);
+        module.add_async_fn_prelude(RAE_SET_SUCCESS_FOR_TASK, set_success_for_task);
+        module.add_async_fn_prelude(RAE_GET_NEXT_METHOD, get_next_method);
+
+        //mutex
+        module.add_async_fn_prelude(LOCK, lock);
+        module.add_async_fn_prelude(RELEASE, release);
+        module.add_async_fn_prelude(IS_LOCKED, is_locked);
         module
     }
 }
@@ -196,103 +287,156 @@ impl Display for JobType {
 pub type JobId = usize;
 
 /// Trait that a platform needs to implement to be able to be used as execution platform in RAE.
+#[async_trait]
 pub trait RAEInterface: Any + Send + Sync {
     /// Initial what needs to be.
-    fn init(&mut self, state: RAEState, status: ActionsProgress);
+    async fn init(&mut self, state: RAEState, status: ActionsProgress);
 
     /// Executes a command on the platform
-    fn exec_command(&self, args: &[LValue], command_id: usize) -> Result<LValue, LError>;
+    async fn exec_command(&self, args: &[LValue], command_id: usize) -> Result<LValue, LError>;
 
-    fn cancel_command(&self, args: &[LValue]) -> Result<LValue, LError>;
+    async fn cancel_command(&self, args: &[LValue]) -> Result<LValue, LError>;
 
     ///Get the whole state of the platform
-    fn get_state(&self, args: &[LValue]) -> Result<LValue, LError>;
+    async fn get_state(&self, args: &[LValue]) -> Result<LValue, LError>;
 
     ///Get a specific state variable
-    fn get_state_variable(&self, args: &[LValue]) -> Result<LValue, LError>;
+    async fn get_state_variable(&self, args: &[LValue]) -> Result<LValue, LError>;
 
     ///Return the status of all the actions
-    fn get_status(&self, args: &[LValue]) -> Result<LValue, LError>;
+    async fn get_status(&self, args: &[LValue]) -> Result<LValue, LError>;
 
     ///Launch the platform (such as the simulation in godot) and open communication
-    fn launch_platform(&mut self, args: &[LValue]) -> Result<LValue, LError>;
+    async fn launch_platform(&mut self, args: &[LValue]) -> Result<LValue, LError>;
 
     /// Start the platform process
-    fn start_platform(&self, args: &[LValue]) -> Result<LValue, LError>;
+    async fn start_platform(&self, args: &[LValue]) -> Result<LValue, LError>;
 
     /// Open communication with the platform
-    fn open_com(&mut self, args: &[LValue]) -> Result<LValue, LError>;
+    async fn open_com(&mut self, args: &[LValue]) -> Result<LValue, LError>;
 
     /// Returns the status of a given action
-    fn get_action_status(&self, action_id: &usize) -> Status;
+    async fn get_action_status(&self, action_id: &usize) -> Status;
 
     /// Set the status of a given action
-    fn set_status(&self, action_id: usize, status: Status);
+    async fn set_status(&self, action_id: usize, status: Status);
 
     /// Returns the RAE domain of the platform.
-    fn domain(&self) -> &'static str;
+    async fn domain(&self) -> &'static str;
 }
 
+#[async_trait]
 impl RAEInterface for () {
-    fn init(&mut self, _: RAEState, _: ActionsProgress) {
-        todo!()
+    async fn init(&mut self, _: RAEState, _: ActionsProgress) {}
+
+    async fn exec_command(&self, _args: &[LValue], _: usize) -> Result<LValue, LError> {
+        Ok(Nil)
     }
 
-    fn exec_command(&self, _args: &[LValue], _: usize) -> Result<LValue, LError> {
-        todo!()
+    async fn cancel_command(&self, _: &[LValue]) -> Result<LValue, LError> {
+        Ok(Nil)
     }
 
-    fn cancel_command(&self, _: &[LValue]) -> Result<LValue, LError> {
-        todo!()
+    async fn get_state(&self, _: &[LValue]) -> Result<LValue, LError> {
+        Ok(Nil)
     }
 
-    fn get_state(&self, _: &[LValue]) -> Result<LValue, LError> {
-        todo!()
+    async fn get_state_variable(&self, _args: &[LValue]) -> Result<LValue, LError> {
+        Ok(Nil)
     }
 
-    fn get_state_variable(&self, _args: &[LValue]) -> Result<LValue, LError> {
-        todo!()
+    async fn get_status(&self, _args: &[LValue]) -> Result<LValue, LError> {
+        Ok(Nil)
     }
 
-    fn get_status(&self, _args: &[LValue]) -> Result<LValue, LError> {
-        todo!()
+    async fn launch_platform(&mut self, _: &[LValue]) -> Result<LValue, LError> {
+        Ok(Nil)
     }
 
-    fn launch_platform(&mut self, _: &[LValue]) -> Result<LValue, LError> {
-        todo!()
+    async fn start_platform(&self, _: &[LValue]) -> Result<LValue, LError> {
+        Ok(Nil)
     }
 
-    fn start_platform(&self, _: &[LValue]) -> Result<LValue, LError> {
-        todo!()
+    async fn open_com(&mut self, _: &[LValue]) -> Result<LValue, LError> {
+        Ok(Nil)
     }
 
-    fn open_com(&mut self, _: &[LValue]) -> Result<LValue, LError> {
-        todo!()
+    async fn get_action_status(&self, _action_id: &usize) -> Status {
+        Status::Pending
     }
 
-    fn get_action_status(&self, _action_id: &usize) -> Status {
-        todo!()
-    }
+    async fn set_status(&self, _action_id: usize, _status: Status) {}
 
-    fn set_status(&self, _action_id: usize, _status: Status) {
-        todo!()
-    }
-
-    fn domain(&self) -> &'static str {
-        todo!()
+    async fn domain(&self) -> &'static str {
+        ""
     }
 }
-
-pub fn exec_command(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
+#[macro_rules_attribute(dyn_async!)]
+async fn exec_command<'a>(
+    args: &'a [LValue],
+    _env: &'a LEnv,
+    ctx: &'a CtxRaeExec,
+) -> Result<LValue, LError> {
     let command_id = ctx.actions_progress.get_new_id();
     let debug: LValue = args.into();
     info!("exec command {}: {}", command_id, debug);
-    ctx.platform_interface.exec_command(args, command_id)?;
-    Ok(command_id.into())
+    ctx.platform_interface
+        .exec_command(args, command_id)
+        .await?;
+
+    //println!("await on action (id={})", action_id);
+
+    let mut receiver = ctx.actions_progress.declare_new_watcher(&command_id).await;
+    info!("waiting on action {}", command_id);
+
+    let mut action_status = ctx
+        .actions_progress
+        .status
+        .read()
+        .await
+        .get(&command_id)
+        .unwrap()
+        .clone();
+
+    loop {
+        //println!("waiting on status:");
+        match action_status {
+            Status::Pending => {
+                //println!("not triggered");
+            }
+            Status::Running => {
+                //println!("running");
+            }
+            Status::Failure => {
+                warn!("Command {} is a failure.", command_id);
+                return Ok(false.into());
+            }
+            Status::Done => {
+                info!("Command {} is a success.", command_id);
+                return Ok(true.into());
+            }
+        }
+        action_status = if let true = receiver.recv().await.unwrap() {
+            ctx.actions_progress
+                .status
+                .read()
+                .await
+                .get(&command_id)
+                .unwrap()
+                .clone()
+        } else {
+            unreachable!("the signal for an update should always be true")
+        }
+    }
 }
 
 ///Retract a fact to state
-pub fn retract_fact(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
+#[macro_rules_attribute(dyn_async!)]
+async fn retract_fact<'a>(
+    args: &'a [LValue],
+    _env: &'a LEnv,
+    ctx: &'a CtxRaeExec,
+) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(
             RAE_RETRACT,
@@ -301,14 +445,18 @@ pub fn retract_fact(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LV
             2..2,
         ));
     }
-    let key = args[0].clone().into();
-    let value = args[1].clone().into();
-    let c_state = ctx.state.clone();
-    blocking_async!(c_state.retract_fact(key, value).await).expect("todo!")
+    let key = (&args[0]).into();
+    let value = (&args[1]).into();
+    ctx.state.retract_fact(key, value).await
 }
 
 ///Add a fact to fact state
-pub fn assert_fact(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
+#[macro_rules_attribute(dyn_async!)]
+async fn assert_fact<'a>(
+    args: &'a [LValue],
+    _env: &'a LEnv,
+    ctx: &'a CtxRaeExec,
+) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(
             RAE_ASSERT,
@@ -317,17 +465,21 @@ pub fn assert_fact(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LVa
             2..2,
         ));
     }
-    let key = args[0].clone().into();
-    let value = args[1].clone().into();
-    let c_state = ctx.state.clone();
-    blocking_async!(c_state.add_fact(key, value).await).expect("todo!");
+    let key = (&args[0]).into();
+    let value = (&args[1]).into();
+    ctx.state.add_fact(key, value).await;
 
     Ok(True)
 }
 
 ///Monitor the status of an action that has been triggered
 /// Return true if the action is a success, false otherwise
-pub fn fn_await(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
+#[macro_rules_attribute(dyn_async!)]
+async fn fn_await<'a>(
+    args: &'a [LValue],
+    _env: &'a LEnv,
+    ctx: &'a CtxRaeExec,
+) -> Result<LValue, LError> {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(
             RAE_AWAIT,
@@ -341,46 +493,39 @@ pub fn fn_await(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue
     //println!("await on action (id={})", action_id);
 
     if let LValue::Number(LNumber::Usize(action_id)) = action_id {
-        let mut receiver = ctx.actions_progress.declare_new_watcher(&action_id);
-        let action_progress = ctx.actions_progress.clone();
-        let handle = tokio::runtime::Handle::current();
+        let mut receiver = ctx.actions_progress.declare_new_watcher(&action_id).await;
         info!("waiting on action {}", action_id);
-        thread::spawn(move || {
-            handle.block_on(async move {
-                loop {
-                    //println!("waiting on status:");
-                    match receiver.recv().await.unwrap() {
-                        true => {
-                            //println!("status updated!");
-                            match action_progress.status.read().await.get(&action_id) {
-                                Some(s) => match s {
-                                    Status::Pending => {
-                                        //println!("not triggered");
-                                    }
-                                    Status::Running => {
-                                        //println!("running");
-                                    }
-                                    Status::Failure => {
-                                        warn!("Command {} is a failure.", action_id);
-                                        return Ok(false.into());
-                                    }
-                                    Status::Done => {
-                                        info!("Command {} is a success.", action_id);
-                                        return Ok(true.into());
-                                    }
-                                },
-                                None => {
-                                    panic!("no action status")
-                                }
-                            };
+
+        loop {
+            //println!("waiting on status:");
+            match receiver.recv().await.unwrap() {
+                true => {
+                    //println!("status updated!");
+                    match ctx.actions_progress.status.read().await.get(&action_id) {
+                        Some(s) => match s {
+                            Status::Pending => {
+                                //println!("not triggered");
+                            }
+                            Status::Running => {
+                                //println!("running");
+                            }
+                            Status::Failure => {
+                                warn!("Command {} is a failure.", action_id);
+                                return Ok(false.into());
+                            }
+                            Status::Done => {
+                                info!("Command {} is a success.", action_id);
+                                return Ok(true.into());
+                            }
+                        },
+                        None => {
+                            panic!("no action status")
                         }
-                        false => panic!("sync to watch action status should not be false"),
-                    }
+                    };
                 }
-            })
-        })
-        .join()
-        .unwrap()
+                false => panic!("sync to watch action status should not be false"),
+            }
+        }
     } else {
         Err(WrongType(
             RAE_AWAIT,
@@ -478,40 +623,50 @@ fn get_best_method(args: &[LValue], env: &LEnv, ctx: &CtxRaeExec) -> Result<LVal
 
     Ok(method_instance)
 }
-
-pub fn launch_platform(
-    args: &[LValue],
-    _env: &LEnv,
-    ctx: &mut CtxRaeExec,
+#[macro_rules_attribute(dyn_async!)]
+async fn launch_platform<'a>(
+    args: &'a [LValue],
+    _env: &'a LEnv,
+    ctx: &'a mut CtxRaeExec,
 ) -> Result<LValue, LError> {
     match &ctx.actions_progress.sync.sender {
         None => Err(SpecialError(
             RAE_LAUNCH_PLATFORM,
             "sender to actions status watcher missing.".to_string(),
         )),
-        Some(_) => ctx.platform_interface.launch_platform(args),
+        Some(_) => ctx.platform_interface.launch_platform(args).await,
     }
 }
 
-pub fn start_platform(
-    args: &[LValue],
-    _env: &LEnv,
-    ctx: &mut CtxRaeExec,
+#[macro_rules_attribute(dyn_async!)]
+async fn start_platform<'a>(
+    args: &'a [LValue],
+    _env: &'a LEnv,
+    ctx: &'a mut CtxRaeExec,
 ) -> Result<LValue, LError> {
-    ctx.platform_interface.start_platform(args)
+    ctx.platform_interface.start_platform(args).await
 }
-
-pub fn open_com(args: &[LValue], _env: &LEnv, ctx: &mut CtxRaeExec) -> Result<LValue, LError> {
+#[macro_rules_attribute(dyn_async!)]
+async fn open_com<'a>(
+    args: &'a [LValue],
+    _env: &'a LEnv,
+    ctx: &'a mut CtxRaeExec,
+) -> Result<LValue, LError> {
     match &ctx.actions_progress.sync.sender {
         None => Err(SpecialError(
             RAE_START_PLATFORM,
             "sender to actions status watcher missing.".to_string(),
         )),
-        Some(_) => ctx.platform_interface.open_com(args),
+        Some(_) => ctx.platform_interface.open_com(args).await,
     }
 }
 
-pub fn get_state(args: &[LValue], env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
+#[macro_rules_attribute(dyn_async!)]
+async fn get_state<'a>(
+    args: &'a [LValue],
+    env: &'a LEnv,
+    ctx: &'a CtxRaeExec,
+) -> Result<LValue, LError> {
     let _type = match args.len() {
         0 => None,
         1 => {
@@ -549,29 +704,44 @@ pub fn get_state(args: &[LValue], env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue
         }
     };
 
-    let platform_state = ctx.platform_interface.get_state(args).unwrap();
-    let c_state = ctx.state.clone();
-    let state = blocking_async!(c_state.get_state(_type).await.into_map()).expect("todo!");
+    let platform_state = ctx.platform_interface.get_state(args).await.unwrap();
+    let state = ctx.state.get_state(_type).await.into_map();
     union_map(&[platform_state, state], env, &())
 }
 
-pub fn get_state_variable(
-    args: &[LValue],
-    _env: &LEnv,
-    ctx: &CtxRaeExec,
+#[macro_rules_attribute(dyn_async!)]
+async fn get_state_variable<'a>(
+    args: &'a [LValue],
+    _env: &'a LEnv,
+    ctx: &'a CtxRaeExec,
 ) -> Result<LValue, LError> {
-    ctx.platform_interface.get_state_variable(args)
+    ctx.platform_interface.get_state_variable(args).await
 }
 
-pub fn get_status(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
-    ctx.platform_interface.get_status(args)
+#[macro_rules_attribute(dyn_async!)]
+async fn get_status<'a>(
+    args: &'a [LValue],
+    _env: &'a LEnv,
+    ctx: &'a CtxRaeExec,
+) -> Result<LValue, LError> {
+    ctx.platform_interface.get_status(args).await
 }
 
-pub fn cancel_command(args: &[LValue], _env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
-    ctx.platform_interface.cancel_command(args)
+#[macro_rules_attribute(dyn_async!)]
+async fn cancel_command<'a>(
+    args: &'a [LValue],
+    _env: &'a LEnv,
+    ctx: &'a CtxRaeExec,
+) -> Result<LValue, LError> {
+    ctx.platform_interface.cancel_command(args).await
 }
 
-pub fn wait_on(args: &[LValue], _env: &LEnv, _: &CtxRaeExec) -> Result<LValue, LError> {
+#[macro_rules_attribute(dyn_async!)]
+async fn wait_on<'a>(
+    args: &'a [LValue],
+    _env: &'a LEnv,
+    _: &'a CtxRaeExec,
+) -> Result<LValue, LError> {
     //info!("wait on function");
     //println!("wait on function with {} args", args.len());
     if args.len() != 1 {
@@ -583,36 +753,39 @@ pub fn wait_on(args: &[LValue], _env: &LEnv, _: &CtxRaeExec) -> Result<LValue, L
         ));
     }
     //println!("New wait on {}", args[0]);
-    let mut rx = add_waiter(args[0].clone());
+    let mut rx = add_waiter(args[0].clone()).await;
     //println!("receiver ok");
-    blocking_async!({
-        if let false = rx.recv().await.expect("could not receive msg from waiters") {
-            unreachable!("should not receive false from waiters")
-        }
-        //println!("end of wait on");
-    })
-    .expect("todo!");
+
+    if let false = rx.recv().await.expect("could not receive msg from waiters") {
+        unreachable!("should not receive false from waiters")
+    }
+
     //println!("end wait on");
     Ok(LValue::True)
 }
 
 //Takes an instantiated task to refine and return the best applicable method and a task_id.
 //TODO: Implement a way to configure select
-fn select(args: &[LValue], _: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
+#[macro_rules_attribute(dyn_async!)]
+async fn select<'a>(
+    args: &'a [LValue],
+    _: &'a LEnv,
+    ctx: &'a CtxRaeExec,
+) -> Result<LValue, LError> {
     let task = args[0].clone();
 
     if let LValue::List(_) = &args[1] {
         let methods = args[1].clone();
         info!("Add task {} to agenda", task);
-        let task_id = ctx.agenda.add_task(task);
+        let task_id = ctx.agenda.add_task(task).await;
         info!("methods with their score found: {}", args[1]);
         let methods: Vec<LValue> = sort_greedy(methods)?.try_into()?; //Handle the case where there is no methods
         info!("sorted_methods: {}", LValue::from(&methods));
-        let mut stack = ctx.agenda.get_stack(task_id).unwrap();
+        let mut stack = ctx.agenda.get_stack(task_id).await.unwrap();
         stack.set_current_method(methods[0].clone());
         stack.set_applicable_methods(methods[1..].into());
 
-        ctx.agenda.update_stack(stack)?;
+        ctx.agenda.update_stack(stack).await?;
 
         //info!("agenda: {}", ctx.agenda);
 
@@ -632,8 +805,12 @@ fn select(args: &[LValue], _: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError>
     - Return (task_id, best_method)
      */
 }
-
-fn get_next_method(args: &[LValue], _: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
+#[macro_rules_attribute(dyn_async!)]
+async fn get_next_method<'a>(
+    args: &'a [LValue],
+    _: &'a LEnv,
+    ctx: &'a CtxRaeExec,
+) -> Result<LValue, LError> {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(
             RAE_GET_NEXT_METHOD,
@@ -644,7 +821,7 @@ fn get_next_method(args: &[LValue], _: &LEnv, ctx: &CtxRaeExec) -> Result<LValue
     }
 
     if let LValue::Number(LNumber::Usize(task_id)) = &args[0] {
-        let next_method = ctx.agenda.get_next_applicable_method(task_id);
+        let next_method = ctx.agenda.get_next_applicable_method(task_id).await;
         Ok(next_method)
     } else {
         Err(WrongType(
@@ -656,7 +833,12 @@ fn get_next_method(args: &[LValue], _: &LEnv, ctx: &CtxRaeExec) -> Result<LValue
     }
 }
 
-fn set_success_for_task(args: &[LValue], _: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
+#[macro_rules_attribute(dyn_async!)]
+async fn set_success_for_task<'a>(
+    args: &'a [LValue],
+    _: &'a LEnv,
+    ctx: &'a CtxRaeExec,
+) -> Result<LValue, LError> {
     /*
     Steps:
     - Remove the stack from the agenda
@@ -673,7 +855,7 @@ fn set_success_for_task(args: &[LValue], _: &LEnv, ctx: &CtxRaeExec) -> Result<L
     }
 
     if let LValue::Number(LNumber::Usize(task_id)) = &args[0] {
-        ctx.agenda.remove_task(task_id)?;
+        ctx.agenda.remove_task(task_id).await?;
         Ok(LValue::True)
     } else {
         Err(WrongType(
@@ -683,4 +865,34 @@ fn set_success_for_task(args: &[LValue], _: &LEnv, ctx: &CtxRaeExec) -> Result<L
             NameTypeLValue::Usize,
         ))
     }
+}
+
+/*
+MUTEXES
+ */
+
+#[macro_rules_attribute(dyn_async!)]
+async fn lock<'a>(args: &'a [LValue], _: &'a LEnv, _: &'a CtxRaeExec) -> Result<LValue, LError> {
+    match mutex::lock(args[0].clone()).await {
+        MutexResponse::Ok => Ok(Nil),
+        MutexResponse::Wait(mut rx) => {
+            rx.recv().await;
+            Ok(True)
+        }
+    }
+}
+
+#[macro_rules_attribute(dyn_async!)]
+async fn release<'a>(args: &'a [LValue], _: &'a LEnv, _: &'a CtxRaeExec) -> Result<LValue, LError> {
+    mutex::release(args[0].clone()).await;
+    Ok(True)
+}
+
+#[macro_rules_attribute(dyn_async!)]
+async fn is_locked<'a>(
+    args: &'a [LValue],
+    _: &'a LEnv,
+    _: &'a CtxRaeExec,
+) -> Result<LValue, LError> {
+    Ok(mutex::is_locked(args[0].clone()).await.into())
 }

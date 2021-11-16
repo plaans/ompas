@@ -64,7 +64,6 @@ impl CtxRobot {
 }
 
 impl GetModule for CtxRobot {
-    //TODO: doc
     fn get_module(self) -> Module {
         let mut module = Module {
             ctx: Arc::new(self),

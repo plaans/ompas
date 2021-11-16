@@ -8,6 +8,7 @@ edition = "2018"
 
 [dependencies]
 ompas_utils = {path = "../utils"}
+async-recursion = "0.3.2"
 aries_model = {git = "https://github.com/Yirmandias/aries/", branch = "parse_string"}
 aries_planning = {git = "https://github.com/Yirmandias/aries/", branch = "parse_string"}
 aries_utils = {git = "https://github.com/Yirmandias/aries/", branch = "parse_string"}
@@ -23,3 +24,8 @@ lazy_static = "0.1.*"
 rand = "0.8.4"
 chrono = "0.4.19"
 macro_rules_attribute = "0.0.2"
+futures = "0.3.17"
+
+[[example]]
+name = "pretty-print"
+path = "examples/pretty_print.rs"

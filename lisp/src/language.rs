@@ -4,6 +4,10 @@ pub mod scheme_primitives {
     /*
     LIST FUNCTIONS
      */
+    pub const FIRST: &str = "first";
+    pub const SECOND: &str = "second";
+    pub const THIRD: &str = "third";
+    pub const REST: &str = "rest";
     pub const CAR: &str = "car";
     pub const CDR: &str = "cdr";
     pub const APPEND: &str = "append";
@@ -21,10 +25,33 @@ pub mod scheme_primitives {
     pub const GET: &str = "get";
     pub const GET_MAP: &str = "get-map";
     pub const SET_MAP: &str = "set-map";
+    pub const REMOVE_MAP: &str = "remove-map";
+    pub const REMOVE_KEY_VALUE_MAP: &str = "remove-key-value-map";
     pub const UNION_MAP: &str = "union-map";
     pub const MAP: &str = "map";
 
+    //Types of variables
+    pub const INT: &str = "int";
+    pub const BOOL: &str = "bool";
+    pub const FLOAT: &str = "float";
+    pub const NUMBER: &str = "number";
+    pub const SYMBOL: &str = "symbol";
+    pub const STRING: &str = "string";
+    pub const CHARACTER: &str = "character";
+    pub const FUTURE: &str = "future";
+    pub const TRUE: &str = "true";
+    pub const NIL: &str = "nil";
+    pub const SEXPR: &str = "sexpr";
+    pub const FN: &str = "fn";
+    pub const OBJECT: &str = "object";
+    pub const ATOM: &str = "atom";
+    pub const CORE_OPERATOR: &str = "core-operator";
+    pub const MUT_FN: &str = "mut-fn";
+    pub const USIZE: &str = "USIZE";
+    pub const ASYNC_FN: &str = "async-fn";
+    pub const ASYNC_MUT_FN: &str = "async-mut-fn";
     //Core language
+
     pub const DEFINE: &str = "define";
     pub const DEF_MACRO: &str = "defmacro";
     pub const LAMBDA: &str = "lambda";
@@ -39,15 +66,18 @@ pub mod scheme_primitives {
     pub const BEGIN: &str = "begin";
     pub const ASYNC: &str = "async";
     pub const AWAIT: &str = "await";
+    pub const RACE: &str = "race";
     pub const EVAL: &str = "eval";
+    pub const PARSE: &str = "parse";
+    pub const EXPAND: &str = "expand";
+
     pub const LET: &str = "let";
     pub const LET_STAR: &str = "let*";
     pub const COND: &str = "cond";
-    pub const MACRO_EXPAND: &str = "macro-expand";
+    pub const TEST_MACRO: &str = "test-macro";
 
     //Boolean
-    pub const TRUE: &str = "true";
-    pub const NIL: &str = "nil";
+
     pub const FALSE: &str = "false";
     pub const NOT: &str = "not";
     pub const NOT_SHORT: &str = "!";
@@ -72,8 +102,8 @@ pub mod scheme_primitives {
     //predicates
     pub const IS_NUMBER: &str = "number?";
     pub const IS_FLOAT: &str = "float?";
-    pub const IS_INTEGER: &str = "integer";
-    pub const IS_BOOL: &str = "boolean?";
+    pub const IS_INT: &str = "int?";
+    pub const IS_BOOL: &str = "bool?";
     pub const IS_SYMBOL: &str = "symbol?";
     pub const IS_STRING: &str = "string?";
     pub const IS_FN: &str = "fn?";
@@ -82,11 +112,10 @@ pub mod scheme_primitives {
     pub const IS_MAP: &str = "map?";
     pub const IS_LAMBDA: &str = "lambda?";
     pub const IS_QUOTE: &str = "quote?";
-
-    //TODO: implement following functions
-    //Not yet implemented
-    pub const IS_EQUAL: &str = "equal?";
     pub const IS_PAIR: &str = "pair?";
+    pub const IS_EQUAL: &str = "equal?";
+
+    //Not yet implemented
     pub const IS_NIL: &str = "null?";
 
     pub const FN_MAP: &str = "map";
@@ -100,7 +129,10 @@ pub mod scheme_primitives {
 ///Problem during expansion
 //Documentation
 pub mod doc {
-    //TODO: Write the doc for the basic functions
+    pub const DOC_FIRST: &str = "Return the first element of a list or nil.";
+    pub const DOC_SECOND: &str = "Return the second element of a list or nil.";
+    pub const DOC_THIRD: &str = "Return the third element of a list or nil.";
+    pub const DOC_REST: &str = "Same as cdr";
     pub const DOC_CAR: &str =
         "Takes a list of at least one element, and return the first element. Nil otherwise.";
     pub const DOC_CDR: &str =
@@ -188,9 +220,9 @@ Return *false* otherwise. Return an error if args are not numbers of there is th
     pub const DOC_IS_FN: &str = "Return true if symbol is LValue::Fn";
     pub const DOC_IS_MUT_FN: &str = "Return true if symbol is LValue::MutFn";
 
-    //TODO: complete documentation
-    pub const DOC_IS_PAIR: &str = "todo!";
-    pub const DOC_IS_EQUAL: &str = "todo!";
+    pub const DOC_IS_PAIR: &str = "Return true if the list is not empty, false otherwise.";
+    pub const DOC_IS_EQUAL: &str = "Return true if the 2 LValues are equal, false otherwise.";
+
     pub const DOC_ASYNC: &str =
         "Evaluate asynchronously a LValue. Returns the pid(usize) of the task";
     pub const DOC_AWAIT: &str = "Await on a pid to get the result of the evaluation.";
@@ -198,5 +230,5 @@ Return *false* otherwise. Return an error if args are not numbers of there is th
     pub const DOC_LET: &str = "Macro used to abstract variable binding in functional programming.";
     pub const DOC_LET_STAR: &str = "Macro used to abstract variable binding in functional programming.\
     The difference with let is that you can bind variables in function of previously bound variables.";
-    pub const DOC_MACRO_EXPAND: &str = "Expand a macro. Used mainly for debug";
+    pub const DOC_MACRO_TEST_MACRO: &str = "Test the macro expansion. Used mainly for debug";
 }

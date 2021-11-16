@@ -11,7 +11,7 @@ use std::sync::Arc;
 LANGUAGE
 */
 
-const MOD_COUNTER: &str = "mod-counter";
+const MOD_COUNTER: &str = "counter";
 const DOC_MOD_COUNTER: &str = "documentation of the module counter";
 
 pub const TYPE_COUNTER: &str = "counter";
@@ -168,7 +168,7 @@ impl GetModule for CtxCounter {
             ctx: Arc::new(self),
             prelude: vec![],
             raw_lisp: Default::default(),
-            label: MOD_COUNTER,
+            label: MOD_COUNTER.into(),
         };
 
         module.add_fn_prelude(GET_COUNTER, get_counter);

@@ -1,0 +1,11 @@
+(begin
+    (def-action pick ?r)
+    (def-action pick_package ?r ?p)
+    (def-action place ?r)
+    (def-action do_move ?r ?a ?s ?d)
+    (def-action navigate_to ?r ?x ?y)
+    (def-action navigate_to_cell ?r ?cx ?cy)
+    (def-action navigate_to_area ?r ?area)
+    (def-action go_charge ?r)
+    (def-action do_rotation ?r ?a ?w)
+    (def-action face_belt ?r ?b ?w))

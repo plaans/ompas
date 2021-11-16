@@ -14,7 +14,7 @@ use std::sync::Arc;
 LANGUAGE
  */
 
-const MOD_HELP: &str = "mod-help";
+const MOD_HELP: &str = "help";
 const DOC_MOD_HELP: &str =
     "Documentation of the module help. Add Documentation for core functions aswell.";
 const DOC_MOD_HELP_VERBOSE: &str = "functions:\n\
@@ -80,6 +80,10 @@ impl Documentation for CtxDoc {
             LHelp::new(LIST, DOC_LIST),
             LHelp::new_verbose(MAP, DOC_MAP, DOC_MAP_VERBOSE),
             LHelp::new(GET, DOC_GET),
+            LHelp::new(FIRST, DOC_FIRST),
+            LHelp::new(SECOND, DOC_SECOND),
+            LHelp::new(THIRD, DOC_THIRD),
+            LHelp::new(REST, DOC_REST),
             LHelp::new(CAR, DOC_CAR),
             LHelp::new(CDR, DOC_CDR),
             LHelp::new(APPEND, DOC_APPEND),
@@ -117,7 +121,7 @@ impl Documentation for CtxDoc {
             LHelp::new(EVAL, DOC_EVAL),
             LHelp::new(LET, DOC_LET),
             LHelp::new(LET_STAR, DOC_LET_STAR),
-            LHelp::new(MACRO_EXPAND, DOC_MACRO_EXPAND),
+            LHelp::new(TEST_MACRO, DOC_MACRO_TEST_MACRO),
         ]
     }
 }
@@ -145,7 +149,7 @@ impl GetModule for CtxDoc {
             ctx: Arc::new(self),
             prelude: vec![],
             raw_lisp: Default::default(),
-            label: MOD_HELP,
+            label: MOD_HELP.into(),
         };
 
         module.add_fn_prelude(HELP, help);
@@ -153,7 +157,8 @@ impl GetModule for CtxDoc {
     }
 }
 
-//TODO: doc
+/// Struct that contain information to define a documentation for a Lisp function
+/// It has the label of the function and its short description. An optional longer description can also be provided.
 #[derive(Clone)]
 pub struct LHelp {
     label: &'static str,

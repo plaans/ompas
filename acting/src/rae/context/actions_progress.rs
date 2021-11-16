@@ -2,7 +2,6 @@ use crate::rae::context::rae_state::{ActionStatus, ActionStatusSet};
 use crate::rae::TOKIO_CHANNEL_SIZE;
 use im::HashMap;
 use log::{error, info, warn};
-use ompas_utils::blocking_async;
 use std::fmt::{Display, Formatter};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -25,12 +24,9 @@ pub struct ActionsProgress {
 }
 
 impl ActionsProgress {
-    pub fn declare_new_watcher(&self, action_id: &usize) -> Receiver<bool> {
+    pub async fn declare_new_watcher(&self, action_id: &usize) -> Receiver<bool> {
         let (sender, receiver) = mpsc::channel(TOKIO_CHANNEL_SIZE);
-        let c_sync = self.sync.clone();
-        let c_action_id = *action_id;
-        blocking_async!(c_sync.add_action_to_watch(c_action_id, sender).await)
-            .expect("fail adding action to watch");
+        self.sync.add_action_to_watch(*action_id, sender).await;
         receiver
     }
 }
@@ -95,13 +91,13 @@ pub struct ActionStatusSync {
 
 impl ActionStatusSync {
     pub async fn trigger_event_update(&self, id: &usize) {
-        //TODO: resolve bug that we have sometimes.
-        let sender = self.map.read().await.get(id).unwrap().clone();
-        if let Err(e) = sender.send(true).await {
-            warn!(
+        if let Some(sender) = self.map.read().await.get(id) {
+            if let Err(e) = sender.send(true).await {
+                warn!(
                 "trigger_event_update failed to send signal to receiver for update on action status: {}",
                 e
             )
+            }
         }
     }
 
@@ -120,7 +116,7 @@ pub async fn async_status_watcher_run(asw: ActionStatusSync, mut receiver: Recei
                 panic!("error from receiver")
             }
             Some(id) => {
-                info!("action status of {} is updated", id);
+                //info!("action status of {} is updated", id);
                 asw.trigger_event_update(&id).await;
             }
         }

@@ -124,7 +124,7 @@ pub async fn rae_run(mut context: RAEEnv, options: &RAEOptions, _log: String) {
             vec![RAE_LAUNCH_PLATFORM.to_string(), string].into()
         }
     };
-    let result = eval(&lvalue, &mut context.env, &mut context.ctxs);
+    let result = eval(&lvalue, &mut context.env, &mut context.ctxs).await;
     //Windows::
     //let result = eval(&vec![LValue::Symbol("rae-open-com-platform".to_string())].into(), &mut context.env, &mut context.ctxs);
     match result {
@@ -133,8 +133,7 @@ pub async fn rae_run(mut context: RAEEnv, options: &RAEOptions, _log: String) {
     }
 
     let receiver_event_update_state = context.state.subscribe_on_update().await;
-    let env_check_wait_on = context.get_eval_env();
-    let ctxs_check_wait_on = context.ctxs.clone();
+    let (env_check_wait_on, ctxs_check_wait_on) = context.get_exec_env().await;
     tokio::spawn(async move {
         task_check_wait_on(
             receiver_event_update_state,
@@ -153,8 +152,7 @@ pub async fn rae_run(mut context: RAEEnv, options: &RAEOptions, _log: String) {
             //let _job_id = &context.agenda.add_job(job.clone());
             info!("new job received!");
 
-            let new_env = context.get_eval_env();
-            let new_ctxs = context.ctxs.clone();
+            let (new_env, new_ctxs) = context.get_exec_env().await;
 
             tokio::spawn(async move {
                 progress_2(job.core.clone(), new_env, new_ctxs).await;
@@ -166,7 +164,7 @@ pub async fn rae_run(mut context: RAEEnv, options: &RAEOptions, _log: String) {
 async fn progress_2(job_lvalue: LValue, mut env: LEnv, mut ctxs: ContextCollection) {
     info!("new triggered task: {}", job_lvalue);
     //info!("LValue to be evaluated: {}", job_lvalue);
-    match eval(&job_lvalue, &mut env, &mut ctxs) {
+    match eval(&job_lvalue, &mut env, &mut ctxs).await {
         Ok(lv) => info!("result of task {}: {}", job_lvalue, lv),
         Err(e) => error!("End of progress_2: {}", e),
     }
@@ -188,19 +186,6 @@ pub async fn output(_status: RAEStatus, _log: String) {
 
     //writes formatted message to log
 }
-
-///Takes a task in argument and return the methods
-pub fn get_methods() {
-    todo!()
-}
-
-///Take an instantiated task as argument and return a set of applicable methods
-pub fn get_instantiated_methods() {
-    todo!()
-}
-
-///Select the method that will be run in the RAE
-pub fn select_method() {}
 
 pub struct RAEStatus {
     pub task: JobId,

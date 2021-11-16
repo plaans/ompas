@@ -5,7 +5,6 @@ use crate::structs::LError::{
 };
 use crate::structs::{LError, LNumber, LValue, NameTypeLValue};
 use im::HashMap;
-use std::convert::TryFrom;
 
 /// Default function of the Lisp Environement.
 /// Does nothing outside returning a string.
@@ -69,75 +68,77 @@ pub fn begin(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
 
 /// Returns a list
 pub fn list(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
-    Ok(LValue::List(args.to_vec()))
+    if args.is_empty() {
+        Ok(LValue::Nil)
+    } else {
+        Ok(LValue::List(args.to_vec()))
+    }
 }
 
 /// Construct a map
 pub fn map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
-    let mut facts: HashMap<LValue, LValue> = Default::default();
-    if args.len() != 1 {
-        return Err(WrongNumberOfArgument(MAP, args.into(), args.len(), 1..1));
-    }
-    match args.get(0).unwrap() {
-        LValue::List(list_sv) => {
-            //println!("list_sv : {:?}", list_sv);
-            for sv in list_sv {
-                match sv {
-                    LValue::List(val_sv) => {
-                        //println!("sv: {:?}", val_sv);
-                        if val_sv.len() != 3 {
-                            return Err(WrongNumberOfArgument(
-                                MAP,
-                                val_sv.into(),
-                                val_sv.len(),
-                                3..3,
-                            ));
-                        }
-                        if String::try_from(&val_sv[1])?.as_str().eq(".") {
-                            //println!("insert a new fact");
+    match args.len() {
+        0 => Ok(LValue::Map(Default::default())),
+        1 => match args.get(0).unwrap() {
+            LValue::List(list_sv) => {
+                let mut facts: HashMap<LValue, LValue> = Default::default();
+                for sv in list_sv {
+                    match sv {
+                        LValue::List(val_sv) => {
+                            if val_sv.len() != 2 {
+                                return Err(WrongNumberOfArgument(
+                                    MAP,
+                                    val_sv.into(),
+                                    val_sv.len(),
+                                    2..2,
+                                ));
+                            }
+
                             let key = val_sv[0].clone();
-                            let value = val_sv[2].clone();
+                            let value = val_sv[1].clone();
                             facts.insert(key, value);
-                        } else {
-                            //println!("doesn't match pattern")
+                        }
+                        lv => {
+                            return Err(WrongType(MAP, lv.clone(), lv.into(), NameTypeLValue::List))
                         }
                     }
-                    lv => return Err(WrongType(MAP, lv.clone(), lv.into(), NameTypeLValue::List)),
                 }
+                Ok(LValue::Map(facts))
             }
-        }
-        lv => return Err(WrongType(MAP, lv.clone(), lv.into(), NameTypeLValue::List)),
+            LValue::Nil => Ok(LValue::Map(Default::default())),
+            lv => Err(WrongType(MAP, lv.clone(), lv.into(), NameTypeLValue::List)),
+        },
+        _ => Err(WrongNumberOfArgument(MAP, args.into(), args.len(), 1..1)),
     }
-    Ok(LValue::Map(facts))
 }
 
 #[deprecated]
-pub fn set(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
-    if args.len() != 2 {
-        return Err(WrongNumberOfArgument(SET, args.into(), args.len(), 2..2));
-    }
-    let lv = args.get(0).unwrap();
-    match lv {
-        LValue::Map(s) => {
-            let mut facts = s.clone();
-            if let LValue::List(list) = args.get(1).unwrap() {
-                if list.len() != 2 {
-                    return Err(WrongNumberOfArgument(SET, args.into(), list.len(), 2..2));
-                }
-                let key = list.get(0).unwrap();
-                let value = list.get(1).unwrap();
-                facts.insert(key.clone(), value.clone());
-            }
-            Ok(LValue::Map(facts))
-        }
-        lv => Err(LError::SpecialError(
+pub fn set(args: &[LValue], env: &LEnv, ctx: &()) -> Result<LValue, LError> {
+    if args.is_empty() {
+        return Err(WrongNumberOfArgument(
             SET,
-            format!("Cannot set a {}", NameTypeLValue::from(lv)),
+            args.into(),
+            args.len(),
+            1..std::usize::MAX,
+        ));
+    }
+    match &args[0] {
+        LValue::Map(_) => set_map(args, env, ctx),
+        LValue::List(_) | LValue::Nil => set_list(args, env, ctx),
+        _ => Err(NotInListOfExpectedTypes(
+            SET,
+            args[0].clone(),
+            (&args[0]).into(),
+            vec![
+                NameTypeLValue::List,
+                NameTypeLValue::Map,
+                NameTypeLValue::Nil,
+            ],
         )),
     }
 }
 
-pub fn get(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn get(args: &[LValue], env: &LEnv, ctx: &()) -> Result<LValue, LError> {
     if args.is_empty() {
         return Err(WrongNumberOfArgument(
             GET,
@@ -146,26 +147,19 @@ pub fn get(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
             1..std::usize::MAX,
         ));
     }
-    let lv = args.get(0).unwrap();
-    match lv {
-        LValue::Map(map) => {
-            if args.len() == 2 {
-                let key = &args[1];
-                let value = map.get(key).unwrap_or(&LValue::Nil);
-                Ok(value.clone())
-            } else if args.len() == 1 {
-                Ok(LValue::Map(map.clone()))
-            } else {
-                Err(WrongNumberOfArgument(GET, lv.clone(), args.len(), 1..2))
-            }
-        }
-        lv => {
-            if args.len() > 1 {
-                Err(WrongNumberOfArgument(GET, args.into(), args.len(), 1..1))
-            } else {
-                Ok(lv.clone())
-            }
-        }
+    match &args[0] {
+        LValue::Map(_) => get_map(args, env, ctx),
+        LValue::List(_) | LValue::Nil => get_list(args, env, ctx),
+        _ => Err(NotInListOfExpectedTypes(
+            GET,
+            args[0].clone(),
+            (&args[0]).into(),
+            vec![
+                NameTypeLValue::List,
+                NameTypeLValue::Map,
+                NameTypeLValue::Nil,
+            ],
+        )),
     }
 }
 
@@ -207,27 +201,16 @@ pub fn set_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     match &args[0] {
         LValue::Map(m) => match &args[1] {
             LValue::List(val_sv) => {
-                if val_sv.len() == 3 {
-                    if String::try_from(&val_sv[1])
-                        .unwrap_or_else(|_| String::from(""))
-                        .as_str()
-                        .eq(".")
-                    {
-                        let key = val_sv.get(0).unwrap().clone();
-                        let value = val_sv.get(2).unwrap().clone();
-                        Ok(m.update(key, value).into())
-                    } else {
-                        Err(SpecialError(
-                            SET_MAP,
-                            "Expected an entry of the format (<key> . <value>)".to_string(),
-                        ))
-                    }
+                if val_sv.len() == 2 {
+                    let key = val_sv.get(0).unwrap().clone();
+                    let value = val_sv.get(1).unwrap().clone();
+                    Ok(m.update(key, value).into())
                 } else {
                     Err(WrongNumberOfArgument(
                         SET_MAP,
                         val_sv.into(),
                         val_sv.len(),
-                        3..3,
+                        2..2,
                     ))
                 }
             }
@@ -240,6 +223,110 @@ pub fn set_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
         },
         lv => Err(WrongType(
             SET_MAP,
+            lv.clone(),
+            lv.into(),
+            NameTypeLValue::Map,
+        )),
+    }
+}
+
+pub fn remove_key_value_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    if args.len() != 2 {
+        return Err(WrongNumberOfArgument(
+            REMOVE_MAP,
+            args.into(),
+            args.len(),
+            2..2,
+        ));
+    }
+
+    match &args[0] {
+        LValue::Map(m) => match &args[1] {
+            LValue::List(val_sv) => {
+                if val_sv.len() == 2 {
+                    let key = val_sv.get(0).unwrap().clone();
+                    let value = val_sv.get(1).unwrap().clone();
+                    match m.get(&key) {
+                        None => {
+                            return Err(SpecialError(
+                                REMOVE_MAP,
+                                format!("map does not contain key {}", key),
+                            ))
+                        }
+                        Some(v) => {
+                            if *v == value {
+                                let mut m = m.clone();
+                                m.remove(&key);
+                                Ok(m.into())
+                            } else {
+                                Err(SpecialError(
+                                    REMOVE_MAP,
+                                    format!("map does not entry key ({}:{})", key, value),
+                                ))
+                            }
+                        }
+                    }
+                } else {
+                    Err(WrongNumberOfArgument(
+                        REMOVE_MAP,
+                        val_sv.into(),
+                        val_sv.len(),
+                        2..2,
+                    ))
+                }
+            }
+            lv => Err(WrongType(
+                REMOVE_MAP,
+                lv.clone(),
+                lv.into(),
+                NameTypeLValue::List,
+            )),
+        },
+        lv => Err(WrongType(
+            REMOVE_MAP,
+            lv.clone(),
+            lv.into(),
+            NameTypeLValue::Map,
+        )),
+    }
+}
+
+pub fn remove_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    if args.len() != 2 {
+        return Err(WrongNumberOfArgument(
+            REMOVE_MAP,
+            args.into(),
+            args.len(),
+            2..2,
+        ));
+    }
+
+    match &args[0] {
+        LValue::Map(m) => match &args[1] {
+            LValue::List(val_sv) => {
+                if val_sv.len() == 1 {
+                    let key = val_sv.get(0).unwrap().clone();
+                    let mut new_m = m.clone();
+                    new_m.remove(&key);
+                    Ok(new_m.into())
+                } else {
+                    Err(WrongNumberOfArgument(
+                        REMOVE_MAP,
+                        val_sv.into(),
+                        val_sv.len(),
+                        1..1,
+                    ))
+                }
+            }
+            lv => Err(WrongType(
+                REMOVE_MAP,
+                lv.clone(),
+                lv.into(),
+                NameTypeLValue::List,
+            )),
+        },
+        lv => Err(WrongType(
+            REMOVE_MAP,
             lv.clone(),
             lv.into(),
             NameTypeLValue::Map,
@@ -289,7 +376,6 @@ pub fn union_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
 }*/
 
 ///It takes two arguments, an element and a list and returns a list with the element inserted at the first place.
-//TODO: implement all the casesn
 pub fn cons(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(CONS, args.into(), args.len(), 2..2));
@@ -304,6 +390,72 @@ pub fn cons(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
         }
         LValue::Nil => Ok(vec![first.clone()].into()),
         _ => Ok(vec![first.clone(), second.clone()].into()),
+    }
+}
+
+pub fn first(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    match args.len() {
+        1 => match &args[0] {
+            LValue::List(list) => {
+                if !list.is_empty() {
+                    Ok(list.first().unwrap().clone())
+                } else {
+                    Ok(LValue::Nil)
+                }
+            }
+            LValue::Nil => Ok(LValue::Nil),
+            lv => Err(WrongType(
+                FIRST,
+                lv.clone(),
+                lv.into(),
+                NameTypeLValue::List,
+            )),
+        },
+        _ => Err(WrongNumberOfArgument(FIRST, args.into(), args.len(), 1..1)),
+    }
+}
+
+pub fn second(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    match args.len() {
+        1 => match &args[0] {
+            LValue::List(list) => {
+                if list.len() >= 2 {
+                    Ok(list[1].clone())
+                } else {
+                    Ok(LValue::Nil)
+                }
+            }
+            LValue::Nil => Ok(LValue::Nil),
+            lv => Err(WrongType(
+                SECOND,
+                lv.clone(),
+                lv.into(),
+                NameTypeLValue::List,
+            )),
+        },
+        _ => Err(WrongNumberOfArgument(SECOND, args.into(), args.len(), 1..1)),
+    }
+}
+
+pub fn third(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    match args.len() {
+        1 => match &args[0] {
+            LValue::List(list) => {
+                if list.len() >= 3 {
+                    Ok(list[2].clone())
+                } else {
+                    Ok(LValue::Nil)
+                }
+            }
+            LValue::Nil => Ok(LValue::Nil),
+            lv => Err(WrongType(
+                THIRD,
+                lv.clone(),
+                lv.into(),
+                NameTypeLValue::List,
+            )),
+        },
+        _ => Err(WrongNumberOfArgument(THIRD, args.into(), args.len(), 1..1)),
     }
 }
 
@@ -345,6 +497,29 @@ pub fn cdr(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
         }
     } else {
         Err(WrongNumberOfArgument(CDR, args.into(), args.len(), 1..1))
+    }
+}
+
+///It takes a list as argument, and returns a list without the first element
+pub fn rest(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    if args.len() == 1 {
+        match &args[0] {
+            LValue::List(list) => {
+                if list.len() < 2 {
+                    Ok(LValue::Nil)
+                } else {
+                    //let slice = &list[1..];
+                    //let vec = slice.to_vec();
+                    let mut new_list = list.clone();
+                    new_list.remove(0);
+                    Ok(new_list.into())
+                }
+            }
+            LValue::Nil => Ok(LValue::Nil),
+            lv => Err(WrongType(REST, lv.clone(), lv.into(), NameTypeLValue::List)),
+        }
+    } else {
+        Err(WrongNumberOfArgument(REST, args.into(), args.len(), 1..1))
     }
 }
 
@@ -536,6 +711,7 @@ pub fn length(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     match &args[0] {
         LValue::List(l) => Ok(l.len().into()),
         LValue::Map(m) => Ok(m.len().into()),
+        LValue::Nil => Ok(0.into()),
         lv => Err(NotInListOfExpectedTypes(
             LEN,
             lv.clone(),
@@ -684,7 +860,7 @@ pub fn is_integer(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
                 Ok(false.into())
             }
         }
-        i => Err(WrongNumberOfArgument(IS_INTEGER, args.into(), i, 1..1)),
+        i => Err(WrongNumberOfArgument(IS_INT, args.into(), i, 1..1)),
     }
 }
 
@@ -767,7 +943,7 @@ pub fn is_lambda(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
 }
 
 /// Returns true if LValue is a quote
-pub fn is_quote(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+/*pub fn is_quote(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     match args.len() {
         1 => match args.get(0).unwrap() {
             LValue::Quote(_) => Ok(LValue::True),
@@ -775,7 +951,7 @@ pub fn is_quote(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
         },
         i => Err(WrongNumberOfArgument(IS_QUOTE, args.into(), i, 1..1)),
     }
-}
+}*/
 
 /// Returns true if LValue is a hashmap
 pub fn is_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {

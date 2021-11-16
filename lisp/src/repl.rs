@@ -5,7 +5,6 @@
 use crate::language::scheme_primitives::NIL;
 use crate::TOKIO_CHANNEL_SIZE;
 use chrono::{DateTime, Utc};
-use ompas_utils::pretty_print::pretty_print;
 use ompas_utils::task_handler::{subscribe_new_task, EndSignal};
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
@@ -189,6 +188,7 @@ async fn log(
 /// - sender: channel object to send string to lisp interpreter.
 /// - receiver: channel object to receive ack from lisp interpreter after evaluation.
 /// Used for synchronization.
+#[warn(deprecated)]
 async fn repl(sender: Sender<String>, mut receiver: Receiver<String>) {
     let mut rl = Editor::<()>::new();
     if rl.load_history("history.txt").is_err() {
@@ -196,8 +196,6 @@ async fn repl(sender: Sender<String>, mut receiver: Receiver<String>) {
     }
 
     loop {
-        //TODO: to handle side effects when other user wants to connect to lisp.
-        //TODO: add multiline support
         let readline = rl.readline(">> ");
 
         match readline {
@@ -246,29 +244,3 @@ async fn repl(sender: Sender<String>, mut receiver: Receiver<String>) {
 }
 
 pub const EXIT_CODE_STDOUT: &str = "EXIT";
-
-/*async fn output(mut receiver: Receiver<String>) {
-    let mut end_receiver = ompas_utils::task_handler::subscribe_new_task();
-    println!("output launched");
-    loop {
-        tokio::select! {
-            str = receiver.recv() => {
-                let str = str.expect("could not receive");
-
-                let mut stdout = std::io::stdout();
-                stdout.lock();
-                stdout
-                    .write_all(format!("{}\n", str).as_bytes())
-                    .expect("could not print to stdout");
-                drop(stdout);
-            }
-            _ = end_receiver.recv() => {
-                println!("output task ended");
-                break;
-            }
-        }
-
-        //TODO: check if it always works.
-        //print!("{}\n", str);
-    }
-}*/

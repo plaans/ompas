@@ -308,10 +308,9 @@ async fn def_lambda<'a>(
     if let LValue::List(list) = &args[0] {
         if let LValue::Symbol(label) = &list[0] {
             let expanded = expand(&list[1], true, &mut ctx.env.env, &mut ctx.env.ctxs).await?;
-            let (e, c) = LEnv::root().await;
+            let (mut e, mut c) = LEnv::root().await;
             let result = eval(&expanded, &mut e, &mut c).await?;
-            if let LValue::Lambda(l) = &result {
-                println!("def-lambda: {:?}", l.get_env());
+            if let LValue::Lambda(_) = &result {
                 ctx.env.add_lambda(label.clone(), result);
             }
         }
@@ -336,7 +335,7 @@ async fn def_state_function<'a>(
     }
 
     let lvalue = cons(&[GENERATE_STATE_FUNCTION.into(), args.into()], env, &())?;
-    let (e, c) = LEnv::root().await;
+    let (mut e, mut c) = LEnv::root().await;
 
     let lvalue = eval(
         &expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs).await?,
@@ -406,7 +405,7 @@ async fn def_action_model<'a>(
     }
 
     let lvalue = cons(&[GENERATE_ACTION_MODEL.into(), args.into()], env, &())?;
-    let (e, c) = LEnv::root().await;
+    let (mut e, mut c) = LEnv::root().await;
 
     let lvalue = eval(
         &expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs).await?,
@@ -469,7 +468,7 @@ async fn def_action_operational_model<'a>(
         env,
         &(),
     )?;
-    let (e, c) = LEnv::root().await;
+    let (mut e, mut c) = LEnv::root().await;
 
     let lvalue = eval(
         &expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs).await?,
@@ -529,7 +528,7 @@ async fn def_action<'a>(
 
     let lvalue = cons(&[GENERATE_ACTION.into(), args.into()], env, &())?;
 
-    let (e, c) = LEnv::root().await;
+    let (mut e, mut c) = LEnv::root().await;
 
     let lvalue = eval(
         &expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs).await?,
@@ -588,6 +587,8 @@ async fn def_method<'a>(
     }
 
     let lvalue = cons(&[GENERATE_METHOD.into(), args.into()], env, &())?;
+
+    let (mut e, mut c) = LEnv::root().await;
 
     let lvalue = eval(
         &expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs).await?,
@@ -707,7 +708,6 @@ async fn def_task<'a>(
     env: &'a LEnv,
     ctx: &'a mut CtxRae,
 ) -> Result<LValue, LError> {
-    //println!("in {}", RAE_DEF_TASK);
     if args.is_empty() {
         return Err(WrongNumberOfArgument(
             RAE_DEF_TASK,
@@ -719,7 +719,7 @@ async fn def_task<'a>(
 
     let lvalue = cons(&[GENERATE_TASK_SIMPLE.into(), args.into()], env, &())?;
 
-    let (e, c) = LEnv::root().await;
+    let (mut e, mut c) = LEnv::root().await;
 
     let lvalue = eval(
         &expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs).await?,

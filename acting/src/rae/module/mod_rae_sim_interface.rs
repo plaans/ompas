@@ -81,13 +81,14 @@ pub async fn check_preconditions<'a>(
         let state = &args[1];
 
         let mut new_env = ctx.sim_env.clone();
+        let mut new_ctxs = ctx.sim_ctxs.clone();
         new_env.insert(STATE.to_string(), state.clone());
         let lv = cons(
             &[EVAL_PRE_CONDITIONS.into(), instantiated_method.clone()],
-            env,
+            &env,
             &(),
         )?;
-        eval(&lv, &mut new_env, &mut ctx.sim_ctxs.clone()).await
+        eval(&lv, &mut new_env, &mut new_ctxs).await
     }
 }
 #[macro_rules_attribute(dyn_async!)]
@@ -111,9 +112,10 @@ pub async fn compute_score<'a>(
         new_env.insert(STATE.to_string(), state.clone());
         let lv = cons(
             &[COMPUTE_SCORE.into(), instantiated_method.clone()],
-            env,
+            &env,
             &(),
         )?;
+
         eval(&lv, &mut new_env, &mut ctx.sim_ctxs.clone()).await
     }
 }
@@ -149,7 +151,6 @@ pub async fn generate_applicable_instances<'a>(
     };
 
     for m in methods {
-        //println!("method for the task: {}", m);
         let types = map_methods_types.get(&m).expect("Entry should be defined");
         let vec_types: Vec<LValue> = types.try_into()?;
         if vec_types.len() > n_params {

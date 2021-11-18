@@ -42,8 +42,11 @@ pub const MACRO_GENERATE_STATE_FUNCTION: &str = "(defmacro generate-state-functi
         `(list ,label
             (lambda ,params
                 ,(cons 'rae-get-state-variable (cons `(quote ,label) params)))
-            (lambda ,params
-                (get-map state ,(cons 'list (cons `(quote ,label) params))))))))";
+            ,(if (= params nil)
+                `(lambda nil
+                        (get-map state ',label))
+                `(lambda ,params
+                            (get-map state ,(cons 'list (cons `(quote ,label) params)))))))))";
 
 /// Macro used to generate code to define an action in RAE environment.
 pub const MACRO_GENERATE_ACTION: &str = "(defmacro generate-action
@@ -272,6 +275,8 @@ pub fn generate_type_test_expr(args: &[LValue], _: &LEnv, _: &()) -> Result<LVal
         str.push(')');
 
         Ok(LValue::String(str))
+    } else if let LValue::Nil = &args[0] {
+        Ok(LValue::String("true".to_string()))
     } else {
         Err(WrongType(
             GENERATE_TYPE_TEST_EXPR,
@@ -354,7 +359,20 @@ mod test {
         };
 
         let (mut env, mut ctxs) = init_env_and_ctxs().await;
-        test_expression_with_env(macro_to_test, &mut env, &mut ctxs, true).await
+        test_expression_with_env(macro_to_test, &mut env, &mut ctxs, true).await?;
+
+        let macro_to_test_2 = TestExpression {
+            inner: MACRO_GENERATE_STATE_FUNCTION,
+            dependencies: vec![],
+            expression: "(generate-state-function sf)",
+            expanded: "(list sf
+                            (lambda nil (rae-get-state-variable 'sf))
+                            (lambda nil (get-map state 'sf)))",
+            result: "(list sf
+                            (lambda nil (rae-get-state-variable 'sf))
+                            (lambda nil (get-map state 'sf)))",
+        };
+        test_expression_with_env(macro_to_test_2, &mut env, &mut ctxs, true).await
     }
 
     #[tokio::test]

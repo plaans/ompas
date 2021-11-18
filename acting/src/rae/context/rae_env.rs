@@ -612,6 +612,7 @@ impl RAEEnv {
         let mut exec_env = self.env.clone();
         let mut exec_ctxs = self.ctxs.clone();
         let (sim_env, sim_ctxs) = init_simu_env(None).await;
+
         let mut ctx_rae_sim_interface = CtxRaeSimInterface::new(sim_env, sim_ctxs);
         ctx_rae_sim_interface.add_domain_sim(domain_sim_env);
 

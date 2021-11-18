@@ -405,7 +405,11 @@ pub struct LLambda {
 
 impl Debug for LLambda {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{:?} : {:?}", self.params, self.body)
+        write!(
+            f,
+            "-lambda {:?} : {:?}\n-env: {:?}",
+            self.params, self.body, self.env,
+        )
     }
 }
 
@@ -477,6 +481,10 @@ impl LLambda {
             }
         };
         Ok(env)
+    }
+
+    pub fn get_env(&self) -> LEnv {
+        self.env.clone()
     }
 
     /// Method to call a lambda and execute it.

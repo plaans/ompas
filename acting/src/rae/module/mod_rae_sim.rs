@@ -10,6 +10,10 @@ const SUCCESS: &str = "success";
 const FAILURE: &str = "failure";
 const IS_SUCCESS: &str = "success?";
 const IS_FAILURE: &str = "failure?";
+//const IS_LOCKED: &str = "locked?";
+const LAMBDA_IS_LOCKED: &str = "(define locked?
+    (lambda (r)
+        (get-map state (list 'locked r))))";
 
 const MACRO_ASSERT: &str = "(defmacro assert
     (lambda args
@@ -21,16 +25,14 @@ const MACRO_RETRACT: &str = "(defmacro retract
 
 const LAMBDA_GET_PRECONDITIONS: &str = "(define get-preconditions\
     (lambda (label)\
-        (begin
-            (get-type label)
-            (get rae-method-pre-conditions-map label))))";
+        (get rae-method-pre-conditions-map label)))";
 
 const LAMBDA_GET_SCORE: &str = "(define get-score\
     (lambda (label)\
         (get rae-method-score-map label)))";
 
-const LAMBDA_EVAL_PRE_CONDITIONS: &str = "(define eval-pre-conditions\
-(lambda args\
+const LAMBDA_EVAL_PRE_CONDITIONS: &str = "(define eval-pre-conditions
+(lambda args
     (eval (cons (get-preconditions (car args)) (cdr args)))))";
 
 const LAMBDA_COMPUTE_SCORE: &str = "(define compute-score 
@@ -55,6 +57,7 @@ impl GetModule for CtxRaeSim {
                 LAMBDA_GET_SCORE,
                 LAMBDA_EVAL_PRE_CONDITIONS,
                 LAMBDA_COMPUTE_SCORE,
+                LAMBDA_IS_LOCKED,
             ]
             .into(),
             label: MOD_RAE_SIM.to_string(),

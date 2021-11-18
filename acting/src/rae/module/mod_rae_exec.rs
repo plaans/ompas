@@ -42,9 +42,12 @@ pub const WAIT_ON: &str = "check";
 pub const LOCK: &str = "lock";
 pub const RELEASE: &str = "release";
 pub const IS_LOCKED: &str = "locked?";
+pub const LOCKED: &str = "locked";
+pub const LOCKED_LIST: &str = "locked-list";
 //RAE Interface with a platform
 pub const RAE_EXEC_COMMAND: &str = "rae-exec-command";
 pub const RAE_GET_STATE: &str = "rae-get-state";
+pub const RAE_GET_FACTS: &str = "rae-get-facts";
 pub const RAE_GET_STATE_VARIBALE: &str = "rae-get-state-variable";
 pub const RAE_LAUNCH_PLATFORM: &str = "rae-launch-platform";
 pub const RAE_OPEN_COM_PLATFORM: &str = "rae-open-com-platform";
@@ -68,17 +71,6 @@ pub const MACRO_WAIT_ON: &str = "(defmacro wait-on (lambda (expr)
         (check ,expr))))";
 pub const LABEL_ENUMERATE_PARAMS: &str = "enumerate-params";
 
-/*pub const LAMBDA_MUTEX_LOCK: &str = "(define mutex::lock (lambda (__symbol__)
-                                        (begin
-                                            (wait-on `(not (mutex::locked? ,__symbol__)))
-                                            (assert `(locked ,__symbol__) true))))";
-
-pub const LAMBDA_MUTEX_IS_LOCKED: &str = "(define mutex::locked? (lambda (__symbol__)
-                                        (rae-get-state-variable `(locked ,__symbol__))))";
-
-pub const LAMBDA_MUTEX_RELEASE: &str = "(define mutex::release (lambda (__symbol__)
-                                        (retract `(locked ,__symbol__) true)))";*/
-
 pub const LAMBDA_PROGRESS: &str = "
 (define progress (lambda args
     (let* ((result (eval (cons select (cons `(quote ,(car args)) (cdr args)))))
@@ -94,7 +86,7 @@ pub const LAMBDA_PROGRESS: &str = "
 pub const LAMBDA_SELECT: &str = "
 (define select
   (lambda args
-    (rae-select args (generate-applicable-instances (rae-get-state) args ))))";
+    (rae-select args (generate-applicable-instances (rae-get-facts) args ))))";
 
 pub const LAMBDA_RETRY: &str = "
 (define retry (lambda (task_id)
@@ -189,6 +181,7 @@ impl GetModule for CtxRaeExec {
         };
 
         module.add_async_fn_prelude(RAE_GET_STATE, get_state);
+        module.add_async_fn_prelude(RAE_GET_FACTS, get_facts);
         module.add_async_fn_prelude(RAE_GET_STATE_VARIBALE, get_state_variable);
         module.add_async_fn_prelude(RAE_EXEC_COMMAND, exec_command);
         module.add_async_mut_fn_prelude(RAE_LAUNCH_PLATFORM, launch_platform);
@@ -213,6 +206,7 @@ impl GetModule for CtxRaeExec {
         module.add_async_fn_prelude(LOCK, lock);
         module.add_async_fn_prelude(RELEASE, release);
         module.add_async_fn_prelude(IS_LOCKED, is_locked);
+        module.add_async_fn_prelude(LOCKED_LIST, get_list_locked);
         module
     }
 }
@@ -662,6 +656,20 @@ async fn open_com<'a>(
 }
 
 #[macro_rules_attribute(dyn_async!)]
+async fn get_facts<'a>(
+    _: &'a [LValue],
+    env: &'a LEnv,
+    ctx: &'a CtxRaeExec,
+) -> Result<LValue, LError> {
+    let mut state: im::HashMap<LValue, LValue> = get_state(&[], env, ctx).await?.try_into()?;
+    let locked: Vec<LValue> = get_list_locked(&[], env, ctx).await?.try_into()?;
+    for e in locked {
+        state.insert(vec![LOCKED.into(), e].into(), True);
+    }
+    Ok(state.into())
+}
+
+#[macro_rules_attribute(dyn_async!)]
 async fn get_state<'a>(
     args: &'a [LValue],
     env: &'a LEnv,
@@ -895,4 +903,18 @@ async fn is_locked<'a>(
     _: &'a CtxRaeExec,
 ) -> Result<LValue, LError> {
     Ok(mutex::is_locked(args[0].clone()).await.into())
+}
+
+#[macro_rules_attribute(dyn_async!)]
+async fn get_list_locked<'a>(
+    _: &'a [LValue],
+    _: &'a LEnv,
+    _: &'a CtxRaeExec,
+) -> Result<LValue, LError> {
+    let locked = mutex::get_list_locked()
+        .await
+        .iter()
+        .map(|s| s.into())
+        .collect::<Vec<LValue>>();
+    Ok(locked.into())
 }

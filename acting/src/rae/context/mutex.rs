@@ -44,6 +44,10 @@ pub async fn is_locked(lv: LValue) -> bool {
     MUTEXES.is_locked(lv).await
 }
 
+pub async fn get_list_locked() -> Vec<String> {
+    MUTEXES.get_list_locked().await
+}
+
 pub enum MutexResponse {
     Ok,
     Wait(mpsc::Receiver<bool>),
@@ -82,5 +86,14 @@ impl MutexMap {
 
     pub async fn is_locked(&self, lv: LValue) -> bool {
         self.map.lock().await.contains_key(&lv.to_string())
+    }
+
+    pub async fn get_list_locked(&self) -> Vec<String> {
+        self.map
+            .lock()
+            .await
+            .keys()
+            .cloned()
+            .collect::<Vec<String>>()
     }
 }

@@ -9,6 +9,7 @@ use ::macro_rules_attribute::macro_rules_attribute;
 use ompas_lisp::async_await;
 use ompas_lisp::core::{eval, expand, parse, LEnv};
 use ompas_lisp::functions::cons;
+use ompas_lisp::language::scheme_primitives::LE;
 use ompas_lisp::modules::doc::{Documentation, LHelp};
 use ompas_lisp::structs::LError::*;
 use ompas_lisp::structs::LValue::Nil;
@@ -295,7 +296,6 @@ async fn def_lambda<'a>(
     _: &'a LEnv,
     ctx: &'a mut CtxRae,
 ) -> Result<LValue, LError> {
-    //println!("def_lambda");
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(
             RAE_DEF_LAMBDA,
@@ -308,10 +308,11 @@ async fn def_lambda<'a>(
     if let LValue::List(list) = &args[0] {
         if let LValue::Symbol(label) = &list[0] {
             let expanded = expand(&list[1], true, &mut ctx.env.env, &mut ctx.env.ctxs).await?;
-            let result = eval(&expanded, &mut ctx.env.env, &mut ctx.env.ctxs).await?;
-            //println!("result {}", result);
-            if let LValue::Lambda(_) = &result {
-                ctx.env.add_lambda(label.clone(), result)
+            let (e, c) = LEnv::root().await;
+            let result = eval(&expanded, &mut e, &mut c).await?;
+            if let LValue::Lambda(l) = &result {
+                println!("def-lambda: {:?}", l.get_env());
+                ctx.env.add_lambda(label.clone(), result);
             }
         }
     }
@@ -335,15 +336,14 @@ async fn def_state_function<'a>(
     }
 
     let lvalue = cons(&[GENERATE_STATE_FUNCTION.into(), args.into()], env, &())?;
+    let (e, c) = LEnv::root().await;
 
     let lvalue = eval(
         &expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs).await?,
-        &mut ctx.env.env,
-        &mut ctx.env.ctxs,
+        &mut e,
+        &mut c,
     )
     .await?;
-
-    //println!("lvalue: {}", lvalue);
 
     if let LValue::List(list) = &lvalue {
         if list.len() != 3 {
@@ -405,18 +405,15 @@ async fn def_action_model<'a>(
         ));
     }
 
-    //println!("define action: {}", LValue::from(args));
-
     let lvalue = cons(&[GENERATE_ACTION_MODEL.into(), args.into()], env, &())?;
+    let (e, c) = LEnv::root().await;
 
     let lvalue = eval(
         &expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs).await?,
-        &mut ctx.env.env,
-        &mut ctx.env.ctxs,
+        &mut e,
+        &mut c,
     )
     .await?;
-
-    //println!("def-action-model: lvalue: {}", lvalue);
 
     if let LValue::List(list) = &lvalue {
         if list.len() != 2 {
@@ -467,22 +464,19 @@ async fn def_action_operational_model<'a>(
         ));
     }
 
-    //println!("define action: {}", LValue::from(args));
-
     let lvalue = cons(
         &[GENERATE_ACTION_OPERATIONAL_MODEL.into(), args.into()],
         env,
         &(),
     )?;
+    let (e, c) = LEnv::root().await;
 
     let lvalue = eval(
         &expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs).await?,
-        &mut ctx.env.env,
-        &mut ctx.env.ctxs,
+        &mut e,
+        &mut c,
     )
     .await?;
-
-    //println!("def-action-operational-model: lvalue: {}", lvalue);
 
     if let LValue::List(list) = &lvalue {
         if list.len() != 2 {
@@ -533,18 +527,16 @@ async fn def_action<'a>(
         ));
     }
 
-    //println!("define action: {}", LValue::from(args));
-
     let lvalue = cons(&[GENERATE_ACTION.into(), args.into()], env, &())?;
+
+    let (e, c) = LEnv::root().await;
 
     let lvalue = eval(
         &expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs).await?,
-        &mut ctx.env.env,
-        &mut ctx.env.ctxs,
+        &mut e,
+        &mut c,
     )
     .await?;
-
-    //println!("def-action: lvalue: {}", lvalue);
 
     if let LValue::List(list) = &lvalue {
         if list.len() != 2 {
@@ -599,8 +591,8 @@ async fn def_method<'a>(
 
     let lvalue = eval(
         &expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs).await?,
-        &mut ctx.env.env,
-        &mut ctx.env.ctxs,
+        &mut e,
+        &mut c,
     )
     .await?;
 
@@ -616,72 +608,77 @@ async fn def_method<'a>(
             ));
         } else if let LValue::Symbol(method_label) = &list[0] {
             if let LValue::Symbol(task_label) = &list[1] {
-                if let LValue::List(lv_types) = &list[2] {
-                    let mut types = vec![];
-                    for e in lv_types {
-                        if let LValue::Symbol(s) = e {
-                            types.push(s.clone());
-                        } else {
-                            return Err(WrongType(
-                                RAE_DEF_METHOD,
-                                e.clone(),
-                                e.into(),
-                                NameTypeLValue::Symbol,
-                            ));
-                        }
-                    }
-                    if let LValue::Lambda(_) = &list[3] {
-                        if let LValue::Lambda(_) = &list[4] {
-                            if let LValue::Lambda(_) = &list[5] {
-                                if let LValue::Lambda(_) = &list[6] {
-                                    ctx.env.add_method(
-                                        method_label.to_string(),
-                                        task_label.to_string(),
-                                        types,
-                                        list[3].clone(),
-                                        list[4].clone(),
-                                        list[5].clone(),
-                                        list[6].clone(),
-                                    )?;
+                match &list[2] {
+                    LValue::List(_) | LValue::Nil => {
+                        let mut types = vec![];
+                        if let LValue::List(lv_types) = &list[2] {
+                            for e in lv_types {
+                                if let LValue::Symbol(s) = e {
+                                    types.push(s.clone());
                                 } else {
                                     return Err(WrongType(
                                         RAE_DEF_METHOD,
-                                        list[6].clone(),
-                                        list[6].clone().into(),
+                                        e.clone(),
+                                        e.into(),
+                                        NameTypeLValue::Symbol,
+                                    ));
+                                }
+                            }
+                        }
+                        if let LValue::Lambda(_) = &list[3] {
+                            if let LValue::Lambda(_) = &list[4] {
+                                if let LValue::Lambda(_) = &list[5] {
+                                    if let LValue::Lambda(_) = &list[6] {
+                                        ctx.env.add_method(
+                                            method_label.to_string(),
+                                            task_label.to_string(),
+                                            types,
+                                            list[3].clone(),
+                                            list[4].clone(),
+                                            list[5].clone(),
+                                            list[6].clone(),
+                                        )?;
+                                    } else {
+                                        return Err(WrongType(
+                                            RAE_DEF_METHOD,
+                                            list[6].clone(),
+                                            list[6].clone().into(),
+                                            NameTypeLValue::Lambda,
+                                        ));
+                                    }
+                                } else {
+                                    return Err(WrongType(
+                                        RAE_DEF_METHOD,
+                                        list[5].clone(),
+                                        list[5].clone().into(),
                                         NameTypeLValue::Lambda,
                                     ));
                                 }
                             } else {
                                 return Err(WrongType(
                                     RAE_DEF_METHOD,
-                                    list[5].clone(),
-                                    list[5].clone().into(),
+                                    list[4].clone(),
+                                    list[4].clone().into(),
                                     NameTypeLValue::Lambda,
                                 ));
                             }
                         } else {
                             return Err(WrongType(
                                 RAE_DEF_METHOD,
-                                list[4].clone(),
-                                list[4].clone().into(),
+                                list[3].clone(),
+                                list[3].clone().into(),
                                 NameTypeLValue::Lambda,
                             ));
                         }
-                    } else {
+                    }
+                    _ => {
                         return Err(WrongType(
                             RAE_DEF_METHOD,
-                            list[3].clone(),
-                            list[3].clone().into(),
-                            NameTypeLValue::Lambda,
-                        ));
+                            list[2].clone(),
+                            (&list[2]).into(),
+                            NameTypeLValue::List,
+                        ))
                     }
-                } else {
-                    return Err(WrongType(
-                        RAE_DEF_METHOD,
-                        list[2].clone(),
-                        (&list[2]).into(),
-                        NameTypeLValue::List,
-                    ));
                 }
             } else {
                 return Err(WrongType(
@@ -722,10 +719,12 @@ async fn def_task<'a>(
 
     let lvalue = cons(&[GENERATE_TASK_SIMPLE.into(), args.into()], env, &())?;
 
+    let (e, c) = LEnv::root().await;
+
     let lvalue = eval(
         &expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs).await?,
-        &mut ctx.env.env,
-        &mut ctx.env.ctxs,
+        &mut e,
+        &mut c,
     )
     .await?;
 

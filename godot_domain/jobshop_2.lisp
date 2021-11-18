@@ -16,20 +16,20 @@
                                 (if (contains (machine.processes_list (car seq)) ?p)
                                     (cons (car seq) (__process__ ?p (cdr seq)))
                                     (__process__ ?p (cdr seq))))))
-                    (define machines (rae-get-state-variable machines))
+                    (define machines (machines))
                     (define result (__process__ ?process machines))
                     result))))
     (def-lambda '(available_robots
-            (lambda nil
-                (begin
-                    (define __l_available_robots__
-                        (lambda (l)
-                            (if (null? l)
-                                nil
-                                (if (not (locked? (car l)))
-                                    (cons (car l) (__l_available_robots__ (cdr l)))
-                                    (__l_available_robots__ (cdr l))))))
-                    (__l_available_robots__ (rae-get-state-variable robots))))))
+        (lambda nil
+            (begin
+                (define __l_available_robots__
+                    (lambda (l)
+                        (if (null? l)
+                            nil
+                            (if (not (locked? (car l)))
+                                (cons (car l) (__l_available_robots__ (cdr l)))
+                                (__l_available_robots__ (cdr l))))))
+                (__l_available_robots__ (robots))))))
 
     (def-lambda '(find_output_machine 
         (lambda nil
@@ -41,7 +41,7 @@
                             (if (= (machine.type (car seq)) output_machine)
                                 (car seq)
                                 (__lambda__ (cdr seq))))))
-                (__lambda__ (rae-get-state-variable machines))))))
+                (__lambda__ (machines))))))
 
     (def-lambda '(take_first 
         (lambda (seq)
@@ -73,24 +73,36 @@
             (:effects nil)
             (:score 0)
             (:body
-                (let ((?r (rand-element (available_robots))))
+                (let ((?r (arbitrary (available_robots) rand-element)))
                     (begin
                         (mutex::lock-and-do ?r
                             (t_carry_to_machine ?r ?p (find_output_machine))
                         ))))))
     
     (def-task t_process_on_machine ?p ?m)
-    (def-method m_process_on_machine
+    (def-method m_robot_available
         '((:task t_process_on_machine)
         (:params (?p package) (?m machine))
-        (:pre-conditions true)
+        (:pre-conditions (!= (available_robots) nil))
         (:effects nil)
         (:score 0)
-        (:body (let ((?r (rand-element (rae-get-state-variable robots))))
-                (begin
-                    (mutex::lock-and-do ?r
-                        (t_carry_to_machine ?r ?p ?m))
-                    (wait-on `(= (package.location ,?p) (machine.output_belt ,?m))))))))
+        (:body (let ((?r (arbitrary (available_robots) rand-element)))
+                (if (!= ?r nil)
+                    (begin
+                        (mutex::lock-and-do ?r
+                            (t_carry_to_machine ?r ?p ?m))
+                        (wait-on `(= (package.location ,?p) (machine.output_belt ,?m))))
+                    (t_process_on_machine))))))
+
+    ;(def-method m_no_robot_available
+    ;    '((:task t_process_on_machine)
+    ;   (:params (?p package) (?m machine))
+    ;    (:pre-conditions (= (available_robots) nil))
+    ;    (:effects nil)
+    ;    (:score 0)
+    ;    (:body (begin
+    ;            (wait-on `(!= (available_robots) nil))
+    ;            (t_process_on_machine)))))
 
     (def-task t_position_robot_to_belt ?r ?b)
     (def-method m_position_robot_to_belt
@@ -168,3 +180,9 @@
                             (go_charge ?r)
                             (wait-on `(> (robot.battery ,?r) 0.9)))))))))
 )
+
+(define eval-pre-conditions
+(lambda args
+    (begin
+        (print locked?)
+        (eval (cons (get-preconditions (car args)) (cdr args))))))

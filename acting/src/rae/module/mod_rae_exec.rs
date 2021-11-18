@@ -61,9 +61,9 @@ pub const RAE_GET_NEXT_METHOD: &str = "rae-get-next-method";
 pub const RAE_SET_SUCCESS_FOR_TASK: &str = "rae-set-success-for-task";
 
 pub const MACRO_MUTEX_LOCK_AND_DO: &str = "(defmacro mutex::lock-and-do 
-    (lambda (r b)
+    (lambda (r p b)
         `(begin
-            (lock ,r)
+            (lock ,r ,p)
             ,b
             (release ,r))))";
 pub const MACRO_WAIT_ON: &str = "(defmacro wait-on (lambda (expr)
@@ -881,8 +881,33 @@ MUTEXES
 
 #[macro_rules_attribute(dyn_async!)]
 async fn lock<'a>(args: &'a [LValue], _: &'a LEnv, _: &'a CtxRaeExec) -> Result<LValue, LError> {
-    match mutex::lock(args[0].clone()).await {
-        MutexResponse::Ok => Ok(Nil),
+    if args.len() != 2 {
+        return Err(WrongNumberOfArgument(LOCK, args.into(), args.len(), 2..2));
+    }
+
+    let ressource = if let LValue::Symbol(s) = args[0].clone() {
+        s
+    } else {
+        return Err(WrongType(
+            LOCK,
+            args[0].clone(),
+            (&args[0]).into(),
+            NameTypeLValue::Symbol,
+        ));
+    };
+    let priority = if let LValue::Number(LNumber::Int(i)) = &args[1] {
+        *i as usize
+    } else {
+        return Err(WrongType(
+            LOCK,
+            args[1].clone(),
+            (&args[1]).into(),
+            NameTypeLValue::Number,
+        ));
+    };
+
+    match mutex::lock(ressource, priority).await {
+        MutexResponse::Ok => Ok(True),
         MutexResponse::Wait(mut rx) => {
             rx.recv().await;
             Ok(True)

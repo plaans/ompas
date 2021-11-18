@@ -1,3 +1,4 @@
+use crate::rae::context::mutex::MutexResponse::Wait;
 use log::{info, warn};
 use ompas_lisp::structs::LValue;
 use std::collections::VecDeque;
@@ -10,21 +11,38 @@ lazy_static! {
     pub static ref MUTEXES: MutexMap = Default::default();
 }
 
+#[derive(Clone)]
+pub struct Waiter {
+    pub sender: mpsc::Sender<bool>,
+    pub priority: usize,
+}
+
 #[derive(Default, Clone)]
 pub struct RaeMutex {
-    fifo: VecDeque<mpsc::Sender<bool>>,
+    fifo: VecDeque<Waiter>,
 }
 
 impl RaeMutex {
-    pub fn new_waiter(&mut self) -> mpsc::Receiver<bool> {
+    pub fn new_waiter(&mut self, priority: usize) -> mpsc::Receiver<bool> {
         let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
-        self.fifo.push_back(tx);
+        let waiter = Waiter {
+            sender: tx,
+            priority,
+        };
+        self.fifo.push_back(waiter);
+        self.fifo
+            .make_contiguous()
+            .sort_by(|w1, w2| w1.priority.cmp(&w2.priority));
         rx
     }
 
     pub async fn release(&mut self) -> bool {
         if let Some(waiter) = self.fifo.pop_front() {
-            waiter.send(true).await.expect("error releasing the mutex");
+            waiter
+                .sender
+                .send(true)
+                .await
+                .expect("error releasing the mutex");
             false
         } else {
             true
@@ -32,8 +50,8 @@ impl RaeMutex {
     }
 }
 
-pub async fn lock(lv: LValue) -> MutexResponse {
-    MUTEXES.lock(lv).await
+pub async fn lock(r: String, p: usize) -> MutexResponse {
+    MUTEXES.lock(r, p).await
 }
 
 pub async fn release(lv: LValue) {
@@ -59,17 +77,16 @@ pub struct MutexMap {
 }
 
 impl MutexMap {
-    pub async fn lock(&self, lv: LValue) -> MutexResponse {
-        let key: String = lv.to_string();
-        info!("locking {}", key);
+    pub async fn lock(&self, r: String, p: usize) -> MutexResponse {
+        info!("locking {} with priority {}", r, p);
         let mut locked = self.map.lock().await;
-        if locked.contains_key(&key) {
-            info!("already locked {}", key);
-            let waiter = locked.get_mut(&key).unwrap().new_waiter();
+        if locked.contains_key(&r) {
+            info!("already locked {}", r);
+            let waiter = locked.get_mut(&r).unwrap().new_waiter(p);
             MutexResponse::Wait(waiter)
         } else {
-            info!("not locked yet {}!", key);
-            locked.insert(key, Default::default());
+            info!("not locked yet {}!", r);
+            locked.insert(r, Default::default());
             MutexResponse::Ok
         }
     }

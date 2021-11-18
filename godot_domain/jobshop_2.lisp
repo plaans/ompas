@@ -75,7 +75,7 @@
             (:body
                 (let ((?r (arbitrary (available_robots) rand-element)))
                     (begin
-                        (mutex::lock-and-do ?r
+                        (mutex::lock-and-do ?r 10
                             (t_carry_to_machine ?r ?p (find_output_machine))
                         ))))))
     
@@ -89,20 +89,20 @@
         (:body (let ((?r (arbitrary (available_robots) rand-element)))
                 (if (!= ?r nil)
                     (begin
-                        (mutex::lock-and-do ?r
+                        (mutex::lock-and-do ?r 11
                             (t_carry_to_machine ?r ?p ?m))
                         (wait-on `(= (package.location ,?p) (machine.output_belt ,?m))))
                     (t_process_on_machine))))))
 
-    ;(def-method m_no_robot_available
-    ;    '((:task t_process_on_machine)
-    ;   (:params (?p package) (?m machine))
-    ;    (:pre-conditions (= (available_robots) nil))
-    ;    (:effects nil)
-    ;    (:score 0)
-    ;    (:body (begin
-    ;            (wait-on `(!= (available_robots) nil))
-    ;            (t_process_on_machine)))))
+    (def-method m_no_robot_available
+        '((:task t_process_on_machine)
+        (:params (?p package) (?m machine))
+        (:pre-conditions (= (available_robots) nil))
+        (:effects nil)
+        (:score 0)
+        (:body (begin
+                (wait-on `(!= (available_robots) nil))
+                (t_process_on_machine)))))
 
     (def-task t_position_robot_to_belt ?r ?b)
     (def-method m_position_robot_to_belt
@@ -175,7 +175,7 @@
              (loop
                  (begin
                      (wait-on `(< (robot.battery ,?r) 0.4))
-                     (mutex::lock-and-do ?r
+                     (mutex::lock-and-do ?r 50
                         (begin
                             (go_charge ?r)
                             (wait-on `(> (robot.battery ,?r) 0.9)))))))))

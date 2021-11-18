@@ -29,3 +29,14 @@
                      (f (second args)))
                     (f l)))
               (else nil)))) ; error cases
+
+
+(define (available_robots
+        (lambda nil
+            (begin
+                (define __l_available_robots__
+                    (lambda args
+                        (if (null? args)
+                            nil
+                            (cons (car args) (__l_available_robots__ (cdr args))))))
+                (__l_available_robots__ '(r1 r2 r3))))))

@@ -20,16 +20,16 @@
                     (define result (__process__ ?process machines))
                     result))))
     (def-lambda '(available_robots
-        (lambda nil
-            (begin
-                (define __l_available_robots__
-                    (lambda args
-                        (if (null? args)
-                            nil
-                            (if (not (locked? (car args)))
-                                (cons (car args) (__l_available_robots__ (cdr args)))
-                                (__l_available_robots__ (cdr args))))))
-                (__l_available_robots__ (rae-get-state-variable robots))))))
+            (lambda nil
+                (begin
+                    (define __l_available_robots__
+                        (lambda (l)
+                            (if (null? l)
+                                nil
+                                (if (not (locked? (car l)))
+                                    (cons (car l) (__l_available_robots__ (cdr l)))
+                                    (__l_available_robots__ (cdr l))))))
+                    (__l_available_robots__ (rae-get-state-variable robots))))))
 
     (def-lambda '(find_output_machine 
         (lambda nil

@@ -49,7 +49,6 @@
                 nil
                 (cons (caar seq) (take_first (cdr seq)))))))
 
-
     (def-task t_process_package ?p)
 
     (def-method m_process_to_do_r
@@ -179,10 +178,65 @@
                         (begin
                             (go_charge ?r)
                             (wait-on `(> (robot.battery ,?r) 0.9)))))))))
-)
+    (def-task t_check_robots_batteries)
+    (def-lambda '(async_check_battery
+        (lambda (?r) (async (t_check_battery ?r)))))
+    
+    (def-method m_check_initial_robots_batteries
+        '((:task t_check_robots_batteries)
+        (:params)
+        (:pre-conditions true)
+        (:effects nil)
+        (:score 0)
+        (:body 
+            (begin
+                (define list_robots (robots))
+                (mapf async_check_battery list_robots)
+                (t_check_batteries_new_robots list_robots)))))
 
-(define eval-pre-conditions
-(lambda args
-    (begin
-        (print locked?)
-        (eval (cons (get-preconditions (car args)) (cdr args))))))
+    (def-task t_check_batteries_new_robots ?l)
+    (def-method m_check_oncoming_robots
+        '((:task t_check_batteries_new_robots)
+        (:params (?l list))
+        (:pre-conditions true)
+        (:effects nil)
+        (:score 0)
+        (:body 
+            (begin
+                (wait-on `(> ,(length ?l) (length (robots))))
+                (define new_list_robots (robots))
+                (define l_new_robots (sublist (new_list_robots) (length ?l)))
+                (mapf async_check_battery l_new_robots)
+                (t_check_batteries_new_robots new_list_robots)))))
+
+    (def-lambda '(async_process_package
+            (lambda (?p) (async (t_process_package ?p)))))
+    (def-task t_process_packages)
+    (def-method m_process_initial_packages
+            '((:task t_process_packages)
+            (:params)
+            (:pre-conditions true)
+            (:effects nil)
+            (:score 0)
+            (:body
+                (begin
+                    (define list_packages (packages))
+                    (mapf async_process_package list_packages)
+                    ;(t_process_new_packages list_packages)
+                    ))))
+
+        (def-task t_process_new_packages ?l)
+        (def-method m_check_oncoming_packages
+            '((:task t_process_new_packages)
+            (:params (?l list))
+            (:pre-conditions true)
+            (:effects nil)
+            (:score 0)
+            (:body
+                (begin
+                    (wait-on `(> ,(length ?l) (length (packages))))
+                    (define new_lp (packages))
+                    (define l_new_p (sublist (new_lp) (length ?l)))
+                    (mapf async_check_battery l_new_p)
+                    (t_check_batteries_new_robots new_lp)))))
+)

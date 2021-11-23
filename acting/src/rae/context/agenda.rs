@@ -2,6 +2,7 @@ use im::HashMap;
 use ompas_lisp::structs::LError::SpecialError;
 use ompas_lisp::structs::{LError, LValue};
 use ompas_utils::other::get_and_update_id_counter;
+use std::cell::Ref;
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -19,12 +20,16 @@ impl Agenda {
             "Agenda:\n\t-number of task: {}\n\t-Actual agenda:\n",
             self.next_id.load(Ordering::Relaxed)
         );
-        let inner = self.get_inner().await;
+        let inner: im::HashMap<usize, RefinementStack> = self.get_inner().await;
         if inner.is_empty() {
             string.push_str("\t\tIs empty...");
         } else {
-            for (id, rs) in inner {
-                string.push_str(format!("\t\t{}: {:?}", id, rs).as_str())
+            let mut k_v: Vec<(usize, RefinementStack)> =
+                inner.iter().map(|k| (k.0.clone(), k.1.clone())).collect();
+
+            k_v.sort_by(|k1, k2| k1.0.cmp(&k2.0));
+            for (id, rs) in k_v {
+                string.push_str(format!("\t\t{}: {}\n", id, rs).as_str())
             }
         }
         string

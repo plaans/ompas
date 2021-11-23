@@ -73,20 +73,20 @@ pub const LABEL_ENUMERATE_PARAMS: &str = "enumerate-params";
 
 pub const LAMBDA_PROGRESS: &str = "
 (define progress (lambda args
-    (let* ((result (eval (cons select (cons `(quote ,(car args)) (cdr args)))))
+    (let* ((result (eval (cons select (quote-list args))))
             (first_m (car result))
             (task_id (cadr result)))
             
             (if (null? first_m)
                 nil
-                (if (eval first_m)
+                (if (enr first_m)
                     (rae-set-success-for-task task_id)
                     (retry task_id))))))";
 
 pub const LAMBDA_SELECT: &str = "
 (define select
   (lambda args
-    (rae-select args (generate-applicable-instances (rae-get-facts) args ))))";
+    (rae-select args (generate-applicable-instances (rae-get-facts) args))))";
 
 pub const LAMBDA_RETRY: &str = "
 (define retry (lambda (task_id)
@@ -95,7 +95,7 @@ pub const LAMBDA_RETRY: &str = "
             (print \"Retrying task \" task_id)
             (if (null? new_method) ; if there is no method applicable
             nil
-            (if (eval new_method)
+            (if (enr new_method)
                 (rae-set-success-for-task task_id)
                 (rae-retry task_id)))))))";
 
@@ -112,7 +112,7 @@ pub const LAMBDA_GET_METHOD_GENERATOR: &str = "\
             (get rae-method-generator-map label)))";
 
 pub const LAMBDA_GENERATE_INSTANCES: &str = "
-(define generate-œ (lambda args
+(define generate-instances (lambda args
     (let* ((label (car args))
             (i_params (cdr args))
             (methods (get-methods label)))

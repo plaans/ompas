@@ -700,12 +700,7 @@ pub fn reverse(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
 /// return the length of the object if it is a table or a list.
 pub fn length(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() != 1 {
-        return Err(WrongNumberOfArgument(
-            REVERSE,
-            args.into(),
-            args.len(),
-            1..1,
-        ));
+        return Err(WrongNumberOfArgument(LEN, args.into(), args.len(), 1..1));
     }
 
     match &args[0] {

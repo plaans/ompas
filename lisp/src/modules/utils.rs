@@ -16,8 +16,9 @@
 
 use crate::core::LEnv;
 use crate::modules::doc::{Documentation, LHelp};
-use crate::structs::LError::{WrongNumberOfArgument, WrongType};
-use crate::structs::{GetModule, LError, LValue, Module, NameTypeLValue};
+use crate::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
+use crate::structs::LValue::Nil;
+use crate::structs::{GetModule, LCoreOperator, LError, LValue, Module, NameTypeLValue};
 use aries_utils::StreamingIterator;
 use rand::Rng;
 use std::ops::Deref;
@@ -29,17 +30,30 @@ const MOD_UTILS: &str = "utils";
 const RAND_ELEMENT: &str = "rand-element";
 const ENUMERATE: &str = "enumerate";
 const CONTAINS: &str = "contains";
+const SUB_LIST: &str = "sublist";
+const QUOTE_LIST: &str = "quote-list";
 const TRANSFORM_IN_SINGLETON_LIST: &str = "transform-in-singleton-list";
 
 // Documentation
+const DOC_MOD_UTILS: &str = "collection of utility functions.";
+const DOC_MOD_UTILS_VERBOSE: &str = "functions:\n\
+-rand-element\n\
+-enumerate\n\
+-contains\n\
+-sublist\n\
+-transfrom-in-singleton-list\n";
 const DOC_RAND_ELEMENT: &str = "Return a random element of a list";
 const DOC_RAND_ELEMENT_VERBOSE: &str = "Example: \n(rand-element (list 1 2 3 4))\n=> 1";
 const DOC_ENUMERATE: &str =
     "Return a enumeration of all possible combinations of elements of 1+ lists";
 const DOC_ENUMERATE_VERBOSE: &str =
     "Example: \n(enumerate (list 1 2) (list 3 4))\n=> ((1 3)(1 4)(2 3)(2 4))";
-//MACROS
+const DOC_CONTAINS: &str =
+    "Returns true if a LValue is contains into an other (for a map if the key is inside it)";
+const DOC_SUB_LIST: &str = "Returns a sublist of a list";
+const DOC_TRANSFORM_IN_SINGLETON_LIST: &str = "todo!";
 
+//MACROS
 pub const MACRO_TEST_MACRO: &str = "(defmacro test-macro
    (lambda (x)
     `(expand (parse ,x))))";
@@ -201,6 +215,13 @@ pub const LAMBDA_ARBITRARY: &str = "(define arbitrary
                     (f l)))
               (else nil)))) ; error cases";
 
+pub const LAMBDA_EVAL_NON_RECURSIVE: &str = "(define enr
+    (lambda (l)
+        (eval (cons (car l) (quote-list (cdr l))))))";
+
+pub const DOC_ARBITRARY: &str = "todo!";
+pub const DOC_EVAL_NON_RECURSIVE: &str = "todo!";
+
 #[derive(Default, Copy, Clone, Debug)]
 pub struct CtxUtils {}
 
@@ -237,6 +258,7 @@ impl GetModule for CtxUtils {
                 MACRO_LET_STAR,
                 //MACRO_FOR,
                 LAMBDA_ARBITRARY,
+                LAMBDA_EVAL_NON_RECURSIVE,
             ]
             .into(),
             label: MOD_UTILS.into(),
@@ -245,7 +267,9 @@ impl GetModule for CtxUtils {
         module.add_fn_prelude(RAND_ELEMENT, rand_element);
         module.add_fn_prelude(ENUMERATE, enumerate);
         module.add_fn_prelude(CONTAINS, contains);
+        module.add_fn_prelude(SUB_LIST, sublist);
         module.add_fn_prelude(TRANSFORM_IN_SINGLETON_LIST, transform_in_singleton_list);
+        module.add_fn_prelude(QUOTE_LIST, quote_list);
 
         module
     }
@@ -256,6 +280,10 @@ impl Documentation for CtxUtils {
         vec![
             LHelp::new_verbose(RAND_ELEMENT, DOC_RAND_ELEMENT, DOC_RAND_ELEMENT_VERBOSE),
             LHelp::new_verbose(ENUMERATE, DOC_ENUMERATE, DOC_ENUMERATE_VERBOSE),
+            LHelp::new_verbose(MOD_UTILS, DOC_MOD_UTILS, DOC_MOD_UTILS_VERBOSE),
+            LHelp::new(SUB_LIST, DOC_SUB_LIST),
+            LHelp::new(CONTAINS, DOC_CONTAINS),
+            LHelp::new(TRANSFORM_IN_SINGLETON_LIST, DOC_TRANSFORM_IN_SINGLETON_LIST),
         ]
     }
 }
@@ -356,6 +384,114 @@ pub fn contains(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     Ok(LValue::Nil)
 }
 
+//returns a sublist of the a list
+pub fn sublist(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    match args.len() {
+        2 => {
+            if let LValue::List(l) = &args[0] {
+                if let LValue::Number(n) = &args[1] {
+                    if n.is_natural() {
+                        let i: usize = n.into();
+                        return Ok(l[i..].into());
+                    } else {
+                        Err(SpecialError(
+                            SUB_LIST,
+                            "Indexes should be natural numbers".to_string(),
+                        ))
+                    }
+                } else {
+                    Err(WrongType(
+                        SUB_LIST,
+                        args[1].clone(),
+                        (&args[1]).into(),
+                        NameTypeLValue::Number,
+                    ))
+                }
+            } else {
+                Err(WrongType(
+                    SUB_LIST,
+                    args[0].clone(),
+                    (&args[0]).into(),
+                    NameTypeLValue::List,
+                ))
+            }
+        }
+        3 => {
+            if let LValue::List(l) = &args[0] {
+                if let LValue::Number(n1) = &args[1] {
+                    if let LValue::Number(n2) = &args[2] {
+                        if n1.is_natural() && n2.is_natural() {
+                            let i1: usize = n1.into();
+                            let i2: usize = n2.into();
+                            return Ok(l[i1..i2].into());
+                        } else {
+                            Err(SpecialError(
+                                SUB_LIST,
+                                "Indexes should be natural numbers".to_string(),
+                            ))
+                        }
+                    } else {
+                        Err(WrongType(
+                            SUB_LIST,
+                            args[1].clone(),
+                            (&args[2]).into(),
+                            NameTypeLValue::Number,
+                        ))
+                    }
+                } else {
+                    Err(WrongType(
+                        SUB_LIST,
+                        args[1].clone(),
+                        (&args[1]).into(),
+                        NameTypeLValue::Number,
+                    ))
+                }
+            } else {
+                Err(WrongType(
+                    SUB_LIST,
+                    args[0].clone(),
+                    (&args[0]).into(),
+                    NameTypeLValue::List,
+                ))
+            }
+        }
+        _ => Err(WrongNumberOfArgument(
+            SUB_LIST,
+            args.into(),
+            args.len(),
+            2..3,
+        )),
+    }
+}
+
+pub fn quote_list(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+    if args.len() != 1 {
+        return Err(WrongNumberOfArgument(
+            QUOTE_LIST,
+            args.into(),
+            args.len(),
+            1..1,
+        ));
+    }
+
+    if let LValue::List(l) = &args[0] {
+        let mut vec: Vec<LValue> = vec![];
+        for e in l {
+            vec.push(vec![LCoreOperator::Quote.into(), e.clone()].into());
+        }
+        Ok(vec.into())
+    } else if let LValue::Nil = &args[0] {
+        Ok(Nil)
+    } else {
+        Err(WrongType(
+            QUOTE_LIST,
+            args[0].clone(),
+            (&args[0]).into(),
+            NameTypeLValue::List,
+        ))
+    }
+}
+
 pub fn transform_in_singleton_list(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.is_empty() {
         return Err(WrongNumberOfArgument(
@@ -378,7 +514,27 @@ mod test {
     use crate::core::{parse, LEnv};
     use crate::modules::utils::*;
     use crate::structs::LError;
+    use crate::structs::LValue::True;
     use crate::test_utils::{test_expression, TestExpression};
+
+    #[test]
+    fn test_contains() -> Result<(), LError> {
+        let lv: &[LValue] = &[vec![1, 2, 3, 4, 5, 6].into(), 6.into()];
+        let result = contains(lv, &LEnv::empty(), &())?;
+        assert_eq!(result, True);
+        Ok(())
+    }
+
+    #[test]
+    fn test_sublist() -> Result<(), LError> {
+        let lv_1: &[LValue] = &[vec![1, 2, 3, 4, 5, 6].into(), 1.into()];
+        let lv_2: &[LValue] = &[vec![1, 2, 3, 4, 5, 6].into(), 1.into(), 3.into()];
+        let result1 = sublist(lv_1, &LEnv::empty(), &())?;
+        let result2 = sublist(lv_2, &LEnv::empty(), &())?;
+        assert_eq!(result1, vec![2, 3, 4, 5, 6].into());
+        assert_eq!(result2, vec![2, 3].into());
+        Ok(())
+    }
 
     #[tokio::test]
     async fn test_macro_test_macro() -> Result<(), LError> {

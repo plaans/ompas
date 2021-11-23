@@ -231,6 +231,7 @@ pub fn generate_type_test_expr(args: &[LValue], _: &LEnv, _: &()) -> Result<LVal
                     if let LValue::Symbol(p) = &param[0] {
                         if let LValue::Symbol(t) = &param[1] {
                             match t.as_str() {
+                                LIST => str.push_str(format!("({} {})", IS_LIST, p).as_str()),
                                 BOOL => str.push_str(format!("({} {})", IS_BOOL, p).as_str()),
                                 INT => str.push_str(format!("({} {})", IS_INT, p).as_str()),
                                 FLOAT => str.push_str(format!("({} {})", IS_FLOAT, p).as_str()),
@@ -456,14 +457,15 @@ mod test {
             inner: LAMBDA_GENERATE_TYPE_PRE_CONDITIONS,
             dependencies: vec![],
             expression:
-                "(gtpc '((?r robot) (?f float ) (?i int) (?b bool) (?s symbol)(?n number)))",
-            expanded: "(gtpc '((?r robot) (?f float ) (?i int) (?b bool) (?s symbol)(?n number)))",
+                "(gtpc '((?r robot) (?f float ) (?i int) (?b bool) (?s symbol) (?n number) (?l list)))",
+            expanded: "(gtpc '((?r robot) (?f float ) (?i int) (?b bool) (?s symbol) (?n number) (?l list)))",
             result: "(if (! (= (robot.instance ?r) nil))
                         (if (float? ?f)
                             (if (int? ?i)
                                 (if (bool? ?b)
                                     (if (symbol? ?s)
-                                        (number? ?n))))))",
+                                        (if (number? ?n)
+                                            (list? ?l)))))))",
         };
         let (mut env, mut ctxs) = init_env_and_ctxs().await;
 

@@ -5,7 +5,7 @@ pub mod wait_on {
     use ompas_utils::task_handler;
     use std::sync::Arc;
     use std::thread;
-    use tokio::sync::{broadcast, mpsc, Mutex};
+    use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
 
     lazy_static! {
         pub static ref WAIT_ON_COLLECTION: WaitOnCollection = Default::default();
@@ -64,6 +64,23 @@ pub mod wait_on {
     pub struct WaitOn {
         lambda: LValue,
         channel: mpsc::Sender<bool>,
+    }
+
+    pub async fn get_debug() -> String {
+        let lambdas: Vec<LValue> = WAIT_ON_COLLECTION
+            .inner
+            .lock()
+            .await
+            .iter()
+            .map(|k| k.lambda.clone())
+            .collect();
+        let mut str = "'wait-on' lambdas: \n".to_string();
+        for l in lambdas {
+            str.push('-');
+            str.push_str(l.to_string().as_str());
+            str.push('\n');
+        }
+        str
     }
 
     pub async fn task_check_wait_on(

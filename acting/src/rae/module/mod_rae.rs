@@ -23,22 +23,26 @@ use tokio::sync::Mutex;
 use tokio::task::block_in_place;
 
 //LANGUAGE
-const MOD_RAE: &str = "mod-rae";
+const MOD_RAE: &str = "rae";
+const DOC_MOD_RAE: &str = "Module exposed to the user to configure and launch rae.";
+const DOC_MOD_RAE_VERBOSE: &str = "functions:\n\
+-getters : get-methods, get-actions, get-symbol-type, get-tasks, get-state-functions, get-env,\n\
+    get-state, get-status, get-agenda, get-config-platform\n\
+-definitions : def-state-function, def-actions, def-action-model, def-action-operational-model,\n\
+    def-task, def-method, def-initial-state\n\
+-configuration: configure-platform\n\
+-launch: launch";
 
-//const RAE_ADD_ACTION: &str = "rae-add-action";
-//const RAE_ADD_METHOD: &str = "rae-add-method";
-//const RAE_ADD_TASK: &str = "rae-add-task";
-//const RAE_ADD_STATE_FUNCTION: &str = "rae-add-state-function";
-const RAE_GET_METHODS: &str = "rae-get-methods";
-const RAE_GET_ACTIONS: &str = "rae-get-actions";
-const RAE_GET_SYMBOL_TYPE: &str = "rae-get-symbol-type";
-const RAE_GET_TASKS: &str = "rae-get-tasks";
-const RAE_GET_STATE_FUNCTIONS: &str = "rae-get-state-functions";
-const RAE_GET_ENV: &str = "rae-get-env";
-const RAE_LAUNCH: &str = "rae-launch";
-const RAE_GET_STATE: &str = "rae-get-state";
-const RAE_GET_STATUS: &str = "rae-get-status";
-const RAE_GET_AGENDA: &str = "rae-get-agenda";
+const RAE_GET_METHODS: &str = "get-methods";
+const RAE_GET_ACTIONS: &str = "get-actions";
+const RAE_GET_SYMBOL_TYPE: &str = "get-symbol-type";
+const RAE_GET_TASKS: &str = "get-tasks";
+const RAE_GET_STATE_FUNCTIONS: &str = "get-state-functions";
+const RAE_GET_ENV: &str = "get-env";
+const RAE_LAUNCH: &str = "launch";
+const RAE_GET_STATE: &str = "get-state";
+const RAE_GET_STATUS: &str = "get-status";
+const RAE_GET_AGENDA: &str = "get-agenda";
 
 const RAE_DEF_STATE_FUNCTION: &str = "def-state-function";
 const RAE_DEF_ACTION: &str = "def-action";
@@ -48,8 +52,8 @@ const RAE_DEF_TASK: &str = "def-task";
 const RAE_DEF_METHOD: &str = "def-method";
 const RAE_DEF_LAMBDA: &str = "def-lambda";
 const RAE_DEF_INITIAL_STATE: &str = "def-initial-state";
-const RAE_CONFIGURE_PLATFORM: &str = "rae-configure-platform";
-const RAE_GET_CONFIG_PLATFORM: &str = "rae-get-config-platform";
+const RAE_CONFIGURE_PLATFORM: &str = "configure-platform";
+const RAE_GET_CONFIG_PLATFORM: &str = "get-config-platform";
 
 //DOCUMENTATION
 const DOC_RAE_GET_METHODS: &str = "Returns the list of all defined methods in RAE environment";
@@ -167,6 +171,7 @@ impl GetModule for CtxRae {
 impl Documentation for CtxRae {
     fn documentation() -> Vec<LHelp> {
         vec![
+            LHelp::new_verbose(MOD_RAE, DOC_MOD_RAE, DOC_MOD_RAE_VERBOSE),
             LHelp::new(RAE_GET_METHODS, DOC_RAE_GET_METHODS),
             LHelp::new(RAE_GET_ACTIONS, DOC_RAE_GET_ACTIONS),
             LHelp::new_verbose(

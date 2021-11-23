@@ -33,11 +33,11 @@ const LAMBDA_GET_SCORE: &str = "(define get-score\
 
 const LAMBDA_EVAL_PRE_CONDITIONS: &str = "(define eval-pre-conditions
 (lambda args
-    (eval (cons (get-preconditions (car args)) (cdr args)))))";
+    (eval (cons (get-preconditions (car args)) (quote-list (cdr args))))))";
 
 const LAMBDA_COMPUTE_SCORE: &str = "(define compute-score 
     (lambda args
-        (eval (cons (get-score (car args)) (cdr args)))))";
+        (eval (cons (get-score (car args)) (quote-list (cdr args))))))";
 
 pub const EVAL_PRE_CONDITIONS: &str = "eval-pre-conditions";
 pub const COMPUTE_SCORE: &str = "compute-score";

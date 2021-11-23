@@ -66,6 +66,10 @@ pub async fn get_list_locked() -> Vec<String> {
     MUTEXES.get_list_locked().await
 }
 
+pub async fn get_debug() -> String {
+    MUTEXES.get_debug().await
+}
+
 pub enum MutexResponse {
     Ok,
     Wait(mpsc::Receiver<bool>),
@@ -112,5 +116,21 @@ impl MutexMap {
             .keys()
             .cloned()
             .collect::<Vec<String>>()
+    }
+
+    pub async fn get_debug(&self) -> String {
+        let locked: Vec<(String, usize)> = self
+            .map
+            .lock()
+            .await
+            .iter()
+            .map(|k_v| (k_v.0.clone(), k_v.1.fifo.len()))
+            .collect();
+        let mut str = "mutexes:\n".to_string();
+
+        for e in locked {
+            str.push_str(format!("- {}: {} waiting\n", e.0, e.1).as_str());
+        }
+        str
     }
 }

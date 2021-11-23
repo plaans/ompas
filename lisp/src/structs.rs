@@ -119,6 +119,25 @@ pub enum LNumber {
     Usize(usize),
 }
 
+impl LNumber {
+    pub fn is_real(&self) -> bool {
+        true
+    }
+    pub fn is_natural(&self) -> bool {
+        match self {
+            LNumber::Usize(_) => true,
+            LNumber::Int(i) => i.is_positive(),
+            LNumber::Float(f) => f.floor() == *f && f.is_sign_positive(),
+        }
+    }
+    pub fn is_integer(&self) -> bool {
+        match self {
+            LNumber::Int(_) | LNumber::Usize(_) => true,
+            LNumber::Float(f) => f.is_sign_positive(),
+        }
+    }
+}
+
 impl Display for LNumber {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {

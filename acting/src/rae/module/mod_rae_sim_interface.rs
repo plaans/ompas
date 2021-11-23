@@ -8,7 +8,7 @@ use im::HashMap;
 use ompas_lisp::core::{eval, ContextCollection, LEnv};
 use ompas_lisp::functions::{append, cons};
 use ompas_lisp::modules::doc::{Documentation, LHelp};
-use ompas_lisp::modules::utils::enumerate;
+use ompas_lisp::modules::utils::{enumerate, quote_list};
 use ompas_lisp::structs::LCoreOperator::Quote;
 use ompas_lisp::structs::LError::{WrongNumberOfArgument, WrongType};
 use ompas_lisp::structs::LValue::{Nil, True};
@@ -168,16 +168,8 @@ pub async fn generate_applicable_instances<'a>(
                 enumerate(params.as_slice(), env, &())?.try_into()?;
 
             for element in instances_of_params {
-                let lv = cons(
-                    &[
-                        vec![LValue::CoreOperator(Quote), m.clone()].into(),
-                        element.clone(),
-                    ],
-                    env,
-                    &(),
-                )?;
-
                 let method = cons(&[m.clone(), element.clone()], env, &())?;
+                let lv = quote_list(&[method.clone()], env, &())?;
 
                 match check_preconditions(&[lv.clone(), state.clone()], env, ctx).await? {
                     LValue::True => {
@@ -189,15 +181,8 @@ pub async fn generate_applicable_instances<'a>(
                 }
             }
         } else {
-            let lv = cons(
-                &[
-                    vec![LValue::CoreOperator(Quote), m.clone()].into(),
-                    params.clone().into(),
-                ],
-                env,
-                &(),
-            )?;
             let method = cons(&[m.clone(), params.clone().into()], env, &())?;
+            let lv = quote_list(&[method.clone()], env, &())?;
             match check_preconditions(&[lv.clone(), state.clone()], env, ctx).await? {
                 LValue::True => {
                     let score = compute_score(&[lv.clone(), state.clone()], env, ctx).await?;

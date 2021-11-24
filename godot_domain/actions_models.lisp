@@ -3,6 +3,9 @@
         '((:params ?r)
           (:pre-conditions (> (robot.battery ?r) 0.4))
           (:effects
+              (and
+                (at-start ...)
+                (at-end ...))
                 (assert (robot.busy ?r) true))))
     (def-action-operational-model place
         '((:params ?r)

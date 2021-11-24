@@ -1,3 +1,6 @@
+mod algo;
+mod structs;
+
 #[cfg(test)]
 mod tests {
     #[test]

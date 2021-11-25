@@ -1,5 +1,5 @@
-mod algo;
-mod structs;
+pub mod algo;
+pub mod structs;
 
 #[cfg(test)]
 mod tests {

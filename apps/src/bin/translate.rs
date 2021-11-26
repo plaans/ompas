@@ -91,7 +91,7 @@ async fn test() -> Result<(), LError> {
 
     let mut symbol_table = SymTable::default();
 
-    let chronicle = translate_LValue_to_chronicle(slice, &mut symbol_table);
+    let chronicle = translate_lvalue_to_chronicle(slice, &mut symbol_table);
 
     println!("{}", chronicle.format_with_sym_table(&symbol_table));
     Ok(())

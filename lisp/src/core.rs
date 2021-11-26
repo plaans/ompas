@@ -231,7 +231,6 @@ impl GetModule for CtxRoot {
         module.add_prelude(IF, LCoreOperator::If.into());
         module.add_prelude(LAMBDA, LCoreOperator::DefLambda.into());
         module.add_prelude(DEF_MACRO, LCoreOperator::DefMacro.into());
-        module.add_prelude(SET, LCoreOperator::Set.into());
         module.add_prelude(BEGIN, LCoreOperator::Begin.into());
         module.add_prelude(QUASI_QUOTE, LCoreOperator::QuasiQuote.into());
         module.add_prelude(QUOTE, LCoreOperator::Quote.into());
@@ -365,8 +364,7 @@ impl LEnv {
     }
 
     pub fn insert(&mut self, key: String, exp: LValue) {
-        self.symbols.insert(key, exp);
-        //self.new_entries.push(key);
+        self.symbols = self.symbols.update(key, exp);
     }
 
     pub fn update(&self, key: String, exp: LValue) -> Self {
@@ -774,33 +772,6 @@ pub async fn expand(
                         }
                         return Ok(vec![LCoreOperator::Quote.into(), list[1].clone()].into());
                     }
-                    LCoreOperator::Set => {
-                        if list.len() != 3 {
-                            return Err(WrongNumberOfArgument(
-                                "expand",
-                                list.into(),
-                                list.len(),
-                                3..3,
-                            ));
-                        }
-                        let var = &list[1];
-                        //Can only set a symbol
-                        if !matches!(var, LValue::Symbol(_s)) {
-                            return Err(WrongType(
-                                "expand",
-                                var.clone(),
-                                var.into(),
-                                NameTypeLValue::Symbol,
-                            ));
-                        }
-
-                        return Ok(vec![
-                            LCoreOperator::Set.into(),
-                            var.clone(),
-                            expand(&list[2], false, env, ctxs).await?,
-                        ]
-                        .into());
-                    }
                     LCoreOperator::Begin => {
                         return if list.len() == 1 {
                             Ok(LValue::Nil)
@@ -1088,24 +1059,6 @@ pub async fn eval(
                             println!("=> {}", &args[0].clone());
                         }
                         return Ok(args[0].clone());
-                    }
-                    LCoreOperator::Set => {
-                        return match &args[0] {
-                            LValue::Symbol(s) => {
-                                let exp = eval(&args[1], &mut env, ctxs).await?;
-                                env.set(s.to_string(), exp)?;
-                                if get_debug() {
-                                    println!("=> {}", LValue::Nil);
-                                }
-                                Ok(LValue::Nil)
-                            }
-                            lv => Err(WrongType(
-                                "eval",
-                                lv.clone(),
-                                lv.into(),
-                                NameTypeLValue::Symbol,
-                            )),
-                        };
                     }
                     LCoreOperator::Begin => {
                         let firsts = &args[0..args.len() - 1];

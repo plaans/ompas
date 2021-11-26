@@ -22,7 +22,7 @@ fn create_list_test() -> Vec<(&'static str, LValue)> {
         ("(define x 3)", LValue::Nil),
         ("x", 3.into()),
         ("(+ x x)", 6.into()),
-        ("(begin (define x 1) (set! x (+ x 1)) (+ x 1))", 3.into()),
+        ("(begin (define x 1) (define x (+ x 1)) (+ x 1))", 3.into()),
         ("((lambda (x) (+ x x)) 5)", 10.into()),
         ("(define twice (lambda (x) (* 2 x)))", LValue::Nil),
         ("(twice 5)", 10.into()),

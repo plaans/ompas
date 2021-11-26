@@ -1,8 +1,37 @@
+use crate::structs::Sym::Unique;
 use ompas_lisp::structs::LValue;
 use std::collections::{HashMap, HashSet};
-use std::fmt::{Display, Formatter};
+use std::fmt::{write, Display, Formatter};
 
-type Sym = String;
+#[derive(Hash, Eq, PartialEq, Clone)]
+pub enum Sym {
+    Unique(String),
+    Several(String, usize),
+}
+
+impl Sym {
+    pub fn get_string(&self) -> &String {
+        match self {
+            Sym::Unique(s) => s,
+            Sym::Several(s, _) => s,
+        }
+    }
+}
+
+impl From<String> for Sym {
+    fn from(s: String) -> Self {
+        Self::Unique(s)
+    }
+}
+
+impl Display for Sym {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Unique(s) => write!(f, "{}", s),
+            Self::Several(s, i) => write!(f, "{}({})", s, i),
+        }
+    }
+}
 
 type SymId = usize;
 
@@ -37,6 +66,8 @@ pub struct SymTable {
     ids: HashMap<Sym, SymId>,
     symbol_types: HashMap<SymId, SymType>,
     types_number: HashMap<SymType, usize>,
+    multiple_def: HashMap<String, Vec<SymId>>,
+    pointer_to_ver: Vec<HashMap<String, usize>>,
 }
 
 impl Default for SymTable {
@@ -50,6 +81,8 @@ impl Default for SymTable {
             ids: Default::default(),
             symbol_types: Default::default(),
             types_number,
+            multiple_def: Default::default(),
+            pointer_to_ver: vec![Default::default()],
         }
     }
 }
@@ -70,16 +103,32 @@ impl SymTable {
         let sym = format!("r_{}", n);
         *n = *n + 1 as usize;
         let id = self.symbols.len();
-        self.symbols.push(sym.clone());
-        self.ids.insert(sym, id);
+        self.symbols.push(sym.clone().into());
+        self.ids.insert(sym.into(), id);
         self.symbol_types.insert(id, SymType::Result);
         id
     }
 
+    pub fn unique_to_several(&mut self, sym: &String) {
+        if !self.multiple_def.contains_key(sym) {
+            //change value in vec of symbol
+            let id = self.ids.remove(&Unique(sym.clone())).unwrap();
+            self.symbols[id] = Sym::Several(sym.clone(), 0);
+            //Update key in hashmap
+            self.ids.insert(self.symbols[id].clone(), id);
+            //Create new entry in multiple_def
+            self.multiple_def.insert(sym.clone(), vec![id]);
+            self.pointer_to_ver
+                .last_mut()
+                .unwrap()
+                .insert(sym.clone(), 0);
+        }
+    }
+
     pub fn declare_new_interval(&mut self) -> Interval {
         let n = self.types_number.get_mut(&SymType::Timepoint).unwrap();
-        let start = format!("t_{}", n);
-        let end = format!("t_{}", *n + 1 as usize);
+        let start: Sym = format!("t_{}", n).into();
+        let end: Sym = format!("t_{}", *n + 1 as usize).into();
         *n = *n + 2 as usize;
         let id_1 = self.symbols.len();
         let id_2 = id_1 + 1;
@@ -95,9 +144,18 @@ impl SymTable {
         }
     }
 
+    pub fn new_context(&mut self) {
+        self.pointer_to_ver
+            .push(self.pointer_to_ver.last().unwrap().clone())
+    }
+
+    pub fn revert_context(&mut self) {
+        self.pointer_to_ver.remove(self.pointer_to_ver.len() - 1);
+    }
+
     pub fn declare_new_timepoint(&mut self) -> SymId {
         let n = self.types_number.get_mut(&SymType::Timepoint).unwrap();
-        let sym = format!("t_{}", n);
+        let sym: Sym = format!("t_{}", n).into();
         *n = *n + 1 as usize;
         let id = self.symbols.len();
         self.symbols.push(sym.clone());
@@ -106,16 +164,48 @@ impl SymTable {
         id
     }
 
-    pub fn declare_new_object(&mut self, obj: Option<Sym>) -> SymId {
+    pub fn it_exists(&self, sym: &String) -> bool {
+        !self
+            .ids
+            .keys()
+            .filter(|k| k.get_string() == sym)
+            .collect::<Vec<&Sym>>()
+            .is_empty()
+    }
+
+    pub fn declare_new_object(
+        &mut self,
+        obj: Option<String>,
+        if_it_exists_create_new: bool,
+    ) -> SymId {
         let n = self.types_number.get_mut(&SymType::Object).unwrap();
-        let sym = match obj {
-            Some(s) => s,
-            None => {
-                format!("o_{}", n)
-            }
-        };
+        let temp_n = n.clone();
         *n = *n + 1 as usize;
         let id = self.symbols.len();
+        let sym: Sym = match obj {
+            None => format!("o_{}", temp_n).into(),
+            Some(s) => {
+                if self.it_exists(&s) {
+                    if if_it_exists_create_new {
+                        self.unique_to_several(&s);
+                        let vec_similar = self.multiple_def.get_mut(&s).unwrap();
+                        let n = vec_similar.len();
+                        vec_similar.push(id);
+                        *self.pointer_to_ver.last_mut().unwrap().get_mut(&s).unwrap() =
+                            vec_similar.len() - 1;
+                        Sym::Several(s, n)
+                    } else {
+                        return *match self.pointer_to_ver.last().unwrap().get(&s) {
+                            None => self.ids.get(&s.into()).unwrap(),
+                            Some(i) => self.multiple_def.get(&s).unwrap().get(*i).unwrap(),
+                        };
+                    }
+                } else {
+                    s.into()
+                }
+            }
+        };
+
         self.symbols.push(sym.clone());
         self.ids.insert(sym, id);
         self.symbol_types.insert(id, SymType::Object);
@@ -132,11 +222,19 @@ impl FormatWithSymTable for PartialChronicle {
 
         let mut s = String::new();
         s.push_str("-variable(s): {");
-        for (i, id) in self.variables.iter().enumerate() {
+
+        let mut variables = self
+            .variables
+            .iter()
+            .map(|id| get_sym(id).to_string())
+            .collect::<Vec<String>>();
+        variables.sort();
+
+        for (i, sym) in variables.iter().enumerate() {
             if i != 0 {
                 s.push(',');
             }
-            s.push_str(get_sym(id).as_str());
+            s.push_str(sym);
         }
         s.push_str("}\n");
 
@@ -187,14 +285,14 @@ impl FormatWithSymTable for Chronicle {
         //name
         s.push_str("-name: ");
         for e in &self.name {
-            s.push_str(get_sym(e).as_str());
+            s.push_str(get_sym(e).to_string().as_str());
             s.push(' ');
         }
         s.push('\n');
         //task
         s.push_str("-task: ");
         for e in &self.task {
-            s.push_str(get_sym(e).as_str());
+            s.push_str(get_sym(e).to_string().as_str());
             s.push(' ');
         }
         s.push('\n');
@@ -221,7 +319,11 @@ pub struct PartialChronicle {
 
 impl Absorb for PartialChronicle {
     fn absorb(mut self, mut other: Self) -> Self {
-        self.variables.union(&other.variables);
+        self.variables = self
+            .variables
+            .union(&other.variables)
+            .map(|id| *id)
+            .collect();
         self.constraints.append(&mut other.constraints);
         self.conditions.append(&mut other.conditions);
         self.effects.append(&mut other.effects);
@@ -316,7 +418,7 @@ impl ExpressionChronicle {
         self.value = lit;
     }
 
-    pub fn get_lit(&mut self) -> Lit {
+    pub fn get_lit(&self) -> Lit {
         self.value.clone()
     }
 }
@@ -480,6 +582,12 @@ pub enum Lit {
     Exp(Vec<Lit>),
 }
 
+impl From<&str> for Lit {
+    fn from(s: &str) -> Self {
+        Self::LValue(s.into())
+    }
+}
+
 impl From<&SymId> for Lit {
     fn from(s: &SymId) -> Self {
         Self::Atom(*s)
@@ -525,7 +633,7 @@ impl From<Vec<Lit>> for Lit {
 impl FormatWithSymTable for Lit {
     fn format_with_sym_table(&self, st: &SymTable) -> String {
         match self {
-            Lit::Atom(a) => st.symbols.get(*a).unwrap().clone(),
+            Lit::Atom(a) => st.symbols.get(*a).unwrap().to_string(),
             Lit::Constraint(c) => c.format_with_sym_table(st),
             Lit::Exp(vec) => {
                 let mut str = "(".to_string();

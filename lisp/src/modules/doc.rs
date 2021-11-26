@@ -75,7 +75,6 @@ impl Documentation for CtxDoc {
             LHelp::new(QUOTE, DOC_QUOTE),
             LHelp::new(QUASI_QUOTE, QUASI_QUOTE),
             LHelp::new(UNQUOTE, DOC_UNQUOTE),
-            LHelp::new(SET, DOC_SET),
             LHelp::new_verbose(BEGIN, DOC_BEGIN, DOC_BEGIN_VERBOSE),
             LHelp::new(LIST, DOC_LIST),
             LHelp::new_verbose(MAP, DOC_MAP, DOC_MAP_VERBOSE),

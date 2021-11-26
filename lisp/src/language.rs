@@ -22,6 +22,7 @@ pub mod scheme_primitives {
     pub const CONS: &str = "cons";
 
     //Other
+    pub const SET: &str = "set";
     pub const GET: &str = "get";
     pub const GET_MAP: &str = "get-map";
     pub const SET_MAP: &str = "set-map";
@@ -62,7 +63,6 @@ pub mod scheme_primitives {
     pub const QUOTE_CHAR: char = '\'';
     pub const UNQUOTE_CHAR: char = ',';
     pub const QUASI_QUOTE_CHAR: char = '`';
-    pub const SET: &str = "set!";
     pub const BEGIN: &str = "begin";
     pub const ASYNC: &str = "async";
     pub const AWAIT: &str = "await";
@@ -183,7 +183,6 @@ and then it returns the remainder of the list beginning with the first argument.
     pub const DOC_QUOTE: &str = "Prevent the LValue to be evaluated";
     pub const DOC_QUASI_QUOTE: &str = "Begins a context mixing quoting and unquoting";
     pub const DOC_UNQUOTE: &str = "Evaluated an expression present inside a quasi-quote statement";
-    pub const DOC_SET: &str = "Set the value of an entry of the environment";
     pub const DOC_BEGIN: &str = "Evaluated a list LValue and returns the last one.";
     pub const DOC_BEGIN_VERBOSE: &str = "Example: \n\
                                      \t>>(begin 10 (* 3 3))\n\

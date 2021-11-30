@@ -1,6 +1,5 @@
 use crate::structs::Lit;
 use crate::structs::*;
-use ompas_lisp::functions::last;
 use ompas_lisp::language::scheme_primitives::EVAL;
 use ompas_lisp::structs::{LCoreOperator, LValue};
 

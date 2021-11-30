@@ -1,7 +1,7 @@
 use crate::structs::Sym::Unique;
 use ompas_lisp::structs::LValue;
 use std::collections::{HashMap, HashSet};
-use std::fmt::{write, Display, Formatter};
+use std::fmt::{Display, Formatter};
 
 #[derive(Hash, Eq, PartialEq, Clone)]
 pub enum Sym {

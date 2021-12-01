@@ -1,98 +1,99 @@
-use ompas_lisp::core::{parse, LEnv};
-use ompas_lisp::structs::LError::SpecialError;
-use ompas_lisp::structs::{LError, LValue};
-use ompas_planning::algo::{
-    translate_lvalue_to_chronicle, translate_lvalue_to_expression_chronicle_r,
-};
-use ompas_planning::structs::*;
-use rustyline::error::ReadlineError;
-use rustyline::Editor;
+use std::path::PathBuf;
+
+use structopt::StructOpt;
+
+//use ompas_modules::robot::CtxRobot;
+use ompas_lisp::core::*;
+use ompas_lisp::lisp_interpreter::{LispInterpreter, LispInterpreterConfig};
+use ompas_lisp::modules::_type::CtxType;
+use ompas_lisp::modules::doc::{CtxDoc, Documentation};
+use ompas_lisp::modules::error::CtxError;
+use ompas_lisp::modules::io::CtxIo;
+use ompas_lisp::modules::math::CtxMath;
+use ompas_lisp::modules::string::CtxString;
+use ompas_lisp::modules::utils::CtxUtils;
+use ompas_planning::mod_domain::CtxDomain;
+
+pub const TOKIO_CHANNEL_SIZE: usize = 65_384;
+
+#[derive(Debug, StructOpt)]
+#[structopt(
+    name = "Translate",
+    about = "A binary to translate RAE Domain into Chronicles"
+)]
+struct Opt {
+    #[structopt(short = "d", long = "debug")]
+    debug: bool,
+
+    #[structopt(short = "p", long = "log-path")]
+    log: Option<PathBuf>,
+}
 
 #[tokio::main]
-async fn main() -> Result<(), LError> {
-    println!("translate binary");
-    let mut rl = Editor::<()>::new();
-    if rl.load_history("history_translate.txt").is_err() {
-        println!("No previous history.");
-    }
-    loop {
-        let readline = rl.readline(">> ");
+async fn main() {
+    println!("Scheme console v0.1");
 
-        match readline {
-            Ok(string) => {
-                rl.add_history_entry(string.clone());
-                let _ = translate_2(&string).await?;
-            }
-            Err(ReadlineError::Interrupted) => {
-                println!("CTRL-C");
-                break;
-            }
-            Err(ReadlineError::Eof) => {
-                println!("CTRL-D");
-                break;
-            }
-            Err(err) => {
-                println!("Error: {:?}", err);
-                break;
-            }
-        }
+    let opt: Opt = Opt::from_args();
+    println!("{:?}", opt);
+    if opt.debug {
+        activate_debug();
     }
 
-    rl.save_history("history_translate.txt").unwrap();
-
-    Ok(())
+    //test_lib_model(&opt);
+    lisp_interpreter(opt.log).await;
 }
 
-async fn translate_2(exp: &str) -> Result<ExpressionChronicle, LError> {
-    let (mut env, mut ctxs) = LEnv::root().await;
-    let lv = parse(exp, &mut env, &mut ctxs).await?;
+pub async fn lisp_interpreter(log: Option<PathBuf>) {
+    let mut li = LispInterpreter::new().await;
 
-    let mut symbol_table = SymTable::default();
+    let mut ctx_doc = CtxDoc::default();
+    let mut ctx_io = CtxIo::default();
+    let ctx_math = CtxMath::default();
+    let ctx_type = CtxType::default();
+    let ctx_utils = CtxUtils::default();
+    let ctx_string = CtxString::default();
+    let ctx_domain = CtxDomain::new().await;
 
-    let chronicle = translate_lvalue_to_expression_chronicle_r(&lv, &mut symbol_table);
-    println!("{}", chronicle.format_with_sym_table(&symbol_table));
-    Ok(chronicle)
-}
+    //Insert the doc for the different contexts.
+    ctx_doc.insert_doc(CtxIo::documentation());
+    ctx_doc.insert_doc(CtxMath::documentation());
+    ctx_doc.insert_doc(CtxType::documentation());
+    ctx_doc.insert_doc(CtxUtils::documentation());
+    ctx_doc.insert_doc(CtxString::documentation());
+    ctx_doc.insert_doc(CtxDomain::documentation());
 
-async fn translate(exp: &str) -> Result<Chronicle, LError> {
-    let (mut env, mut ctxs) = LEnv::root().await;
-    let lv = parse(exp, &mut env, &mut ctxs).await?;
+    //Add the sender of the channel.
+    ctx_io.add_communication(li.subscribe());
+    if let Some(pb) = &log {
+        ctx_io.set_log_output(pb.clone().into());
+    }
 
-    let slice = if let LValue::List(l) = &lv {
-        l.as_slice()
-    } else {
-        return Err(SpecialError(
-            "MAIN_TRANSLATE",
-            "exp should be a list".to_string(),
-        ));
-    };
+    li.import_namespace(CtxError::default())
+        .await
+        .expect("error loading error");
+    li.import_namespace(ctx_utils)
+        .await
+        .expect("error loading utils");
+    li.import_namespace(ctx_doc)
+        .await
+        .expect("error loading doc");
+    li.import_namespace(ctx_io).await.expect("error loading io");
+    li.import_namespace(ctx_math)
+        .await
+        .expect("error loading math");
+    li.import_namespace(ctx_type)
+        .await
+        .expect("error loading type");
 
-    let mut symbol_table = SymTable::default();
+    li.import(ctx_string)
+        .await
+        .expect("error loading ctx string");
 
-    let chronicle = translate_lvalue_to_chronicle(slice, &mut symbol_table);
-    println!("{}", chronicle.format_with_sym_table(&symbol_table));
-    Ok(chronicle)
-}
+    li.import_namespace(ctx_domain)
+        .await
+        .expect("error loading rae domain");
 
-#[tokio::test]
-async fn test() -> Result<(), LError> {
-    let exp = "(test 1 2 3 4)";
-    let (mut env, mut ctxs) = LEnv::root().await;
-    let lv = parse(exp, &mut env, &mut ctxs).await?;
+    li.set_config(LispInterpreterConfig::new(true));
 
-    let slice = if let LValue::List(l) = &lv {
-        l.as_slice()
-    } else {
-        return Err(SpecialError(
-            "MAIN_TRANSLATE",
-            "exp should be a list".to_string(),
-        ));
-    };
-
-    let mut symbol_table = SymTable::default();
-
-    let chronicle = translate_lvalue_to_chronicle(slice, &mut symbol_table);
-
-    println!("{}", chronicle.format_with_sym_table(&symbol_table));
-    Ok(())
+    li.run(log).await;
 }

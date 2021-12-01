@@ -2,7 +2,7 @@
 use crate::core::LEnv;
 use crate::lisp_interpreter::ChannelToLispInterpreter;
 use crate::modules::doc::{Documentation, LHelp};
-use crate::structs::LError::{WrongNumberOfArgument, WrongType};
+use crate::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
 use crate::structs::{GetModule, LError, LValue, Module, NameTypeLValue};
 use std::fs::File;
 use std::io::{Read, Write};
@@ -162,7 +162,10 @@ pub fn read(args: &[LValue], _: &LEnv, _: &CtxIo) -> Result<LValue, LError> {
         }
     };
 
-    let mut file = File::open(file_name)?;
+    let mut file = match File::open(&file_name) {
+        Ok(f) => f,
+        Err(e) => return Err(SpecialError(READ, format!("{}: {}", file_name, e))),
+    };
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;
 

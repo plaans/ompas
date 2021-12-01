@@ -86,3 +86,7 @@ path = "examples/logger.rs"
 [[example]]
 name = "test_lenv"
 path = "examples/recursive_search_of_symbol.rs"
+
+[[example]]
+name = "test_chronicle_conversion"
+path = "examples/convert_to_chronicle.rs"

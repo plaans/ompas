@@ -1,12 +1,17 @@
 //! Module containing the Scheme library to setup DOMAIN environment
 
+use crate::algo::translate_lvalue_to_expression_chronicle_r;
+use crate::structs::{FormatWithSymTable, SymTable};
 use ::macro_rules_attribute::macro_rules_attribute;
 use ompas_acting::rae::context::rae_env::*;
 use ompas_acting::rae::context::rae_state::{LState, RAEState, StateType};
 use ompas_acting::rae::module::mod_rae_description::*;
-use ompas_lisp::core::{eval, expand, ContextCollection, LEnv};
+use ompas_lisp::core::ImportType::WithoutPrefix;
+use ompas_lisp::core::{eval, expand, import, ContextCollection, LEnv};
 use ompas_lisp::functions::cons;
 use ompas_lisp::modules::doc::{Documentation, LHelp};
+use ompas_lisp::modules::math::CtxMath;
+use ompas_lisp::modules::utils::CtxUtils;
 use ompas_lisp::structs::LError::*;
 use ompas_lisp::structs::LValue::Nil;
 use ompas_lisp::structs::*;
@@ -75,7 +80,6 @@ const DOC_DEF_METHOD_VERBOSE: &str =
 const DOC_DEF_LAMBDA: &str = "Add a lambda to DOMAIN environment";
 const DOC_DEF_INITIAL_STATE: &str = "Add initial facts in the state. Most of the time it is general knowledge and not initialisation of facts.";
 
-#[derive(Default)]
 pub struct CtxDomain {
     pub domain: DomainEnv,
     pub env: LEnv,
@@ -83,12 +87,41 @@ pub struct CtxDomain {
     pub state: RAEState,
 }
 
+impl CtxDomain {
+    pub async fn new() -> Self {
+        let (mut env, mut ctxs) = LEnv::root().await;
+
+        //Math
+        import(&mut env, &mut ctxs, CtxUtils::default(), WithoutPrefix)
+            .await
+            .expect("error loading ctx utils");
+        import(&mut env, &mut ctxs, CtxMath::default(), WithoutPrefix)
+            .await
+            .expect("error loading ctx math");
+        import(
+            &mut env,
+            &mut ctxs,
+            CtxRaeDescription::default(),
+            WithoutPrefix,
+        )
+        .await
+        .expect("error loading ctx rae description");
+
+        Self {
+            domain: Default::default(),
+            env,
+            ctxs,
+            state: Default::default(),
+        }
+    }
+}
+
 impl GetModule for CtxDomain {
     fn get_module(self) -> Module {
         let mut module = Module {
             ctx: Arc::new(self),
             prelude: vec![],
-            raw_lisp: Default::default(),
+            raw_lisp: vec!["(read godot_domain/translate.lisp)"].into(),
             label: MOD_DOMAIN.to_string(),
         };
 
@@ -97,6 +130,9 @@ impl GetModule for CtxDomain {
         module.add_fn_prelude(DOMAIN_GET_ACTIONS, get_actions);
         module.add_fn_prelude(DOMAIN_GET_TASKS, get_tasks);
         module.add_fn_prelude(DOMAIN_GET_ENV, get_env);
+
+        module.add_fn_prelude(DOMAIN_TRANSLATE_EXPR, translate_expr);
+        module.add_fn_prelude(DOMAIN_TRANSLATE_DOMAIN, translate_domain);
 
         module.add_async_mut_fn_prelude(DOMAIN_DEF_STATE_FUNCTION, def_state_function);
         module.add_async_mut_fn_prelude(DOMAIN_DEF_ACTION, def_action);
@@ -142,12 +178,26 @@ impl Documentation for CtxDomain {
     }
 }
 
-pub fn translate_expr(_: &[LValue], _env: &LEnv, ctx: &CtxDomain) -> Result<LValue, LError> {
-    todo!()
+pub fn translate_expr(args: &[LValue], _env: &LEnv, ctx: &CtxDomain) -> Result<LValue, LError> {
+    if args.len() != 1 {
+        return Err(WrongNumberOfArgument(
+            DOMAIN_TRANSLATE_EXPR,
+            args.into(),
+            args.len(),
+            1..1,
+        ));
+    }
+
+    let lv = &args[0];
+
+    let mut symbol_table = SymTable::default();
+    let chronicle = translate_lvalue_to_expression_chronicle_r(lv, &mut symbol_table);
+    let string = chronicle.format_with_sym_table(&symbol_table);
+    Ok(string.into())
 }
 
 pub fn translate_domain(_: &[LValue], _env: &LEnv, ctx: &CtxDomain) -> Result<LValue, LError> {
-    todo!()
+    Ok("Not implemented yet".into())
 }
 ///Get the methods of a given task
 pub fn get_methods(_: &[LValue], _env: &LEnv, ctx: &CtxDomain) -> Result<LValue, LError> {

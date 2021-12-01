@@ -97,7 +97,7 @@ impl Display for LError {
 
 impl From<std::io::Error> for LError {
     fn from(e: std::io::Error) -> Self {
-        SpecialError("io", e.to_string())
+        SpecialError("std::io::Error", e.to_string())
     }
 }
 

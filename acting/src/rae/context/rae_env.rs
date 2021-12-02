@@ -36,86 +36,11 @@ pub const RAE_METHOD_TYPES_MAP: &str = "rae-method-types-map";
 pub const RAE_METHOD_SCORE_MAP: &str = "rae-method-score-map";
 pub const RAE_METHOD_GENERATOR_MAP: &str = "rae-method-generator-map";
 pub const RAE_METHOD_PRE_CONDITIONS_MAP: &str = "rae-method-pre-conditions-map";
-pub const RAE_METHODS_EFFECTS_MAP: &str = "rae-method-effects-map";
 pub const ACTION_TYPE: &str = "action_type";
 pub const TASK_TYPE: &str = "task_type";
 pub const METHOD_TYPE: &str = "method_type";
 pub const STATE_FUNCTION_TYPE: &str = "state_function_type";
 pub const LAMBDA_TYPE: &str = "lambda_type";
-
-#[derive(Debug, Clone)]
-pub struct Method {
-    task_label: String,
-    parameters: Parameters,
-    lambda_pre_conditions: LValue,
-    lambda_effects: LValue,
-    lambda_score: LValue,
-    lambda_body: LValue,
-}
-
-//Getters
-impl Method {
-    pub fn get_task_label(&self) -> &String {
-        &self.task_label
-    }
-
-    pub fn get_parameters(&self) -> &Parameters {
-        &self.parameters
-    }
-
-    pub fn get_pre_conditions(&self) -> &LValue {
-        &self.lambda_pre_conditions
-    }
-
-    pub fn get_effects(&self) -> &LValue {
-        &self.lambda_pre_conditions
-    }
-
-    pub fn get_body(&self) -> &LValue {
-        &self.lambda_body
-    }
-}
-
-impl Method {
-    pub fn new(
-        task_label: String,
-        parameters: Parameters,
-        conds: LValue,
-        effects: LValue,
-        score: LValue,
-        body: LValue,
-    ) -> Self {
-        Self {
-            task_label,
-            parameters,
-            lambda_pre_conditions: conds,
-            lambda_effects: effects,
-            lambda_score: score,
-            lambda_body: body,
-        }
-    }
-}
-
-impl Display for Method {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "-task: {}\n\
-            -parameters: {}\n\
-            -pre-conditions: {}\n\
-            -effects: {}\n\
-            -score: {}\n\
-            -body: {}\n",
-            self.task_label,
-            self.parameters,
-            self.lambda_pre_conditions
-                .pretty_print("pre-conditions: ".len()),
-            self.lambda_effects.pretty_print("effects: ".len()),
-            self.lambda_score.pretty_print("score: ".len()),
-            self.lambda_body.pretty_print("body: ".len())
-        )
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct Parameters {
@@ -211,6 +136,71 @@ impl Display for Parameters {
 }
 
 #[derive(Debug, Clone)]
+pub struct Method {
+    task_label: String,
+    parameters: Parameters,
+    lambda_pre_conditions: LValue,
+    lambda_score: LValue,
+    lambda_body: LValue,
+}
+
+//Getters
+impl Method {
+    pub fn get_task_label(&self) -> &String {
+        &self.task_label
+    }
+
+    pub fn get_parameters(&self) -> &Parameters {
+        &self.parameters
+    }
+
+    pub fn get_pre_conditions(&self) -> &LValue {
+        &self.lambda_pre_conditions
+    }
+
+    pub fn get_body(&self) -> &LValue {
+        &self.lambda_body
+    }
+}
+
+impl Method {
+    pub fn new(
+        task_label: String,
+        parameters: Parameters,
+        conds: LValue,
+        score: LValue,
+        body: LValue,
+    ) -> Self {
+        Self {
+            task_label,
+            parameters,
+            lambda_pre_conditions: conds,
+            lambda_score: score,
+            lambda_body: body,
+        }
+    }
+}
+
+impl Display for Method {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "-task: {}\n\
+            -parameters: {}\n\
+            -pre-conditions: {}\n\
+            -score: {}\n\
+            -body: {}\n",
+            self.task_label,
+            self.parameters,
+            self.lambda_pre_conditions
+                .pretty_print("pre-conditions: ".len()),
+            self.lambda_score.pretty_print("score: ".len()),
+            self.lambda_body.pretty_print("body: ".len())
+        )
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Task {
     body: LValue,
     parameters: Parameters,
@@ -254,7 +244,7 @@ impl Display for Task {
             f,
             "-parameters: {}\n\
             -body: {}\n\
-             -methods: {}\n",
+            -methods: {}\n",
             self.parameters,
             self.body.pretty_print("body: ".len()),
             str_methods
@@ -264,13 +254,18 @@ impl Display for Task {
 
 #[derive(Debug, Clone)]
 pub struct DualExpression {
+    parameters: Parameters,
     exec: LValue,
     sim: LValue,
 }
 
 impl DualExpression {
-    pub fn new(exec: LValue, sim: LValue) -> Self {
-        Self { exec, sim }
+    pub fn new(parameters: Parameters, exec: LValue, sim: LValue) -> Self {
+        Self {
+            parameters,
+            exec,
+            sim,
+        }
     }
 }
 
@@ -278,7 +273,8 @@ impl Display for DualExpression {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "exec: {}\nsimu: {}",
+            "parameters : {}, exec: {}\nsimu: {}",
+            self.parameters,
             self.exec.pretty_print("exec: ".len()),
             self.sim.pretty_print("simu: ".len())
         )
@@ -513,7 +509,6 @@ impl DomainEnv {
         let mut env = LEnv::empty();
         let mut map_task_method: HashMap<LValue, LValue> = Default::default();
         let mut map_method_pre_conditions: HashMap<LValue, LValue> = Default::default();
-        let mut map_method_effects: HashMap<LValue, LValue> = Default::default();
         let mut map_method_score: HashMap<LValue, LValue> = Default::default();
         let mut map_method_types: HashMap<LValue, LValue> = Default::default();
 
@@ -528,7 +523,6 @@ impl DomainEnv {
         for (label, method) in self.get_methods() {
             env.insert(label.clone(), method.lambda_body.clone());
             map_method_pre_conditions.insert(label.into(), method.lambda_pre_conditions.clone());
-            map_method_effects.insert(label.into(), method.lambda_effects.clone());
             map_method_score.insert(label.into(), method.lambda_score.clone());
             map_method_types.insert(label.into(), method.parameters.get_types().clone().into());
         }
@@ -566,10 +560,6 @@ impl DomainEnv {
             RAE_METHOD_PRE_CONDITIONS_MAP.to_string(),
             map_method_pre_conditions.into(),
         );
-        env.insert(
-            RAE_METHODS_EFFECTS_MAP.to_string(),
-            map_method_effects.into(),
-        );
 
         env.insert(RAE_METHOD_SCORE_MAP.to_string(), map_method_score.into());
 
@@ -580,7 +570,6 @@ impl DomainEnv {
         let mut env = LEnv::empty();
         let mut map_task_method: HashMap<LValue, LValue> = Default::default();
         let mut map_method_pre_conditions: HashMap<LValue, LValue> = Default::default();
-        let mut map_method_effects: HashMap<LValue, LValue> = Default::default();
         let mut map_method_score: HashMap<LValue, LValue> = Default::default();
         let mut map_method_types: HashMap<LValue, LValue> = Default::default();
 
@@ -595,7 +584,6 @@ impl DomainEnv {
         for (label, method) in self.get_methods() {
             env.insert(label.clone(), method.lambda_body.clone());
             map_method_pre_conditions.insert(label.into(), method.lambda_pre_conditions.clone());
-            map_method_effects.insert(label.into(), method.lambda_effects.clone());
             map_method_score.insert(label.into(), method.lambda_score.clone());
             map_method_types.insert(label.into(), method.parameters.get_types().clone().into());
         }
@@ -633,10 +621,6 @@ impl DomainEnv {
         env.insert(
             RAE_METHOD_PRE_CONDITIONS_MAP.to_string(),
             map_method_pre_conditions.into(),
-        );
-        env.insert(
-            RAE_METHODS_EFFECTS_MAP.to_string(),
-            map_method_effects.into(),
         );
 
         env.insert(RAE_METHOD_SCORE_MAP.to_string(), map_method_score.into());
@@ -816,11 +800,10 @@ impl RAEEnv {
         task_label: String,
         parameters: Parameters,
         conds: LValue,
-        effects: LValue,
         score: LValue,
         body: LValue,
     ) -> Result<(), LError> {
-        let method = Method::new(task_label, parameters, conds, effects, score, body);
+        let method = Method::new(task_label, parameters, conds, score, body);
 
         self.domain_env.add_method(method_label, method)?;
 

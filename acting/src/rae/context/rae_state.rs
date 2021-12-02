@@ -14,7 +14,6 @@ use tokio::sync::{broadcast, Mutex, RwLock};
 pub const KEY_DYNAMIC: &str = "dynamic";
 pub const KEY_STATIC: &str = "static";
 pub const KEY_INNER_WORLD: &str = "inner-world";
-const INSTANCE: &str = "instance";
 
 #[derive(Clone, Debug, PartialOrd, PartialEq, Eq)]
 pub enum StateType {
@@ -144,12 +143,12 @@ impl RAEState {
             Some(_type) => match _type {
                 StateType::Static => {
                     let new_state = self._static.write().await.union(&state).inner;
-                    match self.check_for_instance_declaration(&state).await {
+                    /*match self.check_for_instance_declaration(&state).await {
                         None => {}
                         Some(inner_world) => {
                             self.inner_world.write().await.inner = inner_world.inner;
                         }
-                    }
+                    }*/
                     self._static.write().await.inner = new_state;
                 }
                 StateType::Dynamic => {
@@ -157,8 +156,8 @@ impl RAEState {
                     self.dynamic.write().await.inner = new_state;
                 }
                 StateType::InnerWorld => {
-                    let new_state = self.dynamic.write().await.union(&state).inner;
-                    self.dynamic.write().await.inner = new_state;
+                    let new_state = self.inner_world.write().await.union(&state).inner;
+                    self.inner_world.write().await.inner = new_state;
                 }
             },
         }
@@ -211,7 +210,7 @@ impl RAEState {
         }
     }
 
-    async fn check_for_instance_declaration(&self, state: &LState) -> Option<LState> {
+    /*async fn check_for_instance_declaration(&self, state: &LState) -> Option<LState> {
         for element in &state.inner {
             //let string_key = element.0.to_string();
             //println!("{}", string_key);
@@ -256,7 +255,7 @@ impl RAEState {
         }
 
         None
-    }
+    }*/
 }
 
 #[derive(Debug, Clone, Copy)]

@@ -6,20 +6,66 @@ use crate::tcp::{task_tcp_connection, TEST_TCP};
 use crate::TOKIO_CHANNEL_SIZE;
 use async_trait::async_trait;
 use core::time;
+use im::{HashMap, HashSet};
 use ompas_acting::rae::context::actions_progress::{ActionsProgress, Status};
 use ompas_acting::rae::context::rae_state::{RAEState, StateType, KEY_DYNAMIC, KEY_STATIC};
 use ompas_acting::rae::module::mod_rae_exec::{
-    RAEInterface, RAE_GET_STATE_VARIBALE, RAE_LAUNCH_PLATFORM,
+    CtxPlatform, RAEInterface, RAE_GET_STATE_VARIBALE, RAE_LAUNCH_PLATFORM,
 };
 use ompas_lisp::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
+use ompas_lisp::structs::LValue::Nil;
 use ompas_lisp::structs::*;
 use ompas_utils::task_handler;
+use std::convert::TryInto;
 use std::net::SocketAddr;
 use std::process::Command;
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
-use tokio::sync::mpsc;
 use tokio::sync::mpsc::Sender;
+use tokio::sync::{mpsc, RwLock};
+
+#[derive(Default, Clone)]
+pub struct Instance {
+    inner: Arc<RwLock<HashMap<String, HashSet<String>>>>,
+}
+
+impl Instance {
+    pub async fn add_instance_of(&self, instance: String, _type: String) {
+        let mut locked = self.inner.write().await;
+
+        match locked.get_mut(&_type) {
+            Some(vec) => {
+                vec.insert(instance);
+            }
+            None => {
+                let mut set = HashSet::new();
+                set.insert(instance);
+                locked.insert(_type, set);
+            }
+        };
+    }
+
+    pub async fn add_type(&self, _type: String) {
+        self.inner.write().await.insert(_type, HashSet::default());
+    }
+}
+
+impl Instance {
+    pub async fn is_of_type(&self, instance: String, _type: String) -> LResult {
+        match self.inner.read().await.get(&_type) {
+            Some(vec) => Ok(vec.contains(&instance).into()),
+            None => Ok(false.into()),
+        }
+    }
+
+    pub async fn instance_of(&self, _type: String) -> LResult {
+        match self.inner.read().await.get(&_type) {
+            Some(set) => Ok(set.clone().iter().cloned().collect::<Vec<String>>().into()),
+            None => Ok(Nil),
+        }
+    }
+}
 
 /// Struct used to bind RAE and Godot.
 #[derive(Default, Clone)]
@@ -27,6 +73,7 @@ pub struct PlatformGodot {
     pub socket_info: SocketInfo,
     pub sender_socket: Option<Sender<String>>,
     pub state: RAEState,
+    pub instance: Instance,
     pub status: ActionsProgress,
 }
 
@@ -385,7 +432,10 @@ impl RAEInterface for PlatformGodot {
         //println!("godot launched!");
         let state = self.state.clone();
         let status = self.status.clone();
-        tokio::spawn(async move { task_tcp_connection(&socket_addr, rx, state, status).await });
+        let instance = self.instance.clone();
+        tokio::spawn(async move {
+            task_tcp_connection(&socket_addr, rx, state, status, instance).await
+        });
         //println!("com opened with godot");
         Ok(LValue::Nil)
     }
@@ -404,5 +454,42 @@ impl RAEInterface for PlatformGodot {
     async fn domain(&self) -> &'static str {
         //GODOT_DOMAIN
         "(read godot_domain/init.lisp)"
+    }
+
+    //1 arg: return all instances of a type
+    //2 arg: check if an instance is of a certain type
+    async fn instance(&self, args: &[LValue]) -> LResult {
+        match args.len() {
+            1 => self.instance.instance_of((&args[0]).try_into()?).await,
+            2 => {
+                self.instance
+                    .is_of_type((&args[0]).try_into()?, (&args[1]).try_into()?)
+                    .await
+            }
+            _ => Err(WrongNumberOfArgument(
+                "godot::instance",
+                args.into(),
+                args.len(),
+                1..2,
+            )),
+        }
+    }
+
+    fn context_platform(&self) -> CtxPlatform {
+        CtxPlatform::new(GodotCtx::default())
+    }
+}
+
+#[derive(Clone, Default)]
+struct GodotCtx {}
+
+impl GetModule for GodotCtx {
+    fn get_module(self) -> Module {
+        Module {
+            ctx: Arc::new(self),
+            prelude: vec![],
+            raw_lisp: Default::default(),
+            label: "".to_string(),
+        }
     }
 }

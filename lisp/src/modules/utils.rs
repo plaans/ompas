@@ -291,7 +291,8 @@ impl Documentation for CtxUtils {
 ///Return enumeration from a list of list
 ///uses function from aries_utils
 /// # Example:
-///``` rust
+///``` rust    #[allow(unused_mut)]
+
 /// use ompas_lisp::modules::utils::{CtxUtils, enumerate};
 /// use ompas_lisp::structs::LValue;
 /// use ompas_lisp::core::LEnv;
@@ -392,7 +393,7 @@ pub fn sublist(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
                 if let LValue::Number(n) = &args[1] {
                     if n.is_natural() {
                         let i: usize = n.into();
-                        return Ok(l[i..].into());
+                        Ok(l[i..].into())
                     } else {
                         Err(SpecialError(
                             SUB_LIST,
@@ -423,7 +424,7 @@ pub fn sublist(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
                         if n1.is_natural() && n2.is_natural() {
                             let i1: usize = n1.into();
                             let i2: usize = n2.into();
-                            return Ok(l[i1..i2].into());
+                            Ok(l[i1..i2].into())
                         } else {
                             Err(SpecialError(
                                 SUB_LIST,

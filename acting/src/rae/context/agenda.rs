@@ -25,7 +25,7 @@ impl Agenda {
             string.push_str("\t\tIs empty...");
         } else {
             let mut k_v: Vec<(usize, RefinementStack)> =
-                inner.iter().map(|k| (k.0.clone(), k.1.clone())).collect();
+                inner.iter().map(|k| (*k.0, k.1.clone())).collect();
 
             k_v.sort_by(|k1, k2| k1.0.cmp(&k2.0));
             for (id, rs) in k_v {

@@ -103,7 +103,7 @@ impl SymTable {
     pub fn declare_new_result(&mut self) -> SymId {
         let n = self.types_number.get_mut(&SymType::Result).unwrap();
         let sym = format!("r_{}", n);
-        *n = *n + 1 as usize;
+        *n += 1;
         let id = self.symbols.len();
         self.symbols.push(sym.clone().into());
         self.ids.insert(sym.into(), id);
@@ -111,27 +111,27 @@ impl SymTable {
         id
     }
 
-    pub fn unique_to_several(&mut self, sym: &String) {
+    pub fn unique_to_several(&mut self, sym: &str) {
         if !self.multiple_def.contains_key(sym) {
             //change value in vec of symbol
-            let id = self.ids.remove(&Unique(sym.clone())).unwrap();
-            self.symbols[id] = Sym::Several(sym.clone(), 0);
+            let id = self.ids.remove(&Unique(sym.to_string())).unwrap();
+            self.symbols[id] = Sym::Several(sym.to_string(), 0);
             //Update key in hashmap
             self.ids.insert(self.symbols[id].clone(), id);
             //Create new entry in multiple_def
-            self.multiple_def.insert(sym.clone(), vec![id]);
+            self.multiple_def.insert(sym.to_string(), vec![id]);
             self.pointer_to_ver
                 .last_mut()
                 .unwrap()
-                .insert(sym.clone(), 0);
+                .insert(sym.to_string(), 0);
         }
     }
 
     pub fn declare_new_interval(&mut self) -> Interval {
         let n = self.types_number.get_mut(&SymType::Timepoint).unwrap();
         let start: Sym = format!("t_{}", n).into();
-        let end: Sym = format!("t_{}", *n + 1 as usize).into();
-        *n = *n + 2 as usize;
+        let end: Sym = format!("t_{}", *n + 1).into();
+        *n += 2;
         let id_1 = self.symbols.len();
         let id_2 = id_1 + 1;
         self.symbols.push(start.clone());
@@ -158,7 +158,7 @@ impl SymTable {
     pub fn declare_new_timepoint(&mut self) -> SymId {
         let n = self.types_number.get_mut(&SymType::Timepoint).unwrap();
         let sym: Sym = format!("t_{}", n).into();
-        *n = *n + 1 as usize;
+        *n += 1;
         let id = self.symbols.len();
         self.symbols.push(sym.clone());
         self.ids.insert(sym, id);
@@ -166,13 +166,8 @@ impl SymTable {
         id
     }
 
-    pub fn it_exists(&self, sym: &String) -> bool {
-        !self
-            .ids
-            .keys()
-            .filter(|k| k.get_string() == sym)
-            .collect::<Vec<&Sym>>()
-            .is_empty()
+    pub fn it_exists(&self, sym: &str) -> bool {
+        self.ids.keys().any(|k| k.get_string() == sym)
     }
 
     pub fn declare_new_object(
@@ -181,8 +176,8 @@ impl SymTable {
         if_it_exists_create_new: bool,
     ) -> SymId {
         let n = self.types_number.get_mut(&SymType::Object).unwrap();
-        let temp_n = n.clone();
-        *n = *n + 1 as usize;
+        let temp_n = *n;
+        *n += 1;
         let id = self.symbols.len();
         let sym: Sym = match obj {
             None => format!("o_{}", temp_n).into(),
@@ -354,11 +349,7 @@ pub struct PartialChronicle {
 
 impl Absorb for PartialChronicle {
     fn absorb(mut self, mut other: Self) -> Self {
-        self.variables = self
-            .variables
-            .union(&other.variables)
-            .map(|id| *id)
-            .collect();
+        self.variables = self.variables.union(&other.variables).copied().collect();
         self.constraints.append(&mut other.constraints);
         self.conditions.append(&mut other.conditions);
         self.effects.append(&mut other.effects);
@@ -636,7 +627,7 @@ impl From<Constraint> for Lit {
 
 impl From<Vec<Lit>> for Lit {
     fn from(vec: Vec<Lit>) -> Self {
-        Self::Exp(vec.clone())
+        Self::Exp(vec)
     }
 }
 
@@ -651,7 +642,7 @@ impl FormatWithSymTable for Lit {
                     if i != 0 {
                         str.push(' ');
                     }
-                    str.push_str(e.format_with_sym_table(&st).as_str())
+                    str.push_str(e.format_with_sym_table(st).as_str())
                 }
                 str.push(')');
                 str

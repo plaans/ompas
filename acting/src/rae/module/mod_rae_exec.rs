@@ -54,6 +54,7 @@ pub const RAE_OPEN_COM_PLATFORM: &str = "rae-open-com-platform";
 pub const RAE_START_PLATFORM: &str = "rae-start-platform";
 pub const RAE_GET_STATUS: &str = "rae-get-status";
 pub const RAE_CANCEL_COMMAND: &str = "rae-cancel-command";
+pub const RAE_INSTANCE: &str = "instance";
 pub const RAE_GET_INSTANTIATED_METHODS: &str = "rae-get-instantiated-methods";
 pub const RAE_GET_BEST_METHOD: &str = "rae-get-best-method";
 pub const RAE_SELECT: &str = "rae-select";
@@ -162,9 +163,6 @@ impl GetModule for CtxRaeExec {
         let init: InitLisp = vec![
             MACRO_MUTEX_LOCK_AND_DO,
             MACRO_WAIT_ON,
-            //LAMBDA_MUTEX_LOCK,
-            //LAMBDA_MUTEX_IS_LOCKED,
-            //LAMBDA_MUTEX_RELEASE,
             LAMBDA_PROGRESS,
             LAMBDA_SELECT,
             LAMBDA_RETRY,
@@ -187,6 +185,7 @@ impl GetModule for CtxRaeExec {
         module.add_async_mut_fn_prelude(RAE_LAUNCH_PLATFORM, launch_platform);
         module.add_async_fn_prelude(RAE_GET_STATUS, get_status);
         module.add_async_fn_prelude(RAE_CANCEL_COMMAND, cancel_command);
+        module.add_async_fn_prelude(RAE_INSTANCE, instance);
         //Manage facts:
         module.add_async_fn_prelude(RAE_ASSERT, assert_fact);
         module.add_async_fn_prelude(RAE_ASSERT_SHORT, assert_fact);
@@ -317,6 +316,10 @@ pub trait RAEInterface: Any + Send + Sync {
 
     /// Returns the RAE domain of the platform.
     async fn domain(&self) -> &'static str;
+
+    async fn instance(&self, args: &[LValue]) -> LResult;
+
+    fn context_platform(&self) -> CtxPlatform;
 }
 
 #[async_trait]
@@ -364,7 +367,34 @@ impl RAEInterface for () {
     async fn domain(&self) -> &'static str {
         ""
     }
+
+    async fn instance(&self, _args: &[LValue]) -> LResult {
+        Ok(Nil)
+    }
+
+    fn context_platform(&self) -> CtxPlatform {
+        todo!()
+    }
 }
+
+pub struct CtxPlatform {
+    module: Module,
+}
+
+impl CtxPlatform {
+    pub fn new(ctx: impl GetModule) -> Self {
+        Self {
+            module: ctx.get_module(),
+        }
+    }
+}
+
+impl GetModule for CtxPlatform {
+    fn get_module(self) -> Module {
+        self.module
+    }
+}
+
 #[macro_rules_attribute(dyn_async!)]
 async fn exec_command<'a>(
     args: &'a [LValue],
@@ -942,4 +972,13 @@ async fn get_list_locked<'a>(
         .map(|s| s.into())
         .collect::<Vec<LValue>>();
     Ok(locked.into())
+}
+
+#[macro_rules_attribute(dyn_async!)]
+async fn instance<'a>(
+    args: &'a [LValue],
+    _env: &'a LEnv,
+    ctx: &'a CtxRaeExec,
+) -> Result<LValue, LError> {
+    ctx.platform_interface.instance(args).await
 }

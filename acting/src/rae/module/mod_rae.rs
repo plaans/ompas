@@ -350,20 +350,33 @@ async fn def_state_function<'a>(
     .await?;
 
     if let LValue::List(list) = &lvalue {
-        if list.len() != 3 {
+        if list.len() != 4 {
             return Err(WrongNumberOfArgument(
                 RAE_DEF_STATE_FUNCTION,
                 lvalue.clone(),
                 list.len(),
-                3..3,
+                4..4,
             ));
         } else if let LValue::Symbol(action_label) = &list[0] {
-            if let LValue::Lambda(_) = &list[1] {
+            if let LValue::List(_) | LValue::Nil = &list[1] {
                 if let LValue::Lambda(_) = &list[2] {
-                    ctx.env.add_state_function(
-                        action_label.to_string(),
-                        StateFunction::new(list[1].clone(), list[2].clone()),
-                    )?;
+                    if let LValue::Lambda(_) = &list[3] {
+                        ctx.env.add_state_function(
+                            action_label.to_string(),
+                            StateFunction::new(
+                                (&list[1]).try_into()?,
+                                list[2].clone(),
+                                list[3].clone(),
+                            ),
+                        )?;
+                    } else {
+                        return Err(WrongType(
+                            RAE_DEF_STATE_FUNCTION,
+                            list[2].clone(),
+                            list[2].clone().into(),
+                            NameTypeLValue::Lambda,
+                        ));
+                    }
                 } else {
                     return Err(WrongType(
                         RAE_DEF_STATE_FUNCTION,
@@ -376,8 +389,8 @@ async fn def_state_function<'a>(
                 return Err(WrongType(
                     RAE_DEF_STATE_FUNCTION,
                     list[1].clone(),
-                    list[1].clone().into(),
-                    NameTypeLValue::Lambda,
+                    (&list[1]).into(),
+                    NameTypeLValue::List,
                 ));
             }
         } else {
@@ -543,23 +556,34 @@ async fn def_action<'a>(
     .await?;
 
     if let LValue::List(list) = &lvalue {
-        if list.len() != 2 {
+        if list.len() != 3 {
             return Err(WrongNumberOfArgument(
                 RAE_DEF_ACTION,
                 lvalue.clone(),
                 list.len(),
-                2..2,
+                3..3,
             ));
         } else if let LValue::Symbol(action_label) = &list[0] {
-            if let LValue::Lambda(_) = &list[1] {
-                ctx.env
-                    .add_action(action_label.to_string(), Action::new(list[1].clone(), Nil))?;
+            if let LValue::List(_) | LValue::Nil = &list[1] {
+                if let LValue::Lambda(_) = &list[2] {
+                    ctx.env.add_action(
+                        action_label.to_string(),
+                        Action::new((&list[1]).try_into()?, list[2].clone(), Nil),
+                    )?;
+                } else {
+                    return Err(WrongType(
+                        RAE_DEF_ACTION,
+                        list[2].clone(),
+                        list[2].clone().into(),
+                        NameTypeLValue::Lambda,
+                    ));
+                }
             } else {
                 return Err(WrongType(
                     RAE_DEF_ACTION,
                     list[1].clone(),
                     list[1].clone().into(),
-                    NameTypeLValue::Lambda,
+                    NameTypeLValue::List,
                 ));
             }
         } else {
@@ -605,12 +629,12 @@ async fn def_method<'a>(
     //println!("lvalue: {}", lvalue);
 
     if let LValue::List(list) = &lvalue {
-        if list.len() != 7 {
+        if list.len() != 6 {
             return Err(WrongNumberOfArgument(
                 RAE_DEF_METHOD,
                 lvalue.clone(),
                 list.len(),
-                7..7,
+                6..6,
             ));
         } else if let LValue::Symbol(method_label) = &list[0] {
             if let LValue::Symbol(task_label) = &list[1] {
@@ -619,24 +643,14 @@ async fn def_method<'a>(
                         if let LValue::Lambda(_) = &list[3] {
                             if let LValue::Lambda(_) = &list[4] {
                                 if let LValue::Lambda(_) = &list[5] {
-                                    if let LValue::Lambda(_) = &list[6] {
-                                        ctx.env.add_method(
-                                            method_label.to_string(),
-                                            task_label.to_string(),
-                                            list[2].clone().try_into()?,
-                                            list[3].clone(),
-                                            list[4].clone(),
-                                            list[5].clone(),
-                                            list[6].clone(),
-                                        )?;
-                                    } else {
-                                        return Err(WrongType(
-                                            RAE_DEF_METHOD,
-                                            list[6].clone(),
-                                            list[6].clone().into(),
-                                            NameTypeLValue::Lambda,
-                                        ));
-                                    }
+                                    ctx.env.add_method(
+                                        method_label.to_string(),
+                                        task_label.to_string(),
+                                        list[2].clone().try_into()?,
+                                        list[3].clone(),
+                                        list[4].clone(),
+                                        list[5].clone(),
+                                    )?;
                                 } else {
                                     return Err(WrongType(
                                         RAE_DEF_METHOD,

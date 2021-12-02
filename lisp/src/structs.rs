@@ -15,6 +15,8 @@ use std::ops::{Add, Div, Mul, Range, Sub};
 use std::pin::Pin;
 use std::sync::Arc;
 
+pub type LResult = Result<LValue, LError>;
+
 /// Error struct for Scheme
 /// Different kinds of errors are proposed, to have better explanation when one occurs:
 /// - WrongType: the LValue kind is not the one expected
@@ -127,7 +129,7 @@ impl LNumber {
         match self {
             LNumber::Usize(_) => true,
             LNumber::Int(i) => i.is_positive(),
-            LNumber::Float(f) => f.floor() == *f && f.is_sign_positive(),
+            LNumber::Float(f) => (f.floor() - *f).abs() < f64::EPSILON,
         }
     }
     pub fn is_integer(&self) -> bool {
@@ -2374,6 +2376,17 @@ impl Module {
 /// that will be loaded into the LEnv and ContextCollection.
 pub trait GetModule {
     fn get_module(self) -> Module;
+}
+
+impl GetModule for () {
+    fn get_module(self) -> Module {
+        Module {
+            ctx: Arc::new(self),
+            prelude: vec![],
+            raw_lisp: Default::default(),
+            label: "()".to_string(),
+        }
+    }
 }
 
 //TODO: Complete tests writing

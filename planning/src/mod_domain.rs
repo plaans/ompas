@@ -178,7 +178,7 @@ impl Documentation for CtxDomain {
     }
 }
 
-pub fn translate_expr(args: &[LValue], _env: &LEnv, ctx: &CtxDomain) -> Result<LValue, LError> {
+pub fn translate_expr(args: &[LValue], _env: &LEnv, _ctx: &CtxDomain) -> Result<LValue, LError> {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(
             DOMAIN_TRANSLATE_EXPR,
@@ -313,20 +313,33 @@ async fn def_state_function<'a>(
     .await?;
 
     if let LValue::List(list) = &lvalue {
-        if list.len() != 3 {
+        if list.len() != 4 {
             return Err(WrongNumberOfArgument(
                 DOMAIN_DEF_STATE_FUNCTION,
                 lvalue.clone(),
                 list.len(),
-                3..3,
+                4..4,
             ));
         } else if let LValue::Symbol(action_label) = &list[0] {
-            if let LValue::Lambda(_) = &list[1] {
+            if let LValue::List(_) | LValue::Nil = &list[1] {
                 if let LValue::Lambda(_) = &list[2] {
-                    ctx.domain.add_state_function(
-                        action_label.to_string(),
-                        StateFunction::new(list[1].clone(), list[2].clone()),
-                    );
+                    if let LValue::Lambda(_) = &list[3] {
+                        ctx.domain.add_state_function(
+                            action_label.to_string(),
+                            StateFunction::new(
+                                (&list[1]).try_into()?,
+                                list[2].clone(),
+                                list[3].clone(),
+                            ),
+                        );
+                    } else {
+                        return Err(WrongType(
+                            DOMAIN_DEF_STATE_FUNCTION,
+                            list[3].clone(),
+                            list[3].clone().into(),
+                            NameTypeLValue::Lambda,
+                        ));
+                    }
                 } else {
                     return Err(WrongType(
                         DOMAIN_DEF_STATE_FUNCTION,
@@ -339,8 +352,8 @@ async fn def_state_function<'a>(
                 return Err(WrongType(
                     DOMAIN_DEF_STATE_FUNCTION,
                     list[1].clone(),
-                    list[1].clone().into(),
-                    NameTypeLValue::Lambda,
+                    list[2].clone().into(),
+                    NameTypeLValue::Symbol,
                 ));
             }
         } else {
@@ -514,15 +527,26 @@ async fn def_action<'a>(
                 2..2,
             ));
         } else if let LValue::Symbol(action_label) = &list[0] {
-            if let LValue::Lambda(_) = &list[1] {
-                ctx.domain
-                    .add_action(action_label.to_string(), Action::new(list[1].clone(), Nil));
+            if let LValue::List(_) | LValue::Nil = &list[1] {
+                if let LValue::Lambda(_) = &list[1] {
+                    ctx.domain.add_action(
+                        action_label.to_string(),
+                        Action::new((&list[1]).try_into()?, list[1].clone(), Nil),
+                    );
+                } else {
+                    return Err(WrongType(
+                        DOMAIN_DEF_ACTION,
+                        list[2].clone(),
+                        list[2].clone().into(),
+                        NameTypeLValue::Lambda,
+                    ));
+                }
             } else {
                 return Err(WrongType(
                     DOMAIN_DEF_ACTION,
                     list[1].clone(),
                     list[1].clone().into(),
-                    NameTypeLValue::Lambda,
+                    NameTypeLValue::List,
                 ));
             }
         } else {
@@ -581,24 +605,14 @@ async fn def_method<'a>(
                         if let LValue::Lambda(_) = &list[3] {
                             if let LValue::Lambda(_) = &list[4] {
                                 if let LValue::Lambda(_) = &list[5] {
-                                    if let LValue::Lambda(_) = &list[6] {
-                                        let method = Method::new(
-                                            task_label.to_string(),
-                                            list[2].clone().try_into()?,
-                                            list[3].clone(),
-                                            list[4].clone(),
-                                            list[5].clone(),
-                                            list[6].clone(),
-                                        );
-                                        ctx.domain.add_method(method_label.to_string(), method)?;
-                                    } else {
-                                        return Err(WrongType(
-                                            DOMAIN_DEF_METHOD,
-                                            list[6].clone(),
-                                            list[6].clone().into(),
-                                            NameTypeLValue::Lambda,
-                                        ));
-                                    }
+                                    let method = Method::new(
+                                        task_label.to_string(),
+                                        list[2].clone().try_into()?,
+                                        list[3].clone(),
+                                        list[4].clone(),
+                                        list[5].clone(),
+                                    );
+                                    ctx.domain.add_method(method_label.to_string(), method)?;
                                 } else {
                                     return Err(WrongType(
                                         DOMAIN_DEF_METHOD,

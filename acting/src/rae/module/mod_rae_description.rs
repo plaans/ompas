@@ -20,28 +20,31 @@ pub const GENERATE_ACTION_OPERATIONAL_MODEL: &str = "generate-action-operational
 pub const GENERATE_METHOD: &str = "generate-method";
 
 /// Macro used to generate code to define a task in RAE environment.
-pub const MACRO_GENERATE_TASK: &str = "(defmacro generate-task \
-                                        (lambda (l body) \
-                                            (quasiquote (list (unquote l) (lambda (unquote (cdar body)) \
-                                                (if (unquote (cadadr body)) \
-                                                    (unquote (cadaddr body)) \
-                                                    (quote (task is not applicable in the given state))))))))";
+/*pub const MACRO_GENERATE_TASK: &str = "(defmacro generate-task \
+(lambda (l body) \
+    (quasiquote (list (unquote l) (lambda (unquote (cdar body)) \
+        (if (unquote (cadadr body)) \
+            (unquote (cadaddr body)) \
+            (quote (task is not applicable in the given state))))))))";*/
 
 /// Macro used to generate code to define a task in the simplified representation in RAE environment.
 pub const MACRO_GENERATE_TASK_SIMPLE: &str = "(defmacro generate-task-simple 
     (lambda args
-    (let ((label (car args))
-          (params (cdr args)))
+    (let* ((label (car args))
+          (p_expr (cdr args))
+          (params (car (unzip p_expr))))
          `(list ,label 
-            (quote ,params)
+            (quote ,p_expr)
             (lambda ,params
                 ,(cons 'progress (cons `(quote ,label) params)))))))";
 
 /// Macro used to generate code to define a state function in RAE environment.
 pub const MACRO_GENERATE_STATE_FUNCTION: &str = "(defmacro generate-state-function (lambda args
-    (let ((label (car args))
-          (params (cdr args)))
+    (let* ((label (car args))
+          (p_expr (cdr args))
+          (params (car (unzip p_expr))))
         `(list ,label
+            (quote ,p_expr)
             (lambda ,params
                 ,(cons 'rae-get-state-variable (cons `(quote ,label) params)))
             ,(if (= params nil)
@@ -53,32 +56,42 @@ pub const MACRO_GENERATE_STATE_FUNCTION: &str = "(defmacro generate-state-functi
 /// Macro used to generate code to define an action in RAE environment.
 pub const MACRO_GENERATE_ACTION: &str = "(defmacro generate-action
     (lambda args
-        (let ((label (car args))
-              (params (cdr args)))
+        (let* ((label (car args))
+               (p_expr (cdr args))
+               (p_unzip (unzip p_expr))
+               (params (car p_unzip))
+               (types (cadr p_unzip)))
              `(list ,label
+                 (quote ,p_expr)
                  (lambda ,params ,(cons 'rae-exec-command
                      (cons `(quote ,label) params)))))))";
 
 pub const MACRO_GENERATE_ACTION_MODEL: &str = "
 (defmacro generate-action-model
     (lambda (label def)
-        (let ((params (cdar def))
+        (let* ((p_expr (cdar def))
+               (p_unzip (unzip p_expr))
+               (params (car p_unzip))
                (conds (cadr (get def 1)))
                (effs (cadr (get def 2))))
               `(list ,label (lambda ,params
                     (begin
-                        (if ,conds
-                            ,effs
-                            )
+                        (if ,(gtpc p_expr)
+                            (if ,conds
+                                ,effs))
                         state))))))";
 pub const MACRO_GENERATE_ACTION_OPERATIONAL_MODEL: &str =
     "(defmacro generate-action-operational-model
     (lambda (label def)
-        (let ((params (cdar def))
-              (body (cadr (get def 1))))
+        (let* ((p_expr (cdar def))
+               (body (cadr (get def 1)))
+               (p_unzip (unzip p_expr))
+               (params (car p_unzip)))
+
               `(list ,label (lambda ,params
                     (begin
-                        ,body
+                        (if ,(gtpc p_expr)
+                            ,body)
                         state))))))";
 
 /// Macro used to generate code to define a method in REA environment.
@@ -87,9 +100,8 @@ pub const MACRO_GENERATE_METHOD: &str = "(defmacro generate-method
         (let ((t_label (cadar def))
             (p_expr (cdr (get def 1)))
             (conds (cadr (get def 2)))
-            (effs (cadr (get def 3)))
-            (score (cadr (get def 4)))
-            (body (cadr (get def 5))))
+            (score (cadr (get def 3)))
+            (body (cadr (get def 4))))
 
             (let* ((p_unzip (unzip p_expr))
                 (params (car p_unzip))
@@ -102,42 +114,8 @@ pub const MACRO_GENERATE_METHOD: &str = "(defmacro generate-method
                 (lambda ,params
                     (if ,(gtpc p_expr)
                         (if ,conds true)))
-                (lambda ,params ,effs)
                 (lambda ,params ,score)
                 (lambda ,params ,body))))))";
-
-/*pub const MACRO_GENERATE_METHOD: &str=
-"(defmacro generate-method;-final-till-there-is-a-new-one
-    (lambda (method-label m-def)
-    (let* ((task-label (cadr (get-list m-def 0)))
-            (params (cdr (get-list m-def 1)))
-            (pre-conditions (cadr (get-list m-def 2)))
-            (effects (cadr (get-list m-def 3)))
-            (body (cadr (get-list m-def 6)))
-            (parameter-generator (cdr (get-list m-def 4)))
-            (list-element (car parameter-generator))
-            (body-generator (cadr parameter-generator))
-            (score-generator (cadr (get-list m-def 5))))
-            `(list ,method-label
-                    ;label of the task
-                    (quote ,task-label)
-                    ;body of the method
-                    (lambda ,params ,pre-conditions)
-                    (lambda ,params ,effects)
-                    ;lambda to generate instances
-                    (lambda args
-                        (begin
-                            (define eval_params
-                                (lambda args
-                                    (let ((params (car args)))
-                                        (if (null? params)
-                                            nil
-                                            (if (eval (cons (lambda ,params ,body-generator) params))
-                                                (cons (list (cons (quote ,method-label) params) (eval (cons (lambda ,params ,score-generator) params)))
-                                                    (eval_params (cdr args)))
-                                                (eval_params (cdr args)))))))
-                            (eval_params (eval (cons enumerate (append args (quote ,list-element)))))))
-                    (lambda ,params ,body)))))";*/
 
 /// Macro used to generate code to define a method in RAE environment.
 pub const MACRO_GENERATE_METHOD_PARAMETERS: &str =
@@ -230,17 +208,16 @@ pub fn generate_type_test_expr(args: &[LValue], _: &LEnv, _: &()) -> Result<LVal
         for param in params {
             if let LValue::List(param) = &param {
                 if param.len() == 2 {
-                    if let LValue::Symbol(p) = &param[0] {
-                        if let LValue::Symbol(t) = &param[1] {
-                            match t.as_str() {
-                                LIST => str.push_str(format!("({} {})", IS_LIST, p).as_str()),
-                                BOOL => str.push_str(format!("({} {})", IS_BOOL, p).as_str()),
-                                INT => str.push_str(format!("({} {})", IS_INT, p).as_str()),
-                                FLOAT => str.push_str(format!("({} {})", IS_FLOAT, p).as_str()),
-                                NUMBER => str.push_str(format!("({} {})", IS_NUMBER, p).as_str()),
-                                SYMBOL => str.push_str(format!("({} {})", IS_SYMBOL, p).as_str()),
-                                _ => str
-                                    .push_str(format!("(!= ({}.instance {}) nil)", t, p).as_str()),
+                    if let LValue::Symbol(par) = &param[0] {
+                        if let LValue::Symbol(tpe) = &param[1] {
+                            match tpe.as_str() {
+                                LIST => str.push_str(format!("({} {})", IS_LIST, par).as_str()),
+                                BOOL => str.push_str(format!("({} {})", IS_BOOL, par).as_str()),
+                                INT => str.push_str(format!("({} {})", IS_INT, par).as_str()),
+                                FLOAT => str.push_str(format!("({} {})", IS_FLOAT, par).as_str()),
+                                NUMBER => str.push_str(format!("({} {})", IS_NUMBER, par).as_str()),
+                                SYMBOL => str.push_str(format!("({} {})", IS_SYMBOL, par).as_str()),
+                                _ => str.push_str(format!("(instance {} {})", par, tpe).as_str()),
                             }
                         } else {
                             return Err(WrongType(
@@ -338,9 +315,17 @@ mod test {
         let macro_to_test = TestExpression {
             inner: MACRO_GENERATE_TASK_SIMPLE,
             dependencies: vec![],
-            expression: "(generate-task-simple t_navigate_to ?r ?x ?y)",
-            expanded: "(list t_navigate_to (lambda (?r ?x ?y) (progress 't_navigate_to ?r ?x ?y)))",
-            result: "(list t_navigate_to (lambda (?r ?x ?y) (progress 't_navigate_to ?r ?x ?y)))",
+            expression: "(generate-task-simple t_navigate_to (?r robot) (?x int) (?y int))",
+            expanded: "(list \
+                        t_navigate_to
+                        '((?r robot) (?x int) (?y int))
+                        (lambda (?r ?x ?y)
+                            (progress 't_navigate_to ?r ?x ?y)))",
+            result: "(list \
+                        t_navigate_to
+                        '((?r robot) (?x int) (?y int))
+                        (lambda (?r ?x ?y)
+                            (progress 't_navigate_to ?r ?x ?y)))",
         };
 
         let (mut env, mut ctxs) = init_env_and_ctxs().await;
@@ -352,11 +337,13 @@ mod test {
         let macro_to_test = TestExpression {
             inner: MACRO_GENERATE_STATE_FUNCTION,
             dependencies: vec![],
-            expression: "(generate-state-function sf ?a ?b ?c)",
+            expression: "(generate-state-function sf (?a object) (?b object) (?c object))",
             expanded: "(list sf
+                            '((?a object) (?b object) (?c object))
                             (lambda (?a ?b ?c) (rae-get-state-variable 'sf ?a ?b ?c))
                             (lambda (?a ?b ?c) (get-map state (list 'sf ?a ?b ?c))))",
             result: "(list sf
+                            '((?a object) (?b object) (?c object))
                             (lambda (?a ?b ?c) (rae-get-state-variable 'sf ?a ?b ?c))
                             (lambda (?a ?b ?c) (get-map state (list 'sf ?a ?b ?c))))",
         };
@@ -369,9 +356,11 @@ mod test {
             dependencies: vec![],
             expression: "(generate-state-function sf)",
             expanded: "(list sf
+                            'nil
                             (lambda nil (rae-get-state-variable 'sf))
                             (lambda nil (get-map state 'sf)))",
             result: "(list sf
+                            'nil
                             (lambda nil (rae-get-state-variable 'sf))
                             (lambda nil (get-map state 'sf)))",
         };
@@ -383,10 +372,12 @@ mod test {
         let macro_to_test = TestExpression {
             inner: MACRO_GENERATE_ACTION,
             dependencies: vec![],
-            expression: "(generate-action pick_package ?r ?p)",
+            expression: "(generate-action pick_package (?r robot) (?p package))",
             expanded: "(list pick_package
+                            '((?r robot) (?p package))
                             (lambda (?r ?p) (rae-exec-command 'pick_package ?r ?p)))",
             result: "(list pick_package
+                            '((?r robot) (?p package))
                             (lambda (?r ?p) (rae-exec-command 'pick_package ?r ?p)))",
         };
 
@@ -400,22 +391,24 @@ mod test {
             inner: MACRO_GENERATE_ACTION_MODEL,
             dependencies: vec![],
             expression: "(generate-action-model pick
-                ((:params ?r)
+                ((:params (?r robot))
                   (:pre-conditions (> (robot.battery ?r) 0.4))
                   (:effects
                         (assert (robot.busy ?r) true))))",
             expanded: "(list pick
                             (lambda (?r)
                                 (begin
+                                    (if (instance ?r robot)
                                     (if (> (robot.battery ?r) 0.4)
-                                        (assert (robot.busy ?r) true))
-                                    state))))",
+                                        (assert (robot.busy ?r) true)))
+                                    state)))",
             result: "(list pick
                             (lambda (?r)
                                 (begin
+                                    (if (instance ?r robot)
                                     (if (> (robot.battery ?r) 0.4)
-                                        (assert (robot.busy ?r) true))
-                                    state))))",
+                                        (assert (robot.busy ?r) true)))
+                                    state)))",
         };
 
         let (mut env, mut ctxs) = init_env_and_ctxs().await;
@@ -428,7 +421,7 @@ mod test {
             inner: MACRO_GENERATE_ACTION_OPERATIONAL_MODEL,
             dependencies: vec![],
             expression: "(generate-action-operational-model place
-                        ((:params ?r)
+                        ((:params (?r robot))
                           (:body
                             (if (> (robot.battery ?r) 0.4)
                                 (assert (robot.busy ?r) false)
@@ -436,16 +429,18 @@ mod test {
             expanded: "(list place
                             (lambda (?r)
                                 (begin
+                                    (if (instance ?r robot)
                                     (if (> (robot.battery ?r) 0.4)
                                         (assert (robot.busy ?r) false)
-                                        (failure))
+                                        (failure)))
                                     state)))",
             result: "(list place
                             (lambda (?r)
                                 (begin
+                                    (if (instance ?r robot)
                                     (if (> (robot.battery ?r) 0.4)
                                         (assert (robot.busy ?r) false)
-                                        (failure))
+                                        (failure)))
                                     state)))",
         };
 
@@ -461,7 +456,7 @@ mod test {
             expression:
                 "(gtpc '((?r robot) (?f float ) (?i int) (?b bool) (?s symbol) (?n number) (?l list)))",
             expanded: "(gtpc '((?r robot) (?f float ) (?i int) (?b bool) (?s symbol) (?n number) (?l list)))",
-            result: "(if (! (= (robot.instance ?r) nil))
+            result: "(if (instance ?r robot)
                         (if (float? ?f)
                             (if (int? ?i)
                                 (if (bool? ?b)
@@ -482,41 +477,36 @@ mod test {
             expression: "(generate-method m_navigate_to ((:task t_navigate_to)
             (:params (?r robot) (?x float) (?y float))
             (:pre-conditions (and (robot.available ?r) (< ?x 10) (< ?y 10)))
-            (:effects (assert (robot.position ?r) (list ?x ?y)))
             (:score 0)
             (:body
             (begin
                 (navigate_to ?r ?x ?y)))))",
             expanded: "(list m_navigate_to
     't_navigate_to
-    '(robot float float)
+    '((?r robot) (?x float) (?y float))
     (lambda (?r ?x ?y)
-        (if (if (! (= (robot.instance ?r) nil))
+        (if (if (instance ?r robot)
                 (if (float? ?x)
                     (float? ?y)))
             (if (if (robot.available ?r)
                     (if (< ?x 10)
                         (< ?y 10)))
                 true)))
-    (lambda (?r ?x ?y)
-        (assert (robot.position ?r) (list ?x ?y)))
     (lambda (?r ?x ?y) 0 )
     (lambda (?r ?x ?y)
         (begin
             (navigate_to ?r ?x ?y))))",
             result: "(list m_navigate_to
     't_navigate_to
-    '(robot float float)
+    '((?r robot) (?x float) (?y float))
     (lambda (?r ?x ?y)
-        (if (if (! (= (robot.instance ?r) nil))
+        (if (if (instance ?r robot)
                 (if (float? ?x)
                     (float? ?y)))
             (if (if (robot.available ?r)
                     (if (< ?x 10)
                         (< ?y 10)))
                 true)))
-    (lambda (?r ?x ?y)
-        (assert (robot.position ?r) (list ?x ?y)))
     (lambda (?r ?x ?y) 0 )
     (lambda (?r ?x ?y)
         (begin

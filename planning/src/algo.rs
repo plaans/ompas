@@ -10,7 +10,9 @@ pub fn translate_domain_env_to_hierarchy(context: Context) -> (Domain, SymTable)
     let mut symbol_table = SymTable::default();
 
     let mut methods = vec![];
+    #[allow(unused_mut)]
     let mut tasks = vec![];
+    #[allow(unused_mut)]
     let mut actions = vec![];
 
     for (method_label, method) in context.domain.get_methods() {
@@ -23,7 +25,7 @@ pub fn translate_domain_env_to_hierarchy(context: Context) -> (Domain, SymTable)
 
             for e in method.get_parameters().get_params() {
                 let symbol_id = symbol_table.declare_new_object(Some(e), false);
-                name.push(symbol_id.clone());
+                name.push(symbol_id);
                 chronicle.add_var(&symbol_id)
             }
 
@@ -39,7 +41,7 @@ pub fn translate_domain_env_to_hierarchy(context: Context) -> (Domain, SymTable)
 
             for e in task.get_parameters().get_params() {
                 let symbol_id = symbol_table.declare_new_object(Some(e), false);
-                task_name.push(symbol_id.clone());
+                task_name.push(symbol_id);
                 chronicle.add_var(&symbol_id)
             }
 
@@ -63,7 +65,7 @@ pub fn translate_lvalue_to_expression_chronicle_r(
             ec.set_lit(Lit::LValue(vec![EVAL.into(), exp.clone()].into()));
             ec.add_effect(Effect {
                 interval: TransitionInterval::new(
-                    ec.get_interval().clone(),
+                    *ec.get_interval(),
                     sym_table.declare_new_timepoint(),
                 ),
                 transition: Transition::new(ec.get_result().into(), ec.get_lit()),
@@ -81,7 +83,7 @@ pub fn translate_lvalue_to_expression_chronicle_r(
                 LCoreOperator::Begin => {
                     sym_table.new_scope();
                     let mut literal: Vec<Lit> = vec!["begin".into()];
-                    let mut previous_interval = ec.get_interval().clone();
+                    let mut previous_interval = *ec.get_interval();
                     for (i, e) in l[1..].iter().enumerate() {
                         let mut ec_i = translate_lvalue_to_expression_chronicle_r(e, sym_table);
 
@@ -92,7 +94,7 @@ pub fn translate_lvalue_to_expression_chronicle_r(
                             ec_i.get_interval().start().into(),
                         ));
 
-                        previous_interval = ec_i.get_interval().clone();
+                        previous_interval = *ec_i.get_interval();
 
                         if i == l.len() - 2 {
                             ec.add_constraint(Constraint::Eq(
@@ -110,17 +112,17 @@ pub fn translate_lvalue_to_expression_chronicle_r(
 
                     let literal: Lit = vec![EVAL.into(), literal.into()].into();
 
-                    let expression_chronicle = Expression {
+                    /*let expression_chronicle = Expression {
                         interval: ec.get_interval().clone(),
                         lit: literal.clone(),
-                    };
+                    };*/
 
                     ec.set_lit(literal);
                     let persistence = sym_table.declare_new_timepoint();
 
                     ec.add_var(&persistence);
                     ec.add_effect(Effect {
-                        interval: TransitionInterval::new(ec.get_interval().clone(), persistence),
+                        interval: TransitionInterval::new(*ec.get_interval(), persistence),
                         transition: Transition::new(ec.get_result().into(), ec.get_lit()),
                     });
                     //ec.add_subtask(expression_chronicle);
@@ -131,7 +133,7 @@ pub fn translate_lvalue_to_expression_chronicle_r(
             _ => {
                 sym_table.new_scope();
                 let mut literal: Vec<Lit> = vec![];
-                let mut previous_interval = ec.get_interval().clone();
+                let mut previous_interval = *ec.get_interval();
                 for e in l {
                     let mut ec_i = translate_lvalue_to_expression_chronicle_r(e, sym_table);
 
@@ -142,7 +144,7 @@ pub fn translate_lvalue_to_expression_chronicle_r(
                         ec_i.get_interval().start().into(),
                     ));
 
-                    previous_interval = ec_i.get_interval().clone();
+                    previous_interval = *ec_i.get_interval();
                     ec = ec.absorb(ec_i);
                 }
 
@@ -159,7 +161,7 @@ pub fn translate_lvalue_to_expression_chronicle_r(
                 ec.add_var(&persistence);
 
                 ec.add_effect(Effect {
-                    interval: TransitionInterval::new(ec.get_interval().clone(), persistence),
+                    interval: TransitionInterval::new(*ec.get_interval(), persistence),
                     transition: Transition::new(ec.get_result().into(), ec.get_lit()),
                 });
                 //ec.add_subtask(expression_chronicle);
@@ -194,7 +196,7 @@ pub fn translate_lvalue_to_expression_chronicle_r_2(
             ec.set_lit(Lit::LValue(vec![EVAL.into(), exp.clone()].into()));
             ec.add_effect(Effect {
                 interval: TransitionInterval::new(
-                    ec.get_interval().clone(),
+                    *ec.get_interval(),
                     symbol_table.declare_new_timepoint(),
                 ),
                 transition: Transition::new(ec.get_result().into(), ec.get_lit()),
@@ -213,7 +215,7 @@ pub fn translate_lvalue_to_expression_chronicle_r_2(
                 LCoreOperator::Begin => {
                     symbol_table.new_scope();
                     let mut literal: Vec<Lit> = vec!["begin".into()];
-                    let mut previous_interval = ec.get_interval().clone();
+                    let mut previous_interval = *ec.get_interval();
                     for (i, e) in l[1..].iter().enumerate() {
                         let mut ec_i =
                             translate_lvalue_to_expression_chronicle_r_2(e, context, symbol_table);
@@ -225,7 +227,7 @@ pub fn translate_lvalue_to_expression_chronicle_r_2(
                             ec_i.get_interval().start().into(),
                         ));
 
-                        previous_interval = ec_i.get_interval().clone();
+                        previous_interval = *ec_i.get_interval();
 
                         if i == l.len() - 2 {
                             ec.add_constraint(Constraint::Eq(
@@ -243,17 +245,17 @@ pub fn translate_lvalue_to_expression_chronicle_r_2(
 
                     let literal: Lit = vec![EVAL.into(), literal.into()].into();
 
-                    let expression_chronicle = Expression {
+                    /*let expression_chronicle = Expression {
                         interval: ec.get_interval().clone(),
                         lit: literal.clone(),
-                    };
+                    };*/
 
                     ec.set_lit(literal);
                     let persistence = symbol_table.declare_new_timepoint();
 
                     ec.add_var(&persistence);
                     ec.add_effect(Effect {
-                        interval: TransitionInterval::new(ec.get_interval().clone(), persistence),
+                        interval: TransitionInterval::new(*ec.get_interval(), persistence),
                         transition: Transition::new(ec.get_result().into(), ec.get_lit()),
                     });
                     //ec.add_subtask(expression_chronicle);
@@ -264,7 +266,7 @@ pub fn translate_lvalue_to_expression_chronicle_r_2(
             _ => {
                 symbol_table.new_scope();
                 let mut literal: Vec<Lit> = vec![];
-                let mut previous_interval = ec.get_interval().clone();
+                let mut previous_interval = *ec.get_interval();
                 for e in l {
                     let mut ec_i =
                         translate_lvalue_to_expression_chronicle_r_2(e, context, symbol_table);
@@ -276,7 +278,7 @@ pub fn translate_lvalue_to_expression_chronicle_r_2(
                         ec_i.get_interval().start().into(),
                     ));
 
-                    previous_interval = ec_i.get_interval().clone();
+                    previous_interval = *ec_i.get_interval();
                     ec = ec.absorb(ec_i);
                 }
 
@@ -293,7 +295,7 @@ pub fn translate_lvalue_to_expression_chronicle_r_2(
                 ec.add_var(&persistence);
 
                 ec.add_effect(Effect {
-                    interval: TransitionInterval::new(ec.get_interval().clone(), persistence),
+                    interval: TransitionInterval::new(*ec.get_interval(), persistence),
                     transition: Transition::new(ec.get_result().into(), ec.get_lit()),
                 });
                 //ec.add_subtask(expression_chronicle);
@@ -325,7 +327,7 @@ pub fn translate_lvalue_to_chronicle(exp: &[LValue], sym_table: &mut SymTable) -
     let f = sym_table.declare_new_object(Some(exp[0].to_string()), false);
     let mut literal: Vec<Lit> = vec![f.into()];
 
-    let mut previous_interval = interval.clone();
+    let mut previous_interval = interval;
     for e in &exp[1..] {
         let expression = Expression {
             interval: sym_table.declare_new_interval(),
@@ -352,7 +354,7 @@ pub fn translate_lvalue_to_chronicle(exp: &[LValue], sym_table: &mut SymTable) -
             expression.interval.start().into(),
         ));
 
-        previous_interval = expression.interval.clone();
+        previous_interval = expression.interval;
 
         chronicle.add_effect(effect);
         chronicle.add_subtask(expression);
@@ -376,8 +378,7 @@ pub fn translate_lvalue_to_chronicle(exp: &[LValue], sym_table: &mut SymTable) -
                 LValue::from("eval"),
                 expression_chronicle
                     .lit
-                    .format_with_sym_table(&sym_table)
-                    .to_string()
+                    .format_with_sym_table(sym_table)
                     .into(),
             ])
             .into(),

@@ -85,7 +85,7 @@ pub async fn check_preconditions<'a>(
         new_env.insert(STATE.to_string(), state.clone());
         let lv = cons(
             &[EVAL_PRE_CONDITIONS.into(), instantiated_method.clone()],
-            &env,
+            env,
             &(),
         )?;
         eval(&lv, &mut new_env, &mut new_ctxs).await
@@ -112,7 +112,7 @@ pub async fn compute_score<'a>(
         new_env.insert(STATE.to_string(), state.clone());
         let lv = cons(
             &[COMPUTE_SCORE.into(), instantiated_method.clone()],
-            &env,
+            env,
             &(),
         )?;
 

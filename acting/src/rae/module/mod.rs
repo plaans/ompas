@@ -6,13 +6,14 @@ use crate::rae::module::mod_rae_monitor::CtxRaeMonitor;
 use crate::rae::module::mod_rae_sim::CtxRaeSim;
 use crate::rae::TOKIO_CHANNEL_SIZE;
 use ompas_lisp::async_await;
-use ompas_lisp::core::ImportType::WithoutPrefix;
+use ompas_lisp::core::ImportType::{WithPrefix, WithoutPrefix};
 use ompas_lisp::core::{eval, import, parse, ContextCollection, LEnv};
 use ompas_lisp::modules::_type::CtxType;
 use ompas_lisp::modules::io::CtxIo;
 use ompas_lisp::modules::math::CtxMath;
 use ompas_lisp::modules::utils::CtxUtils;
 use ompas_lisp::structs::{InitLisp, LValue};
+use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::mpsc;
@@ -43,6 +44,8 @@ pub async fn init_ctx_rae(
     };
 
     let domain = platform.domain().await;
+
+    let context = platform.context_platform();
 
     let mut rae_env = RAEEnv::new(Some(receiver_job), Some(receiver_sync)).await;
     rae_env.actions_progress.sync.sender = Some(sender_sync);
@@ -105,6 +108,10 @@ pub async fn init_ctx_rae(
     import(&mut rae_env.env, &mut rae_env.ctxs, ctx_io, WithoutPrefix)
         .await
         .expect("error loading io");
+
+    import(&mut rae_env.env, &mut rae_env.ctxs, context, WithPrefix)
+        .await
+        .expect("error loading ctx of the platform");
 
     ctx_rae.env = rae_env;
     ctx_rae.domain = vec![domain].into();

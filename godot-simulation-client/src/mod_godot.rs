@@ -300,6 +300,7 @@ impl Default for CtxGodot {
             sender_socket: None,
             state: state.clone(),
             status: status.clone(),
+            instance: Default::default(),
         };
         Self {
             state,

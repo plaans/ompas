@@ -1,7 +1,7 @@
 //! Module containing the Scheme library to setup DOMAIN environment
 
-use crate::algo::translate_lvalue_to_expression_chronicle_r;
-use crate::structs::{FormatWithSymTable, SymTable};
+use crate::algo::{translate_domain_env_to_hierarchy, translate_lvalue_to_expression_chronicle_r};
+use crate::structs::{Context, FormatWithSymTable, SymTable};
 use ::macro_rules_attribute::macro_rules_attribute;
 use ompas_acting::rae::context::rae_env::*;
 use ompas_acting::rae::context::rae_state::{LState, RAEState, StateType};
@@ -121,7 +121,7 @@ impl GetModule for CtxDomain {
         let mut module = Module {
             ctx: Arc::new(self),
             prelude: vec![],
-            raw_lisp: vec!["(read godot_domain/translate.lisp)"].into(),
+            raw_lisp: vec!["(read instances/gripper/init.lisp)"].into(),
             label: MOD_DOMAIN.to_string(),
         };
 
@@ -197,7 +197,13 @@ pub fn translate_expr(args: &[LValue], _env: &LEnv, ctx: &CtxDomain) -> Result<L
 }
 
 pub fn translate_domain(_: &[LValue], _env: &LEnv, ctx: &CtxDomain) -> Result<LValue, LError> {
-    Ok("Not implemented yet".into())
+    let (domain, st) = translate_domain_env_to_hierarchy(Context {
+        domain: ctx.domain.clone(),
+        env: ctx.env.clone(),
+        ctxs: ctx.ctxs.clone(),
+    });
+
+    Ok(domain.format_with_sym_table(&st).into())
 }
 ///Get the methods of a given task
 pub fn get_methods(_: &[LValue], _env: &LEnv, ctx: &CtxDomain) -> Result<LValue, LError> {
@@ -532,7 +538,6 @@ async fn def_action<'a>(
     Ok(Nil)
 }
 
-/// Defines a method in DOMAIN environment.
 #[macro_rules_attribute(dyn_async!)]
 async fn def_method<'a>(
     args: &'a [LValue],
@@ -573,36 +578,19 @@ async fn def_method<'a>(
             if let LValue::Symbol(task_label) = &list[1] {
                 match &list[2] {
                     LValue::List(_) | LValue::Nil => {
-                        let mut types = vec![];
-                        if let LValue::List(lv_types) = &list[2] {
-                            for e in lv_types {
-                                if let LValue::Symbol(s) = e {
-                                    types.push(s.clone());
-                                } else {
-                                    return Err(WrongType(
-                                        DOMAIN_DEF_METHOD,
-                                        e.clone(),
-                                        e.into(),
-                                        NameTypeLValue::Symbol,
-                                    ));
-                                }
-                            }
-                        }
                         if let LValue::Lambda(_) = &list[3] {
                             if let LValue::Lambda(_) = &list[4] {
                                 if let LValue::Lambda(_) = &list[5] {
                                     if let LValue::Lambda(_) = &list[6] {
-                                        ctx.domain.add_method(
-                                            method_label.to_string(),
-                                            Method::new(
-                                                task_label.to_string(),
-                                                types,
-                                                list[3].clone(),
-                                                list[4].clone(),
-                                                list[5].clone(),
-                                                list[6].clone(),
-                                            ),
-                                        )?;
+                                        let method = Method::new(
+                                            task_label.to_string(),
+                                            list[2].clone().try_into()?,
+                                            list[3].clone(),
+                                            list[4].clone(),
+                                            list[5].clone(),
+                                            list[6].clone(),
+                                        );
+                                        ctx.domain.add_method(method_label.to_string(), method)?;
                                     } else {
                                         return Err(WrongType(
                                             DOMAIN_DEF_METHOD,
@@ -640,7 +628,7 @@ async fn def_method<'a>(
                         return Err(WrongType(
                             DOMAIN_DEF_METHOD,
                             list[2].clone(),
-                            (&list[2]).into(),
+                            list[2].clone().into(),
                             NameTypeLValue::List,
                         ))
                     }
@@ -695,22 +683,22 @@ async fn def_task<'a>(
     //println!("new_task: {}", lvalue);
 
     if let LValue::List(list) = &lvalue {
-        if list.len() != 2 {
+        if list.len() != 3 {
             return Err(WrongNumberOfArgument(
                 DOMAIN_DEF_TASK,
                 lvalue.clone(),
                 list.len(),
-                2..2,
+                3..3,
             ));
         } else if let LValue::Symbol(task_label) = &list[0] {
-            if let LValue::Lambda(_) = &list[1] {
-                ctx.domain
-                    .add_task(task_label.to_string(), Task::new(list[1].clone()));
+            if let LValue::Lambda(_) = &list[2] {
+                let task = Task::new(list[2].clone(), (&list[1]).try_into()?);
+                ctx.domain.add_task(task_label.to_string(), task);
             } else {
                 return Err(WrongType(
                     DOMAIN_DEF_TASK,
-                    list[1].clone(),
-                    list[1].clone().into(),
+                    list[2].clone(),
+                    list[2].clone().into(),
                     NameTypeLValue::Lambda,
                 ));
             }

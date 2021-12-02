@@ -616,21 +616,6 @@ async fn def_method<'a>(
             if let LValue::Symbol(task_label) = &list[1] {
                 match &list[2] {
                     LValue::List(_) | LValue::Nil => {
-                        let mut types = vec![];
-                        if let LValue::List(lv_types) = &list[2] {
-                            for e in lv_types {
-                                if let LValue::Symbol(s) = e {
-                                    types.push(s.clone());
-                                } else {
-                                    return Err(WrongType(
-                                        RAE_DEF_METHOD,
-                                        e.clone(),
-                                        e.into(),
-                                        NameTypeLValue::Symbol,
-                                    ));
-                                }
-                            }
-                        }
                         if let LValue::Lambda(_) = &list[3] {
                             if let LValue::Lambda(_) = &list[4] {
                                 if let LValue::Lambda(_) = &list[5] {
@@ -638,7 +623,7 @@ async fn def_method<'a>(
                                         ctx.env.add_method(
                                             method_label.to_string(),
                                             task_label.to_string(),
-                                            types,
+                                            list[2].clone().try_into()?,
                                             list[3].clone(),
                                             list[4].clone(),
                                             list[5].clone(),
@@ -681,7 +666,7 @@ async fn def_method<'a>(
                         return Err(WrongType(
                             RAE_DEF_METHOD,
                             list[2].clone(),
-                            (&list[2]).into(),
+                            list[2].clone().into(),
                             NameTypeLValue::List,
                         ))
                     }
@@ -736,21 +721,25 @@ async fn def_task<'a>(
     //println!("new_task: {}", lvalue);
 
     if let LValue::List(list) = &lvalue {
-        if list.len() != 2 {
+        if list.len() != 3 {
             return Err(WrongNumberOfArgument(
                 RAE_DEF_TASK,
                 lvalue.clone(),
                 list.len(),
-                2..2,
+                3..3,
             ));
         } else if let LValue::Symbol(task_label) = &list[0] {
-            if let LValue::Lambda(_) = &list[1] {
-                ctx.env.add_task(task_label.to_string(), list[1].clone())?;
+            if let LValue::Lambda(_) = &list[2] {
+                ctx.env.add_task(
+                    task_label.to_string(),
+                    list[2].clone(),
+                    (&list[1]).try_into()?,
+                )?;
             } else {
                 return Err(WrongType(
                     RAE_DEF_TASK,
-                    list[1].clone(),
-                    list[1].clone().into(),
+                    list[2].clone(),
+                    list[2].clone().into(),
                     NameTypeLValue::Lambda,
                 ));
             }

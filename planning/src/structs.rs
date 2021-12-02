@@ -1,4 +1,6 @@
 use crate::structs::Sym::Unique;
+use ompas_acting::rae::context::rae_env::DomainEnv;
+use ompas_lisp::core::{ContextCollection, LEnv};
 use ompas_lisp::structs::LValue;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Display, Formatter};
@@ -144,12 +146,12 @@ impl SymTable {
         }
     }
 
-    pub fn new_context(&mut self) {
+    pub fn new_scope(&mut self) {
         self.pointer_to_ver
             .push(self.pointer_to_ver.last().unwrap().clone())
     }
 
-    pub fn revert_context(&mut self) {
+    pub fn revert_scope(&mut self) {
         self.pointer_to_ver.remove(self.pointer_to_ver.len() - 1);
     }
 
@@ -308,6 +310,39 @@ pub struct Chronicle {
     partial_chronicle: PartialChronicle,
 }
 
+impl Chronicle {
+    pub fn add_var(&mut self, sym_id: &SymId) {
+        self.partial_chronicle.add_var(sym_id);
+    }
+    pub fn add_interval(&mut self, interval: &Interval) {
+        self.partial_chronicle.add_interval(interval);
+    }
+
+    pub fn add_constraint(&mut self, constraint: Constraint) {
+        self.partial_chronicle.add_constraint(constraint);
+    }
+
+    pub fn add_condition(&mut self, cond: Condition) {
+        self.partial_chronicle.add_condition(cond)
+    }
+
+    pub fn add_effect(&mut self, effect: Effect) {
+        self.partial_chronicle.add_effect(effect)
+    }
+
+    pub fn add_subtask(&mut self, sub_task: Expression) {
+        self.partial_chronicle.add_subtask(sub_task)
+    }
+
+    pub fn set_name(&mut self, name: Vec<SymId>) {
+        self.name = name;
+    }
+
+    pub fn set_task(&mut self, task: Vec<SymId>) {
+        self.task = task;
+    }
+}
+
 #[derive(Clone, Default)]
 pub struct PartialChronicle {
     variables: HashSet<SymId>,
@@ -355,31 +390,6 @@ impl PartialChronicle {
 
     pub fn add_subtask(&mut self, sub_task: Expression) {
         self.subtasks.push(sub_task);
-    }
-}
-
-impl Chronicle {
-    pub fn add_var(&mut self, sym_id: &SymId) {
-        self.partial_chronicle.add_var(sym_id);
-    }
-    pub fn add_interval(&mut self, interval: &Interval) {
-        self.partial_chronicle.add_interval(interval);
-    }
-
-    pub fn add_constraint(&mut self, constraint: Constraint) {
-        self.partial_chronicle.add_constraint(constraint);
-    }
-
-    pub fn add_condition(&mut self, cond: Condition) {
-        self.partial_chronicle.add_condition(cond)
-    }
-
-    pub fn add_effect(&mut self, effect: Effect) {
-        self.partial_chronicle.add_effect(effect)
-    }
-
-    pub fn add_subtask(&mut self, sub_task: Expression) {
-        self.partial_chronicle.add_subtask(sub_task)
     }
 }
 
@@ -720,13 +730,58 @@ impl FormatWithSymTable for Interval {
     }
 }
 
+pub struct Context {
+    pub domain: DomainEnv,
+    pub env: LEnv,
+    pub ctxs: ContextCollection,
+}
+
 pub struct Problem {}
 
 type Action = Chronicle;
 type Method = Chronicle;
 
-struct Domain {
+#[derive(Default)]
+pub struct Domain {
     actions: Vec<Action>,
     tasks: Vec<Lit>,
     methods: Vec<Method>,
+}
+
+impl Domain {
+    pub fn new(actions: Vec<Action>, tasks: Vec<Lit>, methods: Vec<Method>) -> Self {
+        Self {
+            actions,
+            tasks,
+            methods,
+        }
+    }
+}
+
+impl FormatWithSymTable for Domain {
+    fn format_with_sym_table(&self, st: &SymTable) -> String {
+        let mut str = String::new();
+
+        str.push_str("DOMAIN:\n");
+
+        //actions
+        str.push_str("ACTIONS: \n");
+        for action in &self.actions {
+            str.push_str(format!("{}\n", action.format_with_sym_table(st)).as_str());
+        }
+
+        //tasks
+        str.push_str("TASKS: \n");
+        for task in &self.tasks {
+            str.push_str(format!("{}\n", task.format_with_sym_table(st)).as_str());
+        }
+
+        //methods
+        str.push_str("METHODS: \n");
+        for method in &self.methods {
+            str.push_str(format!("{}\n", method.format_with_sym_table(st)).as_str());
+        }
+
+        str
+    }
 }

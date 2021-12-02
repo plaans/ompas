@@ -32,8 +32,10 @@ pub const MACRO_GENERATE_TASK_SIMPLE: &str = "(defmacro generate-task-simple
     (lambda args
     (let ((label (car args))
           (params (cdr args)))
-         `(list ,label (lambda ,params
-                    ,(cons 'progress (cons `(quote ,label) params)))))))";
+         `(list ,label 
+            (quote ,params)
+            (lambda ,params
+                ,(cons 'progress (cons `(quote ,label) params)))))))";
 
 /// Macro used to generate code to define a state function in RAE environment.
 pub const MACRO_GENERATE_STATE_FUNCTION: &str = "(defmacro generate-state-function (lambda args
@@ -95,7 +97,7 @@ pub const MACRO_GENERATE_METHOD: &str = "(defmacro generate-method
     
             `(list ,m_label 
                 (quote ,t_label)
-                (quote ,types)
+                (quote ,p_expr)
                 ;lambda for preconditons
                 (lambda ,params
                     (if ,(gtpc p_expr)

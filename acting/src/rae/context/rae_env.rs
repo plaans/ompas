@@ -9,9 +9,12 @@ use im::HashMap;
 use log::Level::Debug;
 use ompas_lisp::core::ImportType::WithoutPrefix;
 use ompas_lisp::core::{import, ContextCollection, LEnv};
+use ompas_lisp::language::scheme_primitives::OBJECT;
 use ompas_lisp::structs::LCoreOperator::Define;
-use ompas_lisp::structs::LError::SpecialError;
-use ompas_lisp::structs::{InitLisp, LError, LFn, LLambda, LValue};
+use ompas_lisp::structs::LError::{
+    NotInListOfExpectedTypes, SpecialError, WrongNumberOfArgument, WrongType,
+};
+use ompas_lisp::structs::{InitLisp, LError, LFn, LLambda, LValue, NameTypeLValue};
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{Display, Formatter};
 use std::panic::panic_any;
@@ -21,6 +24,7 @@ use std::sync::Arc;
 use std::thread;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{mpsc, RwLock};
+use tokio_stream::StreamExt;
 
 pub const RAE_TASK_METHODS_MAP: &str = "rae-task-methods-map";
 pub const RAE_TASK_LIST: &str = "rae-task-list";
@@ -42,17 +46,40 @@ pub const LAMBDA_TYPE: &str = "lambda_type";
 #[derive(Debug, Clone)]
 pub struct Method {
     task_label: String,
+    parameters: Parameters,
     lambda_pre_conditions: LValue,
     lambda_effects: LValue,
     lambda_score: LValue,
-    types: Vec<String>,
     lambda_body: LValue,
+}
+
+//Getters
+impl Method {
+    pub fn get_task_label(&self) -> &String {
+        &self.task_label
+    }
+
+    pub fn get_parameters(&self) -> &Parameters {
+        &self.parameters
+    }
+
+    pub fn get_pre_conditions(&self) -> &LValue {
+        &self.lambda_pre_conditions
+    }
+
+    pub fn get_effects(&self) -> &LValue {
+        &self.lambda_pre_conditions
+    }
+
+    pub fn get_body(&self) -> &LValue {
+        &self.lambda_body
+    }
 }
 
 impl Method {
     pub fn new(
         task_label: String,
-        types: Vec<String>,
+        parameters: Parameters,
         conds: LValue,
         effects: LValue,
         score: LValue,
@@ -60,10 +87,10 @@ impl Method {
     ) -> Self {
         Self {
             task_label,
+            parameters,
             lambda_pre_conditions: conds,
             lambda_effects: effects,
             lambda_score: score,
-            types,
             lambda_body: body,
         }
     }
@@ -74,23 +101,13 @@ impl Display for Method {
         write!(
             f,
             "-task: {}\n\
-            -types: {}\n\
+            -parameters: {}\n\
             -pre-conditions: {}\n\
             -effects: {}\n\
             -score: {}\n\
             -body: {}\n",
             self.task_label,
-            {
-                let mut str = '('.to_string();
-                for (i, t) in self.types.iter().enumerate() {
-                    if i != 0 {
-                        str.push(',');
-                    }
-                    str.push_str(t);
-                }
-                str.push(')');
-                str
-            },
+            self.parameters,
             self.lambda_pre_conditions
                 .pretty_print("pre-conditions: ".len()),
             self.lambda_effects.pretty_print("effects: ".len()),
@@ -99,22 +116,122 @@ impl Display for Method {
         )
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct Parameters {
+    inner: Vec<(String, String)>,
+}
+
+const PARAMETERS_TRY_FROM_LVALUE: &str = "Parameters::TryFrom(LValue)";
+
+impl TryFrom<&LValue> for Parameters {
+    type Error = LError;
+
+    //form: ((param type) (param2 type2) ... (paramn typen))
+    fn try_from(value: &LValue) -> Result<Self, Self::Error> {
+        let mut vec = vec![];
+
+        if let LValue::List(list) = value {
+            for e in list {
+                match e {
+                    LValue::List(description) => {
+                        if description.len() == 2 {
+                            vec.push((
+                                (&description[0]).try_into()?,
+                                (&description[1]).try_into()?,
+                            ));
+                        } else {
+                            return Err(WrongNumberOfArgument(
+                                PARAMETERS_TRY_FROM_LVALUE,
+                                e.clone(),
+                                description.len(),
+                                2..2,
+                            ));
+                        }
+                    }
+                    LValue::Symbol(s) => {
+                        vec.push((s.into(), OBJECT.into()));
+                    }
+                    _ => {
+                        return Err(NotInListOfExpectedTypes(
+                            PARAMETERS_TRY_FROM_LVALUE,
+                            e.clone(),
+                            e.into(),
+                            vec![NameTypeLValue::List, NameTypeLValue::Symbol],
+                        ))
+                    }
+                }
+            }
+        } else if let LValue::Nil = &value {
+        } else {
+            return Err(WrongType(
+                PARAMETERS_TRY_FROM_LVALUE,
+                value.clone(),
+                value.into(),
+                NameTypeLValue::List,
+            ));
+        }
+
+        Ok(Self { inner: vec })
+    }
+}
+
+impl TryFrom<LValue> for Parameters {
+    type Error = LError;
+
+    fn try_from(v: LValue) -> Result<Self, Self::Error> {
+        (&v).try_into()
+    }
+}
+
+impl Parameters {
+    pub fn get_params(&self) -> Vec<String> {
+        self.inner.iter().map(|tuple| tuple.0.clone()).collect()
+    }
+
+    pub fn get_types(&self) -> Vec<String> {
+        self.inner.iter().map(|tuple| tuple.1.clone()).collect()
+    }
+}
+
+impl Display for Parameters {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut str = '('.to_string();
+        for (i, e) in self.inner.iter().enumerate() {
+            if i != 0 {
+                str.push(' ');
+            }
+            str.push_str(format!("({} {})", e.0, e.1).as_str());
+        }
+
+        str.push(')');
+
+        write!(f, "{}", str)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Task {
     body: LValue,
+    parameters: Parameters,
     methods: Vec<String>,
 }
 
 impl Task {
-    pub fn new(body: LValue) -> Self {
+    pub fn new(body: LValue, parameters: Parameters) -> Self {
         Self {
             body,
+            parameters,
             methods: vec![],
         }
     }
 
     pub fn get_body(&self) -> &LValue {
         &self.body
+    }
+
+    pub fn get_parameters(&self) -> &Parameters {
+        &self.parameters
     }
 
     pub fn get_methods(&self) -> &Vec<String> {
@@ -135,8 +252,10 @@ impl Display for Task {
 
         write!(
             f,
-            "-body: {}\n\
+            "-parameters: {}\n\
+            -body: {}\n\
              -methods: {}\n",
+            self.parameters,
             self.body.pretty_print("body: ".len()),
             str_methods
         )
@@ -411,7 +530,7 @@ impl DomainEnv {
             map_method_pre_conditions.insert(label.into(), method.lambda_pre_conditions.clone());
             map_method_effects.insert(label.into(), method.lambda_effects.clone());
             map_method_score.insert(label.into(), method.lambda_score.clone());
-            map_method_types.insert(label.into(), method.types.clone().into());
+            map_method_types.insert(label.into(), method.parameters.get_types().clone().into());
         }
 
         //Add all actions to env:
@@ -478,7 +597,7 @@ impl DomainEnv {
             map_method_pre_conditions.insert(label.into(), method.lambda_pre_conditions.clone());
             map_method_effects.insert(label.into(), method.lambda_effects.clone());
             map_method_score.insert(label.into(), method.lambda_score.clone());
-            map_method_types.insert(label.into(), method.types.clone().into());
+            map_method_types.insert(label.into(), method.parameters.get_types().clone().into());
         }
 
         //Add all actions to env:
@@ -679,8 +798,13 @@ impl RAEEnv {
         Ok(())
     }
 
-    pub fn add_task(&mut self, label: String, body: LValue) -> Result<(), LError> {
-        self.domain_env.add_task(label, Task::new(body));
+    pub fn add_task(
+        &mut self,
+        label: String,
+        body: LValue,
+        parameters: Parameters,
+    ) -> Result<(), LError> {
+        self.domain_env.add_task(label, Task::new(body, parameters));
 
         Ok(())
     }
@@ -690,13 +814,13 @@ impl RAEEnv {
         &mut self,
         method_label: String,
         task_label: String,
-        types: Vec<String>,
+        parameters: Parameters,
         conds: LValue,
         effects: LValue,
         score: LValue,
         body: LValue,
     ) -> Result<(), LError> {
-        let method = Method::new(task_label, types, conds, effects, score, body);
+        let method = Method::new(task_label, parameters, conds, effects, score, body);
 
         self.domain_env.add_method(method_label, method)?;
 

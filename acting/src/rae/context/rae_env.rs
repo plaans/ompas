@@ -260,6 +260,20 @@ pub struct DualExpression {
 }
 
 impl DualExpression {
+    pub fn get_parameters(&self) -> &Parameters {
+        &self.parameters
+    }
+
+    pub fn get_exec(&self) -> &LValue {
+        &self.exec
+    }
+
+    pub fn get_sim(&self) -> &LValue {
+        &self.sim
+    }
+}
+
+impl DualExpression {
     pub fn new(parameters: Parameters, exec: LValue, sim: LValue) -> Self {
         Self {
             parameters,
@@ -291,29 +305,21 @@ pub struct DomainEnv {
     state_functions: HashMap<String, StateFunction>,
     actions: HashMap<String, Action>,
     lambdas: HashMap<String, LValue>,
-    map_symbol_type: HashMap<LValue, LValue>,
+    map_symbol_type: HashMap<String, String>,
 }
 
 impl DomainEnv {
     pub fn get_element_description(&self, label: String) -> String {
-        match self.map_symbol_type.get(&label.clone().into()) {
+        match self.map_symbol_type.get(&label) {
             None => format!("Keyword {} is not defined in the domain.", label),
-            Some(symbol_type) => {
-                if let LValue::Symbol(s) = symbol_type {
-                    match s.as_str() {
-                        TASK_TYPE => self.tasks.get(&label).unwrap().to_string(),
-                        METHOD_TYPE => self.methods.get(&label).unwrap().to_string(),
-                        STATE_FUNCTION_TYPE => {
-                            self.state_functions.get(&label).unwrap().to_string()
-                        }
-                        LAMBDA_TYPE => self.lambdas.get(&label).unwrap().to_string(),
-                        ACTION_TYPE => self.actions.get(&label).unwrap().to_string(),
-                        _ => panic!("There should no other type of symbol_type"),
-                    }
-                } else {
-                    panic!("A symbol_type must be LValue::Symbol")
-                }
-            }
+            Some(s) => match s.as_str() {
+                TASK_TYPE => self.tasks.get(&label).unwrap().to_string(),
+                METHOD_TYPE => self.methods.get(&label).unwrap().to_string(),
+                STATE_FUNCTION_TYPE => self.state_functions.get(&label).unwrap().to_string(),
+                LAMBDA_TYPE => self.lambdas.get(&label).unwrap().to_string(),
+                ACTION_TYPE => self.actions.get(&label).unwrap().to_string(),
+                _ => panic!("There should no other type of symbol_type"),
+            },
         }
     }
 }
@@ -442,8 +448,8 @@ impl DomainEnv {
             .into()
     }
 
-    pub fn get_map_symbol_type(&self) -> LValue {
-        self.map_symbol_type.clone().into()
+    pub fn get_map_symbol_type(&self) -> &HashMap<String, String> {
+        &self.map_symbol_type
     }
 }
 
@@ -549,7 +555,10 @@ impl DomainEnv {
             RAE_STATE_FUNCTION_LIST.to_string(),
             self.get_list_state_functions(),
         );
-        env.insert(RAE_SYMBOL_TYPE.to_string(), self.get_map_symbol_type());
+        env.insert(
+            RAE_SYMBOL_TYPE.to_string(),
+            self.get_map_symbol_type().into(),
+        );
         /*env.insert(
             RAE_METHOD_GENERATOR_MAP.to_string(),
             map_method_generator.into(),
@@ -610,7 +619,10 @@ impl DomainEnv {
             RAE_STATE_FUNCTION_LIST.to_string(),
             self.get_list_state_functions(),
         );
-        env.insert(RAE_SYMBOL_TYPE.to_string(), self.get_map_symbol_type());
+        env.insert(
+            RAE_SYMBOL_TYPE.to_string(),
+            self.get_map_symbol_type().into(),
+        );
         /*env.insert(
             RAE_METHOD_GENERATOR_MAP.to_string(),
             map_method_generator.into(),

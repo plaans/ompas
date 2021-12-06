@@ -1,5 +1,5 @@
 (begin
-    (def-action move ?from ?to)
+    (def-action move '(?from room) '(?to room))
     (def-action-model move
         '((:params (?from room) (?to room))
           (:pre-conditions (at-robby ?from))
@@ -8,9 +8,9 @@
                 (assert (at-robby ?from) false)
                 (assert (at-robby ?to) true)))))
 
-    (def-action pick ?obj ?room ?gripper)
+    (def-action pick '(?obj ball) '(?room room) '(?gripper gripper))
     (def-action-model move
-        '((:params (?obj object) (?room room) (?gripper gripper))
+        '((:params (?obj ball) (?room room) (?gripper gripper))
           (:pre-conditions (and (at ?obj ?room) (at-robby ?room) (free ?gripper)))
           (:effects
             (begin
@@ -18,9 +18,9 @@
                 (assert (at ?obj ?room) false)
                 (assert (free ?gripper) false)))))
 
-    (def-action drop ?obj ?room ?gripper)
+    (def-action drop '(?obj ball) '(?room room) '(?gripper gripper))
     (def-action-model drop
-        '((:params (?obj object) (?room room) (?gripper gripper))
+        '((:params (?obj ball) (?room room) (?gripper gripper))
           (:pre-conditions (and (carry ?obj ?gripper) (at-robby ?room)))
           (:effects
             (begin

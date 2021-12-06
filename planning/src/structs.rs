@@ -38,7 +38,7 @@ impl Display for Sym {
 type SymId = usize;
 
 pub trait Absorb {
-    fn absorb(self, other: Self) -> Self;
+    fn absorb(&mut self, other: Self);
 }
 
 pub trait FormatWithSymTable {
@@ -306,6 +306,19 @@ pub struct Chronicle {
 }
 
 impl Chronicle {
+    pub fn absorb_expression_chronicle(&mut self, ec: ExpressionChronicle) {
+        self.partial_chronicle.absorb(ec.partial_chronicle);
+        //add result
+        self.add_var(&ec.result);
+
+        //add interval
+        self.add_interval(&ec.interval);
+
+        //add new subtask
+    }
+}
+
+impl Chronicle {
     pub fn add_var(&mut self, sym_id: &SymId) {
         self.partial_chronicle.add_var(sym_id);
     }
@@ -348,13 +361,12 @@ pub struct PartialChronicle {
 }
 
 impl Absorb for PartialChronicle {
-    fn absorb(mut self, mut other: Self) -> Self {
+    fn absorb(&mut self, mut other: Self) {
         self.variables = self.variables.union(&other.variables).copied().collect();
         self.constraints.append(&mut other.constraints);
         self.conditions.append(&mut other.conditions);
         self.effects.append(&mut other.effects);
         self.subtasks.append(&mut other.subtasks);
-        self
     }
 }
 
@@ -450,17 +462,10 @@ impl ExpressionChronicle {
 }
 
 impl Absorb for ExpressionChronicle {
-    fn absorb(self, other: Self) -> Self {
-        let mut p_c = self.partial_chronicle.absorb(other.partial_chronicle);
-        p_c.add_interval(&other.interval);
-        p_c.add_var(&other.result);
-        Self {
-            interval: self.interval,
-            result: self.result,
-            partial_chronicle: p_c,
-            value: self.value,
-            debug: self.debug,
-        }
+    fn absorb(&mut self, other: Self) {
+        self.partial_chronicle.absorb(other.partial_chronicle);
+        self.add_interval(&other.interval);
+        self.add_var(&other.result);
     }
 }
 
@@ -699,6 +704,15 @@ impl FormatWithSymTable for Expression {
 pub struct Interval {
     start: SymId,
     end: SymId,
+}
+
+impl Interval {
+    pub fn new(start: &SymId, end: &SymId) -> Self {
+        Self {
+            start: *start,
+            end: *end,
+        }
+    }
 }
 
 impl Interval {

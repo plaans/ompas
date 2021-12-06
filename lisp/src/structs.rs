@@ -1151,9 +1151,21 @@ impl TryFrom<&str> for LCoreOperator {
     }
 }
 
-impl From<im::HashMap<LValue, LValue>> for LValue {
-    fn from(map: HashMap<LValue, LValue>) -> Self {
-        LValue::Map(map)
+impl<K: Clone + Into<LValue>, V: Clone + Into<LValue>> From<&im::HashMap<K, V>> for LValue {
+    fn from(map: &im::HashMap<K, V>) -> Self {
+        let mut new_map: HashMap<LValue, LValue> = im::HashMap::new();
+
+        for (k, v) in map.iter() {
+            new_map.insert(k.clone().into(), v.clone().into());
+        }
+
+        LValue::Map(new_map)
+    }
+}
+
+impl<K: Clone + Into<LValue>, V: Clone + Into<LValue>> From<im::HashMap<K, V>> for LValue {
+    fn from(map: im::HashMap<K, V>) -> Self {
+        (&map).into()
     }
 }
 

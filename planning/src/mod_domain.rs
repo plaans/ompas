@@ -1,6 +1,9 @@
 //! Module containing the Scheme library to setup DOMAIN environment
 
-use crate::algo::{translate_domain_env_to_hierarchy, translate_lvalue_to_expression_chronicle_r};
+use crate::algo::{
+    transform_lambda_expression, translate_domain_env_to_hierarchy,
+    translate_lvalue_to_expression_chronicle_r,
+};
 use crate::structs::{Context, FormatWithSymTable, SymTable};
 use ::macro_rules_attribute::macro_rules_attribute;
 use ompas_acting::rae::context::rae_env::*;
@@ -48,6 +51,7 @@ const DOMAIN_DEF_INITIAL_STATE: &str = "def-initial-state";
 
 const DOMAIN_TRANSLATE_EXPR: &str = "translate-expr";
 const DOMAIN_TRANSLATE_DOMAIN: &str = "translate-domain";
+const DOMAIN_TRANSFORM_LAMBDA: &str = "transform-lambda";
 
 //DOCUMENTATION
 const DOC_DOMAIN_GET_METHODS: &str =
@@ -80,6 +84,23 @@ const DOC_DEF_METHOD_VERBOSE: &str =
 const DOC_DEF_LAMBDA: &str = "Add a lambda to DOMAIN environment";
 const DOC_DEF_INITIAL_STATE: &str = "Add initial facts in the state. Most of the time it is general knowledge and not initialisation of facts.";
 
+const LAMBDA_TEST_1: &str = "(define test_1 (lambda (x y z) (* (+ x y) z)))";
+const LAMBDA_TEST_2: &str = "(define test_2 (lambda args (car args)))";
+
+#[derive(Default)]
+pub struct CtxTest {}
+
+impl GetModule for CtxTest {
+    fn get_module(self) -> Module {
+        Module {
+            ctx: Arc::new(()),
+            prelude: vec![],
+            raw_lisp: vec![LAMBDA_TEST_1, LAMBDA_TEST_2].into(),
+            label: "".to_string(),
+        }
+    }
+}
+
 pub struct CtxDomain {
     pub domain: DomainEnv,
     pub env: LEnv,
@@ -107,6 +128,10 @@ impl CtxDomain {
         .await
         .expect("error loading ctx rae description");
 
+        import(&mut env, &mut ctxs, CtxTest::default(), WithoutPrefix)
+            .await
+            .expect("error loading ctx test");
+
         Self {
             domain: Default::default(),
             env,
@@ -133,6 +158,7 @@ impl GetModule for CtxDomain {
 
         module.add_fn_prelude(DOMAIN_TRANSLATE_EXPR, translate_expr);
         module.add_fn_prelude(DOMAIN_TRANSLATE_DOMAIN, translate_domain);
+        module.add_fn_prelude(DOMAIN_TRANSFORM_LAMBDA, transform_lambda);
 
         module.add_async_mut_fn_prelude(DOMAIN_DEF_STATE_FUNCTION, def_state_function);
         module.add_async_mut_fn_prelude(DOMAIN_DEF_ACTION, def_action);
@@ -204,6 +230,23 @@ pub fn translate_domain(_: &[LValue], _env: &LEnv, ctx: &CtxDomain) -> Result<LV
     });
 
     Ok(domain.format_with_sym_table(&st).into())
+}
+
+pub fn transform_lambda(args: &[LValue], _env: &LEnv, ctx: &CtxDomain) -> Result<LValue, LError> {
+    if args.len() != 1 {
+        return Err(WrongNumberOfArgument(
+            DOMAIN_TRANSFORM_LAMBDA,
+            args.into(),
+            args.len(),
+            1..1,
+        ));
+    }
+
+    let mut env = ctx.env.clone();
+
+    let mut ctxs = ctx.ctxs.clone();
+
+    transform_lambda_expression(&args[0], &mut env, &mut ctxs)
 }
 ///Get the methods of a given task
 pub fn get_methods(_: &[LValue], _env: &LEnv, ctx: &CtxDomain) -> Result<LValue, LError> {

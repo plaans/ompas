@@ -1,7 +1,10 @@
 use crate::structs::Lit;
 use crate::structs::*;
+use ompas_lisp::core::{eval, expand, parse, ContextCollection, LEnv};
 use ompas_lisp::language::scheme_primitives::EVAL;
-use ompas_lisp::structs::{LCoreOperator, LValue};
+use ompas_lisp::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
+use ompas_lisp::structs::{LCoreOperator, LResult, LValue, LambdaArgs, NameTypeLValue};
+use ompas_utils::blocking_async;
 
 pub fn translate_domain_env_to_hierarchy(context: Context) -> (Domain, SymTable) {
     //for each action: translate to chronicle
@@ -477,4 +480,112 @@ pub fn translate_lvalue_to_chronicle(exp: &[LValue], sym_table: &mut SymTable) -
     });
     chronicle.add_subtask(expression_chronicle);
     chronicle
+}
+
+pub const TRANSFROM_LAMBDA_EXPRESSION: &str = "transform-lambda-expression";
+
+pub fn transform_lambda_expression(
+    lv: &LValue,
+    env: &mut LEnv,
+    ctxs: &mut ContextCollection,
+) -> LResult {
+    println!("in transform lambda");
+
+    if let LValue::List(list) = lv {
+        if list.is_empty() {
+            return Err(WrongNumberOfArgument(
+                TRANSFROM_LAMBDA_EXPRESSION,
+                lv.clone(),
+                0,
+                1..std::usize::MAX,
+            ));
+        }
+
+        let arg = list[0].clone();
+        let mut c_env = env.clone();
+        let mut c_ctxs = ctxs.clone();
+
+        let lambda = blocking_async!({
+            eval(
+                &expand(&arg, true, &mut c_env, &mut c_ctxs).await?,
+                &mut c_env,
+                &mut c_ctxs,
+            )
+            .await
+        })
+        .expect("Error in thread evaluating lambda")?;
+        println!("evaluating is a success");
+        if let LValue::Lambda(l) = lambda {
+            let mut lisp = "(begin".to_string();
+
+            let args = &list[1..];
+
+            let params = l.get_params();
+            let body = l.get_body();
+
+            match params {
+                LambdaArgs::Sym(param) => {
+                    let arg = if args.len() == 1 {
+                        match &args[0] {
+                            LValue::Nil => LValue::Nil,
+                            _ => vec![args[0].clone()].into(),
+                        }
+                    } else {
+                        args.into()
+                    };
+                    lisp.push_str(format!("(define {} '{})", param, arg).as_str());
+                }
+                LambdaArgs::List(params) => {
+                    if params.len() != args.len() {
+                        return Err(SpecialError(
+                            TRANSFROM_LAMBDA_EXPRESSION,
+                            format!(
+                                "in lambda {}: ",
+                                WrongNumberOfArgument(
+                                    TRANSFROM_LAMBDA_EXPRESSION,
+                                    args.into(),
+                                    args.len(),
+                                    params.len()..params.len(),
+                                )
+                            ),
+                        ));
+                    }
+                    for (param, arg) in params.iter().zip(args) {
+                        lisp.push_str(format!("(define {} '{})", param.to_string(), arg).as_str());
+                    }
+                }
+                LambdaArgs::Nil => {
+                    if !args.is_empty() {
+                        return Err(SpecialError(
+                            TRANSFROM_LAMBDA_EXPRESSION,
+                            "Lambda was expecting no args.".to_string(),
+                        ));
+                    }
+                }
+            };
+
+            lisp.push_str(body.to_string().as_str());
+            lisp.push(')');
+
+            let mut c_env = env.clone();
+            let mut c_ctxs = ctxs.clone();
+
+            blocking_async!(parse(&lisp, &mut c_env, &mut c_ctxs).await)
+                .expect("error in thread parsing string")
+        } else {
+            Err(WrongType(
+                TRANSFROM_LAMBDA_EXPRESSION,
+                list[0].clone(),
+                (&list[0]).into(),
+                NameTypeLValue::Lambda,
+            ))
+        }
+    } else {
+        Err(WrongType(
+            TRANSFROM_LAMBDA_EXPRESSION,
+            lv.clone(),
+            lv.into(),
+            NameTypeLValue::List,
+        ))
+    }
 }

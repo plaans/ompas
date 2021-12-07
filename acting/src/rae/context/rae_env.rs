@@ -351,7 +351,7 @@ impl DomainEnv {
 impl DomainEnv {
     pub fn add_task(&mut self, label: String, value: Task) {
         self.tasks.insert(label.clone(), value);
-        self.map_symbol_type.insert(label.into(), TASK_TYPE.into());
+        self.map_symbol_type.insert(label, TASK_TYPE.into());
     }
 
     pub fn add_method(&mut self, label: String, value: Method) -> Result<(), LError> {
@@ -366,8 +366,7 @@ impl DomainEnv {
             Some(task) => {
                 task.methods.push(label.clone());
                 self.methods.insert(label.clone(), value);
-                self.map_symbol_type
-                    .insert(label.into(), METHOD_TYPE.into());
+                self.map_symbol_type.insert(label, METHOD_TYPE.into());
                 Ok(())
             }
         }
@@ -376,13 +375,12 @@ impl DomainEnv {
     pub fn add_state_function(&mut self, label: String, value: StateFunction) {
         self.state_functions.insert(label.clone(), value);
         self.map_symbol_type
-            .insert(label.into(), STATE_FUNCTION_TYPE.into());
+            .insert(label, STATE_FUNCTION_TYPE.into());
     }
 
     pub fn add_action(&mut self, label: String, value: Action) {
         self.actions.insert(label.clone(), value);
-        self.map_symbol_type
-            .insert(label.into(), ACTION_TYPE.into());
+        self.map_symbol_type.insert(label, ACTION_TYPE.into());
     }
 
     pub fn add_action_sample_fn(&mut self, label: String, value: LValue) -> Result<(), LError> {
@@ -401,8 +399,7 @@ impl DomainEnv {
 
     pub fn add_lambda(&mut self, label: String, value: LValue) {
         self.lambdas.insert(label.clone(), value);
-        self.map_symbol_type
-            .insert(label.into(), LAMBDA_TYPE.into());
+        self.map_symbol_type.insert(label, LAMBDA_TYPE.into());
     }
 }
 

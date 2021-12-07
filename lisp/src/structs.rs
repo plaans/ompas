@@ -523,6 +523,10 @@ impl LLambda {
     pub fn get_body(&self) -> LValue {
         *self.body.clone()
     }
+
+    pub fn get_params(&self) -> LambdaArgs {
+        self.params.clone()
+    }
 }
 
 impl From<&LLambda> for LValue {

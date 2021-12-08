@@ -1,8 +1,8 @@
 //! Module containing the Scheme library to setup DOMAIN environment
 
 use crate::algo::{
-    transform_lambda_expression, translate_domain_env_to_hierarchy,
-    translate_lvalue_to_expression_chronicle_r,
+    pre_processing, transform_lambda_expression, translate_domain_env_to_hierarchy,
+    translate_lvalue_to_expression_chronicle_r_2,
 };
 use crate::structs::{Context, FormatWithSymTable, SymTable};
 use ::macro_rules_attribute::macro_rules_attribute;
@@ -52,6 +52,9 @@ const DOMAIN_DEF_INITIAL_STATE: &str = "def-initial-state";
 const DOMAIN_TRANSLATE_EXPR: &str = "translate-expr";
 const DOMAIN_TRANSLATE_DOMAIN: &str = "translate-domain";
 const DOMAIN_TRANSFORM_LAMBDA: &str = "transform-lambda";
+
+const DOMAIN_PRE_PROCESSING: &str = "pre-processing";
+const DOMAIN_PRE_PROCESSING_DOMAIN: &str = "pre-processing-domain";
 
 //DOCUMENTATION
 const DOC_DOMAIN_GET_METHODS: &str =
@@ -108,6 +111,22 @@ pub struct CtxDomain {
     pub state: RAEState,
 }
 
+impl From<&CtxDomain> for Context {
+    fn from(ctx: &CtxDomain) -> Self {
+        Self {
+            domain: ctx.domain.clone(),
+            env: ctx.env.clone(),
+            ctxs: ctx.ctxs.clone(),
+        }
+    }
+}
+
+impl From<CtxDomain> for Context {
+    fn from(ctx: CtxDomain) -> Self {
+        (&ctx).into()
+    }
+}
+
 impl CtxDomain {
     pub async fn new() -> Self {
         let (mut env, mut ctxs) = LEnv::root().await;
@@ -156,9 +175,11 @@ impl GetModule for CtxDomain {
         module.add_fn_prelude(DOMAIN_GET_TASKS, get_tasks);
         module.add_fn_prelude(DOMAIN_GET_ENV, get_env);
 
-        module.add_fn_prelude(DOMAIN_TRANSLATE_EXPR, translate_expr);
+        module.add_async_fn_prelude(DOMAIN_TRANSLATE_EXPR, translate_expr);
         module.add_fn_prelude(DOMAIN_TRANSLATE_DOMAIN, translate_domain);
         module.add_fn_prelude(DOMAIN_TRANSFORM_LAMBDA, transform_lambda);
+        module.add_fn_prelude(DOMAIN_PRE_PROCESSING, lisp_pre_processing);
+        module.add_fn_prelude(DOMAIN_PRE_PROCESSING_DOMAIN, lisp_pre_processing_domain);
 
         module.add_async_mut_fn_prelude(DOMAIN_DEF_STATE_FUNCTION, def_state_function);
         module.add_async_mut_fn_prelude(DOMAIN_DEF_ACTION, def_action);
@@ -203,8 +224,12 @@ impl Documentation for CtxDomain {
         ]
     }
 }
-
-pub fn translate_expr(args: &[LValue], _env: &LEnv, _ctx: &CtxDomain) -> Result<LValue, LError> {
+#[macro_rules_attribute(dyn_async!)]
+async fn translate_expr<'a>(
+    args: &'a [LValue],
+    _env: &'a LEnv,
+    ctx: &'a CtxDomain,
+) -> Result<LValue, LError> {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(
             DOMAIN_TRANSLATE_EXPR,
@@ -214,10 +239,14 @@ pub fn translate_expr(args: &[LValue], _env: &LEnv, _ctx: &CtxDomain) -> Result<
         ));
     }
 
-    let lv = &args[0];
+    let mut env = ctx.env.clone();
+    let mut ctxs = ctx.ctxs.clone();
+
+    let lv = expand(&args[0], true, &mut env, &mut ctxs).await?;
 
     let mut symbol_table = SymTable::default();
-    let chronicle = translate_lvalue_to_expression_chronicle_r(lv, &mut symbol_table);
+    let chronicle =
+        translate_lvalue_to_expression_chronicle_r_2(&lv, &ctx.into(), &mut symbol_table)?;
     let string = chronicle.format_with_sym_table(&symbol_table);
     Ok(string.into())
 }
@@ -227,7 +256,7 @@ pub fn translate_domain(_: &[LValue], _env: &LEnv, ctx: &CtxDomain) -> Result<LV
         domain: ctx.domain.clone(),
         env: ctx.env.clone(),
         ctxs: ctx.ctxs.clone(),
-    });
+    })?;
 
     Ok(domain.format_with_sym_table(&st).into())
 }
@@ -242,12 +271,32 @@ pub fn transform_lambda(args: &[LValue], _env: &LEnv, ctx: &CtxDomain) -> Result
         ));
     }
 
-    let mut env = ctx.env.clone();
+    let env = ctx.env.clone();
 
-    let mut ctxs = ctx.ctxs.clone();
+    let ctxs = ctx.ctxs.clone();
 
-    transform_lambda_expression(&args[0], &mut env, &mut ctxs)
+    transform_lambda_expression(&args[0], env, ctxs)
 }
+
+pub fn lisp_pre_processing(args: &[LValue], _: &LEnv, ctx: &CtxDomain) -> LResult {
+    if args.len() != 1 {
+        return Err(WrongNumberOfArgument(
+            DOMAIN_TRANSFORM_LAMBDA,
+            args.into(),
+            args.len(),
+            1..1,
+        ));
+    }
+
+    pre_processing(&args[0], &ctx.into())
+}
+
+pub fn lisp_pre_processing_domain(_: &[LValue], _: &LEnv, _ctx: &CtxDomain) -> LResult {
+    //let mut context: Context = ctx.into();
+
+    todo!()
+}
+
 ///Get the methods of a given task
 pub fn get_methods(_: &[LValue], _env: &LEnv, ctx: &CtxDomain) -> Result<LValue, LError> {
     Ok(ctx.domain.get_list_methods())

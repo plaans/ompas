@@ -1,6 +1,76 @@
 pub const MOD_ROOT: &str = "mod-root";
 
 pub mod scheme_primitives {
+
+    pub fn get_scheme_primitives() -> Vec<&'static str> {
+        vec![
+            FIRST,
+            SECOND,
+            THIRD,
+            REST,
+            CAR,
+            CDR,
+            APPEND,
+            LAST,
+            EMPTY,
+            LEN,
+            MEMBER,
+            REVERSE,
+            LIST,
+            GET_LIST,
+            SET_LIST,
+            CONS,
+            SET,
+            GET,
+            GET_MAP,
+            SET_MAP,
+            REMOVE_MAP,
+            REMOVE_KEY_VALUE_MAP,
+            UNION_MAP,
+            MAP,
+            DEFINE,
+            DEF_MACRO,
+            LAMBDA,
+            IF,
+            QUOTE,
+            QUASI_QUOTE,
+            UNQUOTE,
+            "'", //quote char
+            ",", //quasi quote char
+            "`", //unquote char
+            BEGIN,
+            ASYNC,
+            AWAIT,
+            EVAL,
+            PARSE,
+            EXPAND,
+            NOT,
+            ADD,
+            SUB,
+            MUL,
+            DIV,
+            GT,
+            LT,
+            GE,
+            LE,
+            EQ,
+            IS_NUMBER,
+            IS_FLOAT,
+            IS_INT,
+            IS_BOOL,
+            IS_SYMBOL,
+            IS_STRING,
+            IS_FN,
+            IS_MUT_FN,
+            IS_LIST,
+            IS_MAP,
+            IS_LAMBDA,
+            IS_QUOTE,
+            IS_PAIR,
+            IS_EQUAL,
+            IS_NIL,
+        ]
+    }
     /*
     LIST FUNCTIONS
      */
@@ -115,9 +185,9 @@ pub mod scheme_primitives {
     pub const IS_PAIR: &str = "pair?";
     pub const IS_EQUAL: &str = "equal?";
 
-    //Not yet implemented
     pub const IS_NIL: &str = "null?";
 
+    //Not yet implemented
     pub const FN_MAP: &str = "map";
     pub const APPLY: &str = "APPLY";
     pub const ZIP: &str = "zip";

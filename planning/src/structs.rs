@@ -1,7 +1,9 @@
 use crate::structs::Sym::Unique;
 use ompas_acting::rae::context::rae_env::DomainEnv;
 use ompas_lisp::core::{ContextCollection, LEnv};
-use ompas_lisp::structs::LValue;
+use ompas_lisp::language::scheme_primitives::*;
+use ompas_lisp::structs::LError::SpecialError;
+use ompas_lisp::structs::{LError, LValue};
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Display, Formatter};
 
@@ -26,6 +28,12 @@ impl From<String> for Sym {
     }
 }
 
+impl From<&str> for Sym {
+    fn from(s: &str) -> Self {
+        Self::Unique(s.to_string())
+    }
+}
+
 impl Display for Sym {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -45,11 +53,16 @@ pub trait FormatWithSymTable {
     fn format_with_sym_table(&self, st: &SymTable) -> String;
 }
 
-#[derive(Clone, PartialOrd, PartialEq, Eq, Ord, Hash)]
+#[derive(Clone, Copy, PartialOrd, PartialEq, Eq, Ord, Hash)]
 pub enum SymType {
     Timepoint,
     Result,
     Object,
+    Action,
+    StateFunction,
+    Method,
+    Task,
+    Function,
 }
 
 impl Display for SymType {
@@ -58,6 +71,11 @@ impl Display for SymType {
             SymType::Timepoint => write!(f, "timepoint"),
             SymType::Result => write!(f, "return"),
             SymType::Object => write!(f, "object"),
+            SymType::Action => write!(f, "action"),
+            SymType::StateFunction => write!(f, "state-function"),
+            SymType::Method => write!(f, "method"),
+            SymType::Task => write!(f, "task"),
+            SymType::Function => write!(f, "function"),
         }
     }
 }
@@ -78,14 +96,62 @@ impl Default for SymTable {
         types_number.insert(SymType::Result, 0);
         types_number.insert(SymType::Timepoint, 0);
         types_number.insert(SymType::Object, 0);
-        Self {
+        types_number.insert(SymType::Action, 0);
+        types_number.insert(SymType::StateFunction, 0);
+        types_number.insert(SymType::Method, 0);
+        types_number.insert(SymType::Task, 0);
+        types_number.insert(SymType::Function, 0);
+
+        let mut st = Self {
             symbols: vec![],
             ids: Default::default(),
             symbol_types: Default::default(),
             types_number,
             multiple_def: Default::default(),
             pointer_to_ver: vec![Default::default()],
+        };
+
+        //Symbols of lisp functions that are useful
+        //Not exhaustive
+        st.add_list_of_symbols_of_same_type(
+            get_scheme_primitives()
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+            &SymType::Function,
+        )
+        .expect("error while adding symbols of scheme primitives");
+
+        st
+    }
+}
+
+impl SymTable {
+    pub fn add_list_of_symbols_of_same_type(
+        &mut self,
+        list: Vec<String>,
+        sym_type: &SymType,
+    ) -> Result<(), LError> {
+        let types_number = *self.types_number.get(sym_type).unwrap();
+
+        for element in &list {
+            if self.it_exists(element) {
+                return Err(SpecialError(
+                    "add_list_of_symbols_of_same_type",
+                    format!("{} already exists", element),
+                ));
+            }
+
+            let id = self.symbols.len();
+            self.symbols.push(element.clone().into());
+            self.ids.insert(element.clone().into(), id);
+            self.symbol_types.insert(id, *sym_type);
         }
+
+        self.types_number
+            .insert(*sym_type, types_number + list.len());
+
+        Ok(())
     }
 }
 
@@ -566,7 +632,7 @@ impl FormatWithSymTable for Transition {
 
 #[derive(Clone)]
 pub struct Effect {
-    pub interval: TransitionInterval,
+    pub interval: Interval,
     pub transition: Transition,
 }
 
@@ -630,9 +696,32 @@ impl From<Constraint> for Lit {
     }
 }
 
-impl From<Vec<Lit>> for Lit {
-    fn from(vec: Vec<Lit>) -> Self {
-        Self::Exp(vec)
+impl<T: Clone + Into<Lit>> From<&Vec<T>> for Lit {
+    fn from(v: &Vec<T>) -> Self {
+        Lit::Exp(v.iter().map(|e| e.clone().into()).collect())
+    }
+}
+
+impl<T: Clone + Into<Lit>> From<Vec<T>> for Lit {
+    fn from(v: Vec<T>) -> Self {
+        (&v).into()
+    }
+}
+
+pub fn lvalue_to_lit(lv: &LValue, st: &mut SymTable) -> Result<Lit, LError> {
+    match lv {
+        LValue::List(list) => {
+            let mut vec = vec![];
+            for e in list {
+                vec.push(lvalue_to_lit(e, st)?);
+            }
+            Ok(vec.into())
+        }
+        LValue::Map(_) => Err(SpecialError(
+            "LValue to lit",
+            "Map transformation to lit is not supported yet.".to_string(),
+        )),
+        lv => Ok(st.declare_new_object(Some(lv.to_string()), false).into()),
     }
 }
 

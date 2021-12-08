@@ -3,10 +3,34 @@ use crate::structs::*;
 use ompas_lisp::core::{eval, expand, parse, ContextCollection, LEnv};
 use ompas_lisp::language::scheme_primitives::EVAL;
 use ompas_lisp::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
-use ompas_lisp::structs::{LCoreOperator, LResult, LValue, LambdaArgs, NameTypeLValue};
+use ompas_lisp::structs::{LCoreOperator, LError, LResult, LValue, LambdaArgs, NameTypeLValue};
 use ompas_utils::blocking_async;
 
-pub fn translate_domain_env_to_hierarchy(context: Context) -> (Domain, SymTable) {
+//Names of the functions
+
+const PRE_PROCESSING: &str = "pre_processing";
+const TRANSLATE_LVALUE_TO_EXPRESSION_CHRONICLE_R_2: &str =
+    "translate_lvalue_to_expression_chronicle_r_2";
+
+pub fn pre_processing(lv: &LValue, context: &Context) -> LResult {
+    let mut lv = match transform_lambda_expression(lv, context.env.clone(), context.ctxs.clone()) {
+        Ok(lv) => lv,
+        Err(_) => lv.clone(),
+    };
+
+    if let LValue::List(list) = &lv {
+        let mut result = vec![];
+        for lv in list {
+            result.push(pre_processing(lv, context)?)
+        }
+
+        lv = result.into()
+    }
+
+    Ok(lv)
+}
+
+pub fn translate_domain_env_to_hierarchy(context: Context) -> Result<(Domain, SymTable), LError> {
     //for each action: translate to chronicle
     //for each method: translate to chronicle
 
@@ -39,7 +63,7 @@ pub fn translate_domain_env_to_hierarchy(context: Context) -> (Domain, SymTable)
             action.get_sim(),
             &context,
             &mut symbol_table,
-        );
+        )?;
 
         chronicle.absorb_expression_chronicle(ec);
 
@@ -85,24 +109,33 @@ pub fn translate_domain_env_to_hierarchy(context: Context) -> (Domain, SymTable)
         methods.push(chronicle);
     }
 
-    (Domain::new(actions, tasks, methods), symbol_table)
+    Ok((Domain::new(actions, tasks, methods), symbol_table))
 }
 
 pub fn translate_lvalue_to_expression_chronicle_r_2(
     exp: &LValue,
     context: &Context,
     symbol_table: &mut SymTable,
-) -> ExpressionChronicle {
+) -> Result<ExpressionChronicle, LError> {
     let mut ec = ExpressionChronicle::new(exp.clone(), symbol_table);
 
     match exp {
-        LValue::Symbol(_) => {
-            ec.set_lit(Lit::LValue(vec![EVAL.into(), exp.clone()].into()));
+        LValue::Symbol(s) => {
+            ec.set_lit(
+                vec![
+                    Lit::from(
+                        symbol_table
+                            .id(&EVAL.into())
+                            .expect("eval should be in the sym table"),
+                    ),
+                    symbol_table
+                        .declare_new_object(Some(s.into()), false)
+                        .into(),
+                ]
+                .into(),
+            );
             ec.add_effect(Effect {
-                interval: TransitionInterval::new(
-                    *ec.get_interval(),
-                    symbol_table.declare_new_timepoint(),
-                ),
+                interval: *ec.get_interval(),
                 transition: Transition::new(ec.get_result().into(), ec.get_lit()),
             });
         }
@@ -111,7 +144,7 @@ pub fn translate_lvalue_to_expression_chronicle_r_2(
                 LCoreOperator::Define => {
                     let var = symbol_table.declare_new_object(Some(l[1].to_string()), true);
                     let val =
-                        translate_lvalue_to_expression_chronicle_r_2(&l[2], context, symbol_table);
+                        translate_lvalue_to_expression_chronicle_r_2(&l[2], context, symbol_table)?;
                     ec.add_constraint(Constraint::Eq(val.get_result().into(), var.into()));
                     ec.add_constraint(Constraint::Eq(ec.get_result().into(), LValue::Nil.into()));
                     ec.absorb(val);
@@ -122,7 +155,7 @@ pub fn translate_lvalue_to_expression_chronicle_r_2(
                     let mut previous_interval = *ec.get_interval();
                     for (i, e) in l[1..].iter().enumerate() {
                         let mut ec_i =
-                            translate_lvalue_to_expression_chronicle_r_2(e, context, symbol_table);
+                            translate_lvalue_to_expression_chronicle_r_2(e, context, symbol_table)?;
 
                         literal.push(ec_i.get_result().into());
 
@@ -147,7 +180,9 @@ pub fn translate_lvalue_to_expression_chronicle_r_2(
                         ec.get_interval().end().into(),
                     ));
 
-                    let literal: Lit = vec![EVAL.into(), literal.into()].into();
+                    let literal: Lit = literal.into();
+
+                    let literal: Lit = vec![EVAL.into(), literal].into();
 
                     /*let expression_chronicle = Expression {
                         interval: ec.get_interval().clone(),
@@ -155,11 +190,9 @@ pub fn translate_lvalue_to_expression_chronicle_r_2(
                     };*/
 
                     ec.set_lit(literal);
-                    let persistence = symbol_table.declare_new_timepoint();
 
-                    ec.add_var(&persistence);
                     ec.add_effect(Effect {
-                        interval: TransitionInterval::new(*ec.get_interval(), persistence),
+                        interval: *ec.get_interval(),
                         transition: Transition::new(ec.get_result().into(), ec.get_lit()),
                     });
                     //ec.add_subtask(expression_chronicle);
@@ -181,7 +214,7 @@ pub fn translate_lvalue_to_expression_chronicle_r_2(
                         });
 
                         let ec_a =
-                            translate_lvalue_to_expression_chronicle_r_2(a, context, symbol_table);
+                            translate_lvalue_to_expression_chronicle_r_2(a, context, symbol_table)?;
 
                         ec.add_constraint(Constraint::Eq(
                             ec.get_result().into(),
@@ -195,6 +228,7 @@ pub fn translate_lvalue_to_expression_chronicle_r_2(
                             ec.get_interval().end().into(),
                             ec_a.get_interval().end().into(),
                         ));
+                        ec.absorb(ec_a);
                     } else if a == &LValue::Nil {
                         ec.add_condition(Condition {
                             interval: Interval::new(
@@ -205,7 +239,7 @@ pub fn translate_lvalue_to_expression_chronicle_r_2(
                         });
 
                         let ec_b =
-                            translate_lvalue_to_expression_chronicle_r_2(b, context, symbol_table);
+                            translate_lvalue_to_expression_chronicle_r_2(b, context, symbol_table)?;
 
                         ec.add_constraint(Constraint::Eq(
                             ec.get_result().into(),
@@ -219,13 +253,26 @@ pub fn translate_lvalue_to_expression_chronicle_r_2(
                             ec.get_interval().end().into(),
                             ec_b.get_interval().end().into(),
                         ));
+                        ec.absorb(ec_b);
                     }
                     //Two blocks where we have to define two methods
                     else {
-                        panic!("not supported yet")
+                        return Err(SpecialError(
+                            TRANSLATE_LVALUE_TO_EXPRESSION_CHRONICLE_R_2,
+                            "Two branches If block is not supported yet...".to_string(),
+                        ));
                     }
                 }
-                _ => panic!("not supported yet"),
+                LCoreOperator::Quote => {
+                    ec =
+                        translate_lvalue_to_expression_chronicle_r_2(&l[1], context, symbol_table)?;
+                }
+                co => {
+                    return Err(SpecialError(
+                        TRANSLATE_LVALUE_TO_EXPRESSION_CHRONICLE_R_2,
+                        format!("{} not supported yet", co),
+                    ))
+                }
             },
             _ => {
                 symbol_table.new_scope();
@@ -233,7 +280,7 @@ pub fn translate_lvalue_to_expression_chronicle_r_2(
                 let mut previous_interval = *ec.get_interval();
                 for e in l {
                     let mut ec_i =
-                        translate_lvalue_to_expression_chronicle_r_2(e, context, symbol_table);
+                        translate_lvalue_to_expression_chronicle_r_2(e, context, symbol_table)?;
 
                     literal.push(ec_i.get_result().into());
 
@@ -251,15 +298,12 @@ pub fn translate_lvalue_to_expression_chronicle_r_2(
                     ec.get_interval().end().into(),
                 ));
 
-                let literal: Lit = vec![EVAL.into(), literal.into()].into();
+                let literal: Lit = vec![EVAL.into(), Lit::from(literal)].into();
 
                 ec.set_lit(literal);
 
-                let persistence = symbol_table.declare_new_timepoint();
-                ec.add_var(&persistence);
-
                 ec.add_effect(Effect {
-                    interval: TransitionInterval::new(*ec.get_interval(), persistence),
+                    interval: *ec.get_interval(),
                     transition: Transition::new(ec.get_result().into(), ec.get_lit()),
                 });
                 //ec.add_subtask(expression_chronicle);
@@ -279,137 +323,7 @@ pub fn translate_lvalue_to_expression_chronicle_r_2(
         }
     }
 
-    ec
-}
-
-pub fn translate_lvalue_to_expression_chronicle_r(
-    exp: &LValue,
-    sym_table: &mut SymTable,
-) -> ExpressionChronicle {
-    let mut ec = ExpressionChronicle::new(exp.clone(), sym_table);
-
-    match exp {
-        LValue::Symbol(_) => {
-            ec.set_lit(Lit::LValue(vec![EVAL.into(), exp.clone()].into()));
-            ec.add_effect(Effect {
-                interval: TransitionInterval::new(
-                    *ec.get_interval(),
-                    sym_table.declare_new_timepoint(),
-                ),
-                transition: Transition::new(ec.get_result().into(), ec.get_lit()),
-            });
-        }
-        LValue::List(l) => match &l[0] {
-            LValue::CoreOperator(co) => match co {
-                LCoreOperator::Define => {
-                    let var = sym_table.declare_new_object(Some(l[1].to_string()), true);
-                    let val = translate_lvalue_to_expression_chronicle_r(&l[2], sym_table);
-                    ec.add_constraint(Constraint::Eq(val.get_result().into(), var.into()));
-                    ec.add_constraint(Constraint::Eq(ec.get_result().into(), LValue::Nil.into()));
-                    ec.absorb(val);
-                }
-                LCoreOperator::Begin => {
-                    sym_table.new_scope();
-                    let mut literal: Vec<Lit> = vec!["begin".into()];
-                    let mut previous_interval = *ec.get_interval();
-                    for (i, e) in l[1..].iter().enumerate() {
-                        let mut ec_i = translate_lvalue_to_expression_chronicle_r(e, sym_table);
-
-                        literal.push(ec_i.get_result().into());
-
-                        ec_i.add_constraint(Constraint::LT(
-                            previous_interval.end().into(),
-                            ec_i.get_interval().start().into(),
-                        ));
-
-                        previous_interval = *ec_i.get_interval();
-
-                        if i == l.len() - 2 {
-                            ec.add_constraint(Constraint::Eq(
-                                ec.get_result().into(),
-                                ec_i.get_result().into(),
-                            ))
-                        }
-                        ec.absorb(ec_i);
-                    }
-
-                    ec.add_constraint(Constraint::LT(
-                        previous_interval.end().into(),
-                        ec.get_interval().end().into(),
-                    ));
-
-                    let literal: Lit = vec![EVAL.into(), literal.into()].into();
-
-                    /*let expression_chronicle = Expression {
-                        interval: ec.get_interval().clone(),
-                        lit: literal.clone(),
-                    };*/
-
-                    ec.set_lit(literal);
-                    let persistence = sym_table.declare_new_timepoint();
-
-                    ec.add_var(&persistence);
-                    ec.add_effect(Effect {
-                        interval: TransitionInterval::new(*ec.get_interval(), persistence),
-                        transition: Transition::new(ec.get_result().into(), ec.get_lit()),
-                    });
-                    //ec.add_subtask(expression_chronicle);
-                    sym_table.revert_scope();
-                }
-                _ => panic!("not supported yet"),
-            },
-            _ => {
-                sym_table.new_scope();
-                let mut literal: Vec<Lit> = vec![];
-                let mut previous_interval = *ec.get_interval();
-                for e in l {
-                    let mut ec_i = translate_lvalue_to_expression_chronicle_r(e, sym_table);
-
-                    literal.push(ec_i.get_result().into());
-
-                    ec_i.add_constraint(Constraint::LT(
-                        previous_interval.end().into(),
-                        ec_i.get_interval().start().into(),
-                    ));
-
-                    previous_interval = *ec_i.get_interval();
-                    ec.absorb(ec_i);
-                }
-
-                ec.add_constraint(Constraint::LT(
-                    previous_interval.end().into(),
-                    ec.get_interval().end().into(),
-                ));
-
-                let literal: Lit = vec![EVAL.into(), literal.into()].into();
-
-                ec.set_lit(literal);
-
-                let persistence = sym_table.declare_new_timepoint();
-                ec.add_var(&persistence);
-
-                ec.add_effect(Effect {
-                    interval: TransitionInterval::new(*ec.get_interval(), persistence),
-                    transition: Transition::new(ec.get_result().into(), ec.get_lit()),
-                });
-                //ec.add_subtask(expression_chronicle);
-                sym_table.revert_scope();
-            }
-        },
-        LValue::Nil
-        | LValue::True
-        | LValue::Number(_)
-        | LValue::String(_)
-        | LValue::Character(_) => {
-            ec.set_lit(exp.into());
-            ec.add_constraint(Constraint::Eq(ec.get_result().into(), ec.get_lit()))
-        }
-        _ => {
-            panic!("not supported yet")
-        }
-    }
-
-    ec
+    Ok(ec)
 }
 
 pub fn translate_lvalue_to_chronicle(exp: &[LValue], sym_table: &mut SymTable) -> Chronicle {
@@ -433,10 +347,8 @@ pub fn translate_lvalue_to_chronicle(exp: &[LValue], sym_table: &mut SymTable) -
         chronicle.add_interval(&expression.interval);
         chronicle.add_var(&result_e);
 
-        let persistence = sym_table.declare_new_timepoint();
-        chronicle.add_var(&persistence);
         let effect = Effect {
-            interval: TransitionInterval::new(expression.interval, persistence),
+            interval: expression.interval,
             transition: Transition::new(
                 result_e.into(),
                 LValue::from(vec!["eval".into(), e.clone()]).into(),
@@ -465,7 +377,7 @@ pub fn translate_lvalue_to_chronicle(exp: &[LValue], sym_table: &mut SymTable) -
     };
 
     chronicle.add_effect(Effect {
-        interval: TransitionInterval::new(interval, sym_table.declare_new_timepoint()),
+        interval,
         transition: Transition::new(
             result.into(),
             LValue::from(vec![
@@ -484,12 +396,8 @@ pub fn translate_lvalue_to_chronicle(exp: &[LValue], sym_table: &mut SymTable) -
 
 pub const TRANSFROM_LAMBDA_EXPRESSION: &str = "transform-lambda-expression";
 
-pub fn transform_lambda_expression(
-    lv: &LValue,
-    env: &mut LEnv,
-    ctxs: &mut ContextCollection,
-) -> LResult {
-    println!("in transform lambda");
+pub fn transform_lambda_expression(lv: &LValue, env: LEnv, ctxs: ContextCollection) -> LResult {
+    //println!("in transform lambda");
 
     if let LValue::List(list) = lv {
         if list.is_empty() {
@@ -514,7 +422,7 @@ pub fn transform_lambda_expression(
             .await
         })
         .expect("Error in thread evaluating lambda")?;
-        println!("evaluating is a success");
+        //println!("evaluating is a success");
         if let LValue::Lambda(l) = lambda {
             let mut lisp = "(begin".to_string();
 
@@ -567,8 +475,8 @@ pub fn transform_lambda_expression(
             lisp.push_str(body.to_string().as_str());
             lisp.push(')');
 
-            let mut c_env = env.clone();
-            let mut c_ctxs = ctxs.clone();
+            let mut c_env = env;
+            let mut c_ctxs = ctxs;
 
             blocking_async!(parse(&lisp, &mut c_env, &mut c_ctxs).await)
                 .expect("error in thread parsing string")

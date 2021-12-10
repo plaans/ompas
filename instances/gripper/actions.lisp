@@ -9,7 +9,7 @@
                 (assert (at-robby ?to) true)))))
 
     (def-action pick '(?obj ball) '(?room room) '(?gripper gripper))
-    (def-action-model move
+    (def-action-model pick
         '((:params (?obj ball) (?room room) (?gripper gripper))
           (:pre-conditions (and (at ?obj ?room) (at-robby ?room) (free ?gripper)))
           (:effects

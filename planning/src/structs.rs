@@ -160,8 +160,15 @@ impl SymTable {
         self.symbols.get(*id)
     }
 
-    pub fn id(&self, sym: &Sym) -> Option<&SymId> {
-        self.ids.get(sym)
+    pub fn id(&self, sym: &str) -> Option<&SymId> {
+        //Look before in the multiple_def table, and then looking in self.ids
+        if self.multiple_def.contains_key(sym) {
+            let ver = self.pointer_to_ver.last().unwrap().get(sym).unwrap();
+            let value = self.multiple_def.get(sym).unwrap().get(*ver);
+            value
+        } else {
+            self.ids.get(&sym.into())
+        }
     }
 
     //Declare a new return value

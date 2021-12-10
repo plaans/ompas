@@ -37,11 +37,22 @@ pub fn translate_domain_env_to_hierarchy(context: Context) -> Result<(Domain, Sy
 
     let mut symbol_table = SymTable::default();
 
-    //Add actions, tasks and methods symbols to symbol_table:
-    for (label, _type) in context.domain.get_map_symbol_type().iter() {
-        symbol_table.declare_new_object(Some(label.clone()), false);
-    }
+    let actions: Vec<String> = context.domain.get_actions().keys().cloned().collect();
+    let tasks: Vec<String> = context.domain.get_tasks().keys().cloned().collect();
+    let state_functions = context
+        .domain
+        .get_state_functions()
+        .keys()
+        .cloned()
+        .collect();
+    let methods = context.domain.get_methods().keys().cloned().collect();
 
+    symbol_table.add_list_of_symbols_of_same_type(actions, &SymType::Action)?;
+    symbol_table.add_list_of_symbols_of_same_type(state_functions, &SymType::StateFunction)?;
+    symbol_table.add_list_of_symbols_of_same_type(methods, &SymType::Method)?;
+    symbol_table.add_list_of_symbols_of_same_type(tasks, &SymType::Task)?;
+
+    //Add actions, tasks and methods symbols to symbol_table:
     let mut methods = vec![];
     #[allow(unused_mut)]
     let mut tasks = vec![];
@@ -50,23 +61,20 @@ pub fn translate_domain_env_to_hierarchy(context: Context) -> Result<(Domain, Sy
 
     for (action_label, action) in context.domain.get_actions() {
         //evaluate the lambda sim.
-        let mut chronicle = Chronicle::default();
-        let symbol_id = symbol_table.declare_new_object(Some(action_label.clone()), false);
+        let mut chronicle =
+            translate_lvalue_to_chronicle(action.get_sim(), &context, &mut symbol_table)?;
+        let symbol_id = *symbol_table
+            .id(action_label)
+            .unwrap_or_else(|| panic!("{} was not well defined", action_label));
         let mut name = vec![symbol_id];
 
         for e in action.get_parameters().get_params() {
-            let symbol_id = symbol_table.declare_new_object(Some(e), true);
+            let symbol_id = *symbol_table
+                .id(&e)
+                .expect("parameters were not defined in the chronicle");
             name.push(symbol_id);
             chronicle.add_var(&symbol_id);
         }
-
-        let ec = translate_lvalue_to_expression_chronicle(
-            &pre_processing(action.get_sim(), &context)?,
-            &context,
-            &mut symbol_table,
-        )?;
-
-        chronicle.absorb_expression_chronicle(ec);
 
         chronicle.set_name(name);
 
@@ -164,7 +172,7 @@ pub fn translate_lvalue_to_expression_chronicle(
                 vec![
                     Lit::from(
                         symbol_table
-                            .id(&EVAL.into())
+                            .id(EVAL)
                             .expect("eval should be in the sym table"),
                     ),
                     symbol_table
@@ -191,7 +199,7 @@ pub fn translate_lvalue_to_expression_chronicle(
                 LCoreOperator::Begin => {
                     symbol_table.new_scope();
                     let mut literal: Vec<Lit> = vec![symbol_table
-                        .id(&BEGIN.into())
+                        .id(BEGIN)
                         .expect("begin is not defined in the symbol table")
                         .into()];
                     let mut previous_interval = *ec.get_interval();
@@ -226,7 +234,7 @@ pub fn translate_lvalue_to_expression_chronicle(
 
                     let literal: Lit = vec![
                         symbol_table
-                            .id(&EVAL.into())
+                            .id(EVAL)
                             .expect("eval not defined in symbol table.")
                             .into(),
                         literal,
@@ -259,7 +267,7 @@ pub fn translate_lvalue_to_expression_chronicle(
                             constraint: Constraint::Eq(
                                 cond,
                                 symbol_table
-                                    .id(&TRUE.into())
+                                    .id(TRUE)
                                     .expect("True not defined in symbol table")
                                     .into(),
                             ),
@@ -290,7 +298,7 @@ pub fn translate_lvalue_to_expression_chronicle(
                             constraint: Constraint::Eq(
                                 cond,
                                 symbol_table
-                                    .id(&FALSE.into())
+                                    .id(FALSE)
                                     .expect("True not defined in symbol table")
                                     .into(),
                             ),
@@ -357,7 +365,7 @@ pub fn translate_lvalue_to_expression_chronicle(
 
                 let literal: Lit = vec![
                     symbol_table
-                        .id(&EVAL.into())
+                        .id(EVAL)
                         .expect("Eval not defined in symbol table")
                         .into(),
                     Lit::from(literal),

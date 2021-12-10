@@ -4,6 +4,9 @@ pub mod scheme_primitives {
 
     pub fn get_scheme_primitives() -> Vec<&'static str> {
         vec![
+            TRUE,
+            FALSE,
+            NIL,
             FIRST,
             SECOND,
             THIRD,

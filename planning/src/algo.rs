@@ -1,16 +1,17 @@
 use crate::structs::Lit;
 use crate::structs::*;
 use ompas_lisp::core::{eval, expand, parse, ContextCollection, LEnv};
-use ompas_lisp::language::scheme_primitives::EVAL;
+use ompas_lisp::language::scheme_primitives::*;
 use ompas_lisp::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
 use ompas_lisp::structs::{LCoreOperator, LError, LResult, LValue, LambdaArgs, NameTypeLValue};
 use ompas_utils::blocking_async;
 
 //Names of the functions
 
-const PRE_PROCESSING: &str = "pre_processing";
-const TRANSLATE_LVALUE_TO_EXPRESSION_CHRONICLE_R_2: &str =
-    "translate_lvalue_to_expression_chronicle_r_2";
+//const PRE_PROCESSING: &str = "pre_processing";
+const TRANSLATE_LVALUE_TO_EXPRESSION_CHRONICLE: &str = "translate_lvalue_to_expression_chronicle";
+
+const TRANSLATE_LVALUE_TO_CHRONICLE: &str = "translate_lvalue_to_chronicle";
 
 pub fn pre_processing(lv: &LValue, context: &Context) -> LResult {
     let mut lv = match transform_lambda_expression(lv, context.env.clone(), context.ctxs.clone()) {
@@ -59,8 +60,8 @@ pub fn translate_domain_env_to_hierarchy(context: Context) -> Result<(Domain, Sy
             chronicle.add_var(&symbol_id);
         }
 
-        let ec = translate_lvalue_to_expression_chronicle_r_2(
-            action.get_sim(),
+        let ec = translate_lvalue_to_expression_chronicle(
+            &pre_processing(action.get_sim(), &context)?,
             &context,
             &mut symbol_table,
         )?;
@@ -112,7 +113,45 @@ pub fn translate_domain_env_to_hierarchy(context: Context) -> Result<(Domain, Sy
     Ok((Domain::new(actions, tasks, methods), symbol_table))
 }
 
-pub fn translate_lvalue_to_expression_chronicle_r_2(
+pub fn translate_lvalue_to_chronicle(
+    exp: &LValue,
+    context: &Context,
+    symbol_table: &mut SymTable,
+) -> Result<Chronicle, LError> {
+    //Creation and instantiation of the chronicle
+
+    if let LValue::Lambda(lambda) = exp {
+        let mut chronicle = Chronicle::default();
+        let params = lambda.get_params();
+        match params {
+            LambdaArgs::Sym(s) => {
+                symbol_table.declare_new_object(Some(s), true);
+            }
+            LambdaArgs::List(list) => {
+                for param in list {
+                    symbol_table.declare_new_object(Some(param), true);
+                }
+            }
+            LambdaArgs::Nil => {}
+        }
+        let body = pre_processing(&lambda.get_body(), context)?;
+
+        let ec = translate_lvalue_to_expression_chronicle(&body, context, symbol_table)?;
+
+        chronicle.absorb_expression_chronicle(ec);
+        Ok(chronicle)
+    } else {
+        Err(SpecialError(
+            TRANSLATE_LVALUE_TO_CHRONICLE,
+            format!(
+                "chronicle can only be extracted from a lambda, here we have {}",
+                NameTypeLValue::from(exp)
+            ),
+        ))
+    }
+}
+
+pub fn translate_lvalue_to_expression_chronicle(
     exp: &LValue,
     context: &Context,
     symbol_table: &mut SymTable,
@@ -144,18 +183,21 @@ pub fn translate_lvalue_to_expression_chronicle_r_2(
                 LCoreOperator::Define => {
                     let var = symbol_table.declare_new_object(Some(l[1].to_string()), true);
                     let val =
-                        translate_lvalue_to_expression_chronicle_r_2(&l[2], context, symbol_table)?;
+                        translate_lvalue_to_expression_chronicle(&l[2], context, symbol_table)?;
                     ec.add_constraint(Constraint::Eq(val.get_result().into(), var.into()));
                     ec.add_constraint(Constraint::Eq(ec.get_result().into(), LValue::Nil.into()));
                     ec.absorb(val);
                 }
                 LCoreOperator::Begin => {
                     symbol_table.new_scope();
-                    let mut literal: Vec<Lit> = vec!["begin".into()];
+                    let mut literal: Vec<Lit> = vec![symbol_table
+                        .id(&BEGIN.into())
+                        .expect("begin is not defined in the symbol table")
+                        .into()];
                     let mut previous_interval = *ec.get_interval();
                     for (i, e) in l[1..].iter().enumerate() {
                         let mut ec_i =
-                            translate_lvalue_to_expression_chronicle_r_2(e, context, symbol_table)?;
+                            translate_lvalue_to_expression_chronicle(e, context, symbol_table)?;
 
                         literal.push(ec_i.get_result().into());
 
@@ -182,12 +224,14 @@ pub fn translate_lvalue_to_expression_chronicle_r_2(
 
                     let literal: Lit = literal.into();
 
-                    let literal: Lit = vec![EVAL.into(), literal].into();
-
-                    /*let expression_chronicle = Expression {
-                        interval: ec.get_interval().clone(),
-                        lit: literal.clone(),
-                    };*/
+                    let literal: Lit = vec![
+                        symbol_table
+                            .id(&EVAL.into())
+                            .expect("eval not defined in symbol table.")
+                            .into(),
+                        literal,
+                    ]
+                    .into();
 
                     ec.set_lit(literal);
 
@@ -203,6 +247,8 @@ pub fn translate_lvalue_to_expression_chronicle_r_2(
                     let a = &l[2];
                     let b = &l[3];
 
+                    let cond = lvalue_to_lit(cond, symbol_table)?;
+
                     //Taking in account 1 branch if
                     if b == &LValue::Nil {
                         ec.add_condition(Condition {
@@ -210,11 +256,17 @@ pub fn translate_lvalue_to_expression_chronicle_r_2(
                                 &ec.get_interval().start(),
                                 &ec.get_interval().start(),
                             ),
-                            constraint: Constraint::Eq(cond.into(), "true".into()),
+                            constraint: Constraint::Eq(
+                                cond,
+                                symbol_table
+                                    .id(&TRUE.into())
+                                    .expect("True not defined in symbol table")
+                                    .into(),
+                            ),
                         });
 
                         let ec_a =
-                            translate_lvalue_to_expression_chronicle_r_2(a, context, symbol_table)?;
+                            translate_lvalue_to_expression_chronicle(a, context, symbol_table)?;
 
                         ec.add_constraint(Constraint::Eq(
                             ec.get_result().into(),
@@ -235,11 +287,17 @@ pub fn translate_lvalue_to_expression_chronicle_r_2(
                                 &ec.get_interval().start(),
                                 &ec.get_interval().start(),
                             ),
-                            constraint: Constraint::Eq(cond.into(), "false".into()),
+                            constraint: Constraint::Eq(
+                                cond,
+                                symbol_table
+                                    .id(&FALSE.into())
+                                    .expect("True not defined in symbol table")
+                                    .into(),
+                            ),
                         });
 
                         let ec_b =
-                            translate_lvalue_to_expression_chronicle_r_2(b, context, symbol_table)?;
+                            translate_lvalue_to_expression_chronicle(b, context, symbol_table)?;
 
                         ec.add_constraint(Constraint::Eq(
                             ec.get_result().into(),
@@ -258,18 +316,17 @@ pub fn translate_lvalue_to_expression_chronicle_r_2(
                     //Two blocks where we have to define two methods
                     else {
                         return Err(SpecialError(
-                            TRANSLATE_LVALUE_TO_EXPRESSION_CHRONICLE_R_2,
+                            TRANSLATE_LVALUE_TO_EXPRESSION_CHRONICLE,
                             "Two branches If block is not supported yet...".to_string(),
                         ));
                     }
                 }
                 LCoreOperator::Quote => {
-                    ec =
-                        translate_lvalue_to_expression_chronicle_r_2(&l[1], context, symbol_table)?;
+                    ec = translate_lvalue_to_expression_chronicle(&l[1], context, symbol_table)?;
                 }
                 co => {
                     return Err(SpecialError(
-                        TRANSLATE_LVALUE_TO_EXPRESSION_CHRONICLE_R_2,
+                        TRANSLATE_LVALUE_TO_EXPRESSION_CHRONICLE,
                         format!("{} not supported yet", co),
                     ))
                 }
@@ -280,7 +337,7 @@ pub fn translate_lvalue_to_expression_chronicle_r_2(
                 let mut previous_interval = *ec.get_interval();
                 for e in l {
                     let mut ec_i =
-                        translate_lvalue_to_expression_chronicle_r_2(e, context, symbol_table)?;
+                        translate_lvalue_to_expression_chronicle(e, context, symbol_table)?;
 
                     literal.push(ec_i.get_result().into());
 
@@ -298,7 +355,14 @@ pub fn translate_lvalue_to_expression_chronicle_r_2(
                     ec.get_interval().end().into(),
                 ));
 
-                let literal: Lit = vec![EVAL.into(), Lit::from(literal)].into();
+                let literal: Lit = vec![
+                    symbol_table
+                        .id(&EVAL.into())
+                        .expect("Eval not defined in symbol table")
+                        .into(),
+                    Lit::from(literal),
+                ]
+                .into();
 
                 ec.set_lit(literal);
 
@@ -318,83 +382,18 @@ pub fn translate_lvalue_to_expression_chronicle_r_2(
             ec.set_lit(exp.into());
             ec.add_constraint(Constraint::Eq(ec.get_result().into(), ec.get_lit()))
         }
-        _ => {
-            panic!("not supported yet")
+        lv => {
+            return Err(SpecialError(
+                TRANSLATE_LVALUE_TO_EXPRESSION_CHRONICLE,
+                format!("{} not supported yet", NameTypeLValue::from(lv)),
+            ))
         }
     }
 
     Ok(ec)
 }
 
-pub fn translate_lvalue_to_chronicle(exp: &[LValue], sym_table: &mut SymTable) -> Chronicle {
-    let mut chronicle = Chronicle::default();
-    let interval = sym_table.declare_new_interval();
-    chronicle.add_interval(&interval);
-    let result = sym_table.declare_new_result();
-    chronicle.add_var(&result);
-    let f = sym_table.declare_new_object(Some(exp[0].to_string()), false);
-    let mut literal: Vec<Lit> = vec![f.into()];
-
-    let mut previous_interval = interval;
-    for e in &exp[1..] {
-        let expression = Expression {
-            interval: sym_table.declare_new_interval(),
-            lit: Lit::LValue(e.clone()),
-        };
-
-        let result_e = sym_table.declare_new_result();
-        literal.push(result_e.into());
-        chronicle.add_interval(&expression.interval);
-        chronicle.add_var(&result_e);
-
-        let effect = Effect {
-            interval: expression.interval,
-            transition: Transition::new(
-                result_e.into(),
-                LValue::from(vec!["eval".into(), e.clone()]).into(),
-            ),
-        };
-
-        chronicle.add_constraint(Constraint::LT(
-            previous_interval.end().into(),
-            expression.interval.start().into(),
-        ));
-
-        previous_interval = expression.interval;
-
-        chronicle.add_effect(effect);
-        chronicle.add_subtask(expression);
-    }
-
-    chronicle.add_constraint(Constraint::LT(
-        previous_interval.end().into(),
-        interval.end().into(),
-    ));
-
-    let expression_chronicle = Expression {
-        interval,
-        lit: Lit::from(literal.clone()),
-    };
-
-    chronicle.add_effect(Effect {
-        interval,
-        transition: Transition::new(
-            result.into(),
-            LValue::from(vec![
-                LValue::from("eval"),
-                expression_chronicle
-                    .lit
-                    .format_with_sym_table(sym_table)
-                    .into(),
-            ])
-            .into(),
-        ),
-    });
-    chronicle.add_subtask(expression_chronicle);
-    chronicle
-}
-
-pub const TRANSFROM_LAMBDA_EXPRESSION: &str = "transform-lambda-expression";
+pub const TRANSFORM_LAMBDA_EXPRESSION: &str = "transform-lambda-expression";
 
 pub fn transform_lambda_expression(lv: &LValue, env: LEnv, ctxs: ContextCollection) -> LResult {
     //println!("in transform lambda");
@@ -402,7 +401,7 @@ pub fn transform_lambda_expression(lv: &LValue, env: LEnv, ctxs: ContextCollecti
     if let LValue::List(list) = lv {
         if list.is_empty() {
             return Err(WrongNumberOfArgument(
-                TRANSFROM_LAMBDA_EXPRESSION,
+                TRANSFORM_LAMBDA_EXPRESSION,
                 lv.clone(),
                 0,
                 1..std::usize::MAX,
@@ -446,11 +445,11 @@ pub fn transform_lambda_expression(lv: &LValue, env: LEnv, ctxs: ContextCollecti
                 LambdaArgs::List(params) => {
                     if params.len() != args.len() {
                         return Err(SpecialError(
-                            TRANSFROM_LAMBDA_EXPRESSION,
+                            TRANSFORM_LAMBDA_EXPRESSION,
                             format!(
                                 "in lambda {}: ",
                                 WrongNumberOfArgument(
-                                    TRANSFROM_LAMBDA_EXPRESSION,
+                                    TRANSFORM_LAMBDA_EXPRESSION,
                                     args.into(),
                                     args.len(),
                                     params.len()..params.len(),
@@ -465,7 +464,7 @@ pub fn transform_lambda_expression(lv: &LValue, env: LEnv, ctxs: ContextCollecti
                 LambdaArgs::Nil => {
                     if !args.is_empty() {
                         return Err(SpecialError(
-                            TRANSFROM_LAMBDA_EXPRESSION,
+                            TRANSFORM_LAMBDA_EXPRESSION,
                             "Lambda was expecting no args.".to_string(),
                         ));
                     }
@@ -482,7 +481,7 @@ pub fn transform_lambda_expression(lv: &LValue, env: LEnv, ctxs: ContextCollecti
                 .expect("error in thread parsing string")
         } else {
             Err(WrongType(
-                TRANSFROM_LAMBDA_EXPRESSION,
+                TRANSFORM_LAMBDA_EXPRESSION,
                 list[0].clone(),
                 (&list[0]).into(),
                 NameTypeLValue::Lambda,
@@ -490,7 +489,7 @@ pub fn transform_lambda_expression(lv: &LValue, env: LEnv, ctxs: ContextCollecti
         }
     } else {
         Err(WrongType(
-            TRANSFROM_LAMBDA_EXPRESSION,
+            TRANSFORM_LAMBDA_EXPRESSION,
             lv.clone(),
             lv.into(),
             NameTypeLValue::List,

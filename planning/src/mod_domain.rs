@@ -2,7 +2,7 @@
 
 use crate::algo::{
     pre_processing, transform_lambda_expression, translate_domain_env_to_hierarchy,
-    translate_lvalue_to_expression_chronicle_r_2,
+    translate_lvalue_to_chronicle,
 };
 use crate::structs::{Context, FormatWithSymTable, SymTable};
 use ::macro_rules_attribute::macro_rules_attribute;
@@ -245,8 +245,7 @@ async fn translate_expr<'a>(
     let lv = expand(&args[0], true, &mut env, &mut ctxs).await?;
 
     let mut symbol_table = SymTable::default();
-    let chronicle =
-        translate_lvalue_to_expression_chronicle_r_2(&lv, &ctx.into(), &mut symbol_table)?;
+    let chronicle = translate_lvalue_to_chronicle(&lv, &ctx.into(), &mut symbol_table)?;
     let string = chronicle.format_with_sym_table(&symbol_table);
     Ok(string.into())
 }
@@ -291,10 +290,26 @@ pub fn lisp_pre_processing(args: &[LValue], _: &LEnv, ctx: &CtxDomain) -> LResul
     pre_processing(&args[0], &ctx.into())
 }
 
-pub fn lisp_pre_processing_domain(_: &[LValue], _: &LEnv, _ctx: &CtxDomain) -> LResult {
+pub fn lisp_pre_processing_domain(_: &[LValue], _: &LEnv, ctx: &CtxDomain) -> LResult {
     //let mut context: Context = ctx.into();
+    let mut str = "pre-processing of the domain:\n".to_string();
+    let context = ctx.into();
 
-    todo!()
+    for (action_label, action) in ctx.domain.get_actions() {
+        let pre_processed = pre_processing(action.get_sim(), &context)?;
+
+        str.push_str(
+            format!(
+                "{}:\n\tbefore: {}\n\tafter: {}\n",
+                action_label,
+                action.get_sim().pretty_print("\tbefore: ".len()),
+                pre_processed.pretty_print("\tafter: ".len()),
+            )
+            .as_str(),
+        );
+    }
+
+    Ok(str.into())
 }
 
 ///Get the methods of a given task

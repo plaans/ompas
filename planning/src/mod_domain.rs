@@ -1,8 +1,8 @@
 //! Module containing the Scheme library to setup DOMAIN environment
 
 use crate::algo::{
-    pre_processing, transform_lambda_expression, translate_domain_env_to_hierarchy,
-    translate_lvalue_to_chronicle,
+    pre_processing, transform_lambda_expression, translate_cond_if,
+    translate_domain_env_to_hierarchy, translate_lvalue_to_chronicle,
 };
 use crate::structs::{Context, FormatWithSymTable, SymTable};
 use ::macro_rules_attribute::macro_rules_attribute;
@@ -52,6 +52,7 @@ const DOMAIN_DEF_INITIAL_STATE: &str = "def-initial-state";
 const DOMAIN_TRANSLATE_EXPR: &str = "translate-expr";
 const DOMAIN_TRANSLATE_DOMAIN: &str = "translate-domain";
 const DOMAIN_TRANSFORM_LAMBDA: &str = "transform-lambda";
+const DOMAIN_TRANSLATE_COND_EXPR: &str = "translate-cond-expr";
 
 const DOMAIN_PRE_PROCESSING: &str = "pre-processing";
 const DOMAIN_PRE_PROCESSING_DOMAIN: &str = "pre-processing-domain";
@@ -180,6 +181,7 @@ impl GetModule for CtxDomain {
         module.add_fn_prelude(DOMAIN_TRANSFORM_LAMBDA, transform_lambda);
         module.add_fn_prelude(DOMAIN_PRE_PROCESSING, lisp_pre_processing);
         module.add_fn_prelude(DOMAIN_PRE_PROCESSING_DOMAIN, lisp_pre_processing_domain);
+        module.add_fn_prelude(DOMAIN_TRANSLATE_COND_EXPR, translate_cond_expr);
 
         module.add_async_mut_fn_prelude(DOMAIN_DEF_STATE_FUNCTION, def_state_function);
         module.add_async_mut_fn_prelude(DOMAIN_DEF_ACTION, def_action);
@@ -258,6 +260,24 @@ pub fn translate_domain(_: &[LValue], _env: &LEnv, ctx: &CtxDomain) -> Result<LV
     })?;
 
     Ok(domain.format_with_sym_table(&st).into())
+}
+
+pub fn translate_cond_expr(args: &[LValue], _env: &LEnv, ctx: &CtxDomain) -> LResult {
+    if args.len() != 1 {
+        return Err(WrongNumberOfArgument(
+            DOMAIN_TRANSFORM_LAMBDA,
+            args.into(),
+            args.len(),
+            1..1,
+        ));
+    }
+
+    let mut symbol_table = SymTable::default();
+    let context = ctx.into();
+
+    let result = translate_cond_if(&args[0], &context, &mut symbol_table)?;
+
+    Ok(result.format_with_sym_table(&symbol_table).into())
 }
 
 pub fn transform_lambda(args: &[LValue], _env: &LEnv, ctx: &CtxDomain) -> Result<LValue, LError> {

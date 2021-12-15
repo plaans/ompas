@@ -3,7 +3,7 @@ use ompas_acting::rae::context::rae_env::DomainEnv;
 use ompas_lisp::core::{ContextCollection, LEnv};
 use ompas_lisp::language::scheme_primitives::*;
 use ompas_lisp::structs::LError::SpecialError;
-use ompas_lisp::structs::{LError, LValue};
+use ompas_lisp::structs::{LError, LNumber, LValue};
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Display, Formatter};
 
@@ -487,6 +487,8 @@ impl ExpressionChronicle {
     }
 }
 
+//Creates a new expression chronicle, declaring an interval and a result variable in the symbol table.
+//The LValue is used for debug
 impl ExpressionChronicle {
     pub fn new(lv: LValue, st: &mut SymTable) -> Self {
         let interval = st.declare_new_interval();
@@ -656,9 +658,29 @@ impl FormatWithSymTable for Effect {
 #[derive(Clone)]
 pub enum Lit {
     Atom(SymId),
+    Number(LNumber),
+    Boolean(bool),
     LValue(LValue),
     Constraint(Box<Constraint>),
     Exp(Vec<Lit>),
+}
+
+impl From<&LNumber> for Lit {
+    fn from(n: &LNumber) -> Self {
+        Self::Number(n.clone())
+    }
+}
+
+impl From<LNumber> for Lit {
+    fn from(n: LNumber) -> Self {
+        (&n).into()
+    }
+}
+
+impl From<bool> for Lit {
+    fn from(b: bool) -> Self {
+        Self::Boolean(b)
+    }
 }
 
 impl From<&str> for Lit {
@@ -728,6 +750,9 @@ pub fn lvalue_to_lit(lv: &LValue, st: &mut SymTable) -> Result<Lit, LError> {
             "LValue to lit",
             "Map transformation to lit is not supported yet.".to_string(),
         )),
+        LValue::Number(n) => Ok(n.into()),
+        LValue::True => Ok(true.into()),
+        LValue::Nil => Ok(false.into()),
         lv => Ok(st.declare_new_object(Some(lv.to_string()), false).into()),
     }
 }
@@ -749,6 +774,11 @@ impl FormatWithSymTable for Lit {
                 str
             }
             Lit::LValue(lv) => lv.to_string(),
+            Lit::Number(n) => n.to_string(),
+            Lit::Boolean(b) => match b {
+                true => "true".to_string(),
+                false => "nil".to_string(),
+            },
         }
     }
 }
@@ -758,19 +788,31 @@ pub enum Constraint {
     Eq(Lit, Lit),
     Neg(Lit),
     LT(Lit, Lit),
+    And(Lit, Lit),
+    Or(Lit, Lit),
 }
 
 impl FormatWithSymTable for Constraint {
     fn format_with_sym_table(&self, st: &SymTable) -> String {
         match self {
             Constraint::Eq(l1, l2) => format!(
-                "{} = {}",
+                "({} = {})",
                 l1.format_with_sym_table(st),
                 l2.format_with_sym_table(st)
             ),
-            Constraint::Neg(l1) => format!("! {}", l1.format_with_sym_table(st)),
+            Constraint::Neg(l1) => format!("(! {})", l1.format_with_sym_table(st)),
             Constraint::LT(l1, l2) => format!(
-                "{} < {}",
+                "({} < {})",
+                l1.format_with_sym_table(st),
+                l2.format_with_sym_table(st)
+            ),
+            Constraint::And(l1, l2) => format!(
+                "({} && {})",
+                l1.format_with_sym_table(st),
+                l2.format_with_sym_table(st)
+            ),
+            Constraint::Or(l1, l2) => format!(
+                "({} || {})",
                 l1.format_with_sym_table(st),
                 l2.format_with_sym_table(st)
             ),
@@ -783,8 +825,6 @@ pub struct Expression {
     pub interval: Interval,
     pub lit: Lit,
 }
-
-impl Expression {}
 
 impl FormatWithSymTable for Expression {
     fn format_with_sym_table(&self, st: &SymTable) -> String {

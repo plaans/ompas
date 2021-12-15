@@ -1132,7 +1132,7 @@ pub async fn eval(
                     }
                     LCoreOperator::Expand => {
                         let arg = &args[0];
-                        return expand(&eval(arg, env, ctxs).await?, true, env, ctxs).await;
+                        return expand(arg, true, env, ctxs).await;
                     }
                 }
             } else {

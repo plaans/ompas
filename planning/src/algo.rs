@@ -1,8 +1,11 @@
+use crate::structs::Constraint;
 use crate::structs::Lit;
 use crate::structs::*;
 use ompas_lisp::core::{eval, expand, parse, ContextCollection, LEnv};
 use ompas_lisp::language::scheme_primitives::*;
-use ompas_lisp::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
+use ompas_lisp::structs::LError::{
+    NotInListOfExpectedTypes, SpecialError, WrongNumberOfArgument, WrongType,
+};
 use ompas_lisp::structs::{LCoreOperator, LError, LResult, LValue, LambdaArgs, NameTypeLValue};
 use ompas_utils::blocking_async;
 
@@ -168,6 +171,7 @@ pub fn translate_lvalue_to_expression_chronicle(
 
     match exp {
         LValue::Symbol(s) => {
+            //Generale case
             ec.set_lit(
                 vec![
                     Lit::from(
@@ -251,11 +255,25 @@ pub fn translate_lvalue_to_expression_chronicle(
                     symbol_table.revert_scope();
                 }
                 LCoreOperator::If => {
+                    /*
+                    Code for the general case.
+                    In this case we accept computation inside condition blocks
+
                     let cond = &l[1];
                     let a = &l[2];
                     let b = &l[3];
 
-                    let cond = lvalue_to_lit(cond, symbol_table)?;
+                    let cond =
+                        translate_lvalue_to_expression_chronicle(cond, context, symbol_table)?;
+
+                    ec.add_constraint(Constraint::Eq(
+                        cond.get_interval().start().into(),
+                        ec.get_interval().start().into(),
+                    ));
+                    ec.add_constraint(Constraint::Eq(
+                        cond.get_interval().start().into(),
+                        cond.get_interval().end().into(),
+                    ));
 
                     //Taking in account 1 branch if
                     if b == &LValue::Nil {
@@ -264,13 +282,7 @@ pub fn translate_lvalue_to_expression_chronicle(
                                 &ec.get_interval().start(),
                                 &ec.get_interval().start(),
                             ),
-                            constraint: Constraint::Eq(
-                                cond,
-                                symbol_table
-                                    .id(TRUE)
-                                    .expect("True not defined in symbol table")
-                                    .into(),
-                            ),
+                            constraint: Constraint::Eq(cond.get_result().into(), true.into()),
                         });
 
                         let ec_a =
@@ -296,12 +308,72 @@ pub fn translate_lvalue_to_expression_chronicle(
                                 &ec.get_interval().start(),
                             ),
                             constraint: Constraint::Eq(
-                                cond,
+                                cond.get_result().into(),
                                 symbol_table
                                     .id(FALSE)
                                     .expect("True not defined in symbol table")
                                     .into(),
                             ),
+                        });
+
+                        let ec_b =
+                            translate_lvalue_to_expression_chronicle(b, context, symbol_table)?;
+
+                        ec.add_constraint(Constraint::Eq(
+                            ec.get_result().into(),
+                            ec_b.get_result().into(),
+                        ));
+                        ec.add_constraint(Constraint::Eq(
+                            ec.get_interval().start().into(),
+                            ec_b.get_interval().start().into(),
+                        ));
+                        ec.add_constraint(Constraint::Eq(
+                            ec.get_interval().end().into(),
+                            ec_b.get_interval().end().into(),
+                        ));
+                        ec.absorb(ec_b);
+                    */
+
+                    //We suppose here that the condition is a pure literal condition
+                    let cond = &l[1];
+                    let a = &l[2];
+                    let b = &l[3];
+
+                    let cond = translate_cond_if(cond, context, symbol_table)?;
+
+                    //Taking in account 1 branch if
+                    if b == &LValue::Nil {
+                        ec.add_condition(Condition {
+                            interval: Interval::new(
+                                &ec.get_interval().start(),
+                                &ec.get_interval().start(),
+                            ),
+                            constraint: Constraint::Eq(cond, true.into()),
+                        });
+
+                        let ec_a =
+                            translate_lvalue_to_expression_chronicle(a, context, symbol_table)?;
+
+                        ec.add_constraint(Constraint::Eq(
+                            ec.get_result().into(),
+                            ec_a.get_result().into(),
+                        ));
+                        ec.add_constraint(Constraint::Eq(
+                            ec.get_interval().start().into(),
+                            ec_a.get_interval().start().into(),
+                        ));
+                        ec.add_constraint(Constraint::Eq(
+                            ec.get_interval().end().into(),
+                            ec_a.get_interval().end().into(),
+                        ));
+                        ec.absorb(ec_a);
+                    } else if a == &LValue::Nil {
+                        ec.add_condition(Condition {
+                            interval: Interval::new(
+                                &ec.get_interval().start(),
+                                &ec.get_interval().start(),
+                            ),
+                            constraint: Constraint::Neg(cond),
                         });
 
                         let ec_b =
@@ -399,6 +471,70 @@ pub fn translate_lvalue_to_expression_chronicle(
     }
 
     Ok(ec)
+}
+
+pub const TRANSLATE_COND_IF: &str = "translate_cond_if";
+
+pub fn translate_cond_if(
+    exp: &LValue,
+    context: &Context,
+    symbol_table: &mut SymTable,
+) -> Result<Lit, LError> {
+    match exp {
+        LValue::List(list) => {
+            if list.len() == 4 {
+                if let LValue::CoreOperator(LCoreOperator::If) = &list[0] {
+                    let cond = translate_cond_if(&list[1], context, symbol_table)?;
+
+                    //And case:
+                    if &list[3] == &LValue::Nil {
+                        Ok(Constraint::And(
+                            cond,
+                            translate_cond_if(&list[2], context, symbol_table)?,
+                        )
+                        .into())
+                    }
+                    //Or case
+                    else if &list[2] == &LValue::True {
+                        Ok(Constraint::Or(
+                            cond,
+                            translate_cond_if(&list[3], context, symbol_table)?,
+                        )
+                        .into())
+                    } else {
+                        Err(SpecialError(
+                            TRANSLATE_COND_IF,
+                            "Expected an \"or\" or \"and\" expression.".to_string(),
+                        ))
+                    }
+                } else {
+                    Err(WrongType(
+                        TRANSLATE_COND_IF,
+                        list[0].clone(),
+                        (&list[0]).into(),
+                        NameTypeLValue::CoreOperator,
+                    ))
+                }
+            } else {
+                Ok(lvalue_to_lit(exp, symbol_table)?)
+            }
+        }
+        LValue::Symbol(s) => Ok(symbol_table
+            .declare_new_object(Some(s.clone()), false)
+            .into()),
+        LValue::Character(c) => Ok(symbol_table
+            .declare_new_object(Some(c.to_string()), false)
+            .into()),
+        LValue::Nil => Ok(false.into()),
+        LValue::True => Ok(true.into()),
+        LValue::Number(n) => Ok(n.into()),
+        _ => Err(NotInListOfExpectedTypes(
+            TRANSLATE_COND_IF,
+            exp.clone(),
+            exp.into(),
+            vec![NameTypeLValue::List, NameTypeLValue::Atom],
+        )),
+    }
 }
 
 pub const TRANSFORM_LAMBDA_EXPRESSION: &str = "transform-lambda-expression";

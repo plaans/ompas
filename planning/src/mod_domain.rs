@@ -718,12 +718,12 @@ async fn def_method<'a>(
     //println!("lvalue: {}", lvalue);
 
     if let LValue::List(list) = &lvalue {
-        if list.len() != 7 {
+        if list.len() != 6 {
             return Err(WrongNumberOfArgument(
                 DOMAIN_DEF_METHOD,
                 lvalue.clone(),
                 list.len(),
-                7..7,
+                6..6,
             ));
         } else if let LValue::Symbol(method_label) = &list[0] {
             if let LValue::Symbol(task_label) = &list[1] {

@@ -1,6 +1,7 @@
 use crate::structs::Constraint;
 use crate::structs::Lit;
 use crate::structs::*;
+use ompas_acting::rae::module::mod_rae_exec::{RAE_ASSERT, RAE_INSTANCE, RAE_RETRACT};
 use ompas_lisp::core::{eval, expand, parse, ContextCollection, LEnv};
 use ompas_lisp::language::scheme_primitives::*;
 use ompas_lisp::structs::LError::{
@@ -86,17 +87,30 @@ pub fn translate_domain_env_to_hierarchy(context: Context) -> Result<(Domain, Sy
 
     //Add all methods to the domain
     for (method_label, method) in context.domain.get_methods() {
-        let mut chronicle = Chronicle::default();
+        let mut chronicle =
+            translate_lvalue_to_chronicle(method.get_body(), &context, &mut symbol_table)?;
 
         //Declaring the method
         {
-            let symbol_id = symbol_table.declare_new_object(Some(method_label.clone()), false);
+            let pre_conditions = translate_lvalue_to_expression_chronicle(
+                method.get_pre_conditions(),
+                &context,
+                &mut symbol_table,
+            )?;
+
+            chronicle.absorb_expression_chronicle(pre_conditions);
+
+            let symbol_id = *symbol_table
+                .id(method_label)
+                .unwrap_or_else(|| panic!("{} was not well defined", method_label));
             let mut name = vec![symbol_id];
 
             for e in method.get_parameters().get_params() {
-                let symbol_id = symbol_table.declare_new_object(Some(e), true);
+                let symbol_id = *symbol_table
+                    .id(&e)
+                    .expect("parameters were not defined in the chronicle");
                 name.push(symbol_id);
-                chronicle.add_var(&symbol_id)
+                chronicle.add_var(&symbol_id);
             }
 
             chronicle.set_name(name);
@@ -173,22 +187,11 @@ pub fn translate_lvalue_to_expression_chronicle(
         LValue::Symbol(s) => {
             //Generale case
             ec.set_lit(
-                vec![
-                    Lit::from(
-                        symbol_table
-                            .id(EVAL)
-                            .expect("eval should be in the sym table"),
-                    ),
-                    symbol_table
-                        .declare_new_object(Some(s.into()), false)
-                        .into(),
-                ]
-                .into(),
+                symbol_table
+                    .declare_new_object(Some(s.into()), false)
+                    .into(),
             );
-            ec.add_effect(Effect {
-                interval: *ec.get_interval(),
-                transition: Transition::new(ec.get_result().into(), ec.get_lit()),
-            });
+            ec.add_constraint(Constraint::Eq(ec.get_result().into(), ec.get_lit()));
         }
         LValue::List(l) => match &l[0] {
             LValue::CoreOperator(co) => match co {
@@ -412,10 +415,84 @@ pub fn translate_lvalue_to_expression_chronicle(
                 }
             },
             _ => {
+                let mut expression_type = ExpressionType::Lisp;
+
                 symbol_table.new_scope();
                 let mut literal: Vec<Lit> = vec![];
+
+                if let LValue::Symbol(s) = &l[0] {
+                    match s.as_str() {
+                        RAE_ASSERT => {
+                            if l.len() != 3 {
+                                return Err(WrongNumberOfArgument(
+                                    TRANSLATE_LVALUE_TO_EXPRESSION_CHRONICLE,
+                                    exp.clone(),
+                                    l.len(),
+                                    3..3,
+                                ));
+                            }
+
+                            let state_variable = translate_lvalue_to_expression_chronicle(
+                                &l[1],
+                                context,
+                                symbol_table,
+                            )?;
+                            let value = translate_lvalue_to_expression_chronicle(
+                                &l[2],
+                                context,
+                                symbol_table,
+                            )?;
+
+                            ec.add_effect(Effect {
+                                interval: *ec.get_interval(),
+                                transition: Transition::new(
+                                    state_variable.get_lit(),
+                                    value.get_lit(),
+                                ),
+                            });
+
+                            ec.absorb(state_variable);
+                            ec.absorb(value);
+
+                            return Ok(ec);
+                        }
+                        //RAE_INSTANCE => {}
+                        RAE_RETRACT => {
+                            return Err(SpecialError(
+                                TRANSLATE_LVALUE_TO_EXPRESSION_CHRONICLE,
+                                "not yet supported".to_string(),
+                            ))
+                        }
+                        _ => match symbol_table.id(s) {
+                            Some(id) => {
+                                match symbol_table
+                                        .get_type(id)
+                                        .expect("a defined symbol should have a type")
+                                    {
+                                        SymType::Action => {
+                                            expression_type = ExpressionType::Action;
+                                        }
+                                        SymType::Function => {
+                                        }
+                                        SymType::Method => return Err(SpecialError(TRANSLATE_LVALUE_TO_EXPRESSION_CHRONICLE, format!("{} is method and can not be directly called into the body of a method.\
+                                \nPlease call the task that use the method instead", s))),
+                                        SymType::StateFunction => {
+                                            expression_type = ExpressionType::StateFunction
+                                        }
+                                        SymType::Task => {
+                                            expression_type = ExpressionType::Task
+                                        }
+                                        _ => return Err(SpecialError(TRANSLATE_LVALUE_TO_EXPRESSION_CHRONICLE, "{} first symbol should be a function, task, action or state function".to_string())),
+                                    }
+                                literal.push(id.into())
+                            }
+                            None => {}
+                        },
+                    }
+                }
+
                 let mut previous_interval = *ec.get_interval();
-                for e in l {
+                for e in &l[1..] {
                     let mut ec_i =
                         translate_lvalue_to_expression_chronicle(e, context, symbol_table)?;
 
@@ -435,22 +512,38 @@ pub fn translate_lvalue_to_expression_chronicle(
                     ec.get_interval().end().into(),
                 ));
 
-                let literal: Lit = vec![
-                    symbol_table
-                        .id(EVAL)
-                        .expect("Eval not defined in symbol table")
-                        .into(),
-                    Lit::from(literal),
-                ]
-                .into();
+                match expression_type {
+                    ExpressionType::Pure | ExpressionType::Lisp => {
+                        let literal: Lit = vec![
+                            symbol_table
+                                .id(EVAL)
+                                .expect("Eval not defined in symbol table")
+                                .into(),
+                            Lit::from(literal),
+                        ]
+                        .into();
 
-                ec.set_lit(literal);
+                        ec.set_lit(literal);
 
-                ec.add_effect(Effect {
-                    interval: *ec.get_interval(),
-                    transition: Transition::new(ec.get_result().into(), ec.get_lit()),
-                });
-                //ec.add_subtask(expression_chronicle);
+                        ec.add_effect(Effect {
+                            interval: *ec.get_interval(),
+                            transition: Transition::new(ec.get_result().into(), ec.get_lit()),
+                        });
+                        //ec.add_subtask(expression_chronicle);
+                    }
+                    ExpressionType::Action | ExpressionType::Task => ec.add_subtask(Expression {
+                        interval: *ec.get_interval(),
+                        lit: literal.into(),
+                    }),
+                    ExpressionType::StateFunction => {
+                        ec.set_lit(literal.into());
+
+                        ec.add_effect(Effect {
+                            interval: *ec.get_interval(),
+                            transition: Transition::new(ec.get_result().into(), ec.get_lit()),
+                        });
+                    }
+                }
                 symbol_table.revert_scope();
             }
         },

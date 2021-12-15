@@ -1,5 +1,6 @@
 use crate::structs::Sym::Unique;
 use ompas_acting::rae::context::rae_env::DomainEnv;
+use ompas_acting::rae::module::mod_rae_exec::{RAE_ASSERT, RAE_INSTANCE, RAE_RETRACT};
 use ompas_lisp::core::{ContextCollection, LEnv};
 use ompas_lisp::language::scheme_primitives::*;
 use ompas_lisp::structs::LError::SpecialError;
@@ -65,6 +66,14 @@ pub enum SymType {
     Function,
 }
 
+pub enum ExpressionType {
+    Pure,
+    Lisp,
+    Action,
+    Task,
+    StateFunction,
+}
+
 impl Display for SymType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -121,7 +130,15 @@ impl Default for SymTable {
             &SymType::Function,
         )
         .expect("error while adding symbols of scheme primitives");
-
+        st.add_list_of_symbols_of_same_type(
+            vec![
+                RAE_ASSERT.to_string(),
+                RAE_RETRACT.to_string(),
+                RAE_INSTANCE.to_string(),
+            ],
+            &SymType::Function,
+        )
+        .expect("error while adding symbols of rae");
         st
     }
 }
@@ -158,6 +175,10 @@ impl SymTable {
 impl SymTable {
     pub fn get(&self, id: &SymId) -> Option<&Sym> {
         self.symbols.get(*id)
+    }
+
+    pub fn get_type(&self, id: &SymId) -> Option<&SymType> {
+        self.symbol_types.get(id)
     }
 
     pub fn id(&self, sym: &str) -> Option<&SymId> {

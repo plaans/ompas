@@ -85,7 +85,7 @@ pub fn translate_domain_env_to_hierarchy(context: Context) -> Result<(Domain, Sy
         actions.push(chronicle)
     }
 
-    //Add all methods to the domain
+    /*//Add all methods to the domain
     for (method_label, method) in context.domain.get_methods() {
         let mut chronicle =
             translate_lvalue_to_chronicle(method.get_body(), &context, &mut symbol_table)?;
@@ -133,7 +133,7 @@ pub fn translate_domain_env_to_hierarchy(context: Context) -> Result<(Domain, Sy
         }
 
         methods.push(chronicle);
-    }
+    }*/
 
     Ok((Domain::new(actions, tasks, methods), symbol_table))
 }

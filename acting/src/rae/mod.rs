@@ -19,6 +19,7 @@ use ompas_lisp::structs::{LError, LValue};
 use std::mem;
 
 pub mod context;
+pub mod internal_platform;
 pub mod module;
 mod rae_log;
 mod select_methods;

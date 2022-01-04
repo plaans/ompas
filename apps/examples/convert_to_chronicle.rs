@@ -2,7 +2,7 @@ use ompas_lisp::core::{parse, LEnv};
 use ompas_lisp::structs::LError::SpecialError;
 use ompas_lisp::structs::{LError, LValue};
 use ompas_planning::algo::{
-    translate_lvalue_to_chronicle, translate_lvalue_to_expression_chronicle_r,
+    translate_lvalue_to_chronicle, translate_lvalue_to_expression_chronicle,
 };
 use ompas_planning::structs::*;
 use rustyline::error::ReadlineError;
@@ -49,7 +49,13 @@ async fn translate_2(exp: &str) -> Result<ExpressionChronicle, LError> {
 
     let mut symbol_table = SymTable::default();
 
-    let chronicle = translate_lvalue_to_expression_chronicle_r(&lv, &mut symbol_table);
+    let context = Context {
+        domain: Default::default(),
+        env: Default::default(),
+        ctxs: Default::default(),
+    };
+
+    let chronicle = translate_lvalue_to_expression_chronicle(&lv, &context, &mut symbol_table)?;
     println!("{}", chronicle.format_with_sym_table(&symbol_table));
     Ok(chronicle)
 }
@@ -58,18 +64,15 @@ async fn translate(exp: &str) -> Result<Chronicle, LError> {
     let (mut env, mut ctxs) = LEnv::root().await;
     let lv = parse(exp, &mut env, &mut ctxs).await?;
 
-    let slice = if let LValue::List(l) = &lv {
-        l.as_slice()
-    } else {
-        return Err(SpecialError(
-            "MAIN_TRANSLATE",
-            "exp should be a list".to_string(),
-        ));
+    let context = Context {
+        domain: Default::default(),
+        env: Default::default(),
+        ctxs: Default::default(),
     };
 
     let mut symbol_table = SymTable::default();
 
-    let chronicle = translate_lvalue_to_chronicle(slice, &mut symbol_table);
+    let chronicle = translate_lvalue_to_chronicle(&lv, &context, &mut symbol_table)?;
     println!("{}", chronicle.format_with_sym_table(&symbol_table));
     Ok(chronicle)
 }
@@ -80,18 +83,11 @@ async fn test() -> Result<(), LError> {
     let (mut env, mut ctxs) = LEnv::root().await;
     let lv = parse(exp, &mut env, &mut ctxs).await?;
 
-    let slice = if let LValue::List(l) = &lv {
-        l.as_slice()
-    } else {
-        return Err(SpecialError(
-            "MAIN_TRANSLATE",
-            "exp should be a list".to_string(),
-        ));
-    };
-
     let mut symbol_table = SymTable::default();
 
-    let chronicle = translate_lvalue_to_chronicle(slice, &mut symbol_table);
+    let context = Context::default();
+
+    let chronicle = translate_lvalue_to_chronicle(&lv, &mut symbol_table)?;
 
     println!("{}", chronicle.format_with_sym_table(&symbol_table));
     Ok(())

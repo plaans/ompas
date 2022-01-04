@@ -1,6 +1,7 @@
 use crate::structs::Sym::Unique;
 use ompas_acting::rae::context::rae_env::DomainEnv;
-use ompas_acting::rae::module::rae_exec::{RAE_ASSERT, RAE_INSTANCE, RAE_RETRACT};
+use ompas_acting::rae::module::rae_exec::platform::RAE_INSTANCE;
+use ompas_acting::rae::module::rae_exec::{RAE_ASSERT, RAE_RETRACT};
 use ompas_lisp::core::{ContextCollection, LEnv};
 use ompas_lisp::language::scheme_primitives::*;
 use ompas_lisp::structs::LError::SpecialError;
@@ -892,6 +893,7 @@ impl FormatWithSymTable for Interval {
     }
 }
 
+#[derive(Default)]
 pub struct Context {
     pub domain: DomainEnv,
     pub env: LEnv,

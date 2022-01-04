@@ -1,7 +1,6 @@
 use crate::rae::context::actions_progress::Status;
 use crate::rae::module::rae_exec::{
-    CtxRaeExec, RAE_LAUNCH_PLATFORM, RAE_OPEN_COM_PLATFORM, RAE_START_PLATFORM, SYMBOL_EXEC_MODE,
-    SYMBOL_RAE_MODE, SYMBOL_SIMU_MODE,
+    CtxRaeExec, SYMBOL_EXEC_MODE, SYMBOL_RAE_MODE, SYMBOL_SIMU_MODE,
 };
 use ::macro_rules_attribute::macro_rules_attribute;
 use log::{info, warn};
@@ -10,6 +9,12 @@ use ompas_lisp::structs::LError::SpecialError;
 use ompas_lisp::structs::{LError, LValue};
 use ompas_utils::dyn_async;
 use std::convert::TryInto;
+
+pub const RAE_EXEC_COMMAND: &str = "rae-exec-command";
+pub const RAE_LAUNCH_PLATFORM: &str = "rae-launch-platform";
+pub const RAE_OPEN_COM_PLATFORM: &str = "rae-open-com-platform";
+pub const RAE_START_PLATFORM: &str = "rae-start-platform";
+pub const RAE_INSTANCE: &str = "instance";
 
 #[macro_rules_attribute(dyn_async!)]
 pub async fn exec_command<'a>(
@@ -162,5 +167,21 @@ pub async fn cancel_command<'a>(
             "{} should have either {} or {} value.",
             SYMBOL_RAE_MODE, SYMBOL_EXEC_MODE, SYMBOL_SIMU_MODE
         ),
+    }
+}
+
+#[macro_rules_attribute(dyn_async!)]
+pub async fn instance<'a>(
+    args: &'a [LValue],
+    _env: &'a LEnv,
+    ctx: &'a CtxRaeExec,
+) -> Result<LValue, LError> {
+    if let Some(platform) = &ctx.platform_interface {
+        platform.instance(args).await
+    } else {
+        Err(SpecialError(
+            RAE_INSTANCE,
+            "instance not yet implemented in internal rae functionning".into(),
+        ))
     }
 }

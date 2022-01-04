@@ -350,33 +350,20 @@ async fn def_state_function<'a>(
     .await?;
 
     if let LValue::List(list) = &lvalue {
-        if list.len() != 4 {
+        if list.len() != 3 {
             return Err(WrongNumberOfArgument(
                 RAE_DEF_STATE_FUNCTION,
                 lvalue.clone(),
                 list.len(),
-                4..4,
+                3..3,
             ));
-        } else if let LValue::Symbol(action_label) = &list[0] {
+        } else if let LValue::Symbol(sf_label) = &list[0] {
             if let LValue::List(_) | LValue::Nil = &list[1] {
                 if let LValue::Lambda(_) = &list[2] {
-                    if let LValue::Lambda(_) = &list[3] {
-                        ctx.env.add_state_function(
-                            action_label.to_string(),
-                            StateFunction::new(
-                                (&list[1]).try_into()?,
-                                list[2].clone(),
-                                list[3].clone(),
-                            ),
-                        )?;
-                    } else {
-                        return Err(WrongType(
-                            RAE_DEF_STATE_FUNCTION,
-                            list[2].clone(),
-                            list[2].clone().into(),
-                            NameTypeLValue::Lambda,
-                        ));
-                    }
+                    ctx.env.add_state_function(
+                        sf_label.to_string(),
+                        StateFunction::new((&list[1]).try_into()?, list[2].clone()),
+                    )?;
                 } else {
                     return Err(WrongType(
                         RAE_DEF_STATE_FUNCTION,

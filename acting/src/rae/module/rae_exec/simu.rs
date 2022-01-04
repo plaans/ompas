@@ -12,6 +12,10 @@ pub const LAMBDA_GET_SCORE: &str = "(define get-score\
     (lambda (label)\
         (get rae-method-score-map label)))";
 
+pub const LAMBDA_GET_ACTION_MODEL: &str = "(define get-action-model 
+    (lambda (label)
+        (get rae-action-model-map label)))";
+
 pub const LAMBDA_EVAL_PRE_CONDITIONS: &str = "(define eval-pre-conditions
     (lambda (method)
         (sim_block

@@ -86,7 +86,7 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     let _ctx_godot = CtxGodot::default();
     let ctx_utils = CtxUtils::default();
     let (ctx_rae, ctx_rae_monitor) =
-        init_ctx_rae(Box::new(PlatformGodot::default()), log.clone()).await;
+        init_ctx_rae(Some(Box::new(PlatformGodot::default())), log.clone()).await;
     //Insert the doc for the different contexts.
     ctx_doc.insert_doc(CtxIo::documentation());
     ctx_doc.insert_doc(CtxMath::documentation());

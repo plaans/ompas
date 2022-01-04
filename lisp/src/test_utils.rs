@@ -39,7 +39,7 @@ pub async fn test_expression(test_expression: TestExpression) -> Result<(), LErr
         test_expression.expression, expanded, expected
     );
 
-    assert_eq!(expanded, expected,);
+    assert_eq!(expanded, expected);
 
     let result = eval(&expanded, &mut env, &mut ctxs).await?;
     let expected_result = parse(test_expression.result, &mut env, &mut ctxs).await?;

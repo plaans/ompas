@@ -1,6 +1,6 @@
-mod platform;
-mod rae_mutex;
-mod simu;
+pub mod platform;
+pub mod rae_mutex;
+pub mod simu;
 
 use crate::rae::context::actions_progress::{ActionId, ActionsProgress, Status};
 use crate::rae::context::agenda::Agenda;
@@ -53,16 +53,12 @@ pub const IS_LOCKED: &str = "locked?";
 pub const LOCKED: &str = "locked";
 pub const LOCKED_LIST: &str = "locked-list";
 //RAE Interface with a platform
-pub const RAE_EXEC_COMMAND: &str = "rae-exec-command";
 pub const RAE_GET_STATE: &str = "rae-get-state";
 pub const RAE_GET_FACTS: &str = "rae-get-facts";
 pub const RAE_GET_STATE_VARIBALE: &str = "rae-get-state-variable";
-pub const RAE_LAUNCH_PLATFORM: &str = "rae-launch-platform";
-pub const RAE_OPEN_COM_PLATFORM: &str = "rae-open-com-platform";
-pub const RAE_START_PLATFORM: &str = "rae-start-platform";
+
 pub const RAE_GET_STATUS: &str = "rae-get-status";
 pub const RAE_CANCEL_COMMAND: &str = "rae-cancel-command";
-pub const RAE_INSTANCE: &str = "instance";
 pub const RAE_GET_INSTANTIATED_METHODS: &str = "rae-get-instantiated-methods";
 pub const RAE_GET_BEST_METHOD: &str = "rae-get-best-method";
 pub const RAE_SELECT: &str = "rae-select";
@@ -191,6 +187,7 @@ impl GetModule for CtxRaeExec {
             LAMBDA_ARBITRARY,
             LAMBDA_GET_PRECONDITIONS,
             LAMBDA_GET_SCORE,
+            LAMBDA_GET_ACTION_MODEL,
             LAMBDA_EVAL_PRE_CONDITIONS,
             LAMBDA_COMPUTE_SCORE,
             LAMBDA_GENERATE_APPLICABLE_INSTANCES,
@@ -220,7 +217,6 @@ impl GetModule for CtxRaeExec {
         module.add_async_fn_prelude(RAE_ASSERT_SHORT, assert_fact);
         module.add_async_fn_prelude(RAE_RETRACT, retract_fact);
         module.add_async_fn_prelude(RAE_RETRACT_SHORT, retract_fact);
-        //module.add_async_fn_prelude(RAE_AWAIT, fn_await);
         module.add_async_mut_fn_prelude(RAE_OPEN_COM_PLATFORM, open_com);
         module.add_async_mut_fn_prelude(RAE_START_PLATFORM, start_platform);
         module.add_fn_prelude(RAE_GET_INSTANTIATED_METHODS, get_instantiated_methods);
@@ -532,70 +528,6 @@ async fn assert_fact<'a>(
     }
 }
 
-///Monitor the status of an action that has been triggered
-/// Return true if the action is a success, false otherwise
-#[macro_rules_attribute(dyn_async!)]
-async fn fn_await<'a>(
-    args: &'a [LValue],
-    _env: &'a LEnv,
-    ctx: &'a CtxRaeExec,
-) -> Result<LValue, LError> {
-    if args.len() != 1 {
-        return Err(WrongNumberOfArgument(
-            RAE_AWAIT,
-            args.into(),
-            args.len(),
-            1..1,
-        ));
-    }
-
-    let action_id = args[0].clone();
-    //println!("await on action (id={})", action_id);
-
-    if let LValue::Number(LNumber::Usize(action_id)) = action_id {
-        let mut receiver = ctx.actions_progress.declare_new_watcher(&action_id).await;
-        info!("waiting on action {}", action_id);
-
-        loop {
-            //println!("waiting on status:");
-            match receiver.recv().await.unwrap() {
-                true => {
-                    //println!("status updated!");
-                    match ctx.actions_progress.status.read().await.get(&action_id) {
-                        Some(s) => match s {
-                            Status::Pending => {
-                                //println!("not triggered");
-                            }
-                            Status::Running => {
-                                //println!("running");
-                            }
-                            Status::Failure => {
-                                warn!("Command {} is a failure.", action_id);
-                                return Ok(false.into());
-                            }
-                            Status::Done => {
-                                info!("Command {} is a success.", action_id);
-                                return Ok(true.into());
-                            }
-                        },
-                        None => {
-                            panic!("no action status")
-                        }
-                    };
-                }
-                false => panic!("sync to watch action status should not be false"),
-            }
-        }
-    } else {
-        Err(WrongType(
-            RAE_AWAIT,
-            action_id.clone(),
-            action_id.into(),
-            NameTypeLValue::Usize,
-        ))
-    }
-}
-
 //Return the labels of the methods
 
 fn get_instantiated_methods(
@@ -860,6 +792,7 @@ async fn select<'a>(
     - Return (task_id, best_method)
      */
 }
+
 #[macro_rules_attribute(dyn_async!)]
 async fn get_next_method<'a>(
     args: &'a [LValue],
@@ -918,22 +851,6 @@ async fn set_success_for_task<'a>(
             args[0].clone(),
             (&args[0]).into(),
             NameTypeLValue::Usize,
-        ))
-    }
-}
-
-#[macro_rules_attribute(dyn_async!)]
-async fn instance<'a>(
-    args: &'a [LValue],
-    _env: &'a LEnv,
-    ctx: &'a CtxRaeExec,
-) -> Result<LValue, LError> {
-    if let Some(platform) = &ctx.platform_interface {
-        platform.instance(args).await
-    } else {
-        Err(SpecialError(
-            RAE_INSTANCE,
-            "instance not yet implemented in internal rae functionning".into(),
         ))
     }
 }
@@ -1044,3 +961,67 @@ let mode: String = env
         ),
     }
  */
+
+/*///Monitor the status of an action that has been triggered
+/// Return true if the action is a success, false otherwise
+#[macro_rules_attribute(dyn_async!)]
+async fn fn_await<'a>(
+    args: &'a [LValue],
+    _env: &'a LEnv,
+    ctx: &'a CtxRaeExec,
+) -> Result<LValue, LError> {
+    if args.len() != 1 {
+        return Err(WrongNumberOfArgument(
+            RAE_AWAIT,
+            args.into(),
+            args.len(),
+            1..1,
+        ));
+    }
+
+    let action_id = args[0].clone();
+    //println!("await on action (id={})", action_id);
+
+    if let LValue::Number(LNumber::Usize(action_id)) = action_id {
+        let mut receiver = ctx.actions_progress.declare_new_watcher(&action_id).await;
+        info!("waiting on action {}", action_id);
+
+        loop {
+            //println!("waiting on status:");
+            match receiver.recv().await.unwrap() {
+                true => {
+                    //println!("status updated!");
+                    match ctx.actions_progress.status.read().await.get(&action_id) {
+                        Some(s) => match s {
+                            Status::Pending => {
+                                //println!("not triggered");
+                            }
+                            Status::Running => {
+                                //println!("running");
+                            }
+                            Status::Failure => {
+                                warn!("Command {} is a failure.", action_id);
+                                return Ok(false.into());
+                            }
+                            Status::Done => {
+                                info!("Command {} is a success.", action_id);
+                                return Ok(true.into());
+                            }
+                        },
+                        None => {
+                            panic!("no action status")
+                        }
+                    };
+                }
+                false => panic!("sync to watch action status should not be false"),
+            }
+        }
+    } else {
+        Err(WrongType(
+            RAE_AWAIT,
+            action_id.clone(),
+            action_id.into(),
+            NameTypeLValue::Usize,
+        ))
+    }
+}*/

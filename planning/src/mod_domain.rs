@@ -440,33 +440,20 @@ async fn def_state_function<'a>(
     .await?;
 
     if let LValue::List(list) = &lvalue {
-        if list.len() != 4 {
+        if list.len() != 3 {
             return Err(WrongNumberOfArgument(
                 DOMAIN_DEF_STATE_FUNCTION,
                 lvalue.clone(),
                 list.len(),
-                4..4,
+                3..3,
             ));
         } else if let LValue::Symbol(action_label) = &list[0] {
             if let LValue::List(_) | LValue::Nil = &list[1] {
                 if let LValue::Lambda(_) = &list[2] {
-                    if let LValue::Lambda(_) = &list[3] {
-                        ctx.domain.add_state_function(
-                            action_label.to_string(),
-                            StateFunction::new(
-                                (&list[1]).try_into()?,
-                                list[2].clone(),
-                                list[3].clone(),
-                            ),
-                        );
-                    } else {
-                        return Err(WrongType(
-                            DOMAIN_DEF_STATE_FUNCTION,
-                            list[3].clone(),
-                            list[3].clone().into(),
-                            NameTypeLValue::Lambda,
-                        ));
-                    }
+                    ctx.domain.add_state_function(
+                        action_label.to_string(),
+                        StateFunction::new((&list[1]).try_into()?, list[2].clone()),
+                    );
                 } else {
                     return Err(WrongType(
                         DOMAIN_DEF_STATE_FUNCTION,

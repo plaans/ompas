@@ -27,14 +27,15 @@ use tokio_stream::StreamExt;
 
 pub const RAE_TASK_METHODS_MAP: &str = "rae-task-methods-map";
 pub const RAE_TASK_LIST: &str = "rae-task-list";
-pub const RAE_METHOD_LIST: &str = "rae_methods_list";
-pub const RAE_ACTION_LIST: &str = "rae_actions_list";
+pub const RAE_METHOD_LIST: &str = "rae-methods-list";
+pub const RAE_ACTION_LIST: &str = "rae-actions-list";
 pub const RAE_STATE_FUNCTION_LIST: &str = "rae-state-function-list";
 pub const RAE_SYMBOL_TYPE: &str = "rae-symbol-type";
 pub const RAE_METHOD_TYPES_MAP: &str = "rae-method-types-map";
 pub const RAE_METHOD_SCORE_MAP: &str = "rae-method-score-map";
 pub const RAE_METHOD_GENERATOR_MAP: &str = "rae-method-generator-map";
 pub const RAE_METHOD_PRE_CONDITIONS_MAP: &str = "rae-method-pre-conditions-map";
+pub const RAE_ACTION_MODEL_MAP: &str = "rae-action-model-map";
 pub const ACTION_TYPE: &str = "action_type";
 pub const TASK_TYPE: &str = "task_type";
 pub const METHOD_TYPE: &str = "method_type";
@@ -252,13 +253,46 @@ impl Display for Task {
 }
 
 #[derive(Debug, Clone)]
-pub struct DualExpression {
+pub struct StateFunction {
+    parameters: Parameters,
+    body: LValue,
+}
+
+impl StateFunction {
+    pub fn get_parameters(&self) -> &Parameters {
+        &self.parameters
+    }
+
+    pub fn get_body(&self) -> &LValue {
+        &self.body
+    }
+}
+
+impl StateFunction {
+    pub fn new(parameters: Parameters, body: LValue) -> Self {
+        Self { parameters, body }
+    }
+}
+
+impl Display for StateFunction {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "parameters : {}, body: {}\n",
+            self.parameters,
+            self.body.pretty_print("exec: ".len()),
+        )
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Action {
     parameters: Parameters,
     exec: LValue,
     sim: LValue,
 }
 
-impl DualExpression {
+impl Action {
     pub fn get_parameters(&self) -> &Parameters {
         &self.parameters
     }
@@ -272,7 +306,7 @@ impl DualExpression {
     }
 }
 
-impl DualExpression {
+impl Action {
     pub fn new(parameters: Parameters, exec: LValue, sim: LValue) -> Self {
         Self {
             parameters,
@@ -282,20 +316,17 @@ impl DualExpression {
     }
 }
 
-impl Display for DualExpression {
+impl Display for Action {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "parameters : {}, exec: {}\nsimu: {}",
+            "parameters : {}\n exec: {}\n sim: {} ",
             self.parameters,
             self.exec.pretty_print("exec: ".len()),
-            self.sim.pretty_print("simu: ".len())
+            self.sim.pretty_print("sim: ".len())
         )
     }
 }
-
-pub type Action = DualExpression;
-pub type StateFunction = DualExpression;
 
 #[derive(Default, Debug, Clone)]
 pub struct DomainEnv {
@@ -513,6 +544,7 @@ impl DomainEnv {
         let mut map_method_pre_conditions: HashMap<LValue, LValue> = Default::default();
         let mut map_method_score: HashMap<LValue, LValue> = Default::default();
         let mut map_method_types: HashMap<LValue, LValue> = Default::default();
+        let mut map_action_model: HashMap<LValue, LValue> = Default::default();
 
         //Add all tasks to env:
         for (label, task) in self.get_tasks() {
@@ -532,11 +564,12 @@ impl DomainEnv {
         //Add all actions to env:
         for (label, action) in self.get_actions() {
             env.insert(label.clone(), action.exec.clone());
+            map_action_model.insert(label.into(), action.sim.clone());
         }
 
         //Add all state functions to env:
         for (label, state_function) in self.get_state_functions() {
-            env.insert(label.clone(), state_function.exec.clone());
+            env.insert(label.clone(), state_function.body.clone());
         }
 
         //Add all lambdas to env:
@@ -567,6 +600,8 @@ impl DomainEnv {
         );
 
         env.insert(RAE_METHOD_SCORE_MAP.to_string(), map_method_score.into());
+
+        env.insert(RAE_ACTION_MODEL_MAP.to_string(), map_action_model.into());
 
         env
     }
@@ -600,7 +635,7 @@ impl DomainEnv {
 
         //Add all state functions to env:
         for (label, state_function) in self.get_state_functions() {
-            env.insert(label.clone(), state_function.sim.clone());
+            env.insert(label.clone(), state_function.body.clone());
         }
 
         //Add all lambdas to env:

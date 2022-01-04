@@ -538,19 +538,6 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_macro_test_macro() -> Result<(), LError> {
-        let macro_to_test = TestExpression {
-            inner: MACRO_TEST_MACRO,
-            dependencies: vec![],
-            expression: "(test-macro \"(if (= 1 2) true nil)\")",
-            expanded: "(expand (parse \"(if (= 1 2) true nil)\"))",
-            result: "(if (= 1 2) true nil)",
-        };
-
-        test_expression(macro_to_test).await
-    }
-
-    #[tokio::test]
     async fn test_macro_and() -> Result<(), LError> {
         let macro_to_test = TestExpression {
             inner: MACRO_AND,
@@ -558,6 +545,19 @@ mod test {
             expression: "(and (= (+ 1 1) 2) (< 3 4))",
             expanded: "(if (= (+ 1 1) 2) (< 3 4) nil)",
             result: "true",
+        };
+
+        test_expression(macro_to_test).await
+    }
+
+    #[tokio::test]
+    async fn test_macro_test_macro() -> Result<(), LError> {
+        let macro_to_test = TestExpression {
+            inner: MACRO_TEST_MACRO,
+            dependencies: vec![MACRO_AND],
+            expression: "(test-macro \"(and (= 1 2) (> 3 4))\")",
+            expanded: "(expand (parse \"(and (= 1 2) (> 3 4))\"))",
+            result: "(if (= 1 2) (> 3 4) nil)",
         };
 
         test_expression(macro_to_test).await

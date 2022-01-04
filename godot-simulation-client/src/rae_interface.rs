@@ -9,9 +9,8 @@ use core::time;
 use im::{HashMap, HashSet};
 use ompas_acting::rae::context::actions_progress::{ActionsProgress, Status};
 use ompas_acting::rae::context::rae_state::{RAEState, StateType, KEY_DYNAMIC, KEY_STATIC};
-use ompas_acting::rae::module::rae_exec::{
-    CtxPlatform, RAEInterface, RAE_GET_STATE_VARIBALE, RAE_LAUNCH_PLATFORM,
-};
+use ompas_acting::rae::module::rae_exec::platform::RAE_LAUNCH_PLATFORM;
+use ompas_acting::rae::module::rae_exec::{CtxPlatform, RAEInterface, RAE_GET_STATE_VARIBALE};
 use ompas_lisp::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
 use ompas_lisp::structs::LValue::Nil;
 use ompas_lisp::structs::*;

@@ -64,3 +64,17 @@
   (lambda args
     (sim_block
     (rae-select args (eval (cons generate_applicable_instances (quote-list args)))))))
+
+
+(defmacro generate-state-function (lambda args
+    (let* ((label (car args))
+          (p_expr (cdr args))
+          (params (car (unzip p_expr))))
+        `(list ,label
+            (quote ,p_expr)
+            (lambda ,params
+                (if (= rae-mode exec-mode)
+                    ,(cons 'rae-get-state-variable (cons `(quote ,label) params))
+                    ,(if (= params nil)
+                        `(get-map state ',label)
+                        `(get-map state ,(cons 'list (cons `(quote ,label) params))))))))))

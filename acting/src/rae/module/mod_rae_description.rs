@@ -46,12 +46,11 @@ pub const MACRO_GENERATE_STATE_FUNCTION: &str = "(defmacro generate-state-functi
         `(list ,label
             (quote ,p_expr)
             (lambda ,params
-                ,(cons 'rae-get-state-variable (cons `(quote ,label) params)))
-            ,(if (= params nil)
-                `(lambda nil
-                        (get-map state ',label))
-                `(lambda ,params
-                            (get-map state ,(cons 'list (cons `(quote ,label) params)))))))))";
+                (if (= rae-mode exec-mode)
+                    ,(cons 'rae-get-state-variable (cons `(quote ,label) params))
+                    ,(if (= params nil)
+                        `(get-map state ',label)
+                        `(get-map state ,(cons 'list (cons `(quote ,label) params))))))))))";
 
 /// Macro used to generate code to define an action in RAE environment.
 pub const MACRO_GENERATE_ACTION: &str = "(defmacro generate-action
@@ -63,8 +62,11 @@ pub const MACRO_GENERATE_ACTION: &str = "(defmacro generate-action
                (types (cadr p_unzip)))
              `(list ,label
                  (quote ,p_expr)
-                 (lambda ,params ,(cons 'rae-exec-command
-                     (cons `(quote ,label) params)))))))";
+                 (lambda ,params 
+                    (if (= rae-mode exec-mode)
+                        ,(cons 'rae-exec-command
+                            (cons `(quote ,label) params))
+                        ,(cons `(get-action-model (quote ,label)) params)))))))";
 
 pub const MACRO_GENERATE_ACTION_MODEL: &str = "
 (defmacro generate-action-model
@@ -270,7 +272,7 @@ pub fn generate_type_test_expr(args: &[LValue], _: &LEnv, _: &()) -> Result<LVal
 #[cfg(test)]
 mod test {
     use crate::rae::module::mod_rae_description::*;
-    use crate::rae::module::r#mod::CtxRaeExec;
+    use crate::rae::module::rae_exec::CtxRaeExec;
     use ompas_lisp::core::ImportType::WithoutPrefix;
     use ompas_lisp::core::{activate_debug, import, ContextCollection, LEnv};
     use ompas_lisp::modules::io::CtxIo;
@@ -340,12 +342,16 @@ mod test {
             expression: "(generate-state-function sf (?a object) (?b object) (?c object))",
             expanded: "(list sf
                             '((?a object) (?b object) (?c object))
-                            (lambda (?a ?b ?c) (rae-get-state-variable 'sf ?a ?b ?c))
-                            (lambda (?a ?b ?c) (get-map state (list 'sf ?a ?b ?c))))",
+                            (lambda (?a ?b ?c)
+                                (if (= rae-mode exec-mode)
+                                (rae-get-state-variable 'sf ?a ?b ?c)
+                                (get-map state (list 'sf ?a ?b ?c)))))",
             result: "(list sf
-                            '((?a object) (?b object) (?c object))
-                            (lambda (?a ?b ?c) (rae-get-state-variable 'sf ?a ?b ?c))
-                            (lambda (?a ?b ?c) (get-map state (list 'sf ?a ?b ?c))))",
+                        '((?a object) (?b object) (?c object))
+                        (lambda (?a ?b ?c)
+                            (if (= rae-mode exec-mode)
+                            (rae-get-state-variable 'sf ?a ?b ?c)
+                            (get-map state (list 'sf ?a ?b ?c)))))",
         };
 
         let (mut env, mut ctxs) = init_env_and_ctxs().await;
@@ -357,12 +363,16 @@ mod test {
             expression: "(generate-state-function sf)",
             expanded: "(list sf
                             'nil
-                            (lambda nil (rae-get-state-variable 'sf))
-                            (lambda nil (get-map state 'sf)))",
+                            (lambda nil 
+                                (if (= rae-mode exec-mode)
+                                    (rae-get-state-variable 'sf)
+                                    (get-map state 'sf))))",
             result: "(list sf
-                            'nil
-                            (lambda nil (rae-get-state-variable 'sf))
-                            (lambda nil (get-map state 'sf)))",
+                        'nil
+                        (lambda nil 
+                            (if (= rae-mode exec-mode)
+                                (rae-get-state-variable 'sf)
+                                (get-map state 'sf))))",
         };
         test_expression_with_env(macro_to_test_2, &mut env, &mut ctxs, true).await
     }
@@ -373,12 +383,16 @@ mod test {
             inner: MACRO_GENERATE_ACTION,
             dependencies: vec![],
             expression: "(generate-action pick_package (?r robot) (?p package))",
-            expanded: "(list pick_package
-                            '((?r robot) (?p package))
-                            (lambda (?r ?p) (rae-exec-command 'pick_package ?r ?p)))",
-            result: "(list pick_package
-                            '((?r robot) (?p package))
-                            (lambda (?r ?p) (rae-exec-command 'pick_package ?r ?p)))",
+            expanded: "(list pick_package '((?r robot) (?p package))
+                           (lambda (?r ?p)
+                              (if (= rae-mode exec-mode)
+                                  (rae-exec-command (quote pick_package) ?r ?p)
+                                  ((get-action-model (quote pick_package)) ?r ?p))))",
+            result: "(list pick_package '((?r robot) (?p package))
+                           (lambda (?r ?p)
+                              (if (= rae-mode exec-mode)
+                                  (rae-exec-command (quote pick_package) ?r ?p)
+                                  ((get-action-model (quote pick_package)) ?r ?p))))",
         };
 
         let (mut env, mut ctxs) = init_env_and_ctxs().await;

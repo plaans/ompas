@@ -1,9 +1,8 @@
 use crate::rae::context::rae_env::RAEEnv;
 use crate::rae::module::mod_rae::CtxRae;
 use crate::rae::module::mod_rae_description::CtxRaeDescription;
-use crate::rae::module::mod_rae_exec::{CtxRaeExec, RAEInterface};
 use crate::rae::module::mod_rae_monitor::CtxRaeMonitor;
-use crate::rae::module::mod_rae_sim::CtxRaeSim;
+use crate::rae::module::rae_exec::{CtxRaeExec, RAEInterface};
 use crate::rae::TOKIO_CHANNEL_SIZE;
 use ompas_lisp::async_await;
 use ompas_lisp::core::ImportType::{WithPrefix, WithoutPrefix};
@@ -20,15 +19,15 @@ use tokio::sync::mpsc;
 
 pub mod mod_rae;
 pub mod mod_rae_description;
-pub mod mod_rae_exec;
 pub mod mod_rae_monitor;
 pub(crate) mod mod_rae_sim;
 pub(crate) mod mod_rae_sim_interface;
+pub mod rae_exec;
 
 /// Initialize the libraries to load inside Scheme env.
 /// Takes as argument the execution platform.
 pub async fn init_ctx_rae(
-    mut platform: Box<dyn RAEInterface>,
+    platform: Option<Box<dyn RAEInterface>>,
     working_directory: Option<PathBuf>,
 ) -> (CtxRae, CtxRaeMonitor) {
     //println!("in init ctx_rae");
@@ -43,16 +42,35 @@ pub async fn init_ctx_rae(
         env: RAEEnv::new(None, None).await,
     };
 
-    let domain = platform.domain().await;
-
-    let context = platform.context_platform();
-
     let mut rae_env = RAEEnv::new(Some(receiver_job), Some(receiver_sync)).await;
-    rae_env.actions_progress.sync.sender = Some(sender_sync);
 
-    platform
-        .init(rae_env.state.clone(), rae_env.actions_progress.clone())
-        .await;
+    let platform = match platform {
+        Some(mut platform) => {
+            let domain = platform.domain().await;
+
+            ctx_rae.domain = vec![domain].into();
+
+            let context_platform = platform.context_platform();
+
+            import(
+                &mut rae_env.env,
+                &mut rae_env.ctxs,
+                context_platform,
+                WithPrefix,
+            )
+            .await
+            .expect("error loading ctx of the platform");
+
+            rae_env.actions_progress.sync.sender = Some(sender_sync);
+
+            platform
+                .init(rae_env.state.clone(), rae_env.actions_progress.clone())
+                .await;
+
+            Some(platform)
+        }
+        None => None,
+    };
 
     //Clone all structs that need to be shared to monitor action status, state and agenda.
 
@@ -109,15 +127,11 @@ pub async fn init_ctx_rae(
         .await
         .expect("error loading io");
 
-    import(&mut rae_env.env, &mut rae_env.ctxs, context, WithPrefix)
-        .await
-        .expect("error loading ctx of the platform");
-
     ctx_rae.env = rae_env;
-    ctx_rae.domain = vec![domain].into();
     (ctx_rae, ctx_rae_monitor)
 }
 
+#[allow(unused)]
 pub(crate) async fn init_simu_env(working_directory: Option<PathBuf>) -> (LEnv, ContextCollection) {
     /*Construction of the environment for simulation.
     This enviroment will contain the following modules:
@@ -144,9 +158,9 @@ pub(crate) async fn init_simu_env(working_directory: Option<PathBuf>) -> (LEnv, 
         .await
         .expect("error loading io");
 
-    import(&mut env, &mut ctxs, CtxRaeSim::default(), WithoutPrefix)
-        .await
-        .expect("error loading raesim");
+    /*import(&mut env, &mut ctxs, CtxRaeSim::default(), WithoutPrefix)
+    .await
+    .expect("error loading raesim");*/
 
     import(&mut env, &mut ctxs, CtxType::default(), WithoutPrefix)
         .await

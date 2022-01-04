@@ -270,7 +270,7 @@ pub fn generate_type_test_expr(args: &[LValue], _: &LEnv, _: &()) -> Result<LVal
 #[cfg(test)]
 mod test {
     use crate::rae::module::mod_rae_description::*;
-    use crate::rae::module::mod_rae_exec::CtxRaeExec;
+    use crate::rae::module::r#mod::CtxRaeExec;
     use ompas_lisp::core::ImportType::WithoutPrefix;
     use ompas_lisp::core::{activate_debug, import, ContextCollection, LEnv};
     use ompas_lisp::modules::io::CtxIo;

@@ -957,17 +957,16 @@ pub async fn eval(
     let mut temp_env: LEnv;
     let mut env = env;
 
+    let str = format!("{}", lv);
+
     loop {
-        if get_debug() {
-            println!("lv: {}", lv.clone());
-        }
         if let LValue::Symbol(s) = &lv {
             let result = match env.get_symbol(s.as_str()) {
                 None => lv.clone(),
                 Some(lv) => lv,
             };
             if get_debug() {
-                println!("=> {}", result)
+                println!("{} => {}", str, result)
             }
             return Ok(result);
         } else if let LValue::List(list) = &lv {
@@ -994,7 +993,7 @@ pub async fn eval(
                             }
                         };
                         if get_debug() {
-                            println!("=> {}", LValue::Nil);
+                            println!("{} => {}", str, LValue::Nil);
                         }
                         return Ok(LValue::Nil);
                     }
@@ -1033,7 +1032,7 @@ pub async fn eval(
                         let r_lvalue =
                             LValue::Lambda(LLambda::new(params, body.clone(), env.clone()));
                         if get_debug() {
-                            println!("=> {}", r_lvalue);
+                            println!("{} => {}", str, r_lvalue);
                         }
                         return Ok(r_lvalue);
                     }
@@ -1056,7 +1055,7 @@ pub async fn eval(
                     }
                     LCoreOperator::Quote => {
                         if get_debug() {
-                            println!("=> {}", &args[0].clone());
+                            println!("{} => {}", str, &args[0].clone());
                         }
                         return Ok(args[0].clone());
                     }
@@ -1161,7 +1160,7 @@ pub async fn eval(
                         };
                         let r_lvalue = fun.call(args, env, ctx)?;
                         if get_debug() {
-                            println!("=> {}", r_lvalue);
+                            println!("{} => {}", str, r_lvalue);
                         }
                         return Ok(r_lvalue);
                     }
@@ -1171,7 +1170,7 @@ pub async fn eval(
                             Some(u) => {
                                 let r_lvalue = fun.call(args, env, ctxs.get_mut_context(u))?;
                                 if get_debug() {
-                                    println!("=> {}", r_lvalue);
+                                    println!("{} => {}", str, r_lvalue);
                                 }
                                 Ok(r_lvalue)
                             }
@@ -1184,7 +1183,7 @@ pub async fn eval(
                         };
                         let r_lvalue = fun.call(args, env, ctx).await?;
                         if get_debug() {
-                            println!("=> {}", r_lvalue);
+                            println!("{} => {}", str, r_lvalue);
                         }
                         return Ok(r_lvalue);
                     }
@@ -1194,7 +1193,7 @@ pub async fn eval(
                             Some(u) => {
                                 let r_lvalue = fun.call(args, env, ctxs.get_mut_context(u)).await?;
                                 if get_debug() {
-                                    println!("=> {}", r_lvalue);
+                                    println!("{} => {}", str, r_lvalue);
                                 }
                                 Ok(r_lvalue)
                             }
@@ -1207,7 +1206,7 @@ pub async fn eval(
             }
         } else {
             if get_debug() {
-                println!("=> {}", lv.clone());
+                println!("{} => {}", str, lv.clone());
             }
             return Ok(lv);
         }

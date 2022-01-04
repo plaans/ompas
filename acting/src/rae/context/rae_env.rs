@@ -2,8 +2,7 @@ use crate::rae::context::actions_progress::ActionsProgress;
 use crate::rae::context::agenda::Agenda;
 use crate::rae::context::rae_state::RAEState;
 use crate::rae::module::init_simu_env;
-use crate::rae::module::mod_rae_exec::{Job, JobId};
-use crate::rae::module::mod_rae_sim_interface::CtxRaeSimInterface;
+use crate::rae::module::rae_exec::{Job, JobId};
 use crate::rae::TOKIO_CHANNEL_SIZE;
 use im::HashMap;
 use log::Level::Debug;
@@ -720,12 +719,12 @@ pub struct RAEEnv {
 impl RAEEnv {
     pub async fn get_exec_env(&self) -> (LEnv, ContextCollection) {
         let mut domain_exec_env: LEnv = self.domain_env.get_exec_env();
-        let domain_sim_env = self.domain_env.get_sim_env();
-        let mut exec_env = self.env.clone();
-        let mut exec_ctxs = self.ctxs.clone();
-        let (sim_env, sim_ctxs) = init_simu_env(None).await;
+        //let domain_sim_env = self.domain_env.get_sim_env();
+        let exec_env = self.env.clone();
+        let exec_ctxs = self.ctxs.clone();
+        //let (sim_env, sim_ctxs) = init_simu_env(None).await;
 
-        let mut ctx_rae_sim_interface = CtxRaeSimInterface::new(sim_env, sim_ctxs);
+        /*let mut ctx_rae_sim_interface = CtxRaeSimInterface::new(sim_env, sim_ctxs);
         ctx_rae_sim_interface.add_domain_sim(domain_sim_env);
 
         import(
@@ -735,7 +734,7 @@ impl RAEEnv {
             WithoutPrefix,
         )
         .await
-        .expect("error loading ctx_rae_sim_interface");
+        .expect("error loading ctx_rae_sim_interface");*/
 
         domain_exec_env.set_outer(exec_env);
         (domain_exec_env, exec_ctxs)

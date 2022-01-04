@@ -114,11 +114,13 @@ async fn async_read_socket(
             match message._type {
                 GodotMessageType::StaticState | GodotMessageType::DynamicState => {
                     let temp_state: LState = message.try_into().unwrap();
-
+                    //println!("new state");
                     for (k,v) in &temp_state.inner {
                         if let LValueS::List(list)= &k {
-                            if list.len() == 2 && list[0].to_string() == "instance" {
+                            //println!("k: {}\nv: {}", k,v);
+                            if list.len() == 2 && list[0].to_string().contains(".instance") {
                                 let instance_val = &list[1];
+                                //println!("add instance {} {}", instance_val, v);
                                 instance.add_instance_of(instance_val.to_string(), v.to_string()).await;
                             }
                         }

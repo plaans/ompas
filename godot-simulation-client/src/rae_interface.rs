@@ -9,7 +9,7 @@ use core::time;
 use im::{HashMap, HashSet};
 use ompas_acting::rae::context::actions_progress::{ActionsProgress, Status};
 use ompas_acting::rae::context::rae_state::{RAEState, StateType, KEY_DYNAMIC, KEY_STATIC};
-use ompas_acting::rae::module::mod_rae_exec::{
+use ompas_acting::rae::module::rae_exec::{
     CtxPlatform, RAEInterface, RAE_GET_STATE_VARIBALE, RAE_LAUNCH_PLATFORM,
 };
 use ompas_lisp::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
@@ -53,8 +53,13 @@ impl Instance {
 
 impl Instance {
     pub async fn is_of_type(&self, instance: String, _type: String) -> LResult {
+        //println!("instances : {:?}", self.inner.read().await);
+
         match self.inner.read().await.get(&_type) {
-            Some(vec) => Ok(vec.contains(&instance).into()),
+            Some(vec) => {
+                //println!("type exist");
+                Ok(vec.contains(&instance).into())
+            }
             None => Ok(false.into()),
         }
     }
@@ -456,10 +461,25 @@ impl RAEInterface for PlatformGodot {
         "(read godot_domain/init.lisp)"
     }
 
+    //0 arg: return a map of all instances
     //1 arg: return all instances of a type
-    //2 arg: check if an instance is of a certain type
+    //2 args: check if an instance is of a certain type
     async fn instance(&self, args: &[LValue]) -> LResult {
         match args.len() {
+            0 => {
+                let map_instances: im::HashMap<String, HashSet<String>> =
+                    self.instance.inner.read().await.clone();
+                let mut map: im::HashMap<LValue, LValue> = Default::default();
+                for (_type, instances) in map_instances {
+                    let value = instances
+                        .iter()
+                        .map(|s| LValue::from(s))
+                        .collect::<Vec<LValue>>();
+                    map.insert(_type.into(), value.into());
+                }
+
+                Ok(map.into())
+            }
             1 => self.instance.instance_of((&args[0]).try_into()?).await,
             2 => {
                 self.instance

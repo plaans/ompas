@@ -1,60 +1,66 @@
-(defmacro generate-state-function (lambda args
-    (let ((label (car args))
-          (params (cdr args)))
-        `(list ,label
-            (lambda ,params
-                ,(cons 'rae-get-state-variable (cons `(quote ,label) params)))
-            (lambda ,params
-                (get-map state (list`(quote ,label) params)))))))
+(defmacro sim_block (lambda (body)
+`(begin
+    (define state (get_facts))
+    (define rae-mode simu-mode)
+    ,body)))
 
-(defmacro generate-state-function (lambda args
-    (let ((label (car args))
-          (params (cdr args)))
-        `(list ,label
-            (lambda ,params
-                ,(cons 'rae-get-state-variable (cons `(quote ,label) params)))
-            (lambda ,params
-                (get-map state ,(cons 'list (cons `(quote ,label) params))))))))
+(define check_preconditions (lambda (method)
+    (sim_block (eval-pre-conditions method))))
 
+(define eval-pre-conditions
+    (lambda (method)
+        (sim_block
+            (eval (cons (get-preconditions (car method)) (quote-list (cdr method)))))))
 
-(test-macro "(generate-state-function robot.coordinates ?r ?i)")
+(define compute-score 
+    (lambda (method)
+        (sim_block
+            (eval (cons (get-score (car method)) (quote-list (cdr method)))))))
 
+(define applicable?
+    (lambda (method)
+        (sim_block
+            (eval-pre-conditions method))))
 
-(define arbitrary
-    (lambda args
-        (cond ((= (length args) 1) ; default case
-               (car (first args)))
-              ((= (length args) 2) ; specific function
-               (let ((l (first args))
-                     (f (second args)))
-                    (f l)))
-              (else nil)))) ; error cases
-
-
-(define (available_robots
-        (lambda nil
-            (begin
-                (define __l_available_robots__
-                    (lambda args
-                        (if (null? args)
-                            nil
-                            (cons (car args) (__l_available_robots__ (cdr args))))))
-                (__l_available_robots__ '(r1 r2 r3))))))
+(define generate_applicable_instances
+    (lambda (task)
+        (let* ((task_label (first task))
+               (params (cdr task))
+               (methods (get rae-task-methods-map task_label)))
+            (r_generate_instances 
+                (enr (cons enumerate (cons methods params)))))))
 
 
-(defmacro generate-state-function (lambda args
-    (let ((label (car args))
-          (params (cdr args)))
-        `(list ,label
-            (lambda ,params
-                ,(cons 'rae-get-state-variable (cons `(quote ,label) params)))
-            ,(if (= params nil)
-                `(lambda nil
-                        (get-map state ',label))
-                `(lambda ,params
-                            (get-map state ,(cons 'list (cons `(quote ,label) params)))))))))
+(define r_test_method 
+    (lambda (instances)
+        (if (null? instances)
+            nil
+            (if (eval-pre-conditions (car instances))
+                (cons (list (car instances) (compute-score (car instances))) (r_test_method (cdr instances)))
+                (r_test_method (cdr instances))))))
 
+(define r_generate_instances
+    (lambda (methods)
+        (if (null? methods)
+            nil
+            (let* ((method (car methods))
+                    (methods (cdr methods))
+                    (method_label (first method))
+                    (params (cdr method)))
+                (begin
+                    (define types (get rae-method-types-map method_label))
+                    (if (> (length types) (length params))
+                        (begin
+                            (define instance_types (mapf (sublist types (length params)) instance))
+                            (define instances (enumerate (cons (car methods instance_types))))
+                            (append (r_test_method instances) (r_generate_instances (cdr methods))))
+                        (cons
+                            (if (eval-pre-conditions method)
+                                (list method (compute-score method))
+                                nil)
+                            (r_generate_instances (cdr methods)))))))))
 
-(define locked?
-    (lambda (r)
-        (get-map state (list 'locked r))))
+(define select
+  (lambda args
+    (sim_block
+    (rae-select args (eval (cons generate_applicable_instances (quote-list args)))))))

@@ -112,7 +112,6 @@ pub fn map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     }
 }
 
-#[deprecated]
 pub fn set(args: &[LValue], env: &LEnv, ctx: &()) -> Result<LValue, LError> {
     if args.is_empty() {
         return Err(WrongNumberOfArgument(

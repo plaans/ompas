@@ -1,7 +1,6 @@
-use crate::rae::context::rae_env::{
+/*use crate::rae::context::rae_env::{
     RAE_METHOD_SCORE_MAP, RAE_METHOD_TYPES_MAP, RAE_TASK_METHODS_MAP,
 };
-use crate::rae::module::mod_rae_sim::{COMPUTE_SCORE, EVAL_PRE_CONDITIONS};
 use ::macro_rules_attribute::macro_rules_attribute;
 use core::mem;
 use im::HashMap;
@@ -21,13 +20,7 @@ use std::sync::Arc;
 LANGAUGE
  */
 
-pub const CHECK_PRECONDITIONS: &str = "check-preconditions";
-pub const GENERATE_APPLICABLE_INSTANCES: &str = "generate-applicable-instances";
 pub const MOD_CTX_RAE_SIM_INTERFACE: &str = "rae-sim-interface";
-pub const STATE: &str = "state";
-pub const LAMBDA_IS_APPLICABLE: &str = "(define applicable? \
-    (lambda args\
-        (check_preconditions args (rae-get-state))))";
 
 pub struct CtxRaeSimInterface {
     pub sim_env: LEnv,
@@ -118,8 +111,9 @@ pub async fn compute_score<'a>(
 
         eval(&lv, &mut new_env, &mut ctx.sim_ctxs.clone()).await
     }
-}
+}*/
 
+/*
 #[macro_rules_attribute(dyn_async!)]
 pub async fn generate_applicable_instances<'a>(
     args: &'a [LValue],
@@ -199,7 +193,7 @@ pub async fn generate_applicable_instances<'a>(
     } else {
         Ok(list_applicable_methods.into())
     }
-}
+}*/
 
 /*Functions
 test_preconditions

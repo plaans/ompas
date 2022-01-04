@@ -1,3 +1,7 @@
+mod platform;
+mod rae_mutex;
+mod simu;
+
 use crate::rae::context::actions_progress::{ActionId, ActionsProgress, Status};
 use crate::rae::context::agenda::Agenda;
 use crate::rae::context::mutex;
@@ -5,12 +9,15 @@ use crate::rae::context::mutex::MutexResponse;
 use crate::rae::context::rae_env::RAE_TASK_METHODS_MAP;
 use crate::rae::context::rae_state::*;
 use crate::rae::context::ressource_access::wait_on::add_waiter;
+use crate::rae::module::rae_exec::platform::*;
+use crate::rae::module::rae_exec::rae_mutex::*;
+use crate::rae::module::rae_exec::simu::*;
 use crate::rae::select_methods::sort_greedy;
 use ::macro_rules_attribute::macro_rules_attribute;
 use async_trait::async_trait;
 use log::{error, info, warn};
 use ompas_lisp::core::{ContextCollection, LEnv};
-use ompas_lisp::functions::{cons, union_map};
+use ompas_lisp::functions::{cons, get_map, remove_key_value_map, set, set_map, union_map};
 use ompas_lisp::modules::doc::{Documentation, LHelp};
 use ompas_lisp::structs::LError::*;
 use ompas_lisp::structs::LValue::*;
@@ -21,6 +28,7 @@ use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::fmt::{Display, Formatter};
+use std::string::String;
 use std::sync::{Arc, PoisonError, RwLock, RwLockReadGuard};
 use std::thread;
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -61,6 +69,11 @@ pub const RAE_SELECT: &str = "rae-select";
 pub const RAE_GET_NEXT_METHOD: &str = "rae-get-next-method";
 pub const RAE_SET_SUCCESS_FOR_TASK: &str = "rae-set-success-for-task";
 
+const SUCCESS: &str = "success";
+const FAILURE: &str = "failure";
+const IS_SUCCESS: &str = "success?";
+const IS_FAILURE: &str = "failure?";
+
 pub const MACRO_MUTEX_LOCK_AND_DO: &str = "(defmacro mutex::lock-and-do 
     (lambda (r p b)
         `(begin
@@ -73,8 +86,8 @@ pub const MACRO_WAIT_ON: &str = "(defmacro wait-on (lambda (expr)
 pub const LABEL_ENUMERATE_PARAMS: &str = "enumerate-params";
 
 pub const LAMBDA_PROGRESS: &str = "
-(define progress (lambda args
-    (let* ((result (eval (cons select (quote-list args))))
+(define progress (lambda task
+    (let* ((result (select task))
             (first_m (car result))
             (task_id (cadr result)))
             
@@ -86,8 +99,9 @@ pub const LAMBDA_PROGRESS: &str = "
 
 pub const LAMBDA_SELECT: &str = "
 (define select
-  (lambda args
-    (rae-select args (generate-applicable-instances (rae-get-facts) args))))";
+  (lambda (task)
+    (sim_block
+    (rae-select task (generate_applicable_instances task)))))))";
 
 pub const LAMBDA_RETRY: &str = "
 (define retry (lambda (task_id)
@@ -138,12 +152,17 @@ pub const LAMBDA_ARBITRARY: &str = "(define arbitrary
 							(f (cadr args)))
 						 (f elements)))))";
 
+pub const DEFINE_RAE_MODE: &str = "(define rae-mode EXEC-MODE)";
+pub const SYMBOL_EXEC_MODE: &str = "exec-mode";
+pub const SYMBOL_SIMU_MODE: &str = "simu-mode";
+pub const SYMBOL_RAE_MODE: &str = "rae-mode";
+
 ///Context that will contains primitives for the RAE executive
 pub struct CtxRaeExec {
     //pub stream: JobStream,
     pub actions_progress: ActionsProgress,
     pub state: RAEState,
-    pub platform_interface: Box<dyn RAEInterface>,
+    pub platform_interface: Option<Box<dyn RAEInterface>>,
     pub agenda: Agenda,
 }
 
@@ -152,7 +171,7 @@ impl Default for CtxRaeExec {
         Self {
             actions_progress: Default::default(),
             state: Default::default(),
-            platform_interface: Box::new(()),
+            platform_interface: None,
             agenda: Default::default(),
         }
     }
@@ -163,12 +182,22 @@ impl GetModule for CtxRaeExec {
         let init: InitLisp = vec![
             MACRO_MUTEX_LOCK_AND_DO,
             MACRO_WAIT_ON,
+            MACRO_SIM_BLOCK,
             LAMBDA_PROGRESS,
             LAMBDA_SELECT,
             LAMBDA_RETRY,
             LAMBDA_GET_METHODS,
             LAMBDA_GET_METHOD_GENERATOR,
             LAMBDA_ARBITRARY,
+            LAMBDA_GET_PRECONDITIONS,
+            LAMBDA_GET_SCORE,
+            LAMBDA_EVAL_PRE_CONDITIONS,
+            LAMBDA_COMPUTE_SCORE,
+            LAMBDA_GENERATE_APPLICABLE_INSTANCES,
+            LAMBDA_R_GENERATE_INSTANCES,
+            LAMBDA_R_TEST_METHOD,
+            DEFINE_RAE_MODE,
+            LAMBDA_IS_APPLICABLE,
         ]
         .into();
         let mut module = Module {
@@ -206,6 +235,12 @@ impl GetModule for CtxRaeExec {
         module.add_async_fn_prelude(RELEASE, release);
         module.add_async_fn_prelude(IS_LOCKED, is_locked);
         module.add_async_fn_prelude(LOCKED_LIST, get_list_locked);
+
+        //success and failure
+        module.add_fn_prelude(SUCCESS, success);
+        module.add_fn_prelude(FAILURE, failure);
+        module.add_fn_prelude(IS_SUCCESS, is_success);
+        module.add_fn_prelude(IS_FAILURE, is_failure);
         module
     }
 }
@@ -215,7 +250,7 @@ impl CtxRaeExec {
         self.actions_progress.get_status(action_id).await
     }
 
-    pub fn add_platform(&mut self, platform: Box<dyn RAEInterface>) {
+    pub fn add_platform(&mut self, platform: Option<Box<dyn RAEInterface>>) {
         self.platform_interface = platform;
     }
 }
@@ -395,105 +430,106 @@ impl GetModule for CtxPlatform {
     }
 }
 
-#[macro_rules_attribute(dyn_async!)]
-async fn exec_command<'a>(
-    args: &'a [LValue],
-    _env: &'a LEnv,
-    ctx: &'a CtxRaeExec,
-) -> Result<LValue, LError> {
-    let command_id = ctx.actions_progress.get_new_id();
-    let debug: LValue = args.into();
-    info!("exec command {}: {}", command_id, debug);
-    ctx.platform_interface
-        .exec_command(args, command_id)
-        .await?;
-
-    //println!("await on action (id={})", action_id);
-
-    let mut receiver = ctx.actions_progress.declare_new_watcher(&command_id).await;
-    info!("waiting on action {}", command_id);
-
-    let mut action_status = ctx
-        .actions_progress
-        .status
-        .read()
-        .await
-        .get(&command_id)
-        .unwrap()
-        .clone();
-
-    loop {
-        //println!("waiting on status:");
-        match action_status {
-            Status::Pending => {
-                //println!("not triggered");
-            }
-            Status::Running => {
-                //println!("running");
-            }
-            Status::Failure => {
-                warn!("Command {} is a failure.", command_id);
-                return Ok(false.into());
-            }
-            Status::Done => {
-                info!("Command {} is a success.", command_id);
-                return Ok(true.into());
-            }
-        }
-        action_status = if let true = receiver.recv().await.unwrap() {
-            ctx.actions_progress
-                .status
-                .read()
-                .await
-                .get(&command_id)
-                .unwrap()
-                .clone()
-        } else {
-            unreachable!("the signal for an update should always be true")
-        }
-    }
-}
-
 ///Retract a fact to state
 #[macro_rules_attribute(dyn_async!)]
 async fn retract_fact<'a>(
     args: &'a [LValue],
-    _env: &'a LEnv,
+    env: &'a LEnv,
     ctx: &'a CtxRaeExec,
 ) -> Result<LValue, LError> {
-    if args.len() != 2 {
-        return Err(WrongNumberOfArgument(
-            RAE_RETRACT,
-            args.into(),
-            args.len(),
-            2..2,
-        ));
+    let mode: String = env
+        .get_symbol("rae-mode")
+        .expect("rae-mode should be defined, default value is exec mode")
+        .try_into()?;
+    match mode.as_str() {
+        SYMBOL_EXEC_MODE => {
+            if args.len() != 2 {
+                return Err(WrongNumberOfArgument(
+                    RAE_RETRACT,
+                    args.into(),
+                    args.len(),
+                    2..2,
+                ));
+            }
+            let key = (&args[0]).into();
+            let value = (&args[1]).into();
+            ctx.state.retract_fact(key, value).await
+        }
+        SYMBOL_SIMU_MODE => {
+            /*
+            (defmacro retract
+             (lambda args
+                 `(define state (remove-key-value-map state (quote ,args)))))
+              */
+            let state = match env.get_symbol(STATE) {
+                Some(lv) => lv,
+                None => {
+                    return Err(SpecialError(
+                        RAE_RETRACT,
+                        "state not defined in env".to_string(),
+                    ))
+                }
+            };
+
+            remove_key_value_map(&[state, args.into()], env, &())
+        }
+        _ => unreachable!(
+            "{} should have either {} or {} value.",
+            SYMBOL_RAE_MODE, SYMBOL_EXEC_MODE, SYMBOL_SIMU_MODE
+        ),
     }
-    let key = (&args[0]).into();
-    let value = (&args[1]).into();
-    ctx.state.retract_fact(key, value).await
 }
 
 ///Add a fact to fact state
 #[macro_rules_attribute(dyn_async!)]
 async fn assert_fact<'a>(
     args: &'a [LValue],
-    _env: &'a LEnv,
+    env: &'a LEnv,
     ctx: &'a CtxRaeExec,
 ) -> Result<LValue, LError> {
-    if args.len() != 2 {
-        return Err(WrongNumberOfArgument(
-            RAE_ASSERT,
-            args.into(),
-            args.len(),
-            2..2,
-        ));
-    }
-    let key = (&args[0]).into();
-    let value = (&args[1]).into();
-    ctx.state.add_fact(key, value).await;
+    let mode: String = env
+        .get_symbol("rae-mode")
+        .expect("rae-mode should be defined, default value is exec mode")
+        .try_into()?;
+    match mode.as_str() {
+        SYMBOL_EXEC_MODE => {
+            if args.len() != 2 {
+                return Err(WrongNumberOfArgument(
+                    RAE_ASSERT,
+                    args.into(),
+                    args.len(),
+                    2..2,
+                ));
+            }
+            let key = (&args[0]).into();
+            let value = (&args[1]).into();
+            ctx.state.add_fact(key, value).await;
 
-    Ok(True)
+            Ok(True)
+        }
+        SYMBOL_SIMU_MODE => {
+            /*
+            (defmacro assert
+                (lambda args
+                    `(define state (set-map state (quote ,args)))))
+             */
+            let state = match env.get_symbol(STATE) {
+                Some(lv) => lv,
+                None => {
+                    return Err(SpecialError(
+                        RAE_ASSERT,
+                        "state not defined in env.".to_string(),
+                    ))
+                }
+            };
+
+            set_map(&[state, args.into()], env, &())
+        }
+        _ => unreachable!(
+            "{} should have either {} or {} value.",
+            SYMBOL_RAE_MODE, SYMBOL_EXEC_MODE, SYMBOL_SIMU_MODE
+        ),
+    }
 }
 
 ///Monitor the status of an action that has been triggered
@@ -647,43 +683,6 @@ fn get_best_method(args: &[LValue], env: &LEnv, ctx: &CtxRaeExec) -> Result<LVal
 
     Ok(method_instance)
 }
-#[macro_rules_attribute(dyn_async!)]
-async fn launch_platform<'a>(
-    args: &'a [LValue],
-    _env: &'a LEnv,
-    ctx: &'a mut CtxRaeExec,
-) -> Result<LValue, LError> {
-    match &ctx.actions_progress.sync.sender {
-        None => Err(SpecialError(
-            RAE_LAUNCH_PLATFORM,
-            "sender to actions status watcher missing.".to_string(),
-        )),
-        Some(_) => ctx.platform_interface.launch_platform(args).await,
-    }
-}
-
-#[macro_rules_attribute(dyn_async!)]
-async fn start_platform<'a>(
-    args: &'a [LValue],
-    _env: &'a LEnv,
-    ctx: &'a mut CtxRaeExec,
-) -> Result<LValue, LError> {
-    ctx.platform_interface.start_platform(args).await
-}
-#[macro_rules_attribute(dyn_async!)]
-async fn open_com<'a>(
-    args: &'a [LValue],
-    _env: &'a LEnv,
-    ctx: &'a mut CtxRaeExec,
-) -> Result<LValue, LError> {
-    match &ctx.actions_progress.sync.sender {
-        None => Err(SpecialError(
-            RAE_START_PLATFORM,
-            "sender to actions status watcher missing.".to_string(),
-        )),
-        Some(_) => ctx.platform_interface.open_com(args).await,
-    }
-}
 
 #[macro_rules_attribute(dyn_async!)]
 async fn get_facts<'a>(
@@ -693,6 +692,7 @@ async fn get_facts<'a>(
 ) -> Result<LValue, LError> {
     let mut state: im::HashMap<LValue, LValue> = get_state(&[], env, ctx).await?.try_into()?;
     let locked: Vec<LValue> = get_list_locked(&[], env, ctx).await?.try_into()?;
+
     for e in locked {
         state.insert(vec![LOCKED.into(), e].into(), True);
     }
@@ -702,7 +702,7 @@ async fn get_facts<'a>(
 #[macro_rules_attribute(dyn_async!)]
 async fn get_state<'a>(
     args: &'a [LValue],
-    env: &'a LEnv,
+    _env: &'a LEnv,
     ctx: &'a CtxRaeExec,
 ) -> Result<LValue, LError> {
     let _type = match args.len() {
@@ -742,9 +742,8 @@ async fn get_state<'a>(
         }
     };
 
-    let platform_state = ctx.platform_interface.get_state(args).await.unwrap();
     let state = ctx.state.get_state(_type).await.into_map();
-    union_map(&[platform_state, state], env, &())
+    Ok(state)
 }
 
 #[macro_rules_attribute(dyn_async!)]
@@ -753,25 +752,43 @@ async fn get_state_variable<'a>(
     _env: &'a LEnv,
     ctx: &'a CtxRaeExec,
 ) -> Result<LValue, LError> {
-    ctx.platform_interface.get_state_variable(args).await
+    if args.is_empty() {
+        return Err(WrongNumberOfArgument(
+            RAE_GET_STATE_VARIBALE,
+            args.into(),
+            0,
+            1..std::usize::MAX,
+        ));
+    }
+    let key: LValueS = if args.len() > 1 {
+        LValue::from(args).into()
+    } else {
+        args[0].clone().into()
+    };
+
+    let state = ctx.state.get_state(None).await;
+
+    let value = state.inner.get(&key).unwrap_or(&LValueS::Bool(false));
+    //println!("value: {}", value);
+
+    Ok(value.into())
 }
 
 #[macro_rules_attribute(dyn_async!)]
 async fn get_status<'a>(
-    args: &'a [LValue],
+    _args: &'a [LValue],
     _env: &'a LEnv,
     ctx: &'a CtxRaeExec,
 ) -> Result<LValue, LError> {
-    ctx.platform_interface.get_status(args).await
-}
+    let status = ctx.actions_progress.status.read().await;
 
-#[macro_rules_attribute(dyn_async!)]
-async fn cancel_command<'a>(
-    args: &'a [LValue],
-    _env: &'a LEnv,
-    ctx: &'a CtxRaeExec,
-) -> Result<LValue, LError> {
-    ctx.platform_interface.cancel_command(args).await
+    let mut string = "Action(s) Status\n".to_string();
+
+    for e in status.iter() {
+        string.push_str(format!("- {}: {}\n", e.0, e.1).as_str())
+    }
+
+    Ok(LValue::String(string))
 }
 
 #[macro_rules_attribute(dyn_async!)]
@@ -905,80 +922,125 @@ async fn set_success_for_task<'a>(
     }
 }
 
-/*
-MUTEXES
- */
-
-#[macro_rules_attribute(dyn_async!)]
-async fn lock<'a>(args: &'a [LValue], _: &'a LEnv, _: &'a CtxRaeExec) -> Result<LValue, LError> {
-    if args.len() != 2 {
-        return Err(WrongNumberOfArgument(LOCK, args.into(), args.len(), 2..2));
-    }
-
-    let ressource = if let LValue::Symbol(s) = args[0].clone() {
-        s
-    } else {
-        return Err(WrongType(
-            LOCK,
-            args[0].clone(),
-            (&args[0]).into(),
-            NameTypeLValue::Symbol,
-        ));
-    };
-    let priority = if let LValue::Number(LNumber::Int(i)) = &args[1] {
-        *i as usize
-    } else {
-        return Err(WrongType(
-            LOCK,
-            args[1].clone(),
-            (&args[1]).into(),
-            NameTypeLValue::Number,
-        ));
-    };
-
-    match mutex::lock(ressource, priority).await {
-        MutexResponse::Ok => Ok(True),
-        MutexResponse::Wait(mut rx) => {
-            rx.recv().await;
-            Ok(True)
-        }
-    }
-}
-
-#[macro_rules_attribute(dyn_async!)]
-async fn release<'a>(args: &'a [LValue], _: &'a LEnv, _: &'a CtxRaeExec) -> Result<LValue, LError> {
-    mutex::release(args[0].clone()).await;
-    Ok(True)
-}
-
-#[macro_rules_attribute(dyn_async!)]
-async fn is_locked<'a>(
-    args: &'a [LValue],
-    _: &'a LEnv,
-    _: &'a CtxRaeExec,
-) -> Result<LValue, LError> {
-    Ok(mutex::is_locked(args[0].clone()).await.into())
-}
-
-#[macro_rules_attribute(dyn_async!)]
-async fn get_list_locked<'a>(
-    _: &'a [LValue],
-    _: &'a LEnv,
-    _: &'a CtxRaeExec,
-) -> Result<LValue, LError> {
-    let locked = mutex::get_list_locked()
-        .await
-        .iter()
-        .map(|s| s.into())
-        .collect::<Vec<LValue>>();
-    Ok(locked.into())
-}
-
 #[macro_rules_attribute(dyn_async!)]
 async fn instance<'a>(
     args: &'a [LValue],
     _env: &'a LEnv,
     ctx: &'a CtxRaeExec,
 ) -> Result<LValue, LError> {
-    ctx.platform_interface.instance(args).await
+    if let Some(platform) = &ctx.platform_interface {
+        platform.instance(args).await
+    } else {
+        Err(SpecialError(
+            RAE_INSTANCE,
+            "instance not yet implemented in internal rae functionning".into(),
+        ))
+    }
 }
+
+pub fn success(args: &[LValue], _: &LEnv, _: &CtxRaeExec) -> Result<LValue, LError> {
+    Ok(vec![LValue::from(SUCCESS), args.into()].into())
+}
+
+pub fn failure(args: &[LValue], _: &LEnv, _: &CtxRaeExec) -> Result<LValue, LError> {
+    Ok(vec![LValue::from(FAILURE), args.into()].into())
+}
+
+pub fn is_failure(args: &[LValue], _: &LEnv, _: &CtxRaeExec) -> Result<LValue, LError> {
+    if args.len() != 1 {
+        return Err(WrongNumberOfArgument(
+            IS_FAILURE,
+            args.into(),
+            args.len(),
+            1..1,
+        ));
+    }
+
+    if let LValue::List(list) = &args[0] {
+        if let LValue::Symbol(s) = &list[0] {
+            match s.as_str() {
+                SUCCESS => Ok(false.into()),
+                FAILURE => Ok(true.into()),
+                _ => Err(WrongType(
+                    IS_FAILURE,
+                    list[0].clone(),
+                    (&list[0]).into(),
+                    NameTypeLValue::Other("{success,failure}".to_string()),
+                )),
+            }
+        } else {
+            Err(WrongType(
+                IS_FAILURE,
+                list[0].clone(),
+                (&list[0]).into(),
+                NameTypeLValue::Other("{success,failure}".to_string()),
+            ))
+        }
+    } else {
+        Err(WrongType(
+            IS_FAILURE,
+            args[0].clone(),
+            (&args[0]).into(),
+            NameTypeLValue::List,
+        ))
+    }
+}
+
+pub fn is_success(args: &[LValue], _: &LEnv, _: &CtxRaeExec) -> Result<LValue, LError> {
+    if args.len() != 1 {
+        return Err(WrongNumberOfArgument(
+            IS_SUCCESS,
+            args.into(),
+            args.len(),
+            1..1,
+        ));
+    }
+
+    if let LValue::List(list) = &args[0] {
+        if let LValue::Symbol(s) = &list[0] {
+            match s.as_str() {
+                SUCCESS => Ok(true.into()),
+                FAILURE => Ok(false.into()),
+                _ => Err(WrongType(
+                    IS_SUCCESS,
+                    list[0].clone(),
+                    (&list[0]).into(),
+                    NameTypeLValue::Other("{success,failure}".to_string()),
+                )),
+            }
+        } else {
+            Err(WrongType(
+                IS_SUCCESS,
+                list[0].clone(),
+                (&list[0]).into(),
+                NameTypeLValue::Other("{success,failure}".to_string()),
+            ))
+        }
+    } else {
+        Err(WrongType(
+            IS_SUCCESS,
+            args[0].clone(),
+            (&args[0]).into(),
+            NameTypeLValue::List,
+        ))
+    }
+}
+
+/*
+let mode: String = env
+        .get_symbol("rae-mode")
+        .expect("rae-mode should be defined, default value is exec mode")
+        .try_into()?;
+    match mode.as_str() {
+        SYMBOL_EXEC_MODE => {
+            todo!()
+        }
+        SYMBOL_SIMU_MODE => {
+            todo!()
+        }
+        _ => unreachable!(
+            "{} should have either {} or {} value.",
+            SYMBOL_RAE_MODE, SYMBOL_EXEC_MODE, SYMBOL_SIMU_MODE
+        ),
+    }
+ */

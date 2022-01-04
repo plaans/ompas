@@ -1,7 +1,7 @@
 use crate::structs::Constraint;
 use crate::structs::Lit;
 use crate::structs::*;
-use ompas_acting::rae::module::mod_rae_exec::{RAE_ASSERT, RAE_INSTANCE, RAE_RETRACT};
+use ompas_acting::rae::module::rae_exec::{RAE_ASSERT, RAE_RETRACT};
 use ompas_lisp::core::{eval, expand, parse, ContextCollection, LEnv};
 use ompas_lisp::language::scheme_primitives::*;
 use ompas_lisp::structs::LError::{
@@ -57,6 +57,7 @@ pub fn translate_domain_env_to_hierarchy(context: Context) -> Result<(Domain, Sy
     symbol_table.add_list_of_symbols_of_same_type(tasks, &SymType::Task)?;
 
     //Add actions, tasks and methods symbols to symbol_table:
+    #[allow(unused_mut)]
     let mut methods = vec![];
     #[allow(unused_mut)]
     let mut tasks = vec![];

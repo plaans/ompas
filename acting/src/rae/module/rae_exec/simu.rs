@@ -49,9 +49,9 @@ pub const LAMBDA_R_GENERATE_INSTANCES: &str = "(define r_generate_instances
                     (params (cdr method)))
                 (begin
                     (define types (get rae-method-types-map method_label))
-                    (if (> (length types) (length params))
+                    (if (> (len types) (len params))
                         (begin
-                            (define instance_types (mapf instance (sublist types (length params))))
+                            (define instance_types (mapf instance (sublist types (len params))))
                             (define instances (enr (cons enumerate (append method instance_types))))
                             (append (r_test_method instances) (r_generate_instances methods)))
                         (cons

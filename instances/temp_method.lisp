@@ -49,9 +49,9 @@
                     (params (cdr method)))
                 (begin
                     (define types (get rae-method-types-map method_label))
-                    (if (> (length types) (length params))
+                    (if (> (len types) (len params))
                         (begin
-                            (define instance_types (mapf (sublist types (length params)) instance))
+                            (define instance_types (mapf (sublist types (len params)) instance))
                             (define instances (enumerate (cons (car methods instance_types))))
                             (append (r_test_method instances) (r_generate_instances (cdr methods))))
                         (cons

@@ -139,7 +139,7 @@
                 (let ((?b (machine.input_belt ?m)))
                     (begin
                         (t_position_robot_to_belt ?r ?b)
-                        (wait-on `(< (length (belt.packages_list ,?b)) (length (belt.cells ,?b))))
+                        (wait-on `(< (len (belt.packages_list ,?b)) (len (belt.cells ,?b))))
                         (place ?r))))))
 
     (def-task t_charge '(?r robot))
@@ -190,9 +190,9 @@
         (:score 0)
         (:body 
             (begin
-                (wait-on `(> ,(length ?l) (length (robots))))
+                (wait-on `(> ,(len ?l) (len (robots))))
                 (define new_list_robots (robots))
-                (define l_new_robots (sublist (new_list_robots) (length ?l)))
+                (define l_new_robots (sublist (new_list_robots) (len ?l)))
                 (mapf async_check_battery l_new_robots)
                 (t_check_batteries_new_robots new_list_robots)))))
 
@@ -219,9 +219,9 @@
             (:score 0)
             (:body
                 (begin
-                    (wait-on `(> ,(length ?l) (length (instance package))))
+                    (wait-on `(> ,(len ?l) (len (instance package))))
                     (define new_lp (instance package))
-                    (define l_new_p (sublist (new_lp) (length ?l)))
+                    (define l_new_p (sublist (new_lp) (len ?l)))
                     (mapf async_check_battery l_new_p)
                     (t_check_batteries_new_robots new_lp)))))
 )

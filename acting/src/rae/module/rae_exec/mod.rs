@@ -142,7 +142,7 @@ pub const LAMBDA_GENERATE_INSTANCES: &str = "
 
 pub const LAMBDA_ARBITRARY: &str = "(define arbitrary
 	(lambda args
-		(if (= (length args) 1)
+		(if (= (len args) 1)
 				(caar args)
 				(let ((elements (car args))
 							(f (cadr args)))

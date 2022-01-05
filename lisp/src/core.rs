@@ -290,7 +290,6 @@ impl GetModule for CtxRoot {
         module.add_fn_prelude(EQ, eq);
 
         //predicates
-        module.add_fn_prelude(IS_NUMBER, is_number);
         module.add_fn_prelude(IS_INT, is_integer);
         module.add_fn_prelude(IS_FLOAT, is_float);
         module.add_fn_prelude(IS_NIL, is_nil);

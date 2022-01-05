@@ -232,7 +232,7 @@ pub fn set_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
 pub fn remove_key_value_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(
-            REMOVE_MAP,
+            REMOVE_KEY_VALUE_MAP,
             args.into(),
             args.len(),
             2..2,
@@ -248,7 +248,7 @@ pub fn remove_key_value_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue,
                     match m.get(&key) {
                         None => {
                             return Err(SpecialError(
-                                REMOVE_MAP,
+                                REMOVE_KEY_VALUE_MAP,
                                 format!("map does not contain key {}", key),
                             ))
                         }
@@ -259,15 +259,15 @@ pub fn remove_key_value_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue,
                                 Ok(m.into())
                             } else {
                                 Err(SpecialError(
-                                    REMOVE_MAP,
-                                    format!("map does not entry key ({}:{})", key, value),
+                                    REMOVE_KEY_VALUE_MAP,
+                                    format!("map does not have key value ({}:{})", key, value),
                                 ))
                             }
                         }
                     }
                 } else {
                     Err(WrongNumberOfArgument(
-                        REMOVE_MAP,
+                        REMOVE_KEY_VALUE_MAP,
                         val_sv.into(),
                         val_sv.len(),
                         2..2,
@@ -275,14 +275,14 @@ pub fn remove_key_value_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue,
                 }
             }
             lv => Err(WrongType(
-                REMOVE_MAP,
+                REMOVE_KEY_VALUE_MAP,
                 lv.clone(),
                 lv.into(),
                 NameTypeLValue::List,
             )),
         },
         lv => Err(WrongType(
-            REMOVE_MAP,
+            REMOVE_KEY_VALUE_MAP,
             lv.clone(),
             lv.into(),
             NameTypeLValue::Map,
@@ -301,28 +301,10 @@ pub fn remove_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     }
 
     match &args[0] {
-        LValue::Map(m) => match &args[1] {
-            LValue::List(val_sv) => {
-                if val_sv.len() == 1 {
-                    let key = val_sv.get(0).unwrap().clone();
-                    let mut new_m = m.clone();
-                    new_m.remove(&key);
-                    Ok(new_m.into())
-                } else {
-                    Err(WrongNumberOfArgument(
-                        REMOVE_MAP,
-                        val_sv.into(),
-                        val_sv.len(),
-                        1..1,
-                    ))
-                }
-            }
-            lv => Err(WrongType(
-                REMOVE_MAP,
-                lv.clone(),
-                lv.into(),
-                NameTypeLValue::List,
-            )),
+        LValue::Map(m) => {
+            let mut new_m = m.clone();
+            new_m.remove(&args[1]);
+            Ok(new_m.into())
         },
         lv => Err(WrongType(
             REMOVE_MAP,
@@ -633,7 +615,7 @@ pub fn get_list(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
 pub fn set_list(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() != 3 {
         return Err(WrongNumberOfArgument(
-            GET_LIST,
+            SET_LIST,
             args.into(),
             args.len(),
             3..3,
@@ -648,13 +630,13 @@ pub fn set_list(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
                 Ok(vec.into())
             } else {
                 Err(SpecialError(
-                    GET_LIST,
+                    SET_LIST,
                     format!("index out of bound, must be in [{};{}]", 0, vec.len() - 1),
                 ))
             }
         } else {
             Err(WrongType(
-                GET_LIST,
+                SET_LIST,
                 args[1].clone(),
                 (&args[1]).into(),
                 NameTypeLValue::Int,
@@ -662,7 +644,7 @@ pub fn set_list(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
         }
     } else {
         Err(WrongType(
-            GET_LIST,
+            SET_LIST,
             args[0].clone(),
             (&args[0]).into(),
             NameTypeLValue::List,

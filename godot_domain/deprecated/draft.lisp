@@ -22,8 +22,8 @@
         (:score 0)
         (:body 
             (begin
-                (wait-on `(> ,(length ?l) (length (packages))))
+                (wait-on `(> ,(len ?l) (len (packages))))
                 (define new_lp (packages))
-                (define l_new_p (sublist (new_lp) (length ?l)))
+                (define l_new_p (sublist (new_lp) (len ?l)))
                 (mapf async_check_battery l_new_p)
                 (t_check_batteries_new_robots new_lp)))))

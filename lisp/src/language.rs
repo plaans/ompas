@@ -86,7 +86,7 @@ pub mod scheme_primitives {
     pub const APPEND: &str = "append";
     pub const LAST: &str = "last";
     pub const EMPTY: &str = "empty";
-    pub const LEN: &str = "length";
+    pub const LEN: &str = "len";
     pub const MEMBER: &str = "member";
     pub const REVERSE: &str = "reverse";
     pub const LIST: &str = "list";

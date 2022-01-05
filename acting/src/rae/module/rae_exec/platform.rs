@@ -15,9 +15,9 @@ pub const LAMBDA_INSTANCE: &str = "(define instance
     (lambda args
         (if (rae-platform?)
             (enr (cons fn-instance args))
-            (cond ((= (length args) 1)
+            (cond ((= (len args) 1)
                     (get (rae-get-facts) (list 'instance (car args))))
-                  ((= (length args) 2)
+                  ((= (len args) 2)
                     (contains
                         (get (rae-get-facts) (list 'instance (cadr args)))
                         (car args))))))))";

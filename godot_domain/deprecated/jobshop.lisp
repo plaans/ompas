@@ -176,7 +176,7 @@
                 (let ((?b (machine.input_belt ?m)))
                     (begin
                         (t_position_robot_to_belt ?r ?b)
-                        (wait-on `(< (length (belt.packages_list ,?b)) (length (belt.cells ,?b))))
+                        (wait-on `(< (len (belt.packages_list ,?b)) (len (belt.cells ,?b))))
                         (place ?r))))))
 
     (def-task t_charge ?r)

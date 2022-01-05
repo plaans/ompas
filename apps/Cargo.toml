@@ -36,6 +36,11 @@ name = "ompas"
 path = "src/bin/ompas.rs"
 
 [[bin]]
+name = "ompas-simu"
+path = "src/bin/ompas-simu.rs"
+
+
+[[bin]]
 name = "scheme"
 path = "src/bin/scheme.rs"
 

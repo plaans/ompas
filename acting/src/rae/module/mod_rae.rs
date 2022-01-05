@@ -780,11 +780,31 @@ async fn def_initial_state<'a>(
         ));
     }
 
-    if let LValue::List(list) = &args[0] {
-        let mut state: LState = LState {
-            inner: Default::default(),
+    if let LValue::Map(map) = &args[0] {
+        let state: LState = LState {
+            inner: {
+                let mut map_2: im::HashMap<LValueS, LValueS> = Default::default();
+                for (k, v) in map {
+                    map_2.insert(k.into(), v.into());
+                }
+                map_2
+            },
             _type: Some(StateType::InnerWorld),
         };
+
+        ctx.env.state.update_state(state).await;
+        Ok(Nil)
+    } else {
+        Err(WrongType(
+            RAE_DEF_INITIAL_STATE,
+            args[0].clone(),
+            (&args[0]).into(),
+            NameTypeLValue::Map,
+        ))
+    }
+    /*
+    if let LValue::List(list) = &args[0] {
+
         for fact in list {
             if let LValue::List(k_v) = fact {
                 if k_v.len() == 3 && k_v[1] == LValue::Symbol(".".to_string()) {
@@ -808,9 +828,9 @@ async fn def_initial_state<'a>(
             args[0].clone().into(),
             NameTypeLValue::List,
         ));
-    }
+    }*/
 
-    Ok(Nil)
+    //Ok(Nil)
 }
 
 /// Returns all the status of the actions pretty printed

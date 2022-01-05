@@ -52,13 +52,13 @@ pub const LAMBDA_R_GENERATE_INSTANCES: &str = "(define r_generate_instances
                     (if (> (length types) (length params))
                         (begin
                             (define instance_types (mapf instance (sublist types (length params))))
-                            (define instances (enumerate (cons (car methods) instance_types)))
-                            (append (r_test_method instances) (r_generate_instances (cdr methods))))
+                            (define instances (enr (cons enumerate (append method instance_types))))
+                            (append (r_test_method instances) (r_generate_instances methods)))
                         (cons
                             (if (eval-pre-conditions method)
                                 (list method (compute-score method))
                                 nil)
-                            (r_generate_instances (cdr methods)))))))))";
+                            (r_generate_instances methods))))))))";
 
 pub const LAMBDA_R_TEST_METHOD: &str = "(define r_test_method 
     (lambda (instances)

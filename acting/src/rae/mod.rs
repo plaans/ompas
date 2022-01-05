@@ -109,11 +109,12 @@ const TOKIO_CHANNEL_SIZE: usize = 65_536; //=2^16
 /// Receives Job to handle in separate tasks.
 pub async fn rae_run(mut context: RAEEnv, options: &RAEOptions, _log: String) {
     let async_action_status = context.actions_progress.sync.clone();
-    let receiver_sync = mem::replace(&mut context.status_watcher, None).unwrap();
-    tokio::spawn(async move {
-        //println!("starting status watcher");
-        async_status_watcher_run(async_action_status, receiver_sync).await;
-    });
+    if let Some(receiver_sync) = mem::replace(&mut context.status_watcher, None) {
+        tokio::spawn(async move {
+            //println!("starting status watcher");
+            async_status_watcher_run(async_action_status, receiver_sync).await;
+        });
+    }
 
     //println!("async status watcher");
 

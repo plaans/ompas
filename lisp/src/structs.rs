@@ -2063,18 +2063,18 @@ impl From<&LValue> for LValueS {
             },
             LValue::Fn(f) => LValueS::Symbol(f.get_label().to_string()),
             LValue::MutFn(f) => LValueS::Symbol(f.get_label().to_string()),
-            LValue::Lambda(_) => LValue::Nil.into(),
+            LValue::Lambda(_) => panic!("cannot convert LValue::Lambda into LValueS"),
             LValue::CoreOperator(co) => LValueS::Symbol(co.to_string()),
             LValue::Map(m) => LValueS::Map(m.iter().map(|(k, v)| (k.into(), v.into())).collect()),
             LValue::List(l) => LValueS::List(l.iter().map(|lv| lv.into()).collect()),
             //LValue::Quote(l) => l.deref().into(),
-            LValue::True => LValueS::Symbol(TRUE.to_string()),
-            LValue::Nil => LValueS::Symbol(NIL.to_string()),
+            LValue::True => LValueS::Bool(true),
+            LValue::Nil => LValueS::Bool(false),
             LValue::String(s) => LValueS::Symbol(s.clone()),
             LValue::Character(c) => LValueS::Symbol(c.to_string()),
             LValue::AsyncFn(fun) => LValueS::Symbol(fun.debug_label.to_string()),
             LValue::AsyncMutFn(fun) => LValueS::Symbol(fun.debug_label.to_string()),
-            LValue::Future(_) => LValueS::Bool(false),
+            LValue::Future(_) => panic!("cannot convert LValue::Future into LValueS"),
         }
     }
 }

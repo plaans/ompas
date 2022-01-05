@@ -2,29 +2,26 @@
     (def-action move '(?from room) '(?to room))
     (def-action-model move
         '((:params (?from room) (?to room))
-          (:pre-conditions (at-robby ?from))
+          (:pre-conditions (= (at-robby) ?from))
           (:effects
             (begin
-                (assert (at-robby ?from) false)
-                (assert (at-robby ?to) true)))))
+                (assert 'at-robby ?to)))))
 
     (def-action pick '(?obj ball) '(?room room) '(?gripper gripper))
     (def-action-model pick
         '((:params (?obj ball) (?room room) (?gripper gripper))
-          (:pre-conditions (and (at ?obj ?room) (at-robby ?room) (free ?gripper)))
+          (:pre-conditions (and (= (at ?obj) ?room) (= (at-robby) ?room) (null? (carry ?gripper))))
           (:effects
             (begin
-                (assert (carry ?obj ?gripper) true)
-                (assert (at ?obj ?room) false)
-                (assert (free ?gripper) false)))))
+                (assert `(carry ,?gripper) ?obj)
+                (assert `(at ,?obj) nil)))))
 
     (def-action drop '(?obj ball) '(?room room) '(?gripper gripper))
     (def-action-model drop
         '((:params (?obj ball) (?room room) (?gripper gripper))
-          (:pre-conditions (and (carry ?obj ?gripper) (at-robby ?room)))
+          (:pre-conditions (and (= (carry ?gripper) ?obj) (= (at-robby) ?room)))
           (:effects
             (begin
-                (assert (carry ?obj ?gripper) false)
-                (assert (at ?obj ?room) true)
-                (assert (free ?gripper) true)))))
+                (assert `(carry ,?gripper) nil)
+                (assert `(at ,?obj) ?room )))))
 )

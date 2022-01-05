@@ -1,0 +1,11 @@
+(def-initial-state
+ (map '(((instance room) (bedroom kitchen living_room))
+   ((instance ball) (b1 b2 b3 b4))
+   ((instance gripper) (left right))
+   (at-robby bedroom)
+   ((at b1) bedroom)
+   ((at b2) bedroom)
+   ((at b3) bedroom)
+   ((at b4) bedroom)
+   ((carry left) nil)
+   ((carry right) nil))))

@@ -153,6 +153,9 @@ pub const SYMBOL_EXEC_MODE: &str = "exec-mode";
 pub const SYMBOL_SIMU_MODE: &str = "simu-mode";
 pub const SYMBOL_RAE_MODE: &str = "rae-mode";
 
+pub const DEFINE_RAE_PLATFORM: &str = "(define rae-platform some)";
+pub const DEFINE_NO_RAE_PLATFORM: &str = "(define rae-platform nil)";
+
 ///Context that will contains primitives for the RAE executive
 pub struct CtxRaeExec {
     //pub stream: JobStream,
@@ -179,6 +182,7 @@ impl GetModule for CtxRaeExec {
             MACRO_MUTEX_LOCK_AND_DO,
             MACRO_WAIT_ON,
             MACRO_SIM_BLOCK,
+            LAMBDA_INSTANCE,
             LAMBDA_PROGRESS,
             LAMBDA_SELECT,
             LAMBDA_RETRY,
@@ -207,11 +211,12 @@ impl GetModule for CtxRaeExec {
         module.add_async_fn_prelude(RAE_GET_STATE, get_state);
         module.add_async_fn_prelude(RAE_GET_FACTS, get_facts);
         module.add_async_fn_prelude(RAE_GET_STATE_VARIBALE, get_state_variable);
-        module.add_async_fn_prelude(RAE_EXEC_COMMAND, exec_command);
+        module.add_async_fn_prelude(RAE_EXEC_COMMAND, fn_exec_command);
         module.add_async_mut_fn_prelude(RAE_LAUNCH_PLATFORM, launch_platform);
         module.add_async_fn_prelude(RAE_GET_STATUS, get_status);
         module.add_async_fn_prelude(RAE_CANCEL_COMMAND, cancel_command);
-        module.add_async_fn_prelude(RAE_INSTANCE, instance);
+        module.add_async_fn_prelude(RAE_INSTANCE, fn_instance);
+        module.add_fn_prelude(RAE_IS_PLATFORM_DEFINED, is_platform_defined);
         //Manage facts:
         module.add_async_fn_prelude(RAE_ASSERT, assert_fact);
         module.add_async_fn_prelude(RAE_ASSERT_SHORT, assert_fact);
@@ -622,13 +627,29 @@ async fn get_facts<'a>(
     env: &'a LEnv,
     ctx: &'a CtxRaeExec,
 ) -> Result<LValue, LError> {
-    let mut state: im::HashMap<LValue, LValue> = get_state(&[], env, ctx).await?.try_into()?;
-    let locked: Vec<LValue> = get_list_locked(&[], env, ctx).await?.try_into()?;
+    let mode: String = env
+        .get_symbol("rae-mode")
+        .expect("rae-mode should be defined, default value is exec mode")
+        .try_into()?;
+    match mode.as_str() {
+        SYMBOL_EXEC_MODE => {
+            let mut state: im::HashMap<LValue, LValue> =
+                get_state(&[], env, ctx).await?.try_into()?;
+            let locked: Vec<LValue> = get_list_locked(&[], env, ctx).await?.try_into()?;
 
-    for e in locked {
-        state.insert(vec![LOCKED.into(), e].into(), True);
+            for e in locked {
+                state.insert(vec![LOCKED.into(), e].into(), True);
+            }
+            Ok(state.into())
+        }
+        SYMBOL_SIMU_MODE => Ok(env
+            .get_symbol(STATE)
+            .expect("state should be defined in simu mode")),
+        _ => unreachable!(
+            "{} should have either {} or {} value.",
+            SYMBOL_RAE_MODE, SYMBOL_EXEC_MODE, SYMBOL_SIMU_MODE
+        ),
     }
-    Ok(state.into())
 }
 
 #[macro_rules_attribute(dyn_async!)]

@@ -320,9 +320,9 @@ async fn repl(mut com: ChannelToLispInterpreter) {
                     }
                     Some(b) => b,
                 };
-                if buffer != NIL {
-                    println!("LI>> {}", buffer);
-                }
+                //if buffer != NIL {
+                println!("LI>> {}", buffer);
+                //}
 
                 /*assert_eq!(
                     buffer, "ACK",

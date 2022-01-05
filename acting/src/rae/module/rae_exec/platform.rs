@@ -1,23 +1,40 @@
 use crate::rae::context::actions_progress::Status;
 use crate::rae::module::rae_exec::{
-    CtxRaeExec, SYMBOL_EXEC_MODE, SYMBOL_RAE_MODE, SYMBOL_SIMU_MODE,
+    get_facts, CtxRaeExec, SYMBOL_EXEC_MODE, SYMBOL_RAE_MODE, SYMBOL_SIMU_MODE,
 };
 use ::macro_rules_attribute::macro_rules_attribute;
 use log::{info, warn};
 use ompas_lisp::core::LEnv;
+use ompas_lisp::functions::get;
 use ompas_lisp::structs::LError::SpecialError;
-use ompas_lisp::structs::{LError, LValue};
+use ompas_lisp::structs::{LError, LResult, LValue};
 use ompas_utils::dyn_async;
 use std::convert::TryInto;
+
+pub const LAMBDA_INSTANCE: &str = "(define instance
+    (lambda args
+        (if (rae-platform?)
+            (enr (cons fn-instance args))
+            (cond ((= (length args) 1)
+                    (get (rae-get-facts) (list 'instance (car args))))
+                  ((= (length args) 2)
+                    (contains
+                        (get (rae-get-facts) (list 'instance (cadr args)))
+                        (car args))))))))";
 
 pub const RAE_EXEC_COMMAND: &str = "rae-exec-command";
 pub const RAE_LAUNCH_PLATFORM: &str = "rae-launch-platform";
 pub const RAE_OPEN_COM_PLATFORM: &str = "rae-open-com-platform";
 pub const RAE_START_PLATFORM: &str = "rae-start-platform";
-pub const RAE_INSTANCE: &str = "instance";
+pub const RAE_IS_PLATFORM_DEFINED: &str = "rae-platform?";
+pub const RAE_INSTANCE: &str = "fn-instance";
+
+pub fn is_platform_defined(_: &[LValue], _: &LEnv, ctx: &CtxRaeExec) -> LResult {
+    Ok(ctx.platform_interface.is_some().into())
+}
 
 #[macro_rules_attribute(dyn_async!)]
-pub async fn exec_command<'a>(
+pub async fn fn_exec_command<'a>(
     args: &'a [LValue],
     env: &'a LEnv,
     ctx: &'a CtxRaeExec,
@@ -171,7 +188,7 @@ pub async fn cancel_command<'a>(
 }
 
 #[macro_rules_attribute(dyn_async!)]
-pub async fn instance<'a>(
+pub async fn fn_instance<'a>(
     args: &'a [LValue],
     _env: &'a LEnv,
     ctx: &'a CtxRaeExec,

@@ -35,17 +35,15 @@ pub async fn init_ctx_rae(
     let mut ctx_rae = CtxRae::default();
     let (sender_job, receiver_job) = mpsc::channel(TOKIO_CHANNEL_SIZE);
 
-    let (sender_sync, receiver_sync) = mpsc::channel(TOKIO_CHANNEL_SIZE);
-
     let ctx_rae_monitor = CtxRaeMonitor {
         sender_to_rae: Some(sender_job),
         env: RAEEnv::new(None, None).await,
     };
 
-    let mut rae_env = RAEEnv::new(Some(receiver_job), Some(receiver_sync)).await;
-
-    let platform = match platform {
+    let (mut rae_env, platform) = match platform {
         Some(mut platform) => {
+            let (sender_sync, receiver_sync) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+            let mut rae_env = RAEEnv::new(Some(receiver_job), Some(receiver_sync)).await;
             let domain = platform.domain().await;
 
             ctx_rae.domain = vec![domain].into();
@@ -67,9 +65,9 @@ pub async fn init_ctx_rae(
                 .init(rae_env.state.clone(), rae_env.actions_progress.clone())
                 .await;
 
-            Some(platform)
+            (rae_env, Some(platform))
         }
-        None => None,
+        None => (RAEEnv::new(Some(receiver_job), None).await, None),
     };
 
     //Clone all structs that need to be shared to monitor action status, state and agenda.

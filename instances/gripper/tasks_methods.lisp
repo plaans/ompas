@@ -2,8 +2,8 @@
     (def-task pick-and-drop '(?ball ball) '(?room room))
     (def-method m1
         '((:task pick-and-drop)
-          (:params (?gripper gripper) (?ball ball) (?room room) (?departure room))
-          (:pre-conditions (and ( = (at ?ball) (at-robby)) (free ?gripper) (= ?departure room)))
+          (:params (?ball ball) (?room room) (?gripper gripper) (?departure room))
+          (:pre-conditions (and ( = (at ?ball) (at-robby)) (null? (carry ?gripper)) (= ?departure (at-robby))))
           (:score 0)
           (:body
             (begin
@@ -11,15 +11,15 @@
                 (move ?departure ?room)
                 (drop ?ball ?room ?gripper)))))
 
-    (def-method m2
-        '((:task pick-and-drop)
-          (:params (?gripper gripper) (?ball ball) (?room room) (?departure room) (?intermediaire room))
-          (:pre-conditions (and (!= (at ?ball) (at-robby)) (free ?gripper) (= ?departure (at-robby)) (= intermediaire (at ?ball))))
-          (:score 0)
-          (:body
-            (begin
-                (move ?departure ?intermediaire)
-                (pick ?ball ?intermediaire ?gripper)
-                (move ?intermediaire ?room)
-                (drop ?ball ?room ?gripper)))))
+    ;(def-method m2
+    ;    '((:task pick-and-drop)
+    ;      (:params (?ball ball) (?room room)  (?gripper gripper) (?departure room) (?intermediaire room))
+    ;      (:pre-conditions (and (!= (at ?ball) (at-robby)) (null? (carry ?gripper)) (= ?departure (at-robby)) (= intermediaire (at ?ball))))
+    ;      (:score 0)
+    ;      (:body
+    ;        (begin
+    ;            (move ?departure ?intermediaire)
+    ;            (pick ?ball ?intermediaire ?gripper)
+    ;            (move ?intermediaire ?room)
+    ;            (drop ?ball ?room ?gripper)))))
 )

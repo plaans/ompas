@@ -46,7 +46,7 @@ pub const RAE_ASSERT_SHORT: &str = "+>";
 pub const RAE_RETRACT: &str = "retract";
 pub const RAE_RETRACT_SHORT: &str = "->";
 pub const RAE_AWAIT: &str = "rae-await";
-pub const WAIT_ON: &str = "check";
+pub const CHECK: &str = "check";
 pub const LOCK: &str = "lock";
 pub const RELEASE: &str = "release";
 pub const IS_LOCKED: &str = "locked?";
@@ -70,12 +70,6 @@ const FAILURE: &str = "failure";
 const IS_SUCCESS: &str = "success?";
 const IS_FAILURE: &str = "failure?";
 
-pub const MACRO_MUTEX_LOCK_AND_DO: &str = "(defmacro mutex::lock-and-do 
-    (lambda (r p b)
-        `(begin
-            (lock ,r ,p)
-            ,b
-            (release ,r))))";
 pub const MACRO_WAIT_ON: &str = "(defmacro wait-on (lambda (expr)
     `(if (not (eval ,expr))
         (check ,expr))))";
@@ -117,7 +111,7 @@ pub const LAMBDA_GET_METHODS: &str = "\
     (lambda (label)\
         (get rae-task-methods-map label)))";
 
-pub const LAMBDA_GET_METHOD_GENERATOR: &str = "\
+/*pub const LAMBDA_GET_METHOD_GENERATOR: &str = "\
 (define get-method-generator
        (lambda (label)
             (get rae-method-generator-map label)))";
@@ -138,15 +132,15 @@ pub const LAMBDA_GENERATE_INSTANCES: &str = "
                                     (append (list (get-method-generator (car methods)))
                                         i_params))
                                 (__generate__ (cdr methods))))))
-                (__generate__ methods)))))";
+                (__generate__ methods)))))";*/
 
-pub const LAMBDA_ARBITRARY: &str = "(define arbitrary
+/*pub const LAMBDA_ARBITRARY: &str = "(define arbitrary
 	(lambda args
 		(if (= (len args) 1)
 				(caar args)
 				(let ((elements (car args))
 							(f (cadr args)))
-						 (f elements)))))";
+						 (f elements)))))";*/
 
 pub const DEFINE_RAE_MODE: &str = "(define rae-mode EXEC-MODE)";
 pub const SYMBOL_EXEC_MODE: &str = "exec-mode";
@@ -187,8 +181,8 @@ impl GetModule for CtxRaeExec {
             LAMBDA_SELECT,
             LAMBDA_RETRY,
             LAMBDA_GET_METHODS,
-            LAMBDA_GET_METHOD_GENERATOR,
-            LAMBDA_ARBITRARY,
+            //LAMBDA_GET_METHOD_GENERATOR,
+            //LAMBDA_ARBITRARY,
             LAMBDA_GET_PRECONDITIONS,
             LAMBDA_GET_SCORE,
             LAMBDA_GET_ACTION_MODEL,
@@ -226,7 +220,7 @@ impl GetModule for CtxRaeExec {
         module.add_async_mut_fn_prelude(RAE_START_PLATFORM, start_platform);
         module.add_fn_prelude(RAE_GET_INSTANTIATED_METHODS, get_instantiated_methods);
         module.add_fn_prelude(RAE_GET_BEST_METHOD, get_best_method);
-        module.add_async_fn_prelude(WAIT_ON, wait_on);
+        module.add_async_fn_prelude(CHECK, check);
         module.add_async_fn_prelude(RAE_SELECT, select);
         module.add_async_fn_prelude(RAE_SET_SUCCESS_FOR_TASK, set_success_for_task);
         module.add_async_fn_prelude(RAE_GET_NEXT_METHOD, get_next_method);
@@ -745,7 +739,7 @@ async fn get_status<'a>(
 }
 
 #[macro_rules_attribute(dyn_async!)]
-async fn wait_on<'a>(
+async fn check<'a>(
     args: &'a [LValue],
     _env: &'a LEnv,
     _: &'a CtxRaeExec,

@@ -11,6 +11,12 @@ use ompas_lisp::structs::{LError, LNumber, LValue, NameTypeLValue};
 use ompas_utils::dyn_async;
 use std::convert::TryInto;
 
+pub const MACRO_MUTEX_LOCK_AND_DO: &str = "(defmacro mutex::lock-and-do
+    (lambda (r p b)
+        `(begin
+            (lock ,r ,p)
+            ,b
+            (release ,r))))";
 pub const LOCK: &str = "lock";
 //pub const RELEASE: &str = "release";
 pub const IS_LOCKED: &str = "locked?";

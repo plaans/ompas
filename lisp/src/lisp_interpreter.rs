@@ -1,5 +1,4 @@
 use crate::core::{eval, parse, ContextCollection, ImportType, LEnv};
-use crate::language::scheme_primitives::NIL;
 use crate::structs::{GetModule, LError};
 use crate::TOKIO_CHANNEL_SIZE;
 use chrono::{DateTime, Utc};

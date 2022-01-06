@@ -231,7 +231,7 @@ impl GetModule for CtxUtils {
             ctx: Arc::new(()),
             prelude: vec![],
             raw_lisp: vec![
-                MACRO_TEST_MACRO,
+                //MACRO_TEST_MACRO,
                 MACRO_AND,
                 MACRO_OR,
                 MACRO_CAAR,

@@ -9,6 +9,7 @@ LANGUAGE
 
 const MOD_STRING: &str = "string";
 const CONCATENATE: &str = "concatenate";
+//todo
 const DOC_CONCATENATE: &str = "todo!";
 
 #[derive(Default)]
@@ -34,7 +35,7 @@ impl Documentation for CtxString {
     }
 }
 
-//add test for concatenate
+//Todo: add test for concatenate
 pub fn concatenate(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     let mut str = String::new();
     for e in args {

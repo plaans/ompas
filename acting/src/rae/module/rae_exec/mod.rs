@@ -748,7 +748,7 @@ async fn check<'a>(
     //println!("wait on function with {} args", args.len());
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(
-            WAIT_ON,
+            CHECK,
             args.into(),
             args.len(),
             1..1,

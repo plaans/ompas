@@ -127,7 +127,7 @@ impl LispInterpreter {
         crate::core::import(&mut self.env, &mut self.ctxs, ctx, ImportType::WithPrefix).await
     }
 
-    pub async fn recv(&mut self) -> Option<String> {
+    async fn recv(&mut self) -> Option<String> {
         self.li_channel.recv().await
     }
 

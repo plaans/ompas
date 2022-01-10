@@ -802,35 +802,6 @@ async fn def_initial_state<'a>(
             NameTypeLValue::Map,
         ))
     }
-    /*
-    if let LValue::List(list) = &args[0] {
-
-        for fact in list {
-            if let LValue::List(k_v) = fact {
-                if k_v.len() == 3 && k_v[1] == LValue::Symbol(".".to_string()) {
-                    state.insert((&k_v[0]).into(), (&k_v[2]).into())
-                }
-            } else {
-                return Err(WrongType(
-                    RAE_DEF_INITIAL_STATE,
-                    fact.clone(),
-                    fact.into(),
-                    NameTypeLValue::List,
-                ));
-            }
-        }
-        let c_state = ctx.env.state.clone();
-        c_state.update_state(state).await;
-    } else {
-        return Err(WrongType(
-            RAE_DEF_INITIAL_STATE,
-            args[0].clone(),
-            args[0].clone().into(),
-            NameTypeLValue::List,
-        ));
-    }*/
-
-    //Ok(Nil)
 }
 
 /// Returns all the status of the actions pretty printed

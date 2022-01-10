@@ -609,6 +609,7 @@ name = "ompas_planning"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "im",
  "macro_rules_attribute",
  "ompas_acting",
  "ompas_lisp",

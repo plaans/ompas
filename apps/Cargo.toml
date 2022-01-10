@@ -52,6 +52,10 @@ path = "src/bin/root_scheme.rs"
 name = "translate"
 path = "src/bin/translate.rs"
 
+[[bin]]
+name = "union-map"
+path = "src/bin/union_map_bin.rs"
+
 [[example]]
 name = "virtual_robot"
 path = "examples/robot_sim.rs"

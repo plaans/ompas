@@ -1,3 +1,5 @@
+mod union_map_bin;
+
 use std::path::PathBuf;
 
 use structopt::StructOpt;

@@ -305,7 +305,7 @@ pub fn remove_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
             let mut new_m = m.clone();
             new_m.remove(&args[1]);
             Ok(new_m.into())
-        },
+        }
         lv => Err(WrongType(
             REMOVE_MAP,
             lv.clone(),
@@ -505,7 +505,7 @@ pub fn rest(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
 }
 
 ///It merges two or more list into one.
-pub fn append(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn append(args: &[LValue], _env: &LEnv, _ctx: &()) -> Result<LValue, LError> {
     let mut new_list = Vec::new();
     for element in args {
         match element {

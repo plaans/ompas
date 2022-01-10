@@ -866,35 +866,26 @@ async fn def_initial_state<'a>(
         ));
     }
 
-    if let LValue::List(list) = &args[0] {
-        let mut state: LState = LState {
-            inner: Default::default(),
+    if let LValue::Map(map) = &args[0] {
+        let state: LState = LState {
+            inner: {
+                let mut map_2: im::HashMap<LValueS, LValueS> = Default::default();
+                for (k, v) in map {
+                    map_2.insert(k.into(), v.into());
+                }
+                map_2
+            },
             _type: Some(StateType::InnerWorld),
         };
-        for fact in list {
-            if let LValue::List(k_v) = fact {
-                if k_v.len() == 3 && k_v[1] == LValue::Symbol(".".to_string()) {
-                    state.insert((&k_v[0]).into(), (&k_v[2]).into())
-                }
-            } else {
-                return Err(WrongType(
-                    DOMAIN_DEF_INITIAL_STATE,
-                    fact.clone(),
-                    fact.into(),
-                    NameTypeLValue::List,
-                ));
-            }
-        }
-        let c_state = ctx.state.clone();
-        c_state.update_state(state).await;
+
+        ctx.state.update_state(state).await;
+        Ok(Nil)
     } else {
-        return Err(WrongType(
+        Err(WrongType(
             DOMAIN_DEF_INITIAL_STATE,
             args[0].clone(),
-            args[0].clone().into(),
-            NameTypeLValue::List,
-        ));
+            (&args[0]).into(),
+            NameTypeLValue::Map,
+        ))
     }
-
-    Ok(Nil)
 }

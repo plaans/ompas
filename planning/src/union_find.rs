@@ -1,6 +1,6 @@
 use std::clone::Clone;
 use std::collections::{HashMap, VecDeque};
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 
 #[derive(Default, Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct NodeId {
@@ -33,7 +33,7 @@ impl Display for NodeId {
 
 pub type Rank = usize;
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct Node<T: Display + Clone + Default> {
     value: T,
     parent: NodeId,
@@ -75,7 +75,7 @@ impl<T: Display + Clone + Default> Node<T> {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Forest<T: Display + Default + Clone> {
     inner: Vec<Node<T>>,
 }
@@ -114,51 +114,49 @@ impl<T: Display + Default + Clone> Forest<T> {
     }
 }
 
-impl<T: Display + Default + Clone> Forest<T> {
-    pub fn format(&self) -> String {
+impl<T: Debug + Display + Default + Clone> Display for Forest<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut string = String::new();
 
         let mut groups: HashMap<NodeId, VecDeque<Node<T>>> = Default::default();
 
         for (node_id, node) in self.inner.iter().enumerate() {
-            let node_id = &node_id.into();
-            if let Some(vec) = groups.get_mut(node_id) {
-                if self.get_parent(node_id) == *node_id {
-                    vec.push_front(node.clone());
-                } else {
+            let parent_id = &node.get_parent();
+            if *parent_id != node_id.into() {
+                if let Some(vec) = groups.get_mut(parent_id) {
                     vec.push_back(node.clone());
+                } else {
+                    groups.insert(*parent_id, {
+                        let mut vec = VecDeque::new();
+                        vec.push_front(node.clone());
+                        vec
+                    });
                 }
             } else {
-                groups.insert(*node_id, {
-                    let mut vec = VecDeque::new();
-                    vec.push_front(node.clone());
-                    vec
-                });
+                groups.insert(*parent_id, VecDeque::new());
             }
         }
 
-        for (_, tree) in groups {
+        //println!("[debug] groups: {:?}\n", groups);
+
+        for (root_id, tree) in groups {
             let mut format = "{".to_string();
             for (i, element) in tree.iter().enumerate() {
                 if i != 0 {
-                    if i != 1 {
-                        format.push(',');
-                    }
-
-                    format.push_str(format!("{}", element).as_str())
+                    format.push(',');
                 }
+                format.push_str(element.to_string().as_str())
             }
 
             format.push_str("}");
 
-            string
-                .push_str(format!("{}: {}\n", tree.front().unwrap().get_value(), format).as_str());
+            string.push_str(format!("{}: {}\n", self.inner[*root_id.index()], format).as_str());
         }
-        string
+        write!(f, "{}", string)
     }
 }
 
-pub fn union<T: Display + Default + Clone>(forest: &mut Forest<T>, x: &NodeId, y: &mut NodeId) {
+pub fn union<T: Display + Default + Clone>(forest: &mut Forest<T>, x: &NodeId, y: &NodeId) {
     let x_root = find(forest, x);
     let y_root = find(forest, y);
     if x_root != y_root {
@@ -180,35 +178,3 @@ pub fn find<T: Display + Default + Clone>(forest: &mut Forest<T>, x: &NodeId) ->
     }
     forest.get_parent(x).clone()
 }
-
-/*
- fonction MakeSet(x)
-     x.parent := x
-     x.rang   := 0
-
- fonction Union(x, y)
-     xRacine := Find(x)
-     yRacine := Find(y)
-     si xRacine
-
-
-    {\displaystyle \neq }
-
-\neq  yRacine
-           si xRacine.rang < yRacine.rang
-                 xRacine.parent := yRacine
-           sinon
-                 yRacine.parent := xRacine
-                 si xRacine.rang == yRacine.rang
-                         xRacine.rang := xRacine.rang + 1
-
-                          fonction Find(x)
-     si x.parent
-
-
-    {\displaystyle \neq }
-
-\neq  x
-        x.parent := Find(x.parent)
-     retourner x.parent
- */

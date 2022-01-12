@@ -1,7 +1,7 @@
 //Example in https://upload.wikimedia.org/wikipedia/commons/thumb/2/2b/Union_find_example.png/220px-Union_find_example.png
 
 use im::HashMap;
-use ompas_planning::union_find::Forest;
+use ompas_planning::union_find::{find, union, Forest};
 
 fn main() {
     let chars = "abcdef".chars();
@@ -13,4 +13,54 @@ fn main() {
     for char in chars {
         map_char_node.insert(char, forest.new_node(char));
     }
+
+    //println!("[debug] forest: {:?}\n", forest);
+    println!("forest: {}\n", forest);
+
+    union(
+        &mut forest,
+        map_char_node.get(&'a').unwrap(),
+        map_char_node.get(&'b').unwrap(),
+    );
+
+    println!("union a b");
+
+    println!("forest: {}\n", forest);
+
+    union(
+        &mut forest,
+        map_char_node.get(&'c').unwrap(),
+        map_char_node.get(&'d').unwrap(),
+    );
+
+    println!("union c d");
+
+    println!("forest: {}\n", forest);
+
+    union(
+        &mut forest,
+        map_char_node.get(&'a').unwrap(),
+        map_char_node.get(&'c').unwrap(),
+    );
+
+    println!("union a c");
+
+    println!("forest: {}\n", forest);
+    println!("[debug] forest: {:?}\n", forest);
+
+    find(&mut forest, map_char_node.get(&'d').unwrap());
+
+    println!("find d");
+
+    println!("forest: {}\n", forest);
+
+    union(
+        &mut forest,
+        map_char_node.get(&'b').unwrap(),
+        map_char_node.get(&'e').unwrap(),
+    );
+
+    println!("union b e");
+
+    println!("forest: {}\n", forest);
 }

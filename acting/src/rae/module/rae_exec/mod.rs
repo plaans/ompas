@@ -135,12 +135,12 @@ pub const LAMBDA_GENERATE_INSTANCES: &str = "
                 (__generate__ methods)))))";*/
 
 /*pub const LAMBDA_ARBITRARY: &str = "(define arbitrary
-	(lambda args
-		(if (= (len args) 1)
-				(caar args)
-				(let ((elements (car args))
-							(f (cadr args)))
-						 (f elements)))))";*/
+(lambda args
+    (if (= (len args) 1)
+            (caar args)
+            (let ((elements (car args))
+                        (f (cadr args)))
+                     (f elements)))))";*/
 
 pub const DEFINE_RAE_MODE: &str = "(define rae-mode EXEC-MODE)";
 pub const SYMBOL_EXEC_MODE: &str = "exec-mode";
@@ -151,23 +151,13 @@ pub const DEFINE_RAE_PLATFORM: &str = "(define rae-platform some)";
 pub const DEFINE_NO_RAE_PLATFORM: &str = "(define rae-platform nil)";
 
 ///Context that will contains primitives for the RAE executive
+#[derive(Default)]
 pub struct CtxRaeExec {
     //pub stream: JobStream,
     pub actions_progress: ActionsProgress,
     pub state: RAEState,
     pub platform_interface: Option<Box<dyn RAEInterface>>,
     pub agenda: Agenda,
-}
-
-impl Default for CtxRaeExec {
-    fn default() -> Self {
-        Self {
-            actions_progress: Default::default(),
-            state: Default::default(),
-            platform_interface: None,
-            agenda: Default::default(),
-        }
-    }
 }
 
 impl GetModule for CtxRaeExec {
@@ -747,12 +737,7 @@ async fn check<'a>(
     //info!("wait on function");
     //println!("wait on function with {} args", args.len());
     if args.len() != 1 {
-        return Err(WrongNumberOfArgument(
-            CHECK,
-            args.into(),
-            args.len(),
-            1..1,
-        ));
+        return Err(WrongNumberOfArgument(CHECK, args.into(), args.len(), 1..1));
     }
     //println!("New wait on {}", args[0]);
     let mut rx = add_waiter(args[0].clone()).await;

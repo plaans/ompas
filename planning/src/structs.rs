@@ -1,4 +1,5 @@
 use crate::structs::Sym::Unique;
+use crate::union_find::{Forest, NodeId};
 use ompas_acting::rae::context::rae_env::DomainEnv;
 use ompas_acting::rae::module::rae_exec::platform::RAE_INSTANCE;
 use ompas_acting::rae::module::rae_exec::{RAE_ASSERT, RAE_RETRACT};
@@ -10,9 +11,74 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::{Display, Formatter};
 
 #[derive(Hash, Eq, PartialEq, Clone)]
+pub enum Atom {
+    Bool(bool),
+    Number(LNumber),
+    Sym(Sym),
+}
+
+impl Display for Atom {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Atom::Bool(b) => write!(f, "{}", b),
+            Atom::Number(n) => write!(f, "{}", n),
+            Atom::Sym(s) => write!(f, "{}", s),
+        }
+    }
+}
+
+impl Default for Atom {
+    fn default() -> Self {
+        Self::Bool(false)
+    }
+}
+
+impl From<&str> for Atom {
+    fn from(s: &str) -> Self {
+        Self::Sym(s.into())
+    }
+}
+
+impl From<bool> for Atom {
+    fn from(b: bool) -> Self {
+        Self::Bool(b)
+    }
+}
+
+impl From<&LNumber> for Atom {
+    fn from(n: &LNumber) -> Self {
+        Self::Number(n.clone())
+    }
+}
+
+impl From<LNumber> for Atom {
+    fn from(n: LNumber) -> Self {
+        (&n).into()
+    }
+}
+
+impl From<&Sym> for Atom {
+    fn from(sym: &Sym) -> Self {
+        Self::Sym(sym.clone())
+    }
+}
+
+impl From<Sym> for Atom {
+    fn from(sym: Sym) -> Self {
+        (&sym).into()
+    }
+}
+
+#[derive(Hash, Eq, PartialEq, Clone)]
 pub enum Sym {
     Unique(String),
     Several(String, usize),
+}
+
+impl Default for Sym {
+    fn default() -> Self {
+        Unique("".to_string())
+    }
 }
 
 impl Sym {
@@ -45,7 +111,7 @@ impl Display for Sym {
     }
 }
 
-type SymId = usize;
+type AtomId = NodeId;
 
 pub trait Absorb {
     fn absorb(&mut self, other: Self);
@@ -56,9 +122,12 @@ pub trait FormatWithSymTable {
 }
 
 #[derive(Clone, Copy, PartialOrd, PartialEq, Eq, Ord, Hash)]
-pub enum SymType {
+pub enum AtomType {
+    Number,
+    Boolean,
     Timepoint,
     Result,
+    Symbol,
     Object,
     Action,
     StateFunction,
@@ -75,48 +144,98 @@ pub enum ExpressionType {
     StateFunction,
 }
 
-impl Display for SymType {
+impl Display for AtomType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            SymType::Timepoint => write!(f, "timepoint"),
-            SymType::Result => write!(f, "return"),
-            SymType::Object => write!(f, "object"),
-            SymType::Action => write!(f, "action"),
-            SymType::StateFunction => write!(f, "state-function"),
-            SymType::Method => write!(f, "method"),
-            SymType::Task => write!(f, "task"),
-            SymType::Function => write!(f, "function"),
+            AtomType::Timepoint => write!(f, "timepoint"),
+            AtomType::Result => write!(f, "return"),
+            AtomType::Object => write!(f, "object"),
+            AtomType::Action => write!(f, "action"),
+            AtomType::StateFunction => write!(f, "state-function"),
+            AtomType::Method => write!(f, "method"),
+            AtomType::Task => write!(f, "task"),
+            AtomType::Function => write!(f, "function"),
+            AtomType::Number => write!(f, "number"),
+            AtomType::Boolean => write!(f, "boolean"),
+            AtomType::Symbol => write!(f, "symbol"),
+        }
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct SymbolTypes {
+    inner: HashMap<AtomId, AtomType>,
+    types_number: TypesNumber,
+}
+
+impl SymbolTypes {
+    pub fn get_type(&self, atom_id: &AtomId) -> Option<&AtomType> {
+        self.inner.get(atom_id)
+    }
+
+    pub fn get_number_of_type(&self, atom_type: &AtomType) -> usize {
+        self.types_number.get_number_of_type(atom_type)
+    }
+
+    pub fn add_new_atom(&mut self, id: AtomId, atom_type: AtomType) {
+        self.inner.insert(id, atom_type);
+        self.types_number.increase_number_of_type(&atom_type);
+    }
+}
+
+#[derive(Clone)]
+pub struct TypesNumber {
+    inner: HashMap<AtomType, usize>,
+}
+
+impl TypesNumber {
+    pub fn increase_number_of_type(&mut self, atom_type: &AtomType) -> usize {
+        let n = self.inner.get_mut(atom_type).unwrap();
+        let previous = *n;
+        *n += 1;
+        previous
+    }
+
+    pub fn get_number_of_type(&self, atom_type: &AtomType) -> usize {
+        *self.inner.get(atom_type).unwrap()
+    }
+}
+
+impl Default for TypesNumber {
+    fn default() -> Self {
+        let mut types_number = HashMap::new();
+        types_number.insert(AtomType::Number, 0);
+        types_number.insert(AtomType::Boolean, 0);
+        types_number.insert(AtomType::Symbol, 0);
+        types_number.insert(AtomType::Result, 0);
+        types_number.insert(AtomType::Timepoint, 0);
+        types_number.insert(AtomType::Object, 0);
+        types_number.insert(AtomType::Action, 0);
+        types_number.insert(AtomType::StateFunction, 0);
+        types_number.insert(AtomType::Method, 0);
+        types_number.insert(AtomType::Task, 0);
+        types_number.insert(AtomType::Function, 0);
+        Self {
+            inner: types_number,
         }
     }
 }
 
 #[derive(Clone)]
 pub struct SymTable {
-    symbols: Vec<Sym>,
-    ids: HashMap<Sym, SymId>,
-    symbol_types: HashMap<SymId, SymType>,
-    types_number: HashMap<SymType, usize>,
-    multiple_def: HashMap<String, Vec<SymId>>,
+    symbols: Forest<Atom>,
+    ids: HashMap<Sym, AtomId>,
+    symbol_types: SymbolTypes,
+    multiple_def: HashMap<String, Vec<AtomId>>,
     pointer_to_ver: Vec<HashMap<String, usize>>,
 }
 
 impl Default for SymTable {
     fn default() -> Self {
-        let mut types_number = HashMap::new();
-        types_number.insert(SymType::Result, 0);
-        types_number.insert(SymType::Timepoint, 0);
-        types_number.insert(SymType::Object, 0);
-        types_number.insert(SymType::Action, 0);
-        types_number.insert(SymType::StateFunction, 0);
-        types_number.insert(SymType::Method, 0);
-        types_number.insert(SymType::Task, 0);
-        types_number.insert(SymType::Function, 0);
-
         let mut st = Self {
-            symbols: vec![],
+            symbols: Forest::default(),
             ids: Default::default(),
             symbol_types: Default::default(),
-            types_number,
             multiple_def: Default::default(),
             pointer_to_ver: vec![Default::default()],
         };
@@ -128,7 +247,7 @@ impl Default for SymTable {
                 .iter()
                 .map(|s| s.to_string())
                 .collect(),
-            &SymType::Function,
+            &AtomType::Function,
         )
         .expect("error while adding symbols of scheme primitives");
         st.add_list_of_symbols_of_same_type(
@@ -137,7 +256,7 @@ impl Default for SymTable {
                 RAE_RETRACT.to_string(),
                 RAE_INSTANCE.to_string(),
             ],
-            &SymType::Function,
+            &AtomType::Function,
         )
         .expect("error while adding symbols of rae");
         st
@@ -148,10 +267,8 @@ impl SymTable {
     pub fn add_list_of_symbols_of_same_type(
         &mut self,
         list: Vec<String>,
-        sym_type: &SymType,
+        sym_type: &AtomType,
     ) -> Result<(), LError> {
-        let types_number = *self.types_number.get(sym_type).unwrap();
-
         for element in &list {
             if self.it_exists(element) {
                 return Err(SpecialError(
@@ -160,29 +277,24 @@ impl SymTable {
                 ));
             }
 
-            let id = self.symbols.len();
-            self.symbols.push(element.clone().into());
-            self.ids.insert(element.clone().into(), id);
-            self.symbol_types.insert(id, *sym_type);
+            let id = self.symbols.new_node(element.as_str().into());
+            self.ids.insert(element.as_str().into(), id);
+            self.symbol_types.add_new_atom(id, *sym_type);
         }
-
-        self.types_number
-            .insert(*sym_type, types_number + list.len());
-
         Ok(())
     }
 }
 
 impl SymTable {
-    pub fn get(&self, id: &SymId) -> Option<&Sym> {
-        self.symbols.get(*id)
+    pub fn get(&self, id: &AtomId) -> Option<&Atom> {
+        self.symbols.get_value(id)
     }
 
-    pub fn get_type(&self, id: &SymId) -> Option<&SymType> {
-        self.symbol_types.get(id)
+    pub fn get_type(&self, id: &AtomId) -> Option<&AtomType> {
+        self.symbol_types.get_type(id)
     }
 
-    pub fn id(&self, sym: &str) -> Option<&SymId> {
+    pub fn id(&self, sym: &str) -> Option<&AtomId> {
         //Look before in the multiple_def table, and then looking in self.ids
         if self.multiple_def.contains_key(sym) {
             let ver = self.pointer_to_ver.last().unwrap().get(sym).unwrap();
@@ -193,16 +305,22 @@ impl SymTable {
         }
     }
 
+    pub fn new_bool(&mut self, b: bool) -> AtomId {
+        self.symbols.new_node(b.into())
+    }
+
+    pub fn new_number(&mut self, n: LNumber) -> AtomId {
+        self.symbols.new_node(n.into())
+    }
+
     //Declare a new return value
     //The name of the return value will be format!("r_{}", last_return_index)
-    pub fn declare_new_result(&mut self) -> SymId {
-        let n = self.types_number.get_mut(&SymType::Result).unwrap();
-        let sym = format!("r_{}", n);
-        *n += 1;
-        let id = self.symbols.len();
-        self.symbols.push(sym.clone().into());
-        self.ids.insert(sym.into(), id);
-        self.symbol_types.insert(id, SymType::Result);
+    pub fn declare_new_result(&mut self) -> AtomId {
+        let n = self.symbol_types.get_number_of_type(&AtomType::Result);
+        let sym: Sym = format!("r_{}", n).into();
+        let id = self.symbols.new_node((&sym).into());
+        self.ids.insert(sym, id);
+        self.symbol_types.add_new_atom(id, AtomType::Result);
         id
     }
 
@@ -210,9 +328,10 @@ impl SymTable {
         if !self.multiple_def.contains_key(sym) {
             //change value in vec of symbol
             let id = self.ids.remove(&Unique(sym.to_string())).unwrap();
-            self.symbols[id] = Sym::Several(sym.to_string(), 0);
+            let value = Sym::Several(sym.to_string(), 0);
+            self.symbols.set_value(&id, (&value).into());
             //Update key in hashmap
-            self.ids.insert(self.symbols[id].clone(), id);
+            self.ids.insert(value, id);
             //Create new entry in multiple_def
             self.multiple_def.insert(sym.to_string(), vec![id]);
             self.pointer_to_ver
@@ -223,18 +342,15 @@ impl SymTable {
     }
 
     pub fn declare_new_interval(&mut self) -> Interval {
-        let n = self.types_number.get_mut(&SymType::Timepoint).unwrap();
+        let n = self.symbol_types.get_number_of_type(&AtomType::Timepoint);
         let start: Sym = format!("t_{}", n).into();
-        let end: Sym = format!("t_{}", *n + 1).into();
-        *n += 2;
-        let id_1 = self.symbols.len();
-        let id_2 = id_1 + 1;
-        self.symbols.push(start.clone());
-        self.symbols.push(end.clone());
+        let end: Sym = format!("t_{}", n + 1).into();
+        let id_1 = self.symbols.new_node((&start).into());
+        let id_2 = self.symbols.new_node((&end).into());
         self.ids.insert(start, id_1);
-        self.symbol_types.insert(id_1, SymType::Timepoint);
+        self.symbol_types.add_new_atom(id_1, AtomType::Timepoint);
         self.ids.insert(end, id_2);
-        self.symbol_types.insert(id_2, SymType::Timepoint);
+        self.symbol_types.add_new_atom(id_2, AtomType::Timepoint);
         Interval {
             start: id_1,
             end: id_2,
@@ -250,14 +366,12 @@ impl SymTable {
         self.pointer_to_ver.remove(self.pointer_to_ver.len() - 1);
     }
 
-    pub fn declare_new_timepoint(&mut self) -> SymId {
-        let n = self.types_number.get_mut(&SymType::Timepoint).unwrap();
+    pub fn declare_new_timepoint(&mut self) -> AtomId {
+        let n = self.symbol_types.get_number_of_type(&AtomType::Timepoint);
         let sym: Sym = format!("t_{}", n).into();
-        *n += 1;
-        let id = self.symbols.len();
-        self.symbols.push(sym.clone());
+        let id = self.symbols.new_node((&sym).into());
         self.ids.insert(sym, id);
-        self.symbol_types.insert(id, SymType::Timepoint);
+        self.symbol_types.add_new_atom(id, AtomType::Timepoint);
         id
     }
 
@@ -265,49 +379,49 @@ impl SymTable {
         self.ids.keys().any(|k| k.get_string() == sym)
     }
 
-    pub fn declare_new_object(
-        &mut self,
-        obj: Option<String>,
-        if_it_exists_create_new: bool,
-    ) -> SymId {
-        let n = self.types_number.get_mut(&SymType::Object).unwrap();
-        let temp_n = *n;
-        *n += 1;
-        let id = self.symbols.len();
-        let sym: Sym = match obj {
-            None => format!("o_{}", temp_n).into(),
-            Some(s) => {
-                if self.it_exists(&s) {
-                    if if_it_exists_create_new {
-                        self.unique_to_several(&s);
-                        let vec_similar = self.multiple_def.get_mut(&s).unwrap();
-                        let n = vec_similar.len();
-                        vec_similar.push(id);
-                        *self.pointer_to_ver.last_mut().unwrap().get_mut(&s).unwrap() =
-                            vec_similar.len() - 1;
-                        Sym::Several(s, n)
-                    } else {
-                        return *match self.pointer_to_ver.last().unwrap().get(&s) {
-                            None => self.ids.get(&s.into()).unwrap(),
-                            Some(i) => self.multiple_def.get(&s).unwrap().get(*i).unwrap(),
-                        };
-                    }
-                } else {
-                    s.into()
-                }
-            }
-        };
+    pub fn declare_new_symbol(&mut self, symbol: String, if_it_exists_create_new: bool) -> AtomId {
+        if self.it_exists(&symbol) {
+            return if if_it_exists_create_new {
+                self.unique_to_several(&symbol);
+                let vec_similar = self.multiple_def.get_mut(&symbol).unwrap();
+                let n = vec_similar.len();
+                *self
+                    .pointer_to_ver
+                    .last_mut()
+                    .unwrap()
+                    .get_mut(&symbol)
+                    .unwrap() = n;
+                let id = self.symbols.new_node(Sym::Several(symbol, n).into());
+                vec_similar.push(id);
+                id
+            } else {
+                return *match self.pointer_to_ver.last().unwrap().get(&symbol) {
+                    None => self.ids.get(&symbol.into()).unwrap(),
+                    Some(i) => self.multiple_def.get(&symbol).unwrap().get(*i).unwrap(),
+                };
+            };
+        } else {
+            let sym: Sym = symbol.into();
+            let id = self.symbols.new_node((&sym).into());
+            self.ids.insert(sym, id);
+            self.symbol_types.add_new_atom(id, AtomType::Symbol);
+            id
+        }
+    }
 
-        self.symbols.push(sym.clone());
+    pub fn declare_new_object(&mut self) -> AtomId {
+        let n = self.symbol_types.get_number_of_type(&AtomType::Object);
+        let sym: Sym = format!("o_{}", n).into();
+        let id = self.symbols.new_node(sym.clone().into());
         self.ids.insert(sym, id);
-        self.symbol_types.insert(id, SymType::Object);
+        self.symbol_types.add_new_atom(id, AtomType::Object);
         id
     }
 }
 
 impl FormatWithSymTable for PartialChronicle {
     fn format_with_sym_table(&self, st: &SymTable) -> String {
-        let get_sym = |id: &SymId| {
+        let get_sym = |id: &AtomId| {
             st.get(id)
                 .expect("error in the definition of the symbol_table")
         };
@@ -368,7 +482,7 @@ impl FormatWithSymTable for PartialChronicle {
 
 impl FormatWithSymTable for Chronicle {
     fn format_with_sym_table(&self, st: &SymTable) -> String {
-        let get_sym = |id: &SymId| {
+        let get_sym = |id: &AtomId| {
             st.get(id)
                 .expect("error in the definition of the symbol_table")
         };
@@ -395,8 +509,8 @@ impl FormatWithSymTable for Chronicle {
 
 #[derive(Clone, Default)]
 pub struct Chronicle {
-    name: Vec<SymId>,
-    task: Vec<SymId>,
+    name: Vec<AtomId>,
+    task: Vec<AtomId>,
     partial_chronicle: PartialChronicle,
 }
 
@@ -414,7 +528,7 @@ impl Chronicle {
 }
 
 impl Chronicle {
-    pub fn add_var(&mut self, sym_id: &SymId) {
+    pub fn add_var(&mut self, sym_id: &AtomId) {
         self.partial_chronicle.add_var(sym_id);
     }
     pub fn add_interval(&mut self, interval: &Interval) {
@@ -437,18 +551,18 @@ impl Chronicle {
         self.partial_chronicle.add_subtask(sub_task)
     }
 
-    pub fn set_name(&mut self, name: Vec<SymId>) {
+    pub fn set_name(&mut self, name: Vec<AtomId>) {
         self.name = name;
     }
 
-    pub fn set_task(&mut self, task: Vec<SymId>) {
+    pub fn set_task(&mut self, task: Vec<AtomId>) {
         self.task = task;
     }
 }
 
 #[derive(Clone, Default)]
 pub struct PartialChronicle {
-    variables: HashSet<SymId>,
+    variables: HashSet<AtomId>,
     constraints: Vec<Constraint>,
     conditions: Vec<Condition>,
     effects: Vec<Effect>,
@@ -466,7 +580,7 @@ impl Absorb for PartialChronicle {
 }
 
 impl PartialChronicle {
-    pub fn add_var(&mut self, sym_id: &SymId) {
+    pub fn add_var(&mut self, sym_id: &AtomId) {
         self.variables.insert(*sym_id);
     }
     pub fn add_interval(&mut self, interval: &Interval) {
@@ -489,11 +603,15 @@ impl PartialChronicle {
     pub fn add_subtask(&mut self, sub_task: Expression) {
         self.subtasks.push(sub_task);
     }
+
+    pub fn get_constraints(&self) -> &Vec<Constraint> {
+        &self.constraints
+    }
 }
 
 pub struct ExpressionChronicle {
     interval: Interval,
-    result: SymId,
+    result: AtomId,
     partial_chronicle: PartialChronicle,
     value: Lit,
     debug: LValue,
@@ -504,8 +622,12 @@ impl ExpressionChronicle {
         &self.interval
     }
 
-    pub fn get_result(&self) -> &SymId {
+    pub fn get_result(&self) -> &AtomId {
         &self.result
+    }
+
+    pub fn get_constraints(&self) -> &Vec<Constraint> {
+        self.partial_chronicle.get_constraints()
     }
 }
 
@@ -534,7 +656,7 @@ impl ExpressionChronicle {
 }
 
 impl ExpressionChronicle {
-    pub fn add_var(&mut self, sym_id: &SymId) {
+    pub fn add_var(&mut self, sym_id: &AtomId) {
         self.partial_chronicle.add_var(sym_id);
     }
     pub fn add_interval(&mut self, interval: &Interval) {
@@ -568,7 +690,7 @@ impl Absorb for ExpressionChronicle {
 
 impl FormatWithSymTable for ExpressionChronicle {
     fn format_with_sym_table(&self, st: &SymTable) -> String {
-        let get_sym = |id: &SymId| {
+        let get_sym = |id: &AtomId| {
             st.get(id)
                 .expect("error in the definition of the symbol_table")
         };
@@ -613,11 +735,11 @@ impl FormatWithSymTable for Condition {
 #[derive(Clone)]
 pub struct TransitionInterval {
     interval: Interval,
-    persistence: SymId,
+    persistence: AtomId,
 }
 
 impl TransitionInterval {
-    pub fn new(interval: Interval, persistence: SymId) -> Self {
+    pub fn new(interval: Interval, persistence: AtomId) -> Self {
         Self {
             interval,
             persistence,
@@ -679,59 +801,23 @@ impl FormatWithSymTable for Effect {
 
 #[derive(Clone)]
 pub enum Lit {
-    Atom(SymId),
-    Number(LNumber),
-    Boolean(bool),
-    LValue(LValue),
+    Atom(AtomId),
+    //Number(LNumber),
+    //Boolean(bool),
+    //LValue(LValue),
     Constraint(Box<Constraint>),
     Exp(Vec<Lit>),
 }
 
-impl From<&LNumber> for Lit {
-    fn from(n: &LNumber) -> Self {
-        Self::Number(n.clone())
-    }
-}
-
-impl From<LNumber> for Lit {
-    fn from(n: LNumber) -> Self {
-        (&n).into()
-    }
-}
-
-impl From<bool> for Lit {
-    fn from(b: bool) -> Self {
-        Self::Boolean(b)
-    }
-}
-
-impl From<&str> for Lit {
-    fn from(s: &str) -> Self {
-        Self::LValue(s.into())
-    }
-}
-
-impl From<&SymId> for Lit {
-    fn from(s: &SymId) -> Self {
+impl From<&AtomId> for Lit {
+    fn from(s: &AtomId) -> Self {
         Self::Atom(*s)
     }
 }
 
-impl From<SymId> for Lit {
-    fn from(s: SymId) -> Self {
+impl From<AtomId> for Lit {
+    fn from(s: AtomId) -> Self {
         (&s).into()
-    }
-}
-
-impl From<&LValue> for Lit {
-    fn from(lv: &LValue) -> Self {
-        Self::LValue(lv.clone())
-    }
-}
-
-impl From<LValue> for Lit {
-    fn from(lv: LValue) -> Self {
-        (&lv).into()
     }
 }
 
@@ -772,17 +858,17 @@ pub fn lvalue_to_lit(lv: &LValue, st: &mut SymTable) -> Result<Lit, LError> {
             "LValue to lit",
             "Map transformation to lit is not supported yet.".to_string(),
         )),
-        LValue::Number(n) => Ok(n.into()),
-        LValue::True => Ok(true.into()),
-        LValue::Nil => Ok(false.into()),
-        lv => Ok(st.declare_new_object(Some(lv.to_string()), false).into()),
+        LValue::Number(n) => Ok(st.new_number(n.clone()).into()),
+        LValue::True => Ok(st.new_bool(true).into()),
+        LValue::Nil => Ok(st.new_bool(false).into()),
+        lv => Ok(st.declare_new_symbol(lv.to_string(), false).into()),
     }
 }
 
 impl FormatWithSymTable for Lit {
     fn format_with_sym_table(&self, st: &SymTable) -> String {
         match self {
-            Lit::Atom(a) => st.symbols.get(*a).unwrap().to_string(),
+            Lit::Atom(a) => st.symbols.get_value(a).unwrap().to_string(),
             Lit::Constraint(c) => c.format_with_sym_table(st),
             Lit::Exp(vec) => {
                 let mut str = "(".to_string();
@@ -795,12 +881,6 @@ impl FormatWithSymTable for Lit {
                 str.push(')');
                 str
             }
-            Lit::LValue(lv) => lv.to_string(),
-            Lit::Number(n) => n.to_string(),
-            Lit::Boolean(b) => match b {
-                true => "true".to_string(),
-                false => "nil".to_string(),
-            },
         }
     }
 }
@@ -860,12 +940,12 @@ impl FormatWithSymTable for Expression {
 
 #[derive(Copy, Clone)]
 pub struct Interval {
-    start: SymId,
-    end: SymId,
+    start: AtomId,
+    end: AtomId,
 }
 
 impl Interval {
-    pub fn new(start: &SymId, end: &SymId) -> Self {
+    pub fn new(start: &AtomId, end: &AtomId) -> Self {
         Self {
             start: *start,
             end: *end,
@@ -874,11 +954,11 @@ impl Interval {
 }
 
 impl Interval {
-    pub fn start(&self) -> SymId {
+    pub fn start(&self) -> AtomId {
         self.start
     }
 
-    pub fn end(&self) -> SymId {
+    pub fn end(&self) -> AtomId {
         self.end
     }
 }
@@ -887,8 +967,8 @@ impl FormatWithSymTable for Interval {
     fn format_with_sym_table(&self, st: &SymTable) -> String {
         format!(
             "[{},{}]",
-            st.symbols.get(self.start).unwrap(),
-            st.symbols.get(self.end).unwrap()
+            st.symbols.get_value(&self.start).unwrap(),
+            st.symbols.get_value(&self.end).unwrap()
         )
     }
 }

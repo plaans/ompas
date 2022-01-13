@@ -470,10 +470,7 @@ impl RAEInterface for PlatformGodot {
                     self.instance.inner.read().await.clone();
                 let mut map: im::HashMap<LValue, LValue> = Default::default();
                 for (_type, instances) in map_instances {
-                    let value = instances
-                        .iter()
-                        .map(|s| LValue::from(s))
-                        .collect::<Vec<LValue>>();
+                    let value = instances.iter().map(LValue::from).collect::<Vec<LValue>>();
                     map.insert(_type.into(), value.into());
                 }
 

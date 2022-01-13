@@ -276,9 +276,9 @@ impl StateFunction {
 
 impl Display for StateFunction {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
+        writeln!(
             f,
-            "parameters : {}, body: {}\n",
+            "parameters : {}, body: {}",
             self.parameters,
             self.body.pretty_print("exec: ".len()),
         )

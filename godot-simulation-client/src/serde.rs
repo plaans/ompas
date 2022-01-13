@@ -258,9 +258,7 @@ pub fn parse_into_lvalue(se: &SExpr) -> Result<LValueS, ()> {
         SExpr::List(list) => {
             //println!("expression is a list");
             let list_iter = list.iter();
-            let vec: Vec<LValueS> = list_iter
-                .map(|x| parse_into_lvalue(x))
-                .collect::<Result<_, _>>()?;
+            let vec: Vec<LValueS> = list_iter.map(parse_into_lvalue).collect::<Result<_, _>>()?;
             Ok(LValueS::List(vec))
         }
     }

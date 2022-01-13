@@ -67,21 +67,11 @@ impl LEnv {
 }
 
 /// Struct Wrapping contexts (modules) for each library.
-#[derive(Clone, Debug)]
+#[derive(Default, Clone, Debug)]
 pub struct ContextCollection {
     inner: Vec<Arc<dyn Any + Send + Sync>>,
     map_label_usize: HashMap<String, usize>,
     reverse_map: HashMap<usize, String>,
-}
-
-impl Default for ContextCollection {
-    fn default() -> Self {
-        Self {
-            inner: vec![],
-            map_label_usize: Default::default(),
-            reverse_map: Default::default(),
-        }
-    }
 }
 
 impl ContextCollection {
@@ -594,7 +584,7 @@ pub fn parse_into_lvalue(se: &SExpr) -> LValue {
             if list_iter.is_empty() {
                 LValue::Nil
             } else {
-                let vec: Vec<LValue> = list_iter.map(|x| parse_into_lvalue(x)).collect();
+                let vec: Vec<LValue> = list_iter.map(parse_into_lvalue).collect();
                 //Expand possible quotting
                 //expand_quoting(vec)
                 LValue::List(vec)
@@ -979,7 +969,7 @@ pub async fn eval(
                     LCoreOperator::Define => {
                         match &args[0] {
                             LValue::Symbol(s) => {
-                                let exp = eval(&args[1], &mut env, ctxs).await?;
+                                let exp = eval(&args[1], env, ctxs).await?;
                                 env.insert(s.to_string(), exp);
                             }
                             lv => {
@@ -1039,7 +1029,7 @@ pub async fn eval(
                         let test = &args[0];
                         let conseq = &args[1];
                         let alt = &args[2];
-                        lv = match eval(test, &mut env, ctxs).await? {
+                        lv = match eval(test, env, ctxs).await? {
                             LValue::True => conseq.clone(),
                             LValue::Nil => alt.clone(),
                             lv => {
@@ -1063,7 +1053,7 @@ pub async fn eval(
                         let last = args.last().unwrap();
 
                         for e in firsts {
-                            eval(e, &mut env, ctxs).await?;
+                            eval(e, env, ctxs).await?;
                         }
                         lv = last.clone();
                     }
@@ -1137,7 +1127,7 @@ pub async fn eval(
                 let mut exps: Vec<LValue> = vec![];
 
                 for x in list {
-                    exps.push(eval(x, &mut env, ctxs).await?)
+                    exps.push(eval(x, env, ctxs).await?)
                 }
 
                 /*let exps = list

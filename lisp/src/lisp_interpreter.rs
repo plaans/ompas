@@ -159,7 +159,7 @@ impl LispInterpreter {
             //stdout.write_all(format!("receiving command: {}\n", str_lvalue).as_bytes());
 
             match parse(str_lvalue.as_str(), &mut self.env, &mut self.ctxs).await {
-                Ok(lv) => match eval(&lv, &mut self.env, &mut &mut self.ctxs).await {
+                Ok(lv) => match eval(&lv, &mut self.env, &mut self.ctxs).await {
                     Ok(lv) => {
                         self.li_channel
                             .send(&id_subscriber, lv.pretty_print(0))

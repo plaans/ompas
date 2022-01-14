@@ -1,5 +1,5 @@
 use crate::structs::Sym::Unique;
-use crate::union_find::{Forest, NodeId};
+use crate::union_find::{Forest, Node, NodeId};
 use ompas_acting::rae::context::rae_env::DomainEnv;
 use ompas_acting::rae::module::rae_exec::platform::RAE_INSTANCE;
 use ompas_acting::rae::module::rae_exec::{RAE_ASSERT, RAE_RETRACT};
@@ -10,7 +10,7 @@ use ompas_lisp::structs::{LError, LNumber, LValue};
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Display, Formatter};
 
-#[derive(Hash, Eq, PartialEq, Clone)]
+#[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub enum Atom {
     Bool(bool),
     Number(LNumber),
@@ -69,7 +69,7 @@ impl From<Sym> for Atom {
     }
 }
 
-#[derive(Hash, Eq, PartialEq, Clone)]
+#[derive(Debug, Hash, Eq, PartialEq, Clone)]
 pub enum Sym {
     Unique(String),
     Several(String, usize),
@@ -230,6 +230,21 @@ pub struct SymTable {
     pointer_to_ver: Vec<HashMap<String, usize>>,
 }
 
+//Forest methods
+impl SymTable {
+    pub fn union_atom(&mut self, a: &AtomId, b: &AtomId) {
+        self.symbols.union(a, b);
+    }
+
+    pub fn find_parent(&mut self, a: &AtomId) -> AtomId {
+        self.symbols.find(a)
+    }
+
+    pub fn get_parent(&self, a: &AtomId) -> AtomId {
+        self.symbols.get_parent(a)
+    }
+}
+
 impl Default for SymTable {
     fn default() -> Self {
         let mut st = Self {
@@ -286,7 +301,11 @@ impl SymTable {
 }
 
 impl SymTable {
-    pub fn get(&self, id: &AtomId) -> Option<&Atom> {
+    pub fn get_node(&self, id: &AtomId) -> Option<&Node<Atom>> {
+        self.symbols.get_node(id)
+    }
+
+    pub fn get_atom(&self, id: &AtomId) -> Option<&Atom> {
         self.symbols.get_value(id)
     }
 
@@ -306,11 +325,15 @@ impl SymTable {
     }
 
     pub fn new_bool(&mut self, b: bool) -> AtomId {
-        self.symbols.new_node(b.into())
+        let id = self.symbols.new_node(b.into());
+        self.symbol_types.add_new_atom(id, AtomType::Boolean);
+        id
     }
 
     pub fn new_number(&mut self, n: LNumber) -> AtomId {
-        self.symbols.new_node(n.into())
+        let id = self.symbols.new_node(n.into());
+        self.symbol_types.add_new_atom(id, AtomType::Number);
+        id
     }
 
     //Declare a new return value
@@ -392,6 +415,7 @@ impl SymTable {
                     .get_mut(&symbol)
                     .unwrap() = n;
                 let id = self.symbols.new_node(Sym::Several(symbol, n).into());
+                self.symbol_types.add_new_atom(id, AtomType::Symbol);
                 vec_similar.push(id);
                 id
             } else {
@@ -422,8 +446,8 @@ impl SymTable {
 impl FormatWithSymTable for PartialChronicle {
     fn format_with_sym_table(&self, st: &SymTable) -> String {
         let get_sym = |id: &AtomId| {
-            st.get(id)
-                .expect("error in the definition of the symbol_table")
+            st.get_atom(&st.get_parent(id))
+                .expect("error in the definition of the symbol table")
         };
 
         let mut s = String::new();
@@ -482,27 +506,30 @@ impl FormatWithSymTable for PartialChronicle {
 
 impl FormatWithSymTable for Chronicle {
     fn format_with_sym_table(&self, st: &SymTable) -> String {
-        let get_sym = |id: &AtomId| {
-            st.get(id)
-                .expect("error in the definition of the symbol_table")
-        };
+        let get_atom = |id: &AtomId| st.get_atom(&st.get_parent(id)).expect("error in sym table");
 
         let mut s = String::new();
         //name
         s.push_str("-name: ");
         for e in &self.name {
-            s.push_str(get_sym(e).to_string().as_str());
+            s.push_str(get_atom(e).to_string().as_str());
             s.push(' ');
         }
         s.push('\n');
         //task
         s.push_str("-task: ");
         for e in &self.task {
-            s.push_str(get_sym(e).to_string().as_str());
+            s.push_str(get_atom(e).to_string().as_str());
             s.push(' ');
         }
         s.push('\n');
         s.push_str(self.partial_chronicle.format_with_sym_table(st).as_str());
+
+        //Debug
+        if let Some(exp) = &self.debug {
+            s.push_str(format!("debug: {}", exp.pretty_print("debug: ".len())).as_str());
+        }
+
         s
     }
 }
@@ -512,6 +539,13 @@ pub struct Chronicle {
     name: Vec<AtomId>,
     task: Vec<AtomId>,
     partial_chronicle: PartialChronicle,
+    debug: Option<LValue>,
+}
+
+impl Chronicle {
+    pub fn set_debug(&mut self, debug: Option<LValue>) {
+        self.debug = debug;
+    }
 }
 
 impl Chronicle {
@@ -580,6 +614,29 @@ impl Absorb for PartialChronicle {
 }
 
 impl PartialChronicle {
+    pub fn rm_var(&mut self, sym_id: &AtomId) {
+        self.variables.remove(sym_id);
+    }
+
+    pub fn rm_set_var(&mut self, ids: Vec<AtomId>) {
+        for id in ids {
+            self.rm_var(&id);
+        }
+    }
+
+    pub fn rm_constraint(&mut self, index: usize) {
+        self.constraints.remove(index);
+    }
+
+    pub fn rm_set_constraint(&mut self, mut indexes: Vec<usize>) {
+        indexes.reverse();
+        for index in indexes {
+            self.rm_constraint(index);
+        }
+    }
+}
+
+impl PartialChronicle {
     pub fn add_var(&mut self, sym_id: &AtomId) {
         self.variables.insert(*sym_id);
     }
@@ -607,6 +664,10 @@ impl PartialChronicle {
     pub fn get_constraints(&self) -> &Vec<Constraint> {
         &self.constraints
     }
+
+    pub fn get_variables(&self) -> &HashSet<AtomId> {
+        &self.variables
+    }
 }
 
 pub struct ExpressionChronicle {
@@ -615,6 +676,24 @@ pub struct ExpressionChronicle {
     partial_chronicle: PartialChronicle,
     value: Lit,
     debug: LValue,
+}
+
+impl ExpressionChronicle {
+    pub fn rm_var(&mut self, sym_id: &AtomId) {
+        self.partial_chronicle.rm_var(sym_id);
+    }
+
+    pub fn rm_set_var(&mut self, ids: Vec<AtomId>) {
+        self.partial_chronicle.rm_set_var(ids)
+    }
+
+    pub fn rm_constraint(&mut self, index: usize) {
+        self.partial_chronicle.rm_constraint(index);
+    }
+
+    pub fn rm_set_constraint(&mut self, indexes: Vec<usize>) {
+        self.partial_chronicle.rm_set_constraint(indexes)
+    }
 }
 
 impl ExpressionChronicle {
@@ -628,6 +707,10 @@ impl ExpressionChronicle {
 
     pub fn get_constraints(&self) -> &Vec<Constraint> {
         self.partial_chronicle.get_constraints()
+    }
+
+    pub fn get_variables(&self) -> &HashSet<AtomId> {
+        self.partial_chronicle.get_variables()
     }
 }
 
@@ -691,7 +774,7 @@ impl Absorb for ExpressionChronicle {
 impl FormatWithSymTable for ExpressionChronicle {
     fn format_with_sym_table(&self, st: &SymTable) -> String {
         let get_sym = |id: &AtomId| {
-            st.get(id)
+            st.get_atom(&st.get_parent(id))
                 .expect("error in the definition of the symbol_table")
         };
         let mut s = String::new();
@@ -751,9 +834,9 @@ impl FormatWithSymTable for TransitionInterval {
     fn format_with_sym_table(&self, st: &SymTable) -> String {
         format!(
             "[{},{},{}]",
-            st.get(&self.interval.start).unwrap(),
-            st.get(&self.interval.end).unwrap(),
-            st.get(&self.persistence).unwrap()
+            st.get_atom(&st.get_parent(&self.interval.start)).unwrap(),
+            st.get_atom(&st.get_parent(&self.interval.end)).unwrap(),
+            st.get_atom(&st.get_parent(&self.persistence)).unwrap()
         )
     }
 }
@@ -802,9 +885,6 @@ impl FormatWithSymTable for Effect {
 #[derive(Clone)]
 pub enum Lit {
     Atom(AtomId),
-    //Number(LNumber),
-    //Boolean(bool),
-    //LValue(LValue),
     Constraint(Box<Constraint>),
     Exp(Vec<Lit>),
 }
@@ -868,7 +948,11 @@ pub fn lvalue_to_lit(lv: &LValue, st: &mut SymTable) -> Result<Lit, LError> {
 impl FormatWithSymTable for Lit {
     fn format_with_sym_table(&self, st: &SymTable) -> String {
         match self {
-            Lit::Atom(a) => st.symbols.get_value(a).unwrap().to_string(),
+            Lit::Atom(a) => st
+                .symbols
+                .get_value(&st.symbols.get_parent(a))
+                .unwrap()
+                .to_string(),
             Lit::Constraint(c) => c.format_with_sym_table(st),
             Lit::Exp(vec) => {
                 let mut str = "(".to_string();
@@ -1025,6 +1109,8 @@ impl FormatWithSymTable for Domain {
         for method in &self.methods {
             str.push_str(format!("{}\n", method.format_with_sym_table(st)).as_str());
         }
+
+        str.push_str(format!("FOREST:\n{} \n", st.symbols).as_str());
 
         str
     }

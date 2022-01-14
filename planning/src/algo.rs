@@ -35,19 +35,80 @@ pub fn pre_processing(lv: &LValue, context: &Context) -> LResult {
     Ok(lv)
 }
 
-pub fn unify_equal(ec: &mut ExpressionChronicle, sym_table: &mut SymTable, context: &Context) {
-    for constraint in ec.get_constraints() {
+pub fn unify_equal(ec: &mut ExpressionChronicle, sym_table: &mut SymTable, _context: &Context) {
+    let mut vec_constraint_to_rm = vec![];
+
+    for (index, constraint) in ec.get_constraints().iter().enumerate() {
         if let Constraint::Eq(a, b) = constraint {
             if let (Lit::Atom(id_1), Lit::Atom(id_2)) = (a, b) {
                 let type_1 = sym_table.get_type(id_1).expect("id should be defined");
                 let type_2 = sym_table.get_type(id_2).expect("id should be defined");
+                match (type_1, type_2) {
+                    (
+                        AtomType::Boolean | AtomType::Number,
+                        AtomType::Boolean | AtomType::Number,
+                    ) => {
+                        assert_eq!(
+                            sym_table.get_atom(id_1).unwrap(),
+                            sym_table.get_atom(id_2).unwrap()
+                        );
+                    }
+                    (AtomType::Number, AtomType::Timepoint) => {
+                        sym_table.union_atom(id_1, id_2);
+                        vec_constraint_to_rm.push(index);
+                    }
+                    (AtomType::Timepoint, AtomType::Number) => {
+                        sym_table.union_atom(id_2, id_1);
+                        vec_constraint_to_rm.push(index);
+                    }
+                    (AtomType::Boolean | AtomType::Number, _) => {
+                        sym_table.union_atom(id_1, id_2);
+                        vec_constraint_to_rm.push(index);
+                    }
+                    (_, AtomType::Boolean | AtomType::Number) => {
+                        sym_table.union_atom(id_2, id_1);
+                        vec_constraint_to_rm.push(index);
+                    }
+                    (AtomType::Symbol, AtomType::Object | AtomType::Result) => {
+                        sym_table.union_atom(id_1, id_2);
+                        vec_constraint_to_rm.push(index);
+                    }
+                    (AtomType::Object | AtomType::Result, AtomType::Symbol) => {
+                        sym_table.union_atom(id_2, id_1);
+                        vec_constraint_to_rm.push(index);
+                    }
+                    (AtomType::Result, AtomType::Result) => {
+                        sym_table.union_atom(id_1, id_2);
+                        vec_constraint_to_rm.push(index);
+                    }
+                    (AtomType::Timepoint, AtomType::Timepoint) => {
+                        sym_table.union_atom(id_1, id_2);
+                        vec_constraint_to_rm.push(index);
+                    }
+                    (_, _) => {}
+                }
             }
         }
     }
+
+    ec.rm_set_constraint(vec_constraint_to_rm)
+}
+
+pub fn rm_useless_var(ec: &mut ExpressionChronicle, sym_table: &mut SymTable, _context: &Context) {
+    let mut vec = vec![];
+
+    for var in ec.get_variables() {
+        if *var != sym_table.get_parent(var) {
+            vec.push(*var)
+        }
+    }
+
+    ec.rm_set_var(vec)
 }
 
 pub fn post_processing(ec: &mut ExpressionChronicle, sym_table: &mut SymTable, context: &Context) {
-    unify_equal(ec, sym_table, context)
+    unify_equal(ec, sym_table, context);
+    rm_useless_var(ec, sym_table, context);
 }
 
 pub fn translate_domain_env_to_hierarchy(context: Context) -> Result<(Domain, SymTable), LError> {
@@ -177,7 +238,11 @@ pub fn translate_lvalue_to_chronicle(
         }
         let body = pre_processing(&lambda.get_body(), context)?;
 
-        let ec = translate_lvalue_to_expression_chronicle(&body, context, symbol_table)?;
+        chronicle.set_debug(Some(body.clone()));
+
+        let mut ec = translate_lvalue_to_expression_chronicle(&body, context, symbol_table)?;
+
+        post_processing(&mut ec, symbol_table, context);
 
         chronicle.absorb_expression_chronicle(ec);
         Ok(chronicle)
@@ -238,12 +303,12 @@ pub fn translate_lvalue_to_expression_chronicle(
 
                         previous_interval = *ec_i.get_interval();
 
-                        if i == l.len() - 2 {
+                        /*if i == l.len() - 2 {
                             ec.add_constraint(Constraint::Eq(
                                 ec.get_result().into(),
                                 ec_i.get_result().into(),
                             ))
-                        }
+                        }*/
                         ec.absorb(ec_i);
                     }
 

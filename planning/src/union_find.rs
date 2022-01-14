@@ -109,10 +109,7 @@ impl<T: Display + Default + Clone> Forest<T> {
     }
 
     pub fn get_parent(&self, id: &NodeId) -> NodeId {
-        self.inner
-            .get(*id.index())
-            .expect("strong error")
-            .get_parent()
+        self.inner.get(*id.index()).unwrap().get_parent()
     }
 
     pub fn set_parent(&mut self, id: &NodeId, parent: NodeId) {

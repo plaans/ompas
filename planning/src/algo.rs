@@ -290,7 +290,7 @@ pub fn translate_lvalue_to_expression_chronicle(
                         .expect("begin is not defined in the symbol table")
                         .into()];
                     let mut previous_interval = *ec.get_interval();
-                    for (i, e) in l[1..].iter().enumerate() {
+                    for (_i, e) in l[1..].iter().enumerate() {
                         let mut ec_i =
                             translate_lvalue_to_expression_chronicle(e, context, symbol_table)?;
 

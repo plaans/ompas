@@ -69,7 +69,7 @@ pub const MACRO_GENERATE_ACTION: &str = "(defmacro generate-action
                                 ,(cons 'rae-exec-command
                                     (cons `(quote ,label) params))
                                 ,(cons `(get-action-model (quote ,label)) params))
-                            (print \"Action \" (quote ,label) params \"executed !\"))
+                            (print \"action \" (quote ,label) params \"executed !\"))
                         ,(cons `(get-action-model (quote ,label)) params)))))))";
 
 pub const MACRO_GENERATE_ACTION_MODEL: &str = "
@@ -81,11 +81,10 @@ pub const MACRO_GENERATE_ACTION_MODEL: &str = "
                (conds (cadr (get def 1)))
                (effs (cadr (get def 2))))
               `(list ,label (lambda ,params
-                    (begin
-                        (if ,(gtpc p_expr)
-                            (if ,conds
-                                ,effs))
-                        state))))))";
+                    (if ,(gtpc p_expr)
+                        (if ,conds
+                            ,effs))
+                    )))))";
 pub const MACRO_GENERATE_ACTION_OPERATIONAL_MODEL: &str =
     "(defmacro generate-action-operational-model
     (lambda (label def)
@@ -95,10 +94,9 @@ pub const MACRO_GENERATE_ACTION_OPERATIONAL_MODEL: &str =
                (params (car p_unzip)))
 
               `(list ,label (lambda ,params
-                    (begin
-                        (if ,(gtpc p_expr)
-                            ,body)
-                        state))))))";
+                    (if ,(gtpc p_expr)
+                        ,body)
+                    )))))";
 
 /// Macro used to generate code to define a method in REA environment.
 pub const MACRO_GENERATE_METHOD: &str = "(defmacro generate-method
@@ -387,16 +385,26 @@ mod test {
             inner: MACRO_GENERATE_ACTION,
             dependencies: vec![],
             expression: "(generate-action pick_package (?r robot) (?p package))",
-            expanded: "(list pick_package '((?r robot) (?p package))
-                           (lambda (?r ?p)
-                              (if (= rae-mode exec-mode)
-                                  (rae-exec-command (quote pick_package) ?r ?p)
-                                  ((get-action-model (quote pick_package)) ?r ?p))))",
-            result: "(list pick_package '((?r robot) (?p package))
-                           (lambda (?r ?p)
-                              (if (= rae-mode exec-mode)
-                                  (rae-exec-command (quote pick_package) ?r ?p)
-                                  ((get-action-model (quote pick_package)) ?r ?p))))",
+            expanded: "(list pick_package
+                            '((?r robot) (?p package))
+                            (lambda (?r ?p)
+                                (if (= rae-mode exec-mode) 
+                                    (begin 
+                                        (if (rae-platform?)
+                                            (rae-exec-command (quote pick_package) ?r ?p)
+                                            ((get-action-model (quote pick_package)) ?r ?p))
+                                        (print \"action \" (quote pick_package) params \"executed !\"))
+                                    ((get-action-model (quote pick_package)) ?r ?p))))",
+            result: "(list pick_package
+                        '((?r robot) (?p package))
+                        (lambda (?r ?p)
+                            (if (= rae-mode exec-mode) 
+                                (begin 
+                                    (if (rae-platform?)
+                                        (rae-exec-command (quote pick_package) ?r ?p)
+                                        ((get-action-model (quote pick_package)) ?r ?p))
+                                    (print \"action \" (quote pick_package) params \"executed !\"))
+                                ((get-action-model (quote pick_package)) ?r ?p))))",
         };
 
         let (mut env, mut ctxs) = init_env_and_ctxs().await;
@@ -415,18 +423,16 @@ mod test {
                         (assert (robot.busy ?r) true))))",
             expanded: "(list pick
                             (lambda (?r)
-                                (begin
-                                    (if (instance ?r robot)
+                                (if (instance ?r robot)
                                     (if (> (robot.battery ?r) 0.4)
                                         (assert (robot.busy ?r) true)))
-                                    state)))",
+                                    )))",
             result: "(list pick
                             (lambda (?r)
-                                (begin
-                                    (if (instance ?r robot)
+                                (if (instance ?r robot)
                                     (if (> (robot.battery ?r) 0.4)
                                         (assert (robot.busy ?r) true)))
-                                    state)))",
+                                    )))",
         };
 
         let (mut env, mut ctxs) = init_env_and_ctxs().await;
@@ -446,20 +452,18 @@ mod test {
                                 (failure)))))",
             expanded: "(list place
                             (lambda (?r)
-                                (begin
-                                    (if (instance ?r robot)
+                                (if (instance ?r robot)
                                     (if (> (robot.battery ?r) 0.4)
                                         (assert (robot.busy ?r) false)
                                         (failure)))
-                                    state)))",
+                                    ))",
             result: "(list place
                             (lambda (?r)
-                                (begin
-                                    (if (instance ?r robot)
+                                (if (instance ?r robot)
                                     (if (> (robot.battery ?r) 0.4)
                                         (assert (robot.busy ?r) false)
                                         (failure)))
-                                    state)))",
+                                    ))",
         };
 
         let (mut env, mut ctxs) = init_env_and_ctxs().await;

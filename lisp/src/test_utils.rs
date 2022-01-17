@@ -75,7 +75,7 @@ pub async fn test_expression_with_env(
     println!(
         "test_macro:\n\
         \t-expression: {}\n\
-        \t-extended: {}\n\
+        \t-expanded: {}\n\
         \t-expected: {}",
         test_expression.expression, expanded, expected
     );

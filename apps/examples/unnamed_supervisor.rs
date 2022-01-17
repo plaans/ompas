@@ -14,7 +14,7 @@ use ompas_godot_simulation_client::rae_interface::PlatformGodot;
 use ompas_lisp::core::ImportType::WithoutPrefix;
 use ompas_lisp::core::*;
 use ompas_lisp::modules::_type::CtxType;
-use ompas_lisp::modules::counter::CtxCounter;
+use ompas_lisp::modules::deprecated::counter::CtxCounter;
 use ompas_lisp::modules::doc::{CtxDoc, Documentation};
 use ompas_lisp::modules::io::CtxIo;
 use ompas_lisp::modules::math::CtxMath;

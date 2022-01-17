@@ -20,8 +20,6 @@ use tokio::sync::mpsc;
 pub mod mod_rae;
 pub mod mod_rae_description;
 pub mod mod_rae_monitor;
-pub(crate) mod mod_rae_sim;
-pub(crate) mod mod_rae_sim_interface;
 pub mod rae_exec;
 
 /// Initialize the libraries to load inside Scheme env.

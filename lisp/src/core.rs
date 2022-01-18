@@ -373,7 +373,7 @@ impl LEnv {
     }
 
     pub fn add_macro(&mut self, key: String, _macro: LLambda) {
-        self.macro_table.insert(key, _macro);
+        self.macro_table = self.macro_table.update(key, _macro)
     }
 
     pub fn get_macro(&self, key: &str) -> Option<&LLambda> {
@@ -1199,41 +1199,5 @@ pub async fn eval(
             }
             return Ok(lv);
         }
-    }
-}
-
-/// Expand a macro without evaluating it
-/// Used mainly for debug.
-#[allow(unused)]
-pub async fn macro_expand(
-    args: &[LValue],
-    env: &LEnv,
-    ctxs: &mut ContextCollection,
-) -> Result<LValue, LError> {
-    let env = &mut env.clone();
-    if args.len() < 2 {
-        return Err(WrongNumberOfArgument(
-            "eval",
-            args.into(),
-            args.len(),
-            2..std::usize::MAX,
-        ));
-    }
-    if let LValue::Symbol(sym) = &args[0] {
-        let _macro = env.get_macro(sym).cloned();
-        match _macro {
-            None => Err(SpecialError(
-                "eval",
-                format!("{} is not a defined macro", sym),
-            )),
-            Some(m) => expand(&m.call(&args[1..], env, ctxs).await?, true, env, ctxs).await,
-        }
-    } else {
-        Err(WrongType(
-            "eval",
-            args[0].clone(),
-            (&args[0]).into(),
-            NameTypeLValue::Symbol,
-        ))
     }
 }

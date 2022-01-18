@@ -20,7 +20,8 @@ pub enum Atom {
 impl Display for Atom {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Atom::Bool(b) => write!(f, "{}", b),
+            Atom::Bool(true) => write!(f, "true"),
+            Atom::Bool(false) => write!(f, "nil"),
             Atom::Number(n) => write!(f, "{}", n),
             Atom::Sym(s) => write!(f, "{}", s),
         }
@@ -121,6 +122,14 @@ pub trait FormatWithSymTable {
     fn format_with_sym_table(&self, st: &SymTable) -> String;
 }
 
+pub enum ExpressionType {
+    Pure,
+    Lisp,
+    Action,
+    Task,
+    StateFunction,
+}
+
 #[derive(Clone, Copy, PartialOrd, PartialEq, Eq, Ord, Hash)]
 pub enum AtomType {
     Number,
@@ -134,14 +143,6 @@ pub enum AtomType {
     Method,
     Task,
     Function,
-}
-
-pub enum ExpressionType {
-    Pure,
-    Lisp,
-    Action,
-    Task,
-    StateFunction,
 }
 
 impl Display for AtomType {
@@ -228,6 +229,12 @@ pub struct SymTable {
     symbol_types: SymbolTypes,
     multiple_def: HashMap<String, Vec<AtomId>>,
     pointer_to_ver: Vec<HashMap<String, usize>>,
+}
+
+impl SymTable {
+    pub fn get_sym(&self, id: &AtomId) -> &Atom {
+        self.get_atom(&self.get_parent(id)).unwrap()
+    }
 }
 
 //Forest methods
@@ -443,83 +450,28 @@ impl SymTable {
     }
 }
 
-impl FormatWithSymTable for PartialChronicle {
-    fn format_with_sym_table(&self, st: &SymTable) -> String {
-        let get_sym = |id: &AtomId| {
-            st.get_atom(&st.get_parent(id))
-                .expect("error in the definition of the symbol table")
-        };
-
-        let mut s = String::new();
-        s.push_str("-variable(s): {");
-
-        let mut variables = self
-            .variables
-            .iter()
-            .map(|id| get_sym(id).to_string())
-            .collect::<Vec<String>>();
-        variables.sort();
-
-        for (i, sym) in variables.iter().enumerate() {
-            if i != 0 {
-                s.push(',');
-            }
-            s.push_str(sym);
-        }
-        s.push_str("}\n");
-
-        s.push_str("-constraint(s): {\n");
-        for c in &self.constraints {
-            s.push('\t');
-            s.push_str(c.format_with_sym_table(st).as_str());
-            s.push('\n');
-        }
-        s.push_str("}\n");
-
-        //conditions
-        s.push_str("-conditon(s): {\n");
-        for e in &self.conditions {
-            s.push('\t');
-            s.push_str(e.format_with_sym_table(st).as_str());
-            s.push('\n');
-        }
-        s.push_str("}\n");
-        //effects
-        s.push_str("-effect(s): {\n");
-        for e in &self.effects {
-            s.push('\t');
-            s.push_str(e.format_with_sym_table(st).as_str());
-            s.push('\n');
-        }
-        s.push_str("}\n");
-        //substasks
-        s.push_str("-subtask(s): {\n");
-        for e in &self.subtasks {
-            s.push('\t');
-            s.push_str(e.format_with_sym_table(st).as_str());
-            s.push('\n');
-        }
-        s.push_str("}\n");
-        s
-    }
+#[derive(Clone, Default)]
+pub struct Chronicle {
+    name: Vec<AtomId>,
+    task: Vec<AtomId>,
+    partial_chronicle: PartialChronicle,
+    debug: Option<LValue>,
 }
 
 impl FormatWithSymTable for Chronicle {
     fn format_with_sym_table(&self, st: &SymTable) -> String {
-        let get_atom = |id: &AtomId| st.get_atom(&st.get_parent(id)).expect("error in sym table");
-
         let mut s = String::new();
         //name
         s.push_str("-name: ");
         for e in &self.name {
-            s.push_str(get_atom(e).to_string().as_str());
+            s.push_str(st.get_sym(e).to_string().as_str());
             s.push(' ');
         }
         s.push('\n');
         //task
         s.push_str("-task: ");
         for e in &self.task {
-            s.push_str(get_atom(e).to_string().as_str());
+            s.push_str(st.get_sym(e).to_string().as_str());
             s.push(' ');
         }
         s.push('\n');
@@ -527,19 +479,12 @@ impl FormatWithSymTable for Chronicle {
 
         //Debug
         if let Some(exp) = &self.debug {
-            s.push_str(format!("debug: {}", exp.pretty_print("debug: ".len())).as_str());
+            //s.push_str(format!("debug: {}", exp.pretty_print("debug: ".len())).as_str());
+            s.push_str(format!("debug: {:?}", exp).as_str());
         }
 
         s
     }
-}
-
-#[derive(Clone, Default)]
-pub struct Chronicle {
-    name: Vec<AtomId>,
-    task: Vec<AtomId>,
-    partial_chronicle: PartialChronicle,
-    debug: Option<LValue>,
 }
 
 impl Chronicle {
@@ -601,6 +546,62 @@ pub struct PartialChronicle {
     conditions: Vec<Condition>,
     effects: Vec<Effect>,
     subtasks: Vec<Expression>,
+}
+
+impl FormatWithSymTable for PartialChronicle {
+    fn format_with_sym_table(&self, st: &SymTable) -> String {
+        let mut s = String::new();
+        s.push_str("-variable(s): {");
+
+        let mut variables = self
+            .variables
+            .iter()
+            .map(|id| st.get_sym(id).to_string())
+            .collect::<Vec<String>>();
+        variables.sort();
+
+        for (i, sym) in variables.iter().enumerate() {
+            if i != 0 {
+                s.push(',');
+            }
+            s.push_str(sym);
+        }
+        s.push_str("}\n");
+
+        s.push_str("-constraint(s): {\n");
+        for c in &self.constraints {
+            s.push('\t');
+            s.push_str(c.format_with_sym_table(st).as_str());
+            s.push('\n');
+        }
+        s.push_str("}\n");
+
+        //conditions
+        s.push_str("-conditon(s): {\n");
+        for e in &self.conditions {
+            s.push('\t');
+            s.push_str(e.format_with_sym_table(st).as_str());
+            s.push('\n');
+        }
+        s.push_str("}\n");
+        //effects
+        s.push_str("-effect(s): {\n");
+        for e in &self.effects {
+            s.push('\t');
+            s.push_str(e.format_with_sym_table(st).as_str());
+            s.push('\n');
+        }
+        s.push_str("}\n");
+        //substasks
+        s.push_str("-subtask(s): {\n");
+        for e in &self.subtasks {
+            s.push('\t');
+            s.push_str(e.format_with_sym_table(st).as_str());
+            s.push('\n');
+        }
+        s.push_str("}\n");
+        s
+    }
 }
 
 impl Absorb for PartialChronicle {
@@ -765,6 +766,14 @@ impl ExpressionChronicle {
 
 impl Absorb for ExpressionChronicle {
     fn absorb(&mut self, other: Self) {
+        /*self.add_constraint(Constraint::LT(
+            self.get_interval().start.into(),
+            other.get_interval().start.into(),
+        ));
+        self.add_constraint(Constraint::LT(
+            other.get_interval().end.into(),
+            self.get_interval().end.into(),
+        ));*/
         self.partial_chronicle.absorb(other.partial_chronicle);
         self.add_interval(&other.interval);
         self.add_var(&other.result);
@@ -773,17 +782,13 @@ impl Absorb for ExpressionChronicle {
 
 impl FormatWithSymTable for ExpressionChronicle {
     fn format_with_sym_table(&self, st: &SymTable) -> String {
-        let get_sym = |id: &AtomId| {
-            st.get_atom(&st.get_parent(id))
-                .expect("error in the definition of the symbol_table")
-        };
         let mut s = String::new();
 
         s.push_str(
             format!(
                 "{} {} <- {}\n",
                 self.interval.format_with_sym_table(st),
-                get_sym(&self.result),
+                st.get_sym(&self.result),
                 self.debug
             )
             .as_str(),
@@ -815,7 +820,7 @@ impl FormatWithSymTable for Condition {
     }
 }
 
-#[derive(Clone)]
+/*#[derive(Clone)]
 pub struct TransitionInterval {
     interval: Interval,
     persistence: AtomId,
@@ -839,7 +844,7 @@ impl FormatWithSymTable for TransitionInterval {
             st.get_atom(&st.get_parent(&self.persistence)).unwrap()
         )
     }
-}
+}*/
 
 #[derive(Clone)]
 pub struct Transition {
@@ -948,11 +953,7 @@ pub fn lvalue_to_lit(lv: &LValue, st: &mut SymTable) -> Result<Lit, LError> {
 impl FormatWithSymTable for Lit {
     fn format_with_sym_table(&self, st: &SymTable) -> String {
         match self {
-            Lit::Atom(a) => st
-                .symbols
-                .get_value(&st.symbols.get_parent(a))
-                .unwrap()
-                .to_string(),
+            Lit::Atom(a) => st.get_sym(a).to_string(),
             Lit::Constraint(c) => c.format_with_sym_table(st),
             Lit::Exp(vec) => {
                 let mut str = "(".to_string();
@@ -1049,11 +1050,7 @@ impl Interval {
 
 impl FormatWithSymTable for Interval {
     fn format_with_sym_table(&self, st: &SymTable) -> String {
-        format!(
-            "[{},{}]",
-            st.symbols.get_value(&self.start).unwrap(),
-            st.symbols.get_value(&self.end).unwrap()
-        )
+        format!("[{},{}]", st.get_sym(&self.start), st.get_sym(&self.end),)
     }
 }
 
@@ -1110,7 +1107,7 @@ impl FormatWithSymTable for Domain {
             str.push_str(format!("{}\n", method.format_with_sym_table(st)).as_str());
         }
 
-        str.push_str(format!("FOREST:\n{} \n", st.symbols).as_str());
+        //str.push_str(format!("FOREST:\n{} \n", st.symbols).as_str());
 
         str
     }

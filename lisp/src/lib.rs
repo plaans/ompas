@@ -7,6 +7,7 @@ pub mod language;
 pub mod lisp_interpreter;
 pub mod modules;
 pub mod repl;
+pub mod static_eval;
 pub mod structs;
 pub mod test_utils;
 

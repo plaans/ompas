@@ -134,7 +134,7 @@ pub fn expand_static(
                         //eprintln!("expand: define: Ok!");
                         if list.len() < 3 {
                             return Err(WrongNumberOfArgument(
-                                "expand",
+                                EXPAND_STATIC,
                                 x.clone(),
                                 list.len(),
                                 3..std::usize::MAX,
@@ -163,7 +163,7 @@ pub fn expand_static(
                             LValue::Symbol(sym) => {
                                 if list.len() != 3 {
                                     return Err(WrongNumberOfArgument(
-                                        "expand",
+                                        EXPAND_STATIC,
                                         x.clone(),
                                         list.len(),
                                         3..3,
@@ -177,7 +177,7 @@ pub fn expand_static(
                                 if def == LCoreOperator::DefMacro {
                                     if !top_level {
                                         return Err(SpecialError(
-                                            "expand",
+                                            EXPAND_STATIC,
                                             format!("{}: defmacro only allowed at top level", x),
                                         ));
                                     }
@@ -186,7 +186,7 @@ pub fn expand_static(
                                     //println!("new macro: {}", proc);
                                     if !matches!(proc.lvalue, LValue::Lambda(_)) {
                                         return Err(SpecialError(
-                                            "expand",
+                                            EXPAND_STATIC,
                                             format!("{}: macro must be a procedure", proc),
                                         ));
                                     } else {
@@ -524,7 +524,7 @@ pub fn eval_static(
                 println!("{} => {}", str, result)
             }
 
-            return Ok(PLValue::into_pure(&lv));
+            return Ok(PLValue::into_pure(&result));
         } else if let LValue::List(list) = &lv {
             //println!("expression is a list");
             let list = list.as_slice();
@@ -703,7 +703,7 @@ pub fn eval_static(
 
                 for x in list {
                     let result = eval_static(x, env, ctxs, pfc)?;
-                    all_pure = result.is_pure();
+                    all_pure &= result.is_pure();
                     exps.push(result);
                 }
 

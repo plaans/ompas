@@ -51,7 +51,9 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     let ctx_utils = CtxUtils::default();
     let ctx_string = CtxString::default();
 
-    let ctx_eval_static = CtxStaticEval::new().await;
+    let ctx_eval_static = CtxStaticEval::new()
+        .await
+        .expect("error creating eval static environment");
 
     //Insert the doc for the different contexts.
     ctx_doc.insert_doc(CtxIo::documentation());

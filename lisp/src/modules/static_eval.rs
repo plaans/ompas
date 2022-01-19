@@ -4,10 +4,9 @@ use crate::modules::doc::{Documentation, LHelp};
 use crate::modules::error::CtxError;
 use crate::modules::math::CtxMath;
 use crate::modules::utils::CtxUtils;
-use crate::static_eval::{eval_static, PLValue, PureFonction, PureFonctionCollection};
+use crate::static_eval::{eval_static, expand_static, PureFonction, PureFonctionCollection};
 use crate::structs::LError::WrongNumberOfArgument;
 use crate::structs::{GetModule, LError, LResult, LValue, Module};
-use ompas_utils::blocking_async;
 use std::sync::Arc;
 
 /*
@@ -26,7 +25,7 @@ pub struct CtxStaticEval {
 ///Import basic scheme modules.
 /// Other modules can be imported via 'import' and 'import_namespace' functions
 impl CtxStaticEval {
-    pub async fn new() -> Self {
+    pub async fn new() -> Result<Self, LError> {
         let mut env = LEnv::default();
         let mut ctxs = ContextCollection::default();
         let mut pfc = PureFonctionCollection::default();
@@ -44,11 +43,11 @@ impl CtxStaticEval {
         let ctx_error = CtxError::default();
         pfc.append(ctx_error.get_pure_fonctions_symbols());
 
-        import(&mut env, &mut ctxs, ctx_root, ImportType::WithoutPrefix).await;
-        import(&mut env, &mut ctxs, ctx_math, ImportType::WithoutPrefix).await;
-        import(&mut env, &mut ctxs, ctx_utils, ImportType::WithoutPrefix).await;
-        import(&mut env, &mut ctxs, ctx_error, ImportType::WithoutPrefix).await;
-        Self { env, ctxs, pfc }
+        import(&mut env, &mut ctxs, ctx_root, ImportType::WithoutPrefix).await?;
+        import(&mut env, &mut ctxs, ctx_math, ImportType::WithoutPrefix).await?;
+        import(&mut env, &mut ctxs, ctx_utils, ImportType::WithoutPrefix).await?;
+        import(&mut env, &mut ctxs, ctx_error, ImportType::WithoutPrefix).await?;
+        Ok(Self { env, ctxs, pfc })
     }
 }
 
@@ -98,12 +97,14 @@ pub fn scheme_eval_static(args: &[LValue], _: &LEnv, ctx: &CtxStaticEval) -> LRe
         ));
     }
 
-    let result = eval_static(
-        &args.into(),
-        &mut ctx.env.clone(),
-        &mut ctx.ctxs.clone(),
-        &ctx.pfc,
-    )?;
+    let mut env = ctx.env.clone();
+    let mut ctxs = ctx.ctxs.clone();
+
+    let result = expand_static(&args[0], true, &mut env, &mut ctxs, &ctx.pfc)?;
+
+    let result = eval_static(result.get_lvalue(), &mut env, &mut ctxs, &ctx.pfc)?;
+
+    println!("static evaluation returned: {}", result.get_lvalue());
 
     Ok(result.get_lvalue().clone())
 }

@@ -11,6 +11,7 @@ use ompas_lisp::modules::doc::{CtxDoc, Documentation};
 use ompas_lisp::modules::error::CtxError;
 use ompas_lisp::modules::io::CtxIo;
 use ompas_lisp::modules::math::CtxMath;
+use ompas_lisp::modules::static_eval::CtxStaticEval;
 use ompas_lisp::modules::string::CtxString;
 use ompas_lisp::modules::utils::CtxUtils;
 
@@ -50,6 +51,8 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     let ctx_utils = CtxUtils::default();
     let ctx_string = CtxString::default();
 
+    let ctx_eval_static = CtxStaticEval::new().await;
+
     //Insert the doc for the different contexts.
     ctx_doc.insert_doc(CtxIo::documentation());
     ctx_doc.insert_doc(CtxMath::documentation());
@@ -87,6 +90,10 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     li.import_namespace(CtxRaeDescription::default())
         .await
         .expect("error loading rae description");
+
+    li.import_namespace(ctx_eval_static)
+        .await
+        .expect("error loading context eval_static");
 
     li.set_config(LispInterpreterConfig::new(true));
 

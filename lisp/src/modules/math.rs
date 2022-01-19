@@ -1,5 +1,6 @@
 use crate::core::LEnv;
 use crate::modules::doc::{Documentation, LHelp};
+use crate::static_eval::{PureFonction, PureFonctionCollection};
 use crate::structs::LError::{WrongNumberOfArgument, WrongType};
 use crate::structs::{GetModule, LError, LNumber, LValue, Module, NameTypeLValue};
 use rand::Rng;
@@ -96,6 +97,12 @@ impl Documentation for CtxMath {
             ),
             LHelp::new(ABS, DOC_ABS),
         ]
+    }
+}
+
+impl PureFonction for CtxMath {
+    fn get_pure_fonctions_symbols(&self) -> PureFonctionCollection {
+        vec![SIN, COS, SQRT, POW, SQUARE, ABS].into()
     }
 }
 

@@ -1,5 +1,6 @@
 use crate::core::LEnv;
 use crate::modules::doc::{Documentation, LHelp};
+use crate::static_eval::{PureFonction, PureFonctionCollection};
 use crate::structs::LError::{WrongNumberOfArgument, WrongType};
 use crate::structs::{GetModule, LError, LValue, Module, NameTypeLValue};
 use std::sync::Arc;
@@ -56,6 +57,12 @@ impl Documentation for CtxError {
             LHelp::new(IS_ERR, DOC_IS_ERR),
             LHelp::new_verbose(MOD_ERROR, DOC_MOD_ERROR, DOC_MOD_ERROR_VERBOSE),
         ]
+    }
+}
+
+impl PureFonction for CtxError {
+    fn get_pure_fonctions_symbols(&self) -> PureFonctionCollection {
+        vec![OK, ERR, IS_OK, IS_ERR].into()
     }
 }
 

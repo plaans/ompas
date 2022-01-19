@@ -16,6 +16,7 @@
 
 use crate::core::LEnv;
 use crate::modules::doc::{Documentation, LHelp};
+use crate::static_eval::{PureFonction, PureFonctionCollection};
 use crate::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
 use crate::structs::LValue::Nil;
 use crate::structs::{GetModule, LCoreOperator, LError, LValue, Module, NameTypeLValue};
@@ -272,6 +273,20 @@ impl GetModule for CtxUtils {
         module.add_fn_prelude(QUOTE_LIST, quote_list);
 
         module
+    }
+}
+
+impl PureFonction for CtxUtils {
+    fn get_pure_fonctions_symbols(&self) -> PureFonctionCollection {
+        vec![
+            RAND_ELEMENT,
+            ENUMERATE,
+            CONTAINS,
+            SUB_LIST,
+            TRANSFORM_IN_SINGLETON_LIST,
+            QUOTE_LIST,
+        ]
+        .into()
     }
 }
 

@@ -2,11 +2,8 @@ pub const MOD_ROOT: &str = "mod-root";
 
 pub mod scheme_primitives {
 
-    pub fn get_scheme_primitives() -> Vec<&'static str> {
+    pub fn get_pure_primitives() -> Vec<&'static str> {
         vec![
-            TRUE,
-            FALSE,
-            NIL,
             FIRST,
             SECOND,
             THIRD,
@@ -31,22 +28,6 @@ pub mod scheme_primitives {
             REMOVE_KEY_VALUE_MAP,
             UNION_MAP,
             MAP,
-            DEFINE,
-            DEF_MACRO,
-            LAMBDA,
-            IF,
-            QUOTE,
-            QUASI_QUOTE,
-            UNQUOTE,
-            "'", //quote char
-            ",", //quasi quote char
-            "`", //unquote char
-            BEGIN,
-            ASYNC,
-            AWAIT,
-            EVAL,
-            PARSE,
-            EXPAND,
             NOT,
             ADD,
             SUB,
@@ -73,6 +54,30 @@ pub mod scheme_primitives {
             IS_EQUAL,
             IS_NIL,
         ]
+    }
+
+    pub fn get_scheme_primitives() -> Vec<&'static str> {
+        let mut vec = get_pure_primitives();
+        vec.append(&mut vec![
+            DEFINE,
+            DEF_MACRO,
+            LAMBDA,
+            IF,
+            QUOTE,
+            QUASI_QUOTE,
+            UNQUOTE,
+            "'", //quote char
+            ",", //quasi quote char
+            "`", //unquote char
+            BEGIN,
+            ASYNC,
+            AWAIT,
+            EVAL,
+            PARSE,
+            EXPAND,
+        ]);
+
+        vec
     }
     /*
     LIST FUNCTIONS

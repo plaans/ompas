@@ -2,6 +2,7 @@
 use crate::functions::*;
 use crate::language::scheme_primitives::*;
 use crate::language::*;
+use crate::static_eval::{PureFonction, PureFonctionCollection};
 use crate::structs::LCoreOperator::Quote;
 use crate::structs::LError::*;
 use crate::structs::NameTypeLValue::{List, Symbol};
@@ -200,7 +201,13 @@ impl Default for LEnv {
     }
 }
 #[derive(Default)]
-struct CtxRoot(());
+pub struct CtxRoot(());
+
+impl PureFonction for CtxRoot {
+    fn get_pure_fonctions_symbols(&self) -> PureFonctionCollection {
+        get_pure_primitives().into()
+    }
+}
 
 impl GetModule for CtxRoot {
     /// Returns all basic functions, macros, and lambdas

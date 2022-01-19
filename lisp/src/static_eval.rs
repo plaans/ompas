@@ -19,6 +19,18 @@ pub struct PLValue {
 }
 
 impl PLValue {
+    pub fn is_pure(&self) -> bool {
+        self.pure
+    }
+}
+
+impl PLValue {
+    pub fn get_lvalue(&self) -> &LValue {
+        &self.lvalue
+    }
+}
+
+impl PLValue {
     pub fn into_pure(lv: &LValue) -> PLValue {
         PLValue {
             lvalue: lv.clone(),
@@ -49,19 +61,6 @@ impl Display for PLValue {
     }
 }
 
-impl PLValue {
-    pub fn is_pure(&self) -> bool {
-        self.pure
-    }
-}
-
-impl PLValue {
-    pub fn unpure(mut self) -> Self {
-        self.pure = false;
-        self
-    }
-}
-
 impl From<&PLValue> for LValue {
     fn from(pl: &PLValue) -> Self {
         pl.lvalue.clone()
@@ -89,8 +88,29 @@ impl From<LValue> for PLValue {
     }
 }*/
 
+#[derive(Default, Clone)]
 pub struct PureFonctionCollection {
     inner: HashSet<&'static str>,
+}
+
+impl From<Vec<&'static str>> for PureFonctionCollection {
+    fn from(vec: Vec<&'static str>) -> Self {
+        let mut set = HashSet::default();
+        for e in vec {
+            set.insert(e);
+        }
+        Self { inner: set }
+    }
+}
+
+impl PureFonctionCollection {
+    pub fn append(&mut self, other: Self) {
+        self.inner = self.inner.union(&other.inner).cloned().collect();
+    }
+}
+
+pub trait PureFonction {
+    fn get_pure_fonctions_symbols(&self) -> PureFonctionCollection;
 }
 
 impl PureFonctionCollection {

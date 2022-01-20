@@ -1,12 +1,16 @@
 //! Scheme module implementing symbol typing.
 //! Development in standby. Some features might not be completely working...
-use crate::core::LEnv;
-use crate::language::scheme_primitives::{BOOL, FLOAT, INT, OBJECT, SYMBOL, USIZE};
-use crate::modules::doc::{Documentation, LHelp};
-use crate::structs::LError::{
+use crate::core::language::*;
+use crate::core::structs::lenv::LEnv;
+use crate::core::structs::lerror::LError;
+use crate::core::structs::lerror::LError::{
     NotInListOfExpectedTypes, SpecialError, WrongNumberOfArgument, WrongType,
 };
-use crate::structs::{GetModule, LError, LNumber, LValue, Module, NameTypeLValue};
+use crate::core::structs::lnumber::LNumber;
+use crate::core::structs::lvalue::LValue;
+use crate::core::structs::module::{GetModule, Module};
+use crate::core::structs::typelvalue::TypeLValue;
+use crate::modules::doc::{Documentation, LHelp};
 use std::convert::TryInto;
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
@@ -77,7 +81,7 @@ impl LSymType {
             lst => Err(LError::ConversionError(
                 "as_state_function",
                 lst.into(),
-                NameTypeLValue::Other(STATE_FUNCTION.to_string()),
+                TypeLValue::Other(STATE_FUNCTION.to_string()),
             )),
         }
     }
@@ -155,7 +159,7 @@ impl From<LType> for String {
     }
 }
 
-impl From<LSymType> for NameTypeLValue {
+impl From<LSymType> for TypeLValue {
     fn from(lst: LSymType) -> Self {
         (&lst).into()
     }
@@ -173,12 +177,12 @@ impl From<LSymType> for LValue {
     }
 }
 
-impl From<&LSymType> for NameTypeLValue {
+impl From<&LSymType> for TypeLValue {
     fn from(lst: &LSymType) -> Self {
         match lst {
-            LSymType::StateFunction(_) => NameTypeLValue::Other("State Function".to_string()),
-            LSymType::Type(_) => NameTypeLValue::Other("TYPE".to_string()),
-            LSymType::Object(_) => NameTypeLValue::Other("Object".to_string()),
+            LSymType::StateFunction(_) => TypeLValue::Other("State Function".to_string()),
+            LSymType::Type(_) => TypeLValue::Other("TYPE".to_string()),
+            LSymType::Object(_) => TypeLValue::Other("Object".to_string()),
         }
     }
 }
@@ -363,7 +367,7 @@ pub fn is_type(args: &[LValue], _: &LEnv, ctx: &CtxType) -> Result<LValue, LErro
                 IS_TYPE,
                 lv.clone(),
                 lv.into(),
-                NameTypeLValue::Symbol,
+                TypeLValue::Symbol,
             )),
         },
         i => Err(WrongNumberOfArgument(IS_TYPE, args.into(), i, 1..1)),
@@ -384,7 +388,7 @@ pub fn is_object(args: &[LValue], _: &LEnv, ctx: &CtxType) -> Result<LValue, LEr
                 IS_OBJECT,
                 lv.clone(),
                 lv.into(),
-                NameTypeLValue::Symbol,
+                TypeLValue::Symbol,
             )),
         },
         i => Err(WrongNumberOfArgument(IS_OBJECT, args.into(), i, 1..1)),
@@ -405,7 +409,7 @@ pub fn is_state_function(args: &[LValue], _: &LEnv, ctx: &CtxType) -> Result<LVa
                 IS_STATE_FUNCTION,
                 lv.clone(),
                 lv.into(),
-                NameTypeLValue::Symbol,
+                TypeLValue::Symbol,
             )),
         },
         i => Err(WrongNumberOfArgument(
@@ -439,7 +443,7 @@ pub fn type_of(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> Result<LValue, L
                     TYPE_OF,
                     lv.clone(),
                     lv.into(),
-                    NameTypeLValue::Other("type_id(usize)".to_string()),
+                    TypeLValue::Other("type_id(usize)".to_string()),
                 )),
             }
         }
@@ -447,7 +451,7 @@ pub fn type_of(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> Result<LValue, L
             TYPE_OF,
             lv.clone(),
             lv.into(),
-            NameTypeLValue::Symbol,
+            TypeLValue::Symbol,
         )),
     }
 }
@@ -461,7 +465,7 @@ pub fn sub_type(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> Result<LValue, 
             1..1,
         ));
     }
-    let expected_type = NameTypeLValue::Other("TYPE".to_string());
+    let expected_type = TypeLValue::Other("TYPE".to_string());
     let parent_type: usize = match &args[0] {
         LValue::Symbol(s) => match ctx.get_type_from_sym(s) {
             None => {
@@ -480,7 +484,7 @@ pub fn sub_type(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> Result<LValue, 
                 SUB_TYPE,
                 lv.clone(),
                 lv.into(),
-                NameTypeLValue::Symbol,
+                TypeLValue::Symbol,
             ))
         }
     };
@@ -496,7 +500,7 @@ pub fn new_state_function(
 ) -> Result<LValue, LError> {
     let mut t_params: Vec<String> = Vec::new();
     let mut t_value: String = String::from(OBJECT);
-    let expected_type = NameTypeLValue::Other("TYPE".to_string());
+    let expected_type = TypeLValue::Other("TYPE".to_string());
     for (i, arg) in args.iter().enumerate() {
         match arg {
             LValue::Symbol(s) => {
@@ -573,7 +577,7 @@ pub fn new_object(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> Result<LValue
                 NEW_OBJECT,
                 lv.clone(),
                 lv.into(),
-                vec![NameTypeLValue::Symbol, NameTypeLValue::Usize],
+                vec![TypeLValue::Symbol, TypeLValue::Usize],
             ))
         }
     };
@@ -583,7 +587,7 @@ pub fn new_object(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> Result<LValue
             NEW_OBJECT,
             (&args[0]).clone(),
             (&args[0]).into(),
-            NameTypeLValue::Symbol,
+            TypeLValue::Symbol,
         )),
         Some(lst) => match lst {
             LSymType::Type(_) => {
@@ -594,7 +598,7 @@ pub fn new_object(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> Result<LValue
                 NEW_OBJECT,
                 lst.into(),
                 lst.into(),
-                NameTypeLValue::Other("type".to_string()),
+                TypeLValue::Other("type".to_string()),
             )),
         },
     }
@@ -621,7 +625,7 @@ pub fn get_type(args: &[LValue], _: &LEnv, ctx: &CtxType) -> Result<LValue, LErr
                 lst => lst.to_string(),
             },
         },
-        lv => NameTypeLValue::from(lv).to_string(),
+        lv => TypeLValue::from(lv).to_string(),
     };
 
     Ok(type_as_string.into())

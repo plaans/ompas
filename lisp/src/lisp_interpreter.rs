@@ -1,5 +1,8 @@
-use crate::core::{eval, parse, ContextCollection, ImportType, LEnv};
-use crate::structs::{GetModule, LError};
+use crate::core::structs::contextcollection::ContextCollection;
+use crate::core::structs::lenv::{import, ImportType, LEnv};
+use crate::core::structs::lerror::LError;
+use crate::core::structs::module::GetModule;
+use crate::core::{eval, parse};
 use crate::TOKIO_CHANNEL_SIZE;
 use chrono::{DateTime, Utc};
 use im::HashMap;
@@ -114,7 +117,7 @@ impl LispInterpreter {
 
 impl LispInterpreter {
     pub async fn import_namespace(&mut self, ctx: impl GetModule) -> Result<(), LError> {
-        crate::core::import(
+        import(
             &mut self.env,
             &mut self.ctxs,
             ctx,
@@ -124,7 +127,7 @@ impl LispInterpreter {
     }
 
     pub async fn import(&mut self, ctx: impl GetModule) -> Result<(), LError> {
-        crate::core::import(&mut self.env, &mut self.ctxs, ctx, ImportType::WithPrefix).await
+        import(&mut self.env, &mut self.ctxs, ctx, ImportType::WithPrefix).await
     }
 
     async fn recv(&mut self) -> Option<String> {

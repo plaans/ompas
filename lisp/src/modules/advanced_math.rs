@@ -1,8 +1,12 @@
-use crate::core::LEnv;
+use crate::core::structs::lenv::LEnv;
+use crate::core::structs::lerror::LError;
+use crate::core::structs::lerror::LError::{WrongNumberOfArgument, WrongType};
+use crate::core::structs::lnumber::LNumber;
+use crate::core::structs::lvalue::LValue;
+use crate::core::structs::module::{GetModule, Module};
+use crate::core::structs::typelvalue::TypeLValue;
 use crate::modules::doc::{Documentation, LHelp};
 use crate::static_eval::{PureFonction, PureFonctionCollection};
-use crate::structs::LError::{WrongNumberOfArgument, WrongType};
-use crate::structs::{GetModule, LError, LNumber, LValue, Module, NameTypeLValue};
 use rand::Rng;
 use std::sync::Arc;
 
@@ -118,12 +122,7 @@ pub fn sin(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
             let f: f64 = n.into();
             Ok(f.sin().into())
         }
-        lv => Err(WrongType(
-            SIN,
-            lv.clone(),
-            lv.into(),
-            NameTypeLValue::Number,
-        )),
+        lv => Err(WrongType(SIN, lv.clone(), lv.into(), TypeLValue::Number)),
     }
 }
 
@@ -139,12 +138,7 @@ pub fn cos(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
             let f: f64 = n.into();
             Ok(f.cos().into())
         }
-        lv => Err(WrongType(
-            COS,
-            lv.clone(),
-            lv.into(),
-            NameTypeLValue::Number,
-        )),
+        lv => Err(WrongType(COS, lv.clone(), lv.into(), TypeLValue::Number)),
     }
 }
 
@@ -158,12 +152,7 @@ pub fn sqrt(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
             let f: f64 = n.into();
             Ok(f.sqrt().into())
         }
-        lv => Err(WrongType(
-            SQRT,
-            lv.clone(),
-            lv.into(),
-            NameTypeLValue::Number,
-        )),
+        lv => Err(WrongType(SQRT, lv.clone(), lv.into(), TypeLValue::Number)),
     }
 }
 
@@ -182,7 +171,7 @@ pub fn pow(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
                 POW,
                 args[1].clone(),
                 (&args[1]).into(),
-                NameTypeLValue::Number,
+                TypeLValue::Number,
             ))
         }
     } else {
@@ -190,7 +179,7 @@ pub fn pow(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
             POW,
             args[0].clone(),
             (&args[0]).into(),
-            NameTypeLValue::Number,
+            TypeLValue::Number,
         ))
     }
 }
@@ -205,12 +194,7 @@ pub fn square(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
             let f: f64 = n.into();
             Ok(f.powi(2).into())
         }
-        lv => Err(WrongType(
-            SQUARE,
-            lv.clone(),
-            lv.into(),
-            NameTypeLValue::Number,
-        )),
+        lv => Err(WrongType(SQUARE, lv.clone(), lv.into(), TypeLValue::Number)),
     }
 }
 
@@ -226,12 +210,7 @@ pub fn abs(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
             LNumber::Usize(u) => LNumber::Usize(*u),
         }
         .into()),
-        lv => Err(WrongType(
-            SQUARE,
-            lv.clone(),
-            lv.into(),
-            NameTypeLValue::Number,
-        )),
+        lv => Err(WrongType(SQUARE, lv.clone(), lv.into(), TypeLValue::Number)),
     }
 }
 
@@ -255,7 +234,7 @@ pub fn rand_int_in_range(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LE
                 RAND_INT_IN_RANGE,
                 args[1].clone(),
                 (&args[1]).into(),
-                NameTypeLValue::Number,
+                TypeLValue::Number,
             ))
         }
     } else {
@@ -263,7 +242,7 @@ pub fn rand_int_in_range(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LE
             RAND_INT_IN_RANGE,
             args[0].clone(),
             (&args[0]).into(),
-            NameTypeLValue::Number,
+            TypeLValue::Number,
         ))
     }
 }
@@ -288,7 +267,7 @@ pub fn rand_float_in_range(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, 
                 RAND_FLOAT_IN_RANGE,
                 args[1].clone(),
                 (&args[1]).into(),
-                NameTypeLValue::Number,
+                TypeLValue::Number,
             ))
         }
     } else {
@@ -296,7 +275,7 @@ pub fn rand_float_in_range(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, 
             RAND_FLOAT_IN_RANGE,
             args[0].clone(),
             (&args[0]).into(),
-            NameTypeLValue::Number,
+            TypeLValue::Number,
         ))
     }
 }

@@ -4,10 +4,11 @@ use crate::rae::module::rae_exec::{
 };
 use ::macro_rules_attribute::macro_rules_attribute;
 use log::{info, warn};
-use ompas_lisp::core::LEnv;
-use ompas_lisp::functions::get;
-use ompas_lisp::structs::LError::SpecialError;
-use ompas_lisp::structs::{LError, LResult, LValue};
+use ompas_lisp::core::structs::lenv::LEnv;
+use ompas_lisp::core::structs::lerror::LError;
+use ompas_lisp::core::structs::lerror::LError::SpecialError;
+use ompas_lisp::core::structs::lvalue::LValue;
+use ompas_lisp::core::structs::LResult;
 use ompas_utils::dyn_async;
 use std::convert::TryInto;
 

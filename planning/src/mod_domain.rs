@@ -8,16 +8,25 @@ use crate::structs::{Context, FormatWithSymTable, SymTable};
 use ::macro_rules_attribute::macro_rules_attribute;
 use ompas_acting::rae::context::rae_env::*;
 use ompas_acting::rae::context::rae_state::{LState, RAEState, StateType};
+use ompas_acting::rae::module::mod_rae::CtxRae;
 use ompas_acting::rae::module::mod_rae_description::*;
-use ompas_lisp::core::ImportType::WithoutPrefix;
-use ompas_lisp::core::{eval, expand, import, ContextCollection, LEnv};
-use ompas_lisp::functions::cons;
+use ompas_lisp::core::root_module::list::cons;
+use ompas_lisp::core::root_module::CtxRoot;
+use ompas_lisp::core::structs::contextcollection::ContextCollection;
+use ompas_lisp::core::structs::lenv::ImportType::WithoutPrefix;
+use ompas_lisp::core::structs::lenv::{import, LEnv};
+use ompas_lisp::core::structs::lerror::LError;
+use ompas_lisp::core::structs::lerror::LError::{WrongNumberOfArgument, WrongType};
+use ompas_lisp::core::structs::lvalue::LValue;
+use ompas_lisp::core::structs::lvalues::LValueS;
+use ompas_lisp::core::structs::module::{GetModule, Module};
+use ompas_lisp::core::structs::typelvalue::TypeLValue;
+use ompas_lisp::core::structs::LResult;
+use ompas_lisp::core::{eval, expand};
+use ompas_lisp::modules::advanced_math::CtxMath;
 use ompas_lisp::modules::doc::{Documentation, LHelp};
-use ompas_lisp::modules::math::CtxMath;
 use ompas_lisp::modules::utils::CtxUtils;
-use ompas_lisp::structs::LError::*;
-use ompas_lisp::structs::LValue::Nil;
-use ompas_lisp::structs::*;
+use ompas_lisp::static_eval::{PureFonction, PureFonctionCollection};
 use ompas_utils::dyn_async;
 use std::sync::Arc;
 
@@ -109,6 +118,7 @@ pub struct CtxDomain {
     pub domain: DomainEnv,
     pub env: LEnv,
     pub ctxs: ContextCollection,
+    pub pfc: PureFonctionCollection,
     pub state: RAEState,
 }
 
@@ -118,6 +128,7 @@ impl From<&CtxDomain> for Context {
             domain: ctx.domain.clone(),
             env: ctx.env.clone(),
             ctxs: ctx.ctxs.clone(),
+            pfc: ctx.pfc.clone(),
         }
     }
 }
@@ -131,24 +142,35 @@ impl From<CtxDomain> for Context {
 impl CtxDomain {
     pub async fn new() -> Self {
         let (mut env, mut ctxs) = LEnv::root().await;
+        let mut pfc = PureFonctionCollection::default();
 
+        pfc.append(CtxRoot::default().get_pure_fonctions_symbols());
+        let ctx_math = CtxMath::default();
+        let ctx_utils = CtxUtils::default();
+        let ctx_rae_description = CtxRaeDescription::default();
+        let ctx_rae = CtxRae::default();
+        let ctx_test = CtxTest::default();
+
+        pfc.append(ctx_math.get_pure_fonctions_symbols());
+        pfc.append(ctx_utils.get_pure_fonctions_symbols());
+        pfc.append(ctx_rae_description.get_pure_fonctions_symbols());
+        pfc.append(ctx_rae.get_pure_fonctions_symbols());
         //Math
-        import(&mut env, &mut ctxs, CtxUtils::default(), WithoutPrefix)
+        import(&mut env, &mut ctxs, ctx_utils, WithoutPrefix)
             .await
             .expect("error loading ctx utils");
-        import(&mut env, &mut ctxs, CtxMath::default(), WithoutPrefix)
+        import(&mut env, &mut ctxs, ctx_math, WithoutPrefix)
             .await
             .expect("error loading ctx math");
-        import(
-            &mut env,
-            &mut ctxs,
-            CtxRaeDescription::default(),
-            WithoutPrefix,
-        )
-        .await
-        .expect("error loading ctx rae description");
+        import(&mut env, &mut ctxs, ctx_rae_description, WithoutPrefix)
+            .await
+            .expect("error loading ctx rae description");
 
-        import(&mut env, &mut ctxs, CtxTest::default(), WithoutPrefix)
+        import(&mut env, &mut ctxs, ctx_rae, WithoutPrefix)
+            .await
+            .expect("error loading ctx rae description");
+
+        import(&mut env, &mut ctxs, ctx_test, WithoutPrefix)
             .await
             .expect("error loading ctx test");
 
@@ -156,6 +178,7 @@ impl CtxDomain {
             domain: Default::default(),
             env,
             ctxs,
+            pfc,
             state: Default::default(),
         }
     }
@@ -257,6 +280,7 @@ pub fn translate_domain(_: &[LValue], _env: &LEnv, ctx: &CtxDomain) -> Result<LV
         domain: ctx.domain.clone(),
         env: ctx.env.clone(),
         ctxs: ctx.ctxs.clone(),
+        pfc: ctx.pfc.clone(),
     })?;
 
     Ok(domain.format_with_sym_table(&st).into())
@@ -364,7 +388,7 @@ pub fn get_env(args: &[LValue], _env: &LEnv, ctx: &CtxDomain) -> Result<LValue, 
                     DOMAIN_GET_ENV,
                     args[0].clone(),
                     args[0].clone().into(),
-                    NameTypeLValue::Symbol,
+                    TypeLValue::Symbol,
                 ));
             }
         }
@@ -459,7 +483,7 @@ async fn def_state_function<'a>(
                         DOMAIN_DEF_STATE_FUNCTION,
                         list[2].clone(),
                         list[2].clone().into(),
-                        NameTypeLValue::Lambda,
+                        TypeLValue::Lambda,
                     ));
                 }
             } else {
@@ -467,7 +491,7 @@ async fn def_state_function<'a>(
                     DOMAIN_DEF_STATE_FUNCTION,
                     list[1].clone(),
                     list[2].clone().into(),
-                    NameTypeLValue::Symbol,
+                    TypeLValue::Symbol,
                 ));
             }
         } else {
@@ -475,12 +499,12 @@ async fn def_state_function<'a>(
                 DOMAIN_DEF_STATE_FUNCTION,
                 list[0].clone(),
                 list[0].clone().into(),
-                NameTypeLValue::Symbol,
+                TypeLValue::Symbol,
             ));
         }
     }
 
-    Ok(Nil)
+    Ok(LValue::Nil)
 }
 
 /// Defines an action in DOMAIN environment.
@@ -526,7 +550,7 @@ async fn def_action_model<'a>(
                     DOMAIN_DEF_ACTION_MODEL,
                     list[1].clone(),
                     list[1].clone().into(),
-                    NameTypeLValue::Lambda,
+                    TypeLValue::Lambda,
                 ));
             }
         } else {
@@ -534,12 +558,12 @@ async fn def_action_model<'a>(
                 DOMAIN_DEF_ACTION_MODEL,
                 list[0].clone(),
                 list[0].clone().into(),
-                NameTypeLValue::Symbol,
+                TypeLValue::Symbol,
             ));
         }
     }
 
-    Ok(Nil)
+    Ok(LValue::Nil)
 }
 
 /// Defines an action in DOMAIN environment.
@@ -589,7 +613,7 @@ async fn def_action_operational_model<'a>(
                     DOMAIN_DEF_ACTION_OPERATIONAL_MODEL,
                     list[1].clone(),
                     list[1].clone().into(),
-                    NameTypeLValue::Lambda,
+                    TypeLValue::Lambda,
                 ));
             }
         } else {
@@ -597,12 +621,12 @@ async fn def_action_operational_model<'a>(
                 DOMAIN_DEF_ACTION_OPERATIONAL_MODEL,
                 list[0].clone(),
                 list[0].clone().into(),
-                NameTypeLValue::Symbol,
+                TypeLValue::Symbol,
             ));
         }
     }
 
-    Ok(Nil)
+    Ok(LValue::Nil)
 }
 
 /// Defines an action in DOMAIN environment.
@@ -645,14 +669,14 @@ async fn def_action<'a>(
                 if let LValue::Lambda(_) = &list[2] {
                     ctx.domain.add_action(
                         action_label.to_string(),
-                        Action::new((&list[1]).try_into()?, list[2].clone(), Nil),
+                        Action::new((&list[1]).try_into()?, list[2].clone(), LValue::Nil),
                     );
                 } else {
                     return Err(WrongType(
                         DOMAIN_DEF_ACTION,
                         list[2].clone(),
                         list[2].clone().into(),
-                        NameTypeLValue::Lambda,
+                        TypeLValue::Lambda,
                     ));
                 }
             } else {
@@ -660,7 +684,7 @@ async fn def_action<'a>(
                     DOMAIN_DEF_ACTION,
                     list[1].clone(),
                     list[1].clone().into(),
-                    NameTypeLValue::List,
+                    TypeLValue::List,
                 ));
             }
         } else {
@@ -668,12 +692,12 @@ async fn def_action<'a>(
                 DOMAIN_DEF_ACTION,
                 list[0].clone(),
                 list[0].clone().into(),
-                NameTypeLValue::Symbol,
+                TypeLValue::Symbol,
             ));
         }
     }
 
-    Ok(Nil)
+    Ok(LValue::Nil)
 }
 
 #[macro_rules_attribute(dyn_async!)]
@@ -732,7 +756,7 @@ async fn def_method<'a>(
                                         DOMAIN_DEF_METHOD,
                                         list[5].clone(),
                                         list[5].clone().into(),
-                                        NameTypeLValue::Lambda,
+                                        TypeLValue::Lambda,
                                     ));
                                 }
                             } else {
@@ -740,7 +764,7 @@ async fn def_method<'a>(
                                     DOMAIN_DEF_METHOD,
                                     list[4].clone(),
                                     list[4].clone().into(),
-                                    NameTypeLValue::Lambda,
+                                    TypeLValue::Lambda,
                                 ));
                             }
                         } else {
@@ -748,7 +772,7 @@ async fn def_method<'a>(
                                 DOMAIN_DEF_METHOD,
                                 list[3].clone(),
                                 list[3].clone().into(),
-                                NameTypeLValue::Lambda,
+                                TypeLValue::Lambda,
                             ));
                         }
                     }
@@ -757,7 +781,7 @@ async fn def_method<'a>(
                             DOMAIN_DEF_METHOD,
                             list[2].clone(),
                             list[2].clone().into(),
-                            NameTypeLValue::List,
+                            TypeLValue::List,
                         ))
                     }
                 }
@@ -766,7 +790,7 @@ async fn def_method<'a>(
                     DOMAIN_DEF_METHOD,
                     list[1].clone(),
                     list[1].clone().into(),
-                    NameTypeLValue::Symbol,
+                    TypeLValue::Symbol,
                 ));
             }
         } else {
@@ -774,12 +798,12 @@ async fn def_method<'a>(
                 DOMAIN_DEF_METHOD,
                 list[0].clone(),
                 list[0].clone().into(),
-                NameTypeLValue::Symbol,
+                TypeLValue::Symbol,
             ));
         }
     }
 
-    Ok(Nil)
+    Ok(LValue::Nil)
 }
 
 #[macro_rules_attribute(dyn_async!)]
@@ -827,7 +851,7 @@ async fn def_task<'a>(
                     DOMAIN_DEF_TASK,
                     list[2].clone(),
                     list[2].clone().into(),
-                    NameTypeLValue::Lambda,
+                    TypeLValue::Lambda,
                 ));
             }
         } else {
@@ -835,7 +859,7 @@ async fn def_task<'a>(
                 DOMAIN_DEF_TASK,
                 list[0].clone(),
                 list[0].clone().into(),
-                NameTypeLValue::Symbol,
+                TypeLValue::Symbol,
             ));
         }
     } else {
@@ -843,11 +867,11 @@ async fn def_task<'a>(
             DOMAIN_DEF_TASK,
             lvalue.clone(),
             lvalue.into(),
-            NameTypeLValue::List,
+            TypeLValue::List,
         ));
     }
 
-    Ok(Nil)
+    Ok(LValue::Nil)
 }
 
 ///Takes in input a list of initial facts that will be stored in the inner world part of the State.
@@ -879,13 +903,13 @@ async fn def_initial_state<'a>(
         };
 
         ctx.state.update_state(state).await;
-        Ok(Nil)
+        Ok(LValue::Nil)
     } else {
         Err(WrongType(
             DOMAIN_DEF_INITIAL_STATE,
             args[0].clone(),
             (&args[0]).into(),
-            NameTypeLValue::Map,
+            TypeLValue::Map,
         ))
     }
 }

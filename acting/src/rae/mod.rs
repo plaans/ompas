@@ -14,13 +14,14 @@ use crate::rae::context::ressource_access::wait_on::task_check_wait_on;
 use crate::rae::module::rae_exec::platform::RAE_LAUNCH_PLATFORM;
 use crate::rae::module::rae_exec::{Job, JobId};
 use log::{error, info};
-use ompas_lisp::core::{eval, ContextCollection, LEnv};
-use ompas_lisp::functions::cons;
-use ompas_lisp::structs::{LError, LValue};
+use ompas_lisp::core::eval;
+use ompas_lisp::core::structs::contextcollection::ContextCollection;
+use ompas_lisp::core::structs::lenv::LEnv;
+use ompas_lisp::core::structs::lerror::LError;
+use ompas_lisp::core::structs::lvalue::LValue;
 use std::mem;
 
 pub mod context;
-pub mod internal_platform;
 pub mod module;
 mod rae_log;
 mod select_methods;

@@ -1,9 +1,10 @@
 use crate::rae::context::actions_progress::Status;
 use im::HashMap;
-use ompas_lisp::core::LEnv;
-use ompas_lisp::functions::cons;
-use ompas_lisp::structs::LError::SpecialError;
-use ompas_lisp::structs::{LError, LValue, LValueS};
+
+use ompas_lisp::core::structs::lerror::LError;
+use ompas_lisp::core::structs::lerror::LError::SpecialError;
+use ompas_lisp::core::structs::lvalue::LValue;
+use ompas_lisp::core::structs::lvalues::LValueS;
 use std::fmt::{Display, Formatter};
 use std::ops::{Deref, DerefMut};
 use std::ptr::write_bytes;

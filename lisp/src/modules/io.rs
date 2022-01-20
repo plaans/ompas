@@ -1,9 +1,12 @@
 //!
-use crate::core::LEnv;
+use crate::core::structs::lenv::LEnv;
+use crate::core::structs::lerror::LError;
+use crate::core::structs::lerror::LError::{SpecialError, WrongNumberOfArgument, WrongType};
+use crate::core::structs::lvalue::LValue;
+use crate::core::structs::module::{GetModule, Module};
+use crate::core::structs::typelvalue::TypeLValue;
 use crate::lisp_interpreter::ChannelToLispInterpreter;
 use crate::modules::doc::{Documentation, LHelp};
-use crate::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
-use crate::structs::{GetModule, LError, LValue, Module, NameTypeLValue};
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::PathBuf;
@@ -152,14 +155,7 @@ pub fn read(args: &[LValue], _: &LEnv, _: &CtxIo) -> Result<LValue, LError> {
     }
     let file_name = match &args[0] {
         LValue::Symbol(s) => s.to_string(),
-        lv => {
-            return Err(WrongType(
-                READ,
-                lv.clone(),
-                lv.into(),
-                NameTypeLValue::Symbol,
-            ))
-        }
+        lv => return Err(WrongType(READ, lv.clone(), lv.into(), TypeLValue::Symbol)),
     };
 
     let mut file = match File::open(&file_name) {
@@ -193,12 +189,7 @@ pub fn write(args: &[LValue], _: &LEnv, _: &CtxIo) -> Result<LValue, LError> {
             f.write_all(args[1].to_string().as_bytes())?;
             Ok(LValue::Nil)
         }
-        lv => Err(WrongType(
-            WRITE,
-            lv.clone(),
-            lv.into(),
-            NameTypeLValue::Symbol,
-        )),
+        lv => Err(WrongType(WRITE, lv.clone(), lv.into(), TypeLValue::Symbol)),
     }
 
     //println!("module Io: write");

@@ -1,5 +1,7 @@
-use crate::core::{eval, parse, ContextCollection, LEnv};
-use crate::structs::LError;
+use crate::core::structs::contextcollection::ContextCollection;
+use crate::core::structs::lenv::LEnv;
+use crate::core::structs::lerror::LError;
+use crate::core::{eval, parse};
 
 pub struct TestExpression {
     pub inner: &'static str,

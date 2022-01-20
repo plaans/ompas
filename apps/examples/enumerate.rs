@@ -1,6 +1,6 @@
 use aries_utils::enumerate;
 use aries_utils::StreamingIterator;
-use ompas_lisp::structs::LValue;
+use ompas_lisp::core::structs::lvalue::LValue;
 
 fn main() {
     println!("hello, world!");

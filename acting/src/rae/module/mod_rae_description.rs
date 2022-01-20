@@ -1,7 +1,12 @@
-use ompas_lisp::core::LEnv;
-use ompas_lisp::language::scheme_primitives::*;
-use ompas_lisp::structs::LError::{WrongNumberOfArgument, WrongType};
-use ompas_lisp::structs::{GetModule, LError, LValue, Module, NameTypeLValue};
+use ompas_lisp::core::language::*;
+use ompas_lisp::core::root_module::predicate::language::*;
+use ompas_lisp::core::structs::lenv::LEnv;
+use ompas_lisp::core::structs::lerror::LError;
+use ompas_lisp::core::structs::lerror::LError::{WrongNumberOfArgument, WrongType};
+use ompas_lisp::core::structs::lvalue::LValue;
+use ompas_lisp::core::structs::module::{GetModule, Module};
+use ompas_lisp::core::structs::typelvalue::TypeLValue;
+use ompas_lisp::static_eval::{PureFonction, PureFonctionCollection};
 use std::convert::TryInto;
 use std::sync::Arc;
 
@@ -195,6 +200,12 @@ impl GetModule for CtxRaeDescription {
     }
 }
 
+impl PureFonction for CtxRaeDescription {
+    fn get_pure_fonctions_symbols(&self) -> PureFonctionCollection {
+        vec![].into()
+    }
+}
+
 /// Takes as input a p_expr of the form ((p1 p1_type) ... (p_n pn_type))
 pub fn generate_type_test_expr(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     if args.len() != 1 {
@@ -228,7 +239,7 @@ pub fn generate_type_test_expr(args: &[LValue], _: &LEnv, _: &()) -> Result<LVal
                                 GENERATE_TYPE_TEST_EXPR,
                                 param[1].clone(),
                                 (&param[1]).into(),
-                                NameTypeLValue::Symbol,
+                                TypeLValue::Symbol,
                             ));
                         }
                     } else {
@@ -236,7 +247,7 @@ pub fn generate_type_test_expr(args: &[LValue], _: &LEnv, _: &()) -> Result<LVal
                             GENERATE_TYPE_TEST_EXPR,
                             param[0].clone(),
                             (&param[0]).into(),
-                            NameTypeLValue::Symbol,
+                            TypeLValue::Symbol,
                         ));
                     }
                 } else {
@@ -252,7 +263,7 @@ pub fn generate_type_test_expr(args: &[LValue], _: &LEnv, _: &()) -> Result<LVal
                     GENERATE_TYPE_TEST_EXPR,
                     param.clone(),
                     param.into(),
-                    NameTypeLValue::List,
+                    TypeLValue::List,
                 ));
             }
         }
@@ -266,7 +277,7 @@ pub fn generate_type_test_expr(args: &[LValue], _: &LEnv, _: &()) -> Result<LVal
             GENERATE_TYPE_TEST_EXPR,
             args[0].clone(),
             (&args[0]).into(),
-            NameTypeLValue::List,
+            TypeLValue::List,
         ))
     }
 }
@@ -275,12 +286,13 @@ pub fn generate_type_test_expr(args: &[LValue], _: &LEnv, _: &()) -> Result<LVal
 mod test {
     use crate::rae::module::mod_rae_description::*;
     use crate::rae::module::rae_exec::CtxRaeExec;
-    use ompas_lisp::core::ImportType::WithoutPrefix;
-    use ompas_lisp::core::{activate_debug, import, ContextCollection, LEnv};
+    use ompas_lisp::core::structs::contextcollection::ContextCollection;
+    use ompas_lisp::core::structs::lenv::ImportType::WithoutPrefix;
+    use ompas_lisp::core::structs::lenv::{import, LEnv};
+    use ompas_lisp::core::structs::lerror::LError;
+    use ompas_lisp::modules::advanced_math::CtxMath;
     use ompas_lisp::modules::io::CtxIo;
-    use ompas_lisp::modules::math::CtxMath;
     use ompas_lisp::modules::utils::CtxUtils;
-    use ompas_lisp::structs::LError;
     use ompas_lisp::test_utils::{test_expression, test_expression_with_env, TestExpression};
 
     async fn init_env_and_ctxs() -> (LEnv, ContextCollection) {

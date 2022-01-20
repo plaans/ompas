@@ -4,9 +4,11 @@ use ::macro_rules_attribute::macro_rules_attribute;
 use ompas_acting::rae::context::actions_progress::ActionsProgress;
 use ompas_acting::rae::context::rae_state::RAEState;
 use ompas_acting::rae::module::rae_exec::RAEInterface;
-use ompas_lisp::core::LEnv;
+use ompas_lisp::core::structs::lenv::LEnv;
+use ompas_lisp::core::structs::lerror::LError;
+use ompas_lisp::core::structs::lvalue::LValue;
+use ompas_lisp::core::structs::module::{GetModule, Module};
 use ompas_lisp::modules::doc::{Documentation, LHelp};
-use ompas_lisp::structs::{GetModule, LError, LValue, Module};
 use ompas_utils::dyn_async;
 use std::sync::Arc;
 

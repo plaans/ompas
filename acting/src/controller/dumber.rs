@@ -1,8 +1,8 @@
 //! [Deprecated]
 //! Previous work to develop a dumb controller to test lisp integration
 
+use ompas_lisp::core::structs::module::{GetModule, Module};
 use ompas_lisp::modules::doc::{Documentation, LHelp};
-use ompas_lisp::structs::{GetModule, Module};
 use std::sync::Arc;
 
 //LANGUAGE

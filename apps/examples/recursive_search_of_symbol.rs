@@ -1,5 +1,5 @@
-use ompas_lisp::core::LEnv;
-use ompas_lisp::structs::LValue;
+use ompas_lisp::core::structs::lenv::LEnv;
+use ompas_lisp::core::structs::lvalue::LValue;
 
 fn main() {
     println!("test lenv");

@@ -1,6 +1,6 @@
 use crate::rae::context::mutex::MutexResponse::Wait;
 use log::{info, warn};
-use ompas_lisp::structs::LValue;
+use ompas_lisp::core::structs::lvalue::LValue;
 use std::collections::VecDeque;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, Mutex, RwLock};

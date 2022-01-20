@@ -1,8 +1,14 @@
-use crate::core::{expand_quasi_quote, get_debug, parse_into_lvalue, ContextCollection, LEnv};
-use crate::structs::LError::{
+use crate::core::structs::contextcollection::ContextCollection;
+use crate::core::structs::lcoreoperator::LCoreOperator;
+use crate::core::structs::lenv::LEnv;
+use crate::core::structs::lerror::LError;
+use crate::core::structs::lerror::LError::{
     NotInListOfExpectedTypes, SpecialError, WrongNumberOfArgument, WrongType,
 };
-use crate::structs::{LCoreOperator, LError, LLambda, LValue, LambdaArgs, NameTypeLValue};
+use crate::core::structs::llambda::{LLambda, LambdaArgs};
+use crate::core::structs::lvalue::LValue;
+use crate::core::structs::typelvalue::TypeLValue;
+use crate::core::{expand_quasi_quote, get_debug, parse_into_lvalue};
 use std::any::Any;
 use std::collections::HashSet;
 use std::convert::{TryFrom, TryInto};
@@ -207,7 +213,7 @@ pub fn expand_static(
                                     EXPAND_STATIC,
                                     x.clone(),
                                     x.into(),
-                                    NameTypeLValue::Symbol,
+                                    TypeLValue::Symbol,
                                 ))
                             }
                         }
@@ -241,7 +247,7 @@ pub fn expand_static(
                                     EXPAND_STATIC,
                                     lv.clone(),
                                     lv.into(),
-                                    vec![NameTypeLValue::List, NameTypeLValue::Symbol],
+                                    vec![TypeLValue::List, TypeLValue::Symbol],
                                 ))
                             }
                         }
@@ -553,7 +559,7 @@ pub fn eval_static(
                                     EVAL_STATIC,
                                     lv.clone(),
                                     lv.into(),
-                                    NameTypeLValue::Symbol,
+                                    TypeLValue::Symbol,
                                 ))
                             }
                         };
@@ -572,7 +578,7 @@ pub fn eval_static(
                                                 EVAL_STATIC,
                                                 lv.clone(),
                                                 lv.into(),
-                                                NameTypeLValue::Symbol,
+                                                TypeLValue::Symbol,
                                             ))
                                         }
                                     }
@@ -586,7 +592,7 @@ pub fn eval_static(
                                     EVAL_STATIC,
                                     lv.clone(),
                                     lv.into(),
-                                    vec![NameTypeLValue::List, NameTypeLValue::Symbol],
+                                    vec![TypeLValue::List, TypeLValue::Symbol],
                                 ))
                             }
                         };
@@ -612,7 +618,7 @@ pub fn eval_static(
                                         EVAL_STATIC,
                                         lv.clone(),
                                         lv.into(),
-                                        NameTypeLValue::Bool,
+                                        TypeLValue::Bool,
                                     ))
                                 }
                             };
@@ -677,7 +683,7 @@ pub fn eval_static(
                                     EVAL_STATIC,
                                     args[0].clone(),
                                     (&args[0]).into(),
-                                    NameTypeLValue::String,
+                                    TypeLValue::String,
                                 ))
                             }
                         }
@@ -755,7 +761,7 @@ pub fn eval_static(
                             EVAL_STATIC,
                             lv.clone(),
                             lv.into(),
-                            NameTypeLValue::Fn,
+                            TypeLValue::Fn,
                         ));
                     }
                 };

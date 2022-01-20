@@ -1,7 +1,9 @@
 pub mod wait_on {
     use log::{info, warn};
-    use ompas_lisp::core::{eval, ContextCollection, LEnv};
-    use ompas_lisp::structs::{LError, LValue};
+    use ompas_lisp::core::eval;
+    use ompas_lisp::core::structs::contextcollection::ContextCollection;
+    use ompas_lisp::core::structs::lenv::LEnv;
+    use ompas_lisp::core::structs::lvalue::LValue;
     use ompas_utils::task_handler;
     use std::sync::Arc;
     use std::thread;

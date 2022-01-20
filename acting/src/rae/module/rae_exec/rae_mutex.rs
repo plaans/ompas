@@ -4,10 +4,13 @@ use crate::rae::module::rae_exec::{
     CtxRaeExec, SYMBOL_EXEC_MODE, SYMBOL_RAE_MODE, SYMBOL_SIMU_MODE,
 };
 use ::macro_rules_attribute::macro_rules_attribute;
-use ompas_lisp::core::LEnv;
-use ompas_lisp::functions::get_map;
-use ompas_lisp::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
-use ompas_lisp::structs::{LError, LNumber, LValue, NameTypeLValue};
+use ompas_lisp::core::root_module::map::get_map;
+use ompas_lisp::core::structs::lenv::LEnv;
+use ompas_lisp::core::structs::lerror::LError;
+use ompas_lisp::core::structs::lerror::LError::{SpecialError, WrongNumberOfArgument, WrongType};
+use ompas_lisp::core::structs::lnumber::LNumber;
+use ompas_lisp::core::structs::lvalue::LValue;
+use ompas_lisp::core::structs::typelvalue::TypeLValue;
 use ompas_utils::dyn_async;
 use std::convert::TryInto;
 
@@ -38,7 +41,7 @@ pub async fn lock<'a>(
             LOCK,
             args[0].clone(),
             (&args[0]).into(),
-            NameTypeLValue::Symbol,
+            TypeLValue::Symbol,
         ));
     };
     let priority = if let LValue::Number(LNumber::Int(i)) = &args[1] {
@@ -48,7 +51,7 @@ pub async fn lock<'a>(
             LOCK,
             args[1].clone(),
             (&args[1]).into(),
-            NameTypeLValue::Number,
+            TypeLValue::Number,
         ));
     };
 

@@ -3,11 +3,11 @@ use crate::rae::context::rae_env::RAEEnv;
 use crate::rae::context::ressource_access::wait_on;
 use crate::rae::module::rae_exec::{Job, JobType};
 use ::macro_rules_attribute::macro_rules_attribute;
-use ompas_lisp::core::LEnv;
-use ompas_lisp::functions::get_map;
+use ompas_lisp::core::structs::lenv::LEnv;
+use ompas_lisp::core::structs::lerror::LError;
+use ompas_lisp::core::structs::lvalue::LValue;
+use ompas_lisp::core::structs::module::{GetModule, Module};
 use ompas_lisp::modules::doc::{Documentation, LHelp};
-use ompas_lisp::structs::LValue::Nil;
-use ompas_lisp::structs::{GetModule, LError, LValue, LValueS, Module};
 use ompas_utils::dyn_async;
 use std::sync::Arc;
 use tokio::sync::mpsc::Sender;
@@ -85,7 +85,7 @@ pub fn trigger_task(args: &[LValue], _env: &LEnv, ctx: &CtxRaeMonitor) -> Result
     tokio::spawn(async move {
         sender.send(job).await.expect("could not task job to rae");
     });
-    Ok(Nil)
+    Ok(LValue::Nil)
 }
 
 #[macro_rules_attribute(dyn_async!)]

@@ -11,9 +11,13 @@ use ompas_acting::rae::context::actions_progress::{ActionsProgress, Status};
 use ompas_acting::rae::context::rae_state::{RAEState, StateType, KEY_DYNAMIC, KEY_STATIC};
 use ompas_acting::rae::module::rae_exec::platform::RAE_LAUNCH_PLATFORM;
 use ompas_acting::rae::module::rae_exec::{CtxPlatform, RAEInterface, RAE_GET_STATE_VARIBALE};
-use ompas_lisp::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
-use ompas_lisp::structs::LValue::Nil;
-use ompas_lisp::structs::*;
+use ompas_lisp::core::structs::lerror::LError;
+use ompas_lisp::core::structs::lerror::LError::*;
+use ompas_lisp::core::structs::lvalue::LValue;
+use ompas_lisp::core::structs::lvalues::LValueS;
+use ompas_lisp::core::structs::module::{GetModule, Module};
+use ompas_lisp::core::structs::typelvalue::TypeLValue;
+use ompas_lisp::core::structs::LResult;
 use ompas_utils::task_handler;
 use std::convert::TryInto;
 use std::net::SocketAddr;
@@ -66,7 +70,7 @@ impl Instance {
     pub async fn instance_of(&self, _type: String) -> LResult {
         match self.inner.read().await.get(&_type) {
             Some(set) => Ok(set.clone().iter().cloned().collect::<Vec<String>>().into()),
-            None => Ok(Nil),
+            None => Ok(LValue::Nil),
         }
     }
 }
@@ -164,7 +168,7 @@ impl RAEInterface for PlatformGodot {
                 "PlatformGodot::cancel_command",
                 args[0].clone(),
                 (&args[0]).into(),
-                NameTypeLValue::Number,
+                TypeLValue::Number,
             ));
         };
 
@@ -217,7 +221,7 @@ impl RAEInterface for PlatformGodot {
                         "PlatformGodot::get_state",
                         lv.clone(),
                         lv.into(),
-                        NameTypeLValue::Symbol,
+                        TypeLValue::Symbol,
                     ))
                 }
             },
@@ -336,7 +340,7 @@ impl RAEInterface for PlatformGodot {
                         "PlatformGodot::start_platform",
                         args[0].clone(),
                         (&args[0]).into(),
-                        NameTypeLValue::Symbol,
+                        TypeLValue::Symbol,
                     ));
                 }
             } //path of the project (absolute path)
@@ -397,7 +401,7 @@ impl RAEInterface for PlatformGodot {
                             "PlatformGodot::open_com",
                             lv.clone(),
                             lv.into(),
-                            NameTypeLValue::Symbol,
+                            TypeLValue::Symbol,
                         ))
                     }
                 };
@@ -409,7 +413,7 @@ impl RAEInterface for PlatformGodot {
                             "PlatformGodot::open_com",
                             lv.clone(),
                             lv.into(),
-                            NameTypeLValue::Usize,
+                            TypeLValue::Usize,
                         ))
                     }
                 };

@@ -1,11 +1,19 @@
 //! Module to add an help module to the project.
 //! It provides a struct for the help in Scheme
 
-use crate::core::LEnv;
-use crate::language::doc::*;
-use crate::language::scheme_primitives::*;
-use crate::structs::LError::{WrongNumberOfArgument, WrongType};
-use crate::structs::{GetModule, LError, LValue, Module, NameTypeLValue};
+use crate::core::language::{LIST, MAP};
+use crate::core::root_module::basic_math::language::*;
+use crate::core::root_module::language::*;
+use crate::core::root_module::list::language::*;
+use crate::core::root_module::map::language::*;
+use crate::core::root_module::predicate::language::*;
+use crate::core::structs::lcoreoperator::language::*;
+use crate::core::structs::lenv::LEnv;
+use crate::core::structs::lerror::LError;
+use crate::core::structs::lerror::LError::{WrongNumberOfArgument, WrongType};
+use crate::core::structs::lvalue::LValue;
+use crate::core::structs::module::{GetModule, Module};
+use crate::core::structs::typelvalue::TypeLValue;
 use std::collections::BTreeMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
@@ -118,9 +126,6 @@ impl Documentation for CtxDoc {
             LHelp::new(AWAIT, DOC_AWAIT),
             LHelp::new(ASYNC, DOC_ASYNC),
             LHelp::new(EVAL, DOC_EVAL),
-            LHelp::new(LET, DOC_LET),
-            LHelp::new(LET_STAR, DOC_LET_STAR),
-            LHelp::new(TEST_MACRO, DOC_MACRO_TEST_MACRO),
         ]
     }
 }
@@ -207,12 +212,7 @@ pub fn help(args: &[LValue], _: &LEnv, ctx: &CtxDoc) -> Result<LValue, LError> {
             LValue::MutFn(fun) => Ok(LValue::String(ctx.get(fun.get_label()))),
             LValue::Symbol(s) => Ok(LValue::String(ctx.get(s))),
             LValue::CoreOperator(co) => Ok(LValue::String(ctx.get(&co.to_string()))),
-            lv => Err(WrongType(
-                HELP,
-                lv.clone(),
-                lv.into(),
-                NameTypeLValue::Symbol,
-            )),
+            lv => Err(WrongType(HELP, lv.clone(), lv.into(), TypeLValue::Symbol)),
         },
         _ => Err(WrongNumberOfArgument(HELP, args.into(), args.len(), 0..1)),
     }

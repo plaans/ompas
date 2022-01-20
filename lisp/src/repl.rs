@@ -2,7 +2,7 @@
 //! The repl is based on the project rustyline.
 //!
 //! It contains only one function (for the moment): run that takes two arguments.
-use crate::language::scheme_primitives::NIL;
+use crate::core::language::NIL;
 use crate::TOKIO_CHANNEL_SIZE;
 use chrono::{DateTime, Utc};
 use ompas_utils::task_handler::{subscribe_new_task, EndSignal};

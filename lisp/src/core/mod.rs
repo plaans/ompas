@@ -1,23 +1,33 @@
-#![allow(deprecated)]
-use crate::functions::*;
-use crate::language::scheme_primitives::*;
-use crate::language::*;
-use crate::static_eval::{PureFonction, PureFonctionCollection};
-use crate::structs::LCoreOperator::Quote;
-use crate::structs::LError::*;
-use crate::structs::NameTypeLValue::{List, Symbol};
-use crate::structs::*;
+use crate::core::language::*;
+use crate::core::root_module::list::language::CONS;
+use crate::core::structs::contextcollection::ContextCollection;
+use crate::core::structs::lcoreoperator::language::*;
+use crate::core::structs::lcoreoperator::LCoreOperator;
+use crate::core::structs::lcoreoperator::LCoreOperator::Quote;
+use crate::core::structs::lenv::LEnv;
+use crate::core::structs::lerror::LError;
+use crate::core::structs::lerror::LError::{
+    NotInListOfExpectedTypes, SpecialError, WrongNumberOfArgument, WrongType,
+};
+use crate::core::structs::lfuture::FutureResult;
+use crate::core::structs::llambda::{LLambda, LambdaArgs};
+use crate::core::structs::lnumber::LNumber;
+use crate::core::structs::lvalue::LValue;
+use crate::core::structs::module::AsyncLTrait;
+use crate::core::structs::typelvalue::TypeLValue;
 use aries_planning::parsing::sexpr::SExpr;
 use async_recursion::async_recursion;
-use im::hashmap::HashMap;
-use im::HashSet;
 use std::any::Any;
-use std::convert::{TryFrom, TryInto};
-use std::fmt::{Display, Formatter};
-use std::ops::Deref;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::convert::TryFrom;
+use std::sync::atomic::Ordering;
+pub mod functions;
+pub mod language;
+pub mod root_module;
+pub mod structs;
+use std::convert::TryInto;
+use std::sync::atomic::AtomicBool;
 
+#[allow(deprecated)]
 lazy_static! {
     ///Global variable used to enable debug println.
     /// Mainly used during development.
@@ -33,451 +43,6 @@ pub fn activate_debug() {
 /// Returns the value of debug
 pub fn get_debug() -> bool {
     DEBUG.load(Ordering::Relaxed)
-}
-
-/// Structs used to store the Scheme Environment
-/// - It contains a mapping of <symbol(String), LValue>
-/// - It also contains macros, special LLambdas used to format LValue expressions.
-/// - A LEnv can inherits from an outer environment. It can use symbols from it, but not modify them.
-#[derive(Clone, Debug)]
-pub struct LEnv {
-    symbols: im::HashMap<String, LValue>,
-    macro_table: im::HashMap<String, LLambda>,
-    //pub(crate) new_entries: Vec<String>, Used to export new entries, but not really important in the end
-    outer: Option<Box<LEnv>>,
-    //task_handler: TaskHandler
-}
-
-impl Display for LEnv {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut str = "".to_string();
-        for s in &self.symbols {
-            str.push_str(format!("{}: {}\n", s.0, s.1).as_str())
-        }
-        if let Some(outer) = &self.outer {
-            str.push_str(outer.to_string().as_str());
-        }
-        writeln!(f, "{}", str)
-    }
-}
-
-impl LEnv {
-    pub fn merge_by_symbols(&mut self, other: &Self) {
-        self.symbols = self.symbols.clone().union(other.symbols.clone());
-    }
-}
-
-/// Struct Wrapping contexts (modules) for each library.
-#[derive(Default, Clone, Debug)]
-pub struct ContextCollection {
-    inner: Vec<Arc<dyn Any + Send + Sync>>,
-    map_label_usize: HashMap<String, usize>,
-    reverse_map: HashMap<usize, String>,
-}
-
-impl ContextCollection {
-    ///Insert a new context
-    pub fn insert(&mut self, ctx: Arc<dyn Any + Send + Sync>, label: String) -> usize {
-        self.inner.push(ctx);
-        let id = self.inner.len() - 1;
-        self.map_label_usize.insert(label.clone(), id);
-        self.reverse_map.insert(id, label);
-        id
-    }
-
-    /// Returns a reference to the context with the corresponding id
-    pub fn get_context(&self, id: usize) -> &(dyn Any + Send + Sync) {
-        match self.inner.get(id) {
-            None => panic!("id {} corresponds to no ctx:\n {:?}", id, self),
-            Some(some) => some.deref(),
-        }
-    }
-
-    /// Returns the context corresponding to the label.
-    pub fn get_context_with_label(&self, label: &str) -> &dyn Any {
-        let id = match self.map_label_usize.get(label) {
-            None => panic!("no context with such label"),
-            Some(s) => *s,
-        };
-
-        self.get_context(id)
-    }
-
-    /// Returns a mutable reference to the context with corresponding id
-    pub fn get_mut_context(&mut self, id: usize) -> &mut (dyn Any + Send + Sync) {
-        match self.inner.get_mut(id) {
-            None => panic!("no context with id {}", 1),
-            Some(ctx) => match Arc::get_mut(ctx) {
-                None => panic!("Could no get mut ref from Arc of mod {}. This is probably because the reference to the context is shared", self.reverse_map.get(&id).unwrap()),
-                Some(ctx) => ctx
-            }
-        }
-    }
-}
-/*
-#[derive(Clone)]
-pub struct RefLEnv(Rc<LEnv>);
-
-impl Default for RefLEnv {
-    fn default() -> Self {
-        RefLEnv(Rc::new(LEnv::default()))
-    }
-}
-
-impl From<LEnv> for RefLEnv {
-    fn from(e: LEnv) -> Self {
-        RefLEnv(Rc::new(e))
-    }
-}
-
-impl RefLEnv {
-    pub fn clone_from_root(&self) -> LEnv {
-        let mut env = self.0.deref().clone();
-        let outer = env.outer.clone();
-        match outer {
-            None => {}
-            Some(s) => env.merge_by_symbols(&s.clone().clone_from_root()),
-        };
-        env.outer = None;
-        env.into()
-    }
-}
-
-impl RefLEnv {
-    pub fn keys(&self) -> Vec<String> {
-        let mut keys: Vec<String> = self.symbols.keys().cloned().collect();
-        keys.append(&mut self.macro_table.keys().cloned().collect());
-        if let Some(outer) = self.outer.clone() {
-            keys.append(&mut outer.keys())
-        }
-        keys
-    }
-
-    pub fn root() -> Self {
-        RefLEnv(Rc::new(LEnv::root()))
-    }
-
-    pub fn new(env: LEnv) -> Self {
-        RefLEnv(Rc::new(env))
-    }
-
-    pub fn new_from_outer(outer: RefLEnv) -> Self {
-        RefLEnv(Rc::new(LEnv {
-            symbols: Default::default(),
-            macro_table: Default::default(),
-            //new_entries: vec![],
-            //outer: Some(outer),
-        }))
-    }
-
-    pub fn empty() -> Self {
-        RefLEnv(Rc::new(LEnv::empty()))
-    }
-}
-
-impl Deref for RefLEnv {
-    type Target = LEnv;
-
-    fn deref(&self) -> &Self::Target {
-        &(self.0)
-    }
-}
-
-impl DerefMut for RefLEnv {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        Rc::get_mut(&mut self.0).unwrap()
-    }
-}*/
-
-impl PartialEq for LEnv {
-    fn eq(&self, other: &Self) -> bool {
-        self == other
-    }
-}
-
-impl Default for LEnv {
-    fn default() -> Self {
-        Self::empty()
-    }
-}
-#[derive(Default)]
-pub struct CtxRoot(());
-
-impl PureFonction for CtxRoot {
-    fn get_pure_fonctions_symbols(&self) -> PureFonctionCollection {
-        get_pure_primitives().into()
-    }
-}
-
-impl GetModule for CtxRoot {
-    /// Returns all basic functions, macros, and lambdas
-    ///
-    fn get_module(self) -> Module {
-        let mut module = Module {
-            ctx: Arc::new(()),
-            prelude: vec![],
-            raw_lisp: Default::default(),
-            label: MOD_ROOT.into(),
-        };
-
-        module.add_prelude(DEFINE, LCoreOperator::Define.into());
-        module.add_prelude(NIL, LValue::Nil);
-
-        //Core Operators
-        module.add_prelude(DEFINE, LCoreOperator::Define.into());
-        module.add_prelude(IF, LCoreOperator::If.into());
-        module.add_prelude(LAMBDA, LCoreOperator::DefLambda.into());
-        module.add_prelude(DEF_MACRO, LCoreOperator::DefMacro.into());
-        module.add_prelude(BEGIN, LCoreOperator::Begin.into());
-        module.add_prelude(QUASI_QUOTE, LCoreOperator::QuasiQuote.into());
-        module.add_prelude(QUOTE, LCoreOperator::Quote.into());
-        module.add_prelude(UNQUOTE, LCoreOperator::UnQuote.into());
-
-        module.add_fn_prelude(ENV_GET_KEYS, env_get_keys);
-        module.add_fn_prelude(ENV_GET_MACROS, env_get_macros);
-        module.add_fn_prelude(ENV_GET_MACRO, env_get_macro);
-
-        //Special entry
-        module.add_fn_prelude(GET, get);
-        module.add_fn_prelude(SET, set);
-        //State is an alias for map
-
-        /*
-         * LIST FUNCTIONS
-         */
-        module.add_fn_prelude(LIST, list);
-        module.add_fn_prelude(FIRST, first);
-        module.add_fn_prelude(SECOND, second);
-        module.add_fn_prelude(THIRD, third);
-        module.add_fn_prelude(REST, rest);
-        module.add_fn_prelude(CAR, car);
-        module.add_fn_prelude(CDR, cdr);
-        module.add_fn_prelude(LAST, last);
-        module.add_fn_prelude(CONS, cons);
-        module.add_fn_prelude(LEN, length);
-        module.add_fn_prelude(EMPTY, empty);
-        module.add_fn_prelude(GET_LIST, get_list);
-        module.add_fn_prelude(SET_LIST, set_list);
-
-        //Map functions
-        module.add_fn_prelude(MAP, map);
-        module.add_fn_prelude(GET_MAP, get_map);
-        module.add_fn_prelude(SET_MAP, set_map);
-        module.add_fn_prelude(UNION_MAP, union_map);
-        module.add_fn_prelude(REMOVE_MAP, remove_map);
-        module.add_fn_prelude(REMOVE_KEY_VALUE_MAP, remove_key_value_map);
-
-        module.add_fn_prelude(NOT, not);
-        module.add_fn_prelude(NOT_SHORT, not);
-
-        module.add_fn_prelude(APPEND, append);
-
-        module.add_fn_prelude(MEMBER, member);
-
-        module.add_fn_prelude(REVERSE, reverse);
-
-        module.add_fn_prelude(ADD, add);
-        module.add_fn_prelude(SUB, sub);
-        module.add_fn_prelude(MUL, mul);
-        module.add_fn_prelude(DIV, div);
-        module.add_fn_prelude(GT, gt);
-        module.add_fn_prelude(GE, ge);
-        module.add_fn_prelude(LT, lt);
-        module.add_fn_prelude(LE, le);
-        module.add_fn_prelude(EQ, eq);
-
-        //predicates
-        module.add_fn_prelude(IS_INT, is_integer);
-        module.add_fn_prelude(IS_FLOAT, is_float);
-        module.add_fn_prelude(IS_NIL, is_nil);
-        module.add_fn_prelude(IS_NUMBER, is_number);
-        module.add_fn_prelude(IS_BOOL, is_bool);
-        module.add_fn_prelude(IS_SYMBOL, is_symbol);
-        module.add_fn_prelude(IS_STRING, is_string);
-        module.add_fn_prelude(IS_FN, is_fn);
-        module.add_fn_prelude(IS_MUT_FN, is_mut_fn);
-        //module.add_fn_prelude(IS_QUOTE, is_quote);
-        module.add_fn_prelude(IS_MAP, is_map);
-        module.add_fn_prelude(IS_LIST, is_list);
-        module.add_fn_prelude(IS_LAMBDA, is_lambda);
-
-        module.add_fn_prelude(IS_PAIR, is_pair);
-        module.add_fn_prelude(IS_EQUAL, is_equal);
-        module
-    }
-}
-
-impl LEnv {
-    /// Returns the env with all the basic functions, the ContextCollection with CtxRoot
-    /// and InitialLisp containing the definition of macros and lambdas,
-    pub async fn root() -> (Self, ContextCollection) {
-        // let map = im::hashmap::HashMap::new();
-        // map.ins
-        let mut env = LEnv::default();
-        let mut ctxs = ContextCollection::default();
-        import(
-            &mut env,
-            &mut ctxs,
-            CtxRoot::default(),
-            ImportType::WithoutPrefix,
-        )
-        .await
-        .expect("error while loading module root");
-        (env, ctxs)
-    }
-
-    pub fn empty() -> Self {
-        LEnv {
-            symbols: Default::default(),
-            macro_table: Default::default(),
-            //new_entries: vec![],
-            outer: None,
-        }
-    }
-
-    pub fn set_outer(&mut self, outer: Self) {
-        self.outer = Some(Box::new(outer));
-    }
-
-    pub fn get_symbol(&self, s: &str) -> Option<LValue> {
-        match self.symbols.get(s) {
-            None => match &self.outer {
-                None => None,
-                Some(outer) => outer.get_symbol(s),
-            },
-            Some(s) => Some(s.clone()),
-        }
-    }
-
-    pub fn get_ref_symbol(&self, s: &str) -> Option<&LValue> {
-        match self.symbols.get(s) {
-            None => match &self.outer {
-                None => None,
-                Some(outer) => outer.get_ref_symbol(s),
-            },
-            Some(s) => Some(s),
-        }
-    }
-
-    pub fn insert(&mut self, key: String, exp: LValue) {
-        self.symbols = self.symbols.update(key, exp);
-    }
-
-    pub fn update(&self, key: String, exp: LValue) -> Self {
-        let mut update = self.clone();
-        update.symbols.insert(key, exp);
-        update
-    }
-
-    pub fn set(&mut self, key: String, exp: LValue) -> Result<(), LError> {
-        match self.get_symbol(key.as_str()) {
-            None => Err(UndefinedSymbol(SET, key)),
-            Some(_) => {
-                self.symbols.insert(key, exp);
-                Ok(())
-            }
-        }
-    }
-
-    pub fn add_macro(&mut self, key: String, _macro: LLambda) {
-        self.macro_table = self.macro_table.update(key, _macro)
-    }
-
-    pub fn get_macro(&self, key: &str) -> Option<&LLambda> {
-        self.macro_table.get(key)
-    }
-
-    pub fn keys(&self) -> HashSet<String> {
-        let mut keys: HashSet<String> = self.symbols.keys().cloned().collect();
-        keys = keys.union(self.macro_table.keys().cloned().collect());
-        if let Some(outer) = &self.outer {
-            keys = keys.union(outer.keys());
-        }
-        keys
-    }
-
-    pub fn macros(&self) -> HashSet<String> {
-        let mut macros: HashSet<String> = self.macro_table.keys().cloned().collect();
-        if let Some(outer) = &self.outer {
-            macros = macros.union(outer.macros());
-        }
-        macros
-    }
-}
-
-/// Load a library (module) into the environment so it can be used.
-/// *ctx* is moved into *ctxs*.
-/*pub async fn load_module(
-    env: &mut LEnv,
-    ctxs: &mut ContextCollection,
-    ctx: impl GetModule,
-) -> Result<LValue, LError> {
-    let mut module = ctx.get_module();
-    let id = ctxs.insert(module.ctx, module.label);
-    //println!("id: {}", id);
-    for (sym, lv) in &mut module.prelude {
-        match lv {
-            LValue::Fn(fun) => fun.set_index_mod(id),
-            LValue::MutFn(fun) => fun.set_index_mod(id),
-            LValue::AsyncFn(fun) => fun.set_index_mod(id),
-            LValue::AsyncMutFn(fun) => fun.set_index_mod(id),
-            _ => {}
-        }
-        env.insert(sym.to_string(), lv.clone());
-    }
-
-    for element in module.raw_lisp.inner() {
-        //println!("Adding {} to rae_env", element);
-        let lvalue = parse(element, env, ctxs).await?;
-
-        if lvalue != LValue::Nil {
-            eval(&lvalue, env, ctxs).await?;
-        }
-    }
-    Ok(Nil)
-}*/
-
-#[derive(Debug)]
-pub enum ImportType {
-    WithPrefix,
-    WithoutPrefix,
-}
-
-pub async fn import(
-    env: &mut LEnv,
-    ctxs: &mut ContextCollection,
-    ctx: impl GetModule,
-    import_type: ImportType,
-) -> Result<(), LError> {
-    let mut module = ctx.get_module();
-    let id = ctxs.insert(module.ctx, module.label.clone());
-    //println!("id: {}", id);
-    for (sym, lv) in &mut module.prelude {
-        match lv {
-            LValue::Fn(fun) => fun.set_index_mod(id),
-            LValue::MutFn(fun) => fun.set_index_mod(id),
-            LValue::AsyncFn(fun) => fun.set_index_mod(id),
-            LValue::AsyncMutFn(fun) => fun.set_index_mod(id),
-            _ => {}
-        }
-        match import_type {
-            ImportType::WithPrefix => {
-                env.insert(format!("{}::{}", module.label, sym.to_string()), lv.clone());
-            }
-            ImportType::WithoutPrefix => {
-                env.insert(sym.to_string(), lv.clone());
-            }
-        }
-    }
-
-    for element in module.raw_lisp.inner() {
-        let lvalue = parse(element, env, ctxs).await?;
-
-        if lvalue != LValue::Nil {
-            eval(&lvalue, env, ctxs).await?;
-        }
-    }
-    Ok(())
 }
 
 /// Parse an str and returns an expanded LValue
@@ -684,7 +249,7 @@ pub async fn expand(
                                     "expand",
                                     x.clone(),
                                     x.into(),
-                                    NameTypeLValue::Symbol,
+                                    TypeLValue::Symbol,
                                 ))
                             }
                         }
@@ -718,7 +283,7 @@ pub async fn expand(
                                     "expand",
                                     lv.clone(),
                                     lv.into(),
-                                    vec![List, Symbol],
+                                    vec![TypeLValue::List, TypeLValue::Symbol],
                                 ))
                             }
                         }
@@ -984,7 +549,7 @@ pub async fn eval(
                                     "eval",
                                     lv.clone(),
                                     lv.into(),
-                                    NameTypeLValue::Symbol,
+                                    TypeLValue::Symbol,
                                 ))
                             }
                         };
@@ -1006,7 +571,7 @@ pub async fn eval(
                                                 "eval",
                                                 lv.clone(),
                                                 lv.into(),
-                                                NameTypeLValue::Symbol,
+                                                TypeLValue::Symbol,
                                             ))
                                         }
                                     }
@@ -1020,7 +585,7 @@ pub async fn eval(
                                     "eval",
                                     lv.clone(),
                                     lv.into(),
-                                    vec![NameTypeLValue::List, NameTypeLValue::Symbol],
+                                    vec![TypeLValue::List, TypeLValue::Symbol],
                                 ))
                             }
                         };
@@ -1044,7 +609,7 @@ pub async fn eval(
                                     "eval",
                                     lv.clone(),
                                     lv.into(),
-                                    NameTypeLValue::Bool,
+                                    TypeLValue::Bool,
                                 ))
                             }
                         };
@@ -1105,7 +670,7 @@ pub async fn eval(
                                 EVAL,
                                 future.clone(),
                                 (&future).into(),
-                                NameTypeLValue::Future,
+                                TypeLValue::Future,
                             ))
                         };
                     }
@@ -1121,7 +686,7 @@ pub async fn eval(
                                 "eval",
                                 args[0].clone(),
                                 (&args[0]).into(),
-                                NameTypeLValue::String,
+                                TypeLValue::String,
                             ))
                         }
                     }
@@ -1196,7 +761,7 @@ pub async fn eval(
                         };
                     }
                     lv => {
-                        return Err(WrongType("eval", lv.clone(), lv.into(), NameTypeLValue::Fn));
+                        return Err(WrongType("eval", lv.clone(), lv.into(), TypeLValue::Fn));
                     }
                 };
             }

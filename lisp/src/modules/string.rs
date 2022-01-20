@@ -1,6 +1,8 @@
-use crate::core::LEnv;
+use crate::core::structs::lenv::LEnv;
+use crate::core::structs::lerror::LError;
+use crate::core::structs::lvalue::LValue;
+use crate::core::structs::module::{GetModule, Module};
 use crate::modules::doc::{Documentation, LHelp};
-use crate::structs::{GetModule, LError, LValue, Module};
 use std::sync::Arc;
 
 /*

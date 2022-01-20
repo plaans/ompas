@@ -6,14 +6,15 @@ use crate::rae::module::rae_exec::{Job, JobId};
 use crate::rae::TOKIO_CHANNEL_SIZE;
 use im::HashMap;
 use log::Level::Debug;
-use ompas_lisp::core::ImportType::WithoutPrefix;
-use ompas_lisp::core::{import, ContextCollection, LEnv};
-use ompas_lisp::language::scheme_primitives::OBJECT;
-use ompas_lisp::structs::LCoreOperator::Define;
-use ompas_lisp::structs::LError::{
+use ompas_lisp::core::language::OBJECT;
+use ompas_lisp::core::structs::contextcollection::ContextCollection;
+use ompas_lisp::core::structs::lenv::LEnv;
+use ompas_lisp::core::structs::lerror::LError;
+use ompas_lisp::core::structs::lerror::LError::{
     NotInListOfExpectedTypes, SpecialError, WrongNumberOfArgument, WrongType,
 };
-use ompas_lisp::structs::{InitLisp, LError, LFn, LLambda, LValue, NameTypeLValue};
+use ompas_lisp::core::structs::lvalue::LValue;
+use ompas_lisp::core::structs::typelvalue::TypeLValue;
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{Display, Formatter};
 use std::panic::panic_any;
@@ -82,7 +83,7 @@ impl TryFrom<&LValue> for Parameters {
                             PARAMETERS_TRY_FROM_LVALUE,
                             e.clone(),
                             e.into(),
-                            vec![NameTypeLValue::List, NameTypeLValue::Symbol],
+                            vec![TypeLValue::List, TypeLValue::Symbol],
                         ))
                     }
                 }
@@ -93,7 +94,7 @@ impl TryFrom<&LValue> for Parameters {
                 PARAMETERS_TRY_FROM_LVALUE,
                 value.clone(),
                 value.into(),
-                NameTypeLValue::List,
+                TypeLValue::List,
             ));
         }
 

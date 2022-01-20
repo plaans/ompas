@@ -1,9 +1,13 @@
 //! Example Module
 //! Gives an example on how to code a rust library to be bound in Scheme.
-use crate::core::LEnv;
+use crate::core::structs::lenv::LEnv;
+use crate::core::structs::lerror::LError;
+use crate::core::structs::lerror::LError::{SpecialError, WrongNumberOfArgument, WrongType};
+use crate::core::structs::lnumber::LNumber;
+use crate::core::structs::lvalue::LValue;
+use crate::core::structs::module::{GetModule, Module};
+use crate::core::structs::typelvalue::TypeLValue;
 use crate::modules::doc::{Documentation, LHelp};
-use crate::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
-use crate::structs::{GetModule, LError, LNumber, LValue, Module, NameTypeLValue};
 use std::convert::TryFrom;
 use std::sync::Arc;
 
@@ -57,7 +61,7 @@ pub fn get_counter(args: &[LValue], _: &LEnv, ctx: &CtxCounter) -> Result<LValue
             GET_COUNTER,
             lv.clone(),
             lv.into(),
-            NameTypeLValue::Other(TYPE_COUNTER.to_string()),
+            TypeLValue::Other(TYPE_COUNTER.to_string()),
         )),
     }
 }
@@ -93,7 +97,7 @@ pub fn decrement_counter(
             DECREMENT_COUNTER,
             lv.clone(),
             lv.into(),
-            NameTypeLValue::Other(TYPE_COUNTER.to_string()),
+            TypeLValue::Other(TYPE_COUNTER.to_string()),
         )),
     }
 }
@@ -126,7 +130,7 @@ pub fn increment_counter(
             INCREMENT_COUNTER,
             lv.clone(),
             lv.into(),
-            NameTypeLValue::Other(TYPE_COUNTER.to_string()),
+            TypeLValue::Other(TYPE_COUNTER.to_string()),
         )),
     }
 }
@@ -153,7 +157,7 @@ pub fn set_counter(args: &[LValue], _: &LEnv, ctx: &mut CtxCounter) -> Result<LV
             SET_COUNTER,
             lv.clone(),
             lv.into(),
-            NameTypeLValue::Other(TYPE_COUNTER.to_string()),
+            TypeLValue::Other(TYPE_COUNTER.to_string()),
         )),
     }
 }

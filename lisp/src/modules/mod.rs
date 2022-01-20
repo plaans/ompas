@@ -1,9 +1,9 @@
 pub mod _type;
+pub mod advanced_math;
 pub mod deprecated;
 pub mod doc;
 pub mod error;
 pub mod io;
-pub mod math;
 pub mod static_eval;
 pub mod string;
 pub mod utils;

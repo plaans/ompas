@@ -1,5 +1,5 @@
 use ompas_acting::rae::context::rae_state::LState;
-use ompas_lisp::structs::LValueS;
+use ompas_lisp::core::structs::lvalues::LValueS;
 
 #[test]
 fn test_union() {

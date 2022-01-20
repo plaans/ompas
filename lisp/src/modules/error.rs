@@ -1,8 +1,11 @@
-use crate::core::LEnv;
+use crate::core::structs::lenv::LEnv;
+use crate::core::structs::lerror::LError;
+use crate::core::structs::lerror::LError::{WrongNumberOfArgument, WrongType};
+use crate::core::structs::lvalue::LValue;
+use crate::core::structs::module::{GetModule, Module};
+use crate::core::structs::typelvalue::TypeLValue;
 use crate::modules::doc::{Documentation, LHelp};
 use crate::static_eval::{PureFonction, PureFonctionCollection};
-use crate::structs::LError::{WrongNumberOfArgument, WrongType};
-use crate::structs::{GetModule, LError, LValue, Module, NameTypeLValue};
 use std::sync::Arc;
 
 //LANGUAGE
@@ -88,7 +91,7 @@ pub fn is_err(args: &[LValue], _: &LEnv, _: &CtxError) -> Result<LValue, LError>
                     IS_ERR,
                     list[0].clone(),
                     (&list[0]).into(),
-                    NameTypeLValue::Other("{ok,err}".to_string()),
+                    TypeLValue::Other("{ok,err}".to_string()),
                 )),
             }
         } else {
@@ -96,7 +99,7 @@ pub fn is_err(args: &[LValue], _: &LEnv, _: &CtxError) -> Result<LValue, LError>
                 IS_ERR,
                 list[0].clone(),
                 (&list[0]).into(),
-                NameTypeLValue::Other("{ok,err}".to_string()),
+                TypeLValue::Other("{ok,err}".to_string()),
             ))
         }
     } else {
@@ -104,7 +107,7 @@ pub fn is_err(args: &[LValue], _: &LEnv, _: &CtxError) -> Result<LValue, LError>
             IS_ERR,
             args[0].clone(),
             (&args[0]).into(),
-            NameTypeLValue::List,
+            TypeLValue::List,
         ))
     }
 }
@@ -123,7 +126,7 @@ pub fn is_ok(args: &[LValue], _: &LEnv, _: &CtxError) -> Result<LValue, LError> 
                     IS_ERR,
                     list[0].clone(),
                     (&list[0]).into(),
-                    NameTypeLValue::Other("{ok,err}".to_string()),
+                    TypeLValue::Other("{ok,err}".to_string()),
                 )),
             }
         } else {
@@ -131,7 +134,7 @@ pub fn is_ok(args: &[LValue], _: &LEnv, _: &CtxError) -> Result<LValue, LError> 
                 IS_ERR,
                 list[0].clone(),
                 (&list[0]).into(),
-                NameTypeLValue::Other("{ok,err}".to_string()),
+                TypeLValue::Other("{ok,err}".to_string()),
             ))
         }
     } else {
@@ -139,7 +142,7 @@ pub fn is_ok(args: &[LValue], _: &LEnv, _: &CtxError) -> Result<LValue, LError> 
             IS_ERR,
             args[0].clone(),
             (&args[0]).into(),
-            NameTypeLValue::List,
+            TypeLValue::List,
         ))
     }
 }

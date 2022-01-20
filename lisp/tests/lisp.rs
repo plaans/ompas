@@ -1,8 +1,10 @@
-use ompas_lisp::core::{eval, parse, LEnv};
-use ompas_lisp::structs::LError::SpecialError;
-use ompas_lisp::structs::{LError, LValue};
-
 // To run tests with println, use cargo test -- --nocapture
+
+use ompas_lisp::core::structs::lenv::LEnv;
+use ompas_lisp::core::structs::lerror::LError;
+use ompas_lisp::core::structs::lerror::LError::SpecialError;
+use ompas_lisp::core::structs::lvalue::LValue;
+use ompas_lisp::core::{eval, parse};
 
 fn create_list_test() -> Vec<(&'static str, LValue)> {
     let is_tests = vec![

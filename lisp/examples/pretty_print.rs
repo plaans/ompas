@@ -1,5 +1,6 @@
-use ompas_lisp::core::{parse, LEnv};
-use ompas_lisp::structs::LError;
+use ompas_lisp::core::parse;
+use ompas_lisp::core::structs::lenv::LEnv;
+use ompas_lisp::core::structs::lerror::LError;
 
 const EXAMPLE: &str = "(begin (+ 3 3) (+ 6 2) (3))";
 const EXAMPLE_2: &str = "(if (> 1 3) nil (+ 3 6))";

@@ -6,14 +6,17 @@ use crate::rae::module::mod_rae_description::*;
 use crate::rae::module::rae_exec::{CtxRaeExec, RAEInterface};
 use crate::rae::{rae_log, rae_run, RAEOptions};
 use ::macro_rules_attribute::macro_rules_attribute;
-use ompas_lisp::async_await;
-use ompas_lisp::core::{eval, expand, parse, LEnv};
-use ompas_lisp::functions::cons;
-use ompas_lisp::language::scheme_primitives::LE;
+use ompas_lisp::core::root_module::list::cons;
+use ompas_lisp::core::structs::lenv::LEnv;
+use ompas_lisp::core::structs::lerror::LError;
+use ompas_lisp::core::structs::lerror::LError::{SpecialError, WrongNumberOfArgument, WrongType};
+use ompas_lisp::core::structs::lvalue::LValue;
+use ompas_lisp::core::structs::lvalues::LValueS;
+use ompas_lisp::core::structs::module::{GetModule, InitLisp, Module};
+use ompas_lisp::core::structs::typelvalue::TypeLValue;
+use ompas_lisp::core::{eval, expand};
 use ompas_lisp::modules::doc::{Documentation, LHelp};
-use ompas_lisp::structs::LError::*;
-use ompas_lisp::structs::LValue::Nil;
-use ompas_lisp::structs::*;
+use ompas_lisp::static_eval::{PureFonction, PureFonctionCollection};
 use ompas_utils::dyn_async;
 use std::convert::TryInto;
 use std::mem;
@@ -168,6 +171,12 @@ impl GetModule for CtxRae {
     }
 }
 
+impl PureFonction for CtxRae {
+    fn get_pure_fonctions_symbols(&self) -> PureFonctionCollection {
+        vec![].into()
+    }
+}
+
 impl Documentation for CtxRae {
     fn documentation() -> Vec<LHelp> {
         vec![
@@ -249,7 +258,7 @@ pub fn get_state_function(_: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LVa
                     RAE_GET_SYMBOL_TYPE,
                     args[0].clone(),
                     args[0].clone().into(),
-                    NameTypeLValue::Symbol,
+                    TypeLValue::Symbol,
                 ))
             }
         }
@@ -274,7 +283,7 @@ pub fn get_env(args: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LEr
                     RAE_GET_ENV,
                     args[0].clone(),
                     args[0].clone().into(),
-                    NameTypeLValue::Symbol,
+                    TypeLValue::Symbol,
                 ));
             }
         }
@@ -369,7 +378,7 @@ async fn def_state_function<'a>(
                         RAE_DEF_STATE_FUNCTION,
                         list[2].clone(),
                         list[2].clone().into(),
-                        NameTypeLValue::Lambda,
+                        TypeLValue::Lambda,
                     ));
                 }
             } else {
@@ -377,7 +386,7 @@ async fn def_state_function<'a>(
                     RAE_DEF_STATE_FUNCTION,
                     list[1].clone(),
                     (&list[1]).into(),
-                    NameTypeLValue::List,
+                    TypeLValue::List,
                 ));
             }
         } else {
@@ -385,12 +394,12 @@ async fn def_state_function<'a>(
                 RAE_DEF_STATE_FUNCTION,
                 list[0].clone(),
                 list[0].clone().into(),
-                NameTypeLValue::Symbol,
+                TypeLValue::Symbol,
             ));
         }
     }
 
-    Ok(Nil)
+    Ok(LValue::Nil)
 }
 
 /// Defines an action in RAE environment.
@@ -436,7 +445,7 @@ async fn def_action_model<'a>(
                     RAE_DEF_ACTION_MODEL,
                     list[1].clone(),
                     list[1].clone().into(),
-                    NameTypeLValue::Lambda,
+                    TypeLValue::Lambda,
                 ));
             }
         } else {
@@ -444,12 +453,12 @@ async fn def_action_model<'a>(
                 RAE_DEF_ACTION_MODEL,
                 list[0].clone(),
                 list[0].clone().into(),
-                NameTypeLValue::Symbol,
+                TypeLValue::Symbol,
             ));
         }
     }
 
-    Ok(Nil)
+    Ok(LValue::Nil)
 }
 
 /// Defines an action in RAE environment.
@@ -499,7 +508,7 @@ async fn def_action_operational_model<'a>(
                     RAE_DEF_ACTION_OPERATIONAL_MODEL,
                     list[1].clone(),
                     list[1].clone().into(),
-                    NameTypeLValue::Lambda,
+                    TypeLValue::Lambda,
                 ));
             }
         } else {
@@ -507,12 +516,12 @@ async fn def_action_operational_model<'a>(
                 RAE_DEF_ACTION_OPERATIONAL_MODEL,
                 list[0].clone(),
                 list[0].clone().into(),
-                NameTypeLValue::Symbol,
+                TypeLValue::Symbol,
             ));
         }
     }
 
-    Ok(Nil)
+    Ok(LValue::Nil)
 }
 
 /// Defines an action in RAE environment.
@@ -555,14 +564,14 @@ async fn def_action<'a>(
                 if let LValue::Lambda(_) = &list[2] {
                     ctx.env.add_action(
                         action_label.to_string(),
-                        Action::new((&list[1]).try_into()?, list[2].clone(), Nil),
+                        Action::new((&list[1]).try_into()?, list[2].clone(), LValue::Nil),
                     )?;
                 } else {
                     return Err(WrongType(
                         RAE_DEF_ACTION,
                         list[2].clone(),
                         list[2].clone().into(),
-                        NameTypeLValue::Lambda,
+                        TypeLValue::Lambda,
                     ));
                 }
             } else {
@@ -570,7 +579,7 @@ async fn def_action<'a>(
                     RAE_DEF_ACTION,
                     list[1].clone(),
                     list[1].clone().into(),
-                    NameTypeLValue::List,
+                    TypeLValue::List,
                 ));
             }
         } else {
@@ -578,12 +587,12 @@ async fn def_action<'a>(
                 RAE_DEF_ACTION,
                 list[0].clone(),
                 list[0].clone().into(),
-                NameTypeLValue::Symbol,
+                TypeLValue::Symbol,
             ));
         }
     }
 
-    Ok(Nil)
+    Ok(LValue::Nil)
 }
 
 /// Defines a method in RAE environment.
@@ -643,7 +652,7 @@ async fn def_method<'a>(
                                         RAE_DEF_METHOD,
                                         list[5].clone(),
                                         list[5].clone().into(),
-                                        NameTypeLValue::Lambda,
+                                        TypeLValue::Lambda,
                                     ));
                                 }
                             } else {
@@ -651,7 +660,7 @@ async fn def_method<'a>(
                                     RAE_DEF_METHOD,
                                     list[4].clone(),
                                     list[4].clone().into(),
-                                    NameTypeLValue::Lambda,
+                                    TypeLValue::Lambda,
                                 ));
                             }
                         } else {
@@ -659,7 +668,7 @@ async fn def_method<'a>(
                                 RAE_DEF_METHOD,
                                 list[3].clone(),
                                 list[3].clone().into(),
-                                NameTypeLValue::Lambda,
+                                TypeLValue::Lambda,
                             ));
                         }
                     }
@@ -668,7 +677,7 @@ async fn def_method<'a>(
                             RAE_DEF_METHOD,
                             list[2].clone(),
                             list[2].clone().into(),
-                            NameTypeLValue::List,
+                            TypeLValue::List,
                         ))
                     }
                 }
@@ -677,7 +686,7 @@ async fn def_method<'a>(
                     RAE_DEF_METHOD,
                     list[1].clone(),
                     list[1].clone().into(),
-                    NameTypeLValue::Symbol,
+                    TypeLValue::Symbol,
                 ));
             }
         } else {
@@ -685,12 +694,12 @@ async fn def_method<'a>(
                 RAE_DEF_METHOD,
                 list[0].clone(),
                 list[0].clone().into(),
-                NameTypeLValue::Symbol,
+                TypeLValue::Symbol,
             ));
         }
     }
 
-    Ok(Nil)
+    Ok(LValue::Nil)
 }
 
 #[macro_rules_attribute(dyn_async!)]
@@ -741,7 +750,7 @@ async fn def_task<'a>(
                     RAE_DEF_TASK,
                     list[2].clone(),
                     list[2].clone().into(),
-                    NameTypeLValue::Lambda,
+                    TypeLValue::Lambda,
                 ));
             }
         } else {
@@ -749,7 +758,7 @@ async fn def_task<'a>(
                 RAE_DEF_TASK,
                 list[0].clone(),
                 list[0].clone().into(),
-                NameTypeLValue::Symbol,
+                TypeLValue::Symbol,
             ));
         }
     } else {
@@ -757,11 +766,11 @@ async fn def_task<'a>(
             RAE_DEF_TASK,
             lvalue.clone(),
             lvalue.into(),
-            NameTypeLValue::List,
+            TypeLValue::List,
         ));
     }
 
-    Ok(Nil)
+    Ok(LValue::Nil)
 }
 
 ///Takes in input a list of initial facts that will be stored in the inner world part of the State.
@@ -793,13 +802,13 @@ async fn def_initial_state<'a>(
         };
 
         ctx.env.state.update_state(state).await;
-        Ok(Nil)
+        Ok(LValue::Nil)
     } else {
         Err(WrongType(
             RAE_DEF_INITIAL_STATE,
             args[0].clone(),
             (&args[0]).into(),
-            NameTypeLValue::Map,
+            TypeLValue::Map,
         ))
     }
 }
@@ -850,7 +859,7 @@ async fn get_state<'a>(
                     RAE_GET_STATE,
                     args[0].clone(),
                     (&args[0]).into(),
-                    NameTypeLValue::Symbol,
+                    TypeLValue::Symbol,
                 ));
             }
         }

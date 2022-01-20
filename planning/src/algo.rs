@@ -2,12 +2,21 @@ use crate::structs::Constraint;
 use crate::structs::Lit;
 use crate::structs::*;
 use ompas_acting::rae::module::rae_exec::{RAE_ASSERT, RAE_RETRACT};
-use ompas_lisp::core::{eval, expand, parse, ContextCollection, LEnv};
-use ompas_lisp::language::scheme_primitives::*;
-use ompas_lisp::structs::LError::{
+use ompas_lisp::core::structs::contextcollection::ContextCollection;
+use ompas_lisp::core::structs::lcoreoperator::language::{BEGIN, EVAL};
+use ompas_lisp::core::structs::lcoreoperator::LCoreOperator;
+use ompas_lisp::core::structs::lenv::LEnv;
+use ompas_lisp::core::structs::lerror::LError;
+use ompas_lisp::core::structs::lerror::LError::{
     NotInListOfExpectedTypes, SpecialError, WrongNumberOfArgument, WrongType,
 };
-use ompas_lisp::structs::{LCoreOperator, LError, LResult, LValue, LambdaArgs, NameTypeLValue};
+use ompas_lisp::core::structs::llambda::LambdaArgs;
+use ompas_lisp::core::structs::lvalue::LValue;
+use ompas_lisp::core::structs::typelvalue::TypeLValue;
+use ompas_lisp::core::structs::LResult;
+use ompas_lisp::core::*;
+use ompas_lisp::static_eval::{eval_static, PureFonctionCollection};
+
 use ompas_utils::blocking_async;
 
 //Names of the functions
@@ -18,6 +27,22 @@ const TRANSLATE_LVALUE_TO_EXPRESSION_CHRONICLE: &str = "translate_lvalue_to_expr
 const TRANSLATE_LVALUE_TO_CHRONICLE: &str = "translate_lvalue_to_chronicle";
 
 pub fn pre_processing(lv: &LValue, context: &Context) -> LResult {
+    let lv = pre_process_transform_lambda(lv, context)?;
+
+    let lv = pre_eval(&lv, context);
+
+    lv
+}
+
+pub fn pre_eval(lv: &LValue, context: &Context) -> LResult {
+    let mut env = context.env.clone();
+    let mut ctxs = context.ctxs.clone();
+    let plv = eval_static(lv, &mut env, &mut ctxs, &PureFonctionCollection::default())?;
+
+    Ok(plv.get_lvalue().clone())
+}
+
+pub fn pre_process_transform_lambda(lv: &LValue, context: &Context) -> LResult {
     let mut lv = match transform_lambda_expression(lv, context.env.clone(), context.ctxs.clone()) {
         Ok(lv) => lv,
         Err(_) => lv.clone(),
@@ -26,7 +51,7 @@ pub fn pre_processing(lv: &LValue, context: &Context) -> LResult {
     if let LValue::List(list) = &lv {
         let mut result = vec![];
         for lv in list {
-            result.push(pre_processing(lv, context)?)
+            result.push(pre_process_transform_lambda(lv, context)?)
         }
 
         lv = result.into()
@@ -251,7 +276,7 @@ pub fn translate_lvalue_to_chronicle(
             TRANSLATE_LVALUE_TO_CHRONICLE,
             format!(
                 "chronicle can only be extracted from a lambda, here we have a {}.",
-                NameTypeLValue::from(exp)
+                TypeLValue::from(exp)
             ),
         ))
     }
@@ -506,7 +531,7 @@ pub fn translate_lvalue_to_expression_chronicle(
                     _ => {
                         return Err(SpecialError(
                             TRANSLATE_LVALUE_TO_EXPRESSION_CHRONICLE,
-                            format!("{} is not yet supported", NameTypeLValue::from(&l[0])),
+                            format!("{} is not yet supported", TypeLValue::from(&l[0])),
                         ))
                     }
                 }
@@ -577,7 +602,7 @@ pub fn translate_lvalue_to_expression_chronicle(
         lv => {
             return Err(SpecialError(
                 TRANSLATE_LVALUE_TO_EXPRESSION_CHRONICLE,
-                format!("{} not supported yet", NameTypeLValue::from(lv)),
+                format!("{} not supported yet", TypeLValue::from(lv)),
             ))
         }
     }
@@ -624,7 +649,7 @@ pub fn translate_cond_if(
                         TRANSLATE_COND_IF,
                         list[0].clone(),
                         (&list[0]).into(),
-                        NameTypeLValue::CoreOperator,
+                        TypeLValue::CoreOperator,
                     ))
                 }
             } else {
@@ -638,7 +663,7 @@ pub fn translate_cond_if(
             TRANSLATE_COND_IF,
             exp.clone(),
             exp.into(),
-            vec![NameTypeLValue::List, NameTypeLValue::Atom],
+            vec![TypeLValue::List, TypeLValue::Atom],
         )),
     }
 }
@@ -734,7 +759,7 @@ pub fn transform_lambda_expression(lv: &LValue, env: LEnv, ctxs: ContextCollecti
                 TRANSFORM_LAMBDA_EXPRESSION,
                 list[0].clone(),
                 (&list[0]).into(),
-                NameTypeLValue::Lambda,
+                TypeLValue::Lambda,
             ))
         }
     } else {
@@ -742,7 +767,7 @@ pub fn transform_lambda_expression(lv: &LValue, env: LEnv, ctxs: ContextCollecti
             TRANSFORM_LAMBDA_EXPRESSION,
             lv.clone(),
             lv.into(),
-            NameTypeLValue::List,
+            TypeLValue::List,
         ))
     }
 }

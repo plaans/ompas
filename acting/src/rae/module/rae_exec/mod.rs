@@ -16,12 +16,19 @@ use crate::rae::select_methods::sort_greedy;
 use ::macro_rules_attribute::macro_rules_attribute;
 use async_trait::async_trait;
 use log::{error, info, warn};
-use ompas_lisp::core::{ContextCollection, LEnv};
-use ompas_lisp::functions::{cons, get_map, remove_key_value_map, set, set_map, union_map};
+use ompas_lisp::core::root_module::list::cons;
+use ompas_lisp::core::root_module::map::{remove_key_value_map, set_map};
+use ompas_lisp::core::structs::lenv::LEnv;
+use ompas_lisp::core::structs::lerror::LError;
+use ompas_lisp::core::structs::lerror::LError::{SpecialError, WrongNumberOfArgument, WrongType};
+use ompas_lisp::core::structs::lnumber::LNumber;
+use ompas_lisp::core::structs::lvalue::LValue;
+use ompas_lisp::core::structs::lvalue::LValue::{Nil, True};
+use ompas_lisp::core::structs::lvalues::LValueS;
+use ompas_lisp::core::structs::module::{GetModule, InitLisp, Module};
+use ompas_lisp::core::structs::typelvalue::TypeLValue;
+use ompas_lisp::core::structs::LResult;
 use ompas_lisp::modules::doc::{Documentation, LHelp};
-use ompas_lisp::structs::LError::*;
-use ompas_lisp::structs::LValue::*;
-use ompas_lisp::structs::*;
 use ompas_utils::dyn_async;
 use std::any::Any;
 use std::collections::hash_map::RandomState;
@@ -595,7 +602,7 @@ fn get_best_method(args: &[LValue], env: &LEnv, ctx: &CtxRaeExec) -> Result<LVal
             RAE_GET_BEST_METHOD,
             methods.clone(),
             methods.into(),
-            NameTypeLValue::List,
+            TypeLValue::List,
         ));
     };
 
@@ -665,7 +672,7 @@ async fn get_state<'a>(
                     RAE_GET_STATE,
                     args[0].clone(),
                     (&args[0]).into(),
-                    NameTypeLValue::Symbol,
+                    TypeLValue::Symbol,
                 ));
             }
         }
@@ -816,7 +823,7 @@ async fn get_next_method<'a>(
             RAE_GET_NEXT_METHOD,
             args[0].clone(),
             (&args[0]).into(),
-            NameTypeLValue::Usize,
+            TypeLValue::Usize,
         ))
     }
 }
@@ -850,7 +857,7 @@ async fn set_success_for_task<'a>(
             RAE_SET_SUCCESS_FOR_TASK,
             args[0].clone(),
             (&args[0]).into(),
-            NameTypeLValue::Usize,
+            TypeLValue::Usize,
         ))
     }
 }
@@ -882,7 +889,7 @@ pub fn is_failure(args: &[LValue], _: &LEnv, _: &CtxRaeExec) -> Result<LValue, L
                     IS_FAILURE,
                     list[0].clone(),
                     (&list[0]).into(),
-                    NameTypeLValue::Other("{success,failure}".to_string()),
+                    TypeLValue::Other("{success,failure}".to_string()),
                 )),
             }
         } else {
@@ -890,7 +897,7 @@ pub fn is_failure(args: &[LValue], _: &LEnv, _: &CtxRaeExec) -> Result<LValue, L
                 IS_FAILURE,
                 list[0].clone(),
                 (&list[0]).into(),
-                NameTypeLValue::Other("{success,failure}".to_string()),
+                TypeLValue::Other("{success,failure}".to_string()),
             ))
         }
     } else {
@@ -898,7 +905,7 @@ pub fn is_failure(args: &[LValue], _: &LEnv, _: &CtxRaeExec) -> Result<LValue, L
             IS_FAILURE,
             args[0].clone(),
             (&args[0]).into(),
-            NameTypeLValue::List,
+            TypeLValue::List,
         ))
     }
 }
@@ -922,7 +929,7 @@ pub fn is_success(args: &[LValue], _: &LEnv, _: &CtxRaeExec) -> Result<LValue, L
                     IS_SUCCESS,
                     list[0].clone(),
                     (&list[0]).into(),
-                    NameTypeLValue::Other("{success,failure}".to_string()),
+                    TypeLValue::Other("{success,failure}".to_string()),
                 )),
             }
         } else {
@@ -930,7 +937,7 @@ pub fn is_success(args: &[LValue], _: &LEnv, _: &CtxRaeExec) -> Result<LValue, L
                 IS_SUCCESS,
                 list[0].clone(),
                 (&list[0]).into(),
-                NameTypeLValue::Other("{success,failure}".to_string()),
+                TypeLValue::Other("{success,failure}".to_string()),
             ))
         }
     } else {
@@ -938,7 +945,7 @@ pub fn is_success(args: &[LValue], _: &LEnv, _: &CtxRaeExec) -> Result<LValue, L
             IS_SUCCESS,
             args[0].clone(),
             (&args[0]).into(),
-            NameTypeLValue::List,
+            TypeLValue::List,
         ))
     }
 }
@@ -1021,7 +1028,7 @@ async fn fn_await<'a>(
             RAE_AWAIT,
             action_id.clone(),
             action_id.into(),
-            NameTypeLValue::Usize,
+            TypeLValue::Usize,
         ))
     }
 }*/

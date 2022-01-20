@@ -1,5 +1,7 @@
-use ompas_lisp::structs::LError::WrongType;
-use ompas_lisp::structs::{LError, LValue, NameTypeLValue};
+use ompas_lisp::core::structs::lerror::LError;
+use ompas_lisp::core::structs::lerror::LError::WrongType;
+use ompas_lisp::core::structs::lvalue::LValue;
+use ompas_lisp::core::structs::typelvalue::TypeLValue;
 
 //Does nothing particular for the moment
 pub fn sort_greedy(methods: LValue) -> Result<LValue, LError> {
@@ -27,7 +29,7 @@ pub fn sort_greedy(methods: LValue) -> Result<LValue, LError> {
             "select_first_applicable_method",
             methods.clone(),
             methods.into(),
-            NameTypeLValue::List,
+            TypeLValue::List,
         ))
     }
 }

@@ -1,6 +1,7 @@
 use im::HashMap;
-use ompas_lisp::structs::LError::SpecialError;
-use ompas_lisp::structs::{LError, LValue};
+use ompas_lisp::core::structs::lerror::LError;
+use ompas_lisp::core::structs::lerror::LError::SpecialError;
+use ompas_lisp::core::structs::lvalue::LValue;
 use ompas_utils::other::get_and_update_id_counter;
 use std::cell::Ref;
 use std::fmt::{Debug, Display, Formatter};

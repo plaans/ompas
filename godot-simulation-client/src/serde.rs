@@ -1,7 +1,9 @@
 use aries_planning::parsing::sexpr::SExpr;
 use ompas_acting::rae::context::rae_state::ActionStatus::*;
 use ompas_acting::rae::context::rae_state::{ActionStatus, LState, StateType};
-use ompas_lisp::structs::{LError, LValue, LValueS};
+use ompas_lisp::core::structs::lerror::LError;
+use ompas_lisp::core::structs::lvalue::LValue;
+use ompas_lisp::core::structs::lvalues::LValueS;
 use serde::{Deserialize, Serialize, Serializer};
 use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};

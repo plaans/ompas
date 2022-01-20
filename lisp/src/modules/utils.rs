@@ -14,45 +14,66 @@
 //! => ((1 3)(1 4)(2 3)(2 4))
 //! ```
 
-use crate::core::LEnv;
+use crate::core::structs::lcoreoperator::LCoreOperator;
+use crate::core::structs::lenv::LEnv;
+use crate::core::structs::lerror::LError;
+use crate::core::structs::lerror::LError::{SpecialError, WrongNumberOfArgument, WrongType};
+use crate::core::structs::lvalue::LValue;
+use crate::core::structs::module::{GetModule, Module};
+use crate::core::structs::typelvalue::TypeLValue;
 use crate::modules::doc::{Documentation, LHelp};
+use crate::modules::utils::language::*;
 use crate::static_eval::{PureFonction, PureFonctionCollection};
-use crate::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
-use crate::structs::LValue::Nil;
-use crate::structs::{GetModule, LCoreOperator, LError, LValue, Module, NameTypeLValue};
 use aries_utils::StreamingIterator;
 use rand::Rng;
 use std::ops::Deref;
 use std::sync::Arc;
 
 //LANGUAGE
+pub mod language {
+    pub const MOD_UTILS: &str = "utils";
+    pub const RAND_ELEMENT: &str = "rand-element";
+    pub const ENUMERATE: &str = "enumerate";
+    pub const CONTAINS: &str = "contains";
+    pub const SUB_LIST: &str = "sublist";
+    pub const QUOTE_LIST: &str = "quote-list";
+    pub const TRANSFORM_IN_SINGLETON_LIST: &str = "transform-in-singleton-list";
 
-const MOD_UTILS: &str = "utils";
-const RAND_ELEMENT: &str = "rand-element";
-const ENUMERATE: &str = "enumerate";
-const CONTAINS: &str = "contains";
-const SUB_LIST: &str = "sublist";
-const QUOTE_LIST: &str = "quote-list";
-const TRANSFORM_IN_SINGLETON_LIST: &str = "transform-in-singleton-list";
+    pub const LET: &str = "let";
+    pub const LET_STAR: &str = "let*";
+    pub const COND: &str = "cond";
+    pub const TEST_MACRO: &str = "test-macro";
+    //Not yet implemented
+    pub const FN_MAP: &str = "map";
+    pub const APPLY: &str = "APPLY";
+    pub const ZIP: &str = "zip";
+    pub const UNZIP: &str = "unzip";
+    pub const COMBINE: &str = "combine";
 
-// Documentation
-const DOC_MOD_UTILS: &str = "collection of utility functions.";
-const DOC_MOD_UTILS_VERBOSE: &str = "functions:\n\
+    // Documentation
+    pub const DOC_MOD_UTILS: &str = "collection of utility functions.";
+    pub const DOC_MOD_UTILS_VERBOSE: &str = "functions:\n\
 -rand-element\n\
 -enumerate\n\
 -contains\n\
 -sublist\n\
 -transfrom-in-singleton-list\n";
-const DOC_RAND_ELEMENT: &str = "Return a random element of a list";
-const DOC_RAND_ELEMENT_VERBOSE: &str = "Example: \n(rand-element (list 1 2 3 4))\n=> 1";
-const DOC_ENUMERATE: &str =
-    "Return a enumeration of all possible combinations of elements of 1+ lists";
-const DOC_ENUMERATE_VERBOSE: &str =
-    "Example: \n(enumerate (list 1 2) (list 3 4))\n=> ((1 3)(1 4)(2 3)(2 4))";
-const DOC_CONTAINS: &str =
-    "Returns true if a LValue is contains into an other (for a map if the key is inside it)";
-const DOC_SUB_LIST: &str = "Returns a sublist of a list";
-const DOC_TRANSFORM_IN_SINGLETON_LIST: &str = "todo!";
+    pub const DOC_RAND_ELEMENT: &str = "Return a random element of a list";
+    pub const DOC_RAND_ELEMENT_VERBOSE: &str = "Example: \n(rand-element (list 1 2 3 4))\n=> 1";
+    pub const DOC_ENUMERATE: &str =
+        "Return a enumeration of all possible combinations of elements of 1+ lists";
+    pub const DOC_ENUMERATE_VERBOSE: &str =
+        "Example: \n(enumerate (list 1 2) (list 3 4))\n=> ((1 3)(1 4)(2 3)(2 4))";
+    pub const DOC_CONTAINS: &str =
+        "Returns true if a LValue is contains into an other (for a map if the key is inside it)";
+    pub const DOC_SUB_LIST: &str = "Returns a sublist of a list";
+    pub const DOC_TRANSFORM_IN_SINGLETON_LIST: &str = "todo!";
+
+    pub const DOC_LET: &str = "Macro used to abstract variable binding in functional programming.";
+    pub const DOC_LET_STAR: &str = "Macro used to abstract variable binding in functional programming.\
+    The difference with let is that you can bind variables in function of previously bound variables.";
+    pub const DOC_MACRO_TEST_MACRO: &str = "Test the macro expansion. Used mainly for debug";
+}
 
 //MACROS
 pub const MACRO_TEST_MACRO: &str = "(defmacro test-macro
@@ -299,6 +320,9 @@ impl Documentation for CtxUtils {
             LHelp::new(SUB_LIST, DOC_SUB_LIST),
             LHelp::new(CONTAINS, DOC_CONTAINS),
             LHelp::new(TRANSFORM_IN_SINGLETON_LIST, DOC_TRANSFORM_IN_SINGLETON_LIST),
+            LHelp::new(LET, DOC_LET),
+            LHelp::new(LET_STAR, DOC_LET_STAR),
+            LHelp::new(TEST_MACRO, DOC_MACRO_TEST_MACRO),
         ]
     }
 }
@@ -309,8 +333,8 @@ impl Documentation for CtxUtils {
 ///``` rust    #[allow(unused_mut)]
 
 /// use ompas_lisp::modules::utils::{CtxUtils, enumerate};
-/// use ompas_lisp::structs::LValue;
-/// use ompas_lisp::core::LEnv;
+/// use ompas_lisp::core::structs::lvalue::LValue;
+/// use ompas_lisp::core::structs::lenv::LEnv;
 /// let lists: &[LValue] = &[vec![1,2,3].into(), vec![4,5,6].into()];
 /// let enumeration = enumerate(lists, &LEnv::default(), &());
 /// ```
@@ -360,7 +384,7 @@ pub fn rand_element(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError>
                     RAND_ELEMENT,
                     args[0].clone(),
                     (&args[0]).into(),
-                    NameTypeLValue::Symbol,
+                    TypeLValue::Symbol,
                 ))
             }
         }
@@ -420,7 +444,7 @@ pub fn sublist(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
                         SUB_LIST,
                         args[1].clone(),
                         (&args[1]).into(),
-                        NameTypeLValue::Number,
+                        TypeLValue::Number,
                     ))
                 }
             } else {
@@ -428,7 +452,7 @@ pub fn sublist(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
                     SUB_LIST,
                     args[0].clone(),
                     (&args[0]).into(),
-                    NameTypeLValue::List,
+                    TypeLValue::List,
                 ))
             }
         }
@@ -451,7 +475,7 @@ pub fn sublist(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
                             SUB_LIST,
                             args[1].clone(),
                             (&args[2]).into(),
-                            NameTypeLValue::Number,
+                            TypeLValue::Number,
                         ))
                     }
                 } else {
@@ -459,7 +483,7 @@ pub fn sublist(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
                         SUB_LIST,
                         args[1].clone(),
                         (&args[1]).into(),
-                        NameTypeLValue::Number,
+                        TypeLValue::Number,
                     ))
                 }
             } else {
@@ -467,7 +491,7 @@ pub fn sublist(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
                     SUB_LIST,
                     args[0].clone(),
                     (&args[0]).into(),
-                    NameTypeLValue::List,
+                    TypeLValue::List,
                 ))
             }
         }
@@ -497,13 +521,13 @@ pub fn quote_list(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
         }
         Ok(vec.into())
     } else if let LValue::Nil = &args[0] {
-        Ok(Nil)
+        Ok(LValue::Nil)
     } else {
         Err(WrongType(
             QUOTE_LIST,
             args[0].clone(),
             (&args[0]).into(),
-            NameTypeLValue::List,
+            TypeLValue::List,
         ))
     }
 }
@@ -527,17 +551,15 @@ pub fn transform_in_singleton_list(args: &[LValue], _: &LEnv, _: &()) -> Result<
 
 #[cfg(test)]
 mod test {
-    use crate::core::{parse, LEnv};
+    use crate::core::parse;
     use crate::modules::utils::*;
-    use crate::structs::LError;
-    use crate::structs::LValue::True;
     use crate::test_utils::{test_expression, TestExpression};
 
     #[test]
     fn test_contains() -> Result<(), LError> {
         let lv: &[LValue] = &[vec![1, 2, 3, 4, 5, 6].into(), 6.into()];
         let result = contains(lv, &LEnv::empty(), &())?;
-        assert_eq!(result, True);
+        assert_eq!(result, LValue::True);
         Ok(())
     }
 

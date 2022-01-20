@@ -1,12 +1,17 @@
-use crate::core::ImportType::{WithPrefix, WithoutPrefix};
-use crate::core::{import, ContextCollection, CtxRoot, ImportType, LEnv};
+use crate::core::root_module::CtxRoot;
+use crate::core::structs::contextcollection::ContextCollection;
+use crate::core::structs::lenv::ImportType::{WithPrefix, WithoutPrefix};
+use crate::core::structs::lenv::{import, ImportType, LEnv};
+use crate::core::structs::lerror::LError;
+use crate::core::structs::lerror::LError::WrongNumberOfArgument;
+use crate::core::structs::lvalue::LValue;
+use crate::core::structs::module::{GetModule, Module};
+use crate::core::structs::LResult;
+use crate::modules::advanced_math::CtxMath;
 use crate::modules::doc::{Documentation, LHelp};
 use crate::modules::error::CtxError;
-use crate::modules::math::CtxMath;
 use crate::modules::utils::CtxUtils;
 use crate::static_eval::{eval_static, expand_static, PureFonction, PureFonctionCollection};
-use crate::structs::LError::WrongNumberOfArgument;
-use crate::structs::{GetModule, LError, LResult, LValue, Module};
 use std::sync::Arc;
 
 /*

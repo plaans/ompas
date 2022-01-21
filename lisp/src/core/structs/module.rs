@@ -1,5 +1,7 @@
-use crate::core::structs::function::*;
+use crate::core::structs::documentation::Documentation;
 use crate::core::structs::lvalue::LValue;
+use crate::core::structs::new_function::*;
+use crate::core::structs::purefonction::PureFonctionCollection;
 use std::any::Any;
 use std::sync::Arc;
 
@@ -43,11 +45,7 @@ pub struct Module {
 
 impl Module {
     /// Add a function to the module.
-    pub fn add_fn_prelude<T: 'static + Send + Sync, L: ToString>(
-        &mut self,
-        label: L,
-        fun: NativeFn<T>,
-    ) {
+    pub fn add_fn_prelude<L: ToString>(&mut self, label: L, fun: NativeFn) {
         self.prelude.push((
             label.to_string(),
             LValue::Fn(LFn::new(fun, label.to_string())),
@@ -55,7 +53,7 @@ impl Module {
     }
 
     /// Add a mutate function to the module.
-    pub fn add_mut_fn_prelude<
+    /*pub fn add_mut_fn_prelude<
         T: 'static,
         //R: Into<Result<LValue, LError>>,
         //F: Fn(&[LValue], &LEnv, &mut T) -> R + 'static,
@@ -69,24 +67,15 @@ impl Module {
             label.to_string(),
             LValue::MutFn(LMutFn::new(fun, label.to_string())),
         ))
-    }
+    }*/
 
-    pub fn add_async_fn_prelude<
-        T: 'static,
-        //R: Into<Result<LValue, LError>>,
-        //F: Fn(&[LValue], &LEnv, &mut T) -> R + 'static,
-        L: ToString,
-    >(
-        &mut self,
-        label: L,
-        fun: AsyncNativeFn<T>,
-    ) {
+    pub fn add_async_fn_prelude<L: ToString>(&mut self, label: L, fun: AsyncNativeFn) {
         self.prelude.push((
             label.to_string(),
             LValue::AsyncFn(LAsyncFn::new(fun, label.to_string())),
         ))
     }
-    pub fn add_async_mut_fn_prelude<
+    /*pub fn add_async_mut_fn_prelude<
         T: 'static,
         //R: Into<Result<LValue, LError>>,
         //F: Fn(&[LValue], &LEnv, &mut T) -> R + 'static,
@@ -100,7 +89,7 @@ impl Module {
             label.to_string(),
             LValue::AsyncMutFn(LAsyncMutFn::new(fun, label.to_string())),
         ))
-    }
+    }*/
 
     /// Add a LValue to the prelude.
     pub fn add_prelude(&mut self, label: &str, lv: LValue) {
@@ -110,17 +99,29 @@ impl Module {
 
 /// Trait that must be implemented by a context to build a Module object
 /// that will be loaded into the LEnv and ContextCollection.
-pub trait GetModule {
-    fn get_module(self) -> Module;
+pub trait IntoModule {
+    fn into_module(self) -> Module;
+
+    fn documentation(&self) -> Documentation;
+
+    fn pure_fonctions(&self) -> PureFonctionCollection;
 }
 
-impl GetModule for () {
-    fn get_module(self) -> Module {
+impl IntoModule for () {
+    fn into_module(self) -> Module {
         Module {
             ctx: Arc::new(self),
             prelude: vec![],
             raw_lisp: Default::default(),
             label: "()".to_string(),
         }
+    }
+
+    fn documentation(&self) -> Documentation {
+        todo!()
+    }
+
+    fn pure_fonctions(&self) -> PureFonctionCollection {
+        todo!()
     }
 }

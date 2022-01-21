@@ -1,26 +1,139 @@
 use crate::core::root_module::language::SET;
 use crate::core::root_module::CtxRoot;
 use crate::core::structs::contextcollection::ContextCollection;
-use crate::core::structs::lerror::LError;
-use crate::core::structs::lerror::LError::UndefinedSymbol;
+use crate::core::structs::documentation::{Documentation, LHelp};
+use crate::core::structs::lcoreoperator::language::*;
+use crate::core::structs::lenv::language::*;
+use crate::core::structs::lerror::LError::{UndefinedSymbol, WrongNumberOfArgument, WrongType};
+use crate::core::structs::lerror::{LError, LResult};
 use crate::core::structs::llambda::LLambda;
 use crate::core::structs::lvalue::LValue;
-use crate::core::structs::module::GetModule;
+use crate::core::structs::module::IntoModule;
+use crate::core::structs::new_function::*;
+use crate::core::structs::purefonction::PureFonctionCollection;
+use crate::core::structs::typelvalue::TypeLValue;
 use crate::core::{eval, parse};
+use anyhow::{anyhow, bail};
 use im::HashSet;
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
+use std::sync::Arc;
+use tokio::sync::RwLock;
+
+pub mod language {
+
+    pub const ENV_GET_KEYS: &str = "env.get_keys"; //return a list of keys of the environment
+    pub const ENV_GET_MACROS: &str = "env.get_macros";
+    pub const ENV_GET_MACRO: &str = "env.get_macro";
+
+    pub const HELP: &str = "help";
+    pub const DOC_HELP: &str =
+        "Give a list of all the available functions added by the modules and available in the core.";
+    pub const DOC_HELP_VERBOSE: &str = "takes 0..1 arguments:\
+                                -no argument: give the list of all the functions\n\
+                                -1 argument: give the documentation of the function.";
+}
 
 /// Structs used to store the Scheme Environment
 /// - It contains a mapping of <symbol(String), LValue>
 /// - It also contains macros, special LLambdas used to format LValue expressions.
 /// - A LEnv can inherits from an outer environment. It can use symbols from it, but not modify them.
 #[derive(Clone, Debug)]
-pub struct LEnv {
+pub struct InnerLEnv {
     symbols: im::HashMap<String, LValue>,
     macro_table: im::HashMap<String, LLambda>,
-    //pub(crate) new_entries: Vec<String>, Used to export new entries, but not really important in the end
-    outer: Option<Box<LEnv>>,
-    //task_handler: TaskHandler
+    ctxs: Arc<RwLock<ContextCollection>>,
+    pfc: Arc<RwLock<PureFonctionCollection>>,
+    documentation: Arc<RwLock<Documentation>>,
+    outer: Option<Arc<LEnv>>,
+}
+
+impl InnerLEnv {
+    pub async fn get_documentation(&self) -> Documentation {
+        self.documentation.read().await.clone()
+    }
+
+    pub async fn add_documentation(&mut self, doc: Documentation) {
+        self.documentation.write().await.append(doc)
+    }
+
+    pub async fn add_pure_functions(&mut self, pfc: PureFonctionCollection) {
+        self.pfc.write().await.append(pfc);
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct LEnv {
+    inner: Arc<InnerLEnv>,
+}
+
+impl LEnv {
+    pub fn get_context<T>(&self, label: &str) -> Result<&T, anyhow::Error> {
+        self.inner.ctxs.read().get::<T>(label)
+    }
+
+    pub async fn get_mut_context<T>(&self, label: &str) -> Result<&mut T, anyhow::Error> {
+        self.inner.ctxs.read().get_mut::<T>(label)
+    }
+
+    pub async fn get_documentation(&self) -> Documentation {
+        self.inner.get_documentation().await
+    }
+
+    pub async fn add_documentation(&self, doc: Documentation) {
+        self.inneradd_documentation(doc).await
+    }
+
+    pub async fn add_pure_functions(&self, pfc: PureFonctionCollection) {
+        self.inner.add_pure_fonctions(pfc).await
+    }
+}
+
+impl From<InnerLEnv> for LEnv {
+    fn from(inner_lenv: InnerLEnv) -> Self {
+        Self {
+            inner: Arc::new(inner_lenv),
+        }
+    }
+}
+
+impl Default for LEnv {
+    fn default() -> Self {
+        let mut symbols = HashMap::default();
+        let documentation = vec![
+            LHelp::new_verbose(HELP, DOC_HELP, DOC_HELP_VERBOSE),
+            LHelp::new(DEFINE, DOC_DEFINE),
+            LHelp::new_verbose(LAMBDA, DOC_LAMBDA, DOC_LAMBDA_VEBROSE),
+            LHelp::new(DEF_MACRO, DOC_DEF_MACRO),
+            LHelp::new(IF, DOC_IF),
+            LHelp::new(QUOTE, DOC_QUOTE),
+            LHelp::new(QUASI_QUOTE, QUASI_QUOTE),
+            LHelp::new(UNQUOTE, DOC_UNQUOTE),
+            LHelp::new_verbose(BEGIN, DOC_BEGIN, DOC_BEGIN_VERBOSE),
+            LHelp::new(AWAIT, DOC_AWAIT),
+            LHelp::new(ASYNC, DOC_ASYNC),
+            LHelp::new(EVAL, DOC_EVAL),
+        ]
+        .into();
+        let pfc = PureFonctionCollection::default();
+
+        symbols.insert(HELP, LFn::new(help, HELP.to_string()));
+
+        symbols.insert(ENV_GET_KEYS, LFn::new(env_get_keys, ENV_GET_KEYS));
+        symbols.insert(ENV_GET_MACROS, LFn::new(env_get_macros, ENV_GET_MACROS));
+        symbols.insert(ENV_GET_MACRO, LFn::new(env_get_macro, ENV_GET_MACRO));
+
+        Self {
+            inner: Arc::new(InnerLEnv {
+                symbols: Default::default(),
+                macro_table: Default::default(),
+                ctxs: Arc::new(Default::default()),
+                pfc: Arc::new(Default::default()),
+                documentation: Arc::new(documentation),
+                outer: None,
+            }),
+        }
+    }
 }
 
 impl LEnv {
@@ -29,29 +142,14 @@ impl LEnv {
     }
     /// Returns the env with all the basic functions, the ContextCollection with CtxRoot
     /// and InitialLisp containing the definition of macros and lambdas,
-    pub async fn root() -> (Self, ContextCollection) {
+    pub async fn root() -> Self {
         // let map = im::hashmap::HashMap::new();
         // map.ins
         let mut env = LEnv::default();
-        let mut ctxs = ContextCollection::default();
-        import(
-            &mut env,
-            &mut ctxs,
-            CtxRoot::default(),
-            ImportType::WithoutPrefix,
-        )
-        .await
-        .expect("error while loading module root");
-        (env, ctxs)
-    }
-
-    pub fn empty() -> Self {
-        LEnv {
-            symbols: Default::default(),
-            macro_table: Default::default(),
-            //new_entries: vec![],
-            outer: None,
-        }
+        env.import(CtxRoot::default(), ImportType::WithoutPrefix)
+            .await
+            .expect("error while loading module root");
+        env
     }
 
     pub fn set_outer(&mut self, outer: Self) {
@@ -122,6 +220,38 @@ impl LEnv {
         }
         macros
     }
+
+    pub async fn import(
+        &mut self,
+        ctx: impl IntoModule,
+        import_type: ImportType,
+    ) -> Result<(), LError> {
+        self.add_documentation(ctx.documentation());
+        self.add_pure_functions(ctx.pure_fonctions());
+
+        let mut module = ctx.into_module();
+        self.inner.ctxs.insert(module.ctx, module.label.clone());
+        //println!("id: {}", id);
+        for (sym, lv) in &mut module.prelude {
+            match import_type {
+                ImportType::WithPrefix => {
+                    self.insert(format!("{}::{}", module.label, sym.to_string()), lv.clone());
+                }
+                ImportType::WithoutPrefix => {
+                    self.insert(sym.to_string(), lv.clone());
+                }
+            }
+        }
+
+        for element in module.raw_lisp.inner() {
+            let lvalue = parse(element, self).await?;
+
+            if lvalue != LValue::Nil {
+                eval(&lvalue, self).await?;
+            }
+        }
+        Ok(())
+    }
 }
 
 impl Display for LEnv {
@@ -155,114 +285,65 @@ pub enum ImportType {
     WithoutPrefix,
 }
 
-pub async fn import(
-    env: &mut LEnv,
-    ctxs: &mut ContextCollection,
-    ctx: impl GetModule,
-    import_type: ImportType,
-) -> Result<(), LError> {
-    let mut module = ctx.get_module();
-    let id = ctxs.insert(module.ctx, module.label.clone());
-    //println!("id: {}", id);
-    for (sym, lv) in &mut module.prelude {
-        match lv {
-            LValue::Fn(fun) => fun.set_index_mod(id),
-            LValue::MutFn(fun) => fun.set_index_mod(id),
-            LValue::AsyncFn(fun) => fun.set_index_mod(id),
-            LValue::AsyncMutFn(fun) => fun.set_index_mod(id),
-            _ => {}
-        }
-        match import_type {
-            ImportType::WithPrefix => {
-                env.insert(format!("{}::{}", module.label, sym.to_string()), lv.clone());
-            }
-            ImportType::WithoutPrefix => {
-                env.insert(sym.to_string(), lv.clone());
-            }
-        }
-    }
-
-    for element in module.raw_lisp.inner() {
-        let lvalue = parse(element, env, ctxs).await?;
-
-        if lvalue != LValue::Nil {
-            eval(&lvalue, env, ctxs).await?;
-        }
-    }
-    Ok(())
+/// Returns a list of all the keys present in the environment
+pub fn env_get_keys(_: &[LValue], env: &LEnv) -> LResult {
+    Ok(env
+        .keys()
+        .iter()
+        .map(|x| LValue::from(x.clone()))
+        .collect::<Vec<LValue>>()
+        .into())
 }
 
-/*
-#[derive(Clone)]
-pub struct RefLEnv(Rc<LEnv>);
+pub fn env_get_macros(_: &[LValue], env: &LEnv) -> LResult {
+    Ok(env
+        .macros()
+        .iter()
+        .map(|x| LValue::from(x.clone()))
+        .collect::<Vec<LValue>>()
+        .into())
+}
 
-impl Default for RefLEnv {
-    fn default() -> Self {
-        RefLEnv(Rc::new(LEnv::default()))
+pub fn env_get_macro(args: &[LValue], env: &LEnv) -> LResult {
+    if args.len() != 1 {
+        return bail!(WrongNumberOfArgument(
+            ENV_GET_MACRO,
+            args.into(),
+            args.len(),
+            1..1,
+        ));
+    }
+    if let LValue::Symbol(s) = &args[0] {
+        Ok(match env.get_macro(s).cloned() {
+            Some(l) => l.into(),
+            None => LValue::Nil,
+        })
+    } else {
+        bail!(WrongType(
+            ENV_GET_MACRO,
+            args[0].clone(),
+            (&args[0]).into(),
+            TypeLValue::Symbol,
+        ))
     }
 }
 
-impl From<LEnv> for RefLEnv {
-    fn from(e: LEnv) -> Self {
-        RefLEnv(Rc::new(e))
+///print the help
+/// Takes 0 or 1 parameter.
+/// 0 parameter: gives the list of all the functions
+/// 1 parameter: write the help of
+pub fn help(args: &[LValue], env: &LEnv) -> LResult {
+    let documentation: Arc<Documentation> = env.get_documentation()?;
+
+    match args.len() {
+        0 => Ok(documentation.get_all().into()),
+        1 => match &args[0] {
+            LValue::Fn(fun) => Ok(LValue::String(documentation.get(fun.get_label()))),
+            LValue::MutFn(fun) => Ok(LValue::String(documentation.get(fun.get_label()))),
+            LValue::Symbol(s) => Ok(LValue::String(documentation.get(s))),
+            LValue::CoreOperator(co) => Ok(LValue::String(documentation.get(&co.to_string()))),
+            lv => bail!(WrongType(HELP, lv.clone(), lv.into(), TypeLValue::Symbol)),
+        },
+        _ => bail!(WrongNumberOfArgument(HELP, args.into(), args.len(), 0..1)),
     }
 }
-
-impl RefLEnv {
-    pub fn clone_from_root(&self) -> LEnv {
-        let mut env = self.0.deref().clone();
-        let outer = env.outer.clone();
-        match outer {
-            None => {}
-            Some(s) => env.merge_by_symbols(&s.clone().clone_from_root()),
-        };
-        env.outer = None;
-        env.into()
-    }
-}
-
-impl RefLEnv {
-    pub fn keys(&self) -> Vec<String> {
-        let mut keys: Vec<String> = self.symbols.keys().cloned().collect();
-        keys.append(&mut self.macro_table.keys().cloned().collect());
-        if let Some(outer) = self.outer.clone() {
-            keys.append(&mut outer.keys())
-        }
-        keys
-    }
-
-    pub fn root() -> Self {
-        RefLEnv(Rc::new(LEnv::root()))
-    }
-
-    pub fn new(env: LEnv) -> Self {
-        RefLEnv(Rc::new(env))
-    }
-
-    pub fn new_from_outer(outer: RefLEnv) -> Self {
-        RefLEnv(Rc::new(LEnv {
-            symbols: Default::default(),
-            macro_table: Default::default(),
-            //new_entries: vec![],
-            //outer: Some(outer),
-        }))
-    }
-
-    pub fn empty() -> Self {
-        RefLEnv(Rc::new(LEnv::empty()))
-    }
-}
-
-impl Deref for RefLEnv {
-    type Target = LEnv;
-
-    fn deref(&self) -> &Self::Target {
-        &(self.0)
-    }
-}
-
-impl DerefMut for RefLEnv {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        Rc::get_mut(&mut self.0).unwrap()
-    }
-}*/

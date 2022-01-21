@@ -5,7 +5,6 @@ use crate::core::structs::lcoreoperator::language::*;
 use crate::core::structs::lcoreoperator::LCoreOperator;
 use crate::core::structs::lcoreoperator::LCoreOperator::Quote;
 use crate::core::structs::lenv::LEnv;
-use crate::core::structs::lerror::LError;
 use crate::core::structs::lerror::LError::{
     NotInListOfExpectedTypes, SpecialError, WrongNumberOfArgument, WrongType,
 };
@@ -20,10 +19,12 @@ use async_recursion::async_recursion;
 use std::any::Any;
 use std::convert::TryFrom;
 use std::sync::atomic::Ordering;
-pub mod functions;
+
 pub mod language;
 pub mod root_module;
 pub mod structs;
+use crate::core::structs::lerror::LResult;
+use anyhow::bail;
 use std::convert::TryInto;
 use std::sync::atomic::AtomicBool;
 
@@ -46,17 +47,10 @@ pub fn get_debug() -> bool {
 }
 
 /// Parse an str and returns an expanded LValue
-pub async fn parse(
-    str: &str,
-    env: &mut LEnv,
-    ctxs: &mut ContextCollection,
-) -> Result<LValue, LError> {
+pub async fn parse(str: &str, env: &LEnv) -> LResult {
     match aries_planning::parsing::sexpr::parse(str) {
-        Ok(se) => expand(&parse_into_lvalue(&se), true, env, ctxs).await,
-        Err(e) => Err(SpecialError(
-            "parse",
-            format!("Error in command: {}", e.to_string()),
-        )),
+        Ok(se) => expand(&parse_into_lvalue(&se), true, env).await,
+        Err(e) => bail!(format!("bail!or in command: {}", e.to_string()),),
     }
 }
 
@@ -167,12 +161,7 @@ pub fn parse_into_lvalue(se: &SExpr) -> LValue {
 
 /// Expand LValues Expressions as Macros
 #[async_recursion]
-pub async fn expand(
-    x: &LValue,
-    top_level: bool,
-    env: &mut LEnv,
-    ctxs: &mut ContextCollection,
-) -> Result<LValue, LError> {
+pub async fn expand(x: &LValue, top_level: bool, env: &LEnv) -> LResult {
     match x {
         LValue::List(list) => {
             if let Ok(co) = LCoreOperator::try_from(&list[0]) {
@@ -180,7 +169,7 @@ pub async fn expand(
                     LCoreOperator::Define | LCoreOperator::DefMacro => {
                         //eprintln!("expand: define: Ok!");
                         if list.len() < 3 {
-                            return Err(WrongNumberOfArgument(
+                            bail!(WrongNumberOfArgument(
                                 "expand",
                                 x.clone(),
                                 list.len(),
@@ -202,36 +191,29 @@ pub async fn expand(
                                         &vec![def.into(), f.clone(), new_body.into()].into(),
                                         top_level,
                                         env,
-                                        ctxs,
                                     )
                                     .await;
                                 }
                             }
                             LValue::Symbol(sym) => {
                                 if list.len() != 3 {
-                                    return Err(WrongNumberOfArgument(
+                                    bail!(WrongNumberOfArgument(
                                         "expand",
                                         x.clone(),
                                         list.len(),
                                         3..3,
                                     ));
                                 }
-                                let exp = expand(&list[2], top_level, env, ctxs).await?;
+                                let exp = expand(&list[2], top_level, env).await?;
                                 //println!("after expansion: {}", exp);
                                 if def == LCoreOperator::DefMacro {
                                     if !top_level {
-                                        return Err(SpecialError(
-                                            "expand",
-                                            format!("{}: defmacro only allowed at top level", x),
-                                        ));
+                                        bail!(format!("{}: defmacro only allowed at top level", x),);
                                     }
-                                    let proc = eval(&exp, &mut env.clone(), ctxs).await?;
+                                    let proc = eval(&exp, &mut env.clone()).await?;
                                     //println!("new macro: {}", proc);
                                     if !matches!(proc, LValue::Lambda(_)) {
-                                        return Err(SpecialError(
-                                            "expand",
-                                            format!("{}: macro must be a procedure", proc),
-                                        ));
+                                        bail!(format!("{}: macro must be a procedure", proc),);
                                     } else {
                                         env.add_macro(sym.clone(), proc.try_into()?);
                                     }
@@ -245,18 +227,13 @@ pub async fn expand(
                                 );
                             }
                             _ => {
-                                return Err(WrongType(
-                                    "expand",
-                                    x.clone(),
-                                    x.into(),
-                                    TypeLValue::Symbol,
-                                ))
+                                bail!(WrongType("expand", x.clone(), x.into(), TypeLValue::Symbol,))
                             }
                         }
                     }
                     LCoreOperator::DefLambda => {
                         if list.len() < 3 {
-                            return Err(WrongNumberOfArgument(
+                            bail!(WrongNumberOfArgument(
                                 "expand",
                                 x.clone(),
                                 list.len(),
@@ -270,16 +247,13 @@ pub async fn expand(
                             LValue::List(vars_list) => {
                                 for v in vars_list {
                                     if !matches!(v, LValue::Symbol(_)) {
-                                        return Err(SpecialError(
-                                            "expand",
-                                            format!("illegal lambda argument list: {}", x),
-                                        ));
+                                        bail!(format!("illegal lambda argument list: {}", x),);
                                     }
                                 }
                             }
                             LValue::Symbol(_) | LValue::Nil => {}
                             lv => {
-                                return Err(NotInListOfExpectedTypes(
+                                bail!(NotInListOfExpectedTypes(
                                     "expand",
                                     lv.clone(),
                                     lv.into(),
@@ -297,7 +271,7 @@ pub async fn expand(
                         return Ok(vec![
                             LCoreOperator::DefLambda.into(),
                             vars.clone(),
-                            expand(&exp, top_level, env, ctxs).await?,
+                            expand(&exp, top_level, env).await?,
                         ]
                         .into());
                     }
@@ -307,7 +281,7 @@ pub async fn expand(
                             list.push(LValue::Nil);
                         }
                         if list.len() != 4 {
-                            return Err(WrongNumberOfArgument(
+                            bail!(WrongNumberOfArgument(
                                 "expand",
                                 (&list).into(),
                                 list.len(),
@@ -317,14 +291,14 @@ pub async fn expand(
                         //return map(expand, x)
                         let mut expanded_list = vec![LCoreOperator::If.into()];
                         for x in &list[1..] {
-                            expanded_list.push(expand(x, false, env, ctxs).await?)
+                            expanded_list.push(expand(x, false, env).await?)
                         }
                         return Ok(expanded_list.into());
                     }
                     LCoreOperator::Quote => {
                         //println!("expand: quote: Ok!");
                         if list.len() != 2 {
-                            return Err(WrongNumberOfArgument(
+                            bail!(WrongNumberOfArgument(
                                 "expand",
                                 list.into(),
                                 list.len(),
@@ -339,14 +313,14 @@ pub async fn expand(
                         } else {
                             let mut expanded_list = vec![LCoreOperator::Begin.into()];
                             for x in &list[1..] {
-                                expanded_list.push(expand(x, top_level, env, ctxs).await?)
+                                expanded_list.push(expand(x, top_level, env).await?)
                             }
                             Ok(expanded_list.into())
                         }
                     }
                     LCoreOperator::QuasiQuote => {
                         return if list.len() != 2 {
-                            Err(WrongNumberOfArgument(
+                            bail!(WrongNumberOfArgument(
                                 "expand",
                                 list.into(),
                                 list.len(),
@@ -357,19 +331,16 @@ pub async fn expand(
                             //println!("{}", expanded);
                             //to expand quasiquote recursively
                             expand(&expanded, top_level, env, ctxs);*/
-                            expand(&expand_quasi_quote(&list[1], env)?, top_level, env, ctxs).await
+                            expand(&expand_quasi_quote(&list[1], env)?, top_level, env).await
                             //Ok(expanded)
                         };
                     }
                     LCoreOperator::UnQuote => {
-                        return Err(SpecialError(
-                            "expand",
-                            "unquote must be inside a quasiquote expression".to_string(),
-                        ))
+                        bail!("unquote must be inside a quasiquote expression".to_string(),)
                     }
                     LCoreOperator::Async => {
                         return if list.len() != 2 {
-                            Err(WrongNumberOfArgument(
+                            bail!(WrongNumberOfArgument(
                                 "expand",
                                 list.into(),
                                 list.len(),
@@ -377,13 +348,13 @@ pub async fn expand(
                             ))
                         } else {
                             let mut expanded = vec![LCoreOperator::Async.into()];
-                            expanded.push(expand(&list[1], top_level, env, ctxs).await?);
+                            expanded.push(expand(&list[1], top_level, env).await?);
                             Ok(expanded.into())
                         }
                     }
                     LCoreOperator::Await => {
                         return if list.len() != 2 {
-                            Err(WrongNumberOfArgument(
+                            bail!(WrongNumberOfArgument(
                                 "expand",
                                 list.into(),
                                 list.len(),
@@ -391,13 +362,13 @@ pub async fn expand(
                             ))
                         } else {
                             let mut expanded = vec![LCoreOperator::Await.into()];
-                            expanded.push(expand(&list[1], top_level, env, ctxs).await?);
+                            expanded.push(expand(&list[1], top_level, env).await?);
                             Ok(expanded.into())
                         }
                     }
                     LCoreOperator::Eval => {
                         return if list.len() != 2 {
-                            Err(WrongNumberOfArgument(
+                            bail!(WrongNumberOfArgument(
                                 "expand",
                                 list.into(),
                                 list.len(),
@@ -405,13 +376,13 @@ pub async fn expand(
                             ))
                         } else {
                             let mut expanded = vec![LCoreOperator::Eval.into()];
-                            expanded.push(expand(&list[1], top_level, env, ctxs).await?);
+                            expanded.push(expand(&list[1], top_level, env).await?);
                             Ok(expanded.into())
                         }
                     }
                     LCoreOperator::Parse => {
                         return if list.len() != 2 {
-                            Err(WrongNumberOfArgument(
+                            bail!(WrongNumberOfArgument(
                                 "expand",
                                 list.into(),
                                 list.len(),
@@ -419,13 +390,13 @@ pub async fn expand(
                             ))
                         } else {
                             let mut expanded = vec![LCoreOperator::Parse.into()];
-                            expanded.push(expand(&list[1], top_level, env, ctxs).await?);
+                            expanded.push(expand(&list[1], top_level, env).await?);
                             Ok(expanded.into())
                         }
                     }
                     LCoreOperator::Expand => {
                         return if list.len() != 2 {
-                            Err(WrongNumberOfArgument(
+                            bail!(WrongNumberOfArgument(
                                 "expand",
                                 list.into(),
                                 list.len(),
@@ -433,7 +404,7 @@ pub async fn expand(
                             ))
                         } else {
                             let mut expanded = vec![LCoreOperator::Expand.into()];
-                            expanded.push(expand(&list[1], top_level, env, ctxs).await?);
+                            expanded.push(expand(&list[1], top_level, env).await?);
                             Ok(expanded.into())
                         }
                     }
@@ -443,8 +414,7 @@ pub async fn expand(
                     None => {}
                     Some(m) => {
                         let expanded =
-                            expand(&m.call(&list[1..], env, ctxs).await?, top_level, env, ctxs)
-                                .await?;
+                            expand(&m.call(&list[1..], env).await?, top_level, env).await?;
                         if get_debug() {
                             println!("In expand: macro expanded: {:?}", expanded);
                         }
@@ -455,7 +425,7 @@ pub async fn expand(
 
             let mut expanded_list: Vec<LValue> = vec![];
             for e in list {
-                expanded_list.push(expand(e, false, env, ctxs).await?);
+                expanded_list.push(expand(e, false, env).await?);
             }
 
             /*let expanded_list: Vec<LValue> = list
@@ -469,7 +439,7 @@ pub async fn expand(
 }
 
 /// Expand quasiquote expressions
-pub fn expand_quasi_quote(x: &LValue, env: &LEnv) -> Result<LValue, LError> {
+pub fn expand_quasi_quote(x: &LValue, env: &LEnv) -> LResult {
     match x {
         LValue::List(list) => {
             if list.is_empty() {
@@ -481,7 +451,7 @@ pub fn expand_quasi_quote(x: &LValue, env: &LEnv) -> Result<LValue, LError> {
                     if let Ok(co) = LCoreOperator::try_from(s.as_str()) {
                         if co == LCoreOperator::UnQuote {
                             if list.len() != 2 {
-                                return Err(WrongNumberOfArgument(
+                                bail!(WrongNumberOfArgument(
                                     "expand_quasi_quote",
                                     x.clone(),
                                     list.len(),
@@ -509,11 +479,7 @@ pub fn expand_quasi_quote(x: &LValue, env: &LEnv) -> Result<LValue, LError> {
 /// Evaluate a LValue
 /// Main function of the Scheme Interpreter
 #[async_recursion]
-pub async fn eval(
-    lv: &LValue,
-    env: &mut LEnv,
-    ctxs: &mut ContextCollection,
-) -> Result<LValue, LError> {
+pub async fn eval(lv: &LValue, env: &LEnv) -> LResult {
     let mut lv = lv.clone();
     let mut temp_env: LEnv;
     let mut env = env;
@@ -541,16 +507,11 @@ pub async fn eval(
                     LCoreOperator::Define => {
                         match &args[0] {
                             LValue::Symbol(s) => {
-                                let exp = eval(&args[1], env, ctxs).await?;
+                                let exp = eval(&args[1], env).await?;
                                 env.insert(s.to_string(), exp);
                             }
                             lv => {
-                                return Err(WrongType(
-                                    "eval",
-                                    lv.clone(),
-                                    lv.into(),
-                                    TypeLValue::Symbol,
-                                ))
+                                bail!(WrongType("eval", lv.clone(), lv.into(), TypeLValue::Symbol,))
                             }
                         };
                         if get_debug() {
@@ -567,7 +528,7 @@ pub async fn eval(
                                     match val {
                                         LValue::Symbol(s) => vec_sym.push(s.clone()),
                                         lv => {
-                                            return Err(WrongType(
+                                            bail!(WrongType(
                                                 "eval",
                                                 lv.clone(),
                                                 lv.into(),
@@ -581,7 +542,7 @@ pub async fn eval(
                             LValue::Symbol(s) => s.clone().into(),
                             LValue::Nil => LambdaArgs::Nil,
                             lv => {
-                                return Err(NotInListOfExpectedTypes(
+                                bail!(NotInListOfExpectedTypes(
                                     "eval",
                                     lv.clone(),
                                     lv.into(),
@@ -601,16 +562,11 @@ pub async fn eval(
                         let test = &args[0];
                         let conseq = &args[1];
                         let alt = &args[2];
-                        lv = match eval(test, env, ctxs).await? {
+                        lv = match eval(test, env).await? {
                             LValue::True => conseq.clone(),
                             LValue::Nil => alt.clone(),
                             lv => {
-                                return Err(WrongType(
-                                    "eval",
-                                    lv.clone(),
-                                    lv.into(),
-                                    TypeLValue::Bool,
-                                ))
+                                bail!(WrongType("eval", lv.clone(), lv.into(), TypeLValue::Bool,))
                             }
                         };
                     }
@@ -625,7 +581,7 @@ pub async fn eval(
                         let last = args.last().unwrap();
 
                         for e in firsts {
-                            eval(e, env, ctxs).await?;
+                            eval(e, env).await?;
                         }
                         lv = last.clone();
                     }
@@ -636,7 +592,6 @@ pub async fn eval(
                         //println!("async evaluation");
                         let lvalue = args[0].clone();
                         let mut new_env = env.clone();
-                        let mut ctxs = ctxs.clone();
 
                         /*let future: LValue =
                         tokio::spawn(
@@ -646,7 +601,7 @@ pub async fn eval(
                         .unwrap()?;*/
 
                         let future: LValue =
-                            (Box::pin(async move { eval(&lvalue, &mut new_env, &mut ctxs).await })
+                            (Box::pin(async move { eval(&lvalue, &new_env).await })
                                 as FutureResult)
                                 .into();
                         let future_2 = future.clone();
@@ -661,12 +616,12 @@ pub async fn eval(
                     }
                     LCoreOperator::Await => {
                         //println!("awaiting on async evaluation");
-                        let future = eval(&args[0], env, ctxs).await?;
+                        let future = eval(&args[0], env).await?;
 
                         return if let LValue::Future(future) = future {
                             future.await
                         } else {
-                            Err(WrongType(
+                            bail!(WrongType(
                                 EVAL,
                                 future.clone(),
                                 (&future).into(),
@@ -676,13 +631,13 @@ pub async fn eval(
                     }
                     LCoreOperator::Eval => {
                         let arg = &args[0];
-                        lv = expand(&eval(arg, env, ctxs).await?, true, env, ctxs).await?;
+                        lv = expand(&eval(arg, env).await?, true, env).await?;
                     }
                     LCoreOperator::Parse => {
-                        return if let LValue::String(s) = eval(&args[0], env, ctxs).await? {
-                            parse(s.as_str(), env, ctxs).await
+                        return if let LValue::String(s) = eval(&args[0], env).await? {
+                            parse(s.as_str(), env).await
                         } else {
-                            Err(WrongType(
+                            bail!(WrongType(
                                 "eval",
                                 args[0].clone(),
                                 (&args[0]).into(),
@@ -692,14 +647,14 @@ pub async fn eval(
                     }
                     LCoreOperator::Expand => {
                         let arg = &args[0];
-                        return expand(&eval(arg, env, ctxs).await?, true, env, ctxs).await;
+                        return expand(&eval(arg, env).await?, true, env).await;
                     }
                 }
             } else {
                 let mut exps: Vec<LValue> = vec![];
 
                 for x in list {
-                    exps.push(eval(x, env, ctxs).await?)
+                    exps.push(eval(x, env).await?)
                 }
 
                 /*let exps = list
@@ -715,53 +670,21 @@ pub async fn eval(
                         env = &mut temp_env;
                     }
                     LValue::Fn(fun) => {
-                        let ctx: &dyn Any = match fun.get_index_mod() {
-                            None => unreachable!("{} should have a module index", fun.debug_label),
-                            Some(u) => ctxs.get_context(u),
-                        };
-                        let r_lvalue = fun.call(args, env, ctx)?;
+                        let r_lvalue = fun.call(args, env)?;
                         if get_debug() {
                             println!("{} => {}", str, r_lvalue);
                         }
                         return Ok(r_lvalue);
-                    }
-                    LValue::MutFn(fun) => {
-                        return match fun.get_index_mod() {
-                            None => unreachable!("{} should have a module index", fun.debug_label),
-                            Some(u) => {
-                                let r_lvalue = fun.call(args, env, ctxs.get_mut_context(u))?;
-                                if get_debug() {
-                                    println!("{} => {}", str, r_lvalue);
-                                }
-                                Ok(r_lvalue)
-                            }
-                        };
                     }
                     LValue::AsyncFn(fun) => {
-                        let ctx: &AsyncLTrait = match fun.get_index_mod() {
-                            None => unreachable!("{} should have a module index", fun.debug_label),
-                            Some(u) => ctxs.get_context(u),
-                        };
-                        let r_lvalue = fun.call(args, env, ctx).await?;
+                        let r_lvalue = fun.call(args, env).await?;
                         if get_debug() {
                             println!("{} => {}", str, r_lvalue);
                         }
                         return Ok(r_lvalue);
                     }
-                    LValue::AsyncMutFn(fun) => {
-                        return match fun.get_index_mod() {
-                            None => unreachable!("{} should have a module index", fun.debug_label),
-                            Some(u) => {
-                                let r_lvalue = fun.call(args, env, ctxs.get_mut_context(u)).await?;
-                                if get_debug() {
-                                    println!("{} => {}", str, r_lvalue);
-                                }
-                                Ok(r_lvalue)
-                            }
-                        };
-                    }
                     lv => {
-                        return Err(WrongType("eval", lv.clone(), lv.into(), TypeLValue::Fn));
+                        bail!(WrongType("eval", lv.clone(), lv.into(), TypeLValue::Fn));
                     }
                 };
             }

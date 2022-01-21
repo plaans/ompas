@@ -99,14 +99,9 @@ impl LLambda {
     }
 
     /// Method to call a lambda and execute it.
-    pub async fn call(
-        &self,
-        args: &[LValue],
-        env: &LEnv,
-        ctxs: &mut ContextCollection,
-    ) -> Result<LValue, LError> {
-        let mut new_env = self.get_new_env(args, env.clone())?;
-        eval(&*self.body, &mut new_env, ctxs).await
+    pub async fn call(&self, args: &[LValue], env: &LEnv) -> Result<LValue, LError> {
+        let new_env = self.get_new_env(args, env.clone())?;
+        eval(&*self.body, &new_env).await
     }
 
     /// Returns the body of the lambda

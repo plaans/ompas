@@ -1,4 +1,4 @@
-use crate::core::structs::lerror::LError;
+use crate::core::structs::lerror::{LError, LResult};
 use crate::core::structs::lvalue::LValue;
 use futures::future::Shared;
 use futures::Future;
@@ -6,7 +6,7 @@ use futures::FutureExt;
 use std::pin::Pin;
 
 /// Internal type of future returned by an async
-pub type FutureResult = Pin<Box<dyn Send + Future<Output = Result<LValue, LError>>>>;
+pub type FutureResult = Pin<Box<dyn Send + Future<Output = LResult>>>;
 
 /// Type returned by an async and clonable.
 pub type LFuture = Shared<FutureResult>;

@@ -1,8 +1,9 @@
+use crate::core::structs::documentation::{Documentation, LHelp};
 use crate::core::structs::lenv::LEnv;
-use crate::core::structs::lerror::LError;
+use crate::core::structs::lerror::LResult;
 use crate::core::structs::lvalue::LValue;
-use crate::core::structs::module::{GetModule, Module};
-use crate::modules::doc::{Documentation, LHelp};
+use crate::core::structs::module::{IntoModule, Module};
+use crate::core::structs::purefonction::PureFonctionCollection;
 use std::sync::Arc;
 
 /*
@@ -17,8 +18,8 @@ const DOC_CONCATENATE: &str = "todo!";
 #[derive(Default)]
 pub struct CtxString {}
 
-impl GetModule for CtxString {
-    fn get_module(self) -> Module {
+impl IntoModule for CtxString {
+    fn into_module(self) -> Module {
         let mut module = Module {
             ctx: Arc::new(()),
             prelude: vec![],
@@ -29,16 +30,18 @@ impl GetModule for CtxString {
         module.add_fn_prelude(CONCATENATE, concatenate);
         module
     }
-}
 
-impl Documentation for CtxString {
-    fn documentation() -> Vec<LHelp> {
-        vec![LHelp::new(CONCATENATE, DOC_CONCATENATE)]
+    fn documentation(self) -> Documentation {
+        vec![LHelp::new(CONCATENATE, DOC_CONCATENATE)].into()
+    }
+
+    fn pure_fonctions(self) -> PureFonctionCollection {
+        Default::default()
     }
 }
 
 //Todo: add test for concatenate
-pub fn concatenate(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn concatenate(args: &[LValue], _: &LEnv) -> LResult {
     let mut str = String::new();
     for e in args {
         str.push_str(e.to_string().as_str())

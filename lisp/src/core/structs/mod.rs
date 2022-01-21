@@ -1,7 +1,5 @@
-use crate::core::structs::lerror::LError;
-use crate::core::structs::lvalue::LValue;
-
 pub mod contextcollection;
+pub mod documentation;
 pub mod function;
 pub mod lcoreoperator;
 pub mod lenv;
@@ -12,6 +10,6 @@ pub mod lnumber;
 pub mod lvalue;
 pub mod lvalues;
 pub mod module;
+pub mod new_function;
+pub mod purefonction;
 pub mod typelvalue;
-
-pub type LResult = Result<LValue, LError>;

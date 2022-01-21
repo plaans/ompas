@@ -1,12 +1,13 @@
+use crate::core::structs::documentation::{Documentation, LHelp};
 use crate::core::structs::lenv::LEnv;
-use crate::core::structs::lerror::LError;
 use crate::core::structs::lerror::LError::{WrongNumberOfArgument, WrongType};
+use crate::core::structs::lerror::{LError, LResult};
 use crate::core::structs::lnumber::LNumber;
 use crate::core::structs::lvalue::LValue;
-use crate::core::structs::module::{GetModule, Module};
+use crate::core::structs::module::{IntoModule, Module};
+use crate::core::structs::purefonction::PureFonctionCollection;
 use crate::core::structs::typelvalue::TypeLValue;
-use crate::modules::doc::{Documentation, LHelp};
-use crate::static_eval::{PureFonction, PureFonctionCollection};
+use anyhow::bail;
 use rand::Rng;
 use std::sync::Arc;
 
@@ -51,14 +52,14 @@ const PI: &str = "pi";
 #[derive(Default, Debug)]
 pub struct CtxMath {}
 
-impl GetModule for CtxMath {
+impl IntoModule for CtxMath {
     /// Provides all the functions to make some basic computation.
     /// New functions and constants will be added in time, when needed.
     /// Here is a list of all the elements provided by this module
     /// -Random: "rand-int-in-range", "rand-float-in-range".
     /// -Trigonometry: "sin", "cos".
     /// -Constants: "pi".
-    fn get_module(self) -> Module {
+    fn into_module(self) -> Module {
         let mut module = Module {
             ctx: Arc::new(()),
             prelude: vec![],
@@ -78,10 +79,8 @@ impl GetModule for CtxMath {
 
         module
     }
-}
 
-impl Documentation for CtxMath {
-    fn documentation() -> Vec<LHelp> {
+    fn documentation(self) -> Documentation {
         vec![
             LHelp::new_verbose(MOD_MATH, DOC_MOD_MATH, DOC_MOD_MATH_VERBOSE),
             LHelp::new(SIN, DOC_SIN),
@@ -101,20 +100,19 @@ impl Documentation for CtxMath {
             ),
             LHelp::new(ABS, DOC_ABS),
         ]
+        .into()
     }
-}
 
-impl PureFonction for CtxMath {
-    fn get_pure_fonctions_symbols(&self) -> PureFonctionCollection {
+    fn pure_fonctions(self) -> PureFonctionCollection {
         vec![SIN, COS, SQRT, POW, SQUARE, ABS].into()
     }
 }
 
 ///Compute the sin of a LNumber
 /// Only takes one element in args
-pub fn sin(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn sin(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 1 {
-        return Err(WrongNumberOfArgument(SIN, args.into(), args.len(), 1..1));
+        return Err(WrongNumberOfArgument(SIN, args.into(), args.len(), 1..1).into());
     }
 
     match &args[0] {
@@ -122,15 +120,15 @@ pub fn sin(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
             let f: f64 = n.into();
             Ok(f.sin().into())
         }
-        lv => Err(WrongType(SIN, lv.clone(), lv.into(), TypeLValue::Number)),
+        lv => bail!(WrongType(SIN, lv.clone(), lv.into(), TypeLValue::Number).into()),
     }
 }
 
 /// Compute the cos of a LNumber
 /// Only takes one element in args
-pub fn cos(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn cos(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 1 {
-        return Err(WrongNumberOfArgument(COS, args.into(), args.len(), 1..1));
+        bail!(WrongNumberOfArgument(COS, args.into(), args.len(), 1..1).into());
     }
 
     match &args[0] {
@@ -138,13 +136,13 @@ pub fn cos(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
             let f: f64 = n.into();
             Ok(f.cos().into())
         }
-        lv => Err(WrongType(COS, lv.clone(), lv.into(), TypeLValue::Number)),
+        lv => bail!(WrongType(COS, lv.clone(), lv.into(), TypeLValue::Number)),
     }
 }
 
-pub fn sqrt(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn sqrt(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 1 {
-        return Err(WrongNumberOfArgument(SQRT, args.into(), args.len(), 1..1));
+        bail!(WrongNumberOfArgument(SQRT, args.into(), args.len(), 1..1));
     }
 
     match &args[0] {
@@ -152,13 +150,13 @@ pub fn sqrt(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
             let f: f64 = n.into();
             Ok(f.sqrt().into())
         }
-        lv => Err(WrongType(SQRT, lv.clone(), lv.into(), TypeLValue::Number)),
+        lv => bail!(WrongType(SQRT, lv.clone(), lv.into(), TypeLValue::Number)),
     }
 }
 
-pub fn pow(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn pow(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 2 {
-        return Err(WrongNumberOfArgument(POW, args.into(), args.len(), 2..2));
+        bail!(WrongNumberOfArgument(POW, args.into(), args.len(), 2..2));
     }
 
     if let LValue::Number(n) = &args[0] {
@@ -167,7 +165,7 @@ pub fn pow(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
             let p: f64 = p.into();
             Ok(f.powf(p).into())
         } else {
-            Err(WrongType(
+            bail!(WrongType(
                 POW,
                 args[1].clone(),
                 (&args[1]).into(),
@@ -175,7 +173,7 @@ pub fn pow(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
             ))
         }
     } else {
-        Err(WrongType(
+        bail!(WrongType(
             POW,
             args[0].clone(),
             (&args[0]).into(),
@@ -184,9 +182,9 @@ pub fn pow(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     }
 }
 
-pub fn square(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn square(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 1 {
-        return Err(WrongNumberOfArgument(SQUARE, args.into(), args.len(), 1..1));
+        return bail!(WrongNumberOfArgument(SQUARE, args.into(), args.len(), 1..1));
     }
 
     match &args[0] {
@@ -194,13 +192,13 @@ pub fn square(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
             let f: f64 = n.into();
             Ok(f.powi(2).into())
         }
-        lv => Err(WrongType(SQUARE, lv.clone(), lv.into(), TypeLValue::Number)),
+        lv => bail!(WrongType(SQUARE, lv.clone(), lv.into(), TypeLValue::Number)),
     }
 }
 
-pub fn abs(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn abs(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 1 {
-        return Err(WrongNumberOfArgument(SQUARE, args.into(), args.len(), 1..1));
+        return bail!(WrongNumberOfArgument(SQUARE, args.into(), args.len(), 1..1));
     }
 
     match &args[0] {
@@ -210,14 +208,14 @@ pub fn abs(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
             LNumber::Usize(u) => LNumber::Usize(*u),
         }
         .into()),
-        lv => Err(WrongType(SQUARE, lv.clone(), lv.into(), TypeLValue::Number)),
+        lv => bail!(WrongType(SQUARE, lv.clone(), lv.into(), TypeLValue::Number)),
     }
 }
 
 /// Returns an integer randomly picked between two numbers.
-pub fn rand_int_in_range(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn rand_int_in_range(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 2 {
-        return Err(WrongNumberOfArgument(
+        return bail!(WrongNumberOfArgument(
             RAND_INT_IN_RANGE,
             args.into(),
             args.len(),
@@ -230,7 +228,7 @@ pub fn rand_int_in_range(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LE
             let value: i64 = rand::thread_rng().gen_range(n1.into()..n2.into());
             Ok(value.into())
         } else {
-            Err(WrongType(
+            bail!(WrongType(
                 RAND_INT_IN_RANGE,
                 args[1].clone(),
                 (&args[1]).into(),
@@ -238,7 +236,7 @@ pub fn rand_int_in_range(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LE
             ))
         }
     } else {
-        Err(WrongType(
+        bail!(WrongType(
             RAND_INT_IN_RANGE,
             args[0].clone(),
             (&args[0]).into(),
@@ -248,9 +246,9 @@ pub fn rand_int_in_range(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LE
 }
 
 /// Returns a float randomly picked between two numbers.
-pub fn rand_float_in_range(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn rand_float_in_range(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 2 {
-        return Err(WrongNumberOfArgument(
+        return bail!(WrongNumberOfArgument(
             RAND_FLOAT_IN_RANGE,
             args.into(),
             args.len(),
@@ -263,7 +261,7 @@ pub fn rand_float_in_range(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, 
             let value: f64 = rand::thread_rng().gen_range(n1.into()..n2.into());
             Ok(value.into())
         } else {
-            Err(WrongType(
+            bail!(WrongType(
                 RAND_FLOAT_IN_RANGE,
                 args[1].clone(),
                 (&args[1]).into(),
@@ -271,7 +269,7 @@ pub fn rand_float_in_range(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, 
             ))
         }
     } else {
-        Err(WrongType(
+        bail!(WrongType(
             RAND_FLOAT_IN_RANGE,
             args[0].clone(),
             (&args[0]).into(),
@@ -287,40 +285,37 @@ mod tests {
     #[test]
     fn test_cos() {
         let env = LEnv::default();
-        assert_eq!(cos(&[0.0.into()], &env, &()).unwrap(), 1.0.into());
+        assert_eq!(cos(&[0.0.into()], &env).unwrap(), 1.0.into());
     }
 
     #[test]
     fn test_sin() {
         let env = LEnv::default();
-        assert_eq!(sin(&[0.0.into()], &env, &()).unwrap(), 0.0.into());
+        assert_eq!(sin(&[0.0.into()], &env).unwrap(), 0.0.into());
     }
 
     #[test]
     fn test_sqrt() {
         let env = LEnv::default();
-        assert_eq!(sqrt(&[4.0.into()], &env, &()).unwrap(), 2.0.into());
+        assert_eq!(sqrt(&[4.0.into()], &env).unwrap(), 2.0.into());
     }
 
     #[test]
     fn test_power() {
         let env = LEnv::default();
-        assert_eq!(
-            pow(&[2.0.into(), 4.0.into()], &env, &()).unwrap(),
-            16.0.into()
-        );
+        assert_eq!(pow(&[2.0.into(), 4.0.into()], &env).unwrap(), 16.0.into());
     }
 
     #[test]
     fn test_square() {
         let env = LEnv::default();
-        assert_eq!(square(&[2.0.into()], &env, &()).unwrap(), 4.0.into());
+        assert_eq!(square(&[2.0.into()], &env).unwrap(), 4.0.into());
     }
 
     #[test]
     fn test_abs() {
         let env = LEnv::default();
-        assert_eq!(abs(&[(-1.0).into()], &env, &()).unwrap(), 1.0.into());
-        assert_eq!(abs(&[3.0.into()], &env, &()).unwrap(), 3.0.into());
+        assert_eq!(abs(&[(-1.0).into()], &env).unwrap(), 1.0.into());
+        assert_eq!(abs(&[3.0.into()], &env).unwrap(), 3.0.into());
     }
 }

@@ -14,16 +14,17 @@
 //! => ((1 3)(1 4)(2 3)(2 4))
 //! ```
 
+use crate::core::structs::documentation::{Documentation, LHelp};
 use crate::core::structs::lcoreoperator::LCoreOperator;
 use crate::core::structs::lenv::LEnv;
-use crate::core::structs::lerror::LError;
 use crate::core::structs::lerror::LError::{SpecialError, WrongNumberOfArgument, WrongType};
+use crate::core::structs::lerror::{LError, LResult};
 use crate::core::structs::lvalue::LValue;
-use crate::core::structs::module::{GetModule, Module};
+use crate::core::structs::module::{IntoModule, Module};
+use crate::core::structs::purefonction::PureFonctionCollection;
 use crate::core::structs::typelvalue::TypeLValue;
-use crate::modules::doc::{Documentation, LHelp};
 use crate::modules::utils::language::*;
-use crate::static_eval::{PureFonction, PureFonctionCollection};
+use anyhow::bail;
 use aries_utils::StreamingIterator;
 use rand::Rng;
 use std::ops::Deref;
@@ -247,8 +248,8 @@ pub const DOC_EVAL_NON_RECURSIVE: &str = "todo!";
 #[derive(Default, Copy, Clone, Debug)]
 pub struct CtxUtils {}
 
-impl GetModule for CtxUtils {
-    fn get_module(self) -> Module {
+impl IntoModule for CtxUtils {
+    fn into_module(self) -> Module {
         let mut module = Module {
             ctx: Arc::new(()),
             prelude: vec![],
@@ -295,24 +296,8 @@ impl GetModule for CtxUtils {
 
         module
     }
-}
 
-impl PureFonction for CtxUtils {
-    fn get_pure_fonctions_symbols(&self) -> PureFonctionCollection {
-        vec![
-            RAND_ELEMENT,
-            ENUMERATE,
-            CONTAINS,
-            SUB_LIST,
-            TRANSFORM_IN_SINGLETON_LIST,
-            QUOTE_LIST,
-        ]
-        .into()
-    }
-}
-
-impl Documentation for CtxUtils {
-    fn documentation() -> Vec<LHelp> {
+    fn documentation(self) -> Documentation {
         vec![
             LHelp::new_verbose(RAND_ELEMENT, DOC_RAND_ELEMENT, DOC_RAND_ELEMENT_VERBOSE),
             LHelp::new_verbose(ENUMERATE, DOC_ENUMERATE, DOC_ENUMERATE_VERBOSE),
@@ -324,6 +309,19 @@ impl Documentation for CtxUtils {
             LHelp::new(LET_STAR, DOC_LET_STAR),
             LHelp::new(TEST_MACRO, DOC_MACRO_TEST_MACRO),
         ]
+        .into()
+    }
+
+    fn pure_fonctions(self) -> PureFonctionCollection {
+        vec![
+            RAND_ELEMENT,
+            ENUMERATE,
+            CONTAINS,
+            SUB_LIST,
+            TRANSFORM_IN_SINGLETON_LIST,
+            QUOTE_LIST,
+        ]
+        .into()
     }
 }
 
@@ -338,7 +336,7 @@ impl Documentation for CtxUtils {
 /// let lists: &[LValue] = &[vec![1,2,3].into(), vec![4,5,6].into()];
 /// let enumeration = enumerate(lists, &LEnv::default(), &());
 /// ```
-pub fn enumerate(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn enumerate(args: &[LValue], _: &LEnv) -> LResult {
     let mut vec_iter = vec![];
     let mut new_args = vec![];
 
@@ -373,14 +371,14 @@ pub fn enumerate(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
 
 ///Return an element randomly chosen from a list
 /// Takes a LValue::List as arg.
-pub fn rand_element(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn rand_element(args: &[LValue], _: &LEnv) -> LResult {
     match args.len() {
         1 => {
             if let LValue::List(list) = &args[0] {
                 let index = rand::thread_rng().gen_range(0..list.len());
                 Ok(list[index].clone())
             } else {
-                Err(WrongType(
+                bail!(WrongType(
                     RAND_ELEMENT,
                     args[0].clone(),
                     (&args[0]).into(),
@@ -388,7 +386,7 @@ pub fn rand_element(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError>
                 ))
             }
         }
-        _ => Err(WrongNumberOfArgument(
+        _ => bail!(WrongNumberOfArgument(
             RAND_ELEMENT,
             args.into(),
             args.len(),
@@ -398,9 +396,9 @@ pub fn rand_element(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError>
 }
 
 ///Takes a list or map and search if it contains a LValue inside
-pub fn contains(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn contains(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 2 {
-        return Err(WrongNumberOfArgument(
+        bail!(WrongNumberOfArgument(
             CONTAINS,
             args.into(),
             args.len(),
@@ -425,7 +423,7 @@ pub fn contains(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
 }
 
 //returns a sublist of the a list
-pub fn sublist(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn sublist(args: &[LValue], _: &LEnv) -> LResult {
     match args.len() {
         2 => {
             if let LValue::List(l) = &args[0] {
@@ -434,13 +432,13 @@ pub fn sublist(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
                         let i: usize = n.into();
                         Ok(l[i..].into())
                     } else {
-                        Err(SpecialError(
+                        bail!(SpecialError(
                             SUB_LIST,
                             "Indexes should be natural numbers".to_string(),
                         ))
                     }
                 } else {
-                    Err(WrongType(
+                    bail!(WrongType(
                         SUB_LIST,
                         args[1].clone(),
                         (&args[1]).into(),
@@ -448,7 +446,7 @@ pub fn sublist(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
                     ))
                 }
             } else {
-                Err(WrongType(
+                bail!(WrongType(
                     SUB_LIST,
                     args[0].clone(),
                     (&args[0]).into(),
@@ -465,13 +463,13 @@ pub fn sublist(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
                             let i2: usize = n2.into();
                             Ok(l[i1..i2].into())
                         } else {
-                            Err(SpecialError(
+                            bail!(SpecialError(
                                 SUB_LIST,
                                 "Indexes should be natural numbers".to_string(),
                             ))
                         }
                     } else {
-                        Err(WrongType(
+                        bail!(WrongType(
                             SUB_LIST,
                             args[1].clone(),
                             (&args[2]).into(),
@@ -479,7 +477,7 @@ pub fn sublist(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
                         ))
                     }
                 } else {
-                    Err(WrongType(
+                    bail!(WrongType(
                         SUB_LIST,
                         args[1].clone(),
                         (&args[1]).into(),
@@ -487,7 +485,7 @@ pub fn sublist(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
                     ))
                 }
             } else {
-                Err(WrongType(
+                bail!(WrongType(
                     SUB_LIST,
                     args[0].clone(),
                     (&args[0]).into(),
@@ -495,7 +493,7 @@ pub fn sublist(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
                 ))
             }
         }
-        _ => Err(WrongNumberOfArgument(
+        _ => bail!(WrongNumberOfArgument(
             SUB_LIST,
             args.into(),
             args.len(),
@@ -504,9 +502,9 @@ pub fn sublist(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     }
 }
 
-pub fn quote_list(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn quote_list(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 1 {
-        return Err(WrongNumberOfArgument(
+        bail!(WrongNumberOfArgument(
             QUOTE_LIST,
             args.into(),
             args.len(),
@@ -523,7 +521,7 @@ pub fn quote_list(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     } else if let LValue::Nil = &args[0] {
         Ok(LValue::Nil)
     } else {
-        Err(WrongType(
+        bail!(WrongType(
             QUOTE_LIST,
             args[0].clone(),
             (&args[0]).into(),
@@ -532,9 +530,9 @@ pub fn quote_list(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     }
 }
 
-pub fn transform_in_singleton_list(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn transform_in_singleton_list(args: &[LValue], _: &LEnv) -> LResult {
     if args.is_empty() {
-        return Err(WrongNumberOfArgument(
+        bail!(WrongNumberOfArgument(
             TRANSFORM_IN_SINGLETON_LIST,
             args.into(),
             0,
@@ -558,7 +556,7 @@ mod test {
     #[test]
     fn test_contains() -> Result<(), LError> {
         let lv: &[LValue] = &[vec![1, 2, 3, 4, 5, 6].into(), 6.into()];
-        let result = contains(lv, &LEnv::empty(), &())?;
+        let result = contains(lv, &LEnv::empty())?;
         assert_eq!(result, LValue::True);
         Ok(())
     }
@@ -567,8 +565,8 @@ mod test {
     fn test_sublist() -> Result<(), LError> {
         let lv_1: &[LValue] = &[vec![1, 2, 3, 4, 5, 6].into(), 1.into()];
         let lv_2: &[LValue] = &[vec![1, 2, 3, 4, 5, 6].into(), 1.into(), 3.into()];
-        let result1 = sublist(lv_1, &LEnv::empty(), &())?;
-        let result2 = sublist(lv_2, &LEnv::empty(), &())?;
+        let result1 = sublist(lv_1, &LEnv::default())?;
+        let result2 = sublist(lv_2, &LEnv::default())?;
         assert_eq!(result1, vec![2, 3, 4, 5, 6].into());
         assert_eq!(result2, vec![2, 3].into());
         Ok(())
@@ -839,12 +837,12 @@ mod test {
         let (mut env, mut ctxs) = LEnv::root().await;
 
         //Load macro
-        parse(MACRO_LOOP, &mut env, &mut ctxs).await?;
+        parse(MACRO_LOOP, &mut env).await?;
 
         //Expand expression
-        let expanded = parse(expression, &mut env, &mut ctxs).await?;
+        let expanded = parse(expression, &mut env).await?;
 
-        let expected = parse(expected, &mut env, &mut ctxs).await?;
+        let expected = parse(expected, &mut env).await?;
 
         println!(
             "test_macro:\n\

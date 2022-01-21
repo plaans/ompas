@@ -1,5 +1,4 @@
 use crate::core::language::{FUTURE, NIL, TRUE};
-use crate::core::structs::function::*;
 use crate::core::structs::lcoreoperator::language::*;
 use crate::core::structs::lcoreoperator::LCoreOperator;
 use crate::core::structs::lerror::LError;
@@ -7,6 +6,7 @@ use crate::core::structs::lerror::LError::ConversionError;
 use crate::core::structs::lfuture::*;
 use crate::core::structs::llambda::*;
 use crate::core::structs::lnumber::LNumber;
+use crate::core::structs::new_function::*;
 use crate::core::structs::typelvalue::TypeLValue;
 use crate::modules::utils::language::*;
 use im::HashMap;
@@ -28,12 +28,12 @@ pub enum LValue {
     Number(LNumber),
     #[serde(skip)]
     Fn(LFn),
-    #[serde(skip)]
-    MutFn(LMutFn),
+    //#[serde(skip)]
+    //MutFn(LMutFn),
     #[serde(skip)]
     AsyncFn(LAsyncFn),
-    #[serde(skip)]
-    AsyncMutFn(LAsyncMutFn),
+    //#[serde(skip)]
+    //AsyncMutFn(LAsyncMutFn),
     #[serde(skip)]
     Lambda(LLambda),
     #[serde(skip)]

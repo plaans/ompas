@@ -1,10 +1,11 @@
 use crate::core::root_module::list::language::*;
 use crate::core::structs::lenv::LEnv;
-use crate::core::structs::lerror::LError;
-use crate::core::structs::lerror::LError::{SpecialError, WrongNumberOfArgument, WrongType};
+use crate::core::structs::lerror::LError::{WrongNumberOfArgument, WrongType};
+use crate::core::structs::lerror::LResult;
 use crate::core::structs::lnumber::LNumber;
 use crate::core::structs::lvalue::LValue;
 use crate::core::structs::typelvalue::TypeLValue;
+use anyhow::bail;
 
 pub mod language {
 
@@ -52,7 +53,7 @@ and then it returns the remainder of the list beginning with the first argument.
 }
 
 /// Returns a list
-pub fn list(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn list(args: &[LValue], _: &LEnv) -> LResult {
     if args.is_empty() {
         Ok(LValue::Nil)
     } else {
@@ -61,9 +62,9 @@ pub fn list(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
 }
 
 ///It takes two arguments, an element and a list and returns a list with the element inserted at the first place.
-pub fn cons(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn cons(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 2 {
-        return Err(WrongNumberOfArgument(CONS, args.into(), args.len(), 2..2));
+        bail!(WrongNumberOfArgument(CONS, args.into(), args.len(), 2..2));
     }
     let first = &args[0];
     let second = &args[1];
@@ -78,7 +79,7 @@ pub fn cons(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     }
 }
 
-pub fn first(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn first(args: &[LValue], _: &LEnv) -> LResult {
     match args.len() {
         1 => match &args[0] {
             LValue::List(list) => {
@@ -89,13 +90,13 @@ pub fn first(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
                 }
             }
             LValue::Nil => Ok(LValue::Nil),
-            lv => Err(WrongType(FIRST, lv.clone(), lv.into(), TypeLValue::List)),
+            lv => bail!(WrongType(FIRST, lv.clone(), lv.into(), TypeLValue::List)),
         },
-        _ => Err(WrongNumberOfArgument(FIRST, args.into(), args.len(), 1..1)),
+        _ => bail!(WrongNumberOfArgument(FIRST, args.into(), args.len(), 1..1)),
     }
 }
 
-pub fn second(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn second(args: &[LValue], _: &LEnv) -> LResult {
     match args.len() {
         1 => match &args[0] {
             LValue::List(list) => {
@@ -106,13 +107,13 @@ pub fn second(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
                 }
             }
             LValue::Nil => Ok(LValue::Nil),
-            lv => Err(WrongType(SECOND, lv.clone(), lv.into(), TypeLValue::List)),
+            lv => bail!(WrongType(SECOND, lv.clone(), lv.into(), TypeLValue::List)),
         },
-        _ => Err(WrongNumberOfArgument(SECOND, args.into(), args.len(), 1..1)),
+        _ => bail!(WrongNumberOfArgument(SECOND, args.into(), args.len(), 1..1)),
     }
 }
 
-pub fn third(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn third(args: &[LValue], _: &LEnv) -> LResult {
     match args.len() {
         1 => match &args[0] {
             LValue::List(list) => {
@@ -123,14 +124,14 @@ pub fn third(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
                 }
             }
             LValue::Nil => Ok(LValue::Nil),
-            lv => Err(WrongType(THIRD, lv.clone(), lv.into(), TypeLValue::List)),
+            lv => bail!(WrongType(THIRD, lv.clone(), lv.into(), TypeLValue::List)),
         },
-        _ => Err(WrongNumberOfArgument(THIRD, args.into(), args.len(), 1..1)),
+        _ => bail!(WrongNumberOfArgument(THIRD, args.into(), args.len(), 1..1)),
     }
 }
 
 ///It takes a list as argument, and returns its first element.
-pub fn car(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn car(args: &[LValue], _: &LEnv) -> LResult {
     match args.len() {
         1 => match &args[0] {
             LValue::List(list) => {
@@ -141,14 +142,14 @@ pub fn car(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
                 }
             }
             LValue::Nil => Ok(LValue::Nil),
-            lv => Err(WrongType(CAR, lv.clone(), lv.into(), TypeLValue::List)),
+            lv => bail!(WrongType(CAR, lv.clone(), lv.into(), TypeLValue::List)),
         },
-        _ => Err(WrongNumberOfArgument(CAR, args.into(), args.len(), 1..1)),
+        _ => bail!(WrongNumberOfArgument(CAR, args.into(), args.len(), 1..1)),
     }
 }
 
 ///It takes a list as argument, and returns a list without the first element
-pub fn cdr(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn cdr(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() == 1 {
         match &args[0] {
             LValue::List(list) => {
@@ -163,15 +164,15 @@ pub fn cdr(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
                 }
             }
             LValue::Nil => Ok(LValue::Nil),
-            lv => Err(WrongType(CDR, lv.clone(), lv.into(), TypeLValue::List)),
+            lv => bail!(WrongType(CDR, lv.clone(), lv.into(), TypeLValue::List)),
         }
     } else {
-        Err(WrongNumberOfArgument(CDR, args.into(), args.len(), 1..1))
+        bail!(WrongNumberOfArgument(CDR, args.into(), args.len(), 1..1))
     }
 }
 
 ///It takes a list as argument, and returns a list without the first element
-pub fn rest(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn rest(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() == 1 {
         match &args[0] {
             LValue::List(list) => {
@@ -186,22 +187,22 @@ pub fn rest(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
                 }
             }
             LValue::Nil => Ok(LValue::Nil),
-            lv => Err(WrongType(REST, lv.clone(), lv.into(), TypeLValue::List)),
+            lv => bail!(WrongType(REST, lv.clone(), lv.into(), TypeLValue::List)),
         }
     } else {
-        Err(WrongNumberOfArgument(REST, args.into(), args.len(), 1..1))
+        bail!(WrongNumberOfArgument(REST, args.into(), args.len(), 1..1))
     }
 }
 
 ///It merges two or more list into one.
-pub fn append(args: &[LValue], _env: &LEnv, _ctx: &()) -> Result<LValue, LError> {
+pub fn append(args: &[LValue], _env: &LEnv, _ctx: &()) -> LResult {
     let mut new_list = Vec::new();
     for element in args {
         match element {
             LValue::List(list) => new_list.append(&mut list.clone()),
             LValue::Nil => {}
             _ => {
-                return Err(WrongType(
+                return bail!(WrongType(
                     APPEND,
                     element.clone(),
                     element.into(),
@@ -214,7 +215,7 @@ pub fn append(args: &[LValue], _env: &LEnv, _ctx: &()) -> Result<LValue, LError>
 }
 
 ///It takes a list and returns the last element.
-pub fn last(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn last(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() == 1 {
         match args.first().unwrap() {
             LValue::List(list) => {
@@ -224,19 +225,19 @@ pub fn last(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
                     Ok(LValue::Nil)
                 }
             }
-            lv => Err(WrongType(LAST, lv.clone(), lv.into(), TypeLValue::List)),
+            lv => bail!(WrongType(LAST, lv.clone(), lv.into(), TypeLValue::List)),
         }
     } else {
-        Err(WrongNumberOfArgument(LAST, args.into(), args.len(), 1..1))
+        bail!(WrongNumberOfArgument(LAST, args.into(), args.len(), 1..1))
     }
 }
 
 ///It takes two arguments of which the second must be a list,
 /// if the first argument is a member of the second argument,
 /// and then it returns the remainder of the list beginning with the first argument.
-pub fn member(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn member(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 2 {
-        return Err(WrongNumberOfArgument(MEMBER, args.into(), args.len(), 2..2));
+        return bail!(WrongNumberOfArgument(MEMBER, args.into(), args.len(), 2..2));
     }
     let value_to_find = &args[0];
     match &args[1] {
@@ -248,13 +249,13 @@ pub fn member(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
             }
             Ok(LValue::Nil)
         }
-        lv => Err(WrongType(MEMBER, lv.clone(), lv.into(), TypeLValue::List)),
+        lv => bail!(WrongType(MEMBER, lv.clone(), lv.into(), TypeLValue::List)),
     }
 }
 
-pub fn get_list(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn get_list(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 2 {
-        return Err(WrongNumberOfArgument(
+        return bail!(WrongNumberOfArgument(
             GET_LIST,
             args.into(),
             args.len(),
@@ -267,19 +268,16 @@ pub fn get_list(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
             if vec.len() > *i as usize {
                 Ok(vec[*i as usize].clone())
             } else {
-                Err(SpecialError(
-                    GET_LIST,
-                    format!(
-                        "list: {}. {} is out of bound, must be in [{};{}]",
-                        LValue::from(args),
-                        i,
-                        0,
-                        vec.len() - 1
-                    ),
+                bail!(format!(
+                    "list: {}. {} is out of bound, must be in [{};{}]",
+                    LValue::from(args),
+                    i,
+                    0,
+                    vec.len() - 1
                 ))
             }
         } else {
-            Err(WrongType(
+            bail!(WrongType(
                 GET_LIST,
                 args[1].clone(),
                 (&args[1]).into(),
@@ -287,7 +285,7 @@ pub fn get_list(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
             ))
         }
     } else {
-        Err(WrongType(
+        bail!(WrongType(
             GET_LIST,
             args[0].clone(),
             (&args[0]).into(),
@@ -296,9 +294,9 @@ pub fn get_list(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
     }
 }
 
-pub fn set_list(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn set_list(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 3 {
-        return Err(WrongNumberOfArgument(
+        return bail!(WrongNumberOfArgument(
             SET_LIST,
             args.into(),
             args.len(),
@@ -313,13 +311,14 @@ pub fn set_list(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
                 vec[*i as usize] = args[1].clone();
                 Ok(vec.into())
             } else {
-                Err(SpecialError(
-                    SET_LIST,
-                    format!("index out of bound, must be in [{};{}]", 0, vec.len() - 1),
+                bail!(format!(
+                    "index out of bound, must be in [{};{}]",
+                    0,
+                    vec.len() - 1
                 ))
             }
         } else {
-            Err(WrongType(
+            bail!(WrongType(
                 SET_LIST,
                 args[1].clone(),
                 (&args[1]).into(),
@@ -327,7 +326,7 @@ pub fn set_list(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
             ))
         }
     } else {
-        Err(WrongType(
+        bail!(WrongType(
             SET_LIST,
             args[0].clone(),
             (&args[0]).into(),
@@ -337,7 +336,7 @@ pub fn set_list(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
 }
 
 /// It takes a list and returns a list with the top elements in reverse order.
-pub fn reverse(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn reverse(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() == 1 {
         match args.first().unwrap() {
             LValue::List(list) => {
@@ -345,10 +344,10 @@ pub fn reverse(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
                 new_list.reverse();
                 Ok(new_list.into())
             }
-            lv => Err(WrongType(REVERSE, lv.clone(), lv.into(), TypeLValue::List)),
+            lv => bail!(WrongType(REVERSE, lv.clone(), lv.into(), TypeLValue::List)),
         }
     } else {
-        Err(WrongNumberOfArgument(
+        bail!(WrongNumberOfArgument(
             REVERSE,
             args.into(),
             args.len(),

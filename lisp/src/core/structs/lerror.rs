@@ -1,6 +1,7 @@
 use crate::core::structs::lerror::LError::SpecialError;
 use crate::core::structs::lvalue::LValue;
 use crate::core::structs::typelvalue::TypeLValue;
+use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::ops::Range;
 
@@ -33,6 +34,8 @@ pub enum LError {
     SpecialError(&'static str, String),
     ConversionError(&'static str, TypeLValue, TypeLValue),
 }
+
+impl Error for LError {}
 
 impl Display for LError {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
@@ -89,3 +92,5 @@ impl From<std::io::Error> for LError {
         SpecialError("std::io::Error", e.to_string())
     }
 }
+
+pub type LResult = Result<LValue, anyhow::Error>;

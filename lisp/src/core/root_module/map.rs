@@ -1,11 +1,13 @@
 use crate::core::language::MAP;
 use crate::core::root_module::map::language::*;
 use crate::core::structs::lenv::LEnv;
-use crate::core::structs::lerror::LError;
 use crate::core::structs::lerror::LError::*;
+use crate::core::structs::lerror::LResult;
 use crate::core::structs::lvalue::LValue;
 use crate::core::structs::typelvalue::TypeLValue;
+use anyhow::bail;
 use im::HashMap;
+use tokio::time::interval;
 
 pub mod language {
 
@@ -37,7 +39,7 @@ pub mod language {
                                         \ttwenty: 20";
 }
 
-pub fn map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn map(args: &[LValue], _: &LEnv) -> LResult {
     match args.len() {
         0 => Ok(LValue::Map(Default::default())),
         1 => match args.get(0).unwrap() {
@@ -52,33 +54,33 @@ pub fn map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
                                     val_sv.into(),
                                     val_sv.len(),
                                     2..2,
-                                ));
+                                )
+                                .into());
                             }
 
                             let key = val_sv[0].clone();
                             let value = val_sv[1].clone();
                             facts.insert(key, value);
                         }
-                        lv => return Err(WrongType(MAP, lv.clone(), lv.into(), TypeLValue::List)),
+                        lv => {
+                            return Err(
+                                WrongType(MAP, lv.clone(), lv.into(), TypeLValue::List).into()
+                            )
+                        }
                     }
                 }
                 Ok(LValue::Map(facts))
             }
             LValue::Nil => Ok(LValue::Map(Default::default())),
-            lv => Err(WrongType(MAP, lv.clone(), lv.into(), TypeLValue::List)),
+            lv => Err(WrongType(MAP, lv.clone(), lv.into(), TypeLValue::List).into()),
         },
-        _ => Err(WrongNumberOfArgument(MAP, args.into(), args.len(), 1..1)),
+        _ => Err(WrongNumberOfArgument(MAP, args.into(), args.len(), 1..1).into()),
     }
 }
 
-pub fn get_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn get_map(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 2 {
-        return Err(WrongNumberOfArgument(
-            GET_MAP,
-            args.into(),
-            0,
-            1..std::usize::MAX,
-        ));
+        return Err(WrongNumberOfArgument(GET_MAP, args.into(), 0, 1..std::usize::MAX).into());
     }
 
     match &args[0] {
@@ -87,17 +89,17 @@ pub fn get_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
             let value = map.get(key).unwrap_or(&LValue::Nil);
             Ok(value.clone())
         }
-        lv => Err(WrongType(GET_MAP, lv.clone(), lv.into(), TypeLValue::Map)),
+        lv => bail!(WrongType(GET_MAP, lv.clone(), lv.into(), TypeLValue::Map)),
     }
 }
 
-pub fn set_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn set_map(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 2 {
-        return Err(WrongNumberOfArgument(
+        bail!(WrongNumberOfArgument(
             SET_MAP,
             args.into(),
             args.len(),
-            2..2,
+            2..2
         ));
     }
 
@@ -109,28 +111,25 @@ pub fn set_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
                     let value = val_sv.get(1).unwrap().clone();
                     Ok(m.update(key, value).into())
                 } else {
-                    Err(WrongNumberOfArgument(
+                    bail!(WrongNumberOfArgument(
                         SET_MAP,
                         val_sv.into(),
                         val_sv.len(),
-                        2..2,
+                        2..2
                     ))
                 }
             }
-            lv => Err(WrongType(SET_MAP, lv.clone(), lv.into(), TypeLValue::List)),
+            lv => bail!(WrongType(SET_MAP, lv.clone(), lv.into(), TypeLValue::List)),
         },
-        lv => Err(WrongType(SET_MAP, lv.clone(), lv.into(), TypeLValue::Map)),
+        lv => bail!(WrongType(SET_MAP, lv.clone(), lv.into(), TypeLValue::Map)),
     }
 }
 
-pub fn remove_key_value_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn remove_key_value_map(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 2 {
-        return Err(WrongNumberOfArgument(
-            REMOVE_KEY_VALUE_MAP,
-            args.into(),
-            args.len(),
-            2..2,
-        ));
+        return Err(
+            WrongNumberOfArgument(REMOVE_KEY_VALUE_MAP, args.into(), args.len(), 2..2).into(),
+        );
     }
 
     match &args[0] {
@@ -144,7 +143,8 @@ pub fn remove_key_value_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue,
                             return Err(SpecialError(
                                 REMOVE_KEY_VALUE_MAP,
                                 format!("map does not contain key {}", key),
-                            ))
+                            )
+                            .into())
                         }
                         Some(v) => {
                             if *v == value {
@@ -155,7 +155,8 @@ pub fn remove_key_value_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue,
                                 Err(SpecialError(
                                     REMOVE_KEY_VALUE_MAP,
                                     format!("map does not have key value ({}:{})", key, value),
-                                ))
+                                )
+                                .into())
                             }
                         }
                     }
@@ -165,7 +166,8 @@ pub fn remove_key_value_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue,
                         val_sv.into(),
                         val_sv.len(),
                         2..2,
-                    ))
+                    )
+                    .into())
                 }
             }
             lv => Err(WrongType(
@@ -173,25 +175,16 @@ pub fn remove_key_value_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue,
                 lv.clone(),
                 lv.into(),
                 TypeLValue::List,
-            )),
+            )
+            .into()),
         },
-        lv => Err(WrongType(
-            REMOVE_KEY_VALUE_MAP,
-            lv.clone(),
-            lv.into(),
-            TypeLValue::Map,
-        )),
+        lv => Err(WrongType(REMOVE_KEY_VALUE_MAP, lv.clone(), lv.into(), TypeLValue::Map).into()),
     }
 }
 
-pub fn remove_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn remove_map(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 2 {
-        return Err(WrongNumberOfArgument(
-            REMOVE_MAP,
-            args.into(),
-            args.len(),
-            2..2,
-        ));
+        return Err(WrongNumberOfArgument(REMOVE_MAP, args.into(), args.len(), 2..2).into());
     }
 
     match &args[0] {
@@ -200,24 +193,14 @@ pub fn remove_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
             new_m.remove(&args[1]);
             Ok(new_m.into())
         }
-        lv => Err(WrongType(
-            REMOVE_MAP,
-            lv.clone(),
-            lv.into(),
-            TypeLValue::Map,
-        )),
+        lv => Err(WrongType(REMOVE_MAP, lv.clone(), lv.into(), TypeLValue::Map).into()),
     }
 }
 
 /// Merges two hashmap tables
-pub fn union_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn union_map(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 2 {
-        return Err(WrongNumberOfArgument(
-            UNION_MAP,
-            args.into(),
-            args.len(),
-            2..2,
-        ));
+        return Err(WrongNumberOfArgument(UNION_MAP, args.into(), args.len(), 2..2).into());
     }
     let map1 = &args[0];
     let map2 = &args[1];
@@ -226,19 +209,9 @@ pub fn union_map(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
         if let LValue::Map(map2) = map2.clone() {
             Ok(map1.union(map2).into())
         } else {
-            Err(WrongType(
-                UNION_MAP,
-                map2.clone(),
-                map2.into(),
-                TypeLValue::Map,
-            ))
+            Err(WrongType(UNION_MAP, map2.clone(), map2.into(), TypeLValue::Map).into())
         }
     } else {
-        Err(WrongType(
-            UNION_MAP,
-            map1.clone(),
-            map1.into(),
-            TypeLValue::Map,
-        ))
+        Err(WrongType(UNION_MAP, map1.clone(), map1.into(), TypeLValue::Map).into())
     }
 }

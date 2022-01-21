@@ -9,6 +9,7 @@ use crate::core::structs::llambda::{LLambda, LambdaArgs};
 use crate::core::structs::lvalue::LValue;
 use crate::core::structs::typelvalue::TypeLValue;
 use crate::core::{expand_quasi_quote, get_debug, parse_into_lvalue};
+use anyhow::bail;
 use std::any::Any;
 use std::collections::HashSet;
 use std::convert::{TryFrom, TryInto};
@@ -94,44 +95,7 @@ impl From<LValue> for PLValue {
     }
 }*/
 
-#[derive(Default, Clone)]
-pub struct PureFonctionCollection {
-    inner: HashSet<&'static str>,
-}
-
-impl From<Vec<&'static str>> for PureFonctionCollection {
-    fn from(vec: Vec<&'static str>) -> Self {
-        let mut set = HashSet::default();
-        for e in vec {
-            set.insert(e);
-        }
-        Self { inner: set }
-    }
-}
-
-impl PureFonctionCollection {
-    pub fn append(&mut self, other: Self) {
-        self.inner = self.inner.union(&other.inner).cloned().collect();
-    }
-}
-
-pub trait PureFonction {
-    fn get_pure_fonctions_symbols(&self) -> PureFonctionCollection;
-}
-
-impl PureFonctionCollection {
-    pub fn is_pure(&self, f: &str) -> bool {
-        self.inner.contains(f)
-    }
-}
-
-pub fn expand_static(
-    x: &LValue,
-    top_level: bool,
-    env: &mut LEnv,
-    ctxs: &mut ContextCollection,
-    pfc: &PureFonctionCollection,
-) -> Result<PLValue, LError> {
+pub fn expand_static(x: &LValue, top_level: bool, env: &LEnv) -> Result<PLValue, anyhow::Error> {
     match x {
         LValue::List(list) => {
             if let Ok(co) = LCoreOperator::try_from(&list[0]) {
@@ -139,7 +103,7 @@ pub fn expand_static(
                     LCoreOperator::Define | LCoreOperator::DefMacro => {
                         //eprintln!("expand: define: Ok!");
                         if list.len() < 3 {
-                            return Err(WrongNumberOfArgument(
+                            bail!(WrongNumberOfArgument(
                                 EXPAND_STATIC,
                                 x.clone(),
                                 list.len(),
@@ -161,37 +125,34 @@ pub fn expand_static(
                                         &vec![def.into(), f.clone(), new_body.into()].into(),
                                         top_level,
                                         env,
-                                        ctxs,
-                                        pfc,
                                     );
                                 }
                             }
                             LValue::Symbol(sym) => {
                                 if list.len() != 3 {
-                                    return Err(WrongNumberOfArgument(
+                                    bail!(WrongNumberOfArgument(
                                         EXPAND_STATIC,
                                         x.clone(),
                                         list.len(),
                                         3..3,
                                     ));
                                 }
-                                let exp = expand_static(&list[2], top_level, env, ctxs, pfc)?;
+                                let exp = expand_static(&list[2], top_level, env)?;
                                 if !exp.is_pure() {
                                     return Ok(PLValue::into_unpure(x));
                                 }
                                 //println!("after expansion: {}", exp);
                                 if def == LCoreOperator::DefMacro {
                                     if !top_level {
-                                        return Err(SpecialError(
+                                        bail!(SpecialError(
                                             EXPAND_STATIC,
                                             format!("{}: defmacro only allowed at top level", x),
                                         ));
                                     }
-                                    let proc =
-                                        eval_static(&exp.into(), &mut env.clone(), ctxs, pfc)?;
+                                    let proc = eval_static(&exp.into(), &mut env.clone())?;
                                     //println!("new macro: {}", proc);
                                     if !matches!(proc.lvalue, LValue::Lambda(_)) {
-                                        return Err(SpecialError(
+                                        bail!(SpecialError(
                                             EXPAND_STATIC,
                                             format!("{}: macro must be a procedure", proc),
                                         ));
@@ -209,7 +170,7 @@ pub fn expand_static(
                                 ));
                             }
                             _ => {
-                                return Err(WrongType(
+                                bail!(WrongType(
                                     EXPAND_STATIC,
                                     x.clone(),
                                     x.into(),
@@ -220,7 +181,7 @@ pub fn expand_static(
                     }
                     LCoreOperator::DefLambda => {
                         if list.len() < 3 {
-                            return Err(WrongNumberOfArgument(
+                            bail!(WrongNumberOfArgument(
                                 EXPAND_STATIC,
                                 x.clone(),
                                 list.len(),
@@ -234,7 +195,7 @@ pub fn expand_static(
                             LValue::List(vars_list) => {
                                 for v in vars_list {
                                     if !matches!(v, LValue::Symbol(_)) {
-                                        return Err(SpecialError(
+                                        bail!(SpecialError(
                                             EXPAND_STATIC,
                                             format!("illegal lambda argument list: {}", x),
                                         ));
@@ -243,7 +204,7 @@ pub fn expand_static(
                             }
                             LValue::Symbol(_) | LValue::Nil => {}
                             lv => {
-                                return Err(NotInListOfExpectedTypes(
+                                bail!(NotInListOfExpectedTypes(
                                     EXPAND_STATIC,
                                     lv.clone(),
                                     lv.into(),
@@ -258,7 +219,7 @@ pub fn expand_static(
                             vec.append(&mut body.to_vec());
                             LValue::List(vec)
                         };
-                        let result = expand_static(&exp, top_level, env, ctxs, pfc)?;
+                        let result = expand_static(&exp, top_level, env)?;
                         if result.is_pure() {
                             return Ok(PLValue::into_unpure(x));
                         }
@@ -273,7 +234,7 @@ pub fn expand_static(
                             list.push(LValue::Nil);
                         }
                         if list.len() != 4 {
-                            return Err(WrongNumberOfArgument(
+                            bail!(WrongNumberOfArgument(
                                 EXPAND_STATIC,
                                 (&list).into(),
                                 list.len(),
@@ -283,7 +244,7 @@ pub fn expand_static(
                         //return map(expand, x)
                         let mut expanded_list = vec![LCoreOperator::If.into()];
                         for x in &list[1..] {
-                            let result = expand_static(x, false, env, ctxs, pfc)?;
+                            let result = expand_static(x, false, env)?;
                             if !result.is_pure() {
                                 return Ok(PLValue::into_unpure(x));
                             }
@@ -294,7 +255,7 @@ pub fn expand_static(
                     LCoreOperator::Quote => {
                         //println!("expand: quote: Ok!");
                         if list.len() != 2 {
-                            return Err(WrongNumberOfArgument(
+                            bail!(WrongNumberOfArgument(
                                 EXPAND_STATIC,
                                 list.into(),
                                 list.len(),
@@ -311,7 +272,7 @@ pub fn expand_static(
                         } else {
                             let mut expanded_list = vec![LCoreOperator::Begin.into()];
                             for e in &list[1..] {
-                                let result = expand_static(e, top_level, env, ctxs, pfc)?;
+                                let result = expand_static(e, top_level, env)?;
                                 if !result.is_pure() {
                                     return Ok(PLValue::into_unpure(x));
                                 }
@@ -322,7 +283,7 @@ pub fn expand_static(
                     }
                     LCoreOperator::QuasiQuote => {
                         return if list.len() != 2 {
-                            Err(WrongNumberOfArgument(
+                            bail!(WrongNumberOfArgument(
                                 EXPAND_STATIC,
                                 list.into(),
                                 list.len(),
@@ -333,25 +294,19 @@ pub fn expand_static(
                             //println!("{}", expanded);
                             //to expand quasiquote recursively
                             expand(&expanded, top_level, env, ctxs);*/
-                            expand_static(
-                                &expand_quasi_quote(&list[1], env)?,
-                                top_level,
-                                env,
-                                ctxs,
-                                pfc,
-                            )
+                            expand_static(&expand_quasi_quote(&list[1], env)?, top_level, env)
                             //Ok(expanded)
                         };
                     }
                     LCoreOperator::UnQuote => {
-                        return Err(SpecialError(
+                        bail!(SpecialError(
                             EXPAND_STATIC,
                             "unquote must be inside a quasiquote expression".to_string(),
                         ))
                     }
                     LCoreOperator::Async => {
                         return if list.len() != 2 {
-                            Err(WrongNumberOfArgument(
+                            bail!(WrongNumberOfArgument(
                                 EXPAND_STATIC,
                                 list.into(),
                                 list.len(),
@@ -359,7 +314,7 @@ pub fn expand_static(
                             ))
                         } else {
                             let mut expanded = vec![LCoreOperator::Async.into()];
-                            let result = expand_static(&list[1], top_level, env, ctxs, pfc)?;
+                            let result = expand_static(&list[1], top_level, env)?;
 
                             if !result.is_pure() {
                                 return Ok(PLValue::into_unpure(x));
@@ -370,7 +325,7 @@ pub fn expand_static(
                     }
                     LCoreOperator::Await => {
                         return if list.len() != 2 {
-                            Err(WrongNumberOfArgument(
+                            bail!(WrongNumberOfArgument(
                                 EXPAND_STATIC,
                                 list.into(),
                                 list.len(),
@@ -378,7 +333,7 @@ pub fn expand_static(
                             ))
                         } else {
                             let mut expanded = vec![LCoreOperator::Await.into()];
-                            let result = expand_static(&list[1], top_level, env, ctxs, pfc)?;
+                            let result = expand_static(&list[1], top_level, env)?;
 
                             if !result.is_pure() {
                                 return Ok(PLValue::into_unpure(x));
@@ -389,7 +344,7 @@ pub fn expand_static(
                     }
                     LCoreOperator::Eval => {
                         return if list.len() != 2 {
-                            Err(WrongNumberOfArgument(
+                            bail!(WrongNumberOfArgument(
                                 EXPAND_STATIC,
                                 list.into(),
                                 list.len(),
@@ -397,7 +352,7 @@ pub fn expand_static(
                             ))
                         } else {
                             let mut expanded = vec![LCoreOperator::Eval.into()];
-                            let result = expand_static(&list[1], top_level, env, ctxs, pfc)?;
+                            let result = expand_static(&list[1], top_level, env)?;
                             if !result.is_pure() {
                                 return Ok(PLValue::into_unpure(x));
                             }
@@ -407,7 +362,7 @@ pub fn expand_static(
                     }
                     LCoreOperator::Parse => {
                         return if list.len() != 2 {
-                            Err(WrongNumberOfArgument(
+                            bail!(WrongNumberOfArgument(
                                 EXPAND_STATIC,
                                 list.into(),
                                 list.len(),
@@ -415,7 +370,7 @@ pub fn expand_static(
                             ))
                         } else {
                             let mut expanded = vec![LCoreOperator::Parse.into()];
-                            let result = expand_static(&list[1], top_level, env, ctxs, pfc)?;
+                            let result = expand_static(&list[1], top_level, env)?;
 
                             if !result.is_pure() {
                                 return Ok(PLValue::into_unpure(x));
@@ -426,7 +381,7 @@ pub fn expand_static(
                     }
                     LCoreOperator::Expand => {
                         return if list.len() != 2 {
-                            Err(WrongNumberOfArgument(
+                            bail!(WrongNumberOfArgument(
                                 EXPAND_STATIC,
                                 list.into(),
                                 list.len(),
@@ -434,7 +389,7 @@ pub fn expand_static(
                             ))
                         } else {
                             let mut expanded = vec![LCoreOperator::Expand.into()];
-                            let result = expand_static(&list[1], top_level, env, ctxs, pfc)?;
+                            let result = expand_static(&list[1], top_level, env)?;
 
                             if !result.is_pure() {
                                 return Ok(PLValue::into_unpure(x));
@@ -450,12 +405,12 @@ pub fn expand_static(
                     None => {}
                     Some(m) => {
                         let mut new_env = m.get_new_env(&list[1..], env.clone())?;
-                        let result = eval_static(&m.get_body(), &mut new_env, ctxs, pfc)?;
+                        let result = eval_static(&m.get_body(), &mut new_env)?;
                         if !result.is_pure() {
                             return Ok(PLValue::into_unpure(x));
                         }
 
-                        let expanded = expand_static(&result.lvalue, top_level, env, ctxs, pfc)?;
+                        let expanded = expand_static(&result.lvalue, top_level, env)?;
                         if get_debug() {
                             println!("In expand: macro expanded: {:?}", expanded);
                         }
@@ -466,7 +421,7 @@ pub fn expand_static(
 
             let mut expanded_list: Vec<LValue> = vec![];
             for e in list {
-                let result = expand_static(e, false, env, ctxs, pfc)?;
+                let result = expand_static(e, false, env)?;
                 if result.is_pure() {
                     expanded_list.push(result.lvalue);
                 } else {
@@ -484,27 +439,17 @@ pub fn expand_static(
     }
 }
 
-pub fn parse_static(
-    str: &str,
-    env: &mut LEnv,
-    ctxs: &mut ContextCollection,
-    pfc: &PureFonctionCollection,
-) -> Result<PLValue, LError> {
+pub fn parse_static(str: &str, env: &LEnv) -> Result<PLValue, anyhow::Error> {
     match aries_planning::parsing::sexpr::parse(str) {
-        Ok(se) => expand_static(&parse_into_lvalue(&se), true, env, ctxs, pfc),
-        Err(e) => Err(SpecialError(
+        Ok(se) => expand_static(&parse_into_lvalue(&se), true, env),
+        Err(e) => bail!(SpecialError(
             PARSE_STATIC,
             format!("Error in command: {}", e.to_string()),
         )),
     }
 }
 
-pub fn eval_static(
-    lv: &LValue,
-    env: &mut LEnv,
-    ctxs: &mut ContextCollection,
-    pfc: &PureFonctionCollection,
-) -> Result<PLValue, LError> {
+pub fn eval_static(lv: &LValue, env: &LEnv) -> Result<PLValue, anyhow::Error> {
     let mut lv = lv.clone();
     let mut temp_env: LEnv;
     let mut env = env;
@@ -542,7 +487,7 @@ pub fn eval_static(
                     LCoreOperator::Define => {
                         return match &args[0] {
                             LValue::Symbol(s) => {
-                                let result = eval_static(&args[1], env, ctxs, pfc)?;
+                                let result = eval_static(&args[1], env)?;
                                 return if result.pure {
                                     env.insert(s.to_string(), result.lvalue);
                                     if get_debug() {
@@ -555,7 +500,7 @@ pub fn eval_static(
                                 }
                             }
                             lv => {
-                                Err(WrongType(
+                                bail!(WrongType(
                                     EVAL_STATIC,
                                     lv.clone(),
                                     lv.into(),
@@ -574,7 +519,7 @@ pub fn eval_static(
                                     match val {
                                         LValue::Symbol(s) => vec_sym.push(s.clone()),
                                         lv => {
-                                            return Err(WrongType(
+                                            bail!(WrongType(
                                                 EVAL_STATIC,
                                                 lv.clone(),
                                                 lv.into(),
@@ -588,7 +533,7 @@ pub fn eval_static(
                             LValue::Symbol(s) => s.clone().into(),
                             LValue::Nil => LambdaArgs::Nil,
                             lv => {
-                                return Err(NotInListOfExpectedTypes(
+                                bail!(NotInListOfExpectedTypes(
                                     EVAL_STATIC,
                                     lv.clone(),
                                     lv.into(),
@@ -608,13 +553,13 @@ pub fn eval_static(
                         let test = &args[0];
                         let conseq = &args[1];
                         let alt = &args[2];
-                        let result = eval_static(test, env, ctxs, pfc)?;
+                        let result = eval_static(test, env)?;
                         if result.pure {
                             lv = match result.lvalue {
                                 LValue::True => conseq.clone(),
                                 LValue::Nil => alt.clone(),
                                 lv => {
-                                    return Err(WrongType(
+                                    bail!(WrongType(
                                         EVAL_STATIC,
                                         lv.clone(),
                                         lv.into(),
@@ -640,7 +585,7 @@ pub fn eval_static(
 
                         for e in args {
                             if all_pure {
-                                let result = eval_static(e, env, ctxs, pfc)?;
+                                let result = eval_static(e, env)?;
                                 all_pure = result.pure;
                                 elements.push(result.lvalue)
                             }else {
@@ -655,15 +600,15 @@ pub fn eval_static(
                     }
                     LCoreOperator::QuasiQuote
                     | LCoreOperator::UnQuote
-                    | LCoreOperator::DefMacro => return Err(SpecialError(EVAL_STATIC, "quasiquote, unquote and defmacro should not be prensent in exanded expressions".to_string())),
+                    | LCoreOperator::DefMacro => bail!(SpecialError(EVAL_STATIC, "quasiquote, unquote and defmacro should not be prensent in exanded expressions".to_string())),
                     LCoreOperator::Async | LCoreOperator::Await => {
                         return Ok(PLValue::into_unpure(&lv));
                     }
                     LCoreOperator::Eval => {
                         let arg = &args[0];
-                        let result = eval_static(arg, env, ctxs, pfc)?;
+                        let result = eval_static(arg, env)?;
                         lv = if result.is_pure() {
-                            let result = expand_static(&result.lvalue, true, env, ctxs, pfc)?;
+                            let result = expand_static(&result.lvalue, true, env)?;
                             if  result.is_pure() {
                                 result.lvalue
                             }else {
@@ -674,12 +619,12 @@ pub fn eval_static(
                         };
                     }
                     LCoreOperator::Parse => {
-                        let result = eval_static(&args[0], env, ctxs, pfc)?;
+                        let result = eval_static(&args[0], env)?;
                         return if result.is_pure() {
                             if let LValue::String(s) = result.lvalue {
-                                parse_static(s.as_str(), env, ctxs, pfc)
+                                parse_static(s.as_str(), env)
                             } else {
-                                Err(WrongType(
+                                bail!(WrongType(
                                     EVAL_STATIC,
                                     args[0].clone(),
                                     (&args[0]).into(),
@@ -694,9 +639,9 @@ pub fn eval_static(
                     }
                     LCoreOperator::Expand => {
                         let arg = &args[0];
-                        let result = eval_static(arg, env, ctxs, pfc)?;
+                        let result = eval_static(arg, env)?;
                         return if result.is_pure() {
-                            expand_static(&result.lvalue, true, env, ctxs, pfc)
+                            expand_static(&result.lvalue, true, env)
                         }else {
                             Ok(PLValue::into_unpure(&lv))
                         }
@@ -708,7 +653,7 @@ pub fn eval_static(
                 let mut all_pure = true;
 
                 for x in list {
-                    let result = eval_static(x, env, ctxs, pfc)?;
+                    let result = eval_static(x, env)?;
                     all_pure &= result.is_pure();
                     exps.push(result);
                 }
@@ -734,7 +679,7 @@ pub fn eval_static(
                             None => unreachable!("{} should have a module index", fun.debug_label),
                             Some(u) => ctxs.get_context(u),
                         };
-                        let r_lvalue = fun.call(args.as_slice(), env, ctx)?;
+                        let r_lvalue = fun.call(args.as_slice(), env)?;
                         if get_debug() {
                             println!("{} => {}", str, r_lvalue);
                         }
@@ -757,7 +702,7 @@ pub fn eval_static(
                         unreachable!("should have been detected unpure before")
                     }
                     lv => {
-                        return Err(WrongType(
+                        bail!(WrongType(
                             EVAL_STATIC,
                             lv.clone(),
                             lv.into(),

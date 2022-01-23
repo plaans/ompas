@@ -1,12 +1,13 @@
 use ompas_lisp::core::language::*;
 use ompas_lisp::core::root_module::predicate::language::*;
+use ompas_lisp::core::structs::documentation::Documentation;
 use ompas_lisp::core::structs::lenv::LEnv;
-use ompas_lisp::core::structs::lerror::LError;
 use ompas_lisp::core::structs::lerror::LError::{WrongNumberOfArgument, WrongType};
+use ompas_lisp::core::structs::lerror::{LError, LResult};
 use ompas_lisp::core::structs::lvalue::LValue;
-use ompas_lisp::core::structs::module::{GetModule, Module};
+use ompas_lisp::core::structs::module::{IntoModule, Module};
+use ompas_lisp::core::structs::purefonction::PureFonctionCollection;
 use ompas_lisp::core::structs::typelvalue::TypeLValue;
-use ompas_lisp::static_eval::{PureFonction, PureFonctionCollection};
 use std::convert::TryInto;
 use std::sync::Arc;
 
@@ -176,8 +177,8 @@ const LAMBDA_GENERATE_TYPE_PRE_CONDITIONS: &str =
 #[derive(Default)]
 pub struct CtxRaeDescription {}
 
-impl GetModule for CtxRaeDescription {
-    fn get_module(self) -> Module {
+impl IntoModule for CtxRaeDescription {
+    fn into_module(self) -> Module {
         let mut module = Module {
             ctx: Arc::new(()),
             prelude: vec![],
@@ -198,16 +199,18 @@ impl GetModule for CtxRaeDescription {
         module.add_fn_prelude(GENERATE_TYPE_TEST_EXPR, generate_type_test_expr);
         module
     }
-}
 
-impl PureFonction for CtxRaeDescription {
-    fn get_pure_fonctions_symbols(&self) -> PureFonctionCollection {
+    fn documentation(&self) -> Documentation {
+        Default::default()
+    }
+
+    fn pure_fonctions(&self) -> PureFonctionCollection {
         vec![].into()
     }
 }
 
 /// Takes as input a p_expr of the form ((p1 p1_type) ... (p_n pn_type))
-pub fn generate_type_test_expr(args: &[LValue], _: &LEnv, _: &()) -> Result<LValue, LError> {
+pub fn generate_type_test_expr(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(
             GENERATE_TYPE_TEST_EXPR,
@@ -288,42 +291,37 @@ mod test {
     use crate::rae::module::rae_exec::CtxRaeExec;
     use ompas_lisp::core::structs::contextcollection::ContextCollection;
     use ompas_lisp::core::structs::lenv::ImportType::WithoutPrefix;
-    use ompas_lisp::core::structs::lenv::{import, LEnv};
+    use ompas_lisp::core::structs::lenv::LEnv;
     use ompas_lisp::core::structs::lerror::LError;
     use ompas_lisp::modules::advanced_math::CtxMath;
     use ompas_lisp::modules::io::CtxIo;
     use ompas_lisp::modules::utils::CtxUtils;
     use ompas_lisp::test_utils::{test_expression, test_expression_with_env, TestExpression};
 
-    async fn init_env_and_ctxs() -> (LEnv, ContextCollection) {
-        let (mut env, mut ctxs) = LEnv::root().await;
+    async fn init_env_and_ctxs() -> LEnv {
+        let mut env = LEnv::root().await;
 
-        import(&mut env, &mut ctxs, CtxUtils::default(), WithoutPrefix)
+        env.import(CtxUtils::default(), WithoutPrefix)
             .await
             .expect("error loading utils");
 
-        import(&mut env, &mut ctxs, CtxMath::default(), WithoutPrefix)
+        env.import(CtxMath::default(), WithoutPrefix)
             .await
             .expect("error loading math");
 
-        import(&mut env, &mut ctxs, CtxRaeExec::default(), WithoutPrefix)
+        env.import(CtxRaeExec::default(), WithoutPrefix)
             .await
             .expect("error loading rae exec");
 
-        import(
-            &mut env,
-            &mut ctxs,
-            CtxRaeDescription::default(),
-            WithoutPrefix,
-        )
-        .await
-        .expect("error loading rae description");
+        env.import(CtxRaeDescription::default(), WithoutPrefix)
+            .await
+            .expect("error loading rae description");
 
-        import(&mut env, &mut ctxs, CtxIo::default(), WithoutPrefix)
+        env.import(CtxIo::default(), WithoutPrefix)
             .await
             .expect("error loading io");
 
-        (env, ctxs)
+        env
     }
 
     #[tokio::test]
@@ -344,8 +342,8 @@ mod test {
                             (progress 't_navigate_to ?r ?x ?y)))",
         };
 
-        let (mut env, mut ctxs) = init_env_and_ctxs().await;
-        test_expression_with_env(macro_to_test, &mut env, &mut ctxs, true).await
+        let mut env = init_env_and_ctxs().await;
+        test_expression_with_env(macro_to_test, &mut env, true).await
     }
 
     #[tokio::test]
@@ -368,8 +366,8 @@ mod test {
                             (get-map state (list 'sf ?a ?b ?c)))))",
         };
 
-        let (mut env, mut ctxs) = init_env_and_ctxs().await;
-        test_expression_with_env(macro_to_test, &mut env, &mut ctxs, true).await?;
+        let mut env = init_env_and_ctxs().await;
+        test_expression_with_env(macro_to_test, &mut env, true).await?;
 
         let macro_to_test_2 = TestExpression {
             inner: MACRO_GENERATE_STATE_FUNCTION,
@@ -388,7 +386,7 @@ mod test {
                                 (rae-get-state-variable 'sf)
                                 (get-map state 'sf))))",
         };
-        test_expression_with_env(macro_to_test_2, &mut env, &mut ctxs, true).await
+        test_expression_with_env(macro_to_test_2, &mut env, true).await
     }
 
     #[tokio::test]
@@ -419,8 +417,8 @@ mod test {
                                 ((get-action-model (quote pick_package)) ?r ?p))))",
         };
 
-        let (mut env, mut ctxs) = init_env_and_ctxs().await;
-        test_expression_with_env(macro_to_test, &mut env, &mut ctxs, true).await
+        let mut env = init_env_and_ctxs().await;
+        test_expression_with_env(macro_to_test, &mut env, true).await
     }
 
     #[tokio::test]
@@ -447,8 +445,8 @@ mod test {
                                     )))",
         };
 
-        let (mut env, mut ctxs) = init_env_and_ctxs().await;
-        test_expression_with_env(macro_to_test, &mut env, &mut ctxs, true).await
+        let mut env = init_env_and_ctxs().await;
+        test_expression_with_env(macro_to_test, &mut env, true).await
     }
 
     #[tokio::test]
@@ -478,8 +476,8 @@ mod test {
                                     ))",
         };
 
-        let (mut env, mut ctxs) = init_env_and_ctxs().await;
-        test_expression_with_env(macro_to_test, &mut env, &mut ctxs, true).await
+        let mut env = init_env_and_ctxs().await;
+        test_expression_with_env(macro_to_test, &mut env, true).await
     }
 
     #[tokio::test]
@@ -498,9 +496,9 @@ mod test {
                                         (if (number? ?n)
                                             (list? ?l)))))))",
         };
-        let (mut env, mut ctxs) = init_env_and_ctxs().await;
+        let mut env = init_env_and_ctxs().await;
 
-        test_expression_with_env(lambda_test, &mut env, &mut ctxs, false).await
+        test_expression_with_env(lambda_test, &mut env, false).await
     }
 
     #[tokio::test]
@@ -547,7 +545,7 @@ mod test {
             (navigate_to ?r ?x ?y))))",
         };
 
-        let (mut env, mut ctxs) = init_env_and_ctxs().await;
-        test_expression_with_env(macro_to_test, &mut env, &mut ctxs, true).await
+        let mut env = init_env_and_ctxs().await;
+        test_expression_with_env(macro_to_test, &mut env, true).await
     }
 }

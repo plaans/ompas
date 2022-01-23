@@ -6,8 +6,8 @@ use crate::rae::module::rae_exec::{
 use ::macro_rules_attribute::macro_rules_attribute;
 use ompas_lisp::core::root_module::map::get_map;
 use ompas_lisp::core::structs::lenv::LEnv;
-use ompas_lisp::core::structs::lerror::LError;
 use ompas_lisp::core::structs::lerror::LError::{SpecialError, WrongNumberOfArgument, WrongType};
+use ompas_lisp::core::structs::lerror::{LError, LResult};
 use ompas_lisp::core::structs::lnumber::LNumber;
 use ompas_lisp::core::structs::lvalue::LValue;
 use ompas_lisp::core::structs::typelvalue::TypeLValue;
@@ -25,11 +25,7 @@ pub const LOCK: &str = "lock";
 pub const IS_LOCKED: &str = "locked?";
 
 #[macro_rules_attribute(dyn_async!)]
-pub async fn lock<'a>(
-    args: &'a [LValue],
-    _: &'a LEnv,
-    _: &'a CtxRaeExec,
-) -> Result<LValue, LError> {
+pub async fn lock<'a>(args: &'a [LValue], _: &'a LEnv) -> LResult {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(LOCK, args.into(), args.len(), 2..2));
     }
@@ -65,21 +61,13 @@ pub async fn lock<'a>(
 }
 
 #[macro_rules_attribute(dyn_async!)]
-pub async fn release<'a>(
-    args: &'a [LValue],
-    _: &'a LEnv,
-    _: &'a CtxRaeExec,
-) -> Result<LValue, LError> {
+pub async fn release<'a>(args: &'a [LValue], _: &'a LEnv) -> LResult {
     mutex::release(args[0].clone()).await;
     Ok(LValue::True)
 }
 
 #[macro_rules_attribute(dyn_async!)]
-pub async fn is_locked<'a>(
-    args: &'a [LValue],
-    env: &'a LEnv,
-    _: &'a CtxRaeExec,
-) -> Result<LValue, LError> {
+pub async fn is_locked<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     let mode: String = env
         .get_symbol("rae-mode")
         .expect("rae-mode should be defined, default value is exec mode")
@@ -96,7 +84,7 @@ pub async fn is_locked<'a>(
                     ))
                 }
             };
-            get_map(&[state, args.into()], env, &())
+            get_map(&[state, args.into()], env)
         }
         _ => unreachable!(
             "{} should have either {} or {} value.",
@@ -106,11 +94,7 @@ pub async fn is_locked<'a>(
 }
 
 #[macro_rules_attribute(dyn_async!)]
-pub async fn get_list_locked<'a>(
-    _: &'a [LValue],
-    _: &'a LEnv,
-    _: &'a CtxRaeExec,
-) -> Result<LValue, LError> {
+pub async fn get_list_locked<'a>(_: &'a [LValue], _: &'a LEnv) -> LResult {
     let locked = mutex::get_list_locked()
         .await
         .iter()

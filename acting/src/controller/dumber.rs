@@ -1,8 +1,9 @@
 //! [Deprecated]
 //! Previous work to develop a dumb controller to test lisp integration
 
-use ompas_lisp::core::structs::module::{GetModule, Module};
-use ompas_lisp::modules::doc::{Documentation, LHelp};
+use ompas_lisp::core::structs::documentation::{Documentation, LHelp};
+use ompas_lisp::core::structs::module::{IntoModule, Module};
+use ompas_lisp::core::structs::purefonction::PureFonctionCollection;
 use std::sync::Arc;
 
 //LANGUAGE
@@ -27,8 +28,8 @@ pub const LAMBDA_DUMBER_ROBOT: &str = "(define dumber_robot
 #[derive(Default, Debug)]
 pub struct CtxDumber {}
 
-impl GetModule for CtxDumber {
-    fn get_module(self) -> Module {
+impl IntoModule for CtxDumber {
+    fn into_module(self) -> Module {
         Module {
             ctx: Arc::new(self),
             prelude: vec![],
@@ -36,10 +37,12 @@ impl GetModule for CtxDumber {
             label: MOD_DUMBER.to_string(),
         }
     }
-}
 
-impl Documentation for CtxDumber {
-    fn documentation() -> Vec<LHelp> {
-        vec![LHelp::new(MOD_DUMBER, DOC_MOD_DUMBER)]
+    fn documentation(&self) -> Documentation {
+        vec![LHelp::new(MOD_DUMBER, DOC_MOD_DUMBER)].into()
+    }
+
+    fn pure_fonctions(&self) -> PureFonctionCollection {
+        Default::default()
     }
 }

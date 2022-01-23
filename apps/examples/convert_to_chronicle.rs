@@ -44,8 +44,8 @@ async fn main() -> Result<(), LError> {
 }
 
 async fn translate_2(exp: &str) -> Result<ExpressionChronicle, LError> {
-    let (mut env, mut ctxs) = LEnv::root().await;
-    let lv = parse(exp, &mut env, &mut ctxs).await?;
+    let mut env = LEnv::root().await;
+    let lv = parse(exp, &mut env).await?;
 
     let mut symbol_table = SymTable::default();
 
@@ -57,8 +57,8 @@ async fn translate_2(exp: &str) -> Result<ExpressionChronicle, LError> {
 }
 
 async fn translate(exp: &str) -> Result<Chronicle, LError> {
-    let (mut env, mut ctxs) = LEnv::root().await;
-    let lv = parse(exp, &mut env, &mut ctxs).await?;
+    let mut env = LEnv::root().await;
+    let lv = parse(exp, &mut env).await?;
 
     let context = Context::default();
 

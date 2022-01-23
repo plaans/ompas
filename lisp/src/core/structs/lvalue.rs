@@ -221,8 +221,7 @@ impl LValue {
 impl Display for LValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            LValue::Fn(fun) => write!(f, "{}", fun.debug_label),
-            LValue::MutFn(fun) => write!(f, "{}", fun.debug_label),
+            LValue::Fn(fun) => write!(f, "{}", fun.get_label()),
             LValue::Nil => write!(f, "{}", NIL),
             LValue::Symbol(s) | LValue::String(s) => write!(f, "{}", s),
             LValue::Number(n) => write!(f, "{}", n),
@@ -252,8 +251,7 @@ impl Display for LValue {
                 write!(f, "{}", co)
             }
             LValue::Character(c) => write!(f, "{}", c),
-            LValue::AsyncFn(fun) => write!(f, "{}", fun.debug_label),
-            LValue::AsyncMutFn(fun) => write!(f, "{}", fun.debug_label),
+            LValue::AsyncFn(fun) => write!(f, "{}", fun.get_label()),
             LValue::Future(_) => write!(f, "{}", FUTURE),
         }
     }
@@ -312,8 +310,7 @@ impl TryFrom<&LValue> for String {
             LValue::True => Ok(TRUE.into()),
             LValue::Nil => Ok(NIL.into()),
             LValue::Number(n) => Ok(n.to_string()),
-            LValue::Fn(f) => Ok(f.debug_label.to_string()),
-            LValue::MutFn(f) => Ok(f.debug_label.to_string()),
+            LValue::Fn(f) => Ok(f.get_label().to_string()),
             lv => Err(ConversionError(
                 "String::tryfrom<&LValue>",
                 lv.into(),
@@ -486,13 +483,9 @@ impl PartialEq for LValue {
             (LValue::List(l1), LValue::List(l2)) => *l1 == *l2,
             (LValue::Map(m1), LValue::Map(m2)) => *m1 == *m2,
             (LValue::Lambda(l1), LValue::Lambda(l2)) => *l1 == *l2,
-            (LValue::Fn(f1), LValue::Fn(f2)) => f1.debug_label == f2.debug_label,
-            (LValue::MutFn(mf1), LValue::MutFn(mf2)) => mf1.debug_label == mf2.debug_label,
+            (LValue::Fn(f1), LValue::Fn(f2)) => f1.get_label() == f2.get_label(),
             (LValue::CoreOperator(c1), LValue::CoreOperator(c2)) => c1 == c2,
             (LValue::AsyncFn(af1), LValue::AsyncFn(af2)) => af1.get_label() == af2.get_label(),
-            (LValue::AsyncMutFn(amf1), LValue::AsyncMutFn(amf2)) => {
-                amf1.get_label() == amf2.get_label()
-            }
             (_, _) => false,
         }
     }
@@ -794,6 +787,18 @@ impl From<bool> for LValue {
             true => LValue::True,
             false => LValue::Nil,
         }
+    }
+}
+
+impl From<LFn> for LValue {
+    fn from(lfn: LFn) -> Self {
+        Self::Fn(lfn)
+    }
+}
+
+impl From<LAsyncFn> for LValue {
+    fn from(alfn: LAsyncFn) -> Self {
+        Self::AsyncFn(alfn)
     }
 }
 

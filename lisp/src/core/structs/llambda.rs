@@ -1,5 +1,4 @@
 use crate::core::eval;
-use crate::core::structs::contextcollection::ContextCollection;
 use crate::core::structs::lenv::LEnv;
 use crate::core::structs::lerror::LError;
 use crate::core::structs::lerror::LError::{SpecialError, WrongNumberOfArgument};
@@ -100,8 +99,8 @@ impl LLambda {
 
     /// Method to call a lambda and execute it.
     pub async fn call(&self, args: &[LValue], env: &LEnv) -> Result<LValue, LError> {
-        let new_env = self.get_new_env(args, env.clone())?;
-        eval(&*self.body, &new_env).await
+        let mut new_env = self.get_new_env(args, env.clone())?;
+        eval(&*self.body, &mut new_env).await
     }
 
     /// Returns the body of the lambda

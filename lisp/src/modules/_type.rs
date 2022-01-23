@@ -3,16 +3,16 @@
 use crate::core::language::*;
 use crate::core::structs::documentation::{Documentation, LHelp};
 use crate::core::structs::lenv::LEnv;
+use crate::core::structs::lerror;
 use crate::core::structs::lerror::LError::{
-    NotInListOfExpectedTypes, SpecialError, WrongNumberOfArgument, WrongType,
+    ConversionError, NotInListOfExpectedTypes, SpecialError, WrongNumberOfArgument, WrongType,
 };
-use crate::core::structs::lerror::{LError, LResult};
+use crate::core::structs::lerror::LResult;
 use crate::core::structs::lnumber::LNumber;
 use crate::core::structs::lvalue::LValue;
 use crate::core::structs::module::{IntoModule, Module};
 use crate::core::structs::purefonction::PureFonctionCollection;
 use crate::core::structs::typelvalue::TypeLValue;
-use anyhow::bail;
 use std::convert::TryInto;
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
@@ -77,10 +77,10 @@ impl Display for LSymType {
 }
 
 impl LSymType {
-    pub fn as_state_function(&self) -> Result<LStateFunction, LError> {
+    pub fn as_state_function(&self) -> lerror::Result<LStateFunction> {
         match self {
             LSymType::StateFunction(sf) => Ok(sf.clone()),
-            lst => bail!(LError::ConversionError(
+            lst => Err(ConversionError(
                 "as_state_function",
                 lst.into(),
                 TypeLValue::Other(STATE_FUNCTION.to_string()),
@@ -299,15 +299,15 @@ impl IntoModule for CtxType {
         module.add_fn_prelude(IS_OBJECT, is_object);
         module.add_fn_prelude(IS_TYPE, is_type);
         module.add_fn_prelude(GET_TYPE, get_type);
-        module.add_mut_fn_prelude(TYPE_OF, type_of);
-        module.add_mut_fn_prelude(SUB_TYPE, sub_type);
-        module.add_mut_fn_prelude(NEW_STATE_FUNCTION, new_state_function);
-        module.add_mut_fn_prelude(NEW_OBJECT, new_object);
+        module.add_fn_prelude(TYPE_OF, type_of);
+        module.add_fn_prelude(SUB_TYPE, sub_type);
+        module.add_fn_prelude(NEW_STATE_FUNCTION, new_state_function);
+        module.add_fn_prelude(NEW_OBJECT, new_object);
 
         module
     }
 
-    fn documentation(self) -> Documentation {
+    fn documentation(&self) -> Documentation {
         vec![
             LHelp::new(MOD_TYPE, DOC_MOD_TYPE),
             LHelp::new(IS_STATE_FUNCTION, DOC_IS_STATE_FUNCTION),
@@ -327,8 +327,8 @@ impl IntoModule for CtxType {
         .into()
     }
 
-    fn pure_fonctions(self) -> PureFonctionCollection {
-        todo!()
+    fn pure_fonctions(&self) -> PureFonctionCollection {
+        Default::default()
     }
 }
 
@@ -363,20 +363,20 @@ pub fn is_type(args: &[LValue], env: &LEnv) -> LResult {
     match args.len() {
         1 => match &args[0] {
             LValue::Symbol(s) => match ctx.get_type_from_sym(s) {
-                None => bail!(SpecialError(IS_TYPE, "symbol has no type".to_string())),
+                None => Err(SpecialError(IS_TYPE, "symbol has no type".to_string())),
                 Some(sym_type) => match sym_type {
                     LSymType::Type(_) => Ok(LValue::True),
                     _ => Ok(LValue::Nil),
                 },
             },
-            lv => bail!(WrongType(
+            lv => Err(WrongType(
                 IS_TYPE,
                 lv.clone(),
                 lv.into(),
                 TypeLValue::Symbol,
             )),
         },
-        i => bail!(WrongNumberOfArgument(IS_TYPE, args.into(), i, 1..1)),
+        i => Err(WrongNumberOfArgument(IS_TYPE, args.into(), i, 1..1)),
     }
 }
 
@@ -391,14 +391,14 @@ pub fn is_object(args: &[LValue], env: &LEnv) -> LResult {
                     _ => Ok(LValue::Nil),
                 },
             },
-            lv => bail!(WrongType(
+            lv => Err(WrongType(
                 IS_OBJECT,
                 lv.clone(),
                 lv.into(),
                 TypeLValue::Symbol,
             )),
         },
-        i => bail!(WrongNumberOfArgument(IS_OBJECT, args.into(), i, 1..1)),
+        i => Err(WrongNumberOfArgument(IS_OBJECT, args.into(), i, 1..1)),
     }
 }
 
@@ -414,14 +414,14 @@ pub fn is_state_function(args: &[LValue], env: &LEnv) -> LResult {
                     _ => Ok(LValue::Nil),
                 },
             },
-            lv => bail!(WrongType(
+            lv => Err(WrongType(
                 IS_STATE_FUNCTION,
                 lv.clone(),
                 lv.into(),
                 TypeLValue::Symbol,
             )),
         },
-        i => bail!(WrongNumberOfArgument(
+        i => Err(WrongNumberOfArgument(
             IS_STATE_FUNCTION,
             args.into(),
             i,
@@ -432,13 +432,15 @@ pub fn is_state_function(args: &[LValue], env: &LEnv) -> LResult {
 
 pub fn type_of(args: &[LValue], env: &LEnv) -> LResult {
     if args.len() != 2 {
-        return bail!(WrongNumberOfArgument(
+        return Err(WrongNumberOfArgument(
             TYPE_OF,
             args.into(),
             args.len(),
             2..2,
         ));
     }
+
+    let mut env = env.clone();
 
     let ctx = env.get_mut_context::<CtxType>(MOD_TYPE)?;
 
@@ -450,7 +452,7 @@ pub fn type_of(args: &[LValue], env: &LEnv) -> LResult {
                     ctx.bind_sym_type(s, *u);
                     Ok(LValue::Nil)
                 }
-                lv => bail!(WrongType(
+                lv => Err(WrongType(
                     TYPE_OF,
                     lv.clone(),
                     lv.into(),
@@ -458,7 +460,7 @@ pub fn type_of(args: &[LValue], env: &LEnv) -> LResult {
                 )),
             }
         }
-        lv => bail!(WrongType(
+        lv => Err(WrongType(
             TYPE_OF,
             lv.clone(),
             lv.into(),
@@ -469,13 +471,14 @@ pub fn type_of(args: &[LValue], env: &LEnv) -> LResult {
 
 pub fn sub_type(args: &[LValue], env: &LEnv) -> LResult {
     if args.len() != 1 {
-        return bail!(WrongNumberOfArgument(
+        return Err(WrongNumberOfArgument(
             SUB_TYPE,
             args.into(),
             args.len(),
             1..1,
         ));
     }
+    let mut env = env.clone();
 
     let ctx = env.get_mut_context::<CtxType>(MOD_TYPE)?;
 
@@ -483,18 +486,18 @@ pub fn sub_type(args: &[LValue], env: &LEnv) -> LResult {
     let parent_type: usize = match &args[0] {
         LValue::Symbol(s) => match ctx.get_type_from_sym(s) {
             None => {
-                return bail!(SpecialError(
+                return Err(SpecialError(
                     SUB_TYPE,
                     format!("{} has no type annotations", s),
                 ))
             }
             Some(lst) => match lst {
                 LSymType::Type(_) => *ctx.get_type_id(s).unwrap(),
-                lst => return bail!(WrongType(SUB_TYPE, lst.into(), lst.into(), expected_type)),
+                lst => return Err(WrongType(SUB_TYPE, lst.into(), lst.into(), expected_type)),
             },
         },
         lv => {
-            return bail!(WrongType(
+            return Err(WrongType(
                 SUB_TYPE,
                 lv.clone(),
                 lv.into(),
@@ -508,7 +511,9 @@ pub fn sub_type(args: &[LValue], env: &LEnv) -> LResult {
 }
 
 pub fn new_state_function(args: &[LValue], env: &LEnv) -> LResult {
-    let ctx = env.get_mut_context::<CtxType>(MOD_TYPE)?;
+    let new_env = &mut env.clone();
+
+    let ctx = new_env.get_mut_context::<CtxType>(MOD_TYPE)?;
 
     let mut t_params: Vec<String> = Vec::new();
     let mut t_value: String = String::from(OBJECT);
@@ -516,7 +521,7 @@ pub fn new_state_function(args: &[LValue], env: &LEnv) -> LResult {
     for (i, arg) in args.iter().enumerate() {
         match arg {
             LValue::Symbol(s) => {
-                if is_type(&args[i..i + 1], env)?.try_into()? {
+                if is_type(&args[i..i + 1], &env)?.try_into()? {
                     if i == args.len() - 1 {
                         t_value = s.clone();
                     } else {
@@ -524,13 +529,13 @@ pub fn new_state_function(args: &[LValue], env: &LEnv) -> LResult {
                     }
                 } else {
                     return match ctx.get_type_from_sym(s) {
-                        None => bail!(WrongType(
+                        None => Err(WrongType(
                             NEW_STATE_FUNCTION,
                             arg.clone(),
                             arg.into(),
                             expected_type,
                         )),
-                        Some(lst) => bail!(WrongType(
+                        Some(lst) => Err(WrongType(
                             NEW_STATE_FUNCTION,
                             arg.clone(),
                             lst.into(),
@@ -540,7 +545,7 @@ pub fn new_state_function(args: &[LValue], env: &LEnv) -> LResult {
                 }
             }
             lv => {
-                return bail!(WrongType(
+                return Err(WrongType(
                     NEW_STATE_FUNCTION,
                     lv.clone(),
                     lv.into(),
@@ -557,9 +562,12 @@ pub fn new_state_function(args: &[LValue], env: &LEnv) -> LResult {
     Ok(type_id.into())
 }
 
-pub fn new_object(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> LResult {
+pub fn new_object(args: &[LValue], env: &LEnv) -> LResult {
+    let mut env = env.clone();
+
+    let ctx = env.get_mut_context::<CtxType>(MOD_TYPE)?;
     if args.len() != 1 {
-        return bail!(WrongNumberOfArgument(
+        return Err(WrongNumberOfArgument(
             NEW_OBJECT,
             args.into(),
             args.len(),
@@ -571,7 +579,7 @@ pub fn new_object(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> LResult {
         LValue::Symbol(s) => {
             type_id = match ctx.get_type_id(s) {
                 None => {
-                    return bail!(SpecialError(
+                    return Err(SpecialError(
                         NEW_OBJECT,
                         "no type annotation corresponding to the symbol".to_string(),
                     ))
@@ -585,7 +593,7 @@ pub fn new_object(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> LResult {
             ctx.get_type(type_id)
         }
         lv => {
-            return bail!(NotInListOfExpectedTypes(
+            return Err(NotInListOfExpectedTypes(
                 NEW_OBJECT,
                 lv.clone(),
                 lv.into(),
@@ -595,7 +603,7 @@ pub fn new_object(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> LResult {
     };
 
     match option_type {
-        None => bail!(WrongType(
+        None => Err(WrongType(
             NEW_OBJECT,
             (&args[0]).clone(),
             (&args[0]).into(),
@@ -606,7 +614,7 @@ pub fn new_object(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> LResult {
                 let type_id = ctx.add_type(LSymType::Object(type_id));
                 Ok(type_id.into())
             }
-            lst => bail!(WrongType(
+            lst => Err(WrongType(
                 NEW_OBJECT,
                 lst.into(),
                 lst.into(),
@@ -618,7 +626,7 @@ pub fn new_object(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> LResult {
 
 pub fn get_type(args: &[LValue], env: &LEnv) -> LResult {
     if args.len() != 1 {
-        return bail!(WrongNumberOfArgument(
+        return Err(WrongNumberOfArgument(
             GET_TYPE,
             args.into(),
             args.len(),

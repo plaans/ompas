@@ -7,7 +7,7 @@ use crate::rae::TOKIO_CHANNEL_SIZE;
 
 use ompas_lisp::core::structs::contextcollection::ContextCollection;
 use ompas_lisp::core::structs::lenv::ImportType::{WithPrefix, WithoutPrefix};
-use ompas_lisp::core::structs::lenv::{import, LEnv};
+use ompas_lisp::core::structs::lenv::LEnv;
 use ompas_lisp::modules::_type::CtxType;
 use ompas_lisp::modules::advanced_math::CtxMath;
 use ompas_lisp::modules::io::CtxIo;
@@ -41,21 +41,18 @@ pub async fn init_ctx_rae(
     let (mut rae_env, platform) = match platform {
         Some(mut platform) => {
             let (sender_sync, receiver_sync) = mpsc::channel(TOKIO_CHANNEL_SIZE);
-            let mut rae_env = RAEEnv::new(Some(receiver_job), Some(receiver_sync)).await;
+            let mut rae_env: RAEEnv = RAEEnv::new(Some(receiver_job), Some(receiver_sync)).await;
             let domain = platform.domain().await;
 
             ctx_rae.domain = vec![domain].into();
 
             let context_platform = platform.context_platform();
 
-            import(
-                &mut rae_env.env,
-                &mut rae_env.ctxs,
-                context_platform,
-                WithPrefix,
-            )
-            .await
-            .expect("error loading ctx of the platform");
+            rae_env
+                .env
+                .import(context_platform, WithPrefix)
+                .await
+                .expect("error loading ctx of the platform");
 
             rae_env.actions_progress.sync.sender = Some(sender_sync);
 
@@ -77,23 +74,17 @@ pub async fn init_ctx_rae(
         agenda: rae_env.agenda.clone(),
     };
 
-    import(
-        &mut rae_env.env,
-        &mut rae_env.ctxs,
-        CtxUtils::default(),
-        WithoutPrefix,
-    )
-    .await
-    .expect("error loading utils");
+    rae_env
+        .env
+        .import(CtxUtils::default(), WithoutPrefix)
+        .await
+        .expect("error loading utils");
 
-    import(
-        &mut rae_env.env,
-        &mut rae_env.ctxs,
-        CtxMath::default(),
-        WithoutPrefix,
-    )
-    .await
-    .expect("error loading math");
+    rae_env
+        .env
+        .import(CtxMath::default(), WithoutPrefix)
+        .await
+        .expect("error loading math");
 
     let mut ctx_io = CtxIo::default();
     if let Some(ref path) = working_directory {
@@ -101,25 +92,21 @@ pub async fn init_ctx_rae(
         ctx_rae.log = working_directory;
     }
 
-    import(
-        &mut rae_env.env,
-        &mut rae_env.ctxs,
-        ctx_rae_exec,
-        WithoutPrefix,
-    )
-    .await
-    .expect("error loading rae exec");
+    rae_env
+        .env
+        .import(ctx_rae_exec, WithoutPrefix)
+        .await
+        .expect("error loading rae exec");
 
-    import(
-        &mut rae_env.env,
-        &mut rae_env.ctxs,
-        CtxRaeDescription::default(),
-        WithoutPrefix,
-    )
-    .await
-    .expect("error loading rae description");
+    rae_env
+        .env
+        .import(CtxRaeDescription::default(), WithoutPrefix)
+        .await
+        .expect("error loading rae description");
 
-    import(&mut rae_env.env, &mut rae_env.ctxs, ctx_io, WithoutPrefix)
+    rae_env
+        .env
+        .import(ctx_io, WithoutPrefix)
         .await
         .expect("error loading io");
 
@@ -128,7 +115,7 @@ pub async fn init_ctx_rae(
 }
 
 #[allow(unused)]
-pub(crate) async fn init_simu_env(working_directory: Option<PathBuf>) -> (LEnv, ContextCollection) {
+pub(crate) async fn init_simu_env(working_directory: Option<PathBuf>) -> LEnv {
     /*Construction of the environment for simulation.
     This enviroment will contain the following modules:
     - io
@@ -136,12 +123,12 @@ pub(crate) async fn init_simu_env(working_directory: Option<PathBuf>) -> (LEnv, 
     - utils
     - ctx_rae_simu
      */
-    let (mut env, mut ctxs) = LEnv::root().await;
-    import(&mut env, &mut ctxs, CtxUtils::default(), WithoutPrefix)
+    let mut env = LEnv::root().await;
+    env.import(CtxUtils::default(), WithoutPrefix)
         .await
         .expect("error loading utils");
 
-    import(&mut env, &mut ctxs, CtxMath::default(), WithoutPrefix)
+    env.import(CtxMath::default(), WithoutPrefix)
         .await
         .expect("error loading math");
 
@@ -150,7 +137,7 @@ pub(crate) async fn init_simu_env(working_directory: Option<PathBuf>) -> (LEnv, 
         ctx_io.set_log_output(path.clone().into());
     }
 
-    import(&mut env, &mut ctxs, ctx_io, WithoutPrefix)
+    env.import(ctx_io, WithoutPrefix)
         .await
         .expect("error loading io");
 
@@ -158,9 +145,9 @@ pub(crate) async fn init_simu_env(working_directory: Option<PathBuf>) -> (LEnv, 
     .await
     .expect("error loading raesim");*/
 
-    import(&mut env, &mut ctxs, CtxType::default(), WithoutPrefix)
+    env.import(CtxType::default(), WithoutPrefix)
         .await
         .expect("error loading type");
 
-    (env, ctxs)
+    env
 }

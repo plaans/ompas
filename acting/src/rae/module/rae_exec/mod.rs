@@ -18,17 +18,17 @@ use async_trait::async_trait;
 use log::{error, info, warn};
 use ompas_lisp::core::root_module::list::cons;
 use ompas_lisp::core::root_module::map::{remove_key_value_map, set_map};
+use ompas_lisp::core::structs::documentation::Documentation;
 use ompas_lisp::core::structs::lenv::LEnv;
-use ompas_lisp::core::structs::lerror::LError;
 use ompas_lisp::core::structs::lerror::LError::{SpecialError, WrongNumberOfArgument, WrongType};
+use ompas_lisp::core::structs::lerror::{LError, LResult};
 use ompas_lisp::core::structs::lnumber::LNumber;
 use ompas_lisp::core::structs::lvalue::LValue;
 use ompas_lisp::core::structs::lvalue::LValue::{Nil, True};
 use ompas_lisp::core::structs::lvalues::LValueS;
-use ompas_lisp::core::structs::module::{GetModule, InitLisp, Module};
+use ompas_lisp::core::structs::module::{InitLisp, IntoModule, Module};
+use ompas_lisp::core::structs::purefonction::PureFonctionCollection;
 use ompas_lisp::core::structs::typelvalue::TypeLValue;
-use ompas_lisp::core::structs::LResult;
-use ompas_lisp::modules::doc::{Documentation, LHelp};
 use ompas_utils::dyn_async;
 use std::any::Any;
 use std::collections::hash_map::RandomState;
@@ -167,8 +167,8 @@ pub struct CtxRaeExec {
     pub agenda: Agenda,
 }
 
-impl GetModule for CtxRaeExec {
-    fn get_module(self) -> Module {
+impl IntoModule for CtxRaeExec {
+    fn into_module(self) -> Module {
         let init: InitLisp = vec![
             MACRO_MUTEX_LOCK_AND_DO,
             MACRO_WAIT_ON,
@@ -203,7 +203,7 @@ impl GetModule for CtxRaeExec {
         module.add_async_fn_prelude(RAE_GET_FACTS, get_facts);
         module.add_async_fn_prelude(RAE_GET_STATE_VARIBALE, get_state_variable);
         module.add_async_fn_prelude(RAE_EXEC_COMMAND, fn_exec_command);
-        module.add_async_mut_fn_prelude(RAE_LAUNCH_PLATFORM, launch_platform);
+        module.add_async_fn_prelude(RAE_LAUNCH_PLATFORM, launch_platform);
         module.add_async_fn_prelude(RAE_GET_STATUS, get_status);
         module.add_async_fn_prelude(RAE_CANCEL_COMMAND, cancel_command);
         module.add_async_fn_prelude(RAE_INSTANCE, fn_instance);
@@ -213,8 +213,8 @@ impl GetModule for CtxRaeExec {
         module.add_async_fn_prelude(RAE_ASSERT_SHORT, assert_fact);
         module.add_async_fn_prelude(RAE_RETRACT, retract_fact);
         module.add_async_fn_prelude(RAE_RETRACT_SHORT, retract_fact);
-        module.add_async_mut_fn_prelude(RAE_OPEN_COM_PLATFORM, open_com);
-        module.add_async_mut_fn_prelude(RAE_START_PLATFORM, start_platform);
+        module.add_async_fn_prelude(RAE_OPEN_COM_PLATFORM, open_com);
+        module.add_async_fn_prelude(RAE_START_PLATFORM, start_platform);
         module.add_fn_prelude(RAE_GET_INSTANTIATED_METHODS, get_instantiated_methods);
         module.add_fn_prelude(RAE_GET_BEST_METHOD, get_best_method);
         module.add_async_fn_prelude(CHECK, check);
@@ -235,6 +235,14 @@ impl GetModule for CtxRaeExec {
         module.add_fn_prelude(IS_FAILURE, is_failure);
         module
     }
+
+    fn documentation(&self) -> Documentation {
+        Default::default()
+    }
+
+    fn pure_fonctions(&self) -> PureFonctionCollection {
+        Default::default()
+    }
 }
 
 impl CtxRaeExec {
@@ -244,12 +252,6 @@ impl CtxRaeExec {
 
     pub fn add_platform(&mut self, platform: Option<Box<dyn RAEInterface>>) {
         self.platform_interface = platform;
-    }
-}
-
-impl Documentation for CtxRaeExec {
-    fn documentation() -> Vec<LHelp> {
-        todo!()
     }
 }
 
@@ -409,26 +411,31 @@ pub struct CtxPlatform {
 }
 
 impl CtxPlatform {
-    pub fn new(ctx: impl GetModule) -> Self {
+    pub fn new(ctx: impl IntoModule) -> Self {
         Self {
-            module: ctx.get_module(),
+            module: ctx.into_module(),
         }
     }
 }
 
-impl GetModule for CtxPlatform {
-    fn get_module(self) -> Module {
+impl IntoModule for CtxPlatform {
+    fn into_module(self) -> Module {
         self.module
+    }
+
+    fn documentation(&self) -> Documentation {
+        Default::default()
+    }
+
+    fn pure_fonctions(&self) -> PureFonctionCollection {
+        Default::default()
     }
 }
 
 ///Retract a fact to state
 #[macro_rules_attribute(dyn_async!)]
-async fn retract_fact<'a>(
-    args: &'a [LValue],
-    env: &'a LEnv,
-    ctx: &'a CtxRaeExec,
-) -> Result<LValue, LError> {
+async fn retract_fact<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
     let mode: String = env
         .get_symbol("rae-mode")
         .expect("rae-mode should be defined, default value is exec mode")
@@ -463,7 +470,7 @@ async fn retract_fact<'a>(
                 }
             };
 
-            remove_key_value_map(&[state, args.into()], env, &())
+            remove_key_value_map(&[state, args.into()], env)
         }
         _ => unreachable!(
             "{} should have either {} or {} value.",
@@ -474,11 +481,9 @@ async fn retract_fact<'a>(
 
 ///Add a fact to fact state
 #[macro_rules_attribute(dyn_async!)]
-async fn assert_fact<'a>(
-    args: &'a [LValue],
-    env: &'a LEnv,
-    ctx: &'a CtxRaeExec,
-) -> Result<LValue, LError> {
+async fn assert_fact<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
+
     let mode: String = env
         .get_symbol("rae-mode")
         .expect("rae-mode should be defined, default value is exec mode")
@@ -515,7 +520,7 @@ async fn assert_fact<'a>(
                 }
             };
 
-            set_map(&[state, args.into()], env, &())
+            set_map(&[state, args.into()], env)
         }
         _ => unreachable!(
             "{} should have either {} or {} value.",
@@ -526,11 +531,7 @@ async fn assert_fact<'a>(
 
 //Return the labels of the methods
 
-fn get_instantiated_methods(
-    args: &[LValue],
-    env: &LEnv,
-    _ctx: &CtxRaeExec,
-) -> Result<LValue, LError> {
+fn get_instantiated_methods(args: &[LValue], env: &LEnv) -> LResult {
     if args.is_empty() {
         return Err(WrongNumberOfArgument(
             RAE_GET_INSTANTIATED_METHODS,
@@ -559,7 +560,7 @@ fn get_instantiated_methods(
                     for method in methods {
                         //Handle here the case where it is needed to generate all instantiation of methods where several parameters are possible.
                         instantiated_method
-                            .push(cons(&[method.clone(), task_args.clone()], env, &()).unwrap());
+                            .push(cons(&[method.clone(), task_args.clone()], env).unwrap());
                     }
                     instantiated_method.into()
                 } else if let LValue::Nil = methods {
@@ -578,7 +579,7 @@ fn get_instantiated_methods(
     Ok(methods)
 }
 
-fn get_best_method(args: &[LValue], env: &LEnv, ctx: &CtxRaeExec) -> Result<LValue, LError> {
+fn get_best_method(args: &[LValue], env: &LEnv) -> LResult {
     /*ompas_utils::log::send(format!("env in get_best_method :\n {}", env));
     let task_methods_map = env.get_symbol(RAE_TASK_METHODS_MAP);
     ompas_utils::log::send(format!(
@@ -586,7 +587,7 @@ fn get_best_method(args: &[LValue], env: &LEnv, ctx: &CtxRaeExec) -> Result<LVal
         task_methods_map
     ));*/
 
-    let methods = get_instantiated_methods(args, env, ctx)?;
+    let methods = get_instantiated_methods(args, env)?;
     let task_args = &args[1..];
     //log::send(format!("methods for {}: {}\n", LValue::from(args), methods));
     let best_method = if let LValue::List(methods) = methods {
@@ -606,27 +607,22 @@ fn get_best_method(args: &[LValue], env: &LEnv, ctx: &CtxRaeExec) -> Result<LVal
         ));
     };
 
-    let method_instance = cons(&[best_method, task_args.into()], env, &())?;
+    let method_instance = cons(&[best_method, task_args.into()], env)?;
     //log::send(format!("instance of the method: {}\n", method_instance));
 
     Ok(method_instance)
 }
 
 #[macro_rules_attribute(dyn_async!)]
-async fn get_facts<'a>(
-    _: &'a [LValue],
-    env: &'a LEnv,
-    ctx: &'a CtxRaeExec,
-) -> Result<LValue, LError> {
+async fn get_facts<'a>(_: &'a [LValue], env: &'a LEnv) -> LResult {
     let mode: String = env
         .get_symbol("rae-mode")
         .expect("rae-mode should be defined, default value is exec mode")
         .try_into()?;
     match mode.as_str() {
         SYMBOL_EXEC_MODE => {
-            let mut state: im::HashMap<LValue, LValue> =
-                get_state(&[], env, ctx).await?.try_into()?;
-            let locked: Vec<LValue> = get_list_locked(&[], env, ctx).await?.try_into()?;
+            let mut state: im::HashMap<LValue, LValue> = get_state(&[], env).await?.try_into()?;
+            let locked: Vec<LValue> = get_list_locked(&[], env).await?.try_into()?;
 
             for e in locked {
                 state.insert(vec![LOCKED.into(), e].into(), True);
@@ -644,11 +640,9 @@ async fn get_facts<'a>(
 }
 
 #[macro_rules_attribute(dyn_async!)]
-async fn get_state<'a>(
-    args: &'a [LValue],
-    _env: &'a LEnv,
-    ctx: &'a CtxRaeExec,
-) -> Result<LValue, LError> {
+async fn get_state<'a>(args: &'a [LValue], env: &'a LEnv) -> Result<LValue, LError> {
+    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
+
     let _type = match args.len() {
         0 => None,
         1 => {
@@ -691,11 +685,9 @@ async fn get_state<'a>(
 }
 
 #[macro_rules_attribute(dyn_async!)]
-async fn get_state_variable<'a>(
-    args: &'a [LValue],
-    _env: &'a LEnv,
-    ctx: &'a CtxRaeExec,
-) -> Result<LValue, LError> {
+async fn get_state_variable<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
+
     if args.is_empty() {
         return Err(WrongNumberOfArgument(
             RAE_GET_STATE_VARIBALE,
@@ -719,11 +711,9 @@ async fn get_state_variable<'a>(
 }
 
 #[macro_rules_attribute(dyn_async!)]
-async fn get_status<'a>(
-    _args: &'a [LValue],
-    _env: &'a LEnv,
-    ctx: &'a CtxRaeExec,
-) -> Result<LValue, LError> {
+async fn get_status<'a>(_: &'a [LValue], env: &'a LEnv) -> LResult {
+    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
+
     let status = ctx.actions_progress.status.read().await;
 
     let mut string = "Action(s) Status\n".to_string();
@@ -736,11 +726,7 @@ async fn get_status<'a>(
 }
 
 #[macro_rules_attribute(dyn_async!)]
-async fn check<'a>(
-    args: &'a [LValue],
-    _env: &'a LEnv,
-    _: &'a CtxRaeExec,
-) -> Result<LValue, LError> {
+async fn check<'a>(args: &'a [LValue], _: &'a LEnv) -> LResult {
     //info!("wait on function");
     //println!("wait on function with {} args", args.len());
     if args.len() != 1 {
@@ -761,12 +747,10 @@ async fn check<'a>(
 //Takes an instantiated task to refine and return the best applicable method and a task_id.
 //TODO: Implement a way to configure select
 #[macro_rules_attribute(dyn_async!)]
-async fn select<'a>(
-    args: &'a [LValue],
-    _: &'a LEnv,
-    ctx: &'a CtxRaeExec,
-) -> Result<LValue, LError> {
+async fn select<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     let task = args[0].clone();
+
+    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
 
     if let LValue::List(_) = &args[1] {
         let methods = args[1].clone();
@@ -801,11 +785,7 @@ async fn select<'a>(
 }
 
 #[macro_rules_attribute(dyn_async!)]
-async fn get_next_method<'a>(
-    args: &'a [LValue],
-    _: &'a LEnv,
-    ctx: &'a CtxRaeExec,
-) -> Result<LValue, LError> {
+async fn get_next_method<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(
             RAE_GET_NEXT_METHOD,
@@ -814,6 +794,7 @@ async fn get_next_method<'a>(
             1..1,
         ));
     }
+    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
 
     if let LValue::Number(LNumber::Usize(task_id)) = &args[0] {
         let next_method = ctx.agenda.get_next_applicable_method(task_id).await;
@@ -829,16 +810,14 @@ async fn get_next_method<'a>(
 }
 
 #[macro_rules_attribute(dyn_async!)]
-async fn set_success_for_task<'a>(
-    args: &'a [LValue],
-    _: &'a LEnv,
-    ctx: &'a CtxRaeExec,
-) -> Result<LValue, LError> {
+async fn set_success_for_task<'a>(args: &'a [LValue], env: &'a LEnv) -> Result<LValue, LError> {
     /*
     Steps:
     - Remove the stack from the agenda
     - Return true
      */
+
+    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
 
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(
@@ -862,15 +841,15 @@ async fn set_success_for_task<'a>(
     }
 }
 
-pub fn success(args: &[LValue], _: &LEnv, _: &CtxRaeExec) -> Result<LValue, LError> {
+pub fn success(args: &[LValue], _: &LEnv) -> LResult {
     Ok(vec![LValue::from(SUCCESS), args.into()].into())
 }
 
-pub fn failure(args: &[LValue], _: &LEnv, _: &CtxRaeExec) -> Result<LValue, LError> {
+pub fn failure(args: &[LValue], _: &LEnv) -> LResult {
     Ok(vec![LValue::from(FAILURE), args.into()].into())
 }
 
-pub fn is_failure(args: &[LValue], _: &LEnv, _: &CtxRaeExec) -> Result<LValue, LError> {
+pub fn is_failure(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(
             IS_FAILURE,
@@ -910,7 +889,7 @@ pub fn is_failure(args: &[LValue], _: &LEnv, _: &CtxRaeExec) -> Result<LValue, L
     }
 }
 
-pub fn is_success(args: &[LValue], _: &LEnv, _: &CtxRaeExec) -> Result<LValue, LError> {
+pub fn is_success(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(
             IS_SUCCESS,

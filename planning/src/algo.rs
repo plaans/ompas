@@ -2,20 +2,18 @@ use crate::structs::Constraint;
 use crate::structs::Lit;
 use crate::structs::*;
 use ompas_acting::rae::module::rae_exec::{RAE_ASSERT, RAE_RETRACT};
-use ompas_lisp::core::structs::contextcollection::ContextCollection;
 use ompas_lisp::core::structs::lcoreoperator::language::{BEGIN, EVAL};
 use ompas_lisp::core::structs::lcoreoperator::LCoreOperator;
 use ompas_lisp::core::structs::lenv::LEnv;
-use ompas_lisp::core::structs::lerror::LError;
 use ompas_lisp::core::structs::lerror::LError::{
     NotInListOfExpectedTypes, SpecialError, WrongNumberOfArgument, WrongType,
 };
+use ompas_lisp::core::structs::lerror::{LError, LResult};
 use ompas_lisp::core::structs::llambda::LambdaArgs;
 use ompas_lisp::core::structs::lvalue::LValue;
 use ompas_lisp::core::structs::typelvalue::TypeLValue;
-use ompas_lisp::core::structs::LResult;
 use ompas_lisp::core::*;
-use ompas_lisp::static_eval::{eval_static, PureFonctionCollection};
+use ompas_lisp::static_eval::eval_static;
 
 use ompas_utils::blocking_async;
 
@@ -36,14 +34,13 @@ pub fn pre_processing(lv: &LValue, context: &Context) -> LResult {
 
 pub fn pre_eval(lv: &LValue, context: &Context) -> LResult {
     let mut env = context.env.clone();
-    let mut ctxs = context.ctxs.clone();
-    let plv = eval_static(lv, &mut env, &mut ctxs, &PureFonctionCollection::default())?;
+    let plv = eval_static(lv, &mut env)?;
 
     Ok(plv.get_lvalue().clone())
 }
 
 pub fn pre_process_transform_lambda(lv: &LValue, context: &Context) -> LResult {
-    let mut lv = match transform_lambda_expression(lv, context.env.clone(), context.ctxs.clone()) {
+    let mut lv = match transform_lambda_expression(lv, context.env.clone()) {
         Ok(lv) => lv,
         Err(_) => lv.clone(),
     };
@@ -449,7 +446,7 @@ pub fn translate_lvalue_to_expression_chronicle(
                 let mut literal: Vec<Lit> = vec![];
 
                 match &l[0] {
-                    LValue::Symbol(_) | LValue::Fn(_) | LValue::MutFn(_) => {
+                    LValue::Symbol(_) | LValue::Fn(_) => {
                         let s = l[0].to_string();
                         match s.as_str() {
                             RAE_ASSERT => {
@@ -670,7 +667,7 @@ pub fn translate_cond_if(
 
 pub const TRANSFORM_LAMBDA_EXPRESSION: &str = "transform-lambda-expression";
 
-pub fn transform_lambda_expression(lv: &LValue, env: LEnv, ctxs: ContextCollection) -> LResult {
+pub fn transform_lambda_expression(lv: &LValue, env: LEnv) -> LResult {
     //println!("in transform lambda");
 
     if let LValue::List(list) = lv {
@@ -685,17 +682,10 @@ pub fn transform_lambda_expression(lv: &LValue, env: LEnv, ctxs: ContextCollecti
 
         let arg = list[0].clone();
         let mut c_env = env.clone();
-        let mut c_ctxs = ctxs.clone();
 
-        let lambda = blocking_async!({
-            eval(
-                &expand(&arg, true, &mut c_env, &mut c_ctxs).await?,
-                &mut c_env,
-                &mut c_ctxs,
-            )
-            .await
-        })
-        .expect("Error in thread evaluating lambda")?;
+        let lambda =
+            blocking_async!(eval(&expand(&arg, true, &mut c_env).await?, &mut c_env,).await)
+                .expect("Error in thread evaluating lambda")?;
         //println!("evaluating is a success");
         if let LValue::Lambda(l) = lambda {
             let mut lisp = "(begin".to_string();
@@ -750,10 +740,8 @@ pub fn transform_lambda_expression(lv: &LValue, env: LEnv, ctxs: ContextCollecti
             lisp.push(')');
 
             let mut c_env = env;
-            let mut c_ctxs = ctxs;
 
-            blocking_async!(parse(&lisp, &mut c_env, &mut c_ctxs).await)
-                .expect("error in thread parsing string")
+            blocking_async!(parse(&lisp, &mut c_env).await).expect("error in thread parsing string")
         } else {
             Err(WrongType(
                 TRANSFORM_LAMBDA_EXPRESSION,

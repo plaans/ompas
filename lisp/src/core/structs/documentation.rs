@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::fmt::{Debug, Display, Formatter};
 
+#[derive(Default, Debug, Clone)]
 pub struct Documentation {
     inner: BTreeMap<String, LHelp>,
 }
@@ -12,14 +13,14 @@ impl Documentation {
 
     pub fn get_all(&self) -> String {
         let mut string = String::new();
-        for element in self.map_help.iter() {
+        for element in self.inner.iter() {
             string.push_str(format!("¤ {}\n", element.1).as_str())
         }
         string
     }
 
     pub fn get(&self, sym: &str) -> String {
-        match self.map_help.get(sym) {
+        match self.inner.get(sym) {
             None => "no such function".to_string(),
             Some(h) => format!("{:?}\n", h),
         }
@@ -66,7 +67,7 @@ impl From<Vec<LHelp>> for Documentation {
     fn from(vec: Vec<LHelp>) -> Self {
         let mut result: BTreeMap<String, LHelp> = Default::default();
         for e in vec {
-            result.insert(e.label.to_string(), e)
+            result.insert(e.label.to_string(), e);
         }
         Self { inner: result }
     }

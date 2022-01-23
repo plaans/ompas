@@ -34,11 +34,11 @@ pub mod wait_on {
             self.inner.lock().await.push(w);
             rx
         }
-        pub async fn check_wait_on(&self, mut env: LEnv, mut ctxs: ContextCollection) {
+        pub async fn check_wait_on(&self, mut env: LEnv) {
             let mut item_to_remove = vec![];
             let mut waiters = self.inner.lock().await;
             for (id, waiter) in waiters.iter().enumerate() {
-                let result = eval(&waiter.lambda, &mut env, &mut ctxs).await;
+                let result = eval(&waiter.lambda, &mut env).await;
                 match result {
                     Ok(lv) => {
                         //info!("{} => {}", waiter.lambda, lv);
@@ -85,11 +85,7 @@ pub mod wait_on {
         str
     }
 
-    pub async fn task_check_wait_on(
-        mut receiver: broadcast::Receiver<bool>,
-        env: LEnv,
-        ctxs: ContextCollection,
-    ) {
+    pub async fn task_check_wait_on(mut receiver: broadcast::Receiver<bool>, env: LEnv) {
         //println!("task check wait on active");
         let mut end_receiver = task_handler::subscribe_new_task();
         loop {
@@ -98,7 +94,7 @@ pub mod wait_on {
                     let n_wait_on = WAIT_ON_COLLECTION.inner.lock().await.len();
                     if n_wait_on != 0 {
                         //info!("{} wait ons to check!", n_wait_on);
-                        WAIT_ON_COLLECTION.check_wait_on(env.clone(), ctxs.clone()).await;
+                        WAIT_ON_COLLECTION.check_wait_on(env.clone()).await;
                     }
                 }
                 _ = end_receiver.recv() => {

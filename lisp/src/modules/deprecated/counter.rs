@@ -10,9 +10,8 @@ use crate::core::structs::module::{IntoModule, Module};
 use crate::core::structs::purefonction::PureFonctionCollection;
 use crate::core::structs::typelvalue::TypeLValue;
 use crate::modules::deprecated::counter::language::*;
-use anyhow::bail;
 use std::convert::TryFrom;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 /*
 LANGUAGE
@@ -59,7 +58,7 @@ pub struct Counter {
 
 pub fn get_counter(args: &[LValue], env: &LEnv) -> LResult {
     if args.len() != 1 {
-        bail!(WrongNumberOfArgument(
+        return Err(WrongNumberOfArgument(
             GET_COUNTER,
             args.into(),
             args.len(),
@@ -71,10 +70,10 @@ pub fn get_counter(args: &[LValue], env: &LEnv) -> LResult {
 
     match &args[0] {
         LValue::Number(LNumber::Usize(u)) => match ctx.counters.get(*u) {
-            None => bail!(SpecialError(GET_COUNTER, "index out of reach".to_string())),
+            None => Err(SpecialError(GET_COUNTER, "index out of reach".to_string())),
             Some(c) => Ok(LValue::Number(LNumber::Int(c.val as i64))),
         },
-        lv => bail!(WrongType(
+        lv => Err(WrongType(
             GET_COUNTER,
             lv.clone(),
             lv.into(),
@@ -85,7 +84,7 @@ pub fn get_counter(args: &[LValue], env: &LEnv) -> LResult {
 
 pub fn decrement_counter(args: &[LValue], env: &LEnv) -> LResult {
     if args.len() != 1 {
-        return bail!(WrongNumberOfArgument(
+        return Err(WrongNumberOfArgument(
             DECREMENT_COUNTER,
             args.into(),
             args.len(),
@@ -93,11 +92,13 @@ pub fn decrement_counter(args: &[LValue], env: &LEnv) -> LResult {
         ));
     }
 
+    let mut env = env.clone();
+
     let ctx = env.get_mut_context::<CtxCounter>(MOD_COUNTER)?;
 
     match &args[0] {
         LValue::Number(LNumber::Usize(u)) => match ctx.counters.get_mut(*u) {
-            None => bail!(SpecialError(
+            None => Err(SpecialError(
                 DECREMENT_COUNTER,
                 "index out of reach".to_string(),
             )),
@@ -108,7 +109,7 @@ pub fn decrement_counter(args: &[LValue], env: &LEnv) -> LResult {
                 Ok(LValue::Nil)
             }
         },
-        lv => bail!(WrongType(
+        lv => Err(WrongType(
             DECREMENT_COUNTER,
             lv.clone(),
             lv.into(),
@@ -119,7 +120,7 @@ pub fn decrement_counter(args: &[LValue], env: &LEnv) -> LResult {
 
 pub fn increment_counter(args: &[LValue], env: &LEnv) -> LResult {
     if args.len() != 1 {
-        bail!(WrongNumberOfArgument(
+        return Err(WrongNumberOfArgument(
             INCREMENT_COUNTER,
             args.into(),
             args.len(),
@@ -127,11 +128,13 @@ pub fn increment_counter(args: &[LValue], env: &LEnv) -> LResult {
         ));
     }
 
+    let mut env = env.clone();
+
     let ctx = env.get_mut_context::<CtxCounter>(MOD_COUNTER)?;
 
     match &args[0] {
         LValue::Number(LNumber::Usize(u)) => match ctx.counters.get_mut(*u) {
-            None => bail!(SpecialError(
+            None => Err(SpecialError(
                 INCREMENT_COUNTER,
                 "index out of reach".to_string(),
             )),
@@ -140,7 +143,7 @@ pub fn increment_counter(args: &[LValue], env: &LEnv) -> LResult {
                 Ok(LValue::Nil)
             }
         },
-        lv => bail!(WrongType(
+        lv => Err(WrongType(
             INCREMENT_COUNTER,
             lv.clone(),
             lv.into(),
@@ -151,7 +154,7 @@ pub fn increment_counter(args: &[LValue], env: &LEnv) -> LResult {
 
 pub fn set_counter(args: &[LValue], env: &LEnv) -> LResult {
     if args.len() != 2 {
-        return bail!(WrongNumberOfArgument(
+        return Err(WrongNumberOfArgument(
             SET_COUNTER,
             args.into(),
             args.len(),
@@ -159,17 +162,19 @@ pub fn set_counter(args: &[LValue], env: &LEnv) -> LResult {
         ));
     }
 
+    let mut env = env.clone();
+
     let ctx = env.get_mut_context::<CtxCounter>(MOD_COUNTER)?;
 
     match &args[0] {
         LValue::Number(LNumber::Usize(u)) => match ctx.counters.get_mut(*u) {
-            None => bail!(SpecialError(SET_COUNTER, "index out of reach".to_string())),
+            None => Err(SpecialError(SET_COUNTER, "index out of reach".to_string())),
             Some(c) => {
                 c.val = i64::try_from(&args[1])? as u32;
                 Ok(LValue::Nil)
             }
         },
-        lv => bail!(WrongType(
+        lv => Err(WrongType(
             SET_COUNTER,
             lv.clone(),
             lv.into(),
@@ -179,6 +184,7 @@ pub fn set_counter(args: &[LValue], env: &LEnv) -> LResult {
 }
 
 pub fn new_counter(_: &[LValue], env: &LEnv) -> LResult {
+    let mut env = env.clone();
     let ctx = env.get_mut_context::<CtxCounter>(MOD_COUNTER)?;
     Ok(LValue::Number(LNumber::Usize(ctx.new_counter())))
 }
@@ -186,7 +192,7 @@ pub fn new_counter(_: &[LValue], env: &LEnv) -> LResult {
 impl IntoModule for CtxCounter {
     fn into_module(self) -> Module {
         let mut module = Module {
-            ctx: Arc::new(self),
+            ctx: Arc::new(RwLock::new(self)),
             prelude: vec![],
             raw_lisp: Default::default(),
             label: MOD_COUNTER.into(),
@@ -201,7 +207,7 @@ impl IntoModule for CtxCounter {
         module
     }
 
-    fn documentation(self) -> Documentation {
+    fn documentation(&self) -> Documentation {
         vec![
             LHelp::new(MOD_COUNTER, DOC_MOD_COUNTER),
             LHelp::new(GET_COUNTER, DOC_GET_COUNTER),
@@ -213,7 +219,7 @@ impl IntoModule for CtxCounter {
         .into()
     }
 
-    fn pure_fonctions(self) -> PureFonctionCollection {
+    fn pure_fonctions(&self) -> PureFonctionCollection {
         Default::default()
     }
 }

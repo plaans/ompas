@@ -1,4 +1,4 @@
-use crate::core::structs::lenv::LEnv;
+/*use crate::core::structs::lenv::LEnv;
 use crate::core::structs::lerror::LError;
 use crate::core::structs::lvalue::LValue;
 use crate::core::structs::module::AsyncLTrait;
@@ -397,7 +397,7 @@ mod test_async {
     #[tokio::test]
     async fn test_pointer_async() -> Result<(), LError> {
         let p_test = test;
-        let result = p_test(&[LValue::Nil], &LEnv::empty(), &()).await?;
+        let result = p_test(&[LValue::Nil], &LEnv::default(), &()).await?;
 
         assert_eq!(result, LValue::Nil);
 
@@ -410,7 +410,7 @@ mod test_async {
 
         let fun: &AsyncNativeFn<()> = fun.downcast_ref::<AsyncNativeFn<()>>().unwrap();
 
-        let env = &LEnv::empty();
+        let env = &LEnv::default();
         let args = &[LValue::Nil];
         let ctx = &();
 
@@ -427,7 +427,7 @@ mod test_async {
 
         let fun: &AsyncNativeFn<()> = fun.downcast_ref::<AsyncNativeFn<()>>().unwrap();
 
-        let env = &LEnv::empty();
+        let env = &LEnv::default();
         let args = &[LValue::Nil];
         let ctx = &();
 
@@ -455,7 +455,7 @@ mod test_async {
             fun(args, env, ctx)
         };
 
-        let env = &LEnv::empty();
+        let env = &LEnv::default();
         let args = &[LValue::Nil];
         let ctx = &();
 
@@ -530,3 +530,4 @@ mod test_async {
         }
     }
 }
+*/

@@ -38,7 +38,7 @@ pub enum LError {
 impl Error for LError {}
 
 impl Display for LError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
         match self {
             LError::WrongType(f_name, s, s1, s2) => {
                 write!(f, "In {}, {}: Got {}, expected {}", f_name, s, s1, s2)
@@ -93,4 +93,12 @@ impl From<std::io::Error> for LError {
     }
 }
 
-pub type LResult = Result<LValue, anyhow::Error>;
+pub type LResult = std::result::Result<LValue, LError>;
+
+pub type Result<T> = std::result::Result<T, LError>;
+
+impl From<anyhow::Error> for LError {
+    fn from(e: anyhow::Error) -> Self {
+        Self::SpecialError("", e.to_string())
+    }
+}

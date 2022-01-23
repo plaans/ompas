@@ -22,9 +22,7 @@ pub enum TypeLValue {
     Character,
     SExpr,
     Fn,
-    MutFn,
     AsyncFn,
-    AsyncMutFn,
     Lambda,
     Nil,
     Map,
@@ -52,14 +50,12 @@ impl Display for TypeLValue {
             TypeLValue::Atom => ATOM,
             TypeLValue::CoreOperator => CORE_OPERATOR,
             TypeLValue::Other(s) => s.as_str(),
-            TypeLValue::MutFn => MUT_FN,
             TypeLValue::Int => INT,
             TypeLValue::Float => FLOAT,
             TypeLValue::Usize => USIZE,
             TypeLValue::Bool => BOOL,
             TypeLValue::Character => CHARACTER,
             TypeLValue::AsyncFn => ASYNC_FN,
-            TypeLValue::AsyncMutFn => ASYNC_MUT_FN,
             TypeLValue::Future => FUTURE,
         };
         write!(f, "{}", str)
@@ -101,7 +97,6 @@ impl From<&LValue> for TypeLValue {
             LValue::Number(LNumber::Usize(_)) => TypeLValue::Usize,
             LValue::Symbol(_) => TypeLValue::Symbol,
             LValue::Fn(_) => TypeLValue::Fn,
-            LValue::MutFn(_) => TypeLValue::MutFn,
             LValue::Nil => TypeLValue::Nil,
             LValue::Lambda(_) => TypeLValue::Lambda,
             LValue::Map(_) => TypeLValue::Map,
@@ -111,7 +106,6 @@ impl From<&LValue> for TypeLValue {
             LValue::String(_) => TypeLValue::String,
             LValue::Character(_) => TypeLValue::Character,
             LValue::AsyncFn(_) => TypeLValue::AsyncFn,
-            LValue::AsyncMutFn(_) => TypeLValue::AsyncMutFn,
             LValue::Future(_) => TypeLValue::Future,
         }
     }

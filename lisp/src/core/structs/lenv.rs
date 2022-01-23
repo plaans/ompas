@@ -1,11 +1,11 @@
-use crate::core::root_module::language::SET;
 use crate::core::root_module::CtxRoot;
 use crate::core::structs::contextcollection::ContextCollection;
 use crate::core::structs::documentation::{Documentation, LHelp};
 use crate::core::structs::lcoreoperator::language::*;
 use crate::core::structs::lenv::language::*;
-use crate::core::structs::lerror::LError::{UndefinedSymbol, WrongNumberOfArgument, WrongType};
-use crate::core::structs::lerror::{LError, LResult};
+use crate::core::structs::lerror;
+use crate::core::structs::lerror::LError::{WrongNumberOfArgument, WrongType};
+use crate::core::structs::lerror::LResult;
 use crate::core::structs::llambda::LLambda;
 use crate::core::structs::lvalue::LValue;
 use crate::core::structs::module::IntoModule;
@@ -13,12 +13,10 @@ use crate::core::structs::new_function::*;
 use crate::core::structs::purefonction::PureFonctionCollection;
 use crate::core::structs::typelvalue::TypeLValue;
 use crate::core::{eval, parse};
-use anyhow::{anyhow, bail};
 use im::HashSet;
-use std::collections::HashMap;
+use std::any::Any;
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
-use tokio::sync::RwLock;
 
 pub mod language {
 
@@ -39,67 +37,49 @@ pub mod language {
 /// - It also contains macros, special LLambdas used to format LValue expressions.
 /// - A LEnv can inherits from an outer environment. It can use symbols from it, but not modify them.
 #[derive(Clone, Debug)]
-pub struct InnerLEnv {
+pub struct LEnv {
     symbols: im::HashMap<String, LValue>,
     macro_table: im::HashMap<String, LLambda>,
-    ctxs: Arc<RwLock<ContextCollection>>,
-    pfc: Arc<RwLock<PureFonctionCollection>>,
-    documentation: Arc<RwLock<Documentation>>,
+    ctxs: ContextCollection,
+    pfc: PureFonctionCollection,
+    documentation: Documentation,
     outer: Option<Arc<LEnv>>,
 }
 
-impl InnerLEnv {
-    pub async fn get_documentation(&self) -> Documentation {
-        self.documentation.read().await.clone()
+impl LEnv {
+    pub fn set_outer(&mut self, env: LEnv) {
+        self.outer = Some(Arc::new(env))
+    }
+    pub fn get_documentation(&self) -> Documentation {
+        self.documentation.clone()
     }
 
-    pub async fn add_documentation(&mut self, doc: Documentation) {
-        self.documentation.write().await.append(doc)
+    pub fn add_documentation(&mut self, doc: Documentation) {
+        self.documentation.append(doc)
     }
 
-    pub async fn add_pure_functions(&mut self, pfc: PureFonctionCollection) {
-        self.pfc.write().await.append(pfc);
+    pub fn add_pure_functions(&mut self, pfc: PureFonctionCollection) {
+        self.pfc.append(pfc);
     }
-}
 
-#[derive(Clone, Debug)]
-pub struct LEnv {
-    inner: Arc<InnerLEnv>,
+    pub fn get_pfc(&self) -> &PureFonctionCollection {
+        &self.pfc
+    }
 }
 
 impl LEnv {
-    pub fn get_context<T>(&self, label: &str) -> Result<&T, anyhow::Error> {
-        self.inner.ctxs.read().get::<T>(label)
+    pub fn get_context<T: Any + Send + Sync>(&self, label: &str) -> Result<&T, anyhow::Error> {
+        self.ctxs.get::<T>(label)
     }
 
-    pub async fn get_mut_context<T>(&self, label: &str) -> Result<&mut T, anyhow::Error> {
-        self.inner.ctxs.read().get_mut::<T>(label)
-    }
-
-    pub async fn get_documentation(&self) -> Documentation {
-        self.inner.get_documentation().await
-    }
-
-    pub async fn add_documentation(&self, doc: Documentation) {
-        self.inneradd_documentation(doc).await
-    }
-
-    pub async fn add_pure_functions(&self, pfc: PureFonctionCollection) {
-        self.inner.add_pure_fonctions(pfc).await
-    }
-}
-
-impl From<InnerLEnv> for LEnv {
-    fn from(inner_lenv: InnerLEnv) -> Self {
-        Self {
-            inner: Arc::new(inner_lenv),
-        }
+    pub fn get_mut_context<T: Any + Send + Sync>(&mut self, label: &str) -> lerror::Result<&mut T> {
+        self.ctxs.get_mut::<T>(label)
     }
 }
 
 impl Default for LEnv {
     fn default() -> Self {
-        let mut symbols = HashMap::default();
+        let mut symbols: im::HashMap<String, LValue> = Default::default();
         let documentation = vec![
             LHelp::new_verbose(HELP, DOC_HELP, DOC_HELP_VERBOSE),
             LHelp::new(DEFINE, DOC_DEFINE),
@@ -115,23 +95,29 @@ impl Default for LEnv {
             LHelp::new(EVAL, DOC_EVAL),
         ]
         .into();
-        let pfc = PureFonctionCollection::default();
 
-        symbols.insert(HELP, LFn::new(help, HELP.to_string()));
+        symbols.insert(HELP.to_string(), LFn::new(help, HELP.to_string()).into());
 
-        symbols.insert(ENV_GET_KEYS, LFn::new(env_get_keys, ENV_GET_KEYS));
-        symbols.insert(ENV_GET_MACROS, LFn::new(env_get_macros, ENV_GET_MACROS));
-        symbols.insert(ENV_GET_MACRO, LFn::new(env_get_macro, ENV_GET_MACRO));
+        symbols.insert(
+            ENV_GET_KEYS.to_string(),
+            LFn::new(env_get_keys, ENV_GET_KEYS.to_string()).into(),
+        );
+        symbols.insert(
+            ENV_GET_MACROS.to_string(),
+            LFn::new(env_get_macros, ENV_GET_MACROS.to_string()).into(),
+        );
+        symbols.insert(
+            ENV_GET_MACRO.to_string(),
+            LFn::new(env_get_macro, ENV_GET_MACRO.to_string()).into(),
+        );
 
         Self {
-            inner: Arc::new(InnerLEnv {
-                symbols: Default::default(),
-                macro_table: Default::default(),
-                ctxs: Arc::new(Default::default()),
-                pfc: Arc::new(Default::default()),
-                documentation: Arc::new(documentation),
-                outer: None,
-            }),
+            symbols: Default::default(),
+            macro_table: Default::default(),
+            ctxs: Default::default(),
+            pfc: Default::default(),
+            documentation,
+            outer: None,
         }
     }
 }
@@ -152,27 +138,23 @@ impl LEnv {
         env
     }
 
-    pub fn set_outer(&mut self, outer: Self) {
-        self.outer = Some(Box::new(outer));
-    }
-
     pub fn get_symbol(&self, s: &str) -> Option<LValue> {
         match self.symbols.get(s) {
+            Some(lv) => Some(lv.clone()),
             None => match &self.outer {
                 None => None,
                 Some(outer) => outer.get_symbol(s),
             },
-            Some(s) => Some(s.clone()),
         }
     }
 
     pub fn get_ref_symbol(&self, s: &str) -> Option<&LValue> {
         match self.symbols.get(s) {
+            Some(lv) => Some(lv),
             None => match &self.outer {
                 None => None,
                 Some(outer) => outer.get_ref_symbol(s),
             },
-            Some(s) => Some(s),
         }
     }
 
@@ -186,18 +168,8 @@ impl LEnv {
         update
     }
 
-    pub fn set(&mut self, key: String, exp: LValue) -> Result<(), LError> {
-        match self.get_symbol(key.as_str()) {
-            None => Err(UndefinedSymbol(SET, key)),
-            Some(_) => {
-                self.symbols.insert(key, exp);
-                Ok(())
-            }
-        }
-    }
-
     pub fn add_macro(&mut self, key: String, _macro: LLambda) {
-        self.macro_table = self.macro_table.update(key, _macro)
+        self.macro_table.insert(key, _macro);
     }
 
     pub fn get_macro(&self, key: &str) -> Option<&LLambda> {
@@ -205,8 +177,7 @@ impl LEnv {
     }
 
     pub fn keys(&self) -> im::HashSet<String> {
-        let mut keys: HashSet<String> = self.symbols.keys().cloned().collect();
-        keys = keys.union(self.macro_table.keys().cloned().collect());
+        let mut keys: im::HashSet<String> = self.symbols.keys().cloned().collect();
         if let Some(outer) = &self.outer {
             keys = keys.union(outer.keys());
         }
@@ -214,23 +185,19 @@ impl LEnv {
     }
 
     pub fn macros(&self) -> HashSet<String> {
-        let mut macros: HashSet<String> = self.macro_table.keys().cloned().collect();
-        if let Some(outer) = &self.outer {
-            macros = macros.union(outer.macros());
-        }
-        macros
+        self.macro_table.keys().cloned().collect()
     }
 
     pub async fn import(
         &mut self,
         ctx: impl IntoModule,
         import_type: ImportType,
-    ) -> Result<(), LError> {
+    ) -> lerror::Result<()> {
         self.add_documentation(ctx.documentation());
         self.add_pure_functions(ctx.pure_fonctions());
 
         let mut module = ctx.into_module();
-        self.inner.ctxs.insert(module.ctx, module.label.clone());
+        self.ctxs.insert(module.ctx, module.label.clone());
         //println!("id: {}", id);
         for (sym, lv) in &mut module.prelude {
             match import_type {
@@ -260,9 +227,6 @@ impl Display for LEnv {
         for s in &self.symbols {
             str.push_str(format!("{}: {}\n", s.0, s.1).as_str())
         }
-        if let Some(outer) = &self.outer {
-            str.push_str(outer.to_string().as_str());
-        }
         writeln!(f, "{}", str)
     }
 }
@@ -270,12 +234,6 @@ impl Display for LEnv {
 impl PartialEq for LEnv {
     fn eq(&self, other: &Self) -> bool {
         self == other
-    }
-}
-
-impl Default for LEnv {
-    fn default() -> Self {
-        Self::empty()
     }
 }
 
@@ -306,7 +264,7 @@ pub fn env_get_macros(_: &[LValue], env: &LEnv) -> LResult {
 
 pub fn env_get_macro(args: &[LValue], env: &LEnv) -> LResult {
     if args.len() != 1 {
-        return bail!(WrongNumberOfArgument(
+        return Err(WrongNumberOfArgument(
             ENV_GET_MACRO,
             args.into(),
             args.len(),
@@ -319,7 +277,7 @@ pub fn env_get_macro(args: &[LValue], env: &LEnv) -> LResult {
             None => LValue::Nil,
         })
     } else {
-        bail!(WrongType(
+        Err(WrongType(
             ENV_GET_MACRO,
             args[0].clone(),
             (&args[0]).into(),
@@ -333,17 +291,16 @@ pub fn env_get_macro(args: &[LValue], env: &LEnv) -> LResult {
 /// 0 parameter: gives the list of all the functions
 /// 1 parameter: write the help of
 pub fn help(args: &[LValue], env: &LEnv) -> LResult {
-    let documentation: Arc<Documentation> = env.get_documentation()?;
+    let documentation: Documentation = env.get_documentation();
 
     match args.len() {
         0 => Ok(documentation.get_all().into()),
         1 => match &args[0] {
             LValue::Fn(fun) => Ok(LValue::String(documentation.get(fun.get_label()))),
-            LValue::MutFn(fun) => Ok(LValue::String(documentation.get(fun.get_label()))),
             LValue::Symbol(s) => Ok(LValue::String(documentation.get(s))),
             LValue::CoreOperator(co) => Ok(LValue::String(documentation.get(&co.to_string()))),
-            lv => bail!(WrongType(HELP, lv.clone(), lv.into(), TypeLValue::Symbol)),
+            lv => Err(WrongType(HELP, lv.clone(), lv.into(), TypeLValue::Symbol)),
         },
-        _ => bail!(WrongNumberOfArgument(HELP, args.into(), args.len(), 0..1)),
+        _ => Err(WrongNumberOfArgument(HELP, args.into(), args.len(), 0..1)),
     }
 }

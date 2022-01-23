@@ -1,4 +1,4 @@
-use crate::core::structs::lerror::{LError, LResult};
+use crate::core::structs::lerror::LResult;
 use crate::core::structs::lvalue::LValue;
 use futures::future::Shared;
 use futures::Future;
@@ -33,12 +33,11 @@ mod test_lfuture {
 
     #[tokio::test]
     async fn create_lvalue_future() -> Result<(), LError> {
-        let (mut env, mut ctxs) = LEnv::root().await;
+        let mut env = LEnv::root().await;
         let args = LValue::Nil;
 
-        let future: LValue = (Box::pin(async move { eval(&args, &mut env, &mut ctxs).await })
-            as FutureResult)
-            .into();
+        let future: LValue =
+            (Box::pin(async move { eval(&args, &mut env).await }) as FutureResult).into();
 
         //let future: LValue = future.into();
 

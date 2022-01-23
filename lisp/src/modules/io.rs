@@ -9,7 +9,6 @@ use crate::core::structs::purefonction::PureFonctionCollection;
 use crate::core::structs::typelvalue::TypeLValue;
 use crate::lisp_interpreter::ChannelToLispInterpreter;
 use crate::modules::io::language::*;
-use anyhow::bail;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::PathBuf;
@@ -114,7 +113,7 @@ impl IntoModule for CtxIo {
         module
     }
 
-    fn documentation(self) -> Documentation {
+    fn documentation(&self) -> Documentation {
         vec![
             LHelp::new_verbose(MOD_IO, DOC_MOD_IO, DOC_MOD_IO_VERBOSE),
             LHelp::new_verbose(PRINT, DOC_PRINT, DOC_PRINT_VERBOSE),
@@ -124,7 +123,7 @@ impl IntoModule for CtxIo {
         .into()
     }
 
-    fn pure_fonctions(self) -> PureFonctionCollection {
+    fn pure_fonctions(&self) -> PureFonctionCollection {
         Default::default()
     }
 }
@@ -162,16 +161,16 @@ pub fn read(args: &[LValue], _: &LEnv) -> LResult {
     //let mut stdout = io::stdout();
     //stdout.write_all(b"module Io: read\n");
     if args.len() != 1 {
-        bail!(WrongNumberOfArgument(READ, args.into(), args.len(), 1..1));
+        return Err(WrongNumberOfArgument(READ, args.into(), args.len(), 1..1));
     }
     let file_name = match &args[0] {
         LValue::Symbol(s) => s.to_string(),
-        lv => bail!(WrongType(READ, lv.clone(), lv.into(), TypeLValue::Symbol)),
+        lv => return Err(WrongType(READ, lv.clone(), lv.into(), TypeLValue::Symbol)),
     };
 
     let mut file = match File::open(&file_name) {
         Ok(f) => f,
-        Err(e) => bail!(SpecialError(READ, format!("{}: {}", file_name, e))),
+        Err(e) => return Err(SpecialError(READ, format!("{}: {}", file_name, e))),
     };
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;
@@ -190,7 +189,7 @@ pub fn read(args: &[LValue], _: &LEnv) -> LResult {
 /// (write <file> <lvalue>)
 pub fn write(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 2 {
-        bail!(WrongNumberOfArgument(WRITE, args.into(), args.len(), 2..2));
+        return Err(WrongNumberOfArgument(WRITE, args.into(), args.len(), 2..2));
     }
 
     match &args[0] {
@@ -200,7 +199,7 @@ pub fn write(args: &[LValue], _: &LEnv) -> LResult {
             f.write_all(args[1].to_string().as_bytes())?;
             Ok(LValue::Nil)
         }
-        lv => bail!(WrongType(WRITE, lv.clone(), lv.into(), TypeLValue::Symbol)),
+        lv => Err(WrongType(WRITE, lv.clone(), lv.into(), TypeLValue::Symbol)),
     }
 }
 

@@ -1,3 +1,5 @@
+use crate::core::structs::lerror;
+use crate::core::structs::lerror::LError;
 use anyhow::anyhow;
 use im::HashMap;
 use std::any::Any;
@@ -18,12 +20,13 @@ impl ContextCollection {
     }
 }
 
-impl<T> ContextCollection {
-    pub fn get(&self, label: &str) -> Result<&T, anyhow::Error> {
-        let value = match self.inner.get(label) {
-            Some(t) => t,
-            None => return Err(anyhow!("Context \"{}\" does not exist!", label)),
-        };
+impl ContextCollection {
+    pub fn get<T: Any + Send + Sync>(&self, label: &str) -> Result<&T, anyhow::Error> {
+        let value = self
+            .inner
+            .get(label)
+            .ok_or_else(|| LError::from(anyhow!("Context \"{}\" does not exist!", label)))?;
+
         let ctx: &T = value
             .downcast_ref::<T>()
             .ok_or_else(|| anyhow!("Impossible to downcast context"))?;
@@ -31,14 +34,18 @@ impl<T> ContextCollection {
         Ok(ctx)
     }
 
-    pub fn get_mut(&self, label: &str) -> Result<&mut T, anyhow::Error> {
-        let value = match self.inner.get(label) {
-            Some(t) => t,
-            None => return Err(anyhow!("Context \"{}\" does not exist!", label)),
-        };
-        let ctx: &mut T = value
+    pub fn get_mut<T: Any + Send + Sync>(&mut self, label: &str) -> lerror::Result<&mut T> {
+        let value = self
+            .inner
+            .get_mut(label)
+            .ok_or_else(|| LError::from(anyhow!("Context \"{}\" does not exist!", label)))?;
+
+        let any = Arc::get_mut(value)
+            .ok_or_else(|| LError::from(anyhow!("Impossible to get mutable context")))?;
+
+        let ctx: &mut T = any
             .downcast_mut::<T>()
-            .ok_or_else(|| anyhow!("Impossible to downcast context"))?;
+            .ok_or_else(|| LError::from(anyhow!("Impossible to downcast context")))?;
 
         Ok(ctx)
     }

@@ -5,9 +5,7 @@ use crate::core::structs::lerror::LError::*;
 use crate::core::structs::lerror::LResult;
 use crate::core::structs::lvalue::LValue;
 use crate::core::structs::typelvalue::TypeLValue;
-use anyhow::bail;
 use im::HashMap;
-use tokio::time::interval;
 
 pub mod language {
 
@@ -89,17 +87,17 @@ pub fn get_map(args: &[LValue], _: &LEnv) -> LResult {
             let value = map.get(key).unwrap_or(&LValue::Nil);
             Ok(value.clone())
         }
-        lv => bail!(WrongType(GET_MAP, lv.clone(), lv.into(), TypeLValue::Map)),
+        lv => Err(WrongType(GET_MAP, lv.clone(), lv.into(), TypeLValue::Map)),
     }
 }
 
 pub fn set_map(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 2 {
-        bail!(WrongNumberOfArgument(
+        return Err(WrongNumberOfArgument(
             SET_MAP,
             args.into(),
             args.len(),
-            2..2
+            2..2,
         ));
     }
 
@@ -111,17 +109,17 @@ pub fn set_map(args: &[LValue], _: &LEnv) -> LResult {
                     let value = val_sv.get(1).unwrap().clone();
                     Ok(m.update(key, value).into())
                 } else {
-                    bail!(WrongNumberOfArgument(
+                    Err(WrongNumberOfArgument(
                         SET_MAP,
                         val_sv.into(),
                         val_sv.len(),
-                        2..2
+                        2..2,
                     ))
                 }
             }
-            lv => bail!(WrongType(SET_MAP, lv.clone(), lv.into(), TypeLValue::List)),
+            lv => Err(WrongType(SET_MAP, lv.clone(), lv.into(), TypeLValue::List)),
         },
-        lv => bail!(WrongType(SET_MAP, lv.clone(), lv.into(), TypeLValue::Map)),
+        lv => Err(WrongType(SET_MAP, lv.clone(), lv.into(), TypeLValue::Map)),
     }
 }
 

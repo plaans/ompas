@@ -31,11 +31,11 @@ impl IntoModule for CtxString {
         module
     }
 
-    fn documentation(self) -> Documentation {
+    fn documentation(&self) -> Documentation {
         vec![LHelp::new(CONCATENATE, DOC_CONCATENATE)].into()
     }
 
-    fn pure_fonctions(self) -> PureFonctionCollection {
+    fn pure_fonctions(&self) -> PureFonctionCollection {
         Default::default()
     }
 }

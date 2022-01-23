@@ -1,7 +1,6 @@
 use crate::core::language::*;
 use crate::core::root_module::basic_math::language::*;
 use crate::core::root_module::basic_math::*;
-use crate::core::root_module::env::*;
 use crate::core::root_module::language::*;
 use crate::core::root_module::list::language::*;
 use crate::core::root_module::list::*;
@@ -12,13 +11,12 @@ use crate::core::root_module::predicate::*;
 use crate::core::structs::documentation::{Documentation, LHelp};
 use crate::core::structs::lenv::LEnv;
 use crate::core::structs::lerror::LError::{NotInListOfExpectedTypes, WrongNumberOfArgument};
-use crate::core::structs::lerror::{LError, LResult};
+use crate::core::structs::lerror::LResult;
 use crate::core::structs::lvalue::LValue;
 use crate::core::structs::module::{IntoModule, Module};
 use crate::core::structs::purefonction::PureFonctionCollection;
 use crate::core::structs::typelvalue::TypeLValue;
-use anyhow::{anyhow, bail};
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 pub mod basic_math;
 pub mod env;
@@ -126,7 +124,7 @@ impl IntoModule for CtxRoot {
     ///
     fn into_module(self) -> Module {
         let mut module = Module {
-            ctx: Arc::new(()),
+            ctx: Arc::new(RwLock::new(())),
             prelude: vec![],
             raw_lisp: Default::default(),
             label: MOD_ROOT.into(),
@@ -190,7 +188,6 @@ impl IntoModule for CtxRoot {
         module.add_fn_prelude(IS_SYMBOL, is_symbol);
         module.add_fn_prelude(IS_STRING, is_string);
         module.add_fn_prelude(IS_FN, is_fn);
-        module.add_fn_prelude(IS_MUT_FN, is_mut_fn);
         //module.add_fn_prelude(IS_QUOTE, is_quote);
         module.add_fn_prelude(IS_MAP, is_map);
         module.add_fn_prelude(IS_LIST, is_list);
@@ -201,7 +198,7 @@ impl IntoModule for CtxRoot {
         module
     }
 
-    fn documentation(self) -> Documentation {
+    fn documentation(&self) -> Documentation {
         vec![
             LHelp::new(LIST, DOC_LIST),
             LHelp::new_verbose(MAP, DOC_MAP, DOC_MAP_VERBOSE),
@@ -246,8 +243,8 @@ impl IntoModule for CtxRoot {
         .into()
     }
 
-    fn pure_fonctions(self) -> PureFonctionCollection {
-        todo!()
+    fn pure_fonctions(&self) -> PureFonctionCollection {
+        Default::default()
     }
 }
 /// Default function of the Lisp Environement.
@@ -260,38 +257,38 @@ pub fn default(_args: &[LValue], _: &LEnv) -> LResult {
 
 pub fn set(args: &[LValue], env: &LEnv) -> LResult {
     if args.is_empty() {
-        return Err(anyhow!(WrongNumberOfArgument(
+        return Err(WrongNumberOfArgument(
             SET,
             args.into(),
             args.len(),
             1..std::usize::MAX,
-        )));
+        ));
     }
     match &args[0] {
         LValue::Map(_) => set_map(args, env),
         LValue::List(_) | LValue::Nil => set_list(args, env),
-        _ => Err(anyhow!(NotInListOfExpectedTypes(
+        _ => Err(NotInListOfExpectedTypes(
             SET,
             args[0].clone(),
             (&args[0]).into(),
             vec![TypeLValue::List, TypeLValue::Map, TypeLValue::Nil],
-        ))),
+        )),
     }
 }
 
 pub fn get(args: &[LValue], env: &LEnv) -> LResult {
     if args.is_empty() {
-        bail!(WrongNumberOfArgument(
+        return Err(WrongNumberOfArgument(
             GET,
             args.into(),
             0,
-            1..std::usize::MAX
+            1..std::usize::MAX,
         ));
     }
     match &args[0] {
         LValue::Map(_) => get_map(args, env),
         LValue::List(_) | LValue::Nil => get_list(args, env),
-        _ => bail!(NotInListOfExpectedTypes(
+        _ => Err(NotInListOfExpectedTypes(
             GET,
             args[0].clone(),
             (&args[0]).into(),
@@ -303,14 +300,14 @@ pub fn get(args: &[LValue], env: &LEnv) -> LResult {
 /// return the length of the object if it is a table or a list.
 pub fn length(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 1 {
-        bail!(WrongNumberOfArgument(LEN, args.into(), args.len(), 1..1).into());
+        return Err(WrongNumberOfArgument(LEN, args.into(), args.len(), 1..1).into());
     }
 
     match &args[0] {
         LValue::List(l) => Ok(l.len().into()),
         LValue::Map(m) => Ok(m.len().into()),
         LValue::Nil => Ok(0.into()),
-        lv => bail!(NotInListOfExpectedTypes(
+        lv => Err(NotInListOfExpectedTypes(
             LEN,
             lv.clone(),
             lv.into(),
@@ -321,14 +318,14 @@ pub fn length(args: &[LValue], _: &LEnv) -> LResult {
 /// Returns true if a hashmap or list is empty
 pub fn empty(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 1 {
-        return bail!(WrongNumberOfArgument(EMPTY, args.into(), args.len(), 1..1));
+        return Err(WrongNumberOfArgument(EMPTY, args.into(), args.len(), 1..1));
     }
 
     match &args[0] {
         LValue::List(l) => Ok(l.is_empty().into()),
         LValue::Map(m) => Ok(m.is_empty().into()),
         LValue::Nil => Ok(true.into()),
-        lv => bail!(NotInListOfExpectedTypes(
+        lv => Err(NotInListOfExpectedTypes(
             EMPTY,
             lv.clone(),
             lv.into(),

@@ -128,7 +128,7 @@ pub async fn rae_run(mut context: RAEEnv, options: &RAEOptions, _log: String) {
             vec![RAE_LAUNCH_PLATFORM.to_string(), string].into()
         }
     };
-    let result = eval(&lvalue, &mut context.env, &mut context.ctxs).await;
+    let result = eval(&lvalue, &mut context.env).await;
     //Windows::
     //let result = eval(&vec![LValue::Symbol("rae-open-com-platform".to_string())].into(), &mut context.env, &mut context.ctxs);
     match result {
@@ -137,14 +137,9 @@ pub async fn rae_run(mut context: RAEEnv, options: &RAEOptions, _log: String) {
     }
 
     let receiver_event_update_state = context.state.subscribe_on_update().await;
-    let (env_check_wait_on, ctxs_check_wait_on) = context.get_exec_env().await;
+    let env_check_wait_on = context.get_exec_env().await;
     tokio::spawn(async move {
-        task_check_wait_on(
-            receiver_event_update_state,
-            env_check_wait_on,
-            ctxs_check_wait_on,
-        )
-        .await
+        task_check_wait_on(receiver_event_update_state, env_check_wait_on).await
     });
 
     loop {
@@ -156,19 +151,19 @@ pub async fn rae_run(mut context: RAEEnv, options: &RAEOptions, _log: String) {
             //let _job_id = &context.agenda.add_job(job.clone());
             info!("new job received!");
 
-            let (new_env, new_ctxs) = context.get_exec_env().await;
+            let new_env = context.get_exec_env().await;
 
             tokio::spawn(async move {
-                progress_2(job.core.clone(), new_env, new_ctxs).await;
+                progress_2(job.core.clone(), new_env).await;
             });
         }
     }
 }
 
-async fn progress_2(job_lvalue: LValue, mut env: LEnv, mut ctxs: ContextCollection) {
+async fn progress_2(job_lvalue: LValue, mut env: LEnv) {
     info!("new triggered task: {}", job_lvalue);
     //info!("LValue to be evaluated: {}", job_lvalue);
-    match eval(&job_lvalue, &mut env, &mut ctxs).await {
+    match eval(&job_lvalue, &mut env).await {
         Ok(lv) => info!("result of task {}: {}", job_lvalue, lv),
         Err(e) => error!("End of progress_2: {}", e),
     }

@@ -1,6 +1,5 @@
-use crate::core::structs::contextcollection::ContextCollection;
 use crate::core::structs::lenv::{ImportType, LEnv};
-use crate::core::structs::lerror::LError;
+use crate::core::structs::lerror;
 use crate::core::structs::module::IntoModule;
 use crate::core::{eval, parse};
 use crate::TOKIO_CHANNEL_SIZE;
@@ -115,11 +114,11 @@ impl LispInterpreter {
 }
 
 impl LispInterpreter {
-    pub async fn import_namespace(&mut self, ctx: impl IntoModule) -> Result<(), anyhow::Error> {
+    pub async fn import_namespace(&mut self, ctx: impl IntoModule) -> lerror::Result<()> {
         self.env.import(ctx, ImportType::WithoutPrefix).await
     }
 
-    pub async fn import(&mut self, ctx: impl IntoModule) -> Result<(), anyhow::Error> {
+    pub async fn import(&mut self, ctx: impl IntoModule) -> lerror::Result<()> {
         self.env.import(ctx, ImportType::WithPrefix).await
     }
 
@@ -154,8 +153,8 @@ impl LispInterpreter {
 
             //stdout.write_all(format!("receiving command: {}\n", str_lvalue).as_bytes());
 
-            match parse(str_lvalue.as_str(), &self.env).await {
-                Ok(lv) => match eval(&lv, &self.env).await {
+            match parse(str_lvalue.as_str(), &mut self.env).await {
+                Ok(lv) => match eval(&lv, &mut self.env).await {
                     Ok(lv) => {
                         self.li_channel
                             .send(&id_subscriber, lv.pretty_print(0))

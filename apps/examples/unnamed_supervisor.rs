@@ -5,19 +5,15 @@ use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Receiver, Sender};
 
 //use ompas_modules::robot::CtxRobot;
-use ompas_acting::controller::dumber::CtxDumber;
 use ompas_acting::rae::module::init_ctx_rae;
-use ompas_acting::rae::module::mod_rae::CtxRae;
-use ompas_acting::rae::module::mod_rae_monitor::CtxRaeMonitor;
 use ompas_godot_simulation_client::mod_godot::CtxGodot;
 use ompas_godot_simulation_client::rae_interface::PlatformGodot;
 use ompas_lisp::core::structs::lenv::ImportType::WithoutPrefix;
-use ompas_lisp::core::structs::lenv::{import, LEnv};
+use ompas_lisp::core::structs::lenv::LEnv;
 use ompas_lisp::core::{activate_debug, eval, parse};
 use ompas_lisp::modules::_type::CtxType;
 use ompas_lisp::modules::advanced_math::CtxMath;
 use ompas_lisp::modules::deprecated::counter::CtxCounter;
-use ompas_lisp::modules::doc::{CtxDoc, Documentation};
 use ompas_lisp::modules::io::CtxIo;
 use ompas_lisp::modules::utils::CtxUtils;
 use ompas_lisp::repl::{spawn_log, spawn_repl};
@@ -78,8 +74,7 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
         .await
         .expect("error while spawning log task");
 
-    let (mut root_env, mut ctxs) = LEnv::root().await;
-    let mut ctx_doc = CtxDoc::default();
+    let mut root_env = LEnv::root().await;
     let mut ctx_io = CtxIo::default();
     let ctx_math = CtxMath::default();
     let ctx_type = CtxType::default();
@@ -88,14 +83,6 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     let ctx_utils = CtxUtils::default();
     let (ctx_rae, ctx_rae_monitor) =
         init_ctx_rae(Some(Box::new(PlatformGodot::default())), log.clone()).await;
-    //Insert the doc for the different contexts.
-    ctx_doc.insert_doc(CtxIo::documentation());
-    ctx_doc.insert_doc(CtxMath::documentation());
-    ctx_doc.insert_doc(CtxType::documentation());
-    ctx_doc.insert_doc(CtxDumber::documentation());
-    ctx_doc.insert_doc(CtxRae::documentation());
-    ctx_doc.insert_doc(CtxRaeMonitor::documentation());
-    ctx_doc.insert_doc(CtxUtils::documentation());
 
     //Add the sender of the channel.
     //ctx_io.add_sender_li(sender_li.clone());
@@ -110,28 +97,32 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
         agenda: Default::default(),
     };*/
 
-    import(&mut root_env, &mut ctxs, ctx_utils, WithoutPrefix)
+    root_env
+        .import(ctx_utils, WithoutPrefix)
         .await
         .expect("error loading utils");
-    import(&mut root_env, &mut ctxs, ctx_doc, WithoutPrefix)
-        .await
-        .expect("error loading doc");
-    import(&mut root_env, &mut ctxs, ctx_io, WithoutPrefix)
+    root_env
+        .import(ctx_io, WithoutPrefix)
         .await
         .expect("error loading io");
-    import(&mut root_env, &mut ctxs, ctx_math, WithoutPrefix)
+    root_env
+        .import(ctx_math, WithoutPrefix)
         .await
         .expect("error loading math");
-    import(&mut root_env, &mut ctxs, ctx_type, WithoutPrefix)
+    root_env
+        .import(ctx_type, WithoutPrefix)
         .await
         .expect("error loading type");
-    import(&mut root_env, &mut ctxs, ctx_counter, WithoutPrefix)
+    root_env
+        .import(ctx_counter, WithoutPrefix)
         .await
         .expect("error loading counter");
-    import(&mut root_env, &mut ctxs, ctx_rae, WithoutPrefix)
+    root_env
+        .import(ctx_rae, WithoutPrefix)
         .await
         .expect("error loading rae");
-    import(&mut root_env, &mut ctxs, ctx_rae_monitor, WithoutPrefix)
+    root_env
+        .import(ctx_rae_monitor, WithoutPrefix)
         .await
         .expect("error loading monitor");
 
@@ -162,8 +153,8 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
 
         //stdout.write_all(format!("receiving command: {}\n", str_lvalue).as_bytes());
 
-        match parse(str_lvalue.as_str(), env, &mut ctxs).await {
-            Ok(lv) => match eval(&lv, env, &mut ctxs).await {
+        match parse(str_lvalue.as_str(), env).await {
+            Ok(lv) => match eval(&lv, env).await {
                 Ok(lv) => {
                     sender
                         .send(lv.pretty_print(0))

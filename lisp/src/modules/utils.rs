@@ -18,13 +18,12 @@ use crate::core::structs::documentation::{Documentation, LHelp};
 use crate::core::structs::lcoreoperator::LCoreOperator;
 use crate::core::structs::lenv::LEnv;
 use crate::core::structs::lerror::LError::{SpecialError, WrongNumberOfArgument, WrongType};
-use crate::core::structs::lerror::{LError, LResult};
+use crate::core::structs::lerror::LResult;
 use crate::core::structs::lvalue::LValue;
 use crate::core::structs::module::{IntoModule, Module};
 use crate::core::structs::purefonction::PureFonctionCollection;
 use crate::core::structs::typelvalue::TypeLValue;
 use crate::modules::utils::language::*;
-use anyhow::bail;
 use aries_utils::StreamingIterator;
 use rand::Rng;
 use std::ops::Deref;
@@ -297,7 +296,7 @@ impl IntoModule for CtxUtils {
         module
     }
 
-    fn documentation(self) -> Documentation {
+    fn documentation(&self) -> Documentation {
         vec![
             LHelp::new_verbose(RAND_ELEMENT, DOC_RAND_ELEMENT, DOC_RAND_ELEMENT_VERBOSE),
             LHelp::new_verbose(ENUMERATE, DOC_ENUMERATE, DOC_ENUMERATE_VERBOSE),
@@ -312,7 +311,7 @@ impl IntoModule for CtxUtils {
         .into()
     }
 
-    fn pure_fonctions(self) -> PureFonctionCollection {
+    fn pure_fonctions(&self) -> PureFonctionCollection {
         vec![
             RAND_ELEMENT,
             ENUMERATE,
@@ -334,7 +333,7 @@ impl IntoModule for CtxUtils {
 /// use ompas_lisp::core::structs::lvalue::LValue;
 /// use ompas_lisp::core::structs::lenv::LEnv;
 /// let lists: &[LValue] = &[vec![1,2,3].into(), vec![4,5,6].into()];
-/// let enumeration = enumerate(lists, &LEnv::default(), &());
+/// let enumeration = enumerate(lists, &LEnv::default());
 /// ```
 pub fn enumerate(args: &[LValue], _: &LEnv) -> LResult {
     let mut vec_iter = vec![];
@@ -378,7 +377,7 @@ pub fn rand_element(args: &[LValue], _: &LEnv) -> LResult {
                 let index = rand::thread_rng().gen_range(0..list.len());
                 Ok(list[index].clone())
             } else {
-                bail!(WrongType(
+                Err(WrongType(
                     RAND_ELEMENT,
                     args[0].clone(),
                     (&args[0]).into(),
@@ -386,7 +385,7 @@ pub fn rand_element(args: &[LValue], _: &LEnv) -> LResult {
                 ))
             }
         }
-        _ => bail!(WrongNumberOfArgument(
+        _ => Err(WrongNumberOfArgument(
             RAND_ELEMENT,
             args.into(),
             args.len(),
@@ -398,7 +397,7 @@ pub fn rand_element(args: &[LValue], _: &LEnv) -> LResult {
 ///Takes a list or map and search if it contains a LValue inside
 pub fn contains(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 2 {
-        bail!(WrongNumberOfArgument(
+        return Err(WrongNumberOfArgument(
             CONTAINS,
             args.into(),
             args.len(),
@@ -432,13 +431,13 @@ pub fn sublist(args: &[LValue], _: &LEnv) -> LResult {
                         let i: usize = n.into();
                         Ok(l[i..].into())
                     } else {
-                        bail!(SpecialError(
+                        Err(SpecialError(
                             SUB_LIST,
                             "Indexes should be natural numbers".to_string(),
                         ))
                     }
                 } else {
-                    bail!(WrongType(
+                    Err(WrongType(
                         SUB_LIST,
                         args[1].clone(),
                         (&args[1]).into(),
@@ -446,7 +445,7 @@ pub fn sublist(args: &[LValue], _: &LEnv) -> LResult {
                     ))
                 }
             } else {
-                bail!(WrongType(
+                Err(WrongType(
                     SUB_LIST,
                     args[0].clone(),
                     (&args[0]).into(),
@@ -463,13 +462,13 @@ pub fn sublist(args: &[LValue], _: &LEnv) -> LResult {
                             let i2: usize = n2.into();
                             Ok(l[i1..i2].into())
                         } else {
-                            bail!(SpecialError(
+                            Err(SpecialError(
                                 SUB_LIST,
                                 "Indexes should be natural numbers".to_string(),
                             ))
                         }
                     } else {
-                        bail!(WrongType(
+                        Err(WrongType(
                             SUB_LIST,
                             args[1].clone(),
                             (&args[2]).into(),
@@ -477,7 +476,7 @@ pub fn sublist(args: &[LValue], _: &LEnv) -> LResult {
                         ))
                     }
                 } else {
-                    bail!(WrongType(
+                    Err(WrongType(
                         SUB_LIST,
                         args[1].clone(),
                         (&args[1]).into(),
@@ -485,7 +484,7 @@ pub fn sublist(args: &[LValue], _: &LEnv) -> LResult {
                     ))
                 }
             } else {
-                bail!(WrongType(
+                Err(WrongType(
                     SUB_LIST,
                     args[0].clone(),
                     (&args[0]).into(),
@@ -493,7 +492,7 @@ pub fn sublist(args: &[LValue], _: &LEnv) -> LResult {
                 ))
             }
         }
-        _ => bail!(WrongNumberOfArgument(
+        _ => Err(WrongNumberOfArgument(
             SUB_LIST,
             args.into(),
             args.len(),
@@ -504,7 +503,7 @@ pub fn sublist(args: &[LValue], _: &LEnv) -> LResult {
 
 pub fn quote_list(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 1 {
-        bail!(WrongNumberOfArgument(
+        return Err(WrongNumberOfArgument(
             QUOTE_LIST,
             args.into(),
             args.len(),
@@ -521,7 +520,7 @@ pub fn quote_list(args: &[LValue], _: &LEnv) -> LResult {
     } else if let LValue::Nil = &args[0] {
         Ok(LValue::Nil)
     } else {
-        bail!(WrongType(
+        Err(WrongType(
             QUOTE_LIST,
             args[0].clone(),
             (&args[0]).into(),
@@ -532,7 +531,7 @@ pub fn quote_list(args: &[LValue], _: &LEnv) -> LResult {
 
 pub fn transform_in_singleton_list(args: &[LValue], _: &LEnv) -> LResult {
     if args.is_empty() {
-        bail!(WrongNumberOfArgument(
+        return Err(WrongNumberOfArgument(
             TRANSFORM_IN_SINGLETON_LIST,
             args.into(),
             0,
@@ -550,19 +549,20 @@ pub fn transform_in_singleton_list(args: &[LValue], _: &LEnv) -> LResult {
 #[cfg(test)]
 mod test {
     use crate::core::parse;
+    use crate::core::structs::lerror;
     use crate::modules::utils::*;
     use crate::test_utils::{test_expression, TestExpression};
 
     #[test]
-    fn test_contains() -> Result<(), LError> {
+    fn test_contains() -> lerror::Result<()> {
         let lv: &[LValue] = &[vec![1, 2, 3, 4, 5, 6].into(), 6.into()];
-        let result = contains(lv, &LEnv::empty())?;
+        let result = contains(lv, &LEnv::default())?;
         assert_eq!(result, LValue::True);
         Ok(())
     }
 
     #[test]
-    fn test_sublist() -> Result<(), LError> {
+    fn test_sublist() -> lerror::Result<()> {
         let lv_1: &[LValue] = &[vec![1, 2, 3, 4, 5, 6].into(), 1.into()];
         let lv_2: &[LValue] = &[vec![1, 2, 3, 4, 5, 6].into(), 1.into(), 3.into()];
         let result1 = sublist(lv_1, &LEnv::default())?;
@@ -573,7 +573,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_macro_and() -> Result<(), LError> {
+    async fn test_macro_and() -> lerror::Result<()> {
         let macro_to_test = TestExpression {
             inner: MACRO_AND,
             dependencies: vec![],
@@ -586,7 +586,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_macro_test_macro() -> Result<(), LError> {
+    async fn test_macro_test_macro() -> lerror::Result<()> {
         let macro_to_test = TestExpression {
             inner: MACRO_TEST_MACRO,
             dependencies: vec![MACRO_AND],
@@ -599,7 +599,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_macro_or() -> Result<(), LError> {
+    async fn test_macro_or() -> lerror::Result<()> {
         let macro_to_test = TestExpression {
             inner: MACRO_OR,
             dependencies: vec![],
@@ -612,7 +612,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_macro_caar() -> Result<(), LError> {
+    async fn test_macro_caar() -> lerror::Result<()> {
         let macro_to_test = TestExpression {
             inner: MACRO_CAAR,
             dependencies: vec![],
@@ -625,7 +625,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_macro_cadr() -> Result<(), LError> {
+    async fn test_macro_cadr() -> lerror::Result<()> {
         let macro_to_test = TestExpression {
             inner: MACRO_CADR,
             dependencies: vec![],
@@ -638,7 +638,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_macro_cdar() -> Result<(), LError> {
+    async fn test_macro_cdar() -> lerror::Result<()> {
         let macro_to_test = TestExpression {
             inner: MACRO_CDAR,
             dependencies: vec![],
@@ -651,7 +651,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_macro_cddr() -> Result<(), LError> {
+    async fn test_macro_cddr() -> lerror::Result<()> {
         let macro_to_test = TestExpression {
             inner: MACRO_CDDR,
             dependencies: vec![],
@@ -664,7 +664,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_macro_cadar() -> Result<(), LError> {
+    async fn test_macro_cadar() -> lerror::Result<()> {
         let macro_to_test = TestExpression {
             inner: MACRO_CADAR,
             dependencies: vec![],
@@ -677,7 +677,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_macro_caddr() -> Result<(), LError> {
+    async fn test_macro_caddr() -> lerror::Result<()> {
         let macro_to_test = TestExpression {
             inner: MACRO_CADDR,
             dependencies: vec![],
@@ -690,7 +690,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_macro_cdadr() -> Result<(), LError> {
+    async fn test_macro_cdadr() -> lerror::Result<()> {
         let macro_to_test = TestExpression {
             inner: MACRO_CDADR,
             dependencies: vec![],
@@ -703,7 +703,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_macro_caadr() -> Result<(), LError> {
+    async fn test_macro_caadr() -> lerror::Result<()> {
         let macro_to_test = TestExpression {
             inner: MACRO_CAADR,
             dependencies: vec![],
@@ -716,7 +716,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_macro_cadadr() -> Result<(), LError> {
+    async fn test_macro_cadadr() -> lerror::Result<()> {
         let macro_to_test = TestExpression {
             inner: MACRO_CADADR,
             dependencies: vec![],
@@ -729,7 +729,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_macro_cadaddr() -> Result<(), LError> {
+    async fn test_macro_cadaddr() -> lerror::Result<()> {
         let macro_to_test = TestExpression {
             inner: MACRO_CADADDR,
             dependencies: vec![],
@@ -742,7 +742,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_macro_neq() -> Result<(), LError> {
+    async fn test_macro_neq() -> lerror::Result<()> {
         let macro_to_test = TestExpression {
             inner: MACRO_NEQ,
             dependencies: vec![],
@@ -755,7 +755,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_macro_neq_short() -> Result<(), LError> {
+    async fn test_macro_neq_short() -> lerror::Result<()> {
         let macro_to_test = TestExpression {
             inner: MACRO_NEQ_SHORT,
             dependencies: vec![MACRO_NEQ],
@@ -768,7 +768,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_macro_await_async() -> Result<(), LError> {
+    async fn test_macro_await_async() -> lerror::Result<()> {
         let macro_to_test = TestExpression {
             inner: MACRO_AWAIT_ASYNC,
             dependencies: vec![],
@@ -781,7 +781,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_macro_apply() -> Result<(), LError> {
+    async fn test_macro_apply() -> lerror::Result<()> {
         let macro_to_test = TestExpression {
             inner: MACRO_APPLY,
             dependencies: vec![],
@@ -794,7 +794,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_macro_cond() -> Result<(), LError> {
+    async fn test_macro_cond() -> lerror::Result<()> {
         let macro_to_test = TestExpression {
             inner: MACRO_COND,
             dependencies: vec![MACRO_CAAR, MACRO_CADAR],
@@ -824,7 +824,7 @@ mod test {
         test_expression(macro_to_test).await
     }
     #[tokio::test]
-    async fn test_macro_loop() -> Result<(), LError> {
+    async fn test_macro_loop() -> lerror::Result<()> {
         let expression = "(loop (+ 1 1))";
         let expected = "(begin
             (define __loop__
@@ -834,7 +834,7 @@ mod test {
                         (__loop__))))
             (__loop__))))";
 
-        let (mut env, mut ctxs) = LEnv::root().await;
+        let mut env = LEnv::root().await;
 
         //Load macro
         parse(MACRO_LOOP, &mut env).await?;
@@ -858,7 +858,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_lambda_zip() -> Result<(), LError> {
+    async fn test_lambda_zip() -> lerror::Result<()> {
         let test_lambda = TestExpression {
             inner: LAMBDA_ZIP,
             dependencies: vec![MACRO_OR],
@@ -871,7 +871,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_lambda_unzip() -> Result<(), LError> {
+    async fn test_lambda_unzip() -> lerror::Result<()> {
         let test_lambda = TestExpression {
             inner: LAMBDA_UNZIP,
             dependencies: vec![MACRO_CAAR, MACRO_CADAR, MACRO_APPLY],
@@ -884,7 +884,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_lambda_mapf() -> Result<(), LError> {
+    async fn test_lambda_mapf() -> lerror::Result<()> {
         let test_lambda = TestExpression {
             inner: LAMBDA_MAPF,
             dependencies: vec![],
@@ -901,7 +901,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_macro_let() -> Result<(), LError> {
+    async fn test_macro_let() -> lerror::Result<()> {
         let test_lambda = TestExpression {
             inner: MACRO_LET,
             dependencies: vec![MACRO_CAAR, MACRO_CADAR, MACRO_CADR, LAMBDA_UNZIP],
@@ -916,7 +916,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_macro_let_star() -> Result<(), LError> {
+    async fn test_macro_let_star() -> lerror::Result<()> {
         let test_lambda = TestExpression {
             inner: MACRO_LET_STAR,
             dependencies: vec![MACRO_CAAR, MACRO_CDAR],
@@ -931,7 +931,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_lambda_arbitrary() -> Result<(), LError> {
+    async fn test_lambda_arbitrary() -> lerror::Result<()> {
         let test_lambda = TestExpression {
             inner: LAMBDA_ARBITRARY,
             dependencies: vec![

@@ -1,15 +1,15 @@
 use im::HashSet;
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct PureFonctionCollection {
-    inner: HashSet<&'static str>,
+    inner: HashSet<String>,
 }
 
 impl From<Vec<&'static str>> for PureFonctionCollection {
     fn from(vec: Vec<&'static str>) -> Self {
         let mut set = HashSet::default();
         for e in vec {
-            set.insert(e);
+            set.insert(e.to_string());
         }
         Self { inner: set }
     }
@@ -17,7 +17,8 @@ impl From<Vec<&'static str>> for PureFonctionCollection {
 
 impl PureFonctionCollection {
     pub fn append(&mut self, other: Self) {
-        self.inner = self.inner.union(&other.inner).cloned().collect();
+        let new = self.inner.clone().union(other.inner);
+        self.inner = new;
     }
 }
 

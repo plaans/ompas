@@ -5,7 +5,7 @@ use crate::core::structs::lerror::LResult;
 use crate::core::structs::lnumber::LNumber;
 use crate::core::structs::lvalue::LValue;
 use crate::core::structs::typelvalue::TypeLValue;
-use anyhow::bail;
+use anyhow::anyhow;
 
 pub mod language {
 
@@ -64,7 +64,7 @@ pub fn list(args: &[LValue], _: &LEnv) -> LResult {
 ///It takes two arguments, an element and a list and returns a list with the element inserted at the first place.
 pub fn cons(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 2 {
-        bail!(WrongNumberOfArgument(CONS, args.into(), args.len(), 2..2));
+        return Err(WrongNumberOfArgument(CONS, args.into(), args.len(), 2..2));
     }
     let first = &args[0];
     let second = &args[1];
@@ -90,9 +90,9 @@ pub fn first(args: &[LValue], _: &LEnv) -> LResult {
                 }
             }
             LValue::Nil => Ok(LValue::Nil),
-            lv => bail!(WrongType(FIRST, lv.clone(), lv.into(), TypeLValue::List)),
+            lv => Err(WrongType(FIRST, lv.clone(), lv.into(), TypeLValue::List)),
         },
-        _ => bail!(WrongNumberOfArgument(FIRST, args.into(), args.len(), 1..1)),
+        _ => Err(WrongNumberOfArgument(FIRST, args.into(), args.len(), 1..1)),
     }
 }
 
@@ -107,9 +107,9 @@ pub fn second(args: &[LValue], _: &LEnv) -> LResult {
                 }
             }
             LValue::Nil => Ok(LValue::Nil),
-            lv => bail!(WrongType(SECOND, lv.clone(), lv.into(), TypeLValue::List)),
+            lv => Err(WrongType(SECOND, lv.clone(), lv.into(), TypeLValue::List)),
         },
-        _ => bail!(WrongNumberOfArgument(SECOND, args.into(), args.len(), 1..1)),
+        _ => Err(WrongNumberOfArgument(SECOND, args.into(), args.len(), 1..1)),
     }
 }
 
@@ -124,9 +124,9 @@ pub fn third(args: &[LValue], _: &LEnv) -> LResult {
                 }
             }
             LValue::Nil => Ok(LValue::Nil),
-            lv => bail!(WrongType(THIRD, lv.clone(), lv.into(), TypeLValue::List)),
+            lv => Err(WrongType(THIRD, lv.clone(), lv.into(), TypeLValue::List)),
         },
-        _ => bail!(WrongNumberOfArgument(THIRD, args.into(), args.len(), 1..1)),
+        _ => Err(WrongNumberOfArgument(THIRD, args.into(), args.len(), 1..1)),
     }
 }
 
@@ -142,9 +142,9 @@ pub fn car(args: &[LValue], _: &LEnv) -> LResult {
                 }
             }
             LValue::Nil => Ok(LValue::Nil),
-            lv => bail!(WrongType(CAR, lv.clone(), lv.into(), TypeLValue::List)),
+            lv => Err(WrongType(CAR, lv.clone(), lv.into(), TypeLValue::List)),
         },
-        _ => bail!(WrongNumberOfArgument(CAR, args.into(), args.len(), 1..1)),
+        _ => Err(WrongNumberOfArgument(CAR, args.into(), args.len(), 1..1)),
     }
 }
 
@@ -164,10 +164,10 @@ pub fn cdr(args: &[LValue], _: &LEnv) -> LResult {
                 }
             }
             LValue::Nil => Ok(LValue::Nil),
-            lv => bail!(WrongType(CDR, lv.clone(), lv.into(), TypeLValue::List)),
+            lv => Err(WrongType(CDR, lv.clone(), lv.into(), TypeLValue::List)),
         }
     } else {
-        bail!(WrongNumberOfArgument(CDR, args.into(), args.len(), 1..1))
+        Err(WrongNumberOfArgument(CDR, args.into(), args.len(), 1..1))
     }
 }
 
@@ -187,22 +187,22 @@ pub fn rest(args: &[LValue], _: &LEnv) -> LResult {
                 }
             }
             LValue::Nil => Ok(LValue::Nil),
-            lv => bail!(WrongType(REST, lv.clone(), lv.into(), TypeLValue::List)),
+            lv => Err(WrongType(REST, lv.clone(), lv.into(), TypeLValue::List)),
         }
     } else {
-        bail!(WrongNumberOfArgument(REST, args.into(), args.len(), 1..1))
+        Err(WrongNumberOfArgument(REST, args.into(), args.len(), 1..1))
     }
 }
 
 ///It merges two or more list into one.
-pub fn append(args: &[LValue], _env: &LEnv, _ctx: &()) -> LResult {
+pub fn append(args: &[LValue], _: &LEnv) -> LResult {
     let mut new_list = Vec::new();
     for element in args {
         match element {
             LValue::List(list) => new_list.append(&mut list.clone()),
             LValue::Nil => {}
             _ => {
-                return bail!(WrongType(
+                return Err(WrongType(
                     APPEND,
                     element.clone(),
                     element.into(),
@@ -225,10 +225,10 @@ pub fn last(args: &[LValue], _: &LEnv) -> LResult {
                     Ok(LValue::Nil)
                 }
             }
-            lv => bail!(WrongType(LAST, lv.clone(), lv.into(), TypeLValue::List)),
+            lv => Err(WrongType(LAST, lv.clone(), lv.into(), TypeLValue::List)),
         }
     } else {
-        bail!(WrongNumberOfArgument(LAST, args.into(), args.len(), 1..1))
+        Err(WrongNumberOfArgument(LAST, args.into(), args.len(), 1..1))
     }
 }
 
@@ -237,7 +237,7 @@ pub fn last(args: &[LValue], _: &LEnv) -> LResult {
 /// and then it returns the remainder of the list beginning with the first argument.
 pub fn member(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 2 {
-        return bail!(WrongNumberOfArgument(MEMBER, args.into(), args.len(), 2..2));
+        return Err(WrongNumberOfArgument(MEMBER, args.into(), args.len(), 2..2));
     }
     let value_to_find = &args[0];
     match &args[1] {
@@ -249,13 +249,13 @@ pub fn member(args: &[LValue], _: &LEnv) -> LResult {
             }
             Ok(LValue::Nil)
         }
-        lv => bail!(WrongType(MEMBER, lv.clone(), lv.into(), TypeLValue::List)),
+        lv => Err(WrongType(MEMBER, lv.clone(), lv.into(), TypeLValue::List)),
     }
 }
 
 pub fn get_list(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 2 {
-        return bail!(WrongNumberOfArgument(
+        return Err(WrongNumberOfArgument(
             GET_LIST,
             args.into(),
             args.len(),
@@ -268,16 +268,17 @@ pub fn get_list(args: &[LValue], _: &LEnv) -> LResult {
             if vec.len() > *i as usize {
                 Ok(vec[*i as usize].clone())
             } else {
-                bail!(format!(
+                Err(anyhow!(
                     "list: {}. {} is out of bound, must be in [{};{}]",
                     LValue::from(args),
                     i,
                     0,
                     vec.len() - 1
-                ))
+                )
+                .into())
             }
         } else {
-            bail!(WrongType(
+            Err(WrongType(
                 GET_LIST,
                 args[1].clone(),
                 (&args[1]).into(),
@@ -285,7 +286,7 @@ pub fn get_list(args: &[LValue], _: &LEnv) -> LResult {
             ))
         }
     } else {
-        bail!(WrongType(
+        Err(WrongType(
             GET_LIST,
             args[0].clone(),
             (&args[0]).into(),
@@ -296,7 +297,7 @@ pub fn get_list(args: &[LValue], _: &LEnv) -> LResult {
 
 pub fn set_list(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 3 {
-        return bail!(WrongNumberOfArgument(
+        return Err(WrongNumberOfArgument(
             SET_LIST,
             args.into(),
             args.len(),
@@ -311,14 +312,10 @@ pub fn set_list(args: &[LValue], _: &LEnv) -> LResult {
                 vec[*i as usize] = args[1].clone();
                 Ok(vec.into())
             } else {
-                bail!(format!(
-                    "index out of bound, must be in [{};{}]",
-                    0,
-                    vec.len() - 1
-                ))
+                Err(anyhow!("index out of bound, must be in [{};{}]", 0, vec.len() - 1).into())
             }
         } else {
-            bail!(WrongType(
+            Err(WrongType(
                 SET_LIST,
                 args[1].clone(),
                 (&args[1]).into(),
@@ -326,7 +323,7 @@ pub fn set_list(args: &[LValue], _: &LEnv) -> LResult {
             ))
         }
     } else {
-        bail!(WrongType(
+        Err(WrongType(
             SET_LIST,
             args[0].clone(),
             (&args[0]).into(),
@@ -344,10 +341,10 @@ pub fn reverse(args: &[LValue], _: &LEnv) -> LResult {
                 new_list.reverse();
                 Ok(new_list.into())
             }
-            lv => bail!(WrongType(REVERSE, lv.clone(), lv.into(), TypeLValue::List)),
+            lv => Err(WrongType(REVERSE, lv.clone(), lv.into(), TypeLValue::List)),
         }
     } else {
-        bail!(WrongNumberOfArgument(
+        Err(WrongNumberOfArgument(
             REVERSE,
             args.into(),
             args.len(),

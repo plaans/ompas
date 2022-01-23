@@ -7,16 +7,16 @@ use crate::rae::module::rae_exec::{CtxRaeExec, RAEInterface};
 use crate::rae::{rae_log, rae_run, RAEOptions};
 use ::macro_rules_attribute::macro_rules_attribute;
 use ompas_lisp::core::root_module::list::cons;
+use ompas_lisp::core::structs::documentation::{Documentation, LHelp};
 use ompas_lisp::core::structs::lenv::LEnv;
-use ompas_lisp::core::structs::lerror::LError;
 use ompas_lisp::core::structs::lerror::LError::{SpecialError, WrongNumberOfArgument, WrongType};
+use ompas_lisp::core::structs::lerror::{LError, LResult};
 use ompas_lisp::core::structs::lvalue::LValue;
 use ompas_lisp::core::structs::lvalues::LValueS;
-use ompas_lisp::core::structs::module::{GetModule, InitLisp, Module};
+use ompas_lisp::core::structs::module::{InitLisp, IntoModule, Module};
+use ompas_lisp::core::structs::purefonction::{PureFonction, PureFonctionCollection};
 use ompas_lisp::core::structs::typelvalue::TypeLValue;
 use ompas_lisp::core::{eval, expand};
-use ompas_lisp::modules::doc::{Documentation, LHelp};
-use ompas_lisp::static_eval::{PureFonction, PureFonctionCollection};
 use ompas_utils::dyn_async;
 use std::convert::TryInto;
 use std::mem;
@@ -114,15 +114,14 @@ impl Default for CtxRae {
                 state: Default::default(),
                 env: Default::default(),
                 domain_env: Default::default(),
-                ctxs: Default::default(),
             },
             domain: Default::default(),
         }
     }
 }
 
-impl GetModule for CtxRae {
-    fn get_module(self) -> Module {
+impl IntoModule for CtxRae {
+    fn into_module(self) -> Module {
         let domain = self.domain.clone();
         //let domain = Default::default();
         let mut module = Module {
@@ -132,7 +131,7 @@ impl GetModule for CtxRae {
             label: MOD_RAE.to_string(),
         };
 
-        module.add_mut_fn_prelude(RAE_LAUNCH, rae_launch);
+        module.add_fn_prelude(RAE_LAUNCH, rae_launch);
 
         module.add_fn_prelude(RAE_GET_METHODS, get_methods);
         module.add_fn_prelude(RAE_GET_STATE_FUNCTIONS, get_state_function);
@@ -141,21 +140,21 @@ impl GetModule for CtxRae {
         //module.add_fn_prelude(RAE_GET_METHODS_PARAMETERS, get_methods_parameters);
         //module.add_fn_prelude(RAE_GET_SYMBOL_TYPE, get_symbol_type);
         module.add_fn_prelude(RAE_GET_ENV, get_env);
-        module.add_mut_fn_prelude(RAE_CONFIGURE_PLATFORM, configure_platform);
+        module.add_fn_prelude(RAE_CONFIGURE_PLATFORM, configure_platform);
         module.add_fn_prelude(RAE_GET_CONFIG_PLATFORM, get_config_platform);
 
-        module.add_async_mut_fn_prelude(RAE_DEF_STATE_FUNCTION, def_state_function);
-        module.add_async_mut_fn_prelude(RAE_DEF_ACTION, def_action);
-        module.add_async_mut_fn_prelude(RAE_DEF_ACTION_MODEL, def_action_model);
-        module.add_async_mut_fn_prelude(
+        module.add_async_fn_prelude(RAE_DEF_STATE_FUNCTION, def_state_function);
+        module.add_async_fn_prelude(RAE_DEF_ACTION, def_action);
+        module.add_async_fn_prelude(RAE_DEF_ACTION_MODEL, def_action_model);
+        module.add_async_fn_prelude(
             RAE_DEF_ACTION_OPERATIONAL_MODEL,
             def_action_operational_model,
         );
-        module.add_async_mut_fn_prelude(RAE_DEF_TASK, def_task);
-        module.add_async_mut_fn_prelude(RAE_DEF_METHOD, def_method);
-        module.add_async_mut_fn_prelude(RAE_DEF_LAMBDA, def_lambda);
+        module.add_async_fn_prelude(RAE_DEF_TASK, def_task);
+        module.add_async_fn_prelude(RAE_DEF_METHOD, def_method);
+        module.add_async_fn_prelude(RAE_DEF_LAMBDA, def_lambda);
         //module.add_mut_fn_prelude(RAE_DEF_METHOD_PARAMETERS, def_method_parameters);
-        module.add_async_mut_fn_prelude(RAE_DEF_INITIAL_STATE, def_initial_state);
+        module.add_async_fn_prelude(RAE_DEF_INITIAL_STATE, def_initial_state);
 
         //functions to debug the functionnement of rae
         module.add_async_fn_prelude(RAE_GET_STATE, get_state);
@@ -169,16 +168,8 @@ impl GetModule for CtxRae {
 
         module
     }
-}
 
-impl PureFonction for CtxRae {
-    fn get_pure_fonctions_symbols(&self) -> PureFonctionCollection {
-        vec![].into()
-    }
-}
-
-impl Documentation for CtxRae {
-    fn documentation() -> Vec<LHelp> {
+    fn documentation(&self) -> Documentation {
         vec![
             LHelp::new_verbose(MOD_RAE, DOC_MOD_RAE, DOC_MOD_RAE_VERBOSE),
             LHelp::new(RAE_GET_METHODS, DOC_RAE_GET_METHODS),
@@ -208,26 +199,35 @@ impl Documentation for CtxRae {
             LHelp::new(RAE_GET_CONFIG_PLATFORM, DOC_RAE_GET_CONFIG_PLATFORM),
             LHelp::new(RAE_GET_AGENDA, DOC_RAE_GET_AGENDA),
         ]
+        .into()
+    }
+
+    fn pure_fonctions(&self) -> PureFonctionCollection {
+        vec![].into()
     }
 }
 
 ///Get the methods of a given task
-pub fn get_methods(_: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
+pub fn get_methods(_: &[LValue], env: &LEnv) -> LResult {
+    let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
     Ok(ctx.env.domain_env.get_list_methods())
 }
 
 ///Get the list of actions in the environment
-pub fn get_actions(_: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
+pub fn get_actions(_: &[LValue], env: &LEnv) -> Result<LValue, LError> {
+    let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
     Ok(ctx.env.domain_env.get_list_actions())
 }
 
 ///Get the list of tasks in the environment
-pub fn get_tasks(_: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
+pub fn get_tasks(_: &[LValue], env: &LEnv) -> Result<LValue, LError> {
+    let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
     Ok(ctx.env.domain_env.get_list_tasks())
 }
 
 ///Get the list of state functions in the environment
-pub fn get_state_function(_: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
+pub fn get_state_function(_: &[LValue], env: &LEnv) -> Result<LValue, LError> {
+    let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
     Ok(ctx.env.domain_env.get_list_state_functions())
 }
 
@@ -272,7 +272,9 @@ pub fn get_state_function(_: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LVa
 }*/
 
 /// Returns the whole RAE environment if no arg et the entry corresponding to the symbol passed in args.
-pub fn get_env(args: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
+pub fn get_env(args: &[LValue], env: &LEnv) -> Result<LValue, LError> {
+    let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
+
     let key = match args.len() {
         0 => None,
         1 => {
@@ -305,11 +307,7 @@ pub fn get_env(args: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LEr
 
 /// Defines a lambda in RAE environment.
 #[macro_rules_attribute(dyn_async!)]
-async fn def_lambda<'a>(
-    args: &'a [LValue],
-    _: &'a LEnv,
-    ctx: &'a mut CtxRae,
-) -> Result<LValue, LError> {
+async fn def_lambda<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(
             RAE_DEF_LAMBDA,
@@ -319,11 +317,14 @@ async fn def_lambda<'a>(
         ));
     }
 
+    let mut env = env.clone();
+    let ctx = env.get_mut_context::<CtxRae>(MOD_RAE)?;
+
     if let LValue::List(list) = &args[0] {
         if let LValue::Symbol(label) = &list[0] {
-            let expanded = expand(&list[1], true, &mut ctx.env.env, &mut ctx.env.ctxs).await?;
-            let (mut e, mut c) = LEnv::root().await;
-            let result = eval(&expanded, &mut e, &mut c).await?;
+            let expanded = expand(&list[1], true, &mut ctx.env.env).await?;
+            let mut e = LEnv::root().await;
+            let result = eval(&expanded, &mut e).await?;
             if let LValue::Lambda(_) = &result {
                 ctx.env.add_lambda(label.clone(), result);
             }
@@ -334,11 +335,7 @@ async fn def_lambda<'a>(
 
 /// Defines a state function in RAE environment.
 #[macro_rules_attribute(dyn_async!)]
-async fn def_state_function<'a>(
-    args: &'a [LValue],
-    env: &'a LEnv,
-    ctx: &'a mut CtxRae,
-) -> Result<LValue, LError> {
+async fn def_state_function<'a>(args: &'a [LValue], env: &'a LEnv) -> Result<LValue, LError> {
     if args.is_empty() {
         return Err(WrongNumberOfArgument(
             RAE_DEF_STATE_FUNCTION,
@@ -348,15 +345,13 @@ async fn def_state_function<'a>(
         ));
     }
 
-    let lvalue = cons(&[GENERATE_STATE_FUNCTION.into(), args.into()], env, &())?;
-    let (mut e, mut c) = LEnv::root().await;
+    let lvalue = cons(&[GENERATE_STATE_FUNCTION.into(), args.into()], &env)?;
+    let mut e = LEnv::root().await;
 
-    let lvalue = eval(
-        &expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs).await?,
-        &mut e,
-        &mut c,
-    )
-    .await?;
+    let mut env = env.clone();
+    let ctx = env.get_mut_context::<CtxRae>(MOD_RAE)?;
+
+    let lvalue = eval(&expand(&lvalue, true, &mut ctx.env.env).await?, &mut e).await?;
 
     if let LValue::List(list) = &lvalue {
         if list.len() != 3 {
@@ -404,11 +399,7 @@ async fn def_state_function<'a>(
 
 /// Defines an action in RAE environment.
 #[macro_rules_attribute(dyn_async!)]
-async fn def_action_model<'a>(
-    args: &'a [LValue],
-    env: &'a LEnv,
-    ctx: &'a mut CtxRae,
-) -> Result<LValue, LError> {
+async fn def_action_model<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     if args.is_empty() {
         return Err(WrongNumberOfArgument(
             RAE_DEF_ACTION_MODEL,
@@ -418,15 +409,14 @@ async fn def_action_model<'a>(
         ));
     }
 
-    let lvalue = cons(&[GENERATE_ACTION_MODEL.into(), args.into()], env, &())?;
-    let (mut e, mut c) = LEnv::root().await;
+    let lvalue = cons(&[GENERATE_ACTION_MODEL.into(), args.into()], env)?;
+    let mut e = LEnv::root().await;
 
-    let lvalue = eval(
-        &expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs).await?,
-        &mut e,
-        &mut c,
-    )
-    .await?;
+    let mut env = env.clone();
+
+    let ctx = env.get_mut_context::<CtxRae>(MOD_RAE)?;
+
+    let lvalue = eval(&expand(&lvalue, true, &mut ctx.env.env).await?, &mut e).await?;
 
     if let LValue::List(list) = &lvalue {
         if list.len() != 2 {
@@ -463,11 +453,7 @@ async fn def_action_model<'a>(
 
 /// Defines an action in RAE environment.
 #[macro_rules_attribute(dyn_async!)]
-async fn def_action_operational_model<'a>(
-    args: &'a [LValue],
-    env: &'a LEnv,
-    ctx: &'a mut CtxRae,
-) -> Result<LValue, LError> {
+async fn def_action_operational_model<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     if args.is_empty() {
         return Err(WrongNumberOfArgument(
             RAE_DEF_ACTION_OPERATIONAL_MODEL,
@@ -480,16 +466,13 @@ async fn def_action_operational_model<'a>(
     let lvalue = cons(
         &[GENERATE_ACTION_OPERATIONAL_MODEL.into(), args.into()],
         env,
-        &(),
     )?;
-    let (mut e, mut c) = LEnv::root().await;
+    let mut e = LEnv::root().await;
 
-    let lvalue = eval(
-        &expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs).await?,
-        &mut e,
-        &mut c,
-    )
-    .await?;
+    let mut env = env.clone();
+    let ctx = env.get_mut_context::<CtxRae>(MOD_RAE)?;
+
+    let lvalue = eval(&expand(&lvalue, true, &mut ctx.env.env).await?, &mut e).await?;
 
     if let LValue::List(list) = &lvalue {
         if list.len() != 2 {
@@ -526,11 +509,7 @@ async fn def_action_operational_model<'a>(
 
 /// Defines an action in RAE environment.
 #[macro_rules_attribute(dyn_async!)]
-async fn def_action<'a>(
-    args: &'a [LValue],
-    env: &'a LEnv,
-    ctx: &'a mut CtxRae,
-) -> Result<LValue, LError> {
+async fn def_action<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     if args.is_empty() {
         return Err(WrongNumberOfArgument(
             RAE_DEF_ACTION,
@@ -540,16 +519,13 @@ async fn def_action<'a>(
         ));
     }
 
-    let lvalue = cons(&[GENERATE_ACTION.into(), args.into()], env, &())?;
+    let lvalue = cons(&[GENERATE_ACTION.into(), args.into()], &env)?;
+    let mut env = env.clone();
+    let ctx = env.get_mut_context::<CtxRae>(MOD_RAE)?;
 
-    let (mut e, mut c) = LEnv::root().await;
+    let mut e = LEnv::root().await;
 
-    let lvalue = eval(
-        &expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs).await?,
-        &mut e,
-        &mut c,
-    )
-    .await?;
+    let lvalue = eval(&expand(&lvalue, true, &mut ctx.env.env).await?, &mut e).await?;
 
     if let LValue::List(list) = &lvalue {
         if list.len() != 3 {
@@ -597,11 +573,7 @@ async fn def_action<'a>(
 
 /// Defines a method in RAE environment.
 #[macro_rules_attribute(dyn_async!)]
-async fn def_method<'a>(
-    args: &'a [LValue],
-    env: &'a LEnv,
-    ctx: &'a mut CtxRae,
-) -> Result<LValue, LError> {
+async fn def_method<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     if args.is_empty() {
         return Err(WrongNumberOfArgument(
             RAE_DEF_METHOD,
@@ -611,16 +583,14 @@ async fn def_method<'a>(
         ));
     }
 
-    let lvalue = cons(&[GENERATE_METHOD.into(), args.into()], env, &())?;
+    let lvalue = cons(&[GENERATE_METHOD.into(), args.into()], &env)?;
 
-    let (mut e, mut c) = LEnv::root().await;
+    let mut env = env.clone();
+    let ctx = env.get_mut_context::<CtxRae>(MOD_RAE)?;
 
-    let lvalue = eval(
-        &expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs).await?,
-        &mut e,
-        &mut c,
-    )
-    .await?;
+    let mut e = LEnv::root().await;
+
+    let lvalue = eval(&expand(&lvalue, true, &mut ctx.env.env).await?, &mut e).await?;
 
     //println!("lvalue: {}", lvalue);
 
@@ -703,11 +673,7 @@ async fn def_method<'a>(
 }
 
 #[macro_rules_attribute(dyn_async!)]
-async fn def_task<'a>(
-    args: &'a [LValue],
-    env: &'a LEnv,
-    ctx: &'a mut CtxRae,
-) -> Result<LValue, LError> {
+async fn def_task<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     if args.is_empty() {
         return Err(WrongNumberOfArgument(
             RAE_DEF_TASK,
@@ -717,16 +683,14 @@ async fn def_task<'a>(
         ));
     }
 
-    let lvalue = cons(&[GENERATE_TASK_SIMPLE.into(), args.into()], env, &())?;
+    let lvalue = cons(&[GENERATE_TASK_SIMPLE.into(), args.into()], &env)?;
 
-    let (mut e, mut c) = LEnv::root().await;
+    let mut env = env.clone();
+    let ctx = env.get_mut_context::<CtxRae>(MOD_RAE)?;
 
-    let lvalue = eval(
-        &expand(&lvalue, true, &mut ctx.env.env, &mut ctx.env.ctxs).await?,
-        &mut e,
-        &mut c,
-    )
-    .await?;
+    let mut e = LEnv::root().await;
+
+    let lvalue = eval(&expand(&lvalue, true, &mut ctx.env.env).await?, &mut e).await?;
 
     //println!("new_task: {}", lvalue);
 
@@ -775,11 +739,9 @@ async fn def_task<'a>(
 
 ///Takes in input a list of initial facts that will be stored in the inner world part of the State.
 #[macro_rules_attribute(dyn_async!)]
-async fn def_initial_state<'a>(
-    args: &'a [LValue],
-    _: &'a LEnv,
-    ctx: &'a mut CtxRae,
-) -> Result<LValue, LError> {
+async fn def_initial_state<'a>(args: &'a [LValue], env: &'a LEnv) -> Result<LValue, LError> {
+    let mut env = env.clone();
+    let ctx = env.get_mut_context::<CtxRae>(MOD_RAE)?;
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(
             RAE_DEF_INITIAL_STATE,
@@ -815,11 +777,8 @@ async fn def_initial_state<'a>(
 
 /// Returns all the status of the actions pretty printed
 #[macro_rules_attribute(dyn_async!)]
-async fn get_status<'a>(
-    _: &'a [LValue],
-    _env: &'a LEnv,
-    ctx: &'a CtxRae,
-) -> Result<LValue, LError> {
+async fn get_status<'a>(_: &'a [LValue], env: &'a LEnv) -> Result<LValue, LError> {
+    let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
     let status = ctx.env.actions_progress.status.read().await;
     let mut string = "Actions Status:\n".to_string();
     for element in status.iter() {
@@ -831,11 +790,8 @@ async fn get_status<'a>(
 
 /// Returns the whole state if no args, or specific part of it ('static', 'dynamic', 'inner world')
 #[macro_rules_attribute(dyn_async!)]
-async fn get_state<'a>(
-    args: &'a [LValue],
-    _env: &'a LEnv,
-    ctx: &'a CtxRae,
-) -> Result<LValue, LError> {
+async fn get_state<'a>(args: &'a [LValue], env: &'a LEnv) -> Result<LValue, LError> {
+    let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
     let _type = match args.len() {
         0 => None,
         1 => {
@@ -877,7 +833,10 @@ async fn get_state<'a>(
 }
 
 /// Launch main loop of rae in an other asynchronous task.
-pub fn rae_launch(_: &[LValue], _env: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
+pub fn rae_launch(_: &[LValue], env: &LEnv) -> LResult {
+    let mut env = env.clone();
+    let ctx = env.get_mut_context::<CtxRae>(MOD_RAE)?;
+
     let options = ctx.options.clone();
     let rae_env = RAEEnv {
         job_receiver: None,
@@ -887,7 +846,6 @@ pub fn rae_launch(_: &[LValue], _env: &LEnv, ctx: &mut CtxRae) -> Result<LValue,
         state: ctx.env.state.clone(),
         env: ctx.env.env.clone(),
         domain_env: ctx.env.domain_env.clone(),
-        ctxs: Default::default(),
     };
     let context = mem::replace(&mut ctx.env, rae_env);
     rae_log::init(ctx.log.clone()).expect("Error while initiating logger.");
@@ -898,7 +856,9 @@ pub fn rae_launch(_: &[LValue], _env: &LEnv, ctx: &mut CtxRae) -> Result<LValue,
     Ok(LValue::String("rae launched succesfully".to_string()))
 }
 
-pub fn configure_platform(args: &[LValue], _: &LEnv, ctx: &mut CtxRae) -> Result<LValue, LError> {
+pub fn configure_platform(args: &[LValue], env: &LEnv) -> LResult {
+    let mut env = env.clone();
+    let ctx = env.get_mut_context::<CtxRae>(MOD_RAE)?;
     if args.is_empty() {
         return Err(WrongNumberOfArgument(
             RAE_CONFIGURE_PLATFORM,
@@ -915,7 +875,9 @@ pub fn configure_platform(args: &[LValue], _: &LEnv, ctx: &mut CtxRae) -> Result
     Ok(LValue::Nil)
 }
 
-pub fn get_config_platform(args: &[LValue], _: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
+pub fn get_config_platform(args: &[LValue], env: &LEnv) -> LResult {
+    let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
+
     if !args.is_empty() {
         return Err(WrongNumberOfArgument(
             RAE_GET_CONFIG_PLATFORM,
@@ -931,7 +893,8 @@ pub fn get_config_platform(args: &[LValue], _: &LEnv, ctx: &CtxRae) -> Result<LV
     ))
 }
 #[macro_rules_attribute(dyn_async!)]
-async fn get_agenda<'a>(_: &'a [LValue], _: &'a LEnv, ctx: &'a CtxRae) -> Result<LValue, LError> {
+async fn get_agenda<'a>(_: &'a [LValue], env: &'a LEnv) -> Result<LValue, LError> {
+    let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
     let string = ctx.env.agenda.display().await;
     Ok(string.into())
 }

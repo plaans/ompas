@@ -11,13 +11,14 @@ use ompas_acting::rae::context::actions_progress::{ActionsProgress, Status};
 use ompas_acting::rae::context::rae_state::{RAEState, StateType, KEY_DYNAMIC, KEY_STATIC};
 use ompas_acting::rae::module::rae_exec::platform::RAE_LAUNCH_PLATFORM;
 use ompas_acting::rae::module::rae_exec::{CtxPlatform, RAEInterface, RAE_GET_STATE_VARIBALE};
-use ompas_lisp::core::structs::lerror::LError;
+use ompas_lisp::core::structs::documentation::Documentation;
 use ompas_lisp::core::structs::lerror::LError::*;
+use ompas_lisp::core::structs::lerror::{LError, LResult};
 use ompas_lisp::core::structs::lvalue::LValue;
 use ompas_lisp::core::structs::lvalues::LValueS;
-use ompas_lisp::core::structs::module::{GetModule, Module};
+use ompas_lisp::core::structs::module::{IntoModule, Module};
+use ompas_lisp::core::structs::purefonction::PureFonctionCollection;
 use ompas_lisp::core::structs::typelvalue::TypeLValue;
-use ompas_lisp::core::structs::LResult;
 use ompas_utils::task_handler;
 use std::convert::TryInto;
 use std::net::SocketAddr;
@@ -503,13 +504,21 @@ impl RAEInterface for PlatformGodot {
 #[derive(Clone, Default)]
 struct GodotCtx {}
 
-impl GetModule for GodotCtx {
-    fn get_module(self) -> Module {
+impl IntoModule for GodotCtx {
+    fn into_module(self) -> Module {
         Module {
             ctx: Arc::new(self),
             prelude: vec![],
             raw_lisp: Default::default(),
             label: "".to_string(),
         }
+    }
+
+    fn documentation(&self) -> Documentation {
+        Default::default()
+    }
+
+    fn pure_fonctions(&self) -> PureFonctionCollection {
+        Default::default()
     }
 }

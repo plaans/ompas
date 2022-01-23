@@ -540,7 +540,7 @@ impl Display for DomainEnv {
 
 impl DomainEnv {
     pub fn get_exec_env(&self) -> LEnv {
-        let mut env = LEnv::empty();
+        let mut env = LEnv::default();
         let mut map_task_method: HashMap<LValue, LValue> = Default::default();
         let mut map_method_pre_conditions: HashMap<LValue, LValue> = Default::default();
         let mut map_method_score: HashMap<LValue, LValue> = Default::default();
@@ -608,7 +608,7 @@ impl DomainEnv {
     }
 
     pub fn get_sim_env(&self) -> LEnv {
-        let mut env = LEnv::empty();
+        let mut env = LEnv::default();
         let mut map_task_method: HashMap<LValue, LValue> = Default::default();
         let mut map_method_pre_conditions: HashMap<LValue, LValue> = Default::default();
         let mut map_method_score: HashMap<LValue, LValue> = Default::default();
@@ -749,15 +749,13 @@ pub struct RAEEnv {
     pub state: RAEState,
     pub env: LEnv,
     pub domain_env: DomainEnv,
-    pub ctxs: ContextCollection,
 }
 
 impl RAEEnv {
-    pub async fn get_exec_env(&self) -> (LEnv, ContextCollection) {
+    pub async fn get_exec_env(&self) -> LEnv {
         let mut domain_exec_env: LEnv = self.domain_env.get_exec_env();
         //let domain_sim_env = self.domain_env.get_sim_env();
         let exec_env = self.env.clone();
-        let exec_ctxs = self.ctxs.clone();
         //let (sim_env, sim_ctxs) = init_simu_env(None).await;
 
         /*let mut ctx_rae_sim_interface = CtxRaeSimInterface::new(sim_env, sim_ctxs);
@@ -773,7 +771,7 @@ impl RAEEnv {
         .expect("error loading ctx_rae_sim_interface");*/
 
         domain_exec_env.set_outer(exec_env);
-        (domain_exec_env, exec_ctxs)
+        domain_exec_env
     }
 
     pub fn get_sim_env(&self) -> LEnv {
@@ -791,7 +789,7 @@ impl RAEEnv {
         job_receiver: Option<Receiver<Job>>,
         status_watcher: Option<Receiver<usize>>,
     ) -> Self {
-        let (env, ctxs) = LEnv::root().await;
+        let env = LEnv::root().await;
         Self {
             job_receiver,
             agenda: Default::default(),
@@ -799,7 +797,6 @@ impl RAEEnv {
             state: Default::default(),
             env,
             domain_env: Default::default(),
-            ctxs,
             status_watcher,
         }
     }

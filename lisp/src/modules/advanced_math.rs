@@ -1,13 +1,12 @@
 use crate::core::structs::documentation::{Documentation, LHelp};
 use crate::core::structs::lenv::LEnv;
 use crate::core::structs::lerror::LError::{WrongNumberOfArgument, WrongType};
-use crate::core::structs::lerror::{LError, LResult};
+use crate::core::structs::lerror::LResult;
 use crate::core::structs::lnumber::LNumber;
 use crate::core::structs::lvalue::LValue;
 use crate::core::structs::module::{IntoModule, Module};
 use crate::core::structs::purefonction::PureFonctionCollection;
 use crate::core::structs::typelvalue::TypeLValue;
-use anyhow::bail;
 use rand::Rng;
 use std::sync::Arc;
 
@@ -61,7 +60,7 @@ impl IntoModule for CtxMath {
     /// -Constants: "pi".
     fn into_module(self) -> Module {
         let mut module = Module {
-            ctx: Arc::new(()),
+            ctx: Arc::new(self),
             prelude: vec![],
             raw_lisp: Default::default(),
             label: MOD_MATH.into(),
@@ -80,7 +79,7 @@ impl IntoModule for CtxMath {
         module
     }
 
-    fn documentation(self) -> Documentation {
+    fn documentation(&self) -> Documentation {
         vec![
             LHelp::new_verbose(MOD_MATH, DOC_MOD_MATH, DOC_MOD_MATH_VERBOSE),
             LHelp::new(SIN, DOC_SIN),
@@ -103,7 +102,7 @@ impl IntoModule for CtxMath {
         .into()
     }
 
-    fn pure_fonctions(self) -> PureFonctionCollection {
+    fn pure_fonctions(&self) -> PureFonctionCollection {
         vec![SIN, COS, SQRT, POW, SQUARE, ABS].into()
     }
 }
@@ -120,7 +119,7 @@ pub fn sin(args: &[LValue], _: &LEnv) -> LResult {
             let f: f64 = n.into();
             Ok(f.sin().into())
         }
-        lv => bail!(WrongType(SIN, lv.clone(), lv.into(), TypeLValue::Number).into()),
+        lv => Err(WrongType(SIN, lv.clone(), lv.into(), TypeLValue::Number).into()),
     }
 }
 
@@ -128,7 +127,7 @@ pub fn sin(args: &[LValue], _: &LEnv) -> LResult {
 /// Only takes one element in args
 pub fn cos(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 1 {
-        bail!(WrongNumberOfArgument(COS, args.into(), args.len(), 1..1).into());
+        return Err(WrongNumberOfArgument(COS, args.into(), args.len(), 1..1).into());
     }
 
     match &args[0] {
@@ -136,13 +135,13 @@ pub fn cos(args: &[LValue], _: &LEnv) -> LResult {
             let f: f64 = n.into();
             Ok(f.cos().into())
         }
-        lv => bail!(WrongType(COS, lv.clone(), lv.into(), TypeLValue::Number)),
+        lv => Err(WrongType(COS, lv.clone(), lv.into(), TypeLValue::Number)),
     }
 }
 
 pub fn sqrt(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 1 {
-        bail!(WrongNumberOfArgument(SQRT, args.into(), args.len(), 1..1));
+        return Err(WrongNumberOfArgument(SQRT, args.into(), args.len(), 1..1));
     }
 
     match &args[0] {
@@ -150,13 +149,13 @@ pub fn sqrt(args: &[LValue], _: &LEnv) -> LResult {
             let f: f64 = n.into();
             Ok(f.sqrt().into())
         }
-        lv => bail!(WrongType(SQRT, lv.clone(), lv.into(), TypeLValue::Number)),
+        lv => Err(WrongType(SQRT, lv.clone(), lv.into(), TypeLValue::Number)),
     }
 }
 
 pub fn pow(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 2 {
-        bail!(WrongNumberOfArgument(POW, args.into(), args.len(), 2..2));
+        return Err(WrongNumberOfArgument(POW, args.into(), args.len(), 2..2));
     }
 
     if let LValue::Number(n) = &args[0] {
@@ -165,7 +164,7 @@ pub fn pow(args: &[LValue], _: &LEnv) -> LResult {
             let p: f64 = p.into();
             Ok(f.powf(p).into())
         } else {
-            bail!(WrongType(
+            Err(WrongType(
                 POW,
                 args[1].clone(),
                 (&args[1]).into(),
@@ -173,7 +172,7 @@ pub fn pow(args: &[LValue], _: &LEnv) -> LResult {
             ))
         }
     } else {
-        bail!(WrongType(
+        Err(WrongType(
             POW,
             args[0].clone(),
             (&args[0]).into(),
@@ -184,7 +183,7 @@ pub fn pow(args: &[LValue], _: &LEnv) -> LResult {
 
 pub fn square(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 1 {
-        return bail!(WrongNumberOfArgument(SQUARE, args.into(), args.len(), 1..1));
+        return Err(WrongNumberOfArgument(SQUARE, args.into(), args.len(), 1..1));
     }
 
     match &args[0] {
@@ -192,13 +191,13 @@ pub fn square(args: &[LValue], _: &LEnv) -> LResult {
             let f: f64 = n.into();
             Ok(f.powi(2).into())
         }
-        lv => bail!(WrongType(SQUARE, lv.clone(), lv.into(), TypeLValue::Number)),
+        lv => Err(WrongType(SQUARE, lv.clone(), lv.into(), TypeLValue::Number)),
     }
 }
 
 pub fn abs(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 1 {
-        return bail!(WrongNumberOfArgument(SQUARE, args.into(), args.len(), 1..1));
+        return Err(WrongNumberOfArgument(SQUARE, args.into(), args.len(), 1..1));
     }
 
     match &args[0] {
@@ -208,14 +207,14 @@ pub fn abs(args: &[LValue], _: &LEnv) -> LResult {
             LNumber::Usize(u) => LNumber::Usize(*u),
         }
         .into()),
-        lv => bail!(WrongType(SQUARE, lv.clone(), lv.into(), TypeLValue::Number)),
+        lv => Err(WrongType(SQUARE, lv.clone(), lv.into(), TypeLValue::Number)),
     }
 }
 
 /// Returns an integer randomly picked between two numbers.
 pub fn rand_int_in_range(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 2 {
-        return bail!(WrongNumberOfArgument(
+        return Err(WrongNumberOfArgument(
             RAND_INT_IN_RANGE,
             args.into(),
             args.len(),
@@ -228,7 +227,7 @@ pub fn rand_int_in_range(args: &[LValue], _: &LEnv) -> LResult {
             let value: i64 = rand::thread_rng().gen_range(n1.into()..n2.into());
             Ok(value.into())
         } else {
-            bail!(WrongType(
+            Err(WrongType(
                 RAND_INT_IN_RANGE,
                 args[1].clone(),
                 (&args[1]).into(),
@@ -236,7 +235,7 @@ pub fn rand_int_in_range(args: &[LValue], _: &LEnv) -> LResult {
             ))
         }
     } else {
-        bail!(WrongType(
+        Err(WrongType(
             RAND_INT_IN_RANGE,
             args[0].clone(),
             (&args[0]).into(),
@@ -248,7 +247,7 @@ pub fn rand_int_in_range(args: &[LValue], _: &LEnv) -> LResult {
 /// Returns a float randomly picked between two numbers.
 pub fn rand_float_in_range(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 2 {
-        return bail!(WrongNumberOfArgument(
+        return Err(WrongNumberOfArgument(
             RAND_FLOAT_IN_RANGE,
             args.into(),
             args.len(),
@@ -261,7 +260,7 @@ pub fn rand_float_in_range(args: &[LValue], _: &LEnv) -> LResult {
             let value: f64 = rand::thread_rng().gen_range(n1.into()..n2.into());
             Ok(value.into())
         } else {
-            bail!(WrongType(
+            Err(WrongType(
                 RAND_FLOAT_IN_RANGE,
                 args[1].clone(),
                 (&args[1]).into(),
@@ -269,7 +268,7 @@ pub fn rand_float_in_range(args: &[LValue], _: &LEnv) -> LResult {
             ))
         }
     } else {
-        bail!(WrongType(
+        Err(WrongType(
             RAND_FLOAT_IN_RANGE,
             args[0].clone(),
             (&args[0]).into(),

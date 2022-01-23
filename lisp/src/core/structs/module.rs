@@ -3,7 +3,7 @@ use crate::core::structs::lvalue::LValue;
 use crate::core::structs::new_function::*;
 use crate::core::structs::purefonction::PureFonctionCollection;
 use std::any::Any;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 #[derive(Debug, Default, Clone)]
 pub struct InitLisp(Vec<String>);
@@ -110,7 +110,7 @@ pub trait IntoModule {
 impl IntoModule for () {
     fn into_module(self) -> Module {
         Module {
-            ctx: Arc::new(self),
+            ctx: Arc::new(RwLock::new(self)),
             prelude: vec![],
             raw_lisp: Default::default(),
             label: "()".to_string(),

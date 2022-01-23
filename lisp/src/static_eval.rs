@@ -1,7 +1,6 @@
-use crate::core::structs::contextcollection::ContextCollection;
 use crate::core::structs::lcoreoperator::LCoreOperator;
 use crate::core::structs::lenv::LEnv;
-use crate::core::structs::lerror::LError;
+use crate::core::structs::lerror;
 use crate::core::structs::lerror::LError::{
     NotInListOfExpectedTypes, SpecialError, WrongNumberOfArgument, WrongType,
 };
@@ -9,9 +8,7 @@ use crate::core::structs::llambda::{LLambda, LambdaArgs};
 use crate::core::structs::lvalue::LValue;
 use crate::core::structs::typelvalue::TypeLValue;
 use crate::core::{expand_quasi_quote, get_debug, parse_into_lvalue};
-use anyhow::bail;
-use std::any::Any;
-use std::collections::HashSet;
+use anyhow::anyhow;
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{Display, Formatter};
 
@@ -95,7 +92,7 @@ impl From<LValue> for PLValue {
     }
 }*/
 
-pub fn expand_static(x: &LValue, top_level: bool, env: &LEnv) -> Result<PLValue, anyhow::Error> {
+pub fn expand_static(x: &LValue, top_level: bool, env: &mut LEnv) -> lerror::Result<PLValue> {
     match x {
         LValue::List(list) => {
             if let Ok(co) = LCoreOperator::try_from(&list[0]) {
@@ -103,7 +100,7 @@ pub fn expand_static(x: &LValue, top_level: bool, env: &LEnv) -> Result<PLValue,
                     LCoreOperator::Define | LCoreOperator::DefMacro => {
                         //eprintln!("expand: define: Ok!");
                         if list.len() < 3 {
-                            bail!(WrongNumberOfArgument(
+                            return Err(WrongNumberOfArgument(
                                 EXPAND_STATIC,
                                 x.clone(),
                                 list.len(),
@@ -130,7 +127,7 @@ pub fn expand_static(x: &LValue, top_level: bool, env: &LEnv) -> Result<PLValue,
                             }
                             LValue::Symbol(sym) => {
                                 if list.len() != 3 {
-                                    bail!(WrongNumberOfArgument(
+                                    return Err(WrongNumberOfArgument(
                                         EXPAND_STATIC,
                                         x.clone(),
                                         list.len(),
@@ -144,7 +141,7 @@ pub fn expand_static(x: &LValue, top_level: bool, env: &LEnv) -> Result<PLValue,
                                 //println!("after expansion: {}", exp);
                                 if def == LCoreOperator::DefMacro {
                                     if !top_level {
-                                        bail!(SpecialError(
+                                        return Err(SpecialError(
                                             EXPAND_STATIC,
                                             format!("{}: defmacro only allowed at top level", x),
                                         ));
@@ -152,7 +149,7 @@ pub fn expand_static(x: &LValue, top_level: bool, env: &LEnv) -> Result<PLValue,
                                     let proc = eval_static(&exp.into(), &mut env.clone())?;
                                     //println!("new macro: {}", proc);
                                     if !matches!(proc.lvalue, LValue::Lambda(_)) {
-                                        bail!(SpecialError(
+                                        return Err(SpecialError(
                                             EXPAND_STATIC,
                                             format!("{}: macro must be a procedure", proc),
                                         ));
@@ -170,7 +167,7 @@ pub fn expand_static(x: &LValue, top_level: bool, env: &LEnv) -> Result<PLValue,
                                 ));
                             }
                             _ => {
-                                bail!(WrongType(
+                                return Err(WrongType(
                                     EXPAND_STATIC,
                                     x.clone(),
                                     x.into(),
@@ -181,7 +178,7 @@ pub fn expand_static(x: &LValue, top_level: bool, env: &LEnv) -> Result<PLValue,
                     }
                     LCoreOperator::DefLambda => {
                         if list.len() < 3 {
-                            bail!(WrongNumberOfArgument(
+                            return Err(WrongNumberOfArgument(
                                 EXPAND_STATIC,
                                 x.clone(),
                                 list.len(),
@@ -195,7 +192,7 @@ pub fn expand_static(x: &LValue, top_level: bool, env: &LEnv) -> Result<PLValue,
                             LValue::List(vars_list) => {
                                 for v in vars_list {
                                     if !matches!(v, LValue::Symbol(_)) {
-                                        bail!(SpecialError(
+                                        return Err(SpecialError(
                                             EXPAND_STATIC,
                                             format!("illegal lambda argument list: {}", x),
                                         ));
@@ -204,7 +201,7 @@ pub fn expand_static(x: &LValue, top_level: bool, env: &LEnv) -> Result<PLValue,
                             }
                             LValue::Symbol(_) | LValue::Nil => {}
                             lv => {
-                                bail!(NotInListOfExpectedTypes(
+                                return Err(NotInListOfExpectedTypes(
                                     EXPAND_STATIC,
                                     lv.clone(),
                                     lv.into(),
@@ -234,7 +231,7 @@ pub fn expand_static(x: &LValue, top_level: bool, env: &LEnv) -> Result<PLValue,
                             list.push(LValue::Nil);
                         }
                         if list.len() != 4 {
-                            bail!(WrongNumberOfArgument(
+                            return Err(WrongNumberOfArgument(
                                 EXPAND_STATIC,
                                 (&list).into(),
                                 list.len(),
@@ -255,7 +252,7 @@ pub fn expand_static(x: &LValue, top_level: bool, env: &LEnv) -> Result<PLValue,
                     LCoreOperator::Quote => {
                         //println!("expand: quote: Ok!");
                         if list.len() != 2 {
-                            bail!(WrongNumberOfArgument(
+                            return Err(WrongNumberOfArgument(
                                 EXPAND_STATIC,
                                 list.into(),
                                 list.len(),
@@ -283,7 +280,7 @@ pub fn expand_static(x: &LValue, top_level: bool, env: &LEnv) -> Result<PLValue,
                     }
                     LCoreOperator::QuasiQuote => {
                         return if list.len() != 2 {
-                            bail!(WrongNumberOfArgument(
+                            Err(WrongNumberOfArgument(
                                 EXPAND_STATIC,
                                 list.into(),
                                 list.len(),
@@ -299,14 +296,14 @@ pub fn expand_static(x: &LValue, top_level: bool, env: &LEnv) -> Result<PLValue,
                         };
                     }
                     LCoreOperator::UnQuote => {
-                        bail!(SpecialError(
-                            EXPAND_STATIC,
+                        return Err(anyhow!(
                             "unquote must be inside a quasiquote expression".to_string(),
-                        ))
+                        )
+                        .into())
                     }
                     LCoreOperator::Async => {
                         return if list.len() != 2 {
-                            bail!(WrongNumberOfArgument(
+                            Err(WrongNumberOfArgument(
                                 EXPAND_STATIC,
                                 list.into(),
                                 list.len(),
@@ -325,7 +322,7 @@ pub fn expand_static(x: &LValue, top_level: bool, env: &LEnv) -> Result<PLValue,
                     }
                     LCoreOperator::Await => {
                         return if list.len() != 2 {
-                            bail!(WrongNumberOfArgument(
+                            Err(WrongNumberOfArgument(
                                 EXPAND_STATIC,
                                 list.into(),
                                 list.len(),
@@ -344,7 +341,7 @@ pub fn expand_static(x: &LValue, top_level: bool, env: &LEnv) -> Result<PLValue,
                     }
                     LCoreOperator::Eval => {
                         return if list.len() != 2 {
-                            bail!(WrongNumberOfArgument(
+                            Err(WrongNumberOfArgument(
                                 EXPAND_STATIC,
                                 list.into(),
                                 list.len(),
@@ -362,7 +359,7 @@ pub fn expand_static(x: &LValue, top_level: bool, env: &LEnv) -> Result<PLValue,
                     }
                     LCoreOperator::Parse => {
                         return if list.len() != 2 {
-                            bail!(WrongNumberOfArgument(
+                            Err(WrongNumberOfArgument(
                                 EXPAND_STATIC,
                                 list.into(),
                                 list.len(),
@@ -381,7 +378,7 @@ pub fn expand_static(x: &LValue, top_level: bool, env: &LEnv) -> Result<PLValue,
                     }
                     LCoreOperator::Expand => {
                         return if list.len() != 2 {
-                            bail!(WrongNumberOfArgument(
+                            Err(WrongNumberOfArgument(
                                 EXPAND_STATIC,
                                 list.into(),
                                 list.len(),
@@ -439,17 +436,17 @@ pub fn expand_static(x: &LValue, top_level: bool, env: &LEnv) -> Result<PLValue,
     }
 }
 
-pub fn parse_static(str: &str, env: &LEnv) -> Result<PLValue, anyhow::Error> {
+pub fn parse_static(str: &str, env: &mut LEnv) -> lerror::Result<PLValue> {
     match aries_planning::parsing::sexpr::parse(str) {
         Ok(se) => expand_static(&parse_into_lvalue(&se), true, env),
-        Err(e) => bail!(SpecialError(
+        Err(e) => Err(SpecialError(
             PARSE_STATIC,
             format!("Error in command: {}", e.to_string()),
         )),
     }
 }
 
-pub fn eval_static(lv: &LValue, env: &LEnv) -> Result<PLValue, anyhow::Error> {
+pub fn eval_static(lv: &LValue, env: &mut LEnv) -> lerror::Result<PLValue> {
     let mut lv = lv.clone();
     let mut temp_env: LEnv;
     let mut env = env;
@@ -463,12 +460,12 @@ pub fn eval_static(lv: &LValue, env: &LEnv) -> Result<PLValue, anyhow::Error> {
                 Some(lv) => lv,
             };
             match result {
-                LValue::Fn(_) | LValue::MutFn(_) => {
-                    if !pfc.is_pure(s) {
+                LValue::Fn(_) => {
+                    if env.get_pfc().is_pure(s) {
                         return Ok(PLValue::into_unpure(&lv));
                     }
                 }
-                LValue::AsyncFn(_) | LValue::AsyncMutFn(_) => return Ok(PLValue::into_unpure(&lv)),
+                LValue::AsyncFn(_) => return Ok(PLValue::into_unpure(&lv)),
                 _ => {}
             }
             if get_debug() {
@@ -500,7 +497,7 @@ pub fn eval_static(lv: &LValue, env: &LEnv) -> Result<PLValue, anyhow::Error> {
                                 }
                             }
                             lv => {
-                                bail!(WrongType(
+                                Err(WrongType(
                                     EVAL_STATIC,
                                     lv.clone(),
                                     lv.into(),
@@ -519,7 +516,7 @@ pub fn eval_static(lv: &LValue, env: &LEnv) -> Result<PLValue, anyhow::Error> {
                                     match val {
                                         LValue::Symbol(s) => vec_sym.push(s.clone()),
                                         lv => {
-                                            bail!(WrongType(
+                                            return Err(WrongType(
                                                 EVAL_STATIC,
                                                 lv.clone(),
                                                 lv.into(),
@@ -533,7 +530,7 @@ pub fn eval_static(lv: &LValue, env: &LEnv) -> Result<PLValue, anyhow::Error> {
                             LValue::Symbol(s) => s.clone().into(),
                             LValue::Nil => LambdaArgs::Nil,
                             lv => {
-                                bail!(NotInListOfExpectedTypes(
+                                return Err(NotInListOfExpectedTypes(
                                     EVAL_STATIC,
                                     lv.clone(),
                                     lv.into(),
@@ -559,7 +556,7 @@ pub fn eval_static(lv: &LValue, env: &LEnv) -> Result<PLValue, anyhow::Error> {
                                 LValue::True => conseq.clone(),
                                 LValue::Nil => alt.clone(),
                                 lv => {
-                                    bail!(WrongType(
+                                    return Err(WrongType(
                                         EVAL_STATIC,
                                         lv.clone(),
                                         lv.into(),
@@ -600,7 +597,7 @@ pub fn eval_static(lv: &LValue, env: &LEnv) -> Result<PLValue, anyhow::Error> {
                     }
                     LCoreOperator::QuasiQuote
                     | LCoreOperator::UnQuote
-                    | LCoreOperator::DefMacro => bail!(SpecialError(EVAL_STATIC, "quasiquote, unquote and defmacro should not be prensent in exanded expressions".to_string())),
+                    | LCoreOperator::DefMacro => return Err(SpecialError(EVAL_STATIC, "quasiquote, unquote and defmacro should not be prensent in exanded expressions".to_string())),
                     LCoreOperator::Async | LCoreOperator::Await => {
                         return Ok(PLValue::into_unpure(&lv));
                     }
@@ -624,7 +621,7 @@ pub fn eval_static(lv: &LValue, env: &LEnv) -> Result<PLValue, anyhow::Error> {
                             if let LValue::String(s) = result.lvalue {
                                 parse_static(s.as_str(), env)
                             } else {
-                                bail!(WrongType(
+                                Err(WrongType(
                                     EVAL_STATIC,
                                     args[0].clone(),
                                     (&args[0]).into(),
@@ -675,34 +672,17 @@ pub fn eval_static(lv: &LValue, env: &LEnv) -> Result<PLValue, anyhow::Error> {
                         env = &mut temp_env;
                     }
                     LValue::Fn(fun) => {
-                        let ctx: &dyn Any = match fun.get_index_mod() {
-                            None => unreachable!("{} should have a module index", fun.debug_label),
-                            Some(u) => ctxs.get_context(u),
-                        };
                         let r_lvalue = fun.call(args.as_slice(), env)?;
                         if get_debug() {
                             println!("{} => {}", str, r_lvalue);
                         }
                         return Ok(PLValue::into_pure(&r_lvalue));
                     }
-                    LValue::MutFn(fun) => {
-                        return match fun.get_index_mod() {
-                            None => unreachable!("{} should have a module index", fun.debug_label),
-                            Some(u) => {
-                                let r_lvalue =
-                                    fun.call(args.as_slice(), env, ctxs.get_mut_context(u))?;
-                                if get_debug() {
-                                    println!("{} => {}", str, r_lvalue);
-                                }
-                                Ok(PLValue::into_pure(&r_lvalue))
-                            }
-                        };
-                    }
-                    LValue::AsyncFn(_) | LValue::AsyncMutFn(_) => {
+                    LValue::AsyncFn(_) => {
                         unreachable!("should have been detected unpure before")
                     }
                     lv => {
-                        bail!(WrongType(
+                        return Err(WrongType(
                             EVAL_STATIC,
                             lv.clone(),
                             lv.into(),

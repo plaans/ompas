@@ -6,7 +6,6 @@ use crate::core::structs::lvalue::LValue;
 use crate::core::structs::module::{IntoModule, Module};
 use crate::core::structs::purefonction::PureFonctionCollection;
 use crate::core::structs::typelvalue::TypeLValue;
-use anyhow::bail;
 use std::sync::Arc;
 
 //LANGUAGE
@@ -51,7 +50,7 @@ impl IntoModule for CtxError {
         module
     }
 
-    fn documentation(self) -> Documentation {
+    fn documentation(&self) -> Documentation {
         vec![
             LHelp::new(OK, DOC_OK),
             LHelp::new(ERR, DOC_ERR),
@@ -62,7 +61,7 @@ impl IntoModule for CtxError {
         .into()
     }
 
-    fn pure_fonctions(self) -> PureFonctionCollection {
+    fn pure_fonctions(&self) -> PureFonctionCollection {
         vec![OK, ERR, IS_OK, IS_ERR].into()
     }
 }
@@ -77,7 +76,7 @@ pub fn err(args: &[LValue], _: &LEnv) -> LResult {
 
 pub fn is_err(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 1 {
-        bail!(WrongNumberOfArgument(IS_ERR, args.into(), args.len(), 1..1));
+        return Err(WrongNumberOfArgument(IS_ERR, args.into(), args.len(), 1..1));
     }
 
     if let LValue::List(list) = &args[0] {
@@ -85,7 +84,7 @@ pub fn is_err(args: &[LValue], _: &LEnv) -> LResult {
             match s.as_str() {
                 OK => Ok(false.into()),
                 ERR => Ok(true.into()),
-                _ => bail!(WrongType(
+                _ => Err(WrongType(
                     IS_ERR,
                     list[0].clone(),
                     (&list[0]).into(),
@@ -93,7 +92,7 @@ pub fn is_err(args: &[LValue], _: &LEnv) -> LResult {
                 )),
             }
         } else {
-            bail!(WrongType(
+            Err(WrongType(
                 IS_ERR,
                 list[0].clone(),
                 (&list[0]).into(),
@@ -101,7 +100,7 @@ pub fn is_err(args: &[LValue], _: &LEnv) -> LResult {
             ))
         }
     } else {
-        bail!(WrongType(
+        Err(WrongType(
             IS_ERR,
             args[0].clone(),
             (&args[0]).into(),
@@ -112,7 +111,7 @@ pub fn is_err(args: &[LValue], _: &LEnv) -> LResult {
 
 pub fn is_ok(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 1 {
-        bail!(WrongNumberOfArgument(IS_ERR, args.into(), args.len(), 1..1));
+        return Err(WrongNumberOfArgument(IS_ERR, args.into(), args.len(), 1..1));
     }
 
     if let LValue::List(list) = &args[0] {
@@ -120,7 +119,7 @@ pub fn is_ok(args: &[LValue], _: &LEnv) -> LResult {
             match s.as_str() {
                 OK => Ok(true.into()),
                 ERR => Ok(false.into()),
-                _ => bail!(WrongType(
+                _ => Err(WrongType(
                     IS_ERR,
                     list[0].clone(),
                     (&list[0]).into(),
@@ -128,7 +127,7 @@ pub fn is_ok(args: &[LValue], _: &LEnv) -> LResult {
                 )),
             }
         } else {
-            bail!(WrongType(
+            Err(WrongType(
                 IS_ERR,
                 list[0].clone(),
                 (&list[0]).into(),
@@ -136,7 +135,7 @@ pub fn is_ok(args: &[LValue], _: &LEnv) -> LResult {
             ))
         }
     } else {
-        bail!(WrongType(
+        Err(WrongType(
             IS_ERR,
             args[0].clone(),
             (&args[0]).into(),

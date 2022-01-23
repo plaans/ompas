@@ -1,8 +1,8 @@
 use crate::core::root_module::CtxRoot;
-use crate::core::structs::contextcollection::ContextCollection;
-use crate::core::structs::documentation::{Documentation, LHelp};
+use crate::core::structs::documentation::Documentation;
 use crate::core::structs::lenv::ImportType::{WithPrefix, WithoutPrefix};
 use crate::core::structs::lenv::{ImportType, LEnv};
+use crate::core::structs::lerror;
 use crate::core::structs::lerror::LError::WrongNumberOfArgument;
 use crate::core::structs::lerror::{LError, LResult};
 use crate::core::structs::lvalue::LValue;
@@ -13,7 +13,6 @@ use crate::modules::error::CtxError;
 use crate::modules::static_eval::language::*;
 use crate::modules::utils::CtxUtils;
 use crate::static_eval::{eval_static, expand_static};
-use anyhow::bail;
 use std::sync::Arc;
 
 /*
@@ -50,11 +49,11 @@ impl CtxStaticEval {
 }
 
 impl CtxStaticEval {
-    pub async fn import_namespace(&mut self, ctx: impl IntoModule) -> Result<(), LError> {
+    pub async fn import_namespace(&mut self, ctx: impl IntoModule) -> lerror::Result<()> {
         self.env.import(ctx, WithoutPrefix).await
     }
 
-    pub async fn import(&mut self, ctx: impl IntoModule) -> Result<(), LError> {
+    pub async fn import(&mut self, ctx: impl IntoModule) -> lerror::Result<()> {
         self.env.import(ctx, WithPrefix).await
     }
 }
@@ -74,17 +73,17 @@ impl IntoModule for CtxStaticEval {
     }
 
     fn documentation(&self) -> Documentation {
-        todo!()
+        Default::default()
     }
 
     fn pure_fonctions(&self) -> PureFonctionCollection {
-        todo!()
+        Default::default()
     }
 }
 
 pub fn scheme_eval_static(args: &[LValue], env: &LEnv) -> LResult {
     if args.len() != 1 {
-        bail!(WrongNumberOfArgument(
+        return Err(WrongNumberOfArgument(
             EVAL_STATIC,
             args.into(),
             args.len(),
@@ -92,11 +91,13 @@ pub fn scheme_eval_static(args: &[LValue], env: &LEnv) -> LResult {
         ));
     }
 
+    let mut env = env.clone();
+
     let ctx = env.get_mut_context::<CtxStaticEval>(MOD_STATIC_EVAL)?;
 
-    let result = expand_static(&args[0], true, &ctx.env)?;
+    let result = expand_static(&args[0], true, &mut ctx.env)?;
 
-    let result = eval_static(result.get_lvalue(), &ctx.env)?;
+    let result = eval_static(result.get_lvalue(), &mut ctx.env)?;
 
     println!("static evaluation returned: {}", result.get_lvalue());
 

@@ -13,10 +13,10 @@ fn list_of_example() -> Vec<&'static str> {
 
 #[tokio::main]
 async fn main() -> Result<(), LError> {
-    let (mut env, mut ctxs) = LEnv::root().await;
+    let mut env = LEnv::root().await;
 
     for element in list_of_example() {
-        let lvalue = parse(element, &mut env, &mut ctxs).await?;
+        let lvalue = parse(element, &mut env).await?;
         println!("string: {}", element);
         println!("lvalue: {}", lvalue);
         println!("pretty: {}", lvalue.pretty_print("pretty: ".len()))

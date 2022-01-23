@@ -3,11 +3,12 @@ use crate::rae::context::rae_env::RAEEnv;
 use crate::rae::context::ressource_access::wait_on;
 use crate::rae::module::rae_exec::{Job, JobType};
 use ::macro_rules_attribute::macro_rules_attribute;
+use ompas_lisp::core::structs::documentation::{Documentation, LHelp};
 use ompas_lisp::core::structs::lenv::LEnv;
-use ompas_lisp::core::structs::lerror::LError;
+use ompas_lisp::core::structs::lerror::{LError, LResult};
 use ompas_lisp::core::structs::lvalue::LValue;
-use ompas_lisp::core::structs::module::{GetModule, Module};
-use ompas_lisp::modules::doc::{Documentation, LHelp};
+use ompas_lisp::core::structs::module::{IntoModule, Module};
+use ompas_lisp::core::structs::purefonction::PureFonctionCollection;
 use ompas_utils::dyn_async;
 use std::sync::Arc;
 use tokio::sync::mpsc::Sender;
@@ -35,8 +36,8 @@ pub const DOC_RAE_TRIGGER_EVENT_VERBOSE: &str = "";
 pub const DOC_RAE_TRIGGER_TASK: &str = "Sends to RAE a task to execute";
 pub const DOC_RAE_TRIGGER_TASK_VERBOSE: &str = "Example: (rae-trigger-task t_dumber robot0)";
 
-impl GetModule for CtxRaeMonitor {
-    fn get_module(self) -> Module {
+impl IntoModule for CtxRaeMonitor {
+    fn into_module(self) -> Module {
         let mut module = Module {
             ctx: Arc::new(self),
             prelude: vec![],
@@ -51,10 +52,8 @@ impl GetModule for CtxRaeMonitor {
 
         module
     }
-}
 
-impl Documentation for CtxRaeMonitor {
-    fn documentation() -> Vec<LHelp> {
+    fn documentation(&self) -> Documentation {
         vec![
             LHelp::new_verbose(
                 RAE_TRIGGER_TASK,
@@ -67,19 +66,28 @@ impl Documentation for CtxRaeMonitor {
                 DOC_RAE_TRIGGER_TASK_VERBOSE,
             ),
         ]
+        .into()
+    }
+
+    fn pure_fonctions(&self) -> PureFonctionCollection {
+        Default::default()
     }
 }
 
 /// Add an event to the stream of RAE
 /// access asynchronously to the stream
-pub fn trigger_event(_: &[LValue], _env: &LEnv, _: &CtxRaeMonitor) -> Result<LValue, LError> {
+pub fn trigger_event(_: &[LValue], _: &LEnv) -> LResult {
     Ok(LValue::String(
         "trigger event not yet implemented".to_string(),
     ))
 }
 
 /// Sends via a channel a task to execute.
-pub fn trigger_task(args: &[LValue], _env: &LEnv, ctx: &CtxRaeMonitor) -> Result<LValue, LError> {
+pub fn trigger_task(args: &[LValue], env: &LEnv) -> LResult {
+    let env = env.clone();
+
+    let ctx = env.get_context::<CtxRaeMonitor>(MOD_RAE_MONITOR)?;
+
     let job = Job::new(args.into(), JobType::Task);
     let sender = ctx.sender_to_rae.clone().unwrap();
     tokio::spawn(async move {
@@ -89,19 +97,11 @@ pub fn trigger_task(args: &[LValue], _env: &LEnv, ctx: &CtxRaeMonitor) -> Result
 }
 
 #[macro_rules_attribute(dyn_async!)]
-async fn get_mutexes<'a>(
-    _: &'a [LValue],
-    _: &'a LEnv,
-    _: &'a CtxRaeMonitor,
-) -> Result<LValue, LError> {
+async fn get_mutexes<'a>(_: &'a [LValue], _: &'a LEnv) -> LResult {
     Ok(mutex::get_debug().await.into())
 }
 
 #[macro_rules_attribute(dyn_async!)]
-async fn get_wait_ons<'a>(
-    _: &'a [LValue],
-    _: &'a LEnv,
-    _: &'a CtxRaeMonitor,
-) -> Result<LValue, LError> {
+async fn get_wait_ons<'a>(_: &'a [LValue], _: &'a LEnv) -> LResult {
     Ok(wait_on::get_debug().await.into())
 }

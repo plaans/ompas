@@ -4,13 +4,11 @@ use ompas_acting::rae::context::rae_env::DomainEnv;
 use ompas_acting::rae::module::rae_exec::platform::RAE_INSTANCE;
 use ompas_acting::rae::module::rae_exec::{RAE_ASSERT, RAE_RETRACT};
 use ompas_lisp::core::root_module::language::get_scheme_primitives;
-use ompas_lisp::core::structs::contextcollection::ContextCollection;
 use ompas_lisp::core::structs::lenv::LEnv;
 use ompas_lisp::core::structs::lerror::LError;
 use ompas_lisp::core::structs::lerror::LError::SpecialError;
 use ompas_lisp::core::structs::lnumber::LNumber;
 use ompas_lisp::core::structs::lvalue::LValue;
-use ompas_lisp::static_eval::PureFonctionCollection;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Display, Formatter};
 
@@ -1062,8 +1060,6 @@ impl FormatWithSymTable for Interval {
 pub struct Context {
     pub domain: DomainEnv,
     pub env: LEnv,
-    pub ctxs: ContextCollection,
-    pub pfc: PureFonctionCollection,
 }
 
 pub struct Problem {}

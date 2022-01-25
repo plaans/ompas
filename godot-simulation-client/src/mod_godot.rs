@@ -1,9 +1,11 @@
 #![allow(dead_code)]
+
 use crate::rae_interface::PlatformGodot;
 use ::macro_rules_attribute::macro_rules_attribute;
 use ompas_acting::rae::context::actions_progress::ActionsProgress;
 use ompas_acting::rae::context::rae_state::RAEState;
 use ompas_acting::rae::module::rae_exec::RAEInterface;
+use ompas_lisp::core::structs::contextcollection::Context;
 use ompas_lisp::core::structs::documentation::{Documentation, LHelp};
 use ompas_lisp::core::structs::lenv::LEnv;
 use ompas_lisp::core::structs::lerror::LResult;
@@ -12,6 +14,7 @@ use ompas_lisp::core::structs::module::{IntoModule, Module};
 use ompas_lisp::core::structs::purefonction::PureFonctionCollection;
 use ompas_utils::dyn_async;
 use std::sync::Arc;
+use tokio::sync::RwLock;
 
 /*
 LANGUAGE
@@ -291,20 +294,20 @@ pub struct SocketInfo {
 pub struct CtxGodot {
     state: RAEState,
     status: ActionsProgress,
-    platform: PlatformGodot,
+    platform: Arc<RwLock<PlatformGodot>>,
 }
 
 impl Default for CtxGodot {
     fn default() -> Self {
         let state = RAEState::default();
         let status = ActionsProgress::default();
-        let platform = PlatformGodot {
+        let platform = Arc::new(RwLock::new(PlatformGodot {
             socket_info: Default::default(),
             sender_socket: None,
             state: state.clone(),
             status: status.clone(),
             instance: Default::default(),
-        };
+        }));
         Self {
             state,
             status,
@@ -355,7 +358,7 @@ impl IntoModule for CtxGodot {
         .into();
 
         let mut module = Module {
-            ctx: Arc::new(self),
+            ctx: Context::new(self),
             prelude: vec![],
             raw_lisp,
             label: MOD_GODOT.to_string(),
@@ -487,17 +490,18 @@ Functions
 /// Launch the godot process the simulation and opens the com
 #[macro_rules_attribute(dyn_async!)]
 async fn launch_godot<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
-    let mut env = env.clone();
-    let ctx = env.get_mut_context::<CtxGodot>(MOD_GODOT)?;
-    ctx.platform.launch_platform(args).await
+    let env = env.clone();
+    let ctx = env.get_context::<CtxGodot>(MOD_GODOT)?;
+    let mut platform = ctx.platform.write().await;
+    let future = platform.launch_platform(args).await;
+    future
 }
 
 /// Opens the tcp communication to receive state and status update and send commands.
 #[macro_rules_attribute(dyn_async!)]
 async fn open_com<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
-    let mut env = env.clone();
-    let ctx = env.get_mut_context::<CtxGodot>(MOD_GODOT)?;
-    ctx.platform.open_com(args).await
+    let ctx = env.get_context::<CtxGodot>(MOD_GODOT)?;
+    ctx.platform.write().await.open_com(args).await
 }
 
 pub const DEFAULT_PATH_PROJECT_GODOT: &str = "/home/jeremy/godot/simulation-factory-godot/simu";
@@ -506,7 +510,7 @@ pub const DEFAULT_PATH_PROJECT_GODOT: &str = "/home/jeremy/godot/simulation-fact
 #[macro_rules_attribute(dyn_async!)]
 async fn start_godot<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     let ctx = env.get_context::<CtxGodot>(MOD_GODOT)?;
-    ctx.platform.start_platform(args).await
+    ctx.platform.write().await.start_platform(args).await
 }
 /// Commands available
 ///- Navigate to : ['navigate_to', robot_name, destination_x, destination_y]
@@ -519,12 +523,12 @@ async fn start_godot<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
 async fn exec_godot<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     let ctx = env.get_context::<CtxGodot>(MOD_GODOT)?;
     let id = ctx.status.get_new_id();
-    ctx.platform.exec_command(args, id).await
+    ctx.platform.read().await.exec_command(args, id).await
 }
 
 /// Returns the whole state if no args and a particular entry corresponding to the arg.
 #[macro_rules_attribute(dyn_async!)]
 async fn get_state<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     let ctx = env.get_context::<CtxGodot>(MOD_GODOT)?;
-    ctx.platform.get_state(args).await
+    ctx.platform.read().await.get_state(args).await
 }

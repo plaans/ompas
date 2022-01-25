@@ -14,6 +14,7 @@
 //! => ((1 3)(1 4)(2 3)(2 4))
 //! ```
 
+use crate::core::structs::contextcollection::Context;
 use crate::core::structs::documentation::{Documentation, LHelp};
 use crate::core::structs::lcoreoperator::LCoreOperator;
 use crate::core::structs::lenv::LEnv;
@@ -27,7 +28,6 @@ use crate::modules::utils::language::*;
 use aries_utils::StreamingIterator;
 use rand::Rng;
 use std::ops::Deref;
-use std::sync::Arc;
 
 //LANGUAGE
 pub mod language {
@@ -250,7 +250,7 @@ pub struct CtxUtils {}
 impl IntoModule for CtxUtils {
     fn into_module(self) -> Module {
         let mut module = Module {
-            ctx: Arc::new(()),
+            ctx: Context::new(()),
             prelude: vec![],
             raw_lisp: vec![
                 //MACRO_TEST_MACRO,

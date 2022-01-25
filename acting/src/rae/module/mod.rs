@@ -2,7 +2,7 @@ use crate::rae::context::rae_env::RAEEnv;
 use crate::rae::module::mod_rae::CtxRae;
 use crate::rae::module::mod_rae_description::CtxRaeDescription;
 use crate::rae::module::mod_rae_monitor::CtxRaeMonitor;
-use crate::rae::module::rae_exec::{CtxRaeExec, RAEInterface};
+use crate::rae::module::rae_exec::{CtxRaeExec, Platform, RAEInterface};
 use crate::rae::TOKIO_CHANNEL_SIZE;
 
 use ompas_lisp::core::structs::contextcollection::ContextCollection;
@@ -15,7 +15,7 @@ use ompas_lisp::modules::utils::CtxUtils;
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, RwLock};
 
 pub mod mod_rae;
 pub mod mod_rae_description;
@@ -25,7 +25,7 @@ pub mod rae_exec;
 /// Initialize the libraries to load inside Scheme env.
 /// Takes as argument the execution platform.
 pub async fn init_ctx_rae(
-    platform: Option<Box<dyn RAEInterface>>,
+    platform: Option<Platform>,
     working_directory: Option<PathBuf>,
 ) -> (CtxRae, CtxRaeMonitor) {
     //println!("in init ctx_rae");
@@ -39,14 +39,14 @@ pub async fn init_ctx_rae(
     };
 
     let (mut rae_env, platform) = match platform {
-        Some(mut platform) => {
+        Some(platform) => {
             let (sender_sync, receiver_sync) = mpsc::channel(TOKIO_CHANNEL_SIZE);
             let mut rae_env: RAEEnv = RAEEnv::new(Some(receiver_job), Some(receiver_sync)).await;
-            let domain = platform.domain().await;
+            let domain = platform.get_ref().read().await.domain().await;
 
-            ctx_rae.domain = vec![domain].into();
+            ctx_rae.set_domain(vec![domain].into());
 
-            let context_platform = platform.context_platform();
+            let context_platform = platform.get_ref().read().await.context_platform();
 
             rae_env
                 .env
@@ -57,6 +57,9 @@ pub async fn init_ctx_rae(
             rae_env.actions_progress.sync.sender = Some(sender_sync);
 
             platform
+                .get_ref()
+                .write()
+                .await
                 .init(rae_env.state.clone(), rae_env.actions_progress.clone())
                 .await;
 
@@ -89,7 +92,7 @@ pub async fn init_ctx_rae(
     let mut ctx_io = CtxIo::default();
     if let Some(ref path) = working_directory {
         ctx_io.set_log_output(path.clone().into());
-        ctx_rae.log = working_directory;
+        ctx_rae.set_log(working_directory);
     }
 
     rae_env
@@ -110,7 +113,7 @@ pub async fn init_ctx_rae(
         .await
         .expect("error loading io");
 
-    ctx_rae.env = rae_env;
+    ctx_rae.set_rae_env(rae_env).await;
     (ctx_rae, ctx_rae_monitor)
 }
 

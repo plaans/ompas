@@ -16,13 +16,15 @@ use crate::core::{eval, parse};
 use im::HashSet;
 use std::any::Any;
 use std::fmt::{Display, Formatter};
+use std::ops::Deref;
 use std::sync::Arc;
 
 pub mod language {
 
-    pub const ENV_GET_KEYS: &str = "env.get_keys"; //return a list of keys of the environment
-    pub const ENV_GET_MACROS: &str = "env.get_macros";
-    pub const ENV_GET_MACRO: &str = "env.get_macro";
+    pub const ENV_GET_KEYS: &str = "get_keys"; //return a list of keys of the environment
+    pub const ENV_GET_MACROS: &str = "get_macros";
+    pub const ENV_GET_MACRO: &str = "get_macro";
+    pub const ENV_GET_LIST_MODULES: &str = "get_list_modules";
 
     pub const HELP: &str = "help";
     pub const DOC_HELP: &str =
@@ -32,24 +34,75 @@ pub mod language {
                                 -1 argument: give the documentation of the function.";
 }
 
+#[derive(Default, Clone, Debug)]
+pub struct LEnvSymbols {
+    inner: im::HashMap<String, LValue>,
+    outer: Arc<Option<LEnvSymbols>>,
+}
+
+impl LEnvSymbols {
+    pub fn set_outer(&mut self, outer: LEnvSymbols) {
+        self.outer = Arc::new(Some(outer))
+    }
+
+    pub fn insert(&mut self, label: String, lv: LValue) {
+        self.inner = self.inner.update(label, lv);
+    }
+    pub fn get(&self, label: &str) -> Option<LValue> {
+        match self.inner.get(label) {
+            Some(lv) => Some(lv.clone()),
+            None => match self.outer.deref() {
+                None => None,
+                Some(outer) => outer.get(label),
+            },
+        }
+    }
+    pub fn get_ref(&self, label: &str) -> Option<&LValue> {
+        match self.inner.get(label) {
+            Some(lv) => Some(lv),
+            None => match &self.outer.deref() {
+                None => None,
+                Some(outer) => outer.get_ref(label),
+            },
+        }
+    }
+
+    pub fn keys(&self) -> HashSet<String> {
+        let mut keys: HashSet<String> = self.inner.keys().cloned().collect();
+        if let Some(outer) = &*self.outer {
+            keys = keys.union(outer.keys());
+        }
+        keys
+    }
+}
+
+impl Display for LEnvSymbols {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut str = "".to_string();
+        for s in &self.inner {
+            str.push_str(format!("{}: {}\n", s.0, s.1).as_str())
+        }
+        writeln!(f, "{}", str)
+    }
+}
+
 /// Structs used to store the Scheme Environment
 /// - It contains a mapping of <symbol(String), LValue>
 /// - It also contains macros, special LLambdas used to format LValue expressions.
 /// - A LEnv can inherits from an outer environment. It can use symbols from it, but not modify them.
 #[derive(Clone, Debug)]
 pub struct LEnv {
-    symbols: im::HashMap<String, LValue>,
+    symbols: LEnvSymbols,
     macro_table: im::HashMap<String, LLambda>,
     ctxs: ContextCollection,
     pfc: PureFonctionCollection,
     documentation: Documentation,
-    outer: Option<Arc<LEnv>>,
 }
 
 impl LEnv {
-    pub fn set_outer(&mut self, env: LEnv) {
+    /*pub fn set_outer(&mut self, env: LEnv) {
         self.outer = Some(Arc::new(env))
-    }
+    }*/
     pub fn get_documentation(&self) -> Documentation {
         self.documentation.clone()
     }
@@ -68,18 +121,14 @@ impl LEnv {
 }
 
 impl LEnv {
-    pub fn get_context<T: Any + Send + Sync>(&self, label: &str) -> Result<&T, anyhow::Error> {
+    pub fn get_context<T: Any + Send + Sync>(&self, label: &str) -> lerror::Result<&T> {
         self.ctxs.get::<T>(label)
-    }
-
-    pub fn get_mut_context<T: Any + Send + Sync>(&mut self, label: &str) -> lerror::Result<&mut T> {
-        self.ctxs.get_mut::<T>(label)
     }
 }
 
 impl Default for LEnv {
     fn default() -> Self {
-        let mut symbols: im::HashMap<String, LValue> = Default::default();
+        let mut symbols: LEnvSymbols = Default::default();
         let documentation = vec![
             LHelp::new_verbose(HELP, DOC_HELP, DOC_HELP_VERBOSE),
             LHelp::new(DEFINE, DOC_DEFINE),
@@ -99,6 +148,11 @@ impl Default for LEnv {
         symbols.insert(HELP.to_string(), LFn::new(help, HELP.to_string()).into());
 
         symbols.insert(
+            ENV_GET_LIST_MODULES.to_string(),
+            LFn::new(get_list_modules, ENV_GET_LIST_MODULES.to_string()).into(),
+        );
+
+        symbols.insert(
             ENV_GET_KEYS.to_string(),
             LFn::new(env_get_keys, ENV_GET_KEYS.to_string()).into(),
         );
@@ -112,20 +166,19 @@ impl Default for LEnv {
         );
 
         Self {
-            symbols: Default::default(),
+            symbols,
             macro_table: Default::default(),
             ctxs: Default::default(),
             pfc: Default::default(),
             documentation,
-            outer: None,
         }
     }
 }
 
 impl LEnv {
-    pub fn merge_by_symbols(&mut self, other: &Self) {
+    /*pub fn merge_by_symbols(&mut self, other: &Self) {
         self.symbols = self.symbols.clone().union(other.symbols.clone());
-    }
+    }*/
     /// Returns the env with all the basic functions, the ContextCollection with CtxRoot
     /// and InitialLisp containing the definition of macros and lambdas,
     pub async fn root() -> Self {
@@ -138,28 +191,25 @@ impl LEnv {
         env
     }
 
+    pub fn get_symbols(&self) -> LEnvSymbols {
+        self.symbols.clone()
+    }
+
+    pub fn set_new_top_symbols(&mut self, mut symbols: LEnvSymbols) {
+        symbols.outer = Arc::new(Some(self.symbols.clone()));
+        self.symbols = symbols;
+    }
+
     pub fn get_symbol(&self, s: &str) -> Option<LValue> {
-        match self.symbols.get(s) {
-            Some(lv) => Some(lv.clone()),
-            None => match &self.outer {
-                None => None,
-                Some(outer) => outer.get_symbol(s),
-            },
-        }
+        self.symbols.get(s)
     }
 
     pub fn get_ref_symbol(&self, s: &str) -> Option<&LValue> {
-        match self.symbols.get(s) {
-            Some(lv) => Some(lv),
-            None => match &self.outer {
-                None => None,
-                Some(outer) => outer.get_ref_symbol(s),
-            },
-        }
+        self.symbols.get_ref(s)
     }
 
     pub fn insert(&mut self, key: String, exp: LValue) {
-        self.symbols = self.symbols.update(key, exp);
+        self.symbols.insert(key, exp);
     }
 
     pub fn update(&self, key: String, exp: LValue) -> Self {
@@ -177,11 +227,7 @@ impl LEnv {
     }
 
     pub fn keys(&self) -> im::HashSet<String> {
-        let mut keys: im::HashSet<String> = self.symbols.keys().cloned().collect();
-        if let Some(outer) = &self.outer {
-            keys = keys.union(outer.keys());
-        }
-        keys
+        self.symbols.keys()
     }
 
     pub fn macros(&self) -> HashSet<String> {
@@ -223,11 +269,7 @@ impl LEnv {
 
 impl Display for LEnv {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut str = "".to_string();
-        for s in &self.symbols {
-            str.push_str(format!("{}: {}\n", s.0, s.1).as_str())
-        }
-        writeln!(f, "{}", str)
+        writeln!(f, "{}", self.symbols)
     }
 }
 
@@ -303,4 +345,19 @@ pub fn help(args: &[LValue], env: &LEnv) -> LResult {
         },
         _ => Err(WrongNumberOfArgument(HELP, args.into(), args.len(), 0..1)),
     }
+}
+
+pub fn get_list_modules(_: &[LValue], env: &LEnv) -> LResult {
+    let list = env.ctxs.get_list_modules();
+    let mut str = '{'.to_string();
+    for (i, s) in list.iter().enumerate() {
+        if i != 0 {
+            str.push(',')
+        }
+        str.push_str(s)
+    }
+
+    str.push(')');
+
+    Ok(LValue::String(str))
 }

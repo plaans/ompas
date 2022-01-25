@@ -1,10 +1,10 @@
 //! [Deprecated]
 //! Previous work to develop a dumb controller to test lisp integration
 
+use ompas_lisp::core::structs::contextcollection::Context;
 use ompas_lisp::core::structs::documentation::{Documentation, LHelp};
 use ompas_lisp::core::structs::module::{IntoModule, Module};
 use ompas_lisp::core::structs::purefonction::PureFonctionCollection;
-use std::sync::Arc;
 
 //LANGUAGE
 
@@ -31,7 +31,7 @@ pub struct CtxDumber {}
 impl IntoModule for CtxDumber {
     fn into_module(self) -> Module {
         Module {
-            ctx: Arc::new(self),
+            ctx: Context::new(self),
             prelude: vec![],
             raw_lisp: vec![LAMBDA_DUMBER_ROBOT].into(),
             label: MOD_DUMBER.to_string(),

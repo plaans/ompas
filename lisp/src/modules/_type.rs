@@ -1,6 +1,7 @@
 //! Scheme module implementing symbol typing.
 //! Development in standby. Some features might not be completely working...
 use crate::core::language::*;
+use crate::core::structs::contextcollection::Context;
 use crate::core::structs::documentation::{Documentation, LHelp};
 use crate::core::structs::lenv::LEnv;
 use crate::core::structs::lerror;
@@ -15,7 +16,7 @@ use crate::core::structs::purefonction::PureFonctionCollection;
 use crate::core::structs::typelvalue::TypeLValue;
 use std::convert::TryInto;
 use std::fmt::{Debug, Display, Formatter};
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 //pub const TYPE: &str = "type";
 //pub const STATE: &str = "state";
@@ -224,9 +225,9 @@ impl Display for LStateFunction {
 
 #[derive(Debug)]
 pub struct CtxType {
-    map_sym_type_id: im::HashMap<String, usize>,
-    map_type_id_sym: im::HashMap<usize, String>,
-    types: Vec<LSymType>,
+    map_sym_type_id: Arc<RwLock<im::HashMap<String, usize>>>,
+    map_type_id_sym: Arc<RwLock<im::HashMap<usize, String>>>,
+    types: Arc<RwLock<Vec<LSymType>>>,
 }
 
 impl Default for CtxType {
@@ -248,48 +249,57 @@ impl Default for CtxType {
         map_type_id_sym.insert(INDEX_TYPE_OBJECT, OBJECT.into());
 
         Self {
-            map_sym_type_id,
-            map_type_id_sym,
-            types,
+            map_sym_type_id: Arc::new(RwLock::new(map_sym_type_id)),
+            map_type_id_sym: Arc::new(RwLock::new(map_type_id_sym)),
+            types: Arc::new(RwLock::new(types)),
         }
     }
 }
 
 impl CtxType {
-    pub fn get_type_id(&self, sym: &str) -> Option<&usize> {
-        self.map_sym_type_id.get(sym)
-    }
-
-    pub fn get_sym(&self, type_id: &usize) -> Option<&String> {
-        self.map_type_id_sym.get(type_id)
-    }
-
-    pub fn get_type(&self, type_id: usize) -> Option<&LSymType> {
-        self.types.get(type_id)
-    }
-
-    pub fn get_type_from_sym(&self, sym: &str) -> Option<&LSymType> {
-        match self.get_type_id(sym) {
-            None => None,
-            Some(type_id) => self.get_type(*type_id),
+    pub fn get_type_id(&self, sym: &str) -> Option<usize> {
+        match self.map_sym_type_id.read() {
+            Ok(map) => map.get(sym).cloned(),
+            Err(e) => panic!("{}", e),
         }
     }
 
-    pub fn bind_sym_type(&mut self, sym: &str, type_id: usize) {
-        self.map_sym_type_id.insert(sym.to_string(), type_id);
-        self.map_type_id_sym.insert(type_id, sym.to_string());
+    pub fn get_sym(&self, type_id: &usize) -> Option<String> {
+        self.map_type_id_sym.read().unwrap().get(type_id).cloned()
     }
 
-    pub fn add_type(&mut self, sym_type: LSymType) -> usize {
-        self.types.push(sym_type);
-        self.types.len() - 1
+    pub fn get_type(&self, type_id: &usize) -> Option<LSymType> {
+        self.types.read().unwrap().get(*type_id).cloned()
+    }
+
+    pub fn get_type_from_sym(&self, sym: &str) -> Option<LSymType> {
+        match self.get_type_id(sym) {
+            None => None,
+            Some(type_id) => self.get_type(&type_id),
+        }
+    }
+
+    pub fn bind_sym_type(&self, sym: &str, type_id: usize) {
+        self.map_sym_type_id
+            .write()
+            .unwrap()
+            .insert(sym.to_string(), type_id);
+        self.map_type_id_sym
+            .write()
+            .unwrap()
+            .insert(type_id, sym.to_string());
+    }
+
+    pub fn add_type(&self, sym_type: LSymType) -> usize {
+        self.types.write().unwrap().push(sym_type);
+        self.types.write().unwrap().len() - 1
     }
 }
 
 impl IntoModule for CtxType {
     fn into_module(self) -> Module {
         let mut module = Module {
-            ctx: Arc::new(self),
+            ctx: Context::new(self),
             prelude: vec![],
             raw_lisp: Default::default(),
             label: MOD_TYPE.into(),
@@ -440,9 +450,7 @@ pub fn type_of(args: &[LValue], env: &LEnv) -> LResult {
         ));
     }
 
-    let mut env = env.clone();
-
-    let ctx = env.get_mut_context::<CtxType>(MOD_TYPE)?;
+    let ctx = env.get_context::<CtxType>(MOD_TYPE)?;
 
     match &args[0] {
         LValue::Symbol(s) => {
@@ -478,9 +486,8 @@ pub fn sub_type(args: &[LValue], env: &LEnv) -> LResult {
             1..1,
         ));
     }
-    let mut env = env.clone();
 
-    let ctx = env.get_mut_context::<CtxType>(MOD_TYPE)?;
+    let ctx = env.get_context::<CtxType>(MOD_TYPE)?;
 
     let expected_type = TypeLValue::Other("TYPE".to_string());
     let parent_type: usize = match &args[0] {
@@ -492,8 +499,15 @@ pub fn sub_type(args: &[LValue], env: &LEnv) -> LResult {
                 ))
             }
             Some(lst) => match lst {
-                LSymType::Type(_) => *ctx.get_type_id(s).unwrap(),
-                lst => return Err(WrongType(SUB_TYPE, lst.into(), lst.into(), expected_type)),
+                LSymType::Type(_) => ctx.get_type_id(s).unwrap(),
+                lst => {
+                    return Err(WrongType(
+                        SUB_TYPE,
+                        lst.clone().into(),
+                        lst.into(),
+                        expected_type,
+                    ))
+                }
             },
         },
         lv => {
@@ -511,9 +525,7 @@ pub fn sub_type(args: &[LValue], env: &LEnv) -> LResult {
 }
 
 pub fn new_state_function(args: &[LValue], env: &LEnv) -> LResult {
-    let new_env = &mut env.clone();
-
-    let ctx = new_env.get_mut_context::<CtxType>(MOD_TYPE)?;
+    let ctx = env.get_context::<CtxType>(MOD_TYPE)?;
 
     let mut t_params: Vec<String> = Vec::new();
     let mut t_value: String = String::from(OBJECT);
@@ -563,9 +575,7 @@ pub fn new_state_function(args: &[LValue], env: &LEnv) -> LResult {
 }
 
 pub fn new_object(args: &[LValue], env: &LEnv) -> LResult {
-    let mut env = env.clone();
-
-    let ctx = env.get_mut_context::<CtxType>(MOD_TYPE)?;
+    let ctx = env.get_context::<CtxType>(MOD_TYPE)?;
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(
             NEW_OBJECT,
@@ -584,13 +594,13 @@ pub fn new_object(args: &[LValue], env: &LEnv) -> LResult {
                         "no type annotation corresponding to the symbol".to_string(),
                     ))
                 }
-                Some(u) => *u,
+                Some(u) => u,
             };
-            ctx.get_type(type_id)
+            ctx.get_type(&type_id)
         }
         LValue::Number(LNumber::Usize(u)) => {
             type_id = *u;
-            ctx.get_type(type_id)
+            ctx.get_type(u)
         }
         lv => {
             return Err(NotInListOfExpectedTypes(
@@ -609,14 +619,14 @@ pub fn new_object(args: &[LValue], env: &LEnv) -> LResult {
             (&args[0]).into(),
             TypeLValue::Symbol,
         )),
-        Some(lst) => match lst {
+        Some(lst) => match &lst {
             LSymType::Type(_) => {
                 let type_id = ctx.add_type(LSymType::Object(type_id));
                 Ok(type_id.into())
             }
             lst => Err(WrongType(
                 NEW_OBJECT,
-                lst.into(),
+                lst.clone().into(),
                 lst.into(),
                 TypeLValue::Other("type".to_string()),
             )),
@@ -638,7 +648,7 @@ pub fn get_type(args: &[LValue], env: &LEnv) -> LResult {
     let type_as_string = match &args[0] {
         LValue::Symbol(s) => match ctx.get_type_from_sym(s) {
             None => SYMBOL.to_string(),
-            Some(lst) => match lst {
+            Some(lst) => match &lst {
                 LSymType::Object(u) => ctx.get_sym(u).unwrap().to_string(),
                 LSymType::Type(parent_type) => match parent_type {
                     None => "root type".to_string(),

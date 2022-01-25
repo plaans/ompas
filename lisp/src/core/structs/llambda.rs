@@ -1,5 +1,5 @@
 use crate::core::eval;
-use crate::core::structs::lenv::LEnv;
+use crate::core::structs::lenv::{LEnv, LEnvSymbols};
 use crate::core::structs::lerror::LError;
 use crate::core::structs::lerror::LError::{SpecialError, WrongNumberOfArgument};
 use crate::core::structs::lvalue::LValue;
@@ -10,7 +10,7 @@ use std::fmt::{Debug, Display, Formatter};
 pub struct LLambda {
     params: LambdaArgs,
     body: Box<LValue>,
-    env: LEnv,
+    env: LEnvSymbols,
 }
 
 impl Debug for LLambda {
@@ -37,7 +37,7 @@ impl PartialEq for LLambda {
 
 impl LLambda {
     ///Constructs a new lambda, capturing the environment in which it has been created.
-    pub fn new(params: LambdaArgs, body: LValue, env: LEnv) -> Self {
+    pub fn new(params: LambdaArgs, body: LValue, env: LEnvSymbols) -> Self {
         LLambda {
             params,
             body: Box::new(body),
@@ -46,9 +46,8 @@ impl LLambda {
     }
 
     /// Returns a new env containing the environment of the lambda and the current environment in which the lambda is called.
-    pub fn get_new_env(&self, args: &[LValue], outer: LEnv) -> Result<LEnv, LError> {
-        let mut env = self.env.clone();
-        env.set_outer(outer);
+    pub fn get_new_env(&self, args: &[LValue], mut env: LEnv) -> Result<LEnv, LError> {
+        env.set_new_top_symbols(self.env.clone());
 
         match &self.params {
             LambdaArgs::Sym(param) => {
@@ -93,7 +92,7 @@ impl LLambda {
         Ok(env)
     }
 
-    pub fn get_env(&self) -> LEnv {
+    pub fn get_env_symbols(&self) -> LEnvSymbols {
         self.env.clone()
     }
 

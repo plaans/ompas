@@ -1057,7 +1057,7 @@ impl FormatWithSymTable for Interval {
 }
 
 #[derive(Default)]
-pub struct Context {
+pub struct ConversionContext {
     pub domain: DomainEnv,
     pub env: LEnv,
 }

@@ -1,4 +1,5 @@
 //!
+use crate::core::structs::contextcollection::Context;
 use crate::core::structs::documentation::{Documentation, LHelp};
 use crate::core::structs::lenv::LEnv;
 use crate::core::structs::lerror::LError::{SpecialError, WrongNumberOfArgument, WrongType};
@@ -12,7 +13,6 @@ use crate::modules::io::language::*;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::PathBuf;
-use std::sync::Arc;
 
 /*
 LANGUAGE
@@ -100,7 +100,7 @@ impl CtxIo {
 impl IntoModule for CtxIo {
     fn into_module(self) -> Module {
         let mut module = Module {
-            ctx: Arc::new(self),
+            ctx: Context::new(self),
             prelude: vec![],
             raw_lisp: vec![MACRO_READ].into(),
             label: MOD_IO.into(),

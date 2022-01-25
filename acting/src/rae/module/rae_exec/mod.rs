@@ -18,6 +18,7 @@ use async_trait::async_trait;
 use log::{error, info, warn};
 use ompas_lisp::core::root_module::list::cons;
 use ompas_lisp::core::root_module::map::{remove_key_value_map, set_map};
+use ompas_lisp::core::structs::contextcollection::Context;
 use ompas_lisp::core::structs::documentation::Documentation;
 use ompas_lisp::core::structs::lenv::LEnv;
 use ompas_lisp::core::structs::lerror::LError::{SpecialError, WrongNumberOfArgument, WrongType};
@@ -36,16 +37,16 @@ use std::collections::HashMap;
 use std::convert::TryInto;
 use std::fmt::{Display, Formatter};
 use std::string::String;
-use std::sync::{Arc, PoisonError, RwLock, RwLockReadGuard};
+use std::sync::Arc;
 use std::thread;
 use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 
 /*
 LANGUAGE
  */
 
-const MOD_RAE_EXEC: &str = "mod-rae-exec";
+pub const MOD_RAE_EXEC: &str = "mod-rae-exec";
 
 //manage facts
 pub const RAE_ASSERT: &str = "assert";
@@ -157,13 +158,90 @@ pub const SYMBOL_RAE_MODE: &str = "rae-mode";
 pub const DEFINE_RAE_PLATFORM: &str = "(define rae-platform some)";
 pub const DEFINE_NO_RAE_PLATFORM: &str = "(define rae-platform nil)";
 
+pub struct Platform {
+    inner: Arc<RwLock<dyn RAEInterface>>,
+}
+
+impl Platform {
+    pub fn new(platform: impl RAEInterface) -> Self {
+        Self {
+            inner: Arc::new(RwLock::new(platform)),
+        }
+    }
+
+    pub fn get_ref(&self) -> Arc<RwLock<dyn RAEInterface>> {
+        self.inner.clone()
+    }
+
+    /// Initial what needs to be.
+    pub async fn init(&self, state: RAEState, status: ActionsProgress) {
+        self.inner.write().await.init(state, status).await;
+    }
+
+    ///Launch the platform (such as the simulation in godot) and open communication
+    pub async fn launch_platform(&self, args: &[LValue]) -> LResult {
+        self.inner.write().await.launch_platform(args).await
+    }
+
+    /// Start the platform process
+    pub async fn start_platform(&self, args: &[LValue]) -> LResult {
+        self.inner.write().await.start_platform(args).await
+    }
+
+    /// Open communication with the platform
+    pub async fn open_com(&self, args: &[LValue]) -> LResult {
+        self.inner.write().await.open_com(args).await
+    }
+
+    /// Executes a command on the platform
+    pub async fn exec_command(&self, args: &[LValue], command_id: usize) -> LResult {
+        self.inner.read().await.exec_command(args, command_id).await
+    }
+
+    pub async fn cancel_command(&self, args: &[LValue]) -> LResult {
+        self.inner.read().await.cancel_command(args).await
+    }
+
+    ///Get the whole state of the platform
+    pub async fn get_state(&self, args: &[LValue]) -> LResult {
+        self.inner.read().await.get_state(args).await
+    }
+
+    ///Get a specific state variable
+    pub async fn get_state_variable(&self, args: &[LValue]) -> LResult {
+        self.inner.read().await.get_state_variable(args).await
+    }
+    ///Return the status of all the actions
+    pub async fn get_status(&self, args: &[LValue]) -> LResult {
+        self.inner.read().await.get_status(args).await
+    }
+    /// Returns the status of a given action
+    pub async fn get_action_status(&self, action_id: &usize) -> Status {
+        self.inner.read().await.get_action_status(action_id).await
+    }
+
+    /// Set the status of a given action
+    pub async fn set_status(&self, action_id: usize, status: Status) {
+        self.inner.read().await.set_status(action_id, status).await
+    }
+
+    /// Returns the RAE domain of the platform.
+    pub async fn domain(&self) -> &'static str {
+        self.inner.read().await.domain().await
+    }
+
+    pub async fn instance(&self, args: &[LValue]) -> LResult {
+        self.inner.read().await.instance(args).await
+    }
+}
+
 ///Context that will contains primitives for the RAE executive
 #[derive(Default)]
 pub struct CtxRaeExec {
     //pub stream: JobStream,
     pub actions_progress: ActionsProgress,
     pub state: RAEState,
-    pub platform_interface: Option<Box<dyn RAEInterface>>,
+    pub platform_interface: Option<Platform>,
     pub agenda: Agenda,
 }
 
@@ -193,7 +271,7 @@ impl IntoModule for CtxRaeExec {
         ]
         .into();
         let mut module = Module {
-            ctx: Arc::new(self),
+            ctx: Context::new(self),
             prelude: vec![],
             raw_lisp: init,
             label: MOD_RAE_EXEC.to_string(),
@@ -250,7 +328,7 @@ impl CtxRaeExec {
         self.actions_progress.get_status(action_id).await
     }
 
-    pub fn add_platform(&mut self, platform: Option<Box<dyn RAEInterface>>) {
+    pub fn add_platform(&mut self, platform: Option<Platform>) {
         self.platform_interface = platform;
     }
 }
@@ -332,7 +410,7 @@ pub trait RAEInterface: Any + Send + Sync {
     async fn launch_platform(&mut self, args: &[LValue]) -> Result<LValue, LError>;
 
     /// Start the platform process
-    async fn start_platform(&self, args: &[LValue]) -> Result<LValue, LError>;
+    async fn start_platform(&mut self, args: &[LValue]) -> Result<LValue, LError>;
 
     /// Open communication with the platform
     async fn open_com(&mut self, args: &[LValue]) -> Result<LValue, LError>;
@@ -379,7 +457,7 @@ impl RAEInterface for () {
         Ok(Nil)
     }
 
-    async fn start_platform(&self, _: &[LValue]) -> Result<LValue, LError> {
+    async fn start_platform(&mut self, _: &[LValue]) -> Result<LValue, LError> {
         Ok(Nil)
     }
 

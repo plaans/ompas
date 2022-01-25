@@ -112,10 +112,9 @@ pub async fn fn_exec_command<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
 
 #[macro_rules_attribute(dyn_async!)]
 pub async fn launch_platform<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
-    let mut env = env.clone();
-    let ctx = env.get_mut_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
+    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
 
-    if let Some(platform) = &mut ctx.platform_interface {
+    if let Some(platform) = &ctx.platform_interface {
         match &ctx.actions_progress.sync.sender {
             None => Err(SpecialError(
                 RAE_LAUNCH_PLATFORM,
@@ -130,10 +129,9 @@ pub async fn launch_platform<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
 
 #[macro_rules_attribute(dyn_async!)]
 pub async fn start_platform<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
-    let mut env = env.clone();
-    let ctx = env.get_mut_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
+    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
 
-    if let Some(platform) = &mut ctx.platform_interface {
+    if let Some(platform) = &ctx.platform_interface {
         platform.start_platform(args).await
     } else {
         Ok("No platform defined".into())
@@ -141,10 +139,9 @@ pub async fn start_platform<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
 }
 #[macro_rules_attribute(dyn_async!)]
 pub async fn open_com<'a>(args: &'a [LValue], env: &'a LEnv) -> Result<LValue, LError> {
-    let mut env = env.clone();
-    let ctx = env.get_mut_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
+    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
 
-    if let Some(platform) = &mut ctx.platform_interface {
+    if let Some(platform) = &ctx.platform_interface {
         match &ctx.actions_progress.sync.sender {
             None => Err(SpecialError(
                 RAE_OPEN_COM_PLATFORM,
@@ -184,7 +181,6 @@ pub async fn cancel_command<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
 #[macro_rules_attribute(dyn_async!)]
 pub async fn fn_instance<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
-
     if let Some(platform) = &ctx.platform_interface {
         platform.instance(args).await
     } else {

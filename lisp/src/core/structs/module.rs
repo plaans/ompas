@@ -1,9 +1,8 @@
+use crate::core::structs::contextcollection::Context;
 use crate::core::structs::documentation::Documentation;
 use crate::core::structs::lvalue::LValue;
 use crate::core::structs::new_function::*;
 use crate::core::structs::purefonction::PureFonctionCollection;
-use std::any::Any;
-use std::sync::{Arc, RwLock};
 
 #[derive(Debug, Default, Clone)]
 pub struct InitLisp(Vec<String>);
@@ -33,11 +32,9 @@ impl InitLisp {
     }
 }
 
-pub type AsyncLTrait = dyn Any + Send + Sync;
-
 /// Struct to define a Module, Library that will be loaded inside the Scheme Environment.
 pub struct Module {
-    pub ctx: Arc<AsyncLTrait>,
+    pub ctx: Context,
     pub prelude: Vec<(String, LValue)>,
     pub raw_lisp: InitLisp,
     pub label: String,
@@ -110,7 +107,7 @@ pub trait IntoModule {
 impl IntoModule for () {
     fn into_module(self) -> Module {
         Module {
-            ctx: Arc::new(RwLock::new(self)),
+            ctx: Context::new(self),
             prelude: vec![],
             raw_lisp: Default::default(),
             label: "()".to_string(),

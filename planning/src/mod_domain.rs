@@ -4,13 +4,14 @@ use crate::algo::{
     pre_processing, transform_lambda_expression, translate_cond_if,
     translate_domain_env_to_hierarchy, translate_lvalue_to_chronicle,
 };
-use crate::structs::{Context, FormatWithSymTable, SymTable};
+use crate::structs::{ConversionContext, FormatWithSymTable, SymTable};
 use ::macro_rules_attribute::macro_rules_attribute;
 use ompas_acting::rae::context::rae_env::*;
 use ompas_acting::rae::context::rae_state::{LState, RAEState, StateType};
 use ompas_acting::rae::module::mod_rae::CtxRae;
 use ompas_acting::rae::module::mod_rae_description::*;
 use ompas_lisp::core::root_module::list::cons;
+use ompas_lisp::core::structs::contextcollection;
 use ompas_lisp::core::structs::documentation::{Documentation, LHelp};
 use ompas_lisp::core::structs::lenv::ImportType::WithoutPrefix;
 use ompas_lisp::core::structs::lenv::LEnv;
@@ -25,7 +26,7 @@ use ompas_lisp::core::{eval, expand};
 use ompas_lisp::modules::advanced_math::CtxMath;
 use ompas_lisp::modules::utils::CtxUtils;
 use ompas_utils::dyn_async;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 //LANGUAGE
 const MOD_DOMAIN: &str = "domain";
@@ -103,7 +104,7 @@ pub struct CtxTest {}
 impl IntoModule for CtxTest {
     fn into_module(self) -> Module {
         Module {
-            ctx: Arc::new(self),
+            ctx: contextcollection::Context::new(self),
             prelude: vec![],
             raw_lisp: vec![LAMBDA_TEST_1, LAMBDA_TEST_2].into(),
             label: "".to_string(),
@@ -120,21 +121,21 @@ impl IntoModule for CtxTest {
 }
 
 pub struct CtxDomain {
-    pub domain: DomainEnv,
+    pub domain: Arc<RwLock<DomainEnv>>,
     pub env: LEnv,
     pub state: RAEState,
 }
 
-impl From<&CtxDomain> for Context {
+impl From<&CtxDomain> for ConversionContext {
     fn from(ctx: &CtxDomain) -> Self {
         Self {
-            domain: ctx.domain.clone(),
+            domain: ctx.domain.read().unwrap().clone(),
             env: ctx.env.clone(),
         }
     }
 }
 
-impl From<CtxDomain> for Context {
+impl From<CtxDomain> for ConversionContext {
     fn from(ctx: CtxDomain) -> Self {
         (&ctx).into()
     }
@@ -173,7 +174,7 @@ impl CtxDomain {
 impl IntoModule for CtxDomain {
     fn into_module(self) -> Module {
         let mut module = Module {
-            ctx: Arc::new(self),
+            ctx: contextcollection::Context::new(self),
             prelude: vec![],
             raw_lisp: vec!["(read instances/gripper/init.lisp)"].into(),
             label: MOD_DOMAIN.to_string(),
@@ -263,8 +264,8 @@ async fn translate_expr<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
 
 pub fn translate_domain(_: &[LValue], env: &LEnv) -> LResult {
     let ctx = env.get_context::<CtxDomain>(MOD_DOMAIN)?;
-    let (domain, st) = translate_domain_env_to_hierarchy(Context {
-        domain: ctx.domain.clone(),
+    let (domain, st) = translate_domain_env_to_hierarchy(ConversionContext {
+        domain: ctx.domain.read().unwrap().clone(),
         env: ctx.env.clone(),
     })?;
 
@@ -329,7 +330,7 @@ pub fn lisp_pre_processing_domain(_: &[LValue], env: &LEnv) -> LResult {
 
     let context = ctx.into();
 
-    for (action_label, action) in ctx.domain.get_actions() {
+    for (action_label, action) in ctx.domain.read().unwrap().get_actions() {
         let pre_processed = pre_processing(action.get_sim(), &context)?;
 
         str.push_str(
@@ -349,25 +350,25 @@ pub fn lisp_pre_processing_domain(_: &[LValue], env: &LEnv) -> LResult {
 ///Get the methods of a given task
 pub fn get_methods(_: &[LValue], env: &LEnv) -> LResult {
     let ctx = env.get_context::<CtxDomain>(MOD_DOMAIN)?;
-    Ok(ctx.domain.get_list_methods())
+    Ok(ctx.domain.read().unwrap().get_list_methods())
 }
 
 ///Get the list of actions in the environment
 pub fn get_actions(_: &[LValue], env: &LEnv) -> LResult {
     let ctx = env.get_context::<CtxDomain>(MOD_DOMAIN)?;
-    Ok(ctx.domain.get_list_actions())
+    Ok(ctx.domain.read().unwrap().get_list_actions())
 }
 
 ///Get the list of tasks in the environment
 pub fn get_tasks(_: &[LValue], env: &LEnv) -> LResult {
     let ctx = env.get_context::<CtxDomain>(MOD_DOMAIN)?;
-    Ok(ctx.domain.get_list_tasks())
+    Ok(ctx.domain.read().unwrap().get_list_tasks())
 }
 
 ///Get the list of state functions in the environment
 pub fn get_state_function(_: &[LValue], env: &LEnv) -> LResult {
     let ctx = env.get_context::<CtxDomain>(MOD_DOMAIN)?;
-    Ok(ctx.domain.get_list_state_functions())
+    Ok(ctx.domain.read().unwrap().get_list_state_functions())
 }
 
 /// Returns the whole DOMAIN environment if no arg et the entry corresponding to the symbol passed in args.
@@ -398,8 +399,13 @@ pub fn get_env(args: &[LValue], env: &LEnv) -> LResult {
     };
 
     match key {
-        None => Ok(ctx.domain.to_string().into()),
-        Some(key) => Ok(ctx.domain.get_element_description(key).into()),
+        None => Ok(ctx.domain.read().unwrap().to_string().into()),
+        Some(key) => Ok(ctx
+            .domain
+            .read()
+            .unwrap()
+            .get_element_description(key)
+            .into()),
     }
 }
 
@@ -415,16 +421,18 @@ async fn def_lambda<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
         ));
     }
 
-    let mut env = env.clone();
-    let ctx = env.get_mut_context::<CtxDomain>(MOD_DOMAIN)?;
+    let ctx = env.get_context::<CtxDomain>(MOD_DOMAIN)?;
 
     if let LValue::List(list) = &args[0] {
         if let LValue::Symbol(label) = &list[0] {
-            let expanded = expand(&list[1], true, &mut ctx.env).await?;
+            let expanded = expand(&list[1], true, &mut ctx.env.clone()).await?;
             let mut e = LEnv::root().await;
             let result = eval(&expanded, &mut e).await?;
             if let LValue::Lambda(_) = &result {
-                ctx.domain.add_lambda(label.clone(), result);
+                ctx.domain
+                    .write()
+                    .unwrap()
+                    .add_lambda(label.clone(), result);
             }
         }
     }
@@ -446,10 +454,9 @@ async fn def_state_function<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     let lvalue = cons(&[GENERATE_STATE_FUNCTION.into(), args.into()], env)?;
     let mut e = LEnv::root().await;
 
-    let mut env = env.clone();
-    let ctx = env.get_mut_context::<CtxDomain>(MOD_DOMAIN)?;
+    let ctx = env.get_context::<CtxDomain>(MOD_DOMAIN)?;
 
-    let lvalue = eval(&expand(&lvalue, true, &mut ctx.env).await?, &mut e).await?;
+    let lvalue = eval(&expand(&lvalue, true, &mut ctx.env.clone()).await?, &mut e).await?;
 
     if let LValue::List(list) = &lvalue {
         if list.len() != 3 {
@@ -462,7 +469,7 @@ async fn def_state_function<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
         } else if let LValue::Symbol(action_label) = &list[0] {
             if let LValue::List(_) | LValue::Nil = &list[1] {
                 if let LValue::Lambda(_) = &list[2] {
-                    ctx.domain.add_state_function(
+                    ctx.domain.write().unwrap().add_state_function(
                         action_label.to_string(),
                         StateFunction::new((&list[1]).try_into()?, list[2].clone()),
                     );
@@ -510,10 +517,9 @@ async fn def_action_model<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     let lvalue = cons(&[GENERATE_ACTION_MODEL.into(), args.into()], env)?;
     let mut e = LEnv::root().await;
 
-    let mut env = env.clone();
-    let ctx = env.get_mut_context::<CtxDomain>(MOD_DOMAIN)?;
+    let ctx = env.get_context::<CtxDomain>(MOD_DOMAIN)?;
 
-    let lvalue = eval(&expand(&lvalue, true, &mut ctx.env).await?, &mut e).await?;
+    let lvalue = eval(&expand(&lvalue, true, &mut ctx.env.clone()).await?, &mut e).await?;
 
     if let LValue::List(list) = &lvalue {
         if list.len() != 2 {
@@ -526,6 +532,8 @@ async fn def_action_model<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
         } else if let LValue::Symbol(action_label) = &list[0] {
             if let LValue::Lambda(_) = &list[1] {
                 ctx.domain
+                    .write()
+                    .unwrap()
                     .add_action_sample_fn(action_label.into(), list[1].clone())?;
             } else {
                 return Err(WrongType(
@@ -565,11 +573,8 @@ async fn def_action_operational_model<'a>(args: &'a [LValue], env: &'a LEnv) -> 
         env,
     )?;
     let mut e = LEnv::root().await;
-
-    let mut env = env.clone();
-    let ctx = env.get_mut_context::<CtxDomain>(MOD_DOMAIN)?;
-
-    let lvalue = eval(&expand(&lvalue, true, &mut ctx.env).await?, &mut e).await?;
+    let ctx = env.get_context::<CtxDomain>(MOD_DOMAIN)?;
+    let lvalue = eval(&expand(&lvalue, true, &mut ctx.env.clone()).await?, &mut e).await?;
 
     if let LValue::List(list) = &lvalue {
         if list.len() != 2 {
@@ -582,6 +587,8 @@ async fn def_action_operational_model<'a>(args: &'a [LValue], env: &'a LEnv) -> 
         } else if let LValue::Symbol(action_label) = &list[0] {
             if let LValue::Lambda(_) = &list[1] {
                 ctx.domain
+                    .write()
+                    .unwrap()
                     .add_action_sample_fn(action_label.into(), list[1].clone())?;
             } else {
                 return Err(WrongType(
@@ -619,10 +626,8 @@ async fn def_action<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     let lvalue = cons(&[GENERATE_ACTION.into(), args.into()], env)?;
 
     let mut e = LEnv::root().await;
-
-    let mut env = env.clone();
-    let ctx = env.get_mut_context::<CtxDomain>(MOD_DOMAIN)?;
-    let lvalue = eval(&expand(&lvalue, true, &mut ctx.env).await?, &mut e).await?;
+    let ctx = env.get_context::<CtxDomain>(MOD_DOMAIN)?;
+    let lvalue = eval(&expand(&lvalue, true, &mut ctx.env.clone()).await?, &mut e).await?;
 
     if let LValue::List(list) = &lvalue {
         if list.len() != 3 {
@@ -635,7 +640,7 @@ async fn def_action<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
         } else if let LValue::Symbol(action_label) = &list[0] {
             if let LValue::List(_) | LValue::Nil = &list[1] {
                 if let LValue::Lambda(_) = &list[2] {
-                    ctx.domain.add_action(
+                    ctx.domain.write().unwrap().add_action(
                         action_label.to_string(),
                         Action::new((&list[1]).try_into()?, list[2].clone(), LValue::Nil),
                     );
@@ -683,10 +688,9 @@ async fn def_method<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
 
     let mut e = LEnv::root().await;
 
-    let mut env = env.clone();
-    let ctx = env.get_mut_context::<CtxDomain>(MOD_DOMAIN)?;
+    let ctx = env.get_context::<CtxDomain>(MOD_DOMAIN)?;
 
-    let lvalue = eval(&expand(&lvalue, true, &mut ctx.env).await?, &mut e).await?;
+    let lvalue = eval(&expand(&lvalue, true, &mut ctx.env.clone()).await?, &mut e).await?;
 
     //println!("lvalue: {}", lvalue);
 
@@ -712,7 +716,10 @@ async fn def_method<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
                                         list[4].clone(),
                                         list[5].clone(),
                                     );
-                                    ctx.domain.add_method(method_label.to_string(), method)?;
+                                    ctx.domain
+                                        .write()
+                                        .unwrap()
+                                        .add_method(method_label.to_string(), method)?;
                                 } else {
                                     return Err(WrongType(
                                         DOMAIN_DEF_METHOD,
@@ -783,10 +790,9 @@ async fn def_task<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
 
     let mut e = LEnv::root().await;
 
-    let mut env = env.clone();
-    let ctx = env.get_mut_context::<CtxDomain>(MOD_DOMAIN)?;
+    let ctx = env.get_context::<CtxDomain>(MOD_DOMAIN)?;
 
-    let lvalue = eval(&expand(&lvalue, true, &mut ctx.env).await?, &mut e).await?;
+    let lvalue = eval(&expand(&lvalue, true, &mut ctx.env.clone()).await?, &mut e).await?;
 
     //println!("new_task: {}", lvalue);
 
@@ -801,7 +807,10 @@ async fn def_task<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
         } else if let LValue::Symbol(task_label) = &list[0] {
             if let LValue::Lambda(_) = &list[2] {
                 let task = Task::new(list[2].clone(), (&list[1]).try_into()?);
-                ctx.domain.add_task(task_label.to_string(), task);
+                ctx.domain
+                    .write()
+                    .unwrap()
+                    .add_task(task_label.to_string(), task);
             } else {
                 return Err(WrongType(
                     DOMAIN_DEF_TASK,

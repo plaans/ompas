@@ -389,12 +389,6 @@ checksum = "dd25036021b0de88a0aff6b850051563c6516d0bf53f8638938edbb9de732736"
 
 [[package]]
 name = "lazy_static"
-version = "0.1.16"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf186d1a8aa5f5bee5fd662bc9c1b949e0259e1bcc379d1f006847b0080c7417"
-
-[[package]]
-name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
@@ -524,7 +518,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "im",
- "lazy_static 1.4.0",
+ "lazy_static",
  "log",
  "macro_rules_attribute",
  "ompas_lisp",
@@ -593,7 +587,7 @@ dependencies = [
  "chrono",
  "futures",
  "im",
- "lazy_static 0.1.16",
+ "lazy_static",
  "macro_rules_attribute",
  "ompas_utils",
  "rand",
@@ -624,7 +618,7 @@ dependencies = [
  "aries_planning",
  "chrono",
  "im",
- "lazy_static 1.4.0",
+ "lazy_static",
  "log",
  "tokio",
  "tokio-stream",
@@ -932,7 +926,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5277acd7ee46e63e5168a80734c9f6ee81b1367a7d8772a2d765df2a3705d28c"
 dependencies = [
  "clap",
- "lazy_static 1.4.0",
+ "lazy_static",
  "structopt-derive",
 ]
 

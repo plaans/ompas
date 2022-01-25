@@ -540,7 +540,7 @@ pub fn eval_static(lv: &LValue, env: &mut LEnv) -> lerror::Result<PLValue> {
                         };
                         let body = &args[1];
                         let r_lvalue =
-                            LValue::Lambda(LLambda::new(params, body.clone(), env.clone()));
+                            LValue::Lambda(LLambda::new(params, body.clone(), env.get_symbols()));
                         if get_debug() {
                             println!("{} => {}", str, r_lvalue);
                         }

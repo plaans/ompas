@@ -7,23 +7,23 @@ use crate::core::structs::lenv::LEnv;
 use crate::core::structs::lerror::LError::{
     NotInListOfExpectedTypes, WrongNumberOfArgument, WrongType,
 };
+use crate::core::structs::lerror::LResult;
 use crate::core::structs::lfuture::FutureResult;
 use crate::core::structs::llambda::{LLambda, LambdaArgs};
 use crate::core::structs::lnumber::LNumber;
 use crate::core::structs::lvalue::LValue;
 use crate::core::structs::typelvalue::TypeLValue;
+use anyhow::anyhow;
 use aries_planning::parsing::sexpr::SExpr;
 use async_recursion::async_recursion;
 use std::convert::TryFrom;
+use std::convert::TryInto;
+use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 
 pub mod language;
 pub mod root_module;
 pub mod structs;
-use crate::core::structs::lerror::LResult;
-use anyhow::anyhow;
-use std::convert::TryInto;
-use std::sync::atomic::AtomicBool;
 
 lazy_static! {
     ///Global variable used to enable debug println.
@@ -556,7 +556,7 @@ pub async fn eval(lv: &LValue, env: &mut LEnv) -> LResult {
                         };
                         let body = &args[1];
                         let r_lvalue =
-                            LValue::Lambda(LLambda::new(params, body.clone(), env.clone()));
+                            LValue::Lambda(LLambda::new(params, body.clone(), env.get_symbols()));
                         if get_debug() {
                             println!("{} => {}", str, r_lvalue);
                         }

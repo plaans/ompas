@@ -49,7 +49,7 @@ async fn translate_2(exp: &str) -> Result<ExpressionChronicle, LError> {
 
     let mut symbol_table = SymTable::default();
 
-    let context = Context::default();
+    let context = ConversionContext::default();
 
     let chronicle = translate_lvalue_to_expression_chronicle(&lv, &context, &mut symbol_table)?;
     println!("{}", chronicle.format_with_sym_table(&symbol_table));
@@ -60,7 +60,7 @@ async fn translate(exp: &str) -> Result<Chronicle, LError> {
     let mut env = LEnv::root().await;
     let lv = parse(exp, &mut env).await?;
 
-    let context = Context::default();
+    let context = ConversionContext::default();
 
     let mut symbol_table = SymTable::default();
 

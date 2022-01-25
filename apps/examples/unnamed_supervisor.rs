@@ -6,6 +6,7 @@ use tokio::sync::mpsc::{Receiver, Sender};
 
 //use ompas_modules::robot::CtxRobot;
 use ompas_acting::rae::module::init_ctx_rae;
+use ompas_acting::rae::module::rae_exec::Platform;
 use ompas_godot_simulation_client::mod_godot::CtxGodot;
 use ompas_godot_simulation_client::rae_interface::PlatformGodot;
 use ompas_lisp::core::structs::lenv::ImportType::WithoutPrefix;
@@ -82,7 +83,7 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     let _ctx_godot = CtxGodot::default();
     let ctx_utils = CtxUtils::default();
     let (ctx_rae, ctx_rae_monitor) =
-        init_ctx_rae(Some(Box::new(PlatformGodot::default())), log.clone()).await;
+        init_ctx_rae(Some(Platform::new(PlatformGodot::default())), log.clone()).await;
 
     //Add the sender of the channel.
     //ctx_io.add_sender_li(sender_li.clone());

@@ -1,5 +1,6 @@
 use ompas_lisp::core::language::*;
 use ompas_lisp::core::root_module::predicate::language::*;
+use ompas_lisp::core::structs::contextcollection::Context;
 use ompas_lisp::core::structs::documentation::Documentation;
 use ompas_lisp::core::structs::lenv::LEnv;
 use ompas_lisp::core::structs::lerror::LError::{WrongNumberOfArgument, WrongType};
@@ -180,7 +181,7 @@ pub struct CtxRaeDescription {}
 impl IntoModule for CtxRaeDescription {
     fn into_module(self) -> Module {
         let mut module = Module {
-            ctx: Arc::new(()),
+            ctx: Context::new(()),
             prelude: vec![],
             raw_lisp: vec![
                 MACRO_GENERATE_TASK_SIMPLE,

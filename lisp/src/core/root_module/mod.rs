@@ -8,6 +8,7 @@ use crate::core::root_module::map::language::*;
 use crate::core::root_module::map::*;
 use crate::core::root_module::predicate::language::*;
 use crate::core::root_module::predicate::*;
+use crate::core::structs::contextcollection::Context;
 use crate::core::structs::documentation::{Documentation, LHelp};
 use crate::core::structs::lenv::LEnv;
 use crate::core::structs::lerror::LError::{NotInListOfExpectedTypes, WrongNumberOfArgument};
@@ -16,7 +17,6 @@ use crate::core::structs::lvalue::LValue;
 use crate::core::structs::module::{IntoModule, Module};
 use crate::core::structs::purefonction::PureFonctionCollection;
 use crate::core::structs::typelvalue::TypeLValue;
-use std::sync::{Arc, RwLock};
 
 pub mod basic_math;
 pub mod env;
@@ -124,7 +124,7 @@ impl IntoModule for CtxRoot {
     ///
     fn into_module(self) -> Module {
         let mut module = Module {
-            ctx: Arc::new(RwLock::new(())),
+            ctx: Context::new(self),
             prelude: vec![],
             raw_lisp: Default::default(),
             label: MOD_ROOT.into(),

@@ -3,6 +3,7 @@ use crate::rae::context::rae_env::RAEEnv;
 use crate::rae::context::ressource_access::wait_on;
 use crate::rae::module::rae_exec::{Job, JobType};
 use ::macro_rules_attribute::macro_rules_attribute;
+use ompas_lisp::core::structs::contextcollection::Context;
 use ompas_lisp::core::structs::documentation::{Documentation, LHelp};
 use ompas_lisp::core::structs::lenv::LEnv;
 use ompas_lisp::core::structs::lerror::{LError, LResult};
@@ -39,7 +40,7 @@ pub const DOC_RAE_TRIGGER_TASK_VERBOSE: &str = "Example: (rae-trigger-task t_dum
 impl IntoModule for CtxRaeMonitor {
     fn into_module(self) -> Module {
         let mut module = Module {
-            ctx: Arc::new(self),
+            ctx: Context::new(self),
             prelude: vec![],
             raw_lisp: Default::default(),
             label: MOD_RAE_MONITOR.to_string(),

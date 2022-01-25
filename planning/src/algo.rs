@@ -24,7 +24,7 @@ const TRANSLATE_LVALUE_TO_EXPRESSION_CHRONICLE: &str = "translate_lvalue_to_expr
 
 const TRANSLATE_LVALUE_TO_CHRONICLE: &str = "translate_lvalue_to_chronicle";
 
-pub fn pre_processing(lv: &LValue, context: &Context) -> LResult {
+pub fn pre_processing(lv: &LValue, context: &ConversionContext) -> LResult {
     let lv = pre_process_transform_lambda(lv, context)?;
 
     let lv = pre_eval(&lv, context);
@@ -32,14 +32,14 @@ pub fn pre_processing(lv: &LValue, context: &Context) -> LResult {
     lv
 }
 
-pub fn pre_eval(lv: &LValue, context: &Context) -> LResult {
+pub fn pre_eval(lv: &LValue, context: &ConversionContext) -> LResult {
     let mut env = context.env.clone();
     let plv = eval_static(lv, &mut env)?;
 
     Ok(plv.get_lvalue().clone())
 }
 
-pub fn pre_process_transform_lambda(lv: &LValue, context: &Context) -> LResult {
+pub fn pre_process_transform_lambda(lv: &LValue, context: &ConversionContext) -> LResult {
     let mut lv = match transform_lambda_expression(lv, context.env.clone()) {
         Ok(lv) => lv,
         Err(_) => lv.clone(),
@@ -57,7 +57,11 @@ pub fn pre_process_transform_lambda(lv: &LValue, context: &Context) -> LResult {
     Ok(lv)
 }
 
-pub fn unify_equal(ec: &mut ExpressionChronicle, sym_table: &mut SymTable, _context: &Context) {
+pub fn unify_equal(
+    ec: &mut ExpressionChronicle,
+    sym_table: &mut SymTable,
+    _context: &ConversionContext,
+) {
     let mut vec_constraint_to_rm = vec![];
 
     for (index, constraint) in ec.get_constraints().iter().enumerate() {
@@ -116,7 +120,11 @@ pub fn unify_equal(ec: &mut ExpressionChronicle, sym_table: &mut SymTable, _cont
     ec.rm_set_constraint(vec_constraint_to_rm)
 }
 
-pub fn rm_useless_var(ec: &mut ExpressionChronicle, sym_table: &mut SymTable, _context: &Context) {
+pub fn rm_useless_var(
+    ec: &mut ExpressionChronicle,
+    sym_table: &mut SymTable,
+    _context: &ConversionContext,
+) {
     let mut vec = vec![];
 
     for var in ec.get_variables() {
@@ -128,12 +136,18 @@ pub fn rm_useless_var(ec: &mut ExpressionChronicle, sym_table: &mut SymTable, _c
     ec.rm_set_var(vec)
 }
 
-pub fn post_processing(ec: &mut ExpressionChronicle, sym_table: &mut SymTable, context: &Context) {
+pub fn post_processing(
+    ec: &mut ExpressionChronicle,
+    sym_table: &mut SymTable,
+    context: &ConversionContext,
+) {
     unify_equal(ec, sym_table, context);
     rm_useless_var(ec, sym_table, context);
 }
 
-pub fn translate_domain_env_to_hierarchy(context: Context) -> Result<(Domain, SymTable), LError> {
+pub fn translate_domain_env_to_hierarchy(
+    context: ConversionContext,
+) -> Result<(Domain, SymTable), LError> {
     //for each action: translate to chronicle
     //for each method: translate to chronicle
 
@@ -239,7 +253,7 @@ pub fn translate_domain_env_to_hierarchy(context: Context) -> Result<(Domain, Sy
 
 pub fn translate_lvalue_to_chronicle(
     exp: &LValue,
-    context: &Context,
+    context: &ConversionContext,
     symbol_table: &mut SymTable,
 ) -> Result<Chronicle, LError> {
     //Creation and instantiation of the chronicle
@@ -281,7 +295,7 @@ pub fn translate_lvalue_to_chronicle(
 
 pub fn translate_lvalue_to_expression_chronicle(
     exp: &LValue,
-    context: &Context,
+    context: &ConversionContext,
     symbol_table: &mut SymTable,
 ) -> Result<ExpressionChronicle, LError> {
     let mut ec = ExpressionChronicle::new(exp.clone(), symbol_table);
@@ -611,7 +625,7 @@ pub const TRANSLATE_COND_IF: &str = "translate_cond_if";
 
 pub fn translate_cond_if(
     exp: &LValue,
-    context: &Context,
+    context: &ConversionContext,
     symbol_table: &mut SymTable,
 ) -> Result<Lit, LError> {
     match exp {

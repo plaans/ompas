@@ -1,4 +1,5 @@
 use crate::core::root_module::CtxRoot;
+use crate::core::structs::contextcollection::Context;
 use crate::core::structs::documentation::Documentation;
 use crate::core::structs::lenv::ImportType::{WithPrefix, WithoutPrefix};
 use crate::core::structs::lenv::{ImportType, LEnv};
@@ -13,7 +14,10 @@ use crate::modules::error::CtxError;
 use crate::modules::static_eval::language::*;
 use crate::modules::utils::CtxUtils;
 use crate::static_eval::{eval_static, expand_static};
+use ::macro_rules_attribute::macro_rules_attribute;
+use ompas_utils::dyn_async;
 use std::sync::Arc;
+use tokio::sync::RwLock;
 
 /*
 LANGUAGE
@@ -27,7 +31,17 @@ pub mod language {
 
 #[derive(Default, Clone)]
 pub struct CtxStaticEval {
-    env: LEnv,
+    env: Arc<RwLock<LEnv>>,
+}
+
+impl CtxStaticEval {
+    pub async fn get_env(&self) -> LEnv {
+        self.env.read().await.clone()
+    }
+
+    pub async fn set_env(&self, env: LEnv) {
+        *self.env.write().await = env;
+    }
 }
 
 ///Import basic scheme modules.
@@ -44,30 +58,31 @@ impl CtxStaticEval {
             .await?;
         env.import(CtxError::default(), ImportType::WithoutPrefix)
             .await?;
+        let env = Arc::new(RwLock::new(env));
         Ok(Self { env })
     }
 }
 
 impl CtxStaticEval {
     pub async fn import_namespace(&mut self, ctx: impl IntoModule) -> lerror::Result<()> {
-        self.env.import(ctx, WithoutPrefix).await
+        self.env.write().await.import(ctx, WithoutPrefix).await
     }
 
     pub async fn import(&mut self, ctx: impl IntoModule) -> lerror::Result<()> {
-        self.env.import(ctx, WithPrefix).await
+        self.env.write().await.import(ctx, WithPrefix).await
     }
 }
 
 impl IntoModule for CtxStaticEval {
     fn into_module(self) -> Module {
         let mut module = Module {
-            ctx: Arc::new(self),
+            ctx: Context::new(self),
             prelude: vec![],
             raw_lisp: Default::default(),
             label: MOD_STATIC_EVAL.to_string(),
         };
 
-        module.add_fn_prelude(EVAL_STATIC, scheme_eval_static);
+        module.add_async_fn_prelude(EVAL_STATIC, scheme_eval_static);
 
         module
     }
@@ -81,7 +96,8 @@ impl IntoModule for CtxStaticEval {
     }
 }
 
-pub fn scheme_eval_static(args: &[LValue], env: &LEnv) -> LResult {
+#[macro_rules_attribute(dyn_async!)]
+pub async fn scheme_eval_static<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(
             EVAL_STATIC,
@@ -90,14 +106,15 @@ pub fn scheme_eval_static(args: &[LValue], env: &LEnv) -> LResult {
             1..1,
         ));
     }
+    let ctx = env.get_context::<CtxStaticEval>(MOD_STATIC_EVAL)?;
 
-    let mut env = env.clone();
+    let mut env = ctx.get_env().await;
 
-    let ctx = env.get_mut_context::<CtxStaticEval>(MOD_STATIC_EVAL)?;
+    let result = expand_static(&args[0], true, &mut env)?;
 
-    let result = expand_static(&args[0], true, &mut ctx.env)?;
+    let result = eval_static(result.get_lvalue(), &mut env)?;
 
-    let result = eval_static(result.get_lvalue(), &mut ctx.env)?;
+    ctx.set_env(env).await;
 
     println!("static evaluation returned: {}", result.get_lvalue());
 

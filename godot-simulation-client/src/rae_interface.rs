@@ -11,6 +11,7 @@ use ompas_acting::rae::context::actions_progress::{ActionsProgress, Status};
 use ompas_acting::rae::context::rae_state::{RAEState, StateType, KEY_DYNAMIC, KEY_STATIC};
 use ompas_acting::rae::module::rae_exec::platform::RAE_LAUNCH_PLATFORM;
 use ompas_acting::rae::module::rae_exec::{CtxPlatform, RAEInterface, RAE_GET_STATE_VARIBALE};
+use ompas_lisp::core::structs::contextcollection::Context;
 use ompas_lisp::core::structs::documentation::Documentation;
 use ompas_lisp::core::structs::lerror::LError::*;
 use ompas_lisp::core::structs::lerror::{LError, LResult};
@@ -310,7 +311,7 @@ impl RAEInterface for PlatformGodot {
     }
 
     /// Start the platform (start the godot process and launch the simulation)
-    async fn start_platform(&self, args: &[LValue]) -> Result<LValue, LError> {
+    async fn start_platform(&mut self, args: &[LValue]) -> Result<LValue, LError> {
         match args.len() {
             //default settings
             0 => {
@@ -507,7 +508,7 @@ struct GodotCtx {}
 impl IntoModule for GodotCtx {
     fn into_module(self) -> Module {
         Module {
-            ctx: Arc::new(self),
+            ctx: Context::new(self),
             prelude: vec![],
             raw_lisp: Default::default(),
             label: "".to_string(),

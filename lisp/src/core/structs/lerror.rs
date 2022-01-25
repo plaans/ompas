@@ -99,6 +99,6 @@ pub type Result<T> = std::result::Result<T, LError>;
 
 impl From<anyhow::Error> for LError {
     fn from(e: anyhow::Error) -> Self {
-        Self::SpecialError("", e.to_string())
+        Self::SpecialError("anyhow", format!("{:?}", e))
     }
 }

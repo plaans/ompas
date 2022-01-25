@@ -8,7 +8,7 @@ use im::HashMap;
 use log::Level::Debug;
 use ompas_lisp::core::language::OBJECT;
 use ompas_lisp::core::structs::contextcollection::ContextCollection;
-use ompas_lisp::core::structs::lenv::LEnv;
+use ompas_lisp::core::structs::lenv::{LEnv, LEnvSymbols};
 use ompas_lisp::core::structs::lerror::LError;
 use ompas_lisp::core::structs::lerror::LError::{
     NotInListOfExpectedTypes, SpecialError, WrongNumberOfArgument, WrongType,
@@ -539,8 +539,8 @@ impl Display for DomainEnv {
 }
 
 impl DomainEnv {
-    pub fn get_exec_env(&self) -> LEnv {
-        let mut env = LEnv::default();
+    pub fn get_exec_env(&self) -> LEnvSymbols {
+        let mut env = LEnvSymbols::default();
         let mut map_task_method: HashMap<LValue, LValue> = Default::default();
         let mut map_method_pre_conditions: HashMap<LValue, LValue> = Default::default();
         let mut map_method_score: HashMap<LValue, LValue> = Default::default();
@@ -607,8 +607,8 @@ impl DomainEnv {
         env
     }
 
-    pub fn get_sim_env(&self) -> LEnv {
-        let mut env = LEnv::default();
+    pub fn get_sim_env(&self) -> LEnvSymbols {
+        let mut env = LEnvSymbols::default();
         let mut map_task_method: HashMap<LValue, LValue> = Default::default();
         let mut map_method_pre_conditions: HashMap<LValue, LValue> = Default::default();
         let mut map_method_score: HashMap<LValue, LValue> = Default::default();
@@ -753,9 +753,9 @@ pub struct RAEEnv {
 
 impl RAEEnv {
     pub async fn get_exec_env(&self) -> LEnv {
-        let mut domain_exec_env: LEnv = self.domain_env.get_exec_env();
+        let domain_exec_symbols: LEnvSymbols = self.domain_env.get_exec_env();
         //let domain_sim_env = self.domain_env.get_sim_env();
-        let exec_env = self.env.clone();
+        let mut exec_env = self.env.clone();
         //let (sim_env, sim_ctxs) = init_simu_env(None).await;
 
         /*let mut ctx_rae_sim_interface = CtxRaeSimInterface::new(sim_env, sim_ctxs);
@@ -770,13 +770,14 @@ impl RAEEnv {
         .await
         .expect("error loading ctx_rae_sim_interface");*/
 
-        domain_exec_env.set_outer(exec_env);
-        domain_exec_env
+        exec_env.set_new_top_symbols(domain_exec_symbols);
+        exec_env
     }
 
     pub fn get_sim_env(&self) -> LEnv {
-        let mut env: LEnv = self.domain_env.get_sim_env();
-        env.set_outer(self.env.clone());
+        let symbols: LEnvSymbols = self.domain_env.get_sim_env();
+        let mut env = self.env.clone();
+        env.set_new_top_symbols(symbols);
         env
     }
 }

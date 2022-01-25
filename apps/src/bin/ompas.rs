@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use ompas_acting::rae::module::init_ctx_rae;
+use ompas_acting::rae::module::rae_exec::Platform;
 use ompas_godot_simulation_client::rae_interface::PlatformGodot;
 use ompas_lisp::core::activate_debug;
 use ompas_lisp::lisp_interpreter::{LispInterpreter, LispInterpreterConfig};
@@ -45,7 +46,7 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     let ctx_utils = CtxUtils::default();
     let ctx_string = CtxString::default();
     let (ctx_rae, ctx_rae_monitor) =
-        init_ctx_rae(Some(Box::new(PlatformGodot::default())), log.clone()).await;
+        init_ctx_rae(Some(Platform::new(PlatformGodot::default())), log.clone()).await;
     //Insert the doc for the different contexts.
 
     //Add the sender of the channel.

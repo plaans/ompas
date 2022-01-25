@@ -1,7 +1,9 @@
 //! Example Module
 //! Gives an example on how to code a rust library to be bound in Scheme.
+use crate::core::structs::contextcollection::Context;
 use crate::core::structs::documentation::{Documentation, LHelp};
 use crate::core::structs::lenv::LEnv;
+use crate::core::structs::lerror;
 use crate::core::structs::lerror::LError::{SpecialError, WrongNumberOfArgument, WrongType};
 use crate::core::structs::lerror::LResult;
 use crate::core::structs::lnumber::LNumber;
@@ -10,7 +12,6 @@ use crate::core::structs::module::{IntoModule, Module};
 use crate::core::structs::purefonction::PureFonctionCollection;
 use crate::core::structs::typelvalue::TypeLValue;
 use crate::modules::deprecated::counter::language::*;
-use std::convert::TryFrom;
 use std::sync::{Arc, RwLock};
 
 /*
@@ -41,13 +42,48 @@ pub mod language {
 
 #[derive(Default)]
 pub struct CtxCounter {
-    pub(crate) counters: Vec<Counter>,
+    counters: Arc<RwLock<Vec<Counter>>>,
 }
 
 impl CtxCounter {
-    pub fn new_counter(&mut self) -> usize {
-        self.counters.push(Counter::default());
-        self.counters.len() - 1
+    pub fn new_counter(&self) -> usize {
+        let mut counters = self.counters.write().unwrap();
+        counters.push(Counter::default());
+        counters.len() - 1
+    }
+
+    pub fn set_counter(&self, counter: usize, value: u32) -> lerror::Result<()> {
+        match self.counters.write().unwrap().get_mut(counter) {
+            None => Err(SpecialError(SET_COUNTER, "index out of reach".to_string())),
+            Some(c) => Ok(c.val = value),
+        }
+    }
+
+    pub fn decrement_counter(&self, counter: usize) -> lerror::Result<()> {
+        match self.counters.write().unwrap().get_mut(counter) {
+            None => Err(SpecialError(SET_COUNTER, "index out of reach".to_string())),
+            Some(c) => {
+                if c.val > 0 {
+                    Ok(c.val = c.val - 1)
+                } else {
+                    Ok(())
+                }
+            }
+        }
+    }
+
+    pub fn increment_counter(&self, counter: usize) -> lerror::Result<()> {
+        match self.counters.write().unwrap().get_mut(counter) {
+            None => Err(SpecialError(SET_COUNTER, "index out of reach".to_string())),
+            Some(c) => Ok(c.val = c.val + 1),
+        }
+    }
+
+    pub fn get_counter(&self, counter: usize) -> lerror::Result<LValue> {
+        match self.counters.write().unwrap().get(counter) {
+            None => Err(SpecialError(GET_COUNTER, "index out of reach".to_string())),
+            Some(c) => Ok(LValue::Number(LNumber::Int(c.val as i64))),
+        }
     }
 }
 
@@ -69,10 +105,7 @@ pub fn get_counter(args: &[LValue], env: &LEnv) -> LResult {
     let ctx = env.get_context::<CtxCounter>(MOD_COUNTER)?;
 
     match &args[0] {
-        LValue::Number(LNumber::Usize(u)) => match ctx.counters.get(*u) {
-            None => Err(SpecialError(GET_COUNTER, "index out of reach".to_string())),
-            Some(c) => Ok(LValue::Number(LNumber::Int(c.val as i64))),
-        },
+        LValue::Number(LNumber::Usize(u)) => ctx.get_counter(*u),
         lv => Err(WrongType(
             GET_COUNTER,
             lv.clone(),
@@ -92,23 +125,13 @@ pub fn decrement_counter(args: &[LValue], env: &LEnv) -> LResult {
         ));
     }
 
-    let mut env = env.clone();
-
-    let ctx = env.get_mut_context::<CtxCounter>(MOD_COUNTER)?;
+    let ctx = env.get_context::<CtxCounter>(MOD_COUNTER)?;
 
     match &args[0] {
-        LValue::Number(LNumber::Usize(u)) => match ctx.counters.get_mut(*u) {
-            None => Err(SpecialError(
-                DECREMENT_COUNTER,
-                "index out of reach".to_string(),
-            )),
-            Some(c) => {
-                if c.val > 0 {
-                    c.val -= 1;
-                }
-                Ok(LValue::Nil)
-            }
-        },
+        LValue::Number(LNumber::Usize(u)) => {
+            ctx.decrement_counter(*u)?;
+            Ok(LValue::Nil)
+        }
         lv => Err(WrongType(
             DECREMENT_COUNTER,
             lv.clone(),
@@ -128,21 +151,13 @@ pub fn increment_counter(args: &[LValue], env: &LEnv) -> LResult {
         ));
     }
 
-    let mut env = env.clone();
-
-    let ctx = env.get_mut_context::<CtxCounter>(MOD_COUNTER)?;
+    let ctx = env.get_context::<CtxCounter>(MOD_COUNTER)?;
 
     match &args[0] {
-        LValue::Number(LNumber::Usize(u)) => match ctx.counters.get_mut(*u) {
-            None => Err(SpecialError(
-                INCREMENT_COUNTER,
-                "index out of reach".to_string(),
-            )),
-            Some(c) => {
-                c.val += 1;
-                Ok(LValue::Nil)
-            }
-        },
+        LValue::Number(LNumber::Usize(u)) => {
+            ctx.increment_counter(*u)?;
+            Ok(LValue::Nil)
+        }
         lv => Err(WrongType(
             INCREMENT_COUNTER,
             lv.clone(),
@@ -162,37 +177,40 @@ pub fn set_counter(args: &[LValue], env: &LEnv) -> LResult {
         ));
     }
 
-    let mut env = env.clone();
+    let ctx = env.get_context::<CtxCounter>(MOD_COUNTER)?;
 
-    let ctx = env.get_mut_context::<CtxCounter>(MOD_COUNTER)?;
-
-    match &args[0] {
-        LValue::Number(LNumber::Usize(u)) => match ctx.counters.get_mut(*u) {
-            None => Err(SpecialError(SET_COUNTER, "index out of reach".to_string())),
-            Some(c) => {
-                c.val = i64::try_from(&args[1])? as u32;
-                Ok(LValue::Nil)
-            }
-        },
-        lv => Err(WrongType(
+    if let LValue::Number(LNumber::Usize(u)) = &args[0] {
+        if let LValue::Number(n) = &args[1] {
+            let n: u32 = i64::from(n) as u32;
+            ctx.set_counter(*u, n)?;
+            Ok(LValue::Nil)
+        } else {
+            Err(WrongType(
+                SET_COUNTER,
+                args[1].clone(),
+                (&args[1]).into(),
+                TypeLValue::Number,
+            ))
+        }
+    } else {
+        Err(WrongType(
             SET_COUNTER,
-            lv.clone(),
-            lv.into(),
+            args[0].clone(),
+            (&args[0]).into(),
             TypeLValue::Other(TYPE_COUNTER.to_string()),
-        )),
+        ))
     }
 }
 
 pub fn new_counter(_: &[LValue], env: &LEnv) -> LResult {
-    let mut env = env.clone();
-    let ctx = env.get_mut_context::<CtxCounter>(MOD_COUNTER)?;
+    let ctx = env.get_context::<CtxCounter>(MOD_COUNTER)?;
     Ok(LValue::Number(LNumber::Usize(ctx.new_counter())))
 }
 
 impl IntoModule for CtxCounter {
     fn into_module(self) -> Module {
         let mut module = Module {
-            ctx: Arc::new(RwLock::new(self)),
+            ctx: Context::new(self),
             prelude: vec![],
             raw_lisp: Default::default(),
             label: MOD_COUNTER.into(),

@@ -1,3 +1,4 @@
+use crate::core::structs::contextcollection::Context;
 use crate::core::structs::documentation::{Documentation, LHelp};
 use crate::core::structs::lenv::LEnv;
 use crate::core::structs::lerror::LError::{WrongNumberOfArgument, WrongType};
@@ -8,7 +9,6 @@ use crate::core::structs::module::{IntoModule, Module};
 use crate::core::structs::purefonction::PureFonctionCollection;
 use crate::core::structs::typelvalue::TypeLValue;
 use rand::Rng;
-use std::sync::Arc;
 
 //LANGUAGE
 const MOD_MATH: &str = "math";
@@ -60,7 +60,7 @@ impl IntoModule for CtxMath {
     /// -Constants: "pi".
     fn into_module(self) -> Module {
         let mut module = Module {
-            ctx: Arc::new(self),
+            ctx: Context::new(self),
             prelude: vec![],
             raw_lisp: Default::default(),
             label: MOD_MATH.into(),

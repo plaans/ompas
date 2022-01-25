@@ -1,10 +1,10 @@
+use crate::core::structs::contextcollection::Context;
 use crate::core::structs::documentation::{Documentation, LHelp};
 use crate::core::structs::lenv::LEnv;
 use crate::core::structs::lerror::LResult;
 use crate::core::structs::lvalue::LValue;
 use crate::core::structs::module::{IntoModule, Module};
 use crate::core::structs::purefonction::PureFonctionCollection;
-use std::sync::Arc;
 
 /*
 LANGUAGE
@@ -21,7 +21,7 @@ pub struct CtxString {}
 impl IntoModule for CtxString {
     fn into_module(self) -> Module {
         let mut module = Module {
-            ctx: Arc::new(()),
+            ctx: Context::new(()),
             prelude: vec![],
             raw_lisp: Default::default(),
             label: MOD_STRING.to_string(),

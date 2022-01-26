@@ -5,29 +5,19 @@ use crate::rae::module::rae_exec::{
 use ::macro_rules_attribute::macro_rules_attribute;
 use log::{info, warn};
 use ompas_lisp::core::structs::lenv::LEnv;
-use ompas_lisp::core::structs::lerror::LError::SpecialError;
+use ompas_lisp::core::structs::lerror::LError::{SpecialError, WrongNumberOfArgument};
 use ompas_lisp::core::structs::lerror::{LError, LResult};
 use ompas_lisp::core::structs::lvalue::LValue;
+use ompas_lisp::modules::utils::contains;
 use ompas_utils::dyn_async;
 use std::convert::TryInto;
-
-pub const LAMBDA_INSTANCE: &str = "(define instance
-    (lambda args
-        (if (rae-platform?)
-            (enr (cons fn-instance args))
-            (cond ((= (len args) 1)
-                    (get (rae-get-facts) (list 'instance (car args))))
-                  ((= (len args) 2)
-                    (contains
-                        (get (rae-get-facts) (list 'instance (cadr args)))
-                        (car args))))))))";
 
 pub const RAE_EXEC_COMMAND: &str = "rae-exec-command";
 pub const RAE_LAUNCH_PLATFORM: &str = "rae-launch-platform";
 pub const RAE_OPEN_COM_PLATFORM: &str = "rae-open-com-platform";
 pub const RAE_START_PLATFORM: &str = "rae-start-platform";
 pub const RAE_IS_PLATFORM_DEFINED: &str = "rae-platform?";
-pub const RAE_INSTANCE: &str = "fn-instance";
+pub const RAE_INSTANCE: &str = "instance";
 
 pub fn is_platform_defined(_: &[LValue], env: &LEnv) -> LResult {
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
@@ -179,14 +169,43 @@ pub async fn cancel_command<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
 }
 
 #[macro_rules_attribute(dyn_async!)]
-pub async fn fn_instance<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+pub async fn instance<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+    /*
+    The previous lambda definition was as follow
+
+    pub const LAMBDA_INSTANCE: &str = "(define instance
+        (lambda args
+            (if (rae-platform?)
+                (enr (cons fn-instance args))
+                (cond ((= (len args) 1)
+                        (get (rae-get-facts) (list 'instance (car args))))
+                      ((= (len args) 2)
+                        (contains
+                            (get (rae-get-facts) (list 'instance (cadr args)))
+                            (car args))))))))";*/
+
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
     if let Some(platform) = &ctx.platform_interface {
         platform.instance(args).await
     } else {
-        Err(SpecialError(
-            RAE_INSTANCE,
-            "instance not yet implemented in internal rae functionning".into(),
-        ))
+        let facts: im::HashMap<LValue, LValue> = get_facts(&[], env).await?.try_into()?;
+        match args.len() {
+            1 => {
+                let key = vec![RAE_INSTANCE.into(), args[0].clone()].into();
+                let value = facts.get(&key).unwrap_or(&LValue::Nil);
+                Ok(value.clone())
+            }
+            2 => {
+                let key = vec![RAE_INSTANCE.into(), args[1].clone()].into();
+                let instances = facts.get(&key).unwrap_or(&LValue::Nil);
+                contains(&[instances.clone(), args[0].clone()], env)
+            }
+            _ => Err(WrongNumberOfArgument(
+                RAE_INSTANCE,
+                args.into(),
+                args.len(),
+                1..2,
+            )),
+        }
     }
 }

@@ -119,37 +119,6 @@ pub const LAMBDA_GET_METHODS: &str = "\
     (lambda (label)\
         (get rae-task-methods-map label)))";
 
-/*pub const LAMBDA_GET_METHOD_GENERATOR: &str = "\
-(define get-method-generator
-       (lambda (label)
-            (get rae-method-generator-map label)))";
-
-pub const LAMBDA_GENERATE_INSTANCES: &str = "
-(define generate-instances (lambda args
-    (let* ((label (car args))
-            (i_params (cdr args))
-            (methods (get-methods label)))
-
-            (begin
-                (define __generate__
-                    (lambda (methods)
-                        (if (null? methods)
-                            nil
-                            (append
-                                (eval
-                                    (append (list (get-method-generator (car methods)))
-                                        i_params))
-                                (__generate__ (cdr methods))))))
-                (__generate__ methods)))))";*/
-
-/*pub const LAMBDA_ARBITRARY: &str = "(define arbitrary
-(lambda args
-    (if (= (len args) 1)
-            (caar args)
-            (let ((elements (car args))
-                        (f (cadr args)))
-                     (f elements)))))";*/
-
 pub const DEFINE_RAE_MODE: &str = "(define rae-mode EXEC-MODE)";
 pub const SYMBOL_EXEC_MODE: &str = "exec-mode";
 pub const SYMBOL_SIMU_MODE: &str = "simu-mode";
@@ -251,7 +220,7 @@ impl IntoModule for CtxRaeExec {
             MACRO_MUTEX_LOCK_AND_DO,
             MACRO_WAIT_ON,
             MACRO_SIM_BLOCK,
-            LAMBDA_INSTANCE,
+            //LAMBDA_INSTANCE,
             LAMBDA_PROGRESS,
             LAMBDA_SELECT,
             LAMBDA_RETRY,
@@ -284,7 +253,7 @@ impl IntoModule for CtxRaeExec {
         module.add_async_fn_prelude(RAE_LAUNCH_PLATFORM, launch_platform);
         module.add_async_fn_prelude(RAE_GET_STATUS, get_status);
         module.add_async_fn_prelude(RAE_CANCEL_COMMAND, cancel_command);
-        module.add_async_fn_prelude(RAE_INSTANCE, fn_instance);
+        module.add_async_fn_prelude(RAE_INSTANCE, instance);
         module.add_fn_prelude(RAE_IS_PLATFORM_DEFINED, is_platform_defined);
         //Manage facts:
         module.add_async_fn_prelude(RAE_ASSERT, assert_fact);

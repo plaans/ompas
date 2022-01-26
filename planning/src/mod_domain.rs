@@ -10,6 +10,7 @@ use ompas_acting::rae::context::rae_env::*;
 use ompas_acting::rae::context::rae_state::{LState, RAEState, StateType};
 use ompas_acting::rae::module::mod_rae::CtxRae;
 use ompas_acting::rae::module::mod_rae_description::*;
+use ompas_acting::rae::module::rae_exec::CtxRaeExec;
 use ompas_lisp::core::root_module::list::cons;
 use ompas_lisp::core::structs::contextcollection;
 use ompas_lisp::core::structs::documentation::{Documentation, LHelp};
@@ -155,7 +156,7 @@ impl CtxDomain {
             .await
             .expect("error loading ctx rae description");
 
-        env.import(CtxRae::default(), WithoutPrefix)
+        env.import(CtxRaeExec::default(), WithoutPrefix)
             .await
             .expect("error loading ctx rae description");
 

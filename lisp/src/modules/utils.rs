@@ -14,6 +14,7 @@
 //! => ((1 3)(1 4)(2 3)(2 4))
 //! ```
 
+use crate::core::root_module::list::car;
 use crate::core::structs::contextcollection::Context;
 use crate::core::structs::documentation::{Documentation, LHelp};
 use crate::core::structs::lcoreoperator::LCoreOperator;
@@ -24,14 +25,18 @@ use crate::core::structs::lvalue::LValue;
 use crate::core::structs::module::{IntoModule, Module};
 use crate::core::structs::purefonction::PureFonctionCollection;
 use crate::core::structs::typelvalue::TypeLValue;
+use crate::core::{activate_debug, eval};
 use crate::modules::utils::language::*;
+use ::macro_rules_attribute::macro_rules_attribute;
 use aries_utils::StreamingIterator;
+use ompas_utils::dyn_async;
 use rand::Rng;
 use std::ops::Deref;
 
 //LANGUAGE
 pub mod language {
     pub const MOD_UTILS: &str = "utils";
+    pub const ARBITRARY: &str = "arbitrary";
     pub const RAND_ELEMENT: &str = "rand-element";
     pub const ENUMERATE: &str = "enumerate";
     pub const CONTAINS: &str = "contains";
@@ -279,13 +284,14 @@ impl IntoModule for CtxUtils {
                 MACRO_LET,
                 MACRO_LET_STAR,
                 //MACRO_FOR,
-                LAMBDA_ARBITRARY,
+                //LAMBDA_ARBITRARY,
                 LAMBDA_EVAL_NON_RECURSIVE,
             ]
             .into(),
             label: MOD_UTILS.into(),
         };
 
+        module.add_async_fn_prelude(ARBITRARY, arbitrary);
         module.add_fn_prelude(RAND_ELEMENT, rand_element);
         module.add_fn_prelude(ENUMERATE, enumerate);
         module.add_fn_prelude(CONTAINS, contains);
@@ -324,11 +330,46 @@ impl IntoModule for CtxUtils {
     }
 }
 
+#[macro_rules_attribute(dyn_async!)]
+pub async fn arbitrary<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+    /*pub const LAMBDA_ARBITRARY: &str = "(define arbitrary
+    (lambda args
+        (cond ((= (len args) 1) ; default case
+               (car (first args)))
+              ((= (len args) 2) ; specific function
+               (let ((l (first args))
+                     (f (second args)))
+                    (f l)))
+              (else nil)))) ; error cases";*/
+
+    activate_debug();
+
+    match args.len() {
+        1 => car(&[args[0].clone()], env),
+        2 => {
+            eval(
+                &vec![
+                    args[1].clone(),
+                    vec![LCoreOperator::Quote.into(), args[0].clone()].into(),
+                ]
+                .into(),
+                &mut env.clone(),
+            )
+            .await
+        }
+        _ => Err(WrongNumberOfArgument(
+            ARBITRARY,
+            args.into(),
+            args.len(),
+            1..2,
+        )),
+    }
+}
+
 ///Return enumeration from a list of list
 ///uses function from aries_utils
 /// # Example:
 ///``` rust    #[allow(unused_mut)]
-
 /// use ompas_lisp::modules::utils::{CtxUtils, enumerate};
 /// use ompas_lisp::core::structs::lvalue::LValue;
 /// use ompas_lisp::core::structs::lenv::LEnv;
@@ -549,10 +590,26 @@ pub fn transform_in_singleton_list(args: &[LValue], _: &LEnv) -> LResult {
 #[cfg(test)]
 mod test {
     use crate::core::parse;
+    use crate::core::root_module::basic_math::language::LE;
+    use crate::core::root_module::list::language::SECOND;
     use crate::core::structs::lerror;
     use crate::modules::utils::*;
     use crate::test_utils::{test_expression, TestExpression};
 
+    #[tokio::test]
+    async fn test_arbitrary() -> lerror::Result<()> {
+        let env = LEnv::root().await;
+
+        let lv = &[vec![1, 2, 3].into()];
+        let result = arbitrary(lv, &env).await?;
+        assert_eq!(result, LValue::from(1));
+
+        let lv = &[vec![1, 2, 3].into(), SECOND.into()];
+        let result = arbitrary(lv, &env).await?;
+        assert_eq!(result, LValue::from(2));
+
+        Ok(())
+    }
     #[test]
     fn test_contains() -> lerror::Result<()> {
         let lv: &[LValue] = &[vec![1, 2, 3, 4, 5, 6].into(), 6.into()];
@@ -928,42 +985,6 @@ mod test {
         };
 
         test_expression(test_lambda).await
-    }
-
-    #[tokio::test]
-    async fn test_lambda_arbitrary() -> lerror::Result<()> {
-        let test_lambda = TestExpression {
-            inner: LAMBDA_ARBITRARY,
-            dependencies: vec![
-                MACRO_CAAR,
-                MACRO_CADAR,
-                MACRO_CADR,
-                LAMBDA_UNZIP,
-                MACRO_LET,
-                MACRO_COND,
-            ],
-            expression: "(arbitrary '(1 2 3))",
-            expanded: "(arbitrary '(1 2 3))",
-            result: "1",
-        };
-
-        let test_lambda_2 = TestExpression {
-            inner: LAMBDA_ARBITRARY,
-            dependencies: vec![
-                MACRO_CAAR,
-                MACRO_CADAR,
-                MACRO_CADR,
-                LAMBDA_UNZIP,
-                MACRO_LET,
-                MACRO_COND,
-            ],
-            expression: "(arbitrary '(1 2 3) second)",
-            expanded: "(arbitrary '(1 2 3) second)",
-            result: "2",
-        };
-
-        test_expression(test_lambda).await?;
-        test_expression(test_lambda_2).await
     }
 }
 

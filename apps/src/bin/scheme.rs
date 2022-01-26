@@ -4,7 +4,9 @@ use structopt::StructOpt;
 
 //use ompas_modules::robot::CtxRobot;
 use ompas_acting::rae::module::mod_rae_description::CtxRaeDescription;
+use ompas_acting::rae::module::rae_exec::CtxRaeExec;
 use ompas_lisp::core::activate_debug;
+use ompas_lisp::core::structs::lenv::ImportType::WithoutPrefix;
 use ompas_lisp::lisp_interpreter::{LispInterpreter, LispInterpreterConfig};
 use ompas_lisp::modules::_type::CtxType;
 use ompas_lisp::modules::advanced_math::CtxMath;
@@ -49,9 +51,14 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     let ctx_utils = CtxUtils::default();
     let ctx_string = CtxString::default();
 
-    let ctx_eval_static = CtxStaticEval::new()
+    let mut ctx_eval_static: CtxStaticEval = CtxStaticEval::new()
         .await
         .expect("error creating eval static environment");
+
+    ctx_eval_static
+        .import_namespace(CtxRaeExec::default())
+        .await
+        .expect("error importing mod-rae-exec in eval-static");
 
     //Add the sender of the channel.
     ctx_io.add_communication(li.subscribe());

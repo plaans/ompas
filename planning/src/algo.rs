@@ -13,7 +13,7 @@ use ompas_lisp::core::structs::llambda::LambdaArgs;
 use ompas_lisp::core::structs::lvalue::LValue;
 use ompas_lisp::core::structs::typelvalue::TypeLValue;
 use ompas_lisp::core::*;
-use ompas_lisp::static_eval::eval_static;
+use ompas_lisp::static_eval::{eval_static, parse_static};
 
 use ompas_utils::blocking_async;
 
@@ -108,7 +108,11 @@ pub fn unify_equal(
                         vec_constraint_to_rm.push(index);
                     }
                     (AtomType::Timepoint, AtomType::Timepoint) => {
-                        sym_table.union_atom(id_1, id_2);
+                        if id_1 < id_2 {
+                            sym_table.union_atom(id_1, id_2);
+                        } else {
+                            sym_table.union_atom(id_2, id_1);
+                        }
                         vec_constraint_to_rm.push(index);
                     }
                     (_, _) => {}
@@ -303,21 +307,41 @@ pub fn translate_lvalue_to_expression_chronicle(
     match exp {
         LValue::Symbol(s) => {
             //Generale case
-            ec.set_lit(symbol_table.declare_new_symbol(s.into(), false).into());
-            ec.add_constraint(Constraint::Eq(ec.get_result().into(), ec.get_lit()));
+            ec.set_pure_result(symbol_table.declare_new_symbol(s.into(), false).into());
+        }
+        LValue::Nil
+        | LValue::True
+        | LValue::Number(_)
+        | LValue::String(_)
+        | LValue::Character(_) => {
+            ec.set_pure_result(lvalue_to_lit(exp, symbol_table)?);
         }
         LValue::List(l) => match &l[0] {
             LValue::CoreOperator(co) => match co {
                 LCoreOperator::Define => {
-                    let var = symbol_table.declare_new_symbol(l[1].to_string(), true);
-                    let val =
-                        translate_lvalue_to_expression_chronicle(&l[2], context, symbol_table)?;
-                    ec.add_constraint(Constraint::Eq(val.get_result().into(), var.into()));
-                    ec.add_constraint(Constraint::Eq(
-                        ec.get_result().into(),
-                        symbol_table.new_bool(false).into(),
-                    ));
-                    ec.absorb(val);
+                    //Todo : handle the case when the first expression is not a symbol, but an expression that must be evaluated
+                    if let LValue::Symbol(s) = &l[1] {
+                        let var = symbol_table.declare_new_symbol(s.clone(), true);
+                        let val =
+                            translate_lvalue_to_expression_chronicle(&l[2], context, symbol_table)?;
+                        if val.is_result_pure() {
+                            ec.add_constraint(Constraint::Eq(
+                                ec.get_interval().start().into(),
+                                ec.get_interval().end().into(),
+                            ))
+                        }
+                        ec.add_constraint(Constraint::Eq(val.get_result(), var.into()));
+                        ec.set_pure_result(symbol_table.new_bool(false).into());
+                        ec.absorb(val);
+                    } else {
+                        return Err(SpecialError(
+                            TRANSLATE_LVALUE_TO_EXPRESSION_CHRONICLE,
+                            format!(
+                                "Define should take as first argument a symbol and {} is not.",
+                                l[1]
+                            ),
+                        ));
+                    }
                 }
                 LCoreOperator::Begin => {
                     symbol_table.new_scope();
@@ -326,29 +350,41 @@ pub fn translate_lvalue_to_expression_chronicle(
                         .expect("begin is not defined in the symbol table")
                         .into()];
                     let mut previous_interval = *ec.get_interval();
-                    for (_i, e) in l[1..].iter().enumerate() {
+
+                    for (i, e) in l[1..].iter().enumerate() {
                         let mut ec_i =
                             translate_lvalue_to_expression_chronicle(e, context, symbol_table)?;
 
-                        literal.push(ec_i.get_result().into());
+                        literal.push(ec_i.get_result());
 
-                        ec_i.add_constraint(Constraint::LT(
+                        ec_i.add_constraint(Constraint::Eq(
                             previous_interval.end().into(),
                             ec_i.get_interval().start().into(),
                         ));
 
                         previous_interval = *ec_i.get_interval();
 
-                        /*if i == l.len() - 2 {
-                            ec.add_constraint(Constraint::Eq(
-                                ec.get_result().into(),
-                                ec_i.get_result().into(),
-                            ))
-                        }*/
+                        if i == l.len() - 2 {
+                            if ec_i.is_result_pure() {
+                                ec.set_pure_result(ec_i.get_result())
+                            } else {
+                                ec.add_effect(Effect {
+                                    interval: *ec.get_interval(),
+                                    transition: Transition::new(
+                                        ec.get_result().into(),
+                                        ec.get_result(),
+                                    ),
+                                });
+                                /*ec.add_constraint(Constraint::Eq(
+                                    ec.get_result().into(),
+                                    ec_i.get_result().into(),
+                                ))*/
+                            }
+                        }
                         ec.absorb(ec_i);
                     }
 
-                    ec.add_constraint(Constraint::LT(
+                    ec.add_constraint(Constraint::Eq(
                         previous_interval.end().into(),
                         ec.get_interval().end().into(),
                     ));
@@ -366,85 +402,191 @@ pub fn translate_lvalue_to_expression_chronicle(
 
                     ec.set_lit(literal);
 
-                    ec.add_effect(Effect {
-                        interval: *ec.get_interval(),
-                        transition: Transition::new(ec.get_result().into(), ec.get_lit()),
-                    });
-                    //ec.add_subtask(expression_chronicle);
                     symbol_table.revert_scope();
                 }
                 LCoreOperator::If => {
                     //We suppose here that the condition is a pure literal condition
+                    //This supposition is no longer taken in account
                     let cond = &l[1];
                     let a = &l[2];
                     let b = &l[3];
 
-                    let cond = translate_cond_if(cond, context, symbol_table)?;
+                    let cond_simplification = true;
 
-                    //Taking in account 1 branch if
-                    if b == &LValue::Nil {
-                        ec.add_condition(Condition {
-                            interval: Interval::new(
-                                &ec.get_interval().start(),
-                                &ec.get_interval().start(),
-                            ),
-                            constraint: Constraint::Eq(cond, symbol_table.new_bool(true).into()),
-                        });
+                    if cond_simplification {
+                        let cond = translate_cond_if(cond, context, symbol_table)?;
+                        //Taking in account 1 branch if
+                        let other_ec;
 
-                        let ec_a =
-                            translate_lvalue_to_expression_chronicle(a, context, symbol_table)?;
+                        if b == &LValue::Nil {
+                            //[e_cond,e_cond] r_cond = true
+                            ec.add_condition(Condition {
+                                interval: Interval::new(
+                                    &ec.get_interval().start(),
+                                    &ec.get_interval().start(),
+                                ),
+                                constraint: Constraint::Eq(
+                                    cond,
+                                    symbol_table.new_bool(true).into(),
+                                ),
+                            });
 
+                            other_ec =
+                                translate_lvalue_to_expression_chronicle(a, context, symbol_table)?;
+                        } else if a == &LValue::Nil {
+                            //[e_cond, e_cond] r_cond = false
+                            ec.add_condition(Condition {
+                                interval: Interval::new(
+                                    &ec.get_interval().start(),
+                                    &ec.get_interval().start(),
+                                ),
+                                constraint: Constraint::Neg(cond),
+                            });
+
+                            other_ec =
+                                translate_lvalue_to_expression_chronicle(b, context, symbol_table)?;
+                        }
+                        //Two blocks where we have to define two methods
+                        else {
+                            return Err(SpecialError(
+                                TRANSLATE_LVALUE_TO_EXPRESSION_CHRONICLE,
+                                "Two branches If block is not supported yet...".to_string(),
+                            ));
+                        }
+
+                        // e_cond < s_a
                         ec.add_constraint(Constraint::Eq(
+                            ec.get_interval().start().into(),
+                            other_ec.get_interval().start().into(),
+                        ));
+                        //e_a = e
+                        ec.add_constraint(Constraint::Eq(
+                            ec.get_interval().end().into(),
+                            other_ec.get_interval().end().into(),
+                        ));
+                        /*ec.add_constraint(Constraint::Eq(
                             ec.get_result().into(),
                             ec_a.get_result().into(),
-                        ));
+                        ));*/
+                        //[e,e] r <- r_a
+                        if other_ec.is_result_pure() {
+                            ec.set_pure_result(other_ec.get_result())
+                        } else {
+                            ec.add_effect(Effect {
+                                interval: Interval::new(
+                                    &ec.get_interval().end(),
+                                    &ec.get_interval().end(),
+                                ),
+                                transition: Transition::new(
+                                    ec.get_result().into(),
+                                    other_ec.get_result().into(),
+                                ),
+                            });
+                        }
+                        ec.absorb(other_ec);
+                    } else {
+                        let ec_cond =
+                            translate_lvalue_to_expression_chronicle(cond, context, symbol_table)?;
+
                         ec.add_constraint(Constraint::Eq(
                             ec.get_interval().start().into(),
-                            ec_a.get_interval().start().into(),
+                            ec_cond.get_interval().start().into(),
                         ));
-                        ec.add_constraint(Constraint::Eq(
-                            ec.get_interval().end().into(),
-                            ec_a.get_interval().end().into(),
-                        ));
-                        ec.absorb(ec_a);
-                    } else if a == &LValue::Nil {
-                        ec.add_condition(Condition {
-                            interval: Interval::new(
-                                &ec.get_interval().start(),
-                                &ec.get_interval().start(),
-                            ),
-                            constraint: Constraint::Neg(cond),
-                        });
+                        //Taking in account 1 branch if
+                        if b == &LValue::Nil {
+                            //[e_cond,e_cond] r_cond = true
+                            ec.add_condition(Condition {
+                                interval: Interval::new(
+                                    &ec_cond.get_interval().end(),
+                                    &ec_cond.get_interval().end(),
+                                ),
+                                constraint: Constraint::Eq(
+                                    ec_cond.get_result().into(),
+                                    symbol_table.new_bool(true).into(),
+                                ),
+                            });
 
-                        let ec_b =
-                            translate_lvalue_to_expression_chronicle(b, context, symbol_table)?;
+                            let ec_a =
+                                translate_lvalue_to_expression_chronicle(a, context, symbol_table)?;
 
-                        ec.add_constraint(Constraint::Eq(
-                            ec.get_result().into(),
-                            ec_b.get_result().into(),
-                        ));
-                        ec.add_constraint(Constraint::Eq(
-                            ec.get_interval().start().into(),
-                            ec_b.get_interval().start().into(),
-                        ));
-                        ec.add_constraint(Constraint::Eq(
-                            ec.get_interval().end().into(),
-                            ec_b.get_interval().end().into(),
-                        ));
-                        ec.absorb(ec_b);
-                    }
-                    //Two blocks where we have to define two methods
-                    else {
-                        return Err(SpecialError(
-                            TRANSLATE_LVALUE_TO_EXPRESSION_CHRONICLE,
-                            "Two branches If block is not supported yet...".to_string(),
-                        ));
+                            // e_cond < s_a
+                            ec.add_constraint(Constraint::Eq(
+                                ec_cond.get_interval().end().into(),
+                                ec_a.get_interval().start().into(),
+                            ));
+                            //e_a = e
+                            ec.add_constraint(Constraint::Eq(
+                                ec.get_interval().end().into(),
+                                ec_a.get_interval().end().into(),
+                            ));
+                            /*ec.add_constraint(Constraint::Eq(
+                                ec.get_result().into(),
+                                ec_a.get_result().into(),
+                            ));*/
+                            //[e,e] r <- r_a
+                            ec.add_effect(Effect {
+                                interval: Interval::new(
+                                    &ec.get_interval().end(),
+                                    &ec.get_interval().end(),
+                                ),
+                                transition: Transition::new(
+                                    ec.get_result().into(),
+                                    ec_a.get_result().into(),
+                                ),
+                            });
+                            ec.absorb(ec_a);
+                        } else if a == &LValue::Nil {
+                            //[e_cond, e_cond] r_cond = false
+                            ec.add_condition(Condition {
+                                interval: Interval::new(
+                                    &ec.get_interval().start(),
+                                    &ec.get_interval().start(),
+                                ),
+                                constraint: Constraint::Neg(ec_cond.get_result().into()),
+                            });
+
+                            let ec_b =
+                                translate_lvalue_to_expression_chronicle(b, context, symbol_table)?;
+
+                            /*ec.add_constraint(Constraint::Eq(
+                                ec.get_result().into(),
+                                ec_b.get_result().into(),
+                            ));*/
+                            //e_cond = s_b
+                            ec.add_constraint(Constraint::Eq(
+                                ec_cond.get_interval().end().into(),
+                                ec_b.get_interval().start().into(),
+                            ));
+                            //e_b = e
+                            ec.add_constraint(Constraint::Eq(
+                                ec.get_interval().end().into(),
+                                ec_b.get_interval().end().into(),
+                            ));
+                            //[e,e] r <- r_b
+                            ec.add_effect(Effect {
+                                interval: Interval::new(
+                                    &ec.get_interval().end(),
+                                    &ec.get_interval().end(),
+                                ),
+                                transition: Transition::new(
+                                    ec.get_result().into(),
+                                    ec_b.get_result().into(),
+                                ),
+                            });
+                            ec.absorb(ec_b);
+                        }
+                        //Two blocks where we have to define two methods
+                        else {
+                            return Err(SpecialError(
+                                TRANSLATE_LVALUE_TO_EXPRESSION_CHRONICLE,
+                                "Two branches If block is not supported yet...".to_string(),
+                            ));
+                        }
+                        ec.absorb(ec_cond);
                     }
                 }
                 LCoreOperator::Quote => {
-                    ec.set_lit(lvalue_to_lit(&l[1], symbol_table)?);
-                    ec.add_constraint(Constraint::Eq(ec.get_lit(), ec.get_result().into()))
-                    //ec = translate_lvalue_to_expression_chronicle(&l[1], context, symbol_table)?;
+                    ec.set_pure_result(lvalue_to_lit(&l[1], symbol_table)?);
                 }
                 co => {
                     return Err(SpecialError(
@@ -454,6 +596,19 @@ pub fn translate_lvalue_to_expression_chronicle(
                 }
             },
             _ => {
+                /*let plvalue = eval_static(exp, &mut context.env.clone())?;
+
+                if plvalue.is_pure() {
+                    ec.add_constraint(Constraint::Eq(
+                        ec.get_result().into(),
+                        lvalue_to_lit(plvalue.get_lvalue(), symbol_table)?,
+                    ));
+                    ec.add_constraint(Constraint::Eq(
+                        ec.get_interval().start().into(),
+                        ec.get_interval().end().into(),
+                    ));
+                    return Ok(ec);
+                }*/
                 let mut expression_type = ExpressionType::Lisp;
 
                 symbol_table.new_scope();
@@ -487,18 +642,15 @@ pub fn translate_lvalue_to_expression_chronicle(
                                 ec.add_effect(Effect {
                                     interval: *ec.get_interval(),
                                     transition: Transition::new(
-                                        state_variable.get_lit(),
-                                        value.get_lit(),
+                                        state_variable.get_result(),
+                                        value.get_result(),
                                     ),
                                 });
 
                                 ec.absorb(state_variable);
                                 ec.absorb(value);
 
-                                ec.add_constraint(Constraint::Eq(
-                                    ec.get_result().into(),
-                                    symbol_table.new_bool(false).into(),
-                                ));
+                                ec.set_pure_result(symbol_table.new_bool(false).into());
 
                                 return Ok(ec);
                             }
@@ -548,13 +700,15 @@ pub fn translate_lvalue_to_expression_chronicle(
                 }
 
                 let mut previous_interval = *ec.get_interval();
+                let mut is_pure = true;
                 for e in &l[1..] {
                     let mut ec_i =
                         translate_lvalue_to_expression_chronicle(e, context, symbol_table)?;
 
+                    is_pure &= ec_i.is_result_pure();
                     literal.push(ec_i.get_result().into());
 
-                    ec_i.add_constraint(Constraint::LT(
+                    ec_i.add_constraint(Constraint::Eq(
                         previous_interval.end().into(),
                         ec_i.get_interval().start().into(),
                     ));
@@ -570,21 +724,64 @@ pub fn translate_lvalue_to_expression_chronicle(
 
                 match expression_type {
                     ExpressionType::Pure | ExpressionType::Lisp => {
-                        let literal: Lit = vec![
-                            symbol_table
-                                .id(EVAL)
-                                .expect("Eval not defined in symbol table")
-                                .into(),
-                            Lit::from(literal),
-                        ]
-                        .into();
+                        let mut env = context.env.clone();
+                        let mut is_pure = false;
 
-                        ec.set_lit(literal);
+                        let mut string = "(".to_string();
+                        for (i, element) in literal.iter().enumerate() {
+                            if i == 0 {
+                                string
+                                    .push_str(element.format_with_sym_table(symbol_table).as_str());
+                                string.push(' ');
+                            } else {
+                                string.push_str(
+                                    format!(
+                                        "(quote {})",
+                                        element.format_with_sym_table(symbol_table)
+                                    )
+                                    .as_str(),
+                                );
+                            }
+                        }
+                        string.push(')');
 
-                        ec.add_effect(Effect {
-                            interval: *ec.get_interval(),
-                            transition: Transition::new(ec.get_result().into(), ec.get_lit()),
-                        });
+                        println!("expression to be evaluated : {}", string);
+
+                        let result = parse_static(string.as_str(), &mut env);
+                        if let Ok(result) = result {
+                            if result.is_pure() {
+                                let result = eval_static(result.get_lvalue(), &mut env);
+                                if let Ok(result) = result {
+                                    if result.is_pure() {
+                                        ec.set_pure_result(lvalue_to_lit(
+                                            result.get_lvalue(),
+                                            symbol_table,
+                                        )?);
+                                        is_pure = true;
+                                        println!(
+                                            "eval static is a success! result is: {}",
+                                            result.get_lvalue()
+                                        );
+                                    }
+                                }
+                            }
+                        } else {
+                        }
+                        if !is_pure {
+                            let literal: Lit = vec![
+                                symbol_table
+                                    .id(EVAL)
+                                    .expect("Eval not defined in symbol table")
+                                    .into(),
+                                Lit::from(literal),
+                            ]
+                            .into();
+
+                            ec.add_effect(Effect {
+                                interval: *ec.get_interval(),
+                                transition: Transition::new(ec.get_result(), literal),
+                            });
+                        }
                     }
                     ExpressionType::Action | ExpressionType::Task => ec.add_subtask(Expression {
                         interval: *ec.get_interval(),
@@ -595,21 +792,13 @@ pub fn translate_lvalue_to_expression_chronicle(
 
                         ec.add_effect(Effect {
                             interval: *ec.get_interval(),
-                            transition: Transition::new(ec.get_result().into(), ec.get_lit()),
+                            transition: Transition::new(ec.get_result().into(), ec.get_result()),
                         });
                     }
-                }
+                };
                 symbol_table.revert_scope();
             }
         },
-        LValue::Nil
-        | LValue::True
-        | LValue::Number(_)
-        | LValue::String(_)
-        | LValue::Character(_) => {
-            ec.set_lit(lvalue_to_lit(exp, symbol_table)?);
-            ec.add_constraint(Constraint::Eq(ec.get_result().into(), ec.get_lit()))
-        }
         lv => {
             return Err(SpecialError(
                 TRANSLATE_LVALUE_TO_EXPRESSION_CHRONICLE,
@@ -678,7 +867,6 @@ pub fn translate_cond_if(
         )),
     }
 }
-
 pub const TRANSFORM_LAMBDA_EXPRESSION: &str = "transform-lambda-expression";
 
 pub fn transform_lambda_expression(lv: &LValue, env: LEnv) -> LResult {

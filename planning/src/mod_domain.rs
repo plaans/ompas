@@ -3,6 +3,7 @@
 use crate::algo::{
     pre_processing, transform_lambda_expression, translate_cond_if,
     translate_domain_env_to_hierarchy, translate_lvalue_to_chronicle,
+    translate_lvalue_to_expression_chronicle,
 };
 use crate::structs::{ConversionContext, FormatWithSymTable, SymTable};
 use ::macro_rules_attribute::macro_rules_attribute;
@@ -28,6 +29,7 @@ use ompas_lisp::modules::advanced_math::CtxMath;
 use ompas_lisp::modules::utils::CtxUtils;
 use ompas_utils::dyn_async;
 use std::sync::{Arc, RwLock};
+use std::time::SystemTime;
 
 //LANGUAGE
 const MOD_DOMAIN: &str = "domain";
@@ -258,19 +260,29 @@ async fn translate_expr<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     let lv = expand(&args[0], true, &mut env).await?;
 
     let mut symbol_table = SymTable::default();
-    let chronicle = translate_lvalue_to_chronicle(&lv, &ctx.into(), &mut symbol_table)?;
+    let time = SystemTime::now();
+    let chronicle = translate_lvalue_to_expression_chronicle(&lv, &ctx.into(), &mut symbol_table)?;
+    let time = time.elapsed().expect("could not get time").as_micros();
     let string = chronicle.format_with_sym_table(&symbol_table);
-    Ok(string.into())
+
+    Ok(format!("{}\n\n Time to convert: {} µs.", string, time).into())
 }
 
 pub fn translate_domain(_: &[LValue], env: &LEnv) -> LResult {
     let ctx = env.get_context::<CtxDomain>(MOD_DOMAIN)?;
+    let time = SystemTime::now();
     let (domain, st) = translate_domain_env_to_hierarchy(ConversionContext {
         domain: ctx.domain.read().unwrap().clone(),
         env: ctx.env.clone(),
     })?;
+    let time = time.elapsed().expect("could not get time").as_micros();
 
-    Ok(domain.format_with_sym_table(&st).into())
+    Ok(format!(
+        "{}\n\nTime to convert: {} µs.",
+        domain.format_with_sym_table(&st),
+        time
+    )
+    .into())
 }
 
 pub fn translate_cond_expr(args: &[LValue], env: &LEnv) -> LResult {

@@ -109,7 +109,7 @@ impl Display for Sym {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Unique(s) => write!(f, "{}", s),
-            Self::Several(s, i) => write!(f, "{}({})", s, i),
+            Self::Several(s, i) => write!(f, "{}_{}", s, i),
         }
     }
 }
@@ -347,13 +347,13 @@ impl SymTable {
 
     //Declare a new return value
     //The name of the return value will be format!("r_{}", last_return_index)
-    pub fn declare_new_result(&mut self) -> AtomId {
+    pub fn declare_new_result(&mut self) -> ExpressionChronicleResult {
         let n = self.symbol_types.get_number_of_type(&AtomType::Result);
         let sym: Sym = format!("r_{}", n).into();
         let id = self.symbols.new_node((&sym).into());
         self.ids.insert(sym, id);
         self.symbol_types.add_new_atom(id, AtomType::Result);
-        id
+        ExpressionChronicleResult { id, pure: None }
     }
 
     pub fn unique_to_several(&mut self, sym: &str) {
@@ -499,7 +499,7 @@ impl Chronicle {
     pub fn absorb_expression_chronicle(&mut self, ec: ExpressionChronicle) {
         self.partial_chronicle.absorb(ec.partial_chronicle);
         //add result
-        self.add_var(&ec.result);
+        self.add_var(&ec.result.get_id());
 
         //add interval
         self.add_interval(&ec.interval);
@@ -673,9 +673,42 @@ impl PartialChronicle {
     }
 }
 
+#[derive(Clone, Default)]
+pub struct ExpressionChronicleResult {
+    id: AtomId,
+    pure: Option<Lit>,
+}
+
+impl ExpressionChronicleResult {
+    pub fn get_id(&self) -> &AtomId {
+        &self.id
+    }
+
+    pub fn set_pure(&mut self, lit: Lit) {
+        self.pure = Some(lit)
+    }
+
+    pub fn is_pure(&self) -> bool {
+        self.pure.is_some()
+    }
+
+    pub fn get_pure(&self) -> &Option<Lit> {
+        &self.pure
+    }
+}
+
+impl From<ExpressionChronicleResult> for Lit {
+    fn from(ecr: ExpressionChronicleResult) -> Self {
+        match ecr.pure {
+            Some(lit) => lit.clone(),
+            None => ecr.id.into(),
+        }
+    }
+}
+
 pub struct ExpressionChronicle {
     interval: Interval,
-    result: AtomId,
+    result: ExpressionChronicleResult,
     partial_chronicle: PartialChronicle,
     value: Lit,
     debug: LValue,
@@ -697,6 +730,10 @@ impl ExpressionChronicle {
     pub fn rm_set_constraint(&mut self, indexes: Vec<usize>) {
         self.partial_chronicle.rm_set_constraint(indexes)
     }
+
+    pub fn set_pure_result(&mut self, result: Lit) {
+        self.result.set_pure(result)
+    }
 }
 
 impl ExpressionChronicle {
@@ -704,8 +741,16 @@ impl ExpressionChronicle {
         &self.interval
     }
 
-    pub fn get_result(&self) -> &AtomId {
-        &self.result
+    pub fn get_result(&self) -> Lit {
+        self.result.clone().into()
+    }
+
+    pub fn is_result_pure(&self) -> bool {
+        self.result.is_pure()
+    }
+
+    pub fn get_result_id(&self) -> &AtomId {
+        &self.result.get_id()
     }
 
     pub fn get_constraints(&self) -> &Vec<Constraint> {
@@ -723,13 +768,16 @@ impl ExpressionChronicle {
     pub fn new(lv: LValue, st: &mut SymTable) -> Self {
         let interval = st.declare_new_interval();
         let result = st.declare_new_result();
-        Self {
+        let mut ec = Self {
             interval,
             result,
             partial_chronicle: Default::default(),
             value: Lit::Exp(vec![]),
             debug: lv,
-        }
+        };
+
+        ec.add_constraint(Constraint::LEq(interval.start.into(), interval.end.into()));
+        ec
     }
 
     pub fn set_lit(&mut self, lit: Lit) {
@@ -778,23 +826,30 @@ impl Absorb for ExpressionChronicle {
         ));*/
         self.partial_chronicle.absorb(other.partial_chronicle);
         self.add_interval(&other.interval);
-        self.add_var(&other.result);
+        self.add_var(&other.result.get_id());
     }
 }
 
 impl FormatWithSymTable for ExpressionChronicle {
     fn format_with_sym_table(&self, st: &SymTable) -> String {
-        let mut s = String::new();
-
-        s.push_str(
+        let mut s = if self.result.is_pure() {
+            format!(
+                "{} {}\n",
+                self.interval.format_with_sym_table(st),
+                self.result
+                    .get_pure()
+                    .clone()
+                    .unwrap()
+                    .format_with_sym_table(st),
+            )
+        } else {
             format!(
                 "{} {} <- {}\n",
                 self.interval.format_with_sym_table(st),
-                st.get_sym(&self.result),
+                st.get_sym(self.result.get_id()),
                 self.debug
             )
-            .as_str(),
-        );
+        };
         s.push_str(
             format!(
                 "subchronicle: \n{}",
@@ -974,6 +1029,7 @@ impl FormatWithSymTable for Lit {
 
 #[derive(Clone)]
 pub enum Constraint {
+    LEq(Lit, Lit),
     Eq(Lit, Lit),
     Neg(Lit),
     LT(Lit, Lit),
@@ -1005,6 +1061,13 @@ impl FormatWithSymTable for Constraint {
                 l1.format_with_sym_table(st),
                 l2.format_with_sym_table(st)
             ),
+            Constraint::LEq(l1, l2) => {
+                format!(
+                    "({} <= {})",
+                    l1.format_with_sym_table(st),
+                    l2.format_with_sym_table(st)
+                )
+            }
         }
     }
 }

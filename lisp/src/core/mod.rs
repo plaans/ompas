@@ -4,6 +4,7 @@ use crate::core::structs::lcoreoperator::language::*;
 use crate::core::structs::lcoreoperator::LCoreOperator;
 use crate::core::structs::lcoreoperator::LCoreOperator::Quote;
 use crate::core::structs::lenv::LEnv;
+use crate::core::structs::lerror;
 use crate::core::structs::lerror::LError::{
     NotInListOfExpectedTypes, WrongNumberOfArgument, WrongType,
 };
@@ -705,3 +706,168 @@ pub async fn eval(lv: &LValue, env: &mut LEnv) -> LResult {
         }
     }
 }
+/*
+pub fn eval_non_recursive(lv: &LValue, env: &mut LEnv) -> lerror::Result<LValue> {
+    if let LValue::Symbol(s) = &lv {
+        let result = match env.get_symbol(s.as_str()) {
+            None => lv.clone(),
+            Some(lv) => lv,
+        };
+        if get_debug() {
+            println!("{} => {}", str, result)
+        }
+        return Ok(result);
+    } else if let LValue::List(list) = &lv {
+        //println!("expression is a list");
+        let list = list.as_slice();
+        let proc = &list[0];
+        let args = &list[1..];
+        //assert!(args.len() >= 2, "Checked in expansion");
+        if let LValue::CoreOperator(co) = proc {
+            match co {
+                LCoreOperator::Define => {
+                    match &args[0] {
+                        LValue::Symbol(s) => {
+                            env.insert(s.to_string(), args[1].clone());
+                        }
+                        lv => {
+                            return Err(WrongType(
+                                "eval",
+                                lv.clone(),
+                                lv.into(),
+                                TypeLValue::Symbol,
+                            ))
+                        }
+                    };
+                    if get_debug() {
+                        println!("{} => {}", str, LValue::Nil);
+                    }
+                    return Ok(LValue::Nil);
+                }
+                LCoreOperator::DefLambda => {
+                    //println!("it is a lambda");
+                    let params = match &args[0] {
+                        LValue::List(list) => {
+                            let mut vec_sym = Vec::new();
+                            for val in list {
+                                match val {
+                                    LValue::Symbol(s) => vec_sym.push(s.clone()),
+                                    lv => {
+                                        return Err(WrongType(
+                                            "eval",
+                                            lv.clone(),
+                                            lv.into(),
+                                            TypeLValue::Symbol,
+                                        ))
+                                    }
+                                }
+                            }
+                            vec_sym.into()
+                        }
+                        LValue::Symbol(s) => s.clone().into(),
+                        LValue::Nil => LambdaArgs::Nil,
+                        lv => {
+                            return Err(NotInListOfExpectedTypes(
+                                "eval",
+                                lv.clone(),
+                                lv.into(),
+                                vec![TypeLValue::List, TypeLValue::Symbol],
+                            ))
+                        }
+                    };
+                    let body = &args[1];
+                    let r_lvalue =
+                        LValue::Lambda(LLambda::new(params, body.clone(), env.get_symbols()));
+                    if get_debug() {
+                        println!("{} => {}", str, r_lvalue);
+                    }
+                    Ok(r_lvalue)
+                }
+                LCoreOperator::If => {
+                    let test = &args[0];
+                    let conseq = &args[1];
+                    let alt = &args[2];
+                    match &args[0] {
+                        LValue::True => Ok(conseq.clone()),
+                        LValue::Nil => Ok(alt.clone()),
+                        lv => {
+                            return Err(WrongType("eval", lv.clone(), lv.into(), TypeLValue::Bool))
+                        }
+                    }
+                }
+                LCoreOperator::Quote => {
+                    if get_debug() {
+                        println!("{} => {}", str, &args[0].clone());
+                    }
+                    Ok(args[0].clone())
+                }
+                LCoreOperator::Begin => {
+                    let firsts = &args[0..args.len() - 1];
+                    let last = args.last().unwrap();
+
+                    for e in firsts {
+                        eval(e, env).await?;
+                    }
+                    Ok(last.clone())
+                }
+                LCoreOperator::QuasiQuote | LCoreOperator::UnQuote | LCoreOperator::DefMacro => {
+                    return Ok(LValue::Nil)
+                }
+                LCoreOperator::Eval => {
+                    let arg = &args[0];
+                    expand(&eval(arg, env).await?, true, env).await
+                }
+                LCoreOperator::Parse => {
+                    if let LValue::String(s) = eval(&args[0], env).await? {
+                        parse(s.as_str(), env).await
+                    } else {
+                        return Err(WrongType(
+                            "eval",
+                            args[0].clone(),
+                            (&args[0]).into(),
+                            TypeLValue::String,
+                        ));
+                    }
+                }
+                LCoreOperator::Expand => {
+                    let arg = &args[0];
+                    expand(&eval(arg, env).await?, true, env).await
+                }
+                LCoreOperator::Async => {}
+                LCoreOperator::Await => {}
+            }
+        } else {
+            /*let exps = list
+            .iter()
+            .map(|x| eval(x, &mut env, ctxs).await)
+            .collect::<Result<Vec<LValue>, _>>()?;*/
+            let proc = &list[0];
+            let args = &list[1..];
+            match proc {
+                LValue::Lambda(l) => l.call(args, env).await,
+                LValue::Fn(fun) => {
+                    let r_lvalue = fun.call(args, env)?;
+                    if get_debug() {
+                        println!("{} => {}", str, r_lvalue);
+                    }
+                    return Ok(r_lvalue);
+                }
+                LValue::AsyncFn(fun) => {
+                    let r_lvalue = fun.call(args, env).await?;
+                    if get_debug() {
+                        println!("{} => {}", str, r_lvalue);
+                    }
+                    return Ok(r_lvalue);
+                }
+                lv => {
+                    return Err(WrongType("eval", lv.clone(), lv.into(), TypeLValue::Fn));
+                }
+            };
+        }
+    } else {
+        if get_debug() {
+            println!("{} => {}", str, lv.clone());
+        }
+        return Ok(lv.clone());
+    }
+}*/

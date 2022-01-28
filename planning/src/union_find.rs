@@ -1,10 +1,17 @@
 use std::clone::Clone;
+use std::cmp::Ordering;
 use std::collections::{HashMap, VecDeque};
 use std::fmt::{Debug, Display, Formatter};
 
 #[derive(Default, Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct NodeId {
     inner: usize,
+}
+
+impl PartialOrd for NodeId {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.inner.partial_cmp(&other.inner)
+    }
 }
 
 impl From<&usize> for NodeId {

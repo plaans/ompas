@@ -157,7 +157,7 @@ impl LispInterpreter {
                 Ok(lv) => match eval(&lv, &mut self.env).await {
                     Ok(lv) => {
                         self.li_channel
-                            .send(&id_subscriber, lv.pretty_print(0))
+                            .send(&id_subscriber, lv.format(0))
                             .await
                             .expect("error on channel to stdout");
                     }

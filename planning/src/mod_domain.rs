@@ -2,14 +2,12 @@
 
 use crate::algo::{
     pre_processing, transform_lambda_expression, translate_cond_if,
-    translate_domain_env_to_hierarchy, translate_lvalue_to_chronicle,
-    translate_lvalue_to_expression_chronicle,
+    translate_domain_env_to_hierarchy, translate_lvalue_to_expression_chronicle,
 };
 use crate::structs::{ConversionContext, FormatWithSymTable, SymTable};
 use ::macro_rules_attribute::macro_rules_attribute;
 use ompas_acting::rae::context::rae_env::*;
 use ompas_acting::rae::context::rae_state::{LState, RAEState, StateType};
-use ompas_acting::rae::module::mod_rae::CtxRae;
 use ompas_acting::rae::module::mod_rae_description::*;
 use ompas_acting::rae::module::rae_exec::CtxRaeExec;
 use ompas_lisp::core::root_module::list::cons;
@@ -350,8 +348,8 @@ pub fn lisp_pre_processing_domain(_: &[LValue], env: &LEnv) -> LResult {
             format!(
                 "{}:\n\tbefore: {}\n\tafter: {}\n",
                 action_label,
-                action.get_sim().pretty_print("\tbefore: ".len()),
-                pre_processed.pretty_print("\tafter: ".len()),
+                action.get_sim().format("\tbefore: ".len()),
+                pre_processed.format("\tafter: ".len()),
             )
             .as_str(),
         );

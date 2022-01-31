@@ -4,7 +4,6 @@ use crate::core::structs::lcoreoperator::language::*;
 use crate::core::structs::lcoreoperator::LCoreOperator;
 use crate::core::structs::lcoreoperator::LCoreOperator::Quote;
 use crate::core::structs::lenv::LEnv;
-use crate::core::structs::lerror;
 use crate::core::structs::lerror::LError::{
     NotInListOfExpectedTypes, WrongNumberOfArgument, WrongType,
 };

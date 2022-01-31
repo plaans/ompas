@@ -145,6 +145,7 @@ pub enum AtomType {
     Method,
     Task,
     Function,
+    Lambda,
 }
 
 impl Display for AtomType {
@@ -161,6 +162,7 @@ impl Display for AtomType {
             AtomType::Number => write!(f, "number"),
             AtomType::Boolean => write!(f, "boolean"),
             AtomType::Symbol => write!(f, "symbol"),
+            AtomType::Lambda => write!(f, "lambda"),
         }
     }
 }
@@ -218,6 +220,7 @@ impl Default for TypesNumber {
         types_number.insert(AtomType::Method, 0);
         types_number.insert(AtomType::Task, 0);
         types_number.insert(AtomType::Function, 0);
+        types_number.insert(AtomType::Lambda, 1);
         Self {
             inner: types_number,
         }
@@ -454,8 +457,8 @@ impl SymTable {
 
 #[derive(Clone, Default)]
 pub struct Chronicle {
-    name: Vec<AtomId>,
-    task: Vec<AtomId>,
+    name: Lit,
+    task: Lit,
     partial_chronicle: PartialChronicle,
     debug: Option<LValue>,
 }
@@ -464,24 +467,14 @@ impl FormatWithSymTable for Chronicle {
     fn format_with_sym_table(&self, st: &SymTable) -> String {
         let mut s = String::new();
         //name
-        s.push_str("-name: ");
-        for e in &self.name {
-            s.push_str(st.get_sym(e).to_string().as_str());
-            s.push(' ');
-        }
-        s.push('\n');
+        s.push_str(format!("-name: {}\n", self.name.format_with_sym_table(st)).as_str());
         //task
-        s.push_str("-task: ");
-        for e in &self.task {
-            s.push_str(st.get_sym(e).to_string().as_str());
-            s.push(' ');
-        }
-        s.push('\n');
+        s.push_str(format!("-task: {}\n", self.task.format_with_sym_table(st)).as_str());
         s.push_str(self.partial_chronicle.format_with_sym_table(st).as_str());
 
         //Debug
         if let Some(exp) = &self.debug {
-            s.push_str(format!("debug: {}", exp.pretty_print("debug: ".len())).as_str());
+            s.push_str(format!("debug: {}", exp.format("debug: ".len())).as_str());
             //s.push_str(format!("debug: {:?}", exp).as_str());
         }
 
@@ -532,11 +525,11 @@ impl Chronicle {
         self.partial_chronicle.add_subtask(sub_task)
     }
 
-    pub fn set_name(&mut self, name: Vec<AtomId>) {
+    pub fn set_name(&mut self, name: Lit) {
         self.name = name;
     }
 
-    pub fn set_task(&mut self, task: Vec<AtomId>) {
+    pub fn set_task(&mut self, task: Lit) {
         self.task = task;
     }
 }
@@ -949,6 +942,12 @@ pub enum Lit {
     Atom(AtomId),
     Constraint(Box<Constraint>),
     Exp(Vec<Lit>),
+}
+
+impl Default for Lit {
+    fn default() -> Self {
+        Self::Exp(vec![])
+    }
 }
 
 impl From<&AtomId> for Lit {

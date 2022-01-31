@@ -193,10 +193,9 @@ impl Display for Method {
             -body: {}\n",
             self.task_label,
             self.parameters,
-            self.lambda_pre_conditions
-                .pretty_print("pre-conditions: ".len()),
-            self.lambda_score.pretty_print("score: ".len()),
-            self.lambda_body.pretty_print("body: ".len())
+            self.lambda_pre_conditions.format("pre-conditions: ".len()),
+            self.lambda_score.format("score: ".len()),
+            self.lambda_body.format("body: ".len())
         )
     }
 }
@@ -247,7 +246,7 @@ impl Display for Task {
             -body: {}\n\
             -methods: {}\n",
             self.parameters,
-            self.body.pretty_print("body: ".len()),
+            self.body.format("body: ".len()),
             str_methods
         )
     }
@@ -281,7 +280,7 @@ impl Display for StateFunction {
             f,
             "parameters : {}, body: {}",
             self.parameters,
-            self.body.pretty_print("exec: ".len()),
+            self.body.format("exec: ".len()),
         )
     }
 }
@@ -323,8 +322,8 @@ impl Display for Action {
             f,
             "parameters : {}\n exec: {}\n sim: {} ",
             self.parameters,
-            self.exec.pretty_print("exec: ".len()),
-            self.sim.pretty_print("sim: ".len())
+            self.exec.format("exec: ".len()),
+            self.sim.format("sim: ".len())
         )
     }
 }
@@ -518,7 +517,7 @@ impl DomainEnv {
     pub fn print_lambdas(&self) -> String {
         let mut str = "*LAMBDAS:\n".to_string();
         for (label, value) in &self.lambdas {
-            str.push_str(format!("\t-{}:\n{}\n", label, value.pretty_print(0)).as_str())
+            str.push_str(format!("\t-{}:\n{}\n", label, value.format(0)).as_str())
         }
         str
     }

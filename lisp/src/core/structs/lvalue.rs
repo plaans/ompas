@@ -65,10 +65,10 @@ impl LValue {
             if first {
                 first = false;
                 string.push(' ');
-                string.push_str(element.pretty_print(indent).as_str());
+                string.push_str(element.format(indent).as_str());
             } else {
                 string.push_str(
-                    format!("\n{}{}", " ".repeat(indent), element.pretty_print(indent)).as_str(),
+                    format!("\n{}{}", " ".repeat(indent), element.format(indent)).as_str(),
                 );
             }
         }
@@ -82,9 +82,9 @@ impl LValue {
         let mut global_size = 0;
         let mut vec_pretty_printed = vec![];
         for element in list {
-            let pretty_printed = element.pretty_print(indent + TAB_SIZE);
+            let pretty_printed = element.format(indent + TAB_SIZE);
             global_size += pretty_printed.len();
-            vec_pretty_printed.push(element.pretty_print(indent + TAB_SIZE));
+            vec_pretty_printed.push(element.format(indent + TAB_SIZE));
         }
 
         if global_size < MAX_LENGTH + indent {
@@ -115,14 +115,14 @@ impl LValue {
         string
     }
 
-    pub fn pretty_print(&self, indent: usize) -> String {
+    pub fn format(&self, indent: usize) -> String {
         match self {
             LValue::Lambda(l) => {
                 format!(
                     "(lambda {}\n{}{})",
                     l.get_params(),
                     " ".repeat(indent + TAB_SIZE),
-                    l.get_body().pretty_print(indent + TAB_SIZE)
+                    l.get_body().format(indent + TAB_SIZE)
                 )
             }
             LValue::List(list) => {
@@ -136,7 +136,7 @@ impl LValue {
                                     format!(
                                         "\n{}{}",
                                         " ".repeat(indent),
-                                        element.pretty_print(indent + TAB_SIZE)
+                                        element.format(indent + TAB_SIZE)
                                     )
                                     .as_str(),
                                 );
@@ -162,16 +162,14 @@ impl LValue {
                                     for (i, binding) in bindings.iter().enumerate() {
                                         if i == 0 {
                                             string.push_str(
-                                                binding
-                                                    .pretty_print(indent + 1 + TAB_SIZE)
-                                                    .as_str(),
+                                                binding.format(indent + 1 + TAB_SIZE).as_str(),
                                             );
                                         } else {
                                             string.push_str(
                                                 format!(
                                                     "\n{}{}",
                                                     " ".repeat(indent + 1),
-                                                    binding.pretty_print(indent + 1 + TAB_SIZE)
+                                                    binding.format(indent + 1 + TAB_SIZE)
                                                 )
                                                 .as_str(),
                                             );
@@ -185,7 +183,7 @@ impl LValue {
                                     format!(
                                         "\n{}{}",
                                         " ".repeat(indent),
-                                        body.pretty_print(indent + TAB_SIZE)
+                                        body.format(indent + TAB_SIZE)
                                     )
                                     .as_str(),
                                 );
@@ -198,9 +196,9 @@ impl LValue {
 
                                 format!(
                                     "(lambda {}\n{}{}",
-                                    args.pretty_print(indent + TAB_SIZE),
+                                    args.format(indent + TAB_SIZE),
                                     " ".repeat(indent + TAB_SIZE),
-                                    body.pretty_print(indent + TAB_SIZE)
+                                    body.format(indent + TAB_SIZE)
                                 )
                             }
                             COND => LValue::pretty_print_list_aligned(COND, &list[1..], indent),

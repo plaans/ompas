@@ -1,6 +1,7 @@
 use crate::structs::Constraint;
 use crate::structs::Lit;
 use crate::structs::*;
+use im::HashMap;
 use ompas_acting::rae::module::rae_exec::{RAE_ASSERT, RAE_RETRACT};
 use ompas_lisp::core::structs::lcoreoperator::language::{BEGIN, EVAL};
 use ompas_lisp::core::structs::lcoreoperator::LCoreOperator;
@@ -21,8 +22,8 @@ use ompas_utils::blocking_async;
 
 //const PRE_PROCESSING: &str = "pre_processing";
 const TRANSLATE_LVALUE_TO_EXPRESSION_CHRONICLE: &str = "translate_lvalue_to_expression_chronicle";
-
 const TRANSLATE_LVALUE_TO_CHRONICLE: &str = "translate_lvalue_to_chronicle";
+const TRANSFORM_DOMAIN_ENV_TO_HIERARCHY: &str = "transform_domain_env_to_hierarchy";
 
 pub fn pre_processing(lv: &LValue, context: &ConversionContext) -> LResult {
     let lv = pre_process_transform_lambda(lv, context)?;
@@ -32,11 +33,11 @@ pub fn pre_processing(lv: &LValue, context: &ConversionContext) -> LResult {
     lv
 }
 
-pub fn pre_eval(lv: &LValue, context: &ConversionContext) -> LResult {
-    let mut env = context.env.clone();
-    let plv = eval_static(lv, &mut env)?;
-
-    Ok(plv.get_lvalue().clone())
+pub fn pre_eval(lv: &LValue, _context: &ConversionContext) -> LResult {
+    //let mut env = context.env.clone();
+    //let plv = eval_static(lv, &mut env)?;
+    //Ok(plv.get_lvalue().clone());
+    Ok(lv.clone())
 }
 
 pub fn pre_process_transform_lambda(lv: &LValue, context: &ConversionContext) -> LResult {
@@ -173,12 +174,22 @@ pub fn translate_domain_env_to_hierarchy(
     symbol_table.add_list_of_symbols_of_same_type(tasks, &AtomType::Task)?;
 
     //Add actions, tasks and methods symbols to symbol_table:
-    #[allow(unused_mut)]
     let mut methods = vec![];
-    #[allow(unused_mut)]
-    let mut tasks = vec![];
-    #[allow(unused_mut)]
+    let mut tasks_lits = HashMap::new();
     let mut actions = vec![];
+
+    //Add tasks to domain
+    for (task_label, task) in context.domain.get_tasks() {
+        let mut task_lit: Vec<Lit> = vec![symbol_table
+            .id(task_label)
+            .expect("symbol of task should be defined")
+            .into()];
+
+        for param in task.get_parameters().get_params() {
+            task_lit.push(symbol_table.declare_new_symbol(param, true).into())
+        }
+        tasks_lits.insert(task_label, Lit::from(task_lit));
+    }
 
     for (action_label, action) in context.domain.get_actions() {
         //evaluate the lambda sim.
@@ -197,62 +208,65 @@ pub fn translate_domain_env_to_hierarchy(
             chronicle.add_var(&symbol_id);
         }
 
-        chronicle.set_name(name);
+        chronicle.set_name(name.into());
 
         actions.push(chronicle)
     }
 
-    /*//Add all methods to the domain
+    //Add all methods to the domain
     for (method_label, method) in context.domain.get_methods() {
         let mut chronicle =
             translate_lvalue_to_chronicle(method.get_body(), &context, &mut symbol_table)?;
 
-        //Declaring the method
-        {
-            let pre_conditions = translate_lvalue_to_expression_chronicle(
-                method.get_pre_conditions(),
-                &context,
-                &mut symbol_table,
-            )?;
+        /*let pre_conditions = translate_lvalue_to_expression_chronicle(
+            method.get_pre_conditions(),
+            &context,
+            &mut symbol_table,
+        )?;*/
 
-            chronicle.absorb_expression_chronicle(pre_conditions);
+        //chronicle.absorb_expression_chronicle(pre_conditions);
 
-            let symbol_id = *symbol_table
-                .id(method_label)
-                .unwrap_or_else(|| panic!("{} was not well defined", method_label));
-            let mut name = vec![symbol_id];
+        let task = tasks_lits.get(method.get_task_label()).unwrap();
+        let symbol_id = *symbol_table
+            .id(method_label)
+            .unwrap_or_else(|| panic!("{} was not well defined", method_label));
+        let mut name = vec![symbol_id.into()];
 
-            for e in method.get_parameters().get_params() {
+        if let Lit::Exp(exp) = task {
+            chronicle.set_task(task.clone());
+            for param in &exp[1..] {
+                if let Lit::Atom(atom) = param {
+                    chronicle.add_var(atom);
+                    name.push(param.clone());
+                } else {
+                    return Err(SpecialError(
+                        TRANSFORM_DOMAIN_ENV_TO_HIERARCHY,
+                        "parameters of a task should be atoms".to_string(),
+                    ));
+                }
+            }
+            for e in &method.get_parameters().get_params()[exp.len() - 1..] {
                 let symbol_id = *symbol_table
                     .id(&e)
                     .expect("parameters were not defined in the chronicle");
-                name.push(symbol_id);
+                name.push(symbol_id.into());
                 chronicle.add_var(&symbol_id);
             }
-
-            chronicle.set_name(name);
+        } else {
+            return Err(SpecialError(
+                TRANSFORM_DOMAIN_ENV_TO_HIERARCHY,
+                "".to_string(),
+            ));
         }
 
-        //declaring symbols of the task
-        {
-            let task_label = method.get_task_label();
-            let symbol_id = symbol_table.declare_new_object(Some(task_label.clone()), false);
-            let mut task_name = vec![symbol_id];
-            let task = context.domain.get_tasks().get(task_label).unwrap();
-
-            for e in task.get_parameters().get_params() {
-                let symbol_id = symbol_table.declare_new_object(Some(e), false);
-                task_name.push(symbol_id);
-                chronicle.add_var(&symbol_id)
-            }
-
-            chronicle.set_task(task_name);
-        }
-
+        chronicle.set_name(name.into());
         methods.push(chronicle);
-    }*/
+    }
 
-    Ok((Domain::new(actions, tasks, methods), symbol_table))
+    Ok((
+        Domain::new(actions, tasks_lits.values().cloned().collect(), methods),
+        symbol_table,
+    ))
 }
 
 pub fn translate_lvalue_to_chronicle(
@@ -370,10 +384,7 @@ pub fn translate_lvalue_to_expression_chronicle(
                             } else {
                                 ec.add_effect(Effect {
                                     interval: *ec.get_interval(),
-                                    transition: Transition::new(
-                                        ec.get_result().into(),
-                                        ec.get_result(),
-                                    ),
+                                    transition: Transition::new(ec.get_result(), ec_i.get_result()),
                                 });
                                 /*ec.add_constraint(Constraint::Eq(
                                     ec.get_result().into(),
@@ -450,7 +461,10 @@ pub fn translate_lvalue_to_expression_chronicle(
                         else {
                             return Err(SpecialError(
                                 TRANSLATE_LVALUE_TO_EXPRESSION_CHRONICLE,
-                                "Two branches If block is not supported yet...".to_string(),
+                                format!(
+                                    "Two branches If block is not supported yet...\nexp: {}",
+                                    exp
+                                ),
                             ));
                         }
 
@@ -591,7 +605,7 @@ pub fn translate_lvalue_to_expression_chronicle(
                 co => {
                     return Err(SpecialError(
                         TRANSLATE_LVALUE_TO_EXPRESSION_CHRONICLE,
-                        format!("{} not supported yet", co),
+                        format!("{} not supported yet\nexp : {}", co, exp),
                     ))
                 }
             },
@@ -669,6 +683,7 @@ pub fn translate_lvalue_to_expression_chronicle(
                                     {
                                         AtomType::Action => {
                                             expression_type = ExpressionType::Action;
+                                            println!("{} is an action", s);
                                         }
                                         AtomType::Function => {}
                                         AtomType::Method => return Err(SpecialError(TRANSLATE_LVALUE_TO_EXPRESSION_CHRONICLE, format!("{} is method and can not be directly called into the body of a method.\
@@ -700,12 +715,10 @@ pub fn translate_lvalue_to_expression_chronicle(
                 }
 
                 let mut previous_interval = *ec.get_interval();
-                let mut is_pure = true;
                 for e in &l[1..] {
                     let mut ec_i =
                         translate_lvalue_to_expression_chronicle(e, context, symbol_table)?;
 
-                    is_pure &= ec_i.is_result_pure();
                     literal.push(ec_i.get_result().into());
 
                     ec_i.add_constraint(Constraint::Eq(
@@ -802,7 +815,11 @@ pub fn translate_lvalue_to_expression_chronicle(
         lv => {
             return Err(SpecialError(
                 TRANSLATE_LVALUE_TO_EXPRESSION_CHRONICLE,
-                format!("{} not supported yet", TypeLValue::from(lv)),
+                format!(
+                    "{} not supported yet\n exp: {}",
+                    TypeLValue::from(lv),
+                    exp.format(" exp: ".len())
+                ),
             ))
         }
     }

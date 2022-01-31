@@ -68,6 +68,7 @@ impl From<&LValue> for LValueS {
             LValue::Character(c) => LValueS::Symbol(c.to_string()),
             LValue::AsyncFn(fun) => LValueS::Symbol(fun.get_label().to_string()),
             LValue::Future(_) => panic!("cannot convert LValue::Future into LValueS"),
+            LValue::Err(_) => panic!("cannot convert an error into LValueS"),
         }
     }
 }

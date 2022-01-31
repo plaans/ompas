@@ -19,7 +19,7 @@ async fn main() -> Result<(), LError> {
         let lvalue = parse(element, &mut env).await?;
         println!("string: {}", element);
         println!("lvalue: {}", lvalue);
-        println!("pretty: {}", lvalue.pretty_print("pretty: ".len()))
+        println!("pretty: {}", lvalue.format("pretty: ".len()))
     }
 
     Ok(())

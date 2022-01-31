@@ -422,7 +422,7 @@ pub fn translate_lvalue_to_expression_chronicle(
                     let a = &l[2];
                     let b = &l[3];
 
-                    let cond_simplification = true;
+                    let cond_simplification = false;
 
                     if cond_simplification {
                         let cond = translate_cond_if(cond, context, symbol_table)?;
@@ -730,7 +730,7 @@ pub fn translate_lvalue_to_expression_chronicle(
                     ec.absorb(ec_i);
                 }
 
-                ec.add_constraint(Constraint::LT(
+                ec.add_constraint(Constraint::LEq(
                     previous_interval.end().into(),
                     ec.get_interval().end().into(),
                 ));

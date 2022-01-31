@@ -88,9 +88,10 @@ pub const MACRO_GENERATE_ACTION_MODEL: &str = "
                (conds (cadr (get def 1)))
                (effs (cadr (get def 2))))
               `(list ,label (lambda ,params
-                    (if ,(gtpc p_expr)
-                        (if ,conds
-                            ,effs))
+                    (do
+                        (check ,(gtpc p_expr))
+                        (check ,conds)
+                        ,effs)
                     )))))";
 pub const MACRO_GENERATE_ACTION_OPERATIONAL_MODEL: &str =
     "(defmacro generate-action-operational-model
@@ -101,7 +102,8 @@ pub const MACRO_GENERATE_ACTION_OPERATIONAL_MODEL: &str =
                (params (car p_unzip)))
 
               `(list ,label (lambda ,params
-                    (if ,(gtpc p_expr)
+                    (do
+                        (check ,(gtpc p_expr))
                         ,body)
                     )))))";
 

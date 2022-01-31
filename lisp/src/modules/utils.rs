@@ -195,6 +195,16 @@ pub const MACRO_LET_STAR: &str = "(defmacro let*
                             (let* ,(cdr bindings) ,body))
                         (cdar bindings)))))";
 
+pub const MACRO_DO: &str = "(defmacro do
+    (lambda args
+        (if (= (len args) 1)
+            (car args)
+            `(begin 
+                (define __result__ ,(car args))
+                (if (err? __result__)
+                    __result__
+                    ,(cons 'do (cdr args)))))))";
+
 pub const LAMBDA_COMBINE:  &str = "(define combine (lambda (f)
                                                                 (lambda (x y)
                                                                         (if (null? x) (quote ())
@@ -283,6 +293,7 @@ impl IntoModule for CtxUtils {
                 LAMBDA_MAPF,
                 MACRO_LET,
                 MACRO_LET_STAR,
+                MACRO_DO,
                 //MACRO_FOR,
                 //LAMBDA_ARBITRARY,
                 LAMBDA_EVAL_NON_RECURSIVE,
@@ -986,22 +997,38 @@ mod test {
 
         test_expression(test_lambda).await
     }
+
+    #[tokio::test]
+    async fn test_macro_do() -> lerror::Result<()> {
+        let test_macro = TestExpression {
+            inner: MACRO_DO,
+            dependencies: vec![],
+            expression: "(do \
+                (check (> 3 1))\
+                (define x 1)\
+                (check (> 6 (+ x 1)))\
+                (define x 2)\
+                x)",
+            expanded: "(begin
+   (define __result__ (check (> 3 1)))
+   (if (err? __result__)
+          __result__
+          (begin
+             (define __result__ (define x 1))
+             (if (err? __result__)
+                    __result__
+                    (begin
+                       (define __result__ (check (> 6 (+ x 1))))
+                       (if (err? __result__)
+                              __result__
+                              (begin
+                                 (define __result__ (define x 2))
+                                 (if (err? __result__)
+                                        __result__
+                                        x))))))))",
+            result: "2",
+        };
+
+        test_expression(test_macro).await
+    }
 }
-
-//LAMBDAS
-/*pub const LAMBDA_AND: &str = "(define and (lambda args \
-                                                   (if (null? args) true \
-                                                       (if (= (len args) 1) (car args)
-                                                           (if (car args) (and (cdr args)) nil)))))";
-pub const LAMBDA_OR: &str = "(define or (lambda args \
-                                                   (if (null? args) true \
-                                                       (if (= (len args) 1) (car args)
-                                                           (if (car args) true (or (cdr args)))))))";*/
-
-/*pub const LAMBDA_COND: &str = "(define cond (lambda x \
-(if (null? x)\
-    nil\
-    (let ((a (car x))\
-           (tests (car a))\
-           (expr (cdr a)))\
-          (if tests expr (cond (cdr x))))))";*/

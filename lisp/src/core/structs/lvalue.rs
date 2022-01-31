@@ -49,6 +49,7 @@ pub enum LValue {
     //Refers to boolean 'false and empty list in lisp
     True,
     Nil,
+    Err(Box<LValue>),
 }
 
 type Sym = String;
@@ -251,6 +252,7 @@ impl Display for LValue {
             LValue::Character(c) => write!(f, "{}", c),
             LValue::AsyncFn(fun) => write!(f, "{}", fun.get_label()),
             LValue::Future(_) => write!(f, "{}", FUTURE),
+            LValue::Err(e) => write!(f, "err: {}", e),
         }
     }
 }
@@ -484,6 +486,7 @@ impl PartialEq for LValue {
             (LValue::Fn(f1), LValue::Fn(f2)) => f1.get_label() == f2.get_label(),
             (LValue::CoreOperator(c1), LValue::CoreOperator(c2)) => c1 == c2,
             (LValue::AsyncFn(af1), LValue::AsyncFn(af2)) => af1.get_label() == af2.get_label(),
+            (LValue::Err(e1), LValue::Err(e2)) => *e1 == *e2,
             (_, _) => false,
         }
     }

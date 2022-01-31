@@ -6,11 +6,9 @@ use structopt::StructOpt;
 use ompas_acting::rae::module::mod_rae_description::CtxRaeDescription;
 use ompas_acting::rae::module::rae_exec::CtxRaeExec;
 use ompas_lisp::core::activate_debug;
-use ompas_lisp::core::structs::lenv::ImportType::WithoutPrefix;
 use ompas_lisp::lisp_interpreter::{LispInterpreter, LispInterpreterConfig};
 use ompas_lisp::modules::_type::CtxType;
 use ompas_lisp::modules::advanced_math::CtxMath;
-use ompas_lisp::modules::error::CtxError;
 use ompas_lisp::modules::io::CtxIo;
 use ompas_lisp::modules::static_eval::CtxStaticEval;
 use ompas_lisp::modules::string::CtxString;
@@ -66,9 +64,6 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
         ctx_io.set_log_output(pb.clone().into());
     }
 
-    li.import_namespace(CtxError::default())
-        .await
-        .expect("error loading error");
     li.import_namespace(ctx_utils)
         .await
         .expect("error loading utils");

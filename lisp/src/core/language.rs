@@ -10,6 +10,7 @@ pub const CHARACTER: &str = "character";
 pub const FUTURE: &str = "future";
 pub const TRUE: &str = "true";
 pub const NIL: &str = "nil";
+pub const ERR: &str = "err";
 pub const SEXPR: &str = "sexpr";
 pub const FN: &str = "fn";
 pub const OBJECT: &str = "object";

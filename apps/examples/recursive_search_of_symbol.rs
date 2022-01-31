@@ -1,4 +1,4 @@
-use ompas_lisp::core::structs::lenv::{LEnv, LEnvSymbols};
+use ompas_lisp::core::structs::lenv::LEnvSymbols;
 use ompas_lisp::core::structs::lvalue::LValue;
 
 fn main() {

@@ -30,6 +30,7 @@ pub enum TypeLValue {
     Quote,
     Other(String),
     Future,
+    Err,
 }
 
 impl Display for TypeLValue {
@@ -57,6 +58,7 @@ impl Display for TypeLValue {
             TypeLValue::Character => CHARACTER,
             TypeLValue::AsyncFn => ASYNC_FN,
             TypeLValue::Future => FUTURE,
+            TypeLValue::Err => ERR,
         };
         write!(f, "{}", str)
     }
@@ -83,6 +85,7 @@ impl PartialEq for TypeLValue {
             (TypeLValue::Usize, TypeLValue::Usize) => true,
             (TypeLValue::AsyncFn, TypeLValue::AsyncFn) => true,
             (TypeLValue::Other(s1), TypeLValue::Other(s2)) => *s1 == *s2,
+            (TypeLValue::Err, TypeLValue::Err) => true,
             (_, _) => false,
         }
     }
@@ -107,6 +110,7 @@ impl From<&LValue> for TypeLValue {
             LValue::Character(_) => TypeLValue::Character,
             LValue::AsyncFn(_) => TypeLValue::AsyncFn,
             LValue::Future(_) => TypeLValue::Future,
+            LValue::Err(_) => TypeLValue::Err,
         }
     }
 }

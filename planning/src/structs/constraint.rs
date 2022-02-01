@@ -15,14 +15,13 @@ pub enum Constraint {
 impl GetVariables for Constraint {
     fn get_variables(&self) -> im::HashSet<AtomId> {
         match self {
-            Constraint::LEq(_, _) => {}
-            Constraint::Eq(_, _) => {}
-            Constraint::Neg(_) => {}
-            Constraint::LT(_, _) => {}
-            Constraint::And(_, _) => {}
-            Constraint::Or(_, _) => {}
+            Constraint::LEq(l1, l2)
+            | Constraint::Eq(l1, l2)
+            | Constraint::LT(l1, l2)
+            | Constraint::And(l1, l2)
+            | Constraint::Or(l1, l2) => l1.get_variables().union(l2.get_variables()),
+            Constraint::Neg(l) => l.get_variables(),
         }
-        todo!()
     }
 }
 

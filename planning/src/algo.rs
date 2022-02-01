@@ -12,16 +12,17 @@ use ompas_lisp::core::structs::lvalue::LValue;
 use ompas_lisp::core::structs::typelvalue::TypeLValue;
 use ompas_lisp::core::*;
 use ompas_lisp::static_eval::{eval_static, parse_static};
+use std::collections::HashSet;
 
 use crate::structs::atom::AtomType;
-use crate::structs::chronicle::{Chronicle, ExpressionChronicle};
+use crate::structs::chronicle::{Chronicle, ChronicleSet, ExpressionChronicle};
 use crate::structs::condition::Condition;
 use crate::structs::constraint::Constraint;
 use crate::structs::effect::Effect;
 use crate::structs::expression::Expression;
 use crate::structs::interval::Interval;
 use crate::structs::lit::{lvalue_to_lit, Lit};
-use crate::structs::symbol_table::{ExpressionType, SymTable};
+use crate::structs::symbol_table::{AtomId, ExpressionType, SymTable};
 use crate::structs::traits::{Absorb, FormatWithSymTable, GetVariables};
 use crate::structs::transition::Transition;
 use crate::structs::{get_variables_of_type, ConversionContext, Domain};
@@ -155,12 +156,40 @@ pub fn simplify_timepoints(
     sym_table: &mut SymTable,
     _: &ConversionContext,
 ) {
-    let timepoints = get_variables_of_type(ec.get_variables(), sym_table, AtomType::Timepoint);
+    let timepoints: HashSet<AtomId> = get_variables_of_type(
+        ec.get_variables()
+            .iter()
+            .map(|a| sym_table.get_parent(a))
+            .collect(),
+        sym_table,
+        AtomType::Timepoint,
+    );
+    let used_timepoints: HashSet<AtomId> = get_variables_of_type(
+        ec.get_variables_in_set(ChronicleSet::Effect)
+            .iter()
+            .map(|a| sym_table.get_parent(a))
+            .collect(),
+        sym_table,
+        AtomType::Timepoint,
+    );
+
+    let optional_timepoints: HashSet<&AtomId> = timepoints.difference(&used_timepoints).collect();
+
+    println!("not used timepoints : {}", {
+        let mut string = "{".to_string();
+        for (i, t) in optional_timepoints.iter().enumerate() {
+            if i != 0 {
+                string.push(',');
+            }
+            string.push_str(sym_table.get_atom(t).unwrap().to_string().as_str())
+        }
+        string.push('}');
+        string
+    })
 }
 
 pub fn post_processing(
-    ec: &mut ExpressionChronicle,hashset.insert(self.interval.start());
-        hashset.insert(self.interval.end());
+    ec: &mut ExpressionChronicle,
     sym_table: &mut SymTable,
     context: &ConversionContext,
 ) {

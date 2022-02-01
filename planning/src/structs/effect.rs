@@ -1,7 +1,8 @@
 use crate::structs::interval::Interval;
-use crate::structs::symbol_table::SymTable;
-use crate::structs::traits::FormatWithSymTable;
+use crate::structs::symbol_table::{AtomId, SymTable};
+use crate::structs::traits::{FormatWithSymTable, GetVariables};
 use crate::structs::transition::Transition;
+use im::HashSet;
 
 #[derive(Clone)]
 pub struct Effect {
@@ -16,5 +17,13 @@ impl FormatWithSymTable for Effect {
             self.interval.format_with_sym_table(st),
             self.transition.format_with_sym_table(st)
         )
+    }
+}
+
+impl GetVariables for Effect {
+    fn get_variables(&self) -> HashSet<AtomId> {
+        self.interval
+            .get_variables()
+            .union(self.transition.get_variables())
     }
 }

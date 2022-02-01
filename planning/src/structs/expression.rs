@@ -1,7 +1,8 @@
 use crate::structs::interval::Interval;
 use crate::structs::lit::Lit;
-use crate::structs::symbol_table::SymTable;
-use crate::structs::traits::FormatWithSymTable;
+use crate::structs::symbol_table::{AtomId, SymTable};
+use crate::structs::traits::{FormatWithSymTable, GetVariables};
+use im::HashSet;
 
 #[derive(Clone)]
 pub struct Expression {
@@ -16,5 +17,12 @@ impl FormatWithSymTable for Expression {
             self.interval.format_with_sym_table(st),
             self.lit.format_with_sym_table(st)
         )
+    }
+}
+
+impl GetVariables for Expression {
+    fn get_variables(&self) -> HashSet<AtomId> {
+        let hashet = self.interval.get_variables();
+        hashet.union(self.lit.get_variables())
     }
 }

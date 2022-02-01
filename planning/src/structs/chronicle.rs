@@ -1,4 +1,3 @@
-use crate::structs::atom::AtomType;
 use crate::structs::condition::Condition;
 use crate::structs::constraint::Constraint;
 use crate::structs::effect::Effect;
@@ -318,19 +317,38 @@ impl ExpressionChronicle {
     pub fn get_constraints(&self) -> &Vec<Constraint> {
         self.partial_chronicle.get_constraints()
     }
+}
 
-    pub fn get_variables_in_conditions(&self) -> HashSet<AtomId> {
-        let mut hashset: im::HashSet<AtomId> = Default::default();
-        for condition in &self.partial_chronicle.conditions {
-            hashset = hashset.union(condition.interval.get_variables());
-            hashset = hashset.union(condition.constraint.get_variables());
+pub enum ChronicleSet {
+    Effect,
+    Constraint,
+    Condition,
+    SubTask,
+    All,
+}
+
+impl ExpressionChronicle {
+    pub fn get_variables_in_set(&self, set: ChronicleSet) -> im::HashSet<AtomId> {
+        fn build_hashset<T: GetVariables>(vec: &Vec<T>) -> im::HashSet<AtomId> {
+            let mut hashset: HashSet<AtomId> = Default::default();
+            for e in vec {
+                hashset = hashset.union(e.get_variables());
+            }
+
+            hashset
         }
 
-        hashset
-    }
-
-    pub fn get_variables_in_effects(&self) -> im::HashSet<AtomId> {
-        todo!()
+        match set {
+            ChronicleSet::Effect => build_hashset(&self.partial_chronicle.effects),
+            ChronicleSet::Constraint => build_hashset(&self.partial_chronicle.constraints),
+            ChronicleSet::Condition => build_hashset(&self.partial_chronicle.conditions),
+            ChronicleSet::SubTask => build_hashset(&self.partial_chronicle.subtasks),
+            ChronicleSet::All => build_hashset(&self.partial_chronicle.effects).union(
+                build_hashset(&self.partial_chronicle.constraints)
+                    .union(build_hashset(&self.partial_chronicle.conditions))
+                    .union(build_hashset(&self.partial_chronicle.subtasks)),
+            ),
+        }
     }
 }
 

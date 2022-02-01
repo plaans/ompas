@@ -1,6 +1,7 @@
 use crate::structs::lit::Lit;
-use crate::structs::symbol_table::SymTable;
-use crate::structs::traits::FormatWithSymTable;
+use crate::structs::symbol_table::{AtomId, SymTable};
+use crate::structs::traits::{FormatWithSymTable, GetVariables};
+use im::HashSet;
 
 #[derive(Clone)]
 pub struct Transition {
@@ -24,5 +25,13 @@ impl FormatWithSymTable for Transition {
             self.variable.format_with_sym_table(st),
             self.value.format_with_sym_table(st)
         )
+    }
+}
+
+impl GetVariables for Transition {
+    fn get_variables(&self) -> HashSet<AtomId> {
+        self.variable
+            .get_variables()
+            .union(self.value.get_variables())
     }
 }

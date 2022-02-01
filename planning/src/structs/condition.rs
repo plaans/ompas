@@ -22,6 +22,7 @@ impl FormatWithSymTable for Condition {
 
 impl GetVariables for Condition {
     fn get_variables(&self) -> HashSet<AtomId> {
-        todo!()
+        let hashset = self.interval.get_variables();
+        hashset.union(self.constraint.get_variables())
     }
 }

@@ -5,6 +5,7 @@ use im::HashMap;
 use ompas_acting::rae::module::rae_exec::{RAE_ASSERT, RAE_RETRACT};
 use ompas_lisp::core::structs::lcoreoperator::language::{BEGIN, EVAL};
 use ompas_lisp::core::structs::lcoreoperator::LCoreOperator;
+use ompas_lisp::core::structs::lcoreoperator::LCoreOperator::Define;
 use ompas_lisp::core::structs::lenv::LEnv;
 use ompas_lisp::core::structs::lerror::LError::{
     NotInListOfExpectedTypes, SpecialError, WrongNumberOfArgument, WrongType,
@@ -363,20 +364,21 @@ pub fn translate_lvalue_to_expression_chronicle(
                         .id(BEGIN)
                         .expect("begin is not defined in the symbol table")
                         .into()];
-                    let mut previous_interval = *ec.get_interval();
+                    let mut previous_interval: Option<Interval> = None;
 
                     for (i, e) in l[1..].iter().enumerate() {
                         let mut ec_i =
                             translate_lvalue_to_expression_chronicle(e, context, symbol_table)?;
 
                         literal.push(ec_i.get_result());
+                        if i != 0 {
+                            ec_i.add_constraint(Constraint::Eq(
+                                previous_interval.unwrap().end().into(),
+                                ec_i.get_interval().start().into(),
+                            ));
+                        }
 
-                        ec_i.add_constraint(Constraint::Eq(
-                            previous_interval.end().into(),
-                            ec_i.get_interval().start().into(),
-                        ));
-
-                        previous_interval = *ec_i.get_interval();
+                        previous_interval = Some(*ec_i.get_interval());
 
                         if i == l.len() - 2 {
                             if ec_i.is_result_pure() {
@@ -396,7 +398,7 @@ pub fn translate_lvalue_to_expression_chronicle(
                     }
 
                     ec.add_constraint(Constraint::Eq(
-                        previous_interval.end().into(),
+                        previous_interval.unwrap().end().into(),
                         ec.get_interval().end().into(),
                     ));
 
@@ -730,7 +732,7 @@ pub fn translate_lvalue_to_expression_chronicle(
                     ec.absorb(ec_i);
                 }
 
-                ec.add_constraint(Constraint::LT(
+                ec.add_constraint(Constraint::LEq(
                     previous_interval.end().into(),
                     ec.get_interval().end().into(),
                 ));

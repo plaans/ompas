@@ -1,11 +1,7 @@
-use crate::structs::Constraint;
-use crate::structs::Lit;
-use crate::structs::*;
 use im::HashMap;
 use ompas_acting::rae::module::rae_exec::{RAE_ASSERT, RAE_RETRACT};
 use ompas_lisp::core::structs::lcoreoperator::language::{BEGIN, EVAL};
 use ompas_lisp::core::structs::lcoreoperator::LCoreOperator;
-use ompas_lisp::core::structs::lcoreoperator::LCoreOperator::Define;
 use ompas_lisp::core::structs::lenv::LEnv;
 use ompas_lisp::core::structs::lerror::LError::{
     NotInListOfExpectedTypes, SpecialError, WrongNumberOfArgument, WrongType,
@@ -17,6 +13,18 @@ use ompas_lisp::core::structs::typelvalue::TypeLValue;
 use ompas_lisp::core::*;
 use ompas_lisp::static_eval::{eval_static, parse_static};
 
+use crate::structs::atom::AtomType;
+use crate::structs::chronicle::{Chronicle, ExpressionChronicle};
+use crate::structs::condition::Condition;
+use crate::structs::constraint::Constraint;
+use crate::structs::effect::Effect;
+use crate::structs::expression::Expression;
+use crate::structs::interval::Interval;
+use crate::structs::lit::{lvalue_to_lit, Lit};
+use crate::structs::symbol_table::{ExpressionType, SymTable};
+use crate::structs::traits::{Absorb, FormatWithSymTable, GetVariables};
+use crate::structs::transition::Transition;
+use crate::structs::{get_variables_of_type, ConversionContext, Domain};
 use ompas_utils::blocking_async;
 
 //Names of the functions
@@ -134,21 +142,31 @@ pub fn rm_useless_var(
     let mut vec = vec![];
 
     for var in ec.get_variables() {
-        if *var != sym_table.get_parent(var) {
-            vec.push(*var)
+        if var != sym_table.get_parent(&var) {
+            vec.push(var)
         }
     }
 
     ec.rm_set_var(vec)
 }
 
-pub fn post_processing(
+pub fn simplify_timepoints(
     ec: &mut ExpressionChronicle,
+    sym_table: &mut SymTable,
+    _: &ConversionContext,
+) {
+    let timepoints = get_variables_of_type(ec.get_variables(), sym_table, AtomType::Timepoint);
+}
+
+pub fn post_processing(
+    ec: &mut ExpressionChronicle,hashset.insert(self.interval.start());
+        hashset.insert(self.interval.end());
     sym_table: &mut SymTable,
     context: &ConversionContext,
 ) {
     unify_equal(ec, sym_table, context);
     rm_useless_var(ec, sym_table, context);
+    simplify_timepoints(ec, sym_table, context);
 }
 
 pub fn translate_domain_env_to_hierarchy(

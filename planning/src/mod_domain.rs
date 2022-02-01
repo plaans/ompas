@@ -4,7 +4,9 @@ use crate::algo::{
     pre_processing, transform_lambda_expression, translate_cond_if,
     translate_domain_env_to_hierarchy, translate_lvalue_to_expression_chronicle,
 };
-use crate::structs::{ConversionContext, FormatWithSymTable, SymTable};
+use crate::structs::symbol_table::SymTable;
+use crate::structs::traits::FormatWithSymTable;
+use crate::structs::ConversionContext;
 use ::macro_rules_attribute::macro_rules_attribute;
 use ompas_acting::rae::context::rae_env::*;
 use ompas_acting::rae::context::rae_state::{LState, RAEState, StateType};

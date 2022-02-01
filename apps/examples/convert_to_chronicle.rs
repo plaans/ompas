@@ -4,7 +4,7 @@ use ompas_lisp::core::structs::lerror::LError;
 use ompas_planning::algo::{
     translate_lvalue_to_chronicle, translate_lvalue_to_expression_chronicle,
 };
-use ompas_planning::structs::*;
+use ompas_planning::r#mod::*;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 

@@ -55,7 +55,10 @@ impl CtxCounter {
     pub fn set_counter(&self, counter: usize, value: u32) -> lerror::Result<()> {
         match self.counters.write().unwrap().get_mut(counter) {
             None => Err(SpecialError(SET_COUNTER, "index out of reach".to_string())),
-            Some(c) => Ok(c.val = value),
+            Some(c) => {
+                c.val = value;
+                Ok(())
+            }
         }
     }
 
@@ -64,7 +67,8 @@ impl CtxCounter {
             None => Err(SpecialError(SET_COUNTER, "index out of reach".to_string())),
             Some(c) => {
                 if c.val > 0 {
-                    Ok(c.val = c.val - 1)
+                    c.val -= 1;
+                    Ok(())
                 } else {
                     Ok(())
                 }
@@ -75,7 +79,10 @@ impl CtxCounter {
     pub fn increment_counter(&self, counter: usize) -> lerror::Result<()> {
         match self.counters.write().unwrap().get_mut(counter) {
             None => Err(SpecialError(SET_COUNTER, "index out of reach".to_string())),
-            Some(c) => Ok(c.val = c.val + 1),
+            Some(c) => {
+                c.val += 1;
+                Ok(())
+            }
         }
     }
 

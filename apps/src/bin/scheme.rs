@@ -6,7 +6,6 @@ use structopt::StructOpt;
 use ompas_acting::rae::module::mod_rae_description::CtxRaeDescription;
 use ompas_acting::rae::module::rae_exec::CtxRaeExec;
 use ompas_lisp::core::activate_debug;
-use ompas_lisp::core::structs::lenv::ImportType::WithoutPrefix;
 use ompas_lisp::lisp_interpreter::{LispInterpreter, LispInterpreterConfig};
 use ompas_lisp::modules::_type::CtxType;
 use ompas_lisp::modules::advanced_math::CtxMath;

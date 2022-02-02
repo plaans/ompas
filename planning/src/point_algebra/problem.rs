@@ -1,6 +1,8 @@
 use crate::point_algebra::relation_type::{RelationType, RelationTypeBit};
+use cli_table::{print_stdout, Cell, Table};
+use std::fmt::{Debug, Display};
 use std::hash::Hash;
-use std::ops::{Index, IndexMut};
+use std::ops::{Index, IndexMut, Not};
 
 pub struct Relation<T> {
     i: T,
@@ -8,12 +10,31 @@ pub struct Relation<T> {
     relation_type: RelationType,
 }
 
+impl<T> Relation<T> {
+    pub fn new(i: T, j: T, relation_type: RelationType) -> Self {
+        Self {
+            i,
+            j,
+            relation_type,
+        }
+    }
+}
+
 pub struct Problem<T> {
     variables: Vec<T>,
     relations: Vec<Relation<T>>,
 }
 
-impl<T: Clone + Hash + Eq> From<&Problem<T>> for Graph<T> {
+impl<T> Problem<T> {
+    pub fn new(variables: Vec<T>, relations: Vec<Relation<T>>) -> Self {
+        Self {
+            variables,
+            relations,
+        }
+    }
+}
+
+impl<T: Clone + Hash + Eq + Debug> From<&Problem<T>> for Graph<T> {
     fn from(problem: &Problem<T>) -> Self {
         let mut var_key: im::HashMap<T, usize> = Default::default();
         let mut reverse: Vec<T> = Default::default();
@@ -25,8 +46,12 @@ impl<T: Clone + Hash + Eq> From<&Problem<T>> for Graph<T> {
 
         let mut inner = vec![vec![None; problem.variables.len()]; problem.variables.len()];
         for relation in &problem.relations {
-            let index_1 = var_key.get(&relation.i).unwrap();
-            let index_2 = var_key.get(&relation.j).unwrap();
+            let index_1 = var_key.get(&relation.i).unwrap_or_else(|| {
+                panic!("{:?} in not defined in {:?}", relation.i, problem.variables)
+            });
+            let index_2 = var_key.get(&relation.j).unwrap_or_else(|| {
+                panic!("{:?} in not defined in {:?}", relation.j, problem.variables)
+            });
             let relation_type_bit: RelationTypeBit = relation.relation_type.into();
 
             let (a, b, relation_type_bit) = if index_1 < index_2 {
@@ -40,6 +65,8 @@ impl<T: Clone + Hash + Eq> From<&Problem<T>> for Graph<T> {
             } else {
                 inner[*a][*b] = Some(relation_type_bit)
             }
+
+            inner[*b][*a] = Some(inner[*a][*b].unwrap().not())
         }
 
         Self { reverse, inner }
@@ -117,5 +144,32 @@ impl<T> Graph<T> {
         for e in &mut self.inner {
             e.remove(index);
         }
+    }
+}
+
+impl<T: Display> Graph<T> {
+    pub fn print(&self) {
+        let mut table = vec![];
+
+        let mut first_vec = vec!["".cell()];
+        first_vec.append(&mut self.reverse.iter().map(|t| t.cell()).collect());
+        table.push(first_vec);
+        for (l, t) in self.reverse.iter().enumerate() {
+            let mut vec = vec![t.cell()];
+            let line: &Vec<Option<RelationTypeBit>> = &self[l];
+            vec.append(
+                &mut line
+                    .clone()
+                    .iter()
+                    .map(|r| match r {
+                        Some(r) => RelationType::from(r).cell(),
+                        None => "".cell(),
+                    })
+                    .collect(),
+            );
+            table.push(vec);
+        }
+
+        print_stdout(table.table()).expect("error printing graph as table");
     }
 }

@@ -300,7 +300,7 @@ pub fn get(args: &[LValue], env: &LEnv) -> LResult {
 /// return the length of the object if it is a table or a list.
 pub fn length(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 1 {
-        return Err(WrongNumberOfArgument(LEN, args.into(), args.len(), 1..1).into());
+        return Err(WrongNumberOfArgument(LEN, args.into(), args.len(), 1..1));
     }
 
     match &args[0] {

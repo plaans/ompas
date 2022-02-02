@@ -1,9 +1,10 @@
 use crate::point_algebra::problem::{Graph, Timepoint};
 use crate::point_algebra::relation_type::RelationType;
+use ompas_lisp::core::structs::lerror::LError;
 use std::collections::VecDeque;
 
-mod problem;
-mod relation_type;
+pub mod problem;
+pub mod relation_type;
 
 pub type Fail = ();
 
@@ -24,7 +25,7 @@ pub type Fail = ();
 /// 2. S := M[i, k] ◦ M[k,j ];
 /// 3. if M[i, j ] ⊆ S then return false
 /// 4. M[i, j ] := M[i, j]
-pub fn path_consistency<T>(mut m: Graph<T>) -> Result<Graph<T>, Fail> {
+pub fn path_consistency<T>(mut m: Graph<T>) -> Result<Graph<T>, LError> {
     // Q := {(i,j ) | i<j }
     let mut q: VecDeque<(Timepoint, Timepoint)> = Default::default();
     let n = m.get_number_timepoints();
@@ -38,14 +39,14 @@ pub fn path_consistency<T>(mut m: Graph<T>) -> Result<Graph<T>, Fail> {
         for k in (0..n).filter(|k| *k != i && *k != j) {
             if revise(&mut m, i, j, k) {
                 if m[(i, j)] == Some(RelationType::Contradiction.into()) {
-                    return Err(());
+                    return Err(Default::default());
                 } else {
                     q.push_back((i, k))
                 }
             }
             if revise(&mut m, k, i, j) {
                 if m[(k, j)] == Some(RelationType::Contradiction.into()) {
-                    return Err(());
+                    return Err(Default::default());
                 } else {
                     q.push_back((k, j))
                 }
@@ -53,7 +54,7 @@ pub fn path_consistency<T>(mut m: Graph<T>) -> Result<Graph<T>, Fail> {
         }
     }
 
-    return Ok(m);
+    Ok(m)
 }
 
 pub fn revise<T>(m: &mut Graph<T>, i: Timepoint, j: Timepoint, k: Timepoint) -> bool {
@@ -70,5 +71,5 @@ pub fn revise<T>(m: &mut Graph<T>, i: Timepoint, j: Timepoint, k: Timepoint) -> 
     }
     m[(i, j)] = Some(m[(i, j)].unwrap().intersect(&s));
     m[(j, i)] = Some(!m[(i, j)].unwrap());
-    return true;
+    true
 }

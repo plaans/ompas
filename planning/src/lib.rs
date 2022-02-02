@@ -1,6 +1,6 @@
 extern crate core;
 
-pub mod algo;
+pub mod conversion;
 pub mod mod_domain;
 pub mod point_algebra;
 pub mod structs;

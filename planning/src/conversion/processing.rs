@@ -1,377 +1,34 @@
-use im::HashMap;
-use ompas_acting::rae::module::rae_exec::{RAE_ASSERT, RAE_RETRACT};
-use ompas_lisp::core::structs::lcoreoperator::language::{BEGIN, EVAL};
-use ompas_lisp::core::structs::lcoreoperator::LCoreOperator;
-use ompas_lisp::core::structs::lenv::LEnv;
-use ompas_lisp::core::structs::lerror::LError::{
-    NotInListOfExpectedTypes, SpecialError, WrongNumberOfArgument, WrongType,
-};
-use ompas_lisp::core::structs::lerror::{LError, LResult};
-use ompas_lisp::core::structs::llambda::LambdaArgs;
-use ompas_lisp::core::structs::lvalue::LValue;
-use ompas_lisp::core::structs::typelvalue::TypeLValue;
-use ompas_lisp::core::*;
-use ompas_lisp::static_eval::{eval_static, parse_static};
-use std::collections::HashSet;
-
-use crate::point_algebra::problem::Problem;
 use crate::structs::atom::AtomType;
-use crate::structs::chronicle::{Chronicle, ChronicleSet, ExpressionChronicle};
+use crate::structs::chronicle::ExpressionChronicle;
 use crate::structs::condition::Condition;
 use crate::structs::constraint::Constraint;
 use crate::structs::effect::Effect;
 use crate::structs::expression::Expression;
 use crate::structs::interval::Interval;
-use crate::structs::lit::Lit::Constraint;
 use crate::structs::lit::{lvalue_to_lit, Lit};
-use crate::structs::symbol_table::{AtomId, ExpressionType, SymTable};
-use crate::structs::traits::{Absorb, FormatWithSymTable, GetVariables};
+use crate::structs::symbol_table::{ExpressionType, SymTable};
+use crate::structs::traits::{Absorb, FormatWithSymTable};
 use crate::structs::transition::Transition;
-use crate::structs::{get_variables_of_type, ConversionContext, Domain};
-use ompas_utils::blocking_async;
+use crate::structs::ConversionContext;
+#[allow(unused_imports)]
+use ompas_acting::rae::module::rae_exec::platform::RAE_INSTANCE;
+use ompas_acting::rae::module::rae_exec::{RAE_ASSERT, RAE_RETRACT};
+use ompas_lisp::core::structs::lcoreoperator::language::{BEGIN, EVAL};
+use ompas_lisp::core::structs::lcoreoperator::LCoreOperator;
+use ompas_lisp::core::structs::lerror::LError;
+use ompas_lisp::core::structs::lerror::LError::{
+    NotInListOfExpectedTypes, SpecialError, WrongNumberOfArgument, WrongType,
+};
+use ompas_lisp::core::structs::lvalue::LValue;
+use ompas_lisp::core::structs::typelvalue::TypeLValue;
+use ompas_lisp::static_eval::{eval_static, parse_static};
 
 //Names of the functions
 
 //const PRE_PROCESSING: &str = "pre_processing";
 const TRANSLATE_LVALUE_TO_EXPRESSION_CHRONICLE: &str = "translate_lvalue_to_expression_chronicle";
-const TRANSLATE_LVALUE_TO_CHRONICLE: &str = "translate_lvalue_to_chronicle";
-const TRANSFORM_DOMAIN_ENV_TO_HIERARCHY: &str = "transform_domain_env_to_hierarchy";
 
-pub fn pre_processing(lv: &LValue, context: &ConversionContext) -> LResult {
-    let lv = pre_process_transform_lambda(lv, context)?;
-
-    let lv = pre_eval(&lv, context);
-
-    lv
-}
-
-pub fn pre_eval(lv: &LValue, _context: &ConversionContext) -> LResult {
-    //let mut env = context.env.clone();
-    //let plv = eval_static(lv, &mut env)?;
-    //Ok(plv.get_lvalue().clone());
-    Ok(lv.clone())
-}
-
-pub fn pre_process_transform_lambda(lv: &LValue, context: &ConversionContext) -> LResult {
-    let mut lv = match transform_lambda_expression(lv, context.env.clone()) {
-        Ok(lv) => lv,
-        Err(_) => lv.clone(),
-    };
-
-    if let LValue::List(list) = &lv {
-        let mut result = vec![];
-        for lv in list {
-            result.push(pre_process_transform_lambda(lv, context)?)
-        }
-
-        lv = result.into()
-    }
-
-    Ok(lv)
-}
-
-pub fn unify_equal(
-    ec: &mut ExpressionChronicle,
-    sym_table: &mut SymTable,
-    _context: &ConversionContext,
-) {
-    let mut vec_constraint_to_rm = vec![];
-
-    for (index, constraint) in ec.get_constraints().iter().enumerate() {
-        if let Constraint::Eq(a, b) = constraint {
-            if let (Lit::Atom(id_1), Lit::Atom(id_2)) = (a, b) {
-                let type_1 = sym_table.get_type(id_1).expect("id should be defined");
-                let type_2 = sym_table.get_type(id_2).expect("id should be defined");
-                match (type_1, type_2) {
-                    (
-                        AtomType::Boolean | AtomType::Number,
-                        AtomType::Boolean | AtomType::Number,
-                    ) => {
-                        assert_eq!(
-                            sym_table.get_atom(id_1).unwrap(),
-                            sym_table.get_atom(id_2).unwrap()
-                        );
-                    }
-                    (AtomType::Number, AtomType::Timepoint) => {
-                        sym_table.union_atom(id_1, id_2);
-                        vec_constraint_to_rm.push(index);
-                    }
-                    (AtomType::Timepoint, AtomType::Number) => {
-                        sym_table.union_atom(id_2, id_1);
-                        vec_constraint_to_rm.push(index);
-                    }
-                    (AtomType::Boolean | AtomType::Number, _) => {
-                        sym_table.union_atom(id_1, id_2);
-                        vec_constraint_to_rm.push(index);
-                    }
-                    (_, AtomType::Boolean | AtomType::Number) => {
-                        sym_table.union_atom(id_2, id_1);
-                        vec_constraint_to_rm.push(index);
-                    }
-                    (AtomType::Symbol, AtomType::Object | AtomType::Result) => {
-                        sym_table.union_atom(id_1, id_2);
-                        vec_constraint_to_rm.push(index);
-                    }
-                    (AtomType::Object | AtomType::Result, AtomType::Symbol) => {
-                        sym_table.union_atom(id_2, id_1);
-                        vec_constraint_to_rm.push(index);
-                    }
-                    (AtomType::Result, AtomType::Result) => {
-                        sym_table.union_atom(id_1, id_2);
-                        vec_constraint_to_rm.push(index);
-                    }
-                    (AtomType::Timepoint, AtomType::Timepoint) => {
-                        if id_1 < id_2 {
-                            sym_table.union_atom(id_1, id_2);
-                        } else {
-                            sym_table.union_atom(id_2, id_1);
-                        }
-                        vec_constraint_to_rm.push(index);
-                    }
-                    (_, _) => {}
-                }
-            }
-        }
-    }
-
-    ec.rm_set_constraint(vec_constraint_to_rm)
-}
-
-pub fn rm_useless_var(
-    ec: &mut ExpressionChronicle,
-    sym_table: &mut SymTable,
-    _context: &ConversionContext,
-) {
-    let mut vec = vec![];
-
-    for var in ec.get_variables() {
-        if var != sym_table.get_parent(&var) {
-            vec.push(var)
-        }
-    }
-
-    ec.rm_set_var(vec)
-}
-
-pub fn simplify_timepoints(
-    ec: &mut ExpressionChronicle,
-    sym_table: &mut SymTable,
-    _: &ConversionContext,
-) {
-    let timepoints: HashSet<AtomId> = get_variables_of_type(
-        ec.get_variables()
-            .iter()
-            .map(|a| sym_table.get_parent(a))
-            .collect(),
-        sym_table,
-        AtomType::Timepoint,
-    );
-    let used_timepoints: HashSet<AtomId> = get_variables_of_type(
-        ec.get_variables_in_sets(vec![
-            ChronicleSet::Effect,
-            ChronicleSet::Condition,
-            ChronicleSet::SubTask,
-        ])
-        .iter()
-        .map(|a| sym_table.get_parent(a))
-        .collect(),
-        sym_table,
-        AtomType::Timepoint,
-    );
-
-    let optional_timepoints: HashSet<&AtomId> = timepoints.difference(&used_timepoints).collect();
-
-    for constraint in ec.get_constraints() {
-        if constraint != Constraint::Neg(_) {}
-
-        if constraint.get_left().is_atom() && constraint.get_right().is_atom() {}
-    }
-
-    let problem: Problem<AtomId> = Problem::new(timepoints.into(), vec![]);
-
-    /*println!("not used timepoints : {}", {
-        let mut string = "{".to_string();
-        for (i, t) in optional_timepoints.iter().enumerate() {
-            if i != 0 {
-                string.push(',');
-            }
-            string.push_str(sym_table.get_atom(t).unwrap().to_string().as_str())
-        }
-        string.push('}');
-        string
-    })*/
-}
-
-pub fn post_processing(
-    ec: &mut ExpressionChronicle,
-    sym_table: &mut SymTable,
-    context: &ConversionContext,
-) {
-    unify_equal(ec, sym_table, context);
-    rm_useless_var(ec, sym_table, context);
-    simplify_timepoints(ec, sym_table, context);
-}
-
-pub fn translate_domain_env_to_hierarchy(
-    context: ConversionContext,
-) -> Result<(Domain, SymTable), LError> {
-    //for each action: translate to chronicle
-    //for each method: translate to chronicle
-
-    let mut symbol_table = SymTable::default();
-
-    let actions: Vec<String> = context.domain.get_actions().keys().cloned().collect();
-    let tasks: Vec<String> = context.domain.get_tasks().keys().cloned().collect();
-    let state_functions = context
-        .domain
-        .get_state_functions()
-        .keys()
-        .cloned()
-        .collect();
-    let methods = context.domain.get_methods().keys().cloned().collect();
-
-    symbol_table.add_list_of_symbols_of_same_type(actions, &AtomType::Action)?;
-    symbol_table.add_list_of_symbols_of_same_type(state_functions, &AtomType::StateFunction)?;
-    symbol_table.add_list_of_symbols_of_same_type(methods, &AtomType::Method)?;
-    symbol_table.add_list_of_symbols_of_same_type(tasks, &AtomType::Task)?;
-
-    //Add actions, tasks and methods symbols to symbol_table:
-    let mut methods = vec![];
-    let mut tasks_lits = HashMap::new();
-    let mut actions = vec![];
-
-    //Add tasks to domain
-    for (task_label, task) in context.domain.get_tasks() {
-        let mut task_lit: Vec<Lit> = vec![symbol_table
-            .id(task_label)
-            .expect("symbol of task should be defined")
-            .into()];
-
-        for param in task.get_parameters().get_params() {
-            task_lit.push(symbol_table.declare_new_symbol(param, true).into())
-        }
-        tasks_lits.insert(task_label, Lit::from(task_lit));
-    }
-
-    for (action_label, action) in context.domain.get_actions() {
-        //evaluate the lambda sim.
-        let mut chronicle =
-            translate_lvalue_to_chronicle(action.get_sim(), &context, &mut symbol_table)?;
-        let symbol_id = *symbol_table
-            .id(action_label)
-            .unwrap_or_else(|| panic!("{} was not well defined", action_label));
-        let mut name = vec![symbol_id];
-
-        for e in action.get_parameters().get_params() {
-            let symbol_id = *symbol_table
-                .id(&e)
-                .expect("parameters were not defined in the chronicle");
-            name.push(symbol_id);
-            chronicle.add_var(&symbol_id);
-        }
-
-        chronicle.set_name(name.into());
-
-        actions.push(chronicle)
-    }
-
-    //Add all methods to the domain
-    for (method_label, method) in context.domain.get_methods() {
-        let mut chronicle =
-            translate_lvalue_to_chronicle(method.get_body(), &context, &mut symbol_table)?;
-
-        /*let pre_conditions = translate_lvalue_to_expression_chronicle(
-            method.get_pre_conditions(),
-            &context,
-            &mut symbol_table,
-        )?;*/
-
-        //chronicle.absorb_expression_chronicle(pre_conditions);
-
-        let task = tasks_lits.get(method.get_task_label()).unwrap();
-        let symbol_id = *symbol_table
-            .id(method_label)
-            .unwrap_or_else(|| panic!("{} was not well defined", method_label));
-        let mut name = vec![symbol_id.into()];
-
-        if let Lit::Exp(exp) = task {
-            chronicle.set_task(task.clone());
-            for param in &exp[1..] {
-                if let Lit::Atom(atom) = param {
-                    chronicle.add_var(atom);
-                    name.push(param.clone());
-                } else {
-                    return Err(SpecialError(
-                        TRANSFORM_DOMAIN_ENV_TO_HIERARCHY,
-                        "parameters of a task should be atoms".to_string(),
-                    ));
-                }
-            }
-            for e in &method.get_parameters().get_params()[exp.len() - 1..] {
-                let symbol_id = *symbol_table
-                    .id(&e)
-                    .expect("parameters were not defined in the chronicle");
-                name.push(symbol_id.into());
-                chronicle.add_var(&symbol_id);
-            }
-        } else {
-            return Err(SpecialError(
-                TRANSFORM_DOMAIN_ENV_TO_HIERARCHY,
-                "".to_string(),
-            ));
-        }
-
-        chronicle.set_name(name.into());
-        methods.push(chronicle);
-    }
-
-    Ok((
-        Domain::new(actions, tasks_lits.values().cloned().collect(), methods),
-        symbol_table,
-    ))
-}
-
-pub fn translate_lvalue_to_chronicle(
-    exp: &LValue,
-    context: &ConversionContext,
-    symbol_table: &mut SymTable,
-) -> Result<Chronicle, LError> {
-    //Creation and instantiation of the chronicle
-
-    if let LValue::Lambda(lambda) = exp {
-        let mut chronicle = Chronicle::default();
-        let params = lambda.get_params();
-        match params {
-            LambdaArgs::Sym(s) => {
-                symbol_table.declare_new_symbol(s, true);
-            }
-            LambdaArgs::List(list) => {
-                for param in list {
-                    symbol_table.declare_new_symbol(param, true);
-                }
-            }
-            LambdaArgs::Nil => {}
-        }
-        let body = pre_processing(&lambda.get_body(), context)?;
-
-        chronicle.set_debug(Some(body.clone()));
-
-        let mut ec = translate_lvalue_to_expression_chronicle(&body, context, symbol_table)?;
-
-        post_processing(&mut ec, symbol_table, context);
-
-        chronicle.absorb_expression_chronicle(ec);
-        Ok(chronicle)
-    } else {
-        Err(SpecialError(
-            TRANSLATE_LVALUE_TO_CHRONICLE,
-            format!(
-                "chronicle can only be extracted from a lambda, here we have a {}.",
-                TypeLValue::from(exp)
-            ),
-        ))
-    }
-}
+pub const TRANSLATE_COND_IF: &str = "translate_cond_if";
 
 pub fn translate_lvalue_to_expression_chronicle(
     exp: &LValue,
@@ -554,10 +211,7 @@ pub fn translate_lvalue_to_expression_chronicle(
                                     &ec.get_interval().end(),
                                     &ec.get_interval().end(),
                                 ),
-                                transition: Transition::new(
-                                    ec.get_result().into(),
-                                    other_ec.get_result().into(),
-                                ),
+                                transition: Transition::new(ec.get_result(), other_ec.get_result()),
                             });
                         }
                         ec.absorb(other_ec);
@@ -578,7 +232,7 @@ pub fn translate_lvalue_to_expression_chronicle(
                                     &ec_cond.get_interval().end(),
                                 ),
                                 constraint: Constraint::Eq(
-                                    ec_cond.get_result().into(),
+                                    ec_cond.get_result(),
                                     symbol_table.new_bool(true).into(),
                                 ),
                             });
@@ -606,10 +260,7 @@ pub fn translate_lvalue_to_expression_chronicle(
                                     &ec.get_interval().end(),
                                     &ec.get_interval().end(),
                                 ),
-                                transition: Transition::new(
-                                    ec.get_result().into(),
-                                    ec_a.get_result().into(),
-                                ),
+                                transition: Transition::new(ec.get_result(), ec_a.get_result()),
                             });
                             ec.absorb(ec_a);
                         } else if a == &LValue::Nil {
@@ -619,7 +270,7 @@ pub fn translate_lvalue_to_expression_chronicle(
                                     &ec.get_interval().start(),
                                     &ec.get_interval().start(),
                                 ),
-                                constraint: Constraint::Neg(ec_cond.get_result().into()),
+                                constraint: Constraint::Neg(ec_cond.get_result()),
                             });
 
                             let ec_b =
@@ -645,10 +296,7 @@ pub fn translate_lvalue_to_expression_chronicle(
                                     &ec.get_interval().end(),
                                     &ec.get_interval().end(),
                                 ),
-                                transition: Transition::new(
-                                    ec.get_result().into(),
-                                    ec_b.get_result().into(),
-                                ),
+                                transition: Transition::new(ec.get_result(), ec_b.get_result()),
                             });
                             ec.absorb(ec_b);
                         }
@@ -782,7 +430,7 @@ pub fn translate_lvalue_to_expression_chronicle(
                     let mut ec_i =
                         translate_lvalue_to_expression_chronicle(e, context, symbol_table)?;
 
-                    literal.push(ec_i.get_result().into());
+                    literal.push(ec_i.get_result());
 
                     ec_i.add_constraint(Constraint::Eq(
                         previous_interval.end().into(),
@@ -868,7 +516,7 @@ pub fn translate_lvalue_to_expression_chronicle(
 
                         ec.add_effect(Effect {
                             interval: *ec.get_interval(),
-                            transition: Transition::new(ec.get_result().into(), ec.get_result()),
+                            transition: Transition::new(ec.get_result(), ec.get_result()),
                         });
                     }
                 };
@@ -889,8 +537,6 @@ pub fn translate_lvalue_to_expression_chronicle(
 
     Ok(ec)
 }
-
-pub const TRANSLATE_COND_IF: &str = "translate_cond_if";
 
 pub fn translate_cond_if(
     exp: &LValue,
@@ -945,99 +591,5 @@ pub fn translate_cond_if(
             exp.into(),
             vec![TypeLValue::List, TypeLValue::Atom],
         )),
-    }
-}
-pub const TRANSFORM_LAMBDA_EXPRESSION: &str = "transform-lambda-expression";
-
-pub fn transform_lambda_expression(lv: &LValue, env: LEnv) -> LResult {
-    //println!("in transform lambda");
-
-    if let LValue::List(list) = lv {
-        if list.is_empty() {
-            return Err(WrongNumberOfArgument(
-                TRANSFORM_LAMBDA_EXPRESSION,
-                lv.clone(),
-                0,
-                1..std::usize::MAX,
-            ));
-        }
-
-        let arg = list[0].clone();
-        let mut c_env = env.clone();
-
-        let lambda =
-            blocking_async!(eval(&expand(&arg, true, &mut c_env).await?, &mut c_env,).await)
-                .expect("Error in thread evaluating lambda")?;
-        //println!("evaluating is a success");
-        if let LValue::Lambda(l) = lambda {
-            let mut lisp = "(begin".to_string();
-
-            let args = &list[1..];
-
-            let params = l.get_params();
-            let body = l.get_body();
-
-            match params {
-                LambdaArgs::Sym(param) => {
-                    let arg = if args.len() == 1 {
-                        match &args[0] {
-                            LValue::Nil => LValue::Nil,
-                            _ => vec![args[0].clone()].into(),
-                        }
-                    } else {
-                        args.into()
-                    };
-                    lisp.push_str(format!("(define {} '{})", param, arg).as_str());
-                }
-                LambdaArgs::List(params) => {
-                    if params.len() != args.len() {
-                        return Err(SpecialError(
-                            TRANSFORM_LAMBDA_EXPRESSION,
-                            format!(
-                                "in lambda {}: ",
-                                WrongNumberOfArgument(
-                                    TRANSFORM_LAMBDA_EXPRESSION,
-                                    args.into(),
-                                    args.len(),
-                                    params.len()..params.len(),
-                                )
-                            ),
-                        ));
-                    }
-                    for (param, arg) in params.iter().zip(args) {
-                        lisp.push_str(format!("(define {} '{})", param.to_string(), arg).as_str());
-                    }
-                }
-                LambdaArgs::Nil => {
-                    if !args.is_empty() {
-                        return Err(SpecialError(
-                            TRANSFORM_LAMBDA_EXPRESSION,
-                            "Lambda was expecting no args.".to_string(),
-                        ));
-                    }
-                }
-            };
-
-            lisp.push_str(body.to_string().as_str());
-            lisp.push(')');
-
-            let mut c_env = env;
-
-            blocking_async!(parse(&lisp, &mut c_env).await).expect("error in thread parsing string")
-        } else {
-            Err(WrongType(
-                TRANSFORM_LAMBDA_EXPRESSION,
-                list[0].clone(),
-                (&list[0]).into(),
-                TypeLValue::Lambda,
-            ))
-        }
-    } else {
-        Err(WrongType(
-            TRANSFORM_LAMBDA_EXPRESSION,
-            lv.clone(),
-            lv.into(),
-            TypeLValue::List,
-        ))
     }
 }

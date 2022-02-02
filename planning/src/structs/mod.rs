@@ -3,9 +3,9 @@ use crate::structs::chronicle::Chronicle;
 use crate::structs::lit::Lit;
 use crate::structs::symbol_table::{AtomId, SymTable};
 use crate::structs::traits::FormatWithSymTable;
+use im::HashSet;
 use ompas_acting::rae::context::rae_env::DomainEnv;
 use ompas_lisp::core::structs::lenv::LEnv;
-use std::collections::HashSet;
 
 pub mod atom;
 pub mod chronicle;
@@ -41,8 +41,6 @@ pub fn get_variables_of_type(
         .cloned()
         .collect()
 }
-
-pub struct Problem {}
 
 type Action = Chronicle;
 type Method = Chronicle;

@@ -1,6 +1,10 @@
+use crate::point_algebra::problem::Relation;
+use crate::point_algebra::relation_type::RelationType;
+use crate::structs::atom::AtomType;
 use crate::structs::lit::Lit;
 use crate::structs::symbol_table::{AtomId, SymTable};
 use crate::structs::traits::{FormatWithSymTable, GetVariables};
+use ompas_lisp::core::structs::lerror::LError;
 
 #[derive(Clone)]
 pub enum Constraint {
@@ -10,6 +14,29 @@ pub enum Constraint {
     LT(Lit, Lit),
     And(Lit, Lit),
     Or(Lit, Lit),
+}
+impl Constraint {
+    pub fn get_left(&self) -> &Lit {
+        match self {
+            Constraint::LEq(l1, _l2)
+            | Constraint::Eq(l1, _l2)
+            | Constraint::LT(l1, _l2)
+            | Constraint::And(l1, _l2)
+            | Constraint::Or(l1, _l2) => l1,
+            Constraint::Neg(l) => l,
+        }
+    }
+
+    pub fn get_right(&self) -> &Lit {
+        match self {
+            Constraint::LEq(_l1, l2)
+            | Constraint::Eq(_l1, l2)
+            | Constraint::LT(_l1, l2)
+            | Constraint::And(_l1, l2)
+            | Constraint::Or(_l1, l2) => l2,
+            Constraint::Neg(l) => l,
+        }
+    }
 }
 
 impl GetVariables for Constraint {
@@ -56,6 +83,37 @@ impl FormatWithSymTable for Constraint {
                     l2.format_with_sym_table(st)
                 )
             }
+        }
+    }
+}
+
+impl Constraint {
+    pub fn try_into_pa_relation(&self, sym_table: &SymTable) -> Result<Relation<AtomId>, LError> {
+        let relation_type = match self {
+            Constraint::Eq(_, _) => RelationType::Eq,
+            Constraint::LEq(_, _) => RelationType::LEq,
+            Constraint::LT(_, _) => RelationType::LT,
+            _ => return Err(LError::default()),
+        };
+
+        if let Ok(i) = self.get_left().try_into() {
+            let i = sym_table.get_parent(&i);
+            if let Ok(j) = self.get_right().try_into() {
+                let j = sym_table.get_parent(&j);
+                if sym_table.get_type(&i).unwrap() == &AtomType::Timepoint {
+                    if sym_table.get_type(&j).unwrap() == &AtomType::Timepoint {
+                        Ok(Relation::new(i, j, relation_type))
+                    } else {
+                        Err(Default::default())
+                    }
+                } else {
+                    Err(Default::default())
+                }
+            } else {
+                Err(Default::default())
+            }
+        } else {
+            Err(Default::default())
         }
     }
 }

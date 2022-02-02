@@ -441,7 +441,7 @@ pub fn parse_static(str: &str, env: &mut LEnv) -> lerror::Result<PLValue> {
         Ok(se) => expand_static(&parse_into_lvalue(&se), true, env),
         Err(e) => Err(SpecialError(
             PARSE_STATIC,
-            format!("Error in command: {}", e.to_string()),
+            format!("Error in command: {}", e),
         )),
     }
 }

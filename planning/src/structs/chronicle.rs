@@ -46,7 +46,7 @@ impl Chronicle {
     pub fn absorb_expression_chronicle(&mut self, ec: ExpressionChronicle) {
         self.partial_chronicle.absorb(ec.partial_chronicle);
         //add result
-        self.add_var(&ec.result.get_id());
+        self.add_var(ec.result.get_id());
 
         //add interval
         self.add_interval(&ec.interval);
@@ -90,7 +90,7 @@ impl Chronicle {
 
 impl GetVariables for Chronicle {
     fn get_variables(&self) -> HashSet<AtomId> {
-        self.partial_chronicle.get_variables().clone()
+        self.partial_chronicle.get_variables()
     }
 }
 
@@ -261,7 +261,7 @@ impl ExpressionChronicleResult {
 impl From<ExpressionChronicleResult> for Lit {
     fn from(ecr: ExpressionChronicleResult) -> Self {
         match ecr.pure {
-            Some(lit) => lit.clone(),
+            Some(lit) => lit,
             None => ecr.id.into(),
         }
     }
@@ -311,7 +311,7 @@ impl ExpressionChronicle {
     }
 
     pub fn get_result_id(&self) -> &AtomId {
-        &self.result.get_id()
+        self.result.get_id()
     }
 
     pub fn get_constraints(&self) -> &Vec<Constraint> {
@@ -327,7 +327,7 @@ pub enum ChronicleSet {
 }
 
 impl ExpressionChronicle {
-    fn build_hashset<T: GetVariables>(vec: &Vec<T>) -> im::HashSet<AtomId> {
+    fn build_hashset<T: GetVariables>(vec: &[T]) -> im::HashSet<AtomId> {
         let mut hashset: HashSet<AtomId> = Default::default();
         for e in vec {
             hashset = hashset.union(e.get_variables());
@@ -430,7 +430,7 @@ impl Absorb for ExpressionChronicle {
     fn absorb(&mut self, other: Self) {
         self.partial_chronicle.absorb(other.partial_chronicle);
         self.add_interval(&other.interval);
-        self.add_var(&other.result.get_id());
+        self.add_var(other.result.get_id());
     }
 }
 

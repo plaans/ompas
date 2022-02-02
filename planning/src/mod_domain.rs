@@ -1,9 +1,8 @@
 //! Module containing the Scheme library to setup DOMAIN environment
 
-use crate::algo::{
-    pre_processing, transform_lambda_expression, translate_cond_if,
-    translate_domain_env_to_hierarchy, translate_lvalue_to_expression_chronicle,
-};
+use crate::conversion::pre_processing::{pre_processing, transform_lambda_expression};
+use crate::conversion::processing::{translate_cond_if, translate_lvalue_to_expression_chronicle};
+use crate::conversion::translate_domain_env_to_hierarchy;
 use crate::structs::symbol_table::SymTable;
 use crate::structs::traits::FormatWithSymTable;
 use crate::structs::ConversionContext;

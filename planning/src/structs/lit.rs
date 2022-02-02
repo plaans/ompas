@@ -5,12 +5,57 @@ use im::{hashset, HashSet};
 use ompas_lisp::core::structs::lerror;
 use ompas_lisp::core::structs::lerror::LError::SpecialError;
 use ompas_lisp::core::structs::lvalue::LValue;
+use std::ops::Deref;
 
 #[derive(Clone)]
 pub enum Lit {
     Atom(AtomId),
     Constraint(Box<Constraint>),
     Exp(Vec<Lit>),
+}
+
+impl Lit {
+    pub fn is_atom(&self) -> bool {
+        matches!(self, Self::Atom(_))
+    }
+    pub fn constraint(&self) -> bool {
+        matches!(self, Self::Constraint(_))
+    }
+    pub fn exp(&self) -> bool {
+        matches!(self, Self::Exp(_))
+    }
+}
+
+impl TryFrom<&Lit> for AtomId {
+    type Error = ();
+
+    fn try_from(value: &Lit) -> Result<Self, Self::Error> {
+        match value {
+            Lit::Atom(a) => Ok(*a),
+            _ => Err(()),
+        }
+    }
+}
+
+impl TryFrom<&Lit> for Constraint {
+    type Error = ();
+
+    fn try_from(value: &Lit) -> Result<Self, Self::Error> {
+        match value {
+            Lit::Constraint(c) => Ok(c.deref().clone()),
+            _ => Err(()),
+        }
+    }
+}
+
+impl TryFrom<&Lit> for Vec<Lit> {
+    type Error = ();
+    fn try_from(value: &Lit) -> Result<Self, Self::Error> {
+        match value {
+            Lit::Exp(c) => Ok(c.clone()),
+            _ => Err(()),
+        }
+    }
 }
 
 impl Default for Lit {

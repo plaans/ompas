@@ -1,4 +1,5 @@
 use crate::point_algebra::relation_type::RelationType::*;
+use std::fmt::{Display, Formatter};
 use std::ops::{BitAnd, BitOr, Not};
 
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
@@ -103,6 +104,12 @@ impl From<&RelationTypeBit> for RelationType {
     }
 }
 
+impl Display for RelationTypeBit {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:03b}", self.inner)
+    }
+}
+
 impl RelationTypeBit {
     /// Composition table: \
     /// ° | < | = | > \
@@ -151,10 +158,10 @@ impl RelationTypeBit {
         let mut result = 0b000;
         for r1 in &vec_1 {
             for r2 in &vec_2 {
-                result = result | RelationTypeBit::compose_simple_relation(r1, r2).inner;
+                result |= RelationTypeBit::compose_simple_relation(r1, r2).inner;
             }
         }
-        return result.into();
+        result.into()
     }
 
     pub fn included_in(&self, other: &Self) -> bool {
@@ -182,6 +189,23 @@ pub enum RelationType {
     Neq,
     Tautology,
     Contradiction,
+}
+
+impl Display for RelationType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str: &str = match self {
+            Eq => "=",
+            GT => ">",
+            LT => "<",
+            GEq => ">=",
+            LEq => "<=",
+            Neq => "!=",
+            Tautology => "T",
+            Contradiction => "{}",
+        };
+
+        write!(f, "{}", str)
+    }
 }
 
 impl BitAnd for &RelationType {

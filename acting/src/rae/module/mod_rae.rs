@@ -147,8 +147,7 @@ impl CtxRae {
             env: src.env.clone(),
             domain_env: src.domain_env.clone(),
         };
-        let env = mem::replace(&mut *src, new_env);
-        env
+        mem::replace(&mut *src, new_env)
     }
 }
 
@@ -414,7 +413,7 @@ async fn def_state_function<'a>(args: &'a [LValue], env: &'a LEnv) -> Result<LVa
         ));
     }
 
-    let lvalue = cons(&[GENERATE_STATE_FUNCTION.into(), args.into()], &env)?;
+    let lvalue = cons(&[GENERATE_STATE_FUNCTION.into(), args.into()], env)?;
     let mut e = LEnv::root().await;
 
     let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
@@ -591,7 +590,7 @@ async fn def_action<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
         ));
     }
 
-    let lvalue = cons(&[GENERATE_ACTION.into(), args.into()], &env)?;
+    let lvalue = cons(&[GENERATE_ACTION.into(), args.into()], env)?;
     let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
 
     let mut e = LEnv::root().await;
@@ -654,7 +653,7 @@ async fn def_method<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
         ));
     }
 
-    let lvalue = cons(&[GENERATE_METHOD.into(), args.into()], &env)?;
+    let lvalue = cons(&[GENERATE_METHOD.into(), args.into()], env)?;
 
     let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
 
@@ -754,7 +753,7 @@ async fn def_task<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
         ));
     }
 
-    let lvalue = cons(&[GENERATE_TASK_SIMPLE.into(), args.into()], &env)?;
+    let lvalue = cons(&[GENERATE_TASK_SIMPLE.into(), args.into()], env)?;
 
     let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
 

@@ -533,7 +533,7 @@ pub fn new_state_function(args: &[LValue], env: &LEnv) -> LResult {
     for (i, arg) in args.iter().enumerate() {
         match arg {
             LValue::Symbol(s) => {
-                if is_type(&args[i..i + 1], &env)?.try_into()? {
+                if is_type(&args[i..i + 1], env)?.try_into()? {
                     if i == args.len() - 1 {
                         t_value = s.clone();
                     } else {
@@ -649,10 +649,10 @@ pub fn get_type(args: &[LValue], env: &LEnv) -> LResult {
         LValue::Symbol(s) => match ctx.get_type_from_sym(s) {
             None => SYMBOL.to_string(),
             Some(lst) => match &lst {
-                LSymType::Object(u) => ctx.get_sym(u).unwrap().to_string(),
+                LSymType::Object(u) => ctx.get_sym(u).unwrap(),
                 LSymType::Type(parent_type) => match parent_type {
                     None => "root type".to_string(),
-                    Some(u) => format!("subtype of {}", ctx.get_sym(u).unwrap().to_string()),
+                    Some(u) => format!("subtype of {}", ctx.get_sym(u).unwrap()),
                 },
                 lst => lst.to_string(),
             },

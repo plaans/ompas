@@ -1,5 +1,6 @@
 use crate::point_algebra::relation_type::{RelationType, RelationTypeBit};
 use std::hash::Hash;
+use std::ops::{Index, IndexMut};
 
 pub struct Relation<T> {
     i: T,
@@ -68,9 +69,45 @@ impl<T: Clone + Eq + Hash> From<Graph<T>> for Problem<T> {
     }
 }
 
+pub type Timepoint = usize;
+
 pub struct Graph<T> {
     reverse: Vec<T>,
     inner: Vec<Vec<Option<RelationTypeBit>>>,
+}
+
+impl<T> Graph<T> {
+    pub fn get_number_timepoints(&self) -> usize {
+        self.reverse.len()
+    }
+}
+
+impl<T> Index<Timepoint> for Graph<T> {
+    type Output = Vec<Option<RelationTypeBit>>;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.inner[index]
+    }
+}
+
+impl<T> IndexMut<usize> for Graph<T> {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.inner[index]
+    }
+}
+
+impl<T> Index<(Timepoint, Timepoint)> for Graph<T> {
+    type Output = Option<RelationTypeBit>;
+
+    fn index(&self, index: (Timepoint, Timepoint)) -> &Self::Output {
+        &self.inner[index.0][index.1]
+    }
+}
+
+impl<T> IndexMut<(Timepoint, Timepoint)> for Graph<T> {
+    fn index_mut(&mut self, index: (Timepoint, Timepoint)) -> &mut Self::Output {
+        &mut self.inner[index.0][index.1]
+    }
 }
 
 impl<T> Graph<T> {

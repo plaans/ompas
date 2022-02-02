@@ -165,17 +165,21 @@ pub fn simplify_timepoints(
         AtomType::Timepoint,
     );
     let used_timepoints: HashSet<AtomId> = get_variables_of_type(
-        ec.get_variables_in_set(ChronicleSet::Effect)
-            .iter()
-            .map(|a| sym_table.get_parent(a))
-            .collect(),
+        ec.get_variables_in_sets(vec![
+            ChronicleSet::Effect,
+            ChronicleSet::Condition,
+            ChronicleSet::SubTask,
+        ])
+        .iter()
+        .map(|a| sym_table.get_parent(a))
+        .collect(),
         sym_table,
         AtomType::Timepoint,
     );
 
     let optional_timepoints: HashSet<&AtomId> = timepoints.difference(&used_timepoints).collect();
 
-    println!("not used timepoints : {}", {
+    /*println!("not used timepoints : {}", {
         let mut string = "{".to_string();
         for (i, t) in optional_timepoints.iter().enumerate() {
             if i != 0 {
@@ -185,7 +189,7 @@ pub fn simplify_timepoints(
         }
         string.push('}');
         string
-    })
+    })*/
 }
 
 pub fn post_processing(

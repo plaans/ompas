@@ -324,31 +324,42 @@ pub enum ChronicleSet {
     Constraint,
     Condition,
     SubTask,
-    All,
 }
 
 impl ExpressionChronicle {
+    fn build_hashset<T: GetVariables>(vec: &Vec<T>) -> im::HashSet<AtomId> {
+        let mut hashset: HashSet<AtomId> = Default::default();
+        for e in vec {
+            hashset = hashset.union(e.get_variables());
+        }
+
+        hashset
+    }
+
     pub fn get_variables_in_set(&self, set: ChronicleSet) -> im::HashSet<AtomId> {
-        fn build_hashset<T: GetVariables>(vec: &Vec<T>) -> im::HashSet<AtomId> {
-            let mut hashset: HashSet<AtomId> = Default::default();
-            for e in vec {
-                hashset = hashset.union(e.get_variables());
-            }
-
-            hashset
-        }
-
         match set {
-            ChronicleSet::Effect => build_hashset(&self.partial_chronicle.effects),
-            ChronicleSet::Constraint => build_hashset(&self.partial_chronicle.constraints),
-            ChronicleSet::Condition => build_hashset(&self.partial_chronicle.conditions),
-            ChronicleSet::SubTask => build_hashset(&self.partial_chronicle.subtasks),
-            ChronicleSet::All => build_hashset(&self.partial_chronicle.effects).union(
-                build_hashset(&self.partial_chronicle.constraints)
-                    .union(build_hashset(&self.partial_chronicle.conditions))
-                    .union(build_hashset(&self.partial_chronicle.subtasks)),
-            ),
+            ChronicleSet::Effect => Self::build_hashset(&self.partial_chronicle.effects),
+            ChronicleSet::Constraint => Self::build_hashset(&self.partial_chronicle.constraints),
+            ChronicleSet::Condition => Self::build_hashset(&self.partial_chronicle.conditions),
+            ChronicleSet::SubTask => Self::build_hashset(&self.partial_chronicle.subtasks),
         }
+    }
+
+    pub fn get_variables_in_sets(&self, sets: Vec<ChronicleSet>) -> im::HashSet<AtomId> {
+        let mut hashset = HashSet::default();
+        for set in sets {
+            hashset = hashset.union(self.get_variables_in_set(set))
+        }
+        hashset
+    }
+
+    pub fn get_all_variables_in_sets(&self) -> im::HashSet<AtomId> {
+        self.get_variables_in_sets(vec![
+            ChronicleSet::Effect,
+            ChronicleSet::Constraint,
+            ChronicleSet::Condition,
+            ChronicleSet::SubTask,
+        ])
     }
 }
 

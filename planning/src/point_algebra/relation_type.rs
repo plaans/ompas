@@ -156,6 +156,14 @@ impl RelationTypeBit {
         }
         return result.into();
     }
+
+    pub fn included_in(&self, other: &Self) -> bool {
+        self | other == *other
+    }
+
+    pub fn intersect(&self, other: &Self) -> Self {
+        self & other
+    }
 }
 
 impl From<RelationTypeBit> for RelationType {

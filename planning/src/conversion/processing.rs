@@ -14,6 +14,7 @@ use ompas_lisp::core::*;
 use ompas_lisp::static_eval::{eval_static, parse_static};
 use std::collections::HashSet;
 
+use crate::point_algebra::problem::Problem;
 use crate::structs::atom::AtomType;
 use crate::structs::chronicle::{Chronicle, ChronicleSet, ExpressionChronicle};
 use crate::structs::condition::Condition;
@@ -21,6 +22,7 @@ use crate::structs::constraint::Constraint;
 use crate::structs::effect::Effect;
 use crate::structs::expression::Expression;
 use crate::structs::interval::Interval;
+use crate::structs::lit::Lit::Constraint;
 use crate::structs::lit::{lvalue_to_lit, Lit};
 use crate::structs::symbol_table::{AtomId, ExpressionType, SymTable};
 use crate::structs::traits::{Absorb, FormatWithSymTable, GetVariables};
@@ -178,6 +180,14 @@ pub fn simplify_timepoints(
     );
 
     let optional_timepoints: HashSet<&AtomId> = timepoints.difference(&used_timepoints).collect();
+
+    for constraint in ec.get_constraints() {
+        if constraint != Constraint::Neg(_) {}
+
+        if constraint.get_left().is_atom() && constraint.get_right().is_atom() {}
+    }
+
+    let problem: Problem<AtomId> = Problem::new(timepoints.into(), vec![]);
 
     /*println!("not used timepoints : {}", {
         let mut string = "{".to_string();

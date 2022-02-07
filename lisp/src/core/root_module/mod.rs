@@ -1,6 +1,8 @@
 use crate::core::language::*;
 use crate::core::root_module::basic_math::language::*;
 use crate::core::root_module::basic_math::*;
+use crate::core::root_module::error::language::*;
+use crate::core::root_module::error::{check, err, is_err};
 use crate::core::root_module::language::*;
 use crate::core::root_module::list::language::*;
 use crate::core::root_module::list::*;
@@ -20,13 +22,15 @@ use crate::core::structs::typelvalue::TypeLValue;
 
 pub mod basic_math;
 pub mod env;
+mod error;
 pub mod list;
 pub mod map;
 pub mod predicate;
 
 pub mod language {
-    use crate::core::language::{LIST, MAP};
+    use crate::core::language::{ERR, LIST, MAP};
     use crate::core::root_module::basic_math::language::*;
+    use crate::core::root_module::error::language::*;
     use crate::core::root_module::list::language::*;
     use crate::core::root_module::map::language::*;
     use crate::core::root_module::predicate::language::*;
@@ -88,6 +92,9 @@ pub mod language {
             IS_PAIR,
             IS_EQUAL,
             IS_NIL,
+            ERR,
+            CHECK,
+            IS_ERR,
         ]
     }
 
@@ -195,6 +202,11 @@ impl IntoModule for CtxRoot {
 
         module.add_fn_prelude(IS_PAIR, is_pair);
         module.add_fn_prelude(IS_EQUAL, is_equal);
+
+        //Error
+        module.add_fn_prelude(ERR, err);
+        module.add_fn_prelude(IS_ERR, is_err);
+        module.add_fn_prelude(CHECK, check);
         module
     }
 
@@ -239,6 +251,9 @@ impl IntoModule for CtxRoot {
             LHelp::new(IS_QUOTE, DOC_IS_QUOTE),
             LHelp::new(IS_PAIR, DOC_IS_PAIR),
             LHelp::new(IS_EQUAL, DOC_IS_EQUAL),
+            LHelp::new(ERR, DOC_ERR),
+            LHelp::new(IS_ERR, DOC_IS_ERR),
+            LHelp::new(CHECK, DOC_CHECK),
         ]
         .into()
     }

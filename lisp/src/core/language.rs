@@ -19,6 +19,7 @@ pub const MUT_FN: &str = "mut-fn";
 pub const USIZE: &str = "USIZE";
 pub const ASYNC_FN: &str = "async-fn";
 pub const ASYNC_MUT_FN: &str = "async-mut-fn";
+pub const ERR: &str = "err";
 //Core language
 
 //Boolean

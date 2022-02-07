@@ -40,7 +40,7 @@ pub enum LValue {
     CoreOperator(LCoreOperator),
     #[serde(skip)]
     Future(LFuture),
-
+    Err(Box<LValue>),
     // data structure
     #[serde(skip)]
     Map(im::HashMap<LValue, LValue>),
@@ -251,6 +251,7 @@ impl Display for LValue {
             LValue::Character(c) => write!(f, "{}", c),
             LValue::AsyncFn(fun) => write!(f, "{}", fun.get_label()),
             LValue::Future(_) => write!(f, "{}", FUTURE),
+            LValue::Err(e) => write!(f, "err: {}", e),
         }
     }
 }

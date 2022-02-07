@@ -117,6 +117,7 @@ pub mod language {
             EVAL,
             PARSE,
             EXPAND,
+            DO,
         ]);
 
         vec

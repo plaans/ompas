@@ -19,7 +19,7 @@ pub fn post_processing(
 ) -> Result<(), LError> {
     unify_equal(ec, sym_table, context);
     rm_useless_var(ec, sym_table, context);
-    simplify_timepoints(ec, sym_table, context)?;
+    //simplify_timepoints(ec, sym_table, context)?;
     Ok(())
 }
 

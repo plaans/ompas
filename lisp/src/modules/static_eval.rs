@@ -10,7 +10,6 @@ use crate::core::structs::lvalue::LValue;
 use crate::core::structs::module::{IntoModule, Module};
 use crate::core::structs::purefonction::PureFonctionCollection;
 use crate::modules::advanced_math::CtxMath;
-use crate::modules::error::CtxError;
 use crate::modules::static_eval::language::*;
 use crate::modules::utils::CtxUtils;
 use crate::static_eval::{eval_static, expand_static};
@@ -55,8 +54,6 @@ impl CtxStaticEval {
         env.import(CtxMath::default(), ImportType::WithoutPrefix)
             .await?;
         env.import(CtxUtils::default(), ImportType::WithoutPrefix)
-            .await?;
-        env.import(CtxError::default(), ImportType::WithoutPrefix)
             .await?;
         let env = Arc::new(RwLock::new(env));
         Ok(Self { env })

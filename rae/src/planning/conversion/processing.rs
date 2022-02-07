@@ -75,11 +75,11 @@ pub fn translate_lvalue_to_expression_chronicle(
                         ));
                     }
                 }
-                LCoreOperator::Begin => {
+                LCoreOperator::Begin | LCoreOperator::Do => {
                     symbol_table.new_scope();
                     let mut literal: Vec<Lit> = vec![symbol_table
-                        .id(BEGIN)
-                        .expect("begin is not defined in the symbol table")
+                        .id(co.to_string().as_str())
+                        .unwrap_or_else(|| panic!("{} is not defined in the symbol table", co))
                         .into()];
                     let mut previous_interval: Interval = *ec.get_interval();
 

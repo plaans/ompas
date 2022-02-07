@@ -48,8 +48,8 @@ name = "root_scheme"
 path = "src/bin/root_scheme.rs"
 
 [[bin]]
-name = "translate"
-path = "src/bin/translate.rs"
+name = "conversion"
+path = "src/bin/conversion.rs"
 
 [[bin]]
 name = "union-map"

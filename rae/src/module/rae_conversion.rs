@@ -18,11 +18,11 @@ use ompas_utils::dyn_async;
 use std::time::SystemTime;
 
 pub const RAE_CONVERT_EXPR: &str = "convert-expr";
-pub const RAE_CONVERT_DOMAIN: &str = "convert-expr";
-pub const RAE_PRE_PROCESS_LAMBDA: &str = "convert-expr";
-pub const RAE_PRE_PROCESS_EXPR: &str = "convert-expr";
-pub const RAE_PRE_PROCESS_DOMAIN: &str = "convert-expr";
-pub const RAE_CONVERT_COND_EXPR: &str = "convert-expr";
+pub const RAE_CONVERT_DOMAIN: &str = "convert-domain";
+pub const RAE_PRE_PROCESS_LAMBDA: &str = "pre-process-lambda";
+pub const RAE_PRE_PROCESS_EXPR: &str = "pre-process-expr";
+pub const RAE_PRE_PROCESS_DOMAIN: &str = "pre-process-domain";
+pub const RAE_CONVERT_COND_EXPR: &str = "convert-cond-expr";
 
 #[macro_rules_attribute(dyn_async!)]
 pub async fn convert_expr<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {

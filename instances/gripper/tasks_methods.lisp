@@ -6,20 +6,20 @@
           (:pre-conditions (and ( = (at ?ball) (at-robby)) (null? (carry ?gripper)) (= ?departure (at-robby))))
           (:score 0)
           (:body
-            (begin
+            (do
                 (pick ?ball ?departure ?gripper)
                 (move ?departure ?room)
                 (drop ?ball ?room ?gripper)))))
 
-    ;(def-method m2
-    ;    '((:task pick-and-drop)
-    ;      (:params (?ball ball) (?room room)  (?gripper gripper) (?departure room) (?intermediaire room))
-    ;      (:pre-conditions (and (!= (at ?ball) (at-robby)) (null? (carry ?gripper)) (= ?departure (at-robby)) (= intermediaire (at ?ball))))
-    ;      (:score 0)
-    ;      (:body
-    ;        (begin
-    ;            (move ?departure ?intermediaire)
-    ;            (pick ?ball ?intermediaire ?gripper)
-    ;            (move ?intermediaire ?room)
-    ;            (drop ?ball ?room ?gripper)))))
+    (def-method m2
+        '((:task pick-and-drop)
+          (:params (?ball ball) (?room room)  (?gripper gripper) (?departure room) (?intermediaire room))
+          (:pre-conditions (and (!= (at ?ball) (at-robby)) (null? (carry ?gripper)) (= ?departure (at-robby)) (= intermediaire (at ?ball))))
+          (:score 0)
+          (:body
+            (do
+                (move ?departure ?intermediaire)
+                (pick ?ball ?intermediaire ?gripper)
+                (move ?intermediaire ?room)
+                (drop ?ball ?room ?gripper)))))
 )

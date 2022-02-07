@@ -5,7 +5,6 @@ use ompas_lisp::core::activate_debug;
 use ompas_lisp::lisp_interpreter::{LispInterpreter, LispInterpreterConfig};
 use ompas_lisp::modules::_type::CtxType;
 use ompas_lisp::modules::advanced_math::CtxMath;
-use ompas_lisp::modules::error::CtxError;
 use ompas_lisp::modules::io::CtxIo;
 use ompas_lisp::modules::string::CtxString;
 use ompas_lisp::modules::utils::CtxUtils;
@@ -55,9 +54,6 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
         ctx_io.set_log_output(pb.clone().into());
     }
 
-    li.import_namespace(CtxError::default())
-        .await
-        .expect("error loading error");
     li.import_namespace(ctx_utils)
         .await
         .expect("error loading utils");

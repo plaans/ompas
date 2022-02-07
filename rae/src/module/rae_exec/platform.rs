@@ -1,10 +1,12 @@
 use crate::module::rae_exec::*;
 use ::macro_rules_attribute::macro_rules_attribute;
 use log::{info, warn};
+use ompas_lisp::core::root_module::list::cdr;
 use ompas_lisp::core::structs::lenv::LEnv;
 use ompas_lisp::core::structs::lerror::LError::{SpecialError, WrongNumberOfArgument};
 use ompas_lisp::core::structs::lerror::{LError, LResult};
 use ompas_lisp::core::structs::lvalue::LValue;
+use ompas_lisp::core::{eval, parse};
 use ompas_lisp::modules::utils::contains;
 use ompas_utils::dyn_async;
 use std::convert::TryInto;
@@ -22,8 +24,18 @@ pub fn is_platform_defined(_: &[LValue], env: &LEnv) -> LResult {
 }
 
 #[macro_rules_attribute(dyn_async!)]
-pub async fn fn_exec_command<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+pub async fn exec_command<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
+
+    let eval_model = || async {
+        let string = format!(
+            "((get-action-model (quote {}) {})",
+            args[0],
+            cdr(args, env)?
+        );
+        let mut env = env.clone();
+        eval(&parse(&string, &mut env).await?, &mut env).await
+    };
 
     let mode: String = env
         .get_symbol("rae-mode")
@@ -83,13 +95,10 @@ pub async fn fn_exec_command<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
                         }
                     }
                 }
-                None => {
-                    Ok(LValue::Nil)
-                    //Internal simulator behaviour
-                }
+                None => eval_model().await,
             }
         }
-        SYMBOL_SIMU_MODE => Ok(LValue::Nil),
+        SYMBOL_SIMU_MODE => eval_model().await,
         _ => unreachable!(
             "{} should have either {} or {} value.",
             SYMBOL_RAE_MODE, SYMBOL_EXEC_MODE, SYMBOL_SIMU_MODE

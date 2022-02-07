@@ -245,7 +245,7 @@ impl IntoModule for CtxRaeExec {
         module.add_async_fn_prelude(RAE_GET_STATE, get_state);
         module.add_async_fn_prelude(RAE_GET_FACTS, get_facts);
         module.add_async_fn_prelude(RAE_GET_STATE_VARIBALE, get_state_variable);
-        module.add_async_fn_prelude(RAE_EXEC_COMMAND, fn_exec_command);
+        module.add_async_fn_prelude(RAE_EXEC_COMMAND, exec_command);
         module.add_async_fn_prelude(RAE_LAUNCH_PLATFORM, launch_platform);
         module.add_async_fn_prelude(RAE_GET_STATUS, get_status);
         module.add_async_fn_prelude(RAE_CANCEL_COMMAND, cancel_command);
@@ -1015,67 +1015,3 @@ let mode: String = env
         ),
     }
  */
-
-/*///Monitor the status of an action that has been triggered
-/// Return true if the action is a success, false otherwise
-#[macro_rules_attribute(dyn_async!)]
-async fn fn_await<'a>(
-    args: &'a [LValue],
-    _env: &'a LEnv,
-    ctx: &'a CtxRaeExec,
-) -> Result<LValue, LError> {
-    if args.len() != 1 {
-        return Err(WrongNumberOfArgument(
-            RAE_AWAIT,
-            args.into(),
-            args.len(),
-            1..1,
-        ));
-    }
-
-    let action_id = args[0].clone();
-    //println!("await on action (id={})", action_id);
-
-    if let LValue::Number(LNumber::Usize(action_id)) = action_id {
-        let mut receiver = ctx.actions_progress.declare_new_watcher(&action_id).await;
-        info!("waiting on action {}", action_id);
-
-        loop {
-            //println!("waiting on status:");
-            match receiver.recv().await.unwrap() {
-                true => {
-                    //println!("status updated!");
-                    match ctx.actions_progress.status.read().await.get(&action_id) {
-                        Some(s) => match s {
-                            Status::Pending => {
-                                //println!("not triggered");
-                            }
-                            Status::Running => {
-                                //println!("running");
-                            }
-                            Status::Failure => {
-                                warn!("Command {} is a failure.", action_id);
-                                return Ok(false.into());
-                            }
-                            Status::Done => {
-                                info!("Command {} is a success.", action_id);
-                                return Ok(true.into());
-                            }
-                        },
-                        None => {
-                            panic!("no action status")
-                        }
-                    };
-                }
-                false => panic!("sync to watch action status should not be false"),
-            }
-        }
-    } else {
-        Err(WrongType(
-            RAE_AWAIT,
-            action_id.clone(),
-            action_id.into(),
-            TypeLValue::Usize,
-        ))
-    }
-}*/

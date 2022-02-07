@@ -88,14 +88,7 @@ pub const MACRO_GENERATE_ACTION: &str = "(defmacro generate-action
              `(list ,label
                  (quote ,p_expr)
                  (lambda ,params 
-                    (if (= rae-mode exec-mode)
-                        (begin
-                            (if (rae-platform?)
-                                ,(cons 'rae-exec-command
-                                    (cons `(quote ,label) params))
-                                ,(cons `(get-action-model (quote ,label)) params))
-                            (print \"action \" (quote ,label) params \"executed !\"))
-                        ,(cons `(get-action-model (quote ,label)) params)))))))";
+                    ,(cons 'rae-exec-command (cons `(quote ,label) params)))))))";
 
 pub const MACRO_GENERATE_ACTION_MODEL: &str = "
 (defmacro generate-action-model

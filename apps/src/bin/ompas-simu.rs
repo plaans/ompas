@@ -1,4 +1,3 @@
-use ompas_acting::rae::module::init_ctx_rae;
 use ompas_lisp::core::activate_debug;
 use ompas_lisp::lisp_interpreter::{
     ChannelToLispInterpreter, LispInterpreter, LispInterpreterConfig,
@@ -9,6 +8,7 @@ use ompas_lisp::modules::error::CtxError;
 use ompas_lisp::modules::io::CtxIo;
 use ompas_lisp::modules::string::CtxString;
 use ompas_lisp::modules::utils::CtxUtils;
+use ompas_rae::module::init_ctx_rae;
 use std::path::PathBuf;
 use structopt::StructOpt;
 

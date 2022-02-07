@@ -1,7 +1,5 @@
 use std::path::PathBuf;
 
-use ompas_acting::rae::module::init_ctx_rae;
-use ompas_acting::rae::module::rae_exec::Platform;
 use ompas_godot_simulation_client::rae_interface::PlatformGodot;
 use ompas_lisp::core::activate_debug;
 use ompas_lisp::lisp_interpreter::{LispInterpreter, LispInterpreterConfig};
@@ -11,6 +9,8 @@ use ompas_lisp::modules::error::CtxError;
 use ompas_lisp::modules::io::CtxIo;
 use ompas_lisp::modules::string::CtxString;
 use ompas_lisp::modules::utils::CtxUtils;
+use ompas_rae::module::init_ctx_rae;
+use ompas_rae::module::rae_exec::Platform;
 use structopt::StructOpt;
 
 pub const TOKIO_CHANNEL_SIZE: usize = 65_384;

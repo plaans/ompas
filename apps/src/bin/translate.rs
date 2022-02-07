@@ -11,7 +11,6 @@ use ompas_lisp::modules::error::CtxError;
 use ompas_lisp::modules::io::CtxIo;
 use ompas_lisp::modules::string::CtxString;
 use ompas_lisp::modules::utils::CtxUtils;
-use ompas_planning::mod_domain::CtxDomain;
 
 pub const TOKIO_CHANNEL_SIZE: usize = 65_384;
 
@@ -50,7 +49,6 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     let ctx_type = CtxType::default();
     let ctx_utils = CtxUtils::default();
     let ctx_string = CtxString::default();
-    let ctx_domain = CtxDomain::new().await;
 
     //Add the sender of the channel.
     ctx_io.add_communication(li.subscribe());
@@ -75,10 +73,6 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     li.import(ctx_string)
         .await
         .expect("error loading ctx string");
-
-    li.import_namespace(ctx_domain)
-        .await
-        .expect("error loading rae domain");
 
     li.set_config(LispInterpreterConfig::new(true));
 

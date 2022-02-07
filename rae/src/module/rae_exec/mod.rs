@@ -14,7 +14,7 @@ use ::macro_rules_attribute::macro_rules_attribute;
 use async_trait::async_trait;
 use log::info;
 use ompas_lisp::core::root_module::list::cons;
-use ompas_lisp::core::root_module::map::{remove_key_value_map, set_map};
+use ompas_lisp::core::root_module::map::{get_map, remove_key_value_map, set_map};
 use ompas_lisp::core::structs::contextcollection::Context;
 use ompas_lisp::core::structs::documentation::Documentation;
 use ompas_lisp::core::structs::lenv::LEnv;
@@ -739,18 +739,38 @@ async fn get_state_variable<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
             1..std::usize::MAX,
         ));
     }
-    let key: LValueS = if args.len() > 1 {
-        LValue::from(args).into()
+
+    let rae_mode: String = env
+        .get_symbol(SYMBOL_RAE_MODE)
+        .expect("{} not defined")
+        .try_into()?;
+
+    let platform_defined = ctx.platform_interface.is_some();
+
+    if rae_mode == SYMBOL_EXEC_MODE && platform_defined {
+        let key: LValueS = if args.len() > 1 {
+            LValue::from(args).into()
+        } else {
+            args[0].clone().into()
+        };
+
+        let state = ctx.state.get_state(None).await;
+
+        let value = state.inner.get(&key).unwrap_or(&LValueS::Bool(false));
+        //println!("value: {}", value);
+
+        Ok(value.into())
+    } else if rae_mode != SYMBOL_RAE_MODE && rae_mode != SYMBOL_SIMU_MODE {
+        return Err(SpecialError(
+            RAE_GET_STATE_VARIBALE,
+            format!(
+                "RAE_MODE must have the value {} or {}",
+                SYMBOL_EXEC_MODE, SYMBOL_SIMU_MODE,
+            ),
+        ));
     } else {
-        args[0].clone().into()
-    };
-
-    let state = ctx.state.get_state(None).await;
-
-    let value = state.inner.get(&key).unwrap_or(&LValueS::Bool(false));
-    //println!("value: {}", value);
-
-    Ok(value.into())
+        get_map(&[env.get_symbol(STATE).unwrap(), args.into()], env)
+    }
 }
 
 #[macro_rules_attribute(dyn_async!)]

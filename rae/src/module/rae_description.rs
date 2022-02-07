@@ -25,7 +25,6 @@ LANGUAGE
 pub const MOD_RAE_DESCRIPTION: &str = "rae-description";
 
 pub const GENERATE_TASK: &str = "generate-task";
-pub const GENERATE_TASK_SIMPLE: &str = "generate-task-simple";
 pub const GENERATE_STATE_FUNCTION: &str = "generate-state-function";
 pub const GENERATE_ACTION: &str = "generate-action";
 pub const GENERATE_ACTION_MODEL: &str = "generate-action-model";
@@ -54,18 +53,11 @@ pub const DOC_DEF_METHOD_VERBOSE: &str =
         \t(rae-await (navigate_to ?r ?x ?y))\n\
         \t(rae-await (navigate_to ?r (+ ?x 1) (+ ?y 1)))))))";
 pub const DOC_DEF_LAMBDA: &str = "Add a lambda to RAE environment";
-pub const DOC_DEF_INITIAL_STATE: &str = "Add initial facts in the state. Most of the time it is general knowledge and not initialisation of facts.";
-
-/// Macro used to generate code to define a task in RAE environment.
-/*pub const MACRO_GENERATE_TASK: &str = "(defmacro generate-task \
-(lambda (l body) \
-    (quasiquote (list (unquote l) (lambda (unquote (cdar body)) \
-        (if (unquote (cadadr body)) \
-            (unquote (cadaddr body)) \
-            (quote (task is not applicable in the given state))))))))";*/
+pub const DOC_DEF_INITIAL_STATE: &str = "Add initial facts in the state.\
+Most of the time it is general knowledge and not initialisation of facts.";
 
 /// Macro used to generate code to define a task in the simplified representation in RAE environment.
-pub const MACRO_GENERATE_TASK_SIMPLE: &str = "(defmacro generate-task-simple 
+pub const MACRO_GENERATE_TASK: &str = "(defmacro generate-task 
     (lambda args
     (let* ((label (car args))
           (p_expr (cdr args))
@@ -83,11 +75,7 @@ pub const MACRO_GENERATE_STATE_FUNCTION: &str = "(defmacro generate-state-functi
         `(list ,label
             (quote ,p_expr)
             (lambda ,params
-                (if (= rae-mode exec-mode)
-                    ,(cons 'rae-get-state-variable (cons `(quote ,label) params))
-                    ,(if (= params nil)
-                        `(get-map state ',label)
-                        `(get-map state ,(cons 'list (cons `(quote ,label) params))))))))))";
+                    ,(cons 'rae-get-state-variable (cons `(quote ,label) params)))))))";
 
 /// Macro used to generate code to define an action in RAE environment.
 pub const MACRO_GENERATE_ACTION: &str = "(defmacro generate-action
@@ -214,7 +202,7 @@ impl IntoModule for CtxRaeDescription {
             ctx: Context::new(()),
             prelude: vec![],
             raw_lisp: vec![
-                MACRO_GENERATE_TASK_SIMPLE,
+                MACRO_GENERATE_TASK,
                 MACRO_GENERATE_STATE_FUNCTION,
                 MACRO_GENERATE_ACTION,
                 MACRO_GENERATE_ACTION_MODEL,
@@ -699,7 +687,7 @@ pub async fn def_task<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
         ));
     }
 
-    let lvalue = cons(&[GENERATE_TASK_SIMPLE.into(), args.into()], env)?;
+    let lvalue = cons(&[GENERATE_TASK.into(), args.into()], env)?;
 
     let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
 

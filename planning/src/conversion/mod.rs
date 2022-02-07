@@ -166,7 +166,7 @@ pub fn translate_lvalue_to_chronicle(
 
         let mut ec = translate_lvalue_to_expression_chronicle(&body, context, symbol_table)?;
 
-        post_processing(&mut ec, symbol_table, context);
+        post_processing(&mut ec, symbol_table, context)?;
 
         chronicle.absorb_expression_chronicle(ec);
         Ok(chronicle)

@@ -82,21 +82,26 @@ pub fn translate_lvalue_to_expression_chronicle(
                         .id(BEGIN)
                         .expect("begin is not defined in the symbol table")
                         .into()];
-                    let mut previous_interval: Option<Interval> = None;
+                    let mut previous_interval: Interval = *ec.get_interval();
 
                     for (i, e) in l[1..].iter().enumerate() {
-                        let mut ec_i =
+                        let ec_i =
                             translate_lvalue_to_expression_chronicle(e, context, symbol_table)?;
 
                         literal.push(ec_i.get_result());
-                        if i != 0 {
-                            ec_i.add_constraint(Constraint::Eq(
-                                previous_interval.unwrap().end().into(),
+                        if i == 0 {
+                            ec.add_constraint(Constraint::Eq(
+                                previous_interval.end().into(),
                                 ec_i.get_interval().start().into(),
                             ));
+                        } else {
+                            ec.add_constraint(Constraint::Eq(
+                                previous_interval.start().into(),
+                                ec_i.get_interval().start().into(),
+                            ))
                         }
 
-                        previous_interval = Some(*ec_i.get_interval());
+                        previous_interval = *ec_i.get_interval();
 
                         if i == l.len() - 2 {
                             if ec_i.is_result_pure() {
@@ -116,11 +121,11 @@ pub fn translate_lvalue_to_expression_chronicle(
                     }
 
                     ec.add_constraint(Constraint::Eq(
-                        previous_interval.unwrap().end().into(),
+                        previous_interval.end().into(),
                         ec.get_interval().end().into(),
                     ));
 
-                    let literal: Lit = literal.into();
+                    /*let literal: Lit = literal.into();
 
                     let literal: Lit = vec![
                         symbol_table
@@ -131,7 +136,7 @@ pub fn translate_lvalue_to_expression_chronicle(
                     ]
                     .into();
 
-                    ec.set_lit(literal);
+                    ec.set_lit(literal);*/
 
                     symbol_table.revert_scope();
                 }
@@ -188,7 +193,7 @@ pub fn translate_lvalue_to_expression_chronicle(
                             ));
                         }
 
-                        // e_cond < s_a
+                        // e_cond = s_a
                         ec.add_constraint(Constraint::Eq(
                             ec.get_interval().start().into(),
                             other_ec.get_interval().start().into(),
@@ -426,16 +431,21 @@ pub fn translate_lvalue_to_expression_chronicle(
                 }
 
                 let mut previous_interval = *ec.get_interval();
-                for e in &l[1..] {
-                    let mut ec_i =
-                        translate_lvalue_to_expression_chronicle(e, context, symbol_table)?;
+                for (i, e) in l[1..].iter().enumerate() {
+                    let ec_i = translate_lvalue_to_expression_chronicle(e, context, symbol_table)?;
 
                     literal.push(ec_i.get_result());
-
-                    ec_i.add_constraint(Constraint::Eq(
-                        previous_interval.end().into(),
-                        ec_i.get_interval().start().into(),
-                    ));
+                    if i != 0 {
+                        ec.add_constraint(Constraint::Eq(
+                            previous_interval.end().into(),
+                            ec_i.get_interval().start().into(),
+                        ));
+                    } else {
+                        ec.add_constraint(Constraint::Eq(
+                            previous_interval.start().into(),
+                            ec_i.get_interval().start().into(),
+                        ));
+                    }
 
                     previous_interval = *ec_i.get_interval();
                     ec.absorb(ec_i);

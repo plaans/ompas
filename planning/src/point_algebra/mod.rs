@@ -1,5 +1,6 @@
 use crate::point_algebra::problem::{Graph, Timepoint};
 use crate::point_algebra::relation_type::RelationType;
+use crate::point_algebra::relation_type::RelationType::Tautology;
 use ompas_lisp::core::structs::lerror::LError;
 use std::collections::VecDeque;
 
@@ -24,7 +25,8 @@ pub type Fail = ();
 /// 1. if M[i, k] or M[k,j ] is the universal relation then return false;
 /// 2. S := M[i, k] ◦ M[k,j ];
 /// 3. if M[i, j ] ⊆ S then return false
-/// 4. M[i, j ] := M[i, j]
+/// 4. M[i,j ] := M[i, j] intersect S
+/// 5. M[j,i ] := !M[i, j]
 pub fn path_consistency<T>(mut m: Graph<T>) -> Result<Graph<T>, LError> {
     // Q := {(i,j ) | i<j }
     let mut q: VecDeque<(Timepoint, Timepoint)> = Default::default();
@@ -38,14 +40,14 @@ pub fn path_consistency<T>(mut m: Graph<T>) -> Result<Graph<T>, LError> {
     while let Some((i, j)) = q.pop_front() {
         for k in (0..n).filter(|k| *k != i && *k != j) {
             if revise(&mut m, i, j, k) {
-                if m[(i, j)] == Some(RelationType::Contradiction.into()) {
+                if m[(i, j)] == RelationType::Contradiction.into() {
                     return Err(Default::default());
                 } else {
                     q.push_back((i, k))
                 }
             }
             if revise(&mut m, k, i, j) {
-                if m[(k, j)] == Some(RelationType::Contradiction.into()) {
+                if m[(k, j)] == RelationType::Contradiction.into() {
                     return Err(Default::default());
                 } else {
                     q.push_back((k, j))
@@ -60,16 +62,16 @@ pub fn path_consistency<T>(mut m: Graph<T>) -> Result<Graph<T>, LError> {
 pub fn revise<T>(m: &mut Graph<T>, i: Timepoint, j: Timepoint, k: Timepoint) -> bool {
     let r1 = &m[(i, k)];
     let r2 = &m[(k, j)];
-    if *r1 == None || *r2 == None {
+    if *r1 == Tautology.into() || *r2 == Tautology.into() {
         return false;
     }
 
-    let s = r1.unwrap().compose(&r2.unwrap());
+    let s = r1.compose(r2);
 
-    if m[(i, j)].unwrap().included_in(&s) {
+    if m[(i, j)].included_in(&s) {
         return false;
     }
-    m[(i, j)] = Some(m[(i, j)].unwrap().intersect(&s));
-    m[(j, i)] = Some(!m[(i, j)].unwrap());
+    m[(i, j)] = m[(i, j)].intersect(&s);
+    m[(j, i)] = !m[(i, j)];
     true
 }

@@ -1,8 +1,9 @@
+use crate::point_algebra::relation_type::RelationType::Tautology;
 use crate::point_algebra::relation_type::{RelationType, RelationTypeBit};
 use cli_table::{print_stdout, Cell, Table};
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
-use std::ops::{Index, IndexMut, Not};
+use std::ops::{Index, IndexMut};
 
 pub struct Relation<T> {
     i: T,
@@ -44,7 +45,8 @@ impl<T: Clone + Hash + Eq + Debug> From<&Problem<T>> for Graph<T> {
             reverse.push(variable.clone());
         }
 
-        let mut inner = vec![vec![None; problem.variables.len()]; problem.variables.len()];
+        let mut inner: Vec<Vec<RelationTypeBit>> =
+            vec![vec![Tautology.into(); problem.variables.len()]; problem.variables.len()];
         for relation in &problem.relations {
             let index_1 = var_key.get(&relation.i).unwrap_or_else(|| {
                 panic!("{:?} in not defined in {:?}", relation.i, problem.variables)
@@ -60,13 +62,8 @@ impl<T: Clone + Hash + Eq + Debug> From<&Problem<T>> for Graph<T> {
                 (index_2, index_1, !relation_type_bit)
             };
 
-            if let Some(r) = inner[*a][*b] {
-                inner[*a][*b] = Some(r & relation_type_bit);
-            } else {
-                inner[*a][*b] = Some(relation_type_bit)
-            }
-
-            inner[*b][*a] = Some(inner[*a][*b].unwrap().not())
+            inner[*a][*b] = inner[*a][*b] & relation_type_bit;
+            inner[*b][*a] = !inner[*a][*b]
         }
 
         Self { reverse, inner }
@@ -80,7 +77,7 @@ impl<T: Clone + Eq + Hash> From<Graph<T>> for Problem<T> {
 
         for (i, i_relations) in g.inner.iter().enumerate() {
             for (j, r) in i_relations[i + 1..].iter().enumerate() {
-                if let Some(r) = r {
+                if r != &Tautology.into() {
                     relations.push(Relation {
                         i: g.reverse[i].clone(),
                         j: g.reverse[j].clone(),
@@ -100,7 +97,7 @@ pub type Timepoint = usize;
 
 pub struct Graph<T> {
     reverse: Vec<T>,
-    inner: Vec<Vec<Option<RelationTypeBit>>>,
+    inner: Vec<Vec<RelationTypeBit>>,
 }
 
 impl<T> Graph<T> {
@@ -110,7 +107,7 @@ impl<T> Graph<T> {
 }
 
 impl<T> Index<Timepoint> for Graph<T> {
-    type Output = Vec<Option<RelationTypeBit>>;
+    type Output = Vec<RelationTypeBit>;
 
     fn index(&self, index: usize) -> &Self::Output {
         &self.inner[index]
@@ -124,7 +121,7 @@ impl<T> IndexMut<usize> for Graph<T> {
 }
 
 impl<T> Index<(Timepoint, Timepoint)> for Graph<T> {
-    type Output = Option<RelationTypeBit>;
+    type Output = RelationTypeBit;
 
     fn index(&self, index: (Timepoint, Timepoint)) -> &Self::Output {
         &self.inner[index.0][index.1]
@@ -156,14 +153,17 @@ impl<T: Display> Graph<T> {
         table.push(first_vec);
         for (l, t) in self.reverse.iter().enumerate() {
             let mut vec = vec![t.cell()];
-            let line: &Vec<Option<RelationTypeBit>> = &self[l];
+            let line: &Vec<RelationTypeBit> = &self[l];
             vec.append(
                 &mut line
                     .clone()
                     .iter()
-                    .map(|r| match r {
-                        Some(r) => RelationType::from(r).cell(),
-                        None => "".cell(),
+                    .map(|r| {
+                        if *r == Tautology.into() {
+                            "".cell()
+                        } else {
+                            RelationType::from(r).cell()
+                        }
                     })
                     .collect(),
             );

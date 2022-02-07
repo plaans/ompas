@@ -1,3 +1,4 @@
+use crate::point_algebra::path_consistency;
 use crate::point_algebra::problem::{Graph, Problem};
 use crate::structs::atom::AtomType;
 use crate::structs::chronicle::{ChronicleSet, ExpressionChronicle};
@@ -7,15 +8,18 @@ use crate::structs::symbol_table::{AtomId, SymTable};
 use crate::structs::traits::GetVariables;
 use crate::structs::{get_variables_of_type, ConversionContext};
 use im::HashSet;
+use ompas_lisp::core::structs::lerror::LError;
+use ompas_lisp::core::structs::lerror::LError::SpecialError;
 
 pub fn post_processing(
     ec: &mut ExpressionChronicle,
     sym_table: &mut SymTable,
     context: &ConversionContext,
-) {
+) -> Result<(), LError> {
     unify_equal(ec, sym_table, context);
     rm_useless_var(ec, sym_table, context);
-    simplify_timepoints(ec, sym_table, context);
+    simplify_timepoints(ec, sym_table, context)?;
+    Ok(())
 }
 
 pub fn unify_equal(
@@ -105,7 +109,7 @@ pub fn simplify_timepoints(
     ec: &mut ExpressionChronicle,
     sym_table: &mut SymTable,
     _: &ConversionContext,
-) {
+) -> Result<(), LError> {
     let timepoints: HashSet<AtomId> = get_variables_of_type(
         ec.get_variables()
             .iter()
@@ -141,6 +145,21 @@ pub fn simplify_timepoints(
     let graph: Graph<AtomId> = (&problem).into();
 
     graph.print();
+
+    match path_consistency(graph) {
+        Ok(m) => m.print(),
+        Err(_) => {
+            let err: LError = SpecialError(
+                "",
+                "Error in graph. Set of constraints is not consistent.".to_string(),
+            );
+
+            println!("{:?}", err);
+            //return Err(err)
+        }
+    };
+
+    Ok(())
     /*println!("not used timepoints : {}", {
         let mut string = "{".to_string();
         for (i, t) in optional_timepoints.iter().enumerate() {

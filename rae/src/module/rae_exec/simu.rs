@@ -56,7 +56,7 @@ pub const LAMBDA_R_GENERATE_INSTANCES: &str = "(define r_generate_instances
                             (define instances (enr (cons enumerate (append method instance_types))))
                             (append (r_test_method instances) (r_generate_instances methods)))
                         (cons
-                            (if (eval-pre-conditions method)
+                            (if (! (err? (eval-pre-conditions method)))
                                 (list method (compute-score method))
                                 nil)
                             (r_generate_instances methods))))))))";

@@ -1,3 +1,4 @@
+use crate::module::rae_exec::error::RaeExecError;
 use crate::module::rae_exec::*;
 use ::macro_rules_attribute::macro_rules_attribute;
 use log::{info, warn};
@@ -75,7 +76,7 @@ pub async fn exec_command<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
                             }
                             Status::Failure => {
                                 warn!("Command {} is a failure.", command_id);
-                                return Ok(false.into());
+                                return Ok(RaeExecError::ActionFailure.into());
                             }
                             Status::Done => {
                                 info!("Command {} is a success.", command_id);

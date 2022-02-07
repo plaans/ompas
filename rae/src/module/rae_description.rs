@@ -99,10 +99,10 @@ pub const MACRO_GENERATE_ACTION_MODEL: &str = "
                (conds (cadr (get def 1)))
                (effs (cadr (get def 2))))
               `(list ,label (lambda ,params
-                    (if ,(gtpc p_expr)
-                        (if ,conds
-                            ,effs))
-                    )))))";
+                    (do
+                        (check ,(gtpc p_expr))
+                        (check ,conds)
+                        ,effs))))))";
 pub const MACRO_GENERATE_ACTION_OPERATIONAL_MODEL: &str =
     "(defmacro generate-action-operational-model
     (lambda (label def)
@@ -112,9 +112,9 @@ pub const MACRO_GENERATE_ACTION_OPERATIONAL_MODEL: &str =
                (params (car p_unzip)))
 
               `(list ,label (lambda ,params
-                    (if ,(gtpc p_expr)
-                        ,body)
-                    )))))";
+                    (do 
+                        (check ,(gtpc p_expr))
+                        ,body))))))";
 
 /// Macro used to generate code to define a method in REA environment.
 pub const MACRO_GENERATE_METHOD: &str = "(defmacro generate-method
@@ -134,25 +134,26 @@ pub const MACRO_GENERATE_METHOD: &str = "(defmacro generate-method
                 (quote ,p_expr)
                 ;lambda for preconditons
                 (lambda ,params
-                    (if ,(gtpc p_expr)
-                        (if ,conds true)))
+                    (do 
+                        (check ,(gtpc p_expr))
+                        (check ,conds)))
                 (lambda ,params ,score)
                 (lambda ,params ,body))))))";
 
 /// Macro used to generate code to define a method in RAE environment.
-pub const MACRO_GENERATE_METHOD_PARAMETERS: &str =
+/*pub const MACRO_GENERATE_METHOD_PARAMETERS: &str =
     "(defmacro generate-method-parameters (lambda args
     (let ((label (car args))
             (args_enum (cdr args)))
 
-        (quasiquote (quote (unquote 
-            (list label 
+        (quasiquote (quote (unquote
+            (list label
             (let ((p_enum (car args_enum))
                 (p_labels (caadr args_enum))
                 (conds (cadadr args_enum)))
 
-                (quasiquote 
-                    ((unquote begin) 
+                (quasiquote
+                    ((unquote begin)
                         (define eval_params ((unquote lambda) args
                             (let ((params (car args)))
                                 (if (not (null? params))
@@ -170,8 +171,8 @@ pub const MACRO_ENUMERATE_PARAMS: &str = "(defmacro enumerate-params (lambda arg
         (p_labels (caadr args))
         (conds (cadadr args)))
 
-        (quasiquote 
-            (begin 
+        (quasiquote
+            (begin
                 (define eval_params (lambda args
                     (let ((params (car args)))
                         (if (not (null? params))
@@ -179,7 +180,7 @@ pub const MACRO_ENUMERATE_PARAMS: &str = "(defmacro enumerate-params (lambda arg
                                 (cons params (eval_params (cdr args)))
                                 (eval_params (cdr args)))
                             nil))))
-                (eval_params (unquote (cons enumerate p_enum))))))))";
+                (eval_params (unquote (cons enumerate p_enum))))))))";*/
 
 const GENERATE_TYPE_TEST_EXPR: &str = "generate-type-test-expr";
 
@@ -201,7 +202,7 @@ impl IntoModule for CtxRaeDescription {
                 MACRO_GENERATE_ACTION_MODEL,
                 MACRO_GENERATE_ACTION_OPERATIONAL_MODEL,
                 MACRO_GENERATE_METHOD,
-                MACRO_ENUMERATE_PARAMS,
+                //MACRO_ENUMERATE_PARAMS,
                 LAMBDA_GENERATE_TYPE_PRE_CONDITIONS,
             ]
             .into(),

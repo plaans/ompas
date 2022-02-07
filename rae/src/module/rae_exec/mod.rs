@@ -1,3 +1,4 @@
+pub mod error;
 pub mod platform;
 pub mod rae_mutex;
 pub mod simu;

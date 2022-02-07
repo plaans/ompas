@@ -12,7 +12,7 @@ use ompas_lisp::modules::io::CtxIo;
 use ompas_lisp::modules::static_eval::CtxStaticEval;
 use ompas_lisp::modules::string::CtxString;
 use ompas_lisp::modules::utils::CtxUtils;
-use ompas_rae::module::mod_rae_description::CtxRaeDescription;
+use ompas_rae::module::rae_description::CtxRaeDescription;
 use ompas_rae::module::rae_exec::CtxRaeExec;
 
 pub const TOKIO_CHANNEL_SIZE: usize = 65_384;

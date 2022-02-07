@@ -82,12 +82,12 @@ pub const LABEL_ENUMERATE_PARAMS: &str = "enumerate-params";
 pub const LAMBDA_PROGRESS: &str = "
 (define progress (lambda task
     (let* ((result (select task))
-            (first_m (car result))
-            (task_id (cadr result)))
-            
+            (first_m (first result))
+            (task_id (second result)))
+
             (if (null? first_m)
-                nil
-                (if (enr first_m)
+                (err err::no-method-applicable)
+                (if (! (err? (enr first_m)))
                     (rae-set-success-for-task task_id)
                     (retry task_id))))))";
 
@@ -102,11 +102,11 @@ pub const LAMBDA_RETRY: &str = "
     (let ((new_method (rae-get-next-method task_id)))
         (begin 
             (print \"Retrying task \" task_id)
-            (if (null? new_method) ; if there is no method applicable
-            nil
-            (if (enr new_method)
-                (rae-set-success-for-task task_id)
-                (rae-retry task_id)))))))";
+            (if (null? new_method)
+                (err err::no-applicable-method)
+                (if (! (err? (enr new_method)))
+                    (rae-set-success-for-task task_id)
+                    (rae-retry task_id)))))))";
 
 //Access part of the environment
 

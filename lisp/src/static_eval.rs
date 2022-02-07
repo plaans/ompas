@@ -263,11 +263,11 @@ pub fn expand_static(x: &LValue, top_level: bool, env: &mut LEnv) -> lerror::Res
                             &vec![LCoreOperator::Quote.into(), list[1].clone()].into(),
                         ));
                     }
-                    LCoreOperator::Begin => {
+                    LCoreOperator::Begin | LCoreOperator::Do => {
                         return if list.len() == 1 {
                             Ok(PLValue::into_pure(&LValue::Nil))
                         } else {
-                            let mut expanded_list = vec![LCoreOperator::Begin.into()];
+                            let mut expanded_list = vec![co.into()];
                             for e in &list[1..] {
                                 let result = expand_static(e, top_level, env)?;
                                 if !result.is_pure() {
@@ -576,7 +576,8 @@ pub fn eval_static(lv: &LValue, env: &mut LEnv) -> lerror::Result<PLValue> {
                         }
                         return Ok(PLValue::into_pure(&args[0]));
                     }
-                    LCoreOperator::Begin => {
+                    LCoreOperator::Begin | LCoreOperator::Do => {
+                        let _do = *co == LCoreOperator::Do;
                         let mut elements = vec![];
                         let mut all_pure = true;
 
@@ -584,6 +585,9 @@ pub fn eval_static(lv: &LValue, env: &mut LEnv) -> lerror::Result<PLValue> {
                             if all_pure {
                                 let result = eval_static(e, env)?;
                                 all_pure = result.pure;
+                                if result.pure && _do && matches!(result.lvalue, LValue::Err(_)){
+                                    return Ok(result)
+                                }
                                 elements.push(result.lvalue)
                             }else {
                                 elements.push(e.clone())

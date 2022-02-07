@@ -10,7 +10,9 @@ use ompas_lisp::core::root_module::list::cons;
 use ompas_lisp::core::structs::contextcollection::Context;
 use ompas_lisp::core::structs::documentation::{Documentation, LHelp};
 use ompas_lisp::core::structs::lenv::LEnv;
-use ompas_lisp::core::structs::lerror::LError::{SpecialError, WrongNumberOfArgument, WrongType};
+use ompas_lisp::core::structs::lerror::LError::{
+    ConversionError, SpecialError, WrongNumberOfArgument, WrongType,
+};
 use ompas_lisp::core::structs::lerror::{LError, LResult};
 use ompas_lisp::core::structs::lvalue::LValue;
 use ompas_lisp::core::structs::lvalues::LValueS;
@@ -24,6 +26,7 @@ use std::mem;
 use std::mem::swap;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::SystemTime;
 use tokio::sync::{Mutex, RwLock};
 use tokio::task::block_in_place;
 
@@ -59,6 +62,10 @@ const RAE_DEF_LAMBDA: &str = "def-lambda";
 const RAE_DEF_INITIAL_STATE: &str = "def-initial-state";
 const RAE_CONFIGURE_PLATFORM: &str = "configure-platform";
 const RAE_GET_CONFIG_PLATFORM: &str = "get-config-platform";
+
+const RAE_CONVERT_EXPR: &str = "convert-expr";
+const RAE_CONVERT_DOMAIN: &str = "convert-domain";
+const RAE_CONVERT_LAMBDA: &str = "convert-lambda";
 
 //DOCUMENTATION
 const DOC_RAE_GET_METHODS: &str = "Returns the list of all defined methods in RAE environment";
@@ -212,6 +219,14 @@ impl IntoModule for CtxRae {
         module.add_async_fn_prelude(RAE_GET_STATUS, get_status);
         module.add_async_fn_prelude(RAE_GET_AGENDA, get_agenda);
 
+        //Conversion
+        module.add_async_fn_prelude(RAE_CONVERT_EXPR, translate_expr);
+        module.add_fn_prelude(RAE_CONVERT_DOMAIN, translate_domain);
+        module.add_fn_prelude(RAE_CONVERT_LAMBDA, transform_lambda);
+        module.add_fn_prelude(RAE_PRE_PROCESS_EXPR, lisp_pre_processing);
+        module.add_fn_prelude(RAE_PRE_PROCESS_DOMAIN, lisp_pre_processing_domain);
+        module.add_fn_prelude(RAE_CONVERT_COND_EXPR, translate_cond_expr);
+
         /*module.add_mut_fn_prelude(RAE_ADD_ACTION, add_action);
         module.add_mut_fn_prelude(RAE_ADD_STATE_FUNCTION, add_state_function);
         module.add_mut_fn_prelude(RAE_ADD_TASK, add_task);
@@ -290,46 +305,6 @@ pub async fn get_state_function<'a>(_: &'a [LValue], env: &'a LEnv) -> Result<LV
         .domain_env
         .get_list_state_functions())
 }
-
-/// Returns a map method: parameters
-/*pub fn get_methods_parameters(_: &[LValue], _: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
-    Ok(ctx
-        .env
-        .domain_env
-        .get_symbol(RAE_METHOD_PARAMETERS_GENERATOR_MAP)
-        .unwrap())
-}*/
-
-/// Returns the map of symbol: type or the type of the symbol in args.
-/*pub fn get_symbol_type(args: &[LValue], _env: &LEnv, ctx: &CtxRae) -> Result<LValue, LError> {
-    match args.len() {
-        0 => Ok(ctx.env.domain_env.get_symbol(RAE_SYMBOL_TYPE).unwrap()),
-        1 => {
-            if let LValue::Symbol(_) = &args[0] {
-                let map: im::HashMap<LValue, LValue> = ctx
-                    .env
-                    .domain_env
-                    .get_symbol(RAE_SYMBOL_TYPE)
-                    .unwrap()
-                    .try_into()?;
-                Ok(map.get(&args[0]).unwrap_or(&LValue::Nil).clone())
-            } else {
-                Err(WrongType(
-                    RAE_GET_SYMBOL_TYPE,
-                    args[0].clone(),
-                    args[0].clone().into(),
-                    TypeLValue::Symbol,
-                ))
-            }
-        }
-        _ => Err(WrongNumberOfArgument(
-            RAE_GET_SYMBOL_TYPE,
-            args.into(),
-            args.len(),
-            0..1,
-        )),
-    }
-}*/
 
 /// Returns the whole RAE environment if no arg et the entry corresponding to the symbol passed in args.
 #[macro_rules_attribute(dyn_async!)]
@@ -975,4 +950,122 @@ async fn get_agenda<'a>(_: &'a [LValue], env: &'a LEnv) -> Result<LValue, LError
     let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
     let string = ctx.get_rae_env().read().await.agenda.display().await;
     Ok(string.into())
+}
+
+#[macro_rules_attribute(dyn_async!)]
+async fn convert_expr<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+    if args.len() != 1 {
+        return Err(WrongNumberOfArgument(
+            DOMAIN_TRANSLATE_EXPR,
+            args.into(),
+            args.len(),
+            1..1,
+        ));
+    }
+    let ctx = env.get_context::<CtxRae>(MOD_DOMAIN)?;
+
+    let mut env = ctx.env.read().await.clone();
+
+    let lv = expand(&args[0], true, &mut env).await?;
+
+    let mut symbol_table = SymTable::default();
+    let time = SystemTime::now();
+    let chronicle = translate_lvalue_to_expression_chronicle(&lv, &ctx.into(), &mut symbol_table)?;
+    let time = time.elapsed().expect("could not get time").as_micros();
+    let string = chronicle.format_with_sym_table(&symbol_table);
+
+    Ok(format!("{}\n\n Time to convert: {} µs.", string, time).into())
+}
+
+pub fn convert_domain(_: &[LValue], env: &LEnv) -> LResult {
+    let ctx = env.get_context::<CtxRae>(MOD_DOMAIN)?;
+    let time = SystemTime::now();
+    let (domain, st) = translate_domain_env_to_hierarchy(ConversionContext {
+        domain: ctx.domain.clone(),
+        env: ctx.env.clone(),
+    })?;
+    let time = time.elapsed().expect("could not get time").as_micros();
+
+    Ok(format!(
+        "{}\n\nTime to convert: {} µs.",
+        domain.format_with_sym_table(&st),
+        time
+    )
+    .into())
+}
+
+pub fn convert_cond_expr(args: &[LValue], env: &LEnv) -> LResult {
+    if args.len() != 1 {
+        return Err(WrongNumberOfArgument(
+            DOMAIN_TRANSFORM_LAMBDA,
+            args.into(),
+            args.len(),
+            1..1,
+        ));
+    }
+
+    let ctx = env.get_context::<CtxRae>(MOD_DOMAIN)?;
+
+    let mut symbol_table = SymTable::default();
+    let context = ConversionContext::new();
+
+    let result = translate_cond_if(&args[0], &context, &mut symbol_table)?;
+
+    Ok(result.format_with_sym_table(&symbol_table).into())
+}
+
+pub fn pre_process_lambda(args: &[LValue], env: &LEnv) -> LResult {
+    if args.len() != 1 {
+        return Err(WrongNumberOfArgument(
+            DOMAIN_TRANSFORM_LAMBDA,
+            args.into(),
+            args.len(),
+            1..1,
+        ));
+    }
+
+    let ctx = env.get_context::<CtxRae>(MOD_DOMAIN)?;
+    let env = ctx.env.read().await.clone();
+
+    transform_lambda_expression(&args[0], env)
+}
+
+pub fn pre_process_expr(args: &[LValue], env: &LEnv) -> LResult {
+    if args.len() != 1 {
+        return Err(WrongNumberOfArgument(
+            DOMAIN_TRANSFORM_LAMBDA,
+            args.into(),
+            args.len(),
+            1..1,
+        ));
+    }
+
+    let ctx = env.get_context::<CtxDomain>(MOD_DOMAIN)?;
+
+    pre_processing(&args[0], &ctx.into())
+}
+
+pub fn pre_process_domain(_: &[LValue], env: &LEnv) -> LResult {
+    //let mut context: Context = ctx.into();
+    let mut str = "pre-processing of the domain:\n".to_string();
+    let ctx = env.get_context::<CtxRae>(MOD_DOMAIN)?;
+    let rae_env: RAEEnv = ctx.env.read().await;
+
+    let context = ConversionContext {};
+
+    for (action_label, action) in ctx.domain.read().unwrap().get_actions() {
+        let pre_processed = pre_processing(action.get_sim(), &context)?;
+
+        str.push_str(
+            format!(
+                "{}:\n\tbefore: {}\n\tafter: {}\n",
+                action_label,
+                action.get_sim().format("\tbefore: ".len()),
+                pre_processed.format("\tafter: ".len()),
+            )
+            .as_str(),
+        );
+    }
+
+    Ok(str.into())
 }

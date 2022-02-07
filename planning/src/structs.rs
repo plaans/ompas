@@ -1120,8 +1120,14 @@ impl FormatWithSymTable for Interval {
 
 #[derive(Default)]
 pub struct ConversionContext {
-    pub domain: DomainEnv,
-    pub env: LEnv,
+    pub(crate) domain: DomainEnv,
+    pub(crate) env: LEnv,
+}
+
+impl ConversionContext {
+    pub fn new(domain: DomainEnv, env: LEnv) -> Self {
+        Self { domain, env }
+    }
 }
 
 pub struct Problem {}

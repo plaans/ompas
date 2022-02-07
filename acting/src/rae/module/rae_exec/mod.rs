@@ -1,3 +1,5 @@
+pub mod algorithms;
+pub mod error;
 pub mod platform;
 pub mod rae_mutex;
 pub mod simu;
@@ -82,42 +84,6 @@ pub const MACRO_WAIT_ON: &str = "(defmacro wait-on (lambda (expr)
     `(if (not (eval ,expr))
         (check ,expr))))";
 pub const LABEL_ENUMERATE_PARAMS: &str = "enumerate-params";
-
-pub const LAMBDA_PROGRESS: &str = "
-(define progress (lambda task
-    (let* ((result (select task))
-            (first_m (car result))
-            (task_id (cadr result)))
-            
-            (if (null? first_m)
-                nil
-                (if (enr first_m)
-                    (rae-set-success-for-task task_id)
-                    (retry task_id))))))";
-
-pub const LAMBDA_SELECT: &str = "
-(define select
-  (lambda (task)
-    (sim_block
-    (rae-select task (generate_applicable_instances task)))))))";
-
-pub const LAMBDA_RETRY: &str = "
-(define retry (lambda (task_id)
-    (let ((new_method (rae-get-next-method task_id)))
-        (begin 
-            (print \"Retrying task \" task_id)
-            (if (null? new_method) ; if there is no method applicable
-            nil
-            (if (enr new_method)
-                (rae-set-success-for-task task_id)
-                (rae-retry task_id)))))))";
-
-//Access part of the environment
-
-pub const LAMBDA_GET_METHODS: &str = "\
-(define get-methods\
-    (lambda (label)\
-        (get rae-task-methods-map label)))";
 
 pub const DEFINE_RAE_MODE: &str = "(define rae-mode EXEC-MODE)";
 pub const SYMBOL_EXEC_MODE: &str = "exec-mode";

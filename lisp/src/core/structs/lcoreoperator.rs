@@ -24,6 +24,7 @@ pub mod language {
     pub const EVAL: &str = "eval";
     pub const PARSE: &str = "parse";
     pub const EXPAND: &str = "expand";
+    pub const DO: &str = "do";
 
     pub const DOC_DEFINE: &str = "Defines a new entry in the environment/";
     pub const DOC_DEF_MACRO: &str = "Define a new macro, can only be done at the top level";
@@ -72,6 +73,7 @@ pub enum LCoreOperator {
     UnQuote,
     DefMacro,
     Begin,
+    Do,
     Async,
     Await,
     Parse,
@@ -81,21 +83,24 @@ pub enum LCoreOperator {
 
 impl Display for LCoreOperator {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            LCoreOperator::Define => write!(f, "{}", DEFINE),
-            LCoreOperator::DefLambda => write!(f, "{}", LAMBDA),
-            LCoreOperator::If => write!(f, "{}", IF),
-            LCoreOperator::Quote => write!(f, "{}", QUOTE),
-            LCoreOperator::QuasiQuote => write!(f, "{}", QUASI_QUOTE),
-            LCoreOperator::UnQuote => write!(f, "{}", UNQUOTE),
-            LCoreOperator::DefMacro => write!(f, "{}", DEF_MACRO),
-            LCoreOperator::Begin => write!(f, "{}", BEGIN),
-            LCoreOperator::Async => write!(f, "{}", ASYNC),
-            LCoreOperator::Await => write!(f, "{}", AWAIT),
-            LCoreOperator::Eval => write!(f, "{}", EVAL),
-            LCoreOperator::Expand => write!(f, "{}", EXPAND),
-            LCoreOperator::Parse => write!(f, "{}", PARSE),
-        }
+        let str = match self {
+            LCoreOperator::Define => DEFINE,
+            LCoreOperator::DefLambda => LAMBDA,
+            LCoreOperator::If => IF,
+            LCoreOperator::Quote => QUOTE,
+            LCoreOperator::QuasiQuote => QUASI_QUOTE,
+            LCoreOperator::UnQuote => UNQUOTE,
+            LCoreOperator::DefMacro => DEF_MACRO,
+            LCoreOperator::Begin => BEGIN,
+            LCoreOperator::Async => ASYNC,
+            LCoreOperator::Await => AWAIT,
+            LCoreOperator::Eval => EVAL,
+            LCoreOperator::Expand => EXPAND,
+            LCoreOperator::Parse => PARSE,
+            LCoreOperator::Do => DO,
+        };
+
+        write!(f, "{}", str)
     }
 }
 
@@ -117,6 +122,7 @@ impl TryFrom<&str> for LCoreOperator {
             EVAL => Ok(LCoreOperator::Eval),
             PARSE => Ok(LCoreOperator::Parse),
             EXPAND => Ok(LCoreOperator::Expand),
+            DO => Ok(LCoreOperator::Do),
             _ => Err(SpecialError(
                 "LCoreOperator::TryFrom<str>",
                 "string does not correspond to core operator".to_string(),

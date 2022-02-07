@@ -195,15 +195,15 @@ pub const MACRO_LET_STAR: &str = "(defmacro let*
                             (let* ,(cdr bindings) ,body))
                         (cdar bindings)))))";
 
-pub const MACRO_DO: &str = "(defmacro do
-    (lambda args
-        (if (= (len args) 1)
-            (car args)
-            `(begin 
-                (define __result__ ,(car args))
-                (if (err? __result__)
-                    __result__
-                    ,(cons 'do (cdr args)))))))";
+/*pub const MACRO_DO: &str = "(defmacro do
+(lambda args
+    (if (= (len args) 1)
+        (car args)
+        `(begin
+            (define __result__ ,(car args))
+            (if (err? __result__)
+                __result__
+                ,(cons 'do (cdr args)))))))";*/
 
 pub const LAMBDA_COMBINE:  &str = "(define combine (lambda (f)
                                                                 (lambda (x y)
@@ -293,7 +293,6 @@ impl IntoModule for CtxUtils {
                 LAMBDA_MAPF,
                 MACRO_LET,
                 MACRO_LET_STAR,
-                MACRO_DO,
                 //MACRO_FOR,
                 //LAMBDA_ARBITRARY,
                 LAMBDA_EVAL_NON_RECURSIVE,

@@ -316,11 +316,11 @@ pub async fn expand(x: &LValue, top_level: bool, env: &mut LEnv) -> LResult {
                         }
                         return Ok(vec![LCoreOperator::Quote.into(), list[1].clone()].into());
                     }
-                    LCoreOperator::Begin => {
+                    LCoreOperator::Begin | LCoreOperator::Do => {
                         return if list.len() == 1 {
                             Ok(LValue::Nil)
                         } else {
-                            let mut expanded_list = vec![LCoreOperator::Begin.into()];
+                            let mut expanded_list = vec![co.into()];
                             for x in &list[1..] {
                                 expanded_list.push(expand(x, top_level, env).await?)
                             }
@@ -585,12 +585,16 @@ pub async fn eval(lv: &LValue, env: &mut LEnv) -> LResult {
                         }
                         return Ok(args[0].clone());
                     }
-                    LCoreOperator::Begin => {
+                    LCoreOperator::Begin | LCoreOperator::Do => {
+                        let _do = *co == LCoreOperator::Do;
                         let firsts = &args[0..args.len() - 1];
                         let last = args.last().unwrap();
 
                         for e in firsts {
-                            eval(e, env).await?;
+                            let result: LValue = eval(e, env).await?;
+                            if _do && matches!(result, LValue::Err(_)) {
+                                return Ok(result);
+                            }
                         }
                         lv = last.clone();
                     }

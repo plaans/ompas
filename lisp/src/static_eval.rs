@@ -396,6 +396,7 @@ pub fn expand_static(x: &LValue, top_level: bool, env: &mut LEnv) -> lerror::Res
                             Ok(PLValue::into_unpure(&expanded.into()))
                         }
                     }
+                    LCoreOperator::Do => {}
                 }
             } else if let LValue::Symbol(sym) = &list[0] {
                 match env.get_macro(sym) {
@@ -643,6 +644,7 @@ pub fn eval_static(lv: &LValue, env: &mut LEnv) -> lerror::Result<PLValue> {
                             Ok(PLValue::into_unpure(&lv))
                         }
                     }
+                    LCoreOperator::Do => {}
                 }
             } else {
                 let mut exps: Vec<PLValue> = vec![];

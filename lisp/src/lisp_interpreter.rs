@@ -1,6 +1,7 @@
-use crate::core::{eval, parse, ContextCollection, ImportType, LEnv};
-use crate::language::scheme_primitives::NIL;
-use crate::structs::{GetModule, LError};
+use crate::core::structs::lenv::{ImportType, LEnv};
+use crate::core::structs::lerror;
+use crate::core::structs::module::IntoModule;
+use crate::core::{eval, parse};
 use crate::TOKIO_CHANNEL_SIZE;
 use chrono::{DateTime, Utc};
 use im::HashMap;
@@ -102,7 +103,6 @@ impl LispInterpreterConfig {
 #[derive(Debug)]
 pub struct LispInterpreter {
     env: LEnv,
-    ctxs: ContextCollection,
     li_channel: LispInterpreterChannel,
     config: LispInterpreterConfig,
 }
@@ -114,21 +114,15 @@ impl LispInterpreter {
 }
 
 impl LispInterpreter {
-    pub async fn import_namespace(&mut self, ctx: impl GetModule) -> Result<(), LError> {
-        crate::core::import(
-            &mut self.env,
-            &mut self.ctxs,
-            ctx,
-            ImportType::WithoutPrefix,
-        )
-        .await
+    pub async fn import_namespace(&mut self, ctx: impl IntoModule) -> lerror::Result<()> {
+        self.env.import(ctx, ImportType::WithoutPrefix).await
     }
 
-    pub async fn import(&mut self, ctx: impl GetModule) -> Result<(), LError> {
-        crate::core::import(&mut self.env, &mut self.ctxs, ctx, ImportType::WithPrefix).await
+    pub async fn import(&mut self, ctx: impl IntoModule) -> lerror::Result<()> {
+        self.env.import(ctx, ImportType::WithPrefix).await
     }
 
-    pub async fn recv(&mut self) -> Option<String> {
+    async fn recv(&mut self) -> Option<String> {
         self.li_channel.recv().await
     }
 
@@ -159,11 +153,11 @@ impl LispInterpreter {
 
             //stdout.write_all(format!("receiving command: {}\n", str_lvalue).as_bytes());
 
-            match parse(str_lvalue.as_str(), &mut self.env, &mut self.ctxs).await {
-                Ok(lv) => match eval(&lv, &mut self.env, &mut &mut self.ctxs).await {
+            match parse(str_lvalue.as_str(), &mut self.env).await {
+                Ok(lv) => match eval(&lv, &mut self.env).await {
                     Ok(lv) => {
                         self.li_channel
-                            .send(&id_subscriber, lv.pretty_print(0))
+                            .send(&id_subscriber, lv.format(0))
                             .await
                             .expect("error on channel to stdout");
                     }
@@ -199,11 +193,10 @@ impl LispInterpreter {
 
 impl LispInterpreter {
     pub async fn new() -> Self {
-        let (env, ctxs) = LEnv::root().await;
+        let env = LEnv::root().await;
 
         Self {
             env,
-            ctxs,
             li_channel: Default::default(),
             config: Default::default(),
         }
@@ -320,9 +313,9 @@ async fn repl(mut com: ChannelToLispInterpreter) {
                     }
                     Some(b) => b,
                 };
-                if buffer != NIL {
-                    println!("LI>> {}", buffer);
-                }
+                //if buffer != NIL {
+                println!("LI>> {}", buffer);
+                //}
 
                 /*assert_eq!(
                     buffer, "ACK",

@@ -1,8 +1,10 @@
-use ompas_lisp::core::{eval, parse, LEnv};
-use ompas_lisp::structs::LError::SpecialError;
-use ompas_lisp::structs::{LError, LValue};
-
 // To run tests with println, use cargo test -- --nocapture
+
+use ompas_lisp::core::structs::lenv::LEnv;
+use ompas_lisp::core::structs::lerror::LError;
+use ompas_lisp::core::structs::lerror::LError::SpecialError;
+use ompas_lisp::core::structs::lvalue::LValue;
+use ompas_lisp::core::{eval, parse};
 
 fn create_list_test() -> Vec<(&'static str, LValue)> {
     let is_tests = vec![
@@ -22,7 +24,7 @@ fn create_list_test() -> Vec<(&'static str, LValue)> {
         ("(define x 3)", LValue::Nil),
         ("x", 3.into()),
         ("(+ x x)", 6.into()),
-        ("(begin (define x 1) (set! x (+ x 1)) (+ x 1))", 3.into()),
+        ("(begin (define x 1) (define x (+ x 1)) (+ x 1))", 3.into()),
         ("((lambda (x) (+ x x)) 5)", 10.into()),
         ("(define twice (lambda (x) (* 2 x)))", LValue::Nil),
         ("(twice 5)", 10.into()),
@@ -54,7 +56,7 @@ fn create_list_test() -> Vec<(&'static str, LValue)> {
             ("(define riff-shuffle (lambda (deck) (begin \
         (define take (lambda (n seq) (if (<= n 0) (quote ()) (cons (car seq) (take (- n 1) (cdr seq)))))) \
         (define drop (lambda (n seq) (if (<= n 0) seq (drop (- n 1) (cdr seq))))) \
-        (define mid (lambda (seq) (/ (length seq) 2))) \
+        (define mid (lambda (seq) (/ (len seq) 2))) \
         ((combine append) (take (mid deck) deck) (drop (mid deck) deck)))))", LValue::Nil),
             /*("(riff-shuffle (list 1 2 3 4 5 6 7 8))", vec![1, 5, 2, 6, 3, 7, 4, 8].into()),
             ("((repeat riff-shuffle) (list 1 2 3 4 5 6 7 8))",  vec![1, 3, 5, 7, 2, 4, 6, 8].into()),
@@ -65,11 +67,11 @@ fn create_list_test() -> Vec<(&'static str, LValue)> {
 
 #[tokio::test]
 async fn test_lisp_integration() -> Result<(), LError> {
-    let (mut env, mut ctxs) = LEnv::root().await;
+    let mut env = LEnv::root().await;
     for element in create_list_test() {
-        let lvalue = parse(element.0, &mut env, &mut ctxs).await?;
+        let lvalue = parse(element.0, &mut env).await?;
         //stdout.write_all(b"parsing done\n");
-        let result = match eval(&lvalue, &mut env, &mut ctxs).await {
+        let result = match eval(&lvalue, &mut env).await {
             Ok(s) => s,
             Err(e) => {
                 return Err(SpecialError(

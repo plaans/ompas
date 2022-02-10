@@ -1,5 +1,6 @@
 use ompas_godot_simulation_client::serde::*;
-use ompas_lisp::structs::{LError, LValue};
+use ompas_lisp::core::structs::lerror::LError;
+use ompas_lisp::core::structs::lvalue::LValue;
 
 #[test]
 #[test]

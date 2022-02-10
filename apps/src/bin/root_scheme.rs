@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
+use ompas_lisp::core::activate_debug;
 use structopt::StructOpt;
 
 //use ompas_modules::robot::CtxRobot;
-use ompas_lisp::core::*;
 use ompas_lisp::lisp_interpreter::{LispInterpreter, LispInterpreterConfig};
 
 pub const TOKIO_CHANNEL_SIZE: usize = 65_384;

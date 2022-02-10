@@ -14,7 +14,7 @@ lisp_test = []
 [dependencies]
 ompas_lisp = {path = "../lisp"}
 ompas_godot_simulation_client = {path = "../godot-simulation-client"}
-ompas_acting = {path = "../acting"}
+ompas_rae = {path = "../rae"}
 ompas_utils = {path = "../utils"}
 
 aries_model = {git = "https://github.com/Yirmandias/aries/", branch = "parse_string"}
@@ -35,12 +35,25 @@ name = "ompas"
 path = "src/bin/ompas.rs"
 
 [[bin]]
+name = "ompas-simu"
+path = "src/bin/ompas-simu.rs"
+
+
+[[bin]]
 name = "scheme"
 path = "src/bin/scheme.rs"
 
 [[bin]]
 name = "root_scheme"
 path = "src/bin/root_scheme.rs"
+
+[[bin]]
+name = "conversion"
+path = "src/bin/conversion.rs"
+
+[[bin]]
+name = "union-map"
+path = "src/bin/union_map_bin.rs"
 
 [[example]]
 name = "virtual_robot"
@@ -81,3 +94,7 @@ path = "examples/logger.rs"
 [[example]]
 name = "test_lenv"
 path = "examples/recursive_search_of_symbol.rs"
+
+[[example]]
+name = "test_chronicle_conversion"
+path = "examples/convert_to_chronicle.rs"

@@ -1,5 +1,6 @@
-use ompas_lisp::core::{parse, LEnv};
-use ompas_lisp::structs::LError;
+use ompas_lisp::core::parse;
+use ompas_lisp::core::structs::lenv::LEnv;
+use ompas_lisp::core::structs::lerror::LError;
 
 const EXAMPLE: &str = "(begin (+ 3 3) (+ 6 2) (3))";
 const EXAMPLE_2: &str = "(if (> 1 3) nil (+ 3 6))";
@@ -12,13 +13,13 @@ fn list_of_example() -> Vec<&'static str> {
 
 #[tokio::main]
 async fn main() -> Result<(), LError> {
-    let (mut env, mut ctxs) = LEnv::root().await;
+    let mut env = LEnv::root().await;
 
     for element in list_of_example() {
-        let lvalue = parse(element, &mut env, &mut ctxs).await?;
+        let lvalue = parse(element, &mut env).await?;
         println!("string: {}", element);
         println!("lvalue: {}", lvalue);
-        println!("pretty: {}", lvalue.pretty_print("pretty: ".len()))
+        println!("pretty: {}", lvalue.format("pretty: ".len()))
     }
 
     Ok(())

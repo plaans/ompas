@@ -1,7 +1,9 @@
 use aries_planning::parsing::sexpr::SExpr;
-use ompas_acting::rae::context::rae_state::ActionStatus::*;
-use ompas_acting::rae::context::rae_state::{ActionStatus, LState, StateType};
-use ompas_lisp::structs::{LError, LValue, LValueS};
+use ompas_lisp::core::structs::lerror::LError;
+use ompas_lisp::core::structs::lvalue::LValue;
+use ompas_lisp::core::structs::lvalues::LValueS;
+use ompas_rae::context::rae_state::ActionStatus::*;
+use ompas_rae::context::rae_state::{ActionStatus, LState, StateType};
 use serde::{Deserialize, Serialize, Serializer};
 use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
@@ -258,9 +260,7 @@ pub fn parse_into_lvalue(se: &SExpr) -> Result<LValueS, ()> {
         SExpr::List(list) => {
             //println!("expression is a list");
             let list_iter = list.iter();
-            let vec: Vec<LValueS> = list_iter
-                .map(|x| parse_into_lvalue(x))
-                .collect::<Result<_, _>>()?;
+            let vec: Vec<LValueS> = list_iter.map(parse_into_lvalue).collect::<Result<_, _>>()?;
             Ok(LValueS::List(vec))
         }
     }

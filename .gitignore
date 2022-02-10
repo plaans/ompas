@@ -6,3 +6,4 @@ target/
 venv/
 lisp_logs/
 rae_logs/
+*.lock

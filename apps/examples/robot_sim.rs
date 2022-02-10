@@ -1,5 +1,7 @@
-use ompas_lisp::structs::{LError, LValue};
 //use ompas_modules::robot::{exec, new_robot, start_robot_handler, CtxRobot};
+
+use ompas_lisp::core::structs::lerror::LError;
+use ompas_lisp::core::structs::lvalue::LValue;
 
 const START_MSG: &str = "|||SIMPLE ROBOT SIMULATOR|||";
 

@@ -1,6 +1,8 @@
+use crate::rae_interface::Instance;
 use crate::serde::{GodotMessageSerde, GodotMessageType};
-use ompas_acting::rae::context::actions_progress::ActionsProgress;
-use ompas_acting::rae::context::rae_state::*;
+use ompas_lisp::core::structs::lvalues::LValueS;
+use ompas_rae::context::actions_progress::ActionsProgress;
+use ompas_rae::context::rae_state::*;
 use ompas_utils::task_handler;
 use std::convert::TryInto;
 use std::net::SocketAddr;
@@ -18,6 +20,7 @@ pub async fn task_tcp_connection(
     receiver: Receiver<String>,
     state: RAEState,
     status: ActionsProgress,
+    instance: Instance,
 ) {
     let stream = TcpStream::connect(socket_addr).await.unwrap();
 
@@ -25,7 +28,7 @@ pub async fn task_tcp_connection(
     let (rd, wr) = io::split(stream);
 
     // Starts the task to read data from socket.
-    tokio::spawn(async move { async_read_socket(rd, state, status).await });
+    tokio::spawn(async move { async_read_socket(rd, state, status, instance).await });
 
     // Starts the task that awaits on data from inner process, and sends it to godot via tcp.
     tokio::spawn(async move { async_send_socket(wr, receiver).await });
@@ -70,7 +73,12 @@ fn u32_to_u8_array(x: u32) -> [u8; 4] {
     [b4, b3, b2, b1]
 }
 
-async fn async_read_socket(stream: ReadHalf<TcpStream>, state: RAEState, status: ActionsProgress) {
+async fn async_read_socket(
+    stream: ReadHalf<TcpStream>,
+    state: RAEState,
+    status: ActionsProgress,
+    instance: Instance,
+) {
     let mut buf_reader = BufReader::new(stream);
 
     let mut buf = [0; BUFFER_SIZE];
@@ -106,6 +114,17 @@ async fn async_read_socket(stream: ReadHalf<TcpStream>, state: RAEState, status:
             match message._type {
                 GodotMessageType::StaticState | GodotMessageType::DynamicState => {
                     let temp_state: LState = message.try_into().unwrap();
+                    //println!("new state");
+                    for (k,v) in &temp_state.inner {
+                        if let LValueS::List(list)= &k {
+                            //println!("k: {}\nv: {}", k,v);
+                            if list.len() == 2 && list[0].to_string().contains(".instance") {
+                                let instance_val = &list[1];
+                                //println!("add instance {} {}", instance_val, v);
+                                instance.add_instance_of(instance_val.to_string(), v.to_string()).await;
+                            }
+                        }
+                    }
 
                     match &temp_state._type {
                         None => panic!("state should have a type"),

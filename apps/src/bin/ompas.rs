@@ -1,21 +1,16 @@
 use std::path::PathBuf;
 
-use structopt::StructOpt;
-
-use ompas_acting::controller::dumber::CtxDumber;
-use ompas_acting::rae::module::init_ctx_rae;
-use ompas_acting::rae::module::mod_rae::CtxRae;
-use ompas_acting::rae::module::mod_rae_monitor::CtxRaeMonitor;
 use ompas_godot_simulation_client::rae_interface::PlatformGodot;
-use ompas_lisp::core::*;
+use ompas_lisp::core::activate_debug;
 use ompas_lisp::lisp_interpreter::{LispInterpreter, LispInterpreterConfig};
 use ompas_lisp::modules::_type::CtxType;
-use ompas_lisp::modules::doc::{CtxDoc, Documentation};
-use ompas_lisp::modules::error::CtxError;
+use ompas_lisp::modules::advanced_math::CtxMath;
 use ompas_lisp::modules::io::CtxIo;
-use ompas_lisp::modules::math::CtxMath;
 use ompas_lisp::modules::string::CtxString;
 use ompas_lisp::modules::utils::CtxUtils;
+use ompas_rae::module::rae_exec::Platform;
+use ompas_rae::module::CtxRae;
+use structopt::StructOpt;
 
 pub const TOKIO_CHANNEL_SIZE: usize = 65_384;
 
@@ -44,23 +39,14 @@ async fn main() {
 pub async fn lisp_interpreter(log: Option<PathBuf>) {
     let mut li = LispInterpreter::new().await;
 
-    let mut ctx_doc = CtxDoc::default();
     let mut ctx_io = CtxIo::default();
     let ctx_math = CtxMath::default();
     let ctx_type = CtxType::default();
     let ctx_utils = CtxUtils::default();
     let ctx_string = CtxString::default();
-    let (ctx_rae, ctx_rae_monitor) =
-        init_ctx_rae(Box::new(PlatformGodot::default()), log.clone()).await;
+    let ctx_rae =
+        CtxRae::init_ctx_rae(Some(Platform::new(PlatformGodot::default())), log.clone()).await;
     //Insert the doc for the different contexts.
-    ctx_doc.insert_doc(CtxIo::documentation());
-    ctx_doc.insert_doc(CtxMath::documentation());
-    ctx_doc.insert_doc(CtxType::documentation());
-    ctx_doc.insert_doc(CtxDumber::documentation());
-    ctx_doc.insert_doc(CtxRae::documentation());
-    ctx_doc.insert_doc(CtxRaeMonitor::documentation());
-    ctx_doc.insert_doc(CtxUtils::documentation());
-    ctx_doc.insert_doc(CtxString::documentation());
 
     //Add the sender of the channel.
     ctx_io.add_communication(li.subscribe());
@@ -68,15 +54,9 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
         ctx_io.set_log_output(pb.clone().into());
     }
 
-    li.import_namespace(CtxError::default())
-        .await
-        .expect("error loading error");
     li.import_namespace(ctx_utils)
         .await
         .expect("error loading utils");
-    li.import_namespace(ctx_doc)
-        .await
-        .expect("error loading doc");
     li.import_namespace(ctx_io).await.expect("error loading io");
     li.import_namespace(ctx_math)
         .await
@@ -87,9 +67,6 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     li.import_namespace(ctx_rae)
         .await
         .expect("error loading rae");
-    li.import_namespace(ctx_rae_monitor)
-        .await
-        .expect("error loading rae monitor");
 
     li.import(ctx_string)
         .await

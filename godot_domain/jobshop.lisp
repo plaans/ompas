@@ -1,5 +1,4 @@
 (begin
-    (def-initial-state '((robots . ())(machines . ())(packages . ())))
     (def-lambda '(go_random (lambda (?r ?l ?u)
                             (let ((x (rand-int-in-range ?l ?u))
                                   (y (rand-int-in-range ?l ?u)))
@@ -16,20 +15,20 @@
                                 (if (contains (machine.processes_list (car seq)) ?p)
                                     (cons (car seq) (__process__ ?p (cdr seq)))
                                     (__process__ ?p (cdr seq))))))
-                    (define machines (rae-get-state-variable machines))
+                    (define machines (instance machine))
                     (define result (__process__ ?process machines))
                     result))))
     (def-lambda '(available_robots
         (lambda nil
             (begin
                 (define __l_available_robots__
-                    (lambda args
-                        (if (null? args)
+                    (lambda (l)
+                        (if (null? l)
                             nil
-                            (if (not (locked? (car args)))
-                                (cons (car args) (__l_available_robots__ (cdr args)))
-                                (__l_available_robots__ (cdr args))))))
-                (__l_available_robots__ (rae-get-state-variable robots))))))
+                            (if (not (locked? (car l)))
+                                (cons (car l) (__l_available_robots__ (cdr l)))
+                                (__l_available_robots__ (cdr l))))))
+                (__l_available_robots__ (instance robot))))))
 
     (def-lambda '(find_output_machine 
         (lambda nil
@@ -41,7 +40,7 @@
                             (if (= (machine.type (car seq)) output_machine)
                                 (car seq)
                                 (__lambda__ (cdr seq))))))
-                (__lambda__ (rae-get-state-variable machines))))))
+                (__lambda__ (instance machine))))))
 
     (def-lambda '(take_first 
         (lambda (seq)
@@ -49,161 +48,180 @@
                 nil
                 (cons (caar seq) (take_first (cdr seq)))))))
 
-    (def-task t_navigate_to ?r ?x ?y)
+    (def-task t_process_package '(?p package))
 
-    (def-method m_navigate_to
-        '((:task t_navigate_to)
-            (:params (?r robot) (?x float) (?y float))
-            (:pre-conditions true)
-            (:effects nil)
-            (:score 0)
-            (:body
-                (begin
-                    (navigate_to ?r ?x ?y)))))
-    (def-task t_dumber ?r)
-    (def-method m_dumber
-        '((:task t_dumber)
-          (:params (?r robot))
-          (:pre-conditions true)
-          (:effects nil)
-          (:score 0)
-          (:body (begin
-                     (loop
-                         (mutex::lock-and-do ?r (go_random ?r 2 5)))))))
-
-
-    (def-task t_process_package ?p)
-    (def-task t_process_on_machine ?p ?m)
-    ;robot ?r takes the package ?p and place it a the machine ?m
-    (def-task t_pick_and_place ?r ?p ?m)
-
-    (def-method m_process_package
+    (def-method m_process_to_do_r
         '((:task t_process_package)
             (:params (?p package))
-            (:pre-conditions true)
-            (:effects nil)
+            (:pre-conditions (!= (package.processes_list ?p) nil))
             (:score 0)
             (:body
-                (begin
-                    (mapf t_process_on_machine
-                        (begin
-                            (define list_machines
-                                (mapf find_machines_for_process
-                                    (car (unzip (package.processes_list ?p)))))
-                            ;(print "list_machines:" list_machines)
-                            (enumerate (list ?p) (take_first list_machines))))
+                (do
+                    (define ?m
+                        (arbitrary (find_machines_for_process
+                            (caar (unzip (package.processes_list ?p))))))
+                    (t_process_on_machine ?p ?m)
+                    (t_process_package ?p)))))                         
 
-                    (let ((?r (rand-element (rae-get-state-variable robots))))
-                        (begin
-                            (mutex::lock-and-do ?r
-                                (t_carry_to_machine ?r ?p (find_output_machine))
-                            )))))))
-    (def-method m_process_on_machine
+    (def-method m_no_more_process
+        '((:task t_process_package)
+            (:params (?p package))
+            (:pre-conditions (= (package.processes_list ?p) nil))
+            (:score 0)
+            (:body
+                (let ((?r (arbitrary (available_robots) rand-element)))
+                    (do
+                        (mutex::lock-and-do ?r 10
+                            (t_carry_to_machine ?r ?p (find_output_machine))
+                        ))))))
+    
+    (def-task t_process_on_machine '(?p package) '(?m machine))
+    (def-method m_robot_available
         '((:task t_process_on_machine)
         (:params (?p package) (?m machine))
-        (:pre-conditions true)
-        (:effects nil)
+        (:pre-conditions (!= (available_robots) nil))
         (:score 0)
-        (:body (let ((?r (rand-element (rae-get-state-variable robots))))
-                (begin
-                    (mutex::lock-and-do ?r
-                        (t_carry_to_machine ?r ?p ?m))
-                    (wait-on `(= (package.location ,?p) (machine.output_belt ,?m))))))))
+        (:body (let ((?r (arbitrary (available_robots) rand-element)))
+                (if (!= ?r nil)
+                    (do
+                        (mutex::lock-and-do ?r 11
+                            (t_carry_to_machine ?r ?p ?m))
+                        (wait-on `(= (package.location ,?p) (machine.output_belt ,?m))))
+                    (t_process_on_machine))))))
 
+    (def-method m_no_robot_available
+        '((:task t_process_on_machine)
+        (:params (?p package) (?m machine))
+        (:pre-conditions (= (available_robots) nil))
+        (:score 0)
+        (:body (do
+                (wait-on `(!= (available_robots) nil))
+                (t_process_on_machine)))))
 
-    (def-method m_pick_and_place
-        '((:task t_pick_and_place)
-         (:params (?r robot) (?p package) (?m machine))
-         (:pre-conditions true)
-         (:effects nil)
-         (:score 0)
-         (:body (begin
-            ;check that the location of the package is
-            (let ((?l (package.location ?p )))
-                (if (!= (belt.instance ?l) nil)
-                    (begin
-                        (navigate_to_area ?r (car (belt.interact_areas ?l)))
-                        (face_belt ?r ?l)
-                        ;pick the right package on the belt
-                        (pick_package ?r ?p)
-                        (navigate_to_area ?r (car (belt.interact_areas (machine.input_belt ?m))))
-                        (face_belt ?r (machine.input_belt ?m))
-                        (place ?r))
-                    nil))))))
-
-    (def-task t_position_robot_to_belt ?r ?b)
+    (def-task t_position_robot_to_belt '(?r robot) '(?b belt))
     (def-method m_position_robot_to_belt
         '((:task t_position_robot_to_belt)
             (:params (?r robot) (?b belt))
             (:pre-conditions true)
-            (:effects nil)
             (:score 0)
-            (:body (begin
+            (:body (do
                 (navigate_to_area ?r (car (belt.interact_areas ?b)))
                 (face_belt ?r ?b 5)))))
 
-    (def-task t_carry_to_machine ?r ?p ?m)
+    (def-task t_carry_to_machine '(?r robot) '(?p package) '(?m machine))
     (def-method m_carry_to_machine
         '((:task t_carry_to_machine)
             (:params (?r robot) (?p package) (?m machine))
             (:pre-conditions true)
-            (:effects nil)
             (:score 0)
             (:body
-                (begin
+                (do
                     (t_take_package ?r ?p)
                     (t_deliver_package ?r ?m)))))
 
-    (def-task t_take_package ?r ?p)
+    (def-task t_take_package '(?r robot) '(?p package))
     (def-method m_take_package
         '((:task t_take_package)
           (:params (?r robot) (?p package))
           (:pre-conditions true)
-          (:effects nil)
           (:score 0)
-          (:body (begin
+          (:body (do
             (t_position_robot_to_belt ?r (package.location ?p))
             (pick_package ?r ?p)))))
 
-    (def-task t_deliver_package ?r ?m)
+    (def-task t_deliver_package '(?r robot) '(?m machine))
     (def-method m_deliver_package
         '((:task t_deliver_package)
             (:params (?r robot) (?m machine))
             (:pre-conditions true)
-            (:effects nil)
             (:score 0)
             (:body
                 (let ((?b (machine.input_belt ?m)))
-                    (begin
+                    (do
                         (t_position_robot_to_belt ?r ?b)
-                        (wait-on `(< (length (belt.packages_list ,?b)) (length (belt.cells ,?b))))
+                        (wait-on `(< (len (belt.packages_list ,?b)) (len (belt.cells ,?b))))
                         (place ?r))))))
 
-    (def-task t_charge ?r)
+    (def-task t_charge '(?r robot))
     (def-method m_charge
         '((:task t_charge)
             (:params (?r robot))
             (:pre-conditions true)
-            (:effects nil)
             (:score 0)
             (:body
-                (begin
+                (do
                     (go_charge ?r)
                     (wait-on `(= (robot.battery ,?r) 1))))))
 
-    (def-task t_check_battery ?r)
+    (def-task t_check_battery '(?r robot))
     (def-method m_check_battery
          '((:task t_check_battery)
           (:params (?r robot))
           (:pre-conditions true)
-          (:effects nil)
           (:score 0)
           (:body
              (loop
-                 (begin
+                 (do
                      (wait-on `(< (robot.battery ,?r) 0.4))
-                     (mutex::lock-and-do ?r
-                        (begin
+                     (mutex::lock-and-do ?r 50
+                        (do
                             (go_charge ?r)
                             (wait-on `(> (robot.battery ,?r) 0.9)))))))))
+    (def-task t_check_robots_batteries)
+    (def-lambda '(async_check_battery
+        (lambda (?r) (async (t_check_battery ?r)))))
+    
+    (def-method m_check_initial_robots_batteries
+        '((:task t_check_robots_batteries)
+        (:params)
+        (:pre-conditions true)
+        (:score 0)
+        (:body 
+            (do
+                (define list_robots (robots))
+                (mapf async_check_battery list_robots)
+                (t_check_batteries_new_robots list_robots)))))
+
+    (def-task t_check_batteries_new_robots '(?l list))
+    (def-method m_check_oncoming_robots
+        '((:task t_check_batteries_new_robots)
+        (:params (?l list))
+        (:pre-conditions true)
+        (:score 0)
+        (:body 
+            (do
+                (wait-on `(> ,(len ?l) (len (robots))))
+                (define new_list_robots (robots))
+                (define l_new_robots (sublist (new_list_robots) (len ?l)))
+                (mapf async_check_battery l_new_robots)
+                (t_check_batteries_new_robots new_list_robots)))))
+
+    (def-lambda '(async_process_package
+            (lambda (?p) (async (t_process_package ?p)))))
+    (def-task t_process_packages)
+    (def-method m_process_initial_packages
+            '((:task t_process_packages)
+            (:params)
+            (:pre-conditions true)
+            (:score 0)
+            (:body
+                (do
+                    (define list_packages (instance package))
+                    (mapf async_process_package list_packages)
+                    ;(t_process_new_packages list_packages)
+                    ))))
+
+        (def-task t_process_new_packages '(?l list))
+        (def-method m_check_oncoming_packages
+            '((:task t_process_new_packages)
+            (:params (?l list))
+            (:pre-conditions true)
+            (:score 0)
+            (:body
+                (do
+                    (wait-on `(> ,(len ?l) (len (instance package))))
+                    (define new_lp (instance package))
+                    (define l_new_p (sublist (new_lp) (len ?l)))
+                    (mapf async_check_battery l_new_p)
+                    (t_check_batteries_new_robots new_lp)))))
 )

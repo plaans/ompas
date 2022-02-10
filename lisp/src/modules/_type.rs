@@ -1,15 +1,22 @@
 //! Scheme module implementing symbol typing.
 //! Development in standby. Some features might not be completely working...
-use crate::core::LEnv;
-use crate::language::scheme_primitives::{BOOL, FLOAT, INT, OBJECT, SYMBOL, USIZE};
-use crate::modules::doc::{Documentation, LHelp};
-use crate::structs::LError::{
-    NotInListOfExpectedTypes, SpecialError, WrongNumberOfArgument, WrongType,
+use crate::core::language::*;
+use crate::core::structs::contextcollection::Context;
+use crate::core::structs::documentation::{Documentation, LHelp};
+use crate::core::structs::lenv::LEnv;
+use crate::core::structs::lerror;
+use crate::core::structs::lerror::LError::{
+    ConversionError, NotInListOfExpectedTypes, SpecialError, WrongNumberOfArgument, WrongType,
 };
-use crate::structs::{GetModule, LError, LNumber, LValue, Module, NameTypeLValue};
+use crate::core::structs::lerror::LResult;
+use crate::core::structs::lnumber::LNumber;
+use crate::core::structs::lvalue::LValue;
+use crate::core::structs::module::{IntoModule, Module};
+use crate::core::structs::purefonction::PureFonctionCollection;
+use crate::core::structs::typelvalue::TypeLValue;
 use std::convert::TryInto;
 use std::fmt::{Debug, Display, Formatter};
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 //pub const TYPE: &str = "type";
 //pub const STATE: &str = "state";
@@ -71,13 +78,13 @@ impl Display for LSymType {
 }
 
 impl LSymType {
-    pub fn as_state_function(&self) -> Result<LStateFunction, LError> {
+    pub fn as_state_function(&self) -> lerror::Result<LStateFunction> {
         match self {
             LSymType::StateFunction(sf) => Ok(sf.clone()),
-            lst => Err(LError::ConversionError(
+            lst => Err(ConversionError(
                 "as_state_function",
                 lst.into(),
-                NameTypeLValue::Other(STATE_FUNCTION.to_string()),
+                TypeLValue::Other(STATE_FUNCTION.to_string()),
             )),
         }
     }
@@ -155,7 +162,7 @@ impl From<LType> for String {
     }
 }
 
-impl From<LSymType> for NameTypeLValue {
+impl From<LSymType> for TypeLValue {
     fn from(lst: LSymType) -> Self {
         (&lst).into()
     }
@@ -173,12 +180,12 @@ impl From<LSymType> for LValue {
     }
 }
 
-impl From<&LSymType> for NameTypeLValue {
+impl From<&LSymType> for TypeLValue {
     fn from(lst: &LSymType) -> Self {
         match lst {
-            LSymType::StateFunction(_) => NameTypeLValue::Other("State Function".to_string()),
-            LSymType::Type(_) => NameTypeLValue::Other("TYPE".to_string()),
-            LSymType::Object(_) => NameTypeLValue::Other("Object".to_string()),
+            LSymType::StateFunction(_) => TypeLValue::Other("State Function".to_string()),
+            LSymType::Type(_) => TypeLValue::Other("TYPE".to_string()),
+            LSymType::Object(_) => TypeLValue::Other("Object".to_string()),
         }
     }
 }
@@ -218,9 +225,9 @@ impl Display for LStateFunction {
 
 #[derive(Debug)]
 pub struct CtxType {
-    map_sym_type_id: im::HashMap<String, usize>,
-    map_type_id_sym: im::HashMap<usize, String>,
-    types: Vec<LSymType>,
+    map_sym_type_id: Arc<RwLock<im::HashMap<String, usize>>>,
+    map_type_id_sym: Arc<RwLock<im::HashMap<usize, String>>>,
+    types: Arc<RwLock<Vec<LSymType>>>,
 }
 
 impl Default for CtxType {
@@ -242,48 +249,57 @@ impl Default for CtxType {
         map_type_id_sym.insert(INDEX_TYPE_OBJECT, OBJECT.into());
 
         Self {
-            map_sym_type_id,
-            map_type_id_sym,
-            types,
+            map_sym_type_id: Arc::new(RwLock::new(map_sym_type_id)),
+            map_type_id_sym: Arc::new(RwLock::new(map_type_id_sym)),
+            types: Arc::new(RwLock::new(types)),
         }
     }
 }
 
 impl CtxType {
-    pub fn get_type_id(&self, sym: &str) -> Option<&usize> {
-        self.map_sym_type_id.get(sym)
-    }
-
-    pub fn get_sym(&self, type_id: &usize) -> Option<&String> {
-        self.map_type_id_sym.get(type_id)
-    }
-
-    pub fn get_type(&self, type_id: usize) -> Option<&LSymType> {
-        self.types.get(type_id)
-    }
-
-    pub fn get_type_from_sym(&self, sym: &str) -> Option<&LSymType> {
-        match self.get_type_id(sym) {
-            None => None,
-            Some(type_id) => self.get_type(*type_id),
+    pub fn get_type_id(&self, sym: &str) -> Option<usize> {
+        match self.map_sym_type_id.read() {
+            Ok(map) => map.get(sym).cloned(),
+            Err(e) => panic!("{}", e),
         }
     }
 
-    pub fn bind_sym_type(&mut self, sym: &str, type_id: usize) {
-        self.map_sym_type_id.insert(sym.to_string(), type_id);
-        self.map_type_id_sym.insert(type_id, sym.to_string());
+    pub fn get_sym(&self, type_id: &usize) -> Option<String> {
+        self.map_type_id_sym.read().unwrap().get(type_id).cloned()
     }
 
-    pub fn add_type(&mut self, sym_type: LSymType) -> usize {
-        self.types.push(sym_type);
-        self.types.len() - 1
+    pub fn get_type(&self, type_id: &usize) -> Option<LSymType> {
+        self.types.read().unwrap().get(*type_id).cloned()
+    }
+
+    pub fn get_type_from_sym(&self, sym: &str) -> Option<LSymType> {
+        match self.get_type_id(sym) {
+            None => None,
+            Some(type_id) => self.get_type(&type_id),
+        }
+    }
+
+    pub fn bind_sym_type(&self, sym: &str, type_id: usize) {
+        self.map_sym_type_id
+            .write()
+            .unwrap()
+            .insert(sym.to_string(), type_id);
+        self.map_type_id_sym
+            .write()
+            .unwrap()
+            .insert(type_id, sym.to_string());
+    }
+
+    pub fn add_type(&self, sym_type: LSymType) -> usize {
+        self.types.write().unwrap().push(sym_type);
+        self.types.write().unwrap().len() - 1
     }
 }
 
-impl GetModule for CtxType {
-    fn get_module(self) -> Module {
+impl IntoModule for CtxType {
+    fn into_module(self) -> Module {
         let mut module = Module {
-            ctx: Arc::new(self),
+            ctx: Context::new(self),
             prelude: vec![],
             raw_lisp: Default::default(),
             label: MOD_TYPE.into(),
@@ -293,12 +309,36 @@ impl GetModule for CtxType {
         module.add_fn_prelude(IS_OBJECT, is_object);
         module.add_fn_prelude(IS_TYPE, is_type);
         module.add_fn_prelude(GET_TYPE, get_type);
-        module.add_mut_fn_prelude(TYPE_OF, type_of);
-        module.add_mut_fn_prelude(SUB_TYPE, sub_type);
-        module.add_mut_fn_prelude(NEW_STATE_FUNCTION, new_state_function);
-        module.add_mut_fn_prelude(NEW_OBJECT, new_object);
+        module.add_fn_prelude(TYPE_OF, type_of);
+        module.add_fn_prelude(SUB_TYPE, sub_type);
+        module.add_fn_prelude(NEW_STATE_FUNCTION, new_state_function);
+        module.add_fn_prelude(NEW_OBJECT, new_object);
 
         module
+    }
+
+    fn documentation(&self) -> Documentation {
+        vec![
+            LHelp::new(MOD_TYPE, DOC_MOD_TYPE),
+            LHelp::new(IS_STATE_FUNCTION, DOC_IS_STATE_FUNCTION),
+            LHelp::new(IS_OBJECT, DOC_IS_OBJECT),
+            LHelp::new(IS_TYPE, DOC_IS_TYPE),
+            LHelp::new(GET_TYPE, DOC_GET_TYPE),
+            LHelp::new(TYPE_OF, DOC_TYPE_OF),
+            LHelp::new_verbose(SUB_TYPE, DOC_SUB_TYPE, DOC_SUB_TYPE_VERBOSE),
+            LHelp::new_verbose(
+                NEW_STATE_FUNCTION,
+                DOC_NEW_STATE_FUNCTION,
+                DOC_NEW_STATE_FUNCTION_VERBOSE,
+            ),
+            LHelp::new_verbose(NEW_OBJECT, DOC_NEW_OBJECT, DOC_NEW_OBJECT_VERBOSE),
+            LHelp::new_verbose(MOD_TYPE, DOC_MOD_TYPE, DOC_MOD_TYPE_VERBOSE),
+        ]
+        .into()
+    }
+
+    fn pure_fonctions(&self) -> PureFonctionCollection {
+        Default::default()
     }
 }
 
@@ -324,32 +364,12 @@ const DOC_NEW_OBJECT: &str = "Create a new typed object";
 const DOC_NEW_OBJECT_VERBOSE: &str = "Takes one argument that is the type of the object \n\
                                       Example: (typeof bob robot)";
 
-impl Documentation for CtxType {
-    fn documentation() -> Vec<LHelp> {
-        vec![
-            LHelp::new(MOD_TYPE, DOC_MOD_TYPE),
-            LHelp::new(IS_STATE_FUNCTION, DOC_IS_STATE_FUNCTION),
-            LHelp::new(IS_OBJECT, DOC_IS_OBJECT),
-            LHelp::new(IS_TYPE, DOC_IS_TYPE),
-            LHelp::new(GET_TYPE, DOC_GET_TYPE),
-            LHelp::new(TYPE_OF, DOC_TYPE_OF),
-            LHelp::new_verbose(SUB_TYPE, DOC_SUB_TYPE, DOC_SUB_TYPE_VERBOSE),
-            LHelp::new_verbose(
-                NEW_STATE_FUNCTION,
-                DOC_NEW_STATE_FUNCTION,
-                DOC_NEW_STATE_FUNCTION_VERBOSE,
-            ),
-            LHelp::new_verbose(NEW_OBJECT, DOC_NEW_OBJECT, DOC_NEW_OBJECT_VERBOSE),
-            LHelp::new_verbose(MOD_TYPE, DOC_MOD_TYPE, DOC_MOD_TYPE_VERBOSE),
-        ]
-    }
-}
-
 /*
 FUNCTIONS
  */
 
-pub fn is_type(args: &[LValue], _: &LEnv, ctx: &CtxType) -> Result<LValue, LError> {
+pub fn is_type(args: &[LValue], env: &LEnv) -> LResult {
+    let ctx = env.get_context::<CtxType>(MOD_TYPE)?;
     match args.len() {
         1 => match &args[0] {
             LValue::Symbol(s) => match ctx.get_type_from_sym(s) {
@@ -363,14 +383,15 @@ pub fn is_type(args: &[LValue], _: &LEnv, ctx: &CtxType) -> Result<LValue, LErro
                 IS_TYPE,
                 lv.clone(),
                 lv.into(),
-                NameTypeLValue::Symbol,
+                TypeLValue::Symbol,
             )),
         },
         i => Err(WrongNumberOfArgument(IS_TYPE, args.into(), i, 1..1)),
     }
 }
 
-pub fn is_object(args: &[LValue], _: &LEnv, ctx: &CtxType) -> Result<LValue, LError> {
+pub fn is_object(args: &[LValue], env: &LEnv) -> LResult {
+    let ctx = env.get_context::<CtxType>(MOD_TYPE)?;
     match args.len() {
         1 => match args.get(0).unwrap() {
             LValue::Symbol(s) => match ctx.get_type_from_sym(s) {
@@ -384,14 +405,16 @@ pub fn is_object(args: &[LValue], _: &LEnv, ctx: &CtxType) -> Result<LValue, LEr
                 IS_OBJECT,
                 lv.clone(),
                 lv.into(),
-                NameTypeLValue::Symbol,
+                TypeLValue::Symbol,
             )),
         },
         i => Err(WrongNumberOfArgument(IS_OBJECT, args.into(), i, 1..1)),
     }
 }
 
-pub fn is_state_function(args: &[LValue], _: &LEnv, ctx: &CtxType) -> Result<LValue, LError> {
+pub fn is_state_function(args: &[LValue], env: &LEnv) -> LResult {
+    let ctx = env.get_context::<CtxType>(MOD_TYPE)?;
+
     match args.len() {
         1 => match args.get(0).unwrap() {
             LValue::Symbol(s) => match ctx.get_type_from_sym(s) {
@@ -405,7 +428,7 @@ pub fn is_state_function(args: &[LValue], _: &LEnv, ctx: &CtxType) -> Result<LVa
                 IS_STATE_FUNCTION,
                 lv.clone(),
                 lv.into(),
-                NameTypeLValue::Symbol,
+                TypeLValue::Symbol,
             )),
         },
         i => Err(WrongNumberOfArgument(
@@ -417,7 +440,7 @@ pub fn is_state_function(args: &[LValue], _: &LEnv, ctx: &CtxType) -> Result<LVa
     }
 }
 
-pub fn type_of(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> Result<LValue, LError> {
+pub fn type_of(args: &[LValue], env: &LEnv) -> LResult {
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(
             TYPE_OF,
@@ -426,6 +449,8 @@ pub fn type_of(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> Result<LValue, L
             2..2,
         ));
     }
+
+    let ctx = env.get_context::<CtxType>(MOD_TYPE)?;
 
     match &args[0] {
         LValue::Symbol(s) => {
@@ -439,7 +464,7 @@ pub fn type_of(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> Result<LValue, L
                     TYPE_OF,
                     lv.clone(),
                     lv.into(),
-                    NameTypeLValue::Other("type_id(usize)".to_string()),
+                    TypeLValue::Other("type_id(usize)".to_string()),
                 )),
             }
         }
@@ -447,12 +472,12 @@ pub fn type_of(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> Result<LValue, L
             TYPE_OF,
             lv.clone(),
             lv.into(),
-            NameTypeLValue::Symbol,
+            TypeLValue::Symbol,
         )),
     }
 }
 
-pub fn sub_type(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> Result<LValue, LError> {
+pub fn sub_type(args: &[LValue], env: &LEnv) -> LResult {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(
             SUB_TYPE,
@@ -461,7 +486,10 @@ pub fn sub_type(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> Result<LValue, 
             1..1,
         ));
     }
-    let expected_type = NameTypeLValue::Other("TYPE".to_string());
+
+    let ctx = env.get_context::<CtxType>(MOD_TYPE)?;
+
+    let expected_type = TypeLValue::Other("TYPE".to_string());
     let parent_type: usize = match &args[0] {
         LValue::Symbol(s) => match ctx.get_type_from_sym(s) {
             None => {
@@ -471,8 +499,15 @@ pub fn sub_type(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> Result<LValue, 
                 ))
             }
             Some(lst) => match lst {
-                LSymType::Type(_) => *ctx.get_type_id(s).unwrap(),
-                lst => return Err(WrongType(SUB_TYPE, lst.into(), lst.into(), expected_type)),
+                LSymType::Type(_) => ctx.get_type_id(s).unwrap(),
+                lst => {
+                    return Err(WrongType(
+                        SUB_TYPE,
+                        lst.clone().into(),
+                        lst.into(),
+                        expected_type,
+                    ))
+                }
             },
         },
         lv => {
@@ -480,7 +515,7 @@ pub fn sub_type(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> Result<LValue, 
                 SUB_TYPE,
                 lv.clone(),
                 lv.into(),
-                NameTypeLValue::Symbol,
+                TypeLValue::Symbol,
             ))
         }
     };
@@ -489,18 +524,16 @@ pub fn sub_type(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> Result<LValue, 
     Ok(type_id.into())
 }
 
-pub fn new_state_function(
-    args: &[LValue],
-    env: &LEnv,
-    ctx: &mut CtxType,
-) -> Result<LValue, LError> {
+pub fn new_state_function(args: &[LValue], env: &LEnv) -> LResult {
+    let ctx = env.get_context::<CtxType>(MOD_TYPE)?;
+
     let mut t_params: Vec<String> = Vec::new();
     let mut t_value: String = String::from(OBJECT);
-    let expected_type = NameTypeLValue::Other("TYPE".to_string());
+    let expected_type = TypeLValue::Other("TYPE".to_string());
     for (i, arg) in args.iter().enumerate() {
         match arg {
             LValue::Symbol(s) => {
-                if is_type(&args[i..i + 1], env, ctx)?.try_into()? {
+                if is_type(&args[i..i + 1], env)?.try_into()? {
                     if i == args.len() - 1 {
                         t_value = s.clone();
                     } else {
@@ -541,7 +574,8 @@ pub fn new_state_function(
     Ok(type_id.into())
 }
 
-pub fn new_object(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> Result<LValue, LError> {
+pub fn new_object(args: &[LValue], env: &LEnv) -> LResult {
+    let ctx = env.get_context::<CtxType>(MOD_TYPE)?;
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(
             NEW_OBJECT,
@@ -560,20 +594,20 @@ pub fn new_object(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> Result<LValue
                         "no type annotation corresponding to the symbol".to_string(),
                     ))
                 }
-                Some(u) => *u,
+                Some(u) => u,
             };
-            ctx.get_type(type_id)
+            ctx.get_type(&type_id)
         }
         LValue::Number(LNumber::Usize(u)) => {
             type_id = *u;
-            ctx.get_type(type_id)
+            ctx.get_type(u)
         }
         lv => {
             return Err(NotInListOfExpectedTypes(
                 NEW_OBJECT,
                 lv.clone(),
                 lv.into(),
-                vec![NameTypeLValue::Symbol, NameTypeLValue::Usize],
+                vec![TypeLValue::Symbol, TypeLValue::Usize],
             ))
         }
     };
@@ -583,24 +617,24 @@ pub fn new_object(args: &[LValue], _: &LEnv, ctx: &mut CtxType) -> Result<LValue
             NEW_OBJECT,
             (&args[0]).clone(),
             (&args[0]).into(),
-            NameTypeLValue::Symbol,
+            TypeLValue::Symbol,
         )),
-        Some(lst) => match lst {
+        Some(lst) => match &lst {
             LSymType::Type(_) => {
                 let type_id = ctx.add_type(LSymType::Object(type_id));
                 Ok(type_id.into())
             }
             lst => Err(WrongType(
                 NEW_OBJECT,
+                lst.clone().into(),
                 lst.into(),
-                lst.into(),
-                NameTypeLValue::Other("type".to_string()),
+                TypeLValue::Other("type".to_string()),
             )),
         },
     }
 }
 
-pub fn get_type(args: &[LValue], _: &LEnv, ctx: &CtxType) -> Result<LValue, LError> {
+pub fn get_type(args: &[LValue], env: &LEnv) -> LResult {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(
             GET_TYPE,
@@ -609,19 +643,21 @@ pub fn get_type(args: &[LValue], _: &LEnv, ctx: &CtxType) -> Result<LValue, LErr
             1..1,
         ));
     }
+    let ctx = env.get_context::<CtxType>(MOD_TYPE)?;
+
     let type_as_string = match &args[0] {
         LValue::Symbol(s) => match ctx.get_type_from_sym(s) {
             None => SYMBOL.to_string(),
-            Some(lst) => match lst {
-                LSymType::Object(u) => ctx.get_sym(u).unwrap().to_string(),
+            Some(lst) => match &lst {
+                LSymType::Object(u) => ctx.get_sym(u).unwrap(),
                 LSymType::Type(parent_type) => match parent_type {
                     None => "root type".to_string(),
-                    Some(u) => format!("subtype of {}", ctx.get_sym(u).unwrap().to_string()),
+                    Some(u) => format!("subtype of {}", ctx.get_sym(u).unwrap()),
                 },
                 lst => lst.to_string(),
             },
         },
-        lv => NameTypeLValue::from(lv).to_string(),
+        lv => TypeLValue::from(lv).to_string(),
     };
 
     Ok(type_as_string.into())

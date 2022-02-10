@@ -6,20 +6,76 @@ use crate::tcp::{task_tcp_connection, TEST_TCP};
 use crate::TOKIO_CHANNEL_SIZE;
 use async_trait::async_trait;
 use core::time;
-use ompas_acting::rae::context::actions_progress::{ActionsProgress, Status};
-use ompas_acting::rae::context::rae_state::{RAEState, StateType, KEY_DYNAMIC, KEY_STATIC};
-use ompas_acting::rae::module::mod_rae_exec::{
-    RAEInterface, RAE_GET_STATE_VARIBALE, RAE_LAUNCH_PLATFORM,
-};
-use ompas_lisp::structs::LError::{SpecialError, WrongNumberOfArgument, WrongType};
-use ompas_lisp::structs::*;
+use im::{HashMap, HashSet};
+use ompas_lisp::core::structs::contextcollection::Context;
+use ompas_lisp::core::structs::documentation::Documentation;
+use ompas_lisp::core::structs::lerror::LError::*;
+use ompas_lisp::core::structs::lerror::{LError, LResult};
+use ompas_lisp::core::structs::lvalue::LValue;
+use ompas_lisp::core::structs::lvalues::LValueS;
+use ompas_lisp::core::structs::module::{IntoModule, Module};
+use ompas_lisp::core::structs::purefonction::PureFonctionCollection;
+use ompas_lisp::core::structs::typelvalue::TypeLValue;
+use ompas_rae::context::actions_progress::{ActionsProgress, Status};
+use ompas_rae::context::rae_state::{RAEState, StateType, KEY_DYNAMIC, KEY_STATIC};
+use ompas_rae::module::rae_exec::platform::RAE_LAUNCH_PLATFORM;
+use ompas_rae::module::rae_exec::{CtxPlatform, RAEInterface, RAE_GET_STATE_VARIBALE};
 use ompas_utils::task_handler;
+use std::convert::TryInto;
 use std::net::SocketAddr;
 use std::process::Command;
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
-use tokio::sync::mpsc;
 use tokio::sync::mpsc::Sender;
+use tokio::sync::{mpsc, RwLock};
+
+#[derive(Default, Clone)]
+pub struct Instance {
+    inner: Arc<RwLock<HashMap<String, HashSet<String>>>>,
+}
+
+impl Instance {
+    pub async fn add_instance_of(&self, instance: String, _type: String) {
+        let mut locked = self.inner.write().await;
+
+        match locked.get_mut(&_type) {
+            Some(vec) => {
+                vec.insert(instance);
+            }
+            None => {
+                let mut set = HashSet::new();
+                set.insert(instance);
+                locked.insert(_type, set);
+            }
+        };
+    }
+
+    pub async fn add_type(&self, _type: String) {
+        self.inner.write().await.insert(_type, HashSet::default());
+    }
+}
+
+impl Instance {
+    pub async fn is_of_type(&self, instance: String, _type: String) -> LResult {
+        //println!("instances : {:?}", self.inner.read().await);
+
+        match self.inner.read().await.get(&_type) {
+            Some(vec) => {
+                //println!("type exist");
+                Ok(vec.contains(&instance).into())
+            }
+            None => Ok(false.into()),
+        }
+    }
+
+    pub async fn instance_of(&self, _type: String) -> LResult {
+        match self.inner.read().await.get(&_type) {
+            Some(set) => Ok(set.clone().iter().cloned().collect::<Vec<String>>().into()),
+            None => Ok(LValue::Nil),
+        }
+    }
+}
 
 /// Struct used to bind RAE and Godot.
 #[derive(Default, Clone)]
@@ -27,6 +83,7 @@ pub struct PlatformGodot {
     pub socket_info: SocketInfo,
     pub sender_socket: Option<Sender<String>>,
     pub state: RAEState,
+    pub instance: Instance,
     pub status: ActionsProgress,
 }
 
@@ -113,7 +170,7 @@ impl RAEInterface for PlatformGodot {
                 "PlatformGodot::cancel_command",
                 args[0].clone(),
                 (&args[0]).into(),
-                NameTypeLValue::Number,
+                TypeLValue::Number,
             ));
         };
 
@@ -166,7 +223,7 @@ impl RAEInterface for PlatformGodot {
                         "PlatformGodot::get_state",
                         lv.clone(),
                         lv.into(),
-                        NameTypeLValue::Symbol,
+                        TypeLValue::Symbol,
                     ))
                 }
             },
@@ -254,7 +311,7 @@ impl RAEInterface for PlatformGodot {
     }
 
     /// Start the platform (start the godot process and launch the simulation)
-    async fn start_platform(&self, args: &[LValue]) -> Result<LValue, LError> {
+    async fn start_platform(&mut self, args: &[LValue]) -> Result<LValue, LError> {
         match args.len() {
             //default settings
             0 => {
@@ -285,7 +342,7 @@ impl RAEInterface for PlatformGodot {
                         "PlatformGodot::start_platform",
                         args[0].clone(),
                         (&args[0]).into(),
-                        NameTypeLValue::Symbol,
+                        TypeLValue::Symbol,
                     ));
                 }
             } //path of the project (absolute path)
@@ -346,7 +403,7 @@ impl RAEInterface for PlatformGodot {
                             "PlatformGodot::open_com",
                             lv.clone(),
                             lv.into(),
-                            NameTypeLValue::Symbol,
+                            TypeLValue::Symbol,
                         ))
                     }
                 };
@@ -358,7 +415,7 @@ impl RAEInterface for PlatformGodot {
                             "PlatformGodot::open_com",
                             lv.clone(),
                             lv.into(),
-                            NameTypeLValue::Usize,
+                            TypeLValue::Usize,
                         ))
                     }
                 };
@@ -385,7 +442,10 @@ impl RAEInterface for PlatformGodot {
         //println!("godot launched!");
         let state = self.state.clone();
         let status = self.status.clone();
-        tokio::spawn(async move { task_tcp_connection(&socket_addr, rx, state, status).await });
+        let instance = self.instance.clone();
+        tokio::spawn(async move {
+            task_tcp_connection(&socket_addr, rx, state, status, instance).await
+        });
         //println!("com opened with godot");
         Ok(LValue::Nil)
     }
@@ -404,5 +464,62 @@ impl RAEInterface for PlatformGodot {
     async fn domain(&self) -> &'static str {
         //GODOT_DOMAIN
         "(read godot_domain/init.lisp)"
+    }
+
+    //0 arg: return a map of all instances
+    //1 arg: return all instances of a type
+    //2 args: check if an instance is of a certain type
+    async fn instance(&self, args: &[LValue]) -> LResult {
+        match args.len() {
+            0 => {
+                let map_instances: im::HashMap<String, HashSet<String>> =
+                    self.instance.inner.read().await.clone();
+                let mut map: im::HashMap<LValue, LValue> = Default::default();
+                for (_type, instances) in map_instances {
+                    let value = instances.iter().map(LValue::from).collect::<Vec<LValue>>();
+                    map.insert(_type.into(), value.into());
+                }
+
+                Ok(map.into())
+            }
+            1 => self.instance.instance_of((&args[0]).try_into()?).await,
+            2 => {
+                self.instance
+                    .is_of_type((&args[0]).try_into()?, (&args[1]).try_into()?)
+                    .await
+            }
+            _ => Err(WrongNumberOfArgument(
+                "godot::instance",
+                args.into(),
+                args.len(),
+                1..2,
+            )),
+        }
+    }
+
+    fn context_platform(&self) -> CtxPlatform {
+        CtxPlatform::new(GodotCtx::default())
+    }
+}
+
+#[derive(Clone, Default)]
+struct GodotCtx {}
+
+impl IntoModule for GodotCtx {
+    fn into_module(self) -> Module {
+        Module {
+            ctx: Context::new(self),
+            prelude: vec![],
+            raw_lisp: Default::default(),
+            label: "".to_string(),
+        }
+    }
+
+    fn documentation(&self) -> Documentation {
+        Default::default()
+    }
+
+    fn pure_fonctions(&self) -> PureFonctionCollection {
+        Default::default()
     }
 }

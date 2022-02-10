@@ -592,6 +592,7 @@ pub async fn eval(lv: &LValue, env: &mut LEnv) -> LResult {
 
                         for e in firsts {
                             let result: LValue = eval(e, env).await?;
+
                             if _do && matches!(result, LValue::Err(_)) {
                                 return Ok(result);
                             }

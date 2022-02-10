@@ -1,8 +1,10 @@
+use crate::core::language::ERR;
 use crate::core::structs::lnumber::LNumber;
 use crate::core::structs::lvalue::LValue;
 use serde::*;
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
+use std::ops::Deref;
 
 /// Enum used to serialize LValue.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -68,7 +70,9 @@ impl From<&LValue> for LValueS {
             LValue::Character(c) => LValueS::Symbol(c.to_string()),
             LValue::AsyncFn(fun) => LValueS::Symbol(fun.get_label().to_string()),
             LValue::Future(_) => panic!("cannot convert LValue::Future into LValueS"),
-            LValue::Err(_) => panic!("cannot convert an error into LValueS"),
+            LValue::Err(e) => {
+                LValueS::List(vec![LValueS::Symbol(ERR.to_string()), e.deref().into()])
+            }
         }
     }
 }

@@ -56,7 +56,7 @@
             (:pre-conditions (!= (package.processes_list ?p) nil))
             (:score 0)
             (:body
-                (begin
+                (do
                     (define ?m
                         (arbitrary (find_machines_for_process
                             (caar (unzip (package.processes_list ?p))))))
@@ -70,7 +70,7 @@
             (:score 0)
             (:body
                 (let ((?r (arbitrary (available_robots) rand-element)))
-                    (begin
+                    (do
                         (mutex::lock-and-do ?r 10
                             (t_carry_to_machine ?r ?p (find_output_machine))
                         ))))))
@@ -83,7 +83,7 @@
         (:score 0)
         (:body (let ((?r (arbitrary (available_robots) rand-element)))
                 (if (!= ?r nil)
-                    (begin
+                    (do
                         (mutex::lock-and-do ?r 11
                             (t_carry_to_machine ?r ?p ?m))
                         (wait-on `(= (package.location ,?p) (machine.output_belt ,?m))))
@@ -94,7 +94,7 @@
         (:params (?p package) (?m machine))
         (:pre-conditions (= (available_robots) nil))
         (:score 0)
-        (:body (begin
+        (:body (do
                 (wait-on `(!= (available_robots) nil))
                 (t_process_on_machine)))))
 
@@ -104,7 +104,7 @@
             (:params (?r robot) (?b belt))
             (:pre-conditions true)
             (:score 0)
-            (:body (begin
+            (:body (do
                 (navigate_to_area ?r (car (belt.interact_areas ?b)))
                 (face_belt ?r ?b 5)))))
 
@@ -115,7 +115,7 @@
             (:pre-conditions true)
             (:score 0)
             (:body
-                (begin
+                (do
                     (t_take_package ?r ?p)
                     (t_deliver_package ?r ?m)))))
 
@@ -125,7 +125,7 @@
           (:params (?r robot) (?p package))
           (:pre-conditions true)
           (:score 0)
-          (:body (begin
+          (:body (do
             (t_position_robot_to_belt ?r (package.location ?p))
             (pick_package ?r ?p)))))
 
@@ -137,7 +137,7 @@
             (:score 0)
             (:body
                 (let ((?b (machine.input_belt ?m)))
-                    (begin
+                    (do
                         (t_position_robot_to_belt ?r ?b)
                         (wait-on `(< (len (belt.packages_list ,?b)) (len (belt.cells ,?b))))
                         (place ?r))))))
@@ -149,7 +149,7 @@
             (:pre-conditions true)
             (:score 0)
             (:body
-                (begin
+                (do
                     (go_charge ?r)
                     (wait-on `(= (robot.battery ,?r) 1))))))
 
@@ -161,10 +161,10 @@
           (:score 0)
           (:body
              (loop
-                 (begin
+                 (do
                      (wait-on `(< (robot.battery ,?r) 0.4))
                      (mutex::lock-and-do ?r 50
-                        (begin
+                        (do
                             (go_charge ?r)
                             (wait-on `(> (robot.battery ,?r) 0.9)))))))))
     (def-task t_check_robots_batteries)
@@ -177,7 +177,7 @@
         (:pre-conditions true)
         (:score 0)
         (:body 
-            (begin
+            (do
                 (define list_robots (robots))
                 (mapf async_check_battery list_robots)
                 (t_check_batteries_new_robots list_robots)))))
@@ -189,7 +189,7 @@
         (:pre-conditions true)
         (:score 0)
         (:body 
-            (begin
+            (do
                 (wait-on `(> ,(len ?l) (len (robots))))
                 (define new_list_robots (robots))
                 (define l_new_robots (sublist (new_list_robots) (len ?l)))
@@ -205,7 +205,7 @@
             (:pre-conditions true)
             (:score 0)
             (:body
-                (begin
+                (do
                     (define list_packages (instance package))
                     (mapf async_process_package list_packages)
                     ;(t_process_new_packages list_packages)
@@ -218,7 +218,7 @@
             (:pre-conditions true)
             (:score 0)
             (:body
-                (begin
+                (do
                     (wait-on `(> ,(len ?l) (len (instance package))))
                     (define new_lp (instance package))
                     (define l_new_p (sublist (new_lp) (len ?l)))

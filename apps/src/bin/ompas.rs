@@ -1,7 +1,5 @@
 use std::path::PathBuf;
 
-use ompas_acting::rae::module::init_ctx_rae;
-use ompas_acting::rae::module::rae_exec::Platform;
 use ompas_godot_simulation_client::rae_interface::PlatformGodot;
 use ompas_lisp::core::activate_debug;
 use ompas_lisp::lisp_interpreter::{LispInterpreter, LispInterpreterConfig};
@@ -10,6 +8,8 @@ use ompas_lisp::modules::advanced_math::CtxMath;
 use ompas_lisp::modules::io::CtxIo;
 use ompas_lisp::modules::string::CtxString;
 use ompas_lisp::modules::utils::CtxUtils;
+use ompas_rae::module::rae_exec::Platform;
+use ompas_rae::module::CtxRae;
 use structopt::StructOpt;
 
 pub const TOKIO_CHANNEL_SIZE: usize = 65_384;
@@ -44,8 +44,8 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     let ctx_type = CtxType::default();
     let ctx_utils = CtxUtils::default();
     let ctx_string = CtxString::default();
-    let (ctx_rae, ctx_rae_monitor) =
-        init_ctx_rae(Some(Platform::new(PlatformGodot::default())), log.clone()).await;
+    let ctx_rae =
+        CtxRae::init_ctx_rae(Some(Platform::new(PlatformGodot::default())), log.clone()).await;
     //Insert the doc for the different contexts.
 
     //Add the sender of the channel.
@@ -67,9 +67,6 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     li.import_namespace(ctx_rae)
         .await
         .expect("error loading rae");
-    li.import_namespace(ctx_rae_monitor)
-        .await
-        .expect("error loading rae monitor");
 
     li.import(ctx_string)
         .await

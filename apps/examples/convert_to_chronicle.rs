@@ -1,10 +1,13 @@
 use ompas_lisp::core::parse;
 use ompas_lisp::core::structs::lenv::LEnv;
 use ompas_lisp::core::structs::lerror::LError;
-use ompas_planning::algo::{
-    translate_lvalue_to_chronicle, translate_lvalue_to_expression_chronicle,
-};
-use ompas_planning::structs::*;
+
+use ompas_rae::planning::conversion::processing::translate_lvalue_to_expression_chronicle;
+use ompas_rae::planning::conversion::translate_lvalue_to_chronicle;
+use ompas_rae::planning::structs::chronicle::{Chronicle, ExpressionChronicle};
+use ompas_rae::planning::structs::symbol_table::SymTable;
+use ompas_rae::planning::structs::traits::FormatWithSymTable;
+use ompas_rae::planning::structs::ConversionContext;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
@@ -56,6 +59,7 @@ async fn translate_2(exp: &str) -> Result<ExpressionChronicle, LError> {
     Ok(chronicle)
 }
 
+#[allow(dead_code)]
 async fn translate(exp: &str) -> Result<Chronicle, LError> {
     let mut env = LEnv::root().await;
     let lv = parse(exp, &mut env).await?;
@@ -72,14 +76,13 @@ async fn translate(exp: &str) -> Result<Chronicle, LError> {
 #[tokio::test]
 async fn test() -> Result<(), LError> {
     let exp = "(test 1 2 3 4)";
-    let (mut env, mut ctxs) = LEnv::root().await;
-    let lv = parse(exp, &mut env, &mut ctxs).await?;
+    let mut env = LEnv::root().await;
+    let lv = parse(exp, &mut env).await?;
 
     let mut symbol_table = SymTable::default();
 
-    let context = Context::default();
-
-    let chronicle = translate_lvalue_to_chronicle(&lv, &mut symbol_table)?;
+    let chronicle =
+        translate_lvalue_to_chronicle(&lv, &ConversionContext::default(), &mut symbol_table)?;
 
     println!("{}", chronicle.format_with_sym_table(&symbol_table));
     Ok(())

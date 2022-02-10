@@ -28,12 +28,12 @@ pub mod map;
 pub mod predicate;
 
 pub mod language {
-    use super::basic_math::language::*;
-    use super::error::language::*;
-    use super::list::language::*;
-    use super::map::language::*;
-    use super::predicate::language::*;
     use crate::core::language::{ERR, LIST, MAP};
+    use crate::core::root_module::basic_math::language::*;
+    use crate::core::root_module::error::language::*;
+    use crate::core::root_module::list::language::*;
+    use crate::core::root_module::map::language::*;
+    use crate::core::root_module::predicate::language::*;
     use crate::core::structs::lcoreoperator::language::*;
 
     pub const MOD_ROOT: &str = "mod-root";
@@ -117,6 +117,7 @@ pub mod language {
             EVAL,
             PARSE,
             EXPAND,
+            DO,
         ]);
 
         vec
@@ -315,7 +316,7 @@ pub fn get(args: &[LValue], env: &LEnv) -> LResult {
 /// return the length of the object if it is a table or a list.
 pub fn length(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 1 {
-        return Err(WrongNumberOfArgument(LEN, args.into(), args.len(), 1..1).into());
+        return Err(WrongNumberOfArgument(LEN, args.into(), args.len(), 1..1));
     }
 
     match &args[0] {

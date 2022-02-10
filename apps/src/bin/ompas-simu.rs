@@ -1,4 +1,3 @@
-use ompas_acting::rae::module::init_ctx_rae;
 use ompas_lisp::core::activate_debug;
 use ompas_lisp::lisp_interpreter::{
     ChannelToLispInterpreter, LispInterpreter, LispInterpreterConfig,
@@ -8,6 +7,7 @@ use ompas_lisp::modules::advanced_math::CtxMath;
 use ompas_lisp::modules::io::CtxIo;
 use ompas_lisp::modules::string::CtxString;
 use ompas_lisp::modules::utils::CtxUtils;
+use ompas_rae::module::CtxRae;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -43,7 +43,7 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     let ctx_type = CtxType::default();
     let ctx_utils = CtxUtils::default();
     let ctx_string = CtxString::default();
-    let (ctx_rae, ctx_rae_monitor) = init_ctx_rae(None, log.clone()).await;
+    let ctx_rae = CtxRae::init_ctx_rae(None, log.clone()).await;
     //Insert the doc for the different contexts.
 
     //Add the sender of the channel.
@@ -65,9 +65,6 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     li.import_namespace(ctx_rae)
         .await
         .expect("error loading rae");
-    li.import_namespace(ctx_rae_monitor)
-        .await
-        .expect("error loading rae monitor");
 
     li.import(ctx_string)
         .await

@@ -248,7 +248,7 @@ impl LEnv {
         for (sym, lv) in &mut module.prelude {
             match import_type {
                 ImportType::WithPrefix => {
-                    self.insert(format!("{}::{}", module.label, sym.to_string()), lv.clone());
+                    self.insert(format!("{}::{}", module.label, sym), lv.clone());
                 }
                 ImportType::WithoutPrefix => {
                     self.insert(sym.to_string(), lv.clone());

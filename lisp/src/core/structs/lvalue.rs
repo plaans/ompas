@@ -40,7 +40,7 @@ pub enum LValue {
     CoreOperator(LCoreOperator),
     #[serde(skip)]
     Future(LFuture),
-
+    Err(Box<LValue>),
     // data structure
     #[serde(skip)]
     Map(im::HashMap<LValue, LValue>),
@@ -49,7 +49,6 @@ pub enum LValue {
     //Refers to boolean 'false and empty list in lisp
     True,
     Nil,
-    Err(Box<LValue>),
 }
 
 type Sym = String;

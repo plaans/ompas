@@ -104,7 +104,6 @@ impl From<&LValue> for TypeLValue {
             LValue::Lambda(_) => TypeLValue::Lambda,
             LValue::Map(_) => TypeLValue::Map,
             LValue::List(_) => TypeLValue::List,
-            //LValue::Quote(_) => NameTypeLValue::Quote,
             LValue::CoreOperator(_) => TypeLValue::CoreOperator,
             LValue::String(_) => TypeLValue::String,
             LValue::Character(_) => TypeLValue::Character,

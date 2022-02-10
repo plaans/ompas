@@ -111,7 +111,7 @@ impl IntoModule for CtxMath {
 /// Only takes one element in args
 pub fn sin(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 1 {
-        return Err(WrongNumberOfArgument(SIN, args.into(), args.len(), 1..1).into());
+        return Err(WrongNumberOfArgument(SIN, args.into(), args.len(), 1..1));
     }
 
     match &args[0] {
@@ -119,7 +119,7 @@ pub fn sin(args: &[LValue], _: &LEnv) -> LResult {
             let f: f64 = n.into();
             Ok(f.sin().into())
         }
-        lv => Err(WrongType(SIN, lv.clone(), lv.into(), TypeLValue::Number).into()),
+        lv => Err(WrongType(SIN, lv.clone(), lv.into(), TypeLValue::Number)),
     }
 }
 
@@ -127,7 +127,7 @@ pub fn sin(args: &[LValue], _: &LEnv) -> LResult {
 /// Only takes one element in args
 pub fn cos(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 1 {
-        return Err(WrongNumberOfArgument(COS, args.into(), args.len(), 1..1).into());
+        return Err(WrongNumberOfArgument(COS, args.into(), args.len(), 1..1));
     }
 
     match &args[0] {

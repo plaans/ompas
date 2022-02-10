@@ -35,6 +35,12 @@ pub enum LError {
     ConversionError(&'static str, TypeLValue, TypeLValue),
 }
 
+impl Default for LError {
+    fn default() -> Self {
+        SpecialError("", "".to_string())
+    }
+}
+
 impl Error for LError {}
 
 impl Display for LError {

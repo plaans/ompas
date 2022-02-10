@@ -14,9 +14,8 @@ lisp_test = []
 [dependencies]
 ompas_lisp = {path = "../lisp"}
 ompas_godot_simulation_client = {path = "../godot-simulation-client"}
-ompas_acting = {path = "../acting"}
+ompas_rae = {path = "../rae"}
 ompas_utils = {path = "../utils"}
-ompas_planning = {path = "../planning"}
 
 aries_model = {git = "https://github.com/Yirmandias/aries/", branch = "parse_string"}
 aries_planning = {git = "https://github.com/Yirmandias/aries/", branch = "parse_string"}
@@ -49,8 +48,8 @@ name = "root_scheme"
 path = "src/bin/root_scheme.rs"
 
 [[bin]]
-name = "translate"
-path = "src/bin/translate.rs"
+name = "conversion"
+path = "src/bin/conversion.rs"
 
 [[bin]]
 name = "union-map"

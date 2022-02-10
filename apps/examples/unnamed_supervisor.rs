@@ -5,8 +5,7 @@ use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Receiver, Sender};
 
 //use ompas_modules::robot::CtxRobot;
-use ompas_acting::rae::module::init_ctx_rae;
-use ompas_acting::rae::module::rae_exec::Platform;
+
 use ompas_godot_simulation_client::mod_godot::CtxGodot;
 use ompas_godot_simulation_client::rae_interface::PlatformGodot;
 use ompas_lisp::core::structs::lenv::ImportType::WithoutPrefix;
@@ -18,6 +17,8 @@ use ompas_lisp::modules::deprecated::counter::CtxCounter;
 use ompas_lisp::modules::io::CtxIo;
 use ompas_lisp::modules::utils::CtxUtils;
 use ompas_lisp::repl::{spawn_log, spawn_repl};
+use ompas_rae::module::rae_exec::Platform;
+use ompas_rae::module::CtxRae;
 use ompas_utils::task_handler;
 
 pub const TOKIO_CHANNEL_SIZE: usize = 65_384;
@@ -30,15 +31,6 @@ pub const TOKIO_CHANNEL_SIZE: usize = 65_384;
 struct Opt {
     #[structopt(short, long)]
     log: Option<PathBuf>,
-
-    #[structopt(short, long)]
-    repl: bool,
-
-    #[structopt(short = "f", long = "file")]
-    input: Option<PathBuf>,
-
-    #[structopt(short = "t", long = "tests")]
-    test: bool,
 
     #[structopt(short = "d", long = "debug")]
     debug: bool,
@@ -82,8 +74,8 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     let ctx_counter = CtxCounter::default();
     let _ctx_godot = CtxGodot::default();
     let ctx_utils = CtxUtils::default();
-    let (ctx_rae, ctx_rae_monitor) =
-        init_ctx_rae(Some(Platform::new(PlatformGodot::default())), log.clone()).await;
+    let ctx_rae =
+        CtxRae::init_ctx_rae(Some(Platform::new(PlatformGodot::default())), log.clone()).await;
 
     //Add the sender of the channel.
     //ctx_io.add_sender_li(sender_li.clone());
@@ -122,10 +114,6 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
         .import(ctx_rae, WithoutPrefix)
         .await
         .expect("error loading rae");
-    root_env
-        .import(ctx_rae_monitor, WithoutPrefix)
-        .await
-        .expect("error loading monitor");
 
     let env = &mut root_env.clone();
 

@@ -600,7 +600,6 @@ pub fn transform_in_singleton_list(args: &[LValue], _: &LEnv) -> LResult {
 #[cfg(test)]
 mod test {
     use crate::core::parse;
-    use crate::core::root_module::basic_math::language::LE;
     use crate::core::root_module::list::language::SECOND;
     use crate::core::structs::lerror;
     use crate::modules::utils::*;
@@ -995,39 +994,5 @@ mod test {
         };
 
         test_expression(test_lambda).await
-    }
-
-    #[tokio::test]
-    async fn test_macro_do() -> lerror::Result<()> {
-        let test_macro = TestExpression {
-            inner: MACRO_DO,
-            dependencies: vec![],
-            expression: "(do \
-                (check (> 3 1))\
-                (define x 1)\
-                (check (> 6 (+ x 1)))\
-                (define x 2)\
-                x)",
-            expanded: "(begin
-   (define __result__ (check (> 3 1)))
-   (if (err? __result__)
-          __result__
-          (begin
-             (define __result__ (define x 1))
-             (if (err? __result__)
-                    __result__
-                    (begin
-                       (define __result__ (check (> 6 (+ x 1))))
-                       (if (err? __result__)
-                              __result__
-                              (begin
-                                 (define __result__ (define x 2))
-                                 (if (err? __result__)
-                                        __result__
-                                        x))))))))",
-            result: "2",
-        };
-
-        test_expression(test_macro).await
     }
 }

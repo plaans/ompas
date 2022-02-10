@@ -6,8 +6,6 @@ use crate::core::structs::lerror::LResult;
 use crate::core::structs::lvalue::LValue;
 use crate::core::structs::typelvalue::TypeLValue;
 
-//LANGUAGE
-
 pub mod language {
     pub const IS_ERR: &str = "err?";
     pub const DOC_ERR: &str = "Return an LValue::Err(LValue)";
@@ -45,17 +43,11 @@ pub fn is_err(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(IS_ERR, args.into(), args.len(), 1..1));
     }
-
-    if let LValue::Err(_) = &args[0] {
-        Ok(LValue::True)
-    } else {
-        Ok(LValue::Nil)
-    }
+    Ok(matches!(args[0], LValue::Err(_)).into())
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::core::root_module::basic_math::language::LE;
     use crate::core::root_module::error::{check, err, is_err};
     use crate::core::structs::lenv::LEnv;
     use crate::core::structs::lerror;

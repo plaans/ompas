@@ -52,33 +52,33 @@ pub fn map(args: &[LValue], _: &LEnv) -> LResult {
                                     val_sv.into(),
                                     val_sv.len(),
                                     2..2,
-                                )
-                                .into());
+                                ));
                             }
 
                             let key = val_sv[0].clone();
                             let value = val_sv[1].clone();
                             facts.insert(key, value);
                         }
-                        lv => {
-                            return Err(
-                                WrongType(MAP, lv.clone(), lv.into(), TypeLValue::List).into()
-                            )
-                        }
+                        lv => return Err(WrongType(MAP, lv.clone(), lv.into(), TypeLValue::List)),
                     }
                 }
                 Ok(LValue::Map(facts))
             }
             LValue::Nil => Ok(LValue::Map(Default::default())),
-            lv => Err(WrongType(MAP, lv.clone(), lv.into(), TypeLValue::List).into()),
+            lv => Err(WrongType(MAP, lv.clone(), lv.into(), TypeLValue::List)),
         },
-        _ => Err(WrongNumberOfArgument(MAP, args.into(), args.len(), 1..1).into()),
+        _ => Err(WrongNumberOfArgument(MAP, args.into(), args.len(), 1..1)),
     }
 }
 
 pub fn get_map(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 2 {
-        return Err(WrongNumberOfArgument(GET_MAP, args.into(), 0, 1..std::usize::MAX).into());
+        return Err(WrongNumberOfArgument(
+            GET_MAP,
+            args.into(),
+            0,
+            1..std::usize::MAX,
+        ));
     }
 
     match &args[0] {
@@ -125,9 +125,12 @@ pub fn set_map(args: &[LValue], _: &LEnv) -> LResult {
 
 pub fn remove_key_value_map(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 2 {
-        return Err(
-            WrongNumberOfArgument(REMOVE_KEY_VALUE_MAP, args.into(), args.len(), 2..2).into(),
-        );
+        return Err(WrongNumberOfArgument(
+            REMOVE_KEY_VALUE_MAP,
+            args.into(),
+            args.len(),
+            2..2,
+        ));
     }
 
     match &args[0] {
@@ -141,8 +144,7 @@ pub fn remove_key_value_map(args: &[LValue], _: &LEnv) -> LResult {
                             return Err(SpecialError(
                                 REMOVE_KEY_VALUE_MAP,
                                 format!("map does not contain key {}", key),
-                            )
-                            .into())
+                            ))
                         }
                         Some(v) => {
                             if *v == value {
@@ -153,8 +155,7 @@ pub fn remove_key_value_map(args: &[LValue], _: &LEnv) -> LResult {
                                 Err(SpecialError(
                                     REMOVE_KEY_VALUE_MAP,
                                     format!("map does not have key value ({}:{})", key, value),
-                                )
-                                .into())
+                                ))
                             }
                         }
                     }
@@ -164,8 +165,7 @@ pub fn remove_key_value_map(args: &[LValue], _: &LEnv) -> LResult {
                         val_sv.into(),
                         val_sv.len(),
                         2..2,
-                    )
-                    .into())
+                    ))
                 }
             }
             lv => Err(WrongType(
@@ -173,16 +173,25 @@ pub fn remove_key_value_map(args: &[LValue], _: &LEnv) -> LResult {
                 lv.clone(),
                 lv.into(),
                 TypeLValue::List,
-            )
-            .into()),
+            )),
         },
-        lv => Err(WrongType(REMOVE_KEY_VALUE_MAP, lv.clone(), lv.into(), TypeLValue::Map).into()),
+        lv => Err(WrongType(
+            REMOVE_KEY_VALUE_MAP,
+            lv.clone(),
+            lv.into(),
+            TypeLValue::Map,
+        )),
     }
 }
 
 pub fn remove_map(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 2 {
-        return Err(WrongNumberOfArgument(REMOVE_MAP, args.into(), args.len(), 2..2).into());
+        return Err(WrongNumberOfArgument(
+            REMOVE_MAP,
+            args.into(),
+            args.len(),
+            2..2,
+        ));
     }
 
     match &args[0] {
@@ -191,14 +200,24 @@ pub fn remove_map(args: &[LValue], _: &LEnv) -> LResult {
             new_m.remove(&args[1]);
             Ok(new_m.into())
         }
-        lv => Err(WrongType(REMOVE_MAP, lv.clone(), lv.into(), TypeLValue::Map).into()),
+        lv => Err(WrongType(
+            REMOVE_MAP,
+            lv.clone(),
+            lv.into(),
+            TypeLValue::Map,
+        )),
     }
 }
 
 /// Merges two hashmap tables
 pub fn union_map(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 2 {
-        return Err(WrongNumberOfArgument(UNION_MAP, args.into(), args.len(), 2..2).into());
+        return Err(WrongNumberOfArgument(
+            UNION_MAP,
+            args.into(),
+            args.len(),
+            2..2,
+        ));
     }
     let map1 = &args[0];
     let map2 = &args[1];
@@ -207,9 +226,19 @@ pub fn union_map(args: &[LValue], _: &LEnv) -> LResult {
         if let LValue::Map(map2) = map2.clone() {
             Ok(map1.union(map2).into())
         } else {
-            Err(WrongType(UNION_MAP, map2.clone(), map2.into(), TypeLValue::Map).into())
+            Err(WrongType(
+                UNION_MAP,
+                map2.clone(),
+                map2.into(),
+                TypeLValue::Map,
+            ))
         }
     } else {
-        Err(WrongType(UNION_MAP, map1.clone(), map1.into(), TypeLValue::Map).into())
+        Err(WrongType(
+            UNION_MAP,
+            map1.clone(),
+            map1.into(),
+            TypeLValue::Map,
+        ))
     }
 }

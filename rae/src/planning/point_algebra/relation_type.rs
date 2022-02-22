@@ -171,6 +171,11 @@ impl RelationTypeBit {
     pub fn intersect(&self, other: &Self) -> Self {
         self & other
     }
+
+    pub fn converse(&self) -> Self {
+        let r = self.inner;
+        (((0b100 & r) >> 1) + ((0b010 & r) << 1) + (0b001 & r)).into()
+    }
 }
 
 impl From<RelationTypeBit> for RelationType {
@@ -334,9 +339,54 @@ mod tests {
 
     #[test]
     pub fn test_not() {
-        // !(=) -> !=
+        // !(=) -> !=        assert_eq!(RelationTypeBit::from(0b001), RelationType::GT.compose())
+
         assert_eq!(RelationTypeBit::from(0b110), !RelationTypeBit::from(0b001));
         // !(<) -> >=
         assert_eq!(RelationTypeBit::from(0b101), !RelationTypeBit::from(0b010));
+    }
+
+    #[test]
+    pub fn test_converse() {
+        //converse(contradiction) => contradiction
+        assert_eq!(
+            RelationTypeBit::from(0b000),
+            RelationTypeBit::from(0b000).converse()
+        );
+        //converse(=) => =
+        assert_eq!(
+            RelationTypeBit::from(0b001),
+            RelationTypeBit::from(0b001).converse()
+        );
+        //converse(<) => >
+        assert_eq!(
+            RelationTypeBit::from(0b010),
+            RelationTypeBit::from(0b100).converse()
+        );
+        //converse(>) => <
+        assert_eq!(
+            RelationTypeBit::from(0b100),
+            RelationTypeBit::from(0b010).converse()
+        );
+        //converse(<=) => >=
+        assert_eq!(
+            RelationTypeBit::from(0b101),
+            RelationTypeBit::from(0b011).converse()
+        );
+        //converse(>=) => <=
+        assert_eq!(
+            RelationTypeBit::from(0b011),
+            RelationTypeBit::from(0b101).converse()
+        );
+        //converse(!=) => !=
+        assert_eq!(
+            RelationTypeBit::from(0b110),
+            RelationTypeBit::from(0b110).converse()
+        );
+        //converse(tautology) => tautology
+        assert_eq!(
+            RelationTypeBit::from(0b111),
+            RelationTypeBit::from(0b111).converse()
+        );
     }
 }

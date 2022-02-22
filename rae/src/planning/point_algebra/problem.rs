@@ -1,7 +1,9 @@
 use crate::planning::point_algebra::relation_type::RelationType::Tautology;
 use crate::planning::point_algebra::relation_type::{RelationType, RelationTypeBit};
+use crate::planning::structs::symbol_table::SymTable;
+use crate::planning::structs::traits::FormatWithSymTable;
 use cli_table::{print_stdout, Cell, Table};
-use std::fmt::{Debug, Display};
+use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 use std::ops::{Index, IndexMut};
 
@@ -21,6 +23,23 @@ impl<T> Relation<T> {
     }
 }
 
+impl<T: Debug> Debug for Relation<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?} {} {:?}", self.i, self.relation_type, self.j,)
+    }
+}
+
+impl<T: FormatWithSymTable> FormatWithSymTable for Relation<T> {
+    fn format_with_sym_table(&self, st: &SymTable) -> String {
+        format!(
+            "{} {} {}",
+            self.i.format_with_sym_table(st),
+            self.relation_type,
+            self.j.format_with_sym_table(st),
+        )
+    }
+}
+
 pub struct Problem<T> {
     variables: Vec<T>,
     relations: Vec<Relation<T>>,
@@ -32,6 +51,47 @@ impl<T> Problem<T> {
             variables,
             relations,
         }
+    }
+}
+
+impl<T: Debug> Debug for Problem<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut str = "problem:\n".to_string();
+        str.push_str("variables: {");
+        str.push_str(format!("variables: {:#?}\n", self.variables).as_str());
+        str.push_str(format!("relations: {:#?}\n", self.relations).as_str());
+        write!(f, "{}", str)
+    }
+}
+
+impl<T: Display + FormatWithSymTable> FormatWithSymTable for Problem<T> {
+    fn format_with_sym_table(&self, st: &SymTable) -> String {
+        let mut str = "problem:\n".to_string();
+        str.push_str("variables: {");
+        let mut first = true;
+        for variable in &self.variables {
+            if !first {
+                str.push(',')
+            }
+            str.push_str(
+                format!(
+                    "{}({})",
+                    variable.format_with_sym_table(st).as_str(),
+                    variable
+                )
+                .as_str(),
+            );
+            first = false;
+        }
+
+        str.push_str("}\n");
+
+        str.push_str("relations:\n");
+
+        for relation in &self.relations {
+            str.push_str(format!("-{}\n", relation.format_with_sym_table(st)).as_str());
+        }
+        str
     }
 }
 
@@ -49,21 +109,21 @@ impl<T: Clone + Hash + Eq + Debug> From<&Problem<T>> for Graph<T> {
             vec![vec![Tautology.into(); problem.variables.len()]; problem.variables.len()];
         for relation in &problem.relations {
             let index_1 = var_key.get(&relation.i).unwrap_or_else(|| {
-                panic!("{:?} in not defined in {:?}", relation.i, problem.variables)
+                panic!("{:?} is not defined in {:?}", relation.i, problem.variables)
             });
             let index_2 = var_key.get(&relation.j).unwrap_or_else(|| {
-                panic!("{:?} in not defined in {:?}", relation.j, problem.variables)
+                panic!("{:?} is not defined in {:?}", relation.j, problem.variables)
             });
             let relation_type_bit: RelationTypeBit = relation.relation_type.into();
 
             let (a, b, relation_type_bit) = if index_1 < index_2 {
                 (index_1, index_2, relation_type_bit)
             } else {
-                (index_2, index_1, !relation_type_bit)
+                (index_2, index_1, relation_type_bit.converse())
             };
 
             inner[*a][*b] = inner[*a][*b] & relation_type_bit;
-            inner[*b][*a] = !inner[*a][*b]
+            inner[*b][*a] = inner[*a][*b].converse()
         }
 
         Self { reverse, inner }

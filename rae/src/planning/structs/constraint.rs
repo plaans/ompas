@@ -98,12 +98,12 @@ impl Constraint {
         };
 
         if let Ok(i) = self.get_left().try_into() {
-            let i = sym_table.get_parent(&i);
+            let p_i = sym_table.get_parent(&i);
             if let Ok(j) = self.get_right().try_into() {
-                let j = sym_table.get_parent(&j);
-                if sym_table.get_type(&i).unwrap() == &AtomType::Timepoint {
-                    if sym_table.get_type(&j).unwrap() == &AtomType::Timepoint {
-                        Ok(Relation::new(i, j, relation_type))
+                let p_j = sym_table.get_parent(&j);
+                if sym_table.get_type(&p_i).unwrap() == &AtomType::Timepoint {
+                    if sym_table.get_type(&p_j).unwrap() == &AtomType::Timepoint {
+                        Ok(Relation::new(p_i, p_j, relation_type))
                     } else {
                         Err(Default::default())
                     }

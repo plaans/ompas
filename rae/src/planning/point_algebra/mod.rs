@@ -21,12 +21,13 @@ pub type Fail = ();
 // 9.              if M[k,j ]=⊥ then return fail
 // 10.             else add (k, j ) to the end of Q;
 // 11. return m.
+//
 // Subroutine: REVISE(i, k, j )
 // 1. if M[i, k] or M[k,j ] is the universal relation then return false;
 // 2. S := M[i, k] ◦ M[k,j ];
 // 3. if M[i, j ] ⊆ S then return false
 // 4. M[i,j ] := M[i, j] intersect S
-// 5. M[j,i ] := !M[i, j]
+// 5. M[j,i ] := converse(M[i, j])
 pub fn path_consistency<T>(mut m: Graph<T>) -> Result<Graph<T>, LError> {
     // Q := {(i,j ) | i<j }
     let mut q: VecDeque<(Timepoint, Timepoint)> = Default::default();
@@ -72,6 +73,6 @@ pub fn revise<T>(m: &mut Graph<T>, i: Timepoint, j: Timepoint, k: Timepoint) -> 
         return false;
     }
     m[(i, j)] = m[(i, j)].intersect(&s);
-    m[(j, i)] = !m[(i, j)];
+    m[(j, i)] = m[(i, j)].converse();
     true
 }

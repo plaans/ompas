@@ -3,6 +3,7 @@ use crate::module::rae_exec::*;
 use crate::planning::structs::atom::{Atom, AtomType, Sym};
 use crate::planning::structs::chronicle::ExpressionChronicleResult;
 use crate::planning::structs::interval::Interval;
+use crate::planning::structs::traits::FormatWithSymTable;
 use crate::planning::union_find::{Forest, Node, NodeId};
 use ompas_lisp::core::root_module::language::get_scheme_primitives;
 use ompas_lisp::core::structs::lerror;
@@ -11,6 +12,12 @@ use ompas_lisp::core::structs::lnumber::LNumber;
 use std::collections::HashMap;
 
 pub type AtomId = NodeId;
+
+impl FormatWithSymTable for AtomId {
+    fn format_with_sym_table(&self, st: &SymTable) -> String {
+        st.get_sym(self).to_string()
+    }
+}
 
 pub enum ExpressionType {
     Pure,
@@ -87,6 +94,16 @@ pub struct SymTable {
     symbol_types: SymbolTypes,
     multiple_def: HashMap<String, Vec<AtomId>>,
     pointer_to_ver: Vec<HashMap<String, usize>>,
+}
+
+impl SymTable {
+    pub fn flat_bindings(&mut self) {
+        self.symbols.flat_bindings()
+    }
+
+    pub fn format_forest(&self) -> String {
+        self.symbols.to_string()
+    }
 }
 
 impl SymTable {

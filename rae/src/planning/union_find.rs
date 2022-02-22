@@ -1,18 +1,17 @@
 use std::clone::Clone;
-use std::cmp::Ordering;
 use std::collections::{HashMap, VecDeque};
 use std::fmt::{Debug, Display, Formatter};
 
-#[derive(Default, Copy, Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Default, Copy, Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct NodeId {
     inner: usize,
 }
 
-impl PartialOrd for NodeId {
+/*impl PartialOrd for NodeId {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.inner.partial_cmp(&other.inner)
     }
-}
+}*/
 
 impl From<&usize> for NodeId {
     fn from(u: &usize) -> Self {
@@ -91,6 +90,12 @@ pub struct Forest<T: Display + Default + Clone> {
 }
 
 impl<T: Display + Default + Clone> Forest<T> {
+    pub fn flat_bindings(&mut self) {
+        for i in 0..self.inner.len() {
+            self.find(&i.into());
+        }
+    }
+
     pub fn get_node(&self, id: &NodeId) -> Option<&Node<T>> {
         self.inner.get(*id.index())
     }

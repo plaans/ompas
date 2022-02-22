@@ -5,10 +5,10 @@ use crate::planning::structs::chronicle::{ChronicleSet, ExpressionChronicle};
 use crate::planning::structs::constraint::Constraint;
 use crate::planning::structs::lit::Lit;
 use crate::planning::structs::symbol_table::{AtomId, SymTable};
-use crate::planning::structs::{get_variables_of_type, ConversionContext};
-
 use crate::planning::structs::traits::GetVariables;
+use crate::planning::structs::{get_variables_of_type, ConversionContext};
 use im::HashSet;
+use ompas_lisp::core::get_debug;
 use ompas_lisp::core::structs::lerror::LError;
 use ompas_lisp::core::structs::lerror::LError::SpecialError;
 
@@ -19,7 +19,8 @@ pub fn post_processing(
 ) -> Result<(), LError> {
     unify_equal(ec, sym_table, context);
     rm_useless_var(ec, sym_table, context);
-    //simplify_timepoints(ec, sym_table, context)?;
+    sym_table.flat_bindings();
+    simplify_timepoints(ec, sym_table, context)?;
     Ok(())
 }
 
@@ -35,6 +36,7 @@ pub fn unify_equal(
             if let (Lit::Atom(id_1), Lit::Atom(id_2)) = (a, b) {
                 let type_1 = sym_table.get_type(id_1).expect("id should be defined");
                 let type_2 = sym_table.get_type(id_2).expect("id should be defined");
+
                 match (type_1, type_2) {
                     (
                         AtomType::Boolean | AtomType::Number,
@@ -70,7 +72,11 @@ pub fn unify_equal(
                         vec_constraint_to_rm.push(index);
                     }
                     (AtomType::Result, AtomType::Result) => {
-                        sym_table.union_atom(id_1, id_2);
+                        if id_1 < id_2 {
+                            sym_table.union_atom(id_1, id_2);
+                        } else {
+                            sym_table.union_atom(id_2, id_1);
+                        }
                         vec_constraint_to_rm.push(index);
                     }
                     (AtomType::Timepoint, AtomType::Timepoint) => {
@@ -136,19 +142,22 @@ pub fn simplify_timepoints(
     let mut relations = vec![];
     for constraint in ec.get_constraints() {
         if matches!(constraint, Constraint::Neg(_)) {
-        } else if let Ok(relation) = constraint.try_into_pa_relation(sym_table) {
-            relations.push(relation)
+        } else if let Ok(r) = constraint.try_into_pa_relation(sym_table) {
+            relations.push(r);
         }
     }
 
-    let problem: Problem<AtomId> = Problem::new(timepoints.iter().cloned().collect(), relations);
-
+    let mut timepoints: Vec<AtomId> = timepoints.iter().cloned().collect();
+    timepoints.sort();
+    let problem: Problem<AtomId> = Problem::new(timepoints, relations);
     let graph: Graph<AtomId> = (&problem).into();
 
-    graph.print();
-
     match path_consistency(graph) {
-        Ok(m) => m.print(),
+        Ok(m) => {
+            if get_debug() {
+                m.print()
+            }
+        }
         Err(_) => {
             let err: LError = SpecialError(
                 "",

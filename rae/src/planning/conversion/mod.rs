@@ -1,11 +1,10 @@
 use crate::planning::conversion::post_processing::*;
 use crate::planning::conversion::pre_processing::pre_processing;
-use crate::planning::conversion::processing::translate_lvalue_to_expression_chronicle;
+use crate::planning::conversion::processing::convert_lvalue_to_expression_chronicle;
 use crate::planning::structs::atom::AtomType;
 use crate::planning::structs::chronicle::Chronicle;
 use crate::planning::structs::lit::Lit;
-use crate::planning::structs::symbol_table::SymTable;
-use crate::planning::structs::{ConversionContext, Domain};
+use crate::planning::structs::{ChronicleHierarchy, ConversionContext};
 use im::HashMap;
 use ompas_lisp::core::structs::lerror::LError;
 use ompas_lisp::core::structs::lerror::LError::SpecialError;
@@ -17,61 +16,83 @@ pub mod post_processing;
 pub mod pre_processing;
 pub mod processing;
 
-const TRANSLATE_LVALUE_TO_CHRONICLE: &str = "translate_lvalue_to_chronicle";
-const TRANSFORM_DOMAIN_ENV_TO_HIERARCHY: &str = "transform_domain_env_to_hierarchy";
+const CONVERT_LVALUE_TO_CHRONICLE: &str = "convert_lvalue_to_chronicle";
+const CONVERT_DOMAIN_TO_CHRONICLE_HIERARCHY: &str = "convert_domain_to_chronicle_hierarchy";
 
-pub fn translate_domain_env_to_hierarchy(
-    context: ConversionContext,
-) -> Result<(Domain, SymTable), LError> {
+pub fn convert_domain_to_chronicle_hierarchy(
+    mut conversion_context: ConversionContext,
+) -> Result<ChronicleHierarchy, LError> {
     //for each action: translate to chronicle
     //for each method: translate to chronicle
 
-    let mut symbol_table = SymTable::default();
+    let mut ch: ChronicleHierarchy = Default::default();
 
-    let actions: Vec<String> = context.domain.get_actions().keys().cloned().collect();
-    let tasks: Vec<String> = context.domain.get_tasks().keys().cloned().collect();
-    let state_functions = context
+    let actions: Vec<String> = conversion_context
+        .domain
+        .get_actions()
+        .keys()
+        .cloned()
+        .collect();
+    let tasks: Vec<String> = conversion_context
+        .domain
+        .get_tasks()
+        .keys()
+        .cloned()
+        .collect();
+    let state_functions = conversion_context
         .domain
         .get_state_functions()
         .keys()
         .cloned()
         .collect();
-    let methods = context.domain.get_methods().keys().cloned().collect();
+    let methods = conversion_context
+        .domain
+        .get_methods()
+        .keys()
+        .cloned()
+        .collect();
 
-    symbol_table.add_list_of_symbols_of_same_type(actions, &AtomType::Action)?;
-    symbol_table.add_list_of_symbols_of_same_type(state_functions, &AtomType::StateFunction)?;
-    symbol_table.add_list_of_symbols_of_same_type(methods, &AtomType::Method)?;
-    symbol_table.add_list_of_symbols_of_same_type(tasks, &AtomType::Task)?;
+    ch.sym_table
+        .add_list_of_symbols_of_same_type(actions, &AtomType::Action)?;
+    ch.sym_table
+        .add_list_of_symbols_of_same_type(state_functions, &AtomType::StateFunction)?;
+    ch.sym_table
+        .add_list_of_symbols_of_same_type(methods, &AtomType::Method)?;
+    ch.sym_table
+        .add_list_of_symbols_of_same_type(tasks, &AtomType::Task)?;
 
-    //Add actions, tasks and methods symbols to symbol_table:
-    let mut methods = vec![];
+    //Add actions, tasks and methods symbols to ch.sym_table:
     let mut tasks_lits = HashMap::new();
-    let mut actions = vec![];
 
     //Add tasks to domain
-    for (task_label, task) in context.domain.get_tasks() {
-        let mut task_lit: Vec<Lit> = vec![symbol_table
-            .id(task_label)
+    for (task_label, task) in conversion_context.domain.get_tasks().clone() {
+        let mut task_lit: Vec<Lit> = vec![ch
+            .sym_table
+            .id(&task_label)
             .expect("symbol of task should be defined")
             .into()];
 
         for param in task.get_parameters().get_params() {
-            task_lit.push(symbol_table.declare_new_symbol(param, true).into())
+            task_lit.push(ch.sym_table.declare_new_symbol(param, true).into())
         }
-        tasks_lits.insert(task_label, Lit::from(task_lit));
+        let task_lit: Lit = task_lit.into();
+        tasks_lits.insert(task_label, task_lit.clone());
+        ch.tasks.push(task_lit);
     }
 
-    for (action_label, action) in context.domain.get_actions() {
+    for (action_label, action) in conversion_context.domain.get_actions().clone() {
         //evaluate the lambda sim.
         let mut chronicle =
-            translate_lvalue_to_chronicle(action.get_sim(), &context, &mut symbol_table)?;
-        let symbol_id = *symbol_table
-            .id(action_label)
+            convert_lvalue_to_chronicle(action.get_sim(), &mut conversion_context, &mut ch)?;
+        let symbol_id = *ch
+            .sym_table
+            .id(&action_label)
             .unwrap_or_else(|| panic!("{} was not well defined", action_label));
         let mut name = vec![symbol_id];
 
         for e in action.get_parameters().get_params() {
-            let symbol_id = *symbol_table
+            let symbol_id = *ch
+                .sym_table
                 .id(&e)
                 .expect("parameters were not defined in the chronicle");
             name.push(symbol_id);
@@ -79,26 +100,26 @@ pub fn translate_domain_env_to_hierarchy(
         }
 
         chronicle.set_name(name.into());
-
-        actions.push(chronicle)
+        ch.actions.push(chronicle);
     }
 
     //Add all methods to the domain
-    for (method_label, method) in context.domain.get_methods() {
+    for (method_label, method) in conversion_context.domain.get_methods().clone() {
         let mut chronicle =
-            translate_lvalue_to_chronicle(method.get_body(), &context, &mut symbol_table)?;
+            convert_lvalue_to_chronicle(method.get_body(), &mut conversion_context, &mut ch)?;
 
         /*let pre_conditions = translate_lvalue_to_expression_chronicle(
             method.get_pre_conditions(),
-            &context,
-            &mut symbol_table,
+            &conversion_context,
+            &mut ch.sym_table,
         )?;*/
 
         //chronicle.absorb_expression_chronicle(pre_conditions);
 
         let task = tasks_lits.get(method.get_task_label()).unwrap();
-        let symbol_id = *symbol_table
-            .id(method_label)
+        let symbol_id = *ch
+            .sym_table
+            .id(&method_label)
             .unwrap_or_else(|| panic!("{} was not well defined", method_label));
         let mut name = vec![symbol_id.into()];
 
@@ -110,13 +131,14 @@ pub fn translate_domain_env_to_hierarchy(
                     name.push(param.clone());
                 } else {
                     return Err(SpecialError(
-                        TRANSFORM_DOMAIN_ENV_TO_HIERARCHY,
+                        CONVERT_DOMAIN_TO_CHRONICLE_HIERARCHY,
                         "parameters of a task should be atoms".to_string(),
                     ));
                 }
             }
             for e in &method.get_parameters().get_params()[exp.len() - 1..] {
-                let symbol_id = *symbol_table
+                let symbol_id = *ch
+                    .sym_table
                     .id(e)
                     .expect("parameters were not defined in the chronicle");
                 name.push(symbol_id.into());
@@ -124,25 +146,22 @@ pub fn translate_domain_env_to_hierarchy(
             }
         } else {
             return Err(SpecialError(
-                TRANSFORM_DOMAIN_ENV_TO_HIERARCHY,
+                CONVERT_DOMAIN_TO_CHRONICLE_HIERARCHY,
                 "".to_string(),
             ));
         }
 
         chronicle.set_name(name.into());
-        methods.push(chronicle);
+        ch.methods.push(chronicle);
     }
 
-    Ok((
-        Domain::new(actions, tasks_lits.values().cloned().collect(), methods),
-        symbol_table,
-    ))
+    Ok(ch)
 }
 
-pub fn translate_lvalue_to_chronicle(
+pub fn convert_lvalue_to_chronicle(
     exp: &LValue,
-    context: &ConversionContext,
-    symbol_table: &mut SymTable,
+    conversion_context: &mut ConversionContext,
+    ch: &mut ChronicleHierarchy,
 ) -> Result<Chronicle, LError> {
     //Creation and instantiation of the chronicle
 
@@ -151,28 +170,32 @@ pub fn translate_lvalue_to_chronicle(
         let params = lambda.get_params();
         match params {
             LambdaArgs::Sym(s) => {
-                symbol_table.declare_new_symbol(s, true);
+                ch.sym_table.declare_new_symbol(s, true);
             }
             LambdaArgs::List(list) => {
                 for param in list {
-                    symbol_table.declare_new_symbol(param, true);
+                    ch.sym_table.declare_new_symbol(param, true);
                 }
             }
             LambdaArgs::Nil => {}
         }
-        let body = pre_processing(&lambda.get_body(), context)?;
+        let body = pre_processing(
+            &lambda.get_body(),
+            conversion_context,
+            &mut ChronicleHierarchy::default(),
+        )?;
 
         chronicle.set_debug(Some(body.clone()));
 
-        let mut ec = translate_lvalue_to_expression_chronicle(&body, context, symbol_table)?;
+        let mut ec = convert_lvalue_to_expression_chronicle(&body, conversion_context, ch)?;
 
-        post_processing(&mut ec, symbol_table, context)?;
+        post_processing(&mut ec, ch, conversion_context)?;
 
         chronicle.absorb_expression_chronicle(ec);
         Ok(chronicle)
     } else {
         Err(SpecialError(
-            TRANSLATE_LVALUE_TO_CHRONICLE,
+            CONVERT_DOMAIN_TO_CHRONICLE_HIERARCHY,
             format!(
                 "chronicle can only be extracted from a lambda, here we have a {}.",
                 TypeLValue::from(exp)

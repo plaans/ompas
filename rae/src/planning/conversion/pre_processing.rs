@@ -1,4 +1,4 @@
-use crate::planning::structs::ConversionContext;
+use crate::planning::structs::{ChronicleHierarchy, ConversionContext};
 use ompas_lisp::core::structs::lenv::LEnv;
 use ompas_lisp::core::structs::lerror::LError::{SpecialError, WrongNumberOfArgument, WrongType};
 use ompas_lisp::core::structs::lerror::LResult;
@@ -10,7 +10,11 @@ use ompas_utils::blocking_async;
 
 pub const TRANSFORM_LAMBDA_EXPRESSION: &str = "transform-lambda-expression";
 
-pub fn pre_processing(lv: &LValue, context: &ConversionContext) -> LResult {
+pub fn pre_processing(
+    lv: &LValue,
+    context: &ConversionContext,
+    _ch: &mut ChronicleHierarchy,
+) -> LResult {
     let lv = pre_process_transform_lambda(lv, context)?;
 
     #[allow(clippy::let_and_return)]

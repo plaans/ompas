@@ -267,6 +267,7 @@ impl From<ExpressionChronicleResult> for Lit {
     }
 }
 
+#[derive(Clone)]
 pub struct ExpressionChronicle {
     interval: Interval,
     result: ExpressionChronicleResult,

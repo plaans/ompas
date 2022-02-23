@@ -402,7 +402,7 @@ pub fn expand_static(x: &LValue, top_level: bool, env: &mut LEnv) -> lerror::Res
                     None => {}
                     Some(m) => {
                         let mut new_env = m.get_new_env(&list[1..], env.clone())?;
-                        let result = eval_static(&m.get_body(), &mut new_env)?;
+                        let result = eval_static(m.get_body(), &mut new_env)?;
                         if !result.is_pure() {
                             return Ok(PLValue::into_unpure(x));
                         }
@@ -461,7 +461,7 @@ pub fn eval_static(lv: &LValue, env: &mut LEnv) -> lerror::Result<PLValue> {
             };
             match result {
                 LValue::Fn(_) => {
-                    if env.get_pfc().is_pure(s) {
+                    if !env.get_pfc().is_pure(s) {
                         return Ok(PLValue::into_unpure(&lv));
                     }
                 }
@@ -671,7 +671,7 @@ pub fn eval_static(lv: &LValue, env: &mut LEnv) -> lerror::Result<PLValue> {
                 let args: Vec<LValue> = exps[1..].iter().map(|plv| plv.into()).collect();
                 match &proc.lvalue {
                     LValue::Lambda(l) => {
-                        lv = l.get_body();
+                        lv = l.get_body().clone();
                         temp_env = l.get_new_env(args.as_slice(), env.clone())?;
                         env = &mut temp_env;
                     }

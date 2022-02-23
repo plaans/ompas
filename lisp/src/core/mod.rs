@@ -679,7 +679,7 @@ pub async fn eval(lv: &LValue, env: &mut LEnv) -> LResult {
                 let args = &exps[1..];
                 match proc {
                     LValue::Lambda(l) => {
-                        lv = l.get_body();
+                        lv = l.get_body().clone();
                         temp_env = l.get_new_env(args, env.clone())?;
                         env = &mut temp_env;
                     }

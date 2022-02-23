@@ -103,8 +103,8 @@ impl LLambda {
     }
 
     /// Returns the body of the lambda
-    pub fn get_body(&self) -> LValue {
-        *self.body.clone()
+    pub fn get_body(&self) -> &LValue {
+        self.body.as_ref()
     }
 
     pub fn get_params(&self) -> LambdaArgs {

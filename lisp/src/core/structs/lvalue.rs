@@ -128,9 +128,10 @@ impl LValue {
             LValue::List(list) => {
                 if !list.is_empty() {
                     match &list[0] {
-                        LValue::CoreOperator(LCoreOperator::Begin) => {
+                        LValue::CoreOperator(LCoreOperator::Begin)
+                        | LValue::CoreOperator(LCoreOperator::Do) => {
                             let indent = indent + TAB_SIZE;
-                            let mut string = "(begin".to_string();
+                            let mut string = format!("({}", list[0]);
                             for element in &list[1..] {
                                 string.push_str(
                                     format!(

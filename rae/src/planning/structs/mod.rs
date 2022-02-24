@@ -180,15 +180,17 @@ impl Display for ChronicleHierarchy {
         }
 
         //tasks
-        str.push_str("TASKS: \n");
+        str.push_str("TASKS: \n\n");
         for task in &self.tasks {
-            str.push_str(format!("{}\n", task.format_with_sym_table(&self.sym_table)).as_str());
+            str.push_str(format!("{}\n\n\n", task.format_with_sym_table(&self.sym_table)).as_str());
         }
 
         //methods
-        str.push_str("METHODS: \n");
+        str.push_str("METHODS: \n\n");
         for method in &self.methods {
-            str.push_str(format!("{}\n", method.format_with_sym_table(&self.sym_table)).as_str());
+            str.push_str(
+                format!("{}\n\n\n", method.format_with_sym_table(&self.sym_table)).as_str(),
+            );
         }
 
         write!(f, "{}", str)

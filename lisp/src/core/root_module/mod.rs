@@ -68,6 +68,7 @@ pub mod language {
             UNION_MAP,
             MAP,
             NOT,
+            NOT_SHORT,
             ADD,
             SUB,
             MUL,

@@ -17,7 +17,6 @@ pub const RAE_LAUNCH_PLATFORM: &str = "rae-launch-platform";
 pub const RAE_OPEN_COM_PLATFORM: &str = "rae-open-com-platform";
 pub const RAE_START_PLATFORM: &str = "rae-start-platform";
 pub const RAE_IS_PLATFORM_DEFINED: &str = "rae-platform?";
-pub const RAE_INSTANCE: &str = "instance";
 
 pub fn is_platform_defined(_: &[LValue], env: &LEnv) -> LResult {
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;

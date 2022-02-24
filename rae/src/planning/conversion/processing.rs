@@ -1,4 +1,6 @@
-use crate::module::rae_exec::{RAE_ASSERT, RAE_RETRACT};
+use crate::module::rae_exec::{
+    RAE_ASSERT, RAE_ASSERT_SHORT, RAE_INSTANCE, RAE_RETRACT, RAE_RETRACT_SHORT,
+};
 use crate::planning::conversion::post_processing::post_processing;
 use crate::planning::structs::atom::AtomType;
 use crate::planning::structs::chronicle::{Chronicle, ExpressionChronicle};
@@ -143,7 +145,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                     LValue::Symbol(_) | LValue::Fn(_) => {
                         let s = l[0].to_string();
                         match s.as_str() {
-                            RAE_ASSERT => {
+                            RAE_ASSERT | RAE_ASSERT_SHORT => {
                                 if l.len() != 3 {
                                     return Err(WrongNumberOfArgument(
                                         CONVERT_LVALUE_TO_EXPRESSION_CHRONICLE,
@@ -173,8 +175,18 @@ pub fn convert_lvalue_to_expression_chronicle(
 
                                 return Ok(ec);
                             }
-                            //RAE_INSTANCE => {}
-                            RAE_RETRACT => {
+                            RAE_INSTANCE => {
+                                expression_type = ExpressionType::StateFunction;
+                                literal.push(
+                                    ch.sym_table
+                                        .id(RAE_INSTANCE)
+                                        .unwrap_or_else(|| {
+                                            panic!("{} is undefined in symbol table", RAE_INSTANCE)
+                                        })
+                                        .into(),
+                                )
+                            }
+                            RAE_RETRACT | RAE_RETRACT_SHORT => {
                                 return Err(SpecialError(
                                     CONVERT_LVALUE_TO_EXPRESSION_CHRONICLE,
                                     "not yet supported".to_string(),
@@ -339,18 +351,16 @@ pub fn convert_lvalue_to_expression_chronicle(
                         });
                     }
                     ExpressionType::Action | ExpressionType::Task => {
-                        literal.push(ec.get_result().into());
+                        literal.push(ec.get_result());
                         ec.add_subtask(Expression {
                             interval: *ec.get_interval(),
                             lit: literal.into(),
                         })
                     }
                     ExpressionType::StateFunction => {
-                        ec.set_lit(literal.into());
-
                         ec.add_effect(Effect {
                             interval: *ec.get_interval(),
-                            transition: Transition::new(ec.get_result(), ec.get_result()),
+                            transition: Transition::new(ec.get_result(), literal.into()),
                         });
                     }
                 };

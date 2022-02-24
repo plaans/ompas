@@ -298,7 +298,6 @@ pub struct ExpressionChronicle {
     interval: Interval,
     result: ExpressionChronicleResult,
     partial_chronicle: PartialChronicle,
-    value: Lit,
     debug: LValue,
 }
 
@@ -415,7 +414,6 @@ impl ExpressionChronicle {
             interval,
             result,
             partial_chronicle: Default::default(),
-            value: Lit::Exp(vec![]),
             debug: lv,
         };
 
@@ -424,14 +422,6 @@ impl ExpressionChronicle {
             interval.end().into(),
         ));
         ec
-    }
-
-    pub fn set_lit(&mut self, lit: Lit) {
-        self.value = lit;
-    }
-
-    pub fn get_lit(&self) -> Lit {
-        self.value.clone()
     }
 }
 

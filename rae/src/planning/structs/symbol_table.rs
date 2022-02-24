@@ -1,4 +1,3 @@
-use crate::module::rae_exec::platform::RAE_INSTANCE;
 use crate::module::rae_exec::*;
 use crate::planning::structs::atom::{Atom, AtomType, Sym};
 use crate::planning::structs::chronicle::ExpressionChronicleResult;

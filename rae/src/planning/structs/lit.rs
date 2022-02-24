@@ -1,3 +1,4 @@
+use crate::planning::structs::atom::AtomType;
 use crate::planning::structs::constraint::Constraint;
 use crate::planning::structs::symbol_table::{AtomId, SymTable};
 use crate::planning::structs::traits::{FormatWithSymTable, GetVariables};
@@ -117,7 +118,7 @@ pub fn lvalue_to_lit(lv: &LValue, st: &mut SymTable) -> lerror::Result<Lit> {
         LValue::Number(n) => Ok(st.new_number(n.clone()).into()),
         LValue::True => Ok(st.new_bool(true).into()),
         LValue::Nil => Ok(st.new_bool(false).into()),
-        lv => Ok(st.declare_new_symbol(lv.to_string(), false).into()),
+        lv => Ok(st.declare_new_symbol(lv.to_string(), false, false).into()),
     }
 }
 
@@ -154,5 +155,13 @@ impl GetVariables for Lit {
                 hashset
             }
         }
+    }
+
+    fn get_variables_of_type(&self, sym_table: &SymTable, atom_type: &AtomType) -> HashSet<AtomId> {
+        self.get_variables()
+            .iter()
+            .filter(|v| sym_table.get_type(v).unwrap() == atom_type)
+            .cloned()
+            .collect()
     }
 }

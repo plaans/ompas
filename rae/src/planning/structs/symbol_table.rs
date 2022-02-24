@@ -1,6 +1,6 @@
 use crate::module::rae_exec::*;
 use crate::planning::structs::atom::{Atom, AtomType, Sym};
-use crate::planning::structs::chronicle::ExpressionChronicleResult;
+use crate::planning::structs::chronicle::ChronicleResult;
 use crate::planning::structs::interval::Interval;
 use crate::planning::structs::traits::FormatWithSymTable;
 use crate::planning::union_find::{Forest, Node, NodeId};
@@ -74,13 +74,13 @@ impl Default for TypesNumber {
         types_number.insert(AtomType::Symbol, 0);
         types_number.insert(AtomType::Result, 0);
         types_number.insert(AtomType::Timepoint, 0);
-        types_number.insert(AtomType::Object, 0);
         types_number.insert(AtomType::Action, 0);
         types_number.insert(AtomType::StateFunction, 0);
         types_number.insert(AtomType::Method, 0);
         types_number.insert(AtomType::Task, 0);
         types_number.insert(AtomType::Function, 0);
-        types_number.insert(AtomType::Lambda, 1);
+        types_number.insert(AtomType::Lambda, 0);
+        types_number.insert(AtomType::Variable, 0);
         Self {
             inner: types_number,
         }
@@ -220,13 +220,13 @@ impl SymTable {
 
     //Declare a new return value
     //The name of the return value will be format!("r_{}", last_return_index)
-    pub fn declare_new_result(&mut self) -> ExpressionChronicleResult {
+    pub fn declare_new_result(&mut self) -> ChronicleResult {
         let n = self.symbol_types.get_number_of_type(&AtomType::Result);
         let sym: Sym = format!("r_{}", n).into();
         let id = self.symbols.new_node((&sym).into());
         self.ids.insert(sym, id);
         self.symbol_types.add_new_atom(id, AtomType::Result);
-        ExpressionChronicleResult::new(id, None)
+        ChronicleResult::new(id, None)
     }
 
     pub fn unique_to_several(&mut self, sym: &str) {
@@ -281,7 +281,17 @@ impl SymTable {
         self.ids.keys().any(|k| k.get_string() == sym)
     }
 
-    pub fn declare_new_symbol(&mut self, symbol: String, if_it_exists_create_new: bool) -> AtomId {
+    pub fn declare_new_symbol(
+        &mut self,
+        symbol: String,
+        if_it_exists_create_new: bool,
+        is_variable: bool,
+    ) -> AtomId {
+        let atom_type = match is_variable {
+            true => AtomType::Variable,
+            false => AtomType::Symbol,
+        };
+
         if self.it_exists(&symbol) {
             return if if_it_exists_create_new {
                 self.unique_to_several(&symbol);
@@ -294,7 +304,7 @@ impl SymTable {
                     .get_mut(&symbol)
                     .unwrap() = n;
                 let id = self.symbols.new_node(Sym::Several(symbol, n).into());
-                self.symbol_types.add_new_atom(id, AtomType::Symbol);
+                self.symbol_types.add_new_atom(id, atom_type);
                 vec_similar.push(id);
                 id
             } else {
@@ -307,17 +317,8 @@ impl SymTable {
             let sym: Sym = symbol.into();
             let id = self.symbols.new_node((&sym).into());
             self.ids.insert(sym, id);
-            self.symbol_types.add_new_atom(id, AtomType::Symbol);
+            self.symbol_types.add_new_atom(id, atom_type);
             id
         }
-    }
-
-    pub fn declare_new_object(&mut self) -> AtomId {
-        let n = self.symbol_types.get_number_of_type(&AtomType::Object);
-        let sym: Sym = format!("o_{}", n).into();
-        let id = self.symbols.new_node(sym.clone().into());
-        self.ids.insert(sym, id);
-        self.symbol_types.add_new_atom(id, AtomType::Object);
-        id
     }
 }

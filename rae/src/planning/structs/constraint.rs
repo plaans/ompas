@@ -4,6 +4,7 @@ use crate::planning::structs::atom::AtomType;
 use crate::planning::structs::lit::Lit;
 use crate::planning::structs::symbol_table::{AtomId, SymTable};
 use crate::planning::structs::traits::{FormatWithSymTable, GetVariables};
+use im::HashSet;
 use ompas_lisp::core::structs::lerror::LError;
 use std::convert::TryInto;
 
@@ -50,6 +51,14 @@ impl GetVariables for Constraint {
             | Constraint::Or(l1, l2) => l1.get_variables().union(l2.get_variables()),
             Constraint::Neg(l) => l.get_variables(),
         }
+    }
+
+    fn get_variables_of_type(&self, sym_table: &SymTable, atom_type: &AtomType) -> HashSet<AtomId> {
+        self.get_variables()
+            .iter()
+            .filter(|v| sym_table.get_type(v).unwrap() == atom_type)
+            .cloned()
+            .collect()
     }
 }
 

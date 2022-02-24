@@ -1,3 +1,4 @@
+use crate::planning::structs::atom::AtomType;
 use crate::planning::structs::constraint::Constraint;
 use crate::planning::structs::interval::Interval;
 use crate::planning::structs::symbol_table::{AtomId, SymTable};
@@ -24,5 +25,13 @@ impl GetVariables for Condition {
     fn get_variables(&self) -> HashSet<AtomId> {
         let hashset = self.interval.get_variables();
         hashset.union(self.constraint.get_variables())
+    }
+
+    fn get_variables_of_type(&self, sym_table: &SymTable, atom_type: &AtomType) -> HashSet<AtomId> {
+        self.get_variables()
+            .iter()
+            .filter(|v| sym_table.get_type(v).unwrap() == atom_type)
+            .cloned()
+            .collect()
     }
 }

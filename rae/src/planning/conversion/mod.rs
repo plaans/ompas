@@ -6,7 +6,6 @@ use crate::planning::structs::chronicle::Chronicle;
 use crate::planning::structs::lit::Lit;
 use crate::planning::structs::{ChronicleHierarchy, ConversionContext};
 use ompas_lisp::core::structs::lerror::LError;
-use ompas_lisp::core::structs::lerror::LError::SpecialError;
 use ompas_lisp::core::structs::llambda::LambdaArgs;
 use ompas_lisp::core::structs::lvalue::LValue;
 
@@ -16,6 +15,7 @@ pub mod processing;
 
 #[allow(unused)]
 const CONVERT_LVALUE_TO_CHRONICLE: &str = "convert_lvalue_to_chronicle";
+#[allow(unused)]
 const CONVERT_DOMAIN_TO_CHRONICLE_HIERARCHY: &str = "convert_domain_to_chronicle_hierarchy";
 
 pub fn convert_domain_to_chronicle_hierarchy(
@@ -72,7 +72,7 @@ pub fn convert_domain_to_chronicle_hierarchy(
             .into()];
 
         for param in task.get_parameters().get_params() {
-            task_lit.push(ch.sym_table.declare_new_symbol(param, true).into())
+            task_lit.push(ch.sym_table.declare_new_symbol(param, true, true).into())
         }
         task_lit.push(ch.sym_table.declare_new_result().get_id().into());
 
@@ -99,7 +99,7 @@ pub fn convert_domain_to_chronicle_hierarchy(
             chronicle.add_var(&symbol_id);
         }
 
-        name.push(*chronicle.get_result()?);
+        name.push(*chronicle.get_result_id());
 
         chronicle.set_name(name.into());
         ch.actions.push(chronicle);
@@ -107,7 +107,9 @@ pub fn convert_domain_to_chronicle_hierarchy(
 
     //Add all methods to the domain
     for (method_label, method) in conversion_context.domain.get_methods() {
-        let mut chronicle =
+        let chronicle = Chronicle::new_method(method_label, method, &conversion_context, &mut ch)?;
+
+        /*let mut chronicle =
             convert_lvalue_to_chronicle(method.get_body(), &conversion_context, &mut ch)?;
 
         let task = conversion_context
@@ -165,11 +167,36 @@ pub fn convert_domain_to_chronicle_hierarchy(
         }
         name.push(chronicle.get_result()?.into());
 
-        chronicle.set_name(name.into());
+        chronicle.set_name(name.into());*/
         ch.methods.push(chronicle);
     }
 
     Ok(ch)
+}
+
+pub fn build_chronicle(
+    mut chronicle: Chronicle,
+    exp: &LValue,
+    conversion_context: &ConversionContext,
+    ch: &mut ChronicleHierarchy,
+) -> Result<Chronicle, LError> {
+    let lvalue: &LValue = if let LValue::Lambda(lambda) = exp {
+        lambda.get_body()
+    } else {
+        exp
+    };
+
+    let pre_processed = pre_processing(lvalue, conversion_context, ch)?;
+
+    chronicle.set_debug(Some(pre_processed.clone()));
+
+    let mut ec = convert_lvalue_to_expression_chronicle(&pre_processed, conversion_context, ch)?;
+
+    post_processing(&mut ec, conversion_context, ch)?;
+
+    chronicle.absorb_expression_chronicle(ec);
+
+    Ok(chronicle)
 }
 
 pub fn convert_lvalue_to_chronicle(
@@ -179,17 +206,17 @@ pub fn convert_lvalue_to_chronicle(
 ) -> Result<Chronicle, LError> {
     //Creation and instantiation of the chronicle
 
-    let mut chronicle = Chronicle::default();
+    let mut chronicle = Chronicle::new(ch);
 
     let lvalue: &LValue = if let LValue::Lambda(lambda) = exp {
         let params = lambda.get_params();
         match params {
             LambdaArgs::Sym(s) => {
-                ch.sym_table.declare_new_symbol(s, true);
+                ch.sym_table.declare_new_symbol(s, true, true);
             }
             LambdaArgs::List(list) => {
                 for param in list {
-                    ch.sym_table.declare_new_symbol(param, true);
+                    ch.sym_table.declare_new_symbol(param, true, true);
                 }
             }
             LambdaArgs::Nil => {}

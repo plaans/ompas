@@ -28,8 +28,6 @@ use std::convert::TryInto;
 //const PRE_PROCESSING: &str = "pre_processing";
 const CONVERT_LVALUE_TO_EXPRESSION_CHRONICLE: &str = "convert_lvalue_to_expression_chronicle";
 
-pub const TRANSLATE_COND_IF: &str = "translate_cond_if";
-
 pub fn convert_lvalue_to_expression_chronicle(
     exp: &LValue,
     context: &ConversionContext,
@@ -40,7 +38,11 @@ pub fn convert_lvalue_to_expression_chronicle(
     match exp {
         LValue::Symbol(s) => {
             //Generale case
-            ec.set_pure_result(ch.sym_table.declare_new_symbol(s.into(), false).into());
+            let symbol = ch.sym_table.declare_new_symbol(s.into(), false, false);
+            if ch.sym_table.get_type(&symbol).unwrap() == &AtomType::Variable {
+                ec.add_var(&symbol);
+            }
+            ec.set_pure_result(symbol.into());
         }
         LValue::Nil
         | LValue::True
@@ -54,7 +56,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                 LCoreOperator::Define => {
                     //Todo : handle the case when the first expression is not a symbol, but an expression that must be evaluated
                     if let LValue::Symbol(s) = &l[1] {
-                        let var = ch.sym_table.declare_new_symbol(s.clone(), true);
+                        let var = ch.sym_table.declare_new_symbol(s.clone(), true, false);
                         let val = convert_lvalue_to_expression_chronicle(&l[2], context, ch)?;
                         if val.is_result_pure() {
                             ec.add_constraint(Constraint::Eq(
@@ -403,27 +405,35 @@ pub fn convert_if(
 
     let cond_var = ec_cond.get_result();
 
-    let variables = ec_cond
-        .get_variables()
-        .union(ec_b_true.get_variables().union(ec_b_false.get_variables()));
+    let variables = ec_b_true
+        .get_variables_of_type(&ch.sym_table, &AtomType::Variable)
+        .union(ec_b_false.get_variables_of_type(&ch.sym_table, &AtomType::Variable));
+
+    ec.add_variables(variables.clone());
 
     let task_label = ch.local_tasks.new_label(TaskType::IfTask);
-    let task_symbol_id = ch.sym_table.declare_new_symbol(task_label.clone(), true);
+    let task_symbol_id = ch
+        .sym_table
+        .declare_new_symbol(task_label.clone(), true, false);
 
     let mut variables_lit: Vec<Lit> = variables.iter().map(|var| Lit::from(*var)).collect();
 
     let mut task: Vec<Lit> = vec![task_symbol_id.into(), cond_var.clone()];
     task.append(&mut variables_lit.clone());
+    task.push(ec.get_result());
 
     //Construction of the method for the branch true
     let method_true_label = format!("m_{}_true", task_label);
-    let method_true_label = ch.sym_table.declare_new_symbol(method_true_label, true);
+    let method_true_label = ch
+        .sym_table
+        .declare_new_symbol(method_true_label, true, false);
     let mut method_true_name: Vec<Lit> = vec![method_true_label.into(), cond_var.clone()];
     method_true_name.append(&mut variables_lit.clone());
-    let mut method_true = Chronicle::default();
+    let mut method_true = Chronicle::new(ch);
     method_true.set_debug(Some(b_true.clone()));
     method_true.set_task(task.clone().into());
     method_true.set_name(method_true_name.into());
+    method_true.add_var(ec_cond.get_result_id());
     ec_b_true.add_condition(Condition {
         interval: Interval::new(
             &ec_b_true.get_interval().start(),
@@ -437,13 +447,17 @@ pub fn convert_if(
 
     //Construction of the method for the branch false
     let method_false_label = format!("m_{}_false", task_label);
-    let method_false_label = ch.sym_table.declare_new_symbol(method_false_label, true);
+    let method_false_label = ch
+        .sym_table
+        .declare_new_symbol(method_false_label, true, false);
     let mut method_false_name: Vec<Lit> = vec![method_false_label.into(), cond_var.clone()];
     method_false_name.append(&mut variables_lit);
-    let mut method_false = Chronicle::default();
+    method_false_name.push(ec.get_result());
+    let mut method_false = Chronicle::new(ch);
     method_false.set_debug(Some(b_false.clone()));
     method_false.set_task(task.clone().into());
     method_false.set_name(method_false_name.into());
+    method_false.add_var(ec_cond.get_result_id());
     ec_b_false.add_condition(Condition {
         interval: Interval::new(
             &ec_b_false.get_interval().start(),

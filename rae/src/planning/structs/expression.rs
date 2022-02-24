@@ -1,3 +1,4 @@
+use crate::planning::structs::atom::AtomType;
 use crate::planning::structs::interval::Interval;
 use crate::planning::structs::lit::Lit;
 use crate::planning::structs::symbol_table::{AtomId, SymTable};
@@ -24,5 +25,13 @@ impl GetVariables for Expression {
     fn get_variables(&self) -> HashSet<AtomId> {
         let hashet = self.interval.get_variables();
         hashet.union(self.lit.get_variables())
+    }
+
+    fn get_variables_of_type(&self, sym_table: &SymTable, atom_type: &AtomType) -> HashSet<AtomId> {
+        self.get_variables()
+            .iter()
+            .filter(|v| sym_table.get_type(v).unwrap() == atom_type)
+            .cloned()
+            .collect()
     }
 }

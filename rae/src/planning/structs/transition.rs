@@ -1,3 +1,4 @@
+use crate::planning::structs::atom::AtomType;
 use crate::planning::structs::lit::Lit;
 use crate::planning::structs::symbol_table::{AtomId, SymTable};
 use crate::planning::structs::traits::{FormatWithSymTable, GetVariables};
@@ -33,5 +34,13 @@ impl GetVariables for Transition {
         self.variable
             .get_variables()
             .union(self.value.get_variables())
+    }
+
+    fn get_variables_of_type(&self, sym_table: &SymTable, atom_type: &AtomType) -> HashSet<AtomId> {
+        self.get_variables()
+            .iter()
+            .filter(|v| sym_table.get_type(v).unwrap() == atom_type)
+            .cloned()
+            .collect()
     }
 }

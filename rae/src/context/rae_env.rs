@@ -107,6 +107,10 @@ impl Parameters {
     pub fn get_types(&self) -> Vec<String> {
         self.inner.iter().map(|tuple| tuple.1.clone()).collect()
     }
+
+    pub fn get_number(&self) -> usize {
+        self.inner.len()
+    }
 }
 
 impl Display for Parameters {

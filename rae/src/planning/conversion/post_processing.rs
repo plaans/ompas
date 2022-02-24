@@ -63,11 +63,11 @@ pub fn unify_equal(
                         ch.sym_table.union_atom(id_2, id_1);
                         vec_constraint_to_rm.push(index);
                     }
-                    (AtomType::Symbol, AtomType::Object | AtomType::Result) => {
+                    (AtomType::Symbol, AtomType::Result) => {
                         ch.sym_table.union_atom(id_1, id_2);
                         vec_constraint_to_rm.push(index);
                     }
-                    (AtomType::Object | AtomType::Result, AtomType::Symbol) => {
+                    (AtomType::Result, AtomType::Symbol) => {
                         ch.sym_table.union_atom(id_2, id_1);
                         vec_constraint_to_rm.push(index);
                     }

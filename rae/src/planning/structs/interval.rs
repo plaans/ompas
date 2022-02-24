@@ -1,3 +1,4 @@
+use crate::planning::structs::atom::AtomType;
 use crate::planning::structs::symbol_table::{AtomId, SymTable};
 use crate::planning::structs::traits::{FormatWithSymTable, GetVariables};
 use im::{hashset, HashSet};
@@ -36,5 +37,13 @@ impl FormatWithSymTable for Interval {
 impl GetVariables for Interval {
     fn get_variables(&self) -> HashSet<AtomId> {
         hashset![self.start, self.end]
+    }
+
+    fn get_variables_of_type(&self, sym_table: &SymTable, atom_type: &AtomType) -> HashSet<AtomId> {
+        self.get_variables()
+            .iter()
+            .filter(|v| sym_table.get_type(v).unwrap() == atom_type)
+            .cloned()
+            .collect()
     }
 }

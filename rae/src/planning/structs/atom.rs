@@ -110,7 +110,7 @@ pub enum AtomType {
     Timepoint,
     Result,
     Symbol,
-    Object,
+    Variable,
     Action,
     StateFunction,
     Method,
@@ -124,7 +124,6 @@ impl Display for AtomType {
         match self {
             AtomType::Timepoint => write!(f, "timepoint"),
             AtomType::Result => write!(f, "return"),
-            AtomType::Object => write!(f, "object"),
             AtomType::Action => write!(f, "action"),
             AtomType::StateFunction => write!(f, "state-function"),
             AtomType::Method => write!(f, "method"),
@@ -134,6 +133,7 @@ impl Display for AtomType {
             AtomType::Boolean => write!(f, "boolean"),
             AtomType::Symbol => write!(f, "symbol"),
             AtomType::Lambda => write!(f, "lambda"),
+            AtomType::Variable => write!(f, "variable"),
         }
     }
 }

@@ -14,7 +14,7 @@
     (def-method m2
         '((:task pick-and-drop)
           (:params (?ball ball) (?room room)  (?gripper gripper) (?departure room) (?intermediaire room))
-          (:pre-conditions (and (!= (at ?ball) (at-robby)) (null? (carry ?gripper)) (= ?departure (at-robby)) (= intermediaire (at ?ball))))
+          (:pre-conditions (and (!= (at ?ball) (at-robby)) (null? (carry ?gripper)) (= ?departure (at-robby)) (= ?intermediaire (at ?ball))))
           (:score 0)
           (:body
             (do

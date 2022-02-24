@@ -55,6 +55,7 @@ pub async fn convert_domain<'a>(_: &'a [LValue], env: &'a LEnv) -> LResult {
     let time = time.elapsed().expect("could not get time").as_micros();
 
     Ok(format!("{}\n\nTime to convert: {} µs.", ch, time).into())
+    //Ok(format!("Time to convert: {} µs.", time).into())
 }
 
 #[macro_rules_attribute(dyn_async!)]

@@ -7,12 +7,16 @@ use crate::planning::structs::lit::Lit;
 use crate::planning::structs::symbol_table::{AtomId, SymTable};
 use crate::planning::structs::traits::{Absorb, FormatWithSymTable, GetVariables};
 use im::HashSet;
+use ompas_lisp::core::structs::lerror::LError;
+use ompas_lisp::core::structs::lerror::LError::SpecialError;
 use ompas_lisp::core::structs::lvalue::LValue;
 
 #[derive(Clone, Default)]
 pub struct Chronicle {
     name: Lit,
     task: Lit,
+    result: Option<AtomId>,
+    interval: Option<Interval>,
     partial_chronicle: PartialChronicle,
     debug: Option<LValue>,
 }
@@ -44,12 +48,14 @@ impl Chronicle {
 
 impl Chronicle {
     pub fn absorb_expression_chronicle(&mut self, ec: ExpressionChronicle) {
-        self.partial_chronicle.absorb(ec.partial_chronicle);
+        self.result = Some(*ec.result.get_id());
+        self.interval = Some(*ec.get_interval());
         //add result
         self.add_var(ec.result.get_id());
 
         //add interval
         self.add_interval(&ec.interval);
+        self.partial_chronicle.absorb(ec.partial_chronicle);
 
         //add new subtask
     }
@@ -85,6 +91,26 @@ impl Chronicle {
 
     pub fn set_task(&mut self, task: Lit) {
         self.task = task;
+    }
+
+    pub fn get_result(&self) -> Result<&AtomId, LError> {
+        match &self.result {
+            Some(result) => Ok(result),
+            None => Err(SpecialError(
+                "Chronicle::get_result",
+                "result undefined for the chronicle".to_string(),
+            )),
+        }
+    }
+
+    pub fn get_interval(&self) -> Result<&Interval, LError> {
+        match &self.interval {
+            Some(interval) => Ok(interval),
+            None => Err(SpecialError(
+                "Chronicle::get_interval",
+                "interval undefined for the chronicle".to_string(),
+            )),
+        }
     }
 }
 
@@ -295,6 +321,13 @@ impl ExpressionChronicle {
 
     pub fn set_pure_result(&mut self, result: Lit) {
         self.result.set_pure(result)
+    }
+}
+
+impl ExpressionChronicle {
+    pub fn add_variables(&mut self, variables: HashSet<AtomId>) {
+        self.partial_chronicle.variables =
+            self.partial_chronicle.variables.clone().union(variables);
     }
 }
 

@@ -1,4 +1,5 @@
 use crate::module::rae_exec::{RAE_ASSERT, RAE_RETRACT};
+use crate::planning::conversion::post_processing::post_processing;
 use crate::planning::structs::atom::AtomType;
 use crate::planning::structs::chronicle::{Chronicle, ExpressionChronicle};
 use crate::planning::structs::condition::Condition;
@@ -87,12 +88,12 @@ pub fn convert_lvalue_to_expression_chronicle(
                         literal.push(ec_i.get_result());
                         if i == 0 {
                             ec.add_constraint(Constraint::Eq(
-                                previous_interval.end().into(),
+                                previous_interval.start().into(),
                                 ec_i.get_interval().start().into(),
                             ));
                         } else {
                             ec.add_constraint(Constraint::Eq(
-                                previous_interval.start().into(),
+                                previous_interval.end().into(),
                                 ec_i.get_interval().start().into(),
                             ))
                         }
@@ -133,19 +134,6 @@ pub fn convert_lvalue_to_expression_chronicle(
                 }
             },
             _ => {
-                /*let plvalue = eval_static(exp, &mut context.env.clone())?;
-
-                if plvalue.is_pure() {
-                    ec.add_constraint(Constraint::Eq(
-                        ec.get_result().into(),
-                        lvalue_to_lit(plvalue.get_lvalue(), ch.sym_table)?,
-                    ));
-                    ec.add_constraint(Constraint::Eq(
-                        ec.get_interval().start().into(),
-                        ec.get_interval().end().into(),
-                    ));
-                    return Ok(ec);
-                }*/
                 let mut expression_type = ExpressionType::Lisp;
 
                 ch.sym_table.new_scope();
@@ -231,11 +219,14 @@ pub fn convert_lvalue_to_expression_chronicle(
                     }
                 }
 
+                let mut sub_expression_pure = true;
+
                 let mut previous_interval = *ec.get_interval();
                 for (i, e) in l[1..].iter().enumerate() {
                     let ec_i = convert_lvalue_to_expression_chronicle(e, context, ch)?;
 
                     literal.push(ec_i.get_result());
+                    sub_expression_pure &= ec_i.is_result_pure();
                     if i != 0 {
                         ec.add_constraint(Constraint::Eq(
                             previous_interval.end().into(),
@@ -257,8 +248,12 @@ pub fn convert_lvalue_to_expression_chronicle(
                     ec.get_interval().end().into(),
                 ));
 
+                if sub_expression_pure && expression_type == ExpressionType::Lisp {
+                    expression_type = ExpressionType::Pure;
+                }
+
                 match expression_type {
-                    ExpressionType::Pure | ExpressionType::Lisp => {
+                    ExpressionType::Pure => {
                         let mut env = context.env.clone();
                         let mut is_pure = false;
 
@@ -286,18 +281,27 @@ pub fn convert_lvalue_to_expression_chronicle(
                         let result = parse_static(string.as_str(), &mut env);
                         if let Ok(result) = result {
                             if result.is_pure() {
+                                println!("parsing of result is pure");
                                 let result = eval_static(result.get_lvalue(), &mut env);
-                                if let Ok(result) = result {
-                                    if result.is_pure() {
-                                        ec.set_pure_result(lvalue_to_lit(
-                                            result.get_lvalue(),
-                                            &mut ch.sym_table,
-                                        )?);
-                                        is_pure = true;
-                                        println!(
-                                            "eval static is a success! result is: {}",
-                                            result.get_lvalue()
-                                        );
+
+                                match result {
+                                    Ok(result) => {
+                                        if result.is_pure() {
+                                            ec.set_pure_result(lvalue_to_lit(
+                                                result.get_lvalue(),
+                                                &mut ch.sym_table,
+                                            )?);
+                                            is_pure = true;
+                                            println!(
+                                                "eval static is a success! result is: {}",
+                                                result.get_lvalue()
+                                            );
+                                        } else {
+                                            println!("result is not pure: ");
+                                        }
+                                    }
+                                    Err(e) => {
+                                        println!("Error in static evaluation: {}", e);
                                     }
                                 }
                             }
@@ -319,10 +323,28 @@ pub fn convert_lvalue_to_expression_chronicle(
                             });
                         }
                     }
-                    ExpressionType::Action | ExpressionType::Task => ec.add_subtask(Expression {
-                        interval: *ec.get_interval(),
-                        lit: literal.into(),
-                    }),
+                    ExpressionType::Lisp => {
+                        let literal: Lit = vec![
+                            ch.sym_table
+                                .id(EVAL)
+                                .expect("Eval not defined in symbol table")
+                                .into(),
+                            Lit::from(literal),
+                        ]
+                        .into();
+
+                        ec.add_effect(Effect {
+                            interval: *ec.get_interval(),
+                            transition: Transition::new(ec.get_result(), literal),
+                        });
+                    }
+                    ExpressionType::Action | ExpressionType::Task => {
+                        literal.push(ec.get_result().into());
+                        ec.add_subtask(Expression {
+                            interval: *ec.get_interval(),
+                            lit: literal.into(),
+                        })
+                    }
                     ExpressionType::StateFunction => {
                         ec.set_lit(literal.into());
 
@@ -378,16 +400,16 @@ pub fn convert_if(
     let task_label = ch.local_tasks.new_label(TaskType::IfTask);
     let task_symbol_id = ch.sym_table.declare_new_symbol(task_label.clone(), true);
 
-    let mut variables: Vec<Lit> = variables.iter().map(|var| Lit::from(*var)).collect();
+    let mut variables_lit: Vec<Lit> = variables.iter().map(|var| Lit::from(*var)).collect();
 
     let mut task: Vec<Lit> = vec![task_symbol_id.into(), cond_var.clone()];
-    task.append(&mut variables.clone());
+    task.append(&mut variables_lit.clone());
 
     //Construction of the method for the branch true
     let method_true_label = format!("m_{}_true", task_label);
     let method_true_label = ch.sym_table.declare_new_symbol(method_true_label, true);
     let mut method_true_name: Vec<Lit> = vec![method_true_label.into(), cond_var.clone()];
-    method_true_name.append(&mut variables.clone());
+    method_true_name.append(&mut variables_lit.clone());
     let mut method_true = Chronicle::default();
     method_true.set_debug(Some(b_true.clone()));
     method_true.set_task(task.clone().into());
@@ -399,13 +421,15 @@ pub fn convert_if(
         ),
         constraint: Constraint::Eq(cond_var.clone(), ch.sym_table.new_bool(true).into()),
     });
+    ec_b_true.add_variables(variables.clone());
+    post_processing(&mut ec_b_true, context, ch)?;
     method_true.absorb_expression_chronicle(ec_b_true);
 
     //Construction of the method for the branch false
     let method_false_label = format!("m_{}_false", task_label);
     let method_false_label = ch.sym_table.declare_new_symbol(method_false_label, true);
     let mut method_false_name: Vec<Lit> = vec![method_false_label.into(), cond_var.clone()];
-    method_false_name.append(&mut variables);
+    method_false_name.append(&mut variables_lit);
     let mut method_false = Chronicle::default();
     method_false.set_debug(Some(b_false.clone()));
     method_false.set_task(task.clone().into());
@@ -417,6 +441,9 @@ pub fn convert_if(
         ),
         constraint: Constraint::Eq(cond_var, ch.sym_table.new_bool(false).into()),
     });
+    ec_b_false.add_variables(variables);
+    post_processing(&mut ec_b_false, context, ch)?;
+
     method_false.absorb_expression_chronicle(ec_b_false);
 
     ch.tasks.push(task.clone().into());

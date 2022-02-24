@@ -19,6 +19,7 @@ impl FormatWithSymTable for AtomId {
     }
 }
 
+#[derive(PartialEq)]
 pub enum ExpressionType {
     Pure,
     Lisp,

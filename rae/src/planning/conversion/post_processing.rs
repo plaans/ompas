@@ -14,8 +14,8 @@ use ompas_lisp::core::structs::lerror::LError::SpecialError;
 
 pub fn post_processing(
     ec: &mut ExpressionChronicle,
-    ch: &mut ChronicleHierarchy,
     context: &ConversionContext,
+    ch: &mut ChronicleHierarchy,
 ) -> Result<(), LError> {
     unify_equal(ec, ch, context);
     rm_useless_var(ec, ch, context);

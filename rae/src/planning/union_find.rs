@@ -200,6 +200,15 @@ impl<T: Display + Default + Clone> Forest<T> {
             }
         }
     }
+
+    pub fn union_ordered(&mut self, x: &NodeId, y: &NodeId) {
+        let x_root = self.find(x);
+        let y_root = self.find(y);
+        if x_root != y_root {
+            self.set_parent(&y_root, x_root);
+        }
+    }
+
     pub fn find(&mut self, x: &NodeId) -> NodeId {
         if *x != self.get_parent(x) {
             let parent = self.get_parent(x);

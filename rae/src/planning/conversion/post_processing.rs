@@ -1,5 +1,5 @@
 use crate::planning::point_algebra::problem::{Graph, Problem};
-use crate::planning::point_algebra::{path_consistency, remove_useless_timepoints};
+use crate::planning::point_algebra::remove_useless_timepoints;
 use crate::planning::structs::atom::AtomType;
 use crate::planning::structs::chronicle::{ChronicleSet, ExpressionChronicle};
 use crate::planning::structs::constraint::Constraint;
@@ -8,9 +8,7 @@ use crate::planning::structs::symbol_table::{AtomId, SymTable};
 use crate::planning::structs::traits::{FormatWithSymTable, GetVariables};
 use crate::planning::structs::{get_variables_of_type, ChronicleHierarchy, ConversionContext};
 use im::HashSet;
-use ompas_lisp::core::get_debug;
 use ompas_lisp::core::structs::lerror::LError;
-use ompas_lisp::core::structs::lerror::LError::SpecialError;
 
 pub fn post_processing(
     ec: &mut ExpressionChronicle,

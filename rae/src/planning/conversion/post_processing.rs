@@ -4,8 +4,8 @@ use crate::planning::structs::atom::AtomType;
 use crate::planning::structs::chronicle::{ChronicleSet, ExpressionChronicle};
 use crate::planning::structs::constraint::Constraint;
 use crate::planning::structs::lit::Lit;
-use crate::planning::structs::symbol_table::AtomId;
-use crate::planning::structs::traits::GetVariables;
+use crate::planning::structs::symbol_table::{AtomId, SymTable};
+use crate::planning::structs::traits::{FormatWithSymTable, GetVariables};
 use crate::planning::structs::{get_variables_of_type, ChronicleHierarchy, ConversionContext};
 use im::HashSet;
 use ompas_lisp::core::get_debug;
@@ -18,10 +18,83 @@ pub fn post_processing(
     ch: &mut ChronicleHierarchy,
 ) -> Result<(), LError> {
     unify_equal(ec, ch, context);
-    rm_useless_var(ec, ch, context);
     ch.sym_table.flat_bindings();
     simplify_timepoints(ec, ch, context)?;
+    //rm_useless_var(ec, ch, context);
     Ok(())
+}
+
+/// Returns true if the constraint can be safely deleted
+pub fn bind_variables(id_1: &AtomId, id_2: &AtomId, sym_table: &mut SymTable) -> bool {
+    let type_1 = sym_table.get_type(id_1).expect("id should be defined");
+    let type_2 = sym_table.get_type(id_2).expect("id should be defined");
+
+    match (type_1, type_2) {
+        (AtomType::Boolean | AtomType::Number, AtomType::Boolean | AtomType::Number) => {
+            assert_eq!(
+                sym_table.get_atom(id_1).unwrap(),
+                sym_table.get_atom(id_2).unwrap()
+            );
+            false
+        }
+        (AtomType::Number, AtomType::Timepoint) => {
+            sym_table.union_atom(id_1, id_2);
+            true
+        }
+        (AtomType::Timepoint, AtomType::Number) => {
+            sym_table.union_atom(id_2, id_1);
+            true
+        }
+        (AtomType::Boolean | AtomType::Number, _) => {
+            sym_table.union_atom(id_1, id_2);
+            true
+        }
+        (_, AtomType::Boolean | AtomType::Number) => {
+            sym_table.union_atom(id_2, id_1);
+            true
+        }
+        (AtomType::Variable, AtomType::Result) => {
+            sym_table.union_atom(id_1, id_2);
+            true
+        }
+        (AtomType::Result, AtomType::Variable) => {
+            sym_table.union_atom(id_2, id_1);
+            true
+        }
+        (AtomType::Symbol, AtomType::Result | AtomType::Variable) => {
+            sym_table.union_atom(id_1, id_2);
+            true
+        }
+        (AtomType::Variable, AtomType::Variable) => {
+            if id_1 < id_2 {
+                sym_table.union_atom(id_1, id_2);
+            } else {
+                sym_table.union_atom(id_2, id_1);
+            }
+            true
+        }
+        (AtomType::Result | AtomType::Variable, AtomType::Symbol) => {
+            sym_table.union_atom(id_2, id_1);
+            true
+        }
+        (AtomType::Result, AtomType::Result) => {
+            if id_1 < id_2 {
+                sym_table.union_atom(id_1, id_2);
+            } else {
+                sym_table.union_atom(id_2, id_1);
+            }
+            true
+        }
+        (AtomType::Timepoint, AtomType::Timepoint) => {
+            if id_1 < id_2 {
+                sym_table.union_atom(id_1, id_2);
+            } else {
+                sym_table.union_atom(id_2, id_1);
+            }
+            true
+        }
+        (_, _) => false,
+    }
 }
 
 pub fn unify_equal(
@@ -29,65 +102,16 @@ pub fn unify_equal(
     ch: &mut ChronicleHierarchy,
     _context: &ConversionContext,
 ) {
+    println!(
+        "in unify equal for:\n{}",
+        ec.format_with_sym_table(&ch.sym_table)
+    );
     let mut vec_constraint_to_rm = vec![];
-
     for (index, constraint) in ec.get_constraints().iter().enumerate() {
         if let Constraint::Eq(a, b) = constraint {
             if let (Lit::Atom(id_1), Lit::Atom(id_2)) = (a, b) {
-                let type_1 = ch.sym_table.get_type(id_1).expect("id should be defined");
-                let type_2 = ch.sym_table.get_type(id_2).expect("id should be defined");
-
-                match (type_1, type_2) {
-                    (
-                        AtomType::Boolean | AtomType::Number,
-                        AtomType::Boolean | AtomType::Number,
-                    ) => {
-                        assert_eq!(
-                            ch.sym_table.get_atom(id_1).unwrap(),
-                            ch.sym_table.get_atom(id_2).unwrap()
-                        );
-                    }
-                    (AtomType::Number, AtomType::Timepoint) => {
-                        ch.sym_table.union_atom(id_1, id_2);
-                        vec_constraint_to_rm.push(index);
-                    }
-                    (AtomType::Timepoint, AtomType::Number) => {
-                        ch.sym_table.union_atom(id_2, id_1);
-                        vec_constraint_to_rm.push(index);
-                    }
-                    (AtomType::Boolean | AtomType::Number, _) => {
-                        ch.sym_table.union_atom(id_1, id_2);
-                        vec_constraint_to_rm.push(index);
-                    }
-                    (_, AtomType::Boolean | AtomType::Number) => {
-                        ch.sym_table.union_atom(id_2, id_1);
-                        vec_constraint_to_rm.push(index);
-                    }
-                    (AtomType::Symbol, AtomType::Result) => {
-                        ch.sym_table.union_atom(id_1, id_2);
-                        vec_constraint_to_rm.push(index);
-                    }
-                    (AtomType::Result, AtomType::Symbol) => {
-                        ch.sym_table.union_atom(id_2, id_1);
-                        vec_constraint_to_rm.push(index);
-                    }
-                    (AtomType::Result, AtomType::Result) => {
-                        if id_1 < id_2 {
-                            ch.sym_table.union_atom(id_1, id_2);
-                        } else {
-                            ch.sym_table.union_atom(id_2, id_1);
-                        }
-                        vec_constraint_to_rm.push(index);
-                    }
-                    (AtomType::Timepoint, AtomType::Timepoint) => {
-                        if id_1 < id_2 {
-                            ch.sym_table.union_atom(id_1, id_2);
-                        } else {
-                            ch.sym_table.union_atom(id_2, id_1);
-                        }
-                        vec_constraint_to_rm.push(index);
-                    }
-                    (_, _) => {}
+                if let true = bind_variables(id_1, id_2, &mut ch.sym_table) {
+                    vec_constraint_to_rm.push(index);
                 }
             }
         }

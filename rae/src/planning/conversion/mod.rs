@@ -72,7 +72,7 @@ pub fn convert_domain_to_chronicle_hierarchy(
             .into()];
 
         for param in task.get_parameters().get_params() {
-            task_lit.push(ch.sym_table.declare_new_symbol(param, true, true).into())
+            task_lit.push(ch.sym_table.declare_new_symbol(&param, true, true).into())
         }
         task_lit.push(ch.sym_table.declare_new_result().get_id().into());
 
@@ -194,8 +194,7 @@ pub fn build_chronicle(
 
     post_processing(&mut ec, conversion_context, ch)?;
 
-    chronicle.absorb_expression_chronicle(ec);
-
+    chronicle.absorb_expression_chronicle(ec, &mut ch.sym_table);
     Ok(chronicle)
 }
 
@@ -212,11 +211,11 @@ pub fn convert_lvalue_to_chronicle(
         let params = lambda.get_params();
         match params {
             LambdaArgs::Sym(s) => {
-                ch.sym_table.declare_new_symbol(s, true, true);
+                ch.sym_table.declare_new_symbol(&s, true, true);
             }
             LambdaArgs::List(list) => {
                 for param in list {
-                    ch.sym_table.declare_new_symbol(param, true, true);
+                    ch.sym_table.declare_new_symbol(&param, true, true);
                 }
             }
             LambdaArgs::Nil => {}
@@ -235,7 +234,7 @@ pub fn convert_lvalue_to_chronicle(
 
     post_processing(&mut ec, conversion_context, ch)?;
 
-    chronicle.absorb_expression_chronicle(ec);
+    chronicle.absorb_expression_chronicle(ec, &mut ch.sym_table);
 
     Ok(chronicle)
 }

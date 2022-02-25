@@ -115,7 +115,7 @@ impl SymTable {
 //Forest methods
 impl SymTable {
     pub fn union_atom(&mut self, a: &AtomId, b: &AtomId) {
-        self.symbols.union(a, b);
+        self.symbols.union_ordered(a, b);
     }
 
     pub fn find_parent(&mut self, a: &AtomId) -> AtomId {
@@ -234,7 +234,7 @@ impl SymTable {
 
     pub fn unique_to_several(&mut self, sym: &str) {
         if !self.multiple_def.contains_key(sym) {
-            println!("transforming {} into several ", sym);
+            //println!("transforming {} into several ", sym);
             //change value in vec of symbol
             let id = self.ids.remove(&Sym::Unique(sym.to_string())).unwrap();
             let value = Sym::Several(sym.to_string(), 0);
@@ -301,7 +301,7 @@ impl SymTable {
                 self.unique_to_several(symbol);
                 let vec_similar = self.multiple_def.get_mut(symbol).unwrap();
                 let n = vec_similar.len();
-                let mut pointer_to_ver = self
+                let pointer_to_ver = self
                     .pointer_to_ver
                     .last_mut()
                     .expect("no hashmap to version of variable");
@@ -311,12 +311,6 @@ impl SymTable {
                 } else {
                     pointer_to_ver.insert(symbol.to_string(), n);
                 }
-                /**self
-                .pointer_to_ver
-                .last_mut()
-                .expect("no hashmap to version of variable")
-                .get_mut(symbol)
-                .unwrap_or_else(|| panic!("{} should have pointer to ver", symbol)) = n;*/
                 let id = self
                     .symbols
                     .new_node(Sym::Several(symbol.to_string(), n).into());

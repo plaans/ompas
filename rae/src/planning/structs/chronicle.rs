@@ -1,5 +1,6 @@
 use crate::context::rae_env::Method;
 use crate::planning::conversion::build_chronicle;
+use crate::planning::conversion::post_processing::bind_variables;
 use crate::planning::structs::atom::AtomType;
 use crate::planning::structs::condition::Condition;
 use crate::planning::structs::constraint::Constraint;
@@ -135,23 +136,18 @@ impl Chronicle {
 }
 
 impl Chronicle {
-    pub fn absorb_expression_chronicle(&mut self, ec: ExpressionChronicle) {
-        self.add_constraint(Constraint::Eq(
-            self.get_result_id().into(),
-            ec.get_result_id().into(),
-        ));
-        self.add_constraint(Constraint::Eq(
-            self.interval.start().into(),
-            ec.interval.start().into(),
-        ));
-        self.add_constraint(Constraint::Eq(
-            self.interval.end().into(),
-            ec.interval.end().into(),
-        ));
+    pub fn absorb_expression_chronicle(
+        &mut self,
+        ec: ExpressionChronicle,
+        sym_table: &mut SymTable,
+    ) {
+        bind_variables(self.get_result_id(), ec.get_result_id(), sym_table);
+        bind_variables(&self.interval.start(), &ec.interval.start(), sym_table);
+        bind_variables(&self.interval.end(), &ec.interval.end(), sym_table);
+        sym_table.flat_bindings();
         //add result
-        self.add_var(ec.result.get_id());
-
         //add interval
+        self.add_var(ec.get_result_id());
         self.add_interval(&ec.interval);
         self.partial_chronicle.absorb(ec.partial_chronicle);
 
@@ -495,6 +491,9 @@ impl ExpressionChronicle {
             ChronicleSet::Condition,
             ChronicleSet::SubTask,
         ])
+    }
+    pub fn get_debug(&self) -> &LValue {
+        &self.debug
     }
 }
 

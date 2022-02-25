@@ -8,7 +8,7 @@ use im::HashSet;
 use ompas_lisp::core::structs::lerror::LError;
 use std::convert::TryInto;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Constraint {
     LEq(Lit, Lit),
     Eq(Lit, Lit),

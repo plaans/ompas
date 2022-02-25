@@ -198,8 +198,11 @@ impl SymTable {
     pub fn id(&self, sym: &str) -> Option<&AtomId> {
         //Look before in the multiple_def table, and then looking in self.ids
         if self.multiple_def.contains_key(sym) {
-            let ver = self.pointer_to_ver.last().unwrap().get(sym).unwrap();
-            let value = self.multiple_def.get(sym).unwrap().get(*ver);
+            let ver = match self.pointer_to_ver.last().unwrap().get(sym) {
+                Some(ver) => *ver,
+                None => 0,
+            };
+            let value = self.multiple_def.get(sym).unwrap().get(ver);
             value
         } else {
             self.ids.get(&sym.into())
@@ -231,6 +234,7 @@ impl SymTable {
 
     pub fn unique_to_several(&mut self, sym: &str) {
         if !self.multiple_def.contains_key(sym) {
+            println!("transforming {} into several ", sym);
             //change value in vec of symbol
             let id = self.ids.remove(&Sym::Unique(sym.to_string())).unwrap();
             let value = Sym::Several(sym.to_string(), 0);
@@ -283,7 +287,7 @@ impl SymTable {
 
     pub fn declare_new_symbol(
         &mut self,
-        symbol: String,
+        symbol: &str,
         if_it_exists_create_new: bool,
         is_variable: bool,
     ) -> AtomId {
@@ -292,29 +296,48 @@ impl SymTable {
             false => AtomType::Symbol,
         };
 
-        if self.it_exists(&symbol) {
+        if self.it_exists(symbol) {
             return if if_it_exists_create_new {
-                self.unique_to_several(&symbol);
-                let vec_similar = self.multiple_def.get_mut(&symbol).unwrap();
+                self.unique_to_several(symbol);
+                let vec_similar = self.multiple_def.get_mut(symbol).unwrap();
                 let n = vec_similar.len();
-                *self
+                let mut pointer_to_ver = self
                     .pointer_to_ver
                     .last_mut()
-                    .unwrap()
-                    .get_mut(&symbol)
-                    .unwrap() = n;
-                let id = self.symbols.new_node(Sym::Several(symbol, n).into());
+                    .expect("no hashmap to version of variable");
+
+                if pointer_to_ver.contains_key(symbol) {
+                    *pointer_to_ver.get_mut(symbol).unwrap() = n;
+                } else {
+                    pointer_to_ver.insert(symbol.to_string(), n);
+                }
+                /**self
+                .pointer_to_ver
+                .last_mut()
+                .expect("no hashmap to version of variable")
+                .get_mut(symbol)
+                .unwrap_or_else(|| panic!("{} should have pointer to ver", symbol)) = n;*/
+                let id = self
+                    .symbols
+                    .new_node(Sym::Several(symbol.to_string(), n).into());
                 self.symbol_types.add_new_atom(id, atom_type);
                 vec_similar.push(id);
                 id
             } else {
-                return *match self.pointer_to_ver.last().unwrap().get(&symbol) {
-                    None => self.ids.get(&symbol.into()).unwrap(),
-                    Some(i) => self.multiple_def.get(&symbol).unwrap().get(*i).unwrap(),
+                //check multiple def
+                return match self.pointer_to_ver.last().unwrap().get(symbol) {
+                    None => {
+                        if self.multiple_def.contains_key(symbol) {
+                            self.multiple_def.get(symbol).unwrap()[0]
+                        } else {
+                            *self.ids.get(&symbol.to_string().into()).unwrap()
+                        }
+                    }
+                    Some(i) => *self.multiple_def.get(symbol).unwrap().get(*i).unwrap(),
                 };
             };
         } else {
-            let sym: Sym = symbol.into();
+            let sym: Sym = symbol.to_string().into();
             let id = self.symbols.new_node((&sym).into());
             self.ids.insert(sym, id);
             self.symbol_types.add_new_atom(id, atom_type);

@@ -61,12 +61,12 @@ impl Chronicle {
             .into()];
 
         for param in task.get_parameters().get_params() {
-            task_lit.push(ch.sym_table.declare_new_symbol(param, true, true).into())
+            task_lit.push(ch.sym_table.declare_new_symbol(&param, true, true).into())
         }
 
         let task_result_var_id =
             ch.sym_table
-                .declare_new_symbol(format!("{}_r", method.get_task_label()), true, true);
+                .declare_new_symbol(&format!("{}_r", method.get_task_label()), true, true);
 
         task_lit.push(task_result_var_id.into());
 
@@ -77,7 +77,7 @@ impl Chronicle {
             .into()];
 
         for (i, param) in method.get_parameters().get_params().iter().enumerate() {
-            let param_id = ch.sym_table.declare_new_symbol(param.clone(), true, true);
+            let param_id = ch.sym_table.declare_new_symbol(param, true, true);
             if i < n_param_task {
                 chronicle.add_constraint(Constraint::Eq(param_id.into(), task_lit[i + 1].clone()))
             }

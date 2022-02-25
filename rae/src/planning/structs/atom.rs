@@ -1,4 +1,8 @@
+use ompas_lisp::core::structs::lerror::LError;
+use ompas_lisp::core::structs::lerror::LError::ConversionError;
 use ompas_lisp::core::structs::lnumber::LNumber;
+use ompas_lisp::core::structs::typelvalue::TypeLValue;
+use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
@@ -15,6 +19,26 @@ impl Display for Atom {
             Atom::Bool(false) => write!(f, "nil"),
             Atom::Number(n) => write!(f, "{}", n),
             Atom::Sym(s) => write!(f, "{}", s),
+        }
+    }
+}
+
+impl TryFrom<&Atom> for Sym {
+    type Error = LError;
+
+    fn try_from(value: &Atom) -> Result<Self, Self::Error> {
+        if let Atom::Sym(s) = value {
+            Ok(s.clone())
+        } else {
+            Err(ConversionError(
+                "Sym::TryFrom<Atom>",
+                TypeLValue::Other(match value {
+                    Atom::Bool(_) => "Atom::Bool".to_string(),
+                    Atom::Number(_) => "Atom::Number".to_string(),
+                    Atom::Sym(_) => "Atom::Sym".to_string(),
+                }),
+                TypeLValue::Other("Atom::Sym".to_string()),
+            ))
         }
     }
 }

@@ -9,7 +9,7 @@ use ompas_lisp::core::structs::lvalue::LValue;
 use std::convert::TryFrom;
 use std::ops::Deref;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Lit {
     Atom(AtomId),
     Constraint(Box<Constraint>),
@@ -118,7 +118,7 @@ pub fn lvalue_to_lit(lv: &LValue, st: &mut SymTable) -> lerror::Result<Lit> {
         LValue::Number(n) => Ok(st.new_number(n.clone()).into()),
         LValue::True => Ok(st.new_bool(true).into()),
         LValue::Nil => Ok(st.new_bool(false).into()),
-        lv => Ok(st.declare_new_symbol(lv.to_string(), false, false).into()),
+        lv => Ok(st.declare_new_symbol(&lv.to_string(), false, false).into()),
     }
 }
 

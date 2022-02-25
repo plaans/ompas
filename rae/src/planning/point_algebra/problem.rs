@@ -1,6 +1,8 @@
-use crate::planning::point_algebra::relation_type::RelationType::Tautology;
+use crate::planning::point_algebra::relation_type::RelationType::{Contradiction, Tautology};
 use crate::planning::point_algebra::relation_type::{RelationType, RelationTypeBit};
-use crate::planning::structs::symbol_table::SymTable;
+use crate::planning::structs::constraint::Constraint;
+use crate::planning::structs::lit::Lit;
+use crate::planning::structs::symbol_table::{AtomId, SymTable};
 use crate::planning::structs::traits::FormatWithSymTable;
 use cli_table::{print_stdout, Cell, Table};
 use std::fmt::{Debug, Display, Formatter};
@@ -19,6 +21,23 @@ impl<T> Relation<T> {
             i,
             j,
             relation_type,
+        }
+    }
+}
+
+impl From<&Relation<AtomId>> for Constraint {
+    fn from(r: &Relation<AtomId>) -> Self {
+        match &r.relation_type {
+            RelationType::Eq => Constraint::Eq(r.i.into(), r.j.into()),
+            RelationType::GT => Constraint::LT(r.j.into(), r.i.into()),
+            RelationType::LT => Constraint::LT(r.i.into(), r.j.into()),
+            RelationType::GEq => Constraint::LEq(r.j.into(), r.i.into()),
+            RelationType::LEq => Constraint::LEq(r.i.into(), r.j.into()),
+            RelationType::Neq => Constraint::Neg(Lit::Constraint(Box::new(Constraint::Eq(
+                r.i.into(),
+                r.j.into(),
+            )))),
+            Tautology | Contradiction => panic!("should not have been extracted"),
         }
     }
 }
@@ -42,15 +61,29 @@ impl<T: FormatWithSymTable> FormatWithSymTable for Relation<T> {
 
 pub struct Problem<T> {
     variables: Vec<T>,
+    optional: Vec<bool>,
     relations: Vec<Relation<T>>,
 }
 
 impl<T> Problem<T> {
-    pub fn new(variables: Vec<T>, relations: Vec<Relation<T>>) -> Self {
+    pub fn new(mut vars: Vec<(T, bool)>, relations: Vec<Relation<T>>) -> Self {
+        let mut variables = vec![];
+        let mut optional = vec![];
+
+        while let Some((val, opt)) = vars.pop() {
+            variables.push(val);
+            optional.push(opt);
+        }
+
         Self {
             variables,
+            optional,
             relations,
         }
+    }
+
+    pub fn get_relations(&self) -> &Vec<Relation<T>> {
+        &self.relations
     }
 }
 
@@ -116,17 +149,29 @@ impl<T: Clone + Hash + Eq + Debug> From<&Problem<T>> for Graph<T> {
             });
             let relation_type_bit: RelationTypeBit = relation.relation_type.into();
 
-            let (a, b, relation_type_bit) = if index_1 < index_2 {
-                (index_1, index_2, relation_type_bit)
+            if index_1 == index_2 {
+                if relation_type_bit.intersect(&RelationType::Eq.into()) == Contradiction.into() {
+                    panic!(
+                        "relation on a single timepoint as it to be different from himself, gneeee"
+                    );
+                }
             } else {
-                (index_2, index_1, relation_type_bit.converse())
-            };
+                let (a, b, relation_type_bit) = if index_1 < index_2 {
+                    (index_1, index_2, relation_type_bit)
+                } else {
+                    (index_2, index_1, relation_type_bit.converse())
+                };
 
-            inner[*a][*b] = inner[*a][*b] & relation_type_bit;
-            inner[*b][*a] = inner[*a][*b].converse()
+                inner[*a][*b] = inner[*a][*b] & relation_type_bit;
+                inner[*b][*a] = inner[*a][*b].converse()
+            }
         }
 
-        Self { reverse, inner }
+        Self {
+            reverse,
+            optional: problem.optional.clone(),
+            inner,
+        }
     }
 }
 
@@ -136,7 +181,7 @@ impl<T: Clone + Eq + Hash> From<Graph<T>> for Problem<T> {
         let mut relations = vec![];
 
         for (i, i_relations) in g.inner.iter().enumerate() {
-            for (j, r) in i_relations[i + 1..].iter().enumerate() {
+            for (j, r) in i_relations[..i].iter().enumerate() {
                 if r != &Tautology.into() {
                     relations.push(Relation {
                         i: g.reverse[i].clone(),
@@ -148,6 +193,7 @@ impl<T: Clone + Eq + Hash> From<Graph<T>> for Problem<T> {
         }
         Self {
             variables,
+            optional: g.optional,
             relations,
         }
     }
@@ -156,8 +202,9 @@ impl<T: Clone + Eq + Hash> From<Graph<T>> for Problem<T> {
 pub type Timepoint = usize;
 
 pub struct Graph<T> {
-    reverse: Vec<T>,
-    inner: Vec<Vec<RelationTypeBit>>,
+    pub reverse: Vec<T>,
+    pub optional: Vec<bool>,
+    pub inner: Vec<Vec<RelationTypeBit>>,
 }
 
 impl<T> Graph<T> {
@@ -198,6 +245,7 @@ impl<T> Graph<T> {
     pub fn remove_var(&mut self, index: usize) {
         self.reverse.remove(index);
         self.inner.remove(index);
+        self.optional.remove(index);
         for e in &mut self.inner {
             e.remove(index);
         }

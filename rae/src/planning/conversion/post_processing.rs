@@ -1,5 +1,5 @@
-use crate::planning::point_algebra::path_consistency;
 use crate::planning::point_algebra::problem::{Graph, Problem};
+use crate::planning::point_algebra::{path_consistency, remove_useless_timepoints};
 use crate::planning::structs::atom::AtomType;
 use crate::planning::structs::chronicle::{ChronicleSet, ExpressionChronicle};
 use crate::planning::structs::constraint::Constraint;
@@ -102,10 +102,10 @@ pub fn unify_equal(
     ch: &mut ChronicleHierarchy,
     _context: &ConversionContext,
 ) {
-    println!(
+    /*println!(
         "in unify equal for:\n{}",
         ec.format_with_sym_table(&ch.sym_table)
-    );
+    );*/
     let mut vec_constraint_to_rm = vec![];
     for (index, constraint) in ec.get_constraints().iter().enumerate() {
         if let Constraint::Eq(a, b) = constraint {
@@ -162,23 +162,44 @@ pub fn simplify_timepoints(
         AtomType::Timepoint,
     );
 
-    let _optional_timepoints: HashSet<AtomId> = timepoints.clone().difference(used_timepoints);
+    let optional_timepoints: HashSet<AtomId> = timepoints.clone().difference(used_timepoints);
     let mut relations = vec![];
-    for constraint in ec.get_constraints() {
+    let mut index_temporal_constraints = vec![];
+    for (i, constraint) in ec.get_constraints().iter().enumerate() {
         if matches!(constraint, Constraint::Neg(_)) {
         } else if let Ok(r) = constraint.try_into_pa_relation(&ch.sym_table) {
+            index_temporal_constraints.push(i);
             relations.push(r);
         }
     }
 
+    ec.rm_set_constraint(index_temporal_constraints);
+
     let mut timepoints: Vec<AtomId> = timepoints.iter().cloned().collect();
     timepoints.sort();
+    let timepoints = timepoints
+        .iter()
+        .map(|a| (*a, optional_timepoints.contains(a)))
+        .collect();
     let problem: Problem<AtomId> = Problem::new(timepoints, relations);
+    println!(
+        "temporal problem: {}",
+        problem.format_with_sym_table(&ch.sym_table)
+    );
     let graph: Graph<AtomId> = (&problem).into();
+    /*println!(
+        "temporal graph of : {}",
+        ec.format_with_sym_table(&ch.sym_table)
+    );*/
+    graph.print();
 
-    match path_consistency(graph) {
+    /*match path_consistency(graph) {
         Ok(m) => {
             if get_debug() {
+                println!(
+                    "temporal graph of : {}",
+                    ec.format_with_sym_table(&ch.sym_table)
+                );
                 m.print()
             }
         }
@@ -187,13 +208,12 @@ pub fn simplify_timepoints(
                 "",
                 "Error in graph. Set of constraints is not consistent.".to_string(),
             );
-
-            println!("{:?}", err);
-            //return Err(err)
+            //println!("{:?}", err);
+            return Err(err);
         }
-    };
+    };*/
 
-    /*println!("not used timepoints : {}", {
+    println!("not used timepoints : {}", {
         let mut string = "{".to_string();
         for (i, t) in optional_timepoints.iter().enumerate() {
             if i != 0 {
@@ -203,7 +223,22 @@ pub fn simplify_timepoints(
         }
         string.push('}');
         string
-    })*/
+    });
 
+    let new_graph = remove_useless_timepoints(graph)?;
+    println!("graph after removing:");
+    new_graph.print();
+
+    let problem: Problem<AtomId> = new_graph.into();
+    println!(
+        "new temporal problem: {}",
+        problem.format_with_sym_table(&ch.sym_table)
+    );
+
+    for r in problem.get_relations() {
+        ec.add_constraint(r.into())
+    }
+
+    //panic!("no fucking reason");
     Ok(())
 }

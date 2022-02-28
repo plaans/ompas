@@ -7,7 +7,7 @@ use crate::planning::structs::lit::Lit;
 use crate::planning::structs::symbol_table::{AtomId, SymTable};
 use crate::planning::structs::traits::GetVariables;
 use crate::planning::structs::{get_variables_of_type, ChronicleHierarchy, ConversionContext};
-use im::HashSet;
+use im::{hashset, HashSet};
 use ompas_lisp::core::structs::lerror::LError;
 
 pub fn post_processing(
@@ -18,7 +18,7 @@ pub fn post_processing(
     unify_equal(ec, ch, context);
     ch.sym_table.flat_bindings();
     simplify_timepoints(ec, ch, context)?;
-    //rm_useless_var(ec, ch, context);
+    rm_useless_var(ec, ch, context);
     Ok(())
 }
 
@@ -123,15 +123,20 @@ pub fn rm_useless_var(
     ch: &mut ChronicleHierarchy,
     _context: &ConversionContext,
 ) {
-    let mut vec = vec![];
-
-    for var in ec.get_variables() {
-        if var != ch.sym_table.get_parent(&var) {
-            vec.push(var)
-        }
+    let vars = ec.get_variables();
+    let used_vars = ec
+        .get_all_variables_in_sets()
+        .iter()
+        .map(|a| ch.sym_table.get_parent(a))
+        .collect();
+    ec.rm_set_var(ec.get_variables().iter().cloned().collect());
+    let mut parent_vars = hashset![];
+    for var in &vars {
+        parent_vars.insert(ch.sym_table.get_parent(var));
     }
 
-    ec.rm_set_var(vec)
+    let parent_vars = parent_vars.intersection(used_vars);
+    ec.add_variables(parent_vars);
 }
 
 pub fn simplify_timepoints(

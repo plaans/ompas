@@ -154,8 +154,9 @@ impl Chronicle {
         sym_table.flat_bindings();
         //add result
         //add interval
-        self.add_var(ec.get_result_id());
-        self.add_interval(&ec.interval);
+        self.add_var(&sym_table.get_parent(ec.get_result_id()));
+        self.add_var(&sym_table.get_parent(&ec.interval.start()));
+        self.add_var(&sym_table.get_parent(&ec.interval.end()));
         self.partial_chronicle.absorb(ec.partial_chronicle);
 
         //add new subtask

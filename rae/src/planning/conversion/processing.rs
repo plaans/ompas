@@ -43,6 +43,10 @@ pub fn convert_lvalue_to_expression_chronicle(
                 ec.add_var(&symbol);
             }
             ec.set_pure_result(symbol.into());
+            ec.add_constraint(Constraint::Eq(
+                ec.get_interval().start().into(),
+                ec.get_interval().end().into(),
+            ))
         }
         LValue::Nil
         | LValue::True
@@ -69,6 +73,12 @@ pub fn convert_lvalue_to_expression_chronicle(
                                 ec.get_interval().end().into(),
                             ))
                         }
+
+                        ec.add_constraint(Constraint::Eq(
+                            val.get_interval().end().into(),
+                            ec.get_interval().end().into(),
+                        ));
+
                         ec.add_constraint(Constraint::Eq(val.get_result(), var.into()));
                         ec.set_pure_result(ch.sym_table.new_bool(false).into());
                         ec.absorb(val);
@@ -134,6 +144,10 @@ pub fn convert_lvalue_to_expression_chronicle(
                 }
                 LCoreOperator::Quote => {
                     ec.set_pure_result(lvalue_to_lit(&l[1], &mut ch.sym_table)?);
+                    ec.add_constraint(Constraint::Eq(
+                        ec.get_interval().start().into(),
+                        ec.get_interval().end().into(),
+                    ));
                 }
                 co => {
                     return Err(SpecialError(
@@ -166,6 +180,20 @@ pub fn convert_lvalue_to_expression_chronicle(
                                     convert_lvalue_to_expression_chronicle(&l[1], context, ch)?;
                                 let value =
                                     convert_lvalue_to_expression_chronicle(&l[2], context, ch)?;
+
+                                //Temporal constraints
+                                ec.add_constraint(Constraint::Eq(
+                                    ec.get_interval().start().into(),
+                                    state_variable.get_interval().start().into(),
+                                ));
+                                ec.add_constraint(Constraint::Eq(
+                                    state_variable.get_interval().end().into(),
+                                    value.get_interval().end().into(),
+                                ));
+                                ec.add_constraint(Constraint::Eq(
+                                    value.get_interval().end().into(),
+                                    ec.get_interval().end().into(),
+                                ));
 
                                 ec.add_effect(Effect {
                                     interval: *ec.get_interval(),
@@ -241,6 +269,12 @@ pub fn convert_lvalue_to_expression_chronicle(
                 let mut sub_expression_pure = true;
 
                 let mut previous_interval = *ec.get_interval();
+                let f_symbol_end_timepoint = ch.sym_table.declare_new_timepoint();
+                let mut end_last_interval = f_symbol_end_timepoint;
+                ec.add_constraint(Constraint::Eq(
+                    ec.get_interval().start().into(),
+                    f_symbol_end_timepoint.into(),
+                ));
                 for (i, e) in l[1..].iter().enumerate() {
                     let ec_i = convert_lvalue_to_expression_chronicle(e, context, ch)?;
 
@@ -259,11 +293,12 @@ pub fn convert_lvalue_to_expression_chronicle(
                     }
 
                     previous_interval = *ec_i.get_interval();
+                    end_last_interval = ec_i.get_interval().end();
                     ec.absorb(ec_i);
                 }
 
                 ec.add_constraint(Constraint::LEq(
-                    previous_interval.end().into(),
+                    end_last_interval.into(),
                     ec.get_interval().end().into(),
                 ));
 
@@ -295,34 +330,10 @@ pub fn convert_lvalue_to_expression_chronicle(
                         }
                         string.push(')');
 
-                        //println!("expression to be evaluated : {}", string);
-
                         let result = parse_static(string.as_str(), &mut env);
                         if let Ok(result) = result {
                             if result.is_pure() {
-                                //println!("parsing of result is pure");
                                 let result = eval_static(result.get_lvalue(), &mut env);
-
-                                /*match result {
-                                    Ok(result) => {
-                                        if result.is_pure() {
-                                            ec.set_pure_result(lvalue_to_lit(
-                                                result.get_lvalue(),
-                                                &mut ch.sym_table,
-                                            )?);
-                                            is_pure = true;
-                                            /*println!(
-                                                "eval static is a success! result is: {}",
-                                                result.get_lvalue()
-                                            );*/
-                                        } else {
-                                            //println!("result is not pure: ");
-                                        }
-                                    }
-                                    Err(_) => {
-                                        //println!("Error in static evaluation: {}", e);
-                                    }
-                                }*/
 
                                 if let Ok(result) = result {
                                     if result.is_pure() {
@@ -351,6 +362,10 @@ pub fn convert_lvalue_to_expression_chronicle(
                                 transition: Transition::new(ec.get_result(), literal),
                             });
                         }
+                        ec.add_constraint(Constraint::Eq(
+                            end_last_interval.into(),
+                            ec.get_interval().end().into(),
+                        ));
                     }
                     ExpressionType::Lisp => {
                         let literal: Lit = vec![
@@ -366,6 +381,10 @@ pub fn convert_lvalue_to_expression_chronicle(
                             interval: *ec.get_interval(),
                             transition: Transition::new(ec.get_result(), literal),
                         });
+                        ec.add_constraint(Constraint::Eq(
+                            end_last_interval.into(),
+                            ec.get_interval().end().into(),
+                        ));
                     }
                     ExpressionType::Action | ExpressionType::Task => {
                         literal.push(ec.get_result());
@@ -379,6 +398,10 @@ pub fn convert_lvalue_to_expression_chronicle(
                             interval: *ec.get_interval(),
                             transition: Transition::new(ec.get_result(), literal.into()),
                         });
+                        ec.add_constraint(Constraint::Eq(
+                            end_last_interval.into(),
+                            ec.get_interval().end().into(),
+                        ));
                     }
                 };
                 ch.sym_table.revert_scope();

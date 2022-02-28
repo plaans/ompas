@@ -3,7 +3,6 @@ use ompas_lisp::core::structs::lerror::LError;
 use ompas_lisp::core::structs::lvalue::LValue;
 
 #[test]
-#[test]
 fn test_action_response() -> Result<(), LError> {
     let action_msg = GodotMessageSerde {
         _type: GodotMessageType::ActionResponse,

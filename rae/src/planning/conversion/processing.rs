@@ -50,6 +50,11 @@ pub fn convert_lvalue_to_expression_chronicle(
         | LValue::String(_)
         | LValue::Character(_) => {
             ec.set_pure_result(lvalue_to_lit(exp, &mut ch.sym_table)?);
+            //As the result is pure, the expression is considering as having a null time of execution.
+            ec.add_constraint(Constraint::Eq(
+                ec.get_interval().start().into(),
+                ec.get_interval().end().into(),
+            ));
         }
         LValue::List(l) => match &l[0] {
             LValue::CoreOperator(co) => match co {

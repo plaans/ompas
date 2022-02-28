@@ -114,7 +114,14 @@ impl FormatWithSymTable for Chronicle {
     fn format_with_sym_table(&self, st: &SymTable) -> String {
         let mut s = String::new();
         //name
-        s.push_str(format!("-name: {}\n", self.name.format_with_sym_table(st)).as_str());
+        s.push_str(
+            format!(
+                "{} {}\n",
+                self.interval.format_with_sym_table(st),
+                self.name.format_with_sym_table(st)
+            )
+            .as_str(),
+        );
         //task
         s.push_str(format!("-task: {}\n", self.task.format_with_sym_table(st)).as_str());
         s.push_str(self.partial_chronicle.format_with_sym_table(st).as_str());

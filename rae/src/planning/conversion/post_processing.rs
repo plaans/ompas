@@ -5,7 +5,7 @@ use crate::planning::structs::chronicle::{ChronicleSet, ExpressionChronicle};
 use crate::planning::structs::constraint::Constraint;
 use crate::planning::structs::lit::Lit;
 use crate::planning::structs::symbol_table::{AtomId, SymTable};
-use crate::planning::structs::traits::{FormatWithSymTable, GetVariables};
+use crate::planning::structs::traits::GetVariables;
 use crate::planning::structs::{get_variables_of_type, ChronicleHierarchy, ConversionContext};
 use im::HashSet;
 use ompas_lisp::core::structs::lerror::LError;
@@ -180,16 +180,16 @@ pub fn simplify_timepoints(
         .map(|a| (*a, optional_timepoints.contains(a)))
         .collect();
     let problem: Problem<AtomId> = Problem::new(timepoints, relations);
-    println!(
+    /*println!(
         "temporal problem: {}",
         problem.format_with_sym_table(&ch.sym_table)
-    );
+    );*/
     let graph: Graph<AtomId> = (&problem).into();
     /*println!(
         "temporal graph of : {}",
         ec.format_with_sym_table(&ch.sym_table)
     );*/
-    graph.print();
+    //graph.print();
 
     /*match path_consistency(graph) {
         Ok(m) => {
@@ -211,7 +211,7 @@ pub fn simplify_timepoints(
         }
     };*/
 
-    println!("not used timepoints : {}", {
+    /*println!("not used timepoints : {}", {
         let mut string = "{".to_string();
         for (i, t) in optional_timepoints.iter().enumerate() {
             if i != 0 {
@@ -221,17 +221,17 @@ pub fn simplify_timepoints(
         }
         string.push('}');
         string
-    });
+    });*/
 
     let new_graph = remove_useless_timepoints(graph)?;
-    println!("graph after removing:");
-    new_graph.print();
+    //println!("graph after removing:");
+    //new_graph.print();
 
     let problem: Problem<AtomId> = new_graph.into();
-    println!(
+    /*println!(
         "new temporal problem: {}",
         problem.format_with_sym_table(&ch.sym_table)
-    );
+    );*/
 
     for r in problem.get_relations() {
         ec.add_constraint(r.into())

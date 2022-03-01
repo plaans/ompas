@@ -14,6 +14,7 @@ use crate::planning::structs::symbol_table::{AtomId, ExpressionType};
 use crate::planning::structs::traits::{Absorb, FormatWithSymTable, GetVariables};
 use crate::planning::structs::transition::Transition;
 use crate::planning::structs::{ChronicleHierarchy, ConversionContext, TaskType};
+use ompas_lisp::core::root_module::error::language::CHECK;
 use ompas_lisp::core::structs::lcoreoperator::language::EVAL;
 use ompas_lisp::core::structs::lcoreoperator::LCoreOperator;
 use ompas_lisp::core::structs::lerror::LError;
@@ -28,10 +29,26 @@ use std::convert::{TryFrom, TryInto};
 //const PRE_PROCESSING: &str = "pre_processing";
 const CONVERT_LVALUE_TO_EXPRESSION_CHRONICLE: &str = "convert_lvalue_to_expression_chronicle";
 
+#[derive(Default, Clone, Copy)]
+pub struct MetaData {
+    top_level: bool,
+    inside_top_level_do: bool,
+}
+
+impl MetaData {
+    pub fn new(top_level: bool, inside_top_level_do: bool) -> Self {
+        Self {
+            top_level,
+            inside_top_level_do,
+        }
+    }
+}
+
 pub fn convert_lvalue_to_expression_chronicle(
     exp: &LValue,
     context: &ConversionContext,
     ch: &mut ChronicleHierarchy,
+    meta_data: MetaData,
 ) -> Result<ExpressionChronicle, LError> {
     let mut ec = ExpressionChronicle::new(exp.clone(), &mut ch.sym_table);
 
@@ -66,7 +83,12 @@ pub fn convert_lvalue_to_expression_chronicle(
                     //Todo : handle the case when the first expression is not a symbol, but an expression that must be evaluated
                     if let LValue::Symbol(s) = &l[1] {
                         let var = ch.sym_table.declare_new_symbol(s, true, false);
-                        let val = convert_lvalue_to_expression_chronicle(&l[2], context, ch)?;
+                        let val = convert_lvalue_to_expression_chronicle(
+                            &l[2],
+                            context,
+                            ch,
+                            Default::default(),
+                        )?;
                         if val.is_result_pure() {
                             ec.add_constraint(Constraint::Eq(
                                 ec.get_interval().start().into(),
@@ -92,7 +114,92 @@ pub fn convert_lvalue_to_expression_chronicle(
                         ));
                     }
                 }
-                LCoreOperator::Begin | LCoreOperator::Do => {
+                LCoreOperator::Do => {
+                    ch.sym_table.new_scope();
+                    let mut literal: Vec<Lit> = vec![ch
+                        .sym_table
+                        .id(co.to_string().as_str())
+                        .unwrap_or_else(|| panic!("{} is not defined in the symbol table", co))
+                        .into()];
+                    let mut previous_interval: Interval = *ec.get_interval();
+
+                    /*
+                    Harcoded solution that needs to be improved in further iteration of the analysis
+                     */
+                    for (i, e) in l[1..].iter().enumerate() {
+                        let mut is_condition = false;
+                        let lvalue: &LValue = if meta_data.top_level {
+                            if let LValue::List(exp) = e {
+                                if exp[0] == CHECK.into() {
+                                    is_condition = true;
+                                    &exp[1]
+                                } else {
+                                    e
+                                }
+                            } else {
+                                e
+                            }
+                        } else {
+                            e
+                        };
+
+                        let ec_i = convert_lvalue_to_expression_chronicle(
+                            lvalue,
+                            context,
+                            ch,
+                            Default::default(),
+                        )?;
+
+                        if !is_condition {
+                            literal.push(ec_i.get_result());
+
+                            previous_interval = *ec_i.get_interval();
+
+                            if i == l.len() - 2 {
+                                if ec_i.is_result_pure() {
+                                    ec.set_pure_result(ec_i.get_result())
+                                } else {
+                                    ec.add_effect(Effect {
+                                        interval: *ec.get_interval(),
+                                        transition: Transition::new(
+                                            ec.get_result(),
+                                            ec_i.get_result(),
+                                        ),
+                                    });
+                                }
+                            }
+                        } else {
+                            ec.add_condition(Condition {
+                                interval: *ec_i.get_interval(),
+                                constraint: Constraint::Eq(
+                                    ec_i.get_result(),
+                                    ch.sym_table.new_bool(true).into(),
+                                ),
+                            });
+                        }
+
+                        if i == 0 {
+                            ec.add_constraint(Constraint::Eq(
+                                previous_interval.start().into(),
+                                ec_i.get_interval().start().into(),
+                            ));
+                        } else {
+                            ec.add_constraint(Constraint::Eq(
+                                previous_interval.end().into(),
+                                ec_i.get_interval().start().into(),
+                            ))
+                        }
+                        ec.absorb(ec_i);
+                    }
+
+                    ec.add_constraint(Constraint::Eq(
+                        previous_interval.end().into(),
+                        ec.get_interval().end().into(),
+                    ));
+
+                    ch.sym_table.revert_scope();
+                }
+                LCoreOperator::Begin => {
                     ch.sym_table.new_scope();
                     let mut literal: Vec<Lit> = vec![ch
                         .sym_table
@@ -102,7 +209,12 @@ pub fn convert_lvalue_to_expression_chronicle(
                     let mut previous_interval: Interval = *ec.get_interval();
 
                     for (i, e) in l[1..].iter().enumerate() {
-                        let ec_i = convert_lvalue_to_expression_chronicle(e, context, ch)?;
+                        let ec_i = convert_lvalue_to_expression_chronicle(
+                            e,
+                            context,
+                            ch,
+                            Default::default(),
+                        )?;
 
                         literal.push(ec_i.get_result());
                         if i == 0 {
@@ -176,10 +288,18 @@ pub fn convert_lvalue_to_expression_chronicle(
                                     ));
                                 }
 
-                                let state_variable =
-                                    convert_lvalue_to_expression_chronicle(&l[1], context, ch)?;
-                                let value =
-                                    convert_lvalue_to_expression_chronicle(&l[2], context, ch)?;
+                                let state_variable = convert_lvalue_to_expression_chronicle(
+                                    &l[1],
+                                    context,
+                                    ch,
+                                    Default::default(),
+                                )?;
+                                let value = convert_lvalue_to_expression_chronicle(
+                                    &l[2],
+                                    context,
+                                    ch,
+                                    Default::default(),
+                                )?;
 
                                 //Temporal constraints
                                 ec.add_constraint(Constraint::Eq(
@@ -227,6 +347,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                                     "not yet supported".to_string(),
                                 ))
                             }
+                            CHECK => {}
                             _ => {
                                 if let Some(id) = ch.sym_table.id(&s) {
                                     match ch.sym_table
@@ -276,7 +397,8 @@ pub fn convert_lvalue_to_expression_chronicle(
                     f_symbol_end_timepoint.into(),
                 ));
                 for (i, e) in l[1..].iter().enumerate() {
-                    let ec_i = convert_lvalue_to_expression_chronicle(e, context, ch)?;
+                    let ec_i =
+                        convert_lvalue_to_expression_chronicle(e, context, ch, Default::default())?;
 
                     literal.push(ec_i.get_result());
                     sub_expression_pure &= ec_i.is_result_pure();
@@ -442,9 +564,11 @@ pub fn convert_if(
     let b_true = &exp[2];
     let b_false = &exp[3];
 
-    let ec_cond = convert_lvalue_to_expression_chronicle(cond, context, ch)?;
-    let ec_b_true = convert_lvalue_to_expression_chronicle(b_true, context, ch)?;
-    let ec_b_false = convert_lvalue_to_expression_chronicle(b_false, context, ch)?;
+    let ec_cond = convert_lvalue_to_expression_chronicle(cond, context, ch, Default::default())?;
+    let ec_b_true =
+        convert_lvalue_to_expression_chronicle(b_true, context, ch, Default::default())?;
+    let ec_b_false =
+        convert_lvalue_to_expression_chronicle(b_false, context, ch, Default::default())?;
 
     let variables_b_true = ec_b_true.get_variables_of_type(&ch.sym_table, &AtomType::Variable);
 

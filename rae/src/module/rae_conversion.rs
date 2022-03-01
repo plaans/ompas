@@ -2,7 +2,9 @@ use crate::context::rae_env::RAEEnv;
 use crate::module::{CtxRae, MOD_RAE};
 use crate::planning::conversion::convert_domain_to_chronicle_hierarchy;
 use crate::planning::conversion::pre_processing::{pre_processing, transform_lambda_expression};
-use crate::planning::conversion::processing::{convert_if, convert_lvalue_to_expression_chronicle};
+use crate::planning::conversion::processing::{
+    convert_if, convert_lvalue_to_expression_chronicle, MetaData,
+};
 use crate::planning::structs::traits::FormatWithSymTable;
 use crate::planning::structs::{ChronicleHierarchy, ConversionContext};
 use ::macro_rules_attribute::macro_rules_attribute;
@@ -39,7 +41,8 @@ pub async fn convert_expr<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     let mut ch = ChronicleHierarchy::default();
 
     let time = SystemTime::now();
-    let chronicle = convert_lvalue_to_expression_chronicle(&lv, &context, &mut ch)?;
+    let chronicle =
+        convert_lvalue_to_expression_chronicle(&lv, &context, &mut ch, MetaData::new(true, false))?;
     let time = time.elapsed().expect("could not get time").as_micros();
     let string = chronicle.format_with_sym_table(&ch.sym_table);
 

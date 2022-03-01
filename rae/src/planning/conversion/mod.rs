@@ -1,6 +1,6 @@
 use crate::planning::conversion::post_processing::*;
 use crate::planning::conversion::pre_processing::pre_processing;
-use crate::planning::conversion::processing::convert_lvalue_to_expression_chronicle;
+use crate::planning::conversion::processing::{convert_lvalue_to_expression_chronicle, MetaData};
 use crate::planning::structs::atom::AtomType;
 use crate::planning::structs::chronicle::Chronicle;
 use crate::planning::structs::lit::Lit;
@@ -190,7 +190,12 @@ pub fn build_chronicle(
 
     chronicle.set_debug(Some(pre_processed.clone()));
 
-    let mut ec = convert_lvalue_to_expression_chronicle(&pre_processed, conversion_context, ch)?;
+    let mut ec = convert_lvalue_to_expression_chronicle(
+        &pre_processed,
+        conversion_context,
+        ch,
+        MetaData::new(true, false),
+    )?;
 
     post_processing(&mut ec, conversion_context, ch)?;
 
@@ -230,7 +235,12 @@ pub fn convert_lvalue_to_chronicle(
 
     chronicle.set_debug(Some(pre_processed.clone()));
 
-    let mut ec = convert_lvalue_to_expression_chronicle(&pre_processed, conversion_context, ch)?;
+    let mut ec = convert_lvalue_to_expression_chronicle(
+        &pre_processed,
+        conversion_context,
+        ch,
+        MetaData::new(true, false),
+    )?;
 
     post_processing(&mut ec, conversion_context, ch)?;
 

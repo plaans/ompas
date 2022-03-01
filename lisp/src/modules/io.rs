@@ -195,7 +195,7 @@ pub fn write(args: &[LValue], _: &LEnv) -> LResult {
     match &args[0] {
         LValue::Symbol(s) => {
             //got our file name
-            let mut f = File::create(s.to_string())?;
+            let mut f = File::create(s)?;
             f.write_all(args[1].to_string().as_bytes())?;
             Ok(LValue::Nil)
         }

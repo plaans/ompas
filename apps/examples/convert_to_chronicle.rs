@@ -3,7 +3,9 @@ use ompas_lisp::core::structs::lenv::LEnv;
 use ompas_lisp::core::structs::lerror::LError;
 
 use ompas_rae::planning::conversion::convert_lvalue_to_chronicle;
-use ompas_rae::planning::conversion::processing::convert_lvalue_to_expression_chronicle;
+use ompas_rae::planning::conversion::processing::{
+    convert_lvalue_to_expression_chronicle, MetaData,
+};
 use ompas_rae::planning::structs::chronicle::{Chronicle, ExpressionChronicle};
 use ompas_rae::planning::structs::traits::FormatWithSymTable;
 use ompas_rae::planning::structs::{ChronicleHierarchy, ConversionContext};
@@ -53,7 +55,8 @@ async fn translate_2(exp: &str) -> Result<ExpressionChronicle, LError> {
 
     let context = ConversionContext::default();
 
-    let chronicle = convert_lvalue_to_expression_chronicle(&lv, &context, &mut ch)?;
+    let chronicle =
+        convert_lvalue_to_expression_chronicle(&lv, &context, &mut ch, MetaData::new(true, false))?;
     println!("{}", chronicle.format_with_sym_table(&ch.sym_table));
     Ok(chronicle)
 }

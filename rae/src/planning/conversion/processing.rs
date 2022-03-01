@@ -54,7 +54,7 @@ pub fn convert_lvalue_to_expression_chronicle(
 
     match exp {
         LValue::Symbol(s) => {
-            //Generale case
+            //General case
             let symbol = ch.sym_table.declare_new_symbol(s, false, false);
             if ch.sym_table.get_type(&symbol).unwrap() == &AtomType::Variable {
                 ec.add_var(&symbol);
@@ -159,13 +159,18 @@ pub fn convert_lvalue_to_expression_chronicle(
                                 if ec_i.is_result_pure() {
                                     ec.set_pure_result(ec_i.get_result())
                                 } else {
-                                    ec.add_effect(Effect {
+                                    ec.add_constraint(Constraint::Eq(
+                                        ec.get_result(),
+                                        ec_i.get_result(),
+                                    ));
+
+                                    /*ec.add_effect(Effect {
                                         interval: *ec.get_interval(),
                                         transition: Transition::new(
                                             ec.get_result(),
                                             ec_i.get_result(),
                                         ),
-                                    });
+                                    });*/
                                 }
                             }
                         } else {
@@ -232,14 +237,16 @@ pub fn convert_lvalue_to_expression_chronicle(
                         previous_interval = *ec_i.get_interval();
 
                         if i == l.len() - 2 {
-                            if ec_i.is_result_pure() {
-                                ec.set_pure_result(ec_i.get_result())
-                            } else {
-                                ec.add_effect(Effect {
+                            //if ec_i.is_result_pure() {
+                            ec.set_pure_result(ec_i.get_result())
+                        } else {
+                            ec.add_constraint(Constraint::Eq(ec.get_result(), ec_i.get_result()));
+
+                            /*ec.add_effect(Effect {
                                     interval: *ec.get_interval(),
                                     transition: Transition::new(ec.get_result(), ec_i.get_result()),
                                 });
-                            }
+                            }*/
                         }
                         ec.absorb(ec_i);
                     }
@@ -479,10 +486,12 @@ pub fn convert_lvalue_to_expression_chronicle(
                             ]
                             .into();
 
-                            ec.add_effect(Effect {
+                            ec.add_constraint(Constraint::Eq(ec.get_result(), literal));
+
+                            /*ec.add_effect(Effect {
                                 interval: *ec.get_interval(),
                                 transition: Transition::new(ec.get_result(), literal),
-                            });
+                            });*/
                         }
                         ec.add_constraint(Constraint::Eq(
                             end_last_interval.into(),
@@ -499,10 +508,11 @@ pub fn convert_lvalue_to_expression_chronicle(
                         ]
                         .into();
 
-                        ec.add_effect(Effect {
+                        ec.add_constraint(Constraint::Eq(ec.get_result(), literal));
+                        /*ec.add_effect(Effect {
                             interval: *ec.get_interval(),
                             transition: Transition::new(ec.get_result(), literal),
-                        });
+                        });*/
                         ec.add_constraint(Constraint::Eq(
                             end_last_interval.into(),
                             ec.get_interval().end().into(),
@@ -516,10 +526,11 @@ pub fn convert_lvalue_to_expression_chronicle(
                         })
                     }
                     ExpressionType::StateFunction => {
-                        ec.add_effect(Effect {
+                        ec.add_constraint(Constraint::Eq(ec.get_result(), literal.into()));
+                        /*ec.add_effect(Effect {
                             interval: *ec.get_interval(),
                             transition: Transition::new(ec.get_result(), literal.into()),
-                        });
+                        });*/
                         ec.add_constraint(Constraint::Eq(
                             end_last_interval.into(),
                             ec.get_interval().end().into(),

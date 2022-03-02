@@ -37,10 +37,10 @@ pub struct Logger {
 }
 
 impl Logger {
-    fn new(working_directory: Option<PathBuf>) -> Logger {
+    fn new(log_path: PathBuf) -> Logger {
         let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
 
-        tokio::spawn(async move { run_logger_file(rx, working_directory).await });
+        tokio::spawn(async move { run_logger_file(rx, log_path).await });
         //tokio::spawn(async move { run_logger(rx).await });
 
         Logger { tx }
@@ -81,9 +81,13 @@ impl Log for Logger {
 
 /// Initiate new terminal and logger
 /// Build the global object
-pub fn init(working_directory: Option<PathBuf>) -> Result<(), SetLoggerError> {
-    log::set_boxed_logger(Box::new(Logger::new(working_directory)))
-        .map(|()| log::set_max_level(LevelFilter::Info))
+pub fn init(log_path: PathBuf) -> Result<mpsc::Sender<String>, SetLoggerError> {
+    let logger = Logger::new(log_path);
+    let sender = logger.tx.clone();
+    match log::set_boxed_logger(Box::new(logger)).map(|()| log::set_max_level(LevelFilter::Info)) {
+        Err(e) => Err(e),
+        Ok(_) => Ok(sender),
+    }
 }
 
 /// Task that is running asynchronously
@@ -91,35 +95,12 @@ pub fn init(working_directory: Option<PathBuf>) -> Result<(), SetLoggerError> {
 ///
 /// Log files are stored in the <current>/rae_logs.
 /// Files names are formatted in function of the date and time at which the script is launched.
-async fn run_logger_file(mut rx: mpsc::Receiver<String>, working_directory: Option<PathBuf>) {
-    let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
-    let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
-
-    let dir_path: PathBuf = match working_directory {
-        Some(wd) => {
-            let mut dir_path = wd;
-            dir_path.push("rae_logs");
-            dir_path
-        }
-        None => format!(
-            "{}/ompas/rae_logs",
-            match env::var("HOME") {
-                Ok(val) => val,
-                Err(_) => ".".to_string(),
-            }
-        )
-        .into(),
-    };
-
-    fs::create_dir_all(&dir_path).expect("could not create rae logs directory");
-    let mut file_path = dir_path.clone();
-    file_path.push(format!("rae_{}", string_date));
-
+async fn run_logger_file(mut rx: mpsc::Receiver<String>, log_path: PathBuf) {
     let mut file = OpenOptions::new()
         .read(true)
         .write(true)
         .create(true)
-        .open(&file_path)
+        .open(&log_path)
         .expect("error creating log file");
 
     file.write_all("RAE LOG\n\n".as_bytes())
@@ -127,7 +108,7 @@ async fn run_logger_file(mut rx: mpsc::Receiver<String>, working_directory: Opti
 
     Command::new("gnome-terminal")
         .args(&["--title", "RAE LOG"])
-        .args(&["--", "tail", "-f", file_path.to_str().unwrap()])
+        .args(&["--", "tail", "-f", log_path.to_str().unwrap()])
         .spawn()
         .expect("could not spawn terminal");
 
@@ -166,17 +147,24 @@ async fn run_logger_file(mut rx: mpsc::Receiver<String>, working_directory: Opti
                 }
             }
             _ = end_receiver.recv() => {
-                println!("logger ended");
                 if let Some(pid) = logger_pid {
                     Command::new("kill")
                     .args(&["-9", pid.as_str()]).spawn()
                     .expect("Command failed.");
                 }
-                file.write_all(END_MSG.as_bytes()).expect("could not write to RAE log file");
+                println!("Process RAE LOG killed.");
                 break;
             }
         }
     }
+    println!("Draining RAE log queue...");
+    while let Some(msg) = rx.recv().await {
+        file.write_all(format!("{}\n", msg).as_bytes())
+            .expect("could not write to RAE log file");
+    }
+    file.write_all(END_MSG.as_bytes())
+        .expect("could not write to RAE log file");
+    println!("RAE LOG task ended.");
 }
 /// Sends via tcp to logger.py strings that need to be logged.
 /// run_logger is an asynchronous task that await a message to send via tcp.

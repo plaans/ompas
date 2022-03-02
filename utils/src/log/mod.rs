@@ -97,14 +97,13 @@ async fn run_logger_file(mut rx: mpsc::Receiver<String>) {
     let name_file = format!("rae_logs/rae_{}", string_date);
     let mut file = OpenOptions::new()
         .read(true)
-        .write(true)
+        .append(true)
         .create(true)
         .open(name_file.clone())
         .expect("error creating log file");
 
     file.write_all("RAE LOG\n\n".as_bytes())
         .expect("could not write to RAE log file.");
-
     Command::new("gnome-terminal")
         .args(&["--title", "RAE LOG"])
         .args(&["--", "tail", "-f", name_file.as_str()])
@@ -157,6 +156,7 @@ async fn run_logger_file(mut rx: mpsc::Receiver<String>) {
         }
     }
 }
+
 /// Sends via tcp to logger.py strings that need to be logged.
 /// run_logger is an asynchronous task that await a message to send via tcp.
 #[allow(unused)]

@@ -108,7 +108,7 @@
                 (begin
                     (mutex::lock-and-do ?r
                         (t_carry_to_machine ?r ?p ?m))
-                    (wait-on `(= (package.location ,?p) (machine.output_belt ,?m))))))))
+                    (monitor `(= (package.location ,?p) (machine.output_belt ,?m))))))))
 
 
     (def-method m_pick_and_place
@@ -176,7 +176,7 @@
                 (let ((?b (machine.input_belt ?m)))
                     (begin
                         (t_position_robot_to_belt ?r ?b)
-                        (wait-on `(< (len (belt.packages_list ,?b)) (len (belt.cells ,?b))))
+                        (monitor `(< (len (belt.packages_list ,?b)) (len (belt.cells ,?b))))
                         (place ?r))))))
 
     (def-task t_charge ?r)
@@ -189,7 +189,7 @@
             (:body
                 (begin
                     (go_charge ?r)
-                    (wait-on `(= (robot.battery ,?r) 1))))))
+                    (monitor `(= (robot.battery ,?r) 1))))))
 
     (def-task t_check_battery ?r)
     (def-method m_check_battery
@@ -201,9 +201,9 @@
           (:body
              (loop
                  (begin
-                     (wait-on `(< (robot.battery ,?r) 0.4))
+                     (monitor `(< (robot.battery ,?r) 0.4))
                      (mutex::lock-and-do ?r
                         (begin
                             (go_charge ?r)
-                            (wait-on `(> (robot.battery ,?r) 0.9)))))))))
+                            (monitor `(> (robot.battery ,?r) 0.9)))))))))
 )

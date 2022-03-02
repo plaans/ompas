@@ -14,6 +14,7 @@
 //! => ((1 3)(1 4)(2 3)(2 4))
 //! ```
 
+use crate::core::eval;
 use crate::core::root_module::list::car;
 use crate::core::structs::contextcollection::Context;
 use crate::core::structs::documentation::{Documentation, LHelp};
@@ -25,12 +26,12 @@ use crate::core::structs::lvalue::LValue;
 use crate::core::structs::module::{IntoModule, Module};
 use crate::core::structs::purefonction::PureFonctionCollection;
 use crate::core::structs::typelvalue::TypeLValue;
-use crate::core::{activate_debug, eval};
 use crate::modules::utils::language::*;
 use ::macro_rules_attribute::macro_rules_attribute;
 use aries_utils::StreamingIterator;
 use ompas_utils::dyn_async;
 use rand::Rng;
+use std::convert::TryInto;
 use std::ops::Deref;
 
 //LANGUAGE
@@ -256,6 +257,8 @@ pub const LAMBDA_EVAL_NON_RECURSIVE: &str = "(define enr
     (lambda (l)
         (eval (cons (car l) (quote-list (cdr l))))))";
 
+pub const EVAL_NON_RECURSIVE: &str = "enr";
+
 pub const DOC_ARBITRARY: &str = "todo!";
 pub const DOC_EVAL_NON_RECURSIVE: &str = "todo!";
 
@@ -295,13 +298,14 @@ impl IntoModule for CtxUtils {
                 MACRO_LET_STAR,
                 //MACRO_FOR,
                 //LAMBDA_ARBITRARY,
-                LAMBDA_EVAL_NON_RECURSIVE,
+                //LAMBDA_EVAL_NON_RECURSIVE,
             ]
             .into(),
             label: MOD_UTILS.into(),
         };
 
         module.add_async_fn_prelude(ARBITRARY, arbitrary);
+        module.add_async_fn_prelude(EVAL_NON_RECURSIVE, enr);
         module.add_fn_prelude(RAND_ELEMENT, rand_element);
         module.add_fn_prelude(ENUMERATE, enumerate);
         module.add_fn_prelude(CONTAINS, contains);
@@ -352,7 +356,7 @@ pub async fn arbitrary<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
                     (f l)))
               (else nil)))) ; error cases";*/
 
-    activate_debug();
+    //activate_debug();
 
     match args.len() {
         1 => car(&[args[0].clone()], env),
@@ -376,6 +380,28 @@ pub async fn arbitrary<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     }
 }
 
+#[macro_rules_attribute(dyn_async!)]
+pub async fn enr<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+    if args.len() != 1 {
+        return Err(WrongNumberOfArgument(
+            EVAL_NON_RECURSIVE,
+            args.into(),
+            args.len(),
+            1..1,
+        ));
+    }
+
+    let mut args: Vec<LValue> = (&args[0]).try_into()?;
+
+    for (i, arg) in args.iter_mut().enumerate() {
+        if i != 0 {
+            *arg = LValue::List(vec![LCoreOperator::Quote.into(), arg.clone()])
+        }
+    }
+
+    eval(&args.into(), &mut env.clone()).await
+}
+
 ///Return enumeration from a list of list
 ///uses function from aries_utils
 /// # Example:
@@ -389,7 +415,6 @@ pub async fn arbitrary<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
 pub fn enumerate(args: &[LValue], _: &LEnv) -> LResult {
     let mut vec_iter = vec![];
     let mut new_args = vec![];
-
     for arg in args {
         if let LValue::List(_) = arg {
             new_args.push(arg.clone())

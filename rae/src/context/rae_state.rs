@@ -116,7 +116,9 @@ impl RAEState {
 
     async fn trigger_update_event(&self) {
         if let Some(b) = self.sem_update.lock().await.deref() {
-            b.send(true).expect("todo!");
+            if b.receiver_count() > 0 && b.send(true).is_err() {
+                println!("could not broadcast update on state")
+            }
         }
     }
 

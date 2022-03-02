@@ -10,7 +10,7 @@ use tokio_stream::StreamExt;
 //use crate::context::{Action, Method, SelectOption, Status, TaskId};
 use crate::context::actions_progress::async_status_watcher_run;
 use crate::context::rae_env::RAEEnv;
-use crate::context::ressource_access::wait_on::task_check_wait_on;
+use crate::context::ressource_access::monitor::task_check_monitor;
 use crate::module::rae_exec::platform::RAE_LAUNCH_PLATFORM;
 use crate::module::rae_exec::{Job, JobId};
 use log::{error, info};
@@ -147,7 +147,7 @@ pub async fn rae_run(mut context: RAEEnv, options: &RAEOptions, _log: String) {
     let receiver_event_update_state = context.state.subscribe_on_update().await;
     let env_check_wait_on = context.get_exec_env().await;
     tokio::spawn(async move {
-        task_check_wait_on(receiver_event_update_state, env_check_wait_on).await
+        task_check_monitor(receiver_event_update_state, env_check_wait_on).await
     });
 
     loop {

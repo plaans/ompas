@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use std::path::PathBuf;
 
 use structopt::StructOpt;
@@ -7,7 +8,7 @@ use ompas_lisp::core::activate_debug;
 use ompas_lisp::lisp_interpreter::{LispInterpreter, LispInterpreterConfig};
 use ompas_lisp::modules::_type::CtxType;
 use ompas_lisp::modules::advanced_math::CtxMath;
-use ompas_lisp::modules::io::CtxIo;
+use ompas_lisp::modules::io::{CtxIo, LogOutput};
 use ompas_lisp::modules::static_eval::CtxStaticEval;
 use ompas_lisp::modules::string::CtxString;
 use ompas_lisp::modules::utils::CtxUtils;
@@ -59,9 +60,12 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
         .expect("error importing mod-rae-exec in eval-static");
 
     //Add the sender of the channel.
-    ctx_io.add_communication(li.subscribe());
     if let Some(pb) = &log {
-        ctx_io.set_log_output(pb.clone().into());
+        let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
+        let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
+        let mut file_pb = pb.clone();
+        file_pb.push(format!("log_{}.txt", string_date));
+        ctx_io.set_log_output(LogOutput::File(file_pb));
     }
 
     li.import_namespace(ctx_utils)

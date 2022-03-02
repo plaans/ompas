@@ -1,4 +1,4 @@
-pub mod wait_on {
+pub mod monitor {
     use log::{info, warn};
     use ompas_lisp::core::eval;
     use ompas_lisp::core::structs::lenv::LEnv;
@@ -8,31 +8,31 @@ pub mod wait_on {
     use tokio::sync::{broadcast, mpsc, Mutex};
 
     lazy_static! {
-        pub static ref WAIT_ON_COLLECTION: WaitOnCollection = Default::default();
+        pub static ref MONITOR_COLLECTION: MonitorCollection = Default::default();
     }
 
     #[derive(Default, Clone)]
-    pub struct WaitOnCollection {
-        inner: Arc<Mutex<Vec<WaitOn>>>,
+    pub struct MonitorCollection {
+        inner: Arc<Mutex<Vec<Monitor>>>,
     }
 
     const TOKIO_CHANNEL_SIZE: usize = 64;
 
     pub async fn add_waiter(lambda: LValue) -> mpsc::Receiver<bool> {
-        WAIT_ON_COLLECTION.add_waiter(lambda).await
+        MONITOR_COLLECTION.add_waiter(lambda).await
     }
 
-    impl WaitOnCollection {
+    impl MonitorCollection {
         async fn add_waiter(&self, lambda: LValue) -> mpsc::Receiver<bool> {
             let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
-            let w = WaitOn {
+            let w = Monitor {
                 lambda,
                 channel: tx,
             };
             self.inner.lock().await.push(w);
             rx
         }
-        pub async fn check_wait_on(&self, mut env: LEnv) {
+        pub async fn check_monitors(&self, mut env: LEnv) {
             let mut item_to_remove = vec![];
             let mut waiters = self.inner.lock().await;
             for (id, waiter) in waiters.iter().enumerate() {
@@ -61,20 +61,20 @@ pub mod wait_on {
         }
     }
 
-    pub struct WaitOn {
+    pub struct Monitor {
         lambda: LValue,
         channel: mpsc::Sender<bool>,
     }
 
     pub async fn get_debug() -> String {
-        let lambdas: Vec<LValue> = WAIT_ON_COLLECTION
+        let lambdas: Vec<LValue> = MONITOR_COLLECTION
             .inner
             .lock()
             .await
             .iter()
             .map(|k| k.lambda.clone())
             .collect();
-        let mut str = "'wait-on' lambdas: \n".to_string();
+        let mut str = "'monitor' lambdas: \n".to_string();
         for l in lambdas {
             str.push('-');
             str.push_str(l.to_string().as_str());
@@ -83,23 +83,23 @@ pub mod wait_on {
         str
     }
 
-    pub async fn task_check_wait_on(mut receiver: broadcast::Receiver<bool>, env: LEnv) {
+    pub async fn task_check_monitor(mut receiver: broadcast::Receiver<bool>, env: LEnv) {
         //println!("task check wait on active");
         let mut end_receiver = task_handler::subscribe_new_task();
         loop {
             tokio::select! {
                 _ = receiver.recv() => {
-                    let n_wait_on = WAIT_ON_COLLECTION.inner.lock().await.len();
+                    let n_wait_on = MONITOR_COLLECTION.inner.lock().await.len();
                     if n_wait_on != 0 {
-                        //info!("{} wait ons to check!", n_wait_on);
-                        WAIT_ON_COLLECTION.check_wait_on(env.clone()).await;
+                        MONITOR_COLLECTION.check_monitors(env.clone()).await;
                     }
                 }
                 _ = end_receiver.recv() => {
-                    info!("Task \"task_check_wait_on\" killed.");
+                    info!("Task \"task_check_monitor\" killed.");
                     break;
                 }
             }
         }
+        drop(receiver)
     }
 }

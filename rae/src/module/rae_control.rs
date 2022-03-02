@@ -1,6 +1,6 @@
 use crate::module::rae_exec::{Job, JobType};
 use crate::module::{CtxRae, MOD_RAE};
-use crate::supervisor::{rae_log, rae_run, RAEOptions};
+use crate::supervisor::{rae_run, RAEOptions};
 use ::macro_rules_attribute::macro_rules_attribute;
 use ompas_lisp::core::structs::lenv::LEnv;
 use ompas_lisp::core::structs::lerror::LError::WrongNumberOfArgument;
@@ -28,8 +28,6 @@ pub async fn rae_launch<'a>(_: &'a [LValue], env: &'a LEnv) -> LResult {
     let options = ctx.get_options().await.clone();
 
     let context = ctx.own_rae_env().await;
-
-    rae_log::init(ctx.log.clone()).expect("Error while initiating logger.");
 
     tokio::spawn(async move {
         rae_run(context, &options, "rae-log.txt".to_string()).await;

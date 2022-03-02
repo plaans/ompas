@@ -123,7 +123,7 @@ pub fn is_string(args: &[LValue], _: &LEnv) -> LResult {
 pub fn is_list(args: &[LValue], _: &LEnv) -> LResult {
     match args.len() {
         1 => match args.get(0).unwrap() {
-            LValue::List(_) => Ok(LValue::True),
+            LValue::List(_) | LValue::Nil => Ok(LValue::True),
             _ => Ok(LValue::Nil),
         },
         i => Err(WrongNumberOfArgument(IS_LIST, args.into(), i, 1..1)),

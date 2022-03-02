@@ -7,7 +7,8 @@ use crate::module::rae_description::*;
 use crate::module::rae_exec::{CtxRaeExec, Job, Platform};
 use crate::module::rae_monitor::*;
 use crate::planning::structs::ConversionContext;
-use crate::supervisor::{RAEOptions, TOKIO_CHANNEL_SIZE};
+use crate::supervisor::{rae_log, RAEOptions, TOKIO_CHANNEL_SIZE};
+use chrono::{DateTime, Utc};
 use ompas_lisp::core::structs::contextcollection::Context;
 use ompas_lisp::core::structs::documentation::{Documentation, LHelp};
 use ompas_lisp::core::structs::lenv::ImportType::{WithPrefix, WithoutPrefix};
@@ -16,11 +17,11 @@ use ompas_lisp::core::structs::module::{InitLisp, IntoModule, Module};
 use ompas_lisp::core::structs::purefonction::PureFonctionCollection;
 use ompas_lisp::modules::_type::CtxType;
 use ompas_lisp::modules::advanced_math::CtxMath;
-use ompas_lisp::modules::io::CtxIo;
+use ompas_lisp::modules::io::{CtxIo, LogOutput};
 use ompas_lisp::modules::utils::CtxUtils;
-use std::mem;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::{env, fs, mem};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{mpsc, RwLock};
 
@@ -44,7 +45,7 @@ const DOC_MOD_RAE_VERBOSE: &str = "functions:\n\
 const DOC_RAE_LAUNCH: &str = "Launch the main rae loop in an asynchronous task.";
 
 pub struct CtxRae {
-    log: Option<PathBuf>,
+    log: PathBuf,
     options: Arc<RwLock<RAEOptions>>,
     env: Arc<RwLock<RAEEnv>>,
     domain: InitLisp,
@@ -63,6 +64,29 @@ impl CtxRae {
         let mut ctx_rae = CtxRae::default();
         let (sender_job, receiver_job) = mpsc::channel(TOKIO_CHANNEL_SIZE);
         ctx_rae.set_sender_to_rae(Some(sender_job));
+
+        let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
+        let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
+
+        let dir_path: PathBuf = match working_directory {
+            Some(wd) => {
+                let mut dir_path = wd;
+                dir_path.push("rae_logs");
+                dir_path
+            }
+            None => format!(
+                "{}/ompas/rae_logs",
+                match env::var("HOME") {
+                    Ok(val) => val,
+                    Err(_) => ".".to_string(),
+                }
+            )
+            .into(),
+        };
+
+        fs::create_dir_all(&dir_path).expect("could not create rae logs directory");
+        let mut file_path = dir_path.clone();
+        file_path.push(format!("rae_{}.txt", string_date));
 
         let (mut rae_env, platform) = match platform {
             Some(platform) => {
@@ -117,10 +141,11 @@ impl CtxRae {
             .expect("error loading math");
 
         let mut ctx_io = CtxIo::default();
-        if let Some(ref path) = working_directory {
-            ctx_io.set_log_output(path.clone().into());
-            ctx_rae.set_log(working_directory);
-        }
+
+        let channel = rae_log::init(file_path.clone()).expect("Error while initiating logger.");
+
+        ctx_io.set_log_output(LogOutput::Channel(channel));
+        ctx_rae.set_log(file_path);
 
         rae_env
             .env
@@ -164,7 +189,7 @@ impl CtxRae {
 
         let mut ctx_io = CtxIo::default();
         if let Some(ref path) = working_directory {
-            ctx_io.set_log_output(path.clone().into());
+            ctx_io.set_log_output(LogOutput::File(path.clone()));
         }
 
         env.import(ctx_io, WithoutPrefix)
@@ -184,10 +209,10 @@ impl CtxRae {
 }
 
 impl CtxRae {
-    pub fn get_log(&self) -> &Option<PathBuf> {
+    pub fn get_log(&self) -> &PathBuf {
         &self.log
     }
-    pub fn set_log(&mut self, log: Option<PathBuf>) {
+    pub fn set_log(&mut self, log: PathBuf) {
         self.log = log;
     }
 
@@ -250,7 +275,7 @@ impl CtxRae {
 impl Default for CtxRae {
     fn default() -> Self {
         Self {
-            log: None,
+            log: PathBuf::default(),
             options: Default::default(),
             env: Arc::new(RwLock::new(RAEEnv {
                 job_receiver: None,
@@ -320,7 +345,7 @@ impl IntoModule for CtxRae {
         module.add_fn_prelude(RAE_TRIGGER_EVENT, trigger_event);
         module.add_fn_prelude(RAE_TRIGGER_TASK, trigger_task);
         module.add_async_fn_prelude(RAE_GET_MUTEXES, get_mutexes);
-        module.add_async_fn_prelude(RAE_GET_WAIT_ONS, get_wait_ons);
+        module.add_async_fn_prelude(RAE_GET_MONITORS, get_monitors);
 
         module
     }

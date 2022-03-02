@@ -26,11 +26,11 @@
       (:body
          (loop
              (begin
-                 (wait-on `(< (robot.battery ,?r) 0.4))
+                 (monitor `(< (robot.battery ,?r) 0.4))
                  (mutex::lock-and-do ?r
                     (begin
                         (go_charge ?r)
-                        (wait-on `(> (robot.battery ,?r) 0.9)))))))))
+                        (monitor `(> (robot.battery ,?r) 0.9)))))))))
      (def-task test ?r)
      (def-method m_test
         '((:task test)

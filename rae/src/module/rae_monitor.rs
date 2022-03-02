@@ -1,6 +1,6 @@
 use crate::context::mutex;
 use crate::context::rae_state::{StateType, KEY_DYNAMIC, KEY_INNER_WORLD, KEY_STATIC};
-use crate::context::ressource_access::wait_on;
+use crate::context::ressource_access::monitor;
 use crate::module::{CtxRae, MOD_RAE};
 use ::macro_rules_attribute::macro_rules_attribute;
 use ompas_lisp::core::structs::lenv::LEnv;
@@ -20,7 +20,7 @@ pub const RAE_GET_TASKS: &str = "get-tasks";
 pub const RAE_GET_STATE_FUNCTIONS: &str = "get-state-functions";
 pub const RAE_GET_ENV: &str = "get-env";
 pub const RAE_GET_MUTEXES: &str = "get-mutexes";
-pub const RAE_GET_WAIT_ONS: &str = "get-wait-ons";
+pub const RAE_GET_MONITORS: &str = "get-monitors";
 
 pub const DOC_RAE_GET_METHODS: &str = "Returns the list of all defined methods in RAE environment";
 pub const DOC_RAE_GET_ACTIONS: &str = "Returns the list of all defined actions in RAE environment";
@@ -136,8 +136,8 @@ pub async fn get_mutexes<'a>(_: &'a [LValue], _: &'a LEnv) -> LResult {
 }
 
 #[macro_rules_attribute(dyn_async!)]
-pub async fn get_wait_ons<'a>(_: &'a [LValue], _: &'a LEnv) -> LResult {
-    Ok(wait_on::get_debug().await.into())
+pub async fn get_monitors<'a>(_: &'a [LValue], _: &'a LEnv) -> LResult {
+    Ok(monitor::get_debug().await.into())
 }
 
 ///Get the methods of a given task

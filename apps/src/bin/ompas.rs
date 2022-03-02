@@ -49,7 +49,6 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
     //Insert the doc for the different contexts.
 
     //Add the sender of the channel.
-    ctx_io.add_communication(li.subscribe());
     if let Some(pb) = &log {
         ctx_io.set_log_output(pb.clone().into());
     }

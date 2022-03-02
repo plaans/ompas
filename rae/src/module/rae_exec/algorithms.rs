@@ -6,9 +6,13 @@ pub const LAMBDA_PROGRESS: &str = "
 
             (if (null? first_m)
                 (err err::no-applicable-method)
-                (if (! (err? first_m))
-                    (rae-set-success-for-task task_id)
-                    (retry task_id))))))";
+                (begin
+                    (print \"trying \" first_m)
+                    (define result (enr first_m))
+                    (print \"tried fist method of \" task_id)
+                    (if (err? result)
+                        (retry task_id)
+                        (rae-set-success-for-task task_id)))))))";
 
 pub const LAMBDA_SELECT: &str = "
 (define select

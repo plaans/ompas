@@ -32,14 +32,14 @@ const CONVERT_LVALUE_TO_EXPRESSION_CHRONICLE: &str = "convert_lvalue_to_expressi
 #[derive(Default, Clone, Copy)]
 pub struct MetaData {
     top_level: bool,
-    inside_top_level_do: bool,
+    _inside_top_level_do: bool,
 }
 
 impl MetaData {
-    pub fn new(top_level: bool, inside_top_level_do: bool) -> Self {
+    pub fn new(top_level: bool, _inside_top_level_do: bool) -> Self {
         Self {
             top_level,
-            inside_top_level_do,
+            _inside_top_level_do,
         }
     }
 }

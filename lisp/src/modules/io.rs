@@ -8,11 +8,11 @@ use crate::core::structs::lvalue::LValue;
 use crate::core::structs::module::{IntoModule, Module};
 use crate::core::structs::purefonction::PureFonctionCollection;
 use crate::core::structs::typelvalue::TypeLValue;
-use crate::lisp_interpreter::ChannelToLispInterpreter;
 use crate::modules::io::language::*;
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::PathBuf;
+use tokio::sync::mpsc;
 
 /*
 LANGUAGE
@@ -55,6 +55,7 @@ const MACRO_READ: &str = "(defmacro read \
 pub enum LogOutput {
     Stdout,
     File(PathBuf),
+    Channel(mpsc::Sender<String>),
 }
 
 impl From<PathBuf> for LogOutput {
@@ -67,25 +68,18 @@ impl From<PathBuf> for LogOutput {
 /// Note: Be careful when there is response on the receiver
 #[derive(Debug)]
 pub struct CtxIo {
-    sender_li: Option<ChannelToLispInterpreter>,
     log: LogOutput,
 }
 
 impl Default for CtxIo {
     fn default() -> Self {
         Self {
-            sender_li: None,
             log: LogOutput::Stdout,
         }
     }
 }
 
 impl CtxIo {
-    ///Set the sender to lisp interpreter
-    /// Used to send commands to execute
-    pub fn add_communication(&mut self, com: ChannelToLispInterpreter) {
-        self.sender_li = Some(com);
-    }
     ///Set the log output
     pub fn set_log_output(&mut self, output: LogOutput) {
         self.log = output
@@ -142,14 +136,23 @@ pub fn print(args: &[LValue], env: &LEnv) -> LResult {
     let ctx = env.get_context::<CtxIo>(MOD_IO)?;
 
     match &ctx.log {
-        LogOutput::Stdout => println!("{}", lv),
-        LogOutput::File(pb) => match File::open(pb) {
-            Ok(_) => {}
-            Err(_) => {
-                let mut file = File::create(pb)?;
-                file.write_all(format!("{}\n", lv).as_bytes())?;
-            }
-        },
+        LogOutput::Stdout => {
+            println!("{}", lv);
+        }
+        LogOutput::Channel(tx) => {
+            let tx = tx.clone();
+            tokio::spawn(async move { tx.send(lv.to_string()).await });
+        }
+        LogOutput::File(pb) => {
+            //println!("print {} in {:?}", lv, pb);
+            let mut file = OpenOptions::new()
+                .write(true)
+                .append(true)
+                .create(true)
+                .open(pb)
+                .expect("error creating print file");
+            file.write_all(format!("{}\n", lv).as_bytes())?;
+        }
     };
 
     Ok(LValue::Nil)

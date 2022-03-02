@@ -8,7 +8,7 @@ use crate::context::actions_progress::{ActionId, ActionsProgress, Status};
 use crate::context::agenda::Agenda;
 use crate::context::rae_env::RAE_TASK_METHODS_MAP;
 use crate::context::rae_state::*;
-use crate::context::ressource_access::wait_on::add_waiter;
+use crate::context::ressource_access::monitor::add_waiter;
 use crate::module::rae_exec::platform::*;
 use crate::module::rae_exec::rae_mutex::*;
 use crate::module::rae_exec::simu::*;
@@ -35,6 +35,7 @@ use std::any::Any;
 use crate::module::rae_exec::algorithms::*;
 use crate::module::rae_exec::error::{DEFINE_ERR_ACTION_FAILURE, DEFINE_ERR_NO_APPLICABLE_METHOD};
 use crate::supervisor::select_methods::sort_greedy;
+use ompas_lisp::core::eval;
 use std::convert::TryInto;
 use std::fmt::{Display, Formatter};
 use std::string::String;
@@ -79,9 +80,9 @@ const FAILURE: &str = "failure";
 const IS_SUCCESS: &str = "success?";
 const IS_FAILURE: &str = "failure?";
 
-pub const MACRO_WAIT_ON: &str = "(defmacro wait-on (lambda (expr)
-    `(if (not (eval ,expr))
-        (monitor ,expr))))";
+/*pub const MACRO_WAIT_ON: &str = "(defmacro monitor (lambda (expr)
+`(if (not (eval ,expr))
+    (monitor ,expr))))";*/
 pub const LABEL_ENUMERATE_PARAMS: &str = "enumerate-params";
 
 pub const DEFINE_RAE_MODE: &str = "(define rae-mode EXEC-MODE)";
@@ -180,7 +181,7 @@ impl IntoModule for CtxRaeExec {
     fn into_module(self) -> Module {
         let init: InitLisp = vec![
             MACRO_MUTEX_LOCK_AND_DO,
-            MACRO_WAIT_ON,
+            //MACRO_WAIT_ON,
             MACRO_SIM_BLOCK,
             //LAMBDA_INSTANCE,
             LAMBDA_PROGRESS,
@@ -194,9 +195,9 @@ impl IntoModule for CtxRaeExec {
             LAMBDA_GET_ACTION_MODEL,
             LAMBDA_EVAL_PRE_CONDITIONS,
             LAMBDA_COMPUTE_SCORE,
-            LAMBDA_GENERATE_APPLICABLE_INSTANCES,
-            LAMBDA_R_GENERATE_INSTANCES,
-            LAMBDA_R_TEST_METHOD,
+            //LAMBDA_GENERATE_APPLICABLE_INSTANCES,
+            //LAMBDA_R_GENERATE_INSTANCES,
+            //LAMBDA_R_TEST_METHOD,
             DEFINE_RAE_MODE,
             LAMBDA_IS_APPLICABLE,
             DEFINE_ERR_ACTION_FAILURE,
@@ -232,6 +233,12 @@ impl IntoModule for CtxRaeExec {
         module.add_async_fn_prelude(RAE_SELECT, select);
         module.add_async_fn_prelude(RAE_SET_SUCCESS_FOR_TASK, set_success_for_task);
         module.add_async_fn_prelude(RAE_GET_NEXT_METHOD, get_next_method);
+
+        //progress
+        module.add_async_fn_prelude(
+            RAE_GENERATE_APPLICABLE_INSTANCES,
+            generate_applicable_instances,
+        );
 
         //mutex
         module.add_async_fn_prelude(LOCK, lock);
@@ -757,9 +764,13 @@ async fn get_status<'a>(_: &'a [LValue], env: &'a LEnv) -> LResult {
 }
 
 #[macro_rules_attribute(dyn_async!)]
-async fn monitor<'a>(args: &'a [LValue], _: &'a LEnv) -> LResult {
+async fn monitor<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     //info!("wait on function");
     //println!("wait on function with {} args", args.len());
+    /*pub const MACRO_WAIT_ON: &str = "(defmacro monitor (lambda (expr)
+    `(if (not (eval ,expr))
+        (monitor ,expr))))";*/
+
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(
             MONITOR,
@@ -768,15 +779,17 @@ async fn monitor<'a>(args: &'a [LValue], _: &'a LEnv) -> LResult {
             1..1,
         ));
     }
-    //println!("New wait on {}", args[0]);
-    let mut rx = add_waiter(args[0].clone()).await;
-    //println!("receiver ok");
 
-    if let false = rx.recv().await.expect("could not receive msg from waiters") {
-        unreachable!("should not receive false from waiters")
+    if let LValue::True = eval(&args[0], &mut env.clone()).await? {
+    } else {
+        let mut rx = add_waiter(args[0].clone()).await;
+        //println!("receiver ok");
+
+        if let false = rx.recv().await.expect("could not receive msg from waiters") {
+            unreachable!("should not receive false from waiters")
+        }
+        //println!("end wait on");
     }
-
-    //println!("end wait on");
     Ok(LValue::True)
 }
 
@@ -791,8 +804,8 @@ async fn select<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     if let LValue::List(_) = &args[1] {
         let methods = args[1].clone();
         info!("Add task {} to agenda", task);
-        let task_id = ctx.agenda.add_task(task).await;
-        info!("methods with their score found: {}", args[1]);
+        let task_id = ctx.agenda.add_task(task.clone()).await;
+        info!("methods for '{}' (with their score): {}", task, args[1]);
         let methods: Vec<LValue> = sort_greedy(methods)?.try_into()?; //Handle the case where there is no methods
         info!("sorted_methods: {}", LValue::from(&methods));
         let mut stack = ctx.agenda.get_stack(task_id).await.unwrap();

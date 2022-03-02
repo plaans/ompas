@@ -86,8 +86,8 @@
                     (do
                         (mutex::lock-and-do ?r 11
                             (t_carry_to_machine ?r ?p ?m))
-                        (wait-on `(= (package.location ,?p) (machine.output_belt ,?m))))
-                    (t_process_on_machine))))))
+                        (monitor `(= (package.location ,?p) (machine.output_belt ,?m))))
+                    (t_process_on_machine ?p ?m))))))
 
     (def-method m_no_robot_available
         '((:task t_process_on_machine)
@@ -95,7 +95,7 @@
         (:pre-conditions (= (available_robots) nil))
         (:score 0)
         (:body (do
-                (wait-on `(!= (available_robots) nil))
+                (monitor `(!= (available_robots) nil))
                 (t_process_on_machine)))))
 
     (def-task t_position_robot_to_belt '(?r robot) '(?b belt))
@@ -139,7 +139,7 @@
                 (let ((?b (machine.input_belt ?m)))
                     (do
                         (t_position_robot_to_belt ?r ?b)
-                        (wait-on `(< (len (belt.packages_list ,?b)) (len (belt.cells ,?b))))
+                        (monitor `(< (len (belt.packages_list ,?b)) (len (belt.cells ,?b))))
                         (place ?r))))))
 
     (def-task t_charge '(?r robot))
@@ -151,7 +151,7 @@
             (:body
                 (do
                     (go_charge ?r)
-                    (wait-on `(= (robot.battery ,?r) 1))))))
+                    (monitor `(= (robot.battery ,?r) 1))))))
 
     (def-task t_check_battery '(?r robot))
     (def-method m_check_battery
@@ -162,11 +162,11 @@
           (:body
              (loop
                  (do
-                     (wait-on `(< (robot.battery ,?r) 0.4))
+                     (monitor `(< (robot.battery ,?r) 0.4))
                      (mutex::lock-and-do ?r 50
                         (do
                             (go_charge ?r)
-                            (wait-on `(> (robot.battery ,?r) 0.9)))))))))
+                            (monitor `(> (robot.battery ,?r) 0.9)))))))))
     (def-task t_check_robots_batteries)
     (def-lambda '(async_check_battery
         (lambda (?r) (async (t_check_battery ?r)))))
@@ -178,8 +178,9 @@
         (:score 0)
         (:body 
             (do
-                (define list_robots (robots))
+                (define list_robots (instance robot))
                 (mapf async_check_battery list_robots)
+                (print "launched all tasks for initial robots")
                 (t_check_batteries_new_robots list_robots)))))
 
     (def-task t_check_batteries_new_robots '(?l list))
@@ -190,8 +191,8 @@
         (:score 0)
         (:body 
             (do
-                (wait-on `(> ,(len ?l) (len (robots))))
-                (define new_list_robots (robots))
+                (monitor `(> ,(len ?l) (len (instance robot))))
+                (define new_list_robots (instance robot))
                 (define l_new_robots (sublist (new_list_robots) (len ?l)))
                 (mapf async_check_battery l_new_robots)
                 (t_check_batteries_new_robots new_list_robots)))))
@@ -219,9 +220,9 @@
             (:score 0)
             (:body
                 (do
-                    (wait-on `(> ,(len ?l) (len (instance package))))
+                    (monitor `(> ,(len ?l) (len (instance package))))
                     (define new_lp (instance package))
                     (define l_new_p (sublist (new_lp) (len ?l)))
                     (mapf async_check_battery l_new_p)
-                    (t_check_batteries_new_robots new_lp)))))
+                    (t_process_new_packages new_lp)))))
 )

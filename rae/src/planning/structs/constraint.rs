@@ -1,6 +1,8 @@
 use crate::planning::point_algebra::problem::Relation;
 use crate::planning::point_algebra::relation_type::RelationType;
 use crate::planning::structs::atom::AtomType;
+use crate::planning::structs::chronicle::ExpressionChronicle;
+use crate::planning::structs::interval::Interval;
 use crate::planning::structs::lit::Lit;
 use crate::planning::structs::symbol_table::{AtomId, SymTable};
 use crate::planning::structs::traits::{FormatWithSymTable, GetVariables};
@@ -148,4 +150,46 @@ impl Constraint {
             Err(Default::default())
         }
     }
+}
+
+//INTERVAL constraints
+
+pub fn before(a: &Interval, b: &Interval) -> Constraint {
+    Constraint::LEq(a.end().into(), b.start().into())
+}
+pub fn meet(a: &Interval, b: &Interval) -> Constraint {
+    Constraint::Eq(a.end().into(), b.start().into())
+}
+
+pub fn overlap(a: &Interval, b: &Interval) -> Constraint {
+    Constraint::Or(
+        Constraint::LEq(a.start().into(), b.end().into()).into(),
+        Constraint::LEq(b.start().into(), a.end().into()).into(),
+    )
+}
+
+pub fn start(a: &Interval, b: &Interval) -> Constraint {
+    Constraint::Eq(a.start().into(), b.start().into())
+}
+
+pub fn during(a: &Interval, b: &Interval) -> Constraint {
+    Constraint::And(
+        Constraint::LEq(b.start().into(), a.start().into()).into(),
+        Constraint::LEq(a.end().into(), b.end().into()).into(),
+    )
+}
+
+pub fn finish(a: &Interval, b: &Interval) -> Constraint {
+    Constraint::Eq(a.end().into(), b.end().into())
+}
+
+pub fn equal(a: &Interval, b: &Interval) -> Constraint {
+    Constraint::And(
+        Constraint::Eq(a.start().into(), b.start().into()).into(),
+        Constraint::Eq(a.end().into(), b.end().into()).into(),
+    )
+}
+
+pub fn bind_result(a: &ExpressionChronicle, b: &ExpressionChronicle) -> Constraint {
+    Constraint::Eq(a.get_result(), b.get_result())
 }

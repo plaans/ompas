@@ -260,6 +260,7 @@ impl CtxRae {
         ConversionContext {
             domain: rae_env.domain_env.clone(),
             env: rae_env.env.clone(),
+            state: rae_env.state.get_snapshot().await,
         }
     }
 

@@ -101,9 +101,24 @@ pub struct RAEState {
     sem_update: Arc<Mutex<Option<broadcast::Sender<bool>>>>,
 }
 
+#[derive(Default)]
+pub struct RAEStateSnapshot {
+    pub _static: LState,
+    pub dynamic: LState,
+    pub inner_world: LState,
+}
+
 const RAE_STATE_SEM_UPDATE_CHANNEL_SIZE: usize = 64;
 
 impl RAEState {
+    pub async fn get_snapshot(&self) -> RAEStateSnapshot {
+        RAEStateSnapshot {
+            _static: self._static.read().await.clone(),
+            dynamic: self.dynamic.read().await.clone(),
+            inner_world: self.inner_world.read().await.clone(),
+        }
+    }
+
     pub async fn subscribe_on_update(&mut self) -> broadcast::Receiver<bool> {
         let mut sem_update = self.sem_update.lock().await;
         let (tx, rx) = match sem_update.deref() {

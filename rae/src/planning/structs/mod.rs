@@ -1,4 +1,5 @@
-use crate::context::rae_env::{DomainEnv, RAEEnv};
+use crate::context::rae_env::DomainEnv;
+use crate::context::rae_state::RAEStateSnapshot;
 use crate::planning::structs::atom::AtomType;
 use crate::planning::structs::chronicle::Chronicle;
 use crate::planning::structs::lit::Lit;
@@ -104,22 +105,24 @@ impl TaskTypeMetaDataCollection {
 pub struct ConversionContext {
     pub domain: DomainEnv,
     pub env: LEnv,
+    pub state: RAEStateSnapshot,
 }
 
-impl From<&RAEEnv> for ConversionContext {
+/*impl From<&RAEEnv> for ConversionContext {
     fn from(rae_env: &RAEEnv) -> Self {
         Self {
             domain: rae_env.domain_env.clone(),
             env: rae_env.env.clone(),
+            state: rae_env.state.get_snapshot(),
         }
     }
-}
+}*/
 
-impl From<RAEEnv> for ConversionContext {
+/*impl From<RAEEnv> for ConversionContext {
     fn from(ctx: RAEEnv) -> Self {
         (&ctx).into()
     }
-}
+}*/
 
 pub fn get_variables_of_type(
     variables: im::HashSet<AtomId>,

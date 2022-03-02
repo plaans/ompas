@@ -5,7 +5,7 @@ use crate::planning::conversion::post_processing::post_processing;
 use crate::planning::structs::atom::{AtomType, Sym};
 use crate::planning::structs::chronicle::{Chronicle, ExpressionChronicle};
 use crate::planning::structs::condition::Condition;
-use crate::planning::structs::constraint::Constraint;
+use crate::planning::structs::constraint::{bind_result, equal, Constraint};
 use crate::planning::structs::effect::Effect;
 use crate::planning::structs::expression::Expression;
 use crate::planning::structs::interval::Interval;
@@ -510,59 +510,96 @@ pub fn convert_lvalue_to_expression_chronicle(
                                 ec.absorb(val);
                                 return Ok(ec);
                             }
-                            RAE_INSTANCE => match l.len() {
-                                2 => {
-                                    //Case to return the list of all instances of a type
-                                }
-                                3 => {
-                                    let symbol = convert_lvalue_to_expression_chronicle(
-                                        &l[1],
-                                        context,
-                                        ch,
-                                        Default::default(),
-                                    )?;
-                                    let symbol_type = convert_lvalue_to_expression_chronicle(
-                                        &l[2],
-                                        context,
-                                        ch,
-                                        Default::default(),
-                                    )?;
+                            RAE_INSTANCE => {
+                                match l.len() {
+                                    2 => {
+                                        //Case to return the list of all instances of a type
+                                        let symbol_type = convert_lvalue_to_expression_chronicle(
+                                            &l[1],
+                                            context,
+                                            ch,
+                                            Default::default(),
+                                        )?;
 
-                                    ec.add_constraint(Constraint::Eq(
-                                        ec.get_interval().start().into(),
-                                        symbol.get_interval().start().into(),
-                                    ));
-                                    ec.add_constraint(Constraint::Eq(
-                                        symbol.get_interval().end().into(),
-                                        symbol_type.get_interval().start().into(),
-                                    ));
-                                    ec.add_constraint(Constraint::Eq(
-                                        symbol_type.get_interval().end().into(),
-                                        ec.get_interval().end().into(),
-                                    ));
+                                        ec.add_constraint(equal(
+                                            symbol_type.get_interval(),
+                                            ec.get_interval(),
+                                        ));
 
-                                    let constraint = Constraint::Type(
-                                        symbol.get_result(),
-                                        symbol_type.get_result(),
-                                    );
-                                    ec.add_constraint(Constraint::Eq(
-                                        ec.get_result(),
-                                        constraint.into(),
-                                    ));
-                                    ec.absorb(symbol);
-                                    ec.absorb(symbol_type);
-                                    return Ok(ec);
-                                }
-                                _ => {
-                                    return Err(SpecialError(
-                                        CONVERT_LVALUE_TO_EXPRESSION_CHRONICLE,
-                                        format!(
+                                        if symbol_type.is_result_pure() {
+                                            let key = format!(
+                                                "(instance {})",
+                                                symbol_type.format_with_sym_table(&ch.sym_table)
+                                            );
+                                            let lvalue =
+                                                parse_static(&key, &mut context.env.clone())?;
+                                            let result = match context
+                                                .state
+                                                ._static
+                                                .get(&lvalue.get_lvalue().into())
+                                            {
+                                                Some(r) => r.into(),
+                                                None => LValue::Nil,
+                                            };
+
+                                            ec.add_constraint(Constraint::Eq(
+                                                ec.get_result(),
+                                                lvalue_to_lit(&result, &mut ch.sym_table)?,
+                                            ))
+                                        } else {
+                                            return Err(SpecialError(CONVERT_LVALUE_TO_EXPRESSION_CHRONICLE, "cannot handle (instance <type>) with <type> undecided".to_string()));
+                                        }
+                                    }
+                                    3 => {
+                                        let symbol = convert_lvalue_to_expression_chronicle(
+                                            &l[1],
+                                            context,
+                                            ch,
+                                            Default::default(),
+                                        )?;
+                                        let symbol_type = convert_lvalue_to_expression_chronicle(
+                                            &l[2],
+                                            context,
+                                            ch,
+                                            Default::default(),
+                                        )?;
+
+                                        ec.add_constraint(Constraint::Eq(
+                                            ec.get_interval().start().into(),
+                                            symbol.get_interval().start().into(),
+                                        ));
+                                        ec.add_constraint(Constraint::Eq(
+                                            symbol.get_interval().end().into(),
+                                            symbol_type.get_interval().start().into(),
+                                        ));
+                                        ec.add_constraint(Constraint::Eq(
+                                            symbol_type.get_interval().end().into(),
+                                            ec.get_interval().end().into(),
+                                        ));
+
+                                        let constraint = Constraint::Type(
+                                            symbol.get_result(),
+                                            symbol_type.get_result(),
+                                        );
+                                        ec.add_constraint(Constraint::Eq(
+                                            ec.get_result(),
+                                            constraint.into(),
+                                        ));
+                                        ec.absorb(symbol);
+                                        ec.absorb(symbol_type);
+                                        return Ok(ec);
+                                    }
+                                    _ => {
+                                        return Err(SpecialError(
+                                            CONVERT_LVALUE_TO_EXPRESSION_CHRONICLE,
+                                            format!(
                                             "{} has not the right number of args (expecting 1..2)",
                                             exp
                                         ),
-                                    ))
+                                        ))
+                                    }
                                 }
-                            },
+                            }
                             //CHECK => {}
                             _ => {
                                 if let Some(id) = ch.sym_table.id(&s) {

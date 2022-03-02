@@ -17,6 +17,7 @@ use ompas_lisp::core::structs::lerror::LError;
 use ompas_lisp::core::structs::llambda::LLambda;
 use ompas_lisp::core::structs::lvalue::LValue;
 use std::convert::TryInto;
+use std::ops::Deref;
 
 #[derive(Clone)]
 pub struct Chronicle {
@@ -327,7 +328,12 @@ impl PartialChronicle {
     }
 
     pub fn add_constraint(&mut self, constraint: Constraint) {
-        self.constraints.push(constraint);
+        if let Constraint::And(Lit::Constraint(a), Lit::Constraint(b)) = constraint {
+            self.constraints.push(a.deref().clone());
+            self.constraints.push(b.deref().clone());
+        } else {
+            self.constraints.push(constraint);
+        }
     }
 
     pub fn add_condition(&mut self, cond: Condition) {
@@ -555,6 +561,13 @@ impl ExpressionChronicle {
             interval.end().into(),
         ));
         ec
+    }
+
+    pub fn make_instantaneous(&mut self) {
+        self.add_constraint(Constraint::Eq(
+            self.interval.start().into(),
+            self.interval.end().into(),
+        ));
     }
 }
 

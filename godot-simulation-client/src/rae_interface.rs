@@ -375,6 +375,8 @@ impl RAEInterface for PlatformGodot {
             } else {
                 None
             };
+
+            //blocked on the reception of the end signal.
             task_handler::subscribe_new_task()
                 .recv()
                 .await

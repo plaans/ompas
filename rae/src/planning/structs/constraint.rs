@@ -103,14 +103,14 @@ impl FormatWithSymTable for Constraint {
             }
             Constraint::Type(l1, l2) => {
                 format!(
-                    "type({}) = {}",
+                    "(type({}) = {})",
                     l1.format_with_sym_table(st),
                     l2.format_with_sym_table(st)
                 )
             }
             Constraint::Arbitrary(l1, l2) => {
                 format!(
-                    "{} in {}",
+                    "({} in {})",
                     l1.format_with_sym_table(st),
                     l2.format_with_sym_table(st)
                 )

@@ -14,8 +14,12 @@ use crate::planning::structs::symbol_table::{AtomId, ExpressionType};
 use crate::planning::structs::traits::{Absorb, FormatWithSymTable, GetVariables};
 use crate::planning::structs::transition::Transition;
 use crate::planning::structs::{ChronicleHierarchy, ConversionContext, TaskType};
+use ompas_lisp::core::language::{BOOL, FLOAT, INT, NUMBER, TYPE_LIST};
 use ompas_lisp::core::root_module::basic_math::language::{EQ, GEQ, GT, LEQ, LT, NOT, NOT_SHORT};
 use ompas_lisp::core::root_module::error::language::CHECK;
+use ompas_lisp::core::root_module::predicate::language::{
+    IS_BOOL, IS_FLOAT, IS_INT, IS_LIST, IS_NUMBER,
+};
 use ompas_lisp::core::structs::lcoreoperator::language::EVAL;
 use ompas_lisp::core::structs::lcoreoperator::LCoreOperator;
 use ompas_lisp::core::structs::lerror::LError;
@@ -46,7 +50,7 @@ impl MetaData {
     }
 }
 
-pub enum BooleanFunction {
+/*pub enum BooleanFunction {
     EQ,
     LT,
     LEQ,
@@ -55,7 +59,7 @@ pub enum BooleanFunction {
     NOT,
     TYPE,
     ARBITRARY,
-}
+}*/
 
 pub fn convert_lvalue_to_expression_chronicle(
     exp: &LValue,
@@ -294,12 +298,11 @@ pub fn convert_lvalue_to_expression_chronicle(
                 ch.sym_table.new_scope();
                 let mut literal: Vec<Lit> = vec![];
 
-                let mut constraint: Option<BooleanFunction> = None;
-
                 match &l[0] {
                     LValue::Symbol(_) | LValue::Fn(_) => {
                         let s = l[0].to_string();
-                        match s.as_str() {
+                        let str = s.as_str();
+                        match str {
                             RAE_MONITOR => {
                                 //A monitor is a condition
                                 let fluent = convert_lvalue_to_expression_chronicle(
@@ -383,24 +386,184 @@ pub fn convert_lvalue_to_expression_chronicle(
 
                                 return Ok(ec);
                             }
-                            /*RAE_INSTANCE => {
-                                expression_type = ExpressionType::StateFunction;
-                                literal.push(
-                                    ch.sym_table
-                                        .id(RAE_INSTANCE)
-                                        .unwrap_or_else(|| {
-                                            panic!("{} is undefined in symbol table", RAE_INSTANCE)
-                                        })
-                                        .into(),
-                                )
-                            }*/
                             RAE_RETRACT | RAE_RETRACT_SHORT => {
                                 return Err(SpecialError(
                                     CONVERT_LVALUE_TO_EXPRESSION_CHRONICLE,
                                     "not yet supported".to_string(),
                                 ))
                             }
-                            CHECK => {}
+                            EQ | GT | GEQ | LT | LEQ => {
+                                let left = convert_lvalue_to_expression_chronicle(
+                                    &l[1],
+                                    context,
+                                    ch,
+                                    Default::default(),
+                                )?;
+                                let right = convert_lvalue_to_expression_chronicle(
+                                    &l[2],
+                                    context,
+                                    ch,
+                                    Default::default(),
+                                )?;
+
+                                ec.add_constraint(Constraint::Eq(
+                                    ec.get_interval().start().into(),
+                                    left.get_interval().start().into(),
+                                ));
+                                ec.add_constraint(Constraint::Eq(
+                                    left.get_interval().end().into(),
+                                    right.get_interval().start().into(),
+                                ));
+                                ec.add_constraint(Constraint::Eq(
+                                    right.get_interval().end().into(),
+                                    ec.get_interval().end().into(),
+                                ));
+
+                                let a = left.get_result();
+                                let b = right.get_result();
+
+                                let constraint = match str {
+                                    EQ => Constraint::Eq(a, b),
+                                    LT => Constraint::LT(a, b),
+                                    GT => Constraint::LT(b, a),
+                                    LEQ => Constraint::LEq(a, b),
+                                    GEQ => Constraint::LEq(b, a),
+                                    _ => unreachable!(),
+                                };
+
+                                ec.add_constraint(Constraint::Eq(
+                                    ec.get_result(),
+                                    constraint.into(),
+                                ));
+                                ec.absorb(left);
+                                ec.absorb(right);
+                                return Ok(ec);
+                            }
+                            ARBITRARY => {
+                                let val = convert_lvalue_to_expression_chronicle(
+                                    &l[1],
+                                    context,
+                                    ch,
+                                    Default::default(),
+                                )?;
+
+                                ec.add_constraint(Constraint::Eq(
+                                    ec.get_interval().start().into(),
+                                    val.get_interval().start().into(),
+                                ));
+                                ec.add_constraint(Constraint::Eq(
+                                    val.get_interval().end().into(),
+                                    ec.get_interval().end().into(),
+                                ));
+
+                                ec.add_constraint(Constraint::Arbitrary(
+                                    ec.get_result(),
+                                    val.get_result(),
+                                ));
+                                ec.absorb(val);
+                                return Ok(ec);
+                            }
+                            NOT | NOT_SHORT | IS_BOOL | IS_FLOAT | IS_INT | IS_LIST | IS_NUMBER => {
+                                let val = convert_lvalue_to_expression_chronicle(
+                                    &l[1],
+                                    context,
+                                    ch,
+                                    Default::default(),
+                                )?;
+
+                                ec.add_constraint(Constraint::Eq(
+                                    ec.get_interval().start().into(),
+                                    val.get_interval().start().into(),
+                                ));
+                                ec.add_constraint(Constraint::Eq(
+                                    val.get_interval().end().into(),
+                                    ec.get_interval().end().into(),
+                                ));
+
+                                let r = val.get_result();
+
+                                let constraint = match str {
+                                    NOT | NOT_SHORT => Constraint::Neg(r),
+                                    IS_BOOL => {
+                                        Constraint::Type(r, ch.sym_table.id(BOOL).unwrap().into())
+                                    }
+                                    IS_FLOAT => {
+                                        Constraint::Type(r, ch.sym_table.id(FLOAT).unwrap().into())
+                                    }
+                                    IS_INT => {
+                                        Constraint::Type(r, ch.sym_table.id(INT).unwrap().into())
+                                    }
+                                    IS_LIST => Constraint::Type(
+                                        r,
+                                        ch.sym_table.id(TYPE_LIST).unwrap().into(),
+                                    ),
+                                    IS_NUMBER => {
+                                        Constraint::Type(r, ch.sym_table.id(NUMBER).unwrap().into())
+                                    }
+                                    _ => unreachable!(),
+                                };
+
+                                ec.add_constraint(Constraint::Eq(
+                                    ec.get_result(),
+                                    constraint.into(),
+                                ));
+                                ec.absorb(val);
+                                return Ok(ec);
+                            }
+                            RAE_INSTANCE => match l.len() {
+                                2 => {
+                                    //Case to return the list of all instances of a type
+                                }
+                                3 => {
+                                    let symbol = convert_lvalue_to_expression_chronicle(
+                                        &l[1],
+                                        context,
+                                        ch,
+                                        Default::default(),
+                                    )?;
+                                    let symbol_type = convert_lvalue_to_expression_chronicle(
+                                        &l[2],
+                                        context,
+                                        ch,
+                                        Default::default(),
+                                    )?;
+
+                                    ec.add_constraint(Constraint::Eq(
+                                        ec.get_interval().start().into(),
+                                        symbol.get_interval().start().into(),
+                                    ));
+                                    ec.add_constraint(Constraint::Eq(
+                                        symbol.get_interval().end().into(),
+                                        symbol_type.get_interval().start().into(),
+                                    ));
+                                    ec.add_constraint(Constraint::Eq(
+                                        symbol_type.get_interval().end().into(),
+                                        ec.get_interval().end().into(),
+                                    ));
+
+                                    let constraint = Constraint::Type(
+                                        symbol.get_result(),
+                                        symbol_type.get_result(),
+                                    );
+                                    ec.add_constraint(Constraint::Eq(
+                                        ec.get_result(),
+                                        constraint.into(),
+                                    ));
+                                    ec.absorb(symbol);
+                                    ec.absorb(symbol_type);
+                                    return Ok(ec);
+                                }
+                                _ => {
+                                    return Err(SpecialError(
+                                        CONVERT_LVALUE_TO_EXPRESSION_CHRONICLE,
+                                        format!(
+                                            "{} has not the right number of args (expecting 1..2)",
+                                            exp
+                                        ),
+                                    ))
+                                }
+                            },
+                            //CHECK => {}
                             _ => {
                                 if let Some(id) = ch.sym_table.id(&s) {
                                     match ch.sym_table
@@ -412,17 +575,6 @@ pub fn convert_lvalue_to_expression_chronicle(
                                             println!("{} is an action", s);
                                         }
                                         AtomType::Function => {
-                                            constraint = match s.as_str() {
-                                                EQ => Some(BooleanFunction::EQ),
-                                                NOT | NOT_SHORT => Some(BooleanFunction::NOT),
-                                                GT => Some(BooleanFunction::GT),
-                                                GEQ => Some(BooleanFunction::GEQ),
-                                                LT => Some(BooleanFunction::LT),
-                                                LEQ => Some(BooleanFunction::LEQ),
-                                                ARBITRARY => Some(BooleanFunction::ARBITRARY),
-                                                RAE_INSTANCE => Some(BooleanFunction::TYPE),
-                                                _ => None
-                                            };
                                         }
                                         AtomType::Method => return Err(SpecialError(CONVERT_LVALUE_TO_EXPRESSION_CHRONICLE, format!("{} is method and can not be directly called into the body of a method.\
                                 \nPlease call the task that use the method instead", s))),
@@ -535,93 +687,6 @@ pub fn convert_lvalue_to_expression_chronicle(
                         } else {
                         }
                         if !is_pure {
-                            if let Some(bc) = constraint {
-                                match bc {
-                                    BooleanFunction::EQ => ec.add_constraint(Constraint::Eq(
-                                        literal[1].clone(),
-                                        literal[2].clone(),
-                                    )),
-                                    BooleanFunction::LT => ec.add_constraint(Constraint::LT(
-                                        literal[1].clone(),
-                                        literal[2].clone(),
-                                    )),
-                                    BooleanFunction::LEQ => ec.add_constraint(Constraint::LEq(
-                                        literal[1].clone(),
-                                        literal[2].clone(),
-                                    )),
-                                    BooleanFunction::GT => ec.add_constraint(Constraint::LT(
-                                        literal[2].clone(),
-                                        literal[1].clone(),
-                                    )),
-                                    BooleanFunction::GEQ => ec.add_constraint(Constraint::LEq(
-                                        literal[2].clone(),
-                                        literal[1].clone(),
-                                    )),
-                                    BooleanFunction::NOT => {
-                                        ec.add_constraint(Constraint::Neg(literal[1].clone()))
-                                    }
-                                    BooleanFunction::TYPE => ec.add_constraint(Constraint::Type(
-                                        literal[1].clone(),
-                                        literal[2].clone(),
-                                    )),
-                                    BooleanFunction::ARBITRARY => {
-                                        ec.add_constraint(Constraint::Arbitrary(
-                                            literal[1].clone(),
-                                            literal[2].clone(),
-                                        ))
-                                    }
-                                }
-                            } else {
-                                let literal: Lit = vec![
-                                    ch.sym_table
-                                        .id(EVAL)
-                                        .expect("Eval not defined in symbol table")
-                                        .into(),
-                                    Lit::from(literal),
-                                ]
-                                .into();
-
-                                ec.add_constraint(Constraint::Eq(ec.get_result(), literal));
-
-                                /*ec.add_effect(Effect {
-                                    interval: *ec.get_interval(),
-                                    transition: Transition::new(ec.get_result(), literal),
-                                });*/
-                            }
-                        }
-                        ec.add_constraint(Constraint::Eq(
-                            end_last_interval.into(),
-                            ec.get_interval().end().into(),
-                        ));
-                    }
-                    ExpressionType::Lisp => {
-                        if let Some(bc) = constraint {
-                            let constraint = match bc {
-                                BooleanFunction::EQ => {
-                                    Constraint::Eq(literal[1].clone(), literal[2].clone())
-                                }
-                                BooleanFunction::LT => {
-                                    Constraint::LT(literal[1].clone(), literal[2].clone())
-                                }
-                                BooleanFunction::LEQ => {
-                                    Constraint::LEq(literal[1].clone(), literal[2].clone())
-                                }
-                                BooleanFunction::GT => {
-                                    Constraint::LT(literal[2].clone(), literal[1].clone())
-                                }
-                                BooleanFunction::GEQ => {
-                                    Constraint::LEq(literal[2].clone(), literal[1].clone())
-                                }
-                                BooleanFunction::NOT => Constraint::Neg(literal[1].clone()),
-                                BooleanFunction::TYPE => {
-                                    Constraint::Type(literal[1].clone(), literal[2].clone())
-                                }
-                                BooleanFunction::ARBITRARY => {
-                                    Constraint::Arbitrary(literal[1].clone(), literal[2].clone())
-                                }
-                            };
-                            ec.add_constraint(Constraint::Eq(ec.get_result(), constraint.into()))
-                        } else {
                             let literal: Lit = vec![
                                 ch.sym_table
                                     .id(EVAL)
@@ -632,15 +697,36 @@ pub fn convert_lvalue_to_expression_chronicle(
                             .into();
 
                             ec.add_constraint(Constraint::Eq(ec.get_result(), literal));
+
                             /*ec.add_effect(Effect {
                                 interval: *ec.get_interval(),
                                 transition: Transition::new(ec.get_result(), literal),
                             });*/
-                            ec.add_constraint(Constraint::Eq(
-                                end_last_interval.into(),
-                                ec.get_interval().end().into(),
-                            ));
                         }
+                        ec.add_constraint(Constraint::Eq(
+                            end_last_interval.into(),
+                            ec.get_interval().end().into(),
+                        ));
+                    }
+                    ExpressionType::Lisp => {
+                        let literal: Lit = vec![
+                            ch.sym_table
+                                .id(EVAL)
+                                .expect("Eval not defined in symbol table")
+                                .into(),
+                            Lit::from(literal),
+                        ]
+                        .into();
+
+                        ec.add_constraint(Constraint::Eq(ec.get_result(), literal));
+                        /*ec.add_effect(Effect {
+                            interval: *ec.get_interval(),
+                            transition: Transition::new(ec.get_result(), literal),
+                        });*/
+                        ec.add_constraint(Constraint::Eq(
+                            end_last_interval.into(),
+                            ec.get_interval().end().into(),
+                        ));
                     }
                     ExpressionType::Action | ExpressionType::Task => {
                         literal.push(ec.get_result());

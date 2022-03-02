@@ -4,6 +4,7 @@ use crate::planning::structs::chronicle::ChronicleResult;
 use crate::planning::structs::interval::Interval;
 use crate::planning::structs::traits::FormatWithSymTable;
 use crate::planning::union_find::{Forest, Node, NodeId};
+use ompas_lisp::core::language::{BOOL, FLOAT, INT, NUMBER, TYPE_LIST};
 use ompas_lisp::core::root_module::language::get_scheme_primitives;
 use ompas_lisp::core::structs::lerror;
 use ompas_lisp::core::structs::lerror::LError::SpecialError;
@@ -147,6 +148,18 @@ impl Default for SymTable {
             &AtomType::Function,
         )
         .expect("error while adding symbols of scheme primitives");
+        st.add_list_of_symbols_of_same_type(
+            vec![
+                BOOL.to_string(),
+                INT.to_string(),
+                FLOAT.to_string(),
+                NUMBER.to_string(),
+                TYPE_LIST.to_string(),
+            ],
+            &AtomType::Symbol,
+        )
+        .expect("error while adding type symbols");
+
         st.add_list_of_symbols_of_same_type(
             vec![
                 RAE_ASSERT.to_string(),

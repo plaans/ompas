@@ -56,7 +56,7 @@ pub const RAE_RETRACT: &str = "retract";
 pub const RAE_RETRACT_SHORT: &str = "->";
 pub const RAE_INSTANCE: &str = "instance";
 pub const RAE_AWAIT: &str = "rae-await";
-pub const MONITOR: &str = "monitor";
+pub const RAE_MONITOR: &str = "monitor";
 pub const LOCK: &str = "lock";
 pub const RELEASE: &str = "release";
 pub const IS_LOCKED: &str = "locked?";
@@ -229,7 +229,7 @@ impl IntoModule for CtxRaeExec {
         module.add_async_fn_prelude(RAE_START_PLATFORM, start_platform);
         module.add_fn_prelude(RAE_GET_INSTANTIATED_METHODS, get_instantiated_methods);
         module.add_fn_prelude(RAE_GET_BEST_METHOD, get_best_method);
-        module.add_async_fn_prelude(MONITOR, monitor);
+        module.add_async_fn_prelude(RAE_MONITOR, monitor);
         module.add_async_fn_prelude(RAE_SELECT, select);
         module.add_async_fn_prelude(RAE_SET_SUCCESS_FOR_TASK, set_success_for_task);
         module.add_async_fn_prelude(RAE_GET_NEXT_METHOD, get_next_method);
@@ -773,7 +773,7 @@ async fn monitor<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
 
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(
-            MONITOR,
+            RAE_MONITOR,
             args.into(),
             args.len(),
             1..1,

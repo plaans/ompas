@@ -16,26 +16,32 @@ pub enum Constraint {
     LT(Lit, Lit),
     And(Lit, Lit),
     Or(Lit, Lit),
+    Type(Lit, Lit),
+    Arbitrary(Lit, Lit),
 }
 impl Constraint {
     pub fn get_left(&self) -> &Lit {
         match self {
-            Constraint::LEq(l1, _l2)
-            | Constraint::Eq(l1, _l2)
-            | Constraint::LT(l1, _l2)
-            | Constraint::And(l1, _l2)
-            | Constraint::Or(l1, _l2) => l1,
+            Constraint::LEq(l1, _)
+            | Constraint::Eq(l1, _)
+            | Constraint::LT(l1, _)
+            | Constraint::And(l1, _)
+            | Constraint::Or(l1, _)
+            | Constraint::Type(l1, _)
+            | Constraint::Arbitrary(l1, _) => l1,
             Constraint::Neg(l) => l,
         }
     }
 
     pub fn get_right(&self) -> &Lit {
         match self {
-            Constraint::LEq(_l1, l2)
-            | Constraint::Eq(_l1, l2)
-            | Constraint::LT(_l1, l2)
-            | Constraint::And(_l1, l2)
-            | Constraint::Or(_l1, l2) => l2,
+            Constraint::LEq(_, l2)
+            | Constraint::Eq(_, l2)
+            | Constraint::LT(_, l2)
+            | Constraint::And(_, l2)
+            | Constraint::Or(_, l2)
+            | Constraint::Type(_, l2)
+            | Constraint::Arbitrary(_, l2) => l2,
             Constraint::Neg(l) => l,
         }
     }
@@ -48,7 +54,9 @@ impl GetVariables for Constraint {
             | Constraint::Eq(l1, l2)
             | Constraint::LT(l1, l2)
             | Constraint::And(l1, l2)
-            | Constraint::Or(l1, l2) => l1.get_variables().union(l2.get_variables()),
+            | Constraint::Or(l1, l2)
+            | Constraint::Type(l1, l2)
+            | Constraint::Arbitrary(l1, l2) => l1.get_variables().union(l2.get_variables()),
             Constraint::Neg(l) => l.get_variables(),
         }
     }
@@ -89,6 +97,20 @@ impl FormatWithSymTable for Constraint {
             Constraint::LEq(l1, l2) => {
                 format!(
                     "({} <= {})",
+                    l1.format_with_sym_table(st),
+                    l2.format_with_sym_table(st)
+                )
+            }
+            Constraint::Type(l1, l2) => {
+                format!(
+                    "type({}) = {}",
+                    l1.format_with_sym_table(st),
+                    l2.format_with_sym_table(st)
+                )
+            }
+            Constraint::Arbitrary(l1, l2) => {
+                format!(
+                    "{} in {}",
                     l1.format_with_sym_table(st),
                     l2.format_with_sym_table(st)
                 )

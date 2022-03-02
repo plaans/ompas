@@ -148,7 +148,8 @@ impl Chronicle {
         ec: ExpressionChronicle,
         sym_table: &mut SymTable,
     ) {
-        bind_variables(self.get_result_id(), ec.get_result_id(), sym_table);
+        self.add_constraint(Constraint::Eq(self.get_result_id().into(), ec.get_result()));
+        //bind_variables(self.get_result_id(), ec.get_result_id(), sym_table);
         bind_variables(&self.interval.start(), &ec.interval.start(), sym_table);
         bind_variables(&self.interval.end(), &ec.interval.end(), sym_table);
         sym_table.flat_bindings();

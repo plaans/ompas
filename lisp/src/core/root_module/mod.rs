@@ -75,8 +75,8 @@ pub mod language {
             DIV,
             GT,
             LT,
-            GE,
-            LE,
+            GEQ,
+            LEQ,
             EQ,
             IS_NUMBER,
             IS_FLOAT,
@@ -183,9 +183,9 @@ impl IntoModule for CtxRoot {
         module.add_fn_prelude(MUL, mul);
         module.add_fn_prelude(DIV, div);
         module.add_fn_prelude(GT, gt);
-        module.add_fn_prelude(GE, ge);
+        module.add_fn_prelude(GEQ, geq);
         module.add_fn_prelude(LT, lt);
-        module.add_fn_prelude(LE, le);
+        module.add_fn_prelude(LEQ, leq);
         module.add_fn_prelude(EQ, eq);
 
         //predicates
@@ -237,9 +237,9 @@ impl IntoModule for CtxRoot {
             LHelp::new(MUL, DOC_MUL),
             LHelp::new(DIV, DOC_DIV),
             LHelp::new(GT, DOC_GT),
-            LHelp::new(GE, DOC_GE),
+            LHelp::new(GEQ, DOC_GEQ),
             LHelp::new(LT, DOC_LT),
-            LHelp::new(LE, DOC_LE),
+            LHelp::new(LEQ, DOC_LEQ),
             LHelp::new(EQ, DOC_EQ),
             LHelp::new(IS_NIL, DOC_IS_NIL),
             LHelp::new(IS_NUMBER, DOC_IS_NUMBER),

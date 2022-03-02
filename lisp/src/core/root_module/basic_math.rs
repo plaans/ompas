@@ -16,8 +16,8 @@ pub mod language {
     //Comparison
     pub const GT: &str = ">";
     pub const LT: &str = "<";
-    pub const GE: &str = ">=";
-    pub const LE: &str = "<=";
+    pub const GEQ: &str = ">=";
+    pub const LEQ: &str = "<=";
     pub const EQ: &str = "=";
 
     pub const DOC_EQ: &str =
@@ -33,11 +33,11 @@ Return an error if inputs are not numbers or there is wrong numbers of arguments
 Return an error if inputs are not numbers or there is wrong numbers of arguments";
     pub const DOC_GT: &str = "Takes 2 arguments. Return *true* if the first is greater than the second.\
 Return *false* otherwise. Return an error if args are not numbers of there is the wrong number of arguments";
-    pub const DOC_GE: &str = "Takes 2 arguments. Return *true* if the first is greater or equal than the second.\
+    pub const DOC_GEQ: &str = "Takes 2 arguments. Return *true* if the first is greater or equal than the second.\
 Return *false* otherwise. Return an error if args are not numbers of there is the wrong number of arguments";
     pub const DOC_LT: &str = "Takes 2 arguments. Return *true* if the first is less than the second.\
 Return *false* otherwise. Return an error if args are not numbers of there is the wrong number of arguments";
-    pub const DOC_LE: &str = "Takes 2 arguments. Return *true* if the first is less or equal than the second.\
+    pub const DOC_LEQ: &str = "Takes 2 arguments. Return *true* if the first is less or equal than the second.\
 Return *false* otherwise. Return an error if args are not numbers of there is the wrong number of arguments";
 
     pub const NOT: &str = "not";
@@ -110,17 +110,17 @@ pub fn lt(args: &[LValue], _: &LEnv) -> LResult {
     }
 }
 /// Compares two values. Returns true if the first arg is greater or equal to the second. Nil Otherwise
-pub fn ge(args: &[LValue], _: &LEnv) -> LResult {
+pub fn geq(args: &[LValue], _: &LEnv) -> LResult {
     match args.len() {
         2 => Ok((args[0] >= args[1]).into()),
-        i => Err(WrongNumberOfArgument(GE, args.into(), i, 2..2)),
+        i => Err(WrongNumberOfArgument(GEQ, args.into(), i, 2..2)),
     }
 }
 /// Compares two values. Returns true if the first arg is less or equal to the second. Nil Otherwise
-pub fn le(args: &[LValue], _: &LEnv) -> LResult {
+pub fn leq(args: &[LValue], _: &LEnv) -> LResult {
     match args.len() {
         2 => Ok((args[0] <= args[1]).into()),
-        i => Err(WrongNumberOfArgument(LE, args.into(), i, 2..2)),
+        i => Err(WrongNumberOfArgument(LEQ, args.into(), i, 2..2)),
     }
 }
 
@@ -134,7 +134,7 @@ pub fn eq(args: &[LValue], _: &LEnv) -> LResult {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::root_module::basic_math::{add, div, ge, gt, le, lt, mul, sub};
+    use crate::core::root_module::basic_math::{add, div, geq, gt, leq, lt, mul, sub};
     use crate::core::structs::lenv::LEnv;
     use crate::core::structs::lnumber::LNumber;
     use crate::core::structs::lvalue::LValue;
@@ -180,11 +180,20 @@ mod tests {
     }
 
     #[test]
-    fn test_ge() {
+    fn test_geq() {
         let env = LEnv::default();
-        let result_true: bool = ge(&[3.into(), 2.into()], &env).unwrap().try_into().unwrap();
-        let result_false: bool = ge(&[2.into(), 3.into()], &env).unwrap().try_into().unwrap();
-        let result_true_2: bool = ge(&[3.into(), 3.into()], &env).unwrap().try_into().unwrap();
+        let result_true: bool = geq(&[3.into(), 2.into()], &env)
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let result_false: bool = geq(&[2.into(), 3.into()], &env)
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let result_true_2: bool = geq(&[3.into(), 3.into()], &env)
+            .unwrap()
+            .try_into()
+            .unwrap();
         assert!(result_true);
         assert!(!result_false);
         assert!(result_true_2);
@@ -202,11 +211,20 @@ mod tests {
     }
 
     #[test]
-    fn test_le() {
+    fn test_leq() {
         let env = LEnv::default();
-        let result_false: bool = le(&[3.into(), 2.into()], &env).unwrap().try_into().unwrap();
-        let result_true: bool = le(&[2.into(), 3.into()], &env).unwrap().try_into().unwrap();
-        let result_true_2: bool = le(&[3.into(), 3.into()], &env).unwrap().try_into().unwrap();
+        let result_false: bool = leq(&[3.into(), 2.into()], &env)
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let result_true: bool = leq(&[2.into(), 3.into()], &env)
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let result_true_2: bool = leq(&[3.into(), 3.into()], &env)
+            .unwrap()
+            .try_into()
+            .unwrap();
         assert!(result_true);
         assert!(!result_false);
         assert!(result_true_2);

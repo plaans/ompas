@@ -1,6 +1,7 @@
 use crate::context::rae_env::RAEEnv;
 use crate::module::{CtxRae, MOD_RAE};
 use crate::planning::conversion::convert_domain_to_chronicle_hierarchy;
+use crate::planning::conversion::post_processing::post_processing;
 use crate::planning::conversion::pre_processing::{pre_processing, transform_lambda_expression};
 use crate::planning::conversion::processing::{
     convert_if, convert_lvalue_to_expression_chronicle, MetaData,
@@ -41,8 +42,14 @@ pub async fn convert_expr<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     let mut ch = ChronicleHierarchy::default();
 
     let time = SystemTime::now();
-    let chronicle =
-        convert_lvalue_to_expression_chronicle(&lv, &context, &mut ch, MetaData::new(true, false))?;
+    let pre_processed = pre_processing(&lv, &context, &mut ch)?;
+    let mut chronicle = convert_lvalue_to_expression_chronicle(
+        &pre_processed,
+        &context,
+        &mut ch,
+        MetaData::new(true, false),
+    )?;
+    post_processing(&mut chronicle, &context, &mut ch)?;
     let time = time.elapsed().expect("could not get time").as_micros();
     let string = chronicle.format_with_sym_table(&ch.sym_table);
 

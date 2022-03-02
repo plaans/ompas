@@ -1,5 +1,5 @@
 use crate::module::rae_exec::{
-    RAE_ASSERT, RAE_ASSERT_SHORT, RAE_INSTANCE, RAE_RETRACT, RAE_RETRACT_SHORT,
+    RAE_ASSERT, RAE_ASSERT_SHORT, RAE_INSTANCE, RAE_MONITOR, RAE_RETRACT, RAE_RETRACT_SHORT,
 };
 use crate::planning::conversion::post_processing::post_processing;
 use crate::planning::structs::atom::{AtomType, Sym};
@@ -14,6 +14,7 @@ use crate::planning::structs::symbol_table::{AtomId, ExpressionType};
 use crate::planning::structs::traits::{Absorb, FormatWithSymTable, GetVariables};
 use crate::planning::structs::transition::Transition;
 use crate::planning::structs::{ChronicleHierarchy, ConversionContext, TaskType};
+use ompas_lisp::core::root_module::basic_math::language::{EQ, GEQ, GT, LEQ, LT, NOT, NOT_SHORT};
 use ompas_lisp::core::root_module::error::language::CHECK;
 use ompas_lisp::core::structs::lcoreoperator::language::EVAL;
 use ompas_lisp::core::structs::lcoreoperator::LCoreOperator;
@@ -21,6 +22,7 @@ use ompas_lisp::core::structs::lerror::LError;
 use ompas_lisp::core::structs::lerror::LError::{SpecialError, WrongNumberOfArgument};
 use ompas_lisp::core::structs::lvalue::LValue;
 use ompas_lisp::core::structs::typelvalue::TypeLValue;
+use ompas_lisp::modules::utils::language::ARBITRARY;
 use ompas_lisp::static_eval::{eval_static, parse_static};
 use std::convert::{TryFrom, TryInto};
 
@@ -42,6 +44,17 @@ impl MetaData {
             _inside_top_level_do,
         }
     }
+}
+
+pub enum BooleanFunction {
+    EQ,
+    LT,
+    LEQ,
+    GT,
+    GEQ,
+    NOT,
+    TYPE,
+    ARBITRARY,
 }
 
 pub fn convert_lvalue_to_expression_chronicle(
@@ -281,10 +294,43 @@ pub fn convert_lvalue_to_expression_chronicle(
                 ch.sym_table.new_scope();
                 let mut literal: Vec<Lit> = vec![];
 
+                let mut constraint: Option<BooleanFunction> = None;
+
                 match &l[0] {
                     LValue::Symbol(_) | LValue::Fn(_) => {
                         let s = l[0].to_string();
                         match s.as_str() {
+                            RAE_MONITOR => {
+                                //A monitor is a condition
+                                let fluent = convert_lvalue_to_expression_chronicle(
+                                    &l[1],
+                                    context,
+                                    ch,
+                                    Default::default(),
+                                )?;
+                                ec.add_constraint(Constraint::Eq(
+                                    ec.get_interval().start().into(),
+                                    fluent.get_interval().start().into(),
+                                ));
+                                ec.add_constraint(Constraint::Eq(
+                                    ec.get_interval().end().into(),
+                                    fluent.get_interval().end().into(),
+                                ));
+                                ec.add_condition(Condition {
+                                    interval: Interval::new(
+                                        &ec.get_interval().end(),
+                                        &ec.get_interval().end(),
+                                    ),
+                                    constraint: Constraint::Eq(
+                                        ec.get_result(),
+                                        fluent.get_result(),
+                                    ),
+                                });
+
+                                ec.absorb(fluent);
+
+                                return Ok(ec);
+                            }
                             RAE_ASSERT | RAE_ASSERT_SHORT => {
                                 if l.len() != 3 {
                                     return Err(WrongNumberOfArgument(
@@ -337,7 +383,7 @@ pub fn convert_lvalue_to_expression_chronicle(
 
                                 return Ok(ec);
                             }
-                            RAE_INSTANCE => {
+                            /*RAE_INSTANCE => {
                                 expression_type = ExpressionType::StateFunction;
                                 literal.push(
                                     ch.sym_table
@@ -347,7 +393,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                                         })
                                         .into(),
                                 )
-                            }
+                            }*/
                             RAE_RETRACT | RAE_RETRACT_SHORT => {
                                 return Err(SpecialError(
                                     CONVERT_LVALUE_TO_EXPRESSION_CHRONICLE,
@@ -365,7 +411,19 @@ pub fn convert_lvalue_to_expression_chronicle(
                                             expression_type = ExpressionType::Action;
                                             println!("{} is an action", s);
                                         }
-                                        AtomType::Function => {}
+                                        AtomType::Function => {
+                                            constraint = match s.as_str() {
+                                                EQ => Some(BooleanFunction::EQ),
+                                                NOT | NOT_SHORT => Some(BooleanFunction::NOT),
+                                                GT => Some(BooleanFunction::GT),
+                                                GEQ => Some(BooleanFunction::GEQ),
+                                                LT => Some(BooleanFunction::LT),
+                                                LEQ => Some(BooleanFunction::LEQ),
+                                                ARBITRARY => Some(BooleanFunction::ARBITRARY),
+                                                RAE_INSTANCE => Some(BooleanFunction::TYPE),
+                                                _ => None
+                                            };
+                                        }
                                         AtomType::Method => return Err(SpecialError(CONVERT_LVALUE_TO_EXPRESSION_CHRONICLE, format!("{} is method and can not be directly called into the body of a method.\
                                 \nPlease call the task that use the method instead", s))),
                                         AtomType::StateFunction => {
@@ -477,6 +535,93 @@ pub fn convert_lvalue_to_expression_chronicle(
                         } else {
                         }
                         if !is_pure {
+                            if let Some(bc) = constraint {
+                                match bc {
+                                    BooleanFunction::EQ => ec.add_constraint(Constraint::Eq(
+                                        literal[1].clone(),
+                                        literal[2].clone(),
+                                    )),
+                                    BooleanFunction::LT => ec.add_constraint(Constraint::LT(
+                                        literal[1].clone(),
+                                        literal[2].clone(),
+                                    )),
+                                    BooleanFunction::LEQ => ec.add_constraint(Constraint::LEq(
+                                        literal[1].clone(),
+                                        literal[2].clone(),
+                                    )),
+                                    BooleanFunction::GT => ec.add_constraint(Constraint::LT(
+                                        literal[2].clone(),
+                                        literal[1].clone(),
+                                    )),
+                                    BooleanFunction::GEQ => ec.add_constraint(Constraint::LEq(
+                                        literal[2].clone(),
+                                        literal[1].clone(),
+                                    )),
+                                    BooleanFunction::NOT => {
+                                        ec.add_constraint(Constraint::Neg(literal[1].clone()))
+                                    }
+                                    BooleanFunction::TYPE => ec.add_constraint(Constraint::Type(
+                                        literal[1].clone(),
+                                        literal[2].clone(),
+                                    )),
+                                    BooleanFunction::ARBITRARY => {
+                                        ec.add_constraint(Constraint::Arbitrary(
+                                            literal[1].clone(),
+                                            literal[2].clone(),
+                                        ))
+                                    }
+                                }
+                            } else {
+                                let literal: Lit = vec![
+                                    ch.sym_table
+                                        .id(EVAL)
+                                        .expect("Eval not defined in symbol table")
+                                        .into(),
+                                    Lit::from(literal),
+                                ]
+                                .into();
+
+                                ec.add_constraint(Constraint::Eq(ec.get_result(), literal));
+
+                                /*ec.add_effect(Effect {
+                                    interval: *ec.get_interval(),
+                                    transition: Transition::new(ec.get_result(), literal),
+                                });*/
+                            }
+                        }
+                        ec.add_constraint(Constraint::Eq(
+                            end_last_interval.into(),
+                            ec.get_interval().end().into(),
+                        ));
+                    }
+                    ExpressionType::Lisp => {
+                        if let Some(bc) = constraint {
+                            let constraint = match bc {
+                                BooleanFunction::EQ => {
+                                    Constraint::Eq(literal[1].clone(), literal[2].clone())
+                                }
+                                BooleanFunction::LT => {
+                                    Constraint::LT(literal[1].clone(), literal[2].clone())
+                                }
+                                BooleanFunction::LEQ => {
+                                    Constraint::LEq(literal[1].clone(), literal[2].clone())
+                                }
+                                BooleanFunction::GT => {
+                                    Constraint::LT(literal[2].clone(), literal[1].clone())
+                                }
+                                BooleanFunction::GEQ => {
+                                    Constraint::LEq(literal[2].clone(), literal[1].clone())
+                                }
+                                BooleanFunction::NOT => Constraint::Neg(literal[1].clone()),
+                                BooleanFunction::TYPE => {
+                                    Constraint::Type(literal[1].clone(), literal[2].clone())
+                                }
+                                BooleanFunction::ARBITRARY => {
+                                    Constraint::Arbitrary(literal[1].clone(), literal[2].clone())
+                                }
+                            };
+                            ec.add_constraint(Constraint::Eq(ec.get_result(), constraint.into()))
+                        } else {
                             let literal: Lit = vec![
                                 ch.sym_table
                                     .id(EVAL)
@@ -487,36 +632,15 @@ pub fn convert_lvalue_to_expression_chronicle(
                             .into();
 
                             ec.add_constraint(Constraint::Eq(ec.get_result(), literal));
-
                             /*ec.add_effect(Effect {
                                 interval: *ec.get_interval(),
                                 transition: Transition::new(ec.get_result(), literal),
                             });*/
+                            ec.add_constraint(Constraint::Eq(
+                                end_last_interval.into(),
+                                ec.get_interval().end().into(),
+                            ));
                         }
-                        ec.add_constraint(Constraint::Eq(
-                            end_last_interval.into(),
-                            ec.get_interval().end().into(),
-                        ));
-                    }
-                    ExpressionType::Lisp => {
-                        let literal: Lit = vec![
-                            ch.sym_table
-                                .id(EVAL)
-                                .expect("Eval not defined in symbol table")
-                                .into(),
-                            Lit::from(literal),
-                        ]
-                        .into();
-
-                        ec.add_constraint(Constraint::Eq(ec.get_result(), literal));
-                        /*ec.add_effect(Effect {
-                            interval: *ec.get_interval(),
-                            transition: Transition::new(ec.get_result(), literal),
-                        });*/
-                        ec.add_constraint(Constraint::Eq(
-                            end_last_interval.into(),
-                            ec.get_interval().end().into(),
-                        ));
                     }
                     ExpressionType::Action | ExpressionType::Task => {
                         literal.push(ec.get_result());
@@ -526,6 +650,10 @@ pub fn convert_lvalue_to_expression_chronicle(
                         })
                     }
                     ExpressionType::StateFunction => {
+                        /*if sub_expression_pure {
+                            ec.set_pure_result(literal.into());
+                        } else {
+                        }*/
                         ec.add_constraint(Constraint::Eq(ec.get_result(), literal.into()));
                         /*ec.add_effect(Effect {
                             interval: *ec.get_interval(),

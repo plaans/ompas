@@ -141,7 +141,7 @@ pub fn print(args: &[LValue], env: &LEnv) -> LResult {
         }
         LogOutput::Channel(tx) => {
             let tx = tx.clone();
-            tokio::spawn(async move { tx.send(lv.to_string()).await });
+            tokio::spawn(async move { tx.send(format!("PRINT - {}", lv)).await });
         }
         LogOutput::File(pb) => {
             //println!("print {} in {:?}", lv, pb);
@@ -151,7 +151,7 @@ pub fn print(args: &[LValue], env: &LEnv) -> LResult {
                 .create(true)
                 .open(pb)
                 .expect("error creating print file");
-            file.write_all(format!("{}\n", lv).as_bytes())?;
+            file.write_all(format!("PRINT - {}\n", lv).as_bytes())?;
         }
     };
 

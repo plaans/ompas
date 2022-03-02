@@ -357,7 +357,7 @@ impl RAEInterface for PlatformGodot {
         };
 
         tokio::spawn(async {
-            tokio::time::sleep(Duration::from_millis(100)).await;
+            tokio::time::sleep(Duration::from_millis(1000)).await;
             let result = Command::new("pidof")
                 .arg("godot3")
                 .output()

@@ -106,33 +106,10 @@ async fn run_logger_file(mut rx: mpsc::Receiver<String>, log_path: PathBuf) {
     file.write_all("RAE LOG\n\n".as_bytes())
         .expect("could not write to RAE log file.");
 
-    Command::new("gnome-terminal")
-        .args(&["--title", "RAE LOG"])
-        .args(&["--", "tail", "-f", log_path.to_str().unwrap()])
-        .spawn()
-        .expect("could not spawn terminal");
-
-    tokio::time::sleep(Duration::from_millis(2000)).await;
-    let result = Command::new("pidof")
-        .arg("tail")
-        .output()
-        .expect("could not run command.");
-    let pids = String::from_utf8(result.stdout).expect("could not convert into string");
-    //println!("tail pids: {}", pids);
-    let logger_pid = if !pids.is_empty() {
-        let logger_pid = pids
-            .split_whitespace()
-            .next()
-            .expect("could not get first pid")
-            .to_string();
-        //println!("logger pid: {}", logger_pid);
-        Some(logger_pid)
-    } else {
-        None
-    };
+    let mut logger_pid = None;
 
     let mut end_receiver = subscribe_new_task();
-
+    let mut first = true;
     loop {
         tokio::select! {
             str_log = rx.recv() => {
@@ -142,6 +119,33 @@ async fn run_logger_file(mut rx: mpsc::Receiver<String>, log_path: PathBuf) {
                         break;
                     }
                     Some(str) => {
+                        if first {
+                            first = false;
+                            Command::new("gnome-terminal")
+                                .args(&["--title", "RAE LOG"])
+                                .args(&["--", "tail", "-f", log_path.to_str().unwrap()])
+                                .spawn()
+                                .expect("could not spawn terminal");
+
+                            tokio::time::sleep(Duration::from_millis(2000)).await;
+                            let result = Command::new("pidof")
+                                .arg("tail")
+                                .output()
+                                .expect("could not run command.");
+                            let pids = String::from_utf8(result.stdout).expect("could not convert into string");
+                            //println!("tail pids: {}", pids);
+                            logger_pid = if !pids.is_empty() {
+                                let logger_pid = pids
+                                    .split_whitespace()
+                                    .next()
+                                    .expect("could not get first pid")
+                                    .to_string();
+                                //println!("logger pid: {}", logger_pid);
+                                Some(logger_pid)
+                            } else {
+                                None
+                            };
+                        }
                         file.write_all(format!("{}\n", str).as_bytes()).expect("could not write to RAE log file");
                     }
                 }

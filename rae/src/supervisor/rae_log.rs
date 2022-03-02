@@ -112,7 +112,7 @@ async fn run_logger_file(mut rx: mpsc::Receiver<String>, log_path: PathBuf) {
         .spawn()
         .expect("could not spawn terminal");
 
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    tokio::time::sleep(Duration::from_millis(2000)).await;
     let result = Command::new("pidof")
         .arg("tail")
         .output()
@@ -151,6 +151,8 @@ async fn run_logger_file(mut rx: mpsc::Receiver<String>, log_path: PathBuf) {
                     Command::new("kill")
                     .args(&["-9", pid.as_str()]).spawn()
                     .expect("Command failed.");
+                } else {
+                    println!("Could not kill terminal of RAE LOG...");
                 }
                 println!("Process RAE LOG killed.");
                 break;

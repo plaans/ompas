@@ -36,7 +36,7 @@ path = "src/bin/ompas.rs"
 
 [[bin]]
 name = "ompas-simu"
-path = "src/bin/ompas-simu.rs"
+path = "examples/ompas-simu.rs"
 
 
 [[bin]]
@@ -45,15 +45,15 @@ path = "src/bin/scheme.rs"
 
 [[bin]]
 name = "root_scheme"
-path = "src/bin/root_scheme.rs"
+path = "examples/root_scheme.rs"
 
 [[bin]]
 name = "conversion"
-path = "src/bin/conversion.rs"
+path = "examples/conversion.rs"
 
 [[bin]]
 name = "union-map"
-path = "src/bin/union_map_bin.rs"
+path = "examples/union_map_bin.rs"
 
 [[example]]
 name = "virtual_robot"

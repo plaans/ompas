@@ -79,10 +79,6 @@ pub async fn lisp_interpreter(log: Option<PathBuf>) {
 
     li.set_config(LispInterpreterConfig::new(true));
 
-    /*com.send("(read godot_domain/init.lisp)".to_string())
-    .await
-    .expect("could not send to LI");*/
-
     com.send("(read instances/gripper/init.lisp)".to_string())
         .await
         .expect("could not send to LI");

@@ -25,6 +25,9 @@ struct Opt {
 
     #[structopt(short = "p", long = "log-path")]
     log: Option<PathBuf>,
+
+    #[structopt(short = "r", long = "root")]
+    root: bool,
 }
 
 #[tokio::main]
@@ -38,58 +41,61 @@ async fn main() {
     }
 
     //test_lib_model(&opt);
-    lisp_interpreter(opt.log).await;
+    lisp_interpreter(opt.log, opt.root).await;
 }
 
-pub async fn lisp_interpreter(log: Option<PathBuf>) {
+pub async fn lisp_interpreter(log: Option<PathBuf>, root: bool) {
     let mut li = LispInterpreter::new().await;
 
-    let mut ctx_io = CtxIo::default();
-    let ctx_math = CtxMath::default();
-    let ctx_type = CtxType::default();
-    let ctx_utils = CtxUtils::default();
-    let ctx_string = CtxString::default();
+    if !root {
+        let mut ctx_io = CtxIo::default();
 
-    let mut ctx_eval_static: CtxStaticEval = CtxStaticEval::new()
-        .await
-        .expect("error creating eval static environment");
+        let ctx_math = CtxMath::default();
+        let ctx_type = CtxType::default();
+        let ctx_utils = CtxUtils::default();
+        let ctx_string = CtxString::default();
 
-    ctx_eval_static
-        .import_namespace(CtxRaeExec::default())
-        .await
-        .expect("error importing mod-rae-exec in eval-static");
+        let mut ctx_eval_static: CtxStaticEval = CtxStaticEval::new()
+            .await
+            .expect("error creating eval static environment");
 
-    //Add the sender of the channel.
-    if let Some(pb) = &log {
-        let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
-        let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
-        let mut file_pb = pb.clone();
-        file_pb.push(format!("log_{}.txt", string_date));
-        ctx_io.set_log_output(LogOutput::File(file_pb));
+        ctx_eval_static
+            .import_namespace(CtxRaeExec::default())
+            .await
+            .expect("error importing mod-rae-exec in eval-static");
+
+        //Add the sender of the channel.
+        if let Some(pb) = &log {
+            let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
+            let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
+            let mut file_pb = pb.clone();
+            file_pb.push(format!("log_{}.txt", string_date));
+            ctx_io.set_log_output(LogOutput::File(file_pb));
+        }
+
+        li.import_namespace(ctx_utils)
+            .await
+            .expect("error loading utils");
+        li.import_namespace(ctx_io).await.expect("error loading io");
+        li.import_namespace(ctx_math)
+            .await
+            .expect("error loading math");
+        li.import_namespace(ctx_type)
+            .await
+            .expect("error loading type");
+
+        li.import(ctx_string)
+            .await
+            .expect("error loading ctx string");
+
+        li.import_namespace(CtxRaeDescription::default())
+            .await
+            .expect("error loading rae description");
+
+        li.import_namespace(ctx_eval_static)
+            .await
+            .expect("error loading context eval_static");
     }
-
-    li.import_namespace(ctx_utils)
-        .await
-        .expect("error loading utils");
-    li.import_namespace(ctx_io).await.expect("error loading io");
-    li.import_namespace(ctx_math)
-        .await
-        .expect("error loading math");
-    li.import_namespace(ctx_type)
-        .await
-        .expect("error loading type");
-
-    li.import(ctx_string)
-        .await
-        .expect("error loading ctx string");
-
-    li.import_namespace(CtxRaeDescription::default())
-        .await
-        .expect("error loading rae description");
-
-    li.import_namespace(ctx_eval_static)
-        .await
-        .expect("error loading context eval_static");
 
     li.set_config(LispInterpreterConfig::new(true));
 

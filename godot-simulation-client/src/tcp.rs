@@ -142,18 +142,20 @@ async fn async_read_socket(
                 }
                 GodotMessageType::ActionResponse => {
                     let action_status: (usize, ActionStatus) = message.try_into().unwrap();
-                    //println!("{:?}", action_status.1);
-                    if let ActionStatus::ActionResponse(server_id) = action_status.1 {
-                        //println!("yey in action response");
-
-                        map_server_id_action_id.insert(server_id, action_status.0);
-
-                        status
-                            .status
-                            .write()
-                            .await
-                            .insert(action_status.0, action_status.1.into());
+                    match action_status.1 {
+                        ActionStatus::ActionResponse(server_id) => {
+                            map_server_id_action_id.insert(server_id, action_status.0);
+                        }
+                        ActionStatus::ActionDenied => {}
+                        _ => unreachable!()
                     }
+
+                    status
+                        .status
+                        .write()
+                        .await
+                        .insert(action_status.0, action_status.1.into());
+
                     match &status.sync.sender {
                         None => {}
                         Some(sender) => {

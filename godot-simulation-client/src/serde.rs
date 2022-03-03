@@ -1,10 +1,13 @@
 use aries_planning::parsing::sexpr::SExpr;
 use ompas_lisp::core::structs::lerror::LError;
+use ompas_lisp::core::structs::lerror::LError::SpecialError;
 use ompas_lisp::core::structs::lvalue::LValue;
 use ompas_lisp::core::structs::lvalues::LValueS;
 use ompas_rae::context::rae_state::ActionStatus::*;
 use ompas_rae::context::rae_state::{ActionStatus, LState, StateType};
-use serde::{Deserialize, Serialize, Serializer};
+use serde::de::{Error, Visitor};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde_json::Value;
 use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
 
@@ -87,8 +90,7 @@ pub struct SerdeRobotCommand {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SerdeActionResponse {
     pub temp_id: usize,
-    pub action_id: usize,
-    //TODO: take in account case when command is refused (ie action_id = -1)
+    pub action_id: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -178,9 +180,15 @@ impl TryFrom<GodotMessageSerde> for (usize, ActionStatus) {
             GodotMessageType::ActionResponse => {
                 if let GodotMessageSerdeData::ActionResponse(ar) = value.data {
                     id = ar.temp_id;
-                    status = ActionResponse(ar.action_id)
+                    status = if ar.action_id < -1 {
+                        return Err(SpecialError("", "".to_string()));
+                    } else if ar.action_id == -1 {
+                        ActionDenied
+                    } else {
+                        ActionResponse(ar.action_id as usize)
+                    };
                 } else {
-                    unreachable!()
+                    unreachable!("{:?} and expected ActionResponse", value.data)
                 }
             }
             GodotMessageType::ActionFeedback => {
@@ -188,7 +196,7 @@ impl TryFrom<GodotMessageSerde> for (usize, ActionStatus) {
                     id = af.action_id;
                     status = ActionStatus::ActionFeedback(af.feedback);
                 } else {
-                    unreachable!()
+                    unreachable!("{:?} and expected ActionFeedback", value.data)
                 }
             }
             GodotMessageType::ActionResult => {
@@ -196,7 +204,7 @@ impl TryFrom<GodotMessageSerde> for (usize, ActionStatus) {
                     id = ar.action_id;
                     status = ActionStatus::ActionResult(ar.result);
                 } else {
-                    unreachable!()
+                    unreachable!("{:?} and expected ActionResult", value.data)
                 }
             }
             GodotMessageType::ActionPreempt => {
@@ -204,7 +212,7 @@ impl TryFrom<GodotMessageSerde> for (usize, ActionStatus) {
                     id = ai.action_id;
                     status = ActionPreempt;
                 } else {
-                    unreachable!()
+                    unreachable!("{:?} and expected ActionId", value.data)
                 }
             }
             GodotMessageType::ActionCancel => {
@@ -212,7 +220,7 @@ impl TryFrom<GodotMessageSerde> for (usize, ActionStatus) {
                     id = ac.temp_id;
                     status = ActionCancel(ac.cancelled);
                 } else {
-                    unreachable!()
+                    unreachable!("{:?} and expected ActionCancel", value.data)
                 }
             }
             _ => {
@@ -234,7 +242,6 @@ impl Display for GodotMessageSerde {
 pub fn parse_into_lvalue(se: &SExpr) -> Result<LValueS, ()> {
     match se {
         SExpr::Atom(atom) => {
-            //println!("expression is an atom: {}", atom);
             //Test if its an int
             return match atom.as_str().parse::<i64>() {
                 Ok(int) => Ok(LValueS::Int(int)),
@@ -243,14 +250,8 @@ pub fn parse_into_lvalue(se: &SExpr) -> Result<LValueS, ()> {
                     Ok(float) => Ok(LValueS::Float(float)),
                     Err(_) => match atom.as_str() {
                         //Test if its a Boolean
-                        "true" => {
-                            //println!("atom is boolean true");
-                            Ok(LValueS::Bool(true))
-                        }
-                        "false" => {
-                            //println!("atom is boolean false");
-                            Ok(LValueS::Bool(false))
-                        }
+                        "true" => Ok(LValueS::Bool(true)),
+                        "false" => Ok(LValueS::Bool(false)),
 
                         s => Ok(LValueS::Symbol(s.to_string())),
                     },
@@ -258,7 +259,6 @@ pub fn parse_into_lvalue(se: &SExpr) -> Result<LValueS, ()> {
             };
         }
         SExpr::List(list) => {
-            //println!("expression is a list");
             let list_iter = list.iter();
             let vec: Vec<LValueS> = list_iter.map(parse_into_lvalue).collect::<Result<_, _>>()?;
             Ok(LValueS::List(vec))

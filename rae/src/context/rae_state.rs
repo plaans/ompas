@@ -278,6 +278,7 @@ impl RAEState {
 #[derive(Debug, Clone, Copy)]
 pub enum ActionStatus {
     ActionPending,
+    ActionDenied,
     ActionResponse(usize),
     ActionFeedback(f64), //Progress of the action
     ActionResult(bool),  //True the action is a success, false the action is a failure
@@ -300,6 +301,7 @@ impl From<ActionStatus> for Status {
                 true => Status::Done,
                 false => Status::Failure,
             },
+            ActionStatus::ActionDenied => Status::Failure,
         }
     }
 }
@@ -313,6 +315,7 @@ impl Display for ActionStatus {
             ActionStatus::ActionResult(r) => write!(f, "action result: {}", r),
             ActionStatus::ActionPreempt => write!(f, "action preempt"),
             ActionStatus::ActionCancel(r) => write!(f, "action cancel {}", r),
+            ActionStatus::ActionDenied => write!(f, "action denied"),
         }
     }
 }

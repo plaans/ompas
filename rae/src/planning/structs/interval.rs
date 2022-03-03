@@ -16,6 +16,10 @@ impl Interval {
             end: *end,
         }
     }
+
+    pub fn new_instantaneous(t: &AtomId) -> Self {
+        Self { start: *t, end: *t }
+    }
 }
 
 impl Interval {

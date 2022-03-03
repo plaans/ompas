@@ -5,7 +5,7 @@ use crate::planning::conversion::post_processing::post_processing;
 use crate::planning::structs::atom::{AtomType, Sym};
 use crate::planning::structs::chronicle::{Chronicle, ExpressionChronicle};
 use crate::planning::structs::condition::Condition;
-use crate::planning::structs::constraint::{bind_result, equal, Constraint};
+use crate::planning::structs::constraint::{bind_result, equal, finish, meet, start, Constraint};
 use crate::planning::structs::effect::Effect;
 use crate::planning::structs::expression::Expression;
 use crate::planning::structs::interval::Interval;
@@ -77,10 +77,8 @@ pub fn convert_lvalue_to_expression_chronicle(
                 ec.add_var(&symbol);
             }
             ec.set_pure_result(symbol.into());
-            ec.add_constraint(Constraint::Eq(
-                ec.get_interval().start().into(),
-                ec.get_interval().end().into(),
-            ))
+
+            ec.make_instantaneous();
         }
         LValue::Nil
         | LValue::True
@@ -89,10 +87,7 @@ pub fn convert_lvalue_to_expression_chronicle(
         | LValue::Character(_) => {
             ec.set_pure_result(lvalue_to_lit(exp, &mut ch.sym_table)?);
             //As the result is pure, the expression is considering as having a null time of execution.
-            ec.add_constraint(Constraint::Eq(
-                ec.get_interval().start().into(),
-                ec.get_interval().end().into(),
-            ));
+            ec.make_instantaneous();
         }
         LValue::List(l) => match &l[0] {
             LValue::CoreOperator(co) => match co {
@@ -107,17 +102,10 @@ pub fn convert_lvalue_to_expression_chronicle(
                             Default::default(),
                         )?;
                         if val.is_result_pure() {
-                            ec.add_constraint(Constraint::Eq(
-                                ec.get_interval().start().into(),
-                                ec.get_interval().end().into(),
-                            ))
+                            ec.make_instantaneous()
                         }
 
-                        ec.add_constraint(Constraint::Eq(
-                            val.get_interval().end().into(),
-                            ec.get_interval().end().into(),
-                        ));
-
+                        ec.add_constraint(finish(val.get_interval(), ec.get_interval()));
                         ec.add_constraint(Constraint::Eq(val.get_result(), var.into()));
                         ec.set_pure_result(ch.sym_table.new_bool(false).into());
                         ec.absorb(val);
@@ -176,10 +164,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                                 if ec_i.is_result_pure() {
                                     ec.set_pure_result(ec_i.get_result())
                                 } else {
-                                    ec.add_constraint(Constraint::Eq(
-                                        ec.get_result(),
-                                        ec_i.get_result(),
-                                    ));
+                                    ec.add_constraint(bind_result(&ec, &ec_i));
 
                                     /*ec.add_effect(Effect {
                                         interval: *ec.get_interval(),
@@ -201,23 +186,14 @@ pub fn convert_lvalue_to_expression_chronicle(
                         }
 
                         if i == 0 {
-                            ec.add_constraint(Constraint::Eq(
-                                previous_interval.start().into(),
-                                ec_i.get_interval().start().into(),
-                            ));
+                            ec.add_constraint(start(&previous_interval, ec_i.get_interval()));
                         } else {
-                            ec.add_constraint(Constraint::Eq(
-                                previous_interval.end().into(),
-                                ec_i.get_interval().start().into(),
-                            ))
+                            ec.add_constraint(meet(&previous_interval, ec_i.get_interval()));
                         }
                         ec.absorb(ec_i);
                     }
 
-                    ec.add_constraint(Constraint::Eq(
-                        previous_interval.end().into(),
-                        ec.get_interval().end().into(),
-                    ));
+                    ec.add_constraint(finish(&previous_interval, ec.get_interval()));
 
                     ch.sym_table.revert_scope();
                 }
@@ -240,15 +216,9 @@ pub fn convert_lvalue_to_expression_chronicle(
 
                         literal.push(ec_i.get_result());
                         if i == 0 {
-                            ec.add_constraint(Constraint::Eq(
-                                previous_interval.start().into(),
-                                ec_i.get_interval().start().into(),
-                            ));
+                            ec.add_constraint(start(&previous_interval, ec_i.get_interval()));
                         } else {
-                            ec.add_constraint(Constraint::Eq(
-                                previous_interval.end().into(),
-                                ec_i.get_interval().start().into(),
-                            ))
+                            ec.add_constraint(meet(&previous_interval, ec_i.get_interval()));
                         }
 
                         previous_interval = *ec_i.get_interval();
@@ -257,7 +227,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                             //if ec_i.is_result_pure() {
                             ec.set_pure_result(ec_i.get_result())
                         } else {
-                            ec.add_constraint(Constraint::Eq(ec.get_result(), ec_i.get_result()));
+                            ec.add_constraint(bind_result(&ec, &ec_i));
 
                             /*ec.add_effect(Effect {
                                     interval: *ec.get_interval(),
@@ -268,10 +238,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                         ec.absorb(ec_i);
                     }
 
-                    ec.add_constraint(Constraint::Eq(
-                        previous_interval.end().into(),
-                        ec.get_interval().end().into(),
-                    ));
+                    ec.add_constraint(finish(&previous_interval, ec.get_interval()));
 
                     ch.sym_table.revert_scope();
                 }
@@ -280,10 +247,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                 }
                 LCoreOperator::Quote => {
                     ec.set_pure_result(lvalue_to_lit(&l[1], &mut ch.sym_table)?);
-                    ec.add_constraint(Constraint::Eq(
-                        ec.get_interval().start().into(),
-                        ec.get_interval().end().into(),
-                    ));
+                    ec.make_instantaneous();
                 }
                 co => {
                     return Err(SpecialError(
@@ -311,23 +275,11 @@ pub fn convert_lvalue_to_expression_chronicle(
                                     ch,
                                     Default::default(),
                                 )?;
-                                ec.add_constraint(Constraint::Eq(
-                                    ec.get_interval().start().into(),
-                                    fluent.get_interval().start().into(),
-                                ));
-                                ec.add_constraint(Constraint::Eq(
-                                    ec.get_interval().end().into(),
-                                    fluent.get_interval().end().into(),
-                                ));
+                                ec.add_constraint(equal(ec.get_interval(), fluent.get_interval()));
+
                                 ec.add_condition(Condition {
-                                    interval: Interval::new(
-                                        &ec.get_interval().end(),
-                                        &ec.get_interval().end(),
-                                    ),
-                                    constraint: Constraint::Eq(
-                                        ec.get_result(),
-                                        fluent.get_result(),
-                                    ),
+                                    interval: Interval::new_instantaneous(&ec.get_interval().end()),
+                                    constraint: bind_result(&ec, &fluent),
                                 });
 
                                 ec.absorb(fluent);
@@ -358,18 +310,15 @@ pub fn convert_lvalue_to_expression_chronicle(
                                 )?;
 
                                 //Temporal constraints
-                                ec.add_constraint(Constraint::Eq(
-                                    ec.get_interval().start().into(),
-                                    state_variable.get_interval().start().into(),
+                                ec.add_constraint(start(
+                                    ec.get_interval(),
+                                    state_variable.get_interval(),
                                 ));
-                                ec.add_constraint(Constraint::Eq(
-                                    state_variable.get_interval().end().into(),
-                                    value.get_interval().end().into(),
+                                ec.add_constraint(meet(
+                                    state_variable.get_interval(),
+                                    value.get_interval(),
                                 ));
-                                ec.add_constraint(Constraint::Eq(
-                                    value.get_interval().end().into(),
-                                    ec.get_interval().end().into(),
-                                ));
+                                ec.add_constraint(finish(value.get_interval(), ec.get_interval()));
 
                                 ec.add_effect(Effect {
                                     interval: *ec.get_interval(),
@@ -406,18 +355,9 @@ pub fn convert_lvalue_to_expression_chronicle(
                                     Default::default(),
                                 )?;
 
-                                ec.add_constraint(Constraint::Eq(
-                                    ec.get_interval().start().into(),
-                                    left.get_interval().start().into(),
-                                ));
-                                ec.add_constraint(Constraint::Eq(
-                                    left.get_interval().end().into(),
-                                    right.get_interval().start().into(),
-                                ));
-                                ec.add_constraint(Constraint::Eq(
-                                    right.get_interval().end().into(),
-                                    ec.get_interval().end().into(),
-                                ));
+                                ec.add_constraint(start(ec.get_interval(), left.get_interval()));
+                                ec.add_constraint(meet(left.get_interval(), right.get_interval()));
+                                ec.add_constraint(finish(right.get_interval(), ec.get_interval()));
 
                                 let a = left.get_result();
                                 let b = right.get_result();
@@ -447,19 +387,9 @@ pub fn convert_lvalue_to_expression_chronicle(
                                     Default::default(),
                                 )?;
 
-                                ec.add_constraint(Constraint::Eq(
-                                    ec.get_interval().start().into(),
-                                    val.get_interval().start().into(),
-                                ));
-                                ec.add_constraint(Constraint::Eq(
-                                    val.get_interval().end().into(),
-                                    ec.get_interval().end().into(),
-                                ));
+                                ec.add_constraint(equal(ec.get_interval(), val.get_interval()));
+                                ec.add_constraint(bind_result(&ec, &val));
 
-                                ec.add_constraint(Constraint::Arbitrary(
-                                    ec.get_result(),
-                                    val.get_result(),
-                                ));
                                 ec.absorb(val);
                                 return Ok(ec);
                             }
@@ -471,14 +401,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                                     Default::default(),
                                 )?;
 
-                                ec.add_constraint(Constraint::Eq(
-                                    ec.get_interval().start().into(),
-                                    val.get_interval().start().into(),
-                                ));
-                                ec.add_constraint(Constraint::Eq(
-                                    val.get_interval().end().into(),
-                                    ec.get_interval().end().into(),
-                                ));
+                                ec.add_constraint(equal(ec.get_interval(), val.get_interval()));
 
                                 let r = val.get_result();
 
@@ -564,17 +487,13 @@ pub fn convert_lvalue_to_expression_chronicle(
                                             Default::default(),
                                         )?;
 
-                                        ec.add_constraint(Constraint::Eq(
-                                            ec.get_interval().start().into(),
-                                            symbol.get_interval().start().into(),
+                                        ec.add_constraint(start(
+                                            ec.get_interval(),
+                                            symbol.get_interval(),
                                         ));
-                                        ec.add_constraint(Constraint::Eq(
-                                            symbol.get_interval().end().into(),
-                                            symbol_type.get_interval().start().into(),
-                                        ));
-                                        ec.add_constraint(Constraint::Eq(
-                                            symbol_type.get_interval().end().into(),
-                                            ec.get_interval().end().into(),
+                                        ec.add_constraint(meet(
+                                            symbol.get_interval(),
+                                            symbol_type.get_interval(),
                                         ));
 
                                         let constraint = Constraint::Type(
@@ -657,15 +576,9 @@ pub fn convert_lvalue_to_expression_chronicle(
                     literal.push(ec_i.get_result());
                     sub_expression_pure &= ec_i.is_result_pure();
                     if i != 0 {
-                        ec.add_constraint(Constraint::Eq(
-                            previous_interval.end().into(),
-                            ec_i.get_interval().start().into(),
-                        ));
+                        ec.add_constraint(meet(&previous_interval, ec_i.get_interval()));
                     } else {
-                        ec.add_constraint(Constraint::Eq(
-                            previous_interval.start().into(),
-                            ec_i.get_interval().start().into(),
-                        ));
+                        ec.add_constraint(start(&previous_interval, ec_i.get_interval()));
                     }
 
                     previous_interval = *ec_i.get_interval();
@@ -847,30 +760,6 @@ pub fn convert_if(
         )
     }
 
-    /*let complement = variables_b_false
-        .clone()
-        .relative_complement(variables_b_true.clone());
-    let variables_b_true: Vec<AtomId> = variables_b_true.iter().cloned().collect();
-    let complement: Vec<AtomId> = complement.iter().cloned().collect();*/
-
-    //All used variables in methods of the task
-
-    /*let mut variables: Vec<AtomId> = variables_b_true.clone();
-    variables.append(&mut complement.clone());
-    let mut variable_string: Vec<String> = vec![];
-    for v in &variables {
-        variable_string.push(
-            Sym::try_from(ch.sym_table.get_atom(v).unwrap())?
-                .get_string()
-                .clone(),
-        )
-    }*/
-
-    /*println!(
-        "({}) variables: {:#?}\n union : {:#?}",
-        task_label, variable_string, union_string
-    );*/
-
     //CREATION OF THE TASK
 
     let cond_label = format!("{}_cond", task_label);
@@ -903,10 +792,7 @@ pub fn convert_if(
 
     /* Temporal constraints between expression that computes the condition
     And the task to execute. */
-    ec.add_constraint(Constraint::Eq(
-        ec.get_interval().start().into(),
-        ec_cond.get_interval().start().into(),
-    ));
+    ec.add_constraint(start(ec.get_interval(), ec_cond.get_interval()));
 
     ec.add_constraint(Constraint::Eq(
         ec_cond.get_interval().end().into(),

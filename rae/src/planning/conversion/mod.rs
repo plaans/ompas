@@ -91,10 +91,13 @@ pub fn convert_domain_to_chronicle_hierarchy(
         let mut name = vec![symbol_id];
 
         for e in action.get_parameters().get_params() {
-            let symbol_id = *ch
-                .sym_table
-                .id(&e)
-                .expect("parameters were not defined in the chronicle");
+            let symbol_id = *ch.sym_table.id(&e).expect(
+                format!(
+                    "parameters of {} were not defined in the chronicle",
+                    action_label
+                )
+                .as_str(),
+            );
             name.push(symbol_id);
             chronicle.add_var(&symbol_id);
         }

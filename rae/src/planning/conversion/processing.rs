@@ -158,8 +158,6 @@ pub fn convert_lvalue_to_expression_chronicle(
                         if !is_condition {
                             literal.push(ec_i.get_result());
 
-                            previous_interval = *ec_i.get_interval();
-
                             if i == l.len() - 2 {
                                 if ec_i.is_result_pure() {
                                     ec.set_pure_result(ec_i.get_result())
@@ -190,6 +188,8 @@ pub fn convert_lvalue_to_expression_chronicle(
                         } else {
                             ec.add_constraint(meet(&previous_interval, ec_i.get_interval()));
                         }
+                        previous_interval = *ec_i.get_interval();
+
                         ec.absorb(ec_i);
                     }
 
@@ -221,20 +221,14 @@ pub fn convert_lvalue_to_expression_chronicle(
                             ec.add_constraint(meet(&previous_interval, ec_i.get_interval()));
                         }
 
-                        previous_interval = *ec_i.get_interval();
-
                         if i == l.len() - 2 {
-                            //if ec_i.is_result_pure() {
                             ec.set_pure_result(ec_i.get_result())
                         } else {
                             ec.add_constraint(bind_result(&ec, &ec_i));
-
-                            /*ec.add_effect(Effect {
-                                    interval: *ec.get_interval(),
-                                    transition: Transition::new(ec.get_result(), ec_i.get_result()),
-                                });
-                            }*/
                         }
+
+                        previous_interval = *ec_i.get_interval();
+
                         ec.absorb(ec_i);
                     }
 
@@ -565,10 +559,15 @@ pub fn convert_lvalue_to_expression_chronicle(
                 let mut previous_interval = *ec.get_interval();
                 let f_symbol_end_timepoint = ch.sym_table.declare_new_timepoint();
                 let mut end_last_interval = f_symbol_end_timepoint;
-                ec.add_constraint(Constraint::Eq(
-                    ec.get_interval().start().into(),
-                    f_symbol_end_timepoint.into(),
-                ));
+                if !matches!(
+                    expression_type,
+                    ExpressionType::Action | ExpressionType::Task
+                ) {
+                    ec.add_constraint(Constraint::Eq(
+                        ec.get_interval().start().into(),
+                        f_symbol_end_timepoint.into(),
+                    ));
+                }
                 for (i, e) in l[1..].iter().enumerate() {
                     let ec_i =
                         convert_lvalue_to_expression_chronicle(e, context, ch, Default::default())?;

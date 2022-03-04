@@ -106,7 +106,7 @@ impl Chronicle {
             body_lvalue.get_body().clone(),
         ]
         .into();
-        println!("method lvalue (with preconditions):\n{}", method_lvalue);
+        //println!("method lvalue (with preconditions):\n{}", method_lvalue);
         build_chronicle(chronicle, &method_lvalue, conversion_context, ch)
     }
 }

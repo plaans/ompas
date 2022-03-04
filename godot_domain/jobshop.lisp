@@ -209,7 +209,7 @@
                 (do
                     (define list_packages (instance package))
                     (mapf async_process_package list_packages)
-                    ;(t_process_new_packages list_packages)
+                    (t_process_new_packages list_packages)
                     ))))
 
         (def-task t_process_new_packages '(?l list))

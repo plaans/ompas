@@ -177,6 +177,7 @@ impl IntoModule for CtxRoot {
         module.add_fn_prelude(MEMBER, member);
 
         module.add_fn_prelude(REVERSE, reverse);
+        module.add_fn_prelude(INTERSECTION, intersection);
 
         module.add_fn_prelude(ADD, add);
         module.add_fn_prelude(SUB, sub);

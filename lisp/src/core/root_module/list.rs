@@ -28,6 +28,7 @@ pub mod language {
     pub const GET_LIST: &str = "get-list";
     pub const SET_LIST: &str = "set-list";
     pub const CONS: &str = "cons";
+    pub const INTERSECTION: &str = "intersection";
 
     pub const DOC_FIRST: &str = "Return the first element of a list or nil.";
     pub const DOC_SECOND: &str = "Return the second element of a list or nil.";
@@ -352,4 +353,42 @@ pub fn reverse(args: &[LValue], _: &LEnv) -> LResult {
             1..1,
         ))
     }
+}
+
+/// Returns a list of element present in all lists
+pub fn intersection(args: &[LValue], _: &LEnv) -> LResult {
+    if args.is_empty() {
+        return Ok(LValue::Nil);
+    }
+    let mut intersection = vec![];
+    let mut vec_list = vec![];
+    for e in args {
+        match e {
+            LValue::List(list) => {
+                vec_list.push(list);
+            }
+            LValue::Nil => return Ok(LValue::Nil),
+            _ => {
+                return Err(WrongType(
+                    INTERSECTION,
+                    e.clone(),
+                    e.into(),
+                    TypeLValue::List,
+                ))
+            }
+        }
+    }
+
+    for e in vec_list[0] {
+        let mut in_all = true;
+        for list in &vec_list[1..] {
+            in_all &= list.contains(e);
+        }
+
+        if in_all {
+            intersection.push(e.clone())
+        }
+    }
+
+    Ok(intersection.into())
 }

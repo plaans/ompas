@@ -18,5 +18,4 @@
               (:score 0)
               (:body
                     (pick ?ball ?room ?gripper))))
-
 )

@@ -9,10 +9,10 @@ edition = "2018"
 [dependencies]
 ompas_utils = {path = "../utils"}
 async-recursion = "0.3.2"
-aries_model = {git = "https://github.com/Yirmandias/aries/", branch = "parse_string"}
-aries_planning = {git = "https://github.com/Yirmandias/aries/", branch = "parse_string"}
-aries_utils = {git = "https://github.com/Yirmandias/aries/", branch = "parse_string"}
-aries_collections = {git = "https://github.com/Yirmandias/aries/", branch = "parse_string"}
+aries_model = {git = "https://github.com/Yirmandias/aries/", branch = "master"}
+aries_planning = {git = "https://github.com/Yirmandias/aries/", branch = "master"}
+aries_utils = {git = "https://github.com/Yirmandias/aries/", branch = "master"}
+aries_collections = {git = "https://github.com/Yirmandias/aries/", branch = "master"}
 anyhow = "1.0.40"
 rustyline = "7.1.0"
 im = "15.0.0"

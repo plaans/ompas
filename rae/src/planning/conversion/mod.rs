@@ -91,13 +91,12 @@ pub fn convert_domain_to_chronicle_hierarchy(
         let mut name = vec![symbol_id];
 
         for e in action.get_parameters().get_params() {
-            let symbol_id = *ch.sym_table.id(&e).expect(
-                format!(
+            let symbol_id = *ch.sym_table.id(&e).unwrap_or_else(|| {
+                panic!(
                     "parameters of {} were not defined in the chronicle",
                     action_label
                 )
-                .as_str(),
-            );
+            });
             name.push(symbol_id);
             chronicle.add_var(&symbol_id);
         }
@@ -112,67 +111,10 @@ pub fn convert_domain_to_chronicle_hierarchy(
     for (method_label, method) in conversion_context.domain.get_methods() {
         let chronicle = Chronicle::new_method(method_label, method, &conversion_context, &mut ch)?;
 
-        /*let mut chronicle =
-            convert_lvalue_to_chronicle(method.get_body(), &conversion_context, &mut ch)?;
-
-        let task = conversion_context
-            .domain
-            .get_tasks()
-            .get(method.get_task_label())
-            .unwrap();
-
-        let mut task_lit: Vec<Lit> = vec![ch
-            .sym_table
-            .id(method.get_task_label())
-            .expect("symbol of task should be defined")
-            .into()];
-
-        for param in task.get_parameters().get_params() {
-            task_lit.push(ch.sym_table.declare_new_symbol(param, false).into())
-        }
-
-        task_lit.push(chronicle.get_result()?.into());
-
-        let task_lit: Lit = task_lit.into();
-
-        let mut name = vec![ch
-            .sym_table
-            .id(method_label)
-            .expect("symbol of method undefined in sym_table")
-            .into()];
-
-        if let Lit::Exp(ref exp) = task_lit {
-            chronicle.set_task(task_lit.clone());
-            for param in &exp[1..] {
-                if let Lit::Atom(atom) = param {
-                    chronicle.add_var(atom);
-                    name.push(param.clone());
-                } else {
-                    return Err(SpecialError(
-                        CONVERT_DOMAIN_TO_CHRONICLE_HIERARCHY,
-                        "parameters of a task should be atoms".to_string(),
-                    ));
-                }
-            }
-            for e in &method.get_parameters().get_params()[exp.len() - 1..] {
-                let symbol_id = *ch
-                    .sym_table
-                    .id(e)
-                    .expect("parameters were not defined in the chronicle");
-                name.push(symbol_id.into());
-                chronicle.add_var(&symbol_id);
-            }
-        } else {
-            return Err(SpecialError(
-                CONVERT_DOMAIN_TO_CHRONICLE_HIERARCHY,
-                "".to_string(),
-            ));
-        }
-        name.push(chronicle.get_result()?.into());
-
-        chronicle.set_name(name.into());*/
         ch.methods.push(chronicle);
     }
+
+    ch.problem = (&conversion_context).into();
 
     Ok(ch)
 }

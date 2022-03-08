@@ -2,7 +2,6 @@ use crate::module::rae_exec::error::RaeExecError;
 use crate::module::rae_exec::*;
 use ::macro_rules_attribute::macro_rules_attribute;
 use log::{info, warn};
-use ompas_lisp::core::root_module::list::cdr;
 use ompas_lisp::core::structs::lenv::LEnv;
 use ompas_lisp::core::structs::lerror::LError::{SpecialError, WrongNumberOfArgument};
 use ompas_lisp::core::structs::lerror::{LError, LResult};

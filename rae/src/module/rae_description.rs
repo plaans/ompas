@@ -3,7 +3,6 @@ use crate::context::rae_state::{LState, StateType};
 use crate::module::rae_exec::RAE_INSTANCE;
 use crate::module::{CtxRae, MOD_RAE};
 use ::macro_rules_attribute::macro_rules_attribute;
-use aries_planning::classical::state::State;
 use ompas_lisp::core::language::*;
 use ompas_lisp::core::root_module::list::cons;
 use ompas_lisp::core::root_module::predicate::language::*;
@@ -13,7 +12,6 @@ use ompas_lisp::core::structs::lenv::LEnv;
 use ompas_lisp::core::structs::lerror::LError::{WrongNumberOfArgument, WrongType};
 use ompas_lisp::core::structs::lerror::{LError, LResult};
 use ompas_lisp::core::structs::lvalue::LValue;
-use ompas_lisp::core::structs::lvalues::LValueS;
 use ompas_lisp::core::structs::module::{IntoModule, Module};
 use ompas_lisp::core::structs::purefonction::PureFonctionCollection;
 use ompas_lisp::core::structs::typelvalue::TypeLValue;
@@ -982,8 +980,8 @@ mod test {
             inner: LAMBDA_GENERATE_TYPE_PRE_CONDITIONS,
             dependencies: vec![],
             expression:
-                "(gtpc '((?r robot) (?f float ) (?i int) (?b bool) (?s symbol) (?n number) (?l list)))",
-            expanded: "(gtpc '((?r robot) (?f float ) (?i int) (?b bool) (?s symbol) (?n number) (?l list)))",
+                "(gtpc '((?r robot) (?f float ) (?i int) (?b bool) (?s symbol) (?n number) (?l tlist)))",
+            expanded: "(gtpc '((?r robot) (?f float ) (?i int) (?b bool) (?s symbol) (?n number) (?l tlist)))",
             result: "(if (instance ?r robot)
                         (if (float? ?f)
                             (if (int? ?i)

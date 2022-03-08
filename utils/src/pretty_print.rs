@@ -52,7 +52,7 @@ fn pretty_print_sexpr(sexpr: &SExpr, indent: usize) -> String {
         SExpr::Atom(a) => a.to_string(),
         SExpr::List(list) => {
             if let Ok(atom) = list.iter().pop_atom() {
-                match atom.as_str() {
+                match atom.canonical_str() {
                     BEGIN => {
                         let indent = indent + TAB_SIZE;
                         let mut str = "(begin".to_string();
@@ -121,7 +121,7 @@ fn pretty_print_sexpr(sexpr: &SExpr, indent: usize) -> String {
                     LET | LET_STAR => {
                         let mut indent = indent;
                         let mut str = String::new();
-                        match atom.as_str() {
+                        match atom.canonical_str() {
                             LET => {
                                 str.push_str("(let ");
                                 indent += 5;

@@ -255,12 +255,12 @@ pub fn parse_into_lvalue(se: &SExpr) -> Result<LValueS, ()> {
     match se {
         SExpr::Atom(atom) => {
             //Test if its an int
-            return match atom.as_str().parse::<i64>() {
+            return match atom.canonical_str().parse::<i64>() {
                 Ok(int) => Ok(LValueS::Int(int)),
-                Err(_) => match atom.as_str().parse::<f64>() {
+                Err(_) => match atom.canonical_str().parse::<f64>() {
                     //Test if its a float
                     Ok(float) => Ok(LValueS::Float(float)),
-                    Err(_) => match atom.as_str() {
+                    Err(_) => match atom.canonical_str() {
                         //Test if its a Boolean
                         "true" => Ok(LValueS::Bool(true)),
                         "false" => Ok(LValueS::Bool(false)),

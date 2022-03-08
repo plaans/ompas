@@ -9,7 +9,7 @@ use ompas_lisp::core::root_module::language::get_scheme_primitives;
 use ompas_lisp::core::structs::lerror;
 use ompas_lisp::core::structs::lerror::LError::SpecialError;
 use ompas_lisp::core::structs::lnumber::LNumber;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 pub type AtomId = NodeId;
 
@@ -108,6 +108,10 @@ impl SymTable {
 }
 
 impl SymTable {
+    pub fn get_symbols_of_type(&self, _symbol_type: &AtomType) -> HashSet<AtomId> {
+        todo!()
+    }
+
     pub fn get_sym(&self, id: &AtomId) -> &Atom {
         self.get_atom(&self.get_parent(id)).unwrap()
     }

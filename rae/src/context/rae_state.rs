@@ -109,6 +109,7 @@ pub struct RAEStateSnapshot {
     pub _static: LState,
     pub dynamic: LState,
     pub inner_world: LState,
+    pub instance: LState,
 }
 
 const RAE_STATE_SEM_UPDATE_CHANNEL_SIZE: usize = 64;
@@ -119,6 +120,7 @@ impl RAEState {
             _static: self._static.read().await.clone(),
             dynamic: self.dynamic.read().await.clone(),
             inner_world: self.inner_world.read().await.clone(),
+            instance: self.instance.read().await.clone(),
         }
     }
 

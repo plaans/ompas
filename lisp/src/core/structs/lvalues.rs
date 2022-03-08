@@ -115,6 +115,12 @@ impl From<&LValueS> for LValue {
     }
 }
 
+impl From<&str> for LValueS {
+    fn from(s: &str) -> Self {
+        LValueS::Symbol(s.to_string())
+    }
+}
+
 impl From<LValueS> for LValue {
     fn from(lvs: LValueS) -> Self {
         (&lvs).into()

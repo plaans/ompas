@@ -334,6 +334,7 @@ impl TryFrom<&LValue> for Vec<LValue> {
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
         match value {
             LValue::List(l) => Ok(l.clone()),
+            LValue::Nil => Ok(vec![]),
             lv => Err(ConversionError(
                 "Vec<LValue>::tryfrom<&LValue>",
                 lv.into(),

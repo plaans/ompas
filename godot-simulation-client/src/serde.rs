@@ -5,9 +5,7 @@ use ompas_lisp::core::structs::lvalue::LValue;
 use ompas_lisp::core::structs::lvalues::LValueS;
 use ompas_rae::context::rae_state::ActionStatus::*;
 use ompas_rae::context::rae_state::{ActionStatus, LState, StateType};
-use serde::de::{Error, Visitor};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use serde_json::Value;
+use serde::{Deserialize, Serialize, Serializer};
 use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
 
@@ -180,13 +178,27 @@ impl TryFrom<GodotMessageSerde> for (usize, ActionStatus) {
             GodotMessageType::ActionResponse => {
                 if let GodotMessageSerdeData::ActionResponse(ar) = value.data {
                     id = ar.temp_id;
-                    status = if ar.action_id < -1 {
+
+                    status = match ar.action_id {
+                        -1 => ActionDenied,
+                        i => {
+                            if i < 0 {
+                                return Err(SpecialError(
+                                    "GodotMessageSerde",
+                                    "action response is not in {-1} + N".to_string(),
+                                ));
+                            } else {
+                                ActionResponse(i as usize)
+                            }
+                        }
+                    }
+                    /*status = if ar.action_id < -1 {
                         return Err(SpecialError("", "".to_string()));
                     } else if ar.action_id == -1 {
                         ActionDenied
                     } else {
                         ActionResponse(ar.action_id as usize)
-                    };
+                    };*/
                 } else {
                     unreachable!("{:?} and expected ActionResponse", value.data)
                 }

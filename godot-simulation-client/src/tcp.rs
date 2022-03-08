@@ -137,6 +137,9 @@ async fn async_read_socket(
                             StateType::InnerWorld => {
                                 panic!("should not receive inner world fact from godot")
                             }
+                            StateType::Instance => {
+                                panic!("should not receive instance fact from godot")
+                            }
                         },
                     };
                 }

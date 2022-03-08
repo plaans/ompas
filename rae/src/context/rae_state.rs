@@ -14,12 +14,14 @@ use tokio::sync::{broadcast, Mutex, RwLock};
 pub const KEY_DYNAMIC: &str = "dynamic";
 pub const KEY_STATIC: &str = "static";
 pub const KEY_INNER_WORLD: &str = "inner-world";
+pub const KEY_INSTANCE: &str = "instance";
 
 #[derive(Clone, Debug, PartialOrd, PartialEq, Eq)]
 pub enum StateType {
     Static,
     Dynamic,
     InnerWorld,
+    Instance,
 }
 
 #[derive(Clone, Default, Debug)]
@@ -98,10 +100,11 @@ pub struct RAEState {
     _static: Arc<RwLock<LState>>,
     dynamic: Arc<RwLock<LState>>,
     inner_world: Arc<RwLock<LState>>,
+    instance: Arc<RwLock<LState>>,
     sem_update: Arc<Mutex<Option<broadcast::Sender<bool>>>>,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, Debug)]
 pub struct RAEStateSnapshot {
     pub _static: LState,
     pub dynamic: LState,
@@ -140,16 +143,19 @@ impl RAEState {
     pub async fn get_state(&self, _type: Option<StateType>) -> LState {
         match _type {
             None => self.inner_world.read().await.union(
-                &self
-                    ._static
-                    .read()
-                    .await
-                    .union(self.dynamic.read().await.deref()),
+                &self._static.read().await.union(
+                    &self
+                        .dynamic
+                        .read()
+                        .await
+                        .union(self.instance.read().await.deref()),
+                ),
             ),
             Some(_type) => match _type {
                 StateType::Static => self._static.read().await.clone(),
                 StateType::Dynamic => self.dynamic.read().await.clone(),
                 StateType::InnerWorld => self.inner_world.read().await.clone(),
+                StateType::Instance => self.instance.read().await.clone(),
             },
         }
     }
@@ -160,12 +166,6 @@ impl RAEState {
             Some(_type) => match _type {
                 StateType::Static => {
                     let new_state = self._static.write().await.union(&state).inner;
-                    /*match self.check_for_instance_declaration(&state).await {
-                        None => {}
-                        Some(inner_world) => {
-                            self.inner_world.write().await.inner = inner_world.inner;
-                        }
-                    }*/
                     self._static.write().await.inner = new_state;
                 }
                 StateType::Dynamic => {
@@ -175,6 +175,10 @@ impl RAEState {
                 StateType::InnerWorld => {
                     let new_state = self.inner_world.write().await.union(&state).inner;
                     self.inner_world.write().await.inner = new_state;
+                }
+                StateType::Instance => {
+                    let new_state = self.instance.write().await.union(&state).inner;
+                    self.instance.write().await.inner = new_state;
                 }
             },
         }
@@ -195,6 +199,10 @@ impl RAEState {
                 }
                 StateType::InnerWorld => {
                     let mut _ref = self.inner_world.write().await;
+                    _ref.inner = state.inner;
+                }
+                StateType::Instance => {
+                    let mut _ref = self.instance.write().await;
                     _ref.inner = state.inner;
                 }
             },

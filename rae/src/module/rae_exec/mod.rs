@@ -669,12 +669,13 @@ async fn get_state<'a>(args: &'a [LValue], env: &'a LEnv) -> Result<LValue, LErr
                     KEY_STATIC => Some(StateType::Static),
                     KEY_DYNAMIC => Some(StateType::Dynamic),
                     KEY_INNER_WORLD => Some(StateType::InnerWorld),
+                    KEY_INSTANCE => Some(StateType::Instance),
                     _ => {
                         return Err(SpecialError(
                             RAE_GET_STATE,
                             format!(
-                                "was expecting keys {}, {}, {}",
-                                KEY_STATIC, KEY_DYNAMIC, KEY_INNER_WORLD
+                                "was expecting keys {}, {}, {}, {}",
+                                KEY_STATIC, KEY_DYNAMIC, KEY_INNER_WORLD, KEY_INSTANCE
                             ),
                         ))
                     }
@@ -806,17 +807,21 @@ async fn select<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
         info!("Add task {} to agenda", task);
         let task_id = ctx.agenda.add_task(task.clone()).await;
         info!("methods for '{}' (with their score): {}", task, args[1]);
-        let methods: Vec<LValue> = sort_greedy(methods)?.try_into()?; //Handle the case where there is no methods
+        let methods: Vec<LValue> = sort_greedy(methods)?.try_into()?;
         info!("sorted_methods: {}", LValue::from(&methods));
-        let mut stack = ctx.agenda.get_stack(task_id).await.unwrap();
-        stack.set_current_method(methods[0].clone());
-        stack.set_applicable_methods(methods[1..].into());
+        if !methods.is_empty() {
+            let mut stack = ctx.agenda.get_stack(task_id).await.unwrap();
 
-        ctx.agenda.update_stack(stack).await?;
+            stack.set_current_method(methods[0].clone());
+            stack.set_applicable_methods(methods[1..].into());
+            ctx.agenda.update_stack(stack).await?;
 
-        //info!("agenda: {}", ctx.agenda);
+            //info!("agenda: {}", ctx.agenda);
 
-        Ok(vec![methods[0].clone(), task_id.into()].into())
+            Ok(vec![methods[0].clone(), task_id.into()].into())
+        } else {
+            Ok(vec![LValue::Nil, task_id.into()].into())
+        }
     } else {
         return Err(SpecialError(
             "rae-select",

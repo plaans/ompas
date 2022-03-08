@@ -1,5 +1,7 @@
 use crate::context::mutex;
-use crate::context::rae_state::{StateType, KEY_DYNAMIC, KEY_INNER_WORLD, KEY_STATIC};
+use crate::context::rae_state::{
+    StateType, KEY_DYNAMIC, KEY_INNER_WORLD, KEY_INSTANCE, KEY_STATIC,
+};
 use crate::context::ressource_access::monitor;
 use crate::module::{CtxRae, MOD_RAE};
 use ::macro_rules_attribute::macro_rules_attribute;
@@ -70,6 +72,7 @@ pub async fn get_state<'a>(args: &'a [LValue], env: &'a LEnv) -> Result<LValue, 
                     KEY_STATIC => Some(StateType::Static),
                     KEY_DYNAMIC => Some(StateType::Dynamic),
                     KEY_INNER_WORLD => Some(StateType::InnerWorld),
+                    KEY_INSTANCE => Some(StateType::Instance),
                     _ => {
                         return Err(SpecialError(
                             RAE_GET_STATE,

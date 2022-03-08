@@ -1,7 +1,9 @@
 use crate::context::rae_env::{Action, StateFunction};
 use crate::context::rae_state::{LState, StateType};
+use crate::module::rae_exec::RAE_INSTANCE;
 use crate::module::{CtxRae, MOD_RAE};
 use ::macro_rules_attribute::macro_rules_attribute;
+use aries_planning::classical::state::State;
 use ompas_lisp::core::language::*;
 use ompas_lisp::core::root_module::list::cons;
 use ompas_lisp::core::root_module::predicate::language::*;
@@ -753,23 +755,42 @@ pub async fn def_initial_state<'a>(args: &'a [LValue], env: &'a LEnv) -> Result<
     let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
 
     if let LValue::Map(map) = &args[0] {
-        let state: LState = LState {
-            inner: {
-                let mut map_2: im::HashMap<LValueS, LValueS> = Default::default();
-                for (k, v) in map {
-                    map_2.insert(k.into(), v.into());
-                }
-                map_2
-            },
+        let mut inner_world = LState {
+            inner: Default::default(),
             _type: Some(StateType::InnerWorld),
         };
+        let mut instance = LState {
+            inner: Default::default(),
+            _type: Some(StateType::Instance),
+        };
+
+        for (k, v) in map {
+            let mut is_instance = false;
+            if let LValue::List(list) = k {
+                if list[0] == LValue::from(RAE_INSTANCE) {
+                    instance.insert(k.into(), v.into());
+                    is_instance = true;
+                }
+            }
+            if !is_instance {
+                inner_world.insert(k.into(), v.into());
+            }
+        }
 
         ctx.get_rae_env()
             .write()
             .await
             .state
-            .update_state(state)
+            .update_state(inner_world)
             .await;
+
+        ctx.get_rae_env()
+            .write()
+            .await
+            .state
+            .update_state(instance)
+            .await;
+
         Ok(LValue::Nil)
     } else {
         Err(WrongType(

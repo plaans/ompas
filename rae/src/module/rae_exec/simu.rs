@@ -99,6 +99,9 @@ pub const RAE_GENERATE_APPLICABLE_INSTANCES: &str = "generate_applicable_instanc
 
 #[macro_rules_attribute(dyn_async!)]
 pub async fn generate_applicable_instances<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+    let state = env.get_symbol(STATE).unwrap();
+    println!("state : {}", state);
+
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(
             RAE_GENERATE_APPLICABLE_INSTANCES,
@@ -125,11 +128,11 @@ pub async fn generate_applicable_instances<'a>(args: &'a [LValue], env: &'a LEnv
     )?
     .try_into()?;
 
-    /*println!(
+    println!(
         "task: {}\ntemplates: {}",
         LValue::from(task.clone()),
         LValue::from(methods_template.clone())
-    );*/
+    );
 
     for template in methods_template {
         let types: Vec<LValue> = get(
@@ -166,11 +169,11 @@ pub async fn generate_applicable_instances<'a>(args: &'a [LValue], env: &'a LEnv
 
         let instances_template: Vec<LValue> = enumerate(&instances_template, env)?.try_into()?;
 
-        /*println!(
+        println!(
             "instances for template {}: {}",
             template,
             LValue::from(instances_template.clone())
-        );*/
+        );
 
         for i in &instances_template {
             let i_vec: Vec<LValue> = i.try_into()?;
@@ -186,11 +189,11 @@ pub async fn generate_applicable_instances<'a>(args: &'a [LValue], env: &'a LEnv
 
     let applicable_methods = applicable_methods.into();
 
-    /*println!(
+    println!(
         "applicable instances for {}: {}",
         LValue::from(task),
         applicable_methods
-    );*/
+    );
 
     Ok(applicable_methods)
 }

@@ -191,27 +191,60 @@ pub async fn instance<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
                             (car args))))))))";*/
 
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
-    if let Some(platform) = &ctx.platform_interface {
-        platform.instance(args).await
-    } else {
-        let facts: im::HashMap<LValue, LValue> = get_facts(&[], env).await?.try_into()?;
-        match args.len() {
-            1 => {
-                let key = vec![RAE_INSTANCE.into(), args[0].clone()].into();
-                let value = facts.get(&key).unwrap_or(&LValue::Nil);
-                Ok(value.clone())
+    let mode: String = env
+        .get_symbol("rae-mode")
+        .expect("rae-mode should be defined, default value is exec mode")
+        .try_into()?;
+    match mode.as_str() {
+        SYMBOL_EXEC_MODE => {
+            if let Some(platform) = &ctx.platform_interface {
+                platform.instance(args).await
+            } else {
+                let facts: im::HashMap<LValue, LValue> = get_facts(&[], env).await?.try_into()?;
+                match args.len() {
+                    1 => {
+                        let key = vec![RAE_INSTANCE.into(), args[0].clone()].into();
+                        let value = facts.get(&key).unwrap_or(&LValue::Nil);
+                        Ok(value.clone())
+                    }
+                    2 => {
+                        let key = vec![RAE_INSTANCE.into(), args[1].clone()].into();
+                        let instances = facts.get(&key).unwrap_or(&LValue::Nil);
+                        contains(&[instances.clone(), args[0].clone()], env)
+                    }
+                    _ => Err(WrongNumberOfArgument(
+                        RAE_INSTANCE,
+                        args.into(),
+                        args.len(),
+                        1..2,
+                    )),
+                }
             }
-            2 => {
-                let key = vec![RAE_INSTANCE.into(), args[1].clone()].into();
-                let instances = facts.get(&key).unwrap_or(&LValue::Nil);
-                contains(&[instances.clone(), args[0].clone()], env)
-            }
-            _ => Err(WrongNumberOfArgument(
-                RAE_INSTANCE,
-                args.into(),
-                args.len(),
-                1..2,
-            )),
         }
+        SYMBOL_SIMU_MODE => {
+            let state: im::HashMap<LValue, LValue> = env.get_symbol(STATE).unwrap().try_into()?;
+            match args.len() {
+                1 => {
+                    let key = vec![RAE_INSTANCE.into(), args[0].clone()].into();
+                    let value = state.get(&key).unwrap_or(&LValue::Nil);
+                    Ok(value.clone())
+                }
+                2 => {
+                    let key = vec![RAE_INSTANCE.into(), args[1].clone()].into();
+                    let instances = state.get(&key).unwrap_or(&LValue::Nil);
+                    contains(&[instances.clone(), args[0].clone()], env)
+                }
+                _ => Err(WrongNumberOfArgument(
+                    RAE_INSTANCE,
+                    args.into(),
+                    args.len(),
+                    1..2,
+                )),
+            }
+        }
+        _ => unreachable!(
+            "{} should have either {} or {} value.",
+            SYMBOL_RAE_MODE, SYMBOL_EXEC_MODE, SYMBOL_SIMU_MODE
+        ),
     }
 }

@@ -28,11 +28,14 @@ pub async fn exec_command<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
 
     let eval_model = || async {
-        let string = format!(
-            "((get-action-model (quote {}) {})",
-            args[0],
-            cdr(args, env)?
-        );
+        let string = format!("((get-action-model '{}) {})", args[0], {
+            let mut str = "".to_string();
+            for e in &args[1..] {
+                str.push_str(format!("'{}", e).as_str())
+            }
+            str
+        });
+        println!("in eval model, string: {}", string);
         let mut env = env.clone();
         eval(&parse(&string, &mut env).await?, &mut env).await
     };

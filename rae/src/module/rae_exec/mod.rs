@@ -723,29 +723,42 @@ async fn get_state_variable<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
 
     let platform_defined = ctx.platform_interface.is_some();
 
-    if rae_mode == SYMBOL_EXEC_MODE && platform_defined {
-        let key: LValueS = if args.len() > 1 {
-            LValue::from(args).into()
-        } else {
-            args[0].clone().into()
-        };
-
-        let state = ctx.state.get_state(None).await;
-
-        let value = state.inner.get(&key).unwrap_or(&LValueS::Bool(false));
-        //println!("value: {}", value);
-
-        Ok(value.into())
-    } else if rae_mode != SYMBOL_RAE_MODE && rae_mode != SYMBOL_SIMU_MODE {
-        return Err(SpecialError(
-            RAE_GET_STATE_VARIBALE,
-            format!(
-                "RAE_MODE must have the value {} or {}",
-                SYMBOL_EXEC_MODE, SYMBOL_SIMU_MODE,
-            ),
-        ));
+    let key: LValue = if args.len() > 1 {
+        args.into()
     } else {
-        get_map(&[env.get_symbol(STATE).unwrap(), args.into()], env)
+        args[0].clone()
+    };
+
+    match rae_mode.as_str() {
+        SYMBOL_EXEC_MODE => {
+            if platform_defined {
+                let state = ctx.state.get_state(None).await;
+
+                let value = state
+                    .inner
+                    .get(&key.into())
+                    .unwrap_or(&LValueS::Bool(false));
+                //println!("value: {}", value);
+
+                Ok(value.into())
+            } else {
+                let facts: LValue = get_facts(&[], env).await?;
+                get_map(&[facts, key], env)
+            }
+        }
+        SYMBOL_SIMU_MODE => {
+            let state = env.get_symbol(STATE).unwrap();
+            get_map(&[state, key], env)
+        }
+        _ => {
+            return Err(SpecialError(
+                RAE_GET_STATE_VARIBALE,
+                format!(
+                    "RAE_MODE must have the value {} or {} (value = {}).",
+                    SYMBOL_EXEC_MODE, SYMBOL_SIMU_MODE, rae_mode,
+                ),
+            ))
+        }
     }
 }
 
@@ -798,6 +811,15 @@ async fn monitor<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
 //TODO: Implement a way to configure select
 #[macro_rules_attribute(dyn_async!)]
 async fn select<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+    /*
+    Steps:
+    - Create a new entry in the agenda
+    - Generate all instances of applicable methods
+    - Select the best method
+    - Store the stack
+    - Return (best_method, task_id)
+     */
+
     let task = args[0].clone();
 
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
@@ -828,14 +850,6 @@ async fn select<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
             format!("Task {} has no applicable method", task),
         ));
     }
-    /*
-    Steps:
-    - Create a new entry in the agenda
-    - Generate all instances of applicable methods
-    - Select the best method
-    - Store the stack
-    - Return (task_id, best_method)
-     */
 }
 
 #[macro_rules_attribute(dyn_async!)]

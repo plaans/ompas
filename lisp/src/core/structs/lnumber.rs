@@ -23,14 +23,14 @@ impl LNumber {
     pub fn is_natural(&self) -> bool {
         match self {
             LNumber::Usize(_) => true,
-            LNumber::Int(i) => i.is_positive(),
-            LNumber::Float(f) => (f.floor() - *f).abs() < f64::EPSILON,
+            LNumber::Int(i) => *i >= 0,
+            LNumber::Float(f) => f.is_sign_positive(),
         }
     }
     pub fn is_integer(&self) -> bool {
         match self {
             LNumber::Int(_) | LNumber::Usize(_) => true,
-            LNumber::Float(f) => f.is_sign_positive(),
+            LNumber::Float(f) => (f.floor() - *f).abs() < f64::EPSILON,
         }
     }
 }
@@ -178,7 +178,11 @@ impl Add for &LNumber {
             (LNumber::Float(f1), LNumber::Float(f2)) => LNumber::Float(*f1 + *f2),
             (LNumber::Int(i1), LNumber::Float(f2)) => LNumber::Float(*i1 as f64 + *f2),
             (LNumber::Float(f1), LNumber::Int(i2)) => LNumber::Float(*f1 + *i2 as f64),
-            (_, _) => unimplemented!(),
+            (LNumber::Usize(u1), LNumber::Usize(u2)) => LNumber::Usize(*u1 + *u2),
+            (LNumber::Usize(u1), LNumber::Int(i2)) => LNumber::Int(*u1 as i64 + *i2),
+            (LNumber::Int(i1), LNumber::Usize(u2)) => LNumber::Int(*i1 + *u2 as i64),
+            (LNumber::Usize(u1), LNumber::Float(f2)) => LNumber::Float(*u1 as f64 + *f2),
+            (LNumber::Float(f1), LNumber::Usize(u2)) => LNumber::Float(*f1 + *u2 as f64),
         }
     }
 }
@@ -192,7 +196,18 @@ impl Sub for &LNumber {
             (LNumber::Float(f1), LNumber::Float(f2)) => LNumber::Float(*f1 - *f2),
             (LNumber::Int(i1), LNumber::Float(f2)) => LNumber::Float(*i1 as f64 - *f2),
             (LNumber::Float(f1), LNumber::Int(i2)) => LNumber::Float(*f1 - *i2 as f64),
-            (_, _) => unimplemented!(),
+            (LNumber::Usize(u1), LNumber::Usize(u2)) => {
+                let r = *u1 as i64 - *u2 as i64;
+                if r < 0 {
+                    LNumber::Int(r)
+                } else {
+                    LNumber::Usize(r as usize)
+                }
+            }
+            (LNumber::Usize(u1), LNumber::Int(i2)) => LNumber::Int(*u1 as i64 - i2),
+            (LNumber::Int(i1), LNumber::Usize(u2)) => LNumber::Int(*i1 - *u2 as i64),
+            (LNumber::Usize(u1), LNumber::Float(f2)) => LNumber::Float(*u1 as f64 - *f2),
+            (LNumber::Float(f1), LNumber::Usize(u2)) => LNumber::Float(*f1 - *u2 as f64),
         }
     }
 }
@@ -221,7 +236,11 @@ impl Mul for &LNumber {
             (LNumber::Float(f1), LNumber::Float(f2)) => LNumber::Float(*f1 * *f2),
             (LNumber::Int(i1), LNumber::Float(f2)) => LNumber::Float(*i1 as f64 * *f2),
             (LNumber::Float(f1), LNumber::Int(i2)) => LNumber::Float(*f1 * *i2 as f64),
-            (_, _) => unimplemented!(),
+            (LNumber::Usize(u1), LNumber::Usize(u2)) => LNumber::Usize(*u1 * *u2),
+            (LNumber::Usize(u1), LNumber::Int(i2)) => LNumber::Int(*u1 as i64 * *i2),
+            (LNumber::Int(i1), LNumber::Usize(u2)) => LNumber::Int(*i1 * *u2 as i64),
+            (LNumber::Usize(u1), LNumber::Float(f2)) => LNumber::Float(*u1 as f64 * *f2),
+            (LNumber::Float(f1), LNumber::Usize(u2)) => LNumber::Float(*f1 * *u2 as f64),
         }
     }
 }

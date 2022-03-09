@@ -71,7 +71,7 @@ pub const MACRO_GENERATE_TASK: &str = "(defmacro generate-task
 pub const MACRO_GENERATE_STATE_FUNCTION: &str = "(defmacro generate-state-function (lambda args
     (let* ((label (car args))
           (p_expr (cdr args))
-          (params (car (unzip p_expr))))
+          (params (sublist (car (unzip p_expr)) 0 (- (len p_expr) 1))))
         `(list ,label
             (quote ,p_expr)
             (lambda ,params

@@ -13,6 +13,7 @@ use ompas_lisp::core::structs::lvalue::LValue;
 use ompas_lisp::core::structs::typelvalue::TypeLValue;
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{Display, Formatter};
+use std::ops::Deref;
 use tokio::sync::mpsc::Receiver;
 
 pub const RAE_TASK_METHODS_MAP: &str = "rae-task-methods-map";
@@ -32,9 +33,113 @@ pub const METHOD_TYPE: &str = "method_type";
 pub const STATE_FUNCTION_TYPE: &str = "state_function_type";
 pub const LAMBDA_TYPE: &str = "lambda_type";
 
+pub const TUPLE_TYPE: &str = "tuple";
+pub const LIST_TYPE: &str = "tlist";
+
+#[derive(Debug, Clone)]
+pub enum Type {
+    Single(String),
+    List(Box<Type>),
+    Tuple(Vec<Type>),
+}
+
+impl From<&Type> for LValue {
+    fn from(t: &Type) -> Self {
+        match t {
+            Type::Single(s) => s.into(),
+            Type::List(l) => vec![LValue::from(LIST_TYPE), l.deref().into()].into(),
+            Type::Tuple(tuple) => {
+                let mut vec: Vec<LValue> = vec![TUPLE_TYPE.into()];
+                for t in tuple {
+                    vec.push(t.into())
+                }
+                vec.into()
+            }
+        }
+    }
+}
+
+impl From<Type> for LValue {
+    fn from(t: Type) -> Self {
+        (&t).into()
+    }
+}
+
+impl From<&str> for Type {
+    fn from(str: &str) -> Self {
+        Self::Single(str.to_string())
+    }
+}
+
+impl Display for Type {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            Type::Single(s) => s.to_string(),
+            Type::List(t) => format!("[{}]", t),
+            Type::Tuple(t) => {
+                let mut str = "(".to_string();
+                for (i, e) in t.iter().enumerate() {
+                    if i != 0 {
+                        str.push(',');
+                    }
+                    str.push_str(format!("{}", e).as_str())
+                }
+                str.push(')');
+                str
+            }
+        };
+
+        write!(f, "{}", str)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Parameters {
-    inner: Vec<(String, String)>,
+    inner: Vec<(String, Type)>,
+}
+
+const TYPE_TRY_FROM_LVALUE: &str = "Type::try_from<&LValue>";
+
+impl TryFrom<&LValue> for Type {
+    type Error = LError;
+
+    fn try_from(lv: &LValue) -> Result<Self, Self::Error> {
+        let err = SpecialError(
+            TYPE_TRY_FROM_LVALUE,
+            format!("{} {} was expected", TUPLE_TYPE, LIST_TYPE),
+        );
+
+        match lv {
+            LValue::Symbol(s) => Ok(Self::Single(s.to_string())),
+            LValue::List(list) => {
+                assert!(list.len() >= 2);
+                if let LValue::Symbol(s) = &list[0] {
+                    match s.as_str() {
+                        TUPLE_TYPE => Ok(Self::Tuple({
+                            let mut vec: Vec<Type> = Vec::with_capacity(list.len() - 1);
+                            for e in &list[1..] {
+                                vec.push(e.try_into()?)
+                            }
+                            vec
+                        })),
+                        LIST_TYPE => {
+                            assert_eq!(list.len(), 2);
+                            Ok(Self::List(Box::new((&list[1]).try_into()?)))
+                        }
+                        _ => Err(err),
+                    }
+                } else {
+                    Err(err)
+                }
+            }
+            _ => Err(NotInListOfExpectedTypes(
+                TYPE_TRY_FROM_LVALUE,
+                lv.clone(),
+                (lv).into(),
+                vec![TypeLValue::Symbol, TypeLValue::List],
+            )),
+        }
+    }
 }
 
 const PARAMETERS_TRY_FROM_LVALUE: &str = "Parameters::TryFrom(LValue)";
@@ -104,8 +209,23 @@ impl Parameters {
         self.inner.iter().map(|tuple| tuple.0.clone()).collect()
     }
 
-    pub fn get_types(&self) -> Vec<String> {
+    pub fn get_types(&self) -> Vec<Type> {
         self.inner.iter().map(|tuple| tuple.1.clone()).collect()
+    }
+
+    pub fn get_types_as_lvalue(&self) -> LValue {
+        self.inner
+            .iter()
+            .map(|(_, t)| t.into())
+            .collect::<Vec<LValue>>()
+            .into()
+    }
+    pub fn get_params_as_lvalue(&self) -> LValue {
+        self.inner
+            .iter()
+            .map(|(p, _)| p.into())
+            .collect::<Vec<LValue>>()
+            .into()
     }
 
     pub fn get_number(&self) -> usize {
@@ -271,7 +391,7 @@ impl Display for StateFunction {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         writeln!(
             f,
-            "parameters : {}, body: {}",
+            "parameters : {}\nbody: {}",
             self.parameters,
             self.body.format("exec: ".len()),
         )
@@ -551,7 +671,7 @@ impl DomainEnv {
             env.insert(label.clone(), method.lambda_body.clone());
             map_method_pre_conditions.insert(label.into(), method.lambda_pre_conditions.clone());
             map_method_score.insert(label.into(), method.lambda_score.clone());
-            map_method_types.insert(label.into(), method.parameters.get_types().clone().into());
+            map_method_types.insert(label.into(), method.parameters.get_types_as_lvalue());
         }
 
         //Add all actions to env:
@@ -618,7 +738,7 @@ impl DomainEnv {
             env.insert(label.clone(), method.lambda_body.clone());
             map_method_pre_conditions.insert(label.into(), method.lambda_pre_conditions.clone());
             map_method_score.insert(label.into(), method.lambda_score.clone());
-            map_method_types.insert(label.into(), method.parameters.get_types().clone().into());
+            map_method_types.insert(label.into(), method.parameters.get_types_as_lvalue());
         }
 
         //Add all actions to env:

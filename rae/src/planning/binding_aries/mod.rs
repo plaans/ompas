@@ -68,16 +68,14 @@ pub fn build_chronicles(ch: &ChronicleHierarchy) -> Result<chronicles::Problem> 
         let sym = symbol_table
             .id(&sf.0)
             .ok_or_else(|| anyhow!("{} Unknown symbol", sf.0))?;
-        let mut args = Vec::with_capacity(sf.1.get_number() + 1);
+        let mut args = Vec::with_capacity(sf.1.get_number());
         for tpe in &sf.1.get_types() {
             let tpe = symbol_table
                 .types
-                .id_of(tpe)
+                .id_of(&tpe.to_string())
                 .ok_or_else(|| anyhow!("{} Unknown type", sf.0))?;
             args.push(Type::Sym(tpe));
         }
-        // TODO: set to a fixed-point numeral of appropriate precision
-        args.push(Type::Int); // return type (last one) is a int value
         state_functions.push(StateFun { sym, tpe: args })
     }
 

@@ -71,7 +71,14 @@ pub const MACRO_GENERATE_TASK: &str = "(defmacro generate-task
 pub const MACRO_GENERATE_STATE_FUNCTION: &str = "(defmacro generate-state-function (lambda args
     (let* ((label (car args))
           (p_expr (cdr args))
-          (params (sublist (car (unzip p_expr)) 0 (- (len p_expr) 1))))
+          (params (car (unzip p_expr)))
+          (params 
+            (if (null? params)
+                nil
+                (sublist 
+                   params
+                   0
+                   (- (len params)1)))))
         `(list ,label
             (quote ,p_expr)
             (lambda ,params
@@ -868,12 +875,12 @@ mod test {
             expression: "(generate-state-function sf (?a object) (?b object) (?c object))",
             expanded: "(list sf
                             '((?a object) (?b object) (?c object))
-                            (lambda (?a ?b ?c)
-                                (rae-get-state-variable 'sf ?a ?b ?c)))",
+                            (lambda (?a ?b)
+                                (rae-get-state-variable 'sf ?a ?b)))",
             result: "(list sf
                             '((?a object) (?b object) (?c object))
-                            (lambda (?a ?b ?c)
-                                (rae-get-state-variable 'sf ?a ?b ?c)))",
+                            (lambda (?a ?b)
+                                (rae-get-state-variable 'sf ?a ?b)))",
         };
 
         let mut env = init_env_and_ctxs().await;

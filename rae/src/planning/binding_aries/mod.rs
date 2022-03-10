@@ -1,12 +1,18 @@
 use crate::planning::structs::ChronicleHierarchy;
 use anyhow::{anyhow, Result};
-use aries_model::lang::Type;
+use aries_core::Lit as ariesLit;
+use aries_core::*;
+use aries_model::lang::*;
 use aries_model::symbols::SymbolTable;
 use aries_model::types::TypeHierarchy;
 use aries_planning::chronicles;
-use aries_planning::chronicles::StateFun;
+use aries_planning::chronicles::{
+    Chronicle as ariesChronicle, ChronicleInstance, ChronicleKind, ChronicleOrigin,
+    ChronicleTemplate, Container, Ctx, Problem as ariesProblem, StateFun, VarType, TIME_SCALE,
+};
 use aries_planning::parsing::pddl::TypedSymbol;
 use aries_utils::input::Sym;
+use std::sync::Arc;
 
 static TASK_TYPE: &str = "★task★";
 static ABSTRACT_TASK_TYPE: &str = "★abstract_task★";
@@ -79,20 +85,74 @@ pub fn build_chronicles(ch: &ChronicleHierarchy) -> Result<chronicles::Problem> 
         state_functions.push(StateFun { sym, tpe: args })
     }
 
-    // determine the top types in the user-defined hierarchy.
-    // this is typically "object" by convention but might something else (e.g. "obj" in some hddl problems).
-    /*{
-        let all_types: HashSet<&Sym> = ch.types.iter().map(|tpe| &tpe.symbol).collect();
-        let top_types = dom
-            .types
-            .iter()
-            .filter_map(|tpe| tpe.tpe.as_ref())
-            .filter(|tpe| !all_types.contains(tpe))
-            .unique();
-        for t in top_types {
-            types.push((t.clone(), Some(OBJECT_TYPE.into())));
-        }
-    }*/
+    let mut context = Ctx::new(Arc::new(symbol_table), state_functions);
 
+    let init_container = Container::Instance(0);
+    // Initial chronicle construction
+    let mut init_ch = ariesChronicle {
+        kind: ChronicleKind::Problem,
+        presence: ariesLit::TRUE,
+        start: context.origin(),
+        end: context.horizon(),
+        name: vec![],
+        task: None,
+        conditions: vec![],
+        effects: vec![],
+        constraints: vec![],
+        subtasks: vec![],
+    };
+
+    let init_ch = ChronicleInstance {
+        parameters: vec![],
+        origin: ChronicleOrigin::Original,
+        chronicle: init_ch,
+    };
+
+    let mut templates: Vec<ChronicleTemplate> = Vec::new();
+    for t in &ch.chronicle_templates {
+        let cont = Container::Template(templates.len());
+        let template = read_chronicle(cont, t, ch, &mut context)?;
+        templates.push(template);
+    }
+
+    let problem = ariesProblem {
+        context,
+        templates,
+        chronicles: vec![init_ch],
+    };
+
+    Ok(problem)
+}
+
+fn read_chronicle(
+    c: Container,
+    chronicle: &crate::planning::structs::chronicle::Chronicle,
+    ch: &ChronicleHierarchy,
+    context: &mut Ctx,
+) -> Result<ChronicleTemplate> {
+    let top_type: Sym = OBJECT_TYPE.into();
+    let mut params: Vec<Variable> = Vec::new();
+    let prez_var = context.model.new_bvar(c / VarType::Presence);
+    params.push(prez_var.into());
+    let prez = prez_var.true_lit();
+
+    let start = context.model.new_optional_fvar(
+        0,
+        INT_CST_MAX,
+        TIME_SCALE,
+        prez,
+        c / VarType::ChronicleStart,
+    );
+    params.push(start.into());
+    let start = FAtom::from(start);
+    let end = context.model.new_optional_fvar(
+        0,
+        INT_CST_MAX,
+        TIME_SCALE,
+        prez,
+        c / VarType::ChronicleEnd,
+    );
+    params.push(end.into());
+    let end: FAtom = end.into();
     todo!()
 }

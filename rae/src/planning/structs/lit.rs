@@ -1,10 +1,10 @@
-use crate::planning::structs::atom::AtomType;
 use crate::planning::structs::constraint::Constraint;
-use crate::planning::structs::symbol_table::{AtomId, SymTable};
+use crate::planning::structs::symbol_table::{AtomId, SymTable, TypeId};
 use crate::planning::structs::traits::{FormatWithSymTable, GetVariables};
 use im::{hashset, HashSet};
 use ompas_lisp::core::structs::lerror;
 use ompas_lisp::core::structs::lerror::LError::SpecialError;
+use ompas_lisp::core::structs::lnumber::LNumber;
 use ompas_lisp::core::structs::lvalue::LValue;
 use std::convert::TryFrom;
 use std::ops::Deref;
@@ -115,10 +115,14 @@ pub fn lvalue_to_lit(lv: &LValue, st: &mut SymTable) -> lerror::Result<Lit> {
             "LValue to lit",
             "Map transformation to lit is not supported yet.".to_string(),
         )),
-        LValue::Number(n) => Ok(st.new_number(n.clone()).into()),
+        LValue::Number(n) => match n {
+            LNumber::Int(i) => Ok(st.new_int(*i).into()),
+            LNumber::Usize(u) => Ok(st.new_int(*u as i64).into()),
+            LNumber::Float(f) => Ok(st.new_float(*f).into()),
+        },
         LValue::True => Ok(st.new_bool(true).into()),
         LValue::Nil => Ok(st.new_bool(false).into()),
-        lv => Ok(st.declare_new_symbol(&lv.to_string(), false, false).into()),
+        lv => Ok(st.declare_new_symbol(&lv.to_string(), None).into()),
     }
 }
 
@@ -157,10 +161,14 @@ impl GetVariables for Lit {
         }
     }
 
-    fn get_variables_of_type(&self, sym_table: &SymTable, atom_type: &AtomType) -> HashSet<AtomId> {
+    fn get_variables_of_type(
+        &self,
+        sym_table: &SymTable,
+        atom_type: &Option<TypeId>,
+    ) -> HashSet<AtomId> {
         self.get_variables()
             .iter()
-            .filter(|v| sym_table.get_type(v).unwrap() == atom_type)
+            .filter(|v| sym_table.get_type_of(v).unwrap().parent_type == *atom_type)
             .cloned()
             .collect()
     }

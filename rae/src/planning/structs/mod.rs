@@ -135,7 +135,7 @@ pub fn get_variables_of_type(
         .iter()
         .filter(|var| {
             symbol_table
-                .get_type(&symbol_table.get_parent(var))
+                .get_type_of(&symbol_table.get_parent(var))
                 .unwrap()
                 == &atom_type
         })
@@ -143,15 +143,11 @@ pub fn get_variables_of_type(
         .collect()
 }
 
-type Action = Chronicle;
-type Method = Chronicle;
-
 #[derive(Default)]
 pub struct ChronicleHierarchy {
     pub state_function: Vec<StateFunction>,
     pub tasks: Vec<Lit>,
-    pub actions: Vec<Action>,
-    pub methods: Vec<Method>,
+    pub chronicle_templates: Vec<Chronicle>,
     pub local_tasks: TaskTypeMetaDataCollection,
     pub sym_table: SymTable,
     pub problem: Problem,
@@ -211,17 +207,11 @@ impl From<&ConversionContext> for Problem {
 }
 
 impl ChronicleHierarchy {
-    pub fn new(
-        actions: Vec<Action>,
-        tasks: Vec<Lit>,
-        methods: Vec<Method>,
-        sym_table: SymTable,
-    ) -> Self {
+    pub fn new(templates: Vec<Chronicle>, tasks: Vec<Lit>, sym_table: SymTable) -> Self {
         Self {
             state_function: vec![],
-            actions,
             tasks,
-            methods,
+            chronicle_templates: templates,
             local_tasks: Default::default(),
             sym_table,
             problem: Default::default(),
@@ -233,26 +223,18 @@ impl Display for ChronicleHierarchy {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut str = String::new();
 
-        str.push_str("DOMAIN:\n");
+        str.push_str("# DOMAIN:\n");
 
         //actions
-        str.push_str("ACTIONS: \n");
-        for action in &self.actions {
+        str.push_str("# CHRONICLES: \n");
+        for action in &self.chronicle_templates {
             str.push_str(format!("{}\n", action.format_with_sym_table(&self.sym_table)).as_str());
         }
 
         //tasks
-        str.push_str("TASKS: \n\n");
+        str.push_str("# TASKS: \n\n");
         for task in &self.tasks {
             str.push_str(format!("{}\n\n\n", task.format_with_sym_table(&self.sym_table)).as_str());
-        }
-
-        //methods
-        str.push_str("METHODS: \n\n");
-        for method in &self.methods {
-            str.push_str(
-                format!("{}\n\n\n", method.format_with_sym_table(&self.sym_table)).as_str(),
-            );
         }
 
         write!(f, "{}", str)

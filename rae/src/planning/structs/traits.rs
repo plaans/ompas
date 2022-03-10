@@ -1,5 +1,4 @@
-use crate::planning::structs::atom::AtomType;
-use crate::planning::structs::symbol_table::{AtomId, SymTable};
+use crate::planning::structs::symbol_table::{AtomId, SymTable, TypeId};
 
 pub trait Absorb {
     fn absorb(&mut self, other: Self);
@@ -15,6 +14,6 @@ pub trait GetVariables {
     fn get_variables_of_type(
         &self,
         sym_table: &SymTable,
-        atom_type: &AtomType,
+        atom_type: &Option<TypeId>,
     ) -> im::HashSet<AtomId>;
 }

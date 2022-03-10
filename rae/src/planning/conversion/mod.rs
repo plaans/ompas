@@ -1,7 +1,7 @@
 use crate::planning::conversion::post_processing::*;
 use crate::planning::conversion::pre_processing::pre_processing;
 use crate::planning::conversion::processing::{convert_lvalue_to_expression_chronicle, MetaData};
-use crate::planning::structs::atom::AtomType;
+use crate::planning::structs::atom::PlanningAtomType;
 use crate::planning::structs::chronicle::Chronicle;
 use crate::planning::structs::lit::Lit;
 use crate::planning::structs::{ChronicleHierarchy, ConversionContext};
@@ -26,39 +26,52 @@ pub fn convert_domain_to_chronicle_hierarchy(
 
     let mut ch: ChronicleHierarchy = Default::default();
 
-    let actions: Vec<String> = conversion_context
+    let actions: Vec<&str> = conversion_context
         .domain
         .get_actions()
         .keys()
-        .cloned()
+        .map(|s| s.as_str())
         .collect();
-    let tasks: Vec<String> = conversion_context
+    let tasks: Vec<&str> = conversion_context
         .domain
         .get_tasks()
         .keys()
-        .cloned()
+        .map(|s| s.as_str())
         .collect();
     let state_functions = conversion_context
         .domain
         .get_state_functions()
         .keys()
-        .cloned()
+        .map(|s| s.as_str())
         .collect();
     let methods = conversion_context
         .domain
         .get_methods()
         .keys()
-        .cloned()
+        .map(|s| s.as_str())
         .collect();
 
-    ch.sym_table
-        .add_list_of_symbols_of_same_type(actions, &AtomType::Action)?;
-    ch.sym_table
-        .add_list_of_symbols_of_same_type(state_functions, &AtomType::StateFunction)?;
-    ch.sym_table
-        .add_list_of_symbols_of_same_type(methods, &AtomType::Method)?;
-    ch.sym_table
-        .add_list_of_symbols_of_same_type(tasks, &AtomType::Task)?;
+    ch.sym_table.add_list_of_symbols_of_same_type(
+        actions,
+        Some(ch.sym_table.get_basic_type_id(&PlanningAtomType::Action)),
+    )?;
+    ch.sym_table.add_list_of_symbols_of_same_type(
+        state_functions,
+        Some(
+            ch.sym_table
+                .get_basic_type_id(&PlanningAtomType::StateFunction),
+        ),
+    )?;
+    ch.sym_table.add_list_of_symbols_of_same_type(
+        methods,
+        Some(ch.sym_table.get_basic_type_id(&PlanningAtomType::Method)),
+    )?;
+    ch.sym_table.add_list_of_symbols_of_same_type(
+        tasks,
+        Some(ch.sym_table.get_basic_type_id(&PlanningAtomType::Task)),
+    )?;
+
+    //add new types to list of types.
 
     //Add actions, tasks and methods symbols to ch.sym_table:
     //let mut tasks_lits = HashMap::new();
@@ -71,10 +84,11 @@ pub fn convert_domain_to_chronicle_hierarchy(
             .expect("symbol of task should be defined")
             .into()];
 
-        for param in task.get_parameters().get_params() {
-            task_lit.push(ch.sym_table.declare_new_symbol(&param, true, true).into())
+        let params = task.get_parameters();
+        for (param, t) in params.get_params().iter().zip(&params.get_types()) {
+            task_lit.push(ch.sym_table.declare_new_variable(&param, true, None).into())
         }
-        task_lit.push(ch.sym_table.declare_new_result().get_id().into());
+        task_lit.push(ch.sym_table.declare_new_result(None).get_id().into());
 
         let task_lit: Lit = task_lit.into();
         ch.tasks.push(task_lit);
@@ -104,14 +118,14 @@ pub fn convert_domain_to_chronicle_hierarchy(
         name.push(*chronicle.get_result_id());
 
         chronicle.set_name(name.into());
-        ch.actions.push(chronicle);
+        ch.chronicle_templates.push(chronicle);
     }
 
     //Add all methods to the domain
     for (method_label, method) in conversion_context.domain.get_methods() {
         let chronicle = Chronicle::new_method(method_label, method, &conversion_context, &mut ch)?;
 
-        ch.methods.push(chronicle);
+        ch.chronicle_templates.push(chronicle);
     }
 
     ch.problem = (&conversion_context).into();
@@ -161,11 +175,11 @@ pub fn convert_lvalue_to_chronicle(
         let params = lambda.get_params();
         match params {
             LambdaArgs::Sym(s) => {
-                ch.sym_table.declare_new_symbol(&s, true, true);
+                ch.sym_table.declare_new_variable(&s, true, None);
             }
             LambdaArgs::List(list) => {
                 for param in list {
-                    ch.sym_table.declare_new_symbol(&param, true, true);
+                    ch.sym_table.declare_new_variable(&param, true, None);
                 }
             }
             LambdaArgs::Nil => {}

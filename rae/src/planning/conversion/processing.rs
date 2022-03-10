@@ -2,7 +2,7 @@ use crate::module::rae_exec::{
     RAE_ASSERT, RAE_ASSERT_SHORT, RAE_INSTANCE, RAE_MONITOR, RAE_RETRACT, RAE_RETRACT_SHORT,
 };
 use crate::planning::conversion::post_processing::post_processing;
-use crate::planning::structs::atom::{AtomType, Sym};
+use crate::planning::structs::atom::{AtomKind, PlanningAtomType, Sym};
 use crate::planning::structs::chronicle::{Chronicle, ExpressionChronicle};
 use crate::planning::structs::condition::Condition;
 use crate::planning::structs::constraint::{bind_result, equal, finish, meet, start, Constraint};
@@ -72,10 +72,10 @@ pub fn convert_lvalue_to_expression_chronicle(
     match exp {
         LValue::Symbol(s) => {
             //General case
-            let symbol = ch.sym_table.declare_new_symbol(s, false, false);
-            if ch.sym_table.get_type(&symbol).unwrap() == &AtomType::Variable {
+            let symbol = ch.sym_table.declare_new_symbol(s, None);
+            /*if ch.sym_table.get_type_of(&symbol).unwrap() == &AtomType::Variable {
                 ec.add_var(&symbol);
-            }
+            }*/
             ec.set_pure_result(symbol.into());
 
             ec.make_instantaneous();
@@ -94,7 +94,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                 LCoreOperator::Define => {
                     //Todo : handle the case when the first expression is not a symbol, but an expression that must be evaluated
                     if let LValue::Symbol(s) = &l[1] {
-                        let var = ch.sym_table.declare_new_symbol(s, true, false);
+                        let var = ch.sym_table.declare_new_symbol(s, None);
                         let val = convert_lvalue_to_expression_chronicle(
                             &l[2],
                             context,
@@ -516,22 +516,22 @@ pub fn convert_lvalue_to_expression_chronicle(
                             //CHECK => {}
                             _ => {
                                 if let Some(id) = ch.sym_table.id(&s) {
-                                    match ch.sym_table
-                                        .get_type(id)
-                                        .expect("a defined symbol should have a type")
+                                    match ch.sym_table.try_get_basic_type(&ch.sym_table
+                                        .get_type_of(id)
+                                        .expect("a defined symbol should have a type").parent_type.unwrap()).expect("First element")
                                     {
-                                        AtomType::Action => {
+                                        PlanningAtomType::Action => {
                                             expression_type = ExpressionType::Action;
                                             println!("{} is an action", s);
                                         }
-                                        AtomType::Function => {
+                                        PlanningAtomType::Function => {
                                         }
-                                        AtomType::Method => return Err(SpecialError(CONVERT_LVALUE_TO_EXPRESSION_CHRONICLE, format!("{} is method and can not be directly called into the body of a method.\
+                                        PlanningAtomType::Method => return Err(SpecialError(CONVERT_LVALUE_TO_EXPRESSION_CHRONICLE, format!("{} is method and can not be directly called into the body of a method.\
                                 \nPlease call the task that use the method instead", s))),
-                                        AtomType::StateFunction => {
+                                        PlanningAtomType::StateFunction => {
                                             expression_type = ExpressionType::StateFunction
                                         }
-                                        AtomType::Task => {
+                                        PlanningAtomType::Task => {
                                             expression_type = ExpressionType::Task
                                         }
                                         _ => return Err(SpecialError(CONVERT_LVALUE_TO_EXPRESSION_CHRONICLE, format!("{}: first symbol should be a function, task, action or state function", s))),
@@ -744,11 +744,27 @@ pub fn convert_if(
     let ec_b_false =
         convert_lvalue_to_expression_chronicle(b_false, context, ch, Default::default())?;
 
-    let variables_b_true = ec_b_true.get_variables_of_type(&ch.sym_table, &AtomType::Variable);
+    let variables_b_true: im::HashSet<AtomId> = ec_b_true
+        .get_variables()
+        .iter()
+        .filter(|v| {
+            let type_of = ch.sym_table.get_type_of(v).unwrap();
+            type_of.kind == AtomKind::Variable
+        })
+        .cloned()
+        .collect();
 
-    let variables_b_false = ec_b_false.get_variables_of_type(&ch.sym_table, &AtomType::Variable);
+    let variables_b_false: im::HashSet<AtomId> = ec_b_false
+        .get_variables()
+        .iter()
+        .filter(|v| {
+            let type_of = ch.sym_table.get_type_of(v).unwrap();
+            type_of.kind == AtomKind::Variable
+        })
+        .cloned()
+        .collect();
 
-    let union = variables_b_true.clone().union(variables_b_false.clone());
+    let union: im::HashSet<AtomId> = variables_b_true.clone().union(variables_b_false.clone());
 
     let mut union_string: Vec<String> = vec![];
     for v in &union {
@@ -774,9 +790,9 @@ pub fn convert_if(
     let mut task_lit: Vec<Lit> = vec![];
     for (i, s) in task_string.iter().enumerate() {
         if i == 0 {
-            task_lit.push(ch.sym_table.declare_new_symbol(s, false, false).into());
+            task_lit.push(ch.sym_table.declare_new_variable(s, false, None).into());
         } else {
-            task_lit.push(ch.sym_table.declare_new_symbol(s, false, true).into());
+            task_lit.push(ch.sym_table.declare_new_variable(s, false, None).into());
         }
     }
 
@@ -825,9 +841,9 @@ pub fn convert_if(
     let mut task_lit: Vec<Lit> = vec![];
     for (i, s) in task_string.iter().enumerate() {
         if i == 0 {
-            task_lit.push(ch.sym_table.declare_new_symbol(s, false, true).into());
+            task_lit.push(ch.sym_table.declare_new_variable(s, true, None).into());
         } else {
-            task_lit.push(ch.sym_table.declare_new_symbol(s, true, true).into());
+            task_lit.push(ch.sym_table.declare_new_variable(s, true, None).into());
         }
     }
     //println!("({}) task lit: {:#?}", task_label, task_lit);
@@ -843,22 +859,22 @@ pub fn convert_if(
         let mut task_lit: Vec<AtomId> = vec![];
         for (i, s) in task_string.iter().enumerate() {
             if i == 0 {
-                task_lit.push(ch.sym_table.declare_new_symbol(s, false, true));
+                task_lit.push(ch.sym_table.declare_new_variable(s, false, None));
             } else {
-                task_lit.push(ch.sym_table.declare_new_symbol(s, true, true))
-            };
+                task_lit.push(ch.sym_table.declare_new_variable(s, true, None));
+            }
         }
         let method_label = format!("m_{}_{}", task_label, branch);
-        let method_id = ch.sym_table.declare_new_symbol(&method_label, false, false);
+        let method_id = ch.sym_table.declare_new_symbol(&method_label, None);
         let method_cond_var =
             ch.sym_table
-                .declare_new_symbol(&format!("{}_cond", method_label), false, true);
+                .declare_new_variable(&format!("{}_cond", method_label), false, None);
         ec_branch.add_var(&method_cond_var);
         //Bindings of variables of task and method
         ec_branch.add_constraint(Constraint::Eq(method_cond_var.into(), task_lit[1].into()));
         let method_result_var =
             ch.sym_table
-                .declare_new_symbol(&format!("{}_r", method_label), false, true);
+                .declare_new_variable(&format!("{}_r", method_label), false, None);
         ec_branch.add_var(&method_result_var);
         ec_branch.add_constraint(Constraint::Eq(method_result_var.into(), task_lit[2].into()));
 
@@ -880,7 +896,7 @@ pub fn convert_if(
                 let sym: Sym = ch.sym_table.get_atom(var).unwrap().try_into()?;
                 let new_var = ch
                     .sym_table
-                    .declare_new_symbol(sym.get_string(), true, true);
+                    .declare_new_variable(sym.get_string(), true, None);
                 ec_branch.add_var(&new_var);
                 method_name.push(new_var.into());
                 new_var
@@ -900,7 +916,7 @@ pub fn convert_if(
         });
         post_processing(&mut ec_branch, context, ch)?;
         method.absorb_expression_chronicle(ec_branch, &mut ch.sym_table);
-        ch.methods.push(method);
+        ch.chronicle_templates.push(method);
         Ok(())
     };
 

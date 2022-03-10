@@ -1,6 +1,5 @@
-use crate::planning::structs::atom::AtomType;
 use crate::planning::structs::interval::Interval;
-use crate::planning::structs::symbol_table::{AtomId, SymTable};
+use crate::planning::structs::symbol_table::{AtomId, SymTable, TypeId};
 use crate::planning::structs::traits::{FormatWithSymTable, GetVariables};
 use crate::planning::structs::transition::Transition;
 use im::HashSet;
@@ -28,10 +27,14 @@ impl GetVariables for Effect {
             .union(self.transition.get_variables())
     }
 
-    fn get_variables_of_type(&self, sym_table: &SymTable, atom_type: &AtomType) -> HashSet<AtomId> {
+    fn get_variables_of_type(
+        &self,
+        sym_table: &SymTable,
+        atom_type: &Option<TypeId>,
+    ) -> HashSet<AtomId> {
         self.get_variables()
             .iter()
-            .filter(|v| sym_table.get_type(v).unwrap() == atom_type)
+            .filter(|v| sym_table.get_type_of(v).unwrap().parent_type == *atom_type)
             .cloned()
             .collect()
     }

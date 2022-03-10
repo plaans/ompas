@@ -1,3 +1,5 @@
+use crate::planning::structs::symbol_table::{SymTable, TypeId};
+use crate::planning::structs::traits::FormatWithSymTable;
 use ompas_lisp::core::structs::lerror::LError;
 use ompas_lisp::core::structs::lerror::LError::ConversionError;
 use ompas_lisp::core::structs::lnumber::LNumber;
@@ -10,6 +12,7 @@ pub enum Atom {
     Bool(bool),
     Number(LNumber),
     Sym(Sym),
+    //Type(AtomType),
 }
 
 impl Display for Atom {
@@ -19,9 +22,16 @@ impl Display for Atom {
             Atom::Bool(false) => write!(f, "nil"),
             Atom::Number(n) => write!(f, "{}", n),
             Atom::Sym(s) => write!(f, "{}", s),
+            //Atom::Type(t) => write!(f, "{}", t),
         }
     }
 }
+
+/*impl From<&AtomType> for Atom {
+    fn from(at: &AtomType) -> Self {
+        Self::Type(at.clone())
+    }
+}*/
 
 impl TryFrom<&Atom> for Sym {
     type Error = LError;
@@ -36,6 +46,7 @@ impl TryFrom<&Atom> for Sym {
                     Atom::Bool(_) => "Atom::Bool".to_string(),
                     Atom::Number(_) => "Atom::Number".to_string(),
                     Atom::Sym(_) => "Atom::Sym".to_string(),
+                    //Atom::Type(_) => "Atom::Type".to_string(),
                 }),
                 TypeLValue::Other("Atom::Sym".to_string()),
             ))
@@ -85,6 +96,18 @@ impl From<Sym> for Atom {
     }
 }
 
+impl From<i64> for Atom {
+    fn from(i: i64) -> Self {
+        Self::Number(i.into())
+    }
+}
+
+impl From<f64> for Atom {
+    fn from(f: f64) -> Self {
+        Self::Number(f.into())
+    }
+}
+
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
 pub enum Sym {
     Unique(String),
@@ -126,38 +149,80 @@ impl Display for Sym {
         }
     }
 }
-
-#[derive(Clone, Copy, PartialOrd, PartialEq, Eq, Ord, Hash)]
-pub enum AtomType {
-    Number,
-    Boolean,
-    Timepoint,
-    Result,
-    Symbol,
-    Variable,
+#[derive(Copy, Clone, Debug, Hash, PartialEq, PartialOrd, Eq)]
+pub enum PlanningAtomType {
     Action,
     StateFunction,
     Method,
     Task,
+    Timepoint,
+    Int,
+    Float,
+    Bool,
+    Symbol,
     Function,
     Lambda,
 }
 
-impl Display for AtomType {
+impl Display for PlanningAtomType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            AtomType::Timepoint => write!(f, "timepoint"),
-            AtomType::Result => write!(f, "return"),
-            AtomType::Action => write!(f, "action"),
-            AtomType::StateFunction => write!(f, "state-function"),
-            AtomType::Method => write!(f, "method"),
-            AtomType::Task => write!(f, "task"),
-            AtomType::Function => write!(f, "function"),
-            AtomType::Number => write!(f, "number"),
-            AtomType::Boolean => write!(f, "boolean"),
-            AtomType::Symbol => write!(f, "symbol"),
-            AtomType::Lambda => write!(f, "lambda"),
-            AtomType::Variable => write!(f, "variable"),
-        }
+        write!(
+            f,
+            "{}",
+            match self {
+                PlanningAtomType::Action => "action",
+                PlanningAtomType::StateFunction => "state-function",
+                PlanningAtomType::Method => "method",
+                PlanningAtomType::Task => "task",
+                PlanningAtomType::Timepoint => "timepoint",
+                PlanningAtomType::Int => "int",
+                PlanningAtomType::Float => "float",
+                PlanningAtomType::Bool => "boolean",
+                PlanningAtomType::Symbol => "symbol",
+                PlanningAtomType::Function => "function",
+                PlanningAtomType::Lambda => "lambda",
+            }
+        )
+    }
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Hash)]
+pub enum AtomKind {
+    Type,
+    Constant,
+    Result,
+    Variable,
+}
+
+impl Display for AtomKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                AtomKind::Type => "type",
+                AtomKind::Result => "result",
+                AtomKind::Constant => "constant",
+                AtomKind::Variable => "variable",
+            }
+        )
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct AtomType {
+    pub parent_type: Option<TypeId>,
+    pub kind: AtomKind,
+}
+impl FormatWithSymTable for AtomType {
+    fn format_with_sym_table(&self, st: &SymTable) -> String {
+        format!(
+            "{}{}",
+            match &self.parent_type {
+                Some(s) => format!("{} ", st.get_sym(s)),
+                None => "".to_string(),
+            },
+            self.kind
+        )
     }
 }

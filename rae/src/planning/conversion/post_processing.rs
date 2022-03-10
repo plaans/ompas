@@ -1,12 +1,12 @@
 use crate::planning::point_algebra::problem::{Graph, Problem};
 use crate::planning::point_algebra::remove_useless_timepoints;
-use crate::planning::structs::atom::AtomType;
+use crate::planning::structs::atom::{AtomKind, PlanningAtomType};
 use crate::planning::structs::chronicle::{ChronicleSet, ExpressionChronicle};
 use crate::planning::structs::constraint::Constraint;
 use crate::planning::structs::lit::Lit;
 use crate::planning::structs::symbol_table::{AtomId, SymTable};
 use crate::planning::structs::traits::GetVariables;
-use crate::planning::structs::{get_variables_of_type, ChronicleHierarchy, ConversionContext};
+use crate::planning::structs::{ChronicleHierarchy, ConversionContext};
 use im::{hashset, HashSet};
 use ompas_lisp::core::structs::lerror::LError;
 
@@ -23,11 +23,106 @@ pub fn post_processing(
 }
 
 /// Returns true if the constraint can be safely deleted
-pub fn bind_variables(id_1: &AtomId, id_2: &AtomId, sym_table: &mut SymTable) -> bool {
-    let type_1 = sym_table.get_type(id_1).expect("id should be defined");
-    let type_2 = sym_table.get_type(id_2).expect("id should be defined");
+pub fn bind_variables(
+    id_1: &AtomId,
+    id_2: &AtomId,
+    sym_table: &mut SymTable,
+) -> Result<bool, LError> {
+    let type_1 = *sym_table.get_type_of(id_1).expect("id should be defined");
+    let type_2 = *sym_table.get_type_of(id_2).expect("id should be defined");
 
-    match (type_1, type_2) {
+    match (type_1.kind, type_2.kind) {
+        (AtomKind::Type, AtomKind::Type) => {
+            if type_1.parent_type == type_2.parent_type {
+                sym_table.union_atom(id_1, id_2);
+                Ok(true)
+            } else {
+                Err(Default::default())
+            }
+        }
+        (AtomKind::Constant, AtomKind::Constant) => {
+            if type_1.parent_type != type_2.parent_type {
+                return Err(Default::default());
+            }
+            if sym_table.get_atom(id_1).unwrap() != sym_table.get_atom(id_2).unwrap() {
+                return Err(Default::default());
+            }
+            sym_table.union_atom(id_1, id_2);
+            Ok(true)
+        }
+        (AtomKind::Constant, AtomKind::Variable | AtomKind::Result) => {
+            if type_2.parent_type.is_some() {
+                if type_1.parent_type.unwrap() != type_2.parent_type.unwrap() {
+                    return Err(Default::default());
+                }
+            }
+            sym_table.union_atom(id_1, id_2);
+            Ok(true)
+        }
+        (AtomKind::Variable | AtomKind::Result, AtomKind::Constant) => {
+            if type_1.parent_type.is_some() {
+                if type_1.parent_type.unwrap() != type_2.parent_type.unwrap() {
+                    return Err(Default::default());
+                }
+            }
+            sym_table.union_atom(id_2, id_1);
+            Ok(true)
+        }
+        (AtomKind::Variable, AtomKind::Variable) => {
+            match (type_1.parent_type.is_some(), type_2.parent_type.is_some()) {
+                (true, true) => {
+                    if type_1.parent_type.unwrap() == type_2.parent_type.unwrap() {
+                        sym_table.union_atom(id_1, id_2);
+                    } else {
+                        return Err(Default::default());
+                    }
+                }
+                (true, false) => sym_table.union_atom(id_1, id_2),
+                (false, true) => sym_table.union_atom(id_2, id_1),
+                (false, false) => sym_table.union_atom(id_1, id_2),
+            }
+            Ok(true)
+        }
+        (AtomKind::Result, AtomKind::Result) => {
+            match (type_1.parent_type.is_some(), type_2.parent_type.is_some()) {
+                (true, true) => {
+                    if type_1.parent_type.unwrap() == type_2.parent_type.unwrap() {
+                        sym_table.union_atom(id_1, id_2);
+                    } else {
+                        return Err(Default::default());
+                    }
+                }
+                (true, false) => sym_table.union_atom(id_1, id_2),
+                (false, true) => sym_table.union_atom(id_2, id_1),
+                (false, false) => sym_table.union_atom(id_1, id_2),
+            }
+            Ok(true)
+        }
+        (AtomKind::Result, AtomKind::Variable) => {
+            if type_1.parent_type.is_some() && type_2.parent_type.is_some() {
+                if type_1.parent_type.unwrap() != type_2.parent_type.unwrap() {
+                    return Err(Default::default());
+                }
+            } else if type_1.parent_type.is_some() {
+                sym_table.set_type_of(id_2, &type_1.parent_type)
+            }
+            sym_table.union_atom(id_2, id_1);
+            Ok(true)
+        }
+        (AtomKind::Variable, AtomKind::Result) => {
+            if type_1.parent_type.is_some() && type_2.parent_type.is_some() {
+                if type_1.parent_type.unwrap() != type_2.parent_type.unwrap() {
+                    return Err(Default::default());
+                }
+            } else if type_2.parent_type.is_some() {
+                sym_table.set_type_of(id_1, &type_2.parent_type)
+            }
+            sym_table.union_atom(id_1, id_2);
+            Ok(true)
+        }
+        (_, _) => Ok(false),
+    }
+    /*{
         (AtomType::Boolean | AtomType::Number, AtomType::Boolean | AtomType::Number) => {
             assert_eq!(
                 sym_table.get_atom(id_1).unwrap(),
@@ -51,15 +146,19 @@ pub fn bind_variables(id_1: &AtomId, id_2: &AtomId, sym_table: &mut SymTable) ->
             sym_table.union_atom(id_2, id_1);
             true
         }
-        (AtomType::Variable, AtomType::Result) => {
-            sym_table.union_atom(id_1, id_2);
-            true
+        (AtomType::Variable(e1), AtomType::Result(e2)) => {
+            if compatible_variable(e1, e2) {
+                sym_table.union_atom(id_1, id_2);
+                true
+            } else {
+                Err(Default::default())
+            }
         }
-        (AtomType::Result, AtomType::Variable) => {
+        (AtomType::Result(v1), AtomType::Variable(v2)) => {
             sym_table.union_atom(id_2, id_1);
             true
         }
-        (AtomType::Symbol, AtomType::Result | AtomType::Variable) => {
+        (AtomType::Symbol, AtomType::Result(v1) | AtomType::Variable) => {
             sym_table.union_atom(id_1, id_2);
             true
         }
@@ -92,7 +191,7 @@ pub fn bind_variables(id_1: &AtomId, id_2: &AtomId, sym_table: &mut SymTable) ->
             true
         }
         (_, _) => false,
-    }
+    }*/
 }
 
 pub fn unify_equal(
@@ -108,7 +207,7 @@ pub fn unify_equal(
     for (index, constraint) in ec.get_constraints().iter().enumerate() {
         if let Constraint::Eq(a, b) = constraint {
             if let (Lit::Atom(id_1), Lit::Atom(id_2)) = (a, b) {
-                if let true = bind_variables(id_1, id_2, &mut ch.sym_table) {
+                if let Ok(true) = bind_variables(id_1, id_2, &mut ch.sym_table) {
                     vec_constraint_to_rm.push(index);
                 }
             }
@@ -144,26 +243,24 @@ pub fn simplify_timepoints(
     ch: &mut ChronicleHierarchy,
     _: &ConversionContext,
 ) -> Result<(), LError> {
-    let timepoints: HashSet<AtomId> = get_variables_of_type(
-        ec.get_variables()
-            .iter()
-            .map(|a| ch.sym_table.get_parent(a))
-            .collect(),
-        &ch.sym_table,
-        AtomType::Timepoint,
-    );
-    let used_timepoints: HashSet<AtomId> = get_variables_of_type(
-        ec.get_variables_in_sets(vec![
+    let timepoint_type_id = ch.sym_table.get_basic_type_id(&PlanningAtomType::Timepoint);
+
+    let timepoints: HashSet<AtomId> = ec
+        .get_variables()
+        .iter()
+        .map(|a| ch.sym_table.get_parent(a))
+        .filter(|a| ch.sym_table.get_type_of(a).unwrap().parent_type == Some(timepoint_type_id))
+        .collect();
+    let used_timepoints: HashSet<AtomId> = ec
+        .get_variables_in_sets(vec![
             ChronicleSet::Effect,
             ChronicleSet::Condition,
             ChronicleSet::SubTask,
         ])
         .iter()
         .map(|a| ch.sym_table.get_parent(a))
-        .collect(),
-        &ch.sym_table,
-        AtomType::Timepoint,
-    );
+        .filter(|a| ch.sym_table.get_type_of(a).unwrap().parent_type == Some(timepoint_type_id))
+        .collect();
 
     let optional_timepoints: HashSet<AtomId> = timepoints.clone().difference(used_timepoints);
     let mut relations = vec![];

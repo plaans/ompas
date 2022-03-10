@@ -1,10 +1,10 @@
 use crate::planning::point_algebra::problem::Relation;
 use crate::planning::point_algebra::relation_type::RelationType;
-use crate::planning::structs::atom::AtomType;
+use crate::planning::structs::atom::PlanningAtomType;
 use crate::planning::structs::chronicle::ExpressionChronicle;
 use crate::planning::structs::interval::Interval;
 use crate::planning::structs::lit::Lit;
-use crate::planning::structs::symbol_table::{AtomId, SymTable};
+use crate::planning::structs::symbol_table::{AtomId, SymTable, TypeId};
 use crate::planning::structs::traits::{FormatWithSymTable, GetVariables};
 use im::HashSet;
 use ompas_lisp::core::structs::lerror::LError;
@@ -63,10 +63,14 @@ impl GetVariables for Constraint {
         }
     }
 
-    fn get_variables_of_type(&self, sym_table: &SymTable, atom_type: &AtomType) -> HashSet<AtomId> {
+    fn get_variables_of_type(
+        &self,
+        sym_table: &SymTable,
+        atom_type: &Option<TypeId>,
+    ) -> HashSet<AtomId> {
         self.get_variables()
             .iter()
-            .filter(|v| sym_table.get_type(v).unwrap() == atom_type)
+            .filter(|v| sym_table.get_type_of(v).unwrap().parent_type == *atom_type)
             .cloned()
             .collect()
     }
@@ -130,12 +134,14 @@ impl Constraint {
             _ => return Err(LError::default()),
         };
 
+        let timepoint_type_id = sym_table.get_basic_type_id(&PlanningAtomType::Timepoint);
+
         if let Ok(i) = self.get_left().try_into() {
             let p_i = sym_table.get_parent(&i);
             if let Ok(j) = self.get_right().try_into() {
                 let p_j = sym_table.get_parent(&j);
-                if sym_table.get_type(&p_i).unwrap() == &AtomType::Timepoint {
-                    if sym_table.get_type(&p_j).unwrap() == &AtomType::Timepoint {
+                if sym_table.get_type_of(&p_i).unwrap().parent_type == Some(timepoint_type_id) {
+                    if sym_table.get_type_of(&p_j).unwrap().parent_type == Some(timepoint_type_id) {
                         Ok(Relation::new(p_i, p_j, relation_type))
                     } else {
                         Err(Default::default())

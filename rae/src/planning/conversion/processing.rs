@@ -38,28 +38,35 @@ const CONVERT_LVALUE_TO_EXPRESSION_CHRONICLE: &str = "convert_lvalue_to_expressi
 #[derive(Default, Clone, Copy)]
 pub struct MetaData {
     top_level: bool,
-    _inside_top_level_do: bool,
+    check_into_condition: bool,
 }
 
 impl MetaData {
-    pub fn new(top_level: bool, _inside_top_level_do: bool) -> Self {
+    pub fn new(top_level: bool, check_into_condition: bool) -> Self {
         Self {
             top_level,
-            _inside_top_level_do,
+            check_into_condition,
+        }
+    }
+
+    pub fn is_inside_do(&mut self) {
+        if self.top_level {
+            self.check_into_condition = true;
+            self.top_level = false;
+        } else {
+            self.check_into_condition &= true;
+        }
+    }
+
+    pub fn is_last_of_begin(&mut self) {
+        if self.top_level {
+            self.check_into_condition = true;
+            self.top_level = false;
+        } else {
+            self.check_into_condition &= true;
         }
     }
 }
-
-/*pub enum BooleanFunction {
-    EQ,
-    LT,
-    LEQ,
-    GT,
-    GEQ,
-    NOT,
-    TYPE,
-    ARBITRARY,
-}*/
 
 pub fn convert_lvalue_to_expression_chronicle(
     exp: &LValue,
@@ -131,58 +138,23 @@ pub fn convert_lvalue_to_expression_chronicle(
                     /*
                     Harcoded solution that needs to be improved in further iteration of the analysis
                      */
+                    let mut meta_data = meta_data.clone();
+                    meta_data.is_inside_do();
                     for (i, e) in l[1..].iter().enumerate() {
-                        let mut is_condition = false;
-                        let lvalue: &LValue = if meta_data.top_level {
-                            if let LValue::List(exp) = e {
-                                if exp[0] == CHECK.into() {
-                                    is_condition = true;
-                                    &exp[1]
-                                } else {
-                                    e
-                                }
+                        let ec_i =
+                            convert_lvalue_to_expression_chronicle(e, context, ch, meta_data)?;
+
+                        literal.push(ec_i.get_result());
+
+                        if i == l.len() - 2 {
+                            if ec_i.is_result_pure() {
+                                ec.set_pure_result(ec_i.get_result())
                             } else {
-                                e
+                                ec.add_constraint(bind_result(&ec, &ec_i));
                             }
-                        } else {
-                            e
-                        };
-
-                        let ec_i = convert_lvalue_to_expression_chronicle(
-                            lvalue,
-                            context,
-                            ch,
-                            Default::default(),
-                        )?;
-
-                        if !is_condition {
-                            literal.push(ec_i.get_result());
-
-                            if i == l.len() - 2 {
-                                if ec_i.is_result_pure() {
-                                    ec.set_pure_result(ec_i.get_result())
-                                } else {
-                                    ec.add_constraint(bind_result(&ec, &ec_i));
-
-                                    /*ec.add_effect(Effect {
-                                        interval: *ec.get_interval(),
-                                        transition: Transition::new(
-                                            ec.get_result(),
-                                            ec_i.get_result(),
-                                        ),
-                                    });*/
-                                }
-                            }
-                        } else {
-                            ec.add_condition(Condition {
-                                interval: *ec_i.get_interval(),
-                                constraint: Constraint::Eq(
-                                    ec_i.get_result(),
-                                    ch.sym_table.new_bool(true).into(),
-                                ),
-                            });
                         }
 
+                        //Temporal constraints
                         if i == 0 {
                             ec.add_constraint(start(&previous_interval, ec_i.get_interval()));
                         } else {
@@ -207,12 +179,14 @@ pub fn convert_lvalue_to_expression_chronicle(
                     let mut previous_interval: Interval = *ec.get_interval();
 
                     for (i, e) in l[1..].iter().enumerate() {
-                        let ec_i = convert_lvalue_to_expression_chronicle(
-                            e,
-                            context,
-                            ch,
-                            Default::default(),
-                        )?;
+                        let mut meta_data = meta_data.clone();
+
+                        if i == l.len() - 2 {
+                            meta_data.is_last_of_begin();
+                        }
+
+                        let ec_i =
+                            convert_lvalue_to_expression_chronicle(e, context, ch, meta_data)?;
 
                         literal.push(ec_i.get_result());
                         if i == 0 {
@@ -513,7 +487,28 @@ pub fn convert_lvalue_to_expression_chronicle(
                                     }
                                 }
                             }
-                            //CHECK => {}
+                            CHECK => {
+                                let condition = convert_lvalue_to_expression_chronicle(
+                                    &l[1],
+                                    context,
+                                    ch,
+                                    Default::default(),
+                                )?;
+
+                                ec.add_condition(Condition {
+                                    interval: *condition.get_interval(),
+                                    constraint: Constraint::Eq(
+                                        condition.get_result(),
+                                        ch.sym_table.new_bool(true).into(),
+                                    ),
+                                });
+
+                                //WARNING: Not sure of this
+                                ec.absorb(condition);
+                                ec.set_pure_result(ch.sym_table.new_bool(true).into());
+
+                                return Ok(ec);
+                            }
                             _ => {
                                 if let Some(id) = ch.sym_table.id(&s) {
                                     match ch.sym_table.try_get_basic_type(&ch.sym_table

@@ -107,7 +107,7 @@ pub const MACRO_GENERATE_ACTION_MODEL: &str = "
                (effs (cadr (get def 2))))
               `(list ,label (lambda ,params
                     (do
-                        (check ,(gtpc p_expr))
+                        ,(gtpc p_expr)
                         (check ,conds)
                         ,effs))))))";
 
@@ -143,7 +143,7 @@ pub const MACRO_GENERATE_METHOD: &str = "(defmacro generate-method
                 ;lambda for preconditons
                 (lambda ,params
                     (do 
-                        (check ,(gtpc p_expr))
+                        ,(gtpc p_expr)
                         (check ,conds)))
                 (lambda ,params ,score)
                 (lambda ,params ,body))))))";
@@ -242,24 +242,26 @@ pub fn generate_type_test_expr(args: &[LValue], _: &LEnv) -> LResult {
     }
 
     if let LValue::List(params) = &args[0] {
-        let mut str = "(and ".to_string();
+        let mut str = "(do ".to_string();
 
         for param in params {
             if let LValue::List(param) = &param {
                 if param.len() == 2 {
                     if let LValue::Symbol(par) = &param[0] {
                         if let LValue::Symbol(tpe) = &param[1] {
-                            match tpe.as_str() {
+                            let test = match tpe.as_str() {
                                 TYPE_LIST => {
-                                    str.push_str(format!("({} {})", IS_LIST, par).as_str())
+                                    format!("({} {})", IS_LIST, par)
                                 }
-                                BOOL => str.push_str(format!("({} {})", IS_BOOL, par).as_str()),
-                                INT => str.push_str(format!("({} {})", IS_INT, par).as_str()),
-                                FLOAT => str.push_str(format!("({} {})", IS_FLOAT, par).as_str()),
-                                NUMBER => str.push_str(format!("({} {})", IS_NUMBER, par).as_str()),
-                                SYMBOL => str.push_str(format!("({} {})", IS_SYMBOL, par).as_str()),
-                                _ => str.push_str(format!("(instance {} {})", par, tpe).as_str()),
-                            }
+                                BOOL => format!("({} {})", IS_BOOL, par),
+                                INT => format!("({} {})", IS_INT, par),
+                                FLOAT => format!("({} {})", IS_FLOAT, par),
+                                NUMBER => format!("({} {})", IS_NUMBER, par),
+                                SYMBOL => format!("({} {})", IS_SYMBOL, par),
+                                _ => format!("(instance {} {})", par, tpe),
+                            };
+
+                            str.push_str(format!("(check {})", test).as_str())
                         } else {
                             return Err(WrongType(
                                 GENERATE_TYPE_TEST_EXPR,
@@ -989,13 +991,14 @@ mod test {
             expression:
                 "(gtpc '((?r robot) (?f float ) (?i int) (?b bool) (?s symbol) (?n number) (?l tlist)))",
             expanded: "(gtpc '((?r robot) (?f float ) (?i int) (?b bool) (?s symbol) (?n number) (?l tlist)))",
-            result: "(if (instance ?r robot)
-                        (if (float? ?f)
-                            (if (int? ?i)
-                                (if (bool? ?b)
-                                    (if (symbol? ?s)
-                                        (if (number? ?n)
-                                            (list? ?l)))))))",
+            result: "(do 
+                        (check (instance ?r robot))
+                        (check (float? ?f))
+                        (check (int? ?i))
+                        (check (bool? ?b))
+                        (check (symbol? ?s))
+                        (check (number? ?n))
+                        (check(list? ?l)))",
         };
         let mut env = init_env_and_ctxs().await;
 

@@ -1,5 +1,3 @@
-use crate::planning::structs::symbol_table::{SymTable, TypeId};
-use crate::planning::structs::traits::FormatWithSymTable;
 use ompas_lisp::core::structs::lerror::LError;
 use ompas_lisp::core::structs::lerror::LError::ConversionError;
 use ompas_lisp::core::structs::lnumber::LNumber;
@@ -147,82 +145,5 @@ impl Display for Sym {
             Self::Unique(s) => write!(f, "{}", s),
             Self::Several(s, i) => write!(f, "{}_{}", s, i),
         }
-    }
-}
-#[derive(Copy, Clone, Debug, Hash, PartialEq, PartialOrd, Eq)]
-pub enum PlanningAtomType {
-    Action,
-    StateFunction,
-    Method,
-    Task,
-    Timepoint,
-    Int,
-    Float,
-    Bool,
-    Symbol,
-    Function,
-    Lambda,
-}
-
-impl Display for PlanningAtomType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                PlanningAtomType::Action => "action",
-                PlanningAtomType::StateFunction => "state-function",
-                PlanningAtomType::Method => "method",
-                PlanningAtomType::Task => "task",
-                PlanningAtomType::Timepoint => "timepoint",
-                PlanningAtomType::Int => "int",
-                PlanningAtomType::Float => "float",
-                PlanningAtomType::Bool => "boolean",
-                PlanningAtomType::Symbol => "symbol",
-                PlanningAtomType::Function => "function",
-                PlanningAtomType::Lambda => "lambda",
-            }
-        )
-    }
-}
-
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Hash)]
-pub enum AtomKind {
-    Type,
-    Constant,
-    Result,
-    Variable,
-}
-
-impl Display for AtomKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                AtomKind::Type => "type",
-                AtomKind::Result => "result",
-                AtomKind::Constant => "constant",
-                AtomKind::Variable => "variable",
-            }
-        )
-    }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct AtomType {
-    pub parent_type: Option<TypeId>,
-    pub kind: AtomKind,
-}
-impl FormatWithSymTable for AtomType {
-    fn format_with_sym_table(&self, st: &SymTable) -> String {
-        format!(
-            "{}{}",
-            match &self.parent_type {
-                Some(s) => format!("{} ", st.get_sym(s)),
-                None => "".to_string(),
-            },
-            self.kind
-        )
     }
 }

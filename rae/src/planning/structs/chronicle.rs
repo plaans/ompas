@@ -1,115 +1,76 @@
-use crate::context::rae_env::Method;
-use crate::planning::conversion::build_chronicle;
 use crate::planning::conversion::post_processing::bind_variables;
-use crate::planning::structs::atom::PlanningAtomType;
 use crate::planning::structs::condition::Condition;
 use crate::planning::structs::constraint::Constraint;
 use crate::planning::structs::effect::Effect;
 use crate::planning::structs::expression::Expression;
 use crate::planning::structs::interval::Interval;
 use crate::planning::structs::lit::Lit;
-use crate::planning::structs::symbol_table::{AtomId, SymTable, TypeId};
+use crate::planning::structs::symbol_table::{AtomId, SymTable};
 use crate::planning::structs::traits::{Absorb, FormatWithSymTable, GetVariables};
-use crate::planning::structs::{ChronicleHierarchy, ConversionContext};
+use crate::planning::structs::type_table::PlanningAtomType;
+use crate::planning::structs::ChronicleHierarchy;
 use im::HashSet;
-use ompas_lisp::core::structs::lcoreoperator::LCoreOperator;
-use ompas_lisp::core::structs::lerror::LError;
-use ompas_lisp::core::structs::llambda::LLambda;
 use ompas_lisp::core::structs::lvalue::LValue;
-use std::convert::TryInto;
+use std::fmt::Display;
 use std::ops::Deref;
 
 #[derive(Clone)]
 pub struct Chronicle {
     pub name: Lit,
     pub task: Lit,
-    pub result: ChronicleResult,
+    pub result: AtomId,
     pub interval: Interval,
+    pub prez: AtomId,
     pub partial_chronicle: PartialChronicle,
     debug: Option<LValue>,
 }
 
 impl Chronicle {
-    pub fn new(ch: &mut ChronicleHierarchy) -> Self {
-        Self {
-            name: Default::default(),
-            task: Default::default(),
-            result: ch.sym_table.declare_new_result(None),
-            interval: ch.sym_table.declare_new_interval(),
-            partial_chronicle: Default::default(),
-            debug: None,
-        }
-    }
-
-    pub fn new_method(
-        method_label: &str,
-        method: &Method,
-        conversion_context: &ConversionContext,
-        ch: &mut ChronicleHierarchy,
-    ) -> Result<Chronicle, LError> {
-        let mut chronicle = Chronicle::new(ch);
-        let task = conversion_context
-            .domain
-            .get_tasks()
-            .get(method.get_task_label())
-            .unwrap();
-
-        let n_param_task = task.get_parameters().get_number();
-
-        let mut task_lit: Vec<Lit> = vec![ch
-            .sym_table
-            .id(method.get_task_label())
-            .expect("symbol of task should be defined")
-            .into()];
-
-        for param in task.get_parameters().get_params() {
-            task_lit.push(ch.sym_table.declare_new_variable(&param, true, None).into())
-        }
-
-        let task_result_var_id = ch.sym_table.declare_new_variable(
-            &format!("{}_r", method.get_task_label()),
-            true,
-            None,
+    pub fn new(ch: &mut ChronicleHierarchy, label: impl Display) -> Self {
+        let interval = Interval::new(
+            &ch.sym_table.declare_new_variable(
+                format!("{}_start", label),
+                true,
+                Some(PlanningAtomType::Timepoint),
+            ),
+            &ch.sym_table.declare_new_variable(
+                format!("{}_end", label),
+                true,
+                Some(PlanningAtomType::Timepoint),
+            ),
         );
 
-        task_lit.push(task_result_var_id.into());
+        let prez = ch.sym_table.declare_new_variable(
+            format!("{}_prez", label),
+            true,
+            Some(PlanningAtomType::Bool),
+        );
 
-        let mut method_lit = vec![ch
+        let result = ch
             .sym_table
-            .id(method_label)
-            .expect("symbol of method undefined in sym_table")
-            .into()];
+            .declare_new_variable(format!("{}_result", label), true, None);
 
-        for (i, param) in method.get_parameters().get_params().iter().enumerate() {
-            let param_id = ch.sym_table.declare_new_variable(param, true, None);
-            if i < n_param_task {
-                chronicle.add_constraint(Constraint::Eq(param_id.into(), task_lit[i + 1].clone()))
-            }
-            if i == n_param_task {
-                let chronicle_result = chronicle.get_result();
-                chronicle.add_constraint(Constraint::Eq(
-                    chronicle_result.clone(),
-                    task_result_var_id.into(),
-                ));
-                method_lit.push(chronicle_result);
-            }
-            chronicle.add_var(&param_id);
-            method_lit.push(param_id.into());
+        let init_var = vec![
+            prez.clone(),
+            result.clone(),
+            interval.start().clone(),
+            interval.end().clone(),
+        ];
+
+        let mut chronicle = Self {
+            name: Default::default(),
+            task: Default::default(),
+            result,
+            interval,
+            prez,
+            partial_chronicle: Default::default(),
+            debug: None,
+        };
+        for v in init_var {
+            chronicle.add_var(&v);
         }
 
-        chronicle.set_task(task_lit.into());
-        chronicle.set_name(method_lit.into());
-
-        let pre_conditions_lvalue: LLambda = method.get_pre_conditions().try_into()?;
-        let body_lvalue: LLambda = method.get_body().try_into()?;
-        let method_lvalue = vec![
-            LCoreOperator::Do.into(),
-            pre_conditions_lvalue.get_body().clone(),
-            body_lvalue.get_body().clone(),
-        ]
-        .into();
-        //println!("method lvalue (with preconditions):\n{}", method_lvalue);
-        build_chronicle(chronicle, &method_lvalue, conversion_context, ch)
+        chronicle
     }
 }
 
@@ -151,7 +112,7 @@ impl Chronicle {
         ec: ExpressionChronicle,
         sym_table: &mut SymTable,
     ) {
-        self.add_constraint(Constraint::Eq(self.get_result_id().into(), ec.get_result()));
+        self.add_constraint(Constraint::Eq(self.get_result().into(), ec.get_result()));
         //bind_variables(self.get_result_id(), ec.get_result_id(), sym_table);
         bind_variables(&self.interval.start(), &ec.interval.start(), sym_table);
         bind_variables(&self.interval.end(), &ec.interval.end(), sym_table);
@@ -198,14 +159,24 @@ impl Chronicle {
     pub fn set_task(&mut self, task: Lit) {
         self.task = task;
     }
-
-    pub fn get_result(&self) -> Lit {
-        self.result.clone().into()
+}
+impl Chronicle {
+    pub fn get_prez(&self) -> &AtomId {
+        &self.prez
     }
 
-    pub fn get_result_id(&self) -> &AtomId {
-        self.result.get_id()
+    pub fn get_start(&self) -> &AtomId {
+        self.get_interval().start()
     }
+
+    pub fn get_end(&self) -> &AtomId {
+        self.get_interval().end()
+    }
+
+    pub fn get_result(&self) -> &AtomId {
+        &self.result
+    }
+
     pub fn get_interval(&self) -> &Interval {
         &self.interval
     }
@@ -219,7 +190,7 @@ impl GetVariables for Chronicle {
     fn get_variables_of_type(
         &self,
         sym_table: &SymTable,
-        atom_type: &Option<TypeId>,
+        atom_type: &Option<PlanningAtomType>,
     ) -> HashSet<AtomId> {
         self.partial_chronicle
             .get_variables_of_type(sym_table, atom_type)
@@ -329,8 +300,8 @@ impl PartialChronicle {
         self.variables.insert(*sym_id);
     }
     pub fn add_interval(&mut self, interval: &Interval) {
-        self.variables.insert(interval.start());
-        self.variables.insert(interval.end());
+        self.variables.insert(*interval.start());
+        self.variables.insert(*interval.end());
     }
 
     pub fn add_constraint(&mut self, constraint: Constraint) {
@@ -367,11 +338,11 @@ impl GetVariables for PartialChronicle {
     fn get_variables_of_type(
         &self,
         sym_table: &SymTable,
-        atom_type: &Option<TypeId>,
+        atom_type: &Option<PlanningAtomType>,
     ) -> HashSet<AtomId> {
         self.variables
             .iter()
-            .filter(|v| sym_table.get_type_of(v).unwrap().parent_type == *atom_type)
+            .filter(|v| sym_table.get_type_of(v).unwrap().a_type == *atom_type)
             .cloned()
             .collect()
     }
@@ -381,6 +352,12 @@ impl GetVariables for PartialChronicle {
 pub struct ChronicleResult {
     id: AtomId,
     pure: Option<Lit>,
+}
+
+impl From<AtomId> for ChronicleResult {
+    fn from(a: AtomId) -> Self {
+        Self { id: a, pure: None }
+    }
 }
 
 impl ChronicleResult {
@@ -532,11 +509,11 @@ impl GetVariables for ExpressionChronicle {
     fn get_variables_of_type(
         &self,
         sym_table: &SymTable,
-        atom_type: &Option<TypeId>,
+        atom_type: &Option<PlanningAtomType>,
     ) -> HashSet<AtomId> {
         self.get_variables()
             .iter()
-            .filter(|v| sym_table.get_type_of(v).unwrap().parent_type == *atom_type)
+            .filter(|v| sym_table.get_type_of(v).unwrap().a_type == *atom_type)
             .cloned()
             .collect()
     }
@@ -551,10 +528,7 @@ impl ExpressionChronicle {
         let variables = self.get_variables();
         variables
             .iter()
-            .filter(|a| {
-                sym_table.get_type_of(a).unwrap().parent_type
-                    == Some(sym_table.get_basic_type_id(&PlanningAtomType::Symbol))
-            })
+            .filter(|a| sym_table.get_type_of(a).unwrap().a_type == Some(PlanningAtomType::Symbol))
             .cloned()
             .collect()
     }

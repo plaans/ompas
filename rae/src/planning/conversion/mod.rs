@@ -1,13 +1,17 @@
+use crate::context::rae_env::{Parameters, Task};
 use crate::planning::conversion::post_processing::*;
 use crate::planning::conversion::pre_processing::pre_processing;
 use crate::planning::conversion::processing::{convert_lvalue_to_expression_chronicle, MetaData};
-use crate::planning::structs::atom::PlanningAtomType;
 use crate::planning::structs::chronicle::Chronicle;
 use crate::planning::structs::lit::Lit;
+use crate::planning::structs::symbol_table::SymTable;
+use crate::planning::structs::type_table::PlanningAtomType;
 use crate::planning::structs::{ChronicleHierarchy, ConversionContext};
 use ompas_lisp::core::structs::lerror::LError;
-use ompas_lisp::core::structs::llambda::LambdaArgs;
+use ompas_lisp::core::structs::llambda::{LLambda, LambdaArgs};
 use ompas_lisp::core::structs::lvalue::LValue;
+use std::convert::TryInto;
+use std::fmt::Display;
 
 pub mod post_processing;
 pub mod pre_processing;
@@ -51,25 +55,14 @@ pub fn convert_domain_to_chronicle_hierarchy(
         .map(|s| s.as_str())
         .collect();
 
-    ch.sym_table.add_list_of_symbols_of_same_type(
-        actions,
-        Some(ch.sym_table.get_basic_type_id(&PlanningAtomType::Action)),
-    )?;
-    ch.sym_table.add_list_of_symbols_of_same_type(
-        state_functions,
-        Some(
-            ch.sym_table
-                .get_basic_type_id(&PlanningAtomType::StateFunction),
-        ),
-    )?;
-    ch.sym_table.add_list_of_symbols_of_same_type(
-        methods,
-        Some(ch.sym_table.get_basic_type_id(&PlanningAtomType::Method)),
-    )?;
-    ch.sym_table.add_list_of_symbols_of_same_type(
-        tasks,
-        Some(ch.sym_table.get_basic_type_id(&PlanningAtomType::Task)),
-    )?;
+    ch.sym_table
+        .add_list_of_symbols_of_same_type(actions, Some(PlanningAtomType::Action))?;
+    ch.sym_table
+        .add_list_of_symbols_of_same_type(state_functions, Some(PlanningAtomType::StateFunction))?;
+    ch.sym_table
+        .add_list_of_symbols_of_same_type(methods, Some(PlanningAtomType::Method))?;
+    ch.sym_table
+        .add_list_of_symbols_of_same_type(tasks, Some(PlanningAtomType::Task))?;
 
     //add new types to list of types.
 
@@ -77,53 +70,42 @@ pub fn convert_domain_to_chronicle_hierarchy(
     //let mut tasks_lits = HashMap::new();
 
     //Add tasks to domain
-    for (task_label, task) in conversion_context.domain.get_tasks() {
-        let mut task_lit: Vec<Lit> = vec![ch
-            .sym_table
-            .id(task_label)
-            .expect("symbol of task should be defined")
-            .into()];
-
-        let params = task.get_parameters();
-        for (param, t) in params.get_params().iter().zip(&params.get_types()) {
-            task_lit.push(ch.sym_table.declare_new_variable(&param, true, None).into())
-        }
-        task_lit.push(ch.sym_table.declare_new_result(None).get_id().into());
-
-        let task_lit: Lit = task_lit.into();
-        ch.tasks.push(task_lit);
+    for (_, task) in conversion_context.domain.get_tasks() {
+        ch.tasks.push(declare_task(task, &mut ch.sym_table));
     }
 
     for (action_label, action) in conversion_context.domain.get_actions() {
         //evaluate the lambda sim.
-        let mut chronicle =
-            convert_lvalue_to_chronicle(action.get_sim(), &conversion_context, &mut ch)?;
-        let symbol_id = *ch
-            .sym_table
-            .id(action_label)
-            .unwrap_or_else(|| panic!("{} was not well defined", action_label));
-        let mut name = vec![symbol_id];
+        let mut chronicle = convert_abstract_task_to_chronicle(
+            &action.get_sim().try_into()?,
+            action_label,
+            None,
+            action.get_parameters(),
+            &conversion_context,
+            &mut ch,
+        )?;
 
-        for e in action.get_parameters().get_params() {
-            let symbol_id = *ch.sym_table.id(&e).unwrap_or_else(|| {
-                panic!(
-                    "parameters of {} were not defined in the chronicle",
-                    action_label
-                )
-            });
-            name.push(symbol_id);
-            chronicle.add_var(&symbol_id);
-        }
-
-        name.push(*chronicle.get_result_id());
-
-        chronicle.set_name(name.into());
         ch.chronicle_templates.push(chronicle);
     }
 
     //Add all methods to the domain
     for (method_label, method) in conversion_context.domain.get_methods() {
-        let chronicle = Chronicle::new_method(method_label, method, &conversion_context, &mut ch)?;
+        let task = conversion_context
+            .domain
+            .get_tasks()
+            .get(method.get_task_label())
+            .unwrap();
+
+        let method_lambda: LLambda = method.get_lambda().try_into().expect("");
+
+        let chronicle = convert_abstract_task_to_chronicle(
+            &method_lambda,
+            method_label,
+            Some(task),
+            method.get_parameters(),
+            &conversion_context,
+            &mut ch,
+        )?;
 
         ch.chronicle_templates.push(chronicle);
     }
@@ -131,6 +113,164 @@ pub fn convert_domain_to_chronicle_hierarchy(
     ch.problem = (&conversion_context).into();
 
     Ok(ch)
+}
+
+pub fn convert_abstract_task_to_chronicle(
+    lambda: &LLambda,
+    label: impl Display,
+    task: Option<&Task>,
+    parameters: &Parameters,
+    conversion_context: &ConversionContext,
+    ch: &mut ChronicleHierarchy,
+) -> Result<Chronicle, LError> {
+    let symbol_id = ch.sym_table.declare_new_symbol(&label.to_string(), None);
+
+    let mut chronicle = Chronicle::new(ch, label);
+    let mut name = vec![
+        *chronicle.get_prez(),
+        *chronicle.get_result(),
+        *chronicle.get_start(),
+        *chronicle.get_end(),
+        symbol_id,
+    ];
+    if let LambdaArgs::List(l) = lambda.get_params() {
+        assert_eq!(l.len(), parameters.get_number());
+
+        for (pl, (pt, t)) in l.iter().zip(parameters.inner().iter()) {
+            assert_eq!(pl, pt);
+            let id = ch.sym_table.declare_new_variable(pt, true, None);
+            chronicle.add_var(&id);
+            name.push(id);
+        }
+    }
+
+    let pre_processed = pre_processing(lambda.get_body(), conversion_context, ch)?;
+
+    chronicle.set_debug(Some(pre_processed.clone()));
+
+    let mut ec = convert_lvalue_to_expression_chronicle(
+        &pre_processed,
+        conversion_context,
+        ch,
+        MetaData::new(true, false),
+    )?;
+
+    post_processing(&mut ec, conversion_context, ch)?;
+
+    chronicle.absorb_expression_chronicle(ec, &mut ch.sym_table);
+    chronicle.set_name(name.clone().into());
+    chronicle.set_task(match task {
+        Some(task) => declare_task(task, &mut ch.sym_table),
+        None => name.into(),
+    });
+
+    Ok(chronicle)
+}
+
+pub fn convert_lvalue_to_chronicle(
+    exp: &LValue,
+    conversion_context: &ConversionContext,
+    ch: &mut ChronicleHierarchy,
+) -> Result<Chronicle, LError> {
+    //Creation and instantiation of the chronicle
+    let label = "unnamed_chronicle";
+    let symbol_id = ch.sym_table.declare_new_symbol(label, None);
+
+    let mut chronicle = Chronicle::new(ch, label);
+    let mut name = vec![
+        *chronicle.get_prez(),
+        *chronicle.get_result(),
+        *chronicle.get_start(),
+        *chronicle.get_end(),
+        symbol_id,
+    ];
+
+    let lvalue: &LValue = if let LValue::Lambda(lambda) = exp {
+        let params = lambda.get_params();
+        match params {
+            LambdaArgs::Sym(s) => {
+                let id = ch.sym_table.declare_new_variable(&s, true, None);
+                chronicle.add_var(&id);
+                name.push(id);
+            }
+            LambdaArgs::List(list) => {
+                for param in list {
+                    let id = ch.sym_table.declare_new_variable(&param, true, None);
+                    chronicle.add_var(&id);
+                    name.push(id);
+                }
+            }
+            LambdaArgs::Nil => {}
+        }
+
+        lambda.get_body()
+    } else {
+        exp
+    };
+
+    let pre_processed = pre_processing(lvalue, conversion_context, ch)?;
+
+    chronicle.set_debug(Some(pre_processed.clone()));
+
+    let mut ec = convert_lvalue_to_expression_chronicle(
+        &pre_processed,
+        conversion_context,
+        ch,
+        MetaData::new(true, false),
+    )?;
+
+    post_processing(&mut ec, conversion_context, ch)?;
+
+    chronicle.absorb_expression_chronicle(ec, &mut ch.sym_table);
+    chronicle.set_name(name.clone().into());
+    chronicle.set_task(name.into());
+
+    Ok(chronicle)
+}
+
+pub fn declare_task(task: &Task, st: &mut SymTable) -> Lit {
+    let task_label_id = *st
+        .id(task.get_label())
+        .expect("symbol of task should be defined");
+
+    let task_label = task.get_label();
+
+    let prez = st.declare_new_variable(
+        format!("{}_prez", task_label),
+        true,
+        Some(PlanningAtomType::Bool),
+    );
+    let start = st.declare_new_variable(
+        format!("{}_start", task_label),
+        true,
+        Some(PlanningAtomType::Bool),
+    );
+    let end = st.declare_new_variable(
+        format!("{}_end", task_label),
+        true,
+        Some(PlanningAtomType::Bool),
+    );
+
+    let result = st.declare_new_variable(
+        format!("{}_result", task_label),
+        true,
+        Some(PlanningAtomType::Bool),
+    );
+
+    let mut task_lit: Vec<Lit> = vec![
+        prez.into(),
+        result.into(),
+        start.into(),
+        end.into(),
+        task_label_id.into(),
+    ];
+
+    for (param, t) in task.get_parameters().inner() {
+        //TODO: add types for parameters
+        task_lit.push(st.declare_new_variable(&param, true, None).into())
+    }
+
+    task_lit.into()
 }
 
 pub fn build_chronicle(
@@ -159,51 +299,5 @@ pub fn build_chronicle(
     post_processing(&mut ec, conversion_context, ch)?;
 
     chronicle.absorb_expression_chronicle(ec, &mut ch.sym_table);
-    Ok(chronicle)
-}
-
-pub fn convert_lvalue_to_chronicle(
-    exp: &LValue,
-    conversion_context: &ConversionContext,
-    ch: &mut ChronicleHierarchy,
-) -> Result<Chronicle, LError> {
-    //Creation and instantiation of the chronicle
-
-    let mut chronicle = Chronicle::new(ch);
-
-    let lvalue: &LValue = if let LValue::Lambda(lambda) = exp {
-        let params = lambda.get_params();
-        match params {
-            LambdaArgs::Sym(s) => {
-                ch.sym_table.declare_new_variable(&s, true, None);
-            }
-            LambdaArgs::List(list) => {
-                for param in list {
-                    ch.sym_table.declare_new_variable(&param, true, None);
-                }
-            }
-            LambdaArgs::Nil => {}
-        }
-
-        lambda.get_body()
-    } else {
-        exp
-    };
-
-    let pre_processed = pre_processing(lvalue, conversion_context, ch)?;
-
-    chronicle.set_debug(Some(pre_processed.clone()));
-
-    let mut ec = convert_lvalue_to_expression_chronicle(
-        &pre_processed,
-        conversion_context,
-        ch,
-        MetaData::new(true, false),
-    )?;
-
-    post_processing(&mut ec, conversion_context, ch)?;
-
-    chronicle.absorb_expression_chronicle(ec, &mut ch.sym_table);
-
     Ok(chronicle)
 }

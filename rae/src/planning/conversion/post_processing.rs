@@ -1,11 +1,11 @@
 use crate::planning::point_algebra::problem::{Graph, Problem};
 use crate::planning::point_algebra::remove_useless_timepoints;
-use crate::planning::structs::atom::{AtomKind, PlanningAtomType};
 use crate::planning::structs::chronicle::{ChronicleSet, ExpressionChronicle};
 use crate::planning::structs::constraint::Constraint;
 use crate::planning::structs::lit::Lit;
 use crate::planning::structs::symbol_table::{AtomId, SymTable};
 use crate::planning::structs::traits::GetVariables;
+use crate::planning::structs::type_table::{AtomKind, PlanningAtomType, VariableKind};
 use crate::planning::structs::{ChronicleHierarchy, ConversionContext};
 use im::{hashset, HashSet};
 use ompas_lisp::core::structs::lerror::LError;
@@ -32,16 +32,8 @@ pub fn bind_variables(
     let type_2 = *sym_table.get_type_of(id_2).expect("id should be defined");
 
     match (type_1.kind, type_2.kind) {
-        (AtomKind::Type, AtomKind::Type) => {
-            if type_1.parent_type == type_2.parent_type {
-                sym_table.union_atom(id_1, id_2);
-                Ok(true)
-            } else {
-                Err(Default::default())
-            }
-        }
         (AtomKind::Constant, AtomKind::Constant) => {
-            if type_1.parent_type != type_2.parent_type {
+            if type_1.a_type != type_2.a_type {
                 return Err(Default::default());
             }
             if sym_table.get_atom(id_1).unwrap() != sym_table.get_atom(id_2).unwrap() {
@@ -50,28 +42,31 @@ pub fn bind_variables(
             sym_table.union_atom(id_1, id_2);
             Ok(true)
         }
-        (AtomKind::Constant, AtomKind::Variable | AtomKind::Result) => {
-            if type_2.parent_type.is_some() {
-                if type_1.parent_type.unwrap() != type_2.parent_type.unwrap() {
+        (AtomKind::Constant, AtomKind::Variable(_)) => {
+            if type_2.a_type.is_some() {
+                if type_1.a_type.unwrap() != type_2.a_type.unwrap() {
                     return Err(Default::default());
                 }
             }
             sym_table.union_atom(id_1, id_2);
             Ok(true)
         }
-        (AtomKind::Variable | AtomKind::Result, AtomKind::Constant) => {
-            if type_1.parent_type.is_some() {
-                if type_1.parent_type.unwrap() != type_2.parent_type.unwrap() {
+        (AtomKind::Variable(_), AtomKind::Constant) => {
+            if type_1.a_type.is_some() {
+                if type_1.a_type.unwrap() != type_2.a_type.unwrap() {
                     return Err(Default::default());
                 }
             }
             sym_table.union_atom(id_2, id_1);
             Ok(true)
         }
-        (AtomKind::Variable, AtomKind::Variable) => {
-            match (type_1.parent_type.is_some(), type_2.parent_type.is_some()) {
+        (
+            AtomKind::Variable(VariableKind::Parameter),
+            AtomKind::Variable(VariableKind::Parameter),
+        ) => {
+            match (type_1.a_type.is_some(), type_2.a_type.is_some()) {
                 (true, true) => {
-                    if type_1.parent_type.unwrap() == type_2.parent_type.unwrap() {
+                    if type_1.a_type.unwrap() == type_2.a_type.unwrap() {
                         sym_table.union_atom(id_1, id_2);
                     } else {
                         return Err(Default::default());
@@ -83,10 +78,10 @@ pub fn bind_variables(
             }
             Ok(true)
         }
-        (AtomKind::Result, AtomKind::Result) => {
-            match (type_1.parent_type.is_some(), type_2.parent_type.is_some()) {
+        (AtomKind::Variable(VariableKind::Result), AtomKind::Variable(VariableKind::Result)) => {
+            match (type_1.a_type.is_some(), type_2.a_type.is_some()) {
                 (true, true) => {
-                    if type_1.parent_type.unwrap() == type_2.parent_type.unwrap() {
+                    if type_1.a_type.unwrap() == type_2.a_type.unwrap() {
                         sym_table.union_atom(id_1, id_2);
                     } else {
                         return Err(Default::default());
@@ -98,24 +93,24 @@ pub fn bind_variables(
             }
             Ok(true)
         }
-        (AtomKind::Result, AtomKind::Variable) => {
-            if type_1.parent_type.is_some() && type_2.parent_type.is_some() {
-                if type_1.parent_type.unwrap() != type_2.parent_type.unwrap() {
+        (AtomKind::Variable(VariableKind::Result), AtomKind::Variable(VariableKind::Parameter)) => {
+            if type_1.a_type.is_some() && type_2.a_type.is_some() {
+                if type_1.a_type.unwrap() != type_2.a_type.unwrap() {
                     return Err(Default::default());
                 }
-            } else if type_1.parent_type.is_some() {
-                sym_table.set_type_of(id_2, &type_1.parent_type)
+            } else if type_1.a_type.is_some() {
+                sym_table.set_type_of(id_2, &type_1.a_type)
             }
             sym_table.union_atom(id_2, id_1);
             Ok(true)
         }
-        (AtomKind::Variable, AtomKind::Result) => {
-            if type_1.parent_type.is_some() && type_2.parent_type.is_some() {
-                if type_1.parent_type.unwrap() != type_2.parent_type.unwrap() {
+        (AtomKind::Variable(VariableKind::Parameter), AtomKind::Variable(VariableKind::Result)) => {
+            if type_1.a_type.is_some() && type_2.a_type.is_some() {
+                if type_1.a_type.unwrap() != type_2.a_type.unwrap() {
                     return Err(Default::default());
                 }
-            } else if type_2.parent_type.is_some() {
-                sym_table.set_type_of(id_1, &type_2.parent_type)
+            } else if type_2.a_type.is_some() {
+                sym_table.set_type_of(id_1, &type_2.a_type)
             }
             sym_table.union_atom(id_1, id_2);
             Ok(true)
@@ -243,13 +238,13 @@ pub fn simplify_timepoints(
     ch: &mut ChronicleHierarchy,
     _: &ConversionContext,
 ) -> Result<(), LError> {
-    let timepoint_type_id = ch.sym_table.get_basic_type_id(&PlanningAtomType::Timepoint);
-
     let timepoints: HashSet<AtomId> = ec
         .get_variables()
         .iter()
         .map(|a| ch.sym_table.get_parent(a))
-        .filter(|a| ch.sym_table.get_type_of(a).unwrap().parent_type == Some(timepoint_type_id))
+        .filter(|a| {
+            ch.sym_table.get_type_of(a).unwrap().a_type == Some(PlanningAtomType::Timepoint)
+        })
         .collect();
     let used_timepoints: HashSet<AtomId> = ec
         .get_variables_in_sets(vec![
@@ -259,7 +254,9 @@ pub fn simplify_timepoints(
         ])
         .iter()
         .map(|a| ch.sym_table.get_parent(a))
-        .filter(|a| ch.sym_table.get_type_of(a).unwrap().parent_type == Some(timepoint_type_id))
+        .filter(|a| {
+            ch.sym_table.get_type_of(a).unwrap().a_type == Some(PlanningAtomType::Timepoint)
+        })
         .collect();
 
     let optional_timepoints: HashSet<AtomId> = timepoints.clone().difference(used_timepoints);

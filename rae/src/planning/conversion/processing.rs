@@ -2,7 +2,7 @@ use crate::module::rae_exec::{
     RAE_ASSERT, RAE_ASSERT_SHORT, RAE_INSTANCE, RAE_MONITOR, RAE_RETRACT, RAE_RETRACT_SHORT,
 };
 use crate::planning::conversion::post_processing::post_processing;
-use crate::planning::structs::atom::{AtomKind, PlanningAtomType, Sym};
+use crate::planning::structs::atom::Sym;
 use crate::planning::structs::chronicle::{Chronicle, ExpressionChronicle};
 use crate::planning::structs::condition::Condition;
 use crate::planning::structs::constraint::{bind_result, equal, finish, meet, start, Constraint};
@@ -13,12 +13,13 @@ use crate::planning::structs::lit::{lvalue_to_lit, Lit};
 use crate::planning::structs::symbol_table::{AtomId, ExpressionType};
 use crate::planning::structs::traits::{Absorb, FormatWithSymTable, GetVariables};
 use crate::planning::structs::transition::Transition;
+use crate::planning::structs::type_table::{AtomKind, PlanningAtomType, VariableKind};
 use crate::planning::structs::{ChronicleHierarchy, ConversionContext, TaskType};
 use ompas_lisp::core::language::{BOOL, FLOAT, INT, NUMBER, TYPE_LIST};
 use ompas_lisp::core::root_module::basic_math::language::{EQ, GEQ, GT, LEQ, LT, NOT, NOT_SHORT};
 use ompas_lisp::core::root_module::error::language::CHECK;
 use ompas_lisp::core::root_module::predicate::language::{
-    IS_BOOL, IS_FLOAT, IS_INT, IS_LIST, IS_NUMBER,
+    IS_BOOL, IS_FLOAT, IS_INT, IS_LIST, IS_NIL, IS_NUMBER,
 };
 use ompas_lisp::core::structs::lcoreoperator::language::EVAL;
 use ompas_lisp::core::structs::lcoreoperator::LCoreOperator;
@@ -29,6 +30,7 @@ use ompas_lisp::core::structs::typelvalue::TypeLValue;
 use ompas_lisp::modules::utils::language::ARBITRARY;
 use ompas_lisp::static_eval::{eval_static, parse_static};
 use std::convert::{TryFrom, TryInto};
+use std::path::Display;
 
 //Names of the functions
 
@@ -299,7 +301,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                                 ec.absorb(state_variable);
                                 ec.absorb(value);
 
-                                ec.set_pure_result(ch.sym_table.new_bool(false).into());
+                                ec.set_pure_result(ch.sym_table.new_bool(true).into());
 
                                 return Ok(ec);
                             }
@@ -339,10 +341,17 @@ pub fn convert_lvalue_to_expression_chronicle(
                                     _ => unreachable!(),
                                 };
 
-                                ec.add_constraint(Constraint::Eq(
-                                    ec.get_result(),
-                                    constraint.into(),
-                                ));
+                                if !meta_data.top_level
+                                    && left.is_result_pure()
+                                    && right.is_result_pure()
+                                {
+                                    ec.set_pure_result(constraint.into());
+                                } else {
+                                    ec.add_constraint(Constraint::Eq(
+                                        ec.get_result(),
+                                        constraint.into(),
+                                    ));
+                                }
                                 ec.absorb(left);
                                 ec.absorb(right);
                                 return Ok(ec);
@@ -356,12 +365,17 @@ pub fn convert_lvalue_to_expression_chronicle(
                                 )?;
 
                                 ec.add_constraint(equal(ec.get_interval(), val.get_interval()));
-                                ec.add_constraint(bind_result(&ec, &val));
+                                if !meta_data.top_level && val.is_result_pure() {
+                                    ec.set_pure_result(val.get_result());
+                                } else {
+                                    ec.add_constraint(bind_result(&ec, &val));
+                                }
 
                                 ec.absorb(val);
                                 return Ok(ec);
                             }
-                            NOT | NOT_SHORT | IS_BOOL | IS_FLOAT | IS_INT | IS_LIST | IS_NUMBER => {
+                            NOT | NOT_SHORT | IS_BOOL | IS_FLOAT | IS_INT | IS_LIST | IS_NUMBER
+                            | IS_NIL => {
                                 let val = convert_lvalue_to_expression_chronicle(
                                     &l[1],
                                     context,
@@ -391,13 +405,19 @@ pub fn convert_lvalue_to_expression_chronicle(
                                     IS_NUMBER => {
                                         Constraint::Type(r, ch.sym_table.id(NUMBER).unwrap().into())
                                     }
+                                    IS_NIL => {
+                                        Constraint::Eq(r, ch.sym_table.new_bool(false).into())
+                                    }
                                     _ => unreachable!(),
                                 };
-
-                                ec.add_constraint(Constraint::Eq(
-                                    ec.get_result(),
-                                    constraint.into(),
-                                ));
+                                if !meta_data.top_level && val.is_result_pure() {
+                                    ec.set_pure_result(constraint.into());
+                                } else {
+                                    ec.add_constraint(Constraint::Eq(
+                                        ec.get_result(),
+                                        constraint.into(),
+                                    ));
+                                }
                                 ec.absorb(val);
                                 return Ok(ec);
                             }
@@ -463,6 +483,10 @@ pub fn convert_lvalue_to_expression_chronicle(
                                             symbol.get_interval(),
                                             symbol_type.get_interval(),
                                         ));
+                                        ec.add_constraint(finish(
+                                            symbol_type.get_interval(),
+                                            ec.get_interval(),
+                                        ));
 
                                         let constraint = Constraint::Type(
                                             symbol.get_result(),
@@ -488,32 +512,38 @@ pub fn convert_lvalue_to_expression_chronicle(
                                 }
                             }
                             CHECK => {
-                                let condition = convert_lvalue_to_expression_chronicle(
-                                    &l[1],
-                                    context,
-                                    ch,
-                                    Default::default(),
-                                )?;
+                                if meta_data.check_into_condition {
+                                    let condition = convert_lvalue_to_expression_chronicle(
+                                        &l[1],
+                                        context,
+                                        ch,
+                                        Default::default(),
+                                    )?;
 
-                                ec.add_condition(Condition {
-                                    interval: *condition.get_interval(),
-                                    constraint: Constraint::Eq(
-                                        condition.get_result(),
-                                        ch.sym_table.new_bool(true).into(),
-                                    ),
-                                });
+                                    ec.add_condition(Condition {
+                                        interval: *condition.get_interval(),
+                                        constraint: Constraint::Eq(
+                                            condition.get_result(),
+                                            ch.sym_table.new_bool(true).into(),
+                                        ),
+                                    });
+                                    ec.add_constraint(equal(
+                                        ec.get_interval(),
+                                        condition.get_interval(),
+                                    ));
 
-                                //WARNING: Not sure of this
-                                ec.absorb(condition);
-                                ec.set_pure_result(ch.sym_table.new_bool(true).into());
+                                    //WARNING: Not sure of this
+                                    ec.absorb(condition);
+                                    ec.set_pure_result(ch.sym_table.new_bool(true).into());
 
-                                return Ok(ec);
+                                    return Ok(ec);
+                                }
                             }
                             _ => {
                                 if let Some(id) = ch.sym_table.id(&s) {
-                                    match ch.sym_table.try_get_basic_type(&ch.sym_table
+                                    match ch.sym_table
                                         .get_type_of(id)
-                                        .expect("a defined symbol should have a type").parent_type.unwrap()).expect("First element")
+                                        .expect("a defined symbol should have a type").a_type.unwrap()
                                     {
                                         PlanningAtomType::Action => {
                                             expression_type = ExpressionType::Action;
@@ -576,7 +606,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                     }
 
                     previous_interval = *ec_i.get_interval();
-                    end_last_interval = ec_i.get_interval().end();
+                    end_last_interval = *ec_i.get_interval().end();
                     ec.absorb(ec_i);
                 }
 
@@ -744,7 +774,8 @@ pub fn convert_if(
         .iter()
         .filter(|v| {
             let type_of = ch.sym_table.get_type_of(v).unwrap();
-            type_of.kind == AtomKind::Variable
+            type_of.kind == AtomKind::Variable(VariableKind::Parameter)
+                && type_of.a_type != Some(PlanningAtomType::Timepoint)
         })
         .cloned()
         .collect();
@@ -754,7 +785,8 @@ pub fn convert_if(
         .iter()
         .filter(|v| {
             let type_of = ch.sym_table.get_type_of(v).unwrap();
-            type_of.kind == AtomKind::Variable
+            type_of.kind == AtomKind::Variable(VariableKind::Parameter)
+                && type_of.a_type != Some(PlanningAtomType::Timepoint)
         })
         .cloned()
         .collect();
@@ -850,7 +882,8 @@ pub fn convert_if(
                          branch: bool,
                          debug: LValue|
      -> Result<(), LError> {
-        let mut method = Chronicle::new(ch);
+        let method_label = format!("m_{}_{}", task_label, branch);
+        let mut method = Chronicle::new(ch, &method_label);
         let mut task_lit: Vec<AtomId> = vec![];
         for (i, s) in task_string.iter().enumerate() {
             if i == 0 {
@@ -859,7 +892,6 @@ pub fn convert_if(
                 task_lit.push(ch.sym_table.declare_new_variable(s, true, None));
             }
         }
-        let method_label = format!("m_{}_{}", task_label, branch);
         let method_id = ch.sym_table.declare_new_symbol(&method_label, None);
         let method_cond_var =
             ch.sym_table

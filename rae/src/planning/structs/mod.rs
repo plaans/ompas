@@ -1,11 +1,11 @@
 use crate::context::rae_env::{DomainEnv, Parameters, StateFunction};
 use crate::context::rae_state::RAEStateSnapshot;
 use crate::module::rae_exec::RAE_INSTANCE;
-use crate::planning::structs::atom::AtomType;
 use crate::planning::structs::chronicle::Chronicle;
 use crate::planning::structs::lit::Lit;
 use crate::planning::structs::symbol_table::{AtomId, SymTable};
 use crate::planning::structs::traits::FormatWithSymTable;
+use crate::planning::structs::type_table::AtomType;
 use im::{hashmap, HashMap, HashSet};
 use ompas_lisp::core::structs::lenv::LEnv;
 use ompas_lisp::core::structs::lvalues::LValueS;
@@ -22,6 +22,7 @@ pub mod lit;
 pub mod symbol_table;
 pub mod traits;
 pub mod transition;
+pub mod type_table;
 
 pub const IF_TASK_PROTOTYPE: &str = "t_if_task";
 

@@ -1,10 +1,12 @@
 use crate::module::rae_exec::*;
-use crate::planning::structs::atom::{Atom, AtomKind, AtomType, PlanningAtomType, Sym};
+use crate::planning::structs::atom::{Atom, Sym};
 use crate::planning::structs::chronicle::ChronicleResult;
 use crate::planning::structs::interval::Interval;
 use crate::planning::structs::traits::FormatWithSymTable;
+use crate::planning::structs::type_table::{
+    AtomKind, AtomType, PlanningAtomType, TypeId, TypeTable, VariableKind,
+};
 use crate::planning::union_find::{Forest, Node, NodeId};
-use im::hashmap;
 use ompas_lisp::core::root_module::language::get_scheme_primitives;
 use ompas_lisp::core::structs::lerror;
 use ompas_lisp::core::structs::lerror::LError::SpecialError;
@@ -12,16 +14,35 @@ use std::collections::{HashMap, HashSet};
 
 pub type AtomId = NodeId;
 
-pub type TypeId = AtomId;
-
 #[derive(Clone)]
 pub struct SymTable {
     symbols: Forest<Atom>,
     ids: im::HashMap<Sym, AtomId>,
-    basic_types: BasicTypes,
+    types: TypeTable,
     symbol_types: SymbolTypes,
+    meta_data: SymTableMetaData,
     multiple_def: HashMap<String, Vec<AtomId>>,
     pointer_to_ver: Vec<HashMap<String, usize>>,
+}
+
+#[derive(Default, Clone)]
+pub struct SymTableMetaData {
+    n_timepoint: usize,
+    n_result: usize,
+}
+
+impl SymTableMetaData {
+    pub fn new_timepoint_index(&mut self) -> usize {
+        let n = self.n_timepoint;
+        self.n_timepoint += 1;
+        n
+    }
+
+    pub fn new_result_index(&mut self) -> usize {
+        let n = self.n_result;
+        self.n_result += 1;
+        n
+    }
 }
 
 impl Default for SymTable {
@@ -29,8 +50,9 @@ impl Default for SymTable {
         let mut st = Self {
             symbols: Forest::default(),
             ids: Default::default(),
-            basic_types: Default::default(),
+            types: Default::default(),
             symbol_types: Default::default(),
+            meta_data: Default::default(),
             multiple_def: Default::default(),
             pointer_to_ver: vec![Default::default()],
         };
@@ -41,13 +63,13 @@ impl Default for SymTable {
         //Not exhaustive
         st.add_list_of_symbols_of_same_type(
             get_scheme_primitives(),
-            Some(st.get_basic_type_id(&PlanningAtomType::Function)),
+            Some(PlanningAtomType::Function),
         )
         .expect("error while adding symbols of scheme primitives");
 
         st.add_list_of_symbols_of_same_type(
             vec![RAE_ASSERT, RAE_RETRACT, RAE_INSTANCE],
-            Some(st.get_basic_type_id(&PlanningAtomType::Function)),
+            Some(PlanningAtomType::Function),
         )
         .expect("error while adding symbols of rae");
         st
@@ -70,25 +92,22 @@ impl SymTable {
             PlanningAtomType::Lambda,
         ] {
             let id = self.declare_new_type(&bt.to_string(), None);
-            self.basic_types.add_basic_type(&bt, id);
+            self.types.add_type(&bt, id);
         }
     }
 
-    pub fn get_basic_type_id(&self, basic_type: &PlanningAtomType) -> TypeId {
-        self.basic_types.get_basic_type_id(basic_type)
+    pub fn get_type_id(&self, sym_type: impl ToString) -> TypeId {
+        self.types.get_type_id(sym_type)
     }
 
-    pub fn try_get_basic_type(&self, type_id: &TypeId) -> Result<PlanningAtomType, ()> {
-        match self.basic_types.get_basic_type(type_id) {
-            Some(p) => Ok(*p),
-            None => Err(()),
-        }
+    pub fn get_type(&self, type_id: &TypeId) -> Option<&String> {
+        self.types.get_type(type_id)
     }
 
     pub fn add_list_of_symbols_of_same_type(
         &mut self,
         list: Vec<&str>,
-        sym_type: Option<TypeId>,
+        sym_type: Option<PlanningAtomType>,
     ) -> lerror::Result<()> {
         for element in list {
             if self.it_exists(element) {
@@ -103,7 +122,7 @@ impl SymTable {
             self.symbol_types.add_new_atom(
                 &id,
                 AtomType {
-                    parent_type: sym_type,
+                    a_type: sym_type,
                     kind: AtomKind::Constant,
                 },
             );
@@ -121,7 +140,7 @@ impl SymTable {
         self.symbol_types.add_new_atom(
             &id,
             AtomType {
-                parent_type: Some(self.get_basic_type_id(&PlanningAtomType::Bool)),
+                a_type: Some(PlanningAtomType::Bool),
                 kind: AtomKind::Constant,
             },
         );
@@ -133,7 +152,7 @@ impl SymTable {
         self.symbol_types.add_new_atom(
             &id,
             AtomType {
-                parent_type: Some(self.get_basic_type_id(&PlanningAtomType::Int)),
+                a_type: Some(PlanningAtomType::Int),
                 kind: AtomKind::Constant,
             },
         );
@@ -145,7 +164,7 @@ impl SymTable {
         self.symbol_types.add_new_atom(
             &id,
             AtomType {
-                parent_type: Some(self.get_basic_type_id(&PlanningAtomType::Float)),
+                a_type: Some(PlanningAtomType::Float),
                 kind: AtomKind::Constant,
             },
         );
@@ -218,31 +237,32 @@ impl SymTable {
 DECLARATION FUNCTION
  */
 impl SymTable {
-    pub fn declare_new_type(&mut self, sym: &str, sym_type: Option<TypeId>) -> TypeId {
+    pub fn declare_new_type(&mut self, sym: &str, a_type: Option<TypeId>) -> TypeId {
         let id = self.symbols.new_node(sym.into());
-        self.symbol_types.add_new_type(&id);
-        self.symbol_types.add_new_atom(
-            &id,
-            AtomType {
-                parent_type: sym_type,
-                kind: AtomKind::Type,
+        let atom_type = AtomType {
+            a_type: match a_type {
+                Some(t) => Some(PlanningAtomType::SubType(t)),
+                None => None,
             },
-        );
+            kind: AtomKind::Constant,
+        };
+        self.symbol_types.add_new_atom(&id, atom_type);
+        self.types.add_type(sym, id);
         id
     }
 
     //Declare a new return value
     //The name of the return value will be format!("r_{}", last_return_index)
-    pub fn declare_new_result(&mut self, parent_type: Option<TypeId>) -> ChronicleResult {
-        let n = self.symbol_types.get_number_of_kind(&AtomKind::Result);
+    pub fn declare_new_result(&mut self, a_type: Option<PlanningAtomType>) -> ChronicleResult {
+        let n = self.meta_data.new_result_index();
         let sym: Sym = format!("r_{}", n).into();
         let id = self.symbols.new_node((&sym).into());
         self.ids.insert(sym, id);
         self.symbol_types.add_new_atom(
             &id,
             AtomType {
-                parent_type,
-                kind: AtomKind::Result,
+                a_type,
+                kind: AtomKind::Variable(VariableKind::Result),
             },
         );
         ChronicleResult::new(id, None)
@@ -267,17 +287,16 @@ impl SymTable {
     }
 
     pub fn declare_new_interval(&mut self) -> Interval {
-        let n = self
-            .symbol_types
-            .get_number_of_type(&self.get_basic_type_id(&PlanningAtomType::Timepoint));
-        let start: Sym = format!("t_{}", n).into();
-        let end: Sym = format!("t_{}", n + 1).into();
+        let n1 = self.meta_data.new_timepoint_index();
+        let n2 = self.meta_data.new_timepoint_index();
+        let start: Sym = format!("t_{}", n1).into();
+        let end: Sym = format!("t_{}", n2).into();
         let id_1 = self.symbols.new_node((&start).into());
         let id_2 = self.symbols.new_node((&end).into());
         self.ids.insert(start, id_1);
         let timepoint_type = AtomType {
-            parent_type: Some(self.get_basic_type_id(&PlanningAtomType::Timepoint)),
-            kind: AtomKind::Variable,
+            a_type: Some(PlanningAtomType::Timepoint),
+            kind: AtomKind::Variable(VariableKind::Parameter),
         };
 
         self.symbol_types
@@ -288,23 +307,25 @@ impl SymTable {
     }
 
     pub fn declare_new_timepoint(&mut self) -> AtomId {
-        let n = self
-            .symbol_types
-            .get_number_of_type(&self.get_basic_type_id(&PlanningAtomType::Timepoint));
+        let n = self.meta_data.new_timepoint_index();
         let sym: Sym = format!("t_{}", n).into();
         let id = self.symbols.new_node((&sym).into());
         self.ids.insert(sym, id);
         self.symbol_types.add_new_atom(
             &id,
             AtomType {
-                parent_type: Some(self.get_basic_type_id(&PlanningAtomType::Timepoint)),
-                kind: AtomKind::Variable,
+                a_type: Some(PlanningAtomType::Timepoint),
+                kind: AtomKind::Variable(VariableKind::Parameter),
             },
         );
         id
     }
 
-    pub fn declare_new_symbol(&mut self, sym: &str, symbol_type: Option<TypeId>) -> AtomId {
+    pub fn declare_new_symbol(
+        &mut self,
+        sym: &str,
+        symbol_type: Option<PlanningAtomType>,
+    ) -> AtomId {
         if self.it_exists(sym) {
             //check multiple def
             match self.pointer_to_ver.last().unwrap().get(sym) {
@@ -324,7 +345,7 @@ impl SymTable {
             self.symbol_types.add_new_atom(
                 &id,
                 AtomType {
-                    parent_type: symbol_type,
+                    a_type: symbol_type,
                     kind: AtomKind::Constant,
                 },
             );
@@ -334,27 +355,29 @@ impl SymTable {
 
     pub fn declare_new_variable(
         &mut self,
-        symbol: &str,
+        symbol: impl ToString,
         if_it_exists_create_new: bool,
-        var_type: Option<TypeId>,
+        var_type: Option<PlanningAtomType>,
     ) -> AtomId {
         let var_type = AtomType {
-            parent_type: var_type,
-            kind: AtomKind::Variable,
+            a_type: var_type,
+            kind: AtomKind::Variable(VariableKind::Parameter),
         };
 
-        if self.it_exists(symbol) {
+        let symbol = symbol.to_string();
+
+        if self.it_exists(&symbol) {
             return if if_it_exists_create_new {
-                self.unique_to_several(symbol);
-                let vec_similar = self.multiple_def.get_mut(symbol).unwrap();
+                self.unique_to_several(&symbol);
+                let vec_similar = self.multiple_def.get_mut(&symbol).unwrap();
                 let n = vec_similar.len();
                 let pointer_to_ver = self
                     .pointer_to_ver
                     .last_mut()
                     .expect("no hashmap to version of variable");
 
-                if pointer_to_ver.contains_key(symbol) {
-                    *pointer_to_ver.get_mut(symbol).unwrap() = n;
+                if pointer_to_ver.contains_key(&symbol) {
+                    *pointer_to_ver.get_mut(&symbol).unwrap() = n;
                 } else {
                     pointer_to_ver.insert(symbol.to_string(), n);
                 }
@@ -366,15 +389,15 @@ impl SymTable {
                 id
             } else {
                 //check multiple def
-                return match self.pointer_to_ver.last().unwrap().get(symbol) {
+                return match self.pointer_to_ver.last().unwrap().get(&symbol) {
                     None => {
-                        if self.multiple_def.contains_key(symbol) {
-                            self.multiple_def.get(symbol).unwrap()[0]
+                        if self.multiple_def.contains_key(&symbol) {
+                            self.multiple_def.get(&symbol).unwrap()[0]
                         } else {
                             *self.ids.get(&symbol.to_string().into()).unwrap()
                         }
                     }
-                    Some(i) => *self.multiple_def.get(symbol).unwrap().get(*i).unwrap(),
+                    Some(i) => *self.multiple_def.get(&symbol).unwrap().get(*i).unwrap(),
                 };
             };
         } else {
@@ -392,12 +415,8 @@ SETTERS
  */
 
 impl SymTable {
-    pub fn set_type_of(&mut self, atom_id: &AtomId, atom_type: &Option<TypeId>) {
-        self.symbol_types
-            .inner
-            .get_mut(atom_id)
-            .unwrap()
-            .parent_type = *atom_type;
+    pub fn set_type_of(&mut self, atom_id: &AtomId, atom_type: &Option<PlanningAtomType>) {
+        self.symbol_types.inner.get_mut(atom_id).unwrap().a_type = *atom_type;
     }
 }
 
@@ -426,6 +445,42 @@ impl SymTable {
     }
 }
 
+#[derive(Default, Clone)]
+struct SymbolTypes {
+    inner: HashMap<AtomId, AtomType>,
+    //types_number: TypesNumber,
+    //kind_number: KindNumber,
+}
+
+impl SymbolTypes {
+    pub fn get_type(&self, atom_id: &AtomId) -> Option<&AtomType> {
+        self.inner.get(atom_id)
+    }
+}
+/*
+impl SymbolTypes{
+    pub fn get_number_of_type(&self, atom_type: &TypeId) -> usize {
+
+        self.types_number.get_number_of_type(atom_type)
+    }
+
+    pub fn get_number_of_kind(&self, kind: &AtomKind) -> usize {
+        self.kind_number.get_number_of_kind(kind)
+    }
+}*/
+
+impl SymbolTypes {
+    pub fn add_new_atom(&mut self, id: &AtomId, atom_type: AtomType) {
+        self.inner.insert(*id, atom_type);
+    }
+}
+
+impl FormatWithSymTable for AtomId {
+    fn format_with_sym_table(&self, st: &SymTable) -> String {
+        st.get_sym(self).to_string()
+    }
+}
+
 #[derive(PartialEq)]
 pub enum ExpressionType {
     Pure,
@@ -435,41 +490,8 @@ pub enum ExpressionType {
     StateFunction,
 }
 
-#[derive(Default, Clone)]
-struct SymbolTypes {
-    inner: HashMap<AtomId, AtomType>,
-    types_number: TypesNumber,
-    kind_number: KindNumber,
-}
+/*
 
-impl SymbolTypes {
-    pub fn get_type(&self, atom_id: &AtomId) -> Option<&AtomType> {
-        self.inner.get(atom_id)
-    }
-
-    pub fn get_number_of_type(&self, atom_type: &TypeId) -> usize {
-        self.types_number.get_number_of_type(atom_type)
-    }
-
-    pub fn get_number_of_kind(&self, kind: &AtomKind) -> usize {
-        self.kind_number.get_number_of_kind(kind)
-    }
-}
-
-impl SymbolTypes {
-    pub fn add_new_type(&mut self, type_id: &TypeId) {
-        self.types_number.inner.insert(*type_id, 0);
-        self.kind_number.increase_number_of_kind(&AtomKind::Type);
-    }
-
-    pub fn add_new_atom(&mut self, id: &AtomId, atom_type: AtomType) {
-        self.kind_number.increase_number_of_kind(&atom_type.kind);
-        if let Some(t) = &atom_type.parent_type {
-            self.types_number.increase_number_of_type(t);
-        }
-        self.inner.insert(*id, atom_type);
-    }
-}
 
 #[derive(Clone, Default)]
 struct TypesNumber {
@@ -486,12 +508,6 @@ impl TypesNumber {
 
     pub fn get_number_of_type(&self, atom_type: &TypeId) -> usize {
         *self.inner.get(atom_type).unwrap()
-    }
-}
-
-impl FormatWithSymTable for AtomId {
-    fn format_with_sym_table(&self, st: &SymTable) -> String {
-        st.get_sym(self).to_string()
     }
 }
 
@@ -517,36 +533,9 @@ impl Default for KindNumber {
     fn default() -> Self {
         Self {
             inner: hashmap! {
-                AtomKind::Type => 0,
                 AtomKind::Variable => 0,
-                AtomKind::Result => 0,
                 AtomKind::Constant => 0,
             },
         }
     }
-}
-
-#[derive(Clone, Default)]
-pub struct BasicTypes {
-    inner: im::HashMap<PlanningAtomType, TypeId>,
-    reverse: im::HashMap<TypeId, PlanningAtomType>,
-}
-
-impl BasicTypes {
-    pub fn add_basic_type(&mut self, pat: &PlanningAtomType, type_id: TypeId) {
-        self.inner.insert(*pat, type_id);
-        self.reverse.insert(type_id, *pat);
-    }
-
-    pub fn get_basic_type(&self, type_id: &TypeId) -> Option<&PlanningAtomType> {
-        self.reverse.get(type_id)
-    }
-
-    pub fn get_basic_type_id(&self, pat: &PlanningAtomType) -> TypeId {
-        *self.inner.get(pat).unwrap()
-    }
-
-    pub fn is_basic_type(&self, type_id: &TypeId) -> bool {
-        self.reverse.contains_key(type_id)
-    }
-}
+}*/

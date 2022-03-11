@@ -4,11 +4,13 @@ use crate::context::rae_state::RAEState;
 use crate::module::rae_exec::Job;
 use im::HashMap;
 use ompas_lisp::core::language::OBJECT;
+use ompas_lisp::core::structs::lcoreoperator::LCoreOperator;
 use ompas_lisp::core::structs::lenv::{LEnv, LEnvSymbols};
 use ompas_lisp::core::structs::lerror::LError;
 use ompas_lisp::core::structs::lerror::LError::{
     NotInListOfExpectedTypes, SpecialError, WrongNumberOfArgument, WrongType,
 };
+use ompas_lisp::core::structs::llambda::LLambda;
 use ompas_lisp::core::structs::lvalue::LValue;
 use ompas_lisp::core::structs::typelvalue::TypeLValue;
 use std::convert::{TryFrom, TryInto};
@@ -96,6 +98,12 @@ impl Display for Type {
 #[derive(Debug, Clone)]
 pub struct Parameters {
     inner: Vec<(String, Type)>,
+}
+
+impl Parameters {
+    pub fn inner(&self) -> &Vec<(String, Type)> {
+        &self.inner
+    }
 }
 
 const TYPE_TRY_FROM_LVALUE: &str = "Type::try_from<&LValue>";
@@ -275,6 +283,20 @@ impl Method {
     pub fn get_body(&self) -> &LValue {
         &self.lambda_body
     }
+
+    pub fn get_lambda(&self) -> LValue {
+        let l1: LLambda = (&self.lambda_pre_conditions).try_into().expect("");
+        let l2: LLambda = (&self.lambda_body).try_into().expect("");
+        let body: LValue = vec![
+            LCoreOperator::Do.into(),
+            l1.get_body().clone(),
+            l2.get_body().clone(),
+        ]
+        .into();
+        let mut env = l1.get_env_symbols();
+        env.set_outer(l2.get_env_symbols());
+        LLambda::new(l1.get_params(), body, env).into()
+    }
 }
 
 impl Method {
@@ -316,14 +338,16 @@ impl Display for Method {
 #[derive(Debug, Clone)]
 pub struct Task {
     body: LValue,
+    label: String,
     parameters: Parameters,
     methods: Vec<String>,
 }
 
 impl Task {
-    pub fn new(body: LValue, parameters: Parameters) -> Self {
+    pub fn new(label: String, body: LValue, parameters: Parameters) -> Self {
         Self {
             body,
+            label,
             parameters,
             methods: vec![],
         }
@@ -339,6 +363,10 @@ impl Task {
 
     pub fn get_methods(&self) -> &Vec<String> {
         &self.methods
+    }
+
+    pub fn get_label(&self) -> &String {
+        &self.label
     }
 }
 
@@ -942,7 +970,8 @@ impl RAEEnv {
         body: LValue,
         parameters: Parameters,
     ) -> Result<(), LError> {
-        self.domain_env.add_task(label, Task::new(body, parameters));
+        self.domain_env
+            .add_task(label.clone(), Task::new(label, body, parameters));
 
         Ok(())
     }

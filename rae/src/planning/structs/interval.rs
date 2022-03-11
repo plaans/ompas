@@ -1,5 +1,6 @@
-use crate::planning::structs::symbol_table::{AtomId, SymTable, TypeId};
+use crate::planning::structs::symbol_table::{AtomId, SymTable};
 use crate::planning::structs::traits::{FormatWithSymTable, GetVariables};
+use crate::planning::structs::type_table::PlanningAtomType;
 use im::{hashset, HashSet};
 
 #[derive(Copy, Clone)]
@@ -22,12 +23,12 @@ impl Interval {
 }
 
 impl Interval {
-    pub fn start(&self) -> AtomId {
-        self.start
+    pub fn start(&self) -> &AtomId {
+        &self.start
     }
 
-    pub fn end(&self) -> AtomId {
-        self.end
+    pub fn end(&self) -> &AtomId {
+        &self.end
     }
 }
 
@@ -45,11 +46,11 @@ impl GetVariables for Interval {
     fn get_variables_of_type(
         &self,
         sym_table: &SymTable,
-        atom_type: &Option<TypeId>,
+        atom_type: &Option<PlanningAtomType>,
     ) -> HashSet<AtomId> {
         self.get_variables()
             .iter()
-            .filter(|v| sym_table.get_type_of(v).unwrap().parent_type == *atom_type)
+            .filter(|v| sym_table.get_type_of(v).unwrap().a_type == *atom_type)
             .cloned()
             .collect()
     }

@@ -6,6 +6,7 @@ use crate::planning::conversion::pre_processing::{pre_processing, transform_lamb
 use crate::planning::conversion::processing::{
     convert_if, convert_lvalue_to_expression_chronicle, MetaData,
 };
+use crate::planning::structs::chronicle::Chronicle;
 use crate::planning::structs::traits::FormatWithSymTable;
 use crate::planning::structs::{ChronicleHierarchy, ConversionContext};
 use ::macro_rules_attribute::macro_rules_attribute;
@@ -42,13 +43,18 @@ pub async fn convert_expr<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     let mut ch = ChronicleHierarchy::default();
 
     let time = SystemTime::now();
+    let mut chronicle = Chronicle::new(&mut ch, "unnamed_chronicle");
+
     let pre_processed = pre_processing(&lv, &context, &mut ch)?;
-    let mut chronicle = convert_lvalue_to_expression_chronicle(
+    let ec = convert_lvalue_to_expression_chronicle(
         &pre_processed,
         &context,
         &mut ch,
         MetaData::new(true, false),
     )?;
+
+    chronicle.absorb_expression_chronicle(ec);
+
     post_processing(&mut chronicle, &context, &mut ch)?;
     let time = time.elapsed().expect("could not get time").as_micros();
     let string = chronicle.format_with_sym_table(&ch.sym_table);

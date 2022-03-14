@@ -1,6 +1,5 @@
 use crate::module::rae_exec::*;
 use crate::planning::structs::atom::{Atom, Sym};
-use crate::planning::structs::chronicle::ChronicleResult;
 use crate::planning::structs::interval::Interval;
 use crate::planning::structs::traits::FormatWithSymTable;
 use crate::planning::structs::type_table::{
@@ -29,6 +28,7 @@ pub struct SymTable {
 pub struct SymTableMetaData {
     n_timepoint: usize,
     n_result: usize,
+    n_presence: usize,
 }
 
 impl SymTableMetaData {
@@ -41,6 +41,12 @@ impl SymTableMetaData {
     pub fn new_result_index(&mut self) -> usize {
         let n = self.n_result;
         self.n_result += 1;
+        n
+    }
+
+    pub fn new_presence_index(&mut self) -> usize {
+        let n = self.n_presence;
+        self.n_presence += 1;
         n
     }
 }
@@ -253,7 +259,7 @@ impl SymTable {
 
     //Declare a new return value
     //The name of the return value will be format!("r_{}", last_return_index)
-    pub fn declare_new_result(&mut self, a_type: Option<PlanningAtomType>) -> ChronicleResult {
+    pub fn declare_new_result(&mut self, a_type: Option<PlanningAtomType>) -> AtomId {
         let n = self.meta_data.new_result_index();
         let sym: Sym = format!("r_{}", n).into();
         let id = self.symbols.new_node((&sym).into());
@@ -262,28 +268,25 @@ impl SymTable {
             &id,
             AtomType {
                 a_type,
-                kind: AtomKind::Variable(VariableKind::Result),
+                kind: AtomKind::Variable(VariableKind::Local),
             },
         );
-        ChronicleResult::new(id, None)
+        id
     }
 
-    pub fn unique_to_several(&mut self, sym: &str) {
-        if !self.multiple_def.contains_key(sym) {
-            //println!("transforming {} into several ", sym);
-            //change value in vec of symbol
-            let id = self.ids.remove(&Sym::Unique(sym.to_string())).unwrap();
-            let value = Sym::Several(sym.to_string(), 0);
-            self.symbols.set_value(&id, (&value).into());
-            //Update key in hashmap
-            self.ids.insert(value, id);
-            //Create new entry in multiple_def
-            self.multiple_def.insert(sym.to_string(), vec![id]);
-            self.pointer_to_ver
-                .last_mut()
-                .unwrap()
-                .insert(sym.to_string(), 0);
-        }
+    pub fn declare_new_presence(&mut self) -> AtomId {
+        let n = self.meta_data.new_presence_index();
+        let sym: Sym = format!("p_{}", n).into();
+        let id = self.symbols.new_node((&sym).into());
+        self.ids.insert(sym, id);
+        self.symbol_types.add_new_atom(
+            &id,
+            AtomType {
+                a_type: Some(PlanningAtomType::Bool),
+                kind: AtomKind::Variable(VariableKind::Local),
+            },
+        );
+        id
     }
 
     pub fn declare_new_interval(&mut self) -> Interval {
@@ -296,7 +299,7 @@ impl SymTable {
         self.ids.insert(start, id_1);
         let timepoint_type = AtomType {
             a_type: Some(PlanningAtomType::Timepoint),
-            kind: AtomKind::Variable(VariableKind::Parameter),
+            kind: AtomKind::Variable(VariableKind::Local),
         };
 
         self.symbol_types
@@ -315,7 +318,7 @@ impl SymTable {
             &id,
             AtomType {
                 a_type: Some(PlanningAtomType::Timepoint),
-                kind: AtomKind::Variable(VariableKind::Parameter),
+                kind: AtomKind::Variable(VariableKind::Local),
             },
         );
         id
@@ -353,7 +356,7 @@ impl SymTable {
         }
     }
 
-    pub fn declare_new_variable(
+    pub fn declare_new_parameter(
         &mut self,
         symbol: impl ToString,
         if_it_exists_create_new: bool,
@@ -406,6 +409,24 @@ impl SymTable {
             self.ids.insert(sym, id);
             self.symbol_types.add_new_atom(&id, var_type);
             id
+        }
+    }
+
+    fn unique_to_several(&mut self, sym: &str) {
+        if !self.multiple_def.contains_key(sym) {
+            //println!("transforming {} into several ", sym);
+            //change value in vec of symbol
+            let id = self.ids.remove(&Sym::Unique(sym.to_string())).unwrap();
+            let value = Sym::Several(sym.to_string(), 0);
+            self.symbols.set_value(&id, (&value).into());
+            //Update key in hashmap
+            self.ids.insert(value, id);
+            //Create new entry in multiple_def
+            self.multiple_def.insert(sym.to_string(), vec![id]);
+            self.pointer_to_ver
+                .last_mut()
+                .unwrap()
+                .insert(sym.to_string(), 0);
         }
     }
 }

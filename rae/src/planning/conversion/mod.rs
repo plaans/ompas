@@ -76,7 +76,7 @@ pub fn convert_domain_to_chronicle_hierarchy(
 
     for (action_label, action) in conversion_context.domain.get_actions() {
         //evaluate the lambda sim.
-        let mut chronicle = convert_abstract_task_to_chronicle(
+        let chronicle = convert_abstract_task_to_chronicle(
             &action.get_sim().try_into()?,
             action_label,
             None,
@@ -127,7 +127,7 @@ pub fn convert_abstract_task_to_chronicle(
 
     let mut chronicle = Chronicle::new(ch, label);
     let mut name = vec![
-        *chronicle.get_prez(),
+        *chronicle.get_presence(),
         *chronicle.get_result(),
         *chronicle.get_start(),
         *chronicle.get_end(),
@@ -136,9 +136,9 @@ pub fn convert_abstract_task_to_chronicle(
     if let LambdaArgs::List(l) = lambda.get_params() {
         assert_eq!(l.len(), parameters.get_number());
 
-        for (pl, (pt, t)) in l.iter().zip(parameters.inner().iter()) {
+        for (pl, (pt, _t)) in l.iter().zip(parameters.inner().iter()) {
             assert_eq!(pl, pt);
-            let id = ch.sym_table.declare_new_variable(pt, true, None);
+            let id = ch.sym_table.declare_new_parameter(pt, true, None);
             chronicle.add_var(&id);
             name.push(id);
         }
@@ -148,16 +148,17 @@ pub fn convert_abstract_task_to_chronicle(
 
     chronicle.set_debug(Some(pre_processed.clone()));
 
-    let mut ec = convert_lvalue_to_expression_chronicle(
+    let ec = convert_lvalue_to_expression_chronicle(
         &pre_processed,
         conversion_context,
         ch,
         MetaData::new(true, false),
     )?;
 
-    post_processing(&mut ec, conversion_context, ch)?;
+    chronicle.absorb_expression_chronicle(ec);
 
-    chronicle.absorb_expression_chronicle(ec, &mut ch.sym_table);
+    post_processing(&mut chronicle, conversion_context, ch)?;
+
     chronicle.set_name(name.clone().into());
     chronicle.set_task(match task {
         Some(task) => declare_task(task, &mut ch.sym_table),
@@ -178,7 +179,7 @@ pub fn convert_lvalue_to_chronicle(
 
     let mut chronicle = Chronicle::new(ch, label);
     let mut name = vec![
-        *chronicle.get_prez(),
+        *chronicle.get_presence(),
         *chronicle.get_result(),
         *chronicle.get_start(),
         *chronicle.get_end(),
@@ -189,13 +190,13 @@ pub fn convert_lvalue_to_chronicle(
         let params = lambda.get_params();
         match params {
             LambdaArgs::Sym(s) => {
-                let id = ch.sym_table.declare_new_variable(&s, true, None);
+                let id = ch.sym_table.declare_new_parameter(&s, true, None);
                 chronicle.add_var(&id);
                 name.push(id);
             }
             LambdaArgs::List(list) => {
                 for param in list {
-                    let id = ch.sym_table.declare_new_variable(&param, true, None);
+                    let id = ch.sym_table.declare_new_parameter(&param, true, None);
                     chronicle.add_var(&id);
                     name.push(id);
                 }
@@ -212,16 +213,16 @@ pub fn convert_lvalue_to_chronicle(
 
     chronicle.set_debug(Some(pre_processed.clone()));
 
-    let mut ec = convert_lvalue_to_expression_chronicle(
+    let ec = convert_lvalue_to_expression_chronicle(
         &pre_processed,
         conversion_context,
         ch,
         MetaData::new(true, false),
     )?;
+    chronicle.absorb_expression_chronicle(ec);
 
-    post_processing(&mut ec, conversion_context, ch)?;
+    post_processing(&mut chronicle, conversion_context, ch)?;
 
-    chronicle.absorb_expression_chronicle(ec, &mut ch.sym_table);
     chronicle.set_name(name.clone().into());
     chronicle.set_task(name.into());
 
@@ -235,23 +236,23 @@ pub fn declare_task(task: &Task, st: &mut SymTable) -> Lit {
 
     let task_label = task.get_label();
 
-    let prez = st.declare_new_variable(
+    let prez = st.declare_new_parameter(
         format!("{}_prez", task_label),
         true,
         Some(PlanningAtomType::Bool),
     );
-    let start = st.declare_new_variable(
+    let start = st.declare_new_parameter(
         format!("{}_start", task_label),
         true,
         Some(PlanningAtomType::Bool),
     );
-    let end = st.declare_new_variable(
+    let end = st.declare_new_parameter(
         format!("{}_end", task_label),
         true,
         Some(PlanningAtomType::Bool),
     );
 
-    let result = st.declare_new_variable(
+    let result = st.declare_new_parameter(
         format!("{}_result", task_label),
         true,
         Some(PlanningAtomType::Bool),
@@ -265,9 +266,9 @@ pub fn declare_task(task: &Task, st: &mut SymTable) -> Lit {
         task_label_id.into(),
     ];
 
-    for (param, t) in task.get_parameters().inner() {
+    for (param, _t) in task.get_parameters().inner() {
         //TODO: add types for parameters
-        task_lit.push(st.declare_new_variable(&param, true, None).into())
+        task_lit.push(st.declare_new_parameter(&param, true, None).into())
     }
 
     task_lit.into()
@@ -289,15 +290,16 @@ pub fn build_chronicle(
 
     chronicle.set_debug(Some(pre_processed.clone()));
 
-    let mut ec = convert_lvalue_to_expression_chronicle(
+    let ec = convert_lvalue_to_expression_chronicle(
         &pre_processed,
         conversion_context,
         ch,
         MetaData::new(true, false),
     )?;
 
-    post_processing(&mut ec, conversion_context, ch)?;
+    chronicle.absorb_expression_chronicle(ec);
 
-    chronicle.absorb_expression_chronicle(ec, &mut ch.sym_table);
+    post_processing(&mut chronicle, conversion_context, ch)?;
+
     Ok(chronicle)
 }

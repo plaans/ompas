@@ -1,6 +1,6 @@
 use crate::planning::point_algebra::problem::Relation;
 use crate::planning::point_algebra::relation_type::RelationType;
-use crate::planning::structs::chronicle::ExpressionChronicle;
+use crate::planning::structs::expression_chronicle::ExpressionChronicle;
 use crate::planning::structs::interval::Interval;
 use crate::planning::structs::lit::Lit;
 use crate::planning::structs::symbol_table::{AtomId, SymTable};
@@ -198,5 +198,5 @@ pub fn equal(a: &Interval, b: &Interval) -> Constraint {
 }
 
 pub fn bind_result(a: &ExpressionChronicle, b: &ExpressionChronicle) -> Constraint {
-    Constraint::Eq(a.get_result(), b.get_result())
+    Constraint::Eq(a.get_result_as_lit(), b.get_result_as_lit())
 }

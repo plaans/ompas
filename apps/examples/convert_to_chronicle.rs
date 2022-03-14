@@ -6,7 +6,8 @@ use ompas_rae::planning::conversion::convert_lvalue_to_chronicle;
 use ompas_rae::planning::conversion::processing::{
     convert_lvalue_to_expression_chronicle, MetaData,
 };
-use ompas_rae::planning::structs::chronicle::{Chronicle, ExpressionChronicle};
+use ompas_rae::planning::structs::chronicle::Chronicle;
+use ompas_rae::planning::structs::expression_chronicle::ExpressionChronicle;
 use ompas_rae::planning::structs::traits::FormatWithSymTable;
 use ompas_rae::planning::structs::{ChronicleHierarchy, ConversionContext};
 use rustyline::error::ReadlineError;

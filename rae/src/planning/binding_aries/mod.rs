@@ -87,9 +87,9 @@ pub fn build_chronicles(ch: &ChronicleHierarchy) -> Result<chronicles::Problem> 
 
     let mut context = Ctx::new(Arc::new(symbol_table), state_functions);
 
-    let init_container = Container::Instance(0);
+    let _init_container = Container::Instance(0);
     // Initial chronicle construction
-    let mut init_ch = ariesChronicle {
+    let init_ch = ariesChronicle {
         kind: ChronicleKind::Problem,
         presence: ariesLit::TRUE,
         start: context.origin(),
@@ -126,11 +126,11 @@ pub fn build_chronicles(ch: &ChronicleHierarchy) -> Result<chronicles::Problem> 
 
 fn read_chronicle(
     c: Container,
-    chronicle: &crate::planning::structs::chronicle::Chronicle,
-    ch: &ChronicleHierarchy,
+    _chronicle: &crate::planning::structs::chronicle::Chronicle,
+    _ch: &ChronicleHierarchy,
     context: &mut Ctx,
 ) -> Result<ChronicleTemplate> {
-    let top_type: Sym = OBJECT_TYPE.into();
+    let _top_type: Sym = OBJECT_TYPE.into();
     let mut params: Vec<Variable> = Vec::new();
     let prez_var = context.model.new_bvar(c / VarType::Presence);
     params.push(prez_var.into());
@@ -144,7 +144,7 @@ fn read_chronicle(
         c / VarType::ChronicleStart,
     );
     params.push(start.into());
-    let start = FAtom::from(start);
+    let _start = FAtom::from(start);
     let end = context.model.new_optional_fvar(
         0,
         INT_CST_MAX,
@@ -153,6 +153,6 @@ fn read_chronicle(
         c / VarType::ChronicleEnd,
     );
     params.push(end.into());
-    let end: FAtom = end.into();
+    let _end: FAtom = end.into();
     todo!()
 }

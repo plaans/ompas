@@ -95,7 +95,7 @@ pub enum AtomKind {
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Hash)]
 pub enum VariableKind {
-    Result,
+    Local,
     Parameter,
 }
 
@@ -108,7 +108,7 @@ impl Display for AtomKind {
                 AtomKind::Constant => "constant",
                 AtomKind::Variable(b) => {
                     match b {
-                        VariableKind::Result => "result",
+                        VariableKind::Local => "local",
                         VariableKind::Parameter => "parameter",
                     }
                 }
@@ -125,12 +125,12 @@ pub struct AtomType {
 impl FormatWithSymTable for AtomType {
     fn format_with_sym_table(&self, st: &SymTable) -> String {
         format!(
-            "{}{}",
+            "{} {}",
+            self.kind,
             match self.a_type {
                 Some(t) => t.format_with_sym_table(st),
                 None => "untyped".to_string(),
             },
-            self.kind
         )
     }
 }

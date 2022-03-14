@@ -3,11 +3,12 @@ use crate::module::rae_exec::{
 };
 use crate::planning::conversion::post_processing::post_processing;
 use crate::planning::structs::atom::Sym;
-use crate::planning::structs::chronicle::{Chronicle, ExpressionChronicle};
+use crate::planning::structs::chronicle::Chronicle;
 use crate::planning::structs::condition::Condition;
 use crate::planning::structs::constraint::{bind_result, equal, finish, meet, start, Constraint};
 use crate::planning::structs::effect::Effect;
 use crate::planning::structs::expression::Expression;
+use crate::planning::structs::expression_chronicle::ExpressionChronicle;
 use crate::planning::structs::interval::Interval;
 use crate::planning::structs::lit::{lvalue_to_lit, Lit};
 use crate::planning::structs::symbol_table::{AtomId, ExpressionType};
@@ -30,7 +31,6 @@ use ompas_lisp::core::structs::typelvalue::TypeLValue;
 use ompas_lisp::modules::utils::language::ARBITRARY;
 use ompas_lisp::static_eval::{eval_static, parse_static};
 use std::convert::{TryFrom, TryInto};
-use std::path::Display;
 
 //Names of the functions
 
@@ -115,7 +115,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                         }
 
                         ec.add_constraint(finish(val.get_interval(), ec.get_interval()));
-                        ec.add_constraint(Constraint::Eq(val.get_result(), var.into()));
+                        ec.add_constraint(Constraint::Eq(val.get_result_as_lit(), var.into()));
                         ec.set_pure_result(ch.sym_table.new_bool(false).into());
                         ec.absorb(val);
                     } else {
@@ -146,11 +146,11 @@ pub fn convert_lvalue_to_expression_chronicle(
                         let ec_i =
                             convert_lvalue_to_expression_chronicle(e, context, ch, meta_data)?;
 
-                        literal.push(ec_i.get_result());
+                        literal.push(ec_i.get_result_as_lit());
 
                         if i == l.len() - 2 {
                             if ec_i.is_result_pure() {
-                                ec.set_pure_result(ec_i.get_result())
+                                ec.set_pure_result(ec_i.get_result_as_lit())
                             } else {
                                 ec.add_constraint(bind_result(&ec, &ec_i));
                             }
@@ -190,7 +190,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                         let ec_i =
                             convert_lvalue_to_expression_chronicle(e, context, ch, meta_data)?;
 
-                        literal.push(ec_i.get_result());
+                        literal.push(ec_i.get_result_as_lit());
                         if i == 0 {
                             ec.add_constraint(start(&previous_interval, ec_i.get_interval()));
                         } else {
@@ -198,7 +198,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                         }
 
                         if i == l.len() - 2 {
-                            ec.set_pure_result(ec_i.get_result())
+                            ec.set_pure_result(ec_i.get_result_as_lit())
                         } else {
                             ec.add_constraint(bind_result(&ec, &ec_i));
                         }
@@ -293,8 +293,8 @@ pub fn convert_lvalue_to_expression_chronicle(
                                 ec.add_effect(Effect {
                                     interval: *ec.get_interval(),
                                     transition: Transition::new(
-                                        state_variable.get_result(),
-                                        value.get_result(),
+                                        state_variable.get_result_as_lit(),
+                                        value.get_result_as_lit(),
                                     ),
                                 });
 
@@ -329,8 +329,8 @@ pub fn convert_lvalue_to_expression_chronicle(
                                 ec.add_constraint(meet(left.get_interval(), right.get_interval()));
                                 ec.add_constraint(finish(right.get_interval(), ec.get_interval()));
 
-                                let a = left.get_result();
-                                let b = right.get_result();
+                                let a = left.get_result_as_lit();
+                                let b = right.get_result_as_lit();
 
                                 let constraint = match str {
                                     EQ => Constraint::Eq(a, b),
@@ -347,10 +347,14 @@ pub fn convert_lvalue_to_expression_chronicle(
                                 {
                                     ec.set_pure_result(constraint.into());
                                 } else {
-                                    ec.add_constraint(Constraint::Eq(
-                                        ec.get_result(),
+                                    ec.add_condition(Condition {
+                                        interval: *ec.get_interval(),
+                                        constraint,
+                                    });
+                                    /*ec.add_constraint(Constraint::Eq(
+                                        ec.get_result_as_lit(),
                                         constraint.into(),
-                                    ));
+                                    ));*/
                                 }
                                 ec.absorb(left);
                                 ec.absorb(right);
@@ -366,7 +370,7 @@ pub fn convert_lvalue_to_expression_chronicle(
 
                                 ec.add_constraint(equal(ec.get_interval(), val.get_interval()));
                                 if !meta_data.top_level && val.is_result_pure() {
-                                    ec.set_pure_result(val.get_result());
+                                    ec.set_pure_result(val.get_result_as_lit());
                                 } else {
                                     ec.add_constraint(bind_result(&ec, &val));
                                 }
@@ -385,7 +389,7 @@ pub fn convert_lvalue_to_expression_chronicle(
 
                                 ec.add_constraint(equal(ec.get_interval(), val.get_interval()));
 
-                                let r = val.get_result();
+                                let r = val.get_result_as_lit();
 
                                 let constraint = match str {
                                     NOT | NOT_SHORT => Constraint::Neg(r),
@@ -411,12 +415,22 @@ pub fn convert_lvalue_to_expression_chronicle(
                                     _ => unreachable!(),
                                 };
                                 if !meta_data.top_level && val.is_result_pure() {
-                                    ec.set_pure_result(constraint.into());
+                                    if meta_data.top_level {
+                                        ec.add_constraint(Constraint::Eq(
+                                            ec.get_result_as_lit(),
+                                            constraint.into(),
+                                        ));
+                                    } else {
+                                        ec.set_pure_result(constraint.into());
+                                    }
                                 } else {
-                                    ec.add_constraint(Constraint::Eq(
-                                        ec.get_result(),
-                                        constraint.into(),
-                                    ));
+                                    ec.add_condition(Condition {
+                                        interval: *ec.get_interval(),
+                                        constraint: Constraint::Eq(
+                                            ec.get_result_as_lit(),
+                                            constraint.into(),
+                                        ),
+                                    });
                                 }
                                 ec.absorb(val);
                                 return Ok(ec);
@@ -454,7 +468,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                                             };
 
                                             ec.add_constraint(Constraint::Eq(
-                                                ec.get_result(),
+                                                ec.get_result_as_lit(),
                                                 lvalue_to_lit(&result, &mut ch.sym_table)?,
                                             ))
                                         } else {
@@ -489,13 +503,17 @@ pub fn convert_lvalue_to_expression_chronicle(
                                         ));
 
                                         let constraint = Constraint::Type(
-                                            symbol.get_result(),
-                                            symbol_type.get_result(),
+                                            symbol.get_result_as_lit(),
+                                            symbol_type.get_result_as_lit(),
                                         );
-                                        ec.add_constraint(Constraint::Eq(
-                                            ec.get_result(),
+                                        /*ec.add_constraint(Constraint::Eq(
+                                            ec.get_result_as_lit(),
                                             constraint.into(),
-                                        ));
+                                        ));*/
+                                        ec.add_condition(Condition {
+                                            interval: *ec.get_interval(),
+                                            constraint,
+                                        });
                                         ec.absorb(symbol);
                                         ec.absorb(symbol_type);
                                         return Ok(ec);
@@ -523,7 +541,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                                     ec.add_condition(Condition {
                                         interval: *condition.get_interval(),
                                         constraint: Constraint::Eq(
-                                            condition.get_result(),
+                                            condition.get_result_as_lit(),
                                             ch.sym_table.new_bool(true).into(),
                                         ),
                                     });
@@ -597,7 +615,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                     let ec_i =
                         convert_lvalue_to_expression_chronicle(e, context, ch, Default::default())?;
 
-                    literal.push(ec_i.get_result());
+                    literal.push(ec_i.get_result_as_lit());
                     sub_expression_pure &= ec_i.is_result_pure();
                     if i != 0 {
                         ec.add_constraint(meet(&previous_interval, ec_i.get_interval()));
@@ -670,11 +688,14 @@ pub fn convert_lvalue_to_expression_chronicle(
                             ]
                             .into();
 
-                            ec.add_constraint(Constraint::Eq(ec.get_result(), literal));
-
+                            //ec.add_constraint(Constraint::Eq(ec.get_result_as_lit(), literal));
+                            ec.add_condition(Condition {
+                                interval: *ec.get_interval(),
+                                constraint: Constraint::Eq(ec.get_result_as_lit(), literal),
+                            });
                             /*ec.add_effect(Effect {
                                 interval: *ec.get_interval(),
-                                transition: Transition::new(ec.get_result(), literal),
+                                transition: Transition::new(ec.get_result_as_lit(), literal),
                             });*/
                         }
                         ec.add_constraint(Constraint::Eq(
@@ -691,11 +712,14 @@ pub fn convert_lvalue_to_expression_chronicle(
                             Lit::from(literal),
                         ]
                         .into();
-
-                        ec.add_constraint(Constraint::Eq(ec.get_result(), literal));
+                        ec.add_condition(Condition {
+                            interval: *ec.get_interval(),
+                            constraint: Constraint::Eq(ec.get_result_as_lit(), literal),
+                        });
+                        //ec.add_constraint(Constraint::Eq(ec.get_result_as_lit(), literal));
                         /*ec.add_effect(Effect {
                             interval: *ec.get_interval(),
-                            transition: Transition::new(ec.get_result(), literal),
+                            transition: Transition::new(ec.get_result_as_lit(), literal),
                         });*/
                         ec.add_constraint(Constraint::Eq(
                             end_last_interval.into(),
@@ -703,10 +727,16 @@ pub fn convert_lvalue_to_expression_chronicle(
                         ));
                     }
                     ExpressionType::Action | ExpressionType::Task => {
-                        literal.push(ec.get_result());
+                        let mut new_literal = vec![
+                            ec.get_presence().into(),
+                            ec.get_start().into(),
+                            ec.get_end().into(),
+                            ec.get_result_as_lit(),
+                        ];
+                        new_literal.append(&mut literal);
                         ec.add_subtask(Expression {
                             interval: *ec.get_interval(),
-                            lit: literal.into(),
+                            lit: new_literal.into(),
                         })
                     }
                     ExpressionType::StateFunction => {
@@ -714,10 +744,14 @@ pub fn convert_lvalue_to_expression_chronicle(
                             ec.set_pure_result(literal.into());
                         } else {
                         }*/
-                        ec.add_constraint(Constraint::Eq(ec.get_result(), literal.into()));
+                        ec.add_condition(Condition {
+                            interval: *ec.get_interval(),
+                            constraint: Constraint::Eq(ec.get_result_as_lit(), literal.into()),
+                        });
+                        //ec.add_constraint(Constraint::Eq(ec.get_result_as_lit(), literal.into()));
                         /*ec.add_effect(Effect {
                             interval: *ec.get_interval(),
-                            transition: Transition::new(ec.get_result(), literal.into()),
+                            transition: Transition::new(ec.get_result_as_lit(), literal.into()),
                         });*/
                         ec.add_constraint(Constraint::Eq(
                             end_last_interval.into(),
@@ -817,9 +851,9 @@ pub fn convert_if(
     let mut task_lit: Vec<Lit> = vec![];
     for (i, s) in task_string.iter().enumerate() {
         if i == 0 {
-            task_lit.push(ch.sym_table.declare_new_variable(s, false, None).into());
+            task_lit.push(ch.sym_table.declare_new_parameter(s, false, None).into());
         } else {
-            task_lit.push(ch.sym_table.declare_new_variable(s, false, None).into());
+            task_lit.push(ch.sym_table.declare_new_parameter(s, false, None).into());
         }
     }
 
@@ -849,13 +883,13 @@ pub fn convert_if(
     /* Bindings between result of the if and the result of the task*/
     ec.add_constraint(Constraint::Eq(
         ch.sym_table.id(&return_label).unwrap().into(),
-        ec.get_result(),
+        ec.get_result_as_lit(),
     ));
 
     /* Binding between result of condition and parameter of the task*/
     ec.add_constraint(Constraint::Eq(
         ch.sym_table.id(&cond_label).unwrap().into(),
-        ec_cond.get_result(),
+        ec_cond.get_result_as_lit(),
     ));
     ec.absorb(ec_cond);
     ec.add_subtask(Expression {
@@ -868,9 +902,9 @@ pub fn convert_if(
     let mut task_lit: Vec<Lit> = vec![];
     for (i, s) in task_string.iter().enumerate() {
         if i == 0 {
-            task_lit.push(ch.sym_table.declare_new_variable(s, true, None).into());
+            task_lit.push(ch.sym_table.declare_new_parameter(s, true, None).into());
         } else {
-            task_lit.push(ch.sym_table.declare_new_variable(s, true, None).into());
+            task_lit.push(ch.sym_table.declare_new_parameter(s, true, None).into());
         }
     }
     //println!("({}) task lit: {:#?}", task_label, task_lit);
@@ -887,21 +921,21 @@ pub fn convert_if(
         let mut task_lit: Vec<AtomId> = vec![];
         for (i, s) in task_string.iter().enumerate() {
             if i == 0 {
-                task_lit.push(ch.sym_table.declare_new_variable(s, false, None));
+                task_lit.push(ch.sym_table.declare_new_parameter(s, false, None));
             } else {
-                task_lit.push(ch.sym_table.declare_new_variable(s, true, None));
+                task_lit.push(ch.sym_table.declare_new_parameter(s, true, None));
             }
         }
         let method_id = ch.sym_table.declare_new_symbol(&method_label, None);
         let method_cond_var =
             ch.sym_table
-                .declare_new_variable(&format!("{}_cond", method_label), false, None);
+                .declare_new_parameter(&format!("{}_cond", method_label), false, None);
         ec_branch.add_var(&method_cond_var);
         //Bindings of variables of task and method
         ec_branch.add_constraint(Constraint::Eq(method_cond_var.into(), task_lit[1].into()));
         let method_result_var =
             ch.sym_table
-                .declare_new_variable(&format!("{}_r", method_label), false, None);
+                .declare_new_parameter(&format!("{}_r", method_label), false, None);
         ec_branch.add_var(&method_result_var);
         ec_branch.add_constraint(Constraint::Eq(method_result_var.into(), task_lit[2].into()));
 
@@ -911,7 +945,7 @@ pub fn convert_if(
             method_result_var.into(),
         ];
         ec_branch.add_constraint(Constraint::Eq(
-            ec_branch.get_result(),
+            ec_branch.get_result_as_lit(),
             method_result_var.into(),
         ));
 
@@ -923,7 +957,7 @@ pub fn convert_if(
                 let sym: Sym = ch.sym_table.get_atom(var).unwrap().try_into()?;
                 let new_var = ch
                     .sym_table
-                    .declare_new_variable(sym.get_string(), true, None);
+                    .declare_new_parameter(sym.get_string(), true, None);
                 ec_branch.add_var(&new_var);
                 method_name.push(new_var.into());
                 new_var
@@ -941,8 +975,8 @@ pub fn convert_if(
             ),
             constraint: Constraint::Eq(method_cond_var.into(), ch.sym_table.new_bool(true).into()),
         });
-        post_processing(&mut ec_branch, context, ch)?;
-        method.absorb_expression_chronicle(ec_branch, &mut ch.sym_table);
+        method.absorb_expression_chronicle(ec_branch);
+        post_processing(&mut method, context, ch)?;
         ch.chronicle_templates.push(method);
         Ok(())
     };

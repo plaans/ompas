@@ -123,7 +123,7 @@ pub fn lvalue_to_lit(lv: &LValue, st: &mut SymTable) -> lerror::Result<Lit> {
         },
         LValue::True => Ok(st.new_bool(true).into()),
         LValue::Nil => Ok(st.new_bool(false).into()),
-        lv => Ok(st.declare_new_symbol(&lv.to_string(), None).into()),
+        lv => Ok(st.get_symbol(&lv.to_string(), None).into()),
     }
 }
 

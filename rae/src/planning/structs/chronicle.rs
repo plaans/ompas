@@ -116,7 +116,6 @@ impl FormatWithSymTable for Chronicle {
         //Debug
         if let Some(exp) = &self.debug {
             s.push_str(format!("debug: {}", exp.format("debug: ".len())).as_str());
-            //s.push_str(format!("debug: {:?}", exp).as_str());
         }
 
         s

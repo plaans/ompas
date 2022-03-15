@@ -92,7 +92,13 @@ impl FormatWithSymTable for PartialChronicle {
         let mut variables = self
             .variables
             .iter()
-            .map(|id| st.get_sym(id).to_string())
+            .map(|id| {
+                format!(
+                    "{}({})",
+                    st.get_sym(id).to_string(),
+                    st.get_type_of(id).unwrap().a_type.format_with_sym_table(st)
+                )
+            })
             .collect::<Vec<String>>();
         variables.sort();
 

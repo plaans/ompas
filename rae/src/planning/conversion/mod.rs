@@ -9,6 +9,7 @@ use crate::planning::structs::{ChronicleHierarchy, ConversionContext, END, PREZ,
 use ompas_lisp::core::structs::lerror::LError;
 use ompas_lisp::core::structs::llambda::{LLambda, LambdaArgs};
 use ompas_lisp::core::structs::lvalue::LValue;
+use ompas_lisp::core::structs::lvalues::LValueS;
 use std::convert::TryInto;
 use std::fmt::Display;
 
@@ -64,20 +65,50 @@ pub fn convert_domain_to_chronicle_hierarchy(
         .add_list_of_symbols_of_same_type(tasks, Some(PlanningAtomType::Task))?;
 
     //add new types to list of types.
+    let obj_id = *ch.sym_table.get_type_id(PlanningAtomType::Object).unwrap();
 
+    for (obj_type, objects) in &conversion_context.state.instance.inner {
+        let type_sym = if let LValueS::List(vec) = obj_type {
+            vec[1].clone()
+        } else {
+            panic!("should be (instance <type>), we have {}", obj_type)
+        };
+
+        //println!("definition of type: {}", type_sym);
+        let type_id = ch
+            .sym_table
+            .declare_new_type(type_sym.clone(), Some(obj_id));
+
+        /*println!(
+            "type of {}: {}",
+            type_sym,
+            ch.sym_table
+                .get_type_of(&type_id)
+                .unwrap()
+                .format_with_sym_table(&ch.sym_table)
+        );*/
+        if let LValueS::List(objects) = objects {
+            for obj in objects {
+                ch.sym_table
+                    .get_symbol(obj, Some(PlanningAtomType::Other(type_id)));
+            }
+        } else {
+            panic!("should be a list")
+        }
+    }
+    //panic!("for no fucking reason");
     //Add actions, tasks and methods symbols to ch.sym_table:
-    //let mut tasks_lits = HashMap::new();
 
     //Add tasks to domain
-    for (_, task) in conversion_context.domain.get_tasks() {
+    for task in conversion_context.domain.get_tasks().values() {
         ch.tasks.push(declare_task(task, &mut ch.sym_table));
     }
 
-    for (action_label, action) in conversion_context.domain.get_actions() {
+    for action in conversion_context.domain.get_actions().values() {
         //evaluate the lambda sim.
         let chronicle = convert_abstract_task_to_chronicle(
             &action.get_sim().try_into()?,
-            action_label,
+            action.get_label(),
             None,
             action.get_parameters(),
             &conversion_context,
@@ -122,7 +153,7 @@ pub fn convert_abstract_task_to_chronicle(
     conversion_context: &ConversionContext,
     ch: &mut ChronicleHierarchy,
 ) -> Result<Chronicle, LError> {
-    let symbol_id = ch.sym_table.declare_new_symbol(&label.to_string(), None);
+    let symbol_id = ch.sym_table.get_symbol(&label.to_string(), None);
 
     let mut chronicle = Chronicle::new(ch, label);
     let mut name = vec![
@@ -135,9 +166,21 @@ pub fn convert_abstract_task_to_chronicle(
     if let LambdaArgs::List(l) = lambda.get_params() {
         assert_eq!(l.len(), parameters.get_number());
 
-        for (pl, (pt, _t)) in l.iter().zip(parameters.inner().iter()) {
+        for (pl, (pt, t)) in l.iter().zip(parameters.inner().iter()) {
             assert_eq!(pl, pt);
-            let id = ch.sym_table.declare_new_parameter(pt, true, None);
+            let type_id = *ch
+                .sym_table
+                .get_type_id(
+                    t.try_as_single()
+                        .expect("Only single types are handled for the moment."),
+                )
+                .unwrap();
+
+            let id = ch.sym_table.declare_new_parameter(
+                pt,
+                true,
+                Some(PlanningAtomType::Other(type_id)),
+            );
             chronicle.add_var(&id);
             name.push(id);
         }
@@ -180,7 +223,7 @@ pub fn convert_lvalue_to_chronicle(
 ) -> Result<Chronicle, LError> {
     //Creation and instantiation of the chronicle
     let label = "unnamed_chronicle";
-    let symbol_id = ch.sym_table.declare_new_symbol(label, None);
+    let symbol_id = ch.sym_table.get_symbol(label, None);
 
     let mut chronicle = Chronicle::new(ch, label);
     let mut name = vec![

@@ -10,6 +10,7 @@ use ompas_lisp::core::root_module::language::get_scheme_primitives;
 use ompas_lisp::core::structs::lerror;
 use ompas_lisp::core::structs::lerror::LError::SpecialError;
 use std::collections::{HashMap, HashSet};
+use std::fmt::{Display, Formatter};
 
 pub type AtomId = NodeId;
 
@@ -22,6 +23,48 @@ pub struct SymTable {
     meta_data: SymTableMetaData,
     multiple_def: HashMap<String, Vec<AtomId>>,
     pointer_to_ver: Vec<HashMap<String, usize>>,
+}
+
+impl Display for SymTable {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut str = "#SYM TABLE: \n\n".to_string();
+        let mut constant_typed = vec![];
+        let mut constant_untyped = vec![];
+        let mut var_typed = vec![];
+        let mut var_untyped = vec![];
+        for x in self.ids.values() {
+            if x == self.get_parent(x) {
+                let t = self.get_type_of(x).unwrap();
+                match (t.a_type, t.kind) {
+                    (Some(_), AtomKind::Constant) => constant_typed.push(x),
+                    (Some(_), AtomKind::Variable(_)) => var_typed.push(x),
+                    (None, AtomKind::Constant) => constant_untyped.push(x),
+                    (None, AtomKind::Variable(_)) => var_untyped.push(x),
+                }
+            }
+        }
+
+        let mut c = |vec: Vec<&AtomId>, preambule: &str| -> () {
+            str.push_str(format!("\n## {}:\n", preambule).as_str());
+            for e in vec {
+                str.push_str(
+                    format!(
+                        "- {}({})\n",
+                        self.get_sym(e),
+                        self.get_type_of(e).unwrap().format_with_sym_table(self)
+                    )
+                    .as_str(),
+                );
+            }
+        };
+
+        c(constant_typed, "CONSTANT TYPED");
+        c(constant_untyped, "CONSTANT UNTYPED");
+        c(var_typed, "VAR TYPED");
+        c(var_untyped, "VAR UNTYPED");
+
+        write!(f, "{}", str)
+    }
 }
 
 #[derive(Default, Clone)]
@@ -85,28 +128,32 @@ impl Default for SymTable {
 impl SymTable {
     fn add_basic_types(&mut self) {
         for bt in vec![
-            PlanningAtomType::Task,
-            PlanningAtomType::Bool,
-            PlanningAtomType::Method,
             PlanningAtomType::Action,
             PlanningAtomType::StateFunction,
+            PlanningAtomType::Method,
+            PlanningAtomType::Task,
+            PlanningAtomType::Timepoint,
             PlanningAtomType::Int,
             PlanningAtomType::Float,
-            PlanningAtomType::Timepoint,
-            PlanningAtomType::Function,
+            PlanningAtomType::Bool,
             PlanningAtomType::Symbol,
-            PlanningAtomType::Lambda,
+            PlanningAtomType::Function,
+            //PlanningAtomType::Lambda,
+            PlanningAtomType::Object,
         ] {
-            let id = self.declare_new_type(&bt.to_string(), None);
-            self.types.add_type(&bt, id);
+            self.declare_new_type(&bt.to_string(), None);
         }
     }
 
-    pub fn get_type_id(&self, sym_type: impl ToString) -> TypeId {
+    pub fn str_as_planning_atom_type(&self, sym: &str) -> Option<PlanningAtomType> {
+        self.types.try_get_from_str(sym)
+    }
+
+    pub fn get_type_id(&self, sym_type: impl ToString) -> Option<&TypeId> {
         self.types.get_type_id(sym_type)
     }
 
-    pub fn get_type(&self, type_id: &TypeId) -> Option<&String> {
+    pub fn get_type_string(&self, type_id: &TypeId) -> Option<&String> {
         self.types.get_type(type_id)
     }
 
@@ -243,8 +290,10 @@ impl SymTable {
 DECLARATION FUNCTION
  */
 impl SymTable {
-    pub fn declare_new_type(&mut self, sym: &str, a_type: Option<TypeId>) -> TypeId {
-        let id = self.symbols.new_node(sym.into());
+    pub fn declare_new_type(&mut self, sym: impl Display, a_type: Option<TypeId>) -> TypeId {
+        let sym = sym.to_string();
+        let id = self.symbols.new_node(sym.as_str().into());
+        self.ids.insert(sym.as_str().into(), id);
         let atom_type = AtomType {
             a_type: match a_type {
                 Some(t) => Some(PlanningAtomType::SubType(t)),
@@ -324,11 +373,13 @@ impl SymTable {
         id
     }
 
-    pub fn declare_new_symbol(
+    pub fn get_symbol(
         &mut self,
-        sym: &str,
+        sym: impl Display,
         symbol_type: Option<PlanningAtomType>,
     ) -> AtomId {
+        let sym = &sym.to_string();
+
         if self.it_exists(sym) {
             //check multiple def
             match self.pointer_to_ver.last().unwrap().get(sym) {
@@ -478,17 +529,6 @@ impl SymbolTypes {
         self.inner.get(atom_id)
     }
 }
-/*
-impl SymbolTypes{
-    pub fn get_number_of_type(&self, atom_type: &TypeId) -> usize {
-
-        self.types_number.get_number_of_type(atom_type)
-    }
-
-    pub fn get_number_of_kind(&self, kind: &AtomKind) -> usize {
-        self.kind_number.get_number_of_kind(kind)
-    }
-}*/
 
 impl SymbolTypes {
     pub fn add_new_atom(&mut self, id: &AtomId, atom_type: AtomType) {
@@ -508,55 +548,5 @@ pub enum ExpressionType {
     Lisp,
     Action,
     Task,
-    StateFunction,
+    StateFunction(Option<PlanningAtomType>),
 }
-
-/*
-
-
-#[derive(Clone, Default)]
-struct TypesNumber {
-    inner: HashMap<TypeId, usize>,
-}
-
-impl TypesNumber {
-    pub fn increase_number_of_type(&mut self, atom_type: &TypeId) -> usize {
-        let n = self.inner.get_mut(atom_type).unwrap();
-        let previous = *n;
-        *n += 1;
-        previous
-    }
-
-    pub fn get_number_of_type(&self, atom_type: &TypeId) -> usize {
-        *self.inner.get(atom_type).unwrap()
-    }
-}
-
-#[derive(Clone)]
-struct KindNumber {
-    inner: im::HashMap<AtomKind, usize>,
-}
-
-impl KindNumber {
-    pub fn increase_number_of_kind(&mut self, kind: &AtomKind) -> usize {
-        let n = self.inner.get_mut(kind).unwrap();
-        let previous = *n;
-        *n += 1;
-        previous
-    }
-
-    pub fn get_number_of_kind(&self, kind: &AtomKind) -> usize {
-        *self.inner.get(kind).unwrap()
-    }
-}
-
-impl Default for KindNumber {
-    fn default() -> Self {
-        Self {
-            inner: hashmap! {
-                AtomKind::Variable => 0,
-                AtomKind::Constant => 0,
-            },
-        }
-    }
-}*/

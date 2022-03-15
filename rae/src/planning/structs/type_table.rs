@@ -5,6 +5,23 @@ use std::fmt::{Display, Formatter};
 
 pub type TypeId = NodeId;
 
+const ACTION: &str = "action";
+const STATE_FUNCTION: &str = "state-function";
+const METHOD: &str = "method";
+const TASK: &str = "task";
+const TIMEPOINT: &str = "timepoint";
+const INT: &str = "int";
+const FLOAT: &str = "float";
+const BOOL: &str = "bool";
+const SYMBOL: &str = "symbol";
+const FUNCTION: &str = "function";
+//const LAMBDA: &str = "lambda";
+const OBJECT: &str = "object";
+const LOCAL: &str = "local";
+const PARAMETER: &str = "parameter";
+const CONSTANT: &str = "constant";
+const UNTYPED: &str = "untyped";
+
 #[derive(Clone, Default)]
 pub struct TypeTable {
     inner: im::HashMap<String, TypeId>,
@@ -21,13 +38,9 @@ impl TypeTable {
         self.reverse.get(type_id)
     }
 
-    pub fn get_type_id(&self, pat: impl ToString) -> TypeId {
-        *self.inner.get(&pat.to_string()).unwrap()
+    pub fn get_type_id(&self, pat: impl ToString) -> Option<&TypeId> {
+        self.inner.get(&pat.to_string())
     }
-
-    /*pub fn is_basic_type(&self, type_id: &TypeId) -> bool {
-        self.reverse.contains_key(type_id)
-    }*/
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, PartialOrd, Eq)]
@@ -42,7 +55,7 @@ pub enum PlanningAtomType {
     Bool,
     Symbol,
     Function,
-    Lambda,
+    //Lambda,
     Object,
     Other(TypeId),
     SubType(TypeId),
@@ -68,22 +81,45 @@ impl Display for PlanningAtomType {
             f,
             "{}",
             match self {
-                PlanningAtomType::Action => "action".to_string(),
-                PlanningAtomType::StateFunction => "state-function".to_string(),
-                PlanningAtomType::Method => "method".to_string(),
-                PlanningAtomType::Task => "task".to_string(),
-                PlanningAtomType::Timepoint => "timepoint".to_string(),
-                PlanningAtomType::Int => "int".to_string(),
-                PlanningAtomType::Float => "float".to_string(),
-                PlanningAtomType::Bool => "bool".to_string(),
-                PlanningAtomType::Symbol => "symbol".to_string(),
-                PlanningAtomType::Function => "function".to_string(),
-                PlanningAtomType::Lambda => "lambda".to_string(),
-                PlanningAtomType::Object => "object".to_string(),
+                PlanningAtomType::Action => ACTION.to_string(),
+                PlanningAtomType::StateFunction => STATE_FUNCTION.to_string(),
+                PlanningAtomType::Method => METHOD.to_string(),
+                PlanningAtomType::Task => TASK.to_string(),
+                PlanningAtomType::Timepoint => TIMEPOINT.to_string(),
+                PlanningAtomType::Int => INT.to_string(),
+                PlanningAtomType::Float => FLOAT.to_string(),
+                PlanningAtomType::Bool => BOOL.to_string(),
+                PlanningAtomType::Symbol => SYMBOL.to_string(),
+                PlanningAtomType::Function => FUNCTION.to_string(),
+                //PlanningAtomType::Lambda => LAMBDA.to_string(),
+                PlanningAtomType::Object => OBJECT.to_string(),
                 PlanningAtomType::Other(t) => format!("type({})", t),
                 PlanningAtomType::SubType(t) => format!("subtype({})", t),
             }
         )
+    }
+}
+
+impl TypeTable {
+    pub fn try_get_from_str(&self, value: &str) -> Option<PlanningAtomType> {
+        match value {
+            ACTION => Some(PlanningAtomType::Action),
+            STATE_FUNCTION => Some(PlanningAtomType::StateFunction),
+            METHOD => Some(PlanningAtomType::Method),
+            TASK => Some(PlanningAtomType::Task),
+            TIMEPOINT => Some(PlanningAtomType::Timepoint),
+            INT => Some(PlanningAtomType::Int),
+            FLOAT => Some(PlanningAtomType::Float),
+            BOOL => Some(PlanningAtomType::Bool),
+            SYMBOL => Some(PlanningAtomType::Symbol),
+            FUNCTION => Some(PlanningAtomType::Function),
+            //LAMBDA => Some(PlanningAtomType::Lambda),
+            OBJECT => Some(PlanningAtomType::Object),
+            other => match self.get_type_id(other) {
+                Some(t) => Some(PlanningAtomType::Other(*t)),
+                None => None,
+            },
+        }
     }
 }
 
@@ -105,15 +141,24 @@ impl Display for AtomKind {
             f,
             "{}",
             match self {
-                AtomKind::Constant => "constant",
+                AtomKind::Constant => CONSTANT,
                 AtomKind::Variable(b) => {
                     match b {
-                        VariableKind::Local => "local",
-                        VariableKind::Parameter => "parameter",
+                        VariableKind::Local => LOCAL,
+                        VariableKind::Parameter => PARAMETER,
                     }
                 }
             }
         )
+    }
+}
+
+impl FormatWithSymTable for Option<PlanningAtomType> {
+    fn format_with_sym_table(&self, st: &SymTable) -> String {
+        match self {
+            Some(t) => t.format_with_sym_table(st),
+            None => UNTYPED.to_string(),
+        }
     }
 }
 
@@ -124,13 +169,6 @@ pub struct AtomType {
 }
 impl FormatWithSymTable for AtomType {
     fn format_with_sym_table(&self, st: &SymTable) -> String {
-        format!(
-            "{} {}",
-            self.kind,
-            match self.a_type {
-                Some(t) => t.format_with_sym_table(st),
-                None => "untyped".to_string(),
-            },
-        )
+        format!("{} {}", self.kind, self.a_type.format_with_sym_table(st))
     }
 }

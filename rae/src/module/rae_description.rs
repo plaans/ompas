@@ -550,7 +550,12 @@ pub async fn def_action<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
                 if let LValue::Lambda(_) = &list[2] {
                     ctx.get_rae_env().write().await.add_action(
                         action_label.to_string(),
-                        Action::new((&list[1]).try_into()?, list[2].clone(), LValue::Nil),
+                        Action::new(
+                            action_label,
+                            (&list[1]).try_into()?,
+                            list[2].clone(),
+                            LValue::Nil,
+                        ),
                     )?;
                 } else {
                     return Err(WrongType(

@@ -83,7 +83,7 @@ pub fn convert_lvalue_to_expression_chronicle(
     match exp {
         LValue::Symbol(s) => {
             //General case
-            let symbol = ch.sym_table.declare_new_symbol(s, None);
+            let symbol = ch.sym_table.get_symbol(s, None);
             if ch.sym_table.get_type_of(&symbol).unwrap().kind
                 == AtomKind::Variable(VariableKind::Parameter)
             {
@@ -107,7 +107,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                 LCoreOperator::Define => {
                     //Todo : handle the case when the first expression is not a symbol, but an expression that must be evaluated
                     if let LValue::Symbol(s) = &l[1] {
-                        let var = ch.sym_table.declare_new_symbol(s, None);
+                        let var = ch.sym_table.get_symbol(s, None);
                         let val = convert_lvalue_to_expression_chronicle(
                             &l[2],
                             context,
@@ -358,6 +358,10 @@ pub fn convert_lvalue_to_expression_chronicle(
                                             constraint.into(),
                                         ),
                                     });
+                                    ch.sym_table.set_type_of(
+                                        ec.get_result_id(),
+                                        &Some(PlanningAtomType::Bool),
+                                    );
                                     /*ec.add_constraint(Constraint::Eq(
                                         ec.get_result_as_lit(),
                                         constraint.into(),
@@ -427,6 +431,10 @@ pub fn convert_lvalue_to_expression_chronicle(
                                             ec.get_result_as_lit(),
                                             constraint.into(),
                                         ));
+                                        ch.sym_table.set_type_of(
+                                            ec.get_result_id(),
+                                            &Some(PlanningAtomType::Bool),
+                                        );
                                     } else {
                                         ec.set_pure_result(constraint.into());
                                     }
@@ -438,6 +446,10 @@ pub fn convert_lvalue_to_expression_chronicle(
                                             constraint.into(),
                                         ),
                                     });
+                                    ch.sym_table.set_type_of(
+                                        ec.get_result_id(),
+                                        &Some(PlanningAtomType::Bool),
+                                    );
                                 }
                                 ec.absorb(val);
                                 return Ok(ec);
@@ -477,7 +489,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                                             ec.add_constraint(Constraint::Eq(
                                                 ec.get_result_as_lit(),
                                                 lvalue_to_lit(&result, &mut ch.sym_table)?,
-                                            ))
+                                            ));
                                         } else {
                                             return Err(SpecialError(CONVERT_LVALUE_TO_EXPRESSION_CHRONICLE, "cannot handle (instance <type>) with <type> undecided".to_string()));
                                         }
@@ -524,6 +536,10 @@ pub fn convert_lvalue_to_expression_chronicle(
                                                 constraint.into(),
                                             ),
                                         });
+                                        ch.sym_table.set_type_of(
+                                            ec.get_result_id(),
+                                            &Some(PlanningAtomType::Bool),
+                                        );
                                         ec.absorb(symbol);
                                         ec.absorb(symbol_type);
                                         return Ok(ec);
@@ -582,7 +598,9 @@ pub fn convert_lvalue_to_expression_chronicle(
                                         PlanningAtomType::Method => return Err(SpecialError(CONVERT_LVALUE_TO_EXPRESSION_CHRONICLE, format!("{} is method and can not be directly called into the body of a method.\
                                 \nPlease call the task that use the method instead", s))),
                                         PlanningAtomType::StateFunction => {
-                                            expression_type = ExpressionType::StateFunction
+                                            let (_,return_type) = context.domain.get_state_functions().get(&s).unwrap().get_parameters().inner().last().unwrap();
+                                            let return_type = return_type.try_as_single().expect("");
+                                            expression_type = ExpressionType::StateFunction(ch.sym_table.str_as_planning_atom_type(return_type))
                                         }
                                         PlanningAtomType::Task => {
                                             expression_type = ExpressionType::Task
@@ -749,20 +767,13 @@ pub fn convert_lvalue_to_expression_chronicle(
                             lit: new_literal.into(),
                         })
                     }
-                    ExpressionType::StateFunction => {
-                        /*if sub_expression_pure {
-                            ec.set_pure_result(literal.into());
-                        } else {
-                        }*/
+                    ExpressionType::StateFunction(return_type) => {
                         ec.add_condition(Condition {
                             interval: *ec.get_interval(),
                             constraint: Constraint::Eq(ec.get_result_as_lit(), literal.into()),
                         });
-                        //ec.add_constraint(Constraint::Eq(ec.get_result_as_lit(), literal.into()));
-                        /*ec.add_effect(Effect {
-                            interval: *ec.get_interval(),
-                            transition: Transition::new(ec.get_result_as_lit(), literal.into()),
-                        });*/
+                        //Return type of the state_function
+                        ch.sym_table.set_type_of(ec.get_result_id(), &return_type);
                         ec.add_constraint(Constraint::Eq(
                             end_last_interval.into(),
                             ec.get_interval().end().into(),
@@ -796,7 +807,7 @@ pub fn convert_if(
 
     let task_label = ch.local_tasks.new_label(TaskType::IfTask);
     ch.sym_table
-        .declare_new_symbol(&task_label, Some(PlanningAtomType::Task));
+        .get_symbol(&task_label, Some(PlanningAtomType::Task));
     //println!("task_label: {}", task_label);
     //println!("({}) expression: \n{}", task_label, exp.format(0));
 
@@ -863,14 +874,10 @@ pub fn convert_if(
         *ec.get_presence(),
         *ec.get_start(),
         *ec.get_end(),
-        *ec_cond.get_result_id(),
+        *ec.get_result_id(),
         *ch.sym_table.id(&task_label).unwrap(),
+        *ec_cond.get_result_id(),
     ];
-
-    task_lit.push(
-        ch.sym_table
-            .declare_new_parameter(COND, true, Some(PlanningAtomType::Bool)),
-    );
 
     for s in &task_string[6..] {
         task_lit.push(*ch.sym_table.id(s).unwrap());
@@ -894,10 +901,10 @@ pub fn convert_if(
     ec.add_constraint(finish(ec.get_interval(), &sub_task_interval));
 
     /* Bindings between result of the if and the result of the task*/
-    ec.add_constraint(Constraint::Eq(
-        (&task_lit[5]).into(),
+    /*ec.add_constraint(Constraint::Eq(
+        (&task_lit[3]).into(),
         ec.get_result_as_lit(),
-    ));
+    ));*/
 
     /* Binding between result of condition and parameter of the task*/
     ec.absorb(ec_cond);
@@ -926,18 +933,14 @@ pub fn convert_if(
                          debug: LValue|
      -> Result<(), LError> {
         let method_label = format!("m_{}_{}", task_label, branch);
-        let method_id = ch.sym_table.declare_new_symbol(&method_label, None);
+        let method_id = ch
+            .sym_table
+            .get_symbol(&method_label, Some(PlanningAtomType::Method));
 
         let mut method = Chronicle::new(ch, &method_label);
-        let mut task: Vec<AtomId> = vec![];
-        for (i, s) in task_string.iter().enumerate() {
-            if i == 4 {
-                task.push(*ch.sym_table.id(s).unwrap());
-            } else {
-                task.push(ch.sym_table.declare_new_parameter(s, true, None));
-            }
-        }
-        let method_cond_var = ch.sym_table.declare_new_parameter(COND, true, None);
+        let method_cond_var =
+            ch.sym_table
+                .declare_new_parameter(COND, true, Some(PlanningAtomType::Bool));
         let mut name: Vec<AtomId> = vec![
             *method.get_presence(),
             *method.get_start(),
@@ -964,9 +967,11 @@ pub fn convert_if(
                 name.push(*var);
             } else {
                 let sym: Sym = ch.sym_table.get_atom(var).unwrap().try_into()?;
-                let new_var = ch
-                    .sym_table
-                    .declare_new_parameter(sym.get_string(), true, None);
+                let new_var = ch.sym_table.declare_new_parameter(
+                    sym.get_string(),
+                    true,
+                    ch.sym_table.get_type_of(var).unwrap().a_type,
+                );
                 method.add_var(&new_var);
                 name.push(new_var);
             };

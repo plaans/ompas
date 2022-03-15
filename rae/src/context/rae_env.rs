@@ -45,6 +45,16 @@ pub enum Type {
     Tuple(Vec<Type>),
 }
 
+impl Type {
+    pub fn try_as_single(&self) -> Result<&String, ()> {
+        if let Self::Single(s) = self {
+            Ok(s)
+        } else {
+            Err(())
+        }
+    }
+}
+
 impl From<&Type> for LValue {
     fn from(t: &Type) -> Self {
         match t {
@@ -428,6 +438,7 @@ impl Display for StateFunction {
 
 #[derive(Debug, Clone)]
 pub struct Action {
+    label: String,
     parameters: Parameters,
     exec: LValue,
     sim: LValue,
@@ -445,11 +456,16 @@ impl Action {
     pub fn get_sim(&self) -> &LValue {
         &self.sim
     }
+
+    pub fn get_label(&self) -> &String {
+        &self.label
+    }
 }
 
 impl Action {
-    pub fn new(parameters: Parameters, exec: LValue, sim: LValue) -> Self {
+    pub fn new(label: impl Display, parameters: Parameters, exec: LValue, sim: LValue) -> Self {
         Self {
+            label: label.to_string(),
             parameters,
             exec,
             sim,
@@ -461,7 +477,8 @@ impl Display for Action {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "parameters : {}\n exec: {}\n sim: {} ",
+            "label: {}, parameters : {}\n exec: {}\n sim: {} ",
+            self.label,
             self.parameters,
             self.exec.format("exec: ".len()),
             self.sim.format("sim: ".len())

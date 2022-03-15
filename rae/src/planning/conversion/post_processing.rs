@@ -121,8 +121,8 @@ pub fn bind_variables(id_1: &AtomId, id_2: &AtomId, st: &mut SymTable) -> Result
                 println!(
                     "new type of {}({}) -> {}",
                     id_2.format_with_sym_table(st),
-                    type_2.format_with_sym_table(st),
-                    type_1.format_with_sym_table(st)
+                    type_2.a_type.format_with_sym_table(st),
+                    type_1.a_type.format_with_sym_table(st)
                 );
                 st.set_type_of(id_2, &type_1.a_type)
             }
@@ -138,8 +138,8 @@ pub fn bind_variables(id_1: &AtomId, id_2: &AtomId, st: &mut SymTable) -> Result
                 println!(
                     "new type of {}({}) -> {}",
                     id_1.format_with_sym_table(st),
-                    type_1.format_with_sym_table(st),
-                    type_2.format_with_sym_table(st)
+                    type_1.a_type.format_with_sym_table(st),
+                    type_2.a_type.format_with_sym_table(st)
                 );
                 st.set_type_of(id_1, &type_2.a_type)
             }

@@ -117,22 +117,6 @@ pub struct ConversionContext {
     pub state: RAEStateSnapshot,
 }
 
-/*impl From<&RAEEnv> for ConversionContext {
-    fn from(rae_env: &RAEEnv) -> Self {
-        Self {
-            domain: rae_env.domain_env.clone(),
-            env: rae_env.env.clone(),
-            state: rae_env.state.get_snapshot(),
-        }
-    }
-}*/
-
-/*impl From<RAEEnv> for ConversionContext {
-    fn from(ctx: RAEEnv) -> Self {
-        (&ctx).into()
-    }
-}*/
-
 pub fn get_variables_of_type(
     variables: im::HashSet<AtomId>,
     symbol_table: &SymTable,
@@ -251,6 +235,8 @@ impl Display for ChronicleHierarchy {
         for task in &self.tasks {
             str.push_str(format!("{}\n\n\n", task.format_with_sym_table(&self.sym_table)).as_str());
         }
+
+        str.push_str(self.sym_table.to_string().as_str());
 
         write!(f, "{}", str)
     }

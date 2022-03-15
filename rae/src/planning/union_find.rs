@@ -60,11 +60,11 @@ impl<T: Display + Clone + Default> Node<T> {
         self.value = value;
     }
 
-    pub fn get_parent(&self) -> NodeId {
-        self.parent
+    pub fn get_parent(&self) -> &NodeId {
+        &self.parent
     }
-    pub fn set_parent(&mut self, parent: NodeId) {
-        self.parent = parent;
+    pub fn set_parent(&mut self, parent: &NodeId) {
+        self.parent = *parent;
     }
     pub fn get_rank(&self) -> Rank {
         self.rank
@@ -120,11 +120,11 @@ impl<T: Display + Default + Clone> Forest<T> {
         id
     }
 
-    pub fn get_parent(&self, id: &NodeId) -> NodeId {
+    pub fn get_parent(&self, id: &NodeId) -> &NodeId {
         self.inner.get(*id.index()).unwrap().get_parent()
     }
 
-    pub fn set_parent(&mut self, id: &NodeId, parent: NodeId) {
+    pub fn set_parent(&mut self, id: &NodeId, parent: &NodeId) {
         self.inner
             .get_mut(*id.index())
             .expect("")
@@ -150,7 +150,7 @@ impl<T: Debug + Display + Default + Clone> Display for Forest<T> {
         let mut groups: HashMap<NodeId, VecDeque<Node<T>>> = Default::default();
 
         for (node_id, node) in self.inner.iter().enumerate() {
-            let parent_id = &node.get_parent();
+            let parent_id = node.get_parent();
             if *parent_id != node_id.into() {
                 if let Some(vec) = groups.get_mut(parent_id) {
                     vec.push_back(node.clone());
@@ -187,13 +187,13 @@ impl<T: Debug + Display + Default + Clone> Display for Forest<T> {
 
 impl<T: Display + Default + Clone> Forest<T> {
     pub fn union(&mut self, x: &NodeId, y: &NodeId) {
-        let x_root = self.find(x);
-        let y_root = self.find(y);
+        let x_root = *self.find(x);
+        let y_root = *self.find(y);
         if x_root != y_root {
             if self.get_rank(&x_root) < self.get_rank(&y_root) {
-                self.set_parent(&x_root, y_root);
+                self.set_parent(&x_root, &y_root);
             } else {
-                self.set_parent(&y_root, x_root);
+                self.set_parent(&y_root, &x_root);
                 if self.get_rank(x) == self.get_rank(y) {
                     self.set_rank(&x_root, self.get_rank(&x_root) + 1)
                 }
@@ -202,18 +202,18 @@ impl<T: Display + Default + Clone> Forest<T> {
     }
 
     pub fn union_ordered(&mut self, x: &NodeId, y: &NodeId) {
-        let x_root = self.find(x);
-        let y_root = self.find(y);
+        let x_root = *self.find(x);
+        let y_root = *self.find(y);
         if x_root != y_root {
-            self.set_parent(&y_root, x_root);
+            self.set_parent(&y_root, &x_root);
         }
     }
 
-    pub fn find(&mut self, x: &NodeId) -> NodeId {
-        if *x != self.get_parent(x) {
-            let parent = self.get_parent(x);
-            let parent = self.find(&parent);
-            self.set_parent(x, parent);
+    pub fn find(&mut self, x: &NodeId) -> &NodeId {
+        if x != self.get_parent(x) {
+            let parent = *self.get_parent(x);
+            let parent = *self.find(&parent);
+            self.set_parent(x, &parent);
         }
         self.get_parent(x)
     }

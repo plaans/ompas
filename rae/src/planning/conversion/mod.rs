@@ -3,8 +3,7 @@ use crate::planning::conversion::post_processing::*;
 use crate::planning::conversion::pre_processing::pre_processing;
 use crate::planning::conversion::processing::{convert_lvalue_to_expression_chronicle, MetaData};
 use crate::planning::structs::chronicle::Chronicle;
-use crate::planning::structs::lit::Lit;
-use crate::planning::structs::symbol_table::SymTable;
+use crate::planning::structs::symbol_table::{AtomId, SymTable};
 use crate::planning::structs::type_table::PlanningAtomType;
 use crate::planning::structs::{ChronicleHierarchy, ConversionContext};
 use ompas_lisp::core::structs::lerror::LError;
@@ -229,7 +228,7 @@ pub fn convert_lvalue_to_chronicle(
     Ok(chronicle)
 }
 
-pub fn declare_task(task: &Task, st: &mut SymTable) -> Lit {
+pub fn declare_task(task: &Task, st: &mut SymTable) -> Vec<AtomId> {
     let task_label_id = *st
         .id(task.get_label())
         .expect("symbol of task should be defined");
@@ -258,20 +257,14 @@ pub fn declare_task(task: &Task, st: &mut SymTable) -> Lit {
         Some(PlanningAtomType::Bool),
     );
 
-    let mut task_lit: Vec<Lit> = vec![
-        prez.into(),
-        result.into(),
-        start.into(),
-        end.into(),
-        task_label_id.into(),
-    ];
+    let mut task_lit: Vec<AtomId> = vec![prez, result, start, end, task_label_id];
 
     for (param, _t) in task.get_parameters().inner() {
         //TODO: add types for parameters
-        task_lit.push(st.declare_new_parameter(&param, true, None).into())
+        task_lit.push(st.declare_new_parameter(&param, true, None))
     }
 
-    task_lit.into()
+    task_lit
 }
 
 pub fn build_chronicle(

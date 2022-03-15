@@ -143,7 +143,7 @@ impl Constraint {
                     if sym_table.get_type_of(&p_j).unwrap().a_type
                         == Some(PlanningAtomType::Timepoint)
                     {
-                        Ok(Relation::new(p_i, p_j, relation_type))
+                        Ok(Relation::new(*p_i, *p_j, relation_type))
                     } else {
                         Err(Default::default())
                     }

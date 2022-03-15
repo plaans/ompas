@@ -2,7 +2,6 @@ use crate::context::rae_env::{DomainEnv, Parameters, StateFunction};
 use crate::context::rae_state::RAEStateSnapshot;
 use crate::module::rae_exec::RAE_INSTANCE;
 use crate::planning::structs::chronicle::Chronicle;
-use crate::planning::structs::lit::Lit;
 use crate::planning::structs::symbol_table::{AtomId, SymTable};
 use crate::planning::structs::traits::FormatWithSymTable;
 use crate::planning::structs::type_table::AtomType;
@@ -26,7 +25,7 @@ pub mod traits;
 pub mod transition;
 pub mod type_table;
 
-pub const IF_TASK_PROTOTYPE: &str = "t_if_task";
+pub const IF_TASK_PROTOTYPE: &str = "t_if";
 
 #[derive(Default, Copy, Clone)]
 pub struct TaskTypeMetaData {
@@ -149,7 +148,7 @@ pub fn get_variables_of_type(
 #[derive(Default)]
 pub struct ChronicleHierarchy {
     pub state_function: Vec<StateFunction>,
-    pub tasks: Vec<Lit>,
+    pub tasks: Vec<Vec<AtomId>>,
     pub chronicle_templates: Vec<Chronicle>,
     pub local_tasks: TaskTypeMetaDataCollection,
     pub sym_table: SymTable,
@@ -210,7 +209,7 @@ impl From<&ConversionContext> for Problem {
 }
 
 impl ChronicleHierarchy {
-    pub fn new(templates: Vec<Chronicle>, tasks: Vec<Lit>, sym_table: SymTable) -> Self {
+    pub fn new(templates: Vec<Chronicle>, tasks: Vec<Vec<AtomId>>, sym_table: SymTable) -> Self {
         Self {
             state_function: vec![],
             tasks,
@@ -226,12 +225,20 @@ impl Display for ChronicleHierarchy {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut str = String::new();
 
-        str.push_str("# DOMAIN:\n");
+        str.push_str("# DOMAIN:\n\n");
 
         //actions
-        str.push_str("# CHRONICLES: \n");
-        for action in &self.chronicle_templates {
-            str.push_str(format!("{}\n", action.format_with_sym_table(&self.sym_table)).as_str());
+        str.push_str("# TEMPLATES: \n\n");
+        for (id, template) in self.chronicle_templates.iter().enumerate() {
+            str.push_str(
+                format!(
+                    "#{}\n\
+                    {}\n\n\n",
+                    id,
+                    template.format_with_sym_table(&self.sym_table)
+                )
+                .as_str(),
+            );
         }
 
         //tasks

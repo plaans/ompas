@@ -14,38 +14,64 @@ use im::HashSet;
 use ompas_lisp::core::structs::lvalue::LValue;
 use std::fmt::Display;
 
+impl FormatWithSymTable for Vec<AtomId> {
+    fn format_with_sym_table(&self, st: &SymTable) -> String {
+        let mut str = "(".to_string();
+        let mut first = true;
+        for e in self {
+            if first {
+                first = false
+            } else {
+                str.push(' ');
+            }
+            str.push_str(e.format_with_sym_table(st).as_str());
+        }
+        str.push(')');
+        str
+    }
+}
+
 #[derive(Clone)]
 pub struct Chronicle {
-    pub name: Lit,
-    pub task: Lit,
+    pub name: Vec<AtomId>,
+    pub task: Vec<AtomId>,
     pub pc: PartialChronicle,
     debug: Option<LValue>,
 }
+
+const START: &str = "start";
+const END: &str = "end";
+const PREZ: &str = "prez";
+const RESULT: &str = "result";
 
 impl Chronicle {
     pub fn new(ch: &mut ChronicleHierarchy, label: impl Display) -> Self {
         let interval = Interval::new(
             &ch.sym_table.declare_new_parameter(
-                format!("{}_start", label),
+                START,
+                //format!("{}_start", label),
                 true,
                 Some(PlanningAtomType::Timepoint),
             ),
             &ch.sym_table.declare_new_parameter(
-                format!("{}_end", label),
+                END,
+                //format!("{}_end", label),
                 true,
                 Some(PlanningAtomType::Timepoint),
             ),
         );
 
         let presence = ch.sym_table.declare_new_parameter(
-            format!("{}_prez", label),
+            PREZ,
+            //format!("{}_prez", label),
             true,
             Some(PlanningAtomType::Bool),
         );
 
-        let result = ch
-            .sym_table
-            .declare_new_parameter(format!("{}_result", label), true, None);
+        let result = ch.sym_table.declare_new_parameter(
+            RESULT, //format!("{}_result", label),
+            true, None,
+        );
 
         let init_var = vec![
             presence.clone(),
@@ -157,11 +183,11 @@ impl Chronicle {
 SETTERS
  */
 impl Chronicle {
-    pub fn set_name(&mut self, name: Lit) {
+    pub fn set_name(&mut self, name: Vec<AtomId>) {
         self.name = name;
     }
 
-    pub fn set_task(&mut self, task: Lit) {
+    pub fn set_task(&mut self, task: Vec<AtomId>) {
         self.task = task;
     }
 }

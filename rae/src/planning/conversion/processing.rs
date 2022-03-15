@@ -82,9 +82,11 @@ pub fn convert_lvalue_to_expression_chronicle(
         LValue::Symbol(s) => {
             //General case
             let symbol = ch.sym_table.declare_new_symbol(s, None);
-            /*if ch.sym_table.get_type_of(&symbol).unwrap() == &AtomType::Variable {
+            if ch.sym_table.get_type_of(&symbol).unwrap().kind
+                == AtomKind::Variable(VariableKind::Parameter)
+            {
                 ec.add_var(&symbol);
-            }*/
+            }
             ec.set_pure_result(symbol.into());
 
             ec.make_instantaneous();
@@ -349,7 +351,10 @@ pub fn convert_lvalue_to_expression_chronicle(
                                 } else {
                                     ec.add_condition(Condition {
                                         interval: *ec.get_interval(),
-                                        constraint,
+                                        constraint: Constraint::Eq(
+                                            ec.get_result_as_lit(),
+                                            constraint.into(),
+                                        ),
                                     });
                                     /*ec.add_constraint(Constraint::Eq(
                                         ec.get_result_as_lit(),
@@ -512,7 +517,10 @@ pub fn convert_lvalue_to_expression_chronicle(
                                         ));*/
                                         ec.add_condition(Condition {
                                             interval: *ec.get_interval(),
-                                            constraint,
+                                            constraint: Constraint::Eq(
+                                                ec.get_result_as_lit(),
+                                                constraint.into(),
+                                            ),
                                         });
                                         ec.absorb(symbol);
                                         ec.absorb(symbol_type);
@@ -565,7 +573,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                                     {
                                         PlanningAtomType::Action => {
                                             expression_type = ExpressionType::Action;
-                                            println!("{} is an action", s);
+                                            //println!("{} is an action", s);
                                         }
                                         PlanningAtomType::Function => {
                                         }
@@ -777,6 +785,12 @@ pub fn convert_lvalue_to_expression_chronicle(
     Ok(ec)
 }
 
+const PREZ: &str = "prez";
+const START: &str = "start";
+const END: &str = "end";
+const RESULT: &str = "result";
+const COND: &str = "cond";
+
 pub fn convert_if(
     exp: &LValue,
     context: &ConversionContext,
@@ -785,6 +799,8 @@ pub fn convert_if(
     ch.sym_table.new_scope();
 
     let task_label = ch.local_tasks.new_label(TaskType::IfTask);
+    ch.sym_table
+        .declare_new_symbol(&task_label, Some(PlanningAtomType::Task));
     //println!("task_label: {}", task_label);
     //println!("({}) expression: \n{}", task_label, exp.format(0));
 
@@ -809,7 +825,6 @@ pub fn convert_if(
         .filter(|v| {
             let type_of = ch.sym_table.get_type_of(v).unwrap();
             type_of.kind == AtomKind::Variable(VariableKind::Parameter)
-                && type_of.a_type != Some(PlanningAtomType::Timepoint)
         })
         .cloned()
         .collect();
@@ -820,7 +835,6 @@ pub fn convert_if(
         .filter(|v| {
             let type_of = ch.sym_table.get_type_of(v).unwrap();
             type_of.kind == AtomKind::Variable(VariableKind::Parameter)
-                && type_of.a_type != Some(PlanningAtomType::Timepoint)
         })
         .cloned()
         .collect();
@@ -837,24 +851,33 @@ pub fn convert_if(
     }
 
     //CREATION OF THE TASK
-
-    let cond_label = format!("{}_cond", task_label);
-    let return_label = format!("{}_r", task_label);
-
-    let mut task_string = vec![task_label.clone()];
-    task_string.push(cond_label.clone());
-    task_string.push(return_label.clone());
+    let mut task_string = vec![
+        PREZ.to_string(),
+        START.to_string(),
+        END.to_string(),
+        RESULT.to_string(),
+        task_label.clone(),
+        COND.to_string(),
+    ];
     task_string.append(&mut union_string);
 
     //println! {"({}) task string: {:#?}", task_label, task_string};
 
-    let mut task_lit: Vec<Lit> = vec![];
-    for (i, s) in task_string.iter().enumerate() {
-        if i == 0 {
-            task_lit.push(ch.sym_table.declare_new_parameter(s, false, None).into());
-        } else {
-            task_lit.push(ch.sym_table.declare_new_parameter(s, false, None).into());
-        }
+    let mut task_lit: Vec<AtomId> = vec![
+        *ec.get_presence(),
+        *ec.get_start(),
+        *ec.get_end(),
+        *ec_cond.get_result_id(),
+        *ch.sym_table.id(&task_label).unwrap(),
+    ];
+
+    task_lit.push(
+        ch.sym_table
+            .declare_new_parameter(COND, true, Some(PlanningAtomType::Bool)),
+    );
+
+    for s in &task_string[6..] {
+        task_lit.push(*ch.sym_table.id(s).unwrap());
     }
 
     //println!("({}) subtask lit: {:#?}", task_label, task_lit);
@@ -870,27 +893,17 @@ pub fn convert_if(
     And the task to execute. */
     ec.add_constraint(start(ec.get_interval(), ec_cond.get_interval()));
 
-    ec.add_constraint(Constraint::Eq(
-        ec_cond.get_interval().end().into(),
-        sub_task_interval.start().into(),
-    ));
+    ec.add_constraint(meet(ec_cond.get_interval(), &sub_task_interval));
 
-    ec.add_constraint(Constraint::Eq(
-        ec.get_interval().end().into(),
-        sub_task_interval.end().into(),
-    ));
+    ec.add_constraint(finish(ec.get_interval(), &sub_task_interval));
 
     /* Bindings between result of the if and the result of the task*/
     ec.add_constraint(Constraint::Eq(
-        ch.sym_table.id(&return_label).unwrap().into(),
+        (&task_lit[5]).into(),
         ec.get_result_as_lit(),
     ));
 
     /* Binding between result of condition and parameter of the task*/
-    ec.add_constraint(Constraint::Eq(
-        ch.sym_table.id(&cond_label).unwrap().into(),
-        ec_cond.get_result_as_lit(),
-    ));
     ec.absorb(ec_cond);
     ec.add_subtask(Expression {
         interval: sub_task_interval,
@@ -899,83 +912,80 @@ pub fn convert_if(
     ec.add_variables(union.clone());
     ec.add_interval(&sub_task_interval);
 
-    let mut task_lit: Vec<Lit> = vec![];
+    let mut task_lit: Vec<AtomId> = vec![];
     for (i, s) in task_string.iter().enumerate() {
-        if i == 0 {
-            task_lit.push(ch.sym_table.declare_new_parameter(s, true, None).into());
+        if i == 4 {
+            task_lit.push(*ch.sym_table.id(s).unwrap());
         } else {
-            task_lit.push(ch.sym_table.declare_new_parameter(s, true, None).into());
+            task_lit.push(ch.sym_table.declare_new_parameter(s, true, None));
         }
     }
     //println!("({}) task lit: {:#?}", task_label, task_lit);
-    ch.tasks.push(task_lit.into());
+    ch.tasks.push(task_lit);
 
-    let create_method = |mut ec_branch: ExpressionChronicle,
+    let create_method = |ec_branch: ExpressionChronicle,
                          local_variables: &im::HashSet<AtomId>,
                          ch: &mut ChronicleHierarchy,
                          branch: bool,
                          debug: LValue|
      -> Result<(), LError> {
         let method_label = format!("m_{}_{}", task_label, branch);
+        let method_id = ch.sym_table.declare_new_symbol(&method_label, None);
+
         let mut method = Chronicle::new(ch, &method_label);
-        let mut task_lit: Vec<AtomId> = vec![];
+        let mut task: Vec<AtomId> = vec![];
         for (i, s) in task_string.iter().enumerate() {
-            if i == 0 {
-                task_lit.push(ch.sym_table.declare_new_parameter(s, false, None));
+            if i == 4 {
+                task.push(*ch.sym_table.id(s).unwrap());
             } else {
-                task_lit.push(ch.sym_table.declare_new_parameter(s, true, None));
+                task.push(ch.sym_table.declare_new_parameter(s, true, None));
             }
         }
-        let method_id = ch.sym_table.declare_new_symbol(&method_label, None);
-        let method_cond_var =
-            ch.sym_table
-                .declare_new_parameter(&format!("{}_cond", method_label), false, None);
-        ec_branch.add_var(&method_cond_var);
-        //Bindings of variables of task and method
-        ec_branch.add_constraint(Constraint::Eq(method_cond_var.into(), task_lit[1].into()));
-        let method_result_var =
-            ch.sym_table
-                .declare_new_parameter(&format!("{}_r", method_label), false, None);
-        ec_branch.add_var(&method_result_var);
-        ec_branch.add_constraint(Constraint::Eq(method_result_var.into(), task_lit[2].into()));
-
-        let mut method_name: Vec<Lit> = vec![
-            method_id.into(),
-            method_cond_var.into(),
-            method_result_var.into(),
+        let method_cond_var = ch.sym_table.declare_new_parameter(COND, true, None);
+        let mut name: Vec<AtomId> = vec![
+            *method.get_presence(),
+            *method.get_start(),
+            *method.get_end(),
+            *method.get_result(),
+            method_id,
+            method_cond_var,
         ];
-        ec_branch.add_constraint(Constraint::Eq(
-            ec_branch.get_result_as_lit(),
-            method_result_var.into(),
-        ));
+        method.add_var(&method_cond_var);
+        //Bindings of variables of task and method
+        //ec_branch.add_constraint(Constraint::Eq(method_cond_var.into(), task_lit[1].into()));
+        //ec_branch.add_constraint(Constraint::Eq(method_result_var.into(), task_lit[2].into()));
+        method.absorb_expression_chronicle(ec_branch);
+        method.add_condition(Condition {
+            interval: Interval::new(method.get_start(), method.get_start()),
+            constraint: Constraint::Eq(
+                method_cond_var.into(),
+                ch.sym_table.new_bool(branch).into(),
+            ),
+        });
 
-        for (i, var) in union.iter().enumerate() {
-            let var = if local_variables.contains(var) {
-                method_name.push(var.into());
-                *var
+        for var in &union {
+            if local_variables.contains(var) {
+                name.push(*var);
             } else {
                 let sym: Sym = ch.sym_table.get_atom(var).unwrap().try_into()?;
                 let new_var = ch
                     .sym_table
                     .declare_new_parameter(sym.get_string(), true, None);
-                ec_branch.add_var(&new_var);
-                method_name.push(new_var.into());
-                new_var
+                method.add_var(&new_var);
+                name.push(new_var);
             };
-            ec_branch.add_constraint(Constraint::Eq(var.into(), task_lit[3 + i].into()));
         }
+        let mut task: Vec<AtomId> = Vec::with_capacity(task_string.len());
+        name[0..task_string.len()]
+            .iter()
+            .for_each(|l| task.push(*l));
+        task[4] = ch.sym_table.id(&task_label).unwrap().clone();
 
         method.set_debug(Some(debug));
-        method.set_task(task_lit.into());
-        method.set_name(method_name.into());
-        ec_branch.add_condition(Condition {
-            interval: Interval::new(
-                &ec_branch.get_interval().start(),
-                &ec_branch.get_interval().start(),
-            ),
-            constraint: Constraint::Eq(method_cond_var.into(), ch.sym_table.new_bool(true).into()),
-        });
-        method.absorb_expression_chronicle(ec_branch);
+        method.set_task(task);
+        method.set_name(name);
+
+        //method.absorb_expression_chronicle(ec_branch);
         post_processing(&mut method, context, ch)?;
         ch.chronicle_templates.push(method);
         Ok(())

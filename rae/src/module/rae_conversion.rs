@@ -69,7 +69,7 @@ pub async fn convert_domain<'a>(_: &'a [LValue], env: &'a LEnv) -> LResult {
     let time = SystemTime::now();
     let ch = convert_domain_to_chronicle_hierarchy(context)?;
     let time = time.elapsed().expect("could not get time").as_micros();
-
+    //panic!("for no fucking reason");
     Ok(format!("{}\n\nTime to convert: {} µs.", ch, time).into())
     //Ok(format!("Time to convert: {} µs.", time).into())
 }

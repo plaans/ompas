@@ -25,16 +25,19 @@ pub fn post_processing(
 
 /// Returns true if the constraint can be safely deleted
 pub fn bind_variables(id_1: &AtomId, id_2: &AtomId, st: &mut SymTable) -> Result<bool, LError> {
+    let id_1 = *st.get_parent(id_1);
+    let id_2 = *st.get_parent(id_2);
+    let id_1 = &id_1;
+    let id_2 = &id_2;
     let type_1 = *st.get_type_of(id_1).expect("id should be defined");
     let type_2 = *st.get_type_of(id_2).expect("id should be defined");
-
-    println!(
+    /*println!(
         "binding: {}({}), {}({})",
         id_1.format_with_sym_table(st),
         type_1.format_with_sym_table(st),
         id_2.format_with_sym_table(st),
         type_2.format_with_sym_table(st)
-    );
+    );*/
 
     match (type_1.kind, type_2.kind) {
         (AtomKind::Constant, AtomKind::Constant) => {
@@ -115,6 +118,12 @@ pub fn bind_variables(id_1: &AtomId, id_2: &AtomId, st: &mut SymTable) -> Result
                     return Err(Default::default());
                 }
             } else if type_1.a_type.is_some() {
+                println!(
+                    "new type of {}({}) -> {}",
+                    id_2.format_with_sym_table(st),
+                    type_2.format_with_sym_table(st),
+                    type_1.format_with_sym_table(st)
+                );
                 st.set_type_of(id_2, &type_1.a_type)
             }
             st.union_atom(id_2, id_1);
@@ -126,6 +135,12 @@ pub fn bind_variables(id_1: &AtomId, id_2: &AtomId, st: &mut SymTable) -> Result
                     return Err(Default::default());
                 }
             } else if type_2.a_type.is_some() {
+                println!(
+                    "new type of {}({}) -> {}",
+                    id_1.format_with_sym_table(st),
+                    type_1.format_with_sym_table(st),
+                    type_2.format_with_sym_table(st)
+                );
                 st.set_type_of(id_1, &type_2.a_type)
             }
             st.union_atom(id_1, id_2);
@@ -154,19 +169,34 @@ pub fn rm_useless_var(
     ch: &mut ChronicleHierarchy,
     _context: &ConversionContext,
 ) {
+    //Variables in expressions
     let vars = c.get_variables();
+    let parameters: HashSet<AtomId> = vars
+        .iter()
+        .filter_map(|v| {
+            let v = ch.sym_table.get_parent(v);
+            if ch.sym_table.get_type_of(v).unwrap().kind
+                == AtomKind::Variable(VariableKind::Parameter)
+            {
+                Some(*v)
+            } else {
+                None
+            }
+        })
+        .collect();
     let used_vars = c
         .get_all_variables_in_sets()
         .iter()
-        .map(|a| ch.sym_table.get_parent(a))
+        .map(|a| *ch.sym_table.get_parent(a))
         .collect();
     c.rm_set_var(c.get_variables().iter().cloned().collect());
     let mut parent_vars = hashset![];
     for var in &vars {
-        parent_vars.insert(ch.sym_table.get_parent(var));
+        parent_vars.insert(*ch.sym_table.get_parent(var));
     }
 
     let parent_vars = parent_vars.intersection(used_vars);
+    let parent_vars = parent_vars.union(parameters);
     c.add_variables(parent_vars);
 }
 
@@ -178,7 +208,7 @@ pub fn simplify_timepoints(
     let timepoints: HashSet<AtomId> = c
         .get_variables()
         .iter()
-        .map(|a| ch.sym_table.get_parent(a))
+        .map(|a| *ch.sym_table.get_parent(a))
         .filter(|a| {
             ch.sym_table.get_type_of(a).unwrap().a_type == Some(PlanningAtomType::Timepoint)
         })
@@ -190,7 +220,7 @@ pub fn simplify_timepoints(
             ChronicleSet::SubTask,
         ])
         .iter()
-        .map(|a| ch.sym_table.get_parent(a))
+        .map(|a| *ch.sym_table.get_parent(a))
         .filter(|a| {
             ch.sym_table.get_type_of(a).unwrap().a_type == Some(PlanningAtomType::Timepoint)
         })

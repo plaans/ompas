@@ -449,11 +449,11 @@ impl SymTable {
         self.symbols.union_ordered(a, b);
     }
 
-    pub fn find_parent(&mut self, a: &AtomId) -> AtomId {
+    pub fn find_parent(&mut self, a: &AtomId) -> &AtomId {
         self.symbols.find(a)
     }
 
-    pub fn get_parent(&self, a: &AtomId) -> AtomId {
+    pub fn get_parent(&self, a: &AtomId) -> &AtomId {
         self.symbols.get_parent(a)
     }
 

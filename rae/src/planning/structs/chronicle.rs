@@ -9,7 +9,7 @@ use crate::planning::structs::partial_chronicle::PartialChronicle;
 use crate::planning::structs::symbol_table::{AtomId, SymTable};
 use crate::planning::structs::traits::{Absorb, FormatWithSymTable, GetVariables};
 use crate::planning::structs::type_table::PlanningAtomType;
-use crate::planning::structs::ChronicleHierarchy;
+use crate::planning::structs::{ChronicleHierarchy, END, PREZ, RESULT, START};
 use im::HashSet;
 use ompas_lisp::core::structs::lvalue::LValue;
 use std::fmt::Display;
@@ -33,16 +33,12 @@ impl FormatWithSymTable for Vec<AtomId> {
 
 #[derive(Clone)]
 pub struct Chronicle {
+    label: String,
     pub name: Vec<AtomId>,
     pub task: Vec<AtomId>,
     pub pc: PartialChronicle,
     debug: Option<LValue>,
 }
-
-const START: &str = "start";
-const END: &str = "end";
-const PREZ: &str = "prez";
-const RESULT: &str = "result";
 
 impl Chronicle {
     pub fn new(ch: &mut ChronicleHierarchy, label: impl Display) -> Self {
@@ -92,6 +88,7 @@ impl Chronicle {
         };
 
         let mut chronicle = Self {
+            label: label.to_string(),
             name: Default::default(),
             task: Default::default(),
             pc: pc,
@@ -109,6 +106,8 @@ impl FormatWithSymTable for Chronicle {
     fn format_with_sym_table(&self, st: &SymTable) -> String {
         let mut s = String::new();
         //name
+        s.push_str(self.label.as_str());
+        s.push('\n');
         s.push_str(format!("- name: {}\n", self.name.format_with_sym_table(st)).as_str());
         //task
         s.push_str(format!("- task: {}\n", self.task.format_with_sym_table(st)).as_str());

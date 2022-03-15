@@ -15,7 +15,9 @@ use crate::planning::structs::symbol_table::{AtomId, ExpressionType};
 use crate::planning::structs::traits::{Absorb, FormatWithSymTable, GetVariables};
 use crate::planning::structs::transition::Transition;
 use crate::planning::structs::type_table::{AtomKind, PlanningAtomType, VariableKind};
-use crate::planning::structs::{ChronicleHierarchy, ConversionContext, TaskType};
+use crate::planning::structs::{
+    ChronicleHierarchy, ConversionContext, TaskType, COND, END, PREZ, RESULT, START,
+};
 use ompas_lisp::core::language::{BOOL, FLOAT, INT, NUMBER, TYPE_LIST};
 use ompas_lisp::core::root_module::basic_math::language::{EQ, GEQ, GT, LEQ, LT, NOT, NOT_SHORT};
 use ompas_lisp::core::root_module::error::language::CHECK;
@@ -785,12 +787,6 @@ pub fn convert_lvalue_to_expression_chronicle(
     Ok(ec)
 }
 
-const PREZ: &str = "prez";
-const START: &str = "start";
-const END: &str = "end";
-const RESULT: &str = "result";
-const COND: &str = "cond";
-
 pub fn convert_if(
     exp: &LValue,
     context: &ConversionContext,
@@ -975,10 +971,7 @@ pub fn convert_if(
                 name.push(new_var);
             };
         }
-        let mut task: Vec<AtomId> = Vec::with_capacity(task_string.len());
-        name[0..task_string.len()]
-            .iter()
-            .for_each(|l| task.push(*l));
+        let mut task: Vec<AtomId> = name[0..task_string.len()].iter().map(|l| *l).collect();
         task[4] = ch.sym_table.id(&task_label).unwrap().clone();
 
         method.set_debug(Some(debug));

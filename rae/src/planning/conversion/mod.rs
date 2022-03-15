@@ -5,7 +5,7 @@ use crate::planning::conversion::processing::{convert_lvalue_to_expression_chron
 use crate::planning::structs::chronicle::Chronicle;
 use crate::planning::structs::symbol_table::{AtomId, SymTable};
 use crate::planning::structs::type_table::PlanningAtomType;
-use crate::planning::structs::{ChronicleHierarchy, ConversionContext};
+use crate::planning::structs::{ChronicleHierarchy, ConversionContext, END, PREZ, RESULT, START};
 use ompas_lisp::core::structs::lerror::LError;
 use ompas_lisp::core::structs::llambda::{LLambda, LambdaArgs};
 use ompas_lisp::core::structs::lvalue::LValue;
@@ -142,6 +142,18 @@ pub fn convert_abstract_task_to_chronicle(
             name.push(id);
         }
     }
+    chronicle.set_name(name.clone().into());
+    chronicle.set_task(match task {
+        Some(task) => {
+            let mut task_name: Vec<AtomId> = name[0..task.get_parameters().get_number() + 5]
+                .iter()
+                .map(|l| *l)
+                .collect();
+            task_name[4] = ch.sym_table.id(&task.get_label()).unwrap().clone();
+            task_name
+        }
+        None => name.into(),
+    });
 
     let pre_processed = pre_processing(lambda.get_body(), conversion_context, ch)?;
 
@@ -157,12 +169,6 @@ pub fn convert_abstract_task_to_chronicle(
     chronicle.absorb_expression_chronicle(ec);
 
     post_processing(&mut chronicle, conversion_context, ch)?;
-
-    chronicle.set_name(name.clone().into());
-    chronicle.set_task(match task {
-        Some(task) => declare_task(task, &mut ch.sym_table),
-        None => name.into(),
-    });
 
     Ok(chronicle)
 }
@@ -233,29 +239,11 @@ pub fn declare_task(task: &Task, st: &mut SymTable) -> Vec<AtomId> {
         .id(task.get_label())
         .expect("symbol of task should be defined");
 
-    let task_label = task.get_label();
+    let prez = st.declare_new_parameter(PREZ, true, Some(PlanningAtomType::Bool));
+    let start = st.declare_new_parameter(START, true, Some(PlanningAtomType::Bool));
+    let end = st.declare_new_parameter(END, true, Some(PlanningAtomType::Bool));
 
-    let prez = st.declare_new_parameter(
-        format!("{}_prez", task_label),
-        true,
-        Some(PlanningAtomType::Bool),
-    );
-    let start = st.declare_new_parameter(
-        format!("{}_start", task_label),
-        true,
-        Some(PlanningAtomType::Bool),
-    );
-    let end = st.declare_new_parameter(
-        format!("{}_end", task_label),
-        true,
-        Some(PlanningAtomType::Bool),
-    );
-
-    let result = st.declare_new_parameter(
-        format!("{}_result", task_label),
-        true,
-        Some(PlanningAtomType::Bool),
-    );
+    let result = st.declare_new_parameter(RESULT, true, Some(PlanningAtomType::Bool));
 
     let mut task_lit: Vec<AtomId> = vec![prez, result, start, end, task_label_id];
 

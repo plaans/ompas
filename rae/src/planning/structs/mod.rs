@@ -25,6 +25,11 @@ pub mod traits;
 pub mod transition;
 pub mod type_table;
 
+pub const START: &str = "start";
+pub const END: &str = "end";
+pub const PREZ: &str = "prez";
+pub const RESULT: &str = "result";
+pub const COND: &str = "cond";
 pub const IF_TASK_PROTOTYPE: &str = "t_if";
 
 #[derive(Default, Copy, Clone)]

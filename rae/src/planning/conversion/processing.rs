@@ -575,6 +575,10 @@ pub fn convert_lvalue_to_expression_chronicle(
                                         ec.get_interval(),
                                         condition.get_interval(),
                                     ));
+                                    ch.sym_table.set_type_of(
+                                        condition.get_result_id(),
+                                        &Some(PlanningAtomType::Bool),
+                                    );
 
                                     //WARNING: Not sure of this
                                     ec.absorb(condition);
@@ -820,33 +824,27 @@ pub fn convert_if(
     let b_true = &exp[2];
     let b_false = &exp[3];
 
-    let ec_cond = convert_lvalue_to_expression_chronicle(cond, context, ch, Default::default())?;
-    let ec_b_true =
-        convert_lvalue_to_expression_chronicle(b_true, context, ch, Default::default())?;
-    let ec_b_false =
-        convert_lvalue_to_expression_chronicle(b_false, context, ch, Default::default())?;
-
-    let variables_b_true: im::HashSet<AtomId> = ec_b_true
+    let b_true_lit = lvalue_to_lit(b_true, &mut ch.sym_table)?;
+    let b_false_lit = lvalue_to_lit(b_false, &mut ch.sym_table)?;
+    let b_true_variables: im::HashSet<AtomId> = b_true_lit
         .get_variables()
         .iter()
-        .filter(|v| {
-            let type_of = ch.sym_table.get_type_of(v).unwrap();
-            type_of.kind == AtomKind::Variable(VariableKind::Parameter)
+        .filter(|a| {
+            ch.sym_table.get_type_of(a).unwrap().kind == AtomKind::Variable(VariableKind::Parameter)
         })
         .cloned()
         .collect();
 
-    let variables_b_false: im::HashSet<AtomId> = ec_b_false
+    let b_false_variables: im::HashSet<AtomId> = b_false_lit
         .get_variables()
         .iter()
-        .filter(|v| {
-            let type_of = ch.sym_table.get_type_of(v).unwrap();
-            type_of.kind == AtomKind::Variable(VariableKind::Parameter)
+        .filter(|a| {
+            ch.sym_table.get_type_of(a).unwrap().kind == AtomKind::Variable(VariableKind::Parameter)
         })
         .cloned()
         .collect();
 
-    let union: im::HashSet<AtomId> = variables_b_true.clone().union(variables_b_false.clone());
+    let union: im::HashSet<AtomId> = b_true_variables.clone().union(b_false_variables.clone());
 
     let mut union_string: Vec<String> = vec![];
     for v in &union {
@@ -868,7 +866,7 @@ pub fn convert_if(
     ];
     task_string.append(&mut union_string);
 
-    //println! {"({}) task string: {:#?}", task_label, task_string};
+    let ec_cond = convert_lvalue_to_expression_chronicle(cond, context, ch, Default::default())?;
 
     let mut task_lit: Vec<AtomId> = vec![
         *ec.get_presence(),
@@ -882,8 +880,6 @@ pub fn convert_if(
     for s in &task_string[6..] {
         task_lit.push(*ch.sym_table.id(s).unwrap());
     }
-
-    //println!("({}) subtask lit: {:#?}", task_label, task_lit);
 
     let sub_task_interval = ch.sym_table.declare_new_interval();
 
@@ -900,19 +896,12 @@ pub fn convert_if(
 
     ec.add_constraint(finish(ec.get_interval(), &sub_task_interval));
 
-    /* Bindings between result of the if and the result of the task*/
-    /*ec.add_constraint(Constraint::Eq(
-        (&task_lit[3]).into(),
-        ec.get_result_as_lit(),
-    ));*/
-
     /* Binding between result of condition and parameter of the task*/
     ec.absorb(ec_cond);
     ec.add_subtask(Expression {
         interval: sub_task_interval,
         lit: task_lit.into(),
     });
-    ec.add_variables(union.clone());
     ec.add_interval(&sub_task_interval);
 
     let mut task_lit: Vec<AtomId> = vec![];
@@ -926,12 +915,12 @@ pub fn convert_if(
     //println!("({}) task lit: {:#?}", task_label, task_lit);
     ch.tasks.push(task_lit);
 
-    let create_method = |ec_branch: ExpressionChronicle,
-                         local_variables: &im::HashSet<AtomId>,
+    let create_method = |lvalue: &LValue,
                          ch: &mut ChronicleHierarchy,
                          branch: bool,
                          debug: LValue|
      -> Result<(), LError> {
+        //ch.sym_table.new_scope();
         let method_label = format!("m_{}_{}", task_label, branch);
         let method_id = ch
             .sym_table
@@ -951,8 +940,22 @@ pub fn convert_if(
         ];
         method.add_var(&method_cond_var);
         //Bindings of variables of task and method
-        //ec_branch.add_constraint(Constraint::Eq(method_cond_var.into(), task_lit[1].into()));
-        //ec_branch.add_constraint(Constraint::Eq(method_result_var.into(), task_lit[2].into()));
+        for var in &union {
+            let sym: Sym = ch.sym_table.get_atom(var).unwrap().try_into()?;
+            let new_var = ch.sym_table.declare_new_parameter(
+                sym.get_string(),
+                true,
+                ch.sym_table.get_type_of(var).unwrap().a_type,
+            );
+            method.add_var(&new_var);
+            name.push(new_var);
+        }
+        let ec_branch = convert_lvalue_to_expression_chronicle(
+            lvalue,
+            context,
+            ch,
+            MetaData::new(true, false),
+        )?;
         method.absorb_expression_chronicle(ec_branch);
         method.add_condition(Condition {
             interval: Interval::new(method.get_start(), method.get_start()),
@@ -962,20 +965,6 @@ pub fn convert_if(
             ),
         });
 
-        for var in &union {
-            if local_variables.contains(var) {
-                name.push(*var);
-            } else {
-                let sym: Sym = ch.sym_table.get_atom(var).unwrap().try_into()?;
-                let new_var = ch.sym_table.declare_new_parameter(
-                    sym.get_string(),
-                    true,
-                    ch.sym_table.get_type_of(var).unwrap().a_type,
-                );
-                method.add_var(&new_var);
-                name.push(new_var);
-            };
-        }
         let mut task: Vec<AtomId> = name[0..task_string.len()].iter().map(|l| *l).collect();
         task[4] = ch.sym_table.id(&task_label).unwrap().clone();
 
@@ -986,11 +975,12 @@ pub fn convert_if(
         //method.absorb_expression_chronicle(ec_branch);
         post_processing(&mut method, context, ch)?;
         ch.chronicle_templates.push(method);
+        //ch.sym_table.revert_scope();
         Ok(())
     };
 
-    create_method(ec_b_true, &variables_b_true, ch, true, b_true.clone())?;
-    create_method(ec_b_false, &variables_b_false, ch, false, b_false.clone())?;
+    create_method(b_true, ch, true, b_true.clone())?;
+    create_method(b_false, ch, false, b_false.clone())?;
 
     ch.sym_table.revert_scope();
     Ok(ec)

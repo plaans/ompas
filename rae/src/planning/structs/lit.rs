@@ -104,6 +104,8 @@ impl<T: Clone + Into<Lit>> From<Vec<T>> for Lit {
 }
 
 pub fn lvalue_to_lit(lv: &LValue, st: &mut SymTable) -> lerror::Result<Lit> {
+    //println!("in lvalue_to_lit:\n{}", lv.format(0));
+    //stdout().flush();
     match lv {
         LValue::List(list) => {
             let mut vec = vec![];
@@ -123,22 +125,28 @@ pub fn lvalue_to_lit(lv: &LValue, st: &mut SymTable) -> lerror::Result<Lit> {
         },
         LValue::True => Ok(st.new_bool(true).into()),
         LValue::Nil => Ok(st.new_bool(false).into()),
-        lv => Ok(st.get_symbol(&lv.to_string(), None).into()),
+        lv => Ok(match st.id(&lv.to_string()) {
+            Some(id) => id.into(),
+            None => {
+                //println!("symbol {} does not exist", lv.to_string());
+                st.declare_symbol(&lv.to_string(), None).into()
+            }
+        }),
     }
 }
 
 impl FormatWithSymTable for Lit {
-    fn format_with_sym_table(&self, st: &SymTable) -> String {
+    fn format_with_sym_table(&self, st: &SymTable, sym_version: bool) -> String {
         match self {
-            Lit::Atom(a) => st.get_sym(a).to_string(),
-            Lit::Constraint(c) => c.format_with_sym_table(st),
+            Lit::Atom(a) => a.format_with_sym_table(st, sym_version),
+            Lit::Constraint(c) => c.format_with_sym_table(st, sym_version),
             Lit::Exp(vec) => {
                 let mut str = "(".to_string();
                 for (i, e) in vec.iter().enumerate() {
                     if i != 0 {
                         str.push(' ');
                     }
-                    str.push_str(e.format_with_sym_table(st).as_str())
+                    str.push_str(e.format_with_sym_table(st, sym_version).as_str())
                 }
                 str.push(')');
                 str

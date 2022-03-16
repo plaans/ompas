@@ -83,7 +83,7 @@ pub fn convert_lvalue_to_expression_chronicle(
     match exp {
         LValue::Symbol(s) => {
             //General case
-            let symbol = ch.sym_table.get_symbol(s, None);
+            let symbol = ch.sym_table.declare_symbol(s, None);
             if ch.sym_table.get_type_of(&symbol).unwrap().kind
                 == AtomKind::Variable(VariableKind::Parameter)
             {
@@ -107,7 +107,9 @@ pub fn convert_lvalue_to_expression_chronicle(
                 LCoreOperator::Define => {
                     //Todo : handle the case when the first expression is not a symbol, but an expression that must be evaluated
                     if let LValue::Symbol(s) = &l[1] {
-                        let var = ch.sym_table.get_symbol(s, None);
+                        let var = ch
+                            .sym_table
+                            .declare_new_variable(s, None, VariableKind::Local);
                         let val = convert_lvalue_to_expression_chronicle(
                             &l[2],
                             context,
@@ -119,7 +121,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                         }
 
                         ec.add_constraint(finish(val.get_interval(), ec.get_interval()));
-                        ec.add_constraint(Constraint::Eq(val.get_result_as_lit(), var.into()));
+                        ec.add_constraint(Constraint::Eq(var.into(), val.get_result_as_lit()));
                         ec.set_pure_result(ch.sym_table.new_bool(false).into());
                         ec.absorb(val);
                     } else {
@@ -471,7 +473,8 @@ pub fn convert_lvalue_to_expression_chronicle(
                                         if symbol_type.is_result_pure() {
                                             let key = format!(
                                                 "(instance {})",
-                                                symbol_type.format_with_sym_table(&ch.sym_table)
+                                                symbol_type
+                                                    .format_with_sym_table(&ch.sym_table, false)
                                             );
                                             let lvalue =
                                                 parse_static(&key, &mut context.env.clone())?;
@@ -680,20 +683,24 @@ pub fn convert_lvalue_to_expression_chronicle(
                             for (i, element) in literal.iter().enumerate() {
                                 if i == 0 {
                                     string.push_str(
-                                        element.format_with_sym_table(&ch.sym_table).as_str(),
+                                        element
+                                            .format_with_sym_table(&ch.sym_table, false)
+                                            .as_str(),
                                     );
                                     string.push(' ');
                                 } else {
                                     string.push_str(
                                         format!(
                                             "(quote {})",
-                                            element.format_with_sym_table(&ch.sym_table)
+                                            element.format_with_sym_table(&ch.sym_table, false)
                                         )
                                         .as_str(),
                                     );
                                 }
                             }
                             string.push(')');
+
+                            //println!("static eval of pure expression: {}", string);
 
                             let result = parse_static(string.as_str(), &mut env);
                             if let Ok(result) = result {
@@ -814,7 +821,7 @@ pub fn convert_if(
 
     let task_label = ch.local_tasks.new_label(TaskType::IfTask);
     ch.sym_table
-        .get_symbol(&task_label, Some(PlanningAtomType::Task));
+        .declare_symbol(&task_label, Some(PlanningAtomType::Task));
     //println!("task_label: {}", task_label);
     //println!("({}) expression: \n{}", task_label, exp.format(0));
 
@@ -852,8 +859,8 @@ pub fn convert_if(
     let mut union_string: Vec<String> = vec![];
     for v in &union {
         union_string.push(
-            Sym::try_from(ch.sym_table.get_atom(v).unwrap())?
-                .get_string()
+            Sym::try_from(ch.sym_table.get_atom(v, false).unwrap())?
+                .get_sym()
                 .clone(),
         )
     }
@@ -927,7 +934,7 @@ pub fn convert_if(
         let method_label = format!("m_{}_{}", task_label, branch);
         let method_id = ch
             .sym_table
-            .get_symbol(&method_label, Some(PlanningAtomType::Method));
+            .declare_symbol(&method_label, Some(PlanningAtomType::Method));
 
         let mut method = Chronicle::new(ch, &method_label);
         let method_cond_var =
@@ -944,9 +951,9 @@ pub fn convert_if(
         method.add_var(&method_cond_var);
         //Bindings of variables of task and method
         for var in &union {
-            let sym: Sym = ch.sym_table.get_atom(var).unwrap().try_into()?;
+            let sym: Sym = ch.sym_table.get_atom(var, false).unwrap().try_into()?;
             let new_var = ch.sym_table.declare_new_parameter(
-                sym.get_string(),
+                sym.get_sym(),
                 true,
                 ch.sym_table.get_type_of(var).unwrap().a_type,
             );

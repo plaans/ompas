@@ -6,7 +6,7 @@ pub trait Absorb {
 }
 
 pub trait FormatWithSymTable {
-    fn format_with_sym_table(&self, st: &SymTable) -> String;
+    fn format_with_sym_table(&self, st: &SymTable, sym_version: bool) -> String;
 }
 
 pub trait GetVariables {

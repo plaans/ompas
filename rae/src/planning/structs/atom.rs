@@ -1,3 +1,5 @@
+use crate::planning::structs::symbol_table::SymTable;
+use crate::planning::structs::traits::FormatWithSymTable;
 use ompas_lisp::core::structs::lerror::LError;
 use ompas_lisp::core::structs::lerror::LError::ConversionError;
 use ompas_lisp::core::structs::lnumber::LNumber;
@@ -119,7 +121,7 @@ impl Default for Sym {
 }
 
 impl Sym {
-    pub fn get_string(&self) -> &String {
+    pub fn get_sym(&self) -> &String {
         match self {
             Sym::Unique(s) => s,
             Sym::Several(s, _) => s,
@@ -144,6 +146,19 @@ impl Display for Sym {
         match self {
             Self::Unique(s) => write!(f, "{}", s),
             Self::Several(s, i) => write!(f, "{}_{}", s, i),
+        }
+    }
+}
+
+impl FormatWithSymTable for Atom {
+    fn format_with_sym_table(&self, _: &SymTable, sym_version: bool) -> String {
+        if let Self::Sym(s) = self {
+            match sym_version {
+                true => s.to_string(),
+                false => s.get_sym().clone(),
+            }
+        } else {
+            self.to_string()
         }
     }
 }

@@ -62,14 +62,14 @@ pub enum PlanningAtomType {
 }
 
 impl FormatWithSymTable for PlanningAtomType {
-    fn format_with_sym_table(&self, st: &SymTable) -> String {
+    fn format_with_sym_table(&self, st: &SymTable, sym_version: bool) -> String {
         format!(
             "{}",
             match self {
                 PlanningAtomType::SubType(t) => {
-                    format!("subtype of {}", t.format_with_sym_table(st))
+                    format!("subtype of {}", t.format_with_sym_table(st, sym_version))
                 }
-                PlanningAtomType::Other(t) => t.format_with_sym_table(st),
+                PlanningAtomType::Other(t) => t.format_with_sym_table(st, sym_version),
                 pat => pat.to_string(),
             }
         )
@@ -154,9 +154,9 @@ impl Display for AtomKind {
 }
 
 impl FormatWithSymTable for Option<PlanningAtomType> {
-    fn format_with_sym_table(&self, st: &SymTable) -> String {
+    fn format_with_sym_table(&self, st: &SymTable, sym_version: bool) -> String {
         match self {
-            Some(t) => t.format_with_sym_table(st),
+            Some(t) => t.format_with_sym_table(st, sym_version),
             None => UNTYPED.to_string(),
         }
     }
@@ -168,7 +168,11 @@ pub struct AtomType {
     pub kind: AtomKind,
 }
 impl FormatWithSymTable for AtomType {
-    fn format_with_sym_table(&self, st: &SymTable) -> String {
-        format!("{} {}", self.kind, self.a_type.format_with_sym_table(st))
+    fn format_with_sym_table(&self, st: &SymTable, sym_version: bool) -> String {
+        format!(
+            "{} {}",
+            self.kind,
+            self.a_type.format_with_sym_table(st, sym_version)
+        )
     }
 }

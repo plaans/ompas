@@ -47,11 +47,15 @@ impl Display for SymTable {
         let mut c = |vec: Vec<&AtomId>, preambule: &str| -> () {
             str.push_str(format!("\n## {}:\n", preambule).as_str());
             for e in vec {
+                assert_eq!(e, self.get_parent(e));
                 str.push_str(
                     format!(
-                        "- {}({})\n",
-                        self.get_sym(e),
-                        self.get_type_of(e).unwrap().format_with_sym_table(self)
+                        "- ({}){}({})\n",
+                        e,
+                        self.get_atom(e, true).unwrap(),
+                        self.get_type_of(e)
+                            .unwrap()
+                            .format_with_sym_table(self, true)
                     )
                     .as_str(),
                 );
@@ -233,8 +237,11 @@ impl SymTable {
         self.symbols.get_node(id)
     }
 
-    pub fn get_atom(&self, id: &AtomId) -> Option<&Atom> {
-        self.symbols.get_value(id)
+    pub fn get_atom(&self, id: &AtomId, parent: bool) -> Option<&Atom> {
+        match parent {
+            true => self.symbols.get_value(self.get_parent(id)),
+            false => self.symbols.get_value(id),
+        }
     }
 
     pub fn get_type_of(&self, id: &AtomId) -> Option<&AtomType> {
@@ -259,16 +266,16 @@ impl SymTable {
         todo!()
     }
 
-    pub fn get_sym(&self, id: &AtomId) -> &Atom {
+    /*pub fn get_sym(&self, id: &AtomId) -> &Atom {
         self.get_atom(&self.get_parent(id)).unwrap()
-    }
+    }*/
 }
 /*
 BOOLEAN FUNCTION
  */
 impl SymTable {
     pub fn it_exists(&self, sym: &str) -> bool {
-        self.ids.keys().any(|k| k.get_string() == sym)
+        self.ids.keys().any(|k| k.get_sym() == sym)
     }
 }
 
@@ -373,25 +380,14 @@ impl SymTable {
         id
     }
 
-    pub fn get_symbol(
+    pub fn declare_symbol(
         &mut self,
         sym: impl Display,
-        symbol_type: Option<PlanningAtomType>,
+        a_type: Option<PlanningAtomType>,
     ) -> AtomId {
         let sym = &sym.to_string();
-
         if self.it_exists(sym) {
-            //check multiple def
-            match self.pointer_to_ver.last().unwrap().get(sym) {
-                None => {
-                    if self.multiple_def.contains_key(sym) {
-                        self.multiple_def.get(sym).unwrap()[0]
-                    } else {
-                        *self.ids.get(&sym.to_string().into()).unwrap()
-                    }
-                }
-                Some(i) => *self.multiple_def.get(sym).unwrap().get(*i).unwrap(),
-            }
+            *self.id(sym).unwrap()
         } else {
             let sym: Sym = sym.to_string().into();
             let id = self.symbols.new_node((&sym).into());
@@ -399,10 +395,53 @@ impl SymTable {
             self.symbol_types.add_new_atom(
                 &id,
                 AtomType {
-                    a_type: symbol_type,
+                    a_type,
                     kind: AtomKind::Constant,
                 },
             );
+            id
+        }
+    }
+
+    pub fn declare_new_variable(
+        &mut self,
+        symbol: impl ToString,
+        var_type: Option<PlanningAtomType>,
+        var_kind: VariableKind,
+    ) -> AtomId {
+        let symbol = symbol.to_string();
+
+        let var_type = AtomType {
+            a_type: var_type,
+            kind: AtomKind::Variable(var_kind),
+        };
+
+        if self.it_exists(&symbol) {
+            self.unique_to_several(&symbol);
+            let vec_similar = self.multiple_def.get_mut(&symbol).unwrap();
+            let n = vec_similar.len();
+            let pointer_to_ver = self
+                .pointer_to_ver
+                .last_mut()
+                .expect("no hashmap to version of variable");
+
+            if pointer_to_ver.contains_key(&symbol) {
+                *pointer_to_ver.get_mut(&symbol).unwrap() = n;
+            } else {
+                pointer_to_ver.insert(symbol.to_string(), n);
+            }
+            let sym = Sym::Several(symbol.to_string(), n);
+
+            let id = self.symbols.new_node((&sym).into());
+            self.ids.insert(sym, n.into());
+            self.symbol_types.add_new_atom(&id, var_type);
+            vec_similar.push(id);
+            id
+        } else {
+            let sym: Sym = symbol.to_string().into();
+            let id = self.symbols.new_node((&sym).into());
+            self.ids.insert(sym, id);
+            self.symbol_types.add_new_atom(&id, var_type);
             id
         }
     }
@@ -435,9 +474,10 @@ impl SymTable {
                 } else {
                     pointer_to_ver.insert(symbol.to_string(), n);
                 }
-                let id = self
-                    .symbols
-                    .new_node(Sym::Several(symbol.to_string(), n).into());
+                let sym = Sym::Several(symbol.to_string(), n);
+
+                let id = self.symbols.new_node((&sym).into());
+                self.ids.insert(sym, id);
                 self.symbol_types.add_new_atom(&id, var_type);
                 vec_similar.push(id);
                 id
@@ -537,8 +577,10 @@ impl SymbolTypes {
 }
 
 impl FormatWithSymTable for AtomId {
-    fn format_with_sym_table(&self, st: &SymTable) -> String {
-        st.get_sym(self).to_string()
+    fn format_with_sym_table(&self, st: &SymTable, sym_version: bool) -> String {
+        st.get_atom(self, true)
+            .unwrap()
+            .format_with_sym_table(st, sym_version)
     }
 }
 

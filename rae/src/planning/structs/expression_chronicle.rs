@@ -211,27 +211,36 @@ impl Absorb for ExpressionChronicle {
 }
 
 impl FormatWithSymTable for ExpressionChronicle {
-    fn format_with_sym_table(&self, st: &SymTable) -> String {
+    fn format_with_sym_table(&self, st: &SymTable, sym_version: bool) -> String {
         let mut s = if self.pc.result.is_pure() {
             format!(
                 "{} {}\n",
-                self.pc.interval.format_with_sym_table(st),
+                self.pc.interval.format_with_sym_table(st, sym_version),
                 self.pc
                     .result
                     .get_pure()
                     .clone()
                     .unwrap()
-                    .format_with_sym_table(st),
+                    .format_with_sym_table(st, sym_version),
             )
         } else {
             format!(
                 "{} {} <- {}\n",
-                self.pc.interval.format_with_sym_table(st),
-                st.get_sym(self.pc.result.get_id()),
+                self.pc.interval.format_with_sym_table(st, sym_version),
+                self.pc
+                    .result
+                    .get_id()
+                    .format_with_sym_table(st, sym_version),
                 self.debug
             )
         };
-        s.push_str(format!("subchronicle: \n{}", self.pc.format_with_sym_table(st)).as_str());
+        s.push_str(
+            format!(
+                "subchronicle: \n{}",
+                self.pc.format_with_sym_table(st, sym_version)
+            )
+            .as_str(),
+        );
 
         s
     }

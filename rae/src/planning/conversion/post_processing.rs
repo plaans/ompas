@@ -4,7 +4,7 @@ use crate::planning::structs::chronicle::{Chronicle, ChronicleSet};
 use crate::planning::structs::constraint::Constraint;
 use crate::planning::structs::lit::Lit;
 use crate::planning::structs::symbol_table::{AtomId, SymTable};
-use crate::planning::structs::traits::{FormatWithSymTable, GetVariables};
+use crate::planning::structs::traits::GetVariables;
 use crate::planning::structs::type_table::{AtomKind, PlanningAtomType, VariableKind};
 use crate::planning::structs::{ChronicleHierarchy, ConversionContext};
 use im::{hashset, HashSet};
@@ -44,7 +44,7 @@ pub fn bind_variables(id_1: &AtomId, id_2: &AtomId, st: &mut SymTable) -> Result
             if type_1.a_type != type_2.a_type {
                 return Err(Default::default());
             }
-            if st.get_atom(id_1).unwrap() != st.get_atom(id_2).unwrap() {
+            if st.get_atom(id_1, false).unwrap() != st.get_atom(id_2, false).unwrap() {
                 return Err(Default::default());
             }
             st.union_atom(id_1, id_2);
@@ -118,12 +118,12 @@ pub fn bind_variables(id_1: &AtomId, id_2: &AtomId, st: &mut SymTable) -> Result
                     return Err(Default::default());
                 }
             } else if type_1.a_type.is_some() {
-                println!(
+                /*println!(
                     "new type of {}({}) -> {}",
-                    id_2.format_with_sym_table(st),
-                    type_2.a_type.format_with_sym_table(st),
-                    type_1.a_type.format_with_sym_table(st)
-                );
+                    id_2.format_with_sym_table(st, true),
+                    type_2.a_type.format_with_sym_table(st, true),
+                    type_1.a_type.format_with_sym_table(st, true)
+                );*/
                 st.set_type_of(id_2, &type_1.a_type)
             }
             st.union_atom(id_2, id_1);
@@ -135,12 +135,12 @@ pub fn bind_variables(id_1: &AtomId, id_2: &AtomId, st: &mut SymTable) -> Result
                     return Err(Default::default());
                 }
             } else if type_2.a_type.is_some() {
-                println!(
+                /*println!(
                     "new type of {}({}) -> {}",
-                    id_1.format_with_sym_table(st),
-                    type_1.a_type.format_with_sym_table(st),
-                    type_2.a_type.format_with_sym_table(st)
-                );
+                    id_1.format_with_sym_table(st, true),
+                    type_1.a_type.format_with_sym_table(st, true),
+                    type_2.a_type.format_with_sym_table(st, true)
+                );*/
                 st.set_type_of(id_1, &type_2.a_type)
             }
             st.union_atom(id_1, id_2);
@@ -197,6 +197,9 @@ pub fn rm_useless_var(
 
     let parent_vars = parent_vars.intersection(used_vars);
     let parent_vars = parent_vars.union(parameters);
+    for v in &parent_vars {
+        assert_eq!(v, ch.sym_table.get_parent(v));
+    }
     c.add_variables(parent_vars);
 }
 

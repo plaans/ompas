@@ -224,7 +224,7 @@ impl Display for ChronicleHierarchy {
                     "#{}\n\
                     {}\n\n\n",
                     id,
-                    template.format_with_sym_table(&self.sym_table)
+                    template.format_with_sym_table(&self.sym_table, true)
                 )
                 .as_str(),
             );
@@ -233,7 +233,13 @@ impl Display for ChronicleHierarchy {
         //tasks
         str.push_str("# TASKS: \n\n");
         for task in &self.tasks {
-            str.push_str(format!("{}\n\n\n", task.format_with_sym_table(&self.sym_table)).as_str());
+            str.push_str(
+                format!(
+                    "{}\n\n\n",
+                    task.format_with_sym_table(&self.sym_table, true)
+                )
+                .as_str(),
+            );
         }
 
         str.push_str(self.sym_table.to_string().as_str());

@@ -49,12 +49,12 @@ impl<T: Debug> Debug for Relation<T> {
 }
 
 impl<T: FormatWithSymTable> FormatWithSymTable for Relation<T> {
-    fn format_with_sym_table(&self, st: &SymTable) -> String {
+    fn format_with_sym_table(&self, st: &SymTable, sym_version: bool) -> String {
         format!(
             "{} {} {}",
-            self.i.format_with_sym_table(st),
+            self.i.format_with_sym_table(st, sym_version),
             self.relation_type,
-            self.j.format_with_sym_table(st),
+            self.j.format_with_sym_table(st, sym_version),
         )
     }
 }
@@ -98,7 +98,7 @@ impl<T: Debug> Debug for Problem<T> {
 }
 
 impl<T: Display + FormatWithSymTable> FormatWithSymTable for Problem<T> {
-    fn format_with_sym_table(&self, st: &SymTable) -> String {
+    fn format_with_sym_table(&self, st: &SymTable, sym_version: bool) -> String {
         let mut str = "problem:\n".to_string();
         str.push_str("variables: {");
         let mut first = true;
@@ -109,7 +109,7 @@ impl<T: Display + FormatWithSymTable> FormatWithSymTable for Problem<T> {
             str.push_str(
                 format!(
                     "{}({})",
-                    variable.format_with_sym_table(st).as_str(),
+                    variable.format_with_sym_table(st, sym_version).as_str(),
                     variable
                 )
                 .as_str(),
@@ -122,7 +122,9 @@ impl<T: Display + FormatWithSymTable> FormatWithSymTable for Problem<T> {
         str.push_str("relations:\n");
 
         for relation in &self.relations {
-            str.push_str(format!("-{}\n", relation.format_with_sym_table(st)).as_str());
+            str.push_str(
+                format!("-{}\n", relation.format_with_sym_table(st, sym_version)).as_str(),
+            );
         }
         str
     }

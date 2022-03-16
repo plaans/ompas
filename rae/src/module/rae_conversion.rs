@@ -57,7 +57,7 @@ pub async fn convert_expr<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
 
     post_processing(&mut chronicle, &context, &mut ch)?;
     let time = time.elapsed().expect("could not get time").as_micros();
-    let string = chronicle.format_with_sym_table(&ch.sym_table);
+    let string = chronicle.format_with_sym_table(&ch.sym_table, true);
 
     Ok(format!("{}\n\n Time to convert: {} µs.", string, time).into())
 }
@@ -70,7 +70,6 @@ pub async fn convert_domain<'a>(_: &'a [LValue], env: &'a LEnv) -> LResult {
     let ch = convert_domain_to_chronicle_hierarchy(context)?;
     let time = time.elapsed().expect("could not get time").as_micros();
     Ok(format!("{}\n\nTime to convert: {} µs.", ch, time).into())
-    //Ok(format!("Time to convert: {} µs.", time).into())
 }
 
 #[macro_rules_attribute(dyn_async!)]
@@ -91,7 +90,7 @@ pub async fn convert_cond_expr<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult
 
     let result = convert_if(&args[0], &context, &mut ch)?;
 
-    Ok(result.format_with_sym_table(&ch.sym_table).into())
+    Ok(result.format_with_sym_table(&ch.sym_table, true).into())
 }
 
 #[macro_rules_attribute(dyn_async!)]

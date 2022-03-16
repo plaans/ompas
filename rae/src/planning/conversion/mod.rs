@@ -90,7 +90,7 @@ pub fn convert_domain_to_chronicle_hierarchy(
         if let LValueS::List(objects) = objects {
             for obj in objects {
                 ch.sym_table
-                    .get_symbol(obj, Some(PlanningAtomType::Other(type_id)));
+                    .declare_symbol(obj, Some(PlanningAtomType::Other(type_id)));
             }
         } else {
             panic!("should be a list")
@@ -153,7 +153,7 @@ pub fn convert_abstract_task_to_chronicle(
     conversion_context: &ConversionContext,
     ch: &mut ChronicleHierarchy,
 ) -> Result<Chronicle, LError> {
-    let symbol_id = ch.sym_table.get_symbol(&label.to_string(), None);
+    let symbol_id = ch.sym_table.declare_symbol(&label.to_string(), None);
 
     let mut chronicle = Chronicle::new(ch, label);
     let mut name = vec![
@@ -223,7 +223,9 @@ pub fn convert_lvalue_to_chronicle(
 ) -> Result<Chronicle, LError> {
     //Creation and instantiation of the chronicle
     let label = "unnamed_chronicle";
-    let symbol_id = ch.sym_table.get_symbol(label, None);
+    let symbol_id = ch
+        .sym_table
+        .declare_symbol(label, Some(PlanningAtomType::Task));
 
     let mut chronicle = Chronicle::new(ch, label);
     let mut name = vec![

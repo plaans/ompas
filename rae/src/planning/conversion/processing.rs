@@ -232,7 +232,7 @@ pub fn convert_lvalue_to_expression_chronicle(
             },
             _ => {
                 let mut expression_type = ExpressionType::Lisp;
-
+                let mut is_special_expression = false;
                 ch.sym_table.new_scope();
                 let mut literal: Vec<Lit> = vec![];
 
@@ -257,8 +257,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                                 });
 
                                 ec.absorb(fluent);
-
-                                return Ok(ec);
+                                is_special_expression = true;
                             }
                             RAE_ASSERT | RAE_ASSERT_SHORT => {
                                 if l.len() != 3 {
@@ -306,8 +305,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                                 ec.absorb(value);
 
                                 ec.set_pure_result(ch.sym_table.new_bool(true).into());
-
-                                return Ok(ec);
+                                is_special_expression = true;
                             }
                             RAE_RETRACT | RAE_RETRACT_SHORT => {
                                 return Err(SpecialError(
@@ -369,7 +367,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                                 }
                                 ec.absorb(left);
                                 ec.absorb(right);
-                                return Ok(ec);
+                                is_special_expression = true;
                             }
                             ARBITRARY => {
                                 let val = convert_lvalue_to_expression_chronicle(
@@ -387,7 +385,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                                 }
 
                                 ec.absorb(val);
-                                return Ok(ec);
+                                is_special_expression = true;
                             }
                             NOT | NOT_SHORT | IS_BOOL | IS_FLOAT | IS_INT | IS_LIST | IS_NUMBER
                             | IS_NIL => {
@@ -452,7 +450,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                                     );
                                 }
                                 ec.absorb(val);
-                                return Ok(ec);
+                                is_special_expression = true;
                             }
                             RAE_INSTANCE => {
                                 match l.len() {
@@ -542,7 +540,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                                         );
                                         ec.absorb(symbol);
                                         ec.absorb(symbol_type);
-                                        return Ok(ec);
+                                        is_special_expression = true;
                                     }
                                     _ => {
                                         return Err(SpecialError(
@@ -584,7 +582,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                                     ec.absorb(condition);
                                     ec.set_pure_result(ch.sym_table.new_bool(true).into());
 
-                                    return Ok(ec);
+                                    is_special_expression = true;
                                 }
                             }
                             _ => {
@@ -628,89 +626,118 @@ pub fn convert_lvalue_to_expression_chronicle(
                         ))
                     }
                 }
+                if !is_special_expression {
+                    let mut sub_expression_pure = true;
 
-                let mut sub_expression_pure = true;
+                    let mut previous_interval = *ec.get_interval();
+                    let f_symbol_end_timepoint = ch.sym_table.declare_new_timepoint();
+                    let mut end_last_interval = f_symbol_end_timepoint;
+                    if !matches!(
+                        expression_type,
+                        ExpressionType::Action | ExpressionType::Task
+                    ) {
+                        ec.add_constraint(Constraint::Eq(
+                            ec.get_interval().start().into(),
+                            f_symbol_end_timepoint.into(),
+                        ));
+                    }
+                    for (i, e) in l[1..].iter().enumerate() {
+                        let ec_i = convert_lvalue_to_expression_chronicle(
+                            e,
+                            context,
+                            ch,
+                            Default::default(),
+                        )?;
 
-                let mut previous_interval = *ec.get_interval();
-                let f_symbol_end_timepoint = ch.sym_table.declare_new_timepoint();
-                let mut end_last_interval = f_symbol_end_timepoint;
-                if !matches!(
-                    expression_type,
-                    ExpressionType::Action | ExpressionType::Task
-                ) {
-                    ec.add_constraint(Constraint::Eq(
-                        ec.get_interval().start().into(),
-                        f_symbol_end_timepoint.into(),
-                    ));
-                }
-                for (i, e) in l[1..].iter().enumerate() {
-                    let ec_i =
-                        convert_lvalue_to_expression_chronicle(e, context, ch, Default::default())?;
+                        literal.push(ec_i.get_result_as_lit());
+                        sub_expression_pure &= ec_i.is_result_pure();
+                        if i != 0 {
+                            ec.add_constraint(meet(&previous_interval, ec_i.get_interval()));
+                        } else {
+                            ec.add_constraint(start(&previous_interval, ec_i.get_interval()));
+                        }
 
-                    literal.push(ec_i.get_result_as_lit());
-                    sub_expression_pure &= ec_i.is_result_pure();
-                    if i != 0 {
-                        ec.add_constraint(meet(&previous_interval, ec_i.get_interval()));
-                    } else {
-                        ec.add_constraint(start(&previous_interval, ec_i.get_interval()));
+                        previous_interval = *ec_i.get_interval();
+                        end_last_interval = *ec_i.get_interval().end();
+                        ec.absorb(ec_i);
                     }
 
-                    previous_interval = *ec_i.get_interval();
-                    end_last_interval = *ec_i.get_interval().end();
-                    ec.absorb(ec_i);
-                }
+                    ec.add_constraint(Constraint::LEq(
+                        end_last_interval.into(),
+                        ec.get_interval().end().into(),
+                    ));
 
-                ec.add_constraint(Constraint::LEq(
-                    end_last_interval.into(),
-                    ec.get_interval().end().into(),
-                ));
+                    if sub_expression_pure && expression_type == ExpressionType::Lisp {
+                        expression_type = ExpressionType::Pure;
+                    }
 
-                if sub_expression_pure && expression_type == ExpressionType::Lisp {
-                    expression_type = ExpressionType::Pure;
-                }
+                    match expression_type {
+                        ExpressionType::Pure => {
+                            let mut env = context.env.clone();
+                            let mut is_pure = false;
 
-                match expression_type {
-                    ExpressionType::Pure => {
-                        let mut env = context.env.clone();
-                        let mut is_pure = false;
-
-                        let mut string = "(".to_string();
-                        for (i, element) in literal.iter().enumerate() {
-                            if i == 0 {
-                                string.push_str(
-                                    element.format_with_sym_table(&ch.sym_table).as_str(),
-                                );
-                                string.push(' ');
-                            } else {
-                                string.push_str(
-                                    format!(
-                                        "(quote {})",
-                                        element.format_with_sym_table(&ch.sym_table)
-                                    )
-                                    .as_str(),
-                                );
-                            }
-                        }
-                        string.push(')');
-
-                        let result = parse_static(string.as_str(), &mut env);
-                        if let Ok(result) = result {
-                            if result.is_pure() {
-                                let result = eval_static(result.get_lvalue(), &mut env);
-
-                                if let Ok(result) = result {
-                                    if result.is_pure() {
-                                        ec.set_pure_result(lvalue_to_lit(
-                                            result.get_lvalue(),
-                                            &mut ch.sym_table,
-                                        )?);
-                                        is_pure = true;
-                                    }
+                            let mut string = "(".to_string();
+                            for (i, element) in literal.iter().enumerate() {
+                                if i == 0 {
+                                    string.push_str(
+                                        element.format_with_sym_table(&ch.sym_table).as_str(),
+                                    );
+                                    string.push(' ');
+                                } else {
+                                    string.push_str(
+                                        format!(
+                                            "(quote {})",
+                                            element.format_with_sym_table(&ch.sym_table)
+                                        )
+                                        .as_str(),
+                                    );
                                 }
                             }
-                        } else {
+                            string.push(')');
+
+                            let result = parse_static(string.as_str(), &mut env);
+                            if let Ok(result) = result {
+                                if result.is_pure() {
+                                    let result = eval_static(result.get_lvalue(), &mut env);
+
+                                    if let Ok(result) = result {
+                                        if result.is_pure() {
+                                            ec.set_pure_result(lvalue_to_lit(
+                                                result.get_lvalue(),
+                                                &mut ch.sym_table,
+                                            )?);
+                                            is_pure = true;
+                                        }
+                                    }
+                                }
+                            } else {
+                            }
+                            if !is_pure {
+                                let literal: Lit = vec![
+                                    ch.sym_table
+                                        .id(EVAL)
+                                        .expect("Eval not defined in symbol table")
+                                        .into(),
+                                    Lit::from(literal),
+                                ]
+                                .into();
+
+                                //ec.add_constraint(Constraint::Eq(ec.get_result_as_lit(), literal));
+                                ec.add_condition(Condition {
+                                    interval: *ec.get_interval(),
+                                    constraint: Constraint::Eq(ec.get_result_as_lit(), literal),
+                                });
+                                /*ec.add_effect(Effect {
+                                    interval: *ec.get_interval(),
+                                    transition: Transition::new(ec.get_result_as_lit(), literal),
+                                });*/
+                            }
+                            ec.add_constraint(Constraint::Eq(
+                                end_last_interval.into(),
+                                ec.get_interval().end().into(),
+                            ));
                         }
-                        if !is_pure {
+                        ExpressionType::Lisp => {
                             let literal: Lit = vec![
                                 ch.sym_table
                                     .id(EVAL)
@@ -719,71 +746,47 @@ pub fn convert_lvalue_to_expression_chronicle(
                                 Lit::from(literal),
                             ]
                             .into();
-
-                            //ec.add_constraint(Constraint::Eq(ec.get_result_as_lit(), literal));
                             ec.add_condition(Condition {
                                 interval: *ec.get_interval(),
                                 constraint: Constraint::Eq(ec.get_result_as_lit(), literal),
                             });
+                            //ec.add_constraint(Constraint::Eq(ec.get_result_as_lit(), literal));
                             /*ec.add_effect(Effect {
                                 interval: *ec.get_interval(),
                                 transition: Transition::new(ec.get_result_as_lit(), literal),
                             });*/
+                            ec.add_constraint(Constraint::Eq(
+                                end_last_interval.into(),
+                                ec.get_interval().end().into(),
+                            ));
                         }
-                        ec.add_constraint(Constraint::Eq(
-                            end_last_interval.into(),
-                            ec.get_interval().end().into(),
-                        ));
-                    }
-                    ExpressionType::Lisp => {
-                        let literal: Lit = vec![
-                            ch.sym_table
-                                .id(EVAL)
-                                .expect("Eval not defined in symbol table")
-                                .into(),
-                            Lit::from(literal),
-                        ]
-                        .into();
-                        ec.add_condition(Condition {
-                            interval: *ec.get_interval(),
-                            constraint: Constraint::Eq(ec.get_result_as_lit(), literal),
-                        });
-                        //ec.add_constraint(Constraint::Eq(ec.get_result_as_lit(), literal));
-                        /*ec.add_effect(Effect {
-                            interval: *ec.get_interval(),
-                            transition: Transition::new(ec.get_result_as_lit(), literal),
-                        });*/
-                        ec.add_constraint(Constraint::Eq(
-                            end_last_interval.into(),
-                            ec.get_interval().end().into(),
-                        ));
-                    }
-                    ExpressionType::Action | ExpressionType::Task => {
-                        let mut new_literal = vec![
-                            ec.get_presence().into(),
-                            ec.get_start().into(),
-                            ec.get_end().into(),
-                            ec.get_result_as_lit(),
-                        ];
-                        new_literal.append(&mut literal);
-                        ec.add_subtask(Expression {
-                            interval: *ec.get_interval(),
-                            lit: new_literal.into(),
-                        })
-                    }
-                    ExpressionType::StateFunction(return_type) => {
-                        ec.add_condition(Condition {
-                            interval: *ec.get_interval(),
-                            constraint: Constraint::Eq(ec.get_result_as_lit(), literal.into()),
-                        });
-                        //Return type of the state_function
-                        ch.sym_table.set_type_of(ec.get_result_id(), &return_type);
-                        ec.add_constraint(Constraint::Eq(
-                            end_last_interval.into(),
-                            ec.get_interval().end().into(),
-                        ));
-                    }
-                };
+                        ExpressionType::Action | ExpressionType::Task => {
+                            let mut new_literal = vec![
+                                ec.get_presence().into(),
+                                ec.get_start().into(),
+                                ec.get_end().into(),
+                                ec.get_result_as_lit(),
+                            ];
+                            new_literal.append(&mut literal);
+                            ec.add_subtask(Expression {
+                                interval: *ec.get_interval(),
+                                lit: new_literal.into(),
+                            })
+                        }
+                        ExpressionType::StateFunction(return_type) => {
+                            ec.add_condition(Condition {
+                                interval: *ec.get_interval(),
+                                constraint: Constraint::Eq(ec.get_result_as_lit(), literal.into()),
+                            });
+                            //Return type of the state_function
+                            ch.sym_table.set_type_of(ec.get_result_id(), &return_type);
+                            ec.add_constraint(Constraint::Eq(
+                                end_last_interval.into(),
+                                ec.get_interval().end().into(),
+                            ));
+                        }
+                    };
+                }
                 ch.sym_table.revert_scope();
             }
         },
@@ -920,7 +923,7 @@ pub fn convert_if(
                          branch: bool,
                          debug: LValue|
      -> Result<(), LError> {
-        //ch.sym_table.new_scope();
+        ch.sym_table.new_scope();
         let method_label = format!("m_{}_{}", task_label, branch);
         let method_id = ch
             .sym_table
@@ -975,7 +978,7 @@ pub fn convert_if(
         //method.absorb_expression_chronicle(ec_branch);
         post_processing(&mut method, context, ch)?;
         ch.chronicle_templates.push(method);
-        //ch.sym_table.revert_scope();
+        ch.sym_table.revert_scope();
         Ok(())
     };
 

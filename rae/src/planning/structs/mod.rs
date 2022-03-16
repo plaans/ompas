@@ -236,7 +236,7 @@ impl Display for ChronicleHierarchy {
             str.push_str(format!("{}\n\n\n", task.format_with_sym_table(&self.sym_table)).as_str());
         }
 
-        //str.push_str(self.sym_table.to_string().as_str());
+        str.push_str(self.sym_table.to_string().as_str());
 
         write!(f, "{}", str)
     }

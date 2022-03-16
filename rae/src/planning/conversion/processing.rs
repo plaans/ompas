@@ -856,16 +856,15 @@ pub fn convert_if(
 
     let union: im::HashSet<AtomId> = b_true_variables.clone().union(b_false_variables.clone());
 
-    let mut union_string: Vec<String> = vec![];
-    for v in &union {
-        union_string.push(
-            Sym::try_from(ch.sym_table.get_atom(v, false).unwrap())?
-                .get_sym()
-                .clone(),
-        )
-    }
-
     //CREATION OF THE TASK
+    let mut types = vec![
+        Some(PlanningAtomType::Bool),
+        Some(PlanningAtomType::Timepoint),
+        Some(PlanningAtomType::Timepoint),
+        None,
+        Some(PlanningAtomType::Bool),
+    ];
+
     let mut task_string = vec![
         PREZ.to_string(),
         START.to_string(),
@@ -874,6 +873,15 @@ pub fn convert_if(
         task_label.clone(),
         COND.to_string(),
     ];
+    let mut union_string: Vec<String> = vec![];
+    for v in &union {
+        union_string.push(
+            Sym::try_from(ch.sym_table.get_atom(v, false).unwrap())?
+                .get_sym()
+                .clone(),
+        );
+        types.push(ch.sym_table.get_type_of(v).and_then(|a| a.a_type));
+    }
     task_string.append(&mut union_string);
 
     let ec_cond = convert_lvalue_to_expression_chronicle(cond, context, ch, Default::default())?;
@@ -919,7 +927,7 @@ pub fn convert_if(
         if i == 4 {
             task_lit.push(*ch.sym_table.id(s).unwrap());
         } else {
-            task_lit.push(ch.sym_table.declare_new_parameter(s, true, None));
+            task_lit.push(ch.sym_table.declare_new_parameter(s, true, types[i]));
         }
     }
     //println!("({}) task lit: {:#?}", task_label, task_lit);

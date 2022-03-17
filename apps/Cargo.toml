@@ -35,23 +35,14 @@ name = "ompas"
 path = "src/bin/ompas.rs"
 
 [[bin]]
-name = "ompas-simu"
-path = "examples/ompas-simu.rs"
-
-
-[[bin]]
 name = "scheme"
 path = "src/bin/scheme.rs"
 
-[[bin]]
-name = "root_scheme"
-path = "examples/root_scheme.rs"
-
-[[bin]]
+[[example]]
 name = "conversion"
 path = "examples/conversion.rs"
 
-[[bin]]
+[[example]]
 name = "union-map"
 path = "examples/union_map_bin.rs"
 

@@ -24,7 +24,7 @@ pub fn post_processing(
 }
 
 /// Returns true if the constraint can be safely deleted
-pub fn bind_variables(id_1: &AtomId, id_2: &AtomId, st: &mut SymTable) -> Result<bool, LError> {
+pub fn bind_atoms(id_1: &AtomId, id_2: &AtomId, st: &mut SymTable) -> Result<bool, LError> {
     let id_1 = *st.get_parent(id_1);
     let id_2 = *st.get_parent(id_2);
     let id_1 = &id_1;
@@ -72,11 +72,11 @@ pub fn bind_variables(id_1: &AtomId, id_2: &AtomId, st: &mut SymTable) -> Result
             AtomKind::Variable(VariableKind::Parameter),
             AtomKind::Variable(VariableKind::Parameter),
         ) => {
-            /*let ((id_1, type_1), (id_2, type_2)) = if id_1 < id_2 {
+            let ((id_1, type_1), (id_2, type_2)) = if id_1 < id_2 {
                 ((id_1, type_1), (id_2, type_2))
             } else {
                 ((id_2, type_2), (id_1, type_1))
-            };*/
+            };
 
             match (type_1.a_type.is_some(), type_2.a_type.is_some()) {
                 (true, true) => {
@@ -154,7 +154,7 @@ pub fn unify_equal(c: &mut Chronicle, ch: &mut ChronicleHierarchy, _context: &Co
     for (index, constraint) in c.get_constraints().iter().enumerate() {
         if let Constraint::Eq(a, b) = constraint {
             if let (Lit::Atom(id_1), Lit::Atom(id_2)) = (a, b) {
-                if let Ok(true) = bind_variables(id_1, id_2, &mut ch.sym_table) {
+                if let Ok(true) = bind_atoms(id_1, id_2, &mut ch.sym_table) {
                     vec_constraint_to_rm.push(index);
                 }
             }

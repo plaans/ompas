@@ -253,10 +253,21 @@ pub fn convert_lvalue_to_expression_chronicle(
                                 )?;
                                 ec.add_constraint(equal(ec.get_interval(), fluent.get_interval()));
 
-                                ec.add_condition(Condition {
+                                //WARNING: revoir la définition de la conversion de monitor
+                                /*ec.add_condition(Condition {
                                     interval: Interval::new_instantaneous(&ec.get_interval().end()),
                                     constraint: bind_result(&ec, &fluent),
+                                });*/
+
+                                ec.add_condition(Condition {
+                                    interval: Interval::new_instantaneous(&ec.get_interval().end()),
+                                    constraint: Constraint::Eq(
+                                        fluent.get_result_as_lit(),
+                                        ch.sym_table.new_bool(true).into(),
+                                    ),
                                 });
+
+                                ec.set_pure_result(ch.sym_table.new_bool(true).into());
 
                                 ec.absorb(fluent);
                                 is_special_expression = true;
@@ -380,10 +391,17 @@ pub fn convert_lvalue_to_expression_chronicle(
                                 )?;
 
                                 ec.add_constraint(equal(ec.get_interval(), val.get_interval()));
+                                let constraint = Constraint::Arbitrary(
+                                    ec.get_result_id().into(),
+                                    val.get_result_as_lit(),
+                                );
                                 if !meta_data.top_level && val.is_result_pure() {
-                                    ec.set_pure_result(val.get_result_as_lit());
+                                    ec.add_constraint(constraint);
                                 } else {
-                                    ec.add_constraint(bind_result(&ec, &val));
+                                    ec.add_condition(Condition {
+                                        interval: Interval::new_instantaneous(ec.get_end()),
+                                        constraint: constraint,
+                                    });
                                 }
 
                                 ec.absorb(val);
@@ -862,6 +880,7 @@ pub fn convert_if(
         Some(PlanningAtomType::Timepoint),
         Some(PlanningAtomType::Timepoint),
         None,
+        Some(PlanningAtomType::Task),
         Some(PlanningAtomType::Bool),
     ];
 

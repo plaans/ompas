@@ -103,14 +103,6 @@ pub fn remove_useless_timepoints<T>(mut m: Graph<T>) -> Result<Graph<T>, LError>
                     2 => {
                         let first = linked_timepoints[0];
                         let second = linked_timepoints[1];
-                        /*if m[first][second] == Tautology.into() {
-                            m[first][second] = m[first][i].compose(&m[i][second]);
-                            m[second][first] = m[first][second].converse();
-                            m.remove_var(i);
-                            last_index = i;
-                            done = false;
-                            break;
-                        }*/
                         m[first][second] = m[first][i].compose(&m[i][second]);
                         m[second][first] = m[first][second].converse();
                         m.remove_var(i);

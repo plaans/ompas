@@ -1,19 +1,19 @@
 use crate::planning::point_algebra::problem::{Graph, Problem};
 use crate::planning::point_algebra::remove_useless_timepoints;
-use crate::planning::structs::chronicle::{Chronicle, ChronicleSet};
+use crate::planning::structs::chronicle::{ChronicleSet, ChronicleTemplate};
 use crate::planning::structs::constraint::Constraint;
 use crate::planning::structs::lit::Lit;
 use crate::planning::structs::symbol_table::{AtomId, SymTable};
 use crate::planning::structs::traits::{FormatWithParent, GetVariables};
 use crate::planning::structs::type_table::{AtomKind, PlanningAtomType, VariableKind};
-use crate::planning::structs::{ChronicleHierarchy, ConversionContext};
+use crate::planning::structs::{ConversionCollection, ConversionContext};
 use im::{hashset, HashSet};
 use ompas_lisp::core::structs::lerror::LError;
 
 pub fn post_processing(
-    c: &mut Chronicle,
+    c: &mut ChronicleTemplate,
     context: &ConversionContext,
-    ch: &mut ChronicleHierarchy,
+    ch: &mut ConversionCollection,
 ) -> Result<(), LError> {
     unify_equal(c, ch, context);
     ch.sym_table.flat_bindings();
@@ -150,7 +150,11 @@ pub fn bind_atoms(id_1: &AtomId, id_2: &AtomId, st: &mut SymTable) -> Result<boo
     }
 }
 
-pub fn unify_equal(c: &mut Chronicle, ch: &mut ChronicleHierarchy, _context: &ConversionContext) {
+pub fn unify_equal(
+    c: &mut ChronicleTemplate,
+    ch: &mut ConversionCollection,
+    _context: &ConversionContext,
+) {
     let mut vec_constraint_to_rm = vec![];
     for (index, constraint) in c.get_constraints().iter().enumerate() {
         if let Constraint::Eq(a, b) = constraint {
@@ -166,8 +170,8 @@ pub fn unify_equal(c: &mut Chronicle, ch: &mut ChronicleHierarchy, _context: &Co
 }
 
 pub fn rm_useless_var(
-    c: &mut Chronicle,
-    ch: &mut ChronicleHierarchy,
+    c: &mut ChronicleTemplate,
+    ch: &mut ConversionCollection,
     _context: &ConversionContext,
 ) {
     //Variables in expressions
@@ -205,8 +209,8 @@ pub fn rm_useless_var(
 }
 
 pub fn simplify_timepoints(
-    c: &mut Chronicle,
-    ch: &mut ChronicleHierarchy,
+    c: &mut ChronicleTemplate,
+    ch: &mut ConversionCollection,
     _: &ConversionContext,
 ) -> Result<(), LError> {
     let timepoints: HashSet<AtomId> = c

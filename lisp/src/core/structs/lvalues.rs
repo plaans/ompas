@@ -1,7 +1,9 @@
 use crate::core::language::ERR;
+use crate::core::structs::lerror::LError;
 use crate::core::structs::lnumber::LNumber;
 use crate::core::structs::lvalue::LValue;
 use serde::*;
+use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
@@ -124,6 +126,29 @@ impl From<&str> for LValueS {
 impl From<LValueS> for LValue {
     fn from(lvs: LValueS) -> Self {
         (&lvs).into()
+    }
+}
+
+impl TryFrom<&LValueS> for Vec<LValueS> {
+    type Error = LError;
+
+    fn try_from(value: &LValueS) -> Result<Self, Self::Error> {
+        match value {
+            LValueS::List(l) => Ok(l.clone()),
+            _ => Err(Default::default()),
+        }
+    }
+}
+
+impl TryFrom<&LValueS> for String {
+    type Error = LError;
+
+    fn try_from(value: &LValueS) -> Result<Self, Self::Error> {
+        if let LValueS::Symbol(s) = value {
+            Ok(s.clone())
+        } else {
+            Err(Default::default())
+        }
     }
 }
 

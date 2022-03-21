@@ -2,10 +2,10 @@ use crate::context::rae_env::{Parameters, Task};
 use crate::planning::conversion::post_processing::*;
 use crate::planning::conversion::pre_processing::pre_processing;
 use crate::planning::conversion::processing::{convert_lvalue_to_expression_chronicle, MetaData};
-use crate::planning::structs::chronicle::Chronicle;
+use crate::planning::structs::chronicle::ChronicleTemplate;
 use crate::planning::structs::symbol_table::{AtomId, SymTable};
 use crate::planning::structs::type_table::PlanningAtomType;
-use crate::planning::structs::{ChronicleHierarchy, ConversionContext, END, PREZ, RESULT, START};
+use crate::planning::structs::{ConversionCollection, ConversionContext};
 use aries_planning::chronicles::ChronicleKind;
 use ompas_lisp::core::structs::lerror::LError;
 use ompas_lisp::core::structs::llambda::{LLambda, LambdaArgs};
@@ -25,11 +25,11 @@ const CONVERT_DOMAIN_TO_CHRONICLE_HIERARCHY: &str = "convert_domain_to_chronicle
 
 pub fn convert_domain_to_chronicle_hierarchy(
     conversion_context: ConversionContext,
-) -> Result<ChronicleHierarchy, LError> {
+) -> Result<ConversionCollection, LError> {
     //for each action: translate to chronicle
     //for each method: translate to chronicle
 
-    let mut ch: ChronicleHierarchy = Default::default();
+    let mut ch: ConversionCollection = Default::default();
 
     let actions: Vec<&str> = conversion_context
         .domain
@@ -143,8 +143,6 @@ pub fn convert_domain_to_chronicle_hierarchy(
         ch.chronicle_templates.push(chronicle);
     }
 
-    ch.problem = (&conversion_context).into();
-
     Ok(ch)
 }
 
@@ -154,14 +152,14 @@ pub fn convert_abstract_task_to_chronicle(
     task: Option<&Task>,
     parameters: &Parameters,
     conversion_context: &ConversionContext,
-    ch: &mut ChronicleHierarchy,
+    ch: &mut ConversionCollection,
     chronicle_kind: ChronicleKind,
-) -> Result<Chronicle, LError> {
+) -> Result<ChronicleTemplate, LError> {
     let symbol_id = ch.sym_table.declare_symbol(&label.to_string(), None);
 
-    let mut chronicle = Chronicle::new(ch, label, chronicle_kind);
+    let mut chronicle = ChronicleTemplate::new(ch, label, chronicle_kind);
     let mut name = vec![
-        /**chronicle.get_presence(),
+        /* *chronicle.get_presence(),
          *chronicle.get_result(),
          *chronicle.get_start(),
          *chronicle.get_end(),*/
@@ -223,17 +221,17 @@ pub fn convert_abstract_task_to_chronicle(
 pub fn convert_lvalue_to_chronicle(
     exp: &LValue,
     conversion_context: &ConversionContext,
-    ch: &mut ChronicleHierarchy,
-) -> Result<Chronicle, LError> {
+    ch: &mut ConversionCollection,
+) -> Result<ChronicleTemplate, LError> {
     //Creation and instantiation of the chronicle
     let label = "unnamed_chronicle";
     let symbol_id = ch
         .sym_table
         .declare_symbol(label, Some(PlanningAtomType::Task));
 
-    let mut chronicle = Chronicle::new(ch, label, ChronicleKind::Method);
+    let mut chronicle = ChronicleTemplate::new(ch, label, ChronicleKind::Method);
     let mut name = vec![
-        /**chronicle.get_presence(),
+        /* *chronicle.get_presence(),
          *chronicle.get_result(),
          *chronicle.get_start(),
          *chronicle.get_end(),*/
@@ -288,11 +286,11 @@ pub fn declare_task(task: &Task, st: &mut SymTable) -> Vec<AtomId> {
         .id(task.get_label())
         .expect("symbol of task should be defined");
 
-    let prez = st.declare_new_parameter(PREZ, true, Some(PlanningAtomType::Bool));
+    /*let prez = st.declare_new_parameter(PREZ, true, Some(PlanningAtomType::Bool));
     let start = st.declare_new_parameter(START, true, Some(PlanningAtomType::Bool));
     let end = st.declare_new_parameter(END, true, Some(PlanningAtomType::Bool));
 
-    let result = st.declare_new_parameter(RESULT, true, Some(PlanningAtomType::Bool));
+    let result = st.declare_new_parameter(RESULT, true, Some(PlanningAtomType::Bool));*/
 
     //let mut task_lit: Vec<AtomId> = vec![prez, result, start, end, task_label_id];
     let mut task_lit: Vec<AtomId> = vec![task_label_id];
@@ -306,11 +304,11 @@ pub fn declare_task(task: &Task, st: &mut SymTable) -> Vec<AtomId> {
 }
 
 pub fn build_chronicle(
-    mut chronicle: Chronicle,
+    mut chronicle: ChronicleTemplate,
     exp: &LValue,
     conversion_context: &ConversionContext,
-    ch: &mut ChronicleHierarchy,
-) -> Result<Chronicle, LError> {
+    ch: &mut ConversionCollection,
+) -> Result<ChronicleTemplate, LError> {
     let lvalue: &LValue = if let LValue::Lambda(lambda) = exp {
         lambda.get_body()
     } else {

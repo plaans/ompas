@@ -1,8 +1,7 @@
-use crate::planning::structs::chronicle::Chronicle;
 use crate::planning::structs::symbol_table::AtomId;
 use crate::planning::structs::traits::GetVariables;
 use crate::planning::structs::type_table::PlanningAtomType;
-use crate::planning::structs::ChronicleHierarchy;
+use crate::planning::structs::{ConversionCollection, Problem};
 use anyhow::{anyhow, Result};
 use aries_core::Lit as ariesLit;
 use aries_core::*;
@@ -19,6 +18,7 @@ use aries_planning::chronicles::{
 };
 use aries_planning::parsing::pddl::TypedSymbol;
 use aries_utils::input::Sym;
+use ompas_lisp::core::structs::lvalues::LValueS;
 use std::convert::TryInto;
 use std::sync::Arc;
 
@@ -29,9 +29,14 @@ static ACTION_TYPE: &str = "★action★";
 static METHOD_TYPE: &str = "★method★";
 static PREDICATE_TYPE: &str = "★predicate★";
 static OBJECT_TYPE: &str = "★object★";
+static STATE_FUNCTION_TYPE: &str = "★state-function★";
 static FUNCTION_TYPE: &str = "★function★";
+static TYPE_TYPE: &str = "★type★";
+static INSTANCE_SFN: &str = "instance";
 
-pub fn build_chronicles(ch: &ChronicleHierarchy) -> Result<chronicles::Problem> {
+static FLOAT_SCALE: IntCst = 10;
+
+pub fn build_chronicles(problem: &Problem) -> Result<chronicles::Problem> {
     let mut types: Vec<(Sym, Option<Sym>)> = vec![
         (TASK_TYPE.into(), None),
         (ABSTRACT_TASK_TYPE.into(), Some(TASK_TYPE.into())),
@@ -40,26 +45,28 @@ pub fn build_chronicles(ch: &ChronicleHierarchy) -> Result<chronicles::Problem> 
         (METHOD_TYPE.into(), None),
         (PREDICATE_TYPE.into(), None),
         (FUNCTION_TYPE.into(), None),
+        (STATE_FUNCTION_TYPE.into(), None),
         (OBJECT_TYPE.into(), None),
+        (TYPE_TYPE.into(), None),
     ];
     //let top_type: Sym = OBJECT_TYPE.into();
 
-    let problem = &ch.problem;
+    let mut symbols: Vec<TypedSymbol> = vec![];
 
-    {
-        for t in &problem.types {
-            types.push((t.into(), Some(OBJECT_TYPE.into())));
-        }
+    for t in &problem.types {
+        types.push((t.into(), Some(OBJECT_TYPE.into())));
+        symbols.push(TypedSymbol::new(t, TYPE_TYPE));
     }
 
     let th = TypeHierarchy::new(types)?;
-    let mut symbols: Vec<TypedSymbol> = vec![];
+
     for (o, t) in &problem.objects {
         symbols.push(TypedSymbol::new(o, t))
     }
 
+    symbols.push(TypedSymbol::new(INSTANCE_SFN, STATE_FUNCTION_TYPE));
     for (label, _) in &problem.state_functions {
-        symbols.push(TypedSymbol::new(label, FUNCTION_TYPE));
+        symbols.push(TypedSymbol::new(label, STATE_FUNCTION_TYPE));
     }
     for a in &problem.actions {
         symbols.push(TypedSymbol::new(a, ACTION_TYPE));
@@ -77,7 +84,31 @@ pub fn build_chronicles(ch: &ChronicleHierarchy) -> Result<chronicles::Problem> 
         .collect();
     let symbol_table = SymbolTable::new(th, symbols)?;
 
-    let mut state_functions = Vec::with_capacity(problem.state_functions.len());
+    let mut state_functions = Vec::with_capacity(problem.state_functions.len() + 1);
+    /*
+     * Add state function for type.
+     * instance(<object>) -> type
+     */
+    {
+        let sym = symbol_table
+            .id(INSTANCE_SFN)
+            .ok_or_else(|| anyhow!("{} undefined", INSTANCE_SFN))?;
+        let mut args = Vec::with_capacity(2);
+        args.push(Type::Sym(
+            symbol_table
+                .types
+                .id_of(OBJECT_TYPE)
+                .ok_or_else(|| anyhow!("{} undefined.", OBJECT_TYPE))?,
+        ));
+        args.push(Type::Sym(
+            symbol_table
+                .types
+                .id_of(TYPE_TYPE)
+                .ok_or_else(|| anyhow!("{} undefined", TYPE_TYPE))?,
+        ));
+        state_functions.push(StateFun { sym, tpe: args })
+    }
+
     for sf in &problem.state_functions {
         let sym = symbol_table
             .id(&sf.0)
@@ -97,7 +128,7 @@ pub fn build_chronicles(ch: &ChronicleHierarchy) -> Result<chronicles::Problem> 
 
     let _init_container = Container::Instance(0);
     // Initial chronicle construction
-    let init_ch = ariesChronicle {
+    let mut init_ch = ariesChronicle {
         kind: ChronicleKind::Problem,
         presence: ariesLit::TRUE,
         start: context.origin(),
@@ -110,6 +141,106 @@ pub fn build_chronicles(ch: &ChronicleHierarchy) -> Result<chronicles::Problem> 
         subtasks: vec![],
     };
 
+    let lvalues_into_satom = |v: &LValueS| -> SAtom {
+        let v: String = v.try_into().expect("");
+        context
+            .typed_sym(context.model.get_symbol_table().id(&v).unwrap())
+            .into()
+    };
+
+    let lvalues_into_atom = |v: &LValueS| -> Atom {
+        match v {
+            LValueS::Symbol(s) => context
+                .typed_sym(context.model.get_symbol_table().id(s.as_str()).unwrap())
+                .into(),
+            LValueS::Int(i) => IAtom::from(*i as i32).into(),
+            LValueS::Float(f) => {
+                let f: i32 = (f * FLOAT_SCALE as f64) as i32;
+                FAtom::new(IAtom::from(f), FLOAT_SCALE).into()
+            }
+            LValueS::Bool(b) => match b {
+                true => Lit::TRUE.into(),
+                false => Lit::FALSE.into(),
+            },
+            _ => panic!(""),
+        }
+    };
+
+    /*
+    Add initial state
+     */
+    /*
+    Initialisation of instance state variable
+     */
+    let state = &problem.initial_state;
+    for (key, value) in &state.instance.inner {
+        let key: Vec<LValueS> = key.try_into()?;
+        assert_eq!(key.len(), 2);
+        assert_eq!(&key[1].to_string(), INSTANCE_SFN);
+        let sf: SAtom = lvalues_into_satom(&key[0]);
+        let object: SAtom = lvalues_into_satom(&key[1]);
+        let value: Atom = lvalues_into_atom(value);
+        let sv = vec![sf, object];
+
+        init_ch.effects.push(Effect {
+            transition_start: init_ch.start,
+            persistence_start: init_ch.start,
+            state_var: sv,
+            value: value,
+        });
+    }
+
+    /*
+    Initialisation of static state variables
+     */
+    //We suppose for the moment that all args of state variable are objects
+    for (key, value) in &state._static.inner {
+        let key: Vec<LValueS> = key.try_into()?;
+        let key: Vec<SAtom> = key.iter().map(lvalues_into_satom).collect();
+        let value = lvalues_into_atom(value);
+        init_ch.effects.push(Effect {
+            transition_start: init_ch.start,
+            persistence_start: init_ch.start,
+            state_var: key,
+            value: value,
+        });
+    }
+
+    /*
+    Initialisation of dynamic state variables
+     */
+
+    for (key, value) in &state.dynamic.inner {
+        let key: Vec<LValueS> = key.try_into()?;
+        let key: Vec<SAtom> = key.iter().map(lvalues_into_satom).collect();
+        let value = lvalues_into_atom(value);
+        init_ch.effects.push(Effect {
+            transition_start: init_ch.start,
+            persistence_start: init_ch.start,
+            state_var: key,
+            value: value,
+        });
+    }
+
+    /*
+    Initilisation of inner world
+    */
+    for (key, value) in &state.inner_world.inner {
+        let key: Vec<LValueS> = key.try_into()?;
+        let key: Vec<SAtom> = key.iter().map(lvalues_into_satom).collect();
+        let value = lvalues_into_atom(value);
+        init_ch.effects.push(Effect {
+            transition_start: init_ch.start,
+            persistence_start: init_ch.start,
+            state_var: key,
+            value: value,
+        });
+    }
+
+    /*
+    Goals: Add subtask
+     */
+
     let init_ch = ChronicleInstance {
         parameters: vec![],
         origin: ChronicleOrigin::Original,
@@ -117,9 +248,9 @@ pub fn build_chronicles(ch: &ChronicleHierarchy) -> Result<chronicles::Problem> 
     };
 
     let mut templates: Vec<ChronicleTemplate> = Vec::new();
-    for t in &ch.chronicle_templates {
+    for t in &problem.cc.chronicle_templates {
         let cont = Container::Template(templates.len());
-        let template = read_chronicle(cont, t, ch, &mut context)?;
+        let template = read_chronicle(cont, t, &problem.cc, &mut context)?;
         templates.push(template);
     }
 
@@ -155,8 +286,8 @@ impl BindingAriesAtoms {
 
 fn read_chronicle(
     c: Container,
-    chronicle: &crate::planning::structs::chronicle::Chronicle,
-    ch: &ChronicleHierarchy,
+    chronicle: &crate::planning::structs::chronicle::ChronicleTemplate,
+    ch: &ConversionCollection,
     context: &mut Ctx,
 ) -> Result<ChronicleTemplate> {
     let mut bindings = BindingAriesAtoms::default();

@@ -1,7 +1,8 @@
 use crate::context::rae_env::{DomainEnv, Parameters, StateFunction};
 use crate::context::rae_state::RAEStateSnapshot;
 use crate::module::rae_exec::RAE_INSTANCE;
-use crate::planning::structs::chronicle::Chronicle;
+use crate::planning::structs::chronicle::ChronicleTemplate;
+use crate::planning::structs::lit::Lit;
 use crate::planning::structs::symbol_table::{AtomId, SymTable};
 use crate::planning::structs::traits::FormatWithSymTable;
 use crate::planning::structs::type_table::AtomType;
@@ -135,13 +136,12 @@ pub fn get_variables_of_type(
 }
 
 #[derive(Default)]
-pub struct ChronicleHierarchy {
+pub struct ConversionCollection {
     pub state_function: Vec<StateFunction>,
     pub tasks: Vec<Vec<AtomId>>,
-    pub chronicle_templates: Vec<Chronicle>,
+    pub chronicle_templates: Vec<ChronicleTemplate>,
     pub local_tasks: TaskTypeMetaDataCollection,
     pub sym_table: SymTable,
-    pub problem: Problem,
 }
 
 #[derive(Default)]
@@ -153,6 +153,8 @@ pub struct Problem {
     pub state_functions: Vec<(String, Parameters)>,
     pub objects: Vec<(String, String)>,
     pub initial_state: RAEStateSnapshot,
+    pub goal_tasks: Vec<Lit>,
+    pub cc: ConversionCollection,
 }
 
 impl From<&ConversionContext> for Problem {
@@ -193,24 +195,29 @@ impl From<&ConversionContext> for Problem {
             state_functions,
             objects,
             initial_state: cc.state.clone(),
+            goal_tasks: vec![],
+            cc: Default::default(),
         }
     }
 }
 
-impl ChronicleHierarchy {
-    pub fn new(templates: Vec<Chronicle>, tasks: Vec<Vec<AtomId>>, sym_table: SymTable) -> Self {
+impl ConversionCollection {
+    pub fn new(
+        templates: Vec<ChronicleTemplate>,
+        tasks: Vec<Vec<AtomId>>,
+        sym_table: SymTable,
+    ) -> Self {
         Self {
             state_function: vec![],
             tasks,
             chronicle_templates: templates,
             local_tasks: Default::default(),
             sym_table,
-            problem: Default::default(),
         }
     }
 }
 
-impl Display for ChronicleHierarchy {
+impl Display for ConversionCollection {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut str = String::new();
 

@@ -1,4 +1,4 @@
-use crate::planning::structs::{ChronicleHierarchy, ConversionContext};
+use crate::planning::structs::{ConversionCollection, ConversionContext};
 use ompas_lisp::core::structs::lenv::LEnv;
 use ompas_lisp::core::structs::lerror::LError::{SpecialError, WrongNumberOfArgument, WrongType};
 use ompas_lisp::core::structs::lerror::LResult;
@@ -13,7 +13,7 @@ pub const TRANSFORM_LAMBDA_EXPRESSION: &str = "transform-lambda-expression";
 pub fn pre_processing(
     lv: &LValue,
     context: &ConversionContext,
-    _ch: &mut ChronicleHierarchy,
+    _ch: &mut ConversionCollection,
 ) -> LResult {
     let lv = pre_process_transform_lambda(lv, context)?;
 

@@ -11,7 +11,7 @@ use crate::planning::structs::traits::{
     Absorb, FormatWithParent, FormatWithSymTable, GetVariables,
 };
 use crate::planning::structs::type_table::PlanningAtomType;
-use crate::planning::structs::{ChronicleHierarchy, END, PREZ, RESULT, START};
+use crate::planning::structs::{ConversionCollection, END, PREZ, RESULT, START};
 use aries_planning::chronicles::ChronicleKind;
 use im::HashSet;
 use ompas_lisp::core::structs::lvalue::LValue;
@@ -35,7 +35,7 @@ impl FormatWithSymTable for Vec<AtomId> {
 }
 
 #[derive(Clone)]
-pub struct Chronicle {
+pub struct ChronicleTemplate {
     chronicle_kind: ChronicleKind,
     label: String,
     pub name: Vec<AtomId>,
@@ -44,9 +44,9 @@ pub struct Chronicle {
     debug: Option<LValue>,
 }
 
-impl Chronicle {
+impl ChronicleTemplate {
     pub fn new(
-        ch: &mut ChronicleHierarchy,
+        ch: &mut ConversionCollection,
         label: impl Display,
         chronicle_kind: ChronicleKind,
     ) -> Self {
@@ -111,7 +111,7 @@ impl Chronicle {
     }
 }
 
-impl FormatWithSymTable for Chronicle {
+impl FormatWithSymTable for ChronicleTemplate {
     fn format_with_sym_table(&self, st: &SymTable, sym_version: bool) -> String {
         let mut s = String::new();
         //name
@@ -143,7 +143,7 @@ impl FormatWithSymTable for Chronicle {
     }
 }
 
-impl FormatWithParent for Chronicle {
+impl FormatWithParent for ChronicleTemplate {
     fn format_with_parent(&mut self, st: &SymTable) {
         self.name.format_with_parent(st);
         self.task.format_with_parent(st);
@@ -151,13 +151,13 @@ impl FormatWithParent for Chronicle {
     }
 }
 
-impl Chronicle {
+impl ChronicleTemplate {
     pub fn set_debug(&mut self, debug: Option<LValue>) {
         self.debug = debug;
     }
 }
 
-impl Chronicle {
+impl ChronicleTemplate {
     pub fn absorb_expression_chronicle(&mut self, ec: ExpressionChronicle) {
         self.add_constraint(Constraint::Eq(
             self.get_result().into(),
@@ -178,7 +178,7 @@ impl Chronicle {
 /*
 ADDERS
  */
-impl Chronicle {
+impl ChronicleTemplate {
     pub fn add_var(&mut self, sym_id: &AtomId) {
         self.pc.add_var(sym_id);
     }
@@ -209,7 +209,7 @@ impl Chronicle {
 /*
 SETTERS
  */
-impl Chronicle {
+impl ChronicleTemplate {
     pub fn set_name(&mut self, name: Vec<AtomId>) {
         self.name = name;
     }
@@ -223,7 +223,7 @@ impl Chronicle {
 REMOVERS
  */
 
-impl Chronicle {
+impl ChronicleTemplate {
     pub fn rm_var(&mut self, sym_id: &AtomId) {
         self.pc.rm_var(sym_id);
     }
@@ -244,7 +244,7 @@ impl Chronicle {
 /*
 GETTERS
  */
-impl Chronicle {
+impl ChronicleTemplate {
     pub fn get_presence(&self) -> &AtomId {
         &self.pc.presence
     }
@@ -317,7 +317,7 @@ impl Chronicle {
     }
 }
 
-impl GetVariables for Chronicle {
+impl GetVariables for ChronicleTemplate {
     fn get_variables(&self) -> HashSet<AtomId> {
         self.pc.get_variables()
     }

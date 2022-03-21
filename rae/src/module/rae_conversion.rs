@@ -6,9 +6,9 @@ use crate::planning::conversion::pre_processing::{pre_processing, transform_lamb
 use crate::planning::conversion::processing::{
     convert_if, convert_lvalue_to_expression_chronicle, MetaData,
 };
-use crate::planning::structs::chronicle::Chronicle;
+use crate::planning::structs::chronicle::ChronicleTemplate;
 use crate::planning::structs::traits::FormatWithSymTable;
-use crate::planning::structs::{ChronicleHierarchy, ConversionContext};
+use crate::planning::structs::{ConversionCollection, ConversionContext};
 use ::macro_rules_attribute::macro_rules_attribute;
 use aries_planning::chronicles::ChronicleKind;
 use ompas_lisp::core::expand;
@@ -41,10 +41,10 @@ pub async fn convert_expr<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
 
     let lv = expand(&args[0], true, &mut context.env).await?;
 
-    let mut ch = ChronicleHierarchy::default();
+    let mut ch = ConversionCollection::default();
 
     let time = SystemTime::now();
-    let mut chronicle = Chronicle::new(&mut ch, "unnamed_chronicle", ChronicleKind::Method);
+    let mut chronicle = ChronicleTemplate::new(&mut ch, "unnamed_chronicle", ChronicleKind::Method);
 
     let pre_processed = pre_processing(&lv, &context, &mut ch)?;
     let ec = convert_lvalue_to_expression_chronicle(
@@ -87,7 +87,7 @@ pub async fn convert_cond_expr<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult
     let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
     let context: ConversionContext = ctx.get_conversion_context().await;
 
-    let mut ch = ChronicleHierarchy::default();
+    let mut ch = ConversionCollection::default();
 
     let result = convert_if(&args[0], &context, &mut ch)?;
 
@@ -125,7 +125,7 @@ pub async fn pre_process_expr<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult 
     let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
     let context: ConversionContext = ctx.get_conversion_context().await;
 
-    pre_processing(&args[0], &context, &mut ChronicleHierarchy::default())
+    pre_processing(&args[0], &context, &mut ConversionCollection::default())
 }
 
 #[macro_rules_attribute(dyn_async!)]
@@ -140,7 +140,7 @@ pub async fn pre_process_domain<'a>(_: &'a [LValue], env: &'a LEnv) -> LResult {
         let pre_processed = pre_processing(
             action.get_sim(),
             &context,
-            &mut ChronicleHierarchy::default(),
+            &mut ConversionCollection::default(),
         )?;
 
         str.push_str(

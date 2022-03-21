@@ -3,7 +3,7 @@ use crate::module::rae_exec::{
 };
 use crate::planning::conversion::post_processing::post_processing;
 use crate::planning::structs::atom::Sym;
-use crate::planning::structs::chronicle::Chronicle;
+use crate::planning::structs::chronicle::ChronicleTemplate;
 use crate::planning::structs::condition::Condition;
 use crate::planning::structs::constraint::{bind_result, equal, finish, meet, start, Constraint};
 use crate::planning::structs::effect::Effect;
@@ -15,9 +15,7 @@ use crate::planning::structs::symbol_table::{AtomId, ExpressionType};
 use crate::planning::structs::traits::{Absorb, FormatWithSymTable, GetVariables};
 use crate::planning::structs::transition::Transition;
 use crate::planning::structs::type_table::{AtomKind, PlanningAtomType, VariableKind};
-use crate::planning::structs::{
-    ChronicleHierarchy, ConversionContext, TaskType, COND, END, PREZ, RESULT, START,
-};
+use crate::planning::structs::{ConversionCollection, ConversionContext, TaskType, COND};
 use aries_planning::chronicles::ChronicleKind;
 use ompas_lisp::core::language::{BOOL, FLOAT, INT, NUMBER, TYPE_LIST};
 use ompas_lisp::core::root_module::basic_math::language::{EQ, GEQ, GT, LEQ, LT, NOT, NOT_SHORT};
@@ -76,7 +74,7 @@ impl MetaData {
 pub fn convert_lvalue_to_expression_chronicle(
     exp: &LValue,
     context: &ConversionContext,
-    ch: &mut ChronicleHierarchy,
+    ch: &mut ConversionCollection,
     meta_data: MetaData,
 ) -> Result<ExpressionChronicle, LError> {
     let mut ec = ExpressionChronicle::new(exp.clone(), &mut ch.sym_table);
@@ -844,7 +842,7 @@ pub fn convert_lvalue_to_expression_chronicle(
 pub fn convert_if(
     exp: &LValue,
     context: &ConversionContext,
-    ch: &mut ChronicleHierarchy,
+    ch: &mut ConversionCollection,
 ) -> Result<ExpressionChronicle, LError> {
     ch.sym_table.new_scope();
 
@@ -917,7 +915,7 @@ pub fn convert_if(
     let ec_cond = convert_lvalue_to_expression_chronicle(cond, context, ch, Default::default())?;
 
     let mut task_lit: Vec<AtomId> = vec![
-        /**ec.get_presence(),
+        /* *ec.get_presence(),
          *ec.get_start(),
          *ec.get_end(),
          *ec.get_result_id(),*/
@@ -964,7 +962,7 @@ pub fn convert_if(
     ch.tasks.push(task_lit);
 
     let create_method = |lvalue: &LValue,
-                         ch: &mut ChronicleHierarchy,
+                         ch: &mut ConversionCollection,
                          branch: bool,
                          debug: LValue|
      -> Result<(), LError> {
@@ -974,12 +972,12 @@ pub fn convert_if(
             .sym_table
             .declare_symbol(&method_label, Some(PlanningAtomType::Method));
 
-        let mut method = Chronicle::new(ch, &method_label, ChronicleKind::Method);
+        let mut method = ChronicleTemplate::new(ch, &method_label, ChronicleKind::Method);
         let method_cond_var =
             ch.sym_table
                 .declare_new_parameter(COND, true, Some(PlanningAtomType::Bool));
         let mut name: Vec<AtomId> = vec![
-            /**method.get_presence(),
+            /* *method.get_presence(),
              *method.get_start(),
              *method.get_end(),
              *method.get_result(),*/

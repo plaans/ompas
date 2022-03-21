@@ -6,10 +6,10 @@ use ompas_rae::planning::conversion::convert_lvalue_to_chronicle;
 use ompas_rae::planning::conversion::processing::{
     convert_lvalue_to_expression_chronicle, MetaData,
 };
-use ompas_rae::planning::structs::chronicle::Chronicle;
+use ompas_rae::planning::structs::chronicle::ChronicleTemplate;
 use ompas_rae::planning::structs::expression_chronicle::ExpressionChronicle;
 use ompas_rae::planning::structs::traits::FormatWithSymTable;
-use ompas_rae::planning::structs::{ChronicleHierarchy, ConversionContext};
+use ompas_rae::planning::structs::{ConversionCollection, ConversionContext};
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
@@ -52,7 +52,7 @@ async fn translate_2(exp: &str) -> Result<ExpressionChronicle, LError> {
     let mut env = LEnv::root().await;
     let lv = parse(exp, &mut env).await?;
 
-    let mut ch = ChronicleHierarchy::default();
+    let mut ch = ConversionCollection::default();
 
     let context = ConversionContext::default();
 
@@ -63,11 +63,11 @@ async fn translate_2(exp: &str) -> Result<ExpressionChronicle, LError> {
 }
 
 #[allow(dead_code)]
-async fn translate(exp: &str) -> Result<Chronicle, LError> {
+async fn translate(exp: &str) -> Result<ChronicleTemplate, LError> {
     let mut env = LEnv::root().await;
     let lv = parse(exp, &mut env).await?;
 
-    let mut ch = ChronicleHierarchy::default();
+    let mut ch = ConversionCollection::default();
 
     let chronicle = convert_lvalue_to_chronicle(&lv, &ConversionContext::default(), &mut ch)?;
     println!("{}", chronicle.format_with_sym_table(&ch.sym_table));

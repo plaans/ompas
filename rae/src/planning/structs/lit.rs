@@ -1,6 +1,6 @@
 use crate::planning::structs::constraint::Constraint;
 use crate::planning::structs::symbol_table::{AtomId, SymTable};
-use crate::planning::structs::traits::{FormatWithSymTable, GetVariables};
+use crate::planning::structs::traits::{FormatWithParent, FormatWithSymTable, GetVariables};
 use crate::planning::structs::type_table::PlanningAtomType;
 use im::{hashset, HashSet};
 use ompas_lisp::core::structs::lerror;
@@ -151,6 +151,16 @@ impl FormatWithSymTable for Lit {
                 str.push(')');
                 str
             }
+        }
+    }
+}
+
+impl FormatWithParent for Lit {
+    fn format_with_parent(&mut self, st: &SymTable) {
+        match self {
+            Lit::Atom(a) => a.format_with_parent(st),
+            Lit::Constraint(c) => c.format_with_parent(st),
+            Lit::Exp(vec) => vec.format_with_parent(st),
         }
     }
 }

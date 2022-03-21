@@ -1,6 +1,6 @@
 use crate::planning::structs::interval::Interval;
 use crate::planning::structs::symbol_table::{AtomId, SymTable};
-use crate::planning::structs::traits::{FormatWithSymTable, GetVariables};
+use crate::planning::structs::traits::{FormatWithParent, FormatWithSymTable, GetVariables};
 use crate::planning::structs::transition::Transition;
 use crate::planning::structs::type_table::PlanningAtomType;
 use im::HashSet;
@@ -18,6 +18,13 @@ impl FormatWithSymTable for Effect {
             self.interval.format_with_sym_table(st, sym_version),
             self.transition.format_with_sym_table(st, sym_version)
         )
+    }
+}
+
+impl FormatWithParent for Effect {
+    fn format_with_parent(&mut self, st: &SymTable) {
+        self.interval.format_with_parent(st);
+        self.transition.format_with_parent(st);
     }
 }
 

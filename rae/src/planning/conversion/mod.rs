@@ -6,6 +6,7 @@ use crate::planning::structs::chronicle::Chronicle;
 use crate::planning::structs::symbol_table::{AtomId, SymTable};
 use crate::planning::structs::type_table::PlanningAtomType;
 use crate::planning::structs::{ChronicleHierarchy, ConversionContext, END, PREZ, RESULT, START};
+use aries_planning::chronicles::ChronicleKind;
 use ompas_lisp::core::structs::lerror::LError;
 use ompas_lisp::core::structs::llambda::{LLambda, LambdaArgs};
 use ompas_lisp::core::structs::lvalue::LValue;
@@ -113,6 +114,7 @@ pub fn convert_domain_to_chronicle_hierarchy(
             action.get_parameters(),
             &conversion_context,
             &mut ch,
+            ChronicleKind::Action,
         )?;
 
         ch.chronicle_templates.push(chronicle);
@@ -135,6 +137,7 @@ pub fn convert_domain_to_chronicle_hierarchy(
             method.get_parameters(),
             &conversion_context,
             &mut ch,
+            ChronicleKind::Method,
         )?;
 
         ch.chronicle_templates.push(chronicle);
@@ -152,15 +155,16 @@ pub fn convert_abstract_task_to_chronicle(
     parameters: &Parameters,
     conversion_context: &ConversionContext,
     ch: &mut ChronicleHierarchy,
+    chronicle_kind: ChronicleKind,
 ) -> Result<Chronicle, LError> {
     let symbol_id = ch.sym_table.declare_symbol(&label.to_string(), None);
 
-    let mut chronicle = Chronicle::new(ch, label);
+    let mut chronicle = Chronicle::new(ch, label, chronicle_kind);
     let mut name = vec![
-        *chronicle.get_presence(),
-        *chronicle.get_result(),
-        *chronicle.get_start(),
-        *chronicle.get_end(),
+        /**chronicle.get_presence(),
+         *chronicle.get_result(),
+         *chronicle.get_start(),
+         *chronicle.get_end(),*/
         symbol_id,
     ];
     if let LambdaArgs::List(l) = lambda.get_params() {
@@ -227,12 +231,12 @@ pub fn convert_lvalue_to_chronicle(
         .sym_table
         .declare_symbol(label, Some(PlanningAtomType::Task));
 
-    let mut chronicle = Chronicle::new(ch, label);
+    let mut chronicle = Chronicle::new(ch, label, ChronicleKind::Method);
     let mut name = vec![
-        *chronicle.get_presence(),
-        *chronicle.get_result(),
-        *chronicle.get_start(),
-        *chronicle.get_end(),
+        /**chronicle.get_presence(),
+         *chronicle.get_result(),
+         *chronicle.get_start(),
+         *chronicle.get_end(),*/
         symbol_id,
     ];
 
@@ -290,7 +294,8 @@ pub fn declare_task(task: &Task, st: &mut SymTable) -> Vec<AtomId> {
 
     let result = st.declare_new_parameter(RESULT, true, Some(PlanningAtomType::Bool));
 
-    let mut task_lit: Vec<AtomId> = vec![prez, result, start, end, task_label_id];
+    //let mut task_lit: Vec<AtomId> = vec![prez, result, start, end, task_label_id];
+    let mut task_lit: Vec<AtomId> = vec![task_label_id];
 
     for (param, _t) in task.get_parameters().inner() {
         //TODO: add types for parameters

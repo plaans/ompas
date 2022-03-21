@@ -10,6 +10,7 @@ use crate::planning::structs::chronicle::Chronicle;
 use crate::planning::structs::traits::FormatWithSymTable;
 use crate::planning::structs::{ChronicleHierarchy, ConversionContext};
 use ::macro_rules_attribute::macro_rules_attribute;
+use aries_planning::chronicles::ChronicleKind;
 use ompas_lisp::core::expand;
 use ompas_lisp::core::structs::lenv::LEnv;
 use ompas_lisp::core::structs::lerror::LError::WrongNumberOfArgument;
@@ -43,7 +44,7 @@ pub async fn convert_expr<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     let mut ch = ChronicleHierarchy::default();
 
     let time = SystemTime::now();
-    let mut chronicle = Chronicle::new(&mut ch, "unnamed_chronicle");
+    let mut chronicle = Chronicle::new(&mut ch, "unnamed_chronicle", ChronicleKind::Method);
 
     let pre_processed = pre_processing(&lv, &context, &mut ch)?;
     let ec = convert_lvalue_to_expression_chronicle(

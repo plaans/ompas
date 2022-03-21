@@ -18,6 +18,7 @@ use crate::planning::structs::type_table::{AtomKind, PlanningAtomType, VariableK
 use crate::planning::structs::{
     ChronicleHierarchy, ConversionContext, TaskType, COND, END, PREZ, RESULT, START,
 };
+use aries_planning::chronicles::ChronicleKind;
 use ompas_lisp::core::language::{BOOL, FLOAT, INT, NUMBER, TYPE_LIST};
 use ompas_lisp::core::root_module::basic_math::language::{EQ, GEQ, GT, LEQ, LT, NOT, NOT_SHORT};
 use ompas_lisp::core::root_module::error::language::CHECK;
@@ -362,21 +363,21 @@ pub fn convert_lvalue_to_expression_chronicle(
                                 {
                                     ec.set_pure_result(constraint.into());
                                 } else {
-                                    ec.add_condition(Condition {
+                                    /*ec.add_condition(Condition {
                                         interval: *ec.get_interval(),
                                         constraint: Constraint::Eq(
                                             ec.get_result_as_lit(),
                                             constraint.into(),
                                         ),
-                                    });
+                                    });*/
+                                    ec.add_constraint(Constraint::Eq(
+                                        ec.get_result_as_lit(),
+                                        constraint.into(),
+                                    ));
                                     ch.sym_table.set_type_of(
                                         ec.get_result_id(),
                                         &Some(PlanningAtomType::Bool),
                                     );
-                                    /*ec.add_constraint(Constraint::Eq(
-                                        ec.get_result_as_lit(),
-                                        constraint.into(),
-                                    ));*/
                                 }
                                 ec.absorb(left);
                                 ec.absorb(right);
@@ -398,10 +399,11 @@ pub fn convert_lvalue_to_expression_chronicle(
                                 if !meta_data.top_level && val.is_result_pure() {
                                     ec.add_constraint(constraint);
                                 } else {
-                                    ec.add_condition(Condition {
+                                    ec.add_constraint(constraint);
+                                    /*ec.add_condition(Condition {
                                         interval: Interval::new_instantaneous(ec.get_end()),
                                         constraint: constraint,
-                                    });
+                                    });*/
                                 }
 
                                 ec.absorb(val);
@@ -457,13 +459,17 @@ pub fn convert_lvalue_to_expression_chronicle(
                                         ec.set_pure_result(constraint.into());
                                     }
                                 } else {
-                                    ec.add_condition(Condition {
+                                    /*ec.add_condition(Condition {
                                         interval: *ec.get_interval(),
                                         constraint: Constraint::Eq(
                                             ec.get_result_as_lit(),
                                             constraint.into(),
                                         ),
-                                    });
+                                    });*/
+                                    ec.add_constraint(Constraint::Eq(
+                                        ec.get_result_as_lit(),
+                                        constraint.into(),
+                                    ));
                                     ch.sym_table.set_type_of(
                                         ec.get_result_id(),
                                         &Some(PlanningAtomType::Bool),
@@ -544,17 +550,17 @@ pub fn convert_lvalue_to_expression_chronicle(
                                             symbol.get_result_as_lit(),
                                             symbol_type.get_result_as_lit(),
                                         );
-                                        /*ec.add_constraint(Constraint::Eq(
+                                        ec.add_constraint(Constraint::Eq(
                                             ec.get_result_as_lit(),
                                             constraint.into(),
-                                        ));*/
-                                        ec.add_condition(Condition {
+                                        ));
+                                        /*ec.add_condition(Condition {
                                             interval: *ec.get_interval(),
                                             constraint: Constraint::Eq(
                                                 ec.get_result_as_lit(),
                                                 constraint.into(),
                                             ),
-                                        });
+                                        });*/
                                         ch.sym_table.set_type_of(
                                             ec.get_result_id(),
                                             &Some(PlanningAtomType::Bool),
@@ -583,13 +589,18 @@ pub fn convert_lvalue_to_expression_chronicle(
                                         Default::default(),
                                     )?;
 
-                                    ec.add_condition(Condition {
+                                    /*ec.add_condition(Condition {
                                         interval: *condition.get_interval(),
                                         constraint: Constraint::Eq(
                                             condition.get_result_as_lit(),
                                             ch.sym_table.new_bool(true).into(),
                                         ),
-                                    });
+                                    });*/
+
+                                    ec.add_constraint(Constraint::Eq(
+                                        condition.get_result_as_lit(),
+                                        ch.sym_table.new_bool(true).into(),
+                                    ));
                                     ec.add_constraint(equal(
                                         ec.get_interval(),
                                         condition.get_interval(),
@@ -747,11 +758,11 @@ pub fn convert_lvalue_to_expression_chronicle(
                                 ]
                                 .into();
 
-                                //ec.add_constraint(Constraint::Eq(ec.get_result_as_lit(), literal));
-                                ec.add_condition(Condition {
+                                ec.add_constraint(Constraint::Eq(ec.get_result_as_lit(), literal));
+                                /*ec.add_condition(Condition {
                                     interval: *ec.get_interval(),
                                     constraint: Constraint::Eq(ec.get_result_as_lit(), literal),
-                                });
+                                });*/
                                 /*ec.add_effect(Effect {
                                     interval: *ec.get_interval(),
                                     transition: Transition::new(ec.get_result_as_lit(), literal),
@@ -771,11 +782,11 @@ pub fn convert_lvalue_to_expression_chronicle(
                                 Lit::from(literal),
                             ]
                             .into();
-                            ec.add_condition(Condition {
+                            /*ec.add_condition(Condition {
                                 interval: *ec.get_interval(),
                                 constraint: Constraint::Eq(ec.get_result_as_lit(), literal),
-                            });
-                            //ec.add_constraint(Constraint::Eq(ec.get_result_as_lit(), literal));
+                            });*/
+                            ec.add_constraint(Constraint::Eq(ec.get_result_as_lit(), literal));
                             /*ec.add_effect(Effect {
                                 interval: *ec.get_interval(),
                                 transition: Transition::new(ec.get_result_as_lit(), literal),
@@ -801,7 +812,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                         ExpressionType::StateFunction(return_type) => {
                             ec.add_condition(Condition {
                                 interval: *ec.get_interval(),
-                                constraint: Constraint::Eq(ec.get_result_as_lit(), literal.into()),
+                                constraint: Constraint::Eq(literal.into(), ec.get_result_as_lit()),
                             });
                             //Return type of the state_function
                             ch.sym_table.set_type_of(ec.get_result_id(), &return_type);
@@ -876,19 +887,19 @@ pub fn convert_if(
 
     //CREATION OF THE TASK
     let mut types = vec![
-        Some(PlanningAtomType::Bool),
+        /*Some(PlanningAtomType::Bool),
         Some(PlanningAtomType::Timepoint),
         Some(PlanningAtomType::Timepoint),
-        None,
+        None,*/
         Some(PlanningAtomType::Task),
         Some(PlanningAtomType::Bool),
     ];
 
     let mut task_string = vec![
-        PREZ.to_string(),
+        /*PREZ.to_string(),
         START.to_string(),
         END.to_string(),
-        RESULT.to_string(),
+        RESULT.to_string(),*/
         task_label.clone(),
         COND.to_string(),
     ];
@@ -906,15 +917,15 @@ pub fn convert_if(
     let ec_cond = convert_lvalue_to_expression_chronicle(cond, context, ch, Default::default())?;
 
     let mut task_lit: Vec<AtomId> = vec![
-        *ec.get_presence(),
-        *ec.get_start(),
-        *ec.get_end(),
-        *ec.get_result_id(),
+        /**ec.get_presence(),
+         *ec.get_start(),
+         *ec.get_end(),
+         *ec.get_result_id(),*/
         *ch.sym_table.id(&task_label).unwrap(),
         *ec_cond.get_result_id(),
     ];
 
-    for s in &task_string[6..] {
+    for s in &task_string[2..] {
         task_lit.push(*ch.sym_table.id(s).unwrap());
     }
 
@@ -943,7 +954,7 @@ pub fn convert_if(
 
     let mut task_lit: Vec<AtomId> = vec![];
     for (i, s) in task_string.iter().enumerate() {
-        if i == 4 {
+        if i == 0 {
             task_lit.push(*ch.sym_table.id(s).unwrap());
         } else {
             task_lit.push(ch.sym_table.declare_new_parameter(s, true, types[i]));
@@ -963,15 +974,15 @@ pub fn convert_if(
             .sym_table
             .declare_symbol(&method_label, Some(PlanningAtomType::Method));
 
-        let mut method = Chronicle::new(ch, &method_label);
+        let mut method = Chronicle::new(ch, &method_label, ChronicleKind::Method);
         let method_cond_var =
             ch.sym_table
                 .declare_new_parameter(COND, true, Some(PlanningAtomType::Bool));
         let mut name: Vec<AtomId> = vec![
-            *method.get_presence(),
-            *method.get_start(),
-            *method.get_end(),
-            *method.get_result(),
+            /**method.get_presence(),
+             *method.get_start(),
+             *method.get_end(),
+             *method.get_result(),*/
             method_id,
             method_cond_var,
         ];
@@ -994,16 +1005,21 @@ pub fn convert_if(
             MetaData::new(true, false),
         )?;
         method.absorb_expression_chronicle(ec_branch);
-        method.add_condition(Condition {
+        method.add_constraint(Constraint::Eq(
+            method_cond_var.into(),
+            ch.sym_table.new_bool(branch).into(),
+        ));
+
+        /*method.add_condition(Condition {
             interval: Interval::new(method.get_start(), method.get_start()),
             constraint: Constraint::Eq(
                 method_cond_var.into(),
                 ch.sym_table.new_bool(branch).into(),
             ),
-        });
+        });*/
 
         let mut task: Vec<AtomId> = name[0..task_string.len()].iter().map(|l| *l).collect();
-        task[4] = ch.sym_table.id(&task_label).unwrap().clone();
+        task[0] = ch.sym_table.id(&task_label).unwrap().clone();
 
         method.set_debug(Some(debug));
         method.set_task(task);

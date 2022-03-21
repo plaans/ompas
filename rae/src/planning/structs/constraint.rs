@@ -4,7 +4,7 @@ use crate::planning::structs::expression_chronicle::ExpressionChronicle;
 use crate::planning::structs::interval::Interval;
 use crate::planning::structs::lit::Lit;
 use crate::planning::structs::symbol_table::{AtomId, SymTable};
-use crate::planning::structs::traits::{FormatWithSymTable, GetVariables};
+use crate::planning::structs::traits::{FormatWithParent, FormatWithSymTable, GetVariables};
 use crate::planning::structs::type_table::PlanningAtomType;
 use im::HashSet;
 use ompas_lisp::core::structs::lerror::LError;
@@ -121,6 +121,24 @@ impl FormatWithSymTable for Constraint {
                     l2.format_with_sym_table(st, sym_version)
                 )
             }
+        }
+    }
+}
+
+impl FormatWithParent for Constraint {
+    fn format_with_parent(&mut self, st: &SymTable) {
+        match self {
+            Constraint::LEq(l1, l2)
+            | Constraint::Eq(l1, l2)
+            | Constraint::LT(l1, l2)
+            | Constraint::And(l1, l2)
+            | Constraint::Or(l1, l2)
+            | Constraint::Type(l1, l2)
+            | Constraint::Arbitrary(l1, l2) => {
+                l1.format_with_parent(st);
+                l2.format_with_parent(st);
+            }
+            Constraint::Neg(a) => a.format_with_parent(st),
         }
     }
 }

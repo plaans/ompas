@@ -17,6 +17,7 @@ const SYMBOL: &str = "symbol";
 const FUNCTION: &str = "function";
 //const LAMBDA: &str = "lambda";
 const OBJECT: &str = "object";
+const PRESENCE: &str = "presence";
 const LOCAL: &str = "local";
 const PARAMETER: &str = "parameter";
 const CONSTANT: &str = "constant";
@@ -50,6 +51,7 @@ pub enum PlanningAtomType {
     Method,
     Task,
     Timepoint,
+    Presence,
     Int,
     Float,
     Bool,
@@ -95,6 +97,7 @@ impl Display for PlanningAtomType {
                 PlanningAtomType::Object => OBJECT.to_string(),
                 PlanningAtomType::Other(t) => format!("type({})", t),
                 PlanningAtomType::SubType(t) => format!("subtype({})", t),
+                PlanningAtomType::Presence => PRESENCE.to_string(),
             }
         )
     }
@@ -113,8 +116,8 @@ impl TypeTable {
             BOOL => Some(PlanningAtomType::Bool),
             SYMBOL => Some(PlanningAtomType::Symbol),
             FUNCTION => Some(PlanningAtomType::Function),
-            //LAMBDA => Some(PlanningAtomType::Lambda),
             OBJECT => Some(PlanningAtomType::Object),
+            PRESENCE => Some(PlanningAtomType::Presence),
             other => match self.get_type_id(other) {
                 Some(t) => Some(PlanningAtomType::Other(*t)),
                 None => None,

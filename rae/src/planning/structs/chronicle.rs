@@ -7,9 +7,12 @@ use crate::planning::structs::interval::Interval;
 use crate::planning::structs::lit::Lit;
 use crate::planning::structs::partial_chronicle::PartialChronicle;
 use crate::planning::structs::symbol_table::{AtomId, SymTable};
-use crate::planning::structs::traits::{Absorb, FormatWithSymTable, GetVariables};
+use crate::planning::structs::traits::{
+    Absorb, FormatWithParent, FormatWithSymTable, GetVariables,
+};
 use crate::planning::structs::type_table::PlanningAtomType;
 use crate::planning::structs::{ChronicleHierarchy, END, PREZ, RESULT, START};
+use aries_planning::chronicles::ChronicleKind;
 use im::HashSet;
 use ompas_lisp::core::structs::lvalue::LValue;
 use std::fmt::Display;
@@ -33,6 +36,7 @@ impl FormatWithSymTable for Vec<AtomId> {
 
 #[derive(Clone)]
 pub struct Chronicle {
+    chronicle_kind: ChronicleKind,
     label: String,
     pub name: Vec<AtomId>,
     pub task: Vec<AtomId>,
@@ -41,7 +45,11 @@ pub struct Chronicle {
 }
 
 impl Chronicle {
-    pub fn new(ch: &mut ChronicleHierarchy, label: impl Display) -> Self {
+    pub fn new(
+        ch: &mut ChronicleHierarchy,
+        label: impl Display,
+        chronicle_kind: ChronicleKind,
+    ) -> Self {
         let interval = Interval::new(
             &ch.sym_table.declare_new_parameter(
                 START,
@@ -61,7 +69,7 @@ impl Chronicle {
             PREZ,
             //format!("{}_prez", label),
             true,
-            Some(PlanningAtomType::Bool),
+            Some(PlanningAtomType::Presence),
         );
 
         let result = ch.sym_table.declare_new_parameter(
@@ -88,6 +96,7 @@ impl Chronicle {
         };
 
         let mut chronicle = Self {
+            chronicle_kind,
             label: label.to_string(),
             name: Default::default(),
             task: Default::default(),
@@ -131,6 +140,14 @@ impl FormatWithSymTable for Chronicle {
         }
 
         s
+    }
+}
+
+impl FormatWithParent for Chronicle {
+    fn format_with_parent(&mut self, st: &SymTable) {
+        self.name.format_with_parent(st);
+        self.task.format_with_parent(st);
+        self.pc.format_with_parent(st);
     }
 }
 
@@ -250,6 +267,18 @@ impl Chronicle {
 
     pub fn get_constraints(&self) -> &Vec<Constraint> {
         &self.pc.get_constraints()
+    }
+
+    pub fn get_conditions(&self) -> &Vec<Condition> {
+        &self.pc.conditions
+    }
+
+    pub fn get_effects(&self) -> &Vec<Effect> {
+        &self.pc.effects
+    }
+
+    pub fn get_subtasks(&self) -> &Vec<Expression> {
+        &self.pc.subtasks
     }
 
     fn build_hashset<T: GetVariables>(vec: &[T]) -> im::HashSet<AtomId> {

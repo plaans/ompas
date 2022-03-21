@@ -4,7 +4,7 @@ use crate::planning::structs::chronicle::{Chronicle, ChronicleSet};
 use crate::planning::structs::constraint::Constraint;
 use crate::planning::structs::lit::Lit;
 use crate::planning::structs::symbol_table::{AtomId, SymTable};
-use crate::planning::structs::traits::GetVariables;
+use crate::planning::structs::traits::{FormatWithParent, GetVariables};
 use crate::planning::structs::type_table::{AtomKind, PlanningAtomType, VariableKind};
 use crate::planning::structs::{ChronicleHierarchy, ConversionContext};
 use im::{hashset, HashSet};
@@ -20,6 +20,7 @@ pub fn post_processing(
     //panic!("for no fucking reason");
     simplify_timepoints(c, ch, context)?;
     rm_useless_var(c, ch, context);
+    c.format_with_parent(&ch.sym_table);
     Ok(())
 }
 

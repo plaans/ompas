@@ -6,7 +6,9 @@ use crate::planning::structs::expression::Expression;
 use crate::planning::structs::interval::Interval;
 use crate::planning::structs::lit::Lit;
 use crate::planning::structs::symbol_table::{AtomId, SymTable};
-use crate::planning::structs::traits::{Absorb, FormatWithSymTable, GetVariables};
+use crate::planning::structs::traits::{
+    Absorb, FormatWithParent, FormatWithSymTable, GetVariables,
+};
 use crate::planning::structs::type_table::PlanningAtomType;
 use im::{hashset, HashSet};
 use std::ops::Deref;
@@ -72,6 +74,64 @@ impl PartialChronicle {
 
     pub fn get_result_as_lit(&self) -> Lit {
         (&self.result).into()
+    }
+}
+
+impl PartialChronicle {
+    pub fn rm_var(&mut self, sym_id: &AtomId) {
+        self.variables.remove(sym_id);
+    }
+
+    pub fn rm_set_var(&mut self, ids: Vec<AtomId>) {
+        for id in ids {
+            self.rm_var(&id);
+        }
+    }
+
+    pub fn rm_constraint(&mut self, index: usize) {
+        self.constraints.remove(index);
+    }
+
+    pub fn rm_set_constraint(&mut self, mut indexes: Vec<usize>) {
+        indexes.reverse();
+        for index in indexes {
+            self.rm_constraint(index);
+        }
+    }
+}
+
+impl PartialChronicle {
+    pub fn add_var(&mut self, sym_id: &AtomId) {
+        self.variables.insert(*sym_id);
+    }
+    pub fn add_interval(&mut self, interval: &Interval) {
+        self.variables.insert(*interval.start());
+        self.variables.insert(*interval.end());
+    }
+
+    pub fn add_constraint(&mut self, constraint: Constraint) {
+        if let Constraint::And(Lit::Constraint(a), Lit::Constraint(b)) = constraint {
+            self.constraints.push(a.deref().clone());
+            self.constraints.push(b.deref().clone());
+        } else {
+            self.constraints.push(constraint);
+        }
+    }
+
+    pub fn add_condition(&mut self, cond: Condition) {
+        self.conditions.push(cond);
+    }
+
+    pub fn add_effect(&mut self, effect: Effect) {
+        self.effects.push(effect);
+    }
+
+    pub fn add_subtask(&mut self, sub_task: Expression) {
+        self.subtasks.push(sub_task);
+    }
+
+    pub fn get_constraints(&self) -> &Vec<Constraint> {
+        &self.constraints
     }
 }
 
@@ -150,6 +210,26 @@ impl FormatWithSymTable for PartialChronicle {
     }
 }
 
+impl FormatWithParent for PartialChronicle {
+    fn format_with_parent(&mut self, st: &SymTable) {
+        let old_variables = self.variables.clone();
+        let mut new_variables: HashSet<AtomId> = Default::default();
+        for v in &old_variables {
+            let mut v = *v;
+            v.format_with_parent(st);
+            new_variables.insert(v);
+        }
+
+        self.variables = new_variables;
+        self.interval.format_with_parent(st);
+        self.presence.format_with_parent(st);
+        self.constraints.format_with_parent(st);
+        self.conditions.format_with_parent(st);
+        self.effects.format_with_parent(st);
+        self.subtasks.format_with_parent(st);
+    }
+}
+
 impl Absorb for PartialChronicle {
     fn absorb(&mut self, mut other: Self) {
         self.add_constraint(Constraint::Eq(self.presence.into(), other.presence.into()));
@@ -158,64 +238,6 @@ impl Absorb for PartialChronicle {
         self.conditions.append(&mut other.conditions);
         self.effects.append(&mut other.effects);
         self.subtasks.append(&mut other.subtasks);
-    }
-}
-
-impl PartialChronicle {
-    pub fn rm_var(&mut self, sym_id: &AtomId) {
-        self.variables.remove(sym_id);
-    }
-
-    pub fn rm_set_var(&mut self, ids: Vec<AtomId>) {
-        for id in ids {
-            self.rm_var(&id);
-        }
-    }
-
-    pub fn rm_constraint(&mut self, index: usize) {
-        self.constraints.remove(index);
-    }
-
-    pub fn rm_set_constraint(&mut self, mut indexes: Vec<usize>) {
-        indexes.reverse();
-        for index in indexes {
-            self.rm_constraint(index);
-        }
-    }
-}
-
-impl PartialChronicle {
-    pub fn add_var(&mut self, sym_id: &AtomId) {
-        self.variables.insert(*sym_id);
-    }
-    pub fn add_interval(&mut self, interval: &Interval) {
-        self.variables.insert(*interval.start());
-        self.variables.insert(*interval.end());
-    }
-
-    pub fn add_constraint(&mut self, constraint: Constraint) {
-        if let Constraint::And(Lit::Constraint(a), Lit::Constraint(b)) = constraint {
-            self.constraints.push(a.deref().clone());
-            self.constraints.push(b.deref().clone());
-        } else {
-            self.constraints.push(constraint);
-        }
-    }
-
-    pub fn add_condition(&mut self, cond: Condition) {
-        self.conditions.push(cond);
-    }
-
-    pub fn add_effect(&mut self, effect: Effect) {
-        self.effects.push(effect);
-    }
-
-    pub fn add_subtask(&mut self, sub_task: Expression) {
-        self.subtasks.push(sub_task);
-    }
-
-    pub fn get_constraints(&self) -> &Vec<Constraint> {
-        &self.constraints
     }
 }
 

@@ -18,3 +18,19 @@ pub trait GetVariables {
         atom_type: &Option<PlanningAtomType>,
     ) -> im::HashSet<AtomId>;
 }
+
+/*
+Transforms all literals by replacing all atomid by the atomid of their parents.
+ */
+pub trait FormatWithParent {
+    fn format_with_parent(&mut self, st: &SymTable);
+}
+
+impl<T> FormatWithParent for Vec<T>
+where
+    T: FormatWithParent,
+{
+    fn format_with_parent(&mut self, st: &SymTable) {
+        self.iter_mut().for_each(|e| e.format_with_parent(st))
+    }
+}

@@ -242,7 +242,7 @@ impl Display for ChronicleHierarchy {
             );
         }
 
-        str.push_str(self.sym_table.to_string().as_str());
+        //str.push_str(self.sym_table.to_string().as_str());
 
         write!(f, "{}", str)
     }

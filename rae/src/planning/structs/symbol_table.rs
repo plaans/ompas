@@ -1,7 +1,7 @@
 use crate::module::rae_exec::*;
 use crate::planning::structs::atom::{Atom, Sym};
 use crate::planning::structs::interval::Interval;
-use crate::planning::structs::traits::FormatWithSymTable;
+use crate::planning::structs::traits::{FormatWithParent, FormatWithSymTable};
 use crate::planning::structs::type_table::{
     AtomKind, AtomType, PlanningAtomType, TypeId, TypeTable, VariableKind,
 };
@@ -13,6 +13,20 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::{Display, Formatter};
 
 pub type AtomId = NodeId;
+
+impl FormatWithSymTable for AtomId {
+    fn format_with_sym_table(&self, st: &SymTable, sym_version: bool) -> String {
+        st.get_atom(self, true)
+            .unwrap()
+            .format_with_sym_table(st, sym_version)
+    }
+}
+
+impl FormatWithParent for AtomId {
+    fn format_with_parent(&mut self, st: &SymTable) {
+        *self = *st.get_parent(&self);
+    }
+}
 
 #[derive(Clone)]
 pub struct SymTable {
@@ -338,7 +352,7 @@ impl SymTable {
         self.symbol_types.add_new_atom(
             &id,
             AtomType {
-                a_type: Some(PlanningAtomType::Bool),
+                a_type: Some(PlanningAtomType::Presence),
                 kind: AtomKind::Variable(VariableKind::Local),
             },
         );
@@ -573,14 +587,6 @@ impl SymbolTypes {
 impl SymbolTypes {
     pub fn add_new_atom(&mut self, id: &AtomId, atom_type: AtomType) {
         self.inner.insert(*id, atom_type);
-    }
-}
-
-impl FormatWithSymTable for AtomId {
-    fn format_with_sym_table(&self, st: &SymTable, sym_version: bool) -> String {
-        st.get_atom(self, true)
-            .unwrap()
-            .format_with_sym_table(st, sym_version)
     }
 }
 

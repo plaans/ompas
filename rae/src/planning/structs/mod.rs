@@ -2,7 +2,6 @@ use crate::context::rae_env::{DomainEnv, Parameters, StateFunction};
 use crate::context::rae_state::RAEStateSnapshot;
 use crate::module::rae_exec::RAE_INSTANCE;
 use crate::planning::structs::chronicle::ChronicleTemplate;
-use crate::planning::structs::lit::Lit;
 use crate::planning::structs::symbol_table::{AtomId, SymTable};
 use crate::planning::structs::traits::FormatWithSymTable;
 use crate::planning::structs::type_table::AtomType;
@@ -153,7 +152,7 @@ pub struct Problem {
     pub state_functions: Vec<(String, Parameters)>,
     pub objects: Vec<(String, String)>,
     pub initial_state: RAEStateSnapshot,
-    pub goal_tasks: Vec<Lit>,
+    pub goal_tasks: Vec<LValueS>,
     pub cc: ConversionCollection,
 }
 

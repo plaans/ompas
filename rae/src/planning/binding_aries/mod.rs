@@ -1,25 +1,30 @@
-use crate::planning::structs::symbol_table::AtomId;
+use crate::planning::structs::atom::Atom;
+use crate::planning::structs::constraint::Constraint;
+use crate::planning::structs::lit::Lit;
+use crate::planning::structs::symbol_table::{AtomId, SymTable};
 use crate::planning::structs::traits::GetVariables;
-use crate::planning::structs::type_table::PlanningAtomType;
+use crate::planning::structs::type_table::{AtomKind, PlanningAtomType};
 use crate::planning::structs::{ConversionCollection, Problem};
 use anyhow::{anyhow, Result};
-use aries_core::Lit as ariesLit;
+use aries_core::Lit as aLit;
 use aries_core::*;
 use aries_model::extensions::Shaped;
-use aries_model::lang::*;
+use aries_model::lang::{Atom as aAtom, FAtom, FVar, IAtom, SAtom, SVar, Type, Variable};
 use aries_model::symbols::SymbolTable;
 use aries_model::types::TypeHierarchy;
 use aries_planning::chronicles;
-use aries_planning::chronicles::constraints::Constraint;
+use aries_planning::chronicles::constraints::Constraint as aConstraint;
 use aries_planning::chronicles::{
-    Chronicle as ariesChronicle, ChronicleInstance, ChronicleKind, ChronicleOrigin,
-    ChronicleTemplate, Condition, Container, Ctx, Effect, Problem as ariesProblem, StateFun,
-    SubTask, VarType, TIME_SCALE,
+    Chronicle as aChronicle, ChronicleInstance, ChronicleKind, ChronicleOrigin, ChronicleTemplate,
+    Condition, Container, Ctx, Effect, Problem as aProblem, StateFun, SubTask, VarType, TIME_SCALE,
 };
 use aries_planning::parsing::pddl::TypedSymbol;
 use aries_utils::input::Sym;
+use ompas_lisp::core::structs::lerror::LError;
+use ompas_lisp::core::structs::lnumber::LNumber;
 use ompas_lisp::core::structs::lvalues::LValueS;
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
+use std::ops::Deref;
 use std::sync::Arc;
 
 static TASK_TYPE: &str = "★task★";
@@ -35,6 +40,7 @@ static TYPE_TYPE: &str = "★type★";
 static INSTANCE_SFN: &str = "instance";
 
 static FLOAT_SCALE: IntCst = 10;
+static NIL_OBJECT: &str = "★nil★";
 
 pub fn build_chronicles(problem: &Problem) -> Result<chronicles::Problem> {
     let mut types: Vec<(Sym, Option<Sym>)> = vec![
@@ -65,6 +71,7 @@ pub fn build_chronicles(problem: &Problem) -> Result<chronicles::Problem> {
     }
 
     symbols.push(TypedSymbol::new(INSTANCE_SFN, STATE_FUNCTION_TYPE));
+    symbols.push(TypedSymbol::new(NIL_OBJECT, OBJECT_TYPE));
     for (label, _) in &problem.state_functions {
         symbols.push(TypedSymbol::new(label, STATE_FUNCTION_TYPE));
     }
@@ -128,9 +135,9 @@ pub fn build_chronicles(problem: &Problem) -> Result<chronicles::Problem> {
 
     let _init_container = Container::Instance(0);
     // Initial chronicle construction
-    let mut init_ch = ariesChronicle {
+    let mut init_ch = aChronicle {
         kind: ChronicleKind::Problem,
-        presence: ariesLit::TRUE,
+        presence: aLit::TRUE,
         start: ctx.origin(),
         end: ctx.horizon(),
         name: vec![],
@@ -161,7 +168,7 @@ pub fn build_chronicles(problem: &Problem) -> Result<chronicles::Problem> {
         templates.push(template);
     }
 
-    let problem = ariesProblem {
+    let problem = aProblem {
         context: ctx,
         templates,
         chronicles: vec![init_ch],
@@ -176,19 +183,19 @@ fn satom_from_lvalues(ctx: &Ctx, v: &LValueS) -> SAtom {
         .into()
 }
 
-fn atom_from_lvalues(ctx: &Ctx, v: &LValueS) -> Atom {
+fn atom_from_lvalues(ctx: &Ctx, v: &LValueS) -> aAtom {
     match v {
-        LValueS::Symbol(s) => ctx
-            .typed_sym(ctx.model.get_symbol_table().id(s.as_str()).unwrap())
-            .into(),
+        LValueS::Symbol(s) => {
+            SAtom::from(ctx.typed_sym(ctx.model.get_symbol_table().id(s.as_str()).unwrap())).into()
+        }
         LValueS::Int(i) => IAtom::from(*i as i32).into(),
         LValueS::Float(f) => {
             let f: i32 = (f * FLOAT_SCALE as f64) as i32;
             FAtom::new(IAtom::from(f), FLOAT_SCALE).into()
         }
         LValueS::Bool(b) => match b {
-            true => Lit::TRUE.into(),
-            false => Lit::FALSE.into(),
+            true => aLit::TRUE.into(),
+            false => aLit::FALSE.into(),
         },
         _ => panic!(""),
     }
@@ -197,7 +204,7 @@ fn atom_from_lvalues(ctx: &Ctx, v: &LValueS) -> Atom {
 /**
 Add initial state from RAEStateSnapshot
  */
-fn initialize_state(init_ch: &mut ariesChronicle, p: &Problem, ctx: &Ctx) {
+fn initialize_state(init_ch: &mut aChronicle, p: &Problem, ctx: &Ctx) {
     /*
     Initialisation of instance state variable
      */
@@ -208,7 +215,7 @@ fn initialize_state(init_ch: &mut ariesChronicle, p: &Problem, ctx: &Ctx) {
         assert_eq!(&key[1].to_string(), INSTANCE_SFN);
         let sf: SAtom = satom_from_lvalues(ctx, &key[0]);
         let object: SAtom = satom_from_lvalues(ctx, &key[1]);
-        let value: Atom = atom_from_lvalues(ctx, value);
+        let value: aAtom = atom_from_lvalues(ctx, value);
         let sv = vec![sf, object];
 
         init_ch.effects.push(Effect {
@@ -267,12 +274,12 @@ fn initialize_state(init_ch: &mut ariesChronicle, p: &Problem, ctx: &Ctx) {
     }
 }
 
-fn initialize_goal_task(init_ch: &mut ariesChronicle, p: &Problem, ctx: &mut Ctx) {
-    for (i, t) in p.goal_tasks.iter().enumerate() {
+fn initialize_goal_task(init_ch: &mut aChronicle, p: &Problem, ctx: &mut Ctx) {
+    let c = Container::Instance(0);
+    for t in &p.goal_tasks {
         let t: Vec<LValueS> = t.try_into().expect("");
         let task_name: Vec<SAtom> = t.iter().map(|v| satom_from_lvalues(ctx, v)).collect();
 
-        let c = Container::Instance(i);
         let prez = init_ch.presence;
         let start =
             ctx.model
@@ -311,6 +318,76 @@ impl BindingAriesAtoms {
 
     pub fn get_id(&self, var: &Variable) -> Option<&AtomId> {
         self.reverse.get(var)
+    }
+}
+
+fn convert_constraint(bindings: &BindingAriesAtoms, x: &Constraint) -> Result<aConstraint, LError> {
+    match x {
+        Constraint::LEq(a, b) => {
+            let a: AtomId = a.try_into()?;
+            let b: AtomId = b.try_into()?;
+            let a: SVar = bindings.get_var(&a).expect("").try_into()?;
+            let b: SVar = bindings.get_var(&b).expect("").try_into()?;
+            Ok(aConstraint::leq(SAtom::from(a), SAtom::from(b)))
+        }
+        Constraint::Eq(a, b) => {
+            let a: AtomId = a.try_into()?;
+            let a: SVar = bindings.get_var(&a).expect("").try_into()?;
+            match b {
+                Lit::Atom(b) => {
+                    let b: SVar = bindings.get_var(&b).expect("").try_into()?;
+                    Ok(aConstraint::eq(SAtom::from(a), SAtom::from(b)))
+                }
+                Lit::Constraint(c) => Ok(aConstraint::reify(
+                    a,
+                    convert_constraint(bindings, c.deref())?,
+                )),
+                Lit::Exp(_) => Err(Default::default()),
+            }
+        }
+        Constraint::Neg(_) => panic!("not supported yet"),
+        Constraint::LT(a, b) => {
+            let a: AtomId = a.try_into()?;
+            let b: AtomId = b.try_into()?;
+            let a: SVar = bindings.get_var(&a).expect("").try_into()?;
+            let b: SVar = bindings.get_var(&b).expect("").try_into()?;
+            Ok(aConstraint::lt(SAtom::from(a), SAtom::from(b)))
+        }
+        Constraint::And(_, _)
+        | Constraint::Or(_, _)
+        | Constraint::Type(_, _)
+        | Constraint::Arbitrary(_, _) => Err(Default::default()),
+    }
+}
+
+fn atom_id_into_atom(
+    a: &AtomId,
+    sym_table: &SymTable,
+    bindings: &BindingAriesAtoms,
+    context: &Ctx,
+) -> aAtom {
+    let ompas_atom = sym_table.get_atom(a, false).unwrap();
+    let ompas_type = sym_table.get_type_of(a).unwrap();
+
+    match ompas_atom {
+        Atom::Bool(b) => match b {
+            true => aLit::TRUE.into(),
+            false => aLit::FALSE.into(),
+        },
+        Atom::Number(n) => match n {
+            LNumber::Int(i) => IAtom::from(*i as i32).into(),
+            LNumber::Float(f) => {
+                let f: i32 = (f * FLOAT_SCALE as f64) as i32;
+                FAtom::new(IAtom::from(f), FLOAT_SCALE).into()
+            }
+            LNumber::Usize(u) => IAtom::from(*u as i32).into(),
+        },
+        Atom::Sym(s) => match ompas_type.kind {
+            AtomKind::Constant => context
+                .typed_sym(context.model.get_symbol_table().id(s.get_sym()).unwrap())
+                .into(),
+            AtomKind::Variable(_) => (*bindings.get_var(a).unwrap()).into(),
+        },
     }
 }
 
@@ -418,13 +495,18 @@ fn read_chronicle(
     }
     //End declaration of the variables
 
+    let id_into_satom = |a: &AtomId| -> SAtom {
+        SVar::try_from(bindings.get_var(a).unwrap())
+            .expect("")
+            .into()
+    };
     /*
     CREATION of the name
      */
     //For the moment lacking the fact that we can add any kind of variables
     let mut name: Vec<SAtom> = vec![];
     for (i, p) in chronicle.name.iter().enumerate() {
-        if i == 4 {
+        if i == 0 {
             name.push(
                 context
                     .typed_sym(
@@ -437,37 +519,116 @@ fn read_chronicle(
                     .into(),
             )
         } else {
-            //name.push(bindings.get_var(p).unwrap().into())
+            name.push(SVar::try_from(bindings.get_var(p).unwrap())?.into())
         }
     }
 
-    let task: Vec<SAtom> = vec![];
-    for p in &chronicle.task {}
-
-    let mut constraints: Vec<Constraint> = vec![];
+    let mut constraints: Vec<aConstraint> = vec![];
     let mut conditions: Vec<Condition> = vec![];
     let mut effects: Vec<Effect> = vec![];
     let mut subtasks: Vec<SubTask> = vec![];
 
+    let get_atom =
+        |a: &AtomId| -> aAtom { atom_id_into_atom(a, &ch.sym_table, &bindings, &context) };
+
     for x in chronicle.get_constraints() {
-        /*let mut x;
-        constraints.push(x);*/
+        let x = convert_constraint(&bindings, x)?;
+        constraints.push(x);
     }
 
-    for c in chronicle.get_conditions() {}
+    for c in chronicle.get_conditions() {
+        let sv: Vec<Lit> = (&c.sv).try_into()?;
+        let sv = sv
+            .iter()
+            .map(|l| {
+                let a: AtomId = l.try_into().expect("");
+                id_into_satom(&a)
+            })
+            .collect();
+        let value = atom_id_into_atom(
+            &AtomId::try_from(&c.value)?,
+            &ch.sym_table,
+            &bindings,
+            context,
+        );
+        let start = FVar::try_from(bindings.get_var(c.get_start()).unwrap())?;
+        let start = FAtom::from(start);
+        let end = FVar::try_from(bindings.get_var(c.get_end()).unwrap())?;
+        let end = FAtom::from(end);
+        let condition = Condition {
+            start,
+            state_var: sv,
+            value: value.into(),
+            end,
+        };
+        conditions.push(condition);
+    }
 
-    for e in chronicle.get_effects() {}
+    for e in chronicle.get_effects() {
+        let sv: Vec<Lit> = (&e.sv).try_into()?;
+        let sv = sv
+            .iter()
+            .map(|l| {
+                let a: AtomId = l.try_into().expect("");
+                id_into_satom(&a)
+            })
+            .collect();
+        let value = atom_id_into_atom(
+            &AtomId::try_from(&e.value)?,
+            &ch.sym_table,
+            &bindings,
+            context,
+        );
+        let start = FVar::try_from(bindings.get_var(e.get_start()).unwrap())?;
+        let start = FAtom::from(start);
+        let end = FVar::try_from(bindings.get_var(e.get_end()).unwrap())?;
+        let end = FAtom::from(end);
+        let effect = Effect {
+            transition_start: start,
+            persistence_start: end,
+            state_var: sv,
+            value: value.into(),
+        };
+        effects.push(effect);
+    }
 
-    for s in chronicle.get_subtasks() {}
+    for s in chronicle.get_subtasks() {
+        let start: FAtom = get_atom(s.interval.start()).try_into()?;
+        let end: FAtom = get_atom(s.interval.end()).try_into()?;
+        let e: Vec<Lit> = (&s.lit).try_into()?;
+        let e: Vec<SAtom> = e
+            .iter()
+            .map(|l| {
+                let a: AtomId = l.try_into().expect("");
+                get_atom(&a).try_into().expect("")
+            })
+            .collect();
+        let st = SubTask {
+            id: None,
+            start,
+            end,
+            task_name: e,
+        };
 
-    /*let template = ariesChronicle {
-        kind: ChronicleKind::Action,
+        subtasks.push(st);
+    }
+
+    let start = FVar::try_from(bindings.get_var(chronicle.get_start()).unwrap())?;
+    let start = FAtom::from(start);
+    let end = FVar::try_from(bindings.get_var(chronicle.get_end()).unwrap())?;
+    let end = FAtom::from(end);
+
+    let task: Vec<SAtom> = chronicle
+        .task
+        .iter()
+        .map(|a| get_atom(a).try_into().expect(""))
+        .collect();
+
+    let template = aChronicle {
+        kind: chronicle.chronicle_kind,
         presence: prez,
-        start: bindings
-        .get_var(chronicle.get_start())
-        .unwrap()
-        .try_into()?,
-        end: Default::default(), //bindings.get_var(chronicle.get_end()).unwrap().try_into()?,
+        start,
+        end,
         name,
         task: Some(task),
         conditions,
@@ -476,7 +637,11 @@ fn read_chronicle(
         subtasks,
     };
 
-    Ok(template);*/
+    let template = ChronicleTemplate {
+        label: None,
+        parameters: params,
+        chronicle: template,
+    };
 
-    todo!()
+    Ok(template)
 }

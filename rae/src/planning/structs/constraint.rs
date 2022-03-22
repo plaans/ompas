@@ -21,6 +21,47 @@ pub enum Constraint {
     Type(Lit, Lit),
     Arbitrary(Lit, Lit),
 }
+/*
+impl TryFrom<Constraint> for aConstraint {
+    type Error = LError;
+
+    fn try_from(value: Constraint) -> Result<Self, Self::Error> {
+        match value {
+            Constraint::LEq(a, b) => {
+                let a: AtomId = a.try_into()?;
+                let b: AtomId = b.try_into()?;
+                let a: SVar = bindings.get_var(&a).expect("").try_into()?;
+                let b: SVar = bindings.get_var(&b).expect("").try_into()?;
+                Ok(aConstraint::leq(SAtom::from(a), SAtom::from(b)))
+            }
+            Constraint::Eq(a, b) => {
+                let a: AtomId = a.try_into()?;
+                let a: SVar = bindings.get_var(&a).expect("").try_into()?;
+                match b {
+                    Lit::Atom(b) => {
+                        let b: SVar = bindings.get_var(&b).expect("").try_into()?;
+                        Ok(aConstraint::eq(SAtom::from(a), SAtom::from(b)))
+                    }
+                    Lit::Constraint(c) => Ok(aConstraint::reify(a, c.try_into()?)),
+                    Lit::Exp(e_) => Err(Default::default()),
+                }
+            }
+            Constraint::Neg(_) => panic!("not supported yet"),
+            Constraint::LT(a, b) => {
+                let a: AtomId = a.try_into()?;
+                let b: AtomId = b.try_into()?;
+                let a: SVar = bindings.get_var(&a).expect("").try_into()?;
+                let b: SVar = bindings.get_var(&b).expect("").try_into()?;
+                Ok(aConstraint::lt(SAtom::from(a), SAtom::from(b)))
+            }
+            Constraint::And(_, _)
+            | Constraint::Or(_, _)
+            | Constraint::Type(_, _)
+            | Constraint::Arbitrary(_, _) => Err(Default::default()),
+        }
+    }
+}*/
+
 impl Constraint {
     pub fn get_left(&self) -> &Lit {
         match self {

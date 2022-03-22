@@ -13,11 +13,10 @@ use crate::planning::structs::interval::Interval;
 use crate::planning::structs::lit::{lvalue_to_lit, Lit};
 use crate::planning::structs::symbol_table::{AtomId, ExpressionType};
 use crate::planning::structs::traits::{Absorb, FormatWithSymTable, GetVariables};
-use crate::planning::structs::transition::Transition;
 use crate::planning::structs::type_table::{AtomKind, PlanningAtomType, VariableKind};
 use crate::planning::structs::{ConversionCollection, ConversionContext, TaskType, COND};
 use aries_planning::chronicles::ChronicleKind;
-use ompas_lisp::core::language::{BOOL, FLOAT, INT, NUMBER, TYPE_LIST};
+use ompas_lisp::core::language::{BOOL, FLOAT, INT, NUMBER, OBJECT, TYPE_LIST};
 use ompas_lisp::core::root_module::basic_math::language::{EQ, GEQ, GT, LEQ, LT, NOT, NOT_SHORT};
 use ompas_lisp::core::root_module::error::language::CHECK;
 use ompas_lisp::core::root_module::predicate::language::{
@@ -260,10 +259,8 @@ pub fn convert_lvalue_to_expression_chronicle(
 
                                 ec.add_condition(Condition {
                                     interval: Interval::new_instantaneous(&ec.get_interval().end()),
-                                    constraint: Constraint::Eq(
-                                        fluent.get_result_as_lit(),
-                                        ch.sym_table.new_bool(true).into(),
-                                    ),
+                                    sv: fluent.get_result_as_lit(),
+                                    value: ch.sym_table.new_bool(true).into(),
                                 });
 
                                 ec.set_pure_result(ch.sym_table.new_bool(true).into());
@@ -307,10 +304,8 @@ pub fn convert_lvalue_to_expression_chronicle(
 
                                 ec.add_effect(Effect {
                                     interval: *ec.get_interval(),
-                                    transition: Transition::new(
-                                        state_variable.get_result_as_lit(),
-                                        value.get_result_as_lit(),
-                                    ),
+                                    sv: state_variable.get_result_as_lit(),
+                                    value: value.get_result_as_lit(),
                                 });
 
                                 ec.absorb(state_variable);
@@ -508,7 +503,6 @@ pub fn convert_lvalue_to_expression_chronicle(
                                                 Some(r) => r.into(),
                                                 None => LValue::Nil,
                                             };
-
                                             ec.add_constraint(Constraint::Eq(
                                                 ec.get_result_as_lit(),
                                                 lvalue_to_lit(&result, &mut ch.sym_table)?,
@@ -544,14 +538,33 @@ pub fn convert_lvalue_to_expression_chronicle(
                                             ec.get_interval(),
                                         ));
 
-                                        let constraint = Constraint::Type(
+                                        /*let constraint = Constraint::Type(
                                             symbol.get_result_as_lit(),
                                             symbol_type.get_result_as_lit(),
-                                        );
+                                        );*/
+                                        let r = ch.sym_table.declare_new_result(Some(
+                                            PlanningAtomType::SubType(
+                                                *ch.sym_table.get_type_id(OBJECT).unwrap(),
+                                            ),
+                                        ));
+                                        ec.add_condition(Condition {
+                                            interval: *ec.get_interval(),
+                                            sv: vec![
+                                                ch.sym_table.id(RAE_INSTANCE).unwrap().into(),
+                                                symbol.get_result_as_lit(),
+                                            ]
+                                            .into(),
+                                            value: r.into(),
+                                        });
                                         ec.add_constraint(Constraint::Eq(
                                             ec.get_result_as_lit(),
-                                            constraint.into(),
+                                            Constraint::Eq(
+                                                r.into(),
+                                                symbol_type.get_result_as_lit(),
+                                            )
+                                            .into(),
                                         ));
+
                                         /*ec.add_condition(Condition {
                                             interval: *ec.get_interval(),
                                             constraint: Constraint::Eq(
@@ -810,7 +823,8 @@ pub fn convert_lvalue_to_expression_chronicle(
                         ExpressionType::StateFunction(return_type) => {
                             ec.add_condition(Condition {
                                 interval: *ec.get_interval(),
-                                constraint: Constraint::Eq(literal.into(), ec.get_result_as_lit()),
+                                sv: literal.into(),
+                                value: ec.get_result_as_lit(),
                             });
                             //Return type of the state_function
                             ch.sym_table.set_type_of(ec.get_result_id(), &return_type);

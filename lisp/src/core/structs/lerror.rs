@@ -1,6 +1,7 @@
 use crate::core::structs::lerror::LError::SpecialError;
 use crate::core::structs::lvalue::LValue;
 use crate::core::structs::typelvalue::TypeLValue;
+use aries_model::lang::ConversionError;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::ops::Range;
@@ -96,6 +97,12 @@ impl Display for LError {
 impl From<std::io::Error> for LError {
     fn from(e: std::io::Error) -> Self {
         SpecialError("std::io::Error", e.to_string())
+    }
+}
+
+impl From<ConversionError> for LError {
+    fn from(ce: ConversionError) -> Self {
+        SpecialError("aries_model::lang::ConversionError", ce.to_string())
     }
 }
 

@@ -19,11 +19,11 @@ log =  { version = "0.4", features = ["std"] }
 macro_rules_attribute = "0.0.2"
 async-trait = "0.1.51"
 cli-table = "0.4.6"
-aries_core = {git = "https://github.com/Yirmandias/aries/", branch = "master"}
-aries_model = {git = "https://github.com/Yirmandias/aries/", branch = "master"}
-aries_planning = {git = "https://github.com/Yirmandias/aries/", branch = "master"}
-aries_utils = {git = "https://github.com/Yirmandias/aries/", branch = "master"}
-aries_collections = {git = "https://github.com/Yirmandias/aries/", branch = "master"}
+aries_core = {path = "../../aries/core"}
+aries_model = {path = "../../aries/model"}
+aries_planning = {path = "../../aries/planning"}
+aries_utils = {path = "../../aries/utils"}
+aries_collections = {path = "../../aries/collections"}
 anyhow = "1.0.40"
 
 

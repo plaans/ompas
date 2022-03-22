@@ -4,6 +4,7 @@ use crate::planning::structs::traits::{FormatWithParent, FormatWithSymTable, Get
 use crate::planning::structs::type_table::PlanningAtomType;
 use im::{hashset, HashSet};
 use ompas_lisp::core::structs::lerror;
+use ompas_lisp::core::structs::lerror::LError;
 use ompas_lisp::core::structs::lerror::LError::SpecialError;
 use ompas_lisp::core::structs::lnumber::LNumber;
 use ompas_lisp::core::structs::lvalue::LValue;
@@ -30,33 +31,33 @@ impl Lit {
 }
 
 impl TryFrom<&Lit> for AtomId {
-    type Error = ();
+    type Error = LError;
 
     fn try_from(value: &Lit) -> Result<Self, Self::Error> {
         match value {
             Lit::Atom(a) => Ok(*a),
-            _ => Err(()),
+            _ => Err(Default::default()),
         }
     }
 }
 
 impl TryFrom<&Lit> for Constraint {
-    type Error = ();
+    type Error = LError;
 
     fn try_from(value: &Lit) -> Result<Self, Self::Error> {
         match value {
             Lit::Constraint(c) => Ok(c.deref().clone()),
-            _ => Err(()),
+            _ => Err(Default::default()),
         }
     }
 }
 
 impl TryFrom<&Lit> for Vec<Lit> {
-    type Error = ();
+    type Error = LError;
     fn try_from(value: &Lit) -> Result<Self, Self::Error> {
         match value {
             Lit::Exp(c) => Ok(c.clone()),
-            _ => Err(()),
+            _ => Err(Default::default()),
         }
     }
 }

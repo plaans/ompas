@@ -36,7 +36,7 @@ impl FormatWithSymTable for Vec<AtomId> {
 
 #[derive(Clone)]
 pub struct ChronicleTemplate {
-    chronicle_kind: ChronicleKind,
+    pub chronicle_kind: ChronicleKind,
     label: String,
     pub name: Vec<AtomId>,
     pub task: Vec<AtomId>,

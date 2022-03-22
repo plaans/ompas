@@ -52,22 +52,24 @@ pub fn bind_atoms(id_1: &AtomId, id_2: &AtomId, st: &mut SymTable) -> Result<boo
             Ok(true)
         }
         (AtomKind::Constant, AtomKind::Variable(_)) => {
-            if type_2.a_type.is_some() {
+            /*if type_2.a_type.is_some() {
                 if type_1.a_type.unwrap() != type_2.a_type.unwrap() {
                     return Err(Default::default());
                 }
             }
             st.union_atom(id_1, id_2);
-            Ok(true)
+            Ok(true)*/
+            Ok(false)
         }
         (AtomKind::Variable(_), AtomKind::Constant) => {
-            if type_1.a_type.is_some() {
+            /*if type_1.a_type.is_some() {
                 if type_1.a_type.unwrap() != type_2.a_type.unwrap() {
                     return Err(Default::default());
                 }
             }
             st.union_atom(id_2, id_1);
-            Ok(true)
+            Ok(true)*/
+            Ok(false)
         }
         (
             AtomKind::Variable(VariableKind::Parameter),

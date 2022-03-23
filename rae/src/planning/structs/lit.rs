@@ -8,7 +8,7 @@ use ompas_lisp::core::structs::lerror::LError;
 use ompas_lisp::core::structs::lerror::LError::SpecialError;
 use ompas_lisp::core::structs::lnumber::LNumber;
 use ompas_lisp::core::structs::lvalue::LValue;
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 use std::ops::Deref;
 
 #[derive(Clone, Debug)]
@@ -30,6 +30,14 @@ impl Lit {
     }
 }
 
+impl TryFrom<Lit> for AtomId {
+    type Error = LError;
+
+    fn try_from(value: Lit) -> Result<Self, Self::Error> {
+        (&value).try_into()
+    }
+}
+
 impl TryFrom<&Lit> for AtomId {
     type Error = LError;
 
@@ -41,10 +49,36 @@ impl TryFrom<&Lit> for AtomId {
     }
 }
 
-impl TryFrom<&Lit> for Constraint {
+impl TryFrom<&Lit> for Vec<AtomId> {
     type Error = LError;
 
     fn try_from(value: &Lit) -> Result<Self, Self::Error> {
+        match value {
+            Lit::Atom(a) => Ok(vec![*a]),
+            Lit::Constraint(_) => Err(Default::default()),
+            Lit::Exp(l) => {
+                let mut e = vec![];
+                for a in l {
+                    e.push(AtomId::try_from(a)?);
+                }
+                Ok(e)
+            }
+        }
+    }
+}
+
+impl TryFrom<Lit> for Vec<AtomId> {
+    type Error = LError;
+
+    fn try_from(value: Lit) -> Result<Self, Self::Error> {
+        (&value).try_into()
+    }
+}
+
+impl TryFrom<Lit> for Constraint {
+    type Error = LError;
+
+    fn try_from(value: Lit) -> Result<Self, Self::Error> {
         match value {
             Lit::Constraint(c) => Ok(c.deref().clone()),
             _ => Err(Default::default()),
@@ -59,6 +93,13 @@ impl TryFrom<&Lit> for Vec<Lit> {
             Lit::Exp(c) => Ok(c.clone()),
             _ => Err(Default::default()),
         }
+    }
+}
+
+impl TryFrom<Lit> for Vec<Lit> {
+    type Error = LError;
+    fn try_from(value: Lit) -> Result<Self, Self::Error> {
+        (&value).try_into()
     }
 }
 

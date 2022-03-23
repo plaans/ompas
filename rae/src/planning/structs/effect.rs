@@ -1,5 +1,4 @@
 use crate::planning::structs::interval::Interval;
-use crate::planning::structs::lit::Lit;
 use crate::planning::structs::symbol_table::{AtomId, SymTable};
 use crate::planning::structs::traits::{FormatWithParent, FormatWithSymTable, GetVariables};
 use crate::planning::structs::type_table::PlanningAtomType;
@@ -8,8 +7,8 @@ use im::HashSet;
 #[derive(Clone)]
 pub struct Effect {
     pub interval: Interval,
-    pub sv: Lit,
-    pub value: Lit,
+    pub sv: Vec<AtomId>,
+    pub value: AtomId,
 }
 
 impl Effect {
@@ -43,9 +42,12 @@ impl FormatWithParent for Effect {
 
 impl GetVariables for Effect {
     fn get_variables(&self) -> HashSet<AtomId> {
-        self.interval
-            .get_variables()
-            .union(self.sv.get_variables().union(self.value.get_variables()))
+        let mut union = self.interval.get_variables();
+        self.sv.iter().for_each(|a| {
+            union.insert(*a);
+        });
+        union.insert(self.value);
+        union
     }
 
     fn get_variables_of_type(

@@ -257,9 +257,11 @@ pub fn convert_lvalue_to_expression_chronicle(
                                     constraint: bind_result(&ec, &fluent),
                                 });*/
 
+                                let r: Vec<AtomId> = fluent.get_result_as_lit().try_into()?;
+
                                 ec.add_condition(Condition {
                                     interval: Interval::new_instantaneous(&ec.get_interval().end()),
-                                    sv: fluent.get_result_as_lit(),
+                                    sv: r,
                                     value: ch.sym_table.new_bool(true).into(),
                                 });
 
@@ -304,8 +306,8 @@ pub fn convert_lvalue_to_expression_chronicle(
 
                                 ec.add_effect(Effect {
                                     interval: *ec.get_interval(),
-                                    sv: state_variable.get_result_as_lit(),
-                                    value: value.get_result_as_lit(),
+                                    sv: state_variable.get_result_as_lit().try_into()?,
+                                    value: value.get_result_as_lit().try_into()?,
                                 });
 
                                 ec.absorb(state_variable);
@@ -547,13 +549,13 @@ pub fn convert_lvalue_to_expression_chronicle(
                                                 *ch.sym_table.get_type_id(OBJECT).unwrap(),
                                             ),
                                         ));
+                                        ec.add_var(&r);
                                         ec.add_condition(Condition {
                                             interval: *ec.get_interval(),
                                             sv: vec![
-                                                ch.sym_table.id(RAE_INSTANCE).unwrap().into(),
-                                                symbol.get_result_as_lit(),
-                                            ]
-                                            .into(),
+                                                *ch.sym_table.id(RAE_INSTANCE).unwrap(),
+                                                symbol.get_result_as_lit().try_into()?,
+                                            ],
                                             value: r.into(),
                                         });
                                         ec.add_constraint(Constraint::Eq(
@@ -808,23 +810,29 @@ pub fn convert_lvalue_to_expression_chronicle(
                             ));
                         }
                         ExpressionType::Action | ExpressionType::Task => {
-                            let mut new_literal = vec![
+                            /*let mut new_literal = vec![
                                 ec.get_presence().into(),
                                 ec.get_start().into(),
                                 ec.get_end().into(),
                                 ec.get_result_as_lit(),
-                            ];
-                            new_literal.append(&mut literal);
+                            ];*/
+                            //new_literal.append(&mut literal);
+                            ec.add_constraint(Constraint::Eq(
+                                ec.get_result_as_lit(),
+                                ch.sym_table.new_bool(true).into(),
+                            ));
                             ec.add_subtask(Expression {
                                 interval: *ec.get_interval(),
-                                lit: new_literal.into(),
-                            })
+                                lit: literal.into(),
+                            });
+                            ch.sym_table
+                                .set_type_of(ec.get_result_id(), &Some(PlanningAtomType::Bool));
                         }
                         ExpressionType::StateFunction(return_type) => {
                             ec.add_condition(Condition {
                                 interval: *ec.get_interval(),
-                                sv: literal.into(),
-                                value: ec.get_result_as_lit(),
+                                sv: Lit::from(literal).try_into()?,
+                                value: ec.get_result_as_lit().try_into()?,
                             });
                             //Return type of the state_function
                             ch.sym_table.set_type_of(ec.get_result_id(), &return_type);

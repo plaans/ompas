@@ -108,7 +108,8 @@ pub const MACRO_GENERATE_ACTION_MODEL: &str = "
               `(list ,label (lambda ,params
                     (do
                         ,(gtpc p_expr)
-                        (check ,conds)
+                        ;(check ,conds)
+                        ,conds
                         ,effs))))))";
 
 pub const MACRO_GENERATE_ACTION_OPERATIONAL_MODEL: &str =
@@ -121,7 +122,7 @@ pub const MACRO_GENERATE_ACTION_OPERATIONAL_MODEL: &str =
 
               `(list ,label (lambda ,params
                     (do 
-                        (check ,(gtpc p_expr))
+                        ,(gtpc p_expr)
                         ,body))))))";
 
 /// Macro used to generate code to define a method in REA environment.
@@ -144,56 +145,19 @@ pub const MACRO_GENERATE_METHOD: &str = "(defmacro generate-method
                 (lambda ,params
                     (do 
                         ,(gtpc p_expr)
-                        (check ,conds)))
+                        ,conds))
                 (lambda ,params ,score)
                 (lambda ,params ,body))))))";
 
-/// Macro used to generate code to define a method in RAE environment.
-/*pub const MACRO_GENERATE_METHOD_PARAMETERS: &str =
-    "(defmacro generate-method-parameters (lambda args
-    (let ((label (car args))
-            (args_enum (cdr args)))
-
-        (quasiquote (quote (unquote
-            (list label
-            (let ((p_enum (car args_enum))
-                (p_labels (caadr args_enum))
-                (conds (cadadr args_enum)))
-
-                (quasiquote
-                    ((unquote begin)
-                        (define eval_params ((unquote lambda) args
-                            (let ((params (car args)))
-                                (if (not (null? params))
-                                    (if (eval (cons ((unquote lambda) (unquote p_labels) (unquote conds)) params))
-                                        (cons params (eval_params (cdr args)))
-                                        (eval_params (cdr args)))
-                                    nil))))
-                        (eval_params (unquote (cons enumerate p_enum)))))))))))))";
-
-pub const GENERATE_METHOD_PARAMETERS: &str = "generate-method-parameters";
-
-/// Macro to define lambda that will evaluates set of parameters that can instantiate a method in a given state.
-pub const MACRO_ENUMERATE_PARAMS: &str = "(defmacro enumerate-params (lambda args
-    (let ((p_enum (car args))
-        (p_labels (caadr args))
-        (conds (cadadr args)))
-
-        (quasiquote
-            (begin
-                (define eval_params (lambda args
-                    (let ((params (car args)))
-                        (if (not (null? params))
-                            (if (eval (cons (lambda (unquote p_labels) (unquote conds)) params))
-                                (cons params (eval_params (cdr args)))
-                                (eval_params (cdr args)))
-                            nil))))
-                (eval_params (unquote (cons enumerate p_enum))))))))";*/
-
 const GENERATE_TYPE_TEST_EXPR: &str = "generate-type-test-expr";
+const F_AND_EFFECT: &str = "f-and-effect";
+const F_AND_COND: &str = "f-and-cond";
 
 const LAMBDA_GENERATE_TYPE_PRE_CONDITIONS: &str =
     "(define gtpc (lambda (l) (parse (generate-type-test-expr l))))";
+
+const MACRO_AND_COND: &str = "(defmacro and-cond (lambda args (parse (f-and-cond args))))";
+const MACRO_AND_EFFECT: &str = "(defmacro and-effect (lambda args (parse (f-and-effect args))))";
 
 #[derive(Default)]
 pub struct CtxRaeDescription {}
@@ -212,12 +176,16 @@ impl IntoModule for CtxRaeDescription {
                 MACRO_GENERATE_METHOD,
                 //MACRO_ENUMERATE_PARAMS,
                 LAMBDA_GENERATE_TYPE_PRE_CONDITIONS,
+                MACRO_AND_COND,
+                MACRO_AND_EFFECT,
             ]
             .into(),
             label: MOD_RAE_DESCRIPTION.to_string(),
         };
 
         module.add_fn_prelude(GENERATE_TYPE_TEST_EXPR, generate_type_test_expr);
+        module.add_fn_prelude(F_AND_COND, f_and_cond);
+        module.add_fn_prelude(F_AND_EFFECT, f_and_effect);
         module
     }
 
@@ -230,6 +198,63 @@ impl IntoModule for CtxRaeDescription {
     }
 }
 
+fn f_and_cond(args: &[LValue], _: &LEnv) -> LResult {
+    if args.len() != 1 {
+        return Err(WrongNumberOfArgument(
+            GENERATE_TYPE_TEST_EXPR,
+            args.into(),
+            args.len(),
+            1..1,
+        ));
+    }
+
+    if let LValue::List(conditions) = &args[0] {
+        let mut str = "(do ".to_string();
+        for cond in conditions {
+            str.push_str(format!("(check {})", cond).as_str());
+        }
+        str.push(')');
+        Ok(LValue::String(str))
+    } else if let LValue::Nil = &args[0] {
+        Ok(LValue::String("true".to_string()))
+    } else {
+        Err(WrongType(
+            GENERATE_TYPE_TEST_EXPR,
+            args[0].clone(),
+            (&args[0]).into(),
+            TypeLValue::List,
+        ))
+    }
+}
+
+fn f_and_effect(args: &[LValue], _: &LEnv) -> LResult {
+    if args.len() != 1 {
+        return Err(WrongNumberOfArgument(
+            GENERATE_TYPE_TEST_EXPR,
+            args.into(),
+            args.len(),
+            1..1,
+        ));
+    }
+
+    if let LValue::List(conditions) = &args[0] {
+        let mut str = "(begin ".to_string();
+        for cond in conditions {
+            str.push_str(format!("{}", cond).as_str());
+        }
+        str.push(')');
+        Ok(LValue::String(str))
+    } else if let LValue::Nil = &args[0] {
+        Ok(LValue::String("true".to_string()))
+    } else {
+        Err(WrongType(
+            GENERATE_TYPE_TEST_EXPR,
+            args[0].clone(),
+            (&args[0]).into(),
+            TypeLValue::List,
+        ))
+    }
+}
 /// Takes as input a p_expr of the form ((p1 p1_type) ... (p_n pn_type))
 pub fn generate_type_test_expr(args: &[LValue], _: &LEnv) -> LResult {
     if args.len() != 1 {
@@ -418,12 +443,17 @@ pub async fn def_action_model<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult 
     }
 
     let lvalue = cons(&[GENERATE_ACTION_MODEL.into(), args.into()], env)?;
-    let mut e = LEnv::root().await;
 
     let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
     let mut env = ctx.get_rae_env().read().await.env.clone();
-
-    let lvalue = eval(&expand(&lvalue, true, &mut env).await?, &mut e).await?;
+    let lvalue: LResult = expand(&lvalue, true, &mut env).await;
+    let lvalue = match lvalue {
+        Ok(e) => e,
+        Err(e) => panic!("{}", e),
+    };
+    //println!("expanded: {}", lvalue);
+    let lvalue = eval(&lvalue, &mut env).await?;
+    //println!("evaluated: {}", lvalue);
 
     if let LValue::List(list) = &lvalue {
         if list.len() != 2 {
@@ -476,12 +506,11 @@ pub async fn def_action_operational_model<'a>(args: &'a [LValue], env: &'a LEnv)
         &[GENERATE_ACTION_OPERATIONAL_MODEL.into(), args.into()],
         env,
     )?;
-    let mut e = LEnv::root().await;
 
     let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
     let mut env = ctx.get_rae_env().read().await.env.clone();
 
-    let lvalue = eval(&expand(&lvalue, true, &mut env).await?, &mut e).await?;
+    let lvalue = eval(&expand(&lvalue, true, &mut env).await?, &mut env).await?;
 
     if let LValue::List(list) = &lvalue {
         if list.len() != 2 {
@@ -533,9 +562,8 @@ pub async fn def_action<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     let lvalue = cons(&[GENERATE_ACTION.into(), args.into()], env)?;
     let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
 
-    let mut e = LEnv::root().await;
     let mut env = ctx.get_rae_env().read().await.env.clone();
-    let lvalue = eval(&expand(&lvalue, true, &mut env).await?, &mut e).await?;
+    let lvalue = eval(&expand(&lvalue, true, &mut env).await?, &mut env).await?;
 
     if let LValue::List(list) = &lvalue {
         if list.len() != 3 {
@@ -602,10 +630,9 @@ pub async fn def_method<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
 
     let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
 
-    let mut e = LEnv::root().await;
     let mut env = ctx.get_rae_env().read().await.env.clone();
 
-    let lvalue = eval(&expand(&lvalue, true, &mut env).await?, &mut e).await?;
+    let lvalue = eval(&expand(&lvalue, true, &mut env).await?, &mut env).await?;
 
     //println!("lvalue: {}", lvalue);
 
@@ -702,10 +729,9 @@ pub async fn def_task<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
 
     let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
 
-    let mut e = LEnv::root().await;
     let mut env = ctx.get_rae_env().read().await.env.clone();
 
-    let lvalue = eval(&expand(&lvalue, true, &mut env).await?, &mut e).await?;
+    let lvalue = eval(&expand(&lvalue, true, &mut env).await?, &mut env).await?;
 
     //println!("new_task: {}", lvalue);
 

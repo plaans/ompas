@@ -341,6 +341,7 @@ impl IntoModule for CtxRae {
         module.add_async_fn_prelude(RAE_PRE_PROCESS_EXPR, pre_process_expr);
         module.add_async_fn_prelude(RAE_PRE_PROCESS_DOMAIN, pre_process_domain);
         module.add_async_fn_prelude(RAE_CONVERT_COND_EXPR, convert_cond_expr);
+        module.add_async_fn_prelude(RAE_PLAN_TASK, plan_task);
 
         //Trigger task
         module.add_fn_prelude(RAE_TRIGGER_EVENT, trigger_event);

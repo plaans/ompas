@@ -1,5 +1,4 @@
 use crate::planning::structs::interval::Interval;
-use crate::planning::structs::lit::Lit;
 use crate::planning::structs::symbol_table::{AtomId, SymTable};
 use crate::planning::structs::traits::{FormatWithParent, FormatWithSymTable, GetVariables};
 use crate::planning::structs::type_table::PlanningAtomType;
@@ -8,8 +7,8 @@ use im::HashSet;
 #[derive(Clone)]
 pub struct Condition {
     pub interval: Interval,
-    pub sv: Lit,
-    pub value: Lit,
+    pub sv: Vec<AtomId>,
+    pub value: AtomId,
 }
 
 impl Condition {
@@ -43,8 +42,12 @@ impl FormatWithParent for Condition {
 
 impl GetVariables for Condition {
     fn get_variables(&self) -> HashSet<AtomId> {
-        let hashset = self.interval.get_variables();
-        hashset.union(self.value.get_variables().union(self.sv.get_variables()))
+        let mut hashset = self.interval.get_variables();
+        hashset.insert(self.value);
+        self.sv.iter().for_each(|a| {
+            hashset.insert(*a);
+        });
+        hashset
     }
 
     fn get_variables_of_type(

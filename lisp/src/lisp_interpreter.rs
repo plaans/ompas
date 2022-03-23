@@ -151,8 +151,6 @@ impl LispInterpreter {
                 break;
             }
 
-            //stdout.write_all(format!("receiving command: {}\n", str_lvalue).as_bytes());
-
             match parse(str_lvalue.as_str(), &mut self.env).await {
                 Ok(lv) => match eval(&lv, &mut self.env).await {
                     Ok(lv) => {
@@ -162,7 +160,6 @@ impl LispInterpreter {
                             .expect("error on channel to stdout");
                     }
                     Err(e) => {
-                        //stderr.write_all(format!("ELI>>{}\n", e).as_bytes());
                         self.li_channel
                             .send(&id_subscriber, format!("error: {}", e))
                             .await
@@ -170,14 +167,12 @@ impl LispInterpreter {
                     }
                 },
                 Err(e) => {
-                    //stderr.write_all(format!("ELI>>{}\n", e).as_bytes());
                     self.li_channel
                         .send(&id_subscriber, format!("error: {}", e))
                         .await
                         .expect("error on channel to stdout");
                 }
             };
-            //stdout.write_all(b"parsing done\n");
         }
 
         handle_log.await.expect("Error on task log");

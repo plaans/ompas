@@ -32,13 +32,6 @@ pub fn bind_atoms(id_1: &AtomId, id_2: &AtomId, st: &mut SymTable) -> Result<boo
     let id_2 = &id_2;
     let type_1 = *st.get_type_of(id_1).expect("id should be defined");
     let type_2 = *st.get_type_of(id_2).expect("id should be defined");
-    /*println!(
-        "binding: {}({}), {}({})",
-        id_1.format_with_sym_table(st),
-        type_1.format_with_sym_table(st),
-        id_2.format_with_sym_table(st),
-        type_2.format_with_sym_table(st)
-    );*/
 
     match (type_1.kind, type_2.kind) {
         (AtomKind::Constant, AtomKind::Constant) => {
@@ -51,25 +44,41 @@ pub fn bind_atoms(id_1: &AtomId, id_2: &AtomId, st: &mut SymTable) -> Result<boo
             st.union_atom(id_1, id_2);
             Ok(true)
         }
-        (AtomKind::Constant, AtomKind::Variable(_)) => {
-            /*if type_2.a_type.is_some() {
-                if type_1.a_type.unwrap() != type_2.a_type.unwrap() {
-                    return Err(Default::default());
+        (AtomKind::Constant, AtomKind::Variable(kind)) => {
+            match &type_2.a_type {
+                Some(t) => {
+                    if t != &type_2.a_type.unwrap() {
+                        return Err(Default::default());
+                    }
                 }
+                None => st.set_type_of(id_2, &type_2.a_type),
             }
-            st.union_atom(id_1, id_2);
-            Ok(true)*/
-            Ok(false)
+
+            match kind {
+                VariableKind::Local => {
+                    st.union_atom(id_1, id_2);
+                    Ok(true)
+                }
+                VariableKind::Parameter => Ok(false),
+            }
         }
-        (AtomKind::Variable(_), AtomKind::Constant) => {
-            /*if type_1.a_type.is_some() {
-                if type_1.a_type.unwrap() != type_2.a_type.unwrap() {
-                    return Err(Default::default());
+        (AtomKind::Variable(kind), AtomKind::Constant) => {
+            match &type_1.a_type {
+                Some(t) => {
+                    if t != &type_1.a_type.unwrap() {
+                        return Err(Default::default());
+                    }
                 }
+                None => st.set_type_of(id_1, &type_2.a_type),
             }
-            st.union_atom(id_2, id_1);
-            Ok(true)*/
-            Ok(false)
+
+            match kind {
+                VariableKind::Local => {
+                    st.union_atom(id_2, id_1);
+                    Ok(true)
+                }
+                VariableKind::Parameter => Ok(false),
+            }
         }
         (
             AtomKind::Variable(VariableKind::Parameter),

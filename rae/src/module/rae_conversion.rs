@@ -1,5 +1,6 @@
 use crate::context::rae_env::RAEEnv;
 use crate::module::{CtxRae, MOD_RAE};
+use crate::planning::binding_aries::{build_chronicles, run_solver};
 use crate::planning::conversion::convert_domain_to_chronicle_hierarchy;
 use crate::planning::conversion::post_processing::post_processing;
 use crate::planning::conversion::pre_processing::{pre_processing, transform_lambda_expression};
@@ -8,7 +9,7 @@ use crate::planning::conversion::processing::{
 };
 use crate::planning::structs::chronicle::ChronicleTemplate;
 use crate::planning::structs::traits::FormatWithSymTable;
-use crate::planning::structs::{ConversionCollection, ConversionContext};
+use crate::planning::structs::{ConversionCollection, ConversionContext, Problem};
 use ::macro_rules_attribute::macro_rules_attribute;
 use aries_planning::chronicles::ChronicleKind;
 use ompas_lisp::core::expand;
@@ -25,6 +26,7 @@ pub const RAE_PRE_PROCESS_LAMBDA: &str = "pre-process-lambda";
 pub const RAE_PRE_PROCESS_EXPR: &str = "pre-process-expr";
 pub const RAE_PRE_PROCESS_DOMAIN: &str = "pre-process-domain";
 pub const RAE_CONVERT_COND_EXPR: &str = "convert-cond-expr";
+pub const RAE_PLAN_TASK: &str = "plan-task";
 
 #[macro_rules_attribute(dyn_async!)]
 pub async fn convert_expr<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
@@ -71,6 +73,24 @@ pub async fn convert_domain<'a>(_: &'a [LValue], env: &'a LEnv) -> LResult {
     let ch = convert_domain_to_chronicle_hierarchy(context)?;
     let time = time.elapsed().expect("could not get time").as_micros();
     Ok(format!("{}\n\nTime to convert: {} µs.", ch, time).into())
+}
+
+#[macro_rules_attribute(dyn_async!)]
+pub async fn plan_task<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+    let task: LValue = args.into();
+    println!("task to plan: {}", task);
+    let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
+    let context: ConversionContext = ctx.get_conversion_context().await;
+    let mut problem: Problem = (&context).into();
+    let cc = convert_domain_to_chronicle_hierarchy(context)?;
+    println!("cc: {}", cc);
+    problem.cc = cc;
+    problem.goal_tasks.push(task.into());
+
+    let mut aries_problem = build_chronicles(&problem)?;
+
+    run_solver(&mut aries_problem, true);
+    Ok(LValue::Nil)
 }
 
 #[macro_rules_attribute(dyn_async!)]

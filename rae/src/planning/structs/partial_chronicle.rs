@@ -153,9 +153,18 @@ impl FormatWithSymTable for PartialChronicle {
             .variables
             .iter()
             .map(|id| {
-                format!(
+                /*format!(
                     "({}){}({})",
                     id,
+                    id.format_with_sym_table(st, sym_version),
+                    st.get_type_of(id)
+                        .unwrap()
+                        .a_type
+                        .format_with_sym_table(st, sym_version)
+                )*/
+
+                format!(
+                    "{}({})",
                     id.format_with_sym_table(st, sym_version),
                     st.get_type_of(id)
                         .unwrap()

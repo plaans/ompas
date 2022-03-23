@@ -24,6 +24,9 @@ aries_model = {path = "../../aries/model"}
 aries_planning = {path = "../../aries/planning"}
 aries_utils = {path = "../../aries/utils"}
 aries_collections = {path = "../../aries/collections"}
+aries_solver = {path = "../../aries/solver"}
+aries_planners = {path = "../../aries/planners"}
+aries_tnet = {path = "../../aries/tnet"}
 anyhow = "1.0.40"
 
 

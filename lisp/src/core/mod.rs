@@ -648,16 +648,17 @@ pub async fn eval(lv: &LValue, env: &mut LEnv) -> LResult {
                         lv = expand(&eval(arg, env).await?, true, env).await?;
                     }
                     LCoreOperator::Parse => {
-                        return if let LValue::String(s) = eval(&args[0], env).await? {
+                        let result = eval(&args[0], env).await?;
+                        return if let LValue::String(s) = result {
                             parse(s.as_str(), env).await
                         } else {
                             return Err(WrongType(
                                 "eval",
-                                args[0].clone(),
-                                (&args[0]).into(),
+                                result.clone(),
+                                (&result).into(),
                                 TypeLValue::String,
                             ));
-                        }
+                        };
                     }
                     LCoreOperator::Expand => {
                         let arg = &args[0];

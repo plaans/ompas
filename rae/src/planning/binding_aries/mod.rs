@@ -2,23 +2,32 @@ use crate::planning::structs::atom::Atom;
 use crate::planning::structs::constraint::Constraint;
 use crate::planning::structs::lit::Lit;
 use crate::planning::structs::symbol_table::{AtomId, SymTable};
-use crate::planning::structs::traits::GetVariables;
+use crate::planning::structs::traits::{FormatWithSymTable, GetVariables};
 use crate::planning::structs::type_table::{AtomKind, PlanningAtomType};
 use crate::planning::structs::{ConversionCollection, Problem};
 use anyhow::{anyhow, Result};
 use aries_core::Lit as aLit;
 use aries_core::*;
-use aries_model::extensions::Shaped;
+use aries_model::extensions::{SavedAssignment, Shaped};
 use aries_model::lang::{Atom as aAtom, FAtom, FVar, IAtom, SAtom, SVar, Type, Variable};
 use aries_model::symbols::SymbolTable;
 use aries_model::types::TypeHierarchy;
+use aries_planners::encode::{
+    encode, populate_with_task_network, populate_with_template_instances,
+};
+use aries_planners::fmt::{format_hddl_plan, format_pddl_plan};
+use aries_planners::solver::Strat;
+use aries_planners::{ParSolver, Solver};
 use aries_planning::chronicles;
+use aries_planning::chronicles::analysis::hierarchical_is_non_recursive;
 use aries_planning::chronicles::constraints::Constraint as aConstraint;
 use aries_planning::chronicles::{
     Chronicle as aChronicle, ChronicleInstance, ChronicleKind, ChronicleOrigin, ChronicleTemplate,
-    Condition, Container, Ctx, Effect, Problem as aProblem, StateFun, SubTask, VarType, TIME_SCALE,
+    Condition, Container, Ctx, Effect, FiniteProblem, Problem as aProblem, StateFun, SubTask,
+    VarType, TIME_SCALE,
 };
 use aries_planning::parsing::pddl::TypedSymbol;
+use aries_tnet::theory::{StnConfig, StnTheory, TheoryPropagationLevel};
 use aries_utils::input::Sym;
 use ompas_lisp::core::structs::lerror::LError;
 use ompas_lisp::core::structs::lnumber::LNumber;
@@ -26,6 +35,7 @@ use ompas_lisp::core::structs::lvalues::LValueS;
 use std::convert::{TryFrom, TryInto};
 use std::ops::Deref;
 use std::sync::Arc;
+use std::time::Instant;
 
 static TASK_TYPE: &str = "★task★";
 static ABSTRACT_TASK_TYPE: &str = "★abstract_task★";
@@ -41,6 +51,109 @@ static INSTANCE_SFN: &str = "instance";
 
 static FLOAT_SCALE: IntCst = 10;
 static NIL_OBJECT: &str = "★nil★";
+
+fn init_solver(pb: &FiniteProblem) -> Box<Solver> {
+    let model = encode(pb).unwrap();
+    let stn_config = StnConfig {
+        theory_propagation: TheoryPropagationLevel::Full,
+        ..Default::default()
+    };
+
+    let mut solver = Box::new(aries_solver::solver::Solver::new(model));
+    solver.add_theory(|tok| StnTheory::new(tok, stn_config));
+    solver
+}
+
+/// Default set of strategies for HTN problems
+const HTN_DEFAULT_STRATEGIES: [Strat; 2] = [Strat::Activity, Strat::Forward];
+/// Default set of strategies for generative (flat) problems.
+const GEN_DEFAULT_STRATEGIES: [Strat; 1] = [Strat::Activity];
+
+fn solve(pb: &FiniteProblem, htn_mode: bool) -> Option<std::sync::Arc<SavedAssignment>> {
+    let solver = init_solver(pb);
+    let strats: &[Strat] = if htn_mode {
+        &HTN_DEFAULT_STRATEGIES
+    } else {
+        &GEN_DEFAULT_STRATEGIES
+    };
+    let mut solver = if htn_mode {
+        aries_solver::parallel_solver::ParSolver::new(solver, strats.len(), |id, s| {
+            strats[id].adapt_solver(s, pb)
+        })
+    } else {
+        ParSolver::new(solver, 1, |_, _| {})
+    };
+
+    let found_plan = solver.solve().unwrap();
+
+    if let Some(solution) = found_plan {
+        solver.print_stats();
+        Some(solution)
+    } else {
+        None
+    }
+}
+
+pub fn run_solver(problem: &mut chronicles::Problem, htn_mode: bool) {
+    println!("===== Preprocessing ======");
+    aries_planning::chronicles::preprocessing::preprocess(problem);
+    println!("==========================");
+
+    let max_depth = u32::MAX;
+    let min_depth = if htn_mode && hierarchical_is_non_recursive(problem) {
+        max_depth // non recursive htn: bounded size, go directly to max
+    } else {
+        0
+    };
+
+    for n in min_depth..=max_depth {
+        let depth_string = if n == u32::MAX {
+            "∞".to_string()
+        } else {
+            n.to_string()
+        };
+        println!("{} Solving with {} actions", depth_string, depth_string);
+        let start = Instant::now();
+        let mut pb = FiniteProblem {
+            model: problem.context.model.clone(),
+            origin: problem.context.origin(),
+            horizon: problem.context.horizon(),
+            chronicles: problem.chronicles.clone(),
+            tables: problem.context.tables.clone(),
+        };
+        if htn_mode {
+            populate_with_task_network(&mut pb, problem, n).unwrap();
+        } else {
+            populate_with_template_instances(&mut pb, problem, |_| Some(n)).unwrap();
+        }
+        println!("  [{:.3}s] Populated", start.elapsed().as_secs_f32());
+        let start = Instant::now();
+        let result = solve(&pb, htn_mode);
+        println!("  [{:.3}s] solved", start.elapsed().as_secs_f32());
+        if let Some(x) = result {
+            // println!("{}", format_partial_plan(&pb, &x)?);
+            println!("  Solution found");
+            let plan = if htn_mode {
+                format!(
+                    "\n**** Decomposition ****\n\n\
+                    {}\n\n\
+                    **** Plan ****\n\n\
+                    {}",
+                    format_hddl_plan(&pb, &x).unwrap(),
+                    format_pddl_plan(&pb, &x).unwrap()
+                )
+            } else {
+                format_pddl_plan(&pb, &x).unwrap()
+            };
+            println!("{}", plan);
+            //let mut file = File::create(output_file).unwrap();
+            //file.write_all(plan.as_bytes()).unwrap();
+            break;
+        } else {
+            println!("no solution found");
+        }
+    }
+}
 
 pub fn build_chronicles(problem: &Problem) -> Result<chronicles::Problem> {
     let mut types: Vec<(Sym, Option<Sym>)> = vec![
@@ -151,6 +264,8 @@ pub fn build_chronicles(problem: &Problem) -> Result<chronicles::Problem> {
     initialize_state(&mut init_ch, problem, &ctx);
     initialize_goal_task(&mut init_ch, problem, &mut ctx);
 
+    println!("problem initialized");
+
     /*
     Goals: Add subtask
      */
@@ -179,8 +294,13 @@ pub fn build_chronicles(problem: &Problem) -> Result<chronicles::Problem> {
 
 fn satom_from_lvalues(ctx: &Ctx, v: &LValueS) -> SAtom {
     let v: String = v.try_into().expect("");
-    ctx.typed_sym(ctx.model.get_symbol_table().id(&v).unwrap())
-        .into()
+    ctx.typed_sym(
+        ctx.model
+            .get_symbol_table()
+            .id(&v)
+            .unwrap_or_else(|| panic!("{} undefined in symbol table", v)),
+    )
+    .into()
 }
 
 fn atom_from_lvalues(ctx: &Ctx, v: &LValueS) -> aAtom {
@@ -197,7 +317,8 @@ fn atom_from_lvalues(ctx: &Ctx, v: &LValueS) -> aAtom {
             true => aLit::TRUE.into(),
             false => aLit::FALSE.into(),
         },
-        _ => panic!(""),
+        LValueS::List(_) => panic!("cannot convert LValueS::List into atom: {}", v),
+        LValueS::Map(_) => panic!("cannot convert LValueS::Map into atom: {}", v),
     }
 }
 
@@ -212,18 +333,20 @@ fn initialize_state(init_ch: &mut aChronicle, p: &Problem, ctx: &Ctx) {
     for (key, value) in &state.instance.inner {
         let key: Vec<LValueS> = key.try_into().expect("");
         assert_eq!(key.len(), 2);
-        assert_eq!(&key[1].to_string(), INSTANCE_SFN);
+        assert_eq!(&key[0].to_string(), INSTANCE_SFN);
         let sf: SAtom = satom_from_lvalues(ctx, &key[0]);
-        let object: SAtom = satom_from_lvalues(ctx, &key[1]);
-        let value: aAtom = atom_from_lvalues(ctx, value);
-        let sv = vec![sf, object];
-
-        init_ch.effects.push(Effect {
-            transition_start: init_ch.start,
-            persistence_start: init_ch.start,
-            state_var: sv,
-            value: value,
-        });
+        let t: SAtom = satom_from_lvalues(ctx, &key[1]);
+        let objects: Vec<LValueS> = value.try_into().expect("");
+        for obj in &objects {
+            let object: SAtom = satom_from_lvalues(ctx, obj);
+            let sv = vec![sf, object];
+            init_ch.effects.push(Effect {
+                transition_start: init_ch.start,
+                persistence_start: init_ch.start,
+                state_var: sv,
+                value: t.into(),
+            });
+        }
     }
 
     /*
@@ -231,8 +354,11 @@ fn initialize_state(init_ch: &mut aChronicle, p: &Problem, ctx: &Ctx) {
      */
     //We suppose for the moment that all args of state variable are objects
     for (key, value) in &state._static.inner {
-        let key: Vec<LValueS> = key.try_into().expect("");
-        let key: Vec<SAtom> = key.iter().map(|lv| satom_from_lvalues(ctx, lv)).collect();
+        let key: Vec<SAtom> = match key {
+            LValueS::List(vec) => vec.iter().map(|lv| satom_from_lvalues(ctx, lv)).collect(),
+            LValueS::Symbol(_) => vec![satom_from_lvalues(ctx, key)],
+            _ => panic!("state variable is either a symbol or a list of symbols"),
+        };
         let value = atom_from_lvalues(ctx, &value);
         init_ch.effects.push(Effect {
             transition_start: init_ch.start,
@@ -247,8 +373,11 @@ fn initialize_state(init_ch: &mut aChronicle, p: &Problem, ctx: &Ctx) {
      */
 
     for (key, value) in &state.dynamic.inner {
-        let key: Vec<LValueS> = key.try_into().expect("");
-        let key: Vec<SAtom> = key.iter().map(|v| satom_from_lvalues(ctx, v)).collect();
+        let key: Vec<SAtom> = match key {
+            LValueS::List(vec) => vec.iter().map(|lv| satom_from_lvalues(ctx, lv)).collect(),
+            LValueS::Symbol(_) => vec![satom_from_lvalues(ctx, key)],
+            _ => panic!("state variable is either a symbol or a list of symbols"),
+        };
         let value = atom_from_lvalues(ctx, value);
         init_ch.effects.push(Effect {
             transition_start: init_ch.start,
@@ -262,8 +391,11 @@ fn initialize_state(init_ch: &mut aChronicle, p: &Problem, ctx: &Ctx) {
     Initilisation of inner world
     */
     for (key, value) in &state.inner_world.inner {
-        let key: Vec<LValueS> = key.try_into().expect("");
-        let key: Vec<SAtom> = key.iter().map(|v| satom_from_lvalues(ctx, v)).collect();
+        let key: Vec<SAtom> = match key {
+            LValueS::List(vec) => vec.iter().map(|lv| satom_from_lvalues(ctx, lv)).collect(),
+            LValueS::Symbol(_) => vec![satom_from_lvalues(ctx, key)],
+            _ => panic!("state variable is either a symbol or a list of symbols"),
+        };
         let value = atom_from_lvalues(ctx, value);
         init_ch.effects.push(Effect {
             transition_start: init_ch.start,
@@ -321,37 +453,39 @@ impl BindingAriesAtoms {
     }
 }
 
-fn convert_constraint(bindings: &BindingAriesAtoms, x: &Constraint) -> Result<aConstraint, LError> {
+fn convert_constraint(
+    x: &Constraint,
+    bindings: &BindingAriesAtoms,
+    st: &SymTable,
+    ctx: &Ctx,
+) -> Result<aConstraint, LError> {
+    let get_atom = |a: &AtomId| -> aAtom { atom_id_into_atom(a, st, bindings, ctx) };
+
     match x {
         Constraint::LEq(a, b) => {
             let a: AtomId = a.try_into()?;
             let b: AtomId = b.try_into()?;
-            let a: SVar = bindings.get_var(&a).expect("").try_into()?;
-            let b: SVar = bindings.get_var(&b).expect("").try_into()?;
-            Ok(aConstraint::leq(SAtom::from(a), SAtom::from(b)))
+            Ok(aConstraint::leq(get_atom(&a), get_atom(&b)))
         }
         Constraint::Eq(a, b) => {
             let a: AtomId = a.try_into()?;
-            let a: SVar = bindings.get_var(&a).expect("").try_into()?;
             match b {
-                Lit::Atom(b) => {
-                    let b: SVar = bindings.get_var(&b).expect("").try_into()?;
-                    Ok(aConstraint::eq(SAtom::from(a), SAtom::from(b)))
-                }
+                Lit::Atom(b) => Ok(aConstraint::eq(get_atom(&a), get_atom(b))),
                 Lit::Constraint(c) => Ok(aConstraint::reify(
-                    a,
-                    convert_constraint(bindings, c.deref())?,
+                    get_atom(&a),
+                    convert_constraint(c.deref(), bindings, st, ctx)?,
                 )),
                 Lit::Exp(_) => Err(Default::default()),
             }
         }
-        Constraint::Neg(_) => panic!("not supported yet"),
+        Constraint::Neg(a) => {
+            let a: AtomId = a.try_into()?;
+            Ok(aConstraint::neq(get_atom(&a), aLit::FALSE))
+        }
         Constraint::LT(a, b) => {
             let a: AtomId = a.try_into()?;
             let b: AtomId = b.try_into()?;
-            let a: SVar = bindings.get_var(&a).expect("").try_into()?;
-            let b: SVar = bindings.get_var(&b).expect("").try_into()?;
-            Ok(aConstraint::lt(SAtom::from(a), SAtom::from(b)))
+            Ok(aConstraint::lt(get_atom(&a), get_atom(&b)))
         }
         Constraint::And(_, _)
         | Constraint::Or(_, _)
@@ -386,7 +520,13 @@ fn atom_id_into_atom(
             AtomKind::Constant => context
                 .typed_sym(context.model.get_symbol_table().id(s.get_sym()).unwrap())
                 .into(),
-            AtomKind::Variable(_) => (*bindings.get_var(a).unwrap()).into(),
+            AtomKind::Variable(_) => (*bindings.get_var(a).unwrap_or_else(|| {
+                panic!(
+                    "{} undefined in bindings",
+                    sym_table.get_atom(a, false).unwrap()
+                )
+            }))
+            .into(),
         },
     }
 }
@@ -397,6 +537,11 @@ fn read_chronicle(
     ch: &ConversionCollection,
     context: &mut Ctx,
 ) -> Result<ChronicleTemplate> {
+    println!(
+        "reading chronicle: {}",
+        chronicle.format_with_sym_table(&ch.sym_table, false)
+    );
+
     let mut bindings = BindingAriesAtoms::default();
 
     let _top_type: Sym = OBJECT_TYPE.into();
@@ -408,6 +553,7 @@ fn read_chronicle(
     bindings.add_binding(chronicle.get_presence(), &prez_var.into());
     let prez = prez_var.true_lit();
 
+    print!("init params...");
     //TODO: handle case where some parameters are already instantiated.
     for var in &chronicle.get_variables() {
         let t = ch.sym_table.get_type_of(var).unwrap();
@@ -489,21 +635,33 @@ fn read_chronicle(
                 bindings.add_binding(var, &svar.into());
                 svar.into()
             }
+            PlanningAtomType::SubType(_) => {
+                let t = context
+                    .model
+                    .get_symbol_table()
+                    .types
+                    .id_of(TYPE_TYPE)
+                    .expect("object should be defined in type hierarchy");
+                //let s = ch.sym_table.get_atom(var, true).unwrap();
+                let svar = context
+                    .model
+                    .new_optional_sym_var(t, prez, c / VarType::Parameter);
+                bindings.add_binding(var, &svar.into());
+                svar.into()
+            }
             pat => panic!("a parameter cannot be a {}", pat),
         };
         params.push(param);
     }
+    println!("ok!");
+
     //End declaration of the variables
 
-    let id_into_satom = |a: &AtomId| -> SAtom {
-        SVar::try_from(bindings.get_var(a).unwrap())
-            .expect("")
-            .into()
-    };
     /*
     CREATION of the name
      */
     //For the moment lacking the fact that we can add any kind of variables
+    print!("init name...");
     let mut name: Vec<SAtom> = vec![];
     for (i, p) in chronicle.name.iter().enumerate() {
         if i == 0 {
@@ -522,6 +680,7 @@ fn read_chronicle(
             name.push(SVar::try_from(bindings.get_var(p).unwrap())?.into())
         }
     }
+    println!("ok!");
 
     let mut constraints: Vec<aConstraint> = vec![];
     let mut conditions: Vec<Condition> = vec![];
@@ -532,25 +691,17 @@ fn read_chronicle(
         |a: &AtomId| -> aAtom { atom_id_into_atom(a, &ch.sym_table, &bindings, &context) };
 
     for x in chronicle.get_constraints() {
-        let x = convert_constraint(&bindings, x)?;
+        let x = convert_constraint(x, &bindings, &ch.sym_table, context)?;
         constraints.push(x);
     }
 
+    print!("init conditions...");
     for c in chronicle.get_conditions() {
-        let sv: Vec<Lit> = (&c.sv).try_into()?;
-        let sv = sv
-            .iter()
-            .map(|l| {
-                let a: AtomId = l.try_into().expect("");
-                id_into_satom(&a)
-            })
-            .collect();
-        let value = atom_id_into_atom(
-            &AtomId::try_from(&c.value)?,
-            &ch.sym_table,
-            &bindings,
-            context,
-        );
+        let sv =
+            c.sv.iter()
+                .map(|a| get_atom(&a).try_into().unwrap_or_else(|e| panic!("{}", e)))
+                .collect();
+        let value = get_atom(&c.value);
         let start = FVar::try_from(bindings.get_var(c.get_start()).unwrap())?;
         let start = FAtom::from(start);
         let end = FVar::try_from(bindings.get_var(c.get_end()).unwrap())?;
@@ -563,22 +714,15 @@ fn read_chronicle(
         };
         conditions.push(condition);
     }
+    println!("ok!");
 
+    print!("init effects...");
     for e in chronicle.get_effects() {
-        let sv: Vec<Lit> = (&e.sv).try_into()?;
-        let sv = sv
-            .iter()
-            .map(|l| {
-                let a: AtomId = l.try_into().expect("");
-                id_into_satom(&a)
-            })
-            .collect();
-        let value = atom_id_into_atom(
-            &AtomId::try_from(&e.value)?,
-            &ch.sym_table,
-            &bindings,
-            context,
-        );
+        let sv =
+            e.sv.iter()
+                .map(|a| get_atom(a).try_into().unwrap_or_else(|e| panic!("{}", e)))
+                .collect();
+        let value = get_atom(&e.value);
         let start = FVar::try_from(bindings.get_var(e.get_start()).unwrap())?;
         let start = FAtom::from(start);
         let end = FVar::try_from(bindings.get_var(e.get_end()).unwrap())?;
@@ -591,7 +735,9 @@ fn read_chronicle(
         };
         effects.push(effect);
     }
+    println!("ok!");
 
+    print!("init subtasks...");
     for s in chronicle.get_subtasks() {
         let start: FAtom = get_atom(s.interval.start()).try_into()?;
         let end: FAtom = get_atom(s.interval.end()).try_into()?;
@@ -612,17 +758,21 @@ fn read_chronicle(
 
         subtasks.push(st);
     }
+    println!("ok!");
 
     let start = FVar::try_from(bindings.get_var(chronicle.get_start()).unwrap())?;
     let start = FAtom::from(start);
     let end = FVar::try_from(bindings.get_var(chronicle.get_end()).unwrap())?;
     let end = FAtom::from(end);
 
+    print!("init task...");
     let task: Vec<SAtom> = chronicle
         .task
         .iter()
         .map(|a| get_atom(a).try_into().expect(""))
         .collect();
+    println!("ok!");
+    print!("\n\n");
 
     let template = aChronicle {
         kind: chronicle.chronicle_kind,

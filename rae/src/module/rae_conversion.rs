@@ -1,6 +1,7 @@
 use crate::context::rae_env::RAEEnv;
 use crate::module::{CtxRae, MOD_RAE};
-use crate::planning::binding_aries::{build_chronicles, run_solver};
+use crate::planning::binding_aries::build_chronicles;
+use crate::planning::binding_aries::solver::run_solver;
 use crate::planning::conversion::convert_domain_to_chronicle_hierarchy;
 use crate::planning::conversion::post_processing::post_processing;
 use crate::planning::conversion::pre_processing::{pre_processing, transform_lambda_expression};

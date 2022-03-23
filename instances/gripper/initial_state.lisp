@@ -2,7 +2,7 @@
  (map '(((instance room) (bedroom kitchen living_room no_place))
    ((instance ball) (b1 b2 b3 b4 no_ball))
    ((instance gripper) (left right))
-   (at-robby bedroom)
+   (at-robby living_room)
    ((at b1) bedroom)
    ((at b2) bedroom)
    ((at b3) bedroom)

@@ -190,7 +190,7 @@ pub fn convert_abstract_task_to_chronicle(
     chronicle.set_name(name.clone().into());
     chronicle.set_task(match task {
         Some(task) => {
-            let mut task_name: Vec<AtomId> = name[0..task.get_parameters().get_number()]
+            let mut task_name: Vec<AtomId> = name[0..task.get_parameters().get_number() + 1]
                 .iter()
                 .map(|l| *l)
                 .collect();

@@ -12,80 +12,73 @@ use std::convert::TryInto;
 
 #[derive(Clone, Debug)]
 pub enum Constraint {
-    LEq(Lit, Lit),
+    Leq(Lit, Lit),
     Eq(Lit, Lit),
-    Neg(Lit),
-    LT(Lit, Lit),
+    Neq(Lit, Lit),
+    Not(Lit),
+    Lt(Lit, Lit),
     And(Lit, Lit),
     Or(Lit, Lit),
     Type(Lit, Lit),
     Arbitrary(Lit, Lit),
 }
-/*
-impl TryFrom<Constraint> for aConstraint {
-    type Error = LError;
 
-    fn try_from(value: Constraint) -> Result<Self, Self::Error> {
-        match value {
-            Constraint::LEq(a, b) => {
-                let a: AtomId = a.try_into()?;
-                let b: AtomId = b.try_into()?;
-                let a: SVar = bindings.get_var(&a).expect("").try_into()?;
-                let b: SVar = bindings.get_var(&b).expect("").try_into()?;
-                Ok(aConstraint::leq(SAtom::from(a), SAtom::from(b)))
-            }
-            Constraint::Eq(a, b) => {
-                let a: AtomId = a.try_into()?;
-                let a: SVar = bindings.get_var(&a).expect("").try_into()?;
-                match b {
-                    Lit::Atom(b) => {
-                        let b: SVar = bindings.get_var(&b).expect("").try_into()?;
-                        Ok(aConstraint::eq(SAtom::from(a), SAtom::from(b)))
-                    }
-                    Lit::Constraint(c) => Ok(aConstraint::reify(a, c.try_into()?)),
-                    Lit::Exp(e_) => Err(Default::default()),
-                }
-            }
-            Constraint::Neg(_) => panic!("not supported yet"),
-            Constraint::LT(a, b) => {
-                let a: AtomId = a.try_into()?;
-                let b: AtomId = b.try_into()?;
-                let a: SVar = bindings.get_var(&a).expect("").try_into()?;
-                let b: SVar = bindings.get_var(&b).expect("").try_into()?;
-                Ok(aConstraint::lt(SAtom::from(a), SAtom::from(b)))
-            }
-            Constraint::And(_, _)
-            | Constraint::Or(_, _)
-            | Constraint::Type(_, _)
-            | Constraint::Arbitrary(_, _) => Err(Default::default()),
-        }
+impl Constraint {
+    pub fn eq(a: impl Into<Lit>, b: impl Into<Lit>) -> Constraint {
+        Constraint::Eq(a.into(), b.into())
     }
-}*/
+    pub fn leq(a: impl Into<Lit>, b: impl Into<Lit>) -> Constraint {
+        Constraint::Leq(a.into(), b.into())
+    }
+    pub fn lt(a: impl Into<Lit>, b: impl Into<Lit>) -> Constraint {
+        Constraint::Lt(a.into(), b.into())
+    }
+    pub fn neq(a: impl Into<Lit>, b: impl Into<Lit>) -> Constraint {
+        Constraint::Neq(a.into(), b.into())
+    }
+    pub fn neg(a: impl Into<Lit>) -> Constraint {
+        Constraint::Not(a.into())
+    }
+    pub fn or(a: impl Into<Lit>, b: impl Into<Lit>) -> Constraint {
+        Constraint::Or(a.into(), b.into())
+    }
+    pub fn and(a: impl Into<Lit>, b: impl Into<Lit>) -> Constraint {
+        Constraint::And(a.into(), b.into())
+    }
+    pub fn _type(a: impl Into<Lit>, b: impl Into<Lit>) -> Constraint {
+        Constraint::Type(a.into(), b.into())
+    }
+    pub fn arbitrary(a: impl Into<Lit>, b: impl Into<Lit>) -> Constraint {
+        Constraint::Arbitrary(a.into(), b.into())
+    }
+}
 
 impl Constraint {
     pub fn get_left(&self) -> &Lit {
         match self {
-            Constraint::LEq(l1, _)
+            Constraint::Leq(l1, _)
             | Constraint::Eq(l1, _)
-            | Constraint::LT(l1, _)
+            | Constraint::Lt(l1, _)
             | Constraint::And(l1, _)
             | Constraint::Or(l1, _)
             | Constraint::Type(l1, _)
+            | Constraint::Neq(l1, _)
             | Constraint::Arbitrary(l1, _) => l1,
-            Constraint::Neg(l) => l,
+            Constraint::Not(l) => l,
         }
     }
 
     pub fn get_right(&self) -> &Lit {
         match self {
-            Constraint::LEq(_, l2)
+            Constraint::Leq(_, l2)
             | Constraint::Eq(_, l2)
-            | Constraint::LT(_, l2)
+            | Constraint::Lt(_, l2)
             | Constraint::And(_, l2)
             | Constraint::Or(_, l2)
             | Constraint::Type(_, l2)
+            | Constraint::Neq(_, l2)
             | Constraint::Arbitrary(_, l2) => l2,
-            Constraint::Neg(l) => l,
+            Constraint::Not(l) => l,
         }
     }
 }
@@ -93,14 +86,15 @@ impl Constraint {
 impl GetVariables for Constraint {
     fn get_variables(&self) -> im::HashSet<AtomId> {
         match self {
-            Constraint::LEq(l1, l2)
+            Constraint::Leq(l1, l2)
             | Constraint::Eq(l1, l2)
-            | Constraint::LT(l1, l2)
+            | Constraint::Neq(l1, l2)
+            | Constraint::Lt(l1, l2)
             | Constraint::And(l1, l2)
             | Constraint::Or(l1, l2)
             | Constraint::Type(l1, l2)
             | Constraint::Arbitrary(l1, l2) => l1.get_variables().union(l2.get_variables()),
-            Constraint::Neg(l) => l.get_variables(),
+            Constraint::Not(l) => l.get_variables(),
         }
     }
 
@@ -125,8 +119,8 @@ impl FormatWithSymTable for Constraint {
                 l1.format_with_sym_table(st, sym_version),
                 l2.format_with_sym_table(st, sym_version)
             ),
-            Constraint::Neg(l1) => format!("(! {})", l1.format_with_sym_table(st, sym_version)),
-            Constraint::LT(l1, l2) => format!(
+            Constraint::Not(l1) => format!("(! {})", l1.format_with_sym_table(st, sym_version)),
+            Constraint::Lt(l1, l2) => format!(
                 "({} < {})",
                 l1.format_with_sym_table(st, sym_version),
                 l2.format_with_sym_table(st, sym_version)
@@ -141,7 +135,7 @@ impl FormatWithSymTable for Constraint {
                 l1.format_with_sym_table(st, sym_version),
                 l2.format_with_sym_table(st, sym_version)
             ),
-            Constraint::LEq(l1, l2) => {
+            Constraint::Leq(l1, l2) => {
                 format!(
                     "({} <= {})",
                     l1.format_with_sym_table(st, sym_version),
@@ -162,6 +156,11 @@ impl FormatWithSymTable for Constraint {
                     l2.format_with_sym_table(st, sym_version)
                 )
             }
+            Constraint::Neq(l1, l2) => format!(
+                "({} != {})",
+                l1.format_with_sym_table(st, sym_version),
+                l2.format_with_sym_table(st, sym_version)
+            ),
         }
     }
 }
@@ -169,17 +168,18 @@ impl FormatWithSymTable for Constraint {
 impl FormatWithParent for Constraint {
     fn format_with_parent(&mut self, st: &SymTable) {
         match self {
-            Constraint::LEq(l1, l2)
+            Constraint::Leq(l1, l2)
             | Constraint::Eq(l1, l2)
-            | Constraint::LT(l1, l2)
+            | Constraint::Lt(l1, l2)
             | Constraint::And(l1, l2)
             | Constraint::Or(l1, l2)
             | Constraint::Type(l1, l2)
+            | Constraint::Neq(l1, l2)
             | Constraint::Arbitrary(l1, l2) => {
                 l1.format_with_parent(st);
                 l2.format_with_parent(st);
             }
-            Constraint::Neg(a) => a.format_with_parent(st),
+            Constraint::Not(a) => a.format_with_parent(st),
         }
     }
 }
@@ -188,8 +188,9 @@ impl Constraint {
     pub fn try_into_pa_relation(&self, sym_table: &SymTable) -> Result<Relation<AtomId>, LError> {
         let relation_type = match self {
             Constraint::Eq(_, _) => RelationType::Eq,
-            Constraint::LEq(_, _) => RelationType::LEq,
-            Constraint::LT(_, _) => RelationType::LT,
+            Constraint::Leq(_, _) => RelationType::LEq,
+            Constraint::Lt(_, _) => RelationType::LT,
+            Constraint::Neq(_, _) => RelationType::Neq,
             _ => return Err(LError::default()),
         };
 
@@ -221,7 +222,7 @@ impl Constraint {
 //INTERVAL constraints
 
 pub fn before(a: &Interval, b: &Interval) -> Constraint {
-    Constraint::LEq(a.end().into(), b.start().into())
+    Constraint::Leq(a.end().into(), b.start().into())
 }
 pub fn meet(a: &Interval, b: &Interval) -> Constraint {
     Constraint::Eq(a.end().into(), b.start().into())
@@ -229,8 +230,8 @@ pub fn meet(a: &Interval, b: &Interval) -> Constraint {
 
 pub fn overlap(a: &Interval, b: &Interval) -> Constraint {
     Constraint::Or(
-        Constraint::LEq(a.start().into(), b.end().into()).into(),
-        Constraint::LEq(b.start().into(), a.end().into()).into(),
+        Constraint::Leq(a.start().into(), b.end().into()).into(),
+        Constraint::Leq(b.start().into(), a.end().into()).into(),
     )
 }
 
@@ -240,8 +241,8 @@ pub fn start(a: &Interval, b: &Interval) -> Constraint {
 
 pub fn during(a: &Interval, b: &Interval) -> Constraint {
     Constraint::And(
-        Constraint::LEq(b.start().into(), a.start().into()).into(),
-        Constraint::LEq(a.end().into(), b.end().into()).into(),
+        Constraint::Leq(b.start().into(), a.start().into()).into(),
+        Constraint::Leq(a.end().into(), b.end().into()).into(),
     )
 }
 

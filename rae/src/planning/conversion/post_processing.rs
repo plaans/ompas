@@ -1,31 +1,128 @@
 use crate::planning::point_algebra::problem::{Graph, Problem};
 use crate::planning::point_algebra::remove_useless_timepoints;
+use crate::planning::structs::atom::Atom;
 use crate::planning::structs::chronicle::{ChronicleSet, ChronicleTemplate};
 use crate::planning::structs::constraint::Constraint;
 use crate::planning::structs::lit::Lit;
 use crate::planning::structs::symbol_table::{AtomId, SymTable};
-use crate::planning::structs::traits::{FormatWithParent, GetVariables};
+use crate::planning::structs::traits::{FormatWithParent, FormatWithSymTable, GetVariables};
 use crate::planning::structs::type_table::{AtomKind, PlanningAtomType, VariableKind};
 use crate::planning::structs::{ConversionCollection, ConversionContext};
 use im::{hashset, HashSet};
 use ompas_lisp::core::structs::lerror::LError;
+use std::ops::Deref;
 
 pub fn post_processing(
     c: &mut ChronicleTemplate,
     context: &ConversionContext,
     ch: &mut ConversionCollection,
 ) -> Result<(), LError> {
+    //add_constraint_on_end_timepoint(c, context, ch);
     unify_equal(c, ch, context);
     ch.sym_table.flat_bindings();
     //panic!("for no fucking reason");
     simplify_timepoints(c, ch, context)?;
     rm_useless_var(c, ch, context);
+    /*println!(
+        "before merge conditions: {}",
+        c.format_with_sym_table(&ch.sym_table, true)
+    );*/
+    merge_conditions(c, context, ch)?;
+    simplify_constraints(c, context, ch)?;
     c.format_with_parent(&ch.sym_table);
+
     Ok(())
 }
 
+pub fn simplify_constraints(
+    c: &mut ChronicleTemplate,
+    _: &ConversionContext,
+    ch: &mut ConversionCollection,
+) -> Result<(), LError> {
+    //simple case where
+    let mut vec: Vec<(usize, Constraint)> = vec![];
+    for (i, c) in c.pc.constraints.iter().enumerate() {
+        if let Constraint::Eq(a, b) = c {
+            match (a, b) {
+                (Lit::Atom(a), Lit::Constraint(b)) => {
+                    if let Atom::Bool(true) = ch.sym_table.get_atom(a, true).unwrap() {
+                        println!(
+                            "{} => {}",
+                            c.format_with_sym_table(&ch.sym_table, true),
+                            b.format_with_sym_table(&ch.sym_table, true)
+                        );
+                        vec.push((i, b.deref().clone()));
+                    }
+                }
+                (Lit::Constraint(b), Lit::Atom(a)) => {
+                    if let Atom::Bool(true) = ch.sym_table.get_atom(a, true).unwrap() {
+                        println!(
+                            "{} => {}",
+                            c.clone().format_with_sym_table(&ch.sym_table, true),
+                            b.format_with_sym_table(&ch.sym_table, true)
+                        );
+                        vec.push((i, b.deref().clone()));
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    vec.drain(..)
+        .for_each(|(i, cons)| c.pc.constraints[i] = cons);
+
+    Ok(())
+}
+
+pub fn merge_conditions(
+    c: &mut ChronicleTemplate,
+    _: &ConversionContext,
+    ch: &mut ConversionCollection,
+) -> Result<(), LError> {
+    let mut c_to_remove = vec![];
+
+    for (i, c1) in c.get_conditions().iter().enumerate() {
+        for (j, c2) in c.get_conditions()[i + 1..].iter().enumerate() {
+            if c1.interval == c2.interval && c1.sv == c2.sv {
+                println!(
+                    "merging {} and {}",
+                    c1.format_with_sym_table(&ch.sym_table, true),
+                    c2.format_with_sym_table(&ch.sym_table, true)
+                );
+                bind_atoms(&c1.value, &c2.value, &mut ch.sym_table)?;
+                c_to_remove.push(j + i + 1);
+            }
+        }
+    }
+    c_to_remove.sort();
+    c_to_remove.reverse();
+    c_to_remove.iter().for_each(|i| c.rm_condition(*i));
+
+    ch.sym_table.flat_bindings();
+    Ok(())
+}
+
+pub fn add_constraint_on_end_timepoint(
+    c: &mut ChronicleTemplate,
+    _: &ConversionContext,
+    ch: &mut ConversionCollection,
+) {
+    let timepoints: HashSet<AtomId> = c
+        .get_variables()
+        .iter()
+        .map(|a| *ch.sym_table.get_parent(a))
+        .filter(|a| {
+            ch.sym_table.get_type_of(a).unwrap().a_type == Some(PlanningAtomType::Timepoint)
+        })
+        .collect();
+    let end = *c.get_end();
+    for t in &timepoints {
+        c.add_constraint(Constraint::leq(t, end));
+    }
+}
+
 /// Returns true if the constraint can be safely deleted
-pub fn bind_atoms(id_1: &AtomId, id_2: &AtomId, st: &mut SymTable) -> Result<bool, LError> {
+fn bind_atoms(id_1: &AtomId, id_2: &AtomId, st: &mut SymTable) -> Result<bool, LError> {
     let id_1 = *st.get_parent(id_1);
     let id_2 = *st.get_parent(id_2);
     let id_1 = &id_1;
@@ -177,7 +274,8 @@ pub fn unify_equal(
         }
     }
 
-    c.rm_set_constraint(vec_constraint_to_rm)
+    c.rm_set_constraint(vec_constraint_to_rm);
+    ch.sym_table.flat_bindings();
 }
 
 pub fn rm_useless_var(
@@ -186,11 +284,11 @@ pub fn rm_useless_var(
     _context: &ConversionContext,
 ) {
     //Variables in expressions
-    let vars = c.get_variables();
-    let parameters: HashSet<AtomId> = vars
+    c.format_with_parent(&ch.sym_table);
+    let parameters: HashSet<AtomId> = c
+        .get_variables()
         .iter()
         .filter_map(|v| {
-            let v = ch.sym_table.get_parent(v);
             if ch.sym_table.get_type_of(v).unwrap().kind
                 == AtomKind::Variable(VariableKind::Parameter)
             {
@@ -200,23 +298,24 @@ pub fn rm_useless_var(
             }
         })
         .collect();
-    let used_vars = c
+    let used_vars: HashSet<AtomId> = c
         .get_all_variables_in_sets()
         .iter()
-        .map(|a| *ch.sym_table.get_parent(a))
+        .filter_map(|v| {
+            if let AtomKind::Variable(_) = ch.sym_table.get_type_of(v).unwrap().kind {
+                Some(*v)
+            } else {
+                None
+            }
+        })
         .collect();
-    c.rm_set_var(c.get_variables().iter().cloned().collect());
-    let mut parent_vars = hashset![];
-    for var in &vars {
-        parent_vars.insert(*ch.sym_table.get_parent(var));
-    }
+    c.pc.variables.clear();
 
-    let parent_vars = parent_vars.intersection(used_vars);
-    let parent_vars = parent_vars.union(parameters);
-    for v in &parent_vars {
+    let new_vars = used_vars.union(parameters);
+    for v in &new_vars {
         assert_eq!(v, ch.sym_table.get_parent(v));
     }
-    c.add_variables(parent_vars);
+    c.add_variables(new_vars);
 }
 
 pub fn simplify_timepoints(
@@ -249,7 +348,7 @@ pub fn simplify_timepoints(
     let mut relations = vec![];
     let mut index_temporal_constraints = vec![];
     for (i, constraint) in c.get_constraints().iter().enumerate() {
-        if matches!(constraint, Constraint::Neg(_)) {
+        if matches!(constraint, Constraint::Not(_)) {
         } else if let Ok(r) = constraint.try_into_pa_relation(&ch.sym_table) {
             index_temporal_constraints.push(i);
             relations.push(r);

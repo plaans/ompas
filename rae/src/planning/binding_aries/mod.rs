@@ -153,7 +153,7 @@ pub fn build_chronicles(problem: &Problem) -> Result<chronicles::Problem> {
     initialize_state(&mut init_ch, problem, &ctx);
     initialize_goal_task(&mut init_ch, problem, &mut ctx);
 
-    println!("problem initialized");
+    //println!("problem initialized");
 
     /*
     Goals: Add subtask
@@ -165,14 +165,25 @@ pub fn build_chronicles(problem: &Problem) -> Result<chronicles::Problem> {
         chronicle: init_ch,
     };
 
-    println!("initial chronicle: {:?}", init_ch.chronicle);
+    let mut bindings = BindingAriesAtoms::default();
 
     let mut templates: Vec<ChronicleTemplate> = Vec::new();
     for t in &problem.cc.chronicle_templates {
         let cont = Container::Template(templates.len());
-        let template = read_chronicle(cont, t, &problem.cc, &mut ctx)?;
-        println!("template {}: {:?}", templates.len(), template.chronicle);
+        let template = read_chronicle(cont, t, &problem.cc, &mut ctx, &mut bindings)?;
+        //println!("template {}: {:?}", templates.len(), template.chronicle);
         templates.push(template);
+    }
+
+    println!("# SYMBOL TABLE: \n{:?}", ctx.model.get_symbol_table());
+    println!(
+        "{}",
+        bindings.format_with_sym_table(&problem.cc.sym_table, false)
+    );
+    println!("initial chronicle: {:?}", init_ch.chronicle);
+
+    for (i, t) in templates.iter().enumerate() {
+        println!("template {}: {:?}", i, t.chronicle)
     }
 
     let problem = aProblem {
@@ -345,6 +356,23 @@ impl BindingAriesAtoms {
     }
 }
 
+impl FormatWithSymTable for BindingAriesAtoms {
+    fn format_with_sym_table(&self, st: &SymTable, sym_version: bool) -> String {
+        let mut str = "#BINDINGS: \n".to_string();
+        for (var, id) in &self.reverse {
+            str.push_str(
+                format!(
+                    "{:?} <- {}\n",
+                    aAtom::from(*var),
+                    id.format_with_sym_table(st, sym_version)
+                )
+                .as_str(),
+            )
+        }
+        str
+    }
+}
+
 fn convert_constraint(
     x: &Constraint,
     bindings: &BindingAriesAtoms,
@@ -354,7 +382,7 @@ fn convert_constraint(
     let get_atom = |a: &AtomId| -> aAtom { atom_id_into_atom(a, st, bindings, ctx) };
 
     match x {
-        Constraint::LEq(a, b) => {
+        Constraint::Leq(a, b) => {
             let a: AtomId = a.try_into()?;
             let b: AtomId = b.try_into()?;
             Ok(aConstraint::leq(get_atom(&a), get_atom(&b)))
@@ -370,11 +398,11 @@ fn convert_constraint(
                 Lit::Exp(_) => Err(Default::default()),
             }
         }
-        Constraint::Neg(a) => {
+        Constraint::Not(a) => {
             let a: AtomId = a.try_into()?;
             Ok(aConstraint::eq(get_atom(&a), aLit::FALSE))
         }
-        Constraint::LT(a, b) => {
+        Constraint::Lt(a, b) => {
             let a: AtomId = a.try_into()?;
             let b: AtomId = b.try_into()?;
             Ok(aConstraint::lt(get_atom(&a), get_atom(&b)))
@@ -383,6 +411,20 @@ fn convert_constraint(
         | Constraint::Or(_, _)
         | Constraint::Type(_, _)
         | Constraint::Arbitrary(_, _) => Err(Default::default()),
+        Constraint::Neq(a, b) => {
+            let a: AtomId = a.try_into()?;
+            match b {
+                Lit::Atom(b) => Ok(aConstraint::neq(get_atom(&a), get_atom(b))),
+                Lit::Constraint(c) => Ok(aConstraint::reify(
+                    false,
+                    aConstraint::reify(
+                        get_atom(&a),
+                        convert_constraint(c.deref(), bindings, st, ctx)?,
+                    ),
+                )),
+                Lit::Exp(_) => Err(Default::default()),
+            }
+        }
     }
 }
 
@@ -428,13 +470,14 @@ fn read_chronicle(
     chronicle: &crate::planning::structs::chronicle::ChronicleTemplate,
     ch: &ConversionCollection,
     context: &mut Ctx,
+    bindings: &mut BindingAriesAtoms,
 ) -> Result<ChronicleTemplate> {
-    println!(
+    /*println!(
         "reading chronicle: {}",
         chronicle.format_with_sym_table(&ch.sym_table, false)
-    );
+    );*/
 
-    let mut bindings = BindingAriesAtoms::default();
+    //let mut bindings = BindingAriesAtoms::default();
 
     let _top_type: Sym = OBJECT_TYPE.into();
     let mut params: Vec<Variable> = Vec::new();
@@ -445,7 +488,7 @@ fn read_chronicle(
     bindings.add_binding(chronicle.get_presence(), &prez_var.into());
     let prez = prez_var.true_lit();
 
-    print!("init params...");
+    //print!("init params...");
     //TODO: handle case where some parameters are already instantiated.
     for var in &chronicle.get_variables() {
         let t = ch.sym_table.get_type_of(var).unwrap();
@@ -545,7 +588,7 @@ fn read_chronicle(
         };
         params.push(param);
     }
-    println!("ok!");
+    //println!("ok!");
 
     //End declaration of the variables
 
@@ -553,7 +596,7 @@ fn read_chronicle(
     CREATION of the name
      */
     //For the moment lacking the fact that we can add any kind of variables
-    print!("init name...");
+    //print!("init name...");
     let mut name: Vec<SAtom> = vec![];
     for (i, p) in chronicle.name.iter().enumerate() {
         if i == 0 {
@@ -572,7 +615,7 @@ fn read_chronicle(
             name.push(SVar::try_from(bindings.get_var(p).unwrap())?.into())
         }
     }
-    println!("ok!");
+    //println!("ok!");
 
     let mut constraints: Vec<aConstraint> = vec![];
     let mut conditions: Vec<Condition> = vec![];
@@ -587,7 +630,7 @@ fn read_chronicle(
         constraints.push(x);
     }
 
-    print!("init conditions...");
+    //print!("init conditions...");
     for c in chronicle.get_conditions() {
         let sv =
             c.sv.iter()
@@ -606,9 +649,9 @@ fn read_chronicle(
         };
         conditions.push(condition);
     }
-    println!("ok!");
+    //println!("ok!");
 
-    print!("init effects...");
+    //print!("init effects...");
     for e in chronicle.get_effects() {
         let sv =
             e.sv.iter()
@@ -627,9 +670,9 @@ fn read_chronicle(
         };
         effects.push(effect);
     }
-    println!("ok!");
+    //println!("ok!");
 
-    print!("init subtasks...");
+    //print!("init subtasks...");
     for s in chronicle.get_subtasks() {
         let start: FAtom = get_atom(s.interval.start()).try_into()?;
         let end: FAtom = get_atom(s.interval.end()).try_into()?;
@@ -650,21 +693,21 @@ fn read_chronicle(
 
         subtasks.push(st);
     }
-    println!("ok!");
+    //println!("ok!");
 
     let start = FVar::try_from(bindings.get_var(chronicle.get_start()).unwrap())?;
     let start = FAtom::from(start);
     let end = FVar::try_from(bindings.get_var(chronicle.get_end()).unwrap())?;
     let end = FAtom::from(end);
 
-    print!("init task...");
+    //print!("init task...");
     let task: Vec<SAtom> = chronicle
         .task
         .iter()
         .map(|a| get_atom(a).try_into().expect(""))
         .collect();
-    println!("ok!");
-    print!("\n\n");
+    //println!("ok!");
+    //print!("\n\n");
 
     let template = aChronicle {
         kind: chronicle.chronicle_kind,

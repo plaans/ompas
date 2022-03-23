@@ -19,6 +19,7 @@ pub mod language {
     pub const GEQ: &str = ">=";
     pub const LEQ: &str = "<=";
     pub const EQ: &str = "=";
+    pub const NEQ: &str = "!=";
 
     pub const DOC_EQ: &str =
         "Takes 2 arguments. Return true if two arguments are equal. False otherwise.";
@@ -55,6 +56,13 @@ pub fn not(args: &[LValue], _: &LEnv) -> LResult {
     match &args[0] {
         LValue::Nil => Ok(LValue::True),
         _ => Ok(LValue::Nil),
+    }
+}
+
+pub fn neq(args: &[LValue], _: &LEnv) -> LResult {
+    match args.len() {
+        2 => Ok((args[0] != args[1]).into()),
+        i => Err(WrongNumberOfArgument(EQ, args.into(), i, 2..2)),
     }
 }
 

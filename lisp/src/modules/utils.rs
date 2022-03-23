@@ -118,13 +118,13 @@ pub const MACRO_CADADR: &str = "(defmacro cadadr (lambda (x) `(car (cdr (car (cd
 pub const MACRO_CDADR: &str = "(defmacro cdadr (lambda (x) `(cdr (car (cdr ,x)))))";
 pub const MACRO_CADADDR: &str = "(defmacro cadaddr (lambda (x) `(car (cdr (car (cdr (cdr ,x)))))))";
 
-pub const MACRO_NEQ: &str = "(defmacro neq
+/*pub const MACRO_NEQ: &str = "(defmacro neq
                                 (lambda (a b)
                                     `(! (= ,a ,b))))";
 
 pub const MACRO_NEQ_SHORT: &str = "(defmacro !=
                                         (lambda (a b)
-                                            `(neq ,a ,b)))";
+                                            `(neq ,a ,b)))";*/
 
 pub const MACRO_AWAIT_ASYNC: &str = "(defmacro await-async (lambda (x) `(await (async ,x))))";
 
@@ -284,8 +284,6 @@ impl IntoModule for CtxUtils {
                 MACRO_CAADR,
                 MACRO_CADADR,
                 MACRO_CADADDR,
-                MACRO_NEQ,
-                MACRO_NEQ_SHORT,
                 MACRO_AWAIT_ASYNC,
                 MACRO_APPLY,
                 MACRO_COND,

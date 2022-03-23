@@ -2,7 +2,7 @@
     (def-action move '(?from room) '(?to room))
     (def-action-model move
         '((:params (?from room) (?to room))
-          (:pre-conditions (check (= (at-robby) ?from)))
+          (:pre-conditions (and-cond (= (at-robby) ?from) (!= ?from ?to)))
           (:effects
             (begin
                 (assert 'at-robby ?to)))))

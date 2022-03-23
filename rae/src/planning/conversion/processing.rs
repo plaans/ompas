@@ -17,7 +17,9 @@ use crate::planning::structs::type_table::{AtomKind, PlanningAtomType, VariableK
 use crate::planning::structs::{ConversionCollection, ConversionContext, TaskType, COND};
 use aries_planning::chronicles::ChronicleKind;
 use ompas_lisp::core::language::{BOOL, FLOAT, INT, NUMBER, OBJECT, TYPE_LIST};
-use ompas_lisp::core::root_module::basic_math::language::{EQ, GEQ, GT, LEQ, LT, NOT, NOT_SHORT};
+use ompas_lisp::core::root_module::basic_math::language::{
+    EQ, GEQ, GT, LEQ, LT, NEQ, NOT, NOT_SHORT,
+};
 use ompas_lisp::core::root_module::error::language::CHECK;
 use ompas_lisp::core::root_module::predicate::language::{
     IS_BOOL, IS_FLOAT, IS_INT, IS_LIST, IS_NIL, IS_NUMBER,
@@ -31,6 +33,7 @@ use ompas_lisp::core::structs::typelvalue::TypeLValue;
 use ompas_lisp::modules::utils::language::ARBITRARY;
 use ompas_lisp::static_eval::{eval_static, parse_static};
 use std::convert::{TryFrom, TryInto};
+use std::ops::Deref;
 
 //Names of the functions
 
@@ -302,13 +305,22 @@ pub fn convert_lvalue_to_expression_chronicle(
                                     state_variable.get_interval(),
                                     value.get_interval(),
                                 ));
-                                ec.add_constraint(finish(value.get_interval(), ec.get_interval()));
 
+                                //instantaneous effect;
+                                ec.add_constraint(finish(value.get_interval(), ec.get_interval()));
                                 ec.add_effect(Effect {
-                                    interval: *ec.get_interval(),
+                                    interval: Interval::new_instantaneous(ec.get_end()),
                                     sv: state_variable.get_result_as_lit().try_into()?,
                                     value: value.get_result_as_lit().try_into()?,
                                 });
+
+                                //Not instantaneous effect.
+                                /*ec.add_constraint(Constraint::lt(value.get_end(), ec.get_end()));
+                                ec.add_effect(Effect {
+                                    interval: Interval::new_instantaneous(ec.get_end()),
+                                    sv: state_variable.get_result_as_lit().try_into()?,
+                                    value: value.get_result_as_lit().try_into()?,
+                                });*/
 
                                 ec.absorb(state_variable);
                                 ec.absorb(value);
@@ -322,7 +334,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                                     "not yet supported".to_string(),
                                 ))
                             }
-                            EQ | GT | GEQ | LT | LEQ => {
+                            EQ | NEQ | GT | GEQ | LT | LEQ => {
                                 let left = convert_lvalue_to_expression_chronicle(
                                     &l[1],
                                     context,
@@ -345,10 +357,11 @@ pub fn convert_lvalue_to_expression_chronicle(
 
                                 let constraint = match str {
                                     EQ => Constraint::Eq(a, b),
-                                    LT => Constraint::LT(a, b),
-                                    GT => Constraint::LT(b, a),
-                                    LEQ => Constraint::LEq(a, b),
-                                    GEQ => Constraint::LEq(b, a),
+                                    LT => Constraint::Lt(a, b),
+                                    GT => Constraint::Lt(b, a),
+                                    LEQ => Constraint::Leq(a, b),
+                                    GEQ => Constraint::Leq(b, a),
+                                    NEQ => Constraint::Neq(a, b),
                                     _ => unreachable!(),
                                 };
 
@@ -418,7 +431,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                                 let r = val.get_result_as_lit();
 
                                 let constraint = match str {
-                                    NOT | NOT_SHORT => Constraint::Neg(r),
+                                    NOT | NOT_SHORT => Constraint::Not(r),
                                     IS_BOOL => {
                                         Constraint::Type(r, ch.sym_table.id(BOOL).unwrap().into())
                                     }
@@ -601,19 +614,14 @@ pub fn convert_lvalue_to_expression_chronicle(
                                         ch,
                                         Default::default(),
                                     )?;
-
-                                    /*ec.add_condition(Condition {
-                                        interval: *condition.get_interval(),
-                                        constraint: Constraint::Eq(
-                                            condition.get_result_as_lit(),
+                                    match condition.get_result_as_lit() {
+                                        Lit::Constraint(c) => ec.add_constraint(c.deref().clone()),
+                                        l => ec.add_constraint(Constraint::Eq(
+                                            l,
                                             ch.sym_table.new_bool(true).into(),
-                                        ),
-                                    });*/
+                                        )),
+                                    }
 
-                                    ec.add_constraint(Constraint::Eq(
-                                        condition.get_result_as_lit(),
-                                        ch.sym_table.new_bool(true).into(),
-                                    ));
                                     ec.add_constraint(equal(
                                         ec.get_interval(),
                                         condition.get_interval(),
@@ -707,7 +715,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                         ec.absorb(ec_i);
                     }
 
-                    ec.add_constraint(Constraint::LEq(
+                    ec.add_constraint(Constraint::Leq(
                         end_last_interval.into(),
                         ec.get_interval().end().into(),
                     ));
@@ -951,7 +959,7 @@ pub fn convert_if(
 
     let sub_task_interval = ch.sym_table.declare_new_interval();
 
-    ec.add_constraint(Constraint::LEq(
+    ec.add_constraint(Constraint::Leq(
         sub_task_interval.start().into(),
         sub_task_interval.end().into(),
     ));

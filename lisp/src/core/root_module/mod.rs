@@ -69,6 +69,7 @@ pub mod language {
             MAP,
             NOT,
             NOT_SHORT,
+            NEQ,
             ADD,
             SUB,
             MUL,
@@ -188,6 +189,7 @@ impl IntoModule for CtxRoot {
         module.add_fn_prelude(LT, lt);
         module.add_fn_prelude(LEQ, leq);
         module.add_fn_prelude(EQ, eq);
+        module.add_fn_prelude(NEQ, neq);
 
         //predicates
         module.add_fn_prelude(IS_INT, is_integer);

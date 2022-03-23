@@ -239,6 +239,10 @@ impl ChronicleTemplate {
     pub fn rm_set_constraint(&mut self, indexes: Vec<usize>) {
         self.pc.rm_set_constraint(indexes)
     }
+
+    pub fn rm_condition(&mut self, index: usize) {
+        self.pc.rm_condition(index);
+    }
 }
 
 /*

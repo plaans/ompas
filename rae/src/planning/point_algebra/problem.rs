@@ -29,15 +29,16 @@ impl From<&Relation<AtomId>> for Constraint {
     fn from(r: &Relation<AtomId>) -> Self {
         match &r.relation_type {
             RelationType::Eq => Constraint::Eq(r.i.into(), r.j.into()),
-            RelationType::GT => Constraint::LT(r.j.into(), r.i.into()),
-            RelationType::LT => Constraint::LT(r.i.into(), r.j.into()),
-            RelationType::GEq => Constraint::LEq(r.j.into(), r.i.into()),
-            RelationType::LEq => Constraint::LEq(r.i.into(), r.j.into()),
-            RelationType::Neq => Constraint::Neg(Lit::Constraint(Box::new(Constraint::Eq(
+            RelationType::GT => Constraint::Lt(r.j.into(), r.i.into()),
+            RelationType::LT => Constraint::Lt(r.i.into(), r.j.into()),
+            RelationType::GEq => Constraint::Leq(r.j.into(), r.i.into()),
+            RelationType::LEq => Constraint::Leq(r.i.into(), r.j.into()),
+            RelationType::Neq => Constraint::Not(Lit::Constraint(Box::new(Constraint::Eq(
                 r.i.into(),
                 r.j.into(),
             )))),
-            Tautology | Contradiction => panic!("should not have been extracted"),
+            Contradiction => panic!("contradiction in the networkd"),
+            Tautology => panic!("should not have been extracted"),
         }
     }
 }

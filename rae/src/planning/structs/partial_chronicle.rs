@@ -37,7 +37,7 @@ impl PartialChronicle {
             presence.clone()
         ];
 
-        let constraints = vec![Constraint::LEq(
+        let constraints = vec![Constraint::Leq(
             interval.start().into(),
             interval.end().into(),
         )];
@@ -92,7 +92,12 @@ impl PartialChronicle {
         self.constraints.remove(index);
     }
 
+    pub fn rm_condition(&mut self, index: usize) {
+        self.conditions.remove(index);
+    }
+
     pub fn rm_set_constraint(&mut self, mut indexes: Vec<usize>) {
+        indexes.sort();
         indexes.reverse();
         for index in indexes {
             self.rm_constraint(index);
@@ -168,7 +173,6 @@ impl FormatWithSymTable for PartialChronicle {
                     id.format_with_sym_table(st, sym_version),
                     st.get_type_of(id)
                         .unwrap()
-                        .a_type
                         .format_with_sym_table(st, sym_version)
                 )
             })

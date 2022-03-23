@@ -212,6 +212,10 @@ pub fn convert_abstract_task_to_chronicle(
     )?;
 
     chronicle.absorb_expression_chronicle(ec);
+    /*chronicle.add_constraint(Constraint::LT(
+        chronicle.get_start().into(),
+        chronicle.get_end().into(),
+    ));*/
 
     post_processing(&mut chronicle, conversion_context, ch)?;
 

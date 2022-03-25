@@ -89,7 +89,7 @@ impl CtxCounter {
     pub fn get_counter(&self, counter: &usize) -> lerror::Result<LValue> {
         match self.counters.write().unwrap().get(*counter) {
             None => Err(SpecialError(GET_COUNTER, "index out of reach".to_string())),
-            Some(c) => Ok(LValue::Number(LNumber::Int(c.val as i32))),
+            Some(c) => Ok(LValue::Number(LNumber::Int(c.val as i64))),
         }
     }
 }
@@ -219,7 +219,7 @@ pub fn set_counter(args: &[LValue], env: &LEnv) -> LResult {
             ));
         };
         if let LValue::Number(n) = &args[1] {
-            let n: u32 = i32::from(n) as u32;
+            let n: u32 = i64::from(n) as u32;
             ctx.set_counter(u, n)?;
             Ok(LValue::Nil)
         } else {
@@ -242,7 +242,7 @@ pub fn set_counter(args: &[LValue], env: &LEnv) -> LResult {
 
 pub fn new_counter(_: &[LValue], env: &LEnv) -> LResult {
     let ctx = env.get_context::<CtxCounter>(MOD_COUNTER)?;
-    Ok(LValue::Number(LNumber::Int(ctx.new_counter() as i32)))
+    Ok(LValue::Number(LNumber::Int(ctx.new_counter() as i64)))
 }
 
 impl IntoModule for CtxCounter {

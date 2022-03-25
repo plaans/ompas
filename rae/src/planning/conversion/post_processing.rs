@@ -48,8 +48,8 @@ pub fn simplify_constraints(
                     if let Atom::Bool(true) = ch.sym_table.get_atom(a, true).unwrap() {
                         println!(
                             "{} => {}",
-                            c.format_with_sym_table(&ch.sym_table, true),
-                            b.format_with_sym_table(&ch.sym_table, true)
+                            c.format(&ch.sym_table, true),
+                            b.format(&ch.sym_table, true)
                         );
                         vec.push((i, b.deref().clone()));
                     }
@@ -58,8 +58,8 @@ pub fn simplify_constraints(
                     if let Atom::Bool(true) = ch.sym_table.get_atom(a, true).unwrap() {
                         println!(
                             "{} => {}",
-                            c.clone().format_with_sym_table(&ch.sym_table, true),
-                            b.format_with_sym_table(&ch.sym_table, true)
+                            c.clone().format(&ch.sym_table, true),
+                            b.format(&ch.sym_table, true)
                         );
                         vec.push((i, b.deref().clone()));
                     }
@@ -86,8 +86,8 @@ pub fn merge_conditions(
             if c1.interval == c2.interval && c1.sv == c2.sv {
                 println!(
                     "merging {} and {}",
-                    c1.format_with_sym_table(&ch.sym_table, true),
-                    c2.format_with_sym_table(&ch.sym_table, true)
+                    c1.format(&ch.sym_table, true),
+                    c2.format(&ch.sym_table, true)
                 );
                 bind_atoms(&c1.value, &c2.value, &mut ch.sym_table)?;
                 c_to_remove.push(j + i + 1);

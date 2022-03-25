@@ -13,8 +13,8 @@ use std::ops::Deref;
 #[serde(untagged)]
 pub enum LValueS {
     Symbol(String),
-    Int(i32),
-    Float(f32),
+    Int(i64),
+    Float(f64),
     Bool(bool),
     List(Vec<LValueS>),
     Map(Vec<(LValueS, LValueS)>),

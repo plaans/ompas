@@ -22,12 +22,12 @@ impl Effect {
 }
 
 impl FormatWithSymTable for Effect {
-    fn format_with_sym_table(&self, st: &SymTable, sym_version: bool) -> String {
+    fn format(&self, st: &SymTable, sym_version: bool) -> String {
         format!(
             "{} {} <- {}",
-            self.interval.format_with_sym_table(st, sym_version),
-            self.sv.format_with_sym_table(st, sym_version),
-            self.value.format_with_sym_table(st, sym_version),
+            self.interval.format(st, sym_version),
+            self.sv.format(st, sym_version),
+            self.value.format(st, sym_version),
         )
     }
 }

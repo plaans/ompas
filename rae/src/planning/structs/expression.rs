@@ -12,11 +12,11 @@ pub struct Expression {
 }
 
 impl FormatWithSymTable for Expression {
-    fn format_with_sym_table(&self, st: &SymTable, sym_version: bool) -> String {
+    fn format(&self, st: &SymTable, sym_version: bool) -> String {
         format!(
             "{} {}",
-            self.interval.format_with_sym_table(st, sym_version),
-            self.lit.format_with_sym_table(st, sym_version)
+            self.interval.format(st, sym_version),
+            self.lit.format(st, sym_version)
         )
     }
 }

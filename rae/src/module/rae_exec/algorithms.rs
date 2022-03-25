@@ -273,7 +273,7 @@ mod select {
             .map(|lv| LValue::List(vec![lv.clone()]))
             .collect();
 
-        let mut applicable_methods: Vec<(LValue, i32)> = vec![];
+        let mut applicable_methods: Vec<(LValue, i64)> = vec![];
         let state: LValue = get_facts(&[], env).await?;
 
         let mut env = env.clone();
@@ -340,7 +340,7 @@ mod select {
                 let lv: LValue = eval(&arg, &mut env.clone()).await?;
                 if !matches!(lv, LValue::Err(_)) {
                     let arg = cons(&[score_lambda.clone(), i_vec[1..].into()], env)?;
-                    let score: i32 = eval(&arg, &mut env.clone()).await?.try_into()?;
+                    let score: i64 = eval(&arg, &mut env.clone()).await?.try_into()?;
                     applicable_methods.push((i, score))
                 }
             }

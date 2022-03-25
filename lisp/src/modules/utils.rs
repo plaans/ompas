@@ -667,7 +667,7 @@ mod test {
             inner: MACRO_AND,
             dependencies: vec![],
             expression: "(and (= (+ 1 1) 2) (< 3 4))",
-            expanded: "(if (= (+ 1 1) 2) (< 3 4) nil)",
+            expected: "(if (= (+ 1 1) 2) (< 3 4) nil)",
             result: "true",
         };
 
@@ -680,7 +680,7 @@ mod test {
             inner: MACRO_TEST_MACRO,
             dependencies: vec![MACRO_AND],
             expression: "(test-macro \"(and (= 1 2) (> 3 4))\")",
-            expanded: "(expand (parse \"(and (= 1 2) (> 3 4))\"))",
+            expected: "(expand (parse \"(and (= 1 2) (> 3 4))\"))",
             result: "(if (= 1 2) (> 3 4) nil)",
         };
 
@@ -693,7 +693,7 @@ mod test {
             inner: MACRO_OR,
             dependencies: vec![],
             expression: "(or (= (+ 1 1) 2) (< 3 4))",
-            expanded: "(if (= (+ 1 1) 2) true (< 3 4))",
+            expected: "(if (= (+ 1 1) 2) true (< 3 4))",
             result: "true",
         };
 
@@ -706,7 +706,7 @@ mod test {
             inner: MACRO_CAAR,
             dependencies: vec![],
             expression: "(caar '((1 2) (3 4)))",
-            expanded: "(car (car (quote ((1 2) (3 4)))))",
+            expected: "(car (car (quote ((1 2) (3 4)))))",
             result: "1",
         };
 
@@ -719,7 +719,7 @@ mod test {
             inner: MACRO_CADR,
             dependencies: vec![],
             expression: "(cadr '((1 2) (3 4)))",
-            expanded: "(car (cdr (quote ((1 2) (3 4)))))",
+            expected: "(car (cdr (quote ((1 2) (3 4)))))",
             result: "(3 4)",
         };
 
@@ -732,7 +732,7 @@ mod test {
             inner: MACRO_CDAR,
             dependencies: vec![],
             expression: "(cdar '((1 2) (3 4)))",
-            expanded: "(cdr (car (quote ((1 2) (3 4)))))",
+            expected: "(cdr (car (quote ((1 2) (3 4)))))",
             result: "(2)",
         };
 
@@ -745,7 +745,7 @@ mod test {
             inner: MACRO_CDDR,
             dependencies: vec![],
             expression: "(cddr '((1 2) (3 4) 5))",
-            expanded: "(cdr (cdr (quote ((1 2) (3 4) 5))))",
+            expected: "(cdr (cdr (quote ((1 2) (3 4) 5))))",
             result: "(5)",
         };
 
@@ -758,7 +758,7 @@ mod test {
             inner: MACRO_CADAR,
             dependencies: vec![],
             expression: "(cadar '((1 2) (3 4) 5))",
-            expanded: "(car (cdr (car '((1 2) (3 4) 5))))",
+            expected: "(car (cdr (car '((1 2) (3 4) 5))))",
             result: "2",
         };
 
@@ -771,7 +771,7 @@ mod test {
             inner: MACRO_CADDR,
             dependencies: vec![],
             expression: "(caddr '((1 2) (3 4) 5))",
-            expanded: "(car (cdr (cdr '((1 2) (3 4) 5))))",
+            expected: "(car (cdr (cdr '((1 2) (3 4) 5))))",
             result: "5",
         };
 
@@ -784,7 +784,7 @@ mod test {
             inner: MACRO_CDADR,
             dependencies: vec![],
             expression: "(cdadr '((1 2) (3 4) 5))",
-            expanded: "(cdr (car (cdr '((1 2) (3 4) 5))))",
+            expected: "(cdr (car (cdr '((1 2) (3 4) 5))))",
             result: "(4)",
         };
 
@@ -797,7 +797,7 @@ mod test {
             inner: MACRO_CAADR,
             dependencies: vec![],
             expression: "(caadr '((1 2) (3 4) 5))",
-            expanded: "(car (car (cdr '((1 2) (3 4) 5))))",
+            expected: "(car (car (cdr '((1 2) (3 4) 5))))",
             result: "3",
         };
 
@@ -810,7 +810,7 @@ mod test {
             inner: MACRO_CADADR,
             dependencies: vec![],
             expression: "(cadadr '((1 2) (3 4) 5))",
-            expanded: "(car (cdr (car (cdr '((1 2) (3 4) 5)))))",
+            expected: "(car (cdr (car (cdr '((1 2) (3 4) 5)))))",
             result: "4",
         };
 
@@ -823,34 +823,8 @@ mod test {
             inner: MACRO_CADADDR,
             dependencies: vec![],
             expression: "(cadaddr '((1 2) (3 4) ((5 6) 7)))",
-            expanded: "(car (cdr (car (cdr (cdr '((1 2) (3 4) ((5 6) 7)))))))",
+            expected: "(car (cdr (car (cdr (cdr '((1 2) (3 4) ((5 6) 7)))))))",
             result: "7",
-        };
-
-        test_expression(macro_to_test).await
-    }
-
-    #[tokio::test]
-    async fn test_macro_neq() -> lerror::Result<()> {
-        let macro_to_test = TestExpression {
-            inner: MACRO_NEQ,
-            dependencies: vec![],
-            expression: "(neq 1 4)",
-            expanded: "(! (= 1 4))",
-            result: "true",
-        };
-
-        test_expression(macro_to_test).await
-    }
-
-    #[tokio::test]
-    async fn test_macro_neq_short() -> lerror::Result<()> {
-        let macro_to_test = TestExpression {
-            inner: MACRO_NEQ_SHORT,
-            dependencies: vec![MACRO_NEQ],
-            expression: "(!= 1 4)",
-            expanded: "(! (= 1 4))",
-            result: "true",
         };
 
         test_expression(macro_to_test).await
@@ -862,7 +836,7 @@ mod test {
             inner: MACRO_AWAIT_ASYNC,
             dependencies: vec![],
             expression: "(await-async (+ 1 4))",
-            expanded: "(await (async (+ 1 4)))",
+            expected: "(await (async (+ 1 4)))",
             result: "5",
         };
 
@@ -875,7 +849,7 @@ mod test {
             inner: MACRO_APPLY,
             dependencies: vec![],
             expression: "(apply + (1 4))",
-            expanded: "(+ 1 4)",
+            expected: "(+ 1 4)",
             result: "5",
         };
 
@@ -896,7 +870,7 @@ mod test {
                             (else hot))))
 
                     (weather 15))",
-            expanded: "(begin
+            expected: "(begin
                     (define weather (lambda (t) (if (< t 0)
                         cold
                         (if (< t 10)
@@ -952,7 +926,7 @@ mod test {
             inner: LAMBDA_ZIP,
             dependencies: vec![MACRO_OR],
             expression: "(zip '(1 2 3 4) '(5 6 7 8))",
-            expanded: "(zip '(1 2 3 4) '(5 6 7 8))",
+            expected: "(zip '(1 2 3 4) '(5 6 7 8))",
             result: "((1 5) (2 6) (3 7) (4 8))",
         };
 
@@ -965,7 +939,7 @@ mod test {
             inner: LAMBDA_UNZIP,
             dependencies: vec![MACRO_CAAR, MACRO_CADAR, MACRO_APPLY],
             expression: "(unzip '((1 5) (2 6) (3 7) (4 8)))",
-            expanded: "(unzip '((1 5) (2 6) (3 7) (4 8)))",
+            expected: "(unzip '((1 5) (2 6) (3 7) (4 8)))",
             result: "((1 2 3 4) (5 6 7 8))",
         };
 
@@ -980,7 +954,7 @@ mod test {
             expression: "(begin
                             (define square (lambda (x)  (* x x)))
                             (mapf square '(1 2 3 4 5)))",
-            expanded: "(begin
+            expected: "(begin
                             (define square (lambda (x)  (* x x)))
                             (mapf square '(1 2 3 4 5)))",
             result: "(1 4 9 16 25)",
@@ -997,7 +971,7 @@ mod test {
             expression: "(let ((x 1)
                                (y 2))
                               (+ x y))",
-            expanded: "((lambda (x y) (+ x y)) 1 2)",
+            expected: "((lambda (x y) (+ x y)) 1 2)",
             result: "3",
         };
 
@@ -1012,7 +986,7 @@ mod test {
             expression: "(let* ((x 1)\
                                (y (+ x 1)))\
                               (+ x y))",
-            expanded: "((lambda (x) ((lambda (y) (+ x y)) (+ x 1))) 1)",
+            expected: "((lambda (x) ((lambda (y) (+ x y)) (+ x 1))) 1)",
             result: "3",
         };
 

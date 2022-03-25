@@ -151,7 +151,7 @@ impl Display for Sym {
 }
 
 impl FormatWithSymTable for Atom {
-    fn format_with_sym_table(&self, _: &SymTable, sym_version: bool) -> String {
+    fn format(&self, _: &SymTable, sym_version: bool) -> String {
         if let Self::Sym(s) = self {
             match sym_version {
                 true => s.to_string(),

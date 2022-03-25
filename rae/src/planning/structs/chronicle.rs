@@ -18,7 +18,7 @@ use ompas_lisp::core::structs::lvalue::LValue;
 use std::fmt::Display;
 
 impl FormatWithSymTable for Vec<AtomId> {
-    fn format_with_sym_table(&self, st: &SymTable, sym_version: bool) -> String {
+    fn format(&self, st: &SymTable, sym_version: bool) -> String {
         let mut str = "(".to_string();
         let mut first = true;
         for e in self {
@@ -27,7 +27,7 @@ impl FormatWithSymTable for Vec<AtomId> {
             } else {
                 str.push(' ');
             }
-            str.push_str(e.format_with_sym_table(st, sym_version).as_str());
+            str.push_str(e.format(st, sym_version).as_str());
         }
         str.push(')');
         str
@@ -107,27 +107,15 @@ impl ChronicleTemplate {
 }
 
 impl FormatWithSymTable for ChronicleTemplate {
-    fn format_with_sym_table(&self, st: &SymTable, sym_version: bool) -> String {
+    fn format(&self, st: &SymTable, sym_version: bool) -> String {
         let mut s = String::new();
         //name
         s.push_str(self.label.as_str());
         s.push('\n');
-        s.push_str(
-            format!(
-                "- name: {}\n",
-                self.name.format_with_sym_table(st, sym_version)
-            )
-            .as_str(),
-        );
+        s.push_str(format!("- name: {}\n", self.name.format(st, sym_version)).as_str());
         //task
-        s.push_str(
-            format!(
-                "- task: {}\n",
-                self.task.format_with_sym_table(st, sym_version)
-            )
-            .as_str(),
-        );
-        s.push_str(self.pc.format_with_sym_table(st, sym_version).as_str());
+        s.push_str(format!("- task: {}\n", self.task.format(st, sym_version)).as_str());
+        s.push_str(self.pc.format(st, sym_version).as_str());
 
         //Debug
         if let Some(exp) = &self.debug {
@@ -341,10 +329,10 @@ pub struct ChronicleResult {
 }
 
 impl FormatWithSymTable for ChronicleResult {
-    fn format_with_sym_table(&self, st: &SymTable, sym_version: bool) -> String {
+    fn format(&self, st: &SymTable, sym_version: bool) -> String {
         match &self.pure {
-            Some(lit) => lit.format_with_sym_table(st, sym_version),
-            None => self.id.format_with_sym_table(st, sym_version),
+            Some(lit) => lit.format(st, sym_version),
+            None => self.id.format(st, sym_version),
         }
     }
 }

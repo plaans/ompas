@@ -59,7 +59,7 @@ pub async fn convert_expr<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
 
     post_processing(&mut chronicle, &context, &mut ch)?;
     let time = time.elapsed().expect("could not get time").as_micros();
-    let string = chronicle.format_with_sym_table(&ch.sym_table, true);
+    let string = chronicle.format(&ch.sym_table, true);
 
     Ok(format!("{}\n\n Time to convert: {} µs.", string, time).into())
 }
@@ -92,7 +92,7 @@ pub async fn convert_cond_expr<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult
 
     let result = convert_if(&args[0], &context, &mut ch)?;
 
-    Ok(result.format_with_sym_table(&ch.sym_table, true).into())
+    Ok(result.format(&ch.sym_table, true).into())
 }
 
 #[macro_rules_attribute(dyn_async!)]

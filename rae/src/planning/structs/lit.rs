@@ -161,8 +161,8 @@ pub fn lvalue_to_lit(lv: &LValue, st: &mut SymTable) -> lerror::Result<Lit> {
             "Map transformation to lit is not supported yet.".to_string(),
         )),
         LValue::Number(n) => match n {
-            LNumber::Int(i) => Ok(st.new_int(*i).into()),
-            LNumber::Float(f) => Ok(st.new_float(*f).into()),
+            LNumber::Int(i) => Ok(st.new_int(*i as i32).into()),
+            LNumber::Float(f) => Ok(st.new_float(*f as f32).into()),
         },
         LValue::True => Ok(st.new_bool(true).into()),
         LValue::Nil => Ok(st.new_bool(false).into()),
@@ -177,17 +177,17 @@ pub fn lvalue_to_lit(lv: &LValue, st: &mut SymTable) -> lerror::Result<Lit> {
 }
 
 impl FormatWithSymTable for Lit {
-    fn format_with_sym_table(&self, st: &SymTable, sym_version: bool) -> String {
+    fn format(&self, st: &SymTable, sym_version: bool) -> String {
         match self {
-            Lit::Atom(a) => a.format_with_sym_table(st, sym_version),
-            Lit::Constraint(c) => c.format_with_sym_table(st, sym_version),
+            Lit::Atom(a) => a.format(st, sym_version),
+            Lit::Constraint(c) => c.format(st, sym_version),
             Lit::Exp(vec) => {
                 let mut str = "(".to_string();
                 for (i, e) in vec.iter().enumerate() {
                     if i != 0 {
                         str.push(' ');
                     }
-                    str.push_str(e.format_with_sym_table(st, sym_version).as_str())
+                    str.push_str(e.format(st, sym_version).as_str())
                 }
                 str.push(')');
                 str

@@ -112,54 +112,54 @@ impl GetVariables for Constraint {
 }
 
 impl FormatWithSymTable for Constraint {
-    fn format_with_sym_table(&self, st: &SymTable, sym_version: bool) -> String {
+    fn format(&self, st: &SymTable, sym_version: bool) -> String {
         match self {
             Constraint::Eq(l1, l2) => format!(
                 "({} = {})",
-                l1.format_with_sym_table(st, sym_version),
-                l2.format_with_sym_table(st, sym_version)
+                l1.format(st, sym_version),
+                l2.format(st, sym_version)
             ),
-            Constraint::Not(l1) => format!("(! {})", l1.format_with_sym_table(st, sym_version)),
+            Constraint::Not(l1) => format!("(! {})", l1.format(st, sym_version)),
             Constraint::Lt(l1, l2) => format!(
                 "({} < {})",
-                l1.format_with_sym_table(st, sym_version),
-                l2.format_with_sym_table(st, sym_version)
+                l1.format(st, sym_version),
+                l2.format(st, sym_version)
             ),
             Constraint::And(l1, l2) => format!(
                 "({} && {})",
-                l1.format_with_sym_table(st, sym_version),
-                l2.format_with_sym_table(st, sym_version)
+                l1.format(st, sym_version),
+                l2.format(st, sym_version)
             ),
             Constraint::Or(l1, l2) => format!(
                 "({} || {})",
-                l1.format_with_sym_table(st, sym_version),
-                l2.format_with_sym_table(st, sym_version)
+                l1.format(st, sym_version),
+                l2.format(st, sym_version)
             ),
             Constraint::Leq(l1, l2) => {
                 format!(
                     "({} <= {})",
-                    l1.format_with_sym_table(st, sym_version),
-                    l2.format_with_sym_table(st, sym_version)
+                    l1.format(st, sym_version),
+                    l2.format(st, sym_version)
                 )
             }
             Constraint::Type(l1, l2) => {
                 format!(
                     "(type({}) = {})",
-                    l1.format_with_sym_table(st, sym_version),
-                    l2.format_with_sym_table(st, sym_version)
+                    l1.format(st, sym_version),
+                    l2.format(st, sym_version)
                 )
             }
             Constraint::Arbitrary(l1, l2) => {
                 format!(
                     "({} in {})",
-                    l1.format_with_sym_table(st, sym_version),
-                    l2.format_with_sym_table(st, sym_version)
+                    l1.format(st, sym_version),
+                    l2.format(st, sym_version)
                 )
             }
             Constraint::Neq(l1, l2) => format!(
                 "({} != {})",
-                l1.format_with_sym_table(st, sym_version),
-                l2.format_with_sym_table(st, sym_version)
+                l1.format(st, sym_version),
+                l2.format(st, sym_version)
             ),
         }
     }

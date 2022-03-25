@@ -884,7 +884,7 @@ mod test {
             inner: MACRO_GENERATE_TASK,
             dependencies: vec![],
             expression: "(generate-task t_navigate_to (?r robot) (?x int) (?y int))",
-            expanded: "(list \
+            expected: "(list \
                         t_navigate_to
                         '((?r robot) (?x int) (?y int))
                         (lambda (?r ?x ?y)
@@ -906,7 +906,7 @@ mod test {
             inner: MACRO_GENERATE_STATE_FUNCTION,
             dependencies: vec![],
             expression: "(generate-state-function sf (?a object) (?b object) (?c object))",
-            expanded: "(list sf
+            expected: "(list sf
                             '((?a object) (?b object) (?c object))
                             (lambda (?a ?b)
                                 (rae-get-state-variable 'sf ?a ?b)))",
@@ -923,7 +923,7 @@ mod test {
             inner: MACRO_GENERATE_STATE_FUNCTION,
             dependencies: vec![],
             expression: "(generate-state-function sf)",
-            expanded: "(list sf
+            expected: "(list sf
                             'nil
                             (lambda nil
                                 (rae-get-state-variable 'sf)))",
@@ -941,7 +941,7 @@ mod test {
             inner: MACRO_GENERATE_ACTION,
             dependencies: vec![],
             expression: "(generate-action pick_package (?r robot) (?p package))",
-            expanded: "(list pick_package
+            expected: "(list pick_package
                             '((?r robot) (?p package))
                             (lambda (?r ?p)
                                 (rae-exec-command (quote pick_package) ?r ?p)))",
@@ -962,20 +962,24 @@ mod test {
             dependencies: vec![],
             expression: "(generate-action-model pick
                 ((:params (?r robot))
-                  (:pre-conditions (> (robot.battery ?r) 0.4))
+                  (:pre-conditions (check (> (robot.battery ?r) 0.4)))
                   (:effects
                         (assert (robot.busy ?r) true))))",
-            expanded: "(list pick
+            expected: "(list pick
                             (lambda (?r)
                                 (do
-                                  (check (instance ?r robot))
-                                  (check (> (robot.battery ?r) 0.4))
+                                    (do
+                                        (check (instance ?r robot)))
+                                    
+                                        (check (> (robot.battery ?r) 0.4))
                                   (assert (robot.busy ?r) true))))",
             result: "(list pick
                             (lambda (?r)
                                 (do
-                                  (check (instance ?r robot))
-                                  (check (> (robot.battery ?r) 0.4))
+                                    (do
+                                        (check (instance ?r robot)))
+                                    
+                                        (check (> (robot.battery ?r) 0.4))
                                   (assert (robot.busy ?r) true))))",
         };
 
@@ -994,17 +998,19 @@ mod test {
                             (if (> (robot.battery ?r) 0.4)
                                 (assert (robot.busy ?r) false)
                                 (err 0)))))",
-            expanded: "(list place
+            expected: "(list place
                             (lambda (?r)
                                 (do
-                                    (check (instance ?r robot))
+                                    (do
+                                        (check (instance ?r robot)))
                                     (if (> (robot.battery ?r) 0.4)
                                         (assert (robot.busy ?r) false)
                                         (err 0)))))",
             result: "(list place
                             (lambda (?r)
                                 (do
-                                    (check (instance ?r robot))
+                                    (do
+                                        (check (instance ?r robot)))
                                     (if (> (robot.battery ?r) 0.4)
                                         (assert (robot.busy ?r) false)
                                         (err 0)))))",
@@ -1021,7 +1027,7 @@ mod test {
             dependencies: vec![],
             expression:
                 "(gtpc '((?r robot) (?f float ) (?i int) (?b bool) (?s symbol) (?n number) (?l tlist)))",
-            expanded: "(gtpc '((?r robot) (?f float ) (?i int) (?b bool) (?s symbol) (?n number) (?l tlist)))",
+            expected: "(gtpc '((?r robot) (?f float ) (?i int) (?b bool) (?s symbol) (?n number) (?l tlist)))",
             result: "(do 
                         (check (instance ?r robot))
                         (check (float? ?f))
@@ -1043,23 +1049,24 @@ mod test {
             dependencies: vec![LAMBDA_GENERATE_TYPE_PRE_CONDITIONS],
             expression: "(generate-method m_navigate_to ((:task t_navigate_to)
             (:params (?r robot) (?x float) (?y float))
-            (:pre-conditions (and (robot.available ?r) (< ?x 10) (< ?y 10)))
+            (:pre-conditions (and-cond (robot.available ?r) (< ?x 10) (< ?y 10)))
             (:score 0)
             (:body
             (begin
                 (navigate_to ?r ?x ?y)))))",
-            expanded: "(list m_navigate_to
+            expected: "(list m_navigate_to
     't_navigate_to
     '((?r robot) (?x float) (?y float))
     (lambda (?r ?x ?y)
     (do
-        (check
-           (if (instance ?r robot)
-               (if (float? ?x)
-                    (float? ?y))))
-        (check (if (robot.available ?r)
-                (if (< ?x 10)
-                    (< ?y 10)))))) 
+        (do 
+            (check (instance ?r robot))
+            (check (float? ?x))
+            (check (float? ?y)))
+        (do 
+            (check (robot.available ?r))
+            (check (< ?x 10))
+            (check (< ?y 10))))) 
     (lambda (?r ?x ?y) 0 )
     (lambda (?r ?x ?y)
         (begin
@@ -1069,13 +1076,14 @@ mod test {
     '((?r robot) (?x float) (?y float))
     (lambda (?r ?x ?y)
     (do
-        (check
-           (if (instance ?r robot)
-               (if (float? ?x)
-                    (float? ?y))))
-        (check (if (robot.available ?r)
-                (if (< ?x 10)
-                    (< ?y 10)))))) 
+        (do 
+            (check (instance ?r robot))
+            (check (float? ?x))
+            (check (float? ?y)))
+        (do 
+            (check (robot.available ?r))
+            (check (< ?x 10))
+            (check (< ?y 10))))) 
     (lambda (?r ?x ?y) 0 )
     (lambda (?r ?x ?y)
         (begin

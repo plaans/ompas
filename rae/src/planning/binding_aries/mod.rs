@@ -213,7 +213,7 @@ fn atom_from_lvalues(ctx: &Ctx, v: &LValueS) -> aAtom {
         }
         LValueS::Int(i) => IAtom::from(*i as i32).into(),
         LValueS::Float(f) => {
-            let f: i32 = (f * FLOAT_SCALE as f32) as i32;
+            let f: i32 = (f * FLOAT_SCALE as f64) as i32;
             FAtom::new(IAtom::from(f), FLOAT_SCALE).into()
         }
         LValueS::Bool(b) => match b {
@@ -357,14 +357,14 @@ impl BindingAriesAtoms {
 }
 
 impl FormatWithSymTable for BindingAriesAtoms {
-    fn format_with_sym_table(&self, st: &SymTable, sym_version: bool) -> String {
+    fn format(&self, st: &SymTable, sym_version: bool) -> String {
         let mut str = "#BINDINGS: \n".to_string();
         for (var, id) in &self.reverse {
             str.push_str(
                 format!(
                     "{:?} <- {}\n",
                     aAtom::from(*var),
-                    id.format_with_sym_table(st, sym_version)
+                    id.format(st, sym_version)
                 )
                 .as_str(),
             )
@@ -445,7 +445,7 @@ fn atom_id_into_atom(
         Atom::Number(n) => match n {
             LNumber::Int(i) => IAtom::from(*i as i32).into(),
             LNumber::Float(f) => {
-                let f: i32 = (f * FLOAT_SCALE as f32) as i32;
+                let f: i32 = (f * FLOAT_SCALE as f64) as i32;
                 FAtom::new(IAtom::from(f), FLOAT_SCALE).into()
             }
         },

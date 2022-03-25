@@ -136,14 +136,14 @@ impl PartialChronicle {
 }
 
 impl FormatWithSymTable for PartialChronicle {
-    fn format_with_sym_table(&self, st: &SymTable, sym_version: bool) -> String {
+    fn format(&self, st: &SymTable, sym_version: bool) -> String {
         let mut s = String::new();
         s.push_str(
             format!(
                 "{}: {} {}\n",
-                self.presence.format_with_sym_table(st, sym_version),
-                self.interval.format_with_sym_table(st, sym_version),
-                self.result.format_with_sym_table(st, sym_version)
+                self.presence.format(st, sym_version),
+                self.interval.format(st, sym_version),
+                self.result.format(st, sym_version)
             )
             .as_str(),
         );
@@ -165,10 +165,8 @@ impl FormatWithSymTable for PartialChronicle {
 
                 format!(
                     "{}({})",
-                    id.format_with_sym_table(st, sym_version),
-                    st.get_type_of(id)
-                        .unwrap()
-                        .format_with_sym_table(st, sym_version)
+                    id.format(st, sym_version),
+                    st.get_type_of(id).unwrap().format(st, sym_version)
                 )
             })
             .collect::<Vec<String>>();
@@ -185,7 +183,7 @@ impl FormatWithSymTable for PartialChronicle {
         s.push_str("-constraint(s): {\n");
         for c in &self.constraints {
             s.push('\t');
-            s.push_str(c.format_with_sym_table(st, sym_version).as_str());
+            s.push_str(c.format(st, sym_version).as_str());
             s.push('\n');
         }
         s.push_str("}\n");
@@ -194,7 +192,7 @@ impl FormatWithSymTable for PartialChronicle {
         s.push_str("-conditon(s): {\n");
         for e in &self.conditions {
             s.push('\t');
-            s.push_str(e.format_with_sym_table(st, sym_version).as_str());
+            s.push_str(e.format(st, sym_version).as_str());
             s.push('\n');
         }
         s.push_str("}\n");
@@ -202,7 +200,7 @@ impl FormatWithSymTable for PartialChronicle {
         s.push_str("-effect(s): {\n");
         for e in &self.effects {
             s.push('\t');
-            s.push_str(e.format_with_sym_table(st, sym_version).as_str());
+            s.push_str(e.format(st, sym_version).as_str());
             s.push('\n');
         }
         s.push_str("}\n");
@@ -210,7 +208,7 @@ impl FormatWithSymTable for PartialChronicle {
         s.push_str("-subtask(s): {\n");
         for e in &self.subtasks {
             s.push('\t');
-            s.push_str(e.format_with_sym_table(st, sym_version).as_str());
+            s.push_str(e.format(st, sym_version).as_str());
             s.push('\n');
         }
         s.push_str("}\n");

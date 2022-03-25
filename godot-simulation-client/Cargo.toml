@@ -10,10 +10,10 @@ edition = "2018"
 ompas_lisp = {path = "../lisp"}
 ompas_rae = {path = "../rae"}
 ompas_utils = {path = "../utils"}
-aries_model = {git = "https://github.com/Yirmandias/aries/", branch = "master"}
-aries_planning = {git = "https://github.com/Yirmandias/aries/", branch = "master"}
-aries_utils = {git = "https://github.com/Yirmandias/aries/", branch = "master"}
-aries_collections = {git = "https://github.com/Yirmandias/aries/", branch = "master"}
+aries_model = {path = "../../aries/model"}
+aries_planning = {path = "../../aries/planning"}
+aries_utils = {path = "../../aries/utils"}
+aries_collections = {path = "../../aries/collections"}
 anyhow = "1.0.40"
 rustyline = "7.1.0"
 im = "15.0.0"

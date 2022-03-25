@@ -6,7 +6,7 @@ pub struct TestExpression {
     pub inner: &'static str,
     pub dependencies: Vec<&'static str>,
     pub expression: &'static str,
-    pub expanded: &'static str,
+    pub expected: &'static str,
     pub result: &'static str,
 }
 
@@ -25,7 +25,7 @@ pub async fn test_expression(test_expression: TestExpression) -> Result<(), LErr
     //Expand expression
     let expanded = parse(test_expression.expression, &mut env).await?;
 
-    let expected = parse(test_expression.expanded, &mut env).await?;
+    let expected = parse(test_expression.expected, &mut env).await?;
 
     println!(
         "test_macro:\n\
@@ -65,7 +65,7 @@ pub async fn test_expression_with_env(
     //Expand expression
     let expanded = parse(test_expression.expression, env).await?;
 
-    let expected = parse(test_expression.expanded, env).await?;
+    let expected = parse(test_expression.expected, env).await?;
 
     println!(
         "test_macro:\n\

@@ -230,7 +230,7 @@ impl Display for ConversionCollection {
                     "#{}\n\
                     {}\n\n\n",
                     id,
-                    template.format_with_sym_table(&self.sym_table, true)
+                    template.format(&self.sym_table, true)
                 )
                 .as_str(),
             );
@@ -239,13 +239,7 @@ impl Display for ConversionCollection {
         //tasks
         str.push_str("# TASKS: \n\n");
         for task in &self.tasks {
-            str.push_str(
-                format!(
-                    "{}\n\n\n",
-                    task.format_with_sym_table(&self.sym_table, true)
-                )
-                .as_str(),
-            );
+            str.push_str(format!("{}\n\n\n", task.format(&self.sym_table, true)).as_str());
         }
 
         //str.push_str(self.sym_table.to_string().as_str());

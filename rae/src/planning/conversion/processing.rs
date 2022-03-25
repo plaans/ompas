@@ -508,8 +508,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                                         if symbol_type.is_result_pure() {
                                             let key = format!(
                                                 "(instance {})",
-                                                symbol_type
-                                                    .format_with_sym_table(&ch.sym_table, false)
+                                                symbol_type.format(&ch.sym_table, false)
                                             );
                                             let lvalue =
                                                 parse_static(&key, &mut context.env.clone())?;
@@ -735,19 +734,12 @@ pub fn convert_lvalue_to_expression_chronicle(
                             let mut string = "(".to_string();
                             for (i, element) in literal.iter().enumerate() {
                                 if i == 0 {
-                                    string.push_str(
-                                        element
-                                            .format_with_sym_table(&ch.sym_table, false)
-                                            .as_str(),
-                                    );
+                                    string.push_str(element.format(&ch.sym_table, false).as_str());
                                     string.push(' ');
                                 } else {
                                     string.push_str(
-                                        format!(
-                                            "(quote {})",
-                                            element.format_with_sym_table(&ch.sym_table, false)
-                                        )
-                                        .as_str(),
+                                        format!("(quote {})", element.format(&ch.sym_table, false))
+                                            .as_str(),
                                     );
                                 }
                             }

@@ -33,11 +33,11 @@ impl Interval {
 }
 
 impl FormatWithSymTable for Interval {
-    fn format_with_sym_table(&self, st: &SymTable, sym_version: bool) -> String {
+    fn format(&self, st: &SymTable, sym_version: bool) -> String {
         format!(
             "[{},{}]",
-            self.start.format_with_sym_table(st, sym_version),
-            self.end.format_with_sym_table(st, sym_version),
+            self.start.format(st, sym_version),
+            self.end.format(st, sym_version),
         )
     }
 }

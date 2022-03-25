@@ -58,7 +58,7 @@ async fn translate_2(exp: &str) -> Result<ExpressionChronicle, LError> {
 
     let chronicle =
         convert_lvalue_to_expression_chronicle(&lv, &context, &mut ch, MetaData::new(true, false))?;
-    println!("{}", chronicle.format_with_sym_table(&ch.sym_table));
+    println!("{}", chronicle.format(&ch.sym_table, true));
     Ok(chronicle)
 }
 
@@ -70,7 +70,7 @@ async fn translate(exp: &str) -> Result<ChronicleTemplate, LError> {
     let mut ch = ConversionCollection::default();
 
     let chronicle = convert_lvalue_to_chronicle(&lv, &ConversionContext::default(), &mut ch)?;
-    println!("{}", chronicle.format_with_sym_table(&ch.sym_table));
+    println!("{}", chronicle.format(&ch.sym_table, true));
     Ok(chronicle)
 }
 

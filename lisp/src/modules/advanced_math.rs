@@ -116,7 +116,7 @@ pub fn sin(args: &[LValue], _: &LEnv) -> LResult {
 
     match &args[0] {
         LValue::Number(n) => {
-            let f: f32 = n.into();
+            let f: f64 = n.into();
             Ok(f.sin().into())
         }
         lv => Err(WrongType(SIN, lv.clone(), lv.into(), TypeLValue::Number)),
@@ -132,7 +132,7 @@ pub fn cos(args: &[LValue], _: &LEnv) -> LResult {
 
     match &args[0] {
         LValue::Number(n) => {
-            let f: f32 = n.into();
+            let f: f64 = n.into();
             Ok(f.cos().into())
         }
         lv => Err(WrongType(COS, lv.clone(), lv.into(), TypeLValue::Number)),
@@ -146,7 +146,7 @@ pub fn sqrt(args: &[LValue], _: &LEnv) -> LResult {
 
     match &args[0] {
         LValue::Number(n) => {
-            let f: f32 = n.into();
+            let f: f64 = n.into();
             Ok(f.sqrt().into())
         }
         lv => Err(WrongType(SQRT, lv.clone(), lv.into(), TypeLValue::Number)),
@@ -160,8 +160,8 @@ pub fn pow(args: &[LValue], _: &LEnv) -> LResult {
 
     if let LValue::Number(n) = &args[0] {
         if let LValue::Number(p) = &args[1] {
-            let f: f32 = n.into();
-            let p: f32 = p.into();
+            let f: f64 = n.into();
+            let p: f64 = p.into();
             Ok(f.powf(p).into())
         } else {
             Err(WrongType(
@@ -188,7 +188,7 @@ pub fn square(args: &[LValue], _: &LEnv) -> LResult {
 
     match &args[0] {
         LValue::Number(n) => {
-            let f: f32 = n.into();
+            let f: f64 = n.into();
             Ok(f.powi(2).into())
         }
         lv => Err(WrongType(SQUARE, lv.clone(), lv.into(), TypeLValue::Number)),
@@ -223,7 +223,7 @@ pub fn rand_int_in_range(args: &[LValue], _: &LEnv) -> LResult {
 
     if let LValue::Number(n1) = &args[0] {
         if let LValue::Number(n2) = &args[1] {
-            let value: i32 = rand::thread_rng().gen_range(n1.into()..n2.into());
+            let value: i64 = rand::thread_rng().gen_range(n1.into()..n2.into());
             Ok(value.into())
         } else {
             Err(WrongType(
@@ -256,7 +256,7 @@ pub fn rand_float_in_range(args: &[LValue], _: &LEnv) -> LResult {
 
     if let LValue::Number(n1) = &args[0] {
         if let LValue::Number(n2) = &args[1] {
-            let value: f32 = rand::thread_rng().gen_range(n1.into()..n2.into());
+            let value: f64 = rand::thread_rng().gen_range(n1.into()..n2.into());
             Ok(value.into())
         } else {
             Err(WrongType(

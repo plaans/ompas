@@ -20,11 +20,11 @@ impl Transition {
 }
 
 impl FormatWithSymTable for Transition {
-    fn format_with_sym_table(&self, st: &SymTable, sym_version: bool) -> String {
+    fn format(&self, st: &SymTable, sym_version: bool) -> String {
         format!(
             "{} <- {}",
-            self.variable.format_with_sym_table(st, sym_version),
-            self.value.format_with_sym_table(st, sym_version)
+            self.variable.format(st, sym_version),
+            self.value.format(st, sym_version)
         )
     }
 }

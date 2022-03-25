@@ -15,10 +15,8 @@ use std::fmt::{Display, Formatter};
 pub type AtomId = NodeId;
 
 impl FormatWithSymTable for AtomId {
-    fn format_with_sym_table(&self, st: &SymTable, sym_version: bool) -> String {
-        st.get_atom(self, true)
-            .unwrap()
-            .format_with_sym_table(st, sym_version)
+    fn format(&self, st: &SymTable, sym_version: bool) -> String {
+        st.get_atom(self, true).unwrap().format(st, sym_version)
     }
 }
 
@@ -67,9 +65,7 @@ impl Display for SymTable {
                         "- ({}){}({})\n",
                         e,
                         self.get_atom(e, true).unwrap(),
-                        self.get_type_of(e)
-                            .unwrap()
-                            .format_with_sym_table(self, true)
+                        self.get_type_of(e).unwrap().format(self, true)
                     )
                     .as_str(),
                 );

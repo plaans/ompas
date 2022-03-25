@@ -94,7 +94,7 @@ pub fn merge_conditions(
             }
         }
     }
-    c_to_remove.sort();
+    c_to_remove.sort_unstable();
     c_to_remove.reverse();
     c_to_remove.iter().for_each(|i| c.rm_condition(*i));
 

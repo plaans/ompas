@@ -77,12 +77,7 @@ impl ChronicleTemplate {
             true, None,
         );
 
-        let init_var = vec![
-            presence.clone(),
-            result.clone(),
-            interval.start().clone(),
-            interval.end().clone(),
-        ];
+        let init_var = vec![presence, result, *interval.start(), *interval.end()];
 
         let pc: PartialChronicle = PartialChronicle {
             presence,
@@ -100,7 +95,7 @@ impl ChronicleTemplate {
             label: label.to_string(),
             name: Default::default(),
             task: Default::default(),
-            pc: pc,
+            pc,
             debug: None,
         };
         for v in init_var {
@@ -262,7 +257,7 @@ impl ChronicleTemplate {
     }
 
     pub fn get_result(&self) -> &AtomId {
-        &self.pc.result.get_id()
+        self.pc.result.get_id()
     }
 
     pub fn get_interval(&self) -> &Interval {
@@ -270,7 +265,7 @@ impl ChronicleTemplate {
     }
 
     pub fn get_constraints(&self) -> &Vec<Constraint> {
-        &self.pc.get_constraints()
+        self.pc.get_constraints()
     }
 
     pub fn get_conditions(&self) -> &Vec<Condition> {

@@ -65,16 +65,13 @@ pub enum PlanningAtomType {
 
 impl FormatWithSymTable for PlanningAtomType {
     fn format_with_sym_table(&self, st: &SymTable, sym_version: bool) -> String {
-        format!(
-            "{}",
-            match self {
-                PlanningAtomType::SubType(t) => {
-                    format!("subtype of {}", t.format_with_sym_table(st, sym_version))
-                }
-                PlanningAtomType::Other(t) => t.format_with_sym_table(st, sym_version),
-                pat => pat.to_string(),
+        match self {
+            PlanningAtomType::SubType(t) => {
+                format!("subtype of {}", t.format_with_sym_table(st, sym_version))
             }
-        )
+            PlanningAtomType::Other(t) => t.format_with_sym_table(st, sym_version),
+            pat => pat.to_string(),
+        }
     }
 }
 impl Display for PlanningAtomType {
@@ -118,10 +115,7 @@ impl TypeTable {
             FUNCTION => Some(PlanningAtomType::Function),
             OBJECT => Some(PlanningAtomType::Object),
             PRESENCE => Some(PlanningAtomType::Presence),
-            other => match self.get_type_id(other) {
-                Some(t) => Some(PlanningAtomType::Other(*t)),
-                None => None,
-            },
+            other => self.get_type_id(other).map(|t| PlanningAtomType::Other(*t)),
         }
     }
 }

@@ -147,7 +147,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                     /*
                     Harcoded solution that needs to be improved in further iteration of the analysis
                      */
-                    let mut meta_data = meta_data.clone();
+                    let mut meta_data = meta_data;
                     meta_data.is_inside_do();
                     for (i, e) in l[1..].iter().enumerate() {
                         let ec_i =
@@ -188,7 +188,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                     let mut previous_interval: Interval = *ec.get_interval();
 
                     for (i, e) in l[1..].iter().enumerate() {
-                        let mut meta_data = meta_data.clone();
+                        let mut meta_data = meta_data;
 
                         if i == l.len() - 2 {
                             meta_data.is_last_of_begin();
@@ -263,9 +263,9 @@ pub fn convert_lvalue_to_expression_chronicle(
                                 let r: Vec<AtomId> = fluent.get_result_as_lit().try_into()?;
 
                                 ec.add_condition(Condition {
-                                    interval: Interval::new_instantaneous(&ec.get_interval().end()),
+                                    interval: Interval::new_instantaneous(ec.get_end()),
                                     sv: r,
-                                    value: ch.sym_table.new_bool(true).into(),
+                                    value: ch.sym_table.new_bool(true),
                                 });
 
                                 ec.set_pure_result(ch.sym_table.new_bool(true).into());
@@ -404,7 +404,10 @@ pub fn convert_lvalue_to_expression_chronicle(
                                     ec.get_result_id().into(),
                                     val.get_result_as_lit(),
                                 );
-                                if !meta_data.top_level && val.is_result_pure() {
+
+                                ec.add_constraint(constraint);
+
+                                /*if !meta_data.top_level && val.is_result_pure() {
                                     ec.add_constraint(constraint);
                                 } else {
                                     ec.add_constraint(constraint);
@@ -412,7 +415,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                                         interval: Interval::new_instantaneous(ec.get_end()),
                                         constraint: constraint,
                                     });*/
-                                }
+                                }*/
 
                                 ec.absorb(val);
                                 is_special_expression = true;
@@ -569,7 +572,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                                                 *ch.sym_table.id(RAE_INSTANCE).unwrap(),
                                                 symbol.get_result_as_lit().try_into()?,
                                             ],
-                                            value: r.into(),
+                                            value: r,
                                         });
                                         ec.add_constraint(Constraint::Eq(
                                             ec.get_result_as_lit(),
@@ -911,7 +914,7 @@ pub fn convert_if(
         .cloned()
         .collect();
 
-    let union: im::HashSet<AtomId> = b_true_variables.clone().union(b_false_variables.clone());
+    let union: im::HashSet<AtomId> = b_true_variables.union(b_false_variables);
 
     //CREATION OF THE TASK
     let mut types = vec![
@@ -1046,8 +1049,8 @@ pub fn convert_if(
             ),
         });*/
 
-        let mut task: Vec<AtomId> = name[0..task_string.len()].iter().map(|l| *l).collect();
-        task[0] = ch.sym_table.id(&task_label).unwrap().clone();
+        let mut task: Vec<AtomId> = name[0..task_string.len()].to_vec();
+        task[0] = *ch.sym_table.id(&task_label).unwrap();
 
         method.set_debug(Some(debug));
         method.set_task(task);

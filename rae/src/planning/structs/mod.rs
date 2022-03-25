@@ -126,7 +126,7 @@ pub fn get_variables_of_type(
         .iter()
         .filter(|var| {
             symbol_table
-                .get_type_of(&symbol_table.get_parent(var))
+                .get_type_of(symbol_table.get_parent(var))
                 .unwrap()
                 == &atom_type
         })

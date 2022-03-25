@@ -1,3 +1,4 @@
+use num_traits::sign::Signed;
 use serde::*;
 use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
@@ -11,9 +12,8 @@ use std::ops::{Add, Div, Mul, Sub};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum LNumber {
-    Int(i64),
-    Float(f64),
-    Usize(usize),
+    Int(i32),
+    Float(f32),
 }
 
 impl LNumber {
@@ -22,15 +22,21 @@ impl LNumber {
     }
     pub fn is_natural(&self) -> bool {
         match self {
-            LNumber::Usize(_) => true,
             LNumber::Int(i) => *i >= 0,
             LNumber::Float(f) => f.is_sign_positive(),
         }
     }
+    pub fn is_positive(&self) -> bool {
+        match self {
+            LNumber::Int(i) => i.is_positive(),
+            LNumber::Float(f) => f.is_positive(),
+        }
+    }
+
     pub fn is_integer(&self) -> bool {
         match self {
-            LNumber::Int(_) | LNumber::Usize(_) => true,
-            LNumber::Float(f) => (f.floor() - *f).abs() < f64::EPSILON,
+            LNumber::Int(_) => true,
+            LNumber::Float(f) => (f.floor() - *f).abs() < f32::EPSILON,
         }
     }
 }
@@ -40,7 +46,6 @@ impl Display for LNumber {
         match self {
             LNumber::Int(i) => write!(f, "{}", i),
             LNumber::Float(fl) => write!(f, "{}", fl),
-            LNumber::Usize(u) => write!(f, "{}", u),
         }
     }
 }
@@ -50,7 +55,6 @@ impl From<&LNumber> for String {
         match n {
             LNumber::Int(i) => i.to_string(),
             LNumber::Float(f) => f.to_string(),
-            LNumber::Usize(u) => u.to_string(),
         }
     }
 }
@@ -63,8 +67,8 @@ impl From<LNumber> for String {
 
 impl PartialEq for LNumber {
     fn eq(&self, other: &Self) -> bool {
-        let n1: f64 = self.into();
-        let n2: f64 = other.into();
+        let n1: f32 = self.into();
+        let n2: f32 = other.into();
         n1 == n2
     }
 }
@@ -74,58 +78,43 @@ impl From<&LNumber> for usize {
         match n {
             LNumber::Int(i) => *i as usize,
             LNumber::Float(f) => *f as usize,
-            LNumber::Usize(u) => *u,
         }
     }
 }
 
-impl From<&LNumber> for f64 {
+impl From<&LNumber> for f32 {
     fn from(n: &LNumber) -> Self {
         match n {
-            LNumber::Int(i) => *i as f64,
+            LNumber::Int(i) => *i as f32,
             LNumber::Float(f) => *f,
-            LNumber::Usize(u) => *u as f64,
         }
     }
 }
 
-impl From<&LNumber> for i64 {
+impl From<&LNumber> for i32 {
     fn from(n: &LNumber) -> Self {
         match n {
             LNumber::Int(i) => *i,
-            LNumber::Float(f) => *f as i64,
-            LNumber::Usize(u) => *u as i64,
+            LNumber::Float(f) => *f as i32,
         }
-    }
-}
-
-impl From<i64> for LNumber {
-    fn from(i: i64) -> Self {
-        LNumber::Int(i)
     }
 }
 
 impl From<i32> for LNumber {
     fn from(i: i32) -> Self {
-        LNumber::Int(i as i64)
-    }
-}
-
-impl From<f64> for LNumber {
-    fn from(f: f64) -> Self {
-        LNumber::Float(f)
+        LNumber::Int(i as i32)
     }
 }
 
 impl From<f32> for LNumber {
     fn from(f: f32) -> Self {
-        LNumber::Float(f as f64)
+        LNumber::Float(f as f32)
     }
 }
 
 impl From<usize> for LNumber {
     fn from(u: usize) -> Self {
-        LNumber::Usize(u)
+        LNumber::Int(u as i32)
     }
 }
 
@@ -134,7 +123,6 @@ impl Hash for LNumber {
         match self {
             LNumber::Int(i) => i.hash(state),
             LNumber::Float(f) => f.to_string().hash(state),
-            LNumber::Usize(u) => u.hash(state),
         }
     }
 }
@@ -145,26 +133,26 @@ impl PartialOrd for LNumber {
     }
 
     fn lt(&self, other: &Self) -> bool {
-        let n1: f64 = self.into();
-        let n2: f64 = other.into();
+        let n1: f32 = self.into();
+        let n2: f32 = other.into();
         n1 < n2
     }
 
     fn le(&self, other: &Self) -> bool {
-        let n1: f64 = self.into();
-        let n2: f64 = other.into();
+        let n1: f32 = self.into();
+        let n2: f32 = other.into();
         n1 <= n2
     }
 
     fn gt(&self, other: &Self) -> bool {
-        let n1: f64 = self.into();
-        let n2: f64 = other.into();
+        let n1: f32 = self.into();
+        let n2: f32 = other.into();
         n1 > n2
     }
 
     fn ge(&self, other: &Self) -> bool {
-        let n1: f64 = self.into();
-        let n2: f64 = other.into();
+        let n1: f32 = self.into();
+        let n2: f32 = other.into();
         n1 >= n2
     }
 }
@@ -176,13 +164,8 @@ impl Add for &LNumber {
         match (self, rhs) {
             (LNumber::Int(i1), LNumber::Int(i2)) => LNumber::Int(*i1 + *i2),
             (LNumber::Float(f1), LNumber::Float(f2)) => LNumber::Float(*f1 + *f2),
-            (LNumber::Int(i1), LNumber::Float(f2)) => LNumber::Float(*i1 as f64 + *f2),
-            (LNumber::Float(f1), LNumber::Int(i2)) => LNumber::Float(*f1 + *i2 as f64),
-            (LNumber::Usize(u1), LNumber::Usize(u2)) => LNumber::Usize(*u1 + *u2),
-            (LNumber::Usize(u1), LNumber::Int(i2)) => LNumber::Int(*u1 as i64 + *i2),
-            (LNumber::Int(i1), LNumber::Usize(u2)) => LNumber::Int(*i1 + *u2 as i64),
-            (LNumber::Usize(u1), LNumber::Float(f2)) => LNumber::Float(*u1 as f64 + *f2),
-            (LNumber::Float(f1), LNumber::Usize(u2)) => LNumber::Float(*f1 + *u2 as f64),
+            (LNumber::Int(i1), LNumber::Float(f2)) => LNumber::Float(*i1 as f32 + *f2),
+            (LNumber::Float(f1), LNumber::Int(i2)) => LNumber::Float(*f1 + *i2 as f32),
         }
     }
 }
@@ -194,20 +177,8 @@ impl Sub for &LNumber {
         match (self, rhs) {
             (LNumber::Int(i1), LNumber::Int(i2)) => LNumber::Int(*i1 - *i2),
             (LNumber::Float(f1), LNumber::Float(f2)) => LNumber::Float(*f1 - *f2),
-            (LNumber::Int(i1), LNumber::Float(f2)) => LNumber::Float(*i1 as f64 - *f2),
-            (LNumber::Float(f1), LNumber::Int(i2)) => LNumber::Float(*f1 - *i2 as f64),
-            (LNumber::Usize(u1), LNumber::Usize(u2)) => {
-                let r = *u1 as i64 - *u2 as i64;
-                if r < 0 {
-                    LNumber::Int(r)
-                } else {
-                    LNumber::Usize(r as usize)
-                }
-            }
-            (LNumber::Usize(u1), LNumber::Int(i2)) => LNumber::Int(*u1 as i64 - i2),
-            (LNumber::Int(i1), LNumber::Usize(u2)) => LNumber::Int(*i1 - *u2 as i64),
-            (LNumber::Usize(u1), LNumber::Float(f2)) => LNumber::Float(*u1 as f64 - *f2),
-            (LNumber::Float(f1), LNumber::Usize(u2)) => LNumber::Float(*f1 - *u2 as f64),
+            (LNumber::Int(i1), LNumber::Float(f2)) => LNumber::Float(*i1 as f32 - *f2),
+            (LNumber::Float(f1), LNumber::Int(i2)) => LNumber::Float(*f1 - *i2 as f32),
         }
     }
 }
@@ -218,11 +189,8 @@ impl Div for &LNumber {
     fn div(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
             (LNumber::Int(i1), LNumber::Int(i2)) => LNumber::Int(*i1 / *i2),
-            (n1, LNumber::Float(f2)) => LNumber::Float(f64::from(n1) / *f2),
-            (LNumber::Float(f1), n2) => LNumber::Float(*f1 / f64::from(n2)),
-            (n1, LNumber::Int(i2)) => LNumber::Int(i64::from(n1) / *i2),
-            (LNumber::Int(i1), n2) => LNumber::Int(*i1 / i64::from(n2)),
-            (n1, n2) => panic!("attempted rare case of division with {:?} and {:?}", n1, n2),
+            (n1, LNumber::Float(f2)) => LNumber::Float(f32::from(n1) / *f2),
+            (LNumber::Float(f1), n2) => LNumber::Float(*f1 / f32::from(n2)),
         }
     }
 }
@@ -234,13 +202,8 @@ impl Mul for &LNumber {
         match (self, rhs) {
             (LNumber::Int(i1), LNumber::Int(i2)) => LNumber::Int(*i1 * *i2),
             (LNumber::Float(f1), LNumber::Float(f2)) => LNumber::Float(*f1 * *f2),
-            (LNumber::Int(i1), LNumber::Float(f2)) => LNumber::Float(*i1 as f64 * *f2),
-            (LNumber::Float(f1), LNumber::Int(i2)) => LNumber::Float(*f1 * *i2 as f64),
-            (LNumber::Usize(u1), LNumber::Usize(u2)) => LNumber::Usize(*u1 * *u2),
-            (LNumber::Usize(u1), LNumber::Int(i2)) => LNumber::Int(*u1 as i64 * *i2),
-            (LNumber::Int(i1), LNumber::Usize(u2)) => LNumber::Int(*i1 * *u2 as i64),
-            (LNumber::Usize(u1), LNumber::Float(f2)) => LNumber::Float(*u1 as f64 * *f2),
-            (LNumber::Float(f1), LNumber::Usize(u2)) => LNumber::Float(*f1 * *u2 as f64),
+            (LNumber::Int(i1), LNumber::Float(f2)) => LNumber::Float(*i1 as f32 * *f2),
+            (LNumber::Float(f1), LNumber::Int(i2)) => LNumber::Float(*f1 * *i2 as f32),
         }
     }
 }

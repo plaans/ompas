@@ -112,6 +112,12 @@ pub struct RAEStateSnapshot {
     pub instance: LState,
 }
 
+impl From<RAEStateSnapshot> for LValue {
+    fn from(_: RAEStateSnapshot) -> Self {
+        todo!()
+    }
+}
+
 const RAE_STATE_SEM_UPDATE_CHANNEL_SIZE: usize = 64;
 
 impl RAEState {

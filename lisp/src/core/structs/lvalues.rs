@@ -13,8 +13,8 @@ use std::ops::Deref;
 #[serde(untagged)]
 pub enum LValueS {
     Symbol(String),
-    Int(i64),
-    Float(f64),
+    Int(i32),
+    Float(f32),
     Bool(bool),
     List(Vec<LValueS>),
     Map(Vec<(LValueS, LValueS)>),
@@ -58,7 +58,6 @@ impl From<&LValue> for LValueS {
             LValue::Number(n) => match n {
                 LNumber::Int(i) => LValueS::Int(*i),
                 LNumber::Float(f) => LValueS::Float(*f),
-                LNumber::Usize(u) => LValueS::Int(*u as i64),
             },
             LValue::Fn(f) => LValueS::Symbol(f.get_label().to_string()),
             LValue::Lambda(_) => panic!("cannot convert LValue::Lambda into LValueS"),

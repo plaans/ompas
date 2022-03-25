@@ -14,7 +14,6 @@ use crate::module::rae_exec::rae_mutex::*;
 use crate::module::rae_exec::simu::*;
 use ::macro_rules_attribute::macro_rules_attribute;
 use async_trait::async_trait;
-use log::info;
 use ompas_lisp::core::root_module::list::cons;
 use ompas_lisp::core::root_module::map::{get_map, remove_key_value_map, set_map};
 use ompas_lisp::core::structs::contextcollection::Context;
@@ -22,7 +21,6 @@ use ompas_lisp::core::structs::documentation::Documentation;
 use ompas_lisp::core::structs::lenv::LEnv;
 use ompas_lisp::core::structs::lerror::LError::{SpecialError, WrongNumberOfArgument, WrongType};
 use ompas_lisp::core::structs::lerror::{LError, LResult};
-use ompas_lisp::core::structs::lnumber::LNumber;
 use ompas_lisp::core::structs::lvalue::LValue;
 use ompas_lisp::core::structs::lvalue::LValue::{Nil, True};
 use ompas_lisp::core::structs::lvalues::LValueS;
@@ -34,7 +32,6 @@ use std::any::Any;
 
 use crate::module::rae_exec::algorithms::*;
 use crate::module::rae_exec::error::{DEFINE_ERR_ACTION_FAILURE, DEFINE_ERR_NO_APPLICABLE_METHOD};
-use crate::supervisor::select_methods::sort_greedy;
 use ompas_lisp::core::eval;
 use std::convert::TryInto;
 use std::fmt::{Display, Formatter};
@@ -48,6 +45,7 @@ LANGUAGE
  */
 
 pub const MOD_RAE_EXEC: &str = "mod-rae-exec";
+pub const STATE: &str = "state";
 
 //manage facts
 pub const RAE_ASSERT: &str = "assert";
@@ -181,23 +179,12 @@ impl IntoModule for CtxRaeExec {
     fn into_module(self) -> Module {
         let init: InitLisp = vec![
             MACRO_MUTEX_LOCK_AND_DO,
-            //MACRO_WAIT_ON,
             MACRO_SIM_BLOCK,
-            //LAMBDA_INSTANCE,
-            LAMBDA_PROGRESS,
-            LAMBDA_SELECT,
-            LAMBDA_RETRY,
-            LAMBDA_GET_METHODS,
-            //LAMBDA_GET_METHOD_GENERATOR,
-            //LAMBDA_ARBITRARY,
             LAMBDA_GET_PRECONDITIONS,
             LAMBDA_GET_SCORE,
             LAMBDA_GET_ACTION_MODEL,
             LAMBDA_EVAL_PRE_CONDITIONS,
             LAMBDA_COMPUTE_SCORE,
-            //LAMBDA_GENERATE_APPLICABLE_INSTANCES,
-            //LAMBDA_R_GENERATE_INSTANCES,
-            //LAMBDA_R_TEST_METHOD,
             DEFINE_RAE_MODE,
             LAMBDA_IS_APPLICABLE,
             DEFINE_ERR_ACTION_FAILURE,
@@ -230,15 +217,16 @@ impl IntoModule for CtxRaeExec {
         module.add_fn_prelude(RAE_GET_INSTANTIATED_METHODS, get_instantiated_methods);
         module.add_fn_prelude(RAE_GET_BEST_METHOD, get_best_method);
         module.add_async_fn_prelude(RAE_MONITOR, monitor);
-        module.add_async_fn_prelude(RAE_SELECT, select);
-        module.add_async_fn_prelude(RAE_SET_SUCCESS_FOR_TASK, set_success_for_task);
-        module.add_async_fn_prelude(RAE_GET_NEXT_METHOD, get_next_method);
+        //module.add_async_fn_prelude(RAE_SELECT, select);
+        //module.add_async_fn_prelude(RAE_SET_SUCCESS_FOR_TASK, set_success_for_task);
+        //module.add_async_fn_prelude(RAE_GET_NEXT_METHOD, get_next_method);
 
         //progress
-        module.add_async_fn_prelude(
+        module.add_async_fn_prelude(RAE_PROGRESS, progress);
+        /*module.add_async_fn_prelude(
             RAE_GENERATE_APPLICABLE_INSTANCES,
             generate_applicable_instances,
-        );
+        );*/
 
         //mutex
         module.add_async_fn_prelude(LOCK, lock);
@@ -805,108 +793,6 @@ async fn monitor<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
         //println!("end wait on");
     }
     Ok(LValue::True)
-}
-
-//Takes an instantiated task to refine and return the best applicable method and a task_id.
-//TODO: Implement a way to configure select
-#[macro_rules_attribute(dyn_async!)]
-async fn select<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
-    /*
-    Steps:
-    - Create a new entry in the agenda
-    - Generate all instances of applicable methods
-    - Select the best method
-    - Store the stack
-    - Return (best_method, task_id)
-     */
-
-    let task = args[0].clone();
-
-    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
-
-    if let LValue::List(_) = &args[1] {
-        let methods = args[1].clone();
-        info!("Add task {} to agenda", task);
-        let task_id = ctx.agenda.add_task(task.clone()).await;
-        info!("methods for '{}' (with their score): {}", task, args[1]);
-        let methods: Vec<LValue> = sort_greedy(methods)?.try_into()?;
-        info!("sorted_methods: {}", LValue::from(&methods));
-        if !methods.is_empty() {
-            let mut stack = ctx.agenda.get_stack(task_id).await.unwrap();
-
-            stack.set_current_method(methods[0].clone());
-            stack.set_applicable_methods(methods[1..].into());
-            ctx.agenda.update_stack(stack).await?;
-
-            //info!("agenda: {}", ctx.agenda);
-
-            Ok(vec![methods[0].clone(), task_id.into()].into())
-        } else {
-            Ok(vec![LValue::Nil, task_id.into()].into())
-        }
-    } else {
-        return Err(SpecialError(
-            "rae-select",
-            format!("Task {} has no applicable method", task),
-        ));
-    }
-}
-
-#[macro_rules_attribute(dyn_async!)]
-async fn get_next_method<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
-    if args.len() != 1 {
-        return Err(WrongNumberOfArgument(
-            RAE_GET_NEXT_METHOD,
-            args.into(),
-            args.len(),
-            1..1,
-        ));
-    }
-    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
-
-    if let LValue::Number(LNumber::Usize(task_id)) = &args[0] {
-        let next_method = ctx.agenda.get_next_applicable_method(task_id).await;
-        Ok(next_method)
-    } else {
-        Err(WrongType(
-            RAE_GET_NEXT_METHOD,
-            args[0].clone(),
-            (&args[0]).into(),
-            TypeLValue::Usize,
-        ))
-    }
-}
-
-#[macro_rules_attribute(dyn_async!)]
-async fn set_success_for_task<'a>(args: &'a [LValue], env: &'a LEnv) -> Result<LValue, LError> {
-    /*
-    Steps:
-    - Remove the stack from the agenda
-    - Return true
-     */
-
-    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
-
-    if args.len() != 1 {
-        return Err(WrongNumberOfArgument(
-            RAE_SET_SUCCESS_FOR_TASK,
-            args.into(),
-            args.len(),
-            1..1,
-        ));
-    }
-
-    if let LValue::Number(LNumber::Usize(task_id)) = &args[0] {
-        ctx.agenda.remove_task(task_id).await?;
-        Ok(LValue::True)
-    } else {
-        Err(WrongType(
-            RAE_SET_SUCCESS_FOR_TASK,
-            args[0].clone(),
-            (&args[0]).into(),
-            TypeLValue::Usize,
-        ))
-    }
 }
 
 pub fn success(args: &[LValue], _: &LEnv) -> LResult {

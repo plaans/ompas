@@ -24,7 +24,7 @@ impl FormatWithSymTable for AtomId {
 
 impl FormatWithParent for AtomId {
     fn format_with_parent(&mut self, st: &SymTable) {
-        *self = *st.get_parent(&self);
+        *self = *st.get_parent(self);
     }
 }
 
@@ -58,7 +58,7 @@ impl Display for SymTable {
             }
         }
 
-        let mut c = |vec: Vec<&AtomId>, preambule: &str| -> () {
+        let mut c = |vec: Vec<&AtomId>, preambule: &str| {
             str.push_str(format!("\n## {}:\n", preambule).as_str());
             for e in vec {
                 assert_eq!(e, self.get_parent(e));
@@ -145,7 +145,7 @@ impl Default for SymTable {
 
 impl SymTable {
     fn add_basic_types(&mut self) {
-        for bt in vec![
+        for bt in &[
             PlanningAtomType::Action,
             PlanningAtomType::StateFunction,
             PlanningAtomType::Method,
@@ -156,7 +156,6 @@ impl SymTable {
             PlanningAtomType::Bool,
             PlanningAtomType::Symbol,
             PlanningAtomType::Function,
-            //PlanningAtomType::Lambda,
             PlanningAtomType::Object,
         ] {
             self.declare_new_type(&bt.to_string(), None);
@@ -218,7 +217,7 @@ impl SymTable {
         id
     }
 
-    pub fn new_int(&mut self, i: i64) -> AtomId {
+    pub fn new_int(&mut self, i: i32) -> AtomId {
         let id = self.symbols.new_node(i.into());
         self.symbol_types.add_new_atom(
             &id,
@@ -230,7 +229,7 @@ impl SymTable {
         id
     }
 
-    pub fn new_float(&mut self, f: f64) -> AtomId {
+    pub fn new_float(&mut self, f: f32) -> AtomId {
         let id = self.symbols.new_node(f.into());
         self.symbol_types.add_new_atom(
             &id,
@@ -316,10 +315,7 @@ impl SymTable {
         let id = self.symbols.new_node(sym.as_str().into());
         self.ids.insert(sym.as_str().into(), id);
         let atom_type = AtomType {
-            a_type: match a_type {
-                Some(t) => Some(PlanningAtomType::SubType(t)),
-                None => None,
-            },
+            a_type: a_type.map(PlanningAtomType::SubType),
             kind: AtomKind::Constant,
         };
         self.symbol_types.add_new_atom(&id, atom_type);
@@ -372,8 +368,7 @@ impl SymTable {
             kind: AtomKind::Variable(VariableKind::Local),
         };
 
-        self.symbol_types
-            .add_new_atom(&id_1, timepoint_type.clone());
+        self.symbol_types.add_new_atom(&id_1, timepoint_type);
         self.ids.insert(end, id_2);
         self.symbol_types.add_new_atom(&id_2, timepoint_type);
         Interval::new(&id_1, &id_2)

@@ -456,9 +456,16 @@ pub fn type_of(args: &[LValue], env: &LEnv) -> LResult {
         LValue::Symbol(s) => {
             let lv = &args[1];
             match lv {
-                LValue::Number(LNumber::Usize(u)) => {
-                    ctx.bind_sym_type(s, *u);
-                    Ok(LValue::Nil)
+                LValue::Number(LNumber::Int(i)) => {
+                    if i.is_positive() {
+                        ctx.bind_sym_type(s, *i as usize);
+                        Ok(LValue::Nil)
+                    } else {
+                        Err(SpecialError(
+                            TYPE_OF,
+                            "arg must be positive integer".to_string(),
+                        ))
+                    }
                 }
                 lv => Err(WrongType(
                     TYPE_OF,
@@ -598,9 +605,17 @@ pub fn new_object(args: &[LValue], env: &LEnv) -> LResult {
             };
             ctx.get_type(&type_id)
         }
-        LValue::Number(LNumber::Usize(u)) => {
-            type_id = *u;
-            ctx.get_type(u)
+        LValue::Number(LNumber::Int(i)) => {
+            if i.is_positive() {
+                let u = *i as usize;
+                type_id = u;
+                ctx.get_type(&u)
+            } else {
+                return Err(SpecialError(
+                    NEW_OBJECT,
+                    "index is not a positive integer".to_string(),
+                ));
+            }
         }
         lv => {
             return Err(NotInListOfExpectedTypes(

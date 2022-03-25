@@ -352,7 +352,7 @@ impl TryFrom<LValue> for Vec<LValue> {
     }
 }
 
-impl TryFrom<&LValue> for i64 {
+impl TryFrom<&LValue> for i32 {
     type Error = LError;
 
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
@@ -367,7 +367,7 @@ impl TryFrom<&LValue> for i64 {
     }
 }
 
-impl TryFrom<LValue> for i64 {
+impl TryFrom<LValue> for i32 {
     type Error = LError;
 
     fn try_from(value: LValue) -> Result<Self, Self::Error> {
@@ -375,7 +375,7 @@ impl TryFrom<LValue> for i64 {
     }
 }
 
-impl TryFrom<&LValue> for f64 {
+impl TryFrom<&LValue> for f32 {
     type Error = LError;
 
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
@@ -390,7 +390,7 @@ impl TryFrom<&LValue> for f64 {
     }
 }
 
-impl TryFrom<LValue> for f64 {
+impl TryFrom<LValue> for f32 {
     type Error = LError;
 
     fn try_from(value: LValue) -> Result<Self, Self::Error> {
@@ -697,13 +697,13 @@ impl From<LNumber> for LValue {
 
 impl From<u32> for LValue {
     fn from(u: u32) -> Self {
-        LValue::Number(LNumber::Int(u as i64))
+        LValue::Number(LNumber::Int(u as i32))
     }
 }
 
 impl From<usize> for LValue {
     fn from(u: usize) -> Self {
-        LValue::Number(LNumber::Usize(u))
+        LValue::Number(LNumber::Int(u as i32))
     }
 }
 
@@ -759,27 +759,15 @@ impl From<LCoreOperator> for LValue {
     }
 }
 
-impl From<f64> for LValue {
-    fn from(f: f64) -> Self {
-        LValue::Number(LNumber::Float(f))
-    }
-}
-
-impl From<i64> for LValue {
-    fn from(i: i64) -> Self {
-        LValue::Number(LNumber::Int(i))
-    }
-}
-
 impl From<f32> for LValue {
     fn from(f: f32) -> Self {
-        LValue::Number(LNumber::Float(f as f64))
+        LValue::Number(LNumber::Float(f))
     }
 }
 
 impl From<i32> for LValue {
     fn from(i: i32) -> Self {
-        LValue::Number(LNumber::Int(i as i64))
+        LValue::Number(LNumber::Int(i))
     }
 }
 

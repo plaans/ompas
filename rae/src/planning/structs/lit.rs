@@ -162,7 +162,6 @@ pub fn lvalue_to_lit(lv: &LValue, st: &mut SymTable) -> lerror::Result<Lit> {
         )),
         LValue::Number(n) => match n {
             LNumber::Int(i) => Ok(st.new_int(*i).into()),
-            LNumber::Usize(u) => Ok(st.new_int(*u as i64).into()),
             LNumber::Float(f) => Ok(st.new_float(*f).into()),
         },
         LValue::True => Ok(st.new_bool(true).into()),

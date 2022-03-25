@@ -213,7 +213,7 @@ fn atom_from_lvalues(ctx: &Ctx, v: &LValueS) -> aAtom {
         }
         LValueS::Int(i) => IAtom::from(*i as i32).into(),
         LValueS::Float(f) => {
-            let f: i32 = (f * FLOAT_SCALE as f64) as i32;
+            let f: i32 = (f * FLOAT_SCALE as f32) as i32;
             FAtom::new(IAtom::from(f), FLOAT_SCALE).into()
         }
         LValueS::Bool(b) => match b {
@@ -262,12 +262,12 @@ fn initialize_state(init_ch: &mut aChronicle, p: &Problem, ctx: &Ctx) {
             LValueS::Symbol(_) => vec![satom_from_lvalues(ctx, key)],
             _ => panic!("state variable is either a symbol or a list of symbols"),
         };
-        let value = atom_from_lvalues(ctx, &value);
+        let value = atom_from_lvalues(ctx, value);
         init_ch.effects.push(Effect {
             transition_start: init_ch.start,
             persistence_start: init_ch.start,
             state_var: key,
-            value: value,
+            value,
         });
     }
 
@@ -286,7 +286,7 @@ fn initialize_state(init_ch: &mut aChronicle, p: &Problem, ctx: &Ctx) {
             transition_start: init_ch.start,
             persistence_start: init_ch.start,
             state_var: key,
-            value: value,
+            value,
         });
     }
 
@@ -304,7 +304,7 @@ fn initialize_state(init_ch: &mut aChronicle, p: &Problem, ctx: &Ctx) {
             transition_start: init_ch.start,
             persistence_start: init_ch.start,
             state_var: key,
-            value: value,
+            value,
         });
     }
 }
@@ -445,10 +445,9 @@ fn atom_id_into_atom(
         Atom::Number(n) => match n {
             LNumber::Int(i) => IAtom::from(*i as i32).into(),
             LNumber::Float(f) => {
-                let f: i32 = (f * FLOAT_SCALE as f64) as i32;
+                let f: i32 = (f * FLOAT_SCALE as f32) as i32;
                 FAtom::new(IAtom::from(f), FLOAT_SCALE).into()
             }
-            LNumber::Usize(u) => IAtom::from(*u as i32).into(),
         },
         Atom::Sym(s) => match ompas_type.kind {
             AtomKind::Constant => context
@@ -622,11 +621,10 @@ fn read_chronicle(
     let mut effects: Vec<Effect> = vec![];
     let mut subtasks: Vec<SubTask> = vec![];
 
-    let get_atom =
-        |a: &AtomId| -> aAtom { atom_id_into_atom(a, &ch.sym_table, &bindings, &context) };
+    let get_atom = |a: &AtomId| -> aAtom { atom_id_into_atom(a, &ch.sym_table, bindings, context) };
 
     for x in chronicle.get_constraints() {
-        let x = convert_constraint(x, &bindings, &ch.sym_table, context)?;
+        let x = convert_constraint(x, bindings, &ch.sym_table, context)?;
         constraints.push(x);
     }
 
@@ -634,7 +632,7 @@ fn read_chronicle(
     for c in chronicle.get_conditions() {
         let sv =
             c.sv.iter()
-                .map(|a| get_atom(&a).try_into().unwrap_or_else(|e| panic!("{}", e)))
+                .map(|a| get_atom(a).try_into().unwrap_or_else(|e| panic!("{}", e)))
                 .collect();
         let value = get_atom(&c.value);
         let start = FVar::try_from(bindings.get_var(c.get_start()).unwrap())?;
@@ -644,7 +642,7 @@ fn read_chronicle(
         let condition = Condition {
             start,
             state_var: sv,
-            value: value.into(),
+            value,
             end,
         };
         conditions.push(condition);
@@ -666,7 +664,7 @@ fn read_chronicle(
             transition_start: start,
             persistence_start: end,
             state_var: sv,
-            value: value.into(),
+            value,
         };
         effects.push(effect);
     }

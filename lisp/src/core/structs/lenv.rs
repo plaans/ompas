@@ -45,8 +45,8 @@ impl LEnvSymbols {
         self.outer = Arc::new(Some(outer))
     }
 
-    pub fn insert(&mut self, label: String, lv: LValue) {
-        self.inner = self.inner.update(label, lv);
+    pub fn insert(&mut self, label: impl Into<String>, lv: LValue) {
+        self.inner = self.inner.update(label.into(), lv);
     }
     pub fn get(&self, label: &str) -> Option<LValue> {
         match self.inner.get(label) {
@@ -208,7 +208,7 @@ impl LEnv {
         self.symbols.get_ref(s)
     }
 
-    pub fn insert(&mut self, key: String, exp: LValue) {
+    pub fn insert(&mut self, key: impl Into<String>, exp: LValue) {
         self.symbols.insert(key, exp);
     }
 

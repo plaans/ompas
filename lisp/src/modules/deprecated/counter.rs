@@ -86,10 +86,10 @@ impl CtxCounter {
         }
     }
 
-    pub fn get_counter(&self, counter: usize) -> lerror::Result<LValue> {
-        match self.counters.write().unwrap().get(counter) {
+    pub fn get_counter(&self, counter: &usize) -> lerror::Result<LValue> {
+        match self.counters.write().unwrap().get(*counter) {
             None => Err(SpecialError(GET_COUNTER, "index out of reach".to_string())),
-            Some(c) => Ok(LValue::Number(LNumber::Int(c.val as i64))),
+            Some(c) => Ok(LValue::Number(LNumber::Int(c.val as i32))),
         }
     }
 }
@@ -112,7 +112,16 @@ pub fn get_counter(args: &[LValue], env: &LEnv) -> LResult {
     let ctx = env.get_context::<CtxCounter>(MOD_COUNTER)?;
 
     match &args[0] {
-        LValue::Number(LNumber::Usize(u)) => ctx.get_counter(*u),
+        LValue::Number(LNumber::Int(i)) => {
+            if i.is_positive() {
+                ctx.get_counter(&(*i as usize))
+            } else {
+                Err(SpecialError(
+                    GET_COUNTER,
+                    "index is not a positive integer".to_string(),
+                ))
+            }
+        }
         lv => Err(WrongType(
             GET_COUNTER,
             lv.clone(),
@@ -135,9 +144,16 @@ pub fn decrement_counter(args: &[LValue], env: &LEnv) -> LResult {
     let ctx = env.get_context::<CtxCounter>(MOD_COUNTER)?;
 
     match &args[0] {
-        LValue::Number(LNumber::Usize(u)) => {
-            ctx.decrement_counter(*u)?;
-            Ok(LValue::Nil)
+        LValue::Number(LNumber::Int(i)) => {
+            if i.is_positive() {
+                ctx.decrement_counter(*i as usize)?;
+                Ok(LValue::Nil)
+            } else {
+                Err(SpecialError(
+                    DECREMENT_COUNTER,
+                    "index is not a positive integer".to_string(),
+                ))
+            }
         }
         lv => Err(WrongType(
             DECREMENT_COUNTER,
@@ -161,9 +177,16 @@ pub fn increment_counter(args: &[LValue], env: &LEnv) -> LResult {
     let ctx = env.get_context::<CtxCounter>(MOD_COUNTER)?;
 
     match &args[0] {
-        LValue::Number(LNumber::Usize(u)) => {
-            ctx.increment_counter(*u)?;
-            Ok(LValue::Nil)
+        LValue::Number(LNumber::Int(i)) => {
+            if i.is_positive() {
+                ctx.increment_counter(*i as usize)?;
+                Ok(LValue::Nil)
+            } else {
+                Err(SpecialError(
+                    INCREMENT_COUNTER,
+                    "index is not a positive integer".to_string(),
+                ))
+            }
         }
         lv => Err(WrongType(
             INCREMENT_COUNTER,
@@ -186,10 +209,18 @@ pub fn set_counter(args: &[LValue], env: &LEnv) -> LResult {
 
     let ctx = env.get_context::<CtxCounter>(MOD_COUNTER)?;
 
-    if let LValue::Number(LNumber::Usize(u)) = &args[0] {
+    if let LValue::Number(LNumber::Int(i)) = &args[0] {
+        let u = if i.is_positive() {
+            *i as usize
+        } else {
+            return Err(SpecialError(
+                SET_COUNTER,
+                "index is not a positive integer".to_string(),
+            ));
+        };
         if let LValue::Number(n) = &args[1] {
-            let n: u32 = i64::from(n) as u32;
-            ctx.set_counter(*u, n)?;
+            let n: u32 = i32::from(n) as u32;
+            ctx.set_counter(u, n)?;
             Ok(LValue::Nil)
         } else {
             Err(WrongType(
@@ -211,7 +242,7 @@ pub fn set_counter(args: &[LValue], env: &LEnv) -> LResult {
 
 pub fn new_counter(_: &[LValue], env: &LEnv) -> LResult {
     let ctx = env.get_context::<CtxCounter>(MOD_COUNTER)?;
-    Ok(LValue::Number(LNumber::Usize(ctx.new_counter())))
+    Ok(LValue::Number(LNumber::Int(ctx.new_counter() as i32)))
 }
 
 impl IntoModule for CtxCounter {

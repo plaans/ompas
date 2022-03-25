@@ -22,7 +22,6 @@ use ompas_lisp::core::structs::lvalue::LValue;
 use std::mem;
 
 pub mod rae_log;
-pub mod select_methods;
 
 pub type Lisp = String;
 

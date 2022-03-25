@@ -178,20 +178,6 @@ pub async fn cancel_command<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
 
 #[macro_rules_attribute(dyn_async!)]
 pub async fn instance<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
-    /*
-    The previous lambda definition was as follow
-
-    pub const LAMBDA_INSTANCE: &str = "(define instance
-        (lambda args
-            (if (rae-platform?)
-                (enr (cons fn-instance args))
-                (cond ((= (len args) 1)
-                        (get (rae-get-facts) (list 'instance (car args))))
-                      ((= (len args) 2)
-                        (contains
-                            (get (rae-get-facts) (list 'instance (cadr args)))
-                            (car args))))))))";*/
-
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
     let mode: String = env
         .get_symbol("rae-mode")

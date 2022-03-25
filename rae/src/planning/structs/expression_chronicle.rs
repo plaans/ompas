@@ -52,15 +52,15 @@ impl ExpressionChronicle {
     }
 
     pub fn get_interval(&self) -> &Interval {
-        &self.pc.get_interval()
+        self.pc.get_interval()
     }
 
     pub fn get_start(&self) -> &AtomId {
-        &self.pc.interval.start()
+        self.pc.interval.start()
     }
 
     pub fn get_end(&self) -> &AtomId {
-        &self.pc.interval.end()
+        self.pc.interval.end()
     }
 
     pub fn get_result_as_lit(&self) -> Lit {
@@ -68,11 +68,11 @@ impl ExpressionChronicle {
     }
 
     pub fn get_result(&self) -> &ChronicleResult {
-        &self.pc.get_result()
+        self.pc.get_result()
     }
 
     pub fn get_result_id(&self) -> &AtomId {
-        &self.pc.get_result_id()
+        self.pc.get_result_id()
     }
 
     pub fn is_result_pure(&self) -> bool {
@@ -163,12 +163,10 @@ impl ExpressionChronicle {
 //The LValue is used for debug
 impl ExpressionChronicle {
     pub fn new(lv: LValue, st: &mut SymTable) -> Self {
-        let ec = Self {
+        Self {
             pc: PartialChronicle::new(st),
             debug: lv,
-        };
-
-        ec
+        }
     }
 
     pub fn make_instantaneous(&mut self) {

@@ -198,9 +198,8 @@ impl Constraint {
             let p_i = sym_table.get_parent(&i);
             if let Ok(j) = self.get_right().try_into() {
                 let p_j = sym_table.get_parent(&j);
-                if sym_table.get_type_of(&p_i).unwrap().a_type == Some(PlanningAtomType::Timepoint)
-                {
-                    if sym_table.get_type_of(&p_j).unwrap().a_type
+                if sym_table.get_type_of(p_i).unwrap().a_type == Some(PlanningAtomType::Timepoint) {
+                    if sym_table.get_type_of(p_j).unwrap().a_type
                         == Some(PlanningAtomType::Timepoint)
                     {
                         Ok(Relation::new(*p_i, *p_j, relation_type))

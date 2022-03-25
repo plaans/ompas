@@ -46,11 +46,11 @@ pub enum Type {
 }
 
 impl Type {
-    pub fn try_as_single(&self) -> Result<&String, ()> {
+    pub fn try_as_single(&self) -> Option<&String> {
         if let Self::Single(s) = self {
-            Ok(s)
+            Some(s)
         } else {
-            Err(())
+            None
         }
     }
 }

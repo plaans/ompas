@@ -97,7 +97,6 @@ impl From<&LValue> for TypeLValue {
             LValue::True => TypeLValue::True,
             LValue::Number(LNumber::Float(_)) => TypeLValue::Float,
             LValue::Number(LNumber::Int(_)) => TypeLValue::Int,
-            LValue::Number(LNumber::Usize(_)) => TypeLValue::Usize,
             LValue::Symbol(_) => TypeLValue::Symbol,
             LValue::Fn(_) => TypeLValue::Fn,
             LValue::Nil => TypeLValue::Nil,

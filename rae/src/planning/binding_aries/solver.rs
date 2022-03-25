@@ -2,7 +2,6 @@ use aries_model::extensions::SavedAssignment;
 use aries_planners::encode::{
     encode, populate_with_task_network, populate_with_template_instances,
 };
-use aries_planners::fmt::{format_hddl_plan, format_pddl_plan};
 use aries_planners::solver::Strat;
 use aries_planners::{ParSolver, Solver};
 use aries_planning::chronicles;

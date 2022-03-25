@@ -96,14 +96,14 @@ impl From<Sym> for Atom {
     }
 }
 
-impl From<i64> for Atom {
-    fn from(i: i64) -> Self {
+impl From<i32> for Atom {
+    fn from(i: i32) -> Self {
         Self::Number(i.into())
     }
 }
 
-impl From<f64> for Atom {
-    fn from(f: f64) -> Self {
+impl From<f32> for Atom {
+    fn from(f: f32) -> Self {
         Self::Number(f.into())
     }
 }

@@ -30,12 +30,7 @@ impl PartialChronicle {
         let interval = st.declare_new_interval();
         let result = st.declare_new_result(None);
         let presence = st.declare_new_presence();
-        let variables = hashset![
-            *interval.start(),
-            *interval.end(),
-            result.clone(),
-            presence.clone()
-        ];
+        let variables = hashset![*interval.start(), *interval.end(), result, presence];
 
         let constraints = vec![Constraint::Leq(
             interval.start().into(),
@@ -69,7 +64,7 @@ impl PartialChronicle {
     }
 
     pub fn get_result_id(&self) -> &AtomId {
-        &self.result.get_id()
+        self.result.get_id()
     }
 
     pub fn get_result_as_lit(&self) -> Lit {
@@ -97,7 +92,7 @@ impl PartialChronicle {
     }
 
     pub fn rm_set_constraint(&mut self, mut indexes: Vec<usize>) {
-        indexes.sort();
+        indexes.sort_unstable();
         indexes.reverse();
         for index in indexes {
             self.rm_constraint(index);

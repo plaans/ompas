@@ -6,7 +6,6 @@ use crate::planning::structs::{ConversionContext, Problem};
 use ::macro_rules_attribute::macro_rules_attribute;
 use aries_model::extensions::AssignmentExt;
 use aries_model::lang::SAtom;
-use aries_planners::fmt::{format_hddl_plan, format_pddl_plan};
 use aries_planning::chronicles::ChronicleKind;
 use ompas_lisp::core::structs::lenv::LEnv;
 use ompas_lisp::core::structs::lerror::LResult;
@@ -29,13 +28,11 @@ pub async fn plan_task<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
 
     let result = run_solver(&mut aries_problem, true);
     // println!("{}", format_partial_plan(&pb, &x)?);
-    let mut str = String::new();
 
     let result: LValue = if let Some(x) = &result {
         get_instantiated_methods(x)?
     } else {
-        str = "no solution found".to_string();
-        LValue::Nil
+        LValue::String("no solution found".to_string())
     };
 
     Ok(result)

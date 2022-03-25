@@ -114,9 +114,9 @@ pub fn _expand_quoting(mut vec: Vec<LValue>) -> LValue {
 pub fn parse_into_lvalue(se: &SExpr) -> LValue {
     match se {
         SExpr::Atom(atom) => {
-            return match atom.canonical_str().parse::<i64>() {
+            return match atom.canonical_str().parse::<i32>() {
                 Ok(int) => LValue::Number(LNumber::Int(int)),
-                Err(_) => match atom.canonical_str().parse::<f64>() {
+                Err(_) => match atom.canonical_str().parse::<f32>() {
                     //Test if its a float
                     Ok(float) => LValue::Number(LNumber::Float(float)),
                     Err(_) => match atom.canonical_str() {

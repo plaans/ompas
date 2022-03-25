@@ -307,20 +307,20 @@ pub fn convert_lvalue_to_expression_chronicle(
                                 ));
 
                                 //instantaneous effect;
-                                ec.add_constraint(finish(value.get_interval(), ec.get_interval()));
-                                ec.add_effect(Effect {
-                                    interval: Interval::new_instantaneous(ec.get_end()),
-                                    sv: state_variable.get_result_as_lit().try_into()?,
-                                    value: value.get_result_as_lit().try_into()?,
-                                });
-
-                                //Not instantaneous effect.
-                                /*ec.add_constraint(Constraint::lt(value.get_end(), ec.get_end()));
+                                /*ec.add_constraint(finish(value.get_interval(), ec.get_interval()));
                                 ec.add_effect(Effect {
                                     interval: Interval::new_instantaneous(ec.get_end()),
                                     sv: state_variable.get_result_as_lit().try_into()?,
                                     value: value.get_result_as_lit().try_into()?,
                                 });*/
+
+                                //Not instantaneous effect.
+                                ec.add_constraint(Constraint::lt(value.get_end(), ec.get_end()));
+                                ec.add_effect(Effect {
+                                    interval: Interval::new_instantaneous(ec.get_end()),
+                                    sv: state_variable.get_result_as_lit().try_into()?,
+                                    value: value.get_result_as_lit().try_into()?,
+                                });
 
                                 ec.absorb(state_variable);
                                 ec.absorb(value);

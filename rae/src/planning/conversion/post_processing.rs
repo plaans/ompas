@@ -8,7 +8,7 @@ use crate::planning::structs::symbol_table::{AtomId, SymTable};
 use crate::planning::structs::traits::{FormatWithParent, FormatWithSymTable, GetVariables};
 use crate::planning::structs::type_table::{AtomKind, PlanningAtomType, VariableKind};
 use crate::planning::structs::{ConversionCollection, ConversionContext};
-use im::{hashset, HashSet};
+use im::HashSet;
 use ompas_lisp::core::structs::lerror::LError;
 use std::ops::Deref;
 

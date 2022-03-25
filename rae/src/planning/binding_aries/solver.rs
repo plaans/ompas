@@ -9,6 +9,7 @@ use aries_planning::chronicles;
 use aries_planning::chronicles::analysis::hierarchical_is_non_recursive;
 use aries_planning::chronicles::FiniteProblem;
 use aries_tnet::theory::{StnConfig, StnTheory, TheoryPropagationLevel};
+use std::sync::Arc;
 use std::time::Instant;
 
 fn init_solver(pb: &FiniteProblem) -> Box<Solver> {
@@ -53,7 +54,12 @@ fn solve(pb: &FiniteProblem, htn_mode: bool) -> Option<std::sync::Arc<SavedAssig
     }
 }
 
-pub fn run_solver(problem: &mut chronicles::Problem, htn_mode: bool) {
+pub struct PlanResult {
+    pub ass: Arc<SavedAssignment>,
+    pub fp: FiniteProblem,
+}
+
+pub fn run_solver(problem: &mut chronicles::Problem, htn_mode: bool) -> Option<PlanResult> {
     println!("===== Preprocessing ======");
     aries_planning::chronicles::preprocessing::preprocess(problem);
     println!("==========================");
@@ -64,6 +70,8 @@ pub fn run_solver(problem: &mut chronicles::Problem, htn_mode: bool) {
     } else {
         0
     };
+
+    let mut result = None;
 
     for n in min_depth..=max_depth {
         let depth_string = if n == u32::MAX {
@@ -87,29 +95,14 @@ pub fn run_solver(problem: &mut chronicles::Problem, htn_mode: bool) {
         }
         println!("  [{:.3}s] Populated", start.elapsed().as_secs_f32());
         let start = Instant::now();
-        let result = solve(&pb, htn_mode);
+        let solver_result = solve(&pb, htn_mode);
         println!("  [{:.3}s] solved", start.elapsed().as_secs_f32());
-        if let Some(x) = result {
-            // println!("{}", format_partial_plan(&pb, &x)?);
-            println!("  Solution found");
-            let plan = if htn_mode {
-                format!(
-                    "\n**** Decomposition ****\n\n\
-                    {}\n\n\
-                    **** Plan ****\n\n\
-                    {}",
-                    format_hddl_plan(&pb, &x).unwrap(),
-                    format_pddl_plan(&pb, &x).unwrap()
-                )
-            } else {
-                format_pddl_plan(&pb, &x).unwrap()
-            };
-            println!("{}", plan);
-            //let mut file = File::create(output_file).unwrap();
-            //file.write_all(plan.as_bytes()).unwrap();
+        if let Some(x) = solver_result {
+            result = Some(PlanResult { ass: x, fp: pb });
             break;
         } else {
             println!("no solution found");
         }
     }
+    result
 }

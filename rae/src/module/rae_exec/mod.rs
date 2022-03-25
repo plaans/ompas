@@ -996,22 +996,3 @@ pub fn is_success(args: &[LValue], _: &LEnv) -> LResult {
         ))
     }
 }
-
-/*
-let mode: String = env
-        .get_symbol("rae-mode")
-        .expect("rae-mode should be defined, default value is exec mode")
-        .try_into()?;
-    match mode.as_str() {
-        SYMBOL_EXEC_MODE => {
-            todo!()
-        }
-        SYMBOL_SIMU_MODE => {
-            todo!()
-        }
-        _ => unreachable!(
-            "{} should have either {} or {} value.",
-            SYMBOL_RAE_MODE, SYMBOL_EXEC_MODE, SYMBOL_SIMU_MODE
-        ),
-    }
- */

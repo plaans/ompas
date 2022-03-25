@@ -6,6 +6,7 @@ use crate::module::rae_conversion::*;
 use crate::module::rae_description::*;
 use crate::module::rae_exec::{CtxRaeExec, Job, Platform};
 use crate::module::rae_monitor::*;
+use crate::module::rae_planning::plan_task;
 use crate::planning::structs::ConversionContext;
 use crate::supervisor::{rae_log, RAEOptions, TOKIO_CHANNEL_SIZE};
 use chrono::{DateTime, Utc};
@@ -30,6 +31,7 @@ pub mod rae_conversion;
 pub mod rae_description;
 pub mod rae_exec;
 pub mod rae_monitor;
+mod rae_planning;
 
 //LANGUAGE
 const MOD_RAE: &str = "rae";

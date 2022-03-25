@@ -1,3 +1,7 @@
+use ompas_lisp::core::structs::lenv::LEnv;
+use ompas_lisp::core::structs::lerror::LResult;
+use ompas_lisp::core::structs::lvalue::LValue;
+
 pub const LAMBDA_PROGRESS: &str = "
 (define progress (lambda task
     (let* ((result (select task))
@@ -37,3 +41,9 @@ pub const LAMBDA_GET_METHODS: &str = "\
 (define get-methods\
     (lambda (label)\
         (get rae-task-methods-map label)))";
+
+pub async fn progress(args: &[LValue], env: &LEnv) -> LResult {}
+
+pub async fn select(args: &[LValue], env: &LEnv) -> LResult {}
+
+pub async fn retry(args: &[LValue], env: &LEnv) -> LResult {}

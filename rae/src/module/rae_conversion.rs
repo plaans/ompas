@@ -77,24 +77,6 @@ pub async fn convert_domain<'a>(_: &'a [LValue], env: &'a LEnv) -> LResult {
 }
 
 #[macro_rules_attribute(dyn_async!)]
-pub async fn plan_task<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
-    let task: LValue = args.into();
-    println!("task to plan: {}", task);
-    let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
-    let context: ConversionContext = ctx.get_conversion_context().await;
-    let mut problem: Problem = (&context).into();
-    let cc = convert_domain_to_chronicle_hierarchy(context)?;
-    println!("cc: {}", cc);
-    problem.cc = cc;
-    problem.goal_tasks.push(task.into());
-
-    let mut aries_problem = build_chronicles(&problem)?;
-
-    run_solver(&mut aries_problem, true);
-    Ok(LValue::Nil)
-}
-
-#[macro_rules_attribute(dyn_async!)]
 pub async fn convert_cond_expr<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(

@@ -8,7 +8,8 @@ use crate::module::rae_exec::{CtxRaeExec, Job, Platform};
 use crate::module::rae_monitor::*;
 use crate::module::rae_planning::plan_task;
 use crate::planning::structs::ConversionContext;
-use crate::supervisor::{rae_log, RAEOptions, TOKIO_CHANNEL_SIZE};
+use crate::supervisor::options::{RAEOptions, SelectMode};
+use crate::supervisor::{rae_log, TOKIO_CHANNEL_SIZE};
 use chrono::{DateTime, Utc};
 use ompas_lisp::core::structs::contextcollection::Context;
 use ompas_lisp::core::structs::documentation::{Documentation, LHelp};
@@ -226,6 +227,14 @@ impl CtxRae {
         *self.options.write().await = options;
     }
 
+    pub async fn set_platform_config(&self, config: String) {
+        self.options.write().await.set_platform_config(config);
+    }
+
+    pub async fn set_select_mode(&self, select_mode: SelectMode) {
+        self.options.write().await.set_select_mode(select_mode);
+    }
+
     pub fn get_rae_env(&self) -> Arc<RwLock<RAEEnv>> {
         self.env.clone()
     }
@@ -312,11 +321,11 @@ impl IntoModule for CtxRae {
         module.add_async_fn_prelude(RAE_GET_STATE_FUNCTIONS, get_state_function);
         module.add_async_fn_prelude(RAE_GET_ACTIONS, get_actions);
         module.add_async_fn_prelude(RAE_GET_TASKS, get_tasks);
-        //module.add_fn_prelude(RAE_GET_METHODS_PARAMETERS, get_methods_parameters);
-        //module.add_fn_prelude(RAE_GET_SYMBOL_TYPE, get_symbol_type);
         module.add_async_fn_prelude(RAE_GET_ENV, get_env);
         module.add_async_fn_prelude(RAE_CONFIGURE_PLATFORM, configure_platform);
+        module.add_async_fn_prelude(RAE_CONFIGURE_SELECT, configure_select);
         module.add_async_fn_prelude(RAE_GET_CONFIG_PLATFORM, get_config_platform);
+        module.add_async_fn_prelude(RAE_GET_CONFIG_SELECT, get_config_select);
 
         //Domain Definition
         module.add_async_fn_prelude(RAE_DEF_STATE_FUNCTION, def_state_function);

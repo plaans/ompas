@@ -9,96 +9,30 @@ use tokio_stream::StreamExt;
 
 //use crate::context::{Action, Method, SelectOption, Status, TaskId};
 use crate::context::actions_progress::async_status_watcher_run;
-use crate::context::rae_env::RAEEnv;
+use crate::context::rae_env::{DomainEnv, RAEEnv};
 use crate::context::ressource_access::monitor::task_check_monitor;
+use crate::module::rae_description::CtxRaeDescription;
+use crate::module::rae_exec::planning::CtxPlanning;
 use crate::module::rae_exec::platform::RAE_LAUNCH_PLATFORM;
-use crate::module::rae_exec::{Job, JobId};
+use crate::module::rae_exec::{CtxRaeExec, Job, JobId};
+use crate::supervisor::options::RAEOptions;
 use log::{error, info};
 use ompas_lisp::core::eval;
-use ompas_lisp::core::structs::contextcollection::ContextCollection;
+use ompas_lisp::core::structs::contextcollection::{Context, ContextCollection};
+use ompas_lisp::core::structs::documentation::Documentation;
+use ompas_lisp::core::structs::lenv::ImportType::WithoutPrefix;
 use ompas_lisp::core::structs::lenv::LEnv;
 use ompas_lisp::core::structs::lerror::LError;
 use ompas_lisp::core::structs::lvalue::LValue;
+use ompas_lisp::core::structs::module::{IntoModule, Module};
+use ompas_lisp::core::structs::purefonction::PureFonctionCollection;
+use ompas_lisp::modules::advanced_math::CtxMath;
+use ompas_lisp::modules::io::{CtxIo, LogOutput};
+use ompas_lisp::modules::utils::CtxUtils;
 use std::mem;
 
+pub mod options;
 pub mod rae_log;
-
-pub type Lisp = String;
-
-pub enum RAEError {
-    RetryFailure,
-    Other(String),
-}
-
-#[derive(Debug, Default, Clone)]
-pub struct RAEOptions {
-    select_option: SelectOption,
-    platform_config: Option<String>,
-}
-
-impl RAEOptions {
-    pub fn new(option: SelectOption) -> Self {
-        Self {
-            select_option: option,
-            platform_config: None,
-        }
-    }
-
-    pub fn new_with_platform_config(
-        select_option: SelectOption,
-        platform_config: Option<String>,
-    ) -> Self {
-        Self {
-            select_option,
-            platform_config,
-        }
-    }
-
-    pub fn set_select_option(&mut self, dr0: usize, nro: usize) {
-        self.select_option.set_dr0(dr0);
-        self.select_option.set_nr0(nro);
-    }
-
-    pub fn get_select_option(&self) -> &SelectOption {
-        &self.select_option
-    }
-
-    pub fn set_platform_config(&mut self, str: String) {
-        self.platform_config = Some(str);
-    }
-
-    pub fn get_platform_config(&self) -> Option<String> {
-        self.platform_config.clone()
-    }
-}
-
-#[derive(Default, Debug, Copy, Clone)]
-pub struct SelectOption {
-    dr0: usize,
-    nro: usize,
-}
-
-impl SelectOption {
-    pub fn new(dr0: usize, nro: usize) -> Self {
-        SelectOption { dr0, nro }
-    }
-
-    pub fn set_dr0(&mut self, dr0: usize) {
-        self.dr0 = dr0;
-    }
-
-    pub fn set_nr0(&mut self, nro: usize) {
-        self.nro = nro;
-    }
-
-    pub fn get_dr0(&self) -> usize {
-        self.dr0
-    }
-
-    pub fn get_nro(&self) -> usize {
-        self.nro
-    }
-}
 
 pub type ReactiveTriggerId = usize;
 
@@ -123,7 +57,6 @@ pub async fn rae_run(mut context: RAEEnv, options: &RAEOptions, _log: String) {
             async_status_watcher_run(async_action_status, receiver_sync).await;
         });
     }
-
     //println!("async status watcher");
 
     let mut receiver = mem::replace(&mut context.job_receiver, None).unwrap();
@@ -149,6 +82,18 @@ pub async fn rae_run(mut context: RAEEnv, options: &RAEOptions, _log: String) {
         task_check_monitor(receiver_event_update_state, env_check_wait_on).await
     });
 
+    let mut env: LEnv = context.get_exec_env().await;
+    env.import(
+        CtxPlanning::new(
+            context.domain_env.clone(),
+            context.env.clone(),
+            *options.get_select_mode(),
+        ),
+        WithoutPrefix,
+    )
+    .await
+    .expect("Error loading domain in env");
+
     loop {
         //For each new event or task to be addressed, we search for the best method a create a new refinement stack
         //Note: The whole block could be in an async block
@@ -158,34 +103,20 @@ pub async fn rae_run(mut context: RAEEnv, options: &RAEOptions, _log: String) {
             //let _job_id = &context.agenda.add_job(job.clone());
             info!("new job received!");
 
-            let new_env = context.get_exec_env().await;
+            let mut new_env = env.clone();
 
             tokio::spawn(async move {
-                progress_2(job.core.clone(), new_env).await;
+                let job_lvalue = job.core;
+                info!("new triggered task: {}", job_lvalue);
+                //info!("LValue to be evaluated: {}", job_lvalue);
+                match eval(&job_lvalue, &mut new_env).await {
+                    Ok(lv) => info!("result of task {}: {}", job_lvalue, lv),
+                    Err(e) => error!("End of progress_2: {}", e),
+                }
             });
         }
     }
 }
-
-async fn progress_2(job_lvalue: LValue, mut env: LEnv) {
-    info!("new triggered task: {}", job_lvalue);
-    //info!("LValue to be evaluated: {}", job_lvalue);
-    match eval(&job_lvalue, &mut env).await {
-        Ok(lv) => info!("result of task {}: {}", job_lvalue, lv),
-        Err(e) => error!("End of progress_2: {}", e),
-    }
-}
-
-fn _select_greedy(env: &RAEEnv, task: &LValue, _params: &[LValue]) -> Result<LValue, LError> {
-    let methods = env.get_methods_from_task(task)?;
-    //println!("methods: {}", methods);
-    if let LValue::List(list) = methods {
-        Ok(list.first().unwrap_or(&LValue::Nil).clone())
-    } else {
-        panic!("methods should be a list of methods")
-    }
-}
-
 ///Output the status of the task/event
 /// Could be in a terminal, or a log file
 pub async fn output(_status: RAEStatus, _log: String) {

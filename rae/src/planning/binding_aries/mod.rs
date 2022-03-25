@@ -175,7 +175,7 @@ pub fn build_chronicles(problem: &Problem) -> Result<chronicles::Problem> {
         templates.push(template);
     }
 
-    println!("# SYMBOL TABLE: \n{:?}", ctx.model.get_symbol_table());
+    /*println!("# SYMBOL TABLE: \n{:?}", ctx.model.get_symbol_table());
     println!(
         "{}",
         bindings.format_with_sym_table(&problem.cc.sym_table, false)
@@ -184,7 +184,7 @@ pub fn build_chronicles(problem: &Problem) -> Result<chronicles::Problem> {
 
     for (i, t) in templates.iter().enumerate() {
         println!("template {}: {:?}", i, t.chronicle)
-    }
+    }*/
 
     let problem = aProblem {
         context: ctx,

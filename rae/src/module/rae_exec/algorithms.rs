@@ -1,8 +1,9 @@
-use crate::module::rae_exec::algorithms::select::SelectMode;
 use crate::module::rae_exec::error::RaeExecError;
+use crate::module::rae_exec::planning::{CtxPlanning, MOD_PLANNING};
 use crate::module::rae_exec::{
     CtxRaeExec, MOD_RAE_EXEC, RAE_GET_NEXT_METHOD, RAE_SET_SUCCESS_FOR_TASK,
 };
+use crate::supervisor::options::{Planner, SelectMode};
 use ::macro_rules_attribute::macro_rules_attribute;
 use log::info;
 use ompas_lisp::core::structs::lenv::LEnv;
@@ -133,7 +134,6 @@ async fn get_next_method<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     (sim_block
     (rae-select task (generate_applicable_instances task)))))))";*/
 
-const SELECT_MODE: SelectMode = SelectMode::Greedy;
 pub async fn select(args: &[LValue], env: &LEnv) -> LResult {
     /*
     Each function return an ordered list of methods
@@ -142,9 +142,10 @@ pub async fn select(args: &[LValue], env: &LEnv) -> LResult {
     let task: LValue = args.into();
     info!("Add task {} to agenda", task);
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
+    let ctx_planning = env.get_context::<CtxPlanning>(MOD_PLANNING)?;
     let task_id = ctx.agenda.add_task(task.clone()).await;
 
-    let methods: LValue = match SELECT_MODE {
+    let methods: LValue = match &ctx_planning.select_mode {
         SelectMode::Greedy => {
             /*
             Returns all applicable methods sorted by their score
@@ -152,24 +153,11 @@ pub async fn select(args: &[LValue], env: &LEnv) -> LResult {
             info!("select greedy for {}", LValue::from(args));
             select::greedy_select(args, env).await?
         }
-        SelectMode::Planning => {
-            /*
-            Returns a unique function
-             */
-            todo!()
+        SelectMode::Planning(Planner::Aries) => {
+            info!("select with aries for {}", LValue::from(args));
+            select::planning_select(args, env).await?
         }
-        SelectMode::Heuristic => {
-            /*
-            Use an heuristic to sort the methods
-             */
-            todo!()
-        }
-        SelectMode::Learned => {
-            /*
-            Use a learning algorithms to select the best method.
-             */
-            todo!()
-        }
+        _ => todo!(),
     };
 
     if let LValue::List(methods) = methods {
@@ -196,8 +184,13 @@ mod select {
         RAE_METHOD_PRE_CONDITIONS_MAP, RAE_METHOD_SCORE_MAP, RAE_METHOD_TYPES_MAP,
         RAE_TASK_METHODS_MAP,
     };
+    use crate::module::rae_exec::planning::{CtxPlanning, MOD_PLANNING};
     use crate::module::rae_exec::platform::instance;
-    use crate::module::rae_exec::{get_facts, STATE};
+    use crate::module::rae_exec::{get_facts, CtxRaeExec, MOD_RAE_EXEC, STATE};
+    use crate::planning::binding_aries::solver::run_solver;
+    use crate::planning::binding_aries::{build_chronicles, solver};
+    use crate::planning::conversion::convert_domain_to_chronicle_hierarchy;
+    use crate::planning::structs::{ConversionContext, Problem};
     use ::macro_rules_attribute::macro_rules_attribute;
     use ompas_lisp::core::eval;
     use ompas_lisp::core::root_module::get;
@@ -210,16 +203,58 @@ mod select {
     use std::convert::TryInto;
 
     //pub const GREEDY_SELECT: &str = "greedy_select";
-    pub enum SelectMode {
-        Greedy,
-        Planning,
-        Heuristic,
-        Learned,
-    }
+
     //Returns the method to do.
     #[macro_rules_attribute(dyn_async !)]
-    pub async fn planning_select<'a>(_: &'a [LValue], _: &'a LEnv) -> LResult {
-        todo!()
+    pub async fn planning_select<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+        let greedy_methods = greedy_select(args, env);
+
+        let task: LValue = args.into();
+        println!("task to plan: {}", task);
+        let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
+
+        let ctx_domain = env.get_context::<CtxPlanning>(MOD_PLANNING)?;
+
+        let context = ConversionContext {
+            domain: ctx_domain.domain.clone(),
+            env: ctx_domain.env.clone(),
+            state: ctx.state.get_snapshot().await,
+        };
+
+        let mut problem: Problem = (&context).into();
+        let cc = convert_domain_to_chronicle_hierarchy(context)?;
+        println!("cc: {}", cc);
+        problem.cc = cc;
+        problem.goal_tasks.push(task.into());
+
+        let mut aries_problem = build_chronicles(&problem)?;
+
+        let result = run_solver(&mut aries_problem, true);
+        // println!("{}", format_partial_plan(&pb, &x)?);
+
+        let result: LValue = if let Some(x) = &result {
+            let greedy = greedy_methods.await?;
+            println!("greedy methods: {}", greedy);
+            let mut greedy_methods: Vec<LValue> = greedy.try_into()?;
+            let planner_methods = solver::extract_instantiated_methods(x)?;
+            let result: Vec<LValue> = planner_methods.try_into()?;
+            let planner_method = result[0].clone();
+            println!("planners methods: {}", planner_method);
+
+            for i in 0..greedy_methods.len() {
+                if greedy_methods[i] == planner_method {
+                    greedy_methods.remove(i);
+                    break;
+                }
+            }
+            let mut result = vec![planner_method];
+            result.append(&mut greedy_methods);
+            result.into()
+        } else {
+            LValue::String("no solution found".to_string())
+        };
+
+        Ok(result)
     }
 
     #[macro_rules_attribute(dyn_async !)]
@@ -291,11 +326,11 @@ mod select {
             let mut instances_template: Vec<LValue> =
                 enumerate(&instances_template, env)?.try_into()?;
 
-            println!(
+            /*println!(
                 "instances for template {}: {}",
                 template,
                 LValue::from(instances_template.clone())
-            );
+            );*/
 
             let iter = instances_template.drain(..);
 

@@ -1,4 +1,5 @@
-use aries_model::extensions::SavedAssignment;
+use aries_model::extensions::{AssignmentExt, SavedAssignment};
+use aries_model::lang::SAtom;
 use aries_planners::encode::{
     encode, populate_with_task_network, populate_with_template_instances,
 };
@@ -6,8 +7,10 @@ use aries_planners::solver::Strat;
 use aries_planners::{ParSolver, Solver};
 use aries_planning::chronicles;
 use aries_planning::chronicles::analysis::hierarchical_is_non_recursive;
-use aries_planning::chronicles::FiniteProblem;
+use aries_planning::chronicles::{ChronicleKind, FiniteProblem};
 use aries_tnet::theory::{StnConfig, StnTheory, TheoryPropagationLevel};
+use ompas_lisp::core::structs::lerror::LResult;
+use ompas_lisp::core::structs::lvalue::LValue;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -104,4 +107,31 @@ pub fn run_solver(problem: &mut chronicles::Problem, htn_mode: bool) -> Option<P
         }
     }
     result
+}
+
+pub fn extract_instantiated_methods(pr: &PlanResult) -> LResult {
+    let ass = &pr.ass;
+    let problem = &pr.fp;
+
+    let methods: Vec<_> = pr
+        .fp
+        .chronicles
+        .iter()
+        .filter(|ch| {
+            ass.boolean_value_of(ch.chronicle.presence) == Some(true)
+                && ch.chronicle.kind == ChronicleKind::Method
+        })
+        .collect();
+
+    let fmt1 = |x: &SAtom| -> LValue {
+        let sym = ass.sym_domain_of(*x).into_singleton().unwrap();
+        problem.model.shape.symbols.symbol(sym).to_string().into()
+    };
+    let mut lv_methods: Vec<LValue> = vec![];
+    for m in methods {
+        let name: Vec<LValue> = m.chronicle.name.iter().map(|s| fmt1(s)).collect::<_>();
+        lv_methods.push(name.into());
+    }
+
+    Ok(lv_methods.into())
 }

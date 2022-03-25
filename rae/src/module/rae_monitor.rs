@@ -34,6 +34,7 @@ pub const DOC_RAE_GET_STATUS: &str = "Returns the current status of actions";
 pub const DOC_RAE_GET_ENV: &str = "Returns the whole environment.";
 
 pub const RAE_GET_CONFIG_PLATFORM: &str = "get-config-platform";
+pub const RAE_GET_CONFIG_SELECT: &str = "get-config-select";
 pub const DOC_RAE_GET_SYMBOL_TYPE: &str =
     "Returns the type of the symbol as defined in RAE environment";
 pub const DOC_RAE_GET_SYMBOL_TYPE_VERBOSE: &str = "Types:\n\
@@ -122,6 +123,23 @@ pub async fn get_config_platform<'a>(args: &'a [LValue], env: &'a LEnv) -> LResu
             .await
             .get_platform_config()
             .unwrap_or_else(|| String::from("no options")),
+    ))
+}
+
+#[macro_rules_attribute(dyn_async!)]
+pub async fn get_config_select<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+    let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
+
+    if !args.is_empty() {
+        return Err(WrongNumberOfArgument(
+            RAE_GET_CONFIG_PLATFORM,
+            args.into(),
+            args.len(),
+            0..0,
+        ));
+    }
+    Ok(LValue::String(
+        ctx.get_options().await.get_select_mode().to_string(),
     ))
 }
 #[macro_rules_attribute(dyn_async!)]

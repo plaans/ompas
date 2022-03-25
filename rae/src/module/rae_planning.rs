@@ -1,12 +1,9 @@
 use crate::module::{CtxRae, MOD_RAE};
-use crate::planning::binding_aries::build_chronicles;
-use crate::planning::binding_aries::solver::{run_solver, PlanResult};
+use crate::planning::binding_aries::solver::run_solver;
+use crate::planning::binding_aries::{build_chronicles, solver};
 use crate::planning::conversion::convert_domain_to_chronicle_hierarchy;
 use crate::planning::structs::{ConversionContext, Problem};
 use ::macro_rules_attribute::macro_rules_attribute;
-use aries_model::extensions::AssignmentExt;
-use aries_model::lang::SAtom;
-use aries_planning::chronicles::ChronicleKind;
 use ompas_lisp::core::structs::lenv::LEnv;
 use ompas_lisp::core::structs::lerror::LResult;
 use ompas_lisp::core::structs::lvalue::LValue;
@@ -30,37 +27,10 @@ pub async fn plan_task<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     // println!("{}", format_partial_plan(&pb, &x)?);
 
     let result: LValue = if let Some(x) = &result {
-        get_instantiated_methods(x)?
+        solver::extract_instantiated_methods(x)?
     } else {
         LValue::String("no solution found".to_string())
     };
 
     Ok(result)
-}
-
-fn get_instantiated_methods(pr: &PlanResult) -> LResult {
-    let ass = &pr.ass;
-    let problem = &pr.fp;
-
-    let methods: Vec<_> = pr
-        .fp
-        .chronicles
-        .iter()
-        .filter(|ch| {
-            ass.boolean_value_of(ch.chronicle.presence) == Some(true)
-                && ch.chronicle.kind == ChronicleKind::Method
-        })
-        .collect();
-
-    let fmt1 = |x: &SAtom| -> LValue {
-        let sym = ass.sym_domain_of(*x).into_singleton().unwrap();
-        problem.model.shape.symbols.symbol(sym).to_string().into()
-    };
-    let mut lv_methods: Vec<LValue> = vec![];
-    for m in methods {
-        let name: Vec<LValue> = m.chronicle.name.iter().map(|s| fmt1(s)).collect::<_>();
-        lv_methods.push(name.into());
-    }
-
-    Ok(lv_methods.into())
 }

@@ -1,5 +1,6 @@
 pub mod algorithms;
 pub mod error;
+pub mod planning;
 pub mod platform;
 pub mod rae_mutex;
 pub mod simu;

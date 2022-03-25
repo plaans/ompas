@@ -1,17 +1,22 @@
 use crate::module::rae_exec::{Job, JobType};
 use crate::module::{CtxRae, MOD_RAE};
-use crate::supervisor::{rae_run, RAEOptions};
+use crate::supervisor::options::{
+    Planner, RAEOptions, SelectMode, ARIES, GREEDY, HEURISTIC, LEARNING, PLANNING, RAE_PLAN, UPOM,
+};
+use crate::supervisor::rae_run;
 use ::macro_rules_attribute::macro_rules_attribute;
 use ompas_lisp::core::structs::lenv::LEnv;
-use ompas_lisp::core::structs::lerror::LError::WrongNumberOfArgument;
+use ompas_lisp::core::structs::lerror::LError::{SpecialError, WrongNumberOfArgument};
 use ompas_lisp::core::structs::lerror::LResult;
 use ompas_lisp::core::structs::lvalue::LValue;
 use ompas_utils::dyn_async;
+use std::convert::TryInto;
 
 pub const RAE_TRIGGER_EVENT: &str = "trigger-event";
 pub const RAE_TRIGGER_TASK: &str = "trigger-task";
 pub const RAE_LAUNCH: &str = "launch";
 pub const RAE_CONFIGURE_PLATFORM: &str = "configure-platform";
+pub const RAE_CONFIGURE_SELECT: &str = "configure-select";
 
 pub const DOC_RAE_TRIGGER_EVENT: &str = "Sends to RAE an event to handle";
 pub const DOC_RAE_TRIGGER_EVENT_VERBOSE: &str = "";
@@ -53,6 +58,42 @@ pub async fn configure_platform<'a>(args: &'a [LValue], env: &'a LEnv) -> LResul
 
     let rae_options = RAEOptions::new_with_platform_config(Default::default(), Some(string));
     ctx.set_options(rae_options).await;
+    Ok(LValue::Nil)
+}
+#[macro_rules_attribute(dyn_async!)]
+pub async fn configure_select<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+    if args.len() != 1 {
+        return Err(WrongNumberOfArgument(
+            RAE_CONFIGURE_SELECT,
+            args.into(),
+            args.len(),
+            1..1,
+        ));
+    }
+
+    let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
+
+    let m: String = (&args[0]).try_into()?;
+    let select_mode = match m.as_str() {
+        GREEDY => SelectMode::Greedy,
+        PLANNING | ARIES => SelectMode::Planning(Planner::Aries),
+        UPOM => SelectMode::Planning(Planner::UPOM),
+        RAE_PLAN => SelectMode::Planning(Planner::RAEPlan(Default::default())),
+        HEURISTIC => SelectMode::Heuristic,
+        LEARNING => SelectMode::Learning,
+        _ => {
+            return Err(SpecialError(
+                RAE_CONFIGURE_SELECT,
+                format!(
+                    "Select mode is either {}, {}, {} or {}.",
+                    GREEDY, PLANNING, HEURISTIC, LEARNING
+                ),
+            ))
+        }
+    };
+
+    ctx.set_select_mode(select_mode).await;
+
     Ok(LValue::Nil)
 }
 

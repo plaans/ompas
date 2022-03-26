@@ -55,6 +55,119 @@ pub struct CtxRae {
     sender_to_rae: Option<Sender<Job>>,
 }
 
+impl IntoModule for CtxRae {
+    fn into_module(self) -> Module {
+        let domain = self.domain.clone();
+        //let domain = Default::default();
+        let mut module = Module {
+            ctx: Context::new(self),
+            prelude: vec![],
+            raw_lisp: domain,
+            label: MOD_RAE.to_string(),
+        };
+
+        module.add_async_fn_prelude(RAE_LAUNCH, rae_launch);
+
+        module.add_async_fn_prelude(RAE_GET_METHODS, get_methods);
+        module.add_async_fn_prelude(RAE_GET_STATE_FUNCTIONS, get_state_function);
+        module.add_async_fn_prelude(RAE_GET_ACTIONS, get_actions);
+        module.add_async_fn_prelude(RAE_GET_TASKS, get_tasks);
+        module.add_async_fn_prelude(RAE_GET_ENV, get_env);
+        module.add_async_fn_prelude(RAE_CONFIGURE_PLATFORM, configure_platform);
+        module.add_async_fn_prelude(RAE_CONFIGURE_SELECT, configure_select);
+        module.add_async_fn_prelude(RAE_GET_CONFIG_PLATFORM, get_config_platform);
+        module.add_async_fn_prelude(RAE_GET_CONFIG_SELECT, get_config_select);
+
+        //Domain Definition
+        module.add_async_fn_prelude(RAE_DEF_STATE_FUNCTION, def_state_function);
+        module.add_async_fn_prelude(RAE_DEF_ACTION, def_action);
+        module.add_async_fn_prelude(RAE_DEF_ACTION_MODEL, def_action_model);
+        module.add_async_fn_prelude(
+            RAE_DEF_ACTION_OPERATIONAL_MODEL,
+            def_action_operational_model,
+        );
+        module.add_async_fn_prelude(RAE_DEF_TASK, def_task);
+        module.add_async_fn_prelude(RAE_DEF_METHOD, def_method);
+        module.add_async_fn_prelude(RAE_DEF_LAMBDA, def_lambda);
+        module.add_async_fn_prelude(RAE_DEF_INITIAL_STATE, def_initial_state);
+        module.add_async_fn_prelude(RAE_ADD_CONSTANT, add_object);
+        module.add_async_fn_prelude(RAE_ADD_OBJECT, add_object);
+        module.add_async_fn_prelude(RAE_ADD_TYPE, add_type);
+        module.add_async_fn_prelude(RAE_DEF_CONSTANTS, def_objects);
+        module.add_async_fn_prelude(RAE_DEF_TYPES, def_types);
+        module.add_async_fn_prelude(RAE_DEF_OBJECTS, def_objects);
+
+        //functions to debug the functionnement of rae
+        module.add_async_fn_prelude(RAE_GET_STATE, get_state);
+        module.add_async_fn_prelude(RAE_GET_STATUS, get_status);
+        module.add_async_fn_prelude(RAE_GET_AGENDA, get_agenda);
+
+        //Conversion functions
+        module.add_async_fn_prelude(RAE_CONVERT_EXPR, convert_expr);
+        module.add_async_fn_prelude(RAE_CONVERT_DOMAIN, convert_domain);
+        module.add_async_fn_prelude(RAE_PRE_PROCESS_LAMBDA, pre_process_lambda);
+        module.add_async_fn_prelude(RAE_PRE_PROCESS_EXPR, pre_process_expr);
+        module.add_async_fn_prelude(RAE_PRE_PROCESS_DOMAIN, pre_process_domain);
+        module.add_async_fn_prelude(RAE_CONVERT_COND_EXPR, convert_cond_expr);
+        module.add_async_fn_prelude(RAE_PLAN_TASK, plan_task);
+
+        //Trigger task
+        module.add_fn_prelude(RAE_TRIGGER_EVENT, trigger_event);
+        module.add_fn_prelude(RAE_TRIGGER_TASK, trigger_task);
+        module.add_async_fn_prelude(RAE_GET_MUTEXES, get_mutexes);
+        module.add_async_fn_prelude(RAE_GET_MONITORS, get_monitors);
+
+        module
+    }
+
+    fn documentation(&self) -> Documentation {
+        vec![
+            LHelp::new_verbose(MOD_RAE, DOC_MOD_RAE, DOC_MOD_RAE_VERBOSE),
+            LHelp::new(RAE_GET_METHODS, DOC_RAE_GET_METHODS),
+            LHelp::new(RAE_GET_ACTIONS, DOC_RAE_GET_ACTIONS),
+            LHelp::new_verbose(
+                RAE_GET_SYMBOL_TYPE,
+                DOC_RAE_GET_SYMBOL_TYPE,
+                DOC_RAE_GET_SYMBOL_TYPE_VERBOSE,
+            ),
+            LHelp::new(RAE_GET_TASKS, DOC_RAE_GET_TASKS),
+            LHelp::new(RAE_GET_STATE_FUNCTIONS, DOC_RAE_GET_STATE_FUNCTIONS),
+            LHelp::new(RAE_GET_ENV, DOC_RAE_GET_ENV),
+            LHelp::new(RAE_LAUNCH, DOC_RAE_LAUNCH),
+            LHelp::new(RAE_GET_STATE, DOC_RAE_GET_STATE),
+            LHelp::new(RAE_GET_STATUS, DOC_RAE_GET_STATUS),
+            LHelp::new_verbose(
+                RAE_DEF_STATE_FUNCTION,
+                DOC_DEF_STATE_FUNCTION,
+                DOC_DEF_STATE_FUNCTION_VERBOSE,
+            ),
+            LHelp::new_verbose(RAE_DEF_ACTION, DOC_DEF_ACTION, DOC_DEF_ACTION_VERBOSE),
+            LHelp::new_verbose(RAE_DEF_TASK, DOC_DEF_TASK, DOC_DEF_TASK_VERBOSE),
+            LHelp::new_verbose(RAE_DEF_METHOD, DOC_DEF_METHOD, DOC_DEF_METHOD_VERBOSE),
+            LHelp::new(RAE_DEF_LAMBDA, DOC_DEF_LAMBDA),
+            LHelp::new(RAE_DEF_INITIAL_STATE, DOC_DEF_INITIAL_STATE),
+            LHelp::new(RAE_CONFIGURE_PLATFORM, DOC_RAE_CONFIGURE_PLATFORM),
+            LHelp::new(RAE_GET_CONFIG_PLATFORM, DOC_RAE_GET_CONFIG_PLATFORM),
+            LHelp::new(RAE_GET_AGENDA, DOC_RAE_GET_AGENDA),
+            LHelp::new_verbose(
+                RAE_TRIGGER_TASK,
+                DOC_RAE_TRIGGER_TASK,
+                DOC_RAE_TRIGGER_EVENT_VERBOSE,
+            ),
+            LHelp::new_verbose(
+                RAE_TRIGGER_EVENT,
+                DOC_RAE_TRIGGER_EVENT,
+                DOC_RAE_TRIGGER_TASK_VERBOSE,
+            ),
+        ]
+        .into()
+    }
+
+    fn pure_fonctions(&self) -> PureFonctionCollection {
+        vec![].into()
+    }
+}
+
 impl CtxRae {
     /// Initialize the libraries to load inside Scheme env.
     /// Takes as argument the execution platform.
@@ -301,112 +414,5 @@ impl Default for CtxRae {
             domain: Default::default(),
             sender_to_rae: None,
         }
-    }
-}
-
-impl IntoModule for CtxRae {
-    fn into_module(self) -> Module {
-        let domain = self.domain.clone();
-        //let domain = Default::default();
-        let mut module = Module {
-            ctx: Context::new(self),
-            prelude: vec![],
-            raw_lisp: domain,
-            label: MOD_RAE.to_string(),
-        };
-
-        module.add_async_fn_prelude(RAE_LAUNCH, rae_launch);
-
-        module.add_async_fn_prelude(RAE_GET_METHODS, get_methods);
-        module.add_async_fn_prelude(RAE_GET_STATE_FUNCTIONS, get_state_function);
-        module.add_async_fn_prelude(RAE_GET_ACTIONS, get_actions);
-        module.add_async_fn_prelude(RAE_GET_TASKS, get_tasks);
-        module.add_async_fn_prelude(RAE_GET_ENV, get_env);
-        module.add_async_fn_prelude(RAE_CONFIGURE_PLATFORM, configure_platform);
-        module.add_async_fn_prelude(RAE_CONFIGURE_SELECT, configure_select);
-        module.add_async_fn_prelude(RAE_GET_CONFIG_PLATFORM, get_config_platform);
-        module.add_async_fn_prelude(RAE_GET_CONFIG_SELECT, get_config_select);
-
-        //Domain Definition
-        module.add_async_fn_prelude(RAE_DEF_STATE_FUNCTION, def_state_function);
-        module.add_async_fn_prelude(RAE_DEF_ACTION, def_action);
-        module.add_async_fn_prelude(RAE_DEF_ACTION_MODEL, def_action_model);
-        module.add_async_fn_prelude(
-            RAE_DEF_ACTION_OPERATIONAL_MODEL,
-            def_action_operational_model,
-        );
-        module.add_async_fn_prelude(RAE_DEF_TASK, def_task);
-        module.add_async_fn_prelude(RAE_DEF_METHOD, def_method);
-        module.add_async_fn_prelude(RAE_DEF_LAMBDA, def_lambda);
-        module.add_async_fn_prelude(RAE_DEF_INITIAL_STATE, def_initial_state);
-
-        //functions to debug the functionnement of rae
-        module.add_async_fn_prelude(RAE_GET_STATE, get_state);
-        module.add_async_fn_prelude(RAE_GET_STATUS, get_status);
-        module.add_async_fn_prelude(RAE_GET_AGENDA, get_agenda);
-
-        //Conversion functions
-        module.add_async_fn_prelude(RAE_CONVERT_EXPR, convert_expr);
-        module.add_async_fn_prelude(RAE_CONVERT_DOMAIN, convert_domain);
-        module.add_async_fn_prelude(RAE_PRE_PROCESS_LAMBDA, pre_process_lambda);
-        module.add_async_fn_prelude(RAE_PRE_PROCESS_EXPR, pre_process_expr);
-        module.add_async_fn_prelude(RAE_PRE_PROCESS_DOMAIN, pre_process_domain);
-        module.add_async_fn_prelude(RAE_CONVERT_COND_EXPR, convert_cond_expr);
-        module.add_async_fn_prelude(RAE_PLAN_TASK, plan_task);
-
-        //Trigger task
-        module.add_fn_prelude(RAE_TRIGGER_EVENT, trigger_event);
-        module.add_fn_prelude(RAE_TRIGGER_TASK, trigger_task);
-        module.add_async_fn_prelude(RAE_GET_MUTEXES, get_mutexes);
-        module.add_async_fn_prelude(RAE_GET_MONITORS, get_monitors);
-
-        module
-    }
-
-    fn documentation(&self) -> Documentation {
-        vec![
-            LHelp::new_verbose(MOD_RAE, DOC_MOD_RAE, DOC_MOD_RAE_VERBOSE),
-            LHelp::new(RAE_GET_METHODS, DOC_RAE_GET_METHODS),
-            LHelp::new(RAE_GET_ACTIONS, DOC_RAE_GET_ACTIONS),
-            LHelp::new_verbose(
-                RAE_GET_SYMBOL_TYPE,
-                DOC_RAE_GET_SYMBOL_TYPE,
-                DOC_RAE_GET_SYMBOL_TYPE_VERBOSE,
-            ),
-            LHelp::new(RAE_GET_TASKS, DOC_RAE_GET_TASKS),
-            LHelp::new(RAE_GET_STATE_FUNCTIONS, DOC_RAE_GET_STATE_FUNCTIONS),
-            LHelp::new(RAE_GET_ENV, DOC_RAE_GET_ENV),
-            LHelp::new(RAE_LAUNCH, DOC_RAE_LAUNCH),
-            LHelp::new(RAE_GET_STATE, DOC_RAE_GET_STATE),
-            LHelp::new(RAE_GET_STATUS, DOC_RAE_GET_STATUS),
-            LHelp::new_verbose(
-                RAE_DEF_STATE_FUNCTION,
-                DOC_DEF_STATE_FUNCTION,
-                DOC_DEF_STATE_FUNCTION_VERBOSE,
-            ),
-            LHelp::new_verbose(RAE_DEF_ACTION, DOC_DEF_ACTION, DOC_DEF_ACTION_VERBOSE),
-            LHelp::new_verbose(RAE_DEF_TASK, DOC_DEF_TASK, DOC_DEF_TASK_VERBOSE),
-            LHelp::new_verbose(RAE_DEF_METHOD, DOC_DEF_METHOD, DOC_DEF_METHOD_VERBOSE),
-            LHelp::new(RAE_DEF_LAMBDA, DOC_DEF_LAMBDA),
-            LHelp::new(RAE_DEF_INITIAL_STATE, DOC_DEF_INITIAL_STATE),
-            LHelp::new(RAE_CONFIGURE_PLATFORM, DOC_RAE_CONFIGURE_PLATFORM),
-            LHelp::new(RAE_GET_CONFIG_PLATFORM, DOC_RAE_GET_CONFIG_PLATFORM),
-            LHelp::new(RAE_GET_AGENDA, DOC_RAE_GET_AGENDA),
-            LHelp::new_verbose(
-                RAE_TRIGGER_TASK,
-                DOC_RAE_TRIGGER_TASK,
-                DOC_RAE_TRIGGER_EVENT_VERBOSE,
-            ),
-            LHelp::new_verbose(
-                RAE_TRIGGER_EVENT,
-                DOC_RAE_TRIGGER_EVENT,
-                DOC_RAE_TRIGGER_TASK_VERBOSE,
-            ),
-        ]
-        .into()
-    }
-
-    fn pure_fonctions(&self) -> PureFonctionCollection {
-        vec![].into()
     }
 }

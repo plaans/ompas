@@ -1,5 +1,6 @@
 pub mod solver;
 
+use crate::context::rae_env::Type as raeType;
 use crate::planning::structs::atom::Atom;
 use crate::planning::structs::constraint::Constraint;
 use crate::planning::structs::lit::Lit;
@@ -11,7 +12,7 @@ use anyhow::{anyhow, Result};
 use aries_core::Lit as aLit;
 use aries_core::*;
 use aries_model::extensions::Shaped;
-use aries_model::lang::{Atom as aAtom, FAtom, FVar, IAtom, SAtom, SVar, Type, Variable};
+use aries_model::lang::{Atom as aAtom, FAtom, FVar, IAtom, SAtom, SVar, Type as aType, Variable};
 use aries_model::symbols::SymbolTable;
 use aries_model::types::TypeHierarchy;
 use aries_planning::chronicles;
@@ -22,7 +23,10 @@ use aries_planning::chronicles::{
 };
 use aries_planning::parsing::pddl::TypedSymbol;
 use aries_utils::input::Sym;
+use ompas_lisp::core::language::{BOOL, FLOAT, INT};
+use ompas_lisp::core::structs::lerror;
 use ompas_lisp::core::structs::lerror::LError;
+use ompas_lisp::core::structs::lerror::LError::SpecialError;
 use ompas_lisp::core::structs::lnumber::LNumber;
 use ompas_lisp::core::structs::lvalues::LValueS;
 use std::convert::{TryFrom, TryInto};
@@ -43,6 +47,27 @@ static INSTANCE_SFN: &str = "instance";
 
 static FLOAT_SCALE: IntCst = 10;
 static NIL_OBJECT: &str = "★nil★";
+
+static BUILD_CHRONICLES: &str = "build_chronicles";
+
+fn get_type(t: &raeType, symbol_table: &SymbolTable) -> lerror::Result<aType> {
+    match t {
+        raeType::Single(s) => match s.as_str() {
+            BOOL => Ok(aType::Bool),
+            INT => Ok(aType::Int),
+            FLOAT => Ok(aType::Fixed(FLOAT_SCALE)),
+            other => match symbol_table.types.id_of(other) {
+                Some(t) => Ok(aType::Sym(t)),
+                None => Err(SpecialError(
+                    BUILD_CHRONICLES,
+                    format!("{} Unknown type", other),
+                )),
+            },
+        },
+        raeType::List(_) => todo!(),
+        raeType::Tuple(_) => todo!(),
+    }
+}
 
 pub fn build_chronicles(problem: &Problem) -> Result<chronicles::Problem> {
     let mut types: Vec<(Sym, Option<Sym>)> = vec![
@@ -103,13 +128,13 @@ pub fn build_chronicles(problem: &Problem) -> Result<chronicles::Problem> {
             .id(INSTANCE_SFN)
             .ok_or_else(|| anyhow!("{} undefined", INSTANCE_SFN))?;
         let mut args = Vec::with_capacity(2);
-        args.push(Type::Sym(
+        args.push(aType::Sym(
             symbol_table
                 .types
                 .id_of(OBJECT_TYPE)
                 .ok_or_else(|| anyhow!("{} undefined.", OBJECT_TYPE))?,
         ));
-        args.push(Type::Sym(
+        args.push(aType::Sym(
             symbol_table
                 .types
                 .id_of(TYPE_TYPE)
@@ -121,14 +146,10 @@ pub fn build_chronicles(problem: &Problem) -> Result<chronicles::Problem> {
     for sf in &problem.state_functions {
         let sym = symbol_table
             .id(&sf.0)
-            .ok_or_else(|| anyhow!("{} Unknown symbol", sf.0))?;
+            .ok_or_else(|| SpecialError(BUILD_CHRONICLES, format!("{} Unknown symbol", sf.0)))?;
         let mut args = Vec::with_capacity(sf.1.get_number());
         for tpe in &sf.1.get_types() {
-            let tpe = symbol_table
-                .types
-                .id_of(&tpe.to_string())
-                .ok_or_else(|| anyhow!("{} Unknown type", sf.0))?;
-            args.push(Type::Sym(tpe));
+            args.push(get_type(tpe, &symbol_table)?);
         }
         state_functions.push(StateFun { sym, tpe: args })
     }
@@ -175,16 +196,13 @@ pub fn build_chronicles(problem: &Problem) -> Result<chronicles::Problem> {
         templates.push(template);
     }
 
-    /*println!("# SYMBOL TABLE: \n{:?}", ctx.model.get_symbol_table());
-    println!(
-        "{}",
-        bindings.format_with_sym_table(&problem.cc.sym_table, false)
-    );
+    println!("# SYMBOL TABLE: \n{:?}", ctx.model.get_symbol_table());
+    println!("{}", bindings.format(&problem.cc.sym_table, false));
     println!("initial chronicle: {:?}", init_ch.chronicle);
 
     for (i, t) in templates.iter().enumerate() {
         println!("template {}: {:?}", i, t.chronicle)
-    }*/
+    }
 
     let problem = aProblem {
         context: ctx,
@@ -451,7 +469,15 @@ fn atom_id_into_atom(
         },
         Atom::Sym(s) => match ompas_type.kind {
             AtomKind::Constant => context
-                .typed_sym(context.model.get_symbol_table().id(s.get_sym()).unwrap())
+                .typed_sym(
+                    context
+                        .model
+                        .get_symbol_table()
+                        .id(s.get_sym())
+                        .unwrap_or_else(|| {
+                            panic!("{} is not defined in symbol table", s.get_sym())
+                        }),
+                )
                 .into(),
             AtomKind::Variable(_) => (*bindings.get_var(a).unwrap_or_else(|| {
                 panic!(
@@ -661,8 +687,8 @@ fn read_chronicle(
         let end = FVar::try_from(bindings.get_var(e.get_end()).unwrap())?;
         let end = FAtom::from(end);
         let effect = Effect {
-            transition_start: start,
-            persistence_start: end,
+            transition_start: start, // + FAtom::EPSILON,
+            persistence_start: end,  // + FAtom::EPSILON,
             state_var: sv,
             value,
         };

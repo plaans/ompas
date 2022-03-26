@@ -59,6 +59,10 @@ impl LState {
         self.inner.get(key)
     }
 
+    pub fn get_mut(&mut self, key: &LValueS) -> Option<&mut LValueS> {
+        self.inner.get_mut(key)
+    }
+
     pub fn set_type(&mut self, _type: StateType) {
         self._type = Some(_type)
     }
@@ -195,7 +199,7 @@ impl RAEState {
 
     pub async fn set_state(&self, state: LState) {
         match &state._type {
-            None => {}
+            None => panic!("no type for state"),
             Some(_type) => match _type {
                 StateType::Static => {
                     let mut _ref = self._static.write().await;

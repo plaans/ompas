@@ -3,6 +3,7 @@ use aries_model::lang::SAtom;
 use aries_planners::encode::{
     encode, populate_with_task_network, populate_with_template_instances,
 };
+use aries_planners::fmt::{format_hddl_plan, format_pddl_plan};
 use aries_planners::solver::Strat;
 use aries_planners::{ParSolver, Solver};
 use aries_planning::chronicles;
@@ -100,6 +101,20 @@ pub fn run_solver(problem: &mut chronicles::Problem, htn_mode: bool) -> Option<P
         let solver_result = solve(&pb, htn_mode);
         println!("  [{:.3}s] solved", start.elapsed().as_secs_f32());
         if let Some(x) = solver_result {
+            println!("  Solution found");
+            let plan = if htn_mode {
+                format!(
+                    "\n**** Decomposition ****\n\n\
+                    {}\n\n\
+                    **** Plan ****\n\n\
+                    {}",
+                    format_hddl_plan(&pb, &x).unwrap(),
+                    format_pddl_plan(&pb, &x).unwrap()
+                )
+            } else {
+                format_pddl_plan(&pb, &x).unwrap()
+            };
+            println!("{}", plan);
             result = Some(PlanResult { ass: x, fp: pb });
             break;
         } else {

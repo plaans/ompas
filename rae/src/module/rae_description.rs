@@ -9,9 +9,10 @@ use ompas_lisp::core::root_module::predicate::language::*;
 use ompas_lisp::core::structs::contextcollection::Context;
 use ompas_lisp::core::structs::documentation::Documentation;
 use ompas_lisp::core::structs::lenv::LEnv;
-use ompas_lisp::core::structs::lerror::LError::{WrongNumberOfArgument, WrongType};
+use ompas_lisp::core::structs::lerror::LError::{SpecialError, WrongNumberOfArgument, WrongType};
 use ompas_lisp::core::structs::lerror::{LError, LResult};
 use ompas_lisp::core::structs::lvalue::LValue;
+use ompas_lisp::core::structs::lvalues::LValueS;
 use ompas_lisp::core::structs::module::{IntoModule, Module};
 use ompas_lisp::core::structs::purefonction::PureFonctionCollection;
 use ompas_lisp::core::structs::typelvalue::TypeLValue;
@@ -39,6 +40,12 @@ pub const RAE_DEF_TASK: &str = "def-task";
 pub const RAE_DEF_METHOD: &str = "def-method";
 pub const RAE_DEF_LAMBDA: &str = "def-lambda";
 pub const RAE_DEF_INITIAL_STATE: &str = "def-initial-state";
+pub const RAE_ADD_CONSTANT: &str = "add-constant";
+pub const RAE_ADD_TYPE: &str = "add-type";
+pub const RAE_ADD_OBJECT: &str = "add-object";
+pub const RAE_DEF_OBJECTS: &str = "def-objects";
+pub const RAE_DEF_TYPES: &str = "def-types";
+pub const RAE_DEF_CONSTANTS: &str = "def-constants";
 
 pub const DOC_DEF_STATE_FUNCTION: &str = "Insert a state function in RAE environment.";
 pub const DOC_DEF_STATE_FUNCTION_VERBOSE: &str =
@@ -780,7 +787,7 @@ pub async fn def_task<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
 
 ///Takes in input a list of initial facts that will be stored in the inner world part of the State.
 #[macro_rules_attribute(dyn_async!)]
-pub async fn def_initial_state<'a>(args: &'a [LValue], env: &'a LEnv) -> Result<LValue, LError> {
+pub async fn def_initial_state<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(
             RAE_DEF_INITIAL_STATE,
@@ -839,7 +846,120 @@ pub async fn def_initial_state<'a>(args: &'a [LValue], env: &'a LEnv) -> Result<
         ))
     }
 }
-/// TODO: Test des macros
+#[macro_rules_attribute(dyn_async!)]
+pub async fn def_types<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+    for arg in args {
+        add_type(&[arg.clone()], env).await?;
+    }
+    Ok(LValue::Nil)
+}
+#[macro_rules_attribute(dyn_async!)]
+pub async fn def_objects<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+    for arg in args {
+        let list: Vec<LValue> = arg.try_into()?;
+        if list.len() < 2 {
+            return Err(SpecialError(
+                RAE_DEF_CONSTANTS,
+                format!("an objects is defined by a symbol and a type, got {}", arg),
+            ));
+        }
+        let last = list.last().unwrap();
+        for obj in &list[0..list.len() - 1] {
+            add_object(&[obj.clone(), last.clone()], env).await?;
+        }
+    }
+    Ok(LValue::Nil)
+}
+
+/*pub async fn def_objects(args: &[LValue], env: &LEnv) -> LResult {
+    def_constants(args, env).await
+}*/
+
+#[macro_rules_attribute(dyn_async!)]
+pub async fn add_type<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+    let ctx = env.get_context::<CtxRae>(MOD_RAE).unwrap();
+
+    let arg: LValueS = (&args[0]).into();
+
+    let mut instance = LState {
+        inner: Default::default(),
+        _type: Some(StateType::Instance),
+    };
+
+    instance.insert(vec![RAE_INSTANCE.into(), arg].into(), LValueS::List(vec![]));
+
+    ctx.get_rae_env()
+        .write()
+        .await
+        .state
+        .update_state(instance)
+        .await;
+
+    Ok(LValue::Nil)
+}
+
+#[macro_rules_attribute(dyn_async!)]
+pub async fn add_object<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+    if args.len() != 2 {
+        return Err(WrongNumberOfArgument(
+            RAE_ADD_OBJECT,
+            args.into(),
+            args.len(),
+            2..2,
+        ));
+    }
+
+    let ctx = env.get_context::<CtxRae>(MOD_RAE).unwrap();
+
+    let constant: LValueS = (&args[0]).into();
+    let t: LValueS = (&args[1]).into();
+
+    let mut instances: LState = ctx
+        .get_rae_env()
+        .read()
+        .await
+        .state
+        .get_state(Some(StateType::Instance))
+        .await;
+    let key = vec![RAE_INSTANCE.into(), t].into();
+
+    let objects: &mut LValueS = match instances.get_mut(&key) {
+        Some(obj) => obj,
+        None => {
+            return Err(SpecialError(
+                RAE_ADD_OBJECT,
+                format!("type {} is undefined", args[1]),
+            ))
+        }
+    };
+
+    if let LValueS::List(l) = objects {
+        if !l.contains(&constant) {
+            l.push(constant)
+        } else {
+            return Err(SpecialError(
+                RAE_ADD_OBJECT,
+                format!("{} already defined", constant),
+            ));
+        }
+    }
+
+    instances._type = Some(StateType::Instance);
+
+    ctx.get_rae_env()
+        .write()
+        .await
+        .state
+        .set_state(instances)
+        .await;
+
+    Ok(LValue::Nil)
+}
+
+/*pub async fn add_object(args: &[LValue], env: &LEnv) -> LResult {
+    add_constant(args, env).await
+}*/
+
 #[cfg(test)]
 mod test {
     use crate::module::rae_description::*;

@@ -1,8 +1,10 @@
+use std::fs;
 use std::path::PathBuf;
 
 use ompas_godot_simulation_client::mod_godot::CtxGodot;
 use ompas_godot_simulation_client::rae_interface::PlatformGodot;
 use ompas_lisp::core::activate_debug;
+use ompas_lisp::core::language::NIL;
 use ompas_lisp::lisp_interpreter::{LispInterpreter, LispInterpreterConfig};
 use ompas_lisp::modules::_type::CtxType;
 use ompas_lisp::modules::advanced_math::CtxMath;
@@ -23,8 +25,8 @@ struct Opt {
     #[structopt(short = "p", long = "log-path")]
     log: Option<PathBuf>,
 
-    #[structopt(short = "g", long = "gripper")]
-    gripper: bool,
+    #[structopt(short = "s", long = "sim-domain")]
+    sim_domain: Option<PathBuf>,
 
     #[structopt(short = "G", long = "godot")]
     godot: bool,
@@ -40,10 +42,10 @@ async fn main() {
         activate_debug();
     }
     //test_lib_model(&opt);
-    lisp_interpreter(opt.log, opt.gripper, opt.godot).await;
+    lisp_interpreter(opt.log, opt.sim_domain, opt.godot).await;
 }
 
-pub async fn lisp_interpreter(log: Option<PathBuf>, gripper: bool, godot: bool) {
+pub async fn lisp_interpreter(log: Option<PathBuf>, sim_domain: Option<PathBuf>, godot: bool) {
     let mut li = LispInterpreter::new().await;
 
     let mut ctx_io = CtxIo::default();
@@ -74,31 +76,46 @@ pub async fn lisp_interpreter(log: Option<PathBuf>, gripper: bool, godot: bool) 
         .await
         .expect("error loading ctx string");
 
-    if godot {
-        li.import_namespace(CtxGodot::default())
-            .await
-            .expect("error loading godot")
-    } else {
-        let ctx_rae = CtxRae::init_ctx_rae(
-            match gripper {
-                true => None,
-                false => Some(Platform::new(PlatformGodot::default())),
-            },
-            log.clone(),
-        )
-        .await;
-        li.import_namespace(ctx_rae)
-            .await
-            .expect("error loading rae");
+    match sim_domain {
+        Some(ref p) => {
+            let mut com = li.subscribe();
+            let str = fs::read_to_string(p).expect("Something went wrong reading the file");
+            //println!("string in file: {}", str);
+            com.send(str).await.expect("could not send to LI");
+            tokio::spawn(async move {
+                let str: String = com
+                    .recv()
+                    .await
+                    .expect("error receiving result of initialisation of domain");
+                if str != NIL {
+                    println!("init com: {}", str)
+                }
+            });
+        }
+        None => {
+            if godot {
+                li.import_namespace(CtxGodot::default())
+                    .await
+                    .expect("error loading godot")
+            } else {
+            }
+        }
     }
 
+    let ctx_rae = CtxRae::init_ctx_rae(
+        if !godot && sim_domain.is_none() {
+            Some(Platform::new(PlatformGodot::default()))
+        } else {
+            None
+        },
+        log.clone(),
+    )
+    .await;
+    li.import_namespace(ctx_rae)
+        .await
+        .expect("error loading rae");
+
     li.set_config(LispInterpreterConfig::new(true));
-    let com = li.subscribe();
-    if gripper {
-        com.send("(read instances/gripper/init.lisp)".to_string())
-            .await
-            .expect("could not send to LI");
-    }
 
     li.run(log).await;
 }

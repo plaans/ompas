@@ -8,6 +8,7 @@ use crate::planning::structs::type_table::PlanningAtomType;
 use crate::planning::structs::{ConversionCollection, ConversionContext};
 use aries_planning::chronicles::ChronicleKind;
 use ompas_lisp::core::structs::lerror::LError;
+use ompas_lisp::core::structs::lerror::LError::SpecialError;
 use ompas_lisp::core::structs::llambda::{LLambda, LambdaArgs};
 use ompas_lisp::core::structs::lvalue::LValue;
 use ompas_lisp::core::structs::lvalues::LValueS;
@@ -146,6 +147,8 @@ pub fn convert_domain_to_chronicle_hierarchy(
     Ok(ch)
 }
 
+const CONVERT_ABSTRACT_TASK_TO_CHRONICLE: &str = "convert-abtract-task-to-chronicle";
+
 pub fn convert_abstract_task_to_chronicle(
     lambda: &LLambda,
     label: impl Display,
@@ -157,6 +160,7 @@ pub fn convert_abstract_task_to_chronicle(
 ) -> Result<ChronicleTemplate, LError> {
     let symbol_id = ch.sym_table.declare_symbol(&label.to_string(), None);
 
+    let copy_label = label.to_string();
     let mut chronicle = ChronicleTemplate::new(ch, label, chronicle_kind);
     let mut name = vec![
         /* *chronicle.get_presence(),
@@ -166,7 +170,17 @@ pub fn convert_abstract_task_to_chronicle(
         symbol_id,
     ];
     if let LambdaArgs::List(l) = lambda.get_params() {
-        assert_eq!(l.len(), parameters.get_number());
+        if l.len() != parameters.get_number() {
+            return Err(SpecialError(
+                CONVERT_ABSTRACT_TASK_TO_CHRONICLE,
+                format!(
+                    "for {}: definition of parameters are different({} != {})",
+                    copy_label,
+                    lambda.get_params(),
+                    parameters
+                ),
+            ));
+        }
 
         for (pl, (pt, t)) in l.iter().zip(parameters.inner().iter()) {
             assert_eq!(pl, pt);

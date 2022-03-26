@@ -128,6 +128,12 @@ impl From<LValueS> for LValue {
     }
 }
 
+impl<T: Into<LValueS>> From<Vec<T>> for LValueS {
+    fn from(mut v: Vec<T>) -> Self {
+        Self::List(v.drain(..).map(|a| a.into()).collect())
+    }
+}
+
 impl TryFrom<&LValueS> for Vec<LValueS> {
     type Error = LError;
 

@@ -3,17 +3,15 @@ use crate::context::actions_progress::Status::Running;
 use crate::context::agenda::TaskRefinement;
 use crate::module::rae_exec::error::RaeExecError;
 use crate::module::rae_exec::planning::{CtxPlanning, MOD_PLANNING};
-use crate::module::rae_exec::{CtxRaeExec, MOD_RAE_EXEC, PARENT_TASK, RAE_GET_NEXT_METHOD};
+use crate::module::rae_exec::{CtxRaeExec, MOD_RAE_EXEC, PARENT_TASK};
 use crate::supervisor::options::{Planner, SelectMode};
 use ::macro_rules_attribute::macro_rules_attribute;
 use async_recursion::async_recursion;
 use log::info;
 use ompas_lisp::core::structs::lenv::LEnv;
-use ompas_lisp::core::structs::lerror::LError::{SpecialError, WrongNumberOfArgument, WrongType};
 use ompas_lisp::core::structs::lerror::{LError, LResult};
 use ompas_lisp::core::structs::lnumber::LNumber;
 use ompas_lisp::core::structs::lvalue::LValue;
-use ompas_lisp::core::structs::typelvalue::TypeLValue;
 use ompas_lisp::modules::utils::enr;
 use ompas_utils::dyn_async;
 use std::convert::{TryFrom, TryInto};
@@ -109,7 +107,7 @@ pub async fn retry(task_id: usize, env: &LEnv) -> LResult {
     Ok(result)
 }
 
-#[macro_rules_attribute(dyn_async !)]
+/*#[macro_rules_attribute(dyn_async !)]
 async fn get_next_method<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(
@@ -142,7 +140,7 @@ async fn get_next_method<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
             TypeLValue::Usize,
         ))
     }
-}
+}*/
 
 /*const LAMBDA_SELECT: &str = "
 (define select

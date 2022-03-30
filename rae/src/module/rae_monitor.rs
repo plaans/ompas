@@ -153,7 +153,7 @@ pub async fn get_agenda<'a>(args: &'a [LValue], env: &'a LEnv) -> Result<LValue,
         }
         _ => false,
     };
-    let string = ctx.get_rae_env().read().await.agenda.display(all).await;
+    let string = ctx.get_rae_env().read().await.agenda.format(all).await;
     Ok(string.into())
 }
 

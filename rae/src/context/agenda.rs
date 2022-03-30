@@ -4,7 +4,7 @@ use ompas_lisp::core::structs::lerror::LError;
 use ompas_lisp::core::structs::lerror::LError::SpecialError;
 use ompas_lisp::core::structs::lvalue::LValue;
 use ompas_utils::other::get_and_update_id_counter;
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::{format, Debug, Display, Formatter};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -61,31 +61,31 @@ pub struct TaskNetwork {
 }
 
 impl TaskNetwork {
-    fn format_network(
-        str: &mut String,
-        level: usize,
-        first: bool,
-        tn: &im::HashMap<usize, Vec<usize>>,
-        task_id: TaskId,
-    ) {
-        if level == 0 {
-            str.push_str(format!("*{:^3}", task_id).as_str())
+    fn format_network(tn: &im::HashMap<usize, Vec<usize>>, task_id: &TaskId) -> Vec<String> {
+        let subtasks = tn.get(task_id).unwrap();
+        let n = subtasks.len();
+        if subtasks.is_empty() {
+            return vec![format!("{:^3}", task_id), "   ".to_string()];
         } else {
-            if first {
-                str.push_str(format!("---{:^3}", task_id).as_str())
-            } else {
-                str.push_str(
-                    format!("\n{}|---{:^3}", " ".repeat(4 + 6 * (level - 1)), task_id).as_str(),
-                )
+            let mut vec = vec![];
+            for (i, st) in subtasks.iter().enumerate() {
+                for (j, line) in Self::format_network(tn, st).iter().enumerate() {
+                    if j == 0 {
+                        if i == 0 {
+                            vec.push(format!("{:^3}---{}", task_id, line))
+                        } else {
+                            vec.push(format!(" |----{}", line))
+                        }
+                    } else {
+                        if i < n - 1 {
+                            vec.push(format!(" |    {}", line))
+                        } else {
+                            vec.push(format!("      {}", line))
+                        }
+                    }
+                }
             }
-        }
-
-        for (i, st) in tn.get(&task_id).unwrap().iter().enumerate() {
-            if i == 0 {
-                Self::format_network(str, level + 1, true, tn, *st);
-            } else {
-                Self::format_network(str, level + 1, false, tn, *st);
-            }
+            vec
         }
     }
 }
@@ -96,7 +96,10 @@ impl TaskNetwork {
         let parent: Vec<TaskId> = self.parent.read().await.clone();
         let mut str = String::new();
         for p in &parent {
-            Self::format_network(&mut str, 0, true, &tn, *p);
+            Self::format_network(&tn, p).iter().for_each(|s| {
+                str.push_str(s.as_str());
+                str.push('\n');
+            });
             str.push('\n');
         }
         str

@@ -1,6 +1,5 @@
 (begin
     (read instances/gripper_doors/domain.lisp)
-    ;(read instances/gripper/actions_test.lisp)
-    (read instances/gripper_doors/problems/problem_1.lisp)
+    (read instances/gripper_doors/problems/problem_4.lisp)
     (configure-select aries)
 )

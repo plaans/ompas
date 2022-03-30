@@ -33,6 +33,5 @@
           (:body 
             (do 
                 (drive ?t ?intermediaire)
-                (t_move ?t ?to)
-                ))))
+                (t_move ?t ?to)))))
 )

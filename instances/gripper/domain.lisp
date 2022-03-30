@@ -22,7 +22,10 @@
     (def-action pick '(?obj ball) '(?room room) '(?gripper gripper))
     (def-action-model pick
         '((:params (?obj ball) (?room room) (?gripper gripper))
-          (:pre-conditions (and-cond (= (at ?obj) ?room) (= (at-robby) ?room) (= (carry ?gripper) no_ball)))
+          (:pre-conditions (and-cond 
+            (= (at ?obj) ?room)
+            (= (at-robby) ?room)
+            (= (carry ?gripper) no_ball)))
           (:effects
             (begin
                 (assert `(carry ,?gripper) ?obj)
@@ -31,7 +34,9 @@
     (def-action drop '(?obj ball) '(?room room) '(?gripper gripper))
     (def-action-model drop
         '((:params (?obj ball) (?room room) (?gripper gripper))
-          (:pre-conditions (and-cond (= (carry ?gripper) ?obj) (= (at-robby) ?room)))
+          (:pre-conditions (and-cond 
+            (= (carry ?gripper) ?obj)
+            (= (at-robby) ?room)))
           (:effects
             (begin
                 (assert `(carry ,?gripper) no_ball)
@@ -43,7 +48,10 @@
     (def-method m1
         '((:task pick-and-drop)
           (:params (?ball ball) (?room room) (?gripper gripper) (?departure room))
-          (:pre-conditions (and-cond ( = (at ?ball) (at-robby)) (= (carry ?gripper) no_ball) (= ?departure (at-robby))))
+          (:pre-conditions (and-cond 
+            ( = (at ?ball) (at-robby))
+            (= (carry ?gripper) no_ball)
+            (= ?departure (at-robby))))
           (:score 0)
           (:body
             (do

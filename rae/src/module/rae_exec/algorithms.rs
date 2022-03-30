@@ -16,7 +16,7 @@ use ompas_lisp::modules::utils::enr;
 use ompas_utils::dyn_async;
 use std::convert::TryInto;
 
-pub const RAE_PROGRESS: &str = "progress";
+pub const RAE_REFINE: &str = "refine";
 
 /*const LAMBDA_PROGRESS: &str = "
 (define progress (lambda task
@@ -41,7 +41,7 @@ pub const RAE_PROGRESS: &str = "progress";
     (lambda (label)\
         (get rae-task-methods-map label)))";*/
 #[macro_rules_attribute(dyn_async !)]
-pub async fn progress<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+pub async fn refine<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     let result: Vec<LValue> = select(args, env).await?.try_into()?;
     assert_eq!(result.len(), 2);
     let first_m = &result[0];

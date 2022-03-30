@@ -223,7 +223,7 @@ impl IntoModule for CtxRaeExec {
         //module.add_async_fn_prelude(RAE_GET_NEXT_METHOD, get_next_method);
 
         //progress
-        module.add_async_fn_prelude(RAE_PROGRESS, progress);
+        module.add_async_fn_prelude(RAE_REFINE, refine);
         /*module.add_async_fn_prelude(
             RAE_GENERATE_APPLICABLE_INSTANCES,
             generate_applicable_instances,

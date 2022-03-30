@@ -105,7 +105,7 @@ pub fn run_solver(problem: &mut chronicles::Problem, htn_mode: bool) -> Option<P
         0
     };
 
-    propagate_and_print(problem, min_depth, htn_mode);
+    //propagate_and_print(problem, min_depth, htn_mode);
 
     let mut result = None;
 

@@ -72,7 +72,7 @@ pub const MACRO_GENERATE_TASK: &str = "(defmacro generate-task
          `(list ,label 
             (quote ,p_expr)
             (lambda ,params
-                ,(cons 'progress (cons `(quote ,label) params)))))))";
+                ,(cons 'refine (cons `(quote ,label) params)))))))";
 
 /// Macro used to generate code to define a state function in RAE environment.
 pub const MACRO_GENERATE_STATE_FUNCTION: &str = "(defmacro generate-state-function (lambda args
@@ -1008,12 +1008,12 @@ mod test {
                         t_navigate_to
                         '((?r robot) (?x int) (?y int))
                         (lambda (?r ?x ?y)
-                            (progress 't_navigate_to ?r ?x ?y)))",
+                            (refine 't_navigate_to ?r ?x ?y)))",
             result: "(list \
                         t_navigate_to
                         '((?r robot) (?x int) (?y int))
                         (lambda (?r ?x ?y)
-                            (progress 't_navigate_to ?r ?x ?y)))",
+                            (refine 't_navigate_to ?r ?x ?y)))",
         };
 
         let mut env = init_env_and_ctxs().await;

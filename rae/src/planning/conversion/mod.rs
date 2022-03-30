@@ -190,7 +190,7 @@ pub fn convert_abstract_task_to_chronicle(
                     t.try_as_single()
                         .expect("Only single types are handled for the moment."),
                 )
-                .unwrap();
+                .unwrap_or_else(|| panic!("{} is not defined", t.to_string()));
 
             let id = ch.sym_table.declare_new_parameter(
                 pt,

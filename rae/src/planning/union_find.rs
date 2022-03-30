@@ -141,6 +141,10 @@ impl<T: Display + Default + Clone> Forest<T> {
     pub fn set_rank(&mut self, id: &NodeId, rank: Rank) {
         self.inner.get_mut(*id.index()).expect("").set_rank(rank);
     }
+
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
 }
 
 impl<T: Debug + Display + Default + Clone> Display for Forest<T> {

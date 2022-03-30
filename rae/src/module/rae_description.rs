@@ -244,10 +244,10 @@ fn f_and_effect(args: &[LValue], _: &LEnv) -> LResult {
         ));
     }
 
-    if let LValue::List(conditions) = &args[0] {
+    if let LValue::List(effects) = &args[0] {
         let mut str = "(begin ".to_string();
-        for cond in conditions {
-            str.push_str(format!("{}", cond).as_str());
+        for eff in effects {
+            str.push_str(format!("{}", eff).as_str());
         }
         str.push(')');
         Ok(LValue::String(str))

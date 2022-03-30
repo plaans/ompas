@@ -227,7 +227,12 @@ fn satom_from_lvalues(ctx: &Ctx, v: &LValueS) -> SAtom {
 fn atom_from_lvalues(ctx: &Ctx, v: &LValueS) -> aAtom {
     match v {
         LValueS::Symbol(s) => {
-            SAtom::from(ctx.typed_sym(ctx.model.get_symbol_table().id(s.as_str()).unwrap())).into()
+            let id = ctx
+                .model
+                .get_symbol_table()
+                .id(s.as_str())
+                .unwrap_or_else(|| panic!("{} should have been defined as a parameter", s));
+            SAtom::from(ctx.typed_sym(id)).into()
         }
         LValueS::Int(i) => IAtom::from(*i as i32).into(),
         LValueS::Float(f) => {

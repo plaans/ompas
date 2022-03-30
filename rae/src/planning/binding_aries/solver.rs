@@ -3,7 +3,7 @@ use aries_model::lang::SAtom;
 use aries_planners::encode::{
     encode, populate_with_task_network, populate_with_template_instances,
 };
-use aries_planners::fmt::{format_hddl_plan, format_pddl_plan};
+use aries_planners::fmt::{format_hddl_plan, format_partial_plan, format_pddl_plan};
 use aries_planners::solver::Strat;
 use aries_planners::{ParSolver, Solver};
 use aries_planning::chronicles;
@@ -62,6 +62,37 @@ pub struct PlanResult {
     pub fp: FiniteProblem,
 }
 
+/// This function mimics the instantiation of the subproblem of the given `depth`, run the propagation
+/// and exits immediately.
+///
+/// Note that is meant to facilitate debugging of the planner during development.
+fn propagate_and_print(base_problem: &mut chronicles::Problem, depth: u32, htn_mode: bool) {
+    println!("===== Preprocessing ======");
+    aries_planning::chronicles::preprocessing::preprocess(base_problem);
+    println!("==========================");
+
+    let mut pb = FiniteProblem {
+        model: base_problem.context.model.clone(),
+        origin: base_problem.context.origin(),
+        horizon: base_problem.context.horizon(),
+        chronicles: base_problem.chronicles.clone(),
+        tables: base_problem.context.tables.clone(),
+    };
+    if htn_mode {
+        populate_with_task_network(&mut pb, &base_problem, depth).unwrap();
+    } else {
+        populate_with_template_instances(&mut pb, &base_problem, |_| Some(depth)).unwrap();
+    }
+
+    let mut solver = init_solver(&pb);
+    if solver.propagate_and_backtrack_to_consistent() {
+        let str = format_partial_plan(&pb, &solver.model).unwrap();
+        println!("{}", str);
+    } else {
+        panic!("Invalid problem (propagation failed)");
+    }
+}
+
 pub fn run_solver(problem: &mut chronicles::Problem, htn_mode: bool) -> Option<PlanResult> {
     println!("===== Preprocessing ======");
     aries_planning::chronicles::preprocessing::preprocess(problem);
@@ -73,6 +104,8 @@ pub fn run_solver(problem: &mut chronicles::Problem, htn_mode: bool) -> Option<P
     } else {
         0
     };
+
+    propagate_and_print(problem, min_depth, htn_mode);
 
     let mut result = None;
 

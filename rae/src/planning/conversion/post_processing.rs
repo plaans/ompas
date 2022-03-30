@@ -8,6 +8,7 @@ use crate::planning::structs::symbol_table::{AtomId, SymTable};
 use crate::planning::structs::traits::{FormatWithParent, FormatWithSymTable, GetVariables};
 use crate::planning::structs::type_table::{AtomKind, PlanningAtomType, VariableKind};
 use crate::planning::structs::{ConversionCollection, ConversionContext};
+use crate::planning::union_find::Forest;
 use im::HashSet;
 use ompas_lisp::core::structs::lerror::LError;
 use std::ops::Deref;
@@ -79,24 +80,34 @@ pub fn merge_conditions(
     _: &ConversionContext,
     ch: &mut ConversionCollection,
 ) -> Result<(), LError> {
-    let mut c_to_remove = vec![];
+    let mut c_to_remove: HashSet<usize> = Default::default();
 
     for (i, c1) in c.get_conditions().iter().enumerate() {
-        for (j, c2) in c.get_conditions()[i + 1..].iter().enumerate() {
+        let next = i + 1;
+        for (j, c2) in c.get_conditions()[next..].iter().enumerate() {
+            let index = j + next;
             if c1.interval == c2.interval && c1.sv == c2.sv {
                 println!(
-                    "merging {} and {}",
+                    "merging {}({}) and {}({})",
                     c1.format(&ch.sym_table, true),
-                    c2.format(&ch.sym_table, true)
+                    i,
+                    c2.format(&ch.sym_table, true),
+                    index
                 );
                 bind_atoms(&c1.value, &c2.value, &mut ch.sym_table)?;
-                c_to_remove.push(j + i + 1);
+                c_to_remove.insert(index);
             }
         }
     }
-    c_to_remove.sort_unstable();
-    c_to_remove.reverse();
-    c_to_remove.iter().for_each(|i| c.rm_condition(*i));
+
+    let mut vec: Vec<usize> = c_to_remove.iter().copied().collect();
+
+    println!("condition to remove: {:?}", vec);
+    vec.sort_unstable();
+    println!("condition to remove(sorted): {:?}", vec);
+    vec.reverse();
+    println!("condition to remove(reversed): {:?}", vec);
+    vec.iter().for_each(|i| c.rm_condition(*i));
 
     ch.sym_table.flat_bindings();
     Ok(())

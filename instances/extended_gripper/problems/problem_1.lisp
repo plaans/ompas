@@ -1,14 +1,30 @@
 (begin
 
-    (def-types room gripper ball)
-    (def-constants
-    '(left right gripper)
-    '(no_place room)
-    '(no_ball ball)) 
+    (def-types ball room gripper door robot new_bool)
+    (def-constants 
+        (no_ball ball)
+        (no_place room)
+        (yes no new_bool))
+        (no_door door)
+        (left right)
     ;state functions
-    (def-state-function at-robby '(?r room))
-    (def-state-function at '(?b ball) '(?r room))
-    (def-state-function carry '(?g gripper) '(?b ball))
+    (def-state-function at-robot '(?r robot) '(?room room))
+    (def-state-function at-ball '(?b ball) '(?room room))
+    (def-state-function carry '(?r robot) '(?gripper gripper) '(?b ball))
+    (def-state-function connected '(?rx room) '(?ry room) '(?r new_bool))
+    (def-state-function door-used '(?d door) '(?r new_bool))
+    (def-state-function door-opened '(?d) '(?r new_bool))
+    (def-state-function door (?r room) (?d door) (?r new_bool))
+
+    (def-action open '(?r robot) '(?d door) '(?g gripper))
+    (def-action-operational-model open
+    '((:params (?r robot) (?d door) (?g gripper))
+      (:pre-conditions (and-cond (= (door (at-robot ?r) ?d) yes) (= (door-opened ?d) no) (= (carry ?r ?g) no_ball)))
+      (:effects
+        (begin
+            (assert (carry)))
+    
+    )
 
     ;actions
     (def-action move '(?from room) '(?to room))

@@ -23,24 +23,16 @@
           (:score 0)
           (:body true)))
 
-    (def-method m_connected
-        '((:task t_move)
-          (:params (?t truck) (?to location))
-          (:pre-conditions (and-cond (!= (at ?t) ?to) (= (connected (at ?t) ?to) yes )))
-          (:score 0)
-          (:body (drive ?t ?to))))
-
     (def-method m_recursive
         '((:task t_move)
           (:params (?t truck) (?to location) (?intermediaire location))
           (:pre-conditions (and-cond
             (!= (at ?t) ?to)
-            (!= ?to ?intermediaire)
-            (= (connected (at ?t) ?to) no)
             (= (connected (at ?t) ?intermediaire) yes)))
           (:score 0)
           (:body 
             (do 
                 (drive ?t ?intermediaire)
-                (t_move ?intermediaire ?to)))))
+                (t_move ?t ?to)
+                ))))
 )

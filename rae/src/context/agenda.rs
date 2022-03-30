@@ -1,3 +1,4 @@
+use crate::context::actions_progress::Status;
 use im::HashMap;
 use ompas_lisp::core::structs::lerror::LError;
 use ompas_lisp::core::structs::lerror::LError::SpecialError;
@@ -10,21 +11,33 @@ use tokio::sync::RwLock;
 
 #[derive(Default, Clone)]
 pub struct Agenda {
-    inner: Arc<RwLock<im::HashMap<usize, RefinementStack>>>,
+    inner: Arc<RwLock<im::HashMap<usize, TaskRefinement>>>,
     next_id: Arc<AtomicUsize>,
 }
 
 impl Agenda {
-    pub async fn display(&self) -> String {
+    pub async fn display(&self, all: bool) -> String {
         let mut string = format!(
             "Agenda:\n\t-number of task: {}\n\t-Actual agenda:\n",
             self.next_id.load(Ordering::Relaxed)
         );
-        let inner: im::HashMap<usize, RefinementStack> = self.get_inner().await;
+        let mut inner: im::HashMap<usize, TaskRefinement> = self.get_inner().await;
+        if !all {
+            inner = inner
+                .iter()
+                .filter_map(|(&id, t)| {
+                    if t.status != Status::Done {
+                        Some((id, t.clone()))
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        }
         if inner.is_empty() {
             string.push_str("\t\tIs empty...");
         } else {
-            let mut k_v: Vec<(usize, RefinementStack)> =
+            let mut k_v: Vec<(usize, TaskRefinement)> =
                 inner.iter().map(|k| (*k.0, k.1.clone())).collect();
 
             k_v.sort_by(|k1, k2| k1.0.cmp(&k2.0));
@@ -37,11 +50,11 @@ impl Agenda {
 }
 
 impl Agenda {
-    pub async fn add_task(&self, task: LValue) -> usize {
+    pub async fn add_task(&self, task: LValue, parent_task: Option<usize>) -> TaskRefinement {
         let task_id = self.get_next_id();
-        let stack = RefinementStack::new(task, task_id);
-        self.inner.write().await.insert(task_id, stack);
-        task_id
+        let stack = TaskRefinement::new(task, task_id, parent_task);
+        self.inner.write().await.insert(task_id, stack.clone());
+        stack
     }
 
     pub async fn remove_task(&self, task_id: &usize) -> Result<(), LError> {
@@ -54,7 +67,7 @@ impl Agenda {
         }
     }
 
-    pub async fn get_stack(&self, task_id: usize) -> Result<RefinementStack, LError> {
+    pub async fn get_refinement(&self, task_id: usize) -> Result<TaskRefinement, LError> {
         match self.inner.read().await.get(&task_id) {
             None => Err(SpecialError(
                 "agenda.get_stack",
@@ -64,7 +77,8 @@ impl Agenda {
         }
     }
 
-    pub async fn update_stack(&self, rs: RefinementStack) -> Result<(), LError> {
+    pub async fn update_refinement(&self, rs: TaskRefinement) -> Result<(), LError> {
+        //println!("in update stack\n stack: {}", rs);
         let mut locked = self.inner.write().await;
         match locked.contains_key(&rs.task_id) {
             true => {
@@ -92,7 +106,7 @@ impl Agenda {
         next_method
     }
 
-    pub async fn get_inner(&self) -> HashMap<usize, RefinementStack> {
+    pub async fn get_inner(&self) -> HashMap<usize, TaskRefinement> {
         self.inner.read().await.clone()
     }
 
@@ -102,25 +116,63 @@ impl Agenda {
 }
 
 #[derive(Clone, Debug)]
-pub struct RefinementStack {
+pub struct TaskRefinement {
     task: LValue,
     current_method: LValue,
     applicable_methods: Vec<LValue>,
     tried: Vec<LValue>,
     task_id: usize,
+    parent_task: Option<usize>,
+    status: Status,
 }
 
-impl RefinementStack {
-    pub fn new(task: LValue, task_id: usize) -> Self {
+impl TaskRefinement {
+    pub fn new(task: LValue, task_id: usize, parent_task: Option<usize>) -> Self {
         Self {
             task,
             current_method: LValue::Nil,
             applicable_methods: vec![],
             tried: vec![],
             task_id,
+            parent_task,
+            status: Status::Pending,
         }
     }
+}
 
+/*
+GETTERS
+ */
+impl TaskRefinement {
+    pub fn get_current_method(&self) -> &LValue {
+        &self.current_method
+    }
+
+    pub fn get_tried(&self) -> &Vec<LValue> {
+        &self.tried
+    }
+
+    pub fn get_task(&self) -> &LValue {
+        &self.task
+    }
+
+    pub fn get_task_id(&self) -> usize {
+        self.task_id
+    }
+
+    pub fn get_status(&self) -> Status {
+        self.status
+    }
+
+    pub fn get_parent_task(&self) -> Option<usize> {
+        self.parent_task
+    }
+}
+
+/*
+SETTERS
+ */
+impl TaskRefinement {
     pub fn set_current_method(&mut self, current_method: LValue) {
         self.current_method = current_method;
     }
@@ -129,19 +181,33 @@ impl RefinementStack {
         self.applicable_methods = applicable_methods;
     }
 
-    pub fn add_tried_task(&mut self, tried_task: LValue) {
-        self.tried.push(tried_task);
+    pub fn add_tried_method(&mut self, tried_method: LValue) {
+        self.tried.push(tried_method);
+    }
+
+    pub fn set_status(&mut self, status: Status) {
+        self.status = status;
     }
 }
 
-impl Display for RefinementStack {
+impl Display for TaskRefinement {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut str = String::new();
         str.push_str(
             format!(
                 "task: {}\n\
-        current_method: {}\n",
-                self.task, self.current_method
+                parent_task: {}\n\
+                Status: {}\n\
+                current_method: {}\n\
+                tried: {}\n",
+                self.task,
+                match self.parent_task {
+                    Some(p) => p.to_string(),
+                    None => "none".to_string(),
+                },
+                self.status,
+                self.current_method,
+                LValue::from(self.tried.clone()),
             )
             .as_str(),
         );

@@ -1,10 +1,12 @@
+use crate::context::actions_progress::Status;
+use crate::context::actions_progress::Status::Running;
+use crate::context::agenda::TaskRefinement;
 use crate::module::rae_exec::error::RaeExecError;
 use crate::module::rae_exec::planning::{CtxPlanning, MOD_PLANNING};
-use crate::module::rae_exec::{
-    CtxRaeExec, MOD_RAE_EXEC, RAE_GET_NEXT_METHOD, RAE_SET_SUCCESS_FOR_TASK,
-};
+use crate::module::rae_exec::{CtxRaeExec, MOD_RAE_EXEC, PARENT_TASK, RAE_GET_NEXT_METHOD};
 use crate::supervisor::options::{Planner, SelectMode};
 use ::macro_rules_attribute::macro_rules_attribute;
+use async_recursion::async_recursion;
 use log::info;
 use ompas_lisp::core::structs::lenv::LEnv;
 use ompas_lisp::core::structs::lerror::LError::{SpecialError, WrongNumberOfArgument, WrongType};
@@ -14,7 +16,7 @@ use ompas_lisp::core::structs::lvalue::LValue;
 use ompas_lisp::core::structs::typelvalue::TypeLValue;
 use ompas_lisp::modules::utils::enr;
 use ompas_utils::dyn_async;
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 
 pub const RAE_REFINE: &str = "refine";
 
@@ -42,19 +44,31 @@ pub const RAE_REFINE: &str = "refine";
         (get rae-task-methods-map label)))";*/
 #[macro_rules_attribute(dyn_async !)]
 pub async fn refine<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
-    let result: Vec<LValue> = select(args, env).await?.try_into()?;
+    let task: LValue = args.into();
+    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
+    let parent_task: Option<usize> = env
+        .get_ref_symbol(PARENT_TASK)
+        .map(|n| LNumber::try_from(n).unwrap().into());
+    let mut stack: TaskRefinement = ctx.agenda.add_task(task, parent_task).await;
+    let task_id = stack.get_task_id();
+    let result: Vec<LValue> = select(&mut stack, env).await?.try_into()?;
+    stack.set_status(Running);
+    ctx.agenda.update_refinement(stack).await?;
     assert_eq!(result.len(), 2);
     let first_m = &result[0];
-    let task_id = &result[1];
 
     let result: LValue = if first_m == &LValue::Nil {
         RaeExecError::NoApplicableMethod.into()
     } else {
         info!("Trying {} for task {}", first_m, task_id);
-        let result = enr(&[first_m.clone()], env).await?;
+        let mut env = env.clone();
+        env.insert(PARENT_TASK, task_id.into());
+        //println!("in env: {}", env.get_ref_symbol(PARENT_TASK).unwrap());
+        let result = enr(&[first_m.clone()], &mut env).await?;
         if matches!(result, LValue::Err(_)) {
-            retry(&[task_id.clone()], env).await?
+            retry(task_id, &mut env).await?
         } else {
+            set_success_for_task(task_id, &env).await?;
             true.into()
         }
     };
@@ -73,20 +87,22 @@ pub async fn refine<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
                 (rae-set-success-for-task task_id)
                 (rae-retry task_id)))))))";*/
 
-#[macro_rules_attribute(dyn_async !)]
-pub async fn retry<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
-    assert_eq!(args.len(), 1);
-    let task_id = &args[0];
-    let new_method = get_next_method(args, env).await?;
+#[async_recursion]
+pub async fn retry(task_id: usize, env: &LEnv) -> LResult {
+    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
+    let mut stack: TaskRefinement = ctx.agenda.get_refinement(task_id as usize).await?;
+    stack.add_tried_method(stack.get_current_method().clone());
+    let new_method = select(&mut stack, env).await?;
+    ctx.agenda.update_refinement(stack).await?;
     info!("Retrying task {}", task_id);
     let result: LValue = if new_method == LValue::Nil {
         RaeExecError::NoApplicableMethod.into()
     } else {
         let result = enr(&[new_method], env).await?;
         if result == LValue::Nil {
-            retry(args, env).await?
+            retry(task_id, env).await?
         } else {
-            set_success_for_task(&[task_id.clone()], env).await?
+            set_success_for_task(task_id, env).await?
         }
     };
 
@@ -134,42 +150,37 @@ async fn get_next_method<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     (sim_block
     (rae-select task (generate_applicable_instances task)))))))";*/
 
-pub async fn select(args: &[LValue], env: &LEnv) -> LResult {
+pub async fn select(stack: &mut TaskRefinement, env: &LEnv) -> LResult {
     /*
     Each function return an ordered list of methods
      */
-
-    let task: LValue = args.into();
-    info!("Add task {} to agenda", task);
-    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
+    let task_id = stack.get_task_id();
     let ctx_planning = env.get_context::<CtxPlanning>(MOD_PLANNING)?;
-    let task_id = ctx.agenda.add_task(task.clone()).await;
+
+    let task: Vec<LValue> = stack.get_task().try_into()?;
 
     let methods: LValue = match &ctx_planning.select_mode {
         SelectMode::Greedy => {
             /*
             Returns all applicable methods sorted by their score
              */
-            info!("select greedy for {}", LValue::from(args));
-            select::greedy_select(args, env).await?
+            info!("select greedy for {}", stack.get_task());
+            select::greedy_select(task, env).await?
         }
         SelectMode::Planning(Planner::Aries) => {
-            info!("select with aries for {}", LValue::from(args));
-            select::planning_select(args, env).await?
+            info!("select with aries for {}", stack.get_task());
+            select::planning_select(task, env).await?
         }
         _ => todo!(),
     };
 
-    if let LValue::List(methods) = methods {
+    if let LValue::List(mut methods) = methods {
         info!("sorted_methods: {}", LValue::from(&methods));
         if !methods.is_empty() {
-            let mut stack = ctx.agenda.get_stack(task_id).await.unwrap();
+            let tried = stack.get_tried();
+            methods.retain(|lv| !tried.contains(lv));
             stack.set_current_method(methods[0].clone());
             stack.set_applicable_methods(methods[1..].into());
-            ctx.agenda.update_stack(stack).await?;
-
-            //info!("agenda: {}", ctx.agenda);
-
             Ok(vec![methods[0].clone(), task_id.into()].into())
         } else {
             Ok(vec![LValue::Nil, task_id.into()].into())
@@ -191,7 +202,6 @@ mod select {
     use crate::planning::binding_aries::{build_chronicles, solver};
     use crate::planning::conversion::convert_domain_to_chronicle_hierarchy;
     use crate::planning::structs::{ConversionContext, Problem};
-    use ::macro_rules_attribute::macro_rules_attribute;
     use ompas_lisp::core::eval;
     use ompas_lisp::core::root_module::get;
     use ompas_lisp::core::root_module::list::cons;
@@ -199,18 +209,15 @@ mod select {
     use ompas_lisp::core::structs::lerror::LResult;
     use ompas_lisp::core::structs::lvalue::LValue;
     use ompas_lisp::modules::utils::enumerate;
-    use ompas_utils::dyn_async;
     use std::convert::TryInto;
 
     //pub const GREEDY_SELECT: &str = "greedy_select";
 
     //Returns the method to do.
-    #[macro_rules_attribute(dyn_async !)]
-    pub async fn planning_select<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
-        let greedy_methods = greedy_select(args, env);
+    pub async fn planning_select(task: Vec<LValue>, env: &LEnv) -> LResult {
+        let greedy_methods = greedy_select(task.clone(), env);
 
-        let task: LValue = args.into();
-        println!("task to plan: {}", task);
+        println!("task to plan: {}", LValue::from(task.clone()));
         let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
 
         let ctx_domain = env.get_context::<CtxPlanning>(MOD_PLANNING)?;
@@ -241,12 +248,13 @@ mod select {
             let planner_method = result[0].clone();
             println!("planners methods: {}", planner_method);
 
-            for i in 0..greedy_methods.len() {
+            greedy_methods.retain(|m| m != &planner_method);
+            /*for i in 0..greedy_methods.len() {
                 if greedy_methods[i] == planner_method {
                     greedy_methods.remove(i);
                     break;
                 }
-            }
+            }*/
             let mut result = vec![planner_method];
             result.append(&mut greedy_methods);
             result.into()
@@ -257,8 +265,7 @@ mod select {
         Ok(result)
     }
 
-    #[macro_rules_attribute(dyn_async !)]
-    pub async fn greedy_select<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+    pub async fn greedy_select(task: Vec<LValue>, env: &LEnv) -> LResult {
         /*
         Steps:
         - Create a new entry in the agenda
@@ -267,8 +274,11 @@ mod select {
         - Store the stack
         - Return (best_method, task_id)
          */
-        let task_label = &args[0];
-        let params: Vec<LValue> = args[1..]
+
+        //println!("task to test in greedy: {}", LValue::from(task.clone()));
+
+        let task_label = &task[0];
+        let params: Vec<LValue> = task[1..]
             .iter()
             .map(|lv| LValue::List(vec![lv.clone()]))
             .collect();
@@ -357,8 +367,7 @@ mod select {
     }
 }
 
-#[macro_rules_attribute(dyn_async!)]
-async fn set_success_for_task<'a>(args: &'a [LValue], env: &'a LEnv) -> Result<LValue, LError> {
+async fn set_success_for_task(task_id: usize, env: &LEnv) -> Result<LValue, LError> {
     /*
     Steps:
     - Remove the stack from the agenda
@@ -366,34 +375,11 @@ async fn set_success_for_task<'a>(args: &'a [LValue], env: &'a LEnv) -> Result<L
      */
 
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
-
-    if args.len() != 1 {
-        return Err(WrongNumberOfArgument(
-            RAE_SET_SUCCESS_FOR_TASK,
-            args.into(),
-            args.len(),
-            1..1,
-        ));
-    }
-
-    if let LValue::Number(LNumber::Int(task_id)) = &args[0] {
-        if task_id.is_positive() {
-            ctx.agenda.remove_task(&(*task_id as usize)).await?;
-            Ok(LValue::True)
-        } else {
-            Err(SpecialError(
-                RAE_SET_SUCCESS_FOR_TASK,
-                "index is not a positive integer".to_string(),
-            ))
-        }
-    } else {
-        Err(WrongType(
-            RAE_SET_SUCCESS_FOR_TASK,
-            args[0].clone(),
-            (&args[0]).into(),
-            TypeLValue::Usize,
-        ))
-    }
+    let mut refinement: TaskRefinement = ctx.agenda.get_refinement(task_id).await?;
+    refinement.set_status(Status::Done);
+    ctx.agenda.update_refinement(refinement).await?;
+    //ctx.agenda.remove_task(&task_id).await?;
+    Ok(LValue::True)
 }
 
 #[allow(non_snake_case, dead_code)]

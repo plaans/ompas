@@ -143,9 +143,17 @@ pub async fn get_config_select<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult
     ))
 }
 #[macro_rules_attribute(dyn_async!)]
-pub async fn get_agenda<'a>(_: &'a [LValue], env: &'a LEnv) -> Result<LValue, LError> {
+pub async fn get_agenda<'a>(args: &'a [LValue], env: &'a LEnv) -> Result<LValue, LError> {
     let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
-    let string = ctx.get_rae_env().read().await.agenda.display().await;
+    let all = match args.len() {
+        0 => false,
+        1 => {
+            let arg = &args[0];
+            &LValue::Symbol("all".to_string()) == arg
+        }
+        _ => false,
+    };
+    let string = ctx.get_rae_env().read().await.agenda.display(all).await;
     Ok(string.into())
 }
 

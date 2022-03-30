@@ -88,6 +88,8 @@ pub const DEFINE_RAE_MODE: &str = "(define rae-mode EXEC-MODE)";
 pub const SYMBOL_EXEC_MODE: &str = "exec-mode";
 pub const SYMBOL_SIMU_MODE: &str = "simu-mode";
 pub const SYMBOL_RAE_MODE: &str = "rae-mode";
+//pub const DEFINE_PARENT_TASK: &str = "(define parent_task nil)";
+pub const PARENT_TASK: &str = "parent_task";
 
 pub struct Platform {
     inner: Arc<RwLock<dyn RAEInterface>>,
@@ -190,6 +192,7 @@ impl IntoModule for CtxRaeExec {
             LAMBDA_IS_APPLICABLE,
             DEFINE_ERR_ACTION_FAILURE,
             DEFINE_ERR_NO_APPLICABLE_METHOD,
+            //DEFINE_PARENT_TASK,
         ]
         .into();
         let mut module = Module {

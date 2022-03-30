@@ -1,6 +1,9 @@
+use crate::core::structs::lerror::LError;
+use crate::core::structs::lvalue::LValue;
 use num_traits::sign::Signed;
 use serde::*;
 use std::cmp::Ordering;
+use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::{Add, Div, Mul, Sub};
@@ -82,6 +85,12 @@ impl From<&LNumber> for usize {
     }
 }
 
+impl From<LNumber> for usize {
+    fn from(n: LNumber) -> Self {
+        (&n).into()
+    }
+}
+
 impl From<&LNumber> for f64 {
     fn from(n: &LNumber) -> Self {
         match n {
@@ -96,6 +105,18 @@ impl From<&LNumber> for i64 {
         match n {
             LNumber::Int(i) => *i,
             LNumber::Float(f) => *f as i64,
+        }
+    }
+}
+
+impl TryFrom<&LValue> for LNumber {
+    type Error = LError;
+
+    fn try_from(value: &LValue) -> Result<Self, Self::Error> {
+        if let LValue::Number(n) = value {
+            Ok(n.clone())
+        } else {
+            Err(Default::default())
         }
     }
 }

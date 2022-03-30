@@ -30,7 +30,7 @@ impl ActionsProgress {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Status {
     Pending,
     Running,

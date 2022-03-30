@@ -66,6 +66,7 @@ pub struct PlanResult {
 /// and exits immediately.
 ///
 /// Note that is meant to facilitate debugging of the planner during development.
+#[allow(dead_code)]
 fn propagate_and_print(base_problem: &mut chronicles::Problem, depth: u32, htn_mode: bool) {
     println!("===== Preprocessing ======");
     aries_planning::chronicles::preprocessing::preprocess(base_problem);

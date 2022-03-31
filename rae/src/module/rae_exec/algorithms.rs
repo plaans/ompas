@@ -204,7 +204,7 @@ mod select {
     use ompas_lisp::core::structs::lenv::LEnv;
     use ompas_lisp::core::structs::lerror::LResult;
     use ompas_lisp::core::structs::lvalue::LValue;
-    use ompas_lisp::modules::utils::enumerate;
+    use ompas_lisp::modules::utils::{enr, enumerate};
     use std::convert::TryInto;
 
     //pub const GREEDY_SELECT: &str = "greedy_select";
@@ -274,10 +274,12 @@ mod select {
         //println!("task to test in greedy: {}", LValue::from(task.clone()));
 
         let task_label = &task[0];
+        let task_string = LValue::from(task.clone()).to_string();
         let params: Vec<LValue> = task[1..]
             .iter()
             .map(|lv| LValue::List(vec![lv.clone()]))
             .collect();
+        println!("{}: in greedy", task_string);
 
         let mut applicable_methods: Vec<(LValue, i64)> = vec![];
         let state: LValue = get_facts(&[], env).await?;
@@ -323,6 +325,7 @@ mod select {
             )?;
 
             let mut instances_template = vec![template.clone()];
+            println!("{}: params ok", task_string);
             instances_template.append(&mut params.clone());
 
             for t in &types[params.len()..] {
@@ -343,10 +346,10 @@ mod select {
             for i in iter {
                 let i_vec: Vec<LValue> = (&i).try_into()?;
                 let arg = cons(&[pre_conditions_lambda.clone(), i_vec[1..].into()], env)?;
-                let lv: LValue = eval(&arg, &mut env.clone()).await?;
+                let lv: LValue = enr(&[arg], &mut env.clone()).await?;
                 if !matches!(lv, LValue::Err(_)) {
                     let arg = cons(&[score_lambda.clone(), i_vec[1..].into()], env)?;
-                    let score: i64 = eval(&arg, &mut env.clone()).await?.try_into()?;
+                    let score: i64 = enr(&[arg], &mut env.clone()).await?.try_into()?;
                     applicable_methods.push((i, score))
                 }
             }

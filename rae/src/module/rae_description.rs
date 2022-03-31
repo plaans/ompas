@@ -64,15 +64,25 @@ pub const DOC_DEF_INITIAL_STATE: &str = "Add initial facts in the state.\
 Most of the time it is general knowledge and not initialisation of facts.";
 
 /// Macro used to generate code to define a task in the simplified representation in RAE environment.
-pub const MACRO_GENERATE_TASK: &str = "(defmacro generate-task 
-    (lambda args
-    (let* ((label (car args))
-          (p_expr (cdr args))
-          (params (car (unzip p_expr))))
-         `(list ,label 
-            (quote ,p_expr)
-            (lambda ,params
-                ,(cons 'refine (cons `(quote ,label) params)))))))";
+pub const MACRO_GENERATE_TASK: &str = "(defmacro generate-task
+(lambda args
+(let* ((label (car args))
+      (p_expr (cdr args))
+      (params (car (unzip p_expr))))
+     `(list ,label
+        (quote ,p_expr)
+        (lambda ,params
+            ,(cons 'refine (cons `(quote ,label) params)))))))";
+
+/*pub const MACRO_GENERATE_TASK: &str = "(defmacro generate-task
+(lambda args
+(let* ((label (car args))
+      (p_expr (cdr args))
+      (params (car (unzip p_expr))))
+     `(list ,label
+        (quote ,p_expr)
+        (lambda ,params
+            (enr ',(cons 'refine (cons label params))))))))";*/
 
 /// Macro used to generate code to define a state function in RAE environment.
 pub const MACRO_GENERATE_STATE_FUNCTION: &str = "(defmacro generate-state-function (lambda args

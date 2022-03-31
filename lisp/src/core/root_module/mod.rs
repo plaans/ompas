@@ -28,7 +28,7 @@ pub mod map;
 pub mod predicate;
 
 pub mod language {
-    use crate::core::language::{ERR, MAP};
+    use crate::core::language::{ERR, LIST, MAP};
     use crate::core::root_module::basic_math::language::*;
     use crate::core::root_module::error::language::*;
     use crate::core::root_module::list::language::*;

@@ -18,6 +18,8 @@
                     (define machines (instance machine))
                     (define result (__process__ ?process machines))
                     result))))
+
+
     (def-lambda '(available_robots
         (lambda nil
             (begin
@@ -53,7 +55,7 @@
     (def-method m_process_to_do_r
         '((:task t_process_package)
             (:params (?p package))
-            (:pre-conditions (!= (package.processes_list ?p) nil))
+            (:pre-conditions (check (!= (package.processes_list ?p) nil)))
             (:score 0)
             (:body
                 (do
@@ -66,12 +68,12 @@
     (def-method m_no_more_process
         '((:task t_process_package)
             (:params (?p package))
-            (:pre-conditions (= (package.processes_list ?p) nil))
+            (:pre-conditions (check (= (package.processes_list ?p) nil)))
             (:score 0)
             (:body
                 (let ((?r (arbitrary (available_robots) rand-element)))
                     (do
-                        (mutex::lock-and-do ?r 10
+                        (mutex::lock-and-do ?r 15
                             (t_carry_to_machine ?r ?p (find_output_machine))
                         ))))))
     
@@ -79,24 +81,24 @@
     (def-method m_robot_available
         '((:task t_process_on_machine)
         (:params (?p package) (?m machine))
-        (:pre-conditions (!= (available_robots) nil))
+        (:pre-conditions true)
         (:score 0)
-        (:body (let ((?r (arbitrary (available_robots) rand-element)))
-                (if (!= ?r nil)
-                    (do
-                        (mutex::lock-and-do ?r 11
-                            (t_carry_to_machine ?r ?p ?m))
-                        (monitor `(= (package.location ,?p) (machine.output_belt ,?m))))
-                    (t_process_on_machine ?p ?m))))))
+        (:body 
+            (do
+                (define ?r (arbitrary (instance robot) rand-element))
+                (mutex::lock-and-do ?r 11
+                    (t_carry_to_machine ?r ?p ?m))
+                (monitor `(= (package.location ,?p) (machine.output_belt ,?m)))))))
 
-    (def-method m_no_robot_available
-        '((:task t_process_on_machine)
-        (:params (?p package) (?m machine))
-        (:pre-conditions (= (available_robots) nil))
-        (:score 0)
-        (:body (do
-                (monitor `(!= (available_robots) nil))
-                (t_process_on_machine)))))
+    ; (def-method m_no_robot_available
+    ;     '((:task t_process_on_machine)
+    ;     (:params (?p package) (?m machine))
+    ;     (:pre-conditions (check (= (available_robots) nil)))
+    ;     (:score 0)
+    ;     (:body (do
+    ;             (monitor `(!= (available_robots) nil))
+    ;             (print "robots are available again")
+    ;             (t_process_on_machine)))))
 
     (def-task t_position_robot_to_belt '(?r robot) '(?b belt))
     (def-method m_position_robot_to_belt
@@ -167,12 +169,12 @@
                         (do
                             (go_charge ?r)
                             (monitor `(> (robot.battery ,?r) 0.9)))))))))
-    (def-task t_check_robots_batteries)
+    (def-task t_check_rob_bat)
     (def-lambda '(async_check_battery
         (lambda (?r) (async (t_check_battery ?r)))))
     
     (def-method m_check_initial_robots_batteries
-        '((:task t_check_robots_batteries)
+        '((:task t_check_rob_bat)
         (:params)
         (:pre-conditions true)
         (:score 0)
@@ -191,14 +193,17 @@
         (:score 0)
         (:body 
             (do
-                (monitor `(> ,(len ?l) (len (instance robot))))
+                (monitor `(> (len (instance robot)) ,(len ?l)))
                 (define new_list_robots (instance robot))
-                (define l_new_robots (sublist (new_list_robots) (len ?l)))
+                (define l_new_robots (sublist new_list_robots (len ?l)))
+                (print "new robots:" l_new_robots)
                 (mapf async_check_battery l_new_robots)
                 (t_check_batteries_new_robots new_list_robots)))))
 
     (def-lambda '(async_process_package
             (lambda (?p) (async (t_process_package ?p)))))
+
+
     (def-task t_process_packages)
     (def-method m_process_initial_packages
             '((:task t_process_packages)
@@ -220,9 +225,23 @@
             (:score 0)
             (:body
                 (do
-                    (monitor `(> ,(len ?l) (len (instance package))))
+                    (monitor `(>  (len (instance package)) ,(len ?l)))
                     (define new_lp (instance package))
-                    (define l_new_p (sublist (new_lp) (len ?l)))
-                    (mapf async_check_battery l_new_p)
+                    (define l_new_p (sublist new_lp (len ?l)))
+                    (print "new packages:" l_new_p)
+                    (mapf async_process_package l_new_p)
                     (t_process_new_packages new_lp)))))
+
+        (def-task t_jobshop)
+        (def-method m1
+            '((:task t_jobshop)
+                (:params )
+                (:pre-conditions true)
+                (:score 0)
+                (:body
+                    (do
+                        (define f1 (async (t_process_packages)))
+                        (define f2 (async (t_check_rob_bat)))
+                        (await f1)
+                        (await f2)))))
 )

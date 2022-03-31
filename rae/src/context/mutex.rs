@@ -1,4 +1,3 @@
-use log::info;
 use ompas_lisp::core::structs::lvalue::LValue;
 use std::collections::VecDeque;
 use std::sync::Arc;
@@ -28,10 +27,23 @@ impl RaeMutex {
             sender: tx,
             priority,
         };
-        self.fifo.push_back(waiter);
-        self.fifo
-            .make_contiguous()
-            .sort_by(|w1, w2| w1.priority.cmp(&w2.priority));
+        let previous_len = self.fifo.len();
+        if self.fifo.len() == 0 {
+            self.fifo.push_back(waiter)
+        } else {
+            for (i, w) in self.fifo.iter().enumerate() {
+                if w.priority < waiter.priority {
+                    self.fifo.insert(i, waiter);
+                    break;
+                } else if i == self.fifo.len() - 1 {
+                    self.fifo.push_back(waiter);
+                    break;
+                }
+            }
+        }
+
+        assert_eq!(previous_len + 1, self.fifo.len());
+
         rx
     }
 
@@ -66,7 +78,7 @@ pub async fn get_list_locked() -> Vec<String> {
 }
 
 pub async fn get_debug() -> String {
-    MUTEXES.get_debug().await
+    MUTEXES.format().await
 }
 
 pub enum MutexResponse {
@@ -81,14 +93,14 @@ pub struct MutexMap {
 
 impl MutexMap {
     pub async fn lock(&self, r: String, p: usize) -> MutexResponse {
-        info!("locking {} with priority {}", r, p);
+        //info!("locking {} with priority {}", r, p);
         let mut locked = self.map.lock().await;
         if locked.contains_key(&r) {
-            info!("already locked {}", r);
+            //info!("already locked {}", r);
             let waiter = locked.get_mut(&r).unwrap().new_waiter(p);
             MutexResponse::Wait(waiter)
         } else {
-            info!("not locked yet {}!", r);
+            //info!("not locked yet {}!", r);
             locked.insert(r, Default::default());
             MutexResponse::Ok
         }
@@ -97,9 +109,9 @@ impl MutexMap {
     pub async fn release(&self, lv: LValue) {
         let key: String = lv.to_string();
         let mut locked = self.map.lock().await;
-        info!("releasing {}", key);
+        //info!("releasing {}", key);
         if locked.get_mut(&key).unwrap().release().await {
-            info!("no one waiting for the lock on {}", key);
+            //info!("no one waiting for the lock on {}", key);
             locked.remove(&key);
         }
     }
@@ -117,7 +129,7 @@ impl MutexMap {
             .collect::<Vec<String>>()
     }
 
-    pub async fn get_debug(&self) -> String {
+    pub async fn format(&self) -> String {
         let locked: Vec<(String, usize)> = self
             .map
             .lock()

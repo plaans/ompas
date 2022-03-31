@@ -1,4 +1,4 @@
-pub const TYPE_LIST: &str = "tlist";
+pub const LIST: &str = "list";
 pub const MAP: &str = "map";
 pub const INT: &str = "int";
 pub const BOOL: &str = "bool";
@@ -28,7 +28,6 @@ pub const FALSE: &str = "false";
 
 pub fn get_symbol_types() -> Vec<&'static str> {
     vec![
-        TYPE_LIST,
         MAP,
         INT,
         BOOL,

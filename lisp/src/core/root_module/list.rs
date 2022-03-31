@@ -12,7 +12,6 @@ pub mod language {
     /*
     LIST FUNCTIONS
      */
-    pub const LIST: &str = "list";
     pub const FIRST: &str = "first";
     pub const SECOND: &str = "second";
     pub const THIRD: &str = "third";

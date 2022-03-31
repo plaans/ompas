@@ -2,6 +2,7 @@ use crate::context::mutex;
 use crate::context::mutex::MutexResponse;
 use crate::module::rae_exec::{SYMBOL_EXEC_MODE, SYMBOL_RAE_MODE, SYMBOL_SIMU_MODE};
 use ::macro_rules_attribute::macro_rules_attribute;
+use log::info;
 use ompas_lisp::core::root_module::map::get_map;
 use ompas_lisp::core::structs::lenv::LEnv;
 use ompas_lisp::core::structs::lerror::LError::{SpecialError, WrongNumberOfArgument, WrongType};
@@ -24,11 +25,13 @@ pub const IS_LOCKED: &str = "locked?";
 
 #[macro_rules_attribute(dyn_async!)]
 pub async fn lock<'a>(args: &'a [LValue], _: &'a LEnv) -> LResult {
+    info!("rae_exec::lock({})", LValue::from(args));
+
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(LOCK, args.into(), args.len(), 2..2));
     }
 
-    let ressource = if let LValue::Symbol(s) = args[0].clone() {
+    let resource = if let LValue::Symbol(s) = args[0].clone() {
         s
     } else {
         return Err(WrongType(
@@ -49,10 +52,12 @@ pub async fn lock<'a>(args: &'a [LValue], _: &'a LEnv) -> LResult {
         ));
     };
 
-    match mutex::lock(ressource, priority).await {
+    match mutex::lock(resource.clone(), priority).await {
         MutexResponse::Ok => Ok(LValue::True),
         MutexResponse::Wait(mut rx) => {
+            info!("waiting on resource {}", resource);
             rx.recv().await;
+            info!("resource {} unlocked!!!", resource);
             Ok(LValue::True)
         }
     }

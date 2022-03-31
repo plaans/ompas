@@ -1,5 +1,5 @@
 use crate::context::actions_progress::Status;
-use crate::context::actions_progress::Status::Running;
+use crate::context::actions_progress::Status::{Failure, Running};
 use crate::context::agenda::TaskRefinement;
 use crate::module::rae_exec::error::RaeExecError;
 use crate::module::rae_exec::planning::{CtxPlanning, MOD_PLANNING};
@@ -47,27 +47,37 @@ pub async fn refine<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     let parent_task: Option<usize> = env
         .get_ref_symbol(PARENT_TASK)
         .map(|n| LNumber::try_from(n).unwrap().into());
-    let mut stack: TaskRefinement = ctx.agenda.add_task(task, parent_task).await;
+    let mut stack: TaskRefinement = ctx.agenda.add_task(task.clone(), parent_task).await;
     let task_id = stack.get_task_id();
-    let result: Vec<LValue> = select(&mut stack, env).await?.try_into()?;
-    stack.set_status(Running);
-    ctx.agenda.update_refinement(stack).await?;
-    assert_eq!(result.len(), 2);
-    let first_m = &result[0];
+    let result: LValue = select(&mut stack, env).await?;
 
-    let result: LValue = if first_m == &LValue::Nil {
+    let first_m = result;
+
+    let result: LValue = if first_m == LValue::Nil {
+        info!("No applicable method for task {}({})", task, task_id,);
+        stack.set_status(Failure);
+        ctx.agenda.update_refinement(stack).await?;
         RaeExecError::NoApplicableMethod.into()
     } else {
+        stack.set_status(Running);
+        ctx.agenda.update_refinement(stack).await?;
         info!("Trying {} for task {}", first_m, task_id);
         let mut env = env.clone();
         env.insert(PARENT_TASK, task_id.into());
         //println!("in env: {}", env.get_ref_symbol(PARENT_TASK).unwrap());
-        let result = enr(&[first_m.clone()], &mut env).await?;
-        if matches!(result, LValue::Err(_)) {
-            retry(task_id, &mut env).await?
-        } else {
-            set_success_for_task(task_id, &env).await?;
-            true.into()
+        let result: LResult = enr(&[first_m], &mut env).await;
+        match result {
+            Ok(lv) => {
+                if matches!(lv, LValue::Err(_)) {
+                    retry(task_id, &mut env).await?
+                } else {
+                    set_success_for_task(task_id, &env).await?
+                }
+            }
+            Err(e) => {
+                info!("error in evaluation of {}({}): {}", task, task_id, e);
+                RaeExecError::EvaluationError.into()
+            }
         }
     };
 
@@ -89,58 +99,41 @@ pub async fn refine<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
 pub async fn retry(task_id: usize, env: &LEnv) -> LResult {
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
     let mut stack: TaskRefinement = ctx.agenda.get_refinement(task_id as usize).await?;
+    let task = stack.get_task().clone();
+    info!("Retrying task {}({})", task, task_id);
     stack.add_tried_method(stack.get_current_method().clone());
-    let new_method = select(&mut stack, env).await?;
-    ctx.agenda.update_refinement(stack).await?;
-    info!("Retrying task {}", task_id);
+    stack.set_current_method(LValue::Nil);
+    let new_method: LValue = select(&mut stack, env).await?;
     let result: LValue = if new_method == LValue::Nil {
+        info!(
+            "No more method for task {}({}). Task is a failure!",
+            task, task_id
+        );
+        stack.set_status(Failure);
+        ctx.agenda.update_refinement(stack).await?;
         RaeExecError::NoApplicableMethod.into()
     } else {
-        let result = enr(&[new_method], env).await?;
-        if result == LValue::Nil {
-            retry(task_id, env).await?
-        } else {
-            set_success_for_task(task_id, env).await?
+        stack.set_current_method(new_method.clone());
+        ctx.agenda.update_refinement(stack).await?;
+        let result: LResult = enr(&[new_method], env).await;
+
+        match result {
+            Ok(lv) => {
+                if matches!(lv, LValue::Err(_)) {
+                    retry(task_id, env).await?
+                } else {
+                    set_success_for_task(task_id, &env).await?
+                }
+            }
+            Err(e) => {
+                info!("error in evaluation of {}: {}", task, e);
+                RaeExecError::EvaluationError.into()
+            }
         }
     };
 
     Ok(result)
 }
-
-/*#[macro_rules_attribute(dyn_async !)]
-async fn get_next_method<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
-    if args.len() != 1 {
-        return Err(WrongNumberOfArgument(
-            RAE_GET_NEXT_METHOD,
-            args.into(),
-            args.len(),
-            1..1,
-        ));
-    }
-    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
-
-    if let LValue::Number(LNumber::Int(task_id)) = &args[0] {
-        if task_id.is_positive() {
-            let next_method = ctx
-                .agenda
-                .get_next_applicable_method(&(*task_id as usize))
-                .await;
-            Ok(next_method)
-        } else {
-            Err(SpecialError(
-                RAE_GET_NEXT_METHOD,
-                "task_id is not a positive integer".to_string(),
-            ))
-        }
-    } else {
-        Err(WrongType(
-            RAE_GET_NEXT_METHOD,
-            args[0].clone(),
-            (&args[0]).into(),
-            TypeLValue::Usize,
-        ))
-    }
-}*/
 
 /*const LAMBDA_SELECT: &str = "
 (define select
@@ -173,18 +166,23 @@ pub async fn select(stack: &mut TaskRefinement, env: &LEnv) -> LResult {
     };
 
     if let LValue::List(mut methods) = methods {
-        info!("sorted_methods: {}", LValue::from(&methods));
+        let tried = stack.get_tried();
+        methods.retain(|lv| !tried.contains(lv));
+        info!(
+            "sorted_methods for {}({}): {}",
+            stack.get_task(),
+            task_id,
+            LValue::from(&methods)
+        );
         if !methods.is_empty() {
-            let tried = stack.get_tried();
-            methods.retain(|lv| !tried.contains(lv));
             stack.set_current_method(methods[0].clone());
             stack.set_applicable_methods(methods[1..].into());
-            Ok(vec![methods[0].clone(), task_id.into()].into())
+            Ok(methods[0].clone())
         } else {
-            Ok(vec![LValue::Nil, task_id.into()].into())
+            Ok(LValue::Nil)
         }
     } else {
-        Ok(vec![LValue::Nil, task_id.into()].into())
+        Ok(LValue::Nil)
     }
 }
 

@@ -282,7 +282,7 @@ pub fn generate_type_test_expr(args: &[LValue], _: &LEnv) -> LResult {
                     if let LValue::Symbol(par) = &param[0] {
                         if let LValue::Symbol(tpe) = &param[1] {
                             let test = match tpe.as_str() {
-                                TYPE_LIST => {
+                                LIST => {
                                     format!("({} {})", IS_LIST, par)
                                 }
                                 BOOL => format!("({} {})", IS_BOOL, par),

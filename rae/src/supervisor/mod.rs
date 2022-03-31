@@ -1,5 +1,6 @@
 #![allow(unused_imports)]
 
+use std::fmt::format;
 use std::sync::Arc;
 
 use async_recursion::async_recursion;
@@ -12,6 +13,7 @@ use crate::context::actions_progress::async_status_watcher_run;
 use crate::context::rae_env::{DomainEnv, RAEEnv};
 use crate::context::ressource_access::monitor::task_check_monitor;
 use crate::module::rae_description::CtxRaeDescription;
+use crate::module::rae_exec::error::RaeExecError;
 use crate::module::rae_exec::planning::CtxPlanning;
 use crate::module::rae_exec::platform::RAE_LAUNCH_PLATFORM;
 use crate::module::rae_exec::{CtxRaeExec, Job, JobId};
@@ -23,6 +25,7 @@ use ompas_lisp::core::structs::documentation::Documentation;
 use ompas_lisp::core::structs::lenv::ImportType::WithoutPrefix;
 use ompas_lisp::core::structs::lenv::LEnv;
 use ompas_lisp::core::structs::lerror::LError;
+use ompas_lisp::core::structs::lnumber::LNumber;
 use ompas_lisp::core::structs::lvalue::LValue;
 use ompas_lisp::core::structs::module::{IntoModule, Module};
 use ompas_lisp::core::structs::purefonction::PureFonctionCollection;
@@ -30,6 +33,7 @@ use ompas_lisp::modules::advanced_math::CtxMath;
 use ompas_lisp::modules::io::{CtxIo, LogOutput};
 use ompas_lisp::modules::utils::CtxUtils;
 use std::mem;
+use std::ops::Deref;
 
 pub mod options;
 pub mod rae_log;
@@ -110,8 +114,22 @@ pub async fn rae_run(mut context: RAEEnv, options: &RAEOptions, _log: String) {
                 info!("new triggered task: {}", job_lvalue);
                 //info!("LValue to be evaluated: {}", job_lvalue);
                 match eval(&job_lvalue, &mut new_env).await {
-                    Ok(lv) => info!("result of task {}: {}", job_lvalue, lv),
-                    Err(e) => error!("End of progress_2: {}", e),
+                    Ok(lv) => info!(
+                        "result of task {}: {}",
+                        job_lvalue,
+                        match lv {
+                            LValue::Err(e) => {
+                                match e.deref() {
+                                    LValue::Number(LNumber::Int(i)) => {
+                                        format!("{:?}", RaeExecError::i64_as_err(*i))
+                                    }
+                                    lv => lv.to_string(),
+                                }
+                            }
+                            lv => lv.to_string(),
+                        }
+                    ),
+                    Err(e) => error!("Error in asynchronous task: {}", e),
                 }
             });
         }

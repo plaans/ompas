@@ -1,3 +1,4 @@
+use crate::context::rae_env::TYPE_LIST;
 use crate::module::rae_exec::{
     RAE_ASSERT, RAE_ASSERT_SHORT, RAE_INSTANCE, RAE_MONITOR, RAE_RETRACT, RAE_RETRACT_SHORT,
 };
@@ -16,7 +17,7 @@ use crate::planning::structs::traits::{Absorb, FormatWithSymTable, GetVariables}
 use crate::planning::structs::type_table::{AtomKind, PlanningAtomType, VariableKind};
 use crate::planning::structs::{ConversionCollection, ConversionContext, TaskType, COND};
 use aries_planning::chronicles::ChronicleKind;
-use ompas_lisp::core::language::{BOOL, FLOAT, INT, NUMBER, OBJECT, TYPE_LIST};
+use ompas_lisp::core::language::{BOOL, FLOAT, INT, NUMBER, OBJECT};
 use ompas_lisp::core::root_module::basic_math::language::{
     EQ, GEQ, GT, LEQ, LT, NEQ, NOT, NOT_SHORT,
 };

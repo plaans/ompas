@@ -46,7 +46,7 @@ impl Display for TypeLValue {
             TypeLValue::Object => OBJECT,
             TypeLValue::Lambda => LAMBDA,
             TypeLValue::Map => MAP,
-            TypeLValue::List => TYPE_LIST,
+            TypeLValue::List => LIST,
             TypeLValue::Quote => QUOTE,
             TypeLValue::Atom => ATOM,
             TypeLValue::CoreOperator => CORE_OPERATOR,

@@ -4,7 +4,7 @@ use ompas_lisp::core::structs::lerror::LError;
 use ompas_lisp::core::structs::lerror::LError::SpecialError;
 use ompas_lisp::core::structs::lvalue::LValue;
 use ompas_utils::other::get_and_update_id_counter;
-use std::fmt::{format, Debug, Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;

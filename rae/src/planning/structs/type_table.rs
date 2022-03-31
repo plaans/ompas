@@ -4,7 +4,6 @@ use crate::planning::union_find::NodeId;
 use std::fmt::{Display, Formatter};
 
 pub type TypeId = NodeId;
-
 const ACTION: &str = "action";
 const STATE_FUNCTION: &str = "state-function";
 const METHOD: &str = "method";

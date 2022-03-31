@@ -3,7 +3,7 @@ use crate::context::agenda::Agenda;
 use crate::context::rae_state::RAEState;
 use crate::module::rae_exec::Job;
 use im::HashMap;
-use ompas_lisp::core::language::OBJECT;
+use ompas_lisp::core::language::{LIST, OBJECT};
 use ompas_lisp::core::structs::lcoreoperator::LCoreOperator;
 use ompas_lisp::core::structs::lenv::{LEnv, LEnvSymbols};
 use ompas_lisp::core::structs::lerror::LError;
@@ -36,7 +36,7 @@ pub const STATE_FUNCTION_TYPE: &str = "state_function_type";
 pub const LAMBDA_TYPE: &str = "lambda_type";
 
 pub const TUPLE_TYPE: &str = "tuple";
-pub const LIST_TYPE: &str = "tlist";
+pub const TYPE_LIST: &str = "tlist";
 
 #[derive(Debug, Clone)]
 pub enum Type {
@@ -59,7 +59,7 @@ impl From<&Type> for LValue {
     fn from(t: &Type) -> Self {
         match t {
             Type::Single(s) => s.into(),
-            Type::List(l) => vec![LValue::from(LIST_TYPE), l.deref().into()].into(),
+            Type::List(l) => vec![LValue::from(TYPE_LIST), l.deref().into()].into(),
             Type::Tuple(tuple) => {
                 let mut vec: Vec<LValue> = vec![TUPLE_TYPE.into()];
                 for t in tuple {
@@ -124,11 +124,18 @@ impl TryFrom<&LValue> for Type {
     fn try_from(lv: &LValue) -> Result<Self, Self::Error> {
         let err = SpecialError(
             TYPE_TRY_FROM_LVALUE,
-            format!("{} {} was expected", TUPLE_TYPE, LIST_TYPE),
+            format!("{} or {} was expected", TUPLE_TYPE, LIST),
         );
 
         match lv {
-            LValue::Symbol(s) => Ok(Self::Single(s.to_string())),
+            LValue::Symbol(s) => {
+                let string = if s == LIST {
+                    TYPE_LIST.to_string()
+                } else {
+                    s.to_string()
+                };
+                Ok(Self::Single(string))
+            }
             LValue::List(list) => {
                 assert!(list.len() >= 2);
                 if let LValue::Symbol(s) = &list[0] {
@@ -140,7 +147,7 @@ impl TryFrom<&LValue> for Type {
                             }
                             vec
                         })),
-                        LIST_TYPE => {
+                        LIST => {
                             assert_eq!(list.len(), 2);
                             Ok(Self::List(Box::new((&list[1]).try_into()?)))
                         }

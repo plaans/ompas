@@ -7,7 +7,7 @@ use crate::module::rae_exec::{CtxRaeExec, MOD_RAE_EXEC, PARENT_TASK};
 use crate::supervisor::options::{Planner, SelectMode};
 use ::macro_rules_attribute::macro_rules_attribute;
 use async_recursion::async_recursion;
-use log::info;
+use log::{error, info};
 use ompas_lisp::core::structs::lenv::LEnv;
 use ompas_lisp::core::structs::lerror::{LError, LResult};
 use ompas_lisp::core::structs::lnumber::LNumber;
@@ -54,7 +54,7 @@ pub async fn refine<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     let first_m = result;
 
     let result: LValue = if first_m == LValue::Nil {
-        info!("No applicable method for task {}({})", task, task_id,);
+        error!("No applicable method for task {}({})", task, task_id,);
         stack.set_status(Failure);
         ctx.agenda.update_refinement(stack).await?;
         RaeExecError::NoApplicableMethod.into()
@@ -75,7 +75,7 @@ pub async fn refine<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
                 }
             }
             Err(e) => {
-                info!("error in evaluation of {}({}): {}", task, task_id, e);
+                error!("error in evaluation of {}({}): {}", task, task_id, e);
                 RaeExecError::EvaluationError.into()
             }
         }
@@ -100,12 +100,12 @@ pub async fn retry(task_id: usize, env: &LEnv) -> LResult {
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
     let mut stack: TaskRefinement = ctx.agenda.get_refinement(task_id as usize).await?;
     let task = stack.get_task().clone();
-    info!("Retrying task {}({})", task, task_id);
+    error!("Retrying task {}({})", task, task_id);
     stack.add_tried_method(stack.get_current_method().clone());
     stack.set_current_method(LValue::Nil);
     let new_method: LValue = select(&mut stack, env).await?;
     let result: LValue = if new_method == LValue::Nil {
-        info!(
+        error!(
             "No more method for task {}({}). Task is a failure!",
             task, task_id
         );
@@ -126,7 +126,7 @@ pub async fn retry(task_id: usize, env: &LEnv) -> LResult {
                 }
             }
             Err(e) => {
-                info!("error in evaluation of {}: {}", task, e);
+                error!("error in evaluation of {}: {}", task, e);
                 RaeExecError::EvaluationError.into()
             }
         }
@@ -279,7 +279,6 @@ mod select {
             .iter()
             .map(|lv| LValue::List(vec![lv.clone()]))
             .collect();
-        println!("{}: in greedy", task_string);
 
         let mut applicable_methods: Vec<(LValue, i64)> = vec![];
         let state: LValue = get_facts(&[], env).await?;
@@ -325,7 +324,6 @@ mod select {
             )?;
 
             let mut instances_template = vec![template.clone()];
-            println!("{}: params ok", task_string);
             instances_template.append(&mut params.clone());
 
             for t in &types[params.len()..] {

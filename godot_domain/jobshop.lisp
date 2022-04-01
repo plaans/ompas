@@ -71,11 +71,12 @@
             (:pre-conditions (check (= (package.processes_list ?p) nil)))
             (:score 0)
             (:body
-                (let ((?r (arbitrary (available_robots) rand-element)))
-                    (do
-                        (mutex::lock-and-do ?r 15
-                            (t_carry_to_machine ?r ?p (find_output_machine))
-                        ))))))
+                (do
+                    (define ?r (arbitrary (instance robot) rand-element))
+                    (print "package process of " ?p " is done")
+                    (mutex::lock-and-do ?r 15
+                        (t_carry_to_machine ?r ?p (find_output_machine))
+                    )))))
     
     (def-task t_process_on_machine '(?p package) '(?m machine))
     (def-method m_robot_available

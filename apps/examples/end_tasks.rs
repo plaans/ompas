@@ -15,7 +15,7 @@ async fn main() {
                 }
                 fut = receiver.recv() => {
                     let bool = fut.expect("could not receive");
-                    println!("1: end signal: {}", bool)
+                    println!("1: end signal: {}", bool);
                 }
             }
         }

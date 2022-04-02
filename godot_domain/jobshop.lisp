@@ -72,23 +72,21 @@
             (:score 0)
             (:body
                 (do
-                    (define ?r (arbitrary (instance robot) rand-element))
                     (print "package process of " ?p " is done")
-                    (mutex::lock-and-do ?r 15
-                        (t_carry_to_machine ?r ?p (find_output_machine))
+                    (mutex::lock-in-list-and-do (instance robot) 15
+                        (t_carry_to_machine r ?p (find_output_machine))
                     )))))
     
     (def-task t_process_on_machine '(?p package) '(?m machine))
-    (def-method m_robot_available
+    (def-method m_process_on_machine
         '((:task t_process_on_machine)
         (:params (?p package) (?m machine))
         (:pre-conditions true)
         (:score 0)
         (:body 
             (do
-                (define ?r (arbitrary (instance robot) rand-element))
-                (mutex::lock-and-do ?r 11
-                    (t_carry_to_machine ?r ?p ?m))
+                (mutex::lock-in-list-and-do (instance robot) 11
+                    (t_carry_to_machine r ?p ?m))
                 (monitor `(= (package.location ,?p) (machine.output_belt ,?m)))))))
 
     ; (def-method m_no_robot_available

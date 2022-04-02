@@ -5,8 +5,6 @@ pub mod platform;
 pub mod rae_mutex;
 pub mod simu;
 
-use crate::context::actions_progress::{ActionId, ActionsProgress, Status};
-use crate::context::agenda::Agenda;
 use crate::context::rae_env::RAE_TASK_METHODS_MAP;
 use crate::context::rae_state::*;
 use crate::context::ressource_access::monitor::add_waiter;
@@ -31,6 +29,8 @@ use ompas_lisp::core::structs::typelvalue::TypeLValue;
 use ompas_utils::dyn_async;
 use std::any::Any;
 
+use crate::context::refinement::task_collection::TaskStatus;
+use crate::context::refinement::{Agenda, TaskId};
 use crate::module::rae_exec::algorithms::*;
 use crate::module::rae_exec::error::{DEFINE_ERR_ACTION_FAILURE, DEFINE_ERR_NO_APPLICABLE_METHOD};
 use ompas_lisp::core::eval;
@@ -102,8 +102,8 @@ impl Platform {
     }
 
     /// Initial what needs to be.
-    pub async fn init(&self, state: RAEState, status: ActionsProgress) {
-        self.inner.write().await.init(state, status).await;
+    pub async fn init(&self, state: RAEState, agenda: Agenda) {
+        self.inner.write().await.init(state, agenda).await;
     }
 
     ///Launch the platform (such as the simulation in godot) and open communication
@@ -130,29 +130,6 @@ impl Platform {
         self.inner.read().await.cancel_command(args).await
     }
 
-    ///Get the whole state of the platform
-    pub async fn get_state(&self, args: &[LValue]) -> LResult {
-        self.inner.read().await.get_state(args).await
-    }
-
-    ///Get a specific state variable
-    pub async fn get_state_variable(&self, args: &[LValue]) -> LResult {
-        self.inner.read().await.get_state_variable(args).await
-    }
-    ///Return the status of all the actions
-    pub async fn get_status(&self, args: &[LValue]) -> LResult {
-        self.inner.read().await.get_status(args).await
-    }
-    /// Returns the status of a given action
-    pub async fn get_action_status(&self, action_id: &usize) -> Status {
-        self.inner.read().await.get_action_status(action_id).await
-    }
-
-    /// Set the status of a given action
-    pub async fn set_status(&self, action_id: usize, status: Status) {
-        self.inner.read().await.set_status(action_id, status).await
-    }
-
     /// Returns the RAE domain of the platform.
     pub async fn domain(&self) -> &'static str {
         self.inner.read().await.domain().await
@@ -166,8 +143,6 @@ impl Platform {
 ///Context that will contains primitives for the RAE executive
 #[derive(Default)]
 pub struct CtxRaeExec {
-    //pub stream: JobStream,
-    pub actions_progress: ActionsProgress,
     pub state: RAEState,
     pub platform_interface: Option<Platform>,
     pub agenda: Agenda,
@@ -203,7 +178,7 @@ impl IntoModule for CtxRaeExec {
         module.add_async_fn_prelude(RAE_GET_STATE_VARIBALE, get_state_variable);
         module.add_async_fn_prelude(RAE_EXEC_COMMAND, exec_command);
         module.add_async_fn_prelude(RAE_LAUNCH_PLATFORM, launch_platform);
-        module.add_async_fn_prelude(RAE_GET_STATUS, get_status);
+        //module.add_async_fn_prelude(RAE_GET_STATUS, get_status);
         module.add_async_fn_prelude(RAE_CANCEL_COMMAND, cancel_command);
         module.add_async_fn_prelude(RAE_INSTANCE, instance);
         module.add_fn_prelude(RAE_IS_PLATFORM_DEFINED, is_platform_defined);
@@ -253,8 +228,8 @@ impl IntoModule for CtxRaeExec {
 }
 
 impl CtxRaeExec {
-    pub async fn get_execution_status(&self, action_id: &ActionId) -> Option<Status> {
-        self.actions_progress.get_status(action_id).await
+    pub async fn get_execution_status(&self, id: TaskId) -> TaskStatus {
+        self.agenda.get_status(id).await
     }
 
     pub fn add_platform(&mut self, platform: Option<Platform>) {
@@ -319,21 +294,12 @@ pub type JobId = usize;
 #[async_trait]
 pub trait RAEInterface: Any + Send + Sync {
     /// Initial what needs to be.
-    async fn init(&mut self, state: RAEState, status: ActionsProgress);
+    async fn init(&mut self, state: RAEState, agenda: Agenda);
 
     /// Executes a command on the platform
     async fn exec_command(&self, args: &[LValue], command_id: usize) -> Result<LValue, LError>;
 
     async fn cancel_command(&self, args: &[LValue]) -> Result<LValue, LError>;
-
-    ///Get the whole state of the platform
-    async fn get_state(&self, args: &[LValue]) -> Result<LValue, LError>;
-
-    ///Get a specific state variable
-    async fn get_state_variable(&self, args: &[LValue]) -> Result<LValue, LError>;
-
-    ///Return the status of all the actions
-    async fn get_status(&self, args: &[LValue]) -> Result<LValue, LError>;
 
     ///Launch the platform (such as the simulation in godot) and open communication
     async fn launch_platform(&mut self, args: &[LValue]) -> Result<LValue, LError>;
@@ -343,12 +309,6 @@ pub trait RAEInterface: Any + Send + Sync {
 
     /// Open communication with the platform
     async fn open_com(&mut self, args: &[LValue]) -> Result<LValue, LError>;
-
-    /// Returns the status of a given action
-    async fn get_action_status(&self, action_id: &usize) -> Status;
-
-    /// Set the status of a given action
-    async fn set_status(&self, action_id: usize, status: Status);
 
     /// Returns the RAE domain of the platform.
     async fn domain(&self) -> &'static str;
@@ -360,25 +320,13 @@ pub trait RAEInterface: Any + Send + Sync {
 
 #[async_trait]
 impl RAEInterface for () {
-    async fn init(&mut self, _: RAEState, _: ActionsProgress) {}
+    async fn init(&mut self, _: RAEState, _: Agenda) {}
 
     async fn exec_command(&self, _args: &[LValue], _: usize) -> Result<LValue, LError> {
         Ok(Nil)
     }
 
     async fn cancel_command(&self, _: &[LValue]) -> Result<LValue, LError> {
-        Ok(Nil)
-    }
-
-    async fn get_state(&self, _: &[LValue]) -> Result<LValue, LError> {
-        Ok(Nil)
-    }
-
-    async fn get_state_variable(&self, _args: &[LValue]) -> Result<LValue, LError> {
-        Ok(Nil)
-    }
-
-    async fn get_status(&self, _args: &[LValue]) -> Result<LValue, LError> {
         Ok(Nil)
     }
 
@@ -393,12 +341,6 @@ impl RAEInterface for () {
     async fn open_com(&mut self, _: &[LValue]) -> Result<LValue, LError> {
         Ok(Nil)
     }
-
-    async fn get_action_status(&self, _action_id: &usize) -> Status {
-        Status::Pending
-    }
-
-    async fn set_status(&self, _action_id: usize, _status: Status) {}
 
     async fn domain(&self) -> &'static str {
         ""
@@ -751,11 +693,9 @@ async fn get_state_variable<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     }
 }
 
-#[macro_rules_attribute(dyn_async!)]
+/*#[macro_rules_attribute(dyn_async!)]
 async fn get_status<'a>(_: &'a [LValue], env: &'a LEnv) -> LResult {
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
-
-    let status = ctx.actions_progress.status.read().await;
 
     let mut string = "Action(s) Status\n".to_string();
 
@@ -764,7 +704,7 @@ async fn get_status<'a>(_: &'a [LValue], env: &'a LEnv) -> LResult {
     }
 
     Ok(LValue::String(string))
-}
+}*/
 
 #[macro_rules_attribute(dyn_async!)]
 async fn monitor<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {

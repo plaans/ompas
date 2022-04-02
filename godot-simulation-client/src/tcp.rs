@@ -1,8 +1,8 @@
 use crate::rae_interface::Instance;
 use crate::serde::{GodotMessageSerde, GodotMessageType};
 use ompas_lisp::core::structs::lvalues::LValueS;
-use ompas_rae::context::actions_progress::ActionsProgress;
 use ompas_rae::context::rae_state::*;
+use ompas_rae::context::refinement::Agenda;
 use ompas_utils::task_handler;
 use std::convert::TryInto;
 use std::net::SocketAddr;
@@ -19,7 +19,7 @@ pub async fn task_tcp_connection(
     socket_addr: &SocketAddr,
     receiver: Receiver<String>,
     state: RAEState,
-    status: ActionsProgress,
+    status: Agenda,
     instance: Instance,
 ) {
     let stream = TcpStream::connect(socket_addr).await.unwrap();
@@ -76,7 +76,7 @@ fn u32_to_u8_array(x: u32) -> [u8; 4] {
 async fn async_read_socket(
     stream: ReadHalf<TcpStream>,
     state: RAEState,
-    status: ActionsProgress,
+    agenda: Agenda,
     instance: Instance,
 ) {
     let mut buf_reader = BufReader::new(stream);
@@ -144,30 +144,16 @@ async fn async_read_socket(
                     };
                 }
                 GodotMessageType::ActionResponse => {
-                    let action_status: (usize, ActionStatus) = message.try_into().unwrap();
-                    match action_status.1 {
+                    let (godot_id, action_status): (usize, ActionStatus) = message.try_into().unwrap();
+                    match action_status {
                         ActionStatus::ActionResponse(server_id) => {
-                            map_server_id_action_id.insert(server_id, action_status.0);
+                            map_server_id_action_id.insert(server_id, godot_id);
                         }
                         ActionStatus::ActionDenied => {}
                         _ => unreachable!()
                     }
 
-                    status
-                        .status
-                        .write()
-                        .await
-                        .insert(action_status.0, action_status.1.into());
-
-                    match &status.sync.sender {
-                        None => {}
-                        Some(sender) => {
-                            sender
-                                .send(action_status.0)
-                                .await
-                                .expect("fail to send to status watcher!");
-                        }
-                    };
+                    agenda.update_status(godot_id, action_status.into()).await;
                 }
                 GodotMessageType::ActionFeedback
                 | GodotMessageType::ActionResult
@@ -176,22 +162,7 @@ async fn async_read_socket(
                     //println!("the action status is updated");
                     let action_status: (usize, ActionStatus) = message.try_into().unwrap();
                     let id = map_server_id_action_id.get(&action_status.0).unwrap();
-
-                    status
-                        .status
-                        .write()
-                        .await
-                        .insert(*id, action_status.1.into());
-
-                    match &status.sync.sender {
-                        None => {}
-                        Some(sender) => {
-                            sender
-                                .send(*id)
-                                .await
-                                .expect("fail to send to status watcher!");
-                        }
-                    };
+                    agenda.update_status(*id, action_status.1.into()).await;
                 }
                 _ => panic!("should not receive this kind of message"),
             }

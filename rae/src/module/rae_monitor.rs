@@ -47,7 +47,7 @@ pub const DOC_RAE_GET_STATE_FUNCTIONS: &str =
     "Returns the list of all defined state-functions in RAE environment";
 
 /// Returns all the status of the actions pretty printed
-#[macro_rules_attribute(dyn_async!)]
+/*#[macro_rules_attribute(dyn_async!)]
 pub async fn get_status<'a>(_: &'a [LValue], env: &'a LEnv) -> Result<LValue, LError> {
     let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
     let arc_rae_env = ctx.get_rae_env();
@@ -59,7 +59,7 @@ pub async fn get_status<'a>(_: &'a [LValue], env: &'a LEnv) -> Result<LValue, LE
     }
 
     Ok(string.into())
-}
+}*/
 
 /// Returns the whole state if no args, or specific part of it ('static', 'dynamic', 'inner world')
 #[macro_rules_attribute(dyn_async!)]

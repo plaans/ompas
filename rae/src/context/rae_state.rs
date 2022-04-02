@@ -1,6 +1,6 @@
-use crate::context::actions_progress::Status;
 use im::HashMap;
 
+use crate::context::refinement::task_collection::TaskStatus;
 use ompas_lisp::core::structs::lerror::LError;
 use ompas_lisp::core::structs::lerror::LError::SpecialError;
 use ompas_lisp::core::structs::lvalue::LValue;
@@ -306,22 +306,22 @@ pub enum ActionStatus {
     ActionCancel(bool), //True the action has been successfully stopped, false it was a failure to cancel
 }
 
-impl From<ActionStatus> for Status {
+impl From<ActionStatus> for TaskStatus {
     fn from(_as: ActionStatus) -> Self {
         match _as {
-            ActionStatus::ActionPending => Status::Pending,
-            ActionStatus::ActionResponse(_) => Status::Running,
-            ActionStatus::ActionFeedback(_) => Status::Running,
+            ActionStatus::ActionPending => TaskStatus::Pending,
+            ActionStatus::ActionResponse(_) => TaskStatus::Running,
+            ActionStatus::ActionFeedback(_) => TaskStatus::Running,
             ActionStatus::ActionResult(b) => match b {
-                true => Status::Done,
-                false => Status::Failure,
+                true => TaskStatus::Done,
+                false => TaskStatus::Failure,
             },
-            ActionStatus::ActionPreempt => Status::Pending,
+            ActionStatus::ActionPreempt => TaskStatus::Pending,
             ActionStatus::ActionCancel(b) => match b {
-                true => Status::Done,
-                false => Status::Failure,
+                true => TaskStatus::Done,
+                false => TaskStatus::Failure,
             },
-            ActionStatus::ActionDenied => Status::Failure,
+            ActionStatus::ActionDenied => TaskStatus::Failure,
         }
     }
 }

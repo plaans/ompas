@@ -12,14 +12,13 @@ use ompas_lisp::core::structs::documentation::Documentation;
 use ompas_lisp::core::structs::lerror::LError::*;
 use ompas_lisp::core::structs::lerror::{LError, LResult};
 use ompas_lisp::core::structs::lvalue::LValue;
-use ompas_lisp::core::structs::lvalues::LValueS;
 use ompas_lisp::core::structs::module::{IntoModule, Module};
 use ompas_lisp::core::structs::purefonction::PureFonctionCollection;
 use ompas_lisp::core::structs::typelvalue::TypeLValue;
-use ompas_rae::context::actions_progress::{ActionsProgress, Status};
-use ompas_rae::context::rae_state::{RAEState, StateType, KEY_DYNAMIC, KEY_STATIC};
+use ompas_rae::context::rae_state::RAEState;
+use ompas_rae::context::refinement::Agenda;
 use ompas_rae::module::rae_exec::platform::RAE_LAUNCH_PLATFORM;
-use ompas_rae::module::rae_exec::{CtxPlatform, RAEInterface, RAE_GET_STATE_VARIBALE};
+use ompas_rae::module::rae_exec::{CtxPlatform, RAEInterface};
 use ompas_utils::task_handler;
 use std::convert::TryInto;
 use std::net::SocketAddr;
@@ -84,7 +83,7 @@ pub struct PlatformGodot {
     pub sender_socket: Option<Sender<String>>,
     pub state: RAEState,
     pub instance: Instance,
-    pub status: ActionsProgress,
+    pub agenda: Agenda,
 }
 
 impl PlatformGodot {
@@ -105,9 +104,9 @@ impl PlatformGodot {
 impl RAEInterface for PlatformGodot {
     /// Initiliaze the godot platform of a the state (contains Arc to structs)
     /// and ActionsProgress (contains also Arc to structs)
-    async fn init(&mut self, state: RAEState, status: ActionsProgress) {
+    async fn init(&mut self, state: RAEState, agenda: Agenda) {
         self.state = state;
-        self.status = status;
+        self.agenda = agenda;
     }
 
     /// Executes a command on the platform. The command is sent via tcp.
@@ -119,12 +118,6 @@ impl RAEInterface for PlatformGodot {
                 temp_id: command_id,
             }),
         };
-
-        self.status
-            .status
-            .write()
-            .await
-            .insert(command_id, Status::Pending);
 
         //println!("action status created");
 
@@ -200,94 +193,6 @@ impl RAEInterface for PlatformGodot {
             .expect("couldn't send via channel");
 
         Ok(LValue::Nil)
-    }
-
-    /// Returns the state of godot. Arg is either 'static' or 'dynamic'
-    async fn get_state(&self, args: &[LValue]) -> Result<LValue, LError> {
-        let _type = match args.len() {
-            0 => None,
-            1 => match &args[0] {
-                LValue::Symbol(s) => match s.as_str() {
-                    KEY_STATIC => Some(StateType::Static),
-                    KEY_DYNAMIC => Some(StateType::Dynamic),
-                    _ => {
-                        let result1 = Err(SpecialError(
-                            "PlatformGodot::get_state",
-                            format!("Expected keywords {} or {}", KEY_STATIC, KEY_DYNAMIC),
-                        ));
-                        return result1;
-                    }
-                },
-                lv => {
-                    return Err(WrongType(
-                        "PlatformGodot::get_state",
-                        lv.clone(),
-                        lv.into(),
-                        TypeLValue::Symbol,
-                    ))
-                }
-            },
-            _ => {
-                return Err(WrongNumberOfArgument(
-                    "PlatformGodot::get_state",
-                    args.into(),
-                    args.len(),
-                    0..1,
-                ))
-            }
-        };
-
-        //println!("state type: {:?}", _type);
-
-        //let handle = tokio::runtime::Handle::current();
-        //let state = self.state.clone();
-
-        let result = self.state.get_state(_type).await;
-        Ok(result.into_map())
-    }
-
-    /// Returns the value of a state variable.
-    /// args contains the key of the state variable.
-    async fn get_state_variable(&self, args: &[LValue]) -> Result<LValue, LError> {
-        if args.is_empty() {
-            return Err(WrongNumberOfArgument(
-                RAE_GET_STATE_VARIBALE,
-                args.into(),
-                0,
-                1..std::usize::MAX,
-            ));
-        }
-        let key: LValueS = if args.len() > 1 {
-            LValue::from(args).into()
-        } else {
-            args[0].clone().into()
-        };
-
-        //println!("key: {}", key);
-        let c_state = self.state.clone();
-        let state = c_state.get_state(None).await;
-
-        //println!("state: {:?}", state);
-
-        let value = state.inner.get(&key).unwrap_or(&LValueS::Bool(false));
-        //println!("value: {}", value);
-
-        Ok(value.into())
-    }
-
-    /// Return the status of all the actions.
-    async fn get_status(&self, _: &[LValue]) -> Result<LValue, LError> {
-        let status = self.status.status.clone();
-
-        let status = status.read().await;
-
-        let mut string = "Action(s) Status\n".to_string();
-
-        for e in status.iter() {
-            string.push_str(format!("- {}: {}\n", e.0, e.1).as_str())
-        }
-
-        Ok(LValue::String(string))
     }
 
     /// Launch the platform godot and open the tcp communication
@@ -443,22 +348,13 @@ impl RAEInterface for PlatformGodot {
         //println!("godot launching...");
         //println!("godot launched!");
         let state = self.state.clone();
-        let status = self.status.clone();
+        let status = self.agenda.clone();
         let instance = self.instance.clone();
         tokio::spawn(async move {
             task_tcp_connection(&socket_addr, rx, state, status, instance).await
         });
         //println!("com opened with godot");
         Ok(LValue::Nil)
-    }
-
-    /// Return the status of a specific action.
-    async fn get_action_status(&self, action_id: &usize) -> Status {
-        self.status.get_action_status(action_id).await
-    }
-
-    async fn set_status(&self, _: usize, _: Status) {
-        todo!()
     }
 
     /// Function returning the domain of the simulation.

@@ -5,12 +5,14 @@ use ::macro_rules_attribute::macro_rules_attribute;
 use ompas_lisp::core::structs::contextcollection::Context;
 use ompas_lisp::core::structs::documentation::{Documentation, LHelp};
 use ompas_lisp::core::structs::lenv::LEnv;
+use ompas_lisp::core::structs::lerror::LError::{SpecialError, WrongNumberOfArgument, WrongType};
 use ompas_lisp::core::structs::lerror::LResult;
 use ompas_lisp::core::structs::lvalue::LValue;
 use ompas_lisp::core::structs::module::{IntoModule, Module};
 use ompas_lisp::core::structs::purefonction::PureFonctionCollection;
-use ompas_rae::context::actions_progress::ActionsProgress;
-use ompas_rae::context::rae_state::RAEState;
+use ompas_lisp::core::structs::typelvalue::TypeLValue;
+use ompas_rae::context::rae_state::{RAEState, StateType, KEY_DYNAMIC, KEY_STATIC};
+use ompas_rae::context::refinement::Agenda;
 use ompas_rae::module::rae_exec::RAEInterface;
 use ompas_utils::dyn_async;
 use std::sync::Arc;
@@ -293,24 +295,24 @@ pub struct SocketInfo {
 
 pub struct CtxGodot {
     state: RAEState,
-    status: ActionsProgress,
+    agenda: Agenda,
     platform: Arc<RwLock<PlatformGodot>>,
 }
 
 impl Default for CtxGodot {
     fn default() -> Self {
         let state = RAEState::default();
-        let status = ActionsProgress::default();
+        let agenda = Agenda::default();
         let platform = Arc::new(RwLock::new(PlatformGodot {
             socket_info: Default::default(),
             sender_socket: None,
             state: state.clone(),
-            status: status.clone(),
             instance: Default::default(),
+            agenda: agenda.clone(),
         }));
         Self {
             state,
-            status,
+            agenda,
             platform,
         }
     }
@@ -522,7 +524,7 @@ async fn start_godot<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
 #[macro_rules_attribute(dyn_async!)]
 async fn exec_godot<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     let ctx = env.get_context::<CtxGodot>(MOD_GODOT)?;
-    let id = ctx.status.get_new_id();
+    let (id, _) = ctx.agenda.add_action(args.into(), 0).await;
     ctx.platform.read().await.exec_command(args, id).await
 }
 
@@ -530,5 +532,44 @@ async fn exec_godot<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
 #[macro_rules_attribute(dyn_async!)]
 async fn get_state<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     let ctx = env.get_context::<CtxGodot>(MOD_GODOT)?;
-    ctx.platform.read().await.get_state(args).await
+    let _type = match args.len() {
+        0 => None,
+        1 => match &args[0] {
+            LValue::Symbol(s) => match s.as_str() {
+                KEY_STATIC => Some(StateType::Static),
+                KEY_DYNAMIC => Some(StateType::Dynamic),
+                _ => {
+                    let result1 = Err(SpecialError(
+                        "PlatformGodot::get_state",
+                        format!("Expected keywords {} or {}", KEY_STATIC, KEY_DYNAMIC),
+                    ));
+                    return result1;
+                }
+            },
+            lv => {
+                return Err(WrongType(
+                    "PlatformGodot::get_state",
+                    lv.clone(),
+                    lv.into(),
+                    TypeLValue::Symbol,
+                ))
+            }
+        },
+        _ => {
+            return Err(WrongNumberOfArgument(
+                "PlatformGodot::get_state",
+                args.into(),
+                args.len(),
+                0..1,
+            ))
+        }
+    };
+
+    //println!("state type: {:?}", _type);
+
+    //let handle = tokio::runtime::Handle::current();
+    //let state = self.state.clone();
+
+    let result = ctx.state.get_state(_type).await;
+    Ok(result.into_map())
 }

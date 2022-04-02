@@ -1,6 +1,8 @@
-use crate::context::actions_progress::Status;
-use crate::context::actions_progress::Status::{Failure, Running};
-use crate::context::agenda::TaskRefinement;
+use crate::context::refinement::task_collection::TaskStatus::{Failure, Running};
+use crate::context::refinement::task_collection::{
+    AbstractTaskMetaData, RefinementMetaData, TaskMetaData, TaskMetaDataView, TaskStatus,
+};
+use crate::context::refinement::Interval;
 use crate::module::rae_exec::error::RaeExecError;
 use crate::module::rae_exec::planning::{CtxPlanning, MOD_PLANNING};
 use crate::module::rae_exec::{CtxRaeExec, MOD_RAE_EXEC, PARENT_TASK};
@@ -42,25 +44,28 @@ pub const RAE_REFINE: &str = "refine";
         (get rae-task-methods-map label)))";*/
 #[macro_rules_attribute(dyn_async !)]
 pub async fn refine<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
-    let task: LValue = args.into();
+    let task_label: LValue = args.into();
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
     let parent_task: Option<usize> = env
         .get_ref_symbol(PARENT_TASK)
         .map(|n| LNumber::try_from(n).unwrap().into());
-    let mut stack: TaskRefinement = ctx.agenda.add_task(task.clone(), parent_task).await;
-    let task_id = stack.get_task_id();
-    let result: LValue = select(&mut stack, env).await?;
+    let mut task: AbstractTaskMetaData = ctx
+        .agenda
+        .add_abstract_task(task_label.clone(), parent_task)
+        .await;
+    let task_id = task.get_id();
+    let result: LValue = select(&mut task, env).await?;
 
     let first_m = result;
 
     let result: LValue = if first_m == LValue::Nil {
-        error!("No applicable method for task {}({})", task, task_id,);
-        stack.set_status(Failure);
-        ctx.agenda.update_refinement(stack).await?;
+        error!("No applicable method for task {}({})", task_label, task_id,);
+        task.update_status(Failure);
+        ctx.agenda.update_task(task.get_id(), task).await;
         RaeExecError::NoApplicableMethod.into()
     } else {
-        stack.set_status(Running);
-        ctx.agenda.update_refinement(stack).await?;
+        task.update_status(Running);
+        ctx.agenda.update_task(task.get_id(), task).await;
         info!("Trying {} for task {}", first_m, task_id);
         let mut env = env.clone();
         env.insert(PARENT_TASK, task_id.into());
@@ -75,7 +80,7 @@ pub async fn refine<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
                 }
             }
             Err(e) => {
-                error!("error in evaluation of {}({}): {}", task, task_id, e);
+                error!("error in evaluation of {}({}): {}", task_label, task_id, e);
                 RaeExecError::EvaluationError.into()
             }
         }
@@ -98,23 +103,23 @@ pub async fn refine<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
 #[async_recursion]
 pub async fn retry(task_id: usize, env: &LEnv) -> LResult {
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
-    let mut stack: TaskRefinement = ctx.agenda.get_refinement(task_id as usize).await?;
-    let task = stack.get_task().clone();
-    error!("Retrying task {}({})", task, task_id);
-    stack.add_tried_method(stack.get_current_method().clone());
-    stack.set_current_method(LValue::Nil);
-    let new_method: LValue = select(&mut stack, env).await?;
+    let mut task: AbstractTaskMetaData = ctx.agenda.get_abstract_task(task_id as usize).await?;
+    let task_label = task.get_label().clone();
+    error!("Retrying task {}({})", task_label, task_id);
+    task.add_tried_method(task.get_current_method().clone());
+    task.set_current_method(LValue::Nil);
+    let new_method: LValue = select(&mut task, env).await?;
     let result: LValue = if new_method == LValue::Nil {
         error!(
             "No more method for task {}({}). Task is a failure!",
-            task, task_id
+            task_label, task_id
         );
-        stack.set_status(Failure);
-        ctx.agenda.update_refinement(stack).await?;
+        task.update_status(Failure);
+        ctx.agenda.update_task(task.get_id(), task).await;
         RaeExecError::NoApplicableMethod.into()
     } else {
-        stack.set_current_method(new_method.clone());
-        ctx.agenda.update_refinement(stack).await?;
+        task.set_current_method(new_method.clone());
+        ctx.agenda.update_task(task.get_id(), task).await;
         let result: LResult = enr(&[new_method], env).await;
 
         match result {
@@ -126,7 +131,7 @@ pub async fn retry(task_id: usize, env: &LEnv) -> LResult {
                 }
             }
             Err(e) => {
-                error!("error in evaluation of {}: {}", task, e);
+                error!("error in evaluation of {}: {}", task_label, e);
                 RaeExecError::EvaluationError.into()
             }
         }
@@ -141,25 +146,27 @@ pub async fn retry(task_id: usize, env: &LEnv) -> LResult {
     (sim_block
     (rae-select task (generate_applicable_instances task)))))))";*/
 
-pub async fn select(stack: &mut TaskRefinement, env: &LEnv) -> LResult {
+pub async fn select(stack: &mut AbstractTaskMetaData, env: &LEnv) -> LResult {
     /*
     Each function return an ordered list of methods
      */
-    let task_id = stack.get_task_id();
+    let task_id = stack.get_id();
+    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
+    let start = ctx.agenda.get_instant();
     let ctx_planning = env.get_context::<CtxPlanning>(MOD_PLANNING)?;
 
-    let task: Vec<LValue> = stack.get_task().try_into()?;
+    let task: Vec<LValue> = stack.get_label().try_into()?;
 
     let methods: LValue = match &ctx_planning.select_mode {
         SelectMode::Greedy => {
             /*
             Returns all applicable methods sorted by their score
              */
-            info!("select greedy for {}", stack.get_task());
+            info!("select greedy for {}", stack.get_label());
             select::greedy_select(task, env).await?
         }
         SelectMode::Planning(Planner::Aries) => {
-            info!("select with aries for {}", stack.get_task());
+            info!("select with aries for {}", stack.get_label());
             select::planning_select(task, env).await?
         }
         _ => todo!(),
@@ -170,13 +177,19 @@ pub async fn select(stack: &mut TaskRefinement, env: &LEnv) -> LResult {
         methods.retain(|lv| !tried.contains(lv));
         info!(
             "sorted_methods for {}({}): {}",
-            stack.get_task(),
+            stack.get_label(),
             task_id,
             LValue::from(&methods)
         );
         if !methods.is_empty() {
             stack.set_current_method(methods[0].clone());
-            stack.set_applicable_methods(methods[1..].into());
+            let refinement_meta_data = RefinementMetaData {
+                refinement_type: ctx_planning.select_mode,
+                applicable_methods: methods[1..].into(),
+                choosed: methods[0].clone(),
+                interval: Interval::new(start, Some(ctx.agenda.get_instant())),
+            };
+            stack.add_refinement(refinement_meta_data);
             Ok(methods[0].clone())
         } else {
             Ok(LValue::Nil)
@@ -371,9 +384,9 @@ async fn set_success_for_task(task_id: usize, env: &LEnv) -> Result<LValue, LErr
      */
 
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
-    let mut refinement: TaskRefinement = ctx.agenda.get_refinement(task_id).await?;
-    refinement.set_status(Status::Done);
-    ctx.agenda.update_refinement(refinement).await?;
+    let mut task: TaskMetaData = ctx.agenda.trc.get(task_id).await;
+    task.update_status(TaskStatus::Done).await;
+    ctx.agenda.update_task(task.get_id(), task).await;
     //ctx.agenda.remove_task(&task_id).await?;
     Ok(LValue::True)
 }

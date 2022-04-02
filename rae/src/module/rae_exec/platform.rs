@@ -3,13 +3,14 @@ use crate::module::rae_exec::*;
 use ::macro_rules_attribute::macro_rules_attribute;
 use log::{info, warn};
 use ompas_lisp::core::structs::lenv::LEnv;
-use ompas_lisp::core::structs::lerror::LError::{SpecialError, WrongNumberOfArgument};
+use ompas_lisp::core::structs::lerror::LError::WrongNumberOfArgument;
 use ompas_lisp::core::structs::lerror::{LError, LResult};
+use ompas_lisp::core::structs::lnumber::LNumber;
 use ompas_lisp::core::structs::lvalue::LValue;
 use ompas_lisp::core::{eval, parse};
 use ompas_lisp::modules::utils::contains;
 use ompas_utils::dyn_async;
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 
 pub const RAE_EXEC_COMMAND: &str = "rae-exec-command";
 pub const RAE_LAUNCH_PLATFORM: &str = "rae-launch-platform";
@@ -47,54 +48,41 @@ pub async fn exec_command<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
         SYMBOL_EXEC_MODE => {
             match &ctx.platform_interface {
                 Some(platform) => {
-                    let command_id = ctx.actions_progress.get_new_id();
+                    let parent_task: usize = env
+                        .get_ref_symbol(PARENT_TASK)
+                        .map(|n| LNumber::try_from(n).unwrap().into())
+                        .unwrap();
                     let debug: LValue = args.into();
-                    info!("exec command {}: {}", command_id, debug);
-                    platform.exec_command(args, command_id).await?;
+                    let (action_id, mut rx) = ctx.agenda.add_action(args.into(), parent_task).await;
+                    info!("exec command {}: {}", action_id, debug);
+                    platform.exec_command(args, action_id).await?;
 
                     //println!("await on action (id={})", action_id);
+                    info!("waiting on action {}", action_id);
 
-                    let mut receiver = ctx.actions_progress.declare_new_watcher(&command_id).await;
-                    info!("waiting on action {}", command_id);
-
-                    let mut action_status = ctx
-                        .actions_progress
-                        .status
-                        .read()
-                        .await
-                        .get(&command_id)
-                        .unwrap()
-                        .clone();
+                    let mut action_status: TaskStatus = ctx.agenda.get_status(action_id).await;
 
                     loop {
                         //println!("waiting on status:");
                         match action_status {
-                            Status::Pending => {
+                            TaskStatus::Pending => {
                                 //println!("not triggered");
                             }
-                            Status::Running => {
+                            TaskStatus::Running => {
                                 //println!("running");
                             }
-                            Status::Failure => {
-                                warn!("Command {} is a failure.", command_id);
+                            TaskStatus::Failure => {
+                                warn!("Command {} is a failure.", action_id);
+                                ctx.agenda.set_end_time(action_id).await;
                                 return Ok(RaeExecError::ActionFailure.into());
                             }
-                            Status::Done => {
-                                info!("Command {} is a success.", command_id);
+                            TaskStatus::Done => {
+                                info!("Command {} is a success.", action_id);
+                                ctx.agenda.set_end_time(action_id).await;
                                 return Ok(true.into());
                             }
                         }
-                        action_status = if let true = receiver.recv().await.unwrap() {
-                            ctx.actions_progress
-                                .status
-                                .read()
-                                .await
-                                .get(&command_id)
-                                .unwrap()
-                                .clone()
-                        } else {
-                            unreachable!("the signal for an update should always be true")
-                        }
+                        action_status = rx.recv().await.unwrap();
                     }
                 }
                 None => eval_model().await,
@@ -113,13 +101,7 @@ pub async fn launch_platform<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
 
     if let Some(platform) = &ctx.platform_interface {
-        match &ctx.actions_progress.sync.sender {
-            None => Err(SpecialError(
-                RAE_LAUNCH_PLATFORM,
-                "sender to actions status watcher missing.".to_string(),
-            )),
-            Some(_) => platform.launch_platform(args).await,
-        }
+        platform.launch_platform(args).await
     } else {
         Ok("No platform defined".into())
     }
@@ -140,13 +122,7 @@ pub async fn open_com<'a>(args: &'a [LValue], env: &'a LEnv) -> Result<LValue, L
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
 
     if let Some(platform) = &ctx.platform_interface {
-        match &ctx.actions_progress.sync.sender {
-            None => Err(SpecialError(
-                RAE_OPEN_COM_PLATFORM,
-                "sender to actions status watcher missing.".to_string(),
-            )),
-            Some(_) => platform.open_com(args).await,
-        }
+        platform.open_com(args).await
     } else {
         Ok("No platform defined".into())
     }

@@ -1,6 +1,5 @@
-use crate::context::actions_progress::ActionsProgress;
-use crate::context::agenda::Agenda;
 use crate::context::rae_state::RAEState;
+use crate::context::refinement::Agenda;
 use crate::module::rae_exec::Job;
 use im::HashMap;
 use ompas_lisp::core::language::{LIST, OBJECT};
@@ -839,9 +838,7 @@ impl DomainEnv {
 
 pub struct RAEEnv {
     pub job_receiver: Option<Receiver<Job>>,
-    pub status_watcher: Option<Receiver<usize>>,
     pub agenda: Agenda,
-    pub actions_progress: ActionsProgress,
     pub state: RAEState,
     pub env: LEnv,
     pub domain_env: DomainEnv,
@@ -882,19 +879,14 @@ impl RAEEnv {
 
 impl RAEEnv {
     #[allow(clippy::field_reassign_with_default)]
-    pub async fn new(
-        job_receiver: Option<Receiver<Job>>,
-        status_watcher: Option<Receiver<usize>>,
-    ) -> Self {
+    pub async fn new(job_receiver: Option<Receiver<Job>>) -> Self {
         let env = LEnv::root().await;
         Self {
             job_receiver,
             agenda: Default::default(),
-            actions_progress: Default::default(),
             state: Default::default(),
             env,
             domain_env: Default::default(),
-            status_watcher,
         }
     }
 }

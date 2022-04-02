@@ -1,6 +1,7 @@
 //! Module containing the Scheme library to setup RAE environment
 
 use crate::context::rae_env::RAEEnv;
+use crate::context::refinement::Agenda;
 use crate::module::rae_control::*;
 use crate::module::rae_conversion::*;
 use crate::module::rae_description::*;
@@ -99,7 +100,7 @@ impl IntoModule for CtxRae {
 
         //functions to debug the functionnement of rae
         module.add_async_fn_prelude(RAE_GET_STATE, get_state);
-        module.add_async_fn_prelude(RAE_GET_STATUS, get_status);
+        //module.add_async_fn_prelude(RAE_GET_STATUS, get_status);
         module.add_async_fn_prelude(RAE_GET_AGENDA, get_agenda);
 
         //Conversion functions
@@ -206,9 +207,8 @@ impl CtxRae {
 
         let (mut rae_env, platform) = match platform {
             Some(platform) => {
-                let (sender_sync, receiver_sync) = mpsc::channel(TOKIO_CHANNEL_SIZE);
-                let mut rae_env: RAEEnv =
-                    RAEEnv::new(Some(receiver_job), Some(receiver_sync)).await;
+                //let (sender_sync, receiver_sync) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+                let mut rae_env: RAEEnv = RAEEnv::new(Some(receiver_job)).await;
                 let domain = platform.get_ref().read().await.domain().await;
 
                 ctx_rae.set_domain(vec![domain].into());
@@ -221,24 +221,23 @@ impl CtxRae {
                     .await
                     .expect("error loading ctx of the platform");
 
-                rae_env.actions_progress.sync.sender = Some(sender_sync);
+                //rae_env.actions_progress.sync.sender = Some(sender_sync);
 
                 platform
                     .get_ref()
                     .write()
                     .await
-                    .init(rae_env.state.clone(), rae_env.actions_progress.clone())
+                    .init(rae_env.state.clone(), rae_env.agenda.clone())
                     .await;
 
                 (rae_env, Some(platform))
             }
-            None => (RAEEnv::new(Some(receiver_job), None).await, None),
+            None => (RAEEnv::new(Some(receiver_job)).await, None),
         };
 
         //Clone all structs that need to be shared to monitor action status, state and agenda.
 
         let ctx_rae_exec = CtxRaeExec {
-            actions_progress: rae_env.actions_progress.clone(),
             state: rae_env.state.clone(),
             platform_interface: platform,
             agenda: rae_env.agenda.clone(),
@@ -367,16 +366,17 @@ impl CtxRae {
     pub async fn own_rae_env(&self) -> RAEEnv {
         let mut src = self.env.write().await;
 
+        let mut agenda: Agenda = src.agenda.clone();
+        agenda.reset_time_reference();
+
         let new_env = RAEEnv {
             job_receiver: None,
-            status_watcher: None,
-            agenda: src.agenda.clone(),
-            actions_progress: src.actions_progress.clone(),
+            agenda,
             state: src.state.clone(),
             env: src.env.clone(),
             domain_env: src.domain_env.clone(),
         };
-        mem::replace(&mut *src, new_env)
+        mem::replace(&mut src, new_env)
     }
 
     pub async fn get_conversion_context(&self) -> ConversionContext {
@@ -404,9 +404,7 @@ impl Default for CtxRae {
             options: Default::default(),
             env: Arc::new(RwLock::new(RAEEnv {
                 job_receiver: None,
-                status_watcher: None,
                 agenda: Default::default(),
-                actions_progress: Default::default(),
                 state: Default::default(),
                 env: Default::default(),
                 domain_env: Default::default(),

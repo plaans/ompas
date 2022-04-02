@@ -9,7 +9,6 @@ use tokio::sync::{mpsc, Mutex};
 use tokio_stream::StreamExt;
 
 //use crate::context::{Action, Method, SelectOption, Status, TaskId};
-use crate::context::actions_progress::async_status_watcher_run;
 use crate::context::rae_env::{DomainEnv, RAEEnv};
 use crate::context::ressource_access::monitor::task_check_monitor;
 use crate::module::rae_description::CtxRaeDescription;
@@ -54,13 +53,12 @@ pub const TOKIO_CHANNEL_SIZE: usize = 65_536; //=2^16
 /// Main RAE Loop:
 /// Receives Job to handle in separate tasks.
 pub async fn rae_run(mut context: RAEEnv, options: &RAEOptions, _log: String) {
-    let async_action_status = context.actions_progress.sync.clone();
-    if let Some(receiver_sync) = mem::replace(&mut context.status_watcher, None) {
+    /*if let Some(receiver_sync) = mem::replace(&mut context.status_watcher, None) {
         tokio::spawn(async move {
             //println!("starting status watcher");
             async_status_watcher_run(async_action_status, receiver_sync).await;
         });
-    }
+    }*/
     //println!("async status watcher");
 
     let mut receiver = mem::replace(&mut context.job_receiver, None).unwrap();

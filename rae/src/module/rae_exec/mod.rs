@@ -56,11 +56,6 @@ pub const RAE_RETRACT_SHORT: &str = "->";
 pub const RAE_INSTANCE: &str = "instance";
 pub const RAE_AWAIT: &str = "rae-await";
 pub const RAE_MONITOR: &str = "monitor";
-pub const LOCK: &str = "lock";
-pub const RELEASE: &str = "release";
-pub const IS_LOCKED: &str = "locked?";
-pub const LOCKED: &str = "locked";
-pub const LOCKED_LIST: &str = "locked-list";
 //RAE Interface with a platform
 pub const RAE_GET_STATE: &str = "rae-get-state";
 pub const RAE_GET_FACTS: &str = "rae-get-facts";
@@ -182,6 +177,7 @@ impl IntoModule for CtxRaeExec {
     fn into_module(self) -> Module {
         let init: InitLisp = vec![
             MACRO_MUTEX_LOCK_AND_DO,
+            MACRO_MUTEX_LOCK_IN_LIST_AND_DO,
             MACRO_SIM_BLOCK,
             LAMBDA_GET_PRECONDITIONS,
             LAMBDA_GET_SCORE,
@@ -237,6 +233,7 @@ impl IntoModule for CtxRaeExec {
         module.add_async_fn_prelude(RELEASE, release);
         module.add_async_fn_prelude(IS_LOCKED, is_locked);
         module.add_async_fn_prelude(LOCKED_LIST, get_list_locked);
+        module.add_async_fn_prelude(LOCK_IN_LIST, lock_in_list);
 
         //success and failure
         module.add_fn_prelude(SUCCESS, success);

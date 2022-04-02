@@ -1,4 +1,4 @@
-use ompas_lisp::core::structs::lvalue::LValue;
+use async_recursion::async_recursion;
 use std::collections::VecDeque;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
@@ -17,26 +17,49 @@ pub struct Waiter {
 
 #[derive(Default, Clone)]
 pub struct RaeMutex {
-    fifo: VecDeque<Waiter>,
+    fifo: VecDeque<(usize, Waiter)>,
+    n: usize,
+}
+
+pub struct Wait {
+    pub rx: mpsc::Receiver<bool>,
+    pub index: usize,
 }
 
 impl RaeMutex {
-    pub fn new_waiter(&mut self, priority: usize) -> mpsc::Receiver<bool> {
+    pub fn remove_waiter(&mut self, index: usize) {
+        for (i, (n, _)) in self.fifo.iter().enumerate() {
+            if *n == index {
+                self.fifo.remove(i);
+                return;
+            }
+        }
+        unreachable!("remove waiter did not work")
+    }
+
+    fn new_index(&mut self) -> usize {
+        self.n += 1;
+        self.n - 1
+    }
+
+    pub fn new_waiter(&mut self, priority: usize) -> Wait {
         let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
         let waiter = Waiter {
             sender: tx,
             priority,
         };
+        let index = self.new_index();
         let previous_len = self.fifo.len();
+        let value = (index, waiter);
         if self.fifo.len() == 0 {
-            self.fifo.push_back(waiter)
+            self.fifo.push_back(value);
         } else {
-            for (i, w) in self.fifo.iter().enumerate() {
-                if w.priority < waiter.priority {
-                    self.fifo.insert(i, waiter);
+            for (i, (_, w)) in self.fifo.iter().enumerate() {
+                if w.priority < value.1.priority {
+                    self.fifo.insert(i, value);
                     break;
                 } else if i == self.fifo.len() - 1 {
-                    self.fifo.push_back(waiter);
+                    self.fifo.push_back(value);
                     break;
                 }
             }
@@ -44,17 +67,19 @@ impl RaeMutex {
 
         assert_eq!(previous_len + 1, self.fifo.len());
 
-        rx
+        Wait { rx, index }
     }
 
+    #[async_recursion]
     pub async fn release(&mut self) -> bool {
-        if let Some(waiter) = self.fifo.pop_front() {
-            waiter
-                .sender
-                .send(true)
-                .await
-                .expect("error releasing the mutex");
-            false
+        if let Some((_, waiter)) = self.fifo.pop_front() {
+            match waiter.sender.try_send(true) {
+                Ok(_) => false,
+                Err(_) => {
+                    //error!("{}", e);
+                    self.release().await
+                }
+            }
         } else {
             true
         }
@@ -65,12 +90,16 @@ pub async fn lock(r: String, p: usize) -> MutexResponse {
     MUTEXES.lock(r, p).await
 }
 
-pub async fn release(lv: LValue) {
-    MUTEXES.release(lv).await
+pub async fn release(r: String) {
+    MUTEXES.release(r).await
 }
 
-pub async fn is_locked(lv: LValue) -> bool {
-    MUTEXES.is_locked(lv).await
+pub async fn remove_waiter(resource: String, index: usize) {
+    MUTEXES.remove_waiter(resource, index).await
+}
+
+pub async fn is_locked(r: String) -> bool {
+    MUTEXES.is_locked(r).await
 }
 
 pub async fn get_list_locked() -> Vec<String> {
@@ -83,7 +112,7 @@ pub async fn get_debug() -> String {
 
 pub enum MutexResponse {
     Ok,
-    Wait(mpsc::Receiver<bool>),
+    Wait(Wait),
 }
 
 #[derive(Default)]
@@ -106,8 +135,7 @@ impl MutexMap {
         }
     }
 
-    pub async fn release(&self, lv: LValue) {
-        let key: String = lv.to_string();
+    pub async fn release(&self, key: String) {
         let mut locked = self.map.lock().await;
         //info!("releasing {}", key);
         if locked.get_mut(&key).unwrap().release().await {
@@ -116,8 +144,13 @@ impl MutexMap {
         }
     }
 
-    pub async fn is_locked(&self, lv: LValue) -> bool {
-        self.map.lock().await.contains_key(&lv.to_string())
+    pub async fn remove_waiter(&self, resource: String, index: usize) {
+        let mut locked = self.map.lock().await;
+        locked.get_mut(&resource).unwrap().remove_waiter(index);
+    }
+
+    pub async fn is_locked(&self, r: String) -> bool {
+        self.map.lock().await.contains_key(&r)
     }
 
     pub async fn get_list_locked(&self) -> Vec<String> {

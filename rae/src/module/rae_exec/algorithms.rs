@@ -198,7 +198,6 @@ mod select {
     use crate::planning::binding_aries::{build_chronicles, solver};
     use crate::planning::conversion::convert_domain_to_chronicle_hierarchy;
     use crate::planning::structs::{ConversionContext, Problem};
-    use ompas_lisp::core::eval;
     use ompas_lisp::core::root_module::get;
     use ompas_lisp::core::root_module::list::cons;
     use ompas_lisp::core::structs::lenv::LEnv;
@@ -274,7 +273,7 @@ mod select {
         //println!("task to test in greedy: {}", LValue::from(task.clone()));
 
         let task_label = &task[0];
-        let task_string = LValue::from(task.clone()).to_string();
+        //let task_string = LValue::from(task.clone()).to_string();
         let params: Vec<LValue> = task[1..]
             .iter()
             .map(|lv| LValue::List(vec![lv.clone()]))

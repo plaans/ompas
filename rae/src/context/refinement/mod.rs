@@ -53,6 +53,11 @@ impl Interval {
             None => u128::MAX,
         }
     }
+
+    pub fn set_end(&mut self, end: Timepoint) {
+        assert!(self.start <= end);
+        self.end = Some(end)
+    }
 }
 
 #[derive(Clone)]
@@ -123,6 +128,7 @@ impl Agenda {
         let start = self.time_reference.elapsed().as_micros();
         let (action, rx) = ActionMetaData::new(task_id, parent_task, action, start);
         self.trc.insert(task_id, action).await;
+        self.tn.add_task_to_parent(parent_task, task_id).await;
         (task_id, rx)
     }
 
@@ -155,12 +161,22 @@ impl Agenda {
 
     pub async fn set_end_time(&self, id: TaskId) {
         let end = self.time_reference.elapsed().as_micros();
-        let mut task = self.trc.get(id).await;
+        let mut task: TaskMetaData = self.trc.get(id).await;
         task.set_end_timepoint(end);
         self.trc.update(id, task).await;
     }
 
     pub fn get_next_id(&self) -> usize {
         get_and_update_id_counter(self.next_id.clone())
+    }
+}
+
+/*
+METHODS FOR TASK NETWORK
+ */
+
+impl Agenda {
+    pub async fn get_number_of_subtasks(&self, id: TaskId) -> usize {
+        self.tn.get_number_of_subtasks(id).await
     }
 }

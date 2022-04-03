@@ -1,4 +1,5 @@
 use crate::context::refinement::{Interval, TaskId, Timepoint};
+use crate::planning::plan::Plan;
 use crate::supervisor::options::SelectMode;
 use ompas_lisp::core::structs::lerror::LError;
 use ompas_lisp::core::structs::lvalue::LValue;
@@ -401,12 +402,12 @@ impl TaskMetaDataView for AbstractTaskMetaData {
     }
 }
 impl AbstractTaskMetaData {
-    pub fn get_current_method(&self) -> &LValue {
-        &self.current_method
+    pub fn get_last_refinement(&self) -> &RefinementMetaData {
+        &self.refinement.last().unwrap()
     }
 
-    pub fn add_refinement(&mut self, rmd: RefinementMetaData) {
-        self.refinement.push(rmd);
+    pub fn get_current_method(&self) -> &LValue {
+        &self.current_method
     }
 
     pub fn get_tried(&self) -> &Vec<LValue> {
@@ -420,6 +421,10 @@ SETTERS
 impl AbstractTaskMetaData {
     pub fn set_current_method(&mut self, current_method: LValue) {
         self.current_method = current_method;
+    }
+
+    pub fn add_refinement(&mut self, rmd: RefinementMetaData) {
+        self.refinement.push(rmd);
     }
 
     pub fn add_tried_method(&mut self, tried_method: LValue) {
@@ -463,6 +468,7 @@ pub struct RefinementMetaData {
     pub refinement_type: SelectMode,
     pub applicable_methods: Vec<LValue>,
     pub choosed: LValue,
+    pub plan: Option<Plan>,
     pub interval: Interval,
 }
 

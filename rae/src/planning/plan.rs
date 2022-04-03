@@ -4,11 +4,24 @@ use ompas_lisp::core::structs::lvalue::LValue;
 use std::collections::VecDeque;
 use std::convert::TryFrom;
 
+#[derive(Clone, Debug)]
 pub struct Plan {
     pub chronicles: HashMap<usize, TaskInstance>,
 }
 
 impl Plan {
+    pub fn get_root_task(&self) -> Option<usize> {
+        let mut keys: Vec<usize> = self.chronicles.keys().cloned().collect();
+        keys.sort();
+        keys.first().cloned()
+    }
+
+    pub fn get_first_subtask(&self) -> Option<usize> {
+        let mut keys: Vec<usize> = self.chronicles.keys().cloned().collect();
+        keys.sort();
+        keys.get(1).cloned()
+    }
+
     pub fn extract_sub_plan(&self, task_id: usize) -> Plan {
         let mut subtasks: im::HashMap<usize, TaskInstance> = Default::default();
 
@@ -16,7 +29,7 @@ impl Plan {
         subtasks.insert(task_id, task.clone());
 
         match task {
-            TaskInstance::ActionInstance(a) => Plan {
+            TaskInstance::ActionInstance(_) => Plan {
                 chronicles: subtasks,
             },
             TaskInstance::AbstractTaskInstance(a) => {
@@ -75,17 +88,16 @@ impl Plan {
     }
 
     pub fn format_hierarchy(&self) -> String {
-        println!("len: {}", self.chronicles.len());
+        //println!("len: {}", self.chronicles.len());
 
         if self.chronicles.len() == 0 {
             return "".to_string();
         }
 
         //let root = self.chronicles.get(&0).unwrap();
-        let mut keys: Vec<usize> = self.chronicles.keys().cloned().collect();
-        keys.sort();
-        let root_key = keys.first().unwrap();
-        let root = self.chronicles.get(root_key).unwrap();
+
+        let root_key = self.get_root_task().unwrap();
+        let root = self.chronicles.get(&root_key).unwrap();
         match root {
             TaskInstance::ActionInstance(a) => {
                 format!("{}", a.inner)
@@ -95,7 +107,7 @@ impl Plan {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum TaskInstance {
     ActionInstance(ActionInstance),
     AbstractTaskInstance(AbstractTaskInstance),
@@ -137,14 +149,14 @@ impl TryFrom<TaskInstance> for AbstractTaskInstance {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AbstractTaskInstance {
     pub task: LValue,
     pub method: LValue,
     pub subtasks: Vec<usize>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ActionInstance {
     pub inner: LValue,
 }

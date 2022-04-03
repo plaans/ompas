@@ -196,13 +196,13 @@ pub fn build_chronicles(problem: &Problem) -> Result<chronicles::Problem> {
         templates.push(template);
     }
 
-    println!("# SYMBOL TABLE: \n{:?}", ctx.model.get_symbol_table());
+    /*println!("# SYMBOL TABLE: \n{:?}", ctx.model.get_symbol_table());
     println!("{}", bindings.format(&problem.cc.sym_table, false));
     println!("initial chronicle: {:?}", init_ch.chronicle);
 
     for (i, t) in templates.iter().enumerate() {
         println!("template {}: {:?}", i, t.chronicle)
-    }
+    }*/
 
     let problem = aProblem {
         context: ctx,

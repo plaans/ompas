@@ -2,7 +2,6 @@ use crate::context::refinement::task_collection::TaskStatus::{Failure, Running};
 use crate::context::refinement::task_collection::{
     AbstractTaskMetaData, RefinementMetaData, TaskMetaData, TaskMetaDataView, TaskStatus,
 };
-use crate::context::refinement::Interval;
 use crate::module::rae_exec::error::RaeExecError;
 use crate::module::rae_exec::planning::{CtxPlanning, MOD_PLANNING};
 use crate::module::rae_exec::{CtxRaeExec, MOD_RAE_EXEC, PARENT_TASK};
@@ -151,52 +150,37 @@ pub async fn select(stack: &mut AbstractTaskMetaData, env: &LEnv) -> LResult {
     Each function return an ordered list of methods
      */
     let task_id = stack.get_id();
-    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
-    let start = ctx.agenda.get_instant();
     let ctx_planning = env.get_context::<CtxPlanning>(MOD_PLANNING)?;
 
     let task: Vec<LValue> = stack.get_label().try_into()?;
-
-    let methods: LValue = match &ctx_planning.select_mode {
+    let tried = stack.get_tried();
+    let rmd: RefinementMetaData = match &ctx_planning.select_mode {
         SelectMode::Greedy => {
             /*
             Returns all applicable methods sorted by their score
              */
             info!("select greedy for {}", stack.get_label());
-            select::greedy_select(task, env).await?
+            select::greedy_select(tried, task, env).await?
         }
         SelectMode::Planning(Planner::Aries) => {
             info!("select with aries for {}", stack.get_label());
-            select::planning_select(task, env).await?
+            select::planning_select(tried, task, env).await?
         }
         _ => todo!(),
     };
 
-    if let LValue::List(mut methods) = methods {
-        let tried = stack.get_tried();
-        methods.retain(|lv| !tried.contains(lv));
-        info!(
-            "sorted_methods for {}({}): {}",
-            stack.get_label(),
-            task_id,
-            LValue::from(&methods)
-        );
-        if !methods.is_empty() {
-            stack.set_current_method(methods[0].clone());
-            let refinement_meta_data = RefinementMetaData {
-                refinement_type: ctx_planning.select_mode,
-                applicable_methods: methods[1..].into(),
-                choosed: methods[0].clone(),
-                interval: Interval::new(start, Some(ctx.agenda.get_instant())),
-            };
-            stack.add_refinement(refinement_meta_data);
-            Ok(methods[0].clone())
-        } else {
-            Ok(LValue::Nil)
-        }
-    } else {
-        Ok(LValue::Nil)
-    }
+    info!(
+        "sorted_methods for {}({}): {}",
+        stack.get_label(),
+        task_id,
+        LValue::from(&rmd.applicable_methods)
+    );
+
+    let method = rmd.choosed.clone();
+
+    stack.set_current_method(method.clone());
+    stack.add_refinement(rmd);
+    Ok(method)
 }
 
 mod select {
@@ -204,29 +188,113 @@ mod select {
         RAE_METHOD_PRE_CONDITIONS_MAP, RAE_METHOD_SCORE_MAP, RAE_METHOD_TYPES_MAP,
         RAE_TASK_METHODS_MAP,
     };
+    use crate::context::refinement::task_collection::{AbstractTaskMetaData, RefinementMetaData};
+    use crate::context::refinement::Interval;
     use crate::module::rae_exec::planning::{CtxPlanning, MOD_PLANNING};
     use crate::module::rae_exec::platform::instance;
-    use crate::module::rae_exec::{get_facts, CtxRaeExec, MOD_RAE_EXEC, STATE};
+    use crate::module::rae_exec::{
+        get_facts, CtxRaeExec, MOD_RAE_EXEC, PARENT_TASK, RAE_SELECT, STATE,
+    };
     use crate::planning::binding_aries::solver::run_solver;
     use crate::planning::binding_aries::{build_chronicles, solver};
     use crate::planning::conversion::convert_domain_to_chronicle_hierarchy;
+    use crate::planning::plan::AbstractTaskInstance;
     use crate::planning::structs::{ConversionContext, Problem};
+    use crate::supervisor::options::Planner::Aries;
+    use crate::supervisor::options::SelectMode;
     use ompas_lisp::core::root_module::get;
     use ompas_lisp::core::root_module::list::cons;
     use ompas_lisp::core::structs::lenv::LEnv;
-    use ompas_lisp::core::structs::lerror::LResult;
+    use ompas_lisp::core::structs::lerror;
+    use ompas_lisp::core::structs::lerror::LError::SpecialError;
+    use ompas_lisp::core::structs::lnumber::LNumber;
     use ompas_lisp::core::structs::lvalue::LValue;
     use ompas_lisp::modules::utils::{enr, enumerate};
-    use std::convert::TryInto;
+    use std::convert::{TryFrom, TryInto};
 
     //pub const GREEDY_SELECT: &str = "greedy_select";
 
     //Returns the method to do.
-    pub async fn planning_select(task: Vec<LValue>, env: &LEnv) -> LResult {
-        let greedy_methods = greedy_select(task.clone(), env);
+    pub async fn planning_select(
+        tried: &Vec<LValue>,
+        task: Vec<LValue>,
+        env: &LEnv,
+    ) -> lerror::Result<RefinementMetaData> {
+        let mut greedy: RefinementMetaData = greedy_select(tried, task.clone(), env).await?;
 
-        println!("task to plan: {}", LValue::from(task.clone()));
+        println!("Task to plan: {}", LValue::from(task.clone()));
         let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
+
+        match env
+            .get_ref_symbol(PARENT_TASK)
+            .map(|n| LNumber::try_from(n).unwrap().into())
+        {
+            Some(parent_id) => {
+                let parent_stack: AbstractTaskMetaData =
+                    ctx.agenda.get_abstract_task(parent_id).await?;
+                let n = ctx.agenda.get_number_of_subtasks(parent_id).await - 1;
+                println!("Searching for a generated plan...");
+                if let Some(plan) = &parent_stack.get_last_refinement().plan {
+                    //Get number of subtasks for
+                    println!("Parent task has a plan!!!\n {}", plan.format_hierarchy());
+                    let root_id = plan.get_root_task().unwrap();
+                    let instance: AbstractTaskInstance = plan
+                        .chronicles
+                        .get(&root_id)
+                        .unwrap()
+                        .clone()
+                        .try_into()
+                        .expect("root task is not an abstract task");
+                    let task_id = instance.subtasks[n];
+
+                    let refinement: AbstractTaskInstance =
+                        match plan.chronicles.get(&task_id).unwrap().clone().try_into() {
+                            Ok(a) => a,
+                            Err(e) => {
+                                return Err(SpecialError(
+                                    RAE_SELECT,
+                                    format!("task {} is not an abstract task", n),
+                                ))
+                            }
+                        };
+
+                    let task_to_refine = LValue::from(&task);
+                    println!(
+                        "\n* Previous plan propose: ({}) -> {}",
+                        refinement.task, refinement.method,
+                    );
+                    println!("We verify that the method is still applicable...");
+                    println!("\t*tried: {}", LValue::from(tried));
+                    println!("\t*greedy: {}", LValue::from(&greedy.applicable_methods));
+                    let planner_method = refinement.method;
+
+                    if refinement.task == task_to_refine
+                        && !tried.contains(&refinement.task)
+                        && greedy.applicable_methods.contains(&planner_method)
+                    {
+                        let subtask_plan = plan.extract_sub_plan(task_id);
+                        println!("Method is applicable! We can bypass the planner.");
+
+                        println!("*Plan for subtask:\n{}", subtask_plan.format_hierarchy());
+                        greedy.applicable_methods.retain(|m| m != &planner_method);
+
+                        let mut applicable_methods = vec![planner_method];
+                        applicable_methods.append(&mut greedy.applicable_methods);
+                        greedy.plan = Some(subtask_plan);
+                        greedy.choosed = applicable_methods.get(0).cloned().unwrap_or(LValue::Nil);
+                        greedy.applicable_methods = applicable_methods;
+                        greedy.interval.set_end(ctx.agenda.get_instant());
+                        greedy.refinement_type = SelectMode::Planning(Aries);
+                        return Ok(greedy);
+                    } else {
+                        println!("Error in continuum, we are going to plan...");
+                    }
+                } else {
+                    println!("No plan available for parent task...A plan is needed!")
+                }
+            }
+            None => println!("Root task, a plan is needed."),
+        };
 
         let ctx_domain = env.get_context::<CtxPlanning>(MOD_PLANNING)?;
 
@@ -238,7 +306,7 @@ mod select {
 
         let mut problem: Problem = (&context).into();
         let cc = convert_domain_to_chronicle_hierarchy(context)?;
-        println!("cc: {}", cc);
+        //println!("cc: {}", cc);
         problem.cc = cc;
         problem.goal_tasks.push(task.into());
 
@@ -247,36 +315,55 @@ mod select {
         let result = run_solver(&mut aries_problem, true);
         // println!("{}", format_partial_plan(&pb, &x)?);
 
-        let result: LValue = if let Some(x) = &result {
-            let greedy = greedy_methods.await?;
-            println!("greedy methods: {}", greedy);
-            let mut greedy_methods: Vec<LValue> = greedy.try_into()?;
+        let mut greedy: RefinementMetaData = greedy;
+
+        if let Some(x) = &result {
+            println!(
+                "greedy methods: {}",
+                LValue::from(&greedy.applicable_methods)
+            );
             let plan = solver::extract_plan(x);
+            let first_task_id = plan.get_first_subtask().unwrap();
+            let method_plan = plan.extract_sub_plan(first_task_id);
+            let task: AbstractTaskInstance = plan
+                .chronicles
+                .get(&first_task_id)
+                .unwrap()
+                .clone()
+                .try_into()?;
+
+            greedy.plan = Some(method_plan);
+
+            let mut greedy_methods = greedy.applicable_methods.clone();
+
             //let planner_methods = solver::extract_instantiated_methods(x)?;
             //let result: Vec<LValue> = planner_methods.try_into()?;
             //let planner_method = result[0].clone();
 
-            let planner_method = todo!();
+            let planner_method = task.method;
             println!("planners methods: {}", planner_method);
 
             greedy_methods.retain(|m| m != &planner_method);
-            /*for i in 0..greedy_methods.len() {
-                if greedy_methods[i] == planner_method {
-                    greedy_methods.remove(i);
-                    break;
-                }
-            }*/
-            let mut result = vec![planner_method];
-            result.append(&mut greedy_methods);
-            result.into()
-        } else {
-            LValue::String("no solution found".to_string())
-        };
 
-        Ok(result)
+            let mut applicable_methods = vec![planner_method];
+            applicable_methods.append(&mut greedy_methods);
+            applicable_methods.retain(|m| !tried.contains(m));
+
+            greedy.choosed = applicable_methods.get(0).cloned().unwrap_or(LValue::Nil);
+            greedy.applicable_methods = applicable_methods;
+            greedy.interval.set_end(ctx.agenda.get_instant());
+            greedy.refinement_type = SelectMode::Planning(Aries);
+            Ok(greedy)
+        } else {
+            Ok(greedy)
+        }
     }
 
-    pub async fn greedy_select(task: Vec<LValue>, env: &LEnv) -> LResult {
+    pub async fn greedy_select(
+        tried: &Vec<LValue>,
+        task: Vec<LValue>,
+        env: &LEnv,
+    ) -> lerror::Result<RefinementMetaData> {
         /*
         Steps:
         - Create a new entry in the agenda
@@ -285,8 +372,10 @@ mod select {
         - Store the stack
         - Return (best_method, task_id)
          */
+        let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
 
         //println!("task to test in greedy: {}", LValue::from(task.clone()));
+        let start = ctx.agenda.get_instant();
 
         let task_label = &task[0];
         //let task_string = LValue::from(task.clone()).to_string();
@@ -373,9 +462,17 @@ mod select {
          */
 
         applicable_methods.sort_by(|a, b| a.1.cmp(&b.1));
-        let methods: Vec<_> = applicable_methods.drain(..).map(|a| a.0).collect();
+        let mut methods: Vec<_> = applicable_methods.drain(..).map(|a| a.0).collect();
+        methods.retain(|m| !tried.contains(m));
+        let choosed = methods.get(0).cloned().unwrap_or(LValue::Nil);
 
-        Ok(methods.into())
+        Ok(RefinementMetaData {
+            refinement_type: SelectMode::Greedy,
+            applicable_methods: methods,
+            choosed,
+            plan: None,
+            interval: Interval::new(start, Some(ctx.agenda.get_instant())),
+        })
     }
 }
 

@@ -67,4 +67,11 @@ impl TaskNetwork {
         self.inner.write().await.insert(task_id, vec![]);
         self.parent.write().await.push(task_id);
     }
+
+    pub async fn get_number_of_subtasks(&self, id: TaskId) -> usize {
+        match self.inner.read().await.get(&id) {
+            Some(t) => t.len(),
+            None => 0,
+        }
+    }
 }

@@ -5,7 +5,7 @@ use crate::planning::structs::chronicle::{ChronicleSet, ChronicleTemplate};
 use crate::planning::structs::constraint::Constraint;
 use crate::planning::structs::lit::Lit;
 use crate::planning::structs::symbol_table::{AtomId, SymTable};
-use crate::planning::structs::traits::{FormatWithParent, FormatWithSymTable, GetVariables};
+use crate::planning::structs::traits::{FormatWithParent, GetVariables};
 use crate::planning::structs::type_table::{AtomKind, PlanningAtomType, VariableKind};
 use crate::planning::structs::{ConversionCollection, ConversionContext};
 use im::HashSet;
@@ -46,21 +46,21 @@ pub fn simplify_constraints(
             match (a, b) {
                 (Lit::Atom(a), Lit::Constraint(b)) => {
                     if let Atom::Bool(true) = ch.sym_table.get_atom(a, true).unwrap() {
-                        println!(
+                        /*println!(
                             "{} => {}",
                             c.format(&ch.sym_table, true),
                             b.format(&ch.sym_table, true)
-                        );
+                        );*/
                         vec.push((i, b.deref().clone()));
                     }
                 }
                 (Lit::Constraint(b), Lit::Atom(a)) => {
                     if let Atom::Bool(true) = ch.sym_table.get_atom(a, true).unwrap() {
-                        println!(
+                        /*println!(
                             "{} => {}",
                             c.clone().format(&ch.sym_table, true),
                             b.format(&ch.sym_table, true)
-                        );
+                        );*/
                         vec.push((i, b.deref().clone()));
                     }
                 }
@@ -86,13 +86,13 @@ pub fn merge_conditions(
         for (j, c2) in c.get_conditions()[next..].iter().enumerate() {
             let index = j + next;
             if c1.interval == c2.interval && c1.sv == c2.sv {
-                println!(
+                /*println!(
                     "merging {}({}) and {}({})",
                     c1.format(&ch.sym_table, true),
                     i,
                     c2.format(&ch.sym_table, true),
                     index
-                );
+                );*/
                 bind_atoms(&c1.value, &c2.value, &mut ch.sym_table)?;
                 c_to_remove.insert(index);
             }
@@ -101,11 +101,11 @@ pub fn merge_conditions(
 
     let mut vec: Vec<usize> = c_to_remove.iter().copied().collect();
 
-    println!("condition to remove: {:?}", vec);
+    //println!("condition to remove: {:?}", vec);
     vec.sort_unstable();
-    println!("condition to remove(sorted): {:?}", vec);
+    //println!("condition to remove(sorted): {:?}", vec);
     vec.reverse();
-    println!("condition to remove(reversed): {:?}", vec);
+    //println!("condition to remove(reversed): {:?}", vec);
     vec.iter().for_each(|i| c.rm_condition(*i));
 
     ch.sym_table.flat_bindings();

@@ -52,7 +52,7 @@ fn solve(pb: &FiniteProblem, htn_mode: bool) -> Option<std::sync::Arc<SavedAssig
     let found_plan = solver.solve().unwrap();
 
     if let Some(solution) = found_plan {
-        solver.print_stats();
+        //solver.print_stats();
         Some(solution)
     } else {
         None

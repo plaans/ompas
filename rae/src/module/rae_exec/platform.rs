@@ -25,7 +25,14 @@ pub fn is_platform_defined(_: &[LValue], env: &LEnv) -> LResult {
 
 #[macro_rules_attribute(dyn_async!)]
 pub async fn exec_command<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+    let parent_task: usize = env
+        .get_ref_symbol(PARENT_TASK)
+        .map(|n| LNumber::try_from(n).unwrap().into())
+        .unwrap();
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
+    let (action_id, mut rx) = ctx.agenda.add_action(args.into(), parent_task).await;
+    let debug: LValue = args.into();
+    info!("exec command {}: {}", action_id, debug);
 
     let eval_model = || async {
         let string = format!("((get-action-model '{}) {})", args[0], {
@@ -48,13 +55,6 @@ pub async fn exec_command<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
         SYMBOL_EXEC_MODE => {
             match &ctx.platform_interface {
                 Some(platform) => {
-                    let parent_task: usize = env
-                        .get_ref_symbol(PARENT_TASK)
-                        .map(|n| LNumber::try_from(n).unwrap().into())
-                        .unwrap();
-                    let debug: LValue = args.into();
-                    let (action_id, mut rx) = ctx.agenda.add_action(args.into(), parent_task).await;
-                    info!("exec command {}: {}", action_id, debug);
                     platform.exec_command(args, action_id).await?;
 
                     //println!("await on action (id={})", action_id);
@@ -85,7 +85,11 @@ pub async fn exec_command<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
                         action_status = rx.recv().await.unwrap();
                     }
                 }
-                None => eval_model().await,
+                None => {
+                    let r = eval_model().await;
+                    ctx.agenda.set_end_time(action_id).await;
+                    r
+                }
             }
         }
         SYMBOL_SIMU_MODE => eval_model().await,

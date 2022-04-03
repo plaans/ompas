@@ -37,7 +37,7 @@ impl Display for TaskStatus {
 
 #[derive(Clone, Default)]
 pub struct TaskCollection {
-    pub inner: Arc<RwLock<im::OrdMap<TaskId, TaskMetaData>>>,
+    pub inner: Arc<RwLock<im::HashMap<TaskId, TaskMetaData>>>,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -70,7 +70,7 @@ pub struct TaskFilter {
 
 impl TaskCollection {
     pub async fn format(&self, filter: TaskFilter) -> String {
-        let inner: im::OrdMap<usize, TaskMetaData> = self.get_inner().await;
+        let inner: im::HashMap<usize, TaskMetaData> = self.get_inner().await;
 
         let inner: Vec<TaskMetaData> = inner
             .values()
@@ -110,7 +110,7 @@ impl TaskCollection {
 }
 
 impl TaskCollection {
-    pub async fn get_inner(&self) -> im::OrdMap<TaskId, TaskMetaData> {
+    pub async fn get_inner(&self) -> im::HashMap<TaskId, TaskMetaData> {
         self.inner.read().await.clone()
     }
 

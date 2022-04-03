@@ -1,4 +1,3 @@
-use async_recursion::async_recursion;
 use std::collections::VecDeque;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
@@ -70,7 +69,6 @@ impl RaeMutex {
         Wait { rx, index }
     }
 
-    #[async_recursion]
     pub async fn release(&mut self) -> bool {
         while let Some((_, waiter)) = self.fifo.pop_front() {
             if let Ok(_) = waiter.sender.try_send(true) {

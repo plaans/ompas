@@ -5,7 +5,7 @@ use crate::context::refinement::task_collection::{
     AbstractTaskMetaData, ActionMetaData, TaskCollection, TaskFilter, TaskMetaData, TaskStatus,
 };
 use crate::context::refinement::task_network::TaskNetwork;
-use im::OrdMap;
+use im::HashMap;
 use ompas_lisp::core::structs::lerror::LError;
 use ompas_lisp::core::structs::lerror::LError::SpecialError;
 use ompas_lisp::core::structs::lvalue::LValue;
@@ -149,7 +149,7 @@ impl Agenda {
         self.trc.get_status(id).await
     }
 
-    pub async fn get_task_collection(&self) -> OrdMap<TaskId, TaskMetaData> {
+    pub async fn get_task_collection(&self) -> HashMap<TaskId, TaskMetaData> {
         self.trc.get_inner().await
     }
 

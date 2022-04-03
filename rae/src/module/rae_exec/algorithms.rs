@@ -251,9 +251,12 @@ mod select {
             let greedy = greedy_methods.await?;
             println!("greedy methods: {}", greedy);
             let mut greedy_methods: Vec<LValue> = greedy.try_into()?;
-            let planner_methods = solver::extract_instantiated_methods(x)?;
-            let result: Vec<LValue> = planner_methods.try_into()?;
-            let planner_method = result[0].clone();
+            let plan = solver::extract_plan(x);
+            //let planner_methods = solver::extract_instantiated_methods(x)?;
+            //let result: Vec<LValue> = planner_methods.try_into()?;
+            //let planner_method = result[0].clone();
+
+            let planner_method = todo!();
             println!("planners methods: {}", planner_method);
 
             greedy_methods.retain(|m| m != &planner_method);

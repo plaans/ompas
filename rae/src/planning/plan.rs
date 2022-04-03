@@ -1,9 +1,39 @@
+use im::HashMap;
 use ompas_lisp::core::structs::lerror::LError;
 use ompas_lisp::core::structs::lvalue::LValue;
+use std::collections::VecDeque;
 use std::convert::TryFrom;
 
 pub struct Plan {
-    pub chronicles: Vec<TaskInstance>,
+    pub chronicles: HashMap<usize, TaskInstance>,
+}
+
+impl Plan {
+    pub fn extract_sub_plan(&self, task_id: usize) -> Plan {
+        let mut subtasks: im::HashMap<usize, TaskInstance> = Default::default();
+
+        let task = self.chronicles.get(&task_id).unwrap();
+        subtasks.insert(task_id, task.clone());
+
+        match task {
+            TaskInstance::ActionInstance(a) => Plan {
+                chronicles: subtasks,
+            },
+            TaskInstance::AbstractTaskInstance(a) => {
+                let mut queue: VecDeque<usize> = a.subtasks.clone().into();
+                while let Some(subtask) = queue.pop_front() {
+                    let instance = self.chronicles.get(&subtask).unwrap();
+                    if let TaskInstance::AbstractTaskInstance(a) = instance {
+                        queue.append(&mut a.subtasks.clone().into());
+                    }
+                    subtasks.insert(subtask, instance.clone());
+                }
+                Plan {
+                    chronicles: subtasks,
+                }
+            }
+        }
+    }
 }
 
 impl Plan {
@@ -12,7 +42,7 @@ impl Plan {
         level += 1;
         for t in &task.subtasks {
             str.push('\n');
-            let subtask = &self.chronicles[*t];
+            let subtask = &self.chronicles.get(t).unwrap();
             match subtask {
                 TaskInstance::ActionInstance(a) => {
                     str.push_str(format!("{}*{}", "\t".repeat(level), a.inner).as_str())
@@ -27,7 +57,7 @@ impl Plan {
 
     pub fn format(&self) -> String {
         let mut str = "**Plan**\n".to_string();
-        for (i, c) in self.chronicles.iter().enumerate() {
+        for (i, c) in &self.chronicles {
             match c {
                 TaskInstance::ActionInstance(a) => {
                     str.push_str(format!("{:^3} : {}\n", i, a.inner).as_str());
@@ -51,15 +81,21 @@ impl Plan {
             return "".to_string();
         }
 
-        let root = self.chronicles.first().unwrap();
-        if let TaskInstance::AbstractTaskInstance(a) = root {
-            self.format_abstract_task(a, 0)
-        } else {
-            "".to_string()
+        //let root = self.chronicles.get(&0).unwrap();
+        let mut keys: Vec<usize> = self.chronicles.keys().cloned().collect();
+        keys.sort();
+        let root_key = keys.first().unwrap();
+        let root = self.chronicles.get(root_key).unwrap();
+        match root {
+            TaskInstance::ActionInstance(a) => {
+                format!("{}", a.inner)
+            }
+            TaskInstance::AbstractTaskInstance(a) => self.format_abstract_task(a, 0),
         }
     }
 }
 
+#[derive(Clone)]
 pub enum TaskInstance {
     ActionInstance(ActionInstance),
     AbstractTaskInstance(AbstractTaskInstance),
@@ -101,12 +137,14 @@ impl TryFrom<TaskInstance> for AbstractTaskInstance {
     }
 }
 
+#[derive(Clone)]
 pub struct AbstractTaskInstance {
     pub task: LValue,
     pub method: LValue,
     pub subtasks: Vec<usize>,
 }
 
+#[derive(Clone)]
 pub struct ActionInstance {
     pub inner: LValue,
 }

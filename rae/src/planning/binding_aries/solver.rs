@@ -11,6 +11,7 @@ use aries_planning::chronicles;
 use aries_planning::chronicles::analysis::hierarchical_is_non_recursive;
 use aries_planning::chronicles::{ChronicleKind, ChronicleOrigin, FiniteProblem};
 use aries_tnet::theory::{StnConfig, StnTheory, TheoryPropagationLevel};
+use im::HashMap;
 use ompas_lisp::core::structs::lerror::LResult;
 use ompas_lisp::core::structs::lvalue::LValue;
 use std::sync::Arc;
@@ -159,7 +160,6 @@ pub fn run_solver(problem: &mut chronicles::Problem, htn_mode: bool) -> Option<P
     result
 }
 /*
-
 Plan example formatted by format_hddl_plan
 
 3 (drive t1 l2)
@@ -189,8 +189,8 @@ pub fn extract_plan(pr: &PlanResult) -> Plan {
     let chronicles: Vec<_> = problem
         .chronicles
         .iter()
-        .filter(|ch| ass.boolean_value_of(ch.chronicle.presence) == Some(true))
         .enumerate()
+        .filter(|ch| ass.boolean_value_of(ch.1.chronicle.presence) == Some(true))
         .collect();
     // sort by start times
     //chronicles.sort_by_key(|ch| ass.f_domain(ch.1.chronicle.start).num.lb);
@@ -200,7 +200,7 @@ pub fn extract_plan(pr: &PlanResult) -> Plan {
         for &(i, ch) in &chronicles {
             match ch.origin {
                 ChronicleOrigin::Refinement { instance_id, .. } if instance_id == chronicle_id => {
-                    vec.push(i)
+                    vec.push(i);
                 }
                 _ => (),
             }
@@ -208,7 +208,7 @@ pub fn extract_plan(pr: &PlanResult) -> Plan {
         vec
     };
 
-    let mut vec: Vec<TaskInstance> = vec![];
+    let mut map: HashMap<usize, TaskInstance> = Default::default();
 
     for &(i, ch) in &chronicles {
         match ch.chronicle.kind {
@@ -218,7 +218,7 @@ pub fn extract_plan(pr: &PlanResult) -> Plan {
                     method: "root".into(),
                     subtasks: get_subtasks_ids(i),
                 };
-                vec.push(TaskInstance::AbstractTaskInstance(instance));
+                map.insert(i, instance.into());
             }
             ChronicleKind::Method => {
                 let instance = AbstractTaskInstance {
@@ -226,18 +226,18 @@ pub fn extract_plan(pr: &PlanResult) -> Plan {
                     method: fmt(&ch.chronicle.name),
                     subtasks: get_subtasks_ids(i),
                 };
-                vec.push(instance.into());
+                map.insert(i, instance.into());
             }
             ChronicleKind::Action | ChronicleKind::DurativeAction => {
                 let instance = ActionInstance {
                     inner: fmt(&ch.chronicle.name),
                 };
-                vec.push(instance.into());
+                map.insert(i, instance.into());
             }
         }
     }
 
-    Plan { chronicles: vec }
+    Plan { chronicles: map }
 }
 
 pub fn extract_instantiated_methods(pr: &PlanResult) -> LResult {

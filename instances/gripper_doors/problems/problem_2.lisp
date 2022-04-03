@@ -21,3 +21,10 @@
     ((connected r4 r5) yes)
    ((connected r5 r4) yes)
    ))))
+
+
+;      r4
+;      |
+; r1 - r5 - r2
+;      |
+;      r3

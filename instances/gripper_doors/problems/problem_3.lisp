@@ -16,4 +16,5 @@
    ((connected r2 r1) yes)
     ((connected r2 r3) yes)
    ((connected r3 r2) yes)
-   ))))
+   )))
+)

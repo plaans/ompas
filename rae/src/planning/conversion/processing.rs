@@ -825,8 +825,13 @@ pub fn convert_lvalue_to_expression_chronicle(
                                 ec.get_result_as_lit(),
                                 ch.sym_table.new_bool(true).into(),
                             ));
+                            let t = ch.sym_table.declare_new_timepoint();
+                            ec.add_var(&t);
+                            let interval = Interval::new(ec.get_start(), &t);
+                            ec.add_constraint(Constraint::leq(ec.get_start(), t));
+                            ec.add_constraint(Constraint::lt(t, ec.get_end()));
                             ec.add_subtask(Expression {
-                                interval: *ec.get_interval(),
+                                interval: interval,
                                 lit: literal.into(),
                             });
                             ch.sym_table

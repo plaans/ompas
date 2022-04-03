@@ -36,13 +36,12 @@ impl TaskNetwork {
             vec
         }
     }
-}
 
-impl TaskNetwork {
     pub async fn format(&self) -> String {
         let tn = self.inner.read().await.clone();
         let parent: Vec<TaskId> = self.parent.read().await.clone();
         let mut str = String::new();
+        str.push_str("Task Network:\n");
         for p in &parent {
             Self::format_network(&tn, p).iter().for_each(|s| {
                 str.push_str(s.as_str());

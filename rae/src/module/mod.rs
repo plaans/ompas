@@ -100,8 +100,8 @@ impl IntoModule for CtxRae {
 
         //functions to debug the functionnement of rae
         module.add_async_fn_prelude(RAE_GET_STATE, get_state);
-        //module.add_async_fn_prelude(RAE_GET_STATUS, get_status);
         module.add_async_fn_prelude(RAE_GET_AGENDA, get_agenda);
+        module.add_async_fn_prelude(RAE_GET_TASK_NETWORK, get_task_network);
 
         //Conversion functions
         module.add_async_fn_prelude(RAE_CONVERT_EXPR, convert_expr);

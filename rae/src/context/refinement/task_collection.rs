@@ -1,6 +1,5 @@
 use crate::context::refinement::{Interval, TaskId, Timepoint};
 use crate::supervisor::options::SelectMode;
-use crate::supervisor::TOKIO_CHANNEL_SIZE;
 use ompas_lisp::core::structs::lerror::LError;
 use ompas_lisp::core::structs::lvalue::LValue;
 use std::convert::TryFrom;
@@ -16,20 +15,98 @@ pub enum TaskStatus {
     Done,
 }
 
+pub const STATUS_PENDING: &str = "pending";
+pub const STATUS_RUNNING: &str = "running";
+pub const STATUS_FAILURE: &str = "failure";
+pub const STATUS_DONE: &str = "done";
+
 impl Display for TaskStatus {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            Self::Pending => write!(f, "pending"),
-            Self::Running => write!(f, "running"),
-            Self::Failure => write!(f, "failure"),
-            Self::Done => write!(f, "done"),
-        }
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Pending => STATUS_PENDING,
+                Self::Running => STATUS_RUNNING,
+                Self::Failure => STATUS_FAILURE,
+                Self::Done => STATUS_DONE,
+            }
+        )
     }
 }
 
 #[derive(Clone, Default)]
 pub struct TaskCollection {
     pub inner: Arc<RwLock<im::OrdMap<TaskId, TaskMetaData>>>,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum TaskType {
+    AbstractTask,
+    Action,
+}
+
+pub const ABSTRACT_TASK: &str = "abstract-task";
+pub const ACTION: &str = "action";
+
+impl Display for TaskType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                TaskType::AbstractTask => ABSTRACT_TASK,
+                TaskType::Action => ACTION,
+            }
+        )
+    }
+}
+
+#[derive(Copy, Clone, Default, Debug)]
+pub struct TaskFilter {
+    pub task_type: Option<TaskType>,
+    pub status: Option<TaskStatus>,
+}
+
+impl TaskCollection {
+    pub async fn format(&self, filter: TaskFilter) -> String {
+        let inner: im::OrdMap<usize, TaskMetaData> = self.get_inner().await;
+
+        let inner: Vec<TaskMetaData> = inner
+            .values()
+            .filter(|&t| {
+                if let Some(task_type) = &filter.task_type {
+                    match task_type {
+                        TaskType::AbstractTask => t.is_abstract_task(),
+                        TaskType::Action => t.is_action(),
+                    }
+                } else {
+                    true
+                }
+            })
+            .filter(|t| {
+                if let Some(status) = &filter.status {
+                    status == &t.get_status()
+                } else {
+                    true
+                }
+            })
+            .cloned()
+            .collect();
+
+        if inner.is_empty() {
+            return "Empty Agenda...".to_string();
+        } else {
+            let mut string = format!(
+                "Agenda:\n\t-number of task: {}\n\t-Actual agenda:\n",
+                inner.len()
+            );
+            for task in inner {
+                string.push_str(format!("{}\n", task).as_str())
+            }
+            string
+        }
+    }
 }
 
 impl TaskCollection {
@@ -75,6 +152,20 @@ pub enum TaskMetaData {
 }
 
 impl TaskMetaData {
+    pub fn is_abstract_task(&self) -> bool {
+        match self {
+            TaskMetaData::AbstractTask(_) => true,
+            TaskMetaData::Action(_) => false,
+        }
+    }
+
+    pub fn is_action(&self) -> bool {
+        match self {
+            TaskMetaData::AbstractTask(_) => false,
+            TaskMetaData::Action(_) => true,
+        }
+    }
+
     pub fn get_status(&self) -> TaskStatus {
         match self {
             TaskMetaData::AbstractTask(a) => a.status,
@@ -191,13 +282,15 @@ pub struct ActionMetaData {
 }
 
 impl ActionMetaData {
+    const STATUS_CHANNEL_SIZE: usize = 10;
+
     pub fn new(
         id: TaskId,
         parent: usize,
         label: LValue,
         start: Timepoint,
     ) -> (Self, mpsc::Receiver<TaskStatus>) {
-        let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+        let (tx, rx) = mpsc::channel(Self::STATUS_CHANNEL_SIZE);
 
         (
             Self {

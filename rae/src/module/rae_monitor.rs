@@ -2,6 +2,10 @@ use crate::context::mutex;
 use crate::context::rae_state::{
     StateType, KEY_DYNAMIC, KEY_INNER_WORLD, KEY_INSTANCE, KEY_STATIC,
 };
+use crate::context::refinement::task_collection::{
+    TaskFilter, TaskStatus, TaskType, ABSTRACT_TASK, ACTION, STATUS_DONE, STATUS_FAILURE,
+    STATUS_PENDING, STATUS_RUNNING,
+};
 use crate::context::ressource_access::monitor;
 use crate::module::{CtxRae, MOD_RAE};
 use ::macro_rules_attribute::macro_rules_attribute;
@@ -15,6 +19,7 @@ use ompas_utils::dyn_async;
 pub const RAE_GET_STATE: &str = "get-state";
 pub const RAE_GET_STATUS: &str = "get-status";
 pub const RAE_GET_AGENDA: &str = "get-agenda";
+pub const RAE_GET_TASK_NETWORK: &str = "get-task-network";
 pub const RAE_GET_METHODS: &str = "get-methods";
 pub const RAE_GET_ACTIONS: &str = "get-actions";
 pub const RAE_GET_SYMBOL_TYPE: &str = "get-symbol-type";
@@ -143,17 +148,57 @@ pub async fn get_config_select<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult
     ))
 }
 #[macro_rules_attribute(dyn_async!)]
+pub async fn get_task_network<'a>(_: &'a [LValue], env: &'a LEnv) -> Result<LValue, LError> {
+    let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
+
+    let string = ctx
+        .get_rae_env()
+        .read()
+        .await
+        .agenda
+        .format_task_network()
+        .await;
+    Ok(string.into())
+}
+
+#[macro_rules_attribute(dyn_async!)]
 pub async fn get_agenda<'a>(args: &'a [LValue], env: &'a LEnv) -> Result<LValue, LError> {
     let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
-    let all = match args.len() {
-        0 => false,
-        1 => {
-            let arg = &args[0];
-            &LValue::Symbol("all".to_string()) == arg
+    let mut task_filter = TaskFilter::default();
+
+    for arg in args {
+        match arg.to_string().as_str() {
+            ABSTRACT_TASK => task_filter.task_type = Some(TaskType::AbstractTask),
+            ACTION => task_filter.task_type = Some(TaskType::Action),
+            STATUS_PENDING => task_filter.status = Some(TaskStatus::Pending),
+            STATUS_DONE => task_filter.status = Some(TaskStatus::Done),
+            STATUS_FAILURE => task_filter.status = Some(TaskStatus::Failure),
+            STATUS_RUNNING => task_filter.status = Some(TaskStatus::Running),
+            str => {
+                return Err(SpecialError(
+                    RAE_GET_AGENDA,
+                    format!(
+                        "{} is not a valid filter option, expecting ({}, {}, {}, {}, {}, {})",
+                        str,
+                        ABSTRACT_TASK,
+                        ACTION,
+                        STATUS_PENDING,
+                        STATUS_RUNNING,
+                        STATUS_DONE,
+                        STATUS_FAILURE
+                    ),
+                ))
+            }
         }
-        _ => false,
-    };
-    let string = ctx.get_rae_env().read().await.agenda.format(all).await;
+    }
+
+    let string = ctx
+        .get_rae_env()
+        .read()
+        .await
+        .agenda
+        .format_task_collection(task_filter)
+        .await;
     Ok(string.into())
 }
 

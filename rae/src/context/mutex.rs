@@ -72,17 +72,12 @@ impl RaeMutex {
 
     #[async_recursion]
     pub async fn release(&mut self) -> bool {
-        if let Some((_, waiter)) = self.fifo.pop_front() {
-            match waiter.sender.try_send(true) {
-                Ok(_) => false,
-                Err(_) => {
-                    //error!("{}", e);
-                    self.release().await
-                }
+        while let Some((_, waiter)) = self.fifo.pop_front() {
+            if let Ok(_) = waiter.sender.try_send(true) {
+                return false;
             }
-        } else {
-            true
         }
+        return true;
     }
 }
 

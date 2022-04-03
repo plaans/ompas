@@ -2,7 +2,7 @@ pub mod task_collection;
 pub mod task_network;
 
 use crate::context::refinement::task_collection::{
-    AbstractTaskMetaData, ActionMetaData, TaskCollection, TaskMetaData, TaskStatus,
+    AbstractTaskMetaData, ActionMetaData, TaskCollection, TaskFilter, TaskMetaData, TaskStatus,
 };
 use crate::context::refinement::task_network::TaskNetwork;
 use im::OrdMap;
@@ -46,7 +46,7 @@ impl Interval {
         Self { start, end }
     }
 
-    /// Returns end-start if end is defined.
+    /// Returns end - start if end is defined.
     pub fn duration(&self) -> Duration {
         match &self.end {
             Some(e) => e - self.start,
@@ -85,37 +85,12 @@ impl Agenda {
 }
 
 impl Agenda {
-    pub async fn format(&self, all: bool) -> String {
-        let mut inner: im::OrdMap<usize, TaskMetaData> = self.get_task_collection().await;
-        if !all {
-            inner = inner
-                .iter()
-                .filter_map(|(&id, t)| {
-                    if t.get_status() != TaskStatus::Done {
-                        Some((id, t.clone()))
-                    } else {
-                        None
-                    }
-                })
-                .collect()
-        }
-        if inner.is_empty() {
-            return "Empty Agenda...".to_string();
-        } else {
-            let mut string = format!(
-                "Agenda:\n\t-number of task: {}\n\t-Actual agenda:\n",
-                inner.len()
-            );
-            let mut k_v: Vec<(usize, TaskMetaData)> =
-                inner.iter().map(|k| (*k.0, k.1.clone())).collect();
+    pub async fn format_task_collection(&self, filter: TaskFilter) -> String {
+        self.trc.format(filter).await
+    }
 
-            k_v.sort_by(|k1, k2| k1.0.cmp(&k2.0));
-            for (_, rs) in k_v {
-                string.push_str(format!("{}\n", rs).as_str())
-            }
-            string.push_str(format!("\n\nTask Network:\n{}", self.tn.format().await).as_str());
-            string
-        }
+    pub async fn format_task_network(&self) -> String {
+        self.tn.format().await
     }
 }
 

@@ -48,7 +48,7 @@ pub enum TaskType {
 #[derive(Default, Debug, Clone)]
 pub struct RAEEvent {}
 
-pub const TOKIO_CHANNEL_SIZE: usize = 65_536; //=2^16
+pub const TOKIO_CHANNEL_SIZE: usize = 100;
 
 /// Main RAE Loop:
 /// Receives Job to handle in separate tasks.

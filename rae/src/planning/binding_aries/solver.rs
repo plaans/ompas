@@ -1,3 +1,4 @@
+use crate::planning::plan::{AbstractTaskInstance, ActionInstance, Plan, TaskInstance};
 use aries_model::extensions::{AssignmentExt, SavedAssignment};
 use aries_model::lang::SAtom;
 use aries_planners::encode::{
@@ -8,7 +9,7 @@ use aries_planners::solver::Strat;
 use aries_planners::{ParSolver, Solver};
 use aries_planning::chronicles;
 use aries_planning::chronicles::analysis::hierarchical_is_non_recursive;
-use aries_planning::chronicles::{ChronicleKind, FiniteProblem};
+use aries_planning::chronicles::{ChronicleKind, ChronicleOrigin, FiniteProblem};
 use aries_tnet::theory::{StnConfig, StnTheory, TheoryPropagationLevel};
 use ompas_lisp::core::structs::lerror::LResult;
 use ompas_lisp::core::structs::lvalue::LValue;
@@ -156,6 +157,87 @@ pub fn run_solver(problem: &mut chronicles::Problem, htn_mode: bool) -> Option<P
         }
     }
     result
+}
+/*
+
+Plan example formatted by format_hddl_plan
+
+3 (drive t1 l2)
+6 (drive t1 l4)
+root 1
+1 (t_move t1 l4) -> m_recursive 3 4
+4 (t_move t1 l4) -> m_recursive 6 7
+7 (t_move t1 l4) -> m_already_there
+*/
+pub fn extract_plan(pr: &PlanResult) -> Plan {
+    let ass = &pr.ass;
+    let problem = &pr.fp;
+
+    /*let fmt1 = |x: &SAtom| -> LValue {
+        let sym = ass.sym_domain_of(*x).into_singleton().unwrap();
+        problem.model.shape.symbols.symbol(sym).to_string().into()
+    };*/
+    let fmt = |name: &[SAtom]| -> LValue {
+        let syms: Vec<LValue> = name
+            .iter()
+            .map(|x| ass.sym_domain_of(*x).into_singleton().unwrap())
+            .map(|s| problem.model.shape.symbols.symbol(s).to_string().into())
+            .collect();
+        syms.into()
+    };
+
+    let chronicles: Vec<_> = problem
+        .chronicles
+        .iter()
+        .filter(|ch| ass.boolean_value_of(ch.chronicle.presence) == Some(true))
+        .enumerate()
+        .collect();
+    // sort by start times
+    //chronicles.sort_by_key(|ch| ass.f_domain(ch.1.chronicle.start).num.lb);
+
+    let get_subtasks_ids = |chronicle_id: usize| -> Vec<usize> {
+        let mut vec = vec![];
+        for &(i, ch) in &chronicles {
+            match ch.origin {
+                ChronicleOrigin::Refinement { instance_id, .. } if instance_id == chronicle_id => {
+                    vec.push(i)
+                }
+                _ => (),
+            }
+        }
+        vec
+    };
+
+    let mut vec: Vec<TaskInstance> = vec![];
+
+    for &(i, ch) in &chronicles {
+        match ch.chronicle.kind {
+            ChronicleKind::Problem => {
+                let instance = AbstractTaskInstance {
+                    task: "root".into(),
+                    method: "root".into(),
+                    subtasks: get_subtasks_ids(i),
+                };
+                vec.push(TaskInstance::AbstractTaskInstance(instance));
+            }
+            ChronicleKind::Method => {
+                let instance = AbstractTaskInstance {
+                    task: fmt(ch.chronicle.task.as_ref().unwrap()),
+                    method: fmt(&ch.chronicle.name),
+                    subtasks: get_subtasks_ids(i),
+                };
+                vec.push(instance.into());
+            }
+            ChronicleKind::Action | ChronicleKind::DurativeAction => {
+                let instance = ActionInstance {
+                    inner: fmt(&ch.chronicle.name),
+                };
+                vec.push(instance.into());
+            }
+        }
+    }
+
+    Plan { chronicles: vec }
 }
 
 pub fn extract_instantiated_methods(pr: &PlanResult) -> LResult {

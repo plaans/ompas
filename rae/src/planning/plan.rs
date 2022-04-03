@@ -1,0 +1,137 @@
+use ompas_lisp::core::structs::lerror::LError;
+use ompas_lisp::core::structs::lvalue::LValue;
+use std::convert::TryFrom;
+
+pub struct Plan {
+    pub chronicles: Vec<TaskInstance>,
+}
+
+impl Plan {
+    fn format_abstract_task(&self, task: &AbstractTaskInstance, mut level: usize) -> String {
+        let mut str = format!("{}*{} -> {}", "\t".repeat(level), task.task, task.method);
+        level += 1;
+        for t in &task.subtasks {
+            str.push('\n');
+            let subtask = &self.chronicles[*t];
+            match subtask {
+                TaskInstance::ActionInstance(a) => {
+                    str.push_str(format!("{}*{}", "\t".repeat(level), a.inner).as_str())
+                }
+                TaskInstance::AbstractTaskInstance(a) => {
+                    str.push_str(format!("{}", self.format_abstract_task(a, level)).as_str())
+                }
+            }
+        }
+        str
+    }
+
+    pub fn format(&self) -> String {
+        let mut str = "**Plan**\n".to_string();
+        for (i, c) in self.chronicles.iter().enumerate() {
+            match c {
+                TaskInstance::ActionInstance(a) => {
+                    str.push_str(format!("{:^3} : {}\n", i, a.inner).as_str());
+                }
+                TaskInstance::AbstractTaskInstance(a) => {
+                    str.push_str(format!("{:^3} : {} -> {}", i, a.task, a.method).as_str());
+                    for s in &a.subtasks {
+                        str.push_str(format!(" {}", s).as_str())
+                    }
+                    str.push('\n');
+                }
+            }
+        }
+        str
+    }
+
+    pub fn format_hierarchy(&self) -> String {
+        println!("len: {}", self.chronicles.len());
+
+        if self.chronicles.len() == 0 {
+            return "".to_string();
+        }
+
+        let root = self.chronicles.first().unwrap();
+        if let TaskInstance::AbstractTaskInstance(a) = root {
+            self.format_abstract_task(a, 0)
+        } else {
+            "".to_string()
+        }
+    }
+}
+
+pub enum TaskInstance {
+    ActionInstance(ActionInstance),
+    AbstractTaskInstance(AbstractTaskInstance),
+}
+
+impl From<ActionInstance> for TaskInstance {
+    fn from(a: ActionInstance) -> Self {
+        Self::ActionInstance(a)
+    }
+}
+
+impl From<AbstractTaskInstance> for TaskInstance {
+    fn from(a: AbstractTaskInstance) -> Self {
+        Self::AbstractTaskInstance(a)
+    }
+}
+
+impl TryFrom<TaskInstance> for ActionInstance {
+    type Error = LError;
+
+    fn try_from(value: TaskInstance) -> Result<Self, Self::Error> {
+        if let TaskInstance::ActionInstance(a) = value {
+            Ok(a)
+        } else {
+            Err(Default::default())
+        }
+    }
+}
+
+impl TryFrom<TaskInstance> for AbstractTaskInstance {
+    type Error = LError;
+
+    fn try_from(value: TaskInstance) -> Result<Self, Self::Error> {
+        if let TaskInstance::AbstractTaskInstance(a) = value {
+            Ok(a)
+        } else {
+            Err(Default::default())
+        }
+    }
+}
+
+pub struct AbstractTaskInstance {
+    pub task: LValue,
+    pub method: LValue,
+    pub subtasks: Vec<usize>,
+}
+
+pub struct ActionInstance {
+    pub inner: LValue,
+}
+
+/*
+impl ActionInstance {
+    pub fn format(&self, level: usize) -> String {
+        format!("{}*{}", "\t".repeat(level), self.inner)
+    }
+}
+
+impl AbstractTaskInstance {
+    pub fn format(&self, level: usize) -> String {
+        let mut str = format!("{}*{} -> {}", "\t".repeat(level), self.task, self.method);
+        for t in &self.subtasks {
+            str.push('\n');
+            str.push_str(
+                match t {
+                    TaskInstance::ActionInstance(a) => a.format(level + 1),
+                    TaskInstance::AbstractTaskInstance(a) => a.format(level + 1),
+                }
+                .as_str(),
+            );
+        }
+        str.push('\n');
+        str
+    }
+}*/

@@ -313,7 +313,6 @@ pub fn declare_task(task: &Task, st: &mut SymTable) -> Vec<AtomId> {
     let mut task_lit: Vec<AtomId> = vec![task_label_id];
 
     for (param, _t) in task.get_parameters().inner() {
-        //TODO: add types for parameters
         task_lit.push(st.declare_new_parameter(&param, true, None))
     }
 

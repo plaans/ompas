@@ -2,6 +2,7 @@ use crate::module::{CtxRae, MOD_RAE};
 use crate::planning::binding_aries::solver::run_solver;
 use crate::planning::binding_aries::{build_chronicles, solver};
 use crate::planning::conversion::convert_domain_to_chronicle_hierarchy;
+use crate::planning::plan::TaskInstance;
 use crate::planning::structs::{ConversionContext, Problem};
 use ::macro_rules_attribute::macro_rules_attribute;
 use ompas_lisp::core::structs::lenv::LEnv;
@@ -27,6 +28,10 @@ pub async fn plan_task<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     // println!("{}", format_partial_plan(&pb, &x)?);
 
     let result: LValue = if let Some(x) = &result {
+        let plan = solver::extract_plan(x);
+        println!("{}\n{}", plan.format(), plan.format_hierarchy());
+        let root = plan.chronicles.first().unwrap();
+        if let TaskInstance::AbstractTaskInstance(a) = root {}
         solver::extract_instantiated_methods(x)?
     } else {
         LValue::String("no solution found".to_string())

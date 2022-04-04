@@ -613,6 +613,17 @@ impl TypeHierarchy {
         }
         str
     }
+
+    pub fn get_tuple_type_parent(&self) -> Vec<(&String, Option<&String>)> {
+        let mut vec = vec![];
+        for (t, p) in &self.parent {
+            vec.push((
+                self.get_symbol(t).unwrap(),
+                p.map(|id| self.inner.get(&id).unwrap()),
+            ));
+        }
+        vec
+    }
 }
 
 #[derive(Default, Debug, Clone)]
@@ -968,6 +979,10 @@ impl DomainEnv {
         env.insert(RAE_METHOD_SCORE_MAP.to_string(), map_method_score.into());
 
         env
+    }
+
+    pub fn get_type_hierarchy(&self) -> &TypeHierarchy {
+        &self.types
     }
 }
 

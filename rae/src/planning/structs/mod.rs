@@ -1,4 +1,4 @@
-use crate::context::rae_env::{DomainEnv, Parameters, StateFunction};
+use crate::context::rae_env::{DomainEnv, Parameters, StateFunction, TypeHierarchy};
 use crate::context::rae_state::RAEStateSnapshot;
 use crate::module::rae_exec::RAE_INSTANCE;
 use crate::planning::structs::chronicle::ChronicleTemplate;
@@ -148,7 +148,7 @@ pub struct Problem {
     pub actions: Vec<String>,
     pub tasks: Vec<String>,
     pub methods: Vec<String>,
-    pub types: Vec<String>,
+    pub types: TypeHierarchy,
     pub state_functions: Vec<(String, Parameters)>,
     pub objects: Vec<(String, String)>,
     pub initial_state: RAEStateSnapshot,
@@ -161,7 +161,7 @@ impl From<&ConversionContext> for Problem {
         let actions = cc.domain.get_actions().keys().cloned().collect();
         let tasks = cc.domain.get_tasks().keys().cloned().collect();
         let methods = cc.domain.get_methods().keys().cloned().collect();
-        let mut types = vec![];
+        let mut types = cc.domain.get_type_hierarchy().clone();
         let mut objects = vec![];
 
         {
@@ -170,7 +170,9 @@ impl From<&ConversionContext> for Problem {
                     assert_eq!(list_instance.len(), 2);
                     assert_eq!(LValueS::from(RAE_INSTANCE), list_instance[0]);
                     let _type: String = list_instance[1].to_string();
-                    types.push(_type.clone());
+                    if types.get_id(&_type) == None {
+                        types.add_type(_type.clone(), None)
+                    }
                     if let LValueS::List(instance) = v {
                         for element in instance {
                             objects.push((element.to_string(), _type.clone()))

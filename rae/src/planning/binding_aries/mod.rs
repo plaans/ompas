@@ -86,10 +86,22 @@ pub fn build_chronicles(problem: &Problem) -> Result<chronicles::Problem> {
 
     let mut symbols: Vec<TypedSymbol> = vec![];
 
-    for t in &problem.types {
-        types.push((t.into(), Some(OBJECT_TYPE.into())));
+    //Add TypeHierarchy
+    for (t, p) in problem.types.get_tuple_type_parent() {
+        types.push((
+            t.clone().into(),
+            Some(match p {
+                Some(p) => p.clone().into(),
+                None => OBJECT_TYPE.into(),
+            }),
+        ));
         symbols.push(TypedSymbol::new(t, TYPE_TYPE));
     }
+
+    /*for t in &problem.types {
+        types.push((t.into(), Some(OBJECT_TYPE.into())));
+        symbols.push(TypedSymbol::new(t, TYPE_TYPE));
+    }*/
 
     let th = TypeHierarchy::new(types)?;
 

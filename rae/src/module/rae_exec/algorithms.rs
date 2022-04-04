@@ -4,7 +4,7 @@ use crate::context::refinement::task_collection::{
 };
 use crate::module::rae_exec::error::RaeExecError;
 use crate::module::rae_exec::planning::{CtxPlanning, MOD_PLANNING};
-use crate::module::rae_exec::{get_facts, CtxRaeExec, MOD_RAE_EXEC, PARENT_TASK};
+use crate::module::rae_exec::{CtxRaeExec, MOD_RAE_EXEC, PARENT_TASK};
 use crate::supervisor::options::{Planner, SelectMode};
 use ::macro_rules_attribute::macro_rules_attribute;
 use async_recursion::async_recursion;
@@ -195,9 +195,7 @@ mod select {
     use crate::context::refinement::Interval;
     use crate::module::rae_exec::planning::{CtxPlanning, MOD_PLANNING};
     use crate::module::rae_exec::platform::instance;
-    use crate::module::rae_exec::{
-        get_facts, CtxRaeExec, MOD_RAE_EXEC, PARENT_TASK, RAE_SELECT, STATE,
-    };
+    use crate::module::rae_exec::{CtxRaeExec, MOD_RAE_EXEC, PARENT_TASK, RAE_SELECT, STATE};
     use crate::planning::binding_aries::solver::run_solver;
     use crate::planning::binding_aries::{build_chronicles, solver};
     use crate::planning::conversion::convert_domain_to_chronicle_hierarchy;

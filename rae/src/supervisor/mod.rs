@@ -91,7 +91,7 @@ pub async fn rae_run(mut context: RAEEnv, options: &RAEOptions, _log: String) {
     let mut select_mode = options.get_select_mode().clone();
 
     let mut env: LEnv = context.get_exec_env().await;
-    let cc: Option<ConversionCollection> = if matches!(select_mode, Planning(_)) {
+    let cc: Option<ConversionCollection> = if matches!(select_mode, Planning(_, _)) {
         let instant = Instant::now();
         match convert_domain_to_chronicle_hierarchy(ConversionContext {
             domain: context.domain_env.clone(),

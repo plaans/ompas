@@ -15,7 +15,14 @@ impl Display for SelectMode {
             "{}",
             match self {
                 SelectMode::Greedy => GREEDY.to_string(),
-                SelectMode::Planning(p) => p.to_string(),
+                SelectMode::Planning(p, bool) => format!(
+                    "{}{}",
+                    p,
+                    match bool {
+                        true => " with optimisation",
+                        false => " without optimisation",
+                    }
+                ),
                 SelectMode::Heuristic => HEURISTIC.to_string(),
                 SelectMode::Learning => LEARNING.to_string(),
             }
@@ -72,12 +79,13 @@ pub const LEARNING: &str = "learning";
 #[derive(Debug, Copy, Clone)]
 pub enum SelectMode {
     Greedy,
-    Planning(Planner),
+    Planning(Planner, bool),
     Heuristic,
     Learning,
 }
 
 pub const ARIES: &str = "aries";
+pub const ARIES_OPT: &str = "aries-opt";
 pub const UPOM: &str = "upom";
 pub const RAE_PLAN: &str = "rae-plan";
 

@@ -6,7 +6,7 @@ use aries_planners::encode::{
 };
 use aries_planners::fmt::{format_hddl_plan, format_partial_plan, format_pddl_plan};
 use aries_planners::solver::Strat;
-use aries_planners::{ParSolver, Solver};
+use aries_planners::Solver;
 use aries_planning::chronicles;
 use aries_planning::chronicles::analysis::hierarchical_is_non_recursive;
 use aries_planning::chronicles::{ChronicleKind, ChronicleOrigin, FiniteProblem};
@@ -32,24 +32,23 @@ fn init_solver(pb: &FiniteProblem) -> Box<Solver> {
 /// Default set of strategies for HTN problems
 const HTN_DEFAULT_STRATEGIES: [Strat; 2] = [Strat::Activity, Strat::Forward];
 /// Default set of strategies for generative (flat) problems.
-const GEN_DEFAULT_STRATEGIES: [Strat; 1] = [Strat::Activity];
+//const GEN_DEFAULT_STRATEGIES: [Strat; 1] = [Strat::Activity];
 
-fn solve(pb: &FiniteProblem, htn_mode: bool) -> Option<std::sync::Arc<SavedAssignment>> {
+fn solve_htn(pb: &FiniteProblem, optimize: bool) -> Option<std::sync::Arc<SavedAssignment>> {
     let solver = init_solver(pb);
-    let strats: &[Strat] = if htn_mode {
-        &HTN_DEFAULT_STRATEGIES
-    } else {
-        &GEN_DEFAULT_STRATEGIES
-    };
-    let mut solver = if htn_mode {
+    let strats: &[Strat] = &HTN_DEFAULT_STRATEGIES;
+
+    let mut solver =
         aries_solver::parallel_solver::ParSolver::new(solver, strats.len(), |id, s| {
             strats[id].adapt_solver(s, pb)
-        })
-    } else {
-        ParSolver::new(solver, 1, |_, _| {})
-    };
+        });
 
-    let found_plan = solver.solve().unwrap();
+    let found_plan = if optimize {
+        let res = solver.minimize(pb.horizon.num).unwrap();
+        res.map(|tup| tup.1)
+    } else {
+        solver.solve().unwrap()
+    };
 
     if let Some(solution) = found_plan {
         //solver.print_stats();
@@ -96,13 +95,13 @@ fn propagate_and_print(base_problem: &mut chronicles::Problem, depth: u32, htn_m
     }
 }
 
-pub fn run_solver(problem: &mut chronicles::Problem, htn_mode: bool) -> Option<PlanResult> {
+pub fn run_solver_for_htn(problem: &mut chronicles::Problem, optimize: bool) -> Option<PlanResult> {
     println!("===== Preprocessing ======");
     aries_planning::chronicles::preprocessing::preprocess(problem);
     println!("==========================");
 
     let max_depth = u32::MAX;
-    let min_depth = if htn_mode && hierarchical_is_non_recursive(problem) {
+    let min_depth = if hierarchical_is_non_recursive(problem) {
         max_depth // non recursive htn: bounded size, go directly to max
     } else {
         0
@@ -127,30 +126,22 @@ pub fn run_solver(problem: &mut chronicles::Problem, htn_mode: bool) -> Option<P
             chronicles: problem.chronicles.clone(),
             tables: problem.context.tables.clone(),
         };
-        if htn_mode {
-            populate_with_task_network(&mut pb, problem, n).unwrap();
-        } else {
-            populate_with_template_instances(&mut pb, problem, |_| Some(n)).unwrap();
-        }
+        populate_with_task_network(&mut pb, problem, n).unwrap();
+
         println!("  [{:.3}s] Populated", start.elapsed().as_secs_f32());
         let start = Instant::now();
-        let solver_result = solve(&pb, htn_mode);
+        let solver_result = solve_htn(&pb, optimize);
         println!("  [{:.3}s] solved", start.elapsed().as_secs_f32());
         if let Some(x) = solver_result {
             println!("  Solution found");
-            let plan = if htn_mode {
-                format!(
-                    "\n**** Decomposition ****\n\n\
+            println!(
+                "\n**** Decomposition ****\n\n\
                     {}\n\n\
                     **** Plan ****\n\n\
                     {}",
-                    format_hddl_plan(&pb, &x).unwrap(),
-                    format_pddl_plan(&pb, &x).unwrap()
-                )
-            } else {
+                format_hddl_plan(&pb, &x).unwrap(),
                 format_pddl_plan(&pb, &x).unwrap()
-            };
-            println!("{}", plan);
+            );
             result = Some(PlanResult { ass: x, fp: pb });
             break;
         } else {

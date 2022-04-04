@@ -1,7 +1,8 @@
 use crate::module::rae_exec::{Job, JobType};
 use crate::module::{CtxRae, MOD_RAE};
 use crate::supervisor::options::{
-    Planner, RAEOptions, SelectMode, ARIES, GREEDY, HEURISTIC, LEARNING, PLANNING, RAE_PLAN, UPOM,
+    Planner, RAEOptions, SelectMode, ARIES, ARIES_OPT, GREEDY, HEURISTIC, LEARNING, PLANNING,
+    RAE_PLAN, UPOM,
 };
 use crate::supervisor::rae_run;
 use ::macro_rules_attribute::macro_rules_attribute;
@@ -76,9 +77,10 @@ pub async fn configure_select<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult 
     let m: String = (&args[0]).try_into()?;
     let select_mode = match m.as_str() {
         GREEDY => SelectMode::Greedy,
-        PLANNING | ARIES => SelectMode::Planning(Planner::Aries),
-        UPOM => SelectMode::Planning(Planner::UPOM),
-        RAE_PLAN => SelectMode::Planning(Planner::RAEPlan(Default::default())),
+        PLANNING | ARIES => SelectMode::Planning(Planner::Aries, false),
+        ARIES_OPT => SelectMode::Planning(Planner::Aries, true),
+        UPOM => SelectMode::Planning(Planner::UPOM, false),
+        RAE_PLAN => SelectMode::Planning(Planner::RAEPlan(Default::default()), false),
         HEURISTIC => SelectMode::Heuristic,
         LEARNING => SelectMode::Learning,
         _ => {

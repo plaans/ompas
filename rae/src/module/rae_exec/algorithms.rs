@@ -164,9 +164,9 @@ pub async fn select(stack: &mut AbstractTaskMetaData, env: &LEnv) -> LResult {
             info!("select greedy for {}", stack.get_label());
             select::greedy_select(state, tried, task, env).await?
         }
-        SelectMode::Planning(Planner::Aries) => {
+        SelectMode::Planning(Planner::Aries, bool) => {
             info!("select with aries for {}", stack.get_label());
-            select::planning_select(state, tried, task, env).await?
+            select::planning_select(state, tried, task, env, *bool).await?
         }
         _ => todo!(),
     };
@@ -196,12 +196,13 @@ mod select {
     use crate::module::rae_exec::planning::{CtxPlanning, MOD_PLANNING};
     use crate::module::rae_exec::platform::instance;
     use crate::module::rae_exec::{CtxRaeExec, MOD_RAE_EXEC, PARENT_TASK, RAE_SELECT, STATE};
-    use crate::planning::binding_aries::solver::run_solver;
+    use crate::planning::binding_aries::solver::run_solver_for_htn;
     use crate::planning::binding_aries::{generate_chronicles, solver};
     use crate::planning::plan::AbstractTaskInstance;
     use crate::planning::structs::{ConversionContext, Problem};
     use crate::supervisor::options::Planner::Aries;
     use crate::supervisor::options::SelectMode;
+    use log::info;
     use ompas_lisp::core::root_module::get;
     use ompas_lisp::core::root_module::list::cons;
     use ompas_lisp::core::structs::lenv::LEnv;
@@ -211,6 +212,7 @@ mod select {
     use ompas_lisp::core::structs::lvalue::LValue;
     use ompas_lisp::modules::utils::{enr, enumerate};
     use std::convert::{TryFrom, TryInto};
+    use std::time::Instant;
 
     //pub const GREEDY_SELECT: &str = "greedy_select";
 
@@ -220,6 +222,7 @@ mod select {
         tried: &Vec<LValue>,
         task: Vec<LValue>,
         env: &LEnv,
+        optimize: bool,
     ) -> lerror::Result<RefinementMetaData> {
         let mut greedy: RefinementMetaData =
             greedy_select(state.clone(), tried, task.clone(), env).await?;
@@ -287,7 +290,7 @@ mod select {
                         greedy.choosed = applicable_methods.get(0).cloned().unwrap_or(LValue::Nil);
                         greedy.applicable_methods = applicable_methods;
                         greedy.interval.set_end(ctx.agenda.get_instant());
-                        greedy.refinement_type = SelectMode::Planning(Aries);
+                        greedy.refinement_type = SelectMode::Planning(Aries, optimize);
                         return Ok(greedy);
                     } else {
                         println!("Error in continuum, we are going to plan...");
@@ -315,8 +318,13 @@ mod select {
         problem.goal_tasks.push(task.into());
 
         let mut aries_problem = generate_chronicles(&problem)?;
-
-        let result = run_solver(&mut aries_problem, true);
+        let instant = Instant::now();
+        let result = run_solver_for_htn(&mut aries_problem, optimize);
+        info!(
+            "Time to run solver: {} (optimize = {})",
+            instant.elapsed().as_micros() as f64 / 1000.0,
+            optimize
+        );
         // println!("{}", format_partial_plan(&pb, &x)?);
 
         let mut greedy: RefinementMetaData = greedy;
@@ -355,7 +363,7 @@ mod select {
             greedy.choosed = applicable_methods.get(0).cloned().unwrap_or(LValue::Nil);
             greedy.applicable_methods = applicable_methods;
             greedy.interval.set_end(ctx.agenda.get_instant());
-            greedy.refinement_type = SelectMode::Planning(Aries);
+            greedy.refinement_type = SelectMode::Planning(Aries, optimize);
             Ok(greedy)
         } else {
             Ok(greedy)

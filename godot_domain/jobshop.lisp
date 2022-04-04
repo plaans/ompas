@@ -168,6 +168,7 @@
                         (do
                             (go_charge ?r)
                             (monitor `(> (robot.battery ,?r) 0.9)))))))))
+                            
     (def-task t_check_rob_bat)
     (def-lambda '(async_check_battery
         (lambda (?r) (async (t_check_battery ?r)))))

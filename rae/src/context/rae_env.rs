@@ -14,7 +14,7 @@ use ompas_lisp::core::structs::lvalue::LValue;
 use ompas_lisp::core::structs::typelvalue::TypeLValue;
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{Display, Formatter};
-use std::ops::Deref;
+use std::ops::{Add, Deref};
 use tokio::sync::mpsc::Receiver;
 
 pub const RAE_TASK_METHODS_MAP: &str = "rae-task-methods-map";
@@ -492,6 +492,48 @@ impl Display for Action {
     }
 }
 
+pub struct TypeHierarchy {
+    inner: HashMap<String, Option<String>>,
+}
+
+impl TypeHierarchy {
+    pub fn add_type(&mut self, t: impl Display, parent: Option<impl Display>) {
+        if let Some(p) = parent {
+            let parent_key: String = p.to_string();
+            self.inner.insert(t.to_string(), Some(parent_key.clone()));
+            if !self.inner.contains_key(&parent_key) {
+                self.inner.insert(parent_key, None);
+            }
+        } else {
+            self.inner.insert(t.into(), None);
+        }
+    }
+
+    pub fn get_parent(&mut self, t: impl Display) -> Option<String> {
+        match self.inner.get(&t.to_string()) {
+            None => None,
+            Some(p) => p,
+        }
+    }
+
+    pub fn get_parents(&mut self, t: impl Display) -> Vec<String> {
+        let key = t.to_string();
+        let mut parents = vec![];
+        let mut parent = self.get_parent(key);
+        while let Some(p) = parent {
+            parents.push(p.clone());
+            parent = self.get_parent(p)
+        }
+        parents
+    }
+}
+
+impl Display for TypeHierarchy {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
 #[derive(Default, Debug, Clone)]
 pub struct DomainEnv {
     tasks: HashMap<String, Task>,
@@ -499,6 +541,7 @@ pub struct DomainEnv {
     state_functions: HashMap<String, StateFunction>,
     actions: HashMap<String, Action>,
     lambdas: HashMap<String, LValue>,
+    types: TypeHierarchy,
     map_symbol_type: HashMap<String, String>,
 }
 
@@ -594,6 +637,14 @@ impl DomainEnv {
     pub fn add_lambda(&mut self, label: String, value: LValue) {
         self.lambdas.insert(label.clone(), value);
         self.map_symbol_type.insert(label, LAMBDA_TYPE.into());
+    }
+
+    pub fn add_type(&mut self, t: impl Display, p: Option<impl Display>) {
+        self.types.add_type(t, p);
+    }
+
+    pub fn get_parents(&mut self, t: impl Display) -> Vec<String> {
+        self.types.get_parents(t)
     }
 }
 

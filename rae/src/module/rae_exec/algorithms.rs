@@ -4,7 +4,7 @@ use crate::context::refinement::task_collection::{
 };
 use crate::module::rae_exec::error::RaeExecError;
 use crate::module::rae_exec::planning::{CtxPlanning, MOD_PLANNING};
-use crate::module::rae_exec::{CtxRaeExec, MOD_RAE_EXEC, PARENT_TASK};
+use crate::module::rae_exec::{get_facts, CtxRaeExec, MOD_RAE_EXEC, PARENT_TASK};
 use crate::supervisor::options::{Planner, SelectMode};
 use ::macro_rules_attribute::macro_rules_attribute;
 use async_recursion::async_recursion;
@@ -151,6 +151,8 @@ pub async fn select(stack: &mut AbstractTaskMetaData, env: &LEnv) -> LResult {
      */
     let task_id = stack.get_id();
     let ctx_planning = env.get_context::<CtxPlanning>(MOD_PLANNING)?;
+    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
+    let state = ctx.state.get_snapshot().await;
 
     let task: Vec<LValue> = stack.get_label().try_into()?;
     let tried = stack.get_tried();
@@ -160,11 +162,11 @@ pub async fn select(stack: &mut AbstractTaskMetaData, env: &LEnv) -> LResult {
             Returns all applicable methods sorted by their score
              */
             info!("select greedy for {}", stack.get_label());
-            select::greedy_select(tried, task, env).await?
+            select::greedy_select(state, tried, task, env).await?
         }
         SelectMode::Planning(Planner::Aries) => {
             info!("select with aries for {}", stack.get_label());
-            select::planning_select(tried, task, env).await?
+            select::planning_select(state, tried, task, env).await?
         }
         _ => todo!(),
     };
@@ -188,6 +190,7 @@ mod select {
         RAE_METHOD_PRE_CONDITIONS_MAP, RAE_METHOD_SCORE_MAP, RAE_METHOD_TYPES_MAP,
         RAE_TASK_METHODS_MAP,
     };
+    use crate::context::rae_state::RAEStateSnapshot;
     use crate::context::refinement::task_collection::{AbstractTaskMetaData, RefinementMetaData};
     use crate::context::refinement::Interval;
     use crate::module::rae_exec::planning::{CtxPlanning, MOD_PLANNING};
@@ -216,13 +219,17 @@ mod select {
 
     //Returns the method to do.
     pub async fn planning_select(
+        state: RAEStateSnapshot,
         tried: &Vec<LValue>,
         task: Vec<LValue>,
         env: &LEnv,
     ) -> lerror::Result<RefinementMetaData> {
-        let mut greedy: RefinementMetaData = greedy_select(tried, task.clone(), env).await?;
+        let mut greedy: RefinementMetaData =
+            greedy_select(state.clone(), tried, task.clone(), env).await?;
 
-        println!("Task to plan: {}", LValue::from(task.clone()));
+        println!("\n\nTask to plan: {}", LValue::from(task.clone()));
+        println!("\t*tried: {}", LValue::from(tried));
+        println!("\t*greedy: {}", LValue::from(&greedy.applicable_methods));
         let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
 
         match env
@@ -250,7 +257,7 @@ mod select {
                     let refinement: AbstractTaskInstance =
                         match plan.chronicles.get(&task_id).unwrap().clone().try_into() {
                             Ok(a) => a,
-                            Err(e) => {
+                            Err(_) => {
                                 return Err(SpecialError(
                                     RAE_SELECT,
                                     format!("task {} is not an abstract task", n),
@@ -264,8 +271,7 @@ mod select {
                         refinement.task, refinement.method,
                     );
                     println!("We verify that the method is still applicable...");
-                    println!("\t*tried: {}", LValue::from(tried));
-                    println!("\t*greedy: {}", LValue::from(&greedy.applicable_methods));
+
                     let planner_method = refinement.method;
 
                     if refinement.task == task_to_refine
@@ -288,6 +294,7 @@ mod select {
                         return Ok(greedy);
                     } else {
                         println!("Error in continuum, we are going to plan...");
+                        println!("State: {}", LValue::from(state.clone()))
                     }
                 } else {
                     println!("No plan available for parent task...A plan is needed!")
@@ -301,7 +308,7 @@ mod select {
         let context = ConversionContext {
             domain: ctx_domain.domain.clone(),
             env: ctx_domain.env.clone(),
-            state: ctx.state.get_snapshot().await,
+            state: state,
         };
 
         let mut problem: Problem = (&context).into();
@@ -318,10 +325,6 @@ mod select {
         let mut greedy: RefinementMetaData = greedy;
 
         if let Some(x) = &result {
-            println!(
-                "greedy methods: {}",
-                LValue::from(&greedy.applicable_methods)
-            );
             let plan = solver::extract_plan(x);
             let first_task_id = plan.get_first_subtask().unwrap();
             let method_plan = plan.extract_sub_plan(first_task_id);
@@ -341,9 +344,12 @@ mod select {
             //let planner_method = result[0].clone();
 
             let planner_method = task.method;
-            println!("planners methods: {}", planner_method);
-
-            greedy_methods.retain(|m| m != &planner_method);
+            println!("planner method: {}", planner_method);
+            if greedy_methods.contains(&planner_method) {
+                greedy_methods.retain(|m| m != &planner_method);
+            } else {
+                panic!("planner found a non applicable method...")
+            }
 
             let mut applicable_methods = vec![planner_method];
             applicable_methods.append(&mut greedy_methods);
@@ -360,6 +366,7 @@ mod select {
     }
 
     pub async fn greedy_select(
+        state: RAEStateSnapshot,
         tried: &Vec<LValue>,
         task: Vec<LValue>,
         env: &LEnv,
@@ -385,11 +392,10 @@ mod select {
             .collect();
 
         let mut applicable_methods: Vec<(LValue, i64)> = vec![];
-        let state: LValue = get_facts(&[], env).await?;
 
         let mut env = env.clone();
 
-        env.insert(STATE, state);
+        env.insert(STATE, state.into());
         let env = &env;
 
         let methods_template: Vec<LValue> = get(
@@ -476,7 +482,7 @@ mod select {
     }
 }
 
-async fn set_success_for_task(task_id: usize, env: &LEnv) -> Result<LValue, LError> {
+pub async fn set_success_for_task(task_id: usize, env: &LEnv) -> Result<LValue, LError> {
     /*
     Steps:
     - Remove the stack from the agenda
@@ -486,6 +492,7 @@ async fn set_success_for_task(task_id: usize, env: &LEnv) -> Result<LValue, LErr
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
     let mut task: TaskMetaData = ctx.agenda.trc.get(task_id).await;
     task.update_status(TaskStatus::Done).await;
+    task.set_end_timepoint(ctx.agenda.get_instant());
     ctx.agenda.update_task(task.get_id(), task).await;
     //ctx.agenda.remove_task(&task_id).await?;
     Ok(LValue::True)

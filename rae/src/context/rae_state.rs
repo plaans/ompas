@@ -1,6 +1,7 @@
 use im::HashMap;
 
 use crate::context::refinement::task_collection::TaskStatus;
+use ompas_lisp::core::root_module::map::union_map;
 use ompas_lisp::core::structs::lerror::LError;
 use ompas_lisp::core::structs::lerror::LError::SpecialError;
 use ompas_lisp::core::structs::lvalue::LValue;
@@ -117,8 +118,16 @@ pub struct RAEStateSnapshot {
 }
 
 impl From<RAEStateSnapshot> for LValue {
-    fn from(_: RAEStateSnapshot) -> Self {
-        todo!()
+    fn from(r: RAEStateSnapshot) -> Self {
+        let env = Default::default();
+        union_map(
+            &[
+                union_map(&[r.instance.into_map(), r.dynamic.into_map()], &env).unwrap(),
+                union_map(&[r._static.into_map(), r.inner_world.into_map()], &env).unwrap(),
+            ],
+            &env,
+        )
+        .unwrap()
     }
 }
 

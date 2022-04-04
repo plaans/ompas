@@ -859,7 +859,24 @@ pub async fn def_initial_state<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult
 #[macro_rules_attribute(dyn_async!)]
 pub async fn def_types<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     for arg in args {
-        add_type(&[arg.clone()], env).await?;
+        match arg {
+            LValue::List(list) => {
+                if list.len() < 2 {
+                    return Err(SpecialError(
+                        RAE_DEF_CONSTANTS,
+                        format!("an objects is defined by a symbol and a type, got {}", arg),
+                    ));
+                }
+                let last = list.last().unwrap();
+                for t in &list[0..list.len() - 1] {
+                    //println!("new type: {}", t);
+                    add_type(&[t.clone(), last.clone()], env).await?;
+                }
+            }
+            lv => {
+                add_type(&[lv.clone()], env).await?;
+            }
+        }
     }
     Ok(LValue::Nil)
 }
@@ -881,22 +898,39 @@ pub async fn def_objects<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     Ok(LValue::Nil)
 }
 
-/*pub async fn def_objects(args: &[LValue], env: &LEnv) -> LResult {
-    def_constants(args, env).await
-}*/
-
 #[macro_rules_attribute(dyn_async!)]
 pub async fn add_type<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     let ctx = env.get_context::<CtxRae>(MOD_RAE).unwrap();
 
-    let arg: LValueS = (&args[0]).into();
+    let (t, parent) = match args.len() {
+        1 => (args[0].to_string(), None),
+        2 => (args[0].to_string(), Some(args[1].to_string())),
+        l => return Err(WrongNumberOfArgument(RAE_ADD_TYPE, args.into(), l, 1..2)),
+    };
 
     let mut instance = LState {
         inner: Default::default(),
         _type: Some(StateType::Instance),
     };
 
-    instance.insert(vec![RAE_INSTANCE.into(), arg].into(), LValueS::List(vec![]));
+    ctx.env
+        .write()
+        .await
+        .domain_env
+        .add_type(t.clone(), parent.clone());
+
+    instance.insert(
+        vec![LValueS::from(RAE_INSTANCE), LValue::from(&t).into()].into(),
+        LValueS::List(vec![]),
+    );
+
+    if let Some(p) = &parent {
+        let parent_instance: LValueS =
+            vec![LValueS::from(RAE_INSTANCE), LValue::from(p).into()].into();
+        if !instance.inner.contains_key(&parent_instance) {
+            instance.insert(parent_instance, LValueS::List(vec![]))
+        }
+    }
 
     ctx.get_rae_env()
         .write()

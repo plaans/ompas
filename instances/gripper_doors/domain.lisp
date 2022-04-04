@@ -11,7 +11,7 @@
     (def-state-function at-robby '(?r room))
     (def-state-function at '(?b ball) '(?r room))
     (def-state-function carry '(?g gripper) '(?b ball))
-    (def-state-function connected '(?r room) '(?r room) '(?r new_bool))
+    (def-state-function connected '(?r1 room) '(?r2 room) '(?result new_bool))
 
     actions
     (def-action move '(?from room) '(?to room))
@@ -115,8 +115,16 @@
         '((:task t_move)
           (:params (?to room))
           (:pre-conditions (check (= (at-robby) ?to)))
-          (:score 0)
+          (:score 2)
           (:body true)))
+
+    (def-method m_connected
+        '((:task t_move)
+          (:params (?to room))
+          (:pre-conditions 
+            (check (= (connected (at-robby) ?to) yes)))
+          (:score 1)
+          (:body (move (at-robby) ?to))))
 
     (def-method m_recursive
         '((:task t_move)
@@ -128,6 +136,7 @@
           (:body 
             (do 
                 (move (at-robby) ?intermediaire)
-                (t_move ?to)))))
+                (t_move ?to)
+                ))))
 
 )

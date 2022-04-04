@@ -27,6 +27,7 @@ pub struct Interval {
 }
 
 const FACTOR_TO_SEC: f64 = 1_000_000.0;
+#[allow(dead_code)]
 const FACTOR_TO_MILLIS: f64 = 1_000.0;
 
 impl Display for Interval {

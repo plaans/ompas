@@ -1,7 +1,10 @@
 use crate::module::rae_exec::error::RaeExecError;
+use crate::module::rae_exec::planning::{CtxPlanning, MOD_PLANNING};
+use crate::module::rae_exec::platform::InstanceMode::Instances;
 use crate::module::rae_exec::*;
 use ::macro_rules_attribute::macro_rules_attribute;
 use log::{info, warn};
+use ompas_lisp::core::root_module::list::append;
 use ompas_lisp::core::structs::lenv::LEnv;
 use ompas_lisp::core::structs::lerror::LError::WrongNumberOfArgument;
 use ompas_lisp::core::structs::lerror::{LError, LResult};
@@ -87,7 +90,7 @@ pub async fn exec_command<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
                 }
                 None => {
                     let r = eval_model().await;
-                    ctx.agenda.set_end_time(action_id).await;
+                    algorithms::set_success_for_task(action_id, env).await?;
                     r
                 }
             }
@@ -156,6 +159,11 @@ pub async fn cancel_command<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     }
 }
 
+enum InstanceMode {
+    Instances,
+    Check,
+}
+
 #[macro_rules_attribute(dyn_async!)]
 pub async fn instance<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
@@ -163,52 +171,55 @@ pub async fn instance<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
         .get_symbol("rae-mode")
         .expect("rae-mode should be defined, default value is exec mode")
         .try_into()?;
+
+    let look_in_state = |facts: im::HashMap<LValue, LValue>| {
+        let ctx_planning = env.get_context::<CtxPlanning>(MOD_PLANNING)?;
+        let mut values: Vec<LValue> = vec![];
+
+        let mode = match args.len() {
+            1 => InstanceMode::Instances,
+            2 => InstanceMode::Check,
+            _ => {
+                return Err(WrongNumberOfArgument(
+                    RAE_INSTANCE,
+                    args.into(),
+                    args.len(),
+                    1..2,
+                ))
+            }
+        };
+
+        let t = match mode {
+            Instances => args[0].clone(),
+            InstanceMode::Check => args[1].clone(),
+        };
+
+        let mut types: Vec<String> = ctx_planning.domain.get_childs(&t.to_string());
+        types.push(t.to_string());
+        for t in &types {
+            let key = vec![RAE_INSTANCE.into(), LValue::from(t)].into();
+            values.push(facts.get(&key).unwrap_or(&LValue::Nil).clone());
+        }
+
+        let instances = append(values.as_slice(), env)?;
+        match mode {
+            Instances => Ok(instances),
+            InstanceMode::Check => contains(&[instances.clone(), args[0].clone()], env),
+        }
+    };
+
     match mode.as_str() {
         SYMBOL_EXEC_MODE => {
             if let Some(platform) = &ctx.platform_interface {
                 platform.instance(args).await
             } else {
-                let facts: im::HashMap<LValue, LValue> = get_facts(&[], env).await?.try_into()?;
-                match args.len() {
-                    1 => {
-                        let key = vec![RAE_INSTANCE.into(), args[0].clone()].into();
-                        let value = facts.get(&key).unwrap_or(&LValue::Nil);
-                        Ok(value.clone())
-                    }
-                    2 => {
-                        let key = vec![RAE_INSTANCE.into(), args[1].clone()].into();
-                        let instances = facts.get(&key).unwrap_or(&LValue::Nil);
-                        contains(&[instances.clone(), args[0].clone()], env)
-                    }
-                    _ => Err(WrongNumberOfArgument(
-                        RAE_INSTANCE,
-                        args.into(),
-                        args.len(),
-                        1..2,
-                    )),
-                }
+                let state: im::HashMap<LValue, LValue> = get_facts(&[], env).await?.try_into()?;
+                look_in_state(state)
             }
         }
         SYMBOL_SIMU_MODE => {
             let state: im::HashMap<LValue, LValue> = env.get_symbol(STATE).unwrap().try_into()?;
-            match args.len() {
-                1 => {
-                    let key = vec![RAE_INSTANCE.into(), args[0].clone()].into();
-                    let value = state.get(&key).unwrap_or(&LValue::Nil);
-                    Ok(value.clone())
-                }
-                2 => {
-                    let key = vec![RAE_INSTANCE.into(), args[1].clone()].into();
-                    let instances = state.get(&key).unwrap_or(&LValue::Nil);
-                    contains(&[instances.clone(), args[0].clone()], env)
-                }
-                _ => Err(WrongNumberOfArgument(
-                    RAE_INSTANCE,
-                    args.into(),
-                    args.len(),
-                    1..2,
-                )),
-            }
+            look_in_state(state)
         }
         _ => unreachable!(
             "{} should have either {} or {} value.",

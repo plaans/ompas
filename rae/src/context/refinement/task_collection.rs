@@ -1,6 +1,7 @@
 use crate::context::refinement::{Interval, TaskId, Timepoint};
 use crate::planning::plan::Plan;
 use crate::supervisor::options::SelectMode;
+use itertools::Itertools;
 use ompas_lisp::core::structs::lerror::LError;
 use ompas_lisp::core::structs::lvalue::LValue;
 use std::convert::TryFrom;
@@ -92,6 +93,7 @@ impl TaskCollection {
                     true
                 }
             })
+            .sorted_by_key(|&t| t.get_id())
             .cloned()
             .collect();
 

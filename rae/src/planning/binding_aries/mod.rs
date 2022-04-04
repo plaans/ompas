@@ -45,7 +45,7 @@ static FUNCTION_TYPE: &str = "★function★";
 static TYPE_TYPE: &str = "★type★";
 static INSTANCE_SFN: &str = "instance";
 
-static FLOAT_SCALE: IntCst = 10;
+static FLOAT_SCALE: IntCst = 2;
 static NIL_OBJECT: &str = "★nil★";
 
 static BUILD_CHRONICLES: &str = "build_chronicles";

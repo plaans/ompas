@@ -20,6 +20,7 @@ pub const RAE_GET_STATE: &str = "get-state";
 pub const RAE_GET_STATUS: &str = "get-status";
 pub const RAE_GET_AGENDA: &str = "get-agenda";
 pub const RAE_GET_TASK_NETWORK: &str = "get-task-network";
+pub const RAE_GET_TYPE_HIERARCHY: &str = "get-type-hierarchy";
 pub const RAE_GET_METHODS: &str = "get-methods";
 pub const RAE_GET_ACTIONS: &str = "get-actions";
 pub const RAE_GET_SYMBOL_TYPE: &str = "get-symbol-type";
@@ -158,6 +159,14 @@ pub async fn get_task_network<'a>(_: &'a [LValue], env: &'a LEnv) -> Result<LVal
         .agenda
         .format_task_network()
         .await;
+    Ok(string.into())
+}
+
+#[macro_rules_attribute(dyn_async!)]
+pub async fn get_type_hierarchy<'a>(_: &'a [LValue], env: &'a LEnv) -> Result<LValue, LError> {
+    let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
+
+    let string = ctx.env.read().await.format_type_hierarchy();
     Ok(string.into())
 }
 

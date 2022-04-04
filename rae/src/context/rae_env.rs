@@ -14,7 +14,7 @@ use ompas_lisp::core::structs::lvalue::LValue;
 use ompas_lisp::core::structs::typelvalue::TypeLValue;
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{Display, Formatter};
-use std::ops::{Add, Deref};
+use std::ops::Deref;
 use tokio::sync::mpsc::Receiver;
 
 pub const RAE_TASK_METHODS_MAP: &str = "rae-task-methods-map";
@@ -492,45 +492,126 @@ impl Display for Action {
     }
 }
 
+type TypeId = usize;
+
+#[derive(Default, Debug, Clone)]
 pub struct TypeHierarchy {
-    inner: HashMap<String, Option<String>>,
+    inner: HashMap<TypeId, String>,
+    reverse: HashMap<String, TypeId>,
+    parent: HashMap<TypeId, Option<TypeId>>,
+    child: HashMap<TypeId, Vec<TypeId>>,
 }
 
 impl TypeHierarchy {
-    pub fn add_type(&mut self, t: impl Display, parent: Option<impl Display>) {
-        if let Some(p) = parent {
-            let parent_key: String = p.to_string();
-            self.inner.insert(t.to_string(), Some(parent_key.clone()));
-            if !self.inner.contains_key(&parent_key) {
-                self.inner.insert(parent_key, None);
+    pub fn get_id(&self, t: impl Display) -> Option<&TypeId> {
+        self.reverse.get(&t.to_string())
+    }
+
+    pub fn get_symbol(&self, id: &TypeId) -> Option<&String> {
+        self.inner.get(id)
+    }
+
+    pub fn add_type(&mut self, t: String, parent: Option<String>) {
+        if let Some(p) = &parent {
+            let parent_id = match self.get_id(p) {
+                None => {
+                    let id = self.inner.len();
+                    self.inner.insert(id, p.to_string());
+                    self.reverse.insert(p.to_string(), id);
+                    self.parent.insert(id, None);
+                    self.child.insert(id, vec![]);
+                    id
+                }
+                Some(id) => *id,
+            };
+            let child_id = self.inner.len();
+            self.child.get_mut(&parent_id).unwrap().push(child_id);
+            self.inner.insert(child_id, t.to_string());
+            self.reverse.insert(t.to_string(), child_id);
+            self.parent.insert(child_id, Some(parent_id));
+            self.child.insert(child_id, vec![]);
+        } else {
+            let id = self.inner.len();
+            self.inner.insert(id, t.to_string());
+            self.reverse.insert(t.to_string(), id);
+            self.child.insert(id, vec![]);
+            self.parent.insert(id, None);
+        }
+    }
+
+    pub fn get_direct_parent(&self, t: &str) -> Option<&String> {
+        if let Some(id) = self.get_id(t) {
+            match self.parent.get(id).unwrap() {
+                None => None,
+                Some(p) => self.get_symbol(p),
             }
         } else {
-            self.inner.insert(t.into(), None);
+            None
         }
     }
 
-    pub fn get_parent(&mut self, t: impl Display) -> Option<String> {
-        match self.inner.get(&t.to_string()) {
-            None => None,
-            Some(p) => p,
-        }
-    }
-
-    pub fn get_parents(&mut self, t: impl Display) -> Vec<String> {
-        let key = t.to_string();
+    pub fn get_parents(&self, t: &str) -> Vec<String> {
         let mut parents = vec![];
-        let mut parent = self.get_parent(key);
+        let mut parent = self.get_direct_parent(t);
         while let Some(p) = parent {
             parents.push(p.clone());
-            parent = self.get_parent(p)
+            parent = self.get_direct_parent(p)
         }
         parents
     }
-}
 
-impl Display for TypeHierarchy {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        todo!()
+    pub fn get_direct_childs(&self, t: &str) -> Option<Vec<String>> {
+        if let Some(id) = self.get_id(t) {
+            match self.child.get(id) {
+                None => None,
+                Some(p) => Some(
+                    p.iter()
+                        .map(|id| self.get_symbol(id).unwrap().clone())
+                        .collect(),
+                ),
+            }
+        } else {
+            None
+        }
+    }
+
+    pub fn get_childs(&self, t: &str) -> Vec<String> {
+        let mut all_childs = vec![];
+
+        let childs = self.get_direct_childs(t);
+        if let Some(mut childs) = childs {
+            while let Some(child) = childs.pop() {
+                all_childs.push(child.clone());
+                let child_childs = self.get_direct_childs(&child);
+                if let Some(mut new_childs) = child_childs {
+                    childs.append(&mut new_childs)
+                }
+            }
+        }
+        all_childs
+    }
+
+    fn format_childs(&self, id: &TypeId, level: usize) -> String {
+        let mut str = format!("{}- {}\n", "\t".repeat(level), self.get_symbol(id).unwrap());
+        for c in self.child.get(id).unwrap() {
+            str.push_str(self.format_childs(c, level + 1).as_str());
+        }
+        str
+    }
+
+    pub fn format_hierarchy(&self) -> String {
+        let root_types: Vec<TypeId> = self
+            .parent
+            .iter()
+            .filter(|(_, &v)| v == None)
+            .map(|(k, _)| *k)
+            .collect();
+        let mut str = "Type Hierarchy\n".to_string();
+        for r in &root_types {
+            str.push_str(self.format_childs(r, 0).as_str());
+            str.push('\n');
+        }
+        str
     }
 }
 
@@ -639,12 +720,8 @@ impl DomainEnv {
         self.map_symbol_type.insert(label, LAMBDA_TYPE.into());
     }
 
-    pub fn add_type(&mut self, t: impl Display, p: Option<impl Display>) {
+    pub fn add_type(&mut self, t: String, p: Option<String>) {
         self.types.add_type(t, p);
-    }
-
-    pub fn get_parents(&mut self, t: impl Display) -> Vec<String> {
-        self.types.get_parents(t)
     }
 }
 
@@ -692,6 +769,13 @@ impl DomainEnv {
 
     pub fn get_map_symbol_type(&self) -> &HashMap<String, String> {
         &self.map_symbol_type
+    }
+    pub fn get_parents(&self, t: &str) -> Vec<String> {
+        self.types.get_parents(t)
+    }
+
+    pub fn get_childs(&self, t: &str) -> Vec<String> {
+        self.types.get_childs(t)
     }
 }
 
@@ -1002,5 +1086,17 @@ impl RAEEnv {
             None => Ok(LValue::Nil),
             Some(task) => Ok(task.methods.clone().into()),
         }
+    }
+
+    pub fn add_type(&mut self, t: String, p: Option<String>) {
+        self.domain_env.add_type(t, p)
+    }
+
+    pub fn get_parents(&self, t: &str) -> Vec<String> {
+        self.domain_env.get_parents(t)
+    }
+
+    pub fn format_type_hierarchy(&self) -> String {
+        self.domain_env.types.format_hierarchy()
     }
 }

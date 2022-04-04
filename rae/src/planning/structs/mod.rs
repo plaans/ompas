@@ -70,6 +70,7 @@ impl Display for TaskType {
     }
 }
 
+#[derive(Clone)]
 pub struct TaskTypeMetaDataCollection {
     inner: HashMap<TaskType, TaskTypeMetaData>,
 }
@@ -134,7 +135,7 @@ pub fn get_variables_of_type(
         .collect()
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct ConversionCollection {
     pub state_function: Vec<StateFunction>,
     pub tasks: Vec<Vec<AtomId>>,

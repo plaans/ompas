@@ -1,6 +1,6 @@
 use crate::module::{CtxRae, MOD_RAE};
 use crate::planning::binding_aries::solver::run_solver;
-use crate::planning::binding_aries::{build_chronicles, solver};
+use crate::planning::binding_aries::{generate_chronicles, solver};
 use crate::planning::conversion::convert_domain_to_chronicle_hierarchy;
 use crate::planning::structs::{ConversionContext, Problem};
 use ::macro_rules_attribute::macro_rules_attribute;
@@ -21,7 +21,7 @@ pub async fn plan_task<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     problem.cc = cc;
     problem.goal_tasks.push(task.into());
 
-    let mut aries_problem = build_chronicles(&problem)?;
+    let mut aries_problem = generate_chronicles(&problem)?;
 
     let result = run_solver(&mut aries_problem, true);
     // println!("{}", format_partial_plan(&pb, &x)?);

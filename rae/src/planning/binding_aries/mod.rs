@@ -1,6 +1,7 @@
 pub mod solver;
 
 use crate::context::rae_env::Type as raeType;
+use crate::context::rae_state::RAEStateSnapshot;
 use crate::planning::structs::atom::Atom;
 use crate::planning::structs::constraint::Constraint;
 use crate::planning::structs::lit::Lit;
@@ -23,6 +24,7 @@ use aries_planning::chronicles::{
 };
 use aries_planning::parsing::pddl::TypedSymbol;
 use aries_utils::input::Sym;
+use log::info;
 use ompas_lisp::core::language::{BOOL, FLOAT, INT};
 use ompas_lisp::core::structs::lerror;
 use ompas_lisp::core::structs::lerror::LError;
@@ -32,6 +34,7 @@ use ompas_lisp::core::structs::lvalues::LValueS;
 use std::convert::{TryFrom, TryInto};
 use std::ops::Deref;
 use std::sync::Arc;
+use tokio::time::Instant;
 
 static TASK_TYPE: &str = "★task★";
 static ABSTRACT_TASK_TYPE: &str = "★abstract_task★";
@@ -69,7 +72,7 @@ fn get_type(t: &raeType, symbol_table: &SymbolTable) -> lerror::Result<aType> {
     }
 }
 
-pub fn build_chronicles(problem: &Problem) -> Result<chronicles::Problem> {
+pub fn generate_templates(problem: &Problem) -> Result<chronicles::Problem> {
     let mut types: Vec<(Sym, Option<Sym>)> = vec![
         (TASK_TYPE.into(), None),
         (ABSTRACT_TASK_TYPE.into(), Some(TASK_TYPE.into())),
@@ -168,36 +171,6 @@ pub fn build_chronicles(problem: &Problem) -> Result<chronicles::Problem> {
 
     let mut ctx = Ctx::new(Arc::new(symbol_table), state_functions);
 
-    let _init_container = Container::Instance(0);
-    // Initial chronicle construction
-    let mut init_ch = aChronicle {
-        kind: ChronicleKind::Problem,
-        presence: aLit::TRUE,
-        start: ctx.origin(),
-        end: ctx.horizon(),
-        name: vec![],
-        task: None,
-        conditions: vec![],
-        effects: vec![],
-        constraints: vec![],
-        subtasks: vec![],
-    };
-
-    initialize_state(&mut init_ch, problem, &ctx);
-    initialize_goal_task(&mut init_ch, problem, &mut ctx);
-
-    //println!("problem initialized");
-
-    /*
-    Goals: Add subtask
-     */
-
-    let init_ch = ChronicleInstance {
-        parameters: vec![],
-        origin: ChronicleOrigin::Original,
-        chronicle: init_ch,
-    };
-
     let mut bindings = BindingAriesAtoms::default();
 
     let mut templates: Vec<ChronicleTemplate> = Vec::new();
@@ -208,6 +181,14 @@ pub fn build_chronicles(problem: &Problem) -> Result<chronicles::Problem> {
         templates.push(template);
     }
 
+    Ok(aProblem {
+        context: ctx,
+        templates,
+        chronicles: vec![],
+    })
+}
+
+pub fn generate_chronicles(problem: &Problem) -> Result<chronicles::Problem> {
     /*println!("# SYMBOL TABLE: \n{:?}", ctx.model.get_symbol_table());
     println!("{}", bindings.format(&problem.cc.sym_table, false));
     println!("initial chronicle: {:?}", init_ch.chronicle);
@@ -216,13 +197,19 @@ pub fn build_chronicles(problem: &Problem) -> Result<chronicles::Problem> {
         println!("template {}: {:?}", i, t.chronicle)
     }*/
 
-    let problem = aProblem {
-        context: ctx,
-        templates,
-        chronicles: vec![init_ch],
-    };
+    let instant = Instant::now();
+    let mut p = generate_templates(problem)?;
 
-    Ok(problem)
+    let init_ch =
+        create_initial_chronicle(&problem.goal_tasks, &problem.initial_state, &mut p.context);
+
+    p.chronicles.push(init_ch);
+
+    info!(
+        "Generation of the planning problem: {:.3} ms",
+        instant.elapsed().as_micros() as f64 / 1000.0
+    );
+    Ok(p)
 }
 
 fn satom_from_lvalues(ctx: &Ctx, v: &LValueS) -> SAtom {
@@ -261,14 +248,49 @@ fn atom_from_lvalues(ctx: &Ctx, v: &LValueS) -> aAtom {
     }
 }
 
+pub fn create_initial_chronicle(
+    goal_tasks: &Vec<LValueS>,
+    state: &RAEStateSnapshot,
+    ctx: &mut Ctx,
+) -> ChronicleInstance {
+    let _init_container = Container::Instance(0);
+    // Initial chronicle construction
+    let mut init_ch = aChronicle {
+        kind: ChronicleKind::Problem,
+        presence: aLit::TRUE,
+        start: ctx.origin(),
+        end: ctx.horizon(),
+        name: vec![],
+        task: None,
+        conditions: vec![],
+        effects: vec![],
+        constraints: vec![],
+        subtasks: vec![],
+    };
+
+    initialize_state(&mut init_ch, state, &ctx);
+    initialize_goal_task(&mut init_ch, goal_tasks, ctx);
+
+    //println!("problem initialized");
+
+    /*
+    Goals: Add subtask
+     */
+
+    ChronicleInstance {
+        parameters: vec![],
+        origin: ChronicleOrigin::Original,
+        chronicle: init_ch,
+    }
+}
+
 /**
 Add initial state from RAEStateSnapshot
  */
-fn initialize_state(init_ch: &mut aChronicle, p: &Problem, ctx: &Ctx) {
+fn initialize_state(init_ch: &mut aChronicle, state: &RAEStateSnapshot, ctx: &Ctx) {
     /*
     Initialisation of instance state variable
      */
-    let state = &p.initial_state;
     for (key, value) in &state.instance.inner {
         let key: Vec<LValueS> = key.try_into().expect("");
         assert_eq!(key.len(), 2);
@@ -345,9 +367,9 @@ fn initialize_state(init_ch: &mut aChronicle, p: &Problem, ctx: &Ctx) {
     }
 }
 
-fn initialize_goal_task(init_ch: &mut aChronicle, p: &Problem, ctx: &mut Ctx) {
+fn initialize_goal_task(init_ch: &mut aChronicle, goal_tasks: &Vec<LValueS>, ctx: &mut Ctx) {
     let c = Container::Instance(0);
-    for t in &p.goal_tasks {
+    for t in goal_tasks {
         let t: Vec<LValueS> = t.try_into().expect("");
         let task_name: Vec<SAtom> = t.iter().map(|v| satom_from_lvalues(ctx, v)).collect();
 

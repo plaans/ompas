@@ -1,4 +1,5 @@
 use crate::context::rae_env::DomainEnv;
+use crate::planning::structs::ConversionCollection;
 use crate::supervisor::options::SelectMode;
 use ompas_lisp::core::structs::contextcollection::Context;
 use ompas_lisp::core::structs::documentation::Documentation;
@@ -10,15 +11,22 @@ pub const MOD_PLANNING: &str = "mod-planning";
 pub struct CtxPlanning {
     pub env: LEnv,
     pub domain: DomainEnv,
+    pub cc: Option<ConversionCollection>,
     pub select_mode: SelectMode,
 }
 
 impl CtxPlanning {
-    pub fn new(domain: DomainEnv, env: LEnv, select_mode: SelectMode) -> Self {
+    pub fn new(
+        cc: Option<ConversionCollection>,
+        domain: DomainEnv,
+        env: LEnv,
+        select_mode: SelectMode,
+    ) -> Self {
         Self {
             domain,
             env,
             select_mode,
+            cc,
         }
     }
 }

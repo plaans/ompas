@@ -16,8 +16,11 @@ use crate::module::rae_exec::error::RaeExecError;
 use crate::module::rae_exec::planning::CtxPlanning;
 use crate::module::rae_exec::platform::RAE_LAUNCH_PLATFORM;
 use crate::module::rae_exec::{CtxRaeExec, Job, JobId};
-use crate::supervisor::options::RAEOptions;
-use log::{error, info};
+use crate::planning::conversion::convert_domain_to_chronicle_hierarchy;
+use crate::planning::structs::{ConversionCollection, ConversionContext};
+use crate::supervisor::options::SelectMode::Planning;
+use crate::supervisor::options::{RAEOptions, SelectMode};
+use log::{error, info, warn};
 use ompas_lisp::core::eval;
 use ompas_lisp::core::structs::contextcollection::{Context, ContextCollection};
 use ompas_lisp::core::structs::documentation::Documentation;
@@ -33,6 +36,7 @@ use ompas_lisp::modules::io::{CtxIo, LogOutput};
 use ompas_lisp::modules::utils::CtxUtils;
 use std::mem;
 use std::ops::Deref;
+use tokio::time::Instant;
 
 pub mod options;
 pub mod rae_log;
@@ -84,12 +88,39 @@ pub async fn rae_run(mut context: RAEEnv, options: &RAEOptions, _log: String) {
         task_check_monitor(receiver_event_update_state, env_check_wait_on).await
     });
 
+    let mut select_mode = options.get_select_mode().clone();
+
     let mut env: LEnv = context.get_exec_env().await;
+    let cc: Option<ConversionCollection> = if matches!(select_mode, Planning(_)) {
+        let instant = Instant::now();
+        match convert_domain_to_chronicle_hierarchy(ConversionContext {
+            domain: context.domain_env.clone(),
+            env: context.env.clone(),
+            state: context.state.get_snapshot().await,
+        }) {
+            Ok(r) => {
+                info!(
+                    "Conversion time: {:.3} ms",
+                    instant.elapsed().as_micros() as f64 / 1000.0
+                );
+                Some(r)
+            }
+            Err(e) => {
+                select_mode = SelectMode::Greedy;
+                warn!("Cannot plan with the domain...{}", e);
+                None
+            }
+        }
+    } else {
+        None
+    };
+
     env.import(
         CtxPlanning::new(
+            cc,
             context.domain_env.clone(),
             context.env.clone(),
-            *options.get_select_mode(),
+            select_mode,
         ),
         WithoutPrefix,
     )

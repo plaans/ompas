@@ -197,8 +197,7 @@ mod select {
     use crate::module::rae_exec::platform::instance;
     use crate::module::rae_exec::{CtxRaeExec, MOD_RAE_EXEC, PARENT_TASK, RAE_SELECT, STATE};
     use crate::planning::binding_aries::solver::run_solver;
-    use crate::planning::binding_aries::{build_chronicles, solver};
-    use crate::planning::conversion::convert_domain_to_chronicle_hierarchy;
+    use crate::planning::binding_aries::{generate_chronicles, solver};
     use crate::planning::plan::AbstractTaskInstance;
     use crate::planning::structs::{ConversionContext, Problem};
     use crate::supervisor::options::Planner::Aries;
@@ -306,16 +305,16 @@ mod select {
         let context = ConversionContext {
             domain: ctx_domain.domain.clone(),
             env: ctx_domain.env.clone(),
-            state: state,
+            state,
         };
 
         let mut problem: Problem = (&context).into();
-        let cc = convert_domain_to_chronicle_hierarchy(context)?;
+        //let cc = convert_domain_to_chronicle_hierarchy(context)?;
         //println!("cc: {}", cc);
-        problem.cc = cc;
+        problem.cc = ctx_domain.cc.as_ref().unwrap().clone();
         problem.goal_tasks.push(task.into());
 
-        let mut aries_problem = build_chronicles(&problem)?;
+        let mut aries_problem = generate_chronicles(&problem)?;
 
         let result = run_solver(&mut aries_problem, true);
         // println!("{}", format_partial_plan(&pb, &x)?);

@@ -29,5 +29,6 @@ aries_planners = {path = "../../aries/planners"}
 aries_tnet = {path = "../../aries/tnet"}
 anyhow = "1.0.40"
 itertools = "0.10.3"
+rand = "0.8.5"
 
 

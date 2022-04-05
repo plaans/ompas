@@ -17,30 +17,36 @@ use ompas_lisp::modules::utils::enr;
 use ompas_utils::dyn_async;
 use std::convert::{TryFrom, TryInto};
 
-pub const RAE_REFINE: &str = "refine";
+pub const REFINE: &str = "refine";
+pub const RETRY: &str = "retry";
+pub const RAE_SET_SUCCESS_FOR_TASK: &str = "rae-set-success-for-task";
+pub const LAMBDA_RAE_EXEC_TASK: &str = "(define rae-exec-task 
+    (lambda task
+        (begin
+            (define result (enr (cons 'refine task)))
+            (if (err? result)
+                result
+                (let ((method (first result))
+                      (task_id (second result)))
 
-/*const LAMBDA_PROGRESS: &str = "
-(define progress (lambda task
-    (let* ((result (select task))
-            (first_m (first result))
-            (task_id (second result)))
+                    (begin
+                        (define parent_task task_id)
+                        (print \"Trying \" method \" for \" task_id)
+                        (if (err? (enr method))
+                            (rae-retry task_id)
+                            (rae-set-success-for-task task_id))))))))";
 
-            (if (null? first_m)
-                (err err::no-applicable-method)
+pub const LAMBDA_RAE_RETRY: &str = "(define rae-retry 
+    (lambda (task_id)
+        (begin
+            (define result (retry task_id))
+            (if (err? result)
+                result
                 (begin
-                    (print \"trying \" first_m)
-                    (define result (enr first_m))
-                    (print \"tried fist method of \" task_id)
-                    (if (err? result)
-                        (retry task_id)
-                        (rae-set-success-for-task task_id)))))))";*/
+                    (if (err? (enr result))
+                        (rae-retry task_id)
+                        (rae-set-success-for-task task_id)))))))";
 
-//Access part of the environment
-
-/*const LAMBDA_GET_METHODS: &str = "\
-(define get-methods\
-    (lambda (label)\
-        (get rae-task-methods-map label)))";*/
 #[macro_rules_attribute(dyn_async !)]
 pub async fn refine<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     let task_label: LValue = args.into();
@@ -67,9 +73,10 @@ pub async fn refine<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
         ctx.agenda.update_task(task.get_id(), task).await;
         info!("Trying {} for task {}", first_m, task_id);
         let mut env = env.clone();
-        env.insert(PARENT_TASK, task_id.into());
+        //env.insert(PARENT_TASK, task_id.into());
         //println!("in env: {}", env.get_ref_symbol(PARENT_TASK).unwrap());
-        let result: LResult = enr(&[first_m], &mut env).await;
+        vec![first_m, task_id.into()].into()
+        /*let result: LResult = enr(&[first_m], &mut env).await;
         match result {
             Ok(lv) => {
                 if matches!(lv, LValue::Err(_)) {
@@ -82,25 +89,36 @@ pub async fn refine<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
                 error!("error in evaluation of {}({}): {}", task_label, task_id, e);
                 RaeExecError::EvaluationError.into()
             }
-        }
+        }*/
     };
 
     Ok(result)
 }
 
-/*const LAMBDA_RETRY: &str = "
-(define retry (lambda (task_id)
-    (let ((new_method (rae-get-next-method task_id)))
-        (begin
-            (print \"Retrying task \" task_id)
-            (if (null? new_method) ; if there is no method applicable
-            nil
-            (if (enr new_method)
-                (rae-set-success-for-task task_id)
-                (rae-retry task_id)))))))";*/
+#[macro_rules_attribute(dyn_async !)]
+pub async fn set_success_for_task<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+    /*
+    Steps:
+    - Remove the stack from the agenda
+    - Return true
+     */
+    let task_id: i64 = (&args[0]).try_into()?;
+    let task_id = task_id as usize;
 
-#[async_recursion]
-pub async fn retry(task_id: usize, env: &LEnv) -> LResult {
+    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
+    let mut task: TaskMetaData = ctx.agenda.trc.get(task_id).await;
+    task.update_status(TaskStatus::Done).await;
+    task.set_end_timepoint(ctx.agenda.get_instant());
+    ctx.agenda.update_task(task.get_id(), task).await;
+    //ctx.agenda.remove_task(&task_id).await?;
+    Ok(LValue::True)
+}
+
+#[macro_rules_attribute(dyn_async !)]
+pub async fn retry<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+    let task_id: i64 = (&args[0]).try_into()?;
+    let task_id = task_id as usize;
+
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
     let mut task: AbstractTaskMetaData = ctx.agenda.get_abstract_task(task_id as usize).await?;
     let task_label = task.get_label().clone();
@@ -119,7 +137,8 @@ pub async fn retry(task_id: usize, env: &LEnv) -> LResult {
     } else {
         task.set_current_method(new_method.clone());
         ctx.agenda.update_task(task.get_id(), task).await;
-        let result: LResult = enr(&[new_method], env).await;
+        new_method
+        /*let result: LResult = enr(&[new_method], env).await;
 
         match result {
             Ok(lv) => {
@@ -133,7 +152,7 @@ pub async fn retry(task_id: usize, env: &LEnv) -> LResult {
                 error!("error in evaluation of {}: {}", task_label, e);
                 RaeExecError::EvaluationError.into()
             }
-        }
+        }*/
     };
 
     Ok(result)
@@ -211,6 +230,7 @@ mod select {
     use ompas_lisp::core::structs::lnumber::LNumber;
     use ompas_lisp::core::structs::lvalue::LValue;
     use ompas_lisp::modules::utils::{enr, enumerate};
+    use rand::seq::SliceRandom;
     use std::convert::{TryFrom, TryInto};
     use std::time::Instant;
 
@@ -471,8 +491,10 @@ mod select {
         /*
         Sort the list
          */
-
-        applicable_methods.sort_by(|a, b| a.1.cmp(&b.1));
+        let mut rng = rand::thread_rng();
+        applicable_methods.shuffle(&mut rng);
+        applicable_methods.sort_by_key(|a| a.1);
+        applicable_methods.reverse();
         let mut methods: Vec<_> = applicable_methods.drain(..).map(|a| a.0).collect();
         methods.retain(|m| !tried.contains(m));
         let choosed = methods.get(0).cloned().unwrap_or(LValue::Nil);
@@ -485,22 +507,6 @@ mod select {
             interval: Interval::new(start, Some(ctx.agenda.get_instant())),
         })
     }
-}
-
-pub async fn set_success_for_task(task_id: usize, env: &LEnv) -> Result<LValue, LError> {
-    /*
-    Steps:
-    - Remove the stack from the agenda
-    - Return true
-     */
-
-    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
-    let mut task: TaskMetaData = ctx.agenda.trc.get(task_id).await;
-    task.update_status(TaskStatus::Done).await;
-    task.set_end_timepoint(ctx.agenda.get_instant());
-    ctx.agenda.update_task(task.get_id(), task).await;
-    //ctx.agenda.remove_task(&task_id).await?;
-    Ok(LValue::True)
 }
 
 #[allow(non_snake_case, dead_code)]

@@ -163,7 +163,8 @@ impl IntoModule for CtxRaeExec {
             LAMBDA_IS_APPLICABLE,
             DEFINE_ERR_ACTION_FAILURE,
             DEFINE_ERR_NO_APPLICABLE_METHOD,
-            //DEFINE_PARENT_TASK,
+            LAMBDA_RAE_RETRY,
+            LAMBDA_RAE_EXEC_TASK, //DEFINE_PARENT_TASK,
         ]
         .into();
         let mut module = Module {
@@ -197,7 +198,9 @@ impl IntoModule for CtxRaeExec {
         //module.add_async_fn_prelude(RAE_GET_NEXT_METHOD, get_next_method);
 
         //progress
-        module.add_async_fn_prelude(RAE_REFINE, refine);
+        module.add_async_fn_prelude(REFINE, refine);
+        module.add_async_fn_prelude(RETRY, retry);
+        module.add_async_fn_prelude(RAE_SET_SUCCESS_FOR_TASK, set_success_for_task);
         /*module.add_async_fn_prelude(
             RAE_GENERATE_APPLICABLE_INSTANCES,
             generate_applicable_instances,

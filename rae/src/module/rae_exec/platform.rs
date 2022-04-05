@@ -90,7 +90,7 @@ pub async fn exec_command<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
                 }
                 None => {
                     let r = eval_model().await;
-                    algorithms::set_success_for_task(action_id, env).await?;
+                    algorithms::set_success_for_task(&[action_id.into()], env).await?;
                     r
                 }
             }

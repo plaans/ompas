@@ -72,7 +72,7 @@ pub const MACRO_GENERATE_TASK: &str = "(defmacro generate-task
      `(list ,label
         (quote ,p_expr)
         (lambda ,params
-            ,(cons 'refine (cons `(quote ,label) params)))))))";
+            ,(cons 'rae-exec-task (cons `(quote ,label) params)))))))";
 
 /*pub const MACRO_GENERATE_TASK: &str = "(defmacro generate-task
 (lambda args

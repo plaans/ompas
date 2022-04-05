@@ -118,13 +118,13 @@
           (:score 2)
           (:body true)))
 
-    (def-method m_connected
-        '((:task t_move)
-          (:params (?to room))
-          (:pre-conditions 
-            (check (= (connected (at-robby) ?to) yes)))
-          (:score 1)
-          (:body (move (at-robby) ?to))))
+    ; (def-method m_connected
+    ;     '((:task t_move)
+    ;       (:params (?to room))
+    ;       (:pre-conditions 
+    ;         (check (= (connected (at-robby) ?to) yes)))
+    ;       (:score 1)
+    ;       (:body (move (at-robby) ?to))))
 
     (def-method m_recursive
         '((:task t_move)

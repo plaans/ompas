@@ -2,9 +2,11 @@ pub mod task_collection;
 pub mod task_network;
 
 use crate::context::refinement::task_collection::{
-    AbstractTaskMetaData, ActionMetaData, TaskCollection, TaskFilter, TaskMetaData, TaskStatus,
+    AbstractTaskMetaData, ActionMetaData, TaskCollection, TaskFilter, TaskMetaData,
+    TaskMetaDataView, TaskStatus,
 };
 use crate::context::refinement::task_network::TaskNetwork;
+use crate::context::refinement::Duration::Finite;
 use crate::supervisor::options::SelectMode;
 use chrono::{DateTime, Utc};
 use im::HashMap;
@@ -16,6 +18,7 @@ use std::convert::TryInto;
 use std::fmt::{Display, Formatter};
 use std::fs::OpenOptions;
 use std::io::Write;
+use std::ops::{Add, AddAssign};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
@@ -26,7 +29,54 @@ use tokio::time::Instant;
 pub type TaskId = usize;
 
 pub type Timepoint = u128;
-pub type Duration = u128;
+#[derive(Copy, Clone)]
+pub enum Duration {
+    Finite(u128),
+    Inf,
+}
+
+impl Duration {
+    pub fn as_millis(&self) -> f64 {
+        match self {
+            Finite(u) => *u as f64 / FACTOR_TO_MILLIS,
+            Duration::Inf => f64::MAX / FACTOR_TO_MILLIS,
+        }
+    }
+
+    pub fn as_secs(&self) -> f64 {
+        match self {
+            Finite(u) => *u as f64 / FACTOR_TO_SEC,
+            Duration::Inf => f64::MAX / FACTOR_TO_SEC,
+        }
+    }
+}
+
+impl Display for Duration {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Finite(u) => write!(f, "{} µs", u),
+            Duration::Inf => write!(f, "inf"),
+        }
+    }
+}
+
+impl Add for Duration {
+    type Output = Duration;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (Finite(a), Finite(b)) => Finite(a + b),
+            _ => Self::Inf,
+        }
+    }
+}
+
+impl AddAssign for Duration {
+    fn add_assign(&mut self, rhs: Self) {
+        *self = *self + rhs;
+    }
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct Interval {
     start: Timepoint,
@@ -57,8 +107,8 @@ impl Interval {
     /// Returns end - start if end is defined.
     pub fn duration(&self) -> Duration {
         match &self.end {
-            Some(e) => e - self.start,
-            None => u128::MAX,
+            Some(e) => Duration::Finite(e - self.start),
+            None => Duration::Inf,
         }
     }
 
@@ -77,9 +127,11 @@ pub struct Agenda {
 }
 
 const TASK_NAME: &str = "name of the task";
+const TASK_STATUS: &str = "status";
+const TASK_EXECUTION_TIME: &str = "execution time (s)";
 const REFINEMENT_METHOD: &str = "method of refinement ";
 const REFINEMENT_NUMBER: &str = "number of refinement";
-const TOTAL_REFINEMENT_TIME: &str = "total refinement time (ms)";
+const TOTAL_REFINEMENT_TIME: &str = "total refinement time (s)";
 const SUBTASK_NUMBER: &str = "number of subtask";
 const ACTION_NUMBER: &str = "number of actions";
 const RAE_STATS: &str = "rae_stats";
@@ -92,6 +144,11 @@ impl Agenda {
         let task: AbstractTaskMetaData = self.trc.get(id).await.try_into().unwrap();
         let r = task.get_last_refinement();
         r.refinement_type
+    }
+
+    pub async fn get_execution_time(&self, id: &TaskId) -> Duration {
+        let task: AbstractTaskMetaData = self.trc.get(id).await.try_into().unwrap();
+        task.get_duration()
     }
 
     pub async fn get_number_of_subtasks(&self, id: &TaskId) -> usize {
@@ -148,8 +205,8 @@ impl Agenda {
         n
     }
 
-    pub async fn get_total_refinement_time(&self, id: &TaskId) -> f64 {
-        let mut total_time: Duration = 0;
+    pub async fn get_total_refinement_time(&self, id: &TaskId) -> Duration {
+        let mut total_time: Duration = Finite(0);
         let task: AbstractTaskMetaData = self.trc.get(id).await.try_into().unwrap();
         total_time += task.get_total_refinement_time();
         let mut subtasks: Vec<TaskId> = self.tn.get_subtasks(id).await;
@@ -160,7 +217,7 @@ impl Agenda {
                 total_time += task.get_total_refinement_time();
             }
         }
-        total_time as f64 / FACTOR_TO_MILLIS
+        total_time
     }
 
     pub async fn get_stats(&self) -> LValue {
@@ -182,12 +239,20 @@ impl Agenda {
                 self.get_number_of_subtasks_recursive(p).await.into(),
             );
             task_stats.insert(
+                LValue::String(TASK_EXECUTION_TIME.to_string()),
+                self.get_execution_time(p).await.to_string().into(),
+            );
+            task_stats.insert(
+                LValue::String(TASK_STATUS.to_string()),
+                self.get_status(p).await.to_string().into(),
+            );
+            task_stats.insert(
                 LValue::String(ACTION_NUMBER.to_string()),
                 self.get_number_of_actions(p).await.into(),
             );
             task_stats.insert(
                 LValue::String(TOTAL_REFINEMENT_TIME.to_string()),
-                self.get_total_refinement_time(p).await.into(),
+                self.get_total_refinement_time(p).await.to_string().into(),
             );
             map.insert(
                 task_collection.get(p).unwrap().get_label(),
@@ -231,8 +296,10 @@ impl Agenda {
             .open(&file_path)
             .expect("error creating stat file");
         let header = format!(
-            "\"{}\";\"{}\";\"{}\";\"{}\";\"{}\";\"{}\"\n",
+            "\"{}\";\"{}\";\"{}\";\"{}\";\"{}\";\"{}\";\"{}\";\"{}\"\n",
             TASK_NAME,
+            TASK_STATUS,
+            TASK_EXECUTION_TIME,
             REFINEMENT_METHOD,
             REFINEMENT_NUMBER,
             TOTAL_REFINEMENT_TIME,
@@ -248,11 +315,13 @@ impl Agenda {
         for p in &parent {
             file.write_all(
                 format!(
-                    "\"{}\";\"{}\";\"{}\";\"{}\";\"{}\";\"{}\"\n",
+                    "\"{}\";\"{}\";\"{}\";\"{}\";\"{}\";\"{}\";\"{}\";\"{}\"\n",
                     task_collection.get(p).unwrap().get_label(),
+                    self.get_status(p).await.to_string(),
+                    self.get_execution_time(p).await.as_secs(),
                     self.get_refinement_method(p).await.to_string(),
                     self.get_total_number_of_refinement(p).await,
-                    self.get_total_refinement_time(p).await,
+                    self.get_total_refinement_time(p).await.as_secs(),
                     self.get_number_of_subtasks_recursive(p).await,
                     self.get_number_of_actions(p).await,
                 )

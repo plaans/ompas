@@ -12,4 +12,8 @@
    ((carry right) no_ball)
    ((connected r1 r2) yes)
    ((connected r2 r1) yes))))
+
+  (trigger-task pick-and-drop b1 r2)
 )
+
+;r1 - r2

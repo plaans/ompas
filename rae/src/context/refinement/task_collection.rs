@@ -282,6 +282,12 @@ pub trait TaskMetaDataView {
     fn get_parent_task(&self) -> Option<usize>;
 
     fn set_end_timepoint(&mut self, end: Timepoint);
+
+    fn get_start(&self) -> &Timepoint;
+
+    fn get_end(&self) -> &Option<Timepoint>;
+
+    fn get_duration(&self) -> Duration;
 }
 
 #[derive(Clone, Debug)]
@@ -337,6 +343,10 @@ impl TaskMetaDataView for ActionMetaData {
         &self.id
     }
 
+    fn get_start(&self) -> &Timepoint {
+        &self.interval.start
+    }
+
     fn get_status(&self) -> &TaskStatus {
         &self.status
     }
@@ -347,6 +357,14 @@ impl TaskMetaDataView for ActionMetaData {
 
     fn set_end_timepoint(&mut self, end: Timepoint) {
         self.interval.end = Some(end)
+    }
+
+    fn get_end(&self) -> &Option<Timepoint> {
+        &self.interval.end
+    }
+
+    fn get_duration(&self) -> Duration {
+        self.interval.duration()
     }
 }
 
@@ -412,6 +430,18 @@ impl TaskMetaDataView for AbstractTaskMetaData {
     fn set_end_timepoint(&mut self, end: Timepoint) {
         self.interval.end = Some(end)
     }
+
+    fn get_start(&self) -> &Timepoint {
+        &self.interval.start
+    }
+
+    fn get_end(&self) -> &Option<Timepoint> {
+        &self.interval.end
+    }
+
+    fn get_duration(&self) -> Duration {
+        self.interval.duration()
+    }
 }
 impl AbstractTaskMetaData {
     pub fn get_number_of_refinement(&self) -> usize {
@@ -419,7 +449,7 @@ impl AbstractTaskMetaData {
     }
 
     pub fn get_total_refinement_time(&self) -> Duration {
-        let mut total_time: Duration = 0;
+        let mut total_time: Duration = Duration::Finite(0);
         for r in &self.refinement {
             total_time += r.interval.duration()
         }

@@ -17,4 +17,9 @@
     ((connected r2 r3) yes)
    ((connected r3 r2) yes)
    )))
+
+  (trigger-task pick-and-drop b1 r3)
+
 )
+
+; r1 - r2 - r3

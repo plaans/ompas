@@ -231,7 +231,7 @@ impl IntoModule for CtxRaeExec {
 }
 
 impl CtxRaeExec {
-    pub async fn get_execution_status(&self, id: TaskId) -> TaskStatus {
+    pub async fn get_execution_status(&self, id: &TaskId) -> TaskStatus {
         self.agenda.get_status(id).await
     }
 

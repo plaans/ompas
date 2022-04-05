@@ -63,7 +63,7 @@ pub async fn exec_command<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
                     //println!("await on action (id={})", action_id);
                     info!("waiting on action {}", action_id);
 
-                    let mut action_status: TaskStatus = ctx.agenda.get_status(action_id).await;
+                    let mut action_status: TaskStatus = ctx.agenda.get_status(&action_id).await;
 
                     loop {
                         //println!("waiting on status:");
@@ -76,12 +76,12 @@ pub async fn exec_command<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
                             }
                             TaskStatus::Failure => {
                                 warn!("Command {} is a failure.", action_id);
-                                ctx.agenda.set_end_time(action_id).await;
+                                ctx.agenda.set_end_time(&action_id).await;
                                 return Ok(RaeExecError::ActionFailure.into());
                             }
                             TaskStatus::Done => {
                                 info!("Command {} is a success.", action_id);
-                                ctx.agenda.set_end_time(action_id).await;
+                                ctx.agenda.set_end_time(&action_id).await;
                                 return Ok(true.into());
                             }
                         }

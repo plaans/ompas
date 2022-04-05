@@ -33,30 +33,6 @@ pub async fn spawn_repl(sender: Sender<String>) -> Option<Sender<String>> {
     Some(sender_repl)
 }
 
-/// Spawn stdin task.
-/// Not used anymore.
-/*pub async fn spawn_stdin(sender: Sender<String>) -> Option<Sender<String>> {
-    let (sender_stdin, receiver_stdin) = mpsc::channel(TOKIO_CHANNEL_SIZE);
-    tokio::spawn(async move {
-        stdin(sender, receiver_stdin).await;
-    });
-
-    Some(sender_stdin)
-}*/
-
-/// Spawn stdout task
-/// Not used anymore.
-/*pub async fn spawn_stdout() -> Option<Sender<String>> {
-    let (sender_stdout, receiver_stdout): (Sender<String>, Receiver<String>) =
-        mpsc::channel(TOKIO_CHANNEL_SIZE);
-
-    tokio::spawn(async move {
-        output(receiver_stdout).await;
-    });
-
-    Some(sender_stdout)
-}*/
-
 /// Spawn the log task
 pub async fn spawn_log(log_path: Option<PathBuf>) -> Option<(Sender<String>, JoinHandle<()>)> {
     let (sender_log, receiver_log) = mpsc::channel(TOKIO_CHANNEL_SIZE);
@@ -68,57 +44,6 @@ pub async fn spawn_log(log_path: Option<PathBuf>) -> Option<(Sender<String>, Joi
 
     Some((sender_log, handle))
 }
-
-/// Function to handle the repl.
-/// ### functioning:
-/// loop waiting for an object on *stdin*
-/// ### args
-/// - sender: channel object to send string to lisp interpreter.
-/// - receiver: channel object to receive ack from lisp interpreter after evaluation.
-/// Used for synchronization.
-/*async fn stdin(sender: Sender<String>, mut receiver: Receiver<String>) {
-    let mut rl = Editor::<()>::new();
-    if rl.load_history("history.txt").is_err() {
-        println!("No previous history.");
-    }
-
-    loop {
-        let readline = rl.readline(">> ");
-
-        match readline {
-            Ok(string) => {
-                rl.add_history_entry(string.clone());
-                sender
-                    .send(format!("repl:{}", string))
-                    .await
-                    .expect("couldn't send lisp command");
-                let buffer = receiver.recv().await.expect("error receiving");
-                assert_eq!(
-                    buffer, "ACK",
-                    "should receive an ack from Lisp Intrepretor and nothing else"
-                );
-                //println!("repl ack: {}", buffer);
-            }
-            Err(ReadlineError::Interrupted) => {
-                println!("CTRL-C");
-                break;
-            }
-            Err(ReadlineError::Eof) => {
-                println!("CTRL-D");
-                break;
-            }
-            Err(err) => {
-                println!("Error: {:?}", err);
-                break;
-            }
-        }
-    }
-    sender
-        .send("exit".to_string())
-        .await
-        .expect("couldn't send exit msg");
-    rl.save_history("history.txt").unwrap();
-}*/
 
 async fn log(
     mut receiver: Receiver<String>,

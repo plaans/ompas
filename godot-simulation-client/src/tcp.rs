@@ -153,7 +153,7 @@ async fn async_read_socket(
                         _ => unreachable!()
                     }
 
-                    agenda.update_status(godot_id, action_status.into()).await;
+                    agenda.update_status(&godot_id, action_status.into()).await;
                 }
                 GodotMessageType::ActionFeedback
                 | GodotMessageType::ActionResult
@@ -162,7 +162,7 @@ async fn async_read_socket(
                     //println!("the action status is updated");
                     let action_status: (usize, ActionStatus) = message.try_into().unwrap();
                     let id = map_server_id_action_id.get(&action_status.0).unwrap();
-                    agenda.update_status(*id, action_status.1.into()).await;
+                    agenda.update_status(id, action_status.1.into()).await;
                 }
                 _ => panic!("should not receive this kind of message"),
             }

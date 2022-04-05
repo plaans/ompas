@@ -1,4 +1,4 @@
-use crate::context::refinement::{Interval, TaskId, Timepoint};
+use crate::context::refinement::{Duration, Interval, TaskId, Timepoint};
 use crate::planning::plan::Plan;
 use crate::supervisor::options::SelectMode;
 use itertools::Itertools;
@@ -113,6 +113,16 @@ impl TaskCollection {
 }
 
 impl TaskCollection {
+    pub async fn is_action(&self, id: &TaskId) -> bool {
+        self.inner.read().await.get(id).unwrap().is_action()
+    }
+
+    pub async fn is_abstract_task(&self, id: &TaskId) -> bool {
+        self.inner.read().await.get(id).unwrap().is_abstract_task()
+    }
+}
+
+impl TaskCollection {
     pub async fn get_inner(&self) -> im::HashMap<TaskId, TaskMetaData> {
         self.inner.read().await.clone()
     }
@@ -121,15 +131,15 @@ impl TaskCollection {
         self.inner.write().await.insert(id, task.into());
     }
 
-    pub async fn update(&self, id: TaskId, task: impl Into<TaskMetaData>) {
+    pub async fn update(&self, id: &TaskId, task: impl Into<TaskMetaData>) {
         let mut locked = self.inner.write().await;
 
-        if locked.contains_key(&id) {
-            locked.insert(id, task.into());
+        if locked.contains_key(id) {
+            locked.insert(*id, task.into());
         }
     }
 
-    pub async fn update_status(&self, id: TaskId, status: TaskStatus) {
+    pub async fn update_status(&self, id: &TaskId, status: TaskStatus) {
         self.inner
             .write()
             .await
@@ -139,11 +149,11 @@ impl TaskCollection {
             .await
     }
 
-    pub async fn get_status(&self, id: TaskId) -> TaskStatus {
+    pub async fn get_status(&self, id: &TaskId) -> TaskStatus {
         self.inner.read().await.get(&id).unwrap().get_status()
     }
 
-    pub async fn get(&self, id: TaskId) -> TaskMetaData {
+    pub async fn get(&self, id: &TaskId) -> TaskMetaData {
         self.inner.read().await.get(&id).unwrap().clone()
     }
 }
@@ -265,9 +275,9 @@ impl TryFrom<TaskMetaData> for AbstractTaskMetaData {
 pub trait TaskMetaDataView {
     fn get_label(&self) -> &LValue;
 
-    fn get_id(&self) -> usize;
+    fn get_id(&self) -> &TaskId;
 
-    fn get_status(&self) -> TaskStatus;
+    fn get_status(&self) -> &TaskStatus;
 
     fn get_parent_task(&self) -> Option<usize>;
 
@@ -323,12 +333,12 @@ impl TaskMetaDataView for ActionMetaData {
         &self.label
     }
 
-    fn get_id(&self) -> usize {
-        self.id
+    fn get_id(&self) -> &TaskId {
+        &self.id
     }
 
-    fn get_status(&self) -> TaskStatus {
-        self.status
+    fn get_status(&self) -> &TaskStatus {
+        &self.status
     }
 
     fn get_parent_task(&self) -> Option<usize> {
@@ -387,12 +397,12 @@ impl TaskMetaDataView for AbstractTaskMetaData {
         &self.label
     }
 
-    fn get_id(&self) -> usize {
-        self.id
+    fn get_id(&self) -> &TaskId {
+        &self.id
     }
 
-    fn get_status(&self) -> TaskStatus {
-        self.status
+    fn get_status(&self) -> &TaskStatus {
+        &self.status
     }
 
     fn get_parent_task(&self) -> Option<usize> {
@@ -404,6 +414,18 @@ impl TaskMetaDataView for AbstractTaskMetaData {
     }
 }
 impl AbstractTaskMetaData {
+    pub fn get_number_of_refinement(&self) -> usize {
+        self.refinement.len()
+    }
+
+    pub fn get_total_refinement_time(&self) -> Duration {
+        let mut total_time: Duration = 0;
+        for r in &self.refinement {
+            total_time += r.interval.duration()
+        }
+        total_time
+    }
+
     pub fn get_last_refinement(&self) -> &RefinementMetaData {
         &self.refinement.last().unwrap()
     }

@@ -7,13 +7,11 @@ use crate::module::rae_exec::planning::{CtxPlanning, MOD_PLANNING};
 use crate::module::rae_exec::{CtxRaeExec, MOD_RAE_EXEC, PARENT_TASK};
 use crate::supervisor::options::{Planner, SelectMode};
 use ::macro_rules_attribute::macro_rules_attribute;
-use async_recursion::async_recursion;
 use log::{error, info};
 use ompas_lisp::core::structs::lenv::LEnv;
-use ompas_lisp::core::structs::lerror::{LError, LResult};
+use ompas_lisp::core::structs::lerror::LResult;
 use ompas_lisp::core::structs::lnumber::LNumber;
 use ompas_lisp::core::structs::lvalue::LValue;
-use ompas_lisp::modules::utils::enr;
 use ompas_utils::dyn_async;
 use std::convert::{TryFrom, TryInto};
 
@@ -58,7 +56,7 @@ pub async fn refine<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
         .agenda
         .add_abstract_task(task_label.clone(), parent_task)
         .await;
-    let task_id = task.get_id();
+    let task_id = *task.get_id();
     let result: LValue = select(&mut task, env).await?;
 
     let first_m = result;
@@ -66,11 +64,11 @@ pub async fn refine<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     let result: LValue = if first_m == LValue::Nil {
         error!("No applicable method for task {}({})", task_label, task_id,);
         task.update_status(Failure);
-        ctx.agenda.update_task(task.get_id(), task).await;
+        ctx.agenda.update_task(&task_id, task).await;
         RaeExecError::NoApplicableMethod.into()
     } else {
         task.update_status(Running);
-        ctx.agenda.update_task(task.get_id(), task).await;
+        ctx.agenda.update_task(&task_id, task).await;
         info!("Trying {} for task {}", first_m, task_id);
         let mut env = env.clone();
         //env.insert(PARENT_TASK, task_id.into());
@@ -106,10 +104,10 @@ pub async fn set_success_for_task<'a>(args: &'a [LValue], env: &'a LEnv) -> LRes
     let task_id = task_id as usize;
 
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
-    let mut task: TaskMetaData = ctx.agenda.trc.get(task_id).await;
+    let mut task: TaskMetaData = ctx.agenda.trc.get(&task_id).await;
     task.update_status(TaskStatus::Done).await;
     task.set_end_timepoint(ctx.agenda.get_instant());
-    ctx.agenda.update_task(task.get_id(), task).await;
+    ctx.agenda.update_task(&task.get_id(), task).await;
     //ctx.agenda.remove_task(&task_id).await?;
     Ok(LValue::True)
 }
@@ -120,7 +118,7 @@ pub async fn retry<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     let task_id = task_id as usize;
 
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
-    let mut task: AbstractTaskMetaData = ctx.agenda.get_abstract_task(task_id as usize).await?;
+    let mut task: AbstractTaskMetaData = ctx.agenda.get_abstract_task(&(task_id as usize)).await?;
     let task_label = task.get_label().clone();
     error!("Retrying task {}({})", task_label, task_id);
     task.add_tried_method(task.get_current_method().clone());
@@ -132,11 +130,11 @@ pub async fn retry<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
             task_label, task_id
         );
         task.update_status(Failure);
-        ctx.agenda.update_task(task.get_id(), task).await;
+        ctx.agenda.update_task(&task_id, task).await;
         RaeExecError::NoApplicableMethod.into()
     } else {
         task.set_current_method(new_method.clone());
-        ctx.agenda.update_task(task.get_id(), task).await;
+        ctx.agenda.update_task(&task_id, task).await;
         new_method
         /*let result: LResult = enr(&[new_method], env).await;
 
@@ -258,8 +256,9 @@ mod select {
         {
             Some(parent_id) => {
                 let parent_stack: AbstractTaskMetaData =
-                    ctx.agenda.get_abstract_task(parent_id).await?;
-                let n = ctx.agenda.get_number_of_subtasks(parent_id).await - 1;
+                    ctx.agenda.get_abstract_task(&parent_id).await?;
+                let n = ctx.agenda.get_number_of_subtasks(&parent_id).await - 1;
+                println!("{} subtask of {}", n + 1, parent_id);
                 println!("Searching for a generated plan...");
                 if let Some(plan) = &parent_stack.get_last_refinement().plan {
                     //Get number of subtasks for
@@ -273,14 +272,14 @@ mod select {
                         .try_into()
                         .expect("root task is not an abstract task");
                     let task_id = instance.subtasks[n];
-
+                    println!("subtask {:?}: ", plan.chronicles.get(&task_id).unwrap());
                     let refinement: AbstractTaskInstance =
                         match plan.chronicles.get(&task_id).unwrap().clone().try_into() {
                             Ok(a) => a,
                             Err(_) => {
                                 return Err(SpecialError(
                                     RAE_SELECT,
-                                    format!("task {} is not an abstract task", n),
+                                    format!("task {} is not an abstract task:", n),
                                 ))
                             }
                         };
@@ -341,7 +340,7 @@ mod select {
         let instant = Instant::now();
         let result = run_solver_for_htn(&mut aries_problem, optimize);
         info!(
-            "Time to run solver: {} (optimize = {})",
+            "Time to run solver: {:^3} ms (optimize = {})",
             instant.elapsed().as_micros() as f64 / 1000.0,
             optimize
         );

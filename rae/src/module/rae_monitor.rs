@@ -21,6 +21,8 @@ pub const RAE_GET_STATUS: &str = "get-status";
 pub const RAE_GET_AGENDA: &str = "get-agenda";
 pub const RAE_GET_TASK_NETWORK: &str = "get-task-network";
 pub const RAE_GET_TYPE_HIERARCHY: &str = "get-type-hierarchy";
+pub const RAE_GET_STATS: &str = "get-stats";
+pub const RAE_EXPORT_STATS: &str = "export-stats";
 pub const RAE_GET_METHODS: &str = "get-methods";
 pub const RAE_GET_ACTIONS: &str = "get-actions";
 pub const RAE_GET_SYMBOL_TYPE: &str = "get-symbol-type";
@@ -294,4 +296,23 @@ pub async fn get_env<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
             .get_element_description(key)
             .into()),
     }
+}
+
+#[macro_rules_attribute(dyn_async!)]
+pub async fn get_stats<'a>(_: &'a [LValue], env: &'a LEnv) -> LResult {
+    let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
+
+    Ok(ctx.env.read().await.agenda.get_stats().await)
+}
+
+#[macro_rules_attribute(dyn_async!)]
+pub async fn export_stats<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+    let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
+    let file = if args.len() == 1 {
+        Some(args[0].to_string())
+    } else {
+        None
+    };
+    ctx.env.read().await.agenda.export_to_csv(None, file).await;
+    Ok(LValue::Nil)
 }

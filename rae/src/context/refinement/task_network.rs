@@ -4,8 +4,8 @@ use tokio::sync::RwLock;
 
 #[derive(Default, Clone)]
 pub struct TaskNetwork {
-    parent: Arc<RwLock<Vec<usize>>>,
-    inner: Arc<RwLock<im::HashMap<usize, Vec<usize>>>>,
+    parent: Arc<RwLock<Vec<TaskId>>>,
+    pub subtasks: Arc<RwLock<im::HashMap<TaskId, Vec<TaskId>>>>,
 }
 
 impl TaskNetwork {
@@ -38,7 +38,7 @@ impl TaskNetwork {
     }
 
     pub async fn format(&self) -> String {
-        let tn = self.inner.read().await.clone();
+        let tn = self.subtasks.read().await.clone();
         let parent: Vec<TaskId> = self.parent.read().await.clone();
         let mut str = String::new();
         str.push_str("Task Network:\n");
@@ -55,23 +55,34 @@ impl TaskNetwork {
 
 impl TaskNetwork {
     pub async fn add_task_to_parent(&self, parent_task: TaskId, task_id: TaskId) {
-        self.inner
+        self.subtasks
             .write()
             .await
             .get_mut(&parent_task)
             .unwrap()
             .push(task_id);
-        self.inner.write().await.insert(task_id, vec![]);
+        self.subtasks.write().await.insert(task_id, vec![]);
     }
     pub async fn add_new_root_task(&self, task_id: TaskId) {
-        self.inner.write().await.insert(task_id, vec![]);
+        self.subtasks.write().await.insert(task_id, vec![]);
         self.parent.write().await.push(task_id);
     }
 
-    pub async fn get_number_of_subtasks(&self, id: TaskId) -> usize {
-        match self.inner.read().await.get(&id) {
+    pub async fn get_number_of_subtasks(&self, id: &TaskId) -> TaskId {
+        match self.subtasks.read().await.get(id) {
             Some(t) => t.len(),
             None => 0,
+        }
+    }
+
+    pub async fn get_parents(&self) -> Vec<TaskId> {
+        self.parent.read().await.clone()
+    }
+
+    pub async fn get_subtasks(&self, id: &TaskId) -> Vec<TaskId> {
+        match self.subtasks.read().await.get(id) {
+            Some(t) => t.to_vec(),
+            None => vec![],
         }
     }
 }

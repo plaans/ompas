@@ -1,3 +1,4 @@
+use crate::context::refinement::TaskId;
 use im::HashMap;
 use ompas_lisp::core::structs::lerror::LError;
 use ompas_lisp::core::structs::lvalue::LValue;
@@ -6,23 +7,23 @@ use std::convert::TryFrom;
 
 #[derive(Clone, Debug)]
 pub struct Plan {
-    pub chronicles: HashMap<usize, TaskInstance>,
+    pub chronicles: HashMap<TaskId, TaskInstance>,
 }
 
 impl Plan {
-    pub fn get_root_task(&self) -> Option<usize> {
+    pub fn get_root_task(&self) -> Option<TaskId> {
         let mut keys: Vec<usize> = self.chronicles.keys().cloned().collect();
         keys.sort();
         keys.first().cloned()
     }
 
-    pub fn get_first_subtask(&self) -> Option<usize> {
-        let mut keys: Vec<usize> = self.chronicles.keys().cloned().collect();
+    pub fn get_first_subtask(&self) -> Option<TaskId> {
+        let mut keys: Vec<TaskId> = self.chronicles.keys().cloned().collect();
         keys.sort();
         keys.get(1).cloned()
     }
 
-    pub fn extract_sub_plan(&self, task_id: usize) -> Plan {
+    pub fn extract_sub_plan(&self, task_id: TaskId) -> Plan {
         let mut subtasks: im::HashMap<usize, TaskInstance> = Default::default();
 
         let task = self.chronicles.get(&task_id).unwrap();
@@ -33,7 +34,7 @@ impl Plan {
                 chronicles: subtasks,
             },
             TaskInstance::AbstractTaskInstance(a) => {
-                let mut queue: VecDeque<usize> = a.subtasks.clone().into();
+                let mut queue: VecDeque<TaskId> = a.subtasks.clone().into();
                 while let Some(subtask) = queue.pop_front() {
                     let instance = self.chronicles.get(&subtask).unwrap();
                     if let TaskInstance::AbstractTaskInstance(a) = instance {

@@ -98,11 +98,13 @@ impl IntoModule for CtxRae {
         module.add_async_fn_prelude(RAE_DEF_TYPES, def_types);
         module.add_async_fn_prelude(RAE_DEF_OBJECTS, def_objects);
 
-        //functions to debug the functionnement of rae
+        //functions to debug the functioning of rae
         module.add_async_fn_prelude(RAE_GET_STATE, get_state);
         module.add_async_fn_prelude(RAE_GET_AGENDA, get_agenda);
         module.add_async_fn_prelude(RAE_GET_TASK_NETWORK, get_task_network);
         module.add_async_fn_prelude(RAE_GET_TYPE_HIERARCHY, get_type_hierarchy);
+        module.add_async_fn_prelude(RAE_GET_STATS, get_stats);
+        module.add_async_fn_prelude(RAE_EXPORT_STATS, export_stats);
 
         //Conversion functions
         module.add_async_fn_prelude(RAE_CONVERT_EXPR, convert_expr);

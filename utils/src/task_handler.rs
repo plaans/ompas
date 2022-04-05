@@ -53,10 +53,10 @@ pub fn subscribe_new_task() -> Receiver<EndSignal> {
 
 /// Sends to all subscribers the end signal.
 pub fn end_all() {
-    println!(
+    /*println!(
         "number of subscriber(s) to end task: {}",
         TASK_END_HANDLER.broadcast.receiver_count()
-    );
+    );*/
 
     if TASK_END_HANDLER.broadcast.receiver_count() != 0 {
         TASK_END_HANDLER
@@ -65,7 +65,7 @@ pub fn end_all() {
             .expect("could not kill tasks");
         thread::sleep(Duration::from_millis(1000));
     } else {
-        println!("no tasks to kill");
+        //println!("no tasks to kill");
     }
 }
 

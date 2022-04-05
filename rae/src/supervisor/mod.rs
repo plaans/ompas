@@ -57,15 +57,8 @@ pub const TOKIO_CHANNEL_SIZE: usize = 100;
 /// Main RAE Loop:
 /// Receives Job to handle in separate tasks.
 pub async fn rae_run(mut context: RAEEnv, options: &RAEOptions, _log: String) {
-    /*if let Some(receiver_sync) = mem::replace(&mut context.status_watcher, None) {
-        tokio::spawn(async move {
-            //println!("starting status watcher");
-            async_status_watcher_run(async_action_status, receiver_sync).await;
-        });
-    }*/
-    //println!("async status watcher");
-
     let mut receiver = mem::replace(&mut context.job_receiver, None).unwrap();
+
     //Ubuntu::
     let lvalue: LValue = match options.get_platform_config() {
         None => vec![RAE_LAUNCH_PLATFORM].into(),
@@ -75,10 +68,9 @@ pub async fn rae_run(mut context: RAEEnv, options: &RAEOptions, _log: String) {
         }
     };
     let result = eval(&lvalue, &mut context.env).await;
-    //Windows::
-    //let result = eval(&vec![LValue::Symbol("rae-open-com-platform".to_string())].into(), &mut context.env, &mut context.ctxs);
+
     match result {
-        Ok(_) => {} //println!("successfully open com with platform"),
+        Ok(_) => {}
         Err(e) => error!("{}", e),
     }
 

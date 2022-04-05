@@ -69,25 +69,7 @@ pub async fn refine<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     } else {
         task.update_status(Running);
         ctx.agenda.update_task(&task_id, task).await;
-        info!("Trying {} for task {}", first_m, task_id);
-        let mut env = env.clone();
-        //env.insert(PARENT_TASK, task_id.into());
-        //println!("in env: {}", env.get_ref_symbol(PARENT_TASK).unwrap());
         vec![first_m, task_id.into()].into()
-        /*let result: LResult = enr(&[first_m], &mut env).await;
-        match result {
-            Ok(lv) => {
-                if matches!(lv, LValue::Err(_)) {
-                    retry(task_id, &mut env).await?
-                } else {
-                    set_success_for_task(task_id, &env).await?
-                }
-            }
-            Err(e) => {
-                error!("error in evaluation of {}({}): {}", task_label, task_id, e);
-                RaeExecError::EvaluationError.into()
-            }
-        }*/
     };
 
     Ok(result)
@@ -136,21 +118,6 @@ pub async fn retry<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
         task.set_current_method(new_method.clone());
         ctx.agenda.update_task(&task_id, task).await;
         new_method
-        /*let result: LResult = enr(&[new_method], env).await;
-
-        match result {
-            Ok(lv) => {
-                if matches!(lv, LValue::Err(_)) {
-                    retry(task_id, env).await?
-                } else {
-                    set_success_for_task(task_id, &env).await?
-                }
-            }
-            Err(e) => {
-                error!("error in evaluation of {}: {}", task_label, e);
-                RaeExecError::EvaluationError.into()
-            }
-        }*/
     };
 
     Ok(result)

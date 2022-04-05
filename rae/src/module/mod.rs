@@ -178,6 +178,7 @@ impl CtxRae {
     pub async fn init_ctx_rae(
         platform: Option<Platform>,
         working_directory: Option<PathBuf>,
+        display: bool,
     ) -> Self {
         //println!("in init ctx_rae");
 
@@ -260,7 +261,8 @@ impl CtxRae {
 
         let mut ctx_io = CtxIo::default();
 
-        let channel = rae_log::init(file_path.clone()).expect("Error while initiating logger.");
+        let channel =
+            rae_log::init(file_path.clone(), display).expect("Error while initiating logger.");
 
         ctx_io.set_log_output(LogOutput::Channel(channel));
         ctx_rae.set_log(file_path);

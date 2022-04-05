@@ -10,4 +10,8 @@
       ((at b3) bedroom)
       ((at b4) bedroom)
       ((carry left) no_ball)
-      ((carry right) no_ball)))))
+      ((carry right) no_ball))))
+      
+  (trigger-task pick-and-drop b1 kitchen)
+  
+  )

@@ -1,32 +1,39 @@
-use std::fs;
-use std::path::PathBuf;
-
-use ompas_godot_simulation_client::mod_godot::CtxGodot;
-use ompas_godot_simulation_client::rae_interface::PlatformGodot;
-use ompas_lisp::core::activate_debug;
-use ompas_lisp::core::language::NIL;
-use ompas_lisp::lisp_interpreter::{LispInterpreter, LispInterpreterConfig};
+use ompas_lisp::lisp_interpreter::{
+    ChannelToLispInterpreter, LispInterpreter, LispInterpreterConfig,
+};
 use ompas_lisp::modules::_type::CtxType;
 use ompas_lisp::modules::advanced_math::CtxMath;
 use ompas_lisp::modules::io::CtxIo;
 use ompas_lisp::modules::string::CtxString;
 use ompas_lisp::modules::utils::CtxUtils;
-use ompas_rae::module::rae_exec::Platform;
 use ompas_rae::module::CtxRae;
+use std::path::PathBuf;
+use std::time::Duration;
+use std::{env, fs};
 use structopt::StructOpt;
 
 pub const TOKIO_CHANNEL_SIZE: usize = 65_384;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "OMPAS", about = "An acting engine based on RAE.")]
-struct Opt {
-    #[structopt(short = "d", long = "debug")]
-    debug: bool,
-    #[structopt(short = "p", long = "log-path")]
+pub struct Opt {
+    #[structopt(short = "l", long = "log-path")]
     log: Option<PathBuf>,
 
-    #[structopt(short = "s", long = "sim-domain")]
-    sim_domain: PathBuf,
+    #[structopt(short = "d", long = "domain")]
+    domain: PathBuf,
+
+    #[structopt(short = "p", long = "problem")]
+    problem: Option<PathBuf>,
+
+    #[structopt(short = "t", long = "time")]
+    time: Option<u64>,
+
+    #[structopt(short = "a", long = "aries")]
+    aries: bool,
+
+    #[structopt(short = "o", long = "aries-opt")]
+    aries_opt: bool,
 }
 
 #[tokio::main]
@@ -35,14 +42,44 @@ async fn main() {
 
     let opt: Opt = Opt::from_args();
     println!("{:?}", opt);
-    if opt.debug {
-        activate_debug();
-    }
     //test_lib_model(&opt);
-    lisp_interpreter(opt.log, opt.sim_domain).await;
+    lisp_interpreter(opt).await;
 }
 
-pub async fn lisp_interpreter(log: Option<PathBuf>, sim_domain: PathBuf) {
+pub async fn lisp_interpreter(opt: Opt) {
+    let path = fs::canonicalize(opt.domain.clone()).expect("path to domain is unvalid");
+    let mut domain_file_path = path.clone();
+    domain_file_path.push("domain.lisp");
+    println!("domain: {:?}", path);
+    let problem = match opt.problem {
+        Some(p) => {
+            println!("problem : {:?}", p);
+            p
+        }
+        None => {
+            println!("searching for problem files...");
+            let mut problem_path = path.clone();
+            problem_path.push("problems");
+            let mut paths = fs::read_dir(problem_path).unwrap();
+            if let Some(path) = paths.next() {
+                path.unwrap().path()
+            } else {
+                panic!("no problem in subdirectory. Please specify a file path for benchmark.")
+            }
+        }
+    };
+
+    let time = opt.time.unwrap_or(60);
+
+    let log = if let Some(pb) = &opt.log {
+        pb.clone()
+    } else {
+        let home = env::var("HOME").unwrap();
+        PathBuf::from(format!("{}/ompas/benchmark", home))
+    };
+
+    //println!("log path: {:?}", log);
+
     let mut li = LispInterpreter::new().await;
 
     let mut ctx_io = CtxIo::default();
@@ -54,9 +91,8 @@ pub async fn lisp_interpreter(log: Option<PathBuf>, sim_domain: PathBuf) {
     //Insert the doc for the different contexts.
 
     //Add the sender of the channel.
-    if let Some(pb) = &log {
-        ctx_io.set_log_output(pb.clone().into());
-    }
+
+    ctx_io.set_log_output(log.clone().into());
 
     li.import_namespace(ctx_utils)
         .await
@@ -73,20 +109,54 @@ pub async fn lisp_interpreter(log: Option<PathBuf>, sim_domain: PathBuf) {
         .await
         .expect("error loading ctx string");
 
-    let ctx_rae = CtxRae::init_ctx_rae(None, log.clone(), false).await;
+    let ctx_rae = CtxRae::init_ctx_rae(None, Some(log.clone()), false).await;
     li.import_namespace(ctx_rae)
         .await
         .expect("error loading rae");
 
+    let mut com: ChannelToLispInterpreter = li.subscribe();
+    let domain_lisp = fs::read_to_string(domain_file_path.clone())
+        .expect("Something went wrong reading the file");
+    let problem_lisp =
+        fs::read_to_string(problem.clone()).expect("Something went wrong reading the file");
 
-    let domain_file = format!("{}")
+    if opt.aries {
+        com.send("(configure-select aries)".to_string())
+            .await
+            .expect("error on LI");
+    } else if opt.aries_opt {
+        com.send("(configure-select aries-opt)".to_string())
+            .await
+            .expect("error on LI");
+    }
+    com.send(domain_lisp).await.expect("could not send to LI");
+    com.send(problem_lisp).await.expect("could not send to LI");
+    com.send("(launch)".to_string()).await.expect("error on LI");
 
-    let mut com = li.subscribe();
-    let str = fs::read_to_string(sim_domain).expect("Something went wrong reading the file");
-    //println!("string in file: {}", str);
-    com.send(str).await.expect("could not send to LI");
+    li.set_config(LispInterpreterConfig::new(false));
+    tokio::spawn(async move {
+        li.run(Some(log)).await;
+    });
 
-    li.set_config(LispInterpreterConfig::new(true));
+    tokio::time::sleep(Duration::from_secs(time)).await;
+    let problem_name = problem.file_name().unwrap().to_str().unwrap();
+    let domain_name = opt.domain.file_name().unwrap().to_str().unwrap();
+    let problem_name = problem_name.replace(".lisp", "");
+    let domain_name = domain_name.replace(".lisp", "");
+    com.send(format!("(export-stats {}_{})", domain_name, problem_name))
+        .await
+        .expect("could not send to LI");
 
-    li.run(log).await;
+    com.send("exit".to_string())
+        .await
+        .expect("could not send to LI");
+
+    while let Some(m) = com.recv().await {
+        println!("{}", m)
+    }
+
+    println!(
+        "end of the benchmark of li for {} of domain {}",
+        problem_name, domain_name
+    );
 }

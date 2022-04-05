@@ -174,6 +174,7 @@ async fn run_logger_file(mut rx: mpsc::Receiver<String>, log_path: PathBuf, disp
         .expect("could not write to RAE log file");
     println!("RAE LOG task ended.");
 }
+
 /// Sends via tcp to logger.py strings that need to be logged.
 /// run_logger is an asynchronous task that await a message to send via tcp.
 #[allow(unused)]

@@ -38,6 +38,10 @@ path = "src/bin/ompas.rs"
 name = "scheme"
 path = "src/bin/scheme.rs"
 
+[[bin]]
+name = "bench_all"
+path = "src/bin/benchmark_all.rs"
+
 [[example]]
 name = "conversion"
 path = "examples/conversion.rs"

@@ -239,10 +239,10 @@ impl Agenda {
             SUBTASK_NUMBER,
             ACTION_NUMBER
         );
-
-        file.write_all(header.as_bytes())
-            .expect("could not write to stat file");
-
+        if file.metadata().unwrap().len() == 0 {
+            file.write_all(header.as_bytes())
+                .expect("could not write to stat file");
+        }
         let task_collection: HashMap<TaskId, TaskMetaData> = self.trc.inner.read().await.clone();
         let parent: Vec<TaskId> = self.tn.get_parents().await;
         for p in &parent {
@@ -251,10 +251,10 @@ impl Agenda {
                     "\"{}\";\"{}\";\"{}\";\"{}\";\"{}\";\"{}\"\n",
                     task_collection.get(p).unwrap().get_label(),
                     self.get_refinement_method(p).await.to_string(),
-                    self.get_total_number_of_refinement(p).await.into(),
-                    self.get_number_of_subtasks_recursive(p).await.into(),
-                    self.get_number_of_actions(p).await.into(),
-                    self.get_total_refinement_time(p).await.into()
+                    self.get_total_number_of_refinement(p).await,
+                    self.get_total_refinement_time(p).await,
+                    self.get_number_of_subtasks_recursive(p).await,
+                    self.get_number_of_actions(p).await,
                 )
                 .as_bytes(),
             )

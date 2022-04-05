@@ -30,6 +30,9 @@ struct Opt {
 
     #[structopt(short = "G", long = "godot")]
     godot: bool,
+
+    #[structopt(short = "r", long = "rae-log")]
+    rae_log: bool,
 }
 
 #[tokio::main]
@@ -42,10 +45,15 @@ async fn main() {
         activate_debug();
     }
     //test_lib_model(&opt);
-    lisp_interpreter(opt.log, opt.sim_domain, opt.godot).await;
+    lisp_interpreter(opt.log, opt.sim_domain, opt.godot, opt.rae_log).await;
 }
 
-pub async fn lisp_interpreter(log: Option<PathBuf>, sim_domain: Option<PathBuf>, godot: bool) {
+pub async fn lisp_interpreter(
+    log: Option<PathBuf>,
+    sim_domain: Option<PathBuf>,
+    godot: bool,
+    rae_log: bool,
+) {
     let mut li = LispInterpreter::new().await;
 
     let mut ctx_io = CtxIo::default();
@@ -109,6 +117,7 @@ pub async fn lisp_interpreter(log: Option<PathBuf>, sim_domain: Option<PathBuf>,
             None
         },
         log.clone(),
+        rae_log,
     )
     .await;
     li.import_namespace(ctx_rae)

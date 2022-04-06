@@ -143,9 +143,12 @@ pub async fn lisp_interpreter(opt: Opt) {
     let domain_name = opt.domain.file_name().unwrap().to_str().unwrap();
     let problem_name = problem_name.replace(".lisp", "");
     let domain_name = domain_name.replace(".lisp", "");
-    com.send(format!("(export-stats {}_{})", domain_name, problem_name))
-        .await
-        .expect("could not send to LI");
+    com.send(format!(
+        "(export-stats {}_{}_{}s)",
+        domain_name, problem_name, time
+    ))
+    .await
+    .expect("could not send to LI");
 
     com.send("exit".to_string())
         .await

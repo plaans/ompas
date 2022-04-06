@@ -1,7 +1,7 @@
 (begin
   (def-objects
   '(b1 b2 b3 b4 ball)
-  '(r1 r2 r3 room))
+  '(r1 r2 r3 r4 room))
 
 (def-initial-state
  (map '(
@@ -16,10 +16,12 @@
    ((connected r2 r1) yes)
     ((connected r2 r3) yes)
    ((connected r3 r2) yes)
+  ((connected r2 r4) yes)
+   ((connected r4 r2) yes)
    )))
-
-  (trigger-task pick-and-drop b1 r3)
-
+   
+  (trigger-task pick-and-drop b1 r4)
 )
-
+;      r4
+;      |
 ; r1 - r2 - r3

@@ -49,6 +49,10 @@ impl Duration {
             Duration::Inf => f64::MAX / FACTOR_TO_SEC,
         }
     }
+
+    pub fn is_finite(&self) -> bool {
+        matches!(self, Self::Finite(_))
+    }
 }
 
 impl Display for Duration {
@@ -318,7 +322,14 @@ impl Agenda {
                     "\"{}\";\"{}\";\"{}\";\"{}\";\"{}\";\"{}\";\"{}\";\"{}\"\n",
                     task_collection.get(p).unwrap().get_label(),
                     self.get_status(p).await.to_string(),
-                    self.get_execution_time(p).await.as_secs(),
+                    {
+                        let u: Duration = self.get_execution_time(p).await;
+                        if u.is_finite() {
+                            u.as_secs().to_string()
+                        } else {
+                            u.to_string()
+                        }
+                    },
                     self.get_refinement_method(p).await.to_string(),
                     self.get_total_number_of_refinement(p).await,
                     self.get_total_refinement_time(p).await.as_secs(),

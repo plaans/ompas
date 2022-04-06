@@ -1,9 +1,7 @@
-use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::{env, fs};
 use structopt::StructOpt;
-
-pub const TOKIO_CHANNEL_SIZE: usize = 65_384;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "OMPAS", about = "An acting engine based on RAE.")]
@@ -13,13 +11,51 @@ pub struct Opt {
 
     #[structopt(short = "t", long = "time")]
     time: Option<u64>,
+
+    //Number of greedy that will be runned as greedy choose randomly on a set of equal scored methods
+    #[structopt(short = "g", long = "greedy")]
+    greedy: Option<usize>,
+
+    #[structopt(short = "a", long = "aries")]
+    aries: Option<usize>,
 }
 
-const DEFAULT_TIME: u64 = 60;
+const DEFAULT_TIME: u64 = 1;
 
 fn main() {
     let opt: Opt = Opt::from_args();
     println!("OMPAS BENCHMARK v0.1");
+    //Installation of the last version of benchmark
+
+    let mut current_dir = env::current_dir().unwrap();
+    current_dir.push("apps");
+    assert!(env::set_current_dir(&current_dir).is_ok());
+    println!(
+        "Successfully changed working directory to {} !",
+        current_dir.display()
+    );
+
+    println!("Installation of the last version of OMPAS' benchmark...");
+    let child = Command::new("cargo")
+        .args(&["install", "--bin", "benchmark", "--path", "."])
+        .spawn();
+
+    if let Ok(mut c) = child {
+        println!("Spawned successfully");
+        println!("Exit with: {:?}", c.wait());
+    } else {
+        panic!("panic");
+    }
+    println!("Benchmark installed !");
+
+    let mut current_dir = env::current_dir().unwrap();
+    current_dir.pop();
+    assert!(env::set_current_dir(&current_dir).is_ok());
+    println!(
+        "Successfully changed working directory to {} !",
+        current_dir.display()
+    );
+
     println!("Domains to benchmark: {:#?}", opt.domains);
 
     let time = opt.time.unwrap_or(DEFAULT_TIME);
@@ -37,14 +73,13 @@ fn main() {
         }
         println!("Problems found : {:#?}", problems);
         for problem in problems {
-            for select in &["", "-a", "-o"] {
-                let mut command = Command::new("cargo");
+            let mut vec: Vec<&str> = vec![""; opt.greedy.unwrap_or(1)];
+            vec.append(&mut vec!["-a"; opt.aries.unwrap_or(1)]);
+            vec.push("-o");
+
+            for select in &vec {
+                let mut command = Command::new("benchmark");
                 command.args(&[
-                    "run",
-                    "--release",
-                    "--bin",
-                    "benchmark",
-                    "--",
                     "-d",
                     domain_path.to_str().unwrap(),
                     "-p",
@@ -64,26 +99,4 @@ fn main() {
             }
         }
     }
-
-    /*
-    if let Ok(mut c) = Command::new("cargo")
-        .args(&[
-            "run",
-            "--release",
-            "--bin",
-            "benchmark",
-            "--",
-            "-d",
-            "instances/gripper",
-            "-t",
-            "1",
-            "-a",
-        ])
-        .spawn()
-    {
-        println!("Spawned successfully");
-        println!("Exit with: {:?}", c.wait());
-    } else {
-        panic!("panic");
-    }*/
 }

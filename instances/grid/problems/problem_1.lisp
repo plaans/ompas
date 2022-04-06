@@ -2,14 +2,16 @@
 (begin
   (def-objects
   '(t1 t2 truck)
-  '(l1 l2 l3 l4 location))
+  '(s l1 l2 e location))
 
-(def-initial-state
- (map '(
-   ((at t1) l1)
-   ((at t2) l1)
-   ((connected l1 l2) yes)
-   ((connected l1 l3) yes)
-   ((connected l2 l4) yes)
-   ((connected l3 l4) yes))))
+  (def-initial-state
+  (map '(
+    ((at t1) s)
+    ((at t2) s)
+    ((connected s l1) yes)
+    ((connected s l2) yes)
+    ((connected l1 e) yes)
+    ((connected l2 e) yes))))
+
+  (trigger-task t_move t1 e)
 )

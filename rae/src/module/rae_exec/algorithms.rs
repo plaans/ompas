@@ -64,6 +64,7 @@ pub async fn refine<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     let result: LValue = if first_m == LValue::Nil {
         error!("No applicable method for task {}({})", task_label, task_id,);
         task.update_status(Failure);
+        task.set_end_timepoint(ctx.agenda.get_instant());
         ctx.agenda.update_task(&task_id, task).await;
         RaeExecError::NoApplicableMethod.into()
     } else {
@@ -112,6 +113,7 @@ pub async fn retry<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
             task_label, task_id
         );
         task.update_status(Failure);
+        task.set_end_timepoint(ctx.agenda.get_instant());
         ctx.agenda.update_task(&task_id, task).await;
         RaeExecError::NoApplicableMethod.into()
     } else {

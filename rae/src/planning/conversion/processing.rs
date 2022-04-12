@@ -831,7 +831,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                             ec.add_constraint(Constraint::leq(ec.get_start(), t));
                             ec.add_constraint(Constraint::lt(t, ec.get_end()));
                             ec.add_subtask(Expression {
-                                interval: interval,
+                                interval,
                                 lit: literal.into(),
                             });
                             ch.sym_table

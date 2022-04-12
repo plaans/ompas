@@ -24,12 +24,10 @@ impl TaskNetwork {
                         } else {
                             vec.push(format!(" |----{}", line))
                         }
+                    } else if i < n - 1 {
+                        vec.push(format!(" |    {}", line))
                     } else {
-                        if i < n - 1 {
-                            vec.push(format!(" |    {}", line))
-                        } else {
-                            vec.push(format!("      {}", line))
-                        }
+                        vec.push(format!("      {}", line))
                     }
                 }
             }

@@ -13,13 +13,13 @@ pub struct Plan {
 impl Plan {
     pub fn get_root_task(&self) -> Option<TaskId> {
         let mut keys: Vec<usize> = self.chronicles.keys().cloned().collect();
-        keys.sort();
+        keys.sort_unstable();
         keys.first().cloned()
     }
 
     pub fn get_first_subtask(&self) -> Option<TaskId> {
         let mut keys: Vec<TaskId> = self.chronicles.keys().cloned().collect();
-        keys.sort();
+        keys.sort_unstable();
         keys.get(1).cloned()
     }
 
@@ -62,7 +62,7 @@ impl Plan {
                     str.push_str(format!("{}*{}", "\t".repeat(level), a.inner).as_str())
                 }
                 TaskInstance::AbstractTaskInstance(a) => {
-                    str.push_str(format!("{}", self.format_abstract_task(a, level)).as_str())
+                    str.push_str(self.format_abstract_task(a, level).to_string().as_str())
                 }
             }
         }
@@ -91,7 +91,7 @@ impl Plan {
     pub fn format_hierarchy(&self) -> String {
         //println!("len: {}", self.chronicles.len());
 
-        if self.chronicles.len() == 0 {
+        if self.chronicles.is_empty() {
             return "".to_string();
         }
 

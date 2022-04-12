@@ -50,7 +50,7 @@ impl RaeMutex {
         let index = self.new_index();
         let previous_len = self.fifo.len();
         let value = (index, waiter);
-        if self.fifo.len() == 0 {
+        if self.fifo.is_empty() {
             self.fifo.push_back(value);
         } else {
             for (i, (_, w)) in self.fifo.iter().enumerate() {
@@ -71,11 +71,11 @@ impl RaeMutex {
 
     pub async fn release(&mut self) -> bool {
         while let Some((_, waiter)) = self.fifo.pop_front() {
-            if let Ok(_) = waiter.sender.try_send(true) {
+            if waiter.sender.try_send(true).is_ok() {
                 return false;
             }
         }
-        return true;
+        true
     }
 }
 

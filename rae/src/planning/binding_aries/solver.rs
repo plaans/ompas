@@ -51,7 +51,7 @@ fn solve_htn(pb: &FiniteProblem, optimize: bool) -> Option<std::sync::Arc<SavedA
     };
 
     if let Some(solution) = found_plan {
-        //solver.print_stats();
+        solver.print_stats();
         Some(solution)
     } else {
         None
@@ -81,9 +81,9 @@ fn propagate_and_print(base_problem: &mut chronicles::Problem, depth: u32, htn_m
         tables: base_problem.context.tables.clone(),
     };
     if htn_mode {
-        populate_with_task_network(&mut pb, &base_problem, depth).unwrap();
+        populate_with_task_network(&mut pb, base_problem, depth).unwrap();
     } else {
-        populate_with_template_instances(&mut pb, &base_problem, |_| Some(depth)).unwrap();
+        populate_with_template_instances(&mut pb, base_problem, |_| Some(depth)).unwrap();
     }
 
     let mut solver = init_solver(&pb);

@@ -80,7 +80,7 @@ pub async fn rae_run(mut context: RAEEnv, options: &RAEOptions, _log: String) {
         task_check_monitor(receiver_event_update_state, env_check_wait_on).await
     });
 
-    let mut select_mode = options.get_select_mode().clone();
+    let mut select_mode = *options.get_select_mode();
 
     let mut env: LEnv = context.get_exec_env().await;
     let cc: Option<ConversionCollection> = if matches!(select_mode, Planning(_, _)) {

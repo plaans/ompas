@@ -154,7 +154,7 @@ pub async fn lisp_interpreter(opt: Opt) {
         .await
         .expect("could not send to LI");
 
-    while let Some(_) = com.recv().await {
+    while com.recv().await.is_some() {
         //println!("{}", m)
     }
 

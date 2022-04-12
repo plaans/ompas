@@ -145,6 +145,10 @@ impl<T: Display + Default + Clone> Forest<T> {
     pub fn len(&self) -> usize {
         self.inner.len()
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
 }
 
 impl<T: Debug + Display + Default + Clone> Display for Forest<T> {

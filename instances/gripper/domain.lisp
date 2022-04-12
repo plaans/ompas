@@ -71,4 +71,19 @@
                 (move ?intermediaire ?room)
                 (drop ?ball ?room ?gripper)))))
 
+
+    (def-task move-and-pick '(?ball ball))
+    (def-method m_move
+        '((:task move-and-pick)
+          (:params (?ball ball) (?gripper gripper))
+          (:pre-conditions (and-cond 
+            (!= (at ?ball) no_place)
+            (!= (at ?ball) (at-robby))
+            (= (carry ?gripper) no_ball)))
+          (:score 0)
+          (:body
+            (do
+              (move (at-robby) (at ?ball))
+              (check (= (at-robby) (at ?ball)))
+              (pick ?ball (at ?ball) ?gripper)))))
 )

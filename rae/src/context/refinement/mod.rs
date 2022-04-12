@@ -321,7 +321,7 @@ impl Agenda {
                 format!(
                     "\"{}\";\"{}\";\"{}\";\"{}\";\"{}\";\"{}\";\"{}\";\"{}\"\n",
                     task_collection.get(p).unwrap().get_label(),
-                    self.get_status(p).await.to_string(),
+                    self.get_status(p).await,
                     {
                         let u: Duration = self.get_execution_time(p).await;
                         if u.is_finite() {
@@ -330,7 +330,7 @@ impl Agenda {
                             u.to_string()
                         }
                     },
-                    self.get_refinement_method(p).await.to_string(),
+                    self.get_refinement_method(p).await,
                     self.get_total_number_of_refinement(p).await,
                     self.get_total_refinement_time(p).await.as_secs(),
                     self.get_number_of_subtasks_recursive(p).await,

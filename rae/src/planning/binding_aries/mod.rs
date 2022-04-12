@@ -249,7 +249,7 @@ fn atom_from_lvalues(ctx: &Ctx, v: &LValueS) -> aAtom {
 }
 
 pub fn create_initial_chronicle(
-    goal_tasks: &Vec<LValueS>,
+    goal_tasks: &[LValueS],
     state: &RAEStateSnapshot,
     ctx: &mut Ctx,
 ) -> ChronicleInstance {
@@ -268,7 +268,7 @@ pub fn create_initial_chronicle(
         subtasks: vec![],
     };
 
-    initialize_state(&mut init_ch, state, &ctx);
+    initialize_state(&mut init_ch, state, ctx);
     initialize_goal_task(&mut init_ch, goal_tasks, ctx);
 
     //println!("problem initialized");
@@ -367,7 +367,7 @@ fn initialize_state(init_ch: &mut aChronicle, state: &RAEStateSnapshot, ctx: &Ct
     }
 }
 
-fn initialize_goal_task(init_ch: &mut aChronicle, goal_tasks: &Vec<LValueS>, ctx: &mut Ctx) {
+fn initialize_goal_task(init_ch: &mut aChronicle, goal_tasks: &[LValueS], ctx: &mut Ctx) {
     let c = Container::Instance(0);
     for t in goal_tasks {
         let t: Vec<LValueS> = t.try_into().expect("");

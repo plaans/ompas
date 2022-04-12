@@ -527,13 +527,13 @@ impl TypeHierarchy {
             let child_id = self.inner.len();
             self.child.get_mut(&parent_id).unwrap().push(child_id);
             self.inner.insert(child_id, t.to_string());
-            self.reverse.insert(t.to_string(), child_id);
+            self.reverse.insert(t, child_id);
             self.parent.insert(child_id, Some(parent_id));
             self.child.insert(child_id, vec![]);
         } else {
             let id = self.inner.len();
             self.inner.insert(id, t.to_string());
-            self.reverse.insert(t.to_string(), id);
+            self.reverse.insert(t, id);
             self.child.insert(id, vec![]);
             self.parent.insert(id, None);
         }
@@ -562,14 +562,11 @@ impl TypeHierarchy {
 
     pub fn get_direct_childs(&self, t: &str) -> Option<Vec<String>> {
         if let Some(id) = self.get_id(t) {
-            match self.child.get(id) {
-                None => None,
-                Some(p) => Some(
-                    p.iter()
-                        .map(|id| self.get_symbol(id).unwrap().clone())
-                        .collect(),
-                ),
-            }
+            self.child.get(id).map(|p| {
+                p.iter()
+                    .map(|id| self.get_symbol(id).unwrap().clone())
+                    .collect()
+            })
         } else {
             None
         }

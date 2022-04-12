@@ -206,7 +206,7 @@ mod select {
     //Returns the method to do.
     pub async fn planning_select(
         state: RAEStateSnapshot,
-        tried: &Vec<LValue>,
+        tried: &[LValue],
         task: Vec<LValue>,
         env: &LEnv,
         optimize: bool,
@@ -360,7 +360,7 @@ mod select {
 
     pub async fn greedy_select(
         state: RAEStateSnapshot,
-        tried: &Vec<LValue>,
+        tried: &[LValue],
         task: Vec<LValue>,
         env: &LEnv,
     ) -> lerror::Result<RefinementMetaData> {
@@ -447,10 +447,10 @@ mod select {
             for i in iter {
                 let i_vec: Vec<LValue> = (&i).try_into()?;
                 let arg = cons(&[pre_conditions_lambda.clone(), i_vec[1..].into()], env)?;
-                let lv: LValue = enr(&[arg], &mut env.clone()).await?;
+                let lv: LValue = enr(&[arg], &env.clone()).await?;
                 if !matches!(lv, LValue::Err(_)) {
                     let arg = cons(&[score_lambda.clone(), i_vec[1..].into()], env)?;
-                    let score: i64 = enr(&[arg], &mut env.clone()).await?.try_into()?;
+                    let score: i64 = enr(&[arg], &env.clone()).await?.try_into()?;
                     applicable_methods.push((i, score))
                 }
             }

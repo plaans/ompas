@@ -98,7 +98,7 @@ impl TaskCollection {
             .collect();
 
         if inner.is_empty() {
-            return "Empty Agenda...".to_string();
+            "Empty Agenda...".to_string()
         } else {
             let mut string = format!(
                 "Agenda:\n\t-number of task: {}\n\t-Actual agenda:\n",
@@ -143,18 +143,18 @@ impl TaskCollection {
         self.inner
             .write()
             .await
-            .get_mut(&id)
+            .get_mut(id)
             .unwrap()
             .update_status(status)
             .await
     }
 
     pub async fn get_status(&self, id: &TaskId) -> TaskStatus {
-        self.inner.read().await.get(&id).unwrap().get_status()
+        self.inner.read().await.get(id).unwrap().get_status()
     }
 
     pub async fn get(&self, id: &TaskId) -> TaskMetaData {
-        self.inner.read().await.get(&id).unwrap().clone()
+        self.inner.read().await.get(id).unwrap().clone()
     }
 }
 
@@ -327,7 +327,7 @@ impl ActionMetaData {
     pub async fn update_status(&mut self, status: TaskStatus) {
         self.status = status;
         if let Some(tx) = &self.sender_to_watcher {
-            if let Err(_) = tx.try_send(self.status) {
+            if tx.try_send(self.status).is_err() {
                 self.sender_to_watcher = None;
             }
         }
@@ -457,7 +457,7 @@ impl AbstractTaskMetaData {
     }
 
     pub fn get_last_refinement(&self) -> &RefinementMetaData {
-        &self.refinement.last().unwrap()
+        self.refinement.last().unwrap()
     }
 
     pub fn get_current_method(&self) -> &LValue {

@@ -204,7 +204,7 @@ pub async fn instance<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
         let instances = append(values.as_slice(), env)?;
         match mode {
             Instances => Ok(instances),
-            InstanceMode::Check => contains(&[instances.clone(), args[0].clone()], env),
+            InstanceMode::Check => contains(&[instances, args[0].clone()], env),
         }
     };
 

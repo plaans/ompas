@@ -1,0 +1,18 @@
+[submodule "aries"]
+	path = aries
+	url = https://github.com/plaans/aries.git
+[submodule "s-ompas"]
+	path = s-ompas
+	url = https://github.com/Yirmandias/s-ompas.git
+[submodule "ompas-rae"]
+	path = ompas-rae
+	url = https://github.com/Yirmandias/ompas-rae.git
+[submodule "ompas-gobotsim"]
+	path = ompas-gobotsim
+	url = https://github.com/Yirmandias/ompas-gobotsim.git
+[submodule "ompas-benchmark"]
+	path = ompas-benchmark
+	url = https://github.com/Yirmandias/ompas-benchmark.git
+[submodule "ompas-resources"]
+	path = ompas-resources
+	url = https://github.com/Yirmandias/ompas-resources.git

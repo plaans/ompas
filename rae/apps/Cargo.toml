@@ -12,5 +12,5 @@ sompas-core = {path = "../../scheme/core"}
 sompas-repl = {path = "../../scheme/repl"}
 sompas-modules = {path = "../../scheme/modules"}
 structopt = { version = "0.3", default-features = false }
-tokio = { version = "1.5.0", features = ["full", "time"] }
+tokio = { version = "1.17.0", features = ["full", "time"] }
 

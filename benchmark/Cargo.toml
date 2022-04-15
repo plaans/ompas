@@ -12,7 +12,7 @@ sompas-modules = {path = "../scheme/modules"}
 sompas-repl = {path = "../scheme/repl"}
 ompas-rae-scheme = {path = "../rae/scheme"}
 structopt = { version = "0.3", default-features = false }
-tokio = { version = "1.5.0", features = ["full", "time"] }
+tokio = { version = "1.17.0", features = ["full", "time"] }
 
 
 [[bin]]

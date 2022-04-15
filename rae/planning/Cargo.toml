@@ -12,9 +12,9 @@ sompas-language = {path = "../../scheme/language"}
 sompas-core = {path = "../../scheme/core"}
 ompas-rae-language = {path = "../language"}
 ompas-rae-structs = {path = "../structs"}
-tokio = { version = "1.5.0", features = ["full", "time"] }
+tokio = { version = "1.17.0", features = ["full", "time"] }
+log =  { version = "0.4.16", features = ["std"] }
 im = "15.0.0"
-log =  { version = "0.4", features = ["std"] }
 cli-table = "0.4.6"
 aries_core = {path = "../../aries/core"}
 aries_model = {path = "../../aries/model"}

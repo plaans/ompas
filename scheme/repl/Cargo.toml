@@ -11,5 +11,5 @@ sompas-structs = {path = "../structs"}
 sompas-language = {path = "../language"}
 rustyline = "7.1.0"
 im = "15.0.0"
-tokio = { version = "1.5.0", features = ["full", "time"] }
+tokio = { version = "1.17.0", features = ["full", "time"] }
 chrono = "0.4.19"

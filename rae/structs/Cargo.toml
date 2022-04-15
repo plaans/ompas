@@ -14,9 +14,9 @@ sompas-language = {path = "../../scheme/language"}
 sompas-modules = {path = "../../scheme/modules"}
 ompas-rae-language= {path = "../language"}
 aries_planning = {path= "../../aries/planning"}
-tokio = { version = "1.5.0", features = ["full", "time"] }
+tokio = { version = "1.17.0", features = ["full", "time"] }
+log =  { version = "0.4.16", features = ["std"] }
 im = "15.0.0"
 lazy_static = "1.4.0"
 chrono = "0.4.19"
-log =  { version = "0.4", features = ["std"] }
 itertools = "0.10.3"

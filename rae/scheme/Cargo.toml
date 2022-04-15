@@ -17,7 +17,7 @@ ompas-rae-structs = {path ="../structs" }
 ompas-rae-language = {path = "../language"}
 ompas-rae-log = {path = "../log"}
 ompas-rae-core = {path = "../core"}
-tokio = { version = "1.5.0", features = ["full", "time"] }
+tokio = { version = "1.17.0", features = ["full", "time"] }
 im = "15.0.0"
 chrono = "0.4.19"
 log =  { version = "0.4", features = ["std"] }

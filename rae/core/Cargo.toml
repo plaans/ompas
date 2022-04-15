@@ -11,5 +11,5 @@ ompas-rae-language = {path = "../language"}
 ompas-rae-planning = {path = "../planning"}
 sompas-core = {path = "../../scheme/core"}
 sompas-structs = {path = "../../scheme/structs"}
-tokio = { version = "1.5.0", features = ["full", "time"] }
-log =  { version = "0.4", features = ["std"] }
+tokio = { version = "1.17.0", features = ["full", "time"] }
+log =  { version = "0.4.16", features = ["std"] }

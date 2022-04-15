@@ -11,6 +11,6 @@ sompas-core = {path = "../core"}
 sompas-language = {path = "../language"}
 aries_utils = {git = "https://github.com/plaans/aries", branch = "extended_chronicle_constraints"}
 im = "15.0.0"
-tokio = { version = "1.5.0", features = ["full", "time"] }
+tokio = { version = "1.17.0", features = ["full", "time"] }
 rand = "0.8.4"
 macro_rules_attribute = "0.0.2"

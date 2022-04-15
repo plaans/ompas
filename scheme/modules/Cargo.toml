@@ -1,0 +1,16 @@
+[package]
+name = "sompas-modules"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[dependencies]
+sompas-utils = {path = "../utils" }
+sompas-structs = {path = "../structs"}
+sompas-core = {path = "../core"}
+sompas-language = {path = "../language"}
+aries_utils = {git = "https://github.com/plaans/aries", branch = "extended_chronicle_constraints"}
+im = "15.0.0"
+tokio = { version = "1.5.0", features = ["full", "time"] }
+rand = "0.8.4"
+macro_rules_attribute = "0.0.2"

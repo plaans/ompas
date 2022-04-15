@@ -1,0 +1,15 @@
+[package]
+name = "sompas-repl"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[dependencies]
+sompas-utils = {path = "../utils" }
+sompas-core = {path = "../core"}
+sompas-structs = {path = "../structs"}
+sompas-language = {path = "../language"}
+rustyline = "7.1.0"
+im = "15.0.0"
+tokio = { version = "1.5.0", features = ["full", "time"] }
+chrono = "0.4.19"

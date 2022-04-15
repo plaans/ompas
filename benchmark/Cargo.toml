@@ -1,0 +1,27 @@
+[package]
+name = "ompas-benchmark"
+version = "0.1.0"
+authors = ["Yirmandias <turi@insa-toulouse.fr>"]
+edition = "2018"
+default-run = "benchmark"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+sompas-modules = {path = "../scheme/modules"}
+sompas-repl = {path = "../scheme/repl"}
+ompas-rae-scheme = {path = "../rae/scheme"}
+structopt = { version = "0.3", default-features = false }
+tokio = { version = "1.5.0", features = ["full", "time"] }
+
+
+[[bin]]
+name = "benchmark"
+path = "src/bin/benchmark.rs"
+
+[[bin]]
+name = "benchmark_all"
+path = "src/bin/benchmark_all.rs"
+
+
+

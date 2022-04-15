@@ -1,0 +1,29 @@
+[workspace]
+
+
+members = [
+    "scheme/core",
+    "scheme/utils",
+    "scheme/structs",
+    "scheme/repl",
+    "scheme/apps",
+    "scheme/modules",
+    "scheme/language",
+    "resources/playground",
+    "rae/apps",
+    "rae/core",
+    "rae/language",
+    "rae/log",
+    "rae/planning",
+    "rae/scheme",
+    "rae/structs",
+    "gobotsim",
+    "benchmark"
+]
+
+exclude = ["aries"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+
+

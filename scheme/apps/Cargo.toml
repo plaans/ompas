@@ -1,0 +1,24 @@
+[package]
+name = "sompas-apps"
+version = "0.1.0"
+edition = "2021"
+default-run = "scheme"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name = "scheme"
+path = "src/scheme.rs"
+
+
+[dependencies]
+sompas-utils = {path = "../utils" }
+sompas-core = {path = "../core"}
+sompas-structs = {path = "../structs"}
+sompas-language = {path = "../language"}
+sompas-repl = {path = "../repl"}
+sompas-modules = {path = "../modules"}
+im = "15.0.0"
+structopt = { version = "0.3", default-features = false }
+tokio = { version = "1.5.0", features = ["full", "time"] }
+chrono = "0.4.19"

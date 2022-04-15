@@ -1,0 +1,28 @@
+[package]
+name = "ompas-rae-planning"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+sompas-utils = {path= "../../scheme/utils" }
+sompas-structs = {path = "../../scheme/structs"}
+sompas-language = {path = "../../scheme/language"}
+sompas-core = {path = "../../scheme/core"}
+ompas-rae-language = {path = "../language"}
+ompas-rae-structs = {path = "../structs"}
+tokio = { version = "1.5.0", features = ["full", "time"] }
+im = "15.0.0"
+log =  { version = "0.4", features = ["std"] }
+cli-table = "0.4.6"
+aries_core = {path = "../../aries/core"}
+aries_model = {path = "../../aries/model"}
+aries_planning = {path = "../../aries/planning"}
+aries_utils = {path = "../../aries/utils"}
+aries_collections = {path = "../../aries/collections"}
+aries_solver = {path = "../../aries/solver"}
+aries_planners = {path = "../../aries/planners"}
+aries_tnet = {path = "../../aries/tnet"}
+anyhow = "1.0.40"
+rand = "0.8.5"

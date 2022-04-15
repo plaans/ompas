@@ -7,7 +7,7 @@ exclude = ["event"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-aries_planning = {git = "https://github.com/plaans/aries", branch = "extended_chronicle_constraints"}
+aries_planning = {path = "../../aries/planning"}
 tokio-stream = "0.1.6"
 lazy_static = "1.4.0"
 im = "15.0.0"

@@ -1,4 +1,4 @@
-# Operationnal Model Planning and Acting System (OMPAS)
+# Operational Model Planning and Acting System (OMPAS)
 Author: Jérémy Turi
 
 Last update of the readme: 13/04/2021
@@ -18,7 +18,7 @@ The documentation is available at this gitbook: https://yirmandias.gitbook.io/om
 ## Run
 
 You have to install rust on your computer previously.
-You can find intallation instructions on [rust website](https://www.rust-lang.org/tools/install)
+You can find installation instructions on [rust website](https://www.rust-lang.org/tools/install)
 - close the project in your repository
 - build with `cargo build` in a terminal
 - run with `cargo run`, it will launch the ompas binary

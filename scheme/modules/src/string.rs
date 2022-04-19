@@ -41,7 +41,7 @@ impl IntoModule for CtxString {
 }
 
 //Todo: add test for concatenate
-pub fn concatenate(args: &[LValue], _: &LEnv) -> LResult {
+lfn!{pub concatenate(args, _){
     let mut str = String::new();
     for e in args {
         str.push_str(e.to_string().as_str())

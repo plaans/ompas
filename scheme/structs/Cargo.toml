@@ -14,3 +14,5 @@ tokio = { version = "1.17.0", features = ["full", "time"] }
 futures = "0.3.17"
 anyhow = "1.0.56"
 num-traits = "0.2.14"
+macro_rules_attribute = "0.0.2"
+

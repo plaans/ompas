@@ -3,12 +3,13 @@ use crate::lerror::LError;
 use crate::lerror::LError::*;
 use crate::lvalue::LValue;
 use std::fmt::{Debug, Display, Formatter};
+use std::sync::Arc;
 
 /// Struct to define a lambda in Scheme.
 #[derive(Clone)]
 pub struct LLambda {
     params: LambdaArgs,
-    body: Box<LValue>,
+    body: Arc<LValue>,
     env: LEnvSymbols,
 }
 
@@ -39,7 +40,7 @@ impl LLambda {
     pub fn new(params: LambdaArgs, body: LValue, env: LEnvSymbols) -> Self {
         LLambda {
             params,
-            body: Box::new(body),
+            body: Arc::new(body),
             env,
         }
     }

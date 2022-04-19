@@ -2,13 +2,14 @@ use sompas_language::*;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lerror::LError::WrongNumberOfArgument;
 use sompas_structs::lerror::LResult;
+use sompas_structs::lfn;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lvalue::LValue;
 
 /// Logical functional not
 /// true => nil
 /// nil => true
-pub fn not(args: &[LValue], _: &LEnv) -> LResult {
+lfn! {pub not(args, _){
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(NOT, args.into(), args.len(), 1..1));
     }
@@ -18,97 +19,106 @@ pub fn not(args: &[LValue], _: &LEnv) -> LResult {
         _ => Ok(LValue::Nil),
     }
 }
+    }
 
-pub fn neq(args: &[LValue], _: &LEnv) -> LResult {
+lfn! {pub neq(args, _){
     match args.len() {
         2 => Ok((args[0] != args[1]).into()),
         i => Err(WrongNumberOfArgument(EQ, args.into(), i, 2..2)),
     }
 }
+    }
 
-pub fn add(args: &[LValue], _: &LEnv) -> LResult {
+lfn! {pub add(args, _){
     let mut result = LValue::Number(LNumber::Float(0.0));
     for value in args {
         result = (&result + value)?;
     }
     Ok(result)
 }
+    }
 
 /// Substract function. Only takes two args.
 /// # Example
 /// ``` lisp
 /// (- 10 2) => 8
-pub fn sub(args: &[LValue], _: &LEnv) -> LResult {
+lfn! {pub sub(args, _){
     match args.len() {
         2 => &args[0] - &args[1],
         i => Err(WrongNumberOfArgument(SUB, args.into(), i, 2..2)),
     }
 }
+    }
 
-pub fn mul(args: &[LValue], _: &LEnv) -> LResult {
+lfn! {pub mul(args, _){
     let mut result = LValue::Number(LNumber::Float(1.0));
     for value in args {
         result = (&result * value)?;
     }
     Ok(result)
 }
+    }
 /// Division function. Only takes two args.
 /// # Example
 /// ``` lisp
 /// (/ 10 2) => 5
-pub fn div(args: &[LValue], _: &LEnv) -> LResult {
+lfn! {pub div(args, _){
     match args.len() {
         2 => &args[0] / &args[1],
         i => Err(WrongNumberOfArgument(DIV, args.into(), i, 2..2)),
     }
 }
+    }
 
 /// Compares two values. Returns true if the first arg is greater than the second. Nil Otherwise
-pub fn gt(args: &[LValue], _: &LEnv) -> LResult {
+lfn! {pub gt(args, _){
     match args.len() {
         2 => Ok((args[0] > args[1]).into()),
         i => Err(WrongNumberOfArgument(GT, args.into(), i, 2..2)),
     }
 }
+    }
 /// Compares two values. Returns true if the first arg is less than the second. Nil Otherwise
-pub fn lt(args: &[LValue], _: &LEnv) -> LResult {
+lfn! {pub lt(args, _){
     match args.len() {
         2 => Ok((args[0] < args[1]).into()),
         i => Err(WrongNumberOfArgument(LT, args.into(), i, 2..2)),
     }
 }
+    }
 /// Compares two values. Returns true if the first arg is greater or equal to the second. Nil Otherwise
-pub fn geq(args: &[LValue], _: &LEnv) -> LResult {
+lfn! {pub geq(args, _){
     match args.len() {
         2 => Ok((args[0] >= args[1]).into()),
         i => Err(WrongNumberOfArgument(GEQ, args.into(), i, 2..2)),
     }
 }
+    }
 /// Compares two values. Returns true if the first arg is less or equal to the second. Nil Otherwise
-pub fn leq(args: &[LValue], _: &LEnv) -> LResult {
+lfn! {pub leq(args, _){
     match args.len() {
         2 => Ok((args[0] <= args[1]).into()),
         i => Err(WrongNumberOfArgument(LEQ, args.into(), i, 2..2)),
     }
-}
+}}
 
 /// Compares two values. Returns true if the first and second args are equal. Nil Otherwise
-pub fn eq(args: &[LValue], _: &LEnv) -> LResult {
+lfn! {pub eq(args, _){
     match args.len() {
         2 => Ok((args[0] == args[1]).into()),
         i => Err(WrongNumberOfArgument(EQ, args.into(), i, 2..2)),
     }
-}
+}}
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
+    use im::vector;
 
     #[test]
     fn test_add() {
         let env = LEnv::default();
-        let result = add(&[3.into(), 2.into()], &env).unwrap();
+        let result = add(vector![3.into(), 2.into()], &env).unwrap();
         assert_eq!(LValue::Number(LNumber::Float(5.0)), result);
     }
 

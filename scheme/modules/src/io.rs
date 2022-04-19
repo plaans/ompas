@@ -122,7 +122,7 @@ impl IntoModule for CtxIo {
 /// If it is stdout, it is printed in the terminal
 /// Otherwise in the configured file.
 /// If the file is missing, it prints nothing.
-pub fn print(args: &[LValue], env: &LEnv) -> LResult {
+lfn!{pub print(args, env){
     let lv: LValue = match args.len() {
         0 => LValue::Nil,
         1 => args[0].clone(),
@@ -156,7 +156,7 @@ pub fn print(args: &[LValue], env: &LEnv) -> LResult {
 
 /// Read the content of a file and sends the content to the lisp interpreter.
 /// The name of the file is given via args.
-pub fn read(args: &[LValue], _: &LEnv) -> LResult {
+lfn!{pub read(args, _){
     //let mut stdout = io::stdout();
     //stdout.write_all(b"module Io: read\n");
     if args.len() != 1 {
@@ -186,7 +186,7 @@ pub fn read(args: &[LValue], _: &LEnv) -> LResult {
 /// # Example:
 /// ```lisp
 /// (write <file> <lvalue>)
-pub fn write(args: &[LValue], _: &LEnv) -> LResult {
+lfn!{pub write(args, _){
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(WRITE, args.into(), args.len(), 2..2));
     }

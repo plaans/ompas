@@ -3,10 +3,11 @@ use sompas_language::*;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lerror::LError::*;
 use sompas_structs::lerror::LResult;
+use sompas_structs::lfn;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::typelvalue::TypeLValue;
 
-pub fn map(args: &[LValue], _: &LEnv) -> LResult {
+lfn! {pub map(args, _){
     match args.len() {
         0 => Ok(LValue::Map(Default::default())),
         1 => match args.get(0).unwrap() {
@@ -39,8 +40,9 @@ pub fn map(args: &[LValue], _: &LEnv) -> LResult {
         _ => Err(WrongNumberOfArgument(MAP, args.into(), args.len(), 1..1)),
     }
 }
+    }
 
-pub fn get_map(args: &[LValue], _: &LEnv) -> LResult {
+lfn! {pub get_map(args, _){
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(
             GET_MAP,
@@ -59,8 +61,9 @@ pub fn get_map(args: &[LValue], _: &LEnv) -> LResult {
         lv => Err(WrongType(GET_MAP, lv.clone(), lv.into(), TypeLValue::Map)),
     }
 }
+    }
 
-pub fn set_map(args: &[LValue], _: &LEnv) -> LResult {
+lfn! {pub set_map(args, _){
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(
             SET_MAP,
@@ -91,8 +94,9 @@ pub fn set_map(args: &[LValue], _: &LEnv) -> LResult {
         lv => Err(WrongType(SET_MAP, lv.clone(), lv.into(), TypeLValue::Map)),
     }
 }
+    }
 
-pub fn remove_key_value_map(args: &[LValue], _: &LEnv) -> LResult {
+lfn! {pub remove_key_value_map(args, _){
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(
             REMOVE_KEY_VALUE_MAP,
@@ -152,8 +156,9 @@ pub fn remove_key_value_map(args: &[LValue], _: &LEnv) -> LResult {
         )),
     }
 }
+    }
 
-pub fn remove_map(args: &[LValue], _: &LEnv) -> LResult {
+lfn! {pub remove_map(args, _){
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(
             REMOVE_MAP,
@@ -177,9 +182,10 @@ pub fn remove_map(args: &[LValue], _: &LEnv) -> LResult {
         )),
     }
 }
+    }
 
 /// Merges two hashmap tables
-pub fn union_map(args: &[LValue], _: &LEnv) -> LResult {
+lfn! {pub union_map(args, _){
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(
             UNION_MAP,
@@ -211,3 +217,4 @@ pub fn union_map(args: &[LValue], _: &LEnv) -> LResult {
         ))
     }
 }
+    }

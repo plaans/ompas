@@ -388,7 +388,7 @@ pub async fn enr<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
 /// let lists: &[LValue] = &[vec![1,2,3].into(), vec![4,5,6].into()];
 /// let enumeration = enumerate(lists, &LEnv::default());
 /// ```
-pub fn enumerate(args: &[LValue], _: &LEnv) -> LResult {
+lfn!{pub enumerate(args, _){
     let mut vec_iter = vec![];
     let mut new_args = vec![];
     for arg in args {
@@ -422,7 +422,7 @@ pub fn enumerate(args: &[LValue], _: &LEnv) -> LResult {
 
 ///Return an element randomly chosen from a list
 /// Takes a LValue::List as arg.
-pub fn rand_element(args: &[LValue], _: &LEnv) -> LResult {
+lfn!{pub rand_element(args, _){
     match args.len() {
         1 => {
             if let LValue::List(list) = &args[0] {
@@ -447,7 +447,7 @@ pub fn rand_element(args: &[LValue], _: &LEnv) -> LResult {
 }
 
 ///Takes a list or map and search if it contains a LValue inside
-pub fn contains(args: &[LValue], _: &LEnv) -> LResult {
+lfn!{pub contains(args, _){
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(
             CONTAINS,
@@ -474,7 +474,7 @@ pub fn contains(args: &[LValue], _: &LEnv) -> LResult {
 }
 
 //returns a sublist of the a list
-pub fn sublist(args: &[LValue], _: &LEnv) -> LResult {
+lfn!{pub sublist(args, _){
     match args.len() {
         2 => {
             if let LValue::List(l) = &args[0] {
@@ -553,7 +553,7 @@ pub fn sublist(args: &[LValue], _: &LEnv) -> LResult {
     }
 }
 
-pub fn quote_list(args: &[LValue], _: &LEnv) -> LResult {
+lfn!{pub quote_list(args, _){
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(
             QUOTE_LIST,
@@ -581,7 +581,7 @@ pub fn quote_list(args: &[LValue], _: &LEnv) -> LResult {
     }
 }
 
-pub fn transform_in_singleton_list(args: &[LValue], _: &LEnv) -> LResult {
+lfn!{pub transform_in_singleton_list(args, _){
     if args.is_empty() {
         return Err(WrongNumberOfArgument(
             TRANSFORM_IN_SINGLETON_LIST,

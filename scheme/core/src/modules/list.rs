@@ -1,22 +1,25 @@
 use anyhow::anyhow;
+use im::{vector, Vector};
 use sompas_language::*;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lerror::LError::*;
 use sompas_structs::lerror::LResult;
+use sompas_structs::lfn;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::typelvalue::TypeLValue;
 /// Returns a list
-pub fn list(args: &[LValue], _: &LEnv) -> LResult {
+lfn! {pub list(args, _){
     if args.is_empty() {
         Ok(LValue::Nil)
     } else {
-        Ok(LValue::List(args.to_vec()))
+        Ok(args.into())
     }
 }
+    }
 
 ///It takes two arguments, an element and a list and returns a list with the element inserted at the first place.
-pub fn cons(args: &[LValue], _: &LEnv) -> LResult {
+lfn! {pub cons(args, _){
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(CONS, args.into(), args.len(), 2..2));
     }
@@ -24,21 +27,22 @@ pub fn cons(args: &[LValue], _: &LEnv) -> LResult {
     let second = &args[1];
     match second {
         LValue::List(list) => {
-            let mut new_list = vec![first.clone()];
-            new_list.append(&mut list.clone());
+            let mut new_list = vector![first.clone()];
+            new_list.append(list.clone());
             Ok(new_list.into())
         }
         LValue::Nil => Ok(vec![first.clone()].into()),
         _ => Ok(vec![first.clone(), second.clone()].into()),
     }
 }
+    }
 
-pub fn first(args: &[LValue], _: &LEnv) -> LResult {
+lfn! {pub first(args, _){
     match args.len() {
         1 => match &args[0] {
             LValue::List(list) => {
                 if !list.is_empty() {
-                    Ok(list.first().unwrap().clone())
+                    Ok(list.front().unwrap().clone())
                 } else {
                     Ok(LValue::Nil)
                 }
@@ -49,8 +53,9 @@ pub fn first(args: &[LValue], _: &LEnv) -> LResult {
         _ => Err(WrongNumberOfArgument(FIRST, args.into(), args.len(), 1..1)),
     }
 }
+    }
 
-pub fn second(args: &[LValue], _: &LEnv) -> LResult {
+lfn! {pub second(args, _){
     match args.len() {
         1 => match &args[0] {
             LValue::List(list) => {
@@ -66,8 +71,9 @@ pub fn second(args: &[LValue], _: &LEnv) -> LResult {
         _ => Err(WrongNumberOfArgument(SECOND, args.into(), args.len(), 1..1)),
     }
 }
+    }
 
-pub fn third(args: &[LValue], _: &LEnv) -> LResult {
+lfn! {pub third(args, _){
     match args.len() {
         1 => match &args[0] {
             LValue::List(list) => {
@@ -83,14 +89,15 @@ pub fn third(args: &[LValue], _: &LEnv) -> LResult {
         _ => Err(WrongNumberOfArgument(THIRD, args.into(), args.len(), 1..1)),
     }
 }
+    }
 
 ///It takes a list as argument, and returns its first element.
-pub fn car(args: &[LValue], _: &LEnv) -> LResult {
+lfn! {pub car(args, _){
     match args.len() {
         1 => match &args[0] {
             LValue::List(list) => {
                 if !list.is_empty() {
-                    Ok(list.first().unwrap().clone())
+                    Ok(list.front().unwrap().clone())
                 } else {
                     Ok(LValue::Nil)
                 }
@@ -101,9 +108,10 @@ pub fn car(args: &[LValue], _: &LEnv) -> LResult {
         _ => Err(WrongNumberOfArgument(CAR, args.into(), args.len(), 1..1)),
     }
 }
+    }
 
 ///It takes a list as argument, and returns a list without the first element
-pub fn cdr(args: &[LValue], _: &LEnv) -> LResult {
+lfn! {pub cdr(args, _){
     if args.len() == 1 {
         match &args[0] {
             LValue::List(list) => {
@@ -114,7 +122,7 @@ pub fn cdr(args: &[LValue], _: &LEnv) -> LResult {
                     //let vec = slice.to_vec();
                     let mut new_list = list.clone();
                     new_list.remove(0);
-                    Ok(new_list.into())
+                    Ok(LValue::List(new_list))
                 }
             }
             LValue::Nil => Ok(LValue::Nil),
@@ -124,9 +132,10 @@ pub fn cdr(args: &[LValue], _: &LEnv) -> LResult {
         Err(WrongNumberOfArgument(CDR, args.into(), args.len(), 1..1))
     }
 }
+    }
 
 ///It takes a list as argument, and returns a list without the first element
-pub fn rest(args: &[LValue], _: &LEnv) -> LResult {
+lfn! {pub rest(args, _){
     if args.len() == 1 {
         match &args[0] {
             LValue::List(list) => {
@@ -137,7 +146,7 @@ pub fn rest(args: &[LValue], _: &LEnv) -> LResult {
                     //let vec = slice.to_vec();
                     let mut new_list = list.clone();
                     new_list.remove(0);
-                    Ok(new_list.into())
+                    Ok(LValue::List(new_list))
                 }
             }
             LValue::Nil => Ok(LValue::Nil),
@@ -147,13 +156,14 @@ pub fn rest(args: &[LValue], _: &LEnv) -> LResult {
         Err(WrongNumberOfArgument(REST, args.into(), args.len(), 1..1))
     }
 }
+    }
 
 ///It merges two or more list into one.
-pub fn append(args: &[LValue], _: &LEnv) -> LResult {
-    let mut new_list = Vec::new();
+lfn! {pub append(args, _){
+    let mut new_list = vector![];
     for element in args {
         match element {
-            LValue::List(list) => new_list.append(&mut list.clone()),
+            LValue::List(list) => new_list.append(list.clone()),
             LValue::Nil => {}
             _ => {
                 return Err(WrongType(
@@ -167,9 +177,10 @@ pub fn append(args: &[LValue], _: &LEnv) -> LResult {
     }
     Ok(new_list.into())
 }
+    }
 
 ///It takes a list and returns the last element.
-pub fn last(args: &[LValue], _: &LEnv) -> LResult {
+lfn! {pub last(args, _){
     if args.len() == 1 {
         match args.first().unwrap() {
             LValue::List(list) => {
@@ -185,11 +196,12 @@ pub fn last(args: &[LValue], _: &LEnv) -> LResult {
         Err(WrongNumberOfArgument(LAST, args.into(), args.len(), 1..1))
     }
 }
+    }
 
 ///It takes two arguments of which the second must be a list,
 /// if the first argument is a member of the second argument,
 /// and then it returns the remainder of the list beginning with the first argument.
-pub fn member(args: &[LValue], _: &LEnv) -> LResult {
+lfn! {pub member(args, _){
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(MEMBER, args.into(), args.len(), 2..2));
     }
@@ -198,7 +210,7 @@ pub fn member(args: &[LValue], _: &LEnv) -> LResult {
         LValue::List(list) => {
             for (k, element) in list.iter().enumerate() {
                 if element == value_to_find {
-                    return Ok(list[k..].into());
+                    return Ok(list.clone().slice(k..).into());
                 }
             }
             Ok(LValue::Nil)
@@ -206,8 +218,9 @@ pub fn member(args: &[LValue], _: &LEnv) -> LResult {
         lv => Err(WrongType(MEMBER, lv.clone(), lv.into(), TypeLValue::List)),
     }
 }
+    }
 
-pub fn get_list(args: &[LValue], _: &LEnv) -> LResult {
+lfn! {pub get_list(args, _){
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(
             GET_LIST,
@@ -248,8 +261,9 @@ pub fn get_list(args: &[LValue], _: &LEnv) -> LResult {
         ))
     }
 }
+    }
 
-pub fn set_list(args: &[LValue], _: &LEnv) -> LResult {
+lfn! {pub set_list(args, _){
     if args.len() != 3 {
         return Err(WrongNumberOfArgument(
             SET_LIST,
@@ -285,14 +299,17 @@ pub fn set_list(args: &[LValue], _: &LEnv) -> LResult {
         ))
     }
 }
+    }
 
 /// It takes a list and returns a list with the top elements in reverse order.
-pub fn reverse(args: &[LValue], _: &LEnv) -> LResult {
+lfn! {pub reverse(args, _){
     if args.len() == 1 {
         match args.first().unwrap() {
             LValue::List(list) => {
-                let mut new_list = list.clone();
-                new_list.reverse();
+                let mut new_list: Vector<LValue> = vector![];
+                for e in list.iter().rev() {
+                    new_list.push_back(e.clone())
+                }
                 Ok(new_list.into())
             }
             lv => Err(WrongType(REVERSE, lv.clone(), lv.into(), TypeLValue::List)),
@@ -306,9 +323,10 @@ pub fn reverse(args: &[LValue], _: &LEnv) -> LResult {
         ))
     }
 }
+    }
 
 /// Returns a list of element present in all lists
-pub fn intersection(args: &[LValue], _: &LEnv) -> LResult {
+lfn! {pub intersection(args, _){
     if args.is_empty() {
         return Ok(LValue::Nil);
     }
@@ -343,4 +361,5 @@ pub fn intersection(args: &[LValue], _: &LEnv) -> LResult {
     }
 
     Ok(intersection.into())
+}
 }

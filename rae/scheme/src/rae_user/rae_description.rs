@@ -116,7 +116,7 @@ fn f_and_effect(args: &[LValue], _: &LEnv) -> LResult {
     }
 }
 /// Takes as input a p_expr of the form ((p1 p1_type) ... (p_n pn_type))
-pub fn generate_type_test_expr(args: &[LValue], _: &LEnv) -> LResult {
+lfn!{pub generate_type_test_expr(args, _){
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(
             GENERATE_TYPE_TEST_EXPR,
@@ -843,7 +843,7 @@ pub async fn add_object<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     Ok(LValue::Nil)
 }
 
-/*pub async fn add_object(args: &[LValue], env: &LEnv) -> LResult {
+lfn!{/*pub async add_object(args, env){
     add_constant(args, env).await
 }*/
 

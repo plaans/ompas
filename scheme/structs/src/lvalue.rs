@@ -5,57 +5,59 @@ use crate::lerror::LError::ConversionError;
 use crate::lfuture::LFuture;
 use crate::llambda::LLambda;
 use crate::lnumber::LNumber;
+use crate::symbol;
 use crate::typelvalue::TypeLValue;
-use im::HashMap;
-use serde::*;
+use im::{vector, HashMap};
 use sompas_language::*;
 use std::cmp::Ordering;
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
-use std::ops::{Add, Div, Mul, Sub};
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-#[serde(untagged, rename_all = "lowercase")]
-pub enum LValue {
-    // symbol
-    Symbol(Sym),
-    // literaux
-    String(String),
-    Character(char),
-    Number(LNumber),
-    #[serde(skip)]
-    Fn(LFn),
-    //#[serde(skip)]
-    //MutFn(LMutFn),
-    #[serde(skip)]
-    AsyncFn(LAsyncFn),
-    //#[serde(skip)]
-    //AsyncMutFn(LAsyncMutFn),
-    #[serde(skip)]
-    Lambda(LLambda),
-    #[serde(skip)]
-    CoreOperator(LCoreOperator),
-    #[serde(skip)]
-    Future(LFuture),
-    Err(Box<LValue>),
-    // data structure
-    #[serde(skip)]
-    Map(im::HashMap<LValue, LValue>),
-    List(Vec<LValue>),
-    //Quote(Box<LValue>),
-    //Refers to boolean 'false and empty list in lisp
-    True,
-    Nil,
-}
+use std::ops::{Add, Deref, Div, Mul, Sub};
+use std::sync::Arc;
 
 type Sym = String;
+
+#[derive(Clone)]
+pub struct RefLValue(Arc<LValue>);
+
+#[derive(Clone, Debug)] //Serialize, Deserialize, Debug)]
+                        //#[serde(untagged, rename_all = "lowercase")]
+pub enum LValue {
+    // symbol
+    Symbol(Arc<Sym>),
+    // literaux
+    String(Arc<String>),
+    Number(LNumber),
+    //#[serde(skip)]
+    Fn(LFn),
+    //#[serde(skip)]
+    AsyncFn(LAsyncFn),
+    //#[serde(skip)]
+    Lambda(LLambda),
+    //#[serde(skip)]
+    CoreOperator(LCoreOperator),
+    //#[serde(skip)]
+    Future(LFuture),
+    Err(Arc<LValue>),
+    // data structure
+    //#[serde(skip)]
+    Map(im::HashMap<LValue, LValue>),
+    List(im::Vector<LValue>),
+    True,
+    //Refers to boolean 'false and empty list in lisp
+    Nil,
+}
 
 const TAB_SIZE: usize = 3;
 const MAX_LENGTH: usize = 80;
 
 impl LValue {
-    fn pretty_print_list_aligned(keyword: &str, list: &[LValue], mut indent: usize) -> String {
+    fn pretty_print_list_aligned(
+        keyword: &str,
+        list: &im::Vector<LValue>,
+        mut indent: usize,
+    ) -> String {
         let mut string: String = format!("({}", keyword);
         indent += string.len() + 1;
         let mut first = true;
@@ -74,7 +76,7 @@ impl LValue {
         string
     }
 
-    fn pretty_print_list(list: &[LValue], indent: usize) -> String {
+    fn pretty_print_list(list: &im::Vector<LValue>, indent: usize) -> String {
         let mut string = '('.to_string();
 
         let mut global_size = 0;
@@ -130,21 +132,23 @@ impl LValue {
                         | LValue::CoreOperator(LCoreOperator::Do) => {
                             let indent = indent + TAB_SIZE;
                             let mut string = format!("({}", list[0]);
-                            for element in &list[1..] {
-                                string.push_str(
-                                    format!(
-                                        "\n{}{}",
-                                        " ".repeat(indent),
-                                        element.format(indent + TAB_SIZE)
-                                    )
-                                    .as_str(),
-                                );
+                            for (i, element) in list.iter().enumerate() {
+                                if i != 0 {
+                                    string.push_str(
+                                        format!(
+                                            "\n{}{}",
+                                            " ".repeat(indent),
+                                            element.format(indent + TAB_SIZE)
+                                        )
+                                        .as_str(),
+                                    );
+                                }
                             }
                             string.push(')');
                             string
                         }
                         LValue::CoreOperator(LCoreOperator::If) => {
-                            LValue::pretty_print_list_aligned(IF, &list[1..], indent)
+                            LValue::pretty_print_list_aligned(IF, &list.clone().slice(1..), indent)
                         }
                         LValue::Symbol(s) => match s.as_str() {
                             LET | LET_STAR => {
@@ -200,10 +204,14 @@ impl LValue {
                                     body.format(indent + TAB_SIZE)
                                 )
                             }
-                            COND => LValue::pretty_print_list_aligned(COND, &list[1..], indent),
-                            _ => LValue::pretty_print_list(list.as_slice(), indent),
+                            COND => LValue::pretty_print_list_aligned(
+                                COND,
+                                &list.clone().slice(1..),
+                                indent,
+                            ),
+                            _ => LValue::pretty_print_list(&list, indent),
                         },
-                        _ => LValue::pretty_print_list(list.as_slice(), indent),
+                        _ => LValue::pretty_print_list(&list, indent),
                     }
                 } else {
                     NIL.to_string()
@@ -247,7 +255,6 @@ impl Display for LValue {
             LValue::CoreOperator(co) => {
                 write!(f, "{}", co)
             }
-            LValue::Character(c) => write!(f, "{}", c),
             LValue::AsyncFn(fun) => write!(f, "{}", fun.get_label()),
             LValue::Future(_) => write!(f, "{}", FUTURE),
             LValue::Err(e) => write!(f, "err: {}", e),
@@ -304,7 +311,7 @@ impl TryFrom<&LValue> for String {
 
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
         match value {
-            LValue::Symbol(s) => Ok(s.clone()),
+            LValue::Symbol(s) => Ok(s.deref().clone()),
             LValue::True => Ok(TRUE.into()),
             LValue::Nil => Ok(NIL.into()),
             LValue::Number(n) => Ok(n.to_string()),
@@ -326,13 +333,13 @@ impl TryFrom<LValue> for String {
     }
 }
 
-impl TryFrom<&LValue> for Vec<LValue> {
+impl TryFrom<&LValue> for im::Vector<LValue> {
     type Error = LError;
 
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
         match value {
             LValue::List(l) => Ok(l.clone()),
-            LValue::Nil => Ok(vec![]),
+            LValue::Nil => Ok(vector![]),
             lv => Err(ConversionError(
                 "Vec<LValue>::tryfrom<&LValue>",
                 lv.into(),
@@ -342,7 +349,7 @@ impl TryFrom<&LValue> for Vec<LValue> {
     }
 }
 
-impl TryFrom<LValue> for Vec<LValue> {
+impl TryFrom<LValue> for im::Vector<LValue> {
     type Error = LError;
 
     fn try_from(value: LValue) -> Result<Self, Self::Error> {
@@ -475,7 +482,6 @@ impl PartialEq for LValue {
             (LValue::Number(n1), LValue::Number(n2)) => *n1 == *n2,
             (LValue::Symbol(s1), LValue::Symbol(s2)) => *s1 == *s2,
             (LValue::String(s1), LValue::String(s2)) => s1 == s2,
-            (LValue::Character(c1), LValue::Character(c2)) => c1 == c2,
             (LValue::True, LValue::True) => true,
             (LValue::Nil, LValue::Nil) => true,
             //Text comparison
@@ -707,7 +713,7 @@ impl From<usize> for LValue {
 
 impl From<&str> for LValue {
     fn from(s: &str) -> Self {
-        LValue::Symbol(s.to_string())
+        symbol!(s.to_string())
     }
 }
 
@@ -719,7 +725,7 @@ impl From<String> for LValue {
 
 impl From<&String> for LValue {
     fn from(s: &String) -> Self {
-        LValue::Symbol(s.clone())
+        symbol!(s.to_string())
     }
 }
 
@@ -728,14 +734,26 @@ impl From<&[LValue]> for LValue {
         if lv.is_empty() {
             LValue::Nil
         } else {
-            LValue::List(lv.to_vec())
+            LValue::List(lv.into())
         }
+    }
+}
+
+impl<T: Clone + Into<LValue>> From<&im::Vector<T>> for LValue {
+    fn from(vec: &im::Vector<T>) -> Self {
+        LValue::List(vec.iter().map(|x| x.clone().into()).collect())
     }
 }
 
 impl<T: Clone + Into<LValue>> From<&Vec<T>> for LValue {
     fn from(vec: &Vec<T>) -> Self {
         LValue::List(vec.iter().map(|x| x.clone().into()).collect())
+    }
+}
+
+impl<T: Clone + Into<LValue>> From<im::Vector<T>> for LValue {
+    fn from(vec: im::Vector<T>) -> Self {
+        (&vec).into()
     }
 }
 

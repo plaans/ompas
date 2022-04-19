@@ -12,7 +12,7 @@ use std::ops::{Add, Div, Mul, Sub};
 /// - Int(i64)
 /// - Float(f64)
 /// - Usize(usize)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Copy, Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum LNumber {
     Int(i64),

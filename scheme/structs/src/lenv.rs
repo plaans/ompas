@@ -1,14 +1,13 @@
 use crate::contextcollection::{Context, ContextCollection};
 use crate::documentation::{Documentation, LHelp};
 use crate::function::LFn;
-use crate::lerror;
 use crate::lerror::LError::{WrongNumberOfArgument, WrongType};
-use crate::lerror::LResult;
 use crate::llambda::LLambda;
 use crate::lvalue::LValue;
 use crate::module::{InitLisp, IntoModule};
 use crate::purefonction::PureFonctionCollection;
 use crate::typelvalue::TypeLValue;
+use crate::{lerror, lfn, string};
 use im::HashSet;
 use sompas_language::*;
 use std::any::Any;
@@ -260,7 +259,7 @@ impl PartialEq for LEnv {
 }
 
 /// Returns a list of all the keys present in the environment
-pub fn env_get_keys(_: &[LValue], env: &LEnv) -> LResult {
+lfn! { env_get_keys(_,env) {
     Ok(env
         .keys()
         .iter()
@@ -268,8 +267,9 @@ pub fn env_get_keys(_: &[LValue], env: &LEnv) -> LResult {
         .collect::<Vec<LValue>>()
         .into())
 }
+}
 
-pub fn env_get_macros(_: &[LValue], env: &LEnv) -> LResult {
+lfn! { env_get_macros(_,env) {
     Ok(env
         .macros()
         .iter()
@@ -277,8 +277,9 @@ pub fn env_get_macros(_: &[LValue], env: &LEnv) -> LResult {
         .collect::<Vec<LValue>>()
         .into())
 }
+    }
 
-pub fn env_get_macro(args: &[LValue], env: &LEnv) -> LResult {
+lfn! { env_get_macro(args, env) {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(
             ENV_GET_MACRO,
@@ -301,27 +302,30 @@ pub fn env_get_macro(args: &[LValue], env: &LEnv) -> LResult {
         ))
     }
 }
+    }
 
 ///print the help
 /// Takes 0 or 1 parameter.
 /// 0 parameter: gives the list of all the functions
 /// 1 parameter: write the help of
-pub fn help(args: &[LValue], env: &LEnv) -> LResult {
+lfn! {
+    pub help(args,env) {
     let documentation: Documentation = env.get_documentation();
 
     match args.len() {
         0 => Ok(documentation.get_all().into()),
         1 => match &args[0] {
-            LValue::Fn(fun) => Ok(LValue::String(documentation.get(fun.get_label()))),
-            LValue::Symbol(s) => Ok(LValue::String(documentation.get(s))),
-            LValue::CoreOperator(co) => Ok(LValue::String(documentation.get(&co.to_string()))),
+            LValue::Fn(fun) => Ok(string!(documentation.get(fun.get_label()))),
+            LValue::Symbol(s) => Ok(string!(documentation.get(s))),
+            LValue::CoreOperator(co) => Ok(string!(documentation.get(&co.to_string()))),
             lv => Err(WrongType(HELP, lv.clone(), lv.into(), TypeLValue::Symbol)),
         },
         _ => Err(WrongNumberOfArgument(HELP, args.into(), args.len(), 0..1)),
     }
 }
+}
 
-pub fn get_list_modules(_: &[LValue], env: &LEnv) -> LResult {
+lfn! {pub get_list_modules(_,env) {
     let list = env.ctxs.get_list_modules();
     let mut str = '{'.to_string();
     for (i, s) in list.iter().enumerate() {
@@ -333,5 +337,6 @@ pub fn get_list_modules(_: &[LValue], env: &LEnv) -> LResult {
 
     str.push(')');
 
-    Ok(LValue::String(str))
+    Ok(string!(str))
 }
+    }

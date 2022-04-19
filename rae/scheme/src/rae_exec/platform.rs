@@ -14,7 +14,7 @@ use sompas_structs::lvalue::LValue;
 use sompas_utils::dyn_async;
 use std::convert::{TryFrom, TryInto};
 
-pub fn is_platform_defined(_: &[LValue], env: &LEnv) -> LResult {
+lfn!{pub is_platform_defined(_, env){
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
     Ok(ctx.platform_interface.is_some().into())
 }

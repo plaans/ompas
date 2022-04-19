@@ -19,6 +19,7 @@ use sompas_structs::lvalue::LValue;
 use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
 use sompas_structs::typelvalue::TypeLValue;
+use sompas_structs::{lfn, string};
 
 pub const MOD_ROOT: &str = "mod-root";
 
@@ -249,13 +250,13 @@ impl IntoModule for CtxRoot {
 }
 /// Default function of the Lisp Environement.
 /// Does nothing outside returning a string.
-pub fn default(_args: &[LValue], _: &LEnv) -> LResult {
-    Ok(LValue::String("default function".to_string()))
-}
+lfn! {pub default(_args, _){
+    Ok(string!("default function".to_string()))
+}}
 
 /// Construct a map
 
-pub fn set(args: &[LValue], env: &LEnv) -> LResult {
+lfn! {pub set(args, env){
     if args.is_empty() {
         return Err(WrongNumberOfArgument(
             SET,
@@ -274,9 +275,9 @@ pub fn set(args: &[LValue], env: &LEnv) -> LResult {
             vec![TypeLValue::List, TypeLValue::Map, TypeLValue::Nil],
         )),
     }
-}
+}}
 
-pub fn get(args: &[LValue], env: &LEnv) -> LResult {
+lfn! {pub get(args, env){
     if args.is_empty() {
         return Err(WrongNumberOfArgument(
             GET,
@@ -296,9 +297,9 @@ pub fn get(args: &[LValue], env: &LEnv) -> LResult {
         )),
     }
 }
-
+}
 /// return the length of the object if it is a table or a list.
-pub fn length(args: &[LValue], _: &LEnv) -> LResult {
+lfn! {pub length(args, _){
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(LEN, args.into(), args.len(), 1..1));
     }
@@ -315,8 +316,9 @@ pub fn length(args: &[LValue], _: &LEnv) -> LResult {
         )),
     }
 }
+            }
 /// Returns true if a hashmap or list is empty
-pub fn empty(args: &[LValue], _: &LEnv) -> LResult {
+lfn! {pub empty(args, _){
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(EMPTY, args.into(), args.len(), 1..1));
     }
@@ -332,4 +334,5 @@ pub fn empty(args: &[LValue], _: &LEnv) -> LResult {
             vec![TypeLValue::List, TypeLValue::Map, TypeLValue::Nil],
         )),
     }
+}
 }

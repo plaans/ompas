@@ -86,14 +86,14 @@ pub async fn configure_select<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult 
 
 /// Add an event to the stream of RAE
 /// access asynchronously to the stream
-pub fn trigger_event(_: &[LValue], _: &LEnv) -> LResult {
+lfn!{pub trigger_event(_, _){
     Ok(LValue::String(
         "trigger event not yet implemented".to_string(),
     ))
 }
 
 /// Sends via a channel a task to execute.
-pub fn trigger_task(args: &[LValue], env: &LEnv) -> LResult {
+lfn!{pub trigger_task(args, env){
     let env = env.clone();
 
     let ctx = env.get_context::<CtxRae>(MOD_RAE)?;

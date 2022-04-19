@@ -7,6 +7,7 @@ use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
+use std::sync::Arc;
 
 /// Enum used to serialize LValue.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -54,7 +55,7 @@ impl Eq for LValueS {}
 impl From<&LValue> for LValueS {
     fn from(lv: &LValue) -> Self {
         match lv {
-            LValue::Symbol(s) => LValueS::Symbol(s.clone()),
+            LValue::Symbol(s) => LValueS::Symbol(s.deref().clone()),
             LValue::Number(n) => match n {
                 LNumber::Int(i) => LValueS::Int(*i),
                 LNumber::Float(f) => LValueS::Float(*f),
@@ -64,16 +65,12 @@ impl From<&LValue> for LValueS {
             LValue::CoreOperator(co) => LValueS::Symbol(co.to_string()),
             LValue::Map(m) => LValueS::Map(m.iter().map(|(k, v)| (k.into(), v.into())).collect()),
             LValue::List(l) => LValueS::List(l.iter().map(|lv| lv.into()).collect()),
-            //LValue::Quote(l) => l.deref().into(),
             LValue::True => LValueS::Bool(true),
             LValue::Nil => LValueS::Bool(false),
-            LValue::String(s) => LValueS::Symbol(s.clone()),
-            LValue::Character(c) => LValueS::Symbol(c.to_string()),
+            LValue::String(s) => LValueS::Symbol(s.deref().clone()),
             LValue::AsyncFn(fun) => LValueS::Symbol(fun.get_label().to_string()),
             LValue::Future(_) => panic!("cannot convert LValue::Future into LValueS"),
-            LValue::Err(e) => {
-                LValueS::List(vec![LValueS::Symbol(ERR.to_string()), e.deref().into()])
-            }
+            LValue::Err(e) => LValueS::List(vec![ERR.into(), e.deref().into()]),
         }
     }
 }
@@ -87,7 +84,7 @@ impl From<LValue> for LValueS {
 impl From<&LValueS> for LValue {
     fn from(lvs: &LValueS) -> Self {
         match lvs {
-            LValueS::Symbol(s) => LValue::Symbol(s.clone()),
+            LValueS::Symbol(s) => LValue::Symbol(Arc::new(s.clone())),
             LValueS::Int(i) => LValue::Number(LNumber::Int(*i)),
             LValueS::Float(f) => LValue::Number(LNumber::Float(*f)),
             LValueS::Bool(b) => match b {
@@ -106,7 +103,7 @@ impl From<&LValueS> for LValue {
                     LValue::Nil
                 } else {
                     let mut map: im::HashMap<LValue, LValue> = Default::default();
-                    for (k, v) in m {
+                    for (k, v) in m.iter() {
                         map.insert(k.into(), v.into());
                     }
                     LValue::Map(map)
@@ -168,7 +165,7 @@ impl Display for LValueS {
             }
             LValueS::List(l) => {
                 let mut str = String::from("(");
-                for e in l {
+                for e in l.iter() {
                     str.push_str(format!("{} ", e).as_str())
                 }
                 str.push(')');
@@ -176,7 +173,7 @@ impl Display for LValueS {
             }
             LValueS::Map(m) => {
                 let mut str = String::from("(");
-                for e in m {
+                for e in m.iter() {
                     str.push_str(format!("{} . {} ", e.0, e.1).as_str())
                 }
                 str.push(')');

@@ -109,7 +109,7 @@ impl IntoModule for CtxMath {
 
 ///Compute the sin of a LNumber
 /// Only takes one element in args
-pub fn sin(args: &[LValue], _: &LEnv) -> LResult {
+lfn!{pub sin(args, _){
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(SIN, args.into(), args.len(), 1..1));
     }
@@ -125,7 +125,7 @@ pub fn sin(args: &[LValue], _: &LEnv) -> LResult {
 
 /// Compute the cos of a LNumber
 /// Only takes one element in args
-pub fn cos(args: &[LValue], _: &LEnv) -> LResult {
+lfn!{pub cos(args, _){
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(COS, args.into(), args.len(), 1..1));
     }
@@ -139,7 +139,7 @@ pub fn cos(args: &[LValue], _: &LEnv) -> LResult {
     }
 }
 
-pub fn sqrt(args: &[LValue], _: &LEnv) -> LResult {
+lfn!{pub sqrt(args, _){
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(SQRT, args.into(), args.len(), 1..1));
     }
@@ -153,7 +153,7 @@ pub fn sqrt(args: &[LValue], _: &LEnv) -> LResult {
     }
 }
 
-pub fn pow(args: &[LValue], _: &LEnv) -> LResult {
+lfn!{pub pow(args, _){
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(POW, args.into(), args.len(), 2..2));
     }
@@ -181,7 +181,7 @@ pub fn pow(args: &[LValue], _: &LEnv) -> LResult {
     }
 }
 
-pub fn square(args: &[LValue], _: &LEnv) -> LResult {
+lfn!{pub square(args, _){
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(SQUARE, args.into(), args.len(), 1..1));
     }
@@ -195,7 +195,7 @@ pub fn square(args: &[LValue], _: &LEnv) -> LResult {
     }
 }
 
-pub fn abs(args: &[LValue], _: &LEnv) -> LResult {
+lfn!{pub abs(args, _){
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(SQUARE, args.into(), args.len(), 1..1));
     }
@@ -211,7 +211,7 @@ pub fn abs(args: &[LValue], _: &LEnv) -> LResult {
 }
 
 /// Returns an integer randomly picked between two numbers.
-pub fn rand_int_in_range(args: &[LValue], _: &LEnv) -> LResult {
+lfn!{pub rand_int_in_range(args, _){
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(
             RAND_INT_IN_RANGE,
@@ -244,7 +244,7 @@ pub fn rand_int_in_range(args: &[LValue], _: &LEnv) -> LResult {
 }
 
 /// Returns a float randomly picked between two numbers.
-pub fn rand_float_in_range(args: &[LValue], _: &LEnv) -> LResult {
+lfn!{pub rand_float_in_range(args, _){
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(
             RAND_FLOAT_IN_RANGE,

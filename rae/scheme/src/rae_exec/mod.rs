@@ -674,15 +674,15 @@ async fn monitor<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     Ok(LValue::True)
 }
 
-pub fn success(args: &[LValue], _: &LEnv) -> LResult {
+lfn!{pub success(args, _){
     Ok(vec![LValue::from(SUCCESS), args.into()].into())
 }
 
-pub fn failure(args: &[LValue], _: &LEnv) -> LResult {
+lfn!{pub failure(args, _){
     Ok(vec![LValue::from(FAILURE), args.into()].into())
 }
 
-pub fn is_failure(args: &[LValue], _: &LEnv) -> LResult {
+lfn!{pub is_failure(args, _){
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(
             IS_FAILURE,
@@ -722,7 +722,7 @@ pub fn is_failure(args: &[LValue], _: &LEnv) -> LResult {
     }
 }
 
-pub fn is_success(args: &[LValue], _: &LEnv) -> LResult {
+lfn!{pub is_success(args, _){
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(
             IS_SUCCESS,

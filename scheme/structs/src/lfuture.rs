@@ -25,11 +25,11 @@ impl From<FutureResult> for LValue {
 
 #[cfg(test)]
 mod test_lfuture {
-    use crate::lerror::LError;
+    use crate::lerror::LRuntimeError;
     use crate::lvalue::LValue;
 
     #[tokio::test]
-    async fn create_lvalue_future() -> Result<(), LError> {
+    async fn create_lvalue_future() -> Result<(), LRuntimeError> {
         let args = LValue::Nil;
 
         let future: LValue = args.into();

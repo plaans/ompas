@@ -6,13 +6,13 @@ use sompas_core::get_root_env;
 use sompas_language::{LIST, OBJECT};
 use sompas_structs::lcoreoperator::LCoreOperator;
 use sompas_structs::lenv::{LEnv, LEnvSymbols};
-use sompas_structs::lerror::LError;
-use sompas_structs::lerror::LError::{
-    NotInListOfExpectedTypes, SpecialError, WrongNumberOfArgument, WrongType,
+use sompas_structs::lerror::LRuntimeError;
+use sompas_structs::lerror::LRuntimeError::{
+    Anyhow, NotInListOfExpectedTypes, WrongNumberOfArgument, WrongType,
 };
 use sompas_structs::llambda::LLambda;
 use sompas_structs::lvalue::LValue;
-use sompas_structs::typelvalue::TypeLValue;
+use sompas_structs::typelvalue::KindLValue;
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
@@ -119,10 +119,10 @@ impl Parameters {
 const TYPE_TRY_FROM_LVALUE: &str = "Type::try_from<&LValue>";
 
 impl TryFrom<&LValue> for Type {
-    type Error = LError;
+    type Error = LRuntimeError;
 
     fn try_from(lv: &LValue) -> Result<Self, Self::Error> {
-        let err = SpecialError(
+        let err = Anyhow(
             TYPE_TRY_FROM_LVALUE,
             format!("{} or {} was expected", TUPLE_TYPE, LIST),
         );
@@ -161,7 +161,7 @@ impl TryFrom<&LValue> for Type {
                 TYPE_TRY_FROM_LVALUE,
                 lv.clone(),
                 (lv).into(),
-                vec![TypeLValue::Symbol, TypeLValue::List],
+                vec![KindLValue::Symbol, KindLValue::List],
             )),
         }
     }
@@ -170,7 +170,7 @@ impl TryFrom<&LValue> for Type {
 const PARAMETERS_TRY_FROM_LVALUE: &str = "Parameters::TryFrom(LValue)";
 
 impl TryFrom<&LValue> for Parameters {
-    type Error = LError;
+    type Error = LRuntimeError;
 
     //form: ((param type) (param2 type2) ... (paramn typen))
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
@@ -202,7 +202,7 @@ impl TryFrom<&LValue> for Parameters {
                             PARAMETERS_TRY_FROM_LVALUE,
                             e.clone(),
                             e.into(),
-                            vec![TypeLValue::List, TypeLValue::Symbol],
+                            vec![KindLValue::List, KindLValue::Symbol],
                         ))
                     }
                 }
@@ -213,7 +213,7 @@ impl TryFrom<&LValue> for Parameters {
                 PARAMETERS_TRY_FROM_LVALUE,
                 value.clone(),
                 value.into(),
-                TypeLValue::List,
+                KindLValue::List,
             ));
         }
 
@@ -222,7 +222,7 @@ impl TryFrom<&LValue> for Parameters {
 }
 
 impl TryFrom<LValue> for Parameters {
-    type Error = LError;
+    type Error = LRuntimeError;
 
     fn try_from(v: LValue) -> Result<Self, Self::Error> {
         (&v).try_into()
@@ -681,9 +681,9 @@ impl DomainEnv {
         self.map_symbol_type.insert(label, TASK_TYPE.into());
     }
 
-    pub fn add_method(&mut self, label: String, value: Method) -> Result<(), LError> {
+    pub fn add_method(&mut self, label: String, value: Method) -> Result<(), LRuntimeError> {
         match self.tasks.get_mut(&value.task_label) {
-            None => Err(SpecialError(
+            None => Err(Anyhow(
                 "DomainEnv::add_method",
                 format!(
                     "Cannot add method {} because task {} does not exist.",
@@ -710,9 +710,13 @@ impl DomainEnv {
         self.map_symbol_type.insert(label, ACTION_TYPE.into());
     }
 
-    pub fn add_action_sample_fn(&mut self, label: String, value: LValue) -> Result<(), LError> {
+    pub fn add_action_sample_fn(
+        &mut self,
+        label: String,
+        value: LValue,
+    ) -> Result<(), LRuntimeError> {
         match self.actions.get_mut(&label) {
-            None => Err(SpecialError(
+            None => Err(Anyhow(
                 "add_action_sample_fn",
                 format!("Action {} is not defined", label),
             )),
@@ -1040,13 +1044,17 @@ impl RAEEnv {
 }
 
 impl RAEEnv {
-    pub fn add_action(&mut self, label: String, value: Action) -> Result<(), LError> {
+    pub fn add_action(&mut self, label: String, value: Action) -> Result<(), LRuntimeError> {
         self.domain_env.add_action(label, value);
 
         Ok(())
     }
 
-    pub fn add_action_sample_fn(&mut self, label: String, value: LValue) -> Result<(), LError> {
+    pub fn add_action_sample_fn(
+        &mut self,
+        label: String,
+        value: LValue,
+    ) -> Result<(), LRuntimeError> {
         self.domain_env.add_action_sample_fn(label, value)
     }
 
@@ -1054,7 +1062,7 @@ impl RAEEnv {
         &mut self,
         label: String,
         value: StateFunction,
-    ) -> Result<(), LError> {
+    ) -> Result<(), LRuntimeError> {
         self.domain_env.add_state_function(label, value);
 
         Ok(())
@@ -1065,7 +1073,7 @@ impl RAEEnv {
         label: String,
         body: LValue,
         parameters: Parameters,
-    ) -> Result<(), LError> {
+    ) -> Result<(), LRuntimeError> {
         self.domain_env
             .add_task(label.clone(), Task::new(label, body, parameters));
 
@@ -1081,7 +1089,7 @@ impl RAEEnv {
         conds: LValue,
         score: LValue,
         body: LValue,
-    ) -> Result<(), LError> {
+    ) -> Result<(), LRuntimeError> {
         let method = Method::new(task_label, parameters, conds, score, body);
 
         self.domain_env.add_method(method_label, method)?;
@@ -1093,7 +1101,7 @@ impl RAEEnv {
         self.domain_env.add_lambda(label, value);
     }
 
-    pub fn get_methods_from_task(&self, task: &LValue) -> Result<LValue, LError> {
+    pub fn get_methods_from_task(&self, task: &LValue) -> Result<LValue, LRuntimeError> {
         let label: String = task.try_into()?;
         match self.domain_env.get_tasks().get(&*label) {
             None => Ok(LValue::Nil),

@@ -9,14 +9,14 @@ use ompas_rae_structs::planning::symbol_table::{AtomId, SymTable};
 use ompas_rae_structs::planning::traits::{FormatWithParent, GetVariables};
 use ompas_rae_structs::planning::type_table::{AtomKind, PlanningAtomType, VariableKind};
 use ompas_rae_structs::planning::{ConversionCollection, ConversionContext};
-use sompas_structs::lerror::LError;
+use sompas_structs::lerror::LRuntimeError;
 use std::ops::Deref;
 
 pub fn post_processing(
     c: &mut ChronicleTemplate,
     context: &ConversionContext,
     ch: &mut ConversionCollection,
-) -> Result<(), LError> {
+) -> Result<(), LRuntimeError> {
     //add_constraint_on_end_timepoint(c, context, ch);
     unify_equal(c, ch, context);
     ch.sym_table.flat_bindings();
@@ -38,7 +38,7 @@ pub fn simplify_constraints(
     c: &mut ChronicleTemplate,
     _: &ConversionContext,
     ch: &mut ConversionCollection,
-) -> Result<(), LError> {
+) -> Result<(), LRuntimeError> {
     //simple case where
     let mut vec: Vec<(usize, Constraint)> = vec![];
     for (i, c) in c.pc.constraints.iter().enumerate() {
@@ -78,7 +78,7 @@ pub fn merge_conditions(
     c: &mut ChronicleTemplate,
     _: &ConversionContext,
     ch: &mut ConversionCollection,
-) -> Result<(), LError> {
+) -> Result<(), LRuntimeError> {
     let mut c_to_remove: HashSet<usize> = Default::default();
 
     for (i, c1) in c.get_conditions().iter().enumerate() {
@@ -132,7 +132,7 @@ pub fn add_constraint_on_end_timepoint(
 }
 
 /// Returns true if the constraint can be safely deleted
-fn bind_atoms(id_1: &AtomId, id_2: &AtomId, st: &mut SymTable) -> Result<bool, LError> {
+fn bind_atoms(id_1: &AtomId, id_2: &AtomId, st: &mut SymTable) -> Result<bool, LRuntimeError> {
     let id_1 = *st.get_parent(id_1);
     let id_2 = *st.get_parent(id_2);
     let id_1 = &id_1;
@@ -332,7 +332,7 @@ pub fn simplify_timepoints(
     c: &mut ChronicleTemplate,
     ch: &mut ConversionCollection,
     _: &ConversionContext,
-) -> Result<(), LError> {
+) -> Result<(), LRuntimeError> {
     let timepoints: HashSet<AtomId> = c
         .get_variables()
         .iter()

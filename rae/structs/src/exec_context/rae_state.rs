@@ -2,8 +2,8 @@ use im::HashMap;
 
 use crate::refinement::task_collection::TaskStatus;
 use sompas_core::modules::map::union_map;
-use sompas_structs::lerror::LError;
-use sompas_structs::lerror::LError::SpecialError;
+use sompas_structs::lerror::LRuntimeError;
+use sompas_structs::lerror::LRuntimeError::Anyhow;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalues::LValueS;
 use std::fmt::{Display, Formatter};
@@ -235,10 +235,14 @@ impl RAEState {
         self.inner_world.write().await.insert(key, value)
     }
 
-    pub async fn retract_fact(&self, key: LValueS, value: LValueS) -> Result<LValue, LError> {
+    pub async fn retract_fact(
+        &self,
+        key: LValueS,
+        value: LValueS,
+    ) -> Result<LValue, LRuntimeError> {
         let old_value = self.inner_world.read().await.get(&key).cloned();
         match old_value {
-            None => Err(SpecialError(
+            None => Err(Anyhow(
                 "RAEState::retract_fact",
                 "key is not in state".to_string(),
             )),
@@ -247,7 +251,7 @@ impl RAEState {
                     self.inner_world.write().await.remove(&key);
                     Ok(LValue::True)
                 } else {
-                    Err(SpecialError(
+                    Err(Anyhow(
                         "RAEState::retract_fact",
                         "there is no such fact in state".to_string(),
                     ))

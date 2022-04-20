@@ -6,7 +6,7 @@ use std::fmt::{Display, Formatter};
 /// Enum of kinds of LValue
 /// Mainly used for debug and errors.
 #[derive(Clone, Debug)]
-pub enum TypeLValue {
+pub enum KindLValue {
     Bool,
     CoreOperator,
     Atom,
@@ -31,85 +31,85 @@ pub enum TypeLValue {
     Err,
 }
 
-impl Display for TypeLValue {
+impl Display for KindLValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         let str = match self {
-            TypeLValue::Number => NUMBER,
-            TypeLValue::True => TRUE,
-            TypeLValue::Symbol => SYMBOL,
-            TypeLValue::String => STRING,
-            TypeLValue::SExpr => SEXPR,
-            TypeLValue::Fn => FN,
-            TypeLValue::Nil => NIL,
-            TypeLValue::Object => OBJECT,
-            TypeLValue::Lambda => LAMBDA,
-            TypeLValue::Map => MAP,
-            TypeLValue::List => LIST,
-            TypeLValue::Quote => QUOTE,
-            TypeLValue::Atom => ATOM,
-            TypeLValue::CoreOperator => CORE_OPERATOR,
-            TypeLValue::Other(s) => s.as_str(),
-            TypeLValue::Int => INT,
-            TypeLValue::Float => FLOAT,
-            TypeLValue::Usize => USIZE,
-            TypeLValue::Bool => BOOL,
-            TypeLValue::AsyncFn => ASYNC_FN,
-            TypeLValue::Future => FUTURE,
-            TypeLValue::Err => ERR,
+            KindLValue::Number => NUMBER,
+            KindLValue::True => TRUE,
+            KindLValue::Symbol => SYMBOL,
+            KindLValue::String => STRING,
+            KindLValue::SExpr => SEXPR,
+            KindLValue::Fn => FN,
+            KindLValue::Nil => NIL,
+            KindLValue::Object => OBJECT,
+            KindLValue::Lambda => LAMBDA,
+            KindLValue::Map => MAP,
+            KindLValue::List => LIST,
+            KindLValue::Quote => QUOTE,
+            KindLValue::Atom => ATOM,
+            KindLValue::CoreOperator => CORE_OPERATOR,
+            KindLValue::Other(s) => s.as_str(),
+            KindLValue::Int => INT,
+            KindLValue::Float => FLOAT,
+            KindLValue::Usize => USIZE,
+            KindLValue::Bool => BOOL,
+            KindLValue::AsyncFn => ASYNC_FN,
+            KindLValue::Future => FUTURE,
+            KindLValue::Err => ERR,
         };
         write!(f, "{}", str)
     }
 }
 
-impl PartialEq for TypeLValue {
+impl PartialEq for KindLValue {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (TypeLValue::String, TypeLValue::String) => true,
-            (TypeLValue::SExpr, TypeLValue::SExpr) => true,
-            (TypeLValue::True, TypeLValue::True) => true,
-            (TypeLValue::Symbol, TypeLValue::Symbol) => true,
-            (TypeLValue::Fn, TypeLValue::Fn) => true,
-            (TypeLValue::Nil, TypeLValue::Nil) => true,
-            (TypeLValue::Number, TypeLValue::Number) => true,
-            (TypeLValue::Object, TypeLValue::Object) => true,
-            (TypeLValue::Map, TypeLValue::Map) => true,
-            (TypeLValue::List, TypeLValue::List) => true,
-            (TypeLValue::Quote, TypeLValue::Quote) => true,
-            (TypeLValue::Atom, TypeLValue::Atom) => true,
-            (TypeLValue::CoreOperator, TypeLValue::CoreOperator) => true,
-            (TypeLValue::Int, TypeLValue::Int) => true,
-            (TypeLValue::Float, TypeLValue::Float) => true,
-            (TypeLValue::Usize, TypeLValue::Usize) => true,
-            (TypeLValue::AsyncFn, TypeLValue::AsyncFn) => true,
-            (TypeLValue::Other(s1), TypeLValue::Other(s2)) => *s1 == *s2,
-            (TypeLValue::Err, TypeLValue::Err) => true,
+            (KindLValue::String, KindLValue::String) => true,
+            (KindLValue::SExpr, KindLValue::SExpr) => true,
+            (KindLValue::True, KindLValue::True) => true,
+            (KindLValue::Symbol, KindLValue::Symbol) => true,
+            (KindLValue::Fn, KindLValue::Fn) => true,
+            (KindLValue::Nil, KindLValue::Nil) => true,
+            (KindLValue::Number, KindLValue::Number) => true,
+            (KindLValue::Object, KindLValue::Object) => true,
+            (KindLValue::Map, KindLValue::Map) => true,
+            (KindLValue::List, KindLValue::List) => true,
+            (KindLValue::Quote, KindLValue::Quote) => true,
+            (KindLValue::Atom, KindLValue::Atom) => true,
+            (KindLValue::CoreOperator, KindLValue::CoreOperator) => true,
+            (KindLValue::Int, KindLValue::Int) => true,
+            (KindLValue::Float, KindLValue::Float) => true,
+            (KindLValue::Usize, KindLValue::Usize) => true,
+            (KindLValue::AsyncFn, KindLValue::AsyncFn) => true,
+            (KindLValue::Other(s1), KindLValue::Other(s2)) => *s1 == *s2,
+            (KindLValue::Err, KindLValue::Err) => true,
             (_, _) => false,
         }
     }
 }
 
-impl From<&LValue> for TypeLValue {
+impl From<&LValue> for KindLValue {
     fn from(lv: &LValue) -> Self {
         match lv {
-            LValue::True => TypeLValue::True,
-            LValue::Number(LNumber::Float(_)) => TypeLValue::Float,
-            LValue::Number(LNumber::Int(_)) => TypeLValue::Int,
-            LValue::Symbol(_) => TypeLValue::Symbol,
-            LValue::Fn(_) => TypeLValue::Fn,
-            LValue::Nil => TypeLValue::Nil,
-            LValue::Lambda(_) => TypeLValue::Lambda,
-            LValue::Map(_) => TypeLValue::Map,
-            LValue::List(_) => TypeLValue::List,
-            LValue::CoreOperator(_) => TypeLValue::CoreOperator,
-            LValue::String(_) => TypeLValue::String,
-            LValue::AsyncFn(_) => TypeLValue::AsyncFn,
-            LValue::Future(_) => TypeLValue::Future,
-            LValue::Err(_) => TypeLValue::Err,
+            LValue::True => KindLValue::True,
+            LValue::Number(LNumber::Float(_)) => KindLValue::Float,
+            LValue::Number(LNumber::Int(_)) => KindLValue::Int,
+            LValue::Symbol(_) => KindLValue::Symbol,
+            LValue::Fn(_) => KindLValue::Fn,
+            LValue::Nil => KindLValue::Nil,
+            LValue::Lambda(_) => KindLValue::Lambda,
+            LValue::Map(_) => KindLValue::Map,
+            LValue::List(_) => KindLValue::List,
+            LValue::CoreOperator(_) => KindLValue::CoreOperator,
+            LValue::String(_) => KindLValue::String,
+            LValue::AsyncFn(_) => KindLValue::AsyncFn,
+            LValue::Future(_) => KindLValue::Future,
+            LValue::Err(_) => KindLValue::Err,
         }
     }
 }
 
-impl From<LValue> for TypeLValue {
+impl From<LValue> for KindLValue {
     fn from(lv: LValue) -> Self {
         (&lv).into()
     }

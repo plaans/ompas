@@ -1,16 +1,16 @@
 use sompas_language::*;
 use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror::LError::*;
 use sompas_structs::lerror::LResult;
+use sompas_structs::lerror::LRuntimeError::*;
 use sompas_structs::lfn;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lvalue::LValue;
-use sompas_structs::typelvalue::TypeLValue;
+use sompas_structs::typelvalue::KindLValue;
 
 /// Returns true if LValue is Nil
 lfn! {pub is_nil(args, _){
     match args.len() {
-        1 => Ok((TypeLValue::from(&args[0]) == TypeLValue::Nil).into()),
+        1 => Ok((KindLValue::from(&args[0]) == KindLValue::Nil).into()),
         i => Err(WrongNumberOfArgument(IS_NIL, args.into(), i, 1..1)),
     }
 }}
@@ -18,7 +18,7 @@ lfn! {pub is_nil(args, _){
 /// Returns true is LValue is number
 lfn! {pub is_number(args, _){
     match args.len() {
-        1 => Ok((TypeLValue::from(&args[0]) == TypeLValue::Number).into()),
+        1 => Ok((KindLValue::from(&args[0]) == KindLValue::Number).into()),
         i => Err(WrongNumberOfArgument(IS_NUMBER, args.into(), i, 1..1)),
     }
 }}
@@ -53,14 +53,14 @@ lfn! {pub is_float(args, _){
 /// Returns true if LValue is boolean
 lfn! {pub is_bool(args, _){
     match args.len() {
-        1 => Ok((TypeLValue::from(args.get(0).unwrap()) == TypeLValue::Bool).into()),
+        1 => Ok((KindLValue::from(args.get(0).unwrap()) == KindLValue::Bool).into()),
         i => Err(WrongNumberOfArgument(IS_BOOL, args.into(), i, 1..1)),
     }
 }}
 /// Returns true if LValue is a function
 lfn! {pub is_fn(args, _){
     match args.len() {
-        1 => Ok((TypeLValue::from(args.get(0).unwrap()) == TypeLValue::Fn).into()),
+        1 => Ok((KindLValue::from(args.get(0).unwrap()) == KindLValue::Fn).into()),
         i => Err(WrongNumberOfArgument(IS_FN, args.into(), i, 1..1)),
     }
 }}
@@ -138,7 +138,7 @@ lfn! {pub is_equal(args, _){
                 IS_EQUAL,
                 args[1].clone(),
                 (&args[1]).into(),
-                TypeLValue::List,
+                KindLValue::List,
             ))
         }
     } else {
@@ -146,7 +146,7 @@ lfn! {pub is_equal(args, _){
             IS_EQUAL,
             args[0].clone(),
             (&args[0]).into(),
-            TypeLValue::List,
+            KindLValue::List,
         ))
     }
 }}
@@ -169,7 +169,7 @@ lfn! {pub is_pair(args, _){
             IS_PAIR,
             args[0].clone(),
             (&args[0]).into(),
-            TypeLValue::List,
+            KindLValue::List,
         ))
     }
 }}

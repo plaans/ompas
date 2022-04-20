@@ -1,6 +1,6 @@
 use crate::refinement::TaskId;
 use im::HashMap;
-use sompas_structs::lerror::LError;
+use sompas_structs::lerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use std::collections::VecDeque;
 use std::convert::TryFrom;
@@ -127,7 +127,7 @@ impl From<AbstractTaskInstance> for TaskInstance {
 }
 
 impl TryFrom<TaskInstance> for ActionInstance {
-    type Error = LError;
+    type Error = LRuntimeError;
 
     fn try_from(value: TaskInstance) -> Result<Self, Self::Error> {
         if let TaskInstance::ActionInstance(a) = value {
@@ -139,7 +139,7 @@ impl TryFrom<TaskInstance> for ActionInstance {
 }
 
 impl TryFrom<TaskInstance> for AbstractTaskInstance {
-    type Error = LError;
+    type Error = LRuntimeError;
 
     fn try_from(value: TaskInstance) -> Result<Self, Self::Error> {
         if let TaskInstance::AbstractTaskInstance(a) = value {

@@ -2,21 +2,22 @@ use anyhow::anyhow;
 use im::{vector, Vector};
 use sompas_language::*;
 use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror::LError::*;
 use sompas_structs::lerror::LResult;
-use sompas_structs::lfn;
+use sompas_structs::lerror::LRuntimeError::*;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lvalue::LValue;
-use sompas_structs::typelvalue::TypeLValue;
+use sompas_structs::typelvalue::KindLValue;
+use sompas_structs::{check_number_of_arguments, lfn, lfn_extended, list};
 /// Returns a list
-lfn! {pub list(args, _){
+lfn! {
+pub list(args, _){
     if args.is_empty() {
         Ok(LValue::Nil)
     } else {
         Ok(args.into())
     }
 }
-    }
+}
 
 ///It takes two arguments, an element and a list and returns a list with the element inserted at the first place.
 lfn! {pub cons(args, _){
@@ -37,6 +38,19 @@ lfn! {pub cons(args, _){
 }
     }
 
+#[macro_rules_attribute(lfn_extended!)]
+pub fn cons(a: LValue, b: LValue) -> LResult {
+    match b {
+        LValue::List(list) => {
+            let mut new_list = vector![a.clone()];
+            new_list.append(list.clone());
+            Ok(new_list.into())
+        }
+        LValue::Nil => Ok(list![a.clone()]),
+        _ => Ok(list![a.clone(), b.clone()]),
+    }
+}
+
 lfn! {pub first(args, _){
     match args.len() {
         1 => match &args[0] {
@@ -48,7 +62,7 @@ lfn! {pub first(args, _){
                 }
             }
             LValue::Nil => Ok(LValue::Nil),
-            lv => Err(WrongType(FIRST, lv.clone(), lv.into(), TypeLValue::List)),
+            lv => Err(WrongType(FIRST, lv.clone(), lv.into(), KindLValue::List)),
         },
         _ => Err(WrongNumberOfArgument(FIRST, args.into(), args.len(), 1..1)),
     }
@@ -66,7 +80,7 @@ lfn! {pub second(args, _){
                 }
             }
             LValue::Nil => Ok(LValue::Nil),
-            lv => Err(WrongType(SECOND, lv.clone(), lv.into(), TypeLValue::List)),
+            lv => Err(WrongType(SECOND, lv.clone(), lv.into(), KindLValue::List)),
         },
         _ => Err(WrongNumberOfArgument(SECOND, args.into(), args.len(), 1..1)),
     }
@@ -84,7 +98,7 @@ lfn! {pub third(args, _){
                 }
             }
             LValue::Nil => Ok(LValue::Nil),
-            lv => Err(WrongType(THIRD, lv.clone(), lv.into(), TypeLValue::List)),
+            lv => Err(WrongType(THIRD, lv.clone(), lv.into(), KindLValue::List)),
         },
         _ => Err(WrongNumberOfArgument(THIRD, args.into(), args.len(), 1..1)),
     }
@@ -103,7 +117,7 @@ lfn! {pub car(args, _){
                 }
             }
             LValue::Nil => Ok(LValue::Nil),
-            lv => Err(WrongType(CAR, lv.clone(), lv.into(), TypeLValue::List)),
+            lv => Err(WrongType(CAR, lv.clone(), lv.into(), KindLValue::List)),
         },
         _ => Err(WrongNumberOfArgument(CAR, args.into(), args.len(), 1..1)),
     }
@@ -126,7 +140,7 @@ lfn! {pub cdr(args, _){
                 }
             }
             LValue::Nil => Ok(LValue::Nil),
-            lv => Err(WrongType(CDR, lv.clone(), lv.into(), TypeLValue::List)),
+            lv => Err(WrongType(CDR, lv.clone(), lv.into(), KindLValue::List)),
         }
     } else {
         Err(WrongNumberOfArgument(CDR, args.into(), args.len(), 1..1))
@@ -150,7 +164,7 @@ lfn! {pub rest(args, _){
                 }
             }
             LValue::Nil => Ok(LValue::Nil),
-            lv => Err(WrongType(REST, lv.clone(), lv.into(), TypeLValue::List)),
+            lv => Err(WrongType(REST, lv.clone(), lv.into(), KindLValue::List)),
         }
     } else {
         Err(WrongNumberOfArgument(REST, args.into(), args.len(), 1..1))
@@ -170,7 +184,7 @@ lfn! {pub append(args, _){
                     APPEND,
                     element.clone(),
                     element.into(),
-                    TypeLValue::List,
+                    KindLValue::List,
                 ))
             }
         }
@@ -190,7 +204,7 @@ lfn! {pub last(args, _){
                     Ok(LValue::Nil)
                 }
             }
-            lv => Err(WrongType(LAST, lv.clone(), lv.into(), TypeLValue::List)),
+            lv => Err(WrongType(LAST, lv.clone(), lv.into(), KindLValue::List)),
         }
     } else {
         Err(WrongNumberOfArgument(LAST, args.into(), args.len(), 1..1))
@@ -215,7 +229,7 @@ lfn! {pub member(args, _){
             }
             Ok(LValue::Nil)
         }
-        lv => Err(WrongType(MEMBER, lv.clone(), lv.into(), TypeLValue::List)),
+        lv => Err(WrongType(MEMBER, lv.clone(), lv.into(), KindLValue::List)),
     }
 }
     }
@@ -249,7 +263,7 @@ lfn! {pub get_list(args, _){
                 GET_LIST,
                 args[1].clone(),
                 (&args[1]).into(),
-                TypeLValue::Int,
+                KindLValue::Int,
             ))
         }
     } else {
@@ -257,7 +271,7 @@ lfn! {pub get_list(args, _){
             GET_LIST,
             args[0].clone(),
             (&args[0]).into(),
-            TypeLValue::List,
+            KindLValue::List,
         ))
     }
 }
@@ -287,7 +301,7 @@ lfn! {pub set_list(args, _){
                 SET_LIST,
                 args[1].clone(),
                 (&args[1]).into(),
-                TypeLValue::Int,
+                KindLValue::Int,
             ))
         }
     } else {
@@ -295,7 +309,7 @@ lfn! {pub set_list(args, _){
             SET_LIST,
             args[0].clone(),
             (&args[0]).into(),
-            TypeLValue::List,
+            KindLValue::List,
         ))
     }
 }
@@ -312,7 +326,7 @@ lfn! {pub reverse(args, _){
                 }
                 Ok(new_list.into())
             }
-            lv => Err(WrongType(REVERSE, lv.clone(), lv.into(), TypeLValue::List)),
+            lv => Err(WrongType(REVERSE, lv.clone(), lv.into(), KindLValue::List)),
         }
     } else {
         Err(WrongNumberOfArgument(
@@ -343,7 +357,7 @@ lfn! {pub intersection(args, _){
                     INTERSECTION,
                     e.clone(),
                     e.into(),
-                    TypeLValue::List,
+                    KindLValue::List,
                 ))
             }
         }

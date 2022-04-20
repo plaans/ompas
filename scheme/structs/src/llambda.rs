@@ -1,6 +1,6 @@
 use crate::lenv::{LEnv, LEnvSymbols};
-use crate::lerror::LError;
-use crate::lerror::LError::*;
+use crate::lerror::LRuntimeError;
+
 use crate::lvalue::LValue;
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
@@ -46,7 +46,7 @@ impl LLambda {
     }
 
     /// Returns a new env containing the environment of the lambda and the current environment in which the lambda is called.
-    pub fn get_new_env(&self, args: &[LValue], mut env: LEnv) -> Result<LEnv, LError> {
+    pub fn get_new_env(&self, args: &[LValue], mut env: LEnv) -> Result<LEnv, LRuntimeError> {
         env.set_new_top_symbols(self.env.clone());
 
         match &self.params {
@@ -63,7 +63,7 @@ impl LLambda {
             }
             LambdaArgs::List(params) => {
                 if params.len() != args.len() {
-                    return Err(SpecialError(
+                    return Err(Anyhow(
                         "get_new_env",
                         format!(
                             "in lambda {}: ",
@@ -82,7 +82,7 @@ impl LLambda {
             }
             LambdaArgs::Nil => {
                 if !args.is_empty() {
-                    return Err(SpecialError(
+                    return Err(Anyhow(
                         "Lambda.get_env",
                         "Lambda was expecting no args.".to_string(),
                     ));

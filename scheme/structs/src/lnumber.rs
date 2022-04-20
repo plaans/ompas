@@ -1,4 +1,4 @@
-use crate::lerror::LError;
+use crate::lerror::LRuntimeError;
 use crate::lvalue::LValue;
 use num_traits::sign::Signed;
 use serde::*;
@@ -110,7 +110,7 @@ impl From<&LNumber> for i64 {
 }
 
 impl TryFrom<&LValue> for LNumber {
-    type Error = LError;
+    type Error = LRuntimeError;
 
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
         if let LValue::Number(n) = value {

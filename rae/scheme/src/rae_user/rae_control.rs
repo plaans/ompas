@@ -5,7 +5,7 @@ use ompas_rae_language::*;
 use ompas_rae_structs::exec_context::job::{Job, JobType};
 use ompas_rae_structs::exec_context::options::*;
 use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror::LError::{SpecialError, WrongNumberOfArgument};
+use sompas_structs::lerror::LRuntimeError::{Anyhow, WrongNumberOfArgument};
 use sompas_structs::lerror::LResult;
 use sompas_structs::lvalue::LValue;
 use sompas_utils::dyn_async;
@@ -69,7 +69,7 @@ pub async fn configure_select<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult 
         HEURISTIC => SelectMode::Heuristic,
         LEARNING => SelectMode::Learning,
         _ => {
-            return Err(SpecialError(
+            return Err(Anyhow(
                 RAE_CONFIGURE_SELECT,
                 format!(
                     "Select mode is either {}, {}, {} or {}.",

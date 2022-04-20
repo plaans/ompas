@@ -6,10 +6,10 @@ use ompas_rae_structs::exec_context::rae_state::*;
 use ompas_rae_structs::exec_context::ressource_access::monitor;
 use ompas_rae_structs::refinement::task_collection::*;
 use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror::LError::*;
 use sompas_structs::lerror::LResult;
+use sompas_structs::lerror::LRuntimeError::*;
 use sompas_structs::lvalue::LValue;
-use sompas_structs::typelvalue::TypeLValue;
+use sompas_structs::typelvalue::KindLValue;
 use sompas_utils::dyn_async;
 
 /// Returns the whole state if no args, or specific part of it ('static', 'dynamic', 'inner world')
@@ -26,7 +26,7 @@ pub async fn get_state<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
                     KEY_INNER_WORLD => Some(StateType::InnerWorld),
                     KEY_INSTANCE => Some(StateType::Instance),
                     _ => {
-                        return Err(SpecialError(
+                        return Err(Anyhow(
                             RAE_GET_STATE,
                             format!(
                                 "was expecting keys {}, {}, {}",
@@ -40,7 +40,7 @@ pub async fn get_state<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
                     RAE_GET_STATE,
                     args[0].clone(),
                     (&args[0]).into(),
-                    TypeLValue::Symbol,
+                    KindLValue::Symbol,
                 ));
             }
         }
@@ -129,7 +129,7 @@ pub async fn get_agenda<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
             STATUS_FAILURE => task_filter.status = Some(TaskStatus::Failure),
             STATUS_RUNNING => task_filter.status = Some(TaskStatus::Running),
             str => {
-                return Err(SpecialError(
+                return Err(Anyhow(
                     RAE_GET_AGENDA,
                     format!(
                         "{} is not a valid filter option, expecting ({}, {}, {}, {}, {}, {})",
@@ -214,7 +214,7 @@ pub async fn get_env<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
                     RAE_GET_ENV,
                     args[0].clone(),
                     args[0].clone().into(),
-                    TypeLValue::Symbol,
+                    KindLValue::Symbol,
                 ));
             }
         }

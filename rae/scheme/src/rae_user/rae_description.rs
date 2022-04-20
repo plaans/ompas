@@ -10,13 +10,13 @@ use sompas_language::*;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::Documentation;
 use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror::LError::{SpecialError, WrongNumberOfArgument, WrongType};
-use sompas_structs::lerror::{LError, LResult};
+use sompas_structs::lerror::LRuntimeError::{Anyhow, WrongNumberOfArgument, WrongType};
+use sompas_structs::lerror::{LRuntimeError, LResult};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalues::LValueS;
 use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
-use sompas_structs::typelvalue::TypeLValue;
+use sompas_structs::typelvalue::KindLValue;
 use sompas_utils::dyn_async;
 use std::convert::TryInto;
 #[derive(Default)]
@@ -82,7 +82,7 @@ fn f_and_cond(args: &[LValue], _: &LEnv) -> LResult {
             GENERATE_TYPE_TEST_EXPR,
             args[0].clone(),
             (&args[0]).into(),
-            TypeLValue::List,
+            KindLValue::List,
         ))
     }
 }
@@ -111,7 +111,7 @@ fn f_and_effect(args: &[LValue], _: &LEnv) -> LResult {
             GENERATE_TYPE_TEST_EXPR,
             args[0].clone(),
             (&args[0]).into(),
-            TypeLValue::List,
+            KindLValue::List,
         ))
     }
 }

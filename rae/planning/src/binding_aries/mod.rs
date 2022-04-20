@@ -25,7 +25,7 @@ use ompas_rae_structs::planning::type_table::{AtomKind, PlanningAtomType};
 use ompas_rae_structs::planning::{ConversionCollection, Problem};
 use sompas_language::*;
 use sompas_structs::lerror;
-use sompas_structs::lerror::LError::SpecialError;
+use sompas_structs::lerror::LRuntimeError::Anyhow;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lvalues::LValueS;
 use std::convert::{TryFrom, TryInto};
@@ -58,10 +58,7 @@ fn get_type(t: &raeType, symbol_table: &SymbolTable) -> lerror::Result<aType> {
             FLOAT => Ok(aType::Fixed(FLOAT_SCALE)),
             other => match symbol_table.types.id_of(other) {
                 Some(t) => Ok(aType::Sym(t)),
-                None => Err(SpecialError(
-                    BUILD_CHRONICLES,
-                    format!("{} Unknown type", other),
-                )),
+                None => Err(Anyhow(BUILD_CHRONICLES, format!("{} Unknown type", other))),
             },
         },
         raeType::List(_) => todo!(),
@@ -158,7 +155,7 @@ pub fn generate_templates(problem: &Problem) -> Result<chronicles::Problem> {
     for sf in &problem.state_functions {
         let sym = symbol_table
             .id(&sf.0)
-            .ok_or_else(|| SpecialError(BUILD_CHRONICLES, format!("{} Unknown symbol", sf.0)))?;
+            .ok_or_else(|| Anyhow(BUILD_CHRONICLES, format!("{} Unknown symbol", sf.0)))?;
         let mut args = Vec::with_capacity(sf.1.get_number());
         for tpe in &sf.1.get_types() {
             args.push(get_type(tpe, &symbol_table)?);

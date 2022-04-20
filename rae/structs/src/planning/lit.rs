@@ -4,8 +4,8 @@ use crate::planning::traits::{FormatWithParent, FormatWithSymTable, GetVariables
 use crate::planning::type_table::PlanningAtomType;
 use im::{hashset, HashSet};
 use sompas_structs::lerror;
-use sompas_structs::lerror::LError;
-use sompas_structs::lerror::LError::SpecialError;
+use sompas_structs::lerror::LRuntimeError;
+use sompas_structs::lerror::LRuntimeError::Anyhow;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lvalue::LValue;
 use std::convert::{TryFrom, TryInto};
@@ -31,7 +31,7 @@ impl Lit {
 }
 
 impl TryFrom<Lit> for AtomId {
-    type Error = LError;
+    type Error = LRuntimeError;
 
     fn try_from(value: Lit) -> Result<Self, Self::Error> {
         (&value).try_into()
@@ -39,7 +39,7 @@ impl TryFrom<Lit> for AtomId {
 }
 
 impl TryFrom<&Lit> for AtomId {
-    type Error = LError;
+    type Error = LRuntimeError;
 
     fn try_from(value: &Lit) -> Result<Self, Self::Error> {
         match value {
@@ -50,7 +50,7 @@ impl TryFrom<&Lit> for AtomId {
 }
 
 impl TryFrom<&Lit> for Vec<AtomId> {
-    type Error = LError;
+    type Error = LRuntimeError;
 
     fn try_from(value: &Lit) -> Result<Self, Self::Error> {
         match value {
@@ -68,7 +68,7 @@ impl TryFrom<&Lit> for Vec<AtomId> {
 }
 
 impl TryFrom<Lit> for Vec<AtomId> {
-    type Error = LError;
+    type Error = LRuntimeError;
 
     fn try_from(value: Lit) -> Result<Self, Self::Error> {
         (&value).try_into()
@@ -76,7 +76,7 @@ impl TryFrom<Lit> for Vec<AtomId> {
 }
 
 impl TryFrom<Lit> for Constraint {
-    type Error = LError;
+    type Error = LRuntimeError;
 
     fn try_from(value: Lit) -> Result<Self, Self::Error> {
         match value {
@@ -87,7 +87,7 @@ impl TryFrom<Lit> for Constraint {
 }
 
 impl TryFrom<&Lit> for Vec<Lit> {
-    type Error = LError;
+    type Error = LRuntimeError;
     fn try_from(value: &Lit) -> Result<Self, Self::Error> {
         match value {
             Lit::Exp(c) => Ok(c.clone()),
@@ -97,7 +97,7 @@ impl TryFrom<&Lit> for Vec<Lit> {
 }
 
 impl TryFrom<Lit> for Vec<Lit> {
-    type Error = LError;
+    type Error = LRuntimeError;
     fn try_from(value: Lit) -> Result<Self, Self::Error> {
         (&value).try_into()
     }
@@ -156,7 +156,7 @@ pub fn lvalue_to_lit(lv: &LValue, st: &mut SymTable) -> lerror::Result<Lit> {
             }
             Ok(vec.into())
         }
-        LValue::Map(_) => Err(SpecialError(
+        LValue::Map(_) => Err(Anyhow(
             "LValue to lit",
             "Map transformation to lit is not supported yet.".to_string(),
         )),

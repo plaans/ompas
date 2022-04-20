@@ -2,13 +2,13 @@ use rand::Rng;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::{Documentation, LHelp};
 use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror::LError::{WrongNumberOfArgument, WrongType};
+use sompas_structs::lerror::LRuntimeError::{WrongNumberOfArgument, WrongType};
 use sompas_structs::lerror::LResult;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
-use sompas_structs::typelvalue::TypeLValue;
+use sompas_structs::typelvalue::KindLValue;
 
 //LANGUAGE
 const MOD_MATH: &str = "math";

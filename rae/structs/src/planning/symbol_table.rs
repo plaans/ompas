@@ -8,7 +8,7 @@ use crate::planning::type_table::{
 use ompas_rae_language::*;
 use sompas_core::modules::get_scheme_primitives;
 use sompas_structs::lerror;
-use sompas_structs::lerror::LError::SpecialError;
+use sompas_structs::lerror::LRuntimeError::Anyhow;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Display, Formatter};
 
@@ -177,7 +177,7 @@ impl SymTable {
     ) -> lerror::Result<()> {
         for element in list {
             if self.it_exists(element) {
-                return Err(SpecialError(
+                return Err(Anyhow(
                     "add_list_of_symbols_of_same_type",
                     format!("{} already exists", element),
                 ));

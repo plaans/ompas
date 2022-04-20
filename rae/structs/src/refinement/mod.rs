@@ -4,8 +4,8 @@ pub mod task_network;
 use crate::exec_context::options::SelectMode;
 use chrono::{DateTime, Utc};
 use im::HashMap;
-use sompas_structs::lerror::LError;
-use sompas_structs::lerror::LError::SpecialError;
+use sompas_structs::lerror::LRuntimeError;
+use sompas_structs::lerror::LRuntimeError::Anyhow;
 use sompas_structs::lvalue::LValue;
 use sompas_utils::other::get_and_update_id_counter;
 use std::convert::TryInto;
@@ -409,10 +409,10 @@ impl Agenda {
     pub async fn get_abstract_task(
         &self,
         task_id: &TaskId,
-    ) -> Result<AbstractTaskMetaData, LError> {
+    ) -> Result<AbstractTaskMetaData, LRuntimeError> {
         match self.trc.get(task_id).await {
             TaskMetaData::AbstractTask(a) => Ok(a),
-            TaskMetaData::Action(_) => Err(SpecialError(
+            TaskMetaData::Action(_) => Err(Anyhow(
                 GET_ABSTRACT_TASK,
                 format!("{} does not exist", task_id),
             )),

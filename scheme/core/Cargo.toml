@@ -16,3 +16,4 @@ anyhow = "1.0.40"
 tokio = { version = "1.17.0", features = ["full", "time"] }
 im = "15.0.0"
 lazy_static = "1.4.0"
+macro_rules_attribute = "0.0.2"

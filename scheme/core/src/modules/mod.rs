@@ -13,12 +13,12 @@ use sompas_language::*;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::{Documentation, LHelp};
 use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror::LError::*;
 use sompas_structs::lerror::LResult;
+use sompas_structs::lerror::LRuntimeError::*;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
-use sompas_structs::typelvalue::TypeLValue;
+use sompas_structs::typelvalue::KindLValue;
 use sompas_structs::{lfn, string};
 
 pub const MOD_ROOT: &str = "mod-root";
@@ -272,7 +272,7 @@ lfn! {pub set(args, env){
             SET,
             args[0].clone(),
             (&args[0]).into(),
-            vec![TypeLValue::List, TypeLValue::Map, TypeLValue::Nil],
+            vec![KindLValue::List, KindLValue::Map, KindLValue::Nil],
         )),
     }
 }}
@@ -293,7 +293,7 @@ lfn! {pub get(args, env){
             GET,
             args[0].clone(),
             (&args[0]).into(),
-            vec![TypeLValue::List, TypeLValue::Map, TypeLValue::Nil],
+            vec![KindLValue::List, KindLValue::Map, KindLValue::Nil],
         )),
     }
 }
@@ -312,7 +312,7 @@ lfn! {pub length(args, _){
             LEN,
             lv.clone(),
             lv.into(),
-            vec![TypeLValue::List, TypeLValue::Map],
+            vec![KindLValue::List, KindLValue::Map],
         )),
     }
 }
@@ -331,7 +331,7 @@ lfn! {pub empty(args, _){
             EMPTY,
             lv.clone(),
             lv.into(),
-            vec![TypeLValue::List, TypeLValue::Map, TypeLValue::Nil],
+            vec![KindLValue::List, KindLValue::Map, KindLValue::Nil],
         )),
     }
 }

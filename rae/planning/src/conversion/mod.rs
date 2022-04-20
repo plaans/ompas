@@ -8,7 +8,7 @@ use ompas_rae_structs::planning::symbol_table::{AtomId, SymTable};
 use ompas_rae_structs::planning::type_table::PlanningAtomType;
 use ompas_rae_structs::planning::{ConversionCollection, ConversionContext};
 use sompas_structs::lerror;
-use sompas_structs::lerror::LError::SpecialError;
+use sompas_structs::lerror::LRuntimeError::Anyhow;
 use sompas_structs::llambda::{LLambda, LambdaArgs};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalues::LValueS;
@@ -171,7 +171,7 @@ pub fn convert_abstract_task_to_chronicle(
     ];
     if let LambdaArgs::List(l) = lambda.get_params() {
         if l.len() != parameters.get_number() {
-            return Err(SpecialError(
+            return Err(Anyhow(
                 CONVERT_ABSTRACT_TASK_TO_CHRONICLE,
                 format!(
                     "for {}: definition of parameters are different({} != {})",

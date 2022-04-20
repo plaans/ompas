@@ -24,12 +24,12 @@ use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::{Documentation, LHelp};
 use sompas_structs::lcoreoperator::LCoreOperator;
 use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror::LError::{SpecialError, WrongNumberOfArgument, WrongType};
+use sompas_structs::lerror::LRuntimeError::{Anyhow, WrongNumberOfArgument, WrongType};
 use sompas_structs::lerror::LResult;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
-use sompas_structs::typelvalue::TypeLValue;
+use sompas_structs::typelvalue::KindLValue;
 use sompas_utils::dyn_async;
 use std::ops::Deref;
 //LANGUAGE

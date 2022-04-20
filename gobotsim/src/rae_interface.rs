@@ -13,12 +13,12 @@ use ompas_rae_structs::exec_context::rae_state::RAEState;
 use ompas_rae_structs::refinement::Agenda;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::Documentation;
-use sompas_structs::lerror::LError::{SpecialError, WrongNumberOfArgument, WrongType};
 use sompas_structs::lerror::LResult;
+use sompas_structs::lerror::LRuntimeError::{Anyhow, WrongNumberOfArgument, WrongType};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
-use sompas_structs::typelvalue::TypeLValue;
+use sompas_structs::typelvalue::KindLValue;
 use sompas_utils::task_handler;
 use std::convert::TryInto;
 use std::net::SocketAddr;
@@ -127,7 +127,7 @@ impl RAEInterface for PlatformGodot {
 
         let sender = match self.get_sender_socket() {
             None => {
-                return Err(SpecialError(
+                return Err(Anyhow(
                     "PlatformGodot::exec_command",
                     "ctx godot has no sender to simulation, try first to (open-com-godot)"
                         .to_string(),
@@ -163,7 +163,7 @@ impl RAEInterface for PlatformGodot {
                 "PlatformGodot::cancel_command",
                 args[0].clone(),
                 (&args[0]).into(),
-                TypeLValue::Number,
+                KindLValue::Number,
             ));
         };
 
@@ -178,7 +178,7 @@ impl RAEInterface for PlatformGodot {
 
         let sender = match self.get_sender_socket() {
             None => {
-                return Err(SpecialError(
+                return Err(Anyhow(
                     "PlatformGodot::cancel_command",
                     "ctx godot has no sender to simulation, try first to (open-com-godot)"
                         .to_string(),
@@ -247,7 +247,7 @@ impl RAEInterface for PlatformGodot {
                         "PlatformGodot::start_platform",
                         args[0].clone(),
                         (&args[0]).into(),
-                        TypeLValue::Symbol,
+                        KindLValue::Symbol,
                     ));
                 }
             } //path of the project (absolute path)
@@ -310,7 +310,7 @@ impl RAEInterface for PlatformGodot {
                             "PlatformGodot::open_com",
                             lv.clone(),
                             lv.into(),
-                            TypeLValue::Symbol,
+                            KindLValue::Symbol,
                         ))
                     }
                 };
@@ -322,7 +322,7 @@ impl RAEInterface for PlatformGodot {
                             "PlatformGodot::open_com",
                             lv.clone(),
                             lv.into(),
-                            TypeLValue::Usize,
+                            KindLValue::Usize,
                         ))
                     }
                 };

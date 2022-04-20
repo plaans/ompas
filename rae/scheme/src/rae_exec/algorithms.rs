@@ -164,7 +164,7 @@ mod select {
     use sompas_core::modules::list::cons;
     use sompas_modules::utils::{enr, enumerate};
     use sompas_structs::lerror;
-    use sompas_structs::lerror::LError::SpecialError;
+    use sompas_structs::lerror::LRuntimeError::Anyhow;
     use std::time::Instant;
 
     //pub const GREEDY_SELECT: &str = "greedy_select";
@@ -212,7 +212,7 @@ mod select {
                         match plan.chronicles.get(&task_id).unwrap().clone().try_into() {
                             Ok(a) => a,
                             Err(_) => {
-                                return Err(SpecialError(
+                                return Err(Anyhow(
                                     RAE_SELECT,
                                     format!("task {} is not an abstract task:", n),
                                 ))

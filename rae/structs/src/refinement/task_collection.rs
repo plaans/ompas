@@ -2,7 +2,7 @@ use crate::exec_context::options::SelectMode;
 use crate::planning::plan::Plan;
 use crate::refinement::{Duration, Interval, TaskId, Timepoint};
 use itertools::Itertools;
-use sompas_structs::lerror::LError;
+use sompas_structs::lerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
@@ -250,7 +250,7 @@ impl From<ActionMetaData> for TaskMetaData {
 }
 
 impl TryFrom<TaskMetaData> for ActionMetaData {
-    type Error = LError;
+    type Error = LRuntimeError;
 
     fn try_from(value: TaskMetaData) -> Result<Self, Self::Error> {
         if let TaskMetaData::Action(a) = value {
@@ -261,7 +261,7 @@ impl TryFrom<TaskMetaData> for ActionMetaData {
     }
 }
 impl TryFrom<TaskMetaData> for AbstractTaskMetaData {
-    type Error = LError;
+    type Error = LRuntimeError;
 
     fn try_from(value: TaskMetaData) -> Result<Self, Self::Error> {
         if let TaskMetaData::AbstractTask(a) = value {

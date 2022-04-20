@@ -1,14 +1,15 @@
 use crate::contextcollection::{Context, ContextCollection};
 use crate::documentation::{Documentation, LHelp};
 use crate::function::LFn;
-use crate::lerror::LError::{WrongNumberOfArgument, WrongType};
+use crate::lerror::LResult;
 use crate::llambda::LLambda;
-use crate::lvalue::LValue;
+use crate::lvalue::{LValue, Sym};
 use crate::module::{InitLisp, IntoModule};
 use crate::purefonction::PureFonctionCollection;
-use crate::typelvalue::TypeLValue;
-use crate::{lerror, lfn, string};
+use crate::typelvalue::KindLValue;
+use crate::{lerror, lfn, lfn_extended, string};
 use im::HashSet;
+use macro_rules_attribute::macro_rules_attribute;
 use sompas_language::*;
 use std::any::Any;
 use std::fmt::{Display, Formatter};
@@ -269,7 +270,15 @@ lfn! { env_get_keys(_,env) {
 }
 }
 
-lfn! { env_get_macros(_,env) {
+#[macro_rules_attribute(lfn_extended!)]
+pub fn env_get_macros(env: &LEnv) -> im::Vector<LValue> {
+    env.macros()
+        .iter()
+        .map(|x| LValue::from(x.clone()))
+        .collect::<im::Vector<LValue>>()
+}
+
+/*lfn! { env_get_macros(_,env) {
     Ok(env
         .macros()
         .iter()
@@ -277,9 +286,17 @@ lfn! { env_get_macros(_,env) {
         .collect::<Vec<LValue>>()
         .into())
 }
-    }
+    }*/
 
-lfn! { env_get_macro(args, env) {
+#[macro_rules_attribute(lfn_extended!)]
+pub fn env_get_macro(env: &LEnv, m: Sym) -> LResult {
+    Ok(match env.get_macro(&m).cloned() {
+        Some(l) => l.into(),
+        None => LValue::Nil,
+    })
+}
+
+/*lfn! { env_get_macro(args, env) {
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(
             ENV_GET_MACRO,
@@ -298,11 +315,11 @@ lfn! { env_get_macro(args, env) {
             ENV_GET_MACRO,
             args[0].clone(),
             (&args[0]).into(),
-            TypeLValue::Symbol,
+            KindLValue::Symbol,
         ))
     }
 }
-    }
+    }*/
 
 ///print the help
 /// Takes 0 or 1 parameter.
@@ -318,7 +335,7 @@ lfn! {
             LValue::Fn(fun) => Ok(string!(documentation.get(fun.get_label()))),
             LValue::Symbol(s) => Ok(string!(documentation.get(s))),
             LValue::CoreOperator(co) => Ok(string!(documentation.get(&co.to_string()))),
-            lv => Err(WrongType(HELP, lv.clone(), lv.into(), TypeLValue::Symbol)),
+            lv => Err(WrongType(HELP, lv.clone(), lv.into(), KindLValue::Symbol)),
         },
         _ => Err(WrongNumberOfArgument(HELP, args.into(), args.len(), 0..1)),
     }

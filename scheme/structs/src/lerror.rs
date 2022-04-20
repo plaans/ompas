@@ -1,9 +1,12 @@
+use std::backtrace::Backtrace;
+use std::collections::VecDeque;
 //use aries_model::lang::ConversionError;
-use crate::lerror::LError::SpecialError;
 use crate::lvalue::LValue;
-use crate::typelvalue::TypeLValue;
+use crate::typelvalue::KindLValue;
+use anyhow::anyhow;
+use im::Vector;
 use std::error::Error;
-use std::fmt::{Display, Formatter};
+use std::fmt::{format, Display, Formatter};
 use std::ops::Range;
 
 /// Error struct for Scheme
@@ -25,34 +28,108 @@ use std::ops::Range;
 /// # Note:
 /// The first argument of each kind is supposed to be an explanation of where the error occurred.
 /// It can be the name of the function.
-#[derive(Debug, Clone)]
-pub enum LError {
-    WrongType(&'static str, LValue, TypeLValue, TypeLValue),
-    NotInListOfExpectedTypes(&'static str, LValue, TypeLValue, Vec<TypeLValue>),
-    WrongNumberOfArgument(&'static str, LValue, usize, Range<usize>),
-    //ErrLoc(ErrLoc),
-    UndefinedSymbol(&'static str, String),
-    SpecialError(&'static str, String),
-    ConversionError(&'static str, TypeLValue, TypeLValue),
+#[derive(Debug, Clone, Default)]
+pub struct LRuntimeError {
+    backtrace: VecDeque<&'static str>,
+    message: String,
 }
 
-impl Default for LError {
-    fn default() -> Self {
-        SpecialError("", "".to_string())
+impl LRuntimeError {
+    pub fn chain(&mut self, context: &'static str) {
+        self.backtrace.push_front(context)
+    }
+}
+/*
+WrongType(LValue, TypeLValue, TypeLValue),
+    NotInListOfExpectedTypes(LValue, TypeLValue, Vec<TypeLValue>),
+    WrongNumberOfArgument(LValue, usize, Range<usize>),
+    //ErrLoc(ErrLoc),
+    UndefinedSymbol(&'static str, String),
+    Anyhow(&'static str, String),
+    ConversionError(&'static str, TypeLValue, TypeLValue),
+ */
+impl LRuntimeError {
+    pub fn new(context: &'static str, message: impl Display) -> Self {
+        Self {
+            backtrace: [context].into(),
+            message: message.to_string(),
+        }
+    }
+
+    pub fn wrong_type(context: &'static str, lv: &LValue, expected: KindLValue) -> Self {
+        Self {
+            backtrace: [context].into(),
+            message: format!(
+                "Wrong type: {} is a {}, expected {}.",
+                lv,
+                lv.get_kind(),
+                expected
+            ),
+        }
+    }
+    pub fn wrong_number_of_args(
+        context: &'static str,
+        lv: &im::Vector<LValue>,
+        expected: Range<usize>,
+    ) -> Self {
+        let r: String = if r.is_empty() {
+            format!("expected {}", expected.start)
+        } else if r.end == usize::MAX {
+            format!("expected at least {}", expected.start)
+        } else if r.start == usize::MIN {
+            format!("expected at most {}", expected.end)
+        } else {
+            format!("expected between {} and {}", expected.start, expected.end)
+        };
+        Self {
+            backtrace: [context].into(),
+            message: format!(
+                "Wrong number of args: {} is of length {}, {}.",
+                LValue::from(lv),
+                lv.len(),
+                r
+            ),
+        }
+    }
+
+    pub fn not_in_list_of_expected_types(
+        context: &'static str,
+        lv: &LValue,
+        t: Vec<KindLValue>,
+    ) -> Self {
+        Self {
+            backtrace: [context].into(),
+            message: format!(
+                "Wrong type: {} is a {}, expected either one of {:#?}.",
+                lv,
+                lv.get_kind(),
+                t
+            ),
+        }
     }
 }
 
-impl Error for LError {}
+impl Error for LRuntimeError {}
 
-impl Display for LError {
+impl Display for LRuntimeError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        match self {
-            LError::WrongType(f_name, s, s1, s2) => {
-                write!(f, "In {}, {}: Got {}, expected {}", f_name, s, s1, s2)
+        writeln!(f, "{:#?}: {}", self.backtrace, self.message)
+        /*match self {
+            LRuntimeError::WrongType(f_name, s, s1, s2) => {
+                write!(
+                    f,
+                    "In {}, {}: Got {}, expected {}",
+                    self.source().unwrap(),
+                    s,
+                    s1,
+                    s2
+                )
             }
             //LError::ErrLoc(e) => write!(f, "{}",e),
-            LError::UndefinedSymbol(f_name, s) => write!(f, "In {}: {} is undefined", f_name, s),
-            LError::WrongNumberOfArgument(f_name, s, g, r) => {
+            LRuntimeError::UndefinedSymbol(f_name, s) => {
+                write!(f, "In {}: {} is undefined", f_name, s)
+            }
+            LRuntimeError::WrongNumberOfArgument(f_name, s, g, r) => {
                 if r.is_empty() {
                     write!(
                         f,
@@ -79,39 +156,36 @@ impl Display for LError {
                     )
                 }
             }
-            LError::SpecialError(f_name, s) => write!(f, "In {}, {}", f_name, s),
-            LError::ConversionError(f_name, s1, s2) => {
+            LRuntimeError::Anyhow(f_name, s) => write!(f, "In {}, {}", f_name, s),
+            LRuntimeError::ConversionError(f_name, s1, s2) => {
                 write!(f, "In {}, Cannot convert {} into {}.", f_name, s1, s2)
             }
-            LError::NotInListOfExpectedTypes(f_name, lv, typ, list_types) => {
+            LRuntimeError::NotInListOfExpectedTypes(f_name, lv, typ, list_types) => {
                 write!(
                     f,
                     "In {}, {}: Got {}, expected {:?}",
                     f_name, lv, typ, list_types
                 )
             }
+        }*/
+    }
+}
+
+impl From<anyhow::Error> for LRuntimeError {
+    fn from(a: anyhow::Error) -> Self {
+        Self {
+            backtrace: [""].into(),
+            message: a.to_string(),
         }
     }
 }
 
-impl From<std::io::Error> for LError {
+impl From<std::io::Error> for LRuntimeError {
     fn from(e: std::io::Error) -> Self {
-        SpecialError("std::io::Error", e.to_string())
+        Anyhow("std::io::Error", e.to_string())
     }
 }
 
-/*impl From<ConversionError> for LError {
-    fn from(ce: ConversionError) -> Self {
-        SpecialError("aries_model::lang::ConversionError", ce.to_string())
-    }
-}*/
+pub type LResult = std::Result<LValue, LRuntimeError>;
 
-pub type LResult = std::result::Result<LValue, LError>;
-
-pub type Result<T> = std::result::Result<T, LError>;
-
-impl From<anyhow::Error> for LError {
-    fn from(e: anyhow::Error) -> Self {
-        Self::SpecialError("anyhow", format!("{:?}", e))
-    }
-}
+pub type Result<T> = std::result::Result<T, LRuntimeError>;

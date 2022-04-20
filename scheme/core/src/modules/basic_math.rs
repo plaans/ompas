@@ -1,7 +1,7 @@
 use sompas_language::*;
 use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror::LError::WrongNumberOfArgument;
 use sompas_structs::lerror::LResult;
+use sompas_structs::lerror::LRuntimeError::WrongNumberOfArgument;
 use sompas_structs::lfn;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lvalue::LValue;
@@ -118,37 +118,46 @@ mod tests {
     #[test]
     fn test_add() {
         let env = LEnv::default();
-        let result = add(vector![3.into(), 2.into()], &env).unwrap();
+        let result = add(&vector![3.into(), 2.into()], &env).unwrap();
         assert_eq!(LValue::Number(LNumber::Float(5.0)), result);
     }
 
     #[test]
     fn test_sub() {
         let env = LEnv::default();
-        let result = sub(&[3.into(), 2.into()], &env).unwrap();
+        let result = sub(&vector![3.into(), 2.into()], &env).unwrap();
         assert_eq!(LValue::Number(LNumber::Int(1)), result);
     }
 
     #[test]
     fn test_mul() {
         let env = LEnv::default();
-        let result = mul(&[3.into(), 2.into()], &env).unwrap();
+        let result = mul(&vector![3.into(), 2.into()], &env).unwrap();
         assert_eq!(LValue::Number(LNumber::Float(6.0)), result);
     }
 
     #[test]
     fn test_div() {
         let env = LEnv::default();
-        let result = div(&[3.0.into(), 2.0.into()], &env).unwrap();
+        let result = div(&vector![3.0.into(), 2.0.into()], &env).unwrap();
         assert_eq!(LValue::Number(LNumber::Float(1.5)), result);
     }
 
     #[test]
     fn test_gt() {
         let env = LEnv::default();
-        let result_true: bool = gt(&[3.into(), 2.into()], &env).unwrap().try_into().unwrap();
-        let result_false: bool = gt(&[2.into(), 3.into()], &env).unwrap().try_into().unwrap();
-        let result_false_2: bool = gt(&[3.into(), 3.into()], &env).unwrap().try_into().unwrap();
+        let result_true: bool = gt(&vector![3.into(), 2.into()], &env)
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let result_false: bool = gt(&vector![2.into(), 3.into()], &env)
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let result_false_2: bool = gt(&vector![3.into(), 3.into()], &env)
+            .unwrap()
+            .try_into()
+            .unwrap();
         assert!(result_true);
         assert!(!result_false);
         assert!(!result_false_2);

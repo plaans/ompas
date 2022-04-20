@@ -1,10 +1,10 @@
 use sompas_language::*;
 use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror::LError::*;
 use sompas_structs::lerror::LResult;
+use sompas_structs::lerror::LRuntimeError::*;
 use sompas_structs::lfn;
 use sompas_structs::lvalue::LValue;
-use sompas_structs::typelvalue::TypeLValue;
+use sompas_structs::typelvalue::KindLValue;
 use std::sync::Arc;
 
 lfn! {pub check(args, _){
@@ -18,7 +18,7 @@ lfn! {pub check(args, _){
             CHECK,
             args[0].clone(),
             (&args[0]).into(),
-            TypeLValue::Bool,
+            KindLValue::Bool,
         )),
     }
 }}

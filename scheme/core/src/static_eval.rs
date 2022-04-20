@@ -3,12 +3,12 @@ use anyhow::anyhow;
 use sompas_structs::lcoreoperator::LCoreOperator;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lerror;
-use sompas_structs::lerror::LError::{
-    NotInListOfExpectedTypes, SpecialError, WrongNumberOfArgument, WrongType,
+use sompas_structs::lerror::LRuntimeError::{
+    Anyhow, NotInListOfExpectedTypes, WrongNumberOfArgument, WrongType,
 };
 use sompas_structs::llambda::{LLambda, LambdaArgs};
 use sompas_structs::lvalue::LValue;
-use sompas_structs::typelvalue::TypeLValue;
+use sompas_structs::typelvalue::KindLValue;
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{Display, Formatter};
 
@@ -126,7 +126,7 @@ pub fn expand_static(x: &LValue, top_level: bool, env: &mut LEnv) -> lerror::Res
                                 //println!("after expansion: {}", exp);
                                 if def == LCoreOperator::DefMacro {
                                     if !top_level {
-                                        return Err(SpecialError(
+                                        return Err(Anyhow(
                                             EXPAND_STATIC,
                                             format!("{}: defmacro only allowed at top level", x),
                                         ));
@@ -134,7 +134,7 @@ pub fn expand_static(x: &LValue, top_level: bool, env: &mut LEnv) -> lerror::Res
                                     let proc = eval_static(&exp.into(), &mut env.clone())?;
                                     //println!("new macro: {}", proc);
                                     if !matches!(proc.lvalue, LValue::Lambda(_)) {
-                                        return Err(SpecialError(
+                                        return Err(Anyhow(
                                             EXPAND_STATIC,
                                             format!("{}: macro must be a procedure", proc),
                                         ));
@@ -156,7 +156,7 @@ pub fn expand_static(x: &LValue, top_level: bool, env: &mut LEnv) -> lerror::Res
                                     EXPAND_STATIC,
                                     x.clone(),
                                     x.into(),
-                                    TypeLValue::Symbol,
+                                    KindLValue::Symbol,
                                 ))
                             }
                         }
@@ -177,7 +177,7 @@ pub fn expand_static(x: &LValue, top_level: bool, env: &mut LEnv) -> lerror::Res
                             LValue::List(vars_list) => {
                                 for v in vars_list {
                                     if !matches!(v, LValue::Symbol(_)) {
-                                        return Err(SpecialError(
+                                        return Err(Anyhow(
                                             EXPAND_STATIC,
                                             format!("illegal lambda argument list: {}", x),
                                         ));
@@ -190,7 +190,7 @@ pub fn expand_static(x: &LValue, top_level: bool, env: &mut LEnv) -> lerror::Res
                                     EXPAND_STATIC,
                                     lv.clone(),
                                     lv.into(),
-                                    vec![TypeLValue::List, TypeLValue::Symbol],
+                                    vec![KindLValue::List, KindLValue::Symbol],
                                 ))
                             }
                         }
@@ -424,10 +424,7 @@ pub fn expand_static(x: &LValue, top_level: bool, env: &mut LEnv) -> lerror::Res
 pub fn parse_static(str: &str, env: &mut LEnv) -> lerror::Result<PLValue> {
     match aries_planning::parsing::sexpr::parse(str) {
         Ok(se) => expand_static(&parse_into_lvalue(&se), true, env),
-        Err(e) => Err(SpecialError(
-            PARSE_STATIC,
-            format!("Error in command: {}", e),
-        )),
+        Err(e) => Err(Anyhow(PARSE_STATIC, format!("Error in command: {}", e))),
     }
 }
 
@@ -486,7 +483,7 @@ pub fn eval_static(lv: &LValue, env: &mut LEnv) -> lerror::Result<PLValue> {
                                     EVAL_STATIC,
                                     lv.clone(),
                                     lv.into(),
-                                    TypeLValue::Symbol,
+                                    KindLValue::Symbol,
                                 ))
                             }
                         };
@@ -505,7 +502,7 @@ pub fn eval_static(lv: &LValue, env: &mut LEnv) -> lerror::Result<PLValue> {
                                                 EVAL_STATIC,
                                                 lv.clone(),
                                                 lv.into(),
-                                                TypeLValue::Symbol,
+                                                KindLValue::Symbol,
                                             ))
                                         }
                                     }
@@ -519,7 +516,7 @@ pub fn eval_static(lv: &LValue, env: &mut LEnv) -> lerror::Result<PLValue> {
                                     EVAL_STATIC,
                                     lv.clone(),
                                     lv.into(),
-                                    vec![TypeLValue::List, TypeLValue::Symbol],
+                                    vec![KindLValue::List, KindLValue::Symbol],
                                 ))
                             }
                         };
@@ -545,7 +542,7 @@ pub fn eval_static(lv: &LValue, env: &mut LEnv) -> lerror::Result<PLValue> {
                                         EVAL_STATIC,
                                         lv.clone(),
                                         lv.into(),
-                                        TypeLValue::Bool,
+                                        KindLValue::Bool,
                                     ))
                                 }
                             };
@@ -586,7 +583,7 @@ pub fn eval_static(lv: &LValue, env: &mut LEnv) -> lerror::Result<PLValue> {
                     }
                     LCoreOperator::QuasiQuote
                     | LCoreOperator::UnQuote
-                    | LCoreOperator::DefMacro => return Err(SpecialError(EVAL_STATIC, "quasiquote, unquote and defmacro should not be prensent in exanded expressions".to_string())),
+                    | LCoreOperator::DefMacro => return Err(Anyhow(EVAL_STATIC, "quasiquote, unquote and defmacro should not be prensent in exanded expressions".to_string())),
                     LCoreOperator::Async | LCoreOperator::Await => {
                         return Ok(PLValue::into_unpure(&lv));
                     }
@@ -614,7 +611,7 @@ pub fn eval_static(lv: &LValue, env: &mut LEnv) -> lerror::Result<PLValue> {
                                     EVAL_STATIC,
                                     args[0].clone(),
                                     (&args[0]).into(),
-                                    TypeLValue::String,
+                                    KindLValue::String,
                                 ))
                             }
                         }
@@ -675,7 +672,7 @@ pub fn eval_static(lv: &LValue, env: &mut LEnv) -> lerror::Result<PLValue> {
                             EVAL_STATIC,
                             lv.clone(),
                             lv.into(),
-                            TypeLValue::Fn,
+                            KindLValue::Fn,
                         ));
                     }
                 };

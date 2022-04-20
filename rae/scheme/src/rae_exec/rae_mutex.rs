@@ -9,7 +9,7 @@ use sompas_structs::lenv::LEnv;
 use sompas_structs::lerror::LResult;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lvalue::LValue;
-use sompas_structs::typelvalue::TypeLValue;
+use sompas_structs::typelvalue::KindLValue;
 use sompas_utils::dyn_async;
 use sompas_utils::other::generic_race;
 use std::convert::{TryFrom, TryInto};
@@ -31,7 +31,7 @@ pub async fn lock<'a>(args: &'a [LValue], _: &'a LEnv) -> LResult {
             LOCK,
             args[0].clone(),
             (&args[0]).into(),
-            TypeLValue::Symbol,
+            KindLValue::Symbol,
         ));
     };
     let priority = if let LValue::Number(LNumber::Int(i)) = &args[1] {
@@ -41,7 +41,7 @@ pub async fn lock<'a>(args: &'a [LValue], _: &'a LEnv) -> LResult {
             LOCK,
             args[1].clone(),
             (&args[1]).into(),
-            TypeLValue::Number,
+            KindLValue::Number,
         ));
     };
 
@@ -126,7 +126,7 @@ pub async fn is_locked<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
             let state = match env.get_symbol("state") {
                 Some(lv) => lv,
                 None => {
-                    return Err(SpecialError(
+                    return Err(Anyhow(
                         IS_LOCKED,
                         "state should be defined in simu mode".to_string(),
                     ))

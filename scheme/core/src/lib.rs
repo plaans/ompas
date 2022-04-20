@@ -7,13 +7,15 @@ use sompas_language::*;
 use sompas_structs::lcoreoperator::LCoreOperator;
 use sompas_structs::lcoreoperator::LCoreOperator::Quote;
 use sompas_structs::lenv::{ImportType, LEnv};
-use sompas_structs::lerror::LError::{NotInListOfExpectedTypes, WrongNumberOfArgument, WrongType};
 use sompas_structs::lerror::LResult;
+use sompas_structs::lerror::LRuntimeError::{
+    NotInListOfExpectedTypes, WrongNumberOfArgument, WrongType,
+};
 use sompas_structs::lfuture::FutureResult;
 use sompas_structs::llambda::{LLambda, LambdaArgs};
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lvalue::LValue;
-use sompas_structs::typelvalue::TypeLValue;
+use sompas_structs::typelvalue::KindLValue;
 use std::convert::TryFrom;
 use std::convert::TryInto;
 use std::sync::atomic::AtomicBool;
@@ -203,7 +205,7 @@ pub async fn expand(x: &LValue, top_level: bool, env: &mut LEnv) -> LResult {
                                     "expand",
                                     x.clone(),
                                     x.into(),
-                                    TypeLValue::Symbol,
+                                    KindLValue::Symbol,
                                 ))
                             }
                         }
@@ -236,7 +238,7 @@ pub async fn expand(x: &LValue, top_level: bool, env: &mut LEnv) -> LResult {
                                     "expand",
                                     lv.clone(),
                                     lv.into(),
-                                    vec![TypeLValue::List, TypeLValue::Symbol],
+                                    vec![KindLValue::List, KindLValue::Symbol],
                                 ))
                             }
                         }
@@ -486,7 +488,7 @@ pub async fn eval(lv: &LValue, env: &mut LEnv) -> LResult {
                                     "eval",
                                     lv.clone(),
                                     lv.into(),
-                                    TypeLValue::Symbol,
+                                    KindLValue::Symbol,
                                 ))
                             }
                         };
@@ -508,7 +510,7 @@ pub async fn eval(lv: &LValue, env: &mut LEnv) -> LResult {
                                                 "eval",
                                                 lv.clone(),
                                                 lv.into(),
-                                                TypeLValue::Symbol,
+                                                KindLValue::Symbol,
                                             ))
                                         }
                                     }
@@ -522,7 +524,7 @@ pub async fn eval(lv: &LValue, env: &mut LEnv) -> LResult {
                                     "eval",
                                     lv.clone(),
                                     lv.into(),
-                                    vec![TypeLValue::List, TypeLValue::Symbol],
+                                    vec![KindLValue::List, KindLValue::Symbol],
                                 ))
                             }
                         };
@@ -546,7 +548,7 @@ pub async fn eval(lv: &LValue, env: &mut LEnv) -> LResult {
                                     "eval",
                                     lv.clone(),
                                     lv.into(),
-                                    TypeLValue::Bool,
+                                    KindLValue::Bool,
                                 ))
                             }
                         };
@@ -611,7 +613,7 @@ pub async fn eval(lv: &LValue, env: &mut LEnv) -> LResult {
                                 EVAL,
                                 future.clone(),
                                 (&future).into(),
-                                TypeLValue::Future,
+                                KindLValue::Future,
                             ));
                         };
                     }
@@ -628,7 +630,7 @@ pub async fn eval(lv: &LValue, env: &mut LEnv) -> LResult {
                                 "eval",
                                 result.clone(),
                                 (&result).into(),
-                                TypeLValue::String,
+                                KindLValue::String,
                             ));
                         };
                     }
@@ -671,7 +673,7 @@ pub async fn eval(lv: &LValue, env: &mut LEnv) -> LResult {
                         return Ok(r_lvalue);
                     }
                     lv => {
-                        return Err(WrongType("eval", lv.clone(), lv.into(), TypeLValue::Fn));
+                        return Err(WrongType("eval", lv.clone(), lv.into(), KindLValue::Fn));
                     }
                 };
             }

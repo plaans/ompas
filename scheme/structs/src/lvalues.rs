@@ -1,4 +1,4 @@
-use crate::lerror::LError;
+use crate::lerror::LRuntimeError;
 use crate::lnumber::LNumber;
 use crate::lvalue::LValue;
 use serde::*;
@@ -132,7 +132,7 @@ impl<T: Into<LValueS>> From<Vec<T>> for LValueS {
 }
 
 impl TryFrom<&LValueS> for Vec<LValueS> {
-    type Error = LError;
+    type Error = LRuntimeError;
 
     fn try_from(value: &LValueS) -> Result<Self, Self::Error> {
         match value {
@@ -143,7 +143,7 @@ impl TryFrom<&LValueS> for Vec<LValueS> {
 }
 
 impl TryFrom<&LValueS> for String {
-    type Error = LError;
+    type Error = LRuntimeError;
 
     fn try_from(value: &LValueS) -> Result<Self, Self::Error> {
         if let LValueS::Symbol(s) = value {

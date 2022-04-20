@@ -1,11 +1,11 @@
 use im::HashMap;
 use sompas_language::*;
 use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror::LError::*;
 use sompas_structs::lerror::LResult;
+use sompas_structs::lerror::LRuntimeError::*;
 use sompas_structs::lfn;
 use sompas_structs::lvalue::LValue;
-use sompas_structs::typelvalue::TypeLValue;
+use sompas_structs::typelvalue::KindLValue;
 
 lfn! {pub map(args, _){
     match args.len() {
@@ -29,13 +29,13 @@ lfn! {pub map(args, _){
                             let value = val_sv[1].clone();
                             facts.insert(key, value);
                         }
-                        lv => return Err(WrongType(MAP, lv.clone(), lv.into(), TypeLValue::List)),
+                        lv => return Err(WrongType(MAP, lv.clone(), lv.into(), KindLValue::List)),
                     }
                 }
                 Ok(LValue::Map(facts))
             }
             LValue::Nil => Ok(LValue::Map(Default::default())),
-            lv => Err(WrongType(MAP, lv.clone(), lv.into(), TypeLValue::List)),
+            lv => Err(WrongType(MAP, lv.clone(), lv.into(), KindLValue::List)),
         },
         _ => Err(WrongNumberOfArgument(MAP, args.into(), args.len(), 1..1)),
     }
@@ -58,7 +58,7 @@ lfn! {pub get_map(args, _){
             let value = map.get(key).unwrap_or(&LValue::Nil);
             Ok(value.clone())
         }
-        lv => Err(WrongType(GET_MAP, lv.clone(), lv.into(), TypeLValue::Map)),
+        lv => Err(WrongType(GET_MAP, lv.clone(), lv.into(), KindLValue::Map)),
     }
 }
     }
@@ -89,9 +89,9 @@ lfn! {pub set_map(args, _){
                     ))
                 }
             }
-            lv => Err(WrongType(SET_MAP, lv.clone(), lv.into(), TypeLValue::List)),
+            lv => Err(WrongType(SET_MAP, lv.clone(), lv.into(), KindLValue::List)),
         },
-        lv => Err(WrongType(SET_MAP, lv.clone(), lv.into(), TypeLValue::Map)),
+        lv => Err(WrongType(SET_MAP, lv.clone(), lv.into(), KindLValue::Map)),
     }
 }
     }
@@ -114,7 +114,7 @@ lfn! {pub remove_key_value_map(args, _){
                     let value = val_sv.get(1).unwrap().clone();
                     match m.get(&key) {
                         None => {
-                            return Err(SpecialError(
+                            return Err(Anyhow(
                                 REMOVE_KEY_VALUE_MAP,
                                 format!("map does not contain key {}", key),
                             ))
@@ -125,7 +125,7 @@ lfn! {pub remove_key_value_map(args, _){
                                 m.remove(&key);
                                 Ok(m.into())
                             } else {
-                                Err(SpecialError(
+                                Err(Anyhow(
                                     REMOVE_KEY_VALUE_MAP,
                                     format!("map does not have key value ({}:{})", key, value),
                                 ))
@@ -145,14 +145,14 @@ lfn! {pub remove_key_value_map(args, _){
                 REMOVE_KEY_VALUE_MAP,
                 lv.clone(),
                 lv.into(),
-                TypeLValue::List,
+                KindLValue::List,
             )),
         },
         lv => Err(WrongType(
             REMOVE_KEY_VALUE_MAP,
             lv.clone(),
             lv.into(),
-            TypeLValue::Map,
+            KindLValue::Map,
         )),
     }
 }
@@ -178,7 +178,7 @@ lfn! {pub remove_map(args, _){
             REMOVE_MAP,
             lv.clone(),
             lv.into(),
-            TypeLValue::Map,
+            KindLValue::Map,
         )),
     }
 }
@@ -205,7 +205,7 @@ lfn! {pub union_map(args, _){
                 UNION_MAP,
                 map2.clone(),
                 map2.into(),
-                TypeLValue::Map,
+                KindLValue::Map,
             ))
         }
     } else {
@@ -213,7 +213,7 @@ lfn! {pub union_map(args, _){
             UNION_MAP,
             map1.clone(),
             map1.into(),
-            TypeLValue::Map,
+            KindLValue::Map,
         ))
     }
 }

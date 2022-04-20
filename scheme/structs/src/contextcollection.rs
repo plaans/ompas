@@ -1,5 +1,5 @@
 use crate::lerror;
-use crate::lerror::LError;
+use crate::lerror::LRuntimeError;
 use anyhow::anyhow;
 use im::HashMap;
 use std::any::Any;
@@ -42,7 +42,7 @@ impl ContextCollection {
 impl ContextCollection {
     pub fn get<T: Any + Send + Sync>(&self, label: &str) -> lerror::Result<&T> {
         let value = self.inner.get(label).ok_or_else(|| {
-            LError::from(anyhow!(
+            LRuntimeError::from(anyhow!(
                 "In ContextCollection::get, context \"{}\" does not exist!",
                 label
             ))
@@ -51,7 +51,7 @@ impl ContextCollection {
         let ctx: &T = value
             .inner
             .downcast_ref::<T>()
-            .ok_or_else(|| LError::from(anyhow!("Impossible to downcast context")))?;
+            .ok_or_else(|| LRuntimeError::from(anyhow!("Impossible to downcast context")))?;
 
         Ok(ctx)
     }

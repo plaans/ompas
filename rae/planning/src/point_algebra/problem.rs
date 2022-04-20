@@ -7,7 +7,7 @@ use ompas_rae_structs::planning::symbol_table::{AtomId, SymTable};
 use ompas_rae_structs::planning::traits::FormatWithSymTable;
 use ompas_rae_structs::planning::type_table::PlanningAtomType;
 use sompas_structs::lerror;
-use sompas_structs::lerror::LError;
+use sompas_structs::lerror::LRuntimeError;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 use std::ops::{Index, IndexMut};
@@ -27,7 +27,7 @@ pub fn try_into_pa_relation(
         Constraint::Leq(_, _) => RelationType::LEq,
         Constraint::Lt(_, _) => RelationType::LT,
         Constraint::Neq(_, _) => RelationType::Neq,
-        _ => return Err(LError::default()),
+        _ => return Err(LRuntimeError::default()),
     };
 
     if let Ok(i) = constraint.get_left().try_into() {

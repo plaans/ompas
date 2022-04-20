@@ -1,11 +1,11 @@
 use ompas_rae_structs::planning::{ConversionCollection, ConversionContext};
 use sompas_core::*;
 use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror::LError::{SpecialError, WrongNumberOfArgument, WrongType};
 use sompas_structs::lerror::LResult;
+use sompas_structs::lerror::LRuntimeError::{Anyhow, WrongNumberOfArgument, WrongType};
 use sompas_structs::llambda::LambdaArgs;
 use sompas_structs::lvalue::LValue;
-use sompas_structs::typelvalue::TypeLValue;
+use sompas_structs::typelvalue::KindLValue;
 use sompas_utils::blocking_async;
 
 pub const TRANSFORM_LAMBDA_EXPRESSION: &str = "transform-lambda-expression";
@@ -90,7 +90,7 @@ pub fn transform_lambda_expression(lv: &LValue, env: LEnv) -> LResult {
                 }
                 LambdaArgs::List(params) => {
                     if params.len() != args.len() {
-                        return Err(SpecialError(
+                        return Err(Anyhow(
                             TRANSFORM_LAMBDA_EXPRESSION,
                             format!(
                                 "in lambda {}: ",
@@ -109,7 +109,7 @@ pub fn transform_lambda_expression(lv: &LValue, env: LEnv) -> LResult {
                 }
                 LambdaArgs::Nil => {
                     if !args.is_empty() {
-                        return Err(SpecialError(
+                        return Err(Anyhow(
                             TRANSFORM_LAMBDA_EXPRESSION,
                             "Lambda was expecting no args.".to_string(),
                         ));
@@ -128,7 +128,7 @@ pub fn transform_lambda_expression(lv: &LValue, env: LEnv) -> LResult {
                 TRANSFORM_LAMBDA_EXPRESSION,
                 list[0].clone(),
                 (&list[0]).into(),
-                TypeLValue::Lambda,
+                KindLValue::Lambda,
             ))
         }
     } else {
@@ -136,7 +136,7 @@ pub fn transform_lambda_expression(lv: &LValue, env: LEnv) -> LResult {
             TRANSFORM_LAMBDA_EXPRESSION,
             lv.clone(),
             lv.into(),
-            TypeLValue::List,
+            KindLValue::List,
         ))
     }
 }

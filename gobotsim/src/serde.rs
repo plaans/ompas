@@ -2,8 +2,8 @@ use aries_planning::parsing::sexpr::SExpr;
 use ompas_rae_structs::exec_context::rae_state::ActionStatus::ActionDenied;
 use ompas_rae_structs::exec_context::rae_state::{ActionStatus, LState, StateType};
 use serde::{Deserialize, Serialize, Serializer};
-use sompas_structs::lerror::LError;
-use sompas_structs::lerror::LError::SpecialError;
+use sompas_structs::lerror::LRuntimeError;
+use sompas_structs::lerror::LRuntimeError::Anyhow;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalues::LValueS;
 use std::convert::TryFrom;
@@ -130,7 +130,7 @@ pub enum GodotMessageSerdeData {
 }
 
 impl TryFrom<GodotMessageSerde> for LState {
-    type Error = LError;
+    type Error = LRuntimeError;
 
     fn try_from(value: GodotMessageSerde) -> Result<Self, Self::Error> {
         let mut state: LState = Default::default();
@@ -142,7 +142,7 @@ impl TryFrom<GodotMessageSerde> for LState {
                 state.set_type(StateType::Dynamic);
             }
             _ => {
-                return Err(LError::SpecialError(
+                return Err(LRuntimeError::Anyhow(
                     "LState::TryFrom<GodotMessageSerde>",
                     "Was expecting a state".to_string(),
                 ))
@@ -167,7 +167,7 @@ impl TryFrom<GodotMessageSerde> for LState {
 }
 
 impl TryFrom<GodotMessageSerde> for (usize, ActionStatus) {
-    type Error = LError;
+    type Error = LRuntimeError;
 
     fn try_from(value: GodotMessageSerde) -> Result<Self, Self::Error> {
         #![allow(unused_assignments)]
@@ -183,7 +183,7 @@ impl TryFrom<GodotMessageSerde> for (usize, ActionStatus) {
                         -1 => ActionDenied,
                         i => {
                             if i < 0 {
-                                return Err(SpecialError(
+                                return Err(Anyhow(
                                     "GodotMessageSerde",
                                     "action response is not in {-1} + N".to_string(),
                                 ));

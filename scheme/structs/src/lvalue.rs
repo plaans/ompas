@@ -1,12 +1,11 @@
 use crate::function::{LAsyncFn, LFn};
 use crate::lcoreoperator::LCoreOperator;
-use crate::lerror::LError;
-use crate::lerror::LError::ConversionError;
+use crate::lerror::LRuntimeError;
 use crate::lfuture::LFuture;
 use crate::llambda::LLambda;
 use crate::lnumber::LNumber;
 use crate::symbol;
-use crate::typelvalue::TypeLValue;
+use crate::typelvalue::KindLValue;
 use im::{vector, HashMap};
 use sompas_language::*;
 use std::cmp::Ordering;
@@ -16,7 +15,7 @@ use std::hash::{Hash, Hasher};
 use std::ops::{Add, Deref, Div, Mul, Sub};
 use std::sync::Arc;
 
-type Sym = String;
+pub type Sym = String;
 
 #[derive(Clone)]
 pub struct RefLValue(Arc<LValue>);
@@ -221,6 +220,10 @@ impl LValue {
             lv => lv.to_string(),
         }
     }
+
+    pub fn get_kind(&self) -> KindLValue {
+        (&self).into()
+    }
 }
 
 impl Display for LValue {
@@ -284,7 +287,7 @@ impl Hash for LValue {
 impl Eq for LValue {}
 
 impl TryFrom<&LValue> for im::HashMap<LValue, LValue> {
-    type Error = LError;
+    type Error = LRuntimeError;
 
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
         match value {
@@ -292,14 +295,14 @@ impl TryFrom<&LValue> for im::HashMap<LValue, LValue> {
             _ => Err(ConversionError(
                 "hashmap::tryfrom<&LValue>",
                 value.into(),
-                TypeLValue::Map,
+                KindLValue::Map,
             )),
         }
     }
 }
 
 impl TryFrom<LValue> for im::HashMap<LValue, LValue> {
-    type Error = LError;
+    type Error = LRuntimeError;
 
     fn try_from(value: LValue) -> Result<Self, Self::Error> {
         (&value).try_into()
@@ -307,7 +310,7 @@ impl TryFrom<LValue> for im::HashMap<LValue, LValue> {
 }
 
 impl TryFrom<&LValue> for String {
-    type Error = LError;
+    type Error = LRuntimeError;
 
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
         match value {
@@ -319,14 +322,14 @@ impl TryFrom<&LValue> for String {
             lv => Err(ConversionError(
                 "String::tryfrom<&LValue>",
                 lv.into(),
-                TypeLValue::Symbol,
+                KindLValue::Symbol,
             )),
         }
     }
 }
 
 impl TryFrom<LValue> for String {
-    type Error = LError;
+    type Error = LRuntimeError;
 
     fn try_from(value: LValue) -> Result<Self, Self::Error> {
         (&value).try_into()
@@ -334,7 +337,7 @@ impl TryFrom<LValue> for String {
 }
 
 impl TryFrom<&LValue> for im::Vector<LValue> {
-    type Error = LError;
+    type Error = LRuntimeError;
 
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
         match value {
@@ -343,14 +346,14 @@ impl TryFrom<&LValue> for im::Vector<LValue> {
             lv => Err(ConversionError(
                 "Vec<LValue>::tryfrom<&LValue>",
                 lv.into(),
-                TypeLValue::List,
+                KindLValue::List,
             )),
         }
     }
 }
 
 impl TryFrom<LValue> for im::Vector<LValue> {
-    type Error = LError;
+    type Error = LRuntimeError;
 
     fn try_from(value: LValue) -> Result<Self, Self::Error> {
         (&value).try_into()
@@ -358,7 +361,7 @@ impl TryFrom<LValue> for im::Vector<LValue> {
 }
 
 impl TryFrom<&LValue> for i64 {
-    type Error = LError;
+    type Error = LRuntimeError;
 
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
         match value {
@@ -366,14 +369,14 @@ impl TryFrom<&LValue> for i64 {
             lv => Err(ConversionError(
                 "i64::tryfrom<&LValue>",
                 lv.into(),
-                TypeLValue::Number,
+                KindLValue::Number,
             )),
         }
     }
 }
 
 impl TryFrom<LValue> for i64 {
-    type Error = LError;
+    type Error = LRuntimeError;
 
     fn try_from(value: LValue) -> Result<Self, Self::Error> {
         (&value).try_into()
@@ -381,7 +384,7 @@ impl TryFrom<LValue> for i64 {
 }
 
 impl TryFrom<&LValue> for f64 {
-    type Error = LError;
+    type Error = LRuntimeError;
 
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
         match value {
@@ -389,14 +392,14 @@ impl TryFrom<&LValue> for f64 {
             lv => Err(ConversionError(
                 "f64::tryfrom<&LValue>",
                 lv.into(),
-                TypeLValue::Number,
+                KindLValue::Number,
             )),
         }
     }
 }
 
 impl TryFrom<LValue> for f64 {
-    type Error = LError;
+    type Error = LRuntimeError;
 
     fn try_from(value: LValue) -> Result<Self, Self::Error> {
         (&value).try_into()
@@ -404,7 +407,7 @@ impl TryFrom<LValue> for f64 {
 }
 
 impl TryFrom<&LValue> for bool {
-    type Error = LError;
+    type Error = LRuntimeError;
 
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
         match value {
@@ -413,14 +416,14 @@ impl TryFrom<&LValue> for bool {
             lv => Err(ConversionError(
                 "bool::tryfrom<&LValue>",
                 lv.into(),
-                TypeLValue::Bool,
+                KindLValue::Bool,
             )),
         }
     }
 }
 
 impl TryFrom<LValue> for bool {
-    type Error = LError;
+    type Error = LRuntimeError;
 
     fn try_from(value: LValue) -> Result<Self, Self::Error> {
         (&value).try_into()
@@ -428,7 +431,7 @@ impl TryFrom<LValue> for bool {
 }
 
 impl TryFrom<&LValue> for LCoreOperator {
-    type Error = LError;
+    type Error = LRuntimeError;
 
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
         match value {
@@ -437,14 +440,14 @@ impl TryFrom<&LValue> for LCoreOperator {
             lv => Err(ConversionError(
                 "LCoreOperator::tryfrom<&LValue>",
                 lv.into(),
-                TypeLValue::CoreOperator,
+                KindLValue::CoreOperator,
             )),
         }
     }
 }
 
 impl TryFrom<LValue> for LCoreOperator {
-    type Error = LError;
+    type Error = LRuntimeError;
 
     fn try_from(value: LValue) -> Result<Self, Self::Error> {
         (&value).try_into()
@@ -452,7 +455,7 @@ impl TryFrom<LValue> for LCoreOperator {
 }
 
 impl TryFrom<&LValue> for LLambda {
-    type Error = LError;
+    type Error = LRuntimeError;
 
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
         match value {
@@ -460,14 +463,14 @@ impl TryFrom<&LValue> for LLambda {
             lv => Err(ConversionError(
                 "LLambda::tryfrom<&LValue>",
                 lv.into(),
-                TypeLValue::Lambda,
+                KindLValue::Lambda,
             )),
         }
     }
 }
 
 impl TryFrom<LValue> for LLambda {
-    type Error = LError;
+    type Error = LRuntimeError;
 
     fn try_from(value: LValue) -> Result<Self, Self::Error> {
         (&value).try_into()
@@ -532,30 +535,30 @@ impl PartialOrd for LValue {
 }
 
 impl Add for &LValue {
-    type Output = Result<LValue, LError>;
+    type Output = Result<LValue, LRuntimeError>;
 
     fn add(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
             (LValue::Number(n1), LValue::Number(n2)) => Ok(LValue::Number(n1 + n2)),
-            (LValue::Number(_), l) => Err(LError::WrongType(
+            (LValue::Number(_), l) => Err(LRuntimeError::WrongType(
                 "LValue::Add",
                 l.clone(),
                 l.into(),
-                TypeLValue::Number,
+                KindLValue::Number,
             )),
-            (l, LValue::Number(_)) => Err(LError::WrongType(
+            (l, LValue::Number(_)) => Err(LRuntimeError::WrongType(
                 "LValue::Add",
                 l.clone(),
                 l.into(),
-                TypeLValue::Number,
+                KindLValue::Number,
             )),
 
-            (l1, l2) => Err(LError::SpecialError(
+            (l1, l2) => Err(LRuntimeError::Anyhow(
                 "LValue::Add",
                 format!(
                     "{} and {} cannot be add",
-                    TypeLValue::from(l1),
-                    TypeLValue::from(l2)
+                    KindLValue::from(l1),
+                    KindLValue::from(l2)
                 ),
             )),
         }
@@ -563,30 +566,30 @@ impl Add for &LValue {
 }
 
 impl Sub for &LValue {
-    type Output = Result<LValue, LError>;
+    type Output = Result<LValue, LRuntimeError>;
 
     fn sub(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
             (LValue::Number(n1), LValue::Number(n2)) => Ok(LValue::Number(n1 - n2)),
-            (LValue::Number(_), l) => Err(LError::WrongType(
+            (LValue::Number(_), l) => Err(LRuntimeError::WrongType(
                 "LValue::sub",
                 l.clone(),
                 l.into(),
-                TypeLValue::Number,
+                KindLValue::Number,
             )),
-            (l, LValue::Number(_)) => Err(LError::WrongType(
+            (l, LValue::Number(_)) => Err(LRuntimeError::WrongType(
                 "LValue::sub",
                 l.clone(),
                 l.into(),
-                TypeLValue::Number,
+                KindLValue::Number,
             )),
 
-            (l1, l2) => Err(LError::SpecialError(
+            (l1, l2) => Err(LRuntimeError::Anyhow(
                 "LValue::sub",
                 format!(
                     "{} and {} cannot be add",
-                    TypeLValue::from(l1),
-                    TypeLValue::from(l2)
+                    KindLValue::from(l1),
+                    KindLValue::from(l2)
                 ),
             )),
         }
@@ -594,30 +597,30 @@ impl Sub for &LValue {
 }
 
 impl Mul for &LValue {
-    type Output = Result<LValue, LError>;
+    type Output = Result<LValue, LRuntimeError>;
 
     fn mul(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
             (LValue::Number(n1), LValue::Number(n2)) => Ok(LValue::Number(n1 * n2)),
-            (LValue::Number(_), l) => Err(LError::WrongType(
+            (LValue::Number(_), l) => Err(LRuntimeError::WrongType(
                 "LValue::mul",
                 l.clone(),
                 l.into(),
-                TypeLValue::Number,
+                KindLValue::Number,
             )),
-            (l, LValue::Number(_)) => Err(LError::WrongType(
+            (l, LValue::Number(_)) => Err(LRuntimeError::WrongType(
                 "LValue::mul",
                 l.clone(),
                 l.into(),
-                TypeLValue::Number,
+                KindLValue::Number,
             )),
 
-            (l1, l2) => Err(LError::SpecialError(
+            (l1, l2) => Err(LRuntimeError::Anyhow(
                 "LValue::mul",
                 format!(
                     "{} and {} cannot be add",
-                    TypeLValue::from(l1),
-                    TypeLValue::from(l2)
+                    KindLValue::from(l1),
+                    KindLValue::from(l2)
                 ),
             )),
         }
@@ -625,30 +628,30 @@ impl Mul for &LValue {
 }
 
 impl Div for &LValue {
-    type Output = Result<LValue, LError>;
+    type Output = Result<LValue, LRuntimeError>;
 
     fn div(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
             (LValue::Number(n1), LValue::Number(n2)) => Ok(LValue::Number(n1 / n2)),
-            (LValue::Number(_), l) => Err(LError::WrongType(
+            (LValue::Number(_), l) => Err(LRuntimeError::WrongType(
                 "LValue::div",
                 l.clone(),
                 l.into(),
-                TypeLValue::Number,
+                KindLValue::Number,
             )),
-            (l, LValue::Number(_)) => Err(LError::WrongType(
+            (l, LValue::Number(_)) => Err(LRuntimeError::WrongType(
                 "LValue::div",
                 l.clone(),
                 l.into(),
-                TypeLValue::Number,
+                KindLValue::Number,
             )),
 
-            (l1, l2) => Err(LError::SpecialError(
+            (l1, l2) => Err(LRuntimeError::Anyhow(
                 "LValue::div",
                 format!(
                     "{} and {} cannot be add",
-                    TypeLValue::from(l1),
-                    TypeLValue::from(l2)
+                    KindLValue::from(l1),
+                    KindLValue::from(l2)
                 ),
             )),
         }
@@ -656,7 +659,7 @@ impl Div for &LValue {
 }
 
 impl Add for LValue {
-    type Output = Result<LValue, LError>;
+    type Output = Result<LValue, LRuntimeError>;
 
     fn add(self, rhs: Self) -> Self::Output {
         &self + &rhs
@@ -664,7 +667,7 @@ impl Add for LValue {
 }
 
 impl Sub for LValue {
-    type Output = Result<LValue, LError>;
+    type Output = Result<LValue, LRuntimeError>;
 
     fn sub(self, rhs: Self) -> Self::Output {
         &self - &rhs
@@ -672,7 +675,7 @@ impl Sub for LValue {
 }
 
 impl Mul for LValue {
-    type Output = Result<LValue, LError>;
+    type Output = Result<LValue, LRuntimeError>;
 
     fn mul(self, rhs: Self) -> Self::Output {
         &self * &rhs
@@ -680,7 +683,7 @@ impl Mul for LValue {
 }
 
 impl Div for LValue {
-    type Output = Result<LValue, LError>;
+    type Output = Result<LValue, LRuntimeError>;
 
     fn div(self, rhs: Self) -> Self::Output {
         &self / &rhs

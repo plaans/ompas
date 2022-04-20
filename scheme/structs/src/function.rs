@@ -4,7 +4,7 @@ use crate::lvalue::LValue;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
-pub type NativeFn = fn(&im::Vector<LValue>, &LEnv) -> LResult;
+pub type NativeFn = fn(&LEnv, &im::Vector<LValue>) -> LResult;
 
 #[derive(Clone)]
 pub struct LFn {
@@ -20,8 +20,8 @@ impl LFn {
         }
     }
 
-    pub fn call(&self, args: &im::Vector<LValue>, env: &LEnv) -> LResult {
-        (self.fun)(args, env)
+    pub fn call(&self, env: &LEnv, args: &im::Vector<LValue>) -> LResult {
+        (self.fun)(env, args)
     }
 
     pub fn get_label(&self) -> &str {
@@ -36,7 +36,7 @@ impl Debug for LFn {
 }
 
 pub type DynFut<'a> = ::std::pin::Pin<Box<dyn 'a + Send + ::std::future::Future<Output = LResult>>>;
-pub type AsyncNativeFn = for<'a> fn(&'a im::Vector<LValue>, &'a LEnv) -> DynFut<'a>;
+pub type AsyncNativeFn = for<'a> fn(&'a LEnv, &'a im::Vector<LValue>) -> DynFut<'a>;
 
 #[derive(Clone)]
 pub struct LAsyncFn {
@@ -51,8 +51,8 @@ impl LAsyncFn {
             debug: Arc::new(label),
         }
     }
-    pub fn call<'a>(&'a self, args: &'a im::Vector<LValue>, env: &'a LEnv) -> DynFut<'a> {
-        (self.fun)(args, env)
+    pub fn call<'a>(&'a self, env: &'a LEnv, args: &'a im::Vector<LValue>) -> DynFut<'a> {
+        (self.fun)(env, args)
     }
 
     pub fn get_label(&self) -> &str {

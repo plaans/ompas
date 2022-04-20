@@ -1,5 +1,4 @@
-use crate::lerror::LError;
-use crate::lerror::LError::SpecialError;
+use crate::lerror::LRuntimeError;
 use serde::*;
 use sompas_language::{
     ASYNC, AWAIT, BEGIN, DEFINE, DEF_MACRO, DO, EVAL, EXPAND, IF, LAMBDA, PARSE, QUASI_QUOTE,
@@ -65,7 +64,7 @@ impl Display for LCoreOperator {
 }
 
 impl TryFrom<&str> for LCoreOperator {
-    type Error = LError;
+    type Error = LRuntimeError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
@@ -83,7 +82,7 @@ impl TryFrom<&str> for LCoreOperator {
             PARSE => Ok(LCoreOperator::Parse),
             EXPAND => Ok(LCoreOperator::Expand),
             DO => Ok(LCoreOperator::Do),
-            _ => Err(SpecialError(
+            _ => Err(LRuntimeError::new(
                 "LCoreOperator::TryFrom<str>",
                 "string does not correspond to core operator".to_string(),
             )),

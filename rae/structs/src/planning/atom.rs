@@ -1,9 +1,9 @@
 use crate::planning::symbol_table::SymTable;
 use crate::planning::traits::FormatWithSymTable;
-use sompas_structs::lerror::LError;
-use sompas_structs::lerror::LError::ConversionError;
+use sompas_structs::lerror::LRuntimeError;
+use sompas_structs::lerror::LRuntimeError::ConversionError;
 use sompas_structs::lnumber::LNumber;
-use sompas_structs::typelvalue::TypeLValue;
+use sompas_structs::typelvalue::KindLValue;
 use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
 
@@ -34,7 +34,7 @@ impl Display for Atom {
 }*/
 
 impl TryFrom<&Atom> for Sym {
-    type Error = LError;
+    type Error = LRuntimeError;
 
     fn try_from(value: &Atom) -> Result<Self, Self::Error> {
         if let Atom::Sym(s) = value {
@@ -42,13 +42,13 @@ impl TryFrom<&Atom> for Sym {
         } else {
             Err(ConversionError(
                 "Sym::TryFrom<Atom>",
-                TypeLValue::Other(match value {
+                KindLValue::Other(match value {
                     Atom::Bool(_) => "Atom::Bool".to_string(),
                     Atom::Number(_) => "Atom::Number".to_string(),
                     Atom::Sym(_) => "Atom::Sym".to_string(),
                     //Atom::Type(_) => "Atom::Type".to_string(),
                 }),
-                TypeLValue::Other("Atom::Sym".to_string()),
+                KindLValue::Other("Atom::Sym".to_string()),
             ))
         }
     }

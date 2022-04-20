@@ -1,13 +1,13 @@
 use crate::contextcollection::{Context, ContextCollection};
 use crate::documentation::{Documentation, LHelp};
 use crate::function::LFn;
-use crate::lerror::LResult;
+use crate::lerror::{LResult, LRuntimeError};
 use crate::llambda::LLambda;
 use crate::lvalue::{LValue, Sym};
 use crate::module::{InitLisp, IntoModule};
 use crate::purefonction::PureFonctionCollection;
 use crate::typelvalue::KindLValue;
-use crate::{lerror, lfn, lfn_extended, string};
+use crate::{lerror, lfn_extended, string};
 use im::HashSet;
 use macro_rules_attribute::macro_rules_attribute;
 use sompas_language::*;
@@ -260,7 +260,7 @@ impl PartialEq for LEnv {
 }
 
 /// Returns a list of all the keys present in the environment
-lfn! { env_get_keys(_,env) {
+/*lfn! { env_get_keys(_,env) {
     Ok(env
         .keys()
         .iter()
@@ -268,6 +268,15 @@ lfn! { env_get_keys(_,env) {
         .collect::<Vec<LValue>>()
         .into())
 }
+}*/
+
+#[macro_rules_attribute(lfn_extended!)]
+pub fn env_get_keys(env: &LEnv) -> im::Vector<LValue> {
+    env.keys()
+        .iter()
+        .map(|x| LValue::from(x.clone()))
+        .collect::<im::Vector<LValue>>()
+        .into()
 }
 
 #[macro_rules_attribute(lfn_extended!)]
@@ -289,11 +298,11 @@ pub fn env_get_macros(env: &LEnv) -> im::Vector<LValue> {
     }*/
 
 #[macro_rules_attribute(lfn_extended!)]
-pub fn env_get_macro(env: &LEnv, m: Sym) -> LResult {
-    Ok(match env.get_macro(&m).cloned() {
+pub fn env_get_macro(env: &LEnv, m: Sym) -> LValue {
+    match env.get_macro(&m).cloned() {
         Some(l) => l.into(),
         None => LValue::Nil,
-    })
+    }
 }
 
 /*lfn! { env_get_macro(args, env) {
@@ -325,7 +334,7 @@ pub fn env_get_macro(env: &LEnv, m: Sym) -> LResult {
 /// Takes 0 or 1 parameter.
 /// 0 parameter: gives the list of all the functions
 /// 1 parameter: write the help of
-lfn! {
+/*lfn! {
     pub help(args,env) {
     let documentation: Documentation = env.get_documentation();
 
@@ -335,14 +344,45 @@ lfn! {
             LValue::Fn(fun) => Ok(string!(documentation.get(fun.get_label()))),
             LValue::Symbol(s) => Ok(string!(documentation.get(s))),
             LValue::CoreOperator(co) => Ok(string!(documentation.get(&co.to_string()))),
-            lv => Err(WrongType(HELP, lv.clone(), lv.into(), KindLValue::Symbol)),
+            lv => Err(wrong_type!(HELP, &lv, KindLValue::Symbol)),
         },
-        _ => Err(WrongNumberOfArgument(HELP, args.into(), args.len(), 0..1)),
+        _ => Err(LRuntimeError::wrong_number_of_arguments(HELP, args, 0..1)),
     }
 }
+}*/
+
+pub fn help(env: &LEnv, args: &im::Vector<LValue>) -> LResult {
+    let documentation: Documentation = env.get_documentation();
+
+    match args.len() {
+        0 => Ok(documentation.get_all().into()),
+        1 => match &args[0] {
+            LValue::Fn(fun) => Ok(string!(documentation.get(fun.get_label()))),
+            LValue::Symbol(s) => Ok(string!(documentation.get(s))),
+            LValue::CoreOperator(co) => Ok(string!(documentation.get(&co.to_string()))),
+            lv => Err(LRuntimeError::wrong_type(HELP, &lv, KindLValue::Symbol)),
+        },
+        _ => Err(LRuntimeError::wrong_number_of_args(HELP, args, 0..1)),
+    }
 }
 
-lfn! {pub get_list_modules(_,env) {
+#[macro_rules_attribute(lfn_extended!)]
+pub fn get_list_modules(env: &LEnv) -> LValue {
+    let list = env.ctxs.get_list_modules();
+    let mut str = '{'.to_string();
+    for (i, s) in list.iter().enumerate() {
+        if i != 0 {
+            str.push(',')
+        }
+        str.push_str(s)
+    }
+
+    str.push(')');
+
+    string!(str)
+}
+
+/*lfn! {pub get_list_modules(_,env) {
     let list = env.ctxs.get_list_modules();
     let mut str = '{'.to_string();
     for (i, s) in list.iter().enumerate() {
@@ -356,4 +396,4 @@ lfn! {pub get_list_modules(_,env) {
 
     Ok(string!(str))
 }
-    }
+    }*/

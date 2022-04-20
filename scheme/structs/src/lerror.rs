@@ -1,12 +1,9 @@
-use std::backtrace::Backtrace;
 use std::collections::VecDeque;
 //use aries_model::lang::ConversionError;
 use crate::lvalue::LValue;
 use crate::typelvalue::KindLValue;
-use anyhow::anyhow;
-use im::Vector;
 use std::error::Error;
-use std::fmt::{format, Display, Formatter};
+use std::fmt::{Display, Formatter};
 use std::ops::Range;
 
 /// Error struct for Scheme
@@ -72,11 +69,11 @@ impl LRuntimeError {
         lv: &im::Vector<LValue>,
         expected: Range<usize>,
     ) -> Self {
-        let r: String = if r.is_empty() {
+        let r: String = if expected.is_empty() {
             format!("expected {}", expected.start)
-        } else if r.end == usize::MAX {
+        } else if expected.end == usize::MAX {
             format!("expected at least {}", expected.start)
-        } else if r.start == usize::MIN {
+        } else if expected.start == usize::MIN {
             format!("expected at most {}", expected.end)
         } else {
             format!("expected between {} and {}", expected.start, expected.end)
@@ -104,6 +101,30 @@ impl LRuntimeError {
                 lv,
                 lv.get_kind(),
                 t
+            ),
+        }
+    }
+
+    pub fn conversion_error(context: &'static str, lv: &LValue, kind: KindLValue) -> Self {
+        Self {
+            backtrace: [context].into(),
+            message: format!(
+                "Cannot convert {} of type {} into {}",
+                lv,
+                lv.get_kind(),
+                kind
+            ),
+        }
+    }
+
+    pub fn extended_conversion_error<A: Display, B>(context: &'static str, lv: &A) -> Self {
+        Self {
+            backtrace: [context].into(),
+            message: format!(
+                "Cannot convert {} of type {} into {}",
+                lv,
+                std::any::type_name::<A>(),
+                std::any::type_name::<B>()
             ),
         }
     }
@@ -174,7 +195,7 @@ impl Display for LRuntimeError {
 impl From<anyhow::Error> for LRuntimeError {
     fn from(a: anyhow::Error) -> Self {
         Self {
-            backtrace: [""].into(),
+            backtrace: ["anyhow"].into(),
             message: a.to_string(),
         }
     }
@@ -182,10 +203,18 @@ impl From<anyhow::Error> for LRuntimeError {
 
 impl From<std::io::Error> for LRuntimeError {
     fn from(e: std::io::Error) -> Self {
-        Anyhow("std::io::Error", e.to_string())
+        Self {
+            backtrace: ["std::io::Error"].into(),
+            message: e.to_string(),
+        }
     }
 }
 
-pub type LResult = std::Result<LValue, LRuntimeError>;
+impl From<LValue> for LResult {
+    fn from(lv: LValue) -> Self {
+        Ok(lv)
+    }
+}
+pub type LResult = std::result::Result<LValue, LRuntimeError>;
 
 pub type Result<T> = std::result::Result<T, LRuntimeError>;

@@ -1,7 +1,8 @@
 use crate::lenv::{LEnv, LEnvSymbols};
 use crate::lerror::LRuntimeError;
-
 use crate::lvalue::LValue;
+use crate::{lerror, wrong_n_args};
+use function_name::named;
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 
@@ -46,7 +47,12 @@ impl LLambda {
     }
 
     /// Returns a new env containing the environment of the lambda and the current environment in which the lambda is called.
-    pub fn get_new_env(&self, args: &[LValue], mut env: LEnv) -> Result<LEnv, LRuntimeError> {
+    #[named]
+    pub fn get_new_env(
+        &self,
+        args: &im::Vector<LValue>,
+        mut env: LEnv,
+    ) -> Result<LEnv, LRuntimeError> {
         env.set_new_top_symbols(self.env.clone());
 
         match &self.params {
@@ -63,18 +69,9 @@ impl LLambda {
             }
             LambdaArgs::List(params) => {
                 if params.len() != args.len() {
-                    return Err(Anyhow(
-                        "get_new_env",
-                        format!(
-                            "in lambda {}: ",
-                            WrongNumberOfArgument(
-                                "get_new_env",
-                                args.into(),
-                                args.len(),
-                                params.len()..params.len(),
-                            )
-                        ),
-                    ));
+                    let mut err = wrong_n_args!("lambda", args, params.len());
+                    err.chain(function_name!());
+                    return Err(err);
                 }
                 for (param, arg) in params.iter().zip(args) {
                     env.insert(param.to_string(), arg.clone());
@@ -82,10 +79,7 @@ impl LLambda {
             }
             LambdaArgs::Nil => {
                 if !args.is_empty() {
-                    return Err(Anyhow(
-                        "Lambda.get_env",
-                        "Lambda was expecting no args.".to_string(),
-                    ));
+                    return Err(lerror!("lambda was expecting no args."));
                 }
             }
         };

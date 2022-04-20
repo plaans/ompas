@@ -3,7 +3,6 @@ pub mod error;
 pub mod list;
 pub mod map;
 pub mod predicate;
-
 use basic_math::*;
 use error::*;
 use list::*;
@@ -14,7 +13,6 @@ use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::{Documentation, LHelp};
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lerror::LResult;
-use sompas_structs::lerror::LRuntimeError::*;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;

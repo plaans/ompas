@@ -3,9 +3,6 @@ use anyhow::anyhow;
 use sompas_structs::lcoreoperator::LCoreOperator;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lerror;
-use sompas_structs::lerror::LRuntimeError::{
-    Anyhow, NotInListOfExpectedTypes, WrongNumberOfArgument, WrongType,
-};
 use sompas_structs::llambda::{LLambda, LambdaArgs};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::typelvalue::KindLValue;

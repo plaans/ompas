@@ -1,15 +1,16 @@
 use anyhow::anyhow;
+use function_name;
 use im::{vector, Vector};
+use macro_rules_attribute::macro_rules_attribute;
 use sompas_language::*;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lerror::LResult;
-use sompas_structs::lerror::LRuntimeError::*;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::typelvalue::KindLValue;
-use sompas_structs::{check_number_of_arguments, lfn, lfn_extended, list};
+use sompas_structs::{check_number_of_args, lfn, lfn_extended, list, wrong_type};
 /// Returns a list
-lfn! {
+/*lfn! {
 pub list(args, _){
     if args.is_empty() {
         Ok(LValue::Nil)
@@ -17,10 +18,19 @@ pub list(args, _){
         Ok(args.into())
     }
 }
+}*/
+
+#[macro_rules_attribute(lfn_extended!)]
+pub fn list(args: Vector<LValue>) -> LValue {
+    if args.is_empty() {
+        LValue::Nil
+    } else {
+        args.into()
+    }
 }
 
 ///It takes two arguments, an element and a list and returns a list with the element inserted at the first place.
-lfn! {pub cons(args, _){
+/*lfn! {pub cons(args, _){
     if args.len() != 2 {
         return Err(WrongNumberOfArgument(CONS, args.into(), args.len(), 2..2));
     }
@@ -36,18 +46,18 @@ lfn! {pub cons(args, _){
         _ => Ok(vec![first.clone(), second.clone()].into()),
     }
 }
-    }
+    }*/
 
 #[macro_rules_attribute(lfn_extended!)]
-pub fn cons(a: LValue, b: LValue) -> LResult {
+pub fn cons(a: LValue, b: LValue) -> Vector<LValue> {
     match b {
         LValue::List(list) => {
             let mut new_list = vector![a.clone()];
             new_list.append(list.clone());
-            Ok(new_list.into())
+            new_list
         }
-        LValue::Nil => Ok(list![a.clone()]),
-        _ => Ok(list![a.clone(), b.clone()]),
+        LValue::Nil => vector![a.clone()],
+        _ => vector![a.clone(), b.clone()],
     }
 }
 
@@ -62,7 +72,7 @@ lfn! {pub first(args, _){
                 }
             }
             LValue::Nil => Ok(LValue::Nil),
-            lv => Err(WrongType(FIRST, lv.clone(), lv.into(), KindLValue::List)),
+            lv => Err(wrong_type!(FIRST, lv, KindLValue::List)),
         },
         _ => Err(WrongNumberOfArgument(FIRST, args.into(), args.len(), 1..1)),
     }
@@ -80,7 +90,7 @@ lfn! {pub second(args, _){
                 }
             }
             LValue::Nil => Ok(LValue::Nil),
-            lv => Err(WrongType(SECOND, lv.clone(), lv.into(), KindLValue::List)),
+            lv => Err(wrong_type!(SECOND,lv,KindLValue::List)),
         },
         _ => Err(WrongNumberOfArgument(SECOND, args.into(), args.len(), 1..1)),
     }
@@ -98,7 +108,7 @@ lfn! {pub third(args, _){
                 }
             }
             LValue::Nil => Ok(LValue::Nil),
-            lv => Err(WrongType(THIRD, lv.clone(), lv.into(), KindLValue::List)),
+            lv => Err(wrong_type!(THIRD, lv, KindLValue::List)),
         },
         _ => Err(WrongNumberOfArgument(THIRD, args.into(), args.len(), 1..1)),
     }
@@ -117,7 +127,7 @@ lfn! {pub car(args, _){
                 }
             }
             LValue::Nil => Ok(LValue::Nil),
-            lv => Err(WrongType(CAR, lv.clone(), lv.into(), KindLValue::List)),
+            lv => Err(wrong_type!(CAR, lv, KindLValue::List)),
         },
         _ => Err(WrongNumberOfArgument(CAR, args.into(), args.len(), 1..1)),
     }
@@ -140,7 +150,7 @@ lfn! {pub cdr(args, _){
                 }
             }
             LValue::Nil => Ok(LValue::Nil),
-            lv => Err(WrongType(CDR, lv.clone(), lv.into(), KindLValue::List)),
+            lv => Err(wrong_type!(CDR, lv, KindLValue::List)),
         }
     } else {
         Err(WrongNumberOfArgument(CDR, args.into(), args.len(), 1..1))
@@ -164,7 +174,7 @@ lfn! {pub rest(args, _){
                 }
             }
             LValue::Nil => Ok(LValue::Nil),
-            lv => Err(WrongType(REST, lv.clone(), lv.into(), KindLValue::List)),
+            lv => Err(wrong_type!(REST, lv, KindLValue::List)),
         }
     } else {
         Err(WrongNumberOfArgument(REST, args.into(), args.len(), 1..1))
@@ -204,7 +214,7 @@ lfn! {pub last(args, _){
                     Ok(LValue::Nil)
                 }
             }
-            lv => Err(WrongType(LAST, lv.clone(), lv.into(), KindLValue::List)),
+            lv => Err(wrong_type!(LAST, lv, KindLValue::List)),
         }
     } else {
         Err(WrongNumberOfArgument(LAST, args.into(), args.len(), 1..1))
@@ -229,7 +239,7 @@ lfn! {pub member(args, _){
             }
             Ok(LValue::Nil)
         }
-        lv => Err(WrongType(MEMBER, lv.clone(), lv.into(), KindLValue::List)),
+        lv => Err(wrong_type!(MEMBER, lv, KindLValue::List)),
     }
 }
     }
@@ -326,7 +336,7 @@ lfn! {pub reverse(args, _){
                 }
                 Ok(new_list.into())
             }
-            lv => Err(WrongType(REVERSE, lv.clone(), lv.into(), KindLValue::List)),
+            lv => Err(wrong_type!(REVERSE, lv, KindLValue::List)),
         }
     } else {
         Err(WrongNumberOfArgument(

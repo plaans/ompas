@@ -2,7 +2,6 @@ use im::HashMap;
 use sompas_language::*;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lerror::LResult;
-use sompas_structs::lerror::LRuntimeError::*;
 use sompas_structs::lfn;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::typelvalue::KindLValue;

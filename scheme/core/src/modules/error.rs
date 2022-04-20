@@ -1,41 +1,32 @@
-use sompas_language::*;
-use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror::LResult;
-use sompas_structs::lerror::LRuntimeError::*;
-use sompas_structs::lfn;
+use function_name;
+use macro_rules_attribute::macro_rules_attribute;
+use sompas_structs::lfn_extended;
 use sompas_structs::lvalue::LValue;
-use sompas_structs::typelvalue::KindLValue;
 use std::sync::Arc;
 
-lfn! {pub check(args, _){
-    if args.len() != 1 {
-        return Err(WrongNumberOfArgument(CHECK, args.into(), args.len(), 1..1));
+#[macro_rules_attribute(lfn_extended!)]
+pub fn check(b: bool) -> LValue {
+    match b {
+        true => LValue::True,
+        false => LValue::Err(Arc::new(LValue::Nil)),
     }
-    match &args[0] {
-        LValue::True => Ok(LValue::True),
-        LValue::Nil => Ok(LValue::Err(Arc::new(LValue::Nil))),
-        _ => Err(WrongType(
-            CHECK,
-            args[0].clone(),
-            (&args[0]).into(),
-            KindLValue::Bool,
-        )),
-    }
-}}
+}
 
-lfn! {pub err(args, _){
+#[macro_rules_attribute(lfn_extended!)]
+pub fn err(e: LValue) -> LValue {
+    LValue::Err(Arc::new(e))
+}
+
+/*lfn! {pub err(args, _){
     if args.len() != 1 {
         return Err(WrongNumberOfArgument(ERR, args.into(), args.len(), 1..1));
     }
     Ok(LValue::Err(Arc::new(args[0].clone())))
-}}
-
-lfn! {pub is_err(args, _){
-    if args.len() != 1 {
-        return Err(WrongNumberOfArgument(IS_ERR, args.into(), args.len(), 1..1));
-    }
-    Ok(matches!(args[0], LValue::Err(_)).into())
-}}
+}}*/
+#[macro_rules_attribute(lfn_extended!)]
+pub fn is_err(lv: LValue) -> bool {
+    matches!(lv, LValue::Err(_))
+}
 
 #[cfg(test)]
 mod tests {
@@ -46,7 +37,7 @@ mod tests {
     pub fn test_err() -> lerror::Result<()> {
         let env = LEnv::default();
         let lv = 5.into();
-        let result = err(&[lv], &env)?;
+        let result = err(&env, &[lv].into())?;
 
         assert_eq!(LValue::Err(Arc::new(5.into())), result);
         Ok(())

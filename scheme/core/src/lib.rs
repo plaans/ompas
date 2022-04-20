@@ -8,14 +8,13 @@ use sompas_structs::lcoreoperator::LCoreOperator;
 use sompas_structs::lcoreoperator::LCoreOperator::Quote;
 use sompas_structs::lenv::{ImportType, LEnv};
 use sompas_structs::lerror::LResult;
-use sompas_structs::lerror::LRuntimeError::{
-    NotInListOfExpectedTypes, WrongNumberOfArgument, WrongType,
-};
+
 use sompas_structs::lfuture::FutureResult;
 use sompas_structs::llambda::{LLambda, LambdaArgs};
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::typelvalue::KindLValue;
+use sompas_structs::{string, symbol};
 use std::convert::TryFrom;
 use std::convert::TryInto;
 use std::sync::atomic::AtomicBool;
@@ -103,9 +102,9 @@ pub fn parse_into_lvalue(se: &SExpr) -> LValue {
                         }
                         s => {
                             if s.starts_with('\"') && s.ends_with('\"') {
-                                LValue::String(s[1..s.len() - 1].to_string())
+                                string!(s[1..s.len() - 1].to_string())
                             } else {
-                                LValue::Symbol(s.to_string())
+                                symbol!(s.to_string())
                             }
                         }
                     },

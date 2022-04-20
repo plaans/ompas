@@ -303,6 +303,24 @@ impl TryFrom<&LValue> for im::HashMap<LValue, LValue> {
     }
 }
 
+impl TryFrom<&LValue> for &LValue {
+    type Error = LRuntimeError;
+
+    #[function_name::named]
+    fn try_from(value: &LValue) -> Result<Self, Self::Error> {
+        Ok(value)
+    }
+}
+
+impl TryFrom<LValue> for LValue {
+    type Error = LRuntimeError;
+
+    #[function_name::named]
+    fn try_from(value: LValue) -> Result<Self, Self::Error> {
+        Ok(value.clone())
+    }
+}
+
 impl TryFrom<LValue> for im::HashMap<LValue, LValue> {
     type Error = LRuntimeError;
 
@@ -423,6 +441,8 @@ impl TryFrom<&LValue> for bool {
         }
     }
 }
+
+//impl TryFrom<&LValue> for LValue {}
 
 impl TryFrom<LValue> for bool {
     type Error = LRuntimeError;
@@ -693,6 +713,12 @@ impl From<&[LValue]> for LValue {
         } else {
             LValue::List(lv.into())
         }
+    }
+}
+
+impl From<&LValue> for LValue {
+    fn from(lv: &LValue) -> Self {
+        lv.clone()
     }
 }
 

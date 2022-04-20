@@ -3,8 +3,6 @@ name = "sompas-structs"
 version = "0.1.0"
 edition = "2021"
 
-[lib]
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
 sompas-language = {path = "../language"}
@@ -16,3 +14,4 @@ anyhow = "1.0.56"
 num-traits = "0.2.14"
 macro_rules_attribute = "0.0.2"
 function_name = "0.2.0"
+syn = "1.0"

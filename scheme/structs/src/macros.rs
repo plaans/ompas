@@ -1,3 +1,9 @@
+use crate::lvalue::LValue;
+use im::Vector;
+use macro_rules_attribute::macro_rules_attribute;
+extern crate proc_macro;
+use proc_macro::TokenStream;
+
 #[macro_export]
 macro_rules! dyn_async {(
     $( #[$attr:meta] )* // includes doc strings
@@ -30,14 +36,14 @@ macro_rules! symbol {
 #[macro_export]
 macro_rules! err {
     ($x:expr) => {
-        LValue::Err(std::sync::Arc::new($x))
+        LValue::Err(std::sync::Arc::new($x.to_string()))
     };
 }
 
 #[macro_export]
 macro_rules! string {
     ($x:expr) => {
-        LValue::String(std::sync::Arc::new($x))
+        LValue::String(std::sync::Arc::new($x.to_string()))
     };
 }
 
@@ -51,7 +57,7 @@ macro_rules! list {
 #[macro_export]
 macro_rules! lfn {
     ($vi:vis $fname:ident($arg:ident, $env:ident){$($body:tt)*}) => {
-        $vi fn $fname($arg: &im::Vector<$crate::lvalue::LValue>, $env: &$crate::lenv::LEnv) -> $crate::lerror::LResult {
+        $vi fn $fname($env: &$crate::lenv::LEnv, $arg: &im::Vector<$crate::lvalue::LValue>) -> $crate::lerror::LResult {
             $($body)*
         }
     };
@@ -69,18 +75,6 @@ macro_rules! lfn {
     };
 }
 
-/*
-Template of a function
-pub fn <name>(p1: usize, p2: usize) -> anyhow::Result<O> {
-    <body>
-} =>
-pub fn <name>(args: &im::Vector<LValue>, env: &LEnv) -> <0> {
-    if length != 2 {
-        Err()
-    }
-    let p1 = usize::try_from(args[0]
-}
-*/
 #[macro_export]
 macro_rules! count {
     () => (0usize);
@@ -89,18 +83,17 @@ macro_rules! count {
 
 #[macro_export]
 macro_rules! transform_arg {
-    () => {};
-    ($id:ident, $count:literal, $arg:tt, $t:ty) => {
+    ($id:ident $count:literal $arg:ident $t:tt) => {
         let $arg: $t = <$t>::try_from(&$id[$count])?;
     };
 }
 #[macro_export]
 macro_rules! check_args {
     ($count:literal $id:ident) => {};
-    ($count:literal $id:ident $arg1:tt $t:tt $($args:tt)*) => {
-        $crate::transform_arg!($id,$count,$arg1,$t);
+    ($count:literal $id:ident $arg1:ident $t1:tt $(, $arg:ident $t:tt)*) => {
+        $crate::transform_arg!($id $count $arg1 $t1);
         //let $arg1: $t1 = <$t1>::try_from(&args[0])?;
-        $crate::check_args!($count $id $($args)*);
+        $crate::check_args!($count $id $($arg $t),*);
     };
 }
 #[macro_export]
@@ -124,7 +117,7 @@ macro_rules! lfn_extended {
 (
     $( #[$attr:meta] )* // includes doc strings
     $pub:vis
-    fn $fname:ident($env:ident : &LEnv $(,$($arg:tt : $t:tt),*)*) $(-> $Ret:ty)?
+    fn $fname:ident($env:ident : &LEnv $(, $arg:ident : $t:ty)*)  $(-> $Ret:ty)?
     {
         $($body:tt)*
     }
@@ -133,10 +126,46 @@ macro_rules! lfn_extended {
     #[allow(unused_parens)]
     #[function_name::named]
     $pub
-    fn $fname($env: &LEnv, args : &im::Vector<LValue>) -> $crate::lerror::LResult
+    fn $fname($env: &crate::lenv::LEnv, args : &im::Vector<LValue>) -> $crate::lerror::LResult
     {
-        $crate::check_number_of_args!(args, $crate::count!($($($arg)*)*));
-        $crate::check_args!(0 args $($($arg $t)*)*);
+        $crate::check_number_of_args!(args, $crate::count!($($arg)*));
+        $crate::check_args!(0 args $($arg $t),*);
+        let result: $($Ret)? = {|| {
+            $($body)*
+        }}();
+        $crate::fn_result!(result $($Ret)?)
+    }
+);
+/*    (
+    $( #[$attr:meta] )* // includes doc strings
+    $pub:vis
+    fn $fname:ident($($arg:ident : $t:ty),*) $(-> $Ret:ty)?
+    {
+        $($body:tt)*
+    }
+) => (
+        lfn_extended!{
+            $( #[$attr] )* // includes doc strings
+    $pub
+    fn $fname(__env__: &LEnv $(,$arg : $t)*) $(-> $Ret)?
+    {
+        $($body)*
+    }}
+);*/
+    (
+    $( #[$attr:meta] )* // includes doc strings
+    $pub:vis
+    fn $fname:ident($env:ident : &LEnv, $arg:ident : &Vector<LValue>) $(-> $Ret:ty)?
+    {
+        $($body:tt)*
+    }
+) => ($( #[$attr] )* // includes doc strings
+    $( #[$attr] )*
+    #[allow(unused_parens)]
+    #[function_name::named]
+    $pub
+    fn $fname($env: &crate::lenv::LEnv, $arg : &im::Vector<LValue>) -> $crate::lerror::LResult
+    {
         let result: $($Ret)? = {|| {
             $($body)*
         }}();
@@ -146,26 +175,18 @@ macro_rules! lfn_extended {
     (
     $( #[$attr:meta] )* // includes doc strings
     $pub:vis
-    fn $fname:ident($($arg:tt : $t:tt),* ) $(-> $Ret:ty)?
+    fn $fname:ident($arg:ident: &Vector<LValue>) $(-> $Ret:ty)?
     {
         $($body:tt)*
     }
 ) => (
-    $( #[$attr] )*
-    #[allow(unused_parens)]
-    #[function_name::named]
+        lfn_extended!{
+            $( #[$attr] )* // includes doc strings
     $pub
-    fn $fname(__env__: &$crate::lenv::LEnv, args : &im::Vector<$crate::lvalue::LValue>) -> $crate::lerror::LResult
+    fn $fname(__env__: &LEnv, $arg: &Vector<LValue>) $(-> $Ret)?
     {
-
-        let body = || {
-            $crate::check_number_of_args!(args, $crate::count!($($($arg)*)*));
-            $crate::check_args!(0 args $($($arg $t)*)*);
-            $($body)*
-        };
-        let result: $($Ret)? = body();
-        $crate::fn_result!(result $($Ret)?)
-    }
+        $($body)*
+    }}
 );
 }
 
@@ -230,4 +251,9 @@ macro_rules! wrong_type {
     ($lv:expr,$expected:expr) => {
         wrong_type!(function_name!(), $lv, $expected)
     };
+}
+
+#[test]
+pub fn test() -> LValue {
+    LValue::Nil
 }

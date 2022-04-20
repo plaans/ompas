@@ -1,114 +1,87 @@
+use im::Vector;
+use macro_rules_attribute::macro_rules_attribute;
 use sompas_language::*;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lerror::LResult;
-use sompas_structs::lerror::LRuntimeError::WrongNumberOfArgument;
-use sompas_structs::lfn;
+use sompas_structs::lfn_extended;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lvalue::LValue;
+use std::ops::Not;
 
 /// Logical functional not
 /// true => nil
 /// nil => true
-lfn! {pub not(args, _){
-    if args.len() != 1 {
-        return Err(WrongNumberOfArgument(NOT, args.into(), args.len(), 1..1));
-    }
-
-    match &args[0] {
-        LValue::Nil => Ok(LValue::True),
-        _ => Ok(LValue::Nil),
-    }
+#[macro_rules_attribute(lfn_extended!)]
+pub fn not(b: bool) -> bool {
+    b.not()
 }
-    }
 
-lfn! {pub neq(args, _){
-    match args.len() {
-        2 => Ok((args[0] != args[1]).into()),
-        i => Err(WrongNumberOfArgument(EQ, args.into(), i, 2..2)),
-    }
+#[macro_rules_attribute(lfn_extended!)]
+pub fn neq(a: LValue, b: LValue) -> bool {
+    a != b
 }
-    }
 
-lfn! {pub add(args, _){
-    let mut result = LValue::Number(LNumber::Float(0.0));
-    for value in args {
-        result = (&result + value)?;
+#[macro_rules_attribute(lfn_extended!)]
+pub fn add(args: Vector<LNumber>) -> LNumber {
+    let mut result = LNumber::Float(0.0);
+    for value in &args {
+        result = &result + value;
     }
-    Ok(result)
+    result
 }
-    }
 
 /// Substract function. Only takes two args.
 /// # Example
 /// ``` lisp
 /// (- 10 2) => 8
-lfn! {pub sub(args, _){
-    match args.len() {
-        2 => &args[0] - &args[1],
-        i => Err(WrongNumberOfArgument(SUB, args.into(), i, 2..2)),
-    }
+#[macro_rules_attribute(lfn_extended!)]
+pub fn sub(a: LNumber, b: LNumber) -> LNumber {
+    a - b
 }
-    }
 
-lfn! {pub mul(args, _){
-    let mut result = LValue::Number(LNumber::Float(1.0));
+#[macro_rules_attribute(lfn_extended!)]
+pub fn mul(args: &Vector<LNumber>) -> LNumber {
+    let mut result = LNumber::Float(1.0);
     for value in args {
-        result = (&result * value)?;
+        result = &result * value;
     }
-    Ok(result)
+    result
 }
-    }
 /// Division function. Only takes two args.
 /// # Example
 /// ``` lisp
 /// (/ 10 2) => 5
-lfn! {pub div(args, _){
-    match args.len() {
-        2 => &args[0] / &args[1],
-        i => Err(WrongNumberOfArgument(DIV, args.into(), i, 2..2)),
-    }
+#[macro_rules_attribute(lfn_extended!)]
+pub fn div(a: LNumber, b: LNumber) -> LNumber {
+    a / b
 }
-    }
 
 /// Compares two values. Returns true if the first arg is greater than the second. Nil Otherwise
-lfn! {pub gt(args, _){
-    match args.len() {
-        2 => Ok((args[0] > args[1]).into()),
-        i => Err(WrongNumberOfArgument(GT, args.into(), i, 2..2)),
-    }
+#[macro_rules_attribute(lfn_extended!)]
+pub fn gt(a: LNumber, b: LNumber) -> bool {
+    a > b
 }
-    }
 /// Compares two values. Returns true if the first arg is less than the second. Nil Otherwise
-lfn! {pub lt(args, _){
-    match args.len() {
-        2 => Ok((args[0] < args[1]).into()),
-        i => Err(WrongNumberOfArgument(LT, args.into(), i, 2..2)),
-    }
+#[macro_rules_attribute(lfn_extended!)]
+pub fn lt(a: LNumber, b: LNumber) -> bool {
+    a < b
 }
-    }
 /// Compares two values. Returns true if the first arg is greater or equal to the second. Nil Otherwise
-lfn! {pub geq(args, _){
-    match args.len() {
-        2 => Ok((args[0] >= args[1]).into()),
-        i => Err(WrongNumberOfArgument(GEQ, args.into(), i, 2..2)),
-    }
+#[macro_rules_attribute(lfn_extended!)]
+pub fn geq(a: LNumber, b: LNumber) -> bool {
+    a >= b
 }
-    }
 /// Compares two values. Returns true if the first arg is less or equal to the second. Nil Otherwise
-lfn! {pub leq(args, _){
-    match args.len() {
-        2 => Ok((args[0] <= args[1]).into()),
-        i => Err(WrongNumberOfArgument(LEQ, args.into(), i, 2..2)),
-    }
-}}
+#[macro_rules_attribute(lfn_extended!)]
+pub fn leq(a: LNumber, b: LNumber) -> bool {
+    a < b
+}
 
 /// Compares two values. Returns true if the first and second args are equal. Nil Otherwise
-lfn! {pub eq(args, _){
-    match args.len() {
-        2 => Ok((args[0] == args[1]).into()),
-        i => Err(WrongNumberOfArgument(EQ, args.into(), i, 2..2)),
-    }
-}}
+#[macro_rules_attribute(lfn_extended!)]
+pub fn eq(a: LNumber, b: LNumber) -> bool {
+    a == b
+}
 
 #[cfg(test)]
 mod tests {

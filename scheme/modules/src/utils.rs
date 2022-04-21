@@ -32,6 +32,7 @@ use sompas_structs::purefonction::PureFonctionCollection;
 use sompas_structs::typelvalue::KindLValue;
 use sompas_utils::dyn_async;
 use std::ops::Deref;
+use sompas_macros::async_scheme_fn;
 //LANGUAGE
 pub const MOD_UTILS: &str = "utils";
 
@@ -320,7 +321,7 @@ impl IntoModule for CtxUtils {
     }
 }
 
-#[macro_rules_attribute(dyn_async!)]
+#[async_scheme_fn]
 pub async fn arbitrary<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     /*pub const LAMBDA_ARBITRARY: &str = "(define arbitrary
     (lambda args
@@ -335,7 +336,7 @@ pub async fn arbitrary<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     //activate_debug();
 
     match args.len() {
-        1 => car(&[args[0].clone()], env),
+        1 => car(env, &[args[0].clone()]),
         2 => {
             eval(
                 &vec![
@@ -356,18 +357,8 @@ pub async fn arbitrary<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     }
 }
 
-#[macro_rules_attribute(dyn_async!)]
-pub async fn enr<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
-    if args.len() != 1 {
-        return Err(WrongNumberOfArgument(
-            EVAL_NON_RECURSIVE,
-            args.into(),
-            args.len(),
-            1..1,
-        ));
-    }
-
-    let mut args: Vec<LValue> = (&args[0]).try_into()?;
+#[async_scheme_fn]
+pub async fn enr<'a>(env: &'a LEnv,mut args: Vec<LValue>) -> LResult {
 
     for (i, arg) in args.iter_mut().enumerate() {
         if i != 0 {

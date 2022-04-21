@@ -1,8 +1,8 @@
 use crate::advanced_math::CtxMath;
 use crate::utils::CtxUtils;
-use ::macro_rules_attribute::macro_rules_attribute;
 use sompas_core::static_eval::{eval_static, expand_static};
 use sompas_core::{eval_init, get_root_env};
+use sompas_macros::async_scheme_fn;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::Documentation;
 use sompas_structs::lenv::{ImportType, LEnv};
@@ -12,7 +12,6 @@ use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-
 /*
 LANGUAGE
  */
@@ -85,25 +84,15 @@ impl IntoModule for CtxStaticEval {
     }
 }
 
-#[macro_rules_attribute(dyn_async!)]
-pub async fn scheme_eval_static<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
-    if args.len() != 1 {
-        return Err(WrongNumberOfArgument(
-            EVAL_STATIC,
-            args.into(),
-            args.len(),
-            1..1,
-        ));
-    }
+#[async_scheme_fn]
+pub async fn scheme_eval_static<'a>(env: &'a LEnv, lv: &LValue) -> LResult {
     let ctx = env.get_context::<CtxStaticEval>(MOD_STATIC_EVAL)?;
 
     let mut env = ctx.get_env().await;
 
-    let result = expand_static(&args[0], true, &mut env)?;
+    let result = expand_static(&lv, true, &mut env)?;
 
     let result = eval_static(result.get_lvalue(), &mut env)?;
-
-    ctx.set_env(env).await;
 
     println!("static evaluation returned: {}", result.get_lvalue());
 

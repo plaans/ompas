@@ -103,9 +103,9 @@ pub fn async_scheme_fn(_: TokenStream, input: TokenStream) -> TokenStream {
             {
         ::std::boxed::Box::pin(async move {
                 #params
-                let #result #output = {||{
+                let #result #output = {|| async move{
                     #body
-                }}();
+                }}().await;
                 #expr_result
             })
             }
@@ -280,16 +280,16 @@ fn build_return(ident: &Ident, expr: &ReturnType) -> TS {
                                 if o != ok && e != err {
                                     quote! {
                                         match #ident {
-                                            Ok(o) => Ok(#ok::from(o)),
-                                            Err(e) => Err(#err::from(e))
+                                            Ok(o) => Ok(sompas_structs::lvalue::LValue::from(o)),
+                                            Err(e) => Err(sompas_structs::lerror::LRuntimeError::from(e))
                                         }
                                     }
                                 } else if o == ok {
                                     //println!("result returns a LValue");
-                                    quote!(#ident.map_err(|e| #err::from(e)))
+                                    quote!(#ident.map_err(|e| sompas_structs::lerror::LRuntimeError::from(e)))
                                 } else if e == err {
                                     //println!("result returns a LRuntimeError");
-                                    quote!(#ident.map(|o| #ok::from(o)))
+                                    quote!(#ident.map(|o| sompas_structs::lvalue::LValue::from(o)))
                                 } else {
                                     quote!(#ident)
                                 }

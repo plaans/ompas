@@ -2,7 +2,7 @@ use sompas_macros::scheme_fn;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::{Documentation, LHelp};
 use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror::LResult;
+use sompas_structs::lerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::{LValue, Sym};
 use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
@@ -123,7 +123,7 @@ impl IntoModule for CtxIo {
 /// Otherwise in the configured file.
 /// If the file is missing, it prints nothing.
 #[scheme_fn]
-pub fn print(env: &LEnv, args: &[LValue]) -> Result<(), std::io::Error> {
+pub fn print(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
     let lv: LValue = match args.len() {
         0 => LValue::Nil,
         1 => args[0].clone(),

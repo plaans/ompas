@@ -1,10 +1,8 @@
-use function_name;
-use macro_rules_attribute::macro_rules_attribute;
-use sompas_structs::lfn_extended;
+use sompas_macros::scheme_fn;
 use sompas_structs::lvalue::LValue;
 use std::sync::Arc;
 
-#[macro_rules_attribute(lfn_extended!)]
+#[scheme_fn]
 pub fn check(b: bool) -> LValue {
     match b {
         true => LValue::True,
@@ -12,7 +10,7 @@ pub fn check(b: bool) -> LValue {
     }
 }
 
-#[macro_rules_attribute(lfn_extended!)]
+#[scheme_fn]
 pub fn err(e: LValue) -> LValue {
     LValue::Err(Arc::new(e))
 }
@@ -23,11 +21,11 @@ pub fn err(e: LValue) -> LValue {
     }
     Ok(LValue::Err(Arc::new(args[0].clone())))
 }}*/
-#[macro_rules_attribute(lfn_extended!)]
+#[scheme_fn]
 pub fn is_err(lv: LValue) -> bool {
     matches!(lv, LValue::Err(_))
 }
-
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -63,3 +61,4 @@ mod tests {
         Ok(())
     }
 }
+*/

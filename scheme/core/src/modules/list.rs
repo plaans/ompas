@@ -1,27 +1,14 @@
-use anyhow::anyhow;
-use function_name;
-use im::{vector, Vector};
-use macro_rules_attribute::macro_rules_attribute;
 use sompas_language::*;
-use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror::LResult;
-use sompas_structs::lnumber::LNumber;
+use sompas_macros::scheme_fn;
+use sompas_structs::lerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::typelvalue::KindLValue;
-use sompas_structs::{check_number_of_args, lfn, lfn_extended, list, wrong_type};
-/// Returns a list
-/*lfn! {
-pub list(args, _){
-    if args.is_empty() {
-        Ok(LValue::Nil)
-    } else {
-        Ok(args.into())
-    }
-}
-}*/
+use sompas_structs::{lerror, wrong_type};
+use std::ops::Deref;
 
-#[macro_rules_attribute(lfn_extended!)]
-pub fn list(args: Vector<LValue>) -> LValue {
+/// Returns a list
+#[scheme_fn]
+pub fn list(args: Vec<LValue>) -> LValue {
     if args.is_empty() {
         LValue::Nil
     } else {
@@ -30,360 +17,216 @@ pub fn list(args: Vector<LValue>) -> LValue {
 }
 
 ///It takes two arguments, an element and a list and returns a list with the element inserted at the first place.
-/*lfn! {pub cons(args, _){
-    if args.len() != 2 {
-        return Err(WrongNumberOfArgument(CONS, args.into(), args.len(), 2..2));
-    }
-    let first = &args[0];
-    let second = &args[1];
-    match second {
-        LValue::List(list) => {
-            let mut new_list = vector![first.clone()];
-            new_list.append(list.clone());
-            Ok(new_list.into())
-        }
-        LValue::Nil => Ok(vec![first.clone()].into()),
-        _ => Ok(vec![first.clone(), second.clone()].into()),
-    }
-}
-    }*/
-
-#[macro_rules_attribute(lfn_extended!)]
-pub fn cons(a: LValue, b: LValue) -> Vector<LValue> {
+#[scheme_fn]
+pub fn cons(a: LValue, b: LValue) -> Vec<LValue> {
     match b {
         LValue::List(list) => {
-            let mut new_list = vector![a.clone()];
-            new_list.append(list.clone());
+            let mut new_list = vec![a.clone()];
+            new_list.append(&mut list.deref().clone());
             new_list
         }
-        LValue::Nil => vector![a.clone()],
-        _ => vector![a.clone(), b.clone()],
+        LValue::Nil => vec![a.clone()],
+        _ => vec![a.clone(), b.clone()],
     }
 }
 
-lfn! {pub first(args, _){
-    match args.len() {
-        1 => match &args[0] {
-            LValue::List(list) => {
-                if !list.is_empty() {
-                    Ok(list.front().unwrap().clone())
-                } else {
-                    Ok(LValue::Nil)
-                }
+#[scheme_fn]
+pub fn first(list: LValue) -> LResult {
+    match &list {
+        LValue::List(list) => {
+            if !list.is_empty() {
+                Ok(list[0].clone())
+            } else {
+                Ok(LValue::Nil)
             }
-            LValue::Nil => Ok(LValue::Nil),
-            lv => Err(wrong_type!(FIRST, lv, KindLValue::List)),
-        },
-        _ => Err(WrongNumberOfArgument(FIRST, args.into(), args.len(), 1..1)),
+        }
+        LValue::Nil => Ok(LValue::Nil),
+        lv => Err(wrong_type!(FIRST, lv, KindLValue::List)),
     }
 }
-    }
 
-lfn! {pub second(args, _){
-    match args.len() {
-        1 => match &args[0] {
-            LValue::List(list) => {
-                if list.len() >= 2 {
-                    Ok(list[1].clone())
-                } else {
-                    Ok(LValue::Nil)
-                }
+#[scheme_fn]
+pub fn second(list: LValue) -> LResult {
+    match &list {
+        LValue::List(list) => {
+            if list.len() >= 2 {
+                Ok(list[1].clone())
+            } else {
+                Ok(LValue::Nil)
             }
-            LValue::Nil => Ok(LValue::Nil),
-            lv => Err(wrong_type!(SECOND,lv,KindLValue::List)),
-        },
-        _ => Err(WrongNumberOfArgument(SECOND, args.into(), args.len(), 1..1)),
+        }
+        LValue::Nil => Ok(LValue::Nil),
+        lv => Err(wrong_type!(SECOND, lv, KindLValue::List)),
     }
 }
-    }
 
-lfn! {pub third(args, _){
-    match args.len() {
-        1 => match &args[0] {
-            LValue::List(list) => {
-                if list.len() >= 3 {
-                    Ok(list[2].clone())
-                } else {
-                    Ok(LValue::Nil)
-                }
+#[scheme_fn]
+pub fn third(list: LValue) -> LResult {
+    match &list {
+        LValue::List(list) => {
+            if list.len() >= 3 {
+                Ok(list[2].clone())
+            } else {
+                Ok(LValue::Nil)
             }
-            LValue::Nil => Ok(LValue::Nil),
-            lv => Err(wrong_type!(THIRD, lv, KindLValue::List)),
-        },
-        _ => Err(WrongNumberOfArgument(THIRD, args.into(), args.len(), 1..1)),
+        }
+        LValue::Nil => Ok(LValue::Nil),
+        lv => Err(wrong_type!(THIRD, lv, KindLValue::List)),
     }
 }
-    }
 
 ///It takes a list as argument, and returns its first element.
-lfn! {pub car(args, _){
-    match args.len() {
-        1 => match &args[0] {
-            LValue::List(list) => {
-                if !list.is_empty() {
-                    Ok(list.front().unwrap().clone())
-                } else {
-                    Ok(LValue::Nil)
-                }
+#[scheme_fn]
+pub fn car(list: LValue) -> LResult {
+    match &list {
+        LValue::List(list) => {
+            if !list.is_empty() {
+                Ok(list[0].clone())
+            } else {
+                Ok(LValue::Nil)
             }
-            LValue::Nil => Ok(LValue::Nil),
-            lv => Err(wrong_type!(CAR, lv, KindLValue::List)),
-        },
-        _ => Err(WrongNumberOfArgument(CAR, args.into(), args.len(), 1..1)),
+        }
+        LValue::Nil => Ok(LValue::Nil),
+        lv => Err(wrong_type!(CAR, lv, KindLValue::List)),
     }
 }
-    }
 
 ///It takes a list as argument, and returns a list without the first element
-lfn! {pub cdr(args, _){
-    if args.len() == 1 {
-        match &args[0] {
-            LValue::List(list) => {
-                if list.len() < 2 {
-                    Ok(LValue::Nil)
-                } else {
-                    //let slice = &list[1..];
-                    //let vec = slice.to_vec();
-                    let mut new_list = list.clone();
-                    new_list.remove(0);
-                    Ok(LValue::List(new_list))
-                }
+#[scheme_fn]
+pub fn cdr(list: LValue) -> Result<Vec<LValue>, LRuntimeError> {
+    match &list {
+        LValue::List(list) => {
+            if list.len() < 2 {
+                Ok(vec![])
+            } else {
+                //let slice = &list[1..];
+                //let vec = slice.to_vec();
+                let mut new_list = list.deref().clone();
+                new_list.remove(0);
+                Ok(new_list)
             }
-            LValue::Nil => Ok(LValue::Nil),
-            lv => Err(wrong_type!(CDR, lv, KindLValue::List)),
         }
-    } else {
-        Err(WrongNumberOfArgument(CDR, args.into(), args.len(), 1..1))
+        LValue::Nil => Ok(vec![]),
+        lv => Err(wrong_type!(CDR, lv, KindLValue::List)),
     }
 }
-    }
 
 ///It takes a list as argument, and returns a list without the first element
-lfn! {pub rest(args, _){
-    if args.len() == 1 {
-        match &args[0] {
-            LValue::List(list) => {
-                if list.len() < 2 {
-                    Ok(LValue::Nil)
-                } else {
-                    //let slice = &list[1..];
-                    //let vec = slice.to_vec();
-                    let mut new_list = list.clone();
-                    new_list.remove(0);
-                    Ok(LValue::List(new_list))
-                }
+#[scheme_fn]
+pub fn rest(list: LValue) -> Result<Vec<LValue>, LRuntimeError> {
+    match &list {
+        LValue::List(list) => {
+            if list.len() < 2 {
+                Ok(vec![])
+            } else {
+                let mut new_list = list.deref().clone();
+                new_list.remove(0);
+                Ok(new_list)
             }
-            LValue::Nil => Ok(LValue::Nil),
-            lv => Err(wrong_type!(REST, lv, KindLValue::List)),
         }
-    } else {
-        Err(WrongNumberOfArgument(REST, args.into(), args.len(), 1..1))
+        LValue::Nil => Ok(vec![]),
+        lv => Err(wrong_type!(REST, lv, KindLValue::List)),
     }
 }
-    }
 
 ///It merges two or more list into one.
-lfn! {pub append(args, _){
-    let mut new_list = vector![];
+#[scheme_fn]
+pub fn append(args: &[LValue]) -> Result<Vec<LValue>, LRuntimeError> {
+    let mut new_list = vec![];
     for element in args {
         match element {
-            LValue::List(list) => new_list.append(list.clone()),
+            LValue::List(list) => new_list.append(&mut list.deref().clone()),
             LValue::Nil => {}
-            _ => {
-                return Err(WrongType(
-                    APPEND,
-                    element.clone(),
-                    element.into(),
-                    KindLValue::List,
-                ))
-            }
+            _ => return Err(wrong_type!(APPEND, element, KindLValue::List)),
         }
     }
     Ok(new_list.into())
 }
-    }
 
 ///It takes a list and returns the last element.
-lfn! {pub last(args, _){
-    if args.len() == 1 {
-        match args.first().unwrap() {
-            LValue::List(list) => {
-                if !list.is_empty() {
-                    Ok(list.last().unwrap().clone())
-                } else {
-                    Ok(LValue::Nil)
-                }
-            }
-            lv => Err(wrong_type!(LAST, lv, KindLValue::List)),
-        }
+#[scheme_fn]
+pub fn last(list: Vec<LValue>) -> LValue {
+    if !list.is_empty() {
+        list.last().unwrap().clone()
     } else {
-        Err(WrongNumberOfArgument(LAST, args.into(), args.len(), 1..1))
+        LValue::Nil
     }
 }
-    }
 
 ///It takes two arguments of which the second must be a list,
 /// if the first argument is a member of the second argument,
 /// and then it returns the remainder of the list beginning with the first argument.
-lfn! {pub member(args, _){
-    if args.len() != 2 {
-        return Err(WrongNumberOfArgument(MEMBER, args.into(), args.len(), 2..2));
-    }
-    let value_to_find = &args[0];
-    match &args[1] {
-        LValue::List(list) => {
-            for (k, element) in list.iter().enumerate() {
-                if element == value_to_find {
-                    return Ok(list.clone().slice(k..).into());
-                }
-            }
-            Ok(LValue::Nil)
+#[scheme_fn]
+pub fn member(val: &LValue, list: Vec<LValue>) -> LValue {
+    for (k, e) in list.iter().enumerate() {
+        if e == val {
+            return list[k..].into();
         }
-        lv => Err(wrong_type!(MEMBER, lv, KindLValue::List)),
     }
+    LValue::Nil
 }
-    }
 
-lfn! {pub get_list(args, _){
-    if args.len() != 2 {
-        return Err(WrongNumberOfArgument(
-            GET_LIST,
-            args.into(),
-            args.len(),
-            2..2,
-        ));
-    }
-
-    if let LValue::List(vec) = &args[0] {
-        if let LValue::Number(LNumber::Int(i)) = &args[1] {
-            if vec.len() > *i as usize {
-                Ok(vec[*i as usize].clone())
-            } else {
-                Err(anyhow!(
-                    "list: {}. {} is out of bound, must be in [{};{}]",
-                    LValue::from(args),
-                    i,
-                    0,
-                    vec.len() - 1
-                )
-                .into())
-            }
-        } else {
-            Err(WrongType(
-                GET_LIST,
-                args[1].clone(),
-                (&args[1]).into(),
-                KindLValue::Int,
-            ))
-        }
+#[scheme_fn]
+pub fn get_list(list: Vec<LValue>, index: i64) -> LResult {
+    if list.len() > index as usize {
+        Ok(list[index as usize].clone())
     } else {
-        Err(WrongType(
+        Err(lerror!(
             GET_LIST,
-            args[0].clone(),
-            (&args[0]).into(),
-            KindLValue::List,
+            format!(
+                "list: {}. {} is out of bound, must be in [{};{}]",
+                LValue::from(&list),
+                index,
+                0,
+                list.len() - 1
+            )
         ))
     }
 }
-    }
 
-lfn! {pub set_list(args, _){
-    if args.len() != 3 {
-        return Err(WrongNumberOfArgument(
-            SET_LIST,
-            args.into(),
-            args.len(),
-            3..3,
-        ));
-    }
-
-    if let LValue::List(vec) = &args[0] {
-        if let LValue::Number(LNumber::Int(i)) = &args[2] {
-            if vec.len() > *i as usize {
-                let mut vec = vec.clone();
-                vec[*i as usize] = args[1].clone();
-                Ok(vec.into())
-            } else {
-                Err(anyhow!("index out of bound, must be in [{};{}]", 0, vec.len() - 1).into())
-            }
-        } else {
-            Err(WrongType(
-                SET_LIST,
-                args[1].clone(),
-                (&args[1]).into(),
-                KindLValue::Int,
-            ))
-        }
+#[scheme_fn]
+pub fn set_list(
+    list: Vec<LValue>,
+    value: LValue,
+    index: i64,
+) -> Result<Vec<LValue>, LRuntimeError> {
+    if list.len() > index as usize {
+        let mut vec = list.clone();
+        vec[index as usize] = value;
+        Ok(vec)
     } else {
-        Err(WrongType(
+        Err(lerror!(
             SET_LIST,
-            args[0].clone(),
-            (&args[0]).into(),
-            KindLValue::List,
+            format!("index out of bound, must be in [{};{}]", 0, list.len() - 1)
         ))
     }
 }
-    }
 
 /// It takes a list and returns a list with the top elements in reverse order.
-lfn! {pub reverse(args, _){
-    if args.len() == 1 {
-        match args.first().unwrap() {
-            LValue::List(list) => {
-                let mut new_list: Vector<LValue> = vector![];
-                for e in list.iter().rev() {
-                    new_list.push_back(e.clone())
-                }
-                Ok(new_list.into())
-            }
-            lv => Err(wrong_type!(REVERSE, lv, KindLValue::List)),
-        }
-    } else {
-        Err(WrongNumberOfArgument(
-            REVERSE,
-            args.into(),
-            args.len(),
-            1..1,
-        ))
+#[scheme_fn]
+pub fn reverse(list: Vec<LValue>) -> Vec<LValue> {
+    let mut new_list: Vec<LValue> = vec![];
+    for e in list.iter().rev() {
+        new_list.push(e.clone())
     }
+    new_list
 }
-    }
 
 /// Returns a list of element present in all lists
-lfn! {pub intersection(args, _){
-    if args.is_empty() {
-        return Ok(LValue::Nil);
-    }
-    let mut intersection = vec![];
-    let mut vec_list = vec![];
-    for e in args {
-        match e {
-            LValue::List(list) => {
-                vec_list.push(list);
-            }
-            LValue::Nil => return Ok(LValue::Nil),
-            _ => {
-                return Err(WrongType(
-                    INTERSECTION,
-                    e.clone(),
-                    e.into(),
-                    KindLValue::List,
-                ))
-            }
-        }
-    }
-
-    for e in vec_list[0] {
+#[scheme_fn]
+pub fn intersection(lists: Vec<Vec<LValue>>) -> Vec<LValue> {
+    let mut intersec = vec![];
+    let first = &lists[0];
+    for e in first {
         let mut in_all = true;
-        for list in &vec_list[1..] {
+        for list in &lists[1..] {
             in_all &= list.contains(e);
         }
 
         if in_all {
-            intersection.push(e.clone())
+            intersec.push(e.clone())
         }
     }
 
-    Ok(intersection.into())
-}
+    intersec
 }

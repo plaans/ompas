@@ -1,16 +1,11 @@
 use crate::contextcollection::{Context, ContextCollection};
-use crate::documentation::{Documentation, LHelp};
-use crate::function::LFn;
-use crate::lerror::{LResult, LRuntimeError};
+use crate::documentation::Documentation;
+use crate::lerror;
 use crate::llambda::LLambda;
-use crate::lvalue::{LValue, Sym};
+use crate::lvalue::LValue;
 use crate::module::{InitLisp, IntoModule};
 use crate::purefonction::PureFonctionCollection;
-use crate::typelvalue::KindLValue;
-use crate::{lerror, lfn_extended, string};
 use im::HashSet;
-use macro_rules_attribute::macro_rules_attribute;
-use sompas_language::*;
 use std::any::Any;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
@@ -72,7 +67,7 @@ impl Display for LEnvSymbols {
 /// - It contains a mapping of <symbol(String), LValue>
 /// - It also contains macros, special LLambdas used to format LValue expressions.
 /// - A LEnv can inherits from an outer environment. It can use symbols from it, but not modify them.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct LEnv {
     symbols: LEnvSymbols,
     macro_table: im::HashMap<String, LLambda>,
@@ -120,56 +115,6 @@ impl LEnv {
 
     pub fn add_context(&mut self, ctx: Context, label: String) {
         self.ctxs.insert(ctx, label);
-    }
-}
-
-impl Default for LEnv {
-    fn default() -> Self {
-        let mut symbols: LEnvSymbols = Default::default();
-        let documentation = vec![
-            LHelp::new_verbose(HELP, DOC_HELP, DOC_HELP_VERBOSE),
-            LHelp::new(DEFINE, DOC_DEFINE),
-            LHelp::new_verbose(LAMBDA, DOC_LAMBDA, DOC_LAMBDA_VEBROSE),
-            LHelp::new(DEF_MACRO, DOC_DEF_MACRO),
-            LHelp::new(IF, DOC_IF),
-            LHelp::new(QUOTE, DOC_QUOTE),
-            LHelp::new(QUASI_QUOTE, QUASI_QUOTE),
-            LHelp::new(UNQUOTE, DOC_UNQUOTE),
-            LHelp::new_verbose(BEGIN, DOC_BEGIN, DOC_BEGIN_VERBOSE),
-            LHelp::new(AWAIT, DOC_AWAIT),
-            LHelp::new(ASYNC, DOC_ASYNC),
-            LHelp::new(EVAL, DOC_EVAL),
-        ]
-        .into();
-
-        symbols.insert(HELP.to_string(), LFn::new(help, HELP.to_string()).into());
-
-        symbols.insert(
-            ENV_GET_LIST_MODULES.to_string(),
-            LFn::new(get_list_modules, ENV_GET_LIST_MODULES.to_string()).into(),
-        );
-
-        symbols.insert(
-            ENV_GET_KEYS.to_string(),
-            LFn::new(env_get_keys, ENV_GET_KEYS.to_string()).into(),
-        );
-        symbols.insert(
-            ENV_GET_MACROS.to_string(),
-            LFn::new(env_get_macros, ENV_GET_MACROS.to_string()).into(),
-        );
-        symbols.insert(
-            ENV_GET_MACRO.to_string(),
-            LFn::new(env_get_macro, ENV_GET_MACRO.to_string()).into(),
-        );
-
-        Self {
-            symbols,
-            macro_table: Default::default(),
-            ctxs: Default::default(),
-            pfc: Default::default(),
-            documentation,
-            init: Default::default(),
-        }
     }
 }
 
@@ -234,6 +179,10 @@ impl LEnv {
         self.macro_table.insert(key, _macro);
     }
 
+    pub fn get_list_modules(&self) -> Vec<String> {
+        self.ctxs.get_list_modules()
+    }
+
     pub fn get_macro(&self, key: &str) -> Option<&LLambda> {
         self.macro_table.get(key)
     }
@@ -259,7 +208,6 @@ impl PartialEq for LEnv {
     }
 }
 
-/// Returns a list of all the keys present in the environment
 /*lfn! { env_get_keys(_,env) {
     Ok(env
         .keys()
@@ -269,131 +217,3 @@ impl PartialEq for LEnv {
         .into())
 }
 }*/
-
-#[macro_rules_attribute(lfn_extended!)]
-pub fn env_get_keys(env: &LEnv) -> im::Vector<LValue> {
-    env.keys()
-        .iter()
-        .map(|x| LValue::from(x.clone()))
-        .collect::<im::Vector<LValue>>()
-        .into()
-}
-
-#[macro_rules_attribute(lfn_extended!)]
-pub fn env_get_macros(env: &LEnv) -> im::Vector<LValue> {
-    env.macros()
-        .iter()
-        .map(|x| LValue::from(x.clone()))
-        .collect::<im::Vector<LValue>>()
-}
-
-/*lfn! { env_get_macros(_,env) {
-    Ok(env
-        .macros()
-        .iter()
-        .map(|x| LValue::from(x.clone()))
-        .collect::<Vec<LValue>>()
-        .into())
-}
-    }*/
-
-#[macro_rules_attribute(lfn_extended!)]
-pub fn env_get_macro(env: &LEnv, m: Sym) -> LValue {
-    match env.get_macro(&m).cloned() {
-        Some(l) => l.into(),
-        None => LValue::Nil,
-    }
-}
-
-/*lfn! { env_get_macro(args, env) {
-    if args.len() != 1 {
-        return Err(WrongNumberOfArgument(
-            ENV_GET_MACRO,
-            args.into(),
-            args.len(),
-            1..1,
-        ));
-    }
-    if let LValue::Symbol(s) = &args[0] {
-        Ok(match env.get_macro(s).cloned() {
-            Some(l) => l.into(),
-            None => LValue::Nil,
-        })
-    } else {
-        Err(WrongType(
-            ENV_GET_MACRO,
-            args[0].clone(),
-            (&args[0]).into(),
-            KindLValue::Symbol,
-        ))
-    }
-}
-    }*/
-
-///print the help
-/// Takes 0 or 1 parameter.
-/// 0 parameter: gives the list of all the functions
-/// 1 parameter: write the help of
-/*lfn! {
-    pub help(args,env) {
-    let documentation: Documentation = env.get_documentation();
-
-    match args.len() {
-        0 => Ok(documentation.get_all().into()),
-        1 => match &args[0] {
-            LValue::Fn(fun) => Ok(string!(documentation.get(fun.get_label()))),
-            LValue::Symbol(s) => Ok(string!(documentation.get(s))),
-            LValue::CoreOperator(co) => Ok(string!(documentation.get(&co.to_string()))),
-            lv => Err(wrong_type!(HELP, &lv, KindLValue::Symbol)),
-        },
-        _ => Err(LRuntimeError::wrong_number_of_arguments(HELP, args, 0..1)),
-    }
-}
-}*/
-
-pub fn help(env: &LEnv, args: &im::Vector<LValue>) -> LResult {
-    let documentation: Documentation = env.get_documentation();
-
-    match args.len() {
-        0 => Ok(documentation.get_all().into()),
-        1 => match &args[0] {
-            LValue::Fn(fun) => Ok(string!(documentation.get(fun.get_label()))),
-            LValue::Symbol(s) => Ok(string!(documentation.get(s))),
-            LValue::CoreOperator(co) => Ok(string!(documentation.get(&co.to_string()))),
-            lv => Err(LRuntimeError::wrong_type(HELP, &lv, KindLValue::Symbol)),
-        },
-        _ => Err(LRuntimeError::wrong_number_of_args(HELP, args, 0..1)),
-    }
-}
-
-#[macro_rules_attribute(lfn_extended!)]
-pub fn get_list_modules(env: &LEnv) -> LValue {
-    let list = env.ctxs.get_list_modules();
-    let mut str = '{'.to_string();
-    for (i, s) in list.iter().enumerate() {
-        if i != 0 {
-            str.push(',')
-        }
-        str.push_str(s)
-    }
-
-    str.push(')');
-
-    string!(str)
-}
-
-/*lfn! {pub get_list_modules(_,env) {
-    let list = env.ctxs.get_list_modules();
-    let mut str = '{'.to_string();
-    for (i, s) in list.iter().enumerate() {
-        if i != 0 {
-            str.push(',')
-        }
-        str.push_str(s)
-    }
-
-    str.push(')');
-
-    Ok(string!(str))
-}
-    }*/

@@ -1,6 +1,6 @@
 use crate::lenv::{LEnv, LEnvSymbols};
 use crate::lerror::LRuntimeError;
-use crate::lvalue::LValue;
+use crate::lvalue::{LValue, Sym};
 use crate::{lerror, wrong_n_args};
 use function_name::named;
 use std::fmt::{Debug, Display, Formatter};
@@ -48,11 +48,7 @@ impl LLambda {
 
     /// Returns a new env containing the environment of the lambda and the current environment in which the lambda is called.
     #[named]
-    pub fn get_new_env(
-        &self,
-        args: &im::Vector<LValue>,
-        mut env: LEnv,
-    ) -> Result<LEnv, LRuntimeError> {
+    pub fn get_new_env(&self, mut env: LEnv, args: &[LValue]) -> Result<LEnv, LRuntimeError> {
         env.set_new_top_symbols(self.env.clone());
 
         match &self.params {
@@ -60,7 +56,7 @@ impl LLambda {
                 let arg = if args.len() == 1 {
                     match &args[0] {
                         LValue::Nil => LValue::Nil,
-                        _ => vec![args[0].clone()].into(),
+                        lv => vec![lv.clone()].into(),
                     }
                 } else {
                     args.into()
@@ -69,9 +65,7 @@ impl LLambda {
             }
             LambdaArgs::List(params) => {
                 if params.len() != args.len() {
-                    let mut err = wrong_n_args!("lambda", args, params.len());
-                    err.chain(function_name!());
-                    return Err(err);
+                    return Err(wrong_n_args!("lambda", args, params.len()).chain(function_name!()));
                 }
                 for (param, arg) in params.iter().zip(args) {
                     env.insert(param.to_string(), arg.clone());
@@ -127,8 +121,8 @@ impl From<LLambda> for LValue {
 /// ;This lambda is expected to receive exactly three arguments.
 #[derive(Clone, Debug)]
 pub enum LambdaArgs {
-    Sym(String),
-    List(Vec<String>),
+    Sym(Arc<Sym>),
+    List(Vec<Arc<Sym>>),
     Nil,
 }
 
@@ -153,14 +147,14 @@ impl Display for LambdaArgs {
     }
 }
 
-impl From<String> for LambdaArgs {
-    fn from(s: String) -> Self {
+impl From<Arc<Sym>> for LambdaArgs {
+    fn from(s: Arc<Sym>) -> Self {
         LambdaArgs::Sym(s)
     }
 }
 
-impl From<Vec<String>> for LambdaArgs {
-    fn from(vec_sym: Vec<String>) -> Self {
+impl From<Vec<Arc<Sym>>> for LambdaArgs {
+    fn from(vec_sym: Vec<Arc<Sym>>) -> Self {
         LambdaArgs::List(vec_sym)
     }
 }

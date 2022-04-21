@@ -7,11 +7,9 @@ use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::Documentation;
 use sompas_structs::lenv::{ImportType, LEnv};
 use sompas_structs::lerror::LResult;
-use sompas_structs::lerror::LRuntimeError::WrongNumberOfArgument;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
-use sompas_utils::dyn_async;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 

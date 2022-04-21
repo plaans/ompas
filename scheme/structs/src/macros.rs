@@ -1,9 +1,3 @@
-use crate::lvalue::LValue;
-use im::Vector;
-use macro_rules_attribute::macro_rules_attribute;
-extern crate proc_macro;
-use proc_macro::TokenStream;
-
 #[macro_export]
 macro_rules! dyn_async {(
     $( #[$attr:meta] )* // includes doc strings
@@ -50,14 +44,14 @@ macro_rules! string {
 #[macro_export]
 macro_rules! list {
     ($($x:expr),*) => (
-        LValue::List(vector!($($x),*))
+        LValue::List(vec!($($x),*))
     );
 }
 
 #[macro_export]
 macro_rules! lfn {
     ($vi:vis $fname:ident($arg:ident, $env:ident){$($body:tt)*}) => {
-        $vi fn $fname($env: &$crate::lenv::LEnv, $arg: &im::Vector<$crate::lvalue::LValue>) -> $crate::lerror::LResult {
+        $vi fn $fname($env: &$crate::lenv::LEnv, $arg: &Vec<$crate::lvalue::LValue>) -> $crate::lerror::LResult {
             $($body)*
         }
     };
@@ -126,7 +120,7 @@ macro_rules! lfn_extended {
     #[allow(unused_parens)]
     #[function_name::named]
     $pub
-    fn $fname($env: &crate::lenv::LEnv, args : &im::Vector<LValue>) -> $crate::lerror::LResult
+    fn $fname($env: &crate::lenv::LEnv, args : &Vec<LValue>) -> $crate::lerror::LResult
     {
         $crate::check_number_of_args!(args, $crate::count!($($arg)*));
         $crate::check_args!(0 args $($arg $t),*);
@@ -164,7 +158,7 @@ macro_rules! lfn_extended {
     #[allow(unused_parens)]
     #[function_name::named]
     $pub
-    fn $fname($env: &crate::lenv::LEnv, $arg : &im::Vector<LValue>) -> $crate::lerror::LResult
+    fn $fname($env: &crate::lenv::LEnv, $arg : &Vec<LValue>) -> $crate::lerror::LResult
     {
         let result: $($Ret)? = {|| {
             $($body)*
@@ -233,16 +227,20 @@ macro_rules! check_number_of_args {
 #[macro_export]
 macro_rules! wrong_n_args {
     ($fname:expr, $lv:expr,$expected:expr) => {
-        $crate::lerror::LRuntimeError::wrong_number_of_args($fname, $lv, $expected..usize::MAX)
+        $crate::lerror::LRuntimeError::wrong_number_of_args($fname, $lv, $expected..$expected)
     };
-    ($fname:expr, $lv:expr,$lw:tt..$up:tt$) => {
+    ($fname:expr, $lv:expr,$lw:tt..$up:tt) => {
         $crate::lerror::LRuntimeError::wrong_number_of_args($fname, $lv, $lw..$up)
+    };
+    ($fname:expr, $lv:expr,$lw:tt..) => {
+        $crate::lerror::LRuntimeError::wrong_number_of_args($fname, $lv, $lw..usize::MAX)
     };
     ($lv:expr, $low:tt $(..$up:tt)*) => {
         $crate::wrong_n_args!(function_name!(), $lv, $low $(..$up)*)
     };
 }
 
+///(lv: LValue, expr: impl Display)
 #[macro_export]
 macro_rules! wrong_type {
     ($fname:expr, $lv:expr,$expected:expr) => {

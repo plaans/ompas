@@ -1,14 +1,11 @@
 use rand::Rng;
+use sompas_macros::scheme_fn;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::{Documentation, LHelp};
-use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror::LRuntimeError::{WrongNumberOfArgument, WrongType};
-use sompas_structs::lerror::LResult;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
-use sompas_structs::typelvalue::KindLValue;
 
 //LANGUAGE
 const MOD_MATH: &str = "math";
@@ -109,171 +106,53 @@ impl IntoModule for CtxMath {
 
 ///Compute the sin of a LNumber
 /// Only takes one element in args
-lfn!{pub sin(args, _){
-    if args.len() != 1 {
-        return Err(WrongNumberOfArgument(SIN, args.into(), args.len(), 1..1));
-    }
-
-    match &args[0] {
-        LValue::Number(n) => {
-            let f: f64 = n.into();
-            Ok(f.sin().into())
-        }
-        lv => Err(WrongType(SIN, lv.clone(), lv.into(), TypeLValue::Number)),
-    }
+#[scheme_fn]
+pub fn sin(n: LNumber) -> f64 {
+    f64::from(&n).sin()
 }
 
 /// Compute the cos of a LNumber
 /// Only takes one element in args
-lfn!{pub cos(args, _){
-    if args.len() != 1 {
-        return Err(WrongNumberOfArgument(COS, args.into(), args.len(), 1..1));
-    }
-
-    match &args[0] {
-        LValue::Number(n) => {
-            let f: f64 = n.into();
-            Ok(f.cos().into())
-        }
-        lv => Err(WrongType(COS, lv.clone(), lv.into(), TypeLValue::Number)),
-    }
+#[scheme_fn]
+pub fn cos(n: LNumber) -> f64 {
+    f64::from(&n).cos()
 }
 
-lfn!{pub sqrt(args, _){
-    if args.len() != 1 {
-        return Err(WrongNumberOfArgument(SQRT, args.into(), args.len(), 1..1));
-    }
-
-    match &args[0] {
-        LValue::Number(n) => {
-            let f: f64 = n.into();
-            Ok(f.sqrt().into())
-        }
-        lv => Err(WrongType(SQRT, lv.clone(), lv.into(), TypeLValue::Number)),
-    }
+#[scheme_fn]
+pub fn sqrt(n: LNumber) -> f64 {
+    f64::from(&n).sqrt()
 }
 
-lfn!{pub pow(args, _){
-    if args.len() != 2 {
-        return Err(WrongNumberOfArgument(POW, args.into(), args.len(), 2..2));
-    }
-
-    if let LValue::Number(n) = &args[0] {
-        if let LValue::Number(p) = &args[1] {
-            let f: f64 = n.into();
-            let p: f64 = p.into();
-            Ok(f.powf(p).into())
-        } else {
-            Err(WrongType(
-                POW,
-                args[1].clone(),
-                (&args[1]).into(),
-                TypeLValue::Number,
-            ))
-        }
-    } else {
-        Err(WrongType(
-            POW,
-            args[0].clone(),
-            (&args[0]).into(),
-            TypeLValue::Number,
-        ))
-    }
+#[scheme_fn]
+pub fn pow(n: LNumber, p: LNumber) -> f64 {
+    f64::from(&n).powf(f64::from(&p))
 }
 
-lfn!{pub square(args, _){
-    if args.len() != 1 {
-        return Err(WrongNumberOfArgument(SQUARE, args.into(), args.len(), 1..1));
-    }
-
-    match &args[0] {
-        LValue::Number(n) => {
-            let f: f64 = n.into();
-            Ok(f.powi(2).into())
-        }
-        lv => Err(WrongType(SQUARE, lv.clone(), lv.into(), TypeLValue::Number)),
-    }
+#[scheme_fn]
+pub fn square(n: LNumber) -> f64 {
+    f64::from(&n).powi(2)
 }
 
-lfn!{pub abs(args, _){
-    if args.len() != 1 {
-        return Err(WrongNumberOfArgument(SQUARE, args.into(), args.len(), 1..1));
-    }
-
-    match &args[0] {
-        LValue::Number(n) => Ok(match n {
-            LNumber::Int(i) => LNumber::Int(i.abs()),
-            LNumber::Float(f) => LNumber::Float(f.abs()),
-        }
-        .into()),
-        lv => Err(WrongType(SQUARE, lv.clone(), lv.into(), TypeLValue::Number)),
+#[scheme_fn]
+pub fn abs(n: LNumber) -> LNumber {
+    match n {
+        LNumber::Int(i) => LNumber::Int(i.abs()),
+        LNumber::Float(f) => LNumber::Float(f.abs()),
     }
 }
 
 /// Returns an integer randomly picked between two numbers.
-lfn!{pub rand_int_in_range(args, _){
-    if args.len() != 2 {
-        return Err(WrongNumberOfArgument(
-            RAND_INT_IN_RANGE,
-            args.into(),
-            args.len(),
-            2..2,
-        ));
-    }
-
-    if let LValue::Number(n1) = &args[0] {
-        if let LValue::Number(n2) = &args[1] {
-            let value: i64 = rand::thread_rng().gen_range(n1.into()..n2.into());
-            Ok(value.into())
-        } else {
-            Err(WrongType(
-                RAND_INT_IN_RANGE,
-                args[1].clone(),
-                (&args[1]).into(),
-                TypeLValue::Number,
-            ))
-        }
-    } else {
-        Err(WrongType(
-            RAND_INT_IN_RANGE,
-            args[0].clone(),
-            (&args[0]).into(),
-            TypeLValue::Number,
-        ))
-    }
+#[scheme_fn]
+pub fn rand_int_in_range(low: i64, up: i64) -> i64 {
+    let r: i64 = rand::thread_rng().gen_range(low.into()..up.into());
+    r
 }
 
 /// Returns a float randomly picked between two numbers.
-lfn!{pub rand_float_in_range(args, _){
-    if args.len() != 2 {
-        return Err(WrongNumberOfArgument(
-            RAND_FLOAT_IN_RANGE,
-            args.into(),
-            args.len(),
-            2..2,
-        ));
-    }
-
-    if let LValue::Number(n1) = &args[0] {
-        if let LValue::Number(n2) = &args[1] {
-            let value: f64 = rand::thread_rng().gen_range(n1.into()..n2.into());
-            Ok(value.into())
-        } else {
-            Err(WrongType(
-                RAND_FLOAT_IN_RANGE,
-                args[1].clone(),
-                (&args[1]).into(),
-                TypeLValue::Number,
-            ))
-        }
-    } else {
-        Err(WrongType(
-            RAND_FLOAT_IN_RANGE,
-            args[0].clone(),
-            (&args[0]).into(),
-            TypeLValue::Number,
-        ))
-    }
+#[scheme_fn]
+pub fn rand_float_in_range(low: f64, up: f64) -> f64 {
+    let r: f64 = rand::thread_rng().gen_range(low.into()..up.into());
+    r
 }
 
 #[cfg(test)]

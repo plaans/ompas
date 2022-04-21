@@ -1,4 +1,5 @@
 use crate::lerror::LRuntimeError;
+use crate::lvalue::{LValue, RefLValue};
 use serde::*;
 use sompas_language::{
     ASYNC, AWAIT, BEGIN, DEFINE, DEF_MACRO, DO, EVAL, EXPAND, IF, LAMBDA, PARSE, QUASI_QUOTE,
@@ -60,6 +61,12 @@ impl Display for LCoreOperator {
         };
 
         write!(f, "{}", str)
+    }
+}
+
+impl From<LCoreOperator> for RefLValue {
+    fn from(co: LCoreOperator) -> Self {
+        LValue::from(co).into_ref()
     }
 }
 

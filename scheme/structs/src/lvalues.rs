@@ -95,7 +95,7 @@ impl From<&LValueS> for LValue {
                 if l.is_empty() {
                     LValue::Nil
                 } else {
-                    LValue::List(l.iter().map(|x| x.into()).collect())
+                    LValue::List(Arc::new(l.iter().map(|x| x.into()).collect()))
                 }
             }
             LValueS::Map(m) => {

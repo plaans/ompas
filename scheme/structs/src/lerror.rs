@@ -32,19 +32,12 @@ pub struct LRuntimeError {
 }
 
 impl LRuntimeError {
-    pub fn chain(&mut self, context: &'static str) {
-        self.backtrace.push_front(context)
+    pub fn chain(self, context: &'static str) -> Self {
+        self.clone().backtrace.push_front(context);
+        self
     }
 }
-/*
-WrongType(LValue, TypeLValue, TypeLValue),
-    NotInListOfExpectedTypes(LValue, TypeLValue, Vec<TypeLValue>),
-    WrongNumberOfArgument(LValue, usize, Range<usize>),
-    //ErrLoc(ErrLoc),
-    UndefinedSymbol(&'static str, String),
-    Anyhow(&'static str, String),
-    ConversionError(&'static str, TypeLValue, TypeLValue),
- */
+
 impl LRuntimeError {
     pub fn new(context: &'static str, message: impl Display) -> Self {
         Self {
@@ -66,7 +59,7 @@ impl LRuntimeError {
     }
     pub fn wrong_number_of_args(
         context: &'static str,
-        lv: &im::Vector<LValue>,
+        lv: &[LValue],
         expected: Range<usize>,
     ) -> Self {
         let r: String = if expected.is_empty() {

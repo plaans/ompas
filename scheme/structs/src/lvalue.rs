@@ -1,13 +1,13 @@
 use crate::function::{LAsyncFn, LFn};
 use crate::lcoreoperator::LCoreOperator;
-use crate::lerror::{LResult, LRuntimeError};
+use crate::lerror::LRuntimeError;
 use crate::lfuture::LFuture;
 use crate::llambda::LLambda;
 use crate::lnumber::LNumber;
 use crate::typelvalue::KindLValue;
 use crate::{lerror, symbol, wrong_type};
 use function_name::named;
-use im::{vector, HashMap};
+use im::HashMap;
 use sompas_language::*;
 use std::cmp::Ordering;
 use std::convert::{TryFrom, TryInto};
@@ -18,8 +18,7 @@ use std::sync::Arc;
 
 pub type Sym = String;
 
-#[derive(Clone)]
-pub struct RefLValue(Arc<LValue>);
+pub type RefLValue = Arc<LValue>;
 
 #[derive(Clone, Debug)] //Serialize, Deserialize, Debug)]
                         //#[serde(untagged, rename_all = "lowercase")]
@@ -39,25 +38,27 @@ pub enum LValue {
     CoreOperator(LCoreOperator),
     //#[serde(skip)]
     Future(LFuture),
-    Err(Arc<LValue>),
+    Err(RefLValue),
     // data structure
     //#[serde(skip)]
     Map(im::HashMap<LValue, LValue>),
-    List(im::Vector<LValue>),
+    List(Arc<Vec<LValue>>),
     True,
     //Refers to boolean 'false and empty list in lisp
     Nil,
+}
+
+impl From<()> for LValue {
+    fn from(_: ()) -> Self {
+        LValue::Nil
+    }
 }
 
 const TAB_SIZE: usize = 3;
 const MAX_LENGTH: usize = 80;
 
 impl LValue {
-    fn pretty_print_list_aligned(
-        keyword: &str,
-        list: &im::Vector<LValue>,
-        mut indent: usize,
-    ) -> String {
+    fn pretty_print_list_aligned(keyword: &str, list: &[LValue], mut indent: usize) -> String {
         let mut string: String = format!("({}", keyword);
         indent += string.len() + 1;
         let mut first = true;
@@ -76,7 +77,7 @@ impl LValue {
         string
     }
 
-    fn pretty_print_list(list: &im::Vector<LValue>, indent: usize) -> String {
+    fn pretty_print_list(list: &[LValue], indent: usize) -> String {
         let mut string = '('.to_string();
 
         let mut global_size = 0;
@@ -148,7 +149,7 @@ impl LValue {
                             string
                         }
                         LValue::CoreOperator(LCoreOperator::If) => {
-                            LValue::pretty_print_list_aligned(IF, &list.clone().slice(1..), indent)
+                            LValue::pretty_print_list_aligned(IF, &list[1..], indent)
                         }
                         LValue::Symbol(s) => match s.as_str() {
                             LET | LET_STAR => {
@@ -204,11 +205,7 @@ impl LValue {
                                     body.format(indent + TAB_SIZE)
                                 )
                             }
-                            COND => LValue::pretty_print_list_aligned(
-                                COND,
-                                &list.clone().slice(1..),
-                                indent,
-                            ),
+                            COND => LValue::pretty_print_list_aligned(COND, &list[1..], indent),
                             _ => LValue::pretty_print_list(&list, indent),
                         },
                         _ => LValue::pretty_print_list(&list, indent),
@@ -224,6 +221,10 @@ impl LValue {
 
     pub fn get_kind(&self) -> KindLValue {
         self.into()
+    }
+
+    pub fn into_ref(self) -> RefLValue {
+        Arc::new(self)
     }
 }
 
@@ -303,23 +304,23 @@ impl TryFrom<&LValue> for im::HashMap<LValue, LValue> {
     }
 }
 
-impl TryFrom<&LValue> for &LValue {
+/*impl TryFrom<&LValue> for &LValue {
     type Error = LRuntimeError;
 
     #[function_name::named]
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
         Ok(value)
     }
-}
+}*/
 
-impl TryFrom<LValue> for LValue {
+/*impl TryFrom<LValue> for LValue {
     type Error = LRuntimeError;
 
     #[function_name::named]
     fn try_from(value: LValue) -> Result<Self, Self::Error> {
         Ok(value.clone())
     }
-}
+}*/
 
 impl TryFrom<LValue> for im::HashMap<LValue, LValue> {
     type Error = LRuntimeError;
@@ -356,13 +357,13 @@ impl TryFrom<LValue> for String {
     }
 }
 
-impl TryFrom<&LValue> for im::Vector<LValue> {
+impl TryFrom<&LValue> for Vec<LValue> {
     type Error = LRuntimeError;
 
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
         match value {
-            LValue::List(l) => Ok(l.clone()),
-            LValue::Nil => Ok(vector![]),
+            LValue::List(l) => Ok(l.deref().clone()),
+            LValue::Nil => Ok(vec![]),
             lv => Err(LRuntimeError::conversion_error(
                 "Vec<LValue>::tryfrom<&LValue>",
                 lv.into(),
@@ -372,7 +373,7 @@ impl TryFrom<&LValue> for im::Vector<LValue> {
     }
 }
 
-impl TryFrom<LValue> for im::Vector<LValue> {
+impl TryFrom<LValue> for Vec<LValue> {
     type Error = LRuntimeError;
 
     fn try_from(value: LValue) -> Result<Self, Self::Error> {
@@ -711,7 +712,7 @@ impl From<&[LValue]> for LValue {
         if lv.is_empty() {
             LValue::Nil
         } else {
-            LValue::List(lv.into())
+            LValue::List(Arc::new(lv.to_vec()))
         }
     }
 }
@@ -722,21 +723,13 @@ impl From<&LValue> for LValue {
     }
 }
 
-impl<T: Clone + Into<LValue>> From<&im::Vector<T>> for LValue {
-    fn from(vec: &im::Vector<T>) -> Self {
-        LValue::List(vec.iter().map(|x| x.clone().into()).collect())
-    }
-}
-
 impl<T: Clone + Into<LValue>> From<&Vec<T>> for LValue {
     fn from(vec: &Vec<T>) -> Self {
-        LValue::List(vec.iter().map(|x| x.clone().into()).collect())
-    }
-}
-
-impl<T: Clone + Into<LValue>> From<im::Vector<T>> for LValue {
-    fn from(vec: im::Vector<T>) -> Self {
-        (&vec).into()
+        if vec.is_empty() {
+            LValue::Nil
+        } else {
+            LValue::List(Arc::new(vec.iter().map(|x| x.clone().into()).collect()))
+        }
     }
 }
 

@@ -1,7 +1,6 @@
+use sompas_macros::scheme_fn;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::{Documentation, LHelp};
-use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror::LResult;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
@@ -41,10 +40,11 @@ impl IntoModule for CtxString {
 }
 
 //Todo: add test for concatenate
-lfn!{pub concatenate(args, _){
+#[scheme_fn]
+pub fn concatenate(strings: Vec<String>) -> String {
     let mut str = String::new();
-    for e in args {
+    for e in strings {
         str.push_str(e.to_string().as_str())
     }
-    Ok(str.into())
+    str
 }

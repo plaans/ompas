@@ -1,12 +1,12 @@
+use sompas_macros::scheme_fn;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::{Documentation, LHelp};
 use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror::LRuntimeError::{Anyhow, WrongNumberOfArgument, WrongType};
 use sompas_structs::lerror::LResult;
-use sompas_structs::lvalue::LValue;
+use sompas_structs::lvalue::{LValue, Sym};
 use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
-use sompas_structs::typelvalue::KindLValue;
+use sompas_structs::{lerror, string};
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::PathBuf;
@@ -122,7 +122,8 @@ impl IntoModule for CtxIo {
 /// If it is stdout, it is printed in the terminal
 /// Otherwise in the configured file.
 /// If the file is missing, it prints nothing.
-lfn!{pub print(args, env){
+#[scheme_fn]
+pub fn print(env: &LEnv, args: &[LValue]) -> Result<(), std::io::Error> {
     let lv: LValue = match args.len() {
         0 => LValue::Nil,
         1 => args[0].clone(),
@@ -150,26 +151,16 @@ lfn!{pub print(args, env){
             file.write_all(format!("PRINT - {}\n", lv).as_bytes())?;
         }
     };
-
-    Ok(LValue::Nil)
+    Ok(())
 }
 
 /// Read the content of a file and sends the content to the lisp interpreter.
 /// The name of the file is given via args.
-lfn!{pub read(args, _){
-    //let mut stdout = io::stdout();
-    //stdout.write_all(b"module Io: read\n");
-    if args.len() != 1 {
-        return Err(WrongNumberOfArgument(READ, args.into(), args.len(), 1..1));
-    }
-    let file_name = match &args[0] {
-        LValue::Symbol(s) => s.to_string(),
-        lv => return Err(WrongType(READ, lv.clone(), lv.into(), TypeLValue::Symbol)),
-    };
-
+#[scheme_fn]
+pub fn read(file_name: Sym) -> LResult {
     let mut file = match File::open(&file_name) {
         Ok(f) => f,
-        Err(e) => return Err(SpecialError(READ, format!("{}: {}", file_name, e))),
+        Err(e) => return Err(lerror!(READ, format!("{}: {}", file_name, e))),
     };
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;
@@ -178,7 +169,7 @@ lfn!{pub read(args, _){
 
     //TODO: no check of the response to read
 
-    Ok(LValue::String(contents))
+    Ok(string!(contents))
 }
 
 /// Write an lvalue to a given file
@@ -186,20 +177,11 @@ lfn!{pub read(args, _){
 /// # Example:
 /// ```lisp
 /// (write <file> <lvalue>)
-lfn!{pub write(args, _){
-    if args.len() != 2 {
-        return Err(WrongNumberOfArgument(WRITE, args.into(), args.len(), 2..2));
-    }
-
-    match &args[0] {
-        LValue::Symbol(s) => {
-            //got our file name
-            let mut f = File::create(s)?;
-            f.write_all(args[1].to_string().as_bytes())?;
-            Ok(LValue::Nil)
-        }
-        lv => Err(WrongType(WRITE, lv.clone(), lv.into(), TypeLValue::Symbol)),
-    }
+#[scheme_fn]
+pub fn write(s: Sym, lv: &LValue) -> Result<(), std::io::Error> {
+    let mut f = File::create(s)?;
+    f.write_all(lv.to_string().as_bytes())?;
+    Ok(())
 }
 
 //TODO: finish writing tests for io

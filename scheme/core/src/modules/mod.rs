@@ -1,23 +1,27 @@
 pub mod basic_math;
+pub mod env;
 pub mod error;
 pub mod list;
 pub mod map;
 pub mod predicate;
+
+use crate::modules::env::*;
 use basic_math::*;
 use error::*;
 use list::*;
 use map::*;
 use predicate::*;
 use sompas_language::*;
+use sompas_macros::scheme_fn;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::{Documentation, LHelp};
 use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror::LResult;
+use sompas_structs::lerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
 use sompas_structs::typelvalue::KindLValue;
-use sompas_structs::{lfn, string};
+use sompas_structs::wrong_n_args;
 
 pub const MOD_ROOT: &str = "mod-root";
 
@@ -118,6 +122,17 @@ impl IntoModule for CtxRoot {
             raw_lisp: Default::default(),
             label: MOD_ROOT.into(),
         };
+
+        /*
+        Env functions
+         */
+        module.add_fn_prelude(HELP, help);
+
+        module.add_fn_prelude(ENV_GET_LIST_MODULES, get_list_modules);
+
+        module.add_fn_prelude(ENV_GET_KEYS.to_string(), env_get_keys);
+        module.add_fn_prelude(ENV_GET_MACROS, env_get_macros);
+        module.add_fn_prelude(ENV_GET_MACRO.to_string(), env_get_macro);
 
         //Special entry
         module.add_fn_prelude(GET, get);
@@ -238,6 +253,18 @@ impl IntoModule for CtxRoot {
             LHelp::new(ERR, DOC_ERR),
             LHelp::new(IS_ERR, DOC_IS_ERR),
             LHelp::new(CHECK, DOC_CHECK),
+            LHelp::new_verbose(HELP, DOC_HELP, DOC_HELP_VERBOSE),
+            LHelp::new(DEFINE, DOC_DEFINE),
+            LHelp::new_verbose(LAMBDA, DOC_LAMBDA, DOC_LAMBDA_VEBROSE),
+            LHelp::new(DEF_MACRO, DOC_DEF_MACRO),
+            LHelp::new(IF, DOC_IF),
+            LHelp::new(QUOTE, DOC_QUOTE),
+            LHelp::new(QUASI_QUOTE, QUASI_QUOTE),
+            LHelp::new(UNQUOTE, DOC_UNQUOTE),
+            LHelp::new_verbose(BEGIN, DOC_BEGIN, DOC_BEGIN_VERBOSE),
+            LHelp::new(AWAIT, DOC_AWAIT),
+            LHelp::new(ASYNC, DOC_ASYNC),
+            LHelp::new(EVAL, DOC_EVAL),
         ]
         .into()
     }
@@ -248,89 +275,73 @@ impl IntoModule for CtxRoot {
 }
 /// Default function of the Lisp Environement.
 /// Does nothing outside returning a string.
-lfn! {pub default(_args, _){
-    Ok(string!("default function".to_string()))
-}}
+#[scheme_fn]
+pub fn default() -> String {
+    "default function".to_string()
+}
 
 /// Construct a map
-
-lfn! {pub set(args, env){
+#[scheme_fn]
+pub fn set(env: &LEnv, args: &[LValue]) -> LResult {
     if args.is_empty() {
-        return Err(WrongNumberOfArgument(
+        return Err(LRuntimeError::wrong_number_of_args(
             SET,
-            args.into(),
-            args.len(),
+            args,
             1..std::usize::MAX,
         ));
     }
-    match &args[0] {
-        LValue::Map(_) => set_map(args, env),
-        LValue::List(_) | LValue::Nil => set_list(args, env),
-        _ => Err(NotInListOfExpectedTypes(
+    let first = &args[0];
+    match first {
+        LValue::Map(_) => set_map(env, args),
+        LValue::List(_) | LValue::Nil => set_list(env, args),
+        _ => Err(LRuntimeError::not_in_list_of_expected_types(
             SET,
-            args[0].clone(),
-            (&args[0]).into(),
-            vec![KindLValue::List, KindLValue::Map, KindLValue::Nil],
-        )),
-    }
-}}
-
-lfn! {pub get(args, env){
-    if args.is_empty() {
-        return Err(WrongNumberOfArgument(
-            GET,
-            args.into(),
-            0,
-            1..std::usize::MAX,
-        ));
-    }
-    match &args[0] {
-        LValue::Map(_) => get_map(args, env),
-        LValue::List(_) | LValue::Nil => get_list(args, env),
-        _ => Err(NotInListOfExpectedTypes(
-            GET,
-            args[0].clone(),
-            (&args[0]).into(),
+            &first,
             vec![KindLValue::List, KindLValue::Map, KindLValue::Nil],
         )),
     }
 }
+#[scheme_fn]
+pub fn get(env: &LEnv, args: &[LValue]) -> LResult {
+    if args.is_empty() {
+        return Err(wrong_n_args!(GET, args, 2));
+    }
+    match &args[0] {
+        LValue::Map(_) => get_map(env, args),
+        LValue::List(_) | LValue::Nil => get_list(env, args),
+        _ => Err(LRuntimeError::not_in_list_of_expected_types(
+            GET,
+            &args[0],
+            vec![KindLValue::List, KindLValue::Map, KindLValue::Nil],
+        )),
+    }
 }
 /// return the length of the object if it is a table or a list.
-lfn! {pub length(args, _){
-    if args.len() != 1 {
-        return Err(WrongNumberOfArgument(LEN, args.into(), args.len(), 1..1));
-    }
-
-    match &args[0] {
-        LValue::List(l) => Ok(l.len().into()),
-        LValue::Map(m) => Ok(m.len().into()),
-        LValue::Nil => Ok(0.into()),
-        lv => Err(NotInListOfExpectedTypes(
+#[scheme_fn]
+pub fn length(lv: &LValue) -> Result<usize, LRuntimeError> {
+    match lv {
+        LValue::List(l) => Ok(l.len()),
+        LValue::Map(m) => Ok(m.len()),
+        LValue::Nil => Ok(0),
+        lv => Err(LRuntimeError::not_in_list_of_expected_types(
             LEN,
-            lv.clone(),
-            lv.into(),
+            lv,
             vec![KindLValue::List, KindLValue::Map],
         )),
     }
 }
-            }
-/// Returns true if a hashmap or list is empty
-lfn! {pub empty(args, _){
-    if args.len() != 1 {
-        return Err(WrongNumberOfArgument(EMPTY, args.into(), args.len(), 1..1));
-    }
 
-    match &args[0] {
-        LValue::List(l) => Ok(l.is_empty().into()),
-        LValue::Map(m) => Ok(m.is_empty().into()),
-        LValue::Nil => Ok(true.into()),
-        lv => Err(NotInListOfExpectedTypes(
+/// Returns true if a hashmap or list is empty
+#[scheme_fn]
+pub fn empty(lv: &LValue) -> Result<bool, LRuntimeError> {
+    match lv {
+        LValue::List(l) => Ok(l.is_empty()),
+        LValue::Map(m) => Ok(m.is_empty()),
+        LValue::Nil => Ok(true),
+        lv => Err(LRuntimeError::not_in_list_of_expected_types(
             EMPTY,
-            lv.clone(),
-            lv.into(),
+            lv,
             vec![KindLValue::List, KindLValue::Map, KindLValue::Nil],
         )),
     }
-}
 }

@@ -9,6 +9,7 @@ sompas-utils = {path = "../utils" }
 sompas-structs = {path = "../structs"}
 sompas-core = {path = "../core"}
 sompas-language = {path = "../language"}
+sompas-macros = {path = "../macros"}
 aries_utils = {git = "https://github.com/plaans/aries", branch = "extended_chronicle_constraints"}
 im = "15.0.0"
 tokio = { version = "1.17.0", features = ["full", "time"] }

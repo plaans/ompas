@@ -253,7 +253,7 @@ macro_rules! wrong_type {
     };
 }
 
-#[test]
+/*#[test]
 pub fn test() -> LValue {
     LValue::Nil
-}
+}*/

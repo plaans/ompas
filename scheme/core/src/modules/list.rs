@@ -8,7 +8,7 @@ use std::ops::Deref;
 
 /// Returns a list
 #[scheme_fn]
-pub fn list(args: Vec<LValue>) -> LValue {
+pub fn list(args: &[LValue]) -> LValue {
     if args.is_empty() {
         LValue::Nil
     } else {

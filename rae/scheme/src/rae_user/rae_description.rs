@@ -86,7 +86,7 @@ fn f_and_cond(_: &LEnv, args: &[LValue]) -> LResult {
 #[scheme_fn]
 fn f_and_effect(effects: Vec<LValue>) -> String {
     if effects.is_empty() {
-        "true".to_string()
+        "\"true\"".to_string()
     } else {
         let mut str = "(begin ".to_string();
         for eff in effects {
@@ -100,9 +100,9 @@ fn f_and_effect(effects: Vec<LValue>) -> String {
 #[scheme_fn]
 pub fn generate_type_test_expr(params: Vec<LValue>) -> Result<String, LRuntimeError> {
     if params.is_empty() {
-        Ok(true.to_string())
+        Ok("\"true\"".to_string())
     } else {
-        let mut str = "(do ".to_string();
+        let mut str = "\"(do ".to_string();
 
         for param in params {
             if let LValue::List(param) = &param {
@@ -147,7 +147,7 @@ pub fn generate_type_test_expr(params: Vec<LValue>) -> Result<String, LRuntimeEr
                 ));
             }
         }
-        str.push(')');
+        str.push_str(")\"");
 
         Ok(str)
     }
@@ -620,86 +620,6 @@ pub async fn add_type(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> 
 
     Ok(())
 }
-/*
-pub fn add_object<'a>(
-    env: &'a sompas_structs::lenv::LEnv,
-    args: &'a [sompas_structs::lvalue::LValue],
-) -> ::std::pin::Pin<
-    ::std::boxed::Box<
-        dyn ::std::future::Future<Output = sompas_structs::lerror::LResult>
-            + ::std::marker::Send
-            + 'a,
-    >,
-> {
-    ::std::boxed::Box::pin(async move {
-        if args.len() != 2usize {
-            return Err(sompas_structs::lerror::LRuntimeError::wrong_number_of_args(
-                "add_object",
-                args,
-                2usize..usize::MAX,
-            ));
-        }
-        let constant: LValueS =
-            <LValueS>::try_from(&args[0usize]).map_err(|e| e.chain("add_object"))?;
-        let t: LValueS = <LValueS>::try_from(&args[1usize]).map_err(|e| e.chain("add_object"))?;
-        let __result__: Result<(), LRuntimeError> = {
-            || async move {
-                {
-                    let ctx = env.get_context::<CtxRae>(MOD_RAE).unwrap();
-                    let mut instances: LState = ctx
-                        .get_rae_env()
-                        .read()
-                        .await
-                        .state
-                        .get_state(Some(StateType::Instance))
-                        .await;
-                    let key = <[_]>::into_vec(box [RAE_INSTANCE.into(), t]).into();
-                    let objects: &mut LValueS = match instances.get_mut(&key) {
-                        Some(obj) => obj,
-                        None => {
-                            return Err(::sompas_structs::lerror::LRuntimeError::new(
-                                RAE_ADD_OBJECT,
-                                {
-                                    let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                                        &["type ", " is undefined"],
-                                        &[::core::fmt::ArgumentV1::new_display(&t)],
-                                    ));
-                                    res
-                                },
-                            ))
-                        }
-                    };
-                    if let LValueS::List(l) = objects {
-                        if !l.contains(&constant) {
-                            l.push(constant)
-                        } else {
-                            return Err(::sompas_structs::lerror::LRuntimeError::new(
-                                RAE_ADD_OBJECT,
-                                {
-                                    let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                                        &["", " already defined"],
-                                        &[::core::fmt::ArgumentV1::new_display(&constant)],
-                                    ));
-                                    res
-                                },
-                            ));
-                        }
-                    }
-                    instances._type = Some(StateType::Instance);
-                    ctx.get_rae_env()
-                        .write()
-                        .await
-                        .state
-                        .set_state(instances)
-                        .await;
-                    Ok(())
-                }
-            }
-        }()
-        .await;
-        __result__.map(|o| sompas_structs::lvalue::LValue::from(o))
-    })
-}*/
 
 #[async_scheme_fn]
 pub async fn add_object(env: &LEnv, constant: LValue, t: LValue) -> Result<(), LRuntimeError> {

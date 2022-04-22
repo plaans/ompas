@@ -135,11 +135,11 @@ impl From<&str> for LValueS {
     }
 }
 
-/*impl From<LValueS> for LValue {
-    fn from(lvs: LValueS) -> Self {
-        (&lvs).into()
+impl From<&LValueS> for LValue {
+    fn from(lvs: &LValueS) -> Self {
+        lvs.clone().into()
     }
-}*/
+}
 
 impl<T: Into<LValueS>> From<Vec<T>> for LValueS {
     fn from(mut v: Vec<T>) -> Self {

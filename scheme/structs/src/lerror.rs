@@ -32,8 +32,8 @@ pub struct LRuntimeError {
 }
 
 impl LRuntimeError {
-    pub fn chain(self, context: &'static str) -> Self {
-        self.clone().backtrace.push_front(context);
+    pub fn chain(mut self, context: &'static str) -> Self {
+        self.backtrace.push_front(context);
         self
     }
 }
@@ -127,61 +127,12 @@ impl Error for LRuntimeError {}
 
 impl Display for LRuntimeError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        writeln!(f, "{:#?}: {}", self.backtrace, self.message)
-        /*match self {
-            LRuntimeError::WrongType(f_name, s, s1, s2) => {
-                write!(
-                    f,
-                    "In {}, {}: Got {}, expected {}",
-                    self.source().unwrap(),
-                    s,
-                    s1,
-                    s2
-                )
-            }
-            //LError::ErrLoc(e) => write!(f, "{}",e),
-            LRuntimeError::UndefinedSymbol(f_name, s) => {
-                write!(f, "In {}: {} is undefined", f_name, s)
-            }
-            LRuntimeError::WrongNumberOfArgument(f_name, s, g, r) => {
-                if r.is_empty() {
-                    write!(
-                        f,
-                        "In {}, \"{}\": Got {} element(s), expected {}",
-                        f_name, s, g, r.start
-                    )
-                } else if r.end == std::usize::MAX {
-                    write!(
-                        f,
-                        "In {}, \"{}\": Got {} element(s), expected at least {}",
-                        f_name, s, g, r.start
-                    )
-                } else if r.start == std::usize::MIN {
-                    write!(
-                        f,
-                        "In {}, \"{}\": Got {} element(s), expected at most {}",
-                        f_name, s, g, r.end
-                    )
-                } else {
-                    write!(
-                        f,
-                        "In {}, \"{}\": Got {} element(s), expected between {} and {}",
-                        f_name, s, g, r.start, r.end
-                    )
-                }
-            }
-            LRuntimeError::Anyhow(f_name, s) => write!(f, "In {}, {}", f_name, s),
-            LRuntimeError::ConversionError(f_name, s1, s2) => {
-                write!(f, "In {}, Cannot convert {} into {}.", f_name, s1, s2)
-            }
-            LRuntimeError::NotInListOfExpectedTypes(f_name, lv, typ, list_types) => {
-                write!(
-                    f,
-                    "In {}, {}: Got {}, expected {:?}",
-                    f_name, lv, typ, list_types
-                )
-            }
-        }*/
+        let mut str = String::new();
+        for a in &self.backtrace {
+            str.push_str(a);
+            str.push(':');
+        }
+        writeln!(f, "{} {}", str, self.message)
     }
 }
 

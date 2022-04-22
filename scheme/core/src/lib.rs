@@ -17,11 +17,11 @@ use sompas_structs::typelvalue::KindLValue;
 use sompas_structs::{string, symbol, wrong_n_args, wrong_type};
 use std::convert::TryFrom;
 use std::convert::TryInto;
+use std::fmt::Write;
 use std::ops::Deref;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-
 pub mod modules;
 pub mod static_eval;
 pub mod test_utils;
@@ -59,7 +59,11 @@ pub async fn eval_init(env: &mut LEnv) {
     }
 
     if !errors.is_empty() {
-        panic!("Errors loading libraries: {:#?}", errors);
+        let mut str = String::new();
+        for e in errors {
+            writeln!(str, "{}", e);
+        }
+        panic!("Errors loading libraries:\n {}", str);
     }
 }
 //}

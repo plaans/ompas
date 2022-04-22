@@ -215,7 +215,7 @@ fn build_params(
                             return Err(sompas_structs::lerror::LRuntimeError::wrong_number_of_args(
                                 #fname,
                                 #args,
-                                #expected..usize::MAX,
+                                #expected..#expected,
                             ));
                         }
                     };

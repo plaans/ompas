@@ -1,5 +1,8 @@
 use crate::lerror::LRuntimeError;
 use crate::lvalue::LValue;
+use crate::typelvalue::KindLValue;
+use crate::wrong_type;
+use function_name::named;
 use num_traits::sign::Signed;
 use serde::*;
 use std::cmp::Ordering;
@@ -7,7 +10,6 @@ use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::{Add, Div, Mul, Sub};
-
 /// Representation of numbers il LValue:
 /// - Int(i64)
 /// - Float(f64)
@@ -112,11 +114,12 @@ impl From<&LNumber> for i64 {
 impl TryFrom<&LValue> for LNumber {
     type Error = LRuntimeError;
 
+    #[named]
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
         if let LValue::Number(n) = value {
             Ok(n.clone())
         } else {
-            Err(Default::default())
+            Err(wrong_type!(value, KindLValue::Number))
         }
     }
 }

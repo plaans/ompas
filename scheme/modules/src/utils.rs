@@ -444,7 +444,7 @@ pub fn sublist(args: &[LValue]) -> Result<Vec<LValue>, LRuntimeError> {
         2 => {
             let list: Vec<LValue> =
                 <Vec<LValue>>::try_from(&args[0]).map_err(|e| e.chain("sublist"))?;
-            let n: LNumber = <LNumber>::try_from(&args[0]).map_err(|e| e.chain("sublist"))?;
+            let n: LNumber = <LNumber>::try_from(&args[1]).map_err(|e| e.chain("sublist"))?;
 
             if n.is_natural() {
                 let i: usize = n.into();
@@ -459,8 +459,8 @@ pub fn sublist(args: &[LValue]) -> Result<Vec<LValue>, LRuntimeError> {
         3 => {
             let list: Vec<LValue> =
                 <Vec<LValue>>::try_from(&args[0]).map_err(|e| e.chain("sublist"))?;
-            let n1: LNumber = <LNumber>::try_from(&args[0]).map_err(|e| e.chain("sublist"))?;
-            let n2: LNumber = <LNumber>::try_from(&args[0]).map_err(|e| e.chain("sublist"))?;
+            let n1: LNumber = <LNumber>::try_from(&args[1]).map_err(|e| e.chain("sublist"))?;
+            let n2: LNumber = <LNumber>::try_from(&args[2]).map_err(|e| e.chain("sublist"))?;
 
             if n1.is_natural() && n2.is_natural() {
                 let i1: usize = n1.into();

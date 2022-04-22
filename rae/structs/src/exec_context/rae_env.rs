@@ -71,11 +71,11 @@ impl From<Type> for LValue {
     }
 }
 
-/*impl From<Type> for LValue {
-    fn from(t: Type) -> Self {
-        (&t).into()
+impl From<&Type> for LValue {
+    fn from(t: &Type) -> Self {
+        t.clone().into()
     }
-}*/
+}
 
 impl From<&str> for Type {
     fn from(str: &str) -> Self {

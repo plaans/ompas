@@ -52,13 +52,13 @@ impl PartialEq for LValueS {
 
 impl Eq for LValueS {}
 
-impl From<&LValue> for LValueS {
-    fn from(lv: &LValue) -> Self {
+impl From<LValue> for LValueS {
+    fn from(lv: LValue) -> Self {
         match lv {
             LValue::Symbol(s) => LValueS::Symbol(s.deref().clone()),
             LValue::Number(n) => match n {
-                LNumber::Int(i) => LValueS::Int(*i),
-                LNumber::Float(f) => LValueS::Float(*f),
+                LNumber::Int(i) => LValueS::Int(i),
+                LNumber::Float(f) => LValueS::Float(f),
             },
             LValue::Fn(f) => LValueS::Symbol(f.get_label().to_string()),
             LValue::Lambda(_) => panic!("cannot convert LValue::Lambda into LValueS"),
@@ -75,18 +75,34 @@ impl From<&LValue> for LValueS {
     }
 }
 
-impl From<LValue> for LValueS {
-    fn from(lv: LValue) -> Self {
-        (&lv).into()
+impl From<&LValue> for LValueS {
+    fn from(lv: &LValue) -> Self {
+        lv.clone().into()
     }
 }
 
-impl From<&LValueS> for LValue {
-    fn from(lvs: &LValueS) -> Self {
+/*impl TryFrom<LValue> for LValueS {
+    type Error = LRuntimeError;
+
+    fn try_from(value: LValue) -> Result<Self, Self::Error> {
+        Ok(value.into())
+    }
+}
+
+impl TryFrom<&LValue> for LValueS {
+    type Error = LRuntimeError;
+
+    fn try_from(value: &LValue) -> Result<Self, Self::Error> {
+        value.clone().try_into()
+    }
+}*/
+
+impl From<LValueS> for LValue {
+    fn from(lvs: LValueS) -> Self {
         match lvs {
             LValueS::Symbol(s) => LValue::Symbol(Arc::new(s.clone())),
-            LValueS::Int(i) => LValue::Number(LNumber::Int(*i)),
-            LValueS::Float(f) => LValue::Number(LNumber::Float(*f)),
+            LValueS::Int(i) => LValue::Number(LNumber::Int(i)),
+            LValueS::Float(f) => LValue::Number(LNumber::Float(f)),
             LValueS::Bool(b) => match b {
                 true => LValue::True,
                 false => LValue::Nil,
@@ -119,11 +135,11 @@ impl From<&str> for LValueS {
     }
 }
 
-impl From<LValueS> for LValue {
+/*impl From<LValueS> for LValue {
     fn from(lvs: LValueS) -> Self {
         (&lvs).into()
     }
-}
+}*/
 
 impl<T: Into<LValueS>> From<Vec<T>> for LValueS {
     fn from(mut v: Vec<T>) -> Self {

@@ -5,8 +5,8 @@ use crate::exec_context::options::SelectMode;
 use chrono::{DateTime, Utc};
 use im::HashMap;
 use sompas_structs::lerror::LRuntimeError;
-use sompas_structs::lerror::LRuntimeError::Anyhow;
 use sompas_structs::lvalue::LValue;
+use sompas_structs::{lerror, string};
 use sompas_utils::other::get_and_update_id_counter;
 use std::convert::TryInto;
 use std::fmt::{Display, Formatter};
@@ -230,31 +230,31 @@ impl Agenda {
         for p in &parent {
             let mut task_stats: im::HashMap<LValue, LValue> = Default::default();
             task_stats.insert(
-                LValue::String(REFINEMENT_METHOD.to_string()),
+                string!(REFINEMENT_METHOD),
                 self.get_refinement_method(p).await.to_string().into(),
             );
             task_stats.insert(
-                LValue::String(REFINEMENT_NUMBER.to_string()),
+                string!(REFINEMENT_NUMBER),
                 self.get_total_number_of_refinement(p).await.into(),
             );
             task_stats.insert(
-                LValue::String(SUBTASK_NUMBER.to_string()),
+                string!(SUBTASK_NUMBER),
                 self.get_number_of_subtasks_recursive(p).await.into(),
             );
             task_stats.insert(
-                LValue::String(TASK_EXECUTION_TIME.to_string()),
+                string!(TASK_EXECUTION_TIME),
                 self.get_execution_time(p).await.to_string().into(),
             );
             task_stats.insert(
-                LValue::String(TASK_STATUS.to_string()),
+                string!(TASK_STATUS),
                 self.get_status(p).await.to_string().into(),
             );
             task_stats.insert(
-                LValue::String(ACTION_NUMBER.to_string()),
+                string!(ACTION_NUMBER),
                 self.get_number_of_actions(p).await.into(),
             );
             task_stats.insert(
-                LValue::String(TOTAL_REFINEMENT_TIME.to_string()),
+                string!(TOTAL_REFINEMENT_TIME),
                 self.get_total_refinement_time(p).await.to_string().into(),
             );
             map.insert(
@@ -412,9 +412,9 @@ impl Agenda {
     ) -> Result<AbstractTaskMetaData, LRuntimeError> {
         match self.trc.get(task_id).await {
             TaskMetaData::AbstractTask(a) => Ok(a),
-            TaskMetaData::Action(_) => Err(Anyhow(
+            TaskMetaData::Action(_) => Err(lerror!(
                 GET_ABSTRACT_TASK,
-                format!("{} does not exist", task_id),
+                format!("{} does not exist", task_id)
             )),
         }
     }

@@ -94,15 +94,15 @@ impl LLambda {
     }
 }
 
-impl From<&LLambda> for LValue {
+/*impl From<&LLambda> for LValue {
     fn from(l: &LLambda) -> Self {
         LValue::Lambda(l.clone())
     }
-}
+}*/
 
 impl From<LLambda> for LValue {
     fn from(l: LLambda) -> Self {
-        (&l).into()
+        LValue::Lambda(l)
     }
 }
 

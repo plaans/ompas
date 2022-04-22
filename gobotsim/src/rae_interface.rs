@@ -13,12 +13,12 @@ use ompas_rae_structs::exec_context::rae_state::RAEState;
 use ompas_rae_structs::refinement::Agenda;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::Documentation;
-use sompas_structs::lerror::LResult;
-use sompas_structs::lerror::LRuntimeError::{Anyhow, WrongNumberOfArgument, WrongType};
+use sompas_structs::lerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
 use sompas_structs::typelvalue::KindLValue;
+use sompas_structs::{lerror, wrong_n_args, wrong_type};
 use sompas_utils::task_handler;
 use std::convert::TryInto;
 use std::net::SocketAddr;
@@ -114,7 +114,7 @@ impl RAEInterface for PlatformGodot {
         let gs = GodotMessageSerde {
             _type: GodotMessageType::RobotCommand,
             data: GodotMessageSerdeData::RobotCommand(SerdeRobotCommand {
-                command_info: LValue::List(args.to_vec()).into(),
+                command_info: LValue::from(args).into(),
                 temp_id: command_id,
             }),
         };
@@ -127,10 +127,9 @@ impl RAEInterface for PlatformGodot {
 
         let sender = match self.get_sender_socket() {
             None => {
-                return Err(Anyhow(
+                return Err(lerror!(
                     "PlatformGodot::exec_command",
                     "ctx godot has no sender to simulation, try first to (open-com-godot)"
-                        .to_string(),
                 ))
             }
             Some(s) => s.clone(),
@@ -148,22 +147,16 @@ impl RAEInterface for PlatformGodot {
     /// Sends to godot a cancel command.
     async fn cancel_command(&self, args: &[LValue]) -> LResult {
         if args.len() != 1 {
-            return Err(WrongNumberOfArgument(
-                "PlatformGodot::cancel_command",
-                args.into(),
-                args.len(),
-                1..1,
-            ));
+            return Err(wrong_n_args!("PlatformGodot::cancel_command", args, 1));
         }
 
         let id: usize = if let LValue::Number(n) = &args[0] {
             n.into()
         } else {
-            return Err(WrongType(
+            return Err(wrong_type!(
                 "PlatformGodot::cancel_command",
-                args[0].clone(),
-                (&args[0]).into(),
-                KindLValue::Number,
+                &args[0],
+                KindLValue::Number
             ));
         };
 
@@ -178,10 +171,9 @@ impl RAEInterface for PlatformGodot {
 
         let sender = match self.get_sender_socket() {
             None => {
-                return Err(Anyhow(
+                return Err(lerror!(
                     "PlatformGodot::cancel_command",
                     "ctx godot has no sender to simulation, try first to (open-com-godot)"
-                        .to_string(),
                 ))
             }
             Some(s) => s.clone(),
@@ -202,10 +194,9 @@ impl RAEInterface for PlatformGodot {
             1 => (&args[0..1], &args[0..0]),
             2 => (&args[0..1], &args[1..2]),
             _ => {
-                return Err(WrongNumberOfArgument(
+                return Err(LRuntimeError::wrong_number_of_args(
                     GODOT_LAUNCH_PLATFORM,
-                    args.into(),
-                    args.len(),
+                    args,
                     0..2,
                 ))
             }
@@ -243,19 +234,17 @@ impl RAEInterface for PlatformGodot {
                         .spawn()
                         .expect("failed to execute process");
                 } else {
-                    return Err(WrongType(
+                    return Err(wrong_type!(
                         "PlatformGodot::start_platform",
-                        args[0].clone(),
-                        (&args[0]).into(),
-                        KindLValue::Symbol,
+                        &args[0],
+                        KindLValue::Symbol
                     ));
                 }
             } //path of the project (absolute path)
             _ => {
-                return Err(WrongNumberOfArgument(
+                return Err(LRuntimeError::wrong_number_of_args(
                     "PlatformGodot::start_platform",
-                    args.into(),
-                    args.len(),
+                    args,
                     0..1,
                 ))
             } //Unexpected number of arguments
@@ -306,11 +295,10 @@ impl RAEInterface for PlatformGodot {
                 let addr = match &args[0] {
                     LValue::Symbol(s) => s.clone(),
                     lv => {
-                        return Err(WrongType(
+                        return Err(wrong_type!(
                             "PlatformGodot::open_com",
-                            lv.clone(),
-                            lv.into(),
-                            KindLValue::Symbol,
+                            &lv,
+                            KindLValue::Symbol
                         ))
                     }
                 };
@@ -318,11 +306,10 @@ impl RAEInterface for PlatformGodot {
                 let port: usize = match &args[1] {
                     LValue::Number(n) => n.into(),
                     lv => {
-                        return Err(WrongType(
+                        return Err(wrong_type!(
                             "PlatformGodot::open_com",
-                            lv.clone(),
-                            lv.into(),
-                            KindLValue::Usize,
+                            &lv,
+                            KindLValue::Usize
                         ))
                     }
                 };
@@ -330,10 +317,9 @@ impl RAEInterface for PlatformGodot {
                 format!("{}:{}", addr, port).parse().unwrap()
             }
             _ => {
-                return Err(WrongNumberOfArgument(
+                return Err(LRuntimeError::wrong_number_of_args(
                     "PlatformGodot::open_com",
-                    args.into(),
-                    args.len(),
+                    args,
                     0..2,
                 ))
             }
@@ -386,10 +372,9 @@ impl RAEInterface for PlatformGodot {
                     .is_of_type((&args[0]).try_into()?, (&args[1]).try_into()?)
                     .await
             }
-            _ => Err(WrongNumberOfArgument(
+            _ => Err(LRuntimeError::wrong_number_of_args(
                 "godot::instance",
-                args.into(),
-                args.len(),
+                args,
                 1..2,
             )),
         }

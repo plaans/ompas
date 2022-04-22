@@ -1,7 +1,7 @@
 use crate::planning::symbol_table::SymTable;
 use crate::planning::traits::FormatWithSymTable;
+use sompas_structs::lerror;
 use sompas_structs::lerror::LRuntimeError;
-use sompas_structs::lerror::LRuntimeError::ConversionError;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::typelvalue::KindLValue;
 use std::convert::TryFrom;
@@ -40,15 +40,18 @@ impl TryFrom<&Atom> for Sym {
         if let Atom::Sym(s) = value {
             Ok(s.clone())
         } else {
-            Err(ConversionError(
+            Err(lerror!(
                 "Sym::TryFrom<Atom>",
-                KindLValue::Other(match value {
-                    Atom::Bool(_) => "Atom::Bool".to_string(),
-                    Atom::Number(_) => "Atom::Number".to_string(),
-                    Atom::Sym(_) => "Atom::Sym".to_string(),
-                    //Atom::Type(_) => "Atom::Type".to_string(),
-                }),
-                KindLValue::Other("Atom::Sym".to_string()),
+                format!(
+                    "{}, expected {}",
+                    KindLValue::Other(match value {
+                        Atom::Bool(_) => "Atom::Bool".to_string(),
+                        Atom::Number(_) => "Atom::Number".to_string(),
+                        Atom::Sym(_) => "Atom::Sym".to_string(),
+                        //Atom::Type(_) => "Atom::Type".to_string(),
+                    }),
+                    KindLValue::Other("Atom::Sym".to_string()),
+                )
             ))
         }
     }

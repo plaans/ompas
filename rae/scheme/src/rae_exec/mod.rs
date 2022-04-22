@@ -13,18 +13,18 @@ use ompas_rae_structs::refinement::{Agenda, TaskId};
 use sompas_core::eval;
 use sompas_core::modules::list::cons;
 use sompas_core::modules::map::{get_map, remove_key_value_map, set_map};
+use sompas_macros::{async_scheme_fn, scheme_fn};
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::Documentation;
 use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror::LRuntimeError::{Anyhow, WrongNumberOfArgument, WrongType};
-use sompas_structs::lerror::LResult;
+use sompas_structs::lerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalue::LValue::Nil;
 use sompas_structs::lvalues::LValueS;
 use sompas_structs::module::{InitLisp, IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
 use sompas_structs::typelvalue::KindLValue;
-use sompas_utils::dyn_async;
+use sompas_structs::{lerror, list, wrong_n_args, wrong_type};
 use std::any::Any;
 use std::convert::TryInto;
 use std::string::String;
@@ -320,8 +320,8 @@ impl IntoModule for CtxPlatform {
 }
 
 ///Retract a fact to state
-#[macro_rules_attribute(dyn_async!)]
-async fn retract_fact<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+#[async_scheme_fn]
+async fn retract_fact(env: &LEnv, args: &[LValue]) -> LResult {
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
     let mode: String = env
         .get_symbol("rae-mode")
@@ -330,12 +330,7 @@ async fn retract_fact<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     match mode.as_str() {
         SYMBOL_EXEC_MODE => {
             if args.len() != 2 {
-                return Err(WrongNumberOfArgument(
-                    RAE_RETRACT,
-                    args.into(),
-                    args.len(),
-                    2..2,
-                ));
+                return Err(wrong_n_args!(RAE_RETRACT, args, 2));
             }
             let key = (&args[0]).into();
             let value = (&args[1]).into();
@@ -349,15 +344,10 @@ async fn retract_fact<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
               */
             let state = match env.get_symbol(STATE) {
                 Some(lv) => lv,
-                None => {
-                    return Err(Anyhow(
-                        RAE_RETRACT,
-                        "state not defined in env".to_string(),
-                    ))
-                }
+                None => return Err(lerror!(RAE_RETRACT, "state not defined in env".to_string())),
             };
 
-            remove_key_value_map(&[state, args.into()], env)
+            remove_key_value_map(env, &[state, args.into()])
         }
         _ => unreachable!(
             "{} should have either {} or {} value.",
@@ -367,8 +357,8 @@ async fn retract_fact<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
 }
 
 ///Add a fact to fact state
-#[macro_rules_attribute(dyn_async!)]
-async fn assert_fact<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+#[async_scheme_fn]
+async fn assert_fact(env: &LEnv, args: &[LValue]) -> LResult {
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
 
     let mode: String = env
@@ -378,12 +368,7 @@ async fn assert_fact<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     match mode.as_str() {
         SYMBOL_EXEC_MODE => {
             if args.len() != 2 {
-                return Err(WrongNumberOfArgument(
-                    RAE_ASSERT,
-                    args.into(),
-                    args.len(),
-                    2..2,
-                ));
+                return Err(wrong_n_args!(RAE_ASSERT, args, 2));
             }
             let key = (&args[0]).into();
             let value = (&args[1]).into();
@@ -399,15 +384,10 @@ async fn assert_fact<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
              */
             let state = match env.get_symbol(STATE) {
                 Some(lv) => lv,
-                None => {
-                    return Err(Anyhow(
-                        RAE_ASSERT,
-                        "state not defined in env.".to_string(),
-                    ))
-                }
+                None => return Err(lerror!(RAE_ASSERT, "state not defined in env.".to_string())),
             };
 
-            set_map(&[state, args.into()], env)
+            set_map(env, &[state, args.into()])
         }
         _ => unreachable!(
             "{} should have either {} or {} value.",
@@ -418,13 +398,12 @@ async fn assert_fact<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
 
 //Return the labels of the methods
 
-fn get_instantiated_methods(args: &[LValue], env: &LEnv) -> LResult {
+fn get_instantiated_methods(env: &LEnv, args: &[LValue]) -> LResult {
     if args.is_empty() {
-        return Err(WrongNumberOfArgument(
+        return Err(LRuntimeError::wrong_number_of_args(
             RAE_GET_INSTANTIATED_METHODS,
-            args.into(),
-            args.len(),
-            1..std::usize::MAX,
+            args,
+            1..usize::MAX,
         ));
     }
     let task_name = &args[0];
@@ -435,19 +414,19 @@ fn get_instantiated_methods(args: &[LValue], env: &LEnv) -> LResult {
     let methods = if let LValue::Map(map) = task_method_map {
         let methods = match map.get(task_name) {
             None => {
-                return Err(Anyhow(
+                return Err(lerror!(
                     RAE_GET_INSTANTIATED_METHODS,
-                    format!("no methods for {}", task_name),
+                    format!("no methods for {}", task_name)
                 ))
             }
             Some(methods) => {
                 //Got here the list of the symbol of the methods
                 let mut instantiated_method = vec![];
                 if let LValue::List(methods) = methods {
-                    for method in methods {
+                    for method in methods.iter() {
                         //Handle here the case where it is needed to generate all instantiation of methods where several parameters are possible.
                         instantiated_method
-                            .push(cons(&[method.clone(), task_args.clone()], env).unwrap());
+                            .push(cons(env, &[method.clone(), task_args.clone()]).unwrap());
                     }
                     instantiated_method.into()
                 } else if let LValue::Nil = methods {
@@ -466,7 +445,7 @@ fn get_instantiated_methods(args: &[LValue], env: &LEnv) -> LResult {
     Ok(methods)
 }
 
-fn get_best_method(args: &[LValue], env: &LEnv) -> LResult {
+fn get_best_method(env: &LEnv, args: &[LValue]) -> LResult {
     /*ompas_utils::log::send(format!("env in get_best_method :\n {}", env));
     let task_methods_map = env.get_symbol(RAE_TASK_METHODS_MAP);
     ompas_utils::log::send(format!(
@@ -474,42 +453,37 @@ fn get_best_method(args: &[LValue], env: &LEnv) -> LResult {
         task_methods_map
     ));*/
 
-    let methods = get_instantiated_methods(args, env)?;
+    let methods = get_instantiated_methods(env, args)?;
     let task_args = &args[1..];
     //log::send(format!("methods for {}: {}\n", LValue::from(args), methods));
     let best_method = if let LValue::List(methods) = methods {
         if methods.is_empty() {
-            return Err(Anyhow(
+            return Err(lerror!(
                 RAE_GET_BEST_METHOD,
-                "task has no applicable method".to_string(),
+                "task has no applicable method".to_string()
             ));
         }
         methods[0].clone()
     } else {
-        return Err(WrongType(
-            RAE_GET_BEST_METHOD,
-            methods.clone(),
-            methods.into(),
-            KindLValue::List,
-        ));
+        return Err(wrong_type!(RAE_GET_BEST_METHOD, &methods, KindLValue::List));
     };
 
-    let method_instance = cons(&[best_method, task_args.into()], env)?;
+    let method_instance = cons(env, &[best_method, task_args.into()])?;
     //log::send(format!("instance of the method: {}\n", method_instance));
 
     Ok(method_instance)
 }
 
-#[macro_rules_attribute(dyn_async!)]
-async fn get_facts<'a>(_: &'a [LValue], env: &'a LEnv) -> LResult {
+#[async_scheme_fn]
+async fn get_facts(env: &LEnv) -> LResult {
     let mode: String = env
         .get_symbol("rae-mode")
         .expect("rae-mode should be defined, default value is exec mode")
         .try_into()?;
     match mode.as_str() {
         SYMBOL_EXEC_MODE => {
-            let mut state: im::HashMap<LValue, LValue> = get_state(&[], env).await?.try_into()?;
-            let locked: Vec<LValue> = get_list_locked(&[], env).await?.try_into()?;
+            let mut state: im::HashMap<LValue, LValue> = get_state(env, &[]).await?.try_into()?;
+            let locked: Vec<LValue> = get_list_locked(env, &[]).await?.try_into()?;
 
             for e in locked {
                 state.insert(vec![LOCKED.into(), e].into(), LValue::True);
@@ -526,8 +500,8 @@ async fn get_facts<'a>(_: &'a [LValue], env: &'a LEnv) -> LResult {
     }
 }
 
-#[macro_rules_attribute(dyn_async!)]
-async fn get_state<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+#[async_scheme_fn]
+async fn get_state(env: &LEnv, args: &[LValue]) -> LResult {
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
 
     let _type = match args.len() {
@@ -540,29 +514,23 @@ async fn get_state<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
                     KEY_INNER_WORLD => Some(StateType::InnerWorld),
                     KEY_INSTANCE => Some(StateType::Instance),
                     _ => {
-                        return Err(Anyhow(
+                        return Err(lerror!(
                             RAE_GET_STATE,
                             format!(
                                 "was expecting keys {}, {}, {}, {}",
                                 KEY_STATIC, KEY_DYNAMIC, KEY_INNER_WORLD, KEY_INSTANCE
-                            ),
+                            )
                         ))
                     }
                 }
             } else {
-                return Err(WrongType(
-                    RAE_GET_STATE,
-                    args[0].clone(),
-                    (&args[0]).into(),
-                    KindLValue::Symbol,
-                ));
+                return Err(wrong_type!(RAE_GET_STATE, &args[0], KindLValue::Symbol));
             }
         }
         _ => {
-            return Err(WrongNumberOfArgument(
+            return Err(LRuntimeError::wrong_number_of_args(
                 RAE_GET_STATE,
-                args.into(),
-                args.len(),
+                args,
                 0..1,
             ))
         }
@@ -572,16 +540,15 @@ async fn get_state<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     Ok(state)
 }
 
-#[macro_rules_attribute(dyn_async!)]
-async fn get_state_variable<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+#[async_scheme_fn]
+async fn get_state_variable(env: &LEnv, args: &[LValue]) -> LResult {
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
 
     if args.is_empty() {
-        return Err(WrongNumberOfArgument(
+        return Err(LRuntimeError::wrong_number_of_args(
             RAE_GET_STATE_VARIBALE,
-            args.into(),
-            0,
-            1..std::usize::MAX,
+            args,
+            1..usize::MAX,
         ));
     }
 
@@ -611,27 +578,27 @@ async fn get_state_variable<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
 
                 Ok(value.into())
             } else {
-                let facts: LValue = get_facts(&[], env).await?;
-                get_map(&[facts, key], env)
+                let facts: LValue = get_facts(env, &[]).await?;
+                get_map(env, &[facts, key])
             }
         }
         SYMBOL_SIMU_MODE => {
             let state = env.get_symbol(STATE).unwrap();
-            get_map(&[state, key], env)
+            get_map(env, &[state, key])
         }
         _ => {
-            return Err(Anyhow(
+            return Err(lerror!(
                 RAE_GET_STATE_VARIBALE,
                 format!(
                     "RAE_MODE must have the value {} or {} (value = {}).",
                     SYMBOL_EXEC_MODE, SYMBOL_SIMU_MODE, rae_mode,
-                ),
+                )
             ))
         }
     }
 }
 
-/*#[macro_rules_attribute(dyn_async!)]
+/*#[async_scheme_fn]
 async fn get_status<'a>(_: &'a [LValue], env: &'a LEnv) -> LResult {
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
 
@@ -644,8 +611,8 @@ async fn get_status<'a>(_: &'a [LValue], env: &'a LEnv) -> LResult {
     Ok(LValue::String(string))
 }*/
 
-#[macro_rules_attribute(dyn_async!)]
-async fn monitor<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+#[async_scheme_fn]
+async fn monitor(env: &LEnv, args: &[LValue]) -> LResult {
     //info!("wait on function");
     //println!("wait on function with {} args", args.len());
     /*pub const MACRO_WAIT_ON: &str = "(defmacro monitor (lambda (expr)
@@ -653,12 +620,7 @@ async fn monitor<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
         (monitor ,expr))))";*/
 
     if args.len() != 1 {
-        return Err(WrongNumberOfArgument(
-            RAE_MONITOR,
-            args.into(),
-            args.len(),
-            1..1,
-        ));
+        return Err(wrong_n_args!(RAE_MONITOR, args, 1));
     }
 
     if let LValue::True = eval(&args[0], &mut env.clone()).await? {
@@ -673,91 +635,45 @@ async fn monitor<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     }
     Ok(LValue::True)
 }
-
-lfn!{pub success(args, _){
-    Ok(vec![LValue::from(SUCCESS), args.into()].into())
+#[scheme_fn]
+pub fn success(args: &[LValue]) -> LValue {
+    list![LValue::from(SUCCESS), args.into()]
+}
+#[scheme_fn]
+pub fn failure(args: &[LValue]) -> LValue {
+    list![LValue::from(FAILURE), args.into()]
 }
 
-lfn!{pub failure(args, _){
-    Ok(vec![LValue::from(FAILURE), args.into()].into())
-}
-
-lfn!{pub is_failure(args, _){
-    if args.len() != 1 {
-        return Err(WrongNumberOfArgument(
-            IS_FAILURE,
-            args.into(),
-            args.len(),
-            1..1,
-        ));
-    }
-
-    if let LValue::List(list) = &args[0] {
-        if let LValue::Symbol(s) = &list[0] {
-            match s.as_str() {
-                SUCCESS => Ok(false.into()),
-                FAILURE => Ok(true.into()),
-                _ => Err(WrongType(
-                    IS_FAILURE,
-                    list[0].clone(),
-                    (&list[0]).into(),
-                    TypeLValue::Other("{success,failure}".to_string()),
-                )),
-            }
-        } else {
-            Err(WrongType(
+#[scheme_fn]
+pub fn is_failure(list: Vec<LValue>) -> Result<bool, LRuntimeError> {
+    if let LValue::Symbol(s) = &list[0] {
+        match s.as_str() {
+            SUCCESS => Ok(false),
+            FAILURE => Ok(true),
+            _ => Err(wrong_type!(
                 IS_FAILURE,
-                list[0].clone(),
-                (&list[0]).into(),
-                TypeLValue::Other("{success,failure}".to_string()),
-            ))
+                &list[0],
+                KindLValue::Other("{success,failure}".to_string())
+            )),
         }
     } else {
-        Err(WrongType(
-            IS_FAILURE,
-            args[0].clone(),
-            (&args[0]).into(),
-            TypeLValue::List,
-        ))
+        Err(wrong_type!(IS_FAILURE, &list[0], KindLValue::Symbol))
     }
 }
 
-lfn!{pub is_success(args, _){
-    if args.len() != 1 {
-        return Err(WrongNumberOfArgument(
-            IS_SUCCESS,
-            args.into(),
-            args.len(),
-            1..1,
-        ));
-    }
-
-    if let LValue::List(list) = &args[0] {
-        if let LValue::Symbol(s) = &list[0] {
-            match s.as_str() {
-                SUCCESS => Ok(true.into()),
-                FAILURE => Ok(false.into()),
-                _ => Err(WrongType(
-                    IS_SUCCESS,
-                    list[0].clone(),
-                    (&list[0]).into(),
-                    TypeLValue::Other("{success,failure}".to_string()),
-                )),
-            }
-        } else {
-            Err(WrongType(
+#[scheme_fn]
+pub fn is_success(list: Vec<LValue>) -> Result<bool, LRuntimeError> {
+    if let LValue::Symbol(s) = &list[0] {
+        match s.as_str() {
+            SUCCESS => Ok(true),
+            FAILURE => Ok(false),
+            _ => Err(wrong_type!(
                 IS_SUCCESS,
-                list[0].clone(),
-                (&list[0]).into(),
-                TypeLValue::Other("{success,failure}".to_string()),
-            ))
+                &list[0],
+                KindLValue::Other("{success,failure}".to_string())
+            )),
         }
     } else {
-        Err(WrongType(
-            IS_SUCCESS,
-            args[0].clone(),
-            (&args[0]).into(),
-            TypeLValue::List,
-        ))
+        Err(wrong_type!(IS_FAILURE, &list[0], KindLValue::Symbol))
     }
 }

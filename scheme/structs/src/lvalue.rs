@@ -304,23 +304,22 @@ impl TryFrom<&LValue> for im::HashMap<LValue, LValue> {
     }
 }
 
-/*impl TryFrom<&LValue> for &LValue {
+impl TryFrom<&LValue> for Arc<Sym> {
     type Error = LRuntimeError;
 
-    #[function_name::named]
+    #[named]
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
-        Ok(value)
+        match value {
+            LValue::Symbol(a) => Ok(a.clone()),
+            LValue::String(s) => Ok(s.clone()),
+            lv => Err(LRuntimeError::not_in_list_of_expected_types(
+                function_name!(),
+                lv,
+                vec![KindLValue::String, KindLValue::Symbol],
+            )),
+        }
     }
-}*/
-
-/*impl TryFrom<LValue> for LValue {
-    type Error = LRuntimeError;
-
-    #[function_name::named]
-    fn try_from(value: LValue) -> Result<Self, Self::Error> {
-        Ok(value.clone())
-    }
-}*/
+}
 
 impl TryFrom<LValue> for im::HashMap<LValue, LValue> {
     type Error = LRuntimeError;
@@ -665,15 +664,15 @@ impl Div for LValue {
     }
 }
 
-impl From<&LNumber> for LValue {
+/*impl From<&LNumber> for LValue {
     fn from(n: &LNumber) -> Self {
         LValue::Number(n.clone())
     }
-}
+}*/
 
 impl From<LNumber> for LValue {
     fn from(n: LNumber) -> Self {
-        (&n).into()
+        LValue::Number(n)
     }
 }
 
@@ -697,15 +696,15 @@ impl From<&str> for LValue {
 
 impl From<String> for LValue {
     fn from(s: String) -> Self {
-        (&s).into()
+        symbol!(s)
     }
 }
 
-impl From<&String> for LValue {
+/*impl From<&String> for LValue {
     fn from(s: &String) -> Self {
         symbol!(s.to_string())
     }
-}
+}*/
 
 impl From<&[LValue]> for LValue {
     fn from(lv: &[LValue]) -> Self {
@@ -717,14 +716,36 @@ impl From<&[LValue]> for LValue {
     }
 }
 
-impl From<&LValue> for LValue {
+/*impl From<&LValue> for LValue {
     fn from(lv: &LValue) -> Self {
         lv.clone()
     }
+}*/
+
+impl From<Arc<Sym>> for LValue {
+    fn from(a: Arc<Sym>) -> Self {
+        LValue::Symbol(a)
+    }
 }
 
-impl<T: Clone + Into<LValue>> From<&Vec<T>> for LValue {
+impl<T: Into<LValue>> From<&T> for LValue {
+    fn from(t: &T) -> Self {
+        t.clone().into()
+    }
+}
+
+/*impl<T: Clone + Into<LValue>> From<&Vec<T>> for LValue {
     fn from(vec: &Vec<T>) -> Self {
+        if vec.is_empty() {
+            LValue::Nil
+        } else {
+            LValue::List(Arc::new(vec.iter().map(|x| x.clone().into()).collect()))
+        }
+    }
+}*/
+
+impl<T: Clone + Into<LValue>> From<Vec<T>> for LValue {
+    fn from(vec: Vec<T>) -> Self {
         if vec.is_empty() {
             LValue::Nil
         } else {
@@ -733,17 +754,11 @@ impl<T: Clone + Into<LValue>> From<&Vec<T>> for LValue {
     }
 }
 
-impl<T: Clone + Into<LValue>> From<Vec<T>> for LValue {
-    fn from(vec: Vec<T>) -> Self {
-        (&vec).into()
-    }
-}
-
-impl From<&LCoreOperator> for LValue {
+/*impl From<&LCoreOperator> for LValue {
     fn from(co: &LCoreOperator) -> Self {
         LValue::CoreOperator(co.clone())
     }
-}
+}*/
 
 impl From<LCoreOperator> for LValue {
     fn from(co: LCoreOperator) -> Self {
@@ -796,7 +811,7 @@ impl From<LAsyncFn> for LValue {
     }
 }
 
-impl<K: Clone + Into<LValue>, V: Clone + Into<LValue>> From<&im::HashMap<K, V>> for LValue {
+/*impl<K: Clone + Into<LValue>, V: Clone + Into<LValue>> From<&im::HashMap<K, V>> for LValue {
     fn from(map: &im::HashMap<K, V>) -> Self {
         let mut new_map: HashMap<LValue, LValue> = im::HashMap::new();
 
@@ -806,11 +821,17 @@ impl<K: Clone + Into<LValue>, V: Clone + Into<LValue>> From<&im::HashMap<K, V>> 
 
         LValue::Map(new_map)
     }
-}
+}*/
 
 impl<K: Clone + Into<LValue>, V: Clone + Into<LValue>> From<im::HashMap<K, V>> for LValue {
     fn from(map: im::HashMap<K, V>) -> Self {
-        (&map).into()
+        let mut new_map: HashMap<LValue, LValue> = im::HashMap::new();
+
+        for (k, v) in map.iter() {
+            new_map.insert(k.clone().into(), v.clone().into());
+        }
+
+        LValue::Map(new_map)
     }
 }
 

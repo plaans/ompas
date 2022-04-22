@@ -629,7 +629,7 @@ pub fn eval_non_recursive(lv: &LValue, env: &mut LEnv) -> lerror::Result<LValue>
                                 "eval",
                                 lv.clone(),
                                 lv.into(),
-                                TypeLValue::Symbol,
+                                KindLValue::Symbol,
                             ))
                         }
                     };
@@ -651,7 +651,7 @@ pub fn eval_non_recursive(lv: &LValue, env: &mut LEnv) -> lerror::Result<LValue>
                                             "eval",
                                             lv.clone(),
                                             lv.into(),
-                                            TypeLValue::Symbol,
+                                            KindLValue::Symbol,
                                         ))
                                     }
                                 }
@@ -665,7 +665,7 @@ pub fn eval_non_recursive(lv: &LValue, env: &mut LEnv) -> lerror::Result<LValue>
                                 "eval",
                                 lv.clone(),
                                 lv.into(),
-                                vec![TypeLValue::List, TypeLValue::Symbol],
+                                vec![KindLValue::List, KindLValue::Symbol],
                             ))
                         }
                     };
@@ -685,7 +685,7 @@ pub fn eval_non_recursive(lv: &LValue, env: &mut LEnv) -> lerror::Result<LValue>
                         LValue::True => Ok(conseq.clone()),
                         LValue::Nil => Ok(alt.clone()),
                         lv => {
-                            return Err(wrong_type!("eval", lv.clone(), lv.into(), TypeLValue::Bool))
+                            return Err(wrong_type!("eval", lv.clone(), lv.into(), KindLValue::Bool))
                         }
                     }
                 }
@@ -719,7 +719,7 @@ pub fn eval_non_recursive(lv: &LValue, env: &mut LEnv) -> lerror::Result<LValue>
                             "eval",
                             args[0].clone(),
                             (&args[0]).into(),
-                            TypeLValue::String,
+                            KindLValue::String,
                         ));
                     }
                 }
@@ -754,7 +754,7 @@ pub fn eval_non_recursive(lv: &LValue, env: &mut LEnv) -> lerror::Result<LValue>
                     return Ok(r_lvalue);
                 }
                 lv => {
-                    return Err(wrong_type!("eval", lv.clone(), lv.into(), TypeLValue::Fn));
+                    return Err(wrong_type!("eval", lv.clone(), lv.into(), KindLValue::Fn));
                 }
             };
         }

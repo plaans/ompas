@@ -2,23 +2,21 @@
 
 use crate::language::*;
 use crate::rae_interface::PlatformGodot;
-use ::macro_rules_attribute::macro_rules_attribute;
 use ompas_rae_scheme::rae_exec::RAEInterface;
 use ompas_rae_structs::exec_context::rae_state::{RAEState, StateType, KEY_DYNAMIC, KEY_STATIC};
 use ompas_rae_structs::refinement::Agenda;
+use sompas_macros::*;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::{Documentation, LHelp};
 use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror::LResult;
-use sompas_structs::lerror::LRuntimeError::{Anyhow, WrongNumberOfArgument, WrongType};
+use sompas_structs::lerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
 use sompas_structs::typelvalue::KindLValue;
-use sompas_utils::dyn_async;
+use sompas_structs::{lerror, wrong_type};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-
 /*
 LANGUAGE
 */
@@ -228,28 +226,28 @@ Functions
  */
 
 /// Launch the godot process the simulation and opens the com
-#[macro_rules_attribute(dyn_async!)]
-async fn launch_godot<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+#[async_scheme_fn]
+async fn launch_godot(env: &LEnv, args: &[LValue]) -> LResult {
     let env = env.clone();
-    let ctx = env.get_context::<CtxGodot>(MOD_GODOT)?;
+    let ctx = env.get_context::<CtxGodot>(MOD_GODOT).unwrap();
     let mut platform = ctx.platform.write().await;
     let future = platform.launch_platform(args).await;
     future
 }
 
 /// Opens the tcp communication to receive state and status update and send commands.
-#[macro_rules_attribute(dyn_async!)]
-async fn open_com<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
-    let ctx = env.get_context::<CtxGodot>(MOD_GODOT)?;
+#[async_scheme_fn]
+async fn open_com(env: &LEnv, args: &[LValue]) -> LResult {
+    let ctx = env.get_context::<CtxGodot>(MOD_GODOT).unwrap();
     ctx.platform.write().await.open_com(args).await
 }
 
 pub const DEFAULT_PATH_PROJECT_GODOT: &str = "/home/jeremy/godot/simulation-factory-godot/simu";
 
 ///Launch godot
-#[macro_rules_attribute(dyn_async!)]
-async fn start_godot<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
-    let ctx = env.get_context::<CtxGodot>(MOD_GODOT)?;
+#[async_scheme_fn]
+async fn start_godot(env: &LEnv, args: &[LValue]) -> LResult {
+    let ctx = env.get_context::<CtxGodot>(MOD_GODOT).unwrap();
     ctx.platform.write().await.start_platform(args).await
 }
 /// Commands available
@@ -259,17 +257,17 @@ async fn start_godot<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
 ///- Rotation : ['do_rotation', robot_name, angle, speed]
 
 /// Sends a command to godot
-#[macro_rules_attribute(dyn_async!)]
-async fn exec_godot<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
-    let ctx = env.get_context::<CtxGodot>(MOD_GODOT)?;
+#[async_scheme_fn]
+async fn exec_godot(env: &LEnv, args: &[LValue]) -> LResult {
+    let ctx = env.get_context::<CtxGodot>(MOD_GODOT).unwrap();
     let (id, _) = ctx.agenda.add_action(args.into(), 0).await;
     ctx.platform.read().await.exec_command(args, id).await
 }
 
 /// Returns the whole state if no args and a particular entry corresponding to the arg.
-#[macro_rules_attribute(dyn_async!)]
-async fn get_state<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
-    let ctx = env.get_context::<CtxGodot>(MOD_GODOT)?;
+#[async_scheme_fn]
+async fn get_state(env: &LEnv, args: &[LValue]) -> LResult {
+    let ctx = env.get_context::<CtxGodot>(MOD_GODOT).unwrap();
     let _type = match args.len() {
         0 => None,
         1 => match &args[0] {
@@ -277,27 +275,25 @@ async fn get_state<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
                 KEY_STATIC => Some(StateType::Static),
                 KEY_DYNAMIC => Some(StateType::Dynamic),
                 _ => {
-                    let result1 = Err(Anyhow(
+                    let result1 = Err(lerror!(
                         "PlatformGodot::get_state",
-                        format!("Expected keywords {} or {}", KEY_STATIC, KEY_DYNAMIC),
+                        format!("Expected keywords {} or {}", KEY_STATIC, KEY_DYNAMIC)
                     ));
                     return result1;
                 }
             },
             lv => {
-                return Err(WrongType(
+                return Err(wrong_type!(
                     "PlatformGodot::get_state",
-                    lv.clone(),
-                    lv.into(),
-                    KindLValue::Symbol,
+                    &lv,
+                    KindLValue::Symbol
                 ))
             }
         },
         _ => {
-            return Err(WrongNumberOfArgument(
+            return Err(LRuntimeError::wrong_number_of_args(
                 "PlatformGodot::get_state",
-                args.into(),
-                args.len(),
+                args,
                 0..1,
             ))
         }

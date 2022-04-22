@@ -65,17 +65,17 @@ impl Display for PLValue {
     }
 }
 
-impl From<&PLValue> for LValue {
-    fn from(pl: &PLValue) -> Self {
+impl From<PLValue> for LValue {
+    fn from(pl: PLValue) -> Self {
         pl.lvalue.clone()
     }
 }
 
-impl From<PLValue> for LValue {
+/*impl From<PLValue> for LValue {
     fn from(pl: PLValue) -> Self {
         (&pl).into()
     }
-}
+}*/
 
 pub fn expand_static(x: &LValue, top_level: bool, env: &mut LEnv) -> lerror::Result<PLValue> {
     match x {

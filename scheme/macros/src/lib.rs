@@ -18,8 +18,7 @@ const REF_ARGS_TYPE: &str = "&[LValue]";
 const LVALUE_TYPE: &str = "LValue";
 const REF_LVALUE_TYPE: &str = "&LValue";
 const RESULT: &str = "__result__";
-//const DEFAULT_RETURN : &str = "Ok(sompas_struct::lvalue::LValue::Nil)";
-const DEFAULT_RETURN: &str = "Ok(String::new())";
+const DEFAULT_RETURN: &str = "Ok(sompas_structs::lvalue::LValue::Nil)";
 const ERROR_TYPE: &str = "LRuntimeError";
 const RETURN_TYPE: &str = "LResult";
 const RESULT_TYPE: &str = "Result";
@@ -156,20 +155,19 @@ fn build_params(
         return (env, args, new_params);
     }
     let type_lvalue: Type = syn::parse_str::<Type>(format!("{}", LVALUE_TYPE).as_str()).unwrap();
-    let (type_env, type_args, type_ref_lvalue) = if let Some(lt) = defined_lt {
+    let type_ref_lvalue: Type = syn::parse_str::<Type>(REF_LVALUE_TYPE).unwrap();
+    let (type_env, type_args) = if let Some(lt) = defined_lt {
         //println!("&{} {}", lt, ENV_TYPE);
         let type_env: Type =
             syn::parse_str::<Type>(format!("&{} {}", lt, ENV_TYPE).as_str()).unwrap();
         let type_args: Type =
             syn::parse_str::<Type>(format!("&{} {}", lt, ARGS_TYPE).as_str()).unwrap();
-        let type_ref_lvalue: Type =
-            syn::parse_str::<Type>(format!("&{} {}", lt, LVALUE_TYPE).as_str()).unwrap();
-        (type_env, type_args, type_ref_lvalue)
+        (type_env, type_args)
     } else {
         let type_env: Type = syn::parse_str::<Type>(REF_ENV_TYPE).unwrap();
         let type_args: Type = syn::parse_str::<Type>(REF_ARGS_TYPE).unwrap();
-        let type_ref_lvalue: Type = syn::parse_str::<Type>(REF_LVALUE_TYPE).unwrap();
-        (type_env, type_args, type_ref_lvalue)
+
+        (type_env, type_args)
     };
 
     let mut first = true;

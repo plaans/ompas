@@ -2,8 +2,8 @@ use im::HashMap;
 
 use crate::refinement::task_collection::TaskStatus;
 use sompas_core::modules::map::union_map;
+use sompas_structs::lerror;
 use sompas_structs::lerror::LRuntimeError;
-use sompas_structs::lerror::LRuntimeError::Anyhow;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalues::LValueS;
 use std::fmt::{Display, Formatter};
@@ -121,11 +121,11 @@ impl From<RAEStateSnapshot> for LValue {
     fn from(r: RAEStateSnapshot) -> Self {
         let env = Default::default();
         union_map(
-            &[
-                union_map(&[r.instance.into_map(), r.dynamic.into_map()], &env).unwrap(),
-                union_map(&[r._static.into_map(), r.inner_world.into_map()], &env).unwrap(),
-            ],
             &env,
+            &[
+                union_map(&env, &[r.instance.into_map(), r.dynamic.into_map()]).unwrap(),
+                union_map(&env, &[r._static.into_map(), r.inner_world.into_map()]).unwrap(),
+            ],
         )
         .unwrap()
     }
@@ -242,18 +242,15 @@ impl RAEState {
     ) -> Result<LValue, LRuntimeError> {
         let old_value = self.inner_world.read().await.get(&key).cloned();
         match old_value {
-            None => Err(Anyhow(
-                "RAEState::retract_fact",
-                "key is not in state".to_string(),
-            )),
+            None => Err(lerror!("RAEState::retract_fact", "key is not in state")),
             Some(old_value) => {
                 if old_value == value {
                     self.inner_world.write().await.remove(&key);
                     Ok(LValue::True)
                 } else {
-                    Err(Anyhow(
+                    Err(lerror!(
                         "RAEState::retract_fact",
-                        "there is no such fact in state".to_string(),
+                        "there is no such fact in state"
                     ))
                 }
             }

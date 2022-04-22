@@ -1,26 +1,4 @@
 #[macro_export]
-macro_rules! dyn_async {(
-    $( #[$attr:meta] )* // includes doc strings
-    $pub:vis
-    async
-    fn $fname:ident<$lt:lifetime> ( $($args:tt)* ) $(-> $Ret:ty)?
-    {
-        $($body:tt)*
-    }
-) => (
-    $( #[$attr] )*
-    #[allow(unused_parens)]
-    $pub
-    fn $fname<$lt> ( $($args)* ) -> ::std::pin::Pin<::std::boxed::Box<
-        dyn ::std::future::Future<Output = ($($Ret)?)>
-            + ::std::marker::Send + $lt
-    >>
-    {
-        ::std::boxed::Box::pin(async move { $($body)* })
-    }
-)}
-
-#[macro_export]
 macro_rules! symbol {
     ($x:expr) => {
         LValue::Symbol(std::sync::Arc::new($x))
@@ -44,7 +22,7 @@ macro_rules! string {
 #[macro_export]
 macro_rules! list {
     ($($x:expr),*) => (
-        LValue::List(vec!($($x),*))
+        LValue::List(std::sync::Arc::new(vec!($($x),*)))
     );
 }
 

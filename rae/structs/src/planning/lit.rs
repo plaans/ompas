@@ -5,7 +5,6 @@ use crate::planning::type_table::PlanningAtomType;
 use im::{hashset, HashSet};
 use sompas_structs::lerror;
 use sompas_structs::lerror::LRuntimeError;
-use sompas_structs::lerror::LRuntimeError::Anyhow;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lvalue::LValue;
 use std::convert::{TryFrom, TryInto};
@@ -151,14 +150,14 @@ pub fn lvalue_to_lit(lv: &LValue, st: &mut SymTable) -> lerror::Result<Lit> {
     match lv {
         LValue::List(list) => {
             let mut vec = vec![];
-            for e in list {
+            for e in list.iter() {
                 vec.push(lvalue_to_lit(e, st)?);
             }
             Ok(vec.into())
         }
-        LValue::Map(_) => Err(Anyhow(
+        LValue::Map(_) => Err(lerror!(
             "LValue to lit",
-            "Map transformation to lit is not supported yet.".to_string(),
+            "Map transformation to lit is not supported yet."
         )),
         LValue::Number(n) => match n {
             LNumber::Int(i) => Ok(st.new_int(*i as i32).into()),

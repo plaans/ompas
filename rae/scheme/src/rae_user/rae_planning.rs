@@ -1,16 +1,15 @@
 use crate::rae_user::{CtxRae, MOD_RAE};
-use ::macro_rules_attribute::macro_rules_attribute;
 use ompas_rae_planning::binding_aries::solver::run_solver_for_htn;
 use ompas_rae_planning::binding_aries::{generate_chronicles, solver};
 use ompas_rae_planning::conversion::convert_domain_to_chronicle_hierarchy;
 use ompas_rae_structs::planning::{ConversionContext, Problem};
-use sompas_structs::lenv::LEnv;
+use sompas_macros::*;
 use sompas_structs::lerror::LResult;
 use sompas_structs::lvalue::LValue;
-use sompas_utils::dyn_async;
+use sompas_structs::string;
 
-#[macro_rules_attribute(dyn_async!)]
-pub async fn plan_task<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+#[async_scheme_fn]
+pub async fn plan_task(env: &LEnv, args: &[LValue]) -> LResult {
     let task: LValue = args.into();
     println!("task to plan: {}", task);
     let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
@@ -38,7 +37,7 @@ pub async fn plan_task<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
         );
         solver::extract_instantiated_methods(x)?
     } else {
-        LValue::String("no solution found".to_string())
+        string!("no solution found".to_string())
     };
 
     Ok(result)

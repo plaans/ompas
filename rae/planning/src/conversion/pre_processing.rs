@@ -1,11 +1,11 @@
 use ompas_rae_structs::planning::{ConversionCollection, ConversionContext};
 use sompas_core::*;
 use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror::LResult;
-use sompas_structs::lerror::LRuntimeError::{Anyhow, WrongNumberOfArgument, WrongType};
+use sompas_structs::lerror::{LResult, LRuntimeError};
 use sompas_structs::llambda::LambdaArgs;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::typelvalue::KindLValue;
+use sompas_structs::{lerror, wrong_n_args, wrong_type};
 use sompas_utils::blocking_async;
 
 pub const TRANSFORM_LAMBDA_EXPRESSION: &str = "transform-lambda-expression";
@@ -38,7 +38,7 @@ pub fn pre_process_transform_lambda(lv: &LValue, context: &ConversionContext) ->
 
     if let LValue::List(list) = &lv {
         let mut result = vec![];
-        for lv in list {
+        for lv in list.iter() {
             result.push(pre_process_transform_lambda(lv, context)?)
         }
 
@@ -53,10 +53,9 @@ pub fn transform_lambda_expression(lv: &LValue, env: LEnv) -> LResult {
 
     if let LValue::List(list) = lv {
         if list.is_empty() {
-            return Err(WrongNumberOfArgument(
+            return Err(LRuntimeError::wrong_number_of_args(
                 TRANSFORM_LAMBDA_EXPRESSION,
-                lv.clone(),
-                0,
+                list.as_slice(),
                 1..std::usize::MAX,
             ));
         }
@@ -90,18 +89,11 @@ pub fn transform_lambda_expression(lv: &LValue, env: LEnv) -> LResult {
                 }
                 LambdaArgs::List(params) => {
                     if params.len() != args.len() {
-                        return Err(Anyhow(
-                            TRANSFORM_LAMBDA_EXPRESSION,
-                            format!(
-                                "in lambda {}: ",
-                                WrongNumberOfArgument(
-                                    TRANSFORM_LAMBDA_EXPRESSION,
-                                    args.into(),
-                                    args.len(),
-                                    params.len()..params.len(),
-                                )
-                            ),
-                        ));
+                        return Err(
+                            wrong_n_args!(TRANSFORM_LAMBDA_EXPRESSION, args, params.len())
+                                .chain("in lambda")
+                                .chain(TRANSFORM_LAMBDA_EXPRESSION),
+                        );
                     }
                     for (param, arg) in params.iter().zip(args) {
                         lisp.push_str(format!("(define {} '{})", param, arg).as_str());
@@ -109,9 +101,9 @@ pub fn transform_lambda_expression(lv: &LValue, env: LEnv) -> LResult {
                 }
                 LambdaArgs::Nil => {
                     if !args.is_empty() {
-                        return Err(Anyhow(
+                        return Err(lerror!(
                             TRANSFORM_LAMBDA_EXPRESSION,
-                            "Lambda was expecting no args.".to_string(),
+                            "Lambda was expecting no args.".to_string()
                         ));
                     }
                 }
@@ -124,19 +116,17 @@ pub fn transform_lambda_expression(lv: &LValue, env: LEnv) -> LResult {
 
             blocking_async!(parse(&lisp, &mut c_env).await).expect("error in thread parsing string")
         } else {
-            Err(WrongType(
+            Err(wrong_type!(
                 TRANSFORM_LAMBDA_EXPRESSION,
-                list[0].clone(),
-                (&list[0]).into(),
-                KindLValue::Lambda,
+                &list[0],
+                KindLValue::Lambda
             ))
         }
     } else {
-        Err(WrongType(
+        Err(wrong_type!(
             TRANSFORM_LAMBDA_EXPRESSION,
-            lv.clone(),
-            lv.into(),
-            KindLValue::List,
+            lv,
+            KindLValue::List
         ))
     }
 }

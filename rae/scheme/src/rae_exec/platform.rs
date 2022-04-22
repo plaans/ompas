@@ -1,5 +1,4 @@
 use crate::rae_exec::*;
-use ::macro_rules_attribute::macro_rules_attribute;
 use log::{info, warn};
 use ompas_rae_core::planning::{CtxPlanning, MOD_PLANNING};
 use ompas_rae_structs::exec_context::error::RaeExecError;
@@ -11,16 +10,19 @@ use sompas_structs::lenv::LEnv;
 use sompas_structs::lerror::LResult;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lvalue::LValue;
-use sompas_utils::dyn_async;
+use sompas_structs::wrong_n_args;
 use std::convert::{TryFrom, TryInto};
 
-lfn!{pub is_platform_defined(_, env){
-    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
-    Ok(ctx.platform_interface.is_some().into())
+#[scheme_fn]
+pub fn is_platform_defined(env: &LEnv) -> bool {
+    env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)
+        .unwrap()
+        .platform_interface
+        .is_some()
 }
 
-#[macro_rules_attribute(dyn_async!)]
-pub async fn exec_command<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+#[async_scheme_fn]
+pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LResult {
     let parent_task: usize = env
         .get_ref_symbol(PARENT_TASK)
         .map(|n| LNumber::try_from(n).unwrap().into())
@@ -83,7 +85,7 @@ pub async fn exec_command<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
                 }
                 None => {
                     let r = eval_model().await;
-                    algorithms::set_success_for_task(&[action_id.into()], env).await?;
+                    algorithms::set_success_for_task(env, &[action_id.into()]).await?;
                     r
                 }
             }
@@ -96,9 +98,9 @@ pub async fn exec_command<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     }
 }
 
-#[macro_rules_attribute(dyn_async!)]
-pub async fn launch_platform<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
-    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
+#[async_scheme_fn]
+pub async fn launch_platform(env: &LEnv, args: &[LValue]) -> LResult {
+    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC).unwrap();
 
     if let Some(platform) = &ctx.platform_interface {
         platform.launch_platform(args).await
@@ -107,9 +109,9 @@ pub async fn launch_platform<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     }
 }
 
-#[macro_rules_attribute(dyn_async!)]
-pub async fn start_platform<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
-    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
+#[async_scheme_fn]
+pub async fn start_platform(env: &LEnv, args: &[LValue]) -> LResult {
+    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC).unwrap();
 
     if let Some(platform) = &ctx.platform_interface {
         platform.start_platform(args).await
@@ -117,9 +119,9 @@ pub async fn start_platform<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
         Ok("No platform defined".into())
     }
 }
-#[macro_rules_attribute(dyn_async!)]
-pub async fn open_com<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
-    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
+#[async_scheme_fn]
+pub async fn open_com(env: &LEnv, args: &[LValue]) -> LResult {
+    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC).unwrap();
 
     if let Some(platform) = &ctx.platform_interface {
         platform.open_com(args).await
@@ -128,9 +130,9 @@ pub async fn open_com<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     }
 }
 
-#[macro_rules_attribute(dyn_async!)]
-pub async fn cancel_command<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
-    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
+#[async_scheme_fn]
+pub async fn cancel_command(env: &LEnv, args: &[LValue]) -> LResult {
+    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC).unwrap();
 
     let mode: String = env
         .get_symbol("rae-mode")
@@ -157,9 +159,9 @@ enum InstanceMode {
     Check,
 }
 
-#[macro_rules_attribute(dyn_async!)]
-pub async fn instance<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
-    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
+#[async_scheme_fn]
+pub async fn instance(env: &LEnv, args: &[LValue]) -> LResult {
+    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC).unwrap();
     let mode: String = env
         .get_symbol("rae-mode")
         .expect("rae-mode should be defined, default value is exec mode")
@@ -173,10 +175,9 @@ pub async fn instance<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
             1 => InstanceMode::Instances,
             2 => InstanceMode::Check,
             _ => {
-                return Err(WrongNumberOfArgument(
+                return Err(LRuntimeError::wrong_number_of_args(
                     RAE_INSTANCE,
-                    args.into(),
-                    args.len(),
+                    args,
                     1..2,
                 ))
             }
@@ -194,10 +195,10 @@ pub async fn instance<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
             values.push(facts.get(&key).unwrap_or(&LValue::Nil).clone());
         }
 
-        let instances = append(values.as_slice(), env)?;
+        let instances = append(env, values.as_slice())?;
         match &mode {
             InstanceMode::Instances => Ok(instances),
-            InstanceMode::Check => contains(&[instances, args[0].clone()], env),
+            InstanceMode::Check => contains(env, &[instances, args[0].clone()]),
         }
     };
 
@@ -206,7 +207,7 @@ pub async fn instance<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
             if let Some(platform) = &ctx.platform_interface {
                 platform.instance(args).await
             } else {
-                let state: im::HashMap<LValue, LValue> = get_facts(&[], env).await?.try_into()?;
+                let state: im::HashMap<LValue, LValue> = get_facts(env, &[]).await?.try_into()?;
                 look_in_state(state)
             }
         }

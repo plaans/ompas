@@ -7,15 +7,15 @@ use sompas_language::{LIST, OBJECT};
 use sompas_structs::lcoreoperator::LCoreOperator;
 use sompas_structs::lenv::{LEnv, LEnvSymbols};
 use sompas_structs::lerror::LRuntimeError;
-use sompas_structs::lerror::LRuntimeError::{
-    Anyhow, NotInListOfExpectedTypes, WrongNumberOfArgument, WrongType,
-};
+
 use sompas_structs::llambda::LLambda;
-use sompas_structs::lvalue::LValue;
+use sompas_structs::lvalue::{LValue, Sym};
 use sompas_structs::typelvalue::KindLValue;
+use sompas_structs::{lerror, wrong_n_args, wrong_type};
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
+use std::sync::Arc;
 use tokio::sync::mpsc::Receiver;
 
 pub const RAE_TASK_METHODS_MAP: &str = "rae-task-methods-map";
@@ -40,7 +40,7 @@ pub const TYPE_LIST: &str = "tlist";
 
 #[derive(Debug, Clone)]
 pub enum Type {
-    Single(String),
+    Single(Arc<Sym>),
     List(Box<Type>),
     Tuple(Vec<Type>),
 }
@@ -48,17 +48,17 @@ pub enum Type {
 impl Type {
     pub fn try_as_single(&self) -> Option<&String> {
         if let Self::Single(s) = self {
-            Some(s)
+            Some(s.as_ref())
         } else {
             None
         }
     }
 }
 
-impl From<&Type> for LValue {
-    fn from(t: &Type) -> Self {
+impl From<Type> for LValue {
+    fn from(t: Type) -> Self {
         match t {
-            Type::Single(s) => s.into(),
+            Type::Single(s) => LValue::Symbol(s),
             Type::List(l) => vec![LValue::from(TYPE_LIST), l.deref().into()].into(),
             Type::Tuple(tuple) => {
                 let mut vec: Vec<LValue> = vec![TUPLE_TYPE.into()];
@@ -71,15 +71,15 @@ impl From<&Type> for LValue {
     }
 }
 
-impl From<Type> for LValue {
+/*impl From<Type> for LValue {
     fn from(t: Type) -> Self {
         (&t).into()
     }
-}
+}*/
 
 impl From<&str> for Type {
     fn from(str: &str) -> Self {
-        Self::Single(str.to_string())
+        Self::Single(Arc::new(str.to_string()))
     }
 }
 
@@ -107,11 +107,11 @@ impl Display for Type {
 
 #[derive(Debug, Clone)]
 pub struct Parameters {
-    inner: Vec<(String, Type)>,
+    inner: Vec<(Arc<Sym>, Type)>,
 }
 
 impl Parameters {
-    pub fn inner(&self) -> &Vec<(String, Type)> {
+    pub fn inner(&self) -> &Vec<(Arc<Sym>, Type)> {
         &self.inner
     }
 }
@@ -122,19 +122,19 @@ impl TryFrom<&LValue> for Type {
     type Error = LRuntimeError;
 
     fn try_from(lv: &LValue) -> Result<Self, Self::Error> {
-        let err = Anyhow(
+        let err = lerror!(
             TYPE_TRY_FROM_LVALUE,
-            format!("{} or {} was expected", TUPLE_TYPE, LIST),
+            format!("{} or {} was expected", TUPLE_TYPE, LIST)
         );
 
         match lv {
             LValue::Symbol(s) => {
-                let string = if s == LIST {
+                let string = if s.as_str() == LIST {
                     TYPE_LIST.to_string()
                 } else {
                     s.to_string()
                 };
-                Ok(Self::Single(string))
+                Ok(Self::Single(Arc::new(string)))
             }
             LValue::List(list) => {
                 assert!(list.len() >= 2);
@@ -157,10 +157,9 @@ impl TryFrom<&LValue> for Type {
                     Err(err)
                 }
             }
-            _ => Err(NotInListOfExpectedTypes(
+            _ => Err(LRuntimeError::not_in_list_of_expected_types(
                 TYPE_TRY_FROM_LVALUE,
-                lv.clone(),
-                (lv).into(),
+                lv,
                 vec![KindLValue::Symbol, KindLValue::List],
             )),
         }
@@ -172,36 +171,36 @@ const PARAMETERS_TRY_FROM_LVALUE: &str = "Parameters::TryFrom(LValue)";
 impl TryFrom<&LValue> for Parameters {
     type Error = LRuntimeError;
 
-    //form: ((param type) (param2 type2) ... (paramn typen))
+    #[function_name::named]
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
-        let mut vec = vec![];
+        let mut vec: Vec<(Arc<Sym>, Type)> = vec![];
 
         if let LValue::List(list) = value {
-            for e in list {
+            for e in list.iter() {
                 match e {
                     LValue::List(description) => {
                         if description.len() == 2 {
                             vec.push((
-                                (&description[0]).try_into()?,
-                                (&description[1]).try_into()?,
+                                Arc::<Sym>::try_from(&description[0])
+                                    .map_err(|e| e.chain(function_name!()))?,
+                                Type::try_from(&description[1])
+                                    .map_err(|e| e.chain(function_name!()))?,
                             ));
                         } else {
-                            return Err(WrongNumberOfArgument(
+                            return Err(wrong_n_args!(
                                 PARAMETERS_TRY_FROM_LVALUE,
-                                e.clone(),
-                                description.len(),
-                                2..2,
+                                description.as_slice(),
+                                2
                             ));
                         }
                     }
                     LValue::Symbol(s) => {
-                        vec.push((s.into(), OBJECT.into()));
+                        vec.push((s.clone(), OBJECT.into()));
                     }
                     _ => {
-                        return Err(NotInListOfExpectedTypes(
+                        return Err(LRuntimeError::not_in_list_of_expected_types(
                             PARAMETERS_TRY_FROM_LVALUE,
-                            e.clone(),
-                            e.into(),
+                            &e,
                             vec![KindLValue::List, KindLValue::Symbol],
                         ))
                     }
@@ -209,11 +208,10 @@ impl TryFrom<&LValue> for Parameters {
             }
         } else if let LValue::Nil = &value {
         } else {
-            return Err(WrongType(
+            return Err(wrong_type!(
                 PARAMETERS_TRY_FROM_LVALUE,
-                value.clone(),
-                value.into(),
-                KindLValue::List,
+                value,
+                KindLValue::List
             ));
         }
 
@@ -230,7 +228,7 @@ impl TryFrom<LValue> for Parameters {
 }
 
 impl Parameters {
-    pub fn get_params(&self) -> Vec<String> {
+    pub fn get_params(&self) -> Vec<Arc<Sym>> {
         self.inner.iter().map(|tuple| tuple.0.clone()).collect()
     }
 
@@ -636,15 +634,15 @@ pub struct DomainEnv {
 }
 
 impl DomainEnv {
-    pub fn get_element_description(&self, label: String) -> String {
-        match self.map_symbol_type.get(&label) {
+    pub fn get_element_description(&self, label: &str) -> String {
+        match self.map_symbol_type.get(label) {
             None => format!("Keyword {} is not defined in the domain.", label),
             Some(s) => match s.as_str() {
-                TASK_TYPE => self.tasks.get(&label).unwrap().to_string(),
-                METHOD_TYPE => self.methods.get(&label).unwrap().to_string(),
-                STATE_FUNCTION_TYPE => self.state_functions.get(&label).unwrap().to_string(),
-                LAMBDA_TYPE => self.lambdas.get(&label).unwrap().to_string(),
-                ACTION_TYPE => self.actions.get(&label).unwrap().to_string(),
+                TASK_TYPE => self.tasks.get(label).unwrap().to_string(),
+                METHOD_TYPE => self.methods.get(label).unwrap().to_string(),
+                STATE_FUNCTION_TYPE => self.state_functions.get(label).unwrap().to_string(),
+                LAMBDA_TYPE => self.lambdas.get(label).unwrap().to_string(),
+                ACTION_TYPE => self.actions.get(label).unwrap().to_string(),
                 _ => panic!("There should no other type of symbol_type"),
             },
         }
@@ -683,12 +681,12 @@ impl DomainEnv {
 
     pub fn add_method(&mut self, label: String, value: Method) -> Result<(), LRuntimeError> {
         match self.tasks.get_mut(&value.task_label) {
-            None => Err(Anyhow(
+            None => Err(lerror!(
                 "DomainEnv::add_method",
                 format!(
                     "Cannot add method {} because task {} does not exist.",
                     label, value.task_label
-                ),
+                )
             )),
             Some(task) => {
                 task.methods.push(label.clone());
@@ -716,9 +714,9 @@ impl DomainEnv {
         value: LValue,
     ) -> Result<(), LRuntimeError> {
         match self.actions.get_mut(&label) {
-            None => Err(Anyhow(
+            None => Err(lerror!(
                 "add_action_sample_fn",
-                format!("Action {} is not defined", label),
+                format!("Action {} is not defined", label)
             )),
             Some(action) => {
                 //println!("updating sim of {} with {}", label, value);

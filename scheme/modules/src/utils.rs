@@ -14,25 +14,24 @@
 //! => ((1 3)(1 4)(2 3)(2 4))
 //! ```
 
-use ::macro_rules_attribute::macro_rules_attribute;
 use aries_utils::StreamingIterator;
 use rand::Rng;
 use sompas_core::eval;
 use sompas_core::modules::list::car;
 use sompas_language::*;
+use sompas_macros::async_scheme_fn;
+use sompas_macros::scheme_fn;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::{Documentation, LHelp};
 use sompas_structs::lcoreoperator::LCoreOperator;
-use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror::LRuntimeError::{Anyhow, WrongNumberOfArgument, WrongType};
-use sompas_structs::lerror::LResult;
+use sompas_structs::lerror::{LResult, LRuntimeError};
+use sompas_structs::lnumber::LNumber;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
-use sompas_structs::typelvalue::KindLValue;
-use sompas_utils::dyn_async;
+use sompas_structs::{lerror, list};
 use std::ops::Deref;
-use sompas_macros::async_scheme_fn;
+
 //LANGUAGE
 pub const MOD_UTILS: &str = "utils";
 
@@ -322,7 +321,7 @@ impl IntoModule for CtxUtils {
 }
 
 #[async_scheme_fn]
-pub async fn arbitrary<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+pub async fn arbitrary(env: &LEnv, args: &[LValue]) -> LResult {
     /*pub const LAMBDA_ARBITRARY: &str = "(define arbitrary
     (lambda args
         (cond ((= (len args) 1) ; default case
@@ -348,21 +347,15 @@ pub async fn arbitrary<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
             )
             .await
         }
-        _ => Err(WrongNumberOfArgument(
-            ARBITRARY,
-            args.into(),
-            args.len(),
-            1..2,
-        )),
+        _ => Err(LRuntimeError::wrong_number_of_args(ARBITRARY, args, 1..2)),
     }
 }
 
 #[async_scheme_fn]
-pub async fn enr<'a>(env: &'a LEnv,mut args: Vec<LValue>) -> LResult {
-
+pub async fn enr<'a>(env: &'a LEnv, mut args: Vec<LValue>) -> LResult {
     for (i, arg) in args.iter_mut().enumerate() {
         if i != 0 {
-            *arg = LValue::List(vec![LCoreOperator::Quote.into(), arg.clone()])
+            *arg = list![LCoreOperator::Quote.into(), arg.clone()]
         }
     }
 
@@ -379,14 +372,15 @@ pub async fn enr<'a>(env: &'a LEnv,mut args: Vec<LValue>) -> LResult {
 /// let lists: &[LValue] = &[vec![1,2,3].into(), vec![4,5,6].into()];
 /// let enumeration = enumerate(lists, &LEnv::default());
 /// ```
-lfn!{pub enumerate(args, _){
+#[scheme_fn]
+pub fn enumerate(element: &[LValue]) -> Vec<LValue> {
     let mut vec_iter = vec![];
     let mut new_args = vec![];
-    for arg in args {
+    for arg in element {
         if let LValue::List(_) = arg {
             new_args.push(arg.clone())
         } else {
-            new_args.push(LValue::List(vec![arg.clone()]))
+            new_args.push(list![arg.clone()])
         }
     }
 
@@ -408,185 +402,96 @@ lfn!{pub enumerate(args, _){
         vec_result.push(enumeration.into())
     }
 
-    Ok(vec_result.into())
+    vec_result
 }
 
 ///Return an element randomly chosen from a list
 /// Takes a LValue::List as arg.
-lfn!{pub rand_element(args, _){
-    match args.len() {
-        1 => {
-            if let LValue::List(list) = &args[0] {
-                let index = rand::thread_rng().gen_range(0..list.len());
-                Ok(list[index].clone())
-            } else {
-                Err(WrongType(
-                    RAND_ELEMENT,
-                    args[0].clone(),
-                    (&args[0]).into(),
-                    TypeLValue::Symbol,
-                ))
-            }
-        }
-        _ => Err(WrongNumberOfArgument(
-            RAND_ELEMENT,
-            args.into(),
-            args.len(),
-            1..1,
-        )),
-    }
+#[scheme_fn]
+pub fn rand_element(list: Vec<LValue>) -> LValue {
+    let index = rand::thread_rng().gen_range(0..list.len());
+    list[index].clone()
 }
 
 ///Takes a list or map and search if it contains a LValue inside
-lfn!{pub contains(args, _){
-    if args.len() != 2 {
-        return Err(WrongNumberOfArgument(
-            CONTAINS,
-            args.into(),
-            args.len(),
-            2..2,
-        ));
-    }
-
-    if let LValue::List(vec) = &args[0] {
-        for e in vec {
-            if e == &args[1] {
-                return Ok(LValue::True);
+#[scheme_fn]
+pub fn contains(set: &LValue, val: &LValue) -> bool {
+    match &set {
+        LValue::List(vec) => {
+            for e in vec.iter() {
+                if e == val {
+                    return true;
+                }
             }
+            false
         }
-    } else if let LValue::Map(m) = &args[0] {
-        for e in m.keys() {
-            if e == &args[1] {
-                return Ok(LValue::True);
+        LValue::Map(m) => {
+            for e in m.keys() {
+                if e == val {
+                    return true;
+                }
             }
+            false
         }
+        _ => false,
     }
-    Ok(LValue::Nil)
 }
 
 //returns a sublist of the a list
-lfn!{pub sublist(args, _){
+#[scheme_fn]
+pub fn sublist(args: &[LValue]) -> Result<Vec<LValue>, LRuntimeError> {
     match args.len() {
         2 => {
-            if let LValue::List(l) = &args[0] {
-                if let LValue::Number(n) = &args[1] {
-                    if n.is_natural() {
-                        let i: usize = n.into();
-                        Ok(l[i..].into())
-                    } else {
-                        Err(SpecialError(
-                            SUB_LIST,
-                            "Indexes should be natural numbers".to_string(),
-                        ))
-                    }
-                } else {
-                    Err(WrongType(
-                        SUB_LIST,
-                        args[1].clone(),
-                        (&args[1]).into(),
-                        TypeLValue::Number,
-                    ))
-                }
+            let list: Vec<LValue> =
+                <Vec<LValue>>::try_from(&args[0]).map_err(|e| e.chain("sublist"))?;
+            let n: LNumber = <LNumber>::try_from(&args[0]).map_err(|e| e.chain("sublist"))?;
+
+            if n.is_natural() {
+                let i: usize = n.into();
+                Ok(list[i..].to_vec())
             } else {
-                Err(WrongType(
+                Err(lerror!(
                     SUB_LIST,
-                    args[0].clone(),
-                    (&args[0]).into(),
-                    TypeLValue::List,
+                    "Indexes should be natural numbers".to_string()
                 ))
             }
         }
         3 => {
-            if let LValue::List(l) = &args[0] {
-                if let LValue::Number(n1) = &args[1] {
-                    if let LValue::Number(n2) = &args[2] {
-                        if n1.is_natural() && n2.is_natural() {
-                            let i1: usize = n1.into();
-                            let i2: usize = n2.into();
-                            Ok(l[i1..i2].into())
-                        } else {
-                            Err(SpecialError(
-                                SUB_LIST,
-                                "Indexes should be natural numbers".to_string(),
-                            ))
-                        }
-                    } else {
-                        Err(WrongType(
-                            SUB_LIST,
-                            args[1].clone(),
-                            (&args[2]).into(),
-                            TypeLValue::Number,
-                        ))
-                    }
-                } else {
-                    Err(WrongType(
-                        SUB_LIST,
-                        args[1].clone(),
-                        (&args[1]).into(),
-                        TypeLValue::Number,
-                    ))
-                }
+            let list: Vec<LValue> =
+                <Vec<LValue>>::try_from(&args[0]).map_err(|e| e.chain("sublist"))?;
+            let n1: LNumber = <LNumber>::try_from(&args[0]).map_err(|e| e.chain("sublist"))?;
+            let n2: LNumber = <LNumber>::try_from(&args[0]).map_err(|e| e.chain("sublist"))?;
+
+            if n1.is_natural() && n2.is_natural() {
+                let i1: usize = n1.into();
+                let i2: usize = n2.into();
+                Ok(list[i1..i2].to_vec())
             } else {
-                Err(WrongType(
+                Err(lerror!(
                     SUB_LIST,
-                    args[0].clone(),
-                    (&args[0]).into(),
-                    TypeLValue::List,
+                    "Indexes should be natural numbers".to_string()
                 ))
             }
         }
-        _ => Err(WrongNumberOfArgument(
-            SUB_LIST,
-            args.into(),
-            args.len(),
-            2..3,
-        )),
+        _ => Err(LRuntimeError::wrong_number_of_args(SUB_LIST, args, 2..3)),
     }
 }
-
-lfn!{pub quote_list(args, _){
-    if args.len() != 1 {
-        return Err(WrongNumberOfArgument(
-            QUOTE_LIST,
-            args.into(),
-            args.len(),
-            1..1,
-        ));
+#[scheme_fn]
+pub fn quote_list(mut list: Vec<LValue>) -> Vec<LValue> {
+    //let mut vec: Vec<LValue> = vec![];
+    let mut vec = vec![];
+    for e in list.drain(..) {
+        vec.push(list![LCoreOperator::Quote.into(), e])
+        //vec.push(vec![LCoreOperator::Quote.into(), e.clone()].into());
     }
-
-    if let LValue::List(l) = &args[0] {
-        let mut vec: Vec<LValue> = vec![];
-        for e in l {
-            vec.push(vec![LCoreOperator::Quote.into(), e.clone()].into());
-        }
-        Ok(vec.into())
-    } else if let LValue::Nil = &args[0] {
-        Ok(LValue::Nil)
-    } else {
-        Err(WrongType(
-            QUOTE_LIST,
-            args[0].clone(),
-            (&args[0]).into(),
-            TypeLValue::List,
-        ))
-    }
+    vec
 }
 
-lfn!{pub transform_in_singleton_list(args, _){
-    if args.is_empty() {
-        return Err(WrongNumberOfArgument(
-            TRANSFORM_IN_SINGLETON_LIST,
-            args.into(),
-            0,
-            1..std::usize::MAX,
-        ));
-    }
-
-    Ok(args
-        .iter()
-        .map(|lv| LValue::List(vec![lv.clone()]))
+#[scheme_fn]
+pub fn transform_in_singleton_list(args: &[LValue]) -> Vec<LValue> {
+    args.iter()
+        .map(|lv| list![lv.clone()])
         .collect::<Vec<LValue>>()
-        .into())
 }
 
 #[cfg(test)]

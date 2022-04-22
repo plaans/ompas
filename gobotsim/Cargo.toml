@@ -13,6 +13,7 @@ sompas-core= {path = "../scheme/core"}
 sompas-repl = {path = "../scheme/repl"}
 sompas-utils = {path = "../scheme/utils"}
 sompas-language= {path = "../scheme/language"}
+sompas-macros = {path = "../scheme/macros"}
 ompas-rae-structs = {path = "../rae/structs"}
 ompas-rae-scheme = {path = "../rae/scheme"}
 aries_planning = {path = "../aries/planning"}

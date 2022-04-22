@@ -13,27 +13,19 @@ use ompas_rae_structs::planning::chronicle::ChronicleTemplate;
 use ompas_rae_structs::planning::traits::FormatWithSymTable;
 use ompas_rae_structs::planning::{ConversionCollection, ConversionContext};
 use sompas_core::expand;
+use sompas_macros::*;
 use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror::LResult;
-use sompas_structs::lerror::LRuntimeError::WrongNumberOfArgument;
+use sompas_structs::lerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
-use sompas_utils::dyn_async;
+use sompas_structs::wrong_n_args;
 use std::time::SystemTime;
 
-#[macro_rules_attribute(dyn_async!)]
-pub async fn convert_expr<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
-    if args.len() != 1 {
-        return Err(WrongNumberOfArgument(
-            RAE_CONVERT_EXPR,
-            args.into(),
-            args.len(),
-            1..1,
-        ));
-    }
-    let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
+#[async_scheme_fn]
+pub async fn convert_expr(env: &LEnv, expr: &LValue) -> Result<String, LRuntimeError> {
+    let ctx = env.get_context::<CtxRae>(MOD_RAE).unwrap();
     let mut context: ConversionContext = ctx.get_conversion_context().await;
 
-    let lv = expand(&args[0], true, &mut context.env).await?;
+    let lv = expand(&expr, true, &mut context.env).await?;
 
     let mut ch = ConversionCollection::default();
 
@@ -54,76 +46,49 @@ pub async fn convert_expr<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     let time = time.elapsed().expect("could not get time").as_micros();
     let string = chronicle.format(&ch.sym_table, true);
 
-    Ok(format!("{}\n\n Time to convert: {} µs.", string, time).into())
+    Ok(format!("{}\n\n Time to convert: {} µs.", string, time))
 }
 
-#[macro_rules_attribute(dyn_async!)]
-pub async fn convert_domain<'a>(_: &'a [LValue], env: &'a LEnv) -> LResult {
+#[async_scheme_fn]
+pub async fn convert_domain(env: &LEnv) -> Result<String, LRuntimeError> {
     let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
     let context: ConversionContext = ctx.get_conversion_context().await;
     let time = SystemTime::now();
     let ch = convert_domain_to_chronicle_hierarchy(context)?;
     let time = time.elapsed().expect("could not get time").as_micros();
-    Ok(format!("{}\n\nTime to convert: {} µs.", ch, time).into())
+    Ok(format!("{}\n\nTime to convert: {} µs.", ch, time))
 }
 
-#[macro_rules_attribute(dyn_async!)]
-pub async fn convert_cond_expr<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
-    if args.len() != 1 {
-        return Err(WrongNumberOfArgument(
-            RAE_CONVERT_COND_EXPR,
-            args.into(),
-            args.len(),
-            1..1,
-        ));
-    }
-
+#[async_scheme_fn]
+pub async fn convert_cond_expr(env: &LEnv, expr: &LValue) -> Result<String, LRuntimeError> {
     let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
     let context: ConversionContext = ctx.get_conversion_context().await;
 
     let mut ch = ConversionCollection::default();
 
-    let result = convert_if(&args[0], &context, &mut ch)?;
+    let result = convert_if(expr, &context, &mut ch)?;
 
-    Ok(result.format(&ch.sym_table, true).into())
+    Ok(result.format(&ch.sym_table, true))
 }
 
-#[macro_rules_attribute(dyn_async!)]
-pub async fn pre_process_lambda<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
-    if args.len() != 1 {
-        return Err(WrongNumberOfArgument(
-            RAE_PRE_PROCESS_LAMBDA,
-            args.into(),
-            args.len(),
-            1..1,
-        ));
-    }
-
+#[async_scheme_fn]
+pub async fn pre_process_lambda(env: &LEnv, expr: &LValue) -> LResult {
     let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
     let context: ConversionContext = ctx.get_conversion_context().await;
 
-    transform_lambda_expression(&args[0], context.env)
+    transform_lambda_expression(expr, context.env)
 }
 
-#[macro_rules_attribute(dyn_async!)]
-pub async fn pre_process_expr<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
-    if args.len() != 1 {
-        return Err(WrongNumberOfArgument(
-            RAE_PRE_PROCESS_LAMBDA,
-            args.into(),
-            args.len(),
-            1..1,
-        ));
-    }
-
+#[async_scheme_fn]
+pub async fn pre_process_expr(env: &LEnv, expr: &LValue) -> LResult {
     let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
     let context: ConversionContext = ctx.get_conversion_context().await;
 
-    pre_processing(&args[0], &context, &mut ConversionCollection::default())
+    pre_processing(expr, &context, &mut ConversionCollection::default())
 }
 
-#[macro_rules_attribute(dyn_async!)]
-pub async fn pre_process_domain<'a>(_: &'a [LValue], env: &'a LEnv) -> LResult {
+#[async_scheme_fn]
+pub async fn pre_process_domain(env: &LEnv) -> Result<String, LRuntimeError> {
     //let mut context: Context = ctx.into();
     let mut str = "pre-processing of the domain:\n".to_string();
     let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
@@ -148,5 +113,5 @@ pub async fn pre_process_domain<'a>(_: &'a [LValue], env: &'a LEnv) -> LResult {
         );
     }
 
-    Ok(str.into())
+    Ok(str)
 }

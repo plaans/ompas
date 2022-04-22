@@ -1,5 +1,4 @@
 use crate::rae_exec::{CtxRaeExec, MOD_RAE_EXEC, PARENT_TASK};
-use ::macro_rules_attribute::macro_rules_attribute;
 use log::{error, info};
 use ompas_rae_core::planning::{CtxPlanning, MOD_PLANNING};
 use ompas_rae_structs::exec_context::error::RaeExecError;
@@ -8,15 +7,15 @@ use ompas_rae_structs::refinement::task_collection::TaskStatus::*;
 use ompas_rae_structs::refinement::task_collection::{
     AbstractTaskMetaData, RefinementMetaData, TaskMetaData, TaskMetaDataView, TaskStatus,
 };
+use sompas_macros::*;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lerror::LResult;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lvalue::LValue;
-use sompas_utils::dyn_async;
 use std::convert::{TryFrom, TryInto};
 
-#[macro_rules_attribute(dyn_async !)]
-pub async fn refine<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+#[async_scheme_fn]
+pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
     let task_label: LValue = args.into();
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
     let parent_task: Option<usize> = env
@@ -46,8 +45,8 @@ pub async fn refine<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
     Ok(result)
 }
 
-#[macro_rules_attribute(dyn_async !)]
-pub async fn set_success_for_task<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+#[async_scheme_fn]
+pub async fn set_success_for_task(env: &LEnv, args: &[LValue]) -> LResult {
     /*
     Steps:
     - Remove the stack from the agenda
@@ -65,8 +64,8 @@ pub async fn set_success_for_task<'a>(args: &'a [LValue], env: &'a LEnv) -> LRes
     Ok(LValue::True)
 }
 
-#[macro_rules_attribute(dyn_async !)]
-pub async fn retry<'a>(args: &'a [LValue], env: &'a LEnv) -> LResult {
+#[async_scheme_fn]
+pub async fn retry(env: &LEnv, args: &[LValue]) -> LResult {
     let task_id: i64 = (&args[0]).try_into()?;
     let task_id = task_id as usize;
 
@@ -163,8 +162,7 @@ mod select {
     use sompas_core::modules::get;
     use sompas_core::modules::list::cons;
     use sompas_modules::utils::{enr, enumerate};
-    use sompas_structs::lerror;
-    use sompas_structs::lerror::LRuntimeError::Anyhow;
+    use sompas_structs::{lerror, list};
     use std::time::Instant;
 
     //pub const GREEDY_SELECT: &str = "greedy_select";
@@ -212,9 +210,9 @@ mod select {
                         match plan.chronicles.get(&task_id).unwrap().clone().try_into() {
                             Ok(a) => a,
                             Err(_) => {
-                                return Err(Anyhow(
+                                return Err(lerror!(
                                     RAE_SELECT,
-                                    format!("task {} is not an abstract task:", n),
+                                    format!("task {} is not an abstract task:", n)
                                 ))
                             }
                         };
@@ -345,10 +343,7 @@ mod select {
 
         let task_label = &task[0];
         //let task_string = LValue::from(task.clone()).to_string();
-        let params: Vec<LValue> = task[1..]
-            .iter()
-            .map(|lv| LValue::List(vec![lv.clone()]))
-            .collect();
+        let params: Vec<LValue> = task[1..].iter().map(|lv| list![lv.clone()]).collect();
 
         let mut applicable_methods: Vec<(LValue, i64)> = vec![];
 
@@ -358,49 +353,49 @@ mod select {
         let env = &env;
 
         let methods_template: Vec<LValue> = get(
+            env,
             &[
                 env.get_symbol(RAE_TASK_METHODS_MAP).unwrap(),
                 task_label.clone(),
             ],
-            env,
         )?
         .try_into()?;
 
         for template in methods_template {
             let types: Vec<LValue> = get(
+                env,
                 &[
                     env.get_symbol(RAE_METHOD_TYPES_MAP).unwrap(),
                     template.clone(),
                 ],
-                env,
             )?
             .try_into()?;
 
             let score_lambda = get(
+                env,
                 &[
                     env.get_symbol(RAE_METHOD_SCORE_MAP).unwrap(),
                     template.clone(),
                 ],
-                env,
             )?;
 
             let pre_conditions_lambda = get(
+                env,
                 &[
                     env.get_symbol(RAE_METHOD_PRE_CONDITIONS_MAP).unwrap(),
                     template.clone(),
                 ],
-                env,
             )?;
 
             let mut instances_template = vec![template.clone()];
             instances_template.append(&mut params.clone());
 
             for t in &types[params.len()..] {
-                instances_template.push(instance(&[t.clone()], env).await?);
+                instances_template.push(instance(env, &[t.clone()]).await?);
             }
 
             let mut instances_template: Vec<LValue> =
-                enumerate(&instances_template, env)?.try_into()?;
+                enumerate(env, &instances_template)?.try_into()?;
 
             /*println!(
                 "instances for template {}: {}",
@@ -412,11 +407,11 @@ mod select {
 
             for i in iter {
                 let i_vec: Vec<LValue> = (&i).try_into()?;
-                let arg = cons(&[pre_conditions_lambda.clone(), i_vec[1..].into()], env)?;
-                let lv: LValue = enr(&[arg], &env.clone()).await?;
+                let arg = cons(env, &[pre_conditions_lambda.clone(), i_vec[1..].into()])?;
+                let lv: LValue = enr(env, &[arg]).await?;
                 if !matches!(lv, LValue::Err(_)) {
-                    let arg = cons(&[score_lambda.clone(), i_vec[1..].into()], env)?;
-                    let score: i64 = enr(&[arg], &env.clone()).await?.try_into()?;
+                    let arg = cons(env, &[score_lambda.clone(), i_vec[1..].into()])?;
+                    let score: i64 = enr(env, &[arg]).await?.try_into()?;
                     applicable_methods.push((i, score))
                 }
             }

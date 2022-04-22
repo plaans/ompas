@@ -2,8 +2,8 @@ use aries_planning::parsing::sexpr::SExpr;
 use ompas_rae_structs::exec_context::rae_state::ActionStatus::ActionDenied;
 use ompas_rae_structs::exec_context::rae_state::{ActionStatus, LState, StateType};
 use serde::{Deserialize, Serialize, Serializer};
+use sompas_structs::lerror;
 use sompas_structs::lerror::LRuntimeError;
-use sompas_structs::lerror::LRuntimeError::Anyhow;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalues::LValueS;
 use std::convert::TryFrom;
@@ -142,9 +142,9 @@ impl TryFrom<GodotMessageSerde> for LState {
                 state.set_type(StateType::Dynamic);
             }
             _ => {
-                return Err(LRuntimeError::Anyhow(
+                return Err(lerror!(
                     "LState::TryFrom<GodotMessageSerde>",
-                    "Was expecting a state".to_string(),
+                    "Was expecting a state"
                 ))
             }
         }
@@ -183,9 +183,9 @@ impl TryFrom<GodotMessageSerde> for (usize, ActionStatus) {
                         -1 => ActionDenied,
                         i => {
                             if i < 0 {
-                                return Err(Anyhow(
+                                return Err(lerror!(
                                     "GodotMessageSerde",
-                                    "action response is not in {-1} + N".to_string(),
+                                    "action response is not in {-1} + N"
                                 ));
                             } else {
                                 ActionStatus::ActionResponse(i as usize)

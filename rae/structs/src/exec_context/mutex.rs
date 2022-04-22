@@ -84,7 +84,7 @@ pub async fn lock(r: String, p: usize) -> MutexResponse {
     MUTEXES.lock(r, p).await
 }
 
-pub async fn release(r: String) {
+pub async fn release(r: &str) {
     MUTEXES.release(r).await
 }
 
@@ -129,12 +129,12 @@ impl MutexMap {
         }
     }
 
-    pub async fn release(&self, key: String) {
+    pub async fn release(&self, key: &str) {
         let mut locked = self.map.lock().await;
         //info!("releasing {}", key);
-        if locked.get_mut(&key).unwrap().release().await {
+        if locked.get_mut(key).unwrap().release().await {
             //info!("no one waiting for the lock on {}", key);
-            locked.remove(&key);
+            locked.remove(key);
         }
     }
 

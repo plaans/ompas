@@ -12,7 +12,7 @@ pub fn not(b: bool) -> bool {
 }
 
 #[scheme_fn]
-pub fn neq(a: LValue, b: LValue) -> bool {
+pub fn neq(a: &LValue, b: &LValue) -> bool {
     a != b
 }
 
@@ -75,7 +75,7 @@ pub fn leq(a: LNumber, b: LNumber) -> bool {
 
 /// Compares two values. Returns true if the first and second args are equal. Nil Otherwise
 #[scheme_fn]
-pub fn eq(a: LNumber, b: LNumber) -> bool {
+pub fn eq(a: &LValue, b: &LValue) -> bool {
     a == b
 }
 /*

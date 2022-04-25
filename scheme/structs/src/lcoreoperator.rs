@@ -22,7 +22,7 @@ use std::fmt::{Display, Formatter};
 /// - Async: Evaluates in an asynchronous task a LValue.
 /// - Await: Wait on a pid the result of an async.
 /// - Eval: Evaluates an expression.
-#[derive(Copy, Clone, PartialOrd, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Hash, Copy, Clone, PartialOrd, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[serde(untagged, rename_all = "lowercase")]
 pub enum LCoreOperator {
     Define,

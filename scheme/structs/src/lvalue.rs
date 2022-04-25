@@ -270,18 +270,15 @@ impl Display for LValue {
 impl Hash for LValue {
     fn hash<H: Hasher>(&self, state: &mut H) {
         match self {
-            LValue::Symbol(s) => (*s).hash(state),
+            LValue::String(s) => s.as_ref().hash(state),
+            LValue::Symbol(s) => s.as_ref().hash(state),
             LValue::Number(n) => (*n).hash(state),
             LValue::True => true.hash(state),
             LValue::Map(m) => (*m).hash(state),
-            LValue::List(l) => {
-                (*l).hash(state);
-            }
-            /*LValue::Quote(s) => {
-                s.to_string().hash(state);
-            }*/
+            LValue::List(l) => l.as_ref().hash(state),
+            LValue::CoreOperator(co) => co.hash(state),
             LValue::Nil => false.hash(state),
-            _ => {}
+            lv => panic!("cannot hash {}", lv.get_kind()),
         };
     }
 }

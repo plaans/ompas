@@ -1,3 +1,5 @@
+extern crate core;
+
 pub mod contextcollection;
 pub mod documentation;
 pub mod function;

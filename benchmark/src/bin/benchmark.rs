@@ -51,14 +51,12 @@ pub async fn lisp_interpreter(opt: Opt) {
     domain_file_path.push("domain.lisp");
     println!("domain: {:?}", path);
     let problem = match opt.problem {
-        Some(p) => {
-            println!("problem : {:?}", p);
-            p
-        }
+        Some(p) => p,
         None => {
-            println!("searching for problem files...");
+            println!("Searching for problem files...");
             let mut problem_path = path.clone();
             problem_path.push("problems");
+            println!("problems path: {:?}", problem_path);
             let mut paths = fs::read_dir(problem_path).unwrap();
             if let Some(path) = paths.next() {
                 path.unwrap().path()
@@ -67,6 +65,7 @@ pub async fn lisp_interpreter(opt: Opt) {
             }
         }
     };
+    println!("problem : {:?}", problem);
 
     let time = opt.time.unwrap_or(60);
 

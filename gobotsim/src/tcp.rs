@@ -1,9 +1,7 @@
 use crate::rae_interface::Instance;
 use crate::serde::{GodotMessageSerde, GodotMessageType};
-use ompas_rae_structs::exec_context::rae_state::LState;
-use ompas_rae_structs::exec_context::rae_state::RAEState;
-use ompas_rae_structs::exec_context::rae_state::{ActionStatus, StateType};
-use ompas_rae_structs::refinement::Agenda;
+use ompas_rae_structs::agenda::Agenda;
+use ompas_rae_structs::rae_state::*;
 use sompas_structs::lvalues::LValueS;
 use sompas_utils::task_handler;
 use std::convert::TryInto;

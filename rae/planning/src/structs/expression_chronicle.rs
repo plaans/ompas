@@ -1,14 +1,14 @@
-use crate::planning::chronicle::{ChronicleResult, ChronicleSet};
-use crate::planning::condition::Condition;
-use crate::planning::constraint::Constraint;
-use crate::planning::effect::Effect;
-use crate::planning::expression::Expression;
-use crate::planning::interval::Interval;
-use crate::planning::lit::Lit;
-use crate::planning::partial_chronicle::PartialChronicle;
-use crate::planning::symbol_table::{AtomId, SymTable};
-use crate::planning::traits::{Absorb, FormatWithSymTable, GetVariables};
-use crate::planning::type_table::PlanningAtomType;
+use crate::structs::chronicle::{ChronicleResult, ChronicleSet};
+use crate::structs::condition::Condition;
+use crate::structs::constraint::Constraint;
+use crate::structs::effect::Effect;
+use crate::structs::expression::Expression;
+use crate::structs::interval::Interval;
+use crate::structs::lit::Lit;
+use crate::structs::partial_chronicle::PartialChronicle;
+use crate::structs::symbol_table::{AtomId, SymTable};
+use crate::structs::traits::{Absorb, FormatWithSymTable, GetVariables};
+use crate::structs::type_table::PlanningAtomType;
 use im::HashSet;
 use sompas_structs::lvalue::LValue;
 

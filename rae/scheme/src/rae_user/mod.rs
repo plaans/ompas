@@ -3,11 +3,11 @@
 use crate::rae_exec::{CtxRaeExec, Platform};
 use chrono::{DateTime, Utc};
 use ompas_rae_language::*;
-use ompas_rae_structs::exec_context::job::Job;
-use ompas_rae_structs::exec_context::options::{RAEOptions, SelectMode};
-use ompas_rae_structs::exec_context::rae_env::RAEEnv;
-use ompas_rae_structs::planning::ConversionContext;
-use ompas_rae_structs::refinement::Agenda;
+use ompas_rae_planning::structs::ConversionContext;
+use ompas_rae_structs::agenda::Agenda;
+use ompas_rae_structs::job::Job;
+use ompas_rae_structs::options::{RAEOptions, SelectMode};
+use ompas_rae_structs::rae_env::RAEEnv;
 use rae_control::*;
 use rae_conversion::*;
 use rae_description::*;

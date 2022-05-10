@@ -1,5 +1,5 @@
-use crate::planning::symbol_table::SymTable;
-use crate::planning::traits::FormatWithSymTable;
+use crate::structs::symbol_table::SymTable;
+use crate::structs::traits::FormatWithSymTable;
 use sompas_structs::lerror;
 use sompas_structs::lerror::LRuntimeError;
 use sompas_structs::lnumber::LNumber;

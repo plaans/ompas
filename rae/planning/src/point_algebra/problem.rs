@@ -1,11 +1,11 @@
 use crate::point_algebra::relation_type::RelationType::Tautology;
 use crate::point_algebra::relation_type::{RelationType, RelationTypeBit};
+use crate::structs::constraint::Constraint;
+use crate::structs::lit::Lit;
+use crate::structs::symbol_table::{AtomId, SymTable};
+use crate::structs::traits::FormatWithSymTable;
+use crate::structs::type_table::PlanningAtomType;
 use cli_table::{print_stdout, Cell, Table};
-use ompas_rae_structs::planning::constraint::Constraint;
-use ompas_rae_structs::planning::lit::Lit;
-use ompas_rae_structs::planning::symbol_table::{AtomId, SymTable};
-use ompas_rae_structs::planning::traits::FormatWithSymTable;
-use ompas_rae_structs::planning::type_table::PlanningAtomType;
 use sompas_structs::lerror;
 use sompas_structs::lerror::LRuntimeError;
 use std::fmt::{Debug, Display, Formatter};

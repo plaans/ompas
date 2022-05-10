@@ -24,6 +24,7 @@ use sompas_macros::scheme_fn;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::{Documentation, LHelp};
 use sompas_structs::lcoreoperator::LCoreOperator;
+use sompas_structs::lenv::LEnv;
 use sompas_structs::lerror::{LResult, LRuntimeError};
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lvalue::LValue;

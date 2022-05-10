@@ -61,7 +61,7 @@ pub async fn eval_init(env: &mut LEnv) {
     if !errors.is_empty() {
         let mut str = String::new();
         for e in errors {
-            writeln!(str, "{}", e);
+            writeln!(str, "{}", e).expect("panic at writeln");
         }
         panic!("Errors loading libraries:\n {}", str);
     }

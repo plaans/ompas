@@ -1,6 +1,6 @@
 use aries_planning::parsing::sexpr::SExpr;
-use ompas_rae_structs::exec_context::rae_state::ActionStatus::ActionDenied;
-use ompas_rae_structs::exec_context::rae_state::{ActionStatus, LState, StateType};
+use ompas_rae_structs::rae_state::ActionStatus::ActionDenied;
+use ompas_rae_structs::rae_state::{ActionStatus, LState, StateType};
 use serde::{Deserialize, Serialize, Serializer};
 use sompas_structs::lerror;
 use sompas_structs::lerror::LRuntimeError;

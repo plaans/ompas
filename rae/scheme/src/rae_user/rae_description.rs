@@ -1,9 +1,7 @@
-use ::macro_rules_attribute::macro_rules_attribute;
-
 use crate::rae_user::{CtxRae, MOD_RAE};
 use ompas_rae_language::*;
-use ompas_rae_structs::exec_context::rae_env::{Action, StateFunction};
-use ompas_rae_structs::exec_context::rae_state::{LState, StateType};
+use ompas_rae_structs::rae_env::{Action, StateFunction};
+use ompas_rae_structs::rae_state::{LState, StateType};
 use sompas_core::modules::list::cons;
 use sompas_core::{eval, expand, get_root_env};
 use sompas_language::*;
@@ -578,7 +576,7 @@ pub async fn add_type(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> 
     let (t, parent) = match args.len() {
         1 => (args[0].to_string(), None),
         2 => (args[0].to_string(), Some(args[1].to_string())),
-        l => {
+        _ => {
             return Err(LRuntimeError::wrong_number_of_args(
                 RAE_ADD_TYPE,
                 args,

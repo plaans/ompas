@@ -1,6 +1,6 @@
-use crate::planning::forest::NodeId;
-use crate::planning::symbol_table::SymTable;
-use crate::planning::traits::FormatWithSymTable;
+use crate::structs::forest::NodeId;
+use crate::structs::symbol_table::SymTable;
+use crate::structs::traits::FormatWithSymTable;
 use std::fmt::{Display, Formatter};
 
 pub type TypeId = NodeId;

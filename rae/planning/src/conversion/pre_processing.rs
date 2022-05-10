@@ -1,4 +1,4 @@
-use ompas_rae_structs::planning::{ConversionCollection, ConversionContext};
+use crate::structs::{ConversionCollection, ConversionContext};
 use sompas_core::*;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lerror::{LResult, LRuntimeError};

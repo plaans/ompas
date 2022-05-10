@@ -1,5 +1,5 @@
-use crate::planning::symbol_table::{AtomId, SymTable};
-use crate::planning::type_table::PlanningAtomType;
+use crate::structs::symbol_table::{AtomId, SymTable};
+use crate::structs::type_table::PlanningAtomType;
 
 pub trait Absorb {
     fn absorb(&mut self, other: Self);

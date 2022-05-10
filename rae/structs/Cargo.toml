@@ -5,19 +5,20 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-
 [dependencies]
 sompas-utils = {path= "../../scheme/utils" }
 sompas-structs = {path = "../../scheme/structs"}
+sompas-modules = {path = "../../scheme/modules"}
 sompas-core = {path = "../../scheme/core"}
 sompas-language = {path = "../../scheme/language"}
-sompas-modules = {path = "../../scheme/modules"}
-ompas-rae-language= {path = "../language"}
-aries_planning = {path= "../../aries/planning"}
+sompas-macros = {path = "../../scheme/macros"}
 tokio = { version = "1.17.0", features = ["full", "time"] }
-log =  { version = "0.4.16", features = ["std"] }
 im = "15.0.0"
-lazy_static = "1.4.0"
 chrono = "0.4.19"
+log =  { version = "0.4", features = ["std"] }
+macro_rules_attribute = "0.0.2"
+async-trait = "0.1.51"
+aries_planning = {path = "../../aries/planning"}
+rand = "0.8.5"
 itertools = "0.10.3"
-function_name = "0.2.0"
+function_name = "0.2.1"

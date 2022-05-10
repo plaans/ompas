@@ -1,125 +1,30 @@
-pub mod task_collection;
-pub mod task_network;
-
-use crate::exec_context::options::SelectMode;
+use crate::interval::{Duration, Timepoint};
+use crate::options::SelectMode;
+use crate::task_collection::{
+    AbstractTaskMetaData, ActionMetaData, TaskCollection, TaskFilter, TaskMetaData,
+    TaskMetaDataView, TaskStatus,
+};
+use crate::task_network::TaskNetwork;
+use crate::TaskId;
 use chrono::{DateTime, Utc};
-use im::HashMap;
+use core::convert::Into;
+use core::default::Default;
+use core::option::Option;
+use core::option::Option::{None, Some};
+use core::result::Result;
+use core::result::Result::{Err, Ok};
+use core::sync::atomic::AtomicUsize;
 use sompas_structs::lerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::{lerror, string};
 use sompas_utils::other::get_and_update_id_counter;
-use std::convert::TryInto;
-use std::fmt::{Display, Formatter};
 use std::fs::OpenOptions;
 use std::io::Write;
-use std::ops::{Add, AddAssign};
 use std::path::PathBuf;
-use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::time::Instant;
 use std::{env, fs};
-use task_collection::{
-    AbstractTaskMetaData, ActionMetaData, TaskCollection, TaskFilter, TaskMetaData,
-    TaskMetaDataView, TaskStatus,
-};
-use task_network::TaskNetwork;
 use tokio::sync::mpsc;
-
-pub type TaskId = usize;
-
-pub type Timepoint = u128;
-#[derive(Copy, Clone)]
-pub enum Duration {
-    Finite(u128),
-    Inf,
-}
-
-impl Duration {
-    pub fn as_millis(&self) -> f64 {
-        match self {
-            Self::Finite(u) => *u as f64 / FACTOR_TO_MILLIS,
-            Duration::Inf => f64::MAX / FACTOR_TO_MILLIS,
-        }
-    }
-
-    pub fn as_secs(&self) -> f64 {
-        match self {
-            Self::Finite(u) => *u as f64 / FACTOR_TO_SEC,
-            Duration::Inf => f64::MAX / FACTOR_TO_SEC,
-        }
-    }
-
-    pub fn is_finite(&self) -> bool {
-        matches!(self, Self::Finite(_))
-    }
-}
-
-impl Display for Duration {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Finite(u) => write!(f, "{} µs", u),
-            Self::Inf => write!(f, "inf"),
-        }
-    }
-}
-
-impl Add for Duration {
-    type Output = Duration;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        match (self, rhs) {
-            (Self::Finite(a), Self::Finite(b)) => Self::Finite(a + b),
-            _ => Self::Inf,
-        }
-    }
-}
-
-impl AddAssign for Duration {
-    fn add_assign(&mut self, rhs: Self) {
-        *self = *self + rhs;
-    }
-}
-
-#[derive(Debug, Default, Clone)]
-pub struct Interval {
-    start: Timepoint,
-    end: Option<Timepoint>,
-}
-
-const FACTOR_TO_SEC: f64 = 1_000_000.0;
-#[allow(dead_code)]
-const FACTOR_TO_MILLIS: f64 = 1_000.0;
-
-impl Display for Interval {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut str = format!("[{:.3},", self.start as f64 / FACTOR_TO_SEC);
-        match &self.end {
-            Some(end) => str.push_str(format!("{:^3}]", *end as f64 / FACTOR_TO_SEC).as_str()),
-            None => str.push_str("...]"),
-        }
-
-        write!(f, "{}", str)
-    }
-}
-
-impl Interval {
-    pub fn new(start: Timepoint, end: Option<Timepoint>) -> Self {
-        Self { start, end }
-    }
-
-    /// Returns end - start if end is defined.
-    pub fn duration(&self) -> Duration {
-        match &self.end {
-            Some(e) => Duration::Finite(e - self.start),
-            None => Duration::Inf,
-        }
-    }
-
-    pub fn set_end(&mut self, end: Timepoint) {
-        assert!(self.start <= end);
-        self.end = Some(end)
-    }
-}
 
 #[derive(Clone)]
 pub struct Agenda {
@@ -139,9 +44,6 @@ const SUBTASK_NUMBER: &str = "number of subtask";
 const ACTION_NUMBER: &str = "number of actions";
 const RAE_STATS: &str = "rae_stats";
 
-/*
-STATS FUNCTIONS
- */
 impl Agenda {
     pub async fn get_refinement_method(&self, id: &TaskId) -> SelectMode {
         let task: AbstractTaskMetaData = self.trc.get(id).await.try_into().unwrap();
@@ -225,7 +127,8 @@ impl Agenda {
 
     pub async fn get_stats(&self) -> LValue {
         let mut map: im::HashMap<LValue, LValue> = Default::default();
-        let task_collection: HashMap<TaskId, TaskMetaData> = self.trc.inner.read().await.clone();
+        let task_collection: im::HashMap<TaskId, TaskMetaData> =
+            self.trc.inner.read().await.clone();
         let parent: Vec<TaskId> = self.tn.get_parents().await;
         for p in &parent {
             let mut task_stats: im::HashMap<LValue, LValue> = Default::default();
@@ -313,7 +216,8 @@ impl Agenda {
             file.write_all(header.as_bytes())
                 .expect("could not write to stat file");
         }
-        let task_collection: HashMap<TaskId, TaskMetaData> = self.trc.inner.read().await.clone();
+        let task_collection: im::HashMap<TaskId, TaskMetaData> =
+            self.trc.inner.read().await.clone();
         let parent: Vec<TaskId> = self.tn.get_parents().await;
         for p in &parent {
             file.write_all(
@@ -432,7 +336,7 @@ impl Agenda {
         self.trc.get_status(id).await
     }
 
-    pub async fn get_task_collection(&self) -> HashMap<TaskId, TaskMetaData> {
+    pub async fn get_task_collection(&self) -> im::HashMap<TaskId, TaskMetaData> {
         self.trc.get_inner().await
     }
 
@@ -447,7 +351,3 @@ impl Agenda {
         get_and_update_id_counter(self.next_id.clone())
     }
 }
-
-/*
-METHODS FOR TASK NETWORK
- */

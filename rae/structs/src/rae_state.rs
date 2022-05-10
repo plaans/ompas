@@ -1,6 +1,5 @@
+use crate::task_collection::TaskStatus;
 use im::HashMap;
-
-use crate::refinement::task_collection::TaskStatus;
 use sompas_core::modules::map::union_map;
 use sompas_structs::lerror;
 use sompas_structs::lerror::LRuntimeError;

@@ -14,8 +14,8 @@ sompas-repl = {path = "../scheme/repl"}
 sompas-utils = {path = "../scheme/utils"}
 sompas-language= {path = "../scheme/language"}
 sompas-macros = {path = "../scheme/macros"}
-ompas-rae-structs = {path = "../rae/structs"}
 ompas-rae-scheme = {path = "../rae/scheme"}
+ompas-rae-structs = {path = "../rae/structs"}
 aries_planning = {path = "../aries/planning"}
 im = "15.0.0"
 structopt = { version = "0.3", default-features = false }

@@ -1,10 +1,9 @@
 use crate::rae_exec::*;
 use log::info;
+use ompas_rae_core::mutex;
+use ompas_rae_core::mutex::{MutexResponse, Wait};
 use ompas_rae_language::IS_LOCKED;
-use ompas_rae_structs::exec_context::mutex;
-use ompas_rae_structs::exec_context::mutex::*;
 use sompas_core::modules::map::get_map;
-use sompas_structs::lenv::LEnv;
 use sompas_structs::lerror;
 use sompas_structs::lerror::LResult;
 use sompas_structs::lvalue::LValue;
@@ -43,7 +42,7 @@ async fn check_receiver<'a>(mut wait: (String, Wait)) -> String {
 /// Ask to lock a resource in a list
 /// Returns the resource that has been locked.
 #[async_scheme_fn]
-pub async fn lock_in_list(env: &LEnv, mut resources: Vec<LValue>, priority: i64) -> LResult {
+pub async fn lock_in_list(mut resources: Vec<LValue>, priority: i64) -> LResult {
     let mut resources: Vec<String> = resources.drain(..).map(|lv| lv.to_string()).collect();
     let mut receivers: Vec<(String, Wait)> = vec![];
 

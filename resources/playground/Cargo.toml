@@ -12,8 +12,8 @@ sompas-repl = {path = "../../scheme/repl"}
 sompas-utils={path = "../../scheme/utils"}
 ompas-gobotsim = {path = "../../gobotsim"}
 ompas-rae-scheme = {path = "../../rae/scheme"}
+ompas-rae-structs = {path = "../../rae/structs"}
 aries_utils = {path = "../../aries/utils"}
-
 
 tokio = { version = "1.17.0", features = ["full", "time"] }
 rustyline = "7.1.0"

@@ -1,4 +1,11 @@
 pub mod solver;
+use crate::structs::atom::Atom;
+use crate::structs::constraint::Constraint;
+use crate::structs::lit::Lit;
+use crate::structs::symbol_table::{AtomId, SymTable};
+use crate::structs::traits::{FormatWithSymTable, GetVariables};
+use crate::structs::type_table::{AtomKind, PlanningAtomType};
+use crate::structs::{ConversionCollection, Problem};
 use anyhow::{anyhow, Result};
 use aries_core::{IntCst, Lit as aLit, INT_CST_MAX, INT_CST_MIN};
 use aries_model::extensions::Shaped;
@@ -14,15 +21,8 @@ use aries_planning::chronicles::{
 use aries_planning::parsing::pddl::TypedSymbol;
 use aries_utils::input::Sym;
 use log::info;
-use ompas_rae_structs::exec_context::rae_env::Type as raeType;
-use ompas_rae_structs::exec_context::rae_state::RAEStateSnapshot;
-use ompas_rae_structs::planning::atom::Atom;
-use ompas_rae_structs::planning::constraint::Constraint;
-use ompas_rae_structs::planning::lit::Lit;
-use ompas_rae_structs::planning::symbol_table::{AtomId, SymTable};
-use ompas_rae_structs::planning::traits::{FormatWithSymTable, GetVariables};
-use ompas_rae_structs::planning::type_table::{AtomKind, PlanningAtomType};
-use ompas_rae_structs::planning::{ConversionCollection, Problem};
+use ompas_rae_structs::rae_env::Type as raeType;
+use ompas_rae_structs::rae_state::RAEStateSnapshot;
 use sompas_language::*;
 use sompas_structs::lerror;
 use sompas_structs::lnumber::LNumber;
@@ -525,7 +525,7 @@ fn atom_id_into_atom(
 
 fn read_chronicle(
     c: Container,
-    chronicle: &ompas_rae_structs::planning::chronicle::ChronicleTemplate,
+    chronicle: &crate::structs::chronicle::ChronicleTemplate,
     ch: &ConversionCollection,
     context: &mut Ctx,
     bindings: &mut BindingAriesAtoms,

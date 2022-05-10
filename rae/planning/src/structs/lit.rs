@@ -1,7 +1,7 @@
-use crate::planning::constraint::Constraint;
-use crate::planning::symbol_table::{AtomId, SymTable};
-use crate::planning::traits::{FormatWithParent, FormatWithSymTable, GetVariables};
-use crate::planning::type_table::PlanningAtomType;
+use crate::structs::constraint::Constraint;
+use crate::structs::symbol_table::{AtomId, SymTable};
+use crate::structs::traits::{FormatWithParent, FormatWithSymTable, GetVariables};
+use crate::structs::type_table::PlanningAtomType;
 use im::{hashset, HashSet};
 use sompas_structs::lerror;
 use sompas_structs::lerror::LRuntimeError;

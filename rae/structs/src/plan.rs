@@ -1,4 +1,4 @@
-use crate::refinement::TaskId;
+use crate::TaskId;
 use im::HashMap;
 use sompas_structs::lerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;

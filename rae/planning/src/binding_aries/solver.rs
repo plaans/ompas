@@ -11,7 +11,7 @@ use aries_planning::chronicles::analysis::hierarchical_is_non_recursive;
 use aries_planning::chronicles::{ChronicleKind, ChronicleOrigin, FiniteProblem};
 use aries_tnet::theory::{StnConfig, StnTheory, TheoryPropagationLevel};
 use im::HashMap;
-use ompas_rae_structs::planning::plan::{AbstractTaskInstance, ActionInstance, Plan, TaskInstance};
+use ompas_rae_structs::plan::{AbstractTaskInstance, ActionInstance, Plan, TaskInstance};
 use sompas_structs::lerror::LResult;
 use sompas_structs::lvalue::LValue;
 use std::sync::Arc;

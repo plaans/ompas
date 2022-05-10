@@ -1,10 +1,10 @@
 use crate::rae_exec::{CtxRaeExec, MOD_RAE_EXEC, PARENT_TASK};
 use log::{error, info};
+use ompas_rae_core::error::RaeExecError;
 use ompas_rae_core::planning::{CtxPlanning, MOD_PLANNING};
-use ompas_rae_structs::exec_context::error::RaeExecError;
-use ompas_rae_structs::exec_context::options::{Planner, SelectMode};
-use ompas_rae_structs::refinement::task_collection::TaskStatus::*;
-use ompas_rae_structs::refinement::task_collection::{
+use ompas_rae_structs::options::{Planner, SelectMode};
+use ompas_rae_structs::task_collection::TaskStatus::*;
+use ompas_rae_structs::task_collection::{
     AbstractTaskMetaData, RefinementMetaData, TaskMetaData, TaskMetaDataView, TaskStatus,
 };
 use sompas_macros::*;
@@ -147,17 +147,16 @@ mod select {
     use ompas_rae_language::RAE_SELECT;
     use ompas_rae_planning::binding_aries::solver::run_solver_for_htn;
     use ompas_rae_planning::binding_aries::{generate_chronicles, solver};
-    use ompas_rae_structs::exec_context::options::Planner::Aries;
-    use ompas_rae_structs::exec_context::options::SelectMode;
-    use ompas_rae_structs::exec_context::rae_env::{
+
+    use ompas_rae_planning::structs::{ConversionContext, Problem};
+    use ompas_rae_structs::interval::Interval;
+    use ompas_rae_structs::options::Planner::Aries;
+    use ompas_rae_structs::plan::AbstractTaskInstance;
+    use ompas_rae_structs::rae_env::{
         RAE_METHOD_PRE_CONDITIONS_MAP, RAE_METHOD_SCORE_MAP, RAE_METHOD_TYPES_MAP,
         RAE_TASK_METHODS_MAP,
     };
-    use ompas_rae_structs::exec_context::rae_state::RAEStateSnapshot;
-    use ompas_rae_structs::planning::plan::AbstractTaskInstance;
-    use ompas_rae_structs::planning::{ConversionContext, Problem};
-    use ompas_rae_structs::refinement::task_collection::RefinementMetaData;
-    use ompas_rae_structs::refinement::Interval;
+    use ompas_rae_structs::rae_state::RAEStateSnapshot;
     use rand::prelude::SliceRandom;
     use sompas_core::modules::get;
     use sompas_core::modules::list::cons;

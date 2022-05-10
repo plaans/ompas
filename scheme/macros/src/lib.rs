@@ -9,12 +9,15 @@ use syn::{Expr, FnArg, ItemFn, Lifetime, PathArguments, ReturnType, Type};
 use syn::{GenericArgument, Ident};
 
 const DEFAULT_NO_ENV: &str = "__env__";
+const DEFAULT_ENV_TYPE: &str = "&sompas_structs::lenv::LEnv";
+const DEFAULT_ARGS_TYPE: &str = "&[sompas_structs::lvalue::LValue]";
 const DEFAULT_NO_ARGS: &str = "__args__";
 const DEFAULT_ARGS: &str = "args";
 const ENV_TYPE: &str = "LEnv";
-const ARGS_TYPE: &str = "Vec<LValue>";
+const ARGS_TYPE: &str = "[LValue]";
 const REF_ENV_TYPE: &str = "&LEnv";
 const REF_ARGS_TYPE: &str = "&[LValue]";
+const LVALUE_TYPE_LONG: &str = "sompas_structs::lvalue::LValue";
 const LVALUE_TYPE: &str = "LValue";
 const REF_LVALUE_TYPE: &str = "&LValue";
 const RESULT: &str = "__result__";
@@ -31,7 +34,8 @@ pub fn scheme_fn(_: TokenStream, input: TokenStream) -> TokenStream {
     let result: Ident = syn::parse_str(RESULT).unwrap();
     let vis = fun.vis;
     let name = fun.sig.ident;
-    let (env, args, params) = build_params(fun.sig.inputs, None, &name);
+    let ((env, env_type), (args, args_type), params) =
+        build_params(fun.sig.inputs, None, false, &name);
     let output = match &fun.sig.output {
         ReturnType::Default => quote!(),
         ReturnType::Type(_, b) => quote!(: #b),
@@ -39,7 +43,7 @@ pub fn scheme_fn(_: TokenStream, input: TokenStream) -> TokenStream {
     let expr_result = build_return(&result, &fun.sig.output);
     let body = fun.block.as_ref();
     let expanded = quote! {
-         #vis fn #name(#env : &sompas_structs::lenv::LEnv, #args: &[sompas_structs::lvalue::LValue]) -> sompas_structs::lerror::LResult
+         #vis fn #name(#env : #env_type, #args: #args_type) -> sompas_structs::lerror::LResult
         {
             #params
             let #result #output = {||{
@@ -79,12 +83,13 @@ pub fn async_scheme_fn(_: TokenStream, input: TokenStream) -> TokenStream {
     let result: Ident = syn::parse_str(RESULT).unwrap();
     let vis = fun.vis;
     let name = fun.sig.ident;
-    let (env, args, params) = build_params(
+    let ((env, env_type), (args, args_type), params) = build_params(
         fun.sig.inputs,
         match defined_lt {
             true => Some(&lt),
             false => None,
         },
+        true,
         &name,
     );
     let output = match &fun.sig.output {
@@ -94,7 +99,7 @@ pub fn async_scheme_fn(_: TokenStream, input: TokenStream) -> TokenStream {
     let expr_result = build_return(&result, &fun.sig.output);
     let body = fun.block.as_ref();
     let expanded = quote! {
-     #vis fn #name<#lt>(#env : & #lt sompas_structs::lenv::LEnv, #args: & #lt [sompas_structs::lvalue::LValue]) -> ::std::pin::Pin<::std::boxed::Box<
+     #vis fn #name<#lt>(#env : #env_type, #args: #args_type) -> ::std::pin::Pin<::std::boxed::Box<
         dyn ::std::future::Future<Output = sompas_structs::lerror::LResult>
             + ::std::marker::Send + #lt
         >>
@@ -139,20 +144,58 @@ fn try_into_vectored_type(t: &Type) -> Option<Type> {
     None
 }
 
+#[allow(dead_code)]
+#[inline]
+fn is_type(t: &Type, other: &Type) -> bool {
+    let ident: Ident = syn::parse_quote!(#other);
+    match t {
+        Type::Path(path) => path.path.segments.last().unwrap().ident == ident,
+        Type::Reference(r) => {
+            if let Type::Path(path) = r.elem.as_ref() {
+                path.path.segments.last().unwrap().ident == ident
+            } else {
+                panic!("Expected a path (referenced or not), got {}.", quote!(#t))
+            }
+        }
+        _ => panic!("Expected a path (referenced or not), got {}.", quote!(#t)),
+    }
+}
+
 #[inline]
 fn build_params(
     params: Punctuated<FnArg, Comma>,
     defined_lt: Option<&Lifetime>,
+    is_async: bool,
     fname: &Ident,
-) -> (Ident, Ident, TS) {
+) -> ((Ident, Type), (Ident, Type), TS) {
     let fname = fname.to_string();
     let mut env_redefined = false;
     let mut args_redefined = false;
     let mut new_params = TS::new();
     let mut env: Ident = syn::parse_str(DEFAULT_NO_ENV).unwrap();
+    let mut env_type: Type = match is_async {
+        true => match defined_lt {
+            Some(lt) => syn::parse_str::<Type>(format!("&{} {}", lt, ENV_TYPE).as_str()).unwrap(),
+            None => syn::parse_str::<Type>(format!("&{} {}", DEFAULT_LIFETIME, ENV_TYPE).as_str())
+                .unwrap(),
+        },
+        false => syn::parse_str(DEFAULT_ENV_TYPE).unwrap(),
+    };
     let mut args: Ident = syn::parse_str(DEFAULT_ARGS).unwrap();
+    let mut args_type: Type = match is_async {
+        true => match defined_lt {
+            Some(lt) => {
+                syn::parse_str::<Type>(format!("&{} [{}]", lt, LVALUE_TYPE_LONG).as_str()).unwrap()
+            }
+            None => syn::parse_str::<Type>(
+                format!("&{} [{}]", DEFAULT_LIFETIME, LVALUE_TYPE_LONG).as_str(),
+            )
+            .unwrap(),
+        },
+        false => syn::parse_str(DEFAULT_ARGS_TYPE).unwrap(),
+    };
     if params.is_empty() {
-        return (env, args, new_params);
+        return ((env, env_type), (args, args_type), new_params);
     }
     let type_lvalue: Type = syn::parse_str::<Type>(format!("{}", LVALUE_TYPE).as_str()).unwrap();
     let type_ref_lvalue: Type = syn::parse_str::<Type>(REF_LVALUE_TYPE).unwrap();
@@ -188,6 +231,19 @@ fn build_params(
             if i == 0 && t == &type_env {
                 //println!("env is redefined!");
                 env = syn::parse_quote!(#var);
+                env_type = if !is_async {
+                    syn::parse_quote!(#t)
+                } else if let Some(_) = defined_lt {
+                    syn::parse_quote!(#t)
+                } else if let Type::Reference(r) = t {
+                    let lt: Lifetime = syn::parse_str(DEFAULT_LIFETIME).unwrap();
+                    let t = r.elem.as_ref();
+                    syn::parse_quote! {
+                        & #lt #t
+                    }
+                } else {
+                    panic!("type of args should be a reference")
+                };
                 env_redefined = true;
             }
             //using directly args en redefining its ident
@@ -195,6 +251,19 @@ fn build_params(
                 //println!("args is redefiend");
                 args_redefined = true;
                 args = syn::parse_quote!(#var);
+                args_type = if !is_async {
+                    syn::parse_quote!(#t)
+                } else if let Some(_) = defined_lt {
+                    syn::parse_quote!(#t)
+                } else if let Type::Reference(r) = t {
+                    let lt: Lifetime = syn::parse_str(DEFAULT_LIFETIME).unwrap();
+                    let t = r.elem.as_ref();
+                    syn::parse_quote! {
+                        & #lt #t
+                    }
+                } else {
+                    panic!("type of args should be a reference")
+                };
                 assert_eq!(len, i + 1);
                 break;
             }
@@ -242,7 +311,7 @@ fn build_params(
         args = syn::parse_str(DEFAULT_NO_ARGS).unwrap()
     }
 
-    (env, args, new_params)
+    ((env, env_type), (args, args_type), new_params)
 }
 
 #[inline]

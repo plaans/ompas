@@ -3,8 +3,9 @@
 use crate::language::*;
 use crate::rae_interface::PlatformGodot;
 use ompas_rae_scheme::rae_exec::RAEInterface;
-use ompas_rae_structs::exec_context::rae_state::{RAEState, StateType, KEY_DYNAMIC, KEY_STATIC};
-use ompas_rae_structs::refinement::Agenda;
+use ompas_rae_structs::agenda::Agenda;
+use ompas_rae_structs::rae_state::RAEState;
+use ompas_rae_structs::rae_state::*;
 use sompas_macros::*;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::{Documentation, LHelp};

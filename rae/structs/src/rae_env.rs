@@ -1,6 +1,3 @@
-use crate::exec_context::job::Job;
-use crate::exec_context::rae_state::RAEState;
-use crate::refinement::Agenda;
 use im::HashMap;
 use sompas_core::get_root_env;
 use sompas_language::{LIST, OBJECT};
@@ -8,6 +5,9 @@ use sompas_structs::lcoreoperator::LCoreOperator;
 use sompas_structs::lenv::{LEnv, LEnvSymbols};
 use sompas_structs::lerror::LRuntimeError;
 
+use crate::agenda::Agenda;
+use crate::job::Job;
+use crate::rae_state::RAEState;
 use sompas_structs::llambda::LLambda;
 use sompas_structs::lvalue::{LValue, Sym};
 use sompas_structs::typelvalue::KindLValue;

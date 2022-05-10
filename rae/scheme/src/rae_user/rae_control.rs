@@ -1,8 +1,9 @@
 use crate::rae_user::{CtxRae, MOD_RAE};
 use ompas_rae_core::rae_run;
 use ompas_rae_language::*;
-use ompas_rae_structs::exec_context::job::{Job, JobType};
-use ompas_rae_structs::exec_context::options::*;
+use ompas_rae_structs::job::{Job, JobType};
+use ompas_rae_structs::options::*;
+use ompas_rae_structs::options::{Planner, RAEOptions, SelectMode};
 use sompas_macros::*;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lerror;

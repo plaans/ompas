@@ -1,12 +1,12 @@
 use crate::conversion::post_processing::post_processing;
 use crate::conversion::pre_processing::pre_processing;
 use crate::conversion::processing::{convert_lvalue_to_expression_chronicle, MetaData};
+use crate::structs::chronicle::ChronicleTemplate;
+use crate::structs::symbol_table::{AtomId, SymTable};
+use crate::structs::type_table::PlanningAtomType;
+use crate::structs::{ConversionCollection, ConversionContext};
 use aries_planning::chronicles::ChronicleKind;
-use ompas_rae_structs::exec_context::rae_env::{Parameters, Task};
-use ompas_rae_structs::planning::chronicle::ChronicleTemplate;
-use ompas_rae_structs::planning::symbol_table::{AtomId, SymTable};
-use ompas_rae_structs::planning::type_table::PlanningAtomType;
-use ompas_rae_structs::planning::{ConversionCollection, ConversionContext};
+use ompas_rae_structs::rae_env::{Parameters, Task};
 use sompas_structs::lerror;
 use sompas_structs::llambda::{LLambda, LambdaArgs};
 use sompas_structs::lvalue::LValue;

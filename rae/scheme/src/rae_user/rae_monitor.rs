@@ -1,15 +1,16 @@
 use crate::rae_user::{CtxRae, MOD_RAE};
-use ompas_rae_language::{RAE_GET_AGENDA, RAE_GET_CONFIG_PLATFORM, RAE_GET_ENV, RAE_GET_STATE};
-use ompas_rae_structs::exec_context::mutex;
-use ompas_rae_structs::exec_context::rae_state::*;
-use ompas_rae_structs::exec_context::ressource_access::monitor;
-use ompas_rae_structs::refinement::task_collection::*;
+use ompas_rae_core::mutex;
+use ompas_rae_core::ressource_access::monitor;
+use ompas_rae_language::{RAE_GET_AGENDA, RAE_GET_ENV, RAE_GET_STATE};
+use ompas_rae_structs::rae_state::StateType;
+use ompas_rae_structs::rae_state::*;
+use ompas_rae_structs::task_collection::*;
 use sompas_macros::*;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::typelvalue::KindLValue;
-use sompas_structs::{lerror, wrong_n_args, wrong_type};
+use sompas_structs::{lerror, wrong_type};
 /// Returns the whole state if no args, or specific part of it ('static', 'dynamic', 'inner world')
 #[async_scheme_fn]
 pub async fn get_state(env: &LEnv, args: &[LValue]) -> LResult {
@@ -128,32 +129,32 @@ pub async fn get_agenda(env: &LEnv, args: &[LValue]) -> LResult {
 //Conversion functions
 
 #[async_scheme_fn]
-pub async fn get_mutexes(env: &LEnv, args: &[LValue]) -> LResult {
+pub async fn get_mutexes() -> LResult {
     Ok(mutex::get_debug().await.into())
 }
 
 #[async_scheme_fn]
-pub async fn get_monitors(env: &LEnv, args: &[LValue]) -> LResult {
+pub async fn get_monitors() -> LResult {
     Ok(monitor::get_debug().await.into())
 }
 
 ///Get the methods of a given task
 #[async_scheme_fn]
-pub async fn get_methods(env: &LEnv, args: &[LValue]) -> LResult {
+pub async fn get_methods(env: &LEnv) -> LResult {
     let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
     Ok(ctx.get_rae_env().read().await.domain_env.get_list_methods())
 }
 
 ///Get the list of actions in the environment
 #[async_scheme_fn]
-pub async fn get_actions(env: &LEnv, args: &[LValue]) -> LResult {
+pub async fn get_actions(env: &LEnv) -> LResult {
     let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
     Ok(ctx.get_rae_env().read().await.domain_env.get_list_actions())
 }
 
 ///Get the list of tasks in the environment
 #[async_scheme_fn]
-pub async fn get_tasks(env: &LEnv, args: &[LValue]) -> LResult {
+pub async fn get_tasks(env: &LEnv) -> LResult {
     let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
     Ok(ctx.get_rae_env().read().await.domain_env.get_list_tasks())
 }

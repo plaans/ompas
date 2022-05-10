@@ -1,17 +1,17 @@
-use crate::planning::interval::Interval;
-use crate::planning::symbol_table::{AtomId, SymTable};
-use crate::planning::traits::{FormatWithParent, FormatWithSymTable, GetVariables};
-use crate::planning::type_table::PlanningAtomType;
+use crate::structs::interval::Interval;
+use crate::structs::symbol_table::{AtomId, SymTable};
+use crate::structs::traits::{FormatWithParent, FormatWithSymTable, GetVariables};
+use crate::structs::type_table::PlanningAtomType;
 use im::HashSet;
 
-#[derive(Clone)]
-pub struct Effect {
+#[derive(Clone, PartialEq)]
+pub struct Condition {
     pub interval: Interval,
     pub sv: Vec<AtomId>,
     pub value: AtomId,
 }
 
-impl Effect {
+impl Condition {
     pub fn get_start(&self) -> &AtomId {
         self.interval.start()
     }
@@ -21,10 +21,10 @@ impl Effect {
     }
 }
 
-impl FormatWithSymTable for Effect {
+impl FormatWithSymTable for Condition {
     fn format(&self, st: &SymTable, sym_version: bool) -> String {
         format!(
-            "{} {} <- {}",
+            "{} {} = {}",
             self.interval.format(st, sym_version),
             self.sv.format(st, sym_version),
             self.value.format(st, sym_version),
@@ -32,7 +32,7 @@ impl FormatWithSymTable for Effect {
     }
 }
 
-impl FormatWithParent for Effect {
+impl FormatWithParent for Condition {
     fn format_with_parent(&mut self, st: &SymTable) {
         self.interval.format_with_parent(st);
         self.sv.format_with_parent(st);
@@ -40,14 +40,14 @@ impl FormatWithParent for Effect {
     }
 }
 
-impl GetVariables for Effect {
+impl GetVariables for Condition {
     fn get_variables(&self) -> HashSet<AtomId> {
-        let mut union = self.interval.get_variables();
+        let mut hashset = self.interval.get_variables();
+        hashset.insert(self.value);
         self.sv.iter().for_each(|a| {
-            union.insert(*a);
+            hashset.insert(*a);
         });
-        union.insert(self.value);
-        union
+        hashset
     }
 
     fn get_variables_of_type(

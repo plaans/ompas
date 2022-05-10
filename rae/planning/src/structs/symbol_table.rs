@@ -1,8 +1,8 @@
-use crate::planning::atom::{Atom, Sym};
-use crate::planning::forest::{Forest, Node, NodeId};
-use crate::planning::interval::Interval;
-use crate::planning::traits::{FormatWithParent, FormatWithSymTable};
-use crate::planning::type_table::{
+use crate::structs::atom::{Atom, Sym};
+use crate::structs::forest::{Forest, Node, NodeId};
+use crate::structs::interval::Interval;
+use crate::structs::traits::{FormatWithParent, FormatWithSymTable};
+use crate::structs::type_table::{
     AtomKind, AtomType, PlanningAtomType, TypeId, TypeTable, VariableKind,
 };
 use ompas_rae_language::*;

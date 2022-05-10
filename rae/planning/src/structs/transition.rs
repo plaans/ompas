@@ -1,7 +1,7 @@
-use crate::planning::lit::Lit;
-use crate::planning::symbol_table::{AtomId, SymTable};
-use crate::planning::traits::{FormatWithParent, FormatWithSymTable, GetVariables};
-use crate::planning::type_table::PlanningAtomType;
+use crate::structs::lit::Lit;
+use crate::structs::symbol_table::{AtomId, SymTable};
+use crate::structs::traits::{FormatWithParent, FormatWithSymTable, GetVariables};
+use crate::structs::type_table::PlanningAtomType;
 use im::HashSet;
 
 #[derive(Clone)]

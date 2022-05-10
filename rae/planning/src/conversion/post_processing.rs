@@ -1,14 +1,14 @@
 use crate::point_algebra::problem::{try_into_pa_relation, Graph, Problem};
 use crate::point_algebra::remove_useless_timepoints;
+use crate::structs::atom::Atom;
+use crate::structs::chronicle::{ChronicleSet, ChronicleTemplate};
+use crate::structs::constraint::Constraint;
+use crate::structs::lit::Lit;
+use crate::structs::symbol_table::{AtomId, SymTable};
+use crate::structs::traits::{FormatWithParent, GetVariables};
+use crate::structs::type_table::{AtomKind, PlanningAtomType, VariableKind};
+use crate::structs::{ConversionCollection, ConversionContext};
 use im::HashSet;
-use ompas_rae_structs::planning::atom::Atom;
-use ompas_rae_structs::planning::chronicle::{ChronicleSet, ChronicleTemplate};
-use ompas_rae_structs::planning::constraint::Constraint;
-use ompas_rae_structs::planning::lit::Lit;
-use ompas_rae_structs::planning::symbol_table::{AtomId, SymTable};
-use ompas_rae_structs::planning::traits::{FormatWithParent, GetVariables};
-use ompas_rae_structs::planning::type_table::{AtomKind, PlanningAtomType, VariableKind};
-use ompas_rae_structs::planning::{ConversionCollection, ConversionContext};
 use sompas_structs::lerror::LRuntimeError;
 use std::ops::Deref;
 

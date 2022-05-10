@@ -2,12 +2,11 @@ use crate::planning::CtxPlanning;
 use log::{error, info, warn};
 use ompas_rae_language::RAE_LAUNCH_PLATFORM;
 use ompas_rae_planning::conversion::convert_domain_to_chronicle_hierarchy;
-use ompas_rae_structs::exec_context::error::*;
-use ompas_rae_structs::exec_context::options::SelectMode::Planning;
-use ompas_rae_structs::exec_context::options::{RAEOptions, SelectMode};
-use ompas_rae_structs::exec_context::rae_env::RAEEnv;
-use ompas_rae_structs::exec_context::ressource_access::monitor::task_check_monitor;
-use ompas_rae_structs::planning::{ConversionCollection, ConversionContext};
+use ompas_rae_planning::structs::{ConversionCollection, ConversionContext};
+use ompas_rae_structs::options::SelectMode::Planning;
+use ompas_rae_structs::options::{RAEOptions, SelectMode};
+use ompas_rae_structs::rae_env::RAEEnv;
+use ressource_access::monitor::task_check_monitor;
 use sompas_core::{eval, eval_init};
 use sompas_structs::lenv::ImportType::WithoutPrefix;
 use sompas_structs::lenv::LEnv;
@@ -16,9 +15,15 @@ use sompas_structs::lvalue::LValue;
 use std::mem;
 use std::ops::Deref;
 use std::time::Instant;
+
+use crate::error::RaeExecError;
+
 pub type ReactiveTriggerId = usize;
 
+pub mod error;
+pub mod mutex;
 pub mod planning;
+pub mod ressource_access;
 
 #[derive(Debug, Clone)]
 pub enum TaskType {

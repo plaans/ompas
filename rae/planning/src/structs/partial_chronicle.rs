@@ -1,13 +1,13 @@
-use crate::planning::chronicle::ChronicleResult;
-use crate::planning::condition::Condition;
-use crate::planning::constraint::Constraint;
-use crate::planning::effect::Effect;
-use crate::planning::expression::Expression;
-use crate::planning::interval::Interval;
-use crate::planning::lit::Lit;
-use crate::planning::symbol_table::{AtomId, SymTable};
-use crate::planning::traits::{Absorb, FormatWithParent, FormatWithSymTable, GetVariables};
-use crate::planning::type_table::PlanningAtomType;
+use crate::structs::chronicle::ChronicleResult;
+use crate::structs::condition::Condition;
+use crate::structs::constraint::Constraint;
+use crate::structs::effect::Effect;
+use crate::structs::expression::Expression;
+use crate::structs::interval::Interval;
+use crate::structs::lit::Lit;
+use crate::structs::symbol_table::{AtomId, SymTable};
+use crate::structs::traits::{Absorb, FormatWithParent, FormatWithSymTable, GetVariables};
+use crate::structs::type_table::PlanningAtomType;
 use im::{hashset, HashSet};
 use std::ops::Deref;
 

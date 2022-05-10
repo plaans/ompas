@@ -1,6 +1,6 @@
-use ompas_rae_structs::exec_context::options::SelectMode;
-use ompas_rae_structs::exec_context::rae_env::DomainEnv;
-use ompas_rae_structs::planning::ConversionCollection;
+use ompas_rae_planning::structs::ConversionCollection;
+use ompas_rae_structs::options::SelectMode;
+use ompas_rae_structs::rae_env::DomainEnv;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::Documentation;
 use sompas_structs::lenv::LEnv;

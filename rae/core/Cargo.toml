@@ -6,10 +6,13 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ompas-rae-structs = {path = "../structs"}
 ompas-rae-language = {path = "../language"}
 ompas-rae-planning = {path = "../planning"}
+ompas-rae-structs= {path = "../structs"}
 sompas-core = {path = "../../scheme/core"}
 sompas-structs = {path = "../../scheme/structs"}
 tokio = { version = "1.17.0", features = ["full", "time"] }
 log =  { version = "0.4.16", features = ["std"] }
+lazy_static = "1.4.0"
+sompas-utils = {path = "../../scheme/utils"}
+im = "15.1.0"

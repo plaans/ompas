@@ -6,11 +6,10 @@ use async_trait::async_trait;
 use ompas_rae_core::ressource_access::monitor::add_waiter;
 use ompas_rae_language::*;
 use ompas_rae_structs::agenda::Agenda;
+use ompas_rae_structs::context::RAE_TASK_METHODS_MAP;
 use ompas_rae_structs::job::Job;
-use ompas_rae_structs::rae_env::RAE_TASK_METHODS_MAP;
-use ompas_rae_structs::rae_state::*;
-use ompas_rae_structs::rae_state::{RAEState, StateType};
-use ompas_rae_structs::task_collection::TaskStatus;
+use ompas_rae_structs::state::task_status::TaskStatus;
+use ompas_rae_structs::state::world_state::*;
 use ompas_rae_structs::TaskId;
 use sompas_core::eval;
 use sompas_core::modules::list::cons;
@@ -73,7 +72,7 @@ impl Platform {
     }
 
     /// Initial what needs to be.
-    pub async fn init(&self, state: RAEState, agenda: Agenda) {
+    pub async fn init(&self, state: WorldState, agenda: Agenda) {
         self.inner.write().await.init(state, agenda).await;
     }
 
@@ -114,7 +113,7 @@ impl Platform {
 ///Context that will contains primitives for the RAE executive
 #[derive(Default)]
 pub struct CtxRaeExec {
-    pub state: RAEState,
+    pub state: WorldState,
     pub platform_interface: Option<Platform>,
     pub agenda: Agenda,
 }
@@ -234,7 +233,7 @@ impl JobStream {
 #[async_trait]
 pub trait RAEInterface: Any + Send + Sync {
     /// Initial what needs to be.
-    async fn init(&mut self, state: RAEState, agenda: Agenda);
+    async fn init(&mut self, state: WorldState, agenda: Agenda);
 
     /// Executes a command on the platform
     async fn exec_command(&self, args: &[LValue], command_id: usize) -> LResult;
@@ -260,7 +259,7 @@ pub trait RAEInterface: Any + Send + Sync {
 
 #[async_trait]
 impl RAEInterface for () {
-    async fn init(&mut self, _: RAEState, _: Agenda) {}
+    async fn init(&mut self, _: WorldState, _: Agenda) {}
 
     async fn exec_command(&self, _args: &[LValue], _: usize) -> LResult {
         Ok(Nil)

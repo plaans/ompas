@@ -1,7 +1,9 @@
 use crate::rae_user::{CtxRae, MOD_RAE};
 use ompas_rae_language::*;
-use ompas_rae_structs::rae_env::{Action, StateFunction};
-use ompas_rae_structs::rae_state::{LState, StateType};
+use ompas_rae_structs::domain::action::Action;
+use ompas_rae_structs::domain::state_function::StateFunction;
+use ompas_rae_structs::state::partial_state::PartialState;
+use ompas_rae_structs::state::world_state::StateType;
 use sompas_core::modules::list::cons;
 use sompas_core::{eval, expand, get_root_env};
 use sompas_language::*;
@@ -489,11 +491,11 @@ pub async fn def_task(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> 
 pub async fn def_initial_state(env: &LEnv, map: im::HashMap<LValue, LValue>) {
     let ctx = env.get_context::<CtxRae>(MOD_RAE).unwrap();
 
-    let mut inner_world = LState {
+    let mut inner_world = PartialState {
         inner: Default::default(),
         _type: Some(StateType::InnerWorld),
     };
-    let mut instance = LState {
+    let mut instance = PartialState {
         inner: Default::default(),
         _type: Some(StateType::Instance),
     };
@@ -585,7 +587,7 @@ pub async fn add_type(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> 
         }
     };
 
-    let mut instance = LState {
+    let mut instance = PartialState {
         inner: Default::default(),
         _type: Some(StateType::Instance),
     };
@@ -626,7 +628,7 @@ pub async fn add_object(env: &LEnv, constant: LValue, t: LValue) -> Result<(), L
 
     let ctx = env.get_context::<CtxRae>(MOD_RAE).unwrap();
 
-    let mut instances: LState = ctx
+    let mut instances: PartialState = ctx
         .get_rae_env()
         .read()
         .await

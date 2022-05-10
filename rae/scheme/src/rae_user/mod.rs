@@ -5,9 +5,9 @@ use chrono::{DateTime, Utc};
 use ompas_rae_language::*;
 use ompas_rae_planning::structs::ConversionContext;
 use ompas_rae_structs::agenda::Agenda;
+use ompas_rae_structs::context::RAEContext;
 use ompas_rae_structs::job::Job;
 use ompas_rae_structs::options::{RAEOptions, SelectMode};
-use ompas_rae_structs::rae_env::RAEEnv;
 use rae_control::*;
 use rae_conversion::*;
 use rae_description::*;
@@ -52,7 +52,7 @@ pub const TOKIO_CHANNEL_SIZE: usize = 100;
 pub struct CtxRae {
     log: PathBuf,
     options: Arc<RwLock<RAEOptions>>,
-    env: Arc<RwLock<RAEEnv>>,
+    env: Arc<RwLock<RAEContext>>,
     domain: InitLisp,
     sender_to_rae: Option<Sender<Job>>,
 }
@@ -213,7 +213,7 @@ impl CtxRae {
         let (mut rae_env, platform) = match platform {
             Some(platform) => {
                 //let (sender_sync, receiver_sync) = mpsc::channel(TOKIO_CHANNEL_SIZE);
-                let mut rae_env: RAEEnv = RAEEnv::new(Some(receiver_job)).await;
+                let mut rae_env: RAEContext = RAEContext::new(Some(receiver_job)).await;
                 let domain = platform.get_ref().read().await.domain().await;
 
                 ctx_rae.set_domain(vec![domain].into());
@@ -233,7 +233,7 @@ impl CtxRae {
 
                 (rae_env, Some(platform))
             }
-            None => (RAEEnv::new(Some(receiver_job)).await, None),
+            None => (RAEContext::new(Some(receiver_job)).await, None),
         };
 
         //Clone all structs that need to be shared to monitor action status, state and agenda.
@@ -295,11 +295,11 @@ impl CtxRae {
         self.options.write().await.set_select_mode(select_mode);
     }
 
-    pub fn get_rae_env(&self) -> Arc<RwLock<RAEEnv>> {
+    pub fn get_rae_env(&self) -> Arc<RwLock<RAEContext>> {
         self.env.clone()
     }
 
-    pub async fn set_rae_env(&self, rae_env: RAEEnv) {
+    pub async fn set_rae_env(&self, rae_env: RAEContext) {
         *self.env.write().await = rae_env
     }
 
@@ -311,13 +311,13 @@ impl CtxRae {
         self.domain = domain;
     }
 
-    pub async fn own_rae_env(&self) -> RAEEnv {
+    pub async fn own_rae_env(&self) -> RAEContext {
         let mut src = self.env.write().await;
 
         let mut agenda: Agenda = src.agenda.clone();
         agenda.reset_time_reference();
 
-        let new_env = RAEEnv {
+        let new_env = RAEContext {
             job_receiver: None,
             agenda,
             state: src.state.clone(),
@@ -350,7 +350,7 @@ impl Default for CtxRae {
         Self {
             log: PathBuf::default(),
             options: Default::default(),
-            env: Arc::new(RwLock::new(RAEEnv {
+            env: Arc::new(RwLock::new(RAEContext {
                 job_receiver: None,
                 agenda: Default::default(),
                 state: Default::default(),

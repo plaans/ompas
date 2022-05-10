@@ -5,6 +5,46 @@ use std::ops::{Add, AddAssign};
 
 pub type Timepoint = u128;
 
+#[derive(Debug, Default, Clone)]
+pub struct Interval {
+    pub start: Timepoint,
+    pub end: Option<Timepoint>,
+}
+
+const FACTOR_TO_SEC: f64 = 1_000_000.0;
+#[allow(dead_code)]
+const FACTOR_TO_MILLIS: f64 = 1_000.0;
+
+impl Display for Interval {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut str = format!("[{:.3},", self.start as f64 / FACTOR_TO_SEC);
+        match &self.end {
+            Some(end) => str.push_str(format!("{:^3}]", *end as f64 / FACTOR_TO_SEC).as_str()),
+            None => str.push_str("...]"),
+        }
+
+        write!(f, "{}", str)
+    }
+}
+
+impl Interval {
+    pub fn new(start: Timepoint, end: Option<Timepoint>) -> Self {
+        Self { start, end }
+    }
+
+    /// Returns end - start if end is defined.
+    pub fn duration(&self) -> Duration {
+        match &self.end {
+            Some(e) => Duration::Finite(e - self.start),
+            None => Duration::Inf,
+        }
+    }
+
+    pub fn set_end(&mut self, end: Timepoint) {
+        assert!(self.start <= end);
+        self.end = Some(end)
+    }
+}
 #[derive(Copy, Clone)]
 pub enum Duration {
     Finite(u128),
@@ -54,46 +94,5 @@ impl Add for Duration {
 impl AddAssign for Duration {
     fn add_assign(&mut self, rhs: Self) {
         *self = *self + rhs;
-    }
-}
-
-#[derive(Debug, Default, Clone)]
-pub struct Interval {
-    pub start: Timepoint,
-    pub end: Option<Timepoint>,
-}
-
-const FACTOR_TO_SEC: f64 = 1_000_000.0;
-#[allow(dead_code)]
-const FACTOR_TO_MILLIS: f64 = 1_000.0;
-
-impl Display for Interval {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut str = format!("[{:.3},", self.start as f64 / FACTOR_TO_SEC);
-        match &self.end {
-            Some(end) => str.push_str(format!("{:^3}]", *end as f64 / FACTOR_TO_SEC).as_str()),
-            None => str.push_str("...]"),
-        }
-
-        write!(f, "{}", str)
-    }
-}
-
-impl Interval {
-    pub fn new(start: Timepoint, end: Option<Timepoint>) -> Self {
-        Self { start, end }
-    }
-
-    /// Returns end - start if end is defined.
-    pub fn duration(&self) -> Duration {
-        match &self.end {
-            Some(e) => Duration::Finite(e - self.start),
-            None => Duration::Inf,
-        }
-    }
-
-    pub fn set_end(&mut self, end: Timepoint) {
-        assert!(self.start <= end);
-        self.end = Some(end)
     }
 }

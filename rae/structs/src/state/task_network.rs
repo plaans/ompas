@@ -9,6 +9,9 @@ pub struct TaskNetwork {
 }
 
 impl TaskNetwork {
+    /*
+    FORMAT
+     */
     fn format_network(tn: &im::HashMap<usize, Vec<usize>>, task_id: &TaskId) -> Vec<String> {
         let subtasks = tn.get(task_id).unwrap();
         let n = subtasks.len();
@@ -49,9 +52,9 @@ impl TaskNetwork {
         }
         str
     }
-}
-
-impl TaskNetwork {
+    /*
+    ADDERS
+     */
     pub async fn add_task_to_parent(&self, parent_task: TaskId, task_id: TaskId) {
         self.subtasks
             .write()

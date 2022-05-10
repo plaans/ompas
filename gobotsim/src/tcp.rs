@@ -1,7 +1,9 @@
 use crate::rae_interface::Instance;
 use crate::serde::{GodotMessageSerde, GodotMessageType};
 use ompas_rae_structs::agenda::Agenda;
-use ompas_rae_structs::rae_state::*;
+use ompas_rae_structs::state::action_status::*;
+use ompas_rae_structs::state::partial_state::PartialState;
+use ompas_rae_structs::state::world_state::*;
 use sompas_structs::lvalues::LValueS;
 use sompas_utils::task_handler;
 use std::convert::TryInto;
@@ -18,7 +20,7 @@ pub const TEST_TCP: &str = "test_tcp";
 pub async fn task_tcp_connection(
     socket_addr: &SocketAddr,
     receiver: Receiver<String>,
-    state: RAEState,
+    state: WorldState,
     status: Agenda,
     instance: Instance,
 ) {
@@ -75,7 +77,7 @@ fn u32_to_u8_array(x: u32) -> [u8; 4] {
 
 async fn async_read_socket(
     stream: ReadHalf<TcpStream>,
-    state: RAEState,
+    state: WorldState,
     agenda: Agenda,
     instance: Instance,
 ) {
@@ -113,7 +115,7 @@ async fn async_read_socket(
             };
             match message._type {
                 GodotMessageType::StaticState | GodotMessageType::DynamicState => {
-                    let temp_state: LState = message.try_into().unwrap();
+                    let temp_state: PartialState = message.try_into().unwrap();
                     //println!("new state");
                     for (k,v) in &temp_state.inner {
                         if let LValueS::List(list)= &k {

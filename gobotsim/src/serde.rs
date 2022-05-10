@@ -1,6 +1,8 @@
 use aries_planning::parsing::sexpr::SExpr;
-use ompas_rae_structs::rae_state::ActionStatus::ActionDenied;
-use ompas_rae_structs::rae_state::{ActionStatus, LState, StateType};
+use ompas_rae_structs::state::action_status::ActionStatus;
+use ompas_rae_structs::state::action_status::ActionStatus::ActionDenied;
+use ompas_rae_structs::state::partial_state::PartialState;
+use ompas_rae_structs::state::world_state::StateType;
 use serde::{Deserialize, Serialize, Serializer};
 use sompas_structs::lerror;
 use sompas_structs::lerror::LRuntimeError;
@@ -129,11 +131,11 @@ pub enum GodotMessageSerdeData {
     ActionCancel(SerdeActionCancel),
 }
 
-impl TryFrom<GodotMessageSerde> for LState {
+impl TryFrom<GodotMessageSerde> for PartialState {
     type Error = LRuntimeError;
 
     fn try_from(value: GodotMessageSerde) -> Result<Self, Self::Error> {
-        let mut state: LState = Default::default();
+        let mut state: PartialState = Default::default();
         match value._type {
             GodotMessageType::StaticState => {
                 state.set_type(StateType::Static);

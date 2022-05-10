@@ -1,6 +1,7 @@
 use crate::interval::{Duration, Interval, Timepoint};
 use crate::options::SelectMode;
 use crate::plan::Plan;
+use crate::state::task_status::TaskStatus;
 use crate::TaskId;
 use itertools::Itertools;
 use sompas_structs::lerror::LRuntimeError;
@@ -10,68 +11,15 @@ use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum TaskStatus {
-    Pending,
-    Running,
-    Failure,
-    Done,
-}
-
-pub const STATUS_PENDING: &str = "pending";
-pub const STATUS_RUNNING: &str = "running";
-pub const STATUS_FAILURE: &str = "failure";
-pub const STATUS_DONE: &str = "done";
-
-impl Display for TaskStatus {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(
-            f,
-            "{}",
-            match self {
-                Self::Pending => STATUS_PENDING,
-                Self::Running => STATUS_RUNNING,
-                Self::Failure => STATUS_FAILURE,
-                Self::Done => STATUS_DONE,
-            }
-        )
-    }
-}
-
 #[derive(Clone, Default)]
 pub struct TaskCollection {
     pub inner: Arc<RwLock<im::HashMap<TaskId, TaskMetaData>>>,
 }
 
-#[derive(Debug, Copy, Clone)]
-pub enum TaskType {
-    AbstractTask,
-    Action,
-}
-
-pub const ABSTRACT_TASK: &str = "abstract-task";
-pub const ACTION: &str = "action";
-
-impl Display for TaskType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                TaskType::AbstractTask => ABSTRACT_TASK,
-                TaskType::Action => ACTION,
-            }
-        )
-    }
-}
-
-#[derive(Copy, Clone, Default, Debug)]
-pub struct TaskFilter {
-    pub task_type: Option<TaskType>,
-    pub status: Option<TaskStatus>,
-}
-
 impl TaskCollection {
+    /*
+    FORMAT
+     */
     pub async fn format(&self, filter: TaskFilter) -> String {
         let inner: im::HashMap<usize, TaskMetaData> = self.get_inner().await;
 
@@ -111,9 +59,10 @@ impl TaskCollection {
             string
         }
     }
-}
 
-impl TaskCollection {
+    /*
+    BOOLEAN
+     */
     pub async fn is_action(&self, id: &TaskId) -> bool {
         self.inner.read().await.get(id).unwrap().is_action()
     }
@@ -121,13 +70,25 @@ impl TaskCollection {
     pub async fn is_abstract_task(&self, id: &TaskId) -> bool {
         self.inner.read().await.get(id).unwrap().is_abstract_task()
     }
-}
 
-impl TaskCollection {
+    /*
+    GETTERS
+     */
     pub async fn get_inner(&self) -> im::HashMap<TaskId, TaskMetaData> {
         self.inner.read().await.clone()
     }
 
+    pub async fn get_status(&self, id: &TaskId) -> TaskStatus {
+        self.inner.read().await.get(id).unwrap().get_status()
+    }
+
+    pub async fn get(&self, id: &TaskId) -> TaskMetaData {
+        self.inner.read().await.get(id).unwrap().clone()
+    }
+
+    /*
+    SETTERS
+     */
     pub async fn insert(&self, id: TaskId, task: impl Into<TaskMetaData>) {
         self.inner.write().await.insert(id, task.into());
     }
@@ -148,14 +109,6 @@ impl TaskCollection {
             .unwrap()
             .update_status(status)
             .await
-    }
-
-    pub async fn get_status(&self, id: &TaskId) -> TaskStatus {
-        self.inner.read().await.get(id).unwrap().get_status()
-    }
-
-    pub async fn get(&self, id: &TaskId) -> TaskMetaData {
-        self.inner.read().await.get(id).unwrap().clone()
     }
 }
 
@@ -344,10 +297,6 @@ impl TaskMetaDataView for ActionMetaData {
         &self.id
     }
 
-    fn get_start(&self) -> &Timepoint {
-        &self.interval.start
-    }
-
     fn get_status(&self) -> &TaskStatus {
         &self.status
     }
@@ -358,6 +307,10 @@ impl TaskMetaDataView for ActionMetaData {
 
     fn set_end_timepoint(&mut self, end: Timepoint) {
         self.interval.end = Some(end)
+    }
+
+    fn get_start(&self) -> &Timepoint {
+        &self.interval.start
     }
 
     fn get_end(&self) -> &Option<Timepoint> {
@@ -444,7 +397,11 @@ impl TaskMetaDataView for AbstractTaskMetaData {
         self.interval.duration()
     }
 }
+
 impl AbstractTaskMetaData {
+    /*
+    GETTERS
+     */
     pub fn get_number_of_refinement(&self) -> usize {
         self.refinement.len()
     }
@@ -468,12 +425,10 @@ impl AbstractTaskMetaData {
     pub fn get_tried(&self) -> &Vec<LValue> {
         &self.tried
     }
-}
 
-/*
-SETTERS
- */
-impl AbstractTaskMetaData {
+    /*
+    SETTERS
+     */
     pub fn set_current_method(&mut self, current_method: LValue) {
         self.current_method = current_method;
     }
@@ -541,4 +496,32 @@ impl Display for RefinementMetaData {
             self.interval.duration()
         )
     }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum TaskType {
+    AbstractTask,
+    Action,
+}
+
+pub const ABSTRACT_TASK: &str = "abstract-task";
+pub const ACTION: &str = "action";
+
+impl Display for TaskType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                TaskType::AbstractTask => ABSTRACT_TASK,
+                TaskType::Action => ACTION,
+            }
+        )
+    }
+}
+
+#[derive(Copy, Clone, Default, Debug)]
+pub struct TaskFilter {
+    pub task_type: Option<TaskType>,
+    pub status: Option<TaskStatus>,
 }

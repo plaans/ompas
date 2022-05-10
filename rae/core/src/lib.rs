@@ -3,9 +3,9 @@ use log::{error, info, warn};
 use ompas_rae_language::RAE_LAUNCH_PLATFORM;
 use ompas_rae_planning::conversion::convert_domain_to_chronicle_hierarchy;
 use ompas_rae_planning::structs::{ConversionCollection, ConversionContext};
+use ompas_rae_structs::context::RAEContext;
 use ompas_rae_structs::options::SelectMode::Planning;
 use ompas_rae_structs::options::{RAEOptions, SelectMode};
-use ompas_rae_structs::rae_env::RAEEnv;
 use ressource_access::monitor::task_check_monitor;
 use sompas_core::{eval, eval_init};
 use sompas_structs::lenv::ImportType::WithoutPrefix;
@@ -38,7 +38,7 @@ pub const TOKIO_CHANNEL_SIZE: usize = 100;
 
 /// Main RAE Loop:
 /// Receives Job to handle in separate tasks.
-pub async fn rae_run(mut context: RAEEnv, options: &RAEOptions, _log: String) {
+pub async fn rae_run(mut context: RAEContext, options: &RAEOptions, _log: String) {
     let mut receiver = mem::replace(&mut context.job_receiver, None).unwrap();
 
     //Ubuntu::

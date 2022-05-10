@@ -9,7 +9,7 @@ use ompas_rae_planning::conversion::processing::{
 use ompas_rae_planning::structs::chronicle::ChronicleTemplate;
 use ompas_rae_planning::structs::traits::FormatWithSymTable;
 use ompas_rae_planning::structs::{ConversionCollection, ConversionContext};
-use ompas_rae_structs::rae_env::RAEEnv;
+use ompas_rae_structs::context::RAEContext;
 use sompas_core::expand;
 use sompas_macros::*;
 use sompas_structs::lenv::LEnv;
@@ -89,7 +89,7 @@ pub async fn pre_process_domain(env: &LEnv) -> Result<String, LRuntimeError> {
     //let mut context: Context = ctx.into();
     let mut str = "pre-processing of the domain:\n".to_string();
     let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
-    let rae_env: &RAEEnv = &ctx.own_rae_env().await;
+    let rae_env: &RAEContext = &ctx.own_rae_env().await;
     let context: ConversionContext = ctx.get_conversion_context().await;
 
     for (action_label, action) in rae_env.domain_env.get_actions() {

@@ -1,6 +1,6 @@
 use ompas_rae_planning::structs::ConversionCollection;
+use ompas_rae_structs::domain::RAEDomain;
 use ompas_rae_structs::options::SelectMode;
-use ompas_rae_structs::rae_env::DomainEnv;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::Documentation;
 use sompas_structs::lenv::LEnv;
@@ -10,7 +10,7 @@ use sompas_structs::purefonction::PureFonctionCollection;
 pub const MOD_PLANNING: &str = "mod-planning";
 pub struct CtxPlanning {
     pub env: LEnv,
-    pub domain: DomainEnv,
+    pub domain: RAEDomain,
     pub cc: Option<ConversionCollection>,
     pub select_mode: SelectMode,
 }
@@ -18,7 +18,7 @@ pub struct CtxPlanning {
 impl CtxPlanning {
     pub fn new(
         cc: Option<ConversionCollection>,
-        domain: DomainEnv,
+        domain: RAEDomain,
         env: LEnv,
         select_mode: SelectMode,
     ) -> Self {

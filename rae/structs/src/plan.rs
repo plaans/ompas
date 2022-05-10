@@ -48,9 +48,10 @@ impl Plan {
             }
         }
     }
-}
 
-impl Plan {
+    /*
+    FORMAT
+     */
     fn format_abstract_task(&self, task: &AbstractTaskInstance, mut level: usize) -> String {
         let mut str = format!("{}*{} -> {}", "\t".repeat(level), task.task, task.method);
         level += 1;
@@ -161,28 +162,3 @@ pub struct AbstractTaskInstance {
 pub struct ActionInstance {
     pub inner: LValue,
 }
-
-/*
-impl ActionInstance {
-    pub fn format(&self, level: usize) -> String {
-        format!("{}*{}", "\t".repeat(level), self.inner)
-    }
-}
-
-impl AbstractTaskInstance {
-    pub fn format(&self, level: usize) -> String {
-        let mut str = format!("{}*{} -> {}", "\t".repeat(level), self.task, self.method);
-        for t in &self.subtasks {
-            str.push('\n');
-            str.push_str(
-                match t {
-                    TaskInstance::ActionInstance(a) => a.format(level + 1),
-                    TaskInstance::AbstractTaskInstance(a) => a.format(level + 1),
-                }
-                .as_str(),
-            );
-        }
-        str.push('\n');
-        str
-    }
-}*/

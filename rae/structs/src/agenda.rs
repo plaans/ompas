@@ -1,10 +1,11 @@
 use crate::interval::{Duration, Timepoint};
 use crate::options::SelectMode;
-use crate::task_collection::{
+use crate::state::task_network::TaskNetwork;
+use crate::state::task_state::{
     AbstractTaskMetaData, ActionMetaData, TaskCollection, TaskFilter, TaskMetaData,
-    TaskMetaDataView, TaskStatus,
+    TaskMetaDataView,
 };
-use crate::task_network::TaskNetwork;
+use crate::state::task_status::TaskStatus;
 use crate::TaskId;
 use chrono::{DateTime, Utc};
 use core::convert::Into;
@@ -26,14 +27,6 @@ use std::time::Instant;
 use std::{env, fs};
 use tokio::sync::mpsc;
 
-#[derive(Clone)]
-pub struct Agenda {
-    pub trc: TaskCollection,
-    tn: TaskNetwork,
-    next_id: Arc<AtomicUsize>,
-    time_reference: Instant,
-}
-
 const TASK_NAME: &str = "name of the task";
 const TASK_STATUS: &str = "status";
 const TASK_EXECUTION_TIME: &str = "execution time (s)";
@@ -44,7 +37,29 @@ const SUBTASK_NUMBER: &str = "number of subtask";
 const ACTION_NUMBER: &str = "number of actions";
 const RAE_STATS: &str = "rae_stats";
 
+#[derive(Clone)]
+pub struct Agenda {
+    pub trc: TaskCollection,
+    tn: TaskNetwork,
+    next_id: Arc<AtomicUsize>,
+    time_reference: Instant,
+}
+
+impl Default for Agenda {
+    fn default() -> Self {
+        Self {
+            trc: Default::default(),
+            tn: Default::default(),
+            next_id: Arc::new(Default::default()),
+            time_reference: Instant::now(),
+        }
+    }
+}
+
 impl Agenda {
+    /*
+    GETTERS
+     */
     pub async fn get_refinement_method(&self, id: &TaskId) -> SelectMode {
         let task: AbstractTaskMetaData = self.trc.get(id).await.try_into().unwrap();
         let r = task.get_last_refinement();
@@ -244,20 +259,7 @@ impl Agenda {
             .expect("could not write to stat file")
         }
     }
-}
 
-impl Default for Agenda {
-    fn default() -> Self {
-        Self {
-            trc: Default::default(),
-            tn: Default::default(),
-            next_id: Arc::new(Default::default()),
-            time_reference: Instant::now(),
-        }
-    }
-}
-
-impl Agenda {
     pub fn reset_time_reference(&mut self) {
         self.time_reference = Instant::now();
     }
@@ -265,9 +267,7 @@ impl Agenda {
     pub fn get_instant(&self) -> Timepoint {
         self.time_reference.elapsed().as_micros()
     }
-}
 
-impl Agenda {
     pub async fn format_task_collection(&self, filter: TaskFilter) -> String {
         self.trc.format(filter).await
     }
@@ -275,11 +275,7 @@ impl Agenda {
     pub async fn format_task_network(&self) -> String {
         self.tn.format().await
     }
-}
 
-const GET_ABSTRACT_TASK: &str = "get_abstract_task";
-
-impl Agenda {
     pub async fn add_abstract_task(
         &self,
         task: LValue,
@@ -310,6 +306,7 @@ impl Agenda {
         (task_id, rx)
     }
 
+    #[function_name::named]
     pub async fn get_abstract_task(
         &self,
         task_id: &TaskId,
@@ -317,7 +314,7 @@ impl Agenda {
         match self.trc.get(task_id).await {
             TaskMetaData::AbstractTask(a) => Ok(a),
             TaskMetaData::Action(_) => Err(lerror!(
-                GET_ABSTRACT_TASK,
+                function_name!(),
                 format!("{} does not exist", task_id)
             )),
         }

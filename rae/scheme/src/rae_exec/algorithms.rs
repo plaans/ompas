@@ -3,10 +3,11 @@ use log::{error, info};
 use ompas_rae_core::error::RaeExecError;
 use ompas_rae_core::planning::{CtxPlanning, MOD_PLANNING};
 use ompas_rae_structs::options::{Planner, SelectMode};
-use ompas_rae_structs::task_collection::TaskStatus::*;
-use ompas_rae_structs::task_collection::{
-    AbstractTaskMetaData, RefinementMetaData, TaskMetaData, TaskMetaDataView, TaskStatus,
+use ompas_rae_structs::state::task_state::{
+    AbstractTaskMetaData, RefinementMetaData, TaskMetaData, TaskMetaDataView,
 };
+use ompas_rae_structs::state::task_status::TaskStatus;
+use ompas_rae_structs::state::task_status::TaskStatus::*;
 use sompas_macros::*;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lerror::LResult;
@@ -149,14 +150,14 @@ mod select {
     use ompas_rae_planning::binding_aries::{generate_chronicles, solver};
 
     use ompas_rae_planning::structs::{ConversionContext, Problem};
-    use ompas_rae_structs::interval::Interval;
-    use ompas_rae_structs::options::Planner::Aries;
-    use ompas_rae_structs::plan::AbstractTaskInstance;
-    use ompas_rae_structs::rae_env::{
+    use ompas_rae_structs::context::{
         RAE_METHOD_PRE_CONDITIONS_MAP, RAE_METHOD_SCORE_MAP, RAE_METHOD_TYPES_MAP,
         RAE_TASK_METHODS_MAP,
     };
-    use ompas_rae_structs::rae_state::RAEStateSnapshot;
+    use ompas_rae_structs::interval::Interval;
+    use ompas_rae_structs::options::Planner::Aries;
+    use ompas_rae_structs::plan::AbstractTaskInstance;
+    use ompas_rae_structs::state::world_state::WorldStateSnapshot;
     use rand::prelude::SliceRandom;
     use sompas_core::modules::get;
     use sompas_core::modules::list::cons;
@@ -168,7 +169,7 @@ mod select {
 
     //Returns the method to do.
     pub async fn planning_select(
-        state: RAEStateSnapshot,
+        state: WorldStateSnapshot,
         tried: &[LValue],
         task: Vec<LValue>,
         env: &LEnv,
@@ -322,7 +323,7 @@ mod select {
     }
 
     pub async fn greedy_select(
-        state: RAEStateSnapshot,
+        state: WorldStateSnapshot,
         tried: &[LValue],
         task: Vec<LValue>,
         env: &LEnv,

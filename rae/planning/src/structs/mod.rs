@@ -4,8 +4,11 @@ use crate::structs::traits::FormatWithSymTable;
 use crate::structs::type_table::AtomType;
 use im::{hashmap, HashMap, HashSet};
 use ompas_rae_language::RAE_INSTANCE;
-use ompas_rae_structs::rae_env::{DomainEnv, Parameters, StateFunction, TypeHierarchy};
-use ompas_rae_structs::rae_state::RAEStateSnapshot;
+use ompas_rae_structs::domain::parameters::Parameters;
+use ompas_rae_structs::domain::state_function::StateFunction;
+use ompas_rae_structs::domain::type_hierarchy::TypeHierarchy;
+use ompas_rae_structs::domain::RAEDomain;
+use ompas_rae_structs::state::world_state::WorldStateSnapshot;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lvalues::LValueS;
 use std::fmt::{Display, Formatter};
@@ -114,9 +117,9 @@ impl TaskTypeMetaDataCollection {
 
 #[derive(Default, Clone)]
 pub struct ConversionContext {
-    pub domain: DomainEnv,
+    pub domain: RAEDomain,
     pub env: LEnv,
-    pub state: RAEStateSnapshot,
+    pub state: WorldStateSnapshot,
 }
 
 pub fn get_variables_of_type(
@@ -153,7 +156,7 @@ pub struct Problem {
     pub types: TypeHierarchy,
     pub state_functions: Vec<(String, Parameters)>,
     pub objects: Vec<(String, String)>,
-    pub initial_state: RAEStateSnapshot,
+    pub initial_state: WorldStateSnapshot,
     pub goal_tasks: Vec<LValueS>,
     pub cc: ConversionCollection,
 }

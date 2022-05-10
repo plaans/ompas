@@ -14,7 +14,7 @@ use crate::structs::type_table::{AtomKind, PlanningAtomType, VariableKind};
 use crate::structs::{ConversionCollection, ConversionContext, TaskType};
 use aries_planning::chronicles::ChronicleKind;
 use ompas_rae_language::*;
-use ompas_rae_structs::rae_env::*;
+use ompas_rae_structs::context::*;
 use sompas_core::static_eval::{eval_static, parse_static};
 use sompas_language::*;
 use sompas_structs::lcoreoperator::LCoreOperator;

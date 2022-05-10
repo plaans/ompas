@@ -21,8 +21,8 @@ use aries_planning::chronicles::{
 use aries_planning::parsing::pddl::TypedSymbol;
 use aries_utils::input::Sym;
 use log::info;
-use ompas_rae_structs::rae_env::Type as raeType;
-use ompas_rae_structs::rae_state::RAEStateSnapshot;
+use ompas_rae_structs::domain::_type::Type as raeType;
+use ompas_rae_structs::state::world_state::WorldStateSnapshot;
 use sompas_language::*;
 use sompas_structs::lerror;
 use sompas_structs::lnumber::LNumber;
@@ -243,7 +243,7 @@ fn atom_from_lvalues(ctx: &Ctx, v: &LValueS) -> aAtom {
 
 pub fn create_initial_chronicle(
     goal_tasks: &[LValueS],
-    state: &RAEStateSnapshot,
+    state: &WorldStateSnapshot,
     ctx: &mut Ctx,
 ) -> ChronicleInstance {
     let _init_container = Container::Instance(0);
@@ -280,7 +280,7 @@ pub fn create_initial_chronicle(
 /**
 Add initial state from RAEStateSnapshot
  */
-fn initialize_state(init_ch: &mut aChronicle, state: &RAEStateSnapshot, ctx: &Ctx) {
+fn initialize_state(init_ch: &mut aChronicle, state: &WorldStateSnapshot, ctx: &Ctx) {
     /*
     Initialisation of instance state variable
      */

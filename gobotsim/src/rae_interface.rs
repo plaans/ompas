@@ -10,7 +10,7 @@ use core::time;
 use im::{HashMap, HashSet};
 use ompas_rae_scheme::rae_exec::{CtxPlatform, RAEInterface};
 use ompas_rae_structs::agenda::Agenda;
-use ompas_rae_structs::rae_state::RAEState;
+use ompas_rae_structs::state::world_state::WorldState;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::Documentation;
 use sompas_structs::lerror::{LResult, LRuntimeError};
@@ -81,7 +81,7 @@ impl Instance {
 pub struct PlatformGodot {
     pub socket_info: SocketInfo,
     pub sender_socket: Option<Sender<String>>,
-    pub state: RAEState,
+    pub state: WorldState,
     pub instance: Instance,
     pub agenda: Agenda,
 }
@@ -104,7 +104,7 @@ impl PlatformGodot {
 impl RAEInterface for PlatformGodot {
     /// Initiliaze the godot platform of a the state (contains Arc to structs)
     /// and ActionsProgress (contains also Arc to structs)
-    async fn init(&mut self, state: RAEState, agenda: Agenda) {
+    async fn init(&mut self, state: WorldState, agenda: Agenda) {
         self.state = state;
         self.agenda = agenda;
     }

@@ -1,12 +1,12 @@
-use crate::planning::CtxPlanning;
+use crate::ctx_planning::CtxPlanning;
 use log::{error, info, warn};
+use monitor::monitor::task_check_monitor;
 use ompas_rae_language::RAE_LAUNCH_PLATFORM;
 use ompas_rae_planning::conversion::convert_domain_to_chronicle_hierarchy;
 use ompas_rae_planning::structs::{ConversionCollection, ConversionContext};
 use ompas_rae_structs::context::RAEContext;
 use ompas_rae_structs::options::SelectMode::Planning;
 use ompas_rae_structs::options::{RAEOptions, SelectMode};
-use ressource_access::monitor::task_check_monitor;
 use sompas_core::{eval, eval_init};
 use sompas_structs::lenv::ImportType::WithoutPrefix;
 use sompas_structs::lenv::LEnv;
@@ -20,10 +20,10 @@ use crate::error::RaeExecError;
 
 pub type ReactiveTriggerId = usize;
 
+pub mod ctx_planning;
 pub mod error;
+pub mod monitor;
 pub mod mutex;
-pub mod planning;
-pub mod ressource_access;
 
 #[derive(Debug, Clone)]
 pub enum TaskType {

@@ -12,6 +12,7 @@ use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::Documentation;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lerror::{LResult, LRuntimeError};
+use sompas_structs::llambda::LLambda;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalues::LValueS;
 use sompas_structs::module::{IntoModule, Module};
@@ -349,14 +350,15 @@ pub async fn def_action(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError
             return Err(wrong_n_args!(RAE_DEF_ACTION, list.as_slice(), 3));
         } else if let LValue::Symbol(action_label) = &list[0] {
             if let LValue::List(_) | LValue::Nil = &list[1] {
-                if let LValue::Lambda(_) = &list[2] {
+                if let LValue::Lambda(l) = &list[2] {
+                    let sim = LLambda::new(l.get_params(), LValue::Nil, l.get_env_symbols());
                     ctx.get_rae_env().write().await.add_action(
                         action_label.to_string(),
                         Action::new(
                             action_label,
                             (&list[1]).try_into()?,
                             list[2].clone(),
-                            LValue::Nil,
+                            sim.into(),
                         ),
                     )?;
                 } else {

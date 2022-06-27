@@ -39,7 +39,7 @@ pub async fn convert_expr(env: &LEnv, expr: &LValue) -> Result<String, LRuntimeE
 
     chronicle.absorb_expression_chronicle(ec);
 
-    post_processing(&mut chronicle, &context, &mut ch)?;
+    //post_processing(&mut chronicle, &context, &mut ch)?;
     let time = time.elapsed().expect("could not get time").as_micros();
     let string = chronicle.format(&ch.sym_table, true);
 

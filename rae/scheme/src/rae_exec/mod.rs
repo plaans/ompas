@@ -3,7 +3,7 @@ use crate::rae_exec::platform::*;
 use crate::rae_exec::rae_mutex::{get_list_locked, is_locked, lock, lock_in_list, release};
 use ::macro_rules_attribute::macro_rules_attribute;
 use async_trait::async_trait;
-use ompas_rae_core::ressource_access::monitor::add_waiter;
+use ompas_rae_core::monitor::monitor::add_waiter;
 use ompas_rae_language::*;
 use ompas_rae_structs::agenda::Agenda;
 use ompas_rae_structs::context::RAE_TASK_METHODS_MAP;

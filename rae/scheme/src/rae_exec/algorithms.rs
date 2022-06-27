@@ -1,7 +1,7 @@
 use crate::rae_exec::{CtxRaeExec, MOD_RAE_EXEC, PARENT_TASK};
 use log::{error, info};
+use ompas_rae_core::ctx_planning::{CtxPlanning, MOD_PLANNING};
 use ompas_rae_core::error::RaeExecError;
-use ompas_rae_core::planning::{CtxPlanning, MOD_PLANNING};
 use ompas_rae_structs::options::{Planner, SelectMode};
 use ompas_rae_structs::state::task_state::{
     AbstractTaskMetaData, RefinementMetaData, TaskMetaData, TaskMetaDataView,

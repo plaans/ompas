@@ -24,7 +24,7 @@ impl Plan {
     }
 
     pub fn extract_sub_plan(&self, task_id: TaskId) -> Plan {
-        let mut subtasks: im::HashMap<usize, TaskInstance> = Default::default();
+        let mut subtasks: HashMap<usize, TaskInstance> = Default::default();
 
         let task = self.chronicles.get(&task_id).unwrap();
         subtasks.insert(task_id, task.clone());

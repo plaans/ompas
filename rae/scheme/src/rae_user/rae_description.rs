@@ -10,15 +10,15 @@ use sompas_language::*;
 use sompas_macros::*;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::Documentation;
+use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror::{LResult, LRuntimeError};
 use sompas_structs::llambda::LLambda;
+use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalues::LValueS;
 use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
-use sompas_structs::typelvalue::KindLValue;
-use sompas_structs::{lerror, string, wrong_n_args, wrong_type};
+use sompas_structs::{lruntimeerror, string, wrong_n_args, wrong_type};
 use std::convert::TryInto;
 use std::ops::Deref;
 
@@ -535,7 +535,7 @@ pub async fn def_types(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError>
         match arg {
             LValue::List(list) => {
                 if list.len() < 2 {
-                    return Err(lerror!(
+                    return Err(lruntimeerror!(
                         RAE_DEF_CONSTANTS,
                         format!("an objects is defined by a symbol and a type, got {}", arg)
                     ));
@@ -557,7 +557,7 @@ pub async fn def_types(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError>
 pub async fn def_objects(env: &LEnv, args: Vec<Vec<LValue>>) -> Result<(), LRuntimeError> {
     for list in args {
         if list.len() < 2 {
-            return Err(lerror!(
+            return Err(lruntimeerror!(
                 RAE_DEF_CONSTANTS,
                 format!(
                     "an objects is defined by a symbol and a type, got {}",
@@ -641,14 +641,19 @@ pub async fn add_object(env: &LEnv, constant: LValue, t: LValue) -> Result<(), L
 
     let objects: &mut LValueS = match instances.get_mut(&key) {
         Some(obj) => obj,
-        None => return Err(lerror!(RAE_ADD_OBJECT, format!("type {} is undefined", t))),
+        None => {
+            return Err(lruntimeerror!(
+                RAE_ADD_OBJECT,
+                format!("type {} is undefined", t)
+            ))
+        }
     };
 
     if let LValueS::List(l) = objects {
         if !l.contains(&constant) {
             l.push(constant)
         } else {
-            return Err(lerror!(
+            return Err(lruntimeerror!(
                 RAE_ADD_OBJECT,
                 format!("{} already defined", constant)
             ));

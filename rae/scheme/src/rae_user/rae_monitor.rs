@@ -7,11 +7,11 @@ use ompas_rae_structs::state::task_status::TaskStatus;
 use ompas_rae_structs::state::task_status::*;
 use ompas_rae_structs::state::world_state::*;
 use sompas_macros::*;
+use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror::{LResult, LRuntimeError};
+use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
-use sompas_structs::typelvalue::KindLValue;
-use sompas_structs::{lerror, wrong_type};
+use sompas_structs::{lruntimeerror, wrong_type};
 /// Returns the whole state if no args, or specific part of it ('static', 'dynamic', 'inner world')
 #[async_scheme_fn]
 pub async fn get_state(env: &LEnv, args: &[LValue]) -> LResult {
@@ -26,7 +26,7 @@ pub async fn get_state(env: &LEnv, args: &[LValue]) -> LResult {
                     KEY_INNER_WORLD => Some(StateType::InnerWorld),
                     KEY_INSTANCE => Some(StateType::Instance),
                     _ => {
-                        return Err(lerror!(
+                        return Err(lruntimeerror!(
                             RAE_GET_STATE,
                             format!(
                                 "was expecting keys {}, {}, {}",
@@ -100,7 +100,7 @@ pub async fn get_agenda(env: &LEnv, args: &[LValue]) -> LResult {
             STATUS_FAILURE => task_filter.status = Some(TaskStatus::Failure),
             STATUS_RUNNING => task_filter.status = Some(TaskStatus::Running),
             str => {
-                return Err(lerror!(
+                return Err(lruntimeerror!(
                     RAE_GET_AGENDA,
                     format!(
                         "{} is not a valid filter option, expecting ({}, {}, {}, {}, {}, {})",

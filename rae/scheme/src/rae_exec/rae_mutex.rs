@@ -4,8 +4,8 @@ use ompas_rae_core::mutex;
 use ompas_rae_core::mutex::{MutexResponse, Wait};
 use ompas_rae_language::IS_LOCKED;
 use sompas_core::modules::map::get_map;
-use sompas_structs::lerror;
-use sompas_structs::lerror::LResult;
+use sompas_structs::lruntimeerror;
+use sompas_structs::lruntimeerror::LResult;
 use sompas_structs::lvalue::LValue;
 use sompas_utils::dyn_async;
 use sompas_utils::other::generic_race;
@@ -82,7 +82,7 @@ pub async fn is_locked(env: &LEnv, args: &[LValue]) -> LResult {
             let state = match env.get_symbol("state") {
                 Some(lv) => lv,
                 None => {
-                    return Err(lerror!(
+                    return Err(lruntimeerror!(
                         IS_LOCKED,
                         "state should be defined in simu mode".to_string()
                     ))

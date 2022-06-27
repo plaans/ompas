@@ -17,15 +17,15 @@ use sompas_core::modules::map::{get_map, remove_key_value_map, set_map};
 use sompas_macros::{async_scheme_fn, scheme_fn};
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::Documentation;
+use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror::{LResult, LRuntimeError};
+use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalue::LValue::Nil;
 use sompas_structs::lvalues::LValueS;
 use sompas_structs::module::{InitLisp, IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
-use sompas_structs::typelvalue::KindLValue;
-use sompas_structs::{lerror, list, wrong_n_args, wrong_type};
+use sompas_structs::{list, lruntimeerror, wrong_n_args, wrong_type};
 use std::any::Any;
 use std::convert::TryInto;
 use std::string::String;
@@ -345,7 +345,12 @@ async fn retract_fact(env: &LEnv, args: &[LValue]) -> LResult {
               */
             let state = match env.get_symbol(STATE) {
                 Some(lv) => lv,
-                None => return Err(lerror!(RAE_RETRACT, "state not defined in env".to_string())),
+                None => {
+                    return Err(lruntimeerror!(
+                        RAE_RETRACT,
+                        "state not defined in env".to_string()
+                    ))
+                }
             };
 
             remove_key_value_map(env, &[state, args.into()])
@@ -385,7 +390,12 @@ async fn assert_fact(env: &LEnv, args: &[LValue]) -> LResult {
              */
             let state = match env.get_symbol(STATE) {
                 Some(lv) => lv,
-                None => return Err(lerror!(RAE_ASSERT, "state not defined in env.".to_string())),
+                None => {
+                    return Err(lruntimeerror!(
+                        RAE_ASSERT,
+                        "state not defined in env.".to_string()
+                    ))
+                }
             };
 
             set_map(env, &[state, args.into()])
@@ -415,7 +425,7 @@ fn get_instantiated_methods(env: &LEnv, args: &[LValue]) -> LResult {
     let methods = if let LValue::Map(map) = task_method_map {
         let methods = match map.get(task_name) {
             None => {
-                return Err(lerror!(
+                return Err(lruntimeerror!(
                     RAE_GET_INSTANTIATED_METHODS,
                     format!("no methods for {}", task_name)
                 ))
@@ -459,7 +469,7 @@ fn get_best_method(env: &LEnv, args: &[LValue]) -> LResult {
     //log::send(format!("methods for {}: {}\n", LValue::from(args), methods));
     let best_method = if let LValue::List(methods) = methods {
         if methods.is_empty() {
-            return Err(lerror!(
+            return Err(lruntimeerror!(
                 RAE_GET_BEST_METHOD,
                 "task has no applicable method".to_string()
             ));
@@ -515,7 +525,7 @@ async fn get_state(env: &LEnv, args: &[LValue]) -> LResult {
                     KEY_INNER_WORLD => Some(StateType::InnerWorld),
                     KEY_INSTANCE => Some(StateType::Instance),
                     _ => {
-                        return Err(lerror!(
+                        return Err(lruntimeerror!(
                             RAE_GET_STATE,
                             format!(
                                 "was expecting keys {}, {}, {}, {}",
@@ -588,7 +598,7 @@ async fn get_state_variable(env: &LEnv, args: &[LValue]) -> LResult {
             get_map(env, &[state, key])
         }
         _ => {
-            return Err(lerror!(
+            return Err(lruntimeerror!(
                 RAE_GET_STATE_VARIBALE,
                 format!(
                     "RAE_MODE must have the value {} or {} (value = {}).",

@@ -10,8 +10,8 @@ use ompas_rae_structs::state::task_status::TaskStatus;
 use ompas_rae_structs::state::task_status::TaskStatus::*;
 use sompas_macros::*;
 use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror::LResult;
 use sompas_structs::lnumber::LNumber;
+use sompas_structs::lruntimeerror::LResult;
 use sompas_structs::lvalue::LValue;
 use std::convert::{TryFrom, TryInto};
 
@@ -162,7 +162,7 @@ mod select {
     use sompas_core::modules::get;
     use sompas_core::modules::list::cons;
     use sompas_modules::utils::{enr, enumerate};
-    use sompas_structs::{lerror, list};
+    use sompas_structs::{list, lruntimeerror};
     use std::time::Instant;
 
     //pub const GREEDY_SELECT: &str = "greedy_select";
@@ -174,7 +174,7 @@ mod select {
         task: Vec<LValue>,
         env: &LEnv,
         optimize: bool,
-    ) -> lerror::Result<RefinementMetaData> {
+    ) -> lruntimeerror::Result<RefinementMetaData> {
         let mut greedy: RefinementMetaData =
             greedy_select(state.clone(), tried, task.clone(), env).await?;
 
@@ -210,7 +210,7 @@ mod select {
                         match plan.chronicles.get(&task_id).unwrap().clone().try_into() {
                             Ok(a) => a,
                             Err(_) => {
-                                return Err(lerror!(
+                                return Err(lruntimeerror!(
                                     RAE_SELECT,
                                     format!("task {} is not an abstract task:", n)
                                 ))
@@ -327,7 +327,7 @@ mod select {
         tried: &[LValue],
         task: Vec<LValue>,
         env: &LEnv,
-    ) -> lerror::Result<RefinementMetaData> {
+    ) -> lruntimeerror::Result<RefinementMetaData> {
         /*
         Steps:
         - Create a new entry in the agenda

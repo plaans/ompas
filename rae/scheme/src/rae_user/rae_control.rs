@@ -6,8 +6,8 @@ use ompas_rae_structs::options::*;
 use ompas_rae_structs::options::{Planner, RAEOptions, SelectMode};
 use sompas_macros::*;
 use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror;
-use sompas_structs::lerror::{LResult, LRuntimeError};
+use sompas_structs::lruntimeerror;
+use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 
 /// Launch main loop of rae in an other asynchronous task.
@@ -57,7 +57,7 @@ pub async fn configure_select(env: &LEnv, m: String) -> Result<(), LRuntimeError
         HEURISTIC => SelectMode::Heuristic,
         LEARNING => SelectMode::Learning,
         _ => {
-            return Err(lerror!(
+            return Err(lruntimeerror!(
                 RAE_CONFIGURE_SELECT,
                 format!(
                     "Select mode is either {}, {}, {} or {}.",

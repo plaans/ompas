@@ -7,8 +7,8 @@ use sompas_core::modules::list::append;
 use sompas_core::{eval, parse};
 use sompas_modules::utils::contains;
 use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror::LResult;
 use sompas_structs::lnumber::LNumber;
+use sompas_structs::lruntimeerror::LResult;
 use sompas_structs::lvalue::LValue;
 use std::convert::{TryFrom, TryInto};
 

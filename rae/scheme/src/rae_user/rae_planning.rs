@@ -5,7 +5,7 @@ use ompas_rae_planning::conversion::convert_domain_to_chronicle_hierarchy;
 use ompas_rae_planning::structs::{ConversionContext, Problem};
 use sompas_macros::*;
 use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror::LResult;
+use sompas_structs::lruntimeerror::LResult;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::string;
 

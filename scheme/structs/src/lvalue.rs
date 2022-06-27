@@ -1,11 +1,11 @@
 use crate::function::{LAsyncFn, LFn};
+use crate::kindlvalue::KindLValue;
 use crate::lcoreoperator::LCoreOperator;
-use crate::lerror::LRuntimeError;
 use crate::lfuture::LFuture;
 use crate::llambda::LLambda;
 use crate::lnumber::LNumber;
-use crate::typelvalue::KindLValue;
-use crate::{lerror, string, symbol, wrong_type};
+use crate::lruntimeerror::LRuntimeError;
+use crate::{lruntimeerror, string, symbol, wrong_type};
 use function_name::named;
 use im::HashMap;
 use sompas_language::*;
@@ -563,7 +563,7 @@ impl Add for &LValue {
             (LValue::Number(_), l) => Err(wrong_type!(l, KindLValue::Number)),
             (l, LValue::Number(_)) => Err(wrong_type!(l, KindLValue::Number)),
 
-            (l1, l2) => Err(lerror!(format!(
+            (l1, l2) => Err(lruntimeerror!(format!(
                 "{} and {} cannot be add",
                 KindLValue::from(l1),
                 KindLValue::from(l2)
@@ -582,7 +582,7 @@ impl Sub for &LValue {
             (LValue::Number(_), l) => Err(wrong_type!(l, KindLValue::Number)),
             (l, LValue::Number(_)) => Err(wrong_type!(l, KindLValue::Number)),
 
-            (l1, l2) => Err(lerror!(format!(
+            (l1, l2) => Err(lruntimeerror!(format!(
                 "{} and {} cannot be add",
                 KindLValue::from(l1),
                 KindLValue::from(l2)
@@ -601,7 +601,7 @@ impl Mul for &LValue {
             (LValue::Number(_), l) => Err(wrong_type!(l, KindLValue::Number)),
             (l, LValue::Number(_)) => Err(wrong_type!(l.into(), KindLValue::Number)),
 
-            (l1, l2) => Err(lerror!(format!(
+            (l1, l2) => Err(lruntimeerror!(format!(
                 "{} and {} cannot be add",
                 KindLValue::from(l1),
                 KindLValue::from(l2)
@@ -620,7 +620,7 @@ impl Div for &LValue {
             (LValue::Number(_), l) => Err(wrong_type!(l, KindLValue::Number)),
             (l, LValue::Number(_)) => Err(wrong_type!(l, KindLValue::Number)),
 
-            (l1, l2) => Err(lerror!(format!(
+            (l1, l2) => Err(lruntimeerror!(format!(
                 "{} and {} cannot be add",
                 KindLValue::from(l1),
                 KindLValue::from(l2)

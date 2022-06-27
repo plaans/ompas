@@ -1,9 +1,9 @@
 use crate::structs::symbol_table::SymTable;
 use crate::structs::traits::FormatWithSymTable;
-use sompas_structs::lerror;
-use sompas_structs::lerror::LRuntimeError;
+use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lnumber::LNumber;
-use sompas_structs::typelvalue::KindLValue;
+use sompas_structs::lruntimeerror;
+use sompas_structs::lruntimeerror::LRuntimeError;
 use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
 
@@ -40,7 +40,7 @@ impl TryFrom<&Atom> for Sym {
         if let Atom::Sym(s) = value {
             Ok(s.clone())
         } else {
-            Err(lerror!(
+            Err(lruntimeerror!(
                 "Sym::TryFrom<Atom>",
                 format!(
                     "{}, expected {}",

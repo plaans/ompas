@@ -1,8 +1,8 @@
 // To run tests with println, use cargo test -- --nocapture
 
 use sompas_core::{eval, get_root_env, parse};
-use sompas_structs::lerror;
-use sompas_structs::lerror::LRuntimeError::Anyhow;
+use sompas_structs::lruntimeerror;
+use sompas_structs::lruntimeerror::LRuntimeError::Anyhow;
 use sompas_structs::lvalue::LValue;
 
 fn create_list_test() -> Vec<(&'static str, LValue)> {
@@ -65,7 +65,7 @@ fn create_list_test() -> Vec<(&'static str, LValue)> {
 }
 
 #[tokio::test]
-async fn test_lisp_integration() -> lerror::Result<()> {
+async fn test_lisp_integration() -> lruntimeerror::Result<()> {
     let mut env = get_root_env().await;
     for element in create_list_test() {
         let lvalue = parse(element.0, &mut env).await?;

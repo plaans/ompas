@@ -43,7 +43,7 @@ pub fn scheme_fn(_: TokenStream, input: TokenStream) -> TokenStream {
     let expr_result = build_return(&result, &fun.sig.output);
     let body = fun.block.as_ref();
     let expanded = quote! {
-         #vis fn #name(#env : #env_type, #args: #args_type) -> sompas_structs::lerror::LResult
+         #vis fn #name(#env : #env_type, #args: #args_type) -> sompas_structs::lruntimeerror::LResult
         {
             #params
             let #result #output = {||{
@@ -100,7 +100,7 @@ pub fn async_scheme_fn(_: TokenStream, input: TokenStream) -> TokenStream {
     let body = fun.block.as_ref();
     let expanded = quote! {
      #vis fn #name<#lt>(#env : #env_type, #args: #args_type) -> ::std::pin::Pin<::std::boxed::Box<
-        dyn ::std::future::Future<Output = sompas_structs::lerror::LResult>
+        dyn ::std::future::Future<Output = sompas_structs::lruntimeerror::LResult>
             + ::std::marker::Send + #lt
         >>
 
@@ -281,7 +281,7 @@ fn build_params(
                 if first {
                     new_params = quote! {
                         if #args.len() != #expected {
-                            return Err(sompas_structs::lerror::LRuntimeError::wrong_number_of_args(
+                            return Err(sompas_structs::lruntimeerror::LRuntimeError::wrong_number_of_args(
                                 #fname,
                                 #args,
                                 #expected..#expected,
@@ -348,12 +348,12 @@ fn build_return(ident: &Ident, expr: &ReturnType) -> TS {
                                     quote! {
                                         match #ident {
                                             Ok(o) => Ok(sompas_structs::lvalue::LValue::from(o)),
-                                            Err(e) => Err(sompas_structs::lerror::LRuntimeError::from(e))
+                                            Err(e) => Err(sompas_structs::lruntimeerror::LRuntimeError::from(e))
                                         }
                                     }
                                 } else if o == ok {
                                     //println!("result returns a LValue");
-                                    quote!(#ident.map_err(|e| sompas_structs::lerror::LRuntimeError::from(e)))
+                                    quote!(#ident.map_err(|e| sompas_structs::lruntimeerror::LRuntimeError::from(e)))
                                 } else if e == err {
                                     //println!("result returns a LRuntimeError");
                                     quote!(#ident.map(|o| sompas_structs::lvalue::LValue::from(o)))

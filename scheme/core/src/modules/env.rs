@@ -1,11 +1,11 @@
 use sompas_language::HELP;
 use sompas_macros::scheme_fn;
 use sompas_structs::documentation::Documentation;
+use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror::{LResult, LRuntimeError};
+use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::{LValue, Sym};
 use sompas_structs::string;
-use sompas_structs::typelvalue::KindLValue;
 
 /// Returns a list of all the keys present in the environment
 #[scheme_fn]

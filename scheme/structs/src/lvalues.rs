@@ -1,5 +1,5 @@
-use crate::lerror::LRuntimeError;
 use crate::lnumber::LNumber;
+use crate::lruntimeerror::LRuntimeError;
 use crate::lvalue::LValue;
 use serde::*;
 use sompas_language::ERR;

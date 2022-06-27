@@ -1,6 +1,6 @@
-use crate::lerror::LRuntimeError;
+use crate::kindlvalue::KindLValue;
+use crate::lruntimeerror::LRuntimeError;
 use crate::lvalue::LValue;
-use crate::typelvalue::KindLValue;
 use crate::wrong_type;
 use function_name::named;
 use num_traits::sign::Signed;

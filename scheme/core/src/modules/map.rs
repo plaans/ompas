@@ -1,10 +1,10 @@
 use im::HashMap;
 use sompas_language::*;
 use sompas_macros::scheme_fn;
-use sompas_structs::lerror::LRuntimeError;
+use sompas_structs::kindlvalue::KindLValue;
+use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
-use sompas_structs::typelvalue::KindLValue;
-use sompas_structs::{lerror, wrong_n_args, wrong_type};
+use sompas_structs::{lruntimeerror, wrong_n_args, wrong_type};
 #[scheme_fn]
 pub fn map(list: Vec<LValue>) -> Result<im::HashMap<LValue, LValue>, LRuntimeError> {
     let mut facts: HashMap<LValue, LValue> = Default::default();
@@ -48,7 +48,7 @@ pub fn remove_key_value_map(
     val: Vec<LValue>,
 ) -> Result<HashMap<LValue, LValue>, LRuntimeError> {
     if val.len() != 2 {
-        return Err(lerror!(
+        return Err(lruntimeerror!(
             REMOVE_KEY_VALUE_MAP,
             format!("{} is supposed to be a pair (key value)", LValue::from(val))
         ));
@@ -58,7 +58,7 @@ pub fn remove_key_value_map(
     let value = &val[1];
     match map.get(&key) {
         None => {
-            return Err(lerror!(
+            return Err(lruntimeerror!(
                 REMOVE_KEY_VALUE_MAP,
                 format!("map does not contain key {}", key)
             ))
@@ -68,7 +68,7 @@ pub fn remove_key_value_map(
                 map.remove(&key);
                 Ok(map)
             } else {
-                Err(lerror!(
+                Err(lruntimeerror!(
                     REMOVE_KEY_VALUE_MAP,
                     format!("map does not have key value ({} {})", key, value)
                 ))

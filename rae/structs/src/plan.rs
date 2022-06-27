@@ -1,6 +1,6 @@
 use crate::TaskId;
 use im::HashMap;
-use sompas_structs::lerror::LRuntimeError;
+use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use std::collections::VecDeque;
 use std::convert::TryFrom;

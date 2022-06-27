@@ -7,7 +7,7 @@ use crate::structs::type_table::{
 };
 use ompas_rae_language::*;
 use sompas_core::modules::get_scheme_primitives;
-use sompas_structs::lerror;
+use sompas_structs::lruntimeerror;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Display, Formatter};
 
@@ -173,10 +173,10 @@ impl SymTable {
         &mut self,
         list: Vec<&str>,
         sym_type: Option<PlanningAtomType>,
-    ) -> lerror::Result<()> {
+    ) -> lruntimeerror::Result<()> {
         for element in list {
             if self.it_exists(element) {
-                return Err(lerror!(
+                return Err(lruntimeerror!(
                     "add_list_of_symbols_of_same_type",
                     format!("{} already exists", element)
                 ));

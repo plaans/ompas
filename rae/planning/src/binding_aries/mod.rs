@@ -24,8 +24,8 @@ use log::info;
 use ompas_rae_structs::domain::_type::Type as raeType;
 use ompas_rae_structs::state::world_state::WorldStateSnapshot;
 use sompas_language::*;
-use sompas_structs::lerror;
 use sompas_structs::lnumber::LNumber;
+use sompas_structs::lruntimeerror;
 use sompas_structs::lvalues::LValueS;
 use std::convert::{TryFrom, TryInto};
 use std::ops::Deref;
@@ -49,7 +49,7 @@ static NIL_OBJECT: &str = "★nil★";
 
 static BUILD_CHRONICLES: &str = "build_chronicles";
 
-fn get_type(t: &raeType, symbol_table: &SymbolTable) -> lerror::Result<aType> {
+fn get_type(t: &raeType, symbol_table: &SymbolTable) -> lruntimeerror::Result<aType> {
     match t {
         raeType::Single(s) => match s.as_str() {
             BOOL => Ok(aType::Bool),
@@ -57,7 +57,10 @@ fn get_type(t: &raeType, symbol_table: &SymbolTable) -> lerror::Result<aType> {
             FLOAT => Ok(aType::Fixed(FLOAT_SCALE)),
             other => match symbol_table.types.id_of(other) {
                 Some(t) => Ok(aType::Sym(t)),
-                None => Err(lerror!(BUILD_CHRONICLES, format!("{} Unknown type", other))),
+                None => Err(lruntimeerror!(
+                    BUILD_CHRONICLES,
+                    format!("{} Unknown type", other)
+                )),
             },
         },
         raeType::List(_) => todo!(),
@@ -154,7 +157,7 @@ pub fn generate_templates(problem: &Problem) -> Result<chronicles::Problem> {
     for sf in &problem.state_functions {
         let sym = symbol_table
             .id(&sf.0)
-            .ok_or_else(|| lerror!(BUILD_CHRONICLES, format!("{} Unknown symbol", sf.0)))?;
+            .ok_or_else(|| lruntimeerror!(BUILD_CHRONICLES, format!("{} Unknown symbol", sf.0)))?;
         let mut args = Vec::with_capacity(sf.1.get_number());
         for tpe in &sf.1.get_types() {
             args.push(get_type(tpe, &symbol_table)?);
@@ -429,7 +432,7 @@ fn convert_constraint(
     bindings: &BindingAriesAtoms,
     st: &SymTable,
     ctx: &Ctx,
-) -> lerror::Result<aConstraint> {
+) -> lruntimeerror::Result<aConstraint> {
     let get_atom = |a: &AtomId| -> aAtom { atom_id_into_atom(a, st, bindings, ctx) };
 
     match x {

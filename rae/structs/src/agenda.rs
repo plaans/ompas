@@ -15,9 +15,9 @@ use core::option::Option::{None, Some};
 use core::result::Result;
 use core::result::Result::{Err, Ok};
 use core::sync::atomic::AtomicUsize;
-use sompas_structs::lerror::LRuntimeError;
+use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
-use sompas_structs::{lerror, string};
+use sompas_structs::{lruntimeerror, string};
 use sompas_utils::other::get_and_update_id_counter;
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -313,7 +313,7 @@ impl Agenda {
     ) -> Result<AbstractTaskMetaData, LRuntimeError> {
         match self.trc.get(task_id).await {
             TaskMetaData::AbstractTask(a) => Ok(a),
-            TaskMetaData::Action(_) => Err(lerror!(
+            TaskMetaData::Action(_) => Err(lruntimeerror!(
                 function_name!(),
                 format!("{} does not exist", task_id)
             )),

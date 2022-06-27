@@ -3,9 +3,9 @@ use crate::structs::symbol_table::{AtomId, SymTable};
 use crate::structs::traits::{FormatWithParent, FormatWithSymTable, GetVariables};
 use crate::structs::type_table::PlanningAtomType;
 use im::{hashset, HashSet};
-use sompas_structs::lerror;
-use sompas_structs::lerror::LRuntimeError;
 use sompas_structs::lnumber::LNumber;
+use sompas_structs::lruntimeerror;
+use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use std::convert::{TryFrom, TryInto};
 use std::ops::Deref;
@@ -144,7 +144,7 @@ impl<T: Clone + Into<Lit>> From<Vec<T>> for Lit {
     }
 }
 
-pub fn lvalue_to_lit(lv: &LValue, st: &mut SymTable) -> lerror::Result<Lit> {
+pub fn lvalue_to_lit(lv: &LValue, st: &mut SymTable) -> lruntimeerror::Result<Lit> {
     //println!("in lvalue_to_lit:\n{}", lv.format(0));
     //stdout().flush();
     match lv {
@@ -155,7 +155,7 @@ pub fn lvalue_to_lit(lv: &LValue, st: &mut SymTable) -> lerror::Result<Lit> {
             }
             Ok(vec.into())
         }
-        LValue::Map(_) => Err(lerror!(
+        LValue::Map(_) => Err(lruntimeerror!(
             "LValue to lit",
             "Map transformation to lit is not supported yet."
         )),

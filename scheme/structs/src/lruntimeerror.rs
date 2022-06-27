@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 //use aries_model::lang::ConversionError;
+use crate::kindlvalue::KindLValue;
 use crate::lvalue::LValue;
-use crate::typelvalue::KindLValue;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::ops::Range;

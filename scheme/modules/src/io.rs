@@ -2,11 +2,11 @@ use sompas_macros::scheme_fn;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::{Documentation, LHelp};
 use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror::{LResult, LRuntimeError};
+use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::{LValue, Sym};
 use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
-use sompas_structs::{lerror, string};
+use sompas_structs::{lruntimeerror, string};
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::PathBuf;
@@ -160,7 +160,7 @@ pub fn print(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
 pub fn read(file_name: Sym) -> LResult {
     let mut file = match File::open(&file_name) {
         Ok(f) => f,
-        Err(e) => return Err(lerror!(READ, format!("{}: {}", file_name, e))),
+        Err(e) => return Err(lruntimeerror!(READ, format!("{}: {}", file_name, e))),
     };
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;

@@ -1,5 +1,5 @@
 use sompas_core::{get_root_env, parse};
-use sompas_structs::lerror;
+use sompas_structs::lruntimeerror;
 
 const EXAMPLE: &str = "(begin (+ 3 3) (+ 6 2) (3))";
 const EXAMPLE_2: &str = "(if (> 1 3) nil (+ 3 6))";
@@ -11,7 +11,7 @@ fn list_of_example() -> Vec<&'static str> {
 }
 
 #[tokio::main]
-async fn main() -> lerror::Result<()> {
+async fn main() -> lruntimeerror::Result<()> {
     let mut env = get_root_env().await;
 
     for element in list_of_example() {

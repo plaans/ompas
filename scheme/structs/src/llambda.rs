@@ -1,7 +1,7 @@
 use crate::lenv::{LEnv, LEnvSymbols};
-use crate::lerror::LRuntimeError;
+use crate::lruntimeerror::LRuntimeError;
 use crate::lvalue::{LValue, Sym};
-use crate::{lerror, wrong_n_args};
+use crate::{lruntimeerror, wrong_n_args};
 use function_name::named;
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
@@ -73,7 +73,7 @@ impl LLambda {
             }
             LambdaArgs::Nil => {
                 if !args.is_empty() {
-                    return Err(lerror!("lambda was expecting no args."));
+                    return Err(lruntimeerror!("lambda was expecting no args."));
                 }
             }
         };

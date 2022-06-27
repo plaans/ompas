@@ -163,12 +163,12 @@ macro_rules! lfn_extended {
 }
 
 #[macro_export]
-macro_rules! lerror {
+macro_rules! lruntimeerror {
     ($fname:expr, $msg:expr) => {
-        $crate::lerror::LRuntimeError::new($fname, $msg)
+        $crate::lruntimeerror::LRuntimeError::new($fname, $msg)
     };
     ($msg:expr) => {
-        $crate::lerror!(function_name!(), $msg)
+        $crate::lruntimeerror!(function_name!(), $msg)
     };
 }
 
@@ -205,13 +205,13 @@ macro_rules! check_number_of_args {
 #[macro_export]
 macro_rules! wrong_n_args {
     ($fname:expr, $lv:expr,$expected:expr) => {
-        $crate::lerror::LRuntimeError::wrong_number_of_args($fname, $lv, $expected..$expected)
+        $crate::lruntimeerror::LRuntimeError::wrong_number_of_args($fname, $lv, $expected..$expected)
     };
     ($fname:expr, $lv:expr,$lw:tt..$up:tt) => {
-        $crate::lerror::LRuntimeError::wrong_number_of_args($fname, $lv, $lw..$up)
+        $crate::lruntimeerror::LRuntimeError::wrong_number_of_args($fname, $lv, $lw..$up)
     };
     ($fname:expr, $lv:expr,$lw:tt..) => {
-        $crate::lerror::LRuntimeError::wrong_number_of_args($fname, $lv, $lw..usize::MAX)
+        $crate::lruntimeerror::LRuntimeError::wrong_number_of_args($fname, $lv, $lw..usize::MAX)
     };
     ($lv:expr, $low:tt $(..$up:tt)*) => {
         $crate::wrong_n_args!(function_name!(), $lv, $low $(..$up)*)
@@ -222,7 +222,7 @@ macro_rules! wrong_n_args {
 #[macro_export]
 macro_rules! wrong_type {
     ($fname:expr, $lv:expr,$expected:expr) => {
-        $crate::lerror::LRuntimeError::wrong_type($fname, $lv, $expected)
+        $crate::lruntimeerror::LRuntimeError::wrong_type($fname, $lv, $expected)
     };
     ($lv:expr,$expected:expr) => {
         wrong_type!(function_name!(), $lv, $expected)

@@ -6,8 +6,8 @@ use crate::structs::symbol_table::{AtomId, SymTable};
 use crate::structs::traits::FormatWithSymTable;
 use crate::structs::type_table::PlanningAtomType;
 use cli_table::{print_stdout, Cell, Table};
-use sompas_structs::lerror;
-use sompas_structs::lerror::LRuntimeError;
+use sompas_structs::lruntimeerror;
+use sompas_structs::lruntimeerror::LRuntimeError;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 use std::ops::{Index, IndexMut};
@@ -21,7 +21,7 @@ pub struct Relation<T> {
 pub fn try_into_pa_relation(
     constraint: &Constraint,
     sym_table: &SymTable,
-) -> lerror::Result<Relation<AtomId>> {
+) -> lruntimeerror::Result<Relation<AtomId>> {
     let relation_type = match constraint {
         Constraint::Eq(_, _) => RelationType::Eq,
         Constraint::Leq(_, _) => RelationType::LEq,

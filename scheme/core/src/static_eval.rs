@@ -1,12 +1,12 @@
 use crate::{expand_quasi_quote, get_debug, parse_into_lvalue};
 use anyhow::anyhow;
+use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lcoreoperator::LCoreOperator;
 use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror::LRuntimeError;
 use sompas_structs::llambda::{LLambda, LambdaArgs};
+use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
-use sompas_structs::typelvalue::KindLValue;
-use sompas_structs::{lerror, wrong_type};
+use sompas_structs::{lruntimeerror, wrong_type};
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
@@ -77,7 +77,11 @@ impl From<&PLValue> for LValue {
     }
 }
 
-pub fn expand_static(x: &LValue, top_level: bool, env: &mut LEnv) -> lerror::Result<PLValue> {
+pub fn expand_static(
+    x: &LValue,
+    top_level: bool,
+    env: &mut LEnv,
+) -> lruntimeerror::Result<PLValue> {
     match x {
         LValue::List(list) => {
             if let Ok(co) = LCoreOperator::try_from(&list[0]) {
@@ -124,7 +128,7 @@ pub fn expand_static(x: &LValue, top_level: bool, env: &mut LEnv) -> lerror::Res
                                 //println!("after expansion: {}", exp);
                                 if def == LCoreOperator::DefMacro {
                                     if !top_level {
-                                        return Err(lerror!(
+                                        return Err(lruntimeerror!(
                                             EXPAND_STATIC,
                                             format!("{}: defmacro only allowed at top level", x)
                                         ));
@@ -132,7 +136,7 @@ pub fn expand_static(x: &LValue, top_level: bool, env: &mut LEnv) -> lerror::Res
                                     let proc = eval_static(&exp.into(), &mut env.clone())?;
                                     //println!("new macro: {}", proc);
                                     if !matches!(proc.lvalue, LValue::Lambda(_)) {
-                                        return Err(lerror!(
+                                        return Err(lruntimeerror!(
                                             EXPAND_STATIC,
                                             format!("{}: macro must be a procedure", proc)
                                         ));
@@ -167,7 +171,7 @@ pub fn expand_static(x: &LValue, top_level: bool, env: &mut LEnv) -> lerror::Res
                             LValue::List(vars_list) => {
                                 for v in vars_list.iter() {
                                     if !matches!(v, LValue::Symbol(_)) {
-                                        return Err(lerror!(
+                                        return Err(lruntimeerror!(
                                             EXPAND_STATIC,
                                             format!("illegal lambda argument list: {}", x)
                                         ));
@@ -402,14 +406,17 @@ pub fn expand_static(x: &LValue, top_level: bool, env: &mut LEnv) -> lerror::Res
     }
 }
 
-pub fn parse_static(str: &str, env: &mut LEnv) -> lerror::Result<PLValue> {
+pub fn parse_static(str: &str, env: &mut LEnv) -> lruntimeerror::Result<PLValue> {
     match aries_planning::parsing::sexpr::parse(str) {
         Ok(se) => expand_static(&parse_into_lvalue(&se), true, env),
-        Err(e) => Err(lerror!(PARSE_STATIC, format!("Error in command: {}", e))),
+        Err(e) => Err(lruntimeerror!(
+            PARSE_STATIC,
+            format!("Error in command: {}", e)
+        )),
     }
 }
 
-pub fn eval_static(lv: &LValue, env: &mut LEnv) -> lerror::Result<PLValue> {
+pub fn eval_static(lv: &LValue, env: &mut LEnv) -> lruntimeerror::Result<PLValue> {
     let mut lv = lv.clone();
     let mut temp_env: LEnv;
     let mut env = env;
@@ -560,7 +567,7 @@ pub fn eval_static(lv: &LValue, env: &mut LEnv) -> lerror::Result<PLValue> {
                     }
                     LCoreOperator::QuasiQuote
                     | LCoreOperator::UnQuote
-                    | LCoreOperator::DefMacro => return Err(lerror!(EVAL_STATIC, "quasiquote, unquote and defmacro should not be prensent in exanded expressions")),
+                    | LCoreOperator::DefMacro => return Err(lruntimeerror!(EVAL_STATIC, "quasiquote, unquote and defmacro should not be prensent in exanded expressions")),
                     LCoreOperator::Async | LCoreOperator::Await => {
                         return Ok(PLValue::into_unpure(&lv));
                     }

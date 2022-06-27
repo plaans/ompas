@@ -11,8 +11,8 @@ use crate::domain::task::Task;
 use crate::domain::type_hierarchy::TypeHierarchy;
 use im::HashMap;
 use sompas_structs::lenv::LEnvSymbols;
-use sompas_structs::lerror;
-use sompas_structs::lerror::LRuntimeError;
+use sompas_structs::lruntimeerror;
+use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use std::fmt::{Display, Formatter};
 
@@ -83,7 +83,7 @@ impl RAEDomain {
 
     pub fn add_method(&mut self, label: String, value: Method) -> Result<(), LRuntimeError> {
         match self.tasks.get_mut(&value.task_label) {
-            None => Err(lerror!(
+            None => Err(lruntimeerror!(
                 "DomainEnv::add_method",
                 format!(
                     "Cannot add method {} because task {} does not exist.",
@@ -116,7 +116,7 @@ impl RAEDomain {
         value: LValue,
     ) -> Result<(), LRuntimeError> {
         match self.actions.get_mut(&label) {
-            None => Err(lerror!(
+            None => Err(lruntimeerror!(
                 "add_action_sample_fn",
                 format!("Action {} is not defined", label)
             )),

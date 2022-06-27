@@ -13,12 +13,12 @@ use ompas_rae_structs::agenda::Agenda;
 use ompas_rae_structs::state::world_state::WorldState;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::Documentation;
-use sompas_structs::lerror::{LResult, LRuntimeError};
+use sompas_structs::kindlvalue::KindLValue;
+use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
-use sompas_structs::typelvalue::KindLValue;
-use sompas_structs::{lerror, wrong_n_args, wrong_type};
+use sompas_structs::{lruntimeerror, wrong_n_args, wrong_type};
 use sompas_utils::task_handler;
 use std::convert::TryInto;
 use std::net::SocketAddr;
@@ -127,7 +127,7 @@ impl RAEInterface for PlatformGodot {
 
         let sender = match self.get_sender_socket() {
             None => {
-                return Err(lerror!(
+                return Err(lruntimeerror!(
                     "PlatformGodot::exec_command",
                     "ctx godot has no sender to simulation, try first to (open-com-godot)"
                 ))
@@ -171,7 +171,7 @@ impl RAEInterface for PlatformGodot {
 
         let sender = match self.get_sender_socket() {
             None => {
-                return Err(lerror!(
+                return Err(lruntimeerror!(
                     "PlatformGodot::cancel_command",
                     "ctx godot has no sender to simulation, try first to (open-com-godot)"
                 ))

@@ -8,13 +8,13 @@ use ompas_rae_structs::state::world_state::*;
 use sompas_macros::*;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::{Documentation, LHelp};
+use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror::{LResult, LRuntimeError};
+use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
-use sompas_structs::typelvalue::KindLValue;
-use sompas_structs::{lerror, wrong_type};
+use sompas_structs::{lruntimeerror, wrong_type};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 /*
@@ -275,7 +275,7 @@ async fn get_state(env: &LEnv, args: &[LValue]) -> LResult {
                 KEY_STATIC => Some(StateType::Static),
                 KEY_DYNAMIC => Some(StateType::Dynamic),
                 _ => {
-                    let result1 = Err(lerror!(
+                    let result1 = Err(lruntimeerror!(
                         "PlatformGodot::get_state",
                         format!("Expected keywords {} or {}", KEY_STATIC, KEY_DYNAMIC)
                     ));

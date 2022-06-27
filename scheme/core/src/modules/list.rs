@@ -1,9 +1,9 @@
 use sompas_language::*;
 use sompas_macros::scheme_fn;
-use sompas_structs::lerror::{LResult, LRuntimeError};
+use sompas_structs::kindlvalue::KindLValue;
+use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
-use sompas_structs::typelvalue::KindLValue;
-use sompas_structs::{lerror, wrong_type};
+use sompas_structs::{lruntimeerror, wrong_type};
 use std::ops::Deref;
 
 /// Returns a list
@@ -171,7 +171,7 @@ pub fn get_list(list: Vec<LValue>, index: i64) -> LResult {
     if list.len() > index as usize {
         Ok(list[index as usize].clone())
     } else {
-        Err(lerror!(
+        Err(lruntimeerror!(
             GET_LIST,
             format!(
                 "list: {}. {} is out of bound, must be in [{};{}]",
@@ -195,7 +195,7 @@ pub fn set_list(
         vec[index as usize] = value;
         Ok(vec)
     } else {
-        Err(lerror!(
+        Err(lruntimeerror!(
             SET_LIST,
             format!("index out of bound, must be in [{};{}]", 0, list.len() - 1)
         ))

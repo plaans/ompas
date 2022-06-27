@@ -2,11 +2,11 @@ use ompas_gobotsim::serde::{
     GodotMessageSerde, GodotMessageSerdeData, GodotMessageType, SerdeActionCancel,
     SerdeActionFeedback, SerdeActionId, SerdeActionResponse, SerdeActionResult, SerdeRobotCommand,
 };
-use sompas_structs::lerror;
+use sompas_structs::lruntimeerror;
 use sompas_structs::lvalue::LValue;
 
 #[test]
-fn test_action_response() -> lerror::Result<()> {
+fn test_action_response() -> lruntimeerror::Result<()> {
     let action_msg = GodotMessageSerde {
         _type: GodotMessageType::ActionResponse,
         data: GodotMessageSerdeData::ActionResponse(SerdeActionResponse {
@@ -24,7 +24,7 @@ fn test_action_response() -> lerror::Result<()> {
 }
 
 #[test]
-fn test_robot_command() -> lerror::Result<()> {
+fn test_robot_command() -> lruntimeerror::Result<()> {
     let action_msg = GodotMessageSerde {
         _type: GodotMessageType::RobotCommand,
         data: GodotMessageSerdeData::RobotCommand(SerdeRobotCommand {
@@ -45,7 +45,7 @@ fn test_robot_command() -> lerror::Result<()> {
 }
 
 #[test]
-fn test_action_feedback() -> lerror::Result<()> {
+fn test_action_feedback() -> lruntimeerror::Result<()> {
     let action_msg = GodotMessageSerde {
         _type: GodotMessageType::ActionFeedback,
         data: GodotMessageSerdeData::ActionFeedback(SerdeActionFeedback {
@@ -63,7 +63,7 @@ fn test_action_feedback() -> lerror::Result<()> {
 }
 
 #[test]
-fn test_action_result() -> lerror::Result<()> {
+fn test_action_result() -> lruntimeerror::Result<()> {
     let action_msg = GodotMessageSerde {
         _type: GodotMessageType::ActionResult,
         data: GodotMessageSerdeData::ActionResult(SerdeActionResult {
@@ -81,7 +81,7 @@ fn test_action_result() -> lerror::Result<()> {
 }
 
 #[test]
-fn test_action_preempt() -> lerror::Result<()> {
+fn test_action_preempt() -> lruntimeerror::Result<()> {
     let action_msg = GodotMessageSerde {
         _type: GodotMessageType::ActionPreempt,
         data: GodotMessageSerdeData::ActionId(SerdeActionId { action_id: 0 }),
@@ -96,7 +96,7 @@ fn test_action_preempt() -> lerror::Result<()> {
 }
 
 #[test]
-fn test_action_cancel() -> lerror::Result<()> {
+fn test_action_cancel() -> lruntimeerror::Result<()> {
     let action_msg = GodotMessageSerde {
         _type: GodotMessageType::ActionCancel,
         data: GodotMessageSerdeData::ActionCancel(SerdeActionCancel {
@@ -114,7 +114,7 @@ fn test_action_cancel() -> lerror::Result<()> {
 }
 
 #[test]
-fn test_cancel_request() -> lerror::Result<()> {
+fn test_cancel_request() -> lruntimeerror::Result<()> {
     let action_msg = GodotMessageSerde {
         _type: GodotMessageType::CancelRequest,
         data: GodotMessageSerdeData::ActionId(SerdeActionId { action_id: 0 }),
@@ -129,7 +129,7 @@ fn test_cancel_request() -> lerror::Result<()> {
 }
 
 #[test]
-fn test_state_static() -> lerror::Result<()> {
+fn test_state_static() -> lruntimeerror::Result<()> {
     let state_msg = GodotMessageSerde {
         _type: GodotMessageType::StaticState,
         data: GodotMessageSerdeData::LValue(
@@ -146,7 +146,7 @@ fn test_state_static() -> lerror::Result<()> {
 }
 
 #[test]
-fn test_state_dynamic() -> lerror::Result<()> {
+fn test_state_dynamic() -> lruntimeerror::Result<()> {
     let state_msg = GodotMessageSerde {
         _type: GodotMessageType::DynamicState,
         data: GodotMessageSerdeData::LValue(

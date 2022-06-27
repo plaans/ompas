@@ -1,11 +1,11 @@
 use crate::structs::{ConversionCollection, ConversionContext};
 use sompas_core::*;
+use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror::{LResult, LRuntimeError};
 use sompas_structs::llambda::LambdaArgs;
+use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
-use sompas_structs::typelvalue::KindLValue;
-use sompas_structs::{lerror, wrong_n_args, wrong_type};
+use sompas_structs::{lruntimeerror, wrong_n_args, wrong_type};
 use sompas_utils::blocking_async;
 
 pub const TRANSFORM_LAMBDA_EXPRESSION: &str = "transform-lambda-expression";
@@ -101,7 +101,7 @@ pub fn transform_lambda_expression(lv: &LValue, env: LEnv) -> LResult {
                 }
                 LambdaArgs::Nil => {
                     if !args.is_empty() {
-                        return Err(lerror!(
+                        return Err(lruntimeerror!(
                             TRANSFORM_LAMBDA_EXPRESSION,
                             "Lambda was expecting no args.".to_string()
                         ));

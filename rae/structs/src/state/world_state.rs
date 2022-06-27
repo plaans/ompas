@@ -1,7 +1,7 @@
 use crate::state::partial_state::PartialState;
 use sompas_core::modules::map::union_map;
-use sompas_structs::lerror;
-use sompas_structs::lerror::LRuntimeError;
+use sompas_structs::lruntimeerror;
+use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalues::LValueS;
 use std::ops::Deref;
@@ -163,13 +163,16 @@ impl WorldState {
     ) -> Result<LValue, LRuntimeError> {
         let old_value = self.inner_world.read().await.get(&key).cloned();
         match old_value {
-            None => Err(lerror!("RAEState::retract_fact", "key is not in state")),
+            None => Err(lruntimeerror!(
+                "RAEState::retract_fact",
+                "key is not in state"
+            )),
             Some(old_value) => {
                 if old_value == value {
                     self.inner_world.write().await.remove(&key);
                     Ok(LValue::True)
                 } else {
-                    Err(lerror!(
+                    Err(lruntimeerror!(
                         "RAEState::retract_fact",
                         "there is no such fact in state"
                     ))

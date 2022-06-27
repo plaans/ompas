@@ -1,6 +1,6 @@
 use crate::{eval, get_root_env, parse};
 use sompas_structs::lenv::LEnv;
-use sompas_structs::lerror;
+use sompas_structs::lruntimeerror;
 
 pub struct TestExpression {
     pub inner: &'static str,
@@ -10,7 +10,7 @@ pub struct TestExpression {
     pub result: &'static str,
 }
 
-pub async fn test_expression(test_expression: TestExpression) -> lerror::Result<()> {
+pub async fn test_expression(test_expression: TestExpression) -> lruntimeerror::Result<()> {
     //root env
     let mut env = get_root_env().await;
 
@@ -54,7 +54,7 @@ pub async fn test_expression_with_env(
     test_expression: TestExpression,
     env: &mut LEnv,
     eval_result: bool,
-) -> lerror::Result<()> {
+) -> lruntimeerror::Result<()> {
     for e in test_expression.dependencies {
         eval(&parse(e, env).await?, env).await?;
     }

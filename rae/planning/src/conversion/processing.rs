@@ -17,10 +17,10 @@ use ompas_rae_language::*;
 use ompas_rae_structs::context::*;
 use sompas_core::static_eval::{eval_static, parse_static};
 use sompas_language::*;
+use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lcoreoperator::LCoreOperator;
 use sompas_structs::lvalue::LValue;
-use sompas_structs::typelvalue::KindLValue;
-use sompas_structs::{lerror, wrong_n_args};
+use sompas_structs::{lruntimeerror, wrong_n_args};
 use std::convert::{TryFrom, TryInto};
 use std::ops::Deref;
 
@@ -67,7 +67,7 @@ pub fn convert_lvalue_to_expression_chronicle(
     context: &ConversionContext,
     ch: &mut ConversionCollection,
     meta_data: MetaData,
-) -> lerror::Result<ExpressionChronicle> {
+) -> lruntimeerror::Result<ExpressionChronicle> {
     let mut ec = ExpressionChronicle::new(exp.clone(), &mut ch.sym_table);
 
     match exp {
@@ -111,7 +111,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                         ec.set_pure_result(ch.sym_table.new_bool(false).into());
                         ec.absorb(val);
                     } else {
-                        return Err(lerror!(
+                        return Err(lruntimeerror!(
                             CONVERT_LVALUE_TO_EXPRESSION_CHRONICLE,
                             format!(
                                 "Define should take as first argument a symbol and {} is not.",
@@ -212,7 +212,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                     ec.make_instantaneous();
                 }
                 co => {
-                    return Err(lerror!(
+                    return Err(lruntimeerror!(
                         CONVERT_LVALUE_TO_EXPRESSION_CHRONICLE,
                         format!("{} not supported yet\nexp : {}", co, exp)
                     ))
@@ -313,7 +313,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                                 is_special_expression = true;
                             }
                             RAE_RETRACT | RAE_RETRACT_SHORT => {
-                                return Err(lerror!(
+                                return Err(lruntimeerror!(
                                     CONVERT_LVALUE_TO_EXPRESSION_CHRONICLE,
                                     "not yet supported"
                                 ))
@@ -509,7 +509,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                                                 lvalue_to_lit(&result, &mut ch.sym_table)?,
                                             ));
                                         } else {
-                                            return Err(lerror!(CONVERT_LVALUE_TO_EXPRESSION_CHRONICLE, "cannot handle (instance <type>) with <type> undecided"));
+                                            return Err(lruntimeerror!(CONVERT_LVALUE_TO_EXPRESSION_CHRONICLE, "cannot handle (instance <type>) with <type> undecided"));
                                         }
                                     }
                                     3 => {
@@ -582,7 +582,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                                         is_special_expression = true;
                                     }
                                     _ => {
-                                        return Err(lerror!(
+                                        return Err(lruntimeerror!(
                                             CONVERT_LVALUE_TO_EXPRESSION_CHRONICLE,
                                             format!(
                                             "{} has not the right number of args (expecting 1..2)",
@@ -636,7 +636,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                                         }
                                         PlanningAtomType::Function => {
                                         }
-                                        PlanningAtomType::Method => return Err(lerror!(CONVERT_LVALUE_TO_EXPRESSION_CHRONICLE, format!("{} is method and can not be directly called into the body of a method.\
+                                        PlanningAtomType::Method => return Err(lruntimeerror!(CONVERT_LVALUE_TO_EXPRESSION_CHRONICLE, format!("{} is method and can not be directly called into the body of a method.\
                                 \nPlease call the task that use the method instead", s))),
                                         PlanningAtomType::StateFunction => {
                                             let (_,return_type) = context.domain.get_state_functions().get(&s).unwrap().get_parameters().inner().last().unwrap();
@@ -646,11 +646,11 @@ pub fn convert_lvalue_to_expression_chronicle(
                                         PlanningAtomType::Task => {
                                             expression_type = ExpressionType::Task
                                         }
-                                        _ => return Err(lerror!(CONVERT_LVALUE_TO_EXPRESSION_CHRONICLE, format!("{}: first symbol should be a function, task, action or state function", s))),
+                                        _ => return Err(lruntimeerror!(CONVERT_LVALUE_TO_EXPRESSION_CHRONICLE, format!("{}: first symbol should be a function, task, action or state function", s))),
                                     }
                                     literal.push(id.into())
                                 } else {
-                                    return Err(lerror!(
+                                    return Err(lruntimeerror!(
                                         CONVERT_LVALUE_TO_EXPRESSION_CHRONICLE,
                                         format!("function {} is not defined", s)
                                     ));
@@ -659,7 +659,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                         }
                     }
                     _ => {
-                        return Err(lerror!(
+                        return Err(lruntimeerror!(
                             CONVERT_LVALUE_TO_EXPRESSION_CHRONICLE,
                             format!("{} is not yet supported", KindLValue::from(&l[0]))
                         ))
@@ -670,6 +670,7 @@ pub fn convert_lvalue_to_expression_chronicle(
 
                     let mut previous_interval = *ec.get_interval();
                     let f_symbol_end_timepoint = ch.sym_table.declare_new_timepoint();
+                    ec.add_var(&f_symbol_end_timepoint);
                     let mut end_last_interval = f_symbol_end_timepoint;
                     if !matches!(
                         expression_type,
@@ -839,7 +840,7 @@ pub fn convert_lvalue_to_expression_chronicle(
             }
         },
         lv => {
-            return Err(lerror!(
+            return Err(lruntimeerror!(
                 CONVERT_LVALUE_TO_EXPRESSION_CHRONICLE,
                 format!(
                     "{} not supported yet\n exp: {}",
@@ -857,7 +858,7 @@ pub fn convert_if(
     exp: &LValue,
     context: &ConversionContext,
     ch: &mut ConversionCollection,
-) -> lerror::Result<ExpressionChronicle> {
+) -> lruntimeerror::Result<ExpressionChronicle> {
     ch.sym_table.new_scope();
 
     let task_label = ch.local_tasks.new_label(TaskType::IfTask);
@@ -979,7 +980,7 @@ pub fn convert_if(
                          ch: &mut ConversionCollection,
                          branch: bool,
                          debug: LValue|
-     -> lerror::Result<()> {
+     -> lruntimeerror::Result<()> {
         ch.sym_table.new_scope();
         let method_label = format!("m_{}_{}", task_label, branch);
         let method_id = ch

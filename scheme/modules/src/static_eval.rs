@@ -6,7 +6,7 @@ use sompas_macros::async_scheme_fn;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::Documentation;
 use sompas_structs::lenv::{ImportType, LEnv};
-use sompas_structs::lerror::LResult;
+use sompas_structs::lruntimeerror::LResult;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;

@@ -1,7 +1,7 @@
 use crate::point_algebra::problem::{Graph, Timepoint};
 use crate::point_algebra::relation_type::RelationType;
 use crate::point_algebra::relation_type::RelationType::Tautology;
-use sompas_structs::lerror;
+use sompas_structs::lruntimeerror;
 use std::collections::VecDeque;
 
 pub mod problem;
@@ -28,7 +28,7 @@ pub type Fail = ();
 // 3. if M[i, j ] ⊆ S then return false
 // 4. M[i,j ] := M[i, j] intersect S
 // 5. M[j,i ] := converse(M[i, j])
-pub fn path_consistency<T>(mut m: Graph<T>) -> lerror::Result<Graph<T>> {
+pub fn path_consistency<T>(mut m: Graph<T>) -> lruntimeerror::Result<Graph<T>> {
     // Q := {(i,j ) | i<j }
     let mut q: VecDeque<(Timepoint, Timepoint)> = Default::default();
     let n = m.get_number_timepoints();
@@ -77,7 +77,7 @@ pub fn revise<T>(m: &mut Graph<T>, i: Timepoint, j: Timepoint, k: Timepoint) -> 
     true
 }
 
-pub fn remove_useless_timepoints<T>(mut m: Graph<T>) -> lerror::Result<Graph<T>> {
+pub fn remove_useless_timepoints<T>(mut m: Graph<T>) -> lruntimeerror::Result<Graph<T>> {
     let mut last_index = 0;
     let mut done = false;
 

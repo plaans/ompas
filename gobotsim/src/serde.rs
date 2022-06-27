@@ -4,8 +4,8 @@ use ompas_rae_structs::state::action_status::ActionStatus::ActionDenied;
 use ompas_rae_structs::state::partial_state::PartialState;
 use ompas_rae_structs::state::world_state::StateType;
 use serde::{Deserialize, Serialize, Serializer};
-use sompas_structs::lerror;
-use sompas_structs::lerror::LRuntimeError;
+use sompas_structs::lruntimeerror;
+use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalues::LValueS;
 use std::convert::TryFrom;
@@ -144,7 +144,7 @@ impl TryFrom<GodotMessageSerde> for PartialState {
                 state.set_type(StateType::Dynamic);
             }
             _ => {
-                return Err(lerror!(
+                return Err(lruntimeerror!(
                     "LState::TryFrom<GodotMessageSerde>",
                     "Was expecting a state"
                 ))
@@ -185,7 +185,7 @@ impl TryFrom<GodotMessageSerde> for (usize, ActionStatus) {
                         -1 => ActionDenied,
                         i => {
                             if i < 0 {
-                                return Err(lerror!(
+                                return Err(lruntimeerror!(
                                     "GodotMessageSerde",
                                     "action response is not in {-1} + N"
                                 ));

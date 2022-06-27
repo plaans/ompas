@@ -1,8 +1,8 @@
 use crate::domain::_type::Type;
 use sompas_language::OBJECT;
-use sompas_structs::lerror::LRuntimeError;
+use sompas_structs::kindlvalue::KindLValue;
+use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::{LValue, Sym};
-use sompas_structs::typelvalue::KindLValue;
 use sompas_structs::{wrong_n_args, wrong_type};
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;

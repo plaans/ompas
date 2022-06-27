@@ -8,8 +8,8 @@ use crate::structs::{ConversionCollection, ConversionContext};
 use aries_planning::chronicles::ChronicleKind;
 use ompas_rae_structs::domain::parameters::Parameters;
 use ompas_rae_structs::domain::task::Task;
-use sompas_structs::lerror;
 use sompas_structs::llambda::{LLambda, LambdaArgs};
+use sompas_structs::lruntimeerror;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalues::LValueS;
 use std::convert::TryInto;
@@ -26,7 +26,7 @@ const CONVERT_DOMAIN_TO_CHRONICLE_HIERARCHY: &str = "convert_domain_to_chronicle
 
 pub fn convert_domain_to_chronicle_hierarchy(
     conversion_context: ConversionContext,
-) -> lerror::Result<ConversionCollection> {
+) -> lruntimeerror::Result<ConversionCollection> {
     //for each action: translate to chronicle
     //for each method: translate to chronicle
 
@@ -157,7 +157,7 @@ pub fn convert_abstract_task_to_chronicle(
     conversion_context: &ConversionContext,
     ch: &mut ConversionCollection,
     chronicle_kind: ChronicleKind,
-) -> lerror::Result<ChronicleTemplate> {
+) -> lruntimeerror::Result<ChronicleTemplate> {
     let symbol_id = ch.sym_table.declare_symbol(&label.to_string(), None);
 
     let copy_label = label.to_string();
@@ -171,7 +171,7 @@ pub fn convert_abstract_task_to_chronicle(
     ];
     if let LambdaArgs::List(l) = lambda.get_params() {
         if l.len() != parameters.get_number() {
-            return Err(lerror!(
+            return Err(lruntimeerror!(
                 CONVERT_ABSTRACT_TASK_TO_CHRONICLE,
                 format!(
                     "for {}: definition of parameters are different({} != {})",
@@ -239,7 +239,7 @@ pub fn convert_lvalue_to_chronicle(
     exp: &LValue,
     conversion_context: &ConversionContext,
     ch: &mut ConversionCollection,
-) -> lerror::Result<ChronicleTemplate> {
+) -> lruntimeerror::Result<ChronicleTemplate> {
     //Creation and instantiation of the chronicle
     let label = "unnamed_chronicle";
     let symbol_id = ch
@@ -324,7 +324,7 @@ pub fn build_chronicle(
     exp: &LValue,
     conversion_context: &ConversionContext,
     ch: &mut ConversionCollection,
-) -> lerror::Result<ChronicleTemplate> {
+) -> lruntimeerror::Result<ChronicleTemplate> {
     let lvalue: &LValue = if let LValue::Lambda(lambda) = exp {
         lambda.get_body()
     } else {

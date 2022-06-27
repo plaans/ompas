@@ -4,7 +4,7 @@ use crate::plan::Plan;
 use crate::state::task_status::TaskStatus;
 use crate::TaskId;
 use itertools::Itertools;
-use sompas_structs::lerror::LRuntimeError;
+use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};

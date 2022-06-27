@@ -1,7 +1,7 @@
 use crate::contextcollection::{Context, ContextCollection};
 use crate::documentation::Documentation;
-use crate::lerror;
 use crate::llambda::LLambda;
+use crate::lruntimeerror;
 use crate::lvalue::LValue;
 use crate::module::{InitLisp, IntoModule};
 use crate::purefonction::PureFonctionCollection;
@@ -109,7 +109,7 @@ impl LEnv {
     /*
     Return the reference of a context
      */
-    pub fn get_context<T: Any + Send + Sync>(&self, label: &str) -> lerror::Result<&T> {
+    pub fn get_context<T: Any + Send + Sync>(&self, label: &str) -> lruntimeerror::Result<&T> {
         self.ctxs.get::<T>(label)
     }
 

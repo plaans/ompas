@@ -1,5 +1,5 @@
-use crate::lerror;
-use crate::lerror::LRuntimeError;
+use crate::lruntimeerror;
+use crate::lruntimeerror::LRuntimeError;
 use anyhow::anyhow;
 use im::HashMap;
 use std::any::Any;
@@ -40,7 +40,7 @@ impl ContextCollection {
 }
 
 impl ContextCollection {
-    pub fn get<T: Any + Send + Sync>(&self, label: &str) -> lerror::Result<&T> {
+    pub fn get<T: Any + Send + Sync>(&self, label: &str) -> lruntimeerror::Result<&T> {
         let value = self.inner.get(label).ok_or_else(|| {
             LRuntimeError::from(anyhow!(
                 "In ContextCollection::get, context \"{}\" does not exist!",

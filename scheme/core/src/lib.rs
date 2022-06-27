@@ -7,13 +7,13 @@ use sompas_language::*;
 use sompas_structs::lcoreoperator::LCoreOperator;
 use sompas_structs::lcoreoperator::LCoreOperator::Quote;
 use sompas_structs::lenv::{ImportType, LEnv};
-use sompas_structs::lerror::{LResult, LRuntimeError};
+use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 
+use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lfuture::FutureResult;
 use sompas_structs::llambda::{LLambda, LambdaArgs};
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lvalue::LValue;
-use sompas_structs::typelvalue::KindLValue;
 use sompas_structs::{string, symbol, wrong_n_args, wrong_type};
 use std::convert::TryFrom;
 use std::convert::TryInto;

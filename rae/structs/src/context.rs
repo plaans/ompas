@@ -9,7 +9,7 @@ use crate::job::Job;
 use crate::state::world_state::WorldState;
 use sompas_core::get_root_env;
 use sompas_structs::lenv::{LEnv, LEnvSymbols};
-use sompas_structs::lerror::LRuntimeError;
+use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use std::convert::TryInto;
 use tokio::sync::mpsc::Receiver;

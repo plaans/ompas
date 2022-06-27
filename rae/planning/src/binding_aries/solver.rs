@@ -12,7 +12,7 @@ use aries_planning::chronicles::{ChronicleKind, ChronicleOrigin, FiniteProblem};
 use aries_tnet::theory::{StnConfig, StnTheory, TheoryPropagationLevel};
 use im::HashMap;
 use ompas_rae_structs::plan::{AbstractTaskInstance, ActionInstance, Plan, TaskInstance};
-use sompas_structs::lerror::LResult;
+use sompas_structs::lruntimeerror::LResult;
 use sompas_structs::lvalue::LValue;
 use std::sync::Arc;
 use std::time::Instant;

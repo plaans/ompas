@@ -1,4 +1,4 @@
-use crate::lerror::LResult;
+use crate::lruntimeerror::LResult;
 use crate::lvalue::LValue;
 use futures::future::Shared;
 use futures::Future;
@@ -25,7 +25,7 @@ impl From<FutureResult> for LValue {
 
 #[cfg(test)]
 mod test_lfuture {
-    use crate::lerror::LRuntimeError;
+    use crate::lruntimeerror::LRuntimeError;
     use crate::lvalue::LValue;
 
     #[tokio::test]

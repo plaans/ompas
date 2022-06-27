@@ -1,9 +1,9 @@
 use crate::context::{TUPLE_TYPE, TYPE_LIST};
 use sompas_language::LIST;
-use sompas_structs::lerror;
-use sompas_structs::lerror::LRuntimeError;
+use sompas_structs::kindlvalue::KindLValue;
+use sompas_structs::lruntimeerror;
+use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::{LValue, Sym};
-use sompas_structs::typelvalue::KindLValue;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 use std::sync::Arc;
@@ -80,7 +80,7 @@ impl TryFrom<&LValue> for Type {
 
     #[function_name::named]
     fn try_from(lv: &LValue) -> Result<Self, Self::Error> {
-        let err = lerror!(
+        let err = lruntimeerror!(
             function_name!(),
             format!("{} or {} was expected", TUPLE_TYPE, LIST)
         );

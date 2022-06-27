@@ -1,4 +1,4 @@
-use crate::lerror::LRuntimeError;
+use crate::lruntimeerror::LRuntimeError;
 use crate::lvalue::{LValue, RefLValue};
 use serde::*;
 use sompas_language::{

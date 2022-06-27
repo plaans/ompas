@@ -5,11 +5,11 @@ use crate::structs::chronicle::{ChronicleSet, ChronicleTemplate};
 use crate::structs::constraint::Constraint;
 use crate::structs::lit::Lit;
 use crate::structs::symbol_table::{AtomId, SymTable};
-use crate::structs::traits::{FormatWithParent, GetVariables};
+use crate::structs::traits::{FormatWithParent, FormatWithSymTable, GetVariables};
 use crate::structs::type_table::{AtomKind, PlanningAtomType, VariableKind};
 use crate::structs::{ConversionCollection, ConversionContext};
 use im::HashSet;
-use sompas_structs::lerror::LRuntimeError;
+use sompas_structs::lruntimeerror::LRuntimeError;
 use std::ops::Deref;
 
 pub fn post_processing(
@@ -21,6 +21,10 @@ pub fn post_processing(
     unify_equal(c, ch, context);
     ch.sym_table.flat_bindings();
     //panic!("for no fucking reason");
+    /*println!(
+        "before timepoint simplification: {}",
+        c.format(&ch.sym_table, true)
+    );*/
     simplify_timepoints(c, ch, context)?;
     rm_useless_var(c, ch, context);
     /*println!(
@@ -373,10 +377,15 @@ pub fn simplify_timepoints(
         .iter()
         .map(|a| (*a, optional_timepoints.contains(a)))
         .collect();
+    //println!("st: {}", ch.sym_table);
+
     let problem: Problem<AtomId> = Problem::new(timepoints, relations);
+    //println!("problem: {:?}", problem);
 
     let graph: Graph<AtomId> = (&problem).into();
+    //graph.print();
     let new_graph = remove_useless_timepoints(graph)?;
+    //new_graph.print();
     let problem: Problem<AtomId> = new_graph.into();
     for r in problem.get_relations() {
         c.add_constraint(r.into())

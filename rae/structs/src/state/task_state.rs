@@ -414,8 +414,8 @@ impl AbstractTaskMetaData {
         total_time
     }
 
-    pub fn get_last_refinement(&self) -> &RefinementMetaData {
-        self.refinement.last().unwrap()
+    pub fn get_last_refinement(&self) -> Option<&RefinementMetaData> {
+        self.refinement.last()
     }
 
     pub fn get_current_method(&self) -> &LValue {

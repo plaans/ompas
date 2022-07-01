@@ -337,6 +337,16 @@ pub fn simplify_timepoints(
     ch: &mut ConversionCollection,
     _: &ConversionContext,
 ) -> Result<(), LRuntimeError> {
+    let format_hash = |h: &HashSet<AtomId>| -> String {
+        let mut string = "{".to_string();
+        for e in h {
+            string.push_str(e.to_string().as_str());
+            string.push(' ');
+        }
+        string.push('}');
+        string
+    };
+
     let timepoints: HashSet<AtomId> = c
         .get_variables()
         .iter()
@@ -345,6 +355,9 @@ pub fn simplify_timepoints(
             ch.sym_table.get_type_of(a).unwrap().a_type == Some(PlanningAtomType::Timepoint)
         })
         .collect();
+
+    //println!("timepoints: {}", format_hash(&timepoints));
+
     let used_timepoints: HashSet<AtomId> = c
         .get_variables_in_sets(vec![
             ChronicleSet::Effect,
@@ -358,7 +371,25 @@ pub fn simplify_timepoints(
         })
         .collect();
 
+    // println!("used timepoints: {}", format_hash(&used_timepoints));
+
+    let hard_timepoints: HashSet<AtomId> = c
+        .get_variables()
+        .iter()
+        .map(|a| *ch.sym_table.get_parent(a))
+        .filter(|a| {
+            let t = ch.sym_table.get_type_of(a).unwrap();
+            t.kind != AtomKind::Variable(VariableKind::Local)
+                && t.a_type == Some(PlanningAtomType::Timepoint)
+        })
+        .collect();
+
+    //println!("hard timepoints: {}", format_hash(&hard_timepoints));
+
+    let used_timepoints = used_timepoints.union(hard_timepoints);
+
     let optional_timepoints: HashSet<AtomId> = timepoints.clone().difference(used_timepoints);
+    //println!("optional_timepoints: {}", format_hash(&optional_timepoints));
     let mut relations = vec![];
     let mut index_temporal_constraints = vec![];
     for (i, constraint) in c.get_constraints().iter().enumerate() {
@@ -380,12 +411,14 @@ pub fn simplify_timepoints(
     //println!("st: {}", ch.sym_table);
 
     let problem: Problem<AtomId> = Problem::new(timepoints, relations);
+
     //println!("problem: {:?}", problem);
 
     let graph: Graph<AtomId> = (&problem).into();
     //graph.print();
     let new_graph = remove_useless_timepoints(graph)?;
     //new_graph.print();
+
     let problem: Problem<AtomId> = new_graph.into();
     for r in problem.get_relations() {
         c.add_constraint(r.into())

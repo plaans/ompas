@@ -60,10 +60,10 @@ impl Agenda {
     /*
     GETTERS
      */
-    pub async fn get_refinement_method(&self, id: &TaskId) -> SelectMode {
+    pub async fn get_refinement_method(&self, id: &TaskId) -> Option<SelectMode> {
         let task: AbstractTaskMetaData = self.trc.get(id).await.try_into().unwrap();
         let r = task.get_last_refinement();
-        r.refinement_type
+        r.map(|ok| ok.refinement_type)
     }
 
     pub async fn get_execution_time(&self, id: &TaskId) -> Duration {
@@ -149,7 +149,11 @@ impl Agenda {
             let mut task_stats: im::HashMap<LValue, LValue> = Default::default();
             task_stats.insert(
                 string!(REFINEMENT_METHOD),
-                self.get_refinement_method(p).await.to_string().into(),
+                match self.get_refinement_method(p).await {
+                    Some(s) => s.to_string(),
+                    None => "none".to_string(),
+                }
+                .into(),
             );
             task_stats.insert(
                 string!(REFINEMENT_NUMBER),
@@ -248,7 +252,10 @@ impl Agenda {
                             u.to_string()
                         }
                     },
-                    self.get_refinement_method(p).await,
+                    match self.get_refinement_method(p).await {
+                        Some(s) => s.to_string(),
+                        None => "none".to_string(),
+                    },
                     self.get_total_number_of_refinement(p).await,
                     self.get_total_refinement_time(p).await.as_secs(),
                     self.get_number_of_subtasks_recursive(p).await,

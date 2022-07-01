@@ -135,6 +135,12 @@ pub fn convert_lvalue_to_expression_chronicle(
                     let mut meta_data = meta_data;
                     meta_data.is_inside_do();
                     for (i, e) in l[1..].iter().enumerate() {
+                        let mut meta_data = meta_data;
+
+                        if i == l.len() - 2 {
+                            meta_data.is_last_of_begin();
+                        }
+
                         let ec_i =
                             convert_lvalue_to_expression_chronicle(e, context, ch, meta_data)?;
 

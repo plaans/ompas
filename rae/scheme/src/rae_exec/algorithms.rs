@@ -193,7 +193,7 @@ mod select {
                 let n = ctx.agenda.get_number_of_subtasks(&parent_id).await - 1;
                 println!("{} subtask of {}", n + 1, parent_id);
                 println!("Searching for a generated plan...");
-                if let Some(plan) = &parent_stack.get_last_refinement().plan {
+                if let Some(plan) = &parent_stack.get_last_refinement().unwrap().plan {
                     //Get number of subtasks for
                     println!("Parent task has a plan!!!\n {}", plan.format_hierarchy());
                     let root_id = plan.get_root_task().unwrap();

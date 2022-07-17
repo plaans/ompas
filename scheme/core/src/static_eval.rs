@@ -366,6 +366,7 @@ pub fn expand_static(
                             Ok(PLValue::into_unpure(&expanded.into()))
                         }
                     }
+                    co => panic!("{} not yet supported", co),
                 }
             } else if let LValue::Symbol(sym) = &list[0] {
                 match env.get_macro(sym) {
@@ -612,6 +613,7 @@ pub fn eval_static(lv: &LValue, env: &mut LEnv) -> lruntimeerror::Result<PLValue
                             Ok(PLValue::into_unpure(&lv))
                         }
                     }
+                    co => panic!("{} not yet supported", co)
                 }
             } else {
                 let mut exps: Vec<PLValue> = vec![];

@@ -7,7 +7,7 @@ pub const NUMBER: &str = "number";
 pub const SYMBOL: &str = "symbol";
 pub const STRING: &str = "string";
 pub const CHARACTER: &str = "character";
-pub const FUTURE: &str = "future";
+pub const HANDLER: &str = "handler";
 pub const TRUE: &str = "true";
 pub const NIL: &str = "nil";
 pub const ERR: &str = "err";
@@ -36,7 +36,7 @@ pub fn get_symbol_types() -> Vec<&'static str> {
         SYMBOL,
         STRING,
         CHARACTER,
-        FUTURE,
+        HANDLER,
         TRUE,
         NIL,
         ERR,
@@ -70,6 +70,13 @@ pub const EVAL: &str = "eval";
 pub const PARSE: &str = "parse";
 pub const EXPAND: &str = "expand";
 pub const DO: &str = "do";
+pub const INTERRUPT: &str = "interrupt";
+pub const UNINTERRUPTIBLE: &str = "uninterruptible";
+pub const QUASI_INTERRUPTIBLE: &str = "quasiinterruptible";
+pub const INTERRUPTIBLE: &str = "interruptible";
+pub const UNINTERRUPTIBLE_SHORT: &str = "u!";
+pub const QUASI_INTERRUPTIBLE_SHORT: &str = "i?";
+pub const INTERRUPTIBLE_SHORT: &str = "i!";
 
 pub const DOC_DEFINE: &str = "Defines a new entry in the environment/";
 pub const DOC_DEF_MACRO: &str = "Define a new macro, can only be done at the top level";

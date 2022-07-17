@@ -69,7 +69,7 @@ impl From<LValue> for LValueS {
             LValue::Nil => LValueS::Bool(false),
             LValue::String(s) => LValueS::Symbol(s.deref().clone()),
             LValue::AsyncFn(fun) => LValueS::Symbol(fun.get_label().to_string()),
-            LValue::Future(_) => panic!("cannot convert LValue::Future into LValueS"),
+            LValue::Handler(_) => panic!("cannot convert LValue::AsyncHandler into LValueS"),
             LValue::Err(e) => LValueS::List(vec![ERR.into(), e.deref().into()]),
         }
     }

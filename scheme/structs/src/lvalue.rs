@@ -1,7 +1,7 @@
 use crate::function::{LAsyncFn, LFn};
 use crate::kindlvalue::KindLValue;
+use crate::lasynchandler::LAsyncHandler;
 use crate::lcoreoperator::LCoreOperator;
-use crate::lfuture::LFuture;
 use crate::llambda::LLambda;
 use crate::lnumber::LNumber;
 use crate::lruntimeerror::LRuntimeError;
@@ -37,7 +37,8 @@ pub enum LValue {
     //#[serde(skip)]
     CoreOperator(LCoreOperator),
     //#[serde(skip)]
-    Future(LFuture),
+    Handler(LAsyncHandler),
+    //Future(LFuture),
     Err(RefLValue),
     // data structure
     //#[serde(skip)]
@@ -261,7 +262,7 @@ impl Display for LValue {
                 write!(f, "{}", co)
             }
             LValue::AsyncFn(fun) => write!(f, "{}", fun.get_label()),
-            LValue::Future(_) => write!(f, "{}", FUTURE),
+            LValue::Handler(_) => write!(f, "{}", HANDLER),
             LValue::Err(e) => write!(f, "err: {}", e),
         }
     }

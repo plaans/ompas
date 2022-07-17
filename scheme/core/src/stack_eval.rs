@@ -178,6 +178,13 @@ pub async fn non_recursive_eval(lv: LValue, env: LEnv) -> LResult {
 
         match current {
             StackFrame::NonEvaluated(lv) => match lv {
+                LValue::Symbol(s) => {
+                    let result = match env.get_symbol(s.as_str()) {
+                        None => s.into(),
+                        Some(lv) => lv,
+                    };
+                    results.push(result);
+                }
                 LValue::List(list) => {
                     let mut list = list.as_slice();
                     let proc = &list[0];
@@ -349,6 +356,10 @@ pub async fn non_recursive_eval(lv: LValue, env: LEnv) -> LResult {
                             queue.push(next.into())
                         }
                     }
+                }
+                CoreOperatorFrame::Begin(b) => {
+                    let mut r = results.pop_n(b.n);
+                    results.push(r.pop().unwrap());
                 }
                 /*CoreOperatorFrame::Await => {
                     let f = results.pop().unwrap();

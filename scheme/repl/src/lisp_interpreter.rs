@@ -3,6 +3,7 @@ use chrono::{DateTime, Utc};
 use im::HashMap;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
+use sompas_core::stack_eval::non_recursive_eval;
 use sompas_core::{eval, eval_init, get_root_env, parse};
 use sompas_structs::lenv::{ImportType, LEnv};
 use sompas_structs::module::IntoModule;
@@ -153,7 +154,7 @@ impl LispInterpreter {
             }
 
             match parse(str_lvalue.as_str(), &mut self.env).await {
-                Ok(lv) => match eval(&lv, &mut self.env).await {
+                Ok(lv) => match non_recursive_eval(lv.clone(), self.env.clone()).await {
                     Ok(lv) => {
                         self.li_channel
                             .send(&id_subscriber, lv.format(0))

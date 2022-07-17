@@ -2,6 +2,7 @@ use sompas_structs::lenv::LEnv;
 use sompas_structs::lvalue::{LValue, Sym};
 use std::sync::Arc;
 
+#[derive(Copy, Clone, Eq, PartialEq)]
 pub enum Interruptibility {
     Interruptible,
     Unininterruptible,
@@ -12,7 +13,7 @@ pub struct ProcedureFrame {
     pub(crate) n: usize,
 }
 
-impl From<ProcedureFrame> for StackFrame {
+impl From<ProcedureFrame> for StackKind {
     fn from(p: ProcedureFrame) -> Self {
         Self::Procedure(p)
     }
@@ -25,14 +26,15 @@ pub enum CoreOperatorFrame {
     Define(DefineFrame),
     Lambda,
     Await,
+    Interrupt,
     Eval,
     Expand,
     Parse,
 }
 
-impl From<CoreOperatorFrame> for StackFrame {
+impl From<CoreOperatorFrame> for StackKind {
     fn from(c: CoreOperatorFrame) -> Self {
-        StackFrame::CoreOperator(c)
+        StackKind::CoreOperator(c)
     }
 }
 
@@ -41,7 +43,7 @@ pub struct IfFrame {
     pub(crate) alt: LValue,
 }
 
-impl From<IfFrame> for StackFrame {
+impl From<IfFrame> for StackKind {
     fn from(i: IfFrame) -> Self {
         Self::CoreOperator(CoreOperatorFrame::If(i))
     }
@@ -51,7 +53,7 @@ pub struct BeginFrame {
     pub(crate) n: usize,
 }
 
-impl From<BeginFrame> for StackFrame {
+impl From<BeginFrame> for StackKind {
     fn from(b: BeginFrame) -> Self {
         Self::CoreOperator(CoreOperatorFrame::Begin(b))
     }
@@ -61,7 +63,7 @@ pub struct DoFrame {
     pub(crate) rest: Vec<LValue>,
 }
 
-impl From<DoFrame> for StackFrame {
+impl From<DoFrame> for StackKind {
     fn from(d: DoFrame) -> Self {
         Self::CoreOperator(CoreOperatorFrame::Do(d))
     }
@@ -71,19 +73,54 @@ pub struct DefineFrame {
     pub(crate) symbol: Arc<Sym>,
 }
 
-impl From<DefineFrame> for StackFrame {
+impl From<DefineFrame> for StackKind {
     fn from(d: DefineFrame) -> Self {
         Self::CoreOperator(CoreOperatorFrame::Define(d))
     }
 }
 
-impl From<LValue> for StackFrame {
+impl From<LValue> for StackKind {
     fn from(lv: LValue) -> Self {
         Self::NonEvaluated(lv)
     }
 }
 
-pub enum StackFrame {
+pub struct StackFrame {
+    pub(crate) interruptibily: Interruptibility,
+    pub(crate) kind: StackKind,
+}
+
+impl StackFrame {
+    pub fn new(k: impl Into<StackKind>, i: Interruptibility) -> Self {
+        Self {
+            interruptibily: i,
+            kind: k.into(),
+        }
+    }
+
+    pub fn uninterruptible(k: impl Into<StackKind>) -> Self {
+        Self {
+            interruptibily: Interruptibility::Unininterruptible,
+            kind: k.into(),
+        }
+    }
+
+    pub fn interruptible(k: impl Into<StackKind>) -> Self {
+        Self {
+            interruptibily: Interruptibility::Interruptible,
+            kind: k.into(),
+        }
+    }
+
+    pub fn quasiinterruptible(k: impl Into<StackKind>) -> Self {
+        Self {
+            interruptibily: Interruptibility::QuasiInterruptible,
+            kind: k.into(),
+        }
+    }
+}
+
+pub enum StackKind {
     NonEvaluated(LValue),
     Procedure(ProcedureFrame),
     CoreOperator(CoreOperatorFrame),
@@ -143,8 +180,7 @@ impl EvalStack {
     pub fn push(&mut self, f: StackFrame) {
         self.inner.push(f);
     }
-    pub fn push_slice(&mut self, slice: &[LValue]) {
-        let mut list = slice.to_vec();
+    pub fn push_list(&mut self, mut list: Vec<StackFrame>) {
         list.reverse();
         for e in list {
             self.inner.push(e.into())

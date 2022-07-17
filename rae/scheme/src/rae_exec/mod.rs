@@ -634,7 +634,7 @@ async fn monitor(env: &LEnv, args: &[LValue]) -> LResult {
         return Err(wrong_n_args!(RAE_MONITOR, args, 1));
     }
 
-    if let LValue::True = eval(&args[0], &mut env.clone()).await? {
+    if let LValue::True = eval(&args[0], &mut env.clone(), None).await? {
     } else {
         let mut rx = add_waiter(args[0].clone()).await;
         //println!("receiver ok");

@@ -41,7 +41,7 @@ pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LResult {
         });
         //println!("in eval model, string: {}", string);
         let mut env = env.clone();
-        eval(&parse(&string, &mut env).await?, &mut env).await
+        eval(&parse(&string, &mut env).await?, &mut env, None).await
     };
 
     let mode: String = env

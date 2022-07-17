@@ -153,7 +153,7 @@ impl LispInterpreter {
             }
 
             match parse(str_lvalue.as_str(), &mut self.env).await {
-                Ok(lv) => match eval(&lv, &mut self.env).await {
+                Ok(lv) => match eval(&lv, &mut self.env, None).await {
                     Ok(lv) => {
                         self.li_channel
                             .send(&id_subscriber, lv.format(0))

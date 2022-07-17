@@ -37,7 +37,7 @@ pub mod monitor {
             let mut item_to_remove = vec![];
             let mut waiters = self.inner.lock().await;
             for (id, waiter) in waiters.iter().enumerate() {
-                let result = eval(&waiter.lambda, &mut env).await;
+                let result = eval(&waiter.lambda, &mut env, None).await;
                 match result {
                     Ok(lv) => {
                         //info!("{} => {}", waiter.lambda, lv);

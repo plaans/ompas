@@ -64,7 +64,7 @@ pub fn transform_lambda_expression(lv: &LValue, env: LEnv) -> LResult {
         let mut c_env = env.clone();
 
         let lambda =
-            blocking_async!(eval(&expand(&arg, true, &mut c_env).await?, &mut c_env,).await)
+            blocking_async!(eval(&expand(&arg, true, &mut c_env).await?, &mut c_env, None).await)
                 .expect("Error in thread evaluating lambda")?;
         //println!("evaluating is a success");
         if let LValue::Lambda(l) = lambda {

@@ -163,7 +163,7 @@ pub async fn def_lambda(env: &LEnv, list: Vec<LValue>) -> Result<(), LRuntimeErr
     if let LValue::Symbol(label) = &list[0] {
         let expanded = expand(&list[1], true, &mut env).await?;
         let mut e = get_root_env().await;
-        let result = eval(&expanded, &mut e).await?;
+        let result = eval(&expanded, &mut e, None).await?;
         if let LValue::Lambda(_) = &result {
             ctx.get_rae_env()
                 .write()
@@ -183,7 +183,7 @@ pub async fn def_state_function(env: &LEnv, args: &[LValue]) -> Result<(), LRunt
     let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
     let mut env = ctx.get_rae_env().read().await.env.clone();
 
-    let lvalue = eval(&expand(&lvalue, true, &mut env).await?, &mut e).await?;
+    let lvalue = eval(&expand(&lvalue, true, &mut env).await?, &mut e, None).await?;
 
     if let LValue::List(list) = &lvalue {
         if list.len() != 3 {
@@ -241,7 +241,7 @@ pub async fn def_action_model(env: &LEnv, args: &[LValue]) -> Result<(), LRuntim
         Err(e) => panic!("{}", e),
     };
     //println!("expanded: {}", lvalue);
-    let lvalue = eval(&lvalue, &mut env).await?;
+    let lvalue = eval(&lvalue, &mut env, None).await?;
     //println!("evaluated: {}", lvalue);
 
     if let LValue::List(list) = &lvalue {
@@ -294,7 +294,7 @@ pub async fn def_action_operational_model(
     let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
     let mut env = ctx.get_rae_env().read().await.env.clone();
 
-    let lvalue = eval(&expand(&lvalue, true, &mut env).await?, &mut env).await?;
+    let lvalue = eval(&expand(&lvalue, true, &mut env).await?, &mut env, None).await?;
 
     if let LValue::List(list) = &lvalue {
         if list.len() != 2 {
@@ -343,7 +343,7 @@ pub async fn def_action(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError
     let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
 
     let mut env = ctx.get_rae_env().read().await.env.clone();
-    let lvalue = eval(&expand(&lvalue, true, &mut env).await?, &mut env).await?;
+    let lvalue = eval(&expand(&lvalue, true, &mut env).await?, &mut env, None).await?;
 
     if let LValue::List(list) = &lvalue {
         if list.len() != 3 {
@@ -392,7 +392,7 @@ pub async fn def_method(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError
 
     let mut env = ctx.get_rae_env().read().await.env.clone();
 
-    let lvalue = eval(&expand(&lvalue, true, &mut env).await?, &mut env).await?;
+    let lvalue = eval(&expand(&lvalue, true, &mut env).await?, &mut env, None).await?;
 
     //println!("lvalue: {}", lvalue);
 
@@ -461,7 +461,7 @@ pub async fn def_task(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> 
 
     let mut env = ctx.get_rae_env().read().await.env.clone();
 
-    let lvalue = eval(&expand(&lvalue, true, &mut env).await?, &mut env).await?;
+    let lvalue = eval(&expand(&lvalue, true, &mut env).await?, &mut env, None).await?;
 
     //println!("new_task: {}", lvalue);
 

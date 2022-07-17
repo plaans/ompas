@@ -2,6 +2,7 @@ use tokio::sync::mpsc;
 
 const TOKIO_CHANNEL_SIZE: usize = 10;
 
+#[derive(Eq, PartialEq)]
 pub enum InterruptSignal {
     Interrupted,
     NInterrupted,

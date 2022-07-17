@@ -345,6 +345,7 @@ pub async fn arbitrary(env: &LEnv, args: &[LValue]) -> LResult {
                 ]
                 .into(),
                 &mut env.clone(),
+                None,
             )
             .await
         }
@@ -360,7 +361,7 @@ pub async fn enr<'a>(env: &'a LEnv, mut args: Vec<LValue>) -> LResult {
         }
     }
 
-    eval(&args.into(), &mut env.clone()).await
+    eval(&args.into(), &mut env.clone(), None).await
 }
 
 ///Return enumeration from a list of list

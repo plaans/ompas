@@ -49,7 +49,7 @@ pub async fn rae_run(mut context: RAEContext, options: &RAEOptions, _log: String
             vec![RAE_LAUNCH_PLATFORM.to_string(), string].into()
         }
     };
-    let result = eval(&lvalue, &mut context.env).await;
+    let result = eval(&lvalue, &mut context.env, None).await;
 
     match result {
         Ok(_) => {}
@@ -116,7 +116,7 @@ pub async fn rae_run(mut context: RAEContext, options: &RAEOptions, _log: String
                 let job_lvalue = job.core;
                 info!("new triggered task: {}", job_lvalue);
                 //info!("LValue to be evaluated: {}", job_lvalue);
-                match eval(&job_lvalue, &mut new_env).await {
+                match eval(&job_lvalue, &mut new_env, None).await {
                     Ok(lv) => info!(
                         "result of task {}: {}",
                         job_lvalue,

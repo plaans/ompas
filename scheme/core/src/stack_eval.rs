@@ -198,6 +198,10 @@ pub struct Results {
 }
 
 impl Results {
+    pub fn last(&self) -> &LValue {
+        self.inner.last().unwrap()
+    }
+
     pub fn push(&mut self, lv: LValue) {
         self.inner.push(lv);
     }

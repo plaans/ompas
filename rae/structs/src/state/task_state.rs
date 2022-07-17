@@ -9,7 +9,7 @@ use sompas_structs::lvalue::LValue;
 use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::{mpsc, watch, RwLock};
 
 #[derive(Clone, Default)]
 pub struct TaskCollection {
@@ -244,14 +244,27 @@ pub trait TaskMetaDataView {
     fn get_duration(&self) -> Duration;
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct ActionMetaData {
     id: TaskId,
     parent: usize,
     label: LValue,
     status: TaskStatus,
     interval: Interval,
-    sender_to_watcher: Option<mpsc::Sender<TaskStatus>>,
+    sender_to_watcher: Option<watch::Sender<TaskStatus>>,
+}
+
+impl Clone for ActionMetaData {
+    fn clone(&self) -> Self {
+        Self {
+            id: self.id,
+            parent: self.parent,
+            label: self.label.clone(),
+            status: self.status,
+            interval: self.interval.clone(),
+            sender_to_watcher: None,
+        }
+    }
 }
 
 impl ActionMetaData {
@@ -262,8 +275,8 @@ impl ActionMetaData {
         parent: usize,
         label: LValue,
         start: Timepoint,
-    ) -> (Self, mpsc::Receiver<TaskStatus>) {
-        let (tx, rx) = mpsc::channel(Self::STATUS_CHANNEL_SIZE);
+    ) -> (Self, watch::Receiver<TaskStatus>) {
+        let (tx, rx) = watch::channel(TaskStatus::Pending);
 
         (
             Self {
@@ -281,7 +294,7 @@ impl ActionMetaData {
     pub async fn update_status(&mut self, status: TaskStatus) {
         self.status = status;
         if let Some(tx) = &self.sender_to_watcher {
-            if tx.try_send(self.status).is_err() {
+            if tx.send(self.status).is_err() {
                 self.sender_to_watcher = None;
             }
         }

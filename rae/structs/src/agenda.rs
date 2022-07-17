@@ -25,7 +25,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
 use std::{env, fs};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, watch};
 
 const TASK_NAME: &str = "name of the task";
 const TASK_STATUS: &str = "status";
@@ -61,9 +61,12 @@ impl Agenda {
     GETTERS
      */
     pub async fn get_refinement_method(&self, id: &TaskId) -> Option<SelectMode> {
-        let task: AbstractTaskMetaData = self.trc.get(id).await.try_into().unwrap();
-        let r = task.get_last_refinement();
-        r.map(|ok| ok.refinement_type)
+        if let TaskMetaData::AbstractTask(task) = self.trc.get(id).await {
+            let r = task.get_last_refinement();
+            r.map(|ok| ok.refinement_type)
+        } else {
+            None
+        }
     }
 
     pub async fn get_execution_time(&self, id: &TaskId) -> Duration {
@@ -304,7 +307,7 @@ impl Agenda {
         &self,
         action: LValue,
         parent_task: usize,
-    ) -> (TaskId, mpsc::Receiver<TaskStatus>) {
+    ) -> (TaskId, watch::Receiver<TaskStatus>) {
         let task_id = self.get_next_id();
         let start = self.time_reference.elapsed().as_micros();
         let (action, rx) = ActionMetaData::new(task_id, parent_task, action, start);

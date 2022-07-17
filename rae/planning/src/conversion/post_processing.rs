@@ -5,7 +5,7 @@ use crate::structs::chronicle::{ChronicleSet, ChronicleTemplate};
 use crate::structs::constraint::Constraint;
 use crate::structs::lit::Lit;
 use crate::structs::symbol_table::{AtomId, SymTable};
-use crate::structs::traits::{FormatWithParent, FormatWithSymTable, GetVariables};
+use crate::structs::traits::{FormatWithParent, GetVariables};
 use crate::structs::type_table::{AtomKind, PlanningAtomType, VariableKind};
 use crate::structs::{ConversionCollection, ConversionContext};
 use im::HashSet;
@@ -337,7 +337,7 @@ pub fn simplify_timepoints(
     ch: &mut ConversionCollection,
     _: &ConversionContext,
 ) -> Result<(), LRuntimeError> {
-    let format_hash = |h: &HashSet<AtomId>| -> String {
+    /*let format_hash = |h: &HashSet<AtomId>| -> String {
         let mut string = "{".to_string();
         for e in h {
             string.push_str(e.to_string().as_str());
@@ -345,7 +345,7 @@ pub fn simplify_timepoints(
         }
         string.push('}');
         string
-    };
+    };*/
 
     let timepoints: HashSet<AtomId> = c
         .get_variables()

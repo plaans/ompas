@@ -10,20 +10,23 @@ use sompas_structs::lcoreoperator::LCoreOperator;
 use sompas_structs::lcoreoperator::LCoreOperator::Quote;
 use sompas_structs::lenv::{ImportType, LEnv};
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
-use std::collections::VecDeque;
 
-use sompas_structs::function::{LAsyncFn, LFn};
+use crate::stack_eval::{
+    BeginFrame, CoreOperatorFrame, DefineFrame, DoFrame, EvalStack, IfFrame, ProcedureFrame,
+    Results, ScopeCollection, StackFrame,
+};
+use futures::FutureExt;
 use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lasynchandler::LAsyncHandler;
 use sompas_structs::lfuture::{FutureResult, LFuture};
 use sompas_structs::llambda::{LLambda, LambdaArgs};
 use sompas_structs::lnumber::LNumber;
-use sompas_structs::lswitch::{new_interruption_handler, InterruptionReceiver};
+use sompas_structs::lswitch::new_interruption_handler;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::{string, symbol, wrong_n_args, wrong_type};
 use std::convert::TryFrom;
 use std::convert::TryInto;
-use std::fmt::{format, Write};
+use std::fmt::Write;
 use std::ops::Deref;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
@@ -53,7 +56,9 @@ pub async fn eval_init(env: &mut LEnv) {
 
     let inner = env.get_init().clone();
     let inner = inner.inner();
+    //println!("eval init");
     for e in inner {
+        //println!("-{}", e);
         let lv = match parse(e, env).await {
             Ok(lv) => lv,
             Err(e) => {
@@ -189,7 +194,7 @@ pub async fn expand(x: &LValue, top_level: bool, env: &mut LEnv) -> LResult {
                                         )
                                         .into());
                                     }
-                                    let proc = eval(&exp, &mut env.clone()).await?;
+                                    let proc = eval(&exp, env).await?;
                                     //println!("new macro: {}", proc);
                                     if !matches!(proc, LValue::Lambda(_)) {
                                         return Err(
@@ -351,7 +356,7 @@ pub async fn expand(x: &LValue, top_level: bool, env: &mut LEnv) -> LResult {
                         let lv = m.get_body();
                         let env = &mut m.get_new_env(env.clone(), &list[1..])?;
 
-                        let expanded = expand(&eval(lv, env).await?, top_level, env).await?;
+                        let expanded = expand(&eval(&lv, env).await?, top_level, env).await?;
                         if get_debug() {
                             println!("In expand: macro expanded: {:?}", expanded);
                         }
@@ -406,6 +411,270 @@ pub fn expand_quasi_quote(x: &LValue, env: &LEnv) -> LResult {
 /// Evaluate a LValue
 /// Main function of the Scheme Interpreter
 #[async_recursion]
+pub async fn eval(lv: &LValue, root_env: &mut LEnv) -> LResult {
+    //let level: usize = 0;
+    let mut queue: EvalStack = Default::default();
+    queue.push(lv.clone().into());
+
+    let mut scopes: ScopeCollection = ScopeCollection::new(root_env);
+    let mut results: Results = Default::default();
+
+    loop {
+        let current = match queue.pop() {
+            Some(lv) => lv,
+            None => break,
+        };
+
+        match current {
+            StackFrame::NonEvaluated(lv) => match lv {
+                LValue::Symbol(s) => {
+                    let result = match scopes.get_last().get_symbol(s.as_str()) {
+                        None => s.into(),
+                        Some(lv) => lv,
+                    };
+                    results.push(result);
+                }
+                LValue::List(list) => {
+                    let list = list.as_slice();
+                    let proc = &list[0];
+                    let args = &list[1..];
+                    if let LValue::CoreOperator(co) = proc {
+                        match co {
+                            LCoreOperator::Define => {
+                                match &args[0] {
+                                    LValue::Symbol(s) => {
+                                        queue.push(DefineFrame { symbol: s.clone() }.into());
+                                        queue.push(args[1].clone().into());
+                                    }
+                                    lv => return Err(wrong_type!("eval", lv, KindLValue::Symbol)),
+                                };
+                            }
+                            LCoreOperator::DefLambda => {
+                                let params = match &args[0] {
+                                    LValue::List(list) => {
+                                        let mut vec_sym = Vec::new();
+                                        for val in list.iter() {
+                                            match val {
+                                                LValue::Symbol(s) => vec_sym.push(s.clone()),
+                                                lv => {
+                                                    return Err(wrong_type!(
+                                                        "eval",
+                                                        &lv,
+                                                        KindLValue::Symbol
+                                                    ))
+                                                }
+                                            }
+                                        }
+                                        vec_sym.into()
+                                    }
+                                    LValue::Symbol(s) => s.clone().into(),
+                                    LValue::Nil => LambdaArgs::Nil,
+                                    lv => {
+                                        return Err(LRuntimeError::not_in_list_of_expected_types(
+                                            "eval",
+                                            lv,
+                                            vec![KindLValue::List, KindLValue::Symbol],
+                                        ))
+                                    }
+                                };
+                                let body = &args[1];
+                                results.push(LValue::Lambda(LLambda::new(
+                                    params,
+                                    body.clone(),
+                                    scopes.get_last().get_symbols(),
+                                )));
+                            }
+                            LCoreOperator::If => {
+                                scopes.new_scope();
+                                let stack = IfFrame {
+                                    conseq: args[1].clone(),
+                                    alt: args[2].clone(),
+                                };
+
+                                queue.push(stack.into());
+                                queue.push(args[0].clone().into());
+                            }
+                            LCoreOperator::Quote => results.push(args[0].clone()),
+                            LCoreOperator::QuasiQuote => {
+                                panic!("quasiquote not allowed")
+                            }
+                            LCoreOperator::UnQuote => {
+                                panic!("unquote not allowed")
+                            }
+                            LCoreOperator::DefMacro => {
+                                panic!("defmacro not allowed")
+                            }
+                            LCoreOperator::Begin => {
+                                scopes.new_scope();
+                                let stack = BeginFrame { n: args.len() };
+                                queue.push(stack.into());
+                                queue.push_slice(args);
+                            }
+                            LCoreOperator::Do => {
+                                scopes.new_scope();
+                                let stack = DoFrame {
+                                    rest: args[1..].to_vec(),
+                                };
+
+                                queue.push(stack.into());
+                                queue.push(args[0].clone().into())
+                            }
+                            LCoreOperator::Async => {
+                                let lvalue = args[0].clone();
+                                let mut new_env = scopes.get_last().clone();
+
+                                /*let future: LValue =
+                                tokio::spawn(
+                                    async move { eval(&lvalue, &mut new_env, &mut ctxs).await },
+                                )
+                                .await
+                                .unwrap()?;*/
+
+                                let future: FutureResult =
+                                    Box::pin(async move { eval(&lvalue, &mut new_env).await })
+                                        as FutureResult;
+                                let future: LFuture = future.shared();
+                                let future_2 = future.clone();
+                                tokio::spawn(async move {
+                                    #[allow(unused_must_use)]
+                                    future_2.await
+                                });
+
+                                let switch = new_interruption_handler();
+                                let handler = LAsyncHandler::new(future, switch.0);
+
+                                results.push(handler.into());
+                            }
+                            LCoreOperator::Await => {
+                                //println!("awaiting on async evaluation");
+                                queue.push(CoreOperatorFrame::Await.into());
+                                queue.push(args[0].clone().into());
+                            }
+                            LCoreOperator::Eval => {
+                                queue.push(CoreOperatorFrame::Eval.into());
+                                queue.push(CoreOperatorFrame::Expand.into());
+                                queue.push(args[0].clone().into());
+                            }
+                            LCoreOperator::Expand => {
+                                queue.push(CoreOperatorFrame::Expand.into());
+                                queue.push(args[0].clone().into())
+                            }
+                            LCoreOperator::Parse => {
+                                queue.push(CoreOperatorFrame::Parse.into());
+                                queue.push(args[0].clone().into())
+                            }
+                            co => panic!("{} not yet supported in stack-based interpreter", co),
+                        }
+                    } else {
+                        scopes.new_scope();
+                        queue.push(ProcedureFrame { n: list.len() }.into());
+                        queue.push_slice(&list);
+                    }
+                }
+                _ => results.push(lv),
+            },
+            StackFrame::Procedure(pro) => {
+                let exps: Vec<LValue> = results.pop_n(pro.n);
+                let proc = &exps[0];
+                let args = &exps[1..];
+                match proc {
+                    LValue::Lambda(l) => {
+                        queue.push(StackFrame::CoreOperator(CoreOperatorFrame::Lambda));
+                        queue.push(l.get_body().clone().into());
+                        let temp_env = l.get_new_env(scopes.get_last().clone(), args)?;
+                        scopes.new_defined_scope(temp_env);
+                    }
+                    LValue::Fn(fun) => {
+                        let r_lvalue = fun.call(scopes.get_last(), args)?;
+                        results.push(r_lvalue);
+                        scopes.revert_scope();
+                    }
+                    LValue::AsyncFn(fun) => {
+                        let r_lvalue = fun.call(scopes.get_last(), args).await?;
+                        results.push(r_lvalue);
+                        scopes.revert_scope();
+                    }
+                    lv => {
+                        return Err(wrong_type!("eval", lv, KindLValue::Fn));
+                    }
+                }
+            }
+            StackFrame::CoreOperator(cos) => match cos {
+                CoreOperatorFrame::Define(d) => {
+                    let env = scopes.get_last_mut();
+                    let value = results.pop().unwrap();
+                    env.insert(d.symbol.as_ref(), value);
+                    results.push(LValue::Nil);
+                }
+                CoreOperatorFrame::If(i) => {
+                    let result = results.pop().unwrap();
+
+                    match result {
+                        LValue::True => queue.push(i.conseq.into()),
+                        LValue::Nil => queue.push(i.alt.into()),
+                        lv => return Err(wrong_type!("eval", &lv, KindLValue::Bool)),
+                    };
+                    scopes.revert_scope()
+                }
+                CoreOperatorFrame::Do(mut df) => {
+                    if df.rest.is_empty() {
+                        scopes.revert_scope();
+                    } else {
+                        let result = results.pop().unwrap();
+                        if matches!(result, LValue::Err(_)) {
+                            results.push(result);
+                            scopes.revert_scope();
+                        } else {
+                            let next = df.rest.remove(0);
+                            queue.push(df.into());
+                            queue.push(next.into());
+                        }
+                    }
+                }
+                CoreOperatorFrame::Begin(b) => {
+                    let mut r = results.pop_n(b.n);
+                    results.push(r.pop().unwrap());
+                    scopes.revert_scope();
+                }
+                CoreOperatorFrame::Lambda => {
+                    scopes.revert_scope();
+                    scopes.revert_scope();
+                }
+                CoreOperatorFrame::Await => {
+                    let h = results.pop().unwrap();
+                    if let LValue::Handler(h) = h {
+                        let f = h.get_future();
+
+                        match f.await {
+                            Err(e) => return Err(e),
+                            Ok(lv) => results.push(lv),
+                        }
+                    } else {
+                        return Err(wrong_type!(EVAL, &h, KindLValue::Handler));
+                    };
+                }
+                CoreOperatorFrame::Eval => {
+                    queue.push(results.pop().unwrap().into());
+                }
+                CoreOperatorFrame::Expand => {
+                    let result = results.pop().unwrap();
+                    results.push(expand(&result, true, scopes.get_last_mut()).await?);
+                }
+                CoreOperatorFrame::Parse => {
+                    let result = results.pop().unwrap();
+                    if let LValue::String(s) = result {
+                        results.push(parse(s.as_str(), scopes.get_last_mut()).await?)
+                    } else {
+                        return Err(wrong_type!("eval", &result, KindLValue::String));
+                    };
+                }
+            },
+        }
+    }
+    Ok(results.pop().unwrap())
+}
+
+/*#[async_recursion]
 pub async fn eval(lv: &LValue, env: &mut LEnv) -> LResult {
     let mut lv = lv.clone();
     let mut temp_env: LEnv;
@@ -613,7 +882,7 @@ pub async fn eval(lv: &LValue, env: &mut LEnv) -> LResult {
             return Ok(lv);
         }
     }
-}
+}*/
 
 /*/// Evaluate a LValue
 /// Main function of the Scheme Interpreter

@@ -702,7 +702,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_macro_generate_task() -> Result<(), LError> {
+    async fn test_macro_generate_task() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
             inner: MACRO_GENERATE_TASK,
             dependencies: vec![],
@@ -724,7 +724,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_macro_generate_state_function() -> Result<(), LError> {
+    async fn test_macro_generate_state_function() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
             inner: MACRO_GENERATE_STATE_FUNCTION,
             dependencies: vec![],
@@ -759,7 +759,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_macro_generate_action() -> Result<(), LError> {
+    async fn test_macro_generate_action() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
             inner: MACRO_GENERATE_ACTION,
             dependencies: vec![],
@@ -779,7 +779,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_macro_generate_action_model() -> Result<(), LError> {
+    async fn test_macro_generate_action_model() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
             inner: MACRO_GENERATE_ACTION_MODEL,
             dependencies: vec![],
@@ -811,7 +811,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_macro_generate_action_operational_model() -> Result<(), LError> {
+    async fn test_macro_generate_action_operational_model() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
             inner: MACRO_GENERATE_ACTION_OPERATIONAL_MODEL,
             dependencies: vec![],
@@ -844,7 +844,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_lambda_generate_type_pre_conditions() -> Result<(), LError> {
+    async fn test_lambda_generate_type_pre_conditions() -> Result<(), LRuntimeError> {
         let lambda_test = TestExpression {
             inner: LAMBDA_GENERATE_TYPE_PRE_CONDITIONS,
             dependencies: vec![],
@@ -866,7 +866,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_macro_generate_method() -> Result<(), LError> {
+    async fn test_macro_generate_method() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
             inner: MACRO_GENERATE_METHOD,
             dependencies: vec![LAMBDA_GENERATE_TYPE_PRE_CONDITIONS],

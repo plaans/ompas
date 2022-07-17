@@ -4,6 +4,7 @@ use ompas_gobotsim::serde::{
 };
 use sompas_structs::lruntimeerror;
 use sompas_structs::lvalue::LValue;
+use std::sync::Arc;
 
 #[test]
 fn test_action_response() -> lruntimeerror::Result<()> {
@@ -133,7 +134,7 @@ fn test_state_static() -> lruntimeerror::Result<()> {
     let state_msg = GodotMessageSerde {
         _type: GodotMessageType::StaticState,
         data: GodotMessageSerdeData::LValue(
-            LValue::List(vec![10.into(), 20.into(), 30.into()]).into(),
+            LValue::List(Arc::new(vec![10.into(), 20.into(), 30.into()])).into(),
         ),
     };
 
@@ -150,7 +151,7 @@ fn test_state_dynamic() -> lruntimeerror::Result<()> {
     let state_msg = GodotMessageSerde {
         _type: GodotMessageType::DynamicState,
         data: GodotMessageSerdeData::LValue(
-            LValue::List(vec![10.into(), 20.into(), 30.into()]).into(),
+            LValue::List(Arc::new(vec![10.into(), 20.into(), 30.into()])).into(),
         ),
     };
 

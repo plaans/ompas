@@ -1,4 +1,3 @@
-use std::sync::mpsc::TryRecvError;
 use tokio::sync::mpsc;
 
 const TOKIO_CHANNEL_SIZE: usize = 10;

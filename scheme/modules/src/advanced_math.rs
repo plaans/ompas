@@ -158,41 +158,42 @@ pub fn rand_float_in_range(low: f64, up: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sompas_structs::lenv::LEnv;
 
     #[test]
     fn test_cos() {
         let env = LEnv::default();
-        assert_eq!(cos(&[0.0.into()], &env).unwrap(), 1.0.into());
+        assert_eq!(cos(&env, &[0.0.into()]).unwrap(), 1.0.into());
     }
 
     #[test]
     fn test_sin() {
         let env = LEnv::default();
-        assert_eq!(sin(&[0.0.into()], &env).unwrap(), 0.0.into());
+        assert_eq!(sin(&env, &[0.0.into()]).unwrap(), 0.0.into());
     }
 
     #[test]
     fn test_sqrt() {
         let env = LEnv::default();
-        assert_eq!(sqrt(&[4.0.into()], &env).unwrap(), 2.0.into());
+        assert_eq!(sqrt(&env, &[4.0.into()]).unwrap(), 2.0.into());
     }
 
     #[test]
     fn test_power() {
         let env = LEnv::default();
-        assert_eq!(pow(&[2.0.into(), 4.0.into()], &env).unwrap(), 16.0.into());
+        assert_eq!(pow(&env, &[2.0.into(), 4.0.into()]).unwrap(), 16.0.into());
     }
 
     #[test]
     fn test_square() {
         let env = LEnv::default();
-        assert_eq!(square(&[2.0.into()], &env).unwrap(), 4.0.into());
+        assert_eq!(square(&env, &[2.0.into()]).unwrap(), 4.0.into());
     }
 
     #[test]
     fn test_abs() {
         let env = LEnv::default();
-        assert_eq!(abs(&[(-1.0).into()], &env).unwrap(), 1.0.into());
-        assert_eq!(abs(&[3.0.into()], &env).unwrap(), 3.0.into());
+        assert_eq!(abs(&env, &[(-1.0).into()]).unwrap(), 1.0.into());
+        assert_eq!(abs(&env, &[3.0.into()]).unwrap(), 3.0.into());
     }
 }

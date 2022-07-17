@@ -10,10 +10,6 @@ default-run = "scheme"
 name = "scheme"
 path = "src/bin/scheme.rs"
 
-[[bin]]
-name = "sscheme"
-path = "src/bin/stack_scheme.rs"
-
 
 [dependencies]
 sompas-utils = {path = "../utils" }

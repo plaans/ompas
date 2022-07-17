@@ -57,10 +57,11 @@ pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LResult {
                     //println!("await on action (id={})", action_id);
                     info!("waiting on action {}", action_id);
 
-                    let mut action_status: TaskStatus = ctx.agenda.get_status(&action_id).await;
+                    //let mut action_status: TaskStatus = ctx.agenda.get_status(&action_id).await;
 
-                    loop {
+                    while rx.changed().await.is_ok() {
                         //println!("waiting on status:");
+                        let action_status = *rx.borrow();
                         match action_status {
                             TaskStatus::Pending => {
                                 //println!("not triggered");
@@ -79,8 +80,8 @@ pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LResult {
                                 return Ok(true.into());
                             }
                         }
-                        action_status = rx.recv().await.unwrap();
                     }
+                    unreachable!()
                 }
                 None => {
                     let r = eval_model().await;

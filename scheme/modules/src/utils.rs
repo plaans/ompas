@@ -507,11 +507,11 @@ mod test {
         let env = get_root_env().await;
 
         let lv = &[vec![1, 2, 3].into()];
-        let result = arbitrary(lv, &env).await?;
+        let result = arbitrary(&env, lv).await?;
         assert_eq!(result, LValue::from(1));
 
         let lv = &[vec![1, 2, 3].into(), SECOND.into()];
-        let result = arbitrary(lv, &env).await?;
+        let result = arbitrary(&env, lv).await?;
         assert_eq!(result, LValue::from(2));
 
         Ok(())
@@ -519,7 +519,7 @@ mod test {
     #[test]
     fn test_contains() -> lruntimeerror::Result<()> {
         let lv: &[LValue] = &[vec![1, 2, 3, 4, 5, 6].into(), 6.into()];
-        let result = contains(lv, &LEnv::default())?;
+        let result = contains(&LEnv::default(), lv)?;
         assert_eq!(result, LValue::True);
         Ok(())
     }
@@ -528,8 +528,8 @@ mod test {
     fn test_sublist() -> lruntimeerror::Result<()> {
         let lv_1: &[LValue] = &[vec![1, 2, 3, 4, 5, 6].into(), 1.into()];
         let lv_2: &[LValue] = &[vec![1, 2, 3, 4, 5, 6].into(), 1.into(), 3.into()];
-        let result1 = sublist(lv_1, &LEnv::default())?;
-        let result2 = sublist(lv_2, &LEnv::default())?;
+        let result1 = sublist(&LEnv::default(), lv_1)?;
+        let result2 = sublist(&LEnv::default(), lv_2)?;
         assert_eq!(result1, vec![2, 3, 4, 5, 6].into());
         assert_eq!(result2, vec![2, 3].into());
         Ok(())

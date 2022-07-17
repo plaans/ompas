@@ -2,7 +2,7 @@
 
 use sompas_core::{eval, get_root_env, parse};
 use sompas_structs::lruntimeerror;
-use sompas_structs::lruntimeerror::LRuntimeError::Anyhow;
+use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 
 fn create_list_test() -> Vec<(&'static str, LValue)> {
@@ -73,7 +73,7 @@ async fn test_lisp_integration() -> lruntimeerror::Result<()> {
         let result = match eval(&lvalue, &mut env).await {
             Ok(s) => s,
             Err(e) => {
-                return Err(Anyhow(
+                return Err(LRuntimeError::new(
                     "test_lisp_integration",
                     format!("{}:{}:{:?}", element.0, element.1, e).to_string(),
                 ))

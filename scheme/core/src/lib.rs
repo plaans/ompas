@@ -488,7 +488,10 @@ pub async fn eval(
     let mut interrupted = InterruptSignal::NInterrupted;
     let error = LValue::Err(LValue::from(INTERRUPTED).into());
     let mut queue: EvalStack = Default::default();
-    queue.push(StackFrame::interruptible(lv.clone()));
+    queue.push(StackFrame::new_lvalue(
+        lv.clone(),
+        Interruptibility::Interruptible,
+    ));
 
     let mut scopes: ScopeCollection = ScopeCollection::new(root_env);
     let mut results: Results = Default::default();
@@ -502,8 +505,10 @@ pub async fn eval(
 
         if let Some(r) = &mut int {
             interrupted = r.is_interrupted();
-            if interrupted == InterruptSignal::Interrupted {
-                println!("interrupted! last result!: {}", results.last())
+            if get_debug() {
+                if interrupted == InterruptSignal::Interrupted {
+                    println!("interrupted! last result!: {:?}", results.last())
+                }
             }
         }
 
@@ -601,7 +606,7 @@ pub async fn eval(
                                                 DefineFrame { symbol: s.clone() },
                                                 interruptibility,
                                             ));
-                                            queue.push(StackFrame::new(
+                                            queue.push(StackFrame::new_lvalue(
                                                 args[1].clone(),
                                                 interruptibility,
                                             ));
@@ -664,7 +669,10 @@ pub async fn eval(
                                     };
 
                                     queue.push(StackFrame::new(stack, interruptibility));
-                                    queue.push(StackFrame::new(args[0].clone(), interruptibility));
+                                    queue.push(StackFrame::new_lvalue(
+                                        args[0].clone(),
+                                        interruptibility,
+                                    ));
                                 }
                                 LCoreOperator::Quote => results.push(args[0].clone()),
                                 LCoreOperator::QuasiQuote => {
@@ -682,7 +690,9 @@ pub async fn eval(
                                     queue.push(StackFrame::new(stack, interruptibility));
                                     queue.push_list(
                                         args.iter()
-                                            .map(|a| StackFrame::new(a.clone(), interruptibility))
+                                            .map(|a| {
+                                                StackFrame::new_lvalue(a.clone(), interruptibility)
+                                            })
                                             .collect(),
                                     );
                                 }
@@ -694,7 +704,10 @@ pub async fn eval(
                                     };
 
                                     queue.push(StackFrame::new(stack, interruptibility));
-                                    queue.push(StackFrame::new(args[0].clone(), interruptibility));
+                                    queue.push(StackFrame::new_lvalue(
+                                        args[0].clone(),
+                                        interruptibility,
+                                    ));
                                 }
                                 LCoreOperator::Async => {
                                     let result =
@@ -709,7 +722,10 @@ pub async fn eval(
                                         CoreOperatorFrame::Await,
                                         interruptibility,
                                     ));
-                                    queue.push(StackFrame::new(args[0].clone(), interruptibility));
+                                    queue.push(StackFrame::new_lvalue(
+                                        args[0].clone(),
+                                        interruptibility,
+                                    ));
                                 }
                                 LCoreOperator::Eval => {
                                     queue.push(StackFrame::new(
@@ -720,21 +736,30 @@ pub async fn eval(
                                         CoreOperatorFrame::Expand,
                                         interruptibility,
                                     ));
-                                    queue.push(StackFrame::new(args[0].clone(), interruptibility));
+                                    queue.push(StackFrame::new_lvalue(
+                                        args[0].clone(),
+                                        interruptibility,
+                                    ));
                                 }
                                 LCoreOperator::Expand => {
                                     queue.push(StackFrame::new(
                                         CoreOperatorFrame::Expand,
                                         interruptibility,
                                     ));
-                                    queue.push(StackFrame::new(args[0].clone(), interruptibility));
+                                    queue.push(StackFrame::new_lvalue(
+                                        args[0].clone(),
+                                        interruptibility,
+                                    ));
                                 }
                                 LCoreOperator::Parse => {
                                     queue.push(StackFrame::new(
                                         CoreOperatorFrame::Parse,
                                         interruptibility,
                                     ));
-                                    queue.push(StackFrame::new(args[0].clone(), interruptibility));
+                                    queue.push(StackFrame::new_lvalue(
+                                        args[0].clone(),
+                                        interruptibility,
+                                    ));
                                 }
 
                                 LCoreOperator::Interrupt => {
@@ -742,12 +767,17 @@ pub async fn eval(
                                         CoreOperatorFrame::Interrupt,
                                         interruptibility,
                                     ));
-                                    queue.push(StackFrame::new(args[0].clone(), interruptibility));
+                                    queue.push(StackFrame::new_lvalue(
+                                        args[0].clone(),
+                                        interruptibility,
+                                    ));
                                 }
                                 LCoreOperator::Interruptible => {
+                                    unreachable!();
                                     queue.push(StackFrame::interruptible(args[0].clone()))
                                 }
                                 LCoreOperator::Uninterruptible => {
+                                    unreachable!();
                                     queue.push(StackFrame::uninterruptible(args[0].clone()))
                                 }
                                 /*LCoreOperator::QuasiInterruptible => {
@@ -834,7 +864,7 @@ pub async fn eval(
                             ));
                             queue.push_list(
                                 list.iter()
-                                    .map(|a| StackFrame::new(a.clone(), interruptibility))
+                                    .map(|a| StackFrame::new_lvalue(a.clone(), interruptibility))
                                     .collect(),
                             );
                         }
@@ -852,7 +882,10 @@ pub async fn eval(
                 match proc {
                     LValue::Lambda(l) => {
                         queue.push(StackFrame::new(CoreOperatorFrame::Lambda, interruptibility));
-                        queue.push(StackFrame::new(l.get_body().clone(), interruptibility));
+                        queue.push(StackFrame::new_lvalue(
+                            l.get_body().clone(),
+                            interruptibility,
+                        ));
                         let temp_env = match l.get_new_env(scopes.get_last().clone(), args) {
                             Ok(e) => e,
                             Err(e) => {
@@ -906,9 +939,11 @@ pub async fn eval(
 
                     match result {
                         LValue::True => {
-                            queue.push(StackFrame::new(i.conseq.clone(), interruptibility))
+                            queue.push(StackFrame::new_lvalue(i.conseq.clone(), interruptibility))
                         }
-                        LValue::Nil => queue.push(StackFrame::new(i.alt.clone(), interruptibility)),
+                        LValue::Nil => {
+                            queue.push(StackFrame::new_lvalue(i.alt.clone(), interruptibility))
+                        }
                         lv => {
                             let e = wrong_type!("eval", &lv, KindLValue::Bool);
                             expression_error = list![LCoreOperator::If.into(), lv, i.conseq, i.alt];
@@ -929,7 +964,7 @@ pub async fn eval(
                         } else {
                             let next = df.rest.remove(0);
                             queue.push(StackFrame::new(df, interruptibility));
-                            queue.push(StackFrame::new(next, interruptibility));
+                            queue.push(StackFrame::new_lvalue(next, interruptibility));
                         }
                     }
                 }
@@ -991,7 +1026,10 @@ pub async fn eval(
                     };
                 }
                 CoreOperatorFrame::Eval => {
-                    queue.push(StackFrame::new(results.pop().unwrap(), interruptibility));
+                    queue.push(StackFrame::new_lvalue(
+                        results.pop().unwrap(),
+                        interruptibility,
+                    ));
                 }
                 CoreOperatorFrame::Expand => {
                     let result = results.pop().unwrap();

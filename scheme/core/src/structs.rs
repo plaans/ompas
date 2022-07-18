@@ -169,6 +169,26 @@ impl StackFrame {
         }
     }
 
+    pub fn new_lvalue(mut k: LValue, mut i: Interruptibility) -> Self {
+        loop {
+            match k {
+                LValue::List(ref list) => {
+                    if list[0] == LValue::CoreOperator(LCoreOperator::Uninterruptible) {
+                        i = Interruptibility::Unininterruptible;
+                        k = list[1].clone();
+                    } else if list[0] == LValue::CoreOperator(LCoreOperator::Interruptible) {
+                        i = Interruptibility::Interruptible;
+                        k = list[1].clone();
+                    } else {
+                        break;
+                    }
+                }
+                _ => break,
+            }
+        }
+        Self::new(k, i)
+    }
+
     pub fn uninterruptible(k: impl Into<StackKind>) -> Self {
         Self {
             interruptibily: Interruptibility::Unininterruptible,
@@ -272,8 +292,8 @@ pub struct Results {
 }
 
 impl Results {
-    pub fn last(&self) -> &LValue {
-        self.inner.last().unwrap()
+    pub fn last(&self) -> Option<&LValue> {
+        self.inner.last()
     }
 
     pub fn push(&mut self, lv: LValue) {
@@ -308,7 +328,11 @@ impl LDebug {
 
     pub fn print_last_result(&mut self, results: &Results) {
         if get_debug() {
-            println!("{} => {}", self.inner.pop().unwrap(), results.last())
+            println!(
+                "{} => {}",
+                self.inner.pop().unwrap(),
+                results.last().unwrap()
+            )
         }
     }
 }

@@ -17,6 +17,10 @@ impl InterruptionSender {
     pub fn new(tx: mpsc::Sender<InterruptSignal>) -> Self {
         Self { inner: tx }
     }
+
+    pub async fn interrupt(&mut self) {
+        self.inner.send(InterruptSignal::Interrupted).await;
+    }
 }
 
 pub struct InterruptionReceiver {

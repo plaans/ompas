@@ -15,7 +15,8 @@ impl LAsyncHandler {
     }
 
     pub async fn interrupt(&mut self) -> LResult {
-        todo!()
+        self.switch.interrupt().await;
+        self.get_future().await
     }
 
     pub fn get_future(&self) -> LFuture {

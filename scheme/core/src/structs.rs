@@ -1,6 +1,14 @@
+use crate::get_debug;
+use sompas_structs::lcoreoperator::LCoreOperator;
 use sompas_structs::lenv::LEnv;
+use sompas_structs::list;
 use sompas_structs::lvalue::{LValue, Sym};
+use std::fmt::{Display, Formatter};
 use std::sync::Arc;
+
+pub trait Unstack {
+    fn unstack(self, results: &mut Results) -> LValue;
+}
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum Interruptibility {
@@ -11,6 +19,12 @@ pub enum Interruptibility {
 
 pub struct ProcedureFrame {
     pub(crate) n: usize,
+}
+
+impl Unstack for ProcedureFrame {
+    fn unstack(self, results: &mut Results) -> LValue {
+        results.pop_n(self.n).into()
+    }
 }
 
 impl From<ProcedureFrame> for StackKind {
@@ -30,6 +44,57 @@ pub enum CoreOperatorFrame {
     Eval,
     Expand,
     Parse,
+}
+
+impl Unstack for CoreOperatorFrame {
+    fn unstack(self, results: &mut Results) -> LValue {
+        match self {
+            CoreOperatorFrame::If(i) => {
+                list![
+                    LCoreOperator::If.into(),
+                    results.pop().unwrap(),
+                    i.conseq,
+                    i.alt
+                ]
+            }
+            CoreOperatorFrame::Begin(b) => {
+                let mut r = results.pop_n(b.n);
+                let mut list = vec![LCoreOperator::Begin.into()];
+                list.append(&mut r);
+                list.into()
+            }
+            CoreOperatorFrame::Do(mut df) => {
+                let mut list = vec![LCoreOperator::Do.into()];
+                list.append(&mut df.results);
+                list.push(results.pop().unwrap());
+                list.append(&mut df.rest);
+                list.into()
+            }
+            CoreOperatorFrame::Define(d) => {
+                list!(
+                    LCoreOperator::Define.into(),
+                    d.symbol.into(),
+                    results.pop().unwrap()
+                )
+            }
+            CoreOperatorFrame::Lambda => results.pop().unwrap(),
+            CoreOperatorFrame::Await => {
+                list!(LCoreOperator::Await.into(), results.pop().unwrap())
+            }
+            CoreOperatorFrame::Interrupt => {
+                list!(LCoreOperator::Interrupt.into(), results.pop().unwrap())
+            }
+            CoreOperatorFrame::Eval => {
+                list!(LCoreOperator::Eval.into(), results.pop().unwrap())
+            }
+            CoreOperatorFrame::Expand => {
+                list!(LCoreOperator::Expand.into(), results.pop().unwrap())
+            }
+            CoreOperatorFrame::Parse => {
+                list!(LCoreOperator::Parse.into(), results.pop().unwrap())
+            }
+        }
+    }
 }
 
 impl From<CoreOperatorFrame> for StackKind {
@@ -60,6 +125,7 @@ impl From<BeginFrame> for StackKind {
 }
 
 pub struct DoFrame {
+    pub(crate) results: Vec<LValue>,
     pub(crate) rest: Vec<LValue>,
 }
 
@@ -88,6 +154,12 @@ impl From<LValue> for StackKind {
 pub struct StackFrame {
     pub(crate) interruptibily: Interruptibility,
     pub(crate) kind: StackKind,
+}
+
+impl Unstack for StackFrame {
+    fn unstack(self, results: &mut Results) -> LValue {
+        self.kind.unstack(results)
+    }
 }
 
 impl StackFrame {
@@ -124,6 +196,16 @@ pub enum StackKind {
     NonEvaluated(LValue),
     Procedure(ProcedureFrame),
     CoreOperator(CoreOperatorFrame),
+}
+
+impl Unstack for StackKind {
+    fn unstack(self, results: &mut Results) -> LValue {
+        match self {
+            StackKind::NonEvaluated(lv) => lv.clone(),
+            StackKind::Procedure(p) => p.unstack(results),
+            StackKind::CoreOperator(co) => co.unstack(results),
+        }
+    }
 }
 
 pub struct ScopeCollection<'a> {
@@ -212,5 +294,22 @@ impl Results {
 
     pub fn pop_n(&mut self, n: usize) -> Vec<LValue> {
         self.inner.split_off(self.inner.len() - n)
+    }
+}
+
+#[derive(Default)]
+pub struct LDebug {
+    inner: Vec<String>,
+}
+
+impl LDebug {
+    pub fn push(&mut self, s: impl Display) {
+        self.inner.push(s.to_string())
+    }
+
+    pub fn print_last_result(&mut self, results: &Results) {
+        if get_debug() {
+            println!("{} => {}", self.inner.pop().unwrap(), results.last())
+        }
     }
 }

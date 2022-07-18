@@ -90,7 +90,7 @@ impl From<&LNumber> for usize {
 
 impl From<LNumber> for usize {
     fn from(n: LNumber) -> Self {
-        n.into()
+        n.borrow().into()
     }
 }
 

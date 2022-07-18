@@ -9,6 +9,7 @@ use crate::structs::symbol_table::{AtomId, SymTable};
 use crate::structs::traits::{Absorb, FormatWithParent, FormatWithSymTable, GetVariables};
 use crate::structs::type_table::PlanningAtomType;
 use im::{hashset, HashSet};
+use std::borrow::Borrow;
 use std::ops::Deref;
 
 #[derive(Clone)]
@@ -66,7 +67,7 @@ impl PartialChronicle {
     }
 
     pub fn get_result_as_lit(&self) -> Lit {
-        (&self.result).into()
+        self.result.borrow().into()
     }
 }
 

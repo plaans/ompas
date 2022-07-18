@@ -1,7 +1,8 @@
+use std::borrow::Borrow;
 use std::fmt::{Display, Formatter};
 use std::ops::{BitAnd, BitOr, Not};
 
-#[derive(Copy, Clone, Debug, Default, PartialEq)]
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 pub struct RelationTypeBit {
     inner: u8,
 }
@@ -83,7 +84,7 @@ impl From<&RelationType> for RelationTypeBit {
 
 impl From<RelationType> for RelationTypeBit {
     fn from(r: RelationType) -> Self {
-        (&r).into()
+        r.borrow().into()
     }
 }
 
@@ -179,7 +180,7 @@ impl RelationTypeBit {
 
 impl From<RelationTypeBit> for RelationType {
     fn from(rb: RelationTypeBit) -> Self {
-        (&rb).into()
+        rb.borrow().into()
     }
 }
 

@@ -19,6 +19,7 @@ use sompas_structs::lvalues::LValueS;
 use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
 use sompas_structs::{lruntimeerror, string, wrong_n_args, wrong_type};
+use std::borrow::Borrow;
 use std::convert::TryInto;
 use std::ops::Deref;
 
@@ -138,7 +139,7 @@ pub fn generate_type_test_expr(params: Vec<LValue>) -> Result<String, LRuntimeEr
                         ));
                     }
                 } else {
-                    return Err(wrong_n_args!(GENERATE_TYPE_TEST_EXPR, &param, 2));
+                    return Err(wrong_n_args!(GENERATE_TYPE_TEST_EXPR, param, 2));
                 }
             } else {
                 return Err(wrong_type!(
@@ -193,7 +194,7 @@ pub async fn def_state_function(env: &LEnv, args: &[LValue]) -> Result<(), LRunt
                 if let LValue::Lambda(_) = &list[2] {
                     ctx.get_rae_env().write().await.add_state_function(
                         sf_label.to_string(),
-                        StateFunction::new((&list[1]).try_into()?, list[2].clone()),
+                        StateFunction::new(list[1].borrow().try_into()?, list[2].clone()),
                     )?;
                 } else {
                     return Err(wrong_type!(

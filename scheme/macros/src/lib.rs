@@ -71,7 +71,7 @@ pub fn async_scheme_fn(_: TokenStream, input: TokenStream) -> TokenStream {
         defined_lt = true;
         syn::parse_str(quote!(#lt).to_string().as_str())
             .unwrap_or_else(|e| panic!("expected a litefime: {}", e))
-    } else if params.len() == 0 {
+    } else if params.is_empty() {
         syn::parse_str(DEFAULT_LIFETIME).unwrap()
     } else {
         panic!("expected at most a lifetime");
@@ -197,7 +197,7 @@ fn build_params(
     if params.is_empty() {
         return ((env, env_type), (args, args_type), new_params);
     }
-    let type_lvalue: Type = syn::parse_str::<Type>(format!("{}", LVALUE_TYPE).as_str()).unwrap();
+    let type_lvalue: Type = syn::parse_str::<Type>(LVALUE_TYPE).unwrap();
     let type_ref_lvalue: Type = syn::parse_str::<Type>(REF_LVALUE_TYPE).unwrap();
     let (type_env, type_args) = if let Some(lt) = defined_lt {
         //println!("&{} {}", lt, ENV_TYPE);
@@ -231,9 +231,7 @@ fn build_params(
             if i == 0 && t == &type_env {
                 //println!("env is redefined!");
                 env = syn::parse_quote!(#var);
-                env_type = if !is_async {
-                    syn::parse_quote!(#t)
-                } else if let Some(_) = defined_lt {
+                env_type = if !is_async || defined_lt.is_some() {
                     syn::parse_quote!(#t)
                 } else if let Type::Reference(r) = t {
                     let lt: Lifetime = syn::parse_str(DEFAULT_LIFETIME).unwrap();
@@ -251,9 +249,7 @@ fn build_params(
                 //println!("args is redefiend");
                 args_redefined = true;
                 args = syn::parse_quote!(#var);
-                args_type = if !is_async {
-                    syn::parse_quote!(#t)
-                } else if let Some(_) = defined_lt {
+                args_type = if !is_async || defined_lt.is_some() {
                     syn::parse_quote!(#t)
                 } else if let Type::Reference(r) = t {
                     let lt: Lifetime = syn::parse_str(DEFAULT_LIFETIME).unwrap();
@@ -330,41 +326,35 @@ fn build_return(ident: &Ident, expr: &ReturnType) -> TS {
         ReturnType::Type(_, b) => {
             if normal_return_type.contains(b.as_ref()) {
                 quote!(#ident)
-            } else {
-                if let Type::Path(t) = b.as_ref() {
-                    if t.path.segments.len() == 1 {
-                        let segment = &t.path.segments[0];
-                        if &segment.ident == &r_type {
-                            //println!("it is a result");
-                            if let PathArguments::AngleBracketed(args) = &segment.arguments {
-                                assert!(args.args.len() == 2);
-                                let o = &args.args[0];
-                                let e = &args.args[1];
-                                let o: Type =
-                                    syn::parse_str(quote!(#o).to_string().as_str()).unwrap();
-                                let e: Type =
-                                    syn::parse_str(quote!(#e).to_string().as_str()).unwrap();
-                                if o != ok && e != err {
-                                    quote! {
-                                        match #ident {
-                                            Ok(o) => Ok(sompas_structs::lvalue::LValue::from(o)),
-                                            Err(e) => Err(sompas_structs::lruntimeerror::LRuntimeError::from(e))
-                                        }
+            } else if let Type::Path(t) = b.as_ref() {
+                if t.path.segments.len() == 1 {
+                    let segment = &t.path.segments[0];
+                    if segment.ident == r_type {
+                        //println!("it is a result");
+                        if let PathArguments::AngleBracketed(args) = &segment.arguments {
+                            assert!(args.args.len() == 2);
+                            let o = &args.args[0];
+                            let e = &args.args[1];
+                            let o: Type = syn::parse_str(quote!(#o).to_string().as_str()).unwrap();
+                            let e: Type = syn::parse_str(quote!(#e).to_string().as_str()).unwrap();
+                            if o != ok && e != err {
+                                quote! {
+                                    match #ident {
+                                        Ok(o) => Ok(sompas_structs::lvalue::LValue::from(o)),
+                                        Err(e) => Err(sompas_structs::lruntimeerror::LRuntimeError::from(e))
                                     }
-                                } else if o == ok {
-                                    //println!("result returns a LValue");
-                                    quote!(#ident.map_err(|e| sompas_structs::lruntimeerror::LRuntimeError::from(e)))
-                                } else if e == err {
-                                    //println!("result returns a LRuntimeError");
-                                    quote!(#ident.map(|o| sompas_structs::lvalue::LValue::from(o)))
-                                } else {
-                                    quote!(#ident)
                                 }
+                            } else if o == ok {
+                                //println!("result returns a LValue");
+                                quote!(#ident.map_err(|e| sompas_structs::lruntimeerror::LRuntimeError::from(e)))
+                            } else if e == err {
+                                //println!("result returns a LRuntimeError");
+                                quote!(#ident.map(|o| sompas_structs::lvalue::LValue::from(o)))
                             } else {
-                                panic!("should have been brackets")
+                                quote!(#ident)
                             }
                         } else {
-                            classic_return
+                            panic!("should have been brackets")
                         }
                     } else {
                         classic_return
@@ -372,6 +362,8 @@ fn build_return(ident: &Ident, expr: &ReturnType) -> TS {
                 } else {
                     classic_return
                 }
+            } else {
+                classic_return
             }
         }
     };

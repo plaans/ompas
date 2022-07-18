@@ -25,7 +25,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
 use std::{env, fs};
-use tokio::sync::{mpsc, watch};
+use tokio::sync::watch;
 
 const TASK_NAME: &str = "name of the task";
 const TASK_STATUS: &str = "status";

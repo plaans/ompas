@@ -111,6 +111,6 @@ impl From<&LValue> for KindLValue {
 
 impl From<LValue> for KindLValue {
     fn from(lv: LValue) -> Self {
-        (&lv).into()
+        lv.into()
     }
 }

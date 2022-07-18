@@ -4,6 +4,7 @@ use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
+use std::borrow::Borrow;
 use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
 
@@ -77,13 +78,13 @@ impl From<bool> for Atom {
 
 impl From<&LNumber> for Atom {
     fn from(n: &LNumber) -> Self {
-        Self::Number(n.clone())
+        Self::Number(*n)
     }
 }
 
 impl From<LNumber> for Atom {
     fn from(n: LNumber) -> Self {
-        (&n).into()
+        n.borrow().into()
     }
 }
 

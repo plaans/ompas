@@ -98,7 +98,7 @@ macro_rules! lfn_extended {
     #[allow(unused_parens)]
     #[function_name::named]
     $pub
-    fn $fname($env: &crate::lenv::LEnv, args : &Vec<LValue>) -> $crate::lerror::LResult
+    fn $fname($env: &$crate::lenv::LEnv, args : &Vec<LValue>) -> $crate::lerror::LResult
     {
         $crate::check_number_of_args!(args, $crate::count!($($arg)*));
         $crate::check_args!(0 args $($arg $t),*);
@@ -136,7 +136,7 @@ macro_rules! lfn_extended {
     #[allow(unused_parens)]
     #[function_name::named]
     $pub
-    fn $fname($env: &crate::lenv::LEnv, $arg : &Vec<LValue>) -> $crate::lerror::LResult
+    fn $fname($env: &$crate::lenv::LEnv, $arg : &Vec<LValue>) -> $crate::lerror::LResult
     {
         let result: $($Ret)? = {|| {
             $($body)*

@@ -4,6 +4,7 @@ use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::{LValue, Sym};
 use sompas_structs::{wrong_n_args, wrong_type};
+use std::borrow::Borrow;
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 
@@ -46,7 +47,7 @@ impl TryFrom<&LValue> for Parameters {
                     _ => {
                         return Err(LRuntimeError::not_in_list_of_expected_types(
                             function_name!(),
-                            &e,
+                            e,
                             vec![KindLValue::List, KindLValue::Symbol],
                         ))
                     }
@@ -65,7 +66,7 @@ impl TryFrom<LValue> for Parameters {
     type Error = LRuntimeError;
 
     fn try_from(v: LValue) -> Result<Self, Self::Error> {
-        (&v).try_into()
+        v.borrow().try_into()
     }
 }
 

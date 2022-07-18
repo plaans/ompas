@@ -3,7 +3,7 @@ use sompas_structs::lcoreoperator::LCoreOperator;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::list;
 use sompas_structs::lvalue::{LValue, Sym};
-use std::fmt::{Display, Formatter};
+use std::fmt::Display;
 use std::sync::Arc;
 
 pub trait Unstack {
@@ -14,7 +14,6 @@ pub trait Unstack {
 pub enum Interruptibility {
     Interruptible,
     Unininterruptible,
-    QuasiInterruptible,
 }
 
 pub struct ProcedureFrame {
@@ -183,13 +182,6 @@ impl StackFrame {
             kind: k.into(),
         }
     }
-
-    pub fn quasiinterruptible(k: impl Into<StackKind>) -> Self {
-        Self {
-            interruptibily: Interruptibility::QuasiInterruptible,
-            kind: k.into(),
-        }
-    }
 }
 
 pub enum StackKind {
@@ -201,7 +193,7 @@ pub enum StackKind {
 impl Unstack for StackKind {
     fn unstack(self, results: &mut Results) -> LValue {
         match self {
-            StackKind::NonEvaluated(lv) => lv.clone(),
+            StackKind::NonEvaluated(lv) => lv,
             StackKind::Procedure(p) => p.unstack(results),
             StackKind::CoreOperator(co) => co.unstack(results),
         }
@@ -265,7 +257,7 @@ impl EvalStack {
     pub fn push_list(&mut self, mut list: Vec<StackFrame>) {
         list.reverse();
         for e in list {
-            self.inner.push(e.into())
+            self.inner.push(e)
         }
     }
 
@@ -303,8 +295,15 @@ pub struct LDebug {
 }
 
 impl LDebug {
-    pub fn push(&mut self, s: impl Display) {
-        self.inner.push(s.to_string())
+    pub fn push(&mut self, i: Interruptibility, s: impl Display) {
+        self.inner.push(format!(
+            "{}: {}",
+            match i {
+                Interruptibility::Interruptible => "i",
+                Interruptibility::Unininterruptible => "u",
+            },
+            s.to_string()
+        ))
     }
 
     pub fn print_last_result(&mut self, results: &Results) {

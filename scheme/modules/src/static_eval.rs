@@ -90,7 +90,7 @@ pub async fn scheme_eval_static<'a>(env: &'a LEnv, lv: &LValue) -> LResult {
 
     let mut env = ctx.get_env().await;
 
-    let result = expand_static(&lv, true, &mut env)?;
+    let result = expand_static(lv, true, &mut env)?;
 
     let result = eval_static(result.get_lvalue(), &mut env)?;
 

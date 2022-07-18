@@ -2,6 +2,7 @@ use crate::domain::parameters::Parameters;
 use sompas_structs::lcoreoperator::LCoreOperator;
 use sompas_structs::llambda::LLambda;
 use sompas_structs::lvalue::LValue;
+use std::borrow::Borrow;
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone)]
@@ -32,8 +33,8 @@ impl Method {
     }
 
     pub fn get_lambda(&self) -> LValue {
-        let l1: LLambda = (&self.lambda_pre_conditions).try_into().expect("");
-        let l2: LLambda = (&self.lambda_body).try_into().expect("");
+        let l1: LLambda = self.lambda_pre_conditions.borrow().try_into().expect("");
+        let l2: LLambda = self.lambda_body.borrow().try_into().expect("");
         let body: LValue = vec![
             LCoreOperator::Do.into(),
             l1.get_body().clone(),

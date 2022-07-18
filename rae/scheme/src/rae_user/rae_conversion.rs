@@ -22,7 +22,7 @@ pub async fn convert_expr(env: &LEnv, expr: &LValue) -> Result<String, LRuntimeE
     let ctx = env.get_context::<CtxRae>(MOD_RAE).unwrap();
     let mut context: ConversionContext = ctx.get_conversion_context().await;
 
-    let lv = expand(&expr, true, &mut context.env).await?;
+    let lv = expand(expr, true, &mut context.env).await?;
 
     let mut ch = ConversionCollection::default();
 

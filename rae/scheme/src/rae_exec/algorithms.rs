@@ -13,6 +13,7 @@ use sompas_structs::lenv::LEnv;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lruntimeerror::LResult;
 use sompas_structs::lvalue::LValue;
+use std::borrow::Borrow;
 use std::convert::{TryFrom, TryInto};
 
 #[async_scheme_fn]
@@ -53,7 +54,7 @@ pub async fn set_success_for_task(env: &LEnv, args: &[LValue]) -> LResult {
     - Remove the stack from the agenda
     - Return true
      */
-    let task_id: i64 = (&args[0]).try_into()?;
+    let task_id: i64 = args[0].borrow().try_into()?;
     let task_id = task_id as usize;
 
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
@@ -67,7 +68,7 @@ pub async fn set_success_for_task(env: &LEnv, args: &[LValue]) -> LResult {
 
 #[async_scheme_fn]
 pub async fn retry(env: &LEnv, args: &[LValue]) -> LResult {
-    let task_id: i64 = (&args[0]).try_into()?;
+    let task_id: i64 = args[0].borrow().try_into()?;
     let task_id = task_id as usize;
 
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
@@ -263,7 +264,7 @@ mod select {
             state,
         };
 
-        let mut problem: Problem = (&context).into();
+        let mut problem: Problem = context.borrow().into();
         //let cc = convert_domain_to_chronicle_hierarchy(context)?;
         //println!("cc: {}", cc);
         problem.cc = ctx_domain.cc.as_ref().unwrap().clone();
@@ -406,7 +407,7 @@ mod select {
             let iter = instances_template.drain(..);
 
             for i in iter {
-                let i_vec: Vec<LValue> = (&i).try_into()?;
+                let i_vec: Vec<LValue> = i.borrow().try_into()?;
                 let arg = cons(env, &[pre_conditions_lambda.clone(), i_vec[1..].into()])?;
                 let lv: LValue = enr(env, &[arg]).await?;
                 if !matches!(lv, LValue::Err(_)) {

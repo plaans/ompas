@@ -144,14 +144,14 @@ pub fn abs(n: LNumber) -> LNumber {
 /// Returns an integer randomly picked between two numbers.
 #[scheme_fn]
 pub fn rand_int_in_range(low: i64, up: i64) -> i64 {
-    let r: i64 = rand::thread_rng().gen_range(low.into()..up.into());
+    let r: i64 = rand::thread_rng().gen_range(low..up);
     r
 }
 
 /// Returns a float randomly picked between two numbers.
 #[scheme_fn]
 pub fn rand_float_in_range(low: f64, up: f64) -> f64 {
-    let r: f64 = rand::thread_rng().gen_range(low.into()..up.into());
+    let r: f64 = rand::thread_rng().gen_range(low..up);
     r
 }
 

@@ -5,6 +5,7 @@ use crate::wrong_type;
 use function_name::named;
 use num_traits::sign::Signed;
 use serde::*;
+use std::borrow::Borrow;
 use std::cmp::Ordering;
 use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
@@ -66,7 +67,7 @@ impl From<&LNumber> for String {
 
 impl From<LNumber> for String {
     fn from(n: LNumber) -> Self {
-        (&n).to_string()
+        n.to_string()
     }
 }
 
@@ -89,7 +90,7 @@ impl From<&LNumber> for usize {
 
 impl From<LNumber> for usize {
     fn from(n: LNumber) -> Self {
-        (&n).into()
+        n.into()
     }
 }
 
@@ -117,7 +118,7 @@ impl TryFrom<&LValue> for LNumber {
     #[named]
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
         if let LValue::Number(n) = value {
-            Ok(n.clone())
+            Ok(*n)
         } else {
             Err(wrong_type!(value, KindLValue::Number))
         }
@@ -248,21 +249,21 @@ impl Add for LNumber {
     type Output = LNumber;
 
     fn add(self, rhs: Self) -> Self::Output {
-        &self + &rhs
+        self.borrow() + rhs.borrow()
     }
 }
 impl Sub for LNumber {
     type Output = LNumber;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        &self - &rhs
+        self.borrow() - rhs.borrow()
     }
 }
 impl Mul for LNumber {
     type Output = LNumber;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        &self * &rhs
+        self.borrow() * rhs.borrow()
     }
 }
 
@@ -270,7 +271,7 @@ impl Div for LNumber {
     type Output = LNumber;
 
     fn div(self, rhs: Self) -> Self::Output {
-        &self / &rhs
+        self.borrow() / rhs.borrow()
     }
 }
 

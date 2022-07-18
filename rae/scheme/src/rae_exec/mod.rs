@@ -3,7 +3,7 @@ use crate::rae_exec::platform::*;
 use crate::rae_exec::rae_mutex::{get_list_locked, is_locked, lock, lock_in_list, release};
 use ::macro_rules_attribute::macro_rules_attribute;
 use async_trait::async_trait;
-use ompas_rae_core::monitor::monitor::add_waiter;
+use ompas_rae_core::monitor::add_waiter;
 use ompas_rae_language::*;
 use ompas_rae_structs::agenda::Agenda;
 use ompas_rae_structs::context::RAE_TASK_METHODS_MAP;
@@ -27,6 +27,7 @@ use sompas_structs::module::{InitLisp, IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
 use sompas_structs::{list, lruntimeerror, wrong_n_args, wrong_type};
 use std::any::Any;
+use std::borrow::Borrow;
 use std::convert::TryInto;
 use std::string::String;
 use std::sync::Arc;
@@ -333,8 +334,8 @@ async fn retract_fact(env: &LEnv, args: &[LValue]) -> LResult {
             if args.len() != 2 {
                 return Err(wrong_n_args!(RAE_RETRACT, args, 2));
             }
-            let key = (&args[0]).into();
-            let value = (&args[1]).into();
+            let key = args[0].borrow().into();
+            let value = args[1].borrow().into();
             ctx.state.retract_fact(key, value).await
         }
         SYMBOL_SIMU_MODE => {
@@ -376,8 +377,8 @@ async fn assert_fact(env: &LEnv, args: &[LValue]) -> LResult {
             if args.len() != 2 {
                 return Err(wrong_n_args!(RAE_ASSERT, args, 2));
             }
-            let key = (&args[0]).into();
-            let value = (&args[1]).into();
+            let key = args[0].borrow().into();
+            let value = args[1].borrow().into();
             ctx.state.add_fact(key, value).await;
 
             Ok(LValue::True)
@@ -597,15 +598,13 @@ async fn get_state_variable(env: &LEnv, args: &[LValue]) -> LResult {
             let state = env.get_symbol(STATE).unwrap();
             get_map(env, &[state, key])
         }
-        _ => {
-            return Err(lruntimeerror!(
-                RAE_GET_STATE_VARIBALE,
-                format!(
-                    "RAE_MODE must have the value {} or {} (value = {}).",
-                    SYMBOL_EXEC_MODE, SYMBOL_SIMU_MODE, rae_mode,
-                )
-            ))
-        }
+        _ => Err(lruntimeerror!(
+            RAE_GET_STATE_VARIBALE,
+            format!(
+                "RAE_MODE must have the value {} or {} (value = {}).",
+                SYMBOL_EXEC_MODE, SYMBOL_SIMU_MODE, rae_mode,
+            )
+        )),
     }
 }
 

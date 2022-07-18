@@ -100,7 +100,7 @@ impl TryFrom<&LValue> for LValueS {
 impl From<LValueS> for LValue {
     fn from(lvs: LValueS) -> Self {
         match lvs {
-            LValueS::Symbol(s) => LValue::Symbol(Arc::new(s.clone())),
+            LValueS::Symbol(s) => LValue::Symbol(Arc::new(s)),
             LValueS::Int(i) => LValue::Number(LNumber::Int(i)),
             LValueS::Float(f) => LValue::Number(LNumber::Float(f)),
             LValueS::Bool(b) => match b {

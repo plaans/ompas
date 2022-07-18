@@ -9,7 +9,7 @@ use sompas_structs::lvalue::LValue;
 use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
-use tokio::sync::{mpsc, watch, RwLock};
+use tokio::sync::{watch, RwLock};
 
 #[derive(Clone, Default)]
 pub struct TaskCollection {
@@ -268,8 +268,6 @@ impl Clone for ActionMetaData {
 }
 
 impl ActionMetaData {
-    const STATUS_CHANNEL_SIZE: usize = 10;
-
     pub fn new(
         id: TaskId,
         parent: usize,

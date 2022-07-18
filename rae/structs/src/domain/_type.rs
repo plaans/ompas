@@ -4,6 +4,7 @@ use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::{LValue, Sym};
+use std::borrow::Borrow;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 use std::sync::Arc;
@@ -107,7 +108,7 @@ impl TryFrom<&LValue> for Type {
                         })),
                         LIST => {
                             assert_eq!(list.len(), 2);
-                            Ok(Self::List(Box::new((&list[1]).try_into()?)))
+                            Ok(Self::List(Box::new(list[1].borrow().try_into()?)))
                         }
                         _ => Err(err),
                     }

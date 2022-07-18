@@ -9,6 +9,7 @@ use sompas_structs::lruntimeerror::LResult;
 use sompas_structs::lvalue::LValue;
 use sompas_utils::dyn_async;
 use sompas_utils::other::generic_race;
+use std::borrow::Borrow;
 use std::convert::{TryFrom, TryInto};
 
 ///Lock a resource
@@ -77,7 +78,7 @@ pub async fn is_locked(env: &LEnv, args: &[LValue]) -> LResult {
         .expect("rae-mode should be defined, default value is exec mode")
         .try_into()?;
     match mode.as_str() {
-        SYMBOL_EXEC_MODE => Ok(mutex::is_locked((&args[0]).try_into()?).await.into()),
+        SYMBOL_EXEC_MODE => Ok(mutex::is_locked(args[0].borrow().try_into()?).await.into()),
         SYMBOL_SIMU_MODE => {
             let state = match env.get_symbol("state") {
                 Some(lv) => lv,

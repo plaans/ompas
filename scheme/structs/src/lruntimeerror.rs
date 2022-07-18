@@ -1,5 +1,3 @@
-use std::collections::VecDeque;
-//use aries_model::lang::ConversionError;
 use crate::kindlvalue::KindLValue;
 use crate::lvalue::LValue;
 use std::error::Error;
@@ -131,11 +129,10 @@ impl Error for LRuntimeError {}
 
 impl Display for LRuntimeError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        let mut str = String::new();
-        writeln!(f, "message: {}", self.message);
-        writeln!(f, "\nbacktrace:");
+        writeln!(f, "message: {}", self.message).expect("");
+        writeln!(f, "\nbacktrace:").expect("");
         for a in &self.backtrace {
-            writeln!(f, "- from {}", a);
+            writeln!(f, "- from {}", a).expect("");
         }
         Ok(())
     }

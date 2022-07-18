@@ -231,8 +231,7 @@ async fn launch_godot(env: &LEnv, args: &[LValue]) -> LResult {
     let env = env.clone();
     let ctx = env.get_context::<CtxGodot>(MOD_GODOT).unwrap();
     let mut platform = ctx.platform.write().await;
-    let future = platform.launch_platform(args).await;
-    future
+    platform.launch_platform(args).await
 }
 
 /// Opens the tcp communication to receive state and status update and send commands.
@@ -285,7 +284,7 @@ async fn get_state(env: &LEnv, args: &[LValue]) -> LResult {
             lv => {
                 return Err(wrong_type!(
                     "PlatformGodot::get_state",
-                    &lv,
+                    lv,
                     KindLValue::Symbol
                 ))
             }

@@ -1,4 +1,5 @@
 pub mod solver;
+
 use crate::structs::atom::Atom;
 use crate::structs::constraint::Constraint;
 use crate::structs::lit::Lit;
@@ -27,6 +28,7 @@ use sompas_language::*;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lvalues::LValueS;
+use std::borrow::Borrow;
 use std::convert::{TryFrom, TryInto};
 use std::ops::Deref;
 use std::sync::Arc;
@@ -736,7 +738,7 @@ fn read_chronicle(
     for s in chronicle.get_subtasks() {
         let start: FAtom = get_atom(s.interval.start()).try_into()?;
         let end: FAtom = get_atom(s.interval.end()).try_into()?;
-        let e: Vec<Lit> = (&s.lit).try_into()?;
+        let e: Vec<Lit> = s.lit.borrow().try_into()?;
         let e: Vec<SAtom> = e
             .iter()
             .map(|l| {

@@ -296,7 +296,7 @@ pub fn set(env: &LEnv, args: &[LValue]) -> LResult {
         LValue::List(_) | LValue::Nil => set_list(env, args),
         _ => Err(LRuntimeError::not_in_list_of_expected_types(
             SET,
-            &first,
+            first,
             vec![KindLValue::List, KindLValue::Map, KindLValue::Nil],
         )),
     }

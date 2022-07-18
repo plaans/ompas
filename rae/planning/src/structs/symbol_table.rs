@@ -8,6 +8,7 @@ use crate::structs::type_table::{
 use ompas_rae_language::*;
 use sompas_core::modules::get_scheme_primitives;
 use sompas_structs::lruntimeerror;
+use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Display, Formatter};
 
@@ -323,7 +324,7 @@ impl SymTable {
     pub fn declare_new_result(&mut self, a_type: Option<PlanningAtomType>) -> AtomId {
         let n = self.meta_data.new_result_index();
         let sym: Sym = format!("r_{}", n).into();
-        let id = self.symbols.new_node((&sym).into());
+        let id = self.symbols.new_node(sym.borrow().into());
         self.ids.insert(sym, id);
         self.symbol_types.add_new_atom(
             &id,
@@ -580,7 +581,7 @@ impl SymbolTypes {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(Eq, PartialEq)]
 pub enum ExpressionType {
     Pure,
     Lisp,

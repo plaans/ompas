@@ -9,6 +9,7 @@ use crate::{lruntimeerror, string, symbol, wrong_type};
 use function_name::named;
 use im::HashMap;
 use sompas_language::*;
+use std::borrow::Borrow;
 use std::cmp::Ordering;
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{Display, Formatter};
@@ -207,9 +208,9 @@ impl LValue {
                                 )
                             }
                             COND => LValue::pretty_print_list_aligned(COND, &list[1..], indent),
-                            _ => LValue::pretty_print_list(&list, indent),
+                            _ => LValue::pretty_print_list(list, indent),
                         },
-                        _ => LValue::pretty_print_list(&list, indent),
+                        _ => LValue::pretty_print_list(list, indent),
                     }
                 } else {
                     NIL.to_string()
@@ -323,7 +324,7 @@ impl TryFrom<LValue> for im::HashMap<LValue, LValue> {
     type Error = LRuntimeError;
 
     fn try_from(value: LValue) -> Result<Self, Self::Error> {
-        (&value).try_into()
+        value.borrow().try_into()
     }
 }
 
@@ -350,7 +351,7 @@ impl TryFrom<LValue> for String {
     type Error = LRuntimeError;
 
     fn try_from(value: LValue) -> Result<Self, Self::Error> {
-        (&value).try_into()
+        value.borrow().try_into()
     }
 }
 
@@ -363,7 +364,7 @@ impl TryFrom<&LValue> for Vec<LValue> {
             LValue::Nil => Ok(vec![]),
             lv => Err(LRuntimeError::conversion_error(
                 "Vec<LValue>::tryfrom<&LValue>",
-                lv.into(),
+                lv,
                 KindLValue::List,
             )),
         }
@@ -374,7 +375,7 @@ impl TryFrom<LValue> for Vec<LValue> {
     type Error = LRuntimeError;
 
     fn try_from(value: LValue) -> Result<Self, Self::Error> {
-        (&value).try_into()
+        value.borrow().try_into()
     }
 }
 
@@ -397,7 +398,7 @@ impl TryFrom<LValue> for i64 {
     type Error = LRuntimeError;
 
     fn try_from(value: LValue) -> Result<Self, Self::Error> {
-        (&value).try_into()
+        value.borrow().try_into()
     }
 }
 
@@ -409,7 +410,7 @@ impl TryFrom<&LValue> for f64 {
             LValue::Number(n) => Ok(n.into()),
             lv => Err(LRuntimeError::conversion_error(
                 "f64::tryfrom<&LValue>",
-                lv.into(),
+                lv,
                 KindLValue::Number,
             )),
         }
@@ -420,7 +421,7 @@ impl TryFrom<LValue> for f64 {
     type Error = LRuntimeError;
 
     fn try_from(value: LValue) -> Result<Self, Self::Error> {
-        (&value).try_into()
+        value.borrow().try_into()
     }
 }
 
@@ -433,7 +434,7 @@ impl TryFrom<&LValue> for bool {
             LValue::Nil => Ok(false),
             lv => Err(LRuntimeError::conversion_error(
                 "bool::tryfrom<&LValue>",
-                lv.into(),
+                lv,
                 KindLValue::Bool,
             )),
         }
@@ -446,7 +447,7 @@ impl TryFrom<LValue> for bool {
     type Error = LRuntimeError;
 
     fn try_from(value: LValue) -> Result<Self, Self::Error> {
-        (&value).try_into()
+        value.borrow().try_into()
     }
 }
 
@@ -455,11 +456,11 @@ impl TryFrom<&LValue> for LCoreOperator {
 
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
         match value {
-            LValue::CoreOperator(co) => Ok(co.clone()),
+            LValue::CoreOperator(co) => Ok(*co),
             LValue::Symbol(s) => Ok(s.as_str().try_into()?),
             lv => Err(LRuntimeError::conversion_error(
                 "LCoreOperator::tryfrom<&LValue>",
-                lv.into(),
+                lv,
                 KindLValue::CoreOperator,
             )),
         }
@@ -470,7 +471,7 @@ impl TryFrom<LValue> for LCoreOperator {
     type Error = LRuntimeError;
 
     fn try_from(value: LValue) -> Result<Self, Self::Error> {
-        (&value).try_into()
+        value.borrow().try_into()
     }
 }
 
@@ -482,7 +483,7 @@ impl TryFrom<&LValue> for LLambda {
             LValue::Lambda(l) => Ok(l.clone()),
             lv => Err(LRuntimeError::conversion_error(
                 "LLambda::tryfrom<&LValue>",
-                lv.into(),
+                lv,
                 KindLValue::Lambda,
             )),
         }
@@ -493,7 +494,7 @@ impl TryFrom<LValue> for LLambda {
     type Error = LRuntimeError;
 
     fn try_from(value: LValue) -> Result<Self, Self::Error> {
-        (&value).try_into()
+        value.borrow().try_into()
     }
 }
 
@@ -600,7 +601,7 @@ impl Mul for &LValue {
         match (self, rhs) {
             (LValue::Number(n1), LValue::Number(n2)) => Ok(LValue::Number(n1 * n2)),
             (LValue::Number(_), l) => Err(wrong_type!(l, KindLValue::Number)),
-            (l, LValue::Number(_)) => Err(wrong_type!(l.into(), KindLValue::Number)),
+            (l, LValue::Number(_)) => Err(wrong_type!(l, KindLValue::Number)),
 
             (l1, l2) => Err(lruntimeerror!(format!(
                 "{} and {} cannot be add",
@@ -690,7 +691,7 @@ impl From<&str> for LValue {
     fn from(s: &str) -> Self {
         let bytes = s.as_bytes();
         let len = bytes.len();
-        if char::from(bytes[0]) == '"' && char::from(bytes[len - 1]) == '"'.into() {
+        if char::from(bytes[0]) == '"' && char::from(bytes[len - 1]) == '"' {
             string!(s[1..len - 1].to_string())
         } else {
             symbol!(s.to_string())
@@ -700,7 +701,7 @@ impl From<&str> for LValue {
 
 impl From<String> for LValue {
     fn from(s: String) -> Self {
-        (&s).into()
+        s.as_str().into()
     }
 }
 

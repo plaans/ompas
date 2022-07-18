@@ -2,7 +2,7 @@ use tokio::sync::mpsc;
 
 const TOKIO_CHANNEL_SIZE: usize = 10;
 
-#[derive(Eq, PartialEq)]
+#[derive(Eq, PartialEq, Debug)]
 pub enum InterruptSignal {
     Interrupted,
     NInterrupted,
@@ -19,7 +19,7 @@ impl InterruptionSender {
     }
 
     pub async fn interrupt(&mut self) {
-        self.inner.send(InterruptSignal::Interrupted).await;
+        let _ = self.inner.try_send(InterruptSignal::Interrupted);
     }
 }
 
@@ -35,11 +35,12 @@ impl InterruptionReceiver {
     pub fn is_interrupted(&mut self) -> InterruptSignal {
         match self.inner.try_recv() {
             Ok(i) => i,
-            Err(mpsc::error::TryRecvError::Empty) => InterruptSignal::NInterrupted,
-            Err(mpsc::error::TryRecvError::Disconnected) => {
-                panic!("parent evaluation task has been killed")
-            }
+            Err(_) => InterruptSignal::NInterrupted,
         }
+    }
+
+    pub async fn recv(&mut self) -> Option<InterruptSignal> {
+        self.inner.recv().await
     }
 }
 

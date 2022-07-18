@@ -13,6 +13,7 @@ use crate::structs::{ConversionCollection, END, PREZ, RESULT, START};
 use aries_planning::chronicles::ChronicleKind;
 use im::HashSet;
 use sompas_structs::lvalue::LValue;
+use std::borrow::Borrow;
 use std::fmt::Display;
 
 impl FormatWithSymTable for Vec<AtomId> {
@@ -376,7 +377,7 @@ impl From<&ChronicleResult> for Lit {
 
 impl From<ChronicleResult> for Lit {
     fn from(ecr: ChronicleResult) -> Self {
-        (&ecr).into()
+        ecr.borrow().into()
     }
 }
 

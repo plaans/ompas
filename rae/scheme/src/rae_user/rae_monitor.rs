@@ -1,5 +1,5 @@
 use crate::rae_user::{CtxRae, MOD_RAE};
-use ompas_rae_core::monitor::monitor;
+use ompas_rae_core::monitor;
 use ompas_rae_core::mutex;
 use ompas_rae_language::{RAE_GET_AGENDA, RAE_GET_ENV, RAE_GET_STATE};
 use ompas_rae_structs::state::task_state::*;

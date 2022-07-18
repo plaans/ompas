@@ -1,6 +1,6 @@
 use crate::ctx_planning::CtxPlanning;
 use log::{error, info, warn};
-use monitor::monitor::task_check_monitor;
+use monitor::task_check_monitor;
 use ompas_rae_language::RAE_LAUNCH_PLATFORM;
 use ompas_rae_planning::conversion::convert_domain_to_chronicle_hierarchy;
 use ompas_rae_planning::structs::{ConversionCollection, ConversionContext};

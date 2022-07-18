@@ -20,6 +20,7 @@ use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
 use sompas_structs::{lruntimeerror, wrong_n_args, wrong_type};
 use sompas_utils::task_handler;
+use std::borrow::Borrow;
 use std::convert::TryInto;
 use std::net::SocketAddr;
 use std::process::Command;
@@ -297,7 +298,7 @@ impl RAEInterface for PlatformGodot {
                     lv => {
                         return Err(wrong_type!(
                             "PlatformGodot::open_com",
-                            &lv,
+                            lv,
                             KindLValue::Symbol
                         ))
                     }
@@ -308,7 +309,7 @@ impl RAEInterface for PlatformGodot {
                     lv => {
                         return Err(wrong_type!(
                             "PlatformGodot::open_com",
-                            &lv,
+                            lv,
                             KindLValue::Usize
                         ))
                     }
@@ -366,10 +367,14 @@ impl RAEInterface for PlatformGodot {
 
                 Ok(map.into())
             }
-            1 => self.instance.instance_of((&args[0]).try_into()?).await,
+            1 => {
+                self.instance
+                    .instance_of(args[0].borrow().try_into()?)
+                    .await
+            }
             2 => {
                 self.instance
-                    .is_of_type((&args[0]).try_into()?, (&args[1]).try_into()?)
+                    .is_of_type(args[0].borrow().try_into()?, args[1].borrow().try_into()?)
                     .await
             }
             _ => Err(LRuntimeError::wrong_number_of_args(

@@ -67,7 +67,7 @@ impl Display for PLValue {
 
 impl From<PLValue> for LValue {
     fn from(pl: PLValue) -> Self {
-        pl.lvalue.clone()
+        pl.lvalue
     }
 }
 

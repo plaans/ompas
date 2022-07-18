@@ -10,6 +10,7 @@ use crate::structs::type_table::{AtomKind, PlanningAtomType, VariableKind};
 use crate::structs::{ConversionCollection, ConversionContext};
 use im::HashSet;
 use sompas_structs::lruntimeerror::LRuntimeError;
+use std::borrow::Borrow;
 use std::ops::Deref;
 
 pub fn post_processing(
@@ -414,7 +415,7 @@ pub fn simplify_timepoints(
 
     //println!("problem: {:?}", problem);
 
-    let graph: Graph<AtomId> = (&problem).into();
+    let graph: Graph<AtomId> = problem.borrow().into();
     //graph.print();
     let new_graph = remove_useless_timepoints(graph)?;
     //new_graph.print();

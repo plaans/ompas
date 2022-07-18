@@ -2,8 +2,9 @@ use crate::lruntimeerror::LRuntimeError;
 use crate::lvalue::{LValue, RefLValue};
 use serde::*;
 use sompas_language::{
-    ASYNC, AWAIT, BEGIN, DEFINE, DEF_MACRO, DO, EVAL, EXPAND, IF, INTERRUPT, INTERRUPTIBLE, LAMBDA,
-    PARSE, QUASI_INTERRUPTIBLE, QUASI_QUOTE, QUOTE, UNINTERRUPTIBLE, UNQUOTE,
+    ASYNC, AWAIT, BEGIN, DEFINE, DEF_MACRO, DO, EVAL, EXPAND, IF, INTERRUPT, INTERRUPTIBLE,
+    INTERRUPTIBLE_SHORT, LAMBDA, PARSE, QUASI_QUOTE, QUOTE, RACE, UNINTERRUPTIBLE,
+    UNINTERRUPTIBLE_SHORT, UNQUOTE,
 };
 use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
@@ -42,7 +43,8 @@ pub enum LCoreOperator {
     Interrupt,
     Interruptible,
     Uninterruptible,
-    QuasiInterruptible,
+    //QuasiInterruptible,
+    Race,
 }
 
 impl Display for LCoreOperator {
@@ -65,7 +67,7 @@ impl Display for LCoreOperator {
             LCoreOperator::Interrupt => INTERRUPT,
             LCoreOperator::Interruptible => INTERRUPTIBLE,
             LCoreOperator::Uninterruptible => UNINTERRUPTIBLE,
-            LCoreOperator::QuasiInterruptible => QUASI_INTERRUPTIBLE,
+            LCoreOperator::Race => RACE,
         };
 
         write!(f, "{}", str)
@@ -98,9 +100,10 @@ impl TryFrom<&str> for LCoreOperator {
             EXPAND => Ok(LCoreOperator::Expand),
             DO => Ok(LCoreOperator::Do),
             INTERRUPT => Ok(LCoreOperator::Interrupt),
-            INTERRUPTIBLE => Ok(LCoreOperator::Interruptible),
-            UNINTERRUPTIBLE => Ok(LCoreOperator::Uninterruptible),
-            QUASI_INTERRUPTIBLE => Ok(LCoreOperator::QuasiInterruptible),
+            INTERRUPTIBLE | INTERRUPTIBLE_SHORT => Ok(LCoreOperator::Interruptible),
+            UNINTERRUPTIBLE | UNINTERRUPTIBLE_SHORT => Ok(LCoreOperator::Uninterruptible),
+            RACE => Ok(LCoreOperator::Race),
+            //QUASI_INTERRUPTIBLE => Ok(LCoreOperator::QuasiInterruptible),
             _ => Err(LRuntimeError::new(
                 "LCoreOperator::TryFrom<str>",
                 "string does not correspond to core operator".to_string(),

@@ -7,6 +7,7 @@ use sompas_structs::lnumber::LNumber;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
+use std::borrow::Borrow;
 use std::convert::{TryFrom, TryInto};
 use std::ops::Deref;
 
@@ -33,7 +34,7 @@ impl TryFrom<Lit> for AtomId {
     type Error = LRuntimeError;
 
     fn try_from(value: Lit) -> Result<Self, Self::Error> {
-        (&value).try_into()
+        value.borrow().try_into()
     }
 }
 
@@ -70,7 +71,7 @@ impl TryFrom<Lit> for Vec<AtomId> {
     type Error = LRuntimeError;
 
     fn try_from(value: Lit) -> Result<Self, Self::Error> {
-        (&value).try_into()
+        value.borrow().try_into()
     }
 }
 
@@ -98,7 +99,7 @@ impl TryFrom<&Lit> for Vec<Lit> {
 impl TryFrom<Lit> for Vec<Lit> {
     type Error = LRuntimeError;
     fn try_from(value: Lit) -> Result<Self, Self::Error> {
-        (&value).try_into()
+        value.borrow().try_into()
     }
 }
 
@@ -116,7 +117,7 @@ impl From<&AtomId> for Lit {
 
 impl From<AtomId> for Lit {
     fn from(s: AtomId) -> Self {
-        (&s).into()
+        s.borrow().into()
     }
 }
 
@@ -128,7 +129,7 @@ impl From<&Constraint> for Lit {
 
 impl From<Constraint> for Lit {
     fn from(c: Constraint) -> Self {
-        (&c).into()
+        c.borrow().into()
     }
 }
 

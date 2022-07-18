@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::clone::Clone;
 use std::collections::{HashMap, VecDeque};
 use std::fmt::{Debug, Display, Formatter};
@@ -21,7 +22,7 @@ impl From<&usize> for NodeId {
 
 impl From<usize> for NodeId {
     fn from(u: usize) -> Self {
-        (&u).into()
+        u.borrow().into()
     }
 }
 

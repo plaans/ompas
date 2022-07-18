@@ -4,7 +4,7 @@ use crate::structs::traits::{FormatWithParent, FormatWithSymTable, GetVariables}
 use crate::structs::type_table::PlanningAtomType;
 use im::HashSet;
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct Condition {
     pub interval: Interval,
     pub sv: Vec<AtomId>,

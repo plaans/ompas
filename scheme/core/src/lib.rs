@@ -505,10 +505,8 @@ pub async fn eval(
 
         if let Some(r) = &mut int {
             interrupted = r.is_interrupted();
-            if get_debug() {
-                if interrupted == InterruptSignal::Interrupted {
-                    println!("interrupted! last result!: {:?}", results.last())
-                }
+            if get_debug() && interrupted == InterruptSignal::Interrupted {
+                println!("interrupted! last result!: {:?}", results.last())
             }
         }
 
@@ -774,11 +772,11 @@ pub async fn eval(
                                 }
                                 LCoreOperator::Interruptible => {
                                     unreachable!();
-                                    queue.push(StackFrame::interruptible(args[0].clone()))
+                                    //queue.push(StackFrame::interruptible(args[0].clone()))
                                 }
                                 LCoreOperator::Uninterruptible => {
                                     unreachable!();
-                                    queue.push(StackFrame::uninterruptible(args[0].clone()))
+                                    //queue.push(StackFrame::uninterruptible(args[0].clone()))
                                 }
                                 /*LCoreOperator::QuasiInterruptible => {
                                     queue.push(StackFrame::quasiinterruptible(args[0].clone()))

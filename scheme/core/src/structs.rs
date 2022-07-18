@@ -170,20 +170,15 @@ impl StackFrame {
     }
 
     pub fn new_lvalue(mut k: LValue, mut i: Interruptibility) -> Self {
-        loop {
-            match k {
-                LValue::List(ref list) => {
-                    if list[0] == LValue::CoreOperator(LCoreOperator::Uninterruptible) {
-                        i = Interruptibility::Unininterruptible;
-                        k = list[1].clone();
-                    } else if list[0] == LValue::CoreOperator(LCoreOperator::Interruptible) {
-                        i = Interruptibility::Interruptible;
-                        k = list[1].clone();
-                    } else {
-                        break;
-                    }
-                }
-                _ => break,
+        while let LValue::List(ref list) = k {
+            if list[0] == LValue::CoreOperator(LCoreOperator::Uninterruptible) {
+                i = Interruptibility::Unininterruptible;
+                k = list[1].clone();
+            } else if list[0] == LValue::CoreOperator(LCoreOperator::Interruptible) {
+                i = Interruptibility::Interruptible;
+                k = list[1].clone();
+            } else {
+                break;
             }
         }
         Self::new(k, i)
@@ -322,7 +317,7 @@ impl LDebug {
                 Interruptibility::Interruptible => "i",
                 Interruptibility::Unininterruptible => "u",
             },
-            s.to_string()
+            s
         ))
     }
 

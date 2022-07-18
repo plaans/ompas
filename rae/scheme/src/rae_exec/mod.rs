@@ -135,6 +135,8 @@ impl IntoModule for CtxRaeExec {
             DEFINE_ERR_ACTION_FAILURE,
             DEFINE_ERR_NO_APPLICABLE_METHOD,
             LAMBDA_RAE_RETRY,
+            LAMBDA_MONITOR,
+            MACRO_RUN_MONITORING,
             LAMBDA_RAE_EXEC_TASK, //DEFINE_PARENT_TASK,
         ]
         .into();
@@ -163,7 +165,7 @@ impl IntoModule for CtxRaeExec {
         module.add_async_fn_prelude(RAE_START_PLATFORM, start_platform);
         module.add_fn_prelude(RAE_GET_INSTANTIATED_METHODS, get_instantiated_methods);
         module.add_fn_prelude(RAE_GET_BEST_METHOD, get_best_method);
-        module.add_async_fn_prelude(RAE_MONITOR, monitor);
+        module.add_async_fn_prelude(RAE_WAIT_FOR, wait_for);
         //module.add_async_fn_prelude(RAE_SELECT, select);
         //module.add_async_fn_prelude(RAE_SET_SUCCESS_FOR_TASK, set_success_for_task);
         //module.add_async_fn_prelude(RAE_GET_NEXT_METHOD, get_next_method);
@@ -622,7 +624,7 @@ async fn get_status<'a>(_: &'a [LValue], env: &'a LEnv) -> LResult {
 }*/
 
 #[async_scheme_fn]
-async fn monitor(env: &LEnv, args: &[LValue]) -> LResult {
+async fn wait_for(env: &LEnv, args: &[LValue]) -> LResult {
     //info!("wait on function");
     //println!("wait on function with {} args", args.len());
     /*pub const MACRO_WAIT_ON: &str = "(defmacro monitor (lambda (expr)

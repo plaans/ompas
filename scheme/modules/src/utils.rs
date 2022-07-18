@@ -241,6 +241,24 @@ pub const EVAL_NON_RECURSIVE: &str = "enr";
 pub const DOC_ARBITRARY: &str = "todo!";
 pub const DOC_EVAL_NON_RECURSIVE: &str = "todo!";
 
+pub const LAMBDA_PAR: &str = "(define par (lambda l
+    (mapf await (mapf async l))))";
+pub const PAR: &str = "par";
+pub const DOC_PAR: &str = "todo!";
+
+pub const LAMBDA_REPEAT: &str = "(define repeat (lambda (e n)
+    (if (> n 0)
+        (begin
+            (eval e)
+            (repeat e (- n 1))))))";
+
+pub const LAMBDA_RETRY_ONCE: &str = "(define retry-once (lambda (e)
+    (begin
+        (define __r__ (eval e))
+        (if (err? __r__)
+            (eval e)
+            __r__))))";
+
 #[derive(Default, Copy, Clone, Debug)]
 pub struct CtxUtils {}
 
@@ -276,6 +294,9 @@ impl IntoModule for CtxUtils {
                 //MACRO_FOR,
                 //LAMBDA_ARBITRARY,
                 //LAMBDA_EVAL_NON_RECURSIVE,
+                LAMBDA_PAR,
+                LAMBDA_REPEAT,
+                LAMBDA_RETRY_ONCE,
             ]
             .into(),
             label: MOD_UTILS.into(),

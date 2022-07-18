@@ -6,6 +6,15 @@ pub const RAE_RETRACT_SHORT: &str = "->";
 pub const RAE_INSTANCE: &str = "instance";
 pub const RAE_AWAIT: &str = "rae-await";
 pub const RAE_MONITOR: &str = "monitor";
+pub const RAE_WAIT_FOR: &str = "wait-for";
+pub const LAMBDA_MONITOR: &str = "(define monitor
+    (lambda (e)
+        (wait-for `(= ,e nil))))";
+
+pub const MACRO_RUN_MONITORING: &str = "(defmacro run-monitoring
+    (lambda (b m)
+        `(race ,b (monitor ,m))
+))";
 //RAE Interface with a platform
 
 pub const RAE_GET_STATE_VARIBALE: &str = "rae-get-state-variable";

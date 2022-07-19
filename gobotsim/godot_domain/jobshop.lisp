@@ -106,8 +106,8 @@
             (:pre-conditions true)
             (:score 0)
             (:body (do
-                (navigate_to_area ?r (car (belt.interact_areas ?b)))
-                (face_belt ?r ?b 5)))))
+                (await (navigate_to_area ?r (car (belt.interact_areas ?b))))
+                (await (face_belt ?r ?b 5))))))
 
     (def-task t_carry_to_machine '(?r robot) '(?p package) '(?m machine))
     (def-method m_carry_to_machine
@@ -128,7 +128,7 @@
           (:score 0)
           (:body (do
             (t_position_robot_to_belt ?r (package.location ?p))
-            (pick_package ?r ?p)))))
+            (await (pick_package ?r ?p))))))
 
     (def-task t_deliver_package '(?r robot) '(?m machine))
     (def-method m_deliver_package
@@ -141,7 +141,7 @@
                     (do
                         (t_position_robot_to_belt ?r ?b)
                         (await (wait-for `(< (len (belt.packages_list ,?b)) (len (belt.cells ,?b)))))
-                        (place ?r))))))
+                        (await (place ?r)))))))
 
     (def-task t_charge '(?r robot))
     (def-method m_charge
@@ -151,7 +151,7 @@
             (:score 0)
             (:body
                 (do
-                    (go_charge ?r)
+                    (await (go_charge ?r))
                     (await (wait-for `(= (robot.battery ,?r) 1)))))))
 
     (def-task t_check_battery '(?r robot))
@@ -166,7 +166,7 @@
                      (await (wait-for `(< (robot.battery ,?r) 0.4)))
                      (mutex::lock-and-do ?r 50
                         (do
-                            (go_charge ?r)
+                            (await (go_charge ?r))
                             (await (wait-for `(> (robot.battery ,?r) 0.9))))))))))
                             
     (def-task t_check_rob_bat)

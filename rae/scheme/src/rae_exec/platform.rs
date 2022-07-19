@@ -9,6 +9,7 @@ use sompas_modules::utils::contains;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lruntimeerror::LResult;
+use sompas_structs::lswitch::InterruptionReceiver;
 use sompas_structs::lvalue::LValue;
 use std::convert::{TryFrom, TryInto};
 
@@ -21,81 +22,106 @@ pub fn is_platform_defined(env: &LEnv) -> bool {
 }
 
 #[async_scheme_fn]
-pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LResult {
-    let parent_task: usize = env
-        .get_ref_symbol(PARENT_TASK)
-        .map(|n| LNumber::try_from(n).unwrap().into())
-        .unwrap();
-    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
-    let (action_id, mut rx) = ctx.agenda.add_action(args.into(), parent_task).await;
-    let debug: LValue = args.into();
-    info!("exec command {}: {}", action_id, debug);
+pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LAsyncHandler {
+    let env = env.clone();
+    let args = args.to_vec();
 
-    let eval_model = || async {
-        let string = format!("((get-action-model '{}) {})", args[0], {
-            let mut str = "".to_string();
-            for e in &args[1..] {
-                str.push_str(format!("'{}", e).as_str())
-            }
-            str
-        });
-        //println!("in eval model, string: {}", string);
-        let mut env = env.clone();
-        eval(&parse(&string, &mut env).await?, &mut env, None).await
-    };
+    let (tx, mut int_rx) = new_interruption_handler();
 
-    let mode: String = env
-        .get_symbol("rae-mode")
-        .expect("rae-mode should be defined, default value is exec mode")
-        .try_into()?;
-    match mode.as_str() {
-        SYMBOL_EXEC_MODE => {
-            match &ctx.platform_interface {
-                Some(platform) => {
-                    platform.exec_command(args, action_id).await?;
+    let f = (Box::pin(async move {
+        let args = args.as_slice();
+        let parent_task: usize = env
+            .get_ref_symbol(PARENT_TASK)
+            .map(|n| LNumber::try_from(n).unwrap().into())
+            .unwrap();
+        let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
+        let (action_id, mut rx) = ctx.agenda.add_action(args.into(), parent_task).await;
+        let debug: LValue = args.into();
+        info!("exec command {}: {}", action_id, debug);
+        let eval_model = |int: Option<InterruptionReceiver>| async {
+            let string = format!("((get-action-model '{}) {})", args[0], {
+                let mut str = "".to_string();
+                for e in &args[1..] {
+                    str.push_str(format!("'{}", e).as_str())
+                }
+                str
+            });
+            //println!("in eval model, string: {}", string);
+            let mut env = env.clone();
+            eval(&parse(&string, &mut env).await?, &mut env, int).await
+        };
 
-                    //println!("await on action (id={})", action_id);
-                    info!("waiting on action {}", action_id);
+        let mode: String = env
+            .get_symbol("rae-mode")
+            .expect("rae-mode should be defined, default value is exec mode")
+            .try_into()?;
+        match mode.as_str() {
+            SYMBOL_EXEC_MODE => {
+                match &ctx.platform_interface {
+                    Some(platform) => {
+                        platform.exec_command(&args, action_id).await?;
 
-                    //let mut action_status: TaskStatus = ctx.agenda.get_status(&action_id).await;
+                        //println!("await on action (id={})", action_id);
+                        info!("waiting on action {}", action_id);
 
-                    while rx.changed().await.is_ok() {
-                        //println!("waiting on status:");
-                        let action_status = *rx.borrow();
-                        match action_status {
-                            TaskStatus::Pending => {
-                                //println!("not triggered");
+                        //let mut action_status: TaskStatus = ctx.agenda.get_status(&action_id).await;
+
+                        let f = async {
+                            while rx.changed().await.is_ok() {
+                                //println!("waiting on status:");
+                                let action_status = *rx.borrow();
+                                match action_status {
+                                    TaskStatus::Pending => {
+                                        //println!("not triggered");
+                                    }
+                                    TaskStatus::Running => {
+                                        //println!("running");
+                                    }
+                                    TaskStatus::Failure => {
+                                        warn!("Command {} is a failure.", action_id);
+                                        ctx.agenda.set_end_time(&action_id).await;
+                                        return Ok(RaeExecError::ActionFailure.into());
+                                    }
+                                    TaskStatus::Done => {
+                                        info!("Command {} is a success.", action_id);
+                                        ctx.agenda.set_end_time(&action_id).await;
+                                        return Ok(true.into());
+                                    }
+                                }
                             }
-                            TaskStatus::Running => {
-                                //println!("running");
+                            return Err(LRuntimeError::new(
+                                RAE_EXEC_COMMAND,
+                                "error on action status channel",
+                            ));
+                        };
+                        tokio::select! {
+                            _ = int_rx.recv() => {
+                                platform.cancel_command(&[action_id.into()]).await
                             }
-                            TaskStatus::Failure => {
-                                warn!("Command {} is a failure.", action_id);
-                                ctx.agenda.set_end_time(&action_id).await;
-                                return Ok(RaeExecError::ActionFailure.into());
-                            }
-                            TaskStatus::Done => {
-                                info!("Command {} is a success.", action_id);
-                                ctx.agenda.set_end_time(&action_id).await;
-                                return Ok(true.into());
+                            r = f => {
+                                r
                             }
                         }
                     }
-                    unreachable!()
-                }
-                None => {
-                    let r = eval_model().await;
-                    algorithms::set_success_for_task(env, &[action_id.into()]).await?;
-                    r
+                    None => {
+                        let r = eval_model(Some(int_rx)).await;
+                        algorithms::set_success_for_task(&env, &[action_id.into()]).await?;
+                        r
+                    }
                 }
             }
+            SYMBOL_SIMU_MODE => eval_model(None).await,
+            _ => unreachable!(
+                "{} should have either {} or {} value.",
+                SYMBOL_RAE_MODE, SYMBOL_EXEC_MODE, SYMBOL_SIMU_MODE
+            ),
         }
-        SYMBOL_SIMU_MODE => eval_model().await,
-        _ => unreachable!(
-            "{} should have either {} or {} value.",
-            SYMBOL_RAE_MODE, SYMBOL_EXEC_MODE, SYMBOL_SIMU_MODE
-        ),
-    }
+    }) as FutureResult)
+        .shared();
+
+    tokio::spawn(f.clone());
+
+    LAsyncHandler::new(f, tx)
 }
 
 #[async_scheme_fn]

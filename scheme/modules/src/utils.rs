@@ -37,6 +37,7 @@ use sompas_structs::purefonction::PureFonctionCollection;
 use sompas_structs::{interrupted, list, lruntimeerror};
 use std::ops::Deref;
 use std::time::Duration;
+use tokio::pin;
 
 //LANGUAGE
 pub const MOD_UTILS: &str = "utils";
@@ -539,20 +540,15 @@ pub async fn sleep(n: LNumber) -> LAsyncHandler {
     let f: FutureResult = Box::pin(async move {
         let duration = Duration::from_micros((f64::from(&n) * 1_000_000.0) as u64);
 
-        let sleep = tokio::time::sleep(duration).shared();
-        let sleep_2 = sleep.clone();
+        //let sleep = tokio::time::sleep(duration).shared();
+        //let sleep_2 = sleep.clone();
         tokio::select! {
-            r = rx.recv() => {
-                if r {
-                    println!("sleep interrupted: {}", r);
-                    Ok(interrupted!())
-                }else {
-                    println!("handler closed");
-                    sleep_2.await;
-                    Ok(LValue::Nil)
-                }
+            _ = rx.recv() => {
+                //println!("sleep interrupted");
+                Ok(interrupted!())
             }
-            _ = sleep => {
+            _ = tokio::time::sleep(duration) => {
+                println!("sleep terminated");
                 Ok(LValue::Nil)
             }
         }
@@ -560,7 +556,7 @@ pub async fn sleep(n: LNumber) -> LAsyncHandler {
     let f = f.shared();
 
     let f2 = f.clone();
-    tokio::spawn(async move { f2.await });
+    tokio::spawn(f2);
 
     LAsyncHandler::new(f, tx)
 }

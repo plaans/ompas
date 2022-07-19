@@ -459,17 +459,11 @@ pub fn expand_quasi_quote(x: &LValue, env: &LEnv) -> LResult {
 pub fn async_eval(lv: LValue, mut env: LEnv) -> LAsyncHandler {
     let (tx, rx) = new_interruption_handler();
 
-    let future: FutureResult = Box::pin(async move {
-        let r = eval(&lv, &mut env, Some(rx)).await;
-        r
-    }) as FutureResult;
+    let future: FutureResult =
+        Box::pin(async move { eval(&lv, &mut env, Some(rx)).await }) as FutureResult;
     let future: LFuture = future.shared();
-    let future_2 = future.clone();
-    tokio::spawn(async move {
-        #[allow(unused_must_use)]
-        let _ = future_2.await;
-        //println!("done");
-    });
+
+    tokio::spawn(future.clone());
 
     LAsyncHandler::new(future, tx)
 }
@@ -824,15 +818,11 @@ pub async fn eval(
                                                 }
                                             }
                                             _ = rx.recv() => {
-                                                let r1 = tokio::spawn(async move {
-                                                    handler_1.interrupt().await
-                                                });
-                                                let r2 = tokio::spawn(async move {
-                                                    handler_2.interrupt().await
-                                                });
+                                                let r1 = handler_1.interrupt();
+                                                let r2 = handler_2.interrupt();
 
-                                                let r1 = r1.await.unwrap();
-                                                let r2 = r2.await.unwrap();
+                                                let r1 = r1.await;
+                                                let r2 = r2.await;
 
                                                  match (r1, r2) {
                                                     (Ok(l1), Ok(l2)) => {

@@ -31,8 +31,6 @@ impl MonitorCollectionInner {
     }
 }
 
-const TOKIO_CHANNEL_SIZE: usize = 64;
-
 pub async fn add_waiter(lambda: LValue) -> WaitForReceiver {
     MONITOR_COLLECTION.add_waiter(lambda).await
 }
@@ -104,6 +102,10 @@ impl WaitForReceiver {
     pub async fn recv(self) -> Result<bool, oneshot::error::RecvError> {
         self.receiver.await
     }
+
+    pub fn id(&self) -> &WaitForId {
+        &self.id
+    }
 }
 
 pub async fn get_debug() -> String {
@@ -113,7 +115,7 @@ pub async fn get_debug() -> String {
         .await
         .map
         .iter()
-        .map(|(k, v)| v.lambda.clone())
+        .map(|(_, v)| v.lambda.clone())
         .collect();
     let mut str = "'monitor' lambdas: \n".to_string();
     for l in lambdas {

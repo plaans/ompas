@@ -3,7 +3,8 @@ use crate::rae_exec::platform::*;
 use crate::rae_exec::rae_mutex::{get_list_locked, is_locked, lock, lock_in_list, release};
 use ::macro_rules_attribute::macro_rules_attribute;
 use async_trait::async_trait;
-use ompas_rae_core::monitor::add_waiter;
+use futures::FutureExt;
+use ompas_rae_core::monitor::{add_waiter, remove_waiter};
 use ompas_rae_language::*;
 use ompas_rae_structs::agenda::Agenda;
 use ompas_rae_structs::context::RAE_TASK_METHODS_MAP;
@@ -17,9 +18,13 @@ use sompas_core::modules::map::{get_map, remove_key_value_map, set_map};
 use sompas_macros::{async_scheme_fn, scheme_fn};
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::Documentation;
+use sompas_structs::interrupted;
 use sompas_structs::kindlvalue::KindLValue;
+use sompas_structs::lasynchandler::LAsyncHandler;
 use sompas_structs::lenv::LEnv;
+use sompas_structs::lfuture::{FutureResult, LFuture};
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
+use sompas_structs::lswitch::new_interruption_handler;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalue::LValue::Nil;
 use sompas_structs::lvalues::LValueS;
@@ -624,36 +629,36 @@ async fn get_status<'a>(_: &'a [LValue], env: &'a LEnv) -> LResult {
 }*/
 
 #[async_scheme_fn]
-async fn wait_for(env: &LEnv, lv: &LValue) -> LResult {
-    //info!("wait on function");
-    //println!("wait on function with {} args", args.len());
-    /*pub const MACRO_WAIT_ON: &str = "(defmacro monitor (lambda (expr)
-    `(if (not (eval ,expr))
-        (monitor ,expr))))";*/
-
-    /*if args.len() != 1 {
-        return Err(wrong_n_args!(RAE_MONITOR, args, 1));
-    }*/
-
-    //println!("wait-for: {}", lv);
-
-    if let LValue::True = eval(lv, &mut env.clone(), None).await.unwrap() {
-        //println!("wait-for: {} is already true", lv);
-    } else {
-        //println!("wait-for: {} not true yet", lv);
-        let handler = add_waiter(lv.clone()).await;
-        //println!("receiver ok");
-
-        if let false = handler
-            .recv()
-            .await
-            .expect("could not receive msg from waiters")
-        {
-            unreachable!("should not receive false from waiters")
+async fn wait_for(env: &LEnv, lv: LValue) -> LAsyncHandler {
+    let (tx, mut rx) = new_interruption_handler();
+    let mut env = env.clone();
+    let f: LFuture = (Box::pin(async move {
+        //println!("wait-for: {}", lv);
+        if let LValue::True = eval(&lv, &mut env, None).await.unwrap() {
+            //println!("wait-for: {} already true", lv);
+            Ok(LValue::Nil)
+        } else {
+            let handler = add_waiter(lv.clone()).await;
+            let id = *handler.id();
+            //println!("wait-for: waiting on {}", lv);
+            tokio::select! {
+                _ = rx.recv() => {
+                        //println!("wait-for: waiter no longer needed");
+                        remove_waiter(id).await;
+                        Ok(interrupted!())
+                }
+                _ = handler.recv() => {
+                    //println!("success for waiter");
+                    Ok(LValue::Nil)
+                }
+            }
         }
-        //println!("end wait on");
-    }
-    Ok(LValue::True)
+    }) as FutureResult)
+        .shared();
+
+    tokio::spawn(f.clone());
+
+    LAsyncHandler::new(f, tx)
 }
 #[scheme_fn]
 pub fn success(args: &[LValue]) -> LValue {

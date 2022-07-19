@@ -15,10 +15,10 @@ macro_rules! err {
 #[macro_export]
 macro_rules! interrupted {
     () => {
-        LValue::Err(std::sync::Arc::new(list![INTERRUPTED.into()]))
+        LValue::Err(std::sync::Arc::new(list![sompas_language::INTERRUPTED.into()]))
     };
     ($($x:expr),*) => {
-        LValue::Err(std::sync::Arc::new(list![INTERRUPTED.into(), $($x),*]))
+        LValue::Err(std::sync::Arc::new(list![sompas_language::INTERRUPTED.into(), $($x),*]))
     }
 }
 

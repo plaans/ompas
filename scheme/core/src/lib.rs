@@ -21,9 +21,9 @@ use sompas_structs::lasynchandler::LAsyncHandler;
 use sompas_structs::lfuture::{FutureResult, LFuture};
 use sompas_structs::llambda::{LLambda, LambdaArgs};
 use sompas_structs::lnumber::LNumber;
-use sompas_structs::lswitch::{new_interruption_handler, InterruptSignal, InterruptionReceiver};
+use sompas_structs::lswitch::{new_interruption_handler, InterruptionReceiver};
 use sompas_structs::lvalue::LValue;
-use sompas_structs::{list, string, symbol, wrong_n_args, wrong_type};
+use sompas_structs::{interrupted, list, string, symbol, wrong_n_args, wrong_type};
 use std::convert::TryFrom;
 use std::convert::TryInto;
 use std::fmt::Write;
@@ -485,8 +485,8 @@ pub async fn eval(
     let mut debug: LDebug = Default::default();
     debug.push(Unininterruptible, lv);
 
-    let mut interrupted = InterruptSignal::NInterrupted;
-    let error = LValue::Err(LValue::from(INTERRUPTED).into());
+    let mut interrupted = false;
+    let error = interrupted!();
     let mut queue: EvalStack = Default::default();
     queue.push(StackFrame::new_lvalue(
         lv.clone(),
@@ -505,16 +505,14 @@ pub async fn eval(
 
         if let Some(r) = &mut int {
             interrupted = r.is_interrupted();
-            if get_debug() && interrupted == InterruptSignal::Interrupted {
+            if get_debug() && interrupted == true {
                 println!("interrupted! last result!: {:?}", results.last())
             }
         }
 
         let interruptibility = current.interruptibily;
 
-        if interrupted == InterruptSignal::Interrupted
-            && interruptibility == Interruptibility::Interruptible
-        {
+        if interrupted == true && interruptibility == Interruptibility::Interruptible {
             match current.kind {
                 StackKind::NonEvaluated(_) => {
                     results.push(error.clone());
@@ -571,10 +569,8 @@ pub async fn eval(
             }
             debug.print_last_result(&results);
             continue;
-        } else if interrupted == InterruptSignal::Interrupted
-            && current.interruptibily == Unininterruptible
-        {
-            println!("interrupt avoided");
+        } else if interrupted == true && current.interruptibily == Unininterruptible {
+            //println!("interrupt avoided");
         }
 
         match current.kind {
@@ -828,12 +824,21 @@ pub async fn eval(
                                                 }
                                             }
                                             _ = rx.recv() => {
-                                                let r1 = handler_1.interrupt().await;
-                                                let r2 = handler_2.interrupt().await;
+                                                let r1 = tokio::spawn(async move {
+                                                    handler_1.interrupt().await
+                                                });
+                                                let r2 = tokio::spawn(async move {
+                                                    handler_2.interrupt().await
+                                                });
+
+                                                let r1 = r1.await.unwrap();
+                                                let r2 = r2.await.unwrap();
+
                                                  match (r1, r2) {
                                                     (Ok(l1), Ok(l2)) => {
-                                                        Ok(LValue::Err(Arc::new(list![INTERRUPTED.into(),l1, l2])))                                                    }
-                                                        (Err(e1), Ok(l2)) => {
+                                                        Ok(list!(l1,l2))
+                                                    }
+                                                    (Err(e1), Ok(l2)) => {
                                                         Err(e1.chain(format!("Error on race because interruption of first expression returned a runtime error.\nResult of first expression: {}", l2)))
                                                     }
                                                     (Ok(l1), Err(e2)) => {
@@ -981,13 +986,17 @@ pub async fn eval(
                     if let LValue::Handler(ref h) = result {
                         let f = h.get_future();
 
-                        let r: LResult = if let Some(int) = &mut int {
+                        let r: LResult = if interruptibility == Interruptibility::Interruptible
+                            && int.is_some()
+                        {
+                            let int = int.as_mut().unwrap();
                             tokio::select! {
                                 r = f => {
                                     r
                                 }
                                 _ = int.recv() => {
-                                    Ok(LValue::Err(Arc::new("interrupted".into())))
+                                    println!("await interrupted");
+                                    Ok(interrupted!())
                                 }
                             }
                         } else {

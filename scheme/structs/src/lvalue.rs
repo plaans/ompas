@@ -235,7 +235,8 @@ impl Display for LValue {
         match self {
             LValue::Fn(fun) => write!(f, "{}", fun.get_label()),
             LValue::Nil => write!(f, "{}", NIL),
-            LValue::Symbol(s) | LValue::String(s) => write!(f, "{}", s),
+            LValue::Symbol(s) => write!(f, "{}", s),
+            LValue::String(s) => write!(f, "\"{}\"", s),
             LValue::Number(n) => write!(f, "{}", n),
             LValue::True => write!(f, "{}", TRUE),
             LValue::List(list) => {
@@ -264,7 +265,7 @@ impl Display for LValue {
             }
             LValue::AsyncFn(fun) => write!(f, "{}", fun.get_label()),
             LValue::Handler(_) => write!(f, "{}", HANDLER),
-            LValue::Err(e) => write!(f, "err: {}", e),
+            LValue::Err(e) => write!(f, "[err {}]", e),
         }
     }
 }

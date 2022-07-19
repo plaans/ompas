@@ -111,6 +111,8 @@ pub const DOC_HELP: &str =
 pub const DOC_HELP_VERBOSE: &str = "takes 0..1 arguments:\
                             -no argument: give the list of all the functions\n\
                             -1 argument: give the documentation of the function.";
+
+//UTILS
 pub const ARBITRARY: &str = "arbitrary";
 pub const RAND_ELEMENT: &str = "rand-element";
 pub const ENUMERATE: &str = "enumerate";
@@ -118,6 +120,7 @@ pub const CONTAINS: &str = "contains";
 pub const SUB_LIST: &str = "sublist";
 pub const QUOTE_LIST: &str = "quote-list";
 pub const TRANSFORM_IN_SINGLETON_LIST: &str = "transform-in-singleton-list";
+pub const SLEEP: &str = "sleep";
 
 pub const LET: &str = "let";
 pub const LET_STAR: &str = "let*";
@@ -240,6 +243,7 @@ pub const DOC_SET_MAP_VERBOSE: &str = "Example: Here is an example in the repl\n
                                     \tthree: 3\n\
                                     \ttwenty: 20";
 
+//PREDICATES
 pub const IS_NUMBER: &str = "number?";
 pub const IS_FLOAT: &str = "float?";
 pub const IS_INT: &str = "int?";
@@ -254,6 +258,7 @@ pub const IS_LAMBDA: &str = "lambda?";
 pub const IS_QUOTE: &str = "quote?";
 pub const IS_PAIR: &str = "pair?";
 pub const IS_EQUAL: &str = "equal?";
+pub const IS_INTERRUPTED: &str = "interrupted?";
 
 pub const IS_NIL: &str = "null?";
 

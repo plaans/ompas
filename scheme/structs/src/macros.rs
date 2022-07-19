@@ -13,6 +13,16 @@ macro_rules! err {
 }
 
 #[macro_export]
+macro_rules! interrupted {
+    () => {
+        LValue::Err(std::sync::Arc::new(list![INTERRUPTED.into()]))
+    };
+    ($($x:expr),*) => {
+        LValue::Err(std::sync::Arc::new(list![INTERRUPTED.into(), $($x),*]))
+    }
+}
+
+#[macro_export]
 macro_rules! string {
     ($x:expr) => {
         LValue::String(std::sync::Arc::new($x.to_string()))

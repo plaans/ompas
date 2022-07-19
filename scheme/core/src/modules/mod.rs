@@ -206,6 +206,7 @@ impl IntoModule for CtxRoot {
         module.add_fn_prelude(ERR, err);
         module.add_fn_prelude(IS_ERR, is_err);
         module.add_fn_prelude(CHECK, check);
+        module.add_fn_prelude(IS_INTERRUPTED, is_interrupted);
         module
     }
 

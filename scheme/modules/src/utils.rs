@@ -15,6 +15,7 @@
 //! ```
 
 use aries_utils::StreamingIterator;
+use futures::FutureExt;
 use rand::Rng;
 use sompas_core::eval;
 use sompas_core::modules::list::car;
@@ -23,15 +24,19 @@ use sompas_macros::async_scheme_fn;
 use sompas_macros::scheme_fn;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::{Documentation, LHelp};
+use sompas_structs::lasynchandler::LAsyncHandler;
 use sompas_structs::lcoreoperator::LCoreOperator;
 use sompas_structs::lenv::LEnv;
+use sompas_structs::lfuture::FutureResult;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
+use sompas_structs::lswitch::new_interruption_handler;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
-use sompas_structs::{list, lruntimeerror};
+use sompas_structs::{interrupted, list, lruntimeerror};
 use std::ops::Deref;
+use std::time::Duration;
 
 //LANGUAGE
 pub const MOD_UTILS: &str = "utils";
@@ -310,6 +315,7 @@ impl IntoModule for CtxUtils {
         module.add_fn_prelude(SUB_LIST, sublist);
         module.add_fn_prelude(TRANSFORM_IN_SINGLETON_LIST, transform_in_singleton_list);
         module.add_fn_prelude(QUOTE_LIST, quote_list);
+        module.add_async_fn_prelude(SLEEP, sleep);
 
         module
     }
@@ -515,6 +521,28 @@ pub fn transform_in_singleton_list(args: &[LValue]) -> Vec<LValue> {
     args.iter()
         .map(|lv| list![lv.clone()])
         .collect::<Vec<LValue>>()
+}
+
+#[async_scheme_fn]
+pub async fn sleep(n: LNumber) -> LAsyncHandler {
+    let (tx, mut rx) = new_interruption_handler();
+    let f: FutureResult = Box::pin(async move {
+        let duration = Duration::from_micros((f64::from(&n) * 1_000_000.0) as u64);
+        tokio::select! {
+            _ = rx.recv() => {
+                Ok(interrupted!())
+            }
+            _ = tokio::time::sleep(duration) => {
+                Ok(LValue::Nil)
+            }
+        }
+    }) as FutureResult;
+    let f = f.shared();
+
+    let f2 = f.clone();
+    tokio::spawn(async move { f2.await });
+
+    LAsyncHandler::new(f, tx)
 }
 
 #[cfg(test)]

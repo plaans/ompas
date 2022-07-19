@@ -1,6 +1,6 @@
 use crate::ctx_planning::CtxPlanning;
 use log::{error, info, warn};
-use monitor::task_check_monitor;
+use monitor::task_check_wait_for;
 use ompas_rae_language::RAE_LAUNCH_PLATFORM;
 use ompas_rae_planning::conversion::convert_domain_to_chronicle_hierarchy;
 use ompas_rae_planning::structs::{ConversionCollection, ConversionContext};
@@ -59,7 +59,7 @@ pub async fn rae_run(mut context: RAEContext, options: &RAEOptions, _log: String
     let receiver_event_update_state = context.state.subscribe_on_update().await;
     let env_check_wait_on = context.get_exec_env().await;
     tokio::spawn(async move {
-        task_check_monitor(receiver_event_update_state, env_check_wait_on).await
+        task_check_wait_for(receiver_event_update_state, env_check_wait_on).await
     });
 
     let mut select_mode = *options.get_select_mode();

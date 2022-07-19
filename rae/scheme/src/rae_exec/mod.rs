@@ -624,23 +624,31 @@ async fn get_status<'a>(_: &'a [LValue], env: &'a LEnv) -> LResult {
 }*/
 
 #[async_scheme_fn]
-async fn wait_for(env: &LEnv, args: &[LValue]) -> LResult {
+async fn wait_for(env: &LEnv, lv: &LValue) -> LResult {
     //info!("wait on function");
     //println!("wait on function with {} args", args.len());
     /*pub const MACRO_WAIT_ON: &str = "(defmacro monitor (lambda (expr)
     `(if (not (eval ,expr))
         (monitor ,expr))))";*/
 
-    if args.len() != 1 {
+    /*if args.len() != 1 {
         return Err(wrong_n_args!(RAE_MONITOR, args, 1));
-    }
+    }*/
 
-    if let LValue::True = eval(&args[0], &mut env.clone(), None).await? {
+    //println!("wait-for: {}", lv);
+
+    if let LValue::True = eval(lv, &mut env.clone(), None).await.unwrap() {
+        //println!("wait-for: {} is already true", lv);
     } else {
-        let mut rx = add_waiter(args[0].clone()).await;
+        //println!("wait-for: {} not true yet", lv);
+        let handler = add_waiter(lv.clone()).await;
         //println!("receiver ok");
 
-        if let false = rx.recv().await.expect("could not receive msg from waiters") {
+        if let false = handler
+            .recv()
+            .await
+            .expect("could not receive msg from waiters")
+        {
             unreachable!("should not receive false from waiters")
         }
         //println!("end wait on");

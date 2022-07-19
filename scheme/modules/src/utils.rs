@@ -264,6 +264,15 @@ pub const LAMBDA_RETRY_ONCE: &str = "(define retry-once (lambda (e)
             (eval e)
             __r__))))";
 
+pub const LAMBDA_ASYNC_INTERRUPT: &str = "(define await-interrupt
+    (lambda (__h__)
+    (u! 
+        (begin
+            (define __r__ (i! (await __h__)))
+            (if (interrupted? __r__)
+                (interrupt __h__)
+                __r__)))))";
+
 #[derive(Default, Copy, Clone, Debug)]
 pub struct CtxUtils {}
 
@@ -302,6 +311,7 @@ impl IntoModule for CtxUtils {
                 LAMBDA_PAR,
                 LAMBDA_REPEAT,
                 LAMBDA_RETRY_ONCE,
+                LAMBDA_ASYNC_INTERRUPT,
             ]
             .into(),
             label: MOD_UTILS.into(),
@@ -528,11 +538,21 @@ pub async fn sleep(n: LNumber) -> LAsyncHandler {
     let (tx, mut rx) = new_interruption_handler();
     let f: FutureResult = Box::pin(async move {
         let duration = Duration::from_micros((f64::from(&n) * 1_000_000.0) as u64);
+
+        let sleep = tokio::time::sleep(duration).shared();
+        let sleep_2 = sleep.clone();
         tokio::select! {
-            _ = rx.recv() => {
-                Ok(interrupted!())
+            r = rx.recv() => {
+                if r {
+                    println!("sleep interrupted: {}", r);
+                    Ok(interrupted!())
+                }else {
+                    println!("handler closed");
+                    sleep_2.await;
+                    Ok(LValue::Nil)
+                }
             }
-            _ = tokio::time::sleep(duration) => {
+            _ = sleep => {
                 Ok(LValue::Nil)
             }
         }

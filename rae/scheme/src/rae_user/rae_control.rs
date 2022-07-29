@@ -1,14 +1,16 @@
 use crate::rae_user::{CtxRae, MOD_RAE};
-use ompas_rae_core::rae_run;
+use ompas_rae_core::{rae_run, TOKIO_CHANNEL_SIZE};
 use ompas_rae_language::*;
 use ompas_rae_structs::job::{Job, JobType};
 use ompas_rae_structs::options::*;
 use ompas_rae_structs::options::{Planner, RAEOptions, SelectMode};
 use sompas_macros::*;
+use sompas_structs::lasynchandler::LAsyncHandler;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
+use tokio::sync::mpsc;
 
 /// Launch main loop of rae in an other asynchronous task.
 #[async_scheme_fn]
@@ -79,15 +81,17 @@ pub fn trigger_event() -> &str {
 }
 
 /// Sends via a channel a task to execute.
-#[scheme_fn]
-pub fn trigger_task(env: &LEnv, args: &[LValue]) {
+#[async_scheme_fn]
+pub async fn trigger_task(env: &LEnv, args: &[LValue]) -> LAsyncHandler {
     let env = env.clone();
 
     let ctx = env.get_context::<CtxRae>(MOD_RAE).unwrap();
-
-    let job = Job::new(args.into(), JobType::Task);
+    let (tx, mut rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+    let job = Job::new(tx, args.into(), JobType::Task);
     let sender = ctx.sender_to_rae.clone().unwrap();
     tokio::spawn(async move {
         sender.send(job).await.expect("could not task job to rae");
     });
+
+    rx.recv().await.unwrap()
 }

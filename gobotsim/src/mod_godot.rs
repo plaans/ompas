@@ -259,7 +259,7 @@ async fn start_godot(env: &LEnv, args: &[LValue]) -> LResult {
 #[async_scheme_fn]
 async fn exec_godot(env: &LEnv, args: &[LValue]) -> LResult {
     let ctx = env.get_context::<CtxGodot>(MOD_GODOT).unwrap();
-    let (id, _) = ctx.agenda.add_action(args.into(), 0).await;
+    let (id, _) = ctx.agenda.add_action(args.into(), None).await;
     ctx.platform.read().await.exec_command(args, id).await
 }
 

@@ -53,3 +53,22 @@
 (define wait-for (lambda (e)
     (u! 
         (await-interrupt (__wait-for__ e)))))
+
+(await
+    (race
+        (begin
+            (await (sleep 1))
+            (await (sleep 2))
+        )
+        (await (sleep 4))
+    )
+)
+
+(do
+    (define h (sleep 1))
+    (print 1)
+    (await (sleep 2))
+    (print 2)
+    (await h)
+    (print 3)
+)

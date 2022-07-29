@@ -29,3 +29,7 @@ macro_rules_attribute = "0.0.2"
 [[bin]]
 name = "gobot-rae"
 path = "src/bin/gobot_rae.rs"
+
+[[bin]]
+name = "gobot-benchmark"
+path = "src/bin/benchmark.rs"

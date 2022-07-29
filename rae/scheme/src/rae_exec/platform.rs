@@ -30,10 +30,9 @@ pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LAsyncHandler {
 
     let f = (Box::pin(async move {
         let args = args.as_slice();
-        let parent_task: usize = env
+        let parent_task: Option<usize> = env
             .get_ref_symbol(PARENT_TASK)
-            .map(|n| LNumber::try_from(n).unwrap().into())
-            .unwrap();
+            .map(|n| LNumber::try_from(n).unwrap().into());
         let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
         let (action_id, mut rx) = ctx.agenda.add_action(args.into(), parent_task).await;
         let debug: LValue = args.into();

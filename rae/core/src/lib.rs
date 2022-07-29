@@ -1,4 +1,5 @@
 use crate::ctx_planning::CtxPlanning;
+use futures::FutureExt;
 use log::{error, info, warn};
 use monitor::task_check_wait_for;
 use ompas_rae_language::RAE_LAUNCH_PLATFORM;
@@ -8,9 +9,12 @@ use ompas_rae_structs::context::RAEContext;
 use ompas_rae_structs::options::SelectMode::Planning;
 use ompas_rae_structs::options::{RAEOptions, SelectMode};
 use sompas_core::{eval, eval_init};
+use sompas_structs::lasynchandler::LAsyncHandler;
 use sompas_structs::lenv::ImportType::WithoutPrefix;
 use sompas_structs::lenv::LEnv;
+use sompas_structs::lfuture::FutureResult;
 use sompas_structs::lnumber::*;
+use sompas_structs::lswitch::new_interruption_handler;
 use sompas_structs::lvalue::LValue;
 use std::mem;
 use std::ops::Deref;
@@ -112,11 +116,15 @@ pub async fn rae_run(mut context: RAEContext, options: &RAEOptions, _log: String
 
             let mut new_env = env.clone();
 
-            tokio::spawn(async move {
-                let job_lvalue = job.core;
-                info!("new triggered task: {}", job_lvalue);
-                //info!("LValue to be evaluated: {}", job_lvalue);
-                match eval(&job_lvalue, &mut new_env, None).await {
+            let job_lvalue = job.core;
+            info!("new triggered task: {}", job_lvalue);
+            //info!("LValue to be evaluated: {}", job_lvalue);
+
+            let (tx, rx) = new_interruption_handler();
+
+            let future = (Box::pin(async move {
+                let result = eval(&job_lvalue, &mut new_env, Some(rx)).await;
+                match &result {
                     Ok(lv) => info!(
                         "result of task {}: {}",
                         job_lvalue,
@@ -134,7 +142,19 @@ pub async fn rae_run(mut context: RAEContext, options: &RAEOptions, _log: String
                     ),
                     Err(e) => error!("Error in asynchronous task: {}", e),
                 }
-            });
+
+                result
+            }) as FutureResult)
+                .shared();
+
+            let f2 = future.clone();
+
+            tokio::spawn(f2);
+
+            job.sender
+                .send(LAsyncHandler::new(future, tx))
+                .await
+                .expect("");
         }
     }
 }

@@ -306,13 +306,24 @@ impl Agenda {
     pub async fn add_action(
         &self,
         action: LValue,
-        parent_task: usize,
+        parent_task: Option<usize>,
     ) -> (TaskId, watch::Receiver<TaskStatus>) {
         let task_id = self.get_next_id();
         let start = self.time_reference.elapsed().as_micros();
+        let mut parent = false;
+        let parent_task = match parent_task {
+            None => task_id,
+            Some(id) => {
+                parent = true;
+                id
+            }
+        };
+
         let (action, rx) = ActionMetaData::new(task_id, parent_task, action, start);
         self.trc.insert(task_id, action).await;
-        self.tn.add_task_to_parent(parent_task, task_id).await;
+        if parent {
+            self.tn.add_task_to_parent(parent_task, task_id).await;
+        }
         (task_id, rx)
     }
 

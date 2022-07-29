@@ -37,7 +37,6 @@ use sompas_structs::purefonction::PureFonctionCollection;
 use sompas_structs::{interrupted, list, lruntimeerror};
 use std::ops::Deref;
 use std::time::Duration;
-use tokio::pin;
 
 //LANGUAGE
 pub const MOD_UTILS: &str = "utils";

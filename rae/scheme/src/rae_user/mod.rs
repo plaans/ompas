@@ -118,7 +118,7 @@ impl IntoModule for CtxRae {
 
         //Trigger task
         module.add_fn_prelude(RAE_TRIGGER_EVENT, trigger_event);
-        module.add_fn_prelude(RAE_TRIGGER_TASK, trigger_task);
+        module.add_async_fn_prelude(RAE_TRIGGER_TASK, trigger_task);
         module.add_async_fn_prelude(RAE_GET_MUTEXES, get_mutexes);
         module.add_async_fn_prelude(RAE_GET_MONITORS, get_monitors);
 

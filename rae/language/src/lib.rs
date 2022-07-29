@@ -281,7 +281,7 @@ pub const MACRO_GENERATE_ACTION: &str = "(defmacro generate-action
              `(list ,label
                  (quote ,p_expr)
                  (lambda ,params
-                    ,(cons 'rae-exec-command (cons `(quote ,label) params)))))))";
+                    (await ,(cons 'rae-exec-command (cons `(quote ,label) params))))))))";
 
 pub const MACRO_GENERATE_ACTION_MODEL: &str = "
 (defmacro generate-action-model

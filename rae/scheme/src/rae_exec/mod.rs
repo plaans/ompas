@@ -107,7 +107,7 @@ impl Platform {
     }
 
     /// Returns the RAE domain of the platform.
-    pub async fn domain(&self) -> &'static str {
+    pub async fn domain(&self) -> String {
         self.inner.read().await.domain().await
     }
 
@@ -258,7 +258,7 @@ pub trait RAEInterface: Any + Send + Sync {
     async fn open_com(&mut self, args: &[LValue]) -> LResult;
 
     /// Returns the RAE domain of the platform.
-    async fn domain(&self) -> &'static str;
+    async fn domain(&self) -> String;
 
     async fn instance(&self, args: &[LValue]) -> LResult;
 
@@ -289,8 +289,8 @@ impl RAEInterface for () {
         Ok(Nil)
     }
 
-    async fn domain(&self) -> &'static str {
-        ""
+    async fn domain(&self) -> String {
+        "".to_string()
     }
 
     async fn instance(&self, _args: &[LValue]) -> LResult {

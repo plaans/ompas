@@ -45,6 +45,7 @@ impl Default for CtxGodot {
             state: state.clone(),
             instance: Default::default(),
             agenda: agenda.clone(),
+            domain: "/home/jeremy/CLionProjects/ompas/gobotsim/godot_domain/domain.lisp".into(),
         }));
         Self {
             state,

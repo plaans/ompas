@@ -65,7 +65,9 @@ pub async fn lisp_interpreter(log: Option<PathBuf>, godot: bool, rae_log: bool) 
         li.import_namespace(CtxGodot::default());
     } else {
         let ctx_rae = CtxRae::init_ctx_rae(
-            Some(Platform::new(PlatformGodot::default())),
+            Some(Platform::new(PlatformGodot::new(
+                "/home/jeremy/CLionProjects/ompas/gobotsim/godot_domain/domain.lisp".into(),
+            ))),
             log.clone(),
             rae_log,
         )

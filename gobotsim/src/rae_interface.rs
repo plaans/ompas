@@ -23,10 +23,11 @@ use sompas_utils::task_handler;
 use std::borrow::Borrow;
 use std::convert::TryInto;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Arc;
-use std::thread;
 use std::time::Duration;
+use std::{fs, thread};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{mpsc, RwLock};
 
@@ -85,6 +86,20 @@ pub struct PlatformGodot {
     pub state: WorldState,
     pub instance: Instance,
     pub agenda: Agenda,
+    pub domain: PathBuf,
+}
+
+impl PlatformGodot {
+    pub fn new(domain: PathBuf) -> Self {
+        PlatformGodot {
+            socket_info: Default::default(),
+            sender_socket: None,
+            state: Default::default(),
+            instance: Default::default(),
+            agenda: Default::default(),
+            domain,
+        }
+    }
 }
 
 impl PlatformGodot {
@@ -346,9 +361,11 @@ impl RAEInterface for PlatformGodot {
 
     /// Function returning the domain of the simulation.
     /// The domain is hardcoded.
-    async fn domain(&self) -> &'static str {
+    async fn domain(&self) -> String {
         //GODOT_DOMAIN
-        "(read godot_domain/init.lisp)"
+        fs::read_to_string(self.domain.clone()).expect("could not read domain")
+
+        //"(read godot_domain/init.lisp)"
     }
 
     //0 arg: return a map of all instances

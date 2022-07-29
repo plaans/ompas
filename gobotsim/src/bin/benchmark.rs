@@ -28,6 +28,9 @@ pub struct Opt {
 
     #[structopt(short = "a", long = "advanced")]
     advanced: bool,
+
+    #[structopt(short = "L", long = "lrpt")]
+    lrpt: bool,
 }
 
 #[tokio::main]
@@ -45,6 +48,8 @@ pub async fn lisp_interpreter(opt: Opt) {
     let mut domain_file_path = path.clone();
     if opt.advanced {
         domain_file_path.push("domain_advanced.lisp");
+    } else if opt.lrpt {
+        domain_file_path.push("domain_advanced_lrpt.lisp");
     } else {
         domain_file_path.push("domain_greedy.lisp");
     }

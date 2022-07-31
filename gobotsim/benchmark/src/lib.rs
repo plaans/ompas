@@ -25,6 +25,14 @@ impl BenchmarkData {
             n_run
         )
     }
+
+    pub fn mean_time(&self) -> Duration {
+        let mut total = Duration::from_secs(0);
+        for r in &self.runs {
+            total += r.duration;
+        }
+        total / (self.runs.len() as u32)
+    }
 }
 
 pub struct RunData {

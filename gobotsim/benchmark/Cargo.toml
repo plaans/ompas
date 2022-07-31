@@ -14,7 +14,8 @@ ompas-gobotsim = {path = ".."}
 ompas-rae-scheme = {path = "../../rae/scheme"}
 sompas-modules = {path = "../../scheme/modules"}
 sompas-repl = {path = "../../scheme/repl"}
-
+indicatif = "0.17.0"
+colored = "2.0.0"
 
 [[bin]]
 name = "gobot-benchmark"

@@ -30,10 +30,3 @@ macro_rules_attribute = "0.0.2"
 name = "gobot-rae"
 path = "src/bin/gobot_rae.rs"
 
-[[bin]]
-name = "gobot-benchmark"
-path = "src/bin/benchmark.rs"
-
-[[bin]]
-name = "gobot-benchmark-all"
-path = "src/bin/benchmark_all.rs"

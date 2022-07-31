@@ -92,10 +92,23 @@ async fn run_logger_file(mut rx: mpsc::Receiver<String>, log_path: PathBuf, disp
     file.write_all("RAE LOG\n\n".as_bytes())
         .expect("could not write to RAE log file.");
 
-    let mut logger_pid = None;
+    //let mut logger_pid = None;
 
     let mut end_receiver = subscribe_new_task();
-    let mut first = true;
+    //let mut first = true;
+
+    let child = if display {
+        Some(
+            Command::new("gnome-terminal")
+                .args(&["--title", "RAE LOG"])
+                .args(&["--", "tail", "-f", log_path.to_str().unwrap()])
+                .spawn()
+                .expect("could not spawn terminal"),
+        )
+    } else {
+        None
+    };
+
     loop {
         tokio::select! {
             str_log = rx.recv() => {
@@ -105,14 +118,10 @@ async fn run_logger_file(mut rx: mpsc::Receiver<String>, log_path: PathBuf, disp
                         break;
                     }
                     Some(str) => {
-                        if first {
+                        /*if first {
                             first = false;
-                            if display {
-                                Command::new("gnome-terminal")
-                                    .args(&["--title", "RAE LOG"])
-                                    .args(&["--", "tail", "-f", log_path.to_str().unwrap()])
-                                    .spawn()
-                                    .expect("could not spawn terminal");
+
+
 
                                 tokio::time::sleep(Duration::from_millis(2000)).await;
                                 let result = Command::new("pidof")
@@ -133,19 +142,23 @@ async fn run_logger_file(mut rx: mpsc::Receiver<String>, log_path: PathBuf, disp
                                     None
                                 };
                             }
-                        }
+                        }*/
                         file.write_all(format!("{}\n", str).as_bytes()).expect("could not write to RAE log file");
                     }
                 }
             }
             _ = end_receiver.recv() => {
-                if let Some(pid) = logger_pid {
+                if let Some(mut child) = child {
+                    child.kill();
+                }
+
+                /*if let Some(pid) = logger_pid {
                     Command::new("kill")
                     .args(&["-9", pid.as_str()]).spawn()
                     .expect("Command failed.");
                 } else {
                     println!("Could not kill terminal of RAE LOG...");
-                }
+                }*/
                 println!("Process RAE LOG killed.");
                 break;
             }

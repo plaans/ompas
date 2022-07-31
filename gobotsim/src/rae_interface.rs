@@ -22,9 +22,11 @@ use sompas_structs::{lruntimeerror, wrong_n_args, wrong_type};
 use sompas_utils::task_handler;
 use std::borrow::Borrow;
 use std::convert::TryInto;
+use std::fs::File;
 use std::net::SocketAddr;
+use std::os::unix::io::{FromRawFd, IntoRawFd};
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::sync::Arc;
 use std::time::Duration;
 use std::{fs, thread};
@@ -82,17 +84,43 @@ impl Instance {
 #[derive(Default, Clone)]
 pub struct PlatformGodot {
     pub socket_info: SocketInfo,
+    pub headless: bool,
     pub sender_socket: Option<Sender<String>>,
     pub state: WorldState,
     pub instance: Instance,
     pub agenda: Agenda,
-    pub domain: PathBuf,
+    pub domain: GodotDomain,
+}
+
+#[derive(Clone)]
+pub enum GodotDomain {
+    Lisp(String),
+    Path(PathBuf),
+}
+
+impl Default for GodotDomain {
+    fn default() -> Self {
+        Self::Lisp("".to_string())
+    }
+}
+
+impl From<String> for GodotDomain {
+    fn from(s: String) -> Self {
+        Self::Lisp(s)
+    }
+}
+
+impl From<PathBuf> for GodotDomain {
+    fn from(p: PathBuf) -> Self {
+        Self::Path(p)
+    }
 }
 
 impl PlatformGodot {
-    pub fn new(domain: PathBuf) -> Self {
+    pub fn new(domain: GodotDomain, headless: bool) -> Self {
         PlatformGodot {
             socket_info: Default::default(),
+            headless,
             sender_socket: None,
             state: Default::default(),
             instance: Default::default(),
@@ -224,17 +252,31 @@ impl RAEInterface for PlatformGodot {
 
     /// Start the platform (start the godot process and launch the simulation)
     async fn start_platform(&mut self, args: &[LValue]) -> LResult {
-        match args.len() {
+        let godot = match self.headless {
+            true => "godot3-headless",
+            false => "godot3",
+        };
+
+        let bash = "gnome-terminal";
+        //let bash = "bash";
+
+        let f1 = File::create("gobotsim.log").expect("couldn't create file");
+        let f2 = File::create("gobotsim.log").expect("couldn't create file");
+
+        let mut child = match args.len() {
             //default settings
             0 => {
-                Command::new("gnome-terminal")
-                    .args(&["--title", "GODOT 3 Terminal"])
-                    .arg("--")
-                    .arg("godot3")
+                //Command::new(bash)
+                //.args(&["--title", "GODOT 3 Terminal"])
+                //.arg("--")
+                //.arg(godot)
+                Command::new(godot)
                     .arg("--path")
                     .arg(DEFAULT_PATH_PROJECT_GODOT)
+                    .stdout(unsafe { Stdio::from_raw_fd(f1.into_raw_fd()) })
+                    .stderr(unsafe { Stdio::from_raw_fd(f2.into_raw_fd()) })
                     .spawn()
-                    .expect("failed to execute process");
+                    .expect("failed to execute process")
             }
             1 => {
                 if let LValue::Symbol(s) = &args[0] {
@@ -243,12 +285,16 @@ impl RAEInterface for PlatformGodot {
                         s,
                         s.split_whitespace().count()
                     );*/
-                    Command::new("gnome-terminal")
-                        .arg("--")
-                        .arg("godot3")
+                    //Command::new(bash)
+                    //.args(&["--title", "GODOT 3 Terminal"])
+                    //.arg("--")
+                    //.arg(godot)
+                    Command::new(godot)
                         .args(s.split_whitespace())
+                        .stdout(unsafe { Stdio::from_raw_fd(f1.into_raw_fd()) })
+                        .stderr(unsafe { Stdio::from_raw_fd(f2.into_raw_fd()) })
                         .spawn()
-                        .expect("failed to execute process");
+                        .expect("failed to execute process")
                 } else {
                     return Err(wrong_type!(
                         "PlatformGodot::start_platform",
@@ -266,10 +312,10 @@ impl RAEInterface for PlatformGodot {
             } //Unexpected number of arguments
         };
 
-        tokio::spawn(async {
-            tokio::time::sleep(Duration::from_millis(1000)).await;
+        tokio::spawn(async move {
+            /*tokio::time::sleep(Duration::from_millis(1000)).await;
             let result = Command::new("pidof")
-                .arg("godot3")
+                .arg(godot)
                 .output()
                 .expect("could not run command.");
             let pids = String::from_utf8(result.stdout).expect("could not convert into string");
@@ -284,7 +330,7 @@ impl RAEInterface for PlatformGodot {
                 Some(logger_pid)
             } else {
                 None
-            };
+            };*/
 
             //blocked on the reception of the end signal.
             task_handler::subscribe_new_task()
@@ -292,12 +338,14 @@ impl RAEInterface for PlatformGodot {
                 .await
                 .expect("could not receive from task handler");
 
-            if let Some(pid) = logger_pid {
+            /*if let Some(pid) = logger_pid {
                 Command::new("kill")
                     .args(&["-9", pid.as_str()])
                     .spawn()
                     .expect("Command failed.");
-            }
+            }*/
+
+            child.kill();
             println!("process godot killed")
         });
         Ok(LValue::Nil)
@@ -363,9 +411,11 @@ impl RAEInterface for PlatformGodot {
     /// The domain is hardcoded.
     async fn domain(&self) -> String {
         //GODOT_DOMAIN
-        fs::read_to_string(self.domain.clone()).expect("could not read domain")
 
-        //"(read godot_domain/init.lisp)"
+        match &self.domain {
+            GodotDomain::Lisp(l) => l.clone(),
+            GodotDomain::Path(p) => fs::read_to_string(p).expect("could not read domain"),
+        }
     }
 
     //0 arg: return a map of all instances

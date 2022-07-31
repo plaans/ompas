@@ -1,3 +1,4 @@
+use ompas_gobotsim::rae_interface::GodotDomain;
 use ompas_gobotsim::rae_interface::PlatformGodot;
 use ompas_rae_scheme::rae_exec::Platform;
 use ompas_rae_scheme::rae_user::CtxRae;
@@ -31,6 +32,9 @@ pub struct Opt {
 
     #[structopt(short = "L", long = "lrpt")]
     lrpt: bool,
+
+    #[structopt(short = "v", long = "view")]
+    view: bool,
 }
 
 #[tokio::main]
@@ -45,17 +49,10 @@ async fn main() {
 
 pub async fn lisp_interpreter(opt: Opt) {
     let path = fs::canonicalize(opt.domain.clone()).expect("path to domain is unvalid");
-    let mut domain_file_path = path.clone();
-    if opt.advanced {
-        domain_file_path.push("domain_advanced.lisp");
-    } else if opt.lrpt {
-        domain_file_path.push("domain_advanced_lrpt.lisp");
-    } else {
-        domain_file_path.push("domain_greedy.lisp");
-    }
+
     println!("domain: {:?}", path);
-    let problem = match opt.problem {
-        Some(p) => p,
+    let problem = match &opt.problem {
+        Some(p) => p.clone(),
         None => {
             println!("Searching for problem files...");
             let mut problem_path = path.clone();
@@ -107,7 +104,7 @@ pub async fn lisp_interpreter(opt: Opt) {
     };
 
     let ctx_rae = CtxRae::init_ctx_rae(
-        Some(Platform::new(PlatformGodot::new(domain_file_path.clone()))),
+        Some(Platform::new(PlatformGodot::new(domain(&opt), !opt.view))),
         Some(log.clone()),
         false,
     )
@@ -115,8 +112,7 @@ pub async fn lisp_interpreter(opt: Opt) {
     li.import_namespace(ctx_rae);
 
     let mut com: ChannelToLispInterpreter = li.subscribe();
-    /*let domain_lisp = fs::read_to_string(domain_file_path.clone())
-    .expect("Something went wrong reading the file");*/
+
     let problem_lisp =
         fs::read_to_string(problem.clone()).expect("Something went wrong reading the file");
 
@@ -137,18 +133,26 @@ pub async fn lisp_interpreter(opt: Opt) {
 
     println!("bench: task ends");
     let problem_name = problem.file_name().unwrap().to_str().unwrap();
-    let domain_name = domain_file_path.file_name().unwrap().to_str().unwrap();
     let problem_name = problem_name.replace(".lisp", "");
-    let domain_name = domain_name.replace(".lisp", "");
-    com.send(format!("(export-stats {}_{}s)", domain_name, problem_name,))
-        .await
-        .expect("could not send to LI");
+    com.send(format!(
+        "(export-stats gobot-sim_{}_{})",
+        if opt.advanced {
+            "advanced"
+        } else if opt.lrpt {
+            "lrpt"
+        } else {
+            "greedy"
+        },
+        problem_name
+    ))
+    .await
+    .expect("could not send to LI");
 
     com.send("exit".to_string())
         .await
         .expect("could not send to LI");
 
-    for i in 0..6 {
+    for _ in 0..6 {
         com.recv().await;
     }
     /*while com.recv().await.is_some() {
@@ -156,7 +160,34 @@ pub async fn lisp_interpreter(opt: Opt) {
     }*/
 
     println!(
-        "end of the benchmark of li for {} of domain {}",
-        problem_name, domain_name
+        "end of the benchmark :  {} for domain gobot-sim",
+        problem_name
     );
+}
+
+pub fn domain(opt: &Opt) -> GodotDomain {
+    let domain = opt.domain.clone();
+    let mut actions = domain.clone();
+    actions.push("actions.lisp");
+    let mut state_functions = domain.clone();
+    state_functions.push("state_functions.lisp");
+    let mut om = domain.clone();
+    om.push(if opt.advanced {
+        "jobshop_advanced.lisp"
+    } else if opt.lrpt {
+        "jobshop_advanced_lrpt.lisp"
+    } else {
+        "jobshop_greedy.lisp"
+    });
+
+    format!(
+        "(begin
+        (read {})
+    (read {})
+    (read {}))",
+        actions.to_str().unwrap(),
+        state_functions.to_str().unwrap(),
+        om.to_str().unwrap()
+    )
+    .into()
 }

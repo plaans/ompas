@@ -15,6 +15,7 @@ use sompas_structs::lvalue::LValue;
 use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
 use sompas_structs::{lruntimeerror, wrong_type};
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 /*
@@ -41,11 +42,15 @@ impl Default for CtxGodot {
         let agenda = Agenda::default();
         let platform = Arc::new(RwLock::new(PlatformGodot {
             socket_info: Default::default(),
+            headless: false,
             sender_socket: None,
             state: state.clone(),
             instance: Default::default(),
             agenda: agenda.clone(),
-            domain: "/home/jeremy/CLionProjects/ompas/gobotsim/godot_domain/domain.lisp".into(),
+            domain: PathBuf::from(
+                "/home/jeremy/CLionProjects/ompas/gobotsim/godot_domain/domain.lisp",
+            )
+            .into(),
         }));
         Self {
             state,

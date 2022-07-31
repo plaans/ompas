@@ -1,0 +1,25 @@
+[package]
+name = "gobot-sim-benchmark"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = { version = "1.17.0", features = ["full", "time"] }
+lettre = "0.10"
+yaml-rust = "0.4"
+structopt = { version = "0.3", default-features = false }
+ompas-gobotsim = {path = ".."}
+ompas-rae-scheme = {path = "../../rae/scheme"}
+sompas-modules = {path = "../../scheme/modules"}
+sompas-repl = {path = "../../scheme/repl"}
+
+
+[[bin]]
+name = "gobot-benchmark"
+path = "src/bin/benchmark.rs"
+
+[[bin]]
+name = "gobot-benchmark-all"
+path = "src/bin/benchmark_all.rs"

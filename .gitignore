@@ -7,3 +7,5 @@ venv/
 lisp_logs/
 rae_logs/
 Cargo.lock
+email.yml
+*.log

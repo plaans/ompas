@@ -70,7 +70,7 @@ impl MonitorCollection {
                         //info!("Wait on {} is now true.", lambda);
                         drop(lambda);
                         let waiter = waiters.map.remove(id).unwrap();
-                        waiter.channel.send(true);
+                        waiter.channel.send(true).expect("");
                         //.expect("could not send true message to waiter");
                         //item_to_remove.push(*id);
                     } else {

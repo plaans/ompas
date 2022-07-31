@@ -11,7 +11,7 @@ use sompas_utils::task_handler::{subscribe_new_task, EndSignal};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
-use std::{env, fs};
+use std::{env, fs, result};
 use tokio::sync::broadcast;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
@@ -129,6 +129,7 @@ impl LispInterpreter {
         eval_init(&mut self.env).await;
 
         let channel_with_log = self.subscribe();
+        let id_log = channel_with_log.id;
 
         let handle_log = spawn_log(channel_with_log, log).await;
         let handle_repl = if self.config.repl {
@@ -153,23 +154,27 @@ impl LispInterpreter {
             }
 
             match parse(str_lvalue.as_str(), &mut self.env).await {
-                Ok(lv) => match eval(&lv, &mut self.env, None).await {
-                    Ok(lv) => {
-                        self.li_channel
-                            .send(&id_subscriber, lv.format(0))
-                            .await
-                            .expect("error on channel to stdout");
-                    }
-                    Err(e) => {
-                        self.li_channel
-                            .send(&id_subscriber, format!("error: {}", e))
-                            .await
-                            .expect("error on channel to stdout");
-                    }
-                },
-                Err(e) => {
+                Ok(lv) => {
+                    let result = eval(&lv, &mut self.env, None).await;
+
+                    let string = match result {
+                        Ok(lv) => lv.format(0),
+                        Err(e) => {
+                            format!("error: {}", e)
+                        }
+                    };
+                    self.li_channel.send(&id_log, string.clone());
                     self.li_channel
-                        .send(&id_subscriber, format!("error: {}", e))
+                        .send(&id_subscriber, string)
+                        .await
+                        .expect("error on channel to stdout");
+                }
+                Err(e) => {
+                    let msg = format!("error: {}", e);
+                    self.li_channel.send(&id_log, msg.clone());
+
+                    self.li_channel
+                        .send(&id_subscriber, msg)
                         .await
                         .expect("error on channel to stdout");
                 }

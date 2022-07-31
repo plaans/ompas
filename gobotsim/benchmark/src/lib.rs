@@ -16,13 +16,16 @@ impl BenchmarkData {
 
         let n_run = self.runs.len();
 
+        let seconds = total_duration.as_secs() % 60;
+        let minutes = (total_duration.as_secs() / 60) % 60;
+        let hours = (total_duration.as_secs() / 60) / 60;
+
         format!(
             "GOBOT-SIM BENCHMARK\n\
-            \t-total time: {}\n\
+            \t-total time: {}:{}:{}\n\
             \t-number of runs: {}\
         ",
-            total_duration.as_secs(),
-            n_run
+            hours, minutes, seconds, n_run
         )
     }
 

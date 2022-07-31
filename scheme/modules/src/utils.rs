@@ -547,7 +547,7 @@ pub async fn sleep(n: LNumber) -> LAsyncHandler {
                 Ok(interrupted!())
             }
             _ = tokio::time::sleep(duration) => {
-                println!("sleep terminated");
+                //println!("sleep terminated");
                 Ok(LValue::Nil)
             }
         }

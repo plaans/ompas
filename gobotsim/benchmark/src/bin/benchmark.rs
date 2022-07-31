@@ -10,8 +10,10 @@ use sompas_repl::lisp_interpreter::{
     ChannelToLispInterpreter, LispInterpreter, LispInterpreterConfig,
 };
 use std::path::PathBuf;
+use std::time::Duration;
 use std::{env, fs};
 use structopt::StructOpt;
+use tokio::select;
 
 pub const TOKIO_CHANNEL_SIZE: usize = 65_384;
 
@@ -35,6 +37,9 @@ pub struct Opt {
 
     #[structopt(short = "v", long = "view")]
     view: bool,
+
+    #[structopt(short = "t", long = "time")]
+    time: Option<usize>,
 }
 
 #[tokio::main]
@@ -124,12 +129,31 @@ pub async fn lisp_interpreter(opt: Opt) {
     //tokio::time::sleep(Duration::from_secs(time)).await;
     //com.send(domain_lisp).await.expect("could not send to LI");
     com.send(problem_lisp).await.expect("could not send to LI");
+    com.recv().await;
     com.send("(launch)".to_string()).await.expect("error on LI");
+    com.recv().await;
     println!("bench: task starts");
     tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-    com.send("(await (trigger-task t_jobshop))".to_string())
-        .await
-        .expect("error on LI");
+    /*com.send("(await (trigger-task t_jobshop))".to_string())
+    .await
+    .expect("error on LI");*/
+
+    com.send(format!(
+        "(await (race (await (trigger-task t_jobshop)) (await (sleep {}))))",
+        opt.time.unwrap_or(1) * 60
+    ))
+    .await
+    .expect("error on LI");
+
+    /*select! {
+        _ = com.recv() => {
+            println!("task finished")
+        }
+        _ = tokio::time::sleep(Duration::from_secs()=> {
+            println!("Benchmark stopped before completion")
+        }
+    }*/
+    com.recv().await;
 
     println!("bench: task ends");
     let problem_name = problem.file_name().unwrap().to_str().unwrap();
@@ -148,13 +172,12 @@ pub async fn lisp_interpreter(opt: Opt) {
     .await
     .expect("could not send to LI");
 
+    com.recv().await;
     com.send("exit".to_string())
         .await
         .expect("could not send to LI");
 
-    for _ in 0..6 {
-        com.recv().await;
-    }
+    com.recv().await;
     /*while com.recv().await.is_some() {
         //println!("{}", m)
     }*/

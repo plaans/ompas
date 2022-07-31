@@ -25,6 +25,12 @@ pub struct Opt {
 
     #[structopt(short = "c", long = "config")]
     config: PathBuf,
+
+    #[structopt(short = "v", long = "view")]
+    view: bool,
+
+    #[structopt(short = "t", long = "time")]
+    time: Option<usize>,
 }
 
 fn main() {
@@ -110,9 +116,12 @@ fn main() {
                 domain_path.to_str().unwrap(),
                 "-p",
                 problem.to_str().unwrap(),
-                //"-t",
-                //time.to_string().as_str(),
             ]);
+
+            if opt.view {
+                command.arg("-v");
+            }
+            command.args(["-t", format!("{}", opt.time.unwrap_or(1)).as_str()]);
             let f1 = File::create("benchmark.log").expect("couldn't create file");
             let f2 = File::create("benchmark.log").expect("couldn't create file");
             command

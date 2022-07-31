@@ -11,6 +11,7 @@ use sompas_utils::task_handler::{subscribe_new_task, EndSignal};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
+use std::task::Poll;
 use std::{env, fs, result};
 use tokio::sync::broadcast;
 use tokio::sync::mpsc::error::SendError;

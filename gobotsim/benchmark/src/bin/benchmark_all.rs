@@ -92,13 +92,13 @@ fn main() {
     bar.set_length(n_problem.try_into().unwrap());
 
     for problem in problems {
-        let start = SystemTime::now();
         let mut runs = vec![];
         for mode in modes {
-            runs.append(&mut vec![mode; n_problem]);
+            runs.append(&mut vec![mode; number]);
         }
 
         for select in runs {
+            let start = SystemTime::now();
             if !first {
                 std::thread::sleep(Duration::from_secs(5));
             } else {
@@ -124,7 +124,7 @@ fn main() {
             let debug = format!("{:?}", command);
             if let Ok(mut c) = command.spawn() {
                 bar.println(format!(
-                    "{} {} {} with {}.",
+                    "{} {} {}, config: {}",
                     "[benchmark]".bold().green(),
                     "gobot-sim",
                     problem.file_name().unwrap().to_str().unwrap(),

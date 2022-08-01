@@ -1,3 +1,5 @@
+mod bench_config;
+
 use std::time::Duration;
 
 #[derive(Default)]

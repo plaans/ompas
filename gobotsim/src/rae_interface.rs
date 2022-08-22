@@ -155,8 +155,16 @@ impl RAEInterface for PlatformGodot {
 
     /// Executes a command on the platform. The command is sent via tcp.
     async fn exec_command(&self, args: &[LValue], command_id: usize) -> LResult {
+        let _type = {
+            if args[0] == "process".into() {
+                GodotMessageType::MachineCommand
+            } else {
+                GodotMessageType::RobotCommand
+            }
+        };
+
         let gs = GodotMessageSerde {
-            _type: GodotMessageType::RobotCommand,
+            _type,
             data: GodotMessageSerdeData::RobotCommand(SerdeRobotCommand {
                 command_info: LValue::from(args).into(),
                 temp_id: command_id,
@@ -256,9 +264,6 @@ impl RAEInterface for PlatformGodot {
             true => "godot3-headless",
             false => "godot3",
         };
-
-        let bash = "gnome-terminal";
-        //let bash = "bash";
 
         let f1 = File::create("gobotsim.log").expect("couldn't create file");
         let f2 = File::create("gobotsim.log").expect("couldn't create file");

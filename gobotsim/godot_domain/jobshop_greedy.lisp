@@ -89,6 +89,7 @@
                 (define ?r (arbitrary (instance robot) rand-element))
                 (mutex::lock-and-do ?r 11
                     (t_carry_to_machine ?r ?p ?m))
+                (process ?m ?p)
                 (await (wait-for `(= (package.location ,?p) (machine.output_belt ,?m))))))))
 
 

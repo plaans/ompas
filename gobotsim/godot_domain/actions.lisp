@@ -1,4 +1,5 @@
 (begin
+    (def-action process '(?m machine) '(?p package))
     (def-action pick '(?r robot))
     (def-action-model pick
     '((:params (?r robot))

@@ -21,6 +21,8 @@ pub enum GodotMessageType {
     DynamicState,
     #[serde(rename = "robot_command")]
     RobotCommand,
+    #[serde(rename = "machine_command")]
+    MachineCommand,
     #[serde(rename = "action_response")]
     ActionResponse,
     #[serde(rename = "action_feedback")]
@@ -47,6 +49,7 @@ impl Display for GodotMessageType {
             GodotMessageType::ActionPreempt => write!(f, "action_preempt"),
             GodotMessageType::CancelRequest => write!(f, "cancel_request"),
             GodotMessageType::ActionCancel => write!(f, "action_cancel"),
+            GodotMessageType::MachineCommand => write!(f, "machine_command"),
         }
     }
 }
@@ -66,6 +69,7 @@ impl Serialize for GodotMessageType {
             GodotMessageType::ActionPreempt => serializer.serialize_str("action_preempt"),
             GodotMessageType::CancelRequest => serializer.serialize_str("cancel_request"),
             GodotMessageType::ActionCancel => serializer.serialize_str("action_cancel"),
+            GodotMessageType::MachineCommand => serializer.serialize_str("machine_command"),
         }
     }
 }

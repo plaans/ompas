@@ -89,8 +89,13 @@
         (:score 0)
         (:body 
             (do
-                (mutex::lock-in-list-and-do (instance robot) (remaining-time ?p)
+                (define r-time (remaining-time ?p))
+                (mutex::lock-and-do ?m r-time
+                (do 
+                (mutex::lock-in-list-and-do (instance robot) r-time 
                     (t_carry_to_machine r ?p ?m))
+                    (await (sleep 0.1))
+                    (await (wait-for `(!= (package.location ,?p) (machine.input_belt ,?m))))))
                 (await (wait-for `(= (package.location ,?p) (machine.output_belt ,?m))))))))
 
 

@@ -73,9 +73,9 @@
             (:body
                 (do
                     (print "package process of " ?p " is done")
-                    (mutex::lock-in-list-and-do (instance robot) 15
-                        (t_carry_to_machine r ?p (find_output_machine))
-                    )))))
+                    (mutex::lock-in-list-and-do (instance robot) 0
+                        (t_carry_to_machine r ?p (find_output_machine)))
+                    ))))
     
     (def-task t_process_on_machine '(?p package) '(?m machine))
     (def-method m_process_on_machine
@@ -85,9 +85,16 @@
         (:score 0)
         (:body 
             (do
-                (mutex::lock-in-list-and-do (instance robot) 11
+                (mutex::lock-and-do ?m 11
+                (do
+                    (mutex::lock-in-list-and-do (instance robot) 11
                     (t_carry_to_machine r ?p ?m))
-                (await (wait-for `(= (package.location ,?p) (machine.output_belt ,?m))))))))
+                    ;(await (sleep 0.1))
+                    (process ?m ?p)
+                    ;(await (wait-for `(!= (package.location ,?p) (machine.input_belt ,?m))))
+                    ))
+                ;(await (wait-for `(= (package.location ,?p) (machine.output_belt ,?m))))
+                ))))
 
 
     (def-task t_position_robot_to_belt '(?r robot) '(?b belt))
@@ -155,7 +162,7 @@
              (loop
                  (do
                      (await (wait-for `(< (robot.battery ,?r) 0.4)))
-                     (mutex::lock-and-do ?r 50
+                     (mutex::lock-and-do ?r 1000
                         (do
                             (go_charge ?r)
                             (await (wait-for `(> (robot.battery ,?r) 0.9))))))))))

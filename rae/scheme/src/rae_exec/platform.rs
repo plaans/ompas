@@ -1,5 +1,5 @@
 use crate::rae_exec::*;
-use log::{info, warn};
+use log::{error, info, warn};
 use ompas_rae_core::ctx_planning::{CtxPlanning, MOD_PLANNING};
 use ompas_rae_core::error::RaeExecError;
 use ompas_rae_structs::state::task_status::TaskStatus;
@@ -77,7 +77,7 @@ pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LAsyncHandler {
                                         //println!("running");
                                     }
                                     TaskStatus::Failure => {
-                                        warn!("Command {} is a failure.", action_id);
+                                        error!("Command {} is a failure.", action_id);
                                         ctx.agenda.set_end_time(&action_id).await;
                                         return Ok(RaeExecError::ActionFailure.into());
                                     }

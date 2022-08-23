@@ -15,6 +15,7 @@
     (def-state-function machine.processes_list '(?m machine) '(?pl (list int)))
     (def-state-function machine.type '(?m machine) '(?mt symbol))
     (def-state-function machine.progress_rate '(?m machine) '(?pr float))
+    (def-state-function machine.package_processed '(?m machine) '(?p package))
     (def-state-function package.instance '(?p package) '(?t symbol))
     (def-state-function package.location '(?p package) '(?l symbol))
     (def-state-function package.processes_list '(?p package) '(?pl (list (tuple int float))))

@@ -149,7 +149,8 @@ async fn run_logger_file(mut rx: mpsc::Receiver<String>, log_path: PathBuf, disp
             }
             _ = end_receiver.recv() => {
                 if let Some(mut child) = child {
-                    child.kill();
+                    println!("killing rae log");
+                    child.kill().expect("not able to kill rae log");
                 }
 
                 /*if let Some(pid) = logger_pid {

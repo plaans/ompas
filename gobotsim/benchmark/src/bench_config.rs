@@ -36,8 +36,8 @@ const LPTF: &str = "lptf";
 pub enum Technique {
     Greedy,
     Advanced,
-    LRPTF,
-    LPTF,
+    Lrptf,
+    Lptf,
 }
 
 pub type ConfigError = String;
@@ -49,8 +49,8 @@ impl TryFrom<&str> for Technique {
         match value {
             GREEDY => Ok(Self::Greedy),
             ADVANCED => Ok(Self::Advanced),
-            LRPTF => Ok(Self::LRPTF),
-            LPTF => Ok(Self::LPTF),
+            LRPTF => Ok(Self::Lrptf),
+            LPTF => Ok(Self::Lptf),
             t => Err(format!("{} is not a valid technique", t)),
         }
     }
@@ -64,8 +64,8 @@ impl Display for Technique {
             match self {
                 Technique::Greedy => GREEDY,
                 Technique::Advanced => ADVANCED,
-                Technique::LRPTF => LRPTF,
-                Technique::LPTF => LPTF,
+                Technique::Lrptf => LRPTF,
+                Technique::Lptf => LPTF,
             }
         )
     }
@@ -73,7 +73,7 @@ impl Display for Technique {
 
 impl Debug for Technique {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.to_string())
+        write!(f, "{}", self)
     }
 }
 
@@ -118,6 +118,7 @@ pub struct MailConfig {
     pub from: String,
     pub to: String,
     pub smtp: String,
+    #[allow(dead_code)]
     password: String,
 }
 

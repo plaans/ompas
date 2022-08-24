@@ -1,5 +1,5 @@
 use crate::rae_exec::*;
-use log::{error, info, warn};
+use log::{error, info};
 use ompas_rae_core::ctx_planning::{CtxPlanning, MOD_PLANNING};
 use ompas_rae_core::error::RaeExecError;
 use ompas_rae_structs::state::task_status::TaskStatus;
@@ -58,7 +58,7 @@ pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LAsyncHandler {
             SYMBOL_EXEC_MODE => {
                 match &ctx.platform_interface {
                     Some(platform) => {
-                        platform.exec_command(&args, action_id).await?;
+                        platform.exec_command(args, action_id).await?;
 
                         //println!("await on action (id={})", action_id);
                         info!("waiting on action {}", action_id);
@@ -88,10 +88,10 @@ pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LAsyncHandler {
                                     }
                                 }
                             }
-                            return Err(LRuntimeError::new(
+                            Err(LRuntimeError::new(
                                 RAE_EXEC_COMMAND,
                                 "error on action status channel",
-                            ));
+                            ))
                         };
                         tokio::select! {
                             _ = int_rx.recv() => {

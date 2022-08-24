@@ -499,14 +499,14 @@ pub async fn eval(
 
         if let Some(r) = &mut int {
             interrupted = r.is_interrupted();
-            if get_debug() && interrupted == true {
+            if get_debug() && interrupted {
                 println!("interrupted! last result!: {:?}", results.last())
             }
         }
 
         let interruptibility = current.interruptibily;
 
-        if interrupted == true && interruptibility == Interruptibility::Interruptible {
+        if interrupted && interruptibility == Interruptibility::Interruptible {
             match current.kind {
                 StackKind::NonEvaluated(_) => {
                     results.push(error.clone());
@@ -563,7 +563,7 @@ pub async fn eval(
             }
             debug.print_last_result(&results);
             continue;
-        } else if interrupted == true && current.interruptibily == Unininterruptible {
+        } else if interrupted && current.interruptibily == Unininterruptible {
             //println!("interrupt avoided");
         }
 

@@ -28,7 +28,6 @@ use std::os::unix::io::{FromRawFd, IntoRawFd};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::Arc;
-use std::time::Duration;
 use std::{fs, thread};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{mpsc, RwLock};
@@ -270,30 +269,15 @@ impl RAEInterface for PlatformGodot {
 
         let mut child = match args.len() {
             //default settings
-            0 => {
-                //Command::new(bash)
-                //.args(&["--title", "GODOT 3 Terminal"])
-                //.arg("--")
-                //.arg(godot)
-                Command::new(godot)
-                    .arg("--path")
-                    .arg(DEFAULT_PATH_PROJECT_GODOT)
-                    .stdout(unsafe { Stdio::from_raw_fd(f1.into_raw_fd()) })
-                    .stderr(unsafe { Stdio::from_raw_fd(f2.into_raw_fd()) })
-                    .spawn()
-                    .expect("failed to execute process")
-            }
+            0 => Command::new(godot)
+                .arg("--path")
+                .arg(DEFAULT_PATH_PROJECT_GODOT)
+                .stdout(unsafe { Stdio::from_raw_fd(f1.into_raw_fd()) })
+                .stderr(unsafe { Stdio::from_raw_fd(f2.into_raw_fd()) })
+                .spawn()
+                .expect("failed to execute process"),
             1 => {
                 if let LValue::Symbol(s) = &args[0] {
-                    /*println!(
-                        "PlatformGodot::start_platfrom: start godot with config {}({} args)",
-                        s,
-                        s.split_whitespace().count()
-                    );*/
-                    //Command::new(bash)
-                    //.args(&["--title", "GODOT 3 Terminal"])
-                    //.arg("--")
-                    //.arg(godot)
                     Command::new(godot)
                         .args(s.split_whitespace())
                         .stdout(unsafe { Stdio::from_raw_fd(f1.into_raw_fd()) })
@@ -318,39 +302,13 @@ impl RAEInterface for PlatformGodot {
         };
 
         tokio::spawn(async move {
-            /*tokio::time::sleep(Duration::from_millis(1000)).await;
-            let result = Command::new("pidof")
-                .arg(godot)
-                .output()
-                .expect("could not run command.");
-            let pids = String::from_utf8(result.stdout).expect("could not convert into string");
-            //println!("tail pids: {}", pids);
-            let logger_pid = if !pids.is_empty() {
-                let logger_pid = pids
-                    .split_whitespace()
-                    .next()
-                    .expect("could not get first pid")
-                    .to_string();
-                //println!("logger pid: {}", logger_pid);
-                Some(logger_pid)
-            } else {
-                None
-            };*/
-
             //blocked on the reception of the end signal.
             task_handler::subscribe_new_task()
                 .recv()
                 .await
                 .expect("could not receive from task handler");
 
-            /*if let Some(pid) = logger_pid {
-                Command::new("kill")
-                    .args(&["-9", pid.as_str()])
-                    .spawn()
-                    .expect("Command failed.");
-            }*/
-
-            child.kill();
+            child.kill().expect("could not kill godot");
             println!("process godot killed")
         });
         Ok(LValue::Nil)

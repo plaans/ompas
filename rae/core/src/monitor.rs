@@ -62,13 +62,12 @@ impl MonitorCollection {
         let keys: Vec<_> = waiters.map.keys().copied().collect();
         for id in &keys {
             let lambda: &LValue = &waiters.map.get(id).unwrap().lambda;
-            let result = eval(&lambda, &mut env, None).await;
+            let result = eval(lambda, &mut env, None).await;
             match result {
                 Ok(lv) => {
                     //info!("{} => {}", waiter.lambda, lv);
                     if let LValue::True = lv {
                         //info!("Wait on {} is now true.", lambda);
-                        drop(lambda);
                         let waiter = waiters.map.remove(id).unwrap();
                         waiter.channel.send(true).expect("");
                         //.expect("could not send true message to waiter");

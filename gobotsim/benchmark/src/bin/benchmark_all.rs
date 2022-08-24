@@ -127,10 +127,10 @@ fn main() {
             command
                 .stdout(unsafe { Stdio::from_raw_fd(f1.into_raw_fd()) })
                 .stderr(unsafe { Stdio::from_raw_fd(f2.into_raw_fd()) });
-            if select != "" {
+            if !select.is_empty() {
                 command.arg(select);
             }
-            let debug = format!("{:?}", command);
+            //let debug = format!("{:?}", command);
             if let Ok(mut c) = command.spawn() {
                 bar.println(format!(
                     "{} {} {}, config: {}",
@@ -139,7 +139,7 @@ fn main() {
                     problem.file_name().unwrap().to_str().unwrap(),
                     select
                 ));
-                let result = c.wait();
+                let _r = c.wait();
                 //println!("Exit with: {:?}", c.wait());
             } else {
                 panic!("panic");

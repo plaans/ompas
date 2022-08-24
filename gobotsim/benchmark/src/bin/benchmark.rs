@@ -10,10 +10,8 @@ use sompas_repl::lisp_interpreter::{
     ChannelToLispInterpreter, LispInterpreter, LispInterpreterConfig,
 };
 use std::path::PathBuf;
-use std::time::Duration;
 use std::{env, fs};
 use structopt::StructOpt;
-use tokio::select;
 
 pub const TOKIO_CHANNEL_SIZE: usize = 65_384;
 
@@ -194,7 +192,7 @@ pub fn domain(opt: &Opt) -> GodotDomain {
     actions.push("actions.lisp");
     let mut state_functions = domain.clone();
     state_functions.push("state_functions.lisp");
-    let mut om = domain.clone();
+    let mut om = domain;
     om.push(if opt.advanced {
         "jobshop_advanced.lisp"
     } else if opt.lrpt {

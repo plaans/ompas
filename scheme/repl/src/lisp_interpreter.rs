@@ -11,8 +11,7 @@ use sompas_utils::task_handler::{subscribe_new_task, EndSignal};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
-use std::task::Poll;
-use std::{env, fs, result};
+use std::{env, fs};
 use tokio::sync::broadcast;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
@@ -164,7 +163,10 @@ impl LispInterpreter {
                             format!("error: {}", e)
                         }
                     };
-                    self.li_channel.send(&id_log, string.clone());
+                    self.li_channel
+                        .send(&id_log, string.clone())
+                        .await
+                        .expect("error on log");
                     self.li_channel
                         .send(&id_subscriber, string)
                         .await
@@ -172,7 +174,10 @@ impl LispInterpreter {
                 }
                 Err(e) => {
                     let msg = format!("error: {}", e);
-                    self.li_channel.send(&id_log, msg.clone());
+                    self.li_channel
+                        .send(&id_log, msg.clone())
+                        .await
+                        .expect("error on log");
 
                     self.li_channel
                         .send(&id_subscriber, msg)

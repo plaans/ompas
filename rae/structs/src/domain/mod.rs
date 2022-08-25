@@ -4,7 +4,7 @@ use crate::context::{
     RAE_STATE_FUNCTION_LIST, RAE_SYMBOL_TYPE, RAE_TASK_LIST, RAE_TASK_METHODS_MAP,
     STATE_FUNCTION_TYPE, TASK_TYPE,
 };
-use crate::domain::action::Action;
+use crate::domain::command::Command;
 use crate::domain::method::Method;
 use crate::domain::state_function::StateFunction;
 use crate::domain::task::Task;
@@ -17,7 +17,7 @@ use sompas_structs::lvalue::LValue;
 use std::fmt::{Display, Formatter};
 
 pub mod _type;
-pub mod action;
+pub mod command;
 pub mod method;
 pub mod parameters;
 pub mod state_function;
@@ -29,7 +29,7 @@ pub struct RAEDomain {
     pub tasks: HashMap<String, Task>,
     pub methods: HashMap<String, Method>,
     pub state_functions: HashMap<String, StateFunction>,
-    pub actions: HashMap<String, Action>,
+    pub actions: HashMap<String, Command>,
     pub lambdas: HashMap<String, LValue>,
     pub types: TypeHierarchy,
     pub map_symbol_type: HashMap<String, String>,
@@ -65,7 +65,7 @@ impl RAEDomain {
         &self.state_functions
     }
 
-    pub fn get_actions(&self) -> &HashMap<String, Action> {
+    pub fn get_actions(&self) -> &HashMap<String, Command> {
         &self.actions
     }
 
@@ -105,7 +105,7 @@ impl RAEDomain {
             .insert(label, STATE_FUNCTION_TYPE.into());
     }
 
-    pub fn add_action(&mut self, label: String, value: Action) {
+    pub fn add_action(&mut self, label: String, value: Command) {
         self.actions.insert(label.clone(), value);
         self.map_symbol_type.insert(label, ACTION_TYPE.into());
     }

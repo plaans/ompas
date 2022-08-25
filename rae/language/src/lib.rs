@@ -212,9 +212,11 @@ pub const GENERATE_ACTION_OPERATIONAL_MODEL: &str = "generate-action-operational
 pub const GENERATE_METHOD: &str = "generate-method";
 
 pub const RAE_DEF_STATE_FUNCTION: &str = "def-state-function";
-pub const RAE_DEF_ACTION: &str = "def-action";
+pub const RAE_DEF_COMMAND: &str = "def-command";
 pub const RAE_DEF_ACTION_MODEL: &str = "def-action-model";
-pub const RAE_DEF_ACTION_OPERATIONAL_MODEL: &str = "def-action-operational-model";
+pub const RAE_DEF_TASK_MODEL: &str = "def-task-model";
+pub const RAE_DEF_METHOD_MODEL: &str = "def-method-model";
+//pub const RAE_DEF_ACTION_OPERATIONAL_MODEL: &str = "def-action-operational-model";
 pub const RAE_DEF_TASK: &str = "def-task";
 pub const RAE_DEF_METHOD: &str = "def-method";
 pub const RAE_DEF_LAMBDA: &str = "def-lambda";

@@ -59,12 +59,14 @@ pub struct CtxRae {
 
 impl IntoModule for CtxRae {
     fn into_module(self) -> Module {
-        let domain = self.domain.clone();
+        let mut domain = self.domain.clone();
+        let mut macros = vec![MACRO_COMMAND, MACRO_TASK, MACRO_METHOD];
+
         //let domain = Default::default();
         let mut module = Module {
             ctx: Context::new(self),
             prelude: vec![],
-            raw_lisp: domain,
+            raw_lisp: domain.append(macros),
             label: MOD_RAE.to_string(),
         };
 
@@ -82,7 +84,7 @@ impl IntoModule for CtxRae {
 
         //Domain Definition
         module.add_async_fn_prelude(RAE_DEF_STATE_FUNCTION, def_state_function);
-        module.add_async_fn_prelude(RAE_DEF_ACTION, def_action);
+        module.add_async_fn_prelude(RAE_DEF_COMMAND, def_command);
         module.add_async_fn_prelude(RAE_DEF_ACTION_MODEL, def_action_model);
         module.add_async_fn_prelude(
             RAE_DEF_ACTION_OPERATIONAL_MODEL,
@@ -146,7 +148,7 @@ impl IntoModule for CtxRae {
                 DOC_DEF_STATE_FUNCTION,
                 DOC_DEF_STATE_FUNCTION_VERBOSE,
             ),
-            LHelp::new_verbose(RAE_DEF_ACTION, DOC_DEF_ACTION, DOC_DEF_ACTION_VERBOSE),
+            LHelp::new_verbose(RAE_DEF_COMMAND, DOC_DEF_ACTION, DOC_DEF_ACTION_VERBOSE),
             LHelp::new_verbose(RAE_DEF_TASK, DOC_DEF_TASK, DOC_DEF_TASK_VERBOSE),
             LHelp::new_verbose(RAE_DEF_METHOD, DOC_DEF_METHOD, DOC_DEF_METHOD_VERBOSE),
             LHelp::new(RAE_DEF_LAMBDA, DOC_DEF_LAMBDA),

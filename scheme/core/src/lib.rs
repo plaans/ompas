@@ -662,7 +662,10 @@ pub async fn eval(
                                         interruptibility,
                                     ));
                                 }
-                                LCoreOperator::Quote => results.push(args[0].clone()),
+                                LCoreOperator::Quote => {
+                                    results.push(args[0].clone());
+                                    debug.print_last_result(&results);
+                                }
                                 LCoreOperator::QuasiQuote => {
                                     panic!("quasiquote not allowed")
                                 }

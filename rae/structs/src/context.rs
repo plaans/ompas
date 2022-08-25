@@ -1,5 +1,5 @@
 use crate::agenda::Agenda;
-use crate::domain::action::Action;
+use crate::domain::command::Command;
 use crate::domain::method::Method;
 use crate::domain::parameters::Parameters;
 use crate::domain::state_function::StateFunction;
@@ -72,7 +72,7 @@ impl RAEContext {
         }
     }
 
-    pub fn add_action(&mut self, label: String, value: Action) -> Result<(), LRuntimeError> {
+    pub fn add_command(&mut self, label: String, value: Command) -> Result<(), LRuntimeError> {
         self.domain_env.add_action(label, value);
 
         Ok(())

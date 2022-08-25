@@ -50,6 +50,12 @@ pub enum LValue {
     Nil,
 }
 
+impl Default for LValue {
+    fn default() -> Self {
+        Self::Nil
+    }
+}
+
 impl From<()> for LValue {
     fn from(_: ()) -> Self {
         LValue::Nil

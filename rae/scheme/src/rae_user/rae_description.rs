@@ -1,6 +1,7 @@
 use crate::rae_user::{CtxRae, MOD_RAE};
+use log::Level::Debug;
 use ompas_rae_language::*;
-use ompas_rae_structs::domain::action::Action;
+use ompas_rae_structs::domain::command::Command;
 use ompas_rae_structs::domain::state_function::StateFunction;
 use ompas_rae_structs::state::partial_state::PartialState;
 use ompas_rae_structs::state::world_state::StateType;
@@ -22,6 +23,58 @@ use sompas_structs::{lruntimeerror, string, wrong_n_args, wrong_type};
 use std::borrow::Borrow;
 use std::convert::TryInto;
 use std::ops::Deref;
+
+const ACTION_LABEL: &str = ":name";
+const TASK_LABEL: &str = ":task";
+const PARAMETERS: &str = ":params";
+const PRE_CONDITIONS: &str = ":pre-conditions";
+const BODY: &str = ":body";
+const MODEL: &str = ":model";
+
+pub const MACRO_COMMAND: &str = "(defmacro command
+    (lambda attributes
+        (let ((label (car attributes))
+                (attributes (cdr attributes)))
+
+        (begin
+            (define __l__ (lambda (l)
+                (if (null? l)
+                    nil
+                    (cons 
+                        (cons (caar l) (list (cdar l)))
+                        (__l__ (cdr l))))))
+            `(map 
+                (quote ,(cons (cons ':name label) (__l__ attributes))))))))";
+
+pub const MACRO_METHOD: &str = "(defmacro method
+    (lambda attributes
+        (let ((label (car attributes))
+                (attributes (cdr attributes)))
+
+        (begin
+            (define __l__ (lambda (l)
+                (if (null? l)
+                    nil
+                    (cons 
+                        (cons (caar l) (list (cdar l)))
+                        (__l__ (cdr l))))))
+            `(map 
+                (quote ,(cons (cons ':name label) (__l__ attributes))))))))";
+
+pub const MACRO_TASK: &str = "(defmacro task
+    (lambda attributes
+        (let ((label (car attributes))
+                (attributes (cdr attributes)))
+
+        (begin
+            (define __l__ (lambda (l)
+                (if (null? l)
+                    nil
+                    (cons 
+                        (cons (caar l) (list (cdar l)))
+                        (__l__ (cdr l))))))
+            `(map 
+                (quote ,(cons (cons ':name label) (__l__ attributes))))))))";
 
 #[derive(Default)]
 pub struct CtxRaeDescription {}
@@ -331,16 +384,54 @@ pub async fn def_action_operational_model(
 
 /// Defines an action in RAE environment.
 #[async_scheme_fn]
-pub async fn def_action(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
-    if args.is_empty() {
+pub async fn def_command(
+    env: &LEnv,
+    map: im::HashMap<LValue, LValue>,
+) -> Result<(), LRuntimeError> {
+    if map.is_empty() {
         return Err(LRuntimeError::wrong_number_of_args(
-            RAE_DEF_ACTION,
-            args,
+            RAE_DEF_COMMAND,
+            map.into(),
             1..usize::MAX,
         ));
     }
 
-    let lvalue = cons(env, &[GENERATE_ACTION.into(), args.into()])?;
+    let mut command = Command::default();
+    command.set_label(map.get(ACTION_LABEL.into()).unwrap().into());
+    command.set_parameters(map.get(PARAMETERS.into()).unwrap().try_into()?);
+    let params = command.get_parameters().get_params_as_lvalue();
+    let params_list = command.get_parameters().get_params();
+    let lv_exec: LValue = format!(
+        "(lambda {} (await (rae-exec-command {} {})))",
+        params,
+        command.get_label(),
+        {
+            let mut str = String::new();
+            for p in params_list {
+                str.push_str(p.as_str());
+                str.push(' ');
+            }
+            str
+        }
+    )
+    .into();
+    let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
+    let mut env = ctx.get_rae_env().read().await.env.clone();
+    let exec = eval(&expand(&lv_exec, true, &mut env).await?, &mut env, None).await?;
+
+    command.set_exec(exec);
+    let lv_model: LValue = match map.get(MODEL.into()) {
+        None => format!("(lambda {} nil)", params,).into(),
+        Some(model) => format!("(lambda {} {})", params, model).into(),
+    };
+    let model = eval(&expand(&lv_model, true, &mut env).await?, &mut env, None).await?;
+    command.set_model(model);
+    ctx.get_rae_env()
+        .write()
+        .await
+        .add_command(command.get_label(), command)?;
+
+    /*let lvalue = cons(env, &[GENERATE_ACTION.into(), args.into()])?;
     let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
 
     let mut env = ctx.get_rae_env().read().await.env.clone();
@@ -348,14 +439,14 @@ pub async fn def_action(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError
 
     if let LValue::List(list) = &lvalue {
         if list.len() != 3 {
-            return Err(wrong_n_args!(RAE_DEF_ACTION, list.as_slice(), 3));
+            return Err(wrong_n_args!(RAE_DEF_COMMAND, list.as_slice(), 3));
         } else if let LValue::Symbol(action_label) = &list[0] {
             if let LValue::List(_) | LValue::Nil = &list[1] {
                 if let LValue::Lambda(l) = &list[2] {
                     let sim = LLambda::new(l.get_params(), LValue::Nil, l.get_env_symbols());
                     ctx.get_rae_env().write().await.add_action(
                         action_label.to_string(),
-                        Action::new(
+                        Command::new(
                             action_label,
                             (&list[1]).try_into()?,
                             list[2].clone(),
@@ -363,15 +454,15 @@ pub async fn def_action(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError
                         ),
                     )?;
                 } else {
-                    return Err(wrong_type!(RAE_DEF_ACTION, &list[2], KindLValue::Lambda));
+                    return Err(wrong_type!(RAE_DEF_COMMAND, &list[2], KindLValue::Lambda));
                 }
             } else {
-                return Err(wrong_type!(RAE_DEF_ACTION, &list[1], KindLValue::List));
+                return Err(wrong_type!(RAE_DEF_COMMAND, &list[1], KindLValue::List));
             }
         } else {
-            return Err(wrong_type!(RAE_DEF_ACTION, &list[0], KindLValue::Symbol));
+            return Err(wrong_type!(RAE_DEF_COMMAND, &list[0], KindLValue::Symbol));
         }
-    }
+    }*/
 
     Ok(())
 }

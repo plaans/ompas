@@ -1,7 +1,6 @@
 use crate::agenda::Agenda;
 use crate::domain::command::Command;
 use crate::domain::method::Method;
-use crate::domain::parameters::Parameters;
 use crate::domain::state_function::StateFunction;
 use crate::domain::task::Task;
 use crate::domain::RAEDomain;
@@ -78,12 +77,12 @@ impl RAEContext {
         Ok(())
     }
 
-    pub fn add_action_sample_fn(
-        &mut self,
-        label: String,
-        value: LValue,
-    ) -> Result<(), LRuntimeError> {
-        self.domain_env.add_action_sample_fn(label, value)
+    pub fn add_command_model(&mut self, label: String, value: LValue) -> Result<(), LRuntimeError> {
+        self.domain_env.add_command_model(label, value)
+    }
+
+    pub fn add_task_model(&mut self, label: String, value: LValue) -> Result<(), LRuntimeError> {
+        self.domain_env.add_task_model(label, value)
     }
 
     pub fn add_state_function(
@@ -96,14 +95,8 @@ impl RAEContext {
         Ok(())
     }
 
-    pub fn add_task(
-        &mut self,
-        label: String,
-        body: LValue,
-        parameters: Parameters,
-    ) -> Result<(), LRuntimeError> {
-        self.domain_env
-            .add_task(label.clone(), Task::new(label, body, parameters));
+    pub fn add_task(&mut self, label: String, task: Task) -> Result<(), LRuntimeError> {
+        self.domain_env.add_task(label, task);
 
         Ok(())
     }
@@ -112,14 +105,8 @@ impl RAEContext {
     pub fn add_method(
         &mut self,
         method_label: String,
-        task_label: String,
-        parameters: Parameters,
-        conds: LValue,
-        score: LValue,
-        body: LValue,
+        method: Method,
     ) -> Result<(), LRuntimeError> {
-        let method = Method::new(task_label, parameters, conds, score, body);
-
         self.domain_env.add_method(method_label, method)?;
 
         Ok(())
@@ -133,7 +120,7 @@ impl RAEContext {
         let label: String = task.try_into()?;
         match self.domain_env.get_tasks().get(&*label) {
             None => Ok(LValue::Nil),
-            Some(task) => Ok(task.methods.clone().into()),
+            Some(task) => Ok(task.get_methods().clone().into()),
         }
     }
 

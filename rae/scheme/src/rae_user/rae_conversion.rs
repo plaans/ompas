@@ -94,7 +94,7 @@ pub async fn pre_process_domain(env: &LEnv) -> Result<String, LRuntimeError> {
 
     for (action_label, action) in rae_env.domain_env.get_actions() {
         let pre_processed = pre_processing(
-            action.get_sim(),
+            action.get_model(),
             &context,
             &mut ConversionCollection::default(),
         )?;
@@ -103,7 +103,7 @@ pub async fn pre_process_domain(env: &LEnv) -> Result<String, LRuntimeError> {
             format!(
                 "{}:\n\tbefore: {}\n\tafter: {}\n",
                 action_label,
-                action.get_sim().format("\tbefore: ".len()),
+                action.get_model().format("\tbefore: ".len()),
                 pre_processed.format("\tafter: ".len()),
             )
             .as_str(),

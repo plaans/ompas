@@ -1,16 +1,24 @@
+use crate::domain::_type::Type;
 use crate::domain::parameters::Parameters;
 use sompas_structs::lvalue::LValue;
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone)]
 pub struct StateFunction {
+    label: String,
     pub parameters: Parameters,
+    pub result: Type,
     pub body: LValue,
 }
 
 impl StateFunction {
-    pub fn new(parameters: Parameters, body: LValue) -> Self {
-        Self { parameters, body }
+    pub fn new(label: String, parameters: Parameters, result: Type, body: LValue) -> Self {
+        Self {
+            label,
+            parameters,
+            result,
+            body,
+        }
     }
 }
 

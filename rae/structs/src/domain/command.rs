@@ -4,10 +4,10 @@ use std::fmt::{Display, Formatter};
 
 #[derive(Default, Debug, Clone)]
 pub struct Command {
-    pub label: String,
-    pub parameters: Parameters,
-    pub body: LValue,
-    pub model: LValue,
+    label: String,
+    parameters: Parameters,
+    body: LValue,
+    model: LValue,
 }
 
 /*
@@ -19,11 +19,11 @@ impl Command {
     }
 
     pub fn get_body(&self) -> &LValue {
-        &self.exec
+        &self.body
     }
 
     pub fn get_model(&self) -> &LValue {
-        &self.sim
+        &self.model
     }
 
     pub fn get_label(&self) -> &String {
@@ -39,12 +39,12 @@ impl Command {
         self.parameters = params
     }
 
-    pub fn set_exec(&mut self, exec: LValue) {
-        self.exec = exec
+    pub fn set_body(&mut self, body: LValue) {
+        self.body = body
     }
 
-    pub fn set_sim(&mut self, sim: LValue) {
-        self.sim = sim
+    pub fn set_model(&mut self, model: LValue) {
+        self.model = model
     }
 
     pub fn set_label(&mut self, label: String) {

@@ -98,7 +98,7 @@ async fn run_logger_file(mut rx: mpsc::Receiver<String>, log_path: PathBuf, disp
     //let mut first = true;
 
     let child = if display {
-        let mut child = Command::new("gnome-terminal")
+        let child = Command::new("gnome-terminal")
             .args(&["--title", "RAE LOG", "--disable-factory"])
             .args(&["--", "tail", "-f", log_path.to_str().unwrap()])
             .stdout(Stdio::null())
@@ -109,7 +109,7 @@ async fn run_logger_file(mut rx: mpsc::Receiver<String>, log_path: PathBuf, disp
     } else {
         None
     };
-    println!("child pid: {}", child.as_ref().unwrap().id());
+    //println!("child pid: {}", child.as_ref().unwrap().id());
 
     loop {
         tokio::select! {
@@ -125,7 +125,7 @@ async fn run_logger_file(mut rx: mpsc::Receiver<String>, log_path: PathBuf, disp
                 }
             }
             _ = end_receiver.recv() => {
-                if let Some(mut child) = child {
+                if let Some(child) = child {
                     println!("killing rae log process : {}", child.id());
 
                     Command::new("pkill").args(["-P", child.id().to_string().as_str()]).spawn().expect("error on killing process");

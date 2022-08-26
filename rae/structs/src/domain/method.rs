@@ -5,8 +5,9 @@ use sompas_structs::lvalue::LValue;
 use std::borrow::Borrow;
 use std::fmt::{Display, Formatter};
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct Method {
+    pub label: String,
     pub task_label: String,
     pub parameters: Parameters,
     pub lambda_pre_conditions: LValue,
@@ -49,6 +50,7 @@ impl Method {
 
 impl Method {
     pub fn new(
+        label: String,
         task_label: String,
         parameters: Parameters,
         conds: LValue,
@@ -56,6 +58,7 @@ impl Method {
         body: LValue,
     ) -> Self {
         Self {
+            label,
             task_label,
             parameters,
             lambda_pre_conditions: conds,

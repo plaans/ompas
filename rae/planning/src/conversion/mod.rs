@@ -109,7 +109,7 @@ pub fn convert_domain_to_chronicle_hierarchy(
     for action in conversion_context.domain.get_actions().values() {
         //evaluate the lambda sim.
         let chronicle = convert_abstract_task_to_chronicle(
-            &action.get_sim().try_into()?,
+            &action.get_model().try_into()?,
             action.get_label(),
             None,
             action.get_parameters(),

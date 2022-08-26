@@ -204,16 +204,16 @@ pub const DEFINE_ERR_NO_APPLICABLE_METHOD: &str = "(define err::no-applicable-me
 pub const DEFINE_ERR_ACTION_FAILURE: &str = "(define err::action_failure 1)";
 pub const MOD_RAE_DESCRIPTION: &str = "rae-description";
 
-pub const GENERATE_TASK: &str = "generate-task";
+/*pub const GENERATE_TASK: &str = "generate-task";
 pub const GENERATE_STATE_FUNCTION: &str = "generate-state-function";
 pub const GENERATE_ACTION: &str = "generate-action";
 pub const GENERATE_ACTION_MODEL: &str = "generate-action-model";
 pub const GENERATE_ACTION_OPERATIONAL_MODEL: &str = "generate-action-operational-model";
-pub const GENERATE_METHOD: &str = "generate-method";
+pub const GENERATE_METHOD: &str = "generate-method";*/
 
 pub const RAE_DEF_STATE_FUNCTION: &str = "def-state-function";
 pub const RAE_DEF_COMMAND: &str = "def-command";
-pub const RAE_DEF_ACTION_MODEL: &str = "def-action-model";
+pub const RAE_DEF_COMMAND_MODEL: &str = "def-action-model";
 pub const RAE_DEF_TASK_MODEL: &str = "def-task-model";
 pub const RAE_DEF_METHOD_MODEL: &str = "def-method-model";
 //pub const RAE_DEF_ACTION_OPERATIONAL_MODEL: &str = "def-action-operational-model";
@@ -244,7 +244,7 @@ pub const DOC_DEF_LAMBDA: &str = "Add a lambda to RAE environment";
 pub const DOC_DEF_INITIAL_STATE: &str = "Add initial facts in the state.\
 Most of the time it is general knowledge and not initialisation of facts.";
 
-/// Macro used to generate code to define a task in the simplified representation in RAE environment.
+/*/// Macro used to generate code to define a task in the simplified representation in RAE environment.
 pub const MACRO_GENERATE_TASK: &str = "(defmacro generate-task
 (lambda args
 (let* ((label (car args))
@@ -335,18 +335,18 @@ pub const MACRO_GENERATE_METHOD: &str = "(defmacro generate-method
                         ,(gtpc p_expr)
                         ,conds))
                 (lambda ,params ,score)
-                (lambda ,params ,body))))))";
+                (lambda ,params ,body))))))";*/
 
-pub const GENERATE_TYPE_TEST_EXPR: &str = "generate-type-test-expr";
-pub const F_AND_EFFECT: &str = "f-and-effect";
-pub const F_AND_COND: &str = "f-and-cond";
+pub const GENERATE_TEST_TYPE_EXPR: &str = "generate_test_type_expr";
+/*pub const F_AND_EFFECT: &str = "f-and-effect";
+pub const F_AND_COND: &str = "f-and-cond";*/
 
-pub const LAMBDA_GENERATE_TYPE_PRE_CONDITIONS: &str =
+/*pub const LAMBDA_GENERATE_TYPE_PRE_CONDITIONS: &str =
     "(define gtpc (lambda (l) (parse (generate-type-test-expr l))))";
 
 pub const MACRO_AND_COND: &str = "(defmacro and-cond (lambda args (parse (f-and-cond args))))";
 pub const MACRO_AND_EFFECT: &str =
-    "(defmacro and-effect (lambda args (parse (f-and-effect args))))";
+    "(defmacro and-effect (lambda args (parse (f-and-effect args))))";*/
 
 pub const RAE_CONVERT_EXPR: &str = "convert-expr";
 pub const RAE_CONVERT_DOMAIN: &str = "convert-domain";

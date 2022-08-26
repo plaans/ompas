@@ -76,8 +76,8 @@ impl RAEDomain {
 
 //Adder
 impl RAEDomain {
-    pub fn add_task(&mut self, label: String, value: Task) {
-        self.tasks.insert(label.clone(), value);
+    pub fn add_task(&mut self, label: String, task: Task) {
+        self.tasks.insert(label.clone(), task);
         self.map_symbol_type.insert(label, TASK_TYPE.into());
     }
 
@@ -91,7 +91,7 @@ impl RAEDomain {
                 )
             )),
             Some(task) => {
-                task.methods.push(label.clone());
+                task.add_method(label.clone());
                 self.methods.insert(label.clone(), value);
                 self.map_symbol_type.insert(label, METHOD_TYPE.into());
                 Ok(())
@@ -110,11 +110,7 @@ impl RAEDomain {
         self.map_symbol_type.insert(label, ACTION_TYPE.into());
     }
 
-    pub fn add_action_sample_fn(
-        &mut self,
-        label: String,
-        value: LValue,
-    ) -> Result<(), LRuntimeError> {
+    pub fn add_command_model(&mut self, label: String, value: LValue) -> Result<(), LRuntimeError> {
         match self.actions.get_mut(&label) {
             None => Err(lruntimeerror!(
                 "add_action_sample_fn",
@@ -122,7 +118,21 @@ impl RAEDomain {
             )),
             Some(action) => {
                 //println!("updating sim of {} with {}", label, value);
-                action.sim = value;
+                action.set_model(value);
+                Ok(())
+            }
+        }
+    }
+
+    pub fn add_task_model(&mut self, label: String, value: LValue) -> Result<(), LRuntimeError> {
+        match self.tasks.get_mut(&label) {
+            None => Err(lruntimeerror!(
+                "add_action_sample_fn",
+                format!("Action {} is not defined", label)
+            )),
+            Some(task) => {
+                //println!("updating sim of {} with {}", label, value);
+                task.set_model(value);
                 Ok(())
             }
         }
@@ -275,8 +285,8 @@ impl RAEDomain {
 
         //Add all actions to env:
         for (label, action) in self.get_actions() {
-            env.insert(label.clone(), action.exec.clone());
-            map_action_model.insert(label.into(), action.sim.clone());
+            env.insert(label.clone(), action.get_body().clone());
+            map_action_model.insert(label.into(), action.get_model().clone());
         }
 
         //Add all state functions to env:
@@ -342,7 +352,7 @@ impl RAEDomain {
 
         //Add all actions to env:
         for (label, action) in self.get_actions() {
-            env.insert(label.clone(), action.sim.clone());
+            env.insert(label.clone(), action.get_model().clone());
         }
 
         //Add all state functions to env:

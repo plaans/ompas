@@ -8,7 +8,7 @@ use std::borrow::Borrow;
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct Parameters {
     inner: Vec<(Arc<Sym>, Type)>,
 }

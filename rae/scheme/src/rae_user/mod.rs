@@ -60,13 +60,13 @@ pub struct CtxRae {
 impl IntoModule for CtxRae {
     fn into_module(self) -> Module {
         let mut domain = self.domain.clone();
-        let mut macros = vec![MACRO_COMMAND, MACRO_TASK, MACRO_METHOD];
+        domain.append(&mut vec![MACRO_COMMAND, MACRO_TASK, MACRO_METHOD].into());
 
         //let domain = Default::default();
         let mut module = Module {
             ctx: Context::new(self),
             prelude: vec![],
-            raw_lisp: domain.append(macros),
+            raw_lisp: domain,
             label: MOD_RAE.to_string(),
         };
 
@@ -85,11 +85,8 @@ impl IntoModule for CtxRae {
         //Domain Definition
         module.add_async_fn_prelude(RAE_DEF_STATE_FUNCTION, def_state_function);
         module.add_async_fn_prelude(RAE_DEF_COMMAND, def_command);
-        module.add_async_fn_prelude(RAE_DEF_ACTION_MODEL, def_action_model);
-        module.add_async_fn_prelude(
-            RAE_DEF_ACTION_OPERATIONAL_MODEL,
-            def_action_operational_model,
-        );
+        module.add_async_fn_prelude(RAE_DEF_COMMAND_MODEL, def_command_model);
+        module.add_async_fn_prelude(RAE_DEF_TASK_MODEL, def_task_model);
         module.add_async_fn_prelude(RAE_DEF_TASK, def_task);
         module.add_async_fn_prelude(RAE_DEF_METHOD, def_method);
         module.add_async_fn_prelude(RAE_DEF_LAMBDA, def_lambda);
@@ -100,6 +97,7 @@ impl IntoModule for CtxRae {
         module.add_async_fn_prelude(RAE_DEF_CONSTANTS, def_objects);
         module.add_async_fn_prelude(RAE_DEF_TYPES, def_types);
         module.add_async_fn_prelude(RAE_DEF_OBJECTS, def_objects);
+        module.add_async_fn_prelude(GENERATE_TEST_TYPE_EXPR, generate_test_type_expr);
 
         //functions to debug the functioning of rae
         module.add_async_fn_prelude(RAE_GET_STATE, get_state);
@@ -260,9 +258,9 @@ impl CtxRae {
 
         rae_env.env.import(ctx_rae_exec, WithoutPrefix);
 
-        rae_env
-            .env
-            .import(CtxRaeDescription::default(), WithoutPrefix);
+        /*rae_env
+        .env
+        .import(CtxRaeDescription::default(), WithoutPrefix);*/
 
         rae_env.env.import(ctx_io, WithoutPrefix);
 

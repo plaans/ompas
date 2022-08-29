@@ -11,7 +11,7 @@ use ompas_rae_structs::state::task_status::TaskStatus::*;
 use sompas_macros::*;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lnumber::LNumber;
-use sompas_structs::lruntimeerror::LResult;
+use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use std::borrow::Borrow;
 use std::convert::{TryFrom, TryInto};
@@ -28,7 +28,9 @@ pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
         .add_abstract_task(task_label.clone(), parent_task)
         .await;
     let task_id = *task.get_id();
-    let result: LValue = select(&mut task, env).await?;
+    let result: LValue = select(&mut task, env)
+        .await
+        .map_err(|e: LRuntimeError| e.chain("select"))?;
 
     let first_m = result;
 
@@ -119,11 +121,15 @@ pub async fn select(stack: &mut AbstractTaskMetaData, env: &LEnv) -> LResult {
             Returns all applicable methods sorted by their score
              */
             info!("select greedy for {}", stack.get_label());
-            select::greedy_select(state, tried, task, env).await?
+            select::greedy_select(state, tried, task, env)
+                .await
+                .map_err(|e| e.chain("greedy_select"))?
         }
         SelectMode::Planning(Planner::Aries, bool) => {
             info!("select with aries for {}", stack.get_label());
-            select::planning_select(state, tried, task, env, *bool).await?
+            select::planning_select(state, tried, task, env, *bool)
+                .await
+                .map_err(|e| e.chain("planning_select"))?
         }
         _ => todo!(),
     };
@@ -160,9 +166,11 @@ mod select {
     use ompas_rae_structs::plan::AbstractTaskInstance;
     use ompas_rae_structs::state::world_state::WorldStateSnapshot;
     use rand::prelude::SliceRandom;
+    use sompas_core::eval;
     use sompas_core::modules::get;
     use sompas_core::modules::list::cons;
-    use sompas_modules::utils::{enr, enumerate};
+    use sompas_modules::utils::{enumerate, EVAL_NON_RECURSIVE};
+    use sompas_structs::lcoreoperator::LCoreOperator;
     use sompas_structs::{list, lruntimeerror};
     use std::time::Instant;
 
@@ -409,10 +417,31 @@ mod select {
             for i in iter {
                 let i_vec: Vec<LValue> = i.borrow().try_into()?;
                 let arg = cons(env, &[pre_conditions_lambda.clone(), i_vec[1..].into()])?;
-                let lv: LValue = enr(env, &[arg]).await?;
+                let arg_debug = arg.to_string();
+                let lv: LValue = eval(
+                    &list!(
+                        LCoreOperator::Enr.into(),
+                        list!(LCoreOperator::Quote.into(), arg)
+                    ),
+                    &mut env.clone(),
+                    None,
+                )
+                .await
+                .map_err(|e| e.chain(format!("eval pre_conditions: {}", arg_debug)))?;
                 if !matches!(lv, LValue::Err(_)) {
                     let arg = cons(env, &[score_lambda.clone(), i_vec[1..].into()])?;
-                    let score: i64 = enr(env, &[arg]).await?.try_into()?;
+                    let arg_debug = arg.to_string();
+                    let score: i64 = eval(
+                        &list!(
+                            LCoreOperator::Enr.into(),
+                            list!(LCoreOperator::Quote.into(), arg)
+                        ),
+                        &mut env.clone(),
+                        None,
+                    )
+                    .await
+                    .map_err(|e| e.chain(format!("eval score: {}", arg_debug)))?
+                    .try_into()?;
                     applicable_methods.push((i, score))
                 }
             }

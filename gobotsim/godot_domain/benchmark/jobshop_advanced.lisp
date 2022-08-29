@@ -1,12 +1,12 @@
 (begin
-    (def-lambda '(go_random (lambda (?r ?l ?u)
+    (def-lambda 'go_random '(lambda (?r ?l ?u)
                             (let ((x (rand-int-in-range ?l ?u))
                                   (y (rand-int-in-range ?l ?u)))
-                                  (navigate_to ?r x y)))))
+                                  (navigate_to ?r x y))))
 
     (def-lambda
-        '(find_machines_for_process
-            (lambda (?process)
+        'find_machines_for_process
+            '(lambda (?process)
                 (begin
                     (define __process__
                         (lambda (?p seq)
@@ -17,11 +17,11 @@
                                     (__process__ ?p (cdr seq))))))
                     (define machines (instance machine))
                     (define result (__process__ ?process machines))
-                    result))))
+                    result)))
 
 
-    (def-lambda '(available_robots
-        (lambda nil
+    (def-lambda 'available_robots
+        '(lambda nil
             (begin
                 (define __l_available_robots__
                     (lambda (l)
@@ -30,7 +30,7 @@
                             (if (not (locked? (car l)))
                                 (cons (car l) (__l_available_robots__ (cdr l)))
                                 (__l_available_robots__ (cdr l))))))
-                (__l_available_robots__ (instance robot))))))
+                (__l_available_robots__ (instance robot)))))
 
     (def-lambda '(find_output_machine 
         (lambda nil

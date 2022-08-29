@@ -259,10 +259,11 @@ impl Display for LValue {
             }
             LValue::Lambda(l) => write!(f, "{}", l),
             LValue::Map(m) => {
-                let mut result = String::new();
+                let mut result = "[".to_string();
                 for (key, value) in m.iter() {
-                    result.push_str(format!("{}: {}\n", key, value).as_str());
+                    result.push_str(format!("{} : {}\n", key, value).as_str());
                 }
+                result.push(']');
                 write!(f, "{}", result)
             }
             //LValue::Quote(q) => write!(f, "{}", q),

@@ -17,7 +17,7 @@ pub const MACRO_RUN_MONITORING: &str = "(defmacro run-monitoring
 ))";
 //RAE Interface with a platform
 
-pub const RAE_GET_STATE_VARIBALE: &str = "rae-get-state-variable";
+pub const RAE_READ_STATE: &str = "read-state";
 
 pub const RAE_CANCEL_COMMAND: &str = "rae-cancel-command";
 pub const RAE_GET_INSTANTIATED_METHODS: &str = "rae-get-instantiated-methods";
@@ -90,7 +90,7 @@ pub const MACRO_MUTEX_LOCK_IN_LIST_AND_DO: &str = "(defmacro mutex::lock-in-list
             ,b
             (release r))))";
 
-pub const RAE_EXEC_COMMAND: &str = "rae-exec-command";
+pub const RAE_EXEC_COMMAND: &str = "exec-command";
 pub const RAE_LAUNCH_PLATFORM: &str = "rae-launch-platform";
 pub const RAE_OPEN_COM_PLATFORM: &str = "rae-open-com-platform";
 pub const RAE_START_PLATFORM: &str = "rae-start-platform";
@@ -98,7 +98,7 @@ pub const RAE_IS_PLATFORM_DEFINED: &str = "rae-platform?";
 
 pub const REFINE: &str = "refine";
 pub const RETRY: &str = "retry";
-pub const LAMBDA_RAE_EXEC_TASK: &str = "(define rae-exec-task
+pub const LAMBDA_RAE_EXEC_TASK: &str = "(define exec-task
     (lambda task
         (begin
             (define result (enr (cons 'refine task)))
@@ -211,16 +211,16 @@ pub const GENERATE_ACTION_MODEL: &str = "generate-action-model";
 pub const GENERATE_ACTION_OPERATIONAL_MODEL: &str = "generate-action-operational-model";
 pub const GENERATE_METHOD: &str = "generate-method";*/
 
-pub const RAE_DEF_STATE_FUNCTION: &str = "def-state-function";
-pub const RAE_DEF_COMMAND: &str = "def-command";
-pub const RAE_DEF_COMMAND_MODEL: &str = "def-action-model";
-pub const RAE_DEF_TASK_MODEL: &str = "def-task-model";
-pub const RAE_DEF_METHOD_MODEL: &str = "def-method-model";
+pub const RAE_ADD_STATE_FUNCTION: &str = "add-state-function";
+pub const RAE_ADD_COMMAND: &str = "add-command";
+pub const RAE_ADD_COMMAND_MODEL: &str = "add-action-model";
+pub const RAE_ADD_TASK_MODEL: &str = "add-task-model";
+pub const RAE_ADD_METHOD_MODEL: &str = "add-method-model";
 //pub const RAE_DEF_ACTION_OPERATIONAL_MODEL: &str = "def-action-operational-model";
-pub const RAE_DEF_TASK: &str = "def-task";
-pub const RAE_DEF_METHOD: &str = "def-method";
-pub const RAE_DEF_LAMBDA: &str = "def-lambda";
-pub const RAE_DEF_INITIAL_STATE: &str = "def-initial-state";
+pub const RAE_ADD_TASK: &str = "add-task";
+pub const RAE_ADD_METHOD: &str = "add-method";
+pub const RAE_ADD_LAMBDA: &str = "add-lambda";
+pub const RAE_ADD_INITIAL_STATE: &str = "def-initial-state";
 pub const RAE_ADD_CONSTANT: &str = "add-constant";
 pub const RAE_ADD_TYPE: &str = "add-type";
 pub const RAE_ADD_OBJECT: &str = "add-object";
@@ -228,20 +228,20 @@ pub const RAE_DEF_OBJECTS: &str = "def-objects";
 pub const RAE_DEF_TYPES: &str = "def-types";
 pub const RAE_DEF_CONSTANTS: &str = "def-constants";
 
-pub const DOC_DEF_STATE_FUNCTION: &str = "Insert a state function in RAE environment.";
-pub const DOC_DEF_STATE_FUNCTION_VERBOSE: &str =
+pub const DOC_ADD_STATE_FUNCTION: &str = "Insert a state function in RAE environment.";
+pub const DOC_ADD_STATE_FUNCTION_VERBOSE: &str =
     "Example:\n(def-state-function robot.coordinates ?r)";
-pub const DOC_DEF_ACTION: &str = "Insert an action in RAE environment.";
-pub const DOC_DEF_ACTION_VERBOSE: &str = "Example:\n(def-action pick ?r)";
-pub const DOC_DEF_TASK: &str = "Insert a task in RAE environment";
-pub const DOC_DEF_TASK_VERBOSE: &str = "Example:\n(def-task t_navigate_to ?r ?x ?y)";
-pub const DOC_DEF_METHOD: &str = "Insert a method in RAE environment.";
-pub const DOC_DEF_METHOD_VERBOSE: &str =
+pub const DOC_ADD_ACTION: &str = "Insert an action in RAE environment.";
+pub const DOC_ADD_ACTION_VERBOSE: &str = "Example:\n(def-action pick ?r)";
+pub const DOC_ADD_TASK: &str = "Insert a task in RAE environment";
+pub const DOC_ADD_TASK_VERBOSE: &str = "Example:\n(def-task t_navigate_to ?r ?x ?y)";
+pub const DOC_ADD_METHOD: &str = "Insert a method in RAE environment.";
+pub const DOC_ADD_METHOD_VERBOSE: &str =
     "Example:\n(def-method m_navigate_to '((:task t_navigate_to)(:params ?r ?x ?y)(:body (begin\n\
         \t(rae-await (navigate_to ?r ?x ?y))\n\
         \t(rae-await (navigate_to ?r (+ ?x 1) (+ ?y 1)))))))";
-pub const DOC_DEF_LAMBDA: &str = "Add a lambda to RAE environment";
-pub const DOC_DEF_INITIAL_STATE: &str = "Add initial facts in the state.\
+pub const DOC_ADD_LAMBDA: &str = "Add a lambda to RAE environment";
+pub const DOC_ADD_INITIAL_STATE: &str = "Add initial facts in the state.\
 Most of the time it is general knowledge and not initialisation of facts.";
 
 /*/// Macro used to generate code to define a task in the simplified representation in RAE environment.

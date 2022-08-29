@@ -66,6 +66,7 @@ pub const BEGIN: &str = "begin";
 pub const ASYNC: &str = "async";
 pub const AWAIT: &str = "await";
 pub const RACE: &str = "race";
+pub const ENR: &str = "enr";
 pub const EVAL: &str = "eval";
 pub const PARSE: &str = "parse";
 pub const EXPAND: &str = "expand";

@@ -2,7 +2,7 @@ use crate::lruntimeerror::LRuntimeError;
 use crate::lvalue::{LValue, RefLValue};
 use serde::*;
 use sompas_language::{
-    ASYNC, AWAIT, BEGIN, DEFINE, DEF_MACRO, DO, EVAL, EXPAND, IF, INTERRUPT, INTERRUPTIBLE,
+    ASYNC, AWAIT, BEGIN, DEFINE, DEF_MACRO, DO, ENR, EVAL, EXPAND, IF, INTERRUPT, INTERRUPTIBLE,
     INTERRUPTIBLE_SHORT, LAMBDA, PARSE, QUASI_QUOTE, QUOTE, RACE, UNINTERRUPTIBLE,
     UNINTERRUPTIBLE_SHORT, UNQUOTE,
 };
@@ -43,6 +43,7 @@ pub enum LCoreOperator {
     Interrupt,
     Interruptible,
     Uninterruptible,
+    Enr,
     //QuasiInterruptible,
     Race,
 }
@@ -68,6 +69,7 @@ impl Display for LCoreOperator {
             LCoreOperator::Interruptible => INTERRUPTIBLE,
             LCoreOperator::Uninterruptible => UNINTERRUPTIBLE,
             LCoreOperator::Race => RACE,
+            LCoreOperator::Enr => ENR,
         };
 
         write!(f, "{}", str)
@@ -103,6 +105,7 @@ impl TryFrom<&str> for LCoreOperator {
             INTERRUPTIBLE | INTERRUPTIBLE_SHORT => Ok(LCoreOperator::Interruptible),
             UNINTERRUPTIBLE | UNINTERRUPTIBLE_SHORT => Ok(LCoreOperator::Uninterruptible),
             RACE => Ok(LCoreOperator::Race),
+            ENR => Ok(LCoreOperator::Enr),
             //QUASI_INTERRUPTIBLE => Ok(LCoreOperator::QuasiInterruptible),
             _ => Err(LRuntimeError::new(
                 "LCoreOperator::TryFrom<str>",

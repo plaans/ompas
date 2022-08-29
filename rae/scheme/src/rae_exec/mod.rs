@@ -154,7 +154,7 @@ impl IntoModule for CtxRaeExec {
 
         module.add_async_fn_prelude(RAE_GET_STATE, get_state);
         module.add_async_fn_prelude(RAE_GET_FACTS, get_facts);
-        module.add_async_fn_prelude(RAE_GET_STATE_VARIBALE, get_state_variable);
+        module.add_async_fn_prelude(RAE_READ_STATE, read_state);
         module.add_async_fn_prelude(RAE_EXEC_COMMAND, exec_command);
         module.add_async_fn_prelude(RAE_LAUNCH_PLATFORM, launch_platform);
         //module.add_async_fn_prelude(RAE_GET_STATUS, get_status);
@@ -560,12 +560,12 @@ async fn get_state(env: &LEnv, args: &[LValue]) -> LResult {
 }
 
 #[async_scheme_fn]
-async fn get_state_variable(env: &LEnv, args: &[LValue]) -> LResult {
+async fn read_state(env: &LEnv, args: &[LValue]) -> LResult {
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
 
     if args.is_empty() {
         return Err(LRuntimeError::wrong_number_of_args(
-            RAE_GET_STATE_VARIBALE,
+            RAE_READ_STATE,
             args,
             1..usize::MAX,
         ));
@@ -606,7 +606,7 @@ async fn get_state_variable(env: &LEnv, args: &[LValue]) -> LResult {
             get_map(env, &[state, key])
         }
         _ => Err(lruntimeerror!(
-            RAE_GET_STATE_VARIBALE,
+            RAE_READ_STATE,
             format!(
                 "RAE_MODE must have the value {} or {} (value = {}).",
                 SYMBOL_EXEC_MODE, SYMBOL_SIMU_MODE, rae_mode,

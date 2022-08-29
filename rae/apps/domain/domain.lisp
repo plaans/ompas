@@ -1,7 +1,7 @@
 (begin
-    (def-command (command process (:params (?m machine) (?p package))))
-    (def-task (task t_process_package (:params (?p package))))
-    (def-method (method m_process_to_do_r
+    (def-command process (:params (?m machine) (?p package)))
+    (def-task t_process_package (:params (?p package)))
+    (def-method m_process_to_do_r
         (:task t_process_package)
         (:params (?p package))
         (:pre-conditions (check (!= (package.processes_list ?p) nil)))
@@ -12,5 +12,10 @@
                     (arbitrary (find_machines_for_process
                             (caar (unzip (package.processes_list ?p))))))
                     (t_process_on_machine ?p ?m)
-                    (t_process_package ?p)))))
+                    (t_process_package ?p))))
+    (def-state-function robot.coordinates (:params (?r robot)) (:result (tuple int int)))
+    (def-lambda go_random (lambda (?r ?l ?u)
+                                (let ((x (rand-int-in-range ?l ?u))
+                                      (y (rand-int-in-range ?l ?u)))
+                                      (navigate_to ?r x y))))
 )

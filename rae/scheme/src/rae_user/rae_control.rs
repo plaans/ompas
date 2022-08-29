@@ -1,4 +1,4 @@
-use crate::rae_user::{CtxRae, MOD_RAE};
+use crate::rae_user::{CtxRae, MOD_RAE_USER};
 use ompas_rae_core::{rae_run, TOKIO_CHANNEL_SIZE};
 use ompas_rae_language::*;
 use ompas_rae_structs::job::{Job, JobType};
@@ -15,7 +15,7 @@ use tokio::sync::mpsc;
 /// Launch main loop of rae in an other asynchronous task.
 #[async_scheme_fn]
 pub async fn rae_launch(env: &LEnv) -> &str {
-    let ctx = env.get_context::<CtxRae>(MOD_RAE).unwrap();
+    let ctx = env.get_context::<CtxRae>(MOD_RAE_USER).unwrap();
 
     let options = ctx.get_options().await.clone();
 
@@ -29,7 +29,7 @@ pub async fn rae_launch(env: &LEnv) -> &str {
 
 #[async_scheme_fn]
 pub async fn configure_platform(env: &LEnv, args: &[LValue]) -> LResult {
-    let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
+    let ctx = env.get_context::<CtxRae>(MOD_RAE_USER)?;
     if args.is_empty() {
         return Err(LRuntimeError::wrong_number_of_args(
             RAE_CONFIGURE_PLATFORM,
@@ -48,7 +48,7 @@ pub async fn configure_platform(env: &LEnv, args: &[LValue]) -> LResult {
 }
 #[async_scheme_fn]
 pub async fn configure_select(env: &LEnv, m: String) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<CtxRae>(MOD_RAE).unwrap();
+    let ctx = env.get_context::<CtxRae>(MOD_RAE_USER).unwrap();
 
     let select_mode = match m.as_str() {
         GREEDY => SelectMode::Greedy,
@@ -85,7 +85,7 @@ pub fn trigger_event() -> &str {
 pub async fn trigger_task(env: &LEnv, args: &[LValue]) -> LAsyncHandler {
     let env = env.clone();
 
-    let ctx = env.get_context::<CtxRae>(MOD_RAE).unwrap();
+    let ctx = env.get_context::<CtxRae>(MOD_RAE_USER).unwrap();
     let (tx, mut rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
     let job = Job::new(tx, args.into(), JobType::Task);
     let sender = ctx.sender_to_rae.clone().unwrap();

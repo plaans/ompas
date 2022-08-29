@@ -79,8 +79,16 @@ impl Display for Type {
 impl TryFrom<&LValue> for Type {
     type Error = LRuntimeError;
 
+    fn try_from(value: &LValue) -> Result<Self, Self::Error> {
+        value.clone().try_into()
+    }
+}
+
+impl TryFrom<LValue> for Type {
+    type Error = LRuntimeError;
+
     #[function_name::named]
-    fn try_from(lv: &LValue) -> Result<Self, Self::Error> {
+    fn try_from(lv: LValue) -> Result<Self, Self::Error> {
         let err = lruntimeerror!(
             function_name!(),
             format!("{} or {} was expected", TUPLE_TYPE, LIST)
@@ -118,7 +126,7 @@ impl TryFrom<&LValue> for Type {
             }
             _ => Err(LRuntimeError::not_in_list_of_expected_types(
                 function_name!(),
-                lv,
+                &lv,
                 vec![KindLValue::Symbol, KindLValue::List],
             )),
         }

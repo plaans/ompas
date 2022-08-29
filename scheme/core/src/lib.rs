@@ -329,6 +329,15 @@ pub async fn expand(x: &LValue, top_level: bool, env: &mut LEnv) -> LResult {
                             Ok(expanded.into())
                         }
                     }
+                    LCoreOperator::Enr => {
+                        return if list.len() != 2 {
+                            Err(wrong_n_args!("expand", list, 2))
+                        } else {
+                            let mut expanded = vec![LCoreOperator::Enr.into()];
+                            expanded.push(expand(&list[1], top_level, env).await?);
+                            Ok(expanded.into())
+                        }
+                    }
                     LCoreOperator::Parse => {
                         return if list.len() != 2 {
                             Err(wrong_n_args!("expand", list, 2))
@@ -559,6 +568,18 @@ pub async fn eval(
                         results.pop();
                         results.push(error.clone());
                     }
+                    CoreOperatorFrame::Enr => {
+                        results.pop();
+                        results.push(error.clone());
+                    }
+                    CoreOperatorFrame::EvalEnd => {
+                        results.pop();
+                        results.push(error.clone());
+                    }
+                    CoreOperatorFrame::EnrEnd => {
+                        results.pop();
+                        results.push(error.clone());
+                    }
                 },
             }
             debug.print_last_result(&results);
@@ -725,6 +746,16 @@ pub async fn eval(
                                     ));
                                     queue.push(StackFrame::new(
                                         CoreOperatorFrame::Expand,
+                                        interruptibility,
+                                    ));
+                                    queue.push(StackFrame::new_lvalue(
+                                        args[0].clone(),
+                                        interruptibility,
+                                    ));
+                                }
+                                LCoreOperator::Enr => {
+                                    queue.push(StackFrame::new(
+                                        CoreOperatorFrame::Enr,
                                         interruptibility,
                                     ));
                                     queue.push(StackFrame::new_lvalue(
@@ -1026,6 +1057,11 @@ pub async fn eval(
                     };
                 }
                 CoreOperatorFrame::Eval => {
+                    //debug.print_last_result(&results);
+                    queue.push(StackFrame::new(
+                        CoreOperatorFrame::EvalEnd,
+                        interruptibility,
+                    ));
                     queue.push(StackFrame::new_lvalue(
                         results.pop().unwrap(),
                         interruptibility,
@@ -1034,6 +1070,10 @@ pub async fn eval(
                 CoreOperatorFrame::Expand => {
                     let result = results.pop().unwrap();
                     results.push(expand(&result, true, scopes.get_last_mut()).await?);
+                    debug.push(
+                        Unininterruptible,
+                        list!(LCoreOperator::Expand.into(), result),
+                    );
                     debug.print_last_result(&results);
                 }
                 CoreOperatorFrame::Parse => {
@@ -1046,6 +1086,25 @@ pub async fn eval(
                         expression_error = list![LCoreOperator::Parse.into(), result];
                         break Err(e.chain("Parse argument must be a string."));
                     };
+                }
+                CoreOperatorFrame::Enr => {
+                    let expr: LValue = results.pop().unwrap();
+                    let expr = match expr {
+                        LValue::List(list) => {
+                            let mut new_expr = vec![list[0].clone()];
+                            for e in &list.as_slice()[1..] {
+                                new_expr.push(list!(LCoreOperator::Quote.into(), e.clone()))
+                            }
+                            new_expr.into()
+                        }
+                        expr => expr,
+                    };
+                    debug.pop();
+                    queue.push(StackFrame::new(CoreOperatorFrame::EnrEnd, interruptibility));
+                    queue.push(StackFrame::new_lvalue(expr, interruptibility));
+                }
+                CoreOperatorFrame::EvalEnd | CoreOperatorFrame::EnrEnd => {
+                    debug.print_last_result(&results);
                 }
             },
         }

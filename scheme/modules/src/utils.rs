@@ -237,9 +237,9 @@ pub const LAMBDA_ARBITRARY: &str = "(define arbitrary
                     (f l)))
               (else nil)))) ; error cases";
 
-pub const LAMBDA_EVAL_NON_RECURSIVE: &str = "(define enr
-    (lambda (l)
-        (eval (cons (car l) (quote-list (cdr l))))))";
+/*pub const LAMBDA_EVAL_NON_RECURSIVE: &str = "(define enr
+(lambda (l)
+    (eval (cons (car l) (quote-list (cdr l))))))";*/
 
 pub const EVAL_NON_RECURSIVE: &str = "enr";
 
@@ -318,7 +318,7 @@ impl IntoModule for CtxUtils {
         };
 
         module.add_async_fn_prelude(ARBITRARY, arbitrary);
-        module.add_async_fn_prelude(EVAL_NON_RECURSIVE, enr);
+        //module.add_async_fn_prelude(EVAL_NON_RECURSIVE, enr);
         module.add_fn_prelude(RAND_ELEMENT, rand_element);
         module.add_fn_prelude(ENUMERATE, enumerate);
         module.add_fn_prelude(CONTAINS, contains);
@@ -390,7 +390,7 @@ pub async fn arbitrary(env: &LEnv, args: &[LValue]) -> LResult {
     }
 }
 
-#[async_scheme_fn]
+/*#[async_scheme_fn]
 pub async fn enr<'a>(env: &'a LEnv, mut args: Vec<LValue>) -> LResult {
     for (i, arg) in args.iter_mut().enumerate() {
         if i != 0 {
@@ -399,7 +399,7 @@ pub async fn enr<'a>(env: &'a LEnv, mut args: Vec<LValue>) -> LResult {
     }
 
     eval(&args.into(), &mut env.clone(), None).await
-}
+}*/
 
 ///Return enumeration from a list of list
 ///uses function from aries_utils

@@ -1,4 +1,4 @@
-use crate::rae_user::{CtxRae, MOD_RAE};
+use crate::rae_user::{CtxRae, MOD_RAE_USER};
 use ompas_rae_language::*;
 use ompas_rae_structs::domain::command::Command;
 use ompas_rae_structs::domain::method::Method;
@@ -19,7 +19,6 @@ use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalues::LValueS;
 use sompas_structs::{lruntimeerror, wrong_n_args, wrong_type};
 use std::convert::TryInto;
-use std::ops::Deref;
 
 const NAME: &str = ":name";
 const TASK: &str = ":task";
@@ -29,9 +28,10 @@ const BODY: &str = ":body";
 const MODEL: &str = ":model";
 const MODEL_TYPE: &str = ":model-type";
 const EFFECTS: &str = ":effects";
-const RESULT: &str = "result";
+const RESULT: &str = ":result";
+const SCORE: &str = ":score";
 
-pub const MACRO_COMMAND: &str = "(defmacro command
+pub const MACRO_DEF_COMMAND: &str = "(defmacro def-command
     (lambda attributes
         (let ((label (car attributes))
                 (attributes (cdr attributes)))
@@ -43,10 +43,10 @@ pub const MACRO_COMMAND: &str = "(defmacro command
                  (else (cons 
                         (cons (caar l) (list (cdar l)))
                         (__l__ (cdr l)))))))
-            `(map 
-                (quote ,(cons (cons ':name label) (__l__ attributes))))))))";
+            `(add-command (map 
+                (quote ,(cons (cons ':name label) (__l__ attributes)))))))))";
 
-pub const MACRO_METHOD: &str = "(defmacro method
+pub const MACRO_DEF_STATE_FUNCTION: &str = "(defmacro def-state-function
     (lambda attributes
         (let ((label (car attributes))
                 (attributes (cdr attributes)))
@@ -58,10 +58,10 @@ pub const MACRO_METHOD: &str = "(defmacro method
                  (else (cons 
                         (cons (caar l) (list (cdar l)))
                         (__l__ (cdr l)))))))
-            `(map 
-                (quote ,(cons (cons ':name label) (__l__ attributes))))))))";
+            `(add-state-function (map 
+                (quote ,(cons (cons ':name label) (__l__ attributes)))))))))";
 
-pub const MACRO_TASK: &str = "(defmacro task
+pub const MACRO_DEF_METHOD: &str = "(defmacro def-method
     (lambda attributes
         (let ((label (car attributes))
                 (attributes (cdr attributes)))
@@ -73,8 +73,27 @@ pub const MACRO_TASK: &str = "(defmacro task
                  (else (cons 
                         (cons (caar l) (list (cdar l)))
                         (__l__ (cdr l)))))))
-            `(map 
-                (quote ,(cons (cons ':name label) (__l__ attributes))))))))";
+            `(add-method (map 
+                (quote ,(cons (cons ':name label) (__l__ attributes)))))))))";
+
+pub const MACRO_DEF_TASK: &str = "(defmacro def-task
+    (lambda attributes
+        (let ((label (car attributes))
+                (attributes (cdr attributes)))
+
+        (begin
+            (define __l__ (lambda (l)
+                (cond
+                 ((null? l) nil)
+                 (else (cons 
+                        (cons (caar l) (list (cdar l)))
+                        (__l__ (cdr l)))))))
+            `(add-task (map 
+                (quote ,(cons (cons ':name label) (__l__ attributes)))))))))";
+
+pub const MACRO_DEF_LAMBDA: &str = "(defmacro def-lambda
+    (lambda (label lambda)
+            `(add-lambda ',label ',lambda)))";
 pub const MACRO_PDDL_MODEL: &str = "(defmacro pddl-model
     (lambda attributes
     (begin
@@ -121,7 +140,7 @@ impl IntoModule for CtxRaeDescription {
                 MACRO_AND_EFFECT,
             ]
             .into(),
-            label: MOD_RAE_DESCRIPTION.to_string(),
+            label: MOD_RAE_USER_DESCRIPTION.to_string(),
         };
 
         //module.add_fn_prelude(F_AND_COND, f_and_cond);
@@ -234,35 +253,29 @@ pub async fn generate_test_type_expr(env: &LEnv, params: Vec<LValue>) -> LResult
 
 /// Defines a lambda in RAE environment.
 #[async_scheme_fn]
-pub async fn def_lambda(env: &LEnv, list: Vec<LValue>) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<CtxRae>(MOD_RAE).unwrap();
+pub async fn add_lambda(env: &LEnv, label: String, lambda: &LValue) -> Result<(), LRuntimeError> {
+    let ctx = env.get_context::<CtxRae>(MOD_RAE_USER).unwrap();
     let mut env = ctx.get_rae_env().read().await.env.clone();
-
-    if let LValue::Symbol(label) = &list[0] {
-        let expanded = expand(&list[1], true, &mut env).await?;
-        let mut e = get_root_env().await;
-        let result = eval(&expanded, &mut e, None).await?;
-        if let LValue::Lambda(_) = &result {
-            ctx.get_rae_env()
-                .write()
-                .await
-                .add_lambda(label.deref().clone(), result);
-        }
+    let expanded = expand(lambda, true, &mut env).await?;
+    let mut e = get_root_env().await;
+    let result = eval(&expanded, &mut e, None).await?;
+    if let LValue::Lambda(_) = &result {
+        ctx.get_rae_env().write().await.add_lambda(label, result);
     }
     Ok(())
 }
 
 /// Defines a state function in RAE environment.
 #[async_scheme_fn]
-pub async fn def_state_function(
+pub async fn add_state_function(
     env: &LEnv,
     map: im::HashMap<LValue, LValue>,
 ) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
-    let mut env = ctx.get_rae_env().read().await.env.clone();
+    let ctx = env.get_context::<CtxRae>(MOD_RAE_USER)?;
+    let mut new_env = ctx.get_rae_env().read().await.env.clone();
     let label = map.get(&NAME.into()).unwrap();
     let params: Parameters = map.get(&PARAMETERS.into()).unwrap().try_into()?;
-    let result = map.get(&RESULT.into()).unwrap().try_into()?;
+    let result = car(env, &[map.get(&RESULT.into()).unwrap().clone()])?.try_into()?;
     let expr = format!(
         "(lambda {}
                 (read-state '{} {})))",
@@ -277,7 +290,7 @@ pub async fn def_state_function(
             str
         }
     );
-    let body = eval(&parse(&expr, &mut env).await?, &mut env, None).await?;
+    let body = eval(&parse(&expr, &mut new_env).await?, &mut new_env, None).await?;
     let state_function = StateFunction::new(label.to_string(), params, result, body);
     ctx.get_rae_env()
         .write()
@@ -288,18 +301,18 @@ pub async fn def_state_function(
 
 /// Defines an action in RAE environment.
 #[async_scheme_fn]
-pub async fn def_command(
+pub async fn add_command(
     env: &LEnv,
     map: im::HashMap<LValue, LValue>,
 ) -> Result<(), LRuntimeError> {
     if map.is_empty() {
         return Err(LRuntimeError::wrong_number_of_args(
-            RAE_DEF_COMMAND,
+            RAE_ADD_COMMAND,
             &[map.into()],
             1..usize::MAX,
         ));
     }
-    let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
+    let ctx = env.get_context::<CtxRae>(MOD_RAE_USER)?;
     let mut env = ctx.get_rae_env().read().await.env.clone();
     let mut command = Command::default();
     command.set_label(map.get(&NAME.into()).unwrap().to_string());
@@ -323,8 +336,7 @@ pub async fn def_command(
         &mut env,
     )
     .await?;
-    let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
-    let mut env = ctx.get_rae_env().read().await.env.clone();
+
     let exec = eval(&expand(&lv_exec, true, &mut env).await?, &mut env, None).await?;
 
     command.set_body(exec);
@@ -343,25 +355,29 @@ pub async fn def_command(
 }
 
 #[async_scheme_fn]
-pub async fn def_task(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<(), LRuntimeError> {
+pub async fn add_task(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<(), LRuntimeError> {
     if map.is_empty() {
         return Err(LRuntimeError::wrong_number_of_args(
-            RAE_DEF_COMMAND,
+            RAE_ADD_TASK,
             &[map.into()],
             1..usize::MAX,
         ));
     }
-    let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
+    let ctx = env.get_context::<CtxRae>(MOD_RAE_USER)?;
     let mut env = ctx.get_rae_env().read().await.env.clone();
 
     let mut task = Task::default();
     task.set_label(map.get(&NAME.into()).unwrap().to_string());
-    task.set_parameters(map.get(&PARAMETERS.into()).unwrap().try_into()?);
+    task.set_parameters(
+        map.get(&PARAMETERS.into())
+            .unwrap_or(&LValue::Nil)
+            .try_into()?,
+    );
     let params = task.get_parameters().get_params_as_lvalue();
     let params_list = task.get_parameters().get_params();
     let lv_exec: LValue = parse(
         &format!(
-            "(lambda {} (await (exec-task {} {})))",
+            "(lambda {} (await (exec-task '{} {})))",
             params,
             task.get_label(),
             {
@@ -395,16 +411,16 @@ pub async fn def_task(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<()
 
 /// Defines a method in RAE environment.
 #[async_scheme_fn]
-pub async fn def_method(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<(), LRuntimeError> {
+pub async fn add_method(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<(), LRuntimeError> {
     if map.is_empty() {
         return Err(LRuntimeError::wrong_number_of_args(
-            RAE_DEF_METHOD,
+            RAE_ADD_METHOD,
             &[map.into()],
             1..usize::MAX,
         ));
     }
-    let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
-    let mut env = ctx.get_rae_env().read().await.env.clone();
+    let ctx = env.get_context::<CtxRae>(MOD_RAE_USER)?;
+    let mut new_env = ctx.get_rae_env().read().await.env.clone();
 
     //Definition of the method
     let mut method = Method {
@@ -423,7 +439,7 @@ pub async fn def_method(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<
                 method.parameters.get_params_as_lvalue(),
                 test
             );
-            eval(&parse(&expr, &mut env).await?, &mut env, None).await?
+            eval(&parse(&expr, &mut new_env).await?, &mut new_env, None).await?
         }
         Some(conds) => {
             let test =
@@ -436,10 +452,26 @@ pub async fn def_method(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<
                 test,
                 conds
             );
-            eval(&parse(&expr, &mut env).await?, &mut env, None).await?
+            eval(&parse(&expr, &mut new_env).await?, &mut new_env, None).await?
         }
     };
     method.lambda_pre_conditions = conds;
+
+    let score = match map.get(&SCORE.into()) {
+        None => {
+            let expr = format!("(lambda {} 0)", method.parameters.get_params_as_lvalue(),);
+            eval(&parse(&expr, &mut new_env).await?, &mut new_env, None).await?
+        }
+        Some(score) => {
+            let expr = format!(
+                "(lambda {} {})",
+                method.parameters.get_params_as_lvalue(),
+                car(&env, &[score.clone()])?
+            );
+            eval(&parse(&expr, &mut new_env).await?, &mut new_env, None).await?
+        }
+    };
+    method.lambda_score = score;
 
     let conds = cons(
         &LEnv::default(),
@@ -454,12 +486,12 @@ pub async fn def_method(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<
         method.parameters.get_params_as_lvalue(),
         conds,
         car(
-            &env,
+            &new_env,
             &[map.get(&BODY.into()).unwrap_or(&LValue::Nil).clone()]
         )?
     );
 
-    method.lambda_body = eval(&parse(&expr, &mut env).await?, &mut env, None).await?;
+    method.lambda_body = eval(&parse(&expr, &mut new_env).await?, &mut new_env, None).await?;
 
     ctx.get_rae_env()
         .write()
@@ -538,12 +570,12 @@ async fn create_model(env: &mut LEnv, model: im::HashMap<LValue, LValue>) -> LRe
 }
 
 #[async_scheme_fn]
-pub async fn def_command_model(
+pub async fn add_command_model(
     env: &LEnv,
     label: String,
     model: im::HashMap<LValue, LValue>,
 ) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
+    let ctx = env.get_context::<CtxRae>(MOD_RAE_USER)?;
     let mut env = ctx.get_rae_env().read().await.env.clone();
 
     let model = create_model(&mut env, model).await?;
@@ -555,12 +587,12 @@ pub async fn def_command_model(
 }
 
 #[async_scheme_fn]
-pub async fn def_task_model(
+pub async fn add_task_model(
     env: &LEnv,
     label: String,
     model: im::HashMap<LValue, LValue>,
 ) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
+    let ctx = env.get_context::<CtxRae>(MOD_RAE_USER)?;
     let mut env = ctx.get_rae_env().read().await.env.clone();
     let model = create_model(&mut env, model).await?;
     ctx.get_rae_env()
@@ -573,7 +605,7 @@ pub async fn def_task_model(
 ///Takes in input a list of initial facts that will be stored in the inner world part of the State.
 #[async_scheme_fn]
 pub async fn def_initial_state(env: &LEnv, map: im::HashMap<LValue, LValue>) {
-    let ctx = env.get_context::<CtxRae>(MOD_RAE).unwrap();
+    let ctx = env.get_context::<CtxRae>(MOD_RAE_USER).unwrap();
 
     let mut inner_world = PartialState {
         inner: Default::default(),
@@ -657,7 +689,7 @@ pub async fn def_objects(env: &LEnv, args: Vec<Vec<LValue>>) -> Result<(), LRunt
 
 #[async_scheme_fn]
 pub async fn add_type(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<CtxRae>(MOD_RAE).unwrap();
+    let ctx = env.get_context::<CtxRae>(MOD_RAE_USER).unwrap();
 
     let (t, parent) = match args.len() {
         1 => (args[0].to_string(), None),
@@ -710,7 +742,7 @@ pub async fn add_object(env: &LEnv, constant: LValue, t: LValue) -> Result<(), L
     let constant: LValueS = constant.into();
     let t: LValueS = t.into();
 
-    let ctx = env.get_context::<CtxRae>(MOD_RAE).unwrap();
+    let ctx = env.get_context::<CtxRae>(MOD_RAE_USER).unwrap();
 
     let mut instances: PartialState = ctx
         .get_rae_env()

@@ -41,6 +41,9 @@ pub enum CoreOperatorFrame {
     Await,
     Interrupt,
     Eval,
+    EvalEnd,
+    Enr,
+    EnrEnd,
     Expand,
     Parse,
 }
@@ -86,11 +89,20 @@ impl Unstack for CoreOperatorFrame {
             CoreOperatorFrame::Eval => {
                 list!(LCoreOperator::Eval.into(), results.pop().unwrap())
             }
+            CoreOperatorFrame::Enr => {
+                list!(LCoreOperator::Enr.into(), results.pop().unwrap())
+            }
             CoreOperatorFrame::Expand => {
                 list!(LCoreOperator::Expand.into(), results.pop().unwrap())
             }
             CoreOperatorFrame::Parse => {
                 list!(LCoreOperator::Parse.into(), results.pop().unwrap())
+            }
+            CoreOperatorFrame::EvalEnd => {
+                list!(LCoreOperator::Eval.into(), results.pop().unwrap())
+            }
+            CoreOperatorFrame::EnrEnd => {
+                list!(LCoreOperator::Enr.into(), results.pop().unwrap())
             }
         }
     }
@@ -319,6 +331,10 @@ impl LDebug {
             },
             s
         ))
+    }
+
+    pub fn pop(&mut self) {
+        self.inner.pop();
     }
 
     pub fn print_last_result(&mut self, results: &Results) {

@@ -1,4 +1,4 @@
-use crate::rae_user::{CtxRae, MOD_RAE};
+use crate::rae_user::{CtxRae, MOD_RAE_USER};
 use aries_planning::chronicles::ChronicleKind;
 use ompas_rae_planning::conversion::convert_domain_to_chronicle_hierarchy;
 use ompas_rae_planning::conversion::post_processing::post_processing;
@@ -19,7 +19,7 @@ use std::time::SystemTime;
 
 #[async_scheme_fn]
 pub async fn convert_expr(env: &LEnv, expr: &LValue) -> Result<String, LRuntimeError> {
-    let ctx = env.get_context::<CtxRae>(MOD_RAE).unwrap();
+    let ctx = env.get_context::<CtxRae>(MOD_RAE_USER).unwrap();
     let mut context: ConversionContext = ctx.get_conversion_context().await;
 
     let lv = expand(expr, true, &mut context.env).await?;
@@ -48,7 +48,7 @@ pub async fn convert_expr(env: &LEnv, expr: &LValue) -> Result<String, LRuntimeE
 
 #[async_scheme_fn]
 pub async fn convert_domain(env: &LEnv) -> Result<String, LRuntimeError> {
-    let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
+    let ctx = env.get_context::<CtxRae>(MOD_RAE_USER)?;
     let context: ConversionContext = ctx.get_conversion_context().await;
     let time = SystemTime::now();
     let ch = convert_domain_to_chronicle_hierarchy(context)?;
@@ -58,7 +58,7 @@ pub async fn convert_domain(env: &LEnv) -> Result<String, LRuntimeError> {
 
 #[async_scheme_fn]
 pub async fn convert_cond_expr(env: &LEnv, expr: &LValue) -> Result<String, LRuntimeError> {
-    let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
+    let ctx = env.get_context::<CtxRae>(MOD_RAE_USER)?;
     let context: ConversionContext = ctx.get_conversion_context().await;
 
     let mut ch = ConversionCollection::default();
@@ -70,7 +70,7 @@ pub async fn convert_cond_expr(env: &LEnv, expr: &LValue) -> Result<String, LRun
 
 #[async_scheme_fn]
 pub async fn pre_process_lambda(env: &LEnv, expr: &LValue) -> LResult {
-    let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
+    let ctx = env.get_context::<CtxRae>(MOD_RAE_USER)?;
     let context: ConversionContext = ctx.get_conversion_context().await;
 
     transform_lambda_expression(expr, context.env)
@@ -78,7 +78,7 @@ pub async fn pre_process_lambda(env: &LEnv, expr: &LValue) -> LResult {
 
 #[async_scheme_fn]
 pub async fn pre_process_expr(env: &LEnv, expr: &LValue) -> LResult {
-    let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
+    let ctx = env.get_context::<CtxRae>(MOD_RAE_USER)?;
     let context: ConversionContext = ctx.get_conversion_context().await;
 
     pre_processing(expr, &context, &mut ConversionCollection::default())
@@ -88,7 +88,7 @@ pub async fn pre_process_expr(env: &LEnv, expr: &LValue) -> LResult {
 pub async fn pre_process_domain(env: &LEnv) -> Result<String, LRuntimeError> {
     //let mut context: Context = ctx.into();
     let mut str = "pre-processing of the domain:\n".to_string();
-    let ctx = env.get_context::<CtxRae>(MOD_RAE)?;
+    let ctx = env.get_context::<CtxRae>(MOD_RAE_USER)?;
     let rae_env: &RAEContext = &ctx.own_rae_env().await;
     let context: ConversionContext = ctx.get_conversion_context().await;
 

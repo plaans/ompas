@@ -35,7 +35,7 @@ pub mod rae_monitor;
 mod rae_planning;
 
 //LANGUAGE
-const MOD_RAE: &str = "rae";
+const MOD_RAE_USER: &str = "rae_user";
 const DOC_MOD_RAE: &str = "Module exposed to the user to configure and launch rae.";
 const DOC_MOD_RAE_VERBOSE: &str = "functions:\n\
 -getters : get-methods, get-actions, get-symbol-type, get-tasks, get-state-functions, get-env,\n\
@@ -59,15 +59,22 @@ pub struct CtxRae {
 
 impl IntoModule for CtxRae {
     fn into_module(self) -> Module {
-        let mut domain = self.domain.clone();
-        domain.append(&mut vec![MACRO_COMMAND, MACRO_TASK, MACRO_METHOD].into());
+        let mut init_lisp: InitLisp = vec![
+            MACRO_DEF_COMMAND,
+            MACRO_DEF_TASK,
+            MACRO_DEF_METHOD,
+            MACRO_DEF_LAMBDA,
+            MACRO_DEF_STATE_FUNCTION,
+        ]
+        .into();
+        init_lisp.append(&mut self.domain.clone());
 
         //let domain = Default::default();
         let mut module = Module {
             ctx: Context::new(self),
             prelude: vec![],
-            raw_lisp: domain,
-            label: MOD_RAE.to_string(),
+            raw_lisp: init_lisp,
+            label: MOD_RAE_USER.to_string(),
         };
 
         module.add_async_fn_prelude(RAE_LAUNCH, rae_launch);
@@ -83,14 +90,14 @@ impl IntoModule for CtxRae {
         module.add_async_fn_prelude(RAE_GET_CONFIG_SELECT, get_config_select);
 
         //Domain Definition
-        module.add_async_fn_prelude(RAE_DEF_STATE_FUNCTION, def_state_function);
-        module.add_async_fn_prelude(RAE_DEF_COMMAND, def_command);
-        module.add_async_fn_prelude(RAE_DEF_COMMAND_MODEL, def_command_model);
-        module.add_async_fn_prelude(RAE_DEF_TASK_MODEL, def_task_model);
-        module.add_async_fn_prelude(RAE_DEF_TASK, def_task);
-        module.add_async_fn_prelude(RAE_DEF_METHOD, def_method);
-        module.add_async_fn_prelude(RAE_DEF_LAMBDA, def_lambda);
-        module.add_async_fn_prelude(RAE_DEF_INITIAL_STATE, def_initial_state);
+        module.add_async_fn_prelude(RAE_ADD_STATE_FUNCTION, add_state_function);
+        module.add_async_fn_prelude(RAE_ADD_COMMAND, add_command);
+        module.add_async_fn_prelude(RAE_ADD_COMMAND_MODEL, add_command_model);
+        module.add_async_fn_prelude(RAE_ADD_TASK_MODEL, add_task_model);
+        module.add_async_fn_prelude(RAE_ADD_TASK, add_task);
+        module.add_async_fn_prelude(RAE_ADD_METHOD, add_method);
+        module.add_async_fn_prelude(RAE_ADD_LAMBDA, add_lambda);
+        module.add_async_fn_prelude(RAE_ADD_INITIAL_STATE, def_initial_state);
         module.add_async_fn_prelude(RAE_ADD_CONSTANT, add_object);
         module.add_async_fn_prelude(RAE_ADD_OBJECT, add_object);
         module.add_async_fn_prelude(RAE_ADD_TYPE, add_type);
@@ -127,7 +134,7 @@ impl IntoModule for CtxRae {
 
     fn documentation(&self) -> Documentation {
         vec![
-            LHelp::new_verbose(MOD_RAE, DOC_MOD_RAE, DOC_MOD_RAE_VERBOSE),
+            LHelp::new_verbose(MOD_RAE_USER, DOC_MOD_RAE, DOC_MOD_RAE_VERBOSE),
             LHelp::new(RAE_GET_METHODS, DOC_RAE_GET_METHODS),
             LHelp::new(RAE_GET_ACTIONS, DOC_RAE_GET_ACTIONS),
             LHelp::new_verbose(
@@ -142,15 +149,15 @@ impl IntoModule for CtxRae {
             LHelp::new(RAE_GET_STATE, DOC_RAE_GET_STATE),
             LHelp::new(RAE_GET_STATUS, DOC_RAE_GET_STATUS),
             LHelp::new_verbose(
-                RAE_DEF_STATE_FUNCTION,
-                DOC_DEF_STATE_FUNCTION,
-                DOC_DEF_STATE_FUNCTION_VERBOSE,
+                RAE_ADD_STATE_FUNCTION,
+                DOC_ADD_STATE_FUNCTION,
+                DOC_ADD_STATE_FUNCTION_VERBOSE,
             ),
-            LHelp::new_verbose(RAE_DEF_COMMAND, DOC_DEF_ACTION, DOC_DEF_ACTION_VERBOSE),
-            LHelp::new_verbose(RAE_DEF_TASK, DOC_DEF_TASK, DOC_DEF_TASK_VERBOSE),
-            LHelp::new_verbose(RAE_DEF_METHOD, DOC_DEF_METHOD, DOC_DEF_METHOD_VERBOSE),
-            LHelp::new(RAE_DEF_LAMBDA, DOC_DEF_LAMBDA),
-            LHelp::new(RAE_DEF_INITIAL_STATE, DOC_DEF_INITIAL_STATE),
+            LHelp::new_verbose(RAE_ADD_COMMAND, DOC_ADD_ACTION, DOC_ADD_ACTION_VERBOSE),
+            LHelp::new_verbose(RAE_ADD_TASK, DOC_ADD_TASK, DOC_ADD_TASK_VERBOSE),
+            LHelp::new_verbose(RAE_ADD_METHOD, DOC_ADD_METHOD, DOC_ADD_METHOD_VERBOSE),
+            LHelp::new(RAE_ADD_LAMBDA, DOC_ADD_LAMBDA),
+            LHelp::new(RAE_ADD_INITIAL_STATE, DOC_ADD_INITIAL_STATE),
             LHelp::new(RAE_CONFIGURE_PLATFORM, DOC_RAE_CONFIGURE_PLATFORM),
             LHelp::new(RAE_GET_CONFIG_PLATFORM, DOC_RAE_GET_CONFIG_PLATFORM),
             LHelp::new(RAE_GET_AGENDA, DOC_RAE_GET_AGENDA),

@@ -1,5 +1,4 @@
 use crate::state::partial_state::PartialState;
-use log::Level::Debug;
 use sompas_core::modules::map::union_map;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;

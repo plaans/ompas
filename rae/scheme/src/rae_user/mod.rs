@@ -234,7 +234,7 @@ impl CtxRaeUser {
         empty_env.import(CtxRaeExec::default(), WithoutPrefix);
         eval_init(&mut empty_env).await;
 
-        let channel = ompas_rae_log::init(log.clone(), true) //change with configurable display
+        let channel = ompas_rae_log::init(log.clone()) //change with configurable display
             .expect("Error while initiating logger.");
 
         Self {

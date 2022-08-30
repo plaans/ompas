@@ -3,7 +3,6 @@ use log::{info, warn};
 use sompas_core::eval;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lvalue::LValue;
-use sompas_utils::task_handler;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{broadcast, oneshot, Mutex};

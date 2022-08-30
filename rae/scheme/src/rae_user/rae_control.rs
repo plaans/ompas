@@ -54,6 +54,11 @@ pub async fn launch(env: &LEnv) -> &str {
     tokio::spawn(async move {
         run(platform, domain, interface, env, rx, &options).await;
     });
+
+    if ctx.interface.log.display {
+        ompas_rae_log::display_logger(tx_killer.subscribe(), ctx.interface.log.path.clone());
+    }
+
     tokio::spawn(async move { monitor_rae(rx_stop, tx_killer).await });
     "rae launched succesfully"
 }

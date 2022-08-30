@@ -35,10 +35,10 @@ pub struct Logger {
 }
 
 impl Logger {
-    fn new(log_path: PathBuf, display: bool, killer: broadcast::Receiver<EndSignal>) -> Logger {
+    fn new(log_path: PathBuf, killer: broadcast::Receiver<EndSignal>) -> Logger {
         let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
 
-        tokio::spawn(async move { run_logger_file(rx, log_path, display, killer).await });
+        tokio::spawn(async move { run_logger_file(rx, log_path, killer).await });
         //tokio::spawn(async move { run_logger(rx).await });
 
         Logger { tx }
@@ -67,14 +67,32 @@ impl Log for Logger {
 
 /// Initiate new terminal and logger
 /// Build the global object
-pub fn init(log_path: PathBuf, display: bool) -> Result<mpsc::Sender<String>, SetLoggerError> {
+pub fn init(log_path: PathBuf) -> Result<mpsc::Sender<String>, SetLoggerError> {
     let killer = subscribe_new_task();
-    let logger = Logger::new(log_path, display, killer);
+    let logger = Logger::new(log_path, killer);
     let sender = logger.tx.clone();
     match log::set_boxed_logger(Box::new(logger)).map(|()| log::set_max_level(LevelFilter::Info)) {
         Err(e) => Err(e),
         Ok(_) => Ok(sender),
     }
+}
+
+pub fn display_logger(mut killer: broadcast::Receiver<EndSignal>, log_path: PathBuf) {
+    tokio::spawn(async move {
+        let child = Command::new("gnome-terminal")
+            .args(&["--title", "RAE LOG", "--disable-factory"])
+            .args(&["--", "tail", "-f", log_path.to_str().unwrap()])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("could not spawn terminal");
+        killer.recv().await.expect("error on receiver");
+        //println!("killing rae log process : {}", child.id());
+        Command::new("pkill")
+            .args(["-P", child.id().to_string().as_str()])
+            .spawn()
+            .expect("error on killing process");
+    });
 }
 
 /// Task that is running asynchronously
@@ -85,7 +103,6 @@ pub fn init(log_path: PathBuf, display: bool) -> Result<mpsc::Sender<String>, Se
 async fn run_logger_file(
     mut rx: mpsc::Receiver<String>,
     log_path: PathBuf,
-    display: bool,
     mut killer: broadcast::Receiver<EndSignal>,
 ) {
     let mut file = OpenOptions::new()
@@ -100,19 +117,6 @@ async fn run_logger_file(
 
     //let mut logger_pid = None;
     //let mut first = true;
-
-    let child = if display {
-        let child = Command::new("gnome-terminal")
-            .args(&["--title", "RAE LOG", "--disable-factory"])
-            .args(&["--", "tail", "-f", log_path.to_str().unwrap()])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .expect("could not spawn terminal");
-        Some(child)
-    } else {
-        None
-    };
     //println!("child pid: {}", child.as_ref().unwrap().id());
 
     loop {
@@ -129,33 +133,19 @@ async fn run_logger_file(
                 }
             }
             _ = killer.recv() => {
-                if let Some(child) = child {
-                    println!("killing rae log process : {}", child.id());
-
-                    Command::new("pkill").args(["-P", child.id().to_string().as_str()]).spawn().expect("error on killing process");
-                    //child.kill().expect("not able to kill rae log");
-                }
-
-                /*if let Some(pid) = logger_pid {
-                    Command::new("kill")
-                    .args(&["-9", pid.as_str()]).spawn()
-                    .expect("Command failed.");
-                } else {
-                    println!("Could not kill terminal of RAE LOG...");
-                }*/
                 println!("Process RAE LOG killed.");
                 break;
             }
         }
     }
-    println!("Draining RAE log queue...");
+    //println!("Draining RAE log queue...");
     while let Some(msg) = rx.recv().await {
         file.write_all(format!("{}\n", msg).as_bytes())
             .expect("could not write to RAE log file");
     }
     file.write_all(END_MSG.as_bytes())
         .expect("could not write to RAE log file");
-    println!("RAE LOG task ended.");
+    //println!("RAE LOG task ended.");
 }
 
 /// Sends via tcp to logger.py strings that need to be logged.

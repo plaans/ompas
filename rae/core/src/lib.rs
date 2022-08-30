@@ -45,7 +45,7 @@ pub const TOKIO_CHANNEL_SIZE: usize = 100;
 pub async fn run(
     platform: Option<Platform>,
     domain: RAEDomain,
-    mut interface: RAEInterface,
+    interface: RAEInterface,
     mut env: LEnv,
     mut rx: Receiver<RAECommand>,
     options: &RAEOptions,

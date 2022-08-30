@@ -1,5 +1,10 @@
 (begin
     (def-command process (:params (?m machine) (?p package)))
+    (def-command-om-model process (:params (?m machine) (?p package)) (:body nil))
+
+    (def-command pick (:params (?r robot)))
+    (def-command-pddl-model process (:params (?r robot)) (:pre-conditions true) (:effects nil))
+
     (def-task t_process_package (:params (?p package)))
     (def-method m_process_to_do_r
         (:task t_process_package)

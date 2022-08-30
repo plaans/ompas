@@ -22,6 +22,7 @@ use sompas_utils::other::get_and_update_id_counter;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Instant;
 use std::{env, fs};
@@ -43,6 +44,23 @@ pub struct Agenda {
     tn: TaskNetwork,
     next_id: Arc<AtomicUsize>,
     time_reference: Instant,
+}
+
+impl Agenda {
+    pub async fn clear(&self) {
+        *self.trc.inner.write().await = Default::default();
+        *self.tn.subtasks.write().await = Default::default();
+        loop {
+            let id = self.next_id.load(Ordering::Relaxed);
+            if self
+                .next_id
+                .compare_exchange(id, id + 1, Ordering::Acquire, Ordering::Relaxed) //Equivalent to compare_and_swap
+                .is_ok()
+            {
+                break;
+            }
+        }
+    }
 }
 
 impl Default for Agenda {

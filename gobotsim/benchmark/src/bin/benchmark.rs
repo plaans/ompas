@@ -1,7 +1,7 @@
 use ompas_gobotsim::rae_interface::GodotDomain;
 use ompas_gobotsim::rae_interface::PlatformGodot;
-use ompas_rae_scheme::rae_exec::Platform;
-use ompas_rae_scheme::rae_user::CtxRae;
+use ompas_rae_scheme::rae_user::CtxRaeUser;
+use ompas_rae_structs::platform::Platform;
 use sompas_modules::advanced_math::CtxMath;
 use sompas_modules::io::CtxIo;
 use sompas_modules::string::CtxString;
@@ -106,7 +106,7 @@ pub async fn lisp_interpreter(opt: Opt) {
         PathBuf::from(format!("{}/ompas/benchmark", home))
     };
 
-    let ctx_rae = CtxRae::init_ctx_rae(
+    let ctx_rae = CtxRaeUser::new(
         Some(Platform::new(PlatformGodot::new(domain(&opt), !opt.view))),
         Some(log.clone()),
         false,

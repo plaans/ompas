@@ -12,6 +12,7 @@ yaml-rust = "0.4"
 structopt = { version = "0.3", default-features = false }
 ompas-gobotsim = {path = ".."}
 ompas-rae-scheme = {path = "../../rae/scheme"}
+ompas-rae-structs = {path = "../../rae/structs"}
 sompas-modules = {path = "../../scheme/modules"}
 sompas-repl = {path = "../../scheme/repl"}
 indicatif = "0.17.0"

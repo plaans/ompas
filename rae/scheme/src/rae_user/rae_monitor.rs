@@ -1,4 +1,4 @@
-use crate::rae_user::{CtxRae, MOD_RAE_USER};
+use crate::rae_user::{CtxRaeUser, MOD_RAE_USER};
 use ompas_rae_core::monitor;
 use ompas_rae_core::mutex;
 use ompas_rae_language::{RAE_GET_AGENDA, RAE_GET_ENV, RAE_GET_STATE};
@@ -15,7 +15,7 @@ use sompas_structs::{lruntimeerror, wrong_type};
 /// Returns the whole state if no args, or specific part of it ('static', 'dynamic', 'inner world')
 #[async_scheme_fn]
 pub async fn get_state(env: &LEnv, args: &[LValue]) -> LResult {
-    let ctx = env.get_context::<CtxRae>(MOD_RAE_USER)?;
+    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER)?;
     let _type = match args.len() {
         0 => None,
         1 => {
@@ -47,13 +47,13 @@ pub async fn get_state(env: &LEnv, args: &[LValue]) -> LResult {
             ))
         }
     };
-    let state = ctx.get_rae_env().read().await.state.get_state(_type).await;
+    let state = ctx.interface.state.get_state(_type).await;
     Ok(state.into_map())
 }
 
 #[async_scheme_fn]
 pub async fn get_config_platform(env: &LEnv) -> String {
-    let ctx = env.get_context::<CtxRae>(MOD_RAE_USER).unwrap();
+    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER).unwrap();
 
     ctx.get_options()
         .await
@@ -63,32 +63,27 @@ pub async fn get_config_platform(env: &LEnv) -> String {
 
 #[async_scheme_fn]
 pub async fn get_config_select(env: &LEnv) -> String {
-    let ctx = env.get_context::<CtxRae>(MOD_RAE_USER).unwrap();
+    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER).unwrap();
 
     ctx.get_options().await.get_select_mode().to_string()
 }
 #[async_scheme_fn]
 pub async fn get_task_network(env: &LEnv) -> String {
-    let ctx = env.get_context::<CtxRae>(MOD_RAE_USER).unwrap();
+    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER).unwrap();
 
-    ctx.get_rae_env()
-        .read()
-        .await
-        .agenda
-        .format_task_network()
-        .await
+    ctx.interface.agenda.format_task_network().await
 }
 
 #[async_scheme_fn]
 pub async fn get_type_hierarchy(env: &LEnv) -> String {
-    let ctx = env.get_context::<CtxRae>(MOD_RAE_USER).unwrap();
+    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER).unwrap();
 
-    ctx.env.read().await.format_type_hierarchy()
+    ctx.rae_domain.read().await.types.format_hierarchy()
 }
 
 #[async_scheme_fn]
 pub async fn get_agenda(env: &LEnv, args: &[LValue]) -> LResult {
-    let ctx = env.get_context::<CtxRae>(MOD_RAE_USER)?;
+    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER)?;
     let mut task_filter = TaskFilter::default();
 
     for arg in args {
@@ -118,9 +113,7 @@ pub async fn get_agenda(env: &LEnv, args: &[LValue]) -> LResult {
     }
 
     let string = ctx
-        .get_rae_env()
-        .read()
-        .await
+        .interface
         .agenda
         .format_task_collection(task_filter)
         .await;
@@ -142,33 +135,29 @@ pub async fn get_monitors() -> LResult {
 ///Get the methods of a given task
 #[async_scheme_fn]
 pub async fn get_methods(env: &LEnv) -> LResult {
-    let ctx = env.get_context::<CtxRae>(MOD_RAE_USER)?;
-    Ok(ctx.get_rae_env().read().await.domain_env.get_list_methods())
+    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER)?;
+    Ok(ctx.rae_domain.read().await.get_list_methods())
 }
 
 ///Get the list of actions in the environment
 #[async_scheme_fn]
 pub async fn get_actions(env: &LEnv) -> LResult {
-    let ctx = env.get_context::<CtxRae>(MOD_RAE_USER)?;
-    Ok(ctx.get_rae_env().read().await.domain_env.get_list_actions())
+    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER)?;
+    Ok(ctx.rae_domain.read().await.get_list_actions())
 }
 
 ///Get the list of tasks in the environment
 #[async_scheme_fn]
 pub async fn get_tasks(env: &LEnv) -> LResult {
-    let ctx = env.get_context::<CtxRae>(MOD_RAE_USER)?;
-    Ok(ctx.get_rae_env().read().await.domain_env.get_list_tasks())
+    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER)?;
+    Ok(ctx.rae_domain.read().await.get_list_tasks())
 }
 
 ///Get the list of state functions in the environment
 #[async_scheme_fn]
 pub async fn get_state_function(env: &LEnv) -> LValue {
-    let ctx = env.get_context::<CtxRae>(MOD_RAE_USER).unwrap();
-    ctx.get_rae_env()
-        .read()
-        .await
-        .domain_env
-        .get_list_state_functions()
+    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER).unwrap();
+    ctx.rae_domain.read().await.get_list_state_functions()
 }
 
 /// Returns the whole RAE environment if no arg et the entry corresponding to the symbol passed in args.
@@ -186,14 +175,13 @@ pub async fn get_env(env: &LEnv, args: &[LValue]) -> LResult {
         _ => return Err(LRuntimeError::wrong_number_of_args(RAE_GET_ENV, args, 0..1)),
     };
 
-    let ctx = env.get_context::<CtxRae>(MOD_RAE_USER)?;
+    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER)?;
     match key {
-        None => Ok(ctx.get_rae_env().read().await.domain_env.to_string().into()),
+        None => Ok(ctx.rae_domain.read().await.to_string().into()),
         Some(key) => Ok(ctx
-            .get_rae_env()
+            .rae_domain
             .read()
             .await
-            .domain_env
             .get_element_description(key.as_ref())
             .into()),
     }
@@ -201,19 +189,19 @@ pub async fn get_env(env: &LEnv, args: &[LValue]) -> LResult {
 
 #[async_scheme_fn]
 pub async fn get_stats(env: &LEnv) -> LValue {
-    let ctx = env.get_context::<CtxRae>(MOD_RAE_USER).unwrap();
+    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER).unwrap();
 
-    ctx.env.read().await.agenda.get_stats().await
+    ctx.interface.agenda.get_stats().await
 }
 
 #[async_scheme_fn]
 pub async fn export_stats(env: &LEnv, args: &[LValue]) -> LResult {
-    let ctx = env.get_context::<CtxRae>(MOD_RAE_USER)?;
+    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER)?;
     let file = if args.len() == 1 {
         Some(args[0].to_string())
     } else {
         None
     };
-    ctx.env.read().await.agenda.export_to_csv(None, file).await;
+    ctx.interface.agenda.export_to_csv(None, file).await;
     Ok(LValue::Nil)
 }

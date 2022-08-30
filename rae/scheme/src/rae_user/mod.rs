@@ -1,32 +1,31 @@
 //! Module containing the Scheme library to setup RAE environment
 
-use crate::rae_exec::{CtxRaeExec, Platform};
+use crate::rae_exec::CtxRaeExec;
 use chrono::{DateTime, Utc};
 use ompas_rae_language::*;
 use ompas_rae_planning::structs::ConversionContext;
-use ompas_rae_structs::agenda::Agenda;
-use ompas_rae_structs::context::RAEContext;
-use ompas_rae_structs::job::Job;
+use ompas_rae_structs::domain::RAEDomain;
 use ompas_rae_structs::options::{RAEOptions, SelectMode};
+use ompas_rae_structs::platform::{Log, Platform, RAEInterface};
 use rae_control::*;
 use rae_conversion::*;
 use rae_description::*;
 use rae_monitor::*;
 use rae_planning::*;
-use sompas_core::eval_init;
+use sompas_core::{eval_init, get_root_env};
 use sompas_modules::advanced_math::CtxMath;
 use sompas_modules::io::{CtxIo, LogOutput};
 use sompas_modules::utils::CtxUtils;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::{Documentation, LHelp};
 use sompas_structs::lenv::ImportType::{WithPrefix, WithoutPrefix};
+use sompas_structs::lenv::{LEnv, LEnvSymbols};
 use sompas_structs::module::{InitLisp, IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::{env, fs, mem};
-use tokio::sync::mpsc::Sender;
-use tokio::sync::{mpsc, RwLock};
+use std::{env, fs};
+use tokio::sync::RwLock;
 
 pub mod rae_control;
 pub mod rae_conversion;
@@ -49,15 +48,16 @@ const DOC_RAE_LAUNCH: &str = "Launch the main rae loop in an asynchronous task."
 
 pub const TOKIO_CHANNEL_SIZE: usize = 100;
 
-pub struct CtxRae {
-    log: PathBuf,
+pub struct CtxRaeUser {
     options: Arc<RwLock<RAEOptions>>,
-    env: Arc<RwLock<RAEContext>>,
-    domain: InitLisp,
-    sender_to_rae: Option<Sender<Job>>,
+    interface: RAEInterface,
+    platform: Option<Platform>,
+    rae_domain: Arc<RwLock<RAEDomain>>,
+    platform_domain: InitLisp,
+    empty_env: LEnv,
 }
 
-impl IntoModule for CtxRae {
+impl IntoModule for CtxRaeUser {
     fn into_module(self) -> Module {
         let mut init_lisp: InitLisp = vec![
             MACRO_DEF_COMMAND,
@@ -65,9 +65,13 @@ impl IntoModule for CtxRae {
             MACRO_DEF_METHOD,
             MACRO_DEF_LAMBDA,
             MACRO_DEF_STATE_FUNCTION,
+            MACRO_PDDL_MODEL,
+            MACRO_OM_MODEL,
+            MACRO_DEF_COMMAND_PDDL_MODEL,
+            MACRO_DEF_COMMAND_OM_MODEL,
         ]
         .into();
-        init_lisp.append(&mut self.domain.clone());
+        init_lisp.append(&mut self.platform_domain.clone());
 
         //let domain = Default::default();
         let mut module = Module {
@@ -77,15 +81,21 @@ impl IntoModule for CtxRae {
             label: MOD_RAE_USER.to_string(),
         };
 
-        module.add_async_fn_prelude(RAE_LAUNCH, rae_launch);
-
+        /*
+        RAE control
+         */
+        module.add_async_fn_prelude(RAE_LAUNCH, launch);
+        module.add_async_fn_prelude(RAE_STOP, stop);
+        module.add_async_fn_prelude(RAE_CONFIGURE_PLATFORM, configure_platform);
+        module.add_async_fn_prelude(RAE_CONFIGURE_SELECT, configure_select);
+        /*
+        GETTERS
+         */
         module.add_async_fn_prelude(RAE_GET_METHODS, get_methods);
         module.add_async_fn_prelude(RAE_GET_STATE_FUNCTIONS, get_state_function);
         module.add_async_fn_prelude(RAE_GET_ACTIONS, get_actions);
         module.add_async_fn_prelude(RAE_GET_TASKS, get_tasks);
         module.add_async_fn_prelude(RAE_GET_ENV, get_env);
-        module.add_async_fn_prelude(RAE_CONFIGURE_PLATFORM, configure_platform);
-        module.add_async_fn_prelude(RAE_CONFIGURE_SELECT, configure_select);
         module.add_async_fn_prelude(RAE_GET_CONFIG_PLATFORM, get_config_platform);
         module.add_async_fn_prelude(RAE_GET_CONFIG_SELECT, get_config_select);
 
@@ -124,7 +134,6 @@ impl IntoModule for CtxRae {
         module.add_async_fn_prelude(RAE_PLAN_TASK, plan_task);
 
         //Trigger task
-        module.add_fn_prelude(RAE_TRIGGER_EVENT, trigger_event);
         module.add_async_fn_prelude(RAE_TRIGGER_TASK, trigger_task);
         module.add_async_fn_prelude(RAE_GET_MUTEXES, get_mutexes);
         module.add_async_fn_prelude(RAE_GET_MONITORS, get_monitors);
@@ -180,24 +189,16 @@ impl IntoModule for CtxRae {
     }
 }
 
-impl CtxRae {
+impl CtxRaeUser {
     /// Initialize the libraries to load inside Scheme env.
     /// Takes as argument the execution platform.
-    pub async fn init_ctx_rae(
+
+    pub async fn new(
         platform: Option<Platform>,
-        working_directory: Option<PathBuf>,
-        display: bool,
+        working_dir: Option<PathBuf>,
+        display_log: bool,
     ) -> Self {
-        //println!("in init ctx_rae");
-
-        let mut ctx_rae = CtxRae::default();
-        let (sender_job, receiver_job) = mpsc::channel(TOKIO_CHANNEL_SIZE);
-        ctx_rae.set_sender_to_rae(Some(sender_job));
-
-        let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
-        let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
-
-        let dir_path: PathBuf = match working_directory {
+        let dir_path: PathBuf = match working_dir {
             Some(wd) => {
                 let mut dir_path = wd;
                 dir_path.push("rae_logs");
@@ -213,77 +214,99 @@ impl CtxRae {
             .into(),
         };
 
+        let domain: InitLisp = if let Some(platform) = &platform {
+            vec![platform.get_ref().read().await.domain().await].into()
+        } else {
+            Default::default()
+        };
+
+        let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
+        let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
+
         fs::create_dir_all(&dir_path).expect("could not create rae logs directory");
-        let mut file_path = dir_path.clone();
-        file_path.push(format!("rae_{}.txt", string_date));
+        let mut log = dir_path.clone();
+        log.push(format!("rae_{}.txt", string_date));
 
-        let (mut rae_env, platform) = match platform {
-            Some(platform) => {
-                //let (sender_sync, receiver_sync) = mpsc::channel(TOKIO_CHANNEL_SIZE);
-                let mut rae_env: RAEContext = RAEContext::new(Some(receiver_job)).await;
-                let domain = platform.get_ref().read().await.domain().await;
+        let mut empty_env = get_root_env().await;
+        empty_env.import(CtxUtils::default(), WithoutPrefix);
+        empty_env.import(CtxMath::default(), WithoutPrefix);
+        empty_env.import(CtxIo::default(), WithoutPrefix);
+        empty_env.import(CtxRaeExec::default(), WithoutPrefix);
+        eval_init(&mut empty_env).await;
 
-                ctx_rae.set_domain(vec![domain].into());
-
-                let context_platform = platform.get_ref().read().await.context_platform();
-
-                rae_env.env.import(context_platform, WithPrefix);
-
-                //rae_env.actions_progress.sync.sender = Some(sender_sync);
-
-                platform
-                    .get_ref()
-                    .write()
-                    .await
-                    .init(rae_env.state.clone(), rae_env.agenda.clone())
-                    .await;
-
-                (rae_env, Some(platform))
-            }
-            None => (RAEContext::new(Some(receiver_job)).await, None),
-        };
-
-        //Clone all structs that need to be shared to monitor action status, state and agenda.
-
-        let ctx_rae_exec = CtxRaeExec {
-            state: rae_env.state.clone(),
-            platform_interface: platform,
-            agenda: rae_env.agenda.clone(),
-        };
-
-        rae_env.env.import(CtxUtils::default(), WithoutPrefix);
-
-        rae_env.env.import(CtxMath::default(), WithoutPrefix);
-
-        let mut ctx_io = CtxIo::default();
-
-        let channel = ompas_rae_log::init(file_path.clone(), display)
+        let channel = ompas_rae_log::init(log.clone(), true) //change with configurable display
             .expect("Error while initiating logger.");
 
-        ctx_io.set_log_output(LogOutput::Channel(channel));
-        ctx_rae.set_log(file_path);
+        Self {
+            options: Arc::new(Default::default()),
+            interface: RAEInterface {
+                state: Default::default(),
+                agenda: Default::default(),
+                log: Log {
+                    path: log,
+                    channel: Some(channel),
+                    display: display_log,
+                },
+                command_tx: Arc::new(RwLock::new(None)),
+                stop_tx: Arc::new(Default::default()),
+                killer: Arc::new(Default::default()),
+            },
+            platform,
+            rae_domain: Default::default(),
+            platform_domain: domain,
+            empty_env,
+        }
+    }
 
-        rae_env.env.import(ctx_rae_exec, WithoutPrefix);
+    pub fn get_empty_env(&self) -> LEnv {
+        self.empty_env.clone()
+    }
 
-        /*rae_env
-        .env
-        .import(CtxRaeDescription::default(), WithoutPrefix);*/
+    pub async fn get_exec_env(&self) -> LEnv {
+        let mut env = get_root_env().await;
 
-        rae_env.env.import(ctx_io, WithoutPrefix);
+        if let Some(platform) = &self.platform {
+            env.import(
+                platform.get_ref().read().await.context_platform(),
+                WithPrefix,
+            );
+        }
 
-        eval_init(&mut rae_env.env).await;
+        env.import(CtxUtils::default(), WithoutPrefix);
 
-        ctx_rae.set_rae_env(rae_env).await;
-        ctx_rae
+        env.import(CtxMath::default(), WithoutPrefix);
+
+        let mut ctx_io = CtxIo::default();
+        ctx_io.set_log_output(LogOutput::Channel(
+            self.interface.log.channel.as_ref().unwrap().clone(),
+        ));
+
+        env.import(ctx_io, WithoutPrefix);
+
+        let ctx_rae_exec = CtxRaeExec {
+            state: self.interface.state.clone(),
+            platform_interface: self.platform.clone(),
+            agenda: self.interface.agenda.clone(),
+        };
+
+        env.import(ctx_rae_exec, WithoutPrefix);
+
+        eval_init(&mut env).await;
+
+        let domain_exec_symbols: LEnvSymbols = self.rae_domain.read().await.get_exec_env();
+
+        env.set_new_top_symbols(domain_exec_symbols);
+
+        env
     }
 }
 
-impl CtxRae {
+impl CtxRaeUser {
     pub fn get_log(&self) -> &PathBuf {
-        &self.log
+        &self.interface.log.path
     }
     pub fn set_log(&mut self, log: PathBuf) {
-        self.log = log;
+        self.interface.log.path = log;
     }
 
     pub async fn get_options(&self) -> RAEOptions {
@@ -302,70 +325,39 @@ impl CtxRae {
         self.options.write().await.set_select_mode(select_mode);
     }
 
-    pub fn get_rae_env(&self) -> Arc<RwLock<RAEContext>> {
-        self.env.clone()
-    }
-
-    pub async fn set_rae_env(&self, rae_env: RAEContext) {
-        *self.env.write().await = rae_env
-    }
-
     pub fn get_domain(&self) -> &InitLisp {
-        &self.domain
+        &self.platform_domain
     }
 
     pub fn set_domain(&mut self, domain: InitLisp) {
-        self.domain = domain;
-    }
-
-    pub async fn own_rae_env(&self) -> RAEContext {
-        let mut src = self.env.write().await;
-
-        let mut agenda: Agenda = src.agenda.clone();
-        agenda.reset_time_reference();
-
-        let new_env = RAEContext {
-            job_receiver: None,
-            agenda,
-            state: src.state.clone(),
-            env: src.env.clone(),
-            domain_env: src.domain_env.clone(),
-        };
-        mem::replace(&mut src, new_env)
+        self.platform_domain = domain;
     }
 
     pub async fn get_conversion_context(&self) -> ConversionContext {
-        let rae_env = self.env.read().await;
         ConversionContext {
-            domain: rae_env.domain_env.clone(),
-            env: rae_env.env.clone(),
-            state: rae_env.state.get_snapshot().await,
+            domain: self.rae_domain.read().await.clone(),
+            env: self.get_empty_env(),
+            state: self.interface.state.get_snapshot().await,
         }
-    }
-
-    pub fn set_sender_to_rae(&mut self, sender_to_rae: Option<mpsc::Sender<Job>>) {
-        self.sender_to_rae = sender_to_rae;
-    }
-
-    pub fn get_sender_to_rae(&self) -> &Option<Sender<Job>> {
-        &self.sender_to_rae
     }
 }
 
-impl Default for CtxRae {
+impl Default for CtxRaeUser {
     fn default() -> Self {
         Self {
-            log: PathBuf::default(),
             options: Default::default(),
-            env: Arc::new(RwLock::new(RAEContext {
-                job_receiver: None,
-                agenda: Default::default(),
+            interface: RAEInterface {
                 state: Default::default(),
-                env: Default::default(),
-                domain_env: Default::default(),
-            })),
-            domain: Default::default(),
-            sender_to_rae: None,
+                agenda: Default::default(),
+                log: Default::default(),
+                command_tx: Arc::new(Default::default()),
+                stop_tx: Arc::new(Default::default()),
+                killer: Arc::new(Default::default()),
+            },
+            platform: None,
+            rae_domain: Default::default(),
+            platform_domain: Default::default(),
+            empty_env: Default::default(),
         }
     }
 }

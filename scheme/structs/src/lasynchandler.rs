@@ -29,3 +29,10 @@ impl From<LAsyncHandler> for LValue {
         Self::Handler(lah)
     }
 }
+
+/*impl Drop for LAsyncHandler {
+    fn drop(&mut self) {
+        let mut sender = self.switch.clone();
+        tokio::spawn(async move { sender.interrupt().await });
+    }
+}*/

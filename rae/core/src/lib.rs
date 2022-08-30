@@ -1,13 +1,13 @@
 use crate::ctx_planning::CtxPlanning;
 use futures::FutureExt;
 use log::{error, info, warn};
-use monitor::task_check_wait_for;
-use ompas_rae_language::RAE_LAUNCH_PLATFORM;
 use ompas_rae_planning::conversion::convert_domain_to_chronicle_hierarchy;
 use ompas_rae_planning::structs::{ConversionCollection, ConversionContext};
-use ompas_rae_structs::context::RAEContext;
+use ompas_rae_structs::domain::RAEDomain;
 use ompas_rae_structs::options::SelectMode::Planning;
 use ompas_rae_structs::options::{RAEOptions, SelectMode};
+use ompas_rae_structs::platform::{Platform, RAEInterface};
+use ompas_rae_structs::rae_command::RAECommand;
 use sompas_core::{eval, eval_init};
 use sompas_structs::lasynchandler::LAsyncHandler;
 use sompas_structs::lenv::ImportType::WithoutPrefix;
@@ -16,9 +16,9 @@ use sompas_structs::lfuture::FutureResult;
 use sompas_structs::lnumber::*;
 use sompas_structs::lswitch::new_interruption_handler;
 use sompas_structs::lvalue::LValue;
-use std::mem;
 use std::ops::Deref;
 use std::time::Instant;
+use tokio::sync::mpsc::Receiver;
 
 use crate::error::RaeExecError;
 
@@ -42,39 +42,57 @@ pub const TOKIO_CHANNEL_SIZE: usize = 100;
 
 /// Main RAE Loop:
 /// Receives Job to handle in separate tasks.
-pub async fn rae_run(mut context: RAEContext, options: &RAEOptions, _log: String) {
-    let mut receiver = mem::replace(&mut context.job_receiver, None).unwrap();
-
+pub async fn run(
+    platform: Option<Platform>,
+    domain: RAEDomain,
+    mut interface: RAEInterface,
+    mut env: LEnv,
+    mut rx: Receiver<RAECommand>,
+    options: &RAEOptions,
+) {
     //Ubuntu::
-    let lvalue: LValue = match options.get_platform_config() {
+    /*let lvalue: LValue = match options.get_platform_config() {
         None => vec![RAE_LAUNCH_PLATFORM].into(),
         Some(string) => {
             info!("Platform config: {}", string);
             vec![RAE_LAUNCH_PLATFORM.to_string(), string].into()
         }
+    };*/
+
+    match &platform {
+        None => info!("No platform defined"),
+        Some(platform) => match options.get_platform_config() {
+            None => {
+                platform
+                    .launch_platform(&[])
+                    .await
+                    .expect("error launching platform");
+            }
+            Some(config) => {
+                info!("Platform config: {}", config);
+                platform
+                    .launch_platform(&[config.into()])
+                    .await
+                    .expect("error launching platform");
+            }
+        },
     };
-    let result = eval(&lvalue, &mut context.env, None).await;
+
+    /*let result = eval(&lvalue, &mut env, None).await;
 
     match result {
         Ok(_) => {}
         Err(e) => error!("{}", e),
-    }
-
-    let receiver_event_update_state = context.state.subscribe_on_update().await;
-    let env_check_wait_on = context.get_exec_env().await;
-    tokio::spawn(async move {
-        task_check_wait_for(receiver_event_update_state, env_check_wait_on).await
-    });
+    }*/
 
     let mut select_mode = *options.get_select_mode();
 
-    let mut env: LEnv = context.get_exec_env().await;
     let cc: Option<ConversionCollection> = if matches!(select_mode, Planning(_, _)) {
         let instant = Instant::now();
         match convert_domain_to_chronicle_hierarchy(ConversionContext {
-            domain: context.domain_env.clone(),
-            env: context.env.clone(),
-            state: context.state.get_snapshot().await,
+            domain: domain.clone(),
+            env: env.clone(),
+            state: interface.state.get_snapshot().await,
         }) {
             Ok(r) => {
                 info!(
@@ -94,12 +112,7 @@ pub async fn rae_run(mut context: RAEContext, options: &RAEOptions, _log: String
     };
 
     env.import(
-        CtxPlanning::new(
-            cc,
-            context.domain_env.clone(),
-            context.env.clone(),
-            select_mode,
-        ),
+        CtxPlanning::new(cc, domain.clone(), env.clone(), select_mode),
         WithoutPrefix,
     );
 
@@ -108,53 +121,62 @@ pub async fn rae_run(mut context: RAEContext, options: &RAEOptions, _log: String
     loop {
         //For each new event or task to be addressed, we search for the best method a create a new refinement stack
         //Note: The whole block could be in an async block
-        while let Some(job) = receiver.recv().await {
-            //println!("new job received: {}", job);
+        let command = rx.recv().await;
+        match command {
+            None => break,
+            Some(RAECommand::Job(job)) => {
+                info!("new job received!");
 
-            //let _job_id = &context.agenda.add_job(job.clone());
-            info!("new job received!");
+                let mut new_env = env.clone();
 
-            let mut new_env = env.clone();
+                let job_lvalue = job.core;
+                info!("new triggered task: {}", job_lvalue);
+                //info!("LValue to be evaluated: {}", job_lvalue);
 
-            let job_lvalue = job.core;
-            info!("new triggered task: {}", job_lvalue);
-            //info!("LValue to be evaluated: {}", job_lvalue);
+                let (tx, rx) = new_interruption_handler();
 
-            let (tx, rx) = new_interruption_handler();
-
-            let future = (Box::pin(async move {
-                let result = eval(&job_lvalue, &mut new_env, Some(rx)).await;
-                match &result {
-                    Ok(lv) => info!(
-                        "result of task {}: {}",
-                        job_lvalue,
-                        match lv {
-                            LValue::Err(e) => {
-                                match e.deref() {
-                                    LValue::Number(LNumber::Int(i)) => {
-                                        format!("{:?}", RaeExecError::i64_as_err(*i))
+                let future = (Box::pin(async move {
+                    let result = eval(&job_lvalue, &mut new_env, Some(rx)).await;
+                    match &result {
+                        Ok(lv) => info!(
+                            "result of task {}: {}",
+                            job_lvalue,
+                            match lv {
+                                LValue::Err(e) => {
+                                    match e.deref() {
+                                        LValue::Number(LNumber::Int(i)) => {
+                                            format!("{:?}", RaeExecError::i64_as_err(*i))
+                                        }
+                                        lv => lv.to_string(),
                                     }
-                                    lv => lv.to_string(),
                                 }
+                                lv => lv.to_string(),
                             }
-                            lv => lv.to_string(),
-                        }
-                    ),
-                    Err(e) => error!("Error in asynchronous task: {}", e),
+                        ),
+                        Err(e) => error!("Error in asynchronous task: {}", e),
+                    }
+
+                    result
+                }) as FutureResult)
+                    .shared();
+
+                let f2 = future.clone();
+
+                tokio::spawn(f2);
+
+                job.sender
+                    .send(LAsyncHandler::new(future, tx))
+                    .await
+                    .expect("");
+            }
+            Some(RAECommand::Stop) => {
+                println!("quitting rae");
+                match &platform {
+                    None => {}
+                    Some(p) => p.stop_platform().await,
                 }
-
-                result
-            }) as FutureResult)
-                .shared();
-
-            let f2 = future.clone();
-
-            tokio::spawn(f2);
-
-            job.sender
-                .send(LAsyncHandler::new(future, tx))
-                .await
-                .expect("");
+                break;
+            }
         }
     }
 }

@@ -4,7 +4,7 @@ use crate::domain::method::Method;
 use crate::domain::state_function::StateFunction;
 use crate::domain::task::Task;
 use crate::domain::RAEDomain;
-use crate::job::Job;
+use crate::rae_command::RAECommand;
 use crate::state::world_state::WorldState;
 use sompas_core::get_root_env;
 use sompas_structs::lenv::{LEnv, LEnvSymbols};
@@ -36,7 +36,7 @@ pub const TYPE_LIST: &str = "tlist";
 pub type TypeId = usize;
 
 pub struct RAEContext {
-    pub job_receiver: Option<Receiver<Job>>,
+    pub command_rx: Option<Receiver<RAECommand>>,
     pub agenda: Agenda,
     pub state: WorldState,
     pub env: LEnv,
@@ -60,10 +60,10 @@ impl RAEContext {
     }
 
     #[allow(clippy::field_reassign_with_default)]
-    pub async fn new(job_receiver: Option<Receiver<Job>>) -> Self {
+    pub async fn new(command_rx: Option<Receiver<RAECommand>>) -> Self {
         let env = get_root_env().await;
         Self {
-            job_receiver,
+            command_rx,
             agenda: Default::default(),
             state: Default::default(),
             env,
@@ -72,9 +72,7 @@ impl RAEContext {
     }
 
     pub fn add_command(&mut self, label: String, value: Command) -> Result<(), LRuntimeError> {
-        self.domain_env.add_action(label, value);
-
-        Ok(())
+        self.domain_env.add_command(label, value)
     }
 
     pub fn add_command_model(&mut self, label: String, value: LValue) -> Result<(), LRuntimeError> {
@@ -90,15 +88,11 @@ impl RAEContext {
         label: String,
         value: StateFunction,
     ) -> Result<(), LRuntimeError> {
-        self.domain_env.add_state_function(label, value);
-
-        Ok(())
+        self.domain_env.add_state_function(label, value)
     }
 
     pub fn add_task(&mut self, label: String, task: Task) -> Result<(), LRuntimeError> {
-        self.domain_env.add_task(label, task);
-
-        Ok(())
+        self.domain_env.add_task(label, task)
     }
 
     #[allow(clippy::too_many_arguments)]

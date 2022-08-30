@@ -2,13 +2,12 @@ use crate::rae_exec::algorithms::*;
 use crate::rae_exec::platform::*;
 use crate::rae_exec::rae_mutex::{get_list_locked, is_locked, lock, lock_in_list, release};
 use ::macro_rules_attribute::macro_rules_attribute;
-use async_trait::async_trait;
 use futures::FutureExt;
 use ompas_rae_core::monitor::{add_waiter, remove_waiter};
 use ompas_rae_language::*;
 use ompas_rae_structs::agenda::Agenda;
 use ompas_rae_structs::context::RAE_TASK_METHODS_MAP;
-use ompas_rae_structs::job::Job;
+use ompas_rae_structs::platform::Platform;
 use ompas_rae_structs::state::task_status::TaskStatus;
 use ompas_rae_structs::state::world_state::*;
 use ompas_rae_structs::TaskId;
@@ -26,18 +25,13 @@ use sompas_structs::lfuture::{FutureResult, LFuture};
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lswitch::new_interruption_handler;
 use sompas_structs::lvalue::LValue;
-use sompas_structs::lvalue::LValue::Nil;
 use sompas_structs::lvalues::LValueS;
 use sompas_structs::module::{InitLisp, IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
 use sompas_structs::{list, lruntimeerror, wrong_n_args, wrong_type};
-use std::any::Any;
 use std::borrow::Borrow;
 use std::convert::TryInto;
 use std::string::String;
-use std::sync::Arc;
-use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::RwLock;
 
 pub mod algorithms;
 pub mod platform;
@@ -61,60 +55,6 @@ pub const SYMBOL_SIMU_MODE: &str = "simu-mode";
 pub const SYMBOL_RAE_MODE: &str = "rae-mode";
 //pub const DEFINE_PARENT_TASK: &str = "(define parent_task nil)";
 pub const PARENT_TASK: &str = "parent_task";
-
-pub struct Platform {
-    inner: Arc<RwLock<dyn RAEInterface>>,
-}
-
-impl Platform {
-    pub fn new(platform: impl RAEInterface) -> Self {
-        Self {
-            inner: Arc::new(RwLock::new(platform)),
-        }
-    }
-
-    pub fn get_ref(&self) -> Arc<RwLock<dyn RAEInterface>> {
-        self.inner.clone()
-    }
-
-    /// Initial what needs to be.
-    pub async fn init(&self, state: WorldState, agenda: Agenda) {
-        self.inner.write().await.init(state, agenda).await;
-    }
-
-    ///Launch the platform (such as the simulation in godot) and open communication
-    pub async fn launch_platform(&self, args: &[LValue]) -> LResult {
-        self.inner.write().await.launch_platform(args).await
-    }
-
-    /// Start the platform process
-    pub async fn start_platform(&self, args: &[LValue]) -> LResult {
-        self.inner.write().await.start_platform(args).await
-    }
-
-    /// Open communication with the platform
-    pub async fn open_com(&self, args: &[LValue]) -> LResult {
-        self.inner.write().await.open_com(args).await
-    }
-
-    /// Executes a command on the platform
-    pub async fn exec_command(&self, args: &[LValue], command_id: usize) -> LResult {
-        self.inner.read().await.exec_command(args, command_id).await
-    }
-
-    pub async fn cancel_command(&self, args: &[LValue]) -> LResult {
-        self.inner.read().await.cancel_command(args).await
-    }
-
-    /// Returns the RAE domain of the platform.
-    pub async fn domain(&self) -> String {
-        self.inner.read().await.domain().await
-    }
-
-    pub async fn instance(&self, args: &[LValue]) -> LResult {
-        self.inner.read().await.instance(args).await
-    }
-}
 
 ///Context that will contains primitives for the RAE executive
 #[derive(Default)]
@@ -215,116 +155,6 @@ impl CtxRaeExec {
 
     pub fn add_platform(&mut self, platform: Option<Platform>) {
         self.platform_interface = platform;
-    }
-}
-
-pub struct JobStream {
-    sender: Sender<Job>,
-    receiver: Receiver<Job>,
-}
-
-impl JobStream {
-    pub fn new(sender: Sender<Job>, receiver: Receiver<Job>) -> Self {
-        Self { sender, receiver }
-    }
-
-    pub fn get_sender(&self) -> Sender<Job> {
-        self.sender.clone()
-    }
-
-    pub fn get_ref_receiver(&mut self) -> &mut Receiver<Job> {
-        &mut self.receiver
-    }
-}
-
-/// Trait that a platform needs to implement to be able to be used as execution platform in RAE.
-#[async_trait]
-pub trait RAEInterface: Any + Send + Sync {
-    /// Initial what needs to be.
-    async fn init(&mut self, state: WorldState, agenda: Agenda);
-
-    /// Executes a command on the platform
-    async fn exec_command(&self, args: &[LValue], command_id: usize) -> LResult;
-
-    async fn cancel_command(&self, args: &[LValue]) -> LResult;
-
-    ///Launch the platform (such as the simulation in godot) and open communication
-    async fn launch_platform(&mut self, args: &[LValue]) -> LResult;
-
-    /// Start the platform process
-    async fn start_platform(&mut self, args: &[LValue]) -> LResult;
-
-    /// Open communication with the platform
-    async fn open_com(&mut self, args: &[LValue]) -> LResult;
-
-    /// Returns the RAE domain of the platform.
-    async fn domain(&self) -> String;
-
-    async fn instance(&self, args: &[LValue]) -> LResult;
-
-    fn context_platform(&self) -> CtxPlatform;
-}
-
-#[async_trait]
-impl RAEInterface for () {
-    async fn init(&mut self, _: WorldState, _: Agenda) {}
-
-    async fn exec_command(&self, _args: &[LValue], _: usize) -> LResult {
-        Ok(Nil)
-    }
-
-    async fn cancel_command(&self, _: &[LValue]) -> LResult {
-        Ok(Nil)
-    }
-
-    async fn launch_platform(&mut self, _: &[LValue]) -> LResult {
-        Ok(Nil)
-    }
-
-    async fn start_platform(&mut self, _: &[LValue]) -> LResult {
-        Ok(Nil)
-    }
-
-    async fn open_com(&mut self, _: &[LValue]) -> LResult {
-        Ok(Nil)
-    }
-
-    async fn domain(&self) -> String {
-        "".to_string()
-    }
-
-    async fn instance(&self, _args: &[LValue]) -> LResult {
-        Ok(Nil)
-    }
-
-    fn context_platform(&self) -> CtxPlatform {
-        todo!()
-    }
-}
-
-pub struct CtxPlatform {
-    module: Module,
-}
-
-impl CtxPlatform {
-    pub fn new(ctx: impl IntoModule) -> Self {
-        Self {
-            module: ctx.into_module(),
-        }
-    }
-}
-
-impl IntoModule for CtxPlatform {
-    fn into_module(self) -> Module {
-        self.module
-    }
-
-    fn documentation(&self) -> Documentation {
-        Default::default()
-    }
-
-    fn pure_fonctions(&self) -> PureFonctionCollection {
-        Default::default()
     }
 }
 

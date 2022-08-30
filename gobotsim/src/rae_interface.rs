@@ -8,8 +8,11 @@ use crate::TOKIO_CHANNEL_SIZE;
 use async_trait::async_trait;
 use core::time;
 use im::{HashMap, HashSet};
-use ompas_rae_scheme::rae_exec::{CtxPlatform, RAEInterface};
 use ompas_rae_structs::agenda::Agenda;
+use ompas_rae_structs::job::{Job, JobType};
+use ompas_rae_structs::platform::CtxPlatform;
+use ompas_rae_structs::platform::{RAEInterface, RAEPlatform};
+use ompas_rae_structs::rae_command::RAECommand;
 use ompas_rae_structs::state::world_state::WorldState;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::Documentation;
@@ -85,9 +88,8 @@ pub struct PlatformGodot {
     pub socket_info: SocketInfo,
     pub headless: bool,
     pub sender_socket: Option<Sender<String>>,
-    pub state: WorldState,
+    pub interface: RAEInterface,
     pub instance: Instance,
-    pub agenda: Agenda,
     pub domain: GodotDomain,
 }
 
@@ -121,9 +123,8 @@ impl PlatformGodot {
             socket_info: Default::default(),
             headless,
             sender_socket: None,
-            state: Default::default(),
+            interface: Default::default(),
             instance: Default::default(),
-            agenda: Default::default(),
             domain,
         }
     }
@@ -144,12 +145,11 @@ impl PlatformGodot {
 }
 
 #[async_trait]
-impl RAEInterface for PlatformGodot {
+impl RAEPlatform for PlatformGodot {
     /// Initiliaze the godot platform of a the state (contains Arc to structs)
     /// and ActionsProgress (contains also Arc to structs)
-    async fn init(&mut self, state: WorldState, agenda: Agenda) {
-        self.state = state;
-        self.agenda = agenda;
+    async fn init(&mut self, interface: RAEInterface) {
+        self.interface = interface
     }
 
     /// Executes a command on the platform. The command is sent via tcp.
@@ -301,12 +301,18 @@ impl RAEInterface for PlatformGodot {
             } //Unexpected number of arguments
         };
 
+        let mut killer = self
+            .interface
+            .killer
+            .read()
+            .await
+            .as_ref()
+            .unwrap()
+            .subscribe();
+
         tokio::spawn(async move {
             //blocked on the reception of the end signal.
-            task_handler::subscribe_new_task()
-                .recv()
-                .await
-                .expect("could not receive from task handler");
+            killer.recv().await.expect("error receiving kill message");
 
             child.kill().expect("could not kill godot");
             println!("process godot killed")
@@ -360,11 +366,12 @@ impl RAEInterface for PlatformGodot {
 
         //println!("godot launching...");
         //println!("godot launched!");
-        let state = self.state.clone();
-        let status = self.agenda.clone();
+        let state = self.interface.state.clone();
+        let agenda = self.interface.agenda.clone();
         let instance = self.instance.clone();
+        let killer = self.interface.killer.read().await.clone().unwrap();
         tokio::spawn(async move {
-            task_tcp_connection(&socket_addr, rx, state, status, instance).await
+            task_tcp_connection(&socket_addr, rx, state, agenda, instance, killer).await
         });
         //println!("com opened with godot");
         Ok(LValue::Nil)
@@ -413,6 +420,33 @@ impl RAEInterface for PlatformGodot {
                 1..2,
             )),
         }
+    }
+
+    async fn trigger_event(&self, args: &[LValue]) -> LResult {
+        let (sender, mut rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+
+        let event = Job::new(sender, args.into(), JobType::Event);
+        let sender = self
+            .interface
+            .command_tx
+            .read()
+            .await
+            .as_ref()
+            .unwrap()
+            .clone();
+
+        tokio::spawn(async move {
+            sender
+                .send(event.into())
+                .await
+                .expect("could not send job to rae");
+        });
+
+        Ok(rx.recv().await.unwrap().into())
+    }
+
+    async fn stop_platform(&self) {
+        println!("stopping gobot-sim...")
     }
 
     fn context_platform(&self) -> CtxPlatform {

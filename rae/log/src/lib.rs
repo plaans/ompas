@@ -20,9 +20,9 @@ use std::time::Duration;
 use log::{Level, LevelFilter, Log, Metadata, Record, SetLoggerError};
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
-use tokio::sync::mpsc;
+use tokio::sync::{broadcast, mpsc};
 
-use sompas_utils::task_handler::subscribe_new_task;
+use sompas_utils::task_handler::{subscribe_new_task, EndSignal};
 use std::path::PathBuf;
 
 const RAE_LOG_IP_ADDR: &str = "127.0.0.1:10001";
@@ -35,10 +35,10 @@ pub struct Logger {
 }
 
 impl Logger {
-    fn new(log_path: PathBuf, display: bool) -> Logger {
+    fn new(log_path: PathBuf, display: bool, killer: broadcast::Receiver<EndSignal>) -> Logger {
         let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
 
-        tokio::spawn(async move { run_logger_file(rx, log_path, display).await });
+        tokio::spawn(async move { run_logger_file(rx, log_path, display, killer).await });
         //tokio::spawn(async move { run_logger(rx).await });
 
         Logger { tx }
@@ -68,7 +68,8 @@ impl Log for Logger {
 /// Initiate new terminal and logger
 /// Build the global object
 pub fn init(log_path: PathBuf, display: bool) -> Result<mpsc::Sender<String>, SetLoggerError> {
-    let logger = Logger::new(log_path, display);
+    let killer = subscribe_new_task();
+    let logger = Logger::new(log_path, display, killer);
     let sender = logger.tx.clone();
     match log::set_boxed_logger(Box::new(logger)).map(|()| log::set_max_level(LevelFilter::Info)) {
         Err(e) => Err(e),
@@ -81,7 +82,12 @@ pub fn init(log_path: PathBuf, display: bool) -> Result<mpsc::Sender<String>, Se
 ///
 /// Log files are stored in the <current>/rae_logs.
 /// Files names are formatted in function of the date and time at which the script is launched.
-async fn run_logger_file(mut rx: mpsc::Receiver<String>, log_path: PathBuf, display: bool) {
+async fn run_logger_file(
+    mut rx: mpsc::Receiver<String>,
+    log_path: PathBuf,
+    display: bool,
+    mut killer: broadcast::Receiver<EndSignal>,
+) {
     let mut file = OpenOptions::new()
         .read(true)
         .write(true)
@@ -93,8 +99,6 @@ async fn run_logger_file(mut rx: mpsc::Receiver<String>, log_path: PathBuf, disp
         .expect("could not write to RAE log file.");
 
     //let mut logger_pid = None;
-
-    let mut end_receiver = subscribe_new_task();
     //let mut first = true;
 
     let child = if display {
@@ -124,7 +128,7 @@ async fn run_logger_file(mut rx: mpsc::Receiver<String>, log_path: PathBuf, disp
                     }
                 }
             }
-            _ = end_receiver.recv() => {
+            _ = killer.recv() => {
                 if let Some(child) = child {
                     println!("killing rae log process : {}", child.id());
 

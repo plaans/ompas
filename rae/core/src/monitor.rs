@@ -125,23 +125,26 @@ pub async fn get_debug() -> String {
     str
 }
 
-pub async fn task_check_wait_for(mut receiver: broadcast::Receiver<bool>, env: LEnv) {
+pub async fn task_check_wait_for(
+    mut update: broadcast::Receiver<bool>,
+    mut killer: broadcast::Receiver<bool>,
+    env: LEnv,
+) {
     //println!("task check wait on active");
-    let mut end_receiver = task_handler::subscribe_new_task();
+    //let mut end_receiver = task_handler::subscribe_new_task();
     loop {
         tokio::select! {
-            _ = receiver.recv() => {
+            _ = update.recv() => {
                 let n_wait_on = MONITOR_COLLECTION.inner.lock().await.map.len();
                 if n_wait_on != 0 {
                     //println!("wait-for running");
                     MONITOR_COLLECTION.check_wait_for(env.clone()).await;
                 }
             }
-            _ = end_receiver.recv() => {
+            _ = killer.recv() => {
                 info!("Task \"task_check_monitor\" killed.");
                 break;
             }
         }
     }
-    drop(receiver)
 }

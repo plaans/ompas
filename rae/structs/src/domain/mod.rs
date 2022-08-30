@@ -76,9 +76,10 @@ impl RAEDomain {
 
 //Adder
 impl RAEDomain {
-    pub fn add_task(&mut self, label: String, task: Task) {
+    pub fn add_task(&mut self, label: String, task: Task) -> Result<(), LRuntimeError> {
         self.tasks.insert(label.clone(), task);
         self.map_symbol_type.insert(label, TASK_TYPE.into());
+        Ok(())
     }
 
     pub fn add_method(&mut self, label: String, value: Method) -> Result<(), LRuntimeError> {
@@ -99,15 +100,21 @@ impl RAEDomain {
         }
     }
 
-    pub fn add_state_function(&mut self, label: String, value: StateFunction) {
+    pub fn add_state_function(
+        &mut self,
+        label: String,
+        value: StateFunction,
+    ) -> Result<(), LRuntimeError> {
         self.state_functions.insert(label.clone(), value);
         self.map_symbol_type
             .insert(label, STATE_FUNCTION_TYPE.into());
+        Ok(())
     }
 
-    pub fn add_action(&mut self, label: String, value: Command) {
+    pub fn add_command(&mut self, label: String, value: Command) -> Result<(), LRuntimeError> {
         self.actions.insert(label.clone(), value);
         self.map_symbol_type.insert(label, ACTION_TYPE.into());
+        Ok(())
     }
 
     pub fn add_command_model(&mut self, label: String, value: LValue) -> Result<(), LRuntimeError> {

@@ -8,7 +8,7 @@ use sompas_repl::lisp_interpreter::{LispInterpreter, LispInterpreterConfig};
 use std::fs;
 use std::path::PathBuf;
 
-use ompas_rae_scheme::rae_user::CtxRae;
+use ompas_rae_scheme::rae_user::CtxRaeUser;
 use structopt::StructOpt;
 
 pub const TOKIO_CHANNEL_SIZE: usize = 65_384;
@@ -75,7 +75,7 @@ pub async fn lisp_interpreter(log: Option<PathBuf>, sim_domain: PathBuf, rae_log
         }
     });
 
-    let ctx_rae = CtxRae::init_ctx_rae(None, log.clone(), rae_log).await;
+    let ctx_rae = CtxRaeUser::new(None, log.clone(), rae_log).await;
     li.import_namespace(ctx_rae);
 
     li.set_config(LispInterpreterConfig::new(true));

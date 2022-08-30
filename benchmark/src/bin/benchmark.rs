@@ -1,4 +1,4 @@
-use ompas_rae_scheme::rae_user::CtxRae;
+use ompas_rae_scheme::rae_user::CtxRaeUser;
 use sompas_modules::advanced_math::CtxMath;
 use sompas_modules::io::CtxIo;
 use sompas_modules::string::CtxString;
@@ -97,7 +97,7 @@ pub async fn lisp_interpreter(opt: Opt) {
 
     li.import(ctx_string);
 
-    let ctx_rae = CtxRae::init_ctx_rae(None, Some(log.clone()), false).await;
+    let ctx_rae = CtxRaeUser::new(None, Some(log.clone()), false).await;
     li.import_namespace(ctx_rae);
 
     let mut com: ChannelToLispInterpreter = li.subscribe();

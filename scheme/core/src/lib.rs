@@ -806,9 +806,9 @@ pub async fn eval(
                                     queue.push(StackFrame::quasiinterruptible(args[0].clone()))
                                 }*/
                                 LCoreOperator::Race => {
-                                    let mut handler_1 =
+                                    let handler_1 =
                                         async_eval(args[0].clone(), scopes.get_last().clone());
-                                    let mut handler_2 =
+                                    let handler_2 =
                                         async_eval(args[1].clone(), scopes.get_last().clone());
 
                                     let (tx, mut rx) = new_interruption_handler();
@@ -818,8 +818,9 @@ pub async fn eval(
                                         let future_2 = handler_2.get_future();
                                         tokio::select! {
                                             r1 = future_1 => {
-                                                let r2 = handler_2.interrupt().await;
-                                                match (r1, r2) {
+                                                //handler_2.interrupt();
+                                                r1
+                                                /*match (r1, r2) {
                                                     (Ok(l1), Ok(l2)) => {
                                                         Ok(list![l1, l2])
                                                     }
@@ -832,11 +833,12 @@ pub async fn eval(
                                                     (Err(e1), Err(e2)) => {
                                                         Err(e2.chain(e1).chain("Error on race because both expressions returned runtime errors."))
                                                     }
-                                                }
+                                                }*/
                                             }
                                             r2 = future_2 =>  {
-                                                let r1 = handler_1.interrupt().await;
-                                                match (r1, r2) {
+                                                //handler_1.interrupt();
+                                                r2
+                                                /*match (r1, r2) {
                                                     (Ok(l1), Ok(l2)) => {
                                                         Ok(list![l1, l2])
                                                     }
@@ -849,13 +851,15 @@ pub async fn eval(
                                                     (Err(e1), Err(e2)) => {
                                                         Err(e1.chain(e2).chain("Error on race because both expressions returned runtime errors."))
                                                     }
-                                                }
+                                                }*/
                                             }
                                             _ = rx.recv() => {
-                                                let r1 = handler_1.interrupt();
-                                                let r2 = handler_2.interrupt();
+                                                //handler_1.interrupt();
+                                                //handler_2.interrupt();
 
-                                                let r1 = r1.await;
+                                                Ok(interrupted!())
+
+                                                /*let r1 = r1.await;
                                                 let r2 = r2.await;
 
                                                  match (r1, r2) {
@@ -871,7 +875,7 @@ pub async fn eval(
                                                     (Err(e1), Err(e2)) => {
                                                         Err(e1.chain(e2).chain("Error on race because both expressions interruptions returned runtime errors."))
                                                     }
-                                                }
+                                                }*/
 
                                             }
                                         }
@@ -1019,7 +1023,7 @@ pub async fn eval(
                                     r
                                 }
                                 _ = int.recv() => {
-                                    println!("await interrupted");
+                                    //println!("await interrupted");
                                     Ok(interrupted!())
                                 }
                             }

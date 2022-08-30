@@ -1,4 +1,5 @@
 use crate::state::partial_state::PartialState;
+use log::Level::Debug;
 use sompas_core::modules::map::union_map;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
@@ -55,6 +56,13 @@ impl From<WorldStateSnapshot> for LValue {
 const RAE_STATE_SEM_UPDATE_CHANNEL_SIZE: usize = 64;
 
 impl WorldState {
+    pub async fn clear(&self) {
+        self._static.write().await.inner = Default::default();
+        self.dynamic.write().await.inner = Default::default();
+        self.instance.write().await.inner = Default::default();
+        self.inner_world.write().await.inner = Default::default();
+    }
+
     pub async fn get_snapshot(&self) -> WorldStateSnapshot {
         WorldStateSnapshot {
             _static: self._static.read().await.clone(),
@@ -64,7 +72,7 @@ impl WorldState {
         }
     }
 
-    pub async fn subscribe_on_update(&mut self) -> broadcast::Receiver<bool> {
+    pub async fn subscribe_on_update(&self) -> broadcast::Receiver<bool> {
         let mut sem_update = self.sem_update.lock().await;
         let (tx, rx) = match sem_update.deref() {
             None => broadcast::channel(RAE_STATE_SEM_UPDATE_CHANNEL_SIZE),

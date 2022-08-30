@@ -98,32 +98,6 @@ pub const RAE_IS_PLATFORM_DEFINED: &str = "rae-platform?";
 
 pub const REFINE: &str = "refine";
 pub const RETRY: &str = "retry";
-pub const LAMBDA_RAE_EXEC_TASK: &str = "(define exec-task
-    (lambda task
-        (begin
-            (define result (enr (cons 'refine task)))
-            (if (err? result)
-                result
-                (let ((method (first result))
-                      (task_id (second result)))
-
-                    (begin
-                        (define parent_task task_id)
-                        (print \"Trying \" method \" for \" task_id)
-                        (if (err? (enr method))
-                            (rae-retry task_id)
-                            (rae-set-success-for-task task_id))))))))";
-
-pub const LAMBDA_RAE_RETRY: &str = "(define rae-retry
-    (lambda (task_id)
-        (begin
-            (define result (retry task_id))
-            (if (err? result)
-                result
-                (begin
-                    (if (err? (enr result))
-                        (rae-retry task_id)
-                        (rae-set-success-for-task task_id)))))))";
 
 pub const ERR_NO_APPLICABLE_METHOD: &str = "err::no-applicable-method";
 pub const ERR_ACTION_FAILURE: &str = "err::action_failure";
@@ -133,87 +107,15 @@ pub const MACRO_SIM_BLOCK: &str = "(defmacro sim_block (lambda (body)
     (define state (rae-get-facts))
     (define rae-mode simu-mode)
     ,body)))";
-
-pub const LAMBDA_GET_PRECONDITIONS: &str = "(define get-preconditions\
-    (lambda (label)\
-        (get rae-method-pre-conditions-map label)))";
-
-pub const LAMBDA_GET_SCORE: &str = "(define get-score\
-    (lambda (label)\
-        (get rae-method-score-map label)))";
 pub const GET_ACTION_MODEL: &str = "get-action-model";
-
-pub const LAMBDA_GET_ACTION_MODEL: &str = "(define get-action-model
-    (lambda (label)
-        (get rae-action-model-map label)))";
-
-pub const LAMBDA_EVAL_PRE_CONDITIONS: &str = "(define eval-pre-conditions
-    (lambda (method)
-        (sim_block
-            (eval (cons (get-preconditions (car method)) (quote-list (cdr method)))))))";
-
-pub const LAMBDA_COMPUTE_SCORE: &str = "(define compute-score
-    (lambda (method)
-        (sim_block
-            (eval (cons (get-score (car method)) (quote-list (cdr method)))))))";
-
-pub const LAMBDA_IS_APPLICABLE: &str = "(define applicable?
-    (lambda (method)
-        (sim_block
-            (eval-pre-conditions method))))";
-
-pub const LAMBDA_GENERATE_APPLICABLE_INSTANCES: &str = "(define generate_applicable_instances
-    (lambda (task)
-        (let* ((task_label (first task))
-               (params (cdr task))
-               (methods (get rae-task-methods-map task_label)))
-            (r_generate_instances
-                (enr (cons enumerate (cons methods params)))))))";
-
-pub const LAMBDA_R_GENERATE_INSTANCES: &str = "(define r_generate_instances
-    (lambda (methods)
-        (if (null? methods)
-            nil
-            (let* ((method (car methods))
-                    (methods (cdr methods))
-                    (method_label (first method))
-                    (params (cdr method)))
-                (begin
-                    (define types (get rae-method-types-map method_label))
-                    (if (> (len types) (len params))
-                        (begin
-                            (define instance_types (mapf instance (sublist types (len params))))
-                            (define instances (enr (cons enumerate (append method instance_types))))
-                            (append (r_test_method instances) (r_generate_instances methods)))
-                        (cons
-                            (if (! (err? (eval-pre-conditions method)))
-                                (list method (compute-score method))
-                                nil)
-                            (r_generate_instances methods))))))))";
-pub const LAMBDA_R_TEST_METHOD: &str = "(define r_test_method
-    (lambda (instances)
-        (if (null? instances)
-            nil
-            (if (eval-pre-conditions (car instances))
-                (cons
-                    (list (car instances) (compute-score (car instances)))
-                    (r_test_method (cdr instances)))
-                (r_test_method (cdr instances))))))";
 
 pub const DEFINE_ERR_NO_APPLICABLE_METHOD: &str = "(define err::no-applicable-method 0)";
 pub const DEFINE_ERR_ACTION_FAILURE: &str = "(define err::action_failure 1)";
 pub const MOD_RAE_DESCRIPTION: &str = "rae-description";
 
-/*pub const GENERATE_TASK: &str = "generate-task";
-pub const GENERATE_STATE_FUNCTION: &str = "generate-state-function";
-pub const GENERATE_ACTION: &str = "generate-action";
-pub const GENERATE_ACTION_MODEL: &str = "generate-action-model";
-pub const GENERATE_ACTION_OPERATIONAL_MODEL: &str = "generate-action-operational-model";
-pub const GENERATE_METHOD: &str = "generate-method";*/
-
 pub const RAE_ADD_STATE_FUNCTION: &str = "add-state-function";
 pub const RAE_ADD_COMMAND: &str = "add-command";
-pub const RAE_ADD_COMMAND_MODEL: &str = "add-action-model";
+pub const RAE_ADD_COMMAND_MODEL: &str = "add-command-model";
 pub const RAE_ADD_TASK_MODEL: &str = "add-task-model";
 pub const RAE_ADD_METHOD_MODEL: &str = "add-method-model";
 //pub const RAE_DEF_ACTION_OPERATIONAL_MODEL: &str = "def-action-operational-model";
@@ -359,6 +261,7 @@ pub const RAE_PLAN_TASK: &str = "plan-task";
 pub const RAE_TRIGGER_EVENT: &str = "trigger-event";
 pub const RAE_TRIGGER_TASK: &str = "trigger-task";
 pub const RAE_LAUNCH: &str = "launch";
+pub const RAE_STOP: &str = "stop";
 pub const RAE_CONFIGURE_PLATFORM: &str = "configure-platform";
 pub const RAE_CONFIGURE_SELECT: &str = "configure-select";
 

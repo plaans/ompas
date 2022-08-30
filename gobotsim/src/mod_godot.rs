@@ -2,8 +2,8 @@
 
 use crate::language::*;
 use crate::rae_interface::PlatformGodot;
-use ompas_rae_scheme::rae_exec::RAEInterface;
 use ompas_rae_structs::agenda::Agenda;
+use ompas_rae_structs::platform::{RAEInterface, RAEPlatform};
 use ompas_rae_structs::state::world_state::*;
 use sompas_macros::*;
 use sompas_structs::contextcollection::Context;
@@ -38,15 +38,15 @@ pub struct CtxGodot {
 
 impl Default for CtxGodot {
     fn default() -> Self {
-        let state = WorldState::default();
-        let agenda = Agenda::default();
+        let interface = RAEInterface::default();
+        let state = interface.state.clone();
+        let agenda = interface.agenda.clone();
         let platform = Arc::new(RwLock::new(PlatformGodot {
             socket_info: Default::default(),
             headless: false,
             sender_socket: None,
-            state: state.clone(),
+            interface,
             instance: Default::default(),
-            agenda: agenda.clone(),
             domain: PathBuf::from(
                 "/home/jeremy/CLionProjects/ompas/gobotsim/godot_domain/domain.lisp",
             )

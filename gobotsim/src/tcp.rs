@@ -6,10 +6,12 @@ use ompas_rae_structs::state::partial_state::PartialState;
 use ompas_rae_structs::state::world_state::*;
 use sompas_structs::lvalues::LValueS;
 use sompas_utils::task_handler;
+use sompas_utils::task_handler::EndSignal;
 use std::convert::TryInto;
 use std::net::SocketAddr;
 use tokio::io::{self, AsyncReadExt, AsyncWriteExt, BufReader, ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
+use tokio::sync::broadcast;
 use tokio::sync::mpsc::Receiver;
 
 pub const BUFFER_SIZE: usize = 65_536; //65KB should be enough for the moment
@@ -23,24 +25,32 @@ pub async fn task_tcp_connection(
     state: WorldState,
     status: Agenda,
     instance: Instance,
+    killer: broadcast::Sender<EndSignal>,
 ) {
     let stream = TcpStream::connect(socket_addr).await.unwrap();
 
     // splits the tcp connection into a read and write stream.
     let (rd, wr) = io::split(stream);
 
+    let k1 = killer.subscribe();
     // Starts the task to read data from socket.
-    tokio::spawn(async move { async_read_socket(rd, state, status, instance).await });
+    tokio::spawn(async move { async_read_socket(rd, state, status, instance, k1).await });
+
+    let k2 = killer.subscribe();
 
     // Starts the task that awaits on data from inner process, and sends it to godot via tcp.
-    tokio::spawn(async move { async_send_socket(wr, receiver).await });
+    tokio::spawn(async move { async_write_socket(wr, receiver, k2).await });
 }
 
-async fn async_send_socket(mut stream: WriteHalf<TcpStream>, mut receiver: Receiver<String>) {
+async fn async_write_socket(
+    mut stream: WriteHalf<TcpStream>,
+    mut receiver: Receiver<String>,
+    mut killer: broadcast::Receiver<EndSignal>,
+) {
     let test = receiver.recv().await.unwrap();
     assert_eq!(test, TEST_TCP);
     //println!("socket ready to receive command !");
-    let mut end_receiver = task_handler::subscribe_new_task();
+    //let mut end_receiver = task_handler::subscribe_new_task();
     loop {
         tokio::select! {
             command = receiver.recv() => {
@@ -56,7 +66,7 @@ async fn async_send_socket(mut stream: WriteHalf<TcpStream>, mut receiver: Recei
                     Err(_) => panic!("error sending via socket"),
                 }
             }
-            _ = end_receiver.recv() => {
+            _ = killer.recv() => {
                 println!("godot sender task ended");
                 break;
             }
@@ -80,6 +90,7 @@ async fn async_read_socket(
     state: WorldState,
     agenda: Agenda,
     instance: Instance,
+    mut killer: broadcast::Receiver<EndSignal>,
 ) {
     let mut buf_reader = BufReader::new(stream);
 
@@ -87,8 +98,6 @@ async fn async_read_socket(
     let mut size_buf = [0; 4];
 
     let mut map_server_id_action_id: im::HashMap<usize, usize> = Default::default();
-
-    let mut end_receiver = task_handler::subscribe_new_task();
 
     loop {
         tokio::select! {
@@ -170,7 +179,7 @@ async fn async_read_socket(
             }
         }
                 }
-            _ = end_receiver.recv() => {
+            _ = killer.recv() => {
                 println!("godot tcp receiver task ended.");
                 break;
             }

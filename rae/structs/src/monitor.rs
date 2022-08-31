@@ -1,4 +1,3 @@
-use lazy_static::lazy_static;
 use log::{info, warn};
 use sompas_core::eval;
 use sompas_structs::lenv::LEnv;
@@ -7,9 +6,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{broadcast, oneshot, Mutex};
 
-lazy_static! {
+/*lazy_static! {
     pub static ref MONITOR_COLLECTION: MonitorCollection = Default::default();
-}
+}*/
 
 #[derive(Default, Clone)]
 pub struct MonitorCollection {
@@ -30,16 +29,16 @@ impl MonitorCollectionInner {
     }
 }
 
-pub async fn add_waiter(lambda: LValue) -> WaitForReceiver {
+/*pub async fn add_waiter(lambda: LValue) -> WaitForReceiver {
     MONITOR_COLLECTION.add_waiter(lambda).await
 }
 
 pub async fn remove_waiter(id: WaitForId) {
     MONITOR_COLLECTION.remove_waiter(id).await
-}
+}*/
 
 impl MonitorCollection {
-    async fn add_waiter(&self, lambda: LValue) -> WaitForReceiver {
+    pub async fn add_waiter(&self, lambda: LValue) -> WaitForReceiver {
         let (tx, rx) = oneshot::channel();
         let mut inner = self.inner.lock().await;
         //println!("new waiter: {}", lambda);
@@ -52,9 +51,10 @@ impl MonitorCollection {
         WaitForReceiver { receiver: rx, id }
     }
 
-    async fn remove_waiter(&self, id: WaitForId) {
+    pub async fn remove_waiter(&self, id: WaitForId) {
         self.inner.lock().await.map.remove(&id);
     }
+
     pub async fn check_wait_for(&self, mut env: LEnv) {
         //let mut item_to_remove: Vec<WaitForId> = vec![];
         let mut waiters = self.inner.lock().await;
@@ -82,6 +82,28 @@ impl MonitorCollection {
             waiters.map.remove(i);
         })*/
     }
+
+    pub async fn get_debug(&self) -> String {
+        let lambdas: Vec<LValue> = self
+            .inner
+            .lock()
+            .await
+            .map
+            .iter()
+            .map(|(_, v)| v.lambda.clone())
+            .collect();
+        let mut str = "'monitor' lambdas: \n".to_string();
+        for l in lambdas {
+            str.push('-');
+            str.push_str(l.to_string().as_str());
+            str.push('\n');
+        }
+        str
+    }
+
+    pub async fn clear(&self) {
+        *self.inner.lock().await = Default::default()
+    }
 }
 
 pub struct WaitFor {
@@ -106,27 +128,10 @@ impl WaitForReceiver {
     }
 }
 
-pub async fn get_debug() -> String {
-    let lambdas: Vec<LValue> = MONITOR_COLLECTION
-        .inner
-        .lock()
-        .await
-        .map
-        .iter()
-        .map(|(_, v)| v.lambda.clone())
-        .collect();
-    let mut str = "'monitor' lambdas: \n".to_string();
-    for l in lambdas {
-        str.push('-');
-        str.push_str(l.to_string().as_str());
-        str.push('\n');
-    }
-    str
-}
-
 pub async fn task_check_wait_for(
     mut update: broadcast::Receiver<bool>,
-    mut killer: broadcast::Receiver<bool>,
+    mut killed: broadcast::Receiver<bool>,
+    monitors: MonitorCollection,
     env: LEnv,
 ) {
     //println!("task check wait on active");
@@ -134,13 +139,13 @@ pub async fn task_check_wait_for(
     loop {
         tokio::select! {
             _ = update.recv() => {
-                let n_wait_on = MONITOR_COLLECTION.inner.lock().await.map.len();
+                let n_wait_on = monitors.inner.lock().await.map.len();
                 if n_wait_on != 0 {
                     //println!("wait-for running");
-                    MONITOR_COLLECTION.check_wait_for(env.clone()).await;
+                    monitors.check_wait_for(env.clone()).await;
                 }
             }
-            _ = killer.recv() => {
+            _ = killed.recv() => {
                 info!("Task \"task_check_monitor\" killed.");
                 break;
             }

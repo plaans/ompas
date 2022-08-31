@@ -241,6 +241,8 @@ impl CtxRaeUser {
             options: Arc::new(Default::default()),
             interface: RAEInterface {
                 state: Default::default(),
+                mutexes: Default::default(),
+                monitors: Default::default(),
                 agenda: Default::default(),
                 log: Log {
                     path: log,
@@ -248,7 +250,6 @@ impl CtxRaeUser {
                     display: display_log,
                 },
                 command_tx: Arc::new(RwLock::new(None)),
-                stop_tx: Arc::new(Default::default()),
                 killer: Arc::new(Default::default()),
             },
             platform,
@@ -284,6 +285,8 @@ impl CtxRaeUser {
         env.import(ctx_io, WithoutPrefix);
 
         let ctx_rae_exec = CtxRaeExec {
+            mutexes: self.interface.mutexes.clone(),
+            monitors: self.interface.monitors.clone(),
             state: self.interface.state.clone(),
             platform_interface: self.platform.clone(),
             agenda: self.interface.agenda.clone(),
@@ -348,10 +351,11 @@ impl Default for CtxRaeUser {
             options: Default::default(),
             interface: RAEInterface {
                 state: Default::default(),
+                mutexes: Default::default(),
+                monitors: Default::default(),
                 agenda: Default::default(),
                 log: Default::default(),
                 command_tx: Arc::new(Default::default()),
-                stop_tx: Arc::new(Default::default()),
                 killer: Arc::new(Default::default()),
             },
             platform: None,

@@ -1,9 +1,9 @@
 use crate::rae_user::{CtxRaeUser, MOD_RAE_USER};
-use ompas_rae_core::monitor::task_check_wait_for;
 use ompas_rae_core::{run, TOKIO_CHANNEL_SIZE};
 use ompas_rae_language::*;
 use ompas_rae_structs::domain::RAEDomain;
 use ompas_rae_structs::job::{Job, JobType};
+use ompas_rae_structs::monitor::task_check_wait_for;
 use ompas_rae_structs::options::*;
 use ompas_rae_structs::options::{Planner, RAEOptions, SelectMode};
 use sompas_macros::*;
@@ -13,6 +13,7 @@ use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use sompas_utils::task_handler::{subscribe_new_task, EndSignal};
+use std::time::Duration;
 use tokio::sync::{broadcast, mpsc};
 
 /// Launch main loop of rae in an other asynchronous task.
@@ -23,12 +24,12 @@ pub async fn launch(env: &LEnv) -> &str {
     let options = ctx.get_options().await.clone();
 
     let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
-    let (tx_stop, rx_stop) = mpsc::channel(TOKIO_CHANNEL_SIZE);
-    let (tx_killer, killer) = broadcast::channel(TOKIO_CHANNEL_SIZE);
+    //let (tx_stop, rx_stop) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+    let (killer, killed) = broadcast::channel(TOKIO_CHANNEL_SIZE);
 
     *ctx.interface.command_tx.write().await = Some(tx);
-    *ctx.interface.stop_tx.write().await = Some(tx_stop);
-    *ctx.interface.killer.write().await = Some(tx_killer.clone());
+    //*ctx.interface.stop_tx.write().await = Some(tx_stop);
+    *ctx.interface.killer.write().await = Some(killer.clone());
     let interface = ctx.interface.clone();
     let platform = ctx.platform.clone();
 
@@ -47,8 +48,9 @@ pub async fn launch(env: &LEnv) -> &str {
     let state = ctx.interface.state.clone();
     let receiver_event_update_state = state.subscribe_on_update().await;
     let env_clone = env.clone();
+    let monitors = interface.monitors.clone();
     tokio::spawn(async move {
-        task_check_wait_for(receiver_event_update_state, killer, env_clone).await
+        task_check_wait_for(receiver_event_update_state, killed, monitors, env_clone).await
     });
 
     tokio::spawn(async move {
@@ -56,47 +58,45 @@ pub async fn launch(env: &LEnv) -> &str {
     });
 
     if ctx.interface.log.display {
-        ompas_rae_log::display_logger(tx_killer.subscribe(), ctx.interface.log.path.clone());
+        ompas_rae_log::display_logger(killer.subscribe(), ctx.interface.log.path.clone());
     }
 
-    tokio::spawn(async move { monitor_rae(rx_stop, tx_killer).await });
+    tokio::spawn(async move { monitor_rae(killer).await });
     "rae launched succesfully"
 }
 
-pub async fn monitor_rae(
-    mut recv_stop: mpsc::Receiver<EndSignal>,
-    sender_kill: broadcast::Sender<EndSignal>,
-) {
+pub async fn monitor_rae(killer: broadcast::Sender<EndSignal>) {
     let mut recv_general = subscribe_new_task();
+    let mut killed = killer.subscribe();
 
     tokio::select! {
         _ = recv_general.recv() => {
-            println!("stop rae from general")
-        }
-        _ = recv_stop.recv() => {
-            println!("stop rae from repl")
+            println!("stop rae from general");
+            killer
+        .send(true)
+        .expect("monitor_rae: error sending kill message");
+            }
+        _ = killed.recv() => {
+            println!("stop rae from inside")
         }
     }
-
-    sender_kill.send(true).expect("error sending kill message");
 }
 
 #[async_scheme_fn]
 pub async fn stop(env: &LEnv) {
     let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER).unwrap();
 
-    match ctx.interface.get_stop().await {
+    match ctx.interface.get_killer().await {
         None => {}
-        Some(command_tx) => {
-            command_tx
-                .send(true)
-                .await
-                .expect("could not broadcast end signal");
+        Some(killer) => {
+            killer.send(true).expect("could not broadcast end signal");
+            tokio::time::sleep(Duration::from_secs(1)).await; //hardcoded moment to wait for all process to be killed.
             *ctx.interface.command_tx.write().await = None;
-            *ctx.interface.stop_tx.write().await = None;
+            *ctx.interface.killer.write().await = None;
             ctx.interface.state.clear().await;
             ctx.interface.agenda.clear().await;
-            *ctx.interface.killer.write().await = None;
+            ctx.interface.mutexes.clear().await;
+            ctx.interface.monitors.clear().await;
         }
     }
 }

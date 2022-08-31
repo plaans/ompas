@@ -226,12 +226,13 @@ impl RAEPlatform for PlatformGodot {
             Some(s) => s.clone(),
         };
 
-        sender
-            .send(command)
-            .await
-            .expect("couldn't send via channel");
-
-        Ok(LValue::Nil)
+        match sender.try_send(command) {
+            Ok(_) => Ok(LValue::Nil),
+            Err(_) => Err(LRuntimeError::new(
+                "gobotsim::cancel_command",
+                "tcp channel is closed",
+            )),
+        }
     }
 
     /// Launch the platform godot and open the tcp communication

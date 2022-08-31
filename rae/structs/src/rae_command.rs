@@ -4,7 +4,7 @@ use tokio::sync::mpsc::{Receiver, Sender};
 #[derive(Clone, Debug)]
 pub enum RAECommand {
     Job(Job),
-    Stop,
+    //Stop,
 }
 
 impl From<Job> for RAECommand {

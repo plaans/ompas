@@ -1,6 +1,4 @@
 use crate::rae_user::{CtxRaeUser, MOD_RAE_USER};
-use ompas_rae_core::monitor;
-use ompas_rae_core::mutex;
 use ompas_rae_language::{RAE_GET_AGENDA, RAE_GET_ENV, RAE_GET_STATE};
 use ompas_rae_structs::state::task_state::*;
 use ompas_rae_structs::state::task_status::TaskStatus;
@@ -123,13 +121,15 @@ pub async fn get_agenda(env: &LEnv, args: &[LValue]) -> LResult {
 //Conversion functions
 
 #[async_scheme_fn]
-pub async fn get_mutexes() -> LResult {
-    Ok(mutex::get_debug().await.into())
+pub async fn get_mutexes(env: &LEnv) -> LResult {
+    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER)?;
+    Ok(ctx.interface.mutexes.get_debug().await.into())
 }
 
 #[async_scheme_fn]
-pub async fn get_monitors() -> LResult {
-    Ok(monitor::get_debug().await.into())
+pub async fn get_monitors(env: &LEnv) -> LResult {
+    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER)?;
+    Ok(ctx.interface.monitors.get_debug().await.into())
 }
 
 ///Get the methods of a given task

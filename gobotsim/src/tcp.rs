@@ -31,11 +31,11 @@ pub async fn task_tcp_connection(
     // splits the tcp connection into a read and write stream.
     let (rd, wr) = io::split(stream);
 
-    let k1 = killer.subscribe();
+    let k1 = killer.clone();
     // Starts the task to read data from socket.
     tokio::spawn(async move { async_read_socket(rd, state, status, instance, k1).await });
 
-    let k2 = killer.subscribe();
+    let k2 = killer.clone();
 
     // Starts the task that awaits on data from inner process, and sends it to godot via tcp.
     tokio::spawn(async move { async_write_socket(wr, receiver, k2).await });
@@ -44,12 +44,14 @@ pub async fn task_tcp_connection(
 async fn async_write_socket(
     mut stream: WriteHalf<TcpStream>,
     mut receiver: Receiver<String>,
-    mut killer: broadcast::Receiver<EndSignal>,
+    killer: broadcast::Sender<EndSignal>,
 ) {
     let test = receiver.recv().await.unwrap();
     assert_eq!(test, TEST_TCP);
     //println!("socket ready to receive command !");
     //let mut end_receiver = task_handler::subscribe_new_task();
+
+    let mut killed = killer.subscribe();
     loop {
         tokio::select! {
             command = receiver.recv() => {
@@ -65,7 +67,7 @@ async fn async_write_socket(
                     Err(_) => panic!("error sending via socket"),
                 }
             }
-            _ = killer.recv() => {
+            _ = killed.recv() => {
                 println!("godot sender task ended");
                 break;
             }
@@ -89,7 +91,7 @@ async fn async_read_socket(
     state: WorldState,
     agenda: Agenda,
     instance: Instance,
-    mut killer: broadcast::Receiver<EndSignal>,
+    killer: broadcast::Sender<EndSignal>,
 ) {
     let mut buf_reader = BufReader::new(stream);
 
@@ -98,17 +100,23 @@ async fn async_read_socket(
 
     let mut map_server_id_action_id: im::HashMap<usize, usize> = Default::default();
 
+    let mut killed = killer.subscribe();
+
     loop {
         tokio::select! {
             msg = buf_reader.read_exact(&mut size_buf) => {
                 match msg {
             Ok(_) => {}
-            Err(_) => panic!("Error while reading buffer"),
+            Err(_) => {
+                killer.send(true).expect("could send kill message to rae processes.");
+            }//panic!("Error while reading buffer"),
         };
         let size = read_size_from_buf(&size_buf);
         match buf_reader.read_exact(&mut buf[0..size]).await {
             Ok(_) => {}
-            Err(_) => panic!("Error while reading buffer"),
+            Err(_) => {
+                        killer.send(true).expect("could send kill message to rae processes.");
+            }
         };
 
         let msg = read_msg_from_buf(&buf, size);
@@ -178,7 +186,7 @@ async fn async_read_socket(
             }
         }
                 }
-            _ = killer.recv() => {
+            _ = killed.recv() => {
                 println!("godot tcp receiver task ended.");
                 break;
             }

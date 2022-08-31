@@ -1,13 +1,13 @@
-use lazy_static::lazy_static;
+//use lazy_static::lazy_static;
 use std::collections::VecDeque;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
 
 const TOKIO_CHANNEL_SIZE: usize = 16;
 
-lazy_static! {
+/*lazy_static! {
     pub static ref MUTEXES: MutexMap = Default::default();
-}
+}*/
 
 #[derive(Clone)]
 pub struct Waiter {
@@ -80,6 +80,10 @@ impl RaeMutex {
     }
 }
 
+/*pub async fn clear() {
+    MUTEXES.clear().await;
+}
+
 pub async fn lock(r: String, p: usize) -> MutexResponse {
     MUTEXES.lock(r, p).await
 }
@@ -102,19 +106,25 @@ pub async fn get_list_locked() -> Vec<String> {
 
 pub async fn get_debug() -> String {
     MUTEXES.format().await
-}
+}*/
 
 pub enum MutexResponse {
     Ok,
     Wait(Wait),
 }
 
-#[derive(Default)]
-pub struct MutexMap {
+#[derive(Default, Clone)]
+pub struct MutexCollection {
     map: Arc<Mutex<im::HashMap<String, RaeMutex>>>,
 }
 
-impl MutexMap {
+impl MutexCollection {
+    pub async fn clear(&self) {
+        *self.map.lock().await = Default::default();
+        assert!(self.map.lock().await.is_empty());
+        println!("mutex map cleared");
+    }
+
     pub async fn lock(&self, r: String, p: usize) -> MutexResponse {
         //info!("locking {} with priority {}", r, p);
         let mut locked = self.map.lock().await;
@@ -156,7 +166,7 @@ impl MutexMap {
             .collect::<Vec<String>>()
     }
 
-    pub async fn format(&self) -> String {
+    pub async fn get_debug(&self) -> String {
         let locked: Vec<(String, usize)> = self
             .map
             .lock()

@@ -26,8 +26,6 @@ pub type ReactiveTriggerId = usize;
 
 pub mod ctx_planning;
 pub mod error;
-pub mod monitor;
-pub mod mutex;
 
 #[derive(Debug, Clone)]
 pub enum TaskType {
@@ -47,7 +45,7 @@ pub async fn run(
     domain: RAEDomain,
     interface: RAEInterface,
     mut env: LEnv,
-    mut rx: Receiver<RAECommand>,
+    mut command_rx: Receiver<RAECommand>,
     options: &RAEOptions,
 ) {
     //Ubuntu::
@@ -118,65 +116,75 @@ pub async fn run(
 
     eval_init(&mut env).await;
 
+    let mut killed = interface.killer.read().await.as_ref().unwrap().subscribe();
+
+    let mut killers = vec![];
+
     loop {
-        //For each new event or task to be addressed, we search for the best method a create a new refinement stack
-        //Note: The whole block could be in an async block
-        let command = rx.recv().await;
-        match command {
-            None => break,
-            Some(RAECommand::Job(job)) => {
-                info!("new job received!");
+        tokio::select! {
+            command = command_rx.recv() => {
+                match command {
+                    None => break,
+                    Some(RAECommand::Job(job)) => {
+                        info!("new job received!");
 
-                let mut new_env = env.clone();
+                        let mut new_env = env.clone();
 
-                let job_lvalue = job.core;
-                info!("new triggered task: {}", job_lvalue);
-                //info!("LValue to be evaluated: {}", job_lvalue);
+                        let job_lvalue = job.core;
+                        info!("new triggered task: {}", job_lvalue);
+                        //info!("LValue to be evaluated: {}", job_lvalue);
 
-                let (tx, rx) = new_interruption_handler();
+                        let (tx, rx) = new_interruption_handler();
+                        killers.push(tx.clone());
 
-                let future = (Box::pin(async move {
-                    let result = eval(&job_lvalue, &mut new_env, Some(rx)).await;
-                    match &result {
-                        Ok(lv) => info!(
-                            "result of task {}: {}",
-                            job_lvalue,
-                            match lv {
-                                LValue::Err(e) => {
-                                    match e.deref() {
-                                        LValue::Number(LNumber::Int(i)) => {
-                                            format!("{:?}", RaeExecError::i64_as_err(*i))
+                        let future = (Box::pin(async move {
+                            let result = eval(&job_lvalue, &mut new_env, Some(rx)).await;
+                            match &result {
+                                Ok(lv) => info!(
+                                    "result of task {}: {}",
+                                    job_lvalue,
+                                    match lv {
+                                        LValue::Err(e) => {
+                                            match e.deref() {
+                                                LValue::Number(LNumber::Int(i)) => {
+                                                    format!("{:?}", RaeExecError::i64_as_err(*i))
+                                                }
+                                                lv => lv.to_string(),
+                                            }
                                         }
                                         lv => lv.to_string(),
                                     }
-                                }
-                                lv => lv.to_string(),
+                                ),
+                                Err(e) => error!("Error in asynchronous task: {}", e),
                             }
-                        ),
-                        Err(e) => error!("Error in asynchronous task: {}", e),
+
+                            result
+                        }) as FutureResult)
+                            .shared();
+
+                        let f2 = future.clone();
+
+
+                        tokio::spawn(f2);
+
+
+                        job.sender
+                            .send(LAsyncHandler::new(future, tx))
+                            .await
+                            .expect("");
                     }
-
-                    result
-                }) as FutureResult)
-                    .shared();
-
-                let f2 = future.clone();
-
-                tokio::spawn(f2);
-
-                job.sender
-                    .send(LAsyncHandler::new(future, tx))
-                    .await
-                    .expect("");
-            }
-            Some(RAECommand::Stop) => {
-                println!("quitting rae");
-                match &platform {
-                    None => {}
-                    Some(p) => p.stop_platform().await,
                 }
-                break;
+            }
+            _ = killed.recv() => {
+                platform.as_ref().unwrap().stop_platform().await;
+                println!("rae killed");
+
+                for k in &mut killers {
+                    k.interrupt().await;
+                }
             }
         }
+        //For each new event or task to be addressed, we search for the best method a create a new refinement stack
+        //Note: The whole block could be in an async block
     }
 }

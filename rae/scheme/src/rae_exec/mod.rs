@@ -3,10 +3,11 @@ use crate::rae_exec::platform::*;
 use crate::rae_exec::rae_mutex::{get_list_locked, is_locked, lock, lock_in_list, release};
 use ::macro_rules_attribute::macro_rules_attribute;
 use futures::FutureExt;
-use ompas_rae_core::monitor::{add_waiter, remove_waiter};
 use ompas_rae_language::*;
 use ompas_rae_structs::agenda::Agenda;
 use ompas_rae_structs::context::RAE_TASK_METHODS_MAP;
+use ompas_rae_structs::monitor::MonitorCollection;
+use ompas_rae_structs::mutex::MutexCollection;
 use ompas_rae_structs::platform::Platform;
 use ompas_rae_structs::state::task_status::TaskStatus;
 use ompas_rae_structs::state::world_state::*;
@@ -59,6 +60,8 @@ pub const PARENT_TASK: &str = "parent_task";
 ///Context that will contains primitives for the RAE executive
 #[derive(Default)]
 pub struct CtxRaeExec {
+    pub monitors: MonitorCollection,
+    pub mutexes: MutexCollection,
     pub state: WorldState,
     pub platform_interface: Option<Platform>,
     pub agenda: Agenda,
@@ -459,8 +462,11 @@ async fn get_status<'a>(_: &'a [LValue], env: &'a LEnv) -> LResult {
 }*/
 
 #[async_scheme_fn]
-async fn wait_for(env: &LEnv, lv: LValue) -> LAsyncHandler {
+async fn wait_for(env: &LEnv, lv: LValue) -> Result<LAsyncHandler, LRuntimeError> {
     let (tx, mut rx) = new_interruption_handler();
+    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
+    let monitors = ctx.monitors.clone();
+
     let mut env = env.clone();
     let f: LFuture = (Box::pin(async move {
         //println!("wait-for: {}", lv);
@@ -468,13 +474,13 @@ async fn wait_for(env: &LEnv, lv: LValue) -> LAsyncHandler {
             //println!("wait-for: {} already true", lv);
             Ok(LValue::Nil)
         } else {
-            let handler = add_waiter(lv.clone()).await;
+            let handler = monitors.add_waiter(lv.clone()).await;
             let id = *handler.id();
             //println!("wait-for: waiting on {}", lv);
             tokio::select! {
                 _ = rx.recv() => {
                         //println!("wait-for: waiter no longer needed");
-                        remove_waiter(id).await;
+                        monitors.remove_waiter(id).await;
                         Ok(interrupted!())
                 }
                 _ = handler.recv() => {
@@ -488,7 +494,7 @@ async fn wait_for(env: &LEnv, lv: LValue) -> LAsyncHandler {
 
     tokio::spawn(f.clone());
 
-    LAsyncHandler::new(f, tx)
+    Ok(LAsyncHandler::new(f, tx))
 }
 #[scheme_fn]
 pub fn success(args: &[LValue]) -> LValue {

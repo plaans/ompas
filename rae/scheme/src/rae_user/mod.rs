@@ -69,6 +69,9 @@ impl IntoModule for CtxRaeUser {
             MACRO_OM_MODEL,
             MACRO_DEF_COMMAND_PDDL_MODEL,
             MACRO_DEF_COMMAND_OM_MODEL,
+            MACRO_DEF_INITIAL_STATE,
+            MACRO_DEF_TYPES,
+            MACRO_DEF_OBJECTS,
         ]
         .into();
         init_lisp.append(&mut self.platform_domain.clone());
@@ -107,13 +110,13 @@ impl IntoModule for CtxRaeUser {
         module.add_async_fn_prelude(RAE_ADD_TASK, add_task);
         module.add_async_fn_prelude(RAE_ADD_METHOD, add_method);
         module.add_async_fn_prelude(RAE_ADD_LAMBDA, add_lambda);
-        module.add_async_fn_prelude(RAE_ADD_INITIAL_STATE, def_initial_state);
+        module.add_async_fn_prelude(RAE_ADD_FACTS, add_facts);
         module.add_async_fn_prelude(RAE_ADD_CONSTANT, add_object);
         module.add_async_fn_prelude(RAE_ADD_OBJECT, add_object);
         module.add_async_fn_prelude(RAE_ADD_TYPE, add_type);
-        module.add_async_fn_prelude(RAE_DEF_CONSTANTS, def_objects);
-        module.add_async_fn_prelude(RAE_DEF_TYPES, def_types);
-        module.add_async_fn_prelude(RAE_DEF_OBJECTS, def_objects);
+        //module.add_async_fn_prelude(RAE_DEF_CONSTANTS, add_objects);
+        module.add_async_fn_prelude(RAE_ADD_TYPES, add_types);
+        module.add_async_fn_prelude(RAE_ADD_OBJECTS, add_objects);
         module.add_async_fn_prelude(GENERATE_TEST_TYPE_EXPR, generate_test_type_expr);
 
         //functions to debug the functioning of rae
@@ -166,7 +169,7 @@ impl IntoModule for CtxRaeUser {
             LHelp::new_verbose(RAE_ADD_TASK, DOC_ADD_TASK, DOC_ADD_TASK_VERBOSE),
             LHelp::new_verbose(RAE_ADD_METHOD, DOC_ADD_METHOD, DOC_ADD_METHOD_VERBOSE),
             LHelp::new(RAE_ADD_LAMBDA, DOC_ADD_LAMBDA),
-            LHelp::new(RAE_ADD_INITIAL_STATE, DOC_ADD_INITIAL_STATE),
+            LHelp::new(RAE_ADD_FACTS, DOC_ADD_INITIAL_STATE),
             LHelp::new(RAE_CONFIGURE_PLATFORM, DOC_RAE_CONFIGURE_PLATFORM),
             LHelp::new(RAE_GET_CONFIG_PLATFORM, DOC_RAE_GET_CONFIG_PLATFORM),
             LHelp::new(RAE_GET_AGENDA, DOC_RAE_GET_AGENDA),

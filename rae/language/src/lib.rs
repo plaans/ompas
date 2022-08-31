@@ -122,13 +122,13 @@ pub const RAE_ADD_METHOD_MODEL: &str = "add-method-model";
 pub const RAE_ADD_TASK: &str = "add-task";
 pub const RAE_ADD_METHOD: &str = "add-method";
 pub const RAE_ADD_LAMBDA: &str = "add-lambda";
-pub const RAE_ADD_INITIAL_STATE: &str = "def-initial-state";
+pub const RAE_ADD_FACTS: &str = "add-facts";
 pub const RAE_ADD_CONSTANT: &str = "add-constant";
 pub const RAE_ADD_TYPE: &str = "add-type";
 pub const RAE_ADD_OBJECT: &str = "add-object";
-pub const RAE_DEF_OBJECTS: &str = "def-objects";
-pub const RAE_DEF_TYPES: &str = "def-types";
-pub const RAE_DEF_CONSTANTS: &str = "def-constants";
+pub const RAE_ADD_OBJECTS: &str = "add-objects";
+pub const RAE_ADD_TYPES: &str = "add-types";
+//pub const RAE_DEF_CONSTANTS: &str = "def-constants";
 
 pub const DOC_ADD_STATE_FUNCTION: &str = "Insert a state function in RAE environment.";
 pub const DOC_ADD_STATE_FUNCTION_VERBOSE: &str =

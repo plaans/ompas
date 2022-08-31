@@ -131,6 +131,14 @@ pub const MACRO_DEF_COMMAND_PDDL_MODEL: &str = "(defmacro def-command-pddl-model
     (lambda args
         `(add-command-model ,(cons pddl-model args))))";
 
+pub const MACRO_DEF_INITIAL_STATE: &str = "(defmacro def-initial-state (lambda args
+    `(add-facts (map ',args))))";
+
+pub const MACRO_DEF_TYPES: &str = "(defmacro def-types (lambda args
+    (cons 'add-types (quote-list args))))";
+pub const MACRO_DEF_OBJECTS: &str = "(defmacro def-objects (lambda args
+    (cons 'add-objects (quote-list args))))";
+
 /// Takes as input a p_expr of the form ((p1 p1_type) ... (p_n pn_type))
 #[async_scheme_fn]
 pub async fn generate_test_type_expr(env: &LEnv, params: Vec<LValue>) -> LResult {
@@ -538,7 +546,7 @@ pub async fn add_task_model(
 
 ///Takes in input a list of initial facts that will be stored in the inner world part of the State.
 #[async_scheme_fn]
-pub async fn def_initial_state(env: &LEnv, map: im::HashMap<LValue, LValue>) {
+pub async fn add_facts(env: &LEnv, map: im::HashMap<LValue, LValue>) {
     let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER).unwrap();
 
     let mut inner_world = PartialState {
@@ -568,13 +576,13 @@ pub async fn def_initial_state(env: &LEnv, map: im::HashMap<LValue, LValue>) {
     ctx.interface.state.update_state(instance).await;
 }
 #[async_scheme_fn]
-pub async fn def_types(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
+pub async fn add_types(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
     for arg in args {
         match arg {
             LValue::List(list) => {
                 if list.len() < 2 {
                     return Err(lruntimeerror!(
-                        RAE_DEF_CONSTANTS,
+                        RAE_ADD_TYPES,
                         format!("an objects is defined by a symbol and a type, got {}", arg)
                     ));
                 }
@@ -592,11 +600,11 @@ pub async fn def_types(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError>
     Ok(())
 }
 #[async_scheme_fn]
-pub async fn def_objects(env: &LEnv, args: Vec<Vec<LValue>>) -> Result<(), LRuntimeError> {
+pub async fn add_objects(env: &LEnv, args: Vec<Vec<LValue>>) -> Result<(), LRuntimeError> {
     for list in args {
         if list.len() < 2 {
             return Err(lruntimeerror!(
-                RAE_DEF_CONSTANTS,
+                RAE_ADD_OBJECTS,
                 format!(
                     "an objects is defined by a symbol and a type, got {}",
                     LValue::from(list)

@@ -1,15 +1,17 @@
 use colored::Colorize;
-use gobot_sim_benchmark::{BenchmarkData, RunData};
 use indicatif::{ProgressBar, ProgressStyle};
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{Message, SmtpTransport, Transport};
+use ompas_benchmark::gobot_bench_config::GobotBenchConfig;
+use ompas_benchmark::{BenchmarkData, RunData};
+use std::convert::TryInto;
 use std::fmt::Debug;
-use std::fs;
 use std::fs::File;
 use std::os::unix::io::{FromRawFd, IntoRawFd};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::time::{Duration, SystemTime};
+use std::{env, fs};
 use structopt::StructOpt;
 use yaml_rust::YamlLoader;
 
@@ -17,23 +19,21 @@ use yaml_rust::YamlLoader;
 #[structopt(name = "OMPAS", about = "An acting engine based on RAE.")]
 pub struct Opt {
     //Number of greedy that will be runned as greedy choose randomly on a set of equal scored methods
-    #[structopt(short = "n", long = "number")]
-    number: Option<usize>,
-
-    #[structopt(short = "d", long = "domain")]
-    domain: PathBuf,
-
     #[structopt(short = "c", long = "config")]
     config: PathBuf,
 
     #[structopt(short = "v", long = "view")]
     view: bool,
-
-    #[structopt(short = "t", long = "time")]
-    time: Option<usize>,
 }
 
 fn main() {
+    let opt: Opt = Opt::from_args();
+    let config =
+        fs::read_to_string(&opt.config).expect("Something went wrong reading the config file");
+    let configs = YamlLoader::load_from_str(&config).unwrap();
+    let config = &configs[0];
+    let config: GobotBenchConfig = config.try_into().expect("could not read config");
+
     let mut benchmark_data = BenchmarkData::default();
     let bar = ProgressBar::new(0);
     bar.set_style(
@@ -45,20 +45,16 @@ fn main() {
     );
     bar.enable_steady_tick(Duration::from_secs(1));
     bar.reset();
-    let opt: Opt = Opt::from_args();
     println!("GOBOT-SIM+RAE BENCHMARK v0.1");
     //Installation of the last version of benchmark
-
-    println!("Installation of the last version of OMPAS' benchmark...");
+    assert!(env::set_current_dir(&config.bin_path).is_ok());
+    println!(
+        "Successfully changed working directory to {} !",
+        env::current_dir().unwrap().display()
+    );
+    println!("Installation of the last version of OMPAS' gobot-sim benchmark...");
     let child = Command::new("cargo")
-        .args(&[
-            "install",
-            "--force",
-            "--bin",
-            "gobot-benchmark",
-            "--path",
-            ".",
-        ])
+        .args(&["install", "--force", "--bin", "bench_gobot", "--path", "."])
         .spawn();
 
     if let Ok(mut c) = child {
@@ -72,7 +68,7 @@ fn main() {
     //let time = opt.time.unwrap_or(DEFAULT_TIME);
 
     //println!("Benchmark for domain: {}", domain.to_str().unwrap());
-    let domain_path: PathBuf = opt.domain;
+    let domain_path: PathBuf = config.domain_path.clone();
     bar.println("Searching for problem files...");
     let mut problem_path = domain_path.clone();
     problem_path.push("problems");
@@ -93,7 +89,7 @@ fn main() {
     let mut first = true;
 
     let modes = ["-a", "-L", ""];
-    let number = opt.number.unwrap_or(1);
+    let number: usize = config.number as usize;
     let n_problem = modes.len() * problems.len() * number;
     bar.set_length(n_problem.try_into().unwrap());
 
@@ -121,7 +117,7 @@ fn main() {
             if opt.view {
                 command.arg("-v");
             }
-            command.args(["-t", format!("{}", opt.time.unwrap_or(1)).as_str()]);
+            command.args(["-t", format!("{}", config.max_time).as_str()]);
             let f1 = File::create("benchmark.log").expect("couldn't create file");
             let f2 = File::create("benchmark.log").expect("couldn't create file");
             command

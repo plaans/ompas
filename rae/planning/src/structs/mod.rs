@@ -4,10 +4,10 @@ use crate::structs::traits::FormatWithSymTable;
 use crate::structs::type_table::AtomType;
 use im::{hashmap, HashMap, HashSet};
 use ompas_rae_language::RAE_INSTANCE;
-use ompas_rae_structs::domain::parameters::Parameters;
 use ompas_rae_structs::domain::state_function::StateFunction;
 use ompas_rae_structs::domain::type_hierarchy::TypeHierarchy;
 use ompas_rae_structs::domain::RAEDomain;
+use ompas_rae_structs::domain::_type::Type;
 use ompas_rae_structs::state::world_state::WorldStateSnapshot;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lvalues::LValueS;
@@ -154,7 +154,7 @@ pub struct Problem {
     pub tasks: Vec<String>,
     pub methods: Vec<String>,
     pub types: TypeHierarchy,
-    pub state_functions: Vec<(String, Parameters)>,
+    pub state_functions: Vec<(String, Vec<Type>)>,
     pub objects: Vec<(String, String)>,
     pub initial_state: WorldStateSnapshot,
     pub goal_tasks: Vec<LValueS>,
@@ -190,7 +190,11 @@ impl From<&ConversionContext> for Problem {
             .domain
             .get_state_functions()
             .iter()
-            .map(|(k, v)| (k.clone(), v.get_parameters().clone()))
+            .map(|(k, v)| {
+                let mut types = v.get_parameters().get_types();
+                types.push(v.result.clone());
+                (k.clone(), types)
+            })
             .collect();
 
         Self {

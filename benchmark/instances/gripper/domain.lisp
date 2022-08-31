@@ -1,7 +1,7 @@
 (begin
 
     (def-types room gripper ball)
-    (def-constants
+    (def-objects
       (left right gripper)
       (no_place room)
       (no_ball ball)) 

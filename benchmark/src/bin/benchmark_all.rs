@@ -28,7 +28,7 @@ fn main() {
     //Installation of the last version of benchmark
 
     let mut current_dir = env::current_dir().unwrap();
-    current_dir.push("../../../apps");
+    current_dir.push("../rae/apps");
     assert!(env::set_current_dir(&current_dir).is_ok());
     println!(
         "Successfully changed working directory to {} !",

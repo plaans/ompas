@@ -1,18 +1,21 @@
 use std::borrow::Borrow;
+use std::convert::{TryFrom, TryInto};
 use std::fmt::{Debug, Display, Formatter};
 use std::path::PathBuf;
 use yaml_rust::Yaml;
 
-pub struct BenchConfig {
+pub struct PlanningBenchConfig {
     mail: MailConfig,
     number: i64,
     max_time: i64,
-    domain: PathBuf,
+    domain_path: PathBuf,
+    log_path: PathBuf,
+    bin_path: PathBuf,
     problems: Vec<PathBuf>,
-    techniques: Vec<Technique>,
+    techniques: Vec<PlanningTechnique>,
 }
 
-impl Display for BenchConfig {
+impl Display for PlanningBenchConfig {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         writeln!(
             f,
@@ -20,64 +23,78 @@ impl Display for BenchConfig {
         {}\n\
         - number: {}\n\
         - max_time: {}\n\
-        - domain: {:#?}\n\
+        - domain_path: {:#?}\n\
+        - log_path: {:#?}\n\
+        - bin_path: {:#?} \n\
         - problems: {:#?}\n\
         - techniques: {:#?}",
-            self.mail, self.number, self.max_time, self.domain, self.problems, self.techniques
+            self.mail,
+            self.number,
+            self.max_time,
+            self.domain_path,
+            self.log_path,
+            self.bin_path,
+            self.problems,
+            self.techniques
         )
     }
 }
 
 const GREEDY: &str = "greedy";
-const ADVANCED: &str = "advanced";
-const LRPTF: &str = "lrptf";
-const LPTF: &str = "lptf";
+const ARIES: &str = "aries";
+const ARIES_OPT: &str = "aries-opt";
+const RAE_PLAN: &str = "raeplan";
+const UPOM: &str = "upom";
 
-pub enum Technique {
+#[derive(Copy, Clone)]
+pub enum PlanningTechnique {
     Greedy,
-    Advanced,
-    Lrptf,
-    Lptf,
+    Aries,
+    AriesOpt,
+    RAEPlan,
+    UPOM,
 }
 
 pub type ConfigError = String;
 
-impl TryFrom<&str> for Technique {
+impl TryFrom<&str> for PlanningTechnique {
     type Error = ConfigError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
             GREEDY => Ok(Self::Greedy),
-            ADVANCED => Ok(Self::Advanced),
-            LRPTF => Ok(Self::Lrptf),
-            LPTF => Ok(Self::Lptf),
+            ARIES => Ok(Self::Aries),
+            ARIES_OPT => Ok(Self::AriesOpt),
+            RAE_PLAN => Ok(Self::RAEPlan),
+            UPOM => Ok(Self::UPOM),
             t => Err(format!("{} is not a valid technique", t)),
         }
     }
 }
 
-impl Display for Technique {
+impl Display for PlanningTechnique {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         writeln!(
             f,
             "{}",
             match self {
-                Technique::Greedy => GREEDY,
-                Technique::Advanced => ADVANCED,
-                Technique::Lrptf => LRPTF,
-                Technique::Lptf => LPTF,
+                Self::Greedy => GREEDY,
+                Self::Aries => ARIES,
+                Self::AriesOpt => ARIES_OPT,
+                Self::UPOM => UPOM,
+                Self::RAEPlan => RAE_PLAN,
             }
         )
     }
 }
 
-impl Debug for Technique {
+impl Debug for PlanningTechnique {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self)
     }
 }
 
-impl TryFrom<&Yaml> for BenchConfig {
+impl TryFrom<&Yaml> for PlanningBenchConfig {
     type Error = ConfigError;
 
     fn try_from(value: &Yaml) -> Result<Self, Self::Error> {
@@ -104,9 +121,17 @@ impl TryFrom<&Yaml> for BenchConfig {
             max_time: value["max-time"]
                 .as_i64()
                 .ok_or("max-time should be a i64")?,
-            domain: value["domain"]
+            domain_path: value["domain"]
                 .as_str()
                 .ok_or("domain is not valid")?
+                .into(),
+            log_path: value["log_path"]
+                .as_str()
+                .ok_or("log_path invalid.")?
+                .into(),
+            bin_path: value["bin_path"]
+                .as_str()
+                .ok_or("bin_path invalid.")?
                 .into(),
             problems: p2,
             techniques: t2,

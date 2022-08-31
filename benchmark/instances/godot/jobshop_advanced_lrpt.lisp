@@ -1,4 +1,8 @@
 (begin
+    (def-lambda 
+        remaining-time (lambda ?p
+            (eval (cons '+ (cadr (unzip (package.processes_list ?p)))))))
+
     (def-task t_process_package (:params (?p package)))
 
     (def-method m_process_to_do_r
@@ -10,9 +14,9 @@
             (do
                 (define ?m
                     (arbitrary (find_machines_for_process
-                            (caar (unzip (package.processes_list ?p))))))
-                    (t_process_on_machine ?p ?m)
-                    (t_process_package ?p))))                       
+                        (caar (unzip (package.processes_list ?p))))))
+                (t_process_on_machine ?p ?m)
+                (t_process_package ?p))))                       
 
     (def-method m_no_more_process
         (:task t_process_package)
@@ -23,10 +27,10 @@
             (do
                 (print "package process of " ?p " is done")
                 (mutex::lock-in-list-and-do (instance robot) 0
-                    (t_carry_to_machine r ?p (find_output_machine)))
-                )))
+                    (t_carry_to_machine r ?p (find_output_machine))
+                ))))
     
-    (def-task t_process_on_machine (:params (?p package) (?m machine)))
+    (def-task t_process_on_machine (:params (?p package) '(?m machine)))
     (def-method m_process_on_machine
         (:task t_process_on_machine)
         (:params (?p package) (?m machine))
@@ -34,10 +38,10 @@
         (:score 0)
         (:body 
             (do
-                (mutex::lock-and-do ?m 11
-                (do
-                    (mutex::lock-in-list-and-do (instance robot) 11
+                (define r-time (remaining-time ?p))
+                (mutex::lock-and-do ?m r-time
+                (do 
+                (mutex::lock-in-list-and-do (instance robot) r-time 
                     (t_carry_to_machine r ?p ?m))
                     (process ?m))))))
-
 )

@@ -188,11 +188,11 @@ pub async fn lisp_interpreter(opt: Opt) {
 
 pub fn domain(opt: &Opt) -> GodotDomain {
     let domain = opt.domain.clone();
-    let mut actions = domain.clone();
-    actions.push("actions.lisp");
+    let mut commands = domain.clone();
+    commands.push("commands.lisp");
     let mut state_functions = domain.clone();
     state_functions.push("state_functions.lisp");
-    let mut om = domain;
+    let mut om = domain.clone();
     om.push(if opt.advanced {
         "jobshop_advanced.lisp"
     } else if opt.lrpt {
@@ -200,14 +200,23 @@ pub fn domain(opt: &Opt) -> GodotDomain {
     } else {
         "jobshop_greedy.lisp"
     });
+    let mut common = domain.clone();
+    common.push("jobshop_common.lisp");
+
+    let mut lambdas = domain;
+    lambdas.push("lambdas.lisp");
 
     format!(
         "(begin
         (read {})
-    (read {})
-    (read {}))",
-        actions.to_str().unwrap(),
+        (read {})
+        (read {})
+        (read {})
+        (read {}))",
+        commands.to_str().unwrap(),
         state_functions.to_str().unwrap(),
+        lambdas.to_str().unwrap(),
+        common.to_str().unwrap(),
         om.to_str().unwrap()
     )
     .into()

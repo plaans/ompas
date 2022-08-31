@@ -160,8 +160,8 @@ pub fn generate_templates(problem: &Problem) -> Result<chronicles::Problem> {
         let sym = symbol_table
             .id(&sf.0)
             .ok_or_else(|| lruntimeerror!(BUILD_CHRONICLES, format!("{} Unknown symbol", sf.0)))?;
-        let mut args = Vec::with_capacity(sf.1.get_number());
-        for tpe in &sf.1.get_types() {
+        let mut args = Vec::with_capacity(sf.1.len());
+        for tpe in &sf.1 {
             args.push(get_type(tpe, &symbol_table)?);
         }
         state_functions.push(StateFun { sym, tpe: args })

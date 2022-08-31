@@ -1,4 +1,5 @@
-mod bench_config;
+pub mod gobot_bench_config;
+pub mod planning_bench_config;
 
 use std::time::Duration;
 

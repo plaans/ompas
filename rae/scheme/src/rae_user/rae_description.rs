@@ -220,8 +220,23 @@ pub async fn add_state_function(
     let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER)?;
     let mut new_env = ctx.get_empty_env();
     let label = map.get(&NAME.into()).unwrap();
-    let params: Parameters = map.get(&PARAMETERS.into()).unwrap().try_into()?;
-    let result = car(env, &[map.get(&RESULT.into()).unwrap().clone()])?.try_into()?;
+    let params: Parameters = map
+        .get(&PARAMETERS.into())
+        .unwrap_or(&Default::default())
+        .try_into()?;
+    let result = car(
+        env,
+        &[map
+            .get(&RESULT.into())
+            .ok_or_else(|| {
+                LRuntimeError::new(
+                    RAE_ADD_STATE_FUNCTION,
+                    format!("No a :result for {}", label),
+                )
+            })?
+            .clone()],
+    )?
+    .try_into()?;
     let expr = format!(
         "(lambda {}
                 (read-state '{} {})))",

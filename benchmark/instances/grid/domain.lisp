@@ -1,6 +1,6 @@
 (begin
   (def-types location new_bool truck)
-  (def-constants (yes no new_bool))
+  (def-objects (yes no new_bool))
   (def-state-function connected (:params (?x location) (?y location)) (:result new_bool))
   (def-state-function at (:params (?t truck)) (:result location))
   (def-action drive (:params (?t truck)) (:result location))

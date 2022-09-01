@@ -260,6 +260,7 @@ pub const RAE_PLAN_TASK: &str = "plan-task";
 
 pub const RAE_TRIGGER_EVENT: &str = "trigger-event";
 pub const RAE_TRIGGER_TASK: &str = "trigger-task";
+pub const RAE_ADD_TASK_TO_EXECUTE: &str = "add-task-to-execute";
 pub const RAE_LAUNCH: &str = "launch";
 pub const RAE_STOP: &str = "stop";
 pub const RAE_CONFIGURE_PLATFORM: &str = "configure-platform";

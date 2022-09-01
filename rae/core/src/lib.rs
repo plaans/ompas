@@ -168,15 +168,18 @@ pub async fn run(
                         tokio::spawn(f2);
 
 
-                        job.sender
-                            .send(LAsyncHandler::new(future, tx))
-                            .await
-                            .expect("");
+                        match job.sender
+                            .try_send(LAsyncHandler::new(future, tx)) {
+                            Ok(_) =>{}
+                            Err(e) => error!("{}", e.to_string())
+                        }
                     }
                 }
             }
             _ = killed.recv() => {
-                platform.as_ref().unwrap().stop_platform().await;
+                if let Some(platform) = &platform {
+                    platform.stop_platform().await;
+                }
                 println!("rae killed");
 
                 for k in &mut killers {

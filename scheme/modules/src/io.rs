@@ -157,7 +157,7 @@ pub fn print(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
 /// Read the content of a file and sends the content to the lisp interpreter.
 /// The name of the file is given via args.
 #[scheme_fn]
-pub fn read(file_name: Sym) -> LResult {
+pub fn read(file_name: String) -> LResult {
     let mut file = match File::open(&file_name) {
         Ok(f) => f,
         Err(e) => return Err(lruntimeerror!(READ, format!("{}: {}", file_name, e))),

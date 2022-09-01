@@ -22,20 +22,16 @@ indicatif = "0.17.0"
 colored = "2.0.0"
 
 [[bin]]
-name = "bench"
-path = "src/bin/benchmark.rs"
+name = "bench_sim"
+path = "src/bin/bench_sim.rs"
 
 [[bin]]
 name = "bench_gobot"
-path = "src/bin/benchmark_gobot.rs"
+path = "src/bin/bench_gobot.rs"
 
 [[bin]]
-name = "bench_all"
-path = "src/bin/benchmark_all.rs"
-
-[[bin]]
-name = "bench_gobot_all"
-path = "src/bin/benchmark_gobot_all.rs"
+name = "bench"
+path = "src/bin/bench.rs"
 
 
 

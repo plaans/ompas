@@ -242,7 +242,7 @@ impl Display for LValue {
             LValue::Fn(fun) => write!(f, "{}", fun.get_label()),
             LValue::Nil => write!(f, "{}", NIL),
             LValue::Symbol(s) => write!(f, "{}", s),
-            LValue::String(s) => write!(f, "\"{}\"", s),
+            LValue::String(s) => write!(f, "{}", s),
             LValue::Number(n) => write!(f, "{}", n),
             LValue::True => write!(f, "{}", TRUE),
             LValue::List(list) => {
@@ -342,6 +342,7 @@ impl TryFrom<&LValue> for String {
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
         match value {
             LValue::Symbol(s) => Ok(s.deref().clone()),
+            LValue::String(s) => Ok(s.deref().clone()),
             LValue::True => Ok(TRUE.into()),
             LValue::Nil => Ok(NIL.into()),
             LValue::Number(n) => Ok(n.to_string()),

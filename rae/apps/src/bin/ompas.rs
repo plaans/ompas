@@ -1,5 +1,4 @@
 use sompas_core::activate_debug;
-use sompas_language::NIL;
 use sompas_modules::advanced_math::CtxMath;
 use sompas_modules::io::CtxIo;
 use sompas_modules::string::CtxString;
@@ -16,13 +15,16 @@ pub const TOKIO_CHANNEL_SIZE: usize = 65_384;
 #[derive(Debug, StructOpt)]
 #[structopt(name = "OMPAS", about = "An acting engine based on RAE.")]
 struct Opt {
-    #[structopt(short = "d", long = "debug")]
-    debug: bool,
-    #[structopt(short = "p", long = "log-path")]
+    #[structopt(short = "v", long = "view")]
+    view: bool,
+    #[structopt(short = "l", long = "log-path")]
     log: Option<PathBuf>,
 
-    #[structopt(short = "s", long = "sim-domain")]
-    sim_domain: PathBuf,
+    #[structopt(short = "p", long = "problem")]
+    problem: Option<PathBuf>,
+
+    #[structopt(short = "d", long = "domain")]
+    domain: PathBuf,
 
     #[structopt(short = "r", long = "rae-log")]
     rae_log: bool,
@@ -34,14 +36,14 @@ async fn main() {
 
     let opt: Opt = Opt::from_args();
     println!("{:?}", opt);
-    if opt.debug {
+    if opt.view {
         activate_debug();
     }
     //test_lib_model(&opt);
-    lisp_interpreter(opt.log, opt.sim_domain, opt.rae_log).await;
+    lisp_interpreter(&opt).await;
 }
 
-pub async fn lisp_interpreter(log: Option<PathBuf>, sim_domain: PathBuf, rae_log: bool) {
+async fn lisp_interpreter(opt: &Opt) {
     let mut li = LispInterpreter::new().await;
 
     let mut ctx_io = CtxIo::default();
@@ -52,7 +54,7 @@ pub async fn lisp_interpreter(log: Option<PathBuf>, sim_domain: PathBuf, rae_log
     //Insert the doc for the different contexts.
 
     //Add the sender of the channel.
-    if let Some(pb) = &log {
+    if let Some(pb) = &opt.log {
         ctx_io.set_log_output(pb.clone().into());
     }
 
@@ -62,23 +64,30 @@ pub async fn lisp_interpreter(log: Option<PathBuf>, sim_domain: PathBuf, rae_log
     li.import(ctx_string);
 
     let mut com = li.subscribe();
-    let str = fs::read_to_string(sim_domain).expect("Something went wrong reading the file");
+    let str = fs::read_to_string(&opt.domain).expect("Something went wrong reading the file");
     //println!("string in file: {}", str);
     com.send(str).await.expect("could not send to LI");
+    if let Some(p) = &opt.problem {
+        let str = fs::read_to_string(p).expect("Something went wrong reading the file");
+        //println!("string in file: {}", str);
+        com.send(str).await.expect("could not send to LI");
+    }
     tokio::spawn(async move {
-        let str: String = com
-            .recv()
-            .await
-            .expect("error receiving result of initialisation of domain");
-        if str != NIL {
-            println!("init com: {}", str)
+        loop {
+            if let Err(e) = com
+                .recv()
+                .await
+                .expect("error receiving result of initialisation of domain")
+            {
+                panic!("error initialising the domain: {}", e)
+            }
         }
     });
 
-    let ctx_rae = CtxRaeUser::new(None, log.clone(), rae_log).await;
+    let ctx_rae = CtxRaeUser::new(None, opt.log.clone(), opt.rae_log).await;
     li.import_namespace(ctx_rae);
 
     li.set_config(LispInterpreterConfig::new(true));
 
-    li.run(log).await;
+    li.run(opt.log.clone()).await;
 }

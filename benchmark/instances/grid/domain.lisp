@@ -3,9 +3,7 @@
   (def-objects (yes no new_bool))
   (def-state-function connected (:params (?x location) (?y location)) (:result new_bool))
   (def-state-function at (:params (?t truck)) (:result location))
-  (def-action drive (:params (?t truck)) (:result location))
-  
-  (def-command-pddl-model drive (:params (?t truck) (?to location)))
+  (def-command drive (:params (?t truck) (?to location)))
 
   (def-command-pddl-model drive
     (:params (?t truck) (?to location))
@@ -25,9 +23,9 @@
   (def-method m_recursive
     (:task t_move)
     (:params (?t truck) (?to location) (?intermediaire location))
-    (:pre-conditions (and-cond
+    (:pre-conditions
       (!= (at ?t) ?to)
-      (= (connected (at ?t) ?intermediaire) yes)))
+      (= (connected (at ?t) ?intermediaire) yes))
     (:score 0)
     (:body 
       (do 

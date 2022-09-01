@@ -138,7 +138,7 @@ pub async fn lisp_interpreter(opt: Opt) {
 
     com.send(format!(
         "(await (race (await (trigger-task t_jobshop)) (await (sleep {}))))",
-        opt.time.unwrap_or(1) * 60
+        opt.time.unwrap_or(1)
     ))
     .await
     .expect("error on LI");
@@ -208,11 +208,11 @@ pub fn domain(opt: &Opt) -> GodotDomain {
 
     format!(
         "(begin
-        (read {})
-        (read {})
-        (read {})
-        (read {})
-        (read {}))",
+        (read \"{}\")
+        (read \"{}\")
+        (read \"{}\")
+        (read \"{}\")
+        (read \"{}\"))",
         commands.to_str().unwrap(),
         state_functions.to_str().unwrap(),
         lambdas.to_str().unwrap(),

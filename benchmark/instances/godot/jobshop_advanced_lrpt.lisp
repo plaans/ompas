@@ -43,5 +43,5 @@
                 (do 
                 (mutex::lock-in-list-and-do (instance robot) r-time 
                     (t_carry_to_machine r ?p ?m))
-                    (process ?m))))))
+                    (process ?m ?p))))))
 )

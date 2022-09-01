@@ -1,17 +1,15 @@
 use colored::Colorize;
 use indicatif::{ProgressBar, ProgressStyle};
-use lettre::transport::smtp::authentication::Credentials;
-use lettre::{Message, SmtpTransport, Transport};
-use ompas_benchmark::gobot_bench_config::GobotBenchConfig;
-use ompas_benchmark::{BenchmarkData, RunData};
+use ompas_benchmark::config::BenchConfig;
+use ompas_benchmark::{install_binary, send_email, BenchmarkData, RunData};
 use std::convert::TryInto;
 use std::fmt::Debug;
+use std::fs;
 use std::fs::File;
 use std::os::unix::io::{FromRawFd, IntoRawFd};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::time::{Duration, SystemTime};
-use std::{env, fs};
 use structopt::StructOpt;
 use yaml_rust::YamlLoader;
 
@@ -21,9 +19,6 @@ pub struct Opt {
     //Number of greedy that will be runned as greedy choose randomly on a set of equal scored methods
     #[structopt(short = "c", long = "config")]
     config: PathBuf,
-
-    #[structopt(short = "v", long = "view")]
-    view: bool,
 }
 
 fn main() {
@@ -32,7 +27,7 @@ fn main() {
         fs::read_to_string(&opt.config).expect("Something went wrong reading the config file");
     let configs = YamlLoader::load_from_str(&config).unwrap();
     let config = &configs[0];
-    let config: GobotBenchConfig = config.try_into().expect("could not read config");
+    let config: BenchConfig = config.try_into().expect("could not read config");
 
     let mut benchmark_data = BenchmarkData::default();
     let bar = ProgressBar::new(0);
@@ -43,39 +38,40 @@ fn main() {
         .unwrap()
         .progress_chars("##-"),
     );
-    bar.enable_steady_tick(Duration::from_secs(1));
-    bar.reset();
-    println!("GOBOT-SIM+RAE BENCHMARK v0.1");
-    //Installation of the last version of benchmark
-    assert!(env::set_current_dir(&config.bin_path).is_ok());
-    println!(
-        "Successfully changed working directory to {} !",
-        env::current_dir().unwrap().display()
-    );
-    println!("Installation of the last version of OMPAS' gobot-sim benchmark...");
-    let child = Command::new("cargo")
-        .args(&["install", "--force", "--bin", "bench_gobot", "--path", "."])
-        .spawn();
 
-    if let Ok(mut c) = child {
-        bar.println("Spawned successfully");
-        bar.println(format!("Exit with: {:?}", c.wait()));
-    } else {
-        panic!("panic");
-    }
+    bar.println("GOBOT-SIM+RAE BENCHMARK v0.1");
+    //Installation of the last version of benchmark
+    install_binary(config.get_bin_name(), config.bin_path.clone());
+
     bar.println("Benchmark installed !");
 
     //let time = opt.time.unwrap_or(DEFAULT_TIME);
 
     //println!("Benchmark for domain: {}", domain.to_str().unwrap());
     let domain_path: PathBuf = config.domain_path.clone();
-    bar.println("Searching for problem files...");
-    let mut problem_path = domain_path.clone();
-    problem_path.push("problems");
-    let paths = fs::read_dir(problem_path).expect("directory of domain not found...");
     let mut problems = vec![];
-    for path in paths {
-        problems.push(path.unwrap().path())
+    if config.problems.is_empty() {
+        bar.println("Searching for problem files...");
+        let mut problem_path = domain_path.clone();
+        problem_path.push("problems");
+        let paths = fs::read_dir(problem_path).expect("directory of domain not found...");
+        for path in paths {
+            problems.push(path.unwrap().path())
+        }
+    } else {
+        problems = config.problems.clone();
+        let mut problem_path = domain_path.clone();
+        problem_path.push("problems");
+        for p in &mut problems {
+            //println!("problem: {:#?}", p);
+            //println!("parent:{:#?}", p.parent());
+            if p.parent() == None {
+                println!("gonna transform into a complete path");
+                let mut new_path = problem_path.clone();
+                new_path.push(p.clone());
+                *p = new_path;
+            }
+        }
     }
     if problems.is_empty() {
         bar.println("No problem found...");
@@ -88,15 +84,17 @@ fn main() {
 
     let mut first = true;
 
-    let modes = ["-a", "-L", ""];
+    let specific = config.get_specific();
     let number: usize = config.number as usize;
-    let n_problem = modes.len() * problems.len() * number;
+    let n_problem = specific.len() * problems.len() * number;
+    bar.enable_steady_tick(Duration::from_secs(1));
+    bar.reset();
     bar.set_length(n_problem.try_into().unwrap());
 
     for problem in problems {
         let mut runs = vec![];
-        for mode in modes {
-            runs.append(&mut vec![mode; number]);
+        for spec in &specific {
+            runs.append(&mut vec![spec; number]);
         }
 
         for select in runs {
@@ -106,17 +104,13 @@ fn main() {
             } else {
                 first = false
             }
-            let mut command = Command::new("gobot-benchmark");
+            let mut command = Command::new(config.get_bin_name());
             command.args(&[
                 "-d",
                 domain_path.to_str().unwrap(),
                 "-p",
                 problem.to_str().unwrap(),
             ]);
-
-            if opt.view {
-                command.arg("-v");
-            }
             command.args(["-t", format!("{}", config.max_time).as_str()]);
             let f1 = File::create("benchmark.log").expect("couldn't create file");
             let f2 = File::create("benchmark.log").expect("couldn't create file");
@@ -131,12 +125,11 @@ fn main() {
                 bar.println(format!(
                     "{} {} {}, config: {}",
                     "[benchmark]".bold().green(),
-                    "gobot-sim",
+                    config.get_bin_name(),
                     problem.file_name().unwrap().to_str().unwrap(),
                     select
                 ));
                 let _r = c.wait();
-                //println!("Exit with: {:?}", c.wait());
             } else {
                 panic!("panic");
             }
@@ -148,36 +141,8 @@ fn main() {
         }
     }
     bar.finish();
-    send_email(&opt.config, benchmark_data.format_data())
-}
-
-fn send_email(config: &PathBuf, message: String) {
-    println!("sending email");
-    let config = fs::read_to_string(config).expect("Something went wrong reading the config file");
-    let configs = YamlLoader::load_from_str(&config).unwrap();
-    let config = &configs[0];
-
-    let email = Message::builder()
-        .from(config["from"].as_str().unwrap().parse().unwrap())
-        .to(config["to"].as_str().unwrap().parse().unwrap())
-        .subject("GobotSim Benchmark")
-        .body(message)
-        .unwrap();
-
-    let creds = Credentials::new(
-        config["from"].as_str().unwrap().to_string(),
-        config["password"].as_str().unwrap().to_string(),
-    );
-
-    // Open a remote connection to gmail
-    let mailer = SmtpTransport::relay(config["server"].as_str().unwrap())
-        .unwrap()
-        .credentials(creds)
-        .build();
-
-    // Send the email
-    match mailer.send(&email) {
-        Ok(_) => println!("Email sent successfully!"),
-        Err(e) => panic!("Could not send email: {:?}", e),
-    }
+    send_email(
+        &config.mail,
+        benchmark_data.format_data("GOBOT-SIM BENCHMARK".to_string()),
+    )
 }

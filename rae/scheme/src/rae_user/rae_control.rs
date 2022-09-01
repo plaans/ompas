@@ -13,6 +13,7 @@ use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use sompas_utils::task_handler::{subscribe_new_task, EndSignal};
+use std::mem;
 use std::time::Duration;
 use tokio::sync::{broadcast, mpsc};
 
@@ -20,6 +21,11 @@ use tokio::sync::{broadcast, mpsc};
 #[async_scheme_fn]
 pub async fn launch(env: &LEnv) -> &str {
     let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER).unwrap();
+    let mut tasks_to_execute: Vec<Job> = vec![];
+    mem::swap(
+        &mut *ctx.tasks_to_execute.write().await,
+        &mut tasks_to_execute,
+    );
 
     let options = ctx.get_options().await.clone();
 
@@ -62,6 +68,19 @@ pub async fn launch(env: &LEnv) -> &str {
     }
 
     tokio::spawn(async move { monitor_rae(killer).await });
+
+    for t in tasks_to_execute {
+        ctx.interface
+            .command_tx
+            .read()
+            .await
+            .as_ref()
+            .unwrap()
+            .send(t.into())
+            .await
+            .expect("error sending job")
+    }
+
     "rae launched succesfully"
 }
 
@@ -170,4 +189,29 @@ pub async fn trigger_task(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandler, 
             Ok(rx.recv().await.unwrap())
         }
     }
+}
+
+/// Sends via a channel a task to execute.
+#[async_scheme_fn]
+pub async fn add_task_to_execute(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
+    let env = env.clone();
+
+    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER)?;
+    let (tx, _) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+    let job = Job::new(tx, args.into(), JobType::Task);
+
+    match ctx.interface.get_sender().await {
+        None => {
+            ctx.tasks_to_execute.write().await.push(job);
+        }
+        Some(sender) => {
+            tokio::spawn(async move {
+                sender
+                    .send(job.into())
+                    .await
+                    .expect("could not send job to rae");
+            });
+        }
+    };
+    Ok(())
 }

@@ -33,6 +33,9 @@ pub struct Opt {
 
     #[structopt(short = "o", long = "aries-opt")]
     aries_opt: bool,
+
+    #[structopt(short = "v", long = "view")]
+    view: bool,
 }
 
 #[tokio::main]
@@ -97,7 +100,7 @@ pub async fn lisp_interpreter(opt: Opt) {
 
     li.import(ctx_string);
 
-    let ctx_rae = CtxRaeUser::new(None, Some(log.clone()), false).await;
+    let ctx_rae = CtxRaeUser::new(None, Some(log.clone()), opt.view).await;
     li.import_namespace(ctx_rae);
 
     let mut com: ChannelToLispInterpreter = li.subscribe();
@@ -115,14 +118,19 @@ pub async fn lisp_interpreter(opt: Opt) {
             .await
             .expect("error on LI");
     }
-    com.send(domain_lisp).await.expect("could not send to LI");
-    com.send(problem_lisp).await.expect("could not send to LI");
-    com.send("(launch)".to_string()).await.expect("error on LI");
 
     li.set_config(LispInterpreterConfig::new(false));
+
     tokio::spawn(async move {
         li.run(Some(log)).await;
     });
+
+    com.send(domain_lisp).await.expect("could not send to LI");
+    com.recv().await.expect("").expect("");
+    com.send(problem_lisp).await.expect("could not send to LI");
+    com.recv().await.expect("").expect("");
+    com.send("(launch)".to_string()).await.expect("error on LI");
+    com.recv().await.expect("").expect("");
 
     tokio::time::sleep(Duration::from_secs(time)).await;
     let problem_name = problem.file_name().unwrap().to_str().unwrap();
@@ -139,10 +147,6 @@ pub async fn lisp_interpreter(opt: Opt) {
     com.send("exit".to_string())
         .await
         .expect("could not send to LI");
-
-    while com.recv().await.is_some() {
-        //println!("{}", m)
-    }
 
     println!(
         "end of the benchmark of li for {} of domain {}",

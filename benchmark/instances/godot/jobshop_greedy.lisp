@@ -40,5 +40,5 @@
                     (do
                         (mutex::lock-and-do ?r 11
                             (t_carry_to_machine ?r ?p ?m))
-                        (process ?m))))))
+                        (process ?m ?p))))))
 )

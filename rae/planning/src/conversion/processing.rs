@@ -634,7 +634,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                                 if let Some(id) = ch.sym_table.id(&s) {
                                     match ch.sym_table
                                         .get_type_of(id)
-                                        .expect("a defined symbol should have a type").a_type.unwrap()
+                                        .expect("a defined symbol should have a type").a_type.unwrap_or_else(|| panic!("{} has no atom type",s) )
                                     {
                                         PlanningAtomType::Action => {
                                             expression_type = ExpressionType::Action;

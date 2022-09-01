@@ -12,5 +12,5 @@
     ((connected l1 e) yes)
     ((connected l2 e) yes))
 
-  (trigger-task t_move t1 e)
+  (add-task-to-execute t_move t1 e)
 )

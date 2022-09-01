@@ -5,6 +5,7 @@ use chrono::{DateTime, Utc};
 use ompas_rae_language::*;
 use ompas_rae_planning::structs::ConversionContext;
 use ompas_rae_structs::domain::RAEDomain;
+use ompas_rae_structs::job::Job;
 use ompas_rae_structs::options::{RAEOptions, SelectMode};
 use ompas_rae_structs::platform::{Log, Platform, RAEInterface};
 use rae_control::*;
@@ -55,6 +56,7 @@ pub struct CtxRaeUser {
     rae_domain: Arc<RwLock<RAEDomain>>,
     platform_domain: InitLisp,
     empty_env: LEnv,
+    tasks_to_execute: Arc<RwLock<Vec<Job>>>,
 }
 
 impl IntoModule for CtxRaeUser {
@@ -91,6 +93,8 @@ impl IntoModule for CtxRaeUser {
         module.add_async_fn_prelude(RAE_STOP, stop);
         module.add_async_fn_prelude(RAE_CONFIGURE_PLATFORM, configure_platform);
         module.add_async_fn_prelude(RAE_CONFIGURE_SELECT, configure_select);
+        module.add_async_fn_prelude(RAE_TRIGGER_TASK, trigger_task);
+        module.add_async_fn_prelude(RAE_ADD_TASK_TO_EXECUTE, add_task_to_execute);
         /*
         GETTERS
          */
@@ -137,7 +141,7 @@ impl IntoModule for CtxRaeUser {
         module.add_async_fn_prelude(RAE_PLAN_TASK, plan_task);
 
         //Trigger task
-        module.add_async_fn_prelude(RAE_TRIGGER_TASK, trigger_task);
+
         module.add_async_fn_prelude(RAE_GET_MUTEXES, get_mutexes);
         module.add_async_fn_prelude(RAE_GET_MONITORS, get_monitors);
 
@@ -259,6 +263,7 @@ impl CtxRaeUser {
             rae_domain: Default::default(),
             platform_domain: domain,
             empty_env,
+            tasks_to_execute: Arc::new(Default::default()),
         }
     }
 
@@ -365,6 +370,7 @@ impl Default for CtxRaeUser {
             rae_domain: Default::default(),
             platform_domain: Default::default(),
             empty_env: Default::default(),
+            tasks_to_execute: Arc::new(Default::default()),
         }
     }
 }

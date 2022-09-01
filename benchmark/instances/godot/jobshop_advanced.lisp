@@ -38,6 +38,6 @@
                 (do
                     (mutex::lock-in-list-and-do (instance robot) 11
                         (t_carry_to_machine r ?p ?m))
-                    (process ?m))))))
+                    (process ?m ?p))))))
 
 )

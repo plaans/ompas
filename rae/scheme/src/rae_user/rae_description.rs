@@ -488,8 +488,13 @@ async fn create_model(env: &mut LEnv, model: im::HashMap<LValue, LValue>) -> LRe
         .try_into()?;
     let str = match model_type {
         ModelType::PDDL => {
-            let params: Parameters = model.get(&PARAMETERS.into()).unwrap().try_into()?;
-            let conds = model.get(&PRE_CONDITIONS.into()).unwrap();
+            let params: Parameters = model
+                .get(&PARAMETERS.into())
+                .ok_or_else(|| LRuntimeError::new("create_model", "missing :params"))?
+                .try_into()?;
+            let conds = model
+                .get(&PRE_CONDITIONS.into())
+                .ok_or_else(|| LRuntimeError::new("create_model", "missing :pre-conditions"))?;
             let mut str_conds = "(do".to_string();
             if let LValue::List(conds) = conds {
                 for cond in conds.iter() {
@@ -499,7 +504,9 @@ async fn create_model(env: &mut LEnv, model: im::HashMap<LValue, LValue>) -> LRe
             } else {
                 return Err(LRuntimeError::default());
             }
-            let effects = model.get(&EFFECTS.into()).unwrap();
+            let effects = model
+                .get(&EFFECTS.into())
+                .ok_or_else(|| LRuntimeError::new("create_model", "missing :effects"))?;
             let effects = cons(env, &[LCoreOperator::Do.into(), effects.clone()])?;
             let test =
                 generate_test_type_expr(env, &[model.get(&PARAMETERS.into()).unwrap().clone()])
@@ -513,7 +520,10 @@ async fn create_model(env: &mut LEnv, model: im::HashMap<LValue, LValue>) -> LRe
             )
         }
         ModelType::OM => {
-            let params: Parameters = model.get(&PARAMETERS.into()).unwrap().try_into()?;
+            let params: Parameters = model
+                .get(&PARAMETERS.into())
+                .ok_or_else(|| LRuntimeError::new("create_model", "missing :params"))?
+                .try_into()?;
             let body = car(env, &[model.get(&BODY.into()).unwrap().clone()])?;
             let test =
                 generate_test_type_expr(env, &[model.get(&PARAMETERS.into()).unwrap().clone()])

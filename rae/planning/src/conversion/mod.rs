@@ -129,7 +129,7 @@ pub fn convert_domain_to_chronicle_hierarchy(
             .get(method.get_task_label())
             .unwrap();
 
-        let method_lambda: LLambda = method.get_lambda().try_into().expect("");
+        let method_lambda: LLambda = method.get_body().try_into().expect("");
 
         let chronicle = convert_abstract_task_to_chronicle(
             &method_lambda,

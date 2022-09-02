@@ -295,6 +295,14 @@ impl Hash for LValue {
 
 impl Eq for LValue {}
 
+impl TryFrom<&LValue> for usize {
+    type Error = LRuntimeError;
+
+    fn try_from(value: &LValue) -> Result<Self, Self::Error> {
+        LNumber::try_from(value).map(|n| n.into())
+    }
+}
+
 impl TryFrom<&LValue> for im::HashMap<LValue, LValue> {
     type Error = LRuntimeError;
 
@@ -500,6 +508,29 @@ impl TryFrom<&LValue> for LLambda {
 }
 
 impl TryFrom<LValue> for LLambda {
+    type Error = LRuntimeError;
+
+    fn try_from(value: LValue) -> Result<Self, Self::Error> {
+        value.borrow().try_into()
+    }
+}
+
+impl TryFrom<&LValue> for LAsyncHandler {
+    type Error = LRuntimeError;
+
+    fn try_from(value: &LValue) -> Result<Self, Self::Error> {
+        match value {
+            LValue::Handler(l) => Ok(l.clone()),
+            lv => Err(LRuntimeError::conversion_error(
+                "LLambda::tryfrom<&LValue>",
+                lv,
+                KindLValue::Handler,
+            )),
+        }
+    }
+}
+
+impl TryFrom<LValue> for LAsyncHandler {
     type Error = LRuntimeError;
 
     fn try_from(value: LValue) -> Result<Self, Self::Error> {

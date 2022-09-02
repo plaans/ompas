@@ -406,12 +406,20 @@ pub async fn add_method(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<
             let test =
                 generate_test_type_expr(env, &[map.get(&PARAMETERS.into()).unwrap().clone()])
                     .await?;
-            let conds = cons(&LEnv::default(), &[LCoreOperator::Do.into(), conds.clone()])?;
+            let mut str_conds = "(do".to_string();
+            if let LValue::List(conds) = conds {
+                for cond in conds.iter() {
+                    str_conds.push_str(format!("(check {})", cond).as_str());
+                }
+                str_conds.push(')');
+            } else {
+                return Err(LRuntimeError::default());
+            }
             let expr = format!(
                 "(lambda {} (do {} {}))",
                 method.parameters.get_params_as_lvalue(),
                 test,
-                conds
+                str_conds
             );
             eval(&parse(&expr, &mut new_env).await?, &mut new_env, None).await?
         }

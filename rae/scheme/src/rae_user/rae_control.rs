@@ -114,7 +114,7 @@ pub async fn stop(env: &LEnv) {
             *ctx.interface.killer.write().await = None;
             ctx.interface.state.clear().await;
             ctx.interface.agenda.clear().await;
-            ctx.interface.mutexes.clear().await;
+            ctx.interface.resources.clear().await;
             ctx.interface.monitors.clear().await;
         }
     }

@@ -1,8 +1,4 @@
-use crate::agenda::Agenda;
-use crate::monitor::MonitorCollection;
-use crate::mutex::MutexCollection;
-use crate::rae_command::RAECommand;
-use crate::state::world_state::WorldState;
+use crate::rae_interface::RAEInterface;
 use async_trait::async_trait;
 use sompas_structs::documentation::Documentation;
 use sompas_structs::lruntimeerror::LResult;
@@ -10,12 +6,11 @@ use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalue::LValue::Nil;
 use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
-use sompas_utils::task_handler::EndSignal;
 use std::any::Any;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::mpsc::Sender;
-use tokio::sync::{broadcast, RwLock};
+use tokio::sync::RwLock;
 
 pub struct Platform {
     inner: Arc<RwLock<dyn RAEPlatform>>,
@@ -87,40 +82,10 @@ impl Platform {
 }
 
 #[derive(Default, Clone)]
-pub struct RAEInterface {
-    pub state: WorldState,
-    pub mutexes: MutexCollection,
-    pub monitors: MonitorCollection,
-    pub agenda: Agenda,
-    pub log: Log,
-    pub command_tx: Arc<RwLock<Option<Sender<RAECommand>>>>,
-    //pub stop_tx: Arc<RwLock<Option<Sender<EndSignal>>>>,
-    pub killer: Arc<RwLock<Option<broadcast::Sender<EndSignal>>>>,
-}
-
-#[derive(Default, Clone)]
 pub struct Log {
     pub path: PathBuf,
     pub channel: Option<Sender<String>>,
     pub display: bool,
-}
-
-impl RAEInterface {
-    pub async fn get_sender(&self) -> Option<Sender<RAECommand>> {
-        self.command_tx.read().await.clone()
-    }
-
-    /*pub async fn get_stop(&self) -> Option<Sender<EndSignal>> {
-        self.stop_tx.read().await.clone()
-    }*/
-
-    pub async fn get_killer(&self) -> Option<broadcast::Sender<EndSignal>> {
-        self.killer.read().await.clone()
-    }
-
-    pub async fn subscribe_to_killer(&self) -> broadcast::Receiver<EndSignal> {
-        self.killer.read().await.as_ref().unwrap().subscribe()
-    }
 }
 
 /// Trait that a platform needs to implement to be able to be used as execution platform in RAE.

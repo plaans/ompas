@@ -7,7 +7,8 @@ use ompas_rae_planning::structs::ConversionContext;
 use ompas_rae_structs::domain::RAEDomain;
 use ompas_rae_structs::job::Job;
 use ompas_rae_structs::options::{RAEOptions, SelectMode};
-use ompas_rae_structs::platform::{Log, Platform, RAEInterface};
+use ompas_rae_structs::platform::{Log, Platform};
+use ompas_rae_structs::rae_interface::RAEInterface;
 use rae_control::*;
 use rae_conversion::*;
 use rae_description::*;
@@ -142,7 +143,7 @@ impl IntoModule for CtxRaeUser {
 
         //Trigger task
 
-        module.add_async_fn_prelude(RAE_GET_MUTEXES, get_mutexes);
+        module.add_async_fn_prelude(RAE_GET_RESOURCES, get_resources);
         module.add_async_fn_prelude(RAE_GET_MONITORS, get_monitors);
 
         module
@@ -248,7 +249,7 @@ impl CtxRaeUser {
             options: Arc::new(Default::default()),
             interface: RAEInterface {
                 state: Default::default(),
-                mutexes: Default::default(),
+                resources: Default::default(),
                 monitors: Default::default(),
                 agenda: Default::default(),
                 log: Log {
@@ -293,7 +294,7 @@ impl CtxRaeUser {
         env.import(ctx_io, WithoutPrefix);
 
         let ctx_rae_exec = CtxRaeExec {
-            mutexes: self.interface.mutexes.clone(),
+            resources: self.interface.resources.clone(),
             monitors: self.interface.monitors.clone(),
             state: self.interface.state.clone(),
             platform_interface: self.platform.clone(),
@@ -359,7 +360,7 @@ impl Default for CtxRaeUser {
             options: Default::default(),
             interface: RAEInterface {
                 state: Default::default(),
-                mutexes: Default::default(),
+                resources: Default::default(),
                 monitors: Default::default(),
                 agenda: Default::default(),
                 log: Default::default(),

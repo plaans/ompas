@@ -27,6 +27,7 @@ use ompas_rae_structs::state::world_state::WorldStateSnapshot;
 use sompas_language::*;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lruntimeerror;
+use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalues::LValueS;
 use std::borrow::Borrow;
 use std::convert::{TryFrom, TryInto};
@@ -555,7 +556,12 @@ fn read_chronicle(
     //TODO: handle case where some parameters are already instantiated.
     for var in &chronicle.get_variables() {
         let t = ch.sym_table.get_type_of(var).unwrap();
-        let param: Variable = match &t.a_type.unwrap() {
+        let param: Variable = match &t.a_type.ok_or_else(|| {
+            LRuntimeError::new(
+                "read_chronicle",
+                format!("{} has no atom type", var.format(&ch.sym_table, true)),
+            )
+        })? {
             PlanningAtomType::Timepoint => {
                 //TODO: separate start, end and other timepoints
                 let fvar = context.model.new_optional_fvar(

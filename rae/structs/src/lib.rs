@@ -9,6 +9,8 @@ pub mod options;
 pub mod plan;
 pub mod platform;
 pub mod rae_command;
+pub mod rae_interface;
+pub mod resource;
 pub mod state;
 
 pub type TaskId = usize;

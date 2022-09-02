@@ -1,14 +1,16 @@
 use crate::rae_exec::algorithms::*;
 use crate::rae_exec::platform::*;
-use crate::rae_exec::rae_mutex::{get_list_locked, is_locked, lock, lock_in_list, release};
+use crate::rae_exec::rae_resource::{
+    acquire, acquire_in_list, get_list_resources, is_locked, new_resource, release,
+};
 use ::macro_rules_attribute::macro_rules_attribute;
 use futures::FutureExt;
 use ompas_rae_language::*;
 use ompas_rae_structs::agenda::Agenda;
 use ompas_rae_structs::context::RAE_TASK_METHODS_MAP;
 use ompas_rae_structs::monitor::MonitorCollection;
-use ompas_rae_structs::mutex::MutexCollection;
 use ompas_rae_structs::platform::Platform;
+use ompas_rae_structs::resource::ResourceCollection;
 use ompas_rae_structs::state::task_status::TaskStatus;
 use ompas_rae_structs::state::world_state::*;
 use ompas_rae_structs::TaskId;
@@ -36,7 +38,7 @@ use std::string::String;
 
 pub mod algorithms;
 pub mod platform;
-pub mod rae_mutex;
+pub mod rae_resource;
 
 /*
 LANGUAGE
@@ -61,7 +63,7 @@ pub const PARENT_TASK: &str = "parent_task";
 #[derive(Default)]
 pub struct CtxRaeExec {
     pub monitors: MonitorCollection,
-    pub mutexes: MutexCollection,
+    pub resources: ResourceCollection,
     pub state: WorldState,
     pub platform_interface: Option<Platform>,
     pub agenda: Agenda,
@@ -70,8 +72,8 @@ pub struct CtxRaeExec {
 impl IntoModule for CtxRaeExec {
     fn into_module(self) -> Module {
         let init: InitLisp = vec![
-            MACRO_MUTEX_LOCK_AND_DO,
-            MACRO_MUTEX_LOCK_IN_LIST_AND_DO,
+            //MACRO_RESOURCE_ACQUIRE_AND_DO,
+            //MACRO_MUTEX_LOCK_IN_LIST_AND_DO,
             MACRO_SIM_BLOCK,
             LAMBDA_GET_PRECONDITIONS,
             LAMBDA_GET_SCORE,
@@ -128,11 +130,12 @@ impl IntoModule for CtxRaeExec {
         );*/
 
         //mutex
-        module.add_async_fn_prelude(LOCK, lock);
+        module.add_async_fn_prelude(ACQUIRE, acquire);
         module.add_async_fn_prelude(RELEASE, release);
+        module.add_async_fn_prelude(NEW_RESOURCE, new_resource);
         module.add_async_fn_prelude(IS_LOCKED, is_locked);
-        module.add_async_fn_prelude(LOCKED_LIST, get_list_locked);
-        module.add_async_fn_prelude(LOCK_IN_LIST, lock_in_list);
+        module.add_async_fn_prelude(ACQUIRE_LIST, get_list_resources);
+        module.add_async_fn_prelude(ACQUIRE_IN_LIST, acquire_in_list);
 
         //success and failure
         module.add_fn_prelude(SUCCESS, success);
@@ -335,7 +338,7 @@ async fn get_facts(env: &LEnv) -> LResult {
     match mode.as_str() {
         SYMBOL_EXEC_MODE => {
             let mut state: im::HashMap<LValue, LValue> = get_state(env, &[]).await?.try_into()?;
-            let locked: Vec<LValue> = get_list_locked(env, &[]).await?.try_into()?;
+            let locked: Vec<LValue> = get_list_resources(env, &[]).await?.try_into()?;
 
             for e in locked {
                 state.insert(vec![LOCKED.into(), e].into(), LValue::True);

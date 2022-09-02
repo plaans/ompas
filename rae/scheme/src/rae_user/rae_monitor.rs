@@ -121,9 +121,9 @@ pub async fn get_agenda(env: &LEnv, args: &[LValue]) -> LResult {
 //Conversion functions
 
 #[async_scheme_fn]
-pub async fn get_mutexes(env: &LEnv) -> LResult {
+pub async fn get_resources(env: &LEnv) -> LResult {
     let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER)?;
-    Ok(ctx.interface.mutexes.get_debug().await.into())
+    Ok(ctx.interface.resources.get_debug().await.into())
 }
 
 #[async_scheme_fn]

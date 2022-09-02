@@ -45,7 +45,7 @@ pub const RAE_GET_SYMBOL_TYPE: &str = "get-symbol-type";
 pub const RAE_GET_TASKS: &str = "get-tasks";
 pub const RAE_GET_STATE_FUNCTIONS: &str = "get-state-functions";
 pub const RAE_GET_ENV: &str = "get-env";
-pub const RAE_GET_MUTEXES: &str = "get-mutexes";
+pub const RAE_GET_RESOURCES: &str = "get-resources";
 pub const RAE_GET_MONITORS: &str = "get-monitors";
 
 pub const DOC_RAE_GET_METHODS: &str = "Returns the list of all defined methods in RAE environment";
@@ -70,25 +70,13 @@ pub const DOC_RAE_GET_TASKS: &str = "Returns the list of all defined tasks in RA
 pub const DOC_RAE_GET_STATE_FUNCTIONS: &str =
     "Returns the list of all defined state-functions in RAE environment";
 
-pub const MACRO_MUTEX_LOCK_AND_DO: &str = "(defmacro mutex::lock-and-do
-    (lambda (r p b)
-        `(begin
-            (lock ,r ,p)
-            ,b
-            (release ,r))))";
-pub const LOCK: &str = "lock";
+pub const ACQUIRE: &str = "acquire";
 pub const RELEASE: &str = "release";
+pub const NEW_RESOURCE: &str = "new-resource";
 pub const IS_LOCKED: &str = "locked?";
 pub const LOCKED: &str = "locked";
-pub const LOCKED_LIST: &str = "locked-list";
-pub const LOCK_IN_LIST: &str = "lock-in-list";
-
-pub const MACRO_MUTEX_LOCK_IN_LIST_AND_DO: &str = "(defmacro mutex::lock-in-list-and-do
-    (lambda (l p b)
-        `(begin
-            (define r (lock-in-list ,l ,p))
-            ,b
-            (release r))))";
+pub const ACQUIRE_LIST: &str = "acquire-list";
+pub const ACQUIRE_IN_LIST: &str = "acquire-in-list";
 
 pub const RAE_EXEC_COMMAND: &str = "exec-command";
 pub const RAE_LAUNCH_PLATFORM: &str = "rae-launch-platform";

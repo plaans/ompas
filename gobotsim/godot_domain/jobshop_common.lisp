@@ -61,10 +61,9 @@
              (loop
                  (do
                      (await (wait-for `(< (robot.battery ,?r) 0.4)))
-                     (mutex::lock-and-do ?r 1000
-                        (do
-                            (go_charge ?r)
-                            (await (wait-for `(> (robot.battery ,?r) 0.9)))))))))
+                     (define h (await (acquire ?r)))
+                     (go_charge ?r)
+                     (await (wait-for `(> (robot.battery ,?r) 0.9)))))))
                             
     (def-task t_check_rob_bat)
     (def-method m_check_initial_robots_batteries
@@ -101,6 +100,8 @@
         (:score 0)
         (:body
             (do
+                (mapf new-resource (instance robot))
+                (mapf new-resource (instance machine))
                 (define f1 (async (t_process_packages)))
                 (define f2 (async (t_check_rob_bat)))
                 (await f1))))

@@ -78,7 +78,6 @@ fn propagate_and_print(base_problem: &mut chronicles::Problem, depth: u32, htn_m
         origin: base_problem.context.origin(),
         horizon: base_problem.context.horizon(),
         chronicles: base_problem.chronicles.clone(),
-        tables: base_problem.context.tables.clone(),
     };
     if htn_mode {
         populate_with_task_network(&mut pb, base_problem, depth).unwrap();
@@ -124,7 +123,6 @@ pub fn run_solver_for_htn(problem: &mut chronicles::Problem, optimize: bool) -> 
             origin: problem.context.origin(),
             horizon: problem.context.horizon(),
             chronicles: problem.chronicles.clone(),
-            tables: problem.context.tables.clone(),
         };
         populate_with_task_network(&mut pb, problem, n).unwrap();
 

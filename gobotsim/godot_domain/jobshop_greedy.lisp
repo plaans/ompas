@@ -39,5 +39,6 @@
                 (define h1 (await (acquire ?m)))
                 (define h2 (await (acquire ?r)))
                 (t_carry_to_machine ?r ?p ?m)
+                (release h2)
                 (process ?m ?p))))
 )

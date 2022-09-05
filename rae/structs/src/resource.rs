@@ -1,6 +1,6 @@
 use sompas_structs::lruntimeerror::LRuntimeError;
-use sompas_structs::lvalue::LValue;
 use sompas_utils::other::get_and_update_id_counter;
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::sync::atomic::AtomicUsize;
@@ -63,7 +63,7 @@ pub struct Resource {
 impl Resource {
     pub fn update_remaining_capacity(&mut self) -> Result<(), LRuntimeError> {
         let mut capacity = self.max_capacity;
-        let old_capacity = self.capacity;
+        //let old_capacity = self.capacity;
 
         for c in self.acquirers.values() {
             match c {
@@ -100,8 +100,11 @@ impl Resource {
             })
             .collect();
         if !waiters.is_empty() {
-            waiters.sort_by(|(_, w), (_, w2)| w.priority.cmp(&w2.priority));
-            waiters.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
+            waiters.sort_by(|(k1, w1), (k2, w2)| match w2.priority.cmp(&w1.priority) {
+                Ordering::Equal => k1.cmp(k2),
+                o => o,
+            });
+            //waiters.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
             let (id, _) = waiters.first().unwrap();
             let id = **id;
             drop(waiters);
@@ -128,13 +131,11 @@ impl Resource {
     pub fn add_waiter(
         &mut self,
         capacity: Capacity,
-        other: Vec<LValue>,
+        priority: usize,
     ) -> Result<WaitAcquire, LRuntimeError> {
         let id = self.waiter_id;
         self.waiter_id += 1;
         let (tx, rx) = channel(1);
-
-        let priority = other.get(0).unwrap_or(&0.into()).try_into()?;
 
         self.waiters.insert(
             id,
@@ -219,7 +220,7 @@ impl ResourceCollection {
         &self,
         label: String,
         capacity: Capacity,
-        other: Vec<LValue>,
+        priority: usize,
     ) -> Result<AcquireResponse, LRuntimeError> {
         let labels = self.labels.lock().await;
         let id = *labels.get(&label).ok_or_else(|| {
@@ -232,21 +233,21 @@ impl ResourceCollection {
             (Capacity::Unary, Capacity::All) => AcquireResponse::Ok(resource.add_acquire(capacity)),
 
             (Capacity::None, Capacity::All) => {
-                AcquireResponse::Wait(resource.add_waiter(capacity, other)?)
+                AcquireResponse::Wait(resource.add_waiter(capacity, priority)?)
             }
 
             (Capacity::Some(u1), Capacity::Some(u2)) => {
                 if u1 >= u2 {
                     AcquireResponse::Ok(resource.add_acquire(capacity))
                 } else {
-                    AcquireResponse::Wait(resource.add_waiter(capacity, other)?)
+                    AcquireResponse::Wait(resource.add_waiter(capacity, priority)?)
                 }
             }
             (Capacity::Some(_), Capacity::All) => {
                 if resource.capacity == resource.max_capacity {
                     AcquireResponse::Ok(resource.add_acquire(capacity))
                 } else {
-                    AcquireResponse::Wait(resource.add_waiter(capacity, other)?)
+                    AcquireResponse::Wait(resource.add_waiter(capacity, priority)?)
                 }
             }
             _ => Err(LRuntimeError::new("acquire", "acquisition illegal"))?,
@@ -303,6 +304,13 @@ impl ResourceCollection {
         for (label, id) in labels {
             let r: &Resource = inner.get(&id).unwrap();
 
+            let mut w_str = "".to_string();
+            for w in r.waiters.values() {
+                w_str.push_str(
+                    format!("\n\t\t-capacity = {};priority= {}", w.capacity, w.priority).as_str(),
+                );
+            }
+
             str.push_str(
                 format!(
                     "- {}:\n\
@@ -314,7 +322,7 @@ impl ResourceCollection {
                     r.max_capacity,
                     r.capacity,
                     r.acquirers.len(),
-                    r.waiters.len()
+                    w_str,
                 )
                 .as_str(),
             );

@@ -26,6 +26,8 @@ pub const MACRO_MUTEX_LOCK_IN_LIST_AND_DO: &str = "(defmacro mutex::lock-in-list
             ,b
             (release r))))";
 
+pub const PRIORITY: &str = ":priority";
+
 #[async_scheme_fn]
 pub async fn new_resource(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
@@ -59,17 +61,44 @@ pub async fn acquire(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandler, LRunt
         .ok_or_else(|| LRuntimeError::wrong_number_of_args(ACQUIRE, args, 1..2))?
         .try_into()?;
 
-    let capacity = match args.get(1) {
-        None => Capacity::All,
-        Some(lv) => Capacity::Some(lv.try_into()?),
-    };
-
-    let others = vec![];
-    //let others = args[2..].to_vec();
+    let mut priority: usize = 0;
+    let mut capacity = Capacity::All;
+    //init of capacity and
+    match args.len() {
+        1 => {}
+        2 => {
+            if let LValue::List(l) = &args[1] {
+                if l.get(0).unwrap() == &PRIORITY.into() && l.len() == 2 {
+                    priority = l.get(1).unwrap().try_into()?;
+                } else {
+                    Err(LRuntimeError::new("", ""))?
+                }
+            } else {
+                capacity = Capacity::Some(args[1].borrow().try_into()?);
+            }
+        }
+        3 => {
+            capacity = Capacity::Some(args[1].borrow().try_into()?);
+            if let LValue::List(l) = &args[1] {
+                if l.get(0).unwrap() == &PRIORITY.into() && l.len() == 2 {
+                    priority = l.get(1).unwrap().try_into()?;
+                } else {
+                    Err(LRuntimeError::new("", ""))?
+                }
+            } else {
+                Err(LRuntimeError::new("", ""))?
+            }
+        }
+        _ => {}
+    }
 
     let f: LFuture = (Box::pin(async move {
-        info!("Acquiring {} with {} capacity", label, capacity);
-        let rh: ResourceHandler = match resources.acquire(label.clone(), capacity, others).await? {
+        info!(
+            "Acquiring {} with; capacity = {}; priority = {}",
+            label, capacity, priority
+        );
+        let rh: ResourceHandler = match resources.acquire(label.clone(), capacity, priority).await?
+        {
             AcquireResponse::Ok(rh) => rh,
             AcquireResponse::Wait(mut wait) => {
                 info!("waiting on resource {}", label);

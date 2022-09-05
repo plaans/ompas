@@ -61,7 +61,7 @@
              (loop
                  (do
                      (await (wait-for `(< (robot.battery ,?r) 0.4)))
-                     (define h (await (acquire ?r)))
+                     (define h (await (acquire ?r '(:priority 1000))))
                      (go_charge ?r)
                      (await (wait-for `(> (robot.battery ,?r) 0.9)))))))
                             

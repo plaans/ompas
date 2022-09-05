@@ -41,16 +41,19 @@ impl From<usize> for Capacity {
 pub type ResourceId = usize;
 
 pub struct ResourceHandler {
-    //capacity: Capacity,
+    label: String,
     resource_id: ResourceId,
     acquire_id: usize,
 }
 
 impl ResourceHandler {
-    pub fn release(self) {}
+    pub fn get_label(&self) -> &str {
+        &self.label
+    }
 }
 
 pub struct Resource {
+    label: String,
     id: ResourceId,
     max_capacity: Capacity,
     capacity: Capacity,
@@ -99,17 +102,27 @@ impl Resource {
                 _ => false,
             })
             .collect();
+
         if !waiters.is_empty() {
             waiters.sort_by(|(k1, w1), (k2, w2)| match w2.priority.cmp(&w1.priority) {
                 Ordering::Equal => k1.cmp(k2),
                 o => o,
             });
             //waiters.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
-            let (id, _) = waiters.first().unwrap();
-            let id = **id;
+            let keys: Vec<usize> = waiters.iter().map(|(k, _)| **k).collect();
             drop(waiters);
-            let waiter = self.waiters.remove(&id).unwrap();
-            waiter.tx.send(self.add_acquire(waiter.capacity)).await;
+            for key in &keys {
+                let waiter = self.waiters.remove(key).unwrap();
+                let acquire: ResourceHandler = self.add_acquire(waiter.capacity);
+                let acquire_id = acquire.acquire_id;
+                match waiter.tx.send(acquire).await {
+                    Ok(()) => break,
+                    Err(_) => {
+                        self.remove_acquire(acquire_id);
+                        self.update_remaining_capacity().expect("");
+                    }
+                }
+            }
         }
     }
 
@@ -119,6 +132,7 @@ impl Resource {
         self.acquirers.insert(id, capacity);
         self.update_remaining_capacity().unwrap();
         ResourceHandler {
+            label: self.label.clone(),
             resource_id: self.id,
             acquire_id: id,
         }
@@ -153,8 +167,14 @@ impl Resource {
         })
     }
 
-    pub fn remove_waiter(&mut self, waiter_id: usize) {
-        self.waiters.remove(&waiter_id);
+    pub async fn remove_waiter(&mut self, mut wa: WaitAcquire) {
+        match self.waiters.remove(&wa.waiter_id) {
+            None => {
+                let rh: ResourceHandler = wa.rx.recv().await.unwrap();
+                self.remove_acquire(rh.acquire_id);
+            }
+            Some(_) => {}
+        }
     }
 }
 
@@ -200,11 +220,12 @@ impl ResourceCollection {
     pub async fn new_resource(&self, label: String, capacity: Option<Capacity>) {
         let id = get_and_update_id_counter(self.id.clone());
         let mut labels = self.labels.lock().await;
-        labels.insert(label, id);
+        labels.insert(label.clone(), id);
         drop(labels);
         let mut map = self.inner.lock().await;
         let capacity = capacity.unwrap_or(Capacity::Unary);
         let resource = Resource {
+            label,
             id,
             max_capacity: capacity,
             capacity,
@@ -284,7 +305,7 @@ impl ResourceCollection {
     pub async fn remove_waiter(&self, wa: WaitAcquire) {
         let mut map = self.inner.lock().await;
         let resource: &mut Resource = map.get_mut(&wa.resource_id).unwrap();
-        resource.remove_waiter(wa.waiter_id);
+        resource.remove_waiter(wa).await;
     }
 
     pub async fn get_list_resources(&self) -> Vec<String> {

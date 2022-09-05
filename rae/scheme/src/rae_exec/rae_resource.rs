@@ -3,6 +3,7 @@ use log::info;
 use ompas_rae_language::IS_LOCKED;
 use ompas_rae_structs::mutex::Wait;
 use ompas_rae_structs::resource::{AcquireResponse, Capacity, ResourceHandler};
+use rand::{thread_rng, Rng};
 use sompas_core::modules::map::get_map;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LResult;
@@ -94,17 +95,19 @@ pub async fn acquire(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandler, LRunt
 
     let f: LFuture = (Box::pin(async move {
         info!(
-            "Acquiring {} with; capacity = {}; priority = {}",
+            "Acquiring {}; capacity = {}; priority = {}",
             label, capacity, priority
         );
         let rh: ResourceHandler = match resources.acquire(label.clone(), capacity, priority).await?
         {
             AcquireResponse::Ok(rh) => rh,
             AcquireResponse::Wait(mut wait) => {
-                info!("waiting on resource {}", label);
+                info!("Waiting on resource {}", label);
 
                 tokio::select! {
                     _ = rx.recv() => {
+                        info!("Acquisition of {} cancelled.", label);
+                        resources.remove_waiter(wait).await;
                         return Ok(LValue::Err(LValue::Nil.into()))
                     }
                     rh = wait.recv() => {
@@ -120,6 +123,7 @@ pub async fn acquire(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandler, LRunt
 
         let f: LFuture = (Box::pin(async move {
             rx.recv().await;
+            info!("Releasing {}", rh.get_label());
             rc.release(rh).await.map(|_| LValue::Nil)
         }) as FutureResult)
             .shared();
@@ -154,21 +158,14 @@ async fn check_receiver<'a>(mut wait: (String, Wait)) -> String {
 }
 
 #[macro_rules_attribute(dyn_async!)]
-async fn check_acquire<'a>(
-    arg: (LEnv, String, Option<LValue>),
-) -> Result<(String, LAsyncHandler), LRuntimeError> {
-    let (env, label, capacity) = arg;
-
-    let mut args: Vec<LValue> = vec![label.clone().into()];
-    if let Some(c) = capacity {
-        args.push(c)
-    }
+async fn check_acquire<'a>(arg: (LEnv, Vec<LValue>, usize)) -> LResult {
+    let (env, args, d) = arg;
+    let label = args[0].clone();
     let r = acquire(&env, args.as_slice()).await?;
-    if let LValue::Handler(h) = r {
-        Ok((label, h))
-    } else {
-        panic!()
-    }
+    let h_await: LAsyncHandler = r.try_into().unwrap();
+    let h: LValue = h_await.get_future().await?;
+    info!("{} unlocked {}", d, label);
+    Ok(list![label, h])
 }
 /// Ask to lock a resource in a list
 /// Returns the resource that has been locked.
@@ -179,16 +176,25 @@ pub async fn acquire_in_list(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle
         .get(0)
         .ok_or_else(|| LRuntimeError::wrong_number_of_args(ACQUIRE_IN_LIST, args, 1..2))?
         .try_into()?;
-    let capacity = args.get(1).cloned();
+    let d: usize = thread_rng().gen();
+    info!("Acquire element from {}, id: {} ", args[0], d);
+    //let capacity = args.get(1).cloned();
+    let rest = if args.len() > 1 {
+        args[1..].to_vec()
+    } else {
+        vec![]
+    };
 
     let env = env.clone();
 
     let f: LFuture = (Box::pin(async move {
-        let mut resources: Vec<String> = resources.drain(..).map(|lv| lv.to_string()).collect();
-
-        let receivers: Vec<(LEnv, String, Option<LValue>)> = resources
+        let receivers: Vec<(LEnv, Vec<LValue>, usize)> = resources
             .iter_mut()
-            .map(|r| (env.clone(), r.clone(), capacity.clone()))
+            .map(|r| {
+                let mut vec = vec![r.clone()];
+                vec.append(&mut rest.clone());
+                (env.clone(), vec, d)
+            })
             .collect();
 
         tokio::select! {
@@ -196,9 +202,7 @@ pub async fn acquire_in_list(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle
                 Ok(LValue::Err(LValue::Nil.into()))
             }
             r = generic_race(receivers, check_acquire) => {
-                let r = r?;
-                //Retunrs a list with the label of the resource that has been acquired, along the handler
-                Ok(list![r.0.into(), r.1.into()])
+                r
             }
         }
     }) as FutureResult)

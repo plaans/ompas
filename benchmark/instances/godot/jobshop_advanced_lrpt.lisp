@@ -8,7 +8,7 @@
     (def-method m_process_to_do_r
         (:task t_process_package)
         (:params (?p package))
-        (:pre-conditions (check (!= (package.processes_list ?p) nil)))
+        (:pre-conditions (! (null? (package.processes_list ?p))))
         (:score 0)
         (:body
             (do
@@ -21,16 +21,16 @@
     (def-method m_no_more_process
         (:task t_process_package)
         (:params (?p package))
-        (:pre-conditions (check (= (package.processes_list ?p) nil)))
+        (:pre-conditions (null? (package.processes_list ?p)))
         (:score 0)
         (:body
             (do
                 (print "package process of " ?p " is done")
-                (mutex::lock-in-list-and-do (instance robot) 0
-                    (t_carry_to_machine r ?p (find_output_machine))
-                ))))
+                (define h_r (await (acquire-in-list (instance robot))))
+                (define ?r (first h_r))
+                (t_carry_to_machine ?r ?p (find_output_machine)))))
     
-    (def-task t_process_on_machine (:params (?p package) '(?m machine)))
+    (def-task t_process_on_machine (:params (?p package) (?m machine)))
     (def-method m_process_on_machine
         (:task t_process_on_machine)
         (:params (?p package) (?m machine))
@@ -39,9 +39,10 @@
         (:body 
             (do
                 (define r-time (remaining-time ?p))
-                (mutex::lock-and-do ?m r-time
-                (do 
-                (mutex::lock-in-list-and-do (instance robot) r-time 
-                    (t_carry_to_machine r ?p ?m))
-                    (process ?m ?p))))))
+                (define h_m (await (acquire ?m `(:priority ,r-time))))
+                (define h_r (await (acquire-in-list (instance robot) `(:priority ,r-time))))
+                (define ?r (first h_r))
+                (t_carry_to_machine ?r ?p ?m)
+                (release (second h_r))
+                (process ?m ?p))))
 )

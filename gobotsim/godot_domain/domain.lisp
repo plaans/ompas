@@ -6,6 +6,7 @@
     ;(read godot_domain/test.lisp)
     (read godot_domain/jobshop_common.lisp)
     ;(read godot_domain/jobshop_greedy.lisp)
-    (read godot_domain/jobshop_advanced.lisp)
+    ;(read godot_domain/jobshop_advanced.lisp)
+    (read godot_domain/jobshop_advanced_lrpt.lisp)
     (read godot_domain/problems/ft06.lisp)
 )

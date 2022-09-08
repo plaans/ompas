@@ -29,6 +29,8 @@ pub enum KindLValue {
     Other(String),
     Handler,
     Err,
+    MutFn,
+    AsyncMutFn,
 }
 
 impl Display for KindLValue {
@@ -56,6 +58,8 @@ impl Display for KindLValue {
             KindLValue::AsyncFn => ASYNC_FN,
             KindLValue::Handler => HANDLER,
             KindLValue::Err => ERR,
+            KindLValue::MutFn => MUT_FN,
+            KindLValue::AsyncMutFn => ASYNC_MUT_FN,
         };
         write!(f, "{}", str)
     }
@@ -105,6 +109,8 @@ impl From<&LValue> for KindLValue {
             LValue::AsyncFn(_) => KindLValue::AsyncFn,
             LValue::Handler(_) => KindLValue::Handler,
             LValue::Err(_) => KindLValue::Err,
+            LValue::MutFn(_) => KindLValue::MutFn,
+            LValue::AsyncMutFn(_) => KindLValue::AsyncMutFn,
         }
     }
 }

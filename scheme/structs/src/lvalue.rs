@@ -1,4 +1,4 @@
-use crate::function::{LAsyncFn, LFn};
+use crate::function::{LAsyncFn, LAsyncMutFn, LFn, LMutFn};
 use crate::kindlvalue::KindLValue;
 use crate::lasynchandler::LAsyncHandler;
 use crate::lcoreoperator::LCoreOperator;
@@ -31,8 +31,10 @@ pub enum LValue {
     Number(LNumber),
     //#[serde(skip)]
     Fn(LFn),
+    MutFn(LMutFn),
     //#[serde(skip)]
     AsyncFn(LAsyncFn),
+    AsyncMutFn(LAsyncMutFn),
     //#[serde(skip)]
     Lambda(LLambda),
     //#[serde(skip)]
@@ -273,6 +275,8 @@ impl Display for LValue {
             LValue::AsyncFn(fun) => write!(f, "{}", fun.get_label()),
             LValue::Handler(_) => write!(f, "{}", HANDLER),
             LValue::Err(e) => write!(f, "[err {}]", e),
+            LValue::MutFn(fun) => write!(f, "{}", fun.get_label()),
+            LValue::AsyncMutFn(fun) => write!(f, "{}", fun.get_label()),
         }
     }
 }
@@ -296,6 +300,14 @@ impl Hash for LValue {
 impl Eq for LValue {}
 
 impl TryFrom<&LValue> for usize {
+    type Error = LRuntimeError;
+
+    fn try_from(value: &LValue) -> Result<Self, Self::Error> {
+        LNumber::try_from(value).map(|n| n.into())
+    }
+}
+
+impl TryFrom<&LValue> for u64 {
     type Error = LRuntimeError;
 
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
@@ -712,6 +724,12 @@ impl From<&LNumber> for LValue {
 impl From<LNumber> for LValue {
     fn from(n: LNumber) -> Self {
         LValue::Number(n)
+    }
+}
+
+impl From<u64> for LValue {
+    fn from(v: u64) -> Self {
+        LValue::Number(LNumber::Int(v as i64))
     }
 }
 

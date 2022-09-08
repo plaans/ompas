@@ -1,8 +1,8 @@
 use crate::ctx_planning::CtxPlanning;
 use futures::FutureExt;
 use log::{error, info, warn};
-use ompas_rae_planning::conversion::convert_domain_to_chronicle_hierarchy;
-use ompas_rae_planning::structs::{ConversionCollection, ConversionContext};
+use ompas_rae_planning::aries::conversion::convert_domain_to_chronicle_hierarchy;
+use ompas_rae_planning::aries::structs::{ConversionCollection, ConversionContext};
 use ompas_rae_structs::domain::RAEDomain;
 use ompas_rae_structs::options::SelectMode::Planning;
 use ompas_rae_structs::options::{RAEOptions, SelectMode};
@@ -110,7 +110,7 @@ pub async fn run(
         None
     };
 
-    env.import(
+    env.import_module(
         CtxPlanning::new(cc, domain.clone(), env.clone(), select_mode),
         WithoutPrefix,
     );

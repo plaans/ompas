@@ -260,3 +260,23 @@ pub const DOC_RAE_TRIGGER_TASK: &str = "Sends to RAE a task to execute";
 pub const DOC_RAE_TRIGGER_TASK_VERBOSE: &str = "Example: (rae-trigger-task t_dumber robot0)";
 pub const DOC_RAE_CONFIGURE_PLATFORM: &str =
     "Set the options of the platform when it will be runned";
+
+pub const RAE_TASK_METHODS_MAP: &str = "rae-task-methods-map";
+pub const RAE_TASK_LIST: &str = "rae-task-list";
+pub const RAE_METHOD_LIST: &str = "rae-methods-list";
+pub const RAE_ACTION_LIST: &str = "rae-actions-list";
+pub const RAE_STATE_FUNCTION_LIST: &str = "rae-state-function-list";
+pub const RAE_SYMBOL_TYPE: &str = "rae-symbol-type";
+pub const RAE_METHOD_TYPES_MAP: &str = "rae-method-types-map";
+pub const RAE_METHOD_SCORE_MAP: &str = "rae-method-score-map";
+pub const RAE_METHOD_GENERATOR_MAP: &str = "rae-method-generator-map";
+pub const RAE_METHOD_PRE_CONDITIONS_MAP: &str = "rae-method-pre-conditions-map";
+pub const RAE_ACTION_MODEL_MAP: &str = "rae-action-model-map";
+pub const ACTION_TYPE: &str = "action_type";
+pub const TASK_TYPE: &str = "task_type";
+pub const METHOD_TYPE: &str = "method_type";
+pub const STATE_FUNCTION_TYPE: &str = "state_function_type";
+pub const LAMBDA_TYPE: &str = "lambda_type";
+
+pub const TUPLE_TYPE: &str = "tuple";
+pub const TYPE_LIST: &str = "tlist";

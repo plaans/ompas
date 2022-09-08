@@ -163,11 +163,7 @@ impl WorldState {
         self.inner_world.write().await.insert(key, value)
     }
 
-    pub async fn retract_fact(
-        &self,
-        key: LValueS,
-        value: LValueS,
-    ) -> Result<LValue, LRuntimeError> {
+    pub async fn retract_fact(&self, key: LValueS, value: LValueS) -> Result<(), LRuntimeError> {
         let old_value = self.inner_world.read().await.get(&key).cloned();
         match old_value {
             None => Err(lruntimeerror!(
@@ -177,7 +173,7 @@ impl WorldState {
             Some(old_value) => {
                 if old_value == value {
                     self.inner_world.write().await.remove(&key);
-                    Ok(LValue::True)
+                    Ok(())
                 } else {
                     Err(lruntimeerror!(
                         "RAEState::retract_fact",

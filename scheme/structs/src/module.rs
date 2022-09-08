@@ -1,6 +1,8 @@
 use crate::contextcollection::Context;
 use crate::documentation::Documentation;
-use crate::function::{AsyncNativeFn, LAsyncFn, LFn, NativeFn};
+use crate::function::{
+    AsyncNativeFn, AsyncNativeMutFn, LAsyncFn, LAsyncMutFn, LFn, LMutFn, NativeFn, NativeMutFn,
+};
 use crate::lvalue::LValue;
 use crate::purefonction::PureFonctionCollection;
 
@@ -49,10 +51,24 @@ impl Module {
         ))
     }
 
+    pub fn add_mut_fn_prelude<L: ToString>(&mut self, label: L, fun: NativeMutFn) {
+        self.prelude.push((
+            label.to_string(),
+            LValue::MutFn(LMutFn::new(fun, label.to_string())),
+        ))
+    }
+
     pub fn add_async_fn_prelude<L: ToString>(&mut self, label: L, fun: AsyncNativeFn) {
         self.prelude.push((
             label.to_string(),
             LValue::AsyncFn(LAsyncFn::new(fun, label.to_string())),
+        ))
+    }
+
+    pub fn add_async_mut_fn_prelude<L: ToString>(&mut self, label: L, fun: AsyncNativeMutFn) {
+        self.prelude.push((
+            label.to_string(),
+            LValue::AsyncMutFn(LAsyncMutFn::new(fun, label.to_string())),
         ))
     }
 

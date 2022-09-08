@@ -127,7 +127,7 @@ pub enum ImportType {
 impl LEnv {
     /// Returns the env with all the basic functions, the ContextCollection with CtxRoot
     /// and InitialLisp containing the definition of macros and lambdas,
-    pub fn import(&mut self, ctx: impl IntoModule, import_type: ImportType) {
+    pub fn import_module(&mut self, ctx: impl IntoModule, import_type: ImportType) {
         self.add_documentation(ctx.documentation());
         self.add_pure_functions(ctx.pure_fonctions());
 
@@ -146,6 +146,10 @@ impl LEnv {
         }
 
         self.init.append(&mut module.raw_lisp);
+    }
+
+    pub fn import_context(&mut self, ctx: Context, label: impl Display) {
+        self.add_context(ctx, label.to_string());
     }
 
     pub fn get_symbols(&self) -> LEnvSymbols {

@@ -30,6 +30,7 @@ const MODEL_TYPE: &str = ":model-type";
 const EFFECTS: &str = ":effects";
 const RESULT: &str = ":result";
 const SCORE: &str = ":score";
+const COST: &str = ":cost";
 
 pub const MACRO_DEF_COMMAND: &str = "(defmacro def-command
     (lambda attributes
@@ -307,6 +308,14 @@ pub async fn add_command(
     };
     let model = eval(&expand(&lv_model, true, &mut env).await?, &mut env, None).await?;
     command.set_model(model);
+
+    let lv_cost: LValue = match map.get(&COST.into()) {
+        None => parse(&format!("(lambda {} 1)", params), &mut env).await?,
+        Some(model) => parse(&format!("(lambda {} {})", params, model), &mut env).await?,
+    };
+    let cost = eval(&expand(&lv_cost, true, &mut env).await?, &mut env, None).await?;
+    command.set_cost(cost);
+
     ctx.rae_domain
         .write()
         .await
@@ -579,7 +588,7 @@ pub async fn add_task_model(
 
 ///Takes in input a list of initial facts that will be stored in the inner world part of the State.
 #[async_scheme_fn]
-pub async fn add_facts(env: &LEnv, map: im::HashMap<LValue, LValue>) {
+pub async fn add_facts(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<(), LRuntimeError> {
     let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER).unwrap();
 
     let mut inner_world = PartialState {
@@ -595,18 +604,19 @@ pub async fn add_facts(env: &LEnv, map: im::HashMap<LValue, LValue>) {
         let mut is_instance = false;
         if let LValue::List(list) = k {
             if list[0] == LValue::from(RAE_INSTANCE) {
-                instance.insert(k.into(), v.into());
+                instance.insert(k.try_into()?, v.try_into()?);
                 is_instance = true;
             }
         }
         if !is_instance {
-            inner_world.insert(k.into(), v.into());
+            inner_world.insert(k.try_into()?, v.try_into()?);
         }
     }
 
     ctx.interface.state.update_state(inner_world).await;
 
     ctx.interface.state.update_state(instance).await;
+    Ok(())
 }
 #[async_scheme_fn]
 pub async fn add_types(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
@@ -679,13 +689,13 @@ pub async fn add_type(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> 
         .add_type(t.clone(), parent.clone());
 
     instance.insert(
-        vec![LValueS::from(RAE_INSTANCE), LValue::from(&t).into()].into(),
+        vec![LValueS::from(RAE_INSTANCE), LValue::from(&t).try_into()?].into(),
         LValueS::List(vec![]),
     );
 
     if let Some(p) = &parent {
         let parent_instance: LValueS =
-            vec![LValueS::from(RAE_INSTANCE), LValue::from(p).into()].into();
+            vec![LValueS::from(RAE_INSTANCE), LValue::from(p).try_into()?].into();
         if !instance.inner.contains_key(&parent_instance) {
             instance.insert(parent_instance, LValueS::List(vec![]))
         }
@@ -698,8 +708,8 @@ pub async fn add_type(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> 
 
 #[async_scheme_fn]
 pub async fn add_object(env: &LEnv, constant: LValue, t: LValue) -> Result<(), LRuntimeError> {
-    let constant: LValueS = constant.into();
-    let t: LValueS = t.into();
+    let constant: LValueS = constant.try_into()?;
+    let t: LValueS = t.try_into()?;
 
     let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER).unwrap();
 

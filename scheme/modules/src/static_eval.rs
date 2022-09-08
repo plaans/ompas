@@ -40,8 +40,8 @@ impl CtxStaticEval {
     pub async fn new() -> Self {
         let mut env = get_root_env().await;
 
-        env.import(CtxMath::default(), ImportType::WithoutPrefix);
-        env.import(CtxUtils::default(), ImportType::WithoutPrefix);
+        env.import_module(CtxMath::default(), ImportType::WithoutPrefix);
+        env.import_module(CtxUtils::default(), ImportType::WithoutPrefix);
         eval_init(&mut env).await;
         let env = Arc::new(RwLock::new(env));
         Self { env }
@@ -53,11 +53,14 @@ impl CtxStaticEval {
         self.env
             .write()
             .await
-            .import(ctx, ImportType::WithoutPrefix)
+            .import_module(ctx, ImportType::WithoutPrefix)
     }
 
     pub async fn import(&mut self, ctx: impl IntoModule) {
-        self.env.write().await.import(ctx, ImportType::WithPrefix)
+        self.env
+            .write()
+            .await
+            .import_module(ctx, ImportType::WithPrefix)
     }
 }
 

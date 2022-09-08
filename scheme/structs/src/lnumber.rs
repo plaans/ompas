@@ -112,6 +112,21 @@ impl From<&LNumber> for i64 {
     }
 }
 
+impl From<&LNumber> for u64 {
+    fn from(n: &LNumber) -> Self {
+        match n {
+            LNumber::Int(i) => *i as u64,
+            LNumber::Float(f) => *f as u64,
+        }
+    }
+}
+
+impl From<LNumber> for u64 {
+    fn from(n: LNumber) -> Self {
+        n.borrow().into()
+    }
+}
+
 impl TryFrom<&LValue> for LNumber {
     type Error = LRuntimeError;
 

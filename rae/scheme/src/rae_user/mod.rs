@@ -3,7 +3,11 @@
 use crate::rae_exec::CtxRaeExec;
 use chrono::{DateTime, Utc};
 use ompas_rae_language::*;
-use ompas_rae_planning::structs::ConversionContext;
+use ompas_rae_planning::aries::structs::ConversionContext;
+use ompas_rae_structs::contexts::ctx_domain::{CtxDomain, CTX_DOMAIN};
+use ompas_rae_structs::contexts::ctx_mode::{CtxMode, CTX_MODE};
+use ompas_rae_structs::contexts::ctx_state::{CtxState, CTX_STATE};
+use ompas_rae_structs::contexts::ctx_task::{CtxTask, CTX_TASK};
 use ompas_rae_structs::domain::RAEDomain;
 use ompas_rae_structs::job::Job;
 use ompas_rae_structs::options::{RAEOptions, SelectMode};
@@ -236,10 +240,10 @@ impl CtxRaeUser {
         log.push(format!("rae_{}.txt", string_date));
 
         let mut empty_env = get_root_env().await;
-        empty_env.import(CtxUtils::default(), WithoutPrefix);
-        empty_env.import(CtxMath::default(), WithoutPrefix);
-        empty_env.import(CtxIo::default(), WithoutPrefix);
-        empty_env.import(CtxRaeExec::default(), WithoutPrefix);
+        empty_env.import_module(CtxUtils::default(), WithoutPrefix);
+        empty_env.import_module(CtxMath::default(), WithoutPrefix);
+        empty_env.import_module(CtxIo::default(), WithoutPrefix);
+        empty_env.import_module(CtxRaeExec::default(), WithoutPrefix);
         eval_init(&mut empty_env).await;
 
         let channel = ompas_rae_log::init(log.clone()) //change with configurable display
@@ -276,33 +280,42 @@ impl CtxRaeUser {
         let mut env = get_root_env().await;
 
         if let Some(platform) = &self.platform {
-            env.import(
+            env.import_module(
                 platform.get_ref().read().await.context_platform(),
                 WithPrefix,
             );
         }
 
-        env.import(CtxUtils::default(), WithoutPrefix);
+        env.import_module(CtxUtils::default(), WithoutPrefix);
 
-        env.import(CtxMath::default(), WithoutPrefix);
+        env.import_module(CtxMath::default(), WithoutPrefix);
 
         let mut ctx_io = CtxIo::default();
         ctx_io.set_log_output(LogOutput::Channel(
             self.interface.log.channel.as_ref().unwrap().clone(),
         ));
 
-        env.import(ctx_io, WithoutPrefix);
+        env.import_module(ctx_io, WithoutPrefix);
 
         let ctx_rae_exec = CtxRaeExec {
             resources: self.interface.resources.clone(),
             monitors: self.interface.monitors.clone(),
-            state: self.interface.state.clone(),
             platform_interface: self.platform.clone(),
             agenda: self.interface.agenda.clone(),
         };
 
-        env.import(ctx_rae_exec, WithoutPrefix);
+        let ctx_state = CtxState {
+            state: self.interface.state.clone(),
+        };
 
+        env.import_module(ctx_rae_exec, WithoutPrefix);
+        env.import_context(Context::new(ctx_state), CTX_STATE);
+        env.import_context(Context::new(CtxTask::default()), CTX_TASK);
+        env.import_context(Context::new(CtxMode::default()), CTX_MODE);
+        env.import_context(
+            Context::new(CtxDomain::new(self.rae_domain.read().await.clone())),
+            CTX_DOMAIN,
+        );
         eval_init(&mut env).await;
 
         let domain_exec_symbols: LEnvSymbols = self.rae_domain.read().await.get_exec_env();

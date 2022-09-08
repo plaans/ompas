@@ -1,4 +1,4 @@
-use crate::context::{TUPLE_TYPE, TYPE_LIST};
+use ompas_rae_language::*;
 use sompas_language::LIST;
 use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lruntimeerror;

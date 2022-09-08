@@ -2,12 +2,14 @@ use crate::rae_exec::{CtxRaeExec, MOD_RAE_EXEC, PARENT_TASK};
 use log::{error, info};
 use ompas_rae_core::ctx_planning::{CtxPlanning, MOD_PLANNING};
 use ompas_rae_core::error::RaeExecError;
+use ompas_rae_structs::contexts::ctx_state::{CtxState, CTX_STATE};
+use ompas_rae_structs::contexts::ctx_task::{CtxTask, CTX_TASK};
 use ompas_rae_structs::options::{Planner, SelectMode};
 use ompas_rae_structs::state::task_state::{
     AbstractTaskMetaData, RefinementMetaData, TaskMetaData, TaskMetaDataView,
 };
 use ompas_rae_structs::state::task_status::TaskStatus;
-use ompas_rae_structs::state::task_status::TaskStatus::*;
+use ompas_rae_structs::state::world_state::WorldStateSnapshot;
 use sompas_macros::*;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lnumber::LNumber;
@@ -20,9 +22,10 @@ use std::convert::{TryFrom, TryInto};
 pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
     let task_label: LValue = args.into();
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
-    let parent_task: Option<usize> = env
-        .get_ref_symbol(PARENT_TASK)
-        .map(|n| LNumber::try_from(n).unwrap().into());
+    let parent_task: Option<usize> = match env.get_context::<CtxTask>(CTX_TASK) {
+        Ok(ctx) => ctx.parent_id,
+        Err(_) => None,
+    };
     let mut task: AbstractTaskMetaData = ctx
         .agenda
         .add_abstract_task(task_label.clone(), parent_task)
@@ -36,12 +39,12 @@ pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
 
     let result: LValue = if first_m == LValue::Nil {
         error!("No applicable method for task {}({})", task_label, task_id,);
-        task.update_status(Failure);
+        task.update_status(TaskStatus::Failure);
         task.set_end_timepoint(ctx.agenda.get_instant());
         ctx.agenda.update_task(&task_id, task).await;
         RaeExecError::NoApplicableMethod.into()
     } else {
-        task.update_status(Running);
+        task.update_status(TaskStatus::Running);
         ctx.agenda.update_task(&task_id, task).await;
         vec![first_m, task_id.into()].into()
     };
@@ -69,10 +72,7 @@ pub async fn set_success_for_task(env: &LEnv, args: &[LValue]) -> LResult {
 }
 
 #[async_scheme_fn]
-pub async fn retry(env: &LEnv, args: &[LValue]) -> LResult {
-    let task_id: i64 = args[0].borrow().try_into()?;
-    let task_id = task_id as usize;
-
+pub async fn retry(env: &LEnv, task_id: usize) -> LResult {
     let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
     let mut task: AbstractTaskMetaData = ctx.agenda.get_abstract_task(&(task_id as usize)).await?;
     let task_label = task.get_label().clone();
@@ -85,7 +85,7 @@ pub async fn retry(env: &LEnv, args: &[LValue]) -> LResult {
             "No more method for task {}({}). Task is a failure!",
             task_label, task_id
         );
-        task.update_status(Failure);
+        task.update_status(TaskStatus::Failure);
         task.set_end_timepoint(ctx.agenda.get_instant());
         ctx.agenda.update_task(&task_id, task).await;
         RaeExecError::NoApplicableMethod.into()
@@ -110,8 +110,11 @@ pub async fn select(stack: &mut AbstractTaskMetaData, env: &LEnv) -> LResult {
      */
     let task_id = stack.get_id();
     let ctx_planning = env.get_context::<CtxPlanning>(MOD_PLANNING)?;
-    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
-    let state = ctx.state.get_snapshot().await;
+    let state: WorldStateSnapshot = env
+        .get_context::<CtxState>(CTX_STATE)?
+        .state
+        .get_snapshot()
+        .await;
 
     let task: Vec<LValue> = stack.get_label().try_into()?;
     let tried = stack.get_tried();
@@ -152,15 +155,13 @@ mod select {
     use super::*;
     use crate::rae_exec::platform::instance;
     use crate::rae_exec::STATE;
-    use ompas_rae_language::RAE_SELECT;
-    use ompas_rae_planning::binding_aries::solver::run_solver_for_htn;
-    use ompas_rae_planning::binding_aries::{generate_chronicles, solver};
-
-    use ompas_rae_planning::structs::{ConversionContext, Problem};
-    use ompas_rae_structs::context::{
-        RAE_METHOD_PRE_CONDITIONS_MAP, RAE_METHOD_SCORE_MAP, RAE_METHOD_TYPES_MAP,
+    use ompas_rae_language::{
+        RAE_METHOD_PRE_CONDITIONS_MAP, RAE_METHOD_SCORE_MAP, RAE_METHOD_TYPES_MAP, RAE_SELECT,
         RAE_TASK_METHODS_MAP,
     };
+    use ompas_rae_planning::aries::binding::solver::run_solver_for_htn;
+    use ompas_rae_planning::aries::binding::{generate_chronicles, solver};
+    use ompas_rae_planning::aries::structs::{ConversionContext, Problem};
     use ompas_rae_structs::interval::Interval;
     use ompas_rae_structs::options::Planner::Aries;
     use ompas_rae_structs::plan::AbstractTaskInstance;
@@ -191,7 +192,6 @@ mod select {
         println!("\t*tried: {}", LValue::from(tried));
         println!("\t*greedy: {}", LValue::from(&greedy.applicable_methods));
         let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
-
         match env
             .get_ref_symbol(PARENT_TASK)
             .map(|n| LNumber::try_from(n).unwrap().into())
@@ -276,7 +276,7 @@ mod select {
         //let cc = convert_domain_to_chronicle_hierarchy(context)?;
         //println!("cc: {}", cc);
         problem.cc = ctx_domain.cc.as_ref().unwrap().clone();
-        problem.goal_tasks.push(task.into());
+        problem.goal_tasks.push(LValue::from(task).try_into()?);
 
         let mut aries_problem = generate_chronicles(&problem)?;
         let instant = Instant::now();
@@ -427,7 +427,9 @@ mod select {
                     None,
                 )
                 .await
-                .map_err(|e| e.chain(format!("eval pre_conditions: {}", arg_debug)))?;
+                .map_err(|e: LRuntimeError| {
+                    e.chain(format!("eval pre_conditions: {}", arg_debug))
+                })?;
                 if !matches!(lv, LValue::Err(_)) {
                     let arg = cons(env, &[score_lambda.clone(), i_vec[1..].into()])?;
                     let arg_debug = arg.to_string();
@@ -440,7 +442,7 @@ mod select {
                         None,
                     )
                     .await
-                    .map_err(|e| e.chain(format!("eval score: {}", arg_debug)))?
+                    .map_err(|e: LRuntimeError| e.chain(format!("eval score: {}", arg_debug)))?
                     .try_into()?;
                     applicable_methods.push((i, score))
                 }
@@ -468,9 +470,6 @@ mod select {
     }
 }
 
-#[allow(non_snake_case, dead_code)]
-pub fn RAEPlan(_: LValue) {}
-
 pub const LAMBDA_RAE_EXEC_TASK: &str = "(define exec-task
     (lambda task
         (begin
@@ -481,7 +480,7 @@ pub const LAMBDA_RAE_EXEC_TASK: &str = "(define exec-task
                       (task_id (second result)))
 
                     (begin
-                        (define parent_task task_id)
+                        (define-parent-task task_id)
                         (print \"Trying \" method \" for \" task_id)
                         (if (err? (enr method))
                             (rae-retry task_id)

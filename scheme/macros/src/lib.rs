@@ -16,6 +16,7 @@ const DEFAULT_ARGS: &str = "args";
 const ENV_TYPE: &str = "LEnv";
 const ARGS_TYPE: &str = "[LValue]";
 const REF_ENV_TYPE: &str = "&LEnv";
+const REF_MUT_ENV_TYPE: &str = "&mut LEnv";
 const REF_ARGS_TYPE: &str = "&[LValue]";
 const LVALUE_TYPE_LONG: &str = "sompas_structs::lvalue::LValue";
 const LVALUE_TYPE: &str = "LValue";
@@ -199,18 +200,23 @@ fn build_params(
     }
     let type_lvalue: Type = syn::parse_str::<Type>(LVALUE_TYPE).unwrap();
     let type_ref_lvalue: Type = syn::parse_str::<Type>(REF_LVALUE_TYPE).unwrap();
-    let (type_env, type_args) = if let Some(lt) = defined_lt {
+    let (types_env, type_args) = if let Some(lt) = defined_lt {
         //println!("&{} {}", lt, ENV_TYPE);
-        let type_env: Type =
-            syn::parse_str::<Type>(format!("&{} {}", lt, ENV_TYPE).as_str()).unwrap();
+        let types_env: Vec<Type> = vec![
+            syn::parse_str::<Type>(format!("&{} {}", lt, ENV_TYPE).as_str()).unwrap(),
+            syn::parse_str::<Type>(format!("&{} mut {}", lt, ENV_TYPE).as_str()).unwrap(),
+        ];
         let type_args: Type =
             syn::parse_str::<Type>(format!("&{} {}", lt, ARGS_TYPE).as_str()).unwrap();
-        (type_env, type_args)
+        (types_env, type_args)
     } else {
-        let type_env: Type = syn::parse_str::<Type>(REF_ENV_TYPE).unwrap();
+        let types_env: Vec<Type> = vec![
+            syn::parse_str::<Type>(REF_ENV_TYPE).unwrap(),
+            syn::parse_str::<Type>(REF_MUT_ENV_TYPE).unwrap(),
+        ];
         let type_args: Type = syn::parse_str::<Type>(REF_ARGS_TYPE).unwrap();
 
-        (type_env, type_args)
+        (types_env, type_args)
     };
 
     let mut first = true;
@@ -228,7 +234,7 @@ fn build_params(
             let var = p.pat.as_ref();
             //println!("{:?}", t);
             //case where env ident is redefined
-            if i == 0 && t == &type_env {
+            if i == 0 && types_env.contains(t) {
                 //println!("env is redefined!");
                 env = syn::parse_quote!(#var);
                 env_type = if !is_async || defined_lt.is_some() {

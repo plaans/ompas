@@ -1,15 +1,10 @@
-use crate::context::{
-    ACTION_TYPE, LAMBDA_TYPE, METHOD_TYPE, RAE_ACTION_LIST, RAE_ACTION_MODEL_MAP, RAE_METHOD_LIST,
-    RAE_METHOD_PRE_CONDITIONS_MAP, RAE_METHOD_SCORE_MAP, RAE_METHOD_TYPES_MAP,
-    RAE_STATE_FUNCTION_LIST, RAE_SYMBOL_TYPE, RAE_TASK_LIST, RAE_TASK_METHODS_MAP,
-    STATE_FUNCTION_TYPE, TASK_TYPE,
-};
 use crate::domain::command::Command;
 use crate::domain::method::Method;
 use crate::domain::state_function::StateFunction;
 use crate::domain::task::Task;
 use crate::domain::type_hierarchy::TypeHierarchy;
 use im::HashMap;
+use ompas_rae_language::*;
 use sompas_structs::lenv::LEnvSymbols;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
@@ -29,7 +24,7 @@ pub struct RAEDomain {
     pub tasks: HashMap<String, Task>,
     pub methods: HashMap<String, Method>,
     pub state_functions: HashMap<String, StateFunction>,
-    pub actions: HashMap<String, Command>,
+    pub commands: HashMap<String, Command>,
     pub lambdas: HashMap<String, LValue>,
     pub types: TypeHierarchy,
     pub map_symbol_type: HashMap<String, String>,
@@ -44,7 +39,7 @@ impl RAEDomain {
                 METHOD_TYPE => self.methods.get(label).unwrap().to_string(),
                 STATE_FUNCTION_TYPE => self.state_functions.get(label).unwrap().to_string(),
                 LAMBDA_TYPE => self.lambdas.get(label).unwrap().to_string(),
-                ACTION_TYPE => self.actions.get(label).unwrap().to_string(),
+                ACTION_TYPE => self.commands.get(label).unwrap().to_string(),
                 _ => panic!("There should no other type of symbol_type"),
             },
         }
@@ -66,7 +61,7 @@ impl RAEDomain {
     }
 
     pub fn get_actions(&self) -> &HashMap<String, Command> {
-        &self.actions
+        &self.commands
     }
 
     pub fn get_lambdas(&self) -> &HashMap<String, LValue> {
@@ -112,13 +107,13 @@ impl RAEDomain {
     }
 
     pub fn add_command(&mut self, label: String, value: Command) -> Result<(), LRuntimeError> {
-        self.actions.insert(label.clone(), value);
+        self.commands.insert(label.clone(), value);
         self.map_symbol_type.insert(label, ACTION_TYPE.into());
         Ok(())
     }
 
     pub fn add_command_model(&mut self, label: String, value: LValue) -> Result<(), LRuntimeError> {
-        match self.actions.get_mut(&label) {
+        match self.commands.get_mut(&label) {
             None => Err(lruntimeerror!(
                 "add_action_sample_fn",
                 format!("Action {} is not defined", label)
@@ -182,7 +177,7 @@ impl RAEDomain {
     }
 
     pub fn get_list_actions(&self) -> LValue {
-        self.actions
+        self.commands
             .keys()
             .map(|k| LValue::from(k.clone()))
             .collect::<Vec<LValue>>()
@@ -237,7 +232,7 @@ impl RAEDomain {
 
     pub fn print_actions(&self) -> String {
         let mut str = "*ACTIONS:\n".to_string();
-        for (label, value) in &self.actions {
+        for (label, value) in &self.commands {
             str.push_str(format!("\t-{}:\n{}\n\n", label, value).as_str())
         }
         str

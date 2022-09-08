@@ -46,7 +46,7 @@ pub async fn get_root_env() -> LEnv {
     // let map = im::hashmap::HashMap::new();
     // map.ins
     let mut env = LEnv::default();
-    env.import(CtxRoot::default(), ImportType::WithoutPrefix);
+    env.import_module(CtxRoot::default(), ImportType::WithoutPrefix);
     eval_init(&mut env).await;
     env
 }
@@ -927,6 +927,7 @@ pub async fn eval(
                         scopes.new_defined_scope(temp_env);
                     }
                     LValue::Fn(fun) => {
+                        scopes.revert_scope();
                         let r_lvalue = match fun.call(scopes.get_last(), args) {
                             Ok(e) => e,
                             Err(e) => {
@@ -936,9 +937,21 @@ pub async fn eval(
                         };
                         results.push(r_lvalue);
                         debug.print_last_result(&results);
+                    }
+                    LValue::MutFn(fun) => {
                         scopes.revert_scope();
+                        let r_lvalue = match fun.call(scopes.get_last_mut(), args) {
+                            Ok(e) => e,
+                            Err(e) => {
+                                expression_error = exps.into();
+                                break Err(e);
+                            }
+                        };
+                        results.push(r_lvalue);
+                        debug.print_last_result(&results);
                     }
                     LValue::AsyncFn(fun) => {
+                        scopes.revert_scope();
                         let r_lvalue = match fun.call(scopes.get_last(), args).await {
                             Ok(e) => e,
                             Err(e) => {
@@ -948,7 +961,18 @@ pub async fn eval(
                         };
                         results.push(r_lvalue);
                         debug.print_last_result(&results);
+                    }
+                    LValue::AsyncMutFn(fun) => {
                         scopes.revert_scope();
+                        let r_lvalue = match fun.call(scopes.get_last_mut(), args).await {
+                            Ok(e) => e,
+                            Err(e) => {
+                                expression_error = exps.into();
+                                break Err(e);
+                            }
+                        };
+                        results.push(r_lvalue);
+                        debug.print_last_result(&results);
                     }
                     lv => {
                         let e = wrong_type!("eval", lv, KindLValue::Fn);

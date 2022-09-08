@@ -1,8 +1,10 @@
+use crate::kindlvalue::KindLValue;
 use crate::lnumber::LNumber;
 use crate::lruntimeerror::LRuntimeError;
 use crate::lvalue::LValue;
 use serde::*;
 use sompas_language::ERR;
+use std::borrow::Borrow;
 use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
@@ -52,7 +54,60 @@ impl PartialEq for LValueS {
 
 impl Eq for LValueS {}
 
-impl From<LValue> for LValueS {
+impl TryFrom<&LValue> for LValueS {
+    type Error = LRuntimeError;
+
+    #[function_name::named]
+    fn try_from(value: &LValue) -> Result<Self, Self::Error> {
+        let r = match value {
+            LValue::Symbol(s) => LValueS::Symbol(s.deref().clone()),
+            LValue::Number(n) => match n {
+                LNumber::Int(i) => LValueS::Int(*i),
+                LNumber::Float(f) => LValueS::Float(*f),
+            },
+            LValue::Fn(f) => LValueS::Symbol(f.get_label().to_string()),
+            LValue::Lambda(_) => Err(LRuntimeError::conversion_error(
+                function_name!(),
+                value,
+                KindLValue::Other("LValueS".to_string()),
+            ))?,
+            LValue::CoreOperator(co) => LValueS::Symbol(co.to_string()),
+            LValue::Map(m) => LValueS::Map({
+                let mut map = vec![];
+                for (k, v) in m {
+                    map.push((k.try_into()?, v.try_into()?))
+                }
+                map
+            }),
+            LValue::List(l) => {
+                LValueS::List(l.iter().map(|lv| lv.try_into()).collect::<Result<_, _>>()?)
+            }
+            LValue::True => LValueS::Bool(true),
+            LValue::Nil => LValueS::Bool(false),
+            LValue::String(s) => LValueS::Symbol(s.deref().clone()),
+            LValue::AsyncFn(fun) => LValueS::Symbol(fun.get_label().to_string()),
+            LValue::Handler(_) => Err(LRuntimeError::conversion_error(
+                function_name!(),
+                value,
+                KindLValue::Other("LValueS".to_string()),
+            ))?,
+            LValue::Err(e) => LValueS::List(vec![ERR.into(), e.deref().try_into()?]),
+            LValue::MutFn(fun) => LValueS::Symbol(fun.get_label().to_string()),
+            LValue::AsyncMutFn(fun) => LValueS::Symbol(fun.get_label().to_string()),
+        };
+        Ok(r)
+    }
+}
+
+impl TryFrom<LValue> for LValueS {
+    type Error = LRuntimeError;
+
+    fn try_from(value: LValue) -> Result<Self, Self::Error> {
+        value.borrow().try_into()
+    }
+}
+
+/*impl From<LValue> for LValueS {
     fn from(lv: LValue) -> Self {
         match lv {
             LValue::Symbol(s) => LValueS::Symbol(s.deref().clone()),
@@ -79,7 +134,7 @@ impl From<&LValue> for LValueS {
     fn from(lv: &LValue) -> Self {
         lv.clone().into()
     }
-}
+}*/
 
 /*impl TryFrom<LValue> for LValueS {
     type Error = LRuntimeError;

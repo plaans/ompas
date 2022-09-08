@@ -162,7 +162,7 @@ impl RAEPlatform for PlatformGodot {
         let gs = GodotMessageSerde {
             _type,
             data: GodotMessageSerdeData::RobotCommand(SerdeRobotCommand {
-                command_info: LValue::from(args).into(),
+                command_info: LValue::from(args).try_into().unwrap(),
                 temp_id: command_id,
             }),
         };

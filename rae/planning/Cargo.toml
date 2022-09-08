@@ -12,6 +12,7 @@ sompas-language = {path = "../../scheme/language"}
 sompas-core = {path = "../../scheme/core"}
 ompas-rae-language = {path = "../language"}
 ompas-rae-structs = {path = "../structs"}
+sompas-macros = {path = "../../scheme/macros"}
 tokio = { version = "1.17.0", features = ["full", "time"] }
 log =  { version = "0.4.16", features = ["std"] }
 im = "15.0.0"

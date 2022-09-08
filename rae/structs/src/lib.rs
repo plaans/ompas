@@ -1,5 +1,5 @@
 pub mod agenda;
-pub mod context;
+pub mod contexts;
 pub mod domain;
 pub mod interval;
 pub mod job;

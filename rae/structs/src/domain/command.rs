@@ -8,12 +8,30 @@ pub struct Command {
     parameters: Parameters,
     body: LValue,
     model: LValue,
+    cost: LValue,
 }
 
-/*
-GETTERS
- */
 impl Command {
+    pub fn new(
+        label: impl Display,
+        parameters: Parameters,
+        body: LValue,
+        model: LValue,
+        cost: LValue,
+    ) -> Self {
+        Self {
+            label: label.to_string(),
+            parameters,
+            body,
+            model,
+            cost,
+        }
+    }
+
+    /*
+    GETTERS
+     */
+
     pub fn get_parameters(&self) -> &Parameters {
         &self.parameters
     }
@@ -29,12 +47,15 @@ impl Command {
     pub fn get_label(&self) -> &String {
         &self.label
     }
-}
 
-/*
-SETTERS
- */
-impl Command {
+    pub fn get_cost(&self) -> &LValue {
+        &self.cost
+    }
+
+    /*
+    SETTERS
+     */
+
     pub fn set_parameters(&mut self, params: Parameters) {
         self.parameters = params
     }
@@ -50,16 +71,9 @@ impl Command {
     pub fn set_label(&mut self, label: String) {
         self.label = label
     }
-}
 
-impl Command {
-    pub fn new(label: impl Display, parameters: Parameters, body: LValue, model: LValue) -> Self {
-        Self {
-            label: label.to_string(),
-            parameters,
-            body,
-            model,
-        }
+    pub fn set_cost(&mut self, cost: LValue) {
+        self.cost = cost
     }
 }
 
@@ -67,11 +81,12 @@ impl Display for Command {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "label: {}, parameters : {}\n exec: {}\n sim: {} ",
+            "label: {}, parameters : {}\n exec: {}\n sim: {}\n cost: {} ",
             self.label,
             self.parameters,
             self.body.format("exec: ".len()),
-            self.model.format("sim: ".len())
+            self.model.format("sim: ".len()),
+            self.cost.format("cost: ".len()),
         )
     }
 }

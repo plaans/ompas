@@ -122,11 +122,11 @@ impl LispInterpreter {
 
 impl LispInterpreter {
     pub fn import_namespace(&mut self, ctx: impl IntoModule) {
-        self.env.import(ctx, ImportType::WithoutPrefix)
+        self.env.import_module(ctx, ImportType::WithoutPrefix)
     }
 
     pub fn import(&mut self, ctx: impl IntoModule) {
-        self.env.import(ctx, ImportType::WithPrefix)
+        self.env.import_module(ctx, ImportType::WithPrefix)
     }
 
     async fn recv(&mut self) -> Option<String> {

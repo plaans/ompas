@@ -1,8 +1,8 @@
 use crate::rae_user::{CtxRaeUser, MOD_RAE_USER};
-use ompas_rae_planning::binding_aries::solver::run_solver_for_htn;
-use ompas_rae_planning::binding_aries::{generate_chronicles, solver};
-use ompas_rae_planning::conversion::convert_domain_to_chronicle_hierarchy;
-use ompas_rae_planning::structs::{ConversionContext, Problem};
+use ompas_rae_planning::aries::binding::solver::run_solver_for_htn;
+use ompas_rae_planning::aries::binding::{generate_chronicles, solver};
+use ompas_rae_planning::aries::conversion::convert_domain_to_chronicle_hierarchy;
+use ompas_rae_planning::aries::structs::{ConversionContext, Problem};
 use sompas_macros::*;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lruntimeerror::LResult;
@@ -19,7 +19,7 @@ pub async fn plan_task(env: &LEnv, args: &[LValue]) -> LResult {
     let cc = convert_domain_to_chronicle_hierarchy(context)?;
     //println!("cc: {}", cc);
     problem.cc = cc;
-    problem.goal_tasks.push(task.into());
+    problem.goal_tasks.push(task.try_into()?);
 
     let mut aries_problem = generate_chronicles(&problem)?;
 

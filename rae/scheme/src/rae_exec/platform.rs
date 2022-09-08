@@ -2,16 +2,17 @@ use crate::rae_exec::*;
 use log::{error, info};
 use ompas_rae_core::ctx_planning::{CtxPlanning, MOD_PLANNING};
 use ompas_rae_core::error::RaeExecError;
+use ompas_rae_structs::contexts::ctx_mode::{CtxMode, RAEMode, CTX_MODE};
+use ompas_rae_structs::contexts::ctx_task::{CtxTask, CTX_TASK};
 use ompas_rae_structs::state::task_status::TaskStatus;
 use sompas_core::modules::list::append;
 use sompas_core::{eval, parse};
 use sompas_modules::utils::contains;
 use sompas_structs::lenv::LEnv;
-use sompas_structs::lnumber::LNumber;
 use sompas_structs::lruntimeerror::LResult;
 use sompas_structs::lswitch::InterruptionReceiver;
 use sompas_structs::lvalue::LValue;
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryInto;
 
 #[scheme_fn]
 pub fn is_platform_defined(env: &LEnv) -> bool {
@@ -30,9 +31,8 @@ pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LAsyncHandler {
 
     let f = (Box::pin(async move {
         let args = args.as_slice();
-        let parent_task: Option<usize> = env
-            .get_ref_symbol(PARENT_TASK)
-            .map(|n| LNumber::try_from(n).unwrap().into());
+
+        let parent_task = env.get_context::<CtxTask>(CTX_TASK)?.parent_id;
         let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
         let (action_id, mut rx) = ctx.agenda.add_action(args.into(), parent_task).await;
         let debug: LValue = args.into();
@@ -50,12 +50,10 @@ pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LAsyncHandler {
             eval(&parse(&string, &mut env).await?, &mut env, int).await
         };
 
-        let mode: String = env
-            .get_symbol("rae-mode")
-            .expect("rae-mode should be defined, default value is exec mode")
-            .try_into()?;
-        match mode.as_str() {
-            SYMBOL_EXEC_MODE => {
+        let mode = env.get_context::<CtxMode>(CTX_MODE)?.mode;
+
+        match mode {
+            RAEMode::Exec => {
                 match &ctx.platform_interface {
                     Some(platform) => {
                         platform.exec_command(args, action_id).await?;
@@ -109,11 +107,7 @@ pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LAsyncHandler {
                     }
                 }
             }
-            SYMBOL_SIMU_MODE => eval_model(None).await,
-            _ => unreachable!(
-                "{} should have either {} or {} value.",
-                SYMBOL_RAE_MODE, SYMBOL_EXEC_MODE, SYMBOL_SIMU_MODE
-            ),
+            RAEMode::Simu => eval_model(None).await,
         }
     }) as FutureResult)
         .shared();
@@ -157,92 +151,92 @@ pub async fn open_com(env: &LEnv, args: &[LValue]) -> LResult {
 
 #[async_scheme_fn]
 pub async fn cancel_command(env: &LEnv, args: &[LValue]) -> LResult {
-    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC).unwrap();
-
-    let mode: String = env
-        .get_symbol("rae-mode")
-        .expect("rae-mode should be defined, default value is exec mode")
-        .try_into()?;
-    match mode.as_str() {
-        SYMBOL_EXEC_MODE => {
+    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
+    let mode = env.get_context::<CtxMode>(CTX_MODE)?.mode;
+    match mode {
+        RAEMode::Exec => {
             if let Some(platform) = &ctx.platform_interface {
                 platform.cancel_command(args).await
             } else {
                 Ok("cannot cancel command in internal platform (action is instantaneous)".into())
             }
         }
-        SYMBOL_SIMU_MODE => Ok("No cancellation of action in simulation mode".into()),
-        _ => unreachable!(
-            "{} should have either {} or {} value.",
-            SYMBOL_RAE_MODE, SYMBOL_EXEC_MODE, SYMBOL_SIMU_MODE
-        ),
+        RAEMode::Simu => Ok("No cancellation of action in simulation mode".into()),
     }
 }
 
 enum InstanceMode {
+    All,
     Instances,
     Check,
 }
 
-#[async_scheme_fn]
-pub async fn instance(env: &LEnv, args: &[LValue]) -> LResult {
-    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC).unwrap();
-    let mode: String = env
-        .get_symbol("rae-mode")
-        .expect("rae-mode should be defined, default value is exec mode")
-        .try_into()?;
+pub fn look_in_state(
+    env: &LEnv,
+    args: &[LValue],
+    facts: im::HashMap<LValue, LValue>,
+) -> Result<LValue, LRuntimeError> {
+    let ctx_planning = env.get_context::<CtxPlanning>(MOD_PLANNING)?;
+    let mut values: Vec<LValue> = vec![];
 
-    let look_in_state = |facts: im::HashMap<LValue, LValue>| {
-        let ctx_planning = env.get_context::<CtxPlanning>(MOD_PLANNING)?;
-        let mut values: Vec<LValue> = vec![];
-
-        let mode = match args.len() {
-            1 => InstanceMode::Instances,
-            2 => InstanceMode::Check,
-            _ => {
-                return Err(LRuntimeError::wrong_number_of_args(
-                    RAE_INSTANCE,
-                    args,
-                    1..2,
-                ))
-            }
-        };
-
-        let t = match &mode {
-            InstanceMode::Instances => args[0].clone(),
-            InstanceMode::Check => args[1].clone(),
-        };
-
-        let mut types: Vec<String> = ctx_planning.domain.get_childs(&t.to_string());
-        types.push(t.to_string());
-        for t in &types {
-            let key = vec![RAE_INSTANCE.into(), LValue::from(t)].into();
-            values.push(facts.get(&key).unwrap_or(&LValue::Nil).clone());
-        }
-
-        let instances = append(env, values.as_slice())?;
-        match &mode {
-            InstanceMode::Instances => Ok(instances),
-            InstanceMode::Check => contains(env, &[instances, args[0].clone()]),
+    let mode = match args.len() {
+        0 => InstanceMode::All,
+        1 => InstanceMode::Instances,
+        2 => InstanceMode::Check,
+        _ => {
+            return Err(LRuntimeError::wrong_number_of_args(
+                RAE_INSTANCE,
+                args,
+                1..2,
+            ))
         }
     };
 
-    match mode.as_str() {
-        SYMBOL_EXEC_MODE => {
-            if let Some(platform) = &ctx.platform_interface {
-                platform.instance(args).await
-            } else {
-                let state: im::HashMap<LValue, LValue> = get_facts(env, &[]).await?.try_into()?;
-                look_in_state(state)
+    let t = match &mode {
+        InstanceMode::Instances => args[0].clone(),
+        InstanceMode::Check => args[1].clone(),
+        InstanceMode::All => LValue::Nil,
+    };
+
+    match &mode {
+        InstanceMode::All => {
+            let mut map: HashMap<LValue, LValue> = Default::default();
+            let th = ctx_planning.domain.get_type_hierarchy();
+            let types = th.get_types();
+            for t in &types {
+                let key = list![RAE_INSTANCE.into(), t.into()];
+                map.insert(key.clone(), facts.get(&key).unwrap_or(&LValue::Nil).clone());
+            }
+            Ok(map.into())
+        }
+        mode => {
+            let mut types: Vec<String> = ctx_planning.domain.get_childs(&t.to_string());
+            types.push(t.to_string());
+            for t in &types {
+                let key = vec![RAE_INSTANCE.into(), LValue::from(t)].into();
+                values.push(facts.get(&key).unwrap_or(&LValue::Nil).clone());
+            }
+
+            let instances: LValue = append(env, values.as_slice())?;
+            match &mode {
+                InstanceMode::Instances => Ok(instances),
+                InstanceMode::Check => contains(env, &[instances, args[0].clone()]),
+                InstanceMode::All => unreachable!(),
             }
         }
-        SYMBOL_SIMU_MODE => {
-            let state: im::HashMap<LValue, LValue> = env.get_symbol(STATE).unwrap().try_into()?;
-            look_in_state(state)
+    }
+}
+
+#[async_scheme_fn]
+pub async fn instance(env: &LEnv, args: &[LValue]) -> LResult {
+    match &env
+        .get_context::<CtxRaeExec>(MOD_RAE_EXEC)?
+        .platform_interface
+    {
+        None => {
+            let state: im::HashMap<LValue, LValue> = get_facts(env, &[]).await?.try_into()?;
+            look_in_state(env, args, state)
         }
-        _ => unreachable!(
-            "{} should have either {} or {} value.",
-            SYMBOL_RAE_MODE, SYMBOL_EXEC_MODE, SYMBOL_SIMU_MODE
-        ),
+        Some(platform) => platform.instance(args).await,
     }
 }

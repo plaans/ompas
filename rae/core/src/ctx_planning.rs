@@ -1,4 +1,4 @@
-use ompas_rae_planning::structs::ConversionCollection;
+use ompas_rae_planning::aries::structs::ConversionCollection;
 use ompas_rae_structs::domain::RAEDomain;
 use ompas_rae_structs::options::SelectMode;
 use sompas_structs::contextcollection::Context;

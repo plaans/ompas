@@ -1,14 +1,16 @@
 use crate::rae_user::{CtxRaeUser, MOD_RAE_USER};
 use aries_planning::chronicles::ChronicleKind;
-use ompas_rae_planning::conversion::convert_domain_to_chronicle_hierarchy;
-use ompas_rae_planning::conversion::post_processing::post_processing;
-use ompas_rae_planning::conversion::pre_processing::{pre_processing, transform_lambda_expression};
-use ompas_rae_planning::conversion::processing::{
+use ompas_rae_planning::aries::conversion::convert_domain_to_chronicle_hierarchy;
+use ompas_rae_planning::aries::conversion::post_processing::post_processing;
+use ompas_rae_planning::aries::conversion::pre_processing::{
+    pre_processing, transform_lambda_expression,
+};
+use ompas_rae_planning::aries::conversion::processing::{
     convert_if, convert_lvalue_to_expression_chronicle, MetaData,
 };
-use ompas_rae_planning::structs::chronicle::ChronicleTemplate;
-use ompas_rae_planning::structs::traits::FormatWithSymTable;
-use ompas_rae_planning::structs::{ConversionCollection, ConversionContext};
+use ompas_rae_planning::aries::structs::chronicle::ChronicleTemplate;
+use ompas_rae_planning::aries::structs::traits::FormatWithSymTable;
+use ompas_rae_planning::aries::structs::{ConversionCollection, ConversionContext};
 use sompas_core::expand;
 use sompas_macros::*;
 use sompas_structs::lenv::LEnv;

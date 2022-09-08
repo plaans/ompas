@@ -5,9 +5,11 @@ use crate::rae_exec::rae_resource::{
 };
 use ::macro_rules_attribute::macro_rules_attribute;
 use futures::FutureExt;
+use im::HashMap;
 use ompas_rae_language::*;
 use ompas_rae_structs::agenda::Agenda;
-use ompas_rae_structs::context::RAE_TASK_METHODS_MAP;
+use ompas_rae_structs::contexts::ctx_state::{CtxState, CTX_STATE};
+use ompas_rae_structs::contexts::ctx_task::{define_parent_task, DEFINE_PARENT_TASK};
 use ompas_rae_structs::monitor::MonitorCollection;
 use ompas_rae_structs::platform::Platform;
 use ompas_rae_structs::resource::ResourceCollection;
@@ -16,7 +18,7 @@ use ompas_rae_structs::state::world_state::*;
 use ompas_rae_structs::TaskId;
 use sompas_core::eval;
 use sompas_core::modules::list::cons;
-use sompas_core::modules::map::{get_map, remove_key_value_map, set_map};
+use sompas_core::modules::map::get_map;
 use sompas_macros::{async_scheme_fn, scheme_fn};
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::Documentation;
@@ -31,8 +33,7 @@ use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalues::LValueS;
 use sompas_structs::module::{InitLisp, IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
-use sompas_structs::{list, lruntimeerror, wrong_n_args, wrong_type};
-use std::borrow::Borrow;
+use sompas_structs::{list, lruntimeerror, wrong_type};
 use std::convert::TryInto;
 use std::string::String;
 
@@ -64,7 +65,6 @@ pub const PARENT_TASK: &str = "parent_task";
 pub struct CtxRaeExec {
     pub monitors: MonitorCollection,
     pub resources: ResourceCollection,
-    pub state: WorldState,
     pub platform_interface: Option<Platform>,
     pub agenda: Agenda,
 }
@@ -137,6 +137,9 @@ impl IntoModule for CtxRaeExec {
         module.add_async_fn_prelude(ACQUIRE_LIST, get_list_resources);
         module.add_async_fn_prelude(ACQUIRE_IN_LIST, acquire_in_list);
 
+        //Manage hierarchy
+        module.add_mut_fn_prelude(DEFINE_PARENT_TASK, define_parent_task);
+
         //success and failure
         module.add_fn_prelude(SUCCESS, success);
         module.add_fn_prelude(FAILURE, failure);
@@ -166,89 +169,18 @@ impl CtxRaeExec {
 
 ///Retract a fact to state
 #[async_scheme_fn]
-async fn retract_fact(env: &LEnv, args: &[LValue]) -> LResult {
-    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
-    let mode: String = env
-        .get_symbol("rae-mode")
-        .expect("rae-mode should be defined, default value is exec mode")
-        .try_into()?;
-    match mode.as_str() {
-        SYMBOL_EXEC_MODE => {
-            if args.len() != 2 {
-                return Err(wrong_n_args!(RAE_RETRACT, args, 2));
-            }
-            let key = args[0].borrow().into();
-            let value = args[1].borrow().into();
-            ctx.state.retract_fact(key, value).await
-        }
-        SYMBOL_SIMU_MODE => {
-            /*
-            (defmacro retract
-             (lambda args
-                 `(define state (remove-key-value-map state (quote ,args)))))
-              */
-            let state = match env.get_symbol(STATE) {
-                Some(lv) => lv,
-                None => {
-                    return Err(lruntimeerror!(
-                        RAE_RETRACT,
-                        "state not defined in env".to_string()
-                    ))
-                }
-            };
+async fn retract_fact(env: &LEnv, key: LValueS, value: LValueS) -> Result<(), LRuntimeError> {
+    let ctx_state = env.get_context::<CtxState>(CTX_STATE)?;
 
-            remove_key_value_map(env, &[state, args.into()])
-        }
-        _ => unreachable!(
-            "{} should have either {} or {} value.",
-            SYMBOL_RAE_MODE, SYMBOL_EXEC_MODE, SYMBOL_SIMU_MODE
-        ),
-    }
+    ctx_state.state.retract_fact(key, value).await
 }
 
 ///Add a fact to fact state
 #[async_scheme_fn]
-async fn assert_fact(env: &LEnv, args: &[LValue]) -> LResult {
-    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
-
-    let mode: String = env
-        .get_symbol("rae-mode")
-        .expect("rae-mode should be defined, default value is exec mode")
-        .try_into()?;
-    match mode.as_str() {
-        SYMBOL_EXEC_MODE => {
-            if args.len() != 2 {
-                return Err(wrong_n_args!(RAE_ASSERT, args, 2));
-            }
-            let key = args[0].borrow().into();
-            let value = args[1].borrow().into();
-            ctx.state.add_fact(key, value).await;
-
-            Ok(LValue::True)
-        }
-        SYMBOL_SIMU_MODE => {
-            /*
-            (defmacro assert
-                (lambda args
-                    `(define state (set-map state (quote ,args)))))
-             */
-            let state = match env.get_symbol(STATE) {
-                Some(lv) => lv,
-                None => {
-                    return Err(lruntimeerror!(
-                        RAE_ASSERT,
-                        "state not defined in env.".to_string()
-                    ))
-                }
-            };
-
-            set_map(env, &[state, args.into()])
-        }
-        _ => unreachable!(
-            "{} should have either {} or {} value.",
-            SYMBOL_RAE_MODE, SYMBOL_EXEC_MODE, SYMBOL_SIMU_MODE
-        ),
-    }
+async fn assert_fact(env: &LEnv, key: LValueS, value: LValueS) -> Result<(), LRuntimeError> {
+    let ctx_state = env.get_context::<CtxState>(CTX_STATE)?;
+    ctx_state.state.add_fact(key, value).await;
+    Ok(())
 }
 
 //Return the labels of the methods
@@ -331,33 +263,22 @@ fn get_best_method(env: &LEnv, args: &[LValue]) -> LResult {
 
 #[async_scheme_fn]
 async fn get_facts(env: &LEnv) -> LResult {
-    let mode: String = env
-        .get_symbol("rae-mode")
-        .expect("rae-mode should be defined, default value is exec mode")
-        .try_into()?;
-    match mode.as_str() {
-        SYMBOL_EXEC_MODE => {
-            let mut state: im::HashMap<LValue, LValue> = get_state(env, &[]).await?.try_into()?;
-            let locked: Vec<LValue> = get_list_resources(env, &[]).await?.try_into()?;
+    let mut state: im::HashMap<LValue, LValue> = get_state(env, &[]).await?.try_into()?;
+    let locked: Vec<LValue> = get_list_resources(env, &[]).await?.try_into()?;
+    let instances: HashMap<LValue, LValue> = instance(env, &[]).await?.try_into()?;
 
-            for e in locked {
-                state.insert(vec![LOCKED.into(), e].into(), LValue::True);
-            }
-            Ok(state.into())
-        }
-        SYMBOL_SIMU_MODE => Ok(env
-            .get_symbol(STATE)
-            .expect("state should be defined in simu mode")),
-        _ => unreachable!(
-            "{} should have either {} or {} value.",
-            SYMBOL_RAE_MODE, SYMBOL_EXEC_MODE, SYMBOL_SIMU_MODE
-        ),
+    for e in locked {
+        state.insert(vec![LOCKED.into(), e].into(), LValue::True);
     }
+
+    let state = state.union(instances);
+
+    Ok(state.into())
 }
 
 #[async_scheme_fn]
 async fn get_state(env: &LEnv, args: &[LValue]) -> LResult {
-    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
+    let ctx_state = env.get_context::<CtxState>(CTX_STATE)?;
 
     let _type = match args.len() {
         0 => None,
@@ -391,14 +312,12 @@ async fn get_state(env: &LEnv, args: &[LValue]) -> LResult {
         }
     };
 
-    let state = ctx.state.get_state(_type).await.into_map();
+    let state = ctx_state.state.get_state(_type).await.into_map();
     Ok(state)
 }
 
 #[async_scheme_fn]
 async fn read_state(env: &LEnv, args: &[LValue]) -> LResult {
-    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
-
     if args.is_empty() {
         return Err(LRuntimeError::wrong_number_of_args(
             RAE_READ_STATE,
@@ -407,62 +326,15 @@ async fn read_state(env: &LEnv, args: &[LValue]) -> LResult {
         ));
     }
 
-    let rae_mode: String = env
-        .get_symbol(SYMBOL_RAE_MODE)
-        .expect("{} not defined")
-        .try_into()?;
-
-    let platform_defined = ctx.platform_interface.is_some();
-
     let key: LValue = if args.len() > 1 {
         args.into()
     } else {
         args[0].clone()
     };
 
-    match rae_mode.as_str() {
-        SYMBOL_EXEC_MODE => {
-            if platform_defined {
-                let state = ctx.state.get_state(None).await;
-
-                let value = state
-                    .inner
-                    .get(&key.into())
-                    .unwrap_or(&LValueS::Bool(false));
-                //println!("value: {}", value);
-
-                Ok(value.into())
-            } else {
-                let facts: LValue = get_facts(env, &[]).await?;
-                get_map(env, &[facts, key])
-            }
-        }
-        SYMBOL_SIMU_MODE => {
-            let state = env.get_symbol(STATE).unwrap();
-            get_map(env, &[state, key])
-        }
-        _ => Err(lruntimeerror!(
-            RAE_READ_STATE,
-            format!(
-                "RAE_MODE must have the value {} or {} (value = {}).",
-                SYMBOL_EXEC_MODE, SYMBOL_SIMU_MODE, rae_mode,
-            )
-        )),
-    }
+    let facts: LValue = get_facts(env, &[]).await?;
+    get_map(env, &[facts, key])
 }
-
-/*#[async_scheme_fn]
-async fn get_status<'a>(_: &'a [LValue], env: &'a LEnv) -> LResult {
-    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
-
-    let mut string = "Action(s) Status\n".to_string();
-
-    for e in status.iter() {
-        string.push_str(format!("- {}: {}\n", e.0, e.1).as_str())
-    }
-
-    Ok(LValue::String(string))
-}*/
 
 #[async_scheme_fn]
 async fn wait_for(env: &LEnv, lv: LValue) -> Result<LAsyncHandler, LRuntimeError> {

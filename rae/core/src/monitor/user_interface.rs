@@ -348,11 +348,11 @@ pub async fn set_select(env: &LEnv, m: String) -> Result<(), LRuntimeError> {
 
     let select_mode = match m.as_str() {
         GREEDY => SelectMode::Greedy,
-        PLANNING | ARIES => SelectMode::Planning(Planner::Aries, false),
-        ARIES_OPT => SelectMode::Planning(Planner::Aries, true),
-        UPOM => SelectMode::Planning(Planner::UPOM, false),
-        RAE_PLAN => SelectMode::Planning(Planner::RAEPlan(Default::default()), false),
-        C_CHOICE => SelectMode::Planning(Planner::CChoice, false),
+        PLANNING | ARIES => SelectMode::Planning(Planner::Aries(false)),
+        ARIES_OPT => SelectMode::Planning(Planner::Aries(true)),
+        UPOM => SelectMode::Planning(Planner::UPOM),
+        RAE_PLAN => SelectMode::Planning(Planner::RAEPlan(Default::default())),
+        C_CHOICE => SelectMode::Planning(Planner::CChoice(Default::default())),
         HEURISTIC => SelectMode::Heuristic,
         LEARNING => SelectMode::Learning,
         _ => {

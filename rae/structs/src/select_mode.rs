@@ -4,44 +4,62 @@ use std::fmt::{Display, Formatter};
 #[derive(Debug, Copy, Clone)]
 pub enum SelectMode {
     Greedy,
-    Planning(Planner, bool),
+    Planning(Planner),
     Heuristic,
     Learning,
 }
 
 #[derive(Debug, Copy, Clone)]
 pub enum Planner {
-    Aries,
+    Aries(bool),
     UPOM,
-    CChoice,
-    RAEPlan(RaePlanOption),
+    CChoice(CChoiceConfig),
+    RAEPlan(RAEPlanConfig),
 }
 
-#[derive(Default, Debug, Copy, Clone)]
-pub struct RaePlanOption {
-    dr0: usize,
-    nro: usize,
+#[derive(Copy, Clone, Default, Debug)]
+pub struct CChoiceConfig {
+    //Number of methods to compare.
+    b: Option<usize>,
+    //Number of simulation for commands.
+    k: usize,
+    max_depth: Option<usize>,
 }
 
-impl RaePlanOption {
-    pub fn new(dr0: usize, nro: usize) -> Self {
-        Self { dr0, nro }
+impl CChoiceConfig {
+    pub fn get_b(&self) -> Option<usize> {
+        self.b
     }
 
-    pub fn set_dr0(&mut self, dr0: usize) {
-        self.dr0 = dr0;
+    pub fn get_k(&self) -> usize {
+        self.k
     }
 
-    pub fn set_nr0(&mut self, nro: usize) {
-        self.nro = nro;
+    pub fn get_max_depth(&self) -> Option<usize> {
+        self.max_depth
+    }
+}
+
+#[derive(Copy, Clone, Default, Debug)]
+pub struct RAEPlanConfig {
+    //Number of methods to compare.
+    b: Option<usize>,
+    //Number of simulation for commands.
+    k: usize,
+    max_depth: Option<usize>,
+}
+
+impl RAEPlanConfig {
+    pub fn get_b(&self) -> Option<usize> {
+        self.b
     }
 
-    pub fn get_dr0(&self) -> usize {
-        self.dr0
+    pub fn get_k(&self) -> usize {
+        self.k
     }
 
-    pub fn get_nro(&self) -> usize {
-        self.nro
+    pub fn get_max_depth(&self) -> Option<usize> {
+        self.max_depth
     }
 }
 
@@ -51,11 +69,11 @@ impl Display for Planner {
             f,
             "{}",
             match self {
-                Planner::Aries => ARIES.to_string(),
+                Planner::Aries(true) => ARIES_OPT.to_string(),
+                Planner::Aries(false) => ARIES.to_string(),
                 Planner::UPOM => UPOM.to_string(),
-                Planner::RAEPlan(options) =>
-                    format!("{}:\ndr0: {}\nnr0: {}", RAE_PLAN, options.dr0, options.nro),
-                Planner::CChoice => C_CHOICE.to_string(),
+                Planner::RAEPlan(config) => format!("{} ; config = {:?}", RAE_PLAN, config),
+                Planner::CChoice(config) => format!("{} ; config = {:?}", C_CHOICE, config),
             }
         )
     }
@@ -68,14 +86,7 @@ impl Display for SelectMode {
             "{}",
             match self {
                 SelectMode::Greedy => GREEDY.to_string(),
-                SelectMode::Planning(p, bool) => format!(
-                    "{}{}",
-                    p,
-                    match bool {
-                        true => " with optimisation",
-                        false => " without optimisation",
-                    }
-                ),
+                SelectMode::Planning(p) => format!("{}", p),
                 SelectMode::Heuristic => HEURISTIC.to_string(),
                 SelectMode::Learning => LEARNING.to_string(),
             }

@@ -1,11 +1,10 @@
 use crate::contexts::ctx_state::{CtxState, CTX_STATE};
 use crate::exec::refinement::select::greedy_select;
-use log::info;
 use ompas_rae_structs::domain::RAEDomain;
+use ompas_rae_structs::select_mode::CChoiceConfig;
 use rand::prelude::SliceRandom;
 use sompas_core::{eval, parse};
 use sompas_macros::async_scheme_fn;
-use sompas_macros::scheme_fn;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::Documentation;
 use sompas_structs::lenv::LEnv;
@@ -13,37 +12,117 @@ use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
+use std::cmp;
+use std::fmt::{Display, Formatter};
+use std::ops::Add;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use tokio::sync::RwLock;
 
 pub const INCREASE_COST: &str = "increase_cost";
 pub const C_CHOICE: &str = "c_choice";
 pub const MOD_C_CHOICE: &str = "mod-c-choice";
+pub const INF: &str = "inf";
 
 pub const DEFAULT_DEPTH: usize = 10;
-
-#[derive(Copy, Clone, Default)]
-pub struct RAEPlanConfig {
-    //Number of methods to compare.
-    b: Option<usize>,
-    //Number of simulation for commands.
-    k: usize,
-    max_depth: Option<usize>,
-}
 
 #[derive(Default)]
 pub struct CtxCChoice {
     tried: Vec<LValue>,
-    cost: Arc<AtomicU64>,
-    config: RAEPlanConfig,
+    cost: Arc<RwLock<Cost>>,
+    config: CChoiceConfig,
     level: Arc<AtomicU64>,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum Cost {
+    Inf,
+    Some(f64),
+}
+
+impl Default for Cost {
+    fn default() -> Self {
+        Self::Some(0.0)
+    }
+}
+
+impl Add for Cost {
+    type Output = Cost;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (Cost::Some(f1), Cost::Some(f2)) => Cost::Some(f1 + f2),
+            _ => Cost::Inf,
+        }
+    }
+}
+
+impl PartialEq<Self> for Cost {
+    fn eq(&self, _: &Self) -> bool {
+        todo!()
+    }
+}
+
+impl PartialOrd for Cost {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match (self, other) {
+            (Self::Inf, Self::Inf) => Some(cmp::Ordering::Equal),
+            (Self::Inf, Self::Some(_)) => Some(cmp::Ordering::Greater),
+            (Self::Some(_), Self::Inf) => Some(cmp::Ordering::Less),
+            (Self::Some(f1), Self::Some(f2)) => {
+                if f1 == f2 {
+                    Some(cmp::Ordering::Equal)
+                } else if f1 < f2 {
+                    Some(cmp::Ordering::Less)
+                } else {
+                    Some(cmp::Ordering::Greater)
+                }
+            }
+        }
+    }
+}
+
+impl Display for Cost {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Cost::Inf => write!(f, "{}", INF),
+            Cost::Some(u) => write!(f, "{}", u),
+        }
+    }
+}
+
+impl TryFrom<&LValue> for Cost {
+    type Error = LRuntimeError;
+
+    fn try_from(value: &LValue) -> Result<Self, Self::Error> {
+        match value {
+            LValue::Number(n) => Ok(Cost::Some(n.into())),
+            LValue::Symbol(s) => {
+                if s.as_str() == INF {
+                    Ok(Cost::Inf)
+                } else {
+                    Err(Default::default())
+                }
+            }
+            _ => Err(Default::default()),
+        }
+    }
+}
+
+impl From<Cost> for LValue {
+    fn from(c: Cost) -> Self {
+        match c {
+            Cost::Inf => INF.into(),
+            Cost::Some(u) => u.into(),
+        }
+    }
 }
 
 impl CtxCChoice {
     pub fn new(tried: Vec<LValue>, level: u64) -> Self {
         Self {
             tried,
-            cost: Arc::new(Default::default()),
+            cost: Arc::new(RwLock::new(Cost::Some(0.0))),
             config: Default::default(),
             level: Arc::new(AtomicU64::new(level)),
         }
@@ -51,24 +130,16 @@ impl CtxCChoice {
 }
 
 impl CtxCChoice {
-    pub fn increase_cost(&self, cost: u64) {
-        loop {
-            let o_cost = self.cost.load(Ordering::Relaxed);
-            if self
-                .cost
-                .compare_exchange(o_cost, o_cost + cost, Ordering::Relaxed, Ordering::Relaxed)
-                .is_ok()
-            {
-                break;
-            };
-        }
+    pub async fn increase_cost(&self, c: Cost) {
+        let o_c: Cost = self.cost.read().await.clone();
+        *self.cost.write().await = o_c + c;
     }
 
     pub fn increase_level(&self) {
         loop {
             let o_level = self.level.load(Ordering::Relaxed);
             if self
-                .cost
+                .level
                 .compare_exchange(o_level, o_level + 1, Ordering::Relaxed, Ordering::Relaxed)
                 .is_ok()
             {
@@ -77,8 +148,8 @@ impl CtxCChoice {
         }
     }
 
-    pub fn get_cost(&self) -> u64 {
-        self.cost.load(Ordering::Relaxed)
+    pub async fn get_cost(&self) -> Cost {
+        self.cost.read().await.clone()
     }
 }
 
@@ -91,7 +162,7 @@ impl IntoModule for CtxCChoice {
             label: MOD_C_CHOICE.to_string(),
         };
 
-        module.add_fn_prelude(INCREASE_COST, increase_cost);
+        module.add_async_fn_prelude(INCREASE_COST, increase_cost);
         module.add_async_fn_prelude(C_CHOICE, c_choice);
         module
     }
@@ -105,10 +176,10 @@ impl IntoModule for CtxCChoice {
     }
 }
 
-#[scheme_fn]
-pub fn increase_cost(env: &LEnv, cost: u64) -> Result<(), LRuntimeError> {
+#[async_scheme_fn]
+pub async fn increase_cost(env: &LEnv, cost: Cost) -> Result<(), LRuntimeError> {
     let ctx = env.get_context::<CtxCChoice>(MOD_C_CHOICE)?;
-    ctx.increase_cost(cost);
+    ctx.increase_cost(cost).await;
     Ok(())
 }
 
@@ -126,7 +197,7 @@ pub async fn c_choice(env: &LEnv, task: &[LValue]) -> LResult {
     let mut methods: Vec<LValue> = greedy_select(state.clone(), &ctx.tried, task.to_vec(), env)
         .await?
         .applicable_methods;
-    if let Some(b) = ctx.config.b {
+    if let Some(b) = ctx.config.get_b() {
         if b < methods.len() {
             async {
                 let mut rng = rand::thread_rng();
@@ -148,9 +219,10 @@ pub async fn c_choice(env: &LEnv, task: &[LValue]) -> LResult {
         let c_new = new_env
             .get_context::<CtxCChoice>(MOD_C_CHOICE)
             .unwrap()
-            .get_cost();
+            .get_cost()
+            .await;
         println!(
-            "c_choice for {}({}): method = {} ; cost = {:?}",
+            "c_choice for {}({}): method = {} ; cost = {}",
             LValue::from(task),
             level,
             m,
@@ -174,7 +246,8 @@ pub async fn c_choice(env: &LEnv, task: &[LValue]) -> LResult {
 
     env.get_context::<CtxCChoice>(MOD_C_CHOICE)
         .unwrap()
-        .increase_cost(cost.unwrap_or(0));
+        .increase_cost(cost.unwrap_or(Cost::Some(0.0)))
+        .await;
 
     println!(
         "c_choice for {}({}): selected method = {} ; cost = {:?}",
@@ -186,7 +259,7 @@ pub async fn c_choice(env: &LEnv, task: &[LValue]) -> LResult {
     Ok(method)
 }
 
-pub async fn create_env(mut env: LEnv, domain: &RAEDomain) -> LEnv {
+pub async fn c_choice_env(mut env: LEnv, domain: &RAEDomain) -> LEnv {
     for (label, command) in &domain.commands {
         let lv_params = command.get_parameters().get_params_as_lvalue();
         let mut params = "".to_string();

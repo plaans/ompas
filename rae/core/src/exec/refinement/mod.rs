@@ -132,15 +132,21 @@ pub async fn select(stack: &mut AbstractTaskMetaData, env: &LEnv) -> LResult {
                 .await
                 .map_err(|e| e.chain("greedy_select"))?
         }
-        SelectMode::Planning(Planner::Aries, bool) => {
+        SelectMode::Planning(Planner::Aries(bool)) => {
             info!("select with aries for {}", stack.get_label());
             select::aries_select(state, tried, task, env, *bool)
                 .await
                 .map_err(|e| e.chain("planning_select"))?
         }
-        SelectMode::Planning(Planner::CChoice, _) => {
+        SelectMode::Planning(Planner::CChoice(config)) => {
             info!("select with c-choice for {}", stack.get_label());
-            select::c_choice_select(state, tried, task, env)
+            select::c_choice_select(state, tried, task, env, *config)
+                .await
+                .map_err(|e| e.chain("planning_select"))?
+        }
+        SelectMode::Planning(Planner::RAEPlan(config)) => {
+            info!("select with c-choice for {}", stack.get_label());
+            select::rae_plan_select(state, tried, task, env, *config)
                 .await
                 .map_err(|e| e.chain("planning_select"))?
         }

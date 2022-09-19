@@ -89,7 +89,7 @@ pub async fn rae(
     let mut select_mode = *options.get_select_mode();
 
     let cc: Option<ConversionCollection> =
-        if matches!(select_mode, SelectMode::Planning(Planner::Aries, _)) {
+        if matches!(select_mode, SelectMode::Planning(Planner::Aries(_))) {
             let instant = Instant::now();
             match convert_domain_to_chronicle_hierarchy(ConversionContext {
                 domain: domain.clone(),

@@ -3,7 +3,8 @@ use crate::contexts::ctx_planning::{CtxPlanning, CTX_PLANNING};
 use crate::contexts::ctx_rae::{CtxRae, CTX_RAE};
 use crate::contexts::ctx_state::{CtxState, CTX_STATE};
 use crate::contexts::ctx_task::{CtxTask, CTX_TASK};
-use crate::exec::refinement::c_choice::{create_env, CtxCChoice};
+use crate::exec::refinement::c_choice::{c_choice_env, CtxCChoice};
+use crate::exec::refinement::rae_plan::{rae_plan_env, CtxRaePlan};
 use crate::exec::{instance, STATE};
 use log::info;
 use ompas_rae_language::*;
@@ -12,7 +13,7 @@ use ompas_rae_planning::aries::binding::{generate_chronicles, solver};
 use ompas_rae_planning::aries::structs::{ConversionContext, Problem};
 use ompas_rae_structs::interval::Interval;
 use ompas_rae_structs::plan::AbstractTaskInstance;
-use ompas_rae_structs::select_mode::{Planner, SelectMode};
+use ompas_rae_structs::select_mode::{CChoiceConfig, Planner, RAEPlanConfig, SelectMode};
 use ompas_rae_structs::state::task_state::{AbstractTaskMetaData, RefinementMetaData};
 use ompas_rae_structs::state::world_state::WorldStateSnapshot;
 use rand::prelude::SliceRandom;
@@ -101,7 +102,7 @@ pub async fn aries_select(
                     greedy.choosed = applicable_methods.get(0).cloned().unwrap_or(LValue::Nil);
                     greedy.applicable_methods = applicable_methods;
                     greedy.interval.set_end(ctx.agenda.get_instant());
-                    greedy.refinement_type = SelectMode::Planning(Planner::Aries, optimize);
+                    greedy.refinement_type = SelectMode::Planning(Planner::Aries(optimize));
                     return Ok(greedy);
                 } else {
                     println!("Error in continuum, we are going to plan...");
@@ -174,7 +175,7 @@ pub async fn aries_select(
         greedy.choosed = applicable_methods.get(0).cloned().unwrap_or(LValue::Nil);
         greedy.applicable_methods = applicable_methods;
         greedy.interval.set_end(ctx.agenda.get_instant());
-        greedy.refinement_type = SelectMode::Planning(Planner::Aries, optimize);
+        greedy.refinement_type = SelectMode::Planning(Planner::Aries(optimize));
         Ok(greedy)
     } else {
         Ok(greedy)
@@ -314,16 +315,44 @@ pub async fn c_choice_select(
     tried: &[LValue],
     task: Vec<LValue>,
     env: &LEnv,
+    config: CChoiceConfig,
 ) -> lruntimeerror::Result<RefinementMetaData> {
     let new_env = env.clone();
     let domain = env.get_context::<CtxDomain>(CTX_DOMAIN).unwrap();
 
-    let mut new_env: LEnv = create_env(new_env, &domain.domain).await;
+    let mut new_env: LEnv = c_choice_env(new_env, &domain.domain).await;
     new_env.import_module(CtxCChoice::new(tried.to_vec(), 0), WithoutPrefix);
     new_env.import_context(Context::new(CtxState::new(state.clone().into())), CTX_STATE);
 
     let mut greedy: RefinementMetaData = greedy_select(state, tried, task.clone(), env).await?;
-    greedy.refinement_type = SelectMode::Planning(Planner::CChoice, false);
+    greedy.refinement_type = SelectMode::Planning(Planner::CChoice(config));
+
+    let method: LValue = eval(&task.into(), &mut new_env, None).await?;
+
+    greedy.choosed = method;
+    greedy
+        .interval
+        .set_end(env.get_context::<CtxRae>(CTX_RAE)?.agenda.get_instant());
+
+    Ok(greedy)
+}
+
+pub async fn rae_plan_select(
+    state: WorldStateSnapshot,
+    tried: &[LValue],
+    task: Vec<LValue>,
+    env: &LEnv,
+    config: RAEPlanConfig,
+) -> lruntimeerror::Result<RefinementMetaData> {
+    let new_env = env.clone();
+    let domain = env.get_context::<CtxDomain>(CTX_DOMAIN).unwrap();
+
+    let mut new_env: LEnv = rae_plan_env(new_env, &domain.domain).await;
+    new_env.import_module(CtxRaePlan::new(tried.to_vec(), 0), WithoutPrefix);
+    new_env.import_context(Context::new(CtxState::new(state.clone().into())), CTX_STATE);
+
+    let mut greedy: RefinementMetaData = greedy_select(state, tried, task.clone(), env).await?;
+    greedy.refinement_type = SelectMode::Planning(Planner::RAEPlan(config));
 
     let method: LValue = eval(&task.into(), &mut new_env, None).await?;
 

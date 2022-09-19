@@ -31,5 +31,5 @@
       (do 
           (drive ?t ?intermediaire)
           (t_move ?t ?to))))
-  (set-select c-choice)
+  (set-select rae-plan)
 )

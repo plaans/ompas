@@ -96,13 +96,13 @@ impl<T: FormatWithSymTable> FormatWithSymTable for Relation<T> {
     }
 }
 
-pub struct Problem<T> {
+pub struct PAProblem<T> {
     variables: Vec<T>,
     optional: Vec<bool>,
     relations: Vec<Relation<T>>,
 }
 
-impl<T> Problem<T> {
+impl<T> PAProblem<T> {
     pub fn new(mut vars: Vec<(T, bool)>, relations: Vec<Relation<T>>) -> Self {
         let mut variables = vec![];
         let mut optional = vec![];
@@ -124,7 +124,7 @@ impl<T> Problem<T> {
     }
 }
 
-impl<T: Debug> Debug for Problem<T> {
+impl<T: Debug> Debug for PAProblem<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut str = "problem:\n".to_string();
         str.push_str("variables: {");
@@ -134,7 +134,7 @@ impl<T: Debug> Debug for Problem<T> {
     }
 }
 
-impl<T: Display + FormatWithSymTable> FormatWithSymTable for Problem<T> {
+impl<T: Display + FormatWithSymTable> FormatWithSymTable for PAProblem<T> {
     fn format(&self, st: &SymTable, sym_version: bool) -> String {
         let mut str = "problem:\n".to_string();
         str.push_str("variables: {");
@@ -165,8 +165,8 @@ impl<T: Display + FormatWithSymTable> FormatWithSymTable for Problem<T> {
     }
 }
 
-impl<T: Clone + Hash + Eq + Debug> From<&Problem<T>> for Graph<T> {
-    fn from(problem: &Problem<T>) -> Self {
+impl<T: Clone + Hash + Eq + Debug> From<&PAProblem<T>> for Graph<T> {
+    fn from(problem: &PAProblem<T>) -> Self {
         let mut var_key: im::HashMap<T, usize> = Default::default();
         let mut reverse: Vec<T> = Default::default();
 
@@ -214,7 +214,7 @@ impl<T: Clone + Hash + Eq + Debug> From<&Problem<T>> for Graph<T> {
     }
 }
 
-impl<T: Clone + Eq + Hash> From<Graph<T>> for Problem<T> {
+impl<T: Clone + Eq + Hash> From<Graph<T>> for PAProblem<T> {
     fn from(g: Graph<T>) -> Self {
         let variables = g.reverse.clone();
         let mut relations = vec![];

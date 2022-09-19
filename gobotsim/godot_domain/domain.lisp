@@ -9,4 +9,5 @@
     ;(read godot_domain/jobshop_advanced.lisp)
     (read godot_domain/jobshop_advanced_lrpt.lisp)
     (read godot_domain/problems/ft06.lisp)
+    ;(set-select c-choice)
 )

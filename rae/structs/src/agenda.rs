@@ -1,5 +1,5 @@
 use crate::interval::{Duration, Timepoint};
-use crate::options::SelectMode;
+use crate::select_mode::SelectMode;
 use crate::state::task_network::TaskNetwork;
 use crate::state::task_state::{
     AbstractTaskMetaData, ActionMetaData, TaskCollection, TaskFilter, TaskMetaData,

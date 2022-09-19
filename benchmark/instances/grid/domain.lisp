@@ -3,7 +3,7 @@
   (def-objects (yes no new_bool))
   (def-state-function connected (:params (?x location) (?y location)) (:result new_bool))
   (def-state-function at (:params (?t truck)) (:result location))
-  (def-command drive (:params (?t truck) (?to location)))
+  (def-command drive (:params (?t truck) (?to location)) (:cost 1))
 
   (def-command-pddl-model drive
     (:params (?t truck) (?to location))
@@ -31,4 +31,5 @@
       (do 
           (drive ?t ?intermediaire)
           (t_move ?t ?to))))
+  (set-select c-choice)
 )

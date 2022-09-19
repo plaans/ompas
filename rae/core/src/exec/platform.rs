@@ -1,9 +1,10 @@
-use crate::rae_exec::*;
+use crate::contexts::ctx_mode::{CtxMode, RAEMode, CTX_MODE};
+use crate::contexts::ctx_planning::{CtxPlanning, CTX_PLANNING};
+use crate::contexts::ctx_rae::{CtxRae, CTX_RAE};
+use crate::contexts::ctx_task::{CtxTask, CTX_TASK};
+use crate::exec::*;
+use crate::RaeExecError;
 use log::{error, info};
-use ompas_rae_core::ctx_planning::{CtxPlanning, MOD_PLANNING};
-use ompas_rae_core::error::RaeExecError;
-use ompas_rae_structs::contexts::ctx_mode::{CtxMode, RAEMode, CTX_MODE};
-use ompas_rae_structs::contexts::ctx_task::{CtxTask, CTX_TASK};
 use ompas_rae_structs::state::task_status::TaskStatus;
 use sompas_core::modules::list::append;
 use sompas_core::{eval, parse};
@@ -12,11 +13,10 @@ use sompas_structs::lenv::LEnv;
 use sompas_structs::lruntimeerror::LResult;
 use sompas_structs::lswitch::InterruptionReceiver;
 use sompas_structs::lvalue::LValue;
-use std::convert::TryInto;
 
 #[scheme_fn]
 pub fn is_platform_defined(env: &LEnv) -> bool {
-    env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)
+    env.get_context::<CtxRae>(CTX_RAE)
         .unwrap()
         .platform_interface
         .is_some()
@@ -33,7 +33,7 @@ pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LAsyncHandler {
         let args = args.as_slice();
 
         let parent_task = env.get_context::<CtxTask>(CTX_TASK)?.parent_id;
-        let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
+        let ctx = env.get_context::<CtxRae>(CTX_RAE)?;
         let (action_id, mut rx) = ctx.agenda.add_action(args.into(), parent_task).await;
         let debug: LValue = args.into();
         info!("exec command {}: {}", action_id, debug);
@@ -102,7 +102,7 @@ pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LAsyncHandler {
                     }
                     None => {
                         let r = eval_model(Some(int_rx)).await;
-                        algorithms::set_success_for_task(&env, &[action_id.into()]).await?;
+                        set_success_for_task(&env, &[action_id.into()]).await?;
                         r
                     }
                 }
@@ -119,7 +119,7 @@ pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LAsyncHandler {
 
 #[async_scheme_fn]
 pub async fn launch_platform(env: &LEnv, args: &[LValue]) -> LResult {
-    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC).unwrap();
+    let ctx = env.get_context::<CtxRae>(CTX_RAE).unwrap();
 
     if let Some(platform) = &ctx.platform_interface {
         platform.launch_platform(args).await
@@ -129,29 +129,8 @@ pub async fn launch_platform(env: &LEnv, args: &[LValue]) -> LResult {
 }
 
 #[async_scheme_fn]
-pub async fn start_platform(env: &LEnv, args: &[LValue]) -> LResult {
-    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC).unwrap();
-
-    if let Some(platform) = &ctx.platform_interface {
-        platform.start_platform(args).await
-    } else {
-        Ok("No platform defined".into())
-    }
-}
-#[async_scheme_fn]
-pub async fn open_com(env: &LEnv, args: &[LValue]) -> LResult {
-    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC).unwrap();
-
-    if let Some(platform) = &ctx.platform_interface {
-        platform.open_com(args).await
-    } else {
-        Ok("No platform defined".into())
-    }
-}
-
-#[async_scheme_fn]
 pub async fn cancel_command(env: &LEnv, args: &[LValue]) -> LResult {
-    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
+    let ctx = env.get_context::<CtxRae>(CTX_RAE)?;
     let mode = env.get_context::<CtxMode>(CTX_MODE)?.mode;
     match mode {
         RAEMode::Exec => {
@@ -176,7 +155,7 @@ pub fn look_in_state(
     args: &[LValue],
     facts: im::HashMap<LValue, LValue>,
 ) -> Result<LValue, LRuntimeError> {
-    let ctx_planning = env.get_context::<CtxPlanning>(MOD_PLANNING)?;
+    let ctx_planning = env.get_context::<CtxPlanning>(CTX_PLANNING)?;
     let mut values: Vec<LValue> = vec![];
 
     let mode = match args.len() {
@@ -224,19 +203,5 @@ pub fn look_in_state(
                 InstanceMode::All => unreachable!(),
             }
         }
-    }
-}
-
-#[async_scheme_fn]
-pub async fn instance(env: &LEnv, args: &[LValue]) -> LResult {
-    match &env
-        .get_context::<CtxRaeExec>(MOD_RAE_EXEC)?
-        .platform_interface
-    {
-        None => {
-            let state: im::HashMap<LValue, LValue> = get_facts(env, &[]).await?.try_into()?;
-            look_in_state(env, args, state)
-        }
-        Some(platform) => platform.instance(args).await,
     }
 }

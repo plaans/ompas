@@ -10,7 +10,7 @@ default-run = "bench"
 [dependencies]
 sompas-modules = {path = "../scheme/modules"}
 sompas-repl = {path = "../scheme/repl"}
-ompas-rae-scheme = {path = "../rae/scheme"}
+ompas-rae-core = {path = "../rae/core"}
 ompas-rae-structs = {path = "../rae/structs"}
 ompas-gobotsim = {path = "../gobotsim"}
 

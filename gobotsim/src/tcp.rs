@@ -1,4 +1,3 @@
-use crate::rae_interface::Instance;
 use crate::serde::{GodotMessageSerde, GodotMessageType};
 use ompas_rae_structs::agenda::Agenda;
 use ompas_rae_structs::state::action_status::*;
@@ -23,7 +22,6 @@ pub async fn task_tcp_connection(
     receiver: Receiver<String>,
     state: WorldState,
     status: Agenda,
-    instance: Instance,
     killer: broadcast::Sender<EndSignal>,
 ) {
     let stream = TcpStream::connect(socket_addr).await.unwrap();
@@ -33,7 +31,7 @@ pub async fn task_tcp_connection(
 
     let k1 = killer.clone();
     // Starts the task to read data from socket.
-    tokio::spawn(async move { async_read_socket(rd, state, status, instance, k1).await });
+    tokio::spawn(async move { async_read_socket(rd, state, status, k1).await });
 
     let k2 = killer.clone();
 
@@ -90,7 +88,6 @@ async fn async_read_socket(
     stream: ReadHalf<TcpStream>,
     state: WorldState,
     agenda: Agenda,
-    instance: Instance,
     killer: broadcast::Sender<EndSignal>,
 ) {
     let mut buf_reader = BufReader::new(stream);
@@ -138,8 +135,9 @@ async fn async_read_socket(
                             //println!("k: {}\nv: {}", k,v);
                             if list.len() == 2 && list[0].to_string().contains(".instance") {
                                 let instance_val = &list[1];
+                                        state.add_instance(instance_val.to_string(), v.to_string()).await;
                                 //println!("add instance {} {}", instance_val, v);
-                                instance.add_instance_of(instance_val.to_string(), v.to_string()).await;
+                                //instance.add_instance_of(instance_val.to_string(), v.to_string()).await;
                             }
                         }
                     }

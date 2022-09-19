@@ -1,6 +1,6 @@
 use crate::interval::{Duration, Interval, Timepoint};
-use crate::options::SelectMode;
 use crate::plan::Plan;
+use crate::select_mode::SelectMode;
 use crate::state::task_status::TaskStatus;
 use crate::TaskId;
 use itertools::Itertools;

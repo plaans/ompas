@@ -1,6 +1,6 @@
 use ompas_gobotsim::mod_godot::CtxGodot;
 use ompas_gobotsim::rae_interface::{GodotDomain, PlatformGodot};
-use ompas_rae_scheme::rae_user::CtxRaeUser;
+use ompas_rae_core::monitor::CtxRaeUser;
 use ompas_rae_structs::platform::Platform;
 use sompas_core::activate_debug;
 use sompas_modules::advanced_math::CtxMath;

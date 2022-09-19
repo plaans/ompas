@@ -1,4 +1,5 @@
-use crate::rae_exec::*;
+use crate::contexts::ctx_rae::{CtxRae, CTX_RAE};
+use crate::exec::*;
 use log::info;
 use ompas_rae_language::IS_LOCKED;
 use ompas_rae_structs::mutex::Wait;
@@ -31,7 +32,7 @@ pub const PRIORITY: &str = ":priority";
 
 #[async_scheme_fn]
 pub async fn new_resource(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
+    let ctx = env.get_context::<CtxRae>(CTX_RAE)?;
 
     let label: String = args
         .get(0)
@@ -51,7 +52,7 @@ pub async fn new_resource(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeErr
 /// Waits on the resource until its his turn in the queue list
 #[async_scheme_fn]
 pub async fn acquire(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandler, LRuntimeError> {
-    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
+    let ctx = env.get_context::<CtxRae>(CTX_RAE)?;
 
     let resources = ctx.resources.clone();
 
@@ -221,7 +222,7 @@ pub async fn is_locked(env: &LEnv, args: &[LValue]) -> LResult {
         .get_symbol("rae-mode")
         .expect("rae-mode should be defined, default value is exec mode")
         .try_into()?;
-    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
+    let ctx = env.get_context::<CtxRae>(CTX_RAE)?;
 
     match mode.as_str() {
         SYMBOL_EXEC_MODE => Ok(ctx
@@ -250,7 +251,7 @@ pub async fn is_locked(env: &LEnv, args: &[LValue]) -> LResult {
 
 #[async_scheme_fn]
 pub async fn get_list_resources(env: &LEnv) -> Result<Vec<String>, LRuntimeError> {
-    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
+    let ctx = env.get_context::<CtxRae>(CTX_RAE)?;
 
     Ok(ctx.resources.get_list_resources().await)
 }

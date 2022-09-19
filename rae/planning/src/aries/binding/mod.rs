@@ -24,6 +24,7 @@ use aries_planning::parsing::pddl::TypedSymbol;
 use aries_utils::input::Sym;
 use log::info;
 use ompas_rae_structs::domain::_type::Type as raeType;
+use ompas_rae_structs::state::partial_state::PartialState;
 use ompas_rae_structs::state::world_state::WorldStateSnapshot;
 use sompas_language::*;
 use sompas_structs::lnumber::LNumber;
@@ -290,7 +291,7 @@ fn initialize_state(init_ch: &mut aChronicle, state: &WorldStateSnapshot, ctx: &
     /*
     Initialisation of instance state variable
      */
-    for (key, value) in &state.instance.inner {
+    for (key, value) in &PartialState::from(state.instance.clone()).inner {
         let key: Vec<LValueS> = key.try_into().expect("");
         assert_eq!(key.len(), 2);
         assert_eq!(&key[0].to_string(), INSTANCE_SFN);

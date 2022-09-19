@@ -1,5 +1,7 @@
-use crate::rae_user::{CtxRaeUser, MOD_RAE_USER};
+use crate::monitor::{CtxRaeUser, MOD_RAE_USER};
 use aries_planning::chronicles::ChronicleKind;
+use ompas_rae_planning::aries::binding::solver::run_solver_for_htn;
+use ompas_rae_planning::aries::binding::{generate_chronicles, solver};
 use ompas_rae_planning::aries::conversion::convert_domain_to_chronicle_hierarchy;
 use ompas_rae_planning::aries::conversion::post_processing::post_processing;
 use ompas_rae_planning::aries::conversion::pre_processing::{
@@ -10,12 +12,13 @@ use ompas_rae_planning::aries::conversion::processing::{
 };
 use ompas_rae_planning::aries::structs::chronicle::ChronicleTemplate;
 use ompas_rae_planning::aries::structs::traits::FormatWithSymTable;
-use ompas_rae_planning::aries::structs::{ConversionCollection, ConversionContext};
+use ompas_rae_planning::aries::structs::{ConversionCollection, ConversionContext, Problem};
 use sompas_core::expand;
 use sompas_macros::*;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
+use sompas_structs::string;
 use std::time::SystemTime;
 
 #[async_scheme_fn]
@@ -111,4 +114,39 @@ pub async fn pre_process_domain(env: &LEnv) -> Result<String, LRuntimeError> {
     }
 
     Ok(str)
+}
+
+#[async_scheme_fn]
+pub async fn plan_task(env: &LEnv, args: &[LValue]) -> LResult {
+    let task: LValue = args.into();
+    println!("task to plan: {}", task);
+    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER)?;
+    let context: ConversionContext = ctx.get_conversion_context().await;
+    let mut problem: Problem = (&context).into();
+    let cc = convert_domain_to_chronicle_hierarchy(context)?;
+    //println!("cc: {}", cc);
+    problem.cc = cc;
+    problem.goal_tasks.push(task.try_into()?);
+
+    let mut aries_problem = generate_chronicles(&problem)?;
+
+    let result = run_solver_for_htn(&mut aries_problem, true);
+    // println!("{}", format_partial_plan(&pb, &x)?);
+
+    let result: LValue = if let Some(x) = &result {
+        let plan = solver::extract_plan(x);
+        println!("plan:\n{}\n{}", plan.format(), plan.format_hierarchy());
+        let first_task_id = plan.get_first_subtask().unwrap();
+        let subplan = plan.extract_sub_plan(first_task_id);
+        println!(
+            "subplan: \n{}\n{}",
+            subplan.format(),
+            subplan.format_hierarchy()
+        );
+        solver::extract_instantiated_methods(x)?
+    } else {
+        string!("no solution found".to_string())
+    };
+
+    Ok(result)
 }

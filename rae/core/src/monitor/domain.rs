@@ -1,4 +1,4 @@
-use crate::rae_user::{CtxRaeUser, MOD_RAE_USER};
+use crate::monitor::{CtxRaeUser, MOD_RAE_USER};
 use ompas_rae_language::*;
 use ompas_rae_structs::domain::command::Command;
 use ompas_rae_structs::domain::method::Method;
@@ -16,7 +16,6 @@ use sompas_structs::lcoreoperator::LCoreOperator;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
-use sompas_structs::lvalues::LValueS;
 use sompas_structs::{lruntimeerror, wrong_n_args, wrong_type};
 use std::convert::TryInto;
 
@@ -678,17 +677,17 @@ pub async fn add_type(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> 
         }
     };
 
-    let mut instance = PartialState {
+    /*let mut instance = PartialState {
         inner: Default::default(),
         _type: Some(StateType::Instance),
-    };
+    };*/
 
-    ctx.rae_domain
-        .write()
-        .await
-        .add_type(t.clone(), parent.clone());
+    ctx.interface
+        .state
+        .add_type(t.clone(), parent.clone())
+        .await;
 
-    instance.insert(
+    /*instance.insert(
         vec![LValueS::from(RAE_INSTANCE), LValue::from(&t).try_into()?].into(),
         LValueS::List(vec![]),
     );
@@ -699,21 +698,21 @@ pub async fn add_type(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> 
         if !instance.inner.contains_key(&parent_instance) {
             instance.insert(parent_instance, LValueS::List(vec![]))
         }
-    }
+    }*/
 
-    ctx.interface.state.update_state(instance).await;
+    //ctx.interface.state.update_state(instance).await;
 
     Ok(())
 }
 
 #[async_scheme_fn]
-pub async fn add_object(env: &LEnv, constant: LValue, t: LValue) -> Result<(), LRuntimeError> {
-    let constant: LValueS = constant.try_into()?;
-    let t: LValueS = t.try_into()?;
+pub async fn add_object(env: &LEnv, object: String, t: String) -> Result<(), LRuntimeError> {
+    //let constant: LValueS = constant.try_into()?;
+    //let t: LValueS = t.try_into()?;
 
     let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER).unwrap();
 
-    let mut instances: PartialState = ctx
+    /*let mut instances: PartialState = ctx
         .interface
         .state
         .get_state(Some(StateType::Instance))
@@ -743,7 +742,9 @@ pub async fn add_object(env: &LEnv, constant: LValue, t: LValue) -> Result<(), L
 
     instances._type = Some(StateType::Instance);
 
-    ctx.interface.state.set_state(instances).await;
+    ctx.interface.state.set_state(instances).await;*/
+
+    ctx.interface.state.add_instance(object, t).await;
 
     Ok(())
 }
@@ -751,8 +752,9 @@ pub async fn add_object(env: &LEnv, constant: LValue, t: LValue) -> Result<(), L
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::exec::CtxRaeExec;
     use crate::rae_exec::CtxRaeExec;
-    use crate::rae_user::rae_description::CtxRaeDescription;
+    use crate::rae_user::domain::CtxRaeDescription;
     use sompas_core::test_utils::{test_expression_with_env, TestExpression};
     use sompas_core::{eval_init, get_root_env};
     use sompas_modules::advanced_math::CtxMath;

@@ -7,7 +7,6 @@ use crate::tcp::{task_tcp_connection, TEST_TCP};
 use crate::TOKIO_CHANNEL_SIZE;
 use async_trait::async_trait;
 use core::time;
-use im::{HashMap, HashSet};
 use ompas_rae_structs::job::{Job, JobType};
 use ompas_rae_structs::platform::CtxPlatform;
 use ompas_rae_structs::platform::RAEPlatform;
@@ -20,64 +19,15 @@ use sompas_structs::lvalue::LValue;
 use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
 use sompas_structs::{lruntimeerror, wrong_n_args, wrong_type};
-use std::borrow::Borrow;
 use std::convert::TryInto;
 use std::fs::File;
 use std::net::SocketAddr;
 use std::os::unix::io::{FromRawFd, IntoRawFd};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
-use std::sync::Arc;
 use std::{fs, thread};
+use tokio::sync::mpsc;
 use tokio::sync::mpsc::Sender;
-use tokio::sync::{mpsc, RwLock};
-
-#[derive(Default, Clone)]
-pub struct Instance {
-    inner: Arc<RwLock<HashMap<String, HashSet<String>>>>,
-}
-
-impl Instance {
-    pub async fn add_instance_of(&self, instance: String, _type: String) {
-        let mut locked = self.inner.write().await;
-
-        match locked.get_mut(&_type) {
-            Some(vec) => {
-                vec.insert(instance);
-            }
-            None => {
-                let mut set = HashSet::new();
-                set.insert(instance);
-                locked.insert(_type, set);
-            }
-        };
-    }
-
-    pub async fn add_type(&self, _type: String) {
-        self.inner.write().await.insert(_type, HashSet::default());
-    }
-}
-
-impl Instance {
-    pub async fn is_of_type(&self, instance: String, _type: String) -> LResult {
-        //println!("instances : {:?}", self.inner.read().await);
-
-        match self.inner.read().await.get(&_type) {
-            Some(vec) => {
-                //println!("type exist");
-                Ok(vec.contains(&instance).into())
-            }
-            None => Ok(false.into()),
-        }
-    }
-
-    pub async fn instance_of(&self, _type: String) -> LResult {
-        match self.inner.read().await.get(&_type) {
-            Some(set) => Ok(set.clone().iter().cloned().collect::<Vec<String>>().into()),
-            None => Ok(LValue::Nil),
-        }
-    }
-}
 
 /// Struct used to bind RAE and Godot.
 #[derive(Default, Clone)]
@@ -86,7 +36,7 @@ pub struct PlatformGodot {
     pub headless: bool,
     pub sender_socket: Option<Sender<String>>,
     pub interface: RAEInterface,
-    pub instance: Instance,
+    //pub instance: Instance,
     pub domain: GodotDomain,
 }
 
@@ -121,13 +71,128 @@ impl PlatformGodot {
             headless,
             sender_socket: None,
             interface: Default::default(),
-            instance: Default::default(),
             domain,
         }
     }
-}
 
-impl PlatformGodot {
+    pub async fn start_platform(&mut self, args: &[LValue]) -> LResult {
+        let godot = match self.headless {
+            true => "godot3-headless",
+            false => "godot3",
+        };
+
+        let f1 = File::create("gobotsim.log").expect("couldn't create file");
+        let f2 = File::create("gobotsim.log").expect("couldn't create file");
+
+        let mut child = match args.len() {
+            //default settings
+            0 => Command::new(godot)
+                .arg("--path")
+                .arg(DEFAULT_PATH_PROJECT_GODOT)
+                .stdout(unsafe { Stdio::from_raw_fd(f1.into_raw_fd()) })
+                .stderr(unsafe { Stdio::from_raw_fd(f2.into_raw_fd()) })
+                .spawn()
+                .expect("failed to execute process"),
+            1 => {
+                if let LValue::Symbol(s) = &args[0] {
+                    Command::new(godot)
+                        .args(s.split_whitespace())
+                        .stdout(unsafe { Stdio::from_raw_fd(f1.into_raw_fd()) })
+                        .stderr(unsafe { Stdio::from_raw_fd(f2.into_raw_fd()) })
+                        .spawn()
+                        .expect("failed to execute process")
+                } else {
+                    return Err(wrong_type!(
+                        "PlatformGodot::start_platform",
+                        &args[0],
+                        KindLValue::Symbol
+                    ));
+                }
+            } //path of the project (absolute path)
+            _ => {
+                return Err(LRuntimeError::wrong_number_of_args(
+                    "PlatformGodot::start_platform",
+                    args,
+                    0..1,
+                ))
+            } //Unexpected number of arguments
+        };
+
+        let mut killer = self
+            .interface
+            .killer
+            .read()
+            .await
+            .as_ref()
+            .unwrap()
+            .subscribe();
+
+        tokio::spawn(async move {
+            //blocked on the reception of the end signal.
+            killer.recv().await.expect("error receiving kill message");
+
+            child.kill().expect("could not kill godot");
+            println!("process godot killed")
+        });
+        Ok(LValue::Nil)
+    }
+
+    /// Open the tcp communication on the right address:port
+    pub async fn open_com(&mut self, args: &[LValue]) -> LResult {
+        let socket_addr: SocketAddr = match args.len() {
+            0 => "127.0.0.1:10000".parse().unwrap(),
+            2 => {
+                let addr = match &args[0] {
+                    LValue::Symbol(s) => s.clone(),
+                    lv => {
+                        return Err(wrong_type!(
+                            "PlatformGodot::open_com",
+                            lv,
+                            KindLValue::Symbol
+                        ))
+                    }
+                };
+
+                let port: usize = match &args[1] {
+                    LValue::Number(n) => n.into(),
+                    lv => {
+                        return Err(wrong_type!(
+                            "PlatformGodot::open_com",
+                            lv,
+                            KindLValue::Usize
+                        ))
+                    }
+                };
+
+                format!("{}:{}", addr, port).parse().unwrap()
+            }
+            _ => {
+                return Err(LRuntimeError::wrong_number_of_args(
+                    "PlatformGodot::open_com",
+                    args,
+                    0..2,
+                ))
+            }
+        };
+
+        let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+        self.sender_socket = Some(tx.clone());
+
+        //Used to verify if tcp sender works
+        tokio::spawn(async move { tx.send(TEST_TCP.to_string()).await });
+
+        //println!("godot launching...");
+        //println!("godot launched!");
+        let state = self.interface.state.clone();
+        let agenda = self.interface.agenda.clone();
+        let killer = self.interface.killer.read().await.clone().unwrap();
+        tokio::spawn(
+            async move { task_tcp_connection(&socket_addr, rx, state, agenda, killer).await },
+        );
+        //println!("com opened with godot");
+        Ok(LValue::Nil)
+    }
+
     pub fn set_socket_info(&mut self, socket_info: SocketInfo) {
         self.socket_info = socket_info;
     }
@@ -256,124 +321,6 @@ impl RAEPlatform for PlatformGodot {
     }
 
     /// Start the platform (start the godot process and launch the simulation)
-    async fn start_platform(&mut self, args: &[LValue]) -> LResult {
-        let godot = match self.headless {
-            true => "godot3-headless",
-            false => "godot3",
-        };
-
-        let f1 = File::create("gobotsim.log").expect("couldn't create file");
-        let f2 = File::create("gobotsim.log").expect("couldn't create file");
-
-        let mut child = match args.len() {
-            //default settings
-            0 => Command::new(godot)
-                .arg("--path")
-                .arg(DEFAULT_PATH_PROJECT_GODOT)
-                .stdout(unsafe { Stdio::from_raw_fd(f1.into_raw_fd()) })
-                .stderr(unsafe { Stdio::from_raw_fd(f2.into_raw_fd()) })
-                .spawn()
-                .expect("failed to execute process"),
-            1 => {
-                if let LValue::Symbol(s) = &args[0] {
-                    Command::new(godot)
-                        .args(s.split_whitespace())
-                        .stdout(unsafe { Stdio::from_raw_fd(f1.into_raw_fd()) })
-                        .stderr(unsafe { Stdio::from_raw_fd(f2.into_raw_fd()) })
-                        .spawn()
-                        .expect("failed to execute process")
-                } else {
-                    return Err(wrong_type!(
-                        "PlatformGodot::start_platform",
-                        &args[0],
-                        KindLValue::Symbol
-                    ));
-                }
-            } //path of the project (absolute path)
-            _ => {
-                return Err(LRuntimeError::wrong_number_of_args(
-                    "PlatformGodot::start_platform",
-                    args,
-                    0..1,
-                ))
-            } //Unexpected number of arguments
-        };
-
-        let mut killer = self
-            .interface
-            .killer
-            .read()
-            .await
-            .as_ref()
-            .unwrap()
-            .subscribe();
-
-        tokio::spawn(async move {
-            //blocked on the reception of the end signal.
-            killer.recv().await.expect("error receiving kill message");
-
-            child.kill().expect("could not kill godot");
-            println!("process godot killed")
-        });
-        Ok(LValue::Nil)
-    }
-
-    /// Open the tcp communication on the right address:port
-    async fn open_com(&mut self, args: &[LValue]) -> LResult {
-        let socket_addr: SocketAddr = match args.len() {
-            0 => "127.0.0.1:10000".parse().unwrap(),
-            2 => {
-                let addr = match &args[0] {
-                    LValue::Symbol(s) => s.clone(),
-                    lv => {
-                        return Err(wrong_type!(
-                            "PlatformGodot::open_com",
-                            lv,
-                            KindLValue::Symbol
-                        ))
-                    }
-                };
-
-                let port: usize = match &args[1] {
-                    LValue::Number(n) => n.into(),
-                    lv => {
-                        return Err(wrong_type!(
-                            "PlatformGodot::open_com",
-                            lv,
-                            KindLValue::Usize
-                        ))
-                    }
-                };
-
-                format!("{}:{}", addr, port).parse().unwrap()
-            }
-            _ => {
-                return Err(LRuntimeError::wrong_number_of_args(
-                    "PlatformGodot::open_com",
-                    args,
-                    0..2,
-                ))
-            }
-        };
-
-        let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
-        self.sender_socket = Some(tx.clone());
-
-        //Used to verify if tcp sender works
-        tokio::spawn(async move { tx.send(TEST_TCP.to_string()).await });
-
-        //println!("godot launching...");
-        //println!("godot launched!");
-        let state = self.interface.state.clone();
-        let agenda = self.interface.agenda.clone();
-        let instance = self.instance.clone();
-        let killer = self.interface.killer.read().await.clone().unwrap();
-        tokio::spawn(async move {
-            task_tcp_connection(&socket_addr, rx, state, agenda, instance, killer).await
-        });
-        //println!("com opened with godot");
-        Ok(LValue::Nil)
-    }
 
     /// Function returning the domain of the simulation.
     /// The domain is hardcoded.
@@ -383,40 +330,6 @@ impl RAEPlatform for PlatformGodot {
         match &self.domain {
             GodotDomain::Lisp(l) => l.clone(),
             GodotDomain::Path(p) => fs::read_to_string(p).expect("could not read domain"),
-        }
-    }
-
-    //0 arg: return a map of all instances
-    //1 arg: return all instances of a type
-    //2 args: check if an instance is of a certain type
-    async fn instance(&self, args: &[LValue]) -> LResult {
-        match args.len() {
-            0 => {
-                let map_instances: im::HashMap<String, HashSet<String>> =
-                    self.instance.inner.read().await.clone();
-                let mut map: im::HashMap<LValue, LValue> = Default::default();
-                for (_type, instances) in map_instances {
-                    let value = instances.iter().map(LValue::from).collect::<Vec<LValue>>();
-                    map.insert(_type.into(), value.into());
-                }
-
-                Ok(map.into())
-            }
-            1 => {
-                self.instance
-                    .instance_of(args[0].borrow().try_into()?)
-                    .await
-            }
-            2 => {
-                self.instance
-                    .is_of_type(args[0].borrow().try_into()?, args[1].borrow().try_into()?)
-                    .await
-            }
-            _ => Err(LRuntimeError::wrong_number_of_args(
-                "godot::instance",
-                args,
-                1..2,
-            )),
         }
     }
 

@@ -1,4 +1,4 @@
-use crate::aries::point_algebra::problem::{try_into_pa_relation, Graph, Problem};
+use crate::aries::point_algebra::problem::{try_into_pa_relation, Graph, PAProblem};
 use crate::aries::point_algebra::remove_useless_timepoints;
 use crate::aries::structs::atom::Atom;
 use crate::aries::structs::chronicle::{ChronicleSet, ChronicleTemplate};
@@ -411,7 +411,7 @@ pub fn simplify_timepoints(
         .collect();
     //println!("st: {}", ch.sym_table);
 
-    let problem: Problem<AtomId> = Problem::new(timepoints, relations);
+    let problem: PAProblem<AtomId> = PAProblem::new(timepoints, relations);
 
     //println!("problem: {:?}", problem);
 
@@ -420,7 +420,7 @@ pub fn simplify_timepoints(
     let new_graph = remove_useless_timepoints(graph)?;
     //new_graph.print();
 
-    let problem: Problem<AtomId> = new_graph.into();
+    let problem: PAProblem<AtomId> = new_graph.into();
     for r in problem.get_relations() {
         c.add_constraint(r.into())
     }

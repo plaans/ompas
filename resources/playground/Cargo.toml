@@ -11,7 +11,7 @@ sompas-core = {path = "../../scheme/core"}
 sompas-repl = {path = "../../scheme/repl"}
 sompas-utils={path = "../../scheme/utils"}
 ompas-gobotsim = {path = "../../gobotsim"}
-ompas-rae-scheme = {path = "../../rae/scheme"}
+ompas-rae-core = {path = "../../rae/core"}
 ompas-rae-structs = {path = "../../rae/structs"}
 aries_utils = {path = "../../aries/utils"}
 

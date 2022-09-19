@@ -1,21 +1,20 @@
-use crate::rae_exec::algorithms::*;
-use crate::rae_exec::platform::*;
-use crate::rae_exec::rae_resource::{
+use crate::contexts::ctx_rae::{CtxRae, CTX_RAE};
+use crate::contexts::ctx_state::{CtxState, CTX_STATE};
+use crate::contexts::ctx_task::{define_parent_task, DEFINE_PARENT_TASK};
+use crate::exec::platform::*;
+use crate::exec::rae_resource::{
     acquire, acquire_in_list, get_list_resources, is_locked, new_resource, release,
+};
+use crate::exec::refinement::{
+    refine, retry, set_success_for_task, LAMBDA_COMPUTE_SCORE, LAMBDA_EVAL_PRE_CONDITIONS,
+    LAMBDA_GET_ACTION_MODEL, LAMBDA_GET_PRECONDITIONS, LAMBDA_GET_SCORE, LAMBDA_IS_APPLICABLE,
+    LAMBDA_RAE_EXEC_TASK, LAMBDA_RAE_RETRY,
 };
 use ::macro_rules_attribute::macro_rules_attribute;
 use futures::FutureExt;
 use im::HashMap;
 use ompas_rae_language::*;
-use ompas_rae_structs::agenda::Agenda;
-use ompas_rae_structs::contexts::ctx_state::{CtxState, CTX_STATE};
-use ompas_rae_structs::contexts::ctx_task::{define_parent_task, DEFINE_PARENT_TASK};
-use ompas_rae_structs::monitor::MonitorCollection;
-use ompas_rae_structs::platform::Platform;
-use ompas_rae_structs::resource::ResourceCollection;
-use ompas_rae_structs::state::task_status::TaskStatus;
 use ompas_rae_structs::state::world_state::*;
-use ompas_rae_structs::TaskId;
 use sompas_core::eval;
 use sompas_core::modules::list::cons;
 use sompas_core::modules::map::get_map;
@@ -34,12 +33,13 @@ use sompas_structs::lvalues::LValueS;
 use sompas_structs::module::{InitLisp, IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
 use sompas_structs::{list, lruntimeerror, wrong_type};
+use std::borrow::Borrow;
 use std::convert::TryInto;
 use std::string::String;
 
-pub mod algorithms;
 pub mod platform;
 pub mod rae_resource;
+pub mod refinement;
 
 /*
 LANGUAGE
@@ -62,12 +62,7 @@ pub const PARENT_TASK: &str = "parent_task";
 
 ///Context that will contains primitives for the RAE executive
 #[derive(Default)]
-pub struct CtxRaeExec {
-    pub monitors: MonitorCollection,
-    pub resources: ResourceCollection,
-    pub platform_interface: Option<Platform>,
-    pub agenda: Agenda,
-}
+pub struct CtxRaeExec {}
 
 impl IntoModule for CtxRaeExec {
     fn into_module(self) -> Module {
@@ -111,8 +106,6 @@ impl IntoModule for CtxRaeExec {
         module.add_async_fn_prelude(RAE_ASSERT_SHORT, assert_fact);
         module.add_async_fn_prelude(RAE_RETRACT, retract_fact);
         module.add_async_fn_prelude(RAE_RETRACT_SHORT, retract_fact);
-        module.add_async_fn_prelude(RAE_OPEN_COM_PLATFORM, open_com);
-        module.add_async_fn_prelude(RAE_START_PLATFORM, start_platform);
         module.add_fn_prelude(RAE_GET_INSTANTIATED_METHODS, get_instantiated_methods);
         module.add_fn_prelude(RAE_GET_BEST_METHOD, get_best_method);
         module.add_async_fn_prelude(RAE_WAIT_FOR, wait_for);
@@ -154,16 +147,6 @@ impl IntoModule for CtxRaeExec {
 
     fn pure_fonctions(&self) -> PureFonctionCollection {
         Default::default()
-    }
-}
-
-impl CtxRaeExec {
-    pub async fn get_execution_status(&self, id: &TaskId) -> TaskStatus {
-        self.agenda.get_status(id).await
-    }
-
-    pub fn add_platform(&mut self, platform: Option<Platform>) {
-        self.platform_interface = platform;
     }
 }
 
@@ -265,13 +248,10 @@ fn get_best_method(env: &LEnv, args: &[LValue]) -> LResult {
 async fn get_facts(env: &LEnv) -> LResult {
     let mut state: im::HashMap<LValue, LValue> = get_state(env, &[]).await?.try_into()?;
     let locked: Vec<LValue> = get_list_resources(env, &[]).await?.try_into()?;
-    let instances: HashMap<LValue, LValue> = instance(env, &[]).await?.try_into()?;
 
     for e in locked {
         state.insert(vec![LOCKED.into(), e].into(), LValue::True);
     }
-
-    let state = state.union(instances);
 
     Ok(state.into())
 }
@@ -339,7 +319,7 @@ async fn read_state(env: &LEnv, args: &[LValue]) -> LResult {
 #[async_scheme_fn]
 async fn wait_for(env: &LEnv, lv: LValue) -> Result<LAsyncHandler, LRuntimeError> {
     let (tx, mut rx) = new_interruption_handler();
-    let ctx = env.get_context::<CtxRaeExec>(MOD_RAE_EXEC)?;
+    let ctx = env.get_context::<CtxRae>(CTX_RAE)?;
     let monitors = ctx.monitors.clone();
 
     let mut env = env.clone();
@@ -411,5 +391,26 @@ pub fn is_success(list: Vec<LValue>) -> Result<bool, LRuntimeError> {
         }
     } else {
         Err(wrong_type!(IS_FAILURE, &list[0], KindLValue::Symbol))
+    }
+}
+
+//0 arg: return a map of all instances
+//1 arg: return all instances of a type
+//2 args: check if an instance is of a certain type
+#[async_scheme_fn]
+pub async fn instance(env: &LEnv, args: &[LValue]) -> LResult {
+    let state = &env.get_context::<CtxState>(CTX_STATE)?.state;
+
+    match args.len() {
+        0 => Ok(state.get_state(Some(StateType::Instance)).await.into_map()),
+        1 => Ok(state.get_instances(args[0].borrow().try_into()?).await),
+        2 => Ok(state
+            .is_of_type(args[0].borrow().try_into()?, args[1].borrow().try_into()?)
+            .await),
+        _ => Err(LRuntimeError::wrong_number_of_args(
+            "godot::instance",
+            args,
+            1..2,
+        )),
     }
 }

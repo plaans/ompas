@@ -6,14 +6,24 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ompas-rae-language = {path = "../language"}
-ompas-rae-planning = {path = "../planning"}
-ompas-rae-structs= {path = "../structs"}
-sompas-core = {path = "../../scheme/core"}
+sompas-utils = {path= "../../scheme/utils" }
 sompas-structs = {path = "../../scheme/structs"}
+sompas-modules = {path = "../../scheme/modules"}
+sompas-core = {path = "../../scheme/core"}
+sompas-language = {path = "../../scheme/language"}
+sompas-macros = {path = "../../scheme/macros"}
+ompas-rae-structs= {path = "../structs"}
+
+ompas-rae-planning = {path ="../planning" }
+ompas-rae-language = {path = "../language"}
+ompas-rae-log = {path = "../log"}
 tokio = { version = "1.17.0", features = ["full", "time"] }
-log =  { version = "0.4.16", features = ["std"] }
-lazy_static = "1.4.0"
-sompas-utils = {path = "../../scheme/utils"}
-im = "15.1.0"
+im = "15.0.0"
+chrono = "0.4.19"
+log =  { version = "0.4", features = ["std"] }
+macro_rules_attribute = "0.0.2"
+async-trait = "0.1.51"
+aries_planning = {path = "../../aries/planning"}
+rand = "0.8.5"
+itertools = "0.10.3"
 futures = "0.3.17"

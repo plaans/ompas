@@ -47,7 +47,6 @@ impl Default for CtxGodot {
             headless: false,
             sender_socket: None,
             interface,
-            instance: Default::default(),
             domain: PathBuf::from(
                 "/home/jeremy/CLionProjects/ompas/gobotsim/godot_domain/domain.lisp",
             )
@@ -109,7 +108,7 @@ impl IntoModule for CtxGodot {
             label: MOD_GODOT.to_string(),
         };
 
-        module.add_async_fn_prelude(OPEN_COM, open_com);
+        //module.add_async_fn_prelude(OPEN_COM, open_com);
         module.add_async_fn_prelude(LAUNCH_GODOT, launch_godot);
         module.add_async_fn_prelude(START_GODOT, start_godot);
         module.add_async_fn_prelude(EXEC_GODOT, exec_godot);

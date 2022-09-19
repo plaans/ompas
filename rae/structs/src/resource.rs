@@ -9,7 +9,7 @@ use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::sync::Mutex;
 
 const UNARY: &str = "unary";
-const DIVISIBLE: &str = "divisible";
+//const DIVISIBLE: &str = "divisible";
 const ALL: &str = "all";
 const NONE: &str = "none";
 

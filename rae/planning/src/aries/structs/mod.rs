@@ -8,6 +8,7 @@ use ompas_rae_structs::domain::state_function::StateFunction;
 use ompas_rae_structs::domain::type_hierarchy::TypeHierarchy;
 use ompas_rae_structs::domain::RAEDomain;
 use ompas_rae_structs::domain::_type::Type;
+use ompas_rae_structs::state::partial_state::PartialState;
 use ompas_rae_structs::state::world_state::WorldStateSnapshot;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lvalues::LValueS;
@@ -170,7 +171,7 @@ impl From<&ConversionContext> for Problem {
         let mut objects = vec![];
 
         {
-            for (k, v) in &cc.state.instance.inner {
+            for (k, v) in &PartialState::from(cc.state.instance.clone()).inner {
                 if let LValueS::List(list_instance) = k {
                     assert_eq!(list_instance.len(), 2);
                     assert_eq!(LValueS::from(RAE_INSTANCE), list_instance[0]);

@@ -1,14 +1,14 @@
-use crate::ctx_planning::CtxPlanning;
+use crate::contexts::ctx_planning::CtxPlanning;
 use futures::FutureExt;
 use log::{error, info, warn};
 use ompas_rae_planning::aries::conversion::convert_domain_to_chronicle_hierarchy;
 use ompas_rae_planning::aries::structs::{ConversionCollection, ConversionContext};
 use ompas_rae_structs::domain::RAEDomain;
-use ompas_rae_structs::options::SelectMode::Planning;
-use ompas_rae_structs::options::{RAEOptions, SelectMode};
 use ompas_rae_structs::platform::Platform;
 use ompas_rae_structs::rae_command::RAECommand;
 use ompas_rae_structs::rae_interface::RAEInterface;
+use ompas_rae_structs::rae_options::RAEOptions;
+use ompas_rae_structs::select_mode::{Planner, SelectMode};
 use sompas_core::{eval, eval_init};
 use sompas_structs::lasynchandler::LAsyncHandler;
 use sompas_structs::lenv::ImportType::WithoutPrefix;
@@ -23,10 +23,12 @@ use tokio::sync::mpsc::Receiver;
 
 use crate::error::RaeExecError;
 
-pub type ReactiveTriggerId = usize;
-
-pub mod ctx_planning;
+pub mod contexts;
 pub mod error;
+pub mod exec;
+pub mod monitor;
+
+pub type ReactiveTriggerId = usize;
 
 #[derive(Debug, Clone)]
 pub enum TaskType {
@@ -41,7 +43,7 @@ pub const TOKIO_CHANNEL_SIZE: usize = 100;
 
 /// Main RAE Loop:
 /// Receives Job to handle in separate tasks.
-pub async fn run(
+pub async fn rae(
     platform: Option<Platform>,
     domain: RAEDomain,
     interface: RAEInterface,
@@ -86,29 +88,30 @@ pub async fn run(
 
     let mut select_mode = *options.get_select_mode();
 
-    let cc: Option<ConversionCollection> = if matches!(select_mode, Planning(_, _)) {
-        let instant = Instant::now();
-        match convert_domain_to_chronicle_hierarchy(ConversionContext {
-            domain: domain.clone(),
-            env: env.clone(),
-            state: interface.state.get_snapshot().await,
-        }) {
-            Ok(r) => {
-                info!(
-                    "Conversion time: {:.3} ms",
-                    instant.elapsed().as_micros() as f64 / 1000.0
-                );
-                Some(r)
+    let cc: Option<ConversionCollection> =
+        if matches!(select_mode, SelectMode::Planning(Planner::Aries, _)) {
+            let instant = Instant::now();
+            match convert_domain_to_chronicle_hierarchy(ConversionContext {
+                domain: domain.clone(),
+                env: env.clone(),
+                state: interface.state.get_snapshot().await,
+            }) {
+                Ok(r) => {
+                    info!(
+                        "Conversion time: {:.3} ms",
+                        instant.elapsed().as_micros() as f64 / 1000.0
+                    );
+                    Some(r)
+                }
+                Err(e) => {
+                    select_mode = SelectMode::Greedy;
+                    warn!("Cannot plan with the domain...{}", e);
+                    None
+                }
             }
-            Err(e) => {
-                select_mode = SelectMode::Greedy;
-                warn!("Cannot plan with the domain...{}", e);
-                None
-            }
-        }
-    } else {
-        None
-    };
+        } else {
+            None
+        };
 
     env.import_module(
         CtxPlanning::new(cc, domain.clone(), env.clone(), select_mode),

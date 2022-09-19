@@ -1,3 +1,4 @@
+use crate::state::instance::InstanceCollection;
 use crate::state::partial_state::PartialState;
 use sompas_core::modules::map::union_map;
 use sompas_structs::lruntimeerror;
@@ -26,7 +27,7 @@ pub struct WorldState {
     _static: Arc<RwLock<PartialState>>,
     dynamic: Arc<RwLock<PartialState>>,
     inner_world: Arc<RwLock<PartialState>>,
-    instance: Arc<RwLock<PartialState>>,
+    instance: Arc<RwLock<InstanceCollection>>,
     sem_update: Arc<Mutex<Option<broadcast::Sender<bool>>>>,
 }
 
@@ -35,7 +36,19 @@ pub struct WorldStateSnapshot {
     pub _static: PartialState,
     pub dynamic: PartialState,
     pub inner_world: PartialState,
-    pub instance: PartialState,
+    pub instance: InstanceCollection,
+}
+
+impl From<WorldStateSnapshot> for WorldState {
+    fn from(w: WorldStateSnapshot) -> Self {
+        Self {
+            _static: Arc::new(RwLock::new(w._static)),
+            dynamic: Arc::new(RwLock::new(w.dynamic)),
+            inner_world: Arc::new(RwLock::new(w.inner_world)),
+            instance: Arc::new(RwLock::new(w.instance)),
+            sem_update: Arc::new(Mutex::new(None)),
+        }
+    }
 }
 
 impl From<WorldStateSnapshot> for LValue {
@@ -44,7 +57,14 @@ impl From<WorldStateSnapshot> for LValue {
         union_map(
             &env,
             &[
-                union_map(&env, &[r.instance.into_map(), r.dynamic.into_map()]).unwrap(),
+                union_map(
+                    &env,
+                    &[
+                        PartialState::from(r.instance).into_map(),
+                        r.dynamic.into_map(),
+                    ],
+                )
+                .unwrap(),
                 union_map(&env, &[r._static.into_map(), r.inner_world.into_map()]).unwrap(),
             ],
         )
@@ -55,10 +75,26 @@ impl From<WorldStateSnapshot> for LValue {
 const RAE_STATE_SEM_UPDATE_CHANNEL_SIZE: usize = 64;
 
 impl WorldState {
+    pub async fn add_type(&self, t: String, p: Option<String>) {
+        self.instance.write().await.add_type(t, p);
+    }
+
+    pub async fn add_instance(&self, i: String, t: String) {
+        self.instance.write().await.add_instance(i, t);
+    }
+
+    pub async fn is_of_type(&self, i: String, t: String) -> LValue {
+        self.instance.read().await.is_of_type(i, t).await.into()
+    }
+
+    pub async fn get_instances(&self, t: String) -> LValue {
+        self.instance.read().await.get_instances(t).await.into()
+    }
+
     pub async fn clear(&self) {
         self._static.write().await.inner = Default::default();
         self.dynamic.write().await.inner = Default::default();
-        self.instance.write().await.inner = Default::default();
+        *self.instance.write().await = Default::default();
         self.inner_world.write().await.inner = Default::default();
     }
 
@@ -97,14 +133,14 @@ impl WorldState {
                         .dynamic
                         .read()
                         .await
-                        .union(self.instance.read().await.deref()),
+                        .union(&PartialState::from(self.instance.read().await.clone())),
                 ),
             ),
             Some(_type) => match _type {
                 StateType::Static => self._static.read().await.clone(),
                 StateType::Dynamic => self.dynamic.read().await.clone(),
                 StateType::InnerWorld => self.inner_world.read().await.clone(),
-                StateType::Instance => self.instance.read().await.clone(),
+                StateType::Instance => self.instance.read().await.clone().into(),
             },
         }
     }
@@ -126,8 +162,9 @@ impl WorldState {
                     self.inner_world.write().await.inner = new_state;
                 }
                 StateType::Instance => {
-                    let new_state = self.instance.write().await.union(&state).inner;
-                    self.instance.write().await.inner = new_state;
+                    panic!()
+                    /*let new_state = self.instance.write().await.inner.union(&state).inner;
+                    self.instance.write().await.inner.inner = new_state;*/
                 }
             },
         }
@@ -151,8 +188,8 @@ impl WorldState {
                     _ref.inner = state.inner;
                 }
                 StateType::Instance => {
-                    let mut _ref = self.instance.write().await;
-                    _ref.inner = state.inner;
+                    panic!()
+                    //self.instance.write().await.inner.inner = state.inner;
                 }
             },
         }

@@ -52,15 +52,6 @@ impl Platform {
     pub async fn trigger_event(&self, args: &[LValue]) -> LResult {
         self.inner.write().await.trigger_event(args).await
     }
-    /// Start the platform process
-    pub async fn start_platform(&self, args: &[LValue]) -> LResult {
-        self.inner.write().await.start_platform(args).await
-    }
-
-    /// Open communication with the platform
-    pub async fn open_com(&self, args: &[LValue]) -> LResult {
-        self.inner.write().await.open_com(args).await
-    }
 
     /// Executes a command on the platform
     pub async fn exec_command(&self, args: &[LValue], command_id: usize) -> LResult {
@@ -74,10 +65,6 @@ impl Platform {
     /// Returns the RAE domain of the platform.
     pub async fn domain(&self) -> String {
         self.inner.read().await.domain().await
-    }
-
-    pub async fn instance(&self, args: &[LValue]) -> LResult {
-        self.inner.read().await.instance(args).await
     }
 }
 
@@ -102,17 +89,8 @@ pub trait RAEPlatform: Any + Send + Sync {
     ///Launch the platform (such as the simulation in godot) and open communication
     async fn launch_platform(&mut self, args: &[LValue]) -> LResult;
 
-    /// Start the platform process
-    async fn start_platform(&mut self, args: &[LValue]) -> LResult;
-
-    /// Open communication with the platform
-    async fn open_com(&mut self, args: &[LValue]) -> LResult;
-
     /// Returns the RAE domain of the platform.
     async fn domain(&self) -> String;
-
-    /// Instance function implementation depending on the platform
-    async fn instance(&self, args: &[LValue]) -> LResult;
 
     async fn trigger_event(&self, args: &[LValue]) -> LResult;
 
@@ -137,20 +115,8 @@ impl RAEPlatform for () {
         Ok(Nil)
     }
 
-    async fn start_platform(&mut self, _: &[LValue]) -> LResult {
-        Ok(Nil)
-    }
-
-    async fn open_com(&mut self, _: &[LValue]) -> LResult {
-        Ok(Nil)
-    }
-
     async fn domain(&self) -> String {
         "".to_string()
-    }
-
-    async fn instance(&self, _args: &[LValue]) -> LResult {
-        Ok(Nil)
     }
 
     async fn trigger_event(&self, _: &[LValue]) -> LResult {

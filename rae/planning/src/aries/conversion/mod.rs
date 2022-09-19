@@ -8,6 +8,7 @@ use super::structs::{ConversionCollection, ConversionContext};
 use aries_planning::chronicles::ChronicleKind;
 use ompas_rae_structs::domain::parameters::Parameters;
 use ompas_rae_structs::domain::task::Task;
+use ompas_rae_structs::state::partial_state::PartialState;
 use sompas_structs::llambda::{LLambda, LambdaArgs};
 use sompas_structs::lruntimeerror;
 use sompas_structs::lvalue::LValue;
@@ -69,7 +70,8 @@ pub fn convert_domain_to_chronicle_hierarchy(
     //add new types to list of types.
     let obj_id = *ch.sym_table.get_type_id(PlanningAtomType::Object).unwrap();
 
-    for (obj_type, objects) in &conversion_context.state.instance.inner {
+    for (obj_type, objects) in &PartialState::from(conversion_context.state.instance.clone()).inner
+    {
         let type_sym = if let LValueS::List(vec) = obj_type {
             vec[1].clone()
         } else {

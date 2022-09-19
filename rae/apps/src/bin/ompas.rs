@@ -7,7 +7,7 @@ use sompas_repl::lisp_interpreter::{LispInterpreter, LispInterpreterConfig};
 use std::fs;
 use std::path::PathBuf;
 
-use ompas_rae_scheme::rae_user::CtxRaeUser;
+use ompas_rae_core::monitor::CtxRaeUser;
 use structopt::StructOpt;
 
 pub const TOKIO_CHANNEL_SIZE: usize = 65_384;

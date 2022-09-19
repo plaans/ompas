@@ -1,23 +1,22 @@
 //! Module containing the Scheme library to setup RAE environment
 
-use crate::rae_exec::CtxRaeExec;
+use crate::contexts::ctx_domain::{CtxDomain, CTX_DOMAIN};
+use crate::contexts::ctx_mode::{CtxMode, CTX_MODE};
+use crate::contexts::ctx_rae::{CtxRae, CTX_RAE};
+use crate::contexts::ctx_state::{CtxState, CTX_STATE};
+use crate::contexts::ctx_task::{CtxTask, CTX_TASK};
+use crate::exec::CtxRaeExec;
 use chrono::{DateTime, Utc};
+use domain::*;
 use ompas_rae_language::*;
 use ompas_rae_planning::aries::structs::ConversionContext;
-use ompas_rae_structs::contexts::ctx_domain::{CtxDomain, CTX_DOMAIN};
-use ompas_rae_structs::contexts::ctx_mode::{CtxMode, CTX_MODE};
-use ompas_rae_structs::contexts::ctx_state::{CtxState, CTX_STATE};
-use ompas_rae_structs::contexts::ctx_task::{CtxTask, CTX_TASK};
 use ompas_rae_structs::domain::RAEDomain;
 use ompas_rae_structs::job::Job;
-use ompas_rae_structs::options::{RAEOptions, SelectMode};
 use ompas_rae_structs::platform::{Log, Platform};
 use ompas_rae_structs::rae_interface::RAEInterface;
-use rae_control::*;
-use rae_conversion::*;
-use rae_description::*;
-use rae_monitor::*;
-use rae_planning::*;
+use ompas_rae_structs::rae_options::RAEOptions;
+use ompas_rae_structs::select_mode::SelectMode;
+use planning::*;
 use sompas_core::{eval_init, get_root_env};
 use sompas_modules::advanced_math::CtxMath;
 use sompas_modules::io::{CtxIo, LogOutput};
@@ -32,12 +31,10 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::{env, fs};
 use tokio::sync::RwLock;
-
-pub mod rae_control;
-pub mod rae_conversion;
-pub mod rae_description;
-pub mod rae_monitor;
-mod rae_planning;
+use user_interface::*;
+pub mod domain;
+pub mod planning;
+pub mod user_interface;
 
 //LANGUAGE
 const MOD_RAE_USER: &str = "rae_user";
@@ -97,7 +94,7 @@ impl IntoModule for CtxRaeUser {
         module.add_async_fn_prelude(RAE_LAUNCH, launch);
         module.add_async_fn_prelude(RAE_STOP, stop);
         module.add_async_fn_prelude(RAE_CONFIGURE_PLATFORM, configure_platform);
-        module.add_async_fn_prelude(RAE_CONFIGURE_SELECT, configure_select);
+        module.add_async_fn_prelude(RAE_SET_SELECT, set_select);
         module.add_async_fn_prelude(RAE_TRIGGER_TASK, trigger_task);
         module.add_async_fn_prelude(RAE_ADD_TASK_TO_EXECUTE, add_task_to_execute);
         /*
@@ -109,7 +106,7 @@ impl IntoModule for CtxRaeUser {
         module.add_async_fn_prelude(RAE_GET_TASKS, get_tasks);
         module.add_async_fn_prelude(RAE_GET_ENV, get_env);
         module.add_async_fn_prelude(RAE_GET_CONFIG_PLATFORM, get_config_platform);
-        module.add_async_fn_prelude(RAE_GET_CONFIG_SELECT, get_config_select);
+        module.add_async_fn_prelude(RAE_GET_SELECT, get_select);
 
         //Domain Definition
         module.add_async_fn_prelude(RAE_ADD_STATE_FUNCTION, add_state_function);
@@ -297,7 +294,7 @@ impl CtxRaeUser {
 
         env.import_module(ctx_io, WithoutPrefix);
 
-        let ctx_rae_exec = CtxRaeExec {
+        let ctx_rae = CtxRae {
             resources: self.interface.resources.clone(),
             monitors: self.interface.monitors.clone(),
             platform_interface: self.platform.clone(),
@@ -308,7 +305,8 @@ impl CtxRaeUser {
             state: self.interface.state.clone(),
         };
 
-        env.import_module(ctx_rae_exec, WithoutPrefix);
+        env.import_context(Context::new(ctx_rae), CTX_RAE);
+        env.import_module(CtxRaeExec::default(), WithoutPrefix);
         env.import_context(Context::new(ctx_state), CTX_STATE);
         env.import_context(Context::new(CtxTask::default()), CTX_TASK);
         env.import_context(Context::new(CtxMode::default()), CTX_MODE);

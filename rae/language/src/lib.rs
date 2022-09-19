@@ -58,7 +58,7 @@ pub const DOC_RAE_GET_STATUS: &str = "Returns the current status of actions";
 pub const DOC_RAE_GET_ENV: &str = "Returns the whole environment.";
 
 pub const RAE_GET_CONFIG_PLATFORM: &str = "get-config-platform";
-pub const RAE_GET_CONFIG_SELECT: &str = "get-config-select";
+pub const RAE_GET_SELECT: &str = "get-select";
 pub const DOC_RAE_GET_SYMBOL_TYPE: &str =
     "Returns the type of the symbol as defined in RAE environment";
 pub const DOC_RAE_GET_SYMBOL_TYPE_VERBOSE: &str = "Types:\n\
@@ -252,7 +252,7 @@ pub const RAE_ADD_TASK_TO_EXECUTE: &str = "add-task-to-execute";
 pub const RAE_LAUNCH: &str = "launch";
 pub const RAE_STOP: &str = "stop";
 pub const RAE_CONFIGURE_PLATFORM: &str = "configure-platform";
-pub const RAE_CONFIGURE_SELECT: &str = "configure-select";
+pub const RAE_SET_SELECT: &str = "set-select";
 
 pub const DOC_RAE_TRIGGER_EVENT: &str = "Sends to RAE an event to handle";
 pub const DOC_RAE_TRIGGER_EVENT_VERBOSE: &str = "";
@@ -280,3 +280,13 @@ pub const LAMBDA_TYPE: &str = "lambda_type";
 
 pub const TUPLE_TYPE: &str = "tuple";
 pub const TYPE_LIST: &str = "tlist";
+
+pub const GREEDY: &str = "greedy";
+pub const PLANNING: &str = "planning";
+pub const HEURISTIC: &str = "heuristic";
+pub const LEARNING: &str = "learning";
+pub const ARIES: &str = "aries";
+pub const ARIES_OPT: &str = "aries-opt";
+pub const UPOM: &str = "upom";
+pub const RAE_PLAN: &str = "rae-plan";
+pub const C_CHOICE: &str = "c-choice";

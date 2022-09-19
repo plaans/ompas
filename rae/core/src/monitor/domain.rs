@@ -7,7 +7,7 @@ use ompas_rae_structs::domain::state_function::StateFunction;
 use ompas_rae_structs::domain::task::Task;
 use ompas_rae_structs::state::partial_state::PartialState;
 use ompas_rae_structs::state::world_state::StateType;
-use sompas_core::modules::list::{car, cons};
+use sompas_core::modules::list::{car, cons, first};
 use sompas_core::{eval, expand, get_root_env, parse};
 use sompas_language::*;
 use sompas_macros::*;
@@ -310,7 +310,10 @@ pub async fn add_command(
 
     let lv_cost: LValue = match map.get(&COST.into()) {
         None => parse(&format!("(lambda {} 1)", params), &mut env).await?,
-        Some(model) => parse(&format!("(lambda {} {})", params, model), &mut env).await?,
+        Some(model) => {
+            let model = first(&env, &[model.clone()])?;
+            parse(&format!("(lambda {} {})", params, model), &mut env).await?
+        }
     };
     let cost = eval(&expand(&lv_cost, true, &mut env).await?, &mut env, None).await?;
     command.set_cost(cost);
@@ -588,22 +591,21 @@ pub async fn add_task_model(
 ///Takes in input a list of initial facts that will be stored in the inner world part of the State.
 #[async_scheme_fn]
 pub async fn add_facts(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER).unwrap();
+    let state = &env.get_context::<CtxRaeUser>(MOD_RAE_USER)?.interface.state;
 
     let mut inner_world = PartialState {
         inner: Default::default(),
         _type: Some(StateType::InnerWorld),
     };
-    let mut instance = PartialState {
-        inner: Default::default(),
-        _type: Some(StateType::Instance),
-    };
 
     for (k, v) in &map {
-        let mut is_instance = false;
-        if let LValue::List(list) = k {
-            if list[0] == LValue::from(RAE_INSTANCE) {
-                instance.insert(k.try_into()?, v.try_into()?);
+        let mut is_instance: bool = false;
+        if let LValue::List(key) = k {
+            if key[0] == LValue::from(RAE_INSTANCE) {
+                let instances: Vec<LValue> = v.try_into()?;
+                for e in instances {
+                    state.add_instance(key[1].to_string(), e.to_string()).await
+                }
                 is_instance = true;
             }
         }
@@ -612,9 +614,8 @@ pub async fn add_facts(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<(
         }
     }
 
-    ctx.interface.state.update_state(inner_world).await;
+    state.update_state(inner_world).await;
 
-    ctx.interface.state.update_state(instance).await;
     Ok(())
 }
 #[async_scheme_fn]

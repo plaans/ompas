@@ -16,7 +16,7 @@
   (def-method m_already_there
     (:task t_move)
     (:params (?t truck) (?to location))
-    (:pre-conditions (check (= (at ?t) ?to)))
+    (:pre-conditions (= (at ?t) ?to))
     (:score 0)
     (:body true))
 

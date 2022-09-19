@@ -319,7 +319,7 @@ pub async fn c_choice_select(
     let domain = env.get_context::<CtxDomain>(CTX_DOMAIN).unwrap();
 
     let mut new_env: LEnv = create_env(new_env, &domain.domain).await;
-    new_env.import_module(CtxCChoice::new(tried.to_vec()), WithoutPrefix);
+    new_env.import_module(CtxCChoice::new(tried.to_vec(), 0), WithoutPrefix);
     new_env.import_context(Context::new(CtxState::new(state.clone().into())), CTX_STATE);
 
     let mut greedy: RefinementMetaData = greedy_select(state, tried, task.clone(), env).await?;

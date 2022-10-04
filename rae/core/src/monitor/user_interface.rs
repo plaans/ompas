@@ -99,8 +99,8 @@ pub async fn get_agenda(env: &LEnv, args: &[LValue]) -> LResult {
 
     for arg in args {
         match arg.to_string().as_str() {
-            ABSTRACT_TASK => task_filter.task_type = Some(TaskType::AbstractTask),
-            ACTION => task_filter.task_type = Some(TaskType::Action),
+            TASK => task_filter.task_type = Some(TaskType::Task),
+            COMMAND => task_filter.task_type = Some(TaskType::Command),
             STATUS_PENDING => task_filter.status = Some(TaskStatus::Pending),
             STATUS_DONE => task_filter.status = Some(TaskStatus::Done),
             STATUS_FAILURE => task_filter.status = Some(TaskStatus::Failure),
@@ -111,8 +111,8 @@ pub async fn get_agenda(env: &LEnv, args: &[LValue]) -> LResult {
                     format!(
                         "{} is not a valid filter option, expecting ({}, {}, {}, {}, {}, {})",
                         str,
-                        ABSTRACT_TASK,
-                        ACTION,
+                        TASK,
+                        COMMAND,
                         STATUS_PENDING,
                         STATUS_RUNNING,
                         STATUS_DONE,

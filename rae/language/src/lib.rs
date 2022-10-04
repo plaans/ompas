@@ -32,7 +32,7 @@ pub const IS_SUCCESS: &str = "success?";
 pub const IS_FAILURE: &str = "failure?";
 
 pub const RAE_GET_STATE: &str = "get-state";
-pub const RAE_GET_FACTS: &str = "rae-get-facts";
+pub const RAE_GET_FACTS: &str = "get-facts";
 pub const RAE_GET_STATUS: &str = "get-status";
 pub const RAE_GET_AGENDA: &str = "get-agenda";
 pub const RAE_GET_TASK_NETWORK: &str = "get-task-network";

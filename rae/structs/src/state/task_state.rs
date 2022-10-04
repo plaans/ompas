@@ -28,8 +28,8 @@ impl TaskCollection {
             .filter(|&t| {
                 if let Some(task_type) = &filter.task_type {
                     match task_type {
-                        TaskType::AbstractTask => t.is_abstract_task(),
-                        TaskType::Action => t.is_action(),
+                        TaskType::Task => t.is_abstract_task(),
+                        TaskType::Command => t.is_action(),
                     }
                 } else {
                     true
@@ -511,12 +511,12 @@ impl Display for RefinementMetaData {
 
 #[derive(Debug, Copy, Clone)]
 pub enum TaskType {
-    AbstractTask,
-    Action,
+    Task,
+    Command,
 }
 
-pub const ABSTRACT_TASK: &str = "abstract-task";
-pub const ACTION: &str = "action";
+pub const TASK: &str = "task";
+pub const COMMAND: &str = "command";
 
 impl Display for TaskType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -524,8 +524,8 @@ impl Display for TaskType {
             f,
             "{}",
             match self {
-                TaskType::AbstractTask => ABSTRACT_TASK,
-                TaskType::Action => ACTION,
+                TaskType::Task => TASK,
+                TaskType::Command => COMMAND,
             }
         )
     }

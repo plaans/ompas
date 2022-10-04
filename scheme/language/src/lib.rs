@@ -104,7 +104,7 @@ pub const ENV_GET_KEYS: &str = "get_keys";
 //return a list of keys of the environment
 pub const ENV_GET_MACROS: &str = "get_macros";
 pub const ENV_GET_MACRO: &str = "get_macro";
-pub const ENV_GET_LIST_MODULES: &str = "get_list_modules";
+pub const ENV_GET_CONTEXTS: &str = "get_contexts";
 
 pub const HELP: &str = "help";
 pub const DOC_HELP: &str =

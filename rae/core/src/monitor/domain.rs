@@ -753,9 +753,6 @@ pub async fn add_object(env: &LEnv, object: String, t: String) -> Result<(), LRu
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::exec::CtxRaeExec;
-    use crate::rae_exec::CtxRaeExec;
-    use crate::rae_user::domain::CtxRaeDescription;
     use sompas_core::test_utils::{test_expression_with_env, TestExpression};
     use sompas_core::{eval_init, get_root_env};
     use sompas_modules::advanced_math::CtxMath;
@@ -767,23 +764,23 @@ mod test {
     async fn init_env_and_ctxs() -> LEnv {
         let mut env = get_root_env().await;
 
-        env.import(CtxUtils::default(), WithoutPrefix);
+        env.import_module(CtxUtils::default(), WithoutPrefix);
 
-        env.import(CtxMath::default(), WithoutPrefix);
+        env.import_module(CtxMath::default(), WithoutPrefix);
 
-        env.import(CtxRaeExec::default(), WithoutPrefix);
+        //env.import_module(CtxRaeExec::default(), WithoutPrefix);
 
-        env.import(CtxRaeDescription::default(), WithoutPrefix);
+        env.import_module(CtxRaeUser::default(), WithoutPrefix);
 
-        env.import(CtxIo::default(), WithoutPrefix);
+        env.import_module(CtxIo::default(), WithoutPrefix);
         eval_init(&mut env).await;
         env
     }
 
     #[tokio::test]
-    async fn test_macro_generate_task() -> Result<(), LRuntimeError> {
+    async fn test_macro_def_task() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
-            inner: MACRO_GENERATE_TASK,
+            inner: MACRO_DEF_TASK,
             dependencies: vec![],
             expression: "(generate-task t_navigate_to (?r robot) (?x int) (?y int))",
             expected: "(list \
@@ -803,9 +800,9 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_macro_generate_state_function() -> Result<(), LRuntimeError> {
+    async fn test_macro_def_state_function() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
-            inner: MACRO_GENERATE_STATE_FUNCTION,
+            inner: MACRO_DEF_STATE_FUNCTION,
             dependencies: vec![],
             expression: "(generate-state-function sf (?a object) (?b object) (?c object))",
             expected: "(list sf
@@ -822,7 +819,7 @@ mod test {
         test_expression_with_env(macro_to_test, &mut env, true).await?;
 
         let macro_to_test_2 = TestExpression {
-            inner: MACRO_GENERATE_STATE_FUNCTION,
+            inner: MACRO_DEF_STATE_FUNCTION,
             dependencies: vec![],
             expression: "(generate-state-function sf)",
             expected: "(list sf
@@ -838,11 +835,11 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_macro_generate_action() -> Result<(), LRuntimeError> {
+    async fn test_macro_def_command() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
-            inner: MACRO_GENERATE_ACTION,
+            inner: MACRO_DEF_COMMAND,
             dependencies: vec![],
-            expression: "(generate-action pick_package (?r robot) (?p package))",
+            expression: "(def-command pick_package (:params (?r robot) (?p package)))",
             expected: "(list pick_package
                             '((?r robot) (?p package))
                             (lambda (?r ?p)
@@ -858,9 +855,9 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_macro_generate_action_model() -> Result<(), LRuntimeError> {
+    async fn test_macro_def_command_pddl_model() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
-            inner: MACRO_GENERATE_ACTION_MODEL,
+            inner: MACRO_DEF_COMMAND_PDDL_MODEL,
             dependencies: vec![],
             expression: "(generate-action-model pick
                 ((:params (?r robot))
@@ -890,39 +887,38 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_macro_generate_action_operational_model() -> Result<(), LRuntimeError> {
+    async fn test_macro_def_command_om_model() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
-            inner: MACRO_GENERATE_ACTION_OPERATIONAL_MODEL,
+            inner: MACRO_DEF_COMMAND_OM_MODEL,
             dependencies: vec![],
-            expression: "(generate-action-operational-model place
-                        ((:params (?r robot))
-                          (:body
-                            (if (> (robot.battery ?r) 0.4)
-                                (assert (robot.busy ?r) false)
-                                (err 0)))))",
-            expected: "(list place
+            expression: "(generate-action-model pick
+                ((:params (?r robot))
+                  (:pre-conditions (check (> (robot.battery ?r) 0.4)))
+                  (:effects
+                        (assert (robot.busy ?r) true))))",
+            expected: "(list pick
                             (lambda (?r)
                                 (do
                                     (do
                                         (check (instance ?r robot)))
-                                    (if (> (robot.battery ?r) 0.4)
-                                        (assert (robot.busy ?r) false)
-                                        (err 0)))))",
-            result: "(list place
+                                    
+                                        (check (> (robot.battery ?r) 0.4))
+                                  (assert (robot.busy ?r) true))))",
+            result: "(list pick
                             (lambda (?r)
                                 (do
                                     (do
                                         (check (instance ?r robot)))
-                                    (if (> (robot.battery ?r) 0.4)
-                                        (assert (robot.busy ?r) false)
-                                        (err 0)))))",
+                                    
+                                        (check (> (robot.battery ?r) 0.4))
+                                  (assert (robot.busy ?r) true))))",
         };
 
         let mut env = init_env_and_ctxs().await;
         test_expression_with_env(macro_to_test, &mut env, true).await
     }
 
-    #[tokio::test]
+    /*#[tokio::test]
     async fn test_lambda_generate_type_pre_conditions() -> Result<(), LRuntimeError> {
         let lambda_test = TestExpression {
             inner: LAMBDA_GENERATE_TYPE_PRE_CONDITIONS,
@@ -930,7 +926,7 @@ mod test {
             expression:
                 "(gtpc '((?r robot) (?f float ) (?i int) (?b bool) (?s symbol) (?n number) (?l list)))",
             expected: "(gtpc '((?r robot) (?f float ) (?i int) (?b bool) (?s symbol) (?n number) (?l list)))",
-            result: "(do 
+            result: "(do
                         (check (instance ?r robot))
                         (check (float? ?f))
                         (check (int? ?i))
@@ -942,13 +938,13 @@ mod test {
         let mut env = init_env_and_ctxs().await;
 
         test_expression_with_env(lambda_test, &mut env, false).await
-    }
+    }*/
 
     #[tokio::test]
     async fn test_macro_generate_method() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
-            inner: MACRO_GENERATE_METHOD,
-            dependencies: vec![LAMBDA_GENERATE_TYPE_PRE_CONDITIONS],
+            inner: MACRO_DEF_METHOD,
+            dependencies: vec![], //LAMBDA_GENERATE_TYPE_PRE_CONDITIONS],
             expression: "(generate-method m_navigate_to ((:task t_navigate_to)
             (:params (?r robot) (?x float) (?y float))
             (:pre-conditions (and-cond (robot.available ?r) (< ?x 10) (< ?y 10)))

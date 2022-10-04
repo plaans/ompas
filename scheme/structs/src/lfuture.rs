@@ -20,28 +20,3 @@ impl From<FutureResult> for LValue {
         LValue::Future(fr.shared())
     }
 }*/
-
-#[cfg(test)]
-mod test_lfuture {
-    use crate::lruntimeerror::LRuntimeError;
-    use crate::lvalue::LValue;
-
-    /*#[tokio::test]
-    async fn create_lvalue_future() -> Result<(), LRuntimeError> {
-        let args = LValue::Nil;
-
-        let future: LValue = args.into();
-
-        //let future: LValue = future.into();
-
-        let result: LValue = if let LValue::Future(ft) = future {
-            ft.await?
-        } else {
-            LValue::Nil
-        };
-
-        println!("LValue: {}", result);
-
-        Ok(())
-    }*/
-}

@@ -7,3 +7,6 @@ title = "OMPAS Documentation"
 
 [output.html]
 mathjax-support = true
+
+[preprocessor.bib]
+bibliography = "ompas-doc.bib"

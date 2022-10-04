@@ -11,7 +11,7 @@
     (def-state-function carry (:params (?g gripper)) (:result ball))
 
     ;actions
-    (def-command move (:params (?from room)) (:result room))
+    (def-command move (:params (?from room)))
     (def-command-ppdl-model move
       (:params (?from room) (?to room))
       (:pre-conditions (= (at-robby) ?from) (!= ?from ?to))

@@ -1,6 +1,7 @@
-use crate::context::TypeId;
 use im::HashMap;
 use std::fmt::Display;
+
+pub type TypeId = usize;
 
 #[derive(Default, Debug, Clone)]
 pub struct TypeHierarchy {
@@ -11,6 +12,10 @@ pub struct TypeHierarchy {
 }
 
 impl TypeHierarchy {
+    pub fn get_types(&self) -> Vec<String> {
+        self.inner.values().cloned().collect()
+    }
+
     pub fn get_id(&self, t: impl Display) -> Option<&TypeId> {
         self.reverse.get(&t.to_string())
     }

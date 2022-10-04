@@ -12,6 +12,7 @@ sompas-modules = {path = "../../scheme/modules"}
 sompas-core = {path = "../../scheme/core"}
 sompas-language = {path = "../../scheme/language"}
 sompas-macros = {path = "../../scheme/macros"}
+ompas-rae-language = {path = "../language"}
 tokio = { version = "1.17.0", features = ["full", "time"] }
 im = "15.0.0"
 chrono = "0.4.19"

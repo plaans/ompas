@@ -10,7 +10,7 @@ sompas-utils = {path = "../utils" }
 sompas-structs = {path = "../structs"}
 sompas-language = {path = "../language"}
 sompas-macros = {path = "../macros"}
-aries_planning = {git = "https://github.com/plaans/aries", branch = "extended_chronicle_constraints"}
+aries_planning = {path = "../../aries/planning"}
 async-trait = "0.1.53"
 async-recursion = "0.3.2"
 anyhow = "1.0.40"
@@ -19,3 +19,4 @@ im = "15.0.0"
 lazy_static = "1.4.0"
 macro_rules_attribute = "0.0.2"
 function_name = "0.2.0"
+futures = "0.3.17"

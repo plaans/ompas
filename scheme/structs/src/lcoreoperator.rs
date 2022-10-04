@@ -2,8 +2,9 @@ use crate::lruntimeerror::LRuntimeError;
 use crate::lvalue::{LValue, RefLValue};
 use serde::*;
 use sompas_language::{
-    ASYNC, AWAIT, BEGIN, DEFINE, DEF_MACRO, DO, EVAL, EXPAND, IF, LAMBDA, PARSE, QUASI_QUOTE,
-    QUOTE, UNQUOTE,
+    ASYNC, AWAIT, BEGIN, DEFINE, DEF_MACRO, DO, ENR, EVAL, EXPAND, IF, INTERRUPT, INTERRUPTIBLE,
+    INTERRUPTIBLE_SHORT, LAMBDA, PARSE, QUASI_QUOTE, QUOTE, RACE, UNINTERRUPTIBLE,
+    UNINTERRUPTIBLE_SHORT, UNQUOTE,
 };
 use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
@@ -39,6 +40,12 @@ pub enum LCoreOperator {
     Parse,
     Expand,
     Eval,
+    Interrupt,
+    Interruptible,
+    Uninterruptible,
+    Enr,
+    //QuasiInterruptible,
+    Race,
 }
 
 impl Display for LCoreOperator {
@@ -58,6 +65,11 @@ impl Display for LCoreOperator {
             LCoreOperator::Expand => EXPAND,
             LCoreOperator::Parse => PARSE,
             LCoreOperator::Do => DO,
+            LCoreOperator::Interrupt => INTERRUPT,
+            LCoreOperator::Interruptible => INTERRUPTIBLE,
+            LCoreOperator::Uninterruptible => UNINTERRUPTIBLE,
+            LCoreOperator::Race => RACE,
+            LCoreOperator::Enr => ENR,
         };
 
         write!(f, "{}", str)
@@ -89,6 +101,12 @@ impl TryFrom<&str> for LCoreOperator {
             PARSE => Ok(LCoreOperator::Parse),
             EXPAND => Ok(LCoreOperator::Expand),
             DO => Ok(LCoreOperator::Do),
+            INTERRUPT => Ok(LCoreOperator::Interrupt),
+            INTERRUPTIBLE | INTERRUPTIBLE_SHORT => Ok(LCoreOperator::Interruptible),
+            UNINTERRUPTIBLE | UNINTERRUPTIBLE_SHORT => Ok(LCoreOperator::Uninterruptible),
+            RACE => Ok(LCoreOperator::Race),
+            ENR => Ok(LCoreOperator::Enr),
+            //QUASI_INTERRUPTIBLE => Ok(LCoreOperator::QuasiInterruptible),
             _ => Err(LRuntimeError::new(
                 "LCoreOperator::TryFrom<str>",
                 "string does not correspond to core operator".to_string(),

@@ -1,7 +1,7 @@
-use crate::function::{LAsyncFn, LFn};
+use crate::function::{LAsyncFn, LAsyncMutFn, LFn, LMutFn};
 use crate::kindlvalue::KindLValue;
+use crate::lasynchandler::LAsyncHandler;
 use crate::lcoreoperator::LCoreOperator;
-use crate::lfuture::LFuture;
 use crate::llambda::LLambda;
 use crate::lnumber::LNumber;
 use crate::lruntimeerror::LRuntimeError;
@@ -9,6 +9,7 @@ use crate::{lruntimeerror, string, symbol, wrong_type};
 use function_name::named;
 use im::HashMap;
 use sompas_language::*;
+use std::borrow::Borrow;
 use std::cmp::Ordering;
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{Display, Formatter};
@@ -30,14 +31,17 @@ pub enum LValue {
     Number(LNumber),
     //#[serde(skip)]
     Fn(LFn),
+    MutFn(LMutFn),
     //#[serde(skip)]
     AsyncFn(LAsyncFn),
+    AsyncMutFn(LAsyncMutFn),
     //#[serde(skip)]
     Lambda(LLambda),
     //#[serde(skip)]
     CoreOperator(LCoreOperator),
     //#[serde(skip)]
-    Future(LFuture),
+    Handler(LAsyncHandler),
+    //Future(LFuture),
     Err(RefLValue),
     // data structure
     //#[serde(skip)]
@@ -46,6 +50,12 @@ pub enum LValue {
     True,
     //Refers to boolean 'false and empty list in lisp
     Nil,
+}
+
+impl Default for LValue {
+    fn default() -> Self {
+        Self::Nil
+    }
 }
 
 impl From<()> for LValue {
@@ -206,9 +216,9 @@ impl LValue {
                                 )
                             }
                             COND => LValue::pretty_print_list_aligned(COND, &list[1..], indent),
-                            _ => LValue::pretty_print_list(&list, indent),
+                            _ => LValue::pretty_print_list(list, indent),
                         },
-                        _ => LValue::pretty_print_list(&list, indent),
+                        _ => LValue::pretty_print_list(list, indent),
                     }
                 } else {
                     NIL.to_string()
@@ -233,7 +243,8 @@ impl Display for LValue {
         match self {
             LValue::Fn(fun) => write!(f, "{}", fun.get_label()),
             LValue::Nil => write!(f, "{}", NIL),
-            LValue::Symbol(s) | LValue::String(s) => write!(f, "{}", s),
+            LValue::Symbol(s) => write!(f, "{}", s),
+            LValue::String(s) => write!(f, "{}", s),
             LValue::Number(n) => write!(f, "{}", n),
             LValue::True => write!(f, "{}", TRUE),
             LValue::List(list) => {
@@ -250,10 +261,11 @@ impl Display for LValue {
             }
             LValue::Lambda(l) => write!(f, "{}", l),
             LValue::Map(m) => {
-                let mut result = String::new();
+                let mut result = "[".to_string();
                 for (key, value) in m.iter() {
-                    result.push_str(format!("{}: {}\n", key, value).as_str());
+                    result.push_str(format!("{} : {}\n", key, value).as_str());
                 }
+                result.push(']');
                 write!(f, "{}", result)
             }
             //LValue::Quote(q) => write!(f, "{}", q),
@@ -261,8 +273,10 @@ impl Display for LValue {
                 write!(f, "{}", co)
             }
             LValue::AsyncFn(fun) => write!(f, "{}", fun.get_label()),
-            LValue::Future(_) => write!(f, "{}", FUTURE),
-            LValue::Err(e) => write!(f, "err: {}", e),
+            LValue::Handler(_) => write!(f, "{}", HANDLER),
+            LValue::Err(e) => write!(f, "[err {}]", e),
+            LValue::MutFn(fun) => write!(f, "{}", fun.get_label()),
+            LValue::AsyncMutFn(fun) => write!(f, "{}", fun.get_label()),
         }
     }
 }
@@ -284,6 +298,22 @@ impl Hash for LValue {
 }
 
 impl Eq for LValue {}
+
+impl TryFrom<&LValue> for usize {
+    type Error = LRuntimeError;
+
+    fn try_from(value: &LValue) -> Result<Self, Self::Error> {
+        LNumber::try_from(value).map(|n| n.into())
+    }
+}
+
+impl TryFrom<&LValue> for u64 {
+    type Error = LRuntimeError;
+
+    fn try_from(value: &LValue) -> Result<Self, Self::Error> {
+        LNumber::try_from(value).map(|n| n.into())
+    }
+}
 
 impl TryFrom<&LValue> for im::HashMap<LValue, LValue> {
     type Error = LRuntimeError;
@@ -322,7 +352,7 @@ impl TryFrom<LValue> for im::HashMap<LValue, LValue> {
     type Error = LRuntimeError;
 
     fn try_from(value: LValue) -> Result<Self, Self::Error> {
-        (&value).try_into()
+        value.borrow().try_into()
     }
 }
 
@@ -332,6 +362,7 @@ impl TryFrom<&LValue> for String {
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
         match value {
             LValue::Symbol(s) => Ok(s.deref().clone()),
+            LValue::String(s) => Ok(s.deref().clone()),
             LValue::True => Ok(TRUE.into()),
             LValue::Nil => Ok(NIL.into()),
             LValue::Number(n) => Ok(n.to_string()),
@@ -349,7 +380,7 @@ impl TryFrom<LValue> for String {
     type Error = LRuntimeError;
 
     fn try_from(value: LValue) -> Result<Self, Self::Error> {
-        (&value).try_into()
+        value.borrow().try_into()
     }
 }
 
@@ -362,7 +393,7 @@ impl TryFrom<&LValue> for Vec<LValue> {
             LValue::Nil => Ok(vec![]),
             lv => Err(LRuntimeError::conversion_error(
                 "Vec<LValue>::tryfrom<&LValue>",
-                lv.into(),
+                lv,
                 KindLValue::List,
             )),
         }
@@ -373,7 +404,7 @@ impl TryFrom<LValue> for Vec<LValue> {
     type Error = LRuntimeError;
 
     fn try_from(value: LValue) -> Result<Self, Self::Error> {
-        (&value).try_into()
+        value.borrow().try_into()
     }
 }
 
@@ -396,7 +427,7 @@ impl TryFrom<LValue> for i64 {
     type Error = LRuntimeError;
 
     fn try_from(value: LValue) -> Result<Self, Self::Error> {
-        (&value).try_into()
+        value.borrow().try_into()
     }
 }
 
@@ -408,7 +439,7 @@ impl TryFrom<&LValue> for f64 {
             LValue::Number(n) => Ok(n.into()),
             lv => Err(LRuntimeError::conversion_error(
                 "f64::tryfrom<&LValue>",
-                lv.into(),
+                lv,
                 KindLValue::Number,
             )),
         }
@@ -419,7 +450,7 @@ impl TryFrom<LValue> for f64 {
     type Error = LRuntimeError;
 
     fn try_from(value: LValue) -> Result<Self, Self::Error> {
-        (&value).try_into()
+        value.borrow().try_into()
     }
 }
 
@@ -432,7 +463,7 @@ impl TryFrom<&LValue> for bool {
             LValue::Nil => Ok(false),
             lv => Err(LRuntimeError::conversion_error(
                 "bool::tryfrom<&LValue>",
-                lv.into(),
+                lv,
                 KindLValue::Bool,
             )),
         }
@@ -445,7 +476,7 @@ impl TryFrom<LValue> for bool {
     type Error = LRuntimeError;
 
     fn try_from(value: LValue) -> Result<Self, Self::Error> {
-        (&value).try_into()
+        value.borrow().try_into()
     }
 }
 
@@ -454,11 +485,11 @@ impl TryFrom<&LValue> for LCoreOperator {
 
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
         match value {
-            LValue::CoreOperator(co) => Ok(co.clone()),
+            LValue::CoreOperator(co) => Ok(*co),
             LValue::Symbol(s) => Ok(s.as_str().try_into()?),
             lv => Err(LRuntimeError::conversion_error(
                 "LCoreOperator::tryfrom<&LValue>",
-                lv.into(),
+                lv,
                 KindLValue::CoreOperator,
             )),
         }
@@ -469,7 +500,7 @@ impl TryFrom<LValue> for LCoreOperator {
     type Error = LRuntimeError;
 
     fn try_from(value: LValue) -> Result<Self, Self::Error> {
-        (&value).try_into()
+        value.borrow().try_into()
     }
 }
 
@@ -481,7 +512,7 @@ impl TryFrom<&LValue> for LLambda {
             LValue::Lambda(l) => Ok(l.clone()),
             lv => Err(LRuntimeError::conversion_error(
                 "LLambda::tryfrom<&LValue>",
-                lv.into(),
+                lv,
                 KindLValue::Lambda,
             )),
         }
@@ -492,7 +523,30 @@ impl TryFrom<LValue> for LLambda {
     type Error = LRuntimeError;
 
     fn try_from(value: LValue) -> Result<Self, Self::Error> {
-        (&value).try_into()
+        value.borrow().try_into()
+    }
+}
+
+impl TryFrom<&LValue> for LAsyncHandler {
+    type Error = LRuntimeError;
+
+    fn try_from(value: &LValue) -> Result<Self, Self::Error> {
+        match value {
+            LValue::Handler(l) => Ok(l.clone()),
+            lv => Err(LRuntimeError::conversion_error(
+                "LLambda::tryfrom<&LValue>",
+                lv,
+                KindLValue::Handler,
+            )),
+        }
+    }
+}
+
+impl TryFrom<LValue> for LAsyncHandler {
+    type Error = LRuntimeError;
+
+    fn try_from(value: LValue) -> Result<Self, Self::Error> {
+        value.borrow().try_into()
     }
 }
 
@@ -599,7 +653,7 @@ impl Mul for &LValue {
         match (self, rhs) {
             (LValue::Number(n1), LValue::Number(n2)) => Ok(LValue::Number(n1 * n2)),
             (LValue::Number(_), l) => Err(wrong_type!(l, KindLValue::Number)),
-            (l, LValue::Number(_)) => Err(wrong_type!(l.into(), KindLValue::Number)),
+            (l, LValue::Number(_)) => Err(wrong_type!(l, KindLValue::Number)),
 
             (l1, l2) => Err(lruntimeerror!(format!(
                 "{} and {} cannot be add",
@@ -673,6 +727,12 @@ impl From<LNumber> for LValue {
     }
 }
 
+impl From<u64> for LValue {
+    fn from(v: u64) -> Self {
+        LValue::Number(LNumber::Int(v as i64))
+    }
+}
+
 impl From<u32> for LValue {
     fn from(u: u32) -> Self {
         LValue::Number(LNumber::Int(u as i64))
@@ -689,7 +749,7 @@ impl From<&str> for LValue {
     fn from(s: &str) -> Self {
         let bytes = s.as_bytes();
         let len = bytes.len();
-        if char::from(bytes[0]) == '"' && char::from(bytes[len - 1]) == '"'.into() {
+        if char::from(bytes[0]) == '"' && char::from(bytes[len - 1]) == '"' {
             string!(s[1..len - 1].to_string())
         } else {
             symbol!(s.to_string())
@@ -699,7 +759,7 @@ impl From<&str> for LValue {
 
 impl From<String> for LValue {
     fn from(s: String) -> Self {
-        (&s).into()
+        s.as_str().into()
     }
 }
 

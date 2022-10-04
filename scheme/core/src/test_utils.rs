@@ -16,11 +16,16 @@ pub async fn test_expression(test_expression: TestExpression) -> lruntimeerror::
 
     //Load dependencies
     for e in test_expression.dependencies {
-        eval(&parse(e, &mut env).await?, &mut env).await?;
+        eval(&parse(e, &mut env).await?, &mut env, None).await?;
     }
 
     //Load macro
-    eval(&parse(test_expression.inner, &mut env).await?, &mut env).await?;
+    eval(
+        &parse(test_expression.inner, &mut env).await?,
+        &mut env,
+        None,
+    )
+    .await?;
 
     //Expand expression
     let expanded = parse(test_expression.expression, &mut env).await?;
@@ -37,7 +42,7 @@ pub async fn test_expression(test_expression: TestExpression) -> lruntimeerror::
 
     assert_eq!(expanded, expected);
 
-    let result = eval(&expanded, &mut env).await?;
+    let result = eval(&expanded, &mut env, None).await?;
     let expected_result = parse(test_expression.result, &mut env).await?;
     println!(
         "\t-result: {}\n\
@@ -56,11 +61,11 @@ pub async fn test_expression_with_env(
     eval_result: bool,
 ) -> lruntimeerror::Result<()> {
     for e in test_expression.dependencies {
-        eval(&parse(e, env).await?, env).await?;
+        eval(&parse(e, env).await?, env, None).await?;
     }
 
     //Load macro
-    eval(&parse(test_expression.inner, env).await?, env).await?;
+    eval(&parse(test_expression.inner, env).await?, env, None).await?;
 
     //Expand expression
     let expanded = parse(test_expression.expression, env).await?;
@@ -75,16 +80,16 @@ pub async fn test_expression_with_env(
         test_expression.expression, expanded, expected
     );
 
-    assert_eq!(expanded, expected,);
+    assert_eq!(expanded, expected);
 
-    let result = eval(&expanded, env).await?;
+    let result = eval(&expanded, env, None).await?;
     let expected_result = match eval_result {
-        true => eval(&parse(test_expression.result, env).await?, env).await?,
+        true => eval(&parse(test_expression.result, env).await?, env, None).await?,
         false => parse(test_expression.result, env).await?,
     };
     println!(
         "\t-result: {}\n\
-            \t-expected result: {}\n",
+        \t-expected result: {}\n",
         result, expected_result
     );
 

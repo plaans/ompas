@@ -14,7 +14,6 @@ pub fn env_get_keys(env: &LEnv) -> Vec<LValue> {
         .iter()
         .map(|x| LValue::from(x.clone()))
         .collect::<Vec<LValue>>()
-        .into()
 }
 
 #[scheme_fn]
@@ -47,7 +46,7 @@ pub fn help(env: &LEnv, args: &[LValue]) -> LResult {
             LValue::Fn(fun) => Ok(string!(documentation.get(fun.get_label()))),
             LValue::Symbol(s) => Ok(string!(documentation.get(s))),
             LValue::CoreOperator(co) => Ok(string!(documentation.get(&co.to_string()))),
-            lv => Err(LRuntimeError::wrong_type(HELP, &lv, KindLValue::Symbol)),
+            lv => Err(LRuntimeError::wrong_type(HELP, lv, KindLValue::Symbol)),
         },
         _ => Err(LRuntimeError::wrong_number_of_args(HELP, args, 0..1)),
     }

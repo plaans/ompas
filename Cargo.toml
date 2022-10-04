@@ -16,10 +16,9 @@ members = [
     "rae/language",
     "rae/log",
     "rae/planning",
-    "rae/scheme",
     "rae/structs",
     "gobotsim",
-    "benchmark"
+    "benchmark",
 ]
 
 exclude = ["aries"]

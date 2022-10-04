@@ -5,6 +5,7 @@ use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use sompas_core::{eval, eval_init, get_root_env, parse};
 use sompas_structs::lenv::{ImportType, LEnv};
+use sompas_structs::lruntimeerror::LResult;
 use sompas_structs::module::IntoModule;
 use sompas_utils::task_handler;
 use sompas_utils::task_handler::{subscribe_new_task, EndSignal};
@@ -21,7 +22,7 @@ use tokio::task::JoinHandle;
 pub struct LispInterpreterChannel {
     sender: Sender<String>,
     receiver: Receiver<String>,
-    subscribers: HashMap<usize, Sender<String>>,
+    subscribers: HashMap<usize, Sender<LResult>>,
     next_id: usize,
 }
 
@@ -57,18 +58,18 @@ impl LispInterpreterChannel {
         self.receiver.recv().await
     }
 
-    pub async fn send(&mut self, id: &usize, msg: String) -> Result<(), SendError<String>> {
+    pub async fn send(&mut self, id: &usize, result: LResult) -> Result<(), SendError<LResult>> {
         self.subscribers
             .get(id)
             .expect("error getting subscriber's sender")
-            .send(msg)
+            .send(result)
             .await
     }
 }
 #[derive(Debug)]
 pub struct ChannelToLispInterpreter {
     sender: Sender<String>,
-    receiver: Receiver<String>,
+    receiver: Receiver<LResult>,
     id: usize,
 }
 
@@ -79,8 +80,15 @@ impl ChannelToLispInterpreter {
         Ok(())
     }
 
-    pub async fn recv(&mut self) -> Option<String> {
+    pub async fn recv(&mut self) -> Option<LResult> {
         self.receiver.recv().await
+    }
+
+    pub async fn recv_string(&mut self) -> Option<String> {
+        self.receiver.recv().await.map(|lr| match lr {
+            Ok(lv) => lv.to_string(),
+            Err(e) => e.to_string(),
+        })
     }
 
     pub fn close(&mut self) {
@@ -114,11 +122,11 @@ impl LispInterpreter {
 
 impl LispInterpreter {
     pub fn import_namespace(&mut self, ctx: impl IntoModule) {
-        self.env.import(ctx, ImportType::WithoutPrefix)
+        self.env.import_module(ctx, ImportType::WithoutPrefix)
     }
 
     pub fn import(&mut self, ctx: impl IntoModule) {
-        self.env.import(ctx, ImportType::WithPrefix)
+        self.env.import_module(ctx, ImportType::WithPrefix)
     }
 
     async fn recv(&mut self) -> Option<String> {
@@ -129,6 +137,7 @@ impl LispInterpreter {
         eval_init(&mut self.env).await;
 
         let channel_with_log = self.subscribe();
+        let id_log = channel_with_log.id;
 
         let handle_log = spawn_log(channel_with_log, log).await;
         let handle_repl = if self.config.repl {
@@ -153,23 +162,26 @@ impl LispInterpreter {
             }
 
             match parse(str_lvalue.as_str(), &mut self.env).await {
-                Ok(lv) => match eval(&lv, &mut self.env).await {
-                    Ok(lv) => {
-                        self.li_channel
-                            .send(&id_subscriber, lv.format(0))
-                            .await
-                            .expect("error on channel to stdout");
-                    }
-                    Err(e) => {
-                        self.li_channel
-                            .send(&id_subscriber, format!("error: {}", e))
-                            .await
-                            .expect("error on channel to stdout");
-                    }
-                },
+                Ok(lv) => {
+                    let result = eval(&lv, &mut self.env, None).await;
+
+                    self.li_channel
+                        .send(&id_log, result.clone())
+                        .await
+                        .expect("error on log");
+                    self.li_channel
+                        .send(&id_subscriber, result)
+                        .await
+                        .expect("error on channel to stdout");
+                }
                 Err(e) => {
                     self.li_channel
-                        .send(&id_subscriber, format!("error: {}", e))
+                        .send(&id_log, Err(e.clone()))
+                        .await
+                        .expect("error on log");
+
+                    self.li_channel
+                        .send(&id_subscriber, Err(e))
                         .await
                         .expect("error on channel to stdout");
                 }
@@ -263,11 +275,13 @@ async fn log(
                         eprintln!("log task stopped working");
                         break;
                     }
-                    Some(b) => b,
+                    Some(Ok(lv)) => lv.to_string(),
+                    Some(Err(e)) => e.to_string()
                 };
-            file.write_all(format!("{}\n", buffer).as_bytes())
-                .expect("could not write to log file");
-            }
+
+                file.write_all(format!("{}\n", buffer).as_bytes())
+                    .expect("could not write to log file");
+                }
             _ = end_receiver.recv() => {
                 com.close();
                 break;
@@ -276,8 +290,17 @@ async fn log(
     }
     println!("Draining log queue...");
     while let Some(msg) = com.recv().await {
-        file.write_all(format!("{}\n", msg).as_bytes())
-            .expect("could not write to log file");
+        file.write_all(
+            format!(
+                "{}\n",
+                match msg {
+                    Ok(lv) => lv.to_string(),
+                    Err(e) => e.to_string(),
+                }
+            )
+            .as_bytes(),
+        )
+        .expect("could not write to log file");
     }
     println!("log task ended");
 }
@@ -302,12 +325,12 @@ async fn repl(mut com: ChannelToLispInterpreter) {
             Ok(string) => {
                 rl.add_history_entry(string.clone());
                 com.send(string).await.expect("couldn't send lisp command");
-                let buffer = match com.recv().await {
+                let buffer = match com.recv_string().await {
                     None => {
                         eprintln!("repl task stopped working");
                         break;
                     }
-                    Some(b) => b,
+                    Some(s) => s,
                 };
                 //if buffer != NIL {
                 println!("LI>> {}", buffer);

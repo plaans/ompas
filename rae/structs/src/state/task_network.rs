@@ -16,7 +16,7 @@ impl TaskNetwork {
         let subtasks = tn.get(task_id).unwrap();
         let n = subtasks.len();
         if subtasks.is_empty() {
-            return vec![format!("{:^3}", task_id), "   ".to_string()];
+            vec![format!("{:^3}", task_id), "   ".to_string()]
         } else {
             let mut vec = vec![];
             for (i, st) in subtasks.iter().enumerate() {

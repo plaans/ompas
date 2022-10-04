@@ -16,6 +16,7 @@ const DEFAULT_ARGS: &str = "args";
 const ENV_TYPE: &str = "LEnv";
 const ARGS_TYPE: &str = "[LValue]";
 const REF_ENV_TYPE: &str = "&LEnv";
+const REF_MUT_ENV_TYPE: &str = "&mut LEnv";
 const REF_ARGS_TYPE: &str = "&[LValue]";
 const LVALUE_TYPE_LONG: &str = "sompas_structs::lvalue::LValue";
 const LVALUE_TYPE: &str = "LValue";
@@ -40,7 +41,7 @@ pub fn scheme_fn(_: TokenStream, input: TokenStream) -> TokenStream {
         ReturnType::Default => quote!(),
         ReturnType::Type(_, b) => quote!(: #b),
     };
-    let expr_result = build_return(&result, &fun.sig.output);
+    let expr_result = build_return(&result, &fun.sig.output, &name);
     let body = fun.block.as_ref();
     let expanded = quote! {
          #vis fn #name(#env : #env_type, #args: #args_type) -> sompas_structs::lruntimeerror::LResult
@@ -71,7 +72,7 @@ pub fn async_scheme_fn(_: TokenStream, input: TokenStream) -> TokenStream {
         defined_lt = true;
         syn::parse_str(quote!(#lt).to_string().as_str())
             .unwrap_or_else(|e| panic!("expected a litefime: {}", e))
-    } else if params.len() == 0 {
+    } else if params.is_empty() {
         syn::parse_str(DEFAULT_LIFETIME).unwrap()
     } else {
         panic!("expected at most a lifetime");
@@ -96,7 +97,7 @@ pub fn async_scheme_fn(_: TokenStream, input: TokenStream) -> TokenStream {
         ReturnType::Default => quote!(),
         ReturnType::Type(_, b) => quote!(: #b),
     };
-    let expr_result = build_return(&result, &fun.sig.output);
+    let expr_result = build_return(&result, &fun.sig.output, &name);
     let body = fun.block.as_ref();
     let expanded = quote! {
      #vis fn #name<#lt>(#env : #env_type, #args: #args_type) -> ::std::pin::Pin<::std::boxed::Box<
@@ -197,20 +198,25 @@ fn build_params(
     if params.is_empty() {
         return ((env, env_type), (args, args_type), new_params);
     }
-    let type_lvalue: Type = syn::parse_str::<Type>(format!("{}", LVALUE_TYPE).as_str()).unwrap();
+    let type_lvalue: Type = syn::parse_str::<Type>(LVALUE_TYPE).unwrap();
     let type_ref_lvalue: Type = syn::parse_str::<Type>(REF_LVALUE_TYPE).unwrap();
-    let (type_env, type_args) = if let Some(lt) = defined_lt {
+    let (types_env, type_args) = if let Some(lt) = defined_lt {
         //println!("&{} {}", lt, ENV_TYPE);
-        let type_env: Type =
-            syn::parse_str::<Type>(format!("&{} {}", lt, ENV_TYPE).as_str()).unwrap();
+        let types_env: Vec<Type> = vec![
+            syn::parse_str::<Type>(format!("&{} {}", lt, ENV_TYPE).as_str()).unwrap(),
+            syn::parse_str::<Type>(format!("&{} mut {}", lt, ENV_TYPE).as_str()).unwrap(),
+        ];
         let type_args: Type =
             syn::parse_str::<Type>(format!("&{} {}", lt, ARGS_TYPE).as_str()).unwrap();
-        (type_env, type_args)
+        (types_env, type_args)
     } else {
-        let type_env: Type = syn::parse_str::<Type>(REF_ENV_TYPE).unwrap();
+        let types_env: Vec<Type> = vec![
+            syn::parse_str::<Type>(REF_ENV_TYPE).unwrap(),
+            syn::parse_str::<Type>(REF_MUT_ENV_TYPE).unwrap(),
+        ];
         let type_args: Type = syn::parse_str::<Type>(REF_ARGS_TYPE).unwrap();
 
-        (type_env, type_args)
+        (types_env, type_args)
     };
 
     let mut first = true;
@@ -228,12 +234,10 @@ fn build_params(
             let var = p.pat.as_ref();
             //println!("{:?}", t);
             //case where env ident is redefined
-            if i == 0 && t == &type_env {
+            if i == 0 && types_env.contains(t) {
                 //println!("env is redefined!");
                 env = syn::parse_quote!(#var);
-                env_type = if !is_async {
-                    syn::parse_quote!(#t)
-                } else if let Some(_) = defined_lt {
+                env_type = if !is_async || defined_lt.is_some() {
                     syn::parse_quote!(#t)
                 } else if let Type::Reference(r) = t {
                     let lt: Lifetime = syn::parse_str(DEFAULT_LIFETIME).unwrap();
@@ -251,9 +255,7 @@ fn build_params(
                 //println!("args is redefiend");
                 args_redefined = true;
                 args = syn::parse_quote!(#var);
-                args_type = if !is_async {
-                    syn::parse_quote!(#t)
-                } else if let Some(_) = defined_lt {
+                args_type = if !is_async || defined_lt.is_some() {
                     syn::parse_quote!(#t)
                 } else if let Type::Reference(r) = t {
                     let lt: Lifetime = syn::parse_str(DEFAULT_LIFETIME).unwrap();
@@ -315,7 +317,8 @@ fn build_params(
 }
 
 #[inline]
-fn build_return(ident: &Ident, expr: &ReturnType) -> TS {
+fn build_return(ident: &Ident, expr: &ReturnType, fname: &Ident) -> TS {
+    let fname = fname.to_string();
     let default: Expr = syn::parse_str(DEFAULT_RETURN).unwrap();
     let ok: Type = syn::parse_str(LVALUE_TYPE).unwrap();
     let err: Type = syn::parse_str(ERROR_TYPE).unwrap();
@@ -329,42 +332,36 @@ fn build_return(ident: &Ident, expr: &ReturnType) -> TS {
         ReturnType::Default => return quote!(#default),
         ReturnType::Type(_, b) => {
             if normal_return_type.contains(b.as_ref()) {
-                quote!(#ident)
-            } else {
-                if let Type::Path(t) = b.as_ref() {
-                    if t.path.segments.len() == 1 {
-                        let segment = &t.path.segments[0];
-                        if &segment.ident == &r_type {
-                            //println!("it is a result");
-                            if let PathArguments::AngleBracketed(args) = &segment.arguments {
-                                assert!(args.args.len() == 2);
-                                let o = &args.args[0];
-                                let e = &args.args[1];
-                                let o: Type =
-                                    syn::parse_str(quote!(#o).to_string().as_str()).unwrap();
-                                let e: Type =
-                                    syn::parse_str(quote!(#e).to_string().as_str()).unwrap();
-                                if o != ok && e != err {
-                                    quote! {
-                                        match #ident {
-                                            Ok(o) => Ok(sompas_structs::lvalue::LValue::from(o)),
-                                            Err(e) => Err(sompas_structs::lruntimeerror::LRuntimeError::from(e))
-                                        }
-                                    }
-                                } else if o == ok {
-                                    //println!("result returns a LValue");
-                                    quote!(#ident.map_err(|e| sompas_structs::lruntimeerror::LRuntimeError::from(e)))
-                                } else if e == err {
-                                    //println!("result returns a LRuntimeError");
-                                    quote!(#ident.map(|o| sompas_structs::lvalue::LValue::from(o)))
-                                } else {
-                                    quote!(#ident)
-                                }
+                quote!(#ident.map_err(|e| e.chain(#fname)))
+            } else if let Type::Path(t) = b.as_ref() {
+                if t.path.segments.len() == 1 {
+                    let segment = &t.path.segments[0];
+                    if segment.ident == r_type {
+                        //println!("it is a result");
+                        if let PathArguments::AngleBracketed(args) = &segment.arguments {
+                            assert!(args.args.len() == 2);
+                            let o = &args.args[0];
+                            let e = &args.args[1];
+                            let o: Type = syn::parse_str(quote!(#o).to_string().as_str()).unwrap();
+                            let e: Type = syn::parse_str(quote!(#e).to_string().as_str()).unwrap();
+                            if o == ok && e == err {
+                                quote!(#ident.map_err(|e| e.chain(#fname)))
+                            } else if o == ok && e != err {
+                                //println!("result returns a LValue");
+                                quote!(#ident.map_err(|e| sompas_structs::lruntimeerror::LRuntimeError::from(e).chain(#fname)))
+                            } else if o != ok && e == err {
+                                //println!("result returns a LRuntimeError");
+                                quote!(#ident.map(|o| sompas_structs::lvalue::LValue::from(o)).map_err(|e| e.chain(#fname)))
                             } else {
-                                panic!("should have been brackets")
+                                quote! {
+                                    match #ident {
+                                        Ok(o) => Ok(sompas_structs::lvalue::LValue::from(o)),
+                                        Err(e) => Err(sompas_structs::lruntimeerror::LRuntimeError::from(e).chain(#fname))
+                                    }
+                                }
                             }
                         } else {
-                            classic_return
+                            panic!("should have been brackets")
                         }
                     } else {
                         classic_return
@@ -372,6 +369,8 @@ fn build_return(ident: &Ident, expr: &ReturnType) -> TS {
                 } else {
                     classic_return
                 }
+            } else {
+                classic_return
             }
         }
     };

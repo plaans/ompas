@@ -2,8 +2,9 @@
 
 use crate::language::*;
 use crate::rae_interface::PlatformGodot;
-use ompas_rae_scheme::rae_exec::RAEInterface;
 use ompas_rae_structs::agenda::Agenda;
+use ompas_rae_structs::platform::RAEPlatform;
+use ompas_rae_structs::rae_interface::RAEInterface;
 use ompas_rae_structs::state::world_state::*;
 use sompas_macros::*;
 use sompas_structs::contextcollection::Context;
@@ -15,6 +16,7 @@ use sompas_structs::lvalue::LValue;
 use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
 use sompas_structs::{lruntimeerror, wrong_type};
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 /*
@@ -37,14 +39,18 @@ pub struct CtxGodot {
 
 impl Default for CtxGodot {
     fn default() -> Self {
-        let state = WorldState::default();
-        let agenda = Agenda::default();
+        let interface = RAEInterface::default();
+        let state = interface.state.clone();
+        let agenda = interface.agenda.clone();
         let platform = Arc::new(RwLock::new(PlatformGodot {
             socket_info: Default::default(),
+            headless: false,
             sender_socket: None,
-            state: state.clone(),
-            instance: Default::default(),
-            agenda: agenda.clone(),
+            interface,
+            domain: PathBuf::from(
+                "/home/jeremy/CLionProjects/ompas/gobotsim/godot_domain/domain.lisp",
+            )
+            .into(),
         }));
         Self {
             state,
@@ -102,7 +108,7 @@ impl IntoModule for CtxGodot {
             label: MOD_GODOT.to_string(),
         };
 
-        module.add_async_fn_prelude(OPEN_COM, open_com);
+        //module.add_async_fn_prelude(OPEN_COM, open_com);
         module.add_async_fn_prelude(LAUNCH_GODOT, launch_godot);
         module.add_async_fn_prelude(START_GODOT, start_godot);
         module.add_async_fn_prelude(EXEC_GODOT, exec_godot);
@@ -231,8 +237,7 @@ async fn launch_godot(env: &LEnv, args: &[LValue]) -> LResult {
     let env = env.clone();
     let ctx = env.get_context::<CtxGodot>(MOD_GODOT).unwrap();
     let mut platform = ctx.platform.write().await;
-    let future = platform.launch_platform(args).await;
-    future
+    platform.launch_platform(args).await
 }
 
 /// Opens the tcp communication to receive state and status update and send commands.
@@ -260,7 +265,7 @@ async fn start_godot(env: &LEnv, args: &[LValue]) -> LResult {
 #[async_scheme_fn]
 async fn exec_godot(env: &LEnv, args: &[LValue]) -> LResult {
     let ctx = env.get_context::<CtxGodot>(MOD_GODOT).unwrap();
-    let (id, _) = ctx.agenda.add_action(args.into(), 0).await;
+    let (id, _) = ctx.agenda.add_action(args.into(), None).await;
     ctx.platform.read().await.exec_command(args, id).await
 }
 
@@ -285,7 +290,7 @@ async fn get_state(env: &LEnv, args: &[LValue]) -> LResult {
             lv => {
                 return Err(wrong_type!(
                     "PlatformGodot::get_state",
-                    &lv,
+                    lv,
                     KindLValue::Symbol
                 ))
             }

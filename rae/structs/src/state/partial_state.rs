@@ -2,6 +2,7 @@ use crate::state::world_state::StateType;
 use im::HashMap;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalues::LValueS;
+use std::borrow::Borrow;
 
 #[derive(Clone, Default, Debug)]
 pub struct PartialState {
@@ -20,7 +21,7 @@ impl From<&HashMap<LValueS, LValueS>> for PartialState {
 
 impl From<HashMap<LValueS, LValueS>> for PartialState {
     fn from(m: HashMap<LValueS, LValueS>) -> Self {
-        (&m).into()
+        m.borrow().into()
     }
 }
 
@@ -31,7 +32,7 @@ impl From<&PartialState> for HashMap<LValueS, LValueS> {
 }
 impl From<PartialState> for HashMap<LValueS, LValueS> {
     fn from(ls: PartialState) -> Self {
-        (&ls).into()
+        ls.borrow().into()
     }
 }
 

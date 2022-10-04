@@ -15,6 +15,7 @@
 //! ```
 
 use aries_utils::StreamingIterator;
+use futures::FutureExt;
 use rand::Rng;
 use sompas_core::eval;
 use sompas_core::modules::list::car;
@@ -23,15 +24,19 @@ use sompas_macros::async_scheme_fn;
 use sompas_macros::scheme_fn;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::{Documentation, LHelp};
+use sompas_structs::lasynchandler::LAsyncHandler;
 use sompas_structs::lcoreoperator::LCoreOperator;
 use sompas_structs::lenv::LEnv;
+use sompas_structs::lfuture::FutureResult;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
+use sompas_structs::lswitch::new_interruption_handler;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
-use sompas_structs::{list, lruntimeerror};
+use sompas_structs::{interrupted, list, lruntimeerror};
 use std::ops::Deref;
+use std::time::Duration;
 
 //LANGUAGE
 pub const MOD_UTILS: &str = "utils";
@@ -232,14 +237,41 @@ pub const LAMBDA_ARBITRARY: &str = "(define arbitrary
                     (f l)))
               (else nil)))) ; error cases";
 
-pub const LAMBDA_EVAL_NON_RECURSIVE: &str = "(define enr
-    (lambda (l)
-        (eval (cons (car l) (quote-list (cdr l))))))";
+/*pub const LAMBDA_EVAL_NON_RECURSIVE: &str = "(define enr
+(lambda (l)
+    (eval (cons (car l) (quote-list (cdr l))))))";*/
 
 pub const EVAL_NON_RECURSIVE: &str = "enr";
 
 pub const DOC_ARBITRARY: &str = "todo!";
 pub const DOC_EVAL_NON_RECURSIVE: &str = "todo!";
+
+pub const LAMBDA_PAR: &str = "(define par (lambda l
+    (mapf await (mapf async l))))";
+pub const PAR: &str = "par";
+pub const DOC_PAR: &str = "todo!";
+
+pub const LAMBDA_REPEAT: &str = "(define repeat (lambda (e n)
+    (if (> n 0)
+        (begin
+            (eval e)
+            (repeat e (- n 1))))))";
+
+pub const LAMBDA_RETRY_ONCE: &str = "(define retry-once (lambda (e)
+    (begin
+        (define __r__ (eval e))
+        (if (err? __r__)
+            (eval e)
+            __r__))))";
+
+pub const LAMBDA_ASYNC_INTERRUPT: &str = "(define await-interrupt
+    (lambda (__h__)
+    (u! 
+        (begin
+            (define __r__ (i! (await __h__)))
+            (if (interrupted? __r__)
+                (interrupt __h__)
+                __r__)))))";
 
 #[derive(Default, Copy, Clone, Debug)]
 pub struct CtxUtils {}
@@ -276,19 +308,24 @@ impl IntoModule for CtxUtils {
                 //MACRO_FOR,
                 //LAMBDA_ARBITRARY,
                 //LAMBDA_EVAL_NON_RECURSIVE,
+                LAMBDA_PAR,
+                LAMBDA_REPEAT,
+                LAMBDA_RETRY_ONCE,
+                LAMBDA_ASYNC_INTERRUPT,
             ]
             .into(),
             label: MOD_UTILS.into(),
         };
 
         module.add_async_fn_prelude(ARBITRARY, arbitrary);
-        module.add_async_fn_prelude(EVAL_NON_RECURSIVE, enr);
+        //module.add_async_fn_prelude(EVAL_NON_RECURSIVE, enr);
         module.add_fn_prelude(RAND_ELEMENT, rand_element);
         module.add_fn_prelude(ENUMERATE, enumerate);
         module.add_fn_prelude(CONTAINS, contains);
         module.add_fn_prelude(SUB_LIST, sublist);
         module.add_fn_prelude(TRANSFORM_IN_SINGLETON_LIST, transform_in_singleton_list);
         module.add_fn_prelude(QUOTE_LIST, quote_list);
+        module.add_async_fn_prelude(SLEEP, sleep);
 
         module
     }
@@ -345,6 +382,7 @@ pub async fn arbitrary(env: &LEnv, args: &[LValue]) -> LResult {
                 ]
                 .into(),
                 &mut env.clone(),
+                None,
             )
             .await
         }
@@ -352,7 +390,7 @@ pub async fn arbitrary(env: &LEnv, args: &[LValue]) -> LResult {
     }
 }
 
-#[async_scheme_fn]
+/*#[async_scheme_fn]
 pub async fn enr<'a>(env: &'a LEnv, mut args: Vec<LValue>) -> LResult {
     for (i, arg) in args.iter_mut().enumerate() {
         if i != 0 {
@@ -360,8 +398,8 @@ pub async fn enr<'a>(env: &'a LEnv, mut args: Vec<LValue>) -> LResult {
         }
     }
 
-    eval(&args.into(), &mut env.clone()).await
-}
+    eval(&args.into(), &mut env.clone(), None).await
+}*/
 
 ///Return enumeration from a list of list
 ///uses function from aries_utils
@@ -495,6 +533,33 @@ pub fn transform_in_singleton_list(args: &[LValue]) -> Vec<LValue> {
         .collect::<Vec<LValue>>()
 }
 
+#[async_scheme_fn]
+pub async fn sleep(n: LNumber) -> LAsyncHandler {
+    let (tx, mut rx) = new_interruption_handler();
+    let f: FutureResult = Box::pin(async move {
+        let duration = Duration::from_micros((f64::from(&n) * 1_000_000.0) as u64);
+
+        //let sleep = tokio::time::sleep(duration).shared();
+        //let sleep_2 = sleep.clone();
+        tokio::select! {
+            _ = rx.recv() => {
+                //println!("sleep interrupted");
+                Ok(interrupted!())
+            }
+            _ = tokio::time::sleep(duration) => {
+                //println!("sleep terminated");
+                Ok(LValue::Nil)
+            }
+        }
+    }) as FutureResult;
+    let f = f.shared();
+
+    let f2 = f.clone();
+    tokio::spawn(f2);
+
+    LAsyncHandler::new(f, tx)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -507,11 +572,11 @@ mod test {
         let env = get_root_env().await;
 
         let lv = &[vec![1, 2, 3].into()];
-        let result = arbitrary(lv, &env).await?;
+        let result = arbitrary(&env, lv).await?;
         assert_eq!(result, LValue::from(1));
 
         let lv = &[vec![1, 2, 3].into(), SECOND.into()];
-        let result = arbitrary(lv, &env).await?;
+        let result = arbitrary(&env, lv).await?;
         assert_eq!(result, LValue::from(2));
 
         Ok(())
@@ -519,7 +584,7 @@ mod test {
     #[test]
     fn test_contains() -> lruntimeerror::Result<()> {
         let lv: &[LValue] = &[vec![1, 2, 3, 4, 5, 6].into(), 6.into()];
-        let result = contains(lv, &LEnv::default())?;
+        let result = contains(&LEnv::default(), lv)?;
         assert_eq!(result, LValue::True);
         Ok(())
     }
@@ -528,8 +593,8 @@ mod test {
     fn test_sublist() -> lruntimeerror::Result<()> {
         let lv_1: &[LValue] = &[vec![1, 2, 3, 4, 5, 6].into(), 1.into()];
         let lv_2: &[LValue] = &[vec![1, 2, 3, 4, 5, 6].into(), 1.into(), 3.into()];
-        let result1 = sublist(lv_1, &LEnv::default())?;
-        let result2 = sublist(lv_2, &LEnv::default())?;
+        let result1 = sublist(&LEnv::default(), lv_1)?;
+        let result2 = sublist(&LEnv::default(), lv_2)?;
         assert_eq!(result1, vec![2, 3, 4, 5, 6].into());
         assert_eq!(result2, vec![2, 3].into());
         Ok(())

@@ -1,5 +1,3 @@
-use std::collections::VecDeque;
-//use aries_model::lang::ConversionError;
 use crate::kindlvalue::KindLValue;
 use crate::lvalue::LValue;
 use std::error::Error;
@@ -27,28 +25,32 @@ use std::ops::Range;
 /// It can be the name of the function.
 #[derive(Debug, Clone, Default)]
 pub struct LRuntimeError {
-    backtrace: VecDeque<&'static str>,
+    backtrace: Vec<String>,
     message: String,
 }
 
 impl LRuntimeError {
-    pub fn chain(mut self, context: &'static str) -> Self {
-        self.backtrace.push_front(context);
+    pub fn get_message(&self) -> &str {
+        &self.message
+    }
+
+    pub fn chain(mut self, context: impl Display) -> Self {
+        self.backtrace.push(context.to_string());
         self
     }
 }
 
 impl LRuntimeError {
-    pub fn new(context: &'static str, message: impl Display) -> Self {
+    pub fn new(context: impl Display, message: impl Display) -> Self {
         Self {
-            backtrace: [context].into(),
+            backtrace: vec![context.to_string()],
             message: message.to_string(),
         }
     }
 
-    pub fn wrong_type(context: &'static str, lv: &LValue, expected: KindLValue) -> Self {
+    pub fn wrong_type(context: impl Display, lv: &LValue, expected: KindLValue) -> Self {
         Self {
-            backtrace: [context].into(),
+            backtrace: vec![context.to_string()],
             message: format!(
                 "Wrong type: {} is a {}, expected {}.",
                 lv,
@@ -58,7 +60,7 @@ impl LRuntimeError {
         }
     }
     pub fn wrong_number_of_args(
-        context: &'static str,
+        context: impl Display,
         lv: &[LValue],
         expected: Range<usize>,
     ) -> Self {
@@ -72,7 +74,7 @@ impl LRuntimeError {
             format!("expected between {} and {}", expected.start, expected.end)
         };
         Self {
-            backtrace: [context].into(),
+            backtrace: vec![context.to_string()],
             message: format!(
                 "Wrong number of args: {} is of length {}, {}.",
                 LValue::from(lv),
@@ -83,12 +85,12 @@ impl LRuntimeError {
     }
 
     pub fn not_in_list_of_expected_types(
-        context: &'static str,
+        context: impl Display,
         lv: &LValue,
         t: Vec<KindLValue>,
     ) -> Self {
         Self {
-            backtrace: [context].into(),
+            backtrace: vec![context.to_string()],
             message: format!(
                 "Wrong type: {} is a {}, expected either one of {:#?}.",
                 lv,
@@ -100,7 +102,7 @@ impl LRuntimeError {
 
     pub fn conversion_error(context: &'static str, lv: &LValue, kind: KindLValue) -> Self {
         Self {
-            backtrace: [context].into(),
+            backtrace: vec![context.to_string()],
             message: format!(
                 "Cannot convert {} of type {} into {}",
                 lv,
@@ -110,9 +112,9 @@ impl LRuntimeError {
         }
     }
 
-    pub fn extended_conversion_error<A: Display, B>(context: &'static str, lv: &A) -> Self {
+    pub fn extended_conversion_error<A: Display, B>(context: impl Display, lv: &A) -> Self {
         Self {
-            backtrace: [context].into(),
+            backtrace: vec![context.to_string()],
             message: format!(
                 "Cannot convert {} of type {} into {}",
                 lv,
@@ -127,19 +129,19 @@ impl Error for LRuntimeError {}
 
 impl Display for LRuntimeError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        let mut str = String::new();
+        writeln!(f, "message: {}", self.message).expect("");
+        writeln!(f, "\nbacktrace:").expect("");
         for a in &self.backtrace {
-            str.push_str(a);
-            str.push(':');
+            writeln!(f, "- from {}", a).expect("");
         }
-        writeln!(f, "{} {}", str, self.message)
+        Ok(())
     }
 }
 
 impl From<anyhow::Error> for LRuntimeError {
     fn from(a: anyhow::Error) -> Self {
         Self {
-            backtrace: ["anyhow"].into(),
+            backtrace: vec!["anyhow".to_string()],
             message: a.to_string(),
         }
     }
@@ -148,7 +150,7 @@ impl From<anyhow::Error> for LRuntimeError {
 impl From<std::io::Error> for LRuntimeError {
     fn from(e: std::io::Error) -> Self {
         Self {
-            backtrace: ["std::io::Error"].into(),
+            backtrace: vec!["std::io::Error".to_string()],
             message: e.to_string(),
         }
     }

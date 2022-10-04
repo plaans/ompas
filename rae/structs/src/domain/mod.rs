@@ -1,15 +1,10 @@
-use crate::context::{
-    ACTION_TYPE, LAMBDA_TYPE, METHOD_TYPE, RAE_ACTION_LIST, RAE_ACTION_MODEL_MAP, RAE_METHOD_LIST,
-    RAE_METHOD_PRE_CONDITIONS_MAP, RAE_METHOD_SCORE_MAP, RAE_METHOD_TYPES_MAP,
-    RAE_STATE_FUNCTION_LIST, RAE_SYMBOL_TYPE, RAE_TASK_LIST, RAE_TASK_METHODS_MAP,
-    STATE_FUNCTION_TYPE, TASK_TYPE,
-};
-use crate::domain::action::Action;
+use crate::domain::command::Command;
 use crate::domain::method::Method;
 use crate::domain::state_function::StateFunction;
 use crate::domain::task::Task;
 use crate::domain::type_hierarchy::TypeHierarchy;
 use im::HashMap;
+use ompas_rae_language::*;
 use sompas_structs::lenv::LEnvSymbols;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
@@ -17,7 +12,7 @@ use sompas_structs::lvalue::LValue;
 use std::fmt::{Display, Formatter};
 
 pub mod _type;
-pub mod action;
+pub mod command;
 pub mod method;
 pub mod parameters;
 pub mod state_function;
@@ -29,7 +24,7 @@ pub struct RAEDomain {
     pub tasks: HashMap<String, Task>,
     pub methods: HashMap<String, Method>,
     pub state_functions: HashMap<String, StateFunction>,
-    pub actions: HashMap<String, Action>,
+    pub commands: HashMap<String, Command>,
     pub lambdas: HashMap<String, LValue>,
     pub types: TypeHierarchy,
     pub map_symbol_type: HashMap<String, String>,
@@ -44,7 +39,7 @@ impl RAEDomain {
                 METHOD_TYPE => self.methods.get(label).unwrap().to_string(),
                 STATE_FUNCTION_TYPE => self.state_functions.get(label).unwrap().to_string(),
                 LAMBDA_TYPE => self.lambdas.get(label).unwrap().to_string(),
-                ACTION_TYPE => self.actions.get(label).unwrap().to_string(),
+                ACTION_TYPE => self.commands.get(label).unwrap().to_string(),
                 _ => panic!("There should no other type of symbol_type"),
             },
         }
@@ -65,8 +60,8 @@ impl RAEDomain {
         &self.state_functions
     }
 
-    pub fn get_actions(&self) -> &HashMap<String, Action> {
-        &self.actions
+    pub fn get_actions(&self) -> &HashMap<String, Command> {
+        &self.commands
     }
 
     pub fn get_lambdas(&self) -> &HashMap<String, LValue> {
@@ -76,9 +71,10 @@ impl RAEDomain {
 
 //Adder
 impl RAEDomain {
-    pub fn add_task(&mut self, label: String, value: Task) {
-        self.tasks.insert(label.clone(), value);
+    pub fn add_task(&mut self, label: String, task: Task) -> Result<(), LRuntimeError> {
+        self.tasks.insert(label.clone(), task);
         self.map_symbol_type.insert(label, TASK_TYPE.into());
+        Ok(())
     }
 
     pub fn add_method(&mut self, label: String, value: Method) -> Result<(), LRuntimeError> {
@@ -91,7 +87,7 @@ impl RAEDomain {
                 )
             )),
             Some(task) => {
-                task.methods.push(label.clone());
+                task.add_method(label.clone());
                 self.methods.insert(label.clone(), value);
                 self.map_symbol_type.insert(label, METHOD_TYPE.into());
                 Ok(())
@@ -99,30 +95,46 @@ impl RAEDomain {
         }
     }
 
-    pub fn add_state_function(&mut self, label: String, value: StateFunction) {
+    pub fn add_state_function(
+        &mut self,
+        label: String,
+        value: StateFunction,
+    ) -> Result<(), LRuntimeError> {
         self.state_functions.insert(label.clone(), value);
         self.map_symbol_type
             .insert(label, STATE_FUNCTION_TYPE.into());
+        Ok(())
     }
 
-    pub fn add_action(&mut self, label: String, value: Action) {
-        self.actions.insert(label.clone(), value);
+    pub fn add_command(&mut self, label: String, value: Command) -> Result<(), LRuntimeError> {
+        self.commands.insert(label.clone(), value);
         self.map_symbol_type.insert(label, ACTION_TYPE.into());
+        Ok(())
     }
 
-    pub fn add_action_sample_fn(
-        &mut self,
-        label: String,
-        value: LValue,
-    ) -> Result<(), LRuntimeError> {
-        match self.actions.get_mut(&label) {
+    pub fn add_command_model(&mut self, label: String, value: LValue) -> Result<(), LRuntimeError> {
+        match self.commands.get_mut(&label) {
             None => Err(lruntimeerror!(
                 "add_action_sample_fn",
                 format!("Action {} is not defined", label)
             )),
             Some(action) => {
                 //println!("updating sim of {} with {}", label, value);
-                action.sim = value;
+                action.set_model(value);
+                Ok(())
+            }
+        }
+    }
+
+    pub fn add_task_model(&mut self, label: String, value: LValue) -> Result<(), LRuntimeError> {
+        match self.tasks.get_mut(&label) {
+            None => Err(lruntimeerror!(
+                "add_action_sample_fn",
+                format!("Action {} is not defined", label)
+            )),
+            Some(task) => {
+                //println!("updating sim of {} with {}", label, value);
+                task.set_model(value);
                 Ok(())
             }
         }
@@ -165,7 +177,7 @@ impl RAEDomain {
     }
 
     pub fn get_list_actions(&self) -> LValue {
-        self.actions
+        self.commands
             .keys()
             .map(|k| LValue::from(k.clone()))
             .collect::<Vec<LValue>>()
@@ -220,7 +232,7 @@ impl RAEDomain {
 
     pub fn print_actions(&self) -> String {
         let mut str = "*ACTIONS:\n".to_string();
-        for (label, value) in &self.actions {
+        for (label, value) in &self.commands {
             str.push_str(format!("\t-{}:\n{}\n\n", label, value).as_str())
         }
         str
@@ -275,8 +287,8 @@ impl RAEDomain {
 
         //Add all actions to env:
         for (label, action) in self.get_actions() {
-            env.insert(label.clone(), action.exec.clone());
-            map_action_model.insert(label.into(), action.sim.clone());
+            env.insert(label.clone(), action.get_body().clone());
+            map_action_model.insert(label.into(), action.get_model().clone());
         }
 
         //Add all state functions to env:
@@ -342,7 +354,7 @@ impl RAEDomain {
 
         //Add all actions to env:
         for (label, action) in self.get_actions() {
-            env.insert(label.clone(), action.sim.clone());
+            env.insert(label.clone(), action.get_model().clone());
         }
 
         //Add all state functions to env:

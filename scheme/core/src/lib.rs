@@ -1,3 +1,5 @@
+extern crate core;
+
 use crate::modules::CtxRoot;
 use anyhow::anyhow;
 use aries_planning::parsing::sexpr::SExpr;
@@ -5,16 +7,23 @@ use async_recursion::async_recursion;
 use lazy_static::lazy_static;
 use sompas_language::*;
 use sompas_structs::lcoreoperator::LCoreOperator;
-use sompas_structs::lcoreoperator::LCoreOperator::Quote;
 use sompas_structs::lenv::{ImportType, LEnv};
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 
+use crate::structs::{
+    BeginFrame, CoreOperatorFrame, DefineFrame, DoFrame, EvalStack, IfFrame, Interruptibility,
+    LDebug, ProcedureFrame, Results, ScopeCollection, StackFrame, StackKind, Unstack,
+};
+use crate::Interruptibility::Unininterruptible;
+use futures::FutureExt;
 use sompas_structs::kindlvalue::KindLValue;
-use sompas_structs::lfuture::FutureResult;
+use sompas_structs::lasynchandler::LAsyncHandler;
+use sompas_structs::lfuture::{FutureResult, LFuture};
 use sompas_structs::llambda::{LLambda, LambdaArgs};
 use sompas_structs::lnumber::LNumber;
+use sompas_structs::lswitch::{new_interruption_handler, InterruptionReceiver};
 use sompas_structs::lvalue::LValue;
-use sompas_structs::{string, symbol, wrong_n_args, wrong_type};
+use sompas_structs::{interrupted, list, string, symbol, wrong_n_args, wrong_type};
 use std::convert::TryFrom;
 use std::convert::TryInto;
 use std::fmt::Write;
@@ -22,8 +31,10 @@ use std::ops::Deref;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
+
 pub mod modules;
 pub mod static_eval;
+pub mod structs;
 pub mod test_utils;
 lazy_static! {
     ///Global variable used to enable debug println.
@@ -35,7 +46,7 @@ pub async fn get_root_env() -> LEnv {
     // let map = im::hashmap::HashMap::new();
     // map.ins
     let mut env = LEnv::default();
-    env.import(CtxRoot::default(), ImportType::WithoutPrefix);
+    env.import_module(CtxRoot::default(), ImportType::WithoutPrefix);
     eval_init(&mut env).await;
     env
 }
@@ -45,7 +56,9 @@ pub async fn eval_init(env: &mut LEnv) {
 
     let inner = env.get_init().clone();
     let inner = inner.inner();
+    //println!("eval init");
     for e in inner {
+        //println!("-{}", e);
         let lv = match parse(e, env).await {
             Ok(lv) => lv,
             Err(e) => {
@@ -53,7 +66,7 @@ pub async fn eval_init(env: &mut LEnv) {
                 continue;
             }
         };
-        if let Err(e) = eval(&lv, env).await {
+        if let Err(e) = eval(&lv, env, None).await {
             errors.push(e)
         }
     }
@@ -181,7 +194,7 @@ pub async fn expand(x: &LValue, top_level: bool, env: &mut LEnv) -> LResult {
                                         )
                                         .into());
                                     }
-                                    let proc = eval(&exp, &mut env.clone()).await?;
+                                    let proc = eval(&exp, env, None).await?;
                                     //println!("new macro: {}", proc);
                                     if !matches!(proc, LValue::Lambda(_)) {
                                         return Err(
@@ -316,6 +329,15 @@ pub async fn expand(x: &LValue, top_level: bool, env: &mut LEnv) -> LResult {
                             Ok(expanded.into())
                         }
                     }
+                    LCoreOperator::Enr => {
+                        return if list.len() != 2 {
+                            Err(wrong_n_args!("expand", list, 2))
+                        } else {
+                            let mut expanded = vec![LCoreOperator::Enr.into()];
+                            expanded.push(expand(&list[1], top_level, env).await?);
+                            Ok(expanded.into())
+                        }
+                    }
                     LCoreOperator::Parse => {
                         return if list.len() != 2 {
                             Err(wrong_n_args!("expand", list, 2))
@@ -334,6 +356,54 @@ pub async fn expand(x: &LValue, top_level: bool, env: &mut LEnv) -> LResult {
                             Ok(expanded.into())
                         }
                     }
+                    LCoreOperator::Interrupt => {
+                        return if list.len() != 2 {
+                            Err(wrong_n_args!("expand", list, 2))
+                        } else {
+                            let mut expanded = vec![LCoreOperator::Interrupt.into()];
+                            expanded.push(expand(&list[1], top_level, env).await?);
+                            Ok(expanded.into())
+                        }
+                    }
+                    LCoreOperator::Interruptible => {
+                        return if list.len() != 2 {
+                            Err(wrong_n_args!("expand", list, 2))
+                        } else {
+                            let mut expanded = vec![LCoreOperator::Interruptible.into()];
+                            expanded.push(expand(&list[1], top_level, env).await?);
+                            Ok(expanded.into())
+                        }
+                    }
+                    LCoreOperator::Uninterruptible => {
+                        return if list.len() != 2 {
+                            Err(wrong_n_args!("expand", list, 2)
+                                .chain(format!("{} must have one arg", UNINTERRUPTIBLE)))
+                        } else {
+                            let mut expanded = vec![LCoreOperator::Uninterruptible.into()];
+                            expanded.push(expand(&list[1], top_level, env).await?);
+                            Ok(expanded.into())
+                        }
+                    } /*LCoreOperator::QuasiInterruptible => {
+                    return if list.len() != 2 {
+                    Err(wrong_n_args!("expand", list, 2))
+                    } else {
+                    let mut expanded = vec![LCoreOperator::QuasiInterruptible.into()];
+                    expanded.push(expand(&list[1], top_level, env).await?);
+                    Ok(expanded.into())
+                    }
+                    }*/
+                    LCoreOperator::Race => {
+                        return if list.len() != 3 {
+                            Err(wrong_n_args!("expand", list, 3)
+                                .chain(format!("{} must have 2 args.", RACE)))
+                        } else {
+                            let mut expanded = vec![LCoreOperator::Race.into()];
+                            for e in &list[1..] {
+                                expanded.push(expand(e, top_level, env).await?);
+                            }
+                            Ok(expanded.into())
+                        }
+                    }
                 }
             } else if let LValue::Symbol(sym) = &list[0] {
                 match env.get_macro(sym) {
@@ -342,7 +412,7 @@ pub async fn expand(x: &LValue, top_level: bool, env: &mut LEnv) -> LResult {
                         let lv = m.get_body();
                         let env = &mut m.get_new_env(env.clone(), &list[1..])?;
 
-                        let expanded = expand(&eval(lv, env).await?, top_level, env).await?;
+                        let expanded = expand(&eval(lv, env, None).await?, top_level, env).await?;
                         if get_debug() {
                             println!("In expand: macro expanded: {:?}", expanded);
                         }
@@ -389,14 +459,709 @@ pub fn expand_quasi_quote(x: &LValue, env: &LEnv) -> LResult {
                 .into())
             }
         }
-        _ => Ok(vec![Quote.into(), x.clone()].into()),
+        _ => Ok(vec![LCoreOperator::Quote.into(), x.clone()].into()),
     }
     //Verify if has unquotesplicing here
+}
+
+#[inline]
+pub fn async_eval(lv: LValue, mut env: LEnv) -> LAsyncHandler {
+    let (tx, rx) = new_interruption_handler();
+
+    let future: FutureResult =
+        Box::pin(async move { eval(&lv, &mut env, Some(rx)).await }) as FutureResult;
+    let future: LFuture = future.shared();
+
+    tokio::spawn(future.clone());
+
+    LAsyncHandler::new(future, tx)
 }
 
 /// Evaluate a LValue
 /// Main function of the Scheme Interpreter
 #[async_recursion]
+pub async fn eval(
+    lv: &LValue,
+    root_env: &mut LEnv,
+    mut int: Option<InterruptionReceiver>,
+) -> LResult {
+    let mut debug: LDebug = Default::default();
+    debug.push(Unininterruptible, lv);
+
+    let mut interrupted = false;
+    let error = interrupted!();
+    let mut queue: EvalStack = Default::default();
+    queue.push(StackFrame::new_lvalue(
+        lv.clone(),
+        Interruptibility::Interruptible,
+    ));
+
+    let mut scopes: ScopeCollection = ScopeCollection::new(root_env);
+    let mut results: Results = Default::default();
+    let mut expression_error: LValue = LValue::Nil;
+
+    let result: LResult = loop {
+        let current = match queue.pop() {
+            Some(lv) => lv,
+            None => break Ok(results.pop().unwrap()),
+        };
+
+        if let Some(r) = &mut int {
+            interrupted = r.is_interrupted();
+            if get_debug() && interrupted {
+                println!("interrupted! last result!: {:?}", results.last())
+            }
+        }
+
+        let interruptibility = current.interruptibily;
+
+        if interrupted && interruptibility == Interruptibility::Interruptible {
+            match current.kind {
+                StackKind::NonEvaluated(_) => {
+                    results.push(error.clone());
+                }
+                StackKind::Procedure(p) => {
+                    results.pop_n(p.n);
+                    scopes.revert_scope();
+                    results.push(error.clone());
+                }
+                StackKind::CoreOperator(co) => match co {
+                    CoreOperatorFrame::If(_) => {
+                        results.pop();
+                        results.push(error.clone());
+                        scopes.revert_scope();
+                    }
+                    CoreOperatorFrame::Begin(b) => {
+                        let mut r = results.pop_n(b.n);
+                        scopes.revert_scope();
+                        results.push(r.pop().unwrap());
+                        debug.print_last_result(&results);
+                    }
+                    CoreOperatorFrame::Do(_) => {
+                        scopes.revert_scope();
+                    }
+                    CoreOperatorFrame::Define(_) => {
+                        results.pop();
+                        results.push(error.clone());
+                    }
+                    CoreOperatorFrame::Lambda => {
+                        scopes.revert_scope();
+                        scopes.revert_scope();
+                    }
+                    CoreOperatorFrame::Await => {
+                        results.pop();
+                        results.push(error.clone());
+                    }
+                    CoreOperatorFrame::Interrupt => {
+                        results.pop();
+                        results.push(error.clone());
+                    }
+                    CoreOperatorFrame::Eval => {
+                        results.pop();
+                        results.push(error.clone());
+                    }
+                    CoreOperatorFrame::Expand => {
+                        results.pop();
+                        results.push(error.clone());
+                    }
+                    CoreOperatorFrame::Parse => {
+                        results.pop();
+                        results.push(error.clone());
+                    }
+                    CoreOperatorFrame::Enr => {
+                        results.pop();
+                        results.push(error.clone());
+                    }
+                    CoreOperatorFrame::EvalEnd => {
+                        results.pop();
+                        results.push(error.clone());
+                    }
+                    CoreOperatorFrame::EnrEnd => {
+                        results.pop();
+                        results.push(error.clone());
+                    }
+                },
+            }
+            debug.print_last_result(&results);
+            continue;
+        } else if interrupted && current.interruptibily == Unininterruptible {
+            //println!("interrupt avoided");
+        }
+
+        match current.kind {
+            StackKind::NonEvaluated(ref lv) => {
+                if get_debug() {
+                    debug.push(current.interruptibily, lv.to_string());
+                }
+                match lv {
+                    LValue::Symbol(s) => {
+                        let result = match scopes.get_last().get_symbol(s.as_str()) {
+                            None => s.into(),
+                            Some(lv) => lv,
+                        };
+                        results.push(result);
+                        debug.print_last_result(&results);
+                    }
+                    LValue::List(list) => {
+                        let list = list.as_slice();
+                        let proc = &list[0];
+                        let args = &list[1..];
+                        if let LValue::CoreOperator(co) = proc {
+                            match co {
+                                LCoreOperator::Define => {
+                                    match &args[0] {
+                                        LValue::Symbol(s) => {
+                                            queue.push(StackFrame::new(
+                                                DefineFrame { symbol: s.clone() },
+                                                interruptibility,
+                                            ));
+                                            queue.push(StackFrame::new_lvalue(
+                                                args[1].clone(),
+                                                interruptibility,
+                                            ));
+                                        }
+                                        lv => {
+                                            let err = Err(wrong_type!(
+                                                "eval",
+                                                &lv.clone(),
+                                                KindLValue::Symbol
+                                            ));
+                                            expression_error = current.unstack(&mut results);
+                                            break err;
+                                        }
+                                    };
+                                }
+                                LCoreOperator::DefLambda => {
+                                    let params = match &args[0] {
+                                        LValue::List(list) => {
+                                            let mut vec_sym = Vec::new();
+                                            for val in list.iter() {
+                                                match val {
+                                                    LValue::Symbol(s) => vec_sym.push(s.clone()),
+                                                    lv => {
+                                                        return Err(wrong_type!(
+                                                            "eval",
+                                                            lv,
+                                                            KindLValue::Symbol
+                                                        ))
+                                                    }
+                                                }
+                                            }
+                                            vec_sym.into()
+                                        }
+                                        LValue::Symbol(s) => s.clone().into(),
+                                        LValue::Nil => LambdaArgs::Nil,
+                                        lv => {
+                                            let err = LRuntimeError::not_in_list_of_expected_types(
+                                                EVAL,
+                                                &lv.clone(),
+                                                vec![KindLValue::List, KindLValue::Symbol],
+                                            );
+                                            expression_error = current.unstack(&mut results);
+
+                                            break Err(err);
+                                        }
+                                    };
+                                    let body = &args[1];
+                                    results.push(LValue::Lambda(LLambda::new(
+                                        params,
+                                        body.clone(),
+                                        scopes.get_last().get_symbols(),
+                                    )));
+                                    debug.print_last_result(&results);
+                                }
+                                LCoreOperator::If => {
+                                    scopes.new_scope();
+                                    let stack = IfFrame {
+                                        conseq: args[1].clone(),
+                                        alt: args[2].clone(),
+                                    };
+
+                                    queue.push(StackFrame::new(stack, interruptibility));
+                                    queue.push(StackFrame::new_lvalue(
+                                        args[0].clone(),
+                                        interruptibility,
+                                    ));
+                                }
+                                LCoreOperator::Quote => {
+                                    results.push(args[0].clone());
+                                    debug.print_last_result(&results);
+                                }
+                                LCoreOperator::QuasiQuote => {
+                                    panic!("quasiquote not allowed")
+                                }
+                                LCoreOperator::UnQuote => {
+                                    panic!("unquote not allowed")
+                                }
+                                LCoreOperator::DefMacro => {
+                                    panic!("defmacro not allowed")
+                                }
+                                LCoreOperator::Begin => {
+                                    scopes.new_scope();
+                                    let stack = BeginFrame { n: args.len() };
+                                    queue.push(StackFrame::new(stack, interruptibility));
+                                    queue.push_list(
+                                        args.iter()
+                                            .map(|a| {
+                                                StackFrame::new_lvalue(a.clone(), interruptibility)
+                                            })
+                                            .collect(),
+                                    );
+                                }
+                                LCoreOperator::Do => {
+                                    scopes.new_scope();
+                                    let stack = DoFrame {
+                                        results: vec![],
+                                        rest: args[1..].to_vec(),
+                                    };
+
+                                    queue.push(StackFrame::new(stack, interruptibility));
+                                    queue.push(StackFrame::new_lvalue(
+                                        args[0].clone(),
+                                        interruptibility,
+                                    ));
+                                }
+                                LCoreOperator::Async => {
+                                    let result =
+                                        async_eval(args[0].clone(), scopes.get_last().clone());
+
+                                    results.push(result.into());
+                                    debug.print_last_result(&results);
+                                }
+                                LCoreOperator::Await => {
+                                    //println!("awaiting on async evaluation");
+                                    queue.push(StackFrame::new(
+                                        CoreOperatorFrame::Await,
+                                        interruptibility,
+                                    ));
+                                    queue.push(StackFrame::new_lvalue(
+                                        args[0].clone(),
+                                        interruptibility,
+                                    ));
+                                }
+                                LCoreOperator::Eval => {
+                                    queue.push(StackFrame::new(
+                                        CoreOperatorFrame::Eval,
+                                        interruptibility,
+                                    ));
+                                    queue.push(StackFrame::new(
+                                        CoreOperatorFrame::Expand,
+                                        interruptibility,
+                                    ));
+                                    queue.push(StackFrame::new_lvalue(
+                                        args[0].clone(),
+                                        interruptibility,
+                                    ));
+                                }
+                                LCoreOperator::Enr => {
+                                    queue.push(StackFrame::new(
+                                        CoreOperatorFrame::Enr,
+                                        interruptibility,
+                                    ));
+                                    queue.push(StackFrame::new_lvalue(
+                                        args[0].clone(),
+                                        interruptibility,
+                                    ));
+                                }
+                                LCoreOperator::Expand => {
+                                    queue.push(StackFrame::new(
+                                        CoreOperatorFrame::Expand,
+                                        interruptibility,
+                                    ));
+                                    queue.push(StackFrame::new_lvalue(
+                                        args[0].clone(),
+                                        interruptibility,
+                                    ));
+                                }
+                                LCoreOperator::Parse => {
+                                    queue.push(StackFrame::new(
+                                        CoreOperatorFrame::Parse,
+                                        interruptibility,
+                                    ));
+                                    queue.push(StackFrame::new_lvalue(
+                                        args[0].clone(),
+                                        interruptibility,
+                                    ));
+                                }
+
+                                LCoreOperator::Interrupt => {
+                                    queue.push(StackFrame::new(
+                                        CoreOperatorFrame::Interrupt,
+                                        interruptibility,
+                                    ));
+                                    queue.push(StackFrame::new_lvalue(
+                                        args[0].clone(),
+                                        interruptibility,
+                                    ));
+                                }
+                                LCoreOperator::Interruptible => {
+                                    unreachable!();
+                                    //queue.push(StackFrame::interruptible(args[0].clone()))
+                                }
+                                LCoreOperator::Uninterruptible => {
+                                    unreachable!();
+                                    //queue.push(StackFrame::uninterruptible(args[0].clone()))
+                                }
+                                /*LCoreOperator::QuasiInterruptible => {
+                                    queue.push(StackFrame::quasiinterruptible(args[0].clone()))
+                                }*/
+                                LCoreOperator::Race => {
+                                    let handler_1 =
+                                        async_eval(args[0].clone(), scopes.get_last().clone());
+                                    let handler_2 =
+                                        async_eval(args[1].clone(), scopes.get_last().clone());
+
+                                    let (tx, mut rx) = new_interruption_handler();
+
+                                    let future: FutureResult = Box::pin(async move {
+                                        let future_1 = handler_1.get_future();
+                                        let future_2 = handler_2.get_future();
+                                        tokio::select! {
+                                            r1 = future_1 => {
+                                                //handler_2.interrupt();
+                                                r1
+                                                /*match (r1, r2) {
+                                                    (Ok(l1), Ok(l2)) => {
+                                                        Ok(list![l1, l2])
+                                                    }
+                                                    (Err(e1), Ok(l2)) => {
+                                                        Err(e1.chain(format!("Error on race because first expression returned a runtime error.\nResult of first expression: {}", l2)))
+                                                    }
+                                                    (Ok(l1), Err(e2)) => {
+                                                        Err(e2.chain(format!("Error on race because interruption of second expression returned a runtime error.\nResult of second expression: {}", l1)))
+                                                    }
+                                                    (Err(e1), Err(e2)) => {
+                                                        Err(e2.chain(e1).chain("Error on race because both expressions returned runtime errors."))
+                                                    }
+                                                }*/
+                                            }
+                                            r2 = future_2 =>  {
+                                                //handler_1.interrupt();
+                                                r2
+                                                /*match (r1, r2) {
+                                                    (Ok(l1), Ok(l2)) => {
+                                                        Ok(list![l1, l2])
+                                                    }
+                                                    (Err(e1), Ok(l2)) => {
+                                                        Err(e1.chain(format!("Error on race because interruption of first expression returned a runtime error.\nResult of first expression: {}", l2)))
+                                                    }
+                                                    (Ok(l1), Err(e2)) => {
+                                                        Err(e2.chain(format!("Error on race because second expression returned a runtime error.\nResult of second expression: {}", l1)))
+                                                    }
+                                                    (Err(e1), Err(e2)) => {
+                                                        Err(e1.chain(e2).chain("Error on race because both expressions returned runtime errors."))
+                                                    }
+                                                }*/
+                                            }
+                                            _ = rx.recv() => {
+                                                //handler_1.interrupt();
+                                                //handler_2.interrupt();
+
+                                                Ok(interrupted!())
+
+                                                /*let r1 = r1.await;
+                                                let r2 = r2.await;
+
+                                                 match (r1, r2) {
+                                                    (Ok(l1), Ok(l2)) => {
+                                                        Ok(list!(l1,l2))
+                                                    }
+                                                    (Err(e1), Ok(l2)) => {
+                                                        Err(e1.chain(format!("Error on race because interruption of first expression returned a runtime error.\nResult of first expression: {}", l2)))
+                                                    }
+                                                    (Ok(l1), Err(e2)) => {
+                                                        Err(e2.chain(format!("Error on race because interruption of second expression returned a runtime error.\nResult of second expression: {}", l1)))
+                                                    }
+                                                    (Err(e1), Err(e2)) => {
+                                                        Err(e1.chain(e2).chain("Error on race because both expressions interruptions returned runtime errors."))
+                                                    }
+                                                }*/
+
+                                            }
+                                        }
+                                    })
+                                        as FutureResult;
+                                    let future: LFuture = future.shared();
+
+                                    results.push(LAsyncHandler::new(future, tx).into());
+                                    debug.print_last_result(&results);
+                                }
+                            }
+                        } else {
+                            scopes.new_scope();
+                            queue.push(StackFrame::new(
+                                ProcedureFrame { n: list.len() },
+                                interruptibility,
+                            ));
+                            queue.push_list(
+                                list.iter()
+                                    .map(|a| StackFrame::new_lvalue(a.clone(), interruptibility))
+                                    .collect(),
+                            );
+                        }
+                    }
+                    _ => {
+                        results.push(lv.clone());
+                        debug.print_last_result(&results);
+                    }
+                }
+            }
+            StackKind::Procedure(ref pro) => {
+                let exps: Vec<LValue> = results.pop_n(pro.n);
+                let proc = &exps[0];
+                let args = &exps[1..];
+                match proc {
+                    LValue::Lambda(l) => {
+                        queue.push(StackFrame::new(CoreOperatorFrame::Lambda, interruptibility));
+                        queue.push(StackFrame::new_lvalue(
+                            l.get_body().clone(),
+                            interruptibility,
+                        ));
+                        let temp_env = match l.get_new_env(scopes.get_last().clone(), args) {
+                            Ok(e) => e,
+                            Err(e) => {
+                                expression_error = exps.into();
+                                break Err(e);
+                            }
+                        };
+                        scopes.new_defined_scope(temp_env);
+                    }
+                    LValue::Fn(fun) => {
+                        scopes.revert_scope();
+                        let r_lvalue = match fun.call(scopes.get_last(), args) {
+                            Ok(e) => e,
+                            Err(e) => {
+                                expression_error = exps.into();
+                                break Err(e);
+                            }
+                        };
+                        results.push(r_lvalue);
+                        debug.print_last_result(&results);
+                    }
+                    LValue::MutFn(fun) => {
+                        scopes.revert_scope();
+                        let r_lvalue = match fun.call(scopes.get_last_mut(), args) {
+                            Ok(e) => e,
+                            Err(e) => {
+                                expression_error = exps.into();
+                                break Err(e);
+                            }
+                        };
+                        results.push(r_lvalue);
+                        debug.print_last_result(&results);
+                    }
+                    LValue::AsyncFn(fun) => {
+                        scopes.revert_scope();
+                        let r_lvalue = match fun.call(scopes.get_last(), args).await {
+                            Ok(e) => e,
+                            Err(e) => {
+                                expression_error = exps.into();
+                                break Err(e);
+                            }
+                        };
+                        results.push(r_lvalue);
+                        debug.print_last_result(&results);
+                    }
+                    LValue::AsyncMutFn(fun) => {
+                        scopes.revert_scope();
+                        let r_lvalue = match fun.call(scopes.get_last_mut(), args).await {
+                            Ok(e) => e,
+                            Err(e) => {
+                                expression_error = exps.into();
+                                break Err(e);
+                            }
+                        };
+                        results.push(r_lvalue);
+                        debug.print_last_result(&results);
+                    }
+                    lv => {
+                        let e = wrong_type!("eval", lv, KindLValue::Fn);
+                        expression_error = exps.into();
+                        break Err(e);
+                    }
+                }
+            }
+            StackKind::CoreOperator(cos) => match cos {
+                CoreOperatorFrame::Define(d) => {
+                    let env = scopes.get_last_mut();
+                    let value = results.pop().unwrap();
+                    env.insert(d.symbol.as_ref(), value);
+                    results.push(LValue::Nil);
+                    debug.print_last_result(&results);
+                }
+                CoreOperatorFrame::If(i) => {
+                    let result = results.pop().unwrap();
+
+                    match result {
+                        LValue::True => {
+                            queue.push(StackFrame::new_lvalue(i.conseq.clone(), interruptibility))
+                        }
+                        LValue::Nil => {
+                            queue.push(StackFrame::new_lvalue(i.alt.clone(), interruptibility))
+                        }
+                        lv => {
+                            let e = wrong_type!("eval", &lv, KindLValue::Bool);
+                            expression_error = list![LCoreOperator::If.into(), lv, i.conseq, i.alt];
+                            break Err(e.chain("if condition must return a boolean."));
+                        }
+                    };
+                    scopes.revert_scope()
+                }
+                CoreOperatorFrame::Do(mut df) => {
+                    if df.rest.is_empty() {
+                        scopes.revert_scope();
+                    } else {
+                        let result = results.pop().unwrap();
+                        df.results.push(result.clone());
+                        if matches!(result, LValue::Err(_)) {
+                            results.push(result);
+                            scopes.revert_scope();
+                        } else {
+                            let next = df.rest.remove(0);
+                            queue.push(StackFrame::new(df, interruptibility));
+                            queue.push(StackFrame::new_lvalue(next, interruptibility));
+                        }
+                    }
+                }
+                CoreOperatorFrame::Begin(b) => {
+                    let mut r = results.pop_n(b.n);
+                    results.push(r.pop().unwrap());
+                    debug.print_last_result(&results);
+                    scopes.revert_scope();
+                }
+                CoreOperatorFrame::Lambda => {
+                    scopes.revert_scope();
+                    scopes.revert_scope();
+                }
+                CoreOperatorFrame::Await => {
+                    let result = results.pop().unwrap();
+                    if let LValue::Handler(ref h) = result {
+                        let f = h.get_future();
+
+                        let r: LResult = if interruptibility == Interruptibility::Interruptible
+                            && int.is_some()
+                        {
+                            let int = int.as_mut().unwrap();
+                            tokio::select! {
+                                r = f => {
+                                    r
+                                }
+                                _ = int.recv() => {
+                                    //println!("await interrupted");
+                                    Ok(interrupted!())
+                                }
+                            }
+                        } else {
+                            f.await
+                        };
+
+                        match r {
+                            Err(e) => {
+                                expression_error = list![LCoreOperator::Await.into(), result];
+                                break Err(e);
+                            }
+                            Ok(lv) => results.push(lv),
+                        }
+                    } else {
+                        expression_error = list![LCoreOperator::Await.into(), result.clone()];
+                        break Err(wrong_type!(EVAL, &result, KindLValue::Handler)
+                            .chain("Await argument must be a LValue::Handler."));
+                    };
+                }
+                CoreOperatorFrame::Interrupt => {
+                    let mut result = results.pop().unwrap();
+                    if let LValue::Handler(ref mut h) = result {
+                        match h.interrupt().await {
+                            Err(e) => {
+                                expression_error = list![LCoreOperator::Await.into(), result];
+                                break Err(e);
+                            }
+                            Ok(lv) => results.push(lv),
+                        }
+                    } else {
+                        let e = wrong_type!(EVAL, &result, KindLValue::Handler);
+                        expression_error = list![LCoreOperator::Await.into(), result];
+                        break Err(e.chain("Interrupt argument must be a LValue::Handler."));
+                    };
+                }
+                CoreOperatorFrame::Eval => {
+                    //debug.print_last_result(&results);
+                    queue.push(StackFrame::new(
+                        CoreOperatorFrame::EvalEnd,
+                        interruptibility,
+                    ));
+                    queue.push(StackFrame::new_lvalue(
+                        results.pop().unwrap(),
+                        interruptibility,
+                    ));
+                }
+                CoreOperatorFrame::Expand => {
+                    let result = results.pop().unwrap();
+                    results.push(expand(&result, true, scopes.get_last_mut()).await?);
+                    debug.push(
+                        Unininterruptible,
+                        list!(LCoreOperator::Expand.into(), result),
+                    );
+                    debug.print_last_result(&results);
+                }
+                CoreOperatorFrame::Parse => {
+                    let result = results.pop().unwrap();
+                    if let LValue::String(s) = result {
+                        results.push(parse(s.as_str(), scopes.get_last_mut()).await?);
+                        debug.print_last_result(&results);
+                    } else {
+                        let e = wrong_type!("eval", &result, KindLValue::String);
+                        expression_error = list![LCoreOperator::Parse.into(), result];
+                        break Err(e.chain("Parse argument must be a string."));
+                    };
+                }
+                CoreOperatorFrame::Enr => {
+                    let expr: LValue = results.pop().unwrap();
+                    let expr = match expr {
+                        LValue::List(list) => {
+                            let mut new_expr = vec![list[0].clone()];
+                            for e in &list.as_slice()[1..] {
+                                new_expr.push(list!(LCoreOperator::Quote.into(), e.clone()))
+                            }
+                            new_expr.into()
+                        }
+                        expr => expr,
+                    };
+                    debug.pop();
+                    queue.push(StackFrame::new(CoreOperatorFrame::EnrEnd, interruptibility));
+                    queue.push(StackFrame::new_lvalue(expr, interruptibility));
+                }
+                CoreOperatorFrame::EvalEnd | CoreOperatorFrame::EnrEnd => {
+                    debug.print_last_result(&results);
+                }
+            },
+        }
+    };
+
+    match result {
+        Ok(_) => result,
+        Err(e) => unstack(expression_error, e, results, queue),
+    }
+}
+
+pub fn unstack(
+    current: LValue,
+    e: LRuntimeError,
+    mut results: Results,
+    mut queue: EvalStack,
+) -> LResult {
+    results.push(string!(format!("[{} => {}]", current, e.get_message())));
+
+    //loop to unstack and print where the error occured
+
+    while let Some(s) = queue.pop() {
+        let result = s.unstack(&mut results);
+        results.push(result);
+    }
+    Err(e.chain(format!("Scheme :\n{}", results.pop().unwrap().format(0)).as_str()))
+}
+
+/*#[async_recursion]
 pub async fn eval(lv: &LValue, env: &mut LEnv) -> LResult {
     let mut lv = lv.clone();
     let mut temp_env: LEnv;
@@ -505,7 +1270,7 @@ pub async fn eval(lv: &LValue, env: &mut LEnv) -> LResult {
                     LCoreOperator::QuasiQuote
                     | LCoreOperator::UnQuote
                     | LCoreOperator::DefMacro => return Ok(LValue::Nil),
-                    LCoreOperator::Async => {
+                    /*LCoreOperator::Async => {
                         //println!("async evaluation");
                         let lvalue = args[0].clone();
                         let mut new_env = env.clone();
@@ -540,7 +1305,7 @@ pub async fn eval(lv: &LValue, env: &mut LEnv) -> LResult {
                         } else {
                             return Err(wrong_type!(EVAL, &future, KindLValue::Future));
                         };
-                    }
+                    }*/
                     LCoreOperator::Eval => {
                         let arg = &args[0];
                         lv = expand(&eval(arg, env).await?, true, env).await?;
@@ -557,6 +1322,7 @@ pub async fn eval(lv: &LValue, env: &mut LEnv) -> LResult {
                         let arg = &args[0];
                         return expand(&eval(arg, env).await?, true, env).await;
                     }
+                    co => panic!("{} not yet supported", co),
                 }
             } else {
                 let mut exps: Vec<LValue> = vec![];
@@ -602,170 +1368,5 @@ pub async fn eval(lv: &LValue, env: &mut LEnv) -> LResult {
             }
             return Ok(lv);
         }
-    }
-}
-/*
-pub fn eval_non_recursive(lv: &LValue, env: &mut LEnv) -> lerror::Result<LValue> {
-    if let LValue::Symbol(s) = &lv {
-        let result = match env.get_symbol(s.as_str()) {
-            None => lv.clone(),
-            Some(lv) => lv,
-        };
-        if get_debug() {
-            println!("{} => {}", str, result)
-        }
-        return Ok(result);
-    } else if let LValue::List(list) = &lv {
-        //println!("expression is a list");
-        let list = list.as_slice();
-        let proc = &list[0];
-        let args = &list[1..];
-        //assert!(args.len() >= 2, "Checked in expansion");
-        if let LValue::CoreOperator(co) = proc {
-            match co {
-                LCoreOperator::Define => {
-                    match &args[0] {
-                        LValue::Symbol(s) => {
-                            env.insert(s.to_string(), args[1].clone());
-                        }
-                        lv => {
-                            return Err(wrong_type!(
-                                "eval",
-                                lv.clone(),
-                                lv.into(),
-                                KindLValue::Symbol,
-                            ))
-                        }
-                    };
-                    if get_debug() {
-                        println!("{} => {}", str, LValue::Nil);
-                    }
-                    return Ok(LValue::Nil);
-                }
-                LCoreOperator::DefLambda => {
-                    //println!("it is a lambda");
-                    let params = match &args[0] {
-                        LValue::List(list) => {
-                            let mut vec_sym = Vec::new();
-                            for val in list {
-                                match val {
-                                    LValue::Symbol(s) => vec_sym.push(s.clone()),
-                                    lv => {
-                                        return Err(wrong_type!(
-                                            "eval",
-                                            lv.clone(),
-                                            lv.into(),
-                                            KindLValue::Symbol,
-                                        ))
-                                    }
-                                }
-                            }
-                            vec_sym.into()
-                        }
-                        LValue::Symbol(s) => s.clone().into(),
-                        LValue::Nil => LambdaArgs::Nil,
-                        lv => {
-                            return Err(NotInListOfExpectedTypes(
-                                "eval",
-                                lv.clone(),
-                                lv.into(),
-                                vec![KindLValue::List, KindLValue::Symbol],
-                            ))
-                        }
-                    };
-                    let body = &args[1];
-                    let r_lvalue =
-                        LValue::Lambda(LLambda::new(params, body.clone(), env.get_symbols()));
-                    if get_debug() {
-                        println!("{} => {}", str, r_lvalue);
-                    }
-                    Ok(r_lvalue)
-                }
-                LCoreOperator::If => {
-                    let test = &args[0];
-                    let conseq = &args[1];
-                    let alt = &args[2];
-                    match &args[0] {
-                        LValue::True => Ok(conseq.clone()),
-                        LValue::Nil => Ok(alt.clone()),
-                        lv => {
-                            return Err(wrong_type!("eval", lv.clone(), lv.into(), KindLValue::Bool))
-                        }
-                    }
-                }
-                LCoreOperator::Quote => {
-                    if get_debug() {
-                        println!("{} => {}", str, &args[0].clone());
-                    }
-                    Ok(args[0].clone())
-                }
-                LCoreOperator::Begin => {
-                    let firsts = &args[0..args.len() - 1];
-                    let last = args.last().unwrap();
-
-                    for e in firsts {
-                        eval(e, env).await?;
-                    }
-                    Ok(last.clone())
-                }
-                LCoreOperator::QuasiQuote | LCoreOperator::UnQuote | LCoreOperator::DefMacro => {
-                    return Ok(LValue::Nil)
-                }
-                LCoreOperator::Eval => {
-                    let arg = &args[0];
-                    expand(&eval(arg, env).await?, true, env).await
-                }
-                LCoreOperator::Parse => {
-                    if let LValue::String(s) = eval(&args[0], env).await? {
-                        parse(s.as_str(), env).await
-                    } else {
-                        return Err(wrong_type!(
-                            "eval",
-                            args[0].clone(),
-                            (&args[0]).into(),
-                            KindLValue::String,
-                        ));
-                    }
-                }
-                LCoreOperator::Expand => {
-                    let arg = &args[0];
-                    expand(&eval(arg, env).await?, true, env).await
-                }
-                LCoreOperator::Async => {}
-                LCoreOperator::Await => {}
-            }
-        } else {
-            /*let exps = list
-            .iter()
-            .map(|x| eval(x, &mut env, ctxs).await)
-            .collect::<Result<Vec<LValue>, _>>()?;*/
-            let proc = &list[0];
-            let args = &list[1..];
-            match proc {
-                LValue::Lambda(l) => l.call(args, env).await,
-                LValue::Fn(fun) => {
-                    let r_lvalue = fun.call(args, env)?;
-                    if get_debug() {
-                        println!("{} => {}", str, r_lvalue);
-                    }
-                    return Ok(r_lvalue);
-                }
-                LValue::AsyncFn(fun) => {
-                    let r_lvalue = fun.call(args, env).await?;
-                    if get_debug() {
-                        println!("{} => {}", str, r_lvalue);
-                    }
-                    return Ok(r_lvalue);
-                }
-                lv => {
-                    return Err(wrong_type!("eval", lv.clone(), lv.into(), KindLValue::Fn));
-                }
-            };
-        }
-    } else {
-        if get_debug() {
-            println!("{} => {}", str, lv.clone());
-        }
-        return Ok(lv.clone());
     }
 }*/

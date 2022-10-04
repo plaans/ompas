@@ -1,3 +1,4 @@
+use sompas_language::INTERRUPTED;
 use sompas_macros::scheme_fn;
 use sompas_structs::lvalue::LValue;
 use std::sync::Arc;
@@ -24,6 +25,18 @@ pub fn err(e: LValue) -> LValue {
 #[scheme_fn]
 pub fn is_err(lv: LValue) -> bool {
     matches!(lv, LValue::Err(_))
+}
+#[scheme_fn]
+pub fn is_interrupted(lv: LValue) -> bool {
+    if let LValue::Err(r) = lv {
+        if let LValue::List(l) = r.as_ref() {
+            l[0] == INTERRUPTED.into()
+        } else {
+            false
+        }
+    } else {
+        false
+    }
 }
 /*
 #[cfg(test)]

@@ -128,7 +128,7 @@ impl IntoModule for CtxRoot {
          */
         module.add_fn_prelude(HELP, help);
 
-        module.add_fn_prelude(ENV_GET_LIST_MODULES, get_list_modules);
+        module.add_fn_prelude(ENV_GET_CONTEXTS, get_list_modules);
 
         module.add_fn_prelude(ENV_GET_KEYS.to_string(), env_get_keys);
         module.add_fn_prelude(ENV_GET_MACROS, env_get_macros);
@@ -206,6 +206,7 @@ impl IntoModule for CtxRoot {
         module.add_fn_prelude(ERR, err);
         module.add_fn_prelude(IS_ERR, is_err);
         module.add_fn_prelude(CHECK, check);
+        module.add_fn_prelude(IS_INTERRUPTED, is_interrupted);
         module
     }
 
@@ -296,7 +297,7 @@ pub fn set(env: &LEnv, args: &[LValue]) -> LResult {
         LValue::List(_) | LValue::Nil => set_list(env, args),
         _ => Err(LRuntimeError::not_in_list_of_expected_types(
             SET,
-            &first,
+            first,
             vec![KindLValue::List, KindLValue::Map, KindLValue::Nil],
         )),
     }

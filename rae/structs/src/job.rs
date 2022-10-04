@@ -1,5 +1,7 @@
+use sompas_structs::lasynchandler::LAsyncHandler;
 use sompas_structs::lvalue::LValue;
 use std::fmt::{Display, Formatter};
+use tokio::sync::mpsc;
 
 #[derive(Debug, Clone)]
 pub enum JobType {
@@ -9,6 +11,7 @@ pub enum JobType {
 
 #[derive(Debug, Clone)]
 pub struct Job {
+    pub sender: mpsc::Sender<LAsyncHandler>,
     pub _type: JobType,
     pub core: LValue,
 }
@@ -20,8 +23,12 @@ impl Display for Job {
 }
 
 impl Job {
-    pub fn new(value: LValue, _type: JobType) -> Self {
-        Self { _type, core: value }
+    pub fn new(sender: mpsc::Sender<LAsyncHandler>, value: LValue, _type: JobType) -> Self {
+        Self {
+            sender,
+            _type,
+            core: value,
+        }
     }
 }
 

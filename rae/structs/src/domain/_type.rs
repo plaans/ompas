@@ -1,9 +1,10 @@
-use crate::context::{TUPLE_TYPE, TYPE_LIST};
+use ompas_rae_language::*;
 use sompas_language::LIST;
 use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::{LValue, Sym};
+use std::borrow::Borrow;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 use std::sync::Arc;
@@ -78,8 +79,16 @@ impl Display for Type {
 impl TryFrom<&LValue> for Type {
     type Error = LRuntimeError;
 
+    fn try_from(value: &LValue) -> Result<Self, Self::Error> {
+        value.clone().try_into()
+    }
+}
+
+impl TryFrom<LValue> for Type {
+    type Error = LRuntimeError;
+
     #[function_name::named]
-    fn try_from(lv: &LValue) -> Result<Self, Self::Error> {
+    fn try_from(lv: LValue) -> Result<Self, Self::Error> {
         let err = lruntimeerror!(
             function_name!(),
             format!("{} or {} was expected", TUPLE_TYPE, LIST)
@@ -107,7 +116,7 @@ impl TryFrom<&LValue> for Type {
                         })),
                         LIST => {
                             assert_eq!(list.len(), 2);
-                            Ok(Self::List(Box::new((&list[1]).try_into()?)))
+                            Ok(Self::List(Box::new(list[1].borrow().try_into()?)))
                         }
                         _ => Err(err),
                     }
@@ -117,7 +126,7 @@ impl TryFrom<&LValue> for Type {
             }
             _ => Err(LRuntimeError::not_in_list_of_expected_types(
                 function_name!(),
-                lv,
+                &lv,
                 vec![KindLValue::Symbol, KindLValue::List],
             )),
         }

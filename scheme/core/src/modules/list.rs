@@ -140,7 +140,7 @@ pub fn append(args: &[LValue]) -> Result<Vec<LValue>, LRuntimeError> {
             _ => return Err(wrong_type!(APPEND, element, KindLValue::List)),
         }
     }
-    Ok(new_list.into())
+    Ok(new_list)
 }
 
 ///It takes a list and returns the last element.

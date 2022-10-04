@@ -8,7 +8,7 @@ default-run = "scheme"
 
 [[bin]]
 name = "scheme"
-path = "src/scheme.rs"
+path = "src/bin/scheme.rs"
 
 
 [dependencies]

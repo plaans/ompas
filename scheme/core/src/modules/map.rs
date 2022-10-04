@@ -12,7 +12,7 @@ pub fn map(list: Vec<LValue>) -> Result<im::HashMap<LValue, LValue>, LRuntimeErr
         match sv {
             LValue::List(val_sv) => {
                 if val_sv.len() != 2 {
-                    return Err(wrong_n_args!(MAP, &val_sv, 2));
+                    return Err(wrong_n_args!(MAP, val_sv, 2));
                 }
                 let key = val_sv[0].clone();
                 let value = val_sv[1].clone();
@@ -56,16 +56,14 @@ pub fn remove_key_value_map(
 
     let key = &val[0];
     let value = &val[1];
-    match map.get(&key) {
-        None => {
-            return Err(lruntimeerror!(
-                REMOVE_KEY_VALUE_MAP,
-                format!("map does not contain key {}", key)
-            ))
-        }
+    match map.get(key) {
+        None => Err(lruntimeerror!(
+            REMOVE_KEY_VALUE_MAP,
+            format!("map does not contain key {}", key)
+        )),
         Some(v) => {
             if v == value {
-                map.remove(&key);
+                map.remove(key);
                 Ok(map)
             } else {
                 Err(lruntimeerror!(

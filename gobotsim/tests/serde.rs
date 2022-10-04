@@ -4,6 +4,8 @@ use ompas_gobotsim::serde::{
 };
 use sompas_structs::lruntimeerror;
 use sompas_structs::lvalue::LValue;
+use std::convert::TryInto;
+use std::sync::Arc;
 
 #[test]
 fn test_action_response() -> lruntimeerror::Result<()> {
@@ -31,7 +33,8 @@ fn test_robot_command() -> lruntimeerror::Result<()> {
             command_info: LValue::List(
                 vec!["navigate_to".into(), "robot1".into(), 50.into(), 100.into()].into(),
             )
-            .into(),
+            .try_into()
+            .unwrap(),
             temp_id: 0,
         }),
     };
@@ -133,7 +136,9 @@ fn test_state_static() -> lruntimeerror::Result<()> {
     let state_msg = GodotMessageSerde {
         _type: GodotMessageType::StaticState,
         data: GodotMessageSerdeData::LValue(
-            LValue::List(vec![10.into(), 20.into(), 30.into()]).into(),
+            LValue::List(Arc::new(vec![10.into(), 20.into(), 30.into()]))
+                .try_into()
+                .unwrap(),
         ),
     };
 
@@ -150,7 +155,9 @@ fn test_state_dynamic() -> lruntimeerror::Result<()> {
     let state_msg = GodotMessageSerde {
         _type: GodotMessageType::DynamicState,
         data: GodotMessageSerdeData::LValue(
-            LValue::List(vec![10.into(), 20.into(), 30.into()]).into(),
+            LValue::List(Arc::new(vec![10.into(), 20.into(), 30.into()]))
+                .try_into()
+                .unwrap(),
         ),
     };
 

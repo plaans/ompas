@@ -1,5 +1,5 @@
 use crate::interval::{Duration, Timepoint};
-use crate::options::SelectMode;
+use crate::select_mode::SelectMode;
 use crate::state::task_network::TaskNetwork;
 use crate::state::task_state::{
     AbstractTaskMetaData, ActionMetaData, TaskCollection, TaskFilter, TaskMetaData,
@@ -22,10 +22,11 @@ use sompas_utils::other::get_and_update_id_counter;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Instant;
 use std::{env, fs};
-use tokio::sync::mpsc;
+use tokio::sync::watch;
 
 const TASK_NAME: &str = "name of the task";
 const TASK_STATUS: &str = "status";
@@ -45,6 +46,23 @@ pub struct Agenda {
     time_reference: Instant,
 }
 
+impl Agenda {
+    pub async fn clear(&self) {
+        *self.trc.inner.write().await = Default::default();
+        *self.tn.subtasks.write().await = Default::default();
+        loop {
+            let id = self.next_id.load(Ordering::Relaxed);
+            if self
+                .next_id
+                .compare_exchange(id, id + 1, Ordering::Acquire, Ordering::Relaxed) //Equivalent to compare_and_swap
+                .is_ok()
+            {
+                break;
+            }
+        }
+    }
+}
+
 impl Default for Agenda {
     fn default() -> Self {
         Self {
@@ -61,9 +79,12 @@ impl Agenda {
     GETTERS
      */
     pub async fn get_refinement_method(&self, id: &TaskId) -> Option<SelectMode> {
-        let task: AbstractTaskMetaData = self.trc.get(id).await.try_into().unwrap();
-        let r = task.get_last_refinement();
-        r.map(|ok| ok.refinement_type)
+        if let TaskMetaData::AbstractTask(task) = self.trc.get(id).await {
+            let r = task.get_last_refinement();
+            r.map(|ok| ok.refinement_type)
+        } else {
+            None
+        }
     }
 
     pub async fn get_execution_time(&self, id: &TaskId) -> Duration {
@@ -303,13 +324,24 @@ impl Agenda {
     pub async fn add_action(
         &self,
         action: LValue,
-        parent_task: usize,
-    ) -> (TaskId, mpsc::Receiver<TaskStatus>) {
+        parent_task: Option<usize>,
+    ) -> (TaskId, watch::Receiver<TaskStatus>) {
         let task_id = self.get_next_id();
         let start = self.time_reference.elapsed().as_micros();
+        let mut parent = false;
+        let parent_task = match parent_task {
+            None => task_id,
+            Some(id) => {
+                parent = true;
+                id
+            }
+        };
+
         let (action, rx) = ActionMetaData::new(task_id, parent_task, action, start);
         self.trc.insert(task_id, action).await;
-        self.tn.add_task_to_parent(parent_task, task_id).await;
+        if parent {
+            self.tn.add_task_to_parent(parent_task, task_id).await;
+        }
         (task_id, rx)
     }
 

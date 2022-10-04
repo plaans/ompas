@@ -1,6 +1,6 @@
 use crate::interval::{Duration, Interval, Timepoint};
-use crate::options::SelectMode;
 use crate::plan::Plan;
+use crate::select_mode::SelectMode;
 use crate::state::task_status::TaskStatus;
 use crate::TaskId;
 use itertools::Itertools;
@@ -9,7 +9,7 @@ use sompas_structs::lvalue::LValue;
 use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::{watch, RwLock};
 
 #[derive(Clone, Default)]
 pub struct TaskCollection {
@@ -28,8 +28,8 @@ impl TaskCollection {
             .filter(|&t| {
                 if let Some(task_type) = &filter.task_type {
                     match task_type {
-                        TaskType::AbstractTask => t.is_abstract_task(),
-                        TaskType::Action => t.is_action(),
+                        TaskType::Task => t.is_abstract_task(),
+                        TaskType::Command => t.is_action(),
                     }
                 } else {
                     true
@@ -244,26 +244,37 @@ pub trait TaskMetaDataView {
     fn get_duration(&self) -> Duration;
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct ActionMetaData {
     id: TaskId,
     parent: usize,
     label: LValue,
     status: TaskStatus,
     interval: Interval,
-    sender_to_watcher: Option<mpsc::Sender<TaskStatus>>,
+    sender_to_watcher: Option<watch::Sender<TaskStatus>>,
+}
+
+impl Clone for ActionMetaData {
+    fn clone(&self) -> Self {
+        Self {
+            id: self.id,
+            parent: self.parent,
+            label: self.label.clone(),
+            status: self.status,
+            interval: self.interval.clone(),
+            sender_to_watcher: None,
+        }
+    }
 }
 
 impl ActionMetaData {
-    const STATUS_CHANNEL_SIZE: usize = 10;
-
     pub fn new(
         id: TaskId,
         parent: usize,
         label: LValue,
         start: Timepoint,
-    ) -> (Self, mpsc::Receiver<TaskStatus>) {
-        let (tx, rx) = mpsc::channel(Self::STATUS_CHANNEL_SIZE);
+    ) -> (Self, watch::Receiver<TaskStatus>) {
+        let (tx, rx) = watch::channel(TaskStatus::Pending);
 
         (
             Self {
@@ -281,7 +292,7 @@ impl ActionMetaData {
     pub async fn update_status(&mut self, status: TaskStatus) {
         self.status = status;
         if let Some(tx) = &self.sender_to_watcher {
-            if tx.try_send(self.status).is_err() {
+            if tx.send(self.status).is_err() {
                 self.sender_to_watcher = None;
             }
         }
@@ -500,12 +511,12 @@ impl Display for RefinementMetaData {
 
 #[derive(Debug, Copy, Clone)]
 pub enum TaskType {
-    AbstractTask,
-    Action,
+    Task,
+    Command,
 }
 
-pub const ABSTRACT_TASK: &str = "abstract-task";
-pub const ACTION: &str = "action";
+pub const TASK: &str = "task";
+pub const COMMAND: &str = "command";
 
 impl Display for TaskType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -513,8 +524,8 @@ impl Display for TaskType {
             f,
             "{}",
             match self {
-                TaskType::AbstractTask => ABSTRACT_TASK,
-                TaskType::Action => ACTION,
+                TaskType::Task => TASK,
+                TaskType::Command => COMMAND,
             }
         )
     }

@@ -7,7 +7,7 @@ pub const NUMBER: &str = "number";
 pub const SYMBOL: &str = "symbol";
 pub const STRING: &str = "string";
 pub const CHARACTER: &str = "character";
-pub const FUTURE: &str = "future";
+pub const HANDLER: &str = "handler";
 pub const TRUE: &str = "true";
 pub const NIL: &str = "nil";
 pub const ERR: &str = "err";
@@ -36,7 +36,7 @@ pub fn get_symbol_types() -> Vec<&'static str> {
         SYMBOL,
         STRING,
         CHARACTER,
-        FUTURE,
+        HANDLER,
         TRUE,
         NIL,
         ERR,
@@ -66,10 +66,19 @@ pub const BEGIN: &str = "begin";
 pub const ASYNC: &str = "async";
 pub const AWAIT: &str = "await";
 pub const RACE: &str = "race";
+pub const ENR: &str = "enr";
 pub const EVAL: &str = "eval";
 pub const PARSE: &str = "parse";
 pub const EXPAND: &str = "expand";
 pub const DO: &str = "do";
+pub const INTERRUPT: &str = "interrupt";
+pub const INTERRUPTED: &str = "interrupted";
+pub const UNINTERRUPTIBLE: &str = "uninterruptible";
+//pub const QUASI_INTERRUPTIBLE: &str = "quasiinterruptible";
+pub const INTERRUPTIBLE: &str = "interruptible";
+pub const UNINTERRUPTIBLE_SHORT: &str = "u!";
+pub const QUASI_INTERRUPTIBLE_SHORT: &str = "i?";
+pub const INTERRUPTIBLE_SHORT: &str = "i!";
 
 pub const DOC_DEFINE: &str = "Defines a new entry in the environment/";
 pub const DOC_DEF_MACRO: &str = "Define a new macro, can only be done at the top level";
@@ -95,7 +104,7 @@ pub const ENV_GET_KEYS: &str = "get_keys";
 //return a list of keys of the environment
 pub const ENV_GET_MACROS: &str = "get_macros";
 pub const ENV_GET_MACRO: &str = "get_macro";
-pub const ENV_GET_LIST_MODULES: &str = "get_list_modules";
+pub const ENV_GET_CONTEXTS: &str = "get_contexts";
 
 pub const HELP: &str = "help";
 pub const DOC_HELP: &str =
@@ -103,6 +112,8 @@ pub const DOC_HELP: &str =
 pub const DOC_HELP_VERBOSE: &str = "takes 0..1 arguments:\
                             -no argument: give the list of all the functions\n\
                             -1 argument: give the documentation of the function.";
+
+//UTILS
 pub const ARBITRARY: &str = "arbitrary";
 pub const RAND_ELEMENT: &str = "rand-element";
 pub const ENUMERATE: &str = "enumerate";
@@ -110,6 +121,7 @@ pub const CONTAINS: &str = "contains";
 pub const SUB_LIST: &str = "sublist";
 pub const QUOTE_LIST: &str = "quote-list";
 pub const TRANSFORM_IN_SINGLETON_LIST: &str = "transform-in-singleton-list";
+pub const SLEEP: &str = "sleep";
 
 pub const LET: &str = "let";
 pub const LET_STAR: &str = "let*";
@@ -232,6 +244,7 @@ pub const DOC_SET_MAP_VERBOSE: &str = "Example: Here is an example in the repl\n
                                     \tthree: 3\n\
                                     \ttwenty: 20";
 
+//PREDICATES
 pub const IS_NUMBER: &str = "number?";
 pub const IS_FLOAT: &str = "float?";
 pub const IS_INT: &str = "int?";
@@ -246,6 +259,7 @@ pub const IS_LAMBDA: &str = "lambda?";
 pub const IS_QUOTE: &str = "quote?";
 pub const IS_PAIR: &str = "pair?";
 pub const IS_EQUAL: &str = "equal?";
+pub const IS_INTERRUPTED: &str = "interrupted?";
 
 pub const IS_NIL: &str = "null?";
 

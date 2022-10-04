@@ -1,11 +1,10 @@
 use crate::domain::parameters::Parameters;
-use sompas_structs::lcoreoperator::LCoreOperator;
-use sompas_structs::llambda::LLambda;
 use sompas_structs::lvalue::LValue;
 use std::fmt::{Display, Formatter};
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct Method {
+    pub label: String,
     pub task_label: String,
     pub parameters: Parameters,
     pub lambda_pre_conditions: LValue,
@@ -31,9 +30,9 @@ impl Method {
         &self.lambda_body
     }
 
-    pub fn get_lambda(&self) -> LValue {
-        let l1: LLambda = (&self.lambda_pre_conditions).try_into().expect("");
-        let l2: LLambda = (&self.lambda_body).try_into().expect("");
+    /*pub fn get_lambda(&self) -> LValue {
+        let l1: LLambda = self.lambda_pre_conditions.borrow().try_into().expect("");
+        let l2: LLambda = self.lambda_body.borrow().try_into().expect("");
         let body: LValue = vec![
             LCoreOperator::Do.into(),
             l1.get_body().clone(),
@@ -43,11 +42,12 @@ impl Method {
         let mut env = l1.get_env_symbols();
         env.set_outer(l2.get_env_symbols());
         LLambda::new(l1.get_params(), body, env).into()
-    }
+    }*/
 }
 
 impl Method {
     pub fn new(
+        label: String,
         task_label: String,
         parameters: Parameters,
         conds: LValue,
@@ -55,6 +55,7 @@ impl Method {
         body: LValue,
     ) -> Self {
         Self {
+            label,
             task_label,
             parameters,
             lambda_pre_conditions: conds,

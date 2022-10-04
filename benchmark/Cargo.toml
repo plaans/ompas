@@ -3,25 +3,37 @@ name = "ompas-benchmark"
 version = "0.1.0"
 authors = ["Yirmandias <turi@insa-toulouse.fr>"]
 edition = "2018"
-default-run = "benchmark"
+default-run = "bench"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 sompas-modules = {path = "../scheme/modules"}
 sompas-repl = {path = "../scheme/repl"}
-ompas-rae-scheme = {path = "../rae/scheme"}
-structopt = { version = "0.3", default-features = false }
+ompas-rae-core = {path = "../rae/core"}
+ompas-rae-structs = {path = "../rae/structs"}
+ompas-gobotsim = {path = "../gobotsim"}
+
 tokio = { version = "1.17.0", features = ["full", "time"] }
-
+lettre = "0.10"
+yaml-rust = "0.4"
+structopt = { version = "0.3", default-features = false }
+indicatif = "0.17.0"
+colored = "2.0.0"
 
 [[bin]]
-name = "benchmark"
-path = "src/bin/benchmark.rs"
+name = "bench_sim"
+path = "src/bin/bench_sim.rs"
 
 [[bin]]
-name = "benchmark_all"
-path = "src/bin/benchmark_all.rs"
+name = "bench_gobot"
+path = "src/bin/bench_gobot.rs"
+
+[[bin]]
+name = "bench"
+path = "src/bin/bench.rs"
+
+
 
 
 

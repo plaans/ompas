@@ -27,8 +27,10 @@ pub enum KindLValue {
     List,
     Quote,
     Other(String),
-    Future,
+    Handler,
     Err,
+    MutFn,
+    AsyncMutFn,
 }
 
 impl Display for KindLValue {
@@ -54,8 +56,10 @@ impl Display for KindLValue {
             KindLValue::Usize => USIZE,
             KindLValue::Bool => BOOL,
             KindLValue::AsyncFn => ASYNC_FN,
-            KindLValue::Future => FUTURE,
+            KindLValue::Handler => HANDLER,
             KindLValue::Err => ERR,
+            KindLValue::MutFn => MUT_FN,
+            KindLValue::AsyncMutFn => ASYNC_MUT_FN,
         };
         write!(f, "{}", str)
     }
@@ -103,14 +107,16 @@ impl From<&LValue> for KindLValue {
             LValue::CoreOperator(_) => KindLValue::CoreOperator,
             LValue::String(_) => KindLValue::String,
             LValue::AsyncFn(_) => KindLValue::AsyncFn,
-            LValue::Future(_) => KindLValue::Future,
+            LValue::Handler(_) => KindLValue::Handler,
             LValue::Err(_) => KindLValue::Err,
+            LValue::MutFn(_) => KindLValue::MutFn,
+            LValue::AsyncMutFn(_) => KindLValue::AsyncMutFn,
         }
     }
 }
 
 impl From<LValue> for KindLValue {
     fn from(lv: LValue) -> Self {
-        (&lv).into()
+        lv.into()
     }
 }

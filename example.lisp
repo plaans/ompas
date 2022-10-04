@@ -1,7 +1,74 @@
-(defmacro or  (lambda (a b) (quasiquote (if (unquote a) true (unquote b)))))
 
-(define and (lambda args (if (none? args) true (if (car args) (and (cdr args)) false))))
+;par
+    
+(define par (lambda l
+    (mapf await (mapf async l))))
 
-(defmacro and (lambda x (quasiquote (if (none? (unquote x)) true (if (car (unquote x)) (and (cdr (unquote x))) false)))))
 
-(map (quote (((parking_area ) . parking_area0)((polygon parking_area0 ) . ((4 18 ) (4 16 ) (10 16 ) (10 18 ) ))((parking_area ) . parking_area1)((polygon parking_area1 ) . ((21 18 ) (21 16 ) (26 16 ) (26 18 ) ))((machine ) . machine0)((coordinates machine0 ) . (14.5 5.5 ))((input_belt machine0 ) . belt0)((output_belt machine0 ) . belt1)((processes_list machine0 ) . (0 1 2 ))((interact_area ) . interact_area0)((polygon interact_area0 ) . ((9 6 ) (13 6 ) (13 7 ) (9 7 ) ))((belt ) . belt0)((coordinates belt0 ) . (0 0 ))((belt_type belt0 ) . (0 0 ))((polygon belt0 ) . (((9 5 ) (14 5 ) (14 6 ) (9 6 ) ) ))((interact_area ) . interact_area1)((polygon interact_area1 ) . ((17 5 ) (18 5 ) (18 7 ) (15 7 ) (15 6 ) (17 6 ) ))((belt ) . belt1)((coordinates belt1 ) . (0 0 ))((belt_type belt1 ) . (0 0 ))((polygon belt1 ) . (((15 5 ) (17 5 ) (17 6 ) (15 6 ) ) ))((machine ) . machine1)((coordinates machine1 ) . (16.5 11.5 ))((input_belt machine1 ) . belt2)((output_belt machine1 ) . belt3)((processes_list machine1 ) . (2 3 4 5 ))((interact_area ) . interact_area2)((polygon interact_area2 ) . ((11 11 ) (11 14 ) (10 14 ) (10 11 ) ))((belt ) . belt2)((coordinates belt2 ) . (0 0 ))((belt_type belt2 ) . (0 0 ))((polygon belt2 ) . (((11 11 ) (16 11 ) (16 12 ) (11 12 ) ) ((12 12 ) (12 14 ) (11 14 ) (11 12 ) ) ((12 13 ) (14 13 ) (14 14 ) (12 14 ) ) ))((interact_area ) . interact_area3)((polygon interact_area3 ) . ((20 12 ) (21 12 ) (21 11 ) (19 11 ) (19 10 ) (22 10 ) (22 13 ) (20 13 ) ))((interact_area ) . interact_area4)((polygon interact_area4 ) . ((20 13 ) (19 13 ) (19 12 ) (20 12 ) ))((belt ) . belt3)((coordinates belt3 ) . (0 0 ))((belt_type belt3 ) . (0 0 ))((polygon belt3 ) . (((17 11 ) (21 11 ) (21 12 ) (17 12 ) ) ))((machine ) . input_machine0)((coordinates input_machine0 ) . (0.5 7.5 ))((output_belt input_machine0 ) . belt4)((interact_area ) . interact_area5)((polygon interact_area5 ) . ((3 7 ) (3 12 ) (2 12 ) (2 7 ) ))((belt ) . belt4)((coordinates belt4 ) . (0 0 ))((belt_type belt4 ) . (0 0 ))((polygon belt4 ) . (((2 8 ) (1 8 ) (1 7 ) (2 7 ) ) ((2 8 ) (2 12 ) (1 12 ) (1 8 ) ) ))((package ) . package0)((package ) . package1)((package ) . package2)((package ) . package3)((machine ) . output_machine0)((coordinates output_machine0 ) . (31.5 11.5 ))((input_belt output_machine0 ) . belt5)((interact_area ) . interact_area6)((polygon interact_area6 ) . ((30 7 ) (30 12 ) (29 12 ) (29 7 ) ))((belt ) . belt5)((coordinates belt5 ) . (0 0 ))((belt_type belt5 ) . (0 0 ))((polygon belt5 ) . (((31 12 ) (30 12 ) (30 11 ) (31 11 ) ) ((31 7 ) (31 11 ) (30 11 ) (30 7 ) ) ))((robot ) . robot0))))
+
+;wait-for
+;monitor
+(define monitor 
+    (lambda (e)
+        (wait-for `(= ,e nil))))
+;repeat
+(define repeat (lambda (e n)
+    (if (= n 1)
+        (begin
+            (eval e)
+            (repeat e (- n 1))))))
+;retry-once
+(define retry-once (lambda (e)
+    (begin
+        (define __r__ (eval e))
+        (if (err? __r__)
+            (eval e)
+            __r__))))
+
+;run-monitoring
+(define run-monitoring
+    (lambda (b m)
+        (race b `(monitor ,m))
+))
+
+;sleep : __sleep__ return a LFuture
+(define sleep 
+    (lambda (n)
+        (u! 
+            (await-interrupt (__sleep__ n)))))
+
+(define await-interrupt
+    (lambda (__h__)
+    (u! 
+        (begin
+            (define __r__ (i! (await __h__)))
+            (if (interrupted? __r__)
+                (interrupt __h__)
+                __r__)))))
+
+(define exec-command (lambda l)
+    (u! 
+        (await-interrupt (eval (cons `(__exec-command__ ,l))))))
+
+(define wait-for (lambda (e)
+    (u! 
+        (await-interrupt (__wait-for__ e)))))
+
+(await
+    (race
+        (begin
+            (await (sleep 1))
+            (await (sleep 2))
+        )
+        (await (sleep 4))
+    )
+)
+
+(do
+    (define h (sleep 1))
+    (print 1)
+    (await (sleep 2))
+    (print 2)
+    (await h)
+    (print 3)
+)

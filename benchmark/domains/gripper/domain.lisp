@@ -87,3 +87,15 @@
           (check (= (at-robby) (at ?ball)))
           (pick ?ball (at ?ball) ?gripper))))
 )
+
+
+(add-command-model
+ (map '(
+    (:name m_navigate_to)
+    (:task t_navigate_to)
+    (:params (?r robot) (?x float) (?y float))
+    (:pre-conditions (and-cond (robot.available ?r) (< ?x 10) (< ?y 10)))
+    (:score 0)
+    (:body
+    (begin
+        (navigate_to ?r ?x ?y))))))

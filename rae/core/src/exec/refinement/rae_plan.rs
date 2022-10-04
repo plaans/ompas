@@ -150,7 +150,7 @@ impl CtxRaePlan {
     }
 
     pub async fn compose_efficiency(&self, e: Efficiency) {
-        let o_e: Efficiency = self.efficiency.read().await.clone();
+        let o_e: Efficiency = *self.efficiency.read().await;
         *self.efficiency.write().await = Efficiency::compose(o_e, e)
     }
 
@@ -168,7 +168,7 @@ impl CtxRaePlan {
     }
 
     pub async fn get_efficiency(&self) -> Efficiency {
-        self.efficiency.read().await.clone()
+        *self.efficiency.read().await
     }
 }
 

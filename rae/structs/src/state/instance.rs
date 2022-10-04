@@ -49,7 +49,7 @@ impl InstanceCollection {
 
     pub async fn is_of_type(&self, i: String, t: String) -> bool {
         match self.inner.get(&t) {
-            Some(set) => set.contains(&i).into(),
+            Some(set) => set.contains(&i),
             None => false,
         }
     }

@@ -80,7 +80,7 @@ pub async fn test_expression_with_env(
         test_expression.expression, expanded, expected
     );
 
-    assert_eq!(expanded, expected,);
+    assert_eq!(expanded, expected);
 
     let result = eval(&expanded, env, None).await?;
     let expected_result = match eval_result {
@@ -89,7 +89,7 @@ pub async fn test_expression_with_env(
     };
     println!(
         "\t-result: {}\n\
-            \t-expected result: {}\n",
+        \t-expected result: {}\n",
         result, expected_result
     );
 

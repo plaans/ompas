@@ -201,6 +201,17 @@ impl IntoModule for CtxRaeUser {
 impl CtxRaeUser {
     /// Initialize the libraries to load inside Scheme env.
     /// Takes as argument the execution platform.
+    ///
+
+    pub async fn init_empty_env() -> LEnv {
+        let mut empty_env = get_root_env().await;
+        empty_env.import_module(CtxUtils::default(), WithoutPrefix);
+        empty_env.import_module(CtxMath::default(), WithoutPrefix);
+        empty_env.import_module(CtxIo::default(), WithoutPrefix);
+        empty_env.import_module(CtxRaeExec::default(), WithoutPrefix);
+        eval_init(&mut empty_env).await;
+        empty_env
+    }
 
     pub async fn new(
         platform: Option<Platform>,
@@ -236,15 +247,9 @@ impl CtxRaeUser {
         let mut log = dir_path.clone();
         log.push(format!("rae_{}.txt", string_date));
 
-        let mut empty_env = get_root_env().await;
-        empty_env.import_module(CtxUtils::default(), WithoutPrefix);
-        empty_env.import_module(CtxMath::default(), WithoutPrefix);
-        empty_env.import_module(CtxIo::default(), WithoutPrefix);
-        empty_env.import_module(CtxRaeExec::default(), WithoutPrefix);
-        eval_init(&mut empty_env).await;
-
-        let channel = ompas_rae_log::init(log.clone()) //change with configurable display
-            .expect("Error while initiating logger.");
+        let channel =
+            ompas_rae_log::init(log.clone()) //change with configurable display
+                .unwrap_or_else(|e| panic!("Error while initiating logger : {}", e));
 
         Self {
             options: Arc::new(Default::default()),
@@ -264,7 +269,7 @@ impl CtxRaeUser {
             platform,
             rae_domain: Default::default(),
             platform_domain: domain,
-            empty_env,
+            empty_env: Self::init_empty_env().await,
             tasks_to_execute: Arc::new(Default::default()),
         }
     }

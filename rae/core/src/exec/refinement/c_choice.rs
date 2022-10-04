@@ -131,7 +131,7 @@ impl CtxCChoice {
 
 impl CtxCChoice {
     pub async fn increase_cost(&self, c: Cost) {
-        let o_c: Cost = self.cost.read().await.clone();
+        let o_c: Cost = *self.cost.read().await;
         *self.cost.write().await = o_c + c;
     }
 
@@ -149,7 +149,7 @@ impl CtxCChoice {
     }
 
     pub async fn get_cost(&self) -> Cost {
-        self.cost.read().await.clone()
+        *self.cost.read().await
     }
 }
 

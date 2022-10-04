@@ -768,9 +768,10 @@ mod test {
 
         env.import_module(CtxMath::default(), WithoutPrefix);
 
-        //env.import_module(CtxRaeExec::default(), WithoutPrefix);
+        let mut ctx = CtxRaeUser::default();
+        ctx.empty_env = CtxRaeUser::init_empty_env().await;
 
-        env.import_module(CtxRaeUser::default(), WithoutPrefix);
+        env.import_module(ctx, WithoutPrefix);
 
         env.import_module(CtxIo::default(), WithoutPrefix);
         eval_init(&mut env).await;
@@ -782,17 +783,12 @@ mod test {
         let macro_to_test = TestExpression {
             inner: MACRO_DEF_TASK,
             dependencies: vec![],
-            expression: "(generate-task t_navigate_to (?r robot) (?x int) (?y int))",
-            expected: "(list \
-                        t_navigate_to
-                        '((?r robot) (?x int) (?y int))
-                        (lambda (?r ?x ?y)
-                            (rae-exec-task 't_navigate_to ?r ?x ?y)))",
-            result: "(list \
-                        t_navigate_to
-                        '((?r robot) (?x int) (?y int))
-                        (lambda (?r ?x ?y)
-                            (rae-exec-task 't_navigate_to ?r ?x ?y)))",
+            expression: "(def-task t_navigate_to (:params (?r robot) (?x int) (?y int)))",
+            expected: "(add-task \
+                            (map '(\
+                                (:name t_navigate_to)\
+                                (:params ((?r robot) (?x int) (?y int)))))))",
+            result: "nil",
         };
 
         let mut env = init_env_and_ctxs().await;
@@ -804,34 +800,42 @@ mod test {
         let macro_to_test = TestExpression {
             inner: MACRO_DEF_STATE_FUNCTION,
             dependencies: vec![],
-            expression: "(generate-state-function sf (?a object) (?b object) (?c object))",
-            expected: "(list sf
-                            '((?a object) (?b object) (?c object))
-                            (lambda (?a ?b)
-                                (rae-get-state-variable 'sf ?a ?b)))",
-            result: "(list sf
-                            '((?a object) (?b object) (?c object))
-                            (lambda (?a ?b)
-                                (rae-get-state-variable 'sf ?a ?b)))",
+            expression:
+                "(def-state-function sf (:params (?a object) (?b object)) (:result object))",
+            expected: "(add-state-function \
+                            (map '(\
+                                (:name sf)\
+                                (:params ((?a object) (?b object)))\
+                                (:result (object)))))",
+            result: "nil",
         };
 
         let mut env = init_env_and_ctxs().await;
-        test_expression_with_env(macro_to_test, &mut env, true).await?;
+        match test_expression_with_env(macro_to_test, &mut env, true).await {
+            Ok(_) => {}
+            Err(e) => {
+                println!("err : {}", e);
+                return Err(e);
+            }
+        };
 
-        let macro_to_test_2 = TestExpression {
+        let macro_to_test = TestExpression {
             inner: MACRO_DEF_STATE_FUNCTION,
             dependencies: vec![],
-            expression: "(generate-state-function sf)",
-            expected: "(list sf
-                            'nil
-                            (lambda nil
-                                (rae-get-state-variable 'sf)))",
-            result: "(list sf
-                            'nil
-                            (lambda nil
-                                (rae-get-state-variable 'sf)))",
+            expression: "(def-state-function sf (:result object))",
+            expected: "(add-state-function \
+                        (map '(\
+                            (:name sf)\
+                            (:result (object)))))",
+            result: "nil",
         };
-        test_expression_with_env(macro_to_test_2, &mut env, true).await
+        match test_expression_with_env(macro_to_test, &mut env, true).await {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                println!("err : {}", e);
+                Err(e)
+            }
+        }
     }
 
     #[tokio::test]
@@ -840,82 +844,110 @@ mod test {
             inner: MACRO_DEF_COMMAND,
             dependencies: vec![],
             expression: "(def-command pick_package (:params (?r robot) (?p package)))",
-            expected: "(list pick_package
-                            '((?r robot) (?p package))
-                            (lambda (?r ?p)
-                                (rae-exec-command (quote pick_package) ?r ?p)))",
-            result: "(list pick_package
-                            '((?r robot) (?p package))
-                            (lambda (?r ?p)
-                                (rae-exec-command (quote pick_package) ?r ?p)))",
+            expected: "(add-command \
+                            (map '(\
+                                (:name pick_package)\
+                                (:params ((?r robot) (?p package)))))))",
+            result: "nil",
         };
 
         let mut env = init_env_and_ctxs().await;
-        test_expression_with_env(macro_to_test, &mut env, true).await
+        match test_expression_with_env(macro_to_test, &mut env, true).await {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                println!("err : {}", e);
+                Err(e)
+            }
+        }
     }
 
     #[tokio::test]
     async fn test_macro_def_command_pddl_model() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
             inner: MACRO_DEF_COMMAND_PDDL_MODEL,
-            dependencies: vec![],
-            expression: "(generate-action-model pick
-                ((:params (?r robot))
-                  (:pre-conditions (check (> (robot.battery ?r) 0.4)))
-                  (:effects
-                        (assert (robot.busy ?r) true))))",
-            expected: "(list pick
-                            (lambda (?r)
-                                (do
-                                    (do
-                                        (check (instance ?r robot)))
-                                    
-                                        (check (> (robot.battery ?r) 0.4))
-                                  (assert (robot.busy ?r) true))))",
-            result: "(list pick
-                            (lambda (?r)
-                                (do
-                                    (do
-                                        (check (instance ?r robot)))
-                                    
-                                        (check (> (robot.battery ?r) 0.4))
-                                  (assert (robot.busy ?r) true))))",
+            dependencies: vec![MACRO_DEF_COMMAND],
+            expression: "(def-command-pddl-model pick
+                          (:params (?obj ball) (?room room) (?gripper gripper))
+                          (:pre-conditions
+                            (= (at ?obj) ?room)
+                            (= (at-robby) ?room)
+                            (= (carry ?gripper) no_ball))
+                          (:effects
+                            (begin
+                                (assert `(carry ,?gripper) ?obj)
+                                (assert `(at ,?obj) no_place))))",
+            expected: "(add-command-model\
+                (map '(\
+                    (:name pick)\
+                    (:model-type pddl)\
+                    (:params ((?obj ball) (?room room) (?gripper gripper)))\
+                    (:pre-conditions ((= (at ?obj) ?room) (= (at-robby) ?room) (= (carry ?gripper) no_ball)))\
+                    (:effects ((begin (assert `(carry ,?gripper) ?obj) (assert `(at ,?obj) no_place)))))))",
+            result: "nil",
         };
 
         let mut env = init_env_and_ctxs().await;
-        test_expression_with_env(macro_to_test, &mut env, true).await
+
+        eval(
+            &parse(
+                "(def-command pick (:params (?obj ball) (?room room) (?gripper gripper)))",
+                &mut env,
+            )
+            .await?,
+            &mut env,
+            None,
+        )
+        .await?;
+
+        match test_expression_with_env(macro_to_test, &mut env, true).await {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                println!("err : {}", e);
+                Err(e)
+            }
+        }
     }
 
     #[tokio::test]
     async fn test_macro_def_command_om_model() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
             inner: MACRO_DEF_COMMAND_OM_MODEL,
-            dependencies: vec![],
-            expression: "(generate-action-model pick
-                ((:params (?r robot))
-                  (:pre-conditions (check (> (robot.battery ?r) 0.4)))
-                  (:effects
-                        (assert (robot.busy ?r) true))))",
-            expected: "(list pick
-                            (lambda (?r)
+            dependencies: vec![MACRO_DEF_COMMAND],
+            expression: "(def-command-om-model pick
+                            (:params (?r robot))
+                            (:body
                                 (do
-                                    (do
-                                        (check (instance ?r robot)))
-                                    
-                                        (check (> (robot.battery ?r) 0.4))
-                                  (assert (robot.busy ?r) true))))",
-            result: "(list pick
-                            (lambda (?r)
-                                (do
-                                    (do
-                                        (check (instance ?r robot)))
-                                    
-                                        (check (> (robot.battery ?r) 0.4))
-                                  (assert (robot.busy ?r) true))))",
+                                    (check (> (robot.battery ?r) 0.4))
+                                    (assert (robot.busy ?r) true))))",
+            expected: "(add-command-model
+                         (map '(
+                            (:name pick) 
+                            (:model-type om) 
+                            (:params ((?r robot))) 
+                            (:body ((do 
+                              (check (> (robot.battery ?r) 0.4)) 
+                              (assert (robot.busy ?r) true)))))))",
+            result: "nil",
         };
 
         let mut env = init_env_and_ctxs().await;
-        test_expression_with_env(macro_to_test, &mut env, true).await
+        eval(
+            &parse(
+                "(def-command pick (:params (?obj ball) (?room room) (?gripper gripper)))",
+                &mut env,
+            )
+            .await?,
+            &mut env,
+            None,
+        )
+        .await?;
+        match test_expression_with_env(macro_to_test, &mut env, true).await {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                println!("err : {}", e);
+                Err(e)
+            }
+        }
     }
 
     /*#[tokio::test]
@@ -941,54 +973,48 @@ mod test {
     }*/
 
     #[tokio::test]
-    async fn test_macro_generate_method() -> Result<(), LRuntimeError> {
+    async fn test_macro_def_method() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
             inner: MACRO_DEF_METHOD,
-            dependencies: vec![], //LAMBDA_GENERATE_TYPE_PRE_CONDITIONS],
-            expression: "(generate-method m_navigate_to ((:task t_navigate_to)
+            dependencies: vec![MACRO_DEF_TASK], //LAMBDA_GENERATE_TYPE_PRE_CONDITIONS],
+            expression: "(def-method m_navigate_to (:task t_navigate_to)
             (:params (?r robot) (?x float) (?y float))
-            (:pre-conditions (and-cond (robot.available ?r) (< ?x 10) (< ?y 10)))
+            (:pre-conditions (robot.available ?r) (< ?x 10) (< ?y 10))
             (:score 0)
             (:body
             (begin
-                (navigate_to ?r ?x ?y)))))",
-            expected: "(list m_navigate_to
-    't_navigate_to
-    '((?r robot) (?x float) (?y float))
-    (lambda (?r ?x ?y)
-    (do
-        (do 
-            (check (instance ?r robot))
-            (check (float? ?x))
-            (check (float? ?y)))
-        (do 
-            (check (robot.available ?r))
-            (check (< ?x 10))
-            (check (< ?y 10))))) 
-    (lambda (?r ?x ?y) 0 )
-    (lambda (?r ?x ?y)
-        (begin
-            (navigate_to ?r ?x ?y))))",
-            result: "(list m_navigate_to
-    't_navigate_to
-    '((?r robot) (?x float) (?y float))
-    (lambda (?r ?x ?y)
-    (do
-        (do 
-            (check (instance ?r robot))
-            (check (float? ?x))
-            (check (float? ?y)))
-        (do 
-            (check (robot.available ?r))
-            (check (< ?x 10))
-            (check (< ?y 10))))) 
-    (lambda (?r ?x ?y) 0 )
-    (lambda (?r ?x ?y)
-        (begin
-            (navigate_to ?r ?x ?y))))",
+                (navigate_to ?r ?x ?y))))",
+            expected: "(add-method
+ (map '(
+    (:name m_navigate_to)
+    (:task (t_navigate_to))
+    (:params ((?r robot) (?x float) (?y float)))
+    (:pre-conditions ((robot.available ?r) (< ?x 10) (< ?y 10)))
+    (:score (0))
+    (:body
+    ((begin
+        (navigate_to ?r ?x ?y)))))))",
+            result: "nil",
         };
 
         let mut env = init_env_and_ctxs().await;
-        test_expression_with_env(macro_to_test, &mut env, true).await
+
+        eval(
+            &parse(
+                "(def-task t_navigate_to (:params (?r robot) (?x float) (?y float)))",
+                &mut env,
+            )
+            .await?,
+            &mut env,
+            None,
+        )
+        .await?;
+        match test_expression_with_env(macro_to_test, &mut env, true).await {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                println!("err : {}", e);
+                Err(e)
+            }
+        }
     }
 }

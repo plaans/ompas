@@ -8,3 +8,4 @@ lisp_logs/
 rae_logs/
 Cargo.lock
 *.log
+*.yml

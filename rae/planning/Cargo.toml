@@ -27,6 +27,6 @@ aries_utils = {path = "../../aries/utils"}
 aries_collections = {path = "../../aries/collections"}
 aries_solver = {path = "../../aries/solver"}
 aries_planners = {path = "../../aries/planners"}
-aries_tnet = {path = "../../aries/tnet"}
+aries_stn = {path = "../../aries/reasoners/stn"}
 anyhow = "1.0.40"
 rand = "0.8.5"

@@ -9,7 +9,7 @@ use aries_planners::Solver;
 use aries_planning::chronicles;
 use aries_planning::chronicles::analysis::hierarchical_is_non_recursive;
 use aries_planning::chronicles::{ChronicleKind, ChronicleOrigin, FiniteProblem};
-use aries_tnet::theory::{StnConfig, StnTheory, TheoryPropagationLevel};
+use aries_stn::theory::{StnConfig, StnTheory, TheoryPropagationLevel};
 use im::HashMap;
 use ompas_rae_structs::plan::{AbstractTaskInstance, ActionInstance, Plan, TaskInstance};
 use sompas_structs::lruntimeerror::LResult;
@@ -18,13 +18,13 @@ use std::sync::Arc;
 use std::time::Instant;
 
 fn init_solver(pb: &FiniteProblem) -> Box<Solver> {
-    let model = encode(pb).unwrap();
+    let model = encode(pb, None).unwrap();
     let stn_config = StnConfig {
         theory_propagation: TheoryPropagationLevel::Full,
         ..Default::default()
     };
 
-    let mut solver = Box::new(aries_solver::solver::Solver::new(model));
+    let mut solver = Box::new(aries_solver::solver::Solver::new(model.0));
     solver.add_theory(|tok| StnTheory::new(tok, stn_config));
     solver
 }

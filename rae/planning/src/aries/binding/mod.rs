@@ -189,6 +189,7 @@ pub fn generate_templates(problem: &Problem) -> Result<chronicles::Problem> {
 }
 
 pub fn generate_chronicles(problem: &Problem) -> Result<chronicles::Problem> {
+    todo!();
     /*println!("# SYMBOL TABLE: \n{:?}", ctx.model.get_symbol_table());
     println!("{}", bindings.format(&problem.cc.sym_table, false));
     println!("initial chronicle: {:?}", init_ch.chronicle);
@@ -266,6 +267,7 @@ pub fn create_initial_chronicle(
         effects: vec![],
         constraints: vec![],
         subtasks: vec![],
+        cost: None,
     };
 
     initialize_state(&mut init_ch, state, ctx);
@@ -304,6 +306,7 @@ fn initialize_state(init_ch: &mut aChronicle, state: &WorldStateSnapshot, ctx: &
             init_ch.effects.push(Effect {
                 transition_start: init_ch.start,
                 persistence_start: init_ch.start,
+                min_persistence_end: vec![],
                 state_var: sv,
                 value: t.into(),
             });
@@ -324,6 +327,7 @@ fn initialize_state(init_ch: &mut aChronicle, state: &WorldStateSnapshot, ctx: &
         init_ch.effects.push(Effect {
             transition_start: init_ch.start,
             persistence_start: init_ch.start,
+            min_persistence_end: vec![],
             state_var: key,
             value,
         });
@@ -343,6 +347,7 @@ fn initialize_state(init_ch: &mut aChronicle, state: &WorldStateSnapshot, ctx: &
         init_ch.effects.push(Effect {
             transition_start: init_ch.start,
             persistence_start: init_ch.start,
+            min_persistence_end: vec![],
             state_var: key,
             value,
         });
@@ -361,6 +366,7 @@ fn initialize_state(init_ch: &mut aChronicle, state: &WorldStateSnapshot, ctx: &
         init_ch.effects.push(Effect {
             transition_start: init_ch.start,
             persistence_start: init_ch.start,
+            min_persistence_end: vec![],
             state_var: key,
             value,
         });
@@ -467,7 +473,7 @@ fn convert_constraint(
                 get_atom(&b, ctx),
                 eq,
             ));
-            constraints.push(aConstraint::or(vec![lt, eq]));
+            //constraints.push(aConstraint::or(vec![lt, eq]));
         }
         Constraint::Eq(a, b) => {
             //let a: AtomId = a.try_into()?;
@@ -567,7 +573,8 @@ fn read_chronicle(
     context: &mut Ctx,
     bindings: &mut BindingAriesAtoms,
 ) -> Result<ChronicleTemplate> {
-    /*println!(
+    todo!()
+    /*/*println!(
         "reading chronicle: {}",
         chronicle.format_with_sym_table(&ch.sym_table, false)
     );*/
@@ -780,6 +787,7 @@ fn read_chronicle(
         let effect = Effect {
             transition_start: start, // + FAtom::EPSILON,
             persistence_start: end,  // + FAtom::EPSILON,
+            min_persistence_end: vec![],
             state_var: sv,
             value,
         };
@@ -835,6 +843,7 @@ fn read_chronicle(
         effects,
         constraints,
         subtasks,
+        cost: None,
     };
 
     let template = ChronicleTemplate {
@@ -843,5 +852,5 @@ fn read_chronicle(
         chronicle: template,
     };
 
-    Ok(template)
+    Ok(template)*/
 }

@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use flow_graph::config::GraphConvertConfig;
-use flow_graph::graph::FlowGraph;
+use flow_graph::graph::{FlowGraph, NodeId};
 use flow_graph::{convert, ConvertError};
 use sompas_core::{get_root_env, parse};
 use sompas_structs::lenv::LEnv;
@@ -69,7 +69,12 @@ Graph flow converter for SOMPAS code!\n
 
         let mut graph = FlowGraph::default();
 
-        let r = convert(&lv, &mut graph, None, &mut Default::default())?;
+        let r = convert(
+            &lv,
+            &mut graph,
+            Some(NodeId::start()),
+            &mut Default::default(),
+        )?;
 
         output_markdown(
             p.to_str().unwrap(),

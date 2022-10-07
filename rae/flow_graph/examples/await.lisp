@@ -1,0 +1,1 @@
+(await (async (* 3 3)))

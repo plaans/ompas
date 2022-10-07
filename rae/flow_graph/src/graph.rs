@@ -3,13 +3,51 @@ use sompas_structs::lnumber::LNumber;
 use sompas_structs::lvalue::LValue;
 use std::fmt::{Display, Formatter};
 
-pub type NodeId = usize;
+#[derive(Copy, Clone, Debug)]
+pub struct NodeId {
+    absolute: usize,
+    relative: usize,
+}
+
+impl NodeId {
+    pub fn start() -> Self {
+        Self {
+            absolute: 0,
+            relative: 0,
+        }
+    }
+
+    pub fn get_absolute(&self) -> usize {
+        self.absolute
+    }
+
+    pub fn get_relative(&self) -> usize {
+        self.relative
+    }
+}
 pub type Dot = String;
 
-#[derive(Default, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct FlowGraph {
     inner: Vec<Node>,
     result_id: usize,
+}
+
+impl Default for FlowGraph {
+    fn default() -> Self {
+        Self {
+            inner: vec![Node {
+                id: NodeId {
+                    absolute: 0,
+                    relative: 0,
+                },
+                parents: Default::default(),
+                childs: Default::default(),
+                computation: Computation::Start,
+            }],
+            result_id: 0,
+        }
+    }
 }
 
 pub const NODE_PREFIX: char = 'N';
@@ -33,11 +71,12 @@ impl Default for LinkKind {
 
 impl FlowGraph {
     pub fn new_node(&mut self, value: impl Into<Computation>, parent: Option<NodeId>) -> NodeId {
-        let id = self.inner.len();
-        let result_id = self.result_id;
+        let id = NodeId {
+            absolute: self.inner.len(),
+            relative: self.result_id,
+        };
         let node = Node {
             id,
-            result_id,
             parents: Default::default(),
             childs: Default::default(),
             computation: value.into(),
@@ -53,20 +92,22 @@ impl FlowGraph {
         id
     }
 
-    pub fn get_result_id(&self, id: &NodeId) -> &NodeId {
-        &self.inner.get(*id).unwrap().result_id
+    pub fn get(&self, id: &NodeId) -> Option<&Node> {
+        self.inner.get(id.absolute)
     }
 
     pub fn duplicate_result_node(
         &mut self,
-        result_id: NodeId,
+        result_id: usize,
         value: impl Into<Computation>,
         parent: Option<NodeId>,
     ) -> NodeId {
-        let id = self.inner.len();
+        let id = NodeId {
+            absolute: self.inner.len(),
+            relative: result_id,
+        };
         let node = Node {
             id,
-            result_id,
             parents: Default::default(),
             childs: Default::default(),
             computation: value.into(),
@@ -81,30 +122,50 @@ impl FlowGraph {
     }
 
     pub fn add_child(&mut self, node_id: &NodeId, child_id: &NodeId) {
-        self.inner.get_mut(*node_id).unwrap().add_child(child_id);
-        self.inner.get_mut(*child_id).unwrap().add_parent(node_id);
+        self.inner
+            .get_mut(node_id.absolute)
+            .unwrap()
+            .add_child(child_id);
+        self.inner
+            .get_mut(child_id.absolute)
+            .unwrap()
+            .add_parent(node_id);
     }
 
     pub fn add_parent(&mut self, node_id: &NodeId, parent_id: &NodeId) {
-        self.inner.get_mut(*node_id).unwrap().add_parent(parent_id);
-        self.inner.get_mut(*parent_id).unwrap().add_child(node_id);
+        self.inner
+            .get_mut(node_id.absolute)
+            .unwrap()
+            .add_parent(parent_id);
+        self.inner
+            .get_mut(parent_id.absolute)
+            .unwrap()
+            .add_child(node_id);
     }
 
     pub fn set_child_link_lind(&mut self, node_id: &NodeId, link_kind: LinkKind) {
-        let mut node: &mut Node = self.inner.get_mut(*node_id).unwrap();
+        let mut node: &mut Node = self.inner.get_mut(node_id.absolute).unwrap();
         node.childs.link_kind = link_kind;
         let childs = node.childs.inner.clone();
         for child in childs {
-            self.inner.get_mut(child).unwrap().parents.link_kind = link_kind;
+            self.inner
+                .get_mut(child.absolute)
+                .unwrap()
+                .parents
+                .link_kind = link_kind;
         }
     }
 
     pub fn set_parent_link_lind(&mut self, node_id: &NodeId, link_kind: LinkKind) {
-        let mut node: &mut Node = self.inner.get_mut(*node_id).unwrap();
+        let mut node: &mut Node = self.inner.get_mut(node_id.absolute).unwrap();
         node.parents.link_kind = link_kind;
         let parents = node.parents.inner.clone();
         for parent in parents {
-            self.inner.get_mut(parent).unwrap().parents.link_kind = link_kind;
+            self.inner
+                .get_mut(parent.absolute)
+                .unwrap()
+                .parents
+                .link_kind = link_kind;
         }
     }
 
@@ -115,36 +176,51 @@ impl FlowGraph {
     pub fn export_dot(&self) -> Dot {
         let mut dot: Dot = "digraph {\n".to_string();
 
-        if !self.inner.is_empty() {
+        /*if !self.inner.is_empty() {
             dot.push_str("S\n");
             dot.push_str(format!("S -> {}0\n", NODE_PREFIX).as_str());
-        }
+        }*/
         for node in &self.inner {
-            let node_name = format!("{}{}", NODE_PREFIX, node.id);
-            let timepoint_name = format!("{}{}", TIMEPOINT_PREFIX, node.result_id);
-            let result_name = format!("{}{}", RESULT_PREFIX, node.result_id);
-            dot.push_str(
-                format!(
-                    "{} [label= \"{}: {} <- {}\"]\n",
-                    node_name,
-                    timepoint_name,
-                    result_name,
-                    node.computation.to_string(),
-                )
-                .as_str(),
-            );
+            let node_name = format!("{}{}", NODE_PREFIX, node.id.absolute);
+            let timepoint_name = format!("{}{}", TIMEPOINT_PREFIX, node.id.relative);
+            let result_name = format!("{}{}", RESULT_PREFIX, node.id.relative);
+            match node.computation {
+                Computation::Start | Computation::End => {
+                    dot.push_str(
+                        format!(
+                            "{} [label= \"{}\"]\n",
+                            node_name,
+                            node.computation.to_string(),
+                        )
+                        .as_str(),
+                    );
+                }
+                _ => {
+                    dot.push_str(
+                        format!(
+                            "{} [label= \"{}: {} <- {}\"]\n",
+                            node_name,
+                            timepoint_name,
+                            result_name,
+                            node.computation.to_string(),
+                        )
+                        .as_str(),
+                    );
+                }
+            }
+
             match node.childs.link_kind {
                 LinkKind::Seq => {
                     for child in &node.childs.inner {
-                        let child_name = format!("{}{}", NODE_PREFIX, child);
+                        let child_name = format!("{}{}", NODE_PREFIX, child.absolute);
                         dot.push_str(format!("{} -> {}\n", node_name, child_name).as_str());
                     }
                 }
                 LinkKind::Branching => {
                     let true_result = &node.childs.inner[0];
                     let false_result = &node.childs.inner[1];
-                    let true_branch = format!("{}{}", NODE_PREFIX, true_result);
-                    let false_branch = format!("{}{}", NODE_PREFIX, false_result);
+                    let true_branch = format!("{}{}", NODE_PREFIX, true_result.absolute);
+                    let false_branch = format!("{}{}", NODE_PREFIX, false_result.absolute);
 
                     dot.push_str(
                         format!(
@@ -164,7 +240,7 @@ impl FlowGraph {
             }
         }
 
-        dot.push_str(
+        /*dot.push_str(
             format!(
                 "{}{} -> {}{}",
                 NODE_PREFIX,
@@ -173,7 +249,7 @@ impl FlowGraph {
                 self.result_id - 1
             )
             .as_str(),
-        );
+        );*/
 
         dot.push('}');
         dot
@@ -195,7 +271,6 @@ pub struct Childs {
 #[derive(Clone, Debug)]
 pub struct Node {
     id: NodeId,
-    result_id: NodeId,
     parents: Parents,
     childs: Childs,
     computation: Computation,
@@ -214,19 +289,19 @@ impl Node {
     }
 
     /*GETTERS*/
-    pub fn get_parents(&mut self) -> &Vec<NodeId> {
+    pub fn get_parents(&self) -> &Vec<NodeId> {
         &self.parents.inner
     }
 
-    pub fn get_childs(&mut self) -> &Vec<NodeId> {
+    pub fn get_childs(&self) -> &Vec<NodeId> {
         &self.childs.inner
     }
 
-    pub fn get_computation(&mut self) -> &Computation {
+    pub fn get_computation(&self) -> &Computation {
         &self.computation
     }
 
-    pub fn get_id(&mut self) -> &NodeId {
+    pub fn get_id(&self) -> &NodeId {
         &self.id
     }
 }
@@ -243,24 +318,30 @@ pub enum Computation {
     Write(Vec<NodeId>),
     Read(Vec<NodeId>),
     Cst(CstValue),
-    If,
+    Handle(NodeId),
+    Start,
+    End,
 }
 
 impl Computation {
-    pub fn apply(vec: Vec<NodeId>) -> Computation {
-        Computation::Apply(vec)
+    pub fn apply(vec: Vec<NodeId>) -> Self {
+        Self::Apply(vec)
     }
 
-    pub fn write(vec: Vec<NodeId>) -> Computation {
-        Computation::Write(vec)
+    pub fn write(vec: Vec<NodeId>) -> Self {
+        Self::Write(vec)
     }
 
-    pub fn read(vec: Vec<NodeId>) -> Computation {
-        Computation::Read(vec)
+    pub fn read(vec: Vec<NodeId>) -> Self {
+        Self::Read(vec)
     }
 
-    pub fn cst(cst: impl Into<CstValue>) -> Computation {
-        Computation::Cst(cst.into())
+    pub fn cst(cst: impl Into<CstValue>) -> Self {
+        Self::Cst(cst.into())
+    }
+
+    pub fn handle(h: NodeId) -> Self {
+        Self::Handle(h)
     }
 }
 
@@ -274,9 +355,9 @@ impl Display for Computation {
                 for node in vec {
                     if first {
                         first = false;
-                        args.push_str(format!("{}{}", RESULT_PREFIX, node).as_str())
+                        args.push_str(format!("{}{}", RESULT_PREFIX, node.relative).as_str())
                     } else {
-                        args.push_str(format!(",{}{}", RESULT_PREFIX, node).as_str())
+                        args.push_str(format!(",{}{}", RESULT_PREFIX, node.relative).as_str())
                     }
                 }
                 write!(f, "apply({})", args)
@@ -288,9 +369,9 @@ impl Display for Computation {
                 for node in vec {
                     if first {
                         first = false;
-                        args.push_str(format!("{}{}", RESULT_PREFIX, node).as_str())
+                        args.push_str(format!("{}{}", RESULT_PREFIX, node.relative).as_str())
                     } else {
-                        args.push_str(format!(",{}{}", RESULT_PREFIX, node).as_str())
+                        args.push_str(format!(",{}{}", RESULT_PREFIX, node.relative).as_str())
                     }
                 }
                 write!(f, "apply({})", args)
@@ -302,9 +383,9 @@ impl Display for Computation {
                 for node in vec {
                     if first {
                         first = false;
-                        args.push_str(format!("{}{}", RESULT_PREFIX, node).as_str())
+                        args.push_str(format!("{}{}", RESULT_PREFIX, node.relative).as_str())
                     } else {
-                        args.push_str(format!(",{}{}", RESULT_PREFIX, node).as_str())
+                        args.push_str(format!(",{}{}", RESULT_PREFIX, node.relative).as_str())
                     }
                 }
                 write!(f, "read({})", args)
@@ -313,9 +394,11 @@ impl Display for Computation {
                 let mut args = "".to_string();
                 write!(f, "cst({})", cst.to_string())
             }
-            Computation::If => {
-                write!(f, "if")
+            Computation::Handle(node) => {
+                write!(f, "handle({}{})", RESULT_PREFIX, node.relative)
             }
+            Computation::Start => write!(f, "start"),
+            Computation::End => write!(f, "end"),
         }
     }
 }
@@ -338,7 +421,7 @@ impl Display for CstValue {
             CstValue::Symbol(s) => write!(f, "{}", s),
             CstValue::String(s) => write!(f, "{}", s),
             CstValue::Expression(e) => write!(f, "{}", e),
-            CstValue::Result(r) => write!(f, "{}{}", RESULT_PREFIX, r),
+            CstValue::Result(r) => write!(f, "{}{}", RESULT_PREFIX, r.relative),
         }
     }
 }

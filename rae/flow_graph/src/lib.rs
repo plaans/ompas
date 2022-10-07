@@ -1,5 +1,5 @@
 use crate::define_table::DefineTable;
-use crate::graph::{Computation, CstValue, FlowGraph, LinkKind, NodeId};
+use crate::graph::{Computation, CstValue, FlowGraph, LinkKind, Node, NodeId};
 use sompas_structs::lcoreoperator::LCoreOperator;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lvalue::LValue;
@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 pub mod config;
 pub mod define_table;
+pub mod future_table;
 pub mod graph;
 
 pub type ConvertError = String;
@@ -101,14 +102,14 @@ fn convert_list(
 
                 let false_branch = convert(false_branch, fl, parent, define_table)?;
                 fl.set_child_link_lind(&parent.unwrap(), LinkKind::Branching);
-                let result_id = *fl.get_result_id(&p1);
+                let result_id = p1.get_relative();
                 let p2 = fl.duplicate_result_node(
                     result_id,
                     CstValue::result(false_branch),
                     Some(false_branch),
                 );
 
-                let id = fl.new_node(CstValue::result(result_id), None);
+                let id = fl.new_node(CstValue::result(p1), None);
 
                 fl.add_parent(&id, &p1);
                 fl.add_parent(&id, &p2);
@@ -126,10 +127,22 @@ fn convert_list(
                 Ok(parent.unwrap())
             }
             LCoreOperator::Async => {
-                todo!()
+                let define_table = &mut define_table.clone();
+                let e = &list[1];
+                let r_async = convert(e, fl, parent.clone(), define_table)?;
+                Ok(fl.new_node(Computation::handle(r_async), parent))
             }
             LCoreOperator::Await => {
-                todo!()
+                let define_table = &mut define_table.clone();
+                let h = convert(&list[1], fl, parent.clone(), define_table)?;
+                let node: &Node = fl.get(&h).unwrap();
+                if let Computation::Handle(n_async) = node.get_computation().clone() {
+                    let r = fl.new_node(CstValue::result(n_async), Some(h));
+                    fl.add_parent(&r, &n_async);
+                    Ok(r)
+                } else {
+                    panic!()
+                }
             }
             LCoreOperator::Race => {
                 todo!()

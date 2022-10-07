@@ -9,32 +9,64 @@ pub type Dot = String;
 #[derive(Default, Debug, Clone)]
 pub struct FlowGraph {
     inner: Vec<Node>,
+    result_id: usize,
 }
 
 pub const NODE_PREFIX: char = 'N';
 pub const RESULT_PREFIX: char = 'r';
 pub const TIMEPOINT_PREFIX: char = 't';
 pub const BRANCHING_ARROW: &str = "->";
+pub const DASHED_ATTRIBUTE: &str = "[style = dashed]";
 pub const PAR_ARROW: &str = "->";
 
 #[derive(Debug, Copy, Clone)]
-enum LinkKind {
-    Par,
+pub enum LinkKind {
+    Seq,
     Branching,
 }
 
 impl Default for LinkKind {
     fn default() -> Self {
-        Self::Branching
+        Self::Seq
     }
 }
 
 impl FlowGraph {
     pub fn new_node(&mut self, value: impl Into<Computation>, parent: Option<NodeId>) -> NodeId {
         let id = self.inner.len();
-
+        let result_id = self.result_id;
         let node = Node {
             id,
+            result_id,
+            parents: Default::default(),
+            childs: Default::default(),
+            computation: value.into(),
+        };
+
+        self.result_id += 1;
+
+        self.inner.push(node);
+        match parent {
+            None => {}
+            Some(p) => self.add_parent(&id, &p),
+        }
+        id
+    }
+
+    pub fn get_result_id(&self, id: &NodeId) -> &NodeId {
+        &self.inner.get(*id).unwrap().result_id
+    }
+
+    pub fn duplicate_result_node(
+        &mut self,
+        result_id: NodeId,
+        value: impl Into<Computation>,
+        parent: Option<NodeId>,
+    ) -> NodeId {
+        let id = self.inner.len();
+        let node = Node {
+            id,
+            result_id,
             parents: Default::default(),
             childs: Default::default(),
             computation: value.into(),
@@ -58,6 +90,24 @@ impl FlowGraph {
         self.inner.get_mut(*parent_id).unwrap().add_child(node_id);
     }
 
+    pub fn set_child_link_lind(&mut self, node_id: &NodeId, link_kind: LinkKind) {
+        let mut node: &mut Node = self.inner.get_mut(*node_id).unwrap();
+        node.childs.link_kind = link_kind;
+        let childs = node.childs.inner.clone();
+        for child in childs {
+            self.inner.get_mut(child).unwrap().parents.link_kind = link_kind;
+        }
+    }
+
+    pub fn set_parent_link_lind(&mut self, node_id: &NodeId, link_kind: LinkKind) {
+        let mut node: &mut Node = self.inner.get_mut(*node_id).unwrap();
+        node.parents.link_kind = link_kind;
+        let parents = node.parents.inner.clone();
+        for parent in parents {
+            self.inner.get_mut(parent).unwrap().parents.link_kind = link_kind;
+        }
+    }
+
     /*
     Dot export
      */
@@ -65,10 +115,14 @@ impl FlowGraph {
     pub fn export_dot(&self) -> Dot {
         let mut dot: Dot = "digraph {\n".to_string();
 
+        if !self.inner.is_empty() {
+            dot.push_str("S\n");
+            dot.push_str(format!("S -> {}0\n", NODE_PREFIX).as_str());
+        }
         for node in &self.inner {
             let node_name = format!("{}{}", NODE_PREFIX, node.id);
-            let timepoint_name = format!("{}{}", TIMEPOINT_PREFIX, node.id);
-            let result_name = format!("{}{}", RESULT_PREFIX, node.id);
+            let timepoint_name = format!("{}{}", TIMEPOINT_PREFIX, node.result_id);
+            let result_name = format!("{}{}", RESULT_PREFIX, node.result_id);
             dot.push_str(
                 format!(
                     "{} [label= \"{}: {} <- {}\"]\n",
@@ -79,15 +133,47 @@ impl FlowGraph {
                 )
                 .as_str(),
             );
-            for child in &node.childs.inner {
-                let arrow = match node.childs.link_kind {
-                    LinkKind::Par => PAR_ARROW,
-                    LinkKind::Branching => BRANCHING_ARROW,
-                };
-                let child_name = format!("{}{}", NODE_PREFIX, child);
-                dot.push_str(format!("{} {} {}\n", node_name, arrow, child_name).as_str());
+            match node.childs.link_kind {
+                LinkKind::Seq => {
+                    for child in &node.childs.inner {
+                        let child_name = format!("{}{}", NODE_PREFIX, child);
+                        dot.push_str(format!("{} -> {}\n", node_name, child_name).as_str());
+                    }
+                }
+                LinkKind::Branching => {
+                    let true_result = &node.childs.inner[0];
+                    let false_result = &node.childs.inner[1];
+                    let true_branch = format!("{}{}", NODE_PREFIX, true_result);
+                    let false_branch = format!("{}{}", NODE_PREFIX, false_result);
+
+                    dot.push_str(
+                        format!(
+                            "{} -> {} [style = dashed label = \"{}\"]\n",
+                            node_name, true_branch, result_name
+                        )
+                        .as_str(),
+                    );
+                    dot.push_str(
+                        format!(
+                            "{} -> {} [style = dashed label = \"!{}\"]\n",
+                            node_name, false_branch, result_name
+                        )
+                        .as_str(),
+                    );
+                }
             }
         }
+
+        dot.push_str(
+            format!(
+                "{}{} -> {}{}",
+                NODE_PREFIX,
+                self.inner.len() - 1,
+                RESULT_PREFIX,
+                self.result_id - 1
+            )
+            .as_str(),
+        );
 
         dot.push('}');
         dot
@@ -109,6 +195,7 @@ pub struct Childs {
 #[derive(Clone, Debug)]
 pub struct Node {
     id: NodeId,
+    result_id: NodeId,
     parents: Parents,
     childs: Childs,
     computation: Computation,

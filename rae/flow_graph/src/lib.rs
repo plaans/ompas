@@ -1,5 +1,5 @@
 use crate::define_table::DefineTable;
-use crate::graph::{Computation, CstValue, FlowGraph, NodeId};
+use crate::graph::{Computation, CstValue, FlowGraph, LinkKind, NodeId};
 use sompas_structs::lcoreoperator::LCoreOperator;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lvalue::LValue;
@@ -69,9 +69,10 @@ fn convert_list(
 
     match proc {
         LValue::Symbol(_) => {
+            let mut define_table = define_table.clone();
             let mut args = vec![];
             for e in list.as_slice() {
-                let node_id = convert(e, fl, parent, define_table)?;
+                let node_id = convert(e, fl, parent, &mut define_table)?;
                 args.push(node_id);
                 parent = Some(node_id);
             }
@@ -86,7 +87,34 @@ fn convert_list(
                 Ok(fl.new_node(CstValue::bool(false), parent))
             }
             LCoreOperator::If => {
-                todo!()
+                let mut define_table = &mut define_table.clone();
+
+                let cond = &list[1];
+                let true_branch = &list[2];
+                let false_branch = &list[3];
+                let cond = convert(cond, fl, parent, define_table)?;
+
+                parent = Some(cond);
+
+                let true_branch = convert(true_branch, fl, parent, define_table)?;
+                let p1 = fl.new_node(CstValue::result(true_branch), Some(true_branch));
+
+                let false_branch = convert(false_branch, fl, parent, define_table)?;
+                fl.set_child_link_lind(&parent.unwrap(), LinkKind::Branching);
+                let result_id = *fl.get_result_id(&p1);
+                let p2 = fl.duplicate_result_node(
+                    result_id,
+                    CstValue::result(false_branch),
+                    Some(false_branch),
+                );
+
+                let id = fl.new_node(CstValue::result(result_id), None);
+
+                fl.add_parent(&id, &p1);
+                fl.add_parent(&id, &p2);
+                fl.set_parent_link_lind(&id, LinkKind::Branching);
+
+                Ok(id)
             }
             LCoreOperator::Quote => Ok(fl.new_node(CstValue::Expression(list[1].clone()), parent)),
             LCoreOperator::Begin => {

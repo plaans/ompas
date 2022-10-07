@@ -20,6 +20,9 @@ impl TryFrom<&Yaml> for GraphConvertConfig {
             .as_vec()
             .ok_or("problems is not an array.")?;
         let mut problems = vec![];
+        for p in temp_problems {
+            problems.push(p.as_str().ok_or_else(|| "Not a str").unwrap().into())
+        }
 
         Ok(Self {
             input_path: value[INPUT_PATH].as_str().map(|s| PathBuf::from(s)),

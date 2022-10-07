@@ -96,6 +96,18 @@ impl FlowGraph {
         self.inner.get(id.absolute)
     }
 
+    pub fn backtrack_result(&self, mut id: &NodeId) -> NodeId {
+        let mut id = *id;
+        loop {
+            let node: &Node = self.inner.get(id.absolute).unwrap();
+            if let Computation::Cst(CstValue::Result(r)) = &node.computation {
+                id = *r;
+            } else {
+                return id;
+            }
+        }
+    }
+
     pub fn duplicate_result_node(
         &mut self,
         result_id: usize,

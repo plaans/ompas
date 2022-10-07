@@ -135,13 +135,14 @@ fn convert_list(
             LCoreOperator::Await => {
                 let define_table = &mut define_table.clone();
                 let h = convert(&list[1], fl, parent.clone(), define_table)?;
-                let node: &Node = fl.get(&h).unwrap();
+                let h_parent = fl.backtrack_result(&h);
+                let node: &Node = fl.get(&h_parent).unwrap();
                 if let Computation::Handle(n_async) = node.get_computation().clone() {
                     let r = fl.new_node(CstValue::result(n_async), Some(h));
                     fl.add_parent(&r, &n_async);
                     Ok(r)
                 } else {
-                    panic!()
+                    Ok(h)
                 }
             }
             LCoreOperator::Race => {

@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use flow_graph::config::GraphConvertConfig;
-use flow_graph::graph::{FlowGraph, NodeId};
-use flow_graph::{convert, ConvertError};
+use flow_graph::conversion::flow_graph_conversion::{convert, ConvertError};
+use flow_graph::structs::flow_graph::graph::{FlowGraph, NodeId};
 use sompas_core::{get_root_env, parse};
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lvalue::LValue;

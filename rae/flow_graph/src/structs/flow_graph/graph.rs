@@ -1,4 +1,3 @@
-use log::Level::Debug;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lvalue::LValue;
 use std::fmt::{Display, Formatter};

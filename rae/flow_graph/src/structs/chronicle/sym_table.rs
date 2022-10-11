@@ -4,6 +4,7 @@ use crate::structs::chronicle::type_table::{AtomType, TypeId, TypeTable};
 use crate::structs::chronicle::{AtomId, FormatWithSymTable};
 use ompas_rae_language::*;
 use sompas_core::modules::get_scheme_primitives;
+use sompas_structs::lnumber::LNumber;
 use sompas_structs::lruntimeerror;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Display, Formatter};
@@ -31,7 +32,7 @@ impl SymTable {
             AtomType::Function,
             AtomType::Object,
         ] {
-            self.declare_new_type(&bt.to_string(), None);
+            self.new_type(&bt.to_string(), None);
         }
     }
 
@@ -79,16 +80,23 @@ impl SymTable {
         id
     }
 
-    pub fn new_int(&mut self, i: i32) -> AtomId {
+    pub fn new_int(&mut self, i: i64) -> AtomId {
         let id = self.symbols.new_node(i.into());
         self.types.add_new_atom(&id, AtomType::Int);
         id
     }
 
-    pub fn new_float(&mut self, f: f32) -> AtomId {
+    pub fn new_float(&mut self, f: f64) -> AtomId {
         let id = self.symbols.new_node(f.into());
         self.types.add_new_atom(&id, AtomType::Float);
         id
+    }
+
+    pub fn new_number(&mut self, n: &LNumber) -> AtomId {
+        match n {
+            LNumber::Int(i) => self.new_int(*i),
+            LNumber::Float(f) => self.new_float(*f),
+        }
     }
 
     /*
@@ -126,7 +134,7 @@ impl SymTable {
     /*
     DECLARATION FUNCTION
      */
-    pub fn declare_new_type(&mut self, sym: impl Display, a_type: Option<TypeId>) -> TypeId {
+    pub fn new_type(&mut self, sym: impl Display, a_type: Option<TypeId>) -> TypeId {
         let sym = sym.to_string();
         let id = self.symbols.new_node(sym.as_str().into());
         self.ids.insert(sym.as_str().into(), id);
@@ -141,13 +149,46 @@ impl SymTable {
 
     //Declare a new return value
     //The name of the return value will be format!("r_{}", last_return_index)
-    pub fn declare_new_result(&mut self, index: usize, a_type: Option<AtomType>) -> AtomId {
+    pub fn new_result(&mut self) -> AtomId {
+        let index = self.meta_data.new_result_index();
         let atom = Atom::Variable(Variable::Result(index));
         let sym = atom.to_string();
         let id = self.symbols.new_node(atom);
         self.ids.insert(sym, id);
-        self.types
-            .add_new_atom(&id, a_type.unwrap_or(AtomType::Untyped));
+        self.types.add_new_atom(&id, AtomType::Untyped);
+        id
+    }
+
+    pub fn new_timepoint(&mut self) -> AtomId {
+        let index = self.meta_data.new_timepoint_index();
+        let atom = Atom::Variable(Variable::Timepoint(index));
+        let sym = atom.to_string();
+        let id = self.symbols.new_node(atom);
+        self.ids.insert(sym, id);
+        self.types.add_new_atom(&id, AtomType::Timepoint);
+        id
+    }
+
+    pub fn new_symbol(&mut self, sym: impl Display, a_type: Option<AtomType>) -> AtomId {
+        let sym = &sym.to_string();
+        if self.it_exists(sym) {
+            *self.id(sym).unwrap()
+        } else {
+            let sym: String = sym.into();
+            let id = self.symbols.new_node(Atom::Symbol(sym.clone()));
+            self.ids.insert(sym, id);
+            self.types
+                .add_new_atom(&id, a_type.unwrap_or(AtomType::Untyped));
+            id
+        }
+    }
+
+    pub fn new_parameter(&mut self, symbol: impl ToString, var_type: AtomType) -> AtomId {
+        let atom = Atom::Variable(Variable::Parameter(symbol.to_string()));
+        let sym = atom.to_string();
+        let id = self.symbols.new_node(atom);
+        self.ids.insert(sym, id);
+        self.types.add_new_atom(&id, var_type);
         id
     }
 
@@ -184,47 +225,6 @@ impl SymTable {
         self.types.add_new_atom(&id_2, timepoint_type);
         Interval::new(&id_1, &id_2)
     }*/
-
-    pub fn declare_new_timepoint(&mut self, index: usize) -> AtomId {
-        let atom = Atom::Variable(Variable::Timepoint(index));
-        let sym = atom.to_string();
-        let id = self.symbols.new_node(atom);
-        self.ids.insert(sym, id);
-        self.types.add_new_atom(&id, AtomType::Timepoint);
-        id
-    }
-
-    /*pub fn declare_symbol(
-        &mut self,
-        sym: impl Display,
-        a_type: Option<AtomType>,
-    ) -> AtomId {
-        let sym = &sym.to_string();
-        if self.it_exists(sym) {
-            *self.id(sym).unwrap()
-        } else {
-            let sym: Sym = sym.to_string().into();
-            let id = self.symbols.new_node((&sym).into());
-            self.ids.insert(sym, id);
-            self.types.add_new_atom(
-                &id,
-                AtomType {
-                    a_type,
-                    kind: AtomKind::Constant,
-                },
-            );
-            id
-        }
-    }*/
-
-    pub fn declare_new_parameter(&mut self, symbol: impl ToString, var_type: AtomType) -> AtomId {
-        let atom = Atom::Variable(Variable::Parameter(symbol.to_string()));
-        let sym = atom.to_string();
-        let id = self.symbols.new_node(atom);
-        self.ids.insert(sym, id);
-        self.types.add_new_atom(&id, var_type);
-        id
-    }
 
     /*pub fn declare_new_parameter(
         &mut self,

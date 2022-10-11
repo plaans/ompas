@@ -1,5 +1,6 @@
 use crate::structs::chronicle::sym_table::SymTable;
 use crate::structs::chronicle::FormatWithSymTable;
+use crate::structs::flow_graph::graph::{RESULT_PREFIX, TIMEPOINT_PREFIX};
 use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lruntimeerror;
@@ -51,8 +52,8 @@ pub enum Variable {
 impl Display for Variable {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Variable::Timepoint(n) => write!(f, "t{}", n),
-            Variable::Result(n) => write!(f, "n{}", n),
+            Variable::Timepoint(n) => write!(f, "{}{}", TIMEPOINT_PREFIX, n),
+            Variable::Result(n) => write!(f, "{}{}", RESULT_PREFIX, n),
             Variable::Parameter(p) => write!(f, "{}", p),
         }
     }
@@ -113,14 +114,14 @@ impl From<LNumber> for Atom {
     }
 }
 
-impl From<i32> for Atom {
-    fn from(i: i32) -> Self {
+impl From<i64> for Atom {
+    fn from(i: i64) -> Self {
         Self::Number(i.into())
     }
 }
 
-impl From<f32> for Atom {
-    fn from(f: f32) -> Self {
+impl From<f64> for Atom {
+    fn from(f: f64) -> Self {
         Self::Number(f.into())
     }
 }

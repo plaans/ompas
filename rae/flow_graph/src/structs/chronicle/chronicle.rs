@@ -14,28 +14,31 @@ use std::borrow::Borrow;
 use std::fmt::Display;
 use std::ops::Deref;
 
-pub enum ChronicleKind {}
+pub enum ChronicleKind {
+    Command,
+    Method,
+}
 
 pub struct ChronicleDebug {
     pub kind: ChronicleKind,
     label: String,
-    lvalue: LValue,
-    flow_graph: FlowGraph,
+    pub lvalue: LValue,
+    pub flow_graph: FlowGraph,
 }
 
 pub struct ChronicleTemplate {
-    sym_table: SymTable,
-    pub name: Vec<AtomId>,
-    pub task: Vec<AtomId>,
-    pub presence: AtomId,
-    pub interval: Interval,
-    pub result: AtomId,
-    pub variables: HashSet<AtomId>,
-    pub constraints: Vec<Constraint>,
-    pub conditions: Vec<Condition>,
-    pub effects: Vec<Effect>,
-    pub subtasks: Vec<SubTask>,
-    debug: ChronicleDebug,
+    pub sym_table: SymTable,
+    name: Vec<AtomId>,
+    task: Vec<AtomId>,
+    presence: AtomId,
+    interval: Interval,
+    result: AtomId,
+    variables: HashSet<AtomId>,
+    constraints: Vec<Constraint>,
+    conditions: Vec<Condition>,
+    effects: Vec<Effect>,
+    subtasks: Vec<SubTask>,
+    pub debug: ChronicleDebug,
 }
 
 impl ChronicleTemplate {
@@ -43,13 +46,13 @@ impl ChronicleTemplate {
         let mut sym_table = SymTable::default();
 
         let interval = Interval::new(
-            &sym_table.declare_new_parameter(START, AtomType::Timepoint),
-            &sym_table.declare_new_parameter(END, AtomType::Timepoint),
+            &sym_table.new_parameter(START, AtomType::Timepoint),
+            &sym_table.new_parameter(END, AtomType::Timepoint),
         );
 
-        let presence = sym_table.declare_new_parameter(PREZ, AtomType::Presence);
+        let presence = sym_table.new_parameter(PREZ, AtomType::Presence);
 
-        let result = sym_table.declare_new_parameter(RESULT, AtomType::Untyped);
+        let result = sym_table.new_parameter(RESULT, AtomType::Untyped);
 
         let init_var = vec![presence, result, *interval.start(), *interval.end()];
 

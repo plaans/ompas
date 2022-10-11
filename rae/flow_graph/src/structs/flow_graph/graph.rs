@@ -1,122 +1,87 @@
-use sompas_structs::lnumber::LNumber;
-use sompas_structs::lvalue::LValue;
-use std::fmt::{Display, Formatter};
+use crate::structs::chronicle::sym_table::SymTable;
+use crate::structs::chronicle::{AtomId, FormatWithSymTable};
+use std::fmt::Write;
 
-#[derive(Copy, Clone, Debug)]
-pub struct NodeId {
-    absolute: usize,
-    relative: usize,
-}
-
-impl NodeId {
-    pub fn start() -> Self {
-        Self {
-            absolute: 0,
-            relative: 0,
-        }
-    }
-
-    pub fn get_absolute(&self) -> usize {
-        self.absolute
-    }
-
-    pub fn get_relative(&self) -> usize {
-        self.relative
-    }
-}
 pub type Dot = String;
 
-#[derive(Debug, Clone)]
+pub type VerticeId = usize;
+
+#[derive(Clone)]
 pub struct FlowGraph {
-    inner: Vec<Node>,
-    result_id: usize,
-}
-
-impl Default for FlowGraph {
-    fn default() -> Self {
-        Self {
-            inner: vec![Node {
-                id: NodeId {
-                    absolute: 0,
-                    relative: 0,
-                },
-                parents: Default::default(),
-                childs: Default::default(),
-                computation: Computation::Start,
-            }],
-            result_id: 0,
-        }
-    }
-}
-
-pub const NODE_PREFIX: char = 'N';
-pub const RESULT_PREFIX: char = 'r';
-pub const TIMEPOINT_PREFIX: char = 't';
-pub const BRANCHING_ARROW: &str = "->";
-pub const DASHED_ATTRIBUTE: &str = "[style = dashed]";
-pub const PAR_ARROW: &str = "->";
-
-#[derive(Debug, Copy, Clone)]
-pub enum LinkKind {
-    Seq,
-    Branching,
-}
-
-impl Default for LinkKind {
-    fn default() -> Self {
-        Self::Seq
-    }
+    pub sym_table: SymTable,
+    vertices: Vec<Vertice>,
+    edges: Vec<Edge>,
 }
 
 impl FlowGraph {
-    pub fn new_node(&mut self, value: impl Into<Computation>, parent: Option<NodeId>) -> NodeId {
-        let id = NodeId {
-            absolute: self.inner.len(),
-            relative: self.result_id,
-        };
-        let node = Node {
+    pub(crate) fn inner(&self) -> &Vec<Vertice> {
+        &self.vertices
+    }
+
+    pub fn get_result(&self, id: &VerticeId) -> &AtomId {
+        self.vertices.get(*id).unwrap().get_result()
+    }
+
+    pub fn get_timepoint(&self, id: &VerticeId) -> &AtomId {
+        self.vertices.get(*id).unwrap().get_timepoint()
+    }
+
+    pub(crate) fn push(&mut self, mut vertice: Vertice) -> VerticeId {
+        let id = self.vertices.len();
+        vertice.id = id;
+        self.vertices.push(vertice);
+        id
+    }
+
+    pub fn new_vertice(
+        &mut self,
+        value: impl Into<Expression>,
+        parent: Option<VerticeId>,
+    ) -> VerticeId {
+        let id = self.vertices.len();
+
+        let t = self.sym_table.new_timepoint();
+        let r = self.sym_table.new_result();
+
+        let vertice = Vertice {
             id,
-            parents: Default::default(),
-            childs: Default::default(),
+            timepoint: t,
+            result: r,
             computation: value.into(),
         };
 
-        self.result_id += 1;
+        self.vertices.push(vertice);
 
-        self.inner.push(node);
         match parent {
             None => {}
-            Some(p) => self.add_parent(&id, &p),
+            Some(p_id) => self.edges.push(Edge::new(p_id, id, EdgeKind::Seq)),
         }
         id
     }
 
-    pub fn get(&self, id: &NodeId) -> Option<&Node> {
-        self.inner.get(id.absolute)
+    pub fn get(&self, id: &VerticeId) -> Option<&Vertice> {
+        self.vertices.get(*id)
     }
 
-    pub fn backtrack_result(&self, mut id: &NodeId) -> NodeId {
+    /*pub fn backtrack_result(&self, mut id: &VerticeId) -> VerticeId {
         let mut id = *id;
         loop {
-            let node: &Node = self.inner.get(id.absolute).unwrap();
-            if let Computation::Cst(CstValue::Result(r)) = &node.computation {
+            let node: &Vertice = self.inner.get(id.absolute).unwrap();
+            if let Expression::Cst(CstValue::Result(r)) = &node.computation {
                 id = *r;
             } else {
                 return id;
             }
         }
-    }
+    }*/
 
-    pub fn duplicate_result_node(
+    /*pub fn duplicate_result_node(
         &mut self,
         result_id: usize,
-        value: impl Into<Computation>,
-        parent: Option<NodeId>,
-    ) -> NodeId {
-        let id = NodeId {
-            absolute: self.inner.len(),
-            relative: result_id,
-        };
+        value: impl Into<Expression>,
+        parent: Option<VerticeId>,
+    ) -> VerticeId {
+        let id =
         let node = Node {
             id,
             parents: Default::default(),
@@ -130,32 +95,20 @@ impl FlowGraph {
             Some(p) => self.add_parent(&id, &p),
         }
         id
+    }*/
+
+    pub fn add_child(&mut self, node_id: &VerticeId, child_id: &VerticeId) {
+        self.edges
+            .push(Edge::new(*node_id, *child_id, EdgeKind::Seq))
     }
 
-    pub fn add_child(&mut self, node_id: &NodeId, child_id: &NodeId) {
-        self.inner
-            .get_mut(node_id.absolute)
-            .unwrap()
-            .add_child(child_id);
-        self.inner
-            .get_mut(child_id.absolute)
-            .unwrap()
-            .add_parent(node_id);
+    pub fn add_parent(&mut self, node_id: &VerticeId, parent_id: &VerticeId) {
+        self.edges
+            .push(Edge::new(*parent_id, *node_id, EdgeKind::Seq))
     }
 
-    pub fn add_parent(&mut self, node_id: &NodeId, parent_id: &NodeId) {
-        self.inner
-            .get_mut(node_id.absolute)
-            .unwrap()
-            .add_parent(parent_id);
-        self.inner
-            .get_mut(parent_id.absolute)
-            .unwrap()
-            .add_child(node_id);
-    }
-
-    pub fn set_child_link_lind(&mut self, node_id: &NodeId, link_kind: LinkKind) {
-        let mut node: &mut Node = self.inner.get_mut(node_id.absolute).unwrap();
+    /*pub fn set_child_link_lind(&mut self, node_id: &VerticeId, link_kind: EdgeKind) {
+        let mut node: &mut Vertice = self.inner.get_mut(node_id.absolute).unwrap();
         node.childs.link_kind = link_kind;
         let childs = node.childs.inner.clone();
         for child in childs {
@@ -167,8 +120,8 @@ impl FlowGraph {
         }
     }
 
-    pub fn set_parent_link_lind(&mut self, node_id: &NodeId, link_kind: LinkKind) {
-        let mut node: &mut Node = self.inner.get_mut(node_id.absolute).unwrap();
+    pub fn set_parent_link_lind(&mut self, node_id: &VerticeId, link_kind: EdgeKind) {
+        let mut node: &mut Vertice = self.inner.get_mut(node_id.absolute).unwrap();
         node.parents.link_kind = link_kind;
         let parents = node.parents.inner.clone();
         for parent in parents {
@@ -178,7 +131,7 @@ impl FlowGraph {
                 .parents
                 .link_kind = link_kind;
         }
-    }
+    }*/
 
     /*
     Dot export
@@ -191,17 +144,17 @@ impl FlowGraph {
             dot.push_str("S\n");
             dot.push_str(format!("S -> {}0\n", NODE_PREFIX).as_str());
         }*/
-        for node in &self.inner {
-            let node_name = format!("{}{}", NODE_PREFIX, node.id.absolute);
-            let timepoint_name = format!("{}{}", TIMEPOINT_PREFIX, node.id.relative);
-            let result_name = format!("{}{}", RESULT_PREFIX, node.id.relative);
-            match node.computation {
-                Computation::Start | Computation::End => {
+        for vertice in &self.vertices {
+            let node_name = format!("{}{}", VERTICE_PREFIX, vertice.id);
+            let timepoint = self.sym_table.get_atom(&vertice.timepoint, true).unwrap();
+            let result = self.sym_table.get_atom(&vertice.result, true).unwrap();
+            match vertice.computation {
+                Expression::Start | Expression::End => {
                     dot.push_str(
                         format!(
                             "{} [label= \"{}\"]\n",
                             node_name,
-                            node.computation.to_string(),
+                            vertice.computation.format(&self.sym_table, true),
                         )
                         .as_str(),
                     );
@@ -211,39 +164,9 @@ impl FlowGraph {
                         format!(
                             "{} [label= \"{}: {} <- {}\"]\n",
                             node_name,
-                            timepoint_name,
-                            result_name,
-                            node.computation.to_string(),
-                        )
-                        .as_str(),
-                    );
-                }
-            }
-
-            match node.childs.link_kind {
-                LinkKind::Seq => {
-                    for child in &node.childs.inner {
-                        let child_name = format!("{}{}", NODE_PREFIX, child.absolute);
-                        dot.push_str(format!("{} -> {}\n", node_name, child_name).as_str());
-                    }
-                }
-                LinkKind::Branching => {
-                    let true_result = &node.childs.inner[0];
-                    let false_result = &node.childs.inner[1];
-                    let true_branch = format!("{}{}", NODE_PREFIX, true_result.absolute);
-                    let false_branch = format!("{}{}", NODE_PREFIX, false_result.absolute);
-
-                    dot.push_str(
-                        format!(
-                            "{} -> {} [style = dashed label = \"{}\"]\n",
-                            node_name, true_branch, result_name
-                        )
-                        .as_str(),
-                    );
-                    dot.push_str(
-                        format!(
-                            "{} -> {} [style = dashed label = \"!{}\"]\n",
-                            node_name, false_branch, result_name
+                            timepoint,
+                            result,
+                            vertice.computation.format(&self.sym_table, true),
                         )
                         .as_str(),
                     );
@@ -251,172 +174,233 @@ impl FlowGraph {
             }
         }
 
-        /*dot.push_str(
-            format!(
-                "{}{} -> {}{}",
-                NODE_PREFIX,
-                self.inner.len() - 1,
-                RESULT_PREFIX,
-                self.result_id - 1
-            )
-            .as_str(),
-        );*/
+        for edge in &self.edges {
+            let from = format!("{}{}", VERTICE_PREFIX, edge.from);
+            let to = format!("{}{}", VERTICE_PREFIX, edge.to);
+
+            match edge.kind {
+                EdgeKind::Seq => {
+                    dot.push_str(format!("{} -> {}\n", from, to).as_str());
+                }
+                EdgeKind::Branching => {
+                    dot.push_str(format!("{} -> {} [style = dashed]\n", from, to,).as_str());
+                    /*dot.push_str(
+                        format!(
+                            "{} -> {} [style = dashed label = \"!{}\"]\n",
+                            node_name, false_branch, result_name
+                        )
+                        .as_str(),
+                    );*/
+                }
+            }
+        }
 
         dot.push('}');
         dot
     }
 }
 
+impl Default for FlowGraph {
+    fn default() -> Self {
+        let sym_table = SymTable::default();
+        Self {
+            sym_table,
+            vertices: vec![],
+            edges: vec![],
+        }
+    }
+}
+
+pub const VERTICE_PREFIX: char = 'V';
+pub const RESULT_PREFIX: char = 'r';
+pub const TIMEPOINT_PREFIX: char = 't';
+pub const BRANCHING_ARROW: &str = "->";
+pub const DASHED_ATTRIBUTE: &str = "[style = dashed]";
+pub const PAR_ARROW: &str = "->";
+
+#[derive(Copy, Clone)]
+pub struct Edge {
+    from: VerticeId,
+    to: VerticeId,
+    kind: EdgeKind,
+}
+
+impl Edge {
+    pub fn new(from: VerticeId, to: VerticeId, kind: EdgeKind) -> Self {
+        Self { from, to, kind }
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum EdgeKind {
+    Seq,
+    Branching,
+}
+
+impl Default for EdgeKind {
+    fn default() -> Self {
+        Self::Seq
+    }
+}
+/*
 #[derive(Clone, Debug, Default)]
 pub struct Parents {
-    inner: Vec<NodeId>,
+    inner: Vec<VerticeId>,
     link_kind: LinkKind,
 }
 
 #[derive(Clone, Debug, Default)]
 pub struct Childs {
-    inner: Vec<NodeId>,
+    inner: Vec<VerticeId>,
     link_kind: LinkKind,
-}
+}*/
 
 #[derive(Clone, Debug)]
-pub struct Node {
-    id: NodeId,
-    parents: Parents,
-    childs: Childs,
-    computation: Computation,
+pub struct Vertice {
+    pub(crate) id: VerticeId,
+    pub(crate) timepoint: AtomId,
+    pub(crate) result: AtomId,
+    //pub parents: Parents,
+    //pub childs: Childs,
+    pub(crate) computation: Expression,
 }
 
-impl Node {
+impl Vertice {
     /*
     ADDERS
      */
-    pub fn add_parent(&mut self, parent: &NodeId) {
+    /*pub fn add_parent(&mut self, parent: &VerticeId) {
         self.parents.inner.push(*parent)
     }
 
-    pub fn add_child(&mut self, child: &NodeId) {
+    pub fn add_child(&mut self, child: &VerticeId) {
         self.childs.inner.push(*child)
     }
 
     /*GETTERS*/
-    pub fn get_parents(&self) -> &Vec<NodeId> {
+    pub fn get_parents(&self) -> &Vec<VerticeId> {
         &self.parents.inner
     }
 
-    pub fn get_childs(&self) -> &Vec<NodeId> {
+    pub fn get_childs(&self) -> &Vec<VerticeId> {
         &self.childs.inner
-    }
+    }*/
 
-    pub fn get_computation(&self) -> &Computation {
+    pub fn get_computation(&self) -> &Expression {
         &self.computation
     }
 
-    pub fn get_id(&self) -> &NodeId {
+    pub fn get_id(&self) -> &VerticeId {
         &self.id
     }
-}
 
-impl From<CstValue> for Computation {
-    fn from(cst: CstValue) -> Self {
-        Self::Cst(cst)
+    pub fn get_result(&self) -> &AtomId {
+        &self.result
+    }
+
+    pub fn get_timepoint(&self) -> &AtomId {
+        &self.timepoint
     }
 }
 
 #[derive(Debug, Clone)]
-pub enum Computation {
-    Apply(Vec<NodeId>),
-    Write(Vec<NodeId>),
-    Read(Vec<NodeId>),
-    Cst(CstValue),
-    Handle(NodeId),
+pub enum Expression {
+    Apply(Vec<AtomId>),
+    Write(Vec<AtomId>),
+    Read(Vec<AtomId>),
+    Cst(AtomId),
+    Handle(AtomId),
     Start,
     End,
 }
 
-impl Computation {
-    pub fn apply(vec: Vec<NodeId>) -> Self {
+impl Expression {
+    pub fn apply(vec: Vec<AtomId>) -> Self {
         Self::Apply(vec)
     }
 
-    pub fn write(vec: Vec<NodeId>) -> Self {
+    pub fn write(vec: Vec<AtomId>) -> Self {
         Self::Write(vec)
     }
 
-    pub fn read(vec: Vec<NodeId>) -> Self {
+    pub fn read(vec: Vec<AtomId>) -> Self {
         Self::Read(vec)
     }
 
-    pub fn cst(cst: impl Into<CstValue>) -> Self {
-        Self::Cst(cst.into())
+    pub fn cst(cst: AtomId) -> Self {
+        Self::Cst(cst)
     }
 
-    pub fn handle(h: NodeId) -> Self {
+    pub fn handle(h: AtomId) -> Self {
         Self::Handle(h)
     }
 }
 
-impl Display for Computation {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl FormatWithSymTable for Expression {
+    fn format(&self, st: &SymTable, sym_version: bool) -> String {
+        let mut str = "".to_string();
         match self {
-            Computation::Apply(vec) => {
+            Expression::Apply(vec) => {
                 let mut args = "".to_string();
                 let mut first = true;
 
-                for node in vec {
+                for atom in vec {
                     if first {
                         first = false;
-                        args.push_str(format!("{}{}", RESULT_PREFIX, node.relative).as_str())
+                        args.push_str(atom.format(st, sym_version).as_str())
                     } else {
-                        args.push_str(format!(",{}{}", RESULT_PREFIX, node.relative).as_str())
+                        args.push_str(format!(",{}", atom.format(st, sym_version)).as_str())
                     }
                 }
-                write!(f, "apply({})", args)
+                write!(str, "apply({})", args)
             }
-            Computation::Write(vec) => {
+            Expression::Write(vec) => {
                 let mut args = "".to_string();
                 let mut first = true;
 
-                for node in vec {
+                for atom in vec {
                     if first {
                         first = false;
-                        args.push_str(format!("{}{}", RESULT_PREFIX, node.relative).as_str())
+                        args.push_str(atom.format(st, sym_version).as_str())
                     } else {
-                        args.push_str(format!(",{}{}", RESULT_PREFIX, node.relative).as_str())
+                        args.push_str(format!(",{}", atom.format(st, sym_version)).as_str())
                     }
                 }
-                write!(f, "apply({})", args)
+                write!(str, "apply({})", args)
             }
-            Computation::Read(vec) => {
+            Expression::Read(vec) => {
                 let mut args = "".to_string();
                 let mut first = true;
 
-                for node in vec {
+                for atom in vec {
                     if first {
                         first = false;
-                        args.push_str(format!("{}{}", RESULT_PREFIX, node.relative).as_str())
+                        args.push_str(atom.format(st, sym_version).as_str())
                     } else {
-                        args.push_str(format!(",{}{}", RESULT_PREFIX, node.relative).as_str())
+                        args.push_str(format!(",{}", atom.format(st, sym_version)).as_str())
                     }
                 }
-                write!(f, "read({})", args)
+                write!(str, "read({})", args)
             }
-            Computation::Cst(cst) => {
+            Expression::Cst(cst) => {
                 let mut args = "".to_string();
-                write!(f, "cst({})", cst.to_string())
+                write!(str, "cst({})", cst.format(st, sym_version))
             }
-            Computation::Handle(node) => {
-                write!(f, "handle({}{})", RESULT_PREFIX, node.relative)
+            Expression::Handle(vertice) => {
+                write!(str, "handle({})", vertice.format(st, sym_version))
             }
-            Computation::Start => write!(f, "start"),
-            Computation::End => write!(f, "end"),
-        }
+            Expression::Start => write!(str, "start"),
+            Expression::End => write!(str, "end"),
+        };
+        str
     }
 }
 
+/*
 #[derive(Debug, Clone)]
 pub enum CstValue {
-    Result(NodeId),
+    Result(usize),
+    Timepoint(usize),
     Number(LNumber),
     Bool(bool),
     Symbol(String),
@@ -425,14 +409,14 @@ pub enum CstValue {
 }
 
 impl Display for CstValue {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, str: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            CstValue::Number(n) => write!(f, "{}", n),
-            CstValue::Bool(b) => write!(f, "{}", b),
-            CstValue::Symbol(s) => write!(f, "{}", s),
-            CstValue::String(s) => write!(f, "{}", s),
-            CstValue::Expression(e) => write!(f, "{}", e),
-            CstValue::Result(r) => write!(f, "{}{}", RESULT_PREFIX, r.relative),
+            CstValue::Number(n) => write!(str, "{}", n),
+            CstValue::Bool(b) => write!(str, "{}", b),
+            CstValue::Symbol(s) => write!(str, "{}", s),
+            CstValue::String(s) => write!(str, "{}", s),
+            CstValue::Expression(e) => write!(str, "{}", e),
+            CstValue::Result(r) => write!(str, "{}{}", RESULT_PREFIX, r.relative),
         }
     }
 }
@@ -456,4 +440,4 @@ impl CstValue {
     pub fn result(r: NodeId) -> Self {
         Self::Result(r)
     }
-}
+}*/

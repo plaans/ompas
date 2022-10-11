@@ -1,9 +1,11 @@
 use chrono::{DateTime, Utc};
 use flow_graph::config::GraphConvertConfig;
 use flow_graph::conversion::flow_graph_conversion::{convert, ConvertError};
-use flow_graph::structs::flow_graph::graph::{FlowGraph, NodeId};
+use flow_graph::conversion::lvalue_pre_processing::pre_processing;
+use flow_graph::structs::flow_graph::graph::FlowGraph;
 use sompas_core::{get_root_env, parse};
 use sompas_structs::lenv::LEnv;
+use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use std::env::set_current_dir;
 use std::fs;
@@ -27,7 +29,7 @@ struct Opt {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), ConvertError> {
+async fn main() -> Result<(), LRuntimeError> {
     println!(
         "Hello, world!\n
 Graph flow converter for SOMPAS code!\n
@@ -67,14 +69,12 @@ Graph flow converter for SOMPAS code!\n
             .await
             .unwrap_or_else(|r| panic!("{}", r.to_string()));
 
+        let lv = pre_processing(&lv, &env).await?;
+
         let mut graph = FlowGraph::default();
 
-        let r = convert(
-            &lv,
-            &mut graph,
-            Some(NodeId::start()),
-            &mut Default::default(),
-        )?;
+        let r = convert(&lv, &mut graph, None, &mut Default::default())
+            .map_err(|e| LRuntimeError::new("main", e))?;
 
         output_markdown(
             p.to_str().unwrap(),

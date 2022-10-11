@@ -161,8 +161,8 @@ pub fn lvalue_to_lit(lv: &LValue, st: &mut SymTable) -> lruntimeerror::Result<Li
             "Map transformation to lit is not supported yet."
         )),
         LValue::Number(n) => match n {
-            LNumber::Int(i) => Ok(st.new_int(*i as i32).into()),
-            LNumber::Float(f) => Ok(st.new_float(*f as f32).into()),
+            LNumber::Int(i) => Ok(st.new_int(*i).into()),
+            LNumber::Float(f) => Ok(st.new_float(*f).into()),
         },
         LValue::True => Ok(st.new_bool(true).into()),
         LValue::Nil => Ok(st.new_bool(false).into()),

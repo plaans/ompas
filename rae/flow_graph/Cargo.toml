@@ -35,11 +35,9 @@ im = "15.0.0"
 cli-table = "0.4.6"
 structopt = { version = "0.3", default-features = false }
 chrono = "0.4.19"
-
-
-#anyhow = "1.0.40"
 rand = "0.8.5"
 yaml-rust = "0.4"
+async-recursion = "1.0.0"
 
 [[bin]]
 name = "graph-convert"

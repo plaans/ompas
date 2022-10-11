@@ -1,4 +1,5 @@
 use async_recursion::async_recursion;
+use ompas_rae_language::RAE_EXEC_TASK;
 use sompas_core::*;
 use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lenv::LEnv;
@@ -11,7 +12,8 @@ use sompas_utils::blocking_async;
 pub const TRANSFORM_LAMBDA_EXPRESSION: &str = "transform-lambda-expression";
 
 pub async fn pre_processing(lv: &LValue, env: &LEnv) -> LResult {
-    let lv = lambda_expansion(lv, env).await?;
+    let avoid = vec![RAE_EXEC_TASK.to_string()];
+    let lv = lambda_expansion(lv, env, &avoid).await?;
 
     Ok(lv)
 }
@@ -24,8 +26,8 @@ pub async fn pre_processing(lv: &LValue, env: &LEnv) -> LResult {
 }*/
 
 #[async_recursion]
-pub async fn lambda_expansion(lv: &LValue, env: &LEnv) -> LResult {
-    let mut lv = match transform_lambda_expression(lv, env.clone()).await {
+pub async fn lambda_expansion(lv: &LValue, env: &LEnv, avoid: &Vec<String>) -> LResult {
+    let mut lv = match transform_lambda_expression(lv, env.clone(), &avoid).await {
         Ok(lv) => lv,
         Err(_) => lv.clone(),
     };
@@ -33,7 +35,7 @@ pub async fn lambda_expansion(lv: &LValue, env: &LEnv) -> LResult {
     if let LValue::List(list) = &lv {
         let mut result = vec![];
         for lv in list.iter() {
-            result.push(lambda_expansion(lv, env).await?)
+            result.push(lambda_expansion(lv, env, &avoid).await?)
         }
 
         lv = result.into()
@@ -42,7 +44,7 @@ pub async fn lambda_expansion(lv: &LValue, env: &LEnv) -> LResult {
     Ok(lv)
 }
 
-pub async fn transform_lambda_expression(lv: &LValue, env: LEnv) -> LResult {
+pub async fn transform_lambda_expression(lv: &LValue, env: LEnv, avoid: &Vec<String>) -> LResult {
     //println!("in transform lambda");
 
     if let LValue::List(list) = lv {
@@ -57,58 +59,69 @@ pub async fn transform_lambda_expression(lv: &LValue, env: LEnv) -> LResult {
         let arg = list[0].clone();
         let mut c_env = env.clone();
 
-        let lambda = eval(&expand(&arg, true, &mut c_env).await?, &mut c_env, None)
-            .await
-            .expect("Error in thread evaluating lambda");
-        //println!("evaluating is a success");
-        if let LValue::Lambda(l) = lambda {
-            let mut lisp = "(begin".to_string();
+        if !avoid.contains(&arg.to_string()) {
+            let lambda = eval(&expand(&arg, true, &mut c_env).await?, &mut c_env, None)
+                .await
+                .expect("Error in thread evaluating lambda");
+            //println!("evaluating is a success");
+            if let LValue::Lambda(l) = lambda {
+                let mut lisp = "(begin".to_string();
 
-            let args = &list[1..];
+                let args = &list[1..];
 
-            let params = l.get_params();
-            let body = l.get_body();
+                let params = l.get_params();
+                let body = l.get_body();
 
-            match params {
-                LambdaArgs::Sym(param) => {
-                    let arg = if args.len() == 1 {
-                        match &args[0] {
-                            LValue::Nil => LValue::Nil,
-                            _ => vec![args[0].clone()].into(),
-                        }
-                    } else {
-                        args.into()
-                    };
-                    lisp.push_str(format!("(define {} '{})", param, arg).as_str());
-                }
-                LambdaArgs::List(params) => {
-                    if params.len() != args.len() {
-                        return Err(
-                            wrong_n_args!(TRANSFORM_LAMBDA_EXPRESSION, args, params.len())
-                                .chain("in lambda")
-                                .chain(TRANSFORM_LAMBDA_EXPRESSION),
-                        );
-                    }
-                    for (param, arg) in params.iter().zip(args) {
+                match params {
+                    LambdaArgs::Sym(param) => {
+                        let arg = if args.len() == 1 {
+                            match &args[0] {
+                                LValue::Nil => LValue::Nil,
+                                _ => vec![args[0].clone()].into(),
+                            }
+                        } else {
+                            args.into()
+                        };
                         lisp.push_str(format!("(define {} '{})", param, arg).as_str());
                     }
-                }
-                LambdaArgs::Nil => {
-                    if !args.is_empty() {
-                        return Err(lruntimeerror!(
-                            TRANSFORM_LAMBDA_EXPRESSION,
-                            "Lambda was expecting no args.".to_string()
-                        ));
+                    LambdaArgs::List(params) => {
+                        if params.len() != args.len() {
+                            return Err(wrong_n_args!(
+                                TRANSFORM_LAMBDA_EXPRESSION,
+                                args,
+                                params.len()
+                            )
+                            .chain("in lambda")
+                            .chain(TRANSFORM_LAMBDA_EXPRESSION));
+                        }
+                        for (param, arg) in params.iter().zip(args) {
+                            lisp.push_str(format!("(define {} '{})", param, arg).as_str());
+                        }
                     }
-                }
-            };
+                    LambdaArgs::Nil => {
+                        if !args.is_empty() {
+                            return Err(lruntimeerror!(
+                                TRANSFORM_LAMBDA_EXPRESSION,
+                                "Lambda was expecting no args.".to_string()
+                            ));
+                        }
+                    }
+                };
 
-            lisp.push_str(body.to_string().as_str());
-            lisp.push(')');
+                lisp.push_str(body.to_string().as_str());
+                lisp.push(')');
 
-            let mut c_env = env;
+                let mut c_env = env;
 
-            blocking_async!(parse(&lisp, &mut c_env).await).expect("error in thread parsing string")
+                blocking_async!(parse(&lisp, &mut c_env).await)
+                    .expect("error in thread parsing string")
+            } else {
+                Err(wrong_type!(
+                    TRANSFORM_LAMBDA_EXPRESSION,
+                    &list[0],
+                    KindLValue::Lambda
+                ))
+            }
         } else {
             Err(wrong_type!(
                 TRANSFORM_LAMBDA_EXPRESSION,

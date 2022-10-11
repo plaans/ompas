@@ -40,9 +40,28 @@ impl FormatWithSymTable for Vec<AtomId> {
     }
 }
 
+impl FormatWithSymTable for &[AtomId] {
+    fn format(&self, st: &SymTable, sym_version: bool) -> String {
+        let mut str = "(".to_string();
+        let mut first = true;
+        for e in self.iter() {
+            if first {
+                first = false
+            } else {
+                str.push(' ');
+            }
+            str.push_str(e.format(st, sym_version).as_str());
+        }
+        str.push(')');
+        str
+    }
+}
+
 impl FormatWithSymTable for AtomId {
     fn format(&self, st: &SymTable, sym_version: bool) -> String {
-        st.get_atom(self, true).unwrap().format(st, sym_version)
+        st.get_atom(self, sym_version)
+            .unwrap()
+            .format(st, sym_version)
     }
 }
 

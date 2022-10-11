@@ -1,43 +1,68 @@
 use crate::structs::chronicle::chronicle::{ChronicleKind, ChronicleTemplate};
+use crate::structs::chronicle::condition::Condition;
 use crate::structs::chronicle::constraint::Constraint;
+use crate::structs::chronicle::subtask::SubTask;
 use crate::{Expression, FlowGraph};
-use sompas_structs::lnumber::LNumber;
 
 pub fn convert_into_chronicle(graph: FlowGraph) -> ChronicleTemplate {
-    let mut chronicle_template = ChronicleTemplate::new("template", ChronicleKind::Method);
+    let mut ch = ChronicleTemplate::new("template", ChronicleKind::Method, graph.sym_table.clone());
 
-    chronicle_template.debug.flow_graph = graph.clone();
-
-    for node in graph.inner() {
-        match node.get_computation() {
+    for vertice in graph.vertices() {
+        match vertice.get_computation() {
             Expression::Apply(_) => {}
             Expression::Write(_) => {}
-            Expression::Read(_) => {}
-            Expression::Cst(cst) => {
-                /*let val = match cst {
-                    CstValue::Result(_) => todo!(),
-                    CstValue::Number(LNumber::Float(f)) => {
-                        chronicle_template.sym_table.new(*f.into())
-                    }
-                    CstValue::Number(LNumber::Int(i)) => {
-                        chronicle_template.sym_table.new_int(*i.into())
-                    }
-                    CstValue::Bool(b) => chronicle_template.sym_table.new_bool(*b),
-                    CstValue::Symbol(s) => {}
-                    CstValue::String(s) => {}
-                    CstValue::Expression(e) => {}
+            Expression::Read(vec) => {
+                let condition = Condition {
+                    interval: vertice.interval,
+                    sv: vec.clone(),
+                    value: vertice.result,
                 };
-                //let r = chronicle_template.sym_table.new_result()
 
-                chronicle_template
-                    .chronicle_template
-                    .add_constraint(Constraint::eq(r, val))*/
+                ch.add_condition(condition);
+            }
+            Expression::Cst(lit) => {
+                ch.add_constraint(Constraint::Eq(vertice.result.into(), lit.clone()))
             }
             Expression::Handle(_) => {}
-            Expression::Start => {}
-            Expression::End => {}
+            Expression::Start => ch.add_constraint(Constraint::eq(
+                ch.get_interval().start(),
+                vertice.interval.end(),
+            )),
+            Expression::End(id) => {
+                ch.add_constraint(Constraint::eq(ch.get_result(), id));
+
+                ch.add_constraint(Constraint::eq(
+                    ch.get_interval().end(),
+                    vertice.interval.start(),
+                ));
+            }
+            Expression::Exec(vec) => {
+                let subtask = SubTask {
+                    interval: vertice.interval, //TODO: change
+                    lit: vec.into(),
+                };
+
+                ch.add_subtask(subtask);
+                let result = ch.sym_table.new_bool(false);
+                ch.add_constraint(Constraint::eq(vertice.get_result(), result));
+                ch.add_constraint(Constraint::leq(
+                    *vertice.interval.start(),
+                    *vertice.interval.end(),
+                ))
+            }
         }
     }
 
-    chronicle_template
+    for edge in graph.edges() {
+        let from_end = graph.get_interval(edge.from()).end();
+        let to_start = graph.get_interval(edge.to()).start();
+        ch.add_var(from_end);
+        ch.add_var(to_start);
+
+        ch.add_constraint(Constraint::eq(from_end, to_start))
+    }
+
+    ch.debug.flow_graph = graph;
+
+    ch
 }

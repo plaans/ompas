@@ -3,7 +3,7 @@ use crate::structs::chronicle::type_table::AtomType;
 use crate::structs::chronicle::{AtomId, FormatWithParent, FormatWithSymTable, GetVariables};
 use im::{hashset, HashSet};
 
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Interval {
     start: AtomId,
     end: AtomId,

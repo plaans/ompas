@@ -1,7 +1,9 @@
 use chrono::{DateTime, Utc};
 use flow_graph::config::GraphConvertConfig;
-use flow_graph::conversion::flow_graph_conversion::{convert, ConvertError};
+use flow_graph::conversion::convert;
+use flow_graph::conversion::flow_graph_conversion::convert_into_flow_graph;
 use flow_graph::conversion::lvalue_pre_processing::pre_processing;
+use flow_graph::structs::chronicle::chronicle::ChronicleTemplate;
 use flow_graph::structs::flow_graph::graph::FlowGraph;
 use sompas_core::{get_root_env, parse};
 use sompas_structs::lenv::LEnv;
@@ -69,17 +71,18 @@ Graph flow converter for SOMPAS code!\n
             .await
             .unwrap_or_else(|r| panic!("{}", r.to_string()));
 
-        let lv = pre_processing(&lv, &env).await?;
+        let ch = convert(&lv, &env).await?;
+
+        /*let lv = pre_processing(&lv, &env).await?;
 
         let mut graph = FlowGraph::default();
 
-        let r = convert(&lv, &mut graph, None, &mut Default::default())
-            .map_err(|e| LRuntimeError::new("main", e))?;
+        let r = convert_into_flow_graph(&lv, &mut graph, None, &mut Default::default())?;*/
 
         output_markdown(
             p.to_str().unwrap(),
             &lv,
-            &graph,
+            &ch,
             config.output_path.clone().unwrap(),
             true,
         );
@@ -87,7 +90,13 @@ Graph flow converter for SOMPAS code!\n
     Ok(())
 }
 
-fn output_markdown(name: &str, expression: &LValue, graph: &FlowGraph, path: PathBuf, view: bool) {
+fn output_markdown(
+    name: &str,
+    expression: &LValue,
+    ch: &ChronicleTemplate,
+    path: PathBuf,
+    view: bool,
+) {
     let mut path = path;
     let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
     let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
@@ -97,7 +106,7 @@ fn output_markdown(name: &str, expression: &LValue, graph: &FlowGraph, path: Pat
     let dot_file_name = format!("{}.dot", name);
     path_dot.push(&dot_file_name);
     let mut file = File::create(&path_dot).unwrap();
-    let dot = graph.export_dot();
+    let dot = ch.debug.flow_graph.export_dot();
     file.write_all(dot.as_bytes()).unwrap();
     set_current_dir(&path).unwrap();
     let graph_file_name = format!("{}.png", name);
@@ -123,10 +132,16 @@ fn output_markdown(name: &str, expression: &LValue, graph: &FlowGraph, path: Pat
 ## Graph
 \n
 ![]({})
+
+## Chronicle
+```
+{}
+```
     ",
         name,
         expression.format(0),
-        graph_file_name
+        graph_file_name,
+        ch.to_string(),
     );
 
     md_file.write_all(md.as_bytes()).unwrap();

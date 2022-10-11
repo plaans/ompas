@@ -1,3 +1,5 @@
+use crate::structs::chronicle::interval::Interval;
+use crate::structs::chronicle::lit::Lit;
 use crate::structs::chronicle::sym_table::SymTable;
 use crate::structs::chronicle::{AtomId, FormatWithSymTable};
 use std::fmt::Write;
@@ -14,16 +16,19 @@ pub struct FlowGraph {
 }
 
 impl FlowGraph {
-    pub(crate) fn inner(&self) -> &Vec<Vertice> {
+    pub(crate) fn vertices(&self) -> &Vec<Vertice> {
         &self.vertices
+    }
+    pub(crate) fn edges(&self) -> &Vec<Edge> {
+        &self.edges
     }
 
     pub fn get_result(&self, id: &VerticeId) -> &AtomId {
         self.vertices.get(*id).unwrap().get_result()
     }
 
-    pub fn get_timepoint(&self, id: &VerticeId) -> &AtomId {
-        self.vertices.get(*id).unwrap().get_timepoint()
+    pub fn get_interval(&self, id: &VerticeId) -> &Interval {
+        self.vertices.get(*id).unwrap().get_interval()
     }
 
     pub(crate) fn push(&mut self, mut vertice: Vertice) -> VerticeId {
@@ -45,7 +50,7 @@ impl FlowGraph {
 
         let vertice = Vertice {
             id,
-            timepoint: t,
+            interval: Interval::new_instantaneous(&t),
             result: r,
             computation: value.into(),
         };
@@ -107,6 +112,10 @@ impl FlowGraph {
             .push(Edge::new(*parent_id, *node_id, EdgeKind::Seq))
     }
 
+    pub fn set_end(&mut self, vertice: &VerticeId) {
+        self.new_vertice(Expression::End(*self.get_result(vertice)), Some(*vertice));
+    }
+
     /*pub fn set_child_link_lind(&mut self, node_id: &VerticeId, link_kind: EdgeKind) {
         let mut node: &mut Vertice = self.inner.get_mut(node_id.absolute).unwrap();
         node.childs.link_kind = link_kind;
@@ -146,10 +155,20 @@ impl FlowGraph {
         }*/
         for vertice in &self.vertices {
             let node_name = format!("{}{}", VERTICE_PREFIX, vertice.id);
-            let timepoint = self.sym_table.get_atom(&vertice.timepoint, true).unwrap();
+            //let  = self.sym_table.get_atom(&vertice.timepoint, true).unwrap();
             let result = self.sym_table.get_atom(&vertice.result, true).unwrap();
             match vertice.computation {
-                Expression::Start | Expression::End => {
+                Expression::Start => {
+                    dot.push_str(
+                        format!(
+                            "{} [label= \"{}\"]\n",
+                            node_name,
+                            vertice.computation.format(&self.sym_table, true),
+                        )
+                        .as_str(),
+                    );
+                }
+                Expression::End(id) => {
                     dot.push_str(
                         format!(
                             "{} [label= \"{}\"]\n",
@@ -164,7 +183,7 @@ impl FlowGraph {
                         format!(
                             "{} [label= \"{}: {} <- {}\"]\n",
                             node_name,
-                            timepoint,
+                            vertice.interval.format(&self.sym_table, true),
                             result,
                             vertice.computation.format(&self.sym_table, true),
                         )
@@ -229,6 +248,14 @@ impl Edge {
     pub fn new(from: VerticeId, to: VerticeId, kind: EdgeKind) -> Self {
         Self { from, to, kind }
     }
+
+    pub fn from(&self) -> &VerticeId {
+        &self.from
+    }
+
+    pub fn to(&self) -> &VerticeId {
+        &self.to
+    }
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -258,7 +285,7 @@ pub struct Childs {
 #[derive(Clone, Debug)]
 pub struct Vertice {
     pub(crate) id: VerticeId,
-    pub(crate) timepoint: AtomId,
+    pub(crate) interval: Interval,
     pub(crate) result: AtomId,
     //pub parents: Parents,
     //pub childs: Childs,
@@ -298,20 +325,29 @@ impl Vertice {
         &self.result
     }
 
-    pub fn get_timepoint(&self) -> &AtomId {
-        &self.timepoint
+    pub fn get_interval(&self) -> &Interval {
+        &self.interval
+    }
+
+    pub fn get_start(&self) -> &AtomId {
+        &self.interval.start()
+    }
+
+    pub fn get_end(&self) -> &AtomId {
+        &self.interval.end()
     }
 }
 
 #[derive(Debug, Clone)]
 pub enum Expression {
+    Exec(Vec<AtomId>),
     Apply(Vec<AtomId>),
     Write(Vec<AtomId>),
     Read(Vec<AtomId>),
-    Cst(AtomId),
+    Cst(Lit),
     Handle(AtomId),
     Start,
-    End,
+    End(AtomId),
 }
 
 impl Expression {
@@ -326,8 +362,11 @@ impl Expression {
     pub fn read(vec: Vec<AtomId>) -> Self {
         Self::Read(vec)
     }
+    pub fn exec(vec: Vec<AtomId>) -> Self {
+        Self::Exec(vec)
+    }
 
-    pub fn cst(cst: AtomId) -> Self {
+    pub fn cst(cst: Lit) -> Self {
         Self::Cst(cst)
     }
 
@@ -383,14 +422,27 @@ impl FormatWithSymTable for Expression {
                 write!(str, "read({})", args)
             }
             Expression::Cst(cst) => {
-                let mut args = "".to_string();
                 write!(str, "cst({})", cst.format(st, sym_version))
             }
             Expression::Handle(vertice) => {
                 write!(str, "handle({})", vertice.format(st, sym_version))
             }
             Expression::Start => write!(str, "start"),
-            Expression::End => write!(str, "end"),
+            Expression::End(id) => write!(str, "exit({})", id.format(st, sym_version)),
+            Expression::Exec(vec) => {
+                let mut args = "".to_string();
+                let mut first = true;
+
+                for atom in vec {
+                    if first {
+                        first = false;
+                        args.push_str(atom.format(st, sym_version).as_str())
+                    } else {
+                        args.push_str(format!(",{}", atom.format(st, sym_version)).as_str())
+                    }
+                }
+                write!(str, "exec({})", args)
+            }
         };
         str
     }

@@ -11,7 +11,7 @@ use crate::structs::flow_graph::graph::FlowGraph;
 use im::hashset::HashSet;
 use sompas_structs::lvalue::LValue;
 use std::borrow::Borrow;
-use std::fmt::Display;
+use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 
 pub enum ChronicleKind {
@@ -33,7 +33,7 @@ pub struct ChronicleTemplate {
     presence: AtomId,
     interval: Interval,
     result: AtomId,
-    variables: HashSet<AtomId>,
+    pub(crate) variables: HashSet<AtomId>,
     constraints: Vec<Constraint>,
     conditions: Vec<Condition>,
     effects: Vec<Effect>,
@@ -42,9 +42,11 @@ pub struct ChronicleTemplate {
 }
 
 impl ChronicleTemplate {
-    pub fn new(label: impl Display, chronicle_kind: ChronicleKind) -> Self {
-        let mut sym_table = SymTable::default();
-
+    pub fn new(
+        label: impl Display,
+        chronicle_kind: ChronicleKind,
+        mut sym_table: SymTable,
+    ) -> Self {
         let interval = Interval::new(
             &sym_table.new_parameter(START, AtomType::Timepoint),
             &sym_table.new_parameter(END, AtomType::Timepoint),
@@ -57,7 +59,7 @@ impl ChronicleTemplate {
         let init_var = vec![presence, result, *interval.start(), *interval.end()];
 
         let mut chronicle = Self {
-            sym_table: Default::default(),
+            sym_table,
             debug: ChronicleDebug {
                 kind: chronicle_kind,
                 label: label.to_string(),
@@ -66,9 +68,9 @@ impl ChronicleTemplate {
             },
             name: Default::default(),
             task: Default::default(),
-            presence: 0,
+            presence,
             interval,
-            result: Default::default(),
+            result,
             variables: Default::default(),
             constraints: vec![],
             conditions: vec![],
@@ -131,6 +133,15 @@ impl ChronicleTemplate {
         hashset
     }
 
+    pub fn get_all_variables_in_sets(&self) -> im::HashSet<AtomId> {
+        self.get_variables_in_sets(vec![
+            ChronicleSet::Effect,
+            ChronicleSet::Constraint,
+            ChronicleSet::Condition,
+            ChronicleSet::SubTask,
+        ])
+    }
+
     pub fn get_symbol_variables(&self, sym_table: &SymTable) -> HashSet<AtomId> {
         let variables = self.get_variables();
         variables
@@ -186,6 +197,10 @@ impl ChronicleTemplate {
     }
 
     pub fn add_constraint(&mut self, constraint: Constraint) {
+        for var in constraint.get_variables() {
+            self.add_var(&var)
+        }
+
         if let Constraint::And(Lit::Constraint(a), Lit::Constraint(b)) = constraint {
             self.constraints.push(a.deref().clone());
             self.constraints.push(b.deref().clone());
@@ -195,14 +210,24 @@ impl ChronicleTemplate {
     }
 
     pub fn add_condition(&mut self, cond: Condition) {
+        for var in cond.get_variables() {
+            self.add_var(&var);
+        }
+
         self.conditions.push(cond);
     }
 
     pub fn add_effect(&mut self, effect: Effect) {
+        for var in effect.get_variables() {
+            self.add_var(&var);
+        }
         self.effects.push(effect);
     }
 
     pub fn add_subtask(&mut self, sub_task: SubTask) {
+        for var in sub_task.get_variables() {
+            self.add_var(&var);
+        }
         self.subtasks.push(sub_task);
     }
 
@@ -217,27 +242,25 @@ impl ChronicleTemplate {
     pub fn set_task(&mut self, task: Vec<AtomId>) {
         self.task = task;
     }
-}
 
-impl GetVariables for ChronicleTemplate {
-    fn get_variables(&self) -> HashSet<AtomId> {
-        self.variables.clone()
-    }
+    /*
+    FORMATTERS
+     */
 
-    fn get_variables_of_type(&self, sym_table: &SymTable, atom_type: &AtomType) -> HashSet<AtomId> {
-        self.variables
-            .iter()
-            .filter(|v| sym_table.get_type_of(v).unwrap() == atom_type)
-            .cloned()
-            .collect()
-    }
-}
-
-impl FormatWithSymTable for ChronicleTemplate {
-    fn format(&self, st: &SymTable, sym_version: bool) -> String {
+    pub fn format(&self, sym_version: bool) -> String {
+        let st = &self.sym_table;
         let mut s = String::new();
         //name
-        s.push_str(self.debug.label.as_str());
+        s.push_str(
+            format!(
+                "{}:\n {}: {} {}",
+                self.debug.label.as_str(),
+                self.presence.format(st, sym_version),
+                self.interval.format(st, sym_version),
+                self.result.format(st, sym_version)
+            )
+            .as_str(),
+        );
         s.push('\n');
         s.push_str(format!("- name: {}\n", self.name.format(st, sym_version)).as_str());
         //task
@@ -324,10 +347,8 @@ impl FormatWithSymTable for ChronicleTemplate {
 
         s
     }
-}
-
-impl FormatWithParent for ChronicleTemplate {
-    fn format_with_parent(&mut self, st: &SymTable) {
+    pub fn format_with_parent(&mut self) {
+        let st = &self.sym_table;
         self.name.format_with_parent(st);
         self.task.format_with_parent(st);
         let old_variables = self.variables.clone();
@@ -345,6 +366,26 @@ impl FormatWithParent for ChronicleTemplate {
         self.conditions.format_with_parent(st);
         self.effects.format_with_parent(st);
         self.subtasks.format_with_parent(st);
+    }
+}
+
+impl GetVariables for ChronicleTemplate {
+    fn get_variables(&self) -> HashSet<AtomId> {
+        self.variables.clone()
+    }
+
+    fn get_variables_of_type(&self, sym_table: &SymTable, atom_type: &AtomType) -> HashSet<AtomId> {
+        self.variables
+            .iter()
+            .filter(|v| sym_table.get_type_of(v).unwrap() == atom_type)
+            .cloned()
+            .collect()
+    }
+}
+
+impl Display for ChronicleTemplate {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.format(true))
     }
 }
 

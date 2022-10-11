@@ -23,10 +23,13 @@ impl Condition {
 
 impl FormatWithSymTable for Condition {
     fn format(&self, st: &SymTable, sym_version: bool) -> String {
+        let sf = &self.sv[0];
+        let params = &self.sv[1..];
         format!(
-            "{} {} = {}",
+            "{} {}{} = {}",
             self.interval.format(st, sym_version),
-            self.sv.format(st, sym_version),
+            sf.format(st, sym_version),
+            params.format(st, sym_version),
             self.value.format(st, sym_version),
         )
     }

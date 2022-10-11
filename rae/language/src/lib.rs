@@ -78,6 +78,7 @@ pub const LOCKED: &str = "locked";
 pub const ACQUIRE_LIST: &str = "acquire-list";
 pub const ACQUIRE_IN_LIST: &str = "acquire-in-list";
 
+pub const RAE_EXEC_TASK: &str = "exec-task";
 pub const RAE_EXEC_COMMAND: &str = "exec-command";
 pub const RAE_LAUNCH_PLATFORM: &str = "rae-launch-platform";
 pub const RAE_OPEN_COM_PLATFORM: &str = "rae-open-com-platform";

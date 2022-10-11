@@ -19,15 +19,23 @@ pub enum Atom {
 
 impl Atom {
     pub fn is_constant(&self) -> bool {
-        if let Self::Variable(_) = self {
-            false
-        } else {
+        !self.is_variable()
+    }
+
+    pub fn is_parameter(&self) -> bool {
+        if let Self::Variable(Variable::Parameter(_)) = self {
             true
+        } else {
+            false
         }
     }
 
     pub fn is_variable(&self) -> bool {
-        !self.is_constant()
+        if let Self::Variable(_) = self {
+            true
+        } else {
+            false
+        }
     }
 }
 
@@ -127,7 +135,7 @@ impl From<f64> for Atom {
 }
 
 impl FormatWithSymTable for Atom {
-    fn format(&self, _: &SymTable, sym_version: bool) -> String {
+    fn format(&self, _: &SymTable, _: bool) -> String {
         self.to_string()
     }
 }

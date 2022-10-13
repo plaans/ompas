@@ -1,5 +1,5 @@
 use crate::structs::chronicle::forest::NodeId;
-use crate::structs::chronicle::sym_table::SymTable;
+use crate::structs::chronicle::sym_table::RefSymTable;
 use crate::structs::chronicle::type_table::AtomType;
 
 pub mod atom;
@@ -12,6 +12,7 @@ pub mod interval;
 pub mod lit;
 pub mod subtask;
 pub mod sym_table;
+pub mod task_template;
 pub mod type_table;
 
 pub const START: &str = "start";
@@ -24,7 +25,7 @@ pub const IF_TASK_PROTOTYPE: &str = "t_if";
 pub type AtomId = NodeId;
 
 impl FormatWithSymTable for Vec<AtomId> {
-    fn format(&self, st: &SymTable, sym_version: bool) -> String {
+    fn format(&self, st: &RefSymTable, sym_version: bool) -> String {
         let mut str = "(".to_string();
         let mut first = true;
         for e in self {
@@ -41,7 +42,7 @@ impl FormatWithSymTable for Vec<AtomId> {
 }
 
 impl FormatWithSymTable for &[AtomId] {
-    fn format(&self, st: &SymTable, sym_version: bool) -> String {
+    fn format(&self, st: &RefSymTable, sym_version: bool) -> String {
         let mut str = "(".to_string();
         let mut first = true;
         for e in self.iter() {
@@ -58,7 +59,7 @@ impl FormatWithSymTable for &[AtomId] {
 }
 
 impl FormatWithSymTable for AtomId {
-    fn format(&self, st: &SymTable, sym_version: bool) -> String {
+    fn format(&self, st: &RefSymTable, sym_version: bool) -> String {
         st.get_atom(self, sym_version)
             .unwrap()
             .format(st, sym_version)
@@ -66,13 +67,13 @@ impl FormatWithSymTable for AtomId {
 }
 
 impl FormatWithParent for AtomId {
-    fn format_with_parent(&mut self, st: &SymTable) {
-        *self = *st.get_parent(self);
+    fn format_with_parent(&mut self, st: &RefSymTable) {
+        *self = st.get_parent(self);
     }
 }
 
 pub trait FormatWithSymTable {
-    fn format(&self, st: &SymTable, sym_version: bool) -> String;
+    fn format(&self, st: &RefSymTable, sym_version: bool) -> String;
 }
 
 pub trait GetVariables {
@@ -80,7 +81,7 @@ pub trait GetVariables {
 
     fn get_variables_of_type(
         &self,
-        sym_table: &SymTable,
+        sym_table: &RefSymTable,
         atom_type: &AtomType,
     ) -> im::HashSet<AtomId>;
 }
@@ -89,14 +90,14 @@ pub trait GetVariables {
 Transforms all literals by replacing all atomid by the atomid of their parents.
  */
 pub trait FormatWithParent {
-    fn format_with_parent(&mut self, st: &SymTable);
+    fn format_with_parent(&mut self, st: &RefSymTable);
 }
 
 impl<T> FormatWithParent for Vec<T>
 where
     T: FormatWithParent,
 {
-    fn format_with_parent(&mut self, st: &SymTable) {
+    fn format_with_parent(&mut self, st: &RefSymTable) {
         self.iter_mut().for_each(|e| e.format_with_parent(st))
     }
 }

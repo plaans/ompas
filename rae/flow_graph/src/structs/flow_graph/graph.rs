@@ -1,26 +1,34 @@
 use crate::structs::chronicle::interval::Interval;
 use crate::structs::chronicle::lit::Lit;
-use crate::structs::chronicle::sym_table::SymTable;
+use crate::structs::chronicle::sym_table::RefSymTable;
 use crate::structs::chronicle::{AtomId, FormatWithSymTable};
 use std::fmt::Write;
 
 pub type Dot = String;
 
 pub type VerticeId = usize;
+pub type BlockId = usize;
+pub type EdgeId = usize;
 
 #[derive(Clone)]
 pub struct FlowGraph {
-    pub sym_table: SymTable,
+    pub sym_table: RefSymTable,
     vertices: Vec<Vertice>,
-    edges: Vec<Edge>,
+    //edges: Vec<Edge>,
+    pub(crate) scope: Scope,
 }
 
 impl FlowGraph {
+    pub fn new(sym_table: RefSymTable) -> Self {
+        Self {
+            sym_table,
+            vertices: vec![],
+            scope: Default::default(),
+        }
+    }
+
     pub(crate) fn vertices(&self) -> &Vec<Vertice> {
         &self.vertices
-    }
-    pub(crate) fn edges(&self) -> &Vec<Edge> {
-        &self.edges
     }
 
     pub fn get_result(&self, id: &VerticeId) -> &AtomId {
@@ -38,11 +46,7 @@ impl FlowGraph {
         id
     }
 
-    pub fn new_vertice(
-        &mut self,
-        value: impl Into<Expression>,
-        parent: Option<VerticeId>,
-    ) -> VerticeId {
+    pub fn new_vertice(&mut self, value: impl Into<Expression>) -> VerticeId {
         let id = self.vertices.len();
 
         let t = self.sym_table.new_timepoint();
@@ -52,15 +56,12 @@ impl FlowGraph {
             id,
             interval: Interval::new_instantaneous(&t),
             result: r,
+            parent: None,
+            child: None,
             computation: value.into(),
         };
 
         self.vertices.push(vertice);
-
-        match parent {
-            None => {}
-            Some(p_id) => self.edges.push(Edge::new(p_id, id, EdgeKind::Seq)),
-        }
         id
     }
 
@@ -68,151 +69,88 @@ impl FlowGraph {
         self.vertices.get(*id)
     }
 
-    /*pub fn backtrack_result(&self, mut id: &VerticeId) -> VerticeId {
-        let mut id = *id;
-        loop {
-            let node: &Vertice = self.inner.get(id.absolute).unwrap();
-            if let Expression::Cst(CstValue::Result(r)) = &node.computation {
-                id = *r;
-            } else {
-                return id;
-            }
-        }
-    }*/
-
-    /*pub fn duplicate_result_node(
-        &mut self,
-        result_id: usize,
-        value: impl Into<Expression>,
-        parent: Option<VerticeId>,
-    ) -> VerticeId {
-        let id =
-        let node = Node {
-            id,
-            parents: Default::default(),
-            childs: Default::default(),
-            computation: value.into(),
-        };
-
-        self.inner.push(node);
-        match parent {
-            None => {}
-            Some(p) => self.add_parent(&id, &p),
-        }
-        id
-    }*/
-
-    pub fn add_child(&mut self, node_id: &VerticeId, child_id: &VerticeId) {
-        self.edges
-            .push(Edge::new(*node_id, *child_id, EdgeKind::Seq))
+    pub fn set_parent(&mut self, vertice_id: &VerticeId, parent_id: &VerticeId) {
+        self.vertices
+            .get_mut(*vertice_id)
+            .unwrap()
+            .set_parent(parent_id);
+        self.vertices
+            .get_mut(*parent_id)
+            .unwrap()
+            .set_child(vertice_id);
     }
 
-    pub fn add_parent(&mut self, node_id: &VerticeId, parent_id: &VerticeId) {
-        self.edges
-            .push(Edge::new(*parent_id, *node_id, EdgeKind::Seq))
+    pub fn set_child(&mut self, vertice_id: &VerticeId, child_id: &VerticeId) {
+        self.vertices
+            .get_mut(*vertice_id)
+            .unwrap()
+            .set_child(child_id);
+        self.vertices
+            .get_mut(*child_id)
+            .unwrap()
+            .set_parent(vertice_id);
     }
-
-    pub fn set_end(&mut self, vertice: &VerticeId) {
-        self.new_vertice(Expression::End(*self.get_result(vertice)), Some(*vertice));
-    }
-
-    /*pub fn set_child_link_lind(&mut self, node_id: &VerticeId, link_kind: EdgeKind) {
-        let mut node: &mut Vertice = self.inner.get_mut(node_id.absolute).unwrap();
-        node.childs.link_kind = link_kind;
-        let childs = node.childs.inner.clone();
-        for child in childs {
-            self.inner
-                .get_mut(child.absolute)
-                .unwrap()
-                .parents
-                .link_kind = link_kind;
-        }
-    }
-
-    pub fn set_parent_link_lind(&mut self, node_id: &VerticeId, link_kind: EdgeKind) {
-        let mut node: &mut Vertice = self.inner.get_mut(node_id.absolute).unwrap();
-        node.parents.link_kind = link_kind;
-        let parents = node.parents.inner.clone();
-        for parent in parents {
-            self.inner
-                .get_mut(parent.absolute)
-                .unwrap()
-                .parents
-                .link_kind = link_kind;
-        }
-    }*/
 
     /*
     Dot export
      */
 
-    pub fn export_dot(&self) -> Dot {
-        let mut dot: Dot = "digraph {\n".to_string();
+    pub fn export_vertice(&self, id: &VerticeId) -> Dot {
+        let mut next = Some(*id);
 
-        /*if !self.inner.is_empty() {
-            dot.push_str("S\n");
-            dot.push_str(format!("S -> {}0\n", NODE_PREFIX).as_str());
-        }*/
-        for vertice in &self.vertices {
-            let node_name = format!("{}{}", VERTICE_PREFIX, vertice.id);
+        let sym_table = &self.sym_table;
+
+        let mut dot = "".to_string();
+        while let Some(vertice_id) = next {
+            let vertice = self.vertices.get(vertice_id).unwrap();
+            let vertice_name = format!("{}{}", VERTICE_PREFIX, vertice.id);
             //let  = self.sym_table.get_atom(&vertice.timepoint, true).unwrap();
-            let result = self.sym_table.get_atom(&vertice.result, true).unwrap();
-            match vertice.computation {
-                Expression::Start => {
-                    dot.push_str(
-                        format!(
-                            "{} [label= \"{}\"]\n",
-                            node_name,
-                            vertice.computation.format(&self.sym_table, true),
-                        )
-                        .as_str(),
-                    );
-                }
-                Expression::End(id) => {
-                    dot.push_str(
-                        format!(
-                            "{} [label= \"{}\"]\n",
-                            node_name,
-                            vertice.computation.format(&self.sym_table, true),
-                        )
-                        .as_str(),
-                    );
-                }
+            let result = sym_table.get_atom(&vertice.result, false).unwrap();
+            match &vertice.computation {
+                Expression::Block(block) => match block {
+                    Block::If(if_block) => {
+                        dot.push_str(
+                            format!(
+                                "{} [label= \"{}: {} <- {}\"]\n",
+                                vertice_name,
+                                vertice.interval.format(&self.sym_table, false),
+                                result,
+                                vertice.computation.format(&self.sym_table, false),
+                            )
+                            .as_str(),
+                        );
+                        dot.push_str(self.export_vertice(&if_block.true_branch.start).as_str());
+                        dot.push_str(self.export_vertice(&if_block.false_branch.start).as_str());
+                    }
+                },
                 _ => {
                     dot.push_str(
                         format!(
                             "{} [label= \"{}: {} <- {}\"]\n",
-                            node_name,
-                            vertice.interval.format(&self.sym_table, true),
+                            vertice_name,
+                            vertice.interval.format(&self.sym_table, false),
                             result,
-                            vertice.computation.format(&self.sym_table, true),
+                            vertice.computation.format(&self.sym_table, false),
                         )
                         .as_str(),
                     );
                 }
             }
-        }
 
-        for edge in &self.edges {
-            let from = format!("{}{}", VERTICE_PREFIX, edge.from);
-            let to = format!("{}{}", VERTICE_PREFIX, edge.to);
-
-            match edge.kind {
-                EdgeKind::Seq => {
-                    dot.push_str(format!("{} -> {}\n", from, to).as_str());
-                }
-                EdgeKind::Branching => {
-                    dot.push_str(format!("{} -> {} [style = dashed]\n", from, to,).as_str());
-                    /*dot.push_str(
-                        format!(
-                            "{} -> {} [style = dashed label = \"!{}\"]\n",
-                            node_name, false_branch, result_name
-                        )
-                        .as_str(),
-                    );*/
-                }
+            if let Some(parent) = vertice.parent {
+                let parent = format!("{}{}", VERTICE_PREFIX, parent);
+                dot.push_str(format!("{} -> {}\n", parent, vertice_name).as_str());
             }
+
+            next = vertice.child;
         }
+        dot
+    }
+
+    pub fn export_dot(&self) -> Dot {
+        let mut dot: Dot = "digraph {\n".to_string();
+
+        dot.push_str(self.export_vertice(&self.scope.start).as_str());
 
         dot.push('}');
         dot
@@ -221,21 +159,73 @@ impl FlowGraph {
 
 impl Default for FlowGraph {
     fn default() -> Self {
-        let sym_table = SymTable::default();
         Self {
-            sym_table,
+            sym_table: Default::default(),
             vertices: vec![],
-            edges: vec![],
+            scope: Default::default(),
         }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Default)]
+pub struct Scope {
+    pub(crate) start: VerticeId,
+    pub(crate) end: VerticeId,
+}
+
+impl Scope {
+    pub fn start(&self) -> &VerticeId {
+        &self.start
+    }
+
+    pub fn end(&self) -> &VerticeId {
+        &self.end
+    }
+
+    pub fn set_start(&mut self, start: VerticeId) {
+        self.start = start;
+    }
+
+    pub fn set_end(&mut self, end: VerticeId) {
+        self.end = end;
+    }
+
+    pub fn singleton(id: VerticeId) -> Self {
+        Self { start: id, end: id }
+    }
+
+    pub fn expression(start: VerticeId, end: VerticeId) -> Self {
+        Self { start, end }
+    }
+}
+
+impl From<VerticeId> for Scope {
+    fn from(id: VerticeId) -> Self {
+        Self::singleton(id)
     }
 }
 
 pub const VERTICE_PREFIX: char = 'V';
 pub const RESULT_PREFIX: char = 'r';
+pub const IF_PREFIX: &str = "if";
 pub const TIMEPOINT_PREFIX: char = 't';
 pub const BRANCHING_ARROW: &str = "->";
 pub const DASHED_ATTRIBUTE: &str = "[style = dashed]";
 pub const PAR_ARROW: &str = "->";
+
+#[derive(Debug, Clone)]
+pub enum Block {
+    If(IfBlock),
+}
+
+#[derive(Debug, Clone)]
+pub struct IfBlock {
+    pub(crate) cond: AtomId,
+    pub(crate) true_result: AtomId,
+    pub(crate) false_result: AtomId,
+    pub(crate) true_branch: Scope,
+    pub(crate) false_branch: Scope,
+}
 
 #[derive(Copy, Clone)]
 pub struct Edge {
@@ -261,7 +251,7 @@ impl Edge {
 #[derive(Debug, Copy, Clone)]
 pub enum EdgeKind {
     Seq,
-    Branching,
+    Branching(bool),
 }
 
 impl Default for EdgeKind {
@@ -269,49 +259,37 @@ impl Default for EdgeKind {
         Self::Seq
     }
 }
-/*
-#[derive(Clone, Debug, Default)]
-pub struct Parents {
-    inner: Vec<VerticeId>,
-    link_kind: LinkKind,
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct Childs {
-    inner: Vec<VerticeId>,
-    link_kind: LinkKind,
-}*/
 
 #[derive(Clone, Debug)]
 pub struct Vertice {
     pub(crate) id: VerticeId,
     pub(crate) interval: Interval,
     pub(crate) result: AtomId,
-    //pub parents: Parents,
-    //pub childs: Childs,
+    pub(crate) parent: Option<VerticeId>,
+    pub(crate) child: Option<VerticeId>,
     pub(crate) computation: Expression,
 }
 
 impl Vertice {
     /*
-    ADDERS
+    SETTERS
      */
-    /*pub fn add_parent(&mut self, parent: &VerticeId) {
-        self.parents.inner.push(*parent)
+    pub fn set_parent(&mut self, parent: &VerticeId) {
+        self.parent = Some(*parent)
     }
 
-    pub fn add_child(&mut self, child: &VerticeId) {
-        self.childs.inner.push(*child)
+    pub fn set_child(&mut self, child: &VerticeId) {
+        self.child = Some(*child)
     }
 
     /*GETTERS*/
-    pub fn get_parents(&self) -> &Vec<VerticeId> {
-        &self.parents.inner
+    pub fn get_parent(&self) -> &Option<VerticeId> {
+        &self.parent
     }
 
-    pub fn get_childs(&self) -> &Vec<VerticeId> {
-        &self.childs.inner
-    }*/
+    pub fn get_child(&self) -> &Option<VerticeId> {
+        &self.child
+    }
 
     pub fn get_computation(&self) -> &Expression {
         &self.computation
@@ -340,14 +318,14 @@ impl Vertice {
 
 #[derive(Debug, Clone)]
 pub enum Expression {
+    Block(Block),
+    Err(Lit),
     Exec(Vec<AtomId>),
     Apply(Vec<AtomId>),
     Write(Vec<AtomId>),
     Read(Vec<AtomId>),
     Cst(Lit),
     Handle(AtomId),
-    Start,
-    End(AtomId),
 }
 
 impl Expression {
@@ -373,10 +351,14 @@ impl Expression {
     pub fn handle(h: AtomId) -> Self {
         Self::Handle(h)
     }
+
+    pub fn err(err: Lit) -> Self {
+        Self::Err(err)
+    }
 }
 
 impl FormatWithSymTable for Expression {
-    fn format(&self, st: &SymTable, sym_version: bool) -> String {
+    fn format(&self, st: &RefSymTable, sym_version: bool) -> String {
         let mut str = "".to_string();
         match self {
             Expression::Apply(vec) => {
@@ -405,7 +387,7 @@ impl FormatWithSymTable for Expression {
                         args.push_str(format!(",{}", atom.format(st, sym_version)).as_str())
                     }
                 }
-                write!(str, "apply({})", args)
+                write!(str, "write({})", args)
             }
             Expression::Read(vec) => {
                 let mut args = "".to_string();
@@ -427,8 +409,6 @@ impl FormatWithSymTable for Expression {
             Expression::Handle(vertice) => {
                 write!(str, "handle({})", vertice.format(st, sym_version))
             }
-            Expression::Start => write!(str, "start"),
-            Expression::End(id) => write!(str, "exit({})", id.format(st, sym_version)),
             Expression::Exec(vec) => {
                 let mut args = "".to_string();
                 let mut first = true;
@@ -443,53 +423,26 @@ impl FormatWithSymTable for Expression {
                 }
                 write!(str, "exec({})", args)
             }
-        };
+            Expression::Err(err) => {
+                write!(str, "err({})", err.format(st, sym_version))
+            }
+            Expression::Block(block) => {
+                match block {
+                    Block::If(i) => {
+                        write!(
+                            str,
+                            "if({},{},{})",
+                            i.cond.format(st, sym_version),
+                            i.true_result.format(st, sym_version),
+                            i.false_result.format(st, sym_version),
+                            //i.true_branch.format(st, sym_version),
+                            //i.false_branch.format(st, sym_version)
+                        )
+                    }
+                }
+            }
+        }
+        .unwrap();
         str
     }
 }
-
-/*
-#[derive(Debug, Clone)]
-pub enum CstValue {
-    Result(usize),
-    Timepoint(usize),
-    Number(LNumber),
-    Bool(bool),
-    Symbol(String),
-    String(String),
-    Expression(LValue),
-}
-
-impl Display for CstValue {
-    fn fmt(&self, str: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            CstValue::Number(n) => write!(str, "{}", n),
-            CstValue::Bool(b) => write!(str, "{}", b),
-            CstValue::Symbol(s) => write!(str, "{}", s),
-            CstValue::String(s) => write!(str, "{}", s),
-            CstValue::Expression(e) => write!(str, "{}", e),
-            CstValue::Result(r) => write!(str, "{}{}", RESULT_PREFIX, r.relative),
-        }
-    }
-}
-
-impl CstValue {
-    pub fn number(n: LNumber) -> Self {
-        Self::Number(n)
-    }
-    pub fn bool(b: bool) -> Self {
-        Self::Bool(b)
-    }
-    pub fn symbol(s: String) -> Self {
-        Self::Symbol(s)
-    }
-    pub fn string(s: String) -> Self {
-        Self::String(s)
-    }
-    pub fn expression(e: LValue) -> Self {
-        Self::Expression(e)
-    }
-    pub fn result(r: NodeId) -> Self {
-        Self::Result(r)
-    }
-}*/

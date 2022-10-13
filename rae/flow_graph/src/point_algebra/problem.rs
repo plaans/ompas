@@ -2,7 +2,7 @@ use crate::point_algebra::relation_type::RelationType::Tautology;
 use crate::point_algebra::relation_type::{RelationType, RelationTypeBit};
 use crate::structs::chronicle::constraint::Constraint;
 use crate::structs::chronicle::lit::Lit;
-use crate::structs::chronicle::sym_table::SymTable;
+use crate::structs::chronicle::sym_table::{RefSymTable, SymTable};
 use crate::structs::chronicle::type_table::AtomType;
 use crate::structs::chronicle::{AtomId, FormatWithSymTable};
 use cli_table::{print_stdout, Cell, Table};
@@ -20,7 +20,7 @@ pub struct Relation<T> {
 
 pub fn try_into_pa_relation(
     constraint: &Constraint,
-    sym_table: &SymTable,
+    sym_table: &RefSymTable,
 ) -> lruntimeerror::Result<Relation<AtomId>> {
     let relation_type = match constraint {
         Constraint::Eq(_, _) => RelationType::Eq,
@@ -34,9 +34,9 @@ pub fn try_into_pa_relation(
         let p_i = sym_table.get_parent(&i);
         if let Ok(j) = constraint.get_right().try_into() {
             let p_j = sym_table.get_parent(&j);
-            if sym_table.get_type_of(p_i).unwrap() == &AtomType::Timepoint {
-                if sym_table.get_type_of(p_j).unwrap() == &AtomType::Timepoint {
-                    Ok(Relation::new(*p_i, *p_j, relation_type))
+            if sym_table.get_type_of(&p_i) == AtomType::Timepoint {
+                if sym_table.get_type_of(&p_j) == AtomType::Timepoint {
+                    Ok(Relation::new(p_i, p_j, relation_type))
                 } else {
                     Err(Default::default())
                 }
@@ -86,7 +86,7 @@ impl<T: Debug> Debug for Relation<T> {
 }
 
 impl<T: FormatWithSymTable> FormatWithSymTable for Relation<T> {
-    fn format(&self, st: &SymTable, sym_version: bool) -> String {
+    fn format(&self, st: &RefSymTable, sym_version: bool) -> String {
         format!(
             "{} {} {}",
             self.i.format(st, sym_version),
@@ -135,7 +135,7 @@ impl<T: Debug> Debug for PAProblem<T> {
 }
 
 impl<T: Display + FormatWithSymTable> FormatWithSymTable for PAProblem<T> {
-    fn format(&self, st: &SymTable, sym_version: bool) -> String {
+    fn format(&self, st: &RefSymTable, sym_version: bool) -> String {
         let mut str = "problem:\n".to_string();
         str.push_str("variables: {");
         let mut first = true;

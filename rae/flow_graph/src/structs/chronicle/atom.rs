@@ -1,6 +1,6 @@
-use crate::structs::chronicle::sym_table::SymTable;
+use crate::structs::chronicle::sym_table::RefSymTable;
 use crate::structs::chronicle::FormatWithSymTable;
-use crate::structs::flow_graph::graph::{RESULT_PREFIX, TIMEPOINT_PREFIX};
+use crate::structs::flow_graph::graph::{IF_PREFIX, RESULT_PREFIX, TIMEPOINT_PREFIX};
 use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lruntimeerror;
@@ -14,7 +14,35 @@ pub enum Atom {
     Bool(bool),
     Number(LNumber),
     Variable(Variable),
-    Symbol(String),
+    Symbol(Symbol),
+}
+
+#[derive(Hash, Eq, PartialEq, Clone, Debug)]
+pub enum Symbol {
+    Literal(String),
+    SyntheticTask(SyntheticTask),
+}
+
+impl Display for Symbol {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Symbol::Literal(l) => write!(f, "{}", l),
+            Symbol::SyntheticTask(s) => write!(f, "{}", s),
+        }
+    }
+}
+
+#[derive(Hash, Eq, PartialEq, Clone, Debug)]
+pub enum SyntheticTask {
+    If(usize),
+}
+
+impl Display for SyntheticTask {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SyntheticTask::If(i) => write!(f, "{}{}", IF_PREFIX, i),
+        }
+    }
 }
 
 impl Atom {
@@ -72,7 +100,7 @@ impl TryFrom<&Atom> for String {
 
     fn try_from(value: &Atom) -> Result<Self, Self::Error> {
         if let Atom::Symbol(s) = value {
-            Ok(s.clone())
+            Ok(s.to_string())
         } else {
             Err(lruntimeerror!(
                 "Sym::TryFrom<Atom>",
@@ -100,7 +128,7 @@ impl Default for Atom {
 
 impl From<&str> for Atom {
     fn from(s: &str) -> Self {
-        Self::Symbol(s.into())
+        Self::Symbol(Symbol::Literal(s.to_string()))
     }
 }
 
@@ -135,7 +163,7 @@ impl From<f64> for Atom {
 }
 
 impl FormatWithSymTable for Atom {
-    fn format(&self, _: &SymTable, _: bool) -> String {
+    fn format(&self, _: &RefSymTable, _: bool) -> String {
         self.to_string()
     }
 }

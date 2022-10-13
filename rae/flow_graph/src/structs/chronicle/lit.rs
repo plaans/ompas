@@ -1,5 +1,5 @@
 use crate::structs::chronicle::constraint::Constraint;
-use crate::structs::chronicle::sym_table::SymTable;
+use crate::structs::chronicle::sym_table::RefSymTable;
 use crate::structs::chronicle::type_table::AtomType;
 use crate::structs::chronicle::{AtomId, FormatWithParent, FormatWithSymTable, GetVariables};
 use im::{hashset, HashSet};
@@ -145,7 +145,7 @@ impl<T: Clone + Into<Lit>> From<Vec<T>> for Lit {
     }
 }
 
-pub fn lvalue_to_lit(lv: &LValue, st: &mut SymTable) -> lruntimeerror::Result<Lit> {
+pub fn lvalue_to_lit(lv: &LValue, st: &mut RefSymTable) -> lruntimeerror::Result<Lit> {
     //println!("in lvalue_to_lit:\n{}", lv.format(0));
     //stdout().flush();
     match lv {
@@ -177,7 +177,7 @@ pub fn lvalue_to_lit(lv: &LValue, st: &mut SymTable) -> lruntimeerror::Result<Li
 }
 
 impl FormatWithSymTable for Lit {
-    fn format(&self, st: &SymTable, sym_version: bool) -> String {
+    fn format(&self, st: &RefSymTable, sym_version: bool) -> String {
         match self {
             Lit::Atom(a) => a.format(st, sym_version),
             Lit::Constraint(c) => c.format(st, sym_version),
@@ -197,7 +197,7 @@ impl FormatWithSymTable for Lit {
 }
 
 impl FormatWithParent for Lit {
-    fn format_with_parent(&mut self, st: &SymTable) {
+    fn format_with_parent(&mut self, st: &RefSymTable) {
         match self {
             Lit::Atom(a) => a.format_with_parent(st),
             Lit::Constraint(c) => c.format_with_parent(st),
@@ -221,10 +221,14 @@ impl GetVariables for Lit {
         }
     }
 
-    fn get_variables_of_type(&self, sym_table: &SymTable, atom_type: &AtomType) -> HashSet<AtomId> {
+    fn get_variables_of_type(
+        &self,
+        sym_table: &RefSymTable,
+        atom_type: &AtomType,
+    ) -> HashSet<AtomId> {
         self.get_variables()
             .iter()
-            .filter(|v| sym_table.get_type_of(v).unwrap() == atom_type)
+            .filter(|v| sym_table.get_type_of(v) == *atom_type)
             .cloned()
             .collect()
     }

@@ -1,6 +1,6 @@
 use crate::structs::chronicle::interval::Interval;
 use crate::structs::chronicle::lit::Lit;
-use crate::structs::chronicle::sym_table::SymTable;
+use crate::structs::chronicle::sym_table::RefSymTable;
 use crate::structs::chronicle::type_table::AtomType;
 use crate::structs::chronicle::{AtomId, FormatWithParent, FormatWithSymTable, GetVariables};
 use im::HashSet;
@@ -93,17 +93,21 @@ impl GetVariables for Constraint {
         }
     }
 
-    fn get_variables_of_type(&self, sym_table: &SymTable, atom_type: &AtomType) -> HashSet<AtomId> {
+    fn get_variables_of_type(
+        &self,
+        sym_table: &RefSymTable,
+        atom_type: &AtomType,
+    ) -> HashSet<AtomId> {
         self.get_variables()
             .iter()
-            .filter(|v| sym_table.get_type_of(v).unwrap() == atom_type)
+            .filter(|v| sym_table.get_type_of(v) == *atom_type)
             .cloned()
             .collect()
     }
 }
 
 impl FormatWithSymTable for Constraint {
-    fn format(&self, st: &SymTable, sym_version: bool) -> String {
+    fn format(&self, st: &RefSymTable, sym_version: bool) -> String {
         match self {
             Constraint::Eq(l1, l2) => format!(
                 "({} = {})",
@@ -157,7 +161,7 @@ impl FormatWithSymTable for Constraint {
 }
 
 impl FormatWithParent for Constraint {
-    fn format_with_parent(&mut self, st: &SymTable) {
+    fn format_with_parent(&mut self, st: &RefSymTable) {
         match self {
             Constraint::Leq(l1, l2)
             | Constraint::Eq(l1, l2)

@@ -1,10 +1,7 @@
 use chrono::{DateTime, Utc};
 use flow_graph::config::GraphConvertConfig;
 use flow_graph::conversion::convert;
-use flow_graph::conversion::flow_graph_conversion::convert_into_flow_graph;
-use flow_graph::conversion::lvalue_pre_processing::pre_processing;
 use flow_graph::structs::chronicle::chronicle::ChronicleTemplate;
-use flow_graph::structs::flow_graph::graph::FlowGraph;
 use sompas_core::{get_root_env, parse};
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lruntimeerror::LRuntimeError;
@@ -133,7 +130,7 @@ fn output_markdown(
 \n
 ![]({})
 
-## Chronicle
+## Chronicles
 ```
 {}
 ```

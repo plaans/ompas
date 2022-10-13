@@ -3,10 +3,9 @@ use crate::point_algebra::remove_useless_timepoints;
 use crate::structs::chronicle::chronicle::{ChronicleSet, ChronicleTemplate};
 use crate::structs::chronicle::constraint::Constraint;
 use crate::structs::chronicle::lit::Lit;
-use crate::structs::chronicle::sym_table::SymTable;
+use crate::structs::chronicle::sym_table::RefSymTable;
 use crate::structs::chronicle::type_table::AtomType;
-use crate::structs::chronicle::FormatWithSymTable;
-use crate::structs::chronicle::{AtomId, FormatWithParent, GetVariables};
+use crate::structs::chronicle::{AtomId, GetVariables};
 use im::HashSet;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use std::borrow::Borrow;
@@ -29,7 +28,7 @@ pub fn post_processing(c: &mut ChronicleTemplate) -> Result<(), LRuntimeError> {
     );*/
     //merge_conditions(c, context, ch)?;
     //simplify_constraints(c, context, ch)?;
-    //c.format_with_parent(&ch.sym_table);
+    //c.format_with_parent(&ch.get_mut_sym_table());
 
     Ok(())
 }
@@ -62,9 +61,9 @@ pub fn unify_equal(c: &mut ChronicleTemplate) {
 }
 
 /// Returns true if the constraint can be safely deleted
-fn bind_atoms(id_1: &AtomId, id_2: &AtomId, st: &mut SymTable) -> Result<bool, LRuntimeError> {
-    let id_1 = *st.get_parent(id_1);
-    let id_2 = *st.get_parent(id_2);
+fn bind_atoms(id_1: &AtomId, id_2: &AtomId, st: &mut RefSymTable) -> Result<bool, LRuntimeError> {
+    let id_1 = st.get_parent(id_1);
+    let id_2 = st.get_parent(id_2);
     let id_1 = &id_1;
     let id_2 = &id_2;
 
@@ -74,8 +73,8 @@ fn bind_atoms(id_1: &AtomId, id_2: &AtomId, st: &mut SymTable) -> Result<bool, L
         (id_2, id_1)
     };
 
-    let type_1 = *st.get_type_of(id_1).expect("id should be defined");
-    let type_2 = *st.get_type_of(id_2).expect("id should be defined");
+    let type_1 = st.get_type_of(id_1);
+    let type_2 = st.get_type_of(id_2);
 
     let atom_1 = st.get_atom(id_1, false).unwrap().clone();
     let atom_2 = st.get_atom(id_2, false).unwrap().clone();
@@ -85,11 +84,6 @@ fn bind_atoms(id_1: &AtomId, id_2: &AtomId, st: &mut SymTable) -> Result<bool, L
 
     match (constant_1, constant_2) {
         (true, true) => {
-            /*println!(
-                "binding constants {} and {}",
-                id_1.format(st, true),
-                id_2.format(st, true)
-            );*/
             if type_1 != type_2 {
                 return Err(Default::default());
             }
@@ -100,11 +94,6 @@ fn bind_atoms(id_1: &AtomId, id_2: &AtomId, st: &mut SymTable) -> Result<bool, L
             Ok(true)
         }
         (true, false) => {
-            /*println!(
-                "binding constant {} and variable {}",
-                id_1.format(st, true),
-                id_2.format(st, true)
-            );*/
             match &type_2 {
                 AtomType::Untyped => st.set_type_of(id_2, &type_1),
                 t => {
@@ -122,11 +111,6 @@ fn bind_atoms(id_1: &AtomId, id_2: &AtomId, st: &mut SymTable) -> Result<bool, L
             };
         }
         (false, true) => {
-            /*println!(
-                "binding variable {} and constant {}",
-                id_1.format(st, true),
-                id_2.format(st, true)
-            );*/
             match &type_1 {
                 AtomType::Untyped => st.set_type_of(id_1, &type_2),
                 t => {
@@ -144,12 +128,6 @@ fn bind_atoms(id_1: &AtomId, id_2: &AtomId, st: &mut SymTable) -> Result<bool, L
             }
         }
         (false, false) => {
-            /*println!(
-                "binding variables {} and {}",
-                id_1.format(st, true),
-                id_2.format(st, true)
-            );*/
-
             let parameter_1 = atom_1.is_parameter();
             let parameter_2 = atom_2.is_parameter();
 
@@ -208,7 +186,7 @@ pub fn rm_useless_var(c: &mut ChronicleTemplate) {
 
     let new_vars = used_vars.union(parameters);
     for v in &new_vars {
-        assert_eq!(v, c.sym_table.get_parent(v));
+        assert_eq!(*v, c.sym_table.get_parent(v));
     }
     for v in new_vars {
         c.add_var(&v)
@@ -229,8 +207,8 @@ pub fn simplify_timepoints(c: &mut ChronicleTemplate) -> Result<(), LRuntimeErro
     let timepoints: HashSet<AtomId> = c
         .get_variables()
         .iter()
-        .map(|a| *c.sym_table.get_parent(a))
-        .filter(|a| c.sym_table.get_type_of(a).unwrap() == &AtomType::Timepoint)
+        .map(|a| c.sym_table.get_parent(a))
+        .filter(|a| c.sym_table.get_type_of(a) == AtomType::Timepoint)
         .collect();
 
     //println!("timepoints: {}", format_hash(&timepoints));
@@ -242,8 +220,8 @@ pub fn simplify_timepoints(c: &mut ChronicleTemplate) -> Result<(), LRuntimeErro
             ChronicleSet::SubTask,
         ])
         .iter()
-        .map(|a| *c.sym_table.get_parent(a))
-        .filter(|a| c.sym_table.get_type_of(a).unwrap() == &AtomType::Timepoint)
+        .map(|a| c.sym_table.get_parent(a))
+        .filter(|a| c.sym_table.get_type_of(a) == AtomType::Timepoint)
         .collect();
 
     // println!("used timepoints: {}", format_hash(&used_timepoints));
@@ -251,11 +229,11 @@ pub fn simplify_timepoints(c: &mut ChronicleTemplate) -> Result<(), LRuntimeErro
     let hard_timepoints: HashSet<AtomId> = c
         .get_variables()
         .iter()
-        .map(|a| *c.sym_table.get_parent(a))
+        .map(|a| c.sym_table.get_parent(a))
         .filter(|a| {
             let is_variable = c.sym_table.get_atom(a, false).unwrap().is_parameter();
-            let t = c.sym_table.get_type_of(a).unwrap();
-            is_variable && t == &AtomType::Timepoint
+            let t = c.sym_table.get_type_of(a);
+            is_variable && t == AtomType::Timepoint
         })
         .collect();
 
@@ -283,7 +261,7 @@ pub fn simplify_timepoints(c: &mut ChronicleTemplate) -> Result<(), LRuntimeErro
         .iter()
         .map(|a| (*a, optional_timepoints.contains(a)))
         .collect();
-    //println!("st: {}", ch.sym_table);
+    //println!("st: {}", ch.get_mut_sym_table());
 
     let problem: PAProblem<AtomId> = PAProblem::new(timepoints, relations);
 
@@ -356,7 +334,7 @@ pub fn merge_conditions(
                     c2.format(&ch.sym_table, true),
                     index
                 );*/
-                bind_atoms(&c1.value, &c2.value, &mut ch.sym_table)?;
+                bind_atoms(&c1.value, &c2.value, &mut ch.get_mut_sym_table())?;
                 c_to_remove.insert(index);
             }
         }

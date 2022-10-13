@@ -1,4 +1,4 @@
-use crate::structs::chronicle::sym_table::SymTable;
+use crate::structs::chronicle::sym_table::{RefSymTable, SymTable};
 use crate::structs::chronicle::{FormatWithSymTable, NodeId};
 use std::fmt::{Display, Formatter};
 
@@ -65,7 +65,7 @@ pub enum AtomType {
 }
 
 impl FormatWithSymTable for AtomType {
-    fn format(&self, st: &SymTable, sym_version: bool) -> String {
+    fn format(&self, st: &RefSymTable, sym_version: bool) -> String {
         match self {
             /*PlanningAtomType::SubType(t) => {
                 format!("(subtype of {})", t.format(st, sym_version))
@@ -121,7 +121,7 @@ impl TypeTable {
 }
 
 impl FormatWithSymTable for Option<AtomType> {
-    fn format(&self, st: &SymTable, sym_version: bool) -> String {
+    fn format(&self, st: &RefSymTable, sym_version: bool) -> String {
         match self {
             Some(t) => t.format(st, sym_version),
             None => UNTYPED.to_string(),

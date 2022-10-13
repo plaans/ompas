@@ -40,7 +40,7 @@ pub enum SyntheticTask {
 impl Display for SyntheticTask {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            SyntheticTask::If(i) => write!(f, "{}{}", IF_PREFIX, i),
+            SyntheticTask::If(i) => write!(f, "_{}{}_", IF_PREFIX, i),
         }
     }
 }
@@ -88,8 +88,8 @@ pub enum Variable {
 impl Display for Variable {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Variable::Timepoint(n) => write!(f, "{}{}", TIMEPOINT_PREFIX, n),
-            Variable::Result(n) => write!(f, "{}{}", RESULT_PREFIX, n),
+            Variable::Timepoint(n) => write!(f, "_{}{}_", TIMEPOINT_PREFIX, n),
+            Variable::Result(n) => write!(f, "_{}{}_", RESULT_PREFIX, n),
             Variable::Parameter(p) => write!(f, "{}", p),
         }
     }

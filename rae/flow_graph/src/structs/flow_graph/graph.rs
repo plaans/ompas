@@ -122,6 +122,19 @@ impl FlowGraph {
                         dot.push_str(self.export_vertice(&if_block.true_branch.start).as_str());
                         dot.push_str(self.export_vertice(&if_block.false_branch.start).as_str());
                     }
+                    Block::Async(async_block) => {
+                        dot.push_str(
+                            format!(
+                                "{} [label= \"{}: {} <- {}\"]\n",
+                                vertice_name,
+                                vertice.interval.format(&self.sym_table, false),
+                                result,
+                                vertice.computation.format(&self.sym_table, false),
+                            )
+                            .as_str(),
+                        );
+                        dot.push_str(self.export_vertice(async_block.scope.start()).as_str());
+                    }
                 },
                 _ => {
                     dot.push_str(
@@ -216,6 +229,13 @@ pub const PAR_ARROW: &str = "->";
 #[derive(Debug, Clone)]
 pub enum Block {
     If(IfBlock),
+    Async(AsyncBlock),
+}
+
+#[derive(Debug, Clone)]
+pub struct AsyncBlock {
+    pub(crate) result: AtomId,
+    pub(crate) scope: Scope,
 }
 
 #[derive(Debug, Clone)]
@@ -325,7 +345,7 @@ pub enum Expression {
     Write(Vec<AtomId>),
     Read(Vec<AtomId>),
     Cst(Lit),
-    Handle(AtomId),
+    Await(AtomId),
 }
 
 impl Expression {
@@ -346,10 +366,6 @@ impl Expression {
 
     pub fn cst(cst: Lit) -> Self {
         Self::Cst(cst)
-    }
-
-    pub fn handle(h: AtomId) -> Self {
-        Self::Handle(h)
     }
 
     pub fn err(err: Lit) -> Self {
@@ -406,8 +422,8 @@ impl FormatWithSymTable for Expression {
             Expression::Cst(cst) => {
                 write!(str, "cst({})", cst.format(st, sym_version))
             }
-            Expression::Handle(vertice) => {
-                write!(str, "handle({})", vertice.format(st, sym_version))
+            Expression::Await(vertice) => {
+                write!(str, "await({})", vertice.format(st, sym_version))
             }
             Expression::Exec(vec) => {
                 let mut args = "".to_string();
@@ -426,21 +442,20 @@ impl FormatWithSymTable for Expression {
             Expression::Err(err) => {
                 write!(str, "err({})", err.format(st, sym_version))
             }
-            Expression::Block(block) => {
-                match block {
-                    Block::If(i) => {
-                        write!(
-                            str,
-                            "if({},{},{})",
-                            i.cond.format(st, sym_version),
-                            i.true_result.format(st, sym_version),
-                            i.false_result.format(st, sym_version),
-                            //i.true_branch.format(st, sym_version),
-                            //i.false_branch.format(st, sym_version)
-                        )
-                    }
+            Expression::Block(block) => match block {
+                Block::If(i) => {
+                    write!(
+                        str,
+                        "if({},{},{})",
+                        i.cond.format(st, sym_version),
+                        i.true_result.format(st, sym_version),
+                        i.false_result.format(st, sym_version),
+                    )
                 }
-            }
+                Block::Async(a) => {
+                    write!(str, "async({})", a.result.format(st, sym_version),)
+                }
+            },
         }
         .unwrap();
         str

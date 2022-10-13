@@ -1,6 +1,6 @@
 use crate::structs::chronicle::interval::Interval;
 use crate::structs::chronicle::lit::lvalue_to_lit;
-use crate::structs::flow_graph::graph::{Block, IfBlock, Scope, Vertice};
+use crate::structs::flow_graph::graph::{AsyncBlock, Block, IfBlock, Scope, Vertice};
 use crate::{DefineTable, Expression, FlowGraph};
 use core::result::Result;
 use core::result::Result::{Err, Ok};
@@ -140,25 +140,28 @@ fn convert_list(
                 }
                 Ok(scope)
             }
-            /*LCoreOperator::Async => {
+            LCoreOperator::Async => {
                 let define_table = &mut define_table.clone();
                 let e = &list[1];
-                let r_async = convert(e, fl, parent.clone(), define_table)?;
-                Ok(fl.new_vertice(Expression::handle(r_async), parent))
+                let r_async = convert_into_flow_graph(e, fl, define_table)?;
+                let async_block = AsyncBlock {
+                    result: *fl.get_result(r_async.end()),
+                    scope: r_async,
+                };
+
+                Ok(fl
+                    .new_vertice(Expression::Block(Block::Async(async_block)))
+                    .into())
             }
             LCoreOperator::Await => {
                 let define_table = &mut define_table.clone();
-                let h = convert(&list[1], fl, parent.clone(), define_table)?;
-                let h_parent = fl.backtrack_result(&h);
-                let node: &Vertice = fl.get(&h_parent).unwrap();
-                if let Expression::Handle(n_async) = node.get_computation().clone() {
-                    let r = fl.new_vertice(CstValue::result(n_async), Some(h));
-                    fl.add_parent(&r, &n_async);
-                    Ok(r)
-                } else {
-                    Ok(h)
-                }
-            }*/
+                let mut h = convert_into_flow_graph(&list[1], fl, define_table)?;
+                let a = fl.new_vertice(Expression::Await(*fl.get_result(h.end())));
+
+                fl.set_parent(&a, h.end());
+                h.end = a;
+                Ok(h)
+            }
             LCoreOperator::Race => {
                 todo!()
             }

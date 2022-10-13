@@ -316,36 +316,28 @@ impl ChronicleTemplate {
         }
         s.push_str("}\n");
 
-        s.push_str("-constraint(s): {\n");
+        s.push_str("-constraint(s): {");
         for c in &self.constraints {
-            s.push('\t');
-            s.push_str(c.format(&st.borrow(), sym_version).as_str());
-            s.push('\n');
+            write!(s, "\n\t{}", c.format(&st.borrow(), sym_version));
         }
         s.push_str("}\n");
 
         //conditions
-        s.push_str("-conditon(s): {\n");
-        for e in &self.conditions {
-            s.push('\t');
-            s.push_str(e.format(&st.borrow(), sym_version).as_str());
-            s.push('\n');
+        s.push_str("-conditon(s): {");
+        for c in &self.conditions {
+            write!(s, "\n\t{}", c.format(&st.borrow(), sym_version));
         }
         s.push_str("}\n");
         //effects
-        s.push_str("-effect(s): {\n");
+        s.push_str("-effect(s): {");
         for e in &self.effects {
-            s.push('\t');
-            s.push_str(e.format(&st.borrow(), sym_version).as_str());
-            s.push('\n');
+            write!(s, "\n\t{}", e.format(&st.borrow(), sym_version));
         }
         s.push_str("}\n");
         //substasks
-        s.push_str("-subtask(s): {\n");
+        s.push_str("-subtask(s): {");
         for e in &self.subtasks {
-            s.push('\t');
-            s.push_str(e.format(&st.borrow(), sym_version).as_str());
-            s.push('\n');
+            write!(s, "\n\t{}", e.format(&st.borrow(), sym_version));
         }
         s.push_str("}\n");
         s.push_str("-synthetic task(s): {\n");

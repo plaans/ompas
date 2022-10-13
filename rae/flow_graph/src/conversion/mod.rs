@@ -24,8 +24,5 @@ pub async fn convert(lv: &LValue, env: &LEnv) -> Result<ChronicleTemplate, LRunt
     graph.scope = scope;
 
     let mut ch = convert_into_chronicle(&graph, graph.scope);
-
-    post_processing(&mut ch)?;
-
-    Ok(ch)
+    ch
 }

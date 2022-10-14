@@ -7,6 +7,7 @@ use im::HashSet;
 
 #[derive(Clone, Debug)]
 pub enum Constraint {
+    Await(Lit),
     Leq(Lit, Lit),
     Eq(Lit, Lit),
     Neq(Lit, Lit),
@@ -60,6 +61,7 @@ impl Constraint {
             | Constraint::Neq(l1, _)
             | Constraint::Arbitrary(l1, _) => l1,
             Constraint::Not(l) => l,
+            Constraint::Await(a) => a,
         }
     }
 
@@ -74,6 +76,7 @@ impl Constraint {
             | Constraint::Neq(_, l2)
             | Constraint::Arbitrary(_, l2) => l2,
             Constraint::Not(l) => l,
+            Constraint::Await(a) => a,
         }
     }
 }
@@ -89,7 +92,7 @@ impl GetVariables for Constraint {
             | Constraint::Or(l1, l2)
             | Constraint::Type(l1, l2)
             | Constraint::Arbitrary(l1, l2) => l1.get_variables().union(l2.get_variables()),
-            Constraint::Not(l) => l.get_variables(),
+            Constraint::Not(l) | Constraint::Await(l) => l.get_variables(),
         }
     }
 
@@ -156,6 +159,9 @@ impl FormatWithSymTable for Constraint {
                 l1.format(st, sym_version),
                 l2.format(st, sym_version)
             ),
+            Constraint::Await(a) => {
+                format!("await({})", a.format(st, sym_version))
+            }
         }
     }
 }
@@ -174,7 +180,7 @@ impl FormatWithParent for Constraint {
                 l1.format_with_parent(st);
                 l2.format_with_parent(st);
             }
-            Constraint::Not(a) => a.format_with_parent(st),
+            Constraint::Not(a) | Constraint::Await(a) => a.format_with_parent(st),
         }
     }
 }
@@ -184,37 +190,37 @@ impl Constraint {}
 //INTERVAL constraints
 
 pub fn before(a: &Interval, b: &Interval) -> Constraint {
-    Constraint::Leq(a.end().into(), b.start().into())
+    Constraint::Leq(a.get_end().into(), b.get_start().into())
 }
 pub fn meet(a: &Interval, b: &Interval) -> Constraint {
-    Constraint::Eq(a.end().into(), b.start().into())
+    Constraint::Eq(a.get_end().into(), b.get_start().into())
 }
 
 pub fn overlap(a: &Interval, b: &Interval) -> Constraint {
     Constraint::Or(
-        Constraint::Leq(a.start().into(), b.end().into()).into(),
-        Constraint::Leq(b.start().into(), a.end().into()).into(),
+        Constraint::Leq(a.get_start().into(), b.get_end().into()).into(),
+        Constraint::Leq(b.get_start().into(), a.get_end().into()).into(),
     )
 }
 
 pub fn start(a: &Interval, b: &Interval) -> Constraint {
-    Constraint::Eq(a.start().into(), b.start().into())
+    Constraint::Eq(a.get_start().into(), b.get_start().into())
 }
 
 pub fn during(a: &Interval, b: &Interval) -> Constraint {
     Constraint::And(
-        Constraint::Leq(b.start().into(), a.start().into()).into(),
-        Constraint::Leq(a.end().into(), b.end().into()).into(),
+        Constraint::Leq(b.get_start().into(), a.get_start().into()).into(),
+        Constraint::Leq(a.get_end().into(), b.get_end().into()).into(),
     )
 }
 
 pub fn finish(a: &Interval, b: &Interval) -> Constraint {
-    Constraint::Eq(a.end().into(), b.end().into())
+    Constraint::Eq(a.get_end().into(), b.get_end().into())
 }
 
 pub fn equal(a: &Interval, b: &Interval) -> Constraint {
     Constraint::And(
-        Constraint::Eq(a.start().into(), b.start().into()).into(),
-        Constraint::Eq(a.end().into(), b.end().into()).into(),
+        Constraint::Eq(a.get_start().into(), b.get_start().into()).into(),
+        Constraint::Eq(a.get_end().into(), b.get_end().into()).into(),
     )
 }

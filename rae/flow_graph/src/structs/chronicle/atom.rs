@@ -1,6 +1,8 @@
 use crate::structs::chronicle::sym_table::RefSymTable;
-use crate::structs::chronicle::FormatWithSymTable;
-use crate::structs::flow_graph::graph::{IF_PREFIX, RESULT_PREFIX, TIMEPOINT_PREFIX};
+use crate::structs::chronicle::{AtomId, FormatWithSymTable, END, PREZ, RESULT, START};
+use crate::structs::flow_graph::graph::{
+    HANDLE_PREFIX, IF_PREFIX, RESULT_PREFIX, TIMEPOINT_PREFIX,
+};
 use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lruntimeerror;
@@ -16,6 +18,38 @@ pub enum Atom {
     Variable(Variable),
     Symbol(Symbol),
 }
+
+/*#[derive(Hash, Eq, PartialEq, Clone, Debug)]
+pub struct ResultAtom {
+    id: usize,
+    start: AtomId,
+    end: AtomId,
+}
+
+impl ResultAtom {
+    pub fn new(id: usize) -> Self {
+        Self {
+            id,
+            start: 0,
+            end: 0,
+        }
+    }
+
+    pub fn set_start(&mut self, start: &AtomId) {
+        self.start = *start;
+    }
+    pub fn set_end(&mut self, end: &AtomId) {
+        self.end = *end;
+    }
+
+    pub fn get_start(&self) -> &AtomId {
+        &self.start
+    }
+
+    pub fn get_end(&self) -> &AtomId {
+        &self.end
+    }
+}*/
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub enum Symbol {
@@ -80,17 +114,27 @@ impl Display for Atom {
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub enum Variable {
-    Timepoint(usize),
     Result(usize),
+    Timepoint(usize),
+    Handle(usize),
     Parameter(String),
+    Start(usize),
+    End(usize),
+    Presence(usize),
+    ChronicleResult(usize),
 }
 
 impl Display for Variable {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
+            Variable::Result(r) => write!(f, "_{}{}_", RESULT_PREFIX, r),
             Variable::Timepoint(n) => write!(f, "_{}{}_", TIMEPOINT_PREFIX, n),
-            Variable::Result(n) => write!(f, "_{}{}_", RESULT_PREFIX, n),
             Variable::Parameter(p) => write!(f, "{}", p),
+            Variable::Handle(n) => write!(f, "_{}{}_", HANDLE_PREFIX, n),
+            Variable::Start(n) => write!(f, "_{}{}_", START, n),
+            Variable::End(n) => write!(f, "_{}{}_", END, n),
+            Variable::Presence(n) => write!(f, "_{}{}_", PREZ, n),
+            Variable::ChronicleResult(n) => write!(f, "_{}{}_", RESULT, n),
         }
     }
 }

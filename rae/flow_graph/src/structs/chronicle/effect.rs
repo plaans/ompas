@@ -13,11 +13,11 @@ pub struct Effect {
 
 impl Effect {
     pub fn get_start(&self) -> &AtomId {
-        self.interval.start()
+        self.interval.get_start()
     }
 
     pub fn get_end(&self) -> &AtomId {
-        self.interval.end()
+        self.interval.get_end()
     }
 }
 

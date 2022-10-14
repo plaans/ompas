@@ -2,7 +2,7 @@ use crate::point_algebra::relation_type::RelationType::Tautology;
 use crate::point_algebra::relation_type::{RelationType, RelationTypeBit};
 use crate::structs::chronicle::constraint::Constraint;
 use crate::structs::chronicle::lit::Lit;
-use crate::structs::chronicle::sym_table::{RefSymTable, SymTable};
+use crate::structs::chronicle::sym_table::RefSymTable;
 use crate::structs::chronicle::type_table::AtomType;
 use crate::structs::chronicle::{AtomId, FormatWithSymTable};
 use cli_table::{print_stdout, Cell, Table};

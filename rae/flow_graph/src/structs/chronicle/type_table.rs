@@ -1,4 +1,4 @@
-use crate::structs::chronicle::sym_table::{RefSymTable, SymTable};
+use crate::structs::chronicle::sym_table::RefSymTable;
 use crate::structs::chronicle::{FormatWithSymTable, NodeId};
 use std::fmt::{Display, Formatter};
 
@@ -21,6 +21,7 @@ const PARAMETER: &str = "parameter";
 const CONSTANT: &str = "constant";
 const UNTYPED: &str = "untyped";
 const ROOT_TYPE: &str = "root-type";
+const HANDLE: &str = "handle";
 
 #[derive(Clone, Default)]
 pub struct TypeTable {
@@ -53,6 +54,7 @@ pub enum AtomType {
     Task,
     Timepoint,
     Presence,
+    Handle,
     Int,
     Float,
     Bool,
@@ -99,6 +101,7 @@ impl Display for AtomType {
                 AtomType::Untyped => UNTYPED.to_string(),
                 AtomType::RootType => ROOT_TYPE.to_string(),
                 AtomType::SubType(t) => format!("subtype({})", t),
+                AtomType::Handle => HANDLE.to_string(),
             }
         )
     }

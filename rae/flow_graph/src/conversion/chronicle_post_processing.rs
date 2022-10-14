@@ -14,6 +14,7 @@ pub fn post_processing(c: &mut ChronicleTemplate) -> Result<(), LRuntimeError> {
     //add_constraint_on_end_timepoint(c, context, ch);
     c.sym_table.flat_bindings();
     unify_equal(c);
+
     //ch.sym_table.flat_bindings();
     //panic!("for no fucking reason");
     /*println!(
@@ -35,6 +36,7 @@ pub fn post_processing(c: &mut ChronicleTemplate) -> Result<(), LRuntimeError> {
 
 pub fn unify_equal(c: &mut ChronicleTemplate) {
     //println!("before binding: {}", c.format(true));
+    c.sym_table.flat_bindings();
 
     let mut vec_constraint_to_rm = vec![];
     let constraints = c.get_constraints().clone();

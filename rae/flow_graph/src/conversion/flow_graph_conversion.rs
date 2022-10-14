@@ -1,7 +1,10 @@
 use crate::structs::chronicle::interval::Interval;
 use crate::structs::chronicle::lit::lvalue_to_lit;
-use crate::structs::flow_graph::graph::{AsyncBlock, Block, IfBlock, Scope, Vertice};
-use crate::{DefineTable, Expression, FlowGraph};
+use crate::structs::flow_graph::expression::{Block, Expression, IfBlock};
+use crate::structs::flow_graph::handle_table::Handle;
+use crate::structs::flow_graph::scope::Scope;
+use crate::structs::flow_graph::vertice::Vertice;
+use crate::{DefineTable, FlowGraph};
 use core::result::Result;
 use core::result::Result::{Err, Ok};
 use ompas_rae_language::{
@@ -42,9 +45,9 @@ fn convert_symbol(symbol: &Arc<String>, fl: &mut FlowGraph, define_table: &Defin
     match define_table.get(symbol.as_str()) {
         None => {
             let id = fl.sym_table.new_symbol(symbol, None);
-            fl.new_vertice(Expression::cst(id.into())).into()
+            fl.new_instantaneous_vertice(Expression::cst(id)).into()
         }
-        Some(r) => fl.new_vertice(Expression::cst(r.into())).into(),
+        Some(r) => fl.new_instantaneous_vertice(Expression::cst(r)).into(),
     }
 }
 
@@ -55,13 +58,13 @@ fn convert_string(_: &Arc<String>, _: &mut FlowGraph) -> Scope {
 
 fn convert_number(number: &LNumber, fl: &mut FlowGraph) -> Scope {
     let id = fl.sym_table.new_number(number);
-    fl.new_vertice(Expression::cst(id.into())).into()
+    fl.new_instantaneous_vertice(Expression::cst(id)).into()
     //fl.new_vertice(CstValue::number(*number), parent)
 }
 
 fn convert_bool(bool: bool, fl: &mut FlowGraph) -> Scope {
     let id = fl.sym_table.new_bool(bool);
-    fl.new_vertice(Expression::cst(id.into())).into()
+    fl.new_instantaneous_vertice(Expression::cst(id)).into()
 }
 
 fn convert_core_operator(_: &LCoreOperator, _: &mut FlowGraph) -> Scope {
@@ -82,10 +85,10 @@ fn convert_list(
                 let var = &list[1];
                 let val = &list[2];
                 let mut scope = convert_into_flow_graph(val, fl, define_table)?;
-                define_table.insert(var.to_string(), *fl.get_result(scope.end()));
+                define_table.insert(var.to_string(), *fl.get_result(scope.get_end()));
                 let id = fl.sym_table.new_bool(false);
-                let r = fl.new_vertice(Expression::cst(id.into()));
-                fl.set_parent(&r, scope.end());
+                let r = fl.new_instantaneous_vertice(Expression::cst(id));
+                fl.set_parent(&r, scope.get_end());
                 scope.set_end(r);
                 Ok(scope)
             }
@@ -107,22 +110,23 @@ fn convert_list(
                 let false_branch = convert_into_flow_graph(false_branch, fl, define_table)?;
 
                 let if_expression = IfBlock {
-                    cond: *fl.get_result(cond.end()),
-                    true_result: *fl.get_result(true_branch.end()),
-                    false_result: *fl.get_result(false_branch.end()),
+                    cond: *fl.get_result(cond.get_end()),
+                    true_result: *fl.get_result(true_branch.get_end()),
+                    false_result: *fl.get_result(false_branch.get_end()),
                     true_branch,
                     false_branch,
                 };
 
-                let if_id = fl.new_vertice(Expression::Block(Block::If(if_expression)));
-                fl.set_parent(&if_id, cond.end());
+                let if_id =
+                    fl.new_instantaneous_vertice(Expression::Block(Block::If(if_expression)));
+                fl.set_parent(&if_id, cond.get_end());
                 let mut scope = cond;
                 scope.end = if_id;
                 Ok(scope)
             }
             LCoreOperator::Quote => {
                 let lit = lvalue_to_lit(&list[1], &mut fl.sym_table)?;
-                Ok(fl.new_vertice(Expression::cst(lit)).into())
+                Ok(fl.new_instantaneous_vertice(Expression::cst(lit)).into())
             }
             LCoreOperator::Begin => {
                 let mut define_table = define_table.clone();
@@ -134,7 +138,7 @@ fn convert_list(
                         scope = e_scope;
                         first = false;
                     } else {
-                        fl.set_parent(e_scope.start(), scope.end());
+                        fl.set_parent(e_scope.start(), scope.get_end());
                         scope.end = e_scope.end;
                     }
                 }
@@ -143,22 +147,28 @@ fn convert_list(
             LCoreOperator::Async => {
                 let define_table = &mut define_table.clone();
                 let e = &list[1];
-                let r_async = convert_into_flow_graph(e, fl, define_table)?;
-                let async_block = AsyncBlock {
-                    result: *fl.get_result(r_async.end()),
-                    scope: r_async,
+                let scope_expression = convert_into_flow_graph(e, fl, define_table)?;
+
+                let handle_id = fl.sym_table.new_handle();
+
+                let vertice = fl.new_instantaneous_vertice(Expression::Handle(handle_id));
+
+                let handle = Handle {
+                    result: *fl.get_scope_result(&scope_expression),
+                    scope: scope_expression,
+                    ends: vec![],
                 };
 
-                Ok(fl
-                    .new_vertice(Expression::Block(Block::Async(async_block)))
-                    .into())
+                fl.handles.insert(&handle_id, handle);
+
+                Ok(vertice.into())
             }
             LCoreOperator::Await => {
                 let define_table = &mut define_table.clone();
                 let mut h = convert_into_flow_graph(&list[1], fl, define_table)?;
-                let a = fl.new_vertice(Expression::Await(*fl.get_result(h.end())));
+                let a = fl.new_instantaneous_vertice(Expression::Await(*fl.get_scope_result(&h)));
 
-                fl.set_parent(&a, h.end());
+                fl.set_parent(&a, h.get_end());
                 h.end = a;
                 Ok(h)
             }
@@ -190,52 +200,42 @@ fn convert_apply(
             first = false;
             arg_scope = vertice_scope
         } else {
-            fl.set_parent(vertice_scope.start(), arg_scope.end());
+            fl.set_parent(vertice_scope.start(), arg_scope.get_end());
             arg_scope.end = vertice_scope.end;
         }
 
-        args_result.push(*fl.get_result(vertice_scope.end()));
+        args_result.push(*fl.get_result(vertice_scope.get_end()));
     }
 
     Ok(match proc_symbol.as_str() {
         RAE_EXEC_COMMAND | RAE_EXEC_TASK => {
-            let start = fl.sym_table.new_timepoint();
-            let end = fl.sym_table.new_timepoint();
-            let r = fl.sym_table.new_result();
-
-            let vertice = Vertice {
-                id: 0,
-                interval: Interval::new(&start, &end),
-                result: r,
-                parent: None,
-                child: None,
-                computation: Expression::exec(args_result.to_vec()),
-            };
-            let exec_scope: Scope = fl.push(vertice).into();
-            fl.set_parent(exec_scope.start(), arg_scope.end());
+            let exec_scope: Scope = fl
+                .new_vertice(Expression::exec(args_result.to_vec()))
+                .into();
+            fl.set_parent(exec_scope.start(), arg_scope.get_end());
             arg_scope.end = exec_scope.end;
             arg_scope
         }
         RAE_ASSERT | RAE_ASSERT_SHORT => {
-            let id = fl.new_vertice(Expression::write(args_result.to_vec()));
-            fl.set_parent(&id, arg_scope.end());
+            let id = fl.new_instantaneous_vertice(Expression::write(args_result.to_vec()));
+            fl.set_parent(&id, arg_scope.get_end());
             arg_scope.end = id;
             arg_scope
         }
         RAE_READ_STATE => {
-            let id = fl.new_vertice(Expression::read(args_result.to_vec()));
-            fl.set_parent(&id, arg_scope.end());
+            let id = fl.new_instantaneous_vertice(Expression::read(args_result.to_vec()));
+            fl.set_parent(&id, arg_scope.get_end());
             arg_scope.end = id;
             arg_scope
         }
         _ => {
-            fl.set_child(proc_scope.end(), arg_scope.start());
+            fl.set_child(proc_scope.get_end(), arg_scope.start());
 
-            let mut results = vec![*fl.get_result(proc_scope.end())];
+            let mut results = vec![*fl.get_result(proc_scope.get_end())];
             results.append(&mut args_result);
 
-            let id = fl.new_vertice(Expression::apply(results));
-            fl.set_parent(&id, arg_scope.end());
+            let id = fl.new_instantaneous_vertice(Expression::apply(results));
+            fl.set_parent(&id, arg_scope.get_end());
 
             let scope = Scope {
                 start: proc_scope.start,

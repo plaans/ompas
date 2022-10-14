@@ -23,12 +23,16 @@ impl Interval {
 }
 
 impl Interval {
-    pub fn start(&self) -> &AtomId {
+    pub fn get_start(&self) -> &AtomId {
         &self.start
     }
 
-    pub fn end(&self) -> &AtomId {
+    pub fn get_end(&self) -> &AtomId {
         &self.end
+    }
+
+    pub fn set_end(&mut self, end: &AtomId) {
+        self.end = *end;
     }
 }
 

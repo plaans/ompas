@@ -1,4 +1,6 @@
-use crate::conversion::chronicle_post_processing::{post_processing, unify_equal};
+use crate::conversion::chronicle_post_processing::{
+    post_processing, rm_useless_var, simplify_timepoints, unify_equal,
+};
 use crate::structs::chronicle::atom::Atom;
 use crate::structs::chronicle::chronicle::{ChronicleKind, ChronicleTemplate};
 use crate::structs::chronicle::condition::Condition;
@@ -48,6 +50,12 @@ pub fn convert_into_chronicle(
 
     while let Some(id) = queue.pop() {
         let vertice = graph.get(&id).unwrap();
+        if !vertice.interval.is_instantaneous() {
+            ch.add_constraint(Constraint::leq(
+                *vertice.interval.get_start(),
+                *vertice.interval.get_end(),
+            ));
+        }
         match vertice.get_computation() {
             Expression::Apply(a) => ch.add_constraint(Constraint::eq(vertice.result, a)),
             Expression::Write(vec) => {
@@ -86,10 +94,6 @@ pub fn convert_into_chronicle(
                 ch.add_subtask(subtask);
                 let result = ch.sym_table.new_bool(false);
                 ch.add_constraint(Constraint::eq(vertice.get_result(), result));
-                ch.add_constraint(Constraint::leq(
-                    *vertice.interval.get_start(),
-                    *vertice.interval.get_end(),
-                ))
             }
             Expression::Err(_) => {}
             Expression::Block(block) => match block {
@@ -155,6 +159,9 @@ pub fn convert_into_chronicle(
     HANDLES
      */
 
+    /*
+    POST PROCESSING
+     */
     unify_equal(&mut ch);
 
     for a in &awaits {
@@ -173,9 +180,25 @@ pub fn convert_into_chronicle(
         }
     }
 
+    //ch.sym_table.flat_bindings();
+    //panic!("for no fucking reason");
+    /*println!(
+        "before timepoint simplification: {}",
+        c.format(&ch.sym_table, true)
+    );*/
+    simplify_timepoints(&mut ch)?;
+    rm_useless_var(&mut ch);
+    /*println!(
+        "before merge conditions: {}",
+        c.format_with_sym_table(&ch.sym_table, true)
+    );*/
+    //merge_conditions(c, context, ch)?;
+    //simplify_constraints(c, context, ch)?;
+    //c.format_with_parent(&ch.get_mut_sym_table());
+
     ch.debug.flow_graph = graph.clone();
 
-    //post_processing(&mut ch)?;
+    post_processing(&mut ch)?;
 
     Ok(ch)
 }

@@ -92,7 +92,7 @@ impl FlowGraph {
         let end = self.sym_table.new_timepoint();
         let r = self.sym_table.new_result();
 
-        self.sym_table.new_scope(&r, &start);
+        self.sym_table.new_scope(&r, &end);
 
         let vertice = Vertice {
             id,

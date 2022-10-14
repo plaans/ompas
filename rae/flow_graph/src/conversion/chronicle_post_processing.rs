@@ -278,6 +278,9 @@ pub fn simplify_timepoints(c: &mut ChronicleTemplate) -> Result<(), LRuntimeErro
     for r in problem.get_relations() {
         c.add_constraint(r.into())
     }
+
+    c.sym_table.flat_bindings();
+
     Ok(())
 }
 

@@ -20,9 +20,7 @@ impl Interval {
     pub fn new_instantaneous(t: &AtomId) -> Self {
         Self { start: *t, end: *t }
     }
-}
 
-impl Interval {
     pub fn get_start(&self) -> &AtomId {
         &self.start
     }
@@ -33,6 +31,10 @@ impl Interval {
 
     pub fn set_end(&mut self, end: &AtomId) {
         self.end = *end;
+    }
+
+    pub fn is_instantaneous(&self) -> bool {
+        self.start == self.end
     }
 }
 

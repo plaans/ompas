@@ -166,7 +166,7 @@ fn convert_list(
             LCoreOperator::Await => {
                 let define_table = &mut define_table.clone();
                 let mut h = convert_into_flow_graph(&list[1], fl, define_table)?;
-                let a = fl.new_instantaneous_vertice(Expression::Await(*fl.get_scope_result(&h)));
+                let a = fl.new_vertice(Expression::Await(*fl.get_scope_result(&h)));
 
                 fl.set_parent(&a, h.get_end());
                 h.end = a;

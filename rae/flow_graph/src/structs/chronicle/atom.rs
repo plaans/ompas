@@ -9,6 +9,7 @@ use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use std::borrow::Borrow;
 use std::convert::TryFrom;
+use std::env::var;
 use std::fmt::{Display, Formatter};
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
@@ -85,8 +86,15 @@ impl Atom {
     }
 
     pub fn is_parameter(&self) -> bool {
-        if let Self::Variable(Variable::Parameter(_)) = self {
-            true
+        if let Self::Variable(v) = &self {
+            match v {
+                Variable::Parameter(_)
+                | Variable::Start(_)
+                | Variable::End(_)
+                | Variable::Presence(_)
+                | Variable::ChronicleResult(_) => true,
+                _ => false,
+            }
         } else {
             false
         }

@@ -3,6 +3,7 @@ use crate::structs::chronicle::forest::{Forest, Node};
 use crate::structs::chronicle::interval::Interval;
 use crate::structs::chronicle::type_table::{AtomType, TypeId, TypeTable};
 use crate::structs::chronicle::{AtomId, FormatWithSymTable};
+use itertools::Itertools;
 use ompas_rae_language::*;
 use sompas_core::modules::get_scheme_primitives;
 use sompas_structs::lnumber::LNumber;
@@ -10,6 +11,7 @@ use sompas_structs::lruntimeerror;
 use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
+use std::fmt::Write;
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 
@@ -187,6 +189,22 @@ impl RefSymTable {
     pub fn format_forest(&self) -> String {
         RefCell::borrow(&self.0).format_forest()
     }
+
+    pub fn format_scopes(&self) -> String {
+        let scopes = &RefCell::borrow(&self.0).scopes;
+
+        let mut str = "SCOPES:\n".to_string();
+
+        for (atom, interval) in scopes.iter().sorted_by(|a, b| a.0.cmp(&b.0)) {
+            write!(
+                str,
+                "{}: {}\n",
+                atom.format(&self, false),
+                interval.format(&self, false)
+            );
+        }
+        str
+    }
 }
 
 #[derive(Clone)]
@@ -224,6 +242,10 @@ impl SymTable {
     /*
     SCOPES FUNCTIONS
      */
+    pub fn scopes(&self) -> im::HashMap<AtomId, Interval> {
+        self.scopes.clone()
+    }
+
     pub fn get_scope(&self, id: &AtomId) -> Option<&Interval> {
         self.scopes.get(id)
     }

@@ -131,9 +131,11 @@ fn convert_list(
             LCoreOperator::Begin => {
                 let mut define_table = define_table.clone();
                 let mut scope = Scope::default();
+                let mut results = vec![];
                 let mut first = true;
                 for e in &list[1..] {
                     let e_scope = convert_into_flow_graph(e, fl, &mut define_table)?;
+                    results.push(*fl.get_scope_result(&e_scope));
                     if first {
                         scope = e_scope;
                         first = false;
@@ -141,6 +143,10 @@ fn convert_list(
                         fl.set_parent(e_scope.start(), scope.get_end());
                         scope.end = e_scope.end;
                     }
+                }
+                let end = *fl.get_scope_interval(&scope).get_end();
+                for r in results {
+                    fl.sym_table.set_end(&r, &end);
                 }
                 Ok(scope)
             }
@@ -207,7 +213,9 @@ fn convert_apply(
         args_result.push(*fl.get_result(vertice_scope.get_end()));
     }
 
-    Ok(match proc_symbol.as_str() {
+    let mut results = args_result.clone();
+
+    let scope = match proc_symbol.as_str() {
         RAE_EXEC_COMMAND | RAE_EXEC_TASK => {
             let exec_scope: Scope = fl
                 .new_vertice(Expression::exec(args_result.to_vec()))
@@ -231,10 +239,11 @@ fn convert_apply(
         _ => {
             fl.set_child(proc_scope.get_end(), arg_scope.start());
 
-            let mut results = vec![*fl.get_result(proc_scope.get_end())];
-            results.append(&mut args_result);
+            results.push(*fl.get_result(proc_scope.get_end()));
+            let mut vec = vec![*fl.get_result(proc_scope.get_end())];
+            vec.append(&mut args_result);
 
-            let id = fl.new_instantaneous_vertice(Expression::apply(results));
+            let id = fl.new_instantaneous_vertice(Expression::apply(vec));
             fl.set_parent(&id, arg_scope.get_end());
 
             let scope = Scope {
@@ -244,5 +253,13 @@ fn convert_apply(
 
             scope
         }
-    })
+    };
+
+    let end = *fl.get_scope_interval(&scope).get_end();
+
+    for r in results {
+        fl.sym_table.set_end(&r, &end);
+    }
+
+    Ok(scope)
 }

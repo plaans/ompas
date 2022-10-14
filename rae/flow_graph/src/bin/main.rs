@@ -126,10 +126,16 @@ fn output_markdown(
 {}
 ```
 \n
+
 ## Graph
 \n
 ![]({})
 
+\n
+## Scopes
+```
+{}
+```
 ## Chronicles
 ```
 {}
@@ -138,6 +144,7 @@ fn output_markdown(
         name,
         expression.format(0),
         graph_file_name,
+        ch.sym_table.format_scopes(),
         ch.to_string(),
     );
 

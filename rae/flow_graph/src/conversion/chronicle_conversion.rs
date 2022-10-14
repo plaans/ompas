@@ -87,7 +87,7 @@ pub fn convert_into_chronicle(
             //Expression::Await(_) => {}
             Expression::Exec(vec) => {
                 let subtask = SubTask {
-                    interval: vertice.interval, //TODO: change
+                    interval: vertice.interval,
                     lit: vec.into(),
                 };
 
@@ -112,20 +112,7 @@ pub fn convert_into_chronicle(
                         interval: vertice.interval,
                         lit: vec![t_if].into(),
                     })
-                } /*Block::Handle(handle) => {
-                      //Add timepoints constraints on the temporal scope of the handle;
-                      let interval_handle = graph.get_scope_interval(&handle.scope_handle);
-                      let interval_expression = graph.get_scope_interval(&handle.scope_expression);
-                      ch.add_constraint(Constraint::eq(
-                          interval_handle.start(),
-                          interval_expression.start(),
-                      ));
-                      ch.add_constraint(Constraint::leq(
-                          interval_expression.end(),
-                          interval_handle.end(),
-                      ));
-                      queue.push(handle.scope_expression.start)
-                  }*/
+                }
             },
             Expression::Handle(h) => {
                 let handle = graph.handles.get(h).unwrap();

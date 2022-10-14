@@ -38,6 +38,7 @@ chrono = "0.4.19"
 rand = "0.8.5"
 yaml-rust = "0.4"
 async-recursion = "1.0.0"
+itertools = "*"
 
 [[bin]]
 name = "graph-convert"

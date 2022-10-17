@@ -1,6 +1,8 @@
 use crate::structs::chronicle::forest::NodeId;
 use crate::structs::chronicle::sym_table::RefSymTable;
 use crate::structs::chronicle::type_table::AtomType;
+use itertools::Itertools;
+use std::collections::HashSet;
 
 pub mod atom;
 pub mod chronicle;
@@ -25,6 +27,23 @@ pub const IF_TASK_PROTOTYPE: &str = "t_if";
 pub type AtomId = NodeId;
 
 impl FormatWithSymTable for Vec<AtomId> {
+    fn format(&self, st: &RefSymTable, sym_version: bool) -> String {
+        let mut str = "(".to_string();
+        let mut first = true;
+        for e in self {
+            if first {
+                first = false
+            } else {
+                str.push(' ');
+            }
+            str.push_str(e.format(st, sym_version).as_str());
+        }
+        str.push(')');
+        str
+    }
+}
+
+impl FormatWithSymTable for HashSet<AtomId> {
     fn format(&self, st: &RefSymTable, sym_version: bool) -> String {
         let mut str = "(".to_string();
         let mut first = true;

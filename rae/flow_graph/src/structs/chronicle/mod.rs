@@ -66,8 +66,8 @@ impl FormatWithSymTable for AtomId {
     }
 }
 
-impl FormatWithParent for AtomId {
-    fn format_with_parent(&mut self, st: &RefSymTable) {
+impl FlatBindings for AtomId {
+    fn flat_bindings(&mut self, st: &RefSymTable) {
         *self = st.get_parent(self);
     }
 }
@@ -89,15 +89,36 @@ pub trait GetVariables {
 /*
 Transforms all literals by replacing all atomid by the atomid of their parents.
  */
-pub trait FormatWithParent {
-    fn format_with_parent(&mut self, st: &RefSymTable);
+pub trait FlatBindings {
+    fn flat_bindings(&mut self, st: &RefSymTable);
 }
 
-impl<T> FormatWithParent for Vec<T>
+impl<T> FlatBindings for Vec<T>
 where
-    T: FormatWithParent,
+    T: FlatBindings,
 {
-    fn format_with_parent(&mut self, st: &RefSymTable) {
-        self.iter_mut().for_each(|e| e.format_with_parent(st))
+    fn flat_bindings(&mut self, st: &RefSymTable) {
+        self.iter_mut().for_each(|e| e.flat_bindings(st))
+    }
+}
+
+pub trait Replace {
+    fn replace(&mut self, old: &AtomId, new: &AtomId);
+}
+
+impl<T> Replace for Vec<T>
+where
+    T: Replace,
+{
+    fn replace(&mut self, old: &AtomId, new: &AtomId) {
+        self.iter_mut().for_each(|e| e.replace(old, new))
+    }
+}
+
+impl Replace for AtomId {
+    fn replace(&mut self, old: &AtomId, new: &AtomId) {
+        if self == old {
+            *self = *new
+        }
     }
 }

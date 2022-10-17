@@ -1,5 +1,4 @@
 use crate::structs::chronicle::interval::Interval;
-use crate::structs::chronicle::lit::Lit;
 use crate::structs::chronicle::sym_table::RefSymTable;
 use crate::structs::chronicle::{AtomId, FormatWithSymTable};
 use crate::structs::flow_graph::expression::{Block, Expression};
@@ -7,7 +6,6 @@ use crate::structs::flow_graph::handle_table::HandleTable;
 use crate::structs::flow_graph::scope::Scope;
 use crate::structs::flow_graph::vertice::Vertice;
 use std::fmt::Write;
-use tokio::runtime::Handle;
 
 pub type Dot = String;
 
@@ -35,9 +33,9 @@ impl FlowGraph {
         }
     }
 
-    pub(crate) fn vertices(&self) -> &Vec<Vertice> {
+    /*pub(crate) fn vertices(&self) -> &Vec<Vertice> {
         &self.vertices
-    }
+    }*/
 
     pub fn get_result(&self, id: &VerticeId) -> &AtomId {
         self.vertices.get(*id).unwrap().get_result()
@@ -213,9 +211,9 @@ impl FlowGraph {
     pub fn export_dot(&self) -> Dot {
         let mut dot: Dot = "digraph {\n".to_string();
 
-        write!(dot, "{}", self.export_vertice(&self.scope.start));
+        write!(dot, "{}", self.export_vertice(&self.scope.start)).unwrap();
         for (_, handle) in self.handles.inner() {
-            write!(dot, "{}", self.export_vertice(&handle.scope.start));
+            write!(dot, "{}", self.export_vertice(&handle.scope.start)).unwrap();
         }
 
         dot.push('}');

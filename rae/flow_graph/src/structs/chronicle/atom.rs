@@ -1,5 +1,5 @@
 use crate::structs::chronicle::sym_table::RefSymTable;
-use crate::structs::chronicle::{AtomId, FormatWithSymTable, END, PREZ, RESULT, START};
+use crate::structs::chronicle::{FormatWithSymTable, END, PREZ, RESULT, START};
 use crate::structs::flow_graph::graph::{
     HANDLE_PREFIX, IF_PREFIX, RESULT_PREFIX, TIMEPOINT_PREFIX,
 };
@@ -9,7 +9,6 @@ use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use std::borrow::Borrow;
 use std::convert::TryFrom;
-use std::env::var;
 use std::fmt::{Display, Formatter};
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
@@ -54,14 +53,13 @@ impl ResultAtom {
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub enum Symbol {
-    Literal(String),
+    Constant(String),
     SyntheticTask(SyntheticTask),
 }
-
 impl Display for Symbol {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Symbol::Literal(l) => write!(f, "{}", l),
+            Symbol::Constant(l) => write!(f, "{}", l),
             Symbol::SyntheticTask(s) => write!(f, "{}", s),
         }
     }
@@ -88,7 +86,7 @@ impl Atom {
     pub fn is_parameter(&self) -> bool {
         if let Self::Variable(v) = &self {
             match v {
-                Variable::Parameter(_)
+                Variable::Parameter(_, _)
                 | Variable::Start(_)
                 | Variable::End(_)
                 | Variable::Presence(_)
@@ -125,7 +123,7 @@ pub enum Variable {
     Result(usize),
     Timepoint(usize),
     Handle(usize),
-    Parameter(String),
+    Parameter(String, usize),
     Start(usize),
     End(usize),
     Presence(usize),
@@ -137,7 +135,15 @@ impl Display for Variable {
         match self {
             Variable::Result(r) => write!(f, "_{}{}_", RESULT_PREFIX, r),
             Variable::Timepoint(n) => write!(f, "_{}{}_", TIMEPOINT_PREFIX, n),
-            Variable::Parameter(p) => write!(f, "{}", p),
+            Variable::Parameter(p, n) => write!(
+                f,
+                "{}{}",
+                p,
+                match n {
+                    0 => "".to_string(),
+                    n => format!("_{}", n),
+                }
+            ),
             Variable::Handle(n) => write!(f, "_{}{}_", HANDLE_PREFIX, n),
             Variable::Start(n) => write!(f, "_{}{}_", START, n),
             Variable::End(n) => write!(f, "_{}{}_", END, n),
@@ -180,7 +186,7 @@ impl Default for Atom {
 
 impl From<&str> for Atom {
     fn from(s: &str) -> Self {
-        Self::Symbol(Symbol::Literal(s.to_string()))
+        Self::Symbol(Symbol::Constant(s.to_string()))
     }
 }
 

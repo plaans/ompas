@@ -1,7 +1,7 @@
 use crate::structs::chronicle::constraint::Constraint;
 use crate::structs::chronicle::sym_table::RefSymTable;
 use crate::structs::chronicle::type_table::AtomType;
-use crate::structs::chronicle::{AtomId, FormatWithParent, FormatWithSymTable, GetVariables};
+use crate::structs::chronicle::{AtomId, FlatBindings, FormatWithSymTable, GetVariables, Replace};
 use im::{hashset, HashSet};
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lruntimeerror;
@@ -196,12 +196,12 @@ impl FormatWithSymTable for Lit {
     }
 }
 
-impl FormatWithParent for Lit {
-    fn format_with_parent(&mut self, st: &RefSymTable) {
+impl FlatBindings for Lit {
+    fn flat_bindings(&mut self, st: &RefSymTable) {
         match self {
-            Lit::Atom(a) => a.format_with_parent(st),
-            Lit::Constraint(c) => c.format_with_parent(st),
-            Lit::Exp(vec) => vec.format_with_parent(st),
+            Lit::Atom(a) => a.flat_bindings(st),
+            Lit::Constraint(c) => c.flat_bindings(st),
+            Lit::Exp(vec) => vec.flat_bindings(st),
         }
     }
 }
@@ -231,5 +231,15 @@ impl GetVariables for Lit {
             .filter(|v| sym_table.get_type_of(v) == *atom_type)
             .cloned()
             .collect()
+    }
+}
+
+impl Replace for Lit {
+    fn replace(&mut self, old: &AtomId, new: &AtomId) {
+        match self {
+            Lit::Atom(a) => a.replace(old, new),
+            Lit::Constraint(c) => c.replace(old, new),
+            Lit::Exp(e) => e.replace(old, new),
+        }
     }
 }

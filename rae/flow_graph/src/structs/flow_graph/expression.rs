@@ -1,7 +1,6 @@
 use crate::structs::chronicle::lit::Lit;
 use crate::structs::chronicle::sym_table::RefSymTable;
 use crate::structs::chronicle::{AtomId, FormatWithSymTable};
-use crate::structs::flow_graph::graph::HandleId;
 use crate::structs::flow_graph::scope::Scope;
 use std::fmt::Write;
 #[derive(Debug, Clone)]

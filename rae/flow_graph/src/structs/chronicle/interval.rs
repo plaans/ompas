@@ -1,6 +1,6 @@
 use crate::structs::chronicle::sym_table::RefSymTable;
 use crate::structs::chronicle::type_table::AtomType;
-use crate::structs::chronicle::{AtomId, FormatWithParent, FormatWithSymTable, GetVariables};
+use crate::structs::chronicle::{AtomId, FlatBindings, FormatWithSymTable, GetVariables, Replace};
 use im::{hashset, HashSet};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -52,10 +52,10 @@ impl FormatWithSymTable for Interval {
     }
 }
 
-impl FormatWithParent for Interval {
-    fn format_with_parent(&mut self, st: &RefSymTable) {
-        self.start.format_with_parent(st);
-        self.end.format_with_parent(st);
+impl FlatBindings for Interval {
+    fn flat_bindings(&mut self, st: &RefSymTable) {
+        self.start.flat_bindings(st);
+        self.end.flat_bindings(st);
     }
 }
 
@@ -74,5 +74,12 @@ impl GetVariables for Interval {
             .filter(|v| sym_table.get_type_of(v) == *atom_type)
             .cloned()
             .collect()
+    }
+}
+
+impl Replace for Interval {
+    fn replace(&mut self, old: &AtomId, new: &AtomId) {
+        self.end.replace(old, new);
+        self.start.replace(old, new);
     }
 }

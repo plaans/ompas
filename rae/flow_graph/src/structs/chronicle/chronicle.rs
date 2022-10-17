@@ -10,12 +10,10 @@ use crate::structs::chronicle::type_table::AtomType;
 use crate::structs::chronicle::*;
 use crate::structs::flow_graph::graph::FlowGraph;
 use im::hashset::HashSet;
-use sompas_modules::io::write;
 use sompas_structs::lvalue::LValue;
 use std::borrow::Borrow;
 use std::fmt::Write;
 use std::fmt::{Display, Formatter};
-use std::ops::Deref;
 
 pub enum ChronicleKind {
     Command,
@@ -203,12 +201,13 @@ impl ChronicleTemplate {
             self.add_var(&var)
         }
 
-        if let Constraint::And(Lit::Constraint(a), Lit::Constraint(b)) = constraint {
+        /*if let Constraint::And(vec) = constraint {
             self.constraints.push(a.deref().clone());
             self.constraints.push(b.deref().clone());
         } else {
-            self.constraints.push(constraint);
-        }
+
+        }*/
+        self.constraints.push(constraint);
     }
 
     pub fn add_condition(&mut self, cond: Condition) {
@@ -315,34 +314,34 @@ impl ChronicleTemplate {
 
         s.push_str("-constraint(s): {");
         for c in &self.constraints {
-            write!(s, "\n\t{}", c.format(&st.borrow(), sym_version));
+            write!(s, "\n\t{}", c.format(&st.borrow(), sym_version)).unwrap();
         }
         s.push_str("}\n");
 
         //conditions
         s.push_str("-conditon(s): {");
         for c in &self.conditions {
-            write!(s, "\n\t{}", c.format(&st.borrow(), sym_version));
+            write!(s, "\n\t{}", c.format(&st.borrow(), sym_version)).unwrap();
         }
         s.push_str("}\n");
         //effects
         s.push_str("-effect(s): {");
         for e in &self.effects {
-            write!(s, "\n\t{}", e.format(&st.borrow(), sym_version));
+            write!(s, "\n\t{}", e.format(&st.borrow(), sym_version)).unwrap();
         }
         s.push_str("}\n");
         //substasks
         s.push_str("-subtask(s): {");
         for e in &self.subtasks {
-            write!(s, "\n\t{}", e.format(&st.borrow(), sym_version));
+            write!(s, "\n\t{}", e.format(&st.borrow(), sym_version)).unwrap();
         }
         s.push_str("}\n");
         s.push_str("-synthetic task(s): {\n");
         for t in &self.syntactic_chronicles {
-            write!(s, "task: {}\n", t.name.format(&st, sym_version));
-            write!(s, "methods:\n");
+            write!(s, "task: {}\n", t.name.format(&st, sym_version)).unwrap();
+            write!(s, "methods:\n").unwrap();
             for m in &t.methods {
-                write!(s, "{}", m.to_string());
+                write!(s, "{}", m.to_string()).unwrap();
             }
         }
         s.push_str("}\n");
@@ -354,25 +353,26 @@ impl ChronicleTemplate {
 
         s
     }
+
     pub fn format_with_parent(&mut self) {
         let st = &self.sym_table;
-        self.name.format_with_parent(&st.borrow());
-        self.task.format_with_parent(&st.borrow());
+        self.name.flat_bindings(&st.borrow());
+        self.task.flat_bindings(&st.borrow());
         let old_variables = self.variables.clone();
         let mut new_variables: HashSet<AtomId> = Default::default();
         for v in &old_variables {
             let mut v = *v;
-            v.format_with_parent(&st.borrow());
+            v.flat_bindings(&st.borrow());
             new_variables.insert(v);
         }
 
         self.variables = new_variables;
-        self.interval.format_with_parent(&st.borrow());
-        self.presence.format_with_parent(&st.borrow());
-        self.constraints.format_with_parent(&st.borrow());
-        self.conditions.format_with_parent(&st.borrow());
-        self.effects.format_with_parent(&st.borrow());
-        self.subtasks.format_with_parent(&st.borrow());
+        self.interval.flat_bindings(&st.borrow());
+        self.presence.flat_bindings(&st.borrow());
+        self.constraints.flat_bindings(&st.borrow());
+        self.conditions.flat_bindings(&st.borrow());
+        self.effects.flat_bindings(&st.borrow());
+        self.subtasks.flat_bindings(&st.borrow());
     }
 }
 
@@ -391,6 +391,17 @@ impl GetVariables for ChronicleTemplate {
             .filter(|v| sym_table.get_type_of(v) == *atom_type)
             .cloned()
             .collect()
+    }
+}
+
+impl Replace for ChronicleTemplate {
+    fn replace(&mut self, old: &AtomId, new: &AtomId) {
+        self.variables.remove(old);
+        self.variables.insert(*new);
+        self.conditions.replace(old, new);
+        self.constraints.replace(old, new);
+        self.subtasks.replace(old, new);
+        self.effects.replace(old, new);
     }
 }
 

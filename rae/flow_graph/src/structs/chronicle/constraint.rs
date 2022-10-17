@@ -2,21 +2,23 @@ use crate::structs::chronicle::interval::Interval;
 use crate::structs::chronicle::lit::Lit;
 use crate::structs::chronicle::sym_table::RefSymTable;
 use crate::structs::chronicle::type_table::AtomType;
-use crate::structs::chronicle::{AtomId, FormatWithParent, FormatWithSymTable, GetVariables};
+use crate::structs::chronicle::{AtomId, FlatBindings, FormatWithSymTable, GetVariables, Replace};
 use im::HashSet;
-
+use std::fmt::Write;
 #[derive(Clone, Debug)]
 pub enum Constraint {
     Await(Lit),
+    Not(Lit),
     Leq(Lit, Lit),
     Eq(Lit, Lit),
     Neq(Lit, Lit),
-    Not(Lit),
     Lt(Lit, Lit),
-    And(Lit, Lit),
-    Or(Lit, Lit),
     Type(Lit, Lit),
     Arbitrary(Lit, Lit),
+    Min(Vec<Lit>),
+    Max(Vec<Lit>),
+    And(Vec<Lit>),
+    Or(Vec<Lit>),
 }
 
 impl Constraint {
@@ -35,11 +37,18 @@ impl Constraint {
     pub fn neg(a: impl Into<Lit>) -> Constraint {
         Constraint::Not(a.into())
     }
-    pub fn or(a: impl Into<Lit>, b: impl Into<Lit>) -> Constraint {
-        Constraint::Or(a.into(), b.into())
+    pub fn or(mut vec: Vec<impl Into<Lit>>) -> Constraint {
+        Constraint::Or(vec.drain(..).map(|e| e.into()).collect())
     }
-    pub fn and(a: impl Into<Lit>, b: impl Into<Lit>) -> Constraint {
-        Constraint::And(a.into(), b.into())
+    pub fn and(mut vec: Vec<impl Into<Lit>>) -> Constraint {
+        Constraint::And(vec.drain(..).map(|e| e.into()).collect())
+    }
+
+    pub fn min(mut vec: Vec<impl Into<Lit>>) -> Constraint {
+        Constraint::Min(vec.drain(..).map(|e| e.into()).collect())
+    }
+    pub fn max(mut vec: Vec<impl Into<Lit>>) -> Constraint {
+        Constraint::Max(vec.drain(..).map(|e| e.into()).collect())
     }
     pub fn _type(a: impl Into<Lit>, b: impl Into<Lit>) -> Constraint {
         Constraint::Type(a.into(), b.into())
@@ -50,33 +59,37 @@ impl Constraint {
 }
 
 impl Constraint {
-    pub fn get_left(&self) -> &Lit {
+    pub fn get_left(&self) -> Lit {
         match self {
             Constraint::Leq(l1, _)
             | Constraint::Eq(l1, _)
             | Constraint::Lt(l1, _)
-            | Constraint::And(l1, _)
-            | Constraint::Or(l1, _)
             | Constraint::Type(l1, _)
             | Constraint::Neq(l1, _)
-            | Constraint::Arbitrary(l1, _) => l1,
-            Constraint::Not(l) => l,
-            Constraint::Await(a) => a,
+            | Constraint::Arbitrary(l1, _) => l1.clone(),
+            Constraint::Not(l) => l.clone(),
+            Constraint::Await(a) => a.clone(),
+            Constraint::Min(vec)
+            | Constraint::Max(vec)
+            | Constraint::And(vec)
+            | Constraint::Or(vec) => vec.into(),
         }
     }
 
-    pub fn get_right(&self) -> &Lit {
+    pub fn get_right(&self) -> Lit {
         match self {
             Constraint::Leq(_, l2)
             | Constraint::Eq(_, l2)
             | Constraint::Lt(_, l2)
-            | Constraint::And(_, l2)
-            | Constraint::Or(_, l2)
             | Constraint::Type(_, l2)
             | Constraint::Neq(_, l2)
-            | Constraint::Arbitrary(_, l2) => l2,
-            Constraint::Not(l) => l,
-            Constraint::Await(a) => a,
+            | Constraint::Arbitrary(_, l2) => l2.clone(),
+            Constraint::Not(l) => l.clone(),
+            Constraint::Await(a) => a.clone(),
+            Constraint::Min(vec)
+            | Constraint::Max(vec)
+            | Constraint::And(vec)
+            | Constraint::Or(vec) => vec.into(),
         }
     }
 }
@@ -88,10 +101,18 @@ impl GetVariables for Constraint {
             | Constraint::Eq(l1, l2)
             | Constraint::Neq(l1, l2)
             | Constraint::Lt(l1, l2)
-            | Constraint::And(l1, l2)
-            | Constraint::Or(l1, l2)
             | Constraint::Type(l1, l2)
             | Constraint::Arbitrary(l1, l2) => l1.get_variables().union(l2.get_variables()),
+            Constraint::And(vec)
+            | Constraint::Or(vec)
+            | Constraint::Max(vec)
+            | Constraint::Min(vec) => {
+                let mut vars: im::HashSet<AtomId> = Default::default();
+                for lit in vec {
+                    vars = vars.union(lit.get_variables())
+                }
+                vars
+            }
             Constraint::Not(l) | Constraint::Await(l) => l.get_variables(),
         }
     }
@@ -123,16 +144,7 @@ impl FormatWithSymTable for Constraint {
                 l1.format(st, sym_version),
                 l2.format(st, sym_version)
             ),
-            Constraint::And(l1, l2) => format!(
-                "({} && {})",
-                l1.format(st, sym_version),
-                l2.format(st, sym_version)
-            ),
-            Constraint::Or(l1, l2) => format!(
-                "({} || {})",
-                l1.format(st, sym_version),
-                l2.format(st, sym_version)
-            ),
+
             Constraint::Leq(l1, l2) => {
                 format!(
                     "({} <= {})",
@@ -162,25 +174,79 @@ impl FormatWithSymTable for Constraint {
             Constraint::Await(a) => {
                 format!("await({})", a.format(st, sym_version))
             }
+            Constraint::Min(vec) => {
+                let mut str = "".to_string();
+                let mut first = true;
+                for lit in vec {
+                    if first {
+                        write!(str, "{}", lit.format(st, sym_version)).unwrap();
+                        first = false;
+                    } else {
+                        write!(str, ",{}", lit.format(st, sym_version)).unwrap();
+                    }
+                }
+                format!("min({})", str)
+            }
+            Constraint::Max(vec) => {
+                let mut str = "".to_string();
+                let mut first = true;
+                for lit in vec {
+                    if first {
+                        write!(str, "{}", lit.format(st, sym_version)).unwrap();
+                        first = false;
+                    } else {
+                        write!(str, ",{}", lit.format(st, sym_version)).unwrap();
+                    }
+                }
+                format!("max({})", str)
+            }
+            Constraint::And(vec) => {
+                let mut str = "".to_string();
+                let mut first = true;
+                for lit in vec {
+                    if first {
+                        write!(str, "{}", lit.format(st, sym_version)).unwrap();
+                        first = false;
+                    } else {
+                        write!(str, ",{}", lit.format(st, sym_version)).unwrap();
+                    }
+                }
+                format!("and({})", str)
+            }
+            Constraint::Or(vec) => {
+                let mut str = "".to_string();
+                let mut first = true;
+                for lit in vec {
+                    if first {
+                        write!(str, "{}", lit.format(st, sym_version)).unwrap();
+                        first = false;
+                    } else {
+                        write!(str, ",{}", lit.format(st, sym_version)).unwrap();
+                    }
+                }
+                format!("or({})", str)
+            }
         }
     }
 }
 
-impl FormatWithParent for Constraint {
-    fn format_with_parent(&mut self, st: &RefSymTable) {
+impl FlatBindings for Constraint {
+    fn flat_bindings(&mut self, st: &RefSymTable) {
         match self {
             Constraint::Leq(l1, l2)
             | Constraint::Eq(l1, l2)
             | Constraint::Lt(l1, l2)
-            | Constraint::And(l1, l2)
-            | Constraint::Or(l1, l2)
             | Constraint::Type(l1, l2)
             | Constraint::Neq(l1, l2)
             | Constraint::Arbitrary(l1, l2) => {
-                l1.format_with_parent(st);
-                l2.format_with_parent(st);
+                l1.flat_bindings(st);
+                l2.flat_bindings(st);
             }
-            Constraint::Not(a) | Constraint::Await(a) => a.format_with_parent(st),
+            Constraint::Not(a) | Constraint::Await(a) => a.flat_bindings(st),
+
+            Constraint::And(a) | Constraint::Or(a) | Constraint::Min(a) | Constraint::Max(a) => {
+                a.flat_bindings(st);
+            }
         }
     }
 }
@@ -198,8 +264,11 @@ pub fn meet(a: &Interval, b: &Interval) -> Constraint {
 
 pub fn overlap(a: &Interval, b: &Interval) -> Constraint {
     Constraint::Or(
-        Constraint::Leq(a.get_start().into(), b.get_end().into()).into(),
-        Constraint::Leq(b.get_start().into(), a.get_end().into()).into(),
+        vec![
+            Lit::from(Constraint::Leq(a.get_start().into(), b.get_end().into())),
+            Lit::from(Constraint::Leq(b.get_start().into(), a.get_end().into())),
+        ]
+        .into(),
     )
 }
 
@@ -209,8 +278,11 @@ pub fn start(a: &Interval, b: &Interval) -> Constraint {
 
 pub fn during(a: &Interval, b: &Interval) -> Constraint {
     Constraint::And(
-        Constraint::Leq(b.get_start().into(), a.get_start().into()).into(),
-        Constraint::Leq(a.get_end().into(), b.get_end().into()).into(),
+        vec![
+            Lit::from(Constraint::Leq(a.get_start().into(), b.get_end().into())),
+            Lit::from(Constraint::Leq(b.get_start().into(), a.get_end().into())),
+        ]
+        .into(),
     )
 }
 
@@ -220,7 +292,33 @@ pub fn finish(a: &Interval, b: &Interval) -> Constraint {
 
 pub fn equal(a: &Interval, b: &Interval) -> Constraint {
     Constraint::And(
-        Constraint::Eq(a.get_start().into(), b.get_start().into()).into(),
-        Constraint::Eq(a.get_end().into(), b.get_end().into()).into(),
+        vec![
+            Lit::from(Constraint::Leq(a.get_start().into(), b.get_end().into())),
+            Lit::from(Constraint::Leq(b.get_start().into(), a.get_end().into())),
+        ]
+        .into(),
     )
+}
+
+impl Replace for Constraint {
+    fn replace(&mut self, old: &AtomId, new: &AtomId) {
+        match self {
+            Constraint::Leq(l1, l2)
+            | Constraint::Eq(l1, l2)
+            | Constraint::Neq(l1, l2)
+            | Constraint::Lt(l1, l2)
+            | Constraint::Type(l1, l2)
+            | Constraint::Arbitrary(l1, l2) => {
+                l1.replace(old, new);
+                l2.replace(old, new);
+            }
+            Constraint::And(vec)
+            | Constraint::Or(vec)
+            | Constraint::Max(vec)
+            | Constraint::Min(vec) => {
+                vec.replace(old, new);
+            }
+            Constraint::Not(l) | Constraint::Await(l) => l.replace(old, new),
+        }
+    }
 }

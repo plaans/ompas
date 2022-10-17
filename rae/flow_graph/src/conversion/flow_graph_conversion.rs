@@ -1,9 +1,8 @@
-use crate::structs::chronicle::interval::Interval;
 use crate::structs::chronicle::lit::lvalue_to_lit;
+use crate::structs::chronicle::AtomId;
 use crate::structs::flow_graph::expression::{Block, Expression, IfBlock};
 use crate::structs::flow_graph::handle_table::Handle;
 use crate::structs::flow_graph::scope::Scope;
-use crate::structs::flow_graph::vertice::Vertice;
 use crate::{DefineTable, FlowGraph};
 use core::result::Result;
 use core::result::Result::{Err, Ok};
@@ -77,20 +76,35 @@ fn convert_list(
     define_table: &mut DefineTable,
 ) -> Result<Scope, LRuntimeError> {
     let proc = &list[0];
+    let end_scope;
+    let mut out_of_scope: Vec<AtomId> = vec![];
 
-    match proc {
-        LValue::Symbol(_) => convert_apply(list.as_slice(), fl, define_table),
+    let r = match proc {
+        LValue::Symbol(_) => {
+            let (s, e, r) = convert_apply(list.as_slice(), fl, define_table)?;
+            end_scope = e;
+            out_of_scope = r;
+            Ok(s)
+        }
         LValue::CoreOperator(co) => match co {
             LCoreOperator::Define => {
                 let var = &list[1];
                 let val = &list[2];
-                let mut scope = convert_into_flow_graph(val, fl, define_table)?;
-                define_table.insert(var.to_string(), *fl.get_result(scope.get_end()));
+                let mut scope_val = convert_into_flow_graph(val, fl, define_table)?;
+                let val = *fl.get_scope_result(&scope_val);
+
+                let vertice_var = fl.new_instantaneous_vertice(Expression::cst(val));
+                define_table.insert(var.to_string(), *fl.get_result(&vertice_var));
+                fl.set_parent(&vertice_var, scope_val.get_end());
+
                 let id = fl.sym_table.new_bool(false);
                 let r = fl.new_instantaneous_vertice(Expression::cst(id));
-                fl.set_parent(&r, scope.get_end());
-                scope.set_end(r);
-                Ok(scope)
+                fl.set_parent(&r, &vertice_var);
+                scope_val.set_end(r);
+
+                end_scope = *fl.get_scope_interval(&scope_val).get_end();
+                out_of_scope.push(val);
+                Ok(scope_val)
             }
             LCoreOperator::If => {
                 let define_table = &mut define_table.clone();
@@ -122,11 +136,14 @@ fn convert_list(
                 fl.set_parent(&if_id, cond.get_end());
                 let mut scope = cond;
                 scope.end = if_id;
+                end_scope = *fl.get_scope_interval(&scope).get_end();
                 Ok(scope)
             }
             LCoreOperator::Quote => {
                 let lit = lvalue_to_lit(&list[1], &mut fl.sym_table)?;
-                Ok(fl.new_instantaneous_vertice(Expression::cst(lit)).into())
+                let vertice = fl.new_instantaneous_vertice(Expression::cst(lit));
+                end_scope = *fl.get_interval(&vertice).get_end();
+                Ok(vertice.into())
             }
             LCoreOperator::Begin => {
                 let mut define_table = define_table.clone();
@@ -144,10 +161,8 @@ fn convert_list(
                         scope.end = e_scope.end;
                     }
                 }
-                let end = *fl.get_scope_interval(&scope).get_end();
-                for r in results {
-                    fl.sym_table.set_end(&r, &end);
-                }
+                end_scope = *fl.get_scope_interval(&scope).get_end();
+                out_of_scope.append(&mut results);
                 Ok(scope)
             }
             LCoreOperator::Async => {
@@ -167,12 +182,16 @@ fn convert_list(
 
                 fl.handles.insert(&handle_id, handle);
 
+                end_scope = *fl.get_interval(&vertice).get_end();
+
                 Ok(vertice.into())
             }
             LCoreOperator::Await => {
                 let define_table = &mut define_table.clone();
                 let mut h = convert_into_flow_graph(&list[1], fl, define_table)?;
                 let a = fl.new_vertice(Expression::Await(*fl.get_scope_result(&h)));
+                out_of_scope.push(*fl.get_scope_result(&h));
+                end_scope = *fl.get_interval(&a).get_end();
 
                 fl.set_parent(&a, h.get_end());
                 h.end = a;
@@ -184,14 +203,24 @@ fn convert_list(
             co => panic!("Conversion of {} not supported.", co),
         },
         _ => panic!(""),
+    };
+
+    out_of_scope.append(&mut define_table.inner().values().map(|a| *a).collect());
+
+    for o in &out_of_scope {
+        fl.sym_table.set_end(o, &end_scope);
     }
+    r
 }
 
 fn convert_apply(
     expr: &[LValue],
     fl: &mut FlowGraph,
     define_table: &mut DefineTable,
-) -> Result<Scope, LRuntimeError> {
+) -> Result<(Scope, AtomId, Vec<AtomId>), LRuntimeError> {
+    let mut out_of_scope = vec![];
+    let end_scope;
+
     let mut define_table = define_table.clone();
 
     let proc_symbol: String = expr[0].borrow().try_into()?;
@@ -214,6 +243,7 @@ fn convert_apply(
     }
 
     let mut results = args_result.clone();
+    out_of_scope.append(&mut results.clone());
 
     let scope = match proc_symbol.as_str() {
         RAE_EXEC_COMMAND | RAE_EXEC_TASK => {
@@ -245,6 +275,7 @@ fn convert_apply(
 
             let id = fl.new_instantaneous_vertice(Expression::apply(vec));
             fl.set_parent(&id, arg_scope.get_end());
+            out_of_scope.push(*fl.get_scope_result(&proc_scope));
 
             let scope = Scope {
                 start: proc_scope.start,
@@ -255,11 +286,7 @@ fn convert_apply(
         }
     };
 
-    let end = *fl.get_scope_interval(&scope).get_end();
+    end_scope = *fl.get_scope_interval(&scope).get_end();
 
-    for r in results {
-        fl.sym_table.set_end(&r, &end);
-    }
-
-    Ok(scope)
+    Ok((scope, end_scope, out_of_scope))
 }

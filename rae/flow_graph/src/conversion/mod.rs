@@ -1,5 +1,4 @@
 use crate::conversion::chronicle_conversion::convert_into_chronicle;
-use crate::conversion::chronicle_post_processing::post_processing;
 use crate::conversion::flow_graph_conversion::convert_into_flow_graph;
 use crate::conversion::lvalue_pre_processing::pre_processing;
 use crate::structs::chronicle::chronicle::ChronicleTemplate;
@@ -23,6 +22,6 @@ pub async fn convert(lv: &LValue, env: &LEnv) -> Result<ChronicleTemplate, LRunt
     let scope = convert_into_flow_graph(&lv, &mut graph, &mut Default::default())?;
     graph.scope = scope;
 
-    let mut ch = convert_into_chronicle(&graph, graph.scope);
+    let ch = convert_into_chronicle(&graph, graph.scope);
     ch
 }

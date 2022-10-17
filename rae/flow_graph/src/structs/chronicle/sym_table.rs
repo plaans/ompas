@@ -98,7 +98,7 @@ impl RefSymTable {
     }
 
     pub fn id(&self, atom: &str) -> Option<AtomId> {
-        RefCell::borrow(&self.0).id(atom).cloned()
+        RefCell::borrow(&self.0).id(atom)
     }
 
     pub fn get_symbols_of_type(&self, _symbol_type: &AtomType) -> HashSet<AtomId> {
@@ -128,7 +128,7 @@ impl RefSymTable {
         RefCell::borrow_mut(&self.0).new_timepoint()
     }
 
-    pub fn new_if(&mut self) -> AtomId {
+    pub fn new_if(&mut self) -> (AtomId, AtomId, AtomId) {
         RefCell::borrow_mut(&self.0).new_if()
     }
 
@@ -201,7 +201,8 @@ impl RefSymTable {
                 "{}: {}\n",
                 atom.format(&self, false),
                 interval.format(&self, false)
-            );
+            )
+            .unwrap();
         }
         str
     }
@@ -210,10 +211,83 @@ impl RefSymTable {
 #[derive(Clone)]
 struct SymTable {
     symbols: Forest<Atom>,
-    ids: im::HashMap<String, AtomId>,
+    ids: SymbolTableId,
     types: SymbolTypes,
     meta_data: SymTableMetaData,
     scopes: im::HashMap<AtomId, Interval>,
+}
+
+#[derive(Clone, Default)]
+pub struct SymbolTableId {
+    inner: HashMap<String, Id>,
+}
+
+pub type Version = usize;
+
+impl SymbolTableId {
+    pub fn insert(&mut self, symbol: &str, id: &AtomId) -> Version {
+        match self.inner.get_mut(symbol) {
+            None => {
+                self.inner.insert(symbol.to_string(), Id::unique(id));
+                0
+            }
+            Some(s) => match s {
+                Id::Unique(o_id) => {
+                    *s = Id::Several(vec![*o_id, *id]);
+                    1
+                }
+                Id::Several(ids) => {
+                    ids.push(*id);
+                    ids.len() - 1
+                }
+            },
+        }
+    }
+
+    pub fn version(&mut self, symbol: &str) -> Version {
+        match self.inner.get(symbol) {
+            None => 0,
+            Some(id) => id.n_version(),
+        }
+    }
+
+    pub fn get_id(&self, symbol: &str) -> Option<AtomId> {
+        self.inner.get(symbol).map(|id| *id.get_id())
+    }
+
+    pub fn contains(&self, symbol: &str) -> bool {
+        self.inner.contains_key(symbol)
+    }
+}
+
+#[derive(Clone)]
+pub enum Id {
+    Unique(AtomId),
+    Several(Vec<AtomId>),
+}
+
+impl Id {
+    pub fn unique(id: &AtomId) -> Self {
+        Self::Unique(*id)
+    }
+
+    pub fn several(id: &AtomId) -> Self {
+        Self::Several(vec![*id])
+    }
+
+    pub fn get_id(&self) -> &AtomId {
+        match self {
+            Id::Unique(id) => id,
+            Id::Several(vec) => vec.last().unwrap(),
+        }
+    }
+
+    pub fn n_version(&self) -> Version {
+        match self {
+            Id::Unique(_) => 1,
+            Id::Several(vec) => vec.len(),
+        }
+    }
 }
 
 impl SymTable {
@@ -290,7 +364,7 @@ impl SymTable {
             }
 
             let id = self.symbols.new_node(element.into());
-            self.ids.insert(element.into(), id);
+            self.ids.insert(element.into(), &id);
             self.types.add_new_atom(&id, t);
         }
         Ok(())
@@ -331,7 +405,7 @@ impl SymTable {
     pub fn new_type(&mut self, sym: impl Display, a_type: Option<TypeId>) -> TypeId {
         let sym = sym.to_string();
         let id = self.symbols.new_node(sym.as_str().into());
-        self.ids.insert(sym.as_str().into(), id);
+        self.ids.insert(sym.as_str().into(), &id);
         let atom_type = match a_type {
             None => AtomType::RootType,
             Some(t) => AtomType::SubType(t),
@@ -348,7 +422,7 @@ impl SymTable {
         let atom = Atom::Variable(Variable::Result(index));
         let sym = atom.to_string();
         let id = self.symbols.new_node(atom);
-        self.ids.insert(sym, id);
+        self.ids.insert(&sym, &id);
         self.types.add_new_atom(&id, AtomType::Untyped);
         id
     }
@@ -358,28 +432,40 @@ impl SymTable {
         let atom = Atom::Variable(Variable::Timepoint(index));
         let sym = atom.to_string();
         let id = self.symbols.new_node(atom);
-        self.ids.insert(sym, id);
+        self.ids.insert(&sym, &id);
         self.types.add_new_atom(&id, AtomType::Timepoint);
         id
     }
 
-    pub fn new_if(&mut self) -> AtomId {
+    pub fn new_if(&mut self) -> (AtomId, AtomId, AtomId) {
         let atom = Atom::Symbol(Symbol::SyntheticTask(SyntheticTask::If(
             self.meta_data.new_if_index(),
         )));
 
         let sym = atom.to_string();
-        let id = self.symbols.new_node(atom);
-        self.ids.insert(sym, id);
-        self.types.add_new_atom(&id, AtomType::Timepoint);
-        id
+        let id_if = self.symbols.new_node(atom);
+        self.ids.insert(&sym, &id_if);
+        self.types.add_new_atom(&id_if, AtomType::Task);
+
+        let atom_m_true = Atom::Symbol(Symbol::Constant(format!("m_{}_true", sym)));
+        let sym_m_true = atom_m_true.to_string();
+        let id_m_true = self.symbols.new_node(atom_m_true);
+        self.ids.insert(&sym_m_true, &id_m_true);
+        self.types.add_new_atom(&id_m_true, AtomType::Method);
+
+        let atom_m_false = Atom::Symbol(Symbol::Constant(format!("m_{}_false", sym)));
+        let sym_m_false = atom_m_false.to_string();
+        let id_m_false = self.symbols.new_node(atom_m_false);
+        self.ids.insert(&sym_m_false, &id_m_false);
+        self.types.add_new_atom(&id_m_false, AtomType::Method);
+        (id_if, id_m_true, id_m_false)
     }
 
     pub fn new_handle(&mut self) -> AtomId {
         let atom = Atom::Variable(Variable::Handle(self.meta_data.new_handle_index()));
         let sym = atom.to_string();
         let id = self.symbols.new_node(atom);
-        self.ids.insert(sym, id);
+        self.ids.insert(&sym, &id);
         self.types.add_new_atom(&id, AtomType::Handle);
         id
     }
@@ -388,7 +474,7 @@ impl SymTable {
         let atom = Atom::Variable(Variable::Start(self.meta_data.new_start_index()));
         let sym = atom.to_string();
         let id = self.symbols.new_node(atom);
-        self.ids.insert(sym, id);
+        self.ids.insert(&sym, &id);
         self.types.add_new_atom(&id, AtomType::Timepoint);
         id
     }
@@ -397,7 +483,7 @@ impl SymTable {
         let atom = Atom::Variable(Variable::End(self.meta_data.new_end_index()));
         let sym = atom.to_string();
         let id = self.symbols.new_node(atom);
-        self.ids.insert(sym, id);
+        self.ids.insert(&sym, &id);
         self.types.add_new_atom(&id, AtomType::Timepoint);
         id
     }
@@ -406,7 +492,7 @@ impl SymTable {
         let atom = Atom::Variable(Variable::Presence(self.meta_data.new_presence_index()));
         let sym = atom.to_string();
         let id = self.symbols.new_node(atom);
-        self.ids.insert(sym, id);
+        self.ids.insert(&sym, &id);
         self.types.add_new_atom(&id, AtomType::Presence);
         id
     }
@@ -417,7 +503,7 @@ impl SymTable {
         ));
         let sym = atom.to_string();
         let id = self.symbols.new_node(atom);
-        self.ids.insert(sym, id);
+        self.ids.insert(&sym, &id);
         self.types.add_new_atom(&id, AtomType::Untyped);
         id
     }
@@ -425,13 +511,13 @@ impl SymTable {
     pub fn new_symbol(&mut self, sym: impl Display, a_type: Option<AtomType>) -> AtomId {
         let sym = &sym.to_string();
         if self.it_exists(sym) {
-            *self.id(sym).unwrap()
+            self.id(sym).unwrap()
         } else {
             let sym: String = sym.into();
             let id = self
                 .symbols
-                .new_node(Atom::Symbol(Symbol::Literal(sym.clone())));
-            self.ids.insert(sym, id);
+                .new_node(Atom::Symbol(Symbol::Constant(sym.clone())));
+            self.ids.insert(&sym, &id);
             self.types
                 .add_new_atom(&id, a_type.unwrap_or(AtomType::Untyped));
             id
@@ -439,10 +525,11 @@ impl SymTable {
     }
 
     pub fn new_parameter(&mut self, symbol: impl ToString, var_type: AtomType) -> AtomId {
-        let atom = Atom::Variable(Variable::Parameter(symbol.to_string()));
-        let sym = atom.to_string();
+        let symbol = symbol.to_string();
+        let version = self.ids.version(&symbol);
+        let atom = Atom::Variable(Variable::Parameter(symbol.to_string(), version));
         let id = self.symbols.new_node(atom);
-        self.ids.insert(sym, id);
+        self.ids.insert(&symbol, &id);
         self.types.add_new_atom(&id, var_type);
         id
     }
@@ -465,18 +552,18 @@ impl SymTable {
         self.types.get_type_of(id)
     }
 
-    pub fn id(&self, atom: &str) -> Option<&AtomId> {
-        self.ids.get(atom)
+    pub fn id(&self, atom: &str) -> Option<AtomId> {
+        self.ids.get_id(atom)
     }
 
-    pub fn get_symbols_of_type(&self, _symbol_type: &AtomType) -> HashSet<AtomId> {
+    /*pub fn get_symbols_of_type(&self, _symbol_type: &AtomType) -> HashSet<AtomId> {
         todo!()
-    }
+    }*/
     /*
     BOOLEAN FUNCTION
      */
     pub fn it_exists(&self, sym: &str) -> bool {
-        self.ids.keys().any(|k| k == sym)
+        self.ids.contains(sym)
     }
 
     /*
@@ -519,10 +606,10 @@ impl Display for RefSymTable {
         let mut var_untyped = vec![];
         let st = RefCell::borrow(&Rc::borrow(&self.0));
 
-        for x in st.ids.values() {
-            if x == &st.get_parent(x) {
-                let t = self.get_type_of(x);
-                let constant = st.symbols.get_node(x).unwrap().get_value().is_constant();
+        for x in 0..st.symbols.len() {
+            if x == st.get_parent(&x) {
+                let t = self.get_type_of(&x);
+                let constant = st.symbols.get_node(&x).unwrap().get_value().is_constant();
                 match (t, constant) {
                     (AtomType::Untyped, true) => constant_untyped.push(x),
                     (AtomType::Untyped, false) => var_untyped.push(x),
@@ -532,16 +619,16 @@ impl Display for RefSymTable {
             }
         }
 
-        let mut c = |vec: Vec<&AtomId>, preambule: &str| {
+        let mut c = |vec: Vec<AtomId>, preambule: &str| {
             str.push_str(format!("\n## {}:\n", preambule).as_str());
             for e in vec {
-                assert_eq!(*e, self.get_parent(e));
+                assert_eq!(e, self.get_parent(&e));
                 str.push_str(
                     format!(
                         "- ({}){}({})\n",
                         e,
-                        self.get_atom(e, true).unwrap(),
-                        self.get_type_of(e).format(&self, true)
+                        self.get_atom(&e, true).unwrap(),
+                        self.get_type_of(&e).format(&self, true)
                     )
                     .as_str(),
                 );
@@ -567,7 +654,6 @@ pub struct SymTableMetaData {
     n_chronicle_result: usize,
     n_start: usize,
     n_end: usize,
-    n_prez: usize,
 }
 
 impl SymTableMetaData {

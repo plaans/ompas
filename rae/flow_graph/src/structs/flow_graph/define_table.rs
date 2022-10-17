@@ -13,4 +13,8 @@ impl DefineTable {
     pub fn get(&self, var: &str) -> Option<&AtomId> {
         self.inner.get(var)
     }
+
+    pub fn inner(&self) -> &im::HashMap<String, AtomId> {
+        &self.inner
+    }
 }

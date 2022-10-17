@@ -2,7 +2,7 @@ use crate::structs::chronicle::interval::Interval;
 use crate::structs::chronicle::lit::Lit;
 use crate::structs::chronicle::sym_table::RefSymTable;
 use crate::structs::chronicle::type_table::AtomType;
-use crate::structs::chronicle::{AtomId, FormatWithParent, FormatWithSymTable, GetVariables};
+use crate::structs::chronicle::{AtomId, FlatBindings, FormatWithSymTable, GetVariables, Replace};
 use im::HashSet;
 
 #[derive(Clone)]
@@ -21,10 +21,10 @@ impl FormatWithSymTable for SubTask {
     }
 }
 
-impl FormatWithParent for SubTask {
-    fn format_with_parent(&mut self, st: &RefSymTable) {
-        self.interval.format_with_parent(st);
-        self.lit.format_with_parent(st);
+impl FlatBindings for SubTask {
+    fn flat_bindings(&mut self, st: &RefSymTable) {
+        self.interval.flat_bindings(st);
+        self.lit.flat_bindings(st);
     }
 }
 
@@ -44,5 +44,12 @@ impl GetVariables for SubTask {
             .filter(|v| sym_table.get_type_of(v) == *atom_type)
             .cloned()
             .collect()
+    }
+}
+
+impl Replace for SubTask {
+    fn replace(&mut self, old: &AtomId, new: &AtomId) {
+        self.interval.replace(old, new);
+        self.lit.replace(old, new)
     }
 }

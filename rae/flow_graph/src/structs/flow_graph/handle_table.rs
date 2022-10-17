@@ -4,7 +4,7 @@ use im::HashMap;
 
 #[derive(Default, Clone)]
 pub struct HandleTable {
-    handle_bindings: HashMap<AtomId, Vec<AtomId>>,
+    //handle_bindings: HashMap<AtomId, Vec<AtomId>>,
     inner: HashMap<AtomId, Handle>,
 }
 
@@ -19,6 +19,10 @@ impl HandleTable {
 
     pub fn get(&self, id: &AtomId) -> Option<&Handle> {
         self.inner.get(id)
+    }
+
+    pub fn get_mut(&mut self, id: &AtomId) -> Option<&mut Handle> {
+        self.inner.get_mut(id)
     }
 }
 

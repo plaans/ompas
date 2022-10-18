@@ -174,6 +174,11 @@ pub fn convert_into_chronicle(
                         ));
                     }
 
+                    /*
+                    CREATE EXPRESSION FOR METHOD:
+                    - create a new parameter if the parameter is not present in the method,
+                    but needed by the other method of the synthetic task
+                     */
                     let mut modify_and_convert_branch =
                         |mut partial: PartialConversion,
                          method_params: HashMap<AtomId, AtomId>|

@@ -9,14 +9,12 @@ use crate::structs::chronicle::lit::Lit;
 use crate::structs::chronicle::subtask::SubTask;
 use crate::structs::chronicle::task_template::TaskTemplate;
 use crate::structs::chronicle::type_table::AtomType;
-use crate::structs::chronicle::FormatWithSymTable;
 use crate::structs::chronicle::{AtomId, GetVariables, Replace, COND};
 use crate::structs::flow_graph::expression::{Block, Expression};
 use crate::structs::flow_graph::handle_table::HandleTable;
 use crate::structs::flow_graph::scope::Scope;
 use crate::FlowGraph;
 use im::HashMap;
-use itertools::Itertools;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use std::collections::HashSet;
 
@@ -46,7 +44,7 @@ pub fn convert_into_chronicle(
 
     let mut queue = vec![scope.start];
 
-    let mut handles = graph.handles.clone();
+    let handles = graph.handles.clone();
 
     //Binds the start timepoint of the first expression with start timepoint of the chronicle
     ch.add_constraint(Constraint::eq(
@@ -117,101 +115,56 @@ pub fn convert_into_chronicle(
             Expression::Err(_) => {}
             Expression::Block(block) => match block {
                 Block::If(if_block) => {
-                    let mut true_params: HashMap<AtomId, AtomId> = Default::default();
-                    let mut false_params: HashMap<AtomId, AtomId> = Default::default();
                     let (t_if, m_true, m_false) = ch.sym_table.new_if();
-                    let cond_if = ch.sym_table.new_parameter(COND, AtomType::Bool);
 
-                    let mut partial_method_true =
-                        convert_into_chronicle(graph, if_block.true_branch)?;
-                    let method_true = &mut partial_method_true.chronicle;
-                    for v in &method_true.get_variables() {
-                        if let Some(interval) = ch.sym_table.get_scope(v) {
-                            //It means the variable has been created before the method, and shall be transformed into a parameter
-                            if interval.get_start()
-                                < graph.get_scope_interval(&if_block.true_branch).get_start()
-                            {
-                                let param = ch.sym_table.new_parameter(
-                                    ch.sym_table.get_atom(v, false).unwrap().to_string(),
-                                    ch.sym_table.get_type_of(v),
-                                );
-                                method_true.replace(v, &param);
-                                true_params.insert(*v, param);
+                    /*
+                    Partially converts the a branch of 'if', getting by the mean time the variables necessary in computation of the branch that have been defined previously.
+                    It also returns the symbol of cond, as it is necessary
+                     */
+                    let mut partially_convert_branch = |scope: &Scope,
+                                                        branch: bool,
+                                                        label: AtomId|
+                     -> Result<
+                        (PartialConversion, HashMap<AtomId, AtomId>),
+                        LRuntimeError,
+                    > {
+                        let mut branch_params: HashMap<AtomId, AtomId> = Default::default();
+                        let mut partial_method = convert_into_chronicle(graph, *scope)?;
+                        let method = &mut partial_method.chronicle;
+                        for v in &method.get_variables() {
+                            if let Some(interval) = ch.sym_table.get_scope(v) {
+                                //It means the variable has been created before the method, and shall be transformed into a parameter
+                                if interval.get_start()
+                                    < graph.get_scope_interval(scope).get_start()
+                                {
+                                    let param = ch.sym_table.new_parameter(
+                                        ch.sym_table.get_atom(v, false).unwrap().to_string(),
+                                        ch.sym_table.get_type_of(v),
+                                    );
+                                    method.replace(v, &param);
+                                    branch_params.insert(*v, param);
+                                }
                             }
                         }
-                    }
-                    let cond_true = ch.sym_table.new_parameter(COND, AtomType::Bool);
-                    method_true
-                        .add_constraint(Constraint::eq(cond_true, ch.sym_table.new_bool(true)));
+                        let cond = ch.sym_table.new_parameter(COND, AtomType::Bool);
+                        method.add_constraint(Constraint::eq(cond, ch.sym_table.new_bool(branch)));
+                        method.set_task(vec![t_if, cond]);
+                        method.set_name(vec![label, cond]);
+                        Ok((partial_method, branch_params))
+                    };
 
-                    let mut partial_method_false =
-                        convert_into_chronicle(graph, if_block.false_branch)?;
-                    let method_false = &mut partial_method_false.chronicle;
-                    for v in &method_false.get_variables() {
-                        if let Some(interval) = ch.sym_table.get_scope(v) {
-                            //It means the variable has been created before the method, and shall be transformed into a parameter
-                            if interval.get_start()
-                                < graph.get_scope_interval(&if_block.false_branch).get_start()
-                            {
-                                let param = ch.sym_table.new_parameter(
-                                    ch.sym_table.get_atom(v, false).unwrap().to_string(),
-                                    ch.sym_table.get_type_of(v),
-                                );
-                                method_false.replace(v, &param);
-                                false_params.insert(*v, param);
-                            }
-                        }
-                    }
-                    let cond_false = ch.sym_table.new_parameter(COND, AtomType::Bool);
-                    method_false
-                        .add_constraint(Constraint::eq(cond_false, ch.sym_table.new_bool(false)));
+                    let (partial_method_true, true_params) =
+                        partially_convert_branch(&if_block.true_branch, true, m_true)?;
+                    let (partial_method_false, false_params) =
+                        partially_convert_branch(&if_block.false_branch, true, m_false)?;
+
                     let true_params_id: HashSet<AtomId> = true_params.keys().cloned().collect();
                     let false_params_id: HashSet<AtomId> = false_params.keys().cloned().collect();
                     let mut task_params: HashSet<AtomId> =
                         true_params_id.union(&false_params_id).cloned().collect();
 
                     let mut task_params: Vec<AtomId> = task_params.drain().collect();
-                    let mut task_true = vec![t_if, cond_true];
-                    let mut m_true = vec![m_true, cond_true];
-                    for p in &task_params {
-                        let id = match true_params.get(p) {
-                            None => {
-                                let id = ch.sym_table.new_parameter(
-                                    ch.sym_table.get_atom(p, false).unwrap().to_string(),
-                                    ch.sym_table.get_type_of(p),
-                                );
-                                method_true.add_var(&id);
-                                id
-                            }
-                            Some(id) => *id,
-                        };
-                        task_true.push(id);
-                        m_true.push(id);
-                    }
-
-                    method_true.set_task(task_true);
-                    method_true.set_name(m_true);
-
-                    let mut task_false = vec![t_if, cond_false];
-                    let mut m_false = vec![m_false, cond_false];
-                    for p in &task_params {
-                        let id = match false_params.get(p) {
-                            None => {
-                                let id = ch.sym_table.new_parameter(
-                                    ch.sym_table.get_atom(p, false).unwrap().to_string(),
-                                    ch.sym_table.get_type_of(p),
-                                );
-                                method_false.add_var(&id);
-                                id
-                            }
-                            Some(id) => *id,
-                        };
-                        task_false.push(id);
-                        m_false.push(id);
-                    }
-
-                    method_false.set_task(task_false);
-                    method_false.set_name(m_false);
+                    let cond_if = ch.sym_table.new_parameter(COND, AtomType::Bool);
 
                     let mut task = vec![t_if, cond_if];
                     for p in &task_params {
@@ -221,16 +174,39 @@ pub fn convert_into_chronicle(
                         ));
                     }
 
-                    let method_true = post_processing(partial_method_true)?;
-                    let method_false = post_processing(partial_method_false)?;
+                    let mut modify_and_convert_branch =
+                        |mut partial: PartialConversion,
+                         method_params: HashMap<AtomId, AtomId>|
+                         -> Result<ChronicleTemplate, LRuntimeError> {
+                            let method = &mut partial.chronicle;
+                            for p in &task_params {
+                                let id = match method_params.get(p) {
+                                    None => {
+                                        let id = ch.sym_table.new_parameter(
+                                            ch.sym_table.get_atom(p, false).unwrap().to_string(),
+                                            ch.sym_table.get_type_of(p),
+                                        );
+                                        method.add_var(&id);
+                                        id
+                                    }
+                                    Some(id) => *id,
+                                };
+                                method.add_task_parameter(&id);
+                                method.add_method_parameter(&id);
+                            }
+
+                            post_processing(partial)
+                        };
+
+                    let method_true = modify_and_convert_branch(partial_method_true, true_params)?;
+                    let method_false =
+                        modify_and_convert_branch(partial_method_false, false_params)?;
 
                     let task = TaskTemplate {
                         name: task,
                         methods: vec![method_true, method_false],
                     };
                     ch.add_task_template(task);
-
-                    //let cond = ch.sym_table.new_parameter(COND, AtomType::Bool);
 
                     let mut task = vec![t_if, if_block.cond];
                     task.append(&mut task_params);
@@ -280,8 +256,8 @@ pub fn convert_into_chronicle(
     })
 }
 
-pub fn post_processing(mut partial: PartialConversion) -> Result<ChronicleTemplate, LRuntimeError> {
-    let (mut ch, mut awaits, mut handles) = (partial.chronicle, partial.awaits, partial.handles);
+pub fn post_processing(partial: PartialConversion) -> Result<ChronicleTemplate, LRuntimeError> {
+    let (mut ch, awaits, mut handles) = (partial.chronicle, partial.awaits, partial.handles);
 
     /*
     HANDLES

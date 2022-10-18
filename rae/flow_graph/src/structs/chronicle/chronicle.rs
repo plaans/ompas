@@ -155,6 +155,14 @@ impl ChronicleTemplate {
         &self.debug
     }
 
+    pub fn get_name(&self) -> &Vec<AtomId> {
+        &self.name
+    }
+
+    pub fn get_task(&self) -> &Vec<AtomId> {
+        &self.task
+    }
+
     /*
     REMOVERS
      */
@@ -234,6 +242,13 @@ impl ChronicleTemplate {
 
     pub fn add_task_template(&mut self, task: TaskTemplate) {
         self.syntactic_chronicles.push(task)
+    }
+
+    pub fn add_task_parameter(&mut self, param: &AtomId) {
+        self.task.push(*param)
+    }
+    pub fn add_method_parameter(&mut self, param: &AtomId) {
+        self.name.push(*param)
     }
 
     /*

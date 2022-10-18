@@ -1,7 +1,6 @@
 use crate::structs::chronicle::forest::NodeId;
 use crate::structs::chronicle::sym_table::RefSymTable;
 use crate::structs::chronicle::type_table::AtomType;
-use itertools::Itertools;
 use std::collections::HashSet;
 
 pub mod atom;

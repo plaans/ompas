@@ -25,14 +25,21 @@ pub struct Await {
     handle: AtomId,
 }
 
+pub struct PartialConversion {
+    chronicle: ChronicleTemplate,
+    awaits: Vec<Await>,
+    handles: HandleTable,
+}
+
 pub fn convert_method(graph: &FlowGraph, scope: Scope) -> Result<ChronicleTemplate, LRuntimeError> {
-    let (ch, awaits, handles) = convert_into_chronicle(graph, scope)?;
+    let partial = convert_into_chronicle(graph, scope)?;
+    post_processing(partial)
 }
 
 pub fn convert_into_chronicle(
     graph: &FlowGraph,
     scope: Scope,
-) -> Result<(ChronicleTemplate, Vec<Await>, HandleTable), LRuntimeError> {
+) -> Result<PartialConversion, LRuntimeError> {
     let mut awaits: Vec<Await> = vec![];
 
     let mut ch = ChronicleTemplate::new("template", ChronicleKind::Method, graph.sym_table.clone());
@@ -100,6 +107,7 @@ pub fn convert_into_chronicle(
                 let subtask = SubTask {
                     interval: vertice.interval,
                     lit: vec.into(),
+                    result: vertice.result,
                 };
 
                 ch.add_subtask(subtask);
@@ -114,7 +122,9 @@ pub fn convert_into_chronicle(
                     let (t_if, m_true, m_false) = ch.sym_table.new_if();
                     let cond_if = ch.sym_table.new_parameter(COND, AtomType::Bool);
 
-                    let mut method_true = convert_into_chronicle(graph, if_block.true_branch)?;
+                    let mut partial_method_true =
+                        convert_into_chronicle(graph, if_block.true_branch)?;
+                    let method_true = &mut partial_method_true.chronicle;
                     for v in &method_true.get_variables() {
                         if let Some(interval) = ch.sym_table.get_scope(v) {
                             //It means the variable has been created before the method, and shall be transformed into a parameter
@@ -134,7 +144,9 @@ pub fn convert_into_chronicle(
                     method_true
                         .add_constraint(Constraint::eq(cond_true, ch.sym_table.new_bool(true)));
 
-                    let mut method_false = convert_into_chronicle(graph, if_block.false_branch)?;
+                    let mut partial_method_false =
+                        convert_into_chronicle(graph, if_block.false_branch)?;
+                    let method_false = &mut partial_method_false.chronicle;
                     for v in &method_false.get_variables() {
                         if let Some(interval) = ch.sym_table.get_scope(v) {
                             //It means the variable has been created before the method, and shall be transformed into a parameter
@@ -153,28 +165,12 @@ pub fn convert_into_chronicle(
                     let cond_false = ch.sym_table.new_parameter(COND, AtomType::Bool);
                     method_false
                         .add_constraint(Constraint::eq(cond_false, ch.sym_table.new_bool(false)));
-
                     let true_params_id: HashSet<AtomId> = true_params.keys().cloned().collect();
-                    /*println!(
-                        "true params: {}",
-                        true_params_id.format(&ch.sym_table, false)
-                    );*/
                     let false_params_id: HashSet<AtomId> = false_params.keys().cloned().collect();
-                    /*println!(
-                        "false params: {}",
-                        false_params_id.format(&ch.sym_table, false)
-                    );*/
-
                     let mut task_params: HashSet<AtomId> =
                         true_params_id.union(&false_params_id).cloned().collect();
 
                     let mut task_params: Vec<AtomId> = task_params.drain().collect();
-                    //println!("task params: {}", task_params.format(&ch.sym_table, false));
-                    /*for var in &vars_task {
-                        method_true.add_var(var);
-                        method_false.add_var(var)
-                    }*/
-
                     let mut task_true = vec![t_if, cond_true];
                     let mut m_true = vec![m_true, cond_true];
                     for p in &task_params {
@@ -225,19 +221,23 @@ pub fn convert_into_chronicle(
                         ));
                     }
 
+                    let method_true = post_processing(partial_method_true)?;
+                    let method_false = post_processing(partial_method_false)?;
+
                     let task = TaskTemplate {
                         name: task,
                         methods: vec![method_true, method_false],
                     };
                     ch.add_task_template(task);
 
-                    let cond = ch.sym_table.new_parameter(COND, AtomType::Bool);
+                    //let cond = ch.sym_table.new_parameter(COND, AtomType::Bool);
 
-                    let mut task = vec![t_if, cond];
+                    let mut task = vec![t_if, if_block.cond];
                     task.append(&mut task_params);
                     ch.add_subtask(SubTask {
                         interval: vertice.interval,
                         lit: task.into(),
+                        result: vertice.result,
                     })
                 }
             },
@@ -269,37 +269,30 @@ pub fn convert_into_chronicle(
         }
     }
 
+    ch.debug.flow_graph = graph.clone();
+
+    //post_processing(&mut ch)?;
+
+    Ok(PartialConversion {
+        chronicle: ch,
+        awaits,
+        handles,
+    })
+}
+
+pub fn post_processing(mut partial: PartialConversion) -> Result<ChronicleTemplate, LRuntimeError> {
+    let (mut ch, mut awaits, mut handles) = (partial.chronicle, partial.awaits, partial.handles);
+
     /*
     HANDLES
      */
 
-    /*
-    POST PROCESSING
-     */
-    // unify_equal(&mut ch);
+    unify_equal(&mut ch);
 
     /*
      * GET END OF SCOPE FOR VARIABLES CONTAINING HANDLES
      */
 
-    //simplify_timepoints(&mut ch)?;
-    //rm_useless_var(&mut ch);
-    /*println!(
-        "before merge conditions: {}",
-        c.format_with_sym_table(&ch.sym_table, true)
-    );*/
-    //merge_conditions(c, context, ch)?;
-    //simplify_constraints(c, context, ch)?;
-    //c.format_with_parent(&ch.get_mut_sym_table());
-
-    ch.debug.flow_graph = graph.clone();
-
-    //post_processing(&mut ch)?;
-
-    Ok((ch, awaits, handles))
-}
-
-pub fn post_processing(ch: &mut ChronicleTemplate, awaits: Vec<Await>, mut handles: HandleTable) {
     for v in &ch.variables {
         let p = ch.sym_table.get_parent(v);
         if ch.sym_table.get_type_of(&p) == AtomType::Handle {
@@ -316,7 +309,12 @@ pub fn post_processing(ch: &mut ChronicleTemplate, awaits: Vec<Await>, mut handl
             let handle = handles.get(&handle).unwrap();
             ch.add_constraint(Constraint::eq(a.result, handle.result));
             let start = ch.sym_table.get_start(&a.result).unwrap();
-            let end_async = graph.get(handle.scope.get_end()).unwrap().get_end();
+            let end_async = ch
+                .debug
+                .flow_graph
+                .get(handle.scope.get_end())
+                .unwrap()
+                .get_end();
             ch.add_constraint(Constraint::leq(end_async, start));
         } else {
             Err(LRuntimeError::new(
@@ -328,7 +326,23 @@ pub fn post_processing(ch: &mut ChronicleTemplate, awaits: Vec<Await>, mut handl
 
     for (_, handle) in handles.inner() {
         let vec: Vec<Lit> = handle.ends.iter().map(|e| Lit::from(e)).collect();
-        let end_async = graph.get(handle.scope.get_end()).unwrap().get_end();
+        let end_async = ch
+            .debug
+            .flow_graph
+            .get(handle.scope.get_end())
+            .unwrap()
+            .get_end();
         ch.add_constraint(Constraint::leq(end_async, Constraint::Max(vec.into())));
     }
+
+    /*
+    POST PROCESSING
+     */
+
+    simplify_timepoints(&mut ch)?;
+    rm_useless_var(&mut ch);
+    //merge_conditions(c, context, ch)?;
+    //simplify_constraints(c, context, ch)?;
+
+    Ok(ch)
 }

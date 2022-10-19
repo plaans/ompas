@@ -70,9 +70,8 @@ Graph flow converter for SOMPAS code!\n
 
         let ch: ChronicleTemplate = convert(&lv, &env).await?;
 
-        println!("symbol types: {}", ch.sym_table.format_types());
-
-        println!("types forest: {}", ch.sym_table.format_types_forest());
+        //println!("symbol types: {}", ch.sym_table.format_types());
+        //println!("types forest: {}", ch.sym_table.format_types_forest());
         /*let lv = pre_processing(&lv, &env).await?;
 
         let mut graph = FlowGraph::default();

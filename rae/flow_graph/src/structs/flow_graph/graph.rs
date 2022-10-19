@@ -1,6 +1,6 @@
 use crate::structs::chronicle::interval::Interval;
 use crate::structs::chronicle::sym_table::RefSymTable;
-use crate::structs::chronicle::{AtomId, FormatWithSymTable};
+use crate::structs::chronicle::{AtomId, FlatBindings, FormatWithSymTable};
 use crate::structs::flow_graph::expression::{Block, Expression};
 use crate::structs::flow_graph::handle_table::HandleTable;
 use crate::structs::flow_graph::scope::Scope;
@@ -53,6 +53,33 @@ impl FlowGraph {
 
     pub fn get_interval(&self, id: &VerticeId) -> &Interval {
         self.vertices.get(*id).unwrap().get_interval()
+    }
+
+    pub fn remove(&mut self, id: &VerticeId, scope: &mut Scope) {
+        let child = self.get(id).unwrap().get_child().clone();
+        let parent = self.get(id).unwrap().get_parent().clone();
+        if scope.start == *id {
+            match child {
+                None => {}
+                Some(child) => {
+                    scope.start = child;
+                    self.get_mut(&child).unwrap().parent = None;
+                }
+            }
+        } else if scope.end == *id {
+            match parent {
+                None => {}
+                Some(parent) => {
+                    scope.end = parent;
+                    self.get_mut(&parent).unwrap().child = None;
+                }
+            }
+        } else {
+            self.set_parent(&child.unwrap(), &parent.unwrap())
+        }
+        let vertice = self.get_mut(id).unwrap();
+        vertice.child = None;
+        vertice.parent = None;
     }
 
     /*pub(crate) fn push(&mut self, mut vertice: Vertice) -> VerticeId {
@@ -113,6 +140,10 @@ impl FlowGraph {
 
     pub fn get(&self, id: &VerticeId) -> Option<&Vertice> {
         self.vertices.get(*id)
+    }
+
+    pub fn get_mut(&mut self, id: &VerticeId) -> Option<&mut Vertice> {
+        self.vertices.get_mut(*id)
     }
 
     pub fn set_parent(&mut self, vertice_id: &VerticeId, parent_id: &VerticeId) {
@@ -228,6 +259,16 @@ impl Default for FlowGraph {
             vertices: vec![],
             handles: Default::default(),
             scope: Default::default(),
+        }
+    }
+}
+
+impl FlatBindings for FlowGraph {
+    fn flat_bindings(&mut self, st: &RefSymTable) {
+        for v in &mut self.vertices {
+            v.result.flat_bindings(st);
+            v.computation.flat_bindings(st);
+            v.interval.flat_bindings(st);
         }
     }
 }

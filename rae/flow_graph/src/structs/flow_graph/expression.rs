@@ -1,11 +1,18 @@
 use crate::structs::chronicle::lit::Lit;
 use crate::structs::chronicle::sym_table::RefSymTable;
-use crate::structs::chronicle::{AtomId, FormatWithSymTable};
+use crate::structs::chronicle::{AtomId, FlatBindings, FormatWithSymTable};
 use crate::structs::flow_graph::scope::Scope;
 use std::fmt::Write;
 #[derive(Debug, Clone)]
 pub enum Block {
     If(IfBlock),
+}
+impl FlatBindings for Block {
+    fn flat_bindings(&mut self, st: &RefSymTable) {
+        match self {
+            Block::If(if_block) => if_block.flat_bindings(st),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -15,6 +22,14 @@ pub struct IfBlock {
     pub(crate) false_result: AtomId,
     pub(crate) true_branch: Scope,
     pub(crate) false_branch: Scope,
+}
+
+impl FlatBindings for IfBlock {
+    fn flat_bindings(&mut self, st: &RefSymTable) {
+        self.cond.flat_bindings(st);
+        self.true_result.flat_bindings(st);
+        self.false_result.flat_bindings(st);
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -143,5 +158,21 @@ impl FormatWithSymTable for Expression {
         }
         .unwrap();
         str
+    }
+}
+
+impl FlatBindings for Expression {
+    fn flat_bindings(&mut self, st: &RefSymTable) {
+        match self {
+            Expression::Block(b) => b.flat_bindings(st),
+            Expression::Err(e) => e.flat_bindings(st),
+            Expression::Exec(e)
+            | Expression::Apply(e)
+            | Expression::Write(e)
+            | Expression::Read(e) => e.flat_bindings(st),
+            Expression::Cst(a) => a.flat_bindings(st),
+            Expression::Handle(a) => a.flat_bindings(st),
+            Expression::Await(a) => a.flat_bindings(st),
+        }
     }
 }

@@ -1,5 +1,6 @@
 use crate::conversion::chronicle_conversion::{convert_into_chronicle, convert_method};
 use crate::conversion::flow_graph_conversion::convert_into_flow_graph;
+use crate::conversion::flow_graph_post_process::flow_graph_post_processing;
 use crate::conversion::lvalue_pre_processing::pre_processing;
 use crate::structs::chronicle::chronicle::ChronicleTemplate;
 use crate::FlowGraph;
@@ -10,6 +11,7 @@ use sompas_structs::lvalue::LValue;
 pub mod chronicle_conversion;
 pub mod chronicle_post_processing;
 pub mod flow_graph_conversion;
+pub mod flow_graph_post_process;
 pub mod lvalue_pre_processing;
 
 pub async fn convert(lv: &LValue, env: &LEnv) -> Result<ChronicleTemplate, LRuntimeError> {
@@ -21,6 +23,7 @@ pub async fn convert(lv: &LValue, env: &LEnv) -> Result<ChronicleTemplate, LRunt
 
     let scope = convert_into_flow_graph(&lv, &mut graph, &mut Default::default())?;
     graph.scope = scope;
+    flow_graph_post_processing(&mut graph);
 
     let ch = convert_method(&graph, graph.scope);
     ch

@@ -63,7 +63,11 @@ pub fn unify_equal(c: &mut ChronicleTemplate) {
 }
 
 /// Returns true if the constraint can be safely deleted
-fn bind_atoms(id_1: &AtomId, id_2: &AtomId, st: &mut RefSymTable) -> Result<bool, LRuntimeError> {
+pub fn bind_atoms(
+    id_1: &AtomId,
+    id_2: &AtomId,
+    st: &mut RefSymTable,
+) -> Result<bool, LRuntimeError> {
     let id_1 = st.get_parent(id_1);
     let id_2 = st.get_parent(id_2);
     let id_1 = &id_1;

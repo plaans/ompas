@@ -68,8 +68,11 @@ Graph flow converter for SOMPAS code!\n
             .await
             .unwrap_or_else(|r| panic!("{}", r.to_string()));
 
-        let ch = convert(&lv, &env).await?;
+        let ch: ChronicleTemplate = convert(&lv, &env).await?;
 
+        println!("symbol types: {}", ch.sym_table.format_types());
+
+        println!("types forest: {}", ch.sym_table.format_types_forest());
         /*let lv = pre_processing(&lv, &env).await?;
 
         let mut graph = FlowGraph::default();
@@ -130,12 +133,7 @@ fn output_markdown(
 ## Graph
 \n
 ![]({})
-
 \n
-## Scopes
-```
-{}
-```
 ## Chronicles
 ```
 {}
@@ -144,7 +142,6 @@ fn output_markdown(
         name,
         expression.format(0),
         graph_file_name,
-        ch.sym_table.format_scopes(),
         ch.to_string(),
     );
 

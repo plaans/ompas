@@ -285,31 +285,12 @@ impl ChronicleTemplate {
         s.push_str(format!("- name: {}\n", self.name.format(&st.borrow(), sym_version)).as_str());
         //task
         s.push_str(format!("- task: {}\n", self.task.format(&st.borrow(), sym_version)).as_str());
-        /*s.push_str(
-            format!(
-                "{}: {} {}\n",
-                self.presence.format(st, sym_version),
-                self.interval.format(st, sym_version),
-                self.result.format(st, sym_version)
-            )
-                .as_str(),
-        );*/
         s.push_str("-variable(s): {");
 
         let mut variables = self
             .variables
             .iter()
             .map(|id| {
-                /*format!(
-                    "({}){}({})",
-                    id,
-                    id.format_with_sym_table(st, sym_version),
-                    st.get_type_of(id)
-                        .unwrap()
-                        .a_type
-                        .format_with_sym_table(st, sym_version)
-                )*/
-
                 format!(
                     "{}({})",
                     id.format(&st, sym_version),

@@ -168,10 +168,12 @@ pub fn convert_into_chronicle(
 
                     let mut task = vec![t_if, cond_if];
                     for p in &task_params {
-                        task.push(ch.sym_table.new_parameter(
+                        let id = ch.sym_table.new_parameter(
                             ch.sym_table.get_atom(p, false).unwrap().to_string(),
                             ch.sym_table.get_type_of(p),
-                        ));
+                        );
+                        ch.sym_table.union_types(p, &id);
+                        task.push(id);
                     }
 
                     /*
@@ -196,10 +198,18 @@ pub fn convert_into_chronicle(
                                     }
                                     Some(id) => *id,
                                 };
+                                ch.sym_table.union_types(p, &id);
                                 method.add_task_parameter(&id);
                                 method.add_method_parameter(&id);
                             }
-
+                            //We enforce that the return types are the same
+                            let m_result = *method.get_result();
+                            ch.sym_table.union_types(&m_result, &vertice.result);
+                            /*println!(
+                                "union type(id)s {} and {}",
+                                ch.sym_table.get_type_id_of(&m_result),
+                                ch.sym_table.get_type_id_of(&vertice.result)
+                            );*/
                             post_processing(partial)
                         };
 
@@ -212,6 +222,7 @@ pub fn convert_into_chronicle(
                         methods: vec![method_true, method_false],
                     };
                     ch.add_task_template(task);
+                    ch.sym_table.set_type_of(&if_block.cond, &AtomType::Bool);
 
                     let mut task = vec![t_if, if_block.cond];
                     task.append(&mut task_params);

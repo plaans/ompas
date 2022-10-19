@@ -97,7 +97,7 @@ fn bind_atoms(id_1: &AtomId, id_2: &AtomId, st: &mut RefSymTable) -> Result<bool
         }
         (true, false) => {
             match &type_2 {
-                AtomType::Untyped => st.set_type_of(id_2, &type_1),
+                AtomType::Untyped => {} //st.set_type_of(id_2, &type_1),
                 t => {
                     if t != &type_1 {
                         return Err(Default::default());
@@ -114,7 +114,7 @@ fn bind_atoms(id_1: &AtomId, id_2: &AtomId, st: &mut RefSymTable) -> Result<bool
         }
         (false, true) => {
             match &type_1 {
-                AtomType::Untyped => st.set_type_of(id_1, &type_2),
+                AtomType::Untyped => {} //st.set_type_of(id_1, &type_2),
                 t => {
                     if t != &type_1 {
                         return Err(Default::default());
@@ -137,8 +137,8 @@ fn bind_atoms(id_1: &AtomId, id_2: &AtomId, st: &mut RefSymTable) -> Result<bool
                 (AtomType::Untyped, AtomType::Untyped) => {
                     //
                 }
-                (AtomType::Untyped, t) => st.set_type_of(id_1, &t),
-                (t, AtomType::Untyped) => st.set_type_of(id_2, &t),
+                (AtomType::Untyped, t) => {} // st.set_type_of(id_1, &t),
+                (t, AtomType::Untyped) => {} // st.set_type_of(id_2, &t),
                 (t1, t2) => {
                     if t1 != t2 {
                         return Err(Default::default());

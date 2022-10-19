@@ -8,6 +8,7 @@ use ompas_rae_language::*;
 use sompas_core::modules::get_scheme_primitives;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lruntimeerror;
+use sompas_structs::lruntimeerror::LRuntimeError;
 use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -161,10 +162,16 @@ impl RefSymTable {
     }
 
     /*
-    SETTERS
+    TYPES
      */
     pub fn set_type_of(&mut self, atom_id: &AtomId, atom_type: &AtomType) {
         RefCell::borrow_mut(&self.0).set_type_of(atom_id, atom_type)
+    }
+    pub fn union_types(&mut self, a: &AtomId, b: &AtomId) {
+        RefCell::borrow_mut(&self.0).union_types(a, b)
+    }
+    pub fn get_type_id_of(&self, atom_id: &AtomId) -> TypeId {
+        RefCell::borrow(&self.0).get_type_id_of(atom_id).clone()
     }
 
     /*
@@ -186,8 +193,15 @@ impl RefSymTable {
         RefCell::borrow_mut(&self.0).flat_bindings()
     }
 
-    pub fn format_forest(&self) -> String {
-        RefCell::borrow(&self.0).format_forest()
+    pub fn format_symbols_forest(&self) -> String {
+        RefCell::borrow(&self.0).format_symbols_forest()
+    }
+    pub fn format_types_forest(&self) -> String {
+        RefCell::borrow(&self.0).format_types_forest()
+    }
+
+    pub fn format_types(&self) -> String {
+        RefCell::borrow(&self.0).format_types()
     }
 
     pub fn format_scopes(&self) -> String {
@@ -208,7 +222,6 @@ impl RefSymTable {
     }
 }
 
-#[derive(Clone)]
 struct SymTable {
     symbols: Forest<Atom>,
     ids: SymbolTableId,
@@ -341,7 +354,7 @@ impl SymTable {
     }
 
     pub fn get_type_id(&self, symbol: impl ToString) -> Option<TypeId> {
-        self.types.get_type_id(symbol)
+        self.types.get_atom_id_of_type(symbol)
     }
 
     pub fn get_type_string(&self, id: &TypeId) -> Option<String> {
@@ -567,10 +580,18 @@ impl SymTable {
     }
 
     /*
-    SETTERS
+    TYPES
      */
     pub fn set_type_of(&mut self, atom_id: &AtomId, atom_type: &AtomType) {
-        *self.types.inner.get_mut(atom_id).unwrap() = *atom_type;
+        self.types.set_type_of(atom_id, atom_type)
+    }
+
+    pub fn union_types(&mut self, a: &AtomId, b: &AtomId) {
+        self.types.union_types(a, b).unwrap()
+    }
+
+    pub fn get_type_id_of(&self, atom_id: &AtomId) -> &TypeId {
+        self.types.get_type_id_of(atom_id)
     }
 
     /*
@@ -578,6 +599,7 @@ impl SymTable {
      */
     pub fn union_atom(&mut self, a: &AtomId, b: &AtomId) {
         self.symbols.union_ordered(a, b);
+        self.types.union_types(a, b);
     }
 
     pub fn find_parent(&mut self, a: &AtomId) -> AtomId {
@@ -589,11 +611,30 @@ impl SymTable {
     }
 
     pub fn flat_bindings(&mut self) {
-        self.symbols.flat_bindings()
+        self.symbols.flat_bindings();
+        self.types.flat_bindings();
     }
 
-    pub fn format_forest(&self) -> String {
+    pub fn format_symbols_forest(&self) -> String {
         self.symbols.to_string()
+    }
+    pub fn format_types_forest(&self) -> String {
+        self.types.inner.to_string()
+    }
+
+    pub fn format_types(&self) -> String {
+        let mut str = "".to_string();
+        for (a, t) in &self.types.map_symbol_type {
+            write!(
+                str,
+                "{}: {}({})\n",
+                self.symbols.get_value(&a).unwrap(),
+                self.types.inner.get_value(&t).unwrap(),
+                t
+            )
+            .unwrap();
+        }
+        str
     }
 }
 
@@ -731,29 +772,90 @@ impl Default for SymTable {
 
 #[derive(Default, Clone)]
 struct SymbolTypes {
-    inner: HashMap<AtomId, AtomType>,
+    inner: Forest<AtomType>,
+    map_symbol_type: std::collections::HashMap<AtomId, TypeId>,
     type_table: TypeTable,
 }
 
 impl SymbolTypes {
-    pub fn get_type_of(&self, atom_id: &AtomId) -> AtomType {
-        *self.inner.get(atom_id).unwrap()
+    pub fn get_type_of(&self, id: &AtomId) -> AtomType {
+        let id = self.map_symbol_type.get(id).unwrap();
+        //let id = self.inner.get_parent(id);
+        *self.inner.get_value(id).unwrap()
+    }
+
+    pub fn get_type_id_of(&self, id: &AtomId) -> &TypeId {
+        self.map_symbol_type.get(id).unwrap()
     }
 
     pub fn add_new_atom(&mut self, id: &AtomId, atom_type: AtomType) {
-        self.inner.insert(*id, atom_type);
+        let type_id = self.inner.new_node(atom_type);
+        self.map_symbol_type.insert(*id, type_id);
+        //self.inner.insert(*id, atom_type);
     }
 
-    pub fn add_type(&mut self, pat: impl ToString, type_id: TypeId) {
-        self.type_table.add_type(pat, type_id);
+    pub fn set_type_of(&mut self, atom_id: &AtomId, _type: &AtomType) {
+        let type_id = self.map_symbol_type.get(atom_id).unwrap();
+        self.inner.set_value(type_id, *_type);
     }
 
-    pub fn get_type(&self, type_id: &TypeId) -> Option<String> {
-        self.type_table.get_type(type_id).cloned()
+    pub fn add_type(&mut self, pat: impl ToString, id: AtomId) {
+        self.type_table.add_type(pat, id);
     }
 
-    pub fn get_type_id(&self, pat: impl ToString) -> Option<TypeId> {
+    pub fn get_type(&self, id: &AtomId) -> Option<String> {
+        self.type_table.get_type(id).cloned()
+    }
+
+    pub fn get_atom_id_of_type(&self, pat: impl ToString) -> Option<AtomId> {
         self.type_table.get_type_id(pat).cloned()
+    }
+
+    pub fn union_types(&mut self, a: &AtomId, b: &AtomId) -> Result<(), LRuntimeError> {
+        let a = self.map_symbol_type.get(a).unwrap();
+        let b = self.map_symbol_type.get(b).unwrap();
+        let t_a = self.inner.get_value(a).unwrap();
+        let t_b = self.inner.get_value(b).unwrap();
+        match (t_a, t_b) {
+            (AtomType::Untyped, _) => {
+                self.inner.union_ordered(b, a);
+            }
+            (_, AtomType::Untyped) => self.inner.union_ordered(a, b),
+            (t_a, t_b) => {
+                if t_a != t_b {
+                    return Err(Default::default());
+                } else {
+                    self.inner.union_ordered(a, b)
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn find_parent(&mut self, a: &AtomId) -> TypeId {
+        let a = self.map_symbol_type.get(a).unwrap();
+        *self.inner.find(a)
+    }
+
+    pub fn get_parent(&self, a: &AtomId) -> TypeId {
+        let a = self.map_symbol_type.get(a).unwrap();
+        *self.inner.get_parent(a)
+    }
+
+    pub fn flat_bindings(&mut self) {
+        self.inner.flat_bindings();
+        let keys: Vec<_> = self.map_symbol_type.keys().cloned().collect();
+        for key in &keys {
+            let t = self.map_symbol_type.get(key).unwrap();
+            self.map_symbol_type.insert(*key, *self.inner.get_parent(t));
+            let t = self.map_symbol_type.get(key).unwrap();
+            assert_eq!(t, self.inner.get_parent(t))
+        }
+    }
+
+    pub fn format_forest(&self) -> String {
+        self.inner.to_string()
     }
 }
 

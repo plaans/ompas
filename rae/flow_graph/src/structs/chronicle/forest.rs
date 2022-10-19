@@ -116,17 +116,17 @@ impl<T: Debug + Display + Default + Clone> Display for Forest<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut string = String::new();
 
-        let mut groups: HashMap<NodeId, VecDeque<Node<T>>> = Default::default();
+        let mut groups: HashMap<NodeId, VecDeque<(NodeId, Node<T>)>> = Default::default();
 
         for (node_id, node) in self.inner.iter().enumerate() {
             let parent_id = node.get_parent();
             if *parent_id != node_id.into() {
                 if let Some(vec) = groups.get_mut(parent_id) {
-                    vec.push_back(node.clone());
+                    vec.push_back((node_id, node.clone()));
                 } else {
                     groups.insert(*parent_id, {
                         let mut vec = VecDeque::new();
-                        vec.push_front(node.clone());
+                        vec.push_front((node_id, node.clone()));
                         vec
                     });
                 }
@@ -139,16 +139,16 @@ impl<T: Debug + Display + Default + Clone> Display for Forest<T> {
 
         for (root_id, tree) in groups {
             let mut format = "{".to_string();
-            for (i, element) in tree.iter().enumerate() {
+            for (i, (id, element)) in tree.iter().enumerate() {
                 if i != 0 {
                     format.push(',');
                 }
-                format.push_str(element.to_string().as_str())
+                format.push_str(format!("{}({})", element, id).as_str())
             }
 
             format.push('}');
 
-            string.push_str(format!("{}: {}\n", self.inner[root_id], format).as_str());
+            string.push_str(format!("{}({}): {}\n", self.inner[root_id], root_id, format).as_str());
         }
         write!(f, "{}", string)
     }
@@ -170,11 +170,13 @@ impl<T: Display + Default + Clone> Forest<T> {
         }
     }
 
+    /// x becomes the parent of y
     pub fn union_ordered(&mut self, x: &NodeId, y: &NodeId) {
         let x_root = *self.find(x);
         let y_root = *self.find(y);
         if x_root != y_root {
             self.set_parent(&y_root, &x_root);
+            self.set_rank(&x_root, self.get_rank(&x_root) + 1)
         }
     }
 
@@ -183,6 +185,7 @@ impl<T: Display + Default + Clone> Forest<T> {
             let parent = *self.get_parent(x);
             let parent = *self.find(&parent);
             self.set_parent(x, &parent);
+            self.set_rank(&parent, self.get_rank(&parent) + 1);
         }
         self.get_parent(x)
     }

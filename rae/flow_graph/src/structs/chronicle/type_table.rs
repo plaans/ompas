@@ -44,7 +44,7 @@ impl TypeTable {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum AtomType {
     RootType,
     Untyped,
@@ -66,12 +66,15 @@ pub enum AtomType {
     SubType(TypeId),
 }
 
+impl Default for AtomType {
+    fn default() -> Self {
+        Self::Untyped
+    }
+}
+
 impl FormatWithSymTable for AtomType {
     fn format(&self, st: &RefSymTable, sym_version: bool) -> String {
         match self {
-            /*PlanningAtomType::SubType(t) => {
-                format!("(subtype of {})", t.format(st, sym_version))
-            }*/
             AtomType::Custom(t) => t.format(st, sym_version),
             pat => pat.to_string(),
         }

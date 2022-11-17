@@ -17,3 +17,4 @@ pub mod lvalues;
 pub mod macros;
 pub mod module;
 pub mod purefonction;
+pub mod types;

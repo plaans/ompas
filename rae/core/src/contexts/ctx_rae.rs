@@ -1,6 +1,7 @@
+use ompas_rae_interface::platform::Platform;
+use ompas_rae_interface::platform::*;
 use ompas_rae_structs::agenda::Agenda;
 use ompas_rae_structs::monitor::MonitorCollection;
-use ompas_rae_structs::platform::Platform;
 use ompas_rae_structs::resource::ResourceCollection;
 use ompas_rae_structs::state::task_status::TaskStatus;
 use ompas_rae_structs::TaskId;

@@ -16,6 +16,7 @@ sompas-language= {path = "../scheme/language"}
 sompas-macros = {path = "../scheme/macros"}
 ompas-rae-core = {path = "../rae/core"}
 ompas-rae-structs = {path = "../rae/structs"}
+ompas-rae-interface = {path = "../rae/interface"}
 aries_planning = {path = "../aries/planning"}
 im = "15.0.0"
 structopt = { version = "0.3", default-features = false }
@@ -25,6 +26,9 @@ tokio = { version = "1.17.0", features = ["full", "time"] }
 byteorder = "1.4.3"
 async-trait = "0.1.51"
 macro_rules_attribute = "0.0.2"
+tonic = "0.8"
+tokio-stream = { default-features = false, version = "0.1" }
+
 
 [[bin]]
 name = "gobot-rae"

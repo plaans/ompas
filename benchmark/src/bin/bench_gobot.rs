@@ -1,5 +1,5 @@
-use ompas_gobotsim::rae_interface::GodotDomain;
-use ompas_gobotsim::rae_interface::PlatformGodot;
+use ompas_gobotsim::platform::GodotDomain;
+use ompas_gobotsim::platform::PlatformGobotSim;
 use ompas_rae_core::monitor::CtxRaeUser;
 use ompas_rae_structs::platform::Platform;
 use sompas_modules::advanced_math::CtxMath;
@@ -107,7 +107,10 @@ pub async fn lisp_interpreter(opt: Opt) {
     };
 
     let ctx_rae = CtxRaeUser::new(
-        Some(Platform::new(PlatformGodot::new(domain(&opt), !opt.view))),
+        Some(Platform::new(PlatformGobotSim::new(
+            domain(&opt),
+            !opt.view,
+        ))),
         Some(log.clone()),
         false,
     )

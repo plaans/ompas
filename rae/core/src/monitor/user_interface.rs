@@ -1,11 +1,12 @@
 use crate::monitor::{CtxRaeUser, MOD_RAE_USER, TOKIO_CHANNEL_SIZE};
 use crate::rae;
+use ompas_rae_interface::platform::PlatformDescriptor;
 use ompas_rae_language::*;
 use ompas_rae_language::{RAE_GET_AGENDA, RAE_GET_ENV, RAE_GET_STATE};
 use ompas_rae_structs::domain::RAEDomain;
-use ompas_rae_structs::job::{Job, JobType};
+use ompas_rae_structs::job::Job;
 use ompas_rae_structs::monitor::task_check_wait_for;
-use ompas_rae_structs::rae_options::RAEOptions;
+use ompas_rae_structs::rae_options::OMPASOptions;
 use ompas_rae_structs::select_mode::{Planner, SelectMode};
 use ompas_rae_structs::state::task_state::*;
 use ompas_rae_structs::state::task_status::TaskStatus;
@@ -235,19 +236,15 @@ pub async fn launch(env: &LEnv) -> &str {
     //let (tx_stop, rx_stop) = mpsc::channel(TOKIO_CHANNEL_SIZE);
     let (killer, killed) = broadcast::channel(TOKIO_CHANNEL_SIZE);
 
-    *ctx.interface.command_tx.write().await = Some(tx);
+    *ctx.interface.command_stream.write().await = Some(tx);
     //*ctx.interface.stop_tx.write().await = Some(tx_stop);
     *ctx.interface.killer.write().await = Some(killer.clone());
     let interface = ctx.interface.clone();
     let platform = ctx.platform.clone();
 
     if let Some(platform) = &platform {
-        platform
-            .get_ref()
-            .write()
-            .await
-            .init(interface.clone())
-            .await;
+        platform.start().await;
+        *platform.killer.write().await = Some(killer.clone())
     }
 
     let domain: RAEDomain = ctx.rae_domain.read().await.clone();
@@ -273,7 +270,7 @@ pub async fn launch(env: &LEnv) -> &str {
 
     for t in tasks_to_execute {
         ctx.interface
-            .command_tx
+            .command_stream
             .read()
             .await
             .as_ref()
@@ -312,7 +309,7 @@ pub async fn stop(env: &LEnv) {
         Some(killer) => {
             killer.send(true).expect("could not broadcast end signal");
             tokio::time::sleep(Duration::from_secs(1)).await; //hardcoded moment to wait for all process to be killed.
-            *ctx.interface.command_tx.write().await = None;
+            *ctx.interface.command_stream.write().await = None;
             *ctx.interface.killer.write().await = None;
             ctx.interface.state.clear().await;
             ctx.interface.agenda.clear().await;
@@ -337,7 +334,7 @@ pub async fn configure_platform(env: &LEnv, args: &[LValue]) -> LResult {
         string.push_str(format!("{} ", arg).as_str())
     }
 
-    let rae_options = RAEOptions::new_with_platform_config(Default::default(), Some(string));
+    let rae_options = OMPASOptions::new_with_platform_config(Default::default(), Some(string));
     ctx.set_options(rae_options).await;
     Ok(LValue::Nil)
 }
@@ -377,7 +374,7 @@ pub async fn trigger_task(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandler, 
 
     let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER).unwrap();
     let (tx, mut rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
-    let job = Job::new(tx, args.into(), JobType::Task);
+    let job = Job::new(tx, args.into());
 
     match ctx.interface.get_sender().await {
         None => Err(LRuntimeError::new(RAE_TRIGGER_TASK, "no sender to rae")),
@@ -401,7 +398,7 @@ pub async fn add_task_to_execute(env: &LEnv, args: &[LValue]) -> Result<(), LRun
 
     let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER)?;
     let (tx, _) = mpsc::channel(TOKIO_CHANNEL_SIZE);
-    let job = Job::new(tx, args.into(), JobType::Task);
+    let job = Job::new(tx, args.into());
 
     match ctx.interface.get_sender().await {
         None => {

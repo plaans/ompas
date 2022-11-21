@@ -1,29 +1,36 @@
 use crate::agenda::Agenda;
 use crate::monitor::MonitorCollection;
-use crate::platform::Log;
 use crate::rae_command::RAECommand;
 use crate::resource::ResourceCollection;
 use crate::state::world_state::WorldState;
 use sompas_utils::task_handler::EndSignal;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{broadcast, RwLock};
 
 #[derive(Default, Clone)]
-pub struct RAEInterface {
+pub struct OMPASInternalState {
     pub state: WorldState,
     pub resources: ResourceCollection,
     pub monitors: MonitorCollection,
     pub agenda: Agenda,
-    pub log: Log,
-    pub command_tx: Arc<RwLock<Option<Sender<RAECommand>>>>,
+    pub log: LogConfig,
+    pub command_stream: Arc<RwLock<Option<Sender<RAECommand>>>>,
     //pub stop_tx: Arc<RwLock<Option<Sender<EndSignal>>>>,
     pub killer: Arc<RwLock<Option<broadcast::Sender<EndSignal>>>>,
 }
 
-impl RAEInterface {
+#[derive(Default, Clone)]
+pub struct LogConfig {
+    pub path: PathBuf,
+    pub channel: Option<Sender<String>>,
+    pub display: bool,
+}
+
+impl OMPASInternalState {
     pub async fn get_sender(&self) -> Option<Sender<RAECommand>> {
-        self.command_tx.read().await.clone()
+        self.command_stream.read().await.clone()
     }
 
     /*pub async fn get_stop(&self) -> Option<Sender<EndSignal>> {

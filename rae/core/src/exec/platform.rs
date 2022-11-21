@@ -56,7 +56,7 @@ pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LAsyncHandler {
             RAEMode::Exec => {
                 match &ctx.platform_interface {
                     Some(platform) => {
-                        platform.exec_command(args, action_id).await?;
+                        platform.exec_command(args, action_id).await;
 
                         //println!("await on action (id={})", action_id);
                         info!("waiting on action {}", action_id);
@@ -93,7 +93,8 @@ pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LAsyncHandler {
                         };
                         tokio::select! {
                             _ = int_rx.recv() => {
-                                platform.cancel_command(&[action_id.into()]).await
+                                platform.cancel_command(action_id).await;
+                                Ok(LValue::Err(Default::default()))
                             }
                             r = f => {
                                 r
@@ -122,7 +123,8 @@ pub async fn launch_platform(env: &LEnv, args: &[LValue]) -> LResult {
     let ctx = env.get_context::<CtxRae>(CTX_RAE).unwrap();
 
     if let Some(platform) = &ctx.platform_interface {
-        platform.launch_platform(args).await
+        //platform(args).await
+        todo!()
     } else {
         Ok("No platform defined".into())
     }
@@ -135,7 +137,8 @@ pub async fn cancel_command(env: &LEnv, args: &[LValue]) -> LResult {
     match mode {
         RAEMode::Exec => {
             if let Some(platform) = &ctx.platform_interface {
-                platform.cancel_command(args).await
+                //platform.cancel_command(args).await;
+                todo!()
             } else {
                 Ok("cannot cancel command in internal platform (action is instantaneous)".into())
             }

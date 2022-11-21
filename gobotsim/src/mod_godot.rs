@@ -1,10 +1,10 @@
 #![allow(dead_code)]
-
+/*
 use crate::language::*;
-use crate::rae_interface::PlatformGodot;
+use crate::platform::PlatformGobotSim;
+use ompas_rae_interface::platform::PlatformDescriptor;
 use ompas_rae_structs::agenda::Agenda;
-use ompas_rae_structs::platform::RAEPlatform;
-use ompas_rae_structs::rae_interface::RAEInterface;
+use ompas_rae_structs::internal_state::OMPASInternalState;
 use ompas_rae_structs::state::world_state::*;
 use sompas_macros::*;
 use sompas_structs::contextcollection::Context;
@@ -25,33 +25,19 @@ LANGUAGE
 
 const MOD_GODOT: &str = "mod-godot";
 
-#[derive(Default, Clone)]
-pub struct SocketInfo {
-    pub addr: String,
-    pub port: usize,
-}
-
 pub struct CtxGodot {
     state: WorldState,
     agenda: Agenda,
-    platform: Arc<RwLock<PlatformGodot>>,
+    platform: Arc<RwLock<PlatformGobotSim>>,
 }
 
 impl Default for CtxGodot {
     fn default() -> Self {
-        let interface = RAEInterface::default();
-        let state = interface.state.clone();
-        let agenda = interface.agenda.clone();
-        let platform = Arc::new(RwLock::new(PlatformGodot {
-            socket_info: Default::default(),
-            headless: false,
-            sender_socket: None,
-            interface,
-            domain: PathBuf::from(
-                "/home/jeremy/CLionProjects/ompas/gobotsim/godot_domain/domain.lisp",
-            )
-            .into(),
-        }));
+        let platform = Arc::new(RwLock::new(PlatformGobotSim::new(
+            PathBuf::from("/home/jeremy/CLionProjects/ompas/gobotsim/godot_domain/domain.lisp")
+                .into(),
+            false,
+        )));
         Self {
             state,
             agenda,
@@ -233,11 +219,11 @@ Functions
 
 /// Launch the godot process the simulation and opens the com
 #[async_scheme_fn]
-async fn launch_godot(env: &LEnv, args: &[LValue]) -> LResult {
+async fn launch_godot(env: &LEnv) -> LResult {
     let env = env.clone();
     let ctx = env.get_context::<CtxGodot>(MOD_GODOT).unwrap();
     let mut platform = ctx.platform.write().await;
-    platform.launch_platform(args).await
+    platform.start().await
 }
 
 /// Opens the tcp communication to receive state and status update and send commands.
@@ -247,7 +233,6 @@ async fn open_com(env: &LEnv, args: &[LValue]) -> LResult {
     ctx.platform.write().await.open_com(args).await
 }
 
-pub const DEFAULT_PATH_PROJECT_GODOT: &str = "/home/jeremy/godot/simulation-factory-godot/simu";
 
 ///Launch godot
 #[async_scheme_fn]
@@ -312,3 +297,4 @@ async fn get_state(env: &LEnv, args: &[LValue]) -> LResult {
     let result = ctx.state.get_state(_type).await;
     Ok(result.into_map())
 }
+*/

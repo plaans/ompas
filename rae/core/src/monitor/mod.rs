@@ -11,10 +11,9 @@ use domain::*;
 use ompas_rae_language::*;
 use ompas_rae_planning::aries::structs::ConversionContext;
 use ompas_rae_structs::domain::RAEDomain;
+use ompas_rae_structs::internal_state::{LogConfig, OMPASInternalState};
 use ompas_rae_structs::job::Job;
-use ompas_rae_structs::platform::{Log, Platform};
-use ompas_rae_structs::rae_interface::RAEInterface;
-use ompas_rae_structs::rae_options::RAEOptions;
+use ompas_rae_structs::rae_options::OMPASOptions;
 use ompas_rae_structs::select_mode::SelectMode;
 use planning::*;
 use sompas_core::{eval_init, get_root_env};
@@ -23,7 +22,7 @@ use sompas_modules::io::{CtxIo, LogOutput};
 use sompas_modules::utils::CtxUtils;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::{Documentation, LHelp};
-use sompas_structs::lenv::ImportType::{WithPrefix, WithoutPrefix};
+use sompas_structs::lenv::ImportType::WithoutPrefix;
 use sompas_structs::lenv::{LEnv, LEnvSymbols};
 use sompas_structs::module::{InitLisp, IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
@@ -35,7 +34,7 @@ use user_interface::*;
 pub mod domain;
 pub mod planning;
 pub mod user_interface;
-
+use ompas_rae_interface::platform::{Domain, Platform, PlatformDescriptor};
 //LANGUAGE
 const MOD_RAE_USER: &str = "rae_user";
 const DOC_MOD_RAE: &str = "Module exposed to the user to configure and launch rae.";
@@ -52,8 +51,8 @@ const DOC_RAE_LAUNCH: &str = "Launch the main rae loop in an asynchronous task."
 pub const TOKIO_CHANNEL_SIZE: usize = 100;
 
 pub struct CtxRaeUser {
-    options: Arc<RwLock<RAEOptions>>,
-    interface: RAEInterface,
+    options: Arc<RwLock<OMPASOptions>>,
+    interface: OMPASInternalState,
     platform: Option<Platform>,
     rae_domain: Arc<RwLock<RAEDomain>>,
     platform_domain: InitLisp,
@@ -214,7 +213,7 @@ impl CtxRaeUser {
     }
 
     pub async fn new(
-        platform: Option<Platform>,
+        platform: impl PlatformDescriptor,
         working_dir: Option<PathBuf>,
         display_log: bool,
     ) -> Self {
@@ -234,12 +233,6 @@ impl CtxRaeUser {
             .into(),
         };
 
-        let domain: InitLisp = if let Some(platform) = &platform {
-            vec![platform.get_ref().read().await.domain().await].into()
-        } else {
-            Default::default()
-        };
-
         let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
         let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
 
@@ -251,22 +244,36 @@ impl CtxRaeUser {
             ompas_rae_log::init(log.clone()) //change with configurable display
                 .unwrap_or_else(|e| panic!("Error while initiating logger : {}", e));
 
+        let interface = OMPASInternalState {
+            state: Default::default(),
+            resources: Default::default(),
+            monitors: Default::default(),
+            agenda: Default::default(),
+            log: LogConfig {
+                path: log,
+                channel: Some(channel),
+                display: display_log,
+            },
+            killer: Arc::new(Default::default()),
+            command_stream: Arc::new(RwLock::new(None)),
+        };
+        let platform = Platform {
+            inner: Arc::new(RwLock::new(platform)),
+            state: interface.state.clone(),
+            agenda: interface.agenda.clone(),
+            command_stream: Arc::new(Default::default()),
+            killer: Arc::new(Default::default()),
+        };
+
+        let domain: InitLisp = match platform.domain().await {
+            Domain::String(s) => vec![s].into(),
+            Domain::File(f) => vec![fs::read_to_string(f).unwrap()].into(),
+        };
+
         Self {
             options: Arc::new(Default::default()),
-            interface: RAEInterface {
-                state: Default::default(),
-                resources: Default::default(),
-                monitors: Default::default(),
-                agenda: Default::default(),
-                log: Log {
-                    path: log,
-                    channel: Some(channel),
-                    display: display_log,
-                },
-                command_tx: Arc::new(RwLock::new(None)),
-                killer: Arc::new(Default::default()),
-            },
-            platform,
+            interface,
+            platform: Some(platform),
             rae_domain: Default::default(),
             platform_domain: domain,
             empty_env: Self::init_empty_env().await,
@@ -282,10 +289,7 @@ impl CtxRaeUser {
         let mut env = get_root_env().await;
 
         if let Some(platform) = &self.platform {
-            env.import_module(
-                platform.get_ref().read().await.context_platform(),
-                WithPrefix,
-            );
+            //env.import_module(platform.module().await.unwrap(), WithPrefix);
         }
 
         env.import_module(CtxUtils::default(), WithoutPrefix);
@@ -337,11 +341,11 @@ impl CtxRaeUser {
         self.interface.log.path = log;
     }
 
-    pub async fn get_options(&self) -> RAEOptions {
+    pub async fn get_options(&self) -> OMPASOptions {
         self.options.read().await.clone()
     }
 
-    pub async fn set_options(&self, options: RAEOptions) {
+    pub async fn set_options(&self, options: OMPASOptions) {
         *self.options.write().await = options;
     }
 
@@ -374,13 +378,13 @@ impl Default for CtxRaeUser {
     fn default() -> Self {
         Self {
             options: Default::default(),
-            interface: RAEInterface {
+            interface: OMPASInternalState {
                 state: Default::default(),
                 resources: Default::default(),
                 monitors: Default::default(),
                 agenda: Default::default(),
                 log: Default::default(),
-                command_tx: Arc::new(Default::default()),
+                command_stream: Arc::new(Default::default()),
                 killer: Arc::new(Default::default()),
             },
             platform: None,

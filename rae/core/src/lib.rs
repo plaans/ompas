@@ -1,13 +1,14 @@
 use crate::contexts::ctx_planning::CtxPlanning;
 use futures::FutureExt;
 use log::{error, info, warn};
+use ompas_rae_interface::platform::Platform;
+use ompas_rae_interface::platform::PlatformDescriptor;
 use ompas_rae_planning::aries::conversion::convert_domain_to_chronicle_hierarchy;
 use ompas_rae_planning::aries::structs::{ConversionCollection, ConversionContext};
 use ompas_rae_structs::domain::RAEDomain;
-use ompas_rae_structs::platform::Platform;
+use ompas_rae_structs::internal_state::OMPASInternalState;
 use ompas_rae_structs::rae_command::RAECommand;
-use ompas_rae_structs::rae_interface::RAEInterface;
-use ompas_rae_structs::rae_options::RAEOptions;
+use ompas_rae_structs::rae_options::OMPASOptions;
 use ompas_rae_structs::select_mode::{Planner, SelectMode};
 use sompas_core::{eval, eval_init};
 use sompas_structs::lasynchandler::LAsyncHandler;
@@ -30,15 +31,6 @@ pub mod monitor;
 
 pub type ReactiveTriggerId = usize;
 
-#[derive(Debug, Clone)]
-pub enum TaskType {
-    Task,
-    Event,
-}
-
-#[derive(Default, Debug, Clone)]
-pub struct RAEEvent {}
-
 pub const TOKIO_CHANNEL_SIZE: usize = 100;
 
 /// Main RAE Loop:
@@ -46,10 +38,10 @@ pub const TOKIO_CHANNEL_SIZE: usize = 100;
 pub async fn rae(
     platform: Option<Platform>,
     domain: RAEDomain,
-    interface: RAEInterface,
+    interface: OMPASInternalState,
     mut env: LEnv,
     mut command_rx: Receiver<RAECommand>,
-    options: &RAEOptions,
+    options: &OMPASOptions,
 ) {
     //Ubuntu::
     /*let lvalue: LValue = match options.get_platform_config() {
@@ -60,24 +52,10 @@ pub async fn rae(
         }
     };*/
 
-    match &platform {
+    /*match &platform {
         None => info!("No platform defined"),
-        Some(platform) => match options.get_platform_config() {
-            None => {
-                platform
-                    .launch_platform(&[])
-                    .await
-                    .expect("error launching platform");
-            }
-            Some(config) => {
-                info!("Platform config: {}", config);
-                platform
-                    .launch_platform(&[config.into()])
-                    .await
-                    .expect("error launching platform");
-            }
-        },
-    };
+        Some(platform) => platform.start().await,
+    }*/
 
     /*let result = eval(&lvalue, &mut env, None).await;
 
@@ -181,9 +159,9 @@ pub async fn rae(
                 }
             }
             _ = killed.recv() => {
-                if let Some(platform) = &platform {
-                    platform.stop_platform().await;
-                }
+                /*if let Some(platform) = &platform {
+                    platform.stop().await;
+                }*/
                 println!("rae killed");
 
                 for k in &mut killers {

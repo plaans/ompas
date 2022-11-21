@@ -16,3 +16,6 @@
 [submodule "ompas-resources"]
 	path = ompas-resources
 	url = https://github.com/Yirmandias/ompas-resources.git
+[submodule "craft-bots"]
+	path = craft-bots
+	url = https://github.com/Yirmandias/craft-bots.git

@@ -3,12 +3,12 @@ use core::option::Option;
 use core::option::Option::{None, Some};
 
 #[derive(Debug, Default, Clone)]
-pub struct RAEOptions {
+pub struct OMPASOptions {
     select_mode: SelectMode,
     platform_config: Option<String>,
 }
 
-impl RAEOptions {
+impl OMPASOptions {
     pub fn new(select_mode: SelectMode) -> Self {
         Self {
             select_mode,

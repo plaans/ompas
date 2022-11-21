@@ -5,26 +5,26 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 #[derive(Debug, Clone, Copy)]
-pub enum ActionStatus {
-    ActionPending,
-    ActionDenied,
-    ActionResponse(usize),
-    ActionFeedback(f64), //Progress of the action
-    ActionResult(bool),  //True the action is a success, false the action is a failure
-    ActionPreempt,
-    ActionCancel(bool), //True the action has been successfully stopped, false it was a failure to cancel
+pub enum CommandStatus {
+    Pending,
+    Accepted,
+    Rejected,
+    Progress(f64), //Progress of the action
+    Success,       //True the action is a success, false the action is a failure
+    Failure,
+    Cancelled(bool), //True the action has been successfully stopped, false it was a failure to cancel
 }
 
-impl Display for ActionStatus {
+impl Display for CommandStatus {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            ActionStatus::ActionPending => write!(f, "action pending"),
-            ActionStatus::ActionResponse(id) => write!(f, "action response: {}", id),
-            ActionStatus::ActionFeedback(fl) => write!(f, "action feedback: {}", fl),
-            ActionStatus::ActionResult(r) => write!(f, "action result: {}", r),
-            ActionStatus::ActionPreempt => write!(f, "action preempt"),
-            ActionStatus::ActionCancel(r) => write!(f, "action cancel {}", r),
-            ActionStatus::ActionDenied => write!(f, "action denied"),
+            CommandStatus::Accepted => write!(f, "accepted"),
+            CommandStatus::Progress(fl) => write!(f, "progress: {}", fl),
+            CommandStatus::Success => write!(f, "success"),
+            CommandStatus::Cancelled(r) => write!(f, "cancelled: {}", r),
+            CommandStatus::Rejected => write!(f, "rejected"),
+            CommandStatus::Failure => write!(f, "failure"),
+            CommandStatus::Pending => write!(f, "pending"),
         }
     }
 }
@@ -32,7 +32,7 @@ impl Display for ActionStatus {
 #[derive(Default, Debug, Clone)]
 pub struct ActionStatusSet {
     pub server_id_internal_id: Arc<RwLock<im::HashMap<usize, usize>>>,
-    pub status: Arc<RwLock<im::HashMap<usize, ActionStatus>>>,
+    pub status: Arc<RwLock<im::HashMap<usize, CommandStatus>>>,
     next_id: Arc<AtomicUsize>,
 }
 
@@ -50,11 +50,11 @@ impl ActionStatusSet {
         }
     }
 
-    pub async fn set_status(&mut self, internal_id: usize, status: ActionStatus) {
+    pub async fn set_status(&mut self, internal_id: usize, status: CommandStatus) {
         self.status.write().await.insert(internal_id, status);
     }
 
-    pub async fn set_status_from_server(&mut self, server_id: usize, status: ActionStatus) {
+    pub async fn set_status_from_server(&mut self, server_id: usize, status: CommandStatus) {
         let id = *self
             .server_id_internal_id
             .read()
@@ -64,11 +64,11 @@ impl ActionStatusSet {
         self.status.write().await.insert(id, status);
     }
 
-    pub async fn get_status(&self, internal_id: &usize) -> Option<ActionStatus> {
+    pub async fn get_status(&self, internal_id: &usize) -> Option<CommandStatus> {
         self.status.read().await.get(internal_id).cloned()
     }
 
-    pub async fn get_status_from_server(&self, server_id: usize) -> Option<ActionStatus> {
+    pub async fn get_status_from_server(&self, server_id: usize) -> Option<CommandStatus> {
         match self.server_id_internal_id.read().await.get(&server_id) {
             None => None,
             Some(id) => self.status.read().await.get(id).cloned(),
@@ -87,22 +87,16 @@ impl ActionStatusSet {
     }
 }
 
-impl From<ActionStatus> for TaskStatus {
-    fn from(_as: ActionStatus) -> Self {
-        match _as {
-            ActionStatus::ActionPending => TaskStatus::Pending,
-            ActionStatus::ActionResponse(_) => TaskStatus::Running,
-            ActionStatus::ActionFeedback(_) => TaskStatus::Running,
-            ActionStatus::ActionResult(b) => match b {
-                true => TaskStatus::Done,
-                false => TaskStatus::Failure,
-            },
-            ActionStatus::ActionPreempt => TaskStatus::Pending,
-            ActionStatus::ActionCancel(b) => match b {
-                true => TaskStatus::Done,
-                false => TaskStatus::Failure,
-            },
-            ActionStatus::ActionDenied => TaskStatus::Failure,
+impl From<CommandStatus> for TaskStatus {
+    fn from(cs: CommandStatus) -> Self {
+        match cs {
+            CommandStatus::Accepted => TaskStatus::Pending,
+            CommandStatus::Rejected => TaskStatus::Failure,
+            CommandStatus::Progress(_) => TaskStatus::Running,
+            CommandStatus::Success => TaskStatus::Done,
+            CommandStatus::Failure => TaskStatus::Failure,
+            CommandStatus::Cancelled(_) => TaskStatus::Failure,
+            CommandStatus::Pending => TaskStatus::Pending,
         }
     }
 }

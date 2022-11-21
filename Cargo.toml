@@ -17,9 +17,11 @@ members = [
     "rae/log",
     "rae/planning",
     "rae/structs",
+    "rae/flow_graph",
+    "rae/interface",
     "gobotsim",
     "benchmark",
-    "rae/flow_graph",
+
 ]
 
 exclude = ["aries"]

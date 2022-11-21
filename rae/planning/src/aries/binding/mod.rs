@@ -241,8 +241,8 @@ fn atom_from_lvalues(ctx: &Ctx, v: &LValueS) -> aAtom {
             FAtom::new(IAtom::from(f), FLOAT_SCALE).into()
         }
         LValueS::Bool(b) => match b {
-            true => aLit::TRUE.into(),
             false => aLit::FALSE.into(),
+            true => aLit::TRUE.into(),
         },
         LValueS::List(_) => panic!("cannot convert LValueS::List into atom: {}", v),
         LValueS::Map(_) => panic!("cannot convert LValueS::Map into atom: {}", v),

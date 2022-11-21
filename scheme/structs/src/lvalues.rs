@@ -184,6 +184,30 @@ impl From<LValueS> for LValue {
     }
 }
 
+impl From<i64> for LValueS {
+    fn from(i: i64) -> Self {
+        LValueS::Int(i)
+    }
+}
+
+impl From<f64> for LValueS {
+    fn from(f: f64) -> Self {
+        LValueS::Float(f)
+    }
+}
+
+impl From<bool> for LValueS {
+    fn from(b: bool) -> Self {
+        LValueS::Bool(b)
+    }
+}
+
+impl<T: Clone + Into<LValueS>> From<&Vec<T>> for LValueS {
+    fn from(vec: &Vec<T>) -> Self {
+        vec.clone().into()
+    }
+}
+
 impl From<String> for LValueS {
     fn from(s: String) -> Self {
         LValueS::Symbol(s)
@@ -237,9 +261,7 @@ impl Display for LValueS {
             LValueS::Symbol(s) => write!(f, "{}", s),
             LValueS::Int(i) => write!(f, "{}", *i),
             LValueS::Float(fl) => write!(f, "{}", fl),
-            LValueS::Bool(b) => {
-                write!(f, "{}", *b)
-            }
+            LValueS::Bool(b) => write!(f, "{}", b),
             LValueS::List(l) => {
                 let mut str = String::from("(");
                 for e in l.iter() {

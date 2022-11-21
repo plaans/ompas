@@ -1,7 +1,7 @@
-use ompas_gobotsim::mod_godot::CtxGodot;
-use ompas_gobotsim::rae_interface::{GodotDomain, PlatformGodot};
+//use ompas_gobotsim::mod_godot::CtxGodot;
+use ompas_gobotsim::platform::PlatformGobotSim;
 use ompas_rae_core::monitor::CtxRaeUser;
-use ompas_rae_structs::platform::Platform;
+use ompas_rae_interface::platform::{Domain, Platform};
 use sompas_core::activate_debug;
 use sompas_modules::advanced_math::CtxMath;
 use sompas_modules::io::CtxIo;
@@ -62,15 +62,15 @@ pub async fn lisp_interpreter(log: Option<PathBuf>, godot: bool, rae_log: bool) 
     li.import(ctx_string);
 
     if godot {
-        li.import_namespace(CtxGodot::default());
+        //li.import_namespace(CtxGodot::default());
     } else {
         let ctx_rae = CtxRaeUser::new(
-            Some(Platform::new(PlatformGodot::new(
-                GodotDomain::Path(
+            PlatformGobotSim::new(
+                Domain::File(
                     "/home/jeremy/CLionProjects/ompas/gobotsim/godot_domain/domain.lisp".into(),
                 ),
                 false,
-            ))),
+            ),
             log.clone(),
             rae_log,
         )

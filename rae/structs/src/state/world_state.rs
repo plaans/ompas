@@ -79,15 +79,15 @@ impl WorldState {
         self.instance.write().await.add_type(t, p);
     }
 
-    pub async fn add_instance(&self, i: String, t: String) {
-        self.instance.write().await.add_instance(i, t);
+    pub async fn add_instance(&self, instance: String, r#type: String) {
+        self.instance.write().await.add_instance(instance, r#type);
     }
 
-    pub async fn is_of_type(&self, i: String, t: String) -> LValue {
+    pub async fn instance(&self, i: String, t: String) -> LValue {
         self.instance.read().await.is_of_type(i, t).await.into()
     }
 
-    pub async fn get_instances(&self, t: String) -> LValue {
+    pub async fn instances(&self, t: String) -> LValue {
         self.instance.read().await.get_instances(t).await.into()
     }
 

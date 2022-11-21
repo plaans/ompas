@@ -126,7 +126,25 @@ pub struct CommandCancelled {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct InitGetUpdate {}
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct Event {}
+pub struct Event {
+    #[prost(oneof = "event::Event", tags = "1")]
+    pub event: ::core::option::Option<event::Event>,
+}
+/// Nested message and enum types in `Event`.
+pub mod event {
+    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    pub enum Event {
+        #[prost(message, tag = "1")]
+        Instance(super::Instance),
+    }
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct Instance {
+    #[prost(string, tag = "1")]
+    pub r#type: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub object: ::prost::alloc::string::String,
+}
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PlatformUpdate {
     #[prost(oneof = "platform_update::Update", tags = "1, 2")]

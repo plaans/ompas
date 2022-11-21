@@ -14,7 +14,7 @@ use tonic::{Request, Streaming};
 pub struct PlatformGobotSimService {
     pub command_request: mpsc::Sender<CommandRequest>,
     pub command_response: broadcast::Receiver<CommandResponse>,
-    pub state_update: broadcast::Receiver<StateUpdate>,
+    pub state_update: broadcast::Receiver<PlatformUpdate>,
 }
 
 #[async_trait]
@@ -34,10 +34,7 @@ impl PlatformInterface for PlatformGobotSimService {
 
         tokio::spawn(async move {
             while let Ok(msg) = state_update.recv().await {
-                tx.send(Ok(PlatformUpdate {
-                    update: Some(Update::State(msg)),
-                }))
-                .await;
+                tx.send(Ok(msg)).await;
             }
         });
 

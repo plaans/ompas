@@ -2,7 +2,6 @@ use crate::contexts::ctx_planning::CtxPlanning;
 use futures::FutureExt;
 use log::{error, info, warn};
 use ompas_rae_interface::platform::Platform;
-use ompas_rae_interface::platform::PlatformDescriptor;
 use ompas_rae_planning::aries::conversion::convert_domain_to_chronicle_hierarchy;
 use ompas_rae_planning::aries::structs::{ConversionCollection, ConversionContext};
 use ompas_rae_structs::domain::RAEDomain;
@@ -36,7 +35,6 @@ pub const TOKIO_CHANNEL_SIZE: usize = 100;
 /// Main RAE Loop:
 /// Receives Job to handle in separate tasks.
 pub async fn rae(
-    platform: Option<Platform>,
     domain: RAEDomain,
     interface: OMPASInternalState,
     mut env: LEnv,

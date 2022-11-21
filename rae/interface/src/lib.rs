@@ -1,6 +1,7 @@
 use crate::platform_interface::atom::Kind;
 use crate::platform_interface::{atom, Atom, Expression};
 use sompas_structs::lvalues::LValueS;
+use std::fmt::{Display, Formatter};
 
 pub mod platform;
 pub mod platform_interface;
@@ -87,6 +88,18 @@ impl TryFrom<&Atom> for LValueS {
             atom::Kind::Float(f) => (*f).into(),
             atom::Kind::Boolean(b) => (*b).into(),
         })
+    }
+}
+
+impl Display for Atom {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match &self.kind {
+            None => write!(f, ""),
+            Some(Kind::Float(fl)) => write!(f, "{}", fl),
+            Some(Kind::Int(i)) => write!(f, "{}", i),
+            Some(Kind::Symbol(s)) => write!(f, "{}", s),
+            Some(Kind::Boolean(b)) => write!(f, "{}", b),
+        }
     }
 }
 

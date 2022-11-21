@@ -259,7 +259,7 @@ pub async fn launch(env: &LEnv) -> &str {
     });
 
     tokio::spawn(async move {
-        rae(platform, domain, interface, env, rx, &options).await;
+        rae(domain, interface, env, rx, &options).await;
     });
 
     if ctx.interface.log.display {

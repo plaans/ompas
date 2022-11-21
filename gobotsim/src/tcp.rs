@@ -1,8 +1,9 @@
 use crate::serde::{GodotMessageSerde, GodotMessageSerdeData, GodotMessageType, SerdeRobotCommand};
 use ompas_rae_interface::platform_interface::command_request::Request;
 use ompas_rae_interface::platform_interface::{
-    Atom, CommandCancelRequest, CommandExecutionRequest, CommandRequest, CommandResponse,
-    StateUpdate, StateVariable, StateVariableType,
+    event, platform_update, Atom, CommandCancelRequest, CommandExecutionRequest, CommandRequest,
+    CommandResponse, Event, Instance, PlatformUpdate, StateUpdate, StateVariable,
+    StateVariableType,
 };
 use ompas_rae_structs::state::partial_state::PartialState;
 use sompas_structs::lvalues::LValueS;
@@ -24,7 +25,7 @@ pub async fn task_tcp_connection(
     socket_addr: &SocketAddr,
     command_request_receiver: mpsc::Receiver<CommandRequest>,
     command_response_sender: broadcast::Sender<CommandResponse>,
-    state_update_sender: broadcast::Sender<StateUpdate>,
+    state_update_sender: broadcast::Sender<PlatformUpdate>,
     killer: broadcast::Sender<EndSignal>,
 ) {
     let stream = TcpStream::connect(socket_addr).await.unwrap();
@@ -132,7 +133,7 @@ fn u32_to_u8_array(x: u32) -> [u8; 4] {
 async fn async_read_socket(
     stream: ReadHalf<TcpStream>,
     command_response_sender: broadcast::Sender<CommandResponse>,
-    state_update_sender: broadcast::Sender<StateUpdate>,
+    state_update_sender: broadcast::Sender<PlatformUpdate>,
     killer: broadcast::Sender<EndSignal>,
 ) {
     let mut buf_reader = BufReader::new(stream);
@@ -186,28 +187,42 @@ async fn async_read_socket(
                                     for (k, v) in &temps_state.inner {
                                         match k {
                                             LValueS::List(list) => {
-                                        let mut list = list.clone();
+                                                let mut list = list.clone();
                                                 let state_function = list.remove(0);
                                                 let mut parameters: Vec<Atom> = vec![];
                                                 for e in list.drain(..) {
-                                            parameters.push(e.try_into().unwrap())
-                                        }
+                                                    parameters.push(e.try_into().unwrap())
+                                                }
 
-                                                 state_variables.push(StateVariable {
-                                            r#type: StateVariableType::Static.into(),
-                                            state_function: state_function.to_string(),
-                                            parameters,
-                                            value: Some(v.clone().try_into().unwrap())
-                                        })
+                                                let state_function = state_function.to_string();
+                                                if state_function.contains(".instance") {
+                                                    let instance = Instance {
+                                                        r#type: v.to_string(),
+                                                        object: parameters[0].to_string()
+                                                    };
+                                                    state_update_sender.send(PlatformUpdate {
+                                                update: Some(platform_update::Update::Event(Event {
+                                                    event: Some(event::Event::Instance(instance))
+                                                }))
+                                            });
+                                                };
+
+                                                state_variables.push(StateVariable {
+                                                    r#type: StateVariableType::Static.into(),
+                                                    state_function,
+                                                    parameters,
+                                                    value: Some(v.clone().try_into().unwrap())
+                                                })
                                             }
                                     _=> todo!()
                                         }
                                     }
-                                    let state_update = StateUpdate {
-                                        state_variables,
-                                    };
 
-                                    state_update_sender.send(state_update);
+
+                                    state_update_sender.send(PlatformUpdate {
+                                        update: Some(platform_update::Update::State(StateUpdate {
+                                            state_variables
+                                    }))});
                         }
                         GodotMessageType::DynamicState => {
                             let temps_state: PartialState = PartialState::try_from(message).unwrap();
@@ -223,7 +238,7 @@ async fn async_read_socket(
                                         }
 
                                                  state_variables.push(StateVariable {
-                                            r#type: StateVariableType::Static.into(),
+                                            r#type: StateVariableType::Dynamic.into(),
                                             state_function: state_function.to_string(),
                                             parameters,
                                             value: Some(v.clone().try_into().unwrap())
@@ -232,11 +247,12 @@ async fn async_read_socket(
                                     _ => todo!()
                                         }
                                     }
-                                    let state_update = StateUpdate {
-                                        state_variables,
-                                    };
 
-                                    state_update_sender.send(state_update);
+                                    state_update_sender.send(PlatformUpdate {
+                                        update: Some(platform_update::Update::State(StateUpdate {
+                                    state_variables
+                                }))
+                                    });
                         },
                         /*GodotMessageType::StaticState | GodotMessageType::DynamicState => {
                             let temp_state: PartialState = message.try_into().unwrap();

@@ -84,7 +84,16 @@ message CommandCancelled {
 
 message InitGetUpdate {}
 
-message Event {}
+message Event {
+  oneof event {
+    Instance instance = 1;
+  }
+}
+
+message Instance {
+  string type = 1;
+  string object = 2;
+}
 
 message PlatformUpdate {
   oneof update {

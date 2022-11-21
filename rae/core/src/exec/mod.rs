@@ -403,9 +403,9 @@ pub async fn instance(env: &LEnv, args: &[LValue]) -> LResult {
 
     match args.len() {
         0 => Ok(state.get_state(Some(StateType::Instance)).await.into_map()),
-        1 => Ok(state.get_instances(args[0].borrow().try_into()?).await),
+        1 => Ok(state.instances(args[0].borrow().try_into()?).await),
         2 => Ok(state
-            .is_of_type(args[0].borrow().try_into()?, args[1].borrow().try_into()?)
+            .instance(args[0].borrow().try_into()?, args[1].borrow().try_into()?)
             .await),
         _ => Err(LRuntimeError::wrong_number_of_args(
             "godot::instance",

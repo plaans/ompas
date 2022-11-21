@@ -2,7 +2,7 @@ use crate::platform_interface::command_request::Request;
 use crate::platform_interface::command_response::Response;
 use crate::platform_interface::platform_interface_client::PlatformInterfaceClient;
 use crate::platform_interface::{
-    atom, Atom, CommandCancelRequest, CommandExecutionRequest, CommandRequest, CommandResponse,
+    event, CommandCancelRequest, CommandExecutionRequest, CommandRequest, CommandResponse,
     Expression, InitGetUpdate, PlatformUpdate, StateVariableType,
 };
 use crate::{platform_interface, TOKIO_CHANNEL_SIZE};
@@ -14,15 +14,14 @@ use ompas_rae_structs::state::world_state::{StateType, WorldState};
 use platform_interface::platform_update::Update;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalues::LValueS;
-use sompas_structs::module::{IntoModule, Module};
+use sompas_structs::module::IntoModule;
 use sompas_utils::task_handler::EndSignal;
 use std::any::Any;
 use std::borrow::Borrow;
-use std::fmt::{Display, Formatter};
-use std::net::{IpAddr, SocketAddr, SocketAddrV4};
+use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::sync::{broadcast, Mutex, RwLock};
+use tokio::sync::{broadcast, Mutex};
 
 #[derive(Clone)]
 pub struct Platform {
@@ -83,57 +82,62 @@ impl Platform {
 
         loop {
             tokio::select! {
-                        _ = killed.recv() => {
-                            eprintln!("platform update service ended.");
-                            break;
-                        }
-                        msg = stream.message() => {
-                            //println!("[PlatformClient] received new update: {:?}", msg);
-                            match msg {
-                            Err(_) => {
-                                 killer.send(true).expect("could send kill message to rae processes.");
-                            }
-                            Ok(Some(msg)) => {
-                                if let Some(update) =  msg.update {
-                                    match update {
-                                        Update::State(state) => {
-                                            let mut r#static =  PartialState {
-                                                inner: Default::default(),
-                                                _type: Some(StateType::Static)
-                                            };
+                _ = killed.recv() => {
+                    eprintln!("platform update service ended.");
+                    break;
+                }
+                msg = stream.message() => {
+                    //println!("[PlatformClient] received new update: {:?}", msg);
+                    match msg {
+                    Err(_) => {
+                         killer.send(true).expect("could send kill message to rae processes.");
+                    }
+                    Ok(Some(msg)) => {
+                        if let Some(update) =  msg.update {
+                            match update {
+                                Update::State(state) => {
+                                    let mut r#static =  PartialState {
+                                        inner: Default::default(),
+                                        _type: Some(StateType::Static)
+                                    };
 
-                                            let mut dynamic = PartialState {
-                                                inner: Default::default(),
-                                                _type: Some(StateType::Dynamic)
-                                            };
+                                    let mut dynamic = PartialState {
+                                        inner: Default::default(),
+                                        _type: Some(StateType::Dynamic)
+                                    };
 
-                                            for sv in state.state_variables {
+                                    for sv in state.state_variables {
 
-                                                let mut key : Vec<LValueS> = vec![sv.state_function.into()];
-                                                for p in sv.parameters {
-                                                    key.push(p.borrow().try_into().unwrap());
-                                                }
-                                                match StateVariableType::from_i32(sv.r#type).unwrap() {
-                                                    StateVariableType::Static => {
-                                                        r#static.insert(key.into(), sv.value.unwrap().borrow().try_into().unwrap())
-                                                    }
-                                                    StateVariableType::Dynamic => {
-                                                        dynamic.insert(key.into(), sv.value.unwrap().borrow().try_into().unwrap())
-                                                    }
-                                                }
+                                        let mut key : Vec<LValueS> = vec![sv.state_function.into()];
+                                        for p in sv.parameters {
+                                            key.push(p.borrow().try_into().unwrap());
+                                        }
+                                        match StateVariableType::from_i32(sv.r#type).unwrap() {
+                                            StateVariableType::Static => {
+                                                r#static.insert(key.into(), sv.value.unwrap().borrow().try_into().unwrap())
                                             }
-                                                //println!("[PlatformClient] updating state");
-                                                world_state.update_state(r#static).await;
-                                                world_state.update_state(dynamic).await;
+                                            StateVariableType::Dynamic => {
+                                                dynamic.insert(key.into(), sv.value.unwrap().borrow().try_into().unwrap())
+                                            }
                                         }
-                                        Update::Event(event) => {
-                                            todo!()
+                                    }
+                                        //println!("[PlatformClient] updating state");
+                                        world_state.update_state(r#static).await;
+                                        world_state.update_state(dynamic).await;
+                                }
+                                Update::Event(event) => {
+                                    match event.event {
+                                        None => {}
+                                        Some(event::Event::Instance(instance)) => {
+                                            world_state.add_instance(instance.object, instance.r#type).await;
                                         }
+                                    }
                                 }
                             }
                         }
-                        _ => unimplemented!()
                     }
+                    _ => unimplemented!()
+                }
                 }
             }
         }

@@ -119,7 +119,7 @@ pub type SerdeCancelRequest = SerdeActionId;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SerdeActionCancel {
-    pub temp_id: usize,
+    pub action_id: usize,
     pub cancelled: bool,
 }
 
@@ -238,7 +238,7 @@ impl TryFrom<GodotMessageSerde> for (usize, CommandStatus) {
             }
             GodotMessageType::ActionCancel => {
                 if let GodotMessageSerdeData::ActionCancel(ac) = value.data {
-                    id = ac.temp_id;
+                    id = ac.action_id;
                     status = CommandStatus::Cancelled(ac.cancelled);
                 } else {
                     unreachable!("{:?} and expected ActionCancel", value.data)

@@ -59,6 +59,7 @@ impl PlatformInterface for PlatformGobotSimService {
 
         tokio::spawn(async move {
             while let Ok(Some(request)) = command_request_receiver.message().await {
+                println!("[GobotSimService] received new command request");
                 command_request_to_godot.send(request).await;
             }
         });

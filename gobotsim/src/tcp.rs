@@ -1,10 +1,12 @@
 use crate::serde::{GodotMessageSerde, GodotMessageSerdeData, GodotMessageType, SerdeRobotCommand};
 use ompas_rae_interface::platform_interface::command_request::Request;
 use ompas_rae_interface::platform_interface::{
-    event, platform_update, Atom, CommandCancelRequest, CommandExecutionRequest, CommandRequest,
-    CommandResponse, Event, Instance, PlatformUpdate, StateUpdate, StateVariable,
+    command_response, event, platform_update, Atom, CommandAccepted, CommandCancelRequest,
+    CommandCancelled, CommandExecutionRequest, CommandProgress, CommandRejected, CommandRequest,
+    CommandResponse, CommandResult, Event, Instance, PlatformUpdate, StateUpdate, StateVariable,
     StateVariableType,
 };
+use ompas_rae_structs::state::action_status::CommandStatus;
 use ompas_rae_structs::state::partial_state::PartialState;
 use sompas_structs::lvalues::LValueS;
 use sompas_utils::task_handler::EndSignal;
@@ -50,7 +52,7 @@ async fn async_write_socket(
     mut receiver: Receiver<CommandRequest>,
     killer: broadcast::Sender<EndSignal>,
 ) {
-    let test = receiver.recv().await.unwrap();
+    //let test = receiver.recv().await.unwrap();
     //assert_eq!(test, TEST_TCP);
     //println!("socket ready to receive command !");
     //let mut end_receiver = task_handler::subscribe_new_task();
@@ -59,6 +61,7 @@ async fn async_write_socket(
     loop {
         tokio::select! {
             command = receiver.recv() => {
+                //println!("[GodotTCP] new command request");
                 let command: CommandRequest = match command {
                     None => break,
                     Some(s) => s
@@ -286,8 +289,81 @@ async fn async_read_socket(
                                 },
                             };
                         }*/
+                        GodotMessageType::ActionResponse => {
+                            if let GodotMessageSerdeData::ActionResponse(ar) = message.data {
+                                match ar.action_id {
+                                    -1 => {
+                                        command_response_sender.send(CommandRejected {
+                                                command_id : ar.temp_id as u64
+                                            }.into());
+                                    }
+                                    i => {
+                                        if i < 0 {
+                                            /*return Err(lruntimeerror!(
+                                                "GodotMessageSerde",
+                                                "action response is not in {-1} + N"
+                                            ));*/
+                                        } else {
+                                            map_server_id_action_id.insert(ar.action_id as usize, ar.temp_id);
+                                            command_response_sender.send(CommandAccepted {
+                                                command_id : ar.temp_id as u64
+                                            }.into());
+                                        }
+                                    }
+                                };
+                            } else {
+                                unreachable!("{:?} and expected ActionResponse", message.data)
+                            }
+                        }
+                        GodotMessageType::ActionFeedback => {
+                            if let GodotMessageSerdeData::ActionFeedback(af) = message.data {
+                                let command_id = *map_server_id_action_id.get(&af.action_id).expect("") as u64;
+                                command_response_sender.send(CommandProgress {
+                                    command_id,
+                                    progress: af.feedback
+                                }.into());
+                            } else {
+                                unreachable!("{:?} and expected ActionFeedback", message.data)
+                            }
+                        }
+                        GodotMessageType::ActionResult => {
+                            if let GodotMessageSerdeData::ActionResult(ar) = message.data {
+                                let command_id = *map_server_id_action_id.get(&ar.action_id).expect("") as u64;
+                                command_response_sender.send(CommandResult {
+                                    command_id,
+                                    result: ar.result
+                                }.into());
+                            } else {
+                                unreachable!("{:?} and expected ActionResult", message.data)
+                            }
+                        }
+                        GodotMessageType::ActionPreempt => {
+                            unreachable!("{:?}: preempt is not handled", message.data)
+                            /*if let GodotMessageSerdeData::ActionId(ai) = message.data {
+                                let command_id = map_server_id_action_id.get(ar.action_id).expect("");
+                                command_response_sender.send( {
+                                    command_id,
+                                    result: ar.result
+                                }.into())
+                            } else {
+                                unreachable!("{:?} and expected ActionId", message.data)
+                            }*/
+                        }
+                        GodotMessageType::ActionCancel => {
+                            if let GodotMessageSerdeData::ActionCancel(ac) = message.data {
+                                let command_id = *map_server_id_action_id.get(&ac.action_id).expect("") as u64;
+                                command_response_sender.send(CommandCancelled {
+                                    command_id,
+                                    result: ac.cancelled
+                                }.into());
+                            } else {
+                                unreachable!("{:?} and expected ActionCancel", message.data)
+                            }
+                        }
+                        _ => {
+                            unreachable!()
+                        }
                         /*GodotMessageType::ActionResponse => {
-                            let (godot_id, command_status): (usize, CommandStatus) = message.try_into().unwrap();
                             match command_status {
                                 CommandStatus::Accepted => {
                                     map_server_id_action_id.insert(server_id, godot_id);
@@ -295,9 +371,9 @@ async fn async_read_socket(
                                 CommandStatus::Rejected => {}
                                 _ => unreachable!()
                             }
+                        }*/
+                        /*
 
-                            agenda.update_status(&godot_id, action_status.into()).await;
-                        }
                         GodotMessageType::ActionFeedback
                         | GodotMessageType::ActionResult
                         | GodotMessageType::ActionPreempt
@@ -307,12 +383,10 @@ async fn async_read_socket(
                             let id = map_server_id_action_id.get(&action_status.0).unwrap();
                             agenda.update_status(id, action_status.1.into()).await;
                         }
-                        _ => panic!("should not receive this kind of message"),
-                    }
-                }*/
-                    _ => {}
+                        _ => panic!("should not receive this kind of message"),*/
                     }
                 }
+
             }
         }
     }

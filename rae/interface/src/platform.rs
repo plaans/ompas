@@ -38,7 +38,10 @@ impl Platform {
         for arg in command {
             arguments.push(LValueS::try_from(arg).unwrap().try_into().unwrap())
         }
-
+        /*println!(
+            "[PlatformClient] new command request: {}",
+            LValue::from(command)
+        );*/
         let request = CommandRequest {
             request: Some(Request::Execution(CommandExecutionRequest {
                 arguments,

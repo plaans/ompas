@@ -1,5 +1,8 @@
 use crate::platform_interface::atom::Kind;
-use crate::platform_interface::{atom, Atom, Expression};
+use crate::platform_interface::{
+    atom, command_response, Atom, CommandAccepted, CommandCancelled, CommandProgress,
+    CommandRejected, CommandResponse, CommandResult, Expression,
+};
 use sompas_structs::lvalues::LValueS;
 use std::fmt::{Display, Formatter};
 
@@ -115,6 +118,46 @@ impl TryFrom<&Expression> for LValueS {
                 vec.push(LValueS::try_from(e)?);
             }
             Ok(vec.into())
+        }
+    }
+}
+
+impl From<CommandAccepted> for CommandResponse {
+    fn from(ca: CommandAccepted) -> Self {
+        Self {
+            response: Some(command_response::Response::Accepted(ca)),
+        }
+    }
+}
+
+impl From<CommandRejected> for CommandResponse {
+    fn from(cr: CommandRejected) -> Self {
+        Self {
+            response: Some(command_response::Response::Rejected(cr)),
+        }
+    }
+}
+
+impl From<CommandProgress> for CommandResponse {
+    fn from(cp: CommandProgress) -> Self {
+        Self {
+            response: Some(command_response::Response::Progress(cp)),
+        }
+    }
+}
+
+impl From<CommandResult> for CommandResponse {
+    fn from(cr: CommandResult) -> Self {
+        Self {
+            response: Some(command_response::Response::Result(cr)),
+        }
+    }
+}
+
+impl From<CommandCancelled> for CommandResponse {
+    fn from(cc: CommandCancelled) -> Self {
+        Self {
+            response: Some(command_response::Response::Cancelled(cc)),
         }
     }
 }

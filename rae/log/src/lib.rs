@@ -22,7 +22,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 use tokio::sync::{broadcast, mpsc};
 
-use sompas_utils::task_handler::{subscribe_new_task, EndSignal};
+use ompas_utils::task_handler::{subscribe_new_task, EndSignal};
 use std::path::PathBuf;
 
 const RAE_LOG_IP_ADDR: &str = "127.0.0.1:10001";

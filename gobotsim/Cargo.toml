@@ -11,7 +11,7 @@ sompas-modules = {path = "../scheme/modules"}
 sompas-structs = {path = "../scheme/structs"}
 sompas-core= {path = "../scheme/core"}
 sompas-repl = {path = "../scheme/repl"}
-sompas-utils = {path = "../scheme/utils"}
+ompas-utils = {path = "../utils"}
 sompas-language= {path = "../scheme/language"}
 sompas-macros = {path = "../scheme/macros"}
 ompas-rae-core = {path = "../rae/core"}

@@ -10,7 +10,7 @@ async-trait = "0.1.51"
 sompas-structs = {path = "../../scheme/structs"}
 tokio = { version = "1.17.0", features = ["full", "time"] }
 ompas-rae-structs = {path = "../structs"}
-sompas-utils = {path= "../../scheme/utils" }
+ompas-utils = {path= "../../utils" }
 prost = { default-features = false, version = "0.11" }
 tonic = "0.8"
 async-stream = "0.3.3"

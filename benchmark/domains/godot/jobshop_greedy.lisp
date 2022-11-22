@@ -22,7 +22,7 @@
         (:body
             (do
                 (print "package process of " ?p " is done")
-                (define ?r (arbitrary (instance robot) rand-element))
+                (define ?r (arbitrary (instances robot) rand-element))
                 (define h (await (acquire ?r)))
                 (t_carry_to_machine ?r ?p (find_output_machine))
                 )))
@@ -35,7 +35,7 @@
         (:score 0)
         (:body 
             (do
-                (define ?r (arbitrary (instance robot) rand-element))
+                (define ?r (arbitrary (instances robot) rand-element))
                 (define h1 (await (acquire ?m)))
                 (define h2 (await (acquire ?r)))
                 (t_carry_to_machine ?r ?p ?m)

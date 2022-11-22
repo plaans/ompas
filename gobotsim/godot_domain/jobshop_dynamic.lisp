@@ -83,7 +83,7 @@
         (:score 0)
         (:body 
             (do
-                (define list_robots (instance robot))
+                (define list_robots (instances robot))
                 (define h (mapf async_check_battery list_robots))
                 (print "launched all tasks for initial robots")
                 (t_check_batteries_new_robots list_robots)))))
@@ -96,8 +96,8 @@
         (:score 0)
         (:body 
             (do
-                (await (wait-for `(> (len (instance robot)) ,(len ?l))))
-                (define new_list_robots (instance robot))
+                (await (wait-for `(> (len (instances robot)) ,(len ?l))))
+                (define new_list_robots (instances robot))
                 (define l_new_robots (sublist new_list_robots (len ?l)))
                 (print "new robots:" l_new_robots)
                 (mapf async_check_battery l_new_robots)
@@ -115,7 +115,7 @@
             (:score 0)
             (:body
                 (do
-                    (define list_packages (instance package))
+                    (define list_packages (instances package))
                     ;(define h (async (t_process_package (car list_packages))))
                     (define h (mapf async_process_package list_packages))
                     ;(await (car h))
@@ -131,8 +131,8 @@
             (:score 0)
             (:body
                 (do
-                    (await (wait-for `(>  (len (instance package)) ,(len ?l))))
-                    (define new_lp (instance package))
+                    (await (wait-for `(>  (len (instances package)) ,(len ?l))))
+                    (define new_lp (instances package))
                     (define l_new_p (sublist new_lp (len ?l)))
                     (print "new packages:" l_new_p)
                     (mapf async_process_package l_new_p)

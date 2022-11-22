@@ -100,6 +100,7 @@ impl IntoModule for CtxRaeExec {
         //module.add_async_fn_prelude(RAE_GET_STATUS, get_status);
         module.add_async_fn_prelude(RAE_CANCEL_COMMAND, cancel_command);
         module.add_async_fn_prelude(RAE_INSTANCE, instance);
+        module.add_async_fn_prelude(RAE_INSTANCES, instances);
         module.add_fn_prelude(RAE_IS_PLATFORM_DEFINED, is_platform_defined);
         //Manage facts:
         module.add_async_fn_prelude(RAE_ASSERT, assert_fact);
@@ -398,10 +399,10 @@ pub fn is_success(list: Vec<LValue>) -> Result<bool, LRuntimeError> {
 //1 arg: return all instances of a type
 //2 args: check if an instance is of a certain type
 #[async_scheme_fn]
-pub async fn instance(env: &LEnv, args: &[LValue]) -> LResult {
+pub async fn instance(env: &LEnv, object: String, r#type: String) -> LResult {
     let state = &env.get_context::<CtxState>(CTX_STATE)?.state;
 
-    match args.len() {
+    /*match args.len() {
         0 => Ok(state.get_state(Some(StateType::Instance)).await.into_map()),
         1 => Ok(state.instances(args[0].borrow().try_into()?).await),
         2 => Ok(state
@@ -412,5 +413,13 @@ pub async fn instance(env: &LEnv, args: &[LValue]) -> LResult {
             args,
             1..2,
         )),
-    }
+    }*/
+
+    Ok(state.instance(object, r#type).await)
+}
+
+#[async_scheme_fn]
+pub async fn instances(env: &LEnv, r#type: String) -> LResult {
+    let state = &env.get_context::<CtxState>(CTX_STATE)?.state;
+    Ok(state.instances(r#type).await)
 }

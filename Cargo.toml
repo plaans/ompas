@@ -4,6 +4,8 @@
 members = [
     "scheme/core",
     "scheme/macros",
+    "utils",
+    "middleware",
     "scheme/utils",
     "scheme/structs",
     "scheme/repl",

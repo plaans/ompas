@@ -12,7 +12,7 @@ path = "src/bin/scheme.rs"
 
 
 [dependencies]
-sompas-utils = {path = "../utils" }
+ompas-utils = {path = "../../utils" }
 sompas-core = {path = "../core"}
 sompas-structs = {path = "../structs"}
 sompas-language = {path = "../language"}

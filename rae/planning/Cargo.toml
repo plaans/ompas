@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-sompas-utils = {path= "../../scheme/utils" }
+ompas-utils = {path= "../../utils" }
 sompas-structs = {path = "../../scheme/structs"}
 sompas-language = {path = "../../scheme/language"}
 sompas-core = {path = "../../scheme/core"}

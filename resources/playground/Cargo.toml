@@ -9,7 +9,7 @@ edition = "2021"
 sompas-structs = {path = "../../scheme/structs"}
 sompas-core = {path = "../../scheme/core"}
 sompas-repl = {path = "../../scheme/repl"}
-sompas-utils={path = "../../scheme/utils"}
+ompas-utils={path = "../../utils"}
 ompas-gobotsim = {path = "../../gobotsim"}
 ompas-rae-core = {path = "../../rae/core"}
 ompas-rae-structs = {path = "../../rae/structs"}

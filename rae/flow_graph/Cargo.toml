@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 
 #Scheme bindings
-sompas-utils = {path= "../../scheme/utils" }
+ompas-utils = {path= "../../utils" }
 sompas-structs = {path = "../../scheme/structs"}
 sompas-language = {path = "../../scheme/language"}
 sompas-core = {path = "../../scheme/core"}
@@ -38,7 +38,7 @@ chrono = "0.4.19"
 rand = "0.8.5"
 yaml-rust = "0.4"
 async-recursion = "1.0.0"
-itertools = "*"
+itertools = { default-features = false, version = "0.10" }
 
 [[bin]]
 name = "graph-convert"

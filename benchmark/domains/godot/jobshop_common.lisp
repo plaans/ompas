@@ -73,7 +73,7 @@
         (:score 0)
         (:body 
             (do
-                (define list_robots (instance robot))
+                (define list_robots (instances robot))
                 (define list-h (mapf (lambda (?r) (async (t_check_battery ?r))) list_robots))
                 (print "launched all tasks for initial robots")
                 (mapf await list-h))))
@@ -87,7 +87,7 @@
         (:score 0)
         (:body
             (do
-                (define list_packages (instance package))
+                (define list_packages (instances package))
                 (define list-h (mapf (lambda (?p) (async (t_process_package ?p))) list_packages))
                 (mapf await list-h)
                 )))
@@ -100,8 +100,8 @@
         (:score 0)
         (:body
             (do
-                (mapf new-resource (instance robot))
-                (mapf new-resource (instance machine))
+                (mapf new-resource (instances robot))
+                (mapf new-resource (instances machine))
                 (define f1 (async (t_process_packages)))
                 (define f2 (async (t_check_rob_bat)))
                 (await f1))))

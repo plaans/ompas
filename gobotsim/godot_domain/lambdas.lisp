@@ -15,7 +15,7 @@
                                 (if (contains (machine.processes_list (car seq)) ?p)
                                     (cons (car seq) (__process__ ?p (cdr seq)))
                                     (__process__ ?p (cdr seq))))))
-                    (define machines (instance machine))
+                    (define machines (instances machine))
                     (define result (__process__ ?process machines))
                     result)))
 
@@ -30,7 +30,7 @@
                             (if (not (locked? (car l)))
                                 (cons (car l) (__l_available_robots__ (cdr l)))
                                 (__l_available_robots__ (cdr l))))))
-                (__l_available_robots__ (instance robot)))))
+                (__l_available_robots__ (instances robot)))))
 
     (def-lambda find_output_machine 
         (lambda nil
@@ -42,7 +42,7 @@
                             (if (= (machine.type (car seq)) output_machine)
                                 (car seq)
                                 (__lambda__ (cdr seq))))))
-                (__lambda__ (instance machine)))))
+                (__lambda__ (instances machine)))))
 
     (def-lambda take_first 
         (lambda (seq)

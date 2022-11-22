@@ -4,10 +4,10 @@
 //! It contains only one function (for the moment): run that takes two arguments.
 use crate::TOKIO_CHANNEL_SIZE;
 use chrono::{DateTime, Utc};
+use ompas_utils::task_handler::{subscribe_new_task, EndSignal};
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use sompas_language::NIL;
-use sompas_utils::task_handler::{subscribe_new_task, EndSignal};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;

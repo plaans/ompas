@@ -22,7 +22,7 @@
         (:body
             (do
                 (print "package process of " ?p " is done")
-                (define h_r (await (acquire-in-list (instance robot))))
+                (define h_r (await (acquire-in-list (instances robot))))
                 (define ?r (first h_r))
                 (t_carry_to_machine ?r ?p (find_output_machine)))))
     
@@ -35,7 +35,7 @@
         (:body 
             (do
                 (define h_m (await (acquire ?m)))
-                (define h_r (await (acquire-in-list (instance robot))))
+                (define h_r (await (acquire-in-list (instances robot))))
                 (define ?r (first h_r))
                 (t_carry_to_machine ?r ?p ?m)
                 (release (second h_r))

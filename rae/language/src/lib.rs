@@ -4,6 +4,7 @@ pub const RAE_ASSERT_SHORT: &str = "+>";
 pub const RAE_RETRACT: &str = "retract";
 pub const RAE_RETRACT_SHORT: &str = "->";
 pub const RAE_INSTANCE: &str = "instance";
+pub const RAE_INSTANCES: &str = "instances";
 pub const RAE_AWAIT: &str = "rae-await";
 pub const RAE_MONITOR: &str = "monitor";
 pub const RAE_WAIT_FOR: &str = "wait-for";

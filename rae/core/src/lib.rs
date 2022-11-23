@@ -1,9 +1,10 @@
 use crate::contexts::ctx_planning::CtxPlanning;
 use crate::error::RaeExecError;
 use futures::FutureExt;
-use log::{error, info, warn};
 use map_macro::set;
+use ompas_middleware::LogLevel;
 use ompas_middleware::ProcessInterface;
+use ompas_rae_language::PROCESS_TOPIC_ACTING;
 use ompas_rae_planning::aries::conversion::convert_domain_to_chronicle_hierarchy;
 use ompas_rae_planning::aries::structs::{ConversionCollection, ConversionContext};
 use ompas_rae_structs::domain::RAEDomain;
@@ -16,10 +17,7 @@ use sompas_structs::lasynchandler::LAsyncHandler;
 use sompas_structs::lenv::ImportType::WithoutPrefix;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lfuture::FutureResult;
-use sompas_structs::lnumber::*;
 use sompas_structs::lswitch::new_interruption_handler;
-use sompas_structs::lvalue::LValue;
-use std::ops::Deref;
 use std::time::Instant;
 use tokio::sync::mpsc::Receiver;
 
@@ -31,9 +29,8 @@ pub mod monitor;
 pub type ReactiveTriggerId = usize;
 
 pub const TOKIO_CHANNEL_SIZE: usize = 100;
-pub const PROCESS_TOPIC_ACTING: &str = "__PROCESS_TOPIC_ACTING__";
+
 pub const PROCESS_MAIN_RAE: &str = "__PROCESS_MAIN_RAE__";
-pub const LOG_TOPIC_ACTING: &str = "__LOG_TOPIC_ACTING";
 
 /// Main RAE Loop:
 /// Receives Job to handle in separate tasks.
@@ -159,14 +156,12 @@ pub async fn rae(
                 }
             }
             _ = process.recv() => {
-                /*if let Some(platform) = &platform {
-                    platform.stop().await;
-                }*/
-                println!("rae killed");
+                process.log("Main loop of rae ended", LogLevel::Info).await;
 
                 for k in &mut killers {
                     k.interrupt().await;
                 }
+                break process.die().await;
             }
         }
         //For each new event or task to be addressed, we search for the best method a create a new refinement stack

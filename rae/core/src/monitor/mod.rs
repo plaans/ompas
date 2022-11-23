@@ -6,12 +6,12 @@ use crate::contexts::ctx_rae::{CtxRae, CTX_RAE};
 use crate::contexts::ctx_state::{CtxState, CTX_STATE};
 use crate::contexts::ctx_task::{CtxTask, CTX_TASK};
 use crate::exec::CtxRaeExec;
-use chrono::{DateTime, Utc};
 use domain::*;
+use ompas_middleware::ompas_log::{FileDescriptor, Logger};
 use ompas_rae_language::*;
 use ompas_rae_planning::aries::structs::ConversionContext;
 use ompas_rae_structs::domain::RAEDomain;
-use ompas_rae_structs::internal_state::{LogConfig, OMPASInternalState};
+use ompas_rae_structs::internal_state::OMPASInternalState;
 use ompas_rae_structs::job::Job;
 use ompas_rae_structs::rae_options::OMPASOptions;
 use ompas_rae_structs::select_mode::SelectMode;
@@ -26,15 +26,16 @@ use sompas_structs::lenv::ImportType::{WithPrefix, WithoutPrefix};
 use sompas_structs::lenv::{LEnv, LEnvSymbols};
 use sompas_structs::module::{InitLisp, IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
+use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::{env, fs};
 use tokio::sync::RwLock;
 use user_interface::*;
 pub mod domain;
 pub mod planning;
 pub mod user_interface;
 use ompas_rae_interface::platform::{Domain, Platform, PlatformDescriptor};
+
 //LANGUAGE
 const MOD_RAE_USER: &str = "rae_user";
 const DOC_MOD_RAE: &str = "Module exposed to the user to configure and launch rae.";
@@ -217,43 +218,26 @@ impl CtxRaeUser {
         working_dir: Option<PathBuf>,
         display_log: bool,
     ) -> Self {
-        let dir_path: PathBuf = match working_dir {
-            Some(wd) => {
-                let mut dir_path = wd;
-                dir_path.push("rae_logs");
-                dir_path
-            }
-            None => format!(
-                "{}/ompas/rae_logs",
-                match env::var("HOME") {
-                    Ok(val) => val,
-                    Err(_) => ".".to_string(),
-                }
-            )
-            .into(),
-        };
+        /*let channel =
+        ompas_rae_log::init(log.clone()) //change with configurable display
+            .unwrap_or_else(|e| panic!("Error while initiating logger : {}", e));*/
 
-        let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
-        let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
+        let log = Logger::new_topic(
+            LOG_TOPIC_ACTING,
+            working_dir.map(|p| FileDescriptor::AbsolutePath(p.canonicalize().unwrap())),
+        )
+        .await;
 
-        fs::create_dir_all(&dir_path).expect("could not create rae logs directory");
-        let mut log = dir_path.clone();
-        log.push(format!("rae_{}.txt", string_date));
-
-        let channel =
-            ompas_rae_log::init(log.clone()) //change with configurable display
-                .unwrap_or_else(|e| panic!("Error while initiating logger : {}", e));
+        if display_log {
+            Logger::start_display_log_topic(&log).await;
+        }
 
         let interface = OMPASInternalState {
             state: Default::default(),
             resources: Default::default(),
             monitors: Default::default(),
             agenda: Default::default(),
-            log: LogConfig {
-                path: log,
-                channel: Some(channel),
-                display: display_log,
-            },
+            log,
             command_stream: Arc::new(RwLock::new(None)),
         };
         let platform = Platform {
@@ -287,7 +271,9 @@ impl CtxRaeUser {
         let mut env = get_root_env().await;
 
         if let Some(platform) = &self.platform {
-            env.import_module(platform.module().await.unwrap(), WithPrefix);
+            if let Some(module) = platform.module().await {
+                env.import_module(module, WithPrefix);
+            }
         }
 
         env.import_module(CtxUtils::default(), WithoutPrefix);
@@ -295,9 +281,7 @@ impl CtxRaeUser {
         env.import_module(CtxMath::default(), WithoutPrefix);
 
         let mut ctx_io = CtxIo::default();
-        ctx_io.set_log_output(LogOutput::Channel(
-            self.interface.log.channel.as_ref().unwrap().clone(),
-        ));
+        ctx_io.set_log_output(LogOutput::Topic(self.interface.log));
 
         env.import_module(ctx_io, WithoutPrefix);
 
@@ -332,12 +316,12 @@ impl CtxRaeUser {
 }
 
 impl CtxRaeUser {
-    pub fn get_log(&self) -> &PathBuf {
+    /*pub fn get_log(&self) -> &PathBuf {
         &self.interface.log.path
     }
     pub fn set_log(&mut self, log: PathBuf) {
         self.interface.log.path = log;
-    }
+    }*/
 
     pub async fn get_options(&self) -> OMPASOptions {
         self.options.read().await.clone()

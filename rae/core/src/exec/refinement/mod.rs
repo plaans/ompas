@@ -17,7 +17,6 @@ use crate::contexts::ctx_rae::{CtxRae, CTX_RAE};
 use crate::contexts::ctx_state::{CtxState, CTX_STATE};
 use crate::contexts::ctx_task::{CtxTask, CTX_TASK};
 use crate::RaeExecError;
-use log::{error, info};
 use ompas_rae_structs::state::task_status::TaskStatus;
 use sompas_macros::async_scheme_fn;
 use std::convert::{TryFrom, TryInto};

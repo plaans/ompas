@@ -4,7 +4,7 @@ use crate::TOKIO_CHANNEL_SIZE;
 use chrono::{DateTime, Utc};
 use im::HashMap;
 use map_macro::set;
-use ompas_middleware::ompas_log::{FileDescriptor, LOGGER};
+use ompas_middleware::ompas_log::{FileDescriptor, Logger};
 use ompas_middleware::{LogLevel, ProcessInterface, PROCESS_TOPIC_ALL};
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
@@ -143,9 +143,13 @@ impl LispInterpreter {
             set! {PROCESS_TOPIC_INTERPRETER.to_string()},
         )
         .await;
-        LOGGER.new_topic(LOG_TOPIC_INTERPRETER, log).await;
+        Logger::new_topic(LOG_TOPIC_INTERPRETER, log).await;
         process_interface
             .subscribe_to_log_topic(LOG_TOPIC_INTERPRETER)
+            .await;
+
+        process_interface
+            .log("initiate interpreter", LogLevel::Debug)
             .await;
 
         eval_init(&mut self.env).await;
@@ -194,21 +198,17 @@ impl LispInterpreter {
                     match parse(str_lvalue.as_str(), &mut self.env).await {
                         Ok(lv) => {
                             let result = eval(&lv, &mut self.env, None).await;
-
-                            /*self.li_channel
-                                .send(&id_log, result.clone())
-                                .await
-                                .expect("error on log");*/
+                            process_interface.log(format!("{} => {}", str_lvalue, match result.clone() {
+                                Ok(lv) => lv.to_string(),
+                                Err(e) => e.to_string(),
+                            }), LogLevel::Trace).await;
                             self.li_channel
                                 .send(&id_subscriber, result)
                                 .await
                                 .expect("error on channel to stdout");
                         }
                         Err(e) => {
-                            /*self.li_channel
-                                .send(&id_log, Err(e.clone()))
-                                .await
-                                .expect("error on log");*/
+                            process_interface.log(format!("{} => {}", str_lvalue, e), LogLevel::Trace).await;
 
                             self.li_channel
                                 .send(&id_subscriber, Err(e))

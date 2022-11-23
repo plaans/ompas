@@ -292,3 +292,6 @@ pub const ARIES_OPT: &str = "aries-opt";
 pub const UPOM: &str = "upom";
 pub const RAE_PLAN: &str = "rae-plan";
 pub const C_CHOICE: &str = "c-choice";
+
+pub const PROCESS_TOPIC_ACTING: &str = "__PROCESS_TOPIC_ACTING__";
+pub const LOG_TOPIC_ACTING: &str = "__LOG_TOPIC_ACTING__";

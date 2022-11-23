@@ -1,3 +1,5 @@
+use ompas_middleware::ompas_log::{LogMessage, Logger, TopicId};
+use ompas_middleware::LogLevel;
 use sompas_macros::scheme_fn;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::{Documentation, LHelp};
@@ -50,8 +52,8 @@ const MACRO_READ: &str = "(defmacro read \
 #[derive(Debug)]
 pub enum LogOutput {
     Stdout,
+    Topic(TopicId),
     File(PathBuf),
-    Channel(mpsc::Sender<String>),
 }
 
 impl From<PathBuf> for LogOutput {
@@ -136,9 +138,17 @@ pub fn print(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
         LogOutput::Stdout => {
             println!("{}", lv);
         }
-        LogOutput::Channel(tx) => {
-            let tx = tx.clone();
-            tokio::spawn(async move { tx.send(format!("PRINT - {}", lv)).await });
+        LogOutput::Topic(topic_id) => {
+            let topic_id = *topic_id;
+            tokio::spawn(async move {
+                Logger::log(LogMessage::new(
+                    LogLevel::Debug,
+                    "PRINT",
+                    topic_id,
+                    lv.to_string(),
+                ))
+                .await;
+            });
         }
         LogOutput::File(pb) => {
             //println!("print {} in {:?}", lv, pb);

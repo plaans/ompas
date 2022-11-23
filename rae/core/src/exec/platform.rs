@@ -4,7 +4,6 @@ use crate::contexts::ctx_rae::{CtxRae, CTX_RAE};
 use crate::contexts::ctx_task::{CtxTask, CTX_TASK};
 use crate::exec::*;
 use crate::RaeExecError;
-use log::{error, info};
 use ompas_rae_interface::platform::PlatformDescriptor;
 use ompas_rae_structs::state::task_status::TaskStatus;
 use sompas_core::modules::list::append;

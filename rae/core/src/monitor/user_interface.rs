@@ -24,7 +24,7 @@ use sompas_structs::{lruntimeerror, wrong_type};
 use std::collections::HashSet;
 use std::mem;
 use std::time::Duration;
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::mpsc;
 
 /// Returns the whole state if no args, or specific part of it ('static', 'dynamic', 'inner world')
 #[async_scheme_fn]
@@ -235,8 +235,6 @@ pub async fn launch(env: &LEnv) -> &str {
     let options = ctx.get_options().await.clone();
 
     let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
-    //let (tx_stop, rx_stop) = mpsc::channel(TOKIO_CHANNEL_SIZE);
-    let (killer, killed) = broadcast::channel(TOKIO_CHANNEL_SIZE);
 
     *ctx.interface.command_stream.write().await = Some(tx);
     //*ctx.interface.stop_tx.write().await = Some(tx_stop);
@@ -255,16 +253,16 @@ pub async fn launch(env: &LEnv) -> &str {
     let env_clone = env.clone();
     let monitors = interface.monitors.clone();
     tokio::spawn(async move {
-        task_check_wait_for(receiver_event_update_state, killed, monitors, env_clone).await
+        task_check_wait_for(receiver_event_update_state, monitors, env_clone).await
     });
 
     tokio::spawn(async move {
         rae(domain, interface, env, rx, &options).await;
     });
 
-    if ctx.interface.log.display {
+    /*if ctx.interface.log.display {
         ompas_rae_log::display_logger(killer.subscribe(), ctx.interface.log.path.clone());
-    }
+    }*/
 
     for t in tasks_to_execute {
         ctx.interface

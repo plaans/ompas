@@ -4,14 +4,13 @@ use crate::PROCESS_TOPIC_GOBOT_SIM;
 use crate::{DEFAULT_PATH_PROJECT_GODOT, TOKIO_CHANNEL_SIZE};
 use async_trait::async_trait;
 use map_macro::set;
-use ompas_middleware::ompas_log::{LogMessage, LOGGER};
+use ompas_middleware::ompas_log::{LogMessage, Logger};
 use ompas_middleware::{LogLevel, ProcessInterface};
-use ompas_rae_core::{LOG_TOPIC_ACTING, PROCESS_TOPIC_ACTING};
 use ompas_rae_interface::platform::PlatformModule;
 use ompas_rae_interface::platform::{Domain, PlatformDescriptor};
 use ompas_rae_interface::platform_interface::platform_interface_server::PlatformInterfaceServer;
-use ompas_rae_interface::PROCESS_TOPIC_PLATFORM;
 use ompas_rae_interface::{DEFAULT_PLATFORM_SERVICE_IP, DEFAULT_PLATFROM_SERVICE_PORT};
+use ompas_rae_interface::{LOG_TOPIC_PLATFORM, PROCESS_TOPIC_PLATFORM};
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::Documentation;
 use sompas_structs::lruntimeerror::LResult;
@@ -135,13 +134,10 @@ impl PlatformGobotSim {
         };
         let server_info: SocketAddr = self.socket().await;
         tokio::spawn(async move {
-            let mut process = ProcessInterface::new(
-                PROCESS_SERVER_GRPC,
-                set! {PROCESS_TOPIC_PLATFORM, PROCESS_TOPIC_ACTING},
-            )
-            .await;
+            let mut process =
+                ProcessInterface::new(PROCESS_SERVER_GRPC, set! {PROCESS_TOPIC_PLATFORM}).await;
 
-            println!("Serving : {}", server_info);
+            //println!("Serving : {}", server_info);
             let server = Server::builder().add_service(PlatformInterfaceServer::new(service));
             tokio::select! {
                 _ = process.recv() => {
@@ -179,49 +175,45 @@ impl PlatformGobotSim {
 #[async_trait]
 impl PlatformDescriptor for PlatformGobotSim {
     async fn start(&self) {
-        let topic_id = LOGGER.subscribe_to_topic(LOG_TOPIC_ACTING).await;
+        let topic_id = Logger::subscribe_to_topic(LOG_TOPIC_PLATFORM).await;
         match self.start_platform().await {
             Ok(_) => {
-                LOGGER
-                    .log(LogMessage::new(
-                        LogLevel::Debug,
-                        "Platform::start",
-                        set! {topic_id},
-                        "Successfully started platform.",
-                    ))
-                    .await;
+                Logger::log(LogMessage::new(
+                    LogLevel::Debug,
+                    "Platform::start",
+                    topic_id,
+                    "Successfully started platform.",
+                ))
+                .await;
                 match self.open_com().await {
                     Ok(_) => {
-                        LOGGER
-                            .log(LogMessage::new(
-                                LogLevel::Debug,
-                                "Platform::start",
-                                set! {topic_id},
-                                "Successfully open com with platform.",
-                            ))
-                            .await;
+                        Logger::log(LogMessage::new(
+                            LogLevel::Debug,
+                            "Platform::start",
+                            topic_id,
+                            "Successfully open com with platform.",
+                        ))
+                        .await;
                     }
                     Err(e) => {
-                        LOGGER
-                            .log(LogMessage::new(
-                                LogLevel::Debug,
-                                "Platform::start",
-                                set! {topic_id},
-                                format!("Error opening com with platform: {}.", e),
-                            ))
-                            .await;
+                        Logger::log(LogMessage::new(
+                            LogLevel::Debug,
+                            "Platform::start",
+                            topic_id,
+                            format!("Error opening com with platform: {}.", e),
+                        ))
+                        .await;
                     }
                 }
             }
             Err(e) => {
-                LOGGER
-                    .log(LogMessage::new(
-                        LogLevel::Debug,
-                        "Platform::start".to_string(),
-                        set! {topic_id},
-                        format!("Error starting platform: {}", e),
-                    ))
-                    .await;
+                Logger::log(LogMessage::new(
+                    LogLevel::Debug,
+                    "Platform::start".to_string(),
+                    topic_id,
+                    format!("Error starting platform: {}", e),
+                ))
+                .await;
             }
         }
     }

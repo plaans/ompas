@@ -1,8 +1,10 @@
-use log::{info, warn};
+use ompas_middleware::ompas_log::{LogMessage, Logger};
+use ompas_middleware::{LogLevel, ProcessInterface};
+use ompas_rae_language::{LOG_TOPIC_ACTING, PROCESS_TOPIC_ACTING};
 use sompas_core::eval;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lvalue::LValue;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::{broadcast, oneshot, Mutex};
 
@@ -64,7 +66,6 @@ impl MonitorCollection {
             let result = eval(lambda, &mut env, None).await;
             match result {
                 Ok(lv) => {
-                    //info!("{} => {}", waiter.lambda, lv);
                     if let LValue::True = lv {
                         //info!("Wait on {} is now true.", lambda);
                         let waiter = waiters.map.remove(id).unwrap();
@@ -72,10 +73,18 @@ impl MonitorCollection {
                         //.expect("could not send true message to waiter");
                         //item_to_remove.push(*id);
                     } else {
-                        //info!("{} is still false", waiter.lambda)
                     }
                 }
-                Err(e) => warn!("error checking wait on: {}", e),
+                Err(e) => {
+                    let topic_id = Logger::subscribe_to_topic(LOG_TOPIC_ACTING).await;
+                    Logger::log(LogMessage::new(
+                        LogLevel::Warn,
+                        "check_wait_for",
+                        topic_id,
+                        format!("error checking wait on: {}", e),
+                    ))
+                    .await;
+                }
             }
         }
         /*item_to_remove.iter().for_each(|i| {
@@ -130,10 +139,13 @@ impl WaitForReceiver {
 
 pub async fn task_check_wait_for(
     mut update: broadcast::Receiver<bool>,
-    mut killed: broadcast::Receiver<bool>,
     monitors: MonitorCollection,
     env: LEnv,
 ) {
+    let mut set = HashSet::new();
+    set.insert(PROCESS_TOPIC_ACTING);
+    let mut process: ProcessInterface = ProcessInterface::new("TASK_CHECK_WAIT_FOR", set).await;
+    process.subscribe_to_log_topic(LOG_TOPIC_ACTING).await;
     //println!("task check wait on active");
     //let mut end_receiver = task_handler::subscribe_new_task();
     loop {
@@ -141,13 +153,11 @@ pub async fn task_check_wait_for(
             _ = update.recv() => {
                 let n_wait_on = monitors.inner.lock().await.map.len();
                 if n_wait_on != 0 {
-                    //println!("wait-for running");
                     monitors.check_wait_for(env.clone()).await;
                 }
             }
-            _ = killed.recv() => {
-                info!("Task \"task_check_monitor\" killed.");
-                break;
+            _ = process.recv() => {
+                break process.die().await;
             }
         }
     }

@@ -9,6 +9,7 @@ use crate::{platform_interface, TOKIO_CHANNEL_SIZE};
 use crate::{LOG_TOPIC_PLATFORM, PROCESS_TOPIC_PLATFORM};
 use async_trait::async_trait;
 use map_macro::set;
+use ompas_middleware::ompas_log::{LogMessage, Logger};
 use ompas_middleware::{LogLevel, ProcessInterface};
 use ompas_rae_structs::agenda::Agenda;
 use ompas_rae_structs::state::action_status::CommandStatus;
@@ -29,6 +30,7 @@ use tokio::sync::Mutex;
 
 const PROCESS_GET_UPDATES: &str = "__PROCESS_GET_UPDATES__";
 const PROCESS_SEND_COMMANDS: &str = "__PROCESS_SEND_COMMANDS__";
+const PLATFORM_CLIENT: &str = "PlatformClient";
 
 #[derive(Clone)]
 pub struct Platform {
@@ -44,10 +46,16 @@ impl Platform {
         for arg in command {
             arguments.push(LValueS::try_from(arg).unwrap().try_into().unwrap())
         }
-        /*println!(
-            "[PlatformClient] new command request: {}",
-            LValue::from(command)
-        );*/
+        let topic = Logger::subscribe_to_topic(LOG_TOPIC_PLATFORM).await;
+
+        Logger::log(LogMessage::new(
+            LogLevel::Debug,
+            PLATFORM_CLIENT,
+            topic,
+            format!("New command request: {}", LValue::from(command)),
+        ))
+        .await;
+
         let request = CommandRequest {
             request: Some(Request::Execution(CommandExecutionRequest {
                 arguments,
@@ -90,7 +98,11 @@ impl Platform {
             .subscribe_to_log_topic(LOG_TOPIC_PLATFORM)
             .await;
         let request = tonic::IntoRequest::into_request(InitGetUpdate {});
-        println!("[PlatformClient] initiating update stream");
+
+        process_interface
+            .log("Initiating update stream", LogLevel::Info)
+            .await;
+
         let stream = client.get_updates(request).await.expect("");
         let mut stream: tonic::codec::Streaming<PlatformUpdate> = stream.into_inner();
 
@@ -167,7 +179,11 @@ impl Platform {
         let mut process =
             ProcessInterface::new(PROCESS_SEND_COMMANDS, set! {PROCESS_TOPIC_PLATFORM}).await;
         let stream = tokio_stream::wrappers::ReceiverStream::new(command_stream);
-        println!("[PlatformClient] initiating command stream");
+        process.subscribe_to_log_topic(LOG_TOPIC_PLATFORM).await;
+
+        process
+            .log("initiating command stream", LogLevel::Info)
+            .await;
 
         let stream = client
             .send_commands(tonic::Request::new(stream))
@@ -247,7 +263,7 @@ impl PlatformDescriptor for Platform {
         self.inner.write().await.start().await;
 
         let server: SocketAddr = self.socket().await;
-        println!("server addr: {}", server);
+        //println!("server addr: {}", server);
         let client: PlatformInterfaceClient<_> =
             PlatformInterfaceClient::connect(format!("https://{}", server))
                 .await

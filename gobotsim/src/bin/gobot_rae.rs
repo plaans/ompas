@@ -2,6 +2,7 @@ use std::fs;
 //use ompas_gobotsim::mod_godot::CtxGodot;
 use ompas_gobotsim::platform::PlatformGobotSim;
 use ompas_middleware::ompas_log::FileDescriptor;
+use ompas_middleware::Master;
 use ompas_rae_core::monitor::CtxRaeUser;
 use ompas_rae_interface::platform::Domain;
 use sompas_core::activate_debug;
@@ -84,4 +85,5 @@ pub async fn lisp_interpreter(log: Option<PathBuf>, godot: bool, rae_log: bool) 
 
     li.run(log.map(|p| FileDescriptor::AbsolutePath(fs::canonicalize(p).unwrap())))
         .await;
+    Master::end().await;
 }

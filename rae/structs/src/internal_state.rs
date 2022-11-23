@@ -3,7 +3,7 @@ use crate::monitor::MonitorCollection;
 use crate::rae_command::RAECommand;
 use crate::resource::ResourceCollection;
 use crate::state::world_state::WorldState;
-use std::path::PathBuf;
+use ompas_middleware::ompas_log::TopicId;
 use std::sync::Arc;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
@@ -14,18 +14,18 @@ pub struct OMPASInternalState {
     pub resources: ResourceCollection,
     pub monitors: MonitorCollection,
     pub agenda: Agenda,
-    pub log: LogConfig,
+    pub log: TopicId,
     pub command_stream: Arc<RwLock<Option<Sender<RAECommand>>>>,
     //pub stop_tx: Arc<RwLock<Option<Sender<EndSignal>>>>,
     //pub process_interface: Arc<RwLock<Option<ProcessInterface>>>,
 }
 
-#[derive(Default, Clone)]
+/*#[derive(Default, Clone)]
 pub struct LogConfig {
     pub path: PathBuf,
     pub channel: Option<Sender<String>>,
     pub display: bool,
-}
+}*/
 
 impl OMPASInternalState {
     pub async fn get_sender(&self) -> Option<Sender<RAECommand>> {

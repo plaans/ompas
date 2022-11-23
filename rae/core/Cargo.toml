@@ -16,11 +16,10 @@ ompas-rae-structs= {path = "../structs"}
 ompas-rae-interface = {path = "../interface"}
 ompas-rae-planning = {path ="../planning" }
 ompas-rae-language = {path = "../language"}
-ompas-rae-log = {path = "../log"}
+#ompas-rae-log = {path = "../log"}
 tokio = { version = "1.17.0", features = ["full", "time"] }
 im = "15.0.0"
 chrono = "0.4.19"
-log =  { version = "0.4", features = ["std"] }
 macro_rules_attribute = "0.0.2"
 async-trait = "0.1.51"
 aries_planning = {path = "../../aries/planning"}

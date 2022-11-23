@@ -1,4 +1,4 @@
-use crate::ompas_log::{EndSignal, LogMessage, TopicId, END_SIGNAL, LOGGER};
+use crate::ompas_log::{EndSignal, LogMessage, Logger, TopicId, END_SIGNAL};
 use lazy_static::lazy_static;
 use log::Level;
 use map_macro::{map, set};
@@ -7,19 +7,20 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
-use tokio::sync::{mpsc, Mutex, RwLock};
+use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
 
 pub mod ompas_log;
 const TOKIO_CHANNEL_SIZE: usize = 100;
 
 lazy_static! {
-    pub static ref MASTER: Master = Master::new();
+    static ref MASTER: Master = Master::new();
 }
 
 pub const PROCESS_TOPIC_ALL: &str = "__PROCESS_TOPIC_ALL__";
 const TOPIC_ALL_ID: usize = 0;
 const ROOT: usize = 0;
 const LOG_TOPIC_ROOT: &str = "__LOG_TOPIC_ROOT__";
+const MASTER_LABEL: &str = "master";
 pub type ProcessId = usize;
 
 #[derive(Clone)]
@@ -30,6 +31,7 @@ pub struct Master {
     sender: Arc<RwLock<tokio::sync::mpsc::Sender<KillRequest>>>,
     next_topic_id: Arc<AtomicUsize>,
     next_process_id: Arc<AtomicUsize>,
+    end_receiver: Arc<broadcast::Receiver<EndSignal>>,
 }
 
 pub struct ProcessDescriptor {
@@ -40,6 +42,7 @@ pub struct ProcessDescriptor {
 impl Master {
     pub fn new() -> Self {
         let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+        let (tx_end, rx_end) = broadcast::channel(TOKIO_CHANNEL_SIZE);
 
         let master = Self {
             processes: Arc::new(Default::default()),
@@ -52,35 +55,48 @@ impl Master {
             sender: Arc::new(RwLock::new(tx)),
             next_topic_id: Arc::new(AtomicUsize::new(1)),
             next_process_id: Arc::new(Default::default()),
+            end_receiver: Arc::new(rx_end),
         };
 
         let master2 = master.clone();
 
-        tokio::spawn(async move { Master::run_middleware(master2, rx) });
+        tokio::spawn(async move { Master::run_middleware(master2, rx, tx_end).await });
         master
+    }
+
+    pub async fn end() {
+        let mut end = MASTER.end_receiver.resubscribe();
+        let _ = end.recv().await;
     }
 
     async fn run_middleware(
         master: Master,
         mut receiver: tokio::sync::mpsc::Receiver<KillRequest>,
+        end: broadcast::Sender<EndSignal>,
     ) {
-        let topic_id = LOGGER.subscribe_to_topic(LOG_TOPIC_ROOT).await;
+        let topic_id = Logger::subscribe_to_topic(LOG_TOPIC_ROOT).await;
+        Logger::log(LogMessage::new(
+            LogLevel::Info,
+            MASTER_LABEL,
+            topic_id,
+            "INITIATE MASTER",
+        ))
+        .await;
 
         loop {
             if let Some(kill_request) = receiver.recv().await {
                 let id = master.topic_id.write().await.remove(&kill_request.topic);
                 if let Some(id) = id {
-                    LOGGER
-                        .log(LogMessage {
-                            level: Level::Warn,
-                            source: ROOT.to_string(),
-                            topics: set! {topic_id},
-                            message: format!(
-                                "{} requested termination of process topic {}.",
-                                kill_request.requestor, kill_request.topic,
-                            ),
-                        })
-                        .await;
+                    Logger::log(LogMessage {
+                        level: Level::Warn,
+                        source: ROOT.to_string(),
+                        topic: topic_id,
+                        message: format!(
+                            "{} requested termination of process topic {}.",
+                            kill_request.requestor, kill_request.topic,
+                        ),
+                    })
+                    .await;
                     let processes = master.topic_process.lock().await.remove(&id);
                     if let Some(processes) = processes {
                         for p in processes {
@@ -88,11 +104,10 @@ impl Master {
                             if let Some(process) = process {
                                 match process.sender.send(END_SIGNAL).await {
                                     Ok(_) => {
-                                        LOGGER
-                                            .log(LogMessage {
+                                        Logger::log(LogMessage {
                                                 level: Level::Warn,
                                                 source: ROOT.to_string(),
-                                                topics: set! {topic_id},
+                                                topic: topic_id,
                                                 message: format!(
                                                     "Request termination of process {}{{Requested by: {}; Part of Topic: {}}}.",
                                                     process.label,
@@ -103,17 +118,16 @@ impl Master {
                                             .await;
                                     }
                                     Err(err) => {
-                                        LOGGER
-                                            .log(LogMessage {
-                                                level: Level::Warn,
-                                                source: ROOT.to_string(),
-                                                topics: set! {topic_id},
-                                                message: format!(
-                                                    "Error request termination of process {}: {}",
-                                                    process.label, err
-                                                ),
-                                            })
-                                            .await;
+                                        Logger::log(LogMessage {
+                                            level: Level::Warn,
+                                            source: ROOT.to_string(),
+                                            topic: topic_id,
+                                            message: format!(
+                                                "Error request termination of process {}: {}",
+                                                process.label, err
+                                            ),
+                                        })
+                                        .await;
                                     }
                                 }
                             }
@@ -125,6 +139,14 @@ impl Master {
                 }
             }
         }
+        Logger::log(LogMessage::new(
+            LogLevel::Info,
+            MASTER_LABEL,
+            topic_id,
+            "END MASTER",
+        ))
+        .await;
+        let _ = end.send(END_SIGNAL);
     }
 
     async fn subscribe_to_topic(&self, process_id: ProcessId, topic: ProcessTopic) {
@@ -139,6 +161,14 @@ impl Master {
                     .push(process_id);
             }
             None => {
+                let topic_root = Logger::subscribe_to_topic(LOG_TOPIC_ROOT).await;
+                Logger::log(LogMessage::new(
+                    LogLevel::Debug,
+                    MASTER_LABEL,
+                    topic_root,
+                    format!("Creating proces topic {}", topic),
+                ))
+                .await;
                 let id = get_and_update_id_counter(self.next_topic_id.clone());
                 self.topic_process.lock().await.insert(id, vec![process_id]);
                 self.topic_id.write().await.insert(topic, id);
@@ -148,6 +178,14 @@ impl Master {
 
     #[allow(dead_code)]
     async fn new_topic(&self, name: ProcessTopic) -> TopicId {
+        let topic_root = Logger::subscribe_to_topic(LOG_TOPIC_ROOT).await;
+        Logger::log(LogMessage::new(
+            LogLevel::Debug,
+            MASTER_LABEL,
+            topic_root,
+            format!("Creating proces topic {}", name),
+        ))
+        .await;
         let id = get_and_update_id_counter(self.next_topic_id.clone());
         self.topic_process.lock().await.insert(id, vec![]);
         self.topic_id.write().await.insert(name, id);
@@ -191,7 +229,7 @@ pub struct ProcessInterface {
     id: ProcessId,
     sender: mpsc::Sender<KillRequest>,
     receiver: mpsc::Receiver<EndSignal>,
-    log_topic: HashSet<TopicId>,
+    log_topic: TopicId,
 }
 
 #[derive(Clone, Default)]
@@ -220,11 +258,12 @@ impl ProcessInterface {
         self.sender
             .send(KillRequest::new(self.label.to_string(), topic.to_string()))
             .await
-            .unwrap_or_else(|_| {
+            .unwrap_or_else(|e| {
                 panic!(
-                    "Error sending kill signal for topic {} requested by {}",
+                    "Error sending kill signal for topic {} requested by {}: {}",
                     topic.to_string(),
-                    self.label
+                    self.label,
+                    e
                 )
             });
     }
@@ -236,31 +275,28 @@ impl ProcessInterface {
     }
 
     pub async fn subscribe_to_log_topic(&mut self, topic: impl Display) {
-        self.log_topic
-            .insert(LOGGER.subscribe_to_topic(topic.to_string()).await);
+        self.log_topic = Logger::subscribe_to_topic(topic).await;
     }
 
     pub async fn log(&self, message: impl Display, level: LogLevel) {
-        LOGGER
-            .log(LogMessage {
-                level: level.into(),
-                source: self.label.to_string(),
-                topics: self.log_topic.clone(),
-                message: message.to_string(),
-            })
-            .await;
+        Logger::log(LogMessage {
+            level: level.into(),
+            source: self.label.to_string(),
+            topic: self.log_topic.clone(),
+            message: message.to_string(),
+        })
+        .await;
     }
 
     pub async fn die(self) {
-        let topic_root = LOGGER.subscribe_to_topic(LOG_TOPIC_ROOT).await;
-        LOGGER
-            .log(LogMessage {
-                level: Level::Debug,
-                source: self.label.to_string(),
-                topics: set! {topic_root},
-                message: format!("Process {} is dead.", self.label),
-            })
-            .await;
+        let topic_root = Logger::subscribe_to_topic(LOG_TOPIC_ROOT).await;
+        Logger::log(LogMessage {
+            level: Level::Debug,
+            source: self.label.to_string(),
+            topic: topic_root,
+            message: format!("Process {} is dead.", self.label),
+        })
+        .await;
     }
 }
 

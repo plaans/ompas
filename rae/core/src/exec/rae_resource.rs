@@ -1,6 +1,5 @@
 use crate::contexts::ctx_rae::{CtxRae, CTX_RAE};
 use crate::exec::*;
-use log::info;
 use ompas_rae_language::IS_LOCKED;
 use ompas_rae_structs::mutex::Wait;
 use ompas_rae_structs::resource::{AcquireResponse, Capacity, ResourceHandler};

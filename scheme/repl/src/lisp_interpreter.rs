@@ -1,23 +1,27 @@
+use crate::LOG_TOPIC_INTERPRETER;
+use crate::PROCESS_TOPIC_INTERPRETER;
 use crate::TOKIO_CHANNEL_SIZE;
 use chrono::{DateTime, Utc};
 use im::HashMap;
+use map_macro::set;
+use ompas_middleware::ompas_log::{FileDescriptor, LOGGER};
+use ompas_middleware::{LogLevel, ProcessInterface, PROCESS_TOPIC_ALL};
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use sompas_core::{eval, eval_init, get_root_env, parse};
 use sompas_structs::lenv::{ImportType, LEnv};
 use sompas_structs::lruntimeerror::LResult;
 use sompas_structs::module::IntoModule;
-use sompas_utils::task_handler;
-use sompas_utils::task_handler::{subscribe_new_task, EndSignal};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
 use std::{env, fs};
-use tokio::sync::broadcast;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::task::JoinHandle;
 
+const PROCESS_INTERPRETER: &str = "__PROCESS_INTERPRETER__";
+const PROCESS_SPAWN_REPL: &str = "__PROCESS_SPAWN_REPL__";
 #[derive(Debug)]
 pub struct LispInterpreterChannel {
     sender: Sender<String>,
@@ -133,13 +137,23 @@ impl LispInterpreter {
         self.li_channel.recv().await
     }
 
-    pub async fn run(mut self, log: Option<PathBuf>) {
+    pub async fn run(mut self, log: Option<FileDescriptor>) {
+        let mut process_interface: ProcessInterface = ProcessInterface::new(
+            PROCESS_INTERPRETER.to_string(),
+            set! {PROCESS_TOPIC_INTERPRETER.to_string()},
+        )
+        .await;
+        LOGGER.new_topic(LOG_TOPIC_INTERPRETER, log).await;
+        process_interface
+            .subscribe_to_log_topic(LOG_TOPIC_INTERPRETER)
+            .await;
+
         eval_init(&mut self.env).await;
 
-        let channel_with_log = self.subscribe();
-        let id_log = channel_with_log.id;
+        //let channel_with_log = self.subscribe();
+        //let id_log = channel_with_log.id;
 
-        let handle_log = spawn_log(channel_with_log, log).await;
+        //let handle_log = spawn_log(channel_with_log, log).await;
         let handle_repl = if self.config.repl {
             Some(spawn_repl(self.subscribe()).await)
         } else {
@@ -147,48 +161,68 @@ impl LispInterpreter {
         };
 
         loop {
-            let id_subscriber: usize = self
-                .recv()
-                .await
-                .expect("bug in lisp interpretor")
-                .parse()
-                .unwrap();
-            let str_lvalue = self.recv().await.expect("bug in LI");
-            //println!("expr: {}", str_lvalue);
+            tokio::select! {
+                _ = process_interface.recv() => {
+                    process_interface.die().await;
+                    break;
+                }
+                id_subscriber = self.recv() => {
+                    let id_subscriber: usize = match id_subscriber {
+                        None => {
+                            process_interface.log("Error in the interpretor", LogLevel::Error).await;
+                            continue;
+                        }
+                        Some(id) => {
+                            id.parse().unwrap()
+                        }
+                    };
+                    let str_lvalue = match self.recv().await {
+                        None => {
+                            process_interface.log("Error in the interpretor", LogLevel::Error).await;
+                            continue;
+                        }
+                        Some(str) => {
+                            str
+                        }
+                    };
 
-            if str_lvalue == *"exit" {
-                task_handler::end_all();
-                break;
+                    if str_lvalue == *"exit" {
+                        process_interface.kill(PROCESS_TOPIC_ALL).await;
+                        break;
+                    }
+
+                    match parse(str_lvalue.as_str(), &mut self.env).await {
+                        Ok(lv) => {
+                            let result = eval(&lv, &mut self.env, None).await;
+
+                            /*self.li_channel
+                                .send(&id_log, result.clone())
+                                .await
+                                .expect("error on log");*/
+                            self.li_channel
+                                .send(&id_subscriber, result)
+                                .await
+                                .expect("error on channel to stdout");
+                        }
+                        Err(e) => {
+                            /*self.li_channel
+                                .send(&id_log, Err(e.clone()))
+                                .await
+                                .expect("error on log");*/
+
+                            self.li_channel
+                                .send(&id_subscriber, Err(e))
+                                .await
+                                .expect("error on channel to stdout");
+                        }
+                    };
+
+                }
+
             }
-
-            match parse(str_lvalue.as_str(), &mut self.env).await {
-                Ok(lv) => {
-                    let result = eval(&lv, &mut self.env, None).await;
-
-                    self.li_channel
-                        .send(&id_log, result.clone())
-                        .await
-                        .expect("error on log");
-                    self.li_channel
-                        .send(&id_subscriber, result)
-                        .await
-                        .expect("error on channel to stdout");
-                }
-                Err(e) => {
-                    self.li_channel
-                        .send(&id_log, Err(e.clone()))
-                        .await
-                        .expect("error on log");
-
-                    self.li_channel
-                        .send(&id_subscriber, Err(e))
-                        .await
-                        .expect("error on channel to stdout");
-                }
-            };
         }
 
-        handle_log.await.expect("Error on task log");
+        //handle_log.await.expect("Error on task log");
         if let Some(handle) = handle_repl {
             handle.await.expect("Error on task repl");
         }
@@ -213,12 +247,17 @@ impl LispInterpreter {
 
 ///Spawn repl task
 pub async fn spawn_repl(communication: ChannelToLispInterpreter) -> JoinHandle<()> {
-    let mut end_receiver = subscribe_new_task();
+    let mut process_interface = ProcessInterface::new(
+        PROCESS_SPAWN_REPL.to_string(),
+        set! {PROCESS_TOPIC_INTERPRETER.to_string()},
+    )
+    .await;
+
     tokio::spawn(async move {
         tokio::select! {
             _ = repl(communication) => {
             }
-            _ = end_receiver.recv() => {
+            _ = process_interface.recv() => {
                 println!("task_handler killed repl.")
             }
         }
@@ -227,17 +266,17 @@ pub async fn spawn_repl(communication: ChannelToLispInterpreter) -> JoinHandle<(
 
 /// Spawn the log task
 pub async fn spawn_log(com: ChannelToLispInterpreter, log_path: Option<PathBuf>) -> JoinHandle<()> {
-    let end_receiver = subscribe_new_task();
     tokio::spawn(async move {
-        log(com, log_path, end_receiver).await;
+        log(com, log_path).await;
     })
 }
 
-async fn log(
-    mut com: ChannelToLispInterpreter,
-    working_dir: Option<PathBuf>,
-    mut end_receiver: broadcast::Receiver<EndSignal>,
-) {
+async fn log(mut com: ChannelToLispInterpreter, working_dir: Option<PathBuf>) {
+    let mut process_interface = ProcessInterface::new(
+        PROCESS_SPAWN_REPL.to_string(),
+        set! {PROCESS_TOPIC_INTERPRETER.to_string()},
+    )
+    .await;
     let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
     let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
 
@@ -282,7 +321,7 @@ async fn log(
                 file.write_all(format!("{}\n", buffer).as_bytes())
                     .expect("could not write to log file");
                 }
-            _ = end_receiver.recv() => {
+            _ = process_interface.recv() => {
                 com.close();
                 break;
             }

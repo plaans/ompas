@@ -1,4 +1,5 @@
 use crate::aries::structs::{ConversionCollection, ConversionContext};
+use ompas_utils::blocking_async;
 use sompas_core::*;
 use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lenv::LEnv;
@@ -6,7 +7,6 @@ use sompas_structs::llambda::LambdaArgs;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::{lruntimeerror, wrong_n_args, wrong_type};
-use sompas_utils::blocking_async;
 
 pub const TRANSFORM_LAMBDA_EXPRESSION: &str = "transform-lambda-expression";
 

@@ -1,7 +1,8 @@
 use crate::platform_interface::atom::Kind;
 use crate::platform_interface::{
-    atom, command_response, Atom, CommandAccepted, CommandCancelled, CommandProgress,
-    CommandRejected, CommandResponse, CommandResult, Expression,
+    atom, command_response, event, platform_update, Atom, CommandAccepted, CommandCancelled,
+    CommandProgress, CommandRejected, CommandResponse, CommandResult, Event, Expression, Instance,
+    PlatformUpdate, StateUpdate,
 };
 use sompas_structs::lvalues::LValueS;
 use std::fmt::{Display, Formatter};
@@ -11,6 +12,8 @@ pub mod platform_interface;
 
 pub const DEFAULT_PLATFORM_SERVICE_IP: &str = "127.0.0.1";
 pub const DEFAULT_PLATFROM_SERVICE_PORT: u16 = 8257;
+pub const PROCESS_TOPIC_PLATFORM: &str = "__PROCESS_TOPIC_PLATFORM__";
+pub const LOG_TOPIC_PLATFORM: &str = "__LOG_TOPIC_PLATFORM__";
 
 const TOKIO_CHANNEL_SIZE: usize = 100;
 
@@ -39,7 +42,7 @@ impl TryFrom<LValueS> for Atom {
 impl TryFrom<LValueS> for Expression {
     type Error = ();
 
-    fn try_from(mut value: LValueS) -> Result<Self, Self::Error> {
+    fn try_from(value: LValueS) -> Result<Self, Self::Error> {
         Ok(match value {
             LValueS::Symbol(s) => Self {
                 atom: Some(Atom {
@@ -158,6 +161,24 @@ impl From<CommandCancelled> for CommandResponse {
     fn from(cc: CommandCancelled) -> Self {
         Self {
             response: Some(command_response::Response::Cancelled(cc)),
+        }
+    }
+}
+
+impl From<Instance> for PlatformUpdate {
+    fn from(i: Instance) -> Self {
+        Self {
+            update: Some(platform_update::Update::Event(Event {
+                event: Some(event::Event::Instance(i)),
+            })),
+        }
+    }
+}
+
+impl From<StateUpdate> for PlatformUpdate {
+    fn from(su: StateUpdate) -> Self {
+        PlatformUpdate {
+            update: Some(platform_update::Update::State(su)),
         }
     }
 }

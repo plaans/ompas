@@ -4,13 +4,13 @@ use log::info;
 use ompas_rae_language::IS_LOCKED;
 use ompas_rae_structs::mutex::Wait;
 use ompas_rae_structs::resource::{AcquireResponse, Capacity, ResourceHandler};
+use ompas_utils::dyn_async;
+use ompas_utils::other::generic_race;
 use rand::{thread_rng, Rng};
 use sompas_core::modules::map::get_map;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LResult;
 use sompas_structs::lvalue::LValue;
-use sompas_utils::dyn_async;
-use sompas_utils::other::generic_race;
 use std::borrow::Borrow;
 use std::convert::{TryFrom, TryInto};
 

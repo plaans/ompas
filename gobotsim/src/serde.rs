@@ -86,7 +86,7 @@ impl GodotMessageSerde {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SerdeRobotCommand {
+pub struct SerdeCommand {
     pub command_info: LValueS,
     pub temp_id: usize,
 }
@@ -127,7 +127,7 @@ pub struct SerdeActionCancel {
 #[serde(untagged)]
 pub enum GodotMessageSerdeData {
     LValue(LValueS),
-    RobotCommand(SerdeRobotCommand),
+    RobotCommand(SerdeCommand),
     ActionResponse(SerdeActionResponse),
     ActionFeedback(SerdeActionFeedback),
     ActionResult(SerdeActionResult),

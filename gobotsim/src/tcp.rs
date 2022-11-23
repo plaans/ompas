@@ -1,15 +1,18 @@
-use crate::serde::{GodotMessageSerde, GodotMessageSerdeData, GodotMessageType, SerdeRobotCommand};
+use crate::serde::{
+    GodotMessageSerde, GodotMessageSerdeData, GodotMessageType, SerdeCancelRequest, SerdeCommand,
+};
+use crate::PROCESS_TOPIC_GOBOT_SIM;
+use map_macro::set;
+use ompas_middleware::ProcessInterface;
 use ompas_rae_interface::platform_interface::command_request::Request;
 use ompas_rae_interface::platform_interface::{
-    command_response, event, platform_update, Atom, CommandAccepted, CommandCancelRequest,
-    CommandCancelled, CommandExecutionRequest, CommandProgress, CommandRejected, CommandRequest,
-    CommandResponse, CommandResult, Event, Instance, PlatformUpdate, StateUpdate, StateVariable,
-    StateVariableType,
+    Atom, CommandAccepted, CommandCancelRequest, CommandCancelled, CommandExecutionRequest,
+    CommandProgress, CommandRejected, CommandRequest, CommandResponse, CommandResult, Instance,
+    PlatformUpdate, StateUpdate, StateVariable, StateVariableType,
 };
-use ompas_rae_structs::state::action_status::CommandStatus;
+use ompas_rae_interface::PROCESS_TOPIC_PLATFORM;
 use ompas_rae_structs::state::partial_state::PartialState;
 use sompas_structs::lvalues::LValueS;
-use sompas_utils::task_handler::EndSignal;
 use std::convert::TryFrom;
 use std::convert::TryInto;
 use std::net::SocketAddr;
@@ -21,6 +24,8 @@ use tokio::sync::{broadcast, mpsc};
 pub const BUFFER_SIZE: usize = 65_536; //65KB should be enough for the moment
 
 pub const TEST_TCP: &str = "test_tcp";
+const PROCESS_GOBOT_READ_TCP: &str = "__PROCESS_GOBOT_READ_TCP__";
+const PROCESS_GOBOT_WRITE_TCP: &str = "__PROCESS_GOBOT_WRITE_TCP__";
 
 /// Opens the tcp connection with godot
 pub async fn task_tcp_connection(
@@ -28,38 +33,37 @@ pub async fn task_tcp_connection(
     command_request_receiver: mpsc::Receiver<CommandRequest>,
     command_response_sender: broadcast::Sender<CommandResponse>,
     state_update_sender: broadcast::Sender<PlatformUpdate>,
-    killer: broadcast::Sender<EndSignal>,
 ) {
     let stream = TcpStream::connect(socket_addr).await.unwrap();
 
     // splits the tcp connection into a read and write stream.
     let (rd, wr) = io::split(stream);
 
-    let k1 = killer.clone();
     // Starts the task to read data from socket.
     tokio::spawn(async move {
-        async_read_socket(rd, command_response_sender, state_update_sender, k1).await
+        async_read_socket(rd, command_response_sender, state_update_sender).await
     });
 
-    let k2 = killer.clone();
-
     // Starts the task that awaits on data from inner process, and sends it to godot via tcp.
-    tokio::spawn(async move { async_write_socket(wr, command_request_receiver, k2).await });
+    tokio::spawn(async move { async_write_socket(wr, command_request_receiver).await });
 }
 
 async fn async_write_socket(
     mut stream: WriteHalf<TcpStream>,
     mut receiver: Receiver<CommandRequest>,
-    killer: broadcast::Sender<EndSignal>,
 ) {
-    //let test = receiver.recv().await.unwrap();
-    //assert_eq!(test, TEST_TCP);
-    //println!("socket ready to receive command !");
-    //let mut end_receiver = task_handler::subscribe_new_task();
+    let mut process = ProcessInterface::new(
+        PROCESS_GOBOT_WRITE_TCP,
+        set! {PROCESS_TOPIC_GOBOT_SIM, PROCESS_TOPIC_PLATFORM},
+    )
+    .await;
 
-    let mut killed = killer.subscribe();
     loop {
         tokio::select! {
+            _ = process.recv() => {
+                //println!("godot sender task ended");
+                break;
+            }
             command = receiver.recv() => {
                 //println!("[GodotTCP] new command request");
                 let command: CommandRequest = match command {
@@ -76,10 +80,7 @@ async fn async_write_socket(
                     Err(_) => panic!("error sending via socket"),
                 }
             }
-            _ = killed.recv() => {
-                println!("godot sender task ended");
-                break;
-            }
+
         }
     }
 }
@@ -93,7 +94,17 @@ fn command_request_to_string(request: &CommandRequest) -> String {
 }
 
 fn command_cancel_to_string(cancel: &CommandCancelRequest) -> String {
-    todo!()
+    let gs = GodotMessageSerde {
+        _type: GodotMessageType::CancelRequest,
+        data: GodotMessageSerdeData::ActionId(SerdeCancelRequest {
+            action_id: cancel.command_id as usize,
+        }),
+    };
+
+    //println!("action status created");
+
+    let command = serde_json::to_string(&gs).unwrap();
+    command
 }
 
 fn command_execution_to_string(execution: &CommandExecutionRequest) -> String {
@@ -110,7 +121,7 @@ fn command_execution_to_string(execution: &CommandExecutionRequest) -> String {
 
     let gs = GodotMessageSerde {
         _type,
-        data: GodotMessageSerdeData::RobotCommand(SerdeRobotCommand {
+        data: GodotMessageSerdeData::RobotCommand(SerdeCommand {
             command_info: command_info.into(),
             temp_id: execution.command_id as usize,
         }),
@@ -137,8 +148,13 @@ async fn async_read_socket(
     stream: ReadHalf<TcpStream>,
     command_response_sender: broadcast::Sender<CommandResponse>,
     state_update_sender: broadcast::Sender<PlatformUpdate>,
-    killer: broadcast::Sender<EndSignal>,
 ) {
+    let mut process = ProcessInterface::new(
+        PROCESS_GOBOT_READ_TCP,
+        set! {PROCESS_TOPIC_GOBOT_SIM, PROCESS_TOPIC_PLATFORM},
+    )
+    .await;
+
     let mut buf_reader = BufReader::new(stream);
 
     let mut buf = [0; BUFFER_SIZE];
@@ -146,27 +162,26 @@ async fn async_read_socket(
 
     let mut map_server_id_action_id: im::HashMap<usize, usize> = Default::default();
 
-    let mut killed = killer.subscribe();
-
-    loop {
+    'outer: loop {
         //reading an incoming message from the tcp server of godot
         tokio::select! {
-            _ = killed.recv() => {
+            _ = process.recv() => {
                 println!("godot tcp receiver task ended.");
                 break;
             }
             msg = buf_reader.read_exact(&mut size_buf) => {
+
                 match msg {
                     Ok(_) => {}
                     Err(_) => {
-                        killer.send(true).expect("could send kill message to rae processes.");
+                        process.kill(PROCESS_TOPIC_PLATFORM).await;
                     }//panic!("Error while reading buffer"),
                 };
                 let size = read_size_from_buf(&size_buf);
                 match buf_reader.read_exact(&mut buf[0..size]).await {
                     Ok(_) => {}
                     Err(_) => {
-                                killer.send(true).expect("could send kill message to rae processes.");
+                        process.kill(PROCESS_TOPIC_PLATFORM).await;
                     }
                 };
 
@@ -203,12 +218,13 @@ async fn async_read_socket(
                                                         r#type: v.to_string(),
                                                         object: parameters[0].to_string()
                                                     };
-                                                    state_update_sender.send(PlatformUpdate {
-                                                update: Some(platform_update::Update::Event(Event {
-                                                    event: Some(event::Event::Instance(instance))
-                                                }))
-                                            });
-                                                };
+                                                    if let Err(_) = state_update_sender.send(instance.into())
+                                                    {
+                                                        process.kill(PROCESS_TOPIC_PLATFORM).await;
+                                                        process.die().await;
+                                                        break 'outer;
+                                                    }
+                                         };
 
                                                 state_variables.push(StateVariable {
                                                     r#type: StateVariableType::Static.into(),
@@ -221,11 +237,14 @@ async fn async_read_socket(
                                         }
                                     }
 
-
-                                    state_update_sender.send(PlatformUpdate {
-                                        update: Some(platform_update::Update::State(StateUpdate {
-                                            state_variables
-                                    }))});
+                                    if let Err(_) = state_update_sender.send(StateUpdate {
+                                        state_variables
+                                    }.into())
+                                    {
+                                        process.kill(PROCESS_TOPIC_PLATFORM).await;
+                                        process.die().await;
+                                        break 'outer;
+                                    }
                         }
                         GodotMessageType::DynamicState => {
                             let temps_state: PartialState = PartialState::try_from(message).unwrap();
@@ -250,12 +269,14 @@ async fn async_read_socket(
                                     _ => todo!()
                                         }
                                     }
-
-                                    state_update_sender.send(PlatformUpdate {
-                                        update: Some(platform_update::Update::State(StateUpdate {
-                                    state_variables
-                                }))
-                                    });
+                                    if let Err(_) = state_update_sender.send(StateUpdate {
+                                        state_variables
+                                    }.into())
+                                    {
+                                        process.kill(PROCESS_TOPIC_PLATFORM).await;
+                                        process.die().await;
+                                        break 'outer;
+                                    }
                         },
                         /*GodotMessageType::StaticState | GodotMessageType::DynamicState => {
                             let temp_state: PartialState = message.try_into().unwrap();
@@ -293,9 +314,13 @@ async fn async_read_socket(
                             if let GodotMessageSerdeData::ActionResponse(ar) = message.data {
                                 match ar.action_id {
                                     -1 => {
-                                        command_response_sender.send(CommandRejected {
+                                        if let Err(_) = command_response_sender.send(CommandRejected {
                                                 command_id : ar.temp_id as u64
-                                            }.into());
+                                            }.into()) {
+                                            process.kill(PROCESS_TOPIC_PLATFORM).await;
+                                            process.die().await;
+                                            break 'outer;
+                                        }
                                     }
                                     i => {
                                         if i < 0 {
@@ -305,9 +330,14 @@ async fn async_read_socket(
                                             ));*/
                                         } else {
                                             map_server_id_action_id.insert(ar.action_id as usize, ar.temp_id);
-                                            command_response_sender.send(CommandAccepted {
+                                            if let Err(_) = command_response_sender.send(CommandAccepted {
                                                 command_id : ar.temp_id as u64
-                                            }.into());
+                                            }.into())
+                                             {
+                                            process.kill(PROCESS_TOPIC_PLATFORM).await;
+                                            process.die().await;
+                                            break 'outer;
+                                        }
                                         }
                                     }
                                 };
@@ -318,10 +348,14 @@ async fn async_read_socket(
                         GodotMessageType::ActionFeedback => {
                             if let GodotMessageSerdeData::ActionFeedback(af) = message.data {
                                 let command_id = *map_server_id_action_id.get(&af.action_id).expect("") as u64;
-                                command_response_sender.send(CommandProgress {
+                                if let Err(_) = command_response_sender.send(CommandProgress {
                                     command_id,
                                     progress: af.feedback
-                                }.into());
+                                }.into()) {
+                                            process.kill(PROCESS_TOPIC_PLATFORM).await;
+                                            process.die().await;
+                                            break 'outer;
+                                        }
                             } else {
                                 unreachable!("{:?} and expected ActionFeedback", message.data)
                             }
@@ -329,10 +363,14 @@ async fn async_read_socket(
                         GodotMessageType::ActionResult => {
                             if let GodotMessageSerdeData::ActionResult(ar) = message.data {
                                 let command_id = *map_server_id_action_id.get(&ar.action_id).expect("") as u64;
-                                command_response_sender.send(CommandResult {
+                                if let Err(_) = command_response_sender.send(CommandResult {
                                     command_id,
                                     result: ar.result
-                                }.into());
+                                }.into())  {
+                                            process.kill(PROCESS_TOPIC_PLATFORM).await;
+                                            process.die().await;
+                                            break 'outer;
+                                        }
                             } else {
                                 unreachable!("{:?} and expected ActionResult", message.data)
                             }
@@ -352,10 +390,14 @@ async fn async_read_socket(
                         GodotMessageType::ActionCancel => {
                             if let GodotMessageSerdeData::ActionCancel(ac) = message.data {
                                 let command_id = *map_server_id_action_id.get(&ac.action_id).expect("") as u64;
-                                command_response_sender.send(CommandCancelled {
+                                if let Err(_) = command_response_sender.send(CommandCancelled {
                                     command_id,
                                     result: ac.cancelled
-                                }.into());
+                                }.into())  {
+                                            process.kill(PROCESS_TOPIC_PLATFORM).await;
+                                            process.die().await;
+                                            break 'outer;
+                                        }
                             } else {
                                 unreachable!("{:?} and expected ActionCancel", message.data)
                             }

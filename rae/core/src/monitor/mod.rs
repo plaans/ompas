@@ -22,7 +22,7 @@ use sompas_modules::io::{CtxIo, LogOutput};
 use sompas_modules::utils::CtxUtils;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::{Documentation, LHelp};
-use sompas_structs::lenv::ImportType::WithoutPrefix;
+use sompas_structs::lenv::ImportType::{WithPrefix, WithoutPrefix};
 use sompas_structs::lenv::{LEnv, LEnvSymbols};
 use sompas_structs::module::{InitLisp, IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
@@ -254,7 +254,6 @@ impl CtxRaeUser {
                 channel: Some(channel),
                 display: display_log,
             },
-            killer: Arc::new(Default::default()),
             command_stream: Arc::new(RwLock::new(None)),
         };
         let platform = Platform {
@@ -262,7 +261,6 @@ impl CtxRaeUser {
             state: interface.state.clone(),
             agenda: interface.agenda.clone(),
             command_stream: Arc::new(Default::default()),
-            killer: Arc::new(Default::default()),
         };
 
         let domain: InitLisp = match platform.domain().await {
@@ -289,7 +287,7 @@ impl CtxRaeUser {
         let mut env = get_root_env().await;
 
         if let Some(platform) = &self.platform {
-            //env.import_module(platform.module().await.unwrap(), WithPrefix);
+            env.import_module(platform.module().await.unwrap(), WithPrefix);
         }
 
         env.import_module(CtxUtils::default(), WithoutPrefix);
@@ -385,7 +383,6 @@ impl Default for CtxRaeUser {
                 agenda: Default::default(),
                 log: Default::default(),
                 command_stream: Arc::new(Default::default()),
-                killer: Arc::new(Default::default()),
             },
             platform: None,
             rae_domain: Default::default(),

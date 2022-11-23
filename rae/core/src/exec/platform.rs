@@ -5,6 +5,7 @@ use crate::contexts::ctx_task::{CtxTask, CTX_TASK};
 use crate::exec::*;
 use crate::RaeExecError;
 use log::{error, info};
+use ompas_rae_interface::platform::PlatformDescriptor;
 use ompas_rae_structs::state::task_status::TaskStatus;
 use sompas_core::modules::list::append;
 use sompas_core::{eval, parse};
@@ -119,25 +120,25 @@ pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LAsyncHandler {
 }
 
 #[async_scheme_fn]
-pub async fn launch_platform(env: &LEnv, args: &[LValue]) -> LResult {
+pub async fn launch_platform(env: &LEnv) -> LResult {
     let ctx = env.get_context::<CtxRae>(CTX_RAE).unwrap();
 
     if let Some(platform) = &ctx.platform_interface {
-        //platform(args).await
-        todo!()
+        platform.start().await;
+        Ok(LValue::Nil)
     } else {
         Ok("No platform defined".into())
     }
 }
 
 #[async_scheme_fn]
-pub async fn cancel_command(env: &LEnv, args: &[LValue]) -> LResult {
+pub async fn cancel_command(env: &LEnv, command_id: usize) -> LResult {
     let ctx = env.get_context::<CtxRae>(CTX_RAE)?;
     let mode = env.get_context::<CtxMode>(CTX_MODE)?.mode;
     match mode {
         RAEMode::Exec => {
             if let Some(platform) = &ctx.platform_interface {
-                //platform.cancel_command(args).await;
+                platform.cancel_command(command_id).await;
                 todo!()
             } else {
                 Ok("cannot cancel command in internal platform (action is instantaneous)".into())

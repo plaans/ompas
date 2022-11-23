@@ -1,6 +1,8 @@
 use crate::monitor::{CtxRaeUser, MOD_RAE_USER, TOKIO_CHANNEL_SIZE};
 use crate::rae;
+use ompas_middleware::{ProcessInterface, ProcessTopic};
 use ompas_rae_interface::platform::PlatformDescriptor;
+use ompas_rae_interface::PROCESS_TOPIC_PLATFORM;
 use ompas_rae_language::*;
 use ompas_rae_language::{RAE_GET_AGENDA, RAE_GET_ENV, RAE_GET_STATE};
 use ompas_rae_structs::domain::RAEDomain;
@@ -19,7 +21,7 @@ use sompas_structs::lenv::LEnv;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::{lruntimeerror, wrong_type};
-use sompas_utils::task_handler::{subscribe_new_task, EndSignal};
+use std::collections::HashSet;
 use std::mem;
 use std::time::Duration;
 use tokio::sync::{broadcast, mpsc};
@@ -238,13 +240,11 @@ pub async fn launch(env: &LEnv) -> &str {
 
     *ctx.interface.command_stream.write().await = Some(tx);
     //*ctx.interface.stop_tx.write().await = Some(tx_stop);
-    *ctx.interface.killer.write().await = Some(killer.clone());
     let interface = ctx.interface.clone();
     let platform = ctx.platform.clone();
 
     if let Some(platform) = &platform {
         platform.start().await;
-        *platform.killer.write().await = Some(killer.clone())
     }
 
     let domain: RAEDomain = ctx.rae_domain.read().await.clone();
@@ -266,8 +266,6 @@ pub async fn launch(env: &LEnv) -> &str {
         ompas_rae_log::display_logger(killer.subscribe(), ctx.interface.log.path.clone());
     }
 
-    tokio::spawn(async move { monitor_rae(killer).await });
-
     for t in tasks_to_execute {
         ctx.interface
             .command_stream
@@ -283,40 +281,23 @@ pub async fn launch(env: &LEnv) -> &str {
     "rae launched succesfully"
 }
 
-pub async fn monitor_rae(killer: broadcast::Sender<EndSignal>) {
-    let mut recv_general = subscribe_new_task();
-    let mut killed = killer.subscribe();
-
-    tokio::select! {
-        _ = recv_general.recv() => {
-            println!("stop rae from general");
-            killer
-        .send(true)
-        .expect("monitor_rae: error sending kill message");
-            }
-        _ = killed.recv() => {
-            println!("stop rae from inside")
-        }
-    }
-}
+const PROCESS_STOP_OMPAS: &str = "__PROCESS_STOP_OMPAS__";
 
 #[async_scheme_fn]
 pub async fn stop(env: &LEnv) {
+    let set: HashSet<ProcessTopic> = HashSet::new();
+    let process: ProcessInterface = ProcessInterface::new(PROCESS_STOP_OMPAS, set).await;
+
     let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER).unwrap();
 
-    match ctx.interface.get_killer().await {
-        None => {}
-        Some(killer) => {
-            killer.send(true).expect("could not broadcast end signal");
-            tokio::time::sleep(Duration::from_secs(1)).await; //hardcoded moment to wait for all process to be killed.
-            *ctx.interface.command_stream.write().await = None;
-            *ctx.interface.killer.write().await = None;
-            ctx.interface.state.clear().await;
-            ctx.interface.agenda.clear().await;
-            ctx.interface.resources.clear().await;
-            ctx.interface.monitors.clear().await;
-        }
-    }
+    process.kill(PROCESS_TOPIC_PLATFORM).await;
+
+    tokio::time::sleep(Duration::from_secs(1)).await; //hardcoded moment to wait for all process to be killed.
+    *ctx.interface.command_stream.write().await = None;
+    ctx.interface.state.clear().await;
+    ctx.interface.agenda.clear().await;
+    ctx.interface.resources.clear().await;
+    ctx.interface.monitors.clear().await;
 }
 
 #[async_scheme_fn]

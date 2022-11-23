@@ -6,22 +6,29 @@ use crate::platform_interface::{
     Expression, InitGetUpdate, PlatformUpdate, StateVariableType,
 };
 use crate::{platform_interface, TOKIO_CHANNEL_SIZE};
+use crate::{LOG_TOPIC_PLATFORM, PROCESS_TOPIC_PLATFORM};
 use async_trait::async_trait;
+use map_macro::set;
+use ompas_middleware::{LogLevel, ProcessInterface};
 use ompas_rae_structs::agenda::Agenda;
 use ompas_rae_structs::state::action_status::CommandStatus;
 use ompas_rae_structs::state::partial_state::PartialState;
 use ompas_rae_structs::state::world_state::{StateType, WorldState};
 use platform_interface::platform_update::Update;
+use sompas_structs::documentation::Documentation;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalues::LValueS;
-use sompas_structs::module::IntoModule;
-use sompas_utils::task_handler::EndSignal;
+use sompas_structs::module::{IntoModule, Module};
+use sompas_structs::purefonction::PureFonctionCollection;
 use std::any::Any;
 use std::borrow::Borrow;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::sync::{broadcast, Mutex};
+use tokio::sync::Mutex;
+
+const PROCESS_GET_UPDATES: &str = "__PROCESS_GET_UPDATES__";
+const PROCESS_SEND_COMMANDS: &str = "__PROCESS_SEND_COMMANDS__";
 
 #[derive(Clone)]
 pub struct Platform {
@@ -29,7 +36,6 @@ pub struct Platform {
     pub state: WorldState,
     pub agenda: Agenda,
     pub command_stream: Arc<Mutex<Option<tokio::sync::mpsc::Sender<CommandRequest>>>>,
-    pub killer: Arc<tokio::sync::RwLock<Option<tokio::sync::broadcast::Sender<EndSignal>>>>,
 }
 
 impl Platform {
@@ -54,7 +60,8 @@ impl Platform {
             .as_ref()
             .unwrap()
             .send(request)
-            .await;
+            .await
+            .unwrap_or_else(|_| todo!());
     }
 
     pub async fn cancel_command(&self, command_id: usize) {
@@ -69,15 +76,19 @@ impl Platform {
             .as_ref()
             .unwrap()
             .send(request)
-            .await;
+            .await
+            .unwrap_or_else(|_| todo!());
     }
 
     async fn get_updates(
         mut client: PlatformInterfaceClient<tonic::transport::Channel>,
         world_state: WorldState,
-        killer: tokio::sync::broadcast::Sender<EndSignal>,
     ) {
-        let mut killed = killer.subscribe();
+        let mut process_interface: ProcessInterface =
+            ProcessInterface::new(PROCESS_GET_UPDATES, set! {PROCESS_TOPIC_PLATFORM}).await;
+        process_interface
+            .subscribe_to_log_topic(LOG_TOPIC_PLATFORM)
+            .await;
         let request = tonic::IntoRequest::into_request(InitGetUpdate {});
         println!("[PlatformClient] initiating update stream");
         let stream = client.get_updates(request).await.expect("");
@@ -85,62 +96,64 @@ impl Platform {
 
         loop {
             tokio::select! {
-                _ = killed.recv() => {
-                    eprintln!("platform update service ended.");
+                _ = process_interface.recv() => {
                     break;
                 }
                 msg = stream.message() => {
                     //println!("[PlatformClient] received new update: {:?}", msg);
                     match msg {
-                    Err(_) => {
-                         killer.send(true).expect("could send kill message to rae processes.");
-                    }
-                    Ok(Some(msg)) => {
-                        if let Some(update) =  msg.update {
-                            match update {
-                                Update::State(state) => {
-                                    let mut r#static =  PartialState {
-                                        inner: Default::default(),
-                                        _type: Some(StateType::Static)
-                                    };
+                        Err(err) => {
+                                process_interface.log(format!("Ggpc error: {}",err), LogLevel::Error).await;
+                        }
+                        Ok(None) => {
+                            process_interface.log("Grpc stream closed", LogLevel::Error).await;
+                            process_interface.kill(PROCESS_TOPIC_PLATFORM).await;
+                        }
+                        Ok(Some(msg)) => {
+                            if let Some(update) =  msg.update {
+                                match update {
+                                    Update::State(state) => {
+                                        let mut r#static =  PartialState {
+                                            inner: Default::default(),
+                                            _type: Some(StateType::Static)
+                                        };
 
-                                    let mut dynamic = PartialState {
-                                        inner: Default::default(),
-                                        _type: Some(StateType::Dynamic)
-                                    };
+                                        let mut dynamic = PartialState {
+                                            inner: Default::default(),
+                                            _type: Some(StateType::Dynamic)
+                                        };
 
-                                    for sv in state.state_variables {
+                                        for sv in state.state_variables {
 
-                                        let mut key : Vec<LValueS> = vec![sv.state_function.into()];
-                                        for p in sv.parameters {
-                                            key.push(p.borrow().try_into().unwrap());
-                                        }
-                                        match StateVariableType::from_i32(sv.r#type).unwrap() {
-                                            StateVariableType::Static => {
-                                                r#static.insert(key.into(), sv.value.unwrap().borrow().try_into().unwrap())
+                                            let mut key : Vec<LValueS> = vec![sv.state_function.into()];
+                                            for p in sv.parameters {
+                                                key.push(p.borrow().try_into().unwrap());
                                             }
-                                            StateVariableType::Dynamic => {
-                                                dynamic.insert(key.into(), sv.value.unwrap().borrow().try_into().unwrap())
+                                            match StateVariableType::from_i32(sv.r#type).unwrap() {
+                                                StateVariableType::Static => {
+                                                    r#static.insert(key.into(), sv.value.unwrap().borrow().try_into().unwrap())
+                                                }
+                                                StateVariableType::Dynamic => {
+                                                    dynamic.insert(key.into(), sv.value.unwrap().borrow().try_into().unwrap())
+                                                }
                                             }
                                         }
+                                            //println!("[PlatformClient] updating state");
+                                            world_state.update_state(r#static).await;
+                                            world_state.update_state(dynamic).await;
                                     }
-                                        //println!("[PlatformClient] updating state");
-                                        world_state.update_state(r#static).await;
-                                        world_state.update_state(dynamic).await;
-                                }
-                                Update::Event(event) => {
-                                    match event.event {
-                                        None => {}
-                                        Some(event::Event::Instance(instance)) => {
-                                            world_state.add_instance(instance.object, instance.r#type).await;
+                                    Update::Event(event) => {
+                                        match event.event {
+                                            None => {}
+                                            Some(event::Event::Instance(instance)) => {
+                                                world_state.add_instance(instance.object, instance.r#type).await;
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
                     }
-                    _ => unimplemented!()
-                }
                 }
             }
         }
@@ -149,15 +162,10 @@ impl Platform {
     async fn send_commands(
         mut client: PlatformInterfaceClient<tonic::transport::Channel>,
         agenda: Agenda,
-        mut command_stream: tokio::sync::mpsc::Receiver<CommandRequest>,
-        killer: tokio::sync::broadcast::Sender<EndSignal>,
+        command_stream: tokio::sync::mpsc::Receiver<CommandRequest>,
     ) {
-        /*let stream = async_stream::stream! {
-            loop {
-                let command = command_stream.recv().await.unwrap();
-                yield command
-            }
-        };*/
+        let mut process =
+            ProcessInterface::new(PROCESS_SEND_COMMANDS, set! {PROCESS_TOPIC_PLATFORM}).await;
         let stream = tokio_stream::wrappers::ReceiverStream::new(command_stream);
         println!("[PlatformClient] initiating command stream");
 
@@ -167,47 +175,65 @@ impl Platform {
             .expect("");
         let mut stream = stream.into_inner();
 
-        while let Some(command_response) = stream.message().await.expect("") {
-            let command_response: CommandResponse = command_response;
-            match command_response.response {
-                None => {}
-                Some(Response::Accepted(r)) => {
-                    agenda
-                        .update_status(&(r.command_id as usize), CommandStatus::Accepted.into())
-                        .await;
+        loop {
+            tokio::select! {
+                _ = process.recv() => {
+                    break;
                 }
-                Some(Response::Rejected(r)) => {
-                    agenda
-                        .update_status(&(r.command_id as usize), CommandStatus::Rejected.into())
-                        .await;
-                }
-                Some(Response::Progress(f)) => {
-                    agenda
-                        .update_status(
-                            &(f.command_id as usize),
-                            CommandStatus::Progress(f.progress).into(),
-                        )
-                        .await;
-                }
-                Some(Response::Result(r)) => match r.result {
-                    true => {
-                        agenda
-                            .update_status(&(r.command_id as usize), CommandStatus::Success.into())
-                            .await
+                msg = stream.message() => {
+                    match msg {
+                        Err(err) => {
+                                process.log(format!("Ggpc error: {}",err), LogLevel::Error).await;
+                        }
+                        Ok(None) => {
+                            process.log("Grpc stream closed", LogLevel::Error).await;
+                            process.kill(PROCESS_TOPIC_PLATFORM).await;
+                        }
+                        Ok(Some(command_response)) => {
+                            let command_response: CommandResponse = command_response;
+                            match command_response.response {
+                                None => {}
+                                Some(Response::Accepted(r)) => {
+                                    agenda
+                                        .update_status(&(r.command_id as usize), CommandStatus::Accepted.into())
+                                        .await;
+                                }
+                                Some(Response::Rejected(r)) => {
+                                    agenda
+                                        .update_status(&(r.command_id as usize), CommandStatus::Rejected.into())
+                                        .await;
+                                }
+                                Some(Response::Progress(f)) => {
+                                    agenda
+                                        .update_status(
+                                            &(f.command_id as usize),
+                                            CommandStatus::Progress(f.progress).into(),
+                                        )
+                                        .await;
+                                }
+                                Some(Response::Result(r)) => match r.result {
+                                    true => {
+                                        agenda
+                                            .update_status(&(r.command_id as usize), CommandStatus::Success.into())
+                                            .await
+                                    }
+                                    false => {
+                                        agenda
+                                            .update_status(&(r.command_id as usize), CommandStatus::Failure.into())
+                                            .await
+                                    }
+                                },
+                                Some(Response::Cancelled(c)) => {
+                                    agenda
+                                        .update_status(
+                                            &(c.command_id as usize),
+                                            CommandStatus::Cancelled(c.result).into(),
+                                        )
+                                        .await;
+                                }
+                            }
+                        }
                     }
-                    false => {
-                        agenda
-                            .update_status(&(r.command_id as usize), CommandStatus::Failure.into())
-                            .await
-                    }
-                },
-                Some(Response::Cancelled(c)) => {
-                    agenda
-                        .update_status(
-                            &(c.command_id as usize),
-                            CommandStatus::Cancelled(c.result).into(),
-                        )
-                        .await;
                 }
             }
         }
@@ -228,17 +254,15 @@ impl PlatformDescriptor for Platform {
                 .expect("error to connecting to client");
         let client2 = client.clone();
         let state = self.state.clone();
-        let (killer, killed) = broadcast::channel(TOKIO_CHANNEL_SIZE);
-        let killer2 = killer.clone();
         tokio::spawn(async move {
-            Platform::get_updates(client, state, killer).await;
+            Platform::get_updates(client, state).await;
         });
 
         let agenda = self.agenda.clone();
         let (tx, command_stream) = tokio::sync::mpsc::channel(TOKIO_CHANNEL_SIZE);
         *self.command_stream.lock().await = Some(tx);
         tokio::spawn(async move {
-            Platform::send_commands(client2, agenda, command_stream, killer2).await;
+            Platform::send_commands(client2, agenda, command_stream).await;
         });
     }
 
@@ -288,7 +312,36 @@ impl From<PathBuf> for Domain {
 }
 
 pub struct PlatformModule {
-    module: Box<dyn IntoModule>,
+    module: Module,
+    documentation: Documentation,
+    pure_fonctions: PureFonctionCollection,
+}
+
+impl PlatformModule {
+    pub fn new(module: impl IntoModule) -> Self {
+        let documentation = module.documentation();
+        let pure_fonctions = module.pure_fonctions();
+        let module = module.into_module();
+        Self {
+            module,
+            documentation,
+            pure_fonctions,
+        }
+    }
+}
+
+impl IntoModule for PlatformModule {
+    fn into_module(self) -> Module {
+        self.module
+    }
+
+    fn documentation(&self) -> Documentation {
+        self.documentation.clone()
+    }
+
+    fn pure_fonctions(&self) -> PureFonctionCollection {
+        self.pure_fonctions.clone()
+    }
 }
 
 /// Trait that a platform needs to implement to be able to be used as execution platform in RAE.

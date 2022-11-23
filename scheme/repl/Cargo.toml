@@ -13,3 +13,5 @@ rustyline = "7.1.0"
 im = "15.0.0"
 tokio = { version = "1.17.0", features = ["full", "time"] }
 chrono = "0.4.19"
+ompas-middleware = {path = "../../middleware"}
+map-macro = "0.2.4"

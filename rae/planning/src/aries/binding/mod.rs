@@ -4,13 +4,13 @@ use super::structs::atom::Atom;
 use super::structs::constraint::Constraint;
 use super::structs::lit::Lit;
 use super::structs::symbol_table::{AtomId, SymTable};
-use super::structs::traits::{FormatWithSymTable, GetVariables};
-use super::structs::type_table::{AtomKind, PlanningAtomType};
+use super::structs::traits::FormatWithSymTable;
+use super::structs::type_table::AtomKind;
 use super::structs::{ConversionCollection, Problem};
 use anyhow::{anyhow, Result};
-use aries_core::{IntCst, Lit as aLit, INT_CST_MAX, INT_CST_MIN};
+use aries_core::{IntCst, Lit as aLit, INT_CST_MAX};
 use aries_model::extensions::Shaped;
-use aries_model::lang::{Atom as aAtom, FAtom, FVar, IAtom, SAtom, SVar, Type as aType, Variable};
+use aries_model::lang::{Atom as aAtom, FAtom, IAtom, SAtom, Type as aType, Variable};
 use aries_model::symbols::SymbolTable;
 use aries_model::types::TypeHierarchy;
 use aries_planning::chronicles;
@@ -18,11 +18,10 @@ use aries_planning::chronicles::constraints::Constraint as aConstraint;
 use aries_planning::chronicles::VarType::Reification;
 use aries_planning::chronicles::{
     Chronicle as aChronicle, ChronicleInstance, ChronicleKind, ChronicleOrigin, ChronicleTemplate,
-    Condition, Container, Ctx, Effect, Problem as aProblem, StateFun, SubTask, VarType, TIME_SCALE,
+    Container, Ctx, Effect, Problem as aProblem, StateFun, SubTask, VarType, TIME_SCALE,
 };
 use aries_planning::parsing::pddl::TypedSymbol;
 use aries_utils::input::Sym;
-use log::info;
 use ompas_rae_structs::domain::_type::Type as raeType;
 use ompas_rae_structs::state::partial_state::PartialState;
 use ompas_rae_structs::state::world_state::WorldStateSnapshot;
@@ -31,10 +30,8 @@ use sompas_structs::lnumber::LNumber;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalues::LValueS;
-use std::borrow::Borrow;
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryInto;
 use std::sync::Arc;
-use tokio::time::Instant;
 
 static TASK_TYPE: &str = "★task★";
 static ABSTRACT_TASK_TYPE: &str = "★abstract_task★";
@@ -188,7 +185,7 @@ pub fn generate_templates(problem: &Problem) -> Result<chronicles::Problem> {
     })
 }
 
-pub fn generate_chronicles(problem: &Problem) -> Result<chronicles::Problem> {
+pub fn generate_chronicles(_problem: &Problem) -> Result<chronicles::Problem> {
     todo!();
     /*println!("# SYMBOL TABLE: \n{:?}", ctx.model.get_symbol_table());
     println!("{}", bindings.format(&problem.cc.sym_table, false));
@@ -198,7 +195,7 @@ pub fn generate_chronicles(problem: &Problem) -> Result<chronicles::Problem> {
         println!("template {}: {:?}", i, t.chronicle)
     }*/
 
-    let instant = Instant::now();
+    /*let instant = Instant::now();
     let mut p = generate_templates(problem)?;
 
     let init_ch =
@@ -210,7 +207,7 @@ pub fn generate_chronicles(problem: &Problem) -> Result<chronicles::Problem> {
         "Generation of the planning problem: {:.3} ms",
         instant.elapsed().as_micros() as f64 / 1000.0
     );
-    Ok(p)
+    Ok(p)*/
 }
 
 fn satom_from_lvalues(ctx: &Ctx, v: &LValueS) -> SAtom {
@@ -441,6 +438,7 @@ impl FormatWithSymTable for BindingAriesAtoms {
     }
 }
 
+#[allow(dead_code)]
 fn convert_constraint(
     x: &Constraint,
     prez: aLit,
@@ -522,6 +520,7 @@ fn convert_constraint(
     Ok(constraints)
 }
 
+#[allow(dead_code)]
 fn atom_id_into_atom(
     a: &AtomId,
     sym_table: &SymTable,
@@ -567,11 +566,11 @@ fn atom_id_into_atom(
 }
 
 fn read_chronicle(
-    container: Container,
-    chronicle: &super::structs::chronicle::ChronicleTemplate,
-    ch: &ConversionCollection,
-    context: &mut Ctx,
-    bindings: &mut BindingAriesAtoms,
+    _container: Container,
+    _chronicle: &super::structs::chronicle::ChronicleTemplate,
+    _ch: &ConversionCollection,
+    _context: &mut Ctx,
+    _bindings: &mut BindingAriesAtoms,
 ) -> Result<ChronicleTemplate> {
     todo!()
     /*/*println!(

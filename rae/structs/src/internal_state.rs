@@ -3,11 +3,10 @@ use crate::monitor::MonitorCollection;
 use crate::rae_command::RAECommand;
 use crate::resource::ResourceCollection;
 use crate::state::world_state::WorldState;
-use sompas_utils::task_handler::EndSignal;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::mpsc::Sender;
-use tokio::sync::{broadcast, RwLock};
+use tokio::sync::RwLock;
 
 #[derive(Default, Clone)]
 pub struct OMPASInternalState {
@@ -18,7 +17,7 @@ pub struct OMPASInternalState {
     pub log: LogConfig,
     pub command_stream: Arc<RwLock<Option<Sender<RAECommand>>>>,
     //pub stop_tx: Arc<RwLock<Option<Sender<EndSignal>>>>,
-    pub killer: Arc<RwLock<Option<broadcast::Sender<EndSignal>>>>,
+    //pub process_interface: Arc<RwLock<Option<ProcessInterface>>>,
 }
 
 #[derive(Default, Clone)]
@@ -37,11 +36,11 @@ impl OMPASInternalState {
         self.stop_tx.read().await.clone()
     }*/
 
-    pub async fn get_killer(&self) -> Option<broadcast::Sender<EndSignal>> {
+    /*pub async fn get_killer(&self) -> Option<broadcast::Sender<EndSignal>> {
         self.killer.read().await.clone()
     }
 
     pub async fn subscribe_to_killer(&self) -> broadcast::Receiver<EndSignal> {
         self.killer.read().await.as_ref().unwrap().subscribe()
-    }
+    }*/
 }

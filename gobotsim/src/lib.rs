@@ -9,3 +9,4 @@ pub mod tcp;
 /// Const defining the size of the channels.
 const TOKIO_CHANNEL_SIZE: usize = 100;
 const DEFAULT_PATH_PROJECT_GODOT: &str = "/home/jeremy/godot/simulation-factory-godot/simu";
+const PROCESS_TOPIC_GOBOT_SIM: &str = "__PROCESS_TOPIC_GOBOT_SIM__";

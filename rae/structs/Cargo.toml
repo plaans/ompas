@@ -23,3 +23,4 @@ aries_planning = {path = "../../aries/planning"}
 rand = "0.8.5"
 itertools = { default-features = false, version = "0.10" }
 function_name = "0.2.1"
+ompas-middleware = {path = "../../middleware"}

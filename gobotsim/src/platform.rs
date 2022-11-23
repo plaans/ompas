@@ -1,42 +1,36 @@
-use crate::language::GODOT_LAUNCH_PLATFORM;
 use crate::platform_server::PlatformGobotSimService;
-use crate::serde::{
-    GodotMessageSerde, GodotMessageSerdeData, GodotMessageType, SerdeActionId, SerdeRobotCommand,
-};
-use crate::tcp::{task_tcp_connection, TEST_TCP};
+use crate::tcp::task_tcp_connection;
+use crate::PROCESS_TOPIC_GOBOT_SIM;
 use crate::{DEFAULT_PATH_PROJECT_GODOT, TOKIO_CHANNEL_SIZE};
 use async_trait::async_trait;
-use core::time;
+use map_macro::set;
+use ompas_middleware::ompas_log::{LogMessage, LOGGER};
+use ompas_middleware::{LogLevel, ProcessInterface};
+use ompas_rae_core::{LOG_TOPIC_ACTING, PROCESS_TOPIC_ACTING};
 use ompas_rae_interface::platform::PlatformModule;
 use ompas_rae_interface::platform::{Domain, PlatformDescriptor};
 use ompas_rae_interface::platform_interface::platform_interface_server::PlatformInterfaceServer;
+use ompas_rae_interface::PROCESS_TOPIC_PLATFORM;
 use ompas_rae_interface::{DEFAULT_PLATFORM_SERVICE_IP, DEFAULT_PLATFROM_SERVICE_PORT};
-use ompas_rae_structs::internal_state::OMPASInternalState;
-use ompas_rae_structs::job::Job;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::Documentation;
-use sompas_structs::kindlvalue::KindLValue;
-use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
+use sompas_structs::lruntimeerror::LResult;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
-use sompas_structs::{lruntimeerror, wrong_n_args, wrong_type};
-use sompas_utils::task_handler::EndSignal;
-use std::convert::TryInto;
 use std::fs::File;
 use std::net::SocketAddr;
 use std::os::unix::io::{FromRawFd, IntoRawFd};
-use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::time::Duration;
-use std::{fs, thread};
-use tokio::sync::mpsc::Sender;
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::mpsc;
 use tokio::time::sleep;
 use tonic::transport::Server;
 
 const DEFAULT_GOBOT_IP: &str = "127.0.0.1";
 const DEFAULT_GOBOT_PORT: &str = "10000";
+const PROCESS_GOBOT_SIM: &str = "__PROCESS_GOBOT_SIM__";
+const PROCESS_SERVER_GRPC: &str = "__PROCESS_SERVER_GRPC__";
 
 /// Struct used to bind RAE and Godot.
 #[derive(Clone)]
@@ -46,7 +40,6 @@ pub struct PlatformGobotSim {
     pub headless: bool,
     pub domain: Domain,
     pub config: String,
-    killer: broadcast::Sender<EndSignal>,
 }
 impl Default for PlatformGobotSim {
     fn default() -> Self {
@@ -63,7 +56,6 @@ impl Default for PlatformGobotSim {
             headless: false,
             domain: Domain::default(),
             config: "".to_string(),
-            killer: broadcast::channel(TOKIO_CHANNEL_SIZE).0,
         }
     }
 }
@@ -83,7 +75,6 @@ impl PlatformGobotSim {
             headless,
             domain: domain,
             config: "".to_string(),
-            killer: broadcast::channel(TOKIO_CHANNEL_SIZE).0,
         }
     }
 
@@ -113,11 +104,15 @@ impl PlatformGobotSim {
                 .expect("failed to execute process"),
         };
 
-        let mut killer = self.killer.subscribe();
+        let mut process = ProcessInterface::new(
+            PROCESS_GOBOT_SIM.to_string(),
+            set! {PROCESS_TOPIC_GOBOT_SIM, PROCESS_TOPIC_PLATFORM},
+        )
+        .await;
 
         tokio::spawn(async move {
             //blocked on the reception of the end signal.
-            killer.recv().await.expect("error receiving kill message");
+            process.recv().await.expect("error receiving kill message");
 
             child.kill().expect("could not kill godot");
             println!("process godot killed")
@@ -140,11 +135,22 @@ impl PlatformGobotSim {
         };
         let server_info: SocketAddr = self.socket().await;
         tokio::spawn(async move {
+            let mut process = ProcessInterface::new(
+                PROCESS_SERVER_GRPC,
+                set! {PROCESS_TOPIC_PLATFORM, PROCESS_TOPIC_ACTING},
+            )
+            .await;
+
             println!("Serving : {}", server_info);
-            Server::builder()
-                .add_service(PlatformInterfaceServer::new(service))
-                .serve(server_info)
-                .await;
+            let server = Server::builder().add_service(PlatformInterfaceServer::new(service));
+            tokio::select! {
+                _ = process.recv() => {
+                    process.die().await;
+                }
+                _ = server.serve(server_info) => {
+
+                }
+            }
         });
 
         sleep(Duration::from_secs(1)).await;
@@ -154,9 +160,8 @@ impl PlatformGobotSim {
 
         //println!("godot launching...");
         //println!("godot launched!");
-        let killer = self.killer.clone();
         tokio::spawn(async move {
-            task_tcp_connection(&socket_addr, rx_request, tx_response, tx_update, killer).await
+            task_tcp_connection(&socket_addr, rx_request, tx_response, tx_update).await
         });
         //println!("com opened with godot");
         Ok(LValue::Nil)
@@ -174,8 +179,51 @@ impl PlatformGobotSim {
 #[async_trait]
 impl PlatformDescriptor for PlatformGobotSim {
     async fn start(&self) {
-        self.start_platform().await;
-        self.open_com().await;
+        let topic_id = LOGGER.subscribe_to_topic(LOG_TOPIC_ACTING).await;
+        match self.start_platform().await {
+            Ok(_) => {
+                LOGGER
+                    .log(LogMessage::new(
+                        LogLevel::Debug,
+                        "Platform::start",
+                        set! {topic_id},
+                        "Successfully started platform.",
+                    ))
+                    .await;
+                match self.open_com().await {
+                    Ok(_) => {
+                        LOGGER
+                            .log(LogMessage::new(
+                                LogLevel::Debug,
+                                "Platform::start",
+                                set! {topic_id},
+                                "Successfully open com with platform.",
+                            ))
+                            .await;
+                    }
+                    Err(e) => {
+                        LOGGER
+                            .log(LogMessage::new(
+                                LogLevel::Debug,
+                                "Platform::start",
+                                set! {topic_id},
+                                format!("Error opening com with platform: {}.", e),
+                            ))
+                            .await;
+                    }
+                }
+            }
+            Err(e) => {
+                LOGGER
+                    .log(LogMessage::new(
+                        LogLevel::Debug,
+                        "Platform::start".to_string(),
+                        set! {topic_id},
+                        format!("Error starting platform: {}", e),
+                    ))
+                    .await;
+            }
+        }
     }
 
     async fn stop(&self) {

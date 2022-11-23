@@ -1,5 +1,5 @@
+use ompas_utils::other::get_and_update_id_counter;
 use sompas_structs::lruntimeerror::LRuntimeError;
-use sompas_utils::other::get_and_update_id_counter;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};

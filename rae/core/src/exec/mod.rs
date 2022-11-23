@@ -33,7 +33,6 @@ use sompas_structs::lvalues::LValueS;
 use sompas_structs::module::{InitLisp, IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
 use sompas_structs::{list, lruntimeerror, wrong_type};
-use std::borrow::Borrow;
 use std::convert::TryInto;
 use std::string::String;
 

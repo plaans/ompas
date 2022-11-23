@@ -1,6 +1,6 @@
 use ompas_gobotsim::serde::{
     GodotMessageSerde, GodotMessageSerdeData, GodotMessageType, SerdeActionCancel,
-    SerdeActionFeedback, SerdeActionId, SerdeActionResponse, SerdeActionResult, SerdeRobotCommand,
+    SerdeActionFeedback, SerdeActionId, SerdeActionResponse, SerdeActionResult, SerdeCommand,
 };
 use sompas_structs::lruntimeerror;
 use sompas_structs::lvalue::LValue;
@@ -29,7 +29,7 @@ fn test_action_response() -> lruntimeerror::Result<()> {
 fn test_robot_command() -> lruntimeerror::Result<()> {
     let action_msg = GodotMessageSerde {
         _type: GodotMessageType::RobotCommand,
-        data: GodotMessageSerdeData::RobotCommand(SerdeRobotCommand {
+        data: GodotMessageSerdeData::RobotCommand(SerdeCommand {
             command_info: LValue::List(
                 vec!["navigate_to".into(), "robot1".into(), 50.into(), 100.into()].into(),
             )

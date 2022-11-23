@@ -1,7 +1,9 @@
 use crate::contexts::ctx_planning::CtxPlanning;
+use crate::error::RaeExecError;
 use futures::FutureExt;
 use log::{error, info, warn};
-use ompas_rae_interface::platform::Platform;
+use map_macro::set;
+use ompas_middleware::ProcessInterface;
 use ompas_rae_planning::aries::conversion::convert_domain_to_chronicle_hierarchy;
 use ompas_rae_planning::aries::structs::{ConversionCollection, ConversionContext};
 use ompas_rae_structs::domain::RAEDomain;
@@ -21,8 +23,6 @@ use std::ops::Deref;
 use std::time::Instant;
 use tokio::sync::mpsc::Receiver;
 
-use crate::error::RaeExecError;
-
 pub mod contexts;
 pub mod error;
 pub mod exec;
@@ -31,6 +31,9 @@ pub mod monitor;
 pub type ReactiveTriggerId = usize;
 
 pub const TOKIO_CHANNEL_SIZE: usize = 100;
+pub const PROCESS_TOPIC_ACTING: &str = "__PROCESS_TOPIC_ACTING__";
+pub const PROCESS_MAIN_RAE: &str = "__PROCESS_MAIN_RAE__";
+pub const LOG_TOPIC_ACTING: &str = "__LOG_TOPIC_ACTING";
 
 /// Main RAE Loop:
 /// Receives Job to handle in separate tasks.
@@ -41,6 +44,7 @@ pub async fn rae(
     mut command_rx: Receiver<RAECommand>,
     options: &OMPASOptions,
 ) {
+    let mut process = ProcessInterface::new(PROCESS_MAIN_RAE, set! {PROCESS_TOPIC_ACTING}).await;
     //Ubuntu::
     /*let lvalue: LValue = match options.get_platform_config() {
         None => vec![RAE_LAUNCH_PLATFORM].into(),
@@ -95,8 +99,6 @@ pub async fn rae(
     );
 
     eval_init(&mut env).await;
-
-    let mut killed = interface.killer.read().await.as_ref().unwrap().subscribe();
 
     let mut killers = vec![];
 
@@ -156,7 +158,7 @@ pub async fn rae(
                     }
                 }
             }
-            _ = killed.recv() => {
+            _ = process.recv() => {
                 /*if let Some(platform) = &platform {
                     platform.stop().await;
                 }*/

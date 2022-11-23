@@ -12,6 +12,7 @@ sompas-structs = {path = "../scheme/structs"}
 sompas-core= {path = "../scheme/core"}
 sompas-repl = {path = "../scheme/repl"}
 ompas-utils = {path = "../utils"}
+ompas-middleware = {path = "../middleware"}
 sompas-language= {path = "../scheme/language"}
 sompas-macros = {path = "../scheme/macros"}
 ompas-rae-core = {path = "../rae/core"}
@@ -28,6 +29,7 @@ async-trait = "0.1.51"
 macro_rules_attribute = "0.0.2"
 tonic = "0.8"
 tokio-stream = { default-features = false, version = "0.1" }
+map-macro = "0.2.4"
 
 
 [[bin]]

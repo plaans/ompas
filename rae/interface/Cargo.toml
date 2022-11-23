@@ -11,10 +11,12 @@ sompas-structs = {path = "../../scheme/structs"}
 tokio = { version = "1.17.0", features = ["full", "time"] }
 ompas-rae-structs = {path = "../structs"}
 ompas-utils = {path= "../../utils" }
+ompas-middleware=  {path = "../../middleware"}
 prost = { default-features = false, version = "0.11" }
 tonic = "0.8"
 async-stream = "0.3.3"
 tokio-stream = { default-features = false, version = "0.1" }
+map-macro = "0.2.4"
 
 
 [build-dependencies]

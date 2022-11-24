@@ -293,5 +293,9 @@ pub const UPOM: &str = "upom";
 pub const RAE_PLAN: &str = "rae-plan";
 pub const C_CHOICE: &str = "c-choice";
 
-pub const PROCESS_TOPIC_ACTING: &str = "__PROCESS_TOPIC_ACTING__";
-pub const LOG_TOPIC_ACTING: &str = "__LOG_TOPIC_ACTING__";
+pub const PROCESS_TOPIC_OMPAS: &str = "__PROCESS_TOPIC_OMPAS__";
+pub const LOG_TOPIC_OMPAS: &str = "__LOG_TOPIC_OMPAS__";
+pub const OMPAS: &str = "OMPAS";
+
+pub const ACTIVATE_LOG: &str = "activate_log";
+pub const DEACTIVATE_LOG: &str = "deactivate_log";

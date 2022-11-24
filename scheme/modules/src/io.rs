@@ -1,5 +1,4 @@
-use ompas_middleware::ompas_log::{LogMessage, Logger, TopicId};
-use ompas_middleware::LogLevel;
+use ompas_middleware::logger::LogClient;
 use sompas_macros::scheme_fn;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::{Documentation, LHelp};
@@ -12,7 +11,6 @@ use sompas_structs::{lruntimeerror, string};
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::PathBuf;
-use tokio::sync::mpsc;
 
 /*
 LANGUAGE
@@ -52,7 +50,7 @@ const MACRO_READ: &str = "(defmacro read \
 #[derive(Debug)]
 pub enum LogOutput {
     Stdout,
-    Topic(TopicId),
+    Log(LogClient),
     File(PathBuf),
 }
 
@@ -138,16 +136,10 @@ pub fn print(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
         LogOutput::Stdout => {
             println!("{}", lv);
         }
-        LogOutput::Topic(topic_id) => {
-            let topic_id = *topic_id;
+        LogOutput::Log(log) => {
+            let log = log.clone();
             tokio::spawn(async move {
-                Logger::log(LogMessage::new(
-                    LogLevel::Debug,
-                    "PRINT",
-                    topic_id,
-                    lv.to_string(),
-                ))
-                .await;
+                log.debug(lv).await;
             });
         }
         LogOutput::File(pb) => {

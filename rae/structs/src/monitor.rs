@@ -1,10 +1,10 @@
-use ompas_middleware::ompas_log::{LogMessage, Logger};
-use ompas_middleware::{LogLevel, ProcessInterface};
-use ompas_rae_language::{LOG_TOPIC_ACTING, PROCESS_TOPIC_ACTING};
+use ompas_middleware::logger::LogClient;
+use ompas_middleware::ProcessInterface;
+use ompas_rae_language::{LOG_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS};
 use sompas_core::eval;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lvalue::LValue;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{broadcast, oneshot, Mutex};
 
@@ -57,7 +57,7 @@ impl MonitorCollection {
         self.inner.lock().await.map.remove(&id);
     }
 
-    pub async fn check_wait_for(&self, mut env: LEnv) {
+    pub async fn check_wait_for(&self, mut env: LEnv, log: LogClient) {
         //let mut item_to_remove: Vec<WaitForId> = vec![];
         let mut waiters = self.inner.lock().await;
         let keys: Vec<_> = waiters.map.keys().copied().collect();
@@ -76,14 +76,7 @@ impl MonitorCollection {
                     }
                 }
                 Err(e) => {
-                    let topic_id = Logger::subscribe_to_topic(LOG_TOPIC_ACTING).await;
-                    Logger::log(LogMessage::new(
-                        LogLevel::Warn,
-                        "check_wait_for",
-                        topic_id,
-                        format!("error checking wait on: {}", e),
-                    ))
-                    .await;
+                    log.warn(format!("error checking wait on: {e}")).await;
                 }
             }
         }
@@ -142,10 +135,8 @@ pub async fn task_check_wait_for(
     monitors: MonitorCollection,
     env: LEnv,
 ) {
-    let mut set = HashSet::new();
-    set.insert(PROCESS_TOPIC_ACTING);
-    let mut process: ProcessInterface = ProcessInterface::new("TASK_CHECK_WAIT_FOR", set).await;
-    process.subscribe_to_log_topic(LOG_TOPIC_ACTING).await;
+    let mut process: ProcessInterface =
+        ProcessInterface::new("TASK_CHECK_WAIT_FOR", PROCESS_TOPIC_OMPAS, LOG_TOPIC_OMPAS).await;
     //println!("task check wait on active");
     //let mut end_receiver = task_handler::subscribe_new_task();
     loop {
@@ -153,7 +144,7 @@ pub async fn task_check_wait_for(
             _ = update.recv() => {
                 let n_wait_on = monitors.inner.lock().await.map.len();
                 if n_wait_on != 0 {
-                    monitors.check_wait_for(env.clone()).await;
+                    monitors.check_wait_for(env.clone(), process.get_log_client()).await;
                 }
             }
             _ = process.recv() => {

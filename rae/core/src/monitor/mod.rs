@@ -7,7 +7,8 @@ use crate::contexts::ctx_state::{CtxState, CTX_STATE};
 use crate::contexts::ctx_task::{CtxTask, CTX_TASK};
 use crate::exec::CtxRaeExec;
 use domain::*;
-use ompas_middleware::ompas_log::{FileDescriptor, Logger};
+use ompas_middleware::logger::{FileDescriptor, LogClient};
+use ompas_middleware::Master;
 use ompas_rae_language::*;
 use ompas_rae_planning::aries::structs::ConversionContext;
 use ompas_rae_structs::domain::RAEDomain;
@@ -35,6 +36,7 @@ pub mod domain;
 pub mod planning;
 pub mod user_interface;
 use ompas_rae_interface::platform::{Domain, Platform, PlatformDescriptor};
+use ompas_rae_interface::PLATFORM_CLIENT;
 
 //LANGUAGE
 const MOD_RAE_USER: &str = "rae_user";
@@ -97,6 +99,8 @@ impl IntoModule for CtxRaeUser {
         module.add_async_fn_prelude(RAE_SET_SELECT, set_select);
         module.add_async_fn_prelude(RAE_TRIGGER_TASK, trigger_task);
         module.add_async_fn_prelude(RAE_ADD_TASK_TO_EXECUTE, add_task_to_execute);
+        module.add_async_fn_prelude(ACTIVATE_LOG, activate_log);
+        module.add_async_fn_prelude(DEACTIVATE_LOG, deactivate_log);
         /*
         GETTERS
          */
@@ -222,14 +226,16 @@ impl CtxRaeUser {
         ompas_rae_log::init(log.clone()) //change with configurable display
             .unwrap_or_else(|e| panic!("Error while initiating logger : {}", e));*/
 
-        let log = Logger::new_topic(
-            LOG_TOPIC_ACTING,
+        Master::new_log_topic(
+            LOG_TOPIC_OMPAS,
             working_dir.map(|p| FileDescriptor::AbsolutePath(p.canonicalize().unwrap())),
         )
         .await;
 
+        let log_client = LogClient::new(OMPAS, LOG_TOPIC_OMPAS).await;
+
         if display_log {
-            Logger::start_display_log_topic(&log).await;
+            Master::start_display_log_topic(LOG_TOPIC_OMPAS).await;
         }
 
         let interface = OMPASInternalState {
@@ -237,7 +243,7 @@ impl CtxRaeUser {
             resources: Default::default(),
             monitors: Default::default(),
             agenda: Default::default(),
-            log,
+            log: log_client,
             command_stream: Arc::new(RwLock::new(None)),
         };
         let platform = Platform {
@@ -245,6 +251,7 @@ impl CtxRaeUser {
             state: interface.state.clone(),
             agenda: interface.agenda.clone(),
             command_stream: Arc::new(Default::default()),
+            log: LogClient::new(PLATFORM_CLIENT, LOG_TOPIC_OMPAS).await,
         };
 
         let domain: InitLisp = match platform.domain().await {
@@ -281,7 +288,7 @@ impl CtxRaeUser {
         env.import_module(CtxMath::default(), WithoutPrefix);
 
         let mut ctx_io = CtxIo::default();
-        ctx_io.set_log_output(LogOutput::Topic(self.interface.log));
+        ctx_io.set_log_output(LogOutput::Log(self.interface.log.clone()));
 
         env.import_module(ctx_io, WithoutPrefix);
 
@@ -290,6 +297,7 @@ impl CtxRaeUser {
             monitors: self.interface.monitors.clone(),
             platform_interface: self.platform.clone(),
             agenda: self.interface.agenda.clone(),
+            log_client: self.interface.log.clone(),
         };
 
         let ctx_state = CtxState {

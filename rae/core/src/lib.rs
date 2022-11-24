@@ -1,10 +1,9 @@
 use crate::contexts::ctx_planning::CtxPlanning;
 use crate::error::RaeExecError;
 use futures::FutureExt;
-use map_macro::set;
 use ompas_middleware::LogLevel;
 use ompas_middleware::ProcessInterface;
-use ompas_rae_language::PROCESS_TOPIC_ACTING;
+use ompas_rae_language::{LOG_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS};
 use ompas_rae_planning::aries::conversion::convert_domain_to_chronicle_hierarchy;
 use ompas_rae_planning::aries::structs::{ConversionCollection, ConversionContext};
 use ompas_rae_structs::domain::RAEDomain;
@@ -17,7 +16,10 @@ use sompas_structs::lasynchandler::LAsyncHandler;
 use sompas_structs::lenv::ImportType::WithoutPrefix;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lfuture::FutureResult;
+use sompas_structs::lnumber::LNumber;
 use sompas_structs::lswitch::new_interruption_handler;
+use sompas_structs::lvalue::LValue;
+use std::ops::Deref;
 use std::time::Instant;
 use tokio::sync::mpsc::Receiver;
 
@@ -41,7 +43,8 @@ pub async fn rae(
     mut command_rx: Receiver<RAECommand>,
     options: &OMPASOptions,
 ) {
-    let mut process = ProcessInterface::new(PROCESS_MAIN_RAE, set! {PROCESS_TOPIC_ACTING}).await;
+    let mut process =
+        ProcessInterface::new(PROCESS_MAIN_RAE, PROCESS_TOPIC_OMPAS, LOG_TOPIC_OMPAS).await;
     //Ubuntu::
     /*let lvalue: LValue = match options.get_platform_config() {
         None => vec![RAE_LAUNCH_PLATFORM].into(),
@@ -63,6 +66,8 @@ pub async fn rae(
         Err(e) => error!("{}", e),
     }*/
 
+    let log = interface.log.clone();
+
     let mut select_mode = *options.get_select_mode();
 
     let cc: Option<ConversionCollection> =
@@ -74,15 +79,16 @@ pub async fn rae(
                 state: interface.state.get_snapshot().await,
             }) {
                 Ok(r) => {
-                    info!(
+                    log.info(format!(
                         "Conversion time: {:.3} ms",
                         instant.elapsed().as_micros() as f64 / 1000.0
-                    );
+                    ))
+                    .await;
                     Some(r)
                 }
                 Err(e) => {
                     select_mode = SelectMode::Greedy;
-                    warn!("Cannot plan with the domain...{}", e);
+                    log.warn(format!("Cannot plan with the domain...{e}")).await;
                     None
                 }
             }
@@ -105,21 +111,21 @@ pub async fn rae(
                 match command {
                     None => break,
                     Some(RAECommand::Job(job)) => {
-                        info!("new job received!");
+                        log.info("new job received!").await;
 
                         let mut new_env = env.clone();
 
                         let job_lvalue = job.core;
-                        info!("new triggered task: {}", job_lvalue);
+                        log.info(format!("new triggered task: {}", job_lvalue)).await;
                         //info!("LValue to be evaluated: {}", job_lvalue);
 
                         let (tx, rx) = new_interruption_handler();
                         killers.push(tx.clone());
-
+                        let log2 = log.clone();
                         let future = (Box::pin(async move {
                             let result = eval(&job_lvalue, &mut new_env, Some(rx)).await;
                             match &result {
-                                Ok(lv) => info!(
+                                Ok(lv) => log2.info(format!(
                                     "result of task {}: {}",
                                     job_lvalue,
                                     match lv {
@@ -133,8 +139,8 @@ pub async fn rae(
                                         }
                                         lv => lv.to_string(),
                                     }
-                                ),
-                                Err(e) => error!("Error in asynchronous task: {}", e),
+                                )).await,
+                                Err(e) => log2.error(format!("Error in asynchronous task: {}", e)).await,
                             }
 
                             result
@@ -150,7 +156,9 @@ pub async fn rae(
                         match job.sender
                             .try_send(LAsyncHandler::new(future, tx)) {
                             Ok(_) =>{}
-                            Err(e) => error!("{}", e.to_string())
+                            Err(e) => {
+                                log.error(format!("{}", e.to_string())).await;
+                            }
                         }
                     }
                 }

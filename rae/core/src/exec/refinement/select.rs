@@ -6,7 +6,6 @@ use crate::contexts::ctx_task::{CtxTask, CTX_TASK};
 use crate::exec::refinement::c_choice::{c_choice_env, CtxCChoice};
 use crate::exec::refinement::rae_plan::{rae_plan_env, CtxRaePlan};
 use crate::exec::{instance, STATE};
-use log::info;
 use ompas_rae_language::*;
 use ompas_rae_planning::aries::binding::solver::run_solver_for_htn;
 use ompas_rae_planning::aries::binding::{generate_chronicles, solver};
@@ -40,6 +39,8 @@ pub async fn aries_select(
 ) -> lruntimeerror::Result<RefinementMetaData> {
     let mut greedy: RefinementMetaData =
         greedy_select(state.clone(), tried, task.clone(), env).await?;
+
+    let log = env.get_context::<CtxRae>(CTX_RAE)?.get_log_client();
 
     println!("\n\nTask to plan: {}", LValue::from(task.clone()));
     println!("\t*tried: {}", LValue::from(tried));
@@ -132,11 +133,13 @@ pub async fn aries_select(
     let mut aries_problem = generate_chronicles(&problem)?;
     let instant = Instant::now();
     let result = run_solver_for_htn(&mut aries_problem, optimize);
-    info!(
+
+    log.info(format!(
         "Time to run solver: {:^3} ms (optimize = {})",
         instant.elapsed().as_micros() as f64 / 1000.0,
         optimize
-    );
+    ))
+    .await;
     // println!("{}", format_partial_plan(&pb, &x)?);
 
     let mut greedy: RefinementMetaData = greedy;

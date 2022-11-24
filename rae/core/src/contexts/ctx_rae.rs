@@ -1,3 +1,4 @@
+use ompas_middleware::logger::LogClient;
 use ompas_rae_interface::platform::Platform;
 use ompas_rae_structs::agenda::Agenda;
 use ompas_rae_structs::monitor::MonitorCollection;
@@ -12,6 +13,7 @@ pub struct CtxRae {
     pub resources: ResourceCollection,
     pub platform_interface: Option<Platform>,
     pub agenda: Agenda,
+    pub(crate) log_client: LogClient,
 }
 
 impl CtxRae {
@@ -21,5 +23,9 @@ impl CtxRae {
 
     pub fn add_platform(&mut self, platform: Option<Platform>) {
         self.platform_interface = platform;
+    }
+
+    pub fn get_log_client(&self) -> LogClient {
+        self.log_client.clone()
     }
 }

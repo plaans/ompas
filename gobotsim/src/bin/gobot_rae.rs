@@ -1,10 +1,11 @@
 use std::fs;
 //use ompas_gobotsim::mod_godot::CtxGodot;
 use ompas_gobotsim::platform::PlatformGobotSim;
-use ompas_middleware::ompas_log::FileDescriptor;
+use ompas_middleware::logger::{FileDescriptor, LogClient};
 use ompas_middleware::Master;
 use ompas_rae_core::monitor::CtxRaeUser;
 use ompas_rae_interface::platform::Domain;
+use ompas_rae_interface::{LOG_TOPIC_PLATFORM, PLATFORM_CLIENT};
 use sompas_core::activate_debug;
 use sompas_modules::advanced_math::CtxMath;
 use sompas_modules::io::CtxIo;
@@ -73,6 +74,7 @@ pub async fn lisp_interpreter(log: Option<PathBuf>, godot: bool, rae_log: bool) 
                     "/home/jeremy/CLionProjects/ompas/gobotsim/godot_domain/domain.lisp".into(),
                 ),
                 false,
+                LogClient::new(PLATFORM_CLIENT, LOG_TOPIC_PLATFORM).await,
             ),
             log.clone(),
             rae_log,

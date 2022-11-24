@@ -1,6 +1,5 @@
-use crate::TOKIO_CHANNEL_SIZE;
+use crate::{PROCESS_TOPIC_GOBOT_SIM, TOKIO_CHANNEL_SIZE};
 use async_trait::async_trait;
-use map_macro::set;
 use ompas_middleware::{LogLevel, ProcessInterface};
 use ompas_rae_interface::platform_interface::platform_interface_server::PlatformInterface;
 use ompas_rae_interface::platform_interface::{
@@ -32,13 +31,11 @@ impl PlatformInterface for PlatformGobotSimService {
     ) -> Result<Response<Self::GetUpdatesStream>, Status> {
         let mut process = ProcessInterface::new(
             PROCESS_GOBOT_SIM_SERVICE_GET_UPDATES,
-            set! {PROCESS_TOPIC_PLATFORM},
+            PROCESS_TOPIC_GOBOT_SIM,
+            LOG_TOPIC_PLATFORM,
         )
         .await;
-        process.subscribe_to_log_topic(LOG_TOPIC_PLATFORM).await;
-        process
-            .log("Received request for updates!", LogLevel::Debug)
-            .await;
+        process.log_info("Received request for updates!").await;
         let (tx, rx) = tokio::sync::mpsc::channel(TOKIO_CHANNEL_SIZE);
         //let request: InitGetUpdate = request.into_inner();
 
@@ -77,15 +74,12 @@ impl PlatformInterface for PlatformGobotSimService {
     ) -> Result<Response<Self::SendCommandsStream>, Status> {
         let mut process: ProcessInterface = ProcessInterface::new(
             PROCESS_GOBOT_SIM_SERVICE_SEND_COMMANDS,
-            set! {PROCESS_TOPIC_PLATFORM},
+            PROCESS_TOPIC_GOBOT_SIM,
+            LOG_TOPIC_PLATFORM,
         )
         .await;
-        process.subscribe_to_log_topic(LOG_TOPIC_PLATFORM).await;
         process
-            .log(
-                "Received request to execute stream of commands!",
-                LogLevel::Debug,
-            )
+            .log_debug("Received request to execute stream of commands!")
             .await;
         let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
 

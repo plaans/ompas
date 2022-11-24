@@ -8,9 +8,8 @@ use crate::platform_interface::{
 use crate::{platform_interface, TOKIO_CHANNEL_SIZE};
 use crate::{LOG_TOPIC_PLATFORM, PROCESS_TOPIC_PLATFORM};
 use async_trait::async_trait;
-use map_macro::set;
-use ompas_middleware::ompas_log::{LogMessage, Logger};
-use ompas_middleware::{LogLevel, ProcessInterface};
+use ompas_middleware::logger::LogClient;
+use ompas_middleware::ProcessInterface;
 use ompas_rae_structs::agenda::Agenda;
 use ompas_rae_structs::state::action_status::CommandStatus;
 use ompas_rae_structs::state::partial_state::PartialState;
@@ -30,7 +29,6 @@ use tokio::sync::Mutex;
 
 const PROCESS_GET_UPDATES: &str = "__PROCESS_GET_UPDATES__";
 const PROCESS_SEND_COMMANDS: &str = "__PROCESS_SEND_COMMANDS__";
-const PLATFORM_CLIENT: &str = "PlatformClient";
 
 #[derive(Clone)]
 pub struct Platform {
@@ -38,6 +36,7 @@ pub struct Platform {
     pub state: WorldState,
     pub agenda: Agenda,
     pub command_stream: Arc<Mutex<Option<tokio::sync::mpsc::Sender<CommandRequest>>>>,
+    pub log: LogClient,
 }
 
 impl Platform {
@@ -46,15 +45,10 @@ impl Platform {
         for arg in command {
             arguments.push(LValueS::try_from(arg).unwrap().try_into().unwrap())
         }
-        let topic = Logger::subscribe_to_topic(LOG_TOPIC_PLATFORM).await;
 
-        Logger::log(LogMessage::new(
-            LogLevel::Debug,
-            PLATFORM_CLIENT,
-            topic,
-            format!("New command request: {}", LValue::from(command)),
-        ))
-        .await;
+        self.log
+            .debug(format!("New command request: {}", LValue::from(command)))
+            .await;
 
         let request = CommandRequest {
             request: Some(Request::Execution(CommandExecutionRequest {
@@ -92,16 +86,15 @@ impl Platform {
         mut client: PlatformInterfaceClient<tonic::transport::Channel>,
         world_state: WorldState,
     ) {
-        let mut process_interface: ProcessInterface =
-            ProcessInterface::new(PROCESS_GET_UPDATES, set! {PROCESS_TOPIC_PLATFORM}).await;
-        process_interface
-            .subscribe_to_log_topic(LOG_TOPIC_PLATFORM)
-            .await;
+        let mut process_interface: ProcessInterface = ProcessInterface::new(
+            PROCESS_GET_UPDATES,
+            PROCESS_TOPIC_PLATFORM,
+            LOG_TOPIC_PLATFORM,
+        )
+        .await;
         let request = tonic::IntoRequest::into_request(InitGetUpdate {});
 
-        process_interface
-            .log("Initiating update stream", LogLevel::Info)
-            .await;
+        process_interface.log_info("Initiating update stream").await;
 
         let stream = client.get_updates(request).await.expect("");
         let mut stream: tonic::codec::Streaming<PlatformUpdate> = stream.into_inner();
@@ -115,10 +108,10 @@ impl Platform {
                     //println!("[PlatformClient] received new update: {:?}", msg);
                     match msg {
                         Err(err) => {
-                                process_interface.log(format!("Ggpc error: {}",err), LogLevel::Error).await;
+                                process_interface.log_error(format!("Ggpc error: {err}")).await;
                         }
                         Ok(None) => {
-                            process_interface.log("Grpc stream closed", LogLevel::Error).await;
+                            process_interface.log_error("Grpc stream closed").await;
                             process_interface.kill(PROCESS_TOPIC_PLATFORM).await;
                         }
                         Ok(Some(msg)) => {
@@ -176,14 +169,15 @@ impl Platform {
         agenda: Agenda,
         command_stream: tokio::sync::mpsc::Receiver<CommandRequest>,
     ) {
-        let mut process =
-            ProcessInterface::new(PROCESS_SEND_COMMANDS, set! {PROCESS_TOPIC_PLATFORM}).await;
+        let mut process = ProcessInterface::new(
+            PROCESS_SEND_COMMANDS,
+            PROCESS_TOPIC_PLATFORM,
+            LOG_TOPIC_PLATFORM,
+        )
+        .await;
         let stream = tokio_stream::wrappers::ReceiverStream::new(command_stream);
-        process.subscribe_to_log_topic(LOG_TOPIC_PLATFORM).await;
 
-        process
-            .log("initiating command stream", LogLevel::Info)
-            .await;
+        process.log_info("initiating command stream").await;
 
         let stream = client
             .send_commands(tonic::Request::new(stream))
@@ -199,10 +193,10 @@ impl Platform {
                 msg = stream.message() => {
                     match msg {
                         Err(err) => {
-                                process.log(format!("Ggpc error: {}",err), LogLevel::Error).await;
+                                process.log_error(format!("Ggpc error: {err}")).await;
                         }
                         Ok(None) => {
-                            process.log("Grpc stream closed", LogLevel::Error).await;
+                            process.log_error("Grpc stream closed").await;
                             process.kill(PROCESS_TOPIC_PLATFORM).await;
                         }
                         Ok(Some(command_response)) => {

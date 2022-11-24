@@ -2,7 +2,6 @@ use crate::serde::{
     GodotMessageSerde, GodotMessageSerdeData, GodotMessageType, SerdeCancelRequest, SerdeCommand,
 };
 use crate::PROCESS_TOPIC_GOBOT_SIM;
-use map_macro::set;
 use ompas_middleware::ProcessInterface;
 use ompas_rae_interface::platform_interface::command_request::Request;
 use ompas_rae_interface::platform_interface::{
@@ -10,7 +9,7 @@ use ompas_rae_interface::platform_interface::{
     CommandProgress, CommandRejected, CommandRequest, CommandResponse, CommandResult, Instance,
     PlatformUpdate, StateUpdate, StateVariable, StateVariableType,
 };
-use ompas_rae_interface::PROCESS_TOPIC_PLATFORM;
+use ompas_rae_interface::{LOG_TOPIC_PLATFORM, PROCESS_TOPIC_PLATFORM};
 use ompas_rae_structs::state::partial_state::PartialState;
 use sompas_structs::lvalues::LValueS;
 use std::convert::TryFrom;
@@ -54,7 +53,8 @@ async fn async_write_socket(
 ) {
     let mut process = ProcessInterface::new(
         PROCESS_GOBOT_WRITE_TCP,
-        set! {PROCESS_TOPIC_GOBOT_SIM, PROCESS_TOPIC_PLATFORM},
+        PROCESS_TOPIC_GOBOT_SIM,
+        LOG_TOPIC_PLATFORM,
     )
     .await;
 
@@ -151,7 +151,8 @@ async fn async_read_socket(
 ) {
     let mut process = ProcessInterface::new(
         PROCESS_GOBOT_READ_TCP,
-        set! {PROCESS_TOPIC_GOBOT_SIM, PROCESS_TOPIC_PLATFORM},
+        PROCESS_TOPIC_GOBOT_SIM,
+        LOG_TOPIC_PLATFORM,
     )
     .await;
 
@@ -166,8 +167,7 @@ async fn async_read_socket(
         //reading an incoming message from the tcp server of godot
         tokio::select! {
             _ = process.recv() => {
-                println!("godot tcp receiver task ended.");
-                break;
+                break 'outer process.die().await;
             }
             msg = buf_reader.read_exact(&mut size_buf) => {
 

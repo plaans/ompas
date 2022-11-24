@@ -25,6 +25,7 @@ use std::convert::{TryFrom, TryInto};
 pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
     let task_label: LValue = args.into();
     let ctx = env.get_context::<CtxRae>(CTX_RAE)?;
+    let log = ctx.get_log_client();
     let parent_task: Option<usize> = match env.get_context::<CtxTask>(CTX_TASK) {
         Ok(ctx) => ctx.parent_id,
         Err(_) => None,
@@ -41,7 +42,10 @@ pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
     let first_m = result;
 
     let result: LValue = if first_m == LValue::Nil {
-        error!("No applicable method for task {}({})", task_label, task_id,);
+        log.error(format!(
+            "No applicable method for task {task_label}({task_id})"
+        ))
+        .await;
         task.update_status(TaskStatus::Failure);
         task.set_end_timepoint(ctx.agenda.get_instant());
         ctx.agenda.update_task(&task_id, task).await;
@@ -77,17 +81,19 @@ pub async fn set_success_for_task(env: &LEnv, args: &[LValue]) -> LResult {
 #[async_scheme_fn]
 pub async fn retry(env: &LEnv, task_id: usize) -> LResult {
     let ctx = env.get_context::<CtxRae>(CTX_RAE)?;
+    let log = ctx.get_log_client();
     let mut task: AbstractTaskMetaData = ctx.agenda.get_abstract_task(&(task_id as usize)).await?;
     let task_label = task.get_label().clone();
-    error!("Retrying task {}({})", task_label, task_id);
+    log.error(format!("Retrying task {task_label}({task_id})"))
+        .await;
     task.add_tried_method(task.get_current_method().clone());
     task.set_current_method(LValue::Nil);
     let new_method: LValue = select(&mut task, env).await?;
     let result: LValue = if new_method == LValue::Nil {
-        error!(
-            "No more method for task {}({}). Task is a failure!",
-            task_label, task_id
-        );
+        log.error(format!(
+            "No more method for task {task_label}({task_id}). Task is a failure!",
+        ))
+        .await;
         task.update_status(TaskStatus::Failure);
         task.set_end_timepoint(ctx.agenda.get_instant());
         ctx.agenda.update_task(&task_id, task).await;
@@ -113,6 +119,7 @@ pub async fn select(stack: &mut AbstractTaskMetaData, env: &LEnv) -> LResult {
      */
     let task_id = stack.get_id();
     let ctx_planning = env.get_context::<CtxPlanning>(CTX_PLANNING)?;
+    let log = env.get_context::<CtxRae>(CTX_RAE)?.get_log_client();
     let state: WorldStateSnapshot = env
         .get_context::<CtxState>(CTX_STATE)?
         .state
@@ -126,25 +133,29 @@ pub async fn select(stack: &mut AbstractTaskMetaData, env: &LEnv) -> LResult {
             /*
             Returns all applicable methods sorted by their score
              */
-            info!("select greedy for {}", stack.get_label());
+            log.debug(format!("select greedy for {}", stack.get_label()))
+                .await;
             select::greedy_select(state, tried, task, env)
                 .await
                 .map_err(|e| e.chain("greedy_select"))?
         }
         SelectMode::Planning(Planner::Aries(bool)) => {
-            info!("select with aries for {}", stack.get_label());
+            log.debug(format!("select with aries for {}", stack.get_label()))
+                .await;
             select::aries_select(state, tried, task, env, *bool)
                 .await
                 .map_err(|e| e.chain("planning_select"))?
         }
         SelectMode::Planning(Planner::CChoice(config)) => {
-            info!("select with c-choice for {}", stack.get_label());
+            log.debug(format!("select with c-choice for {}", stack.get_label()))
+                .await;
             select::c_choice_select(state, tried, task, env, *config)
                 .await
                 .map_err(|e| e.chain("planning_select"))?
         }
         SelectMode::Planning(Planner::RAEPlan(config)) => {
-            info!("select with c-choice for {}", stack.get_label());
+            log.debug(format!("select with c-choice for {}", stack.get_label()))
+                .await;
             select::rae_plan_select(state, tried, task, env, *config)
                 .await
                 .map_err(|e| e.chain("planning_select"))?
@@ -152,12 +163,13 @@ pub async fn select(stack: &mut AbstractTaskMetaData, env: &LEnv) -> LResult {
         _ => todo!(),
     };
 
-    info!(
+    log.debug(format!(
         "sorted_methods for {}({}): {}",
         stack.get_label(),
         task_id,
         LValue::from(&rmd.applicable_methods)
-    );
+    ))
+    .await;
 
     let method = rmd.choosed.clone();
 

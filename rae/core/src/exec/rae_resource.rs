@@ -53,6 +53,8 @@ pub async fn new_resource(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeErr
 pub async fn acquire(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandler, LRuntimeError> {
     let ctx = env.get_context::<CtxRae>(CTX_RAE)?;
 
+    let log = ctx.get_log_client();
+
     let resources = ctx.resources.clone();
 
     let (tx, mut rx) = new_interruption_handler();
@@ -94,24 +96,25 @@ pub async fn acquire(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandler, LRunt
     }
 
     let f: LFuture = (Box::pin(async move {
-        info!(
-            "Acquiring {}; capacity = {}; priority = {}",
-            label, capacity, priority
-        );
+        log.info(format!(
+            "Acquiring {label}; capacity = {capacity}; priority = {priority}"
+        ))
+        .await;
+
         let rh: ResourceHandler = match resources.acquire(label.clone(), capacity, priority).await?
         {
             AcquireResponse::Ok(rh) => rh,
             AcquireResponse::Wait(mut wait) => {
-                info!("Waiting on resource {}", label);
+                log.info(format!("Waiting on resource {label}")).await;
 
                 tokio::select! {
                     _ = rx.recv() => {
-                        info!("Acquisition of {} cancelled.", label);
+                        log.info(format!("Acquisition of {label} cancelled.")).await;
                         resources.remove_waiter(wait).await;
                         return Ok(LValue::Err(LValue::Nil.into()))
                     }
                     rh = wait.recv() => {
-                        info!("resource {} unlocked!!!", label);
+                        log.info(format!("Resource {label} unlocked !!!")).await;
                         rh
                     }
                 }
@@ -121,9 +124,11 @@ pub async fn acquire(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandler, LRunt
         let rc = resources.clone();
         let (tx, mut rx) = new_interruption_handler();
 
+        let log2 = log.clone();
+
         let f: LFuture = (Box::pin(async move {
             rx.recv().await;
-            info!("Releasing {}", rh.get_label());
+            log2.info(format!("Releasing {}", rh.get_label())).await;
             rc.release(rh).await.map(|_| LValue::Nil)
         }) as FutureResult)
             .shared();
@@ -132,7 +137,8 @@ pub async fn acquire(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandler, LRunt
 
         tokio::spawn(f);
 
-        info!("{} acquired with {} capacity", label, capacity);
+        log.info(format!("{label} acquired with {capacity} capacity."))
+            .await;
 
         Ok(LAsyncHandler::new(f2, tx).into())
     }) as FutureResult)
@@ -164,7 +170,10 @@ async fn check_acquire<'a>(arg: (LEnv, Vec<LValue>, usize)) -> LResult {
     let r = acquire(&env, args.as_slice()).await?;
     let h_await: LAsyncHandler = r.try_into().unwrap();
     let h: LValue = h_await.get_future().await?;
-    info!("{} unlocked {}", d, label);
+    env.get_context::<CtxRae>(CTX_RAE)?
+        .get_log_client()
+        .info(format!("{} unlocked {}", d, label))
+        .await;
     Ok(list![label, h])
 }
 /// Ask to lock a resource in a list
@@ -177,7 +186,10 @@ pub async fn acquire_in_list(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle
         .ok_or_else(|| LRuntimeError::wrong_number_of_args(ACQUIRE_IN_LIST, args, 1..2))?
         .try_into()?;
     let d: usize = thread_rng().gen();
-    info!("Acquire element from {}, id: {} ", args[0], d);
+    env.get_context::<CtxRae>(CTX_RAE)?
+        .get_log_client()
+        .info(format!("Acquire element from {}, id: {} ", args[0], d))
+        .await;
     //let capacity = args.get(1).cloned();
     let rest = if args.len() > 1 {
         args[1..].to_vec()

@@ -3,7 +3,7 @@ use crate::monitor::MonitorCollection;
 use crate::rae_command::RAECommand;
 use crate::resource::ResourceCollection;
 use crate::state::world_state::WorldState;
-use ompas_middleware::ompas_log::TopicId;
+use ompas_middleware::logger::LogClient;
 use std::sync::Arc;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
@@ -14,7 +14,7 @@ pub struct OMPASInternalState {
     pub resources: ResourceCollection,
     pub monitors: MonitorCollection,
     pub agenda: Agenda,
-    pub log: TopicId,
+    pub log: LogClient,
     pub command_stream: Arc<RwLock<Option<Sender<RAECommand>>>>,
     //pub stop_tx: Arc<RwLock<Option<Sender<EndSignal>>>>,
     //pub process_interface: Arc<RwLock<Option<ProcessInterface>>>,

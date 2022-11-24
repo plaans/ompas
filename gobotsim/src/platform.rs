@@ -3,9 +3,8 @@ use crate::tcp::task_tcp_connection;
 use crate::PROCESS_TOPIC_GOBOT_SIM;
 use crate::{DEFAULT_PATH_PROJECT_GODOT, TOKIO_CHANNEL_SIZE};
 use async_trait::async_trait;
-use map_macro::set;
-use ompas_middleware::ompas_log::{LogMessage, Logger};
-use ompas_middleware::{LogLevel, ProcessInterface};
+use ompas_middleware::logger::LogClient;
+use ompas_middleware::ProcessInterface;
 use ompas_rae_interface::platform::PlatformModule;
 use ompas_rae_interface::platform::{Domain, PlatformDescriptor};
 use ompas_rae_interface::platform_interface::platform_interface_server::PlatformInterfaceServer;
@@ -39,6 +38,7 @@ pub struct PlatformGobotSim {
     pub headless: bool,
     pub domain: Domain,
     pub config: String,
+    pub log: LogClient,
 }
 impl Default for PlatformGobotSim {
     fn default() -> Self {
@@ -55,12 +55,13 @@ impl Default for PlatformGobotSim {
             headless: false,
             domain: Domain::default(),
             config: "".to_string(),
+            log: Default::default(),
         }
     }
 }
 
 impl PlatformGobotSim {
-    pub fn new(domain: Domain, headless: bool) -> Self {
+    pub fn new(domain: Domain, headless: bool, log: LogClient) -> Self {
         PlatformGobotSim {
             service_info: format!(
                 "{}:{}",
@@ -74,6 +75,7 @@ impl PlatformGobotSim {
             headless,
             domain: domain,
             config: "".to_string(),
+            log,
         }
     }
 
@@ -104,17 +106,17 @@ impl PlatformGobotSim {
         };
 
         let mut process = ProcessInterface::new(
-            PROCESS_GOBOT_SIM.to_string(),
-            set! {PROCESS_TOPIC_GOBOT_SIM, PROCESS_TOPIC_PLATFORM},
+            PROCESS_GOBOT_SIM,
+            PROCESS_TOPIC_GOBOT_SIM,
+            LOG_TOPIC_PLATFORM,
         )
         .await;
 
         tokio::spawn(async move {
             //blocked on the reception of the end signal.
             process.recv().await.expect("error receiving kill message");
-
             child.kill().expect("could not kill godot");
-            println!("process godot killed")
+            process.die().await;
         });
         Ok(LValue::Nil)
     }
@@ -134,8 +136,12 @@ impl PlatformGobotSim {
         };
         let server_info: SocketAddr = self.socket().await;
         tokio::spawn(async move {
-            let mut process =
-                ProcessInterface::new(PROCESS_SERVER_GRPC, set! {PROCESS_TOPIC_PLATFORM}).await;
+            let mut process = ProcessInterface::new(
+                PROCESS_SERVER_GRPC,
+                PROCESS_TOPIC_PLATFORM,
+                LOG_TOPIC_PLATFORM,
+            )
+            .await;
 
             //println!("Serving : {}", server_info);
             let server = Server::builder().add_service(PlatformInterfaceServer::new(service));
@@ -175,45 +181,24 @@ impl PlatformGobotSim {
 #[async_trait]
 impl PlatformDescriptor for PlatformGobotSim {
     async fn start(&self) {
-        let topic_id = Logger::subscribe_to_topic(LOG_TOPIC_PLATFORM).await;
         match self.start_platform().await {
             Ok(_) => {
-                Logger::log(LogMessage::new(
-                    LogLevel::Debug,
-                    "Platform::start",
-                    topic_id,
-                    "Successfully started platform.",
-                ))
-                .await;
+                self.log.info("Successfully started platform.").await;
                 match self.open_com().await {
                     Ok(_) => {
-                        Logger::log(LogMessage::new(
-                            LogLevel::Debug,
-                            "Platform::start",
-                            topic_id,
-                            "Successfully open com with platform.",
-                        ))
-                        .await;
+                        self.log.info("Successfully open com with platform.").await;
                     }
                     Err(e) => {
-                        Logger::log(LogMessage::new(
-                            LogLevel::Debug,
-                            "Platform::start",
-                            topic_id,
-                            format!("Error opening com with platform: {}.", e),
-                        ))
-                        .await;
+                        self.log
+                            .error(format!("Error opening com with platform: {e}."))
+                            .await;
                     }
                 }
             }
             Err(e) => {
-                Logger::log(LogMessage::new(
-                    LogLevel::Debug,
-                    "Platform::start".to_string(),
-                    topic_id,
-                    format!("Error starting platform: {}", e),
-                ))
-                .await;
+                self.log
+                    .error(format!("Error starting platform: {e}"))
+                    .await;
             }
         }
     }

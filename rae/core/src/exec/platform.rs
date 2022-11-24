@@ -2,12 +2,12 @@ use crate::contexts::ctx_mode::{CtxMode, RAEMode, CTX_MODE};
 use crate::contexts::ctx_planning::{CtxPlanning, CTX_PLANNING};
 use crate::contexts::ctx_rae::{CtxRae, CTX_RAE};
 use crate::contexts::ctx_task::{CtxTask, CTX_TASK};
+use crate::error::RaeExecError;
 use crate::exec::*;
-use crate::RaeExecError;
 use ompas_rae_interface::platform::PlatformDescriptor;
 use ompas_rae_structs::state::task_status::TaskStatus;
 use sompas_core::modules::list::append;
-use sompas_core::{eval, parse};
+use sompas_core::parse;
 use sompas_modules::utils::contains;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lruntimeerror::LResult;
@@ -34,9 +34,11 @@ pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LAsyncHandler {
 
         let parent_task = env.get_context::<CtxTask>(CTX_TASK)?.parent_id;
         let ctx = env.get_context::<CtxRae>(CTX_RAE)?;
+        let log = ctx.get_log_client();
         let (action_id, mut rx) = ctx.agenda.add_action(args.into(), parent_task).await;
         let debug: LValue = args.into();
-        info!("exec command {}: {}", action_id, debug);
+        log.info(format!("Exec command {action_id}: {debug}."))
+            .await;
         let eval_model = |int: Option<InterruptionReceiver>| async {
             let string = format!("((get-action-model '{}) {})", args[0], {
                 let mut str = "".to_string();
@@ -59,8 +61,7 @@ pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LAsyncHandler {
                         platform.exec_command(args, action_id).await;
 
                         //println!("await on action (id={})", action_id);
-                        info!("waiting on action {}", action_id);
-
+                        log.info(format!("Waiting on action {action_id}.")).await;
                         //let mut action_status: TaskStatus = ctx.agenda.get_status(&action_id).await;
 
                         let f = async {
@@ -75,12 +76,14 @@ pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LAsyncHandler {
                                         //println!("running");
                                     }
                                     TaskStatus::Failure => {
-                                        error!("Command {} is a failure.", action_id);
+                                        log.error(format!("Command {action_id} is a failure."))
+                                            .await;
                                         ctx.agenda.set_end_time(&action_id).await;
                                         return Ok(RaeExecError::ActionFailure.into());
                                     }
                                     TaskStatus::Done => {
-                                        info!("Command {} is a success.", action_id);
+                                        log.info(format!("Command {action_id} is a success."))
+                                            .await;
                                         ctx.agenda.set_end_time(&action_id).await;
                                         return Ok(true.into());
                                     }

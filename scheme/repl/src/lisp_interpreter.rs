@@ -3,9 +3,8 @@ use crate::PROCESS_TOPIC_INTERPRETER;
 use crate::TOKIO_CHANNEL_SIZE;
 use chrono::{DateTime, Utc};
 use im::HashMap;
-use map_macro::set;
-use ompas_middleware::ompas_log::{FileDescriptor, Logger};
-use ompas_middleware::{LogLevel, ProcessInterface, PROCESS_TOPIC_ALL};
+use ompas_middleware::logger::FileDescriptor;
+use ompas_middleware::{Master, ProcessInterface, PROCESS_TOPIC_ALL};
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use sompas_core::{eval, eval_init, get_root_env, parse};
@@ -138,19 +137,16 @@ impl LispInterpreter {
     }
 
     pub async fn run(mut self, log: Option<FileDescriptor>) {
+        Master::new_log_topic(LOG_TOPIC_INTERPRETER, log).await;
+
         let mut process_interface: ProcessInterface = ProcessInterface::new(
             PROCESS_INTERPRETER.to_string(),
-            set! {PROCESS_TOPIC_INTERPRETER.to_string()},
+            PROCESS_TOPIC_INTERPRETER,
+            LOG_TOPIC_INTERPRETER,
         )
         .await;
-        Logger::new_topic(LOG_TOPIC_INTERPRETER, log).await;
-        process_interface
-            .subscribe_to_log_topic(LOG_TOPIC_INTERPRETER)
-            .await;
 
-        process_interface
-            .log("initiate interpreter", LogLevel::Debug)
-            .await;
+        process_interface.log_debug("initiate interpreter").await;
 
         eval_init(&mut self.env).await;
 
@@ -173,7 +169,7 @@ impl LispInterpreter {
                 id_subscriber = self.recv() => {
                     let id_subscriber: usize = match id_subscriber {
                         None => {
-                            process_interface.log("Error in the interpretor", LogLevel::Error).await;
+                            process_interface.log_error("Error in the interpretor").await;
                             continue;
                         }
                         Some(id) => {
@@ -182,7 +178,7 @@ impl LispInterpreter {
                     };
                     let str_lvalue = match self.recv().await {
                         None => {
-                            process_interface.log("Error in the interpretor", LogLevel::Error).await;
+                            process_interface.log_error("Error in the interpretor").await;
                             continue;
                         }
                         Some(str) => {
@@ -198,17 +194,17 @@ impl LispInterpreter {
                     match parse(str_lvalue.as_str(), &mut self.env).await {
                         Ok(lv) => {
                             let result = eval(&lv, &mut self.env, None).await;
-                            process_interface.log(format!("{} => {}", str_lvalue, match result.clone() {
+                            process_interface.log_trace(format!("{} => {}", str_lvalue, match result.clone() {
                                 Ok(lv) => lv.to_string(),
                                 Err(e) => e.to_string(),
-                            }), LogLevel::Trace).await;
+                            })).await;
                             self.li_channel
                                 .send(&id_subscriber, result)
                                 .await
                                 .expect("error on channel to stdout");
                         }
                         Err(e) => {
-                            process_interface.log(format!("{} => {}", str_lvalue, e), LogLevel::Trace).await;
+                            process_interface.log_trace(format!("{} => {}", str_lvalue, e)).await;
 
                             self.li_channel
                                 .send(&id_subscriber, Err(e))
@@ -249,7 +245,8 @@ impl LispInterpreter {
 pub async fn spawn_repl(communication: ChannelToLispInterpreter) -> JoinHandle<()> {
     let mut process_interface = ProcessInterface::new(
         PROCESS_SPAWN_REPL.to_string(),
-        set! {PROCESS_TOPIC_INTERPRETER.to_string()},
+        PROCESS_TOPIC_INTERPRETER,
+        LOG_TOPIC_INTERPRETER,
     )
     .await;
 
@@ -274,7 +271,8 @@ pub async fn spawn_log(com: ChannelToLispInterpreter, log_path: Option<PathBuf>)
 async fn log(mut com: ChannelToLispInterpreter, working_dir: Option<PathBuf>) {
     let mut process_interface = ProcessInterface::new(
         PROCESS_SPAWN_REPL.to_string(),
-        set! {PROCESS_TOPIC_INTERPRETER.to_string()},
+        PROCESS_TOPIC_INTERPRETER,
+        LOG_TOPIC_INTERPRETER,
     )
     .await;
     let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);

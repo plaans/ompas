@@ -1,8 +1,8 @@
 use crate::monitor::{CtxRaeUser, MOD_RAE_USER, TOKIO_CHANNEL_SIZE};
 use crate::rae;
-use ompas_middleware::{ProcessInterface, ProcessTopic};
+use ompas_middleware::{Master, ProcessInterface, LOG_TOPIC_ROOT};
 use ompas_rae_interface::platform::PlatformDescriptor;
-use ompas_rae_interface::PROCESS_TOPIC_PLATFORM;
+use ompas_rae_interface::{LOG_TOPIC_PLATFORM, PROCESS_TOPIC_PLATFORM};
 use ompas_rae_language::*;
 use ompas_rae_language::{RAE_GET_AGENDA, RAE_GET_ENV, RAE_GET_STATE};
 use ompas_rae_structs::domain::RAEDomain;
@@ -21,7 +21,6 @@ use sompas_structs::lenv::LEnv;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::{lruntimeerror, wrong_type};
-use std::collections::HashSet;
 use std::mem;
 use std::time::Duration;
 use tokio::sync::mpsc;
@@ -283,8 +282,8 @@ const PROCESS_STOP_OMPAS: &str = "__PROCESS_STOP_OMPAS__";
 
 #[async_scheme_fn]
 pub async fn stop(env: &LEnv) {
-    let set: HashSet<ProcessTopic> = HashSet::new();
-    let process: ProcessInterface = ProcessInterface::new(PROCESS_STOP_OMPAS, set).await;
+    let process: ProcessInterface =
+        ProcessInterface::new(PROCESS_STOP_OMPAS, PROCESS_TOPIC_OMPAS, LOG_TOPIC_OMPAS).await;
 
     let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER).unwrap();
 
@@ -393,4 +392,34 @@ pub async fn add_task_to_execute(env: &LEnv, args: &[LValue]) -> Result<(), LRun
         }
     };
     Ok(())
+}
+
+const LOG_ROOT: &str = "log-root";
+const LOG_PLATFORM: &str = "log-platform";
+const LOG_OMPAS: &str = "log-ompas";
+
+#[async_scheme_fn]
+pub async fn activate_log(logs: Vec<String>) {
+    for log in logs {
+        let topic = match log.as_str() {
+            LOG_ROOT => LOG_TOPIC_ROOT,
+            LOG_PLATFORM => LOG_TOPIC_PLATFORM,
+            LOG_OMPAS => LOG_TOPIC_OMPAS,
+            _ => continue,
+        };
+        Master::start_display_log_topic(topic).await;
+    }
+}
+
+#[async_scheme_fn]
+pub async fn deactivate_log(logs: Vec<String>) {
+    for log in logs {
+        let topic = match log.as_str() {
+            LOG_ROOT => LOG_TOPIC_ROOT,
+            LOG_PLATFORM => LOG_TOPIC_PLATFORM,
+            LOG_OMPAS => LOG_TOPIC_OMPAS,
+            _ => continue,
+        };
+        Master::stop_display_log_topic(topic).await;
+    }
 }

@@ -252,6 +252,7 @@ impl CtxRaeUser {
             agenda: interface.agenda.clone(),
             command_stream: Arc::new(Default::default()),
             log: LogClient::new(PLATFORM_CLIENT, LOG_TOPIC_OMPAS).await,
+            config: Arc::new(Default::default()),
         };
 
         let domain: InitLisp = match platform.domain().await {
@@ -337,10 +338,6 @@ impl CtxRaeUser {
 
     pub async fn set_options(&self, options: OMPASOptions) {
         *self.options.write().await = options;
-    }
-
-    pub async fn set_platform_config(&self, config: String) {
-        self.options.write().await.set_platform_config(config);
     }
 
     pub async fn set_select_mode(&self, select_mode: SelectMode) {

@@ -5,8 +5,8 @@ use crate::{DEFAULT_PATH_PROJECT_GODOT, TOKIO_CHANNEL_SIZE};
 use async_trait::async_trait;
 use ompas_middleware::logger::LogClient;
 use ompas_middleware::ProcessInterface;
-use ompas_rae_interface::platform::PlatformModule;
 use ompas_rae_interface::platform::{Domain, PlatformDescriptor};
+use ompas_rae_interface::platform::{PlatformConfig, PlatformModule};
 use ompas_rae_interface::platform_interface::platform_interface_server::PlatformInterfaceServer;
 use ompas_rae_interface::{DEFAULT_PLATFORM_SERVICE_IP, DEFAULT_PLATFROM_SERVICE_PORT};
 use ompas_rae_interface::{LOG_TOPIC_PLATFORM, PROCESS_TOPIC_PLATFORM};
@@ -79,7 +79,7 @@ impl PlatformGobotSim {
         }
     }
 
-    pub async fn start_platform(&self) -> LResult {
+    pub async fn start_platform(&self, config: Option<String>) -> LResult {
         let godot = match self.headless {
             true => "godot3-headless",
             false => "godot3",
@@ -88,21 +88,28 @@ impl PlatformGobotSim {
         let f1 = File::create("gobotsim.log").expect("couldn't create file");
         let f2 = File::create("gobotsim.log").expect("couldn't create file");
 
-        let mut child = match self.config.is_empty() {
-            //default settings
-            true => Command::new(godot)
-                .arg("--path")
-                .arg(DEFAULT_PATH_PROJECT_GODOT)
+        let mut child = match config {
+            Some(config) => Command::new(godot)
+                .args(config.split_whitespace())
                 .stdout(unsafe { Stdio::from_raw_fd(f1.into_raw_fd()) })
                 .stderr(unsafe { Stdio::from_raw_fd(f2.into_raw_fd()) })
                 .spawn()
                 .expect("failed to execute process"),
-            false => Command::new(godot)
-                .args(self.config.split_whitespace())
-                .stdout(unsafe { Stdio::from_raw_fd(f1.into_raw_fd()) })
-                .stderr(unsafe { Stdio::from_raw_fd(f2.into_raw_fd()) })
-                .spawn()
-                .expect("failed to execute process"),
+            None => match self.config.is_empty() {
+                true => Command::new(godot)
+                    .arg("--path")
+                    .arg(DEFAULT_PATH_PROJECT_GODOT)
+                    .stdout(unsafe { Stdio::from_raw_fd(f1.into_raw_fd()) })
+                    .stderr(unsafe { Stdio::from_raw_fd(f2.into_raw_fd()) })
+                    .spawn()
+                    .expect("failed to execute process"),
+                false => Command::new(godot)
+                    .args(self.config.split_whitespace())
+                    .stdout(unsafe { Stdio::from_raw_fd(f1.into_raw_fd()) })
+                    .stderr(unsafe { Stdio::from_raw_fd(f2.into_raw_fd()) })
+                    .spawn()
+                    .expect("failed to execute process"),
+            },
         };
 
         let mut process = ProcessInterface::new(
@@ -180,8 +187,11 @@ impl PlatformGobotSim {
 
 #[async_trait]
 impl PlatformDescriptor for PlatformGobotSim {
-    async fn start(&self) {
-        match self.start_platform().await {
+    async fn start(&self, config: PlatformConfig) {
+        match self
+            .start_platform(config.get_inner::<String>().cloned())
+            .await
+        {
             Ok(_) => {
                 self.log.info("Successfully started platform.").await;
                 match self.open_com().await {

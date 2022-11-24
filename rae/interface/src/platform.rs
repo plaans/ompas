@@ -15,6 +15,7 @@ use ompas_rae_structs::state::action_status::CommandStatus;
 use ompas_rae_structs::state::partial_state::PartialState;
 use ompas_rae_structs::state::world_state::{StateType, WorldState};
 use platform_interface::platform_update::Update;
+use sompas_structs::contextcollection::AsyncLTrait;
 use sompas_structs::documentation::Documentation;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalues::LValueS;
@@ -22,10 +23,12 @@ use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
 use std::any::Any;
 use std::borrow::Borrow;
+use std::fmt::{Display, Formatter};
 use std::net::SocketAddr;
+use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 
 const PROCESS_GET_UPDATES: &str = "__PROCESS_GET_UPDATES__";
 const PROCESS_SEND_COMMANDS: &str = "__PROCESS_SEND_COMMANDS__";
@@ -37,7 +40,48 @@ pub struct Platform {
     pub agenda: Agenda,
     pub command_stream: Arc<Mutex<Option<tokio::sync::mpsc::Sender<CommandRequest>>>>,
     pub log: LogClient,
+    pub config: Arc<RwLock<PlatformConfig>>,
 }
+
+trait ConfigTrait: Any + Display + Send + Sync {}
+
+#[derive(Clone, Default)]
+pub struct PlatformConfig {
+    inner: Option<Arc<AsyncLTrait>>,
+}
+
+impl PlatformConfig {
+    pub fn new<T: Any + Send + Sync>(config: T) -> Self {
+        Self {
+            inner: Some(Arc::new(config)),
+        }
+    }
+
+    pub fn get_inner<T: Any + Send + Sync>(&self) -> Option<&T> {
+        match &self.inner {
+            None => None,
+            Some(inner) => {
+                <dyn std::any::Any>::downcast_ref::<T>(inner.deref())
+                //inner.deref().downcast_ref::<T>()
+            }
+        }
+    }
+}
+/*
+impl Display for PlatformConfig {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self.inner {
+                None => "none".to_string(),
+                Some(t) => {
+
+                }
+            }
+        )
+    }
+}*/
 
 impl Platform {
     pub async fn exec_command(&self, command: &[LValue], command_id: usize) {
@@ -253,8 +297,12 @@ impl Platform {
 #[async_trait]
 impl PlatformDescriptor for Platform {
     ///Launch the platform (such as the simulation in godot) and open communication
-    async fn start(&self) {
-        self.inner.write().await.start().await;
+    async fn start(&self, _: PlatformConfig) {
+        self.inner
+            .write()
+            .await
+            .start(self.config.read().await.clone())
+            .await;
 
         let server: SocketAddr = self.socket().await;
         //println!("server addr: {}", server);
@@ -358,7 +406,7 @@ impl IntoModule for PlatformModule {
 #[async_trait]
 pub trait PlatformDescriptor: Any + Send + Sync {
     ///Launch the platform (such as the simulation in godot) and open communication
-    async fn start(&self);
+    async fn start(&self, config: PlatformConfig);
 
     ///Stops the platform.
     async fn stop(&self);

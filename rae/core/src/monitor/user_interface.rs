@@ -1,14 +1,13 @@
 use crate::monitor::{CtxRaeUser, MOD_RAE_USER, TOKIO_CHANNEL_SIZE};
 use crate::rae;
 use ompas_middleware::{Master, ProcessInterface, LOG_TOPIC_ROOT};
-use ompas_rae_interface::platform::PlatformDescriptor;
+use ompas_rae_interface::platform::{Platform, PlatformConfig, PlatformDescriptor};
 use ompas_rae_interface::{LOG_TOPIC_PLATFORM, PROCESS_TOPIC_PLATFORM};
 use ompas_rae_language::*;
 use ompas_rae_language::{RAE_GET_AGENDA, RAE_GET_ENV, RAE_GET_STATE};
 use ompas_rae_structs::domain::RAEDomain;
 use ompas_rae_structs::job::Job;
 use ompas_rae_structs::monitor::task_check_wait_for;
-use ompas_rae_structs::rae_options::OMPASOptions;
 use ompas_rae_structs::select_mode::{Planner, SelectMode};
 use ompas_rae_structs::state::task_state::*;
 use ompas_rae_structs::state::task_status::TaskStatus;
@@ -68,10 +67,12 @@ pub async fn get_state(env: &LEnv, args: &[LValue]) -> LResult {
 pub async fn get_config_platform(env: &LEnv) -> String {
     let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER).unwrap();
 
-    ctx.get_options()
-        .await
-        .get_platform_config()
-        .unwrap_or_else(|| String::from("no options"))
+    let string = String::new();
+    /*match &ctx.platform {
+        None => string,
+        Some(p) => p.config.read().await.to_string(),
+    }*/
+    string
 }
 
 #[async_scheme_fn]
@@ -241,7 +242,7 @@ pub async fn launch(env: &LEnv) -> &str {
     let platform = ctx.platform.clone();
 
     if let Some(platform) = &platform {
-        platform.start().await;
+        platform.start(Default::default()).await;
     }
 
     let domain: RAEDomain = ctx.rae_domain.read().await.clone();
@@ -311,9 +312,10 @@ pub async fn configure_platform(env: &LEnv, args: &[LValue]) -> LResult {
     for arg in args {
         string.push_str(format!("{} ", arg).as_str())
     }
+    if let Some(platform) = &ctx.platform {
+        *platform.config.write().await = PlatformConfig::new::<String>(string);
+    }
 
-    let rae_options = OMPASOptions::new_with_platform_config(Default::default(), Some(string));
-    ctx.set_options(rae_options).await;
     Ok(LValue::Nil)
 }
 

@@ -126,7 +126,7 @@ pub async fn launch_platform(env: &LEnv) -> LResult {
     let ctx = env.get_context::<CtxRae>(CTX_RAE).unwrap();
 
     if let Some(platform) = &ctx.platform_interface {
-        platform.start().await;
+        platform.start(Default::default()).await;
         Ok(LValue::Nil)
     } else {
         Ok("No platform defined".into())

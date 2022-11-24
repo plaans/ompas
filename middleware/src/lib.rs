@@ -9,6 +9,7 @@ use map_macro::{map, set};
 use ompas_utils::other::get_and_update_id_counter;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
+use std::ops::Deref;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
@@ -32,7 +33,8 @@ pub struct Master {
     processes: Arc<Mutex<HashMap<ProcessId, ProcessDescriptor>>>,
     topic_id: Arc<RwLock<HashMap<ProcessTopicLabel, ProcessTopidId>>>,
     topics: Arc<RwLock<HashMap<ProcessTopidId, ProcessTopic>>>,
-    sender: Arc<RwLock<tokio::sync::mpsc::Sender<KillRequest>>>,
+    sender_kill: Arc<mpsc::Sender<KillRequest>>,
+    sender_death: Arc<RwLock<Option<mpsc::Sender<DeathNotification>>>>,
     next_topic_id: Arc<AtomicUsize>,
     next_process_id: Arc<AtomicUsize>,
     end_receiver: Arc<broadcast::Receiver<EndSignal>>,
@@ -63,6 +65,7 @@ pub struct ProcessDescriptor {
 impl Master {
     pub fn new() -> Self {
         let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+        let (tx_death, rx_death) = mpsc::channel(TOKIO_CHANNEL_SIZE);
         let (tx_end, rx_end) = broadcast::channel(TOKIO_CHANNEL_SIZE);
 
         let logger = Logger::default();
@@ -79,7 +82,8 @@ impl Master {
                     childs: set!{}
                 }
             })),
-            sender: Arc::new(RwLock::new(tx)),
+            sender_kill: Arc::new(tx),
+            sender_death: Arc::new(RwLock::new(Some(tx_death))),
             next_topic_id: Arc::new(AtomicUsize::new(1)),
             next_process_id: Arc::new(Default::default()),
             end_receiver: Arc::new(rx_end),
@@ -88,7 +92,7 @@ impl Master {
 
         let master2 = master.clone();
 
-        tokio::spawn(async move { Master::run_middleware(master2, rx, tx_end).await });
+        tokio::spawn(async move { Master::run_middleware(master2, rx, rx_death, tx_end).await });
 
         master
     }
@@ -98,9 +102,22 @@ impl Master {
         let _ = end.recv().await;
     }
 
+    async fn remove_process(&self, process_id: ProcessId) {
+        let process: ProcessDescriptor = self.processes.lock().await.remove(&process_id).unwrap();
+        self.logger
+            .log(LogMessage {
+                level: Level::Info,
+                source: process.label.to_string(),
+                topic: MASTER.logger.subscribe_to_topic(LOG_TOPIC_ROOT).await,
+                message: format!("Process {} is dead.", process.label),
+            })
+            .await;
+    }
+
     async fn run_middleware(
         master: Master,
-        mut receiver: mpsc::Receiver<KillRequest>,
+        mut receiver_kill: mpsc::Receiver<KillRequest>,
+        mut receiver_death: mpsc::Receiver<DeathNotification>,
         end: broadcast::Sender<EndSignal>,
     ) {
         let log: LogClient = LogClient::new(MASTER_LABEL, LOG_TOPIC_ROOT).await;
@@ -111,71 +128,89 @@ impl Master {
         master.logger.start(rx).await;
 
         'main: loop {
-            if let Some(kill_request) = receiver.recv().await {
-                let id = master.topic_id.write().await.remove(&kill_request.topic);
-                if let Some(id) = id {
-                    log.info(format!(
-                        "{} requested termination of process topic {}.",
-                        kill_request.requestor, kill_request.topic,
-                    ))
-                    .await;
+            tokio::select! {
+                kill_request = receiver_kill.recv() => {
+                    if let Some(kill_request) = kill_request {
+                        let id = master.topic_id.write().await.remove(&kill_request.topic);
+                        if let Some(id) = id {
+                            log.info(format!(
+                                "{} requested termination of process topic {}.",
+                                kill_request.requestor, kill_request.topic,
+                            ))
+                            .await;
 
-                    let mut topic_ids: Vec<ProcessTopidId> = vec![id];
+                            let mut topic_ids: Vec<ProcessTopidId> = vec![id];
 
-                    while let Some(id) = topic_ids.pop() {
-                        /*
-                        KILLING PROCESSES DEPEND ON THE TOPIC
-                         */
+                            while let Some(id) = topic_ids.pop() {
+                                /*
+                                KILLING PROCESSES DEPEND ON THE TOPIC
+                                 */
 
-                        let mut topics = master.topics.write().await;
+                                let mut topics = master.topics.write().await;
 
-                        let topic: &mut ProcessTopic = topics.get_mut(&id).unwrap();
-                        for p in topic.processes.drain() {
-                            let process = master.processes.lock().await.remove(&p);
-                            if let Some(process) = process {
-                                match process.sender.send(END_SIGNAL).await {
-                                    Ok(_) => {
-                                        log.info(format!(
-                                            "Request termination of process {}{{Requested by: {}; Part of Topic: {}}}.",
-                                            process.label,
-                                            kill_request.requestor,
-                                            kill_request.topic,
-                                        ))
-                                            .await;
+                                let topic: &mut ProcessTopic = topics.get_mut(&id).unwrap();
+                                for p in topic.processes.drain() {
+
+                                    if let Some(process) =  master.processes.lock().await.get(&p) {
+
+                                        match process.sender.send(END_SIGNAL).await {
+                                            Ok(_) => {
+                                                log.info(format!(
+                                                    "Request termination of process {}{{Requested by: {}; Part of Topic: {}}}.",
+                                                    process.label,
+                                                    kill_request.requestor,
+                                                    kill_request.topic,
+                                                ))
+                                                    .await;
+                                            }
+                                            Err(err) => {
+                                                log.warn(format!(
+                                                    "Error request termination of process {}: {}",
+                                                    process.label, err
+                                                ))
+                                                .await;
+                                            }
+                                        }
                                     }
-                                    Err(err) => {
-                                        log.warn(format!(
-                                            "Error request termination of process {}: {}",
-                                            process.label, err
-                                        ))
-                                        .await;
-                                    }
+
+                                }
+
+                                /*
+                                KILLING PROCESSES OF CHILD TOPICS
+                                 */
+
+                                let topic_name = topic.label.to_string();
+                                let childs: Vec<ProcessTopidId> = topic.childs.drain().collect();
+
+                                for topic in childs {
+                                    let child_name = topics.get(&topic).unwrap().label.clone();
+                                    log.info(format!(
+                                        "Request termination of process topic {child_name} because it is a child of the process topic {topic_name}",
+                                    )).await;
+                                    topic_ids.push(topic);
                                 }
                             }
-                        }
 
-                        /*
-                        KILLING PROCESSES OF CHILD TOPICS
-                         */
-
-                        let topic_name = topic.label.to_string();
-                        let childs: Vec<ProcessTopidId> = topic.childs.drain().collect();
-
-                        for topic in childs {
-                            let child_name = topics.get(&topic).unwrap().label.clone();
-                            log.info(format!(
-                                "Request termination of process topic {child_name} because it is a child of the process topic {topic_name}",
-                            )).await;
-                            topic_ids.push(topic);
+                            if id == TOPIC_ALL_ID {
+                                break 'main;
+                            }
                         }
                     }
-
-                    if id == TOPIC_ALL_ID {
-                        break 'main;
+                }
+                death_notification = receiver_death.recv() => {
+                    if let Some(death_notification) = death_notification {
+                        master.remove_process(death_notification.process_id).await;
                     }
                 }
             }
         }
+
+        *master.sender_death.write().await = None;
+
+        while let Some(death_notification) = receiver_death.recv().await {
+            master.remove_process(death_notification.process_id).await;
+        }
+
         log.info("END MASTER").await;
         let _ = tx_end_logger.send(END_SIGNAL).await;
         master.logger.end().await;
@@ -195,9 +230,6 @@ impl Master {
                     .insert(process_id);
             }
             None => {
-                let log = LogClient::new(MASTER_LABEL, LOG_TOPIC_ROOT).await;
-                log.debug(format!("sub: Creating process topic {}", topic))
-                    .await;
                 let parent: Option<&str> = None;
                 let id = self.new_topic(topic, parent).await;
                 self.topics
@@ -217,8 +249,7 @@ impl Master {
             Some(id) => id,
             None => {
                 let log = LogClient::new(MASTER_LABEL, LOG_TOPIC_ROOT).await;
-                log.debug(format!("new: Creating process topic {}", name))
-                    .await;
+                log.debug(format!("Creating process topic {}", name)).await;
                 let id = get_and_update_id_counter(self.next_topic_id.clone());
 
                 let mut topics = self.topics.write().await;
@@ -231,9 +262,7 @@ impl Master {
                             topics.get_mut(&parent_id).unwrap().childs.insert(id);
                         }
                         None => {
-                            log.debug(format!("new: Creating process topic {}", name))
-                                .await;
-
+                            log.debug(format!("Creating process topic {}", name)).await;
                             let parent_id = get_and_update_id_counter(self.next_topic_id.clone());
                             self.topic_id.write().await.insert(parent.to_string(), id);
                             topics.insert(
@@ -286,12 +315,13 @@ impl Master {
         ProcessInterface {
             label: label.to_string(),
             id,
-            sender: self.sender.read().await.clone(),
+            sender_kill: self.sender_kill.deref().clone(),
             receiver: rx,
             log: LogClient {
                 topic_id: self.logger.subscribe_to_topic(log_topic).await,
                 source: label.to_string(),
             },
+            sender_death: self.sender_death.read().await.as_ref().unwrap().clone(),
         }
     }
 
@@ -324,7 +354,8 @@ pub struct ProcessInterface {
     label: String,
     #[allow(dead_code)]
     id: ProcessId,
-    sender: mpsc::Sender<KillRequest>,
+    sender_kill: mpsc::Sender<KillRequest>,
+    sender_death: mpsc::Sender<DeathNotification>,
     receiver: mpsc::Receiver<EndSignal>,
     log: LogClient,
 }
@@ -333,6 +364,10 @@ pub struct ProcessInterface {
 pub struct KillRequest {
     requestor: String,
     topic: ProcessTopicLabel,
+}
+
+pub struct DeathNotification {
+    process_id: ProcessId,
 }
 
 impl KillRequest {
@@ -353,7 +388,7 @@ impl ProcessInterface {
     }
 
     pub async fn kill(&self, topic: impl Display) {
-        self.sender
+        self.sender_kill
             .send(KillRequest::new(self.label.to_string(), topic.to_string()))
             .await
             .unwrap_or_else(|e| {
@@ -400,19 +435,20 @@ impl ProcessInterface {
         self.log.clone()
     }
 
-    pub async fn die(self) {
-        MASTER
-            .logger
-            .log(LogMessage {
-                level: Level::Info,
-                source: self.log.source,
-                topic: MASTER.logger.subscribe_to_topic(LOG_TOPIC_ROOT).await,
-                message: format!("Process {} is dead.", self.label),
+    fn die(&self) {
+        self.sender_death
+            .try_send(DeathNotification {
+                process_id: self.id,
             })
-            .await
+            .unwrap_or_else(|e| panic!("Error sending death notification of {}: {}", self.label, e))
     }
 }
 
+impl Drop for ProcessInterface {
+    fn drop(&mut self) {
+        self.die()
+    }
+}
 pub enum LogLevel {
     Error = 1,
     Warn,

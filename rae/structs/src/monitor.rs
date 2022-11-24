@@ -148,7 +148,7 @@ pub async fn task_check_wait_for(
                 }
             }
             _ = process.recv() => {
-                break process.die().await;
+                break; //process.die().await;
             }
         }
     }

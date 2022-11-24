@@ -167,7 +167,7 @@ async fn async_read_socket(
         //reading an incoming message from the tcp server of godot
         tokio::select! {
             _ = process.recv() => {
-                break 'outer process.die().await;
+                break 'outer ;//process.die().await;
             }
             msg = buf_reader.read_exact(&mut size_buf) => {
 
@@ -221,7 +221,7 @@ async fn async_read_socket(
                                                     if let Err(_) = state_update_sender.send(instance.into())
                                                     {
                                                         process.kill(PROCESS_TOPIC_PLATFORM).await;
-                                                        process.die().await;
+                                                        //process.die().await;
                                                         break 'outer;
                                                     }
                                          };
@@ -242,7 +242,7 @@ async fn async_read_socket(
                                     }.into())
                                     {
                                         process.kill(PROCESS_TOPIC_PLATFORM).await;
-                                        process.die().await;
+                                        //process.die().await;
                                         break 'outer;
                                     }
                         }
@@ -274,7 +274,7 @@ async fn async_read_socket(
                                     }.into())
                                     {
                                         process.kill(PROCESS_TOPIC_PLATFORM).await;
-                                        process.die().await;
+                                        //process.die().await;
                                         break 'outer;
                                     }
                         },
@@ -318,7 +318,7 @@ async fn async_read_socket(
                                                 command_id : ar.temp_id as u64
                                             }.into()) {
                                             process.kill(PROCESS_TOPIC_PLATFORM).await;
-                                            process.die().await;
+                                            //process.die().await;
                                             break 'outer;
                                         }
                                     }
@@ -335,7 +335,7 @@ async fn async_read_socket(
                                             }.into())
                                              {
                                             process.kill(PROCESS_TOPIC_PLATFORM).await;
-                                            process.die().await;
+                                            //process.die().await;
                                             break 'outer;
                                         }
                                         }
@@ -353,7 +353,7 @@ async fn async_read_socket(
                                     progress: af.feedback
                                 }.into()) {
                                             process.kill(PROCESS_TOPIC_PLATFORM).await;
-                                            process.die().await;
+                                            //process.die().await;
                                             break 'outer;
                                         }
                             } else {
@@ -368,7 +368,7 @@ async fn async_read_socket(
                                     result: ar.result
                                 }.into())  {
                                             process.kill(PROCESS_TOPIC_PLATFORM).await;
-                                            process.die().await;
+                                            //process.die().await;
                                             break 'outer;
                                         }
                             } else {
@@ -395,7 +395,7 @@ async fn async_read_socket(
                                     result: ac.cancelled
                                 }.into())  {
                                             process.kill(PROCESS_TOPIC_PLATFORM).await;
-                                            process.die().await;
+                                            //process.die().await;
                                             break 'outer;
                                         }
                             } else {

@@ -116,7 +116,7 @@ impl PlatformGobotSim {
             //blocked on the reception of the end signal.
             process.recv().await.expect("error receiving kill message");
             child.kill().expect("could not kill godot");
-            process.die().await;
+            //process.die().await;
         });
         Ok(LValue::Nil)
     }
@@ -147,7 +147,7 @@ impl PlatformGobotSim {
             let server = Server::builder().add_service(PlatformInterfaceServer::new(service));
             tokio::select! {
                 _ = process.recv() => {
-                    process.die().await;
+                    //process.die().await;
                 }
                 _ = server.serve(server_info) => {
 

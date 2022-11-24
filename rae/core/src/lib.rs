@@ -169,7 +169,7 @@ pub async fn rae(
                 for k in &mut killers {
                     k.interrupt().await;
                 }
-                break process.die().await;
+                break ;//process.die().await;
             }
         }
         //For each new event or task to be addressed, we search for the best method a create a new refinement stack

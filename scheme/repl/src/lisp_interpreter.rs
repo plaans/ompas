@@ -163,7 +163,7 @@ impl LispInterpreter {
         loop {
             tokio::select! {
                 _ = process_interface.recv() => {
-                    process_interface.die().await;
+                    //process_interface.die().await;
                     break;
                 }
                 id_subscriber = self.recv() => {

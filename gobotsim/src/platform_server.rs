@@ -45,13 +45,13 @@ impl PlatformInterface for PlatformGobotSimService {
             loop {
                 tokio::select! {
                     _ = process.recv() => {
-                        break process.die();
+                        break; //process.die();
                     }
                     msg = state_update.recv() => {
                         if let Ok(msg) = msg {
                             if let Err(_) = tx.send(Ok(msg)).await {
                                 process.kill(PROCESS_TOPIC_PLATFORM).await;
-                                break process.die();
+                                break; //process.die();
                             }
                         }
                     }
@@ -93,14 +93,14 @@ impl PlatformInterface for PlatformGobotSimService {
             loop {
                 tokio::select! {
                     _ = process.recv() => {
-                        break process.die();
+                        break; //process.die();
                     }
                     msg = command_request_receiver.message() => {
                         if let Ok(Some(request)) = msg {
                             process.log("Received new command request.", LogLevel::Debug).await;
                             if let Err(_) = command_request_to_godot.send(request).await {
                                 process.kill(PROCESS_TOPIC_PLATFORM).await;
-                                break process.die();
+                                break; //process.die();
                             }
                         }
                     }
@@ -108,7 +108,7 @@ impl PlatformInterface for PlatformGobotSimService {
                         if let Ok(response) = msg {
                             if let Err(_) = tx.send(Ok(response)).await {
                                 process.kill(PROCESS_TOPIC_PLATFORM).await;
-                                break process.die();
+                                break;// process.die();
                             }
                         }
                     }

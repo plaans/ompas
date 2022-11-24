@@ -142,7 +142,9 @@ impl Logger {
                 }
             }
         }
-        receiver.close();
+        //receiver.close();
+
+        *logger.sender_log.write().await = None;
 
         while let Some(message) = receiver.recv().await {
             logger.log_to_file(message).await;

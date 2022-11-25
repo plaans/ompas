@@ -1,10 +1,12 @@
 use std::fs;
+use std::path::PathBuf;
 
 //Build GRPC server and client for UPF planning service
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let proto_file = "src/platform_interface.proto";
+    let proto_file: PathBuf = "../../grpc/platform_interface.proto".into();
+    //let proto_file = proto_file.canonicalize().unwrap();
 
-    let x: [&str; 0] = [];
+    let x: [&str; 1] = ["../../grpc"];
     tonic_build::configure()
         .build_server(true)
         .build_client(true)

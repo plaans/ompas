@@ -1,8 +1,8 @@
 use crate::monitor::{CtxRaeUser, MOD_RAE_USER, TOKIO_CHANNEL_SIZE};
 use crate::rae;
-use ompas_middleware::{Master, ProcessInterface, LOG_TOPIC_ROOT};
-use ompas_rae_interface::platform::{Platform, PlatformConfig, PlatformDescriptor};
-use ompas_rae_interface::{LOG_TOPIC_PLATFORM, PROCESS_TOPIC_PLATFORM};
+use ompas_middleware::ProcessInterface;
+use ompas_rae_interface::platform::{PlatformConfig, PlatformDescriptor};
+use ompas_rae_interface::PROCESS_TOPIC_PLATFORM;
 use ompas_rae_language::*;
 use ompas_rae_language::{RAE_GET_AGENDA, RAE_GET_ENV, RAE_GET_STATE};
 use ompas_rae_structs::domain::RAEDomain;
@@ -68,11 +68,11 @@ pub async fn get_config_platform(env: &LEnv) -> String {
     let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER).unwrap();
 
     let string = String::new();
-    /*match &ctx.platform {
+    match &ctx.platform {
         None => string,
-        Some(p) => p.config.read().await.to_string(),
-    }*/
-    string
+        Some(p) => p.config.read().await.format(),
+    }
+    //string
 }
 
 #[async_scheme_fn]
@@ -313,7 +313,7 @@ pub async fn configure_platform(env: &LEnv, args: &[LValue]) -> LResult {
         string.push_str(format!("{} ", arg).as_str())
     }
     if let Some(platform) = &ctx.platform {
-        *platform.config.write().await = PlatformConfig::new::<String>(string);
+        *platform.config.write().await = PlatformConfig::new_string(string);
     }
 
     Ok(LValue::Nil)
@@ -394,34 +394,4 @@ pub async fn add_task_to_execute(env: &LEnv, args: &[LValue]) -> Result<(), LRun
         }
     };
     Ok(())
-}
-
-const LOG_ROOT: &str = "log-root";
-const LOG_PLATFORM: &str = "log-platform";
-const LOG_OMPAS: &str = "log-ompas";
-
-#[async_scheme_fn]
-pub async fn activate_log(logs: Vec<String>) {
-    for log in logs {
-        let topic = match log.as_str() {
-            LOG_ROOT => LOG_TOPIC_ROOT,
-            LOG_PLATFORM => LOG_TOPIC_PLATFORM,
-            LOG_OMPAS => LOG_TOPIC_OMPAS,
-            _ => continue,
-        };
-        Master::start_display_log_topic(topic).await;
-    }
-}
-
-#[async_scheme_fn]
-pub async fn deactivate_log(logs: Vec<String>) {
-    for log in logs {
-        let topic = match log.as_str() {
-            LOG_ROOT => LOG_TOPIC_ROOT,
-            LOG_PLATFORM => LOG_TOPIC_PLATFORM,
-            LOG_OMPAS => LOG_TOPIC_OMPAS,
-            _ => continue,
-        };
-        Master::stop_display_log_topic(topic).await;
-    }
 }

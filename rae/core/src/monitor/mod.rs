@@ -7,6 +7,7 @@ use crate::contexts::ctx_state::{CtxState, CTX_STATE};
 use crate::contexts::ctx_task::{CtxTask, CTX_TASK};
 use crate::exec::CtxRaeExec;
 use domain::*;
+use log::{activate_log, deactivate_log};
 use ompas_middleware::logger::{FileDescriptor, LogClient};
 use ompas_middleware::Master;
 use ompas_rae_language::*;
@@ -33,8 +34,11 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use user_interface::*;
 pub mod domain;
+pub mod log;
 pub mod planning;
 pub mod user_interface;
+
+use crate::monitor::log::{get_log_level, set_log_level};
 use ompas_rae_interface::platform::{Domain, Platform, PlatformDescriptor};
 use ompas_rae_interface::PLATFORM_CLIENT;
 
@@ -99,8 +103,14 @@ impl IntoModule for CtxRaeUser {
         module.add_async_fn_prelude(RAE_SET_SELECT, set_select);
         module.add_async_fn_prelude(RAE_TRIGGER_TASK, trigger_task);
         module.add_async_fn_prelude(RAE_ADD_TASK_TO_EXECUTE, add_task_to_execute);
+
+        /*
+        LOG
+         */
         module.add_async_fn_prelude(ACTIVATE_LOG, activate_log);
         module.add_async_fn_prelude(DEACTIVATE_LOG, deactivate_log);
+        module.add_async_fn_prelude(GET_LOG_LEVEL, get_log_level);
+        module.add_async_fn_prelude(SET_LOG_LEVEL, set_log_level);
         /*
         GETTERS
          */

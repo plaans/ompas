@@ -293,9 +293,9 @@ fn build_params(
                     first = false
                 }
                 let line = if t == &type_lvalue {
-                    quote! {let #var : #t= #args[#j].clone();}
+                    quote! {let #var : #t = #args[#j].clone();}
                 } else if t == &type_ref_lvalue {
-                    quote! {let #var : #t= &#args[#j];}
+                    quote! {let #var : #t = &#args[#j];}
                 } else {
                     quote! {let #var : #t= <#t>::try_from(&#args[#j]).map_err(|e| e.chain(#fname))?;}
                 };
@@ -327,7 +327,7 @@ fn build_return(ident: &Ident, expr: &ReturnType, fname: &Ident) -> TS {
         syn::parse_str(RETURN_TYPE).unwrap(),
         syn::parse_str(EXTENDED_RETURN_TYPE).unwrap(),
     ];
-    let classic_return = quote!(Ok(#ok::from(#ident)));
+    let classic_return = quote!(Ok(sompas_structs::lvalue::LValue::from(#ident)));
     return match expr {
         ReturnType::Default => return quote!(#default),
         ReturnType::Type(_, b) => {

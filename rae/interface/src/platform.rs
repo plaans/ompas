@@ -15,7 +15,6 @@ use ompas_rae_structs::state::action_status::CommandStatus;
 use ompas_rae_structs::state::partial_state::PartialState;
 use ompas_rae_structs::state::world_state::{StateType, WorldState};
 use platform_interface::platform_update::Update;
-use sompas_structs::contextcollection::AsyncLTrait;
 use sompas_structs::documentation::Documentation;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalues::LValueS;
@@ -23,9 +22,8 @@ use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
 use std::any::Any;
 use std::borrow::Borrow;
-use std::fmt::{Display, Formatter};
+use std::fmt::Display;
 use std::net::SocketAddr;
-use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
@@ -35,7 +33,7 @@ const PROCESS_SEND_COMMANDS: &str = "__PROCESS_SEND_COMMANDS__";
 
 #[derive(Clone)]
 pub struct Platform {
-    pub inner: Arc<tokio::sync::RwLock<dyn PlatformDescriptor>>,
+    pub inner: Arc<RwLock<dyn PlatformDescriptor>>,
     pub state: WorldState,
     pub agenda: Agenda,
     pub command_stream: Arc<Mutex<Option<tokio::sync::mpsc::Sender<CommandRequest>>>>,
@@ -43,45 +41,64 @@ pub struct Platform {
     pub config: Arc<RwLock<PlatformConfig>>,
 }
 
-trait ConfigTrait: Any + Display + Send + Sync {}
+pub trait ConfigTrait: Any + Display + Send + Sync {}
 
-#[derive(Clone, Default)]
-pub struct PlatformConfig {
-    inner: Option<Arc<AsyncLTrait>>,
+impl<T> ConfigTrait for T where T: Any + Display + Send + Sync {}
+
+#[derive(Clone)]
+pub enum PlatformConfig {
+    String(String),
+    Any(Arc<dyn ConfigTrait>),
+    None,
+}
+
+impl Default for PlatformConfig {
+    fn default() -> Self {
+        PlatformConfig::None
+    }
+}
+pub enum InnerPlatformConfig<'a, T> {
+    String(&'a str),
+    Any(&'a T),
+    None,
 }
 
 impl PlatformConfig {
-    pub fn new<T: Any + Send + Sync>(config: T) -> Self {
-        Self {
-            inner: Some(Arc::new(config)),
-        }
+    pub fn new_string(s: String) -> Self {
+        Self::String(s)
     }
 
-    pub fn get_inner<T: Any + Send + Sync>(&self) -> Option<&T> {
-        match &self.inner {
-            None => None,
-            Some(inner) => {
-                <dyn std::any::Any>::downcast_ref::<T>(inner.deref())
-                //inner.deref().downcast_ref::<T>()
-            }
+    pub fn new_none() -> Self {
+        Self::None
+    }
+
+    pub fn new_any<T: ConfigTrait>(config: T) -> Self {
+        Self::Any(Arc::new(config))
+    }
+
+    pub fn get_inner<T: ConfigTrait>(&self) -> InnerPlatformConfig<T> {
+        match &self {
+            Self::None => InnerPlatformConfig::None,
+            Self::String(s) => InnerPlatformConfig::String(s.as_str()),
+            Self::Any(any) => match <dyn Any>::downcast_ref::<T>(any) {
+                Some(t) => InnerPlatformConfig::Any(t),
+                None => InnerPlatformConfig::None,
+            },
         }
     }
-}
-/*
-impl Display for PlatformConfig {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
+    pub fn format(&self) -> String {
+        format!(
             "{}",
-            match self.inner {
-                None => "none".to_string(),
-                Some(t) => {
-
+            match &self {
+                Self::None => "none".to_string(),
+                Self::String(s) => s.to_string(),
+                Self::Any(any) => {
+                    any.to_string()
                 }
             }
         )
     }
-}*/
+}
 
 impl Platform {
     pub async fn exec_command(&self, command: &[LValue], command_id: usize) {

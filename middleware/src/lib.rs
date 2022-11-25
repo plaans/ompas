@@ -8,7 +8,7 @@ use log::Level;
 use map_macro::{map, set};
 use ompas_utils::other::get_and_update_id_counter;
 use std::collections::{HashMap, HashSet};
-use std::fmt::Display;
+use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
@@ -333,7 +333,7 @@ impl Master {
         MASTER.logger.subscribe_to_topic(topic).await
     }
 
-    pub async fn get_log_topic_id() {}
+    //pub async fn get_log_topic_id() {}
 
     pub async fn start_display_log_topic(topic: impl Display) {
         MASTER.logger.start_display_log_topic(topic).await;
@@ -343,8 +343,12 @@ impl Master {
         MASTER.logger.stop_display_log_topic(topic).await;
     }
 
-    pub async fn set_max_log_level(level: LogLevel) {
+    pub async fn set_log_level(level: LogLevel) {
         MASTER.logger.set_max_log_level(level.into()).await;
+    }
+
+    pub async fn get_log_level() -> LogLevel {
+        MASTER.logger.get_max_log_level().await.into()
     }
 }
 
@@ -449,12 +453,57 @@ impl Drop for ProcessInterface {
         self.die()
     }
 }
+
+#[derive(Copy, Clone, Debug)]
 pub enum LogLevel {
     Error = 1,
     Warn,
     Info,
     Debug,
     Trace,
+}
+
+impl Display for LogLevel {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                LogLevel::Error => "error",
+                LogLevel::Warn => "warn",
+                LogLevel::Info => "info",
+                LogLevel::Debug => "debug",
+                LogLevel::Trace => "trace",
+            }
+        )
+    }
+}
+
+impl TryFrom<&str> for LogLevel {
+    type Error = ();
+
+    fn try_from(value: &str) -> Result<Self, <LogLevel as TryFrom<&str>>::Error> {
+        match value {
+            "error" => Ok(Self::Error),
+            "warn" => Ok(Self::Warn),
+            "info" => Ok(Self::Info),
+            "debug" => Ok(Self::Debug),
+            "trace" => Ok(Self::Trace),
+            _ => Err(()),
+        }
+    }
+}
+
+impl From<Level> for LogLevel {
+    fn from(l: Level) -> Self {
+        match l {
+            Level::Error => Self::Error,
+            Level::Warn => Self::Warn,
+            Level::Info => Self::Info,
+            Level::Debug => Self::Debug,
+            Level::Trace => Self::Trace,
+        }
+    }
 }
 
 impl From<LogLevel> for Level {

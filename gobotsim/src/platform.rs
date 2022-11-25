@@ -5,7 +5,7 @@ use crate::{DEFAULT_PATH_PROJECT_GODOT, TOKIO_CHANNEL_SIZE};
 use async_trait::async_trait;
 use ompas_middleware::logger::LogClient;
 use ompas_middleware::ProcessInterface;
-use ompas_rae_interface::platform::{Domain, PlatformDescriptor};
+use ompas_rae_interface::platform::{Domain, InnerPlatformConfig, PlatformDescriptor};
 use ompas_rae_interface::platform::{PlatformConfig, PlatformModule};
 use ompas_rae_interface::platform_interface::platform_interface_server::PlatformInterfaceServer;
 use ompas_rae_interface::{DEFAULT_PLATFORM_SERVICE_IP, DEFAULT_PLATFROM_SERVICE_PORT};
@@ -188,10 +188,13 @@ impl PlatformGobotSim {
 #[async_trait]
 impl PlatformDescriptor for PlatformGobotSim {
     async fn start(&self, config: PlatformConfig) {
-        match self
-            .start_platform(config.get_inner::<String>().cloned())
-            .await
-        {
+        let config: Option<String> = match config.get_inner::<String>() {
+            InnerPlatformConfig::String(s) => Some(s.to_string()),
+            InnerPlatformConfig::Any(s) => Some(s.to_string()),
+            InnerPlatformConfig::None => None,
+        };
+
+        match self.start_platform(config).await {
             Ok(_) => {
                 self.log.info("Successfully started platform.").await;
                 match self.open_com().await {

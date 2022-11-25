@@ -299,3 +299,5 @@ pub const OMPAS: &str = "OMPAS";
 
 pub const ACTIVATE_LOG: &str = "activate_log";
 pub const DEACTIVATE_LOG: &str = "deactivate_log";
+pub const SET_LOG_LEVEL: &str = "set_log_level";
+pub const GET_LOG_LEVEL: &str = "get_log_level";

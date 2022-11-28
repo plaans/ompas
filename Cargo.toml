@@ -2,6 +2,7 @@
 
 
 members = [
+    "craft-bots/ompas-binding",
     "scheme/core",
     "scheme/macros",
     "utils",

@@ -33,6 +33,6 @@ map-macro = "0.2.4"
 
 
 [[bin]]
-name = "gobot-rae"
-path = "src/bin/gobot_rae.rs"
+name = "gobot-ompas"
+path = "src/bin/main.rs"
 

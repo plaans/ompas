@@ -9,7 +9,8 @@ use crate::{platform_interface, TOKIO_CHANNEL_SIZE};
 use crate::{LOG_TOPIC_PLATFORM, PROCESS_TOPIC_PLATFORM};
 use async_trait::async_trait;
 use ompas_middleware::logger::LogClient;
-use ompas_middleware::ProcessInterface;
+use ompas_middleware::{Master, ProcessInterface};
+use ompas_rae_language::PROCESS_TOPIC_OMPAS;
 use ompas_rae_structs::agenda::Agenda;
 use ompas_rae_structs::state::action_status::CommandStatus;
 use ompas_rae_structs::state::partial_state::PartialState;
@@ -30,14 +31,15 @@ use tokio::sync::{Mutex, RwLock};
 
 const PROCESS_GET_UPDATES: &str = "__PROCESS_GET_UPDATES__";
 const PROCESS_SEND_COMMANDS: &str = "__PROCESS_SEND_COMMANDS__";
+const PROCESS_START_PLATFORM: &str = "__PROCESS_START_PLATFORM__";
 
 #[derive(Clone)]
 pub struct Platform {
-    pub inner: Arc<RwLock<dyn PlatformDescriptor>>,
-    pub state: WorldState,
-    pub agenda: Agenda,
-    pub command_stream: Arc<Mutex<Option<tokio::sync::mpsc::Sender<CommandRequest>>>>,
-    pub log: LogClient,
+    inner: Arc<RwLock<dyn PlatformDescriptor>>,
+    state: WorldState,
+    agenda: Agenda,
+    command_stream: Arc<Mutex<Option<tokio::sync::mpsc::Sender<CommandRequest>>>>,
+    log: LogClient,
     pub config: Arc<RwLock<PlatformConfig>>,
 }
 
@@ -101,6 +103,27 @@ impl PlatformConfig {
 }
 
 impl Platform {
+    pub async fn new(
+        inner: Arc<RwLock<dyn PlatformDescriptor>>,
+        state: WorldState,
+        agenda: Agenda,
+        command_stream: Arc<Mutex<Option<tokio::sync::mpsc::Sender<CommandRequest>>>>,
+        log: LogClient,
+        config: Arc<RwLock<PlatformConfig>>,
+    ) -> Self {
+        Master::set_child_process(PROCESS_TOPIC_PLATFORM, PROCESS_TOPIC_OMPAS).await;
+        Master::set_child_process(PROCESS_TOPIC_OMPAS, PROCESS_TOPIC_PLATFORM).await;
+
+        Self {
+            inner,
+            state,
+            agenda,
+            command_stream,
+            log,
+            config,
+        }
+    }
+
     pub async fn exec_command(&self, command: &[LValue], command_id: usize) {
         let mut arguments: Vec<Expression> = vec![];
         for arg in command {
@@ -157,7 +180,16 @@ impl Platform {
 
         process_interface.log_info("Initiating update stream").await;
 
-        let stream = client.get_updates(request).await.expect("");
+        let stream = match client.get_updates(request).await {
+            Ok(s) => s,
+            Err(e) => {
+                process_interface
+                    .log_error(format!("Error starting update stream: {e}"))
+                    .await;
+                process_interface.kill(PROCESS_TOPIC_PLATFORM).await;
+                return;
+            }
+        };
         let mut stream: tonic::codec::Streaming<PlatformUpdate> = stream.into_inner();
 
         loop {
@@ -240,10 +272,16 @@ impl Platform {
 
         process.log_info("initiating command stream").await;
 
-        let stream = client
-            .send_commands(tonic::Request::new(stream))
-            .await
-            .expect("");
+        let stream = match client.send_commands(tonic::Request::new(stream)).await {
+            Ok(s) => s,
+            Err(e) => {
+                process
+                    .log_error(format!("Error starting command stream: {e}"))
+                    .await;
+                process.kill(PROCESS_TOPIC_PLATFORM).await;
+                return;
+            }
+        };
         let mut stream = stream.into_inner();
 
         loop {
@@ -315,6 +353,13 @@ impl Platform {
 impl PlatformDescriptor for Platform {
     ///Launch the platform (such as the simulation in godot) and open communication
     async fn start(&self, _: PlatformConfig) {
+        let process = ProcessInterface::new(
+            PROCESS_START_PLATFORM,
+            PROCESS_TOPIC_PLATFORM,
+            LOG_TOPIC_PLATFORM,
+        )
+        .await;
+
         self.inner
             .write()
             .await
@@ -322,11 +367,21 @@ impl PlatformDescriptor for Platform {
             .await;
 
         let server: SocketAddr = self.socket().await;
+        let socket = format!("https://{}", server);
+        process.log_info(format!("socket: {socket}")).await;
         //println!("server addr: {}", server);
         let client: PlatformInterfaceClient<_> =
-            PlatformInterfaceClient::connect(format!("https://{}", server))
-                .await
-                .expect("error to connecting to client");
+            match PlatformInterfaceClient::connect(socket).await {
+                Ok(c) => c,
+                Err(e) => {
+                    process
+                        .log_error(format!("Error connecting to client: {:?}", e))
+                        .await;
+                    process.kill(PROCESS_TOPIC_PLATFORM).await;
+                    return;
+                }
+            };
+
         let client2 = client.clone();
         let state = self.state.clone();
         tokio::spawn(async move {

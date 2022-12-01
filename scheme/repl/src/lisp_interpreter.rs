@@ -20,7 +20,8 @@ use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::task::JoinHandle;
 
 const PROCESS_INTERPRETER: &str = "__PROCESS_INTERPRETER__";
-const PROCESS_SPAWN_REPL: &str = "__PROCESS_SPAWN_REPL__";
+const PROCESS_REPL: &str = "__PROCESS_REPL__";
+const PROCESS_LOG: &str = "__PROCESS_LOG__";
 #[derive(Debug)]
 pub struct LispInterpreterChannel {
     sender: Sender<String>,
@@ -243,22 +244,7 @@ impl LispInterpreter {
 
 ///Spawn repl task
 pub async fn spawn_repl(communication: ChannelToLispInterpreter) -> JoinHandle<()> {
-    let mut process_interface = ProcessInterface::new(
-        PROCESS_SPAWN_REPL.to_string(),
-        PROCESS_TOPIC_INTERPRETER,
-        LOG_TOPIC_INTERPRETER,
-    )
-    .await;
-
-    tokio::spawn(async move {
-        tokio::select! {
-            _ = repl(communication) => {
-            }
-            _ = process_interface.recv() => {
-                println!("task_handler killed repl.")
-            }
-        }
-    })
+    tokio::spawn(async move { repl(communication).await })
 }
 
 /// Spawn the log task
@@ -270,7 +256,7 @@ pub async fn spawn_log(com: ChannelToLispInterpreter, log_path: Option<PathBuf>)
 
 async fn log(mut com: ChannelToLispInterpreter, working_dir: Option<PathBuf>) {
     let mut process_interface = ProcessInterface::new(
-        PROCESS_SPAWN_REPL.to_string(),
+        PROCESS_LOG,
         PROCESS_TOPIC_INTERPRETER,
         LOG_TOPIC_INTERPRETER,
     )
@@ -350,53 +336,72 @@ async fn log(mut com: ChannelToLispInterpreter, working_dir: Option<PathBuf>) {
 /// - receiver: channel object to receive ack from lisp interpreter after evaluation.
 /// Used for synchronization.
 async fn repl(mut com: ChannelToLispInterpreter) {
+    let mut process_interface = ProcessInterface::new(
+        PROCESS_REPL.to_string(),
+        PROCESS_TOPIC_INTERPRETER,
+        LOG_TOPIC_INTERPRETER,
+    )
+    .await;
     let mut rl = Editor::<()>::new();
     if rl.load_history("history.txt").is_err() {
         println!("No previous history.");
     }
 
-    loop {
-        let readline = rl.readline(">> ");
+    let l = async {
+        loop {
+            let readline = rl.readline(">> ");
 
-        match readline {
-            Ok(string) => {
-                rl.add_history_entry(string.clone());
-                com.send(string).await.expect("couldn't send lisp command");
-                let buffer = match com.recv_string().await {
-                    None => {
-                        eprintln!("repl task stopped working");
-                        break;
-                    }
-                    Some(s) => s,
-                };
-                //if buffer != NIL {
-                println!("LI>> {}", buffer);
-                //}
+            match readline {
+                Ok(string) => {
+                    rl.add_history_entry(string.clone());
+                    com.send(string).await.expect("couldn't send lisp command");
+                    let buffer = match com.recv_string().await {
+                        None => {
+                            eprintln!("repl task stopped working");
+                            break;
+                        }
+                        Some(s) => s,
+                    };
+                    //if buffer != NIL {
+                    println!("LI>> {}", buffer);
+                    //}
 
-                /*assert_eq!(
-                    buffer, "ACK",
-                    "should receive an ack from Lisp Intrepretor and nothing else"
-                );*/
-                //println!("repl ack: {}", buffer);
-            }
-            Err(ReadlineError::Interrupted) => {
-                println!("CTRL-C");
-                break;
-            }
-            Err(ReadlineError::Eof) => {
-                println!("CTRL-D");
-                break;
-            }
-            Err(err) => {
-                println!("Error: {:?}", err);
-                break;
+                    /*assert_eq!(
+                        buffer, "ACK",
+                        "should receive an ack from Lisp Intrepretor and nothing else"
+                    );*/
+                    //println!("repl ack: {}", buffer);
+                }
+                Err(ReadlineError::Interrupted) => {
+                    println!("CTRL-C");
+                    break;
+                }
+                Err(ReadlineError::Eof) => {
+                    println!("CTRL-D");
+                    break;
+                }
+                Err(err) => {
+                    println!("Error: {:?}", err);
+                    break;
+                }
             }
         }
+    };
+
+    tokio::select! {
+        _ = l => {
+            process_interface.kill(PROCESS_TOPIC_ALL).await
+        }
+        _ = process_interface.recv() => {
+
+        }
     }
-    com.send("exit".to_string())
-        .await
-        .expect("couldn't send exit msg");
+
+    /*com.send("exit".to_string())
+    .await
+    .expect("couldn't send exit msg");*/
     rl.save_history("history.txt").unwrap();
+    //println!("end repl");
 }
 
 pub const EXIT_CODE_STDOUT: &str = "EXIT";

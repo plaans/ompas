@@ -243,6 +243,29 @@ impl Master {
         }
     }
 
+    async fn set_parent(&self, child: impl Display, parent: impl Display) -> bool {
+        let id_child = self.get_topic_id(child.to_string()).await;
+        if let Some(id_child) = id_child {
+            let id_parent = self.get_topic_id(parent.to_string()).await;
+            if let Some(id_parent) = id_parent {
+                let log = LogClient::new(MASTER_LABEL, LOG_TOPIC_ROOT).await;
+                log.debug(format!("Process {} is child of {}", child, parent))
+                    .await;
+                self.topics
+                    .write()
+                    .await
+                    .get_mut(&id_parent)
+                    .unwrap()
+                    .childs
+                    .insert(id_child)
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    }
+
     async fn new_topic(&self, name: impl Display, parent: Option<impl Display>) -> ProcessTopidId {
         let id = self.get_topic_id(&name).await;
         match id {
@@ -292,6 +315,10 @@ impl Master {
 
     pub async fn get_topic_id(&self, topic: impl Display) -> Option<ProcessTopidId> {
         self.topic_id.read().await.get(&topic.to_string()).copied()
+    }
+
+    pub async fn set_child_process(child: impl Display, parent: impl Display) -> bool {
+        MASTER.set_parent(child, parent).await
     }
 
     pub async fn subscribe_new_process(

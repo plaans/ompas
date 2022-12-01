@@ -35,9 +35,9 @@ pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LAsyncHandler {
         let parent_task = env.get_context::<CtxTask>(CTX_TASK)?.parent_id;
         let ctx = env.get_context::<CtxRae>(CTX_RAE)?;
         let log = ctx.get_log_client();
-        let (action_id, mut rx) = ctx.agenda.add_action(args.into(), parent_task).await;
+        let (command_id, mut rx) = ctx.agenda.add_action(args.into(), parent_task).await;
         let debug: LValue = args.into();
-        log.info(format!("Exec command {action_id}: {debug}."))
+        log.info(format!("Exec command {command_id}: {debug}."))
             .await;
         let eval_model = |int: Option<InterruptionReceiver>| async {
             let string = format!("((get-action-model '{}) {})", args[0], {
@@ -58,10 +58,10 @@ pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LAsyncHandler {
             RAEMode::Exec => {
                 match &ctx.platform_interface {
                     Some(platform) => {
-                        platform.exec_command(args, action_id).await;
+                        platform.exec_command(args, command_id).await;
 
                         //println!("await on action (id={})", action_id);
-                        log.info(format!("Waiting on action {action_id}.")).await;
+                        log.info(format!("Waiting on command {command_id}.")).await;
                         //let mut action_status: TaskStatus = ctx.agenda.get_status(&action_id).await;
 
                         let f = async {
@@ -76,15 +76,15 @@ pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LAsyncHandler {
                                         //println!("running");
                                     }
                                     TaskStatus::Failure => {
-                                        log.error(format!("Command {action_id} is a failure."))
+                                        log.error(format!("Command {command_id} is a failure."))
                                             .await;
-                                        ctx.agenda.set_end_time(&action_id).await;
+                                        ctx.agenda.set_end_time(&command_id).await;
                                         return Ok(RaeExecError::ActionFailure.into());
                                     }
                                     TaskStatus::Done => {
-                                        log.info(format!("Command {action_id} is a success."))
+                                        log.info(format!("Command {command_id} is a success."))
                                             .await;
-                                        ctx.agenda.set_end_time(&action_id).await;
+                                        ctx.agenda.set_end_time(&command_id).await;
                                         return Ok(true.into());
                                     }
                                 }
@@ -96,7 +96,7 @@ pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LAsyncHandler {
                         };
                         tokio::select! {
                             _ = int_rx.recv() => {
-                                platform.cancel_command(action_id).await;
+                                platform.cancel_command(command_id).await;
                                 Ok(LValue::Err(Default::default()))
                             }
                             r = f => {
@@ -106,7 +106,7 @@ pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LAsyncHandler {
                     }
                     None => {
                         let r = eval_model(Some(int_rx)).await;
-                        set_success_for_task(&env, &[action_id.into()]).await?;
+                        set_success_for_task(&env, &[command_id.into()]).await?;
                         r
                     }
                 }

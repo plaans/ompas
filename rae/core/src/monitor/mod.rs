@@ -256,14 +256,15 @@ impl CtxRaeUser {
             log: log_client,
             command_stream: Arc::new(RwLock::new(None)),
         };
-        let platform = Platform {
-            inner: Arc::new(RwLock::new(platform)),
-            state: interface.state.clone(),
-            agenda: interface.agenda.clone(),
-            command_stream: Arc::new(Default::default()),
-            log: LogClient::new(PLATFORM_CLIENT, LOG_TOPIC_OMPAS).await,
-            config: Arc::new(Default::default()),
-        };
+        let platform = Platform::new(
+            Arc::new(RwLock::new(platform)),
+            interface.state.clone(),
+            interface.agenda.clone(),
+            Arc::new(Default::default()),
+            LogClient::new(PLATFORM_CLIENT, LOG_TOPIC_OMPAS).await,
+            Arc::new(Default::default()),
+        )
+        .await;
 
         let domain: InitLisp = match platform.domain().await {
             Domain::String(s) => vec![s].into(),

@@ -146,7 +146,6 @@ pub async fn generate_test_type_expr(env: &LEnv, params: Vec<LValue>) -> LResult
         Ok(true.into())
     } else {
         let mut str = "(do ".to_string();
-
         for param in params {
             if let LValue::List(param) = &param {
                 if param.len() == 2 {
@@ -393,19 +392,39 @@ pub async fn add_method(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<
     }
     let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER)?;
     let mut new_env = ctx.get_empty_env();
-
+    let parameters = map.get(&PARAMETERS.into()).unwrap_or(&LValue::Nil).clone();
+    let task_label = car(
+        &new_env,
+        &[map
+            .get(&TASK.into())
+            .ok_or(LRuntimeError::new(
+                RAE_ADD_METHOD,
+                ":task is missing in the definition of the method.",
+            ))?
+            .clone()],
+    )?
+    .to_string();
+    let body = car(
+        &new_env,
+        &[map.get(&BODY.into()).unwrap_or(&LValue::Nil).clone()],
+    )?;
+    let label = map
+        .get(&NAME.into())
+        .ok_or(LRuntimeError::new(
+            RAE_ADD_METHOD,
+            ":name is missing in the definition of the method.",
+        ))?
+        .to_string();
     //Definition of the method
     let mut method = Method {
-        label: map.get(&NAME.into()).unwrap().to_string(),
-        task_label: car(env, &[map.get(&TASK.into()).unwrap().clone()])?.to_string(),
-        parameters: map.get(&PARAMETERS.into()).unwrap().try_into()?,
+        label,
+        task_label,
+        parameters: parameters.clone().try_into()?,
         ..Default::default()
     };
     let conds = match map.get(&PRE_CONDITIONS.into()) {
         None => {
-            let test =
-                generate_test_type_expr(env, &[map.get(&PARAMETERS.into()).unwrap().clone()])
-                    .await?;
+            let test = generate_test_type_expr(env, &[parameters.clone()]).await?;
             let expr = format!(
                 "(lambda {} (do {}))",
                 method.parameters.get_params_as_lvalue(),
@@ -414,9 +433,7 @@ pub async fn add_method(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<
             eval(&parse(&expr, &mut new_env).await?, &mut new_env, None).await?
         }
         Some(conds) => {
-            let test =
-                generate_test_type_expr(env, &[map.get(&PARAMETERS.into()).unwrap().clone()])
-                    .await?;
+            let test = generate_test_type_expr(env, &[parameters.clone()]).await?;
             let mut str_conds = "(do".to_string();
             if let LValue::List(conds) = conds {
                 for cond in conds.iter() {
@@ -465,10 +482,7 @@ pub async fn add_method(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<
         "(lambda {} (do {} {}))",
         method.parameters.get_params_as_lvalue(),
         conds,
-        car(
-            &new_env,
-            &[map.get(&BODY.into()).unwrap_or(&LValue::Nil).clone()]
-        )?
+        body
     );
 
     method.lambda_body = eval(&parse(&expr, &mut new_env).await?, &mut new_env, None).await?;

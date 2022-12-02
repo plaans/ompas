@@ -1,30 +1,39 @@
-use crate::state::task_status::TaskStatus;
 use std::fmt::{Display, Formatter};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
+pub const STATUS_PENDING: &str = "pending";
+pub const STATUS_ACCEPTED: &str = "accepted";
+pub const STATUS_REJECTED: &str = "rejected";
+pub const STATUS_RUNNING: &str = "running";
+pub const STATUS_SUCCESS: &str = "success";
+pub const STATUS_FAILURE: &str = "failure";
+pub const STATUS_CANCELLED: &str = "cancelled";
 
-#[derive(Debug, Clone, Copy)]
-pub enum CommandStatus {
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ActionStatus {
     Pending,
     Accepted,
     Rejected,
-    Progress(f64), //Progress of the action
-    Success,       //True the action is a success, false the action is a failure
+    Running(Option<f64>), //Progress of the action
+    Success,              //True the action is a success, false the action is a failure
     Failure,
     Cancelled(bool), //True the action has been successfully stopped, false it was a failure to cancel
 }
 
-impl Display for CommandStatus {
+impl Display for ActionStatus {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            CommandStatus::Accepted => write!(f, "accepted"),
-            CommandStatus::Progress(fl) => write!(f, "progress: {}", fl),
-            CommandStatus::Success => write!(f, "success"),
-            CommandStatus::Cancelled(r) => write!(f, "cancelled: {}", r),
-            CommandStatus::Rejected => write!(f, "rejected"),
-            CommandStatus::Failure => write!(f, "failure"),
-            CommandStatus::Pending => write!(f, "pending"),
+            ActionStatus::Accepted => write!(f, "accepted"),
+            ActionStatus::Running(progress) => match progress {
+                Some(p) => write!(f, "running: {}", p),
+                None => write!(f, "none"),
+            },
+            ActionStatus::Success => write!(f, "success"),
+            ActionStatus::Cancelled(r) => write!(f, "cancelled: {}", r),
+            ActionStatus::Rejected => write!(f, "rejected"),
+            ActionStatus::Failure => write!(f, "failure"),
+            ActionStatus::Pending => write!(f, "pending"),
         }
     }
 }
@@ -32,7 +41,7 @@ impl Display for CommandStatus {
 #[derive(Default, Debug, Clone)]
 pub struct ActionStatusSet {
     pub server_id_internal_id: Arc<RwLock<im::HashMap<usize, usize>>>,
-    pub status: Arc<RwLock<im::HashMap<usize, CommandStatus>>>,
+    pub status: Arc<RwLock<im::HashMap<usize, ActionStatus>>>,
     next_id: Arc<AtomicUsize>,
 }
 
@@ -50,11 +59,11 @@ impl ActionStatusSet {
         }
     }
 
-    pub async fn set_status(&mut self, internal_id: usize, status: CommandStatus) {
+    pub async fn set_status(&mut self, internal_id: usize, status: ActionStatus) {
         self.status.write().await.insert(internal_id, status);
     }
 
-    pub async fn set_status_from_server(&mut self, server_id: usize, status: CommandStatus) {
+    pub async fn set_status_from_server(&mut self, server_id: usize, status: ActionStatus) {
         let id = *self
             .server_id_internal_id
             .read()
@@ -64,11 +73,11 @@ impl ActionStatusSet {
         self.status.write().await.insert(id, status);
     }
 
-    pub async fn get_status(&self, internal_id: &usize) -> Option<CommandStatus> {
+    pub async fn get_status(&self, internal_id: &usize) -> Option<ActionStatus> {
         self.status.read().await.get(internal_id).cloned()
     }
 
-    pub async fn get_status_from_server(&self, server_id: usize) -> Option<CommandStatus> {
+    pub async fn get_status_from_server(&self, server_id: usize) -> Option<ActionStatus> {
         match self.server_id_internal_id.read().await.get(&server_id) {
             None => None,
             Some(id) => self.status.read().await.get(id).cloned(),
@@ -87,16 +96,16 @@ impl ActionStatusSet {
     }
 }
 
-impl From<CommandStatus> for TaskStatus {
-    fn from(cs: CommandStatus) -> Self {
+/*impl From<ActionStatus> for TaskStatus {
+    fn from(cs: ActionStatus) -> Self {
         match cs {
-            CommandStatus::Accepted => TaskStatus::Pending,
-            CommandStatus::Rejected => TaskStatus::Failure,
-            CommandStatus::Progress(_) => TaskStatus::Running,
-            CommandStatus::Success => TaskStatus::Done,
-            CommandStatus::Failure => TaskStatus::Failure,
-            CommandStatus::Cancelled(_) => TaskStatus::Failure,
-            CommandStatus::Pending => TaskStatus::Pending,
+            ActionStatus::Accepted => TaskStatus::Pending,
+            ActionStatus::Rejected => TaskStatus::Failure,
+            ActionStatus::Running(_) => TaskStatus::Running,
+            ActionStatus::Success => TaskStatus::Success,
+            ActionStatus::Failure => TaskStatus::Failure,
+            ActionStatus::Cancelled(_) => TaskStatus::Failure,
+            ActionStatus::Pending => TaskStatus::Pending,
         }
     }
-}
+}*/

@@ -9,9 +9,8 @@ use ompas_rae_structs::domain::RAEDomain;
 use ompas_rae_structs::job::Job;
 use ompas_rae_structs::monitor::task_check_wait_for;
 use ompas_rae_structs::select_mode::{Planner, SelectMode};
-use ompas_rae_structs::state::task_state::*;
-use ompas_rae_structs::state::task_status::TaskStatus;
-use ompas_rae_structs::state::task_status::*;
+use ompas_rae_structs::state::action_state::*;
+use ompas_rae_structs::state::action_status::*;
 use ompas_rae_structs::state::world_state::*;
 use sompas_macros::*;
 use sompas_structs::kindlvalue::KindLValue;
@@ -104,10 +103,14 @@ pub async fn get_agenda(env: &LEnv, args: &[LValue]) -> LResult {
         match arg.to_string().as_str() {
             TASK => task_filter.task_type = Some(TaskType::Task),
             COMMAND => task_filter.task_type = Some(TaskType::Command),
-            STATUS_PENDING => task_filter.status = Some(TaskStatus::Pending),
-            STATUS_DONE => task_filter.status = Some(TaskStatus::Done),
-            STATUS_FAILURE => task_filter.status = Some(TaskStatus::Failure),
-            STATUS_RUNNING => task_filter.status = Some(TaskStatus::Running),
+            STATUS_PENDING => task_filter.status = Some(ActionStatus::Pending),
+            STATUS_ACCEPTED => task_filter.status = Some(ActionStatus::Accepted),
+            STATUS_REJECTED => task_filter.status = Some(ActionStatus::Rejected),
+            STATUS_RUNNING => task_filter.status = Some(ActionStatus::Running(None)),
+            STATUS_SUCCESS => task_filter.status = Some(ActionStatus::Success),
+            STATUS_FAILURE => task_filter.status = Some(ActionStatus::Failure),
+            STATUS_CANCELLED => task_filter.status = Some(ActionStatus::Cancelled(true)),
+
             str => {
                 return Err(lruntimeerror!(
                     RAE_GET_AGENDA,
@@ -118,7 +121,7 @@ pub async fn get_agenda(env: &LEnv, args: &[LValue]) -> LResult {
                         COMMAND,
                         STATUS_PENDING,
                         STATUS_RUNNING,
-                        STATUS_DONE,
+                        STATUS_SUCCESS,
                         STATUS_FAILURE
                     )
                 ))

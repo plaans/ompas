@@ -1,3 +1,5 @@
+extern crate core;
+
 pub mod agenda;
 pub mod domain;
 pub mod internal_state;
@@ -12,4 +14,4 @@ pub mod resource;
 pub mod select_mode;
 pub mod state;
 
-pub type TaskId = usize;
+pub type ActionId = usize;

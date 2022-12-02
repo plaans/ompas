@@ -24,7 +24,7 @@ pub enum StateType {
 
 #[derive(Default, Debug, Clone)]
 pub struct WorldState {
-    _static: Arc<RwLock<PartialState>>,
+    r#static: Arc<RwLock<PartialState>>,
     dynamic: Arc<RwLock<PartialState>>,
     inner_world: Arc<RwLock<PartialState>>,
     instance: Arc<RwLock<InstanceCollection>>,
@@ -42,7 +42,7 @@ pub struct WorldStateSnapshot {
 impl From<WorldStateSnapshot> for WorldState {
     fn from(w: WorldStateSnapshot) -> Self {
         Self {
-            _static: Arc::new(RwLock::new(w._static)),
+            r#static: Arc::new(RwLock::new(w._static)),
             dynamic: Arc::new(RwLock::new(w.dynamic)),
             inner_world: Arc::new(RwLock::new(w.inner_world)),
             instance: Arc::new(RwLock::new(w.instance)),
@@ -92,7 +92,7 @@ impl WorldState {
     }
 
     pub async fn clear(&self) {
-        self._static.write().await.inner = Default::default();
+        self.r#static.write().await.inner = Default::default();
         self.dynamic.write().await.inner = Default::default();
         *self.instance.write().await = Default::default();
         self.inner_world.write().await.inner = Default::default();
@@ -100,7 +100,7 @@ impl WorldState {
 
     pub async fn get_snapshot(&self) -> WorldStateSnapshot {
         WorldStateSnapshot {
-            _static: self._static.read().await.clone(),
+            _static: self.r#static.read().await.clone(),
             dynamic: self.dynamic.read().await.clone(),
             inner_world: self.inner_world.read().await.clone(),
             instance: self.instance.read().await.clone(),
@@ -128,7 +128,7 @@ impl WorldState {
     pub async fn get_state(&self, _type: Option<StateType>) -> PartialState {
         match _type {
             None => self.inner_world.read().await.union(
-                &self._static.read().await.union(
+                &self.r#static.read().await.union(
                     &self
                         .dynamic
                         .read()
@@ -137,7 +137,7 @@ impl WorldState {
                 ),
             ),
             Some(_type) => match _type {
-                StateType::Static => self._static.read().await.clone(),
+                StateType::Static => self.r#static.read().await.clone(),
                 StateType::Dynamic => self.dynamic.read().await.clone(),
                 StateType::InnerWorld => self.inner_world.read().await.clone(),
                 StateType::Instance => self.instance.read().await.clone().into(),
@@ -150,16 +150,25 @@ impl WorldState {
             None => {}
             Some(_type) => match _type {
                 StateType::Static => {
-                    let new_state = self._static.write().await.union(&state).inner;
-                    self._static.write().await.inner = new_state;
+                    let mut r#static = self.r#static.write().await;
+                    let r#static = &mut r#static.inner;
+                    for (k, v) in state.inner {
+                        r#static.insert(k, v);
+                    }
                 }
                 StateType::Dynamic => {
-                    let new_state = self.dynamic.write().await.union(&state).inner;
-                    self.dynamic.write().await.inner = new_state;
+                    let mut dynamic = self.dynamic.write().await;
+                    let dynamic = &mut dynamic.inner;
+                    for (k, v) in state.inner {
+                        dynamic.insert(k, v);
+                    }
                 }
                 StateType::InnerWorld => {
-                    let new_state = self.inner_world.write().await.union(&state).inner;
-                    self.inner_world.write().await.inner = new_state;
+                    let mut inner_world = self.inner_world.write().await;
+                    let inner_world = &mut inner_world.inner;
+                    for (k, v) in state.inner {
+                        inner_world.insert(k, v);
+                    }
                 }
                 StateType::Instance => {
                     panic!()
@@ -176,7 +185,7 @@ impl WorldState {
             None => panic!("no type for state"),
             Some(_type) => match _type {
                 StateType::Static => {
-                    let mut _ref = self._static.write().await;
+                    let mut _ref = self.r#static.write().await;
                     _ref.inner = state.inner;
                 }
                 StateType::Dynamic => {

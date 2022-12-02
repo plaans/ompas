@@ -3,8 +3,8 @@ pub mod rae_plan;
 pub mod select;
 
 use ompas_rae_structs::select_mode::{Planner, SelectMode};
-use ompas_rae_structs::state::task_state::{
-    AbstractTaskMetaData, RefinementMetaData, TaskMetaData, TaskMetaDataView,
+use ompas_rae_structs::state::action_state::{
+    ActionMetaData, ActionMetaDataView, RefinementMetaData, TaskMetaData,
 };
 use ompas_rae_structs::state::world_state::WorldStateSnapshot;
 use sompas_structs::lenv::LEnv;
@@ -17,7 +17,7 @@ use crate::contexts::ctx_rae::{CtxRae, CTX_RAE};
 use crate::contexts::ctx_state::{CtxState, CTX_STATE};
 use crate::contexts::ctx_task::{CtxTask, CTX_TASK};
 use crate::RaeExecError;
-use ompas_rae_structs::state::task_status::TaskStatus;
+use ompas_rae_structs::state::action_status::ActionStatus;
 use sompas_macros::async_scheme_fn;
 use std::convert::{TryFrom, TryInto};
 
@@ -30,10 +30,7 @@ pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
         Ok(ctx) => ctx.parent_id,
         Err(_) => None,
     };
-    let mut task: AbstractTaskMetaData = ctx
-        .agenda
-        .add_abstract_task(task_label.clone(), parent_task)
-        .await;
+    let mut task: TaskMetaData = ctx.agenda.add_task(task_label.clone(), parent_task).await;
     let task_id = *task.get_id();
     let result: LValue = select(&mut task, env)
         .await
@@ -46,12 +43,12 @@ pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
             "No applicable method for task {task_label}({task_id})"
         ))
         .await;
-        task.update_status(TaskStatus::Failure);
+        task.update_status(ActionStatus::Failure);
         task.set_end_timepoint(ctx.agenda.get_instant());
         ctx.agenda.update_task(&task_id, task).await;
         RaeExecError::NoApplicableMethod.into()
     } else {
-        task.update_status(TaskStatus::Running);
+        task.update_status(ActionStatus::Running(None));
         ctx.agenda.update_task(&task_id, task).await;
         vec![first_m, task_id.into()].into()
     };
@@ -70,8 +67,8 @@ pub async fn set_success_for_task(env: &LEnv, args: &[LValue]) -> LResult {
     let task_id = task_id as usize;
 
     let ctx = env.get_context::<CtxRae>(CTX_RAE)?;
-    let mut task: TaskMetaData = ctx.agenda.trc.get(&task_id).await;
-    task.update_status(TaskStatus::Done).await;
+    let mut task: ActionMetaData = ctx.agenda.trc.get(&task_id).await;
+    task.update_status(ActionStatus::Success).await;
     task.set_end_timepoint(ctx.agenda.get_instant());
     ctx.agenda.update_task(&task.get_id(), task).await;
     //ctx.agenda.remove_task(&task_id).await?;
@@ -82,7 +79,7 @@ pub async fn set_success_for_task(env: &LEnv, args: &[LValue]) -> LResult {
 pub async fn retry(env: &LEnv, task_id: usize) -> LResult {
     let ctx = env.get_context::<CtxRae>(CTX_RAE)?;
     let log = ctx.get_log_client();
-    let mut task: AbstractTaskMetaData = ctx.agenda.get_abstract_task(&(task_id as usize)).await?;
+    let mut task: TaskMetaData = ctx.agenda.get_task(&(task_id as usize)).await?;
     let task_label = task.get_label().clone();
     log.error(format!("Retrying task {task_label}({task_id})"))
         .await;
@@ -94,7 +91,7 @@ pub async fn retry(env: &LEnv, task_id: usize) -> LResult {
             "No more method for task {task_label}({task_id}). Task is a failure!",
         ))
         .await;
-        task.update_status(TaskStatus::Failure);
+        task.update_status(ActionStatus::Failure);
         task.set_end_timepoint(ctx.agenda.get_instant());
         ctx.agenda.update_task(&task_id, task).await;
         RaeExecError::NoApplicableMethod.into()
@@ -113,7 +110,7 @@ pub async fn retry(env: &LEnv, task_id: usize) -> LResult {
     (sim_block
     (rae-select task (generate_applicable_instances task)))))))";*/
 
-pub async fn select(stack: &mut AbstractTaskMetaData, env: &LEnv) -> LResult {
+pub async fn select(stack: &mut TaskMetaData, env: &LEnv) -> LResult {
     /*
     Each function return an ordered list of methods
      */

@@ -1,12 +1,11 @@
 use crate::interval::{Duration, Timepoint};
 use crate::select_mode::SelectMode;
-use crate::state::task_network::TaskNetwork;
-use crate::state::task_state::{
-    AbstractTaskMetaData, ActionMetaData, TaskCollection, TaskFilter, TaskMetaData,
-    TaskMetaDataView,
+use crate::state::action_state::{
+    ActionCollection, ActionMetaData, ActionMetaDataView, CommandMetaData, TaskFilter, TaskMetaData,
 };
-use crate::state::task_status::TaskStatus;
-use crate::TaskId;
+use crate::state::action_status::ActionStatus;
+use crate::state::task_network::TaskNetwork;
+use crate::ActionId;
 use chrono::{DateTime, Utc};
 use core::convert::Into;
 use core::default::Default;
@@ -40,7 +39,7 @@ const RAE_STATS: &str = "rae_stats";
 
 #[derive(Clone)]
 pub struct Agenda {
-    pub trc: TaskCollection,
+    pub trc: ActionCollection,
     tn: TaskNetwork,
     next_id: Arc<AtomicUsize>,
     time_reference: Instant,
@@ -78,8 +77,8 @@ impl Agenda {
     /*
     GETTERS
      */
-    pub async fn get_refinement_method(&self, id: &TaskId) -> Option<SelectMode> {
-        if let TaskMetaData::AbstractTask(task) = self.trc.get(id).await {
+    pub async fn get_refinement_method(&self, id: &ActionId) -> Option<SelectMode> {
+        if let ActionMetaData::Task(task) = self.trc.get(id).await {
             let r = task.get_last_refinement();
             r.map(|ok| ok.refinement_type)
         } else {
@@ -87,17 +86,17 @@ impl Agenda {
         }
     }
 
-    pub async fn get_execution_time(&self, id: &TaskId) -> Duration {
-        let task: AbstractTaskMetaData = self.trc.get(id).await.try_into().unwrap();
+    pub async fn get_execution_time(&self, id: &ActionId) -> Duration {
+        let task: TaskMetaData = self.trc.get(id).await.try_into().unwrap();
         task.get_duration()
     }
 
-    pub async fn get_number_of_subtasks(&self, id: &TaskId) -> usize {
+    pub async fn get_number_of_subtasks(&self, id: &ActionId) -> usize {
         self.tn.get_subtasks(id).await.len()
     }
 
-    pub async fn get_number_of_subtasks_recursive(&self, id: &TaskId) -> usize {
-        let mut subtasks: Vec<TaskId> = self.tn.get_subtasks(id).await;
+    pub async fn get_number_of_subtasks_recursive(&self, id: &ActionId) -> usize {
+        let mut subtasks: Vec<ActionId> = self.tn.get_subtasks(id).await;
         let mut n = 0;
         while let Some(c) = subtasks.pop() {
             n += 1;
@@ -107,11 +106,11 @@ impl Agenda {
         n
     }
 
-    pub async fn get_number_of_abstract_tasks(&self, id: &TaskId) -> usize {
-        let mut subtasks: Vec<TaskId> = self.tn.get_subtasks(id).await;
+    pub async fn get_number_of_abstract_tasks(&self, id: &ActionId) -> usize {
+        let mut subtasks: Vec<ActionId> = self.tn.get_subtasks(id).await;
         let mut n = 0;
         while let Some(c) = subtasks.pop() {
-            if self.trc.is_abstract_task(id).await {
+            if self.trc.is_task(id).await {
                 n += 1;
                 subtasks.append(&mut self.tn.get_subtasks(&c).await);
             }
@@ -119,11 +118,11 @@ impl Agenda {
         n
     }
 
-    pub async fn get_number_of_actions(&self, id: &TaskId) -> usize {
-        let mut subtasks: Vec<TaskId> = self.tn.get_subtasks(id).await;
+    pub async fn get_number_of_actions(&self, id: &ActionId) -> usize {
+        let mut subtasks: Vec<ActionId> = self.tn.get_subtasks(id).await;
         let mut n = 0;
         while let Some(c) = subtasks.pop() {
-            if self.trc.is_action(&c).await {
+            if self.trc.is_command(&c).await {
                 n += 1;
             } else {
                 subtasks.append(&mut self.tn.get_subtasks(&c).await);
@@ -132,13 +131,13 @@ impl Agenda {
         n
     }
 
-    pub async fn get_total_number_of_refinement(&self, id: &TaskId) -> usize {
-        let task: AbstractTaskMetaData = self.trc.get(id).await.try_into().unwrap();
+    pub async fn get_total_number_of_refinement(&self, id: &ActionId) -> usize {
+        let task: TaskMetaData = self.trc.get(id).await.try_into().unwrap();
         let mut n = task.get_number_of_refinement();
-        let mut subtasks: Vec<TaskId> = self.tn.get_subtasks(id).await;
+        let mut subtasks: Vec<ActionId> = self.tn.get_subtasks(id).await;
         while let Some(c) = subtasks.pop() {
-            if self.trc.is_abstract_task(&c).await {
-                let task: AbstractTaskMetaData = self.trc.get(&c).await.try_into().unwrap();
+            if self.trc.is_task(&c).await {
+                let task: TaskMetaData = self.trc.get(&c).await.try_into().unwrap();
                 subtasks.append(&mut self.tn.get_subtasks(&c).await);
                 n += task.get_number_of_refinement();
             }
@@ -146,14 +145,14 @@ impl Agenda {
         n
     }
 
-    pub async fn get_total_refinement_time(&self, id: &TaskId) -> Duration {
+    pub async fn get_total_refinement_time(&self, id: &ActionId) -> Duration {
         let mut total_time: Duration = Duration::Finite(0);
-        let task: AbstractTaskMetaData = self.trc.get(id).await.try_into().unwrap();
+        let task: TaskMetaData = self.trc.get(id).await.try_into().unwrap();
         total_time += task.get_total_refinement_time();
-        let mut subtasks: Vec<TaskId> = self.tn.get_subtasks(id).await;
+        let mut subtasks: Vec<ActionId> = self.tn.get_subtasks(id).await;
         while let Some(c) = subtasks.pop() {
-            if self.trc.is_abstract_task(&c).await {
-                let task: AbstractTaskMetaData = self.trc.get(&c).await.try_into().unwrap();
+            if self.trc.is_task(&c).await {
+                let task: TaskMetaData = self.trc.get(&c).await.try_into().unwrap();
                 subtasks.append(&mut self.tn.get_subtasks(&c).await);
                 total_time += task.get_total_refinement_time();
             }
@@ -163,9 +162,9 @@ impl Agenda {
 
     pub async fn get_stats(&self) -> LValue {
         let mut map: im::HashMap<LValue, LValue> = Default::default();
-        let task_collection: im::HashMap<TaskId, TaskMetaData> =
+        let task_collection: im::HashMap<ActionId, ActionMetaData> =
             self.trc.inner.read().await.clone();
-        let parent: Vec<TaskId> = self.tn.get_parents().await;
+        let parent: Vec<ActionId> = self.tn.get_parents().await;
         for p in &parent {
             let mut task_stats: im::HashMap<LValue, LValue> = Default::default();
             task_stats.insert(
@@ -256,9 +255,9 @@ impl Agenda {
             file.write_all(header.as_bytes())
                 .expect("could not write to stat file");
         }
-        let task_collection: im::HashMap<TaskId, TaskMetaData> =
+        let task_collection: im::HashMap<ActionId, ActionMetaData> =
             self.trc.inner.read().await.clone();
-        let parent: Vec<TaskId> = self.tn.get_parents().await;
+        let parent: Vec<ActionId> = self.tn.get_parents().await;
         for p in &parent {
             file.write_all(
                 format!(
@@ -304,14 +303,10 @@ impl Agenda {
         self.tn.format().await
     }
 
-    pub async fn add_abstract_task(
-        &self,
-        task: LValue,
-        parent_task: Option<usize>,
-    ) -> AbstractTaskMetaData {
+    pub async fn add_task(&self, task: LValue, parent_task: Option<usize>) -> TaskMetaData {
         let task_id = self.get_next_id();
         let start = self.time_reference.elapsed().as_micros();
-        let stack = AbstractTaskMetaData::new(task, task_id, parent_task, start);
+        let stack = TaskMetaData::new(task, task_id, parent_task, start);
         self.trc.insert(task_id, stack.clone()).await;
         if let Some(parent_task) = parent_task {
             self.tn.add_task_to_parent(parent_task, task_id).await;
@@ -321,11 +316,11 @@ impl Agenda {
         stack
     }
 
-    pub async fn add_action(
+    pub async fn add_command(
         &self,
         action: LValue,
         parent_task: Option<usize>,
-    ) -> (TaskId, watch::Receiver<TaskStatus>) {
+    ) -> (ActionId, watch::Receiver<ActionStatus>) {
         let task_id = self.get_next_id();
         let start = self.time_reference.elapsed().as_micros();
         let mut parent = false;
@@ -337,7 +332,7 @@ impl Agenda {
             }
         };
 
-        let (action, rx) = ActionMetaData::new(task_id, parent_task, action, start);
+        let (action, rx) = CommandMetaData::new(task_id, parent_task, action, start);
         self.trc.insert(task_id, action).await;
         if parent {
             self.tn.add_task_to_parent(parent_task, task_id).await;
@@ -346,39 +341,36 @@ impl Agenda {
     }
 
     #[function_name::named]
-    pub async fn get_abstract_task(
-        &self,
-        task_id: &TaskId,
-    ) -> Result<AbstractTaskMetaData, LRuntimeError> {
+    pub async fn get_task(&self, task_id: &ActionId) -> Result<TaskMetaData, LRuntimeError> {
         match self.trc.get(task_id).await {
-            TaskMetaData::AbstractTask(a) => Ok(a),
-            TaskMetaData::Action(_) => Err(lruntimeerror!(
+            ActionMetaData::Task(a) => Ok(a),
+            ActionMetaData::Command(_) => Err(lruntimeerror!(
                 function_name!(),
                 format!("{} does not exist", task_id)
             )),
         }
     }
 
-    pub async fn update_task(&self, id: &TaskId, task: impl Into<TaskMetaData>) {
+    pub async fn update_task(&self, id: &ActionId, task: impl Into<ActionMetaData>) {
         //println!("in update stack\n stack: {}", rs);
         self.trc.update(id, task).await
     }
 
-    pub async fn update_status(&self, id: &TaskId, status: TaskStatus) {
+    pub async fn update_status(&self, id: &ActionId, status: ActionStatus) {
         self.trc.update_status(id, status).await
     }
 
-    pub async fn get_status(&self, id: &TaskId) -> TaskStatus {
+    pub async fn get_status(&self, id: &ActionId) -> ActionStatus {
         self.trc.get_status(id).await
     }
 
-    pub async fn get_task_collection(&self) -> im::HashMap<TaskId, TaskMetaData> {
+    pub async fn get_action_collection(&self) -> im::HashMap<ActionId, ActionMetaData> {
         self.trc.get_inner().await
     }
 
-    pub async fn set_end_time(&self, id: &TaskId) {
+    pub async fn set_end_time(&self, id: &ActionId) {
         let end = self.time_reference.elapsed().as_micros();
-        let mut task: TaskMetaData = self.trc.get(id).await;
+        let mut task: ActionMetaData = self.trc.get(id).await;
         task.set_end_timepoint(end);
         self.trc.update(id, task).await;
     }

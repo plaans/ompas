@@ -3,8 +3,8 @@ use ompas_rae_interface::platform::Platform;
 use ompas_rae_structs::agenda::Agenda;
 use ompas_rae_structs::monitor::MonitorCollection;
 use ompas_rae_structs::resource::ResourceCollection;
-use ompas_rae_structs::state::task_status::TaskStatus;
-use ompas_rae_structs::TaskId;
+use ompas_rae_structs::state::action_status::ActionStatus;
+use ompas_rae_structs::ActionId;
 
 pub const CTX_RAE: &str = "CtxRae";
 
@@ -17,7 +17,7 @@ pub struct CtxRae {
 }
 
 impl CtxRae {
-    pub async fn get_execution_status(&self, id: &TaskId) -> TaskStatus {
+    pub async fn get_execution_status(&self, id: &ActionId) -> ActionStatus {
         self.agenda.get_status(id).await
     }
 

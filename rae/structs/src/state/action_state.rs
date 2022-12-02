@@ -1,8 +1,9 @@
 use crate::interval::{Duration, Interval, Timepoint};
 use crate::plan::Plan;
 use crate::select_mode::SelectMode;
-use crate::state::task_status::TaskStatus;
-use crate::TaskId;
+use crate::state::action_status::ActionStatus;
+//use crate::state::task_status::TaskStatus;
+use crate::ActionId;
 use itertools::Itertools;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
@@ -12,24 +13,24 @@ use std::sync::Arc;
 use tokio::sync::{watch, RwLock};
 
 #[derive(Clone, Default)]
-pub struct TaskCollection {
-    pub inner: Arc<RwLock<im::HashMap<TaskId, TaskMetaData>>>,
+pub struct ActionCollection {
+    pub inner: Arc<RwLock<im::HashMap<ActionId, ActionMetaData>>>,
 }
 
-impl TaskCollection {
+impl ActionCollection {
     /*
     FORMAT
      */
     pub async fn format(&self, filter: TaskFilter) -> String {
-        let inner: im::HashMap<usize, TaskMetaData> = self.get_inner().await;
+        let inner: im::HashMap<usize, ActionMetaData> = self.get_inner().await;
 
-        let inner: Vec<TaskMetaData> = inner
+        let inner: Vec<ActionMetaData> = inner
             .values()
             .filter(|&t| {
                 if let Some(task_type) = &filter.task_type {
                     match task_type {
-                        TaskType::Task => t.is_abstract_task(),
-                        TaskType::Command => t.is_action(),
+                        TaskType::Task => t.is_task(),
+                        TaskType::Command => t.is_command(),
                     }
                 } else {
                     true
@@ -63,37 +64,37 @@ impl TaskCollection {
     /*
     BOOLEAN
      */
-    pub async fn is_action(&self, id: &TaskId) -> bool {
-        self.inner.read().await.get(id).unwrap().is_action()
+    pub async fn is_command(&self, id: &ActionId) -> bool {
+        self.inner.read().await.get(id).unwrap().is_command()
     }
 
-    pub async fn is_abstract_task(&self, id: &TaskId) -> bool {
-        self.inner.read().await.get(id).unwrap().is_abstract_task()
+    pub async fn is_task(&self, id: &ActionId) -> bool {
+        self.inner.read().await.get(id).unwrap().is_task()
     }
 
     /*
     GETTERS
      */
-    pub async fn get_inner(&self) -> im::HashMap<TaskId, TaskMetaData> {
+    pub async fn get_inner(&self) -> im::HashMap<ActionId, ActionMetaData> {
         self.inner.read().await.clone()
     }
 
-    pub async fn get_status(&self, id: &TaskId) -> TaskStatus {
+    pub async fn get_status(&self, id: &ActionId) -> ActionStatus {
         self.inner.read().await.get(id).unwrap().get_status()
     }
 
-    pub async fn get(&self, id: &TaskId) -> TaskMetaData {
+    pub async fn get(&self, id: &ActionId) -> ActionMetaData {
         self.inner.read().await.get(id).unwrap().clone()
     }
 
     /*
     SETTERS
      */
-    pub async fn insert(&self, id: TaskId, task: impl Into<TaskMetaData>) {
+    pub async fn insert(&self, id: ActionId, task: impl Into<ActionMetaData>) {
         self.inner.write().await.insert(id, task.into());
     }
 
-    pub async fn update(&self, id: &TaskId, task: impl Into<TaskMetaData>) {
+    pub async fn update(&self, id: &ActionId, task: impl Into<ActionMetaData>) {
         let mut locked = self.inner.write().await;
 
         if locked.contains_key(id) {
@@ -101,7 +102,7 @@ impl TaskCollection {
         }
     }
 
-    pub async fn update_status(&self, id: &TaskId, status: TaskStatus) {
+    pub async fn update_status(&self, id: &ActionId, status: ActionStatus) {
         self.inner
             .write()
             .await
@@ -113,112 +114,112 @@ impl TaskCollection {
 }
 
 #[derive(Clone, Debug)]
-pub enum TaskMetaData {
-    AbstractTask(AbstractTaskMetaData),
-    Action(ActionMetaData),
+pub enum ActionMetaData {
+    Task(TaskMetaData),
+    Command(CommandMetaData),
 }
 
-impl TaskMetaData {
-    pub fn is_abstract_task(&self) -> bool {
+impl ActionMetaData {
+    pub fn is_task(&self) -> bool {
         match self {
-            TaskMetaData::AbstractTask(_) => true,
-            TaskMetaData::Action(_) => false,
+            ActionMetaData::Task(_) => true,
+            ActionMetaData::Command(_) => false,
         }
     }
 
-    pub fn is_action(&self) -> bool {
+    pub fn is_command(&self) -> bool {
         match self {
-            TaskMetaData::AbstractTask(_) => false,
-            TaskMetaData::Action(_) => true,
+            ActionMetaData::Task(_) => false,
+            ActionMetaData::Command(_) => true,
         }
     }
 
-    pub fn get_status(&self) -> TaskStatus {
+    pub fn get_status(&self) -> ActionStatus {
         match self {
-            TaskMetaData::AbstractTask(a) => a.status,
-            TaskMetaData::Action(a) => a.status,
+            ActionMetaData::Task(a) => a.status,
+            ActionMetaData::Command(a) => a.status,
         }
     }
 
-    pub async fn update_status(&mut self, status: TaskStatus) {
+    pub async fn update_status(&mut self, status: ActionStatus) {
         match self {
-            TaskMetaData::AbstractTask(a) => a.update_status(status),
-            TaskMetaData::Action(a) => a.update_status(status).await,
+            ActionMetaData::Task(a) => a.update_status(status),
+            ActionMetaData::Command(a) => a.update_status(status).await,
         }
     }
 
-    pub fn get_id(&self) -> TaskId {
+    pub fn get_id(&self) -> ActionId {
         match self {
-            TaskMetaData::AbstractTask(a) => a.id,
-            TaskMetaData::Action(a) => a.id,
+            ActionMetaData::Task(a) => a.id,
+            ActionMetaData::Command(a) => a.id,
         }
     }
 
     pub fn get_label(&self) -> LValue {
         match self {
-            TaskMetaData::AbstractTask(a) => a.label.clone(),
-            TaskMetaData::Action(a) => a.label.clone(),
+            ActionMetaData::Task(a) => a.label.clone(),
+            ActionMetaData::Command(a) => a.label.clone(),
         }
     }
 
     pub fn set_end_timepoint(&mut self, end: Timepoint) {
         match self {
-            TaskMetaData::AbstractTask(a) => a.set_end_timepoint(end),
-            TaskMetaData::Action(a) => a.set_end_timepoint(end),
+            ActionMetaData::Task(a) => a.set_end_timepoint(end),
+            ActionMetaData::Command(a) => a.set_end_timepoint(end),
         }
     }
 
     pub async fn set_as_done(&mut self, end: Timepoint) {
-        self.update_status(TaskStatus::Done).await;
+        self.update_status(ActionStatus::Success).await;
         self.set_end_timepoint(end);
     }
 
     pub async fn set_as_failure(&mut self, end: Timepoint) {
-        self.update_status(TaskStatus::Failure).await;
+        self.update_status(ActionStatus::Failure).await;
         self.set_end_timepoint(end);
     }
 }
-impl Display for TaskMetaData {
+impl Display for ActionMetaData {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "{}",
             match self {
-                TaskMetaData::AbstractTask(a) => a.to_string(),
-                TaskMetaData::Action(a) => a.to_string(),
+                ActionMetaData::Task(a) => a.to_string(),
+                ActionMetaData::Command(a) => a.to_string(),
             }
         )
     }
 }
 
-impl From<AbstractTaskMetaData> for TaskMetaData {
-    fn from(a: AbstractTaskMetaData) -> Self {
-        Self::AbstractTask(a)
+impl From<TaskMetaData> for ActionMetaData {
+    fn from(a: TaskMetaData) -> Self {
+        Self::Task(a)
     }
 }
 
-impl From<ActionMetaData> for TaskMetaData {
-    fn from(a: ActionMetaData) -> Self {
-        Self::Action(a)
+impl From<CommandMetaData> for ActionMetaData {
+    fn from(a: CommandMetaData) -> Self {
+        Self::Command(a)
     }
 }
 
-impl TryFrom<TaskMetaData> for ActionMetaData {
+impl TryFrom<ActionMetaData> for CommandMetaData {
     type Error = LRuntimeError;
 
-    fn try_from(value: TaskMetaData) -> Result<Self, Self::Error> {
-        if let TaskMetaData::Action(a) = value {
+    fn try_from(value: ActionMetaData) -> Result<Self, Self::Error> {
+        if let ActionMetaData::Command(a) = value {
             Ok(a)
         } else {
             Err(Default::default())
         }
     }
 }
-impl TryFrom<TaskMetaData> for AbstractTaskMetaData {
+impl TryFrom<ActionMetaData> for TaskMetaData {
     type Error = LRuntimeError;
 
-    fn try_from(value: TaskMetaData) -> Result<Self, Self::Error> {
-        if let TaskMetaData::AbstractTask(a) = value {
+    fn try_from(value: ActionMetaData) -> Result<Self, Self::Error> {
+        if let ActionMetaData::Task(a) = value {
             Ok(a)
         } else {
             Err(Default::default())
@@ -226,12 +227,12 @@ impl TryFrom<TaskMetaData> for AbstractTaskMetaData {
     }
 }
 
-pub trait TaskMetaDataView {
+pub trait ActionMetaDataView {
     fn get_label(&self) -> &LValue;
 
-    fn get_id(&self) -> &TaskId;
+    fn get_id(&self) -> &ActionId;
 
-    fn get_status(&self) -> &TaskStatus;
+    fn get_status(&self) -> &ActionStatus;
 
     fn get_parent_task(&self) -> Option<usize>;
 
@@ -245,16 +246,16 @@ pub trait TaskMetaDataView {
 }
 
 #[derive(Debug)]
-pub struct ActionMetaData {
-    id: TaskId,
+pub struct CommandMetaData {
+    id: ActionId,
     parent: usize,
     label: LValue,
-    status: TaskStatus,
+    status: ActionStatus,
     interval: Interval,
-    sender_to_watcher: Option<watch::Sender<TaskStatus>>,
+    sender_to_watcher: Option<watch::Sender<ActionStatus>>,
 }
 
-impl Clone for ActionMetaData {
+impl Clone for CommandMetaData {
     fn clone(&self) -> Self {
         Self {
             id: self.id,
@@ -267,21 +268,21 @@ impl Clone for ActionMetaData {
     }
 }
 
-impl ActionMetaData {
+impl CommandMetaData {
     pub fn new(
-        id: TaskId,
+        id: ActionId,
         parent: usize,
         label: LValue,
         start: Timepoint,
-    ) -> (Self, watch::Receiver<TaskStatus>) {
-        let (tx, rx) = watch::channel(TaskStatus::Pending);
+    ) -> (Self, watch::Receiver<ActionStatus>) {
+        let (tx, rx) = watch::channel(ActionStatus::Pending);
 
         (
             Self {
                 id,
                 parent,
                 label,
-                status: TaskStatus::Pending,
+                status: ActionStatus::Pending,
                 interval: Interval { start, end: None },
                 sender_to_watcher: Some(tx),
             },
@@ -289,7 +290,7 @@ impl ActionMetaData {
         )
     }
 
-    pub async fn update_status(&mut self, status: TaskStatus) {
+    pub async fn update_status(&mut self, status: ActionStatus) {
         self.status = status;
         if let Some(tx) = &self.sender_to_watcher {
             if tx.send(self.status).is_err() {
@@ -299,16 +300,16 @@ impl ActionMetaData {
     }
 }
 
-impl TaskMetaDataView for ActionMetaData {
+impl ActionMetaDataView for CommandMetaData {
     fn get_label(&self) -> &LValue {
         &self.label
     }
 
-    fn get_id(&self) -> &TaskId {
+    fn get_id(&self) -> &ActionId {
         &self.id
     }
 
-    fn get_status(&self) -> &TaskStatus {
+    fn get_status(&self) -> &ActionStatus {
         &self.status
     }
 
@@ -333,7 +334,7 @@ impl TaskMetaDataView for ActionMetaData {
     }
 }
 
-impl Display for ActionMetaData {
+impl Display for CommandMetaData {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         writeln!(
             f,
@@ -345,10 +346,10 @@ impl Display for ActionMetaData {
 }
 
 #[derive(Clone, Debug)]
-pub struct AbstractTaskMetaData {
-    id: TaskId,
+pub struct TaskMetaData {
+    id: ActionId,
     parent_task: Option<usize>,
-    status: TaskStatus,
+    status: ActionStatus,
     label: LValue,
     current_method: LValue,
     refinement: Vec<RefinementMetaData>,
@@ -356,12 +357,12 @@ pub struct AbstractTaskMetaData {
     tried: Vec<LValue>,
 }
 
-impl AbstractTaskMetaData {
+impl TaskMetaData {
     pub fn new(label: LValue, id: usize, parent_task: Option<usize>, start: Timepoint) -> Self {
         Self {
             id,
             parent_task,
-            status: TaskStatus::Pending,
+            status: ActionStatus::Pending,
             label,
             current_method: LValue::Nil,
             refinement: vec![],
@@ -375,16 +376,16 @@ impl AbstractTaskMetaData {
 GETTERS
  */
 
-impl TaskMetaDataView for AbstractTaskMetaData {
+impl ActionMetaDataView for TaskMetaData {
     fn get_label(&self) -> &LValue {
         &self.label
     }
 
-    fn get_id(&self) -> &TaskId {
+    fn get_id(&self) -> &ActionId {
         &self.id
     }
 
-    fn get_status(&self) -> &TaskStatus {
+    fn get_status(&self) -> &ActionStatus {
         &self.status
     }
 
@@ -409,7 +410,7 @@ impl TaskMetaDataView for AbstractTaskMetaData {
     }
 }
 
-impl AbstractTaskMetaData {
+impl TaskMetaData {
     /*
     GETTERS
      */
@@ -452,12 +453,12 @@ impl AbstractTaskMetaData {
         self.tried.push(tried_method);
     }
 
-    pub fn update_status(&mut self, status: TaskStatus) {
+    pub fn update_status(&mut self, status: ActionStatus) {
         self.status = status;
     }
 }
 
-impl Display for AbstractTaskMetaData {
+impl Display for TaskMetaData {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut str = String::new();
         str.push_str(
@@ -534,5 +535,5 @@ impl Display for TaskType {
 #[derive(Copy, Clone, Default, Debug)]
 pub struct TaskFilter {
     pub task_type: Option<TaskType>,
-    pub status: Option<TaskStatus>,
+    pub status: Option<ActionStatus>,
 }

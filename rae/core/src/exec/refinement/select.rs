@@ -13,7 +13,7 @@ use ompas_rae_planning::aries::structs::{ConversionContext, Problem};
 use ompas_rae_structs::interval::Interval;
 use ompas_rae_structs::plan::AbstractTaskInstance;
 use ompas_rae_structs::select_mode::{CChoiceConfig, Planner, RAEPlanConfig, SelectMode};
-use ompas_rae_structs::state::task_state::{AbstractTaskMetaData, RefinementMetaData};
+use ompas_rae_structs::state::action_state::{RefinementMetaData, TaskMetaData};
 use ompas_rae_structs::state::world_state::WorldStateSnapshot;
 use rand::prelude::SliceRandom;
 use sompas_core::eval;
@@ -49,8 +49,7 @@ pub async fn aries_select(
     let parent_task = env.get_context::<CtxTask>(CTX_TASK)?.parent_id;
     match parent_task {
         Some(parent_id) => {
-            let parent_stack: AbstractTaskMetaData =
-                ctx.agenda.get_abstract_task(&parent_id).await?;
+            let parent_stack: TaskMetaData = ctx.agenda.get_task(&parent_id).await?;
             let n = ctx.agenda.get_number_of_subtasks(&parent_id).await - 1;
             println!("{} subtask of {}", n + 1, parent_id);
             println!("Searching for a generated plan...");

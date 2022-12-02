@@ -12,7 +12,7 @@ use ompas_middleware::logger::LogClient;
 use ompas_middleware::{Master, ProcessInterface};
 use ompas_rae_language::PROCESS_TOPIC_OMPAS;
 use ompas_rae_structs::agenda::Agenda;
-use ompas_rae_structs::state::action_status::CommandStatus;
+use ompas_rae_structs::state::action_status::ActionStatus;
 use ompas_rae_structs::state::partial_state::PartialState;
 use ompas_rae_structs::state::world_state::{StateType, WorldState};
 use platform_interface::platform_update::Update;
@@ -232,7 +232,7 @@ impl Platform {
                                                     r#static.insert(key.into(), sv.value.unwrap().borrow().try_into().unwrap())
                                                 }
                                                 StateVariableType::Dynamic => {
-                                                    dynamic.insert(key.into(), sv.value.unwrap().borrow().try_into().unwrap())
+                                                    dynamic.insert(key.clone().into(), sv.value.unwrap().borrow().try_into().unwrap_or_else(|_| panic!("error on state variable {:#?}", key)))
                                                 }
                                             }
                                         }
@@ -304,31 +304,31 @@ impl Platform {
                                 None => {}
                                 Some(Response::Accepted(r)) => {
                                     agenda
-                                        .update_status(&(r.command_id as usize), CommandStatus::Accepted.into())
+                                        .update_status(&(r.command_id as usize), ActionStatus::Accepted.into())
                                         .await;
                                 }
                                 Some(Response::Rejected(r)) => {
                                     agenda
-                                        .update_status(&(r.command_id as usize), CommandStatus::Rejected.into())
+                                        .update_status(&(r.command_id as usize), ActionStatus::Rejected.into())
                                         .await;
                                 }
                                 Some(Response::Progress(f)) => {
                                     agenda
                                         .update_status(
                                             &(f.command_id as usize),
-                                            CommandStatus::Progress(f.progress).into(),
+                                            ActionStatus::Running(Some(f.progress)).into(),
                                         )
                                         .await;
                                 }
                                 Some(Response::Result(r)) => match r.result {
                                     true => {
                                         agenda
-                                            .update_status(&(r.command_id as usize), CommandStatus::Success.into())
+                                            .update_status(&(r.command_id as usize), ActionStatus::Success.into())
                                             .await
                                     }
                                     false => {
                                         agenda
-                                            .update_status(&(r.command_id as usize), CommandStatus::Failure.into())
+                                            .update_status(&(r.command_id as usize), ActionStatus::Failure.into())
                                             .await
                                     }
                                 },
@@ -336,7 +336,7 @@ impl Platform {
                                     agenda
                                         .update_status(
                                             &(c.command_id as usize),
-                                            CommandStatus::Cancelled(c.result).into(),
+                                            ActionStatus::Cancelled(c.result).into(),
                                         )
                                         .await;
                                 }

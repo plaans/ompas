@@ -122,7 +122,7 @@ pub const SUB_LIST: &str = "sublist";
 pub const QUOTE_LIST: &str = "quote-list";
 pub const TRANSFORM_IN_SINGLETON_LIST: &str = "transform-in-singleton-list";
 pub const SLEEP: &str = "sleep";
-
+pub const KIND: &str = "kind";
 pub const LET: &str = "let";
 pub const LET_STAR: &str = "let*";
 pub const COND: &str = "cond";

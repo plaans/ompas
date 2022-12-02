@@ -137,6 +137,7 @@ impl IntoModule for CtxRoot {
         //Special entry
         module.add_fn_prelude(GET, get);
         module.add_fn_prelude(SET, set);
+        module.add_fn_prelude(KIND, kind);
         //State is an alias for map
 
         /*
@@ -345,4 +346,9 @@ pub fn empty(lv: &LValue) -> Result<bool, LRuntimeError> {
             vec![KindLValue::List, KindLValue::Map, KindLValue::Nil],
         )),
     }
+}
+
+#[scheme_fn]
+pub fn kind(lv: &LValue) -> String {
+    lv.get_kind().to_string()
 }

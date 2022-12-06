@@ -131,6 +131,14 @@ pub const MACRO_DEF_COMMAND_PDDL_MODEL: &str = "(defmacro def-command-pddl-model
     (lambda args
         `(add-command-model ,(cons pddl-model args))))";
 
+pub const MACRO_DEF_TASK_OM_MODEL: &str = "(defmacro def-task-om-model
+    (lambda args
+        `(add-task-model ,(cons om-model args))))";
+
+pub const MACRO_DEF_TASK_PDDL_MODEL: &str = "(defmacro def-task-pddl-model
+    (lambda args
+        `(add-task-model ,(cons pddl-model args))))";
+
 pub const MACRO_DEF_INITIAL_STATE: &str = "(defmacro def-initial-state (lambda args
     `(add-facts (map ',args))))";
 
@@ -618,7 +626,9 @@ pub async fn add_facts(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<(
             if key[0] == LValue::from(RAE_INSTANCE) {
                 let instances: Vec<LValue> = v.try_into()?;
                 for e in instances {
-                    state.add_instance(key[1].to_string(), e.to_string()).await
+                    state
+                        .add_instance(&key[1].to_string(), &e.to_string())
+                        .await
                 }
                 is_instance = true;
             }
@@ -692,74 +702,19 @@ pub async fn add_type(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> 
         }
     };
 
-    /*let mut instance = PartialState {
-        inner: Default::default(),
-        _type: Some(StateType::Instance),
-    };*/
-
     ctx.interface
         .state
-        .add_type(t.clone(), parent.clone())
+        .add_type(&t, parent.as_ref().map(|x| &**x))
         .await;
-
-    /*instance.insert(
-        vec![LValueS::from(RAE_INSTANCE), LValue::from(&t).try_into()?].into(),
-        LValueS::List(vec![]),
-    );
-
-    if let Some(p) = &parent {
-        let parent_instance: LValueS =
-            vec![LValueS::from(RAE_INSTANCE), LValue::from(p).try_into()?].into();
-        if !instance.inner.contains_key(&parent_instance) {
-            instance.insert(parent_instance, LValueS::List(vec![]))
-        }
-    }*/
-
-    //ctx.interface.state.update_state(instance).await;
 
     Ok(())
 }
 
 #[async_scheme_fn]
 pub async fn add_object(env: &LEnv, object: String, t: String) -> Result<(), LRuntimeError> {
-    //let constant: LValueS = constant.try_into()?;
-    //let t: LValueS = t.try_into()?;
-
     let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER).unwrap();
 
-    /*let mut instances: PartialState = ctx
-        .interface
-        .state
-        .get_state(Some(StateType::Instance))
-        .await;
-    let key = vec![RAE_INSTANCE.into(), t.clone()].into();
-
-    let objects: &mut LValueS = match instances.get_mut(&key) {
-        Some(obj) => obj,
-        None => {
-            return Err(lruntimeerror!(
-                RAE_ADD_OBJECT,
-                format!("type {} is undefined", t)
-            ))
-        }
-    };
-
-    if let LValueS::List(l) = objects {
-        if !l.contains(&constant) {
-            l.push(constant)
-        } else {
-            return Err(lruntimeerror!(
-                RAE_ADD_OBJECT,
-                format!("{} already defined", constant)
-            ));
-        }
-    }
-
-    instances._type = Some(StateType::Instance);
-
-    ctx.interface.state.set_state(instances).await;*/
-
-    ctx.interface.state.add_instance(object, t).await;
+    ctx.interface.state.add_instance(&object, &t).await;
 
     Ok(())
 }
@@ -964,33 +919,100 @@ mod test {
         }
     }
 
-    /*#[tokio::test]
-    async fn test_lambda_generate_type_pre_conditions() -> Result<(), LRuntimeError> {
-        let lambda_test = TestExpression {
-            inner: LAMBDA_GENERATE_TYPE_PRE_CONDITIONS,
-            dependencies: vec![],
-            expression:
-                "(gtpc '((?r robot) (?f float ) (?i int) (?b bool) (?s symbol) (?n number) (?l list)))",
-            expected: "(gtpc '((?r robot) (?f float ) (?i int) (?b bool) (?s symbol) (?n number) (?l list)))",
-            result: "(do
-                        (check (instance ?r robot))
-                        (check (float? ?f))
-                        (check (int? ?i))
-                        (check (bool? ?b))
-                        (check (symbol? ?s))
-                        (check (number? ?n))
-                        (check (list? ?l)))",
+    #[tokio::test]
+    async fn test_macro_def_task_pddl_model() -> Result<(), LRuntimeError> {
+        let macro_to_test = TestExpression {
+            inner: MACRO_DEF_TASK_PDDL_MODEL,
+            dependencies: vec![MACRO_DEF_TASK],
+            expression: "(def-task-pddl-model pick
+                          (:params (?obj ball) (?room room) (?gripper gripper))
+                          (:pre-conditions
+                            (= (at ?obj) ?room)
+                            (= (at-robby) ?room)
+                            (= (carry ?gripper) no_ball))
+                          (:effects
+                            (begin
+                                (assert `(carry ,?gripper) ?obj)
+                                (assert `(at ,?obj) no_place))))",
+            expected: "(add-task-model\
+                (map '(\
+                    (:name pick)\
+                    (:model-type pddl)\
+                    (:params ((?obj ball) (?room room) (?gripper gripper)))\
+                    (:pre-conditions ((= (at ?obj) ?room) (= (at-robby) ?room) (= (carry ?gripper) no_ball)))\
+                    (:effects ((begin (assert `(carry ,?gripper) ?obj) (assert `(at ,?obj) no_place)))))))",
+            result: "nil",
         };
+
         let mut env = init_env_and_ctxs().await;
 
-        test_expression_with_env(lambda_test, &mut env, false).await
-    }*/
+        eval(
+            &parse(
+                "(def-task pick (:params (?obj ball) (?room room) (?gripper gripper)))",
+                &mut env,
+            )
+            .await?,
+            &mut env,
+            None,
+        )
+        .await?;
+
+        match test_expression_with_env(macro_to_test, &mut env, true).await {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                println!("err : {}", e);
+                Err(e)
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_macro_def_command_om_model() -> Result<(), LRuntimeError> {
+        let macro_to_test = TestExpression {
+            inner: MACRO_DEF_TASK_OM_MODEL,
+            dependencies: vec![MACRO_DEF_TASK],
+            expression: "(def-task-om-model pick
+                            (:params (?r robot))
+                            (:body
+                                (do
+                                    (check (> (robot.battery ?r) 0.4))
+                                    (assert (robot.busy ?r) true))))",
+            expected: "(add-task-model
+                         (map '(
+                            (:name pick) 
+                            (:model-type om) 
+                            (:params ((?r robot))) 
+                            (:body ((do 
+                              (check (> (robot.battery ?r) 0.4)) 
+                              (assert (robot.busy ?r) true)))))))",
+            result: "nil",
+        };
+
+        let mut env = init_env_and_ctxs().await;
+        eval(
+            &parse(
+                "(def-task pick (:params (?obj ball) (?room room) (?gripper gripper)))",
+                &mut env,
+            )
+            .await?,
+            &mut env,
+            None,
+        )
+        .await?;
+        match test_expression_with_env(macro_to_test, &mut env, true).await {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                println!("err : {}", e);
+                Err(e)
+            }
+        }
+    }
 
     #[tokio::test]
     async fn test_macro_def_method() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
             inner: MACRO_DEF_METHOD,
-            dependencies: vec![MACRO_DEF_TASK], //LAMBDA_GENERATE_TYPE_PRE_CONDITIONS],
+            dependencies: vec![MACRO_DEF_TASK],
             expression: "(def-method m_navigate_to (:task t_navigate_to)
             (:params (?r robot) (?x float) (?y float))
             (:pre-conditions (robot.available ?r) (< ?x 10) (< ?y 10))

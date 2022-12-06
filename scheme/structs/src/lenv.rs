@@ -6,6 +6,7 @@ use crate::lvalue::LValue;
 use crate::module::{InitLisp, IntoModule};
 use crate::purefonction::PureFonctionCollection;
 use im::HashSet;
+use ompas_middleware::logger::LogClient;
 use std::any::Any;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
@@ -75,6 +76,7 @@ pub struct LEnv {
     pfc: PureFonctionCollection,
     documentation: Documentation,
     init: InitLisp,
+    pub log: LogClient,
 }
 
 impl LEnv {

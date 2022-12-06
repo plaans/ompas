@@ -1,4 +1,5 @@
-use crate::get_debug;
+use ompas_middleware::logger::LogClient;
+use ompas_middleware::LogLevel;
 use sompas_structs::lcoreoperator::LCoreOperator;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::list;
@@ -319,6 +320,7 @@ impl Results {
 #[derive(Default)]
 pub struct LDebug {
     inner: Vec<String>,
+    pub log: LogClient,
 }
 
 impl LDebug {
@@ -337,13 +339,18 @@ impl LDebug {
         self.inner.pop();
     }
 
-    pub fn print_last_result(&mut self, results: &Results) {
-        if get_debug() {
-            println!(
-                "{} => {}",
-                self.inner.pop().unwrap(),
-                results.last().unwrap()
+    pub async fn log_last_result(&mut self, results: &Results) {
+        //if get_debug() {
+        self.log
+            .log(
+                format!(
+                    "{} => {}",
+                    self.inner.pop().unwrap(),
+                    results.last().unwrap()
+                ),
+                LogLevel::Trace,
             )
-        }
+            .await
+        //}
     }
 }

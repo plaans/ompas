@@ -10,6 +10,7 @@ ompas-utils = {path = "../../utils" }
 sompas-structs = {path = "../structs"}
 sompas-language = {path = "../language"}
 sompas-macros = {path = "../macros"}
+ompas-middleware = {path = "../../middleware"}
 aries_planning = {path = "../../aries/planning"}
 async-trait = "0.1.53"
 async-recursion = "0.3.2"

@@ -102,14 +102,6 @@ pub const MACRO_CADADR: &str = "(defmacro cadadr (lambda (x) `(car (cdr (car (cd
 pub const MACRO_CDADR: &str = "(defmacro cdadr (lambda (x) `(cdr (car (cdr ,x)))))";
 pub const MACRO_CADADDR: &str = "(defmacro cadaddr (lambda (x) `(car (cdr (car (cdr (cdr ,x)))))))";
 
-/*pub const MACRO_NEQ: &str = "(defmacro neq
-                                (lambda (a b)
-                                    `(! (= ,a ,b))))";
-
-pub const MACRO_NEQ_SHORT: &str = "(defmacro !=
-                                        (lambda (a b)
-                                            `(neq ,a ,b)))";*/
-
 pub const MACRO_AWAIT_ASYNC: &str = "(defmacro await-async (lambda (x) `(await (async ,x))))";
 
 pub const MACRO_APPLY: &str = "(defmacro apply
@@ -264,7 +256,7 @@ pub const LAMBDA_RETRY_ONCE: &str = "(define retry-once (lambda (e)
             (eval e)
             __r__))))";
 
-pub const LAMBDA_ASYNC_INTERRUPT: &str = "(define await-interrupt
+pub const LAMBDA_AWAIT_INTERRUPT: &str = "(define await-interrupt
     (lambda (__h__)
     (u! 
         (begin
@@ -272,6 +264,9 @@ pub const LAMBDA_ASYNC_INTERRUPT: &str = "(define await-interrupt
             (if (interrupted? __r__)
                 (interrupt __h__)
                 __r__)))))";
+
+pub const LAMBDA_SLEEP: &str = "(define sleep
+    (lambda (n) (u! (await-interrupt (__sleep__ n)))))";
 
 #[derive(Default, Copy, Clone, Debug)]
 pub struct CtxUtils {}
@@ -298,20 +293,17 @@ impl IntoModule for CtxUtils {
                 MACRO_AWAIT_ASYNC,
                 MACRO_APPLY,
                 MACRO_COND,
-                //MACRO_WHILE,
                 MACRO_LOOP,
                 LAMBDA_UNZIP,
                 LAMBDA_ZIP,
                 LAMBDA_MAPF,
                 MACRO_LET,
                 MACRO_LET_STAR,
-                //MACRO_FOR,
-                //LAMBDA_ARBITRARY,
-                //LAMBDA_EVAL_NON_RECURSIVE,
                 LAMBDA_PAR,
                 LAMBDA_REPEAT,
                 LAMBDA_RETRY_ONCE,
-                LAMBDA_ASYNC_INTERRUPT,
+                LAMBDA_AWAIT_INTERRUPT,
+                LAMBDA_SLEEP,
             ]
             .into(),
             label: MOD_UTILS.into(),
@@ -325,7 +317,7 @@ impl IntoModule for CtxUtils {
         module.add_fn_prelude(SUB_LIST, sublist);
         module.add_fn_prelude(TRANSFORM_IN_SINGLETON_LIST, transform_in_singleton_list);
         module.add_fn_prelude(QUOTE_LIST, quote_list);
-        module.add_async_fn_prelude(SLEEP, sleep);
+        module.add_async_fn_prelude(__SLEEP__, _sleep);
 
         module
     }
@@ -534,7 +526,7 @@ pub fn transform_in_singleton_list(args: &[LValue]) -> Vec<LValue> {
 }
 
 #[async_scheme_fn]
-pub async fn sleep(n: LNumber) -> LAsyncHandler {
+pub async fn _sleep(n: LNumber) -> LAsyncHandler {
     let (tx, mut rx) = new_interruption_handler();
     let f: FutureResult = Box::pin(async move {
         let duration = Duration::from_micros((f64::from(&n) * 1_000_000.0) as u64);

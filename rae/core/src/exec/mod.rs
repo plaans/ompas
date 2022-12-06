@@ -79,6 +79,7 @@ impl IntoModule for CtxRaeExec {
             DEFINE_ERR_ACTION_FAILURE,
             DEFINE_ERR_NO_APPLICABLE_METHOD,
             LAMBDA_RAE_RETRY,
+            LAMBDA_WAIT_FOR,
             LAMBDA_MONITOR,
             MACRO_RUN_MONITORING,
             LAMBDA_RAE_EXEC_TASK, //DEFINE_PARENT_TASK,
@@ -108,7 +109,7 @@ impl IntoModule for CtxRaeExec {
         module.add_async_fn_prelude(RAE_RETRACT_SHORT, retract_fact);
         module.add_fn_prelude(RAE_GET_INSTANTIATED_METHODS, get_instantiated_methods);
         module.add_fn_prelude(RAE_GET_BEST_METHOD, get_best_method);
-        module.add_async_fn_prelude(RAE_WAIT_FOR, wait_for);
+        module.add_async_fn_prelude(RAE_WAIT_FOR, __wait_for__);
         //module.add_async_fn_prelude(RAE_SELECT, select);
         //module.add_async_fn_prelude(RAE_SET_SUCCESS_FOR_TASK, set_success_for_task);
         //module.add_async_fn_prelude(RAE_GET_NEXT_METHOD, get_next_method);
@@ -317,7 +318,7 @@ async fn read_state(env: &LEnv, args: &[LValue]) -> LResult {
 }
 
 #[async_scheme_fn]
-async fn wait_for(env: &LEnv, lv: LValue) -> Result<LAsyncHandler, LRuntimeError> {
+async fn __wait_for__(env: &LEnv, lv: LValue) -> Result<LAsyncHandler, LRuntimeError> {
     let (tx, mut rx) = new_interruption_handler();
     let ctx = env.get_context::<CtxRae>(CTX_RAE)?;
     let monitors = ctx.monitors.clone();
@@ -414,11 +415,11 @@ pub async fn instance(env: &LEnv, object: String, r#type: String) -> LResult {
         )),
     }*/
 
-    Ok(state.instance(object, r#type).await)
+    Ok(state.instance(&object, &r#type).await)
 }
 
 #[async_scheme_fn]
 pub async fn instances(env: &LEnv, r#type: String) -> LResult {
     let state = &env.get_context::<CtxState>(CTX_STATE)?.state;
-    Ok(state.instances(r#type).await)
+    Ok(state.instances(&r#type).await)
 }

@@ -75,20 +75,20 @@ impl From<WorldStateSnapshot> for LValue {
 const RAE_STATE_SEM_UPDATE_CHANNEL_SIZE: usize = 64;
 
 impl WorldState {
-    pub async fn add_type(&self, t: String, p: Option<String>) {
+    pub async fn add_type(&self, t: &str, p: Option<&str>) {
         self.instance.write().await.add_type(t, p);
     }
 
-    pub async fn add_instance(&self, instance: String, r#type: String) {
+    pub async fn add_instance(&self, instance: &str, r#type: &str) {
         self.instance.write().await.add_instance(instance, r#type);
     }
 
-    pub async fn instance(&self, i: String, t: String) -> LValue {
+    pub async fn instance(&self, i: &str, t: &str) -> LValue {
         self.instance.read().await.is_of_type(i, t).await.into()
     }
 
-    pub async fn instances(&self, t: String) -> LValue {
-        self.instance.read().await.get_instances(t).await.into()
+    pub async fn instances(&self, t: &str) -> LValue {
+        self.instance.read().await.get_instances(&t).await.into()
     }
 
     pub async fn clear(&self) {

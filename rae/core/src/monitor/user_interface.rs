@@ -291,7 +291,11 @@ pub async fn stop(env: &LEnv) {
 
     let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER).unwrap();
 
-    process.kill(PROCESS_TOPIC_PLATFORM).await;
+    process.kill(PROCESS_TOPIC_OMPAS).await;
+    drop(process);
+    if let Some(platform) = &ctx.platform {
+        platform.stop().await;
+    }
 
     tokio::time::sleep(Duration::from_secs(1)).await; //hardcoded moment to wait for all process to be killed.
     *ctx.interface.command_stream.write().await = None;

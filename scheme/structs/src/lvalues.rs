@@ -255,6 +255,30 @@ impl TryFrom<&LValueS> for String {
     }
 }
 
+impl TryFrom<&LValueS> for f64 {
+    type Error = LRuntimeError;
+
+    fn try_from(value: &LValueS) -> Result<Self, Self::Error> {
+        if let LValueS::Float(f) = value {
+            Ok(*f)
+        } else {
+            Err(Default::default())
+        }
+    }
+}
+
+impl TryFrom<&LValueS> for i64 {
+    type Error = LRuntimeError;
+
+    fn try_from(value: &LValueS) -> Result<Self, Self::Error> {
+        if let LValueS::Int(i) = value {
+            Ok(*i)
+        } else {
+            Err(Default::default())
+        }
+    }
+}
+
 impl Display for LValueS {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {

@@ -28,34 +28,35 @@ impl From<InstanceCollection> for PartialState {
 }
 
 impl InstanceCollection {
-    pub fn add_type(&mut self, t: String, p: Option<String>) {
-        self.type_hierarchy.add_type(t.clone(), p);
-        self.inner.insert(t, Default::default());
+    pub fn add_type(&mut self, t: &str, p: Option<&str>) {
+        self.type_hierarchy
+            .add_type(t.to_string(), p.map(|s| s.to_string()));
+        self.inner.insert(t.to_string(), Default::default());
     }
 
-    pub fn add_instance(&mut self, i: String, t: String) {
-        match self.inner.get_mut(&t) {
+    pub fn add_instance(&mut self, i: &str, t: &str) {
+        match self.inner.get_mut(t) {
             None => {
                 let mut set = HashSet::new();
-                set.insert(i);
-                self.inner.insert(t.clone(), set);
-                self.type_hierarchy.add_type(t, None);
+                set.insert(i.to_string());
+                self.inner.insert(t.to_string(), set);
+                self.type_hierarchy.add_type(t.to_string(), None);
             }
             Some(set) => {
-                set.insert(i);
+                set.insert(i.to_string());
             }
         }
     }
 
-    pub async fn is_of_type(&self, i: String, t: String) -> bool {
-        match self.inner.get(&t) {
-            Some(set) => set.contains(&i),
+    pub async fn is_of_type(&self, i: &str, t: &str) -> bool {
+        match self.inner.get(t) {
+            Some(set) => set.contains(i),
             None => false,
         }
     }
 
-    pub async fn get_instances(&self, t: String) -> Vec<String> {
-        match self.inner.get(&t) {
+    pub async fn get_instances(&self, t: &str) -> Vec<String> {
+        match self.inner.get(t) {
             Some(set) => set.iter().cloned().collect(),
             None => vec![],
         }

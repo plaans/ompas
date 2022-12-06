@@ -81,12 +81,14 @@ impl Display for Task {
 
         write!(
             f,
-            "-parameters: {}\n\
-            -body: {}\n\
-            -methods: {}\n",
+            "- parameters: {}\n 
+            - body: {}\n\
+            - methods: {}\n\
+            - model: {}\n",
             self.parameters,
-            self.body.format("body: ".len()),
-            str_methods
+            self.body.format("- body: ".len()),
+            str_methods,
+            self.model.format("- model: ".len())
         )
     }
 }

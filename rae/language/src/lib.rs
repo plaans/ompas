@@ -7,7 +7,10 @@ pub const RAE_INSTANCE: &str = "instance";
 pub const RAE_INSTANCES: &str = "instances";
 pub const RAE_AWAIT: &str = "rae-await";
 pub const RAE_MONITOR: &str = "monitor";
-pub const RAE_WAIT_FOR: &str = "wait-for";
+pub const RAE_WAIT_FOR: &str = "__wait_for__";
+pub const LAMBDA_WAIT_FOR: &str = "(define wait-for (lambda (e)
+    (u! 
+        (await-interrupt (__wait_for__ e)))))";
 pub const LAMBDA_MONITOR: &str = "(define monitor
     (lambda (e)
         (wait-for `(= ,e nil))))";
@@ -136,109 +139,7 @@ pub const DOC_ADD_LAMBDA: &str = "Add a lambda to RAE environment";
 pub const DOC_ADD_INITIAL_STATE: &str = "Add initial facts in the state.\
 Most of the time it is general knowledge and not initialisation of facts.";
 
-/*/// Macro used to generate code to define a task in the simplified representation in RAE environment.
-pub const MACRO_GENERATE_TASK: &str = "(defmacro generate-task
-(lambda args
-(let* ((label (car args))
-      (p_expr (cdr args))
-      (params (car (unzip p_expr))))
-     `(list ,label
-        (quote ,p_expr)
-        (lambda ,params
-            ,(cons 'rae-exec-task (cons `(quote ,label) params)))))))";
-
-/// Macro used to generate code to define a state function in RAE environment.
-pub const MACRO_GENERATE_STATE_FUNCTION: &str = "(defmacro generate-state-function (lambda args
-    (let* ((label (car args))
-          (p_expr (cdr args))
-          (params (car (unzip p_expr)))
-          (params
-            (if (null? params)
-                nil
-                (sublist
-                   params
-                   0
-                   (- (len params)1)))))
-        `(list ,label
-            (quote ,p_expr)
-            (lambda ,params
-                    ,(cons 'rae-get-state-variable (cons `(quote ,label) params)))))))";
-
-/// Macro used to generate code to define an action in RAE environment.
-pub const MACRO_GENERATE_ACTION: &str = "(defmacro generate-action
-    (lambda args
-        (let* ((label (car args))
-               (p_expr (cdr args))
-               (p_unzip (unzip p_expr))
-               (params (car p_unzip))
-               (types (cadr p_unzip)))
-             `(list ,label
-                 (quote ,p_expr)
-                 (lambda ,params
-                    (await ,(cons 'rae-exec-command (cons `(quote ,label) params))))))))";
-
-pub const MACRO_GENERATE_ACTION_MODEL: &str = "
-(defmacro generate-action-model
-    (lambda (label def)
-        (let* ((p_expr (cdar def))
-               (p_unzip (unzip p_expr))
-               (params (car p_unzip))
-               (conds (cadr (get def 1)))
-               (effs (cadr (get def 2))))
-              `(list ,label (lambda ,params
-                    (do
-                        ,(gtpc p_expr)
-                        ;(check ,conds)
-                        ,conds
-                        ,effs))))))";
-
-pub const MACRO_GENERATE_ACTION_OPERATIONAL_MODEL: &str =
-    "(defmacro generate-action-operational-model
-    (lambda (label def)
-        (let* ((p_expr (cdar def))
-               (body (cadr (get def 1)))
-               (p_unzip (unzip p_expr))
-               (params (car p_unzip)))
-
-              `(list ,label (lambda ,params
-                    (do
-                        ,(gtpc p_expr)
-                        ,body))))))";
-
-/// Macro used to generate code to define a method in REA environment.
-pub const MACRO_GENERATE_METHOD: &str = "(defmacro generate-method
-    (lambda (m_label def)
-        (let ((t_label (cadar def))
-            (p_expr (cdr (get def 1)))
-            (conds (cadr (get def 2)))
-            (score (cadr (get def 3)))
-            (body (cadr (get def 4))))
-
-            (let* ((p_unzip (unzip p_expr))
-                (params (car p_unzip))
-                (types (cadr p_unzip)))
-
-            `(list ,m_label
-                (quote ,t_label)
-                (quote ,p_expr)
-                ;lambda for preconditons
-                (lambda ,params
-                    (do
-                        ,(gtpc p_expr)
-                        ,conds))
-                (lambda ,params ,score)
-                (lambda ,params ,body))))))";*/
-
 pub const GENERATE_TEST_TYPE_EXPR: &str = "generate_test_type_expr";
-/*pub const F_AND_EFFECT: &str = "f-and-effect";
-pub const F_AND_COND: &str = "f-and-cond";*/
-
-/*pub const LAMBDA_GENERATE_TYPE_PRE_CONDITIONS: &str =
-    "(define gtpc (lambda (l) (parse (generate-type-test-expr l))))";
-
-pub const MACRO_AND_COND: &str = "(defmacro and-cond (lambda args (parse (f-and-cond args))))";
-pub const MACRO_AND_EFFECT: &str =
-    "(defmacro and-effect (lambda args (parse (f-and-effect args))))";*/
 
 pub const RAE_CONVERT_EXPR: &str = "convert-expr";
 pub const RAE_CONVERT_DOMAIN: &str = "convert-domain";

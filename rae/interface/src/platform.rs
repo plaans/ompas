@@ -244,7 +244,7 @@ impl Platform {
                                         match event.event {
                                             None => {}
                                             Some(event::Event::Instance(instance)) => {
-                                                world_state.add_instance(instance.object, instance.r#type).await;
+                                                world_state.add_instance(&instance.object, &instance.r#type).await;
                                             }
                                         }
                                     }

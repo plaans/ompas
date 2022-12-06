@@ -24,7 +24,7 @@ use sompas_modules::io::{CtxIo, LogOutput};
 use sompas_modules::utils::CtxUtils;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::{Documentation, LHelp};
-use sompas_structs::lenv::ImportType::{WithPrefix, WithoutPrefix};
+use sompas_structs::lenv::ImportType::WithoutPrefix;
 use sompas_structs::lenv::{LEnv, LEnvSymbols};
 use sompas_structs::module::{InitLisp, IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
@@ -287,11 +287,14 @@ impl CtxRaeUser {
     }
 
     pub async fn get_exec_env(&self) -> LEnv {
-        let mut env = get_root_env().await;
+        let mut env: LEnv = get_root_env().await;
+        let log = LogClient::new("eval-ompas", LOG_TOPIC_OMPAS).await;
+        env.log = log;
 
         if let Some(platform) = &self.platform {
             if let Some(module) = platform.module().await {
-                env.import_module(module, WithPrefix);
+                //println!("import of platform module");
+                env.import_module(module, WithoutPrefix);
             }
         }
 

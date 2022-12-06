@@ -176,53 +176,53 @@ pub async fn select(stack: &mut TaskMetaData, env: &LEnv) -> LResult {
 }
 
 pub const LAMBDA_RAE_EXEC_TASK: &str = "(define exec-task
-    (lambda task
+    (lambda __task__
         (begin
-            (define result (enr (cons 'refine task)))
-            (if (err? result)
-                result
-                (let ((method (first result))
-                      (task_id (second result)))
+            (define __result__ (enr (cons 'refine __task__)))
+            (if (err? __result__)
+                __result__
+                (let ((__method__ (first __result__))
+                      (__task_id__ (second __result__)))
 
                     (begin
-                        (define-parent-task task_id)
-                        (print \"Trying \" method \" for \" task_id)
-                        (if (err? (enr method))
-                            (rae-retry task_id)
-                            (rae-set-success-for-task task_id))))))))";
+                        (define-parent-task __task_id__)
+                        (print \"Trying \" __method__ \" for \" __task_id__)
+                        (if (err? (enr __method__))
+                            (rae-retry __task_id__)
+                            (rae-set-success-for-task __task_id__))))))))";
 
 pub const LAMBDA_RAE_RETRY: &str = "(define rae-retry
-    (lambda (task_id)
+    (lambda (__task_id__)
         (begin
-            (define result (retry task_id))
-            (if (err? result)
-                result
+            (define __result__ (retry __task_id__))
+            (if (err? __result__)
+                __result__
                 (begin
-                    (if (err? (enr result))
-                        (rae-retry task_id)
-                        (rae-set-success-for-task task_id)))))))";
+                    (if (err? (enr __result__))
+                        (rae-retry __task_id__)
+                        (rae-set-success-for-task __task_id__)))))))";
 
 pub const LAMBDA_GET_PRECONDITIONS: &str = "(define get-preconditions\
-    (lambda (label)\
-        (get rae-method-pre-conditions-map label)))";
+    (lambda (__label__)\
+        (get rae-method-pre-conditions-map __label__)))";
 
 pub const LAMBDA_GET_SCORE: &str = "(define get-score\
-    (lambda (label)\
-        (get rae-method-score-map label)))";
+    (lambda (__label__)\
+        (get rae-method-score-map __label__)))";
 
 pub const LAMBDA_GET_ACTION_MODEL: &str = "(define get-action-model
-    (lambda (label)
-        (get rae-action-model-map label)))";
+    (lambda (__label__)
+        (get rae-action-model-map __label__)))";
 
 pub const LAMBDA_EVAL_PRE_CONDITIONS: &str = "(define eval-pre-conditions
-    (lambda (method)
+    (lambda (__method__)
         (sim_block
-            (eval (cons (get-preconditions (car method)) (quote-list (cdr method)))))))";
+            (eval (cons (get-preconditions (car __method__)) (quote-list (cdr __method__)))))))";
 
 pub const LAMBDA_COMPUTE_SCORE: &str = "(define compute-score
-    (lambda (method)
+    (lambda (__method__)
         (sim_block
-            (eval (cons (get-score (car method)) (quote-list (cdr method)))))))";
+            (eval (cons (get-score (car __method__)) (quote-list (cdr __method__)))))))";
 
 pub const LAMBDA_IS_APPLICABLE: &str = "(define applicable?
     (lambda (method)
@@ -230,39 +230,39 @@ pub const LAMBDA_IS_APPLICABLE: &str = "(define applicable?
             (eval-pre-conditions method))))";
 
 pub const LAMBDA_GENERATE_APPLICABLE_INSTANCES: &str = "(define generate_applicable_instances
-    (lambda (task)
-        (let* ((task_label (first task))
-               (params (cdr task))
-               (methods (get rae-task-methods-map task_label)))
+    (lambda (__task__)
+        (let* ((__task_label__ (first __task__))
+               (__params__ (cdr __task__))
+               (__methods__ (get rae-task-methods-map __task_label__)))
             (r_generate_instances
-                (enr (cons enumerate (cons methods params)))))))";
+                (enr (cons enumerate (cons __methods__ __params__)))))))";
 
 pub const LAMBDA_R_GENERATE_INSTANCES: &str = "(define r_generate_instances
-    (lambda (methods)
-        (if (null? methods)
+    (lambda (__methods__)
+        (if (null? __methods__)
             nil
-            (let* ((method (car methods))
-                    (methods (cdr methods))
-                    (method_label (first method))
-                    (params (cdr method)))
+            (let* ((__method__ (car __methods__))
+                    (__methods__ (cdr __methods__))
+                    (__method_label__ (first __method__))
+                    (__params__ (cdr __method__)))
                 (begin
-                    (define types (get rae-method-types-map method_label))
-                    (if (> (len types) (len params))
+                    (define __types__ (get rae-method-types-map __method_label__))
+                    (if (> (len __types__) (len __params__))
                         (begin
-                            (define instance_types (mapf instance (sublist types (len params))))
-                            (define instances (enr (cons enumerate (append method instance_types))))
-                            (append (r_test_method instances) (r_generate_instances methods)))
+                            (define __instance_types__ (mapf instance (sublist __types__ (len __params__))))
+                            (define __instances__ (enr (cons enumerate (append __method__ __instance_types__))))
+                            (append (r_test_method __instances__) (r_generate_instances __methods__)))
                         (cons
-                            (if (! (err? (eval-pre-conditions method)))
-                                (list method (compute-score method))
+                            (if (! (err? (eval-pre-conditions __method__)))
+                                (list __method__ (compute-score __method__))
                                 nil)
-                            (r_generate_instances methods))))))))";
+                            (r_generate_instances __methods__))))))))";
 pub const LAMBDA_R_TEST_METHOD: &str = "(define r_test_method
-    (lambda (instances)
-        (if (null? instances)
+    (lambda (__instances__)
+        (if (null? __instances__)
             nil
-            (if (eval-pre-conditions (car instances))
+            (if (eval-pre-conditions (car __instances__))
                 (cons
-                    (list (car instances) (compute-score (car instances)))
-                    (r_test_method (cdr instances)))
-                (r_test_method (cdr instances))))))";
+                    (list (car __instances__) (compute-score (car __instances__)))
+                    (r_test_method (cdr __instances__)))
+                (r_test_method (cdr __instances__))))))";

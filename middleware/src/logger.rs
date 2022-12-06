@@ -15,7 +15,7 @@ use std::{fs, mem};
 use tokio::sync::{broadcast, mpsc, RwLock};
 
 const DEFAULT_LOG_DIRECTORY: &str = "/home/jeremy/ompas_logs";
-const DEFAULT_MAX_LOG_LEVEL: Level = Level::Trace;
+const DEFAULT_MAX_LOG_LEVEL: Level = Level::Info;
 pub const END_SIGNAL: EndSignal = EndSignal {};
 pub const PROCESS_LOGGER: &str = "__PROCESS_LOGGER__";
 

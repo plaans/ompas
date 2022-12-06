@@ -15,7 +15,6 @@
 //! ```
 
 use aries_utils::StreamingIterator;
-use futures::FutureExt;
 use rand::Rng;
 use sompas_core::eval;
 use sompas_core::modules::list::car;
@@ -24,22 +23,18 @@ use sompas_macros::async_scheme_fn;
 use sompas_macros::scheme_fn;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::{Documentation, LHelp};
-use sompas_structs::lasynchandler::LAsyncHandler;
 use sompas_structs::lcoreoperator::LCoreOperator;
 use sompas_structs::lenv::LEnv;
-use sompas_structs::lfuture::FutureResult;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
-use sompas_structs::lswitch::new_interruption_handler;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
-use sompas_structs::{interrupted, list, lruntimeerror};
+use sompas_structs::{list, lruntimeerror};
 use std::ops::Deref;
-use std::time::Duration;
 
 //LANGUAGE
-pub const MOD_UTILS: &str = "utils";
+pub const CTX_UTILS: &str = "utils";
 
 // Documentation
 pub const DOC_MOD_UTILS: &str = "collection of utility functions.";
@@ -265,9 +260,6 @@ pub const LAMBDA_AWAIT_INTERRUPT: &str = "(define await-interrupt
                 (interrupt __h__)
                 __r__)))))";
 
-pub const LAMBDA_SLEEP: &str = "(define sleep
-    (lambda (n) (u! (await-interrupt (__sleep__ n)))))";
-
 #[derive(Default, Copy, Clone, Debug)]
 pub struct CtxUtils {}
 
@@ -303,10 +295,9 @@ impl IntoModule for CtxUtils {
                 LAMBDA_REPEAT,
                 LAMBDA_RETRY_ONCE,
                 LAMBDA_AWAIT_INTERRUPT,
-                LAMBDA_SLEEP,
             ]
             .into(),
-            label: MOD_UTILS.into(),
+            label: CTX_UTILS.into(),
         };
 
         module.add_async_fn_prelude(ARBITRARY, arbitrary);
@@ -317,7 +308,6 @@ impl IntoModule for CtxUtils {
         module.add_fn_prelude(SUB_LIST, sublist);
         module.add_fn_prelude(TRANSFORM_IN_SINGLETON_LIST, transform_in_singleton_list);
         module.add_fn_prelude(QUOTE_LIST, quote_list);
-        module.add_async_fn_prelude(__SLEEP__, _sleep);
 
         module
     }
@@ -326,7 +316,7 @@ impl IntoModule for CtxUtils {
         vec![
             LHelp::new_verbose(RAND_ELEMENT, DOC_RAND_ELEMENT, DOC_RAND_ELEMENT_VERBOSE),
             LHelp::new_verbose(ENUMERATE, DOC_ENUMERATE, DOC_ENUMERATE_VERBOSE),
-            LHelp::new_verbose(MOD_UTILS, DOC_MOD_UTILS, DOC_MOD_UTILS_VERBOSE),
+            LHelp::new_verbose(CTX_UTILS, DOC_MOD_UTILS, DOC_MOD_UTILS_VERBOSE),
             LHelp::new(SUB_LIST, DOC_SUB_LIST),
             LHelp::new(CONTAINS, DOC_CONTAINS),
             LHelp::new(TRANSFORM_IN_SINGLETON_LIST, DOC_TRANSFORM_IN_SINGLETON_LIST),
@@ -523,33 +513,6 @@ pub fn transform_in_singleton_list(args: &[LValue]) -> Vec<LValue> {
     args.iter()
         .map(|lv| list![lv.clone()])
         .collect::<Vec<LValue>>()
-}
-
-#[async_scheme_fn]
-pub async fn _sleep(n: LNumber) -> LAsyncHandler {
-    let (tx, mut rx) = new_interruption_handler();
-    let f: FutureResult = Box::pin(async move {
-        let duration = Duration::from_micros((f64::from(&n) * 1_000_000.0) as u64);
-
-        //let sleep = tokio::time::sleep(duration).shared();
-        //let sleep_2 = sleep.clone();
-        tokio::select! {
-            _ = rx.recv() => {
-                //println!("sleep interrupted");
-                Ok(interrupted!())
-            }
-            _ = tokio::time::sleep(duration) => {
-                //println!("sleep terminated");
-                Ok(LValue::Nil)
-            }
-        }
-    }) as FutureResult;
-    let f = f.shared();
-
-    let f2 = f.clone();
-    tokio::spawn(f2);
-
-    LAsyncHandler::new(f, tx)
 }
 
 #[cfg(test)]

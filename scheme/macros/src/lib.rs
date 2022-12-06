@@ -14,6 +14,7 @@ const DEFAULT_ARGS_TYPE: &str = "&[sompas_structs::lvalue::LValue]";
 const DEFAULT_NO_ARGS: &str = "__args__";
 const DEFAULT_ARGS: &str = "args";
 const ENV_TYPE: &str = "LEnv";
+const ENV_TYPE_LONG: &str = "sompas_structs::lenv::LEnv";
 const ARGS_TYPE: &str = "[LValue]";
 const REF_ENV_TYPE: &str = "&LEnv";
 const REF_MUT_ENV_TYPE: &str = "&mut LEnv";
@@ -176,9 +177,13 @@ fn build_params(
     let mut env: Ident = syn::parse_str(DEFAULT_NO_ENV).unwrap();
     let mut env_type: Type = match is_async {
         true => match defined_lt {
-            Some(lt) => syn::parse_str::<Type>(format!("&{} {}", lt, ENV_TYPE).as_str()).unwrap(),
-            None => syn::parse_str::<Type>(format!("&{} {}", DEFAULT_LIFETIME, ENV_TYPE).as_str())
-                .unwrap(),
+            Some(lt) => {
+                syn::parse_str::<Type>(format!("&{} {}", lt, ENV_TYPE_LONG).as_str()).unwrap()
+            }
+            None => {
+                syn::parse_str::<Type>(format!("&{} {}", DEFAULT_LIFETIME, ENV_TYPE_LONG).as_str())
+                    .unwrap()
+            }
         },
         false => syn::parse_str(DEFAULT_ENV_TYPE).unwrap(),
     };

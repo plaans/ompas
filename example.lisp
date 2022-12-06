@@ -54,6 +54,11 @@
     (u! 
         (await-interrupt (__wait-for__ e)))))
 
+
+(define acquire (lambda args
+    (u!
+        (await-interrupt (enr (cons '__acquire__ args))))))
+
 (await
     (race
         (begin

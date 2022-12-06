@@ -11,6 +11,8 @@ use error::*;
 use list::*;
 use map::*;
 use predicate::*;
+use sompas_language::basic_math::*;
+use sompas_language::predicates::*;
 use sompas_language::*;
 use sompas_macros::scheme_fn;
 use sompas_structs::contextcollection::Context;
@@ -257,7 +259,7 @@ impl IntoModule for CtxRoot {
             LHelp::new(CHECK, DOC_CHECK),
             LHelp::new_verbose(HELP, DOC_HELP, DOC_HELP_VERBOSE),
             LHelp::new(DEFINE, DOC_DEFINE),
-            LHelp::new_verbose(LAMBDA, DOC_LAMBDA, DOC_LAMBDA_VEBROSE),
+            LHelp::new_verbose(LAMBDA, DOC_LAMBDA, DOC_LAMBDA_VERBOSE),
             LHelp::new(DEF_MACRO, DOC_DEF_MACRO),
             LHelp::new(IF, DOC_IF),
             LHelp::new(QUOTE, DOC_QUOTE),

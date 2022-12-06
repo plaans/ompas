@@ -89,5 +89,10 @@ async fn lisp_interpreter(opt: &Opt) {
 
     li.set_config(LispInterpreterConfig::new(true));
 
-    li.run(opt.log.clone()).await;
+    li.run(
+        opt.log
+            .map(|p| FileDescriptor::AbsolutePath(fs::canonicalize(p).unwrap())),
+    )
+    .await;
+    Master::end().await;
 }

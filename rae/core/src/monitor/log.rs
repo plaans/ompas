@@ -2,7 +2,6 @@ use ompas_middleware::{LogLevel, Master, LOG_TOPIC_ROOT};
 use ompas_rae_interface::LOG_TOPIC_PLATFORM;
 use ompas_rae_language::LOG_TOPIC_OMPAS;
 use sompas_macros::async_scheme_fn;
-use sompas_structs::lenv::LEnv;
 use sompas_structs::lruntimeerror::LRuntimeError;
 
 const LOG_ROOT: &str = "log-root";

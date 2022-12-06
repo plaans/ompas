@@ -15,6 +15,8 @@ use crate::aries::structs::{ConversionCollection, ConversionContext, TaskType};
 use aries_planning::chronicles::ChronicleKind;
 use ompas_rae_language::*;
 use sompas_core::static_eval::{eval_static, parse_static};
+use sompas_language::basic_math::*;
+use sompas_language::predicates::*;
 use sompas_language::*;
 use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lcoreoperator::LCoreOperator;

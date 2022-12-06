@@ -9,6 +9,7 @@ use ompas_rae_structs::state::partial_state::PartialState;
 use ompas_rae_structs::state::world_state::StateType;
 use sompas_core::modules::list::{car, cons, first};
 use sompas_core::{eval, expand, get_root_env, parse};
+use sompas_language::predicates::*;
 use sompas_language::*;
 use sompas_macros::*;
 use sompas_structs::kindlvalue::KindLValue;

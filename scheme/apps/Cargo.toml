@@ -18,6 +18,7 @@ sompas-structs = {path = "../structs"}
 sompas-language = {path = "../language"}
 sompas-repl = {path = "../repl"}
 sompas-modules = {path = "../modules"}
+ompas-middleware = {path = "../../middleware"}
 im = "15.0.0"
 structopt = { version = "0.3", default-features = false }
 tokio = { version = "1.17.0", features = ["full", "time"] }

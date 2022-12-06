@@ -74,13 +74,26 @@ pub const DOC_RAE_GET_TASKS: &str = "Returns the list of all defined tasks in RA
 pub const DOC_RAE_GET_STATE_FUNCTIONS: &str =
     "Returns the list of all defined state-functions in RAE environment";
 
+pub const __ACQUIRE__: &str = "__acquire__";
+pub const DOC___ACQUIRE__: &str = "";
+
+pub const LAMBDA_ACQUIRE: &str = "(define acquire (lambda __args__
+    (u!
+        (await-interrupt (enr (cons '__acquire__ __args__))))))";
+
 pub const ACQUIRE: &str = "acquire";
+pub const DOC_ACQUIRE: &str = "DOC_ACQUIRE";
+
+pub const __ACQUIRE_IN_LIST__: &str = "__acquire_in_list__";
+pub const LAMBDA_ACQUIRE_IN_LIST: &str = "(define acquire-in-list (lambda __args__
+    (u!
+        (await-interrupt (enr (cons '__acquire_in_list__ __args__))))))";
+pub const ACQUIRE_IN_LIST: &str = "acquire-in-list";
 pub const RELEASE: &str = "release";
 pub const NEW_RESOURCE: &str = "new-resource";
 pub const IS_LOCKED: &str = "locked?";
 pub const LOCKED: &str = "locked";
-pub const ACQUIRE_LIST: &str = "acquire-list";
-pub const ACQUIRE_IN_LIST: &str = "acquire-in-list";
+pub const RESOURCES: &str = "resources";
 
 pub const RAE_EXEC_TASK: &str = "exec-task";
 pub const RAE_EXEC_COMMAND: &str = "exec-command";

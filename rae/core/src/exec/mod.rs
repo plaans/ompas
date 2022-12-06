@@ -3,7 +3,7 @@ use crate::contexts::ctx_state::{CtxState, CTX_STATE};
 use crate::contexts::ctx_task::{define_parent_task, DEFINE_PARENT_TASK};
 use crate::exec::platform::*;
 use crate::exec::rae_resource::{
-    acquire, acquire_in_list, get_list_resources, is_locked, new_resource, release,
+    __acquire__, __acquire_in_list__, is_locked, new_resource, release, resources,
 };
 use crate::exec::refinement::{
     refine, retry, set_success_for_task, LAMBDA_COMPUTE_SCORE, LAMBDA_EVAL_PRE_CONDITIONS,
@@ -81,8 +81,10 @@ impl IntoModule for CtxRaeExec {
             LAMBDA_RAE_RETRY,
             LAMBDA_WAIT_FOR,
             LAMBDA_MONITOR,
+            LAMBDA_ACQUIRE,
+            LAMBDA_ACQUIRE_IN_LIST,
             MACRO_RUN_MONITORING,
-            LAMBDA_RAE_EXEC_TASK, //DEFINE_PARENT_TASK,
+            LAMBDA_RAE_EXEC_TASK,
         ]
         .into();
         let mut module = Module {
@@ -124,12 +126,12 @@ impl IntoModule for CtxRaeExec {
         );*/
 
         //mutex
-        module.add_async_fn_prelude(ACQUIRE, acquire);
+        module.add_async_fn_prelude(__ACQUIRE__, __acquire__);
         module.add_async_fn_prelude(RELEASE, release);
         module.add_async_fn_prelude(NEW_RESOURCE, new_resource);
         module.add_async_fn_prelude(IS_LOCKED, is_locked);
-        module.add_async_fn_prelude(ACQUIRE_LIST, get_list_resources);
-        module.add_async_fn_prelude(ACQUIRE_IN_LIST, acquire_in_list);
+        module.add_async_fn_prelude(RESOURCES, resources);
+        module.add_async_fn_prelude(__ACQUIRE_IN_LIST__, __acquire_in_list__);
 
         //Manage hierarchy
         module.add_mut_fn_prelude(DEFINE_PARENT_TASK, define_parent_task);
@@ -248,7 +250,7 @@ fn get_best_method(env: &LEnv, args: &[LValue]) -> LResult {
 #[async_scheme_fn]
 async fn get_facts(env: &LEnv) -> LResult {
     let mut state: im::HashMap<LValue, LValue> = get_state(env, &[]).await?.try_into()?;
-    let locked: Vec<LValue> = get_list_resources(env, &[]).await?.try_into()?;
+    let locked: Vec<LValue> = resources(env, &[]).await?.try_into()?;
 
     for e in locked {
         state.insert(vec![LOCKED.into(), e].into(), LValue::True);

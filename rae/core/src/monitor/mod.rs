@@ -41,6 +41,7 @@ pub mod user_interface;
 use crate::monitor::log::{get_log_level, set_log_level};
 use ompas_rae_interface::platform::{Domain, Platform, PlatformDescriptor};
 use ompas_rae_interface::PLATFORM_CLIENT;
+use sompas_modules::time::CtxTime;
 
 //LANGUAGE
 const MOD_RAE_USER: &str = "rae_user";
@@ -328,6 +329,7 @@ impl CtxRaeUser {
             Context::new(CtxDomain::new(self.rae_domain.read().await.clone())),
             CTX_DOMAIN,
         );
+        env.import_module(CtxTime::new(2), WithoutPrefix);
         eval_init(&mut env).await;
 
         let domain_exec_symbols: LEnvSymbols = self.rae_domain.read().await.get_exec_env();

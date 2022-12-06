@@ -37,7 +37,7 @@
                 (let ((?b (machine.input_belt ?m)))
                     (do
                         (t_position_robot_to_belt ?r ?b)
-                        (await (wait-for `(< (len (belt.packages_list ,?b)) (len (belt.cells ,?b)))))
+                        (wait-for `(< (len (belt.packages_list ,?b)) (len (belt.cells ,?b))))
                         (place ?r)))))
 
     (def-task t_charge (:params (?r robot)))
@@ -49,7 +49,7 @@
             (:body
                 (do
                     (go_charge ?r)
-                    (await (wait-for `(= (robot.battery ,?r) 1))))))
+                    (wait-for `(= (robot.battery ,?r) 1)))))
 
     (def-task t_check_battery (:params (?r robot)))
     (def-method m_check_battery
@@ -60,10 +60,10 @@
           (:body
              (loop
                  (do
-                     (await (wait-for `(< (robot.battery ,?r) 0.4)))
-                     (define h (await (acquire ?r '(:priority 1000))))
+                     (wait-for `(< (robot.battery ,?r) 0.4))
+                     (define h (acquire ?r '(:priority 1000)))
                      (go_charge ?r)
-                     (await (wait-for `(> (robot.battery ,?r) 0.9)))))))
+                     (wait-for `(> (robot.battery ,?r) 0.9))))))
                             
     (def-task t_check_rob_bat)
     (def-method m_check_initial_robots_batteries

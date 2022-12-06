@@ -53,18 +53,60 @@ pub fn get_symbol_types() -> Vec<&'static str> {
 }
 
 pub const DEFINE: &str = "define";
+pub const DOC_DEFINE: &str = "Defines a new entry in the environment.";
+
 pub const DEF_MACRO: &str = "defmacro";
+pub const DOC_DEF_MACRO: &str = "Define a new macro, can only be done at the top level.";
+
 pub const LAMBDA: &str = "lambda";
+pub const DOC_LAMBDA: &str = "Define a new lambda function";
+pub const DOC_LAMBDA_VERBOSE: &str = "Example:\n\
+                                \t>> (define square (lambda (x) (* x x)))\n\
+                                \t>> (square 10)\n\
+                                \tLI>> 100";
+
 pub const IF: &str = "if";
+pub const DOC_IF: &str =
+    "Conditional evaluation of two expressions in function of a boolean expression.";
+pub const DOC_IF_VERBOSE: &str= "Let us take the expression (if cond a b).\
+ If cond == true, then the result of the expression is the result of the evaluation of a, otherwise the result is the evaluation of b.";
+
 pub const QUOTE: &str = "quote";
+pub const DOC_QUOTE: &str = "Prevent the LValue to be evaluated";
+
 pub const QUASI_QUOTE: &str = "quasiquote";
+pub const DOC_QUASI_QUOTE: &str = "Begins a context mixing quoting and unquoting";
+
 pub const UNQUOTE: &str = "unquote";
+pub const DOC_UNQUOTE: &str = "Evaluated an expression present inside a quasi-quote statement";
+
 pub const QUOTE_CHAR: char = '\'';
+pub const DOC_QUOTE_CHAR: &str = "Short character for quote.";
+
 pub const UNQUOTE_CHAR: char = ',';
+pub const DOC_UNQUOTE_CHAR: &str = "Short character for unquote.";
+
 pub const QUASI_QUOTE_CHAR: char = '`';
+pub const DOC_QUASI_QUOTE_CHAR: &str = "Short character for quasiquote";
+
 pub const BEGIN: &str = "begin";
+pub const DOC_BEGIN: &str = "Evaluate a list of LValue and returns the result of the last one.";
+pub const DOC_BEGIN_VERBOSE: &str = "Example: \n\
+                                 \t>>(begin 10 (* 3 3))\n\
+                                 \tLI>> 9";
+
 pub const ASYNC: &str = "async";
+pub const DOC_ASYNC: &str = "Evaluate asynchronously a LValue. Returns a handle that can be either awaited on or interrupted.";
+pub const DOC_ASYNC_VERBOSE: &str = "Example:\n\
+\t>>(async (* 3 3))\n\
+\tLI>> handle";
+
 pub const AWAIT: &str = "await";
+pub const DOC_AWAIT: &str = "Await on a handle to get the result of the asynchronous evaluation.";
+pub const DOC_AWAIT_VERBOSE: &str = "Example:\n\
+\t>>(await (async (* 3 3)))\n\
+\tLI>> 9";
+
 pub const RACE: &str = "race";
 pub const ENR: &str = "enr";
 pub const EVAL: &str = "eval";
@@ -80,24 +122,6 @@ pub const UNINTERRUPTIBLE_SHORT: &str = "u!";
 pub const QUASI_INTERRUPTIBLE_SHORT: &str = "i?";
 pub const INTERRUPTIBLE_SHORT: &str = "i!";
 
-pub const DOC_DEFINE: &str = "Defines a new entry in the environment/";
-pub const DOC_DEF_MACRO: &str = "Define a new macro, can only be done at the top level";
-pub const DOC_LAMBDA: &str = "Define a new lambda function";
-pub const DOC_LAMBDA_VEBROSE: &str = "Example:\n\
-                                \t>> (define square (lambda (x) (* x x)))\n\
-                                \t>> (square 10)\n\
-                                \tLI>> 100";
-pub const DOC_IF: &str = "Condition block";
-pub const DOC_QUOTE: &str = "Prevent the LValue to be evaluated";
-pub const DOC_QUASI_QUOTE: &str = "Begins a context mixing quoting and unquoting";
-pub const DOC_UNQUOTE: &str = "Evaluated an expression present inside a quasi-quote statement";
-pub const DOC_BEGIN: &str = "Evaluated a list LValue and returns the last one.";
-pub const DOC_BEGIN_VERBOSE: &str = "Example: \n\
-                                 \t>>(begin 10 (* 3 3))\n\
-                                 \tLI>> 9";
-
-pub const DOC_ASYNC: &str = "Evaluate asynchronously a LValue. Returns the pid(usize) of the task";
-pub const DOC_AWAIT: &str = "Await on a pid to get the result of the evaluation.";
 pub const DOC_EVAL: &str = "Eval a LValue.";
 
 pub const ENV_GET_KEYS: &str = "get_keys";
@@ -121,8 +145,9 @@ pub const CONTAINS: &str = "contains";
 pub const SUB_LIST: &str = "sublist";
 pub const QUOTE_LIST: &str = "quote-list";
 pub const TRANSFORM_IN_SINGLETON_LIST: &str = "transform-in-singleton-list";
-pub const __SLEEP__: &str = "__sleep__";
+
 pub const KIND: &str = "kind";
+pub const DOC_KIND: &str = "Return the kind of the LValue.";
 pub const LET: &str = "let";
 pub const LET_STAR: &str = "let*";
 pub const COND: &str = "cond";
@@ -175,38 +200,50 @@ pub const DOC_CONS: &str = "Takes two objects and merges into a list.";
 pub const SET: &str = "set";
 pub const GET: &str = "get";
 
-//Mathematical functions
-pub const ADD: &str = "+";
-pub const SUB: &str = "-";
-pub const MUL: &str = "*";
-pub const DIV: &str = "/";
-
-//Comparison
-pub const GT: &str = ">";
-pub const LT: &str = "<";
-pub const GEQ: &str = ">=";
-pub const LEQ: &str = "<=";
-pub const EQ: &str = "=";
-pub const NEQ: &str = "!=";
-
-pub const DOC_EQ: &str =
-    "Takes 2 arguments. Return true if two arguments are equal. False otherwise.";
-pub const DOC_ADD: &str = "Takes 2+ arguments. Return the addition.\
+/// Set of keywords and documentation for basic mathematical functions.
+pub mod basic_math {
+    //Mathematical functions
+    pub const ADD: &str = "+";
+    pub const DOC_ADD: &str = "Takes 2+ arguments. Return the addition.\
 Return an error if inputs are not numbers or there is wrong numbers of arguments";
-pub const DOC_SUB: &str = "Takes 2 arguments. Return the substraction of the first by the second.\
+
+    pub const SUB: &str = "-";
+    pub const DOC_SUB: &str =
+        "Takes 2 arguments. Return the substraction of the first by the second.\
 return an error if inputs are not numbers or there is wrong numbers of arguments";
-pub const DOC_MUL: &str = "Takes 2+ arguments. Return the multiplication.\
+
+    pub const MUL: &str = "*";
+    pub const DOC_MUL: &str = "Takes 2+ arguments. Return the multiplication.\
 Return an error if inputs are not numbers or there is wrong numbers of arguments";
-pub const DOC_DIV: &str = "Takes 2 arguments. Return the division of the first by the second.\
+
+    pub const DIV: &str = "/";
+    pub const DOC_DIV: &str = "Takes 2 arguments. Return the division of the first by the second.\
 Return an error if inputs are not numbers or there is wrong numbers of arguments";
-pub const DOC_GT: &str = "Takes 2 arguments. Return *true* if the first is greater than the second.\
+
+    //Comparison
+    pub const GT: &str = ">";
+    pub const DOC_GT: &str = "Takes 2 arguments. Return *true* if the first is greater than the second.\
 Return *false* otherwise. Return an error if args are not numbers of there is the wrong number of arguments";
-pub const DOC_GEQ: &str = "Takes 2 arguments. Return *true* if the first is greater or equal than the second.\
+
+    pub const LT: &str = "<";
+    pub const DOC_LT: &str = "Takes 2 arguments. Return *true* if the first is less than the second.\
 Return *false* otherwise. Return an error if args are not numbers of there is the wrong number of arguments";
-pub const DOC_LT: &str = "Takes 2 arguments. Return *true* if the first is less than the second.\
+
+    pub const GEQ: &str = ">=";
+    pub const DOC_GEQ: &str = "Takes 2 arguments. Return *true* if the first is greater or equal than the second.\
 Return *false* otherwise. Return an error if args are not numbers of there is the wrong number of arguments";
-pub const DOC_LEQ: &str = "Takes 2 arguments. Return *true* if the first is less or equal than the second.\
+
+    pub const LEQ: &str = "<=";
+    pub const DOC_LEQ: &str = "Takes 2 arguments. Return *true* if the first is less or equal than the second.\
 Return *false* otherwise. Return an error if args are not numbers of there is the wrong number of arguments";
+
+    pub const EQ: &str = "=";
+    pub const DOC_EQ: &str =
+        "Takes 2 arguments. Return true if two arguments are equal. False otherwise.";
+
+    pub const NEQ: &str = "!=";
+    pub const DOC_NEQ: &str = "Return true if two LValues are different.";
+}
 
 pub const NOT: &str = "not";
 pub const NOT_SHORT: &str = "!";
@@ -244,35 +281,83 @@ pub const DOC_SET_MAP_VERBOSE: &str = "Example: Here is an example in the repl\n
                                     \tthree: 3\n\
                                     \ttwenty: 20";
 
-//PREDICATES
-pub const IS_NUMBER: &str = "number?";
-pub const IS_FLOAT: &str = "float?";
-pub const IS_INT: &str = "int?";
-pub const IS_BOOL: &str = "bool?";
-pub const IS_SYMBOL: &str = "symbol?";
-pub const IS_STRING: &str = "string?";
-pub const IS_FN: &str = "fn?";
-pub const IS_MUT_FN: &str = "mut-fn?";
-pub const IS_LIST: &str = "list?";
-pub const IS_MAP: &str = "map?";
-pub const IS_LAMBDA: &str = "lambda?";
-pub const IS_QUOTE: &str = "quote?";
-pub const IS_PAIR: &str = "pair?";
-pub const IS_EQUAL: &str = "equal?";
-pub const IS_INTERRUPTED: &str = "interrupted?";
+/// Set of keywords and documentations for predicated on the kind of LValues.
+pub mod predicates {
+    pub const IS_NUMBER: &str = "number?";
+    pub const DOC_IS_NUMBER: &str = "Return true if the LValue is a LValue::Number.";
 
-pub const IS_NIL: &str = "null?";
+    pub const IS_FLOAT: &str = "float?";
+    pub const DOC_IS_FLOAT: &str = "Return true if the LValue is a LValue::Number(LNumber::Float).";
 
-pub const DOC_IS_NIL: &str = "Return true if symbol is LValue::Nil or empty list.";
-pub const DOC_IS_NUMBER: &str = "Return true if symbol is LValue::Number";
-pub const DOC_IS_BOOL: &str = "Return true if symbol is LValue::Bool";
-pub const DOC_IS_SYMBOL: &str = "Return true if symbol is LValue::Symbol";
-pub const DOC_IS_MAP: &str = "Return true if symbol is map";
-pub const DOC_IS_LIST: &str = "Return true if symbol is list";
-pub const DOC_IS_LAMBDA: &str = "Return true if symbol is lambda";
-pub const DOC_IS_QUOTE: &str = "Return true if symbol is quote";
-pub const DOC_IS_FN: &str = "Return true if symbol is LValue::Fn";
-pub const DOC_IS_MUT_FN: &str = "Return true if symbol is LValue::MutFn";
+    pub const IS_INT: &str = "int?";
+    pub const DOC_IS_INT: &str = "Return true if the LValue is a LValue::Number(LNumber::Int).";
 
-pub const DOC_IS_PAIR: &str = "Return true if the list is not empty, false otherwise.";
-pub const DOC_IS_EQUAL: &str = "Return true if the 2 LValues are equal, false otherwise.";
+    pub const IS_BOOL: &str = "bool?";
+    pub const DOC_IS_BOOL: &str = "Return true if the LValue is a LValue::Bool.";
+
+    pub const IS_SYMBOL: &str = "symbol?";
+    pub const DOC_IS_SYMBOL: &str = "Return true if the LValue is a LValue::Symbol.";
+
+    pub const IS_STRING: &str = "string?";
+    pub const DOC_IS_STRING: &str = "Return true if the LValue is a LValue::String.";
+
+    pub const IS_FN: &str = "fn?";
+    pub const DOC_IS_FN: &str = "Return true if the LValue is a LValue::Fn.";
+
+    pub const IS_MUT_FN: &str = "mut-fn?";
+    pub const DOC_IS_MUT_FN: &str = "Return true if the LValue is a LValue::MutFn.";
+
+    pub const IS_ASYNC_FN: &str = "async-fn?";
+    pub const DOC_IS_ASYNC_FN: &str = "Return true if the LValue is a LValue::AsyncFn.";
+
+    pub const IS_LIST: &str = "list?";
+    pub const DOC_IS_LIST: &str = "Return true if the LValue is a LValue::List.";
+
+    pub const IS_MAP: &str = "map?";
+    pub const DOC_IS_MAP: &str = "Return true if the LValue is a LValue::Map.";
+
+    pub const IS_LAMBDA: &str = "lambda?";
+    pub const DOC_IS_LAMBDA: &str = "Return true if the LValue is a LValue::Lambda.";
+
+    pub const IS_QUOTE: &str = "quote?";
+    pub const DOC_IS_QUOTE: &str = "Return true if the LValue is a quote expression.";
+
+    pub const IS_PAIR: &str = "pair?";
+    pub const DOC_IS_PAIR: &str = "Return true if the list is not empty, false otherwise.";
+
+    pub const IS_EQUAL: &str = "equal?";
+    pub const DOC_IS_EQUAL: &str = "Return true if two LValues are equal, false otherwise.";
+
+    pub const IS_INTERRUPTED: &str = "interrupted?";
+    pub const DOC_IS_INTERRUPTED: &str =
+        "Return true if the expression is the result of an interruption.";
+
+    pub const IS_NIL: &str = "null?";
+    pub const DOC_IS_NIL: &str = "Return true if symbol is LValue::Nil or empty list.";
+}
+
+/// Collection of functions using time: sleep, time, my-time etc.
+pub mod time {
+    /// Label of the context used the env to manage time
+    pub const CTX_TIME: &str = "ctx-time";
+    pub const DOC_CTX_TIME: &str =
+        "Context used to reason on time. Contains functions as sleep, time, my-time, etc.";
+
+    /// Wrapper around the function sleep
+    pub const LAMBDA_SLEEP: &str = "(define sleep
+    (lambda (n) (u! (await-interrupt (__sleep__ n)))))";
+
+    pub const __SLEEP__: &str = "__sleep__";
+    pub const DOC___SLEEP__: &str =
+        "Sleep for the given time in seconds. Returns a handle that should be awaited on.";
+
+    pub const SLEEP: &str = "sleep";
+    pub const DOC_SLEEP: &str =
+        "Sleep for the given time in seconds. The function can be interrupted.";
+
+    pub const TIME: &str = "time";
+    pub const DOC_TIME: &str = "Return the absolute time";
+
+    pub const MY_TIME: &str = "my-time";
+    pub const DOC_MY_TIME: &str = "return the relative time of the system";
+}

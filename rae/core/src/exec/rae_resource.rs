@@ -13,21 +13,7 @@ use sompas_structs::lvalue::LValue;
 use std::borrow::Borrow;
 use std::convert::{TryFrom, TryInto};
 
-pub const MACRO_RESOURCE_ACQUIRE_AND_DO: &str = "(defmacro resource::acquire-and-do
-    (lambda (r p b)
-        `(begin
-            (acquire ,r ,p)
-            ,b
-            (release ,r))))";
-
-pub const MACRO_MUTEX_LOCK_IN_LIST_AND_DO: &str = "(defmacro mutex::lock-in-list-and-do
-    (lambda (l p b)
-        `(begin
-            (define r (lock-in-list ,l ,p))
-            ,b
-            (release r))))";
-
-pub const PRIORITY: &str = ":priority";
+const PRIORITY: &str = ":priority";
 
 #[async_scheme_fn]
 pub async fn new_resource(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
@@ -50,7 +36,7 @@ pub async fn new_resource(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeErr
 ///Lock a resource
 /// Waits on the resource until its his turn in the queue list
 #[async_scheme_fn]
-pub async fn acquire(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandler, LRuntimeError> {
+pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandler, LRuntimeError> {
     let ctx = env.get_context::<CtxRae>(CTX_RAE)?;
 
     let log = ctx.get_log_client();
@@ -167,7 +153,7 @@ async fn check_receiver<'a>(mut wait: (String, Wait)) -> String {
 async fn check_acquire<'a>(arg: (LEnv, Vec<LValue>, usize)) -> LResult {
     let (env, args, d) = arg;
     let label = args[0].clone();
-    let r = acquire(&env, args.as_slice()).await?;
+    let r = __acquire__(&env, args.as_slice()).await?;
     let h_await: LAsyncHandler = r.try_into().unwrap();
     let h: LValue = h_await.get_future().await?;
     env.get_context::<CtxRae>(CTX_RAE)?
@@ -179,7 +165,10 @@ async fn check_acquire<'a>(arg: (LEnv, Vec<LValue>, usize)) -> LResult {
 /// Ask to lock a resource in a list
 /// Returns the resource that has been locked.
 #[async_scheme_fn]
-pub async fn acquire_in_list(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandler, LRuntimeError> {
+pub async fn __acquire_in_list__(
+    env: &LEnv,
+    args: &[LValue],
+) -> Result<LAsyncHandler, LRuntimeError> {
     let (tx, mut rx) = new_interruption_handler();
     let mut resources: Vec<LValue> = args
         .get(0)
@@ -261,7 +250,7 @@ pub async fn is_locked(env: &LEnv, args: &[LValue]) -> LResult {
 }
 
 #[async_scheme_fn]
-pub async fn get_list_resources(env: &LEnv) -> Result<Vec<String>, LRuntimeError> {
+pub async fn resources(env: &LEnv) -> Result<Vec<String>, LRuntimeError> {
     let ctx = env.get_context::<CtxRae>(CTX_RAE)?;
 
     Ok(ctx.resources.get_list_resources().await)

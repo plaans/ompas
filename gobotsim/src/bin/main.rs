@@ -1,8 +1,8 @@
 use std::fs;
 //use ompas_gobotsim::mod_godot::CtxGodot;
 use ompas_gobotsim::platform::PlatformGobotSim;
-use ompas_middleware::logger::{FileDescriptor, LogClient};
-use ompas_middleware::Master;
+use ompas_middleware::logger::{FileDescriptor, LogClient, Logger};
+use ompas_middleware::{LogLevel, Master};
 use ompas_rae_core::monitor::CtxRaeUser;
 use ompas_rae_interface::platform::Domain;
 use ompas_rae_interface::{LOG_TOPIC_PLATFORM, PLATFORM_CLIENT};
@@ -15,7 +15,8 @@ use sompas_repl::lisp_interpreter::{LispInterpreter, LispInterpreterConfig};
 use std::path::PathBuf;
 use structopt::StructOpt;
 
-pub const TOKIO_CHANNEL_SIZE: usize = 65_384;
+pub const TOKIO_CHANNEL_SIZE: usize = 100;
+pub const LOG_LEVEL: LogLevel = LogLevel::Trace;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "OMPAS", about = "An acting engine based on RAE.")]
@@ -38,9 +39,12 @@ async fn main() {
 
     let opt: Opt = Opt::from_args();
     println!("{:?}", opt);
+    Master::set_log_level(LOG_LEVEL).await;
+
     if opt.debug {
-        activate_debug();
+        Master::set_log_level(LogLevel::Trace).await;
     }
+
     //test_lib_model(&opt);
     lisp_interpreter(opt.log, opt.godot, opt.rae_log).await;
 }

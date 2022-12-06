@@ -2,7 +2,6 @@ use crate::monitor::{CtxRaeUser, MOD_RAE_USER, TOKIO_CHANNEL_SIZE};
 use crate::rae;
 use ompas_middleware::ProcessInterface;
 use ompas_rae_interface::platform::{PlatformConfig, PlatformDescriptor};
-use ompas_rae_interface::PROCESS_TOPIC_PLATFORM;
 use ompas_rae_language::*;
 use ompas_rae_language::{RAE_GET_AGENDA, RAE_GET_ENV, RAE_GET_STATE};
 use ompas_rae_structs::domain::RAEDomain;

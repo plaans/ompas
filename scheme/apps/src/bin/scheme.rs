@@ -1,16 +1,20 @@
 use chrono::{DateTime, Utc};
+use std::fs;
 use std::path::PathBuf;
 
+use ompas_middleware::logger::FileDescriptor;
+use ompas_middleware::Master;
 use sompas_core::activate_debug;
 use sompas_modules::advanced_math::CtxMath;
 use sompas_modules::io::{CtxIo, LogOutput};
 use sompas_modules::static_eval::CtxStaticEval;
 use sompas_modules::string::CtxString;
+use sompas_modules::time::CtxTime;
 use sompas_modules::utils::CtxUtils;
 use sompas_repl::lisp_interpreter::{LispInterpreter, LispInterpreterConfig};
 use structopt::StructOpt;
 
-pub const TOKIO_CHANNEL_SIZE: usize = 65_384;
+pub const TOKIO_CHANNEL_SIZE: usize = 100;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "Scheme", about = "A Scheme REPL")]
@@ -50,6 +54,7 @@ pub async fn lisp_interpreter(log: Option<PathBuf>, root: bool) {
         let ctx_string = CtxString::default();
 
         let ctx_eval_static: CtxStaticEval = CtxStaticEval::new().await;
+        let ctx_time: CtxTime = CtxTime::new(2);
 
         //Add the sender of the channel.
         if let Some(pb) = &log {
@@ -66,9 +71,12 @@ pub async fn lisp_interpreter(log: Option<PathBuf>, root: bool) {
 
         li.import(ctx_string);
         li.import_namespace(ctx_eval_static);
+        li.import(ctx_time);
     }
 
     li.set_config(LispInterpreterConfig::new(true));
 
-    li.run(log).await;
+    li.run(log.map(|p| FileDescriptor::AbsolutePath(fs::canonicalize(p).unwrap())))
+        .await;
+    Master::end().await;
 }

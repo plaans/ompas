@@ -122,6 +122,7 @@ pub fn parse_into_lvalue(se: &SExpr) -> LValue {
                         }
                         s => {
                             if s.starts_with('\"') && s.ends_with('\"') {
+                                //println!("new string: {}", s);
                                 string!(s[1..s.len() - 1].to_string())
                             } else {
                                 symbol!(s.to_string())
@@ -547,7 +548,7 @@ pub async fn eval(
                         let mut r = results.pop_n(b.n);
                         scopes.revert_scope();
                         results.push(r.pop().unwrap());
-                        debug.log_last_result(&results).await;
+                        //debug.log_last_result(&results).await;
                     }
                     CoreOperatorFrame::Do(_) => {
                         scopes.revert_scope();
@@ -602,9 +603,7 @@ pub async fn eval(
 
         match current.kind {
             StackKind::NonEvaluated(ref lv) => {
-                //if get_debug() {
                 debug.push(current.interruptibily, lv.to_string());
-                //}
                 match lv {
                     LValue::Symbol(s) => {
                         let result = match scopes.get_last().get_symbol(s.as_str()) {

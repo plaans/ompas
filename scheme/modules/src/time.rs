@@ -100,9 +100,9 @@ pub async fn __sleep__(n: LNumber) -> LAsyncHandler {
     LAsyncHandler::new(f, tx)
 }
 
-const SECONDS: &str = "seconds";
-const MINUTES: &str = "minutes";
-const HOURS: &str = "hours";
+const SECOND: &str = "second";
+const MINUTE: &str = "minute";
+const HOUR: &str = "hour";
 const DAYS: &str = "day";
 const MONTH: &str = "month";
 const YEAR: &str = "year";
@@ -114,9 +114,9 @@ pub async fn time(env: &LEnv) -> LResult {
     let diff = ctx.diff.load(Ordering::Relaxed);
     let time = Utc::now() + chrono::Duration::hours(diff);
     let mut map: HashMap<LValue, LValue> = Default::default();
-    map.insert(SECONDS.into(), time.second().into());
-    map.insert(MINUTES.into(), time.minute().into());
-    map.insert(HOURS.into(), time.hour().into());
+    map.insert(SECOND.into(), time.second().into());
+    map.insert(MINUTE.into(), time.minute().into());
+    map.insert(HOUR.into(), time.hour().into());
     map.insert(DAYS.into(), time.day().into());
     map.insert(MONTH.into(), time.month().into());
     map.insert(YEAR.into(), time.year().into());

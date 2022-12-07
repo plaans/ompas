@@ -8,6 +8,7 @@ use log::Level;
 use map_macro::{map, set};
 use ompas_utils::other::get_and_update_id_counter;
 use std::collections::{HashMap, HashSet};
+use std::fmt::Write;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 use std::sync::atomic::AtomicUsize;
@@ -243,27 +244,22 @@ impl Master {
         }
     }
 
-    async fn set_parent(&self, child: impl Display, parent: impl Display) -> bool {
-        let id_child = self.get_topic_id(child.to_string()).await;
-        if let Some(id_child) = id_child {
-            let id_parent = self.get_topic_id(parent.to_string()).await;
-            if let Some(id_parent) = id_parent {
-                let log = LogClient::new(MASTER_LABEL, LOG_TOPIC_ROOT).await;
-                log.debug(format!("Process {} is child of {}", child, parent))
-                    .await;
-                self.topics
-                    .write()
-                    .await
-                    .get_mut(&id_parent)
-                    .unwrap()
-                    .childs
-                    .insert(id_child)
-            } else {
-                false
-            }
-        } else {
-            false
-        }
+    async fn set_parent(&self, child: impl Display, parent: impl Display) {
+        let p: Option<String> = None;
+        let id_child = self.new_topic(child.to_string(), p.clone()).await;
+
+        let id_parent = self.new_topic(parent.to_string(), p).await;
+
+        let log = LogClient::new(MASTER_LABEL, LOG_TOPIC_ROOT).await;
+        log.debug(format!("Process {} is child of {}", child, parent))
+            .await;
+        self.topics
+            .write()
+            .await
+            .get_mut(&id_parent)
+            .unwrap()
+            .childs
+            .insert(id_child);
     }
 
     async fn new_topic(&self, name: impl Display, parent: Option<impl Display>) -> ProcessTopidId {
@@ -313,12 +309,34 @@ impl Master {
         }
     }
 
-    pub async fn get_topic_id(&self, topic: impl Display) -> Option<ProcessTopidId> {
-        self.topic_id.read().await.get(&topic.to_string()).copied()
+    async fn format_hierarchy(&self) -> String {
+        let topics = self.topics.read().await;
+        let processes = self.processes.lock().await;
+        let mut str = "PROCESS HIERARCHY".to_string();
+        let n_topic: usize = topics.len();
+        for id in 0..n_topic {
+            let topic: &ProcessTopic = topics.get(&id).unwrap();
+            write!(str, "{}: {{processes = {{", topic.label).unwrap();
+            for (i, id) in topic.processes.iter().enumerate() {
+                if i != 0 {
+                    str.push_str(", ");
+                }
+                write!(str, "{}", processes.get(id).unwrap().label).unwrap();
+            }
+            write!(str, "}}, childs = {{").unwrap();
+            for (i, id) in topic.childs.iter().enumerate() {
+                if i != 0 {
+                    str.push_str(", ");
+                }
+                write!(str, "{}", topics.get(id).unwrap().label).unwrap();
+            }
+            write!(str, "}}}}\n").unwrap();
+        }
+        str
     }
 
-    pub async fn set_child_process(child: impl Display, parent: impl Display) -> bool {
-        MASTER.set_parent(child, parent).await
+    pub async fn get_topic_id(&self, topic: impl Display) -> Option<ProcessTopidId> {
+        self.topic_id.read().await.get(&topic.to_string()).copied()
     }
 
     pub async fn subscribe_new_process(
@@ -350,6 +368,14 @@ impl Master {
             },
             sender_death: self.sender_death.read().await.as_ref().unwrap().clone(),
         }
+    }
+
+    pub async fn set_child_process(child: impl Display, parent: impl Display) {
+        MASTER.set_parent(child, parent).await;
+    }
+
+    pub async fn format_process_hierarchy() -> String {
+        MASTER.format_hierarchy().await
     }
 
     pub async fn new_log_topic(name: impl Display, file_descriptor: Option<FileDescriptor>) {

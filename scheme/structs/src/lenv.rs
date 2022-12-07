@@ -185,8 +185,8 @@ impl LEnv {
         self.macro_table.insert(key, _macro);
     }
 
-    pub fn get_list_modules(&self) -> Vec<String> {
-        self.ctxs.get_list_modules()
+    pub fn get_contexts_labels(&self) -> Vec<String> {
+        self.ctxs.get_contexts_labels()
     }
 
     pub fn get_macro(&self, key: &str) -> Option<&LLambda> {

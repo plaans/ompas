@@ -1,9 +1,9 @@
 use crate::function::{LAsyncFn, LAsyncMutFn, LFn, LMutFn};
 use crate::kindlvalue::KindLValue;
 use crate::lasynchandler::LAsyncHandler;
-use crate::lcoreoperator::LCoreOperator;
 use crate::llambda::LLambda;
 use crate::lnumber::LNumber;
+use crate::lprimitives::LPrimitives;
 use crate::lruntimeerror::LRuntimeError;
 use crate::{lruntimeerror, string, symbol, wrong_type};
 use function_name::named;
@@ -38,7 +38,7 @@ pub enum LValue {
     //#[serde(skip)]
     Lambda(LLambda),
     //#[serde(skip)]
-    CoreOperator(LCoreOperator),
+    CoreOperator(LPrimitives),
     //#[serde(skip)]
     Handler(LAsyncHandler),
     //Future(LFuture),
@@ -139,8 +139,8 @@ impl LValue {
             LValue::List(list) => {
                 if !list.is_empty() {
                     match &list[0] {
-                        LValue::CoreOperator(LCoreOperator::Begin)
-                        | LValue::CoreOperator(LCoreOperator::Do) => {
+                        LValue::CoreOperator(LPrimitives::Begin)
+                        | LValue::CoreOperator(LPrimitives::Do) => {
                             let indent = indent + TAB_SIZE;
                             let mut string = format!("({}", list[0]);
                             for (i, element) in list.iter().enumerate() {
@@ -158,7 +158,7 @@ impl LValue {
                             string.push(')');
                             string
                         }
-                        LValue::CoreOperator(LCoreOperator::If) => {
+                        LValue::CoreOperator(LPrimitives::If) => {
                             LValue::pretty_print_list_aligned(IF, &list[1..], indent)
                         }
                         LValue::Symbol(s) => match s.as_str() {
@@ -480,7 +480,7 @@ impl TryFrom<LValue> for bool {
     }
 }
 
-impl TryFrom<&LValue> for LCoreOperator {
+impl TryFrom<&LValue> for LPrimitives {
     type Error = LRuntimeError;
 
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
@@ -496,7 +496,7 @@ impl TryFrom<&LValue> for LCoreOperator {
     }
 }
 
-impl TryFrom<LValue> for LCoreOperator {
+impl TryFrom<LValue> for LPrimitives {
     type Error = LRuntimeError;
 
     fn try_from(value: LValue) -> Result<Self, Self::Error> {
@@ -814,14 +814,14 @@ impl<T: Clone + Into<LValue>> From<Vec<T>> for LValue {
     }
 }
 
-impl From<&LCoreOperator> for LValue {
-    fn from(co: &LCoreOperator) -> Self {
+impl From<&LPrimitives> for LValue {
+    fn from(co: &LPrimitives) -> Self {
         (*co).into()
     }
 }
 
-impl From<LCoreOperator> for LValue {
-    fn from(co: LCoreOperator) -> Self {
+impl From<LPrimitives> for LValue {
+    fn from(co: LPrimitives) -> Self {
         LValue::CoreOperator(co)
     }
 }

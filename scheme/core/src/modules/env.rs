@@ -1,5 +1,6 @@
+use ompas_middleware::Master;
 use sompas_language::HELP;
-use sompas_macros::scheme_fn;
+use sompas_macros::{async_scheme_fn, scheme_fn};
 use sompas_structs::documentation::Documentation;
 use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lenv::LEnv;
@@ -16,6 +17,7 @@ pub fn env_get_keys(env: &LEnv) -> Vec<LValue> {
         .collect::<Vec<LValue>>()
 }
 
+/// Return the list of macros present in the environment
 #[scheme_fn]
 pub fn env_get_macros(env: &LEnv) -> Vec<LValue> {
     env.macros()
@@ -24,6 +26,7 @@ pub fn env_get_macros(env: &LEnv) -> Vec<LValue> {
         .collect::<Vec<LValue>>()
 }
 
+/// Return the expression of a given macro
 #[scheme_fn]
 pub fn env_get_macro(env: &LEnv, m: Sym) -> LValue {
     match env.get_macro(&m).cloned() {
@@ -32,7 +35,7 @@ pub fn env_get_macro(env: &LEnv, m: Sym) -> LValue {
     }
 }
 
-///print the help
+/// Return a list of help elements
 /// Takes 0 or 1 parameter.
 /// 0 parameter: gives the list of all the functions
 /// 1 parameter: write the help of
@@ -52,9 +55,10 @@ pub fn help(env: &LEnv, args: &[LValue]) -> LResult {
     }
 }
 
+/// Return the list of all modules loaded in the environment
 #[scheme_fn]
-pub fn get_list_modules(env: &LEnv) -> LValue {
-    let list = env.get_list_modules();
+pub fn get_contexts(env: &LEnv) -> String {
+    let list = env.get_contexts_labels();
     let mut str = '{'.to_string();
     for (i, s) in list.iter().enumerate() {
         if i != 0 {
@@ -65,5 +69,11 @@ pub fn get_list_modules(env: &LEnv) -> LValue {
 
     str.push(')');
 
-    string!(str)
+    str
+}
+
+/// Return the list of processes and process topics along their dependencies
+#[async_scheme_fn]
+pub async fn get_process_hierarchy() -> String {
+    Master::format_process_hierarchy().await
 }

@@ -20,9 +20,9 @@ use sompas_core::eval;
 use sompas_core::modules::list::cons;
 use sompas_modules::utils::enumerate;
 use sompas_structs::contextcollection::Context;
-use sompas_structs::lcoreoperator::LCoreOperator;
 use sompas_structs::lenv::ImportType::WithoutPrefix;
 use sompas_structs::lenv::LEnv;
+use sompas_structs::lprimitives::LPrimitives;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::{list, lruntimeerror};
@@ -265,8 +265,8 @@ pub async fn greedy_select(
             let arg_debug = arg.to_string();
             let lv: LValue = eval(
                 &list!(
-                    LCoreOperator::Enr.into(),
-                    list!(LCoreOperator::Quote.into(), arg)
+                    LPrimitives::Enr.into(),
+                    list!(LPrimitives::Quote.into(), arg)
                 ),
                 &mut env.clone(),
                 None,
@@ -278,8 +278,8 @@ pub async fn greedy_select(
                 let arg_debug = arg.to_string();
                 let score: i64 = eval(
                     &list!(
-                        LCoreOperator::Enr.into(),
-                        list!(LCoreOperator::Quote.into(), arg)
+                        LPrimitives::Enr.into(),
+                        list!(LPrimitives::Quote.into(), arg)
                     ),
                     &mut env.clone(),
                     None,

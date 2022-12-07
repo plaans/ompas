@@ -18,247 +18,21 @@ use aries_utils::StreamingIterator;
 use rand::Rng;
 use sompas_core::eval;
 use sompas_core::modules::list::car;
+use sompas_language::utils::*;
 use sompas_language::*;
 use sompas_macros::async_scheme_fn;
 use sompas_macros::scheme_fn;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::documentation::{Documentation, LHelp};
-use sompas_structs::lcoreoperator::LCoreOperator;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lnumber::LNumber;
+use sompas_structs::lprimitives::LPrimitives;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
 use sompas_structs::{list, lruntimeerror};
 use std::ops::Deref;
-
-//LANGUAGE
-pub const CTX_UTILS: &str = "utils";
-
-// Documentation
-pub const DOC_MOD_UTILS: &str = "collection of utility functions.";
-pub const DOC_MOD_UTILS_VERBOSE: &str = "functions:\n\
--rand-element\n\
--enumerate\n\
--contains\n\
--sublist\n\
--transfrom-in-singleton-list\n";
-pub const DOC_RAND_ELEMENT: &str = "Return a random element of a list";
-pub const DOC_RAND_ELEMENT_VERBOSE: &str = "Example: \n(rand-element (list 1 2 3 4))\n=> 1";
-pub const DOC_ENUMERATE: &str =
-    "Return a enumeration of all possible combinations of elements of 1+ lists";
-pub const DOC_ENUMERATE_VERBOSE: &str =
-    "Example: \n(enumerate (list 1 2) (list 3 4))\n=> ((1 3)(1 4)(2 3)(2 4))";
-pub const DOC_CONTAINS: &str =
-    "Returns true if a LValue is contains into an other (for a map if the key is inside it)";
-pub const DOC_SUB_LIST: &str = "Returns a sublist of a list";
-pub const DOC_TRANSFORM_IN_SINGLETON_LIST: &str = "todo!";
-
-pub const DOC_LET: &str = "Macro used to abstract variable binding in functional programming.";
-pub const DOC_LET_STAR: &str = "Macro used to abstract variable binding in functional programming.\
-    The difference with let is that you can bind variables in function of previously bound variables.";
-pub const DOC_MACRO_TEST_MACRO: &str = "Test the macro expansion. Used mainly for debug";
-
-//MACROS
-pub const MACRO_TEST_MACRO: &str = "(defmacro test-macro
-   (lambda (x)
-    `(expand (parse ,x))))";
-
-pub const MACRO_AND: &str = "(defmacro and
-                                (lambda args
-                                    (if (null? args)
-                                        nil
-                                        (if (= (len args) 1)
-                                            (car args)
-                                            `(if ,(car args)
-                                                 ,(cons 'and (cdr args))
-                                                 nil)))))";
-
-pub const MACRO_OR: &str = "(defmacro or 
-                                (lambda args
-                                    (if (null? args)
-                                        nil
-                                        (if (= (len args) 1)
-                                            (car args)
-                                            `(if ,(car args)
-                                                  true
-                                                  ,(cons 'or (cdr args)))))))";
-
-pub const MACRO_CAAR: &str = "(defmacro caar (lambda (x) `(car (car ,x))))";
-pub const MACRO_CADR: &str = "(defmacro cadr (lambda (x) `(car (cdr ,x))))";
-pub const MACRO_CDAR: &str = "(defmacro cdar (lambda (x) `(cdr (car ,x))))";
-pub const MACRO_CDDR: &str = "(defmacro cddr (lambda (x) `(cdr (cdr ,x))))";
-
-pub const MACRO_CAADR: &str = "(defmacro caadr (lambda (x) `(car (car (cdr ,x)))))";
-pub const MACRO_CADDR: &str = "(defmacro caddr (lambda (x) `(car (cdr (cdr ,x)))))";
-pub const MACRO_CADAR: &str = "(defmacro cadar (lambda (x) `(car (cdr (car ,x)))))";
-pub const MACRO_CADADR: &str = "(defmacro cadadr (lambda (x) `(car (cdr (car (cdr ,x))))))";
-pub const MACRO_CDADR: &str = "(defmacro cdadr (lambda (x) `(cdr (car (cdr ,x)))))";
-pub const MACRO_CADADDR: &str = "(defmacro cadaddr (lambda (x) `(car (cdr (car (cdr (cdr ,x)))))))";
-
-pub const MACRO_AWAIT_ASYNC: &str = "(defmacro await-async (lambda (x) `(await (async ,x))))";
-
-pub const MACRO_APPLY: &str = "(defmacro apply
-                                  (lambda (f args)
-                                          (cons f args)))";
-
-pub const MACRO_COND: &str = "(defmacro cond (lambda exprs
-    (if (null? exprs)
-        nil
-        (if (= (caar exprs) 'else)
-            (cadar exprs)
-            `(if ,(caar exprs)
-                ,(cadar exprs)
-                ,(cons cond (cdr exprs)))))))";
-
-pub const MACRO_FOR: &str = "(defmacro for (lambda args \
-(let ((_i_ (get-list args 0)) \
-        (_list_ (get args 2)) \
-        (_body_ (get args 3))) \
-    `(let ((_f_loop_ (lambda args \
-        (if (null? args) \
-            nil \
-            (let ((,_i_ (car args))) \
-                (begin \
-                    ,_body_ \
-                    (_f_loop_ (cdr args)))))))) \
-        (_f_loop_ ,_list_)))))";
-
-pub const MACRO_WHILE: &str = "(defmacro while
-    (lambda (c b)
-        `(begin
-            (define __loop__
-                (lambda nil
-                    (if ,c
-                        (begin
-                            ,b
-                            (__loop__))
-                    nil)))
-            (__loop__))))";
-
-pub const MACRO_LOOP: &str = "(defmacro loop 
-    (lambda (b)
-        `(begin 
-            (define __loop__
-                (lambda nil 
-                    (begin 
-                        ,b
-                        (__loop__))))
-            (__loop__))))";
-
-pub const MACRO_LET: &str = "(defmacro let
-    (lambda (bindings body)
-        (begin
-            (define unzipped (unzip bindings))
-            (define keys (car unzipped))
-            (define values (cadr unzipped))
-            (cons `(lambda ,keys
-                        ,body)
-                    values))))";
-
-pub const MACRO_LET_STAR: &str = "(defmacro let*
-    (lambda (bindings body)
-        (if (= (len bindings) 1)
-            (cons `(lambda ,(list (caar bindings))
-                           ,body)
-                    (cdar bindings))
-            (cons `(lambda ,(list (caar bindings))
-                            (let* ,(cdr bindings) ,body))
-                        (cdar bindings)))))";
-
-/*pub const MACRO_DO: &str = "(defmacro do
-(lambda args
-    (if (= (len args) 1)
-        (car args)
-        `(begin
-            (define __result__ ,(car args))
-            (if (err? __result__)
-                __result__
-                ,(cons 'do (cdr args)))))))";*/
-
-pub const LAMBDA_COMBINE:  &str = "(define combine (lambda (f)
-                                                                (lambda (x y)
-                                                                        (if (null? x) (quote ())
-                                                                            (f (list (car x) (car y))
-                                                                            ((combine f) (cdr x) (cdr y)))))))";
-pub const LAMBDA_ZIP: &str = " (define zip (lambda (l1 l2)\
-                                                        (if (or (null? l1)\
-                                                                (null? l2))\
-                                                             nil\
-                                                             (cons (list (car l1)\
-                                                                         (car l2))\
-                                                                   (zip (cdr l1)\
-                                                                        (cdr l2)))))))";
-
-pub const LAMBDA_UNZIP: &str = "(define unzip
-        (lambda (lists)
-                (begin
-                    (define firsts 
-                        (lambda (lists)
-                            (if (null? lists)
-                                nil
-                                (cons (caar lists)
-                                        (firsts (cdr lists))))))
-                    (define seconds 
-                        (lambda (lists)
-                            (if (null? lists)
-                            nil
-                            (cons (cadar lists)
-                                    (seconds (cdr lists))))))
-                    (list (firsts lists) (seconds lists)))))";
-
-pub const LAMBDA_MAPF: &str = "(define mapf 
-    (lambda (f seq)
-         (if (null? seq)
-         nil
-         (cons (eval (cons f (car seq))) (mapf f (cdr seq))))))";
-
-pub const LAMBDA_ARBITRARY: &str = "(define arbitrary
-    (lambda args
-        (cond ((= (len args) 1) ; default case
-               (car (first args)))
-              ((= (len args) 2) ; specific function
-               (let ((l (first args))
-                     (f (second args)))
-                    (f l)))
-              (else nil)))) ; error cases";
-
-/*pub const LAMBDA_EVAL_NON_RECURSIVE: &str = "(define enr
-(lambda (l)
-    (eval (cons (car l) (quote-list (cdr l))))))";*/
-
-pub const EVAL_NON_RECURSIVE: &str = "enr";
-
-pub const DOC_ARBITRARY: &str = "todo!";
-pub const DOC_EVAL_NON_RECURSIVE: &str = "todo!";
-
-pub const LAMBDA_PAR: &str = "(define par (lambda l
-    (mapf await (mapf async l))))";
-pub const PAR: &str = "par";
-pub const DOC_PAR: &str = "todo!";
-
-pub const LAMBDA_REPEAT: &str = "(define repeat (lambda (e n)
-    (if (> n 0)
-        (begin
-            (eval e)
-            (repeat e (- n 1))))))";
-
-pub const LAMBDA_RETRY_ONCE: &str = "(define retry-once (lambda (e)
-    (begin
-        (define __r__ (eval e))
-        (if (err? __r__)
-            (eval e)
-            __r__))))";
-
-pub const LAMBDA_AWAIT_INTERRUPT: &str = "(define await-interrupt
-    (lambda (__h__)
-    (u! 
-        (begin
-            (define __r__ (i! (await __h__)))
-            (if (interrupted? __r__)
-                (interrupt __h__)
-                __r__)))))";
 
 #[derive(Default, Copy, Clone, Debug)]
 pub struct CtxUtils {}
@@ -269,7 +43,6 @@ impl IntoModule for CtxUtils {
             ctx: Context::new(()),
             prelude: vec![],
             raw_lisp: vec![
-                //MACRO_TEST_MACRO,
                 MACRO_AND,
                 MACRO_OR,
                 MACRO_CAAR,
@@ -297,10 +70,9 @@ impl IntoModule for CtxUtils {
                 LAMBDA_AWAIT_INTERRUPT,
             ]
             .into(),
-            label: CTX_UTILS.into(),
+            label: MOD_UTILS.into(),
         };
 
-        module.add_async_fn_prelude(ARBITRARY, arbitrary);
         //module.add_async_fn_prelude(EVAL_NON_RECURSIVE, enr);
         module.add_fn_prelude(RAND_ELEMENT, rand_element);
         module.add_fn_prelude(ENUMERATE, enumerate);
@@ -313,18 +85,20 @@ impl IntoModule for CtxUtils {
     }
 
     fn documentation(&self) -> Documentation {
-        vec![
-            LHelp::new_verbose(RAND_ELEMENT, DOC_RAND_ELEMENT, DOC_RAND_ELEMENT_VERBOSE),
-            LHelp::new_verbose(ENUMERATE, DOC_ENUMERATE, DOC_ENUMERATE_VERBOSE),
-            LHelp::new_verbose(CTX_UTILS, DOC_MOD_UTILS, DOC_MOD_UTILS_VERBOSE),
-            LHelp::new(SUB_LIST, DOC_SUB_LIST),
-            LHelp::new(CONTAINS, DOC_CONTAINS),
-            LHelp::new(TRANSFORM_IN_SINGLETON_LIST, DOC_TRANSFORM_IN_SINGLETON_LIST),
-            LHelp::new(LET, DOC_LET),
-            LHelp::new(LET_STAR, DOC_LET_STAR),
-            LHelp::new(TEST_MACRO, DOC_MACRO_TEST_MACRO),
-        ]
-        .into()
+        Documentation::new(
+            LHelp::new(MOD_UTILS, DOC_MOD_UTILS),
+            vec![
+                //Functions
+                LHelp::new_verbose(RAND_ELEMENT, DOC_RAND_ELEMENT, DOC_RAND_ELEMENT_VERBOSE),
+                LHelp::new_verbose(ENUMERATE, DOC_ENUMERATE, DOC_ENUMERATE_VERBOSE),
+                LHelp::new(SUB_LIST, DOC_SUB_LIST),
+                LHelp::new(CONTAINS, DOC_CONTAINS),
+                LHelp::new(TRANSFORM_IN_SINGLETON_LIST, DOC_TRANSFORM_IN_SINGLETON_LIST),
+                LHelp::new(LET, DOC_LET),
+                LHelp::new(LET_STAR, DOC_LET_STAR),
+                //Macros
+            ],
+        )
     }
 
     fn pure_fonctions(&self) -> PureFonctionCollection {
@@ -337,38 +111,6 @@ impl IntoModule for CtxUtils {
             QUOTE_LIST,
         ]
         .into()
-    }
-}
-
-#[async_scheme_fn]
-pub async fn arbitrary(env: &LEnv, args: &[LValue]) -> LResult {
-    /*pub const LAMBDA_ARBITRARY: &str = "(define arbitrary
-    (lambda args
-        (cond ((= (len args) 1) ; default case
-               (car (first args)))
-              ((= (len args) 2) ; specific function
-               (let ((l (first args))
-                     (f (second args)))
-                    (f l)))
-              (else nil)))) ; error cases";*/
-
-    //activate_debug();
-
-    match args.len() {
-        1 => car(env, &[args[0].clone()]),
-        2 => {
-            eval(
-                &vec![
-                    args[1].clone(),
-                    vec![LCoreOperator::Quote.into(), args[0].clone()].into(),
-                ]
-                .into(),
-                &mut env.clone(),
-                None,
-            )
-            .await
-        }
-        _ => Err(LRuntimeError::wrong_number_of_args(ARBITRARY, args, 1..2)),
     }
 }
 
@@ -502,7 +244,7 @@ pub fn quote_list(mut list: Vec<LValue>) -> Vec<LValue> {
     //let mut vec: Vec<LValue> = vec![];
     let mut vec = vec![];
     for e in list.drain(..) {
-        vec.push(list![LCoreOperator::Quote.into(), e])
+        vec.push(list![LPrimitives::Quote.into(), e])
         //vec.push(vec![LCoreOperator::Quote.into(), e.clone()].into());
     }
     vec

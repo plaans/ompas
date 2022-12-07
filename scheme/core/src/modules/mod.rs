@@ -130,7 +130,7 @@ impl IntoModule for CtxRoot {
          */
         module.add_fn_prelude(HELP, help);
 
-        module.add_fn_prelude(ENV_GET_CONTEXTS, get_list_modules);
+        module.add_fn_prelude(ENV_GET_CONTEXTS, get_contexts);
 
         module.add_fn_prelude(ENV_GET_KEYS.to_string(), env_get_keys);
         module.add_fn_prelude(ENV_GET_MACROS, env_get_macros);

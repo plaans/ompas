@@ -16,7 +16,7 @@ use im::HashMap;
 use ompas_rae_language::*;
 use ompas_rae_structs::state::world_state::*;
 use sompas_core::eval;
-use sompas_core::modules::list::cons;
+use sompas_core::modules::list::{car, cons};
 use sompas_core::modules::map::get_map;
 use sompas_macros::{async_scheme_fn, scheme_fn};
 use sompas_structs::contextcollection::Context;
@@ -26,6 +26,7 @@ use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lasynchandler::LAsyncHandler;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lfuture::{FutureResult, LFuture};
+use sompas_structs::lprimitives::LPrimitives;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lswitch::new_interruption_handler;
 use sompas_structs::lvalue::LValue;
@@ -103,6 +104,8 @@ impl IntoModule for CtxRaeExec {
         module.add_async_fn_prelude(RAE_CANCEL_COMMAND, cancel_command);
         module.add_async_fn_prelude(RAE_INSTANCE, instance);
         module.add_async_fn_prelude(RAE_INSTANCES, instances);
+        module.add_async_fn_prelude(ARBITRARY, arbitrary);
+
         module.add_fn_prelude(RAE_IS_PLATFORM_DEFINED, is_platform_defined);
         //Manage facts:
         module.add_async_fn_prelude(RAE_ASSERT, assert_fact);
@@ -424,4 +427,36 @@ pub async fn instance(env: &LEnv, object: String, r#type: String) -> LResult {
 pub async fn instances(env: &LEnv, r#type: String) -> LResult {
     let state = &env.get_context::<CtxState>(CTX_STATE)?.state;
     Ok(state.instances(&r#type).await)
+}
+
+#[async_scheme_fn]
+pub async fn arbitrary(env: &LEnv, args: &[LValue]) -> LResult {
+    /*pub const LAMBDA_ARBITRARY: &str = "(define arbitrary
+    (lambda args
+        (cond ((= (len args) 1) ; default case
+               (car (first args)))
+              ((= (len args) 2) ; specific function
+               (let ((l (first args))
+                     (f (second args)))
+                    (f l)))
+              (else nil)))) ; error cases";*/
+
+    //activate_debug();
+
+    match args.len() {
+        1 => car(env, &[args[0].clone()]),
+        2 => {
+            eval(
+                &vec![
+                    args[1].clone(),
+                    vec![LPrimitives::Quote.into(), args[0].clone()].into(),
+                ]
+                .into(),
+                &mut env.clone(),
+                None,
+            )
+            .await
+        }
+        _ => Err(LRuntimeError::wrong_number_of_args(ARBITRARY, args, 1..2)),
+    }
 }

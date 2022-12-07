@@ -215,3 +215,6 @@ pub const ACTIVATE_LOG: &str = "activate_log";
 pub const DEACTIVATE_LOG: &str = "deactivate_log";
 pub const SET_LOG_LEVEL: &str = "set_log_level";
 pub const GET_LOG_LEVEL: &str = "get_log_level";
+
+pub const ARBITRARY: &str = "arbitrary";
+pub const DOC_ARBITRARY: &str = "Takes a list of ";

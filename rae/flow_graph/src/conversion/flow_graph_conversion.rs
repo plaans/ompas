@@ -9,8 +9,8 @@ use core::result::Result::{Err, Ok};
 use ompas_rae_language::{
     RAE_ASSERT, RAE_ASSERT_SHORT, RAE_EXEC_COMMAND, RAE_EXEC_TASK, RAE_READ_STATE,
 };
-use sompas_structs::lcoreoperator::LCoreOperator;
 use sompas_structs::lnumber::LNumber;
+use sompas_structs::lprimitives::LPrimitives;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use std::borrow::Borrow;
@@ -66,7 +66,7 @@ fn convert_bool(bool: bool, fl: &mut FlowGraph) -> Scope {
     fl.new_instantaneous_vertice(Expression::cst(id)).into()
 }
 
-fn convert_core_operator(_: &LCoreOperator, _: &mut FlowGraph) -> Scope {
+fn convert_core_operator(_: &LPrimitives, _: &mut FlowGraph) -> Scope {
     todo!()
 }
 
@@ -87,7 +87,7 @@ fn convert_list(
             Ok(s)
         }
         LValue::CoreOperator(co) => match co {
-            LCoreOperator::Define => {
+            LPrimitives::Define => {
                 let var = &list[1];
                 let val = &list[2];
                 let mut scope_val = convert_into_flow_graph(val, fl, define_table)?;
@@ -106,7 +106,7 @@ fn convert_list(
                 out_of_scope.push(val);
                 Ok(scope_val)
             }
-            LCoreOperator::If => {
+            LPrimitives::If => {
                 let define_table = &mut define_table.clone();
 
                 /*
@@ -139,13 +139,13 @@ fn convert_list(
                 end_scope = *fl.get_scope_interval(&scope).get_end();
                 Ok(scope)
             }
-            LCoreOperator::Quote => {
+            LPrimitives::Quote => {
                 let lit = lvalue_to_lit(&list[1], &mut fl.sym_table)?;
                 let vertice = fl.new_instantaneous_vertice(Expression::cst(lit));
                 end_scope = *fl.get_interval(&vertice).get_end();
                 Ok(vertice.into())
             }
-            LCoreOperator::Begin => {
+            LPrimitives::Begin => {
                 let mut define_table = define_table.clone();
                 let mut scope = Scope::default();
                 let mut results = vec![];
@@ -165,7 +165,7 @@ fn convert_list(
                 out_of_scope.append(&mut results);
                 Ok(scope)
             }
-            LCoreOperator::Async => {
+            LPrimitives::Async => {
                 let define_table = &mut define_table.clone();
                 let e = &list[1];
                 let scope_expression = convert_into_flow_graph(e, fl, define_table)?;
@@ -186,7 +186,7 @@ fn convert_list(
 
                 Ok(vertice.into())
             }
-            LCoreOperator::Await => {
+            LPrimitives::Await => {
                 let define_table = &mut define_table.clone();
                 let mut h = convert_into_flow_graph(&list[1], fl, define_table)?;
                 let a = fl.new_vertice(Expression::Await(*fl.get_scope_result(&h)));
@@ -197,7 +197,7 @@ fn convert_list(
                 h.end = a;
                 Ok(h)
             }
-            LCoreOperator::Race => {
+            LPrimitives::Race => {
                 todo!()
             }
             co => panic!("Conversion of {} not supported.", co),

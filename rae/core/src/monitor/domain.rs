@@ -13,8 +13,8 @@ use sompas_language::predicates::*;
 use sompas_language::*;
 use sompas_macros::*;
 use sompas_structs::kindlvalue::KindLValue;
-use sompas_structs::lcoreoperator::LCoreOperator;
 use sompas_structs::lenv::LEnv;
+use sompas_structs::lprimitives::LPrimitives;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::{lruntimeerror, wrong_n_args, wrong_type};
@@ -549,7 +549,7 @@ async fn create_model(env: &mut LEnv, model: im::HashMap<LValue, LValue>) -> LRe
             let effects = model
                 .get(&EFFECTS.into())
                 .ok_or_else(|| LRuntimeError::new("create_model", "missing :effects"))?;
-            let effects = cons(env, &[LCoreOperator::Do.into(), effects.clone()])?;
+            let effects = cons(env, &[LPrimitives::Do.into(), effects.clone()])?;
             let test =
                 generate_test_type_expr(env, &[model.get(&PARAMETERS.into()).unwrap().clone()])
                     .await?;

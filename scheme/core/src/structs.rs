@@ -1,8 +1,8 @@
 use ompas_middleware::logger::LogClient;
 use ompas_middleware::LogLevel;
-use sompas_structs::lcoreoperator::LCoreOperator;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::list;
+use sompas_structs::lprimitives::LPrimitives;
 use sompas_structs::lvalue::{LValue, Sym};
 use std::fmt::Display;
 use std::sync::Arc;
@@ -54,7 +54,7 @@ impl Unstack for CoreOperatorFrame {
         match self {
             CoreOperatorFrame::If(i) => {
                 list![
-                    LCoreOperator::If.into(),
+                    LPrimitives::If.into(),
                     results.pop().unwrap(),
                     i.conseq,
                     i.alt
@@ -62,12 +62,12 @@ impl Unstack for CoreOperatorFrame {
             }
             CoreOperatorFrame::Begin(b) => {
                 let mut r = results.pop_n(b.n);
-                let mut list = vec![LCoreOperator::Begin.into()];
+                let mut list = vec![LPrimitives::Begin.into()];
                 list.append(&mut r);
                 list.into()
             }
             CoreOperatorFrame::Do(mut df) => {
-                let mut list = vec![LCoreOperator::Do.into()];
+                let mut list = vec![LPrimitives::Do.into()];
                 list.append(&mut df.results);
                 list.push(results.pop().unwrap());
                 list.append(&mut df.rest);
@@ -75,35 +75,35 @@ impl Unstack for CoreOperatorFrame {
             }
             CoreOperatorFrame::Define(d) => {
                 list!(
-                    LCoreOperator::Define.into(),
+                    LPrimitives::Define.into(),
                     d.symbol.into(),
                     results.pop().unwrap()
                 )
             }
             CoreOperatorFrame::Lambda => results.pop().unwrap(),
             CoreOperatorFrame::Await => {
-                list!(LCoreOperator::Await.into(), results.pop().unwrap())
+                list!(LPrimitives::Await.into(), results.pop().unwrap())
             }
             CoreOperatorFrame::Interrupt => {
-                list!(LCoreOperator::Interrupt.into(), results.pop().unwrap())
+                list!(LPrimitives::Interrupt.into(), results.pop().unwrap())
             }
             CoreOperatorFrame::Eval => {
-                list!(LCoreOperator::Eval.into(), results.pop().unwrap())
+                list!(LPrimitives::Eval.into(), results.pop().unwrap())
             }
             CoreOperatorFrame::Enr => {
-                list!(LCoreOperator::Enr.into(), results.pop().unwrap())
+                list!(LPrimitives::Enr.into(), results.pop().unwrap())
             }
             CoreOperatorFrame::Expand => {
-                list!(LCoreOperator::Expand.into(), results.pop().unwrap())
+                list!(LPrimitives::Expand.into(), results.pop().unwrap())
             }
             CoreOperatorFrame::Parse => {
-                list!(LCoreOperator::Parse.into(), results.pop().unwrap())
+                list!(LPrimitives::Parse.into(), results.pop().unwrap())
             }
             CoreOperatorFrame::EvalEnd => {
-                list!(LCoreOperator::Eval.into(), results.pop().unwrap())
+                list!(LPrimitives::Eval.into(), results.pop().unwrap())
             }
             CoreOperatorFrame::EnrEnd => {
-                list!(LCoreOperator::Enr.into(), results.pop().unwrap())
+                list!(LPrimitives::Enr.into(), results.pop().unwrap())
             }
         }
     }
@@ -184,10 +184,10 @@ impl StackFrame {
 
     pub fn new_lvalue(mut k: LValue, mut i: Interruptibility) -> Self {
         while let LValue::List(ref list) = k {
-            if list[0] == LValue::CoreOperator(LCoreOperator::Uninterruptible) {
+            if list[0] == LValue::CoreOperator(LPrimitives::Uninterruptible) {
                 i = Interruptibility::Unininterruptible;
                 k = list[1].clone();
-            } else if list[0] == LValue::CoreOperator(LCoreOperator::Interruptible) {
+            } else if list[0] == LValue::CoreOperator(LPrimitives::Interruptible) {
                 i = Interruptibility::Interruptible;
                 k = list[1].clone();
             } else {

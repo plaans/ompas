@@ -19,7 +19,7 @@ use sompas_language::basic_math::*;
 use sompas_language::predicates::*;
 use sompas_language::*;
 use sompas_structs::kindlvalue::KindLValue;
-use sompas_structs::lcoreoperator::LCoreOperator;
+use sompas_structs::lprimitives::LPrimitives;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::{lruntimeerror, wrong_n_args};
 use std::convert::{TryFrom, TryInto};
@@ -91,7 +91,7 @@ pub fn convert_lvalue_to_expression_chronicle(
         }
         LValue::List(l) => match &l[0] {
             LValue::CoreOperator(co) => match co {
-                LCoreOperator::Define => {
+                LPrimitives::Define => {
                     //Todo : handle the case when the first expression is not a symbol, but an expression that must be evaluated
                     if let LValue::Symbol(s) = &l[1] {
                         let var = ch
@@ -121,7 +121,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                         ));
                     }
                 }
-                LCoreOperator::Do => {
+                LPrimitives::Do => {
                     ch.sym_table.new_scope();
                     let mut literal: Vec<Lit> = vec![ch
                         .sym_table
@@ -170,7 +170,7 @@ pub fn convert_lvalue_to_expression_chronicle(
 
                     ch.sym_table.revert_scope();
                 }
-                LCoreOperator::Begin => {
+                LPrimitives::Begin => {
                     ch.sym_table.new_scope();
                     let mut literal: Vec<Lit> = vec![ch
                         .sym_table
@@ -211,10 +211,10 @@ pub fn convert_lvalue_to_expression_chronicle(
 
                     ch.sym_table.revert_scope();
                 }
-                LCoreOperator::If => {
+                LPrimitives::If => {
                     return convert_if(exp, context, ch);
                 }
-                LCoreOperator::Quote => {
+                LPrimitives::Quote => {
                     ec.set_pure_result(lvalue_to_lit(&l[1], &mut ch.sym_table)?);
                     ec.make_instantaneous();
                 }

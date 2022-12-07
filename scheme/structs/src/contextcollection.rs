@@ -34,7 +34,7 @@ impl ContextCollection {
         self.inner.insert(label, ctx);
     }
 
-    pub fn get_list_modules(&self) -> Vec<String> {
+    pub fn get_contexts_labels(&self) -> Vec<String> {
         self.inner.keys().cloned().collect()
     }
 }

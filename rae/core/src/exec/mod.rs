@@ -1,4 +1,4 @@
-use crate::contexts::ctx_rae::{CtxRae, CTX_RAE};
+use crate::contexts::ctx_rae::{CtxOMPAS, CTX_RAE};
 use crate::contexts::ctx_state::{CtxState, CTX_STATE};
 use crate::contexts::ctx_task::{define_parent_task, DEFINE_PARENT_TASK};
 use crate::exec::platform::*;
@@ -20,18 +20,18 @@ use sompas_core::modules::list::{car, cons};
 use sompas_core::modules::map::get_map;
 use sompas_macros::{async_scheme_fn, scheme_fn};
 use sompas_structs::contextcollection::Context;
-use sompas_structs::documentation::Documentation;
+use sompas_structs::documentation::DocCollection;
 use sompas_structs::interrupted;
 use sompas_structs::kindlvalue::KindLValue;
-use sompas_structs::lasynchandler::LAsyncHandler;
+use sompas_structs::lasynchandler::LAsyncHandle;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lfuture::{FutureResult, LFuture};
+use sompas_structs::lmodule::{InitScheme, LModule};
 use sompas_structs::lprimitives::LPrimitives;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lswitch::new_interruption_handler;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalues::LValueS;
-use sompas_structs::module::{InitLisp, IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
 use sompas_structs::{list, lruntimeerror, wrong_type};
 use std::convert::TryInto;
@@ -65,8 +65,8 @@ pub const PARENT_TASK: &str = "parent_task";
 pub struct CtxRaeExec {}
 
 impl IntoModule for CtxRaeExec {
-    fn into_module(self) -> Module {
-        let init: InitLisp = vec![
+    fn into_module(self) -> LModule {
+        let init: InitScheme = vec![
             //MACRO_RESOURCE_ACQUIRE_AND_DO,
             //MACRO_MUTEX_LOCK_IN_LIST_AND_DO,
             MACRO_SIM_BLOCK,
@@ -88,66 +88,66 @@ impl IntoModule for CtxRaeExec {
             LAMBDA_RAE_EXEC_TASK,
         ]
         .into();
-        let mut module = Module {
+        let mut module = LModule {
             ctx: Context::new(self),
             prelude: vec![],
             raw_lisp: init,
             label: MOD_RAE_EXEC.to_string(),
         };
 
-        module.add_async_fn_prelude(RAE_GET_STATE, get_state);
-        module.add_async_fn_prelude(RAE_GET_FACTS, get_facts);
-        module.add_async_fn_prelude(RAE_READ_STATE, read_state);
-        module.add_async_fn_prelude(RAE_EXEC_COMMAND, exec_command);
-        module.add_async_fn_prelude(RAE_LAUNCH_PLATFORM, launch_platform);
+        module.add_async_fn(RAE_GET_STATE, get_state);
+        module.add_async_fn(RAE_GET_FACTS, get_facts);
+        module.add_async_fn(RAE_READ_STATE, read_state);
+        module.add_async_fn(RAE_EXEC_COMMAND, exec_command);
+        module.add_async_fn(RAE_LAUNCH_PLATFORM, launch_platform);
         //module.add_async_fn_prelude(RAE_GET_STATUS, get_status);
-        module.add_async_fn_prelude(RAE_CANCEL_COMMAND, cancel_command);
-        module.add_async_fn_prelude(RAE_INSTANCE, instance);
-        module.add_async_fn_prelude(RAE_INSTANCES, instances);
-        module.add_async_fn_prelude(ARBITRARY, arbitrary);
+        module.add_async_fn(RAE_CANCEL_COMMAND, cancel_command);
+        module.add_async_fn(RAE_INSTANCE, instance);
+        module.add_async_fn(RAE_INSTANCES, instances);
+        module.add_async_fn(ARBITRARY, arbitrary);
 
-        module.add_fn_prelude(RAE_IS_PLATFORM_DEFINED, is_platform_defined);
+        module.add_fn(RAE_IS_PLATFORM_DEFINED, is_platform_defined);
         //Manage facts:
-        module.add_async_fn_prelude(RAE_ASSERT, assert_fact);
-        module.add_async_fn_prelude(RAE_ASSERT_SHORT, assert_fact);
-        module.add_async_fn_prelude(RAE_RETRACT, retract_fact);
-        module.add_async_fn_prelude(RAE_RETRACT_SHORT, retract_fact);
-        module.add_fn_prelude(RAE_GET_INSTANTIATED_METHODS, get_instantiated_methods);
-        module.add_fn_prelude(RAE_GET_BEST_METHOD, get_best_method);
-        module.add_async_fn_prelude(RAE_WAIT_FOR, __wait_for__);
+        module.add_async_fn(RAE_ASSERT, assert_fact);
+        module.add_async_fn(RAE_ASSERT_SHORT, assert_fact);
+        module.add_async_fn(RAE_RETRACT, retract_fact);
+        module.add_async_fn(RAE_RETRACT_SHORT, retract_fact);
+        module.add_fn(RAE_GET_INSTANTIATED_METHODS, get_instantiated_methods);
+        module.add_fn(RAE_GET_BEST_METHOD, get_best_method);
+        module.add_async_fn(RAE_WAIT_FOR, __wait_for__);
         //module.add_async_fn_prelude(RAE_SELECT, select);
         //module.add_async_fn_prelude(RAE_SET_SUCCESS_FOR_TASK, set_success_for_task);
         //module.add_async_fn_prelude(RAE_GET_NEXT_METHOD, get_next_method);
 
         //progress
-        module.add_async_fn_prelude(REFINE, refine);
-        module.add_async_fn_prelude(RETRY, retry);
-        module.add_async_fn_prelude(RAE_SET_SUCCESS_FOR_TASK, set_success_for_task);
+        module.add_async_fn(REFINE, refine);
+        module.add_async_fn(RETRY, retry);
+        module.add_async_fn(RAE_SET_SUCCESS_FOR_TASK, set_success_for_task);
         /*module.add_async_fn_prelude(
             RAE_GENERATE_APPLICABLE_INSTANCES,
             generate_applicable_instances,
         );*/
 
         //mutex
-        module.add_async_fn_prelude(__ACQUIRE__, __acquire__);
-        module.add_async_fn_prelude(RELEASE, release);
-        module.add_async_fn_prelude(NEW_RESOURCE, new_resource);
-        module.add_async_fn_prelude(IS_LOCKED, is_locked);
-        module.add_async_fn_prelude(RESOURCES, resources);
-        module.add_async_fn_prelude(__ACQUIRE_IN_LIST__, __acquire_in_list__);
+        module.add_async_fn(__ACQUIRE__, __acquire__);
+        module.add_async_fn(RELEASE, release);
+        module.add_async_fn(NEW_RESOURCE, new_resource);
+        module.add_async_fn(IS_LOCKED, is_locked);
+        module.add_async_fn(RESOURCES, resources);
+        module.add_async_fn(__ACQUIRE_IN_LIST__, __acquire_in_list__);
 
         //Manage hierarchy
-        module.add_mut_fn_prelude(DEFINE_PARENT_TASK, define_parent_task);
+        module.add_mut_fn(DEFINE_PARENT_TASK, define_parent_task);
 
         //success and failure
-        module.add_fn_prelude(SUCCESS, success);
-        module.add_fn_prelude(FAILURE, failure);
-        module.add_fn_prelude(IS_SUCCESS, is_success);
-        module.add_fn_prelude(IS_FAILURE, is_failure);
+        module.add_fn(SUCCESS, success);
+        module.add_fn(FAILURE, failure);
+        module.add_fn(IS_SUCCESS, is_success);
+        module.add_fn(IS_FAILURE, is_failure);
         module
     }
 
-    fn documentation(&self) -> Documentation {
+    fn documentation(&self) -> DocCollection {
         Default::default()
     }
 
@@ -323,9 +323,9 @@ async fn read_state(env: &LEnv, args: &[LValue]) -> LResult {
 }
 
 #[async_scheme_fn]
-async fn __wait_for__(env: &LEnv, lv: LValue) -> Result<LAsyncHandler, LRuntimeError> {
+async fn __wait_for__(env: &LEnv, lv: LValue) -> Result<LAsyncHandle, LRuntimeError> {
     let (tx, mut rx) = new_interruption_handler();
-    let ctx = env.get_context::<CtxRae>(CTX_RAE)?;
+    let ctx = env.get_context::<CtxOMPAS>(CTX_RAE)?;
     let monitors = ctx.monitors.clone();
 
     let mut env = env.clone();
@@ -355,7 +355,7 @@ async fn __wait_for__(env: &LEnv, lv: LValue) -> Result<LAsyncHandler, LRuntimeE
 
     tokio::spawn(f.clone());
 
-    Ok(LAsyncHandler::new(f, tx))
+    Ok(LAsyncHandle::new(f, tx))
 }
 #[scheme_fn]
 pub fn success(args: &[LValue]) -> LValue {

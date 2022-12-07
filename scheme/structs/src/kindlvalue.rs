@@ -1,6 +1,6 @@
 use crate::lnumber::LNumber;
 use crate::lvalue::LValue;
-use sompas_language::*;
+use sompas_language::kind::*;
 use std::fmt::{Display, Formatter};
 
 /// Enum of kinds of LValue
@@ -25,7 +25,6 @@ pub enum KindLValue {
     Nil,
     Map,
     List,
-    Quote,
     Other(String),
     Handler,
     Err,
@@ -47,9 +46,8 @@ impl Display for KindLValue {
             KindLValue::Lambda => LAMBDA,
             KindLValue::Map => MAP,
             KindLValue::List => LIST,
-            KindLValue::Quote => QUOTE,
             KindLValue::Atom => ATOM,
-            KindLValue::CoreOperator => CORE_OPERATOR,
+            KindLValue::CoreOperator => PRIMITIVE,
             KindLValue::Other(s) => s.as_str(),
             KindLValue::Int => INT,
             KindLValue::Float => FLOAT,
@@ -78,7 +76,6 @@ impl PartialEq for KindLValue {
             (KindLValue::Object, KindLValue::Object) => true,
             (KindLValue::Map, KindLValue::Map) => true,
             (KindLValue::List, KindLValue::List) => true,
-            (KindLValue::Quote, KindLValue::Quote) => true,
             (KindLValue::Atom, KindLValue::Atom) => true,
             (KindLValue::CoreOperator, KindLValue::CoreOperator) => true,
             (KindLValue::Int, KindLValue::Int) => true,
@@ -104,10 +101,10 @@ impl From<&LValue> for KindLValue {
             LValue::Lambda(_) => KindLValue::Lambda,
             LValue::Map(_) => KindLValue::Map,
             LValue::List(_) => KindLValue::List,
-            LValue::CoreOperator(_) => KindLValue::CoreOperator,
+            LValue::Primitive(_) => KindLValue::CoreOperator,
             LValue::String(_) => KindLValue::String,
             LValue::AsyncFn(_) => KindLValue::AsyncFn,
-            LValue::Handler(_) => KindLValue::Handler,
+            LValue::Handle(_) => KindLValue::Handler,
             LValue::Err(_) => KindLValue::Err,
             LValue::MutFn(_) => KindLValue::MutFn,
             LValue::AsyncMutFn(_) => KindLValue::AsyncMutFn,

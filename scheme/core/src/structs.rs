@@ -184,10 +184,10 @@ impl StackFrame {
 
     pub fn new_lvalue(mut k: LValue, mut i: Interruptibility) -> Self {
         while let LValue::List(ref list) = k {
-            if list[0] == LValue::CoreOperator(LPrimitives::Uninterruptible) {
+            if list[0] == LValue::Primitive(LPrimitives::Uninterruptible) {
                 i = Interruptibility::Unininterruptible;
                 k = list[1].clone();
-            } else if list[0] == LValue::CoreOperator(LPrimitives::Interruptible) {
+            } else if list[0] == LValue::Primitive(LPrimitives::Interruptible) {
                 i = Interruptibility::Interruptible;
                 k = list[1].clone();
             } else {

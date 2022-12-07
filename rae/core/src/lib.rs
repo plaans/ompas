@@ -12,7 +12,7 @@ use ompas_rae_structs::rae_command::RAECommand;
 use ompas_rae_structs::rae_options::OMPASOptions;
 use ompas_rae_structs::select_mode::{Planner, SelectMode};
 use sompas_core::{eval, eval_init};
-use sompas_structs::lasynchandler::LAsyncHandler;
+use sompas_structs::lasynchandler::LAsyncHandle;
 use sompas_structs::lenv::ImportType::WithoutPrefix;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lfuture::FutureResult;
@@ -45,26 +45,6 @@ pub async fn rae(
 ) {
     let mut process =
         ProcessInterface::new(PROCESS_MAIN_RAE, PROCESS_TOPIC_OMPAS, LOG_TOPIC_OMPAS).await;
-    //Ubuntu::
-    /*let lvalue: LValue = match options.get_platform_config() {
-        None => vec![RAE_LAUNCH_PLATFORM].into(),
-        Some(string) => {
-            info!("Platform config: {}", string);
-            vec![RAE_LAUNCH_PLATFORM.to_string(), string].into()
-        }
-    };*/
-
-    /*match &platform {
-        None => info!("No platform defined"),
-        Some(platform) => platform.start().await,
-    }*/
-
-    /*let result = eval(&lvalue, &mut env, None).await;
-
-    match result {
-        Ok(_) => {}
-        Err(e) => error!("{}", e),
-    }*/
 
     let log = interface.log.clone();
 
@@ -154,7 +134,7 @@ pub async fn rae(
 
 
                         match job.sender
-                            .try_send(LAsyncHandler::new(future, tx)) {
+                            .try_send(LAsyncHandle::new(future, tx)) {
                             Ok(_) =>{}
                             Err(e) => {
                                 log.error(format!("{}", e.to_string())).await;

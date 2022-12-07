@@ -1,7 +1,31 @@
+use sompas_language::basic_math::*;
 use sompas_macros::scheme_fn;
+use sompas_structs::lmodule::LModule;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lvalue::LValue;
 use std::ops::Not;
+
+#[derive(Default)]
+pub struct ModBasicMath {}
+
+impl From<ModBasicMath> for LModule {
+    fn from(t: ModBasicMath) -> LModule {
+        let mut module = LModule::new(t, MOD_BASIC_MATH, DOC_MOD_BASIC_MATH);
+        module.add_fn(NOT, not, DOC_NOT, true);
+        module.add_fn(NOT_SHORT, not, DOC_NOT_SHORT, true);
+        module.add_fn(NEQ, neq, DOC_NEQ, true);
+        module.add_fn(ADD, add, DOC_ADD, true);
+        module.add_fn(SUB, sub, DOC_SUB, true);
+        module.add_fn(MUL, mul, DOC_MUL, true);
+        module.add_fn(DIV, div, DOC_DIV, true);
+        module.add_fn(GT, gt, DOC_GT, true);
+        module.add_fn(LT, lt, DOC_LT, true);
+        module.add_fn(GEQ, geq, DOC_GEQ, true);
+        module.add_fn(LEQ, leq, DOC_LEQ, true);
+        module.add_fn(EQ, eq, DOC_EQ, true);
+        module
+    }
+}
 
 /// Logical functional not
 /// true => nil

@@ -1,32 +1,59 @@
-use sompas_language::*;
+use sompas_language::list::*;
 use sompas_macros::scheme_fn;
 use sompas_structs::kindlvalue::KindLValue;
+use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::{lruntimeerror, wrong_type};
 use std::ops::Deref;
 
+#[derive(Default)]
+pub struct ModList {}
+
+impl From<ModList> for LModule {
+    fn from(m: ModList) -> LModule {
+        let mut module = LModule::new(m, MOD_LIST, DOC_MOD_LIST);
+        module.add_fn(FN_LIST, fn_list, (DOC_LIST, DOC_LIST_VERBOSE), true);
+        module.add_fn(FIRST, first, DOC_FIRST, true);
+        module.add_fn(SECOND, second, DOC_SECOND, true);
+        module.add_fn(THIRD, third, DOC_THIRD, true);
+        module.add_fn(REST, rest, DOC_REST, true);
+        module.add_fn(CAR, car, DOC_CAR, true);
+        module.add_fn(CDR, cdr, DOC_CDR, true);
+        module.add_fn(APPEND, append, DOC_APPEND, true);
+        module.add_fn(LAST, last, DOC_LAST, true);
+        module.add_fn(MEMBER, member, DOC_MEMBER, true);
+        module.add_fn(REVERSE, reverse, DOC_REVERSE, true);
+        module.add_fn(
+            GET_LIST,
+            get_list,
+            (DOC_GET_LIST, DOC_GET_LIST_VERBOSE),
+            true,
+        );
+        module.add_fn(
+            SET_LIST,
+            set_list,
+            (DOC_SET_LIST, DOC_SET_LIST_VERBOSE),
+            true,
+        );
+        module.add_fn(CONS, cons, (DOC_CONS, DOC_CONS_VERBOSE), true);
+        module.add_fn(
+            INTERSECTION,
+            intersection,
+            (DOC_INTERSECTION, DOC_INTERSECTION_VERBOSE),
+            true,
+        );
+        module
+    }
+}
+
 /// Returns a list
 #[scheme_fn]
-pub fn list(args: &[LValue]) -> LValue {
+pub fn fn_list(args: &[LValue]) -> LValue {
     if args.is_empty() {
         LValue::Nil
     } else {
         args.into()
-    }
-}
-
-///It takes two arguments, an element and a list and returns a list with the element inserted at the first place.
-#[scheme_fn]
-pub fn cons(a: LValue, b: LValue) -> Vec<LValue> {
-    match b {
-        LValue::List(list) => {
-            let mut new_list = vec![a.clone()];
-            new_list.append(&mut list.deref().clone());
-            new_list
-        }
-        LValue::Nil => vec![a.clone()],
-        _ => vec![a.clone(), b.clone()],
     }
 }
 
@@ -166,6 +193,16 @@ pub fn member(val: &LValue, list: Vec<LValue>) -> LValue {
     LValue::Nil
 }
 
+/// It takes a list and returns a list with the top elements in reverse order.
+#[scheme_fn]
+pub fn reverse(list: Vec<LValue>) -> Vec<LValue> {
+    let mut new_list: Vec<LValue> = vec![];
+    for e in list.iter().rev() {
+        new_list.push(e.clone())
+    }
+    new_list
+}
+
 #[scheme_fn]
 pub fn get_list(list: Vec<LValue>, index: i64) -> LResult {
     if list.len() > index as usize {
@@ -202,14 +239,18 @@ pub fn set_list(
     }
 }
 
-/// It takes a list and returns a list with the top elements in reverse order.
+///It takes two arguments, an element and a list and returns a list with the element inserted at the first place.
 #[scheme_fn]
-pub fn reverse(list: Vec<LValue>) -> Vec<LValue> {
-    let mut new_list: Vec<LValue> = vec![];
-    for e in list.iter().rev() {
-        new_list.push(e.clone())
+pub fn cons(a: LValue, b: LValue) -> Vec<LValue> {
+    match b {
+        LValue::List(list) => {
+            let mut new_list = vec![a.clone()];
+            new_list.append(&mut list.deref().clone());
+            new_list
+        }
+        LValue::Nil => vec![a.clone()],
+        _ => vec![a.clone(), b.clone()],
     }
-    new_list
 }
 
 /// Returns a list of element present in all lists

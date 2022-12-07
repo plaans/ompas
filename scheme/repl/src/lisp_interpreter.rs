@@ -9,8 +9,8 @@ use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use sompas_core::{eval, eval_init, get_root_env, parse};
 use sompas_structs::lenv::{ImportType, LEnv};
+use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::LResult;
-use sompas_structs::module::IntoModule;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
@@ -125,11 +125,11 @@ impl LispInterpreter {
 }
 
 impl LispInterpreter {
-    pub fn import_namespace(&mut self, ctx: impl IntoModule) {
+    pub fn import_namespace(&mut self, ctx: impl Into<LModule>) {
         self.env.import_module(ctx, ImportType::WithoutPrefix)
     }
 
-    pub fn import(&mut self, ctx: impl IntoModule) {
+    pub fn import(&mut self, ctx: impl Into<LModule>) {
         self.env.import_module(ctx, ImportType::WithPrefix)
     }
 

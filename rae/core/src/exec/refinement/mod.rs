@@ -13,9 +13,9 @@ use sompas_structs::lvalue::LValue;
 use std::borrow::Borrow;
 
 use crate::contexts::ctx_planning::{CtxPlanning, CTX_PLANNING};
-use crate::contexts::ctx_rae::{CtxRae, CTX_RAE};
+use crate::contexts::ctx_rae::{CtxOMPAS, CTX_RAE};
 use crate::contexts::ctx_state::{CtxState, CTX_STATE};
-use crate::contexts::ctx_task::{CtxTask, CTX_TASK};
+use crate::contexts::ctx_task::{ModTask, CTX_TASK};
 use crate::RaeExecError;
 use ompas_rae_structs::state::action_status::ActionStatus;
 use sompas_macros::async_scheme_fn;
@@ -24,9 +24,9 @@ use std::convert::{TryFrom, TryInto};
 #[async_scheme_fn]
 pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
     let task_label: LValue = args.into();
-    let ctx = env.get_context::<CtxRae>(CTX_RAE)?;
+    let ctx = env.get_context::<CtxOMPAS>(CTX_RAE)?;
     let log = ctx.get_log_client();
-    let parent_task: Option<usize> = match env.get_context::<CtxTask>(CTX_TASK) {
+    let parent_task: Option<usize> = match env.get_context::<ModTask>(CTX_TASK) {
         Ok(ctx) => ctx.parent_id,
         Err(_) => None,
     };
@@ -66,7 +66,7 @@ pub async fn set_success_for_task(env: &LEnv, args: &[LValue]) -> LResult {
     let task_id: i64 = args[0].borrow().try_into()?;
     let task_id = task_id as usize;
 
-    let ctx = env.get_context::<CtxRae>(CTX_RAE)?;
+    let ctx = env.get_context::<CtxOMPAS>(CTX_RAE)?;
     let mut task: ActionMetaData = ctx.agenda.trc.get(&task_id).await;
     task.update_status(ActionStatus::Success).await;
     task.set_end_timepoint(ctx.agenda.get_instant());
@@ -77,7 +77,7 @@ pub async fn set_success_for_task(env: &LEnv, args: &[LValue]) -> LResult {
 
 #[async_scheme_fn]
 pub async fn retry(env: &LEnv, task_id: usize) -> LResult {
-    let ctx = env.get_context::<CtxRae>(CTX_RAE)?;
+    let ctx = env.get_context::<CtxOMPAS>(CTX_RAE)?;
     let log = ctx.get_log_client();
     let mut task: TaskMetaData = ctx.agenda.get_task(&(task_id as usize)).await?;
     let task_label = task.get_label().clone();
@@ -116,7 +116,7 @@ pub async fn select(stack: &mut TaskMetaData, env: &LEnv) -> LResult {
      */
     let task_id = stack.get_id();
     let ctx_planning = env.get_context::<CtxPlanning>(CTX_PLANNING)?;
-    let log = env.get_context::<CtxRae>(CTX_RAE)?.get_log_client();
+    let log = env.get_context::<CtxOMPAS>(CTX_RAE)?.get_log_client();
     let state: WorldStateSnapshot = env
         .get_context::<CtxState>(CTX_STATE)?
         .state

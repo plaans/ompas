@@ -1,5 +1,5 @@
 use crate::domain::_type::Type;
-use sompas_language::OBJECT;
+use sompas_language::kind::OBJECT;
 use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::{LValue, Sym};

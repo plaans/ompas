@@ -2,12 +2,10 @@ use ompas_rae_planning::aries::structs::ConversionCollection;
 use ompas_rae_structs::domain::RAEDomain;
 use ompas_rae_structs::select_mode::SelectMode;
 use sompas_structs::contextcollection::Context;
-use sompas_structs::documentation::Documentation;
+use sompas_structs::documentation::DocCollection;
 use sompas_structs::lenv::LEnv;
-use sompas_structs::module::{IntoModule, Module};
+use sompas_structs::lmodule::LModule;
 use sompas_structs::purefonction::PureFonctionCollection;
-
-pub const CTX_PLANNING: &str = "CtxPlanning";
 
 pub struct CtxPlanning {
     pub env: LEnv,
@@ -29,24 +27,5 @@ impl CtxPlanning {
             select_mode,
             cc,
         }
-    }
-}
-
-impl IntoModule for CtxPlanning {
-    fn into_module(self) -> Module {
-        Module {
-            ctx: Context::new(self),
-            prelude: vec![],
-            raw_lisp: Default::default(),
-            label: CTX_PLANNING.to_string(),
-        }
-    }
-
-    fn documentation(&self) -> Documentation {
-        vec![].into()
-    }
-
-    fn pure_fonctions(&self) -> PureFonctionCollection {
-        vec![].into()
     }
 }

@@ -1,7 +1,7 @@
 use crate::contexts::ctx_mode::{CtxMode, RAEMode, CTX_MODE};
 use crate::contexts::ctx_planning::{CtxPlanning, CTX_PLANNING};
-use crate::contexts::ctx_rae::{CtxRae, CTX_RAE};
-use crate::contexts::ctx_task::{CtxTask, CTX_TASK};
+use crate::contexts::ctx_rae::{CtxOMPAS, CTX_RAE};
+use crate::contexts::ctx_task::{ModTask, CTX_TASK};
 use crate::error::RaeExecError;
 use crate::exec::*;
 use ompas_rae_interface::platform::PlatformDescriptor;
@@ -16,14 +16,14 @@ use sompas_structs::lvalue::LValue;
 
 #[scheme_fn]
 pub fn is_platform_defined(env: &LEnv) -> bool {
-    env.get_context::<CtxRae>(CTX_RAE)
+    env.get_context::<CtxOMPAS>(CTX_RAE)
         .unwrap()
         .platform_interface
         .is_some()
 }
 
 #[async_scheme_fn]
-pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LAsyncHandler {
+pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LAsyncHandle {
     let env = env.clone();
     let args = args.to_vec();
 
@@ -32,8 +32,8 @@ pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LAsyncHandler {
     let f = (Box::pin(async move {
         let args = args.as_slice();
 
-        let parent_task = env.get_context::<CtxTask>(CTX_TASK)?.parent_id;
-        let ctx = env.get_context::<CtxRae>(CTX_RAE)?;
+        let parent_task = env.get_context::<ModTask>(CTX_TASK)?.parent_id;
+        let ctx = env.get_context::<CtxOMPAS>(CTX_RAE)?;
         let log = ctx.get_log_client();
         let (command_id, mut rx) = ctx.agenda.add_command(args.into(), parent_task).await;
         let debug: LValue = args.into();
@@ -133,12 +133,12 @@ pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LAsyncHandler {
 
     tokio::spawn(f.clone());
 
-    LAsyncHandler::new(f, tx)
+    LAsyncHandle::new(f, tx)
 }
 
 #[async_scheme_fn]
 pub async fn launch_platform(env: &LEnv) -> LResult {
-    let ctx = env.get_context::<CtxRae>(CTX_RAE).unwrap();
+    let ctx = env.get_context::<CtxOMPAS>(CTX_RAE).unwrap();
 
     if let Some(platform) = &ctx.platform_interface {
         platform.start(Default::default()).await;
@@ -150,7 +150,7 @@ pub async fn launch_platform(env: &LEnv) -> LResult {
 
 #[async_scheme_fn]
 pub async fn cancel_command(env: &LEnv, command_id: usize) -> LResult {
-    let ctx = env.get_context::<CtxRae>(CTX_RAE)?;
+    let ctx = env.get_context::<CtxOMPAS>(CTX_RAE)?;
     let mode = env.get_context::<CtxMode>(CTX_MODE)?.mode;
     match mode {
         RAEMode::Exec => {

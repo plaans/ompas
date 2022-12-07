@@ -1,4 +1,4 @@
-use crate::contexts::ctx_rae::{CtxRae, CTX_RAE};
+use crate::contexts::ctx_rae::{CtxOMPAS, CTX_RAE};
 use crate::exec::*;
 use ompas_rae_language::IS_LOCKED;
 use ompas_rae_structs::mutex::Wait;
@@ -17,7 +17,7 @@ const PRIORITY: &str = ":priority";
 
 #[async_scheme_fn]
 pub async fn new_resource(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<CtxRae>(CTX_RAE)?;
+    let ctx = env.get_context::<CtxOMPAS>(CTX_RAE)?;
 
     let label: String = args
         .get(0)
@@ -36,8 +36,8 @@ pub async fn new_resource(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeErr
 ///Lock a resource
 /// Waits on the resource until its his turn in the queue list
 #[async_scheme_fn]
-pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandler, LRuntimeError> {
-    let ctx = env.get_context::<CtxRae>(CTX_RAE)?;
+pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LRuntimeError> {
+    let ctx = env.get_context::<CtxOMPAS>(CTX_RAE)?;
 
     let log = ctx.get_log_client();
 
@@ -126,7 +126,7 @@ pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandler, L
         log.info(format!("{label} acquired with {capacity} capacity."))
             .await;
 
-        Ok(LAsyncHandler::new(f2, tx).into())
+        Ok(LAsyncHandle::new(f2, tx).into())
     }) as FutureResult)
         .shared();
 
@@ -134,12 +134,12 @@ pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandler, L
 
     tokio::spawn(f);
 
-    Ok(LAsyncHandler::new(f2, tx))
+    Ok(LAsyncHandle::new(f2, tx))
 }
 
 /// Release the resource
 #[async_scheme_fn]
-pub async fn release(mut h: LAsyncHandler) -> LResult {
+pub async fn release(mut h: LAsyncHandle) -> LResult {
     h.interrupt().await
 }
 
@@ -154,9 +154,9 @@ async fn check_acquire<'a>(arg: (LEnv, Vec<LValue>, usize)) -> LResult {
     let (env, args, d) = arg;
     let label = args[0].clone();
     let r = __acquire__(&env, args.as_slice()).await?;
-    let h_await: LAsyncHandler = r.try_into().unwrap();
+    let h_await: LAsyncHandle = r.try_into().unwrap();
     let h: LValue = h_await.get_future().await?;
-    env.get_context::<CtxRae>(CTX_RAE)?
+    env.get_context::<CtxOMPAS>(CTX_RAE)?
         .get_log_client()
         .info(format!("{} unlocked {}", d, label))
         .await;
@@ -168,14 +168,14 @@ async fn check_acquire<'a>(arg: (LEnv, Vec<LValue>, usize)) -> LResult {
 pub async fn __acquire_in_list__(
     env: &LEnv,
     args: &[LValue],
-) -> Result<LAsyncHandler, LRuntimeError> {
+) -> Result<LAsyncHandle, LRuntimeError> {
     let (tx, mut rx) = new_interruption_handler();
     let mut resources: Vec<LValue> = args
         .get(0)
         .ok_or_else(|| LRuntimeError::wrong_number_of_args(ACQUIRE_IN_LIST, args, 1..2))?
         .try_into()?;
     let d: usize = thread_rng().gen();
-    env.get_context::<CtxRae>(CTX_RAE)?
+    env.get_context::<CtxOMPAS>(CTX_RAE)?
         .get_log_client()
         .info(format!("Acquire element from {}, id: {} ", args[0], d))
         .await;
@@ -213,7 +213,7 @@ pub async fn __acquire_in_list__(
 
     tokio::spawn(f2);
 
-    Ok(LAsyncHandler::new(f, tx))
+    Ok(LAsyncHandle::new(f, tx))
 }
 
 #[async_scheme_fn]
@@ -222,7 +222,7 @@ pub async fn is_locked(env: &LEnv, args: &[LValue]) -> LResult {
         .get_symbol("rae-mode")
         .expect("rae-mode should be defined, default value is exec mode")
         .try_into()?;
-    let ctx = env.get_context::<CtxRae>(CTX_RAE)?;
+    let ctx = env.get_context::<CtxOMPAS>(CTX_RAE)?;
 
     match mode.as_str() {
         SYMBOL_EXEC_MODE => Ok(ctx
@@ -251,7 +251,7 @@ pub async fn is_locked(env: &LEnv, args: &[LValue]) -> LResult {
 
 #[async_scheme_fn]
 pub async fn resources(env: &LEnv) -> Result<Vec<String>, LRuntimeError> {
-    let ctx = env.get_context::<CtxRae>(CTX_RAE)?;
+    let ctx = env.get_context::<CtxOMPAS>(CTX_RAE)?;
 
     Ok(ctx.resources.get_list_resources().await)
 }

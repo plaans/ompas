@@ -25,7 +25,7 @@ use aries_utils::input::Sym;
 use ompas_rae_structs::domain::_type::Type as raeType;
 use ompas_rae_structs::state::partial_state::PartialState;
 use ompas_rae_structs::state::world_state::WorldStateSnapshot;
-use sompas_language::*;
+use sompas_language::kind::*;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;

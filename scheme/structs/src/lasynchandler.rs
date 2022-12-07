@@ -4,12 +4,12 @@ use crate::lswitch::InterruptionSender;
 use crate::lvalue::LValue;
 
 #[derive(Clone, Debug)]
-pub struct LAsyncHandler {
+pub struct LAsyncHandle {
     future: LFuture,
     switch: InterruptionSender,
 }
 
-impl LAsyncHandler {
+impl LAsyncHandle {
     pub fn new(future: LFuture, switch: InterruptionSender) -> Self {
         Self { future, switch }
     }
@@ -24,9 +24,9 @@ impl LAsyncHandler {
     }
 }
 
-impl From<LAsyncHandler> for LValue {
-    fn from(lah: LAsyncHandler) -> Self {
-        Self::Handler(lah)
+impl From<LAsyncHandle> for LValue {
+    fn from(lah: LAsyncHandle) -> Self {
+        Self::Handle(lah)
     }
 }
 

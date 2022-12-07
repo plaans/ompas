@@ -1,11 +1,11 @@
 use ompas_gobotsim::platform::GodotDomain;
 use ompas_gobotsim::platform::PlatformGobotSim;
-use ompas_rae_core::monitor::CtxRaeUser;
+use ompas_rae_core::monitor::ModRaeUser;
 use ompas_rae_structs::platform::Platform;
-use sompas_modules::advanced_math::CtxMath;
-use sompas_modules::io::CtxIo;
-use sompas_modules::string::CtxString;
-use sompas_modules::utils::CtxUtils;
+use sompas_modules::advanced_math::ModMath;
+use sompas_modules::io::ModIO;
+use sompas_modules::string::ModString;
+use sompas_modules::utils::ModUtils;
 use sompas_repl::lisp_interpreter::{
     ChannelToLispInterpreter, LispInterpreter, LispInterpreterConfig,
 };
@@ -82,10 +82,10 @@ pub async fn lisp_interpreter(opt: Opt) {
 
     let mut li = LispInterpreter::new().await;
 
-    let mut ctx_io = CtxIo::default();
-    let ctx_math = CtxMath::default();
-    let ctx_utils = CtxUtils::default();
-    let ctx_string = CtxString::default();
+    let mut ctx_io = ModIO::default();
+    let ctx_math = ModMath::default();
+    let ctx_utils = ModUtils::default();
+    let ctx_string = ModString::default();
 
     //Insert the doc for the different contexts.
 
@@ -106,7 +106,7 @@ pub async fn lisp_interpreter(opt: Opt) {
         PathBuf::from(format!("{}/ompas/benchmark", home))
     };
 
-    let ctx_rae = CtxRaeUser::new(
+    let ctx_rae = ModRaeUser::new(
         Some(Platform::new(PlatformGobotSim::new(
             domain(&opt),
             !opt.view,

@@ -1,4 +1,5 @@
 use im::HashSet;
+use std::fmt::Display;
 
 #[derive(Default, Clone, Debug)]
 pub struct PureFonctionCollection {
@@ -20,14 +21,10 @@ impl PureFonctionCollection {
         let new = self.inner.clone().union(other.inner);
         self.inner = new;
     }
-}
-
-pub trait PureFonction {
-    fn get_pure_fonctions_symbols(&self) -> PureFonctionCollection;
-}
-
-impl PureFonctionCollection {
     pub fn is_pure(&self, f: &str) -> bool {
         self.inner.contains(f)
+    }
+    pub fn add(&mut self, f: impl Display) {
+        self.inner.insert(f.to_string());
     }
 }

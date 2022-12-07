@@ -5,12 +5,12 @@ use std::path::PathBuf;
 use ompas_middleware::logger::FileDescriptor;
 use ompas_middleware::Master;
 use sompas_core::activate_debug;
-use sompas_modules::advanced_math::CtxMath;
-use sompas_modules::io::{CtxIo, LogOutput};
-use sompas_modules::static_eval::CtxStaticEval;
-use sompas_modules::string::CtxString;
-use sompas_modules::time::CtxTime;
-use sompas_modules::utils::CtxUtils;
+use sompas_modules::advanced_math::ModMath;
+use sompas_modules::io::{LogOutput, ModIO};
+use sompas_modules::static_eval::ModStaticEval;
+use sompas_modules::string::ModString;
+use sompas_modules::time::ModTime;
+use sompas_modules::utils::ModUtils;
 use sompas_repl::lisp_interpreter::{LispInterpreter, LispInterpreterConfig};
 use structopt::StructOpt;
 
@@ -47,14 +47,14 @@ pub async fn lisp_interpreter(log: Option<PathBuf>, root: bool) {
     let mut li = LispInterpreter::new().await;
 
     if !root {
-        let mut ctx_io = CtxIo::default();
+        let mut ctx_io = ModIO::default();
 
-        let ctx_math = CtxMath::default();
-        let ctx_utils = CtxUtils::default();
-        let ctx_string = CtxString::default();
+        let ctx_math = ModMath::default();
+        let ctx_utils = ModUtils::default();
+        let ctx_string = ModString::default();
 
-        let ctx_eval_static: CtxStaticEval = CtxStaticEval::new().await;
-        let ctx_time: CtxTime = CtxTime::new(2);
+        let ctx_eval_static: ModStaticEval = ModStaticEval::new().await;
+        let ctx_time: ModTime = ModTime::new(2);
 
         //Add the sender of the channel.
         if let Some(pb) = &log {

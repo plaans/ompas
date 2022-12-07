@@ -1,6 +1,5 @@
 use ompas_rae_structs::domain::RAEDomain;
 
-pub const CTX_DOMAIN: &str = "CtxDomain";
 pub struct CtxDomain {
     pub domain: RAEDomain,
 }

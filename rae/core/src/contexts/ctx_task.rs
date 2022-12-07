@@ -1,16 +1,17 @@
+use ompas_rae_language::exec::task::*;
 use sompas_macros::scheme_fn;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::lenv::LEnv;
+use sompas_structs::lmodule::LModule;
 
 pub const CTX_TASK: &str = "CtxTask";
-pub const DEFINE_PARENT_TASK: &str = "define-parent-task";
 
 #[derive(Default, Copy, Clone)]
-pub struct CtxTask {
+pub struct ModTask {
     pub parent_id: Option<usize>,
 }
 
-impl CtxTask {
+impl ModTask {
     pub fn new(parent_id: usize) -> Self {
         Self {
             parent_id: Some(parent_id),
@@ -18,7 +19,19 @@ impl CtxTask {
     }
 }
 
+impl From<ModTask> for LModule {
+    fn from(m: ModTask) -> Self {
+        let mut module = LModule::new(m, MOD_TASK, DOC_MOD_TASK);
+        module.add_mut_fn(
+            DEFINE_PARENT_TASK,
+            define_parent_task,
+            DOC_DEFINE_PARENT_TASK,
+        );
+        module
+    }
+}
+
 #[scheme_fn]
 pub fn define_parent_task(env: &mut LEnv, parent_id: usize) {
-    env.import_context(Context::new(CtxTask::new(parent_id)), CTX_TASK);
+    env.import_context(Context::new(ModTask::new(parent_id)), CTX_TASK);
 }

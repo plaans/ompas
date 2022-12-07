@@ -6,11 +6,11 @@ use rand::prelude::SliceRandom;
 use sompas_core::{eval, parse};
 use sompas_macros::async_scheme_fn;
 use sompas_structs::contextcollection::Context;
-use sompas_structs::documentation::Documentation;
+use sompas_structs::documentation::DocCollection;
 use sompas_structs::lenv::LEnv;
+use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
-use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
 use std::cmp;
 use std::fmt::{Display, Formatter};
@@ -27,7 +27,7 @@ pub const INF: &str = "inf";
 pub const DEFAULT_DEPTH: usize = 10;
 
 #[derive(Default)]
-pub struct CtxCChoice {
+pub struct ModCChoice {
     tried: Vec<LValue>,
     cost: Arc<RwLock<Cost>>,
     config: CChoiceConfig,
@@ -118,7 +118,7 @@ impl From<Cost> for LValue {
     }
 }
 
-impl CtxCChoice {
+impl ModCChoice {
     pub fn new(tried: Vec<LValue>, level: u64) -> Self {
         Self {
             tried,
@@ -129,7 +129,7 @@ impl CtxCChoice {
     }
 }
 
-impl CtxCChoice {
+impl ModCChoice {
     pub async fn increase_cost(&self, c: Cost) {
         let o_c: Cost = *self.cost.read().await;
         *self.cost.write().await = o_c + c;
@@ -153,32 +153,30 @@ impl CtxCChoice {
     }
 }
 
-impl IntoModule for CtxCChoice {
-    fn into_module(self) -> Module {
-        let mut module = Module {
+impl From<ModCChoice> for LModule {
+    fn from(_: ModCChoice) -> Self {
+        todo!()
+    }
+}
+
+impl IntoModule for ModCChoice {
+    fn into_module(self) -> LModule {
+        let mut module = LModule {
             ctx: Context::new(self),
             prelude: vec![],
             raw_lisp: Default::default(),
             label: MOD_C_CHOICE.to_string(),
         };
 
-        module.add_async_fn_prelude(INCREASE_COST, increase_cost);
-        module.add_async_fn_prelude(C_CHOICE, c_choice);
+        module.add_async_fn(INCREASE_COST, increase_cost);
+        module.add_async_fn(C_CHOICE, c_choice);
         module
-    }
-
-    fn documentation(&self) -> Documentation {
-        Default::default()
-    }
-
-    fn pure_fonctions(&self) -> PureFonctionCollection {
-        Default::default()
     }
 }
 
 #[async_scheme_fn]
 pub async fn increase_cost(env: &LEnv, cost: Cost) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<CtxCChoice>(MOD_C_CHOICE)?;
+    let ctx = env.get_context::<ModCChoice>(MOD_C_CHOICE)?;
     ctx.increase_cost(cost).await;
     Ok(())
 }
@@ -191,7 +189,7 @@ pub async fn c_choice(env: &LEnv, task: &[LValue]) -> LResult {
     let mut method = LValue::Nil;
     let mut cost = None;
 
-    let ctx = env.get_context::<CtxCChoice>(MOD_C_CHOICE)?;
+    let ctx = env.get_context::<ModCChoice>(MOD_C_CHOICE)?;
     let level = ctx.level.load(Ordering::Relaxed);
 
     let mut methods: Vec<LValue> = greedy_select(state.clone(), &ctx.tried, task.to_vec(), env)
@@ -211,13 +209,13 @@ pub async fn c_choice(env: &LEnv, task: &[LValue]) -> LResult {
         let mut new_env = env.clone();
         println!("Computing cost for {}({})", m, level);
         new_env.import_context(
-            Context::new(CtxCChoice::new(vec![], level + 1)),
+            Context::new(ModCChoice::new(vec![], level + 1)),
             MOD_C_CHOICE,
         );
         new_env.import_context(Context::new(CtxState::new(state.clone().into())), CTX_STATE);
         eval(m, &mut new_env, None).await?;
         let c_new = new_env
-            .get_context::<CtxCChoice>(MOD_C_CHOICE)
+            .get_context::<ModCChoice>(MOD_C_CHOICE)
             .unwrap()
             .get_cost()
             .await;
@@ -244,7 +242,7 @@ pub async fn c_choice(env: &LEnv, task: &[LValue]) -> LResult {
         println!("End computing cost for {}({})", m, level);
     }
 
-    env.get_context::<CtxCChoice>(MOD_C_CHOICE)
+    env.get_context::<ModCChoice>(MOD_C_CHOICE)
         .unwrap()
         .increase_cost(cost.unwrap_or(Cost::Some(0.0)))
         .await;

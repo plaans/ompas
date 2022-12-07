@@ -1,4 +1,4 @@
-use crate::monitor::{CtxRaeUser, MOD_RAE_USER};
+use crate::monitor::{ModRaeUser, MOD_RAE_USER};
 use ompas_rae_language::*;
 use ompas_rae_structs::domain::command::Command;
 use ompas_rae_structs::domain::method::Method;
@@ -9,144 +9,26 @@ use ompas_rae_structs::state::partial_state::PartialState;
 use ompas_rae_structs::state::world_state::StateType;
 use sompas_core::modules::list::{car, cons, first};
 use sompas_core::{eval, expand, get_root_env, parse};
-use sompas_language::predicates::*;
+use sompas_language::predicate::*;
 use sompas_language::*;
 use sompas_macros::*;
 use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lenv::LEnv;
+use sompas_structs::lmodule::LModule;
 use sompas_structs::lprimitives::LPrimitives;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::{lruntimeerror, wrong_n_args, wrong_type};
 use std::convert::TryInto;
 
-const NAME: &str = ":name";
-const TASK: &str = ":task";
-const PARAMETERS: &str = ":params";
-const PRE_CONDITIONS: &str = ":pre-conditions";
-const BODY: &str = ":body";
-const MODEL: &str = ":model";
-const MODEL_TYPE: &str = ":model-type";
-const EFFECTS: &str = ":effects";
-const RESULT: &str = ":result";
-const SCORE: &str = ":score";
-const COST: &str = ":cost";
+//#[derive(Default)]
+pub struct ModDomain {}
 
-pub const MACRO_DEF_COMMAND: &str = "(defmacro def-command
-    (lambda attributes
-        (let ((label (car attributes))
-                (attributes (cdr attributes)))
-
-        (begin
-            (define __l__ (lambda (l)
-                (if (null? l)
-                nil
-                 (cons 
-                        (cons (caar l) (list (cdar l)))
-                        (__l__ (cdr l))))))
-            `(add-command (map 
-                (quote ,(cons (cons ':name label) (__l__ attributes)))))))))";
-
-pub const MACRO_DEF_STATE_FUNCTION: &str = "(defmacro def-state-function
-    (lambda attributes
-        (let ((label (car attributes))
-                (attributes (cdr attributes)))
-
-        (begin
-            (define __l__ (lambda (l)
-                (if (null? l)
-                nil
-                 (cons 
-                        (cons (caar l) (list (cdar l)))
-                        (__l__ (cdr l))))))
-            `(add-state-function (map 
-                (quote ,(cons (cons ':name label) (__l__ attributes)))))))))";
-
-pub const MACRO_DEF_METHOD: &str = "(defmacro def-method
-    (lambda attributes
-        (let ((label (car attributes))
-                (attributes (cdr attributes)))
-
-        (begin
-            (define __l__ (lambda (l)
-                (if (null? l)
-                nil
-                 (cons 
-                        (cons (caar l) (list (cdar l)))
-                        (__l__ (cdr l))))))
-            `(add-method (map 
-                (quote ,(cons (cons ':name label) (__l__ attributes)))))))))";
-
-pub const MACRO_DEF_TASK: &str = "(defmacro def-task
-    (lambda attributes
-        (let ((label (car attributes))
-                (attributes (cdr attributes)))
-
-        (begin
-            (define __l__ (lambda (l)
-                (if (null? l)
-                nil
-                 (cons 
-                        (cons (caar l) (list (cdar l)))
-                        (__l__ (cdr l))))))
-            `(add-task (map 
-                (quote ,(cons (cons ':name label) (__l__ attributes)))))))))";
-
-pub const MACRO_DEF_LAMBDA: &str = "(defmacro def-lambda
-    (lambda (label lambda)
-            `(add-lambda ',label ',lambda)))";
-
-pub const MACRO_PDDL_MODEL: &str = "(defmacro pddl-model
-    (lambda args
-        (let ((label (car args))
-               (args (cdr args)))
-            (begin
-                (define __l__ (lambda (l)
-                (if (null? l)
-                nil
-                 (cons 
-                        (cons (caar l) (list (cdar l)))
-                        (__l__ (cdr l))))))
-                `(map 
-                    (quote ,(append (cons (list ':name label) (cons '(:model-type pddl) nil )) (__l__ args))))))))";
-
-pub const MACRO_OM_MODEL: &str = "(defmacro om-model
-    (lambda args
-        (let ((label (car args))
-               (args (cdr args)))
-            (begin
-                (define __l__ (lambda (l)
-                (if (null? l)
-                nil
-                 (cons 
-                        (cons (caar l) (list (cdar l)))
-                        (__l__ (cdr l))))))
-                `(map 
-                    (quote ,(append (cons (list ':name label) (cons '(:model-type om) nil )) (__l__ args))))))))";
-
-pub const MACRO_DEF_COMMAND_OM_MODEL: &str = "(defmacro def-command-om-model
-    (lambda args
-        `(add-command-model ,(cons om-model args))))";
-
-pub const MACRO_DEF_COMMAND_PDDL_MODEL: &str = "(defmacro def-command-pddl-model
-    (lambda args
-        `(add-command-model ,(cons pddl-model args))))";
-
-pub const MACRO_DEF_TASK_OM_MODEL: &str = "(defmacro def-task-om-model
-    (lambda args
-        `(add-task-model ,(cons om-model args))))";
-
-pub const MACRO_DEF_TASK_PDDL_MODEL: &str = "(defmacro def-task-pddl-model
-    (lambda args
-        `(add-task-model ,(cons pddl-model args))))";
-
-pub const MACRO_DEF_INITIAL_STATE: &str = "(defmacro def-initial-state (lambda args
-    `(add-facts (map ',args))))";
-
-pub const MACRO_DEF_TYPES: &str = "(defmacro def-types (lambda args
-    (cons 'add-types (quote-list args))))";
-pub const MACRO_DEF_OBJECTS: &str = "(defmacro def-objects (lambda args
-    (cons 'add-objects (quote-list args))))";
+impl From<ModDomain> for LModule {
+    fn from(m: ModDomain) -> Self {
+        let module =
+    }
+}
 
 /// Takes as input a p_expr of the form ((p1 p1_type) ... (p_n pn_type))
 #[async_scheme_fn]
@@ -208,7 +90,7 @@ pub async fn generate_test_type_expr(env: &LEnv, params: Vec<LValue>) -> LResult
 /// Defines a lambda in RAE environment.
 #[async_scheme_fn]
 pub async fn add_lambda(env: &LEnv, label: String, lambda: &LValue) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER).unwrap();
+    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER).unwrap();
     let mut env = ctx.get_empty_env();
     let expanded = expand(lambda, true, &mut env).await?;
     let mut e = get_root_env().await;
@@ -225,7 +107,7 @@ pub async fn add_state_function(
     env: &LEnv,
     map: im::HashMap<LValue, LValue>,
 ) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER)?;
+    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER)?;
     let mut new_env = ctx.get_empty_env();
     let label = map.get(&NAME.into()).unwrap();
     let params: Parameters = map
@@ -281,7 +163,7 @@ pub async fn add_command(
             1..usize::MAX,
         ));
     }
-    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER)?;
+    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER)?;
     let mut env = ctx.get_empty_env();
     let mut command = Command::default();
     command.set_label(map.get(&NAME.into()).unwrap().to_string());
@@ -343,7 +225,7 @@ pub async fn add_task(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<()
             1..usize::MAX,
         ));
     }
-    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER)?;
+    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER)?;
     let mut env = ctx.get_empty_env();
 
     let mut task = Task::default();
@@ -399,7 +281,7 @@ pub async fn add_method(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<
             1..usize::MAX,
         ));
     }
-    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER)?;
+    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER)?;
     let mut new_env = ctx.get_empty_env();
     let parameters = map.get(&PARAMETERS.into()).unwrap_or(&LValue::Nil).clone();
     let task_label = car(
@@ -587,7 +469,7 @@ pub async fn add_command_model(
     env: &LEnv,
     model: im::HashMap<LValue, LValue>,
 ) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER)?;
+    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER)?;
     let mut env = ctx.get_empty_env();
     let label: String = model.get(&NAME.into()).unwrap().try_into()?;
     let model = create_model(&mut env, model).await?;
@@ -603,7 +485,7 @@ pub async fn add_task_model(
     env: &LEnv,
     model: im::HashMap<LValue, LValue>,
 ) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER)?;
+    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER)?;
     let mut env = ctx.get_empty_env();
     let label: String = model.get(&NAME.into()).unwrap().try_into()?;
     let model = create_model(&mut env, model).await?;
@@ -614,7 +496,7 @@ pub async fn add_task_model(
 ///Takes in input a list of initial facts that will be stored in the inner world part of the State.
 #[async_scheme_fn]
 pub async fn add_facts(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<(), LRuntimeError> {
-    let state = &env.get_context::<CtxRaeUser>(MOD_RAE_USER)?.interface.state;
+    let state = &env.get_context::<ModRaeUser>(MOD_RAE_USER)?.interface.state;
 
     let mut inner_world = PartialState {
         inner: Default::default(),
@@ -689,7 +571,7 @@ pub async fn add_objects(env: &LEnv, args: Vec<Vec<LValue>>) -> Result<(), LRunt
 
 #[async_scheme_fn]
 pub async fn add_type(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER).unwrap();
+    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER).unwrap();
 
     let (t, parent) = match args.len() {
         1 => (args[0].to_string(), None),
@@ -713,7 +595,7 @@ pub async fn add_type(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> 
 
 #[async_scheme_fn]
 pub async fn add_object(env: &LEnv, object: String, t: String) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER).unwrap();
+    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER).unwrap();
 
     ctx.interface.state.add_instance(&object, &t).await;
 
@@ -725,25 +607,25 @@ mod test {
     use super::*;
     use sompas_core::test_utils::{test_expression_with_env, TestExpression};
     use sompas_core::{eval_init, get_root_env};
-    use sompas_modules::advanced_math::CtxMath;
-    use sompas_modules::io::CtxIo;
-    use sompas_modules::utils::CtxUtils;
+    use sompas_modules::advanced_math::ModMath;
+    use sompas_modules::io::ModIO;
+    use sompas_modules::utils::ModUtils;
     use sompas_structs::lenv::ImportType::WithoutPrefix;
     use sompas_structs::lenv::LEnv;
 
     async fn init_env_and_ctxs() -> LEnv {
         let mut env = get_root_env().await;
 
-        env.import_module(CtxUtils::default(), WithoutPrefix);
+        env.import_module(ModUtils::default(), WithoutPrefix);
 
-        env.import_module(CtxMath::default(), WithoutPrefix);
+        env.import_module(ModMath::default(), WithoutPrefix);
 
-        let mut ctx = CtxRaeUser::default();
-        ctx.empty_env = CtxRaeUser::init_empty_env().await;
+        let mut ctx = ModRaeUser::default();
+        ctx.empty_env = ModRaeUser::init_empty_env().await;
 
         env.import_module(ctx, WithoutPrefix);
 
-        env.import_module(CtxIo::default(), WithoutPrefix);
+        env.import_module(ModIO::default(), WithoutPrefix);
         eval_init(&mut env).await;
         env
     }

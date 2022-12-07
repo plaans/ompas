@@ -1,19 +1,10 @@
-use sompas_structs::documentation::Documentation;
-use sompas_structs::module::{IntoModule, Module};
-use sompas_structs::purefonction::PureFonctionCollection;
+use sompas_language::sort::{DOC_MOD_SORT, MOD_SORT};
+use sompas_structs::lmodule::LModule;
 
-pub struct CtxSort {}
+pub struct ModSort {}
 
-impl IntoModule for CtxSort {
-    fn into_module(self) -> Module {
-        todo!()
-    }
-
-    fn documentation(&self) -> Documentation {
-        todo!()
-    }
-
-    fn pure_fonctions(&self) -> PureFonctionCollection {
-        todo!()
+impl From<ModSort> for LModule {
+    fn from(m: ModSort) -> Self {
+        LModule::new(m, MOD_SORT, DOC_MOD_SORT)
     }
 }

@@ -1,24 +1,22 @@
 use std::collections::BTreeMap;
-use std::fmt::Write;
 use std::fmt::{Debug, Display, Formatter};
 #[derive(Default, Debug, Clone)]
-pub struct Documentation {
-    inner: BTreeMap<String, LHelp>,
+pub struct DocCollection {
+    inner: BTreeMap<String, Doc>,
 }
 
-impl Documentation {
-    /// Creates a new documentation for the module
-    /// Automatically generates the verbose part of the module with the contained element of the module.
-    pub fn new(mut mod_doc: LHelp, other: Vec<LHelp>) -> Self {
-        let mut result: BTreeMap<String, LHelp> = Default::default();
-        let mut verbose_mod: String = format!("Elements contained in {}:\n", mod_doc.label);
-        for e in other {
-            writeln!(verbose_mod, "- {}", e.label).unwrap();
-            result.insert(e.label.to_string(), e);
+impl Display for DocCollection {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        for (label, doc) in &self.inner {
+            writeln!(f, "~ {:<20}: {}", label, doc).unwrap();
         }
-        mod_doc.verbose = Some(verbose_mod);
-        result.insert(mod_doc.label.to_string(), mod_doc);
-        Self { inner: result }
+        Ok(())
+    }
+}
+
+impl DocCollection {
+    pub fn insert(&mut self, label: impl Display, doc: Doc) {
+        self.inner.insert(label.to_string(), doc);
     }
 
     pub fn append(&mut self, mut other: Self) {
@@ -39,33 +37,59 @@ impl Documentation {
             Some(h) => format!("{:?}\n", h),
         }
     }
+
+    pub fn get_mut(&mut self, sym: &str) -> Option<&mut Doc> {
+        self.inner.get_mut(sym)
+    }
 }
 #[derive(Clone)]
-pub struct LHelp {
-    label: String,
-    short: String,
-    verbose: Option<String>,
+pub struct Doc {
+    //label: String,
+    pub(crate) short: String,
+    pub(crate) verbose: Option<String>,
 }
 
-impl LHelp {
-    pub fn new(label: impl Display, short: impl Display) -> LHelp {
-        LHelp {
-            label: label.to_string(),
+impl Doc {
+    pub fn new(short: impl Display) -> Doc {
+        Doc {
+            //label: label.to_string(),
             short: short.to_string(),
             verbose: None,
         }
     }
 
-    pub fn new_verbose(label: impl Display, short: impl Display, verbose: impl Display) -> LHelp {
-        LHelp {
-            label: label.to_string(),
+    pub fn new_verbose(short: impl Display, verbose: impl Display) -> Doc {
+        Doc {
+            //label: label.to_string(),
             short: short.to_string(),
             verbose: Some(verbose.to_string()),
         }
     }
 }
 
-impl Debug for LHelp {
+impl From<&str> for Doc {
+    fn from(s: &str) -> Self {
+        Self::new(s)
+    }
+}
+
+impl From<String> for Doc {
+    fn from(s: String) -> Self {
+        Self::new(s)
+    }
+}
+
+impl<T, U> From<(T, U)> for Doc
+where
+    T: Display,
+    U: Display,
+{
+    fn from(doc: (T, U)) -> Self {
+        Self::new_verbose(doc.0.to_string(), doc.1.to_string())
+    }
+}
+
+impl Debug for Doc {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(
             f,
@@ -76,18 +100,18 @@ impl Debug for LHelp {
     }
 }
 
-impl Display for LHelp {
+impl Display for Doc {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{:<20}: {}", self.label, self.short)
+        write!(f, "{}", self.short)
     }
 }
 
-impl From<Vec<LHelp>> for Documentation {
-    fn from(vec: Vec<LHelp>) -> Self {
-        let mut result: BTreeMap<String, LHelp> = Default::default();
+/*impl From<Vec<Doc>> for DocCollection {
+    fn from(vec: Vec<Doc>) -> Self {
+        let mut result: BTreeMap<String, Doc> = Default::default();
         for e in vec {
             result.insert(e.label.to_string(), e);
         }
         Self { inner: result }
     }
-}
+}*/

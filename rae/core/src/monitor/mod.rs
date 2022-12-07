@@ -2,9 +2,9 @@
 
 use crate::contexts::ctx_domain::{CtxDomain, CTX_DOMAIN};
 use crate::contexts::ctx_mode::{CtxMode, CTX_MODE};
-use crate::contexts::ctx_rae::{CtxRae, CTX_RAE};
+use crate::contexts::ctx_rae::{CtxOMPAS, CTX_RAE};
 use crate::contexts::ctx_state::{CtxState, CTX_STATE};
-use crate::contexts::ctx_task::{CtxTask, CTX_TASK};
+use crate::contexts::ctx_task::{ModTask, CTX_TASK};
 use crate::exec::CtxRaeExec;
 use domain::*;
 use log::{activate_log, deactivate_log};
@@ -19,14 +19,14 @@ use ompas_rae_structs::rae_options::OMPASOptions;
 use ompas_rae_structs::select_mode::SelectMode;
 use planning::*;
 use sompas_core::{eval_init, get_root_env};
-use sompas_modules::advanced_math::CtxMath;
-use sompas_modules::io::{CtxIo, LogOutput};
-use sompas_modules::utils::CtxUtils;
+use sompas_modules::advanced_math::ModMath;
+use sompas_modules::io::{LogOutput, ModIO};
+use sompas_modules::utils::ModUtils;
 use sompas_structs::contextcollection::Context;
-use sompas_structs::documentation::{Documentation, LHelp};
+use sompas_structs::documentation::{Doc, DocCollection};
 use sompas_structs::lenv::ImportType::WithoutPrefix;
 use sompas_structs::lenv::{LEnv, LEnvSymbols};
-use sompas_structs::module::{InitLisp, IntoModule, Module};
+use sompas_structs::lmodule::{InitScheme, LModule};
 use sompas_structs::purefonction::PureFonctionCollection;
 use std::fs;
 use std::path::PathBuf;
@@ -41,7 +41,7 @@ pub mod user_interface;
 use crate::monitor::log::{get_log_level, set_log_level};
 use ompas_rae_interface::platform::{Domain, Platform, PlatformDescriptor};
 use ompas_rae_interface::PLATFORM_CLIENT;
-use sompas_modules::time::CtxTime;
+use sompas_modules::time::ModTime;
 
 //LANGUAGE
 const MOD_RAE_USER: &str = "rae_user";
@@ -58,171 +58,38 @@ const DOC_RAE_LAUNCH: &str = "Launch the main rae loop in an asynchronous task."
 
 pub const TOKIO_CHANNEL_SIZE: usize = 100;
 
-pub struct CtxRaeUser {
+pub struct ModRaeUser {
     options: Arc<RwLock<OMPASOptions>>,
     interface: OMPASInternalState,
     platform: Option<Platform>,
     rae_domain: Arc<RwLock<RAEDomain>>,
-    platform_domain: InitLisp,
+    platform_domain: InitScheme,
     empty_env: LEnv,
     tasks_to_execute: Arc<RwLock<Vec<Job>>>,
 }
 
-impl IntoModule for CtxRaeUser {
-    fn into_module(self) -> Module {
-        let mut init_lisp: InitLisp = vec![
-            MACRO_DEF_COMMAND,
-            MACRO_DEF_TASK,
-            MACRO_DEF_METHOD,
-            MACRO_DEF_LAMBDA,
-            MACRO_DEF_STATE_FUNCTION,
-            MACRO_PDDL_MODEL,
-            MACRO_OM_MODEL,
-            MACRO_DEF_COMMAND_PDDL_MODEL,
-            MACRO_DEF_COMMAND_OM_MODEL,
-            MACRO_DEF_INITIAL_STATE,
-            MACRO_DEF_TYPES,
-            MACRO_DEF_OBJECTS,
-        ]
-        .into();
-        init_lisp.append(&mut self.platform_domain.clone());
-
-        //let domain = Default::default();
-        let mut module = Module {
-            ctx: Context::new(self),
-            prelude: vec![],
-            raw_lisp: init_lisp,
-            label: MOD_RAE_USER.to_string(),
-        };
-
-        /*
-        RAE control
-         */
-        module.add_async_fn_prelude(RAE_LAUNCH, launch);
-        module.add_async_fn_prelude(RAE_STOP, stop);
-        module.add_async_fn_prelude(RAE_CONFIGURE_PLATFORM, configure_platform);
-        module.add_async_fn_prelude(RAE_SET_SELECT, set_select);
-        module.add_async_fn_prelude(RAE_TRIGGER_TASK, trigger_task);
-        module.add_async_fn_prelude(RAE_ADD_TASK_TO_EXECUTE, add_task_to_execute);
-
-        /*
-        LOG
-         */
-        module.add_async_fn_prelude(ACTIVATE_LOG, activate_log);
-        module.add_async_fn_prelude(DEACTIVATE_LOG, deactivate_log);
-        module.add_async_fn_prelude(GET_LOG_LEVEL, get_log_level);
-        module.add_async_fn_prelude(SET_LOG_LEVEL, set_log_level);
-        /*
-        GETTERS
-         */
-        module.add_async_fn_prelude(RAE_GET_METHODS, get_methods);
-        module.add_async_fn_prelude(RAE_GET_STATE_FUNCTIONS, get_state_function);
-        module.add_async_fn_prelude(RAE_GET_ACTIONS, get_actions);
-        module.add_async_fn_prelude(RAE_GET_TASKS, get_tasks);
-        module.add_async_fn_prelude(RAE_GET_ENV, get_env);
-        module.add_async_fn_prelude(RAE_GET_CONFIG_PLATFORM, get_config_platform);
-        module.add_async_fn_prelude(RAE_GET_SELECT, get_select);
-
-        //Domain Definition
-        module.add_async_fn_prelude(RAE_ADD_STATE_FUNCTION, add_state_function);
-        module.add_async_fn_prelude(RAE_ADD_COMMAND, add_command);
-        module.add_async_fn_prelude(RAE_ADD_COMMAND_MODEL, add_command_model);
-        module.add_async_fn_prelude(RAE_ADD_TASK_MODEL, add_task_model);
-        module.add_async_fn_prelude(RAE_ADD_TASK, add_task);
-        module.add_async_fn_prelude(RAE_ADD_METHOD, add_method);
-        module.add_async_fn_prelude(RAE_ADD_LAMBDA, add_lambda);
-        module.add_async_fn_prelude(RAE_ADD_FACTS, add_facts);
-        module.add_async_fn_prelude(RAE_ADD_CONSTANT, add_object);
-        module.add_async_fn_prelude(RAE_ADD_OBJECT, add_object);
-        module.add_async_fn_prelude(RAE_ADD_TYPE, add_type);
-        //module.add_async_fn_prelude(RAE_DEF_CONSTANTS, add_objects);
-        module.add_async_fn_prelude(RAE_ADD_TYPES, add_types);
-        module.add_async_fn_prelude(RAE_ADD_OBJECTS, add_objects);
-        module.add_async_fn_prelude(GENERATE_TEST_TYPE_EXPR, generate_test_type_expr);
-
-        //functions to debug the functioning of rae
-        module.add_async_fn_prelude(RAE_GET_STATE, get_state);
-        module.add_async_fn_prelude(RAE_GET_AGENDA, get_agenda);
-        module.add_async_fn_prelude(RAE_GET_TASK_NETWORK, get_task_network);
-        module.add_async_fn_prelude(RAE_GET_TYPE_HIERARCHY, get_type_hierarchy);
-        module.add_async_fn_prelude(RAE_GET_STATS, get_stats);
-        module.add_async_fn_prelude(RAE_EXPORT_STATS, export_stats);
-
-        //Conversion functions
-        module.add_async_fn_prelude(RAE_CONVERT_EXPR, convert_expr);
-        module.add_async_fn_prelude(RAE_CONVERT_DOMAIN, convert_domain);
-        module.add_async_fn_prelude(RAE_PRE_PROCESS_LAMBDA, pre_process_lambda);
-        module.add_async_fn_prelude(RAE_PRE_PROCESS_EXPR, pre_process_expr);
-        module.add_async_fn_prelude(RAE_PRE_PROCESS_DOMAIN, pre_process_domain);
-        module.add_async_fn_prelude(RAE_CONVERT_COND_EXPR, convert_cond_expr);
-        module.add_async_fn_prelude(RAE_PLAN_TASK, plan_task);
-
-        //Trigger task
-
-        module.add_async_fn_prelude(RAE_GET_RESOURCES, get_resources);
-        module.add_async_fn_prelude(RAE_GET_MONITORS, get_monitors);
+impl From<ModRaeUser> for LModule {
+    fn from(m: ModRaeUser) -> Self {
+        let mut module = LModule::new(m, MOD_RAE_USER, DOC_MOD_RAE_USER);
+        module.add_submodule(ModDomain::default());
+        module.add_submodule(ModLog::default());
+        module.add_submodule(ModPlanning::default());
+        module.add_submodule(ModUserInterface::default());
 
         module
     }
-
-    fn documentation(&self) -> Documentation {
-        vec![
-            LHelp::new_verbose(MOD_RAE_USER, DOC_MOD_RAE, DOC_MOD_RAE_VERBOSE),
-            LHelp::new(RAE_GET_METHODS, DOC_RAE_GET_METHODS),
-            LHelp::new(RAE_GET_ACTIONS, DOC_RAE_GET_ACTIONS),
-            LHelp::new_verbose(
-                RAE_GET_SYMBOL_TYPE,
-                DOC_RAE_GET_SYMBOL_TYPE,
-                DOC_RAE_GET_SYMBOL_TYPE_VERBOSE,
-            ),
-            LHelp::new(RAE_GET_TASKS, DOC_RAE_GET_TASKS),
-            LHelp::new(RAE_GET_STATE_FUNCTIONS, DOC_RAE_GET_STATE_FUNCTIONS),
-            LHelp::new(RAE_GET_ENV, DOC_RAE_GET_ENV),
-            LHelp::new(RAE_LAUNCH, DOC_RAE_LAUNCH),
-            LHelp::new(RAE_GET_STATE, DOC_RAE_GET_STATE),
-            LHelp::new(RAE_GET_STATUS, DOC_RAE_GET_STATUS),
-            LHelp::new_verbose(
-                RAE_ADD_STATE_FUNCTION,
-                DOC_ADD_STATE_FUNCTION,
-                DOC_ADD_STATE_FUNCTION_VERBOSE,
-            ),
-            LHelp::new_verbose(RAE_ADD_COMMAND, DOC_ADD_ACTION, DOC_ADD_ACTION_VERBOSE),
-            LHelp::new_verbose(RAE_ADD_TASK, DOC_ADD_TASK, DOC_ADD_TASK_VERBOSE),
-            LHelp::new_verbose(RAE_ADD_METHOD, DOC_ADD_METHOD, DOC_ADD_METHOD_VERBOSE),
-            LHelp::new(RAE_ADD_LAMBDA, DOC_ADD_LAMBDA),
-            LHelp::new(RAE_ADD_FACTS, DOC_ADD_INITIAL_STATE),
-            LHelp::new(RAE_CONFIGURE_PLATFORM, DOC_RAE_CONFIGURE_PLATFORM),
-            LHelp::new(RAE_GET_CONFIG_PLATFORM, DOC_RAE_GET_CONFIG_PLATFORM),
-            LHelp::new(RAE_GET_AGENDA, DOC_RAE_GET_AGENDA),
-            LHelp::new_verbose(
-                RAE_TRIGGER_TASK,
-                DOC_RAE_TRIGGER_TASK,
-                DOC_RAE_TRIGGER_EVENT_VERBOSE,
-            ),
-            LHelp::new_verbose(
-                RAE_TRIGGER_EVENT,
-                DOC_RAE_TRIGGER_EVENT,
-                DOC_RAE_TRIGGER_TASK_VERBOSE,
-            ),
-        ]
-        .into()
-    }
-
-    fn pure_fonctions(&self) -> PureFonctionCollection {
-        vec![].into()
-    }
 }
 
-impl CtxRaeUser {
+impl ModRaeUser {
     /// Initialize the libraries to load inside Scheme env.
     /// Takes as argument the execution platform.
     ///
 
     pub async fn init_empty_env() -> LEnv {
         let mut empty_env = get_root_env().await;
-        empty_env.import_module(CtxUtils::default(), WithoutPrefix);
-        empty_env.import_module(CtxMath::default(), WithoutPrefix);
-        empty_env.import_module(CtxIo::default(), WithoutPrefix);
+        empty_env.import_module(ModUtils::default(), WithoutPrefix);
+        empty_env.import_module(ModMath::default(), WithoutPrefix);
+        empty_env.import_module(ModIO::default(), WithoutPrefix);
         empty_env.import_module(CtxRaeExec::default(), WithoutPrefix);
         eval_init(&mut empty_env).await;
         empty_env
@@ -267,7 +134,7 @@ impl CtxRaeUser {
         )
         .await;
 
-        let domain: InitLisp = match platform.domain().await {
+        let domain: InitScheme = match platform.domain().await {
             Domain::String(s) => vec![s].into(),
             Domain::File(f) => vec![fs::read_to_string(f).unwrap()].into(),
         };
@@ -299,16 +166,16 @@ impl CtxRaeUser {
             }
         }
 
-        env.import_module(CtxUtils::default(), WithoutPrefix);
+        env.import_module(ModUtils::default(), WithoutPrefix);
 
-        env.import_module(CtxMath::default(), WithoutPrefix);
+        env.import_module(ModMath::default(), WithoutPrefix);
 
-        let mut ctx_io = CtxIo::default();
+        let mut ctx_io = ModIO::default();
         ctx_io.set_log_output(LogOutput::Log(self.interface.log.clone()));
 
         env.import_module(ctx_io, WithoutPrefix);
 
-        let ctx_rae = CtxRae {
+        let ctx_rae = CtxOMPAS {
             resources: self.interface.resources.clone(),
             monitors: self.interface.monitors.clone(),
             platform_interface: self.platform.clone(),
@@ -323,13 +190,13 @@ impl CtxRaeUser {
         env.import_context(Context::new(ctx_rae), CTX_RAE);
         env.import_module(CtxRaeExec::default(), WithoutPrefix);
         env.import_context(Context::new(ctx_state), CTX_STATE);
-        env.import_context(Context::new(CtxTask::default()), CTX_TASK);
+        env.import_context(Context::new(ModTask::default()), CTX_TASK);
         env.import_context(Context::new(CtxMode::default()), CTX_MODE);
         env.import_context(
             Context::new(CtxDomain::new(self.rae_domain.read().await.clone())),
             CTX_DOMAIN,
         );
-        env.import_module(CtxTime::new(2), WithoutPrefix);
+        env.import_module(ModTime::new(2), WithoutPrefix);
         eval_init(&mut env).await;
 
         let domain_exec_symbols: LEnvSymbols = self.rae_domain.read().await.get_exec_env();
@@ -340,7 +207,7 @@ impl CtxRaeUser {
     }
 }
 
-impl CtxRaeUser {
+impl ModRaeUser {
     /*pub fn get_log(&self) -> &PathBuf {
         &self.interface.log.path
     }
@@ -360,11 +227,11 @@ impl CtxRaeUser {
         self.options.write().await.set_select_mode(select_mode);
     }
 
-    pub fn get_domain(&self) -> &InitLisp {
+    pub fn get_domain(&self) -> &InitScheme {
         &self.platform_domain
     }
 
-    pub fn set_domain(&mut self, domain: InitLisp) {
+    pub fn set_domain(&mut self, domain: InitScheme) {
         self.platform_domain = domain;
     }
 
@@ -377,7 +244,7 @@ impl CtxRaeUser {
     }
 }
 
-impl Default for CtxRaeUser {
+impl Default for ModRaeUser {
     fn default() -> Self {
         Self {
             options: Default::default(),

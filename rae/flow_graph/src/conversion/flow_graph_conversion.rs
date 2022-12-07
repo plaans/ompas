@@ -25,7 +25,7 @@ pub fn convert_into_flow_graph(
         LValue::Symbol(s) => convert_symbol(s, fl, define_table),
         LValue::String(s) => convert_string(s, fl),
         LValue::Number(n) => convert_number(n, fl),
-        LValue::CoreOperator(co) => convert_core_operator(co, fl),
+        LValue::Primitive(co) => convert_core_operator(co, fl),
         LValue::List(l) => convert_list(l, fl, define_table)?,
         LValue::True => convert_bool(true, fl),
         LValue::Nil => convert_bool(false, fl),
@@ -86,7 +86,7 @@ fn convert_list(
             out_of_scope = r;
             Ok(s)
         }
-        LValue::CoreOperator(co) => match co {
+        LValue::Primitive(co) => match co {
             LPrimitives::Define => {
                 let var = &list[1];
                 let val = &list[2];

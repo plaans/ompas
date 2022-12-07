@@ -16,11 +16,9 @@ use ompas_rae_structs::state::action_status::ActionStatus;
 use ompas_rae_structs::state::partial_state::PartialState;
 use ompas_rae_structs::state::world_state::{StateType, WorldState};
 use platform_interface::platform_update::Update;
-use sompas_structs::documentation::Documentation;
+use sompas_structs::lmodule::LModule;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalues::LValueS;
-use sompas_structs::module::{IntoModule, Module};
-use sompas_structs::purefonction::PureFonctionCollection;
 use std::any::Any;
 use std::borrow::Borrow;
 use std::fmt::Display;
@@ -441,36 +439,11 @@ impl From<PathBuf> for Domain {
     }
 }
 
-pub struct PlatformModule {
-    module: Module,
-    documentation: Documentation,
-    pure_fonctions: PureFonctionCollection,
-}
+pub struct PlatformModule(LModule);
 
 impl PlatformModule {
-    pub fn new(module: impl IntoModule) -> Self {
-        let documentation = module.documentation();
-        let pure_fonctions = module.pure_fonctions();
-        let module = module.into_module();
-        Self {
-            module,
-            documentation,
-            pure_fonctions,
-        }
-    }
-}
-
-impl IntoModule for PlatformModule {
-    fn into_module(self) -> Module {
-        self.module
-    }
-
-    fn documentation(&self) -> Documentation {
-        self.documentation.clone()
-    }
-
-    fn pure_fonctions(&self) -> PureFonctionCollection {
-        self.pure_fonctions.clone()
+    pub fn new(module: impl Into<LModule>) -> Self {
+        Self(module.into())
     }
 }
 

@@ -1,13 +1,13 @@
 use sompas_core::activate_debug;
-use sompas_modules::advanced_math::CtxMath;
-use sompas_modules::io::CtxIo;
-use sompas_modules::string::CtxString;
-use sompas_modules::utils::CtxUtils;
+use sompas_modules::advanced_math::ModMath;
+use sompas_modules::io::ModIO;
+use sompas_modules::string::ModString;
+use sompas_modules::utils::ModUtils;
 use sompas_repl::lisp_interpreter::{LispInterpreter, LispInterpreterConfig};
 use std::fs;
 use std::path::PathBuf;
 
-use ompas_rae_core::monitor::CtxRaeUser;
+use ompas_rae_core::monitor::ModRaeUser;
 use structopt::StructOpt;
 
 pub const TOKIO_CHANNEL_SIZE: usize = 65_384;
@@ -46,10 +46,10 @@ async fn main() {
 async fn lisp_interpreter(opt: &Opt) {
     let mut li = LispInterpreter::new().await;
 
-    let mut ctx_io = CtxIo::default();
-    let ctx_math = CtxMath::default();
-    let ctx_utils = CtxUtils::default();
-    let ctx_string = CtxString::default();
+    let mut ctx_io = ModIO::default();
+    let ctx_math = ModMath::default();
+    let ctx_utils = ModUtils::default();
+    let ctx_string = ModString::default();
 
     //Insert the doc for the different contexts.
 
@@ -84,7 +84,7 @@ async fn lisp_interpreter(opt: &Opt) {
         }
     });
 
-    let ctx_rae = CtxRaeUser::new(None, opt.log.clone(), opt.rae_log).await;
+    let ctx_rae = ModRaeUser::new(None, opt.log.clone(), opt.rae_log).await;
     li.import_namespace(ctx_rae);
 
     li.set_config(LispInterpreterConfig::new(true));

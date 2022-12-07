@@ -449,7 +449,7 @@ pub fn eval_static(lv: &LValue, env: &mut LEnv) -> lruntimeerror::Result<PLValue
             let proc = &list[0];
             let args = &list[1..];
             //assert!(args.len() >= 2, "Checked in expansion");
-            if let LValue::CoreOperator(co) = proc {
+            if let LValue::Primitive(co) = proc {
                 match co {
                     LPrimitives::Define => {
                         return match &args[0] {

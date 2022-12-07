@@ -3,7 +3,7 @@ use crate::lnumber::LNumber;
 use crate::lruntimeerror::LRuntimeError;
 use crate::lvalue::LValue;
 use serde::*;
-use sompas_language::ERR;
+use sompas_language::kind::ERR;
 use std::borrow::Borrow;
 use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
@@ -71,7 +71,7 @@ impl TryFrom<&LValue> for LValueS {
                 value,
                 KindLValue::Other("LValueS".to_string()),
             ))?,
-            LValue::CoreOperator(co) => LValueS::Symbol(co.to_string()),
+            LValue::Primitive(co) => LValueS::Symbol(co.to_string()),
             LValue::Map(m) => LValueS::Map({
                 let mut map = vec![];
                 for (k, v) in m {
@@ -86,7 +86,7 @@ impl TryFrom<&LValue> for LValueS {
             LValue::Nil => LValueS::Bool(false),
             LValue::String(s) => LValueS::Symbol(s.deref().clone()),
             LValue::AsyncFn(fun) => LValueS::Symbol(fun.get_label().to_string()),
-            LValue::Handler(_) => Err(LRuntimeError::conversion_error(
+            LValue::Handle(_) => Err(LRuntimeError::conversion_error(
                 function_name!(),
                 value,
                 KindLValue::Other("LValueS".to_string()),

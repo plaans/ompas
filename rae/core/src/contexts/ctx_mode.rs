@@ -1,5 +1,3 @@
-pub const CTX_MODE: &str = "CtxMode";
-
 #[derive(Copy, Clone)]
 pub enum RAEMode {
     Exec,

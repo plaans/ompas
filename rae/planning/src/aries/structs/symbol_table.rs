@@ -6,7 +6,7 @@ use crate::aries::structs::type_table::{
     AtomKind, AtomType, PlanningAtomType, TypeId, TypeTable, VariableKind,
 };
 use ompas_rae_language::*;
-use sompas_core::modules::get_scheme_primitives;
+use sompas_language::get_primitives;
 use sompas_structs::lruntimeerror;
 use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
@@ -124,11 +124,8 @@ impl Default for SymTable {
 
         //Symbols of lisp functions that are useful
         //Not exhaustive
-        st.add_list_of_symbols_of_same_type(
-            get_scheme_primitives(),
-            Some(PlanningAtomType::Function),
-        )
-        .expect("error while adding symbols of scheme primitives");
+        st.add_list_of_symbols_of_same_type(get_primitives(), Some(PlanningAtomType::Function))
+            .expect("error while adding symbols of scheme primitives");
 
         st.add_list_of_symbols_of_same_type(
             vec![RAE_ASSERT, RAE_RETRACT, RAE_INSTANCE],

@@ -1,40 +1,19 @@
+use sompas_language::string::*;
 use sompas_macros::scheme_fn;
-use sompas_structs::contextcollection::Context;
-use sompas_structs::documentation::{Documentation, LHelp};
-use sompas_structs::module::{IntoModule, Module};
-use sompas_structs::purefonction::PureFonctionCollection;
+use sompas_structs::lmodule::LModule;
 
 /*
 LANGUAGE
  */
 
-const MOD_STRING: &str = "string";
-const CONCATENATE: &str = "concatenate";
-//todo
-const DOC_CONCATENATE: &str = "todo!";
-
 #[derive(Default)]
-pub struct CtxString {}
+pub struct ModString {}
 
-impl IntoModule for CtxString {
-    fn into_module(self) -> Module {
-        let mut module = Module {
-            ctx: Context::new(()),
-            prelude: vec![],
-            raw_lisp: Default::default(),
-            label: MOD_STRING.to_string(),
-        };
-
-        module.add_fn_prelude(CONCATENATE, concatenate);
+impl From<ModString> for LModule {
+    fn from(m: ModString) -> Self {
+        let mut module = LModule::new(m, MOD_STRING, DOC_MOD_STRING);
+        module.add_fn(CONCATENATE, concatenate, DOC_CONCATENATE, true);
         module
-    }
-
-    fn documentation(&self) -> Documentation {
-        vec![LHelp::new(CONCATENATE, DOC_CONCATENATE)].into()
-    }
-
-    fn pure_fonctions(&self) -> PureFonctionCollection {
-        Default::default()
     }
 }
 

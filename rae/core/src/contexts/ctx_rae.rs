@@ -6,9 +6,7 @@ use ompas_rae_structs::resource::ResourceCollection;
 use ompas_rae_structs::state::action_status::ActionStatus;
 use ompas_rae_structs::ActionId;
 
-pub const CTX_RAE: &str = "CtxRae";
-
-pub struct CtxRae {
+pub struct CtxOMPAS {
     pub monitors: MonitorCollection,
     pub resources: ResourceCollection,
     pub platform_interface: Option<Platform>,
@@ -16,7 +14,7 @@ pub struct CtxRae {
     pub(crate) log_client: LogClient,
 }
 
-impl CtxRae {
+impl CtxOMPAS {
     pub async fn get_execution_status(&self, id: &ActionId) -> ActionStatus {
         self.agenda.get_status(id).await
     }

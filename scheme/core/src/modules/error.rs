@@ -1,7 +1,22 @@
-use sompas_language::INTERRUPTED;
+use sompas_language::error::*;
 use sompas_macros::scheme_fn;
+use sompas_structs::lmodule::LModule;
 use sompas_structs::lvalue::LValue;
 use std::sync::Arc;
+
+#[derive(Default)]
+pub struct ModError {}
+
+impl From<ModError> for LModule {
+    fn from(m: ModError) -> LModule {
+        let mut module = LModule::new(m, MOD_ERROR, DOC_MOD_ERROR);
+        module.add_fn(CHECK, check, DOC_CHECK, true);
+        module.add_fn(FN_ERR, fn_err, DOC_FN_ERR, true);
+        module.add_fn(IS_ERR, is_err, DOC_IS_ERR, true);
+        module.add_fn(IS_INTERRUPTED, is_interrupted, DOC_IS_INTERRUPTED, true);
+        module
+    }
+}
 
 #[scheme_fn]
 pub fn check(b: bool) -> LValue {
@@ -12,16 +27,10 @@ pub fn check(b: bool) -> LValue {
 }
 
 #[scheme_fn]
-pub fn err(e: LValue) -> LValue {
+pub fn fn_err(e: LValue) -> LValue {
     LValue::Err(Arc::new(e))
 }
 
-/*lfn! {pub err(args, _){
-    if args.len() != 1 {
-        return Err(WrongNumberOfArgument(ERR, args.into(), args.len(), 1..1));
-    }
-    Ok(LValue::Err(Arc::new(args[0].clone())))
-}}*/
 #[scheme_fn]
 pub fn is_err(lv: LValue) -> bool {
     matches!(lv, LValue::Err(_))

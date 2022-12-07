@@ -1,27 +1,29 @@
 extern crate core;
 
-use crate::modules::CtxRoot;
-use anyhow::anyhow;
-use aries_planning::parsing::sexpr::SExpr;
-use async_recursion::async_recursion;
-use lazy_static::lazy_static;
-use sompas_language::*;
-use sompas_structs::lenv::{ImportType, LEnv};
-use sompas_structs::lprimitives::LPrimitives;
-use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
-
+use crate::modules::ModRoot;
 use crate::structs::{
     BeginFrame, CoreOperatorFrame, DefineFrame, DoFrame, EvalStack, IfFrame, Interruptibility,
     LDebug, ProcedureFrame, Results, ScopeCollection, StackFrame, StackKind, Unstack,
 };
 use crate::Interruptibility::Unininterruptible;
+use anyhow::anyhow;
+use aries_planning::parsing::sexpr::SExpr;
+use async_recursion::async_recursion;
 use futures::FutureExt;
+use lazy_static::lazy_static;
 use ompas_middleware::LogLevel;
+use sompas_language::kind::*;
+use sompas_language::list::CONS;
+use sompas_language::primitives::*;
+use sompas_language::FALSE;
 use sompas_structs::kindlvalue::KindLValue;
-use sompas_structs::lasynchandler::LAsyncHandler;
+use sompas_structs::lasynchandler::LAsyncHandle;
+use sompas_structs::lenv::{ImportType, LEnv};
 use sompas_structs::lfuture::{FutureResult, LFuture};
 use sompas_structs::llambda::{LLambda, LambdaArgs};
 use sompas_structs::lnumber::LNumber;
+use sompas_structs::lprimitives::LPrimitives;
+use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lswitch::{new_interruption_handler, InterruptionReceiver};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::{interrupted, list, string, symbol, wrong_n_args, wrong_type};
@@ -47,7 +49,7 @@ pub async fn get_root_env() -> LEnv {
     // let map = im::hashmap::HashMap::new();
     // map.ins
     let mut env = LEnv::default();
-    env.import_module(CtxRoot::default(), ImportType::WithoutPrefix);
+    env.import_module(ModRoot::default(), ImportType::WithoutPrefix);
     eval_init(&mut env).await;
     env
 }
@@ -470,7 +472,7 @@ pub fn expand_quasi_quote(x: &LValue, env: &LEnv) -> LResult {
 }
 
 #[inline]
-pub fn async_eval(lv: LValue, mut env: LEnv) -> LAsyncHandler {
+pub fn async_eval(lv: LValue, mut env: LEnv) -> LAsyncHandle {
     let (tx, rx) = new_interruption_handler();
 
     let future: FutureResult =
@@ -479,7 +481,7 @@ pub fn async_eval(lv: LValue, mut env: LEnv) -> LAsyncHandler {
 
     tokio::spawn(future.clone());
 
-    LAsyncHandler::new(future, tx)
+    LAsyncHandle::new(future, tx)
 }
 
 /// Evaluate a LValue
@@ -615,7 +617,7 @@ pub async fn eval(
                         let list = list.as_slice();
                         let proc = &list[0];
                         let args = &list[1..];
-                        if let LValue::CoreOperator(co) = proc {
+                        if let LValue::Primitive(co) = proc {
                             match co {
                                 LPrimitives::Define => {
                                     match &args[0] {
@@ -892,7 +894,7 @@ pub async fn eval(
                                         as FutureResult;
                                     let future: LFuture = future.shared();
 
-                                    results.push(LAsyncHandler::new(future, tx).into());
+                                    results.push(LAsyncHandle::new(future, tx).into());
                                     debug.log_last_result(&results).await;
                                 }
                             }
@@ -1044,7 +1046,7 @@ pub async fn eval(
                 }
                 CoreOperatorFrame::Await => {
                     let result = results.pop().unwrap();
-                    if let LValue::Handler(ref h) = result {
+                    if let LValue::Handle(ref h) = result {
                         let f = h.get_future();
 
                         let r: LResult = if interruptibility == Interruptibility::Interruptible
@@ -1079,7 +1081,7 @@ pub async fn eval(
                 }
                 CoreOperatorFrame::Interrupt => {
                     let mut result = results.pop().unwrap();
-                    if let LValue::Handler(ref mut h) = result {
+                    if let LValue::Handle(ref mut h) = result {
                         match h.interrupt().await {
                             Err(e) => {
                                 expression_error = list![LPrimitives::Await.into(), result];

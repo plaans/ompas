@@ -1,6 +1,6 @@
 use crate::function::{LAsyncFn, LAsyncMutFn, LFn, LMutFn};
 use crate::kindlvalue::KindLValue;
-use crate::lasynchandler::LAsyncHandler;
+use crate::lasynchandler::LAsyncHandle;
 use crate::llambda::LLambda;
 use crate::lnumber::LNumber;
 use crate::lprimitives::LPrimitives;
@@ -8,7 +8,9 @@ use crate::lruntimeerror::LRuntimeError;
 use crate::{lruntimeerror, string, symbol, wrong_type};
 use function_name::named;
 use im::HashMap;
-use sompas_language::*;
+use sompas_language::kind::*;
+use sompas_language::primitives::*;
+use sompas_language::utils::*;
 use std::borrow::Borrow;
 use std::cmp::Ordering;
 use std::convert::{TryFrom, TryInto};
@@ -38,9 +40,9 @@ pub enum LValue {
     //#[serde(skip)]
     Lambda(LLambda),
     //#[serde(skip)]
-    CoreOperator(LPrimitives),
+    Primitive(LPrimitives),
     //#[serde(skip)]
-    Handler(LAsyncHandler),
+    Handle(LAsyncHandle),
     //Future(LFuture),
     Err(RefLValue),
     // data structure
@@ -48,7 +50,7 @@ pub enum LValue {
     Map(im::HashMap<LValue, LValue>),
     List(Arc<Vec<LValue>>),
     True,
-    //Refers to boolean 'false and empty list in lisp
+    ///Refers to boolean 'false and empty list in lisp
     Nil,
 }
 
@@ -139,8 +141,8 @@ impl LValue {
             LValue::List(list) => {
                 if !list.is_empty() {
                     match &list[0] {
-                        LValue::CoreOperator(LPrimitives::Begin)
-                        | LValue::CoreOperator(LPrimitives::Do) => {
+                        LValue::Primitive(LPrimitives::Begin)
+                        | LValue::Primitive(LPrimitives::Do) => {
                             let indent = indent + TAB_SIZE;
                             let mut string = format!("({}", list[0]);
                             for (i, element) in list.iter().enumerate() {
@@ -158,7 +160,7 @@ impl LValue {
                             string.push(')');
                             string
                         }
-                        LValue::CoreOperator(LPrimitives::If) => {
+                        LValue::Primitive(LPrimitives::If) => {
                             LValue::pretty_print_list_aligned(IF, &list[1..], indent)
                         }
                         LValue::Symbol(s) => match s.as_str() {
@@ -269,11 +271,11 @@ impl Display for LValue {
                 write!(f, "{}", result)
             }
             //LValue::Quote(q) => write!(f, "{}", q),
-            LValue::CoreOperator(co) => {
+            LValue::Primitive(co) => {
                 write!(f, "{}", co)
             }
             LValue::AsyncFn(fun) => write!(f, "{}", fun.get_label()),
-            LValue::Handler(_) => write!(f, "{}", HANDLER),
+            LValue::Handle(_) => write!(f, "{}", HANDLER),
             LValue::Err(e) => write!(f, "[err {}]", e),
             LValue::MutFn(fun) => write!(f, "{}", fun.get_label()),
             LValue::AsyncMutFn(fun) => write!(f, "{}", fun.get_label()),
@@ -290,7 +292,7 @@ impl Hash for LValue {
             LValue::True => true.hash(state),
             LValue::Map(m) => (*m).hash(state),
             LValue::List(l) => l.as_ref().hash(state),
-            LValue::CoreOperator(co) => co.hash(state),
+            LValue::Primitive(co) => co.hash(state),
             LValue::Nil => false.hash(state),
             lv => panic!("cannot hash {}", lv.get_kind()),
         };
@@ -485,7 +487,7 @@ impl TryFrom<&LValue> for LPrimitives {
 
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
         match value {
-            LValue::CoreOperator(co) => Ok(*co),
+            LValue::Primitive(co) => Ok(*co),
             LValue::Symbol(s) => Ok(s.as_str().try_into()?),
             lv => Err(LRuntimeError::conversion_error(
                 "LCoreOperator::tryfrom<&LValue>",
@@ -527,12 +529,12 @@ impl TryFrom<LValue> for LLambda {
     }
 }
 
-impl TryFrom<&LValue> for LAsyncHandler {
+impl TryFrom<&LValue> for LAsyncHandle {
     type Error = LRuntimeError;
 
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
         match value {
-            LValue::Handler(l) => Ok(l.clone()),
+            LValue::Handle(l) => Ok(l.clone()),
             lv => Err(LRuntimeError::conversion_error(
                 "LLambda::tryfrom<&LValue>",
                 lv,
@@ -542,7 +544,7 @@ impl TryFrom<&LValue> for LAsyncHandler {
     }
 }
 
-impl TryFrom<LValue> for LAsyncHandler {
+impl TryFrom<LValue> for LAsyncHandle {
     type Error = LRuntimeError;
 
     fn try_from(value: LValue) -> Result<Self, Self::Error> {
@@ -565,7 +567,7 @@ impl PartialEq for LValue {
             (LValue::Map(m1), LValue::Map(m2)) => *m1 == *m2,
             (LValue::Lambda(l1), LValue::Lambda(l2)) => *l1 == *l2,
             (LValue::Fn(f1), LValue::Fn(f2)) => f1.get_label() == f2.get_label(),
-            (LValue::CoreOperator(c1), LValue::CoreOperator(c2)) => c1 == c2,
+            (LValue::Primitive(c1), LValue::Primitive(c2)) => c1 == c2,
             (LValue::AsyncFn(af1), LValue::AsyncFn(af2)) => af1.get_label() == af2.get_label(),
             (LValue::Err(e1), LValue::Err(e2)) => *e1 == *e2,
             (_, _) => false,
@@ -822,7 +824,7 @@ impl From<&LPrimitives> for LValue {
 
 impl From<LPrimitives> for LValue {
     fn from(co: LPrimitives) -> Self {
-        LValue::CoreOperator(co)
+        LValue::Primitive(co)
     }
 }
 

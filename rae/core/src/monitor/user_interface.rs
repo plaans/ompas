@@ -1,9 +1,8 @@
-use crate::monitor::{CtxRaeUser, MOD_RAE_USER, TOKIO_CHANNEL_SIZE};
+use crate::monitor::{ModRaeUser, MOD_RAE_USER, TOKIO_CHANNEL_SIZE};
 use crate::rae;
 use ompas_middleware::ProcessInterface;
 use ompas_rae_interface::platform::{PlatformConfig, PlatformDescriptor};
-use ompas_rae_language::*;
-use ompas_rae_language::{RAE_GET_AGENDA, RAE_GET_ENV, RAE_GET_STATE};
+use ompas_rae_language::monitor::user_interface::*;
 use ompas_rae_structs::domain::RAEDomain;
 use ompas_rae_structs::job::Job;
 use ompas_rae_structs::monitor::task_check_wait_for;
@@ -13,8 +12,9 @@ use ompas_rae_structs::state::action_status::*;
 use ompas_rae_structs::state::world_state::*;
 use sompas_macros::*;
 use sompas_structs::kindlvalue::KindLValue;
-use sompas_structs::lasynchandler::LAsyncHandler;
+use sompas_structs::lasynchandler::LAsyncHandle;
 use sompas_structs::lenv::LEnv;
+use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::{lruntimeerror, wrong_type};
@@ -22,10 +22,59 @@ use std::mem;
 use std::time::Duration;
 use tokio::sync::mpsc;
 
+#[derive(Default)]
+pub struct ModUserInterface {}
+
+impl From<ModUserInterface> for LModule {
+    fn from(m: ModUserInterface) -> Self {
+        let mut module = LModule::new(m, MOD_USER_INTERFACE, DOC_MOD_USER_INTERFACE);
+        module.add_async_fn(GET_STATE, get_state, DOC_GET_STATE, false);
+        module.add_async_fn(
+            GET_CONFIG_PLATFORM,
+            get_config_platform,
+            DOC_GET_CONFIG_PLATFORM,
+            false,
+        );
+        module.add_async_fn(GET_SELECT, get_select, DOC_GET_SELECT, false);
+        module.add_async_fn(
+            GET_TASK_NETWORK,
+            get_task_network,
+            DOC_GET_TASK_NETWORK,
+            false,
+        );
+        module.add_async_fn(
+            GET_TYPE_HIERARCHY,
+            get_type_hierarchy,
+            DOC_GET_TYPE_HIERARCHY,
+            false,
+        );
+        module.add_async_fn(
+            GET_AGENDA,
+            get_agenda,
+            (DOC_GET_AGENDA, DOC_GET_AGENDA_VERBOSE),
+            false,
+        );
+        module.add_async_fn(GET_RESOURCES, get_resources, DOC_GET_RESOURCES, false);
+        module.add_async_fn(GET_MONITORS, get_monitors, DOC_GET_MONITORS, false);
+        module.add_async_fn(GET_COMMANDS, get_commands, DOC_GET_COMMANDS, false);
+        module.add_async_fn(GET_TASKS, get_tasks, DOC_GET_TASKS, false);
+        module.add_async_fn(GET_METHODS, get_methods, DOC_GET_METHODS, false);
+        module.add_async_fn(
+            GET_STATE_FUNCTIONS,
+            get_state_functions,
+            DOC_GET_STATE_FUNCTIONS,
+            false,
+        );
+        module.add_async_fn(GET_STATS, get_stats, DOC_GET_STATS, false);
+        module.add_async_fn(EXPORT_STATS, export_stats, DOC_EXPORT_STATS, false);
+        module
+    }
+}
+
 /// Returns the whole state if no args, or specific part of it ('static', 'dynamic', 'inner world')
 #[async_scheme_fn]
 pub async fn get_state(env: &LEnv, args: &[LValue]) -> LResult {
-    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER)?;
+    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER)?;
     let _type = match args.len() {
         0 => None,
         1 => {
@@ -63,7 +112,7 @@ pub async fn get_state(env: &LEnv, args: &[LValue]) -> LResult {
 
 #[async_scheme_fn]
 pub async fn get_config_platform(env: &LEnv) -> String {
-    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER).unwrap();
+    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER).unwrap();
 
     let string = String::new();
     match &ctx.platform {
@@ -75,27 +124,27 @@ pub async fn get_config_platform(env: &LEnv) -> String {
 
 #[async_scheme_fn]
 pub async fn get_select(env: &LEnv) -> String {
-    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER).unwrap();
+    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER).unwrap();
 
     ctx.get_options().await.get_select_mode().to_string()
 }
 #[async_scheme_fn]
 pub async fn get_task_network(env: &LEnv) -> String {
-    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER).unwrap();
+    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER).unwrap();
 
     ctx.interface.agenda.format_task_network().await
 }
 
 #[async_scheme_fn]
 pub async fn get_type_hierarchy(env: &LEnv) -> String {
-    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER).unwrap();
+    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER).unwrap();
 
     ctx.rae_domain.read().await.types.format_hierarchy()
 }
 
 #[async_scheme_fn]
 pub async fn get_agenda(env: &LEnv, args: &[LValue]) -> LResult {
-    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER)?;
+    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER)?;
     let mut task_filter = TaskFilter::default();
 
     for arg in args {
@@ -140,47 +189,47 @@ pub async fn get_agenda(env: &LEnv, args: &[LValue]) -> LResult {
 
 #[async_scheme_fn]
 pub async fn get_resources(env: &LEnv) -> LResult {
-    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER)?;
+    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER)?;
     Ok(ctx.interface.resources.get_debug().await.into())
 }
 
 #[async_scheme_fn]
 pub async fn get_monitors(env: &LEnv) -> LResult {
-    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER)?;
+    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER)?;
     Ok(ctx.interface.monitors.get_debug().await.into())
-}
-
-///Get the methods of a given task
-#[async_scheme_fn]
-pub async fn get_methods(env: &LEnv) -> LResult {
-    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER)?;
-    Ok(ctx.rae_domain.read().await.get_list_methods())
 }
 
 ///Get the list of actions in the environment
 #[async_scheme_fn]
-pub async fn get_actions(env: &LEnv) -> LResult {
-    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER)?;
+pub async fn get_commands(env: &LEnv) -> LResult {
+    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER)?;
     Ok(ctx.rae_domain.read().await.get_list_actions())
 }
 
 ///Get the list of tasks in the environment
 #[async_scheme_fn]
 pub async fn get_tasks(env: &LEnv) -> LResult {
-    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER)?;
+    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER)?;
     Ok(ctx.rae_domain.read().await.get_list_tasks())
+}
+
+///Get the methods of a given task
+#[async_scheme_fn]
+pub async fn get_methods(env: &LEnv) -> LResult {
+    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER)?;
+    Ok(ctx.rae_domain.read().await.get_list_methods())
 }
 
 ///Get the list of state functions in the environment
 #[async_scheme_fn]
-pub async fn get_state_function(env: &LEnv) -> LValue {
-    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER).unwrap();
+pub async fn get_state_functions(env: &LEnv) -> LValue {
+    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER).unwrap();
     ctx.rae_domain.read().await.get_list_state_functions()
 }
 
 /// Returns the whole RAE environment if no arg et the entry corresponding to the symbol passed in args.
 #[async_scheme_fn]
-pub async fn get_env(env: &LEnv, args: &[LValue]) -> LResult {
+pub async fn get_domain(env: &LEnv, args: &[LValue]) -> LResult {
     let key = match args.len() {
         0 => None,
         1 => {
@@ -193,7 +242,7 @@ pub async fn get_env(env: &LEnv, args: &[LValue]) -> LResult {
         _ => return Err(LRuntimeError::wrong_number_of_args(RAE_GET_ENV, args, 0..1)),
     };
 
-    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER)?;
+    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER)?;
     match key {
         None => Ok(ctx.rae_domain.read().await.to_string().into()),
         Some(key) => Ok(ctx
@@ -207,14 +256,14 @@ pub async fn get_env(env: &LEnv, args: &[LValue]) -> LResult {
 
 #[async_scheme_fn]
 pub async fn get_stats(env: &LEnv) -> LValue {
-    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER).unwrap();
+    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER).unwrap();
 
     ctx.interface.agenda.get_stats().await
 }
 
 #[async_scheme_fn]
 pub async fn export_stats(env: &LEnv, args: &[LValue]) -> LResult {
-    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER)?;
+    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER)?;
     let file = if args.len() == 1 {
         Some(args[0].to_string())
     } else {
@@ -227,7 +276,7 @@ pub async fn export_stats(env: &LEnv, args: &[LValue]) -> LResult {
 /// Launch main loop of rae in an other asynchronous task.
 #[async_scheme_fn]
 pub async fn launch(env: &LEnv) -> &str {
-    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER).unwrap();
+    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER).unwrap();
     let mut tasks_to_execute: Vec<Job> = vec![];
     mem::swap(
         &mut *ctx.tasks_to_execute.write().await,
@@ -288,7 +337,7 @@ pub async fn stop(env: &LEnv) {
     let process: ProcessInterface =
         ProcessInterface::new(PROCESS_STOP_OMPAS, PROCESS_TOPIC_OMPAS, LOG_TOPIC_OMPAS).await;
 
-    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER).unwrap();
+    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER).unwrap();
 
     process.kill(PROCESS_TOPIC_OMPAS).await;
     drop(process);
@@ -306,7 +355,7 @@ pub async fn stop(env: &LEnv) {
 
 #[async_scheme_fn]
 pub async fn configure_platform(env: &LEnv, args: &[LValue]) -> LResult {
-    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER)?;
+    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER)?;
     if args.is_empty() {
         return Err(LRuntimeError::wrong_number_of_args(
             RAE_CONFIGURE_PLATFORM,
@@ -327,7 +376,7 @@ pub async fn configure_platform(env: &LEnv, args: &[LValue]) -> LResult {
 
 #[async_scheme_fn]
 pub async fn set_select(env: &LEnv, m: String) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER).unwrap();
+    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER).unwrap();
 
     let select_mode = match m.as_str() {
         GREEDY => SelectMode::Greedy,
@@ -355,10 +404,10 @@ pub async fn set_select(env: &LEnv, m: String) -> Result<(), LRuntimeError> {
 
 /// Sends via a channel a task to execute.
 #[async_scheme_fn]
-pub async fn trigger_task(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandler, LRuntimeError> {
+pub async fn trigger_task(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LRuntimeError> {
     let env = env.clone();
 
-    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER).unwrap();
+    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER).unwrap();
     let (tx, mut rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
     let job = Job::new(tx, args.into());
 
@@ -382,7 +431,7 @@ pub async fn trigger_task(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandler, 
 pub async fn add_task_to_execute(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
     let env = env.clone();
 
-    let ctx = env.get_context::<CtxRaeUser>(MOD_RAE_USER)?;
+    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER)?;
     let (tx, _) = mpsc::channel(TOKIO_CHANNEL_SIZE);
     let job = Job::new(tx, args.into());
 

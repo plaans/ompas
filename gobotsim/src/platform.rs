@@ -11,10 +11,10 @@ use ompas_rae_interface::platform_interface::platform_interface_server::Platform
 use ompas_rae_interface::{DEFAULT_PLATFORM_SERVICE_IP, DEFAULT_PLATFROM_SERVICE_PORT};
 use ompas_rae_interface::{LOG_TOPIC_PLATFORM, PROCESS_TOPIC_PLATFORM};
 use sompas_structs::contextcollection::Context;
-use sompas_structs::documentation::Documentation;
+use sompas_structs::documentation::DocCollection;
+use sompas_structs::lmodule::{IntoModule, LModule};
 use sompas_structs::lruntimeerror::LResult;
 use sompas_structs::lvalue::LValue;
-use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
 use std::fs::File;
 use std::net::SocketAddr;
@@ -239,8 +239,8 @@ impl PlatformDescriptor for PlatformGobotSim {
 struct GodotCtx {}
 
 impl IntoModule for GodotCtx {
-    fn into_module(self) -> Module {
-        Module {
+    fn into_module(self) -> LModule {
+        LModule {
             ctx: Context::new(self),
             prelude: vec![],
             raw_lisp: Default::default(),
@@ -248,7 +248,7 @@ impl IntoModule for GodotCtx {
         }
     }
 
-    fn documentation(&self) -> Documentation {
+    fn documentation(&self) -> DocCollection {
         Default::default()
     }
 

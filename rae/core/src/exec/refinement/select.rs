@@ -1,9 +1,9 @@
 use crate::contexts::ctx_domain::{CtxDomain, CTX_DOMAIN};
 use crate::contexts::ctx_planning::{CtxPlanning, CTX_PLANNING};
-use crate::contexts::ctx_rae::{CtxRae, CTX_RAE};
+use crate::contexts::ctx_rae::{CtxOMPAS, CTX_RAE};
 use crate::contexts::ctx_state::{CtxState, CTX_STATE};
-use crate::contexts::ctx_task::{CtxTask, CTX_TASK};
-use crate::exec::refinement::c_choice::{c_choice_env, CtxCChoice};
+use crate::contexts::ctx_task::{ModTask, CTX_TASK};
+use crate::exec::refinement::c_choice::{c_choice_env, ModCChoice};
 use crate::exec::refinement::rae_plan::{rae_plan_env, CtxRaePlan};
 use crate::exec::{instance, STATE};
 use ompas_rae_language::*;
@@ -40,13 +40,13 @@ pub async fn aries_select(
     let mut greedy: RefinementMetaData =
         greedy_select(state.clone(), tried, task.clone(), env).await?;
 
-    let log = env.get_context::<CtxRae>(CTX_RAE)?.get_log_client();
+    let log = env.get_context::<CtxOMPAS>(CTX_RAE)?.get_log_client();
 
     println!("\n\nTask to plan: {}", LValue::from(task.clone()));
     println!("\t*tried: {}", LValue::from(tried));
     println!("\t*greedy: {}", LValue::from(&greedy.applicable_methods));
-    let ctx = env.get_context::<CtxRae>(CTX_RAE)?;
-    let parent_task = env.get_context::<CtxTask>(CTX_TASK)?.parent_id;
+    let ctx = env.get_context::<CtxOMPAS>(CTX_RAE)?;
+    let parent_task = env.get_context::<ModTask>(CTX_TASK)?.parent_id;
     match parent_task {
         Some(parent_id) => {
             let parent_stack: TaskMetaData = ctx.agenda.get_task(&parent_id).await?;
@@ -198,7 +198,7 @@ pub async fn greedy_select(
     - Store the stack
     - Return (best_method, task_id)
      */
-    let ctx = env.get_context::<CtxRae>(CTX_RAE)?;
+    let ctx = env.get_context::<CtxOMPAS>(CTX_RAE)?;
     let ctx_domain = env.get_context::<CtxDomain>(CTX_DOMAIN)?;
 
     //println!("task to test in greedy: {}", LValue::from(task.clone()));
@@ -323,7 +323,7 @@ pub async fn c_choice_select(
     let domain = env.get_context::<CtxDomain>(CTX_DOMAIN).unwrap();
 
     let mut new_env: LEnv = c_choice_env(new_env, &domain.domain).await;
-    new_env.import_module(CtxCChoice::new(tried.to_vec(), 0), WithoutPrefix);
+    new_env.import_module(ModCChoice::new(tried.to_vec(), 0), WithoutPrefix);
     new_env.import_context(Context::new(CtxState::new(state.clone().into())), CTX_STATE);
 
     let mut greedy: RefinementMetaData = greedy_select(state, tried, task.clone(), env).await?;
@@ -334,7 +334,7 @@ pub async fn c_choice_select(
     greedy.choosed = method;
     greedy
         .interval
-        .set_end(env.get_context::<CtxRae>(CTX_RAE)?.agenda.get_instant());
+        .set_end(env.get_context::<CtxOMPAS>(CTX_RAE)?.agenda.get_instant());
 
     Ok(greedy)
 }
@@ -361,7 +361,7 @@ pub async fn rae_plan_select(
     greedy.choosed = method;
     greedy
         .interval
-        .set_end(env.get_context::<CtxRae>(CTX_RAE)?.agenda.get_instant());
+        .set_end(env.get_context::<CtxOMPAS>(CTX_RAE)?.agenda.get_instant());
 
     Ok(greedy)
 }

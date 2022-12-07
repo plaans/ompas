@@ -16,114 +16,92 @@
 
 use aries_utils::StreamingIterator;
 use rand::Rng;
-use sompas_core::eval;
-use sompas_core::modules::list::car;
 use sompas_language::utils::*;
-use sompas_language::*;
-use sompas_macros::async_scheme_fn;
 use sompas_macros::scheme_fn;
-use sompas_structs::contextcollection::Context;
-use sompas_structs::documentation::{Documentation, LHelp};
-use sompas_structs::lenv::LEnv;
+use sompas_structs::lmodule::LModule;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lprimitives::LPrimitives;
-use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
+use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
-use sompas_structs::module::{IntoModule, Module};
-use sompas_structs::purefonction::PureFonctionCollection;
 use sompas_structs::{list, lruntimeerror};
 use std::ops::Deref;
 
 #[derive(Default, Copy, Clone, Debug)]
-pub struct CtxUtils {}
+pub struct ModUtils {}
 
-impl IntoModule for CtxUtils {
-    fn into_module(self) -> Module {
-        let mut module = Module {
-            ctx: Context::new(()),
-            prelude: vec![],
-            raw_lisp: vec![
-                MACRO_AND,
-                MACRO_OR,
-                MACRO_CAAR,
-                MACRO_CADR,
-                MACRO_CDAR,
-                MACRO_CDDR,
-                MACRO_CADAR,
-                MACRO_CADDR,
-                MACRO_CDADR,
-                MACRO_CAADR,
-                MACRO_CADADR,
-                MACRO_CADADDR,
-                MACRO_AWAIT_ASYNC,
-                MACRO_APPLY,
-                MACRO_COND,
-                MACRO_LOOP,
-                LAMBDA_UNZIP,
-                LAMBDA_ZIP,
-                LAMBDA_MAPF,
-                MACRO_LET,
-                MACRO_LET_STAR,
-                LAMBDA_PAR,
-                LAMBDA_REPEAT,
-                LAMBDA_RETRY_ONCE,
-                LAMBDA_AWAIT_INTERRUPT,
-            ]
-            .into(),
-            label: MOD_UTILS.into(),
-        };
+impl From<ModUtils> for LModule {
+    fn from(m: ModUtils) -> Self {
+        let mut module = LModule::new(m, MOD_UTILS, DOC_MOD_UTILS);
+        module.add_fn(
+            ENUMERATE,
+            enumerate,
+            (DOC_ENUMERATE, DOC_ENUMERATE_VERBOSE),
+            true,
+        );
+        module.add_fn(
+            RAND_ELEMENT,
+            rand_element,
+            (DOC_RAND_ELEMENT, DOC_RAND_ELEMENT_VERBOSE),
+            false,
+        );
+        module.add_fn(CONTAINS, contains, DOC_CONTAINS, true);
+        module.add_fn(SUBLIST, sublist, (DOC_SUBLIST, DOC_SUBLIST_VERBOSE), true);
+        module.add_fn(
+            QUOTE_LIST,
+            quote_list,
+            (DOC_QUOTE_LIST, DOC_QUOTE_LIST_VERBOSE),
+            true,
+        );
+        module.add_fn(
+            TRANSFORM_IN_SINGLETON_LIST,
+            transform_in_singleton_list,
+            (
+                DOC_TRANSFORM_IN_SINGLETON_LIST,
+                DOC_TRANSFORM_IN_SINGLETON_LIST_VERBOSE,
+            ),
+            true,
+        );
 
-        //module.add_async_fn_prelude(EVAL_NON_RECURSIVE, enr);
-        module.add_fn_prelude(RAND_ELEMENT, rand_element);
-        module.add_fn_prelude(ENUMERATE, enumerate);
-        module.add_fn_prelude(CONTAINS, contains);
-        module.add_fn_prelude(SUB_LIST, sublist);
-        module.add_fn_prelude(TRANSFORM_IN_SINGLETON_LIST, transform_in_singleton_list);
-        module.add_fn_prelude(QUOTE_LIST, quote_list);
+        module.add_macro(AND, MACRO_AND, DOC_AND);
+        module.add_macro(OR, MACRO_OR, DOC_OR);
+        module.add_macro(CAAR, MACRO_CAAR, DOC_CAAR);
+        module.add_macro(CADR, MACRO_CADR, DOC_CADR);
+        module.add_macro(CDAR, MACRO_CDAR, DOC_CDAR);
+        module.add_macro(CDDR, MACRO_CDDR, DOC_CDDR);
+        module.add_macro(CAADR, MACRO_CAADR, DOC_CAADR);
+        module.add_macro(CADDR, MACRO_CADDR, DOC_CADDR);
+        module.add_macro(CADAR, MACRO_CADAR, DOC_CADAR);
+        module.add_macro(CDADR, MACRO_CDADR, DOC_CDADR);
+        module.add_macro(CADADR, MACRO_CADADR, DOC_CADADR);
+        module.add_macro(CADADDR, MACRO_CADADDR, DOC_CADADDR);
+        module.add_macro(AWAIT_ASYNC, MACRO_AWAIT_ASYNC, DOC_AWAIT_ASYNC);
+        module.add_macro(APPLY, MACRO_APPLY, (DOC_APPLY, DOC_APPLY_VERBOSE));
+        module.add_macro(COND, MACRO_COND, (DOC_COND, DOC_COND_VERBOSE));
+        //todo:
+        module.add_doc(FOR, DOC_FOR);
+        //todo:
+        module.add_doc(WHILE, DOC_WHILE);
+        module.add_macro(LOOP, MACRO_LOOP, DOC_LOOP);
+        module.add_macro(LET, MACRO_LET, (DOC_LET, DOC_LET_VERBOSE));
+        module.add_macro(
+            LET_STAR,
+            MACRO_LET_STAR,
+            (DOC_LET_STAR, DOC_LET_STAR_VERBOSE),
+        );
+
+        //Lambdas
+        module.add_lambda(ZIP, LAMBDA_ZIP, (DOC_ZIP, DOC_ZIP_VERBOSE));
+        module.add_lambda(UNZIP, LAMBDA_UNZIP, (DOC_UNZIP, DOC_UNZIP_VERBOSE));
+        module.add_lambda(MAPF, LAMBDA_MAPF, (DOC_MAPF, DOC_MAPF_VERBOSE));
+        //todo:
+        module.add_doc(PAR, DOC_PAR);
+        module.add_lambda(REPEAT, LAMBDA_REPEAT, DOC_REPEAT);
+        module.add_lambda(RETRY_ONCE, LAMBDA_RETRY_ONCE, DOC_RETRY_ONCE);
+        module.add_lambda(AWAIT_INTERRUPT, LAMBDA_AWAIT_INTERRUPT, DOC_AWAIT_INTERRUPT);
 
         module
     }
-
-    fn documentation(&self) -> Documentation {
-        Documentation::new(
-            LHelp::new(MOD_UTILS, DOC_MOD_UTILS),
-            vec![
-                //Functions
-                LHelp::new_verbose(RAND_ELEMENT, DOC_RAND_ELEMENT, DOC_RAND_ELEMENT_VERBOSE),
-                LHelp::new_verbose(ENUMERATE, DOC_ENUMERATE, DOC_ENUMERATE_VERBOSE),
-                LHelp::new(SUB_LIST, DOC_SUB_LIST),
-                LHelp::new(CONTAINS, DOC_CONTAINS),
-                LHelp::new(TRANSFORM_IN_SINGLETON_LIST, DOC_TRANSFORM_IN_SINGLETON_LIST),
-                LHelp::new(LET, DOC_LET),
-                LHelp::new(LET_STAR, DOC_LET_STAR),
-                //Macros
-            ],
-        )
-    }
-
-    fn pure_fonctions(&self) -> PureFonctionCollection {
-        vec![
-            RAND_ELEMENT,
-            ENUMERATE,
-            CONTAINS,
-            SUB_LIST,
-            TRANSFORM_IN_SINGLETON_LIST,
-            QUOTE_LIST,
-        ]
-        .into()
-    }
 }
-
-/*#[async_scheme_fn]
-pub async fn enr<'a>(env: &'a LEnv, mut args: Vec<LValue>) -> LResult {
-    for (i, arg) in args.iter_mut().enumerate() {
-        if i != 0 {
-            *arg = list![LCoreOperator::Quote.into(), arg.clone()]
-        }
-    }
-
-    eval(&args.into(), &mut env.clone(), None).await
-}*/
 
 ///Return enumeration from a list of list
 ///uses function from aries_utils
@@ -214,7 +192,7 @@ pub fn sublist(args: &[LValue]) -> Result<Vec<LValue>, LRuntimeError> {
                 Ok(list[i..].to_vec())
             } else {
                 Err(lruntimeerror!(
-                    SUB_LIST,
+                    SUBLIST,
                     "Indexes should be natural numbers".to_string()
                 ))
             }
@@ -231,12 +209,12 @@ pub fn sublist(args: &[LValue]) -> Result<Vec<LValue>, LRuntimeError> {
                 Ok(list[i1..i2].to_vec())
             } else {
                 Err(lruntimeerror!(
-                    SUB_LIST,
+                    SUBLIST,
                     "Indexes should be natural numbers".to_string()
                 ))
             }
         }
-        _ => Err(LRuntimeError::wrong_number_of_args(SUB_LIST, args, 2..3)),
+        _ => Err(LRuntimeError::wrong_number_of_args(SUBLIST, args, 2..3)),
     }
 }
 #[scheme_fn]

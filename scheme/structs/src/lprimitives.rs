@@ -48,7 +48,7 @@ impl Display for LPrimitives {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         let str = match self {
             LPrimitives::Define => DEFINE,
-            LPrimitives::DefLambda => LAMBDA,
+            LPrimitives::DefLambda => FN_LAMBDA,
             LPrimitives::If => IF,
             LPrimitives::Quote => QUOTE,
             LPrimitives::QuasiQuote => QUASI_QUOTE,
@@ -84,7 +84,7 @@ impl TryFrom<&str> for LPrimitives {
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
             DEFINE => Ok(LPrimitives::Define),
-            LAMBDA => Ok(LPrimitives::DefLambda),
+            FN_LAMBDA => Ok(LPrimitives::DefLambda),
             IF => Ok(LPrimitives::If),
             QUOTE => Ok(LPrimitives::Quote),
             QUASI_QUOTE => Ok(LPrimitives::QuasiQuote),

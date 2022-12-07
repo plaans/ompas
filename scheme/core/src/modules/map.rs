@@ -1,24 +1,48 @@
 use im::HashMap;
-use sompas_language::*;
+use sompas_language::map::*;
 use sompas_macros::scheme_fn;
 use sompas_structs::kindlvalue::KindLValue;
+use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::{lruntimeerror, wrong_n_args, wrong_type};
+
+#[derive(Default)]
+pub struct ModMap {}
+
+impl From<ModMap> for LModule {
+    fn from(m: ModMap) -> Self {
+        let mut module = LModule::new(m, MOD_MAP, DOC_MOD_MAP);
+        module.add_fn(FN_MAP, fn_map, (DOC_FN_MAP, DOC_FN_MAP_VERBOSE), true);
+        module.add_fn(GET_MAP, get_map, (DOC_GET_MAP, DOC_GET_MAP_VERBOSE), true);
+        module.add_fn(SET_MAP, set_map, (DOC_SET_MAP, DOC_SET_MAP_VERBOSE), true);
+        module.add_fn(REMOVE_MAP, remove_map, DOC_REMOVE_MAP, true);
+        module.add_fn(
+            REMOVE_KEY_VALUE_MAP,
+            remove_key_value_map,
+            DOC_REMOVE_KEY_VALUE_MAP,
+            true,
+        );
+        module.add_fn(UNION_MAP, union_map, DOC_UNION_MAP, true);
+
+        module
+    }
+}
+
 #[scheme_fn]
-pub fn map(list: Vec<LValue>) -> Result<im::HashMap<LValue, LValue>, LRuntimeError> {
+pub fn fn_map(list: Vec<LValue>) -> Result<im::HashMap<LValue, LValue>, LRuntimeError> {
     let mut facts: HashMap<LValue, LValue> = Default::default();
     for sv in &list {
         match sv {
             LValue::List(val_sv) => {
                 if val_sv.len() != 2 {
-                    return Err(wrong_n_args!(MAP, val_sv, 2));
+                    return Err(wrong_n_args!(FN_MAP, val_sv, 2));
                 }
                 let key = val_sv[0].clone();
                 let value = val_sv[1].clone();
                 facts.insert(key, value);
             }
-            lv => return Err(wrong_type!(MAP, lv, KindLValue::List)),
+            lv => return Err(wrong_type!(FN_MAP, lv, KindLValue::List)),
         }
     }
     Ok(facts)
@@ -40,6 +64,15 @@ pub fn set_map(
     } else {
         Err(wrong_n_args!(SET_MAP, &val, 2))
     }
+}
+
+#[scheme_fn]
+pub fn remove_map(
+    mut map: im::HashMap<LValue, LValue>,
+    key: &LValue,
+) -> Result<HashMap<LValue, LValue>, LRuntimeError> {
+    map.remove(key);
+    Ok(map)
 }
 
 #[scheme_fn]
@@ -73,15 +106,6 @@ pub fn remove_key_value_map(
             }
         }
     }
-}
-
-#[scheme_fn]
-pub fn remove_map(
-    mut map: im::HashMap<LValue, LValue>,
-    key: &LValue,
-) -> Result<HashMap<LValue, LValue>, LRuntimeError> {
-    map.remove(key);
-    Ok(map)
 }
 
 /// Merges two hashmap tables

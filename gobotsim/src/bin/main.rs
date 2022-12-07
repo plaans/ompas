@@ -3,14 +3,14 @@ use std::fs;
 use ompas_gobotsim::platform::PlatformGobotSim;
 use ompas_middleware::logger::{FileDescriptor, LogClient, Logger};
 use ompas_middleware::{LogLevel, Master};
-use ompas_rae_core::monitor::CtxRaeUser;
+use ompas_rae_core::monitor::ModRaeUser;
 use ompas_rae_interface::platform::Domain;
 use ompas_rae_interface::{LOG_TOPIC_PLATFORM, PLATFORM_CLIENT};
 use sompas_core::activate_debug;
-use sompas_modules::advanced_math::CtxMath;
-use sompas_modules::io::CtxIo;
-use sompas_modules::string::CtxString;
-use sompas_modules::utils::CtxUtils;
+use sompas_modules::advanced_math::ModMath;
+use sompas_modules::io::ModIO;
+use sompas_modules::string::ModString;
+use sompas_modules::utils::ModUtils;
 use sompas_repl::lisp_interpreter::{LispInterpreter, LispInterpreterConfig};
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -52,10 +52,10 @@ async fn main() {
 pub async fn lisp_interpreter(log: Option<PathBuf>, godot: bool, rae_log: bool) {
     let mut li = LispInterpreter::new().await;
 
-    let mut ctx_io = CtxIo::default();
-    let ctx_math = CtxMath::default();
-    let ctx_utils = CtxUtils::default();
-    let ctx_string = CtxString::default();
+    let mut ctx_io = ModIO::default();
+    let ctx_math = ModMath::default();
+    let ctx_utils = ModUtils::default();
+    let ctx_string = ModString::default();
 
     //Insert the doc for the different contexts.
 
@@ -72,7 +72,7 @@ pub async fn lisp_interpreter(log: Option<PathBuf>, godot: bool, rae_log: bool) 
     if godot {
         //li.import_namespace(CtxGodot::default());
     } else {
-        let ctx_rae = CtxRaeUser::new(
+        let ctx_rae = ModRaeUser::new(
             PlatformGobotSim::new(
                 Domain::File(
                     "/home/jeremy/CLionProjects/ompas/gobotsim/godot_domain/domain.lisp".into(),

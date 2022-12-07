@@ -1,4 +1,5 @@
 use crate::aries::conversion::post_processing::post_processing;
+use crate::aries::conversion::processing::utils::COND;
 use crate::aries::structs::atom::Sym;
 use crate::aries::structs::chronicle::ChronicleTemplate;
 use crate::aries::structs::condition::Condition;
@@ -16,7 +17,10 @@ use aries_planning::chronicles::ChronicleKind;
 use ompas_rae_language::*;
 use sompas_core::static_eval::{eval_static, parse_static};
 use sompas_language::basic_math::*;
-use sompas_language::predicates::*;
+use sompas_language::error::CHECK;
+use sompas_language::kind::*;
+use sompas_language::predicate::*;
+use sompas_language::primitives::*;
 use sompas_language::*;
 use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lprimitives::LPrimitives;
@@ -90,7 +94,7 @@ pub fn convert_lvalue_to_expression_chronicle(
             ec.make_instantaneous();
         }
         LValue::List(l) => match &l[0] {
-            LValue::CoreOperator(co) => match co {
+            LValue::Primitive(co) => match co {
                 LPrimitives::Define => {
                     //Todo : handle the case when the first expression is not a symbol, but an expression that must be evaluated
                     if let LValue::Symbol(s) = &l[1] {

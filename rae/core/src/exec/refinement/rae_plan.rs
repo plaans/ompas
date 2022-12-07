@@ -7,11 +7,11 @@ use rand::prelude::SliceRandom;
 use sompas_core::{eval, parse};
 use sompas_macros::async_scheme_fn;
 use sompas_structs::contextcollection::Context;
-use sompas_structs::documentation::Documentation;
+use sompas_structs::documentation::DocCollection;
 use sompas_structs::lenv::LEnv;
+use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
-use sompas_structs::module::{IntoModule, Module};
 use sompas_structs::purefonction::PureFonctionCollection;
 use std::cmp;
 use std::fmt::{Display, Formatter};
@@ -173,20 +173,20 @@ impl CtxRaePlan {
 }
 
 impl IntoModule for CtxRaePlan {
-    fn into_module(self) -> Module {
-        let mut module = Module {
+    fn into_module(self) -> LModule {
+        let mut module = LModule {
             ctx: Context::new(self),
             prelude: vec![],
             raw_lisp: Default::default(),
             label: MOD_RAE_PLAN.to_string(),
         };
 
-        module.add_async_fn_prelude(COMPOSE_EFFICIENCY, compose_efficiency);
-        module.add_async_fn_prelude(RAE_PLAN, rae_plan);
+        module.add_async_fn(COMPOSE_EFFICIENCY, compose_efficiency);
+        module.add_async_fn(RAE_PLAN, rae_plan);
         module
     }
 
-    fn documentation(&self) -> Documentation {
+    fn documentation(&self) -> DocCollection {
         Default::default()
     }
 

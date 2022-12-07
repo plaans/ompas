@@ -15,10 +15,10 @@ macro_rules! err {
 #[macro_export]
 macro_rules! interrupted {
     () => {
-        sompas_structs::lvalue::LValue::Err(std::sync::Arc::new($crate::list![sompas_language::INTERRUPTED.into()]))
+        sompas_structs::lvalue::LValue::Err(std::sync::Arc::new($crate::list![sompas_language::error::INTERRUPTED.into()]))
     };
     ($($x:expr),*) => {
-        sompas_structs::lvalue::LValue::Err(std::sync::Arc::new($crate::list![sompas_language::INTERRUPTED.into(), $($x),*]))
+        sompas_structs::lvalue::LValue::Err(std::sync::Arc::new($crate::list![sompas_language::error::INTERRUPTED.into(), $($x),*]))
     }
 }
 

@@ -1,9 +1,9 @@
 use crate::contextcollection::{Context, ContextCollection};
-use crate::documentation::Documentation;
+use crate::documentation::DocCollection;
 use crate::llambda::LLambda;
+use crate::lmodule::{InitScheme, LModule};
 use crate::lruntimeerror;
 use crate::lvalue::LValue;
-use crate::module::{InitLisp, IntoModule};
 use crate::purefonction::PureFonctionCollection;
 use im::HashSet;
 use ompas_middleware::logger::LogClient;
@@ -74,8 +74,8 @@ pub struct LEnv {
     macro_table: im::HashMap<String, LLambda>,
     ctxs: ContextCollection,
     pfc: PureFonctionCollection,
-    documentation: Documentation,
-    init: InitLisp,
+    documentation: DocCollection,
+    init: InitScheme,
     pub log: LogClient,
 }
 
@@ -83,11 +83,11 @@ impl LEnv {
     /*pub fn set_outer(&mut self, env: LEnv) {
         self.outer = Some(Arc::new(env))
     }*/
-    pub fn get_documentation(&self) -> Documentation {
+    pub fn get_documentation(&self) -> DocCollection {
         self.documentation.clone()
     }
 
-    pub fn add_documentation(&mut self, doc: Documentation) {
+    pub fn add_documentation(&mut self, doc: DocCollection) {
         self.documentation.append(doc)
     }
 
@@ -99,7 +99,7 @@ impl LEnv {
         &self.pfc
     }
 
-    pub fn get_init(&self) -> &InitLisp {
+    pub fn get_init(&self) -> &InitScheme {
         &self.init
     }
 }
@@ -129,25 +129,29 @@ pub enum ImportType {
 impl LEnv {
     /// Returns the env with all the basic functions, the ContextCollection with CtxRoot
     /// and InitialLisp containing the definition of macros and lambdas,
-    pub fn import_module(&mut self, ctx: impl IntoModule, import_type: ImportType) {
-        self.add_documentation(ctx.documentation());
-        self.add_pure_functions(ctx.pure_fonctions());
+    pub fn import_module(&mut self, ctx: impl Into<LModule>, import_type: ImportType) {
+        let module: LModule = ctx.into();
 
-        let mut module = ctx.into_module();
-        self.add_context(module.ctx, module.label.clone());
-        //println!("id: {}", id);
-        for (sym, lv) in &mut module.prelude {
-            match import_type {
-                ImportType::WithPrefix => {
-                    self.insert(format!("{}::{}", module.label, sym), lv.clone());
-                }
-                ImportType::WithoutPrefix => {
-                    self.insert(sym.to_string(), lv.clone());
+        let mut queue = vec![module];
+
+        while let Some(mut module) = queue.pop() {
+            self.add_documentation(module.documentation);
+            self.add_pure_functions(module.pure_fonctions);
+            self.add_context(module.ctx, module.label.to_string());
+            //println!("id: {}", id);
+            for (sym, lv) in module.bindings {
+                match import_type {
+                    ImportType::WithPrefix => {
+                        self.insert(format!("{}::{}", module.label, sym), lv.clone());
+                    }
+                    ImportType::WithoutPrefix => {
+                        self.insert(sym.to_string(), lv.clone());
+                    }
                 }
             }
+            self.init.append(&mut module.prelude);
+            queue.append(&mut module.submodules);
         }
-
-        self.init.append(&mut module.raw_lisp);
     }
 
     pub fn import_context(&mut self, ctx: Context, label: impl Display) {

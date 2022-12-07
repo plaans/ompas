@@ -1,5 +1,5 @@
 use ompas_rae_language::*;
-use sompas_language::LIST;
+use sompas_language::kind::LIST;
 use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;

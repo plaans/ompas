@@ -1,12 +1,27 @@
 use ompas_middleware::{LogLevel, Master, LOG_TOPIC_ROOT};
 use ompas_rae_interface::LOG_TOPIC_PLATFORM;
+use ompas_rae_language::monitor::log::*;
+use ompas_rae_language::process::LOG_TOPIC_OMPAS;
 use ompas_rae_language::LOG_TOPIC_OMPAS;
+use sompas_language::set::DOC_GET;
 use sompas_macros::async_scheme_fn;
+use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::LRuntimeError;
 
-const LOG_ROOT: &str = "log-root";
-const LOG_PLATFORM: &str = "log-platform";
-const LOG_OMPAS: &str = "log-ompas";
+#[derive(Default)]
+pub struct ModLog {}
+
+impl From<ModLog> for LModule {
+    fn from(m: ModLog) -> Self {
+        let mut module = LModule::new(m, MOD_LOG, DOC_MOD_LOG);
+        module.add_async_fn(ACTIVATE_LOG, activate_log, DOC_ACTIVATE_LOG, false);
+        module.add_async_fn(DEACTIVATE_LOG, deactivate_log, DOC_DEACTIVATE_LOG, false);
+        module.add_async_fn(SET_LOG_LEVEL, set_log_level, DOC_SET_LOG_LEVEL, false);
+        module.add_async_fn(GET_LOG_LEVEL, get_log_level, DOC_GET_LOG_LEVEL, false);
+
+        module
+    }
+}
 
 #[async_scheme_fn]
 pub async fn activate_log(logs: Vec<String>) {

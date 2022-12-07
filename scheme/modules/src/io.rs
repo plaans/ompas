@@ -1,12 +1,10 @@
 use ompas_middleware::logger::LogClient;
+use sompas_language::io::*;
 use sompas_macros::scheme_fn;
-use sompas_structs::contextcollection::Context;
-use sompas_structs::documentation::{Documentation, LHelp};
 use sompas_structs::lenv::LEnv;
+use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::{LValue, Sym};
-use sompas_structs::module::{IntoModule, Module};
-use sompas_structs::purefonction::PureFonctionCollection;
 use sompas_structs::{lruntimeerror, string};
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
@@ -15,37 +13,6 @@ use std::path::PathBuf;
 /*
 LANGUAGE
  */
-
-pub const MOD_IO: &str = "io";
-pub const DOC_MOD_IO: &str = "Module than handles input/output functions.";
-pub const DOC_MOD_IO_VERBOSE: &str = "functions:\n\
-                                    -print\n\
-                                    -read\n\
-                                    -write";
-
-pub const PRINT: &str = "print";
-pub const READ: &str = "__read__";
-pub const WRITE: &str = "write";
-//const LOAD: &str = "load";
-
-/*
-DOCUMENTATION
- */
-
-pub const DOC_PRINT: &str = "Print in stdout a LValue.";
-pub const DOC_PRINT_VERBOSE: &str = "Takes a list of arguments and print them in stdout.";
-pub const DOC_READ: &str = "Read a file an evaluate it";
-pub const DOC_READ_VERBOSE: &str = "Takes the name of the file as argument.\n\
-                                Note: The file path is relative to the path of the executable.\n\
-                                Return an error if the file is not found or there is a problem while parsing and evaluation.";
-pub const DOC_WRITE: &str = "Write a LValue to a file";
-pub const DOC_WRITE_VERBOSE: &str = "Takes two arguments: the name of the file and the LValue\n\
-                                 Note: The path of the file is relative to the path of the executable";
-
-const MACRO_READ: &str = "(defmacro read \
-    (lambda (x)\
-        `(eval (parse (__read__ ,x)))))\
-";
 
 #[derive(Debug)]
 pub enum LogOutput {
@@ -63,11 +30,11 @@ impl From<PathBuf> for LogOutput {
 /// Handles the channel to communicate with the Lisp Interpreter
 /// Note: Be careful when there is response on the receiver
 #[derive(Debug)]
-pub struct CtxIo {
+pub struct ModIO {
     log: LogOutput,
 }
 
-impl Default for CtxIo {
+impl Default for ModIO {
     fn default() -> Self {
         Self {
             log: LogOutput::Stdout,
@@ -75,7 +42,7 @@ impl Default for CtxIo {
     }
 }
 
-impl CtxIo {
+impl ModIO {
     ///Set the log output
     pub fn set_log_output(&mut self, output: LogOutput) {
         self.log = output
@@ -87,34 +54,20 @@ impl CtxIo {
     Ok(LValue::None)
 }*/
 
-impl IntoModule for CtxIo {
-    fn into_module(self) -> Module {
-        let mut module = Module {
-            ctx: Context::new(self),
-            prelude: vec![],
-            raw_lisp: vec![MACRO_READ].into(),
-            label: MOD_IO.into(),
-        };
-
-        module.add_fn_prelude(PRINT, print);
-        module.add_fn_prelude(READ, read);
-        module.add_fn_prelude(WRITE, write);
+impl From<ModIO> for LModule {
+    fn from(m: ModIO) -> Self {
+        let mut module = LModule::new(m, MOD_IO, DOC_MOD_IO);
+        module.add_fn(PRINT, print, (DOC_PRINT, DOC_PRINT_VERBOSE), false);
+        module.add_fn(
+            __READ__,
+            __read__,
+            (DOC___READ__, DOC___READ___VERBOSE),
+            false,
+        );
+        module.add_fn(WRITE, write, DOC_WRITE, false);
+        module.add_macro(READ, MACRO_READ, DOC_READ);
 
         module
-    }
-
-    fn documentation(&self) -> Documentation {
-        vec![
-            LHelp::new_verbose(MOD_IO, DOC_MOD_IO, DOC_MOD_IO_VERBOSE),
-            LHelp::new_verbose(PRINT, DOC_PRINT, DOC_PRINT_VERBOSE),
-            LHelp::new_verbose(READ, DOC_READ, DOC_READ_VERBOSE),
-            LHelp::new_verbose(WRITE, DOC_WRITE, DOC_WRITE_VERBOSE),
-        ]
-        .into()
-    }
-
-    fn pure_fonctions(&self) -> PureFonctionCollection {
-        Default::default()
     }
 }
 
@@ -130,7 +83,7 @@ pub fn print(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
         _ => args.into(),
     };
 
-    let ctx = env.get_context::<CtxIo>(MOD_IO)?;
+    let ctx = env.get_context::<ModIO>(MOD_IO)?;
 
     match &ctx.log {
         LogOutput::Stdout => {
@@ -159,7 +112,7 @@ pub fn print(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
 /// Read the content of a file and sends the content to the lisp interpreter.
 /// The name of the file is given via args.
 #[scheme_fn]
-pub fn read(file_name: String) -> LResult {
+pub fn __read__(file_name: String) -> LResult {
     let mut file = match File::open(&file_name) {
         Ok(f) => f,
         Err(e) => return Err(lruntimeerror!(READ, format!("{}: {}", file_name, e))),

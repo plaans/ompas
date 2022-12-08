@@ -1,5 +1,5 @@
 use crate::contextcollection::{Context, ContextCollection};
-use crate::documentation::DocCollection;
+use crate::documentation::{Doc, DocCollection};
 use crate::llambda::LLambda;
 use crate::lmodule::{InitScheme, LModule};
 use crate::lruntimeerror;
@@ -115,8 +115,8 @@ impl LEnv {
         self.ctxs.get::<T>(label)
     }
 
-    pub fn add_context(&mut self, ctx: Context, label: String) {
-        self.ctxs.insert(ctx, label);
+    pub fn add_context(&mut self, ctx: Context) {
+        self.ctxs.insert(ctx);
     }
 }
 
@@ -137,7 +137,7 @@ impl LEnv {
         while let Some(mut module) = queue.pop() {
             self.add_documentation(module.documentation);
             self.add_pure_functions(module.pure_fonctions);
-            self.add_context(module.ctx, module.label.to_string());
+            self.add_context(module.ctx);
             //println!("id: {}", id);
             for (sym, lv) in module.bindings {
                 match import_type {
@@ -154,8 +154,20 @@ impl LEnv {
         }
     }
 
-    pub fn import_context(&mut self, ctx: Context, label: impl Display) {
-        self.add_context(ctx, label.to_string());
+    pub fn update_context(&mut self, ctx: Context) {
+        if self.ctxs.contains(ctx.get_label()) {
+            self.add_context(ctx);
+        } else {
+            panic!(
+                "Cannot update context {} because it does not exist in the environment",
+                ctx.get_label()
+            )
+        }
+    }
+
+    pub fn import_context(&mut self, ctx: Context, doc: impl Into<Doc>) {
+        self.documentation.insert(ctx.get_label(), doc);
+        self.add_context(ctx);
     }
 
     pub fn get_symbols(&self) -> LEnvSymbols {

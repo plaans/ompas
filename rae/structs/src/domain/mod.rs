@@ -4,6 +4,7 @@ use crate::domain::state_function::StateFunction;
 use crate::domain::task::Task;
 use crate::domain::type_hierarchy::TypeHierarchy;
 use im::HashMap;
+use ompas_rae_language::exec::refinement::*;
 use ompas_rae_language::*;
 use sompas_structs::lenv::LEnvSymbols;
 use sompas_structs::lruntimeerror;
@@ -176,7 +177,7 @@ impl RAEDomain {
             .into()
     }
 
-    pub fn get_list_actions(&self) -> LValue {
+    pub fn get_list_commands(&self) -> LValue {
         self.commands
             .keys()
             .map(|k| LValue::from(k.clone()))
@@ -301,31 +302,31 @@ impl RAEDomain {
             env.insert(label.clone(), lambda.clone())
         }
 
-        env.insert(RAE_ACTION_LIST.to_string(), self.get_list_actions());
-        env.insert(RAE_METHOD_LIST.to_string(), self.get_list_methods());
-        env.insert(RAE_TASK_LIST.to_string(), self.get_list_tasks());
+        env.insert(__COMMANDS_LIST__.to_string(), self.get_list_commands());
+        env.insert(__METHODS_LIST__.to_string(), self.get_list_methods());
+        env.insert(__TASKS_LIST__.to_string(), self.get_list_tasks());
         env.insert(
-            RAE_STATE_FUNCTION_LIST.to_string(),
+            __STATE_FUNCTION_LIST__.to_string(),
             self.get_list_state_functions(),
         );
         env.insert(
-            RAE_SYMBOL_TYPE.to_string(),
+            __SYMBOL_TYPE__.to_string(),
             self.get_map_symbol_type().into(),
         );
         /*env.insert(
             RAE_METHOD_GENERATOR_MAP.to_string(),
             map_method_generator.into(),
         );*/
-        env.insert(RAE_TASK_METHODS_MAP.to_string(), map_task_method.into());
-        env.insert(RAE_METHOD_TYPES_MAP.to_string(), map_method_types.into());
+        env.insert(__TASKS_METHODS_MAP__.to_string(), map_task_method.into());
+        env.insert(__METHOD_TYPES_MAP__.to_string(), map_method_types.into());
         env.insert(
-            RAE_METHOD_PRE_CONDITIONS_MAP.to_string(),
+            __METHOD_PRE_CONDITIONS_MAP__.to_string(),
             map_method_pre_conditions.into(),
         );
 
-        env.insert(RAE_METHOD_SCORE_MAP.to_string(), map_method_score.into());
+        env.insert(__METHOD_SCORE_MAP__.to_string(), map_method_score.into());
 
-        env.insert(RAE_ACTION_MODEL_MAP.to_string(), map_action_model.into());
+        env.insert(__COMMAND_MODEL_MAP__.to_string(), map_action_model.into());
 
         env
     }
@@ -367,30 +368,30 @@ impl RAEDomain {
             env.insert(label.clone(), lambda.clone())
         }
 
-        env.insert(RAE_ACTION_LIST.to_string(), self.get_list_actions());
-        env.insert(RAE_METHOD_LIST.to_string(), self.get_list_methods());
-        env.insert(RAE_TASK_LIST.to_string(), self.get_list_tasks());
+        env.insert(__COMMANDS_LIST__.to_string(), self.get_list_commands());
+        env.insert(__METHODS_LIST__.to_string(), self.get_list_methods());
+        env.insert(__TASKS_LIST__.to_string(), self.get_list_tasks());
         env.insert(
-            RAE_STATE_FUNCTION_LIST.to_string(),
+            __STATE_FUNCTION_LIST__.to_string(),
             self.get_list_state_functions(),
         );
         env.insert(
-            RAE_SYMBOL_TYPE.to_string(),
+            __SYMBOL_TYPE__.to_string(),
             self.get_map_symbol_type().into(),
         );
         /*env.insert(
             RAE_METHOD_GENERATOR_MAP.to_string(),
             map_method_generator.into(),
         );*/
-        env.insert(RAE_TASK_METHODS_MAP.to_string(), map_task_method.into());
-        env.insert(RAE_METHOD_TYPES_MAP.to_string(), map_method_types.into());
+        env.insert(__TASKS_METHODS_MAP__.to_string(), map_task_method.into());
+        env.insert(__METHOD_TYPES_MAP__.to_string(), map_method_types.into());
 
         env.insert(
-            RAE_METHOD_PRE_CONDITIONS_MAP.to_string(),
+            __METHOD_PRE_CONDITIONS_MAP__.to_string(),
             map_method_pre_conditions.into(),
         );
 
-        env.insert(RAE_METHOD_SCORE_MAP.to_string(), map_method_score.into());
+        env.insert(__METHOD_SCORE_MAP__.to_string(), map_method_score.into());
 
         env
     }

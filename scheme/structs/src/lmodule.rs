@@ -53,8 +53,13 @@ pub struct LModule {
 
 impl LModule {
     pub fn new<T: Any + Send + Sync>(ctx: T, label: impl Display, doc: impl Into<Doc>) -> Self {
+        let mut doc = doc.into();
+        doc.verbose = Some(match doc.verbose {
+            Some(verbose) => format!("{}\nElement(s) of the module:\n", verbose),
+            None => "Element(s) of the module\n".to_string(),
+        });
         let mut module = Self {
-            ctx: Context::new(ctx),
+            ctx: Context::new(ctx, label.to_string()),
             bindings: vec![],
             prelude: Default::default(),
             label: label.to_string(),
@@ -62,11 +67,7 @@ impl LModule {
             pure_fonctions: Default::default(),
             submodules: vec![],
         };
-        let mut doc: Doc = doc.into();
-        doc.verbose = Some(match doc.verbose {
-            Some(verbose) => format!("{}\nElement(s) of the module:\n", verbose),
-            None => "Element(s) of the module\n".to_string(),
-        });
+
         module.documentation.insert(label, doc);
         module
     }
@@ -176,7 +177,7 @@ impl LModule {
 impl From<()> for LModule {
     fn from(t: ()) -> Self {
         Self {
-            ctx: Context::new(t),
+            ctx: Context::new(t, "()"),
             bindings: vec![],
             prelude: Default::default(),
             label: "".to_string(),

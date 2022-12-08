@@ -1,4 +1,4 @@
-use ompas_rae_core::monitor::ModRaeUser;
+use ompas_rae_core::monitor::ModMonitor;
 use sompas_modules::advanced_math::ModMath;
 use sompas_modules::io::ModIO;
 use sompas_modules::string::ModString;
@@ -100,7 +100,7 @@ pub async fn lisp_interpreter(opt: Opt) {
 
     li.import(ctx_string);
 
-    let ctx_rae = ModRaeUser::new(None, Some(log.clone()), opt.view).await;
+    let ctx_rae = ModMonitor::new(None, Some(log.clone()), opt.view).await;
     li.import_namespace(ctx_rae);
 
     let mut com: ChannelToLispInterpreter = li.subscribe();

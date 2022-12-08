@@ -1,8 +1,8 @@
-use crate::contexts::ctx_rae::{CtxOMPAS, CTX_RAE};
 use crate::exec::*;
-use ompas_rae_language::IS_LOCKED;
+use ompas_rae_language::exec::mode::*;
+use ompas_rae_language::exec::resource::*;
 use ompas_rae_structs::mutex::Wait;
-use ompas_rae_structs::resource::{AcquireResponse, Capacity, ResourceHandler};
+use ompas_rae_structs::resource::{AcquireResponse, Capacity, ResourceCollection, ResourceHandler};
 use ompas_utils::dyn_async;
 use ompas_utils::other::generic_race;
 use rand::{thread_rng, Rng};
@@ -13,7 +13,39 @@ use sompas_structs::lvalue::LValue;
 use std::borrow::Borrow;
 use std::convert::{TryFrom, TryInto};
 
-const PRIORITY: &str = ":priority";
+pub struct ModResource {
+    resources: ResourceCollection,
+}
+
+impl ModResource {
+    pub fn new(resources: ResourceCollection) -> Self {
+        Self { resources }
+    }
+}
+
+impl From<ModResource> for LModule {
+    fn from(m: ModResource) -> Self {
+        let mut module = LModule::new(m, MOD_RESOURCE, DOC_MOD_RESOURCE);
+        module.add_async_fn(
+            NEW_RESOURCE,
+            new_resource,
+            (DOC_NEW_RESOURCE, DOC_NEW_RESOURCE_VERBOSE),
+            false,
+        );
+        module.add_async_fn(__ACQUIRE__, __acquire__, DOC___ACQUIRE__, false);
+        module.add_async_fn(
+            __ACQUIRE_IN_LIST__,
+            __acquire_in_list__,
+            DOC___ACQUIRE_IN_LIST__,
+            false,
+        );
+        module.add_async_fn(IS_LOCKED, is_locked, DOC_IS_LOCKED, false);
+        module.add_async_fn(RESOURCES, resources, DOC_RESOURCES, false);
+        module.add_lambda(ACQUIRE, LAMBDA_ACQUIRE, DOC_ACQUIRE);
+        module.add_lambda(ACQUIRE_IN_LIST, LAMBDA_ACQUIRE_IN_LIST, DOC_ACQUIRE_IN_LIST);
+        module
+    }
+}
 
 #[async_scheme_fn]
 pub async fn new_resource(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
@@ -162,6 +194,7 @@ async fn check_acquire<'a>(arg: (LEnv, Vec<LValue>, usize)) -> LResult {
         .await;
     Ok(list![label, h])
 }
+
 /// Ask to lock a resource in a list
 /// Returns the resource that has been locked.
 #[async_scheme_fn]

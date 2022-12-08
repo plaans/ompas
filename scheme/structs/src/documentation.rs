@@ -15,8 +15,8 @@ impl Display for DocCollection {
 }
 
 impl DocCollection {
-    pub fn insert(&mut self, label: impl Display, doc: Doc) {
-        self.inner.insert(label.to_string(), doc);
+    pub fn insert(&mut self, label: impl Display, doc: impl Into<Doc>) {
+        self.inner.insert(label.to_string(), doc.into());
     }
 
     pub fn append(&mut self, mut other: Self) {

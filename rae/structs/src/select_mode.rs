@@ -1,4 +1,4 @@
-use ompas_rae_language::*;
+use ompas_rae_language::select::*;
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Copy, Clone)]
@@ -19,9 +19,9 @@ pub enum Planner {
 
 #[derive(Copy, Clone, Default, Debug)]
 pub struct CChoiceConfig {
-    //Number of methods to compare.
+    ///Number of methods to compare.
     b: Option<usize>,
-    //Number of simulation for commands.
+    ///Number of simulation for commands.
     k: usize,
     max_depth: Option<usize>,
 }

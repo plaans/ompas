@@ -7,7 +7,7 @@ use sompas_repl::lisp_interpreter::{LispInterpreter, LispInterpreterConfig};
 use std::fs;
 use std::path::PathBuf;
 
-use ompas_rae_core::monitor::ModRaeUser;
+use ompas_rae_core::monitor::ModMonitor;
 use structopt::StructOpt;
 
 pub const TOKIO_CHANNEL_SIZE: usize = 65_384;
@@ -84,7 +84,7 @@ async fn lisp_interpreter(opt: &Opt) {
         }
     });
 
-    let ctx_rae = ModRaeUser::new(None, opt.log.clone(), opt.rae_log).await;
+    let ctx_rae = ModMonitor::new(None, opt.log.clone(), opt.rae_log).await;
     li.import_namespace(ctx_rae);
 
     li.set_config(LispInterpreterConfig::new(true));

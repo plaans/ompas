@@ -1,3 +1,6 @@
+use ompas_rae_language::exec::mode::CTX_MODE;
+use sompas_structs::contextcollection::Context;
+
 #[derive(Copy, Clone)]
 pub enum RAEMode {
     Exec,
@@ -6,6 +9,12 @@ pub enum RAEMode {
 
 pub struct CtxMode {
     pub mode: RAEMode,
+}
+
+impl From<CtxMode> for Context {
+    fn from(c: CtxMode) -> Self {
+        Context::new(c, CTX_MODE)
+    }
 }
 
 impl CtxMode {

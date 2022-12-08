@@ -1,11 +1,7 @@
 //! Module containing the Scheme library to setup RAE environment
-
-use crate::contexts::ctx_domain::{CtxDomain, CTX_DOMAIN};
-use crate::contexts::ctx_mode::{CtxMode, CTX_MODE};
-use crate::contexts::ctx_rae::{CtxOMPAS, CTX_RAE};
-use crate::contexts::ctx_state::{CtxState, CTX_STATE};
-use crate::contexts::ctx_task::{ModTask, CTX_TASK};
-use crate::exec::CtxRaeExec;
+use crate::exec::ModExec;
+use control::*;
+use debug_conversion::*;
 use domain::*;
 use log::{activate_log, deactivate_log};
 use ompas_middleware::logger::{FileDescriptor, LogClient};
@@ -17,7 +13,6 @@ use ompas_rae_structs::internal_state::OMPASInternalState;
 use ompas_rae_structs::job::Job;
 use ompas_rae_structs::rae_options::OMPASOptions;
 use ompas_rae_structs::select_mode::SelectMode;
-use planning::*;
 use sompas_core::{eval_init, get_root_env};
 use sompas_modules::advanced_math::ModMath;
 use sompas_modules::io::{LogOutput, ModIO};
@@ -32,33 +27,23 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use user_interface::*;
+pub mod control;
+pub mod debug_conversion;
 pub mod domain;
 pub mod log;
-pub mod planning;
-pub mod user_interface;
 
-use crate::monitor::log::{get_log_level, set_log_level};
+use crate::monitor::log::{get_log_level, set_log_level, ModLog};
 use ompas_rae_interface::platform::{Domain, Platform, PlatformDescriptor};
 use ompas_rae_interface::PLATFORM_CLIENT;
+use ompas_rae_language::monitor::*;
+use ompas_rae_language::process::{LOG_TOPIC_OMPAS, OMPAS};
 use sompas_modules::time::ModTime;
 
 //LANGUAGE
-const MOD_RAE_USER: &str = "rae_user";
-const DOC_MOD_RAE: &str = "Module exposed to the user to configure and launch rae.";
-const DOC_MOD_RAE_VERBOSE: &str = "functions:\n\
--getters : get-methods, get-actions, get-symbol-type, get-tasks, get-state-functions, get-env,\n\
-    get-state, get-status, get-agenda, get-config-platform\n\
--definitions : def-state-function, def-actions, def-action-model, def-action-operational-model,\n\
-    def-task, def-method, def-initial-state\n\
--configuration: configure-platform\n\
--launch: launch";
-
-const DOC_RAE_LAUNCH: &str = "Launch the main rae loop in an asynchronous task.";
 
 pub const TOKIO_CHANNEL_SIZE: usize = 100;
 
-pub struct ModRaeUser {
+pub struct ModMonitor {
     options: Arc<RwLock<OMPASOptions>>,
     interface: OMPASInternalState,
     platform: Option<Platform>,
@@ -68,19 +53,19 @@ pub struct ModRaeUser {
     tasks_to_execute: Arc<RwLock<Vec<Job>>>,
 }
 
-impl From<ModRaeUser> for LModule {
-    fn from(m: ModRaeUser) -> Self {
-        let mut module = LModule::new(m, MOD_RAE_USER, DOC_MOD_RAE_USER);
+impl From<ModMonitor> for LModule {
+    fn from(m: ModMonitor) -> Self {
+        let mut module = LModule::new(m, MOD_MONITOR, DOC_MOD_MONITOR);
         module.add_submodule(ModDomain::default());
         module.add_submodule(ModLog::default());
-        module.add_submodule(ModPlanning::default());
-        module.add_submodule(ModUserInterface::default());
+        module.add_submodule(ModDebugConversion::default());
+        module.add_submodule(Control::default());
 
         module
     }
 }
 
-impl ModRaeUser {
+impl ModMonitor {
     /// Initialize the libraries to load inside Scheme env.
     /// Takes as argument the execution platform.
     ///
@@ -90,7 +75,7 @@ impl ModRaeUser {
         empty_env.import_module(ModUtils::default(), WithoutPrefix);
         empty_env.import_module(ModMath::default(), WithoutPrefix);
         empty_env.import_module(ModIO::default(), WithoutPrefix);
-        empty_env.import_module(CtxRaeExec::default(), WithoutPrefix);
+        empty_env.import_module(ModExec::default(), WithoutPrefix);
         eval_init(&mut empty_env).await;
         empty_env
     }
@@ -188,7 +173,7 @@ impl ModRaeUser {
         };
 
         env.import_context(Context::new(ctx_rae), CTX_RAE);
-        env.import_module(CtxRaeExec::default(), WithoutPrefix);
+        env.import_module(ModExec::default(), WithoutPrefix);
         env.import_context(Context::new(ctx_state), CTX_STATE);
         env.import_context(Context::new(ModTask::default()), CTX_TASK);
         env.import_context(Context::new(CtxMode::default()), CTX_MODE);
@@ -207,14 +192,7 @@ impl ModRaeUser {
     }
 }
 
-impl ModRaeUser {
-    /*pub fn get_log(&self) -> &PathBuf {
-        &self.interface.log.path
-    }
-    pub fn set_log(&mut self, log: PathBuf) {
-        self.interface.log.path = log;
-    }*/
-
+impl ModMonitor {
     pub async fn get_options(&self) -> OMPASOptions {
         self.options.read().await.clone()
     }
@@ -244,7 +222,7 @@ impl ModRaeUser {
     }
 }
 
-impl Default for ModRaeUser {
+impl Default for ModMonitor {
     fn default() -> Self {
         Self {
             options: Default::default(),

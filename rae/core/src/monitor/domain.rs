@@ -1,5 +1,6 @@
-use crate::monitor::{ModRaeUser, MOD_RAE_USER};
-use ompas_rae_language::*;
+use ompas_rae_language::exec::state::INSTANCE;
+use ompas_rae_language::monitor::domain::*;
+use ompas_rae_language::monitor::MOD_MONITOR;
 use ompas_rae_structs::domain::command::Command;
 use ompas_rae_structs::domain::method::Method;
 use ompas_rae_structs::domain::parameters::Parameters;
@@ -10,7 +11,6 @@ use ompas_rae_structs::state::world_state::StateType;
 use sompas_core::modules::list::{car, cons, first};
 use sompas_core::{eval, expand, get_root_env, parse};
 use sompas_language::predicate::*;
-use sompas_language::*;
 use sompas_macros::*;
 use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lenv::LEnv;
@@ -21,12 +21,85 @@ use sompas_structs::lvalue::LValue;
 use sompas_structs::{lruntimeerror, wrong_n_args, wrong_type};
 use std::convert::TryInto;
 
-//#[derive(Default)]
+#[derive(Default)]
 pub struct ModDomain {}
 
 impl From<ModDomain> for LModule {
     fn from(m: ModDomain) -> Self {
-        let module =
+        let mut module = LModule::new(m, MOD_DOMAIN, DOC_MOD_DOMAIN);
+        module.add_async_fn(
+            GENERATE_TEST_TYPE_EXPR,
+            generate_test_type_expr,
+            DOC_GENERATE_TEST_TYPE_EXPR,
+            false,
+        );
+        module.add_async_fn(
+            ADD_STATE_FUNCTION,
+            add_state_function,
+            DOC_ADD_STATE_FUNCTION,
+            false,
+        );
+        module.add_async_fn(ADD_COMMAND, add_command, DOC_ADD_COMMAND, false);
+        module.add_async_fn(
+            ADD_COMMAND_MODEL,
+            add_command_model,
+            DOC_ADD_COMMAND_MODEL,
+            false,
+        );
+        module.add_async_fn(ADD_TASK, add_task, DOC_ADD_TASK, false);
+        module.add_async_fn(ADD_TASK_MODEL, add_task_model, DOC_ADD_TASK_MODEL, false);
+        module.add_async_fn(ADD_METHOD, add_method, DOC_ADD_METHOD, false);
+        module.add_async_fn(ADD_LAMBDA, add_lambda, DOC_ADD_LAMBDA, false);
+        module.add_async_fn(ADD_FACTS, add_facts, DOC_ADD_FACTS, false);
+        module.add_async_fn(ADD_TYPE, add_type, DOC_ADD_TYPE, false);
+        module.add_async_fn(ADD_TYPES, add_types, DOC_ADD_TYPES, false);
+        module.add_async_fn(ADD_OBJECT, add_object, DOC_ADD_OBJECT, false);
+        module.add_async_fn(ADD_OBJECTS, add_objects, DOC_ADD_OBJECTS, false);
+
+        //Macros
+        module.add_macro(
+            DEF_STATE_FUNCTION,
+            MACRO_DEF_STATE_FUNCTION,
+            (DOC_DEF_STATE_FUNCTION, DOC_DEF_STATE_FUNCTION_VERBOSE),
+        );
+        module.add_macro(
+            DEF_COMMAND,
+            MACRO_DEF_COMMAND,
+            (DOC_DEF_COMMAND, DOC_DEF_COMMAND_VERBOSE),
+        );
+        //todo: add macros to define command models
+        module.add_macro(
+            DEF_TASK,
+            MACRO_DEF_TASK,
+            (DOC_DEF_TASK, DOC_DEF_TASK_VERBOSE),
+        );
+        //todo: add macros to define task models
+        module.add_macro(
+            DEF_METHOD,
+            MACRO_DEF_METHOD,
+            (DOC_DEF_METHOD, DOC_DEF_METHOD_VERBOSE),
+        );
+        module.add_macro(
+            DEF_LAMBDA,
+            MACRO_DEF_LAMBDA,
+            (DOC_DEF_LAMBDA, DOC_DEF_LAMBDA_VERBOSE),
+        );
+        module.add_macro(
+            DEF_FACTS,
+            MACRO_DEF_FACTS,
+            (DOC_DEF_FACTS, DOC_DEF_FACTS_VERBOSE),
+        );
+        module.add_macro(
+            DEF_TYPES,
+            MACRO_DEF_TYPES,
+            (DOC_DEF_TYPES, DOC_DEF_TYPES_VERBOSE),
+        );
+        module.add_macro(
+            DEF_OBJECTS,
+            MACRO_DEF_OBJECTS,
+            (DOC_DEF_OBJECTS, DOC_DEF_OBJECTS_VERBOSE),
+        );
+        module
     }
 }
 
@@ -87,27 +160,13 @@ pub async fn generate_test_type_expr(env: &LEnv, params: Vec<LValue>) -> LResult
     }
 }
 
-/// Defines a lambda in RAE environment.
-#[async_scheme_fn]
-pub async fn add_lambda(env: &LEnv, label: String, lambda: &LValue) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER).unwrap();
-    let mut env = ctx.get_empty_env();
-    let expanded = expand(lambda, true, &mut env).await?;
-    let mut e = get_root_env().await;
-    let result = eval(&expanded, &mut e, None).await?;
-    if let LValue::Lambda(_) = &result {
-        ctx.rae_domain.write().await.add_lambda(label, result);
-    }
-    Ok(())
-}
-
 /// Defines a state function in RAE environment.
 #[async_scheme_fn]
 pub async fn add_state_function(
     env: &LEnv,
     map: im::HashMap<LValue, LValue>,
 ) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER)?;
+    let ctx = env.get_context::<ModDomain>(MOD_DOMAIN)?;
     let mut new_env = ctx.get_empty_env();
     let label = map.get(&NAME.into()).unwrap();
     let params: Parameters = map
@@ -119,10 +178,7 @@ pub async fn add_state_function(
         &[map
             .get(&RESULT.into())
             .ok_or_else(|| {
-                LRuntimeError::new(
-                    RAE_ADD_STATE_FUNCTION,
-                    format!("No a :result for {}", label),
-                )
+                LRuntimeError::new(ADD_STATE_FUNCTION, format!("No a :result for {}", label))
             })?
             .clone()],
     )?
@@ -150,6 +206,67 @@ pub async fn add_state_function(
     Ok(())
 }
 
+async fn create_model(env: &mut LEnv, model: im::HashMap<LValue, LValue>) -> LResult {
+    let model_type: ModelType = model
+        .get(&MODEL_TYPE.into())
+        .unwrap()
+        .to_string()
+        .as_str()
+        .try_into()?;
+    let str = match model_type {
+        ModelType::PDDL => {
+            let params: Parameters = model
+                .get(&PARAMETERS.into())
+                .ok_or_else(|| LRuntimeError::new("create_model", "missing :params"))?
+                .try_into()?;
+            let conds = model
+                .get(&PRE_CONDITIONS.into())
+                .ok_or_else(|| LRuntimeError::new("create_model", "missing :pre-conditions"))?;
+            let mut str_conds = "(do".to_string();
+            if let LValue::List(conds) = conds {
+                for cond in conds.iter() {
+                    str_conds.push_str(format!("(check {})", cond).as_str());
+                }
+                str_conds.push(')');
+            } else {
+                return Err(LRuntimeError::default());
+            }
+            let effects = model
+                .get(&EFFECTS.into())
+                .ok_or_else(|| LRuntimeError::new("create_model", "missing :effects"))?;
+            let effects = cons(env, &[LPrimitives::Do.into(), effects.clone()])?;
+            let test =
+                generate_test_type_expr(env, &[model.get(&PARAMETERS.into()).unwrap().clone()])
+                    .await?;
+            format!(
+                "(lambda {} (do {} {} {}))",
+                params.get_params_as_lvalue(),
+                test,
+                str_conds,
+                effects
+            )
+        }
+        ModelType::OM => {
+            let params: Parameters = model
+                .get(&PARAMETERS.into())
+                .ok_or_else(|| LRuntimeError::new("create_model", "missing :params"))?
+                .try_into()?;
+            let body = car(env, &[model.get(&BODY.into()).unwrap().clone()])?;
+            let test =
+                generate_test_type_expr(env, &[model.get(&PARAMETERS.into()).unwrap().clone()])
+                    .await?;
+            format!(
+                "(lambda {} (do {} {}))",
+                params.get_params_as_lvalue(),
+                test,
+                body
+            )
+        }
+    };
+
+    eval(&parse(&str, env).await?, env, None).await
+}
+
 /// Defines an action in RAE environment.
 #[async_scheme_fn]
 pub async fn add_command(
@@ -158,12 +275,12 @@ pub async fn add_command(
 ) -> Result<(), LRuntimeError> {
     if map.is_empty() {
         return Err(LRuntimeError::wrong_number_of_args(
-            RAE_ADD_COMMAND,
+            ADD_COMMAND,
             &[map.into()],
             1..usize::MAX,
         ));
     }
-    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER)?;
+    let ctx = env.get_context::<ModDomain>(MOD_DOMAIN)?;
     let mut env = ctx.get_empty_env();
     let mut command = Command::default();
     command.set_label(map.get(&NAME.into()).unwrap().to_string());
@@ -217,15 +334,30 @@ pub async fn add_command(
 }
 
 #[async_scheme_fn]
+pub async fn add_command_model(
+    env: &LEnv,
+    model: im::HashMap<LValue, LValue>,
+) -> Result<(), LRuntimeError> {
+    let ctx = env.get_context::<ModDomain>(MOD_DOMAIN)?;
+    let mut env = ctx.get_empty_env();
+    let label: String = model.get(&NAME.into()).unwrap().try_into()?;
+    let model = create_model(&mut env, model).await?;
+    ctx.rae_domain
+        .write()
+        .await
+        .add_command_model(label, model)?;
+    Ok(())
+}
+#[async_scheme_fn]
 pub async fn add_task(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<(), LRuntimeError> {
     if map.is_empty() {
         return Err(LRuntimeError::wrong_number_of_args(
-            RAE_ADD_TASK,
+            ADD_TASK,
             &[map.into()],
             1..usize::MAX,
         ));
     }
-    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER)?;
+    let ctx = env.get_context::<ModDomain>(MOD_DOMAIN)?;
     let mut env = ctx.get_empty_env();
 
     let mut task = Task::default();
@@ -271,17 +403,30 @@ pub async fn add_task(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<()
     Ok(())
 }
 
+#[async_scheme_fn]
+pub async fn add_task_model(
+    env: &LEnv,
+    model: im::HashMap<LValue, LValue>,
+) -> Result<(), LRuntimeError> {
+    let ctx = env.get_context::<ModDomain>(MOD_DOMAIN)?;
+    let mut env = ctx.get_empty_env();
+    let label: String = model.get(&NAME.into()).unwrap().try_into()?;
+    let model = create_model(&mut env, model).await?;
+    ctx.rae_domain.write().await.add_task_model(label, model)?;
+    Ok(())
+}
+
 /// Defines a method in RAE environment.
 #[async_scheme_fn]
 pub async fn add_method(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<(), LRuntimeError> {
     if map.is_empty() {
         return Err(LRuntimeError::wrong_number_of_args(
-            RAE_ADD_METHOD,
+            ADD_METHOD,
             &[map.into()],
             1..usize::MAX,
         ));
     }
-    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER)?;
+    let ctx = env.get_context::<ModDomain>(MOD_MONITOR)?;
     let mut new_env = ctx.get_empty_env();
     let parameters = map.get(&PARAMETERS.into()).unwrap_or(&LValue::Nil).clone();
     let task_label = car(
@@ -289,7 +434,7 @@ pub async fn add_method(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<
         &[map
             .get(&TASK.into())
             .ok_or(LRuntimeError::new(
-                RAE_ADD_METHOD,
+                ADD_METHOD,
                 ":task is missing in the definition of the method.",
             ))?
             .clone()],
@@ -302,7 +447,7 @@ pub async fn add_method(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<
     let label = map
         .get(&NAME.into())
         .ok_or(LRuntimeError::new(
-            RAE_ADD_METHOD,
+            ADD_METHOD,
             ":name is missing in the definition of the method.",
         ))?
         .to_string();
@@ -403,100 +548,24 @@ impl TryFrom<&str> for ModelType {
     }
 }
 
-async fn create_model(env: &mut LEnv, model: im::HashMap<LValue, LValue>) -> LResult {
-    let model_type: ModelType = model
-        .get(&MODEL_TYPE.into())
-        .unwrap()
-        .to_string()
-        .as_str()
-        .try_into()?;
-    let str = match model_type {
-        ModelType::PDDL => {
-            let params: Parameters = model
-                .get(&PARAMETERS.into())
-                .ok_or_else(|| LRuntimeError::new("create_model", "missing :params"))?
-                .try_into()?;
-            let conds = model
-                .get(&PRE_CONDITIONS.into())
-                .ok_or_else(|| LRuntimeError::new("create_model", "missing :pre-conditions"))?;
-            let mut str_conds = "(do".to_string();
-            if let LValue::List(conds) = conds {
-                for cond in conds.iter() {
-                    str_conds.push_str(format!("(check {})", cond).as_str());
-                }
-                str_conds.push(')');
-            } else {
-                return Err(LRuntimeError::default());
-            }
-            let effects = model
-                .get(&EFFECTS.into())
-                .ok_or_else(|| LRuntimeError::new("create_model", "missing :effects"))?;
-            let effects = cons(env, &[LPrimitives::Do.into(), effects.clone()])?;
-            let test =
-                generate_test_type_expr(env, &[model.get(&PARAMETERS.into()).unwrap().clone()])
-                    .await?;
-            format!(
-                "(lambda {} (do {} {} {}))",
-                params.get_params_as_lvalue(),
-                test,
-                str_conds,
-                effects
-            )
-        }
-        ModelType::OM => {
-            let params: Parameters = model
-                .get(&PARAMETERS.into())
-                .ok_or_else(|| LRuntimeError::new("create_model", "missing :params"))?
-                .try_into()?;
-            let body = car(env, &[model.get(&BODY.into()).unwrap().clone()])?;
-            let test =
-                generate_test_type_expr(env, &[model.get(&PARAMETERS.into()).unwrap().clone()])
-                    .await?;
-            format!(
-                "(lambda {} (do {} {}))",
-                params.get_params_as_lvalue(),
-                test,
-                body
-            )
-        }
-    };
-
-    eval(&parse(&str, env).await?, env, None).await
-}
-
+/// Defines a lambda in RAE environment.
 #[async_scheme_fn]
-pub async fn add_command_model(
-    env: &LEnv,
-    model: im::HashMap<LValue, LValue>,
-) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER)?;
+pub async fn add_lambda(env: &LEnv, label: String, lambda: &LValue) -> Result<(), LRuntimeError> {
+    let ctx = env.get_context::<ModDomain>(MOD_DOMAIN).unwrap();
     let mut env = ctx.get_empty_env();
-    let label: String = model.get(&NAME.into()).unwrap().try_into()?;
-    let model = create_model(&mut env, model).await?;
-    ctx.rae_domain
-        .write()
-        .await
-        .add_command_model(label, model)?;
-    Ok(())
-}
-
-#[async_scheme_fn]
-pub async fn add_task_model(
-    env: &LEnv,
-    model: im::HashMap<LValue, LValue>,
-) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER)?;
-    let mut env = ctx.get_empty_env();
-    let label: String = model.get(&NAME.into()).unwrap().try_into()?;
-    let model = create_model(&mut env, model).await?;
-    ctx.rae_domain.write().await.add_task_model(label, model)?;
+    let expanded = expand(lambda, true, &mut env).await?;
+    let mut e = get_root_env().await;
+    let result = eval(&expanded, &mut e, None).await?;
+    if let LValue::Lambda(_) = &result {
+        ctx.rae_domain.write().await.add_lambda(label, result);
+    }
     Ok(())
 }
 
 ///Takes in input a list of initial facts that will be stored in the inner world part of the State.
 #[async_scheme_fn]
 pub async fn add_facts(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<(), LRuntimeError> {
-    let state = &env.get_context::<ModRaeUser>(MOD_RAE_USER)?.interface.state;
+    let state = &env.get_context::<ModDomain>(MOD_DOMAIN)?.interface.state;
 
     let mut inner_world = PartialState {
         inner: Default::default(),
@@ -506,7 +575,7 @@ pub async fn add_facts(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<(
     for (k, v) in &map {
         let mut is_instance: bool = false;
         if let LValue::List(key) = k {
-            if key[0] == LValue::from(RAE_INSTANCE) {
+            if key[0] == LValue::from(INSTANCE) {
                 let instances: Vec<LValue> = v.try_into()?;
                 for e in instances {
                     state
@@ -525,6 +594,25 @@ pub async fn add_facts(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<(
 
     Ok(())
 }
+
+#[async_scheme_fn]
+pub async fn add_type(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
+    let ctx = env.get_context::<ModDomain>(MOD_DOMAIN).unwrap();
+
+    let (t, parent) = match args.len() {
+        1 => (args[0].to_string(), None),
+        2 => (args[0].to_string(), Some(args[1].to_string())),
+        _ => return Err(LRuntimeError::wrong_number_of_args(ADD_TYPE, args, 1..2)),
+    };
+
+    ctx.interface
+        .state
+        .add_type(&t, parent.as_ref().map(|x| &**x))
+        .await;
+
+    Ok(())
+}
+
 #[async_scheme_fn]
 pub async fn add_types(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
     for arg in args {
@@ -532,7 +620,7 @@ pub async fn add_types(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError>
             LValue::List(list) => {
                 if list.len() < 2 {
                     return Err(lruntimeerror!(
-                        RAE_ADD_TYPES,
+                        ADD_TYPES,
                         format!("an objects is defined by a symbol and a type, got {}", arg)
                     ));
                 }
@@ -549,12 +637,22 @@ pub async fn add_types(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError>
     }
     Ok(())
 }
+
+#[async_scheme_fn]
+pub async fn add_object(env: &LEnv, object: String, t: String) -> Result<(), LRuntimeError> {
+    let ctx = env.get_context::<ModDomain>(MOD_DOMAIN).unwrap();
+
+    ctx.interface.state.add_instance(&object, &t).await;
+
+    Ok(())
+}
+
 #[async_scheme_fn]
 pub async fn add_objects(env: &LEnv, args: Vec<Vec<LValue>>) -> Result<(), LRuntimeError> {
     for list in args {
         if list.len() < 2 {
             return Err(lruntimeerror!(
-                RAE_ADD_OBJECTS,
+                ADD_OBJECTS,
                 format!(
                     "an objects is defined by a symbol and a type, got {}",
                     LValue::from(list)
@@ -566,39 +664,6 @@ pub async fn add_objects(env: &LEnv, args: Vec<Vec<LValue>>) -> Result<(), LRunt
             add_object(env, &[obj.clone(), last.clone()]).await?;
         }
     }
-    Ok(())
-}
-
-#[async_scheme_fn]
-pub async fn add_type(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER).unwrap();
-
-    let (t, parent) = match args.len() {
-        1 => (args[0].to_string(), None),
-        2 => (args[0].to_string(), Some(args[1].to_string())),
-        _ => {
-            return Err(LRuntimeError::wrong_number_of_args(
-                RAE_ADD_TYPE,
-                args,
-                1..2,
-            ))
-        }
-    };
-
-    ctx.interface
-        .state
-        .add_type(&t, parent.as_ref().map(|x| &**x))
-        .await;
-
-    Ok(())
-}
-
-#[async_scheme_fn]
-pub async fn add_object(env: &LEnv, object: String, t: String) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<ModRaeUser>(MOD_RAE_USER).unwrap();
-
-    ctx.interface.state.add_instance(&object, &t).await;
-
     Ok(())
 }
 
@@ -620,8 +685,8 @@ mod test {
 
         env.import_module(ModMath::default(), WithoutPrefix);
 
-        let mut ctx = ModRaeUser::default();
-        ctx.empty_env = ModRaeUser::init_empty_env().await;
+        let mut ctx = ModDomain::default();
+        ctx.empty_env = ModDomain::init_empty_env().await;
 
         env.import_module(ctx, WithoutPrefix);
 

@@ -1,6 +1,6 @@
 use ompas_gobotsim::platform::GodotDomain;
 use ompas_gobotsim::platform::PlatformGobotSim;
-use ompas_rae_core::monitor::ModRaeUser;
+use ompas_rae_core::monitor::ModMonitor;
 use ompas_rae_structs::platform::Platform;
 use sompas_modules::advanced_math::ModMath;
 use sompas_modules::io::ModIO;
@@ -106,7 +106,7 @@ pub async fn lisp_interpreter(opt: Opt) {
         PathBuf::from(format!("{}/ompas/benchmark", home))
     };
 
-    let ctx_rae = ModRaeUser::new(
+    let ctx_rae = ModMonitor::new(
         Some(Platform::new(PlatformGobotSim::new(
             domain(&opt),
             !opt.view,

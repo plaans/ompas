@@ -33,5 +33,8 @@ impl From<ModTask> for LModule {
 
 #[scheme_fn]
 pub fn define_parent_task(env: &mut LEnv, parent_id: usize) {
-    env.import_context(Context::new(ModTask::new(parent_id)), CTX_TASK);
+    env.import_context(
+        Context::new(ModTask::new(parent_id), DOC_MOD_TASK),
+        DOC_MOD_TASK,
+    );
 }

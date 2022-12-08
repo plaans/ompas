@@ -1,12 +1,7 @@
-use crate::contexts::ctx_domain::{CtxDomain, CTX_DOMAIN};
-use crate::contexts::ctx_planning::{CtxPlanning, CTX_PLANNING};
-use crate::contexts::ctx_rae::{CtxOMPAS, CTX_RAE};
-use crate::contexts::ctx_state::{CtxState, CTX_STATE};
-use crate::contexts::ctx_task::{ModTask, CTX_TASK};
 use crate::exec::refinement::c_choice::{c_choice_env, ModCChoice};
 use crate::exec::refinement::rae_plan::{rae_plan_env, CtxRaePlan};
-use crate::exec::{instance, STATE};
-use ompas_rae_language::*;
+use crate::exec::state::ModState;
+use ompas_rae_language::exec::state::MOD_STATE;
 use ompas_rae_planning::aries::binding::solver::run_solver_for_htn;
 use ompas_rae_planning::aries::binding::{generate_chronicles, solver};
 use ompas_rae_planning::aries::structs::{ConversionContext, Problem};
@@ -324,7 +319,7 @@ pub async fn c_choice_select(
 
     let mut new_env: LEnv = c_choice_env(new_env, &domain.domain).await;
     new_env.import_module(ModCChoice::new(tried.to_vec(), 0), WithoutPrefix);
-    new_env.import_context(Context::new(CtxState::new(state.clone().into())), CTX_STATE);
+    new_env.import_context(Context::new(ModState::new(state.clone().into())), CTX_STATE);
 
     let mut greedy: RefinementMetaData = greedy_select(state, tried, task.clone(), env).await?;
     greedy.refinement_type = SelectMode::Planning(Planner::CChoice(config));
@@ -351,7 +346,10 @@ pub async fn rae_plan_select(
 
     let mut new_env: LEnv = rae_plan_env(new_env, &domain.domain).await;
     new_env.import_module(CtxRaePlan::new(tried.to_vec(), 0), WithoutPrefix);
-    new_env.import_context(Context::new(CtxState::new(state.clone().into())), CTX_STATE);
+    new_env.update_context(Context::new(
+        ModState::new(state.clone().into(), Default::default()),
+        MOD_STATE,
+    ));
 
     let mut greedy: RefinementMetaData = greedy_select(state, tried, task.clone(), env).await?;
     greedy.refinement_type = SelectMode::Planning(Planner::RAEPlan(config));

@@ -1,10 +1,13 @@
-use crate::contexts::ctx_mode::{CtxMode, RAEMode, CTX_MODE};
-use crate::contexts::ctx_planning::{CtxPlanning, CTX_PLANNING};
-use crate::contexts::ctx_rae::{CtxOMPAS, CTX_RAE};
-use crate::contexts::ctx_task::{ModTask, CTX_TASK};
 use crate::error::RaeExecError;
+use crate::exec::mode::{CtxMode, RAEMode};
+use crate::exec::task::ModTask;
 use crate::exec::*;
-use ompas_rae_interface::platform::PlatformDescriptor;
+use ompas_middleware::logger::LogClient;
+use ompas_rae_interface::platform::{Platform, PlatformDescriptor};
+use ompas_rae_language::exec::mode::CTX_MODE;
+use ompas_rae_language::exec::platform::*;
+use ompas_rae_language::exec::task::MOD_TASK;
+use ompas_rae_structs::agenda::Agenda;
 use ompas_rae_structs::state::action_status::ActionStatus;
 use sompas_core::modules::list::append;
 use sompas_core::parse;
@@ -14,12 +17,36 @@ use sompas_structs::lruntimeerror::LResult;
 use sompas_structs::lswitch::InterruptionReceiver;
 use sompas_structs::lvalue::LValue;
 
-#[scheme_fn]
-pub fn is_platform_defined(env: &LEnv) -> bool {
-    env.get_context::<CtxOMPAS>(CTX_RAE)
-        .unwrap()
-        .platform_interface
-        .is_some()
+pub struct ModPlatform {
+    platform: Option<Platform>,
+    agenda: Agenda,
+    pub(crate) log: LogClient,
+}
+
+impl ModPlatform {
+    pub fn new(platform: Option<Platform>, agenda: Agenda, log: LogClient) -> Self {
+        Self {
+            platform,
+            agenda,
+            log,
+        }
+    }
+}
+
+impl From<ModPlatform> for LModule {
+    fn from(m: ModPlatform) -> Self {
+        let mut module = LModule::new(m, MOD_PLATFORM, DOC_MOD_PLATFORM);
+        module.add_async_fn(EXEC_COMMAND, exec_command, DOC_EXEC_COMMAND, false);
+        module.add_async_fn(CANCEL_COMMAND, cancel_command, DOC_CANCEL_COMMAND, false);
+        module.add_fn(
+            IS_PLATFORM_DEFINED,
+            is_platform_defined,
+            DOC_IS_PLATFORM_DEFINED,
+            false,
+        );
+        module.add_async_fn(START_PLATFORM, start_platform, DOC_START_PLATFORM, false);
+        module
+    }
 }
 
 #[async_scheme_fn]
@@ -32,10 +59,13 @@ pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LAsyncHandle {
     let f = (Box::pin(async move {
         let args = args.as_slice();
 
-        let parent_task = env.get_context::<ModTask>(CTX_TASK)?.parent_id;
-        let ctx = env.get_context::<CtxOMPAS>(CTX_RAE)?;
-        let log = ctx.get_log_client();
-        let (command_id, mut rx) = ctx.agenda.add_command(args.into(), parent_task).await;
+        let parent_task = env.get_context::<ModTask>(MOD_TASK)?.parent_id;
+        let mod_platform = env.get_context::<ModPlatform>(MOD_PLATFORM)?;
+        let log = mod_platform.log.clone();
+        let (command_id, mut rx) = mod_platform
+            .agenda
+            .add_command(args.into(), parent_task)
+            .await;
         let debug: LValue = args.into();
         log.info(format!("Exec command {command_id}: {debug}."))
             .await;
@@ -85,13 +115,13 @@ pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LAsyncHandle {
                                     ActionStatus::Failure => {
                                         log.error(format!("Command {command_id} is a failure."))
                                             .await;
-                                        ctx.agenda.set_end_time(&command_id).await;
+                                        mod_platform.agenda.set_end_time(&command_id).await;
                                         return Ok(RaeExecError::ActionFailure.into());
                                     }
                                     ActionStatus::Success => {
                                         log.info(format!("Command {command_id} is a success."))
                                             .await;
-                                        ctx.agenda.set_end_time(&command_id).await;
+                                        mod_platform.agenda.set_end_time(&command_id).await;
                                         return Ok(true.into());
                                     }
                                     ActionStatus::Cancelled(_) => {
@@ -99,13 +129,13 @@ pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LAsyncHandle {
                                             "Command {command_id} has been cancelled."
                                         ))
                                         .await;
-                                        ctx.agenda.set_end_time(&command_id).await;
+                                        mod_platform.agenda.set_end_time(&command_id).await;
                                         return Ok(true.into());
                                     }
                                 }
                             }
                             Err(LRuntimeError::new(
-                                RAE_EXEC_COMMAND,
+                                EXEC_COMMAND,
                                 "error on action status channel",
                             ))
                         };
@@ -137,24 +167,12 @@ pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LAsyncHandle {
 }
 
 #[async_scheme_fn]
-pub async fn launch_platform(env: &LEnv) -> LResult {
-    let ctx = env.get_context::<CtxOMPAS>(CTX_RAE).unwrap();
-
-    if let Some(platform) = &ctx.platform_interface {
-        platform.start(Default::default()).await;
-        Ok(LValue::Nil)
-    } else {
-        Ok("No platform defined".into())
-    }
-}
-
-#[async_scheme_fn]
 pub async fn cancel_command(env: &LEnv, command_id: usize) -> LResult {
-    let ctx = env.get_context::<CtxOMPAS>(CTX_RAE)?;
+    let mod_platform = env.get_context::<ModPlatform>(MOD_PLATFORM)?;
     let mode = env.get_context::<CtxMode>(CTX_MODE)?.mode;
     match mode {
         RAEMode::Exec => {
-            if let Some(platform) = &ctx.platform_interface {
+            if let Some(platform) = &mod_platform.platform {
                 platform.cancel_command(command_id).await;
                 todo!()
             } else {
@@ -165,12 +183,33 @@ pub async fn cancel_command(env: &LEnv, command_id: usize) -> LResult {
     }
 }
 
-enum InstanceMode {
+#[scheme_fn]
+pub fn is_platform_defined(env: &LEnv) -> bool {
+    env.get_context::<ModPlatform>(MOD_PLATFORM)
+        .unwrap()
+        .platform
+        .is_some()
+}
+
+#[async_scheme_fn]
+pub async fn start_platform(env: &LEnv) -> LResult {
+    let ctx = env.get_context::<ModPlatform>(MOD_PLATFORM).unwrap();
+
+    if let Some(platform) = &ctx.platform_interface {
+        platform.start(Default::default()).await;
+        Ok(LValue::Nil)
+    } else {
+        Ok("No platform defined".into())
+    }
+}
+
+/*enum InstanceMode {
     All,
     Instances,
     Check,
-}
+}*/
 
+/*
 pub fn look_in_state(
     env: &LEnv,
     args: &[LValue],
@@ -225,4 +264,4 @@ pub fn look_in_state(
             }
         }
     }
-}
+}*/

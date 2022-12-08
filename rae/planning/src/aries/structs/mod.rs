@@ -3,7 +3,7 @@ use crate::aries::structs::symbol_table::{AtomId, SymTable};
 use crate::aries::structs::traits::FormatWithSymTable;
 use crate::aries::structs::type_table::AtomType;
 use im::{hashmap, HashMap, HashSet};
-use ompas_rae_language::RAE_INSTANCE;
+use ompas_rae_language::exec::state::INSTANCE;
 use ompas_rae_structs::domain::state_function::StateFunction;
 use ompas_rae_structs::domain::type_hierarchy::TypeHierarchy;
 use ompas_rae_structs::domain::RAEDomain;
@@ -174,7 +174,7 @@ impl From<&ConversionContext> for Problem {
             for (k, v) in &PartialState::from(cc.state.instance.clone()).inner {
                 if let LValueS::List(list_instance) = k {
                     assert_eq!(list_instance.len(), 2);
-                    assert_eq!(LValueS::from(RAE_INSTANCE), list_instance[0]);
+                    assert_eq!(LValueS::from(INSTANCE), list_instance[0]);
                     let _type: String = list_instance[1].to_string();
                     if types.get_id(&_type) == None {
                         types.add_type(_type.clone(), None)

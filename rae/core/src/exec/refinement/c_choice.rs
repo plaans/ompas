@@ -1,5 +1,7 @@
-use crate::contexts::ctx_state::{CtxState, CTX_STATE};
 use crate::exec::refinement::select::greedy_select;
+use crate::exec::state::ModState;
+use ompas_rae_language::exec::c_choice::*;
+use ompas_rae_language::exec::state::{DOC_MOD_STATE, MOD_STATE};
 use ompas_rae_structs::domain::RAEDomain;
 use ompas_rae_structs::select_mode::CChoiceConfig;
 use rand::prelude::SliceRandom;
@@ -18,11 +20,6 @@ use std::ops::Add;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-
-pub const INCREASE_COST: &str = "increase_cost";
-pub const C_CHOICE: &str = "c_choice";
-pub const MOD_C_CHOICE: &str = "mod-c-choice";
-pub const INF: &str = "inf";
 
 pub const DEFAULT_DEPTH: usize = 10;
 
@@ -159,17 +156,11 @@ impl From<ModCChoice> for LModule {
     }
 }
 
-impl IntoModule for ModCChoice {
-    fn into_module(self) -> LModule {
-        let mut module = LModule {
-            ctx: Context::new(self),
-            prelude: vec![],
-            raw_lisp: Default::default(),
-            label: MOD_C_CHOICE.to_string(),
-        };
-
-        module.add_async_fn(INCREASE_COST, increase_cost);
-        module.add_async_fn(C_CHOICE, c_choice);
+impl From<ModCChoice> for LModule {
+    fn from(m: ModCChoice) -> Self {
+        let mut module = LModule::new(m, MOD_C_CHOICE, DOC_MOD_C_CHOICE);
+        module.add_async_fn(INCREASE_COST, increase_cost, DOC_INCREASE_COST, false);
+        module.add_async_fn(C_CHOICE, c_choice, DOC_C_CHOICE, false);
         module
     }
 }
@@ -212,7 +203,13 @@ pub async fn c_choice(env: &LEnv, task: &[LValue]) -> LResult {
             Context::new(ModCChoice::new(vec![], level + 1)),
             MOD_C_CHOICE,
         );
-        new_env.import_context(Context::new(CtxState::new(state.clone().into())), CTX_STATE);
+        new_env.import_context(
+            Context::new(
+                ModState::new(state.clone().into(), Default::default()),
+                MOD_STATE,
+            ),
+            DOC_MOD_STATE,
+        );
         eval(m, &mut new_env, None).await?;
         let c_new = new_env
             .get_context::<ModCChoice>(MOD_C_CHOICE)

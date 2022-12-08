@@ -5,7 +5,7 @@ use crate::aries::structs::traits::{FormatWithParent, FormatWithSymTable};
 use crate::aries::structs::type_table::{
     AtomKind, AtomType, PlanningAtomType, TypeId, TypeTable, VariableKind,
 };
-use ompas_rae_language::*;
+use ompas_rae_language::exec::state::*;
 use sompas_language::get_primitives;
 use sompas_structs::lruntimeerror;
 use std::borrow::Borrow;
@@ -128,7 +128,7 @@ impl Default for SymTable {
             .expect("error while adding symbols of scheme primitives");
 
         st.add_list_of_symbols_of_same_type(
-            vec![RAE_ASSERT, RAE_RETRACT, RAE_INSTANCE],
+            vec![ASSERT, RETRACT, INSTANCE],
             Some(PlanningAtomType::Function),
         )
         .expect("error while adding symbols of rae");

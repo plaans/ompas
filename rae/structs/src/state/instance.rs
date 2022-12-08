@@ -1,7 +1,7 @@
 use crate::domain::type_hierarchy::TypeHierarchy;
 use crate::state::partial_state::PartialState;
 use crate::state::world_state::StateType;
-use ompas_rae_language::RAE_INSTANCE;
+use ompas_rae_language::exec::state::INSTANCE;
 use sompas_structs::list;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalues::LValueS;
@@ -21,7 +21,7 @@ impl From<InstanceCollection> for PartialState {
         };
         for (t, set) in i.inner {
             let v: LValueS = set.iter().cloned().collect::<Vec<_>>().into();
-            p.insert(list![RAE_INSTANCE.into(), t.into()].try_into().unwrap(), v);
+            p.insert(list![INSTANCE.into(), t.into()].try_into().unwrap(), v);
         }
         p
     }

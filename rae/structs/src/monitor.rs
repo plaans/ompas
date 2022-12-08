@@ -1,16 +1,12 @@
 use ompas_middleware::logger::LogClient;
 use ompas_middleware::ProcessInterface;
-use ompas_rae_language::{LOG_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS};
+use ompas_rae_language::process::*;
 use sompas_core::eval;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lvalue::LValue;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{broadcast, oneshot, Mutex};
-
-/*lazy_static! {
-    pub static ref MONITOR_COLLECTION: MonitorCollection = Default::default();
-}*/
 
 #[derive(Default, Clone)]
 pub struct MonitorCollection {
@@ -30,14 +26,6 @@ impl MonitorCollectionInner {
         temp
     }
 }
-
-/*pub async fn add_waiter(lambda: LValue) -> WaitForReceiver {
-    MONITOR_COLLECTION.add_waiter(lambda).await
-}
-
-pub async fn remove_waiter(id: WaitForId) {
-    MONITOR_COLLECTION.remove_waiter(id).await
-}*/
 
 impl MonitorCollection {
     pub async fn add_waiter(&self, lambda: LValue) -> WaitForReceiver {
@@ -67,12 +55,8 @@ impl MonitorCollection {
             match result {
                 Ok(lv) => {
                     if let LValue::True = lv {
-                        //info!("Wait on {} is now true.", lambda);
                         let waiter = waiters.map.remove(id).unwrap();
                         waiter.channel.send(true).expect("");
-                        //.expect("could not send true message to waiter");
-                        //item_to_remove.push(*id);
-                    } else {
                     }
                 }
                 Err(e) => {
@@ -80,9 +64,6 @@ impl MonitorCollection {
                 }
             }
         }
-        /*item_to_remove.iter().for_each(|i| {
-            waiters.map.remove(i);
-        })*/
     }
 
     pub async fn get_debug(&self) -> String {
@@ -136,9 +117,7 @@ pub async fn task_check_wait_for(
     env: LEnv,
 ) {
     let mut process: ProcessInterface =
-        ProcessInterface::new("TASK_CHECK_WAIT_FOR", PROCESS_TOPIC_OMPAS, LOG_TOPIC_OMPAS).await;
-    //println!("task check wait on active");
-    //let mut end_receiver = task_handler::subscribe_new_task();
+        ProcessInterface::new(PROCESS_CHECK_WAIT_FOR, PROCESS_TOPIC_OMPAS, LOG_TOPIC_OMPAS).await;
     loop {
         tokio::select! {
             _ = update.recv() => {
@@ -148,7 +127,7 @@ pub async fn task_check_wait_for(
                 }
             }
             _ = process.recv() => {
-                break; //process.die().await;
+                break;
             }
         }
     }

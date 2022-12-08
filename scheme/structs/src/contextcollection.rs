@@ -3,20 +3,27 @@ use crate::lruntimeerror::LRuntimeError;
 use anyhow::anyhow;
 use im::HashMap;
 use std::any::Any;
+use std::fmt::Display;
 use std::sync::Arc;
 
 pub type AsyncLTrait = dyn Any + Send + Sync;
 
 #[derive(Clone, Debug)]
 pub struct Context {
+    label: String,
     inner: Arc<AsyncLTrait>,
 }
 
 impl Context {
-    pub fn new<T: Any + Send + Sync>(ctx: T) -> Self {
+    pub fn new<T: Any + Send + Sync>(ctx: T, label: impl Display) -> Self {
         Self {
+            label: label.to_string(),
             inner: Arc::new(ctx),
         }
+    }
+
+    pub fn get_label(&self) -> &str {
+        &self.label
     }
 }
 
@@ -30,8 +37,12 @@ pub struct ContextCollection {
 
 impl ContextCollection {
     ///Insert a new context
-    pub fn insert(&mut self, ctx: Context, label: String) {
-        self.inner.insert(label, ctx);
+    pub fn insert(&mut self, ctx: Context) {
+        self.inner.insert(ctx.label.clone(), ctx);
+    }
+
+    pub fn contains(&self, label: impl Display) -> bool {
+        self.inner.contains_key(&label.to_string())
     }
 
     pub fn get_contexts_labels(&self) -> Vec<String> {

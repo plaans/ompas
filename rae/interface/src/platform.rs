@@ -10,7 +10,7 @@ use crate::{LOG_TOPIC_PLATFORM, PROCESS_TOPIC_PLATFORM};
 use async_trait::async_trait;
 use ompas_middleware::logger::LogClient;
 use ompas_middleware::{Master, ProcessInterface};
-use ompas_rae_language::PROCESS_TOPIC_OMPAS;
+use ompas_rae_language::process::PROCESS_TOPIC_OMPAS;
 use ompas_rae_structs::agenda::Agenda;
 use ompas_rae_structs::state::action_status::ActionStatus;
 use ompas_rae_structs::state::partial_state::PartialState;

@@ -12,21 +12,110 @@ use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use std::borrow::Borrow;
 
-use crate::contexts::ctx_planning::{CtxPlanning, CTX_PLANNING};
-use crate::contexts::ctx_rae::{CtxOMPAS, CTX_RAE};
-use crate::contexts::ctx_state::{CtxState, CTX_STATE};
-use crate::contexts::ctx_task::{ModTask, CTX_TASK};
+use crate::exec::task::ModTask;
 use crate::RaeExecError;
+use ompas_middleware::logger::LogClient;
+use ompas_rae_language::exec::refinement::*;
+use ompas_rae_language::exec::task::MOD_TASK;
+use ompas_rae_planning::aries::structs::ConversionCollection;
+use ompas_rae_structs::domain::RAEDomain;
 use ompas_rae_structs::state::action_status::ActionStatus;
 use sompas_macros::async_scheme_fn;
+use sompas_macros::*;
+use sompas_structs::lmodule::LModule;
+use sompas_structs::{list, wrong_type};
 use std::convert::{TryFrom, TryInto};
+
+pub struct ModRefinement {
+    pub env: LEnv,
+    pub domain: RAEDomain,
+    pub cc: Option<ConversionCollection>,
+    pub select_mode: SelectMode,
+    pub log: LogClient,
+}
+
+impl ModRefinement {
+    pub fn new(
+        cc: Option<ConversionCollection>,
+        domain: RAEDomain,
+        env: LEnv,
+        select_mode: SelectMode,
+        log: LogClient,
+    ) -> Self {
+        Self {
+            domain,
+            env,
+            select_mode,
+            cc,
+            log,
+        }
+    }
+}
+
+impl From<ModRefinement> for LModule {
+    fn from(m: ModRefinement) -> Self {
+        let mut module = LModule::new(m, MOD_REFINEMENT, DOC_MOD_REFINEMENT);
+        module.add_async_fn(REFINE, refine, DOC_REFINE, false);
+        module.add_async_fn(
+            SET_SUCCESS_FOR_TASK,
+            set_success_for_task,
+            DOC_SET_SUCCESS_FOR_TASK,
+            false,
+        );
+        module.add_async_fn(IS_SUCCESS, is_success, DOC_IS_SUCCESS, false);
+        module.add_async_fn(IS_FAILURE, is_failure, DOC_IS_FAILURE, false);
+
+        //Lambdas
+        module.add_lambda(EXEC_TASK, LAMBDA_EXEC_TASK, DOC_EXEC_TASK);
+        module.add_lambda(RETRY, LAMBDA_RETRY, DOC_RETRY);
+        module.add_lambda(
+            __GET_PRECONDITIONS__,
+            LAMBDA___GET_PRECONDITIONS__,
+            DOC___GET_PRECONDITIONS__,
+        );
+        module.add_lambda(__GET_SCORE__, LAMBDA___GET_SCORE__, DOC___GET_SCORE__);
+        module.add_lambda(
+            __GET_COMMAND_MODEL__,
+            LAMBDA___GET_COMMAND_MODEL__,
+            DOC___GET_COMMAND_MODEL__,
+        );
+        module.add_lambda(
+            __EVAL_PRE_CONDITIONS__,
+            LAMBDA___EVAL_PRE_CONDITIONS__,
+            DOC___EVAL_PRE_CONDITIONS__,
+        );
+        module.add_lambda(
+            __COMPUTE_SCORE__,
+            LAMBDA___COMPUTE_SCORE__,
+            DOC___COMPUTE_SCORE__,
+        );
+        module.add_lambda(IS_APPLICABLE, LAMBDA_IS_APPLICABLE, DOC_IS_APPLICABLE);
+        module.add_lambda(
+            __GENERATE_APPLICABLE_INSTANCES__,
+            LAMBDA___GENERATE_APPLICABLE_INSTANCES__,
+            DOC___GENERATE_APPLICABLE_INSTANCES__,
+        );
+        module.add_lambda(
+            __R_GENERATE_INSTANCES__,
+            LAMBDA___R_GENERATE_INSTANCES__,
+            DOC___R_GENERATE_INSTANCES__,
+        );
+        module.add_lambda(
+            __R_TEST_METHOD__,
+            LAMBDA_R_TEST_METHOD,
+            DOC___R_TEST_METHOD__,
+        );
+
+        module
+    }
+}
 
 #[async_scheme_fn]
 pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
     let task_label: LValue = args.into();
-    let ctx = env.get_context::<CtxOMPAS>(CTX_RAE)?;
+    let ctx = env.get_context::<ModRefinement>(MOD_REFINEMENT)?;
     let log = ctx.get_log_client();
-    let parent_task: Option<usize> = match env.get_context::<ModTask>(CTX_TASK) {
+    let parent_task: Option<usize> = match env.get_context::<ModTask>(MOD_TASK) {
         Ok(ctx) => ctx.parent_id,
         Err(_) => None,
     };
@@ -66,7 +155,7 @@ pub async fn set_success_for_task(env: &LEnv, args: &[LValue]) -> LResult {
     let task_id: i64 = args[0].borrow().try_into()?;
     let task_id = task_id as usize;
 
-    let ctx = env.get_context::<CtxOMPAS>(CTX_RAE)?;
+    let ctx = env.get_context::<ModRefinement>(MOD_REFINEMENT)?;
     let mut task: ActionMetaData = ctx.agenda.trc.get(&task_id).await;
     task.update_status(ActionStatus::Success).await;
     task.set_end_timepoint(ctx.agenda.get_instant());
@@ -77,7 +166,7 @@ pub async fn set_success_for_task(env: &LEnv, args: &[LValue]) -> LResult {
 
 #[async_scheme_fn]
 pub async fn retry(env: &LEnv, task_id: usize) -> LResult {
-    let ctx = env.get_context::<CtxOMPAS>(CTX_RAE)?;
+    let ctx = env.get_context::<ModRefinement>(MOD_REFINEMENT)?;
     let log = ctx.get_log_client();
     let mut task: TaskMetaData = ctx.agenda.get_task(&(task_id as usize)).await?;
     let task_label = task.get_label().clone();
@@ -116,7 +205,9 @@ pub async fn select(stack: &mut TaskMetaData, env: &LEnv) -> LResult {
      */
     let task_id = stack.get_id();
     let ctx_planning = env.get_context::<CtxPlanning>(CTX_PLANNING)?;
-    let log = env.get_context::<CtxOMPAS>(CTX_RAE)?.get_log_client();
+    let log = env
+        .get_context::<ModRefinement>(MOD_REFINEMENT)?
+        .get_log_client();
     let state: WorldStateSnapshot = env
         .get_context::<CtxState>(CTX_STATE)?
         .state
@@ -175,94 +266,45 @@ pub async fn select(stack: &mut TaskMetaData, env: &LEnv) -> LResult {
     Ok(method)
 }
 
-pub const LAMBDA_RAE_EXEC_TASK: &str = "(define exec-task
-    (lambda __task__
-        (begin
-            (define __result__ (enr (cons 'refine __task__)))
-            (if (err? __result__)
-                __result__
-                (let ((__method__ (first __result__))
-                      (__task_id__ (second __result__)))
+#[scheme_fn]
+pub fn success(args: &[LValue]) -> LValue {
+    list![LValue::from(SUCCESS), args.into()]
+}
+#[scheme_fn]
+pub fn failure(args: &[LValue]) -> LValue {
+    list![LValue::from(FAILURE), args.into()]
+}
 
-                    (begin
-                        (define-parent-task __task_id__)
-                        (print \"Trying \" __method__ \" for \" __task_id__)
-                        (if (err? (enr __method__))
-                            (rae-retry __task_id__)
-                            (rae-set-success-for-task __task_id__))))))))";
+#[scheme_fn]
+pub fn is_failure(list: Vec<LValue>) -> Result<bool, LRuntimeError> {
+    if let LValue::Symbol(s) = &list[0] {
+        match s.as_str() {
+            SUCCESS => Ok(false),
+            FAILURE => Ok(true),
+            _ => Err(wrong_type!(
+                IS_FAILURE,
+                &list[0],
+                KindLValue::Other("{success,failure}".to_string())
+            )),
+        }
+    } else {
+        Err(wrong_type!(IS_FAILURE, &list[0], KindLValue::Symbol))
+    }
+}
 
-pub const LAMBDA_RAE_RETRY: &str = "(define rae-retry
-    (lambda (__task_id__)
-        (begin
-            (define __result__ (retry __task_id__))
-            (if (err? __result__)
-                __result__
-                (begin
-                    (if (err? (enr __result__))
-                        (rae-retry __task_id__)
-                        (rae-set-success-for-task __task_id__)))))))";
-
-pub const LAMBDA_GET_PRECONDITIONS: &str = "(define get-preconditions\
-    (lambda (__label__)\
-        (get rae-method-pre-conditions-map __label__)))";
-
-pub const LAMBDA_GET_SCORE: &str = "(define get-score\
-    (lambda (__label__)\
-        (get rae-method-score-map __label__)))";
-
-pub const LAMBDA_GET_ACTION_MODEL: &str = "(define get-action-model
-    (lambda (__label__)
-        (get rae-action-model-map __label__)))";
-
-pub const LAMBDA_EVAL_PRE_CONDITIONS: &str = "(define eval-pre-conditions
-    (lambda (__method__)
-        (sim_block
-            (eval (cons (get-preconditions (car __method__)) (quote-list (cdr __method__)))))))";
-
-pub const LAMBDA_COMPUTE_SCORE: &str = "(define compute-score
-    (lambda (__method__)
-        (sim_block
-            (eval (cons (get-score (car __method__)) (quote-list (cdr __method__)))))))";
-
-pub const LAMBDA_IS_APPLICABLE: &str = "(define applicable?
-    (lambda (method)
-        (sim_block
-            (eval-pre-conditions method))))";
-
-pub const LAMBDA_GENERATE_APPLICABLE_INSTANCES: &str = "(define generate_applicable_instances
-    (lambda (__task__)
-        (let* ((__task_label__ (first __task__))
-               (__params__ (cdr __task__))
-               (__methods__ (get rae-task-methods-map __task_label__)))
-            (r_generate_instances
-                (enr (cons enumerate (cons __methods__ __params__)))))))";
-
-pub const LAMBDA_R_GENERATE_INSTANCES: &str = "(define r_generate_instances
-    (lambda (__methods__)
-        (if (null? __methods__)
-            nil
-            (let* ((__method__ (car __methods__))
-                    (__methods__ (cdr __methods__))
-                    (__method_label__ (first __method__))
-                    (__params__ (cdr __method__)))
-                (begin
-                    (define __types__ (get rae-method-types-map __method_label__))
-                    (if (> (len __types__) (len __params__))
-                        (begin
-                            (define __instance_types__ (mapf instance (sublist __types__ (len __params__))))
-                            (define __instances__ (enr (cons enumerate (append __method__ __instance_types__))))
-                            (append (r_test_method __instances__) (r_generate_instances __methods__)))
-                        (cons
-                            (if (! (err? (eval-pre-conditions __method__)))
-                                (list __method__ (compute-score __method__))
-                                nil)
-                            (r_generate_instances __methods__))))))))";
-pub const LAMBDA_R_TEST_METHOD: &str = "(define r_test_method
-    (lambda (__instances__)
-        (if (null? __instances__)
-            nil
-            (if (eval-pre-conditions (car __instances__))
-                (cons
-                    (list (car __instances__) (compute-score (car __instances__)))
-                    (r_test_method (cdr __instances__)))
-                (r_test_method (cdr __instances__))))))";
+#[scheme_fn]
+pub fn is_success(list: Vec<LValue>) -> Result<bool, LRuntimeError> {
+    if let LValue::Symbol(s) = &list[0] {
+        match s.as_str() {
+            SUCCESS => Ok(true),
+            FAILURE => Ok(false),
+            _ => Err(wrong_type!(
+                IS_SUCCESS,
+                &list[0],
+                KindLValue::Other("{success,failure}".to_string())
+            )),
+        }
+    } else {
+        Err(wrong_type!(IS_FAILURE, &list[0], KindLValue::Symbol))
+    }
+}

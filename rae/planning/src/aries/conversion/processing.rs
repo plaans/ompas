@@ -14,7 +14,9 @@ use crate::aries::structs::traits::{Absorb, FormatWithSymTable, GetVariables};
 use crate::aries::structs::type_table::{AtomKind, PlanningAtomType, VariableKind};
 use crate::aries::structs::{ConversionCollection, ConversionContext, TaskType};
 use aries_planning::chronicles::ChronicleKind;
-use ompas_rae_language::*;
+use ompas_rae_language::exec::state::*;
+use ompas_rae_language::exec::ARBITRARY;
+use ompas_rae_language::TYPE_LIST;
 use sompas_core::static_eval::{eval_static, parse_static};
 use sompas_language::basic_math::*;
 use sompas_language::error::CHECK;
@@ -240,7 +242,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                         let s = l[0].to_string();
                         let str = s.as_str();
                         match str {
-                            RAE_MONITOR => {
+                            MONITOR => {
                                 //A monitor is a condition
                                 let fluent = convert_lvalue_to_expression_chronicle(
                                     &l[1],
@@ -269,7 +271,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                                 ec.absorb(fluent);
                                 is_special_expression = true;
                             }
-                            RAE_ASSERT | RAE_ASSERT_SHORT => {
+                            ASSERT | ASSERT_SHORT => {
                                 if l.len() != 3 {
                                     return Err(wrong_n_args!(
                                         CONVERT_LVALUE_TO_EXPRESSION_CHRONICLE,
@@ -323,7 +325,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                                 ec.set_pure_result(ch.sym_table.new_bool(true).into());
                                 is_special_expression = true;
                             }
-                            RAE_RETRACT | RAE_RETRACT_SHORT => {
+                            RETRACT | RETRACT_SHORT => {
                                 return Err(lruntimeerror!(
                                     CONVERT_LVALUE_TO_EXPRESSION_CHRONICLE,
                                     "not yet supported"
@@ -484,7 +486,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                                 ec.absorb(val);
                                 is_special_expression = true;
                             }
-                            RAE_INSTANCE => {
+                            INSTANCE => {
                                 match l.len() {
                                     2 => {
                                         //Case to return the list of all instances of a type
@@ -563,7 +565,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                                         ec.add_condition(Condition {
                                             interval: *ec.get_interval(),
                                             sv: vec![
-                                                *ch.sym_table.id(RAE_INSTANCE).unwrap(),
+                                                *ch.sym_table.id(INSTANCE).unwrap(),
                                                 symbol.get_result_as_lit().try_into()?,
                                             ],
                                             value: r,

@@ -3,7 +3,7 @@ use std::fs;
 use ompas_gobotsim::platform::PlatformGobotSim;
 use ompas_middleware::logger::{FileDescriptor, LogClient, Logger};
 use ompas_middleware::{LogLevel, Master};
-use ompas_rae_core::monitor::ModRaeUser;
+use ompas_rae_core::monitor::ModMonitor;
 use ompas_rae_interface::platform::Domain;
 use ompas_rae_interface::{LOG_TOPIC_PLATFORM, PLATFORM_CLIENT};
 use sompas_core::activate_debug;
@@ -72,7 +72,7 @@ pub async fn lisp_interpreter(log: Option<PathBuf>, godot: bool, rae_log: bool) 
     if godot {
         //li.import_namespace(CtxGodot::default());
     } else {
-        let ctx_rae = ModRaeUser::new(
+        let ctx_rae = ModMonitor::new(
             PlatformGobotSim::new(
                 Domain::File(
                     "/home/jeremy/CLionProjects/ompas/gobotsim/godot_domain/domain.lisp".into(),

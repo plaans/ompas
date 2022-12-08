@@ -1,6 +1,7 @@
-use crate::contexts::ctx_state::{CtxState, CTX_STATE};
 use crate::exec::refinement::c_choice::Cost;
 use crate::exec::refinement::select::greedy_select;
+use crate::exec::state::ModState;
+use ompas_rae_language::exec::state::{DOC_MOD_STATE, MOD_STATE};
 use ompas_rae_structs::domain::RAEDomain;
 use ompas_rae_structs::select_mode::RAEPlanConfig;
 use rand::prelude::SliceRandom;
@@ -233,7 +234,13 @@ pub async fn rae_plan(env: &LEnv, task: &[LValue]) -> LResult {
             Context::new(CtxRaePlan::new(vec![], level + 1)),
             MOD_RAE_PLAN,
         );
-        new_env.import_context(Context::new(CtxState::new(state.clone().into())), CTX_STATE);
+        new_env.import_context(
+            Context::new(
+                ModState::new(state.clone().into(), Default::default()),
+                MOD_STATE,
+            ),
+            DOC_MOD_STATE,
+        );
         eval(m, &mut new_env, None).await?;
         let new_efficiency = new_env
             .get_context::<CtxRaePlan>(MOD_RAE_PLAN)

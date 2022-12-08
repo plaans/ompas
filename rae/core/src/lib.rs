@@ -1,9 +1,8 @@
-use crate::contexts::ctx_planning::CtxPlanning;
 use crate::error::RaeExecError;
 use futures::FutureExt;
 use ompas_middleware::LogLevel;
 use ompas_middleware::ProcessInterface;
-use ompas_rae_language::{LOG_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS};
+use ompas_rae_language::process::{LOG_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS};
 use ompas_rae_planning::aries::conversion::convert_domain_to_chronicle_hierarchy;
 use ompas_rae_planning::aries::structs::{ConversionCollection, ConversionContext};
 use ompas_rae_structs::domain::RAEDomain;
@@ -23,7 +22,6 @@ use std::ops::Deref;
 use std::time::Instant;
 use tokio::sync::mpsc::Receiver;
 
-pub mod contexts;
 pub mod error;
 pub mod exec;
 pub mod monitor;

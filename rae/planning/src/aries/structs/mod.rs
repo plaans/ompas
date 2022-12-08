@@ -164,7 +164,7 @@ pub struct Problem {
 
 impl From<&ConversionContext> for Problem {
     fn from(cc: &ConversionContext) -> Self {
-        let actions = cc.domain.get_actions().keys().cloned().collect();
+        let actions = cc.domain.get_commands().keys().cloned().collect();
         let tasks = cc.domain.get_tasks().keys().cloned().collect();
         let methods = cc.domain.get_methods().keys().cloned().collect();
         let mut types = cc.domain.get_type_hierarchy().clone();

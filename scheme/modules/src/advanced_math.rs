@@ -36,7 +36,7 @@ impl From<ModMath> for LModule {
             false,
         );
 
-        module.add_prelude(PI, std::f64::consts::PI.into(), DOC_PI);
+        module.add_value(PI, std::f64::consts::PI.into(), DOC_PI);
 
         module
     }

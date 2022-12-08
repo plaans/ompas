@@ -1,13 +1,15 @@
 use crate::monitor::{ModMonitor, TOKIO_CHANNEL_SIZE};
 use crate::rae;
 use ompas_middleware::ProcessInterface;
-use ompas_rae_interface::platform::{PlatformConfig, PlatformDescriptor};
+use ompas_rae_interface::platform::{Platform, PlatformConfig, PlatformDescriptor};
 use ompas_rae_language::monitor::control::*;
 use ompas_rae_language::process::{LOG_TOPIC_OMPAS, PROCESS_STOP_OMPAS, PROCESS_TOPIC_OMPAS};
 use ompas_rae_language::select::*;
 use ompas_rae_structs::domain::RAEDomain;
+use ompas_rae_structs::internal_state::OMPASInternalState;
 use ompas_rae_structs::job::Job;
 use ompas_rae_structs::monitor::task_check_wait_for;
+use ompas_rae_structs::rae_options::OMPASOptions;
 use ompas_rae_structs::select_mode::{Planner, SelectMode};
 use ompas_rae_structs::state::action_state::*;
 use ompas_rae_structs::state::action_status::*;
@@ -21,14 +23,34 @@ use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::{lruntimeerror, wrong_type};
 use std::mem;
+use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, RwLock};
 
-#[derive(Default)]
-pub struct Control {}
+pub struct ModControl {
+    options: Arc<RwLock<OMPASOptions>>,
+    interface: OMPASInternalState,
+    platform: Option<Platform>,
+    rae_domain: Arc<RwLock<RAEDomain>>,
+    empty_env: LEnv,
+    tasks_to_execute: Arc<RwLock<Vec<Job>>>,
+}
 
-impl From<Control> for LModule {
-    fn from(m: Control) -> Self {
+impl ModControl {
+    pub fn new(monitor: &ModMonitor) -> Self {
+        Self {
+            options: monitor.options.clone(),
+            interface: monitor.interface.clone(),
+            platform: monitor.platform.clone(),
+            rae_domain: monitor.rae_domain.clone(),
+            empty_env: monitor.empty_env.clone(),
+            tasks_to_execute: monitor.tasks_to_execute.clone(),
+        }
+    }
+}
+
+impl From<ModControl> for LModule {
+    fn from(m: ModControl) -> Self {
         let mut module = LModule::new(m, MOD_CONTROL, DOC_MOD_CONTROL);
         module.add_async_fn(START, start, DOC_START, false);
         module.add_async_fn(STOP, stop, DOC_STOP, false);
@@ -389,41 +411,41 @@ pub async fn get_agenda(env: &LEnv, args: &[LValue]) -> LResult {
 
 #[async_scheme_fn]
 pub async fn get_resources(env: &LEnv) -> LResult {
-    let ctx = env.get_context::<ModMonitor>(MOD_CONTROL)?;
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
     Ok(ctx.interface.resources.get_debug().await.into())
 }
 
 #[async_scheme_fn]
 pub async fn get_monitors(env: &LEnv) -> LResult {
-    let ctx = env.get_context::<ModMonitor>(MOD_CONTROL)?;
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
     Ok(ctx.interface.monitors.get_debug().await.into())
 }
 
 ///Get the list of actions in the environment
 #[async_scheme_fn]
 pub async fn get_commands(env: &LEnv) -> LResult {
-    let ctx = env.get_context::<ModMonitor>(MOD_CONTROL)?;
-    Ok(ctx.rae_domain.read().await.get_list_actions())
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
+    Ok(ctx.rae_domain.read().await.get_list_commands())
 }
 
 ///Get the list of tasks in the environment
 #[async_scheme_fn]
 pub async fn get_tasks(env: &LEnv) -> LResult {
-    let ctx = env.get_context::<ModMonitor>(MOD_CONTROL)?;
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
     Ok(ctx.rae_domain.read().await.get_list_tasks())
 }
 
 ///Get the methods of a given task
 #[async_scheme_fn]
 pub async fn get_methods(env: &LEnv) -> LResult {
-    let ctx = env.get_context::<ModMonitor>(MOD_CONTROL)?;
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
     Ok(ctx.rae_domain.read().await.get_list_methods())
 }
 
 ///Get the list of state functions in the environment
 #[async_scheme_fn]
 pub async fn get_state_functions(env: &LEnv) -> LValue {
-    let ctx = env.get_context::<ModMonitor>(MOD_CONTROL).unwrap();
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
     ctx.rae_domain.read().await.get_list_state_functions()
 }
 
@@ -442,7 +464,7 @@ pub async fn get_domain(env: &LEnv, args: &[LValue]) -> LResult {
         _ => return Err(LRuntimeError::wrong_number_of_args(GET_DOMAIN, args, 0..1)),
     };
 
-    let ctx = env.get_context::<ModMonitor>(MOD_RAE_USER)?;
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
     match key {
         None => Ok(ctx.rae_domain.read().await.to_string().into()),
         Some(key) => Ok(ctx
@@ -456,14 +478,14 @@ pub async fn get_domain(env: &LEnv, args: &[LValue]) -> LResult {
 
 #[async_scheme_fn]
 pub async fn get_stats(env: &LEnv) -> LValue {
-    let ctx = env.get_context::<ModMonitor>(MOD_RAE_USER).unwrap();
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
 
     ctx.interface.agenda.get_stats().await
 }
 
 #[async_scheme_fn]
 pub async fn export_stats(env: &LEnv, args: &[LValue]) -> LResult {
-    let ctx = env.get_context::<ModMonitor>(MOD_RAE_USER)?;
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
     let file = if args.len() == 1 {
         Some(args[0].to_string())
     } else {

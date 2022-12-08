@@ -17,6 +17,26 @@ pub mod exec {
         pub const INF: &str = "inf";
     }
 
+    pub mod rae_plan {
+        pub const MOD_RAE_PLAN: &str = "mod_rae_plan";
+        pub const DOC_MOD_RAE_PLAN: &str =
+            "Collection of functions to ease rae_plan to refine tasks.";
+
+        pub const COMPOSE_EFFICIENCY: &str = "compose_efficiency";
+        pub const DOC_COMPOSE_EFFICIENCY: &str = "Compose two efficiencies together.";
+
+        pub const RAE_PLAN: &str = "rae_plan";
+        pub const DOC_RAE_PLAN: &str = "Return a method in function of its efficiency.";
+
+        //keywords
+        pub const INF: &str = "inf";
+    }
+
+    pub mod aries {
+        pub const CTX_ARIES: &str = "aries";
+        pub const SELECT_ARIES: &str = "select_aries";
+    }
+
     pub const MOD_EXEC: &str = "exec";
     pub const DOC_MOD_EXEC: &str = "Collection of functions of the acting language.";
 
@@ -133,6 +153,9 @@ pub mod exec {
         pub const READ_STATE: &str = "read-state";
         pub const DOC_READ_STATE: &str = "Read a state variable.";
 
+        pub const GET_STATE: &str = "get-state";
+        pub const DOC_GET_STATE: &str = "Return the state as a map";
+
         pub const INSTANCE: &str = "instance";
         pub const DOC_INSTANCE: &str = "Check is an objects is of a certain type.";
 
@@ -158,6 +181,11 @@ pub mod exec {
         pub const DOC_RUN_MONITORING: &str= "Execute an expression until either it finishes or the dynamic expression becomes false.";
         pub const MACRO_RUN_MONITORING: &str = "(lambda (b m)
         `(race ,b (monitor ,m)))";
+
+        //keywords
+        pub const STATIC: &str = "static";
+        pub const DYNAMIC: &str = "dynamic";
+        pub const INNER_WORLD: &str = "inner-world";
     }
 
     pub mod task {

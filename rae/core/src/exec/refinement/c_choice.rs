@@ -1,19 +1,24 @@
-use crate::exec::refinement::select::greedy_select;
+use crate::exec::refinement::greedy_select;
 use crate::exec::state::ModState;
+use crate::exec::ModExec;
 use ompas_rae_language::exec::c_choice::*;
-use ompas_rae_language::exec::state::{DOC_MOD_STATE, MOD_STATE};
+use ompas_rae_language::exec::state::MOD_STATE;
 use ompas_rae_structs::domain::RAEDomain;
-use ompas_rae_structs::select_mode::CChoiceConfig;
+use ompas_rae_structs::select_mode::{CChoiceConfig, Planner, SelectMode};
+use ompas_rae_structs::state::action_state::RefinementMetaData;
+use ompas_rae_structs::state::world_state::WorldStateSnapshot;
 use rand::prelude::SliceRandom;
 use sompas_core::{eval, parse};
+use sompas_language::time::MOD_TIME;
 use sompas_macros::async_scheme_fn;
+use sompas_modules::time::ModTime;
 use sompas_structs::contextcollection::Context;
-use sompas_structs::documentation::DocCollection;
+use sompas_structs::lenv::ImportType::WithoutPrefix;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lmodule::LModule;
+use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
-use sompas_structs::purefonction::PureFonctionCollection;
 use std::cmp;
 use std::fmt::{Display, Formatter};
 use std::ops::Add;
@@ -23,12 +28,18 @@ use tokio::sync::RwLock;
 
 pub const DEFAULT_DEPTH: usize = 10;
 
-#[derive(Default)]
 pub struct ModCChoice {
     tried: Vec<LValue>,
     cost: Arc<RwLock<Cost>>,
     config: CChoiceConfig,
     level: Arc<AtomicU64>,
+    domain: Arc<RwLock<RAEDomain>>,
+}
+
+impl From<ModCChoice> for Context {
+    fn from(m: ModCChoice) -> Self {
+        Context::new(m, MOD_C_CHOICE)
+    }
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -116,12 +127,23 @@ impl From<Cost> for LValue {
 }
 
 impl ModCChoice {
-    pub fn new(tried: Vec<LValue>, level: u64) -> Self {
+    pub fn new(exec: &ModExec) -> Self {
+        Self {
+            tried: vec![],
+            cost: Arc::new(Default::default()),
+            config: Default::default(),
+            level: Arc::new(Default::default()),
+            domain: exec.domain.clone(),
+        }
+    }
+
+    pub fn new_from_tried(tried: Vec<LValue>, level: u64) -> Self {
         Self {
             tried,
             cost: Arc::new(RwLock::new(Cost::Some(0.0))),
             config: Default::default(),
             level: Arc::new(AtomicU64::new(level)),
+            domain: Arc::new(Default::default()),
         }
     }
 }
@@ -151,12 +173,6 @@ impl ModCChoice {
 }
 
 impl From<ModCChoice> for LModule {
-    fn from(_: ModCChoice) -> Self {
-        todo!()
-    }
-}
-
-impl From<ModCChoice> for LModule {
     fn from(m: ModCChoice) -> Self {
         let mut module = LModule::new(m, MOD_C_CHOICE, DOC_MOD_C_CHOICE);
         module.add_async_fn(INCREASE_COST, increase_cost, DOC_INCREASE_COST, false);
@@ -174,7 +190,7 @@ pub async fn increase_cost(env: &LEnv, cost: Cost) -> Result<(), LRuntimeError> 
 
 #[async_scheme_fn]
 pub async fn c_choice(env: &LEnv, task: &[LValue]) -> LResult {
-    let state = env.get_context::<CtxState>(CTX_STATE)?;
+    let state = env.get_context::<ModState>(MOD_STATE)?;
     let state = state.state.get_snapshot().await;
     //let map: HashMap<LValue, u64> = Default::default();
     let mut method = LValue::Nil;
@@ -199,17 +215,8 @@ pub async fn c_choice(env: &LEnv, task: &[LValue]) -> LResult {
     for m in &methods {
         let mut new_env = env.clone();
         println!("Computing cost for {}({})", m, level);
-        new_env.import_context(
-            Context::new(ModCChoice::new(vec![], level + 1)),
-            MOD_C_CHOICE,
-        );
-        new_env.import_context(
-            Context::new(
-                ModState::new(state.clone().into(), Default::default()),
-                MOD_STATE,
-            ),
-            DOC_MOD_STATE,
-        );
+        new_env.update_context(ModCChoice::new_from_tried(vec![], level + 1));
+        new_env.update_context(ModState::new_from_snapshot(state.clone().into()));
         eval(m, &mut new_env, None).await?;
         let c_new = new_env
             .get_context::<ModCChoice>(MOD_C_CHOICE)
@@ -297,4 +304,31 @@ pub async fn c_choice_env(mut env: LEnv, domain: &RAEDomain) -> LEnv {
         env.insert(label, model);
     }
     env
+}
+
+pub async fn c_choice_select(
+    state: WorldStateSnapshot,
+    tried: &[LValue],
+    task: Vec<LValue>,
+    env: &LEnv,
+    config: CChoiceConfig,
+) -> lruntimeerror::Result<RefinementMetaData> {
+    let new_env = env.clone();
+    let ctx = env.get_context::<ModCChoice>(MOD_C_CHOICE).unwrap();
+
+    let mut new_env: LEnv = c_choice_env(new_env, &ctx.domain.read().await.clone()).await;
+    new_env.import_module(ModCChoice::new_from_tried(tried.to_vec(), 0), WithoutPrefix);
+    new_env.update_context(ModState::new_from_snapshot(state.clone().into()));
+
+    let mut greedy: RefinementMetaData = greedy_select(state, tried, task.clone(), env).await?;
+    greedy.refinement_type = SelectMode::Planning(Planner::CChoice(config));
+
+    let method: LValue = eval(&task.into(), &mut new_env, None).await?;
+
+    greedy.choosed = method;
+    greedy
+        .interval
+        .set_end(env.get_context::<ModTime>(MOD_TIME)?.get_instant().await);
+
+    Ok(greedy)
 }

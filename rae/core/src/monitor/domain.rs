@@ -1,3 +1,4 @@
+use crate::monitor::ModMonitor;
 use ompas_rae_language::exec::state::INSTANCE;
 use ompas_rae_language::monitor::domain::*;
 use ompas_rae_language::monitor::MOD_MONITOR;
@@ -6,10 +7,12 @@ use ompas_rae_structs::domain::method::Method;
 use ompas_rae_structs::domain::parameters::Parameters;
 use ompas_rae_structs::domain::state_function::StateFunction;
 use ompas_rae_structs::domain::task::Task;
+use ompas_rae_structs::domain::RAEDomain;
 use ompas_rae_structs::state::partial_state::PartialState;
-use ompas_rae_structs::state::world_state::StateType;
+use ompas_rae_structs::state::world_state::{StateType, WorldState};
 use sompas_core::modules::list::{car, cons, first};
 use sompas_core::{eval, expand, get_root_env, parse};
+use sompas_language::kind::*;
 use sompas_language::predicate::*;
 use sompas_macros::*;
 use sompas_structs::kindlvalue::KindLValue;
@@ -20,9 +23,28 @@ use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::{lruntimeerror, wrong_n_args, wrong_type};
 use std::convert::TryInto;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
-#[derive(Default)]
-pub struct ModDomain {}
+pub struct ModDomain {
+    state: WorldState,
+    empty_env: LEnv,
+    rae_domain: Arc<RwLock<RAEDomain>>,
+}
+
+impl ModDomain {
+    pub fn new(monitor: &ModMonitor) -> Self {
+        Self {
+            state: monitor.interface.state.clone(),
+            empty_env: monitor.empty_env.clone(),
+            rae_domain: monitor.rae_domain.clone(),
+        }
+    }
+
+    pub fn get_empty_env(&self) -> LEnv {
+        self.empty_env.clone()
+    }
+}
 
 impl From<ModDomain> for LModule {
     fn from(m: ModDomain) -> Self {
@@ -565,7 +587,7 @@ pub async fn add_lambda(env: &LEnv, label: String, lambda: &LValue) -> Result<()
 ///Takes in input a list of initial facts that will be stored in the inner world part of the State.
 #[async_scheme_fn]
 pub async fn add_facts(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<(), LRuntimeError> {
-    let state = &env.get_context::<ModDomain>(MOD_DOMAIN)?.interface.state;
+    let state = &env.get_context::<ModDomain>(MOD_DOMAIN)?.state;
 
     let mut inner_world = PartialState {
         inner: Default::default(),
@@ -605,10 +627,7 @@ pub async fn add_type(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> 
         _ => return Err(LRuntimeError::wrong_number_of_args(ADD_TYPE, args, 1..2)),
     };
 
-    ctx.interface
-        .state
-        .add_type(&t, parent.as_ref().map(|x| &**x))
-        .await;
+    ctx.state.add_type(&t, parent.as_ref().map(|x| &**x)).await;
 
     Ok(())
 }
@@ -642,7 +661,7 @@ pub async fn add_types(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError>
 pub async fn add_object(env: &LEnv, object: String, t: String) -> Result<(), LRuntimeError> {
     let ctx = env.get_context::<ModDomain>(MOD_DOMAIN).unwrap();
 
-    ctx.interface.state.add_instance(&object, &t).await;
+    ctx.state.add_instance(&object, &t).await;
 
     Ok(())
 }

@@ -35,7 +35,7 @@ pub fn convert_domain_to_chronicle_hierarchy(
 
     let actions: Vec<&str> = conversion_context
         .domain
-        .get_actions()
+        .get_commands()
         .keys()
         .map(|s| s.as_str())
         .collect();
@@ -108,7 +108,7 @@ pub fn convert_domain_to_chronicle_hierarchy(
         ch.tasks.push(declare_task(task, &mut ch.sym_table));
     }
 
-    for action in conversion_context.domain.get_actions().values() {
+    for action in conversion_context.domain.get_commands().values() {
         //evaluate the lambda sim.
         let chronicle = convert_abstract_task_to_chronicle(
             &action.get_model().try_into()?,

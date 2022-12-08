@@ -9,9 +9,7 @@ use ompas_rae_language::exec::platform::*;
 use ompas_rae_language::exec::task::MOD_TASK;
 use ompas_rae_structs::agenda::Agenda;
 use ompas_rae_structs::state::action_status::ActionStatus;
-use sompas_core::modules::list::append;
 use sompas_core::parse;
-use sompas_modules::utils::contains;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lruntimeerror::LResult;
 use sompas_structs::lswitch::InterruptionReceiver;
@@ -24,11 +22,11 @@ pub struct ModPlatform {
 }
 
 impl ModPlatform {
-    pub fn new(platform: Option<Platform>, agenda: Agenda, log: LogClient) -> Self {
+    pub fn new(exec: &ModExec) -> Self {
         Self {
-            platform,
-            agenda,
-            log,
+            platform: exec.platform.clone(),
+            agenda: exec.agenda.clone(),
+            log: exec.log.clone(),
         }
     }
 }
@@ -86,7 +84,7 @@ pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LAsyncHandle {
 
         match mode {
             RAEMode::Exec => {
-                match &ctx.platform_interface {
+                match &mod_platform.platform {
                     Some(platform) => {
                         platform.exec_command(args, command_id).await;
 
@@ -102,7 +100,7 @@ pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LAsyncHandle {
                                     ActionStatus::Rejected => {
                                         log.error(format!("Command {command_id} is a rejected."))
                                             .await;
-                                        ctx.agenda.set_end_time(&command_id).await;
+                                        mod_platform.agenda.set_end_time(&command_id).await;
                                         return Ok(RaeExecError::ActionFailure.into());
                                     }
                                     ActionStatus::Accepted => {}
@@ -195,7 +193,7 @@ pub fn is_platform_defined(env: &LEnv) -> bool {
 pub async fn start_platform(env: &LEnv) -> LResult {
     let ctx = env.get_context::<ModPlatform>(MOD_PLATFORM).unwrap();
 
-    if let Some(platform) = &ctx.platform_interface {
+    if let Some(platform) = &ctx.platform {
         platform.start(Default::default()).await;
         Ok(LValue::Nil)
     } else {

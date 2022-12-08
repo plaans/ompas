@@ -149,12 +149,16 @@ impl LEnv {
                     }
                 }
             }
+            for (context, doc) in module.subcontexts {
+                self.import_context(context, doc);
+            }
             self.init.append(&mut module.prelude);
             queue.append(&mut module.submodules);
         }
     }
 
-    pub fn update_context(&mut self, ctx: Context) {
+    pub fn update_context(&mut self, ctx: impl Into<Context>) {
+        let ctx: Context = ctx.into();
         if self.ctxs.contains(ctx.get_label()) {
             self.add_context(ctx);
         } else {
@@ -165,7 +169,8 @@ impl LEnv {
         }
     }
 
-    pub fn import_context(&mut self, ctx: Context, doc: impl Into<Doc>) {
+    pub fn import_context(&mut self, ctx: impl Into<Context>, doc: impl Into<Doc>) {
+        let ctx: Context = ctx.into();
         self.documentation.insert(ctx.get_label(), doc);
         self.add_context(ctx);
     }

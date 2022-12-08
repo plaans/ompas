@@ -5,17 +5,15 @@ use crate::{DEFAULT_PATH_PROJECT_GODOT, TOKIO_CHANNEL_SIZE};
 use async_trait::async_trait;
 use ompas_middleware::logger::LogClient;
 use ompas_middleware::ProcessInterface;
+use ompas_rae_interface::platform::PlatformConfig;
 use ompas_rae_interface::platform::{Domain, InnerPlatformConfig, PlatformDescriptor};
-use ompas_rae_interface::platform::{PlatformConfig, PlatformModule};
 use ompas_rae_interface::platform_interface::platform_interface_server::PlatformInterfaceServer;
 use ompas_rae_interface::{DEFAULT_PLATFORM_SERVICE_IP, DEFAULT_PLATFROM_SERVICE_PORT};
 use ompas_rae_interface::{LOG_TOPIC_PLATFORM, PROCESS_TOPIC_PLATFORM};
 use sompas_structs::contextcollection::Context;
-use sompas_structs::documentation::DocCollection;
-use sompas_structs::lmodule::{IntoModule, LModule};
+use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::LResult;
 use sompas_structs::lvalue::LValue;
-use sompas_structs::purefonction::PureFonctionCollection;
 use std::fs::File;
 use std::net::SocketAddr;
 use std::os::unix::io::{FromRawFd, IntoRawFd};
@@ -226,7 +224,7 @@ impl PlatformDescriptor for PlatformGobotSim {
         self.domain.clone()
     }
 
-    async fn module(&self) -> Option<PlatformModule> {
+    async fn module(&self) -> Option<LModule> {
         None
     }
 
@@ -238,21 +236,8 @@ impl PlatformDescriptor for PlatformGobotSim {
 #[derive(Clone, Default)]
 struct GodotCtx {}
 
-impl IntoModule for GodotCtx {
-    fn into_module(self) -> LModule {
-        LModule {
-            ctx: Context::new(self),
-            prelude: vec![],
-            raw_lisp: Default::default(),
-            label: "".to_string(),
-        }
-    }
-
-    fn documentation(&self) -> DocCollection {
-        Default::default()
-    }
-
-    fn pure_fonctions(&self) -> PureFonctionCollection {
-        Default::default()
+impl From<GodotCtx> for LModule {
+    fn from(m: GodotCtx) -> Self {
+        LModule::new(m, "GobotSimModule", "")
     }
 }

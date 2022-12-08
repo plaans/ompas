@@ -3,10 +3,8 @@ use crate::exec::ModExec;
 use control::*;
 use debug_conversion::*;
 use domain::*;
-use log::{activate_log, deactivate_log};
 use ompas_middleware::logger::{FileDescriptor, LogClient};
 use ompas_middleware::Master;
-use ompas_rae_language::*;
 use ompas_rae_planning::aries::structs::ConversionContext;
 use ompas_rae_structs::domain::RAEDomain;
 use ompas_rae_structs::internal_state::OMPASInternalState;
@@ -17,12 +15,9 @@ use sompas_core::{eval_init, get_root_env};
 use sompas_modules::advanced_math::ModMath;
 use sompas_modules::io::{LogOutput, ModIO};
 use sompas_modules::utils::ModUtils;
-use sompas_structs::contextcollection::Context;
-use sompas_structs::documentation::{Doc, DocCollection};
 use sompas_structs::lenv::ImportType::WithoutPrefix;
 use sompas_structs::lenv::{LEnv, LEnvSymbols};
 use sompas_structs::lmodule::{InitScheme, LModule};
-use sompas_structs::purefonction::PureFonctionCollection;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -32,7 +27,7 @@ pub mod debug_conversion;
 pub mod domain;
 pub mod log;
 
-use crate::monitor::log::{get_log_level, set_log_level, ModLog};
+use crate::monitor::log::ModLog;
 use ompas_rae_interface::platform::{Domain, Platform, PlatformDescriptor};
 use ompas_rae_interface::PLATFORM_CLIENT;
 use ompas_rae_language::monitor::*;
@@ -44,22 +39,24 @@ use sompas_modules::time::ModTime;
 pub const TOKIO_CHANNEL_SIZE: usize = 100;
 
 pub struct ModMonitor {
-    options: Arc<RwLock<OMPASOptions>>,
-    interface: OMPASInternalState,
-    platform: Option<Platform>,
-    rae_domain: Arc<RwLock<RAEDomain>>,
-    platform_domain: InitScheme,
-    empty_env: LEnv,
-    tasks_to_execute: Arc<RwLock<Vec<Job>>>,
+    pub(crate) options: Arc<RwLock<OMPASOptions>>,
+    pub(crate) interface: OMPASInternalState,
+    pub(crate) platform: Option<Platform>,
+    pub(crate) rae_domain: Arc<RwLock<RAEDomain>>,
+    pub(crate) platform_domain: InitScheme,
+    pub(crate) empty_env: LEnv,
+    pub(crate) tasks_to_execute: Arc<RwLock<Vec<Job>>>,
 }
 
 impl From<ModMonitor> for LModule {
     fn from(m: ModMonitor) -> Self {
+        let mod_domain = ModDomain::new(&m);
+        let mod_control = ModControl::new(&m);
         let mut module = LModule::new(m, MOD_MONITOR, DOC_MOD_MONITOR);
-        module.add_submodule(ModDomain::default());
+        module.add_submodule(mod_domain);
         module.add_submodule(ModLog::default());
         module.add_submodule(ModDebugConversion::default());
-        module.add_submodule(Control::default());
+        module.add_submodule(mod_control);
 
         module
     }
@@ -70,12 +67,12 @@ impl ModMonitor {
     /// Takes as argument the execution platform.
     ///
 
-    pub async fn init_empty_env() -> LEnv {
+    pub async fn init_empty_env(&self) -> LEnv {
         let mut empty_env = get_root_env().await;
         empty_env.import_module(ModUtils::default(), WithoutPrefix);
         empty_env.import_module(ModMath::default(), WithoutPrefix);
         empty_env.import_module(ModIO::default(), WithoutPrefix);
-        empty_env.import_module(ModExec::default(), WithoutPrefix);
+        empty_env.import_module(ModExec::new(&self).await, WithoutPrefix);
         eval_init(&mut empty_env).await;
         empty_env
     }
@@ -109,6 +106,7 @@ impl ModMonitor {
             log: log_client,
             command_stream: Arc::new(RwLock::new(None)),
         };
+
         let platform = Platform::new(
             Arc::new(RwLock::new(platform)),
             interface.state.clone(),
@@ -130,7 +128,8 @@ impl ModMonitor {
             platform: Some(platform),
             rae_domain: Default::default(),
             platform_domain: domain,
-            empty_env: Self::init_empty_env().await,
+            //todo:
+            empty_env: LEnv::default(),
             tasks_to_execute: Arc::new(Default::default()),
         }
     }
@@ -160,28 +159,8 @@ impl ModMonitor {
 
         env.import_module(ctx_io, WithoutPrefix);
 
-        let ctx_rae = CtxOMPAS {
-            resources: self.interface.resources.clone(),
-            monitors: self.interface.monitors.clone(),
-            platform_interface: self.platform.clone(),
-            agenda: self.interface.agenda.clone(),
-            log_client: self.interface.log.clone(),
-        };
-
-        let ctx_state = CtxState {
-            state: self.interface.state.clone(),
-        };
-
-        env.import_context(Context::new(ctx_rae), CTX_RAE);
-        env.import_module(ModExec::default(), WithoutPrefix);
-        env.import_context(Context::new(ctx_state), CTX_STATE);
-        env.import_context(Context::new(ModTask::default()), CTX_TASK);
-        env.import_context(Context::new(CtxMode::default()), CTX_MODE);
-        env.import_context(
-            Context::new(CtxDomain::new(self.rae_domain.read().await.clone())),
-            CTX_DOMAIN,
-        );
         env.import_module(ModTime::new(2), WithoutPrefix);
+        env.import_module(ModExec::new(&self).await, WithoutPrefix);
         eval_init(&mut env).await;
 
         let domain_exec_symbols: LEnvSymbols = self.rae_domain.read().await.get_exec_env();

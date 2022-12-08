@@ -32,7 +32,7 @@ impl From<ModDebugConversion> for LModule {
         module
     }
 }
-
+/*
 #[async_scheme_fn]
 pub async fn convert_expr(env: &LEnv, expr: &LValue) -> Result<String, LRuntimeError> {
     let ctx = env
@@ -163,4 +163,4 @@ pub async fn plan_task(env: &LEnv, args: &[LValue]) -> LResult {
     };
 
     Ok(result)
-}
+}*/

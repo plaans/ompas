@@ -19,6 +19,12 @@ impl ModTask {
     }
 }
 
+impl From<ModTask> for Context {
+    fn from(m: ModTask) -> Self {
+        Context::new(m, MOD_TASK)
+    }
+}
+
 impl From<ModTask> for LModule {
     fn from(m: ModTask) -> Self {
         let mut module = LModule::new(m, MOD_TASK, DOC_MOD_TASK);
@@ -33,8 +39,5 @@ impl From<ModTask> for LModule {
 
 #[scheme_fn]
 pub fn define_parent_task(env: &mut LEnv, parent_id: usize) {
-    env.import_context(
-        Context::new(ModTask::new(parent_id), DOC_MOD_TASK),
-        DOC_MOD_TASK,
-    );
+    env.update_context(ModTask::new(parent_id));
 }

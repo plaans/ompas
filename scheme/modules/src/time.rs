@@ -33,6 +33,14 @@ impl ModTime {
     pub async fn reset_time(&mut self) {
         *self.start.write().await = Instant::now();
     }
+
+    pub async fn get_instant_as_secs(&self) -> f64 {
+        (self.start.read().await.elapsed().as_micros() as f64) / 1_000_000.0
+    }
+
+    pub async fn get_instant(&self) -> u128 {
+        self.start.read().await.elapsed().as_nanos()
+    }
 }
 
 impl From<ModTime> for LModule {
@@ -101,6 +109,5 @@ pub async fn time(env: &LEnv) -> LResult {
 #[async_scheme_fn]
 pub async fn my_time(env: &LEnv) -> Result<f64, LRuntimeError> {
     let ctx = env.get_context::<ModTime>(MOD_TIME)?;
-    let t = (ctx.start.read().await.elapsed().as_micros() as f64) / 1_000_000.0;
-    Ok(t)
+    Ok(ctx.get_instant_as_secs().await)
 }

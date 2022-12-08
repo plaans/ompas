@@ -1,12 +1,11 @@
 use std::fs;
 //use ompas_gobotsim::mod_godot::CtxGodot;
 use ompas_gobotsim::platform::PlatformGobotSim;
-use ompas_middleware::logger::{FileDescriptor, LogClient, Logger};
+use ompas_middleware::logger::{FileDescriptor, LogClient};
 use ompas_middleware::{LogLevel, Master};
 use ompas_rae_core::monitor::ModMonitor;
 use ompas_rae_interface::platform::Domain;
 use ompas_rae_interface::{LOG_TOPIC_PLATFORM, PLATFORM_CLIENT};
-use sompas_core::activate_debug;
 use sompas_modules::advanced_math::ModMath;
 use sompas_modules::io::ModIO;
 use sompas_modules::string::ModString;

@@ -1,12 +1,16 @@
 use crate::exec::resource::resources;
+use crate::exec::ModExec;
+use futures::FutureExt;
 use ompas_rae_language::exec::resource::LOCKED;
 use ompas_rae_language::exec::state::*;
 use ompas_rae_structs::monitor::MonitorCollection;
-use ompas_rae_structs::state::world_state::{StateType, WorldState};
+use ompas_rae_structs::state::world_state::{StateType, WorldState, WorldStateSnapshot};
 use sompas_core::eval;
 use sompas_core::modules::map::get_map;
 use sompas_macros::async_scheme_fn;
+use sompas_structs::contextcollection::Context;
 use sompas_structs::interrupted;
+use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lasynchandler::LAsyncHandle;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lfuture::{FutureResult, LFuture};
@@ -23,8 +27,24 @@ pub struct ModState {
 }
 
 impl ModState {
-    pub fn new(state: WorldState, monitors: MonitorCollection) -> Self {
-        Self { state, monitors }
+    pub fn new(exec: &ModExec) -> Self {
+        Self {
+            state: exec.state.clone(),
+            monitors: exec.monitors.clone(),
+        }
+    }
+
+    pub fn new_from_snapshot(state: WorldStateSnapshot) -> Self {
+        Self {
+            state: state.into(),
+            monitors: Default::default(),
+        }
+    }
+}
+
+impl From<ModState> for Context {
+    fn from(m: ModState) -> Self {
+        Context::new(m, MOD_STATE)
     }
 }
 
@@ -53,24 +73,24 @@ impl From<ModState> for LModule {
 ///Add a fact to fact state
 #[async_scheme_fn]
 async fn assert(env: &LEnv, key: LValueS, value: LValueS) -> Result<(), LRuntimeError> {
-    let ctx_state = env.get_context::<CtxState>(CTX_STATE)?;
-    ctx_state.state.add_fact(key, value).await;
+    let state = env.get_context::<ModState>(MOD_STATE)?;
+    state.state.add_fact(key, value).await;
     Ok(())
 }
 
 ///Retract a fact to state
 #[async_scheme_fn]
 async fn retract(env: &LEnv, key: LValueS, value: LValueS) -> Result<(), LRuntimeError> {
-    let ctx_state = env.get_context::<CtxState>(CTX_STATE)?;
+    let state = env.get_context::<ModState>(MOD_STATE)?;
 
-    ctx_state.state.retract_fact(key, value).await
+    state.state.retract_fact(key, value).await
 }
 
 #[async_scheme_fn]
 async fn read_state(env: &LEnv, args: &[LValue]) -> LResult {
     if args.is_empty() {
         return Err(LRuntimeError::wrong_number_of_args(
-            RAE_READ_STATE,
+            READ_STATE,
             args,
             1..usize::MAX,
         ));
@@ -89,14 +109,14 @@ async fn read_state(env: &LEnv, args: &[LValue]) -> LResult {
 ///2 args: check if an instance is of a certain type
 #[async_scheme_fn]
 pub async fn instance(env: &LEnv, object: String, r#type: String) -> LResult {
-    let state = &env.get_context::<CtxState>(CTX_STATE)?.state;
+    let state = &env.get_context::<ModState>(MOD_STATE)?.state;
 
     Ok(state.instance(&object, &r#type).await)
 }
 
 #[async_scheme_fn]
 pub async fn instances(env: &LEnv, r#type: String) -> LResult {
-    let state = &env.get_context::<CtxState>(CTX_STATE)?.state;
+    let state = &env.get_context::<ModState>(MOD_STATE)?.state;
     Ok(state.instances(&r#type).await)
 }
 
@@ -114,41 +134,35 @@ async fn get_facts(env: &LEnv) -> LResult {
 
 #[async_scheme_fn]
 async fn get_state(env: &LEnv, args: &[LValue]) -> LResult {
-    let ctx_state = env.get_context::<CtxState>(CTX_STATE)?;
+    let ctx = env.get_context::<ModState>(MOD_STATE)?;
 
     let _type = match args.len() {
         0 => None,
         1 => {
             if let LValue::Symbol(sym) = &args[0] {
                 match sym.as_str() {
-                    KEY_STATIC => Some(StateType::Static),
-                    KEY_DYNAMIC => Some(StateType::Dynamic),
-                    KEY_INNER_WORLD => Some(StateType::InnerWorld),
-                    KEY_INSTANCE => Some(StateType::Instance),
+                    STATIC => Some(StateType::Static),
+                    DYNAMIC => Some(StateType::Dynamic),
+                    INNER_WORLD => Some(StateType::InnerWorld),
+                    INSTANCE => Some(StateType::Instance),
                     _ => {
                         return Err(lruntimeerror!(
-                            RAE_GET_STATE,
+                            GET_STATE,
                             format!(
                                 "was expecting keys {}, {}, {}, {}",
-                                KEY_STATIC, KEY_DYNAMIC, KEY_INNER_WORLD, KEY_INSTANCE
+                                STATIC, DYNAMIC, INNER_WORLD, INSTANCE
                             )
                         ))
                     }
                 }
             } else {
-                return Err(wrong_type!(RAE_GET_STATE, &args[0], KindLValue::Symbol));
+                return Err(wrong_type!(GET_STATE, &args[0], KindLValue::Symbol));
             }
         }
-        _ => {
-            return Err(LRuntimeError::wrong_number_of_args(
-                RAE_GET_STATE,
-                args,
-                0..1,
-            ))
-        }
+        _ => return Err(LRuntimeError::wrong_number_of_args(GET_STATE, args, 0..1)),
     };
 
-    let state = ctx_state.state.get_state(_type).await.into_map();
+    let state = ctx.state.get_state(_type).await.into_map();
     Ok(state)
 }
 

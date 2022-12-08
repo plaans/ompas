@@ -3,23 +3,18 @@ use futures::FutureExt;
 use ompas_middleware::LogLevel;
 use ompas_middleware::ProcessInterface;
 use ompas_rae_language::process::{LOG_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS};
-use ompas_rae_planning::aries::conversion::convert_domain_to_chronicle_hierarchy;
-use ompas_rae_planning::aries::structs::{ConversionCollection, ConversionContext};
 use ompas_rae_structs::domain::RAEDomain;
 use ompas_rae_structs::internal_state::OMPASInternalState;
 use ompas_rae_structs::rae_command::RAECommand;
 use ompas_rae_structs::rae_options::OMPASOptions;
-use ompas_rae_structs::select_mode::{Planner, SelectMode};
 use sompas_core::{eval, eval_init};
 use sompas_structs::lasynchandler::LAsyncHandle;
-use sompas_structs::lenv::ImportType::WithoutPrefix;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lfuture::FutureResult;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lswitch::new_interruption_handler;
 use sompas_structs::lvalue::LValue;
 use std::ops::Deref;
-use std::time::Instant;
 use tokio::sync::mpsc::Receiver;
 
 pub mod error;
@@ -45,39 +40,6 @@ pub async fn rae(
         ProcessInterface::new(PROCESS_MAIN_RAE, PROCESS_TOPIC_OMPAS, LOG_TOPIC_OMPAS).await;
 
     let log = interface.log.clone();
-
-    let mut select_mode = *options.get_select_mode();
-
-    let cc: Option<ConversionCollection> =
-        if matches!(select_mode, SelectMode::Planning(Planner::Aries(_))) {
-            let instant = Instant::now();
-            match convert_domain_to_chronicle_hierarchy(ConversionContext {
-                domain: domain.clone(),
-                env: env.clone(),
-                state: interface.state.get_snapshot().await,
-            }) {
-                Ok(r) => {
-                    log.info(format!(
-                        "Conversion time: {:.3} ms",
-                        instant.elapsed().as_micros() as f64 / 1000.0
-                    ))
-                    .await;
-                    Some(r)
-                }
-                Err(e) => {
-                    select_mode = SelectMode::Greedy;
-                    log.warn(format!("Cannot plan with the domain...{e}")).await;
-                    None
-                }
-            }
-        } else {
-            None
-        };
-
-    env.import_module(
-        CtxPlanning::new(cc, domain.clone(), env.clone(), select_mode),
-        WithoutPrefix,
-    );
 
     eval_init(&mut env).await;
 

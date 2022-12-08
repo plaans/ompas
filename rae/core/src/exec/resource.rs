@@ -1,4 +1,5 @@
 use crate::exec::*;
+use ompas_middleware::logger::LogClient;
 use ompas_rae_language::exec::mode::*;
 use ompas_rae_language::exec::resource::*;
 use ompas_rae_structs::mutex::Wait;
@@ -15,11 +16,15 @@ use std::convert::{TryFrom, TryInto};
 
 pub struct ModResource {
     resources: ResourceCollection,
+    log: LogClient,
 }
 
 impl ModResource {
-    pub fn new(resources: ResourceCollection) -> Self {
-        Self { resources }
+    pub fn new(exec: &ModExec) -> Self {
+        Self {
+            resources: exec.resources.clone(),
+            log: exec.log.clone(),
+        }
     }
 }
 
@@ -49,7 +54,7 @@ impl From<ModResource> for LModule {
 
 #[async_scheme_fn]
 pub async fn new_resource(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<CtxOMPAS>(CTX_RAE)?;
+    let ctx = env.get_context::<ModResource>(MOD_RESOURCE)?;
 
     let label: String = args
         .get(0)
@@ -69,9 +74,9 @@ pub async fn new_resource(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeErr
 /// Waits on the resource until its his turn in the queue list
 #[async_scheme_fn]
 pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LRuntimeError> {
-    let ctx = env.get_context::<CtxOMPAS>(CTX_RAE)?;
+    let ctx = env.get_context::<ModResource>(MOD_RESOURCE)?;
 
-    let log = ctx.get_log_client();
+    let log = ctx.log.clone();
 
     let resources = ctx.resources.clone();
 
@@ -188,8 +193,8 @@ async fn check_acquire<'a>(arg: (LEnv, Vec<LValue>, usize)) -> LResult {
     let r = __acquire__(&env, args.as_slice()).await?;
     let h_await: LAsyncHandle = r.try_into().unwrap();
     let h: LValue = h_await.get_future().await?;
-    env.get_context::<CtxOMPAS>(CTX_RAE)?
-        .get_log_client()
+    env.get_context::<ModResource>(MOD_RESOURCE)?
+        .log
         .info(format!("{} unlocked {}", d, label))
         .await;
     Ok(list![label, h])
@@ -208,8 +213,8 @@ pub async fn __acquire_in_list__(
         .ok_or_else(|| LRuntimeError::wrong_number_of_args(ACQUIRE_IN_LIST, args, 1..2))?
         .try_into()?;
     let d: usize = thread_rng().gen();
-    env.get_context::<CtxOMPAS>(CTX_RAE)?
-        .get_log_client()
+    env.get_context::<ModResource>(MOD_RESOURCE)?
+        .log
         .info(format!("Acquire element from {}, id: {} ", args[0], d))
         .await;
     //let capacity = args.get(1).cloned();
@@ -255,7 +260,7 @@ pub async fn is_locked(env: &LEnv, args: &[LValue]) -> LResult {
         .get_symbol("rae-mode")
         .expect("rae-mode should be defined, default value is exec mode")
         .try_into()?;
-    let ctx = env.get_context::<CtxOMPAS>(CTX_RAE)?;
+    let ctx = env.get_context::<ModResource>(MOD_RESOURCE)?;
 
     match mode.as_str() {
         SYMBOL_EXEC_MODE => Ok(ctx
@@ -284,7 +289,7 @@ pub async fn is_locked(env: &LEnv, args: &[LValue]) -> LResult {
 
 #[async_scheme_fn]
 pub async fn resources(env: &LEnv) -> Result<Vec<String>, LRuntimeError> {
-    let ctx = env.get_context::<CtxOMPAS>(CTX_RAE)?;
+    let ctx = env.get_context::<ModResource>(MOD_RESOURCE)?;
 
     Ok(ctx.resources.get_list_resources().await)
 }

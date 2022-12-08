@@ -405,7 +405,7 @@ impl PlatformDescriptor for Platform {
     }
 
     ///Returns a module loaded into the evaluation environment with other bindings
-    async fn module(&self) -> Option<PlatformModule> {
+    async fn module(&self) -> Option<LModule> {
         self.inner.read().await.module().await
     }
 
@@ -439,14 +439,6 @@ impl From<PathBuf> for Domain {
     }
 }
 
-pub struct PlatformModule(LModule);
-
-impl PlatformModule {
-    pub fn new(module: impl Into<LModule>) -> Self {
-        Self(module.into())
-    }
-}
-
 /// Trait that a platform needs to implement to be able to be used as execution platform in RAE.
 #[async_trait]
 pub trait PlatformDescriptor: Any + Send + Sync {
@@ -460,7 +452,7 @@ pub trait PlatformDescriptor: Any + Send + Sync {
     async fn domain(&self) -> Domain;
 
     ///Returns a module loaded into the evaluation environment with other bindings
-    async fn module(&self) -> Option<PlatformModule>;
+    async fn module(&self) -> Option<LModule>;
 
     ///Returns the server info in order to connect OMPAS to the platform using grpc services
     async fn socket(&self) -> SocketAddr;

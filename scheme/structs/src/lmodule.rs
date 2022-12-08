@@ -49,6 +49,7 @@ pub struct LModule {
     pub(crate) documentation: DocCollection,
     pub(crate) pure_fonctions: PureFonctionCollection,
     pub(crate) submodules: Vec<LModule>,
+    pub(crate) subcontexts: Vec<(Context, Doc)>,
 }
 
 impl LModule {
@@ -66,13 +67,14 @@ impl LModule {
             documentation: Default::default(),
             pure_fonctions: Default::default(),
             submodules: vec![],
+            subcontexts: vec![],
         };
 
         module.documentation.insert(label, doc);
         module
     }
 
-    pub fn add_doc(&mut self, label: impl Display, doc: impl Into<Doc>) {
+    pub fn add_doc(&mut self, label: impl Display, doc: impl Into<Doc>, kind: &'static str) {
         self.documentation.insert(label.to_string(), doc.into());
         self.documentation
             .get_mut(&self.label)
@@ -80,7 +82,7 @@ impl LModule {
             .verbose
             .as_mut()
             .unwrap()
-            .push_str(format!("- {}\n", label).as_str());
+            .push_str(format!("- [{}] {}\n", kind, label).as_str());
     }
 
     /// Add a function to the module.
@@ -92,7 +94,7 @@ impl LModule {
         if pure {
             self.pure_fonctions.add(label.to_string())
         }
-        self.add_doc(label, doc);
+        self.add_doc(label, doc, "Fn");
     }
 
     pub fn add_mut_fn(&mut self, label: impl Display, fun: NativeMutFn, doc: impl Into<Doc>) {
@@ -100,7 +102,7 @@ impl LModule {
             label.to_string(),
             LValue::MutFn(LMutFn::new(fun, label.to_string())),
         ));
-        self.add_doc(label, doc);
+        self.add_doc(label, doc, "MutFn");
     }
 
     pub fn add_async_fn(
@@ -117,7 +119,7 @@ impl LModule {
         if pure {
             self.pure_fonctions.add(label.to_string())
         }
-        self.add_doc(label, doc);
+        self.add_doc(label, doc, "AsyncFn");
     }
 
     pub fn add_async_mut_fn(
@@ -130,7 +132,7 @@ impl LModule {
             label.to_string(),
             LValue::AsyncMutFn(LAsyncMutFn::new(fun, label.to_string())),
         ));
-        self.add_doc(label, doc);
+        self.add_doc(label, doc, "AsyncMutFn");
     }
 
     pub fn add_lambda(
@@ -141,7 +143,7 @@ impl LModule {
     ) {
         self.prelude
             .add(format!("(define {} {})", label, expression));
-        self.add_doc(label, doc);
+        self.add_doc(label, doc, "Lambda");
     }
 
     pub fn add_macro(
@@ -152,7 +154,7 @@ impl LModule {
     ) {
         self.prelude
             .add(format!("(defmacro {} {})", label, expression));
-        self.add_doc(label, doc);
+        self.add_doc(label, doc, "Macro");
     }
 
     pub fn add_submodule(&mut self, module: impl Into<LModule>) {
@@ -163,14 +165,27 @@ impl LModule {
             .verbose
             .as_mut()
             .unwrap()
-            .push_str(format!("- {}\n", module.label).as_str());
+            .push_str(format!("- [Module] {}\n", module.label).as_str());
         self.submodules.push(module)
     }
 
+    pub fn add_subcontext(&mut self, context: impl Into<Context>, doc: impl Into<Doc>) {
+        let context: Context = context.into();
+        let doc = doc.into();
+        self.documentation
+            .get_mut(&self.label)
+            .unwrap()
+            .verbose
+            .as_mut()
+            .unwrap()
+            .push_str(format!("- [Context] {}\n", context.get_label()).as_str());
+        self.subcontexts.push((context, doc.clone()));
+    }
+
     /// Add a LValue to the prelude.
-    pub fn add_prelude(&mut self, label: &str, lv: LValue, doc: impl Into<Doc>) {
+    pub fn add_value(&mut self, label: &str, lv: LValue, doc: impl Into<Doc>) {
         self.bindings.push((label.into(), lv));
-        self.add_doc(label, doc);
+        self.add_doc(label, doc, "Value");
     }
 }
 
@@ -184,6 +199,7 @@ impl From<()> for LModule {
             documentation: Default::default(),
             pure_fonctions: Default::default(),
             submodules: vec![],
+            subcontexts: vec![],
         }
     }
 }

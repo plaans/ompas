@@ -455,10 +455,12 @@ pub async fn add_method(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<
         &new_env,
         &[map
             .get(&TASK.into())
-            .ok_or(LRuntimeError::new(
-                ADD_METHOD,
-                ":task is missing in the definition of the method.",
-            ))?
+            .ok_or_else(|| {
+                LRuntimeError::new(
+                    ADD_METHOD,
+                    ":task is missing in the definition of the method.",
+                )
+            })?
             .clone()],
     )?
     .to_string();
@@ -468,10 +470,12 @@ pub async fn add_method(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<
     )?;
     let label = map
         .get(&NAME.into())
-        .ok_or(LRuntimeError::new(
-            ADD_METHOD,
-            ":name is missing in the definition of the method.",
-        ))?
+        .ok_or_else(|| {
+            LRuntimeError::new(
+                ADD_METHOD,
+                ":name is missing in the definition of the method.",
+            )
+        })?
         .to_string();
     //Definition of the method
     let mut method = Method {
@@ -627,7 +631,7 @@ pub async fn add_type(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> 
         _ => return Err(LRuntimeError::wrong_number_of_args(ADD_TYPE, args, 1..2)),
     };
 
-    ctx.state.add_type(&t, parent.as_ref().map(|x| &**x)).await;
+    ctx.state.add_type(&t, parent.as_deref()).await;
 
     Ok(())
 }

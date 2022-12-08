@@ -120,7 +120,7 @@ impl ModControl {
         env.import_module(ctx_io, WithoutPrefix);
 
         env.import_module(ModTime::new(2), WithoutPrefix);
-        env.import_module(ModExec::new(&self).await, WithoutPrefix);
+        env.import_module(ModExec::new(self).await, WithoutPrefix);
         eval_init(&mut env).await;
 
         let domain_exec_symbols: LEnvSymbols = self.domain.read().await.get_exec_env();

@@ -1,7 +1,6 @@
 use crate::conversion::chronicle_post_processing::{
     rm_useless_var, simplify_timepoints, unify_equal,
 };
-use crate::structs::chronicle::chronicle::{ChronicleKind, ChronicleTemplate};
 use crate::structs::chronicle::condition::Condition;
 use crate::structs::chronicle::constraint::Constraint;
 use crate::structs::chronicle::effect::Effect;
@@ -9,7 +8,7 @@ use crate::structs::chronicle::lit::Lit;
 use crate::structs::chronicle::subtask::SubTask;
 use crate::structs::chronicle::task_template::TaskTemplate;
 use crate::structs::chronicle::type_table::AtomType;
-use crate::structs::chronicle::{AtomId, GetVariables, Replace, COND};
+use crate::structs::chronicle::{AtomId, Replace, COND};
 use crate::structs::flow_graph::expression::{Block, Expression};
 use crate::structs::flow_graph::handle_table::HandleTable;
 use crate::structs::flow_graph::scope::Scope;
@@ -317,14 +316,14 @@ pub fn post_processing(partial: PartialConversion) -> Result<ChronicleTemplate, 
     }
 
     for (_, handle) in handles.inner() {
-        let vec: Vec<Lit> = handle.ends.iter().map(|e| Lit::from(e)).collect();
+        let vec: Vec<Lit> = handle.ends.iter().map(Lit::from).collect();
         let end_async = ch
             .debug
             .flow_graph
             .get(handle.scope.get_end())
             .unwrap()
             .get_end();
-        ch.add_constraint(Constraint::leq(end_async, Constraint::Max(vec.into())));
+        ch.add_constraint(Constraint::leq(end_async, Constraint::Max(vec)));
     }
 
     /*

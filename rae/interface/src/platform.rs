@@ -87,16 +87,11 @@ impl PlatformConfig {
         }
     }
     pub fn format(&self) -> String {
-        format!(
-            "{}",
-            match &self {
-                Self::None => "none".to_string(),
-                Self::String(s) => s.to_string(),
-                Self::Any(any) => {
-                    any.to_string()
-                }
-            }
-        )
+        match &self {
+            Self::None => "none".to_string(),
+            Self::String(s) => s.to_string(),
+            Self::Any(any) => any.to_string(),
+        }
     }
 }
 
@@ -302,31 +297,31 @@ impl Platform {
                                 None => {}
                                 Some(Response::Accepted(r)) => {
                                     agenda
-                                        .update_status(&(r.command_id as usize), ActionStatus::Accepted.into())
+                                        .update_status(&(r.command_id as usize), ActionStatus::Accepted)
                                         .await;
                                 }
                                 Some(Response::Rejected(r)) => {
                                     agenda
-                                        .update_status(&(r.command_id as usize), ActionStatus::Rejected.into())
+                                        .update_status(&(r.command_id as usize), ActionStatus::Rejected)
                                         .await;
                                 }
                                 Some(Response::Progress(f)) => {
                                     agenda
                                         .update_status(
                                             &(f.command_id as usize),
-                                            ActionStatus::Running(Some(f.progress)).into(),
+                                            ActionStatus::Running(Some(f.progress)),
                                         )
                                         .await;
                                 }
                                 Some(Response::Result(r)) => match r.result {
                                     true => {
                                         agenda
-                                            .update_status(&(r.command_id as usize), ActionStatus::Success.into())
+                                            .update_status(&(r.command_id as usize), ActionStatus::Success)
                                             .await
                                     }
                                     false => {
                                         agenda
-                                            .update_status(&(r.command_id as usize), ActionStatus::Failure.into())
+                                            .update_status(&(r.command_id as usize), ActionStatus::Failure)
                                             .await
                                     }
                                 },
@@ -334,7 +329,7 @@ impl Platform {
                                     agenda
                                         .update_status(
                                             &(c.command_id as usize),
-                                            ActionStatus::Cancelled(c.result).into(),
+                                            ActionStatus::Cancelled(c.result),
                                         )
                                         .await;
                                 }

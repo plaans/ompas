@@ -8,9 +8,7 @@ pub struct ModDebugConversion {}
 
 impl From<ModDebugConversion> for LModule {
     fn from(m: ModDebugConversion) -> Self {
-        let mut module = LModule::new(m, MOD_DEBUG_CONVERSION, DOC_MOD_DEBUG_CONVERSION);
-        //...
-        module
+        LModule::new(m, MOD_DEBUG_CONVERSION, DOC_MOD_DEBUG_CONVERSION)
     }
 }
 /*

@@ -174,7 +174,7 @@ impl LModule {
             .as_mut()
             .unwrap()
             .push_str(format!("- [Context] {}\n", context.get_label()).as_str());
-        self.subcontexts.push((context, doc.clone()));
+        self.subcontexts.push((context, doc));
     }
 
     /// Add a LValue to the prelude.

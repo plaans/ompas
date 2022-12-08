@@ -1,11 +1,10 @@
 use crate::point_algebra::problem::{try_into_pa_relation, PAGraph, PAProblem};
 use crate::point_algebra::remove_useless_timepoints;
-use crate::structs::chronicle::chronicle::{ChronicleSet, ChronicleTemplate};
 use crate::structs::chronicle::constraint::Constraint;
 use crate::structs::chronicle::lit::Lit;
 use crate::structs::chronicle::sym_table::RefSymTable;
 use crate::structs::chronicle::type_table::AtomType;
-use crate::structs::chronicle::{AtomId, GetVariables};
+use crate::structs::chronicle::AtomId;
 use im::HashSet;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use std::borrow::Borrow;
@@ -44,7 +43,7 @@ pub fn unify_equal(c: &mut ChronicleTemplate) {
     for (index, constraint) in constraints.iter().enumerate() {
         if let Constraint::Eq(a, b) = constraint {
             if let (Lit::Atom(id_1), Lit::Atom(id_2)) = (a, b) {
-                if let Ok(true) = bind_atoms(id_1, id_2, &mut c.sym_table) {
+                if let Ok(true) = bind_atoms(&id_1, &id_2, &mut c.sym_table) {
                     vec_constraint_to_rm.push(index);
                 }
             }
@@ -82,8 +81,8 @@ pub fn bind_atoms(
     let type_1 = st.get_type_of(id_1);
     let type_2 = st.get_type_of(id_2);
 
-    let atom_1 = st.get_atom(id_1, false).unwrap().clone();
-    let atom_2 = st.get_atom(id_2, false).unwrap().clone();
+    let atom_1 = st.get_atom(id_1, false).unwrap();
+    let atom_2 = st.get_atom(id_2, false).unwrap();
 
     let constant_1 = atom_1.is_constant();
     let constant_2 = atom_2.is_constant();
@@ -109,12 +108,12 @@ pub fn bind_atoms(
                 }
             }
 
-            return if atom_2.is_parameter() {
+            if atom_2.is_parameter() {
                 Ok(false)
             } else {
                 st.union_atom(id_1, id_2);
                 Ok(true)
-            };
+            }
         }
         (false, true) => {
             match &type_1 {
@@ -141,8 +140,8 @@ pub fn bind_atoms(
                 (AtomType::Untyped, AtomType::Untyped) => {
                     //
                 }
-                (AtomType::Untyped, t) => {} // st.set_type_of(id_1, &t),
-                (t, AtomType::Untyped) => {} // st.set_type_of(id_2, &t),
+                (AtomType::Untyped, _) => {} // st.set_type_of(id_1, &t),
+                (_, AtomType::Untyped) => {} // st.set_type_of(id_2, &t),
                 (t1, t2) => {
                     if t1 != t2 {
                         return Err(Default::default());

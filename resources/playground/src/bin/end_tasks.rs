@@ -1,4 +1,4 @@
-use sompas_utils::task_handler;
+use ompas_utils::task_handler;
 use std::thread;
 use std::time::Duration;
 

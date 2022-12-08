@@ -13,12 +13,12 @@ pub fn flow_graph_post_processing(graph: &mut FlowGraph) -> Result<(), LRuntimeE
         next = vertice.child;
         if let Expression::Cst(lit) = &vertice.computation {
             if let Lit::Atom(a) = lit {
-                bind_atoms(&a, &vertice.result, &mut sym_table)?;
+                bind_atoms(a, &vertice.result, &mut sym_table)?;
                 let mut scope = graph.scope;
                 graph.remove(&id, &mut scope);
                 graph.scope = scope;
             }
-        } else if let Expression::Block(b) = &vertice.computation {
+        } else if let Expression::Block(_) = &vertice.computation {
         }
     }
 

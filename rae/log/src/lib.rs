@@ -80,8 +80,8 @@ pub fn init(log_path: PathBuf) -> Result<mpsc::Sender<String>, SetLoggerError> {
 pub fn display_logger(mut killer: broadcast::Receiver<EndSignal>, log_path: PathBuf) {
     tokio::spawn(async move {
         let child = Command::new("gnome-terminal")
-            .args(&["--title", "RAE LOG", "--disable-factory"])
-            .args(&["--", "tail", "-f", log_path.to_str().unwrap()])
+            .args(["--title", "RAE LOG", "--disable-factory"])
+            .args(["--", "tail", "-f", log_path.to_str().unwrap()])
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()
@@ -153,7 +153,7 @@ async fn run_logger_file(
 #[allow(unused)]
 async fn run_logger(mut rx: mpsc::Receiver<String>) {
     Command::new("gnome-terminal")
-        .args(&["--", "python3", "utils/src/log/logger.py", "&"])
+        .args(["--", "python3", "utils/src/log/logger.py", "&"])
         .spawn()
         .expect("could not spawn terminal");
 

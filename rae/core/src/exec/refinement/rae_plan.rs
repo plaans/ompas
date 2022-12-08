@@ -162,7 +162,7 @@ impl ModRaePlan {
         Self {
             tried,
             efficiency: Arc::new(RwLock::new(Default::default())),
-            config: self.config.clone(),
+            config: self.config,
             level: Arc::new(AtomicU64::new(level)),
             domain: self.domain.clone(),
         }
@@ -241,7 +241,7 @@ pub async fn rae_plan(env: &LEnv, task: &[LValue]) -> LResult {
         let mut new_env = env.clone();
         println!("Computing cost for {}({})", m, level);
         new_env.update_context(ctx.new_from_tried(vec![], level + 1));
-        new_env.update_context(ModState::new_from_snapshot(state.clone().into()));
+        new_env.update_context(ModState::new_from_snapshot(state.clone()));
         eval(m, &mut new_env, None).await?;
         let new_efficiency = new_env
             .get_context::<ModRaePlan>(MOD_RAE_PLAN)
@@ -343,7 +343,7 @@ pub async fn rae_plan_select(
 
     let mut new_env: LEnv = rae_plan_env(new_env, &ctx.domain.read().await.clone()).await;
     new_env.import_module(ctx.new_from_tried(tried.to_vec(), 0), WithoutPrefix);
-    new_env.update_context(ModState::new_from_snapshot(state.clone().into()));
+    new_env.update_context(ModState::new_from_snapshot(state.clone()));
 
     let mut greedy: RefinementMetaData = greedy_select(state, tried, task.clone(), env).await?;
     greedy.refinement_type = SelectMode::Planning(Planner::RAEPlan(config));

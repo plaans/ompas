@@ -91,7 +91,7 @@ pub async fn rae(
                             .try_send(LAsyncHandle::new(future, tx)) {
                             Ok(_) =>{}
                             Err(e) => {
-                                log.error(format!("{}", e.to_string())).await;
+                                log.error(e.to_string()).await;
                             }
                         }
                     }

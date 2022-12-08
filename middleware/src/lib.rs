@@ -62,6 +62,11 @@ pub struct ProcessDescriptor {
     label: String,
     sender: tokio::sync::mpsc::Sender<EndSignal>,
 }
+impl Default for Master {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl Master {
     pub fn new() -> Self {
@@ -330,7 +335,7 @@ impl Master {
                 }
                 write!(str, "{}", topics.get(id).unwrap().label).unwrap();
             }
-            write!(str, "}}}}\n").unwrap();
+            writeln!(str, "}}}}").unwrap();
         }
         str
     }
@@ -451,9 +456,7 @@ impl ProcessInterface {
             .unwrap_or_else(|e| {
                 panic!(
                     "Error sending kill signal for topic {} requested by {}: {}",
-                    topic.to_string(),
-                    self.label,
-                    e
+                    topic, self.label, e
                 )
             });
     }

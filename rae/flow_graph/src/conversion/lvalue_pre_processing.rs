@@ -1,5 +1,6 @@
 use async_recursion::async_recursion;
-use ompas_rae_language::RAE_EXEC_TASK;
+use ompas_rae_language::exec::refinement::EXEC_TASK;
+use ompas_utils::blocking_async;
 use sompas_core::*;
 use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lenv::LEnv;
@@ -7,12 +8,11 @@ use sompas_structs::llambda::LambdaArgs;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::{lruntimeerror, wrong_n_args, wrong_type};
-use sompas_utils::blocking_async;
 
 pub const TRANSFORM_LAMBDA_EXPRESSION: &str = "transform-lambda-expression";
 
 pub async fn pre_processing(lv: &LValue, env: &LEnv) -> LResult {
-    let avoid = vec![RAE_EXEC_TASK.to_string()];
+    let avoid = vec![EXEC_TASK.to_string()];
     let lv = lambda_expansion(lv, env, &avoid).await?;
 
     Ok(lv)
@@ -27,7 +27,7 @@ pub async fn pre_processing(lv: &LValue, env: &LEnv) -> LResult {
 
 #[async_recursion]
 pub async fn lambda_expansion(lv: &LValue, env: &LEnv, avoid: &Vec<String>) -> LResult {
-    let mut lv = match transform_lambda_expression(lv, env.clone(), &avoid).await {
+    let mut lv = match transform_lambda_expression(lv, env.clone(), avoid).await {
         Ok(lv) => lv,
         Err(_) => lv.clone(),
     };
@@ -35,7 +35,7 @@ pub async fn lambda_expansion(lv: &LValue, env: &LEnv, avoid: &Vec<String>) -> L
     if let LValue::List(list) = &lv {
         let mut result = vec![];
         for lv in list.iter() {
-            result.push(lambda_expansion(lv, env, &avoid).await?)
+            result.push(lambda_expansion(lv, env, avoid).await?)
         }
 
         lv = result.into()
@@ -44,7 +44,7 @@ pub async fn lambda_expansion(lv: &LValue, env: &LEnv, avoid: &Vec<String>) -> L
     Ok(lv)
 }
 
-pub async fn transform_lambda_expression(lv: &LValue, env: LEnv, avoid: &Vec<String>) -> LResult {
+pub async fn transform_lambda_expression(lv: &LValue, env: LEnv, avoid: &[String]) -> LResult {
     //println!("in transform lambda");
 
     if let LValue::List(list) = lv {

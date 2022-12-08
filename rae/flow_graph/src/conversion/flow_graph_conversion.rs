@@ -6,9 +6,10 @@ use crate::structs::flow_graph::scope::Scope;
 use crate::{DefineTable, FlowGraph};
 use core::result::Result;
 use core::result::Result::{Err, Ok};
-use ompas_rae_language::{
-    RAE_ASSERT, RAE_ASSERT_SHORT, RAE_EXEC_COMMAND, RAE_EXEC_TASK, RAE_READ_STATE,
-};
+use ompas_rae_language::exec::platform::*;
+use ompas_rae_language::exec::refinement::EXEC_TASK;
+use ompas_rae_language::exec::state::READ_STATE;
+use ompas_rae_language::exec::state::{ASSERT, ASSERT_SHORT};
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lprimitives::LPrimitives;
 use sompas_structs::lruntimeerror::LRuntimeError;
@@ -205,7 +206,7 @@ fn convert_list(
         _ => panic!(""),
     };
 
-    out_of_scope.append(&mut define_table.inner().values().map(|a| *a).collect());
+    out_of_scope.append(&mut define_table.inner().values().copied().collect());
 
     for o in &out_of_scope {
         fl.sym_table.set_end(o, &end_scope);
@@ -219,7 +220,6 @@ fn convert_apply(
     define_table: &mut DefineTable,
 ) -> Result<(Scope, AtomId, Vec<AtomId>), LRuntimeError> {
     let mut out_of_scope = vec![];
-    let end_scope;
 
     let mut define_table = define_table.clone();
 
@@ -246,7 +246,7 @@ fn convert_apply(
     out_of_scope.append(&mut results.clone());
 
     let scope = match proc_symbol.as_str() {
-        RAE_EXEC_COMMAND | RAE_EXEC_TASK => {
+        EXEC_COMMAND | EXEC_TASK => {
             let exec_scope: Scope = fl
                 .new_vertice(Expression::exec(args_result.to_vec()))
                 .into();
@@ -254,13 +254,13 @@ fn convert_apply(
             arg_scope.end = exec_scope.end;
             arg_scope
         }
-        RAE_ASSERT | RAE_ASSERT_SHORT => {
+        ASSERT | ASSERT_SHORT => {
             let id = fl.new_instantaneous_vertice(Expression::write(args_result.to_vec()));
             fl.set_parent(&id, arg_scope.get_end());
             arg_scope.end = id;
             arg_scope
         }
-        RAE_READ_STATE => {
+        READ_STATE => {
             let id = fl.new_instantaneous_vertice(Expression::read(args_result.to_vec()));
             fl.set_parent(&id, arg_scope.get_end());
             arg_scope.end = id;
@@ -277,16 +277,14 @@ fn convert_apply(
             fl.set_parent(&id, arg_scope.get_end());
             out_of_scope.push(*fl.get_scope_result(&proc_scope));
 
-            let scope = Scope {
+            Scope {
                 start: proc_scope.start,
                 end: id,
-            };
-
-            scope
+            }
         }
     };
 
-    end_scope = *fl.get_scope_interval(&scope).get_end();
+    let end_scope = *fl.get_scope_interval(&scope).get_end();
 
     Ok((scope, end_scope, out_of_scope))
 }

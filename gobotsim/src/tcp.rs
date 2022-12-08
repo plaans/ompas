@@ -5,9 +5,9 @@ use crate::PROCESS_TOPIC_GOBOT_SIM;
 use ompas_middleware::ProcessInterface;
 use ompas_rae_interface::platform_interface::command_request::Request;
 use ompas_rae_interface::platform_interface::{
-    Atom, CommandAccepted, CommandCancelRequest, CommandCancelled, CommandExecutionRequest,
-    CommandProgress, CommandRejected, CommandRequest, CommandResponse, CommandResult, Instance,
-    PlatformUpdate, StateUpdate, StateVariable, StateVariableType,
+    Atom, CommandAccepted, CommandCancelRequest, CommandExecutionRequest, CommandProgress,
+    CommandRejected, CommandRequest, CommandResponse, CommandResult, Instance, PlatformUpdate,
+    StateUpdate, StateVariable, StateVariableType,
 };
 use ompas_rae_interface::{LOG_TOPIC_PLATFORM, PROCESS_TOPIC_PLATFORM};
 use ompas_rae_structs::state::partial_state::PartialState;
@@ -103,8 +103,7 @@ fn command_cancel_to_string(cancel: &CommandCancelRequest) -> String {
 
     //println!("action status created");
 
-    let command = serde_json::to_string(&gs).unwrap();
-    command
+    serde_json::to_string(&gs).unwrap()
 }
 
 fn command_execution_to_string(execution: &CommandExecutionRequest) -> String {
@@ -129,8 +128,7 @@ fn command_execution_to_string(execution: &CommandExecutionRequest) -> String {
 
     //println!("action status created");
 
-    let command = serde_json::to_string(&gs).unwrap();
-    command
+    serde_json::to_string(&gs).unwrap()
 }
 
 /// converts a u32 into a array of u8.
@@ -218,7 +216,7 @@ async fn async_read_socket(
                                                         r#type: v.to_string(),
                                                         object: parameters[0].to_string()
                                                     };
-                                                    if let Err(_) = state_update_sender.send(instance.into())
+                                                    if state_update_sender.send(instance.into()).is_err()
                                                     {
                                                         process.kill(PROCESS_TOPIC_PLATFORM).await;
                                                         //process.die().await;
@@ -237,9 +235,9 @@ async fn async_read_socket(
                                         }
                                     }
 
-                                    if let Err(_) = state_update_sender.send(StateUpdate {
+                                    if state_update_sender.send(StateUpdate {
                                         state_variables
-                                    }.into())
+                                    }.into()).is_err()
                                     {
                                         process.kill(PROCESS_TOPIC_PLATFORM).await;
                                         //process.die().await;
@@ -269,47 +267,15 @@ async fn async_read_socket(
                                     _ => todo!()
                                         }
                                     }
-                                    if let Err(_) = state_update_sender.send(StateUpdate {
+                                    if state_update_sender.send(StateUpdate {
                                         state_variables
-                                    }.into())
+                                    }.into()).is_err()
                                     {
                                         process.kill(PROCESS_TOPIC_PLATFORM).await;
                                         //process.die().await;
                                         break 'outer;
                                     }
                         },
-                        /*GodotMessageType::StaticState | GodotMessageType::DynamicState => {
-                            let temp_state: PartialState = message.try_into().unwrap();
-                            //println!("new state");
-                            for (k,v) in &temp_state.inner {
-                                if let LValueS::List(list)= &k {
-                                    //println!("k: {}\nv: {}", k,v);
-                                    if list.len() == 2 && list[0].to_string().contains(".instance") {
-                                        let instance_val = &list[1];
-                                                state.add_instance(instance_val.to_string(), v.to_string()).await;
-                                        //println!("add instance {} {}", instance_val, v);
-                                        //instance.add_instance_of(instance_val.to_string(), v.to_string()).await;
-                                    }
-                                }
-                            }
-
-                            match &temp_state._type {
-                                None => panic!("state should have a type"),
-                                Some(_type) => match _type {
-                                    StateType::Static => {
-                                        //println!("updating static state: {:?}", temp_state);
-                                        state.update_state(temp_state).await;
-                                    }
-                                    StateType::Dynamic => state.set_state(temp_state).await,
-                                    StateType::InnerWorld => {
-                                        panic!("should not receive inner world fact from godot")
-                                    }
-                                    StateType::Instance => {
-                                        panic!("should not receive instance fact from godot")
-                                    }
-                                },
-                            };
-                        }*/
                         GodotMessageType::ActionResponse => {
                             if let GodotMessageSerdeData::ActionResponse(ar) = message.data {
                                 match ar.action_id {
@@ -348,10 +314,10 @@ async fn async_read_socket(
                         GodotMessageType::ActionFeedback => {
                             if let GodotMessageSerdeData::ActionFeedback(af) = message.data {
                                 let command_id = *map_server_id_action_id.get(&af.action_id).expect("") as u64;
-                                if let Err(_) = command_response_sender.send(CommandProgress {
+                                if command_response_sender.send(CommandProgress {
                                     command_id,
                                     progress: af.feedback
-                                }.into()) {
+                                }.into()).is_err() {
                                             process.kill(PROCESS_TOPIC_PLATFORM).await;
                                             //process.die().await;
                                             break 'outer;
@@ -363,10 +329,10 @@ async fn async_read_socket(
                         GodotMessageType::ActionResult => {
                             if let GodotMessageSerdeData::ActionResult(ar) = message.data {
                                 let command_id = *map_server_id_action_id.get(&ar.action_id).expect("") as u64;
-                                if let Err(_) = command_response_sender.send(CommandResult {
+                                if command_response_sender.send(CommandResult {
                                     command_id,
                                     result: ar.result
-                                }.into())  {
+                                }.into()).is_err()  {
                                             process.kill(PROCESS_TOPIC_PLATFORM).await;
                                             //process.die().await;
                                             break 'outer;
@@ -377,23 +343,14 @@ async fn async_read_socket(
                         }
                         GodotMessageType::ActionPreempt => {
                             unreachable!("{:?}: preempt is not handled", message.data)
-                            /*if let GodotMessageSerdeData::ActionId(ai) = message.data {
-                                let command_id = map_server_id_action_id.get(ar.action_id).expect("");
-                                command_response_sender.send( {
-                                    command_id,
-                                    result: ar.result
-                                }.into())
-                            } else {
-                                unreachable!("{:?} and expected ActionId", message.data)
-                            }*/
                         }
                         GodotMessageType::ActionCancel => {
                             if let GodotMessageSerdeData::ActionCancel(ac) = message.data {
                                 let command_id = *map_server_id_action_id.get(&ac.action_id).expect("") as u64;
-                                if let Err(_) = command_response_sender.send(CommandCancelled {
+                                if command_response_sender.send(CommandCancelled {
                                     command_id,
                                     result: ac.cancelled
-                                }.into())  {
+                                }.into()).is_err()  {
                                             process.kill(PROCESS_TOPIC_PLATFORM).await;
                                             //process.die().await;
                                             break 'outer;
@@ -405,27 +362,6 @@ async fn async_read_socket(
                         _ => {
                             unreachable!()
                         }
-                        /*GodotMessageType::ActionResponse => {
-                            match command_status {
-                                CommandStatus::Accepted => {
-                                    map_server_id_action_id.insert(server_id, godot_id);
-                                }
-                                CommandStatus::Rejected => {}
-                                _ => unreachable!()
-                            }
-                        }*/
-                        /*
-
-                        GodotMessageType::ActionFeedback
-                        | GodotMessageType::ActionResult
-                        | GodotMessageType::ActionPreempt
-                        | GodotMessageType::ActionCancel => {
-                            //println!("the action status is updated");
-                            let action_status: (usize, CommandStatus) = message.try_into().unwrap();
-                            let id = map_server_id_action_id.get(&action_status.0).unwrap();
-                            agenda.update_status(id, action_status.1.into()).await;
-                        }
-                        _ => panic!("should not receive this kind of message"),*/
                     }
                 }
 

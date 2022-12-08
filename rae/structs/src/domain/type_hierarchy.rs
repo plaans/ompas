@@ -113,7 +113,7 @@ impl TypeHierarchy {
         let root_types: Vec<TypeId> = self
             .parent
             .iter()
-            .filter(|(_, &v)| v == None)
+            .filter(|(_, &v)| v.is_none())
             .map(|(k, _)| *k)
             .collect();
         let mut str = "Type Hierarchy\n".to_string();

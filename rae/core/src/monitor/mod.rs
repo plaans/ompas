@@ -8,7 +8,6 @@ use ompas_rae_structs::domain::RAEDomain;
 use ompas_rae_structs::internal_state::OMPASInternalState;
 use ompas_rae_structs::job::Job;
 use ompas_rae_structs::rae_options::OMPASOptions;
-use ompas_rae_structs::select_mode::SelectMode;
 use sompas_core::{eval_init, get_root_env};
 use sompas_structs::lmodule::{InitScheme, LModule};
 use std::fs;

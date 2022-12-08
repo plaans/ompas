@@ -4,8 +4,8 @@ use crate::structs::chronicle::interval::Interval;
 use crate::structs::chronicle::type_table::{AtomType, TypeId, TypeTable};
 use crate::structs::chronicle::{AtomId, FormatWithSymTable};
 use itertools::Itertools;
-use ompas_rae_language::*;
-use sompas_core::modules::get_scheme_primitives;
+use ompas_rae_language::exec::state::{ASSERT, INSTANCE, RETRACT};
+use sompas_language::get_primitives;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
@@ -210,9 +210,9 @@ impl RefSymTable {
         let mut str = "SCOPES:\n".to_string();
 
         for (atom, interval) in scopes.iter().sorted_by(|a, b| a.0.cmp(&b.0)) {
-            write!(
+            writeln!(
                 str,
-                "{}: {}\n",
+                "{}: {}",
                 atom.format(&self, false),
                 interval.format(&self, false)
             )
@@ -625,9 +625,9 @@ impl SymTable {
     pub fn format_types(&self) -> String {
         let mut str = "".to_string();
         for (a, t) in &self.types.map_symbol_type {
-            write!(
+            writeln!(
                 str,
-                "{}: {}({})\n",
+                "{}: {}({})",
                 self.symbols.get_value(&a).unwrap(),
                 self.types.inner.get_value(&t).unwrap(),
                 t
@@ -758,11 +758,11 @@ impl Default for SymTable {
 
         //Symbols of lisp functions that are useful
         //Not exhaustive
-        st.add_list_of_symbols_of_same_type(get_scheme_primitives(), Some(AtomType::Function))
+        st.add_list_of_symbols_of_same_type(get_primitives(), Some(AtomType::Function))
             .expect("error while adding symbols of scheme primitives");
 
         st.add_list_of_symbols_of_same_type(
-            vec![RAE_ASSERT, RAE_RETRACT, RAE_INSTANCE],
+            vec![ASSERT, RETRACT, INSTANCE],
             Some(AtomType::Function),
         )
         .expect("error while adding symbols of rae");

@@ -4,7 +4,6 @@ use crate::structs::chronicle::type_table::AtomType;
 use std::collections::HashSet;
 
 pub mod atom;
-pub mod chronicle;
 pub mod condition;
 pub mod constraint;
 pub mod effect;

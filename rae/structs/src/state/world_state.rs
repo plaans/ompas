@@ -88,7 +88,7 @@ impl WorldState {
     }
 
     pub async fn instances(&self, t: &str) -> LValue {
-        self.instance.read().await.get_instances(&t).await.into()
+        self.instance.read().await.get_instances(t).await.into()
     }
 
     pub async fn clear(&self) {

@@ -1,4 +1,3 @@
-use crate::structs::chronicle::chronicle::ChronicleTemplate;
 use crate::structs::chronicle::AtomId;
 
 pub struct TaskTemplate {

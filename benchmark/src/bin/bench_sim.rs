@@ -99,7 +99,6 @@ pub async fn lisp_interpreter(opt: Opt) {
     li.import_namespace(ctx_math);
 
     li.import(ctx_string);
-
     let ctx_rae = ModMonitor::new(None, Some(log.clone()), opt.view).await;
     li.import_namespace(ctx_rae);
 

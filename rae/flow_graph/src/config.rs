@@ -21,12 +21,17 @@ impl TryFrom<&Yaml> for GraphConvertConfig {
             .ok_or("problems is not an array.")?;
         let mut problems = vec![];
         for p in temp_problems {
-            problems.push(p.as_str().ok_or_else(|| "Not a str").unwrap().into())
+            problems.push(
+                p.as_str()
+                    .ok_or_else(|| panic!("Not a str"))
+                    .unwrap()
+                    .into(),
+            )
         }
 
         Ok(Self {
-            input_path: value[INPUT_PATH].as_str().map(|s| PathBuf::from(s)),
-            output_path: value[OUTPUT_PATH].as_str().map(|s| PathBuf::from(s)),
+            input_path: value[INPUT_PATH].as_str().map(PathBuf::from),
+            output_path: value[OUTPUT_PATH].as_str().map(PathBuf::from),
             problems,
         })
     }

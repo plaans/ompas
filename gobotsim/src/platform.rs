@@ -70,7 +70,7 @@ impl PlatformGobotSim {
                 .parse()
                 .unwrap(),
             headless,
-            domain: domain,
+            domain,
             config: "".to_string(),
             log,
         }
@@ -127,7 +127,7 @@ impl PlatformGobotSim {
 
     /// Open the tcp communication on the right address:port
     pub async fn open_com(&self) -> LResult {
-        let socket_addr = self.godot_tcp_info.clone();
+        let socket_addr = self.godot_tcp_info;
 
         let (tx_request, rx_request) = mpsc::channel(TOKIO_CHANNEL_SIZE);
         let (tx_response, rx_response) = tokio::sync::broadcast::channel(TOKIO_CHANNEL_SIZE);
@@ -228,7 +228,7 @@ impl PlatformDescriptor for PlatformGobotSim {
     }
 
     async fn socket(&self) -> SocketAddr {
-        self.service_info.clone()
+        self.service_info
     }
 }
 

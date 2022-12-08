@@ -1,7 +1,5 @@
-use ompas_gobotsim::platform::GodotDomain;
 use ompas_gobotsim::platform::PlatformGobotSim;
 use ompas_rae_core::monitor::ModMonitor;
-use ompas_rae_structs::platform::Platform;
 use sompas_modules::advanced_math::ModAdvancedMath;
 use sompas_modules::io::ModIO;
 use sompas_modules::string::ModString;

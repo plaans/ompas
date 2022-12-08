@@ -85,25 +85,21 @@ impl Atom {
 
     pub fn is_parameter(&self) -> bool {
         if let Self::Variable(v) = &self {
-            match v {
+            matches!(
+                v,
                 Variable::Parameter(_, _)
-                | Variable::Start(_)
-                | Variable::End(_)
-                | Variable::Presence(_)
-                | Variable::ChronicleResult(_) => true,
-                _ => false,
-            }
+                    | Variable::Start(_)
+                    | Variable::End(_)
+                    | Variable::Presence(_)
+                    | Variable::ChronicleResult(_)
+            )
         } else {
             false
         }
     }
 
     pub fn is_variable(&self) -> bool {
-        if let Self::Variable(_) = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, Self::Variable(_))
     }
 }
 

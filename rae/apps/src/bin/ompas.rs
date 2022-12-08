@@ -7,6 +7,8 @@ use sompas_repl::lisp_interpreter::{LispInterpreter, LispInterpreterConfig};
 use std::fs;
 use std::path::PathBuf;
 
+use ompas_middleware::logger::FileDescriptor;
+use ompas_middleware::Master;
 use ompas_rae_core::monitor::ModMonitor;
 use structopt::StructOpt;
 

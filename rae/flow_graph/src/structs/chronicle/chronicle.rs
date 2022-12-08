@@ -275,9 +275,9 @@ impl ChronicleTemplate {
             format!(
                 "{}:\n {}: {} {}",
                 self.debug.label.as_str(),
-                self.presence.format(&st, sym_version),
-                self.interval.format(&st, sym_version),
-                self.result.format(&st.borrow(), sym_version)
+                self.presence.format(st, sym_version),
+                self.interval.format(st, sym_version),
+                self.result.format(st, sym_version)
             )
             .as_str(),
         );
@@ -334,8 +334,8 @@ impl ChronicleTemplate {
         s.push_str("}\n");
         s.push_str("-synthetic task(s): {\n");
         for t in &self.syntactic_chronicles {
-            write!(s, "task: {}\n", t.name.format(&st, sym_version)).unwrap();
-            write!(s, "methods:\n").unwrap();
+            writeln!(s, "task: {}", t.name.format(&st, sym_version)).unwrap();
+            writeln!(s, "methods:").unwrap();
             for m in &t.methods {
                 write!(s, "{}", m.to_string()).unwrap();
             }

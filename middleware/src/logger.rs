@@ -208,11 +208,11 @@ impl Logger {
                 let (killer, mut killed) = mpsc::channel(1);
                 topic.displayer_killer = Some(killer);
                 let path: PathBuf = topic.absolute_path.clone();
-                let topic_name = format!("{}", topic.label);
+                let topic_name = topic.label.to_string();
                 tokio::spawn(async move {
                     let child = Command::new("gnome-terminal")
-                        .args(&["--title", topic_name.as_str(), "--disable-factory"])
-                        .args(&["--", "tail", "-f", path.to_str().unwrap()])
+                        .args(["--title", topic_name.as_str(), "--disable-factory"])
+                        .args(["--", "tail", "-f", path.to_str().unwrap()])
                         .stdout(Stdio::null())
                         .stderr(Stdio::null())
                         .spawn()
@@ -296,29 +296,25 @@ impl Logger {
             None => format!(
                 "{}/{}/{}.txt",
                 DEFAULT_LOG_DIRECTORY, self.current_log_dir, name
-            )
-            .into(),
+            ),
             Some(FileDescriptor::AbsolutePath(ap)) => ap.to_str().unwrap().to_string(),
             Some(FileDescriptor::RelativePath(rp)) => format!(
                 "{}/{}/{}.txt",
                 DEFAULT_LOG_DIRECTORY,
                 self.current_log_dir,
                 rp.to_str().unwrap()
-            )
-            .into(),
+            ),
             Some(FileDescriptor::Directory(d)) => format!(
                 "{}/{}/{}/{}.txt",
                 DEFAULT_LOG_DIRECTORY,
                 self.current_log_dir,
                 d.to_str().unwrap(),
                 name
-            )
-            .into(),
+            ),
             Some(FileDescriptor::Name(n)) => format!(
                 "{}/{}/{}.txt",
                 DEFAULT_LOG_DIRECTORY, self.current_log_dir, n
-            )
-            .into(),
+            ),
         };
 
         let path: PathBuf = path.into();
@@ -349,7 +345,7 @@ impl Logger {
             id,
             LogTopic {
                 label: name.to_string(),
-                absolute_path: path.into(),
+                absolute_path: path,
                 file,
                 displayer_killer: None,
             },

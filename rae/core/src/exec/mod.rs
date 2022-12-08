@@ -60,7 +60,7 @@ pub struct ModExec {
     resources: ResourceCollection,
     platform: Option<Platform>,
     log: LogClient,
-    cc: Arc<RwLock<Option<ConversionCollection>>>,
+    _cc: Arc<RwLock<Option<ConversionCollection>>>,
 }
 
 impl ModExec {
@@ -74,7 +74,7 @@ impl ModExec {
             resources: monitor.interface.resources.clone(),
             platform: monitor.platform.clone(),
             log: LogClient::new("exec-ompas", LOG_TOPIC_OMPAS).await,
-            cc: monitor.cc.clone(),
+            _cc: monitor.cc.clone(),
         }
     }
 }

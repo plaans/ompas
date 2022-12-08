@@ -49,7 +49,7 @@ impl PlatformInterface for PlatformGobotSimService {
                     }
                     msg = state_update.recv() => {
                         if let Ok(msg) = msg {
-                            if let Err(_) = tx.send(Ok(msg)).await {
+                            if tx.send(Ok(msg)).await.is_err() {
                                 process.kill(PROCESS_TOPIC_PLATFORM).await;
                                 break; //process.die();
                             }
@@ -98,7 +98,7 @@ impl PlatformInterface for PlatformGobotSimService {
                     msg = command_request_receiver.message() => {
                         if let Ok(Some(request)) = msg {
                             process.log("Received new command request.", LogLevel::Debug).await;
-                            if let Err(_) = command_request_to_godot.send(request).await {
+                            if command_request_to_godot.send(request).await.is_err() {
                                 process.kill(PROCESS_TOPIC_PLATFORM).await;
                                 break; //process.die();
                             }
@@ -106,7 +106,7 @@ impl PlatformInterface for PlatformGobotSimService {
                     }
                     msg = command_response_receiver.recv() => {
                         if let Ok(response) = msg {
-                            if let Err(_) = tx.send(Ok(response)).await {
+                            if tx.send(Ok(response)).await.is_err() {
                                 process.kill(PROCESS_TOPIC_PLATFORM).await;
                                 break;// process.die();
                             }

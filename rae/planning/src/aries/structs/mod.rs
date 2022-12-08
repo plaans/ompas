@@ -176,7 +176,7 @@ impl From<&ConversionContext> for Problem {
                     assert_eq!(list_instance.len(), 2);
                     assert_eq!(LValueS::from(INSTANCE), list_instance[0]);
                     let _type: String = list_instance[1].to_string();
-                    if types.get_id(&_type) == None {
+                    if types.get_id(&_type).is_none() {
                         types.add_type(_type.clone(), None)
                     }
                     if let LValueS::List(instance) = v {

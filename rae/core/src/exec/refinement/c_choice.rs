@@ -216,7 +216,7 @@ pub async fn c_choice(env: &LEnv, task: &[LValue]) -> LResult {
         let mut new_env = env.clone();
         println!("Computing cost for {}({})", m, level);
         new_env.update_context(ModCChoice::new_from_tried(vec![], level + 1));
-        new_env.update_context(ModState::new_from_snapshot(state.clone().into()));
+        new_env.update_context(ModState::new_from_snapshot(state.clone()));
         eval(m, &mut new_env, None).await?;
         let c_new = new_env
             .get_context::<ModCChoice>(MOD_C_CHOICE)
@@ -318,7 +318,7 @@ pub async fn c_choice_select(
 
     let mut new_env: LEnv = c_choice_env(new_env, &ctx.domain.read().await.clone()).await;
     new_env.import_module(ModCChoice::new_from_tried(tried.to_vec(), 0), WithoutPrefix);
-    new_env.update_context(ModState::new_from_snapshot(state.clone().into()));
+    new_env.update_context(ModState::new_from_snapshot(state.clone()));
 
     let mut greedy: RefinementMetaData = greedy_select(state, tried, task.clone(), env).await?;
     greedy.refinement_type = SelectMode::Planning(Planner::CChoice(config));

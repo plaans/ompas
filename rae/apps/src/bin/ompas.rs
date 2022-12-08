@@ -1,5 +1,5 @@
 use sompas_core::activate_debug;
-use sompas_modules::advanced_math::ModMath;
+use sompas_modules::advanced_math::ModAdvancedMath;
 use sompas_modules::io::ModIO;
 use sompas_modules::string::ModString;
 use sompas_modules::utils::ModUtils;
@@ -47,7 +47,7 @@ async fn lisp_interpreter(opt: &Opt) {
     let mut li = LispInterpreter::new().await;
 
     let mut ctx_io = ModIO::default();
-    let ctx_math = ModMath::default();
+    let ctx_math = ModAdvancedMath::default();
     let ctx_utils = ModUtils::default();
     let ctx_string = ModString::default();
 

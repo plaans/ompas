@@ -44,6 +44,7 @@ impl From<ModResource> for LModule {
             DOC___ACQUIRE_IN_LIST__,
             false,
         );
+        module.add_async_fn(RELEASE, release, DOC_RELEASE, false);
         module.add_async_fn(IS_LOCKED, is_locked, DOC_IS_LOCKED, false);
         module.add_async_fn(RESOURCES, resources, DOC_RESOURCES, false);
         module.add_lambda(ACQUIRE, LAMBDA_ACQUIRE, DOC_ACQUIRE);

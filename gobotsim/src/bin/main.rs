@@ -6,7 +6,7 @@ use ompas_middleware::{LogLevel, Master};
 use ompas_rae_core::monitor::ModMonitor;
 use ompas_rae_interface::platform::Domain;
 use ompas_rae_interface::{LOG_TOPIC_PLATFORM, PLATFORM_CLIENT};
-use sompas_modules::advanced_math::ModMath;
+use sompas_modules::advanced_math::ModAdvancedMath;
 use sompas_modules::io::ModIO;
 use sompas_modules::string::ModString;
 use sompas_modules::utils::ModUtils;
@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 
 pub const TOKIO_CHANNEL_SIZE: usize = 100;
-pub const LOG_LEVEL: LogLevel = LogLevel::Trace;
+pub const LOG_LEVEL: LogLevel = LogLevel::Debug;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "OMPAS", about = "An acting engine based on RAE.")]
@@ -52,7 +52,7 @@ pub async fn lisp_interpreter(log: Option<PathBuf>, godot: bool, rae_log: bool) 
     let mut li = LispInterpreter::new().await;
 
     let mut ctx_io = ModIO::default();
-    let ctx_math = ModMath::default();
+    let ctx_math = ModAdvancedMath::default();
     let ctx_utils = ModUtils::default();
     let ctx_string = ModString::default();
 

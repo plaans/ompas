@@ -10,7 +10,6 @@ use ompas_rae_interface::platform::{Domain, InnerPlatformConfig, PlatformDescrip
 use ompas_rae_interface::platform_interface::platform_interface_server::PlatformInterfaceServer;
 use ompas_rae_interface::{DEFAULT_PLATFORM_SERVICE_IP, DEFAULT_PLATFROM_SERVICE_PORT};
 use ompas_rae_interface::{LOG_TOPIC_PLATFORM, PROCESS_TOPIC_PLATFORM};
-use sompas_structs::contextcollection::Context;
 use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::LResult;
 use sompas_structs::lvalue::LValue;

@@ -1,4 +1,4 @@
-use crate::advanced_math::ModMath;
+use crate::advanced_math::ModAdvancedMath;
 use crate::utils::ModUtils;
 use sompas_core::static_eval::{eval_static, expand_static};
 use sompas_core::{eval_init, get_root_env};
@@ -35,7 +35,7 @@ impl ModStaticEval {
     pub async fn new() -> Self {
         let mut env = get_root_env().await;
 
-        env.import_module(ModMath::default(), ImportType::WithoutPrefix);
+        env.import_module(ModAdvancedMath::default(), ImportType::WithoutPrefix);
         env.import_module(ModUtils::default(), ImportType::WithoutPrefix);
         eval_init(&mut env).await;
         let env = Arc::new(RwLock::new(env));

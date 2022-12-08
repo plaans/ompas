@@ -1,10 +1,14 @@
+use crate::exec::ModExec;
 use crate::monitor::{ModMonitor, TOKIO_CHANNEL_SIZE};
 use crate::rae;
+use ompas_middleware::logger::LogClient;
 use ompas_middleware::ProcessInterface;
 use ompas_rae_interface::platform::{Platform, PlatformConfig, PlatformDescriptor};
 use ompas_rae_language::monitor::control::*;
 use ompas_rae_language::process::{LOG_TOPIC_OMPAS, PROCESS_STOP_OMPAS, PROCESS_TOPIC_OMPAS};
 use ompas_rae_language::select::*;
+use ompas_rae_planning::aries::conversion::convert_domain_to_chronicle_hierarchy;
+use ompas_rae_planning::aries::structs::{ConversionCollection, ConversionContext};
 use ompas_rae_structs::domain::RAEDomain;
 use ompas_rae_structs::internal_state::OMPASInternalState;
 use ompas_rae_structs::job::Job;
@@ -14,10 +18,16 @@ use ompas_rae_structs::select_mode::{Planner, SelectMode};
 use ompas_rae_structs::state::action_state::*;
 use ompas_rae_structs::state::action_status::*;
 use ompas_rae_structs::state::world_state::*;
+use sompas_core::{eval_init, get_root_env};
 use sompas_macros::*;
+use sompas_modules::advanced_math::ModAdvancedMath;
+use sompas_modules::io::{LogOutput, ModIO};
+use sompas_modules::time::ModTime;
+use sompas_modules::utils::ModUtils;
 use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lasynchandler::LAsyncHandle;
-use sompas_structs::lenv::LEnv;
+use sompas_structs::lenv::ImportType::WithoutPrefix;
+use sompas_structs::lenv::{LEnv, LEnvSymbols};
 use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
@@ -25,15 +35,16 @@ use sompas_structs::{lruntimeerror, wrong_type};
 use std::mem;
 use std::sync::Arc;
 use std::time::Duration;
+use std::time::Instant;
 use tokio::sync::{mpsc, RwLock};
 
 pub struct ModControl {
-    options: Arc<RwLock<OMPASOptions>>,
-    interface: OMPASInternalState,
-    platform: Option<Platform>,
-    rae_domain: Arc<RwLock<RAEDomain>>,
-    empty_env: LEnv,
-    tasks_to_execute: Arc<RwLock<Vec<Job>>>,
+    pub(crate) options: Arc<RwLock<OMPASOptions>>,
+    pub(crate) interface: OMPASInternalState,
+    pub(crate) platform: Option<Platform>,
+    pub(crate) domain: Arc<RwLock<RAEDomain>>,
+    pub(crate) tasks_to_execute: Arc<RwLock<Vec<Job>>>,
+    pub(crate) cc: Arc<RwLock<Option<ConversionCollection>>>,
 }
 
 impl ModControl {
@@ -42,10 +53,81 @@ impl ModControl {
             options: monitor.options.clone(),
             interface: monitor.interface.clone(),
             platform: monitor.platform.clone(),
-            rae_domain: monitor.rae_domain.clone(),
-            empty_env: monitor.empty_env.clone(),
+            domain: monitor.domain.clone(),
             tasks_to_execute: monitor.tasks_to_execute.clone(),
+            cc: Arc::new(Default::default()),
         }
+    }
+
+    pub async fn convert_domain(&self) {
+        let select_mode = *self.options.read().await.get_select_mode();
+
+        let cc: Option<ConversionCollection> =
+            if matches!(select_mode, SelectMode::Planning(Planner::Aries(_))) {
+                let instant = Instant::now();
+                match convert_domain_to_chronicle_hierarchy(ConversionContext {
+                    domain: self.domain.read().await.clone(),
+                    env: self.get_exec_env().await,
+                    state: self.interface.state.get_snapshot().await,
+                }) {
+                    Ok(r) => {
+                        self.interface
+                            .log
+                            .info(format!(
+                                "Conversion time: {:.3} ms",
+                                instant.elapsed().as_micros() as f64 / 1000.0
+                            ))
+                            .await;
+                        Some(r)
+                    }
+                    Err(e) => {
+                        self.options
+                            .write()
+                            .await
+                            .set_select_mode(SelectMode::Greedy);
+                        self.interface
+                            .log
+                            .warn(format!("Cannot plan with the domain...{e}"))
+                            .await;
+                        None
+                    }
+                }
+            } else {
+                None
+            };
+        *self.cc.write().await = cc;
+    }
+
+    pub async fn get_exec_env(&self) -> LEnv {
+        let mut env: LEnv = get_root_env().await;
+        let log = LogClient::new("eval-ompas", LOG_TOPIC_OMPAS).await;
+        env.log = log;
+
+        if let Some(platform) = &self.platform {
+            if let Some(module) = platform.module().await {
+                //println!("import of platform module");
+                env.import_module(module, WithoutPrefix);
+            }
+        }
+
+        env.import_module(ModUtils::default(), WithoutPrefix);
+
+        env.import_module(ModAdvancedMath::default(), WithoutPrefix);
+
+        let mut ctx_io = ModIO::default();
+        ctx_io.set_log_output(LogOutput::Log(self.interface.log.clone()));
+
+        env.import_module(ctx_io, WithoutPrefix);
+
+        env.import_module(ModTime::new(2), WithoutPrefix);
+        env.import_module(ModExec::new(&self).await, WithoutPrefix);
+        eval_init(&mut env).await;
+
+        let domain_exec_symbols: LEnvSymbols = self.domain.read().await.get_exec_env();
+
+        env.set_new_top_symbols(domain_exec_symbols);
+
+        env
     }
 }
 
@@ -79,7 +161,7 @@ impl From<ModControl> for LModule {
             false,
         );
         module.add_async_fn(SET_SELECT, set_select, DOC_SET_SELECT, false);
-        module.add_async_fn(GET_SELECT, get_select, DOC_GET_SELECT, false);
+        module.add_async_fn(GET_DOMAIN, get_domain, DOC_GET_SELECT, false);
         module.add_async_fn(GET_STATE, get_state, DOC_GET_STATE, false);
         module.add_async_fn(
             GET_CONFIG_PLATFORM,
@@ -125,14 +207,12 @@ impl From<ModControl> for LModule {
 /// Launch main loop of rae in an other asynchronous task.
 #[async_scheme_fn]
 pub async fn start(env: &LEnv) -> &str {
-    let ctx = env.get_context::<ModMonitor>(MOD_CONTROL).unwrap();
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
     let mut tasks_to_execute: Vec<Job> = vec![];
     mem::swap(
         &mut *ctx.tasks_to_execute.write().await,
         &mut tasks_to_execute,
     );
-
-    let options = ctx.get_options().await.clone();
 
     let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
 
@@ -145,8 +225,8 @@ pub async fn start(env: &LEnv) -> &str {
         platform.start(Default::default()).await;
     }
 
-    let domain: RAEDomain = ctx.rae_domain.read().await.clone();
     let env = ctx.get_exec_env().await;
+    let log = ctx.interface.log.clone();
 
     let state = ctx.interface.state.clone();
     let receiver_event_update_state = state.subscribe_on_update().await;
@@ -157,7 +237,7 @@ pub async fn start(env: &LEnv) -> &str {
     });
 
     tokio::spawn(async move {
-        rae(domain, interface, env, rx, &options).await;
+        rae(log, env, rx).await;
     });
 
     /*if ctx.interface.log.display {
@@ -184,7 +264,7 @@ pub async fn stop(env: &LEnv) {
     let process: ProcessInterface =
         ProcessInterface::new(PROCESS_STOP_OMPAS, PROCESS_TOPIC_OMPAS, LOG_TOPIC_OMPAS).await;
 
-    let ctx = env.get_context::<ModMonitor>(MOD_CONTROL).unwrap();
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
 
     process.kill(PROCESS_TOPIC_OMPAS).await;
     drop(process);
@@ -205,7 +285,7 @@ pub async fn stop(env: &LEnv) {
 pub async fn trigger_task(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LRuntimeError> {
     let env = env.clone();
 
-    let ctx = env.get_context::<ModMonitor>(MOD_CONTROL).unwrap();
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
     let (tx, mut rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
     let job = Job::new(tx, args.into());
 
@@ -229,7 +309,7 @@ pub async fn trigger_task(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, L
 pub async fn add_task_to_execute(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
     let env = env.clone();
 
-    let ctx = env.get_context::<ModMonitor>(MOD_CONTROL)?;
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
     let (tx, _) = mpsc::channel(TOKIO_CHANNEL_SIZE);
     let job = Job::new(tx, args.into());
 
@@ -251,7 +331,7 @@ pub async fn add_task_to_execute(env: &LEnv, args: &[LValue]) -> Result<(), LRun
 
 #[async_scheme_fn]
 pub async fn set_config_platform(env: &LEnv, args: &[LValue]) -> LResult {
-    let ctx = env.get_context::<ModMonitor>(MOD_CONTROL)?;
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
     if args.is_empty() {
         return Err(LRuntimeError::wrong_number_of_args(
             SET_CONFIG_PLATFORM,
@@ -272,7 +352,7 @@ pub async fn set_config_platform(env: &LEnv, args: &[LValue]) -> LResult {
 
 #[async_scheme_fn]
 pub async fn get_config_platform(env: &LEnv) -> String {
-    let ctx = env.get_context::<ModMonitor>(MOD_CONTROL).unwrap();
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
 
     let string = String::new();
     match &ctx.platform {
@@ -284,14 +364,14 @@ pub async fn get_config_platform(env: &LEnv) -> String {
 
 #[async_scheme_fn]
 pub async fn get_select(env: &LEnv) -> String {
-    let ctx = env.get_context::<ModMonitor>(MOD_CONTROL).unwrap();
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
 
-    ctx.get_options().await.get_select_mode().to_string()
+    ctx.options.read().await.get_select_mode().to_string()
 }
 
 #[async_scheme_fn]
 pub async fn set_select(env: &LEnv, m: String) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<ModMonitor>(MOD_CONTROL).unwrap();
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
 
     let select_mode = match m.as_str() {
         GREEDY => SelectMode::Greedy,
@@ -313,14 +393,14 @@ pub async fn set_select(env: &LEnv, m: String) -> Result<(), LRuntimeError> {
         }
     };
 
-    ctx.set_select_mode(select_mode).await;
+    ctx.options.write().await.set_select_mode(select_mode);
     Ok(())
 }
 
 /// Returns the whole state if no args, or specific part of it ('static', 'dynamic', 'inner world')
 #[async_scheme_fn]
 pub async fn get_state(env: &LEnv, args: &[LValue]) -> LResult {
-    let ctx = env.get_context::<ModMonitor>(MOD_CONTROL)?;
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
     let _type = match args.len() {
         0 => None,
         1 => {
@@ -352,21 +432,21 @@ pub async fn get_state(env: &LEnv, args: &[LValue]) -> LResult {
 
 #[async_scheme_fn]
 pub async fn get_task_network(env: &LEnv) -> String {
-    let ctx = env.get_context::<ModMonitor>(MOD_CONTROL).unwrap();
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
 
     ctx.interface.agenda.format_task_network().await
 }
 
 #[async_scheme_fn]
 pub async fn get_type_hierarchy(env: &LEnv) -> String {
-    let ctx = env.get_context::<ModMonitor>(MOD_CONTROL).unwrap();
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
 
-    ctx.rae_domain.read().await.types.format_hierarchy()
+    ctx.domain.read().await.types.format_hierarchy()
 }
 
 #[async_scheme_fn]
 pub async fn get_agenda(env: &LEnv, args: &[LValue]) -> LResult {
-    let ctx = env.get_context::<ModMonitor>(MOD_CONTROL)?;
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
     let mut task_filter = TaskFilter::default();
 
     for arg in args {
@@ -425,28 +505,28 @@ pub async fn get_monitors(env: &LEnv) -> LResult {
 #[async_scheme_fn]
 pub async fn get_commands(env: &LEnv) -> LResult {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
-    Ok(ctx.rae_domain.read().await.get_list_commands())
+    Ok(ctx.domain.read().await.get_list_commands())
 }
 
 ///Get the list of tasks in the environment
 #[async_scheme_fn]
 pub async fn get_tasks(env: &LEnv) -> LResult {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
-    Ok(ctx.rae_domain.read().await.get_list_tasks())
+    Ok(ctx.domain.read().await.get_list_tasks())
 }
 
 ///Get the methods of a given task
 #[async_scheme_fn]
 pub async fn get_methods(env: &LEnv) -> LResult {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
-    Ok(ctx.rae_domain.read().await.get_list_methods())
+    Ok(ctx.domain.read().await.get_list_methods())
 }
 
 ///Get the list of state functions in the environment
 #[async_scheme_fn]
 pub async fn get_state_functions(env: &LEnv) -> LValue {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
-    ctx.rae_domain.read().await.get_list_state_functions()
+    ctx.domain.read().await.get_list_state_functions()
 }
 
 /// Returns the whole RAE environment if no arg et the entry corresponding to the symbol passed in args.
@@ -466,9 +546,9 @@ pub async fn get_domain(env: &LEnv, args: &[LValue]) -> LResult {
 
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
     match key {
-        None => Ok(ctx.rae_domain.read().await.to_string().into()),
+        None => Ok(ctx.domain.read().await.to_string().into()),
         Some(key) => Ok(ctx
-            .rae_domain
+            .domain
             .read()
             .await
             .get_element_description(key.as_ref())

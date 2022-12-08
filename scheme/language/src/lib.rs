@@ -562,7 +562,7 @@ and then it returns the remainder of the list beginning with the first argument.
 }
 
 pub mod set {
-    pub const MOD_SET: &str = "set";
+    pub const MOD_SET: &str = "mod-set";
     pub const DOC_MOD_SET: &str = "Collection of functions to manipulates sets (list or map)";
 
     pub const SET: &str = "set";
@@ -581,7 +581,7 @@ pub mod set {
 /// Set of keywords and documentation for basic mathematical functions.
 pub mod basic_math {
     //Mathematical functions
-    pub const MOD_BASIC_MATH: &str = "basic-math";
+    pub const MOD_BASIC_MATH: &str = "basic_math";
     pub const DOC_MOD_BASIC_MATH: &str = "Collection of basic mathematical and logic functions.";
 
     pub const NOT: &str = "not";
@@ -758,7 +758,7 @@ pub mod predicate {
 /// Collection of functions using time: sleep, time, my-time etc.
 pub mod time {
     /// Label of the context used the env to manage time
-    pub const MOD_TIME: &str = "time";
+    pub const MOD_TIME: &str = "mod_time";
     pub const DOC_MOD_TIME: &str =
         "Context used to reason on time. Contains functions as sleep, time, my-time, etc.";
 
@@ -787,7 +787,7 @@ pub mod sort {
 }
 
 pub mod eval_static {
-    pub const MOD_EVAL_STATIC: &str = "eval_static";
+    pub const MOD_EVAL_STATIC: &str = "mod_eval_static";
     pub const DOC_MOD_EVAL_STATIC: &str =
         "Collection of functions evaluating statically expressions";
 
@@ -805,7 +805,7 @@ pub mod string {
 }
 
 pub mod advanced_math {
-    pub const MOD_ADVANCED_MATH: &str = "math";
+    pub const MOD_ADVANCED_MATH: &str = "advanced_math";
     pub const DOC_MOD_ADVANCED_MATH: &str =
         "Module handling mathematical functions for basic arithmetic operations and comparisons.";
 

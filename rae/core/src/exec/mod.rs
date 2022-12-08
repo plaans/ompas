@@ -4,23 +4,20 @@ use crate::exec::refinement::*;
 use crate::exec::resource::ModResource;
 use crate::exec::state::ModState;
 use crate::exec::task::ModTask;
-use crate::monitor::ModMonitor;
+use crate::monitor::control::ModControl;
 use ::macro_rules_attribute::macro_rules_attribute;
 use futures::FutureExt;
 use ompas_middleware::logger::LogClient;
 use ompas_rae_interface::platform::Platform;
 use ompas_rae_language::exec::mode::DOC_CTX_MODE;
-use ompas_rae_language::exec::{ARBITRARY, DOC_MOD_EXEC, MOD_EXEC};
+use ompas_rae_language::exec::{ARBITRARY, DOC_ARBITRARY, DOC_MOD_EXEC, MOD_EXEC};
 use ompas_rae_language::process::LOG_TOPIC_OMPAS;
-use ompas_rae_planning::aries::conversion::convert_domain_to_chronicle_hierarchy;
-use ompas_rae_planning::aries::structs::{ConversionCollection, ConversionContext};
+use ompas_rae_planning::aries::structs::ConversionCollection;
 use ompas_rae_structs::agenda::Agenda;
 use ompas_rae_structs::domain::RAEDomain;
 use ompas_rae_structs::monitor::MonitorCollection;
 use ompas_rae_structs::rae_options::OMPASOptions;
 use ompas_rae_structs::resource::ResourceCollection;
-use ompas_rae_structs::select_mode::Planner;
-use ompas_rae_structs::select_mode::SelectMode;
 use ompas_rae_structs::state::world_state::WorldState;
 use sompas_core::eval;
 use sompas_core::modules::list::car;
@@ -36,7 +33,6 @@ use sompas_structs::lswitch::new_interruption_handler;
 use sompas_structs::lvalue::LValue;
 use std::string::String;
 use std::sync::Arc;
-use std::time::Instant;
 use tokio::sync::RwLock;
 
 pub mod mode;
@@ -64,61 +60,22 @@ pub struct ModExec {
     resources: ResourceCollection,
     platform: Option<Platform>,
     log: LogClient,
-    cc: Option<Arc<RwLock<ConversionCollection>>>,
+    cc: Arc<RwLock<Option<ConversionCollection>>>,
 }
 
 impl ModExec {
-    pub async fn new(monitor: &ModMonitor) -> Self {
-        let mut module = Self {
+    pub async fn new(monitor: &ModControl) -> Self {
+        Self {
             options: monitor.options.clone(),
             agenda: monitor.interface.agenda.clone(),
             state: monitor.interface.state.clone(),
-            domain: monitor.rae_domain.clone(),
+            domain: monitor.domain.clone(),
             monitors: monitor.interface.monitors.clone(),
             resources: monitor.interface.resources.clone(),
             platform: monitor.platform.clone(),
             log: LogClient::new("exec-ompas", LOG_TOPIC_OMPAS).await,
-            cc: None,
-        };
-
-        let select_mode = *monitor.options.read().await.get_select_mode();
-
-        let cc: Option<ConversionCollection> =
-            if matches!(select_mode, SelectMode::Planning(Planner::Aries(_))) {
-                let instant = Instant::now();
-                match convert_domain_to_chronicle_hierarchy(ConversionContext {
-                    domain: monitor.rae_domain.read().await.clone(),
-                    env: monitor.empty_env.clone(),
-                    state: monitor.interface.state.get_snapshot().await,
-                }) {
-                    Ok(r) => {
-                        module
-                            .log
-                            .info(format!(
-                                "Conversion time: {:.3} ms",
-                                instant.elapsed().as_micros() as f64 / 1000.0
-                            ))
-                            .await;
-                        Some(r)
-                    }
-                    Err(e) => {
-                        monitor
-                            .options
-                            .write()
-                            .await
-                            .set_select_mode(SelectMode::Greedy);
-                        module
-                            .log
-                            .warn(format!("Cannot plan with the domain...{e}"))
-                            .await;
-                        None
-                    }
-                }
-            } else {
-                None
-            };
-        module.cc = cc.map(|cc| Arc::new(RwLock::new(cc)));
-        module
+            cc: monitor.cc.clone(),
+        }
     }
 }
 
@@ -136,6 +93,7 @@ impl From<ModExec> for LModule {
         module.add_submodule(mod_state);
         module.add_submodule(ModTask::default());
         module.add_submodule(mod_refinement);
+        module.add_async_fn(ARBITRARY, arbitrary, DOC_ARBITRARY, false);
         module
     }
 }

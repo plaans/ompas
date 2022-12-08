@@ -29,15 +29,6 @@ impl InitScheme {
     pub fn inner(&self) -> Vec<&str> {
         self.0.iter().map(|x| x.as_str()).collect()
     }
-
-    /*pub fn begin_lisp(&self) -> String {
-        let mut str = String::new(); //"(begin ".to_string();
-        self.0.iter().for_each(|x| {
-            str.push_str(x.as_str());
-            str.push('\n');
-        });
-        str
-    }*/
 }
 
 /// Struct to define a Module, Library that will be loaded inside the Scheme Environment.
@@ -57,7 +48,7 @@ impl LModule {
         let mut doc = doc.into();
         doc.verbose = Some(match doc.verbose {
             Some(verbose) => format!("{}\nElement(s) of the module:\n", verbose),
-            None => "Element(s) of the module\n".to_string(),
+            None => "Element(s) of the module:\n".to_string(),
         });
         let mut module = Self {
             ctx: Context::new(ctx, label.to_string()),
@@ -72,6 +63,10 @@ impl LModule {
 
         module.documentation.insert(label, doc);
         module
+    }
+
+    pub fn add_prelude(&mut self, mut prelude: InitScheme) {
+        self.prelude.append(&mut prelude)
     }
 
     pub fn add_doc(&mut self, label: impl Display, doc: impl Into<Doc>, kind: &'static str) {

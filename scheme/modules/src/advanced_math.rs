@@ -11,10 +11,10 @@ use sompas_structs::lnumber::LNumber;
 /// -Trigonometry: "sin", "cos".
 /// -Constants: "pi".
 #[derive(Default, Debug)]
-pub struct ModMath {}
+pub struct ModAdvancedMath {}
 
-impl From<ModMath> for LModule {
-    fn from(m: ModMath) -> Self {
+impl From<ModAdvancedMath> for LModule {
+    fn from(m: ModAdvancedMath) -> Self {
         let mut module = LModule::new(m, MOD_ADVANCED_MATH, DOC_MOD_ADVANCED_MATH);
 
         module.add_fn(SIN, sin, DOC_SIN, true);

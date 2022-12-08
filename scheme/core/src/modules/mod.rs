@@ -20,12 +20,12 @@ use sompas_macros::scheme_fn;
 use sompas_structs::lmodule::LModule;
 
 #[derive(Default)]
-pub struct ModRoot {}
+pub struct ModStd {}
 
-impl From<ModRoot> for LModule {
+impl From<ModStd> for LModule {
     /// Returns all basic functions, macros, and lambdas
     ///
-    fn from(m: ModRoot) -> LModule {
+    fn from(m: ModStd) -> LModule {
         let mut module = LModule::new(m, MOD_STD, DOC_MOD_STD);
         module.add_submodule(ModBasicMath::default());
         module.add_submodule(ModError::default());

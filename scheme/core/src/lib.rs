@@ -1,6 +1,6 @@
 extern crate core;
 
-use crate::modules::ModRoot;
+use crate::modules::ModStd;
 use crate::structs::{
     BeginFrame, CoreOperatorFrame, DefineFrame, DoFrame, EvalStack, IfFrame, Interruptibility,
     LDebug, ProcedureFrame, Results, ScopeCollection, StackFrame, StackKind, Unstack,
@@ -49,7 +49,7 @@ pub async fn get_root_env() -> LEnv {
     // let map = im::hashmap::HashMap::new();
     // map.ins
     let mut env = LEnv::default();
-    env.import_module(ModRoot::default(), ImportType::WithoutPrefix);
+    env.import_module(ModStd::default(), ImportType::WithoutPrefix);
     eval_init(&mut env).await;
     env
 }

@@ -1,13 +1,11 @@
 use crate::error::RaeExecError;
 use futures::FutureExt;
+use ompas_middleware::logger::LogClient;
 use ompas_middleware::LogLevel;
 use ompas_middleware::ProcessInterface;
 use ompas_rae_language::process::{LOG_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS};
-use ompas_rae_structs::domain::RAEDomain;
-use ompas_rae_structs::internal_state::OMPASInternalState;
 use ompas_rae_structs::rae_command::RAECommand;
-use ompas_rae_structs::rae_options::OMPASOptions;
-use sompas_core::{eval, eval_init};
+use sompas_core::eval;
 use sompas_structs::lasynchandler::LAsyncHandle;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lfuture::FutureResult;
@@ -30,18 +28,14 @@ pub const PROCESS_MAIN_RAE: &str = "__PROCESS_MAIN_RAE__";
 /// Main RAE Loop:
 /// Receives Job to handle in separate tasks.
 pub async fn rae(
-    domain: RAEDomain,
-    interface: OMPASInternalState,
-    mut env: LEnv,
+    //domain: RAEDomain,
+    //interface: OMPASInternalState,
+    log: LogClient,
+    env: LEnv,
     mut command_rx: Receiver<RAECommand>,
-    options: &OMPASOptions,
 ) {
     let mut process =
         ProcessInterface::new(PROCESS_MAIN_RAE, PROCESS_TOPIC_OMPAS, LOG_TOPIC_OMPAS).await;
-
-    let log = interface.log.clone();
-
-    eval_init(&mut env).await;
 
     let mut killers = vec![];
 

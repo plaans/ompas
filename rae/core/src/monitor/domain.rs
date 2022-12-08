@@ -1,7 +1,6 @@
 use crate::monitor::ModMonitor;
 use ompas_rae_language::exec::state::INSTANCE;
 use ompas_rae_language::monitor::domain::*;
-use ompas_rae_language::monitor::MOD_MONITOR;
 use ompas_rae_structs::domain::command::Command;
 use ompas_rae_structs::domain::method::Method;
 use ompas_rae_structs::domain::parameters::Parameters;
@@ -17,7 +16,7 @@ use sompas_language::predicate::*;
 use sompas_macros::*;
 use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lenv::LEnv;
-use sompas_structs::lmodule::LModule;
+use sompas_structs::lmodule::{InitScheme, LModule};
 use sompas_structs::lprimitives::LPrimitives;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
@@ -29,7 +28,8 @@ use tokio::sync::RwLock;
 pub struct ModDomain {
     state: WorldState,
     empty_env: LEnv,
-    rae_domain: Arc<RwLock<RAEDomain>>,
+    domain_description: InitScheme,
+    domain: Arc<RwLock<RAEDomain>>,
 }
 
 impl ModDomain {
@@ -37,7 +37,8 @@ impl ModDomain {
         Self {
             state: monitor.interface.state.clone(),
             empty_env: monitor.empty_env.clone(),
-            rae_domain: monitor.rae_domain.clone(),
+            domain_description: monitor.platform_domain.clone(),
+            domain: monitor.domain.clone(),
         }
     }
 
@@ -48,6 +49,7 @@ impl ModDomain {
 
 impl From<ModDomain> for LModule {
     fn from(m: ModDomain) -> Self {
+        let prelude = m.domain_description.clone();
         let mut module = LModule::new(m, MOD_DOMAIN, DOC_MOD_DOMAIN);
         module.add_async_fn(
             GENERATE_TEST_TYPE_EXPR,
@@ -121,6 +123,7 @@ impl From<ModDomain> for LModule {
             MACRO_DEF_OBJECTS,
             (DOC_DEF_OBJECTS, DOC_DEF_OBJECTS_VERBOSE),
         );
+        module.add_prelude(prelude);
         module
     }
 }
@@ -221,7 +224,7 @@ pub async fn add_state_function(
     );
     let body = eval(&parse(&expr, &mut new_env).await?, &mut new_env, None).await?;
     let state_function = StateFunction::new(label.to_string(), params, result, body);
-    ctx.rae_domain
+    ctx.domain
         .write()
         .await
         .add_state_function(label.to_string(), state_function)?;
@@ -347,7 +350,7 @@ pub async fn add_command(
     let cost = eval(&expand(&lv_cost, true, &mut env).await?, &mut env, None).await?;
     command.set_cost(cost);
 
-    ctx.rae_domain
+    ctx.domain
         .write()
         .await
         .add_command(command.get_label().to_string(), command)?;
@@ -364,10 +367,7 @@ pub async fn add_command_model(
     let mut env = ctx.get_empty_env();
     let label: String = model.get(&NAME.into()).unwrap().try_into()?;
     let model = create_model(&mut env, model).await?;
-    ctx.rae_domain
-        .write()
-        .await
-        .add_command_model(label, model)?;
+    ctx.domain.write().await.add_command_model(label, model)?;
     Ok(())
 }
 #[async_scheme_fn]
@@ -417,7 +417,7 @@ pub async fn add_task(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<()
     };
     let model = eval(&expand(&lv_model, true, &mut env).await?, &mut env, None).await?;
     task.set_model(model);
-    ctx.rae_domain
+    ctx.domain
         .write()
         .await
         .add_task(task.get_label().to_string(), task)?;
@@ -434,7 +434,7 @@ pub async fn add_task_model(
     let mut env = ctx.get_empty_env();
     let label: String = model.get(&NAME.into()).unwrap().try_into()?;
     let model = create_model(&mut env, model).await?;
-    ctx.rae_domain.write().await.add_task_model(label, model)?;
+    ctx.domain.write().await.add_task_model(label, model)?;
     Ok(())
 }
 
@@ -448,7 +448,7 @@ pub async fn add_method(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<
             1..usize::MAX,
         ));
     }
-    let ctx = env.get_context::<ModDomain>(MOD_MONITOR)?;
+    let ctx = env.get_context::<ModDomain>(MOD_DOMAIN)?;
     let mut new_env = ctx.get_empty_env();
     let parameters = map.get(&PARAMETERS.into()).unwrap_or(&LValue::Nil).clone();
     let task_label = car(
@@ -545,7 +545,7 @@ pub async fn add_method(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<
 
     method.lambda_body = eval(&parse(&expr, &mut new_env).await?, &mut new_env, None).await?;
 
-    ctx.rae_domain
+    ctx.domain
         .write()
         .await
         .add_method(method.label.clone(), method)?;
@@ -579,7 +579,7 @@ pub async fn add_lambda(env: &LEnv, label: String, lambda: &LValue) -> Result<()
     let mut e = get_root_env().await;
     let result = eval(&expanded, &mut e, None).await?;
     if let LValue::Lambda(_) = &result {
-        ctx.rae_domain.write().await.add_lambda(label, result);
+        ctx.domain.write().await.add_lambda(label, result);
     }
     Ok(())
 }
@@ -691,7 +691,7 @@ mod test {
     use super::*;
     use sompas_core::test_utils::{test_expression_with_env, TestExpression};
     use sompas_core::{eval_init, get_root_env};
-    use sompas_modules::advanced_math::ModMath;
+    use sompas_modules::advanced_math::ModAdvancedMath;
     use sompas_modules::io::ModIO;
     use sompas_modules::utils::ModUtils;
     use sompas_structs::lenv::ImportType::WithoutPrefix;
@@ -702,7 +702,7 @@ mod test {
 
         env.import_module(ModUtils::default(), WithoutPrefix);
 
-        env.import_module(ModMath::default(), WithoutPrefix);
+        env.import_module(ModAdvancedMath::default(), WithoutPrefix);
 
         let mut ctx = ModDomain::default();
         ctx.empty_env = ModDomain::init_empty_env().await;

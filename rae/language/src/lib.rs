@@ -632,6 +632,7 @@ pub mod monitor {
     }
 
     pub mod control {
+
         pub const MOD_CONTROL: &str = "control";
         pub const DOC_MOD_CONTROL: &str =
             "Collection of functions to control the execution of the system.";
@@ -642,9 +643,21 @@ pub mod monitor {
         pub const STOP: &str = "stop";
         pub const DOC_STOP: &str = "Stop the acting system.";
 
+        pub const __DEBUG_OMPAS__: &str = "__debug_ompas__";
+        pub const DOC___DEBUG_OMPAS___: &str= "Send an expression that will be executed in the execution environment and return its result.";
+
         pub const TRIGGER_TASK: &str = "trigger-task";
         pub const DOC_TRIGGER_TASK: &str = "Sends to the system a new task to address.";
         pub const DOC_TRIGGER_TASK_VERBOSE: &str = "Example: (trigger-task t_dumber robot0)";
+
+        pub const TRIGGER_METHOD: &str = "trigger-method";
+        pub const DOC_TRIGGER_METHOD: &str = "Sends to the system a method to execute.";
+        pub const DOC_TRIGGER_METHOD_VERBOSE: &str = "Example: (trigger-method m_dumber robot0)";
+
+        pub const TRIGGER_COMMAND: &str = "trigger-command";
+        pub const DOC_TRIGGER_COMMAND: &str = "Sends to the system a command to execute.";
+        pub const DOC_TRIGGER_COMMAND_VERBOSE: &str =
+            "Example: (trigger-command move robot0 bedroom)";
 
         pub const ADD_TASK_TO_EXECUTE: &str = "add-task-to-execute";
         pub const DOC_ADD_TASK_TO_EXECUTE: &str =
@@ -714,6 +727,11 @@ pub mod monitor {
 
         pub const EXPORT_STATS: &str = "export-stats";
         pub const DOC_EXPORT_STATS: &str = "Export the statistics in csv format in a given file.";
+
+        pub const DEBUG_OMPAS: &str = "debug_ompas";
+        pub const DOC_DEBUG_OMPAS: &str = "Wrapper around __debug_ompas__";
+        pub const MACRO_DEBUG_OMPAS: &str = "(lambda (arg)
+    `(__debug_ompas__ ',arg)))";
 
         //pub const RAE_TRIGGER_EVENT: &str = "trigger-event";
     }

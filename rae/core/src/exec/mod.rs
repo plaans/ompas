@@ -69,7 +69,7 @@ impl ModExec {
             options: monitor.options.clone(),
             agenda: monitor.agenda.clone(),
             state: monitor.state.clone(),
-            domain: monitor.domain.clone(),
+            domain: monitor.ompas_domain.clone(),
             monitors: monitor.monitors.clone(),
             resources: monitor.resources.clone(),
             platform: monitor.platform.clone(),

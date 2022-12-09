@@ -50,7 +50,7 @@ pub struct ModControl {
     pub log: LogClient,
     pub task_stream: Arc<RwLock<Option<tokio::sync::mpsc::Sender<OMPASJob>>>>,
     pub(crate) platform: Platform,
-    pub(crate) domain: Arc<RwLock<OMPASDomain>>,
+    pub(crate) ompas_domain: Arc<RwLock<OMPASDomain>>,
     pub(crate) tasks_to_execute: Arc<RwLock<Vec<Job>>>,
     pub(crate) cc: Arc<RwLock<Option<ConversionCollection>>>,
 }
@@ -66,7 +66,7 @@ impl ModControl {
             log: monitor.log.clone(),
             task_stream: monitor.task_stream.clone(),
             platform: monitor.platform.clone(),
-            domain: monitor.ompas_domain.clone(),
+            ompas_domain: monitor.ompas_domain.clone(),
             tasks_to_execute: monitor.tasks_to_execute.clone(),
             cc: Arc::new(Default::default()),
         }
@@ -79,7 +79,7 @@ impl ModControl {
             if matches!(select_mode, SelectMode::Planning(Planner::Aries(_))) {
                 let instant = Instant::now();
                 match convert_domain_to_chronicle_hierarchy(ConversionContext {
-                    domain: self.domain.read().await.clone(),
+                    domain: self.ompas_domain.read().await.clone(),
                     env: self.get_exec_env().await,
                     state: self.state.get_snapshot().await,
                 }) {
@@ -132,7 +132,7 @@ impl ModControl {
         env.import_module(ModExec::new(self).await, WithoutPrefix);
         eval_init(&mut env).await;
 
-        let domain_exec_symbols: LEnvSymbols = self.domain.read().await.get_exec_env();
+        let domain_exec_symbols: LEnvSymbols = self.ompas_domain.read().await.get_exec_env();
 
         env.set_new_top_symbols(domain_exec_symbols);
 
@@ -150,9 +150,27 @@ impl From<ModControl> for LModule {
         module.add_async_fn(START, start, DOC_START, false);
         module.add_async_fn(STOP, stop, DOC_STOP, false);
         module.add_async_fn(
+            __DEBUG_OMPAS__,
+            __debug_ompas__,
+            DOC___DEBUG_OMPAS___,
+            false,
+        );
+        module.add_async_fn(
             TRIGGER_TASK,
             trigger_task,
             (DOC_TRIGGER_TASK, DOC_TRIGGER_TASK_VERBOSE),
+            false,
+        );
+        module.add_async_fn(
+            TRIGGER_METHOD,
+            trigger_method,
+            (DOC_TRIGGER_METHOD, DOC_TRIGGER_METHOD_VERBOSE),
+            false,
+        );
+        module.add_async_fn(
+            TRIGGER_COMMAND,
+            trigger_command,
+            (DOC_TRIGGER_COMMAND, DOC_TRIGGER_COMMAND_VERBOSE),
             false,
         );
         module.add_async_fn(
@@ -213,6 +231,8 @@ impl From<ModControl> for LModule {
         );
         module.add_async_fn(GET_STATS, get_stats, DOC_GET_STATS, false);
         module.add_async_fn(EXPORT_STATS, export_stats, DOC_EXPORT_STATS, false);
+        module.add_macro(DEBUG_OMPAS, MACRO_DEBUG_OMPAS, DOC_DEBUG_OMPAS);
+
         module
     }
 }
@@ -287,12 +307,46 @@ pub async fn stop(env: &LEnv) {
 
 /// Sends via a channel a task to execute.
 #[async_scheme_fn]
+pub async fn __debug_ompas__(env: &LEnv, arg: LValue) -> LResult {
+    let env = env.clone();
+
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
+    let (tx, mut rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+    let job = Job::new_debug(tx, arg);
+
+    match ctx.get_sender().await {
+        None => Err(LRuntimeError::new(__DEBUG_OMPAS__, "no sender to rae")),
+        Some(sender) => {
+            tokio::spawn(async move {
+                sender
+                    .send(job.into())
+                    .await
+                    .expect("could not send job to rae");
+            });
+
+            let handle: LAsyncHandle = rx.recv().await.unwrap()?;
+            handle.get_future().await
+            //Ok(rx.recv().await.unwrap())
+        }
+    }
+}
+
+/// Sends via a channel a task to execute.
+#[async_scheme_fn]
 pub async fn trigger_task(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LRuntimeError> {
     let env = env.clone();
 
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
     let (tx, mut rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
-    let job = Job::new(tx, args.into());
+    let task = args[0].to_string();
+    if !ctx.ompas_domain.read().await.is_task(&task) {
+        return Err(LRuntimeError::new(
+            TRIGGER_TASK,
+            format!("{} is not a task.", task),
+        ));
+    }
+
+    let job = Job::new_task(tx, args.into());
 
     match ctx.get_sender().await {
         None => Err(LRuntimeError::new(TRIGGER_TASK, "no sender to rae")),
@@ -304,7 +358,69 @@ pub async fn trigger_task(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, L
                     .expect("could not send job to rae");
             });
 
-            Ok(rx.recv().await.unwrap())
+            rx.recv().await.unwrap()
+        }
+    }
+}
+
+/// Sends via a channel a task to execute.
+#[async_scheme_fn]
+pub async fn trigger_method(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LRuntimeError> {
+    let env = env.clone();
+
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
+    let (tx, mut rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+    let method = args[0].to_string();
+    if !ctx.ompas_domain.read().await.is_method(&method) {
+        return Err(LRuntimeError::new(
+            TRIGGER_METHOD,
+            format!("{} is not a method.", method),
+        ));
+    }
+    let job = Job::new_method(tx, args.into());
+
+    match ctx.get_sender().await {
+        None => Err(LRuntimeError::new(TRIGGER_METHOD, "no sender to rae")),
+        Some(sender) => {
+            tokio::spawn(async move {
+                sender
+                    .send(job.into())
+                    .await
+                    .expect("could not send job to rae");
+            });
+
+            rx.recv().await.unwrap()
+        }
+    }
+}
+
+/// Sends via a channel a task to execute.
+#[async_scheme_fn]
+pub async fn trigger_command(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LRuntimeError> {
+    let env = env.clone();
+
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
+    let (tx, mut rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+    let command = args[0].to_string();
+    if !ctx.ompas_domain.read().await.is_command(&command) {
+        return Err(LRuntimeError::new(
+            TRIGGER_COMMAND,
+            format!("{} is not a command.", command),
+        ));
+    }
+    let job = Job::new_command(tx, args.into());
+
+    match ctx.get_sender().await {
+        None => Err(LRuntimeError::new(TRIGGER_COMMAND, "no sender to rae")),
+        Some(sender) => {
+            tokio::spawn(async move {
+                sender
+                    .send(job.into())
+                    .await
+                    .expect("could not send job to rae");
+            });
+
+            rx.recv().await.unwrap()
         }
     }
 }
@@ -316,7 +432,16 @@ pub async fn add_task_to_execute(env: &LEnv, args: &[LValue]) -> Result<(), LRun
 
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
     let (tx, _) = mpsc::channel(TOKIO_CHANNEL_SIZE);
-    let job = Job::new(tx, args.into());
+    let task = args[0].to_string();
+
+    if !ctx.ompas_domain.read().await.is_task(&task) {
+        return Err(LRuntimeError::new(
+            ADD_TASK_TO_EXECUTE,
+            format!("{} is not a task.", task),
+        ));
+    }
+
+    let job = Job::new_task(tx, args.into());
 
     match ctx.get_sender().await {
         None => {
@@ -454,7 +579,7 @@ pub async fn get_task_network(env: &LEnv) -> String {
 pub async fn get_type_hierarchy(env: &LEnv) -> String {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
 
-    ctx.domain.read().await.types.format_hierarchy()
+    ctx.ompas_domain.read().await.types.format_hierarchy()
 }
 
 #[async_scheme_fn]
@@ -514,28 +639,28 @@ pub async fn get_monitors(env: &LEnv) -> LResult {
 #[async_scheme_fn]
 pub async fn get_commands(env: &LEnv) -> LResult {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
-    Ok(ctx.domain.read().await.get_list_commands())
+    Ok(ctx.ompas_domain.read().await.get_list_commands())
 }
 
 ///Get the list of tasks in the environment
 #[async_scheme_fn]
 pub async fn get_tasks(env: &LEnv) -> LResult {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
-    Ok(ctx.domain.read().await.get_list_tasks())
+    Ok(ctx.ompas_domain.read().await.get_list_tasks())
 }
 
 ///Get the methods of a given task
 #[async_scheme_fn]
 pub async fn get_methods(env: &LEnv) -> LResult {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
-    Ok(ctx.domain.read().await.get_list_methods())
+    Ok(ctx.ompas_domain.read().await.get_list_methods())
 }
 
 ///Get the list of state functions in the environment
 #[async_scheme_fn]
 pub async fn get_state_functions(env: &LEnv) -> LValue {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
-    ctx.domain.read().await.get_list_state_functions()
+    ctx.ompas_domain.read().await.get_list_state_functions()
 }
 
 /// Returns the whole RAE environment if no arg et the entry corresponding to the symbol passed in args.
@@ -555,9 +680,9 @@ pub async fn get_domain(env: &LEnv, args: &[LValue]) -> LResult {
 
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
     match key {
-        None => Ok(ctx.domain.read().await.to_string().into()),
+        None => Ok(ctx.ompas_domain.read().await.to_string().into()),
         Some(key) => Ok(ctx
-            .domain
+            .ompas_domain
             .read()
             .await
             .get_element_description(key.as_ref())

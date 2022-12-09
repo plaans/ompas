@@ -15,3 +15,6 @@
             (let ((label (car args))
                   (args (cdr args)))
             `(add-command-model (union-map (map '((:name ,label))) ,(cons om-model args))))))
+
+(defmacro debug_ompas (lambda (arg)
+    `(__debug_ompas__ ',arg)))

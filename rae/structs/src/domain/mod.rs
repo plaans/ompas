@@ -46,6 +46,18 @@ impl OMPASDomain {
         }
     }
 
+    pub fn is_task(&self, label: &str) -> bool {
+        self.tasks.contains_key(label)
+    }
+
+    pub fn is_method(&self, label: &str) -> bool {
+        self.methods.contains_key(label)
+    }
+
+    pub fn is_command(&self, label: &str) -> bool {
+        self.commands.contains_key(label)
+    }
+
     //Getters
     pub fn get_tasks(&self) -> &HashMap<String, Task> {
         &self.tasks

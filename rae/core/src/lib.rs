@@ -4,8 +4,9 @@ use ompas_middleware::logger::LogClient;
 use ompas_middleware::LogLevel;
 use ompas_middleware::ProcessInterface;
 use ompas_rae_language::process::{LOG_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS};
+use ompas_rae_structs::job::JobExpr;
 use ompas_rae_structs::rae_command::OMPASJob;
-use sompas_core::eval;
+use sompas_core::{eval, parse};
 use sompas_structs::lasynchandler::LAsyncHandle;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lfuture::FutureResult;
@@ -49,8 +50,32 @@ pub async fn rae(
 
                         let mut new_env = env.clone();
 
-                        let job_lvalue = job.core;
-                        log.info(format!("new triggered task: {}", job_lvalue)).await;
+                        let job_lvalue = match parse(match &job.r#type {
+                            JobExpr::Task(t) => {
+                                log.info(format!("new triggered method: {}", t)).await;
+                                t
+                            },
+                            JobExpr::Method(m) => {
+                                //log.info(format!("new triggered method: {}", job)).await;
+                                m
+                            },
+                            JobExpr::Command(c) => {
+                                //log.info(format!("new triggered command: {}", job)).await;
+                                c
+                            },
+                            JobExpr::Debug(d) => {
+                                //log.info(format!("new triggered debug: {}", job)).await;
+                                d
+                            },
+                        }, &mut new_env).await {
+                            Ok(l) => l,
+                            Err(e) => {
+                                job
+                            .sender.try_send(Err(e));
+                                continue;
+                                }
+                        };
+
                         //info!("LValue to be evaluated: {}", job_lvalue);
 
                         let (tx, rx) = new_interruption_handler();
@@ -88,7 +113,7 @@ pub async fn rae(
 
 
                         match job.sender
-                            .try_send(LAsyncHandle::new(future, tx)) {
+                            .try_send(Ok(LAsyncHandle::new(future, tx))) {
                             Ok(_) =>{}
                             Err(e) => {
                                 log.error(e.to_string()).await;

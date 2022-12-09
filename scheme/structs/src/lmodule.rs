@@ -70,7 +70,9 @@ impl LModule {
     }
 
     pub fn add_doc(&mut self, label: impl Display, doc: impl Into<Doc>, kind: &'static str) {
-        self.documentation.insert(label.to_string(), doc.into());
+        let mut doc = doc.into();
+        doc.short = format!("[{}] {}", kind, doc.short);
+        self.documentation.insert(label.to_string(), doc);
         self.documentation
             .get_mut(&self.label)
             .unwrap()

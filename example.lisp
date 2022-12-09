@@ -18,3 +18,14 @@
 
 (defmacro debug_ompas (lambda (arg)
     `(__debug_ompas__ ',arg)))
+
+(lambda args
+    (begin
+        (define __l__ (lambda (l)
+        (if (null? l)
+        nil
+            (cons
+                (cons (caar l) (list (cdar l)))
+                (__l__ (cdr l))))))
+        `(map
+            (quote ,(append (list '(:model-type pddl)) (__l__ args))))))

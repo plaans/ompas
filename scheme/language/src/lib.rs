@@ -250,7 +250,7 @@ pub mod utils {
 
     //MACROS
     pub const AND: &str = "and";
-    pub const DOC_AND: &str = "[Macro] Return true if all expressions are true.";
+    pub const DOC_AND: &str = "Return true if all expressions are true.";
     pub const MACRO_AND: &str = "(lambda args
                                     (if (null? args)
                                         nil
@@ -261,7 +261,7 @@ pub mod utils {
                                                  nil))))";
 
     pub const OR: &str = "or";
-    pub const DOC_OR: &str = "[Macro] Return true if at least one of the expression is true.";
+    pub const DOC_OR: &str = "Return true if at least one of the expression is true.";
     pub const MACRO_OR: &str = "(lambda args
                                     (if (null? args)
                                         nil
@@ -272,57 +272,57 @@ pub mod utils {
                                                   ,(cons 'or (cdr args))))))";
 
     pub const CAAR: &str = "caar";
-    pub const DOC_CAAR: &str = "[Macro] Combine two car.";
+    pub const DOC_CAAR: &str = "Combine two car.";
     pub const MACRO_CAAR: &str = "(lambda (x) `(car (car ,x)))";
 
     pub const CADR: &str = "cadr";
-    pub const DOC_CADR: &str = "[Macro] Combine car and cdr.";
+    pub const DOC_CADR: &str = "Combine car and cdr.";
     pub const MACRO_CADR: &str = "(lambda (x) `(car (cdr ,x)))";
 
     pub const CDAR: &str = "cdar";
-    pub const DOC_CDAR: &str = "[Macro] Combine cdr and car.";
+    pub const DOC_CDAR: &str = "Combine cdr and car.";
     pub const MACRO_CDAR: &str = "(lambda (x) `(cdr (car ,x)))";
 
     pub const CDDR: &str = "cddr";
-    pub const DOC_CDDR: &str = "[Macro] Combine cdr and cdr.";
+    pub const DOC_CDDR: &str = "Combine cdr and cdr.";
     pub const MACRO_CDDR: &str = "(lambda (x) `(cdr (cdr ,x)))";
 
     pub const CAADR: &str = "caadr";
-    pub const DOC_CAADR: &str = "[Macro] Combine car,car and cdr.";
+    pub const DOC_CAADR: &str = "Combine car,car and cdr.";
     pub const MACRO_CAADR: &str = "(lambda (x) `(car (car (cdr ,x))))";
 
     pub const CADDR: &str = "caddr";
-    pub const DOC_CADDR: &str = "[Macro] Combine car, cdr and cdr.";
+    pub const DOC_CADDR: &str = "Combine car, cdr and cdr.";
     pub const MACRO_CADDR: &str = "(lambda (x) `(car (cdr (cdr ,x))))";
 
     pub const CADAR: &str = "cadar";
-    pub const DOC_CADAR: &str = "[Macro] Combine car, cdr and car";
+    pub const DOC_CADAR: &str = "Combine car, cdr and car";
     pub const MACRO_CADAR: &str = "(lambda (x) `(car (cdr (car ,x))))";
 
     pub const CDADR: &str = "cdadr";
-    pub const DOC_CDADR: &str = "[Macro] Combine cdr, car and cdr";
+    pub const DOC_CDADR: &str = "Combine cdr, car and cdr";
     pub const MACRO_CDADR: &str = "(lambda (x) `(cdr (car (cdr ,x))))";
 
     pub const CADADR: &str = "cadadr";
-    pub const DOC_CADADR: &str = "[Macro] Combine car, cdr, car and cdr";
+    pub const DOC_CADADR: &str = "Combine car, cdr, car and cdr";
     pub const MACRO_CADADR: &str = "(lambda (x) `(car (cdr (car (cdr ,x)))))";
 
     pub const CADADDR: &str = "cdaddr";
-    pub const DOC_CADADDR: &str = "[Macro] Combien car, cdr, car, cdr and cdr";
+    pub const DOC_CADADDR: &str = "Combien car, cdr, car, cdr and cdr";
     pub const MACRO_CADADDR: &str = "(lambda (x) `(car (cdr (car (cdr (cdr ,x))))))";
 
     pub const AWAIT_ASYNC: &str = "await-async";
-    pub const DOC_AWAIT_ASYNC: &str = "[Macro] Combine await and async";
+    pub const DOC_AWAIT_ASYNC: &str = "Combine await and async";
     pub const MACRO_AWAIT_ASYNC: &str = "(lambda (x) `(await (async ,x)))";
 
     pub const APPLY: &str = "apply";
-    pub const DOC_APPLY: &str = "[Macro] apply a function to a list of args";
+    pub const DOC_APPLY: &str = "apply a function to a list of args";
     pub const DOC_APPLY_VERBOSE: &str = "Example: (apply + '(1 2 3)) => (+ 1 2 3)";
     pub const MACRO_APPLY: &str = "(lambda (f args)
                                           (cons f args))";
 
     pub const COND: &str = "cond";
-    pub const DOC_COND: &str ="[Macro] List of tuples {boolean expression, expression}, where if the boolean expression is true, then the expression is evaluated and is result of the whole expression.";
+    pub const DOC_COND: &str ="List of tuples {boolean expression, expression}, where if the boolean expression is true, then the expression is evaluated and is result of the whole expression.";
     pub const DOC_COND_VERBOSE: &str =
         "Example of expression: (cond ((< temp 0) 'cold) (else 'good))";
     pub const MACRO_COND: &str = "(lambda exprs
@@ -335,7 +335,7 @@ pub mod utils {
                 ,(cons cond (cdr exprs))))))";
 
     pub const FOR: &str = "for";
-    pub const DOC_FOR: &str = "[Macro] Not yet implemented";
+    pub const DOC_FOR: &str = "Not yet implemented";
     /*pub const MACRO_FOR: &str = "(defmacro for (lambda args \
     (let ((_i_ (get-list args 0)) \
             (_list_ (get args 2)) \
@@ -350,7 +350,7 @@ pub mod utils {
             (_f_loop_ ,_list_)))))";*/
 
     pub const WHILE: &str = "while";
-    pub const DOC_WHILE: &str = "[Macro] Not yet implemented.";
+    pub const DOC_WHILE: &str = "Not yet implemented.";
     /*pub const MACRO_WHILE: &str = "(defmacro while
     (lambda (c b)
         `(begin
@@ -364,7 +364,7 @@ pub mod utils {
             (__loop__))))";*/
 
     pub const LOOP: &str = "loop";
-    pub const DOC_LOOP: &str = "[Macro] Evaluate infinitely an expression.";
+    pub const DOC_LOOP: &str = "Evaluate infinitely an expression.";
     pub const MACRO_LOOP: &str = "(lambda (b)
         `(begin 
             (define __loop__
@@ -375,7 +375,7 @@ pub mod utils {
             (__loop__)))";
 
     pub const LET: &str = "let";
-    pub const DOC_LET: &str = "[Macro] Abstract variable binding in functional programming.";
+    pub const DOC_LET: &str = "Abstract variable binding in functional programming.";
     pub const DOC_LET_VERBOSE: &str = "Example: (let ((a 1) (b 2)) (+ a b)) => 3";
     pub const MACRO_LET: &str = "(lambda (bindings body)
         (begin
@@ -387,7 +387,7 @@ pub mod utils {
                     values)))";
 
     pub const LET_STAR: &str = "let*";
-    pub const DOC_LET_STAR: &str = "[Macro] Abstract variable binding in functional programming.\
+    pub const DOC_LET_STAR: &str = "Abstract variable binding in functional programming.\
     The difference with let is that you can bind variables in function of previously bound variables.";
     pub const DOC_LET_STAR_VERBOSE: &str = "Example: (let ((a 1) (b (+ a 1))) (+ a b)) => 3";
     pub const MACRO_LET_STAR: &str = "(lambda (bindings body)
@@ -401,7 +401,7 @@ pub mod utils {
 
     //lambdas
     pub const COMBINE: &str = "combine";
-    pub const DOC_COMBINE: &str = "[Macro] Not yet implemented";
+    pub const DOC_COMBINE: &str = "Not yet implemented";
     /*pub const LAMBDA_COMBINE:  &str = "(define combine (lambda (f)
     (lambda (x y)
             (if (null? x) (quote ())
@@ -410,7 +410,7 @@ pub mod utils {
 
     pub const ZIP: &str = "zip";
     pub const DOC_ZIP: &str =
-        "[Lambda] Zip two lists together by combining elements of the two lists by pair.";
+        "Zip two lists together by combining elements of the two lists by pair.";
     pub const DOC_ZIP_VERBOSE: &str =
         "Example: (zip '(1 2 3 4 5) '(6 7 8 9 10)) => ((1 6) (2 7) (3 8) (4 9) (5 10))";
     pub const LAMBDA_ZIP: &str = "(lambda (l1 l2)\
@@ -423,7 +423,7 @@ pub mod utils {
                                                                         (cdr l2))))))";
 
     pub const UNZIP: &str = "unzip";
-    pub const DOC_UNZIP: &str = "[Lambda] Unzip a zipped list.";
+    pub const DOC_UNZIP: &str = "Unzip a zipped list.";
     pub const DOC_UNZIP_VERBOSE: &str =
         "Example: (unzip '((1 6) (2 7) (3 8) (4 9) (5 10))) => ((1 2 3 4 5) (6 7 8 9 10))";
     pub const LAMBDA_UNZIP: &str = "(lambda (lists)
@@ -444,7 +444,7 @@ pub mod utils {
 
     pub const MAPF: &str = "mapf";
     pub const DOC_MAPF: &str =
-        "[Lambda] Apply a function to all elements of a list, and return a list of all the results";
+        "Apply a function to all elements of a list, and return a list of all the results";
     pub const DOC_MAPF_VERBOSE: &str = "Example: (mapf square '(1 2 3)) => (1 4 9)";
     pub const LAMBDA_MAPF: &str = "(lambda (f seq)
          (if (null? seq)
@@ -462,12 +462,12 @@ pub mod utils {
               (else nil)))) ; error cases";*/
 
     pub const PAR: &str = "par";
-    pub const DOC_PAR: &str = "[Lambda] Not yet implemented!";
+    pub const DOC_PAR: &str = "Not yet implemented!";
     /*pub const LAMBDA_PAR: &str = "(define par (lambda l
     (mapf await (mapf async l))))";*/
 
     pub const REPEAT: &str = "repeat";
-    pub const DOC_REPEAT: &str = "[Lambda] Repeat the evaluation of an expression n times.";
+    pub const DOC_REPEAT: &str = "Repeat the evaluation of an expression n times.";
     pub const LAMBDA_REPEAT: &str = "(lambda (e n)
  (if (> n 0)
      (begin
@@ -475,8 +475,7 @@ pub mod utils {
          (repeat e (- n 1)))))";
 
     pub const RETRY_ONCE: &str = "retry-once";
-    pub const DOC_RETRY_ONCE: &str =
-        "[Lambda] Evaluate an expression, and if the result is an error,\
+    pub const DOC_RETRY_ONCE: &str = "Evaluate an expression, and if the result is an error,\
      evaluates it again and return the result of the second evaluation.";
     pub const LAMBDA_RETRY_ONCE: &str = "(lambda (e)
  (begin
@@ -486,7 +485,7 @@ pub mod utils {
          __r__)))";
 
     pub const AWAIT_INTERRUPT: &str = "await-interrupt";
-    pub const DOC_AWAIT_INTERRUPT: &str = "[Lambda] Await on a interruptible handle.";
+    pub const DOC_AWAIT_INTERRUPT: &str = "Await on a interruptible handle.";
     pub const LAMBDA_AWAIT_INTERRUPT: &str = "(lambda (__h__)
  (u! 
      (begin
@@ -864,7 +863,7 @@ pub mod io {
                                  Note: The path of the file is relative to the path of the executable";
 
     pub const READ: &str = "read";
-    pub const DOC_READ: &str = "[Macro] Wrapper around __read__";
+    pub const DOC_READ: &str = "Wrapper around __read__";
     pub const MACRO_READ: &str = "(lambda (x)\
         `(eval (parse (__read__ ,x))))";
 }

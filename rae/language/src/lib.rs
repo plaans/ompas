@@ -433,7 +433,8 @@ pub mod monitor {
         //Macros
 
         pub const DEF_STATE_FUNCTION: &str = "def-state-function";
-        pub const DOC_DEF_STATE_FUNCTION: &str= "[Macro] Wrapper around add-state-function to ease the definition of new state-function.";
+        pub const DOC_DEF_STATE_FUNCTION: &str =
+            "Wrapper around add-state-function to ease the definition of new state-function.";
         pub const DOC_DEF_STATE_FUNCTION_VERBOSE: &str =
             "Example: (def-state-function at (:params (?r robot)) (:result location))";
         pub const MACRO_DEF_STATE_FUNCTION: &str = "(lambda attributes
@@ -452,7 +453,7 @@ pub mod monitor {
 
         pub const DEF_COMMAND: &str = "def-command";
         pub const DOC_DEF_COMMAND: &str =
-            "[Macro] Wrapper around add-command to ease the definition of new command.";
+            "Wrapper around add-command to ease the definition of new command.";
         pub const DOC_DEF_COMMAND_VERBOSE: &str =
             "Example: (def-command pick (:params (?r robot) (?p package))";
         pub const MACRO_DEF_COMMAND: &str = "(lambda attributes
@@ -471,7 +472,7 @@ pub mod monitor {
 
         pub const DEF_TASK: &str = "def-task";
         pub const DOC_DEF_TASK: &str =
-            "[Macro] Wrapper around add-task to ease the definition of new task.";
+            "Wrapper around add-task to ease the definition of new task.";
         pub const DOC_DEF_TASK_VERBOSE: &str =
             "Example: (def-task move (:params (?r robot) (?to location))";
         pub const MACRO_DEF_TASK: &str = "(lambda attributes
@@ -490,7 +491,7 @@ pub mod monitor {
 
         pub const DEF_METHOD: &str = "def-method";
         pub const DOC_DEF_METHOD: &str =
-            "[Macro] Wrapper around add-method to ease the definition of new method.";
+            "Wrapper around add-method to ease the definition of new method.";
         pub const DOC_DEF_METHOD_VERBOSE: &str = "Example: (def-method m_move\n\
              \t(:task move)\n\
              \t(:params (?r robot) (?to location))\n\
@@ -512,17 +513,32 @@ pub mod monitor {
 
         pub const DEF_LAMBDA: &str = "def-lambda";
         pub const DOC_DEF_LAMBDA: &str =
-            "[Macro] Wrapper around add-lambda to ease the definition of new lambda.";
+            "Wrapper around add-lambda to ease the definition of new lambda.";
         pub const DOC_DEF_LAMBDA_VERBOSE: &str = "Example: (def-lambda f (lambda (x) (+ x 1)))";
         pub const MACRO_DEF_LAMBDA: &str = "(lambda (label lambda)
             `(add-lambda ',label ',lambda))";
 
-        /*pub const PDDL_MODEL: &str = "pddl-model";
+        pub const OM_MODEL: &str = "om-model";
+        pub const DOC_OM_MODEL: &str =
+            "Ease the definition of command, task and method models in operational model fashion.";
+        pub const MACRO_OM_MODEL: &str = "(lambda args
+            (let ((label (car args))
+                   (args (cdr args)))
+                (begin
+                    (define __l__ (lambda (l)
+                    (if (null? l)
+                    nil
+                     (cons
+                            (cons (caar l) (list (cdar l)))
+                            (__l__ (cdr l))))))
+                    `(map
+                        (quote ,(append (cons (list ':name label) (cons '(:model-type om) nil )) (__l__ args)))))))";
+
+        pub const PDDL_MODEL: &str = "pddl-model";
         pub const DOC_PDDL_MODEL: &str =
-            "[Macro] Ease the definition of command, task and method models in a pddl fashion.";
-        pub const DOC_PDDL_MODEL_VERBOSE: &str = "Example: (pddl-model (:params )";
-        pub const MACRO_PDDL_MODEL: &str = "(defmacro pddl-model
-        (lambda args
+            "Ease the definition of command, task and method models in a pddl fashion.";
+        pub const DOC_PDDL_MODEL_VERBOSE: &str = "Example: (pddl-model label (:params ))";
+        pub const MACRO_PDDL_MODEL: &str = "(lambda args
             (let ((label (car args))
                    (args (cdr args)))
                 (begin
@@ -533,41 +549,32 @@ pub mod monitor {
                             (cons (caar l) (list (cdar l)))
                             (__l__ (cdr l))))))
                     `(map
-                        (quote ,(append (cons (list ':name label) (cons '(:model-type pddl) nil )) (__l__ args))))))))";
+                        (quote ,(append (cons (list ':name label) (cons '(:model-type pddl) nil )) (__l__ args)))))))";
 
-        pub const MACRO_OM_MODEL: &str = "(defmacro om-model
-        (lambda args
-            (let ((label (car args))
-                   (args (cdr args)))
-                (begin
-                    (define __l__ (lambda (l)
-                    (if (null? l)
-                    nil
-                     (cons
-                            (cons (caar l) (list (cdar l)))
-                            (__l__ (cdr l))))))
-                    `(map
-                        (quote ,(append (cons (list ':name label) (cons '(:model-type om) nil )) (__l__ args))))))))";
+        pub const DEF_COMMAND_OM_MODEL: &str = "def-command-om-model";
+        pub const DOC_DEF_COMMAND_OM_MODEL: &str = "Define an operational model for the command.";
+        pub const MACRO_DEF_COMMAND_OM_MODEL: &str = "(lambda args
+            `(add-command-model ,(cons om-model args)))";
 
-        pub const MACRO_DEF_COMMAND_OM_MODEL: &str = "(defmacro def-command-om-model
-        (lambda args
-            `(add-command-model ,(cons om-model args))))";
+        pub const DEF_COMMAND_PDDL_MODEL: &str = "def-command-pddl-model";
+        pub const DOC_DEF_COMMAND_PDDL_MODEL: &str = "Define an pddl model for the command.";
+        pub const MACRO_DEF_COMMAND_PDDL_MODEL: &str = "(lambda args
+            `(add-command-model ,(cons pddl-model args)))";
 
-        pub const MACRO_DEF_COMMAND_PDDL_MODEL: &str = "(defmacro def-command-pddl-model
-        (lambda args
-            `(add-command-model ,(cons pddl-model args))))";
+        pub const DEF_TASK_OM_MODEL: &str = "def-task-om-model";
+        pub const DOC_DEF_TASK_OM_MODEL: &str = "Define an operational model for the task.";
+        pub const MACRO_DEF_TASK_OM_MODEL: &str = "(lambda args
+            `(add-task-model ,(cons om-model args)))";
 
-        pub const MACRO_DEF_TASK_OM_MODEL: &str = "(defmacro def-task-om-model
-        (lambda args
-            `(add-task-model ,(cons om-model args))))";
-
-        pub const MACRO_DEF_TASK_PDDL_MODEL: &str = "(defmacro def-task-pddl-model
-        (lambda args
-            `(add-task-model ,(cons pddl-model args))))";*/
+        pub const DEF_TASK_PDDL_MODEL: &str = "def-task-pddl-model";
+        pub const DOC_DEF_TASK_PDDL_MODEL: &str = "Define a pddl model for the task.";
+        pub const MACRO_DEF_TASK_PDDL_MODEL: &str = "(lambda args
+            `(add-task-model ,(cons pddl-model args)))";
 
         pub const DEF_FACTS: &str = "def-facts";
         pub const DOC_DEF_FACTS: &str =
-            "[Macro] Wrapper to ease definition of initial facts for the system.";
+            "Wrapper to ease definition of initial facts for the system.";
+
         pub const DOC_DEF_FACTS_VERBOSE: &str = "Example: (def-facts\n
     ((at t1) s)\n
     ((at t2) s)\n
@@ -579,13 +586,14 @@ pub mod monitor {
     `(add-facts (map ',args)))";
 
         pub const DEF_TYPES: &str = "def-types";
-        pub const DOC_DEF_TYPES: &str= "[Macro] Wrapper to ease the definition of new types. Types can be defined as subtypes of other types.";
+        pub const DOC_DEF_TYPES: &str= "Wrapper to ease the definition of new types. Types can be defined as subtypes of other types.";
         pub const DOC_DEF_TYPES_VERBOSE: &str = "Example: (def-types (ball door gripper obj))";
         pub const MACRO_DEF_TYPES: &str = "(lambda args
     (cons 'add-types (quote-list args)))";
 
         pub const DEF_OBJECTS: &str = "def-objects";
-        pub const DOC_DEF_OBJECTS: &str= "[Macro] Wrapper to ease the definition of new objects. Objects are defined with their types.";
+        pub const DOC_DEF_OBJECTS: &str =
+            "Wrapper to ease the definition of new objects. Objects are defined with their types.";
         pub const DOC_DEF_OBJECTS_VERBOSE: &str =
             "Example: (def-objects (b1 b2 b3 ball) (d1 d2 door) (o1 o2 obj))";
         pub const MACRO_DEF_OBJECTS: &str = "(lambda args
@@ -732,8 +740,6 @@ pub mod monitor {
         pub const DOC_DEBUG_OMPAS: &str = "Wrapper around __debug_ompas__";
         pub const MACRO_DEBUG_OMPAS: &str = "(lambda (arg)
     `(__debug_ompas__ ',arg)))";
-
-        //pub const RAE_TRIGGER_EVENT: &str = "trigger-event";
     }
 }
 

@@ -108,6 +108,32 @@ impl From<ModDomain> for LModule {
             MACRO_DEF_LAMBDA,
             (DOC_DEF_LAMBDA, DOC_DEF_LAMBDA_VERBOSE),
         );
+        module.add_macro(OM_MODEL, MACRO_OM_MODEL, DOC_OM_MODEL);
+        module.add_macro(
+            PDDL_MODEL,
+            MACRO_PDDL_MODEL,
+            (DOC_PDDL_MODEL, DOC_PDDL_MODEL_VERBOSE),
+        );
+        module.add_macro(
+            DEF_COMMAND_OM_MODEL,
+            MACRO_DEF_COMMAND_OM_MODEL,
+            DOC_DEF_COMMAND_OM_MODEL,
+        );
+        module.add_macro(
+            DEF_COMMAND_PDDL_MODEL,
+            MACRO_DEF_COMMAND_PDDL_MODEL,
+            DOC_DEF_COMMAND_PDDL_MODEL,
+        );
+        module.add_macro(
+            DEF_TASK_OM_MODEL,
+            MACRO_DEF_TASK_OM_MODEL,
+            DOC_DEF_TASK_OM_MODEL,
+        );
+        module.add_macro(
+            DEF_TASK_PDDL_MODEL,
+            MACRO_DEF_TASK_PDDL_MODEL,
+            DOC_DEF_TASK_PDDL_MODEL,
+        );
         module.add_macro(
             DEF_FACTS,
             MACRO_DEF_FACTS,

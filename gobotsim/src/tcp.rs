@@ -4,12 +4,13 @@ use crate::serde::{
 use crate::PROCESS_TOPIC_GOBOT_SIM;
 use ompas_middleware::ProcessInterface;
 use ompas_rae_interface::platform_interface::command_request::Request;
+use ompas_rae_interface::platform_interface::CommandCancelled;
 use ompas_rae_interface::platform_interface::{
     Atom, CommandAccepted, CommandCancelRequest, CommandExecutionRequest, CommandProgress,
     CommandRejected, CommandRequest, CommandResponse, CommandResult, Instance, PlatformUpdate,
     StateUpdate, StateVariable, StateVariableType,
 };
-use ompas_rae_interface::{LOG_TOPIC_PLATFORM, PROCESS_TOPIC_PLATFORM};
+use ompas_rae_language::interface::*;
 use ompas_rae_structs::state::partial_state::PartialState;
 use sompas_structs::lvalues::LValueS;
 use std::convert::TryFrom;
@@ -280,9 +281,9 @@ async fn async_read_socket(
                             if let GodotMessageSerdeData::ActionResponse(ar) = message.data {
                                 match ar.action_id {
                                     -1 => {
-                                        if let Err(_) = command_response_sender.send(CommandRejected {
+                                        if command_response_sender.send(CommandRejected {
                                                 command_id : ar.temp_id as u64
-                                            }.into()) {
+                                            }.into()).is_err() {
                                             process.kill(PROCESS_TOPIC_PLATFORM).await;
                                             //process.die().await;
                                             break 'outer;
@@ -296,9 +297,9 @@ async fn async_read_socket(
                                             ));*/
                                         } else {
                                             map_server_id_action_id.insert(ar.action_id as usize, ar.temp_id);
-                                            if let Err(_) = command_response_sender.send(CommandAccepted {
+                                            if command_response_sender.send(CommandAccepted {
                                                 command_id : ar.temp_id as u64
-                                            }.into())
+                                            }.into()).is_err()
                                              {
                                             process.kill(PROCESS_TOPIC_PLATFORM).await;
                                             //process.die().await;

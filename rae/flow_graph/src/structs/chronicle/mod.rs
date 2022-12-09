@@ -13,6 +13,7 @@ pub mod lit;
 pub mod subtask;
 pub mod sym_table;
 pub mod task_template;
+pub mod template;
 pub mod type_table;
 
 pub const START: &str = "start";

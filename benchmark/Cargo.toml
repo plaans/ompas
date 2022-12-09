@@ -13,6 +13,10 @@ sompas-repl = {path = "../scheme/repl"}
 ompas-rae-core = {path = "../rae/core"}
 ompas-rae-structs = {path = "../rae/structs"}
 ompas-gobotsim = {path = "../gobotsim"}
+ompas-rae-language = {path = "../rae/language"}
+ompas-middleware = {path = "../middleware"}
+ompas-rae-interface = {path = "../rae/interface"}
+
 
 tokio = { version = "1.17.0", features = ["full", "time"] }
 lettre = "0.10"

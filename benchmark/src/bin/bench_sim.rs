@@ -1,4 +1,7 @@
+use ompas_middleware::logger::FileDescriptor;
+use ompas_middleware::Master;
 use ompas_rae_core::monitor::ModMonitor;
+use ompas_rae_language::process::LOG_TOPIC_OMPAS;
 use sompas_modules::advanced_math::ModAdvancedMath;
 use sompas_modules::io::ModIO;
 use sompas_modules::string::ModString;
@@ -99,7 +102,11 @@ pub async fn lisp_interpreter(opt: Opt) {
     li.import_namespace(ctx_math);
 
     li.import(ctx_string);
-    let ctx_rae = ModMonitor::new(None, Some(log.clone()), opt.view).await;
+    let ctx_rae = ModMonitor::new("nil", Some(log.clone())).await;
+
+    if opt.view {
+        Master::start_display_log_topic(LOG_TOPIC_OMPAS).await;
+    }
     li.import_namespace(ctx_rae);
 
     let mut com: ChannelToLispInterpreter = li.subscribe();
@@ -121,7 +128,10 @@ pub async fn lisp_interpreter(opt: Opt) {
     li.set_config(LispInterpreterConfig::new(false));
 
     tokio::spawn(async move {
-        li.run(Some(log)).await;
+        li.run(Some(FileDescriptor::AbsolutePath(
+            log.canonicalize().unwrap(),
+        )))
+        .await;
     });
 
     com.send(domain_lisp).await.expect("could not send to LI");

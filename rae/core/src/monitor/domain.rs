@@ -6,7 +6,7 @@ use ompas_rae_structs::domain::method::Method;
 use ompas_rae_structs::domain::parameters::Parameters;
 use ompas_rae_structs::domain::state_function::StateFunction;
 use ompas_rae_structs::domain::task::Task;
-use ompas_rae_structs::domain::RAEDomain;
+use ompas_rae_structs::domain::OMPASDomain;
 use ompas_rae_structs::state::partial_state::PartialState;
 use ompas_rae_structs::state::world_state::{StateType, WorldState};
 use sompas_core::modules::list::{car, cons, first};
@@ -29,16 +29,16 @@ pub struct ModDomain {
     state: WorldState,
     empty_env: LEnv,
     domain_description: InitScheme,
-    domain: Arc<RwLock<RAEDomain>>,
+    domain: Arc<RwLock<OMPASDomain>>,
 }
 
 impl ModDomain {
     pub fn new(monitor: &ModMonitor) -> Self {
         Self {
-            state: monitor.interface.state.clone(),
+            state: monitor.state.clone(),
             empty_env: monitor.empty_env.clone(),
-            domain_description: monitor.platform_domain.clone(),
-            domain: monitor.domain.clone(),
+            domain_description: monitor.platform.domain().into(),
+            domain: monitor.ompas_domain.clone(),
         }
     }
 

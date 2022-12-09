@@ -1,5 +1,5 @@
 use ompas_middleware::{LogLevel, Master, LOG_TOPIC_ROOT};
-use ompas_rae_interface::LOG_TOPIC_PLATFORM;
+use ompas_rae_language::interface::LOG_TOPIC_PLATFORM;
 use ompas_rae_language::monitor::log::*;
 use ompas_rae_language::process::LOG_TOPIC_OMPAS;
 use sompas_macros::async_scheme_fn;

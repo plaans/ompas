@@ -8,7 +8,7 @@ use ompas_rae_planning::aries::binding::solver::run_solver_for_htn;
 use ompas_rae_planning::aries::binding::{generate_chronicles, solver};
 use ompas_rae_planning::aries::structs::{ConversionCollection, ConversionContext, Problem};
 use ompas_rae_structs::agenda::Agenda;
-use ompas_rae_structs::domain::RAEDomain;
+use ompas_rae_structs::domain::OMPASDomain;
 use ompas_rae_structs::plan::AbstractTaskInstance;
 use ompas_rae_structs::select_mode::{Planner, SelectMode};
 use ompas_rae_structs::state::action_state::{RefinementMetaData, TaskMetaData};
@@ -24,7 +24,7 @@ use tokio::sync::RwLock;
 pub struct CtxAries {
     log: LogClient,
     agenda: Agenda,
-    domain: Arc<RwLock<RAEDomain>>,
+    domain: Arc<RwLock<OMPASDomain>>,
     cc: Arc<RwLock<ConversionCollection>>,
 }
 

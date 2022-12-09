@@ -4,7 +4,7 @@ use ompas_middleware::logger::LogClient;
 use ompas_middleware::LogLevel;
 use ompas_middleware::ProcessInterface;
 use ompas_rae_language::process::{LOG_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS};
-use ompas_rae_structs::rae_command::RAECommand;
+use ompas_rae_structs::rae_command::OMPASJob;
 use sompas_core::eval;
 use sompas_structs::lasynchandler::LAsyncHandle;
 use sompas_structs::lenv::LEnv;
@@ -32,7 +32,7 @@ pub async fn rae(
     //interface: OMPASInternalState,
     log: LogClient,
     env: LEnv,
-    mut command_rx: Receiver<RAECommand>,
+    mut command_rx: Receiver<OMPASJob>,
 ) {
     let mut process =
         ProcessInterface::new(PROCESS_MAIN_RAE, PROCESS_TOPIC_OMPAS, LOG_TOPIC_OMPAS).await;
@@ -44,7 +44,7 @@ pub async fn rae(
             command = command_rx.recv() => {
                 match command {
                     None => break,
-                    Some(RAECommand::Job(job)) => {
+                    Some(OMPASJob::Job(job)) => {
                         log.info("new job received!").await;
 
                         let mut new_env = env.clone();

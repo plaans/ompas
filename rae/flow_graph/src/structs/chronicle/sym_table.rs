@@ -171,7 +171,7 @@ impl RefSymTable {
         RefCell::borrow_mut(&self.0).union_types(a, b)
     }
     pub fn get_type_id_of(&self, atom_id: &AtomId) -> TypeId {
-        RefCell::borrow(&self.0).get_type_id_of(atom_id).clone()
+        *RefCell::borrow(&self.0).get_type_id_of(atom_id)
     }
 
     /*
@@ -209,12 +209,12 @@ impl RefSymTable {
 
         let mut str = "SCOPES:\n".to_string();
 
-        for (atom, interval) in scopes.iter().sorted_by(|a, b| a.0.cmp(&b.0)) {
+        for (atom, interval) in scopes.iter().sorted_by(|a, b| a.0.cmp(b.0)) {
             writeln!(
                 str,
                 "{}: {}",
-                atom.format(&self, false),
-                interval.format(&self, false)
+                atom.format(self, false),
+                interval.format(self, false)
             )
             .unwrap();
         }
@@ -377,7 +377,7 @@ impl SymTable {
             }
 
             let id = self.symbols.new_node(element.into());
-            self.ids.insert(element.into(), &id);
+            self.ids.insert(element, &id);
             self.types.add_new_atom(&id, t);
         }
         Ok(())
@@ -418,7 +418,7 @@ impl SymTable {
     pub fn new_type(&mut self, sym: impl Display, a_type: Option<TypeId>) -> TypeId {
         let sym = sym.to_string();
         let id = self.symbols.new_node(sym.as_str().into());
-        self.ids.insert(sym.as_str().into(), &id);
+        self.ids.insert(sym.as_str(), &id);
         let atom_type = match a_type {
             None => AtomType::RootType,
             Some(t) => AtomType::SubType(t),
@@ -599,7 +599,7 @@ impl SymTable {
      */
     pub fn union_atom(&mut self, a: &AtomId, b: &AtomId) {
         self.symbols.union_ordered(a, b);
-        self.types.union_types(a, b);
+        self.types.union_types(a, b).unwrap();
     }
 
     pub fn find_parent(&mut self, a: &AtomId) -> AtomId {
@@ -628,8 +628,8 @@ impl SymTable {
             writeln!(
                 str,
                 "{}: {}({})",
-                self.symbols.get_value(&a).unwrap(),
-                self.types.inner.get_value(&t).unwrap(),
+                self.symbols.get_value(a).unwrap(),
+                self.types.inner.get_value(t).unwrap(),
                 t
             )
             .unwrap();
@@ -645,7 +645,7 @@ impl Display for RefSymTable {
         let mut constant_untyped = vec![];
         let mut var_typed = vec![];
         let mut var_untyped = vec![];
-        let st = RefCell::borrow(&Rc::borrow(&self.0));
+        let st = RefCell::borrow(Rc::borrow(&self.0));
 
         for x in 0..st.symbols.len() {
             if x == st.get_parent(&x) {
@@ -669,7 +669,7 @@ impl Display for RefSymTable {
                         "- ({}){}({})\n",
                         e,
                         self.get_atom(&e, true).unwrap(),
-                        self.get_type_of(&e).format(&self, true)
+                        self.get_type_of(&e).format(self, true)
                     )
                     .as_str(),
                 );

@@ -4,7 +4,7 @@ use crate::exec::state::ModState;
 use crate::exec::ModExec;
 use ompas_rae_language::exec::rae_plan::*;
 use ompas_rae_language::exec::state::MOD_STATE;
-use ompas_rae_structs::domain::RAEDomain;
+use ompas_rae_structs::domain::OMPASDomain;
 use ompas_rae_structs::select_mode::{Planner, RAEPlanConfig, SelectMode};
 use ompas_rae_structs::state::action_state::RefinementMetaData;
 use ompas_rae_structs::state::world_state::WorldStateSnapshot;
@@ -138,7 +138,7 @@ pub struct ModRaePlan {
     efficiency: Arc<RwLock<Efficiency>>,
     config: RAEPlanConfig,
     level: Arc<AtomicU64>,
-    domain: Arc<RwLock<RAEDomain>>,
+    domain: Arc<RwLock<OMPASDomain>>,
 }
 
 impl From<ModRaePlan> for Context {
@@ -286,7 +286,7 @@ pub async fn rae_plan(env: &LEnv, task: &[LValue]) -> LResult {
     Ok(method)
 }
 
-pub async fn rae_plan_env(mut env: LEnv, domain: &RAEDomain) -> LEnv {
+pub async fn rae_plan_env(mut env: LEnv, domain: &OMPASDomain) -> LEnv {
     for (label, command) in &domain.commands {
         let lv_params = command.get_parameters().get_params_as_lvalue();
         let mut params = "".to_string();

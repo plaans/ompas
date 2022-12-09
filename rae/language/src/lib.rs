@@ -748,3 +748,16 @@ pub mod process {
     pub const PROCESS_STOP_OMPAS: &str = "__PROCESS_STOP_OMPAS__";
     pub const PROCESS_CHECK_WAIT_FOR: &str = "__PROCESS_CHECK_WAIT_FOR__";
 }
+
+pub mod interface {
+
+    pub const PROCESS_GET_UPDATES: &str = "__PROCESS_GET_UPDATES__";
+    pub const PROCESS_SEND_COMMANDS: &str = "__PROCESS_SEND_COMMANDS__";
+    pub const PROCESS_START_PLATFORM: &str = "__PROCESS_START_PLATFORM__";
+
+    pub const DEFAULT_PLATFORM_SERVICE_IP: &str = "127.0.0.1";
+    pub const DEFAULT_PLATFROM_SERVICE_PORT: u16 = 8257;
+    pub const PROCESS_TOPIC_PLATFORM: &str = "__PROCESS_TOPIC_PLATFORM__";
+    pub const LOG_TOPIC_PLATFORM: &str = "__LOG_TOPIC_PLATFORM__";
+    pub const PLATFORM_CLIENT: &str = "PLATFORM_CLIENT";
+}

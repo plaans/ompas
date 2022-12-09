@@ -3,17 +3,20 @@ use crate::monitor::{ModMonitor, TOKIO_CHANNEL_SIZE};
 use crate::rae;
 use ompas_middleware::logger::LogClient;
 use ompas_middleware::ProcessInterface;
-use ompas_rae_interface::platform::{Platform, PlatformConfig, PlatformDescriptor};
+use ompas_rae_interface::platform::Platform;
+use ompas_rae_interface::platform_config::PlatformConfig;
 use ompas_rae_language::monitor::control::*;
 use ompas_rae_language::process::{LOG_TOPIC_OMPAS, PROCESS_STOP_OMPAS, PROCESS_TOPIC_OMPAS};
 use ompas_rae_language::select::*;
 use ompas_rae_planning::aries::conversion::convert_domain_to_chronicle_hierarchy;
 use ompas_rae_planning::aries::structs::{ConversionCollection, ConversionContext};
-use ompas_rae_structs::domain::RAEDomain;
-use ompas_rae_structs::internal_state::OMPASInternalState;
+use ompas_rae_structs::agenda::Agenda;
+use ompas_rae_structs::domain::OMPASDomain;
 use ompas_rae_structs::job::Job;
-use ompas_rae_structs::monitor::task_check_wait_for;
+use ompas_rae_structs::monitor::{task_check_wait_for, MonitorCollection};
+use ompas_rae_structs::rae_command::OMPASJob;
 use ompas_rae_structs::rae_options::OMPASOptions;
+use ompas_rae_structs::resource::ResourceCollection;
 use ompas_rae_structs::select_mode::{Planner, SelectMode};
 use ompas_rae_structs::state::action_state::*;
 use ompas_rae_structs::state::action_status::*;
@@ -40,9 +43,14 @@ use tokio::sync::{mpsc, RwLock};
 
 pub struct ModControl {
     pub(crate) options: Arc<RwLock<OMPASOptions>>,
-    pub(crate) interface: OMPASInternalState,
-    pub(crate) platform: Option<Platform>,
-    pub(crate) domain: Arc<RwLock<RAEDomain>>,
+    pub state: WorldState,
+    pub resources: ResourceCollection,
+    pub monitors: MonitorCollection,
+    pub agenda: Agenda,
+    pub log: LogClient,
+    pub task_stream: Arc<RwLock<Option<tokio::sync::mpsc::Sender<OMPASJob>>>>,
+    pub(crate) platform: Platform,
+    pub(crate) domain: Arc<RwLock<OMPASDomain>>,
     pub(crate) tasks_to_execute: Arc<RwLock<Vec<Job>>>,
     pub(crate) cc: Arc<RwLock<Option<ConversionCollection>>>,
 }
@@ -51,9 +59,14 @@ impl ModControl {
     pub fn new(monitor: &ModMonitor) -> Self {
         Self {
             options: monitor.options.clone(),
-            interface: monitor.interface.clone(),
+            state: monitor.state.clone(),
+            resources: monitor.resources.clone(),
+            monitors: monitor.monitors.clone(),
+            agenda: monitor.agenda.clone(),
+            log: monitor.log.clone(),
+            task_stream: monitor.task_stream.clone(),
             platform: monitor.platform.clone(),
-            domain: monitor.domain.clone(),
+            domain: monitor.ompas_domain.clone(),
             tasks_to_execute: monitor.tasks_to_execute.clone(),
             cc: Arc::new(Default::default()),
         }
@@ -68,11 +81,10 @@ impl ModControl {
                 match convert_domain_to_chronicle_hierarchy(ConversionContext {
                     domain: self.domain.read().await.clone(),
                     env: self.get_exec_env().await,
-                    state: self.interface.state.get_snapshot().await,
+                    state: self.state.get_snapshot().await,
                 }) {
                     Ok(r) => {
-                        self.interface
-                            .log
+                        self.log
                             .info(format!(
                                 "Conversion time: {:.3} ms",
                                 instant.elapsed().as_micros() as f64 / 1000.0
@@ -85,8 +97,7 @@ impl ModControl {
                             .write()
                             .await
                             .set_select_mode(SelectMode::Greedy);
-                        self.interface
-                            .log
+                        self.log
                             .warn(format!("Cannot plan with the domain...{e}"))
                             .await;
                         None
@@ -103,11 +114,9 @@ impl ModControl {
         let log = LogClient::new("eval-ompas", LOG_TOPIC_OMPAS).await;
         env.log = log;
 
-        if let Some(platform) = &self.platform {
-            if let Some(module) = platform.module().await {
-                //println!("import of platform module");
-                env.import_module(module, WithoutPrefix);
-            }
+        if let Some(module) = self.platform.module().await {
+            //println!("import of platform module");
+            env.import_module(module, WithoutPrefix);
         }
 
         env.import_module(ModUtils::default(), WithoutPrefix);
@@ -115,7 +124,7 @@ impl ModControl {
         env.import_module(ModAdvancedMath::default(), WithoutPrefix);
 
         let mut ctx_io = ModIO::default();
-        ctx_io.set_log_output(LogOutput::Log(self.interface.log.clone()));
+        ctx_io.set_log_output(LogOutput::Log(self.log.clone()));
 
         env.import_module(ctx_io, WithoutPrefix);
 
@@ -128,6 +137,10 @@ impl ModControl {
         env.set_new_top_symbols(domain_exec_symbols);
 
         env
+    }
+
+    pub async fn get_sender(&self) -> Option<tokio::sync::mpsc::Sender<OMPASJob>> {
+        self.task_stream.read().await.clone()
     }
 }
 
@@ -206,7 +219,7 @@ impl From<ModControl> for LModule {
 
 /// Launch main loop of rae in an other asynchronous task.
 #[async_scheme_fn]
-pub async fn start(env: &LEnv) -> &str {
+pub async fn start(env: &LEnv) -> Result<String, LRuntimeError> {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
     let mut tasks_to_execute: Vec<Job> = vec![];
     mem::swap(
@@ -216,22 +229,17 @@ pub async fn start(env: &LEnv) -> &str {
 
     let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
 
-    *ctx.interface.command_stream.write().await = Some(tx);
-    //*ctx.interface.stop_tx.write().await = Some(tx_stop);
-    let interface = ctx.interface.clone();
-    let platform = ctx.platform.clone();
+    *ctx.task_stream.write().await = Some(tx);
 
-    if let Some(platform) = &platform {
-        platform.start(Default::default()).await;
-    }
+    let start_result: String = ctx.platform.start(Default::default()).await?;
 
     let env = ctx.get_exec_env().await;
-    let log = ctx.interface.log.clone();
+    let log = ctx.log.clone();
 
-    let state = ctx.interface.state.clone();
+    let state = ctx.state.clone();
     let receiver_event_update_state = state.subscribe_on_update().await;
     let env_clone = env.clone();
-    let monitors = interface.monitors.clone();
+    let monitors = ctx.monitors.clone();
     tokio::spawn(async move {
         task_check_wait_for(receiver_event_update_state, monitors, env_clone).await
     });
@@ -245,8 +253,7 @@ pub async fn start(env: &LEnv) -> &str {
     }*/
 
     for t in tasks_to_execute {
-        ctx.interface
-            .command_stream
+        ctx.task_stream
             .read()
             .await
             .as_ref()
@@ -256,7 +263,7 @@ pub async fn start(env: &LEnv) -> &str {
             .expect("error sending job")
     }
 
-    "rae launched succesfully"
+    Ok(format!("OMPAS launched successfully. {}", start_result))
 }
 
 #[async_scheme_fn]
@@ -268,16 +275,14 @@ pub async fn stop(env: &LEnv) {
 
     process.kill(PROCESS_TOPIC_OMPAS).await;
     drop(process);
-    if let Some(platform) = &ctx.platform {
-        platform.stop().await;
-    }
+    ctx.platform.stop().await;
 
     tokio::time::sleep(Duration::from_secs(1)).await; //hardcoded moment to wait for all process to be killed.
-    *ctx.interface.command_stream.write().await = None;
-    ctx.interface.state.clear().await;
-    ctx.interface.agenda.clear().await;
-    ctx.interface.resources.clear().await;
-    ctx.interface.monitors.clear().await;
+    *ctx.task_stream.write().await = None;
+    ctx.state.clear().await;
+    ctx.agenda.clear().await;
+    ctx.resources.clear().await;
+    ctx.monitors.clear().await;
 }
 
 /// Sends via a channel a task to execute.
@@ -289,7 +294,7 @@ pub async fn trigger_task(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, L
     let (tx, mut rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
     let job = Job::new(tx, args.into());
 
-    match ctx.interface.get_sender().await {
+    match ctx.get_sender().await {
         None => Err(LRuntimeError::new(TRIGGER_TASK, "no sender to rae")),
         Some(sender) => {
             tokio::spawn(async move {
@@ -313,7 +318,7 @@ pub async fn add_task_to_execute(env: &LEnv, args: &[LValue]) -> Result<(), LRun
     let (tx, _) = mpsc::channel(TOKIO_CHANNEL_SIZE);
     let job = Job::new(tx, args.into());
 
-    match ctx.interface.get_sender().await {
+    match ctx.get_sender().await {
         None => {
             ctx.tasks_to_execute.write().await.push(job);
         }
@@ -343,23 +348,31 @@ pub async fn set_config_platform(env: &LEnv, args: &[LValue]) -> LResult {
     for arg in args {
         string.push_str(format!("{} ", arg).as_str())
     }
-    if let Some(platform) = &ctx.platform {
-        *platform.config.write().await = PlatformConfig::new_string(string);
-    }
 
-    Ok(LValue::Nil)
+    match ctx
+        .platform
+        .try_set_config_platform(PlatformConfig::new_string(string))
+        .await
+    {
+        Ok(_) => Ok(LValue::Nil),
+        Err(_) => Err(LRuntimeError::new(
+            SET_CONFIG_PLATFORM,
+            "Could not set config as there is no execution platform.",
+        )),
+    }
 }
 
 #[async_scheme_fn]
-pub async fn get_config_platform(env: &LEnv) -> String {
+pub async fn get_config_platform(env: &LEnv) -> Result<String, LRuntimeError> {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
 
-    let string = String::new();
-    match &ctx.platform {
-        None => string,
-        Some(p) => p.config.read().await.format(),
+    match &ctx.platform.try_get_config_platform().await {
+        Err(_) => Err(LRuntimeError::new(
+            GET_CONFIG_PLATFORM,
+            "No platform is defined.",
+        )),
+        Ok(p) => Ok(p.format()),
     }
-    //string
 }
 
 #[async_scheme_fn]
@@ -426,7 +439,7 @@ pub async fn get_state(env: &LEnv, args: &[LValue]) -> LResult {
         }
         _ => return Err(LRuntimeError::wrong_number_of_args(GET_STATE, args, 0..1)),
     };
-    let state = ctx.interface.state.get_state(_type).await;
+    let state = ctx.state.get_state(_type).await;
     Ok(state.into_map())
 }
 
@@ -434,7 +447,7 @@ pub async fn get_state(env: &LEnv, args: &[LValue]) -> LResult {
 pub async fn get_task_network(env: &LEnv) -> String {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
 
-    ctx.interface.agenda.format_task_network().await
+    ctx.agenda.format_task_network().await
 }
 
 #[async_scheme_fn]
@@ -479,11 +492,7 @@ pub async fn get_agenda(env: &LEnv, args: &[LValue]) -> LResult {
         }
     }
 
-    let string = ctx
-        .interface
-        .agenda
-        .format_task_collection(task_filter)
-        .await;
+    let string = ctx.agenda.format_task_collection(task_filter).await;
     Ok(string.into())
 }
 
@@ -492,13 +501,13 @@ pub async fn get_agenda(env: &LEnv, args: &[LValue]) -> LResult {
 #[async_scheme_fn]
 pub async fn get_resources(env: &LEnv) -> LResult {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
-    Ok(ctx.interface.resources.get_debug().await.into())
+    Ok(ctx.resources.get_debug().await.into())
 }
 
 #[async_scheme_fn]
 pub async fn get_monitors(env: &LEnv) -> LResult {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
-    Ok(ctx.interface.monitors.get_debug().await.into())
+    Ok(ctx.monitors.get_debug().await.into())
 }
 
 ///Get the list of actions in the environment
@@ -559,8 +568,7 @@ pub async fn get_domain(env: &LEnv, args: &[LValue]) -> LResult {
 #[async_scheme_fn]
 pub async fn get_stats(env: &LEnv) -> LValue {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
-
-    ctx.interface.agenda.get_stats().await
+    ctx.agenda.get_stats().await
 }
 
 #[async_scheme_fn]
@@ -571,6 +579,6 @@ pub async fn export_stats(env: &LEnv, args: &[LValue]) -> LResult {
     } else {
         None
     };
-    ctx.interface.agenda.export_to_csv(None, file).await;
+    ctx.agenda.export_to_csv(None, file).await;
     Ok(LValue::Nil)
 }

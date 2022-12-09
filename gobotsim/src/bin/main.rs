@@ -4,8 +4,9 @@ use ompas_gobotsim::platform::PlatformGobotSim;
 use ompas_middleware::logger::{FileDescriptor, LogClient};
 use ompas_middleware::{LogLevel, Master};
 use ompas_rae_core::monitor::ModMonitor;
-use ompas_rae_interface::platform::Domain;
-use ompas_rae_interface::{LOG_TOPIC_PLATFORM, PLATFORM_CLIENT};
+use ompas_rae_interface::lisp_domain::LispDomain;
+use ompas_rae_language::interface::{LOG_TOPIC_PLATFORM, PLATFORM_CLIENT};
+use ompas_rae_language::process::LOG_TOPIC_OMPAS;
 use sompas_modules::advanced_math::ModAdvancedMath;
 use sompas_modules::io::ModIO;
 use sompas_modules::string::ModString;
@@ -73,17 +74,20 @@ pub async fn lisp_interpreter(log: Option<PathBuf>, godot: bool, rae_log: bool) 
     } else {
         let ctx_rae = ModMonitor::new(
             PlatformGobotSim::new(
-                Domain::File(
+                LispDomain::File(
                     "/home/jeremy/CLionProjects/ompas/gobotsim/godot_domain/domain.lisp".into(),
                 ),
                 false,
                 LogClient::new(PLATFORM_CLIENT, LOG_TOPIC_PLATFORM).await,
             ),
             log.clone(),
-            rae_log,
         )
         .await;
         li.import_namespace(ctx_rae);
+    }
+
+    if rae_log {
+        Master::start_display_log_topic(LOG_TOPIC_OMPAS).await;
     }
 
     li.set_config(LispInterpreterConfig::new(true));

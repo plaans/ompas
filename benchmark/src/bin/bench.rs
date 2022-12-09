@@ -65,7 +65,7 @@ fn main() {
         for p in &mut problems {
             //println!("problem: {:#?}", p);
             //println!("parent:{:#?}", p.parent());
-            if p.parent() == None {
+            if p.parent().is_none() {
                 println!("gonna transform into a complete path");
                 let mut new_path = problem_path.clone();
                 new_path.push(p.clone());
@@ -105,7 +105,7 @@ fn main() {
                 first = false
             }
             let mut command = Command::new(config.get_bin_name());
-            command.args(&[
+            command.args([
                 "-d",
                 domain_path.to_str().unwrap(),
                 "-p",

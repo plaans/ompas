@@ -263,13 +263,10 @@ pub fn meet(a: &Interval, b: &Interval) -> Constraint {
 }
 
 pub fn overlap(a: &Interval, b: &Interval) -> Constraint {
-    Constraint::Or(
-        vec![
-            Lit::from(Constraint::Leq(a.get_start().into(), b.get_end().into())),
-            Lit::from(Constraint::Leq(b.get_start().into(), a.get_end().into())),
-        ]
-        .into(),
-    )
+    Constraint::Or(vec![
+        Lit::from(Constraint::Leq(a.get_start().into(), b.get_end().into())),
+        Lit::from(Constraint::Leq(b.get_start().into(), a.get_end().into())),
+    ])
 }
 
 pub fn start(a: &Interval, b: &Interval) -> Constraint {
@@ -277,13 +274,10 @@ pub fn start(a: &Interval, b: &Interval) -> Constraint {
 }
 
 pub fn during(a: &Interval, b: &Interval) -> Constraint {
-    Constraint::And(
-        vec![
-            Lit::from(Constraint::Leq(a.get_start().into(), b.get_end().into())),
-            Lit::from(Constraint::Leq(b.get_start().into(), a.get_end().into())),
-        ]
-        .into(),
-    )
+    Constraint::And(vec![
+        Lit::from(Constraint::Leq(a.get_start().into(), b.get_end().into())),
+        Lit::from(Constraint::Leq(b.get_start().into(), a.get_end().into())),
+    ])
 }
 
 pub fn finish(a: &Interval, b: &Interval) -> Constraint {
@@ -291,13 +285,10 @@ pub fn finish(a: &Interval, b: &Interval) -> Constraint {
 }
 
 pub fn equal(a: &Interval, b: &Interval) -> Constraint {
-    Constraint::And(
-        vec![
-            Lit::from(Constraint::Leq(a.get_start().into(), b.get_end().into())),
-            Lit::from(Constraint::Leq(b.get_start().into(), a.get_end().into())),
-        ]
-        .into(),
-    )
+    Constraint::And(vec![
+        Lit::from(Constraint::Leq(a.get_start().into(), b.get_end().into())),
+        Lit::from(Constraint::Leq(b.get_start().into(), a.get_end().into())),
+    ])
 }
 
 impl Replace for Constraint {

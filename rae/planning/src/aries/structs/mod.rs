@@ -6,7 +6,7 @@ use im::{hashmap, HashMap, HashSet};
 use ompas_rae_language::exec::state::INSTANCE;
 use ompas_rae_structs::domain::state_function::StateFunction;
 use ompas_rae_structs::domain::type_hierarchy::TypeHierarchy;
-use ompas_rae_structs::domain::RAEDomain;
+use ompas_rae_structs::domain::OMPASDomain;
 use ompas_rae_structs::domain::_type::Type;
 use ompas_rae_structs::state::partial_state::PartialState;
 use ompas_rae_structs::state::world_state::WorldStateSnapshot;
@@ -118,7 +118,7 @@ impl TaskTypeMetaDataCollection {
 
 #[derive(Default, Clone)]
 pub struct ConversionContext {
-    pub domain: RAEDomain,
+    pub domain: OMPASDomain,
     pub env: LEnv,
     pub state: WorldStateSnapshot,
 }

@@ -13,7 +13,7 @@ use ompas_middleware::logger::LogClient;
 use ompas_rae_language::exec::refinement::*;
 use ompas_rae_language::exec::task::MOD_TASK;
 use ompas_rae_structs::agenda::Agenda;
-use ompas_rae_structs::domain::RAEDomain;
+use ompas_rae_structs::domain::OMPASDomain;
 use ompas_rae_structs::interval::Interval;
 use ompas_rae_structs::rae_options::OMPASOptions;
 use ompas_rae_structs::select_mode::{Planner, SelectMode};
@@ -44,7 +44,7 @@ use tokio::sync::RwLock;
 
 pub struct ModRefinement {
     //pub env: LEnv,
-    pub domain: Arc<RwLock<RAEDomain>>,
+    pub domain: Arc<RwLock<OMPASDomain>>,
     pub agenda: Agenda,
     pub state: WorldState,
     pub options: Arc<RwLock<OMPASOptions>>,
@@ -346,7 +346,7 @@ pub async fn greedy_select(
     env.update_context(ModState::new_from_snapshot(state));
     let env = &env;
 
-    let domain: RAEDomain = ctx.domain.read().await.clone();
+    let domain: OMPASDomain = ctx.domain.read().await.clone();
 
     let method_templates: Vec<String> =
         domain.tasks.get(&task_label).unwrap().get_methods().clone();

@@ -14,7 +14,7 @@ pub type HandleId = usize;
 pub type BlockId = usize;
 pub type EdgeId = usize;
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct FlowGraph {
     pub sym_table: RefSymTable,
     pub(crate) vertices: Vec<Vertice>,
@@ -56,8 +56,8 @@ impl FlowGraph {
     }
 
     pub fn remove(&mut self, id: &VerticeId, scope: &mut Scope) {
-        let child = self.get(id).unwrap().get_child().clone();
-        let parent = self.get(id).unwrap().get_parent().clone();
+        let child = *self.get(id).unwrap().get_child();
+        let parent = *self.get(id).unwrap().get_parent();
         if scope.start == *id {
             match child {
                 None => {}
@@ -249,17 +249,6 @@ impl FlowGraph {
 
         dot.push('}');
         dot
-    }
-}
-
-impl Default for FlowGraph {
-    fn default() -> Self {
-        Self {
-            sym_table: Default::default(),
-            vertices: vec![],
-            handles: Default::default(),
-            scope: Default::default(),
-        }
     }
 }
 

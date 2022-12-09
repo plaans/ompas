@@ -4,13 +4,11 @@ use debug_conversion::*;
 use domain::*;
 use ompas_middleware::logger::{FileDescriptor, LogClient};
 use ompas_middleware::Master;
-use ompas_rae_structs::domain::RAEDomain;
-use ompas_rae_structs::internal_state::OMPASInternalState;
+use ompas_rae_structs::domain::OMPASDomain;
 use ompas_rae_structs::job::Job;
 use ompas_rae_structs::rae_options::OMPASOptions;
 use sompas_core::{eval_init, get_root_env};
-use sompas_structs::lmodule::{InitScheme, LModule};
-use std::fs;
+use sompas_structs::lmodule::LModule;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -21,10 +19,16 @@ pub mod log;
 
 use crate::exec::ModExec;
 use crate::monitor::log::ModLog;
-use ompas_rae_interface::platform::{Domain, Platform, PlatformDescriptor};
-use ompas_rae_interface::PLATFORM_CLIENT;
+use ompas_rae_interface::exec_platform::ExecPlatform;
+use ompas_rae_interface::platform::Platform;
+use ompas_rae_interface::platform_declaration::PlatformDeclaration;
 use ompas_rae_language::monitor::*;
 use ompas_rae_language::process::{LOG_TOPIC_OMPAS, OMPAS};
+use ompas_rae_structs::agenda::Agenda;
+use ompas_rae_structs::monitor::MonitorCollection;
+use ompas_rae_structs::rae_command::OMPASJob;
+use ompas_rae_structs::resource::ResourceCollection;
+use ompas_rae_structs::state::world_state::WorldState;
 use sompas_modules::advanced_math::ModAdvancedMath;
 use sompas_modules::string::ModString;
 use sompas_modules::time::ModTime;
@@ -36,12 +40,17 @@ use sompas_structs::lenv::LEnv;
 
 pub const TOKIO_CHANNEL_SIZE: usize = 100;
 
+#[derive(Default)]
 pub struct ModMonitor {
     pub(crate) options: Arc<RwLock<OMPASOptions>>,
-    pub(crate) interface: OMPASInternalState,
-    pub(crate) platform: Option<Platform>,
-    pub(crate) domain: Arc<RwLock<RAEDomain>>,
-    pub(crate) platform_domain: InitScheme,
+    pub state: WorldState,
+    pub resources: ResourceCollection,
+    pub monitors: MonitorCollection,
+    pub agenda: Agenda,
+    pub log: LogClient,
+    pub task_stream: Arc<RwLock<Option<tokio::sync::mpsc::Sender<OMPASJob>>>>,
+    pub(crate) platform: Platform,
+    pub(crate) ompas_domain: Arc<RwLock<OMPASDomain>>,
     pub(crate) empty_env: LEnv,
     pub(crate) tasks_to_execute: Arc<RwLock<Vec<Job>>>,
 }
@@ -61,6 +70,51 @@ impl From<ModMonitor> for LModule {
 }
 
 impl ModMonitor {
+    pub async fn new(
+        platform: impl Into<PlatformDeclaration>,
+        working_dir: Option<PathBuf>,
+    ) -> Self {
+        let mut module = Self::default();
+
+        Master::new_log_topic(
+            LOG_TOPIC_OMPAS,
+            working_dir.map(|p| FileDescriptor::AbsolutePath(p.canonicalize().unwrap())),
+        )
+        .await;
+
+        module.log = LogClient::new(OMPAS, LOG_TOPIC_OMPAS).await;
+
+        let platform = match platform.into() {
+            PlatformDeclaration::Exec(exec) => {
+                let lisp_domain = exec.read().await.domain().await;
+                Platform::new(
+                    module.ompas_domain.clone(),
+                    module.agenda.clone(),
+                    Some(
+                        ExecPlatform::new(
+                            exec,
+                            module.state.clone(),
+                            module.agenda.clone(),
+                            Arc::new(Default::default()),
+                            module.log.clone(),
+                            Arc::new(Default::default()),
+                        )
+                        .await,
+                    ),
+                    lisp_domain,
+                )
+            }
+            PlatformDeclaration::Simu(s) => {
+                Platform::new(module.ompas_domain.clone(), module.agenda.clone(), None, s)
+            }
+        };
+
+        module.platform = platform;
+
+        module.init_empty_env().await;
+        module
+    }
+
     /// Initialize the libraries to load inside Scheme env.
     /// Takes as argument the execution platform.
     ///
@@ -77,95 +131,5 @@ impl ModMonitor {
         );
         eval_init(&mut env).await;
         self.empty_env = env;
-    }
-
-    pub async fn new(
-        platform: impl PlatformDescriptor,
-        working_dir: Option<PathBuf>,
-        display_log: bool,
-    ) -> Self {
-        /*let channel =
-        ompas_rae_log::init(log.clone()) //change with configurable display
-            .unwrap_or_else(|e| panic!("Error while initiating logger : {}", e));*/
-
-        Master::new_log_topic(
-            LOG_TOPIC_OMPAS,
-            working_dir.map(|p| FileDescriptor::AbsolutePath(p.canonicalize().unwrap())),
-        )
-        .await;
-
-        let log_client = LogClient::new(OMPAS, LOG_TOPIC_OMPAS).await;
-
-        if display_log {
-            Master::start_display_log_topic(LOG_TOPIC_OMPAS).await;
-        }
-
-        let interface = OMPASInternalState {
-            state: Default::default(),
-            resources: Default::default(),
-            monitors: Default::default(),
-            agenda: Default::default(),
-            log: log_client,
-            command_stream: Arc::new(RwLock::new(None)),
-        };
-
-        let platform = Platform::new(
-            Arc::new(RwLock::new(platform)),
-            interface.state.clone(),
-            interface.agenda.clone(),
-            Arc::new(Default::default()),
-            LogClient::new(PLATFORM_CLIENT, LOG_TOPIC_OMPAS).await,
-            Arc::new(Default::default()),
-        )
-        .await;
-
-        let domain: InitScheme = match platform.domain().await {
-            Domain::String(s) => vec![s].into(),
-            Domain::File(f) => vec![fs::read_to_string(f).unwrap()].into(),
-        };
-
-        let mut module = Self {
-            options: Arc::new(Default::default()),
-            interface,
-            platform: Some(platform),
-            domain: Default::default(),
-            platform_domain: domain,
-            empty_env: Default::default(),
-            tasks_to_execute: Arc::new(Default::default()),
-        };
-
-        module.init_empty_env().await;
-        module
-    }
-}
-
-impl ModMonitor {
-    pub fn get_domain(&self) -> &InitScheme {
-        &self.platform_domain
-    }
-
-    pub fn set_domain(&mut self, domain: InitScheme) {
-        self.platform_domain = domain;
-    }
-}
-
-impl Default for ModMonitor {
-    fn default() -> Self {
-        Self {
-            options: Default::default(),
-            interface: OMPASInternalState {
-                state: Default::default(),
-                resources: Default::default(),
-                monitors: Default::default(),
-                agenda: Default::default(),
-                log: Default::default(),
-                command_stream: Arc::new(Default::default()),
-            },
-            platform: None,
-            domain: Default::default(),
-            platform_domain: Default::default(),
-            empty_env: Default::default(),
-            tasks_to_execute: Arc::new(Default::default()),
-        }
     }
 }

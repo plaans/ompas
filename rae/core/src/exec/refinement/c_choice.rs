@@ -3,7 +3,7 @@ use crate::exec::state::ModState;
 use crate::exec::ModExec;
 use ompas_rae_language::exec::c_choice::*;
 use ompas_rae_language::exec::state::MOD_STATE;
-use ompas_rae_structs::domain::RAEDomain;
+use ompas_rae_structs::domain::OMPASDomain;
 use ompas_rae_structs::select_mode::{CChoiceConfig, Planner, SelectMode};
 use ompas_rae_structs::state::action_state::RefinementMetaData;
 use ompas_rae_structs::state::world_state::WorldStateSnapshot;
@@ -33,7 +33,7 @@ pub struct ModCChoice {
     cost: Arc<RwLock<Cost>>,
     config: CChoiceConfig,
     level: Arc<AtomicU64>,
-    domain: Arc<RwLock<RAEDomain>>,
+    domain: Arc<RwLock<OMPASDomain>>,
 }
 
 impl From<ModCChoice> for Context {
@@ -261,7 +261,7 @@ pub async fn c_choice(env: &LEnv, task: &[LValue]) -> LResult {
     Ok(method)
 }
 
-pub async fn c_choice_env(mut env: LEnv, domain: &RAEDomain) -> LEnv {
+pub async fn c_choice_env(mut env: LEnv, domain: &OMPASDomain) -> LEnv {
     for (label, command) in &domain.commands {
         let lv_params = command.get_parameters().get_params_as_lvalue();
         let mut params = "".to_string();

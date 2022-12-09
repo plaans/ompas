@@ -3,20 +3,18 @@ use crate::exec::mode::{CtxMode, RAEMode};
 use crate::exec::task::ModTask;
 use crate::exec::*;
 use ompas_middleware::logger::LogClient;
-use ompas_rae_interface::platform::{Platform, PlatformDescriptor};
+use ompas_rae_interface::platform::Platform;
 use ompas_rae_language::exec::mode::CTX_MODE;
 use ompas_rae_language::exec::platform::*;
 use ompas_rae_language::exec::task::MOD_TASK;
 use ompas_rae_structs::agenda::Agenda;
 use ompas_rae_structs::state::action_status::ActionStatus;
-use sompas_core::parse;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lruntimeerror::LResult;
-use sompas_structs::lswitch::InterruptionReceiver;
 use sompas_structs::lvalue::LValue;
 
 pub struct ModPlatform {
-    platform: Option<Platform>,
+    platform: Platform,
     agenda: Agenda,
     pub(crate) log: LogClient,
 }
@@ -48,113 +46,106 @@ impl From<ModPlatform> for LModule {
 }
 
 #[async_scheme_fn]
-pub async fn exec_command(env: &LEnv, args: &[LValue]) -> LAsyncHandle {
+pub async fn exec_command(env: &LEnv, command: &[LValue]) -> LAsyncHandle {
     let env = env.clone();
-    let args = args.to_vec();
+    let command = command.to_vec();
 
     let (tx, mut int_rx) = new_interruption_handler();
 
     let f = (Box::pin(async move {
-        let args = args.as_slice();
+        let command = command.as_slice();
 
         let parent_task = env.get_context::<ModTask>(MOD_TASK)?.parent_id;
         let mod_platform = env.get_context::<ModPlatform>(MOD_PLATFORM)?;
         let log = mod_platform.log.clone();
         let (command_id, mut rx) = mod_platform
             .agenda
-            .add_command(args.into(), parent_task)
+            .add_command(command.into(), parent_task)
             .await;
-        let debug: LValue = args.into();
+        let debug: LValue = command.into();
         log.info(format!("Exec command {command_id}: {debug}."))
             .await;
-        let eval_model = |int: Option<InterruptionReceiver>| async {
-            let string = format!("((get-action-model '{}) {})", args[0], {
-                let mut str = "".to_string();
-                for e in &args[1..] {
-                    str.push_str(format!("'{}", e).as_str())
-                }
-                str
-            });
-            //println!("in eval model, string: {}", string);
-            let mut env = env.clone();
-            eval(&parse(&string, &mut env).await?, &mut env, int).await
-        };
 
         let mode = env.get_context::<CtxMode>(CTX_MODE)?.mode;
 
         match mode {
             RAEMode::Exec => {
-                match &mod_platform.platform {
-                    Some(platform) => {
-                        platform.exec_command(args, command_id).await;
+                match mod_platform.platform.is_exec_defined() {
+                    true => {
+                        mod_platform
+                            .platform
+                            .exec_command_on_platform(command, command_id)
+                            .await?;
+                    }
+                    false => {
+                        mod_platform
+                            .platform
+                            .exec_command_model(env.clone(), command, command_id)
+                            .await;
+                    }
+                }
 
-                        //println!("await on action (id={})", action_id);
-                        log.info(format!("Waiting on command {command_id}.")).await;
-                        //let mut action_status: TaskStatus = ctx.agenda.get_status(&action_id).await;
+                log.info(format!("Waiting on command {command_id}.")).await;
 
-                        let f = async {
-                            while rx.changed().await.is_ok() {
-                                //println!("waiting on status:");
-                                let action_status = *rx.borrow();
-                                match action_status {
-                                    ActionStatus::Rejected => {
-                                        log.error(format!("Command {command_id} is a rejected."))
-                                            .await;
-                                        mod_platform.agenda.set_end_time(&command_id).await;
-                                        return Ok(RaeExecError::ActionFailure.into());
-                                    }
-                                    ActionStatus::Accepted => {}
-                                    ActionStatus::Pending => {
-                                        //println!("not triggered");
-                                    }
-                                    ActionStatus::Running(_) => {
-                                        //println!("running");
-                                    }
-                                    ActionStatus::Failure => {
-                                        log.error(format!("Command {command_id} is a failure."))
-                                            .await;
-                                        mod_platform.agenda.set_end_time(&command_id).await;
-                                        return Ok(RaeExecError::ActionFailure.into());
-                                    }
-                                    ActionStatus::Success => {
-                                        log.info(format!("Command {command_id} is a success."))
-                                            .await;
-                                        mod_platform.agenda.set_end_time(&command_id).await;
-                                        return Ok(true.into());
-                                    }
-                                    ActionStatus::Cancelled(_) => {
-                                        log.info(format!(
-                                            "Command {command_id} has been cancelled."
-                                        ))
-                                        .await;
-                                        mod_platform.agenda.set_end_time(&command_id).await;
-                                        return Ok(true.into());
-                                    }
-                                }
+                let f = async {
+                    while rx.changed().await.is_ok() {
+                        //println!("waiting on status:");
+                        let action_status = *rx.borrow();
+                        match action_status {
+                            ActionStatus::Rejected => {
+                                log.error(format!("Command {command_id} is a rejected."))
+                                    .await;
+                                mod_platform.agenda.set_end_time(&command_id).await;
+                                return Ok(RaeExecError::ActionFailure.into());
                             }
-                            Err(LRuntimeError::new(
-                                EXEC_COMMAND,
-                                "error on action status channel",
-                            ))
-                        };
-                        tokio::select! {
-                            _ = int_rx.recv() => {
-                                platform.cancel_command(command_id).await;
-                                Ok(LValue::Err(Default::default()))
+                            ActionStatus::Accepted => {}
+                            ActionStatus::Pending => {
+                                //println!("not triggered");
                             }
-                            r = f => {
-                                r
+                            ActionStatus::Running(_) => {
+                                //println!("running");
+                            }
+                            ActionStatus::Failure => {
+                                log.error(format!("Command {command_id} is a failure."))
+                                    .await;
+                                mod_platform.agenda.set_end_time(&command_id).await;
+                                return Ok(RaeExecError::ActionFailure.into());
+                            }
+                            ActionStatus::Success => {
+                                log.info(format!("Command {command_id} is a success."))
+                                    .await;
+                                mod_platform.agenda.set_end_time(&command_id).await;
+                                return Ok(true.into());
+                            }
+                            ActionStatus::Cancelled(_) => {
+                                log.info(format!("Command {command_id} has been cancelled."))
+                                    .await;
+                                mod_platform.agenda.set_end_time(&command_id).await;
+                                return Ok(true.into());
                             }
                         }
                     }
-                    None => {
-                        let r = eval_model(Some(int_rx)).await;
-                        set_success_for_task(&env, &[command_id.into()]).await?;
+                    Err(LRuntimeError::new(
+                        EXEC_COMMAND,
+                        "error on action status channel",
+                    ))
+                };
+                tokio::select! {
+                    _ = int_rx.recv() => {
+                        mod_platform.platform.cancel_command(command_id).await;
+                        Ok(LValue::Err(Default::default()))
+                    }
+                    r = f => {
                         r
                     }
                 }
             }
-            RAEMode::Simu => eval_model(None).await,
+            RAEMode::Simu => {
+                mod_platform
+                    .platform
+                    .sim_command(env.clone(), command)
+                    .await
+            }
         }
     }) as FutureResult)
         .shared();
@@ -170,12 +161,8 @@ pub async fn cancel_command(env: &LEnv, command_id: usize) -> LResult {
     let mode = env.get_context::<CtxMode>(CTX_MODE)?.mode;
     match mode {
         RAEMode::Exec => {
-            if let Some(platform) = &mod_platform.platform {
-                platform.cancel_command(command_id).await;
-                todo!()
-            } else {
-                Ok("cannot cancel command in internal platform (action is instantaneous)".into())
-            }
+            mod_platform.platform.cancel_command(command_id).await;
+            todo!()
         }
         RAEMode::Simu => Ok("No cancellation of action in simulation mode".into()),
     }
@@ -186,19 +173,14 @@ pub fn is_platform_defined(env: &LEnv) -> bool {
     env.get_context::<ModPlatform>(MOD_PLATFORM)
         .unwrap()
         .platform
-        .is_some()
+        .is_exec_defined()
 }
 
 #[async_scheme_fn]
-pub async fn start_platform(env: &LEnv) -> LResult {
+pub async fn start_platform(env: &LEnv) -> Result<String, LRuntimeError> {
     let ctx = env.get_context::<ModPlatform>(MOD_PLATFORM).unwrap();
 
-    if let Some(platform) = &ctx.platform {
-        platform.start(Default::default()).await;
-        Ok(LValue::Nil)
-    } else {
-        Ok("No platform defined".into())
-    }
+    ctx.platform.start(Default::default()).await
 }
 
 /*enum InstanceMode {

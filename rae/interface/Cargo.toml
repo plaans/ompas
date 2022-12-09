@@ -13,6 +13,7 @@ ompas-rae-structs = {path = "../structs"}
 ompas-utils = {path= "../../utils" }
 ompas-middleware=  {path = "../../middleware"}
 ompas-rae-language = {path = "../language"}
+sompas-core = {path = "../../scheme/core"}
 prost = { default-features = false, version = "0.11" }
 tonic = "0.8"
 async-stream = "0.3.3"

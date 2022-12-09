@@ -20,14 +20,14 @@ ompas-rae-language = {path = "../language"}
 #ompas-rae-structs = {path = "../structs"}
 
 # aries bindings
-#aries_core = {path = "../../aries/core"}
-#aries_model = {path = "../../aries/model"}
-#aries_planning = {path = "../../aries/planning"}
-#aries_utils = {path = "../../aries/utils"}
-#aries_collections = {path = "../../aries/collections"}
-#aries_solver = {path = "../../aries/solver"}
-#aries_planners = {path = "../../aries/planners"}
-#aries_stn = {path = "../../aries/reasoners/stn"}
+aries_core = {path = "../../aries/core"}
+aries_model = {path = "../../aries/model"}
+aries_planning = {path = "../../aries/planning"}
+aries_utils = {path = "../../aries/utils"}
+aries_collections = {path = "../../aries/collections"}
+aries_solver = {path = "../../aries/solver"}
+aries_planners = {path = "../../aries/planners"}
+aries_stn = {path = "../../aries/reasoners/stn"}
 
 tokio = { version = "1.17.0", features = ["full", "time"] }
 log =  { version = "0.4.16", features = ["std"] }

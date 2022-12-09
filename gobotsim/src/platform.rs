@@ -5,11 +5,14 @@ use crate::{DEFAULT_PATH_PROJECT_GODOT, TOKIO_CHANNEL_SIZE};
 use async_trait::async_trait;
 use ompas_middleware::logger::LogClient;
 use ompas_middleware::ProcessInterface;
-use ompas_rae_interface::platform::PlatformConfig;
-use ompas_rae_interface::platform::{Domain, InnerPlatformConfig, PlatformDescriptor};
+use ompas_rae_interface::lisp_domain::LispDomain;
+use ompas_rae_interface::platform_config::{InnerPlatformConfig, PlatformConfig};
 use ompas_rae_interface::platform_interface::platform_interface_server::PlatformInterfaceServer;
-use ompas_rae_interface::{DEFAULT_PLATFORM_SERVICE_IP, DEFAULT_PLATFROM_SERVICE_PORT};
-use ompas_rae_interface::{LOG_TOPIC_PLATFORM, PROCESS_TOPIC_PLATFORM};
+use ompas_rae_interface::PlatformDescriptor;
+use ompas_rae_language::interface::{
+    DEFAULT_PLATFORM_SERVICE_IP, DEFAULT_PLATFROM_SERVICE_PORT, LOG_TOPIC_PLATFORM,
+    PROCESS_TOPIC_PLATFORM,
+};
 use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::LResult;
 use sompas_structs::lvalue::LValue;
@@ -33,7 +36,7 @@ pub struct PlatformGobotSim {
     pub service_info: SocketAddr,
     pub godot_tcp_info: SocketAddr,
     pub headless: bool,
-    pub domain: Domain,
+    pub domain: LispDomain,
     pub config: String,
     pub log: LogClient,
 }
@@ -50,7 +53,7 @@ impl Default for PlatformGobotSim {
                 .parse()
                 .unwrap(),
             headless: false,
-            domain: Domain::default(),
+            domain: LispDomain::default(),
             config: "".to_string(),
             log: Default::default(),
         }
@@ -58,7 +61,7 @@ impl Default for PlatformGobotSim {
 }
 
 impl PlatformGobotSim {
-    pub fn new(domain: Domain, headless: bool, log: LogClient) -> Self {
+    pub fn new(domain: LispDomain, headless: bool, log: LogClient) -> Self {
         PlatformGobotSim {
             service_info: format!(
                 "{}:{}",
@@ -219,7 +222,7 @@ impl PlatformDescriptor for PlatformGobotSim {
             .await;
     }
 
-    async fn domain(&self) -> Domain {
+    async fn domain(&self) -> LispDomain {
         self.domain.clone()
     }
 

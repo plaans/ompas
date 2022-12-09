@@ -5,7 +5,7 @@ use ompas_rae_interface::platform_interface::platform_interface_server::Platform
 use ompas_rae_interface::platform_interface::{
     CommandRequest, CommandResponse, InitGetUpdate, PlatformUpdate,
 };
-use ompas_rae_interface::{LOG_TOPIC_PLATFORM, PROCESS_TOPIC_PLATFORM};
+use ompas_rae_language::interface::*;
 use tokio::sync::{broadcast, mpsc};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::Response;

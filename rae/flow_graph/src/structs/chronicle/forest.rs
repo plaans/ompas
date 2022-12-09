@@ -59,7 +59,7 @@ pub struct Forest<T: Display + Default + Clone> {
 impl<T: Display + Default + Clone> Forest<T> {
     pub fn flat_bindings(&mut self) {
         for i in 0..self.inner.len() {
-            self.find(&i.into());
+            self.find(&i);
         }
     }
 
@@ -82,7 +82,7 @@ impl<T: Display + Default + Clone> Forest<T> {
 
     pub fn new_node(&mut self, value: T) -> NodeId {
         let id = self.inner.len();
-        let node = Node::new(value, id.clone());
+        let node = Node::new(value, id);
         self.inner.push(node);
         id
     }
@@ -120,7 +120,7 @@ impl<T: Debug + Display + Default + Clone> Display for Forest<T> {
 
         for (node_id, node) in self.inner.iter().enumerate() {
             let parent_id = node.get_parent();
-            if *parent_id != node_id.into() {
+            if *parent_id != node_id {
                 if let Some(vec) = groups.get_mut(parent_id) {
                     vec.push_back((node_id, node.clone()));
                 } else {

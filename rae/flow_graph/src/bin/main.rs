@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use flow_graph::config::GraphConvertConfig;
 use flow_graph::conversion::convert;
-use flow_graph::structs::chronicle::chronicle::ChronicleTemplate;
+use flow_graph::structs::chronicle::template::ChronicleTemplate;
 use sompas_core::{get_root_env, parse};
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lruntimeerror::LRuntimeError;
@@ -41,7 +41,7 @@ Graph flow converter for SOMPAS code!\n
     let config: GraphConvertConfig = match &opt.config {
         Some(config) => {
             let config =
-                fs::read_to_string(&config).expect("Something went wrong reading the config file");
+                fs::read_to_string(config).expect("Something went wrong reading the config file");
 
             let configs = YamlLoader::load_from_str(&config).unwrap();
             let config = &configs[0];
@@ -110,7 +110,7 @@ fn output_markdown(
     set_current_dir(&path).unwrap();
     let graph_file_name = format!("{}.png", name);
     Command::new("dot")
-        .args(&["-Tpng", &dot_file_name, "-o", &graph_file_name])
+        .args(["-Tpng", &dot_file_name, "-o", &graph_file_name])
         .spawn()
         .unwrap()
         .wait()
@@ -141,7 +141,7 @@ fn output_markdown(
         name,
         expression.format(0),
         graph_file_name,
-        ch.to_string(),
+        ch,
     );
 
     md_file.write_all(md.as_bytes()).unwrap();

@@ -10,6 +10,7 @@ use std::path::PathBuf;
 use ompas_middleware::logger::FileDescriptor;
 use ompas_middleware::Master;
 use ompas_rae_core::monitor::ModMonitor;
+use ompas_rae_language::process::LOG_TOPIC_OMPAS;
 use structopt::StructOpt;
 
 pub const TOKIO_CHANNEL_SIZE: usize = 65_384;
@@ -86,13 +87,19 @@ async fn lisp_interpreter(opt: &Opt) {
         }
     });
 
-    let ctx_rae = ModMonitor::new(None, opt.log.clone(), opt.rae_log).await;
+    let ctx_rae = ModMonitor::new("nil", opt.log.clone()).await;
+
+    if opt.rae_log {
+        Master::start_display_log_topic(LOG_TOPIC_OMPAS).await;
+    }
+
     li.import_namespace(ctx_rae);
 
     li.set_config(LispInterpreterConfig::new(true));
 
     li.run(
         opt.log
+            .as_ref()
             .map(|p| FileDescriptor::AbsolutePath(fs::canonicalize(p).unwrap())),
     )
     .await;

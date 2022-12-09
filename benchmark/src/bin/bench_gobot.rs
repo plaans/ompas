@@ -1,5 +1,8 @@
 use ompas_gobotsim::platform::PlatformGobotSim;
+use ompas_middleware::logger::{FileDescriptor, LogClient};
 use ompas_rae_core::monitor::ModMonitor;
+use ompas_rae_interface::lisp_domain::LispDomain;
+use ompas_rae_language::interface::{LOG_TOPIC_PLATFORM, PLATFORM_CLIENT};
 use sompas_modules::advanced_math::ModAdvancedMath;
 use sompas_modules::io::ModIO;
 use sompas_modules::string::ModString;
@@ -105,12 +108,12 @@ pub async fn lisp_interpreter(opt: Opt) {
     };
 
     let ctx_rae = ModMonitor::new(
-        Some(Platform::new(PlatformGobotSim::new(
+        PlatformGobotSim::new(
             domain(&opt),
             !opt.view,
-        ))),
+            LogClient::new(PLATFORM_CLIENT, LOG_TOPIC_PLATFORM).await,
+        ),
         Some(log.clone()),
-        false,
     )
     .await;
     li.import_namespace(ctx_rae);
@@ -122,7 +125,10 @@ pub async fn lisp_interpreter(opt: Opt) {
 
     li.set_config(LispInterpreterConfig::new(false));
     tokio::spawn(async move {
-        li.run(Some(log)).await;
+        li.run(Some(FileDescriptor::AbsolutePath(
+            log.canonicalize().unwrap(),
+        )))
+        .await;
     });
 
     //tokio::time::sleep(Duration::from_secs(time)).await;
@@ -187,7 +193,7 @@ pub async fn lisp_interpreter(opt: Opt) {
     );
 }
 
-pub fn domain(opt: &Opt) -> GodotDomain {
+pub fn domain(opt: &Opt) -> LispDomain {
     let domain = opt.domain.clone();
     let mut commands = domain.clone();
     commands.push("commands.lisp");

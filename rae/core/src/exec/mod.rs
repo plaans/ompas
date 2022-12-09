@@ -14,7 +14,7 @@ use ompas_rae_language::exec::{ARBITRARY, DOC_ARBITRARY, DOC_MOD_EXEC, MOD_EXEC}
 use ompas_rae_language::process::LOG_TOPIC_OMPAS;
 use ompas_rae_planning::aries::structs::ConversionCollection;
 use ompas_rae_structs::agenda::Agenda;
-use ompas_rae_structs::domain::RAEDomain;
+use ompas_rae_structs::domain::OMPASDomain;
 use ompas_rae_structs::monitor::MonitorCollection;
 use ompas_rae_structs::rae_options::OMPASOptions;
 use ompas_rae_structs::resource::ResourceCollection;
@@ -55,10 +55,10 @@ pub struct ModExec {
     options: Arc<RwLock<OMPASOptions>>,
     agenda: Agenda,
     state: WorldState,
-    domain: Arc<RwLock<RAEDomain>>,
+    domain: Arc<RwLock<OMPASDomain>>,
     monitors: MonitorCollection,
     resources: ResourceCollection,
-    platform: Option<Platform>,
+    platform: Platform,
     log: LogClient,
     _cc: Arc<RwLock<Option<ConversionCollection>>>,
 }
@@ -67,11 +67,11 @@ impl ModExec {
     pub async fn new(monitor: &ModControl) -> Self {
         Self {
             options: monitor.options.clone(),
-            agenda: monitor.interface.agenda.clone(),
-            state: monitor.interface.state.clone(),
+            agenda: monitor.agenda.clone(),
+            state: monitor.state.clone(),
             domain: monitor.domain.clone(),
-            monitors: monitor.interface.monitors.clone(),
-            resources: monitor.interface.resources.clone(),
+            monitors: monitor.monitors.clone(),
+            resources: monitor.resources.clone(),
             platform: monitor.platform.clone(),
             log: LogClient::new("exec-ompas", LOG_TOPIC_OMPAS).await,
             _cc: monitor.cc.clone(),

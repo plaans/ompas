@@ -21,7 +21,7 @@ pub mod task;
 pub mod type_hierarchy;
 
 #[derive(Default, Debug, Clone)]
-pub struct RAEDomain {
+pub struct OMPASDomain {
     pub tasks: HashMap<String, Task>,
     pub methods: HashMap<String, Method>,
     pub state_functions: HashMap<String, StateFunction>,
@@ -31,7 +31,7 @@ pub struct RAEDomain {
     pub map_symbol_type: HashMap<String, String>,
 }
 
-impl RAEDomain {
+impl OMPASDomain {
     pub fn get_element_description(&self, label: &str) -> String {
         match self.map_symbol_type.get(label) {
             None => format!("Keyword {} is not defined in the domain.", label),
@@ -389,7 +389,7 @@ impl RAEDomain {
     }
 }
 
-impl Display for RAEDomain {
+impl Display for OMPASDomain {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut str = "*** Domain defined in RAE ***\n".to_string();
 

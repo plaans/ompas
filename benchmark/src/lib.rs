@@ -78,7 +78,7 @@ pub fn send_email(config: &MailConfig, message: String) {
 pub fn install_binary(name: impl Display, path: PathBuf) {
     println!("Installation of the latest version of {}", name);
     let child = Command::new("cargo")
-        .args(&[
+        .args([
             "install",
             "--force",
             "--bin",

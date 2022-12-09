@@ -2,6 +2,7 @@ use crate::conversion::chronicle_conversion::convert_method;
 use crate::conversion::flow_graph_conversion::convert_into_flow_graph;
 use crate::conversion::flow_graph_post_process::flow_graph_post_processing;
 use crate::conversion::lvalue_pre_processing::pre_processing;
+use crate::structs::chronicle::template::ChronicleTemplate;
 use crate::FlowGraph;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lruntimeerror::LRuntimeError;

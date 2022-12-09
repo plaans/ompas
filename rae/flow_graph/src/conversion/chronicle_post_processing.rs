@@ -3,8 +3,10 @@ use crate::point_algebra::remove_useless_timepoints;
 use crate::structs::chronicle::constraint::Constraint;
 use crate::structs::chronicle::lit::Lit;
 use crate::structs::chronicle::sym_table::RefSymTable;
+use crate::structs::chronicle::template::{ChronicleSet, ChronicleTemplate};
 use crate::structs::chronicle::type_table::AtomType;
 use crate::structs::chronicle::AtomId;
+use crate::structs::chronicle::GetVariables;
 use im::HashSet;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use std::borrow::Borrow;
@@ -43,7 +45,7 @@ pub fn unify_equal(c: &mut ChronicleTemplate) {
     for (index, constraint) in constraints.iter().enumerate() {
         if let Constraint::Eq(a, b) = constraint {
             if let (Lit::Atom(id_1), Lit::Atom(id_2)) = (a, b) {
-                if let Ok(true) = bind_atoms(&id_1, &id_2, &mut c.sym_table) {
+                if let Ok(true) = bind_atoms(id_1, id_2, &mut c.sym_table) {
                     vec_constraint_to_rm.push(index);
                 }
             }

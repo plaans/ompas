@@ -1,11 +1,13 @@
 use crate::error::RaeExecError;
+use crate::exec::task::ModTask;
 use futures::FutureExt;
 use ompas_middleware::logger::LogClient;
 use ompas_middleware::LogLevel;
 use ompas_middleware::ProcessInterface;
 use ompas_rae_language::process::{LOG_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS};
-use ompas_rae_structs::job::JobExpr;
+use ompas_rae_structs::job::JobType;
 use ompas_rae_structs::rae_command::OMPASJob;
+use ompas_rae_structs::trigger_collection::{Response, TaskTrigger};
 use sompas_core::{eval, parse};
 use sompas_structs::lasynchandler::LAsyncHandle;
 use sompas_structs::lenv::LEnv;
@@ -30,7 +32,6 @@ pub const PROCESS_MAIN_RAE: &str = "__PROCESS_MAIN_RAE__";
 /// Receives Job to handle in separate tasks.
 pub async fn rae(
     //domain: RAEDomain,
-    //interface: OMPASInternalState,
     log: LogClient,
     env: LEnv,
     mut command_rx: Receiver<OMPASJob>,
@@ -50,28 +51,32 @@ pub async fn rae(
 
                         let mut new_env = env.clone();
 
-                        let job_lvalue = match parse(match &job.r#type {
-                            JobExpr::Task(t) => {
-                                log.info(format!("new triggered method: {}", t)).await;
-                                t
+                        let mut arc_task_id = None;
+
+                        let job_type = job.r#type;
+                        let job_expr = &job.expr;
+
+                        match job_type {
+                            JobType::Task => {
+                                log.info(format!("new triggered method: {}", job_expr)).await;
+                                let mod_task = ModTask::default();
+                                arc_task_id = Some(mod_task.get_pointer());
+                                new_env.update_context(mod_task);
+
                             },
-                            JobExpr::Method(m) => {
-                                //log.info(format!("new triggered method: {}", job)).await;
-                                m
+                            JobType::Debug => {
+                                log.info(format!("new triggered debug: {}", job_expr)).await;
+
                             },
-                            JobExpr::Command(c) => {
-                                //log.info(format!("new triggered command: {}", job)).await;
-                                c
-                            },
-                            JobExpr::Debug(d) => {
-                                //log.info(format!("new triggered debug: {}", job)).await;
-                                d
-                            },
-                        }, &mut new_env).await {
+                        }
+
+
+
+                        let job_lvalue = match parse(job_expr, &mut new_env).await {
                             Ok(l) => l,
                             Err(e) => {
                                 job
-                            .sender.try_send(Err(e));
+                                    .sender.try_send(Err(e)).unwrap();
                                 continue;
                                 }
                         };
@@ -111,9 +116,20 @@ pub async fn rae(
 
                         tokio::spawn(f2);
 
+                        let async_handle = LAsyncHandle::new(future, tx);
+
+                        let response: Response = match job_type {
+                            JobType::Task => {
+                                Response::Trigger(TaskTrigger::new(arc_task_id.unwrap(), async_handle))
+                            }
+                            JobType::Debug => {
+                                Response::Handle(async_handle)
+                            }
+                        };
+
 
                         match job.sender
-                            .try_send(Ok(LAsyncHandle::new(future, tx))) {
+                            .try_send(Ok(response)) {
                             Ok(_) =>{}
                             Err(e) => {
                                 log.error(e.to_string()).await;

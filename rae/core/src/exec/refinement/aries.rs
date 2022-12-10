@@ -57,7 +57,7 @@ pub async fn aries_select(
     println!("\t*tried: {}", LValue::from(tried));
     println!("\t*greedy: {}", LValue::from(&greedy.applicable_methods));
 
-    let parent_task = env.get_context::<ModTask>(MOD_TASK)?.parent_id;
+    let parent_task = env.get_context::<ModTask>(MOD_TASK)?.get_task_id().await;
     match parent_task {
         Some(parent_id) => {
             let parent_stack: TaskMetaData = ctx.agenda.get_task(&parent_id).await?;

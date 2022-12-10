@@ -71,7 +71,7 @@ impl Debug for LMutFn {
 
 pub type DynMutFut<'a> =
     ::std::pin::Pin<Box<dyn 'a + Send + ::std::future::Future<Output = LResult>>>;
-pub type AsyncNativeMutFn = for<'a> fn(&'a LEnv, &'a [LValue]) -> DynFut<'a>;
+pub type AsyncNativeMutFn = for<'a> fn(&'a mut LEnv, &'a [LValue]) -> DynFut<'a>;
 
 #[derive(Clone)]
 pub struct LAsyncMutFn {

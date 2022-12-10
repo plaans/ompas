@@ -247,8 +247,13 @@ fn build_params(
                 } else if let Type::Reference(r) = t {
                     let lt: Lifetime = syn::parse_str(DEFAULT_LIFETIME).unwrap();
                     let t = r.elem.as_ref();
-                    syn::parse_quote! {
-                        & #lt #t
+                    match r.mutability {
+                        None => syn::parse_quote! {
+                            & #lt #t
+                        },
+                        Some(_) => syn::parse_quote! {
+                            & #lt mut #t
+                        },
                     }
                 } else {
                     panic!("type of args should be a reference")

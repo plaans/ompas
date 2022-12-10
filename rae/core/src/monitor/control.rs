@@ -5,6 +5,7 @@ use ompas_middleware::logger::LogClient;
 use ompas_middleware::ProcessInterface;
 use ompas_rae_interface::platform::Platform;
 use ompas_rae_interface::platform_config::PlatformConfig;
+use ompas_rae_language::exec::task::DOC_GET_TASK_ID;
 use ompas_rae_language::monitor::control::*;
 use ompas_rae_language::process::{LOG_TOPIC_OMPAS, PROCESS_STOP_OMPAS, PROCESS_TOPIC_OMPAS};
 use ompas_rae_language::select::*;
@@ -21,6 +22,7 @@ use ompas_rae_structs::select_mode::{Planner, SelectMode};
 use ompas_rae_structs::state::action_state::*;
 use ompas_rae_structs::state::action_status::*;
 use ompas_rae_structs::state::world_state::*;
+use ompas_rae_structs::trigger_collection::{Response, TaskTrigger, TriggerCollection};
 use sompas_core::{eval_init, get_root_env};
 use sompas_macros::*;
 use sompas_modules::advanced_math::ModAdvancedMath;
@@ -28,7 +30,6 @@ use sompas_modules::io::{LogOutput, ModIO};
 use sompas_modules::time::ModTime;
 use sompas_modules::utils::ModUtils;
 use sompas_structs::kindlvalue::KindLValue;
-use sompas_structs::lasynchandler::LAsyncHandle;
 use sompas_structs::lenv::ImportType::WithoutPrefix;
 use sompas_structs::lenv::{LEnv, LEnvSymbols};
 use sompas_structs::lmodule::LModule;
@@ -53,6 +54,7 @@ pub struct ModControl {
     pub(crate) ompas_domain: Arc<RwLock<OMPASDomain>>,
     pub(crate) tasks_to_execute: Arc<RwLock<Vec<Job>>>,
     pub(crate) cc: Arc<RwLock<Option<ConversionCollection>>>,
+    pub(crate) triggers: TriggerCollection,
 }
 
 impl ModControl {
@@ -69,6 +71,7 @@ impl ModControl {
             ompas_domain: monitor.ompas_domain.clone(),
             tasks_to_execute: monitor.tasks_to_execute.clone(),
             cc: Arc::new(Default::default()),
+            triggers: Default::default(),
         }
     }
 
@@ -162,23 +165,15 @@ impl From<ModControl> for LModule {
             false,
         );
         module.add_async_fn(
-            TRIGGER_METHOD,
-            trigger_method,
-            (DOC_TRIGGER_METHOD, DOC_TRIGGER_METHOD_VERBOSE),
-            false,
-        );
-        module.add_async_fn(
-            TRIGGER_COMMAND,
-            trigger_command,
-            (DOC_TRIGGER_COMMAND, DOC_TRIGGER_COMMAND_VERBOSE),
-            false,
-        );
-        module.add_async_fn(
             ADD_TASK_TO_EXECUTE,
             add_task_to_execute,
             DOC_ADD_TASK_TO_EXECUTE,
             false,
         );
+        module.add_async_fn(WAIT_TASK, wait_task, DOC_WAIT_TASK, false);
+        module.add_async_fn(GET_TASK_ID, get_task_id, DOC_GET_TASK_ID, false);
+        module.add_async_fn(CANCEL_TASK, cancel_task, DOC_CANCEL_TASK, false);
+
         module.add_async_fn(
             SET_CONFIG_PLATFORM,
             set_config_platform,
@@ -324,16 +319,18 @@ pub async fn __debug_ompas__(env: &LEnv, arg: LValue) -> LResult {
                     .expect("could not send job to rae");
             });
 
-            let handle: LAsyncHandle = rx.recv().await.unwrap()?;
-            handle.get_future().await
-            //Ok(rx.recv().await.unwrap())
+            if let Response::Handle(handle) = rx.recv().await.unwrap()? {
+                handle.get_future().await
+            } else {
+                unreachable!()
+            }
         }
     }
 }
 
 /// Sends via a channel a task to execute.
 #[async_scheme_fn]
-pub async fn trigger_task(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LRuntimeError> {
+pub async fn trigger_task(env: &LEnv, args: &[LValue]) -> Result<usize, LRuntimeError> {
     let env = env.clone();
 
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
@@ -357,70 +354,12 @@ pub async fn trigger_task(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, L
                     .await
                     .expect("could not send job to rae");
             });
-
-            rx.recv().await.unwrap()
-        }
-    }
-}
-
-/// Sends via a channel a task to execute.
-#[async_scheme_fn]
-pub async fn trigger_method(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LRuntimeError> {
-    let env = env.clone();
-
-    let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
-    let (tx, mut rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
-    let method = args[0].to_string();
-    if !ctx.ompas_domain.read().await.is_method(&method) {
-        return Err(LRuntimeError::new(
-            TRIGGER_METHOD,
-            format!("{} is not a method.", method),
-        ));
-    }
-    let job = Job::new_method(tx, args.into());
-
-    match ctx.get_sender().await {
-        None => Err(LRuntimeError::new(TRIGGER_METHOD, "no sender to rae")),
-        Some(sender) => {
-            tokio::spawn(async move {
-                sender
-                    .send(job.into())
-                    .await
-                    .expect("could not send job to rae");
-            });
-
-            rx.recv().await.unwrap()
-        }
-    }
-}
-
-/// Sends via a channel a task to execute.
-#[async_scheme_fn]
-pub async fn trigger_command(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LRuntimeError> {
-    let env = env.clone();
-
-    let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
-    let (tx, mut rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
-    let command = args[0].to_string();
-    if !ctx.ompas_domain.read().await.is_command(&command) {
-        return Err(LRuntimeError::new(
-            TRIGGER_COMMAND,
-            format!("{} is not a command.", command),
-        ));
-    }
-    let job = Job::new_command(tx, args.into());
-
-    match ctx.get_sender().await {
-        None => Err(LRuntimeError::new(TRIGGER_COMMAND, "no sender to rae")),
-        Some(sender) => {
-            tokio::spawn(async move {
-                sender
-                    .send(job.into())
-                    .await
-                    .expect("could not send job to rae");
-            });
-
-            rx.recv().await.unwrap()
+            let trigger: Response = rx.recv().await.unwrap()?;
+            if let Response::Trigger(trigger) = trigger {
+                Ok(ctx.triggers.add_task(trigger).await)
+            } else {
+                unreachable!("trigger-task should receive a TaskTrigger struct.")
+            }
         }
     }
 }
@@ -457,6 +396,48 @@ pub async fn add_task_to_execute(env: &LEnv, args: &[LValue]) -> Result<(), LRun
         }
     };
     Ok(())
+}
+
+#[async_scheme_fn]
+pub async fn wait_task(env: &LEnv, task_id: usize) -> LResult {
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
+    let trigger: Option<TaskTrigger> = ctx.triggers.get_task(task_id).await;
+    match trigger {
+        Some(trigger) => trigger.get_handle().get_future().await,
+        None => Err(LRuntimeError::new(
+            WAIT_TASK,
+            format!("{} is not the id of a triggered task", task_id),
+        )),
+    }
+}
+
+#[async_scheme_fn]
+pub async fn get_task_id(env: &LEnv, task_id: usize) -> LResult {
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
+    let trigger: Option<TaskTrigger> = ctx.triggers.get_task(task_id).await;
+    match trigger {
+        Some(trigger) => match trigger.get_task_id().await {
+            Some(task_id) => Ok(task_id.into()),
+            None => Ok(LValue::Nil),
+        },
+        None => Err(LRuntimeError::new(
+            WAIT_TASK,
+            format!("{} is not the id of a triggered task", task_id),
+        )),
+    }
+}
+
+#[async_scheme_fn]
+pub async fn cancel_task(env: &LEnv, task_id: usize) -> LResult {
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
+    let trigger: Option<TaskTrigger> = ctx.triggers.get_task(task_id).await;
+    match trigger {
+        Some(trigger) => trigger.get_handle().interrupt().await,
+        None => Err(LRuntimeError::new(
+            WAIT_TASK,
+            format!("{} is not the id of a triggered task", task_id),
+        )),
+    }
 }
 
 #[async_scheme_fn]

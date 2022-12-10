@@ -55,7 +55,7 @@ pub async fn exec_command(env: &LEnv, command: &[LValue]) -> LAsyncHandle {
     let f = (Box::pin(async move {
         let command = command.as_slice();
 
-        let parent_task = env.get_context::<ModTask>(MOD_TASK)?.parent_id;
+        let parent_task = env.get_context::<ModTask>(MOD_TASK)?.get_task_id().await;
         let mod_platform = env.get_context::<ModPlatform>(MOD_PLATFORM)?;
         let log = mod_platform.log.clone();
         let (command_id, mut rx) = mod_platform

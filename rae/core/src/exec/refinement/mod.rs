@@ -127,7 +127,7 @@ pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
     let ctx = env.get_context::<ModRefinement>(MOD_REFINEMENT)?;
     let log = ctx.log.clone();
     let parent_task: Option<usize> = match env.get_context::<ModTask>(MOD_TASK) {
-        Ok(ctx) => ctx.parent_id,
+        Ok(ctx) => ctx.get_task_id().await,
         Err(_) => None,
     };
     let mut task: TaskMetaData = ctx.agenda.add_task(task_label.clone(), parent_task).await;

@@ -13,5 +13,6 @@ pub mod rae_options;
 pub mod resource;
 pub mod select_mode;
 pub mod state;
+pub mod trigger_collection;
 
 pub type ActionId = usize;

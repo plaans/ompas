@@ -1,77 +1,51 @@
-use sompas_structs::lasynchandler::LAsyncHandle;
+use crate::trigger_collection::Response;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use std::fmt::{Display, Formatter};
 use tokio::sync::mpsc;
 
 #[derive(Debug, Clone)]
-pub enum JobExpr {
-    Task(String),
-    Method(String),
-    Command(String),
-    Debug(String),
+pub enum JobType {
+    Task,
+    Debug,
 }
 
-impl Display for JobExpr {
+/*impl Display for JobType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            JobExpr::Task(t) | JobExpr::Method(t) | JobExpr::Command(t) | JobExpr::Debug(t) => {
-                write!(f, "{}", t)
-            }
-        }
+
+                write!(f, "{}", )
+
+
     }
-}
+}*/
 
 #[derive(Debug, Clone)]
 pub struct Job {
-    pub sender: mpsc::Sender<Result<LAsyncHandle, LRuntimeError>>,
-    pub r#type: JobExpr,
+    pub sender: mpsc::Sender<Result<Response, LRuntimeError>>,
+    pub expr: String,
+    pub r#type: JobType,
 }
 
 impl Display for Job {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{}", self.r#type)
+        write!(f, "{}", self.expr)
     }
 }
 
 impl Job {
-    pub fn new_task(
-        sender: mpsc::Sender<Result<LAsyncHandle, LRuntimeError>>,
-        value: LValue,
-    ) -> Self {
+    pub fn new_task(sender: mpsc::Sender<Result<Response, LRuntimeError>>, value: LValue) -> Self {
         Self {
             sender,
-            r#type: JobExpr::Task(value.to_string()),
+            expr: value.to_string(),
+            r#type: JobType::Task,
         }
     }
 
-    pub fn new_method(
-        sender: mpsc::Sender<Result<LAsyncHandle, LRuntimeError>>,
-        value: LValue,
-    ) -> Self {
+    pub fn new_debug(sender: mpsc::Sender<Result<Response, LRuntimeError>>, value: LValue) -> Self {
         Self {
             sender,
-            r#type: JobExpr::Method(value.to_string()),
-        }
-    }
-
-    pub fn new_command(
-        sender: mpsc::Sender<Result<LAsyncHandle, LRuntimeError>>,
-        value: LValue,
-    ) -> Self {
-        Self {
-            sender,
-            r#type: JobExpr::Command(value.to_string()),
-        }
-    }
-
-    pub fn new_debug(
-        sender: mpsc::Sender<Result<LAsyncHandle, LRuntimeError>>,
-        value: LValue,
-    ) -> Self {
-        Self {
-            sender,
-            r#type: JobExpr::Debug(value.to_string()),
+            expr: value.to_string(),
+            r#type: JobType::Debug,
         }
     }
 }

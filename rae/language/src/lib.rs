@@ -193,11 +193,14 @@ pub mod exec {
         pub const DOC_MOD_TASK: &str =
             "Module that contains the Task Context that contains the id of the parent task.";
 
-        pub const DEFINE_PARENT_TASK: &str = "define-parent-task";
-        pub const DOC_DEFINE_PARENT_TASK: &str = "Set in the Task context the parent of the task.";
+        pub const DEFINE_TASK_ID: &str = "define-task-id";
+        pub const DOC_DEFINE_TASK_ID: &str = "Set in the task id of the current executed task.";
+
+        pub const GET_TASK_ID: &str = "get-task-id";
+        pub const DOC_GET_TASK_ID: &str = "Return the id of the current executed task.";
 
         //Keywords
-        pub const PARENT_TASK: &str = "parent_task";
+        pub const LABEL_TASK: &str = "task";
 
         //RAE Interface with a platform
     }
@@ -230,7 +233,7 @@ pub mod exec {
                       (__task_id__ (second __result__)))
 
                     (begin
-                        (define-parent-task __task_id__)
+                        (define-task-id __task_id__)
                         (print \"Trying \" __method__ \" for \" __task_id__)
                         (if (err? (enr __method__))
                             (retry __task_id__)
@@ -658,18 +661,18 @@ pub mod monitor {
         pub const DOC_TRIGGER_TASK: &str = "Sends to the system a new task to address.";
         pub const DOC_TRIGGER_TASK_VERBOSE: &str = "Example: (trigger-task t_dumber robot0)";
 
-        pub const TRIGGER_METHOD: &str = "trigger-method";
-        pub const DOC_TRIGGER_METHOD: &str = "Sends to the system a method to execute.";
-        pub const DOC_TRIGGER_METHOD_VERBOSE: &str = "Example: (trigger-method m_dumber robot0)";
-
-        pub const TRIGGER_COMMAND: &str = "trigger-command";
-        pub const DOC_TRIGGER_COMMAND: &str = "Sends to the system a command to execute.";
-        pub const DOC_TRIGGER_COMMAND_VERBOSE: &str =
-            "Example: (trigger-command move robot0 bedroom)";
-
         pub const ADD_TASK_TO_EXECUTE: &str = "add-task-to-execute";
         pub const DOC_ADD_TASK_TO_EXECUTE: &str =
             "Add a task in the list of tasks that will be sent to the system after it launches.";
+
+        pub const WAIT_TASK: &str = "wait-task";
+        pub const DOC_WAIT_TASK: &str = "Wait on the result of a triggered task.";
+
+        pub const GET_TASK_ID: &str = "get_task_id";
+        pub const DOC_TASK_ID: &str = "Get the internal id of the triggered task.";
+
+        pub const CANCEL_TASK: &str = "cancel-task";
+        pub const DOC_CANCEL_TASK: &str = "Cancel a triggered task.";
 
         pub const SET_CONFIG_PLATFORM: &str = "set-config-platform";
         pub const DOC_SET_CONFIG_PLATFORM: &str = "Configure the platform options.";

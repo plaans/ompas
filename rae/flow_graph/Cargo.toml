@@ -41,5 +41,9 @@ async-recursion = "1.0.0"
 itertools = { default-features = false, version = "0.10" }
 
 [[bin]]
-name = "graph-convert"
+name = "flow-graph"
 path = "src/bin/main.rs"
+
+[[bin]]
+name = "type-network"
+path = "src/bin/type_network.rs"

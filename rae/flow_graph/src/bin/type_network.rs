@@ -11,28 +11,30 @@ use std::process::Command;
 fn main() {
     println!("Hello, world!");
     let tn = &TypeNetwork::default();
-    /*test_meet(tn, Literal, Literal);
-    test_meet(tn, Boolean, Boolean);
-    test_meet(tn, Literal, Boolean);
+    /*test_meet(tn, Boolean, Boolean);
+    test_meet(tn, Any, Boolean);
     test_meet(tn, True, Boolean);
-    test_meet(tn, Boolean, Nil);
-    test_meet(tn, List, Nil);
+    test_meet(tn, Boolean, False);
+    test_meet(tn, List, False);
     test_meet(tn, List, Map);
     test_meet(tn, Map, Any);
     test_meet(tn, Any, Map);
     test_meet(tn, Any, Any);
-    test_meet(tn, Literal, Int);
+    test_meet(tn, Int, Number);
     test_meet(tn, Any, Err(Box::new(Any)));
     test_meet(tn, Err(Box::new(Int)), Err(Box::new(Any)));
-    test_meet(tn, Handle(Box::new(Number)), Handle(Box::new(Literal)));
-    test_meet(tn, Literal, Handle(Box::new(Any)));*/
+    test_meet(tn, Handle(Box::new(Number)), Handle(Box::new(Any)));
+    test_meet(tn, Boolean, Handle(Box::new(Any)));*/
+    //test_meet(tn, Boolean, Union(vec![True, Symbol]));
+    //test_meet(tn, Union(vec![True, Number]), Union(vec![Boolean, Int]));
 
-    //test_union(tn, Literal, Boolean);
-    //test_union(tn, Literal, List);
-    //test_union(tn, Nil, List);
-    //test_union(tn, Union(vec![Nil, Map]), Union(vec![Literal, List]));
-    //test_union(tn, Union(vec![Map, Boolean]), Nil);
-    test_union(tn, Nil, True);
+    //test_union(tn, True, Boolean);
+    //test_union(tn, Boolean, False);
+    //test_union(tn, False, List);
+    //test_union(tn, EmptyList, List);
+    test_union(tn, Union(vec![False, Map]), Union(vec![Boolean, List]));
+    test_union(tn, Union(vec![Map, Boolean]), False);
+    /*test_union(tn, False, True);
     test_union(tn, Union(vec![Symbol, Float, Int]), Boolean);
     test_union(
         tn,
@@ -44,7 +46,7 @@ fn main() {
             Err(Box::new(Any)),
             Map,
         ]),
-    );
+    );*/
 
     //output_markdown("/home/jeremy/Bureau".into(), tn, true);
 }

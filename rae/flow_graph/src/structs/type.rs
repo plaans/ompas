@@ -1,6 +1,8 @@
 use crate::structs::r#type::Type::*;
 use aries_model::decomposition;
 use log::Level::Debug;
+use sompas_structs::lnumber::LNumber;
+use sompas_structs::lvalue::LValue;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
 use std::fmt::{Display, Formatter};
@@ -15,14 +17,15 @@ pub enum Type {
     List,
     Vector(Box<Type>),
     Tuple(Vec<Type>),
-    EmptyList,
+    //EmptyList,
     Handle(Box<Type>),
     Err(Box<Type>),
+    Alias(Box<Type>, Box<Type>),
     //Literal,
     Symbol,
     Boolean,
     True,
-    False,
+    Nil,
     Number,
     Int,
     Float,
@@ -33,11 +36,8 @@ impl Display for Type {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Any => write!(f, "Any"),
-            //Literal => write!(f, "Literal"),
             Boolean => write!(f, "Boolean"),
             True => write!(f, "True"),
-            False => write!(f, "False"),
-            EmptyList => write!(f, "EmptyList"),
             Number => write!(f, "Number"),
             Int => write!(f, "Int"),
             Float => write!(f, "Float"),
@@ -74,9 +74,55 @@ impl Display for Type {
                 }
                 write!(f, ")")
             }
+            /*Cst(cst) => {
+                write!(f, "{}[{}]", cst.r#type, cst.value)
+            }*/
+            Alias(n, t) => write!(f, "{n}"),
+            Nil => write!(f, "Nil"),
         }
     }
 }
+
+/*
+#[derive(Copy, Clone)]
+pub enum TypeGeneric {
+    Type(TypeId),
+    Union(Vec<TypeId>),
+    Err(TypeId),
+    Handle(TypeId),
+    Vec(TypeId),
+    Tuple(Vec<TypeId>),
+}
+
+pub enum DomainKind {
+    Cst(LValue),
+    Type(Type),
+}
+
+impl From<Type> for DomainKind {
+    fn from(t: Type) -> Self {
+        Self::Type(t)
+    }
+}
+
+impl From<&str> for Type {
+    fn from(s: &str) -> Self {
+        New(s.to_string())
+    }
+}
+
+impl From<String> for Type {
+    fn from(s: String) -> Self {
+        s.as_str().into()
+    }
+}
+
+/*#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct Cst {
+    r#type: Type,
+    value: LValue,
+}*/
+
 
 /*pub enum ListType {
     Any,
@@ -85,56 +131,58 @@ impl Display for Type {
 
 pub type TypeId = usize;
 
-pub struct TypeVertice {
+pub struct Domain {
     r#type: Type,
-    parent: Option<Type>,
-    childs: HashSet<Type>,
-    decomposition: Option<HashSet<Type>>,
+    parents: Vec<TypeId>,
+    childs: Vec<TypeId>,
+    decomposition: Option<Vec<TypeId>>,
 }
 
-impl TypeVertice {
-    pub fn decomposition(&self) -> &Option<HashSet<Type>> {
+impl Domain {
+    pub fn decomposition(&self) -> &Option<Vec<TypeId>> {
         &self.decomposition
     }
 
-    pub fn parent(&self) -> &Option<Type> {
-        &self.parent
+    pub fn parents(&self) -> &Vec<TypeId> {
+        &self.parents
     }
 
-    pub fn childs(&self) -> &HashSet<Type> {
+    pub fn childs(&self) -> &Vec<TypeId> {
         &self.childs
     }
 }
 
 pub struct TypeNetwork {
-    types: Vec<TypeVertice>,
+    types: Vec<Domain>,
     types_ids: HashMap<Type, TypeId>,
 }
 
 const TYPE_ID_ANY: usize = 0;
+const TYPE_ID_EMPTY: usize = 1;
 
 impl Default for TypeNetwork {
     fn default() -> Self {
         let mut types_ids: HashMap<Type, TypeId> = Default::default();
         types_ids.insert(Any, TYPE_ID_ANY);
-
+        types_ids.insert(Empty, TYPE_ID_EMPTY);
         let mut network = Self {
-            types: vec![TypeVertice {
-                r#type: Any,
-                parent: None,
-                childs: Default::default(),
+            types: vec![Domain {
+                r#type: Any.into(),
+                parents: vec![],
+                childs: vec![TYPE_ID_EMPTY],
                 decomposition: None,
             }],
             types_ids,
         };
+
         //network.add_type(Any, None);
-        network.add_type(Map, Some(Any));
-        network.add_type(List, Some(Any));
-        network.add_type(Boolean, Some(Any));
-        network.add_type(Number, Some(Any));
-        network.add_type(Symbol, Some(Any));
-        network.add_type(Handle(Box::new(Any)), Some(Any));
-        network.add_type(Err(Box::new(Any)), Some(Any));
+        network.add_type(Map, vec![Any]);
+        network.add_type(List, vec![Any]);
+        network.add_type(Boolean, vec![Any]);
+        network.add_type(Number, vec![Any]);
+        network.add_type(Symbol, vec![Any]);
+        network.add_type(Handle(Box::new(Any)), vec![Any]);
+        network.add_type(Err(Box::new(Any)), vec![Any]);
         network.add_decomposition(
             &Any,
             vec![
@@ -149,16 +197,17 @@ impl Default for TypeNetwork {
             .drain(..)
             .collect(),
         );
-        network.add_type(True, Some(Boolean));
+        /*network.add_type(True, Some(Boolean));
         network.add_type(False, Some(Boolean));
         network.add_decomposition(&Boolean, vec![True, False].drain(..).collect());
         network.add_type(Int, Some(Number));
         network.add_type(Float, Some(Number));
+        network.add_alias("Timepoint", Number);
         network.add_decomposition(&Number, vec![Int, Float].drain(..).collect());
         //network.add_type(Union(vec![]), vec![]);
         network.add_type(Vector(Box::new(Any)), Some(List));
         network.add_type(Tuple(vec![]), Some(List));
-        network.add_type(EmptyList, Some(List));
+        network.add_type(EmptyList, Some(List));*/
 
         network
     }
@@ -168,25 +217,169 @@ pub type Dot = String;
 const VERTICE_PREFIX: &str = "T";
 
 impl TypeNetwork {
-    //union bound
+    /*pub fn add_const(&self, lv: LValue, r#type: Option<Type>) -> Result<(), ()> {
+        //check valeur du type
+
+        let cst = match r#type {
+            None => match &lv {
+                LValue::Symbol(s) => Cst {
+                    r#type: Box::new(Symbol),
+                    value: lv,
+                },
+                LValue::String(_) => {}
+                LValue::Number(n) => match n {
+                    LNumber::Int(_) => Cst {
+                        r#type: Box::new(Int),
+                        value: lv,
+                    },
+                    LNumber::Float(_) => Cst {
+                        r#type: Box::new(Float),
+                        value: lv,
+                    },
+                },
+                LValue::Fn(_) => {}
+                LValue::MutFn(_) => {}
+                LValue::AsyncFn(_) => {}
+                LValue::AsyncMutFn(_) => {}
+                LValue::Lambda(_) => {}
+                LValue::Primitive(_) => {}
+                LValue::Handle(_) => {}
+                LValue::Err(_) => {}
+                LValue::Map(_) => {}
+                LValue::List(_) => {}
+                LValue::True => Cst {
+                    r#type: Box::new(True),
+                    value: lv,
+                },
+                LValue::Nil => Cst {
+                    r#type: Box::new(Union(vec![Boolean, EmptyList])),
+                    value: lv,
+                },
+            },
+            Some(t) => {
+                let mut tcst = t;
+                while let New(_) = &tcst {
+                    tcst = self.get_parent(&tcst).unwrap()
+                }
+                match tcst {
+                    Any => Cst {
+                        r#type: Box::new(Any),
+                        value: lv,
+                    },
+                    Union(_) => {}
+                    Map => {
+                        if let LValue::Map(_) = &lv {
+                            Cst {
+                                r#type: Box::new(Int),
+                                value: lv,
+                            }
+                        } else {
+                            return Err(());
+                        }
+                    }
+                    List => {
+                        if let LValue::List(_) = &lv {
+                            Cst {
+                                r#type: Box::new(Int),
+                                value: lv,
+                            }
+                        } else {
+                            return Err(());
+                        }
+                    }
+                    Vector(_) => {}
+                    Tuple(_) => {}
+                    EmptyList => {
+                        if let LValue::Nil = &lv {
+                            Cst {
+                                r#type: Box::new(Int),
+                                value: lv,
+                            }
+                        }
+                    }
+                    Handle(_) => {}
+                    Err(_) => {
+                        if let LValue::Map(_) = &lv {
+                            Cst {
+                                r#type: Box::new(Int),
+                                value: lv,
+                            }
+                        } else {
+                            Err(())
+                        }
+                    }
+                    Symbol => {
+                        if let LValue::Map(_) = &lv {
+                            Cst {
+                                r#type: Box::new(Int),
+                                value: lv,
+                            }
+                        } else {
+                            Err(())
+                        }
+                    }
+                    Boolean => {}
+                    True => {
+                        if let LValue::True(_) = &lv {
+                            Cst {
+                                r#type: Box::new(Int),
+                                value: lv,
+                            }
+                        }else {
+                            Err(())
+                        }
+                    }
+                    False => {
+                        if let LValue::True(_) = &lv {
+                            Cst {
+                                r#type: Box::new(Int),
+                                value: lv,
+                            }
+                        }else {
+                            Err(())
+                        }
+                    }
+                    Number => {}
+                    Int => {}
+                    Float => {}
+                    New(_) | Cst(_) | Empty => unreachable!(),
+                }
+            }
+        };
+    }*/
 
     pub fn get_type_id(&self, r#type: &Type) -> Option<TypeId> {
         self.types_ids.get(r#type).copied()
     }
 
-    pub fn get_type(&self, type_id: &TypeId) -> Option<Type> {
-        self.types.get(*type_id).map(|t| t.r#type.clone())
-    }
-
-    pub fn add_type(&mut self, r#type: Type, parent: Option<Type>) {
-        let parent = parent.unwrap_or(Any);
-        let id_parent = self.types_ids.get(&parent).unwrap();
-        self.types[*id_parent].childs.insert(r#type.clone());
+    /*pub fn add_alias(&mut self, alias: impl ToString, t: Type) {
         let id = self.types.len();
-        let vertice = TypeVertice {
-            r#type: r#type.clone(),
-            parent: Some(parent),
+        let vertice = Domain {
+            r#type: Alias(Box::new(New(alias.to_string())), Box::new(t)),
+            parent: None,
             childs: Default::default(),
+            decomposition: None,
+        };
+        self.types.push(vertice);
+        self.types_ids.insert(New(alias.to_string()), id);
+    }*/
+
+    pub fn add_type(&mut self, r#type: impl Into<Type>, mut parents: Vec<impl Into<Type>>) {
+        let id = self.types.len();
+        let r#type = r#type.into();
+        let parents = match parents.is_empty() {
+            true => vec![TYPE_ID_ANY],
+            false => parents
+                .drain(..)
+                .map(|t| self.get_type_id(&t.into()).unwrap()),
+        };
+        for p in parents {
+            self.types[p].childs.push(id)
+        }
+        let vertice = Domain {
+            r#type: r#type.clone(),
+            parents,
+            childs: vec![TYPE_ID_EMPTY],
             decomposition: None,
         };
         self.types.push(vertice);
@@ -201,7 +394,7 @@ impl TypeNetwork {
         self.types[id].decomposition = Some(decomposition);
     }
 
-    fn get_parent(&self, ta: &Type) -> Option<Type> {
+    fn get_parents(&self, ta: &TypeId) -> Option<Type> {
         match ta {
             Any => None,
             Handle(t) => match t.deref() {
@@ -226,7 +419,7 @@ impl TypeNetwork {
         }
     }
 
-    fn get_decomposition(&self, ta: &Type) -> Option<HashSet<Type>> {
+    fn get_decomposition(&self, ta: &Type) -> Option<Vec<TypeId>> {
         match ta {
             Err(t) => self.get_decomposition(t).map(|decomposition| {
                 decomposition
@@ -254,9 +447,10 @@ impl TypeNetwork {
         }
     }
 
-    fn get_childs(&self, ta: &Type) -> HashSet<Type> {
-        match ta {
-            Handle(t) => self
+    fn get_childs(&self, id: &TypeId) -> Vec<TypeId> {
+        self.types[*id].childs().clone()
+        /*match ta {
+            /*Handle(t) => self
                 .get_childs(t)
                 .drain()
                 .map(|t| Handle(Box::new(t)))
@@ -265,27 +459,45 @@ impl TypeNetwork {
                 .get_childs(t)
                 .drain()
                 .map(|t| Err(Box::new(t)))
-                .collect(),
-            Tuple(_) => vec![EmptyList].drain(..).collect(),
-            Vector(t) => self
-                .get_childs(t)
-                .drain()
-                .map(|t| Vector(Box::new(t)))
-                .collect(),
+                .collect(),*/
+            //Tuple(_) => vec![EmptyList].drain(..).collect(),
+            Vector(t) | Handle(_) | Err(_) => unreachable!(),
             t => {
-                let id = self.get_type_id(t).unwrap();
                 self.types[id].childs().iter().cloned().collect()
             }
             Empty => Default::default(),
-        }
+        }*/
     }
 
     pub fn meet(&self, ta: &Type, tb: &Type) -> Type {
+        let id_a = &self.types_ids[ta];
+        let id_b = &self.types_ids[tb];
+
+        self.types[self.meet_id(id_a, id_b)].r#type.clone()
+    }
+
+    fn meet_id(&self, ta: &TypeId, tb: &TypeId) -> TypeId {
         if ta == tb {
-            return ta.clone();
+            return *ta;
         }
         //Handling handle
         match (ta, tb) {
+            /*(Alias(t1, t2), tb) => {
+                let r = self.meet(t2, tb);
+                return if &r == t2.deref() {
+                    t1.deref().clone()
+                } else {
+                    r
+                };
+            }
+            (ta, Alias(t1, t2)) => {
+                let r = self.meet(ta, t2);
+                return if &r == t2.deref() {
+                    t1.deref().clone()
+                } else {
+                    r
+                };
+            }*/
             (Any, Handle(_) | Err(_) | Vector(_) | Tuple(_) | Union(_)) => return tb.clone(),
             (Handle(_) | Err(_) | Vector(_) | Tuple(_) | Union(_), Any) => return ta.clone(),
             //handle case
@@ -375,7 +587,7 @@ impl TypeNetwork {
             _ => {}
         };
 
-        //checking parents of ta
+        //checking childs of ta
         let mut parent: Option<Type> = self.get_parent(ta);
         while let Some(p) = &parent {
             if tb == p {
@@ -409,6 +621,22 @@ impl TypeNetwork {
         //Handling handle
         match (ta, tb) {
             //handle case
+            (Alias(t1, t2), tb) => {
+                let r = self.union(t2, tb);
+                return if &r == t2.deref() {
+                    t1.deref().clone()
+                } else {
+                    r
+                };
+            }
+            (ta, Alias(t1, t2)) => {
+                let r = self.union(ta, t2);
+                return if &r == t2.deref() {
+                    t1.deref().clone()
+                } else {
+                    r
+                };
+            }
             (Handle(ha), Handle(hb)) => return Handle(Box::new(self.union(&ha, &hb))),
             //Error case
             (Err(ea), Err(eb)) => return Err(Box::new(self.union(&ea, &eb))),
@@ -668,15 +896,18 @@ impl TypeNetwork {
                 id, vertice.r#type
             )
             .unwrap();
-            if !vertice.childs.is_empty() {
+            if let Alias(t1, t2) = &vertice.r#type {
+                //println!("{t1} is alias of {t2}");
+                let id_type = self.types_ids.get(t2).unwrap();
+                writeln!(
+                    dot,
+                    "{VERTICE_PREFIX}{id} -> {VERTICE_PREFIX}{id_type}[arrowhead=\"none\"]",
+                )
+                .unwrap();
+            } else if !vertice.childs.is_empty() {
                 for child in &vertice.childs {
                     let id_child = self.types_ids.get(child).unwrap();
-                    writeln!(
-                        dot,
-                        "{VERTICE_PREFIX}{} -> {VERTICE_PREFIX}{}",
-                        id, id_child
-                    )
-                    .unwrap();
+                    writeln!(dot, "{VERTICE_PREFIX}{id} -> {VERTICE_PREFIX}{id_child}",).unwrap();
                 }
             } else {
                 writeln!(dot, "{VERTICE_PREFIX}{} -> NONE", id).unwrap();
@@ -686,4 +917,4 @@ impl TypeNetwork {
         dot.push('}');
         dot
     }
-}
+}*/

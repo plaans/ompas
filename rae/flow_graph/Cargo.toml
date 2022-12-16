@@ -47,3 +47,7 @@ path = "src/bin/main.rs"
 [[bin]]
 name = "type-network"
 path = "src/bin/type_network.rs"
+
+[[bin]]
+name = "domain"
+path = "src/bin/domain_collection.rs"

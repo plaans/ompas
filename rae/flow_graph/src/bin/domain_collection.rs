@@ -15,6 +15,18 @@ fn meet(dc: &DomainCollection, ta: impl Into<Type>, tb: impl Into<Type>) {
     println!("{} ^ {} = {}", ta, tb, dc.meet(&ta, &tb))
 }
 
+fn union(dc: &DomainCollection, ta: impl Into<Type>, tb: impl Into<Type>) {
+    let ta = ta.into();
+    let tb = tb.into();
+    println!("{} | {} = {}", ta, tb, dc.union(&ta, &tb))
+}
+
+fn sub(dc: &DomainCollection, ta: impl Into<Type>, tb: impl Into<Type>) {
+    let ta = ta.into();
+    let tb = tb.into();
+    println!("{} / {} = {}", ta, tb, dc.substract(&ta, &tb))
+}
+
 fn main() {
     println!("Hello, world!");
     //let tn = &TypeNetwork::default();
@@ -23,7 +35,7 @@ fn main() {
     /*let union = (: &TypeNetwork, ta: Type, tb: Type) {
         println!("{} | {} = {}", ta, tb, dc.union(&ta, &tb))
     };*/
-    meet(dc, Boolean, Boolean);
+    /*meet(dc, Boolean, Boolean);
     meet(dc, Any, Boolean);
     meet(dc, True, Boolean);
     meet(dc, Boolean, Nil);
@@ -33,22 +45,43 @@ fn main() {
     meet(dc, Map, Any);
     meet(dc, Any, Map);
     meet(dc, Any, Any);
-    meet(dc, Int, Number);
+    meet(dc, Int, Number);*/
     /*meet(
         dc,
-        TypeR::Simple(Err as usize),
-        TypeR::Composed(Err as usize, vec![TypeR::Simple(Int as usize)]),
+        Err(Some(Box::new(Handle(None)))),
+        Err(Some(Box::new(Handle(Some(Box::new(Int)))))),
+    );*/
+    /*union(dc, Boolean, Union(vec![True, Symbol]));
+    union(dc, Union(vec![True, Union(vec![Nil, Number])]), List);
+    union(
+        dc,
+        Union(vec![Boolean, List, Map, Err(None)]),
+        Union(vec![List, Number, Symbol, Handle(None)]),
+    );*/
+    /*sub(dc, Any, Err(None));
+    sub(dc, Err(None), Any);
+    sub(dc, Err(None), Nil);*/
+    //sub(dc, Union(vec![Err(None), Nil]), Union(vec![Nil, Int]));
+    //meet(dc, Substract(Box::new(Any), Box::new(Err(None))), Err(None));
+    //meet(dc, dc.substract(&Any, &Err(None)), Int);
+    //sub(dc, Err(None), Err(Some(Box::new(Int))));
+    union(dc, Err(Some(Box::new(Int))), Err(None));
+    sub(dc, dc.substract(&Any, &Err(None)), Err(Some(Box::new(Int))));
+    sub(dc, dc.substract(&Any, &Err(Some(Box::new(Int)))), Err(None));
+    meet(dc, dc.substract(&Any, &Err(None)), Err(Some(Box::new(Int))));
+    meet(dc, dc.substract(&Any, &Err(Some(Box::new(Int)))), Err(None));
+    sub(dc, dc.substract(&Any, &Int), dc.substract(&Number, &Float));
+    /*meet(
+        dc,
+        dc.substract(&dc.substract(&Any, &Int), &dc.substract(&Number, &Float)),
+        Float,
     );
     meet(
         dc,
-        TypeR::Composed(Err as usize, vec![TypeR::Simple(Int as usize)]),
-        TypeR::Simple(Err as usize),
+        dc.substract(&dc.substract(&Any, &Int), &dc.substract(&Number, &Float)),
+        Int,
     );*/
-    /*meet(Any, Err(Box::new(Any)));
-    meet(tn, Err(Box::new(Int)), Err(Box::new(Any)));
-    test_meet(tn, Handle(Box::new(Number)), Handle(Box::new(Any)));
-    test_meet(tn, Boolean, Handle(Box::new(Any)));*/
-    //test_meet(tn, Boolean, Union(vec![True, Symbol]));
+
     //test_meet(tn, Union(vec![True, Number]), Union(vec![Boolean, Int]));
     //test_meet(tn, "Timepoint".into(), Number);
     //test_meet(tn, Int, "Timepoint".into());
@@ -72,7 +105,7 @@ fn main() {
         ]),
     );*/
 
-    output_domain_collection("/home/jeremy/Bureau/domain".into(), dc, true);
+    //output_domain_collection("/home/jeremy/Bureau/domain".into(), dc, true);
     //output_markdown("/home/jeremy/Bureau".into(), tn, true);
 }
 

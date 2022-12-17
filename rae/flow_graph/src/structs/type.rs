@@ -15,11 +15,11 @@ pub enum Type {
     Union(Vec<Type>),
     Map,
     List,
-    Vector(Box<Type>),
-    Tuple(Vec<Type>),
+    Vector(Option<Box<Type>>),
+    Tuple(Option<Vec<Type>>),
     //EmptyList,
-    Handle(Box<Type>),
-    Err(Box<Type>),
+    Handle(Option<Box<Type>>),
+    Err(Option<Box<Type>>),
     Alias(Box<Type>, Box<Type>),
     //Literal,
     Symbol,
@@ -30,6 +30,7 @@ pub enum Type {
     Int,
     Float,
     New(String),
+    Substract(Box<Type>, Box<Type>),
 }
 
 impl Display for Type {
@@ -45,40 +46,53 @@ impl Display for Type {
             Map => write!(f, "Map"),
             Symbol => write!(f, "Symbol"),
             New(s) => write!(f, "{s}"),
-            Empty => write!(f, "None"),
-            Handle(h) => write!(f, "Handle[{h}]"),
-            Err(e) => write!(f, "Err[{e}]"),
+            Empty => write!(f, "Empty"),
+            Handle(h) => match h {
+                None => write!(f, "Handle"),
+                Some(t) => write!(f, "Handle<{t}>"),
+            },
+            Err(e) => match e {
+                None => write!(f, "Err"),
+                Some(e) => write!(f, "Err<{e}>"),
+            },
             Union(types) => match types.is_empty() {
                 true => {
-                    write!(f, "Union[Any]")
+                    write!(f, "{}", Empty)
                 }
                 false => {
-                    write!(f, "Union(")?;
+                    write!(f, "{{")?;
                     for (i, t) in types.iter().enumerate() {
                         if i != 0 {
                             write!(f, ",")?;
                         }
                         write!(f, "{}", t)?;
                     }
-                    write!(f, ")")
+                    write!(f, "}}")
                 }
             },
-            Vector(t) => write!(f, "Vector[{t}]"),
-            Tuple(types) => {
-                write!(f, "Tuple(")?;
-                for (i, t) in types.iter().enumerate() {
-                    if i != 0 {
-                        write!(f, ",")?;
+            Vector(t) => match t {
+                None => write!(f, "Vector"),
+                Some(t) => write!(f, "Vector<{t}>"),
+            },
+            Tuple(types) => match types {
+                None => write!(f, "Tuple"),
+                Some(types) => {
+                    write!(f, "Tuple<")?;
+                    for (i, t) in types.iter().enumerate() {
+                        if i != 0 {
+                            write!(f, ",")?;
+                        }
+                        write!(f, "{}", t)?;
                     }
-                    write!(f, "{}", t)?;
+                    write!(f, ">")
                 }
-                write!(f, ")")
-            }
+            },
             /*Cst(cst) => {
                 write!(f, "{}[{}]", cst.r#type, cst.value)
             }*/
             Alias(n, t) => write!(f, "{n}"),
             Nil => write!(f, "Nil"),
+            Substract(t1, t2) => write!(f, "({t1} / {t2})"),
         }
     }
 }

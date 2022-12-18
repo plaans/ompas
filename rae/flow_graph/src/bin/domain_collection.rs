@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
-use flow_graph::structs::domain::{DomainCollection, TypeR};
-use flow_graph::structs::r#type::Type;
-use flow_graph::structs::r#type::Type::*;
+use flow_graph::structs::domain::{Domain, TypeLattice};
+use flow_graph::structs::type_test::DomainTest;
+use flow_graph::structs::type_test::DomainTest::*;
 use std::env::set_current_dir;
 use std::fs;
 use std::fs::File;
@@ -9,28 +9,34 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
 
-fn meet(dc: &DomainCollection, ta: impl Into<Type>, tb: impl Into<Type>) {
+fn meet(dc: &TypeLattice, ta: impl Into<DomainTest>, tb: impl Into<DomainTest>) -> DomainTest {
     let ta = ta.into();
     let tb = tb.into();
-    println!("{} ^ {} = {}", ta, tb, dc.meet(&ta, &tb))
+    let r = DomainTest::meet(dc, &ta, &tb);
+    println!("{} ^ {} = {}", ta, tb, r);
+    r
 }
 
-fn union(dc: &DomainCollection, ta: impl Into<Type>, tb: impl Into<Type>) {
+fn union(dc: &TypeLattice, ta: impl Into<DomainTest>, tb: impl Into<DomainTest>) -> DomainTest {
     let ta = ta.into();
     let tb = tb.into();
-    println!("{} | {} = {}", ta, tb, dc.union(&ta, &tb))
+    let r = DomainTest::union(dc, &ta, &tb);
+    println!("{} | {} = {}", ta, tb, r);
+    r
 }
 
-fn sub(dc: &DomainCollection, ta: impl Into<Type>, tb: impl Into<Type>) {
+fn sub(dc: &TypeLattice, ta: impl Into<DomainTest>, tb: impl Into<DomainTest>) -> DomainTest {
     let ta = ta.into();
     let tb = tb.into();
-    println!("{} / {} = {}", ta, tb, dc.substract(&ta, &tb))
+    let r = DomainTest::substract(dc, &ta, &tb);
+    println!("{} / {} = {}", ta, tb, r);
+    r
 }
 
 fn main() {
     println!("Hello, world!");
     //let tn = &TypeNetwork::default();
-    let dc = &DomainCollection::default();
+    let dc = &TypeLattice::default();
 
     /*let union = (: &TypeNetwork, ta: Type, tb: Type) {
         println!("{} | {} = {}", ta, tb, dc.union(&ta, &tb))
@@ -65,12 +71,20 @@ fn main() {
     //meet(dc, Substract(Box::new(Any), Box::new(Err(None))), Err(None));
     //meet(dc, dc.substract(&Any, &Err(None)), Int);
     //sub(dc, Err(None), Err(Some(Box::new(Int))));
-    union(dc, Err(Some(Box::new(Int))), Err(None));
-    sub(dc, dc.substract(&Any, &Err(None)), Err(Some(Box::new(Int))));
-    sub(dc, dc.substract(&Any, &Err(Some(Box::new(Int)))), Err(None));
-    meet(dc, dc.substract(&Any, &Err(None)), Err(Some(Box::new(Int))));
-    meet(dc, dc.substract(&Any, &Err(Some(Box::new(Int)))), Err(None));
-    sub(dc, dc.substract(&Any, &Int), dc.substract(&Number, &Float));
+    union(dc, Boolean, false);
+    union(dc, Boolean, true);
+    meet(dc, Boolean, false);
+    meet(dc, true, false);
+    meet(dc, 1, 1);
+    union(dc, 1, 1);
+    union(dc, 1, 2);
+    meet(dc, Err(None), Err(Some(Box::new(1.into()))));
+    /*union(dc, Err(Some(Box::new(Int))), Err(None));
+    sub(dc, sub(dc, Any, Err(None)), Err(Some(Box::new(Int))));
+    sub(dc, sub(dc, Any, Err(Some(Box::new(Int)))), Err(None));
+    meet(dc, sub(dc, Any, Err(None)), Err(Some(Box::new(Int))));
+    meet(dc, sub(dc, Any, Err(Some(Box::new(Int)))), Err(None));
+    sub(dc, sub(dc, Any, Int), sub(dc, Number, Float));*/
     /*meet(
         dc,
         dc.substract(&dc.substract(&Any, &Int), &dc.substract(&Number, &Float)),
@@ -109,7 +123,7 @@ fn main() {
     //output_markdown("/home/jeremy/Bureau".into(), tn, true);
 }
 
-fn output_domain_collection(path: PathBuf, dc: &DomainCollection, view: bool) {
+fn output_domain_collection(path: PathBuf, dc: &TypeLattice, view: bool) {
     let mut path = path;
     let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
     let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();

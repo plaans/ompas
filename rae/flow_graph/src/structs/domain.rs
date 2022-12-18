@@ -1,63 +1,56 @@
-use crate::structs::chronicle::constraint::meet;
-use crate::structs::domain::SimpleType::*;
-use crate::structs::domain::TypeR::*;
-use crate::structs::r#type::Type;
+use crate::structs::domain::Domain::*;
+use crate::structs::domain::RootType::*;
+//use crate::structs::r#type::Type;
+use crate::structs::type_test::DomainTest;
 use log::Level::Debug;
-use sompas_core::modules::error::check;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Write;
 use std::fmt::{Display, Formatter};
-use std::iter::Map;
+use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
 #[repr(u8)]
-#[derive(Copy, Clone, Eq, PartialEq)]
-enum SimpleType {
+#[derive(Copy, Clone, Eq, PartialEq, Hash)]
+pub(crate) enum RootType {
     Empty = 0,
     Any = 1,
     Boolean = 2,
     List = 3,
-    True = 4,
-    Nil = 5,
-    Map = 6,
-    Err = 7,
-    Handle = 8,
-    Number = 9,
-    Int = 10,
-    Float = 11,
-    Symbol = 12,
+    Map = 4,
+    Err = 5,
+    Handle = 6,
+    Number = 7,
+    Int = 8,
+    Float = 9,
+    Symbol = 10,
 }
 
-impl TryFrom<DomainId> for SimpleType {
+impl TryFrom<TypeId> for RootType {
     type Error = ();
 
-    fn try_from(value: DomainId) -> Result<Self, Self::Error> {
+    fn try_from(value: TypeId) -> Result<Self, Self::Error> {
         Ok(match value {
             0 => Empty,
             1 => Any,
             2 => Boolean,
             3 => List,
-            4 => True,
-            5 => Nil,
-            6 => Map,
-            7 => Err,
-            8 => Handle,
-            9 => Number,
-            10 => Int,
-            11 => Float,
-            12 => Symbol,
+            4 => Map,
+            5 => Err,
+            6 => Handle,
+            7 => Number,
+            8 => Int,
+            9 => Float,
+            10 => Symbol,
             _ => return Result::Err(()),
         })
     }
 }
 
-impl Display for SimpleType {
+impl Display for RootType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Any => write!(f, "Any"),
             Boolean => write!(f, "Boolean"),
-            True => write!(f, "True"),
-            Nil => write!(f, "Nil"),
             List => write!(f, "List"),
             Empty => write!(f, "Empty"),
             Map => write!(f, "Map"),
@@ -71,155 +64,108 @@ impl Display for SimpleType {
     }
 }
 
-enum Domain {
-    Type(SimpleType),
+#[derive(Clone, PartialEq, Eq, Hash)]
+enum BasicType {
+    RootType(RootType),
+    New(String),
 }
 
-impl Display for Domain {
+impl From<RootType> for BasicType {
+    fn from(r: RootType) -> Self {
+        Self::RootType(r)
+    }
+}
+
+impl From<&str> for BasicType {
+    fn from(s: &str) -> Self {
+        Self::New(s.to_string())
+    }
+}
+
+impl From<String> for BasicType {
+    fn from(s: String) -> Self {
+        s.as_str().into()
+    }
+}
+
+impl Display for BasicType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Domain::Type(t) => write!(f, "{}", t),
+            BasicType::RootType(rt) => write!(f, "{}", rt),
+            BasicType::New(s) => write!(f, "{}", s),
         }
     }
 }
 
-pub struct DomainCollection {
-    domains: Vec<Domain>,
-    childs: Vec<Vec<DomainId>>,
-    parents: Vec<Vec<DomainId>>,
-    decomposition: Vec<Vec<DomainId>>,
-    ids: HashMap<Domain, DomainId>,
+pub struct TypeLattice {
+    types: Vec<BasicType>,
+    childs: Vec<Vec<TypeId>>,
+    parents: Vec<Vec<TypeId>>,
+    decomposition: Vec<Vec<TypeId>>,
+    ids: HashMap<BasicType, TypeId>,
 }
 
-pub type DomainId = usize;
+pub type TypeId = usize;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub enum TypeR {
-    Simple(DomainId),
-    Composed(DomainId, Vec<TypeR>),
-    Union(Vec<TypeR>),
-    Substract(Box<TypeR>, Box<TypeR>),
+pub enum Domain {
+    Simple(TypeId),
+    Composed(TypeId, Vec<Domain>),
+    Union(Vec<Domain>),
+    Substract(Box<Domain>, Box<Domain>),
+    Cst(Box<Domain>, Cst),
 }
 
-impl From<&DomainId> for TypeR {
-    fn from(d: &DomainId) -> Self {
-        Simple(*d)
+impl From<RootType> for Domain {
+    fn from(r: RootType) -> Self {
+        Simple(r as usize)
     }
 }
 
-impl TypeR {
-    pub fn from_type(dc: &DomainCollection, t: &Type) -> Self {
-        match t {
-            Type::Any => Simple(Any as usize),
-            Type::Empty => Simple(Empty as usize),
-            Type::Union(vec) => {
-                let mut types: HashSet<TypeR> = Default::default();
-                for t in vec {
-                    match TypeR::from_type(dc, t) {
-                        Union(vec) => {
-                            for t in vec {
-                                types.insert(t);
-                            }
-                        }
-                        t => {
-                            types.insert(t);
-                        }
-                    };
-                }
-                dc.simplify_union(types)
-            }
-            Type::Map => Simple(Map as usize),
-            Type::List => Simple(List as usize),
-            //Type::Vector(_) => {}
-            //Type::Tuple(_) => {}
-            Type::Err(t) => match t {
-                None => Simple(Err as usize),
-                Some(t) => Composed(Err as usize, vec![TypeR::from_type(dc, t)]),
-            },
-            Type::Handle(t) => match t {
-                None => Simple(Handle as usize),
-                Some(t) => Composed(Handle as usize, vec![TypeR::from_type(dc, t)]),
-            },
-            //Type::Alias(_, _) => {}
-            Type::Symbol => Simple(Symbol as usize),
-            Type::Boolean => Simple(Boolean as usize),
-            Type::True => Simple(True as usize),
-            Type::Nil => Simple(Nil as usize),
-            Type::Number => Simple(Number as usize),
-            Type::Int => Simple(Int as usize),
-            Type::Float => Simple(Float as usize),
-            Type::Substract(s, t) => {
-                let s = TypeR::from_type(dc, s);
-                let t = TypeR::from_type(dc, t);
-                dc.__substract(&s, &t)
-            }
-            _ => unreachable!(),
-        }
-    }
+#[derive(Debug, Clone, PartialEq)]
+pub enum Cst {
+    Int(i64),
+    Float(f64),
+    Boolean(bool),
+    Symbol(String),
+}
 
-    pub fn into_type(t: &Self) -> Type {
-        match t {
-            Simple(t) => match SimpleType::try_from(*t) {
-                Ok(t) => match t {
-                    Empty => Type::Empty,
-                    Any => Type::Any,
-                    Boolean => Type::Boolean,
-                    List => Type::List,
-                    True => Type::True,
-                    Nil => Type::Nil,
-                    Map => Type::Map,
-                    Err => Type::Err(None),
-                    Handle => Type::Handle(None),
-                    Number => Type::Number,
-                    Int => Type::Int,
-                    Float => Type::Float,
-                    Symbol => Type::Symbol,
-                    _ => Type::Empty,
-                },
-                Result::Err(_) => Type::Empty,
-            },
+impl Eq for Cst {}
 
-            Composed(t, sub) => {
-                let t = SimpleType::try_from(*t).unwrap();
-                match t {
-                    Err => {
-                        assert_eq!(sub.len(), 1);
-                        Type::Err(Some(Box::new(TypeR::into_type(&sub[0]))))
-                    }
-                    Handle => {
-                        assert_eq!(sub.len(), 1);
-                        Type::Handle(Some(Box::new(TypeR::into_type(&sub[0]))))
-                    }
-                    _ => panic!(),
-                }
-            }
-            Union(t) => Type::Union(t.iter().map(|t| TypeR::into_type(t)).collect()),
-            Substract(t1, t2) => Type::Substract(
-                Box::new(TypeR::into_type(t1)),
-                Box::new(TypeR::into_type(t2)),
-            ),
+impl Hash for Cst {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            Cst::Int(i) => i.hash(state),
+            Cst::Float(f) => f.to_string().hash(state),
+            Cst::Boolean(b) => b.hash(state),
+            Cst::Symbol(s) => s.hash(state),
         }
     }
 }
 
-impl From<SimpleType> for TypeR {
-    fn from(t: SimpleType) -> Self {
-        Simple(t as usize)
+impl Display for Cst {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Cst::Int(i) => write!(f, "{i}"),
+            Cst::Float(fl) => write!(f, "{fl}"),
+            Cst::Boolean(b) => write!(f, "{b}"),
+            Cst::Symbol(s) => write!(f, "{s}"),
+        }
     }
 }
 
-impl From<DomainId> for TypeR {
-    fn from(id: DomainId) -> Self {
+impl From<TypeId> for Domain {
+    fn from(id: TypeId) -> Self {
         Simple(id)
     }
 }
 
-impl TypeR {
-    pub fn format(&self, dc: &DomainCollection) -> String {
+impl Domain {
+    pub fn format(&self, dc: &TypeLattice) -> String {
         match self {
-            Simple(id) => dc.domains[*id].to_string(),
+            Simple(id) => dc.types[*id].to_string(),
             Composed(id, vec) => {
-                format!("{}<{}>", dc.domains[*id].to_string(), {
+                format!("{}<{}>", dc.types[*id].to_string(), {
                     let mut str = "".to_string();
                     for (i, d) in vec.iter().enumerate() {
                         if i != 0 {
@@ -244,14 +190,17 @@ impl TypeR {
             Substract(t1, t2) => {
                 format!("({} / {})", t1.format(dc), t2.format(dc))
             }
+            Cst(t, c) => {
+                format!("{}[{c}]", t.format(dc))
+            }
         }
     }
 }
 
-impl Default for DomainCollection {
+impl Default for TypeLattice {
     fn default() -> Self {
         let mut dc = Self {
-            domains: vec![Domain::Type(Empty), Domain::Type(Any)],
+            types: vec![BasicType::RootType(Empty), BasicType::RootType(Any)],
             childs: vec![vec![], vec![]],
             parents: vec![vec![], vec![]],
             decomposition: vec![vec![], vec![]],
@@ -260,9 +209,9 @@ impl Default for DomainCollection {
 
         dc.add_type(Boolean, vec![]);
         dc.add_type(List, vec![]);
-        dc.add_type(True, vec![Boolean as usize]);
+        /*dc.add_type(True, vec![Boolean as usize]);
         dc.add_decomposition(Boolean as usize, vec![True as usize, Nil as usize]);
-        dc.add_type(Nil, vec![List as usize, Boolean as usize]);
+        dc.add_type(Nil, vec![List as usize, Boolean as usize]);*/
         dc.add_type(Map, vec![]);
         dc.add_type(Err, vec![]);
         dc.add_type(Handle, vec![]);
@@ -289,11 +238,11 @@ impl Default for DomainCollection {
 
 const VERTICE_PREFIX: &str = "D";
 
-impl DomainCollection {
-    fn add_type(&mut self, r#type: impl Into<SimpleType>, parents: Vec<DomainId>) -> DomainId {
+impl TypeLattice {
+    fn add_type(&mut self, r#type: impl Into<BasicType>, parents: Vec<TypeId>) -> TypeId {
         let r#type = r#type.into();
-        let id = self.domains.len();
-        self.domains.push(Domain::Type(r#type));
+        let id = self.types.len();
+        self.types.push(r#type);
         self.childs.push(vec![]);
         self.parents.push(vec![]);
         self.decomposition.push(vec![]);
@@ -307,11 +256,11 @@ impl DomainCollection {
         id
     }
 
-    fn add_decomposition(&mut self, id_type: DomainId, decomposition: Vec<DomainId>) {
+    fn add_decomposition(&mut self, id_type: TypeId, decomposition: Vec<TypeId>) {
         self.decomposition[id_type] = decomposition;
     }
 
-    fn add_parent(&mut self, id_type: DomainId, id_parent: DomainId) {
+    fn add_parent(&mut self, id_type: TypeId, id_parent: TypeId) {
         let parents = &mut self.parents[id_type];
         if !parents.is_empty() {
             if parents[0] == Any as usize {
@@ -323,7 +272,7 @@ impl DomainCollection {
         childs.push(id_type);
     }
 
-    pub fn get_all_childs(&self, id: &DomainId) -> Vec<DomainId> {
+    pub fn get_all_childs(&self, id: &TypeId) -> Vec<TypeId> {
         let mut queue = VecDeque::default();
         queue.push_front(*id);
         let mut childs = vec![];
@@ -340,7 +289,7 @@ impl DomainCollection {
         childs
     }
 
-    pub fn get_all_parents(&self, id: &DomainId) -> Vec<DomainId> {
+    pub fn get_all_parents(&self, id: &TypeId) -> Vec<TypeId> {
         let mut queue = VecDeque::default();
         queue.push_front(*id);
         let mut parents = vec![];
@@ -357,18 +306,11 @@ impl DomainCollection {
         parents
     }
 
-    pub fn get_decomposition(&self, id: &DomainId) -> &Vec<DomainId> {
+    pub fn get_decomposition(&self, id: &TypeId) -> &Vec<TypeId> {
         &self.decomposition[*id]
     }
 
-    pub fn meet(&self, ta: &Type, tb: &Type) -> Type {
-        let ta = TypeR::from_type(&self, &ta);
-        let tb = TypeR::from_type(&self, &tb);
-
-        TypeR::into_type(&self.__meet(&ta, &tb))
-    }
-
-    fn __meet(&self, t1: &TypeR, t2: &TypeR) -> TypeR {
+    pub(crate) fn __meet(&self, t1: &Domain, t2: &Domain) -> Domain {
         match (t1, t2) {
             (Simple(t1), Simple(t2)) => {
                 if t1 == t2 {
@@ -460,18 +402,36 @@ impl DomainCollection {
             }
             (Substract(t1, t2), t3) => self.__substract(&self.__meet(t1, t3), &self.__meet(t2, t3)),
             (t1, Substract(t2, t3)) => self.__substract(&self.__meet(t1, t2), &self.__meet(t1, t3)),
-            _ => Simple(Empty as usize),
+            (Cst(d1, c1), Cst(d2, c2)) => {
+                let meet = self.__meet(d1, d2);
+                if meet != Simple(Empty as usize) {
+                    if c1 == c2 {
+                        return Cst(Box::new(meet), c1.clone());
+                    }
+                }
+                Simple(Empty as usize)
+            }
+            (Cst(d1, c1), t2) => {
+                let meet = self.__meet(d1, t2);
+                if meet != Simple(Empty as usize) {
+                    Cst(Box::new(meet), c1.clone())
+                } else {
+                    Empty.into()
+                }
+            }
+            (t1, Cst(d2, c2)) => {
+                let meet = self.__meet(t1, d2);
+                if meet != Simple(Empty as usize) {
+                    return Cst(Box::new(meet), c2.clone());
+                } else {
+                    Empty.into()
+                }
+            }
+            _ => Empty.into(),
         }
     }
 
-    pub fn union(&self, ta: &Type, tb: &Type) -> Type {
-        let ta = TypeR::from_type(&self, &ta);
-        let tb = TypeR::from_type(&self, &tb);
-
-        TypeR::into_type(&self.__union(&ta, &tb))
-    }
-
-    fn __union(&self, t1: &TypeR, t2: &TypeR) -> TypeR {
+    pub(crate) fn __union(&self, t1: &Domain, t2: &Domain) -> Domain {
         match (t1, t2) {
             (Simple(t1), Simple(t2)) => {
                 if t1 == t2 {
@@ -486,7 +446,7 @@ impl DomainCollection {
                         return Simple(*t1);
                     }
 
-                    return self.simplify_union(vec![t1.into(), t2.into()].drain(..).collect());
+                    return self.simplify_union(vec![Simple(*t1), Simple(*t2)].drain(..).collect());
                 }
             }
             (Simple(_), Composed(top2, _)) => {
@@ -512,7 +472,7 @@ impl DomainCollection {
             (Union(ua), Union(ub)) => {
                 let mut types = ua.clone();
                 types.append(&mut ub.clone());
-                let mut types: HashSet<TypeR> = types.drain(..).collect();
+                let mut types: HashSet<Domain> = types.drain(..).collect();
                 for ta in ua {
                     for tb in ub {
                         match self.__union(ta, tb) {
@@ -530,7 +490,7 @@ impl DomainCollection {
             (Union(ua), tb) => {
                 let mut types = ua.clone();
                 types.push(tb.clone());
-                let mut types: HashSet<TypeR> = types.drain(..).collect();
+                let mut types: HashSet<Domain> = types.drain(..).collect();
                 for ta in ua {
                     match self.__union(ta, tb) {
                         Union(_) => {}
@@ -546,7 +506,7 @@ impl DomainCollection {
             (ta, Union(ub)) => {
                 let mut types = ub.clone();
                 types.push(ta.clone());
-                let mut types: HashSet<TypeR> = types.drain(..).collect();
+                let mut types: HashSet<Domain> = types.drain(..).collect();
                 for tb in ub {
                     match self.__union(ta, tb) {
                         Union(_) => {}
@@ -593,28 +553,46 @@ impl DomainCollection {
                     &self.__substract(&t3.deref(), &self.__meet(t3.deref(), t1)),
                 )
             }
+            (Cst(d1, c1), Cst(d2, c2)) => {
+                if c1 == c2 {
+                    Cst(Box::new(self.__union(d1, d2)), c1.clone())
+                } else {
+                    Union(vec![t1.clone(), t2.clone()])
+                }
+            }
+            (Cst(d1, _), t2) => {
+                let union = self.__union(d1, t1);
+
+                if &union == t2 {
+                    t2.clone()
+                } else {
+                    Union(vec![t1.clone(), t2.clone()])
+                }
+            }
+            (t1, Cst(d2, _)) => {
+                let union = self.__union(t1, d2);
+
+                if &union == t1 {
+                    t1.clone()
+                } else {
+                    Union(vec![t1.clone(), t2.clone()])
+                }
+            }
             _ => Simple(Empty as usize),
         }
     }
 
-    pub fn substract(&self, ta: &Type, tb: &Type) -> Type {
-        let ta = TypeR::from_type(&self, ta);
-        let tb = TypeR::from_type(&self, tb);
-
-        TypeR::into_type(&self.__substract(&ta, &tb))
-    }
-
-    fn __substract(&self, ta: &TypeR, tb: &TypeR) -> TypeR {
-        let meet = self.__meet(ta, tb);
+    pub(crate) fn __substract(&self, t1: &Domain, t2: &Domain) -> Domain {
+        let meet = self.__meet(t1, t2);
         if meet == Simple(Empty as usize) {
-            ta.clone()
-        } else if &meet == ta {
+            t1.clone()
+        } else if &meet == t1 {
             Simple(Empty as usize)
         } else {
-            match (ta, &meet) {
+            match (t1, &meet) {
                 (Union(ta), Union(tb)) => {
-                    let mut ta: HashSet<TypeR> = ta.iter().cloned().collect();
-                    let mut r: Vec<TypeR> = vec![];
+                    let mut ta: HashSet<Domain> = ta.iter().cloned().collect();
+                    let mut r: Vec<Domain> = vec![];
                     for t in tb {
                         if !ta.remove(t) {
                             r.push(t.clone())
@@ -623,7 +601,7 @@ impl DomainCollection {
                     if ta.is_empty() {
                         return Simple(Empty as usize);
                     }
-                    let mut ta: Vec<TypeR> = ta.drain().collect();
+                    let mut ta: Vec<Domain> = ta.drain().collect();
                     let t = match ta.len() {
                         0 => return Simple(Empty as usize),
                         1 => ta.pop().unwrap(),
@@ -637,9 +615,9 @@ impl DomainCollection {
                     }
                 }
                 (Union(ta), t2) => {
-                    let mut ta: HashSet<TypeR> = ta.iter().cloned().collect();
+                    let mut ta: HashSet<Domain> = ta.iter().cloned().collect();
                     let removed = ta.remove(t2);
-                    let mut ta: Vec<TypeR> = ta.drain().collect();
+                    let mut ta: Vec<Domain> = ta.drain().collect();
                     let t = match ta.len() {
                         0 => return Simple(Empty as usize),
                         1 => ta.pop().unwrap(),
@@ -652,9 +630,9 @@ impl DomainCollection {
                     }
                 }
                 (t1, Union(tb)) => {
-                    let mut tb: HashSet<TypeR> = tb.iter().cloned().collect();
+                    let mut tb: HashSet<Domain> = tb.iter().cloned().collect();
                     let removed = tb.remove(t1);
-                    let mut tb: Vec<TypeR> = tb.drain().collect();
+                    let mut tb: Vec<Domain> = tb.drain().collect();
                     let t = match tb.len() {
                         0 => return Simple(Empty as usize),
                         1 => tb.pop().unwrap(),
@@ -666,7 +644,7 @@ impl DomainCollection {
                         Substract(Box::new(t), Box::new(t1.clone()))
                     }
                 }
-                (Substract(t1, t2), _) => {
+                (Substract(t1, t2), t3) => {
                     /*println!(
                         "debug: {}/{} = {}/({}|{})",
                         ta.format(&self),
@@ -675,18 +653,30 @@ impl DomainCollection {
                         t2.format(&self),
                         tb.format(&self)
                     );*/
-                    Substract(t1.clone(), Box::new(self.__union(t2, tb)))
+                    Substract(t1.clone(), Box::new(self.__union(t2, t3)))
+                }
+                (Cst(d1, c1), Cst(d2, c2)) => {
+                    if c1 == c2 {
+                        let sub = self.__substract(d1, d2);
+                        if sub == Empty.into() {
+                            Empty.into()
+                        } else {
+                            Cst(Box::new(sub), c1.clone())
+                        }
+                    } else {
+                        Substract(Box::new(t1.clone()), Box::new(t2.clone()))
+                    }
                 }
                 //(t1, Substract(t2, t3)) => Substract(Box::new(self.__union(t1, t2)), t3.clone()),
-                _ => Substract(Box::new(ta.clone()), Box::new(meet)),
+                _ => Substract(Box::new(t1.clone()), Box::new(meet)),
             }
         }
     }
 
-    fn simplify_union(&self, mut set: HashSet<TypeR>) -> TypeR {
-        let mut tested: HashSet<DomainId> = Default::default();
-        let mut simples: HashSet<DomainId> = Default::default();
-        let mut others: HashSet<TypeR> = Default::default();
+    pub(crate) fn simplify_union(&self, mut set: HashSet<Domain>) -> Domain {
+        let mut tested: HashSet<TypeId> = Default::default();
+        let mut simples: HashSet<TypeId> = Default::default();
+        let mut others: HashSet<Domain> = Default::default();
         for t in set {
             if let Simple(t) = t {
                 simples.insert(t);
@@ -696,14 +686,14 @@ impl DomainCollection {
         }
 
         loop {
-            let mut decompositions: Vec<(DomainId, &Vec<DomainId>)> = vec![];
+            let mut decompositions: Vec<(TypeId, &Vec<TypeId>)> = vec![];
             for t in simples.iter() {
                 if *t == Any as usize {
                     return Simple(Any as usize);
                 }
                 if !tested.contains(t) {
                     tested.insert(t.clone());
-                    let parents: &Vec<DomainId> = &self.parents[*t];
+                    let parents: &Vec<TypeId> = &self.parents[*t];
                     for parent in parents {
                         let d = self.get_decomposition(&parent);
                         if !d.is_empty() {
@@ -730,7 +720,7 @@ impl DomainCollection {
             }
         }
 
-        let mut types: Vec<TypeR> = others.drain().collect();
+        let mut types: Vec<Domain> = others.drain().collect();
         for s in simples {
             types.push(Simple(s))
         }
@@ -741,7 +731,7 @@ impl DomainCollection {
         }
     }
 
-    /*fn add_child(&mut self, id_type: DomainId, id_child: DomainId) {
+    /*fn add_child(&mut self, id_type: TypeId, id_child: TypeId) {
         let childs = &mut self.childs[id_type];
         if childs[0] == Empty as usize {
             childs.remove(0);
@@ -754,7 +744,7 @@ impl DomainCollection {
 
         writeln!(dot, "NONE [label = \"Empty\"]",).unwrap();
 
-        for (id, domain) in self.domains[1..].iter().enumerate() {
+        for (id, domain) in self.types[1..].iter().enumerate() {
             let id = id + 1;
             writeln!(dot, "{VERTICE_PREFIX}{} [label = \"{}\"]", id, domain).unwrap();
 

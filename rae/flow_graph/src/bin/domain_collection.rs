@@ -78,6 +78,12 @@ fn main() {
     meet(dc, 1, 1);
     union(dc, 1, 1);
     union(dc, 1, 2);
+    sub(dc, 1, 2);
+    sub(dc, 1, 1);
+    sub(dc, union(dc, 1, 2), 1);
+    sub(dc, Boolean, false);
+    union(dc, false, sub(dc, Boolean, false));
+    sub(dc, 1, Int);
     meet(dc, Err(None), Err(Some(Box::new(1.into()))));
     /*union(dc, Err(Some(Box::new(Int))), Err(None));
     sub(dc, sub(dc, Any, Err(None)), Err(Some(Box::new(Int))));

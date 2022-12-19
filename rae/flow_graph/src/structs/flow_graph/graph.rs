@@ -18,8 +18,8 @@ pub type EdgeId = usize;
 pub struct FlowGraph {
     pub sym_table: RefSymTable,
     pub(crate) vertices: Vec<Vertice>,
+    pub(crate) flows: Vec<Block>,
     pub(crate) handles: HandleTable,
-    //edges: Vec<Edge>,
     pub(crate) scope: Scope,
 }
 
@@ -28,6 +28,7 @@ impl FlowGraph {
         Self {
             sym_table,
             vertices: vec![],
+            flows: vec![],
             handles: Default::default(),
             scope: Default::default(),
         }

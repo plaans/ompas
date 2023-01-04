@@ -1,6 +1,6 @@
 use crate::structs::chronicle::interval::Interval;
 use crate::structs::chronicle::{FlatBindings, FormatWithSymTable};
-use crate::structs::flow_graph::expression::{Block, Expression};
+use crate::structs::flow_graph::expression::Expression;
 use crate::structs::flow_graph::flow::{Flow, FlowId};
 use crate::structs::flow_graph::handle_table::HandleTable;
 use crate::structs::flow_graph::scope::Scope;
@@ -40,57 +40,37 @@ impl FlowGraph {
         &self.vertices
     }*/
 
-    pub fn get_result(&self, id: &VerticeId) -> &AtomId {
+    pub fn get_vertice_result(&self, id: &VerticeId) -> AtomId {
         self.vertices.get(*id).unwrap().get_result()
     }
 
-    pub fn get_scope_result(&self, scope: &Scope) -> &AtomId {
-        self.get_result(scope.get_end())
+    pub fn get_flow_result(&self, flow: &FlowId) -> AtomId {
+        let flow = &self.flows[*flow];
+        match flow {
+            Flow::Vertice(v) => self.get_vertice_result(v),
+            Flow::Seq(s) => self.get_flow_result(&s.last().unwrap()),
+            Flow::Async(_) => todo!(),
+            Flow::If(r#if) => todo!(),
+        }
     }
 
-    pub fn get_scope_interval(&self, scope: &Scope) -> Interval {
-        let start = self.get_interval(scope.start()).get_start();
-        let end = self.get_interval(scope.get_end()).get_end();
-        Interval::new(start, end)
+    pub fn get_flow_interval(&self, flow: &FlowId) -> Interval {
+        let flow = &self.flows[*flow];
+        match flow {
+            Flow::Vertice(v) => *self.get_vertice_interval(v),
+            Flow::Seq(seq) => {
+                let start = *self.get_flow_interval(&seq.first().unwrap()).get_start();
+                let end = *self.get_flow_interval(&seq.last().unwrap()).get_end();
+                Interval::new(&start, &end)
+            }
+            Flow::Async(_) => todo!(),
+            Flow::If(_) => todo!(),
+        }
     }
 
-    pub fn get_interval(&self, id: &VerticeId) -> &Interval {
+    pub fn get_vertice_interval(&self, id: &VerticeId) -> &Interval {
         self.vertices.get(*id).unwrap().get_interval()
     }
-
-    pub fn remove(&mut self, id: &VerticeId, scope: &mut Scope) {
-        let child = *self.get(id).unwrap().get_child();
-        let parent = *self.get(id).unwrap().get_parent();
-        if scope.start == *id {
-            match child {
-                None => {}
-                Some(child) => {
-                    scope.start = child;
-                    self.get_mut(&child).unwrap().parent = None;
-                }
-            }
-        } else if scope.end == *id {
-            match parent {
-                None => {}
-                Some(parent) => {
-                    scope.end = parent;
-                    self.get_mut(&parent).unwrap().child = None;
-                }
-            }
-        } else {
-            self.set_parent(&child.unwrap(), &parent.unwrap())
-        }
-        let vertice = self.get_mut(id).unwrap();
-        vertice.child = None;
-        vertice.parent = None;
-    }
-
-    /*pub(crate) fn push(&mut self, mut vertice: Vertice) -> VerticeId {
-        let id = self.vertices.len();
-        vertice.id = id;
-        self.vertices.push(vertice);
-        id
-    }*/
 
     pub fn new_instantaneous_vertice(&mut self, value: impl Into<Expression>) -> VerticeId {
         let id = self.vertices.len();
@@ -104,8 +84,6 @@ impl FlowGraph {
             id,
             interval: Interval::new_instantaneous(&t),
             result: r,
-            parent: None,
-            child: None,
             computation: value.into(),
         };
 
@@ -126,13 +104,21 @@ impl FlowGraph {
             id,
             interval: Interval::new(&start, &end),
             result: r,
-            parent: None,
-            child: None,
             computation: value.into(),
         };
 
         self.vertices.push(vertice);
         id
+    }
+
+    pub fn new_flow(&mut self, flow: impl Into<Flow>) -> FlowId {
+        let id = self.flows.len();
+        self.flows.push(flow.into());
+        id
+    }
+
+    pub fn new_vertice_flow(&mut self, vertice_id: VerticeId) -> FlowId {
+        self.new_flow(Flow::Vertice(vertice_id))
     }
 
     /*pub fn new_handle(&mut self, handle: Handle) -> VerticeId {
@@ -149,33 +135,116 @@ impl FlowGraph {
         self.vertices.get_mut(*id)
     }
 
-    pub fn set_parent(&mut self, vertice_id: &VerticeId, parent_id: &VerticeId) {
-        self.vertices
-            .get_mut(*vertice_id)
-            .unwrap()
-            .set_parent(parent_id);
-        self.vertices
-            .get_mut(*parent_id)
-            .unwrap()
-            .set_child(vertice_id);
-    }
-
-    pub fn set_child(&mut self, vertice_id: &VerticeId, child_id: &VerticeId) {
-        self.vertices
-            .get_mut(*vertice_id)
-            .unwrap()
-            .set_child(child_id);
-        self.vertices
-            .get_mut(*child_id)
-            .unwrap()
-            .set_parent(vertice_id);
-    }
-
     /*
     Dot export
      */
 
-    pub fn export_vertice(&self, id: &VerticeId) -> Dot {
+    pub fn export_flow(&self, id: &FlowId) -> (Dot, (VerticeId, VerticeId)) {
+        let sym_table = &self.sym_table;
+        let mut dot = "".to_string();
+        let mut start = None;
+        let mut end = None;
+
+        match &self.flows[*id] {
+            Flow::Vertice(v) => {
+                let vertice: &Vertice = &self.vertices[*v];
+                dot.push_str(
+                    format!(
+                        "V{v} [label= \"{}: {} <- {}\"]\n",
+                        vertice.interval.format(sym_table, false),
+                        vertice.result.format(sym_table, false),
+                        vertice.computation.format(sym_table, false),
+                    )
+                    .as_str(),
+                );
+                start = Some(*v);
+                end = Some(*v);
+            }
+            Flow::If(r#if) => {
+                todo!()
+            }
+            Flow::Seq(seq) => {
+                let mut previous_end = None;
+                for f in seq {
+                    let (f_dot, (f_start, f_end)) = self.export_flow(f);
+                    write!(dot, "{}", f_dot).unwrap();
+                    if let Some(end) = previous_end {
+                        write!(dot, "V{end} -> V{f_start}\n").unwrap();
+                    }
+                    if start == None {
+                        start = Some(f_start)
+                    }
+                    previous_end = Some(f_end);
+                }
+                end = previous_end;
+            }
+            _ => {
+                todo!()
+            }
+        }
+
+        /*while let Some(vertice_id) = next {
+            let vertice = self.vertices.get(vertice_id).unwrap();
+            let vertice_name = format!("{}{}", VERTICE_PREFIX, vertice.id);
+            //let  = self.sym_table.get_atom(&vertice.timepoint, true).unwrap();
+            let result = sym_table.get_domain(&vertice.result, false).unwrap();
+            match &vertice.computation {
+                Expression::Block(block) => match block {
+                    Block::If(if_block) => {
+                        dot.push_str(
+                            format!(
+                                "{} [label= \"{}: {} <- {}\"]\n",
+                                vertice_name,
+                                vertice.interval.format(&self.sym_table, false),
+                                result,
+                                vertice.computation.format(&self.sym_table, false),
+                            )
+                            .as_str(),
+                        );
+                        dot.push_str(self.export_vertice(&if_block.true_branch.start).as_str());
+                        dot.push_str(self.export_vertice(&if_block.false_branch.start).as_str());
+                    } /*Block::Handle(async_block) => {
+                          dot.push_str(
+                              format!(
+                                  "{} [label= \"{}: {} <- {}\"]\n",
+                                  vertice_name,
+                                  vertice.interval.format(&self.sym_table, false),
+                                  result,
+                                  vertice.computation.format(&self.sym_table, false),
+                              )
+                              .as_str(),
+                          );
+                          dot.push_str(
+                              self.export_vertice(async_block.scope_expression.start())
+                                  .as_str(),
+                          );
+                      }*/
+                },
+                _ => {
+                    dot.push_str(
+                        format!(
+                            "{} [label= \"{}: {} <- {}\"]\n",
+                            vertice_name,
+                            vertice.interval.format(&self.sym_table, false),
+                            result,
+                            vertice.computation.format(&self.sym_table, false),
+                        )
+                        .as_str(),
+                    );
+                }
+            }
+
+            if let Some(parent) = vertice.parent {
+                let parent = format!("{}{}", VERTICE_PREFIX, parent);
+                dot.push_str(format!("{} -> {}\n", parent, vertice_name).as_str());
+            }
+
+            next = vertice.child;
+        }*/
+        (dot, (start.unwrap(), end.unwrap()))
+    }
+
+    /*pub fn export_vertice(&self, id: &VerticeId) -> Dot {
         let mut next = Some(*id);
 
         let sym_table = &self.sym_table;
@@ -240,15 +309,15 @@ impl FlowGraph {
             next = vertice.child;
         }
         dot
-    }
+    }*/
 
     pub fn export_dot(&self) -> Dot {
         let mut dot: Dot = "digraph {\n".to_string();
 
-        write!(dot, "{}", self.export_vertice(&self.scope.start)).unwrap();
-        for (_, handle) in self.handles.inner() {
+        write!(dot, "{}", self.export_flow(&self.flow).0).unwrap();
+        /*for (_, handle) in self.handles.inner() {
             write!(dot, "{}", self.export_vertice(&handle.scope.start)).unwrap();
-        }
+        }*/
 
         dot.push('}');
         dot

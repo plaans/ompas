@@ -19,14 +19,12 @@ pub async fn convert(lv: &LValue, env: &LEnv) -> Result<ChronicleTemplate, LRunt
 
     let mut graph = FlowGraph::default();
 
-    let scope = convert_into_flow_graph(&lv, &mut graph, &mut Default::default())?;
-    graph.scope = scope;
+    let flow = convert_into_flow_graph(&lv, &mut graph, &mut Default::default())?;
+    graph.flow = flow;
     //flow_graph_post_processing(&mut graph)?;
-    Ok(ChronicleTemplate::new(
-        "debug",
-        ChronicleKind::Method,
-        graph.sym_table.clone(),
-    ))
+    let mut ch = ChronicleTemplate::new("debug", ChronicleKind::Method, graph.sym_table.clone());
+    ch.debug.flow_graph = graph;
+    Ok(ch)
 
     //convert_method(&graph, graph.scope)
 }

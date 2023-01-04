@@ -1,5 +1,6 @@
 use crate::structs::chronicle::lit::lvalue_to_lit;
-use crate::structs::flow_graph::expression::{Block, Expression, IfBlock};
+use crate::structs::flow_graph::expression::Expression;
+use crate::structs::flow_graph::flow::{Flow, FlowId};
 use crate::structs::flow_graph::handle_table::Handle;
 use crate::structs::flow_graph::scope::Scope;
 use crate::structs::sym_table::AtomId;
@@ -21,7 +22,7 @@ pub fn convert_into_flow_graph(
     lv: &LValue,
     fl: &mut FlowGraph,
     define_table: &mut DefineTable,
-) -> Result<Scope, LRuntimeError> {
+) -> Result<FlowId, LRuntimeError> {
     let node_id = match lv {
         LValue::Symbol(s) => convert_symbol(s, fl, define_table),
         LValue::String(s) => convert_string(s, fl),
@@ -41,33 +42,36 @@ pub fn convert_into_flow_graph(
     Ok(node_id)
 }
 
-fn convert_symbol(symbol: &Arc<String>, fl: &mut FlowGraph, define_table: &DefineTable) -> Scope {
-    match define_table.get(symbol.as_str()) {
+fn convert_symbol(symbol: &Arc<String>, fl: &mut FlowGraph, define_table: &DefineTable) -> FlowId {
+    let vertice_id = match define_table.get(symbol.as_str()) {
         None => {
             let id = fl.sym_table.new_symbol(symbol, None);
-            fl.new_instantaneous_vertice(Expression::cst(id)).into()
+            fl.new_instantaneous_vertice(Expression::expr(id)).into()
         }
-        Some(r) => fl.new_instantaneous_vertice(Expression::cst(r)).into(),
-    }
+        Some(r) => fl.new_instantaneous_vertice(Expression::expr(*r)).into(),
+    };
+
+    fl.new_vertice_flow(vertice_id)
 }
 
-fn convert_string(_: &Arc<String>, _: &mut FlowGraph) -> Scope {
+fn convert_string(_: &Arc<String>, _: &mut FlowGraph) -> FlowId {
     todo!()
     //fl.new_vertice(CstValue::string(string.to_string()), parent)
 }
 
-fn convert_number(number: &LNumber, fl: &mut FlowGraph) -> Scope {
+fn convert_number(number: &LNumber, fl: &mut FlowGraph) -> FlowId {
     let id = fl.sym_table.new_number(number);
-    fl.new_instantaneous_vertice(Expression::cst(id)).into()
-    //fl.new_vertice(CstValue::number(*number), parent)
+    let vertice_id = fl.new_instantaneous_vertice(Expression::expr(id));
+    fl.new_vertice_flow(vertice_id)
 }
 
-fn convert_bool(bool: bool, fl: &mut FlowGraph) -> Scope {
+fn convert_bool(bool: bool, fl: &mut FlowGraph) -> FlowId {
     let id = fl.sym_table.new_bool(bool);
-    fl.new_instantaneous_vertice(Expression::cst(id)).into()
+    let vertice_id = fl.new_instantaneous_vertice(Expression::expr(id));
+    fl.new_vertice_flow(vertice_id)
 }
 
-fn convert_core_operator(_: &LPrimitives, _: &mut FlowGraph) -> Scope {
+fn convert_core_operator(_: &LPrimitives, _: &mut FlowGraph) -> FlowId {
     todo!()
 }
 
@@ -75,40 +79,30 @@ fn convert_list(
     list: &Arc<Vec<LValue>>,
     fl: &mut FlowGraph,
     define_table: &mut DefineTable,
-) -> Result<Scope, LRuntimeError> {
+) -> Result<FlowId, LRuntimeError> {
     let proc = &list[0];
-    let end_scope;
     let mut out_of_scope: Vec<AtomId> = vec![];
 
     let r = match proc {
-        LValue::Symbol(_) => {
-            let (s, e, r) = convert_apply(list.as_slice(), fl, define_table)?;
-            end_scope = e;
-            out_of_scope = r;
-            Ok(s)
-        }
+        LValue::Symbol(_) => convert_apply(list.as_slice(), fl, define_table),
         LValue::Primitive(co) => match co {
             LPrimitives::Define => {
-                let var = &list[1];
+                let var = &list[1].to_string();
                 let val = &list[2];
-                let mut scope_val = convert_into_flow_graph(val, fl, define_table)?;
-                let val = *fl.get_scope_result(&scope_val);
-
-                let vertice_var = fl.new_instantaneous_vertice(Expression::cst(val));
-                define_table.insert(var.to_string(), *fl.get_result(&vertice_var));
-                fl.set_parent(&vertice_var, scope_val.get_end());
+                let mut flow_val = convert_into_flow_graph(val, fl, define_table)?;
+                let id_var = fl.sym_table.new_symbol(var, None);
+                let vertice_var = fl.new_instantaneous_vertice(Expression::expr(id_var));
+                let flow_var = fl.new_vertice_flow(vertice_var);
+                define_table.insert(var.to_string(), fl.get_vertice_result(&vertice_var));
 
                 let id = fl.sym_table.new_bool(false);
-                let r = fl.new_instantaneous_vertice(Expression::cst(id));
-                fl.set_parent(&r, &vertice_var);
-                scope_val.set_end(r);
+                let result = fl.new_instantaneous_vertice(Expression::expr(id));
+                let flow_result = fl.new_vertice_flow(result);
 
-                end_scope = *fl.get_scope_interval(&scope_val).get_end();
-                out_of_scope.push(val);
-                Ok(scope_val)
+                Ok(fl.new_flow(Flow::Seq(vec![flow_val, flow_var, flow_result])))
             }
             LPrimitives::If => {
-                let define_table = &mut define_table.clone();
+                /*let define_table = &mut define_table.clone();
 
                 /*
                 Different parts of an 'if' expression
@@ -138,35 +132,30 @@ fn convert_list(
                 let mut scope = cond;
                 scope.end = if_id;
                 end_scope = *fl.get_scope_interval(&scope).get_end();
-                Ok(scope)
+                Ok(scope)*/
+                todo!()
             }
             LPrimitives::Quote => {
-                let lit = lvalue_to_lit(&list[1], &mut fl.sym_table)?;
-                let vertice = fl.new_instantaneous_vertice(Expression::cst(lit));
+                todo!()
+                /*let lit = lvalue_to_lit(&list[1], &mut fl.sym_table)?;
+                let vertice = fl.new_instantaneous_vertice(Expression::expr(lit));
                 end_scope = *fl.get_interval(&vertice).get_end();
-                Ok(vertice.into())
+                Ok(vertice.into())*/
             }
             LPrimitives::Begin => {
                 let mut define_table = define_table.clone();
-                let mut scope = Scope::default();
                 let mut results = vec![];
-                let mut first = true;
+                let mut seq = vec![];
                 for e in &list[1..] {
-                    let e_scope = convert_into_flow_graph(e, fl, &mut define_table)?;
-                    results.push(*fl.get_scope_result(&e_scope));
-                    if first {
-                        scope = e_scope;
-                        first = false;
-                    } else {
-                        fl.set_parent(e_scope.start(), scope.get_end());
-                        scope.end = e_scope.end;
-                    }
+                    let e_flow = convert_into_flow_graph(e, fl, &mut define_table)?;
+                    results.push(fl.get_flow_result(&e_flow));
+                    seq.push(e_flow);
                 }
-                end_scope = *fl.get_scope_interval(&scope).get_end();
                 out_of_scope.append(&mut results);
-                Ok(scope)
+
+                Ok(fl.new_flow(Flow::Seq(seq)))
             }
-            LPrimitives::Async => {
+            /*LPrimitives::Async => {
                 let define_table = &mut define_table.clone();
                 let e = &list[1];
                 let scope_expression = convert_into_flow_graph(e, fl, define_table)?;
@@ -197,7 +186,7 @@ fn convert_list(
                 fl.set_parent(&a, h.get_end());
                 h.end = a;
                 Ok(h)
-            }
+            }*/
             LPrimitives::Race => {
                 todo!()
             }
@@ -206,11 +195,11 @@ fn convert_list(
         _ => panic!(""),
     };
 
-    out_of_scope.append(&mut define_table.inner().values().copied().collect());
+    /*out_of_scope.append(&mut define_table.inner().values().copied().collect());
 
     for o in &out_of_scope {
         fl.sym_table.set_end(o, &end_scope);
-    }
+    }*/
     r
 }
 
@@ -218,34 +207,25 @@ fn convert_apply(
     expr: &[LValue],
     fl: &mut FlowGraph,
     define_table: &mut DefineTable,
-) -> Result<(Scope, AtomId, Vec<AtomId>), LRuntimeError> {
-    let mut out_of_scope = vec![];
-
+) -> Result<FlowId, LRuntimeError> {
     let mut define_table = define_table.clone();
 
-    let proc_symbol: String = expr[0].borrow().try_into()?;
-    let proc_scope = convert_into_flow_graph(&expr[0], fl, &mut define_table)?;
+    let mut seq: Vec<FlowId> = vec![];
 
-    let mut arg_scope: Scope = Default::default();
-    let mut args_result = vec![];
-    let mut first = true;
-    for arg in &expr[1..] {
-        let vertice_scope = convert_into_flow_graph(arg, fl, &mut define_table)?;
-        if first {
-            first = false;
-            arg_scope = vertice_scope
-        } else {
-            fl.set_parent(vertice_scope.start(), arg_scope.get_end());
-            arg_scope.end = vertice_scope.end;
-        }
-
-        args_result.push(*fl.get_result(vertice_scope.get_end()));
+    for e in expr {
+        seq.push(convert_into_flow_graph(e, fl, &mut define_table)?);
     }
 
-    let mut results = args_result.clone();
-    out_of_scope.append(&mut results.clone());
+    let mut results: Vec<AtomId> = seq.iter().map(|f| fl.get_flow_result(f)).collect();
+    let apply_id = fl.new_vertice(Expression::Apply(results.clone()));
+    let end = *fl.get_vertice_interval(&apply_id).get_end();
+    seq.push(fl.new_vertice_flow(apply_id));
+    for o in results {
+        fl.sym_table.set_end(&o, &end);
+    }
+    Ok(fl.new_flow(Flow::Seq(seq)))
 
-    let scope = match proc_symbol.as_str() {
+    /*let scope = match proc_symbol.as_str() {
         EXEC_COMMAND | EXEC_TASK => {
             let exec_scope: Scope = fl
                 .new_vertice(Expression::exec(args_result.to_vec()))
@@ -282,9 +262,5 @@ fn convert_apply(
                 end: id,
             }
         }
-    };
-
-    let end_scope = *fl.get_scope_interval(&scope).get_end();
-
-    Ok((scope, end_scope, out_of_scope))
+    };*/
 }

@@ -1,12 +1,10 @@
-use crate::point_algebra::problem::{try_into_pa_relation, PAGraph, PAProblem};
+/*use crate::point_algebra::problem::{try_into_pa_relation, PAGraph, PAProblem};
 use crate::point_algebra::remove_useless_timepoints;
 use crate::structs::chronicle::constraint::Constraint;
 use crate::structs::chronicle::lit::Lit;
-use crate::structs::chronicle::sym_table::RefSymTable;
 use crate::structs::chronicle::template::{ChronicleSet, ChronicleTemplate};
-use crate::structs::chronicle::type_table::AtomType;
-use crate::structs::chronicle::AtomId;
 use crate::structs::chronicle::GetVariables;
+use crate::structs::sym_table::AtomId;
 use im::HashSet;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use std::borrow::Borrow;
@@ -379,3 +377,4 @@ pub fn add_constraint_on_end_timepoint(
         c.add_constraint(Constraint::leq(t, end));
     }
 }*/
+*/

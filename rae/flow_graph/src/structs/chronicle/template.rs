@@ -4,11 +4,11 @@ use crate::structs::chronicle::effect::Effect;
 use crate::structs::chronicle::interval::Interval;
 use crate::structs::chronicle::lit::Lit;
 use crate::structs::chronicle::subtask::SubTask;
-use crate::structs::chronicle::sym_table::RefSymTable;
 use crate::structs::chronicle::task_template::TaskTemplate;
-use crate::structs::chronicle::type_table::AtomType;
 use crate::structs::chronicle::*;
+use crate::structs::domain::root_type::RootType;
 use crate::structs::flow_graph::graph::FlowGraph;
+use crate::structs::sym_table::r#ref::RefSymTable;
 use im::hashset::HashSet;
 use sompas_structs::lvalue::LValue;
 use std::borrow::Borrow;
@@ -146,7 +146,12 @@ impl ChronicleTemplate {
         let variables = self.get_variables();
         variables
             .iter()
-            .filter(|a| sym_table.get_type_of(a) == AtomType::Symbol)
+            .filter(|a| {
+                sym_table.contained_in_domain(
+                    &sym_table.get_domain(a, true).unwrap(),
+                    &RootType::Symbol.into(),
+                )
+            })
             .cloned()
             .collect()
     }
@@ -294,7 +299,7 @@ impl ChronicleTemplate {
                 format!(
                     "{}({})",
                     id.format(st, sym_version),
-                    st.get_type_of(id).format(st, sym_version)
+                    st.get_domain(id, sym_version).unwrap()
                 )
             })
             .collect::<Vec<String>>();
@@ -377,14 +382,12 @@ impl GetVariables for ChronicleTemplate {
         self.variables.clone()
     }
 
-    fn get_variables_of_type(
-        &self,
-        sym_table: &RefSymTable,
-        atom_type: &AtomType,
-    ) -> HashSet<AtomId> {
+    fn get_variables_in_domain(&self, sym_table: &RefSymTable, domain: &Domain) -> HashSet<AtomId> {
         self.variables
             .iter()
-            .filter(|v| sym_table.get_type_of(v) == *atom_type)
+            .filter(|v| {
+                sym_table.contained_in_domain(&sym_table.get_domain(v, true).unwrap(), domain)
+            })
             .cloned()
             .collect()
     }

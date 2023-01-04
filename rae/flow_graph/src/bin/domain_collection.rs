@@ -1,7 +1,9 @@
 use chrono::{DateTime, Utc};
-use flow_graph::structs::domain::{Domain, TypeLattice};
-use flow_graph::structs::type_test::DomainTest;
-use flow_graph::structs::type_test::DomainTest::*;
+use flow_graph::structs::domain::domain_test::DomainTest;
+use flow_graph::structs::domain::domain_test::DomainTest::*;
+use flow_graph::structs::domain::domain_test::DomainTest::{Boolean, Int};
+use flow_graph::structs::domain::type_lattice::TypeLattice;
+use flow_graph::structs::domain::Domain;
 use std::env::set_current_dir;
 use std::fs;
 use std::fs::File;

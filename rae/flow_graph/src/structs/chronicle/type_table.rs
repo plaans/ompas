@@ -1,5 +1,5 @@
-use crate::structs::chronicle::sym_table::RefSymTable;
-use crate::structs::chronicle::{FormatWithSymTable, NodeId};
+/*use crate::structs::chronicle::sym_table::RefSymTable;
+use crate::structs::sym_table::forest::NodeId;
 use std::fmt::{Display, Formatter};
 
 pub type TypeId = NodeId;
@@ -134,3 +134,4 @@ impl FormatWithSymTable for Option<AtomType> {
         }
     }
 }
+*/

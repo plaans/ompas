@@ -1,48 +1,17 @@
 use crate::structs::chronicle::lit::Lit;
-use crate::structs::chronicle::sym_table::RefSymTable;
-use crate::structs::chronicle::{AtomId, FlatBindings, FormatWithSymTable};
+use crate::structs::chronicle::{FlatBindings, FormatWithSymTable};
 use crate::structs::flow_graph::scope::Scope;
+use crate::structs::sym_table::r#ref::RefSymTable;
+use crate::structs::sym_table::AtomId;
 use std::fmt::Write;
-#[derive(Debug, Clone)]
-pub enum Block {
-    If(IfBlock),
-}
-impl FlatBindings for Block {
-    fn flat_bindings(&mut self, st: &RefSymTable) {
-        match self {
-            Block::If(if_block) => if_block.flat_bindings(st),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct IfBlock {
-    pub(crate) cond: AtomId,
-    pub(crate) true_result: AtomId,
-    pub(crate) false_result: AtomId,
-    pub(crate) true_branch: Scope,
-    pub(crate) false_branch: Scope,
-}
-
-impl FlatBindings for IfBlock {
-    fn flat_bindings(&mut self, st: &RefSymTable) {
-        self.cond.flat_bindings(st);
-        self.true_result.flat_bindings(st);
-        self.false_result.flat_bindings(st);
-    }
-}
 
 #[derive(Debug, Clone)]
 pub enum Expression {
-    Block(Block),
-    Err(Lit),
+    Expr(AtomId),
     Exec(Vec<AtomId>),
     Apply(Vec<AtomId>),
     Write(Vec<AtomId>),
     Read(Vec<AtomId>),
-    Cst(Lit),
-    Handle(AtomId),
-    Await(AtomId),
 }
 
 impl Expression {
@@ -61,12 +30,8 @@ impl Expression {
         Self::Exec(vec)
     }
 
-    pub fn cst(cst: impl Into<Lit>) -> Self {
-        Self::Cst(cst.into())
-    }
-
-    pub fn err(err: Lit) -> Self {
-        Self::Err(err)
+    pub fn expr(expr: AtomId) -> Self {
+        Self::Expr(expr)
     }
 }
 

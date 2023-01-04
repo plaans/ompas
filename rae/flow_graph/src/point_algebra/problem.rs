@@ -2,9 +2,9 @@ use crate::point_algebra::relation_type::RelationType::Tautology;
 use crate::point_algebra::relation_type::{RelationType, RelationTypeBit};
 use crate::structs::chronicle::constraint::Constraint;
 use crate::structs::chronicle::lit::Lit;
-use crate::structs::chronicle::sym_table::RefSymTable;
-use crate::structs::chronicle::type_table::AtomType;
-use crate::structs::chronicle::{AtomId, FormatWithSymTable};
+use crate::structs::chronicle::FormatWithSymTable;
+use crate::structs::sym_table::r#ref::RefSymTable;
+use crate::structs::sym_table::{AtomId, TIMEPOINT_TYPE};
 use cli_table::{print_stdout, Cell, Table};
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
@@ -30,12 +30,20 @@ pub fn try_into_pa_relation(
         _ => return Err(LRuntimeError::default()),
     };
 
+    let timepoint_domain = sym_table.get_type_as_domain(TIMEPOINT_TYPE);
+
     if let Ok(i) = constraint.get_left().try_into() {
         let p_i = sym_table.get_parent(&i);
         if let Ok(j) = constraint.get_right().try_into() {
             let p_j = sym_table.get_parent(&j);
-            if sym_table.get_type_of(&p_i) == AtomType::Timepoint {
-                if sym_table.get_type_of(&p_j) == AtomType::Timepoint {
+            if sym_table.contained_in_domain(
+                &sym_table.get_domain(&p_i, false).unwrap(),
+                &timepoint_domain,
+            ) {
+                if sym_table.contained_in_domain(
+                    &sym_table.get_domain(&p_j, false).unwrap(),
+                    &timepoint_domain,
+                ) {
                     Ok(Relation::new(p_i, p_j, relation_type))
                 } else {
                     Err(Default::default())

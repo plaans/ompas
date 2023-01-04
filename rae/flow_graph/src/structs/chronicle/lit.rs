@@ -1,7 +1,8 @@
 use crate::structs::chronicle::constraint::Constraint;
-use crate::structs::chronicle::sym_table::RefSymTable;
-use crate::structs::chronicle::type_table::AtomType;
-use crate::structs::chronicle::{AtomId, FlatBindings, FormatWithSymTable, GetVariables, Replace};
+use crate::structs::chronicle::{FlatBindings, FormatWithSymTable, GetVariables, Replace};
+use crate::structs::domain::Domain;
+use crate::structs::sym_table::r#ref::RefSymTable;
+use crate::structs::sym_table::AtomId;
 use im::{hashset, HashSet};
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lruntimeerror;
@@ -221,14 +222,12 @@ impl GetVariables for Lit {
         }
     }
 
-    fn get_variables_of_type(
-        &self,
-        sym_table: &RefSymTable,
-        atom_type: &AtomType,
-    ) -> HashSet<AtomId> {
+    fn get_variables_in_domain(&self, sym_table: &RefSymTable, domain: &Domain) -> HashSet<AtomId> {
         self.get_variables()
             .iter()
-            .filter(|v| sym_table.get_type_of(v) == *atom_type)
+            .filter(|v| {
+                sym_table.contained_in_domain(&sym_table.get_domain(v, true).unwrap(), domain)
+            })
             .cloned()
             .collect()
     }

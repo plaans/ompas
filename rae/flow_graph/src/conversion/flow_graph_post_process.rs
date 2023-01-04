@@ -1,4 +1,4 @@
-use crate::conversion::chronicle_post_processing::bind_atoms;
+/*use crate::conversion::chronicle_post_processing::bind_atoms;
 use crate::structs::chronicle::lit::Lit;
 use crate::structs::chronicle::FlatBindings;
 use crate::{Expression, FlowGraph};
@@ -24,4 +24,4 @@ pub fn flow_graph_post_processing(graph: &mut FlowGraph) -> Result<(), LRuntimeE
 
     graph.flat_bindings(&sym_table);
     Ok(())
-}
+}*/

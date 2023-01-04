@@ -1,9 +1,9 @@
 use chrono::{DateTime, Utc};
-use flow_graph::structs::domain::SimpleType::*;
-use flow_graph::structs::domain::{DomainCollection, SimpleType};
+use flow_graph::structs::domains::SimpleType::*;
+use flow_graph::structs::domains::{DomainCollection, SimpleType};
 //use flow_graph::structs::r#type::Type::*;
 //use flow_graph::structs::r#type::{Type, TypeNetwork};
-use flow_graph::structs::domain::SimpleType::Boolean;
+use flow_graph::structs::domains::SimpleType::Boolean;
 use std::env::set_current_dir;
 use std::fs;
 use std::fs::File;

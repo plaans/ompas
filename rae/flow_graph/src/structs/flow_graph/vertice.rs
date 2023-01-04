@@ -1,6 +1,6 @@
 use crate::structs::chronicle::interval::Interval;
-use crate::structs::chronicle::AtomId;
 use crate::structs::flow_graph::graph::VerticeId;
+use crate::structs::sym_table::AtomId;
 use crate::Expression;
 use core::option::Option;
 use core::option::Option::Some;
@@ -10,8 +10,6 @@ pub struct Vertice {
     pub id: VerticeId,
     pub interval: Interval,
     pub result: AtomId,
-    pub parent: Option<VerticeId>,
-    pub child: Option<VerticeId>,
     pub computation: Expression,
 }
 
@@ -19,7 +17,7 @@ impl Vertice {
     /*
     SETTERS
      */
-    pub fn set_parent(&mut self, parent: &VerticeId) {
+    /*pub fn set_parent(&mut self, parent: &VerticeId) {
         self.parent = Some(*parent)
     }
 
@@ -34,7 +32,7 @@ impl Vertice {
 
     pub fn get_child(&self) -> &Option<VerticeId> {
         &self.child
-    }
+    }*/
 
     pub fn get_computation(&self) -> &Expression {
         &self.computation

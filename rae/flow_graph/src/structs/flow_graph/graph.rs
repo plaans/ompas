@@ -1,10 +1,12 @@
 use crate::structs::chronicle::interval::Interval;
-use crate::structs::chronicle::sym_table::RefSymTable;
-use crate::structs::chronicle::{AtomId, FlatBindings, FormatWithSymTable};
+use crate::structs::chronicle::{FlatBindings, FormatWithSymTable};
 use crate::structs::flow_graph::expression::{Block, Expression};
+use crate::structs::flow_graph::flow::{Flow, FlowId};
 use crate::structs::flow_graph::handle_table::HandleTable;
 use crate::structs::flow_graph::scope::Scope;
 use crate::structs::flow_graph::vertice::Vertice;
+use crate::structs::sym_table::r#ref::RefSymTable;
+use crate::structs::sym_table::AtomId;
 use std::fmt::Write;
 
 pub type Dot = String;
@@ -18,9 +20,9 @@ pub type EdgeId = usize;
 pub struct FlowGraph {
     pub sym_table: RefSymTable,
     pub(crate) vertices: Vec<Vertice>,
-    pub(crate) flows: Vec<Block>,
+    pub(crate) flows: Vec<Flow>,
     pub(crate) handles: HandleTable,
-    pub(crate) scope: Scope,
+    pub(crate) flow: FlowId,
 }
 
 impl FlowGraph {
@@ -30,7 +32,7 @@ impl FlowGraph {
             vertices: vec![],
             flows: vec![],
             handles: Default::default(),
-            scope: Default::default(),
+            flow: 0,
         }
     }
 
@@ -183,7 +185,7 @@ impl FlowGraph {
             let vertice = self.vertices.get(vertice_id).unwrap();
             let vertice_name = format!("{}{}", VERTICE_PREFIX, vertice.id);
             //let  = self.sym_table.get_atom(&vertice.timepoint, true).unwrap();
-            let result = sym_table.get_atom(&vertice.result, false).unwrap();
+            let result = sym_table.get_domain(&vertice.result, false).unwrap();
             match &vertice.computation {
                 Expression::Block(block) => match block {
                     Block::If(if_block) => {

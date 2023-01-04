@@ -1,13 +1,12 @@
-use crate::structs::chronicle::forest::NodeId;
-use crate::structs::chronicle::sym_table::RefSymTable;
-use crate::structs::chronicle::type_table::AtomType;
+use crate::structs::domain::Domain;
+use crate::structs::sym_table::r#ref::RefSymTable;
+use crate::structs::sym_table::AtomId;
 use std::collections::HashSet;
 
 pub mod atom;
 pub mod condition;
 pub mod constraint;
 pub mod effect;
-pub mod forest;
 pub mod interval;
 pub mod lit;
 pub mod subtask;
@@ -15,15 +14,6 @@ pub mod sym_table;
 pub mod task_template;
 pub mod template;
 pub mod type_table;
-
-pub const START: &str = "start";
-pub const END: &str = "end";
-pub const PREZ: &str = "prez";
-pub const RESULT: &str = "result";
-pub const COND: &str = "cond";
-pub const IF_TASK_PROTOTYPE: &str = "t_if";
-
-pub type AtomId = NodeId;
 
 impl FormatWithSymTable for Vec<AtomId> {
     fn format(&self, st: &RefSymTable, sym_version: bool) -> String {
@@ -78,9 +68,10 @@ impl FormatWithSymTable for &[AtomId] {
 
 impl FormatWithSymTable for AtomId {
     fn format(&self, st: &RefSymTable, sym_version: bool) -> String {
-        st.get_atom(self, sym_version)
-            .unwrap()
-            .format(st, sym_version)
+        st.get_debug(self).to_string()
+        /*st.get_domain(self, sym_version)
+        .unwrap()
+        .format(st.)*/
     }
 }
 
@@ -97,10 +88,10 @@ pub trait FormatWithSymTable {
 pub trait GetVariables {
     fn get_variables(&self) -> im::HashSet<AtomId>;
 
-    fn get_variables_of_type(
+    fn get_variables_in_domain(
         &self,
         sym_table: &RefSymTable,
-        atom_type: &AtomType,
+        domain: &Domain,
     ) -> im::HashSet<AtomId>;
 }
 

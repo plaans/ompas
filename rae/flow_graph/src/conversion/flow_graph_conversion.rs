@@ -1,8 +1,8 @@
 use crate::structs::chronicle::lit::lvalue_to_lit;
-use crate::structs::chronicle::AtomId;
 use crate::structs::flow_graph::expression::{Block, Expression, IfBlock};
 use crate::structs::flow_graph::handle_table::Handle;
 use crate::structs::flow_graph::scope::Scope;
+use crate::structs::sym_table::AtomId;
 use crate::{DefineTable, FlowGraph};
 use core::result::Result;
 use core::result::Result::{Err, Ok};

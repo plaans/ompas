@@ -1,5 +1,7 @@
 use crate::structs::flow_graph::graph::VerticeId;
 
+pub type FlowId = usize;
+
 pub enum Flow {
     Vertice(VerticeId),
     Seq(Vec<FlowId>),

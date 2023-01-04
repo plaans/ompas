@@ -1,4 +1,4 @@
-use crate::conversion::chronicle_post_processing::{
+/*use crate::conversion::chronicle_post_processing::{
     rm_useless_var, simplify_timepoints, unify_equal,
 };
 use crate::structs::chronicle::condition::Condition;
@@ -8,12 +8,12 @@ use crate::structs::chronicle::lit::Lit;
 use crate::structs::chronicle::subtask::SubTask;
 use crate::structs::chronicle::task_template::TaskTemplate;
 use crate::structs::chronicle::template::{ChronicleKind, ChronicleTemplate};
-use crate::structs::chronicle::type_table::AtomType;
 use crate::structs::chronicle::GetVariables;
-use crate::structs::chronicle::{AtomId, Replace, COND};
+use crate::structs::chronicle::Replace;
 use crate::structs::flow_graph::expression::{Block, Expression};
 use crate::structs::flow_graph::handle_table::HandleTable;
 use crate::structs::flow_graph::scope::Scope;
+use crate::structs::sym_table::AtomId;
 use crate::FlowGraph;
 use im::HashMap;
 use sompas_structs::lruntimeerror::LRuntimeError;
@@ -338,4 +338,4 @@ pub fn post_processing(partial: PartialConversion) -> Result<ChronicleTemplate, 
     //simplify_constraints(c, context, ch)?;
 
     Ok(ch)
-}
+}*/

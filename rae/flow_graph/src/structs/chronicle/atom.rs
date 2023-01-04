@@ -1,4 +1,4 @@
-use crate::structs::chronicle::sym_table::RefSymTable;
+/*use crate::structs::chronicle::sym_table::RefSymTable;
 use crate::structs::chronicle::{FormatWithSymTable, END, PREZ, RESULT, START};
 use crate::structs::flow_graph::graph::{
     HANDLE_PREFIX, IF_PREFIX, RESULT_PREFIX, TIMEPOINT_PREFIX,
@@ -220,4 +220,4 @@ impl FormatWithSymTable for Atom {
     fn format(&self, _: &RefSymTable, _: bool) -> String {
         self.to_string()
     }
-}
+}*/

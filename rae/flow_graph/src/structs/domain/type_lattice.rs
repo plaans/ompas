@@ -1,210 +1,30 @@
-use crate::structs::domain::Domain::*;
-use crate::structs::domain::RootType::*;
-//use crate::structs::r#type::Type;
-use crate::structs::type_test::DomainTest;
-use log::Level::Debug;
+use crate::structs::domain::basic_type::BasicType;
+use crate::structs::domain::root_type::RootType::*;
+use crate::structs::domain::Domain::{Composed, Cst, Simple, Substract, Union};
+use crate::structs::domain::{Domain, TypeId};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Write;
-use std::fmt::{Display, Formatter};
-use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
-#[repr(u8)]
-#[derive(Copy, Clone, Eq, PartialEq, Hash)]
-pub(crate) enum RootType {
-    Empty = 0,
-    Any = 1,
-    Boolean = 2,
-    List = 3,
-    Map = 4,
-    Err = 5,
-    Handle = 6,
-    Number = 7,
-    Int = 8,
-    Float = 9,
-    Symbol = 10,
-}
-
-impl TryFrom<TypeId> for RootType {
-    type Error = ();
-
-    fn try_from(value: TypeId) -> Result<Self, Self::Error> {
-        Ok(match value {
-            0 => Empty,
-            1 => Any,
-            2 => Boolean,
-            3 => List,
-            4 => Map,
-            5 => Err,
-            6 => Handle,
-            7 => Number,
-            8 => Int,
-            9 => Float,
-            10 => Symbol,
-            _ => return Result::Err(()),
-        })
-    }
-}
-
-impl Display for RootType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Any => write!(f, "Any"),
-            Boolean => write!(f, "Boolean"),
-            List => write!(f, "List"),
-            Empty => write!(f, "Empty"),
-            Map => write!(f, "Map"),
-            Err => write!(f, "Err"),
-            Handle => write!(f, "Handle"),
-            Number => write!(f, "Number"),
-            Int => write!(f, "Int"),
-            Float => write!(f, "Float"),
-            Symbol => write!(f, "Symbol"),
-        }
-    }
-}
-
-#[derive(Clone, PartialEq, Eq, Hash)]
-enum BasicType {
-    RootType(RootType),
-    New(String),
-}
-
-impl From<RootType> for BasicType {
-    fn from(r: RootType) -> Self {
-        Self::RootType(r)
-    }
-}
-
-impl From<&str> for BasicType {
-    fn from(s: &str) -> Self {
-        Self::New(s.to_string())
-    }
-}
-
-impl From<String> for BasicType {
-    fn from(s: String) -> Self {
-        s.as_str().into()
-    }
-}
-
-impl Display for BasicType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            BasicType::RootType(rt) => write!(f, "{}", rt),
-            BasicType::New(s) => write!(f, "{}", s),
-        }
-    }
-}
-
 pub struct TypeLattice {
-    types: Vec<BasicType>,
+    pub(crate) types: Vec<BasicType>,
     childs: Vec<Vec<TypeId>>,
     parents: Vec<Vec<TypeId>>,
     decomposition: Vec<Vec<TypeId>>,
     ids: HashMap<BasicType, TypeId>,
 }
 
-pub type TypeId = usize;
-
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub enum Domain {
-    Simple(TypeId),
-    Composed(TypeId, Vec<Domain>),
-    Union(Vec<Domain>),
-    Substract(Box<Domain>, Box<Domain>),
-    Cst(Box<Domain>, Cst),
-}
-
-impl From<RootType> for Domain {
-    fn from(r: RootType) -> Self {
-        Simple(r as usize)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Cst {
-    Int(i64),
-    Float(f64),
-    Boolean(bool),
-    Symbol(String),
-}
-
-impl Eq for Cst {}
-
-impl Hash for Cst {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        match self {
-            Cst::Int(i) => i.hash(state),
-            Cst::Float(f) => f.to_string().hash(state),
-            Cst::Boolean(b) => b.hash(state),
-            Cst::Symbol(s) => s.hash(state),
-        }
-    }
-}
-
-impl Display for Cst {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Cst::Int(i) => write!(f, "{i}"),
-            Cst::Float(fl) => write!(f, "{fl}"),
-            Cst::Boolean(b) => write!(f, "{b}"),
-            Cst::Symbol(s) => write!(f, "{s}"),
-        }
-    }
-}
-
-impl From<TypeId> for Domain {
-    fn from(id: TypeId) -> Self {
-        Simple(id)
-    }
-}
-
-impl Domain {
-    pub fn format(&self, dc: &TypeLattice) -> String {
-        match self {
-            Simple(id) => dc.types[*id].to_string(),
-            Composed(id, vec) => {
-                format!("{}<{}>", dc.types[*id].to_string(), {
-                    let mut str = "".to_string();
-                    for (i, d) in vec.iter().enumerate() {
-                        if i != 0 {
-                            str.push(',');
-                        }
-                        write!(str, "{}", d.format(dc));
-                    }
-                    str
-                })
-            }
-            Union(u) => {
-                let mut str = "{".to_string();
-                for (i, d) in u.iter().enumerate() {
-                    if i != 0 {
-                        str.push(',');
-                    }
-                    write!(str, "{}", d.format(dc));
-                }
-                str.push('}');
-                str
-            }
-            Substract(t1, t2) => {
-                format!("({} / {})", t1.format(dc), t2.format(dc))
-            }
-            Cst(t, c) => {
-                format!("{}[{c}]", t.format(dc))
-            }
-        }
-    }
-}
-
 impl Default for TypeLattice {
     fn default() -> Self {
+        let mut ids: HashMap<BasicType, TypeId> = Default::default();
+        ids.insert(BasicType::RootType(Empty), 0);
+        ids.insert(BasicType::RootType(Any), 0);
         let mut dc = Self {
             types: vec![BasicType::RootType(Empty), BasicType::RootType(Any)],
             childs: vec![vec![], vec![]],
             parents: vec![vec![], vec![]],
             decomposition: vec![vec![], vec![]],
-            ids: Default::default(),
+            ids,
         };
 
         dc.add_type(Boolean, vec![]);
@@ -236,13 +56,16 @@ impl Default for TypeLattice {
     }
 }
 
-const VERTICE_PREFIX: &str = "D";
-
 impl TypeLattice {
-    fn add_type(&mut self, r#type: impl Into<BasicType>, parents: Vec<TypeId>) -> TypeId {
+    pub fn get_type_id(&self, r#type: impl Into<BasicType>) -> Option<&TypeId> {
+        self.ids.get(&r#type.into())
+    }
+
+    pub fn add_type(&mut self, r#type: impl Into<BasicType>, parents: Vec<TypeId>) -> TypeId {
         let r#type = r#type.into();
         let id = self.types.len();
-        self.types.push(r#type);
+        self.types.push(r#type.clone());
+        self.ids.insert(r#type, id);
         self.childs.push(vec![]);
         self.parents.push(vec![]);
         self.decomposition.push(vec![]);
@@ -310,6 +133,61 @@ impl TypeLattice {
         &self.decomposition[*id]
     }
 
+    pub fn contained_in(&self, d1: &Domain, d2: &Domain) -> bool {
+        match (d1, d2) {
+            (Simple(t1), Simple(t2)) => {
+                let childs_t2 = self.get_all_childs(t2);
+                childs_t2.contains(t1)
+            }
+            (Simple(_), Composed(_, _)) => false,
+            (Composed(top1, _), Simple(t2)) => {
+                let childs_t2 = self.get_all_childs(t2);
+                childs_t2.contains(top1)
+            }
+            (Composed(top1, comp1), Composed(top2, comp2)) => {
+                if top1 == top2 && comp1.len() == comp2.len() {
+                    for (d1, d2) in comp1.iter().zip(comp2) {
+                        if !self.contained_in(d1, d2) {
+                            return false;
+                        }
+                    }
+                    true
+                } else {
+                    false
+                }
+            }
+            (Union(u1), Union(_)) => {
+                for t1 in u1 {
+                    //println!("Meet {ta} and {tb}.");
+                    if !self.contained_in(t1, d2) {
+                        return false;
+                    }
+                }
+                true
+            }
+            (Union(_), _) => false,
+            (t, Union(u2)) => {
+                for t2 in u2 {
+                    if self.contained_in(t, t2) {
+                        return true;
+                    }
+                }
+                false
+            }
+            (Substract(_, _), _) => todo!(),
+            (_, Substract(_, _)) => todo!(),
+            (Cst(d1, c1), Cst(d2, c2)) => {
+                if self.contained_in(d1, d2) {
+                    c1 == c2
+                } else {
+                    false
+                }
+            }
+            (Cst(d1, _), t2) => self.contained_in(d1, t2),
+            (_, Cst(_, _)) => false,
+        }
+    }
+
     pub(crate) fn __meet(&self, t1: &Domain, t2: &Domain) -> Domain {
         match (t1, t2) {
             (Simple(t1), Simple(t2)) => {
@@ -364,7 +242,7 @@ impl TypeLattice {
                     self.__meet(&Simple(*top1), &Simple(*top2))
                 }
             }
-            (Union(ua), Union(ub)) => {
+            (Union(ua), Union(_)) => {
                 //println!("Meet {ta} and {tb}.");
                 let mut union = vec![];
                 for ta in ua {
@@ -427,7 +305,6 @@ impl TypeLattice {
                     Empty.into()
                 }
             }
-            _ => Empty.into(),
         }
     }
 
@@ -578,7 +455,6 @@ impl TypeLattice {
                     Union(vec![t1.clone(), t2.clone()])
                 }
             }
-            _ => Simple(Empty as usize),
         }
     }
 
@@ -673,7 +549,7 @@ impl TypeLattice {
         }
     }
 
-    pub(crate) fn simplify_union(&self, mut set: HashSet<Domain>) -> Domain {
+    pub(crate) fn simplify_union(&self, set: HashSet<Domain>) -> Domain {
         let mut tested: HashSet<TypeId> = Default::default();
         let mut simples: HashSet<TypeId> = Default::default();
         let mut others: HashSet<Domain> = Default::default();
@@ -762,3 +638,5 @@ impl TypeLattice {
         dot
     }
 }
+
+const VERTICE_PREFIX: &str = "D";

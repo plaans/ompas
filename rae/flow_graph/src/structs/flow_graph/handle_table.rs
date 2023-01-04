@@ -1,5 +1,5 @@
-use crate::structs::chronicle::AtomId;
 use crate::structs::flow_graph::scope::Scope;
+use crate::structs::sym_table::AtomId;
 use im::HashMap;
 
 #[derive(Default, Clone)]

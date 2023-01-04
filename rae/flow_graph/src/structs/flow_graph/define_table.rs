@@ -1,4 +1,4 @@
-use crate::structs::chronicle::AtomId;
+use crate::structs::sym_table::AtomId;
 
 #[derive(Default, Clone)]
 pub struct DefineTable {

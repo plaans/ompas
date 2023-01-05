@@ -4,19 +4,18 @@ use crate::structs::domain::Domain;
 use crate::structs::sym_table::r#ref::RefSymTable;
 use crate::structs::sym_table::AtomId;
 use im::{hashset, HashSet};
-use itertools::Itertools;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use std::borrow::Borrow;
-use std::fmt::Write;
 use std::ops::Deref;
 
 #[derive(Debug, Clone)]
 pub enum Lit {
     Exp(Vec<Lit>),
     Atom(AtomId),
+    Await(AtomId),
     Constraint(Box<Constraint>),
     Apply(Vec<AtomId>),
 }
@@ -83,6 +82,7 @@ impl TryFrom<&Lit> for Vec<AtomId> {
                 Ok(e)
             }
             Lit::Apply(vec) => Ok(vec.clone()),
+            Lit::Await(a) => Ok(vec![*a]),
         }
     }
 }
@@ -223,6 +223,9 @@ impl FormatWithSymTable for Lit {
                 str.push(')');
                 str
             }
+            Lit::Await(a) => {
+                format!("await({})", a.format(st, sym_version))
+            }
         }
     }
 }
@@ -234,6 +237,7 @@ impl FlatBindings for Lit {
             Lit::Constraint(c) => c.flat_bindings(st),
             Lit::Exp(vec) => vec.flat_bindings(st),
             Lit::Apply(vec) => vec.flat_bindings(st),
+            Lit::Await(a) => a.flat_bindings(st),
         }
     }
 }
@@ -251,6 +255,7 @@ impl GetVariables for Lit {
                 hashset
             }
             Lit::Apply(vec) => vec.iter().cloned().collect(),
+            Lit::Await(a) => hashset![*a],
         }
     }
 
@@ -272,6 +277,7 @@ impl Replace for Lit {
             Lit::Constraint(c) => c.replace(old, new),
             Lit::Exp(e) => e.replace(old, new),
             Lit::Apply(vec) => vec.replace(old, new),
+            Lit::Await(a) => a.replace(old, new),
         }
     }
 }

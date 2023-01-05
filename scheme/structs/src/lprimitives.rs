@@ -39,6 +39,7 @@ pub enum LPrimitives {
     Interrupt,
     Interruptible,
     Uninterruptible,
+    Err,
     Enr,
     //QuasiInterruptible,
     Race,
@@ -66,6 +67,7 @@ impl Display for LPrimitives {
             LPrimitives::Uninterruptible => UNINTERRUPTIBLE,
             LPrimitives::Race => RACE,
             LPrimitives::Enr => ENR,
+            LPrimitives::Err => ERR,
         };
 
         write!(f, "{}", str)
@@ -102,6 +104,7 @@ impl TryFrom<&str> for LPrimitives {
             UNINTERRUPTIBLE | UNINTERRUPTIBLE_SHORT => Ok(LPrimitives::Uninterruptible),
             RACE => Ok(LPrimitives::Race),
             ENR => Ok(LPrimitives::Enr),
+            ERR => Ok(LPrimitives::Err),
             //QUASI_INTERRUPTIBLE => Ok(LCoreOperator::QuasiInterruptible),
             _ => Err(LRuntimeError::new(
                 "LCoreOperator::TryFrom<str>",

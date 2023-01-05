@@ -1,11 +1,13 @@
 use crate::structs::chronicle::interval::Interval;
-use crate::structs::chronicle::{FlatBindings, FormatWithSymTable};
-use crate::structs::flow_graph::flow::{Flow, FlowId};
+use crate::structs::chronicle::{FlatBindings, FormatWithSymTable, GetVariables};
+use crate::structs::flow_graph::flow::{BranchingFlow, Flow, FlowId, FlowKind};
 use crate::structs::flow_graph::handle_table::HandleTable;
 use crate::structs::flow_graph::vertice::Vertice;
 use crate::structs::sym_table::lit::Lit;
 use crate::structs::sym_table::r#ref::RefSymTable;
 use crate::structs::sym_table::AtomId;
+use im::{hashset, HashSet};
+use std::collections::HashMap;
 use std::fmt::Write;
 
 pub type Dot = String;
@@ -20,6 +22,8 @@ pub struct FlowGraph {
     pub sym_table: RefSymTable,
     pub(crate) vertices: Vec<Vertice>,
     pub(crate) flows: Vec<Flow>,
+    pub(crate) map_atom_id_flow_id: HashMap<AtomId, HashSet<VerticeId>>,
+    pub(crate) map_vertice_id_flow_id: HashMap<VerticeId, FlowId>,
     pub(crate) handles: HandleTable,
     pub(crate) flow: FlowId,
 }
@@ -30,6 +34,8 @@ impl FlowGraph {
             sym_table,
             vertices: vec![],
             flows: vec![],
+            map_atom_id_flow_id: Default::default(),
+            map_vertice_id_flow_id: Default::default(),
             handles: Default::default(),
             flow: 0,
         }
@@ -45,25 +51,27 @@ impl FlowGraph {
 
     pub fn get_flow_result(&self, flow: &FlowId) -> AtomId {
         let flow = &self.flows[*flow];
-        match flow {
-            Flow::Vertice(v) => self.get_vertice_result(v),
-            Flow::Seq(s) => self.get_flow_result(&s.last().unwrap()),
-            Flow::Async(_) => todo!(),
-            Flow::If(r#if) => todo!(),
+        match &flow.kind {
+            FlowKind::Vertice(v) => self.get_vertice_result(v),
+            FlowKind::Seq(s) => self.get_flow_result(&s.last().unwrap()),
+            FlowKind::Branching(branching) => self.get_flow_result(&branching.result),
         }
     }
 
     pub fn get_flow_interval(&self, flow: &FlowId) -> Interval {
         let flow = &self.flows[*flow];
-        match flow {
-            Flow::Vertice(v) => *self.get_vertice_interval(v),
-            Flow::Seq(seq) => {
+        match &flow.kind {
+            FlowKind::Vertice(v) => *self.get_vertice_interval(v),
+            FlowKind::Seq(seq) => {
                 let start = *self.get_flow_interval(&seq.first().unwrap()).get_start();
                 let end = *self.get_flow_interval(&seq.last().unwrap()).get_end();
                 Interval::new(&start, &end)
             }
-            Flow::Async(_) => todo!(),
-            Flow::If(_) => todo!(),
+            FlowKind::Branching(branching) => {
+                let start = *self.get_flow_interval(&branching.cond_flow).get_start();
+                let end = *self.get_flow_interval(&branching.result).get_end();
+                Interval::new(&start, &end)
+            }
         }
     }
 
@@ -83,7 +91,7 @@ impl FlowGraph {
             id,
             interval: Interval::new_instantaneous(&t),
             result: r,
-            computation: value.into(),
+            lit: value.into(),
         };
 
         self.vertices.push(vertice);
@@ -103,21 +111,129 @@ impl FlowGraph {
             id,
             interval: Interval::new(&start, &end),
             result: r,
-            computation: value.into(),
+            lit: value.into(),
         };
+
+        let mut atoms = hashset![start, end, r];
+        atoms = atoms.union(vertice.lit.get_variables());
+        for atom in atoms {
+            match self.map_atom_id_flow_id.get_mut(&atom) {
+                None => {
+                    self.map_atom_id_flow_id.insert(atom, hashset![id]);
+                }
+                Some(set) => {
+                    set.insert(id);
+                }
+            }
+        }
 
         self.vertices.push(vertice);
         id
     }
 
+    pub fn get_atom_of_flow(&self, flow: &FlowId) -> im::HashSet<AtomId> {
+        let flow = &self.flows[*flow];
+
+        match &flow.kind {
+            FlowKind::Vertice(id) => self.get_atom_of_vertice(id),
+            FlowKind::Seq(seq) => {
+                let mut set = im::HashSet::default();
+                for f in seq {
+                    set = set.union(self.get_atom_of_flow(f));
+                }
+                set
+            }
+            FlowKind::Branching(branching) => {
+                let mut set = self.get_atom_of_flow(&branching.cond_flow);
+                set = set.union(self.get_atom_of_flow(&branching.result));
+                set
+            }
+        }
+    }
+
+    pub fn get_atom_of_vertice(&self, vertice: &VerticeId) -> im::HashSet<AtomId> {
+        let vertice = &self.vertices[*vertice];
+        let mut set = vertice.interval.get_variables();
+        set.insert(vertice.result);
+        let set = set.union(vertice.lit.get_variables());
+        set
+    }
+
     pub fn new_flow(&mut self, flow: impl Into<Flow>) -> FlowId {
         let id = self.flows.len();
+        let flow = flow.into();
+        match &flow.kind {
+            FlowKind::Vertice(v) => {
+                self.map_vertice_id_flow_id.insert(*v, id);
+            }
+            FlowKind::Seq(seq) => {
+                for f in seq {
+                    self.flows[*f].parent = Some(id);
+                }
+            }
+            FlowKind::Branching(branching) => {
+                self.flows[branching.cond_flow].parent = Some(id);
+                self.flows[branching.false_flow].parent = Some(id);
+                self.flows[branching.true_flow].parent = Some(id);
+                self.flows[branching.result].parent = Some(id);
+            }
+        }
         self.flows.push(flow.into());
         id
     }
 
     pub fn new_vertice_flow(&mut self, vertice_id: VerticeId) -> FlowId {
-        self.new_flow(Flow::Vertice(vertice_id))
+        self.new_flow(FlowKind::Vertice(vertice_id))
+    }
+
+    pub fn new_seq_flow(&mut self, seq: Vec<FlowId>) -> FlowId {
+        let id = self.flows.len();
+        for f in &seq {
+            self.flows[*f].parent = Some(id)
+        }
+        self.flows.push(FlowKind::Seq(seq).into());
+        id
+    }
+
+    pub fn merge_flow(&mut self, f1_id: &FlowId, f2_id: &FlowId) -> FlowId {
+        let f1 = &self.flows[*f1_id];
+        let f2 = &self.flows[*f2_id];
+
+        let flow: FlowKind = match (&f1.kind, &f2.kind) {
+            (FlowKind::Seq(s1), FlowKind::Seq(s2)) => {
+                let mut seq = s1.clone();
+                seq.append(&mut s2.clone());
+                FlowKind::Seq(seq)
+            }
+            (FlowKind::Seq(s1), _) => {
+                let mut seq = s1.clone();
+                seq.push(*f2_id);
+                FlowKind::Seq(seq)
+            }
+            (_, FlowKind::Seq(s2)) => {
+                let mut seq = vec![*f1_id];
+                seq.append(&mut s2.clone());
+                FlowKind::Seq(seq)
+            }
+            (_, _) => FlowKind::Seq(vec![*f1_id, *f2_id]),
+        };
+
+        self.new_flow(flow)
+    }
+
+    pub fn remove_flow(&mut self, flow: &FlowId) {
+        if let Some(parent_id) = self.flows[*flow].parent {
+            let parent = &mut self.flows[parent_id];
+            match &mut parent.kind {
+                FlowKind::Seq(seq) => {
+                    seq.retain(|f| f != flow);
+                    if seq.is_empty() {
+                        self.remove_flow(&parent_id)
+                    }
+                }
+                _ => unreachable!(),
+            }
+        }
     }
 
     /*pub fn new_handle(&mut self, handle: Handle) -> VerticeId {
@@ -144,25 +260,39 @@ impl FlowGraph {
         let mut start = None;
         let mut end = None;
 
-        match &self.flows[*id] {
-            Flow::Vertice(v) => {
+        match &self.flows[*id].kind {
+            FlowKind::Vertice(v) => {
                 let vertice: &Vertice = &self.vertices[*v];
                 dot.push_str(
                     format!(
                         "V{v} [label= \"{}: {} <- {}\"]\n",
                         vertice.interval.format(sym_table, false),
                         vertice.result.format(sym_table, false),
-                        vertice.computation.format(sym_table, false),
+                        vertice.lit.format(sym_table, false),
                     )
                     .as_str(),
                 );
                 start = Some(*v);
                 end = Some(*v);
             }
-            Flow::If(r#if) => {
-                todo!()
+            FlowKind::Branching(branching) => {
+                let (cond_dot, (cond_start, cond_end)) = self.export_flow(&branching.cond_flow);
+                let cond = self
+                    .sym_table
+                    .get_debug(&self.get_vertice_result(&cond_end));
+                start = Some(cond_start);
+
+                let (true_dot, (true_start, true_end)) = self.export_flow(&branching.true_flow);
+                let (false_dot, (false_start, false_end)) = self.export_flow(&branching.false_flow);
+                let (result_dot, (result_start, result_end)) = self.export_flow(&branching.result);
+                write!(dot, "{cond_dot}{true_dot}{false_dot}{result_dot}").unwrap();
+                write!(dot, "V{cond_end} -> V{true_start} [label = \"{cond}\"]\n",).unwrap();
+                write!(dot, "V{cond_end} -> V{false_start} [label = \"!{cond}\"]\n",).unwrap();
+                write!(dot, "V{true_end} -> V{result_start}\n").unwrap();
+                write!(dot, "V{false_end}-> V{result_start}\n").unwrap();
+                end = Some(result_end);
             }
-            Flow::Seq(seq) => {
+            FlowKind::Seq(seq) => {
                 let mut previous_end = None;
                 for f in seq {
                     let (f_dot, (f_start, f_end)) = self.export_flow(f);
@@ -182,141 +312,18 @@ impl FlowGraph {
             }
         }
 
-        /*while let Some(vertice_id) = next {
-            let vertice = self.vertices.get(vertice_id).unwrap();
-            let vertice_name = format!("{}{}", VERTICE_PREFIX, vertice.id);
-            //let  = self.sym_table.get_atom(&vertice.timepoint, true).unwrap();
-            let result = sym_table.get_domain(&vertice.result, false).unwrap();
-            match &vertice.computation {
-                Expression::Block(block) => match block {
-                    Block::If(if_block) => {
-                        dot.push_str(
-                            format!(
-                                "{} [label= \"{}: {} <- {}\"]\n",
-                                vertice_name,
-                                vertice.interval.format(&self.sym_table, false),
-                                result,
-                                vertice.computation.format(&self.sym_table, false),
-                            )
-                            .as_str(),
-                        );
-                        dot.push_str(self.export_vertice(&if_block.true_branch.start).as_str());
-                        dot.push_str(self.export_vertice(&if_block.false_branch.start).as_str());
-                    } /*Block::Handle(async_block) => {
-                          dot.push_str(
-                              format!(
-                                  "{} [label= \"{}: {} <- {}\"]\n",
-                                  vertice_name,
-                                  vertice.interval.format(&self.sym_table, false),
-                                  result,
-                                  vertice.computation.format(&self.sym_table, false),
-                              )
-                              .as_str(),
-                          );
-                          dot.push_str(
-                              self.export_vertice(async_block.scope_expression.start())
-                                  .as_str(),
-                          );
-                      }*/
-                },
-                _ => {
-                    dot.push_str(
-                        format!(
-                            "{} [label= \"{}: {} <- {}\"]\n",
-                            vertice_name,
-                            vertice.interval.format(&self.sym_table, false),
-                            result,
-                            vertice.computation.format(&self.sym_table, false),
-                        )
-                        .as_str(),
-                    );
-                }
-            }
-
-            if let Some(parent) = vertice.parent {
-                let parent = format!("{}{}", VERTICE_PREFIX, parent);
-                dot.push_str(format!("{} -> {}\n", parent, vertice_name).as_str());
-            }
-
-            next = vertice.child;
-        }*/
         (dot, (start.unwrap(), end.unwrap()))
     }
-
-    /*pub fn export_vertice(&self, id: &VerticeId) -> Dot {
-        let mut next = Some(*id);
-
-        let sym_table = &self.sym_table;
-
-        let mut dot = "".to_string();
-        while let Some(vertice_id) = next {
-            let vertice = self.vertices.get(vertice_id).unwrap();
-            let vertice_name = format!("{}{}", VERTICE_PREFIX, vertice.id);
-            //let  = self.sym_table.get_atom(&vertice.timepoint, true).unwrap();
-            let result = sym_table.get_domain(&vertice.result, false).unwrap();
-            match &vertice.computation {
-                Expression::Block(block) => match block {
-                    Block::If(if_block) => {
-                        dot.push_str(
-                            format!(
-                                "{} [label= \"{}: {} <- {}\"]\n",
-                                vertice_name,
-                                vertice.interval.format(&self.sym_table, false),
-                                result,
-                                vertice.computation.format(&self.sym_table, false),
-                            )
-                            .as_str(),
-                        );
-                        dot.push_str(self.export_vertice(&if_block.true_branch.start).as_str());
-                        dot.push_str(self.export_vertice(&if_block.false_branch.start).as_str());
-                    } /*Block::Handle(async_block) => {
-                          dot.push_str(
-                              format!(
-                                  "{} [label= \"{}: {} <- {}\"]\n",
-                                  vertice_name,
-                                  vertice.interval.format(&self.sym_table, false),
-                                  result,
-                                  vertice.computation.format(&self.sym_table, false),
-                              )
-                              .as_str(),
-                          );
-                          dot.push_str(
-                              self.export_vertice(async_block.scope_expression.start())
-                                  .as_str(),
-                          );
-                      }*/
-                },
-                _ => {
-                    dot.push_str(
-                        format!(
-                            "{} [label= \"{}: {} <- {}\"]\n",
-                            vertice_name,
-                            vertice.interval.format(&self.sym_table, false),
-                            result,
-                            vertice.computation.format(&self.sym_table, false),
-                        )
-                        .as_str(),
-                    );
-                }
-            }
-
-            if let Some(parent) = vertice.parent {
-                let parent = format!("{}{}", VERTICE_PREFIX, parent);
-                dot.push_str(format!("{} -> {}\n", parent, vertice_name).as_str());
-            }
-
-            next = vertice.child;
-        }
-        dot
-    }*/
 
     pub fn export_dot(&self) -> Dot {
         let mut dot: Dot = "digraph {\n".to_string();
 
         write!(dot, "{}", self.export_flow(&self.flow).0).unwrap();
-        /*for (_, handle) in self.handles.inner() {
-            write!(dot, "{}", self.export_vertice(&handle.scope.start)).unwrap();
-        }*/
+        for (id, handle) in self.handles.inner() {
+            let (f_dot, (start, end)) = self.export_flow(&handle.flow);
+            write!(dot, "{} -> V{start}\n", self.sym_table.get_debug(id)).unwrap();
+            write!(dot, "{f_dot}").unwrap();
+        }
 
         dot.push('}');
         dot
@@ -327,7 +334,7 @@ impl FlatBindings for FlowGraph {
     fn flat_bindings(&mut self, st: &RefSymTable) {
         for v in &mut self.vertices {
             v.result.flat_bindings(st);
-            v.computation.flat_bindings(st);
+            v.lit.flat_bindings(st);
             v.interval.flat_bindings(st);
         }
     }

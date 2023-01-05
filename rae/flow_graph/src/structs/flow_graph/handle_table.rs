@@ -1,4 +1,4 @@
-use crate::structs::flow_graph::scope::Scope;
+use crate::structs::flow_graph::flow::FlowId;
 use crate::structs::sym_table::AtomId;
 use im::HashMap;
 
@@ -29,7 +29,7 @@ impl HandleTable {
 #[derive(Clone)]
 pub struct Handle {
     pub(crate) result: AtomId,
-    pub(crate) scope: Scope,
+    pub(crate) flow: FlowId,
     pub(crate) ends: Vec<AtomId>,
 }
 

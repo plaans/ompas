@@ -15,7 +15,7 @@ use ompas_middleware::LogLevel;
 use sompas_language::kind::*;
 use sompas_language::list::CONS;
 use sompas_language::primitives::*;
-use sompas_language::FALSE;
+use sompas_language::{primitives, FALSE};
 use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lasynchandler::LAsyncHandle;
 use sompas_structs::lenv::{ImportType, LEnv};
@@ -406,6 +406,16 @@ pub async fn expand(x: &LValue, top_level: bool, env: &mut LEnv) -> LResult {
                             Ok(expanded.into())
                         }
                     }
+                    LPrimitives::Err => {
+                        return if list.len() != 2 {
+                            Err(wrong_n_args!("expand", list, 2)
+                                .chain(format!("{} must have one arg", primitives::ERR)))
+                        } else {
+                            let mut expanded = vec![LPrimitives::Err.into()];
+                            expanded.push(expand(&list[1], top_level, env).await?);
+                            Ok(expanded.into())
+                        }
+                    }
                 }
             } else if let LValue::Symbol(sym) = &list[0] {
                 match env.get_macro(sym) {
@@ -696,6 +706,9 @@ pub async fn eval(
                                 }
                                 LPrimitives::Quote => {
                                     results.push(args[0].clone());
+                                }
+                                LPrimitives::Err => {
+                                    results.push(LValue::Err(args[0].clone().into_ref()));
                                     debug.log_last_result(&results).await;
                                 }
                                 LPrimitives::QuasiQuote => {

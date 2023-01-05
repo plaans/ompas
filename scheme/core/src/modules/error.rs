@@ -11,7 +11,7 @@ impl From<ModError> for LModule {
     fn from(m: ModError) -> LModule {
         let mut module = LModule::new(m, MOD_ERROR, DOC_MOD_ERROR);
         module.add_fn(CHECK, check, DOC_CHECK, true);
-        module.add_fn(FN_ERR, fn_err, DOC_FN_ERR, true);
+        //module.add_fn(FN_ERR, fn_err, DOC_FN_ERR, true);
         module.add_fn(IS_ERR, is_err, DOC_IS_ERR, true);
         module.add_fn(IS_INTERRUPTED, is_interrupted, DOC_IS_INTERRUPTED, true);
         module
@@ -26,10 +26,10 @@ pub fn check(b: bool) -> LValue {
     }
 }
 
-#[scheme_fn]
+/*#[scheme_fn]
 pub fn fn_err(e: LValue) -> LValue {
     LValue::Err(Arc::new(e))
-}
+}*/
 
 #[scheme_fn]
 pub fn is_err(lv: LValue) -> bool {

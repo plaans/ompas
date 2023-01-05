@@ -154,6 +154,17 @@ impl RefSymTable {
         RefCell::borrow_mut(&self.0).new_parameter(symbol, domain)
     }
 
+    pub fn get_parent(&self, a: &AtomId) -> AtomId {
+        RefCell::borrow(&self.0).get_parent(a)
+    }
+
+    pub fn get_debug(&self, id: &AtomId) -> String {
+        RefCell::borrow(&self.0).get_debug(id).to_string()
+    }
+    /*
+    Domain operators
+     */
+
     pub fn meet_domain(&self, d1: &Domain, d2: &Domain) -> Domain {
         RefCell::borrow(&self.0).meet_domain(d1, d2)
     }
@@ -166,16 +177,12 @@ impl RefSymTable {
         RefCell::borrow(&self.0).substract_domain(d1, d2)
     }
 
+    pub fn set_domain(&mut self, id: &AtomId, domain: Domain) -> bool {
+        RefCell::borrow_mut(&self.0).set_domain(id, domain)
+    }
+
     pub fn contained_in_domain(&self, d1: &Domain, d2: &Domain) -> bool {
         RefCell::borrow(&self.0).contained_in_domain(d1, d2)
-    }
-
-    pub fn get_debug(&self, id: &AtomId) -> String {
-        RefCell::borrow(&self.0).get_debug(id).to_string()
-    }
-
-    pub fn get_parent(&self, a: &AtomId) -> AtomId {
-        RefCell::borrow(&self.0).get_parent(a)
     }
 
     pub fn get_type_as_domain(&self, r#type: impl Into<BasicType>) -> Domain {
@@ -183,62 +190,15 @@ impl RefSymTable {
     }
 
     /*
-    TYPES
-     */
-    /*pub fn set_type_of(&mut self, atom_id: &AtomId, atom_type: &AtomType) {
-        RefCell::borrow_mut(&self.0).set_type_of(atom_id, atom_type)
-    }
-    pub fn union_types(&mut self, a: &AtomId, b: &AtomId) {
-        RefCell::borrow_mut(&self.0).union_types(a, b)
-    }*/
-    /*pub fn get_type_id_of(&self, atom_id: &AtomId) -> TypeId {
-        *RefCell::borrow(&self.0).get_type_id_of(atom_id)
-    }*/
-
-    /*
     FOREST FUNCTIONS
      */
-    /*pub fn union_atom(&mut self, a: &AtomId, b: &AtomId) {
-        RefCell::borrow_mut(&self.0).union_atom(a, b);
-    }
-
-    pub fn find_parent(&mut self, a: &AtomId) -> AtomId {
-        RefCell::borrow_mut(&self.0).find_parent(a)
-    }
-
-
-
     pub fn flat_bindings(&mut self) {
         RefCell::borrow_mut(&self.0).flat_bindings()
     }
 
-    pub fn format_symbols_forest(&self) -> String {
-        RefCell::borrow(&self.0).format_symbols_forest()
+    pub fn try_union_atom(&mut self, id1: &AtomId, id2: &AtomId) -> bool {
+        RefCell::borrow_mut(&self.0).try_union_atom(id1, id2)
     }
-    pub fn format_types_forest(&self) -> String {
-        RefCell::borrow(&self.0).format_types_forest()
-    }
-
-    pub fn format_types(&self) -> String {
-        RefCell::borrow(&self.0).format_types()
-    }
-
-    pub fn format_scopes(&self) -> String {
-        let scopes = &RefCell::borrow(&self.0).scopes;
-
-        let mut str = "SCOPES:\n".to_string();
-
-        for (atom, interval) in scopes.iter().sorted_by(|a, b| a.0.cmp(b.0)) {
-            writeln!(
-                str,
-                "{}: {}",
-                atom.format(self, false),
-                interval.format(self, false)
-            )
-            .unwrap();
-        }
-        str
-    }*/
 }
 
 impl Display for RefSymTable {
@@ -272,7 +232,7 @@ impl Display for RefSymTable {
                         "- ({}){}({})\n",
                         e,
                         self.get_debug(&e),
-                        self.get_domain(&e, true).unwrap(),
+                        self.get_domain(&e, true).unwrap().format(&st.lattice),
                     )
                     .as_str(),
                 );

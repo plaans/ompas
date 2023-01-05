@@ -8,12 +8,12 @@ pub struct Vertice {
     pub id: VerticeId,
     pub interval: Interval,
     pub result: AtomId,
-    pub computation: Lit,
+    pub lit: Lit,
 }
 
 impl Vertice {
     pub fn get_computation(&self) -> &Lit {
-        &self.computation
+        &self.lit
     }
 
     pub fn get_vertice_id(&self) -> VerticeId {

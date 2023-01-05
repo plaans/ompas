@@ -280,6 +280,18 @@ impl SymTable {
         self.ids.get_id(sym)
     }
 
+    pub fn get_debug(&self, id: &AtomId) -> &str {
+        self.debug.get(id).unwrap()
+    }
+
+    pub fn find_parent(&mut self, a: &AtomId) -> AtomId {
+        *self.domains.find(a)
+    }
+
+    /*
+    Domain operators
+     */
+
     pub fn meet_domain(&self, d1: &Domain, d2: &Domain) -> Domain {
         self.lattice.__meet(d1, d2)
     }
@@ -292,12 +304,14 @@ impl SymTable {
         self.lattice.__substract(d1, d2)
     }
 
-    pub fn contained_in_domain(&self, d1: &Domain, d2: &Domain) -> bool {
-        self.lattice.contained_in(d1, d2)
+    pub fn set_domain(&mut self, id: &AtomId, domain: Domain) -> bool {
+        let r = domain != RootType::Empty.into();
+        self.domains.set_value(id, domain);
+        r
     }
 
-    pub fn get_debug(&self, id: &AtomId) -> &str {
-        self.debug.get(id).unwrap()
+    pub fn contained_in_domain(&self, d1: &Domain, d2: &Domain) -> bool {
+        self.lattice.contained_in(d1, d2)
     }
 
     pub fn get_type_as_domain(&self, r#type: impl Into<BasicType>) -> Domain {
@@ -315,43 +329,29 @@ impl SymTable {
     }
 
     /*
-    TYPES
-     */
-    /*pub fn set_type_of(&mut self, atom_id: &AtomId, atom_type: &AtomType) {
-        self.types.set_type_of(atom_id, atom_type)
-    }
-
-    pub fn union_types(&mut self, a: &AtomId, b: &AtomId) {
-        self.types.union_types(a, b).unwrap()
-    }
-
-    pub fn get_type_id_of(&self, atom_id: &AtomId) -> &TypeId {
-        self.types.get_type_id_of(atom_id)
-    }*/
-
-    /*
     FOREST FUNCTIONS
      */
-    /*pub fn union_atom(&mut self, a: &AtomId, b: &AtomId) {
-        self.symbols.union_ordered(a, b);
-        self.types.union_types(a, b).unwrap();
-    }
-
-    pub fn find_parent(&mut self, a: &AtomId) -> AtomId {
-        *self.symbols.find(a)
-    }
-
-
-
     pub fn flat_bindings(&mut self) {
         self.domains.flat_bindings();
     }
 
-    pub fn format_symbols_forest(&self) -> String {
-        self.domains.to_string()
+    pub fn try_union_atom(&mut self, id1: &AtomId, id2: &AtomId) -> bool {
+        let p1 = self.get_parent(id1);
+        let p2 = self.get_parent(id2);
+
+        let domain = self.meet_domain(
+            self.get_domain(&p1, false).unwrap(),
+            self.get_domain(&p2, false).unwrap(),
+        );
+        let r = domain != RootType::Empty.into();
+        self.set_domain(&p1, domain.clone());
+        self.set_domain(&p2, domain);
+        self.domains.union_ordered(&p1, &p2);
+        r
     }
-    pub fn format_types_forest(&self) -> String {
-        self.types.inner.to_string()
+
+    /*pub fn format_symbols_forest(&self) -> String {
+        self.domains.to_string()
     }*/
 }
 

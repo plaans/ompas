@@ -137,11 +137,15 @@ fn output_markdown(
 ```
 {}
 ```
+
+## Sym Table
+{}
     ",
         name,
         expression.format(0),
         graph_file_name,
         ch,
+        ch.sym_table
     );
 
     md_file.write_all(md.as_bytes()).unwrap();

@@ -1,3 +1,4 @@
+use crate::kind::ERR;
 use crate::kind::*;
 use crate::primitives::*;
 
@@ -48,9 +49,9 @@ pub fn get_symbol_types() -> Vec<&'static str> {
         HANDLER,
         TRUE,
         NIL,
-        ERR,
         SEXPR,
         FN,
+        ERR,
         OBJECT,
         ATOM,
         PRIMITIVE,
@@ -181,6 +182,9 @@ pub mod primitives {
 
     pub const INTERRUPTIBLE_SHORT: &str = "i!";
     pub const DOC_INTERRUPTIBLE_SHORT: &str = "Character for the primitive interruptible.";
+
+    pub const ERR: &str = "err";
+    pub const DOC_ERR: &str = "Create an LValue::Err.";
 }
 
 pub mod env {

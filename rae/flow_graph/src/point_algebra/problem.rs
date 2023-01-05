@@ -1,8 +1,8 @@
 use crate::point_algebra::relation_type::RelationType::Tautology;
 use crate::point_algebra::relation_type::{RelationType, RelationTypeBit};
 use crate::structs::chronicle::constraint::Constraint;
-use crate::structs::chronicle::lit::Lit;
 use crate::structs::chronicle::FormatWithSymTable;
+use crate::structs::sym_table::lit::Lit;
 use crate::structs::sym_table::r#ref::RefSymTable;
 use crate::structs::sym_table::{AtomId, TIMEPOINT_TYPE};
 use cli_table::{print_stdout, Cell, Table};

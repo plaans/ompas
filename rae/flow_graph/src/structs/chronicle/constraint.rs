@@ -1,7 +1,7 @@
 use crate::structs::chronicle::interval::Interval;
-use crate::structs::chronicle::lit::Lit;
 use crate::structs::chronicle::{AtomId, FlatBindings, FormatWithSymTable, GetVariables, Replace};
 use crate::structs::domain::Domain;
+use crate::structs::sym_table::lit::Lit;
 use crate::structs::sym_table::r#ref::RefSymTable;
 use im::HashSet;
 use std::fmt::Write;

@@ -17,6 +17,9 @@ pub enum RootType {
     Int = 8,
     Float = 9,
     Symbol = 10,
+    EmptyList = 11,
+    True = 12,
+    False = 13,
 }
 
 impl TryFrom<TypeId> for RootType {
@@ -35,6 +38,9 @@ impl TryFrom<TypeId> for RootType {
             8 => Int,
             9 => Float,
             10 => Symbol,
+            11 => EmptyList,
+            12 => True,
+            13 => False,
             _ => return Result::Err(()),
         })
     }
@@ -54,6 +60,9 @@ impl Display for RootType {
             Int => write!(f, "Int"),
             Float => write!(f, "Float"),
             Symbol => write!(f, "Symbol"),
+            EmptyList => write!(f, "EmptyList"),
+            True => write!(f, "True"),
+            False => write!(f, "False"),
         }
     }
 }

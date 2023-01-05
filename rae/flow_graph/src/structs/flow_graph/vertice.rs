@@ -1,17 +1,18 @@
 use crate::structs::chronicle::interval::Interval;
 use crate::structs::flow_graph::graph::VerticeId;
+use crate::structs::sym_table::lit::Lit;
 use crate::structs::sym_table::AtomId;
-use crate::Expression;
+
 #[derive(Clone, Debug)]
 pub struct Vertice {
     pub id: VerticeId,
     pub interval: Interval,
     pub result: AtomId,
-    pub computation: Expression,
+    pub computation: Lit,
 }
 
 impl Vertice {
-    pub fn get_computation(&self) -> &Expression {
+    pub fn get_computation(&self) -> &Lit {
         &self.computation
     }
 

@@ -15,15 +15,14 @@ pub enum DomainTest {
     List(Option<Vec<DomainTest>>),
     Vector(Option<Box<DomainTest>>),
     Tuple(Option<Vec<DomainTest>>),
-    //EmptyList,
     Handle(Option<Box<DomainTest>>),
     Err(Option<Box<DomainTest>>),
     Alias(Box<DomainTest>, Box<DomainTest>),
     //Literal,
     Symbol,
     Boolean,
-    //True,
-    //Nil,
+    True,
+    Nil,
     Number,
     Int,
     Float,
@@ -53,11 +52,8 @@ impl From<String> for DomainTest {
 impl From<bool> for DomainTest {
     fn from(b: bool) -> Self {
         match b {
-            true => Self::Cst(Box::new(Boolean), cst::Cst::Boolean(true)),
-            false => Self::Cst(
-                Box::new(Union(vec![Boolean, List(None)])),
-                cst::Cst::Boolean(false),
-            ),
+            true => True,
+            false => Nil,
         }
     }
 }
@@ -133,6 +129,8 @@ impl Display for DomainTest {
             Alias(n, _) => write!(f, "{n}"),
             Substract(t1, t2) => write!(f, "({t1} / {t2})"),
             Cst(d1, c) => write!(f, "{d1}[{c}]"),
+            True => write!(f, "true"),
+            Nil => write!(f, "nil"),
         }
     }
 }
@@ -179,8 +177,8 @@ impl DomainTest {
             //Type::Alias(_, _) => {}
             Symbol => RootType::Symbol.into(),
             Boolean => RootType::Boolean.into(),
-            /*True => RootType::True.into(),
-            Nil => RootType::Nil.into(),*/
+            True => RootType::True.into(),
+            Nil => Domain::nil(),
             Number => RootType::Number.into(),
             Int => RootType::Int.into(),
             Float => RootType::Float.into(),
@@ -209,6 +207,9 @@ impl DomainTest {
                     RootType::Int => Int,
                     RootType::Float => Float,
                     RootType::Symbol => Symbol,
+                    RootType::EmptyList => Nil,
+                    RootType::True => True,
+                    RootType::False => Nil,
                 },
                 Result::Err(_) => Empty,
             },

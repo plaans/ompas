@@ -29,9 +29,6 @@ impl Default for TypeLattice {
 
         dc.add_type(Boolean, vec![]);
         dc.add_type(List, vec![]);
-        /*dc.add_type(True, vec![Boolean as usize]);
-        dc.add_decomposition(Boolean as usize, vec![True as usize, Nil as usize]);
-        dc.add_type(Nil, vec![List as usize, Boolean as usize]);*/
         dc.add_type(Map, vec![]);
         dc.add_type(Err, vec![]);
         dc.add_type(Handle, vec![]);
@@ -40,6 +37,10 @@ impl Default for TypeLattice {
         dc.add_type(Float, vec![Number as usize]);
         dc.add_decomposition(Number as usize, vec![Int as usize, Float as usize]);
         dc.add_type(Symbol, vec![]);
+        dc.add_type(EmptyList, vec![List as usize]);
+        dc.add_type(True, vec![Boolean as usize]);
+        dc.add_type(False, vec![Boolean as usize]);
+        dc.add_decomposition(Boolean as usize, vec![True as usize, False as usize]);
         dc.add_decomposition(
             Any as usize,
             vec![

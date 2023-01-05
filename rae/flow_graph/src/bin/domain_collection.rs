@@ -3,7 +3,6 @@ use flow_graph::structs::domain::domain_test::DomainTest;
 use flow_graph::structs::domain::domain_test::DomainTest::*;
 use flow_graph::structs::domain::domain_test::DomainTest::{Boolean, Int};
 use flow_graph::structs::domain::type_lattice::TypeLattice;
-use flow_graph::structs::domain::Domain;
 use std::env::set_current_dir;
 use std::fs;
 use std::fs::File;
@@ -127,7 +126,7 @@ fn main() {
         ]),
     );*/
 
-    //output_domain_collection("/home/jeremy/Bureau/domain".into(), dc, true);
+    output_domain_collection("/home/jeremy/Bureau/domain".into(), dc, true);
     //output_markdown("/home/jeremy/Bureau".into(), tn, true);
 }
 

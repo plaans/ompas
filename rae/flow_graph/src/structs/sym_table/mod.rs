@@ -1,5 +1,6 @@
 pub mod forest;
 pub mod id;
+pub mod lit;
 pub mod meta_data;
 pub mod r#ref;
 
@@ -14,7 +15,11 @@ use crate::structs::sym_table::meta_data::SymTableMetaData;
 //use sompas_language::primitives::DO;
 use crate::structs::domain::basic_type::BasicType;
 use crate::structs::domain::root_type::RootType;
+use crate::structs::sym_table::r#ref::RefSymTable;
 use sompas_structs::lnumber::LNumber;
+use sompas_structs::lruntimeerror;
+use sompas_structs::lruntimeerror::LRuntimeError;
+use sompas_structs::lvalue::LValue;
 use std::collections::HashMap;
 use std::fmt::Display;
 
@@ -237,7 +242,7 @@ impl SymTable {
         if self.it_exists(sym) {
             self.id(sym).unwrap()
         } else {
-            let sym: String = sym.into();
+            let sym: String = sym.to_string();
             let id = self.domains.new_node(domain.unwrap_or_default());
             self.debug.insert(id, sym.to_string());
             self.ids.insert(&sym, &id);
@@ -348,4 +353,33 @@ impl SymTable {
     pub fn format_types_forest(&self) -> String {
         self.types.inner.to_string()
     }*/
+}
+
+pub fn lvalue_to_domain(lv: &LValue, st: &mut RefSymTable) -> Result<Domain, LRuntimeError> {
+    match lv {
+        LValue::List(list) => {
+            let mut vec = vec![];
+            for e in list.iter() {
+                vec.push(lvalue_to_domain(e, st)?);
+            }
+            Ok(Domain::Composed(RootType::List as usize, vec))
+        }
+        LValue::Map(_) => Err(lruntimeerror!(
+            "LValue to lit",
+            "Map transformation to lit is not supported yet."
+        )),
+        LValue::Number(n) => match n {
+            LNumber::Int(i) => Ok((*i).into()),
+            LNumber::Float(f) => Ok((*f).into()),
+        },
+        LValue::True => Ok(true.into()),
+        LValue::Nil => Ok(Domain::nil()),
+        lv => Ok(match st.id(&lv.to_string()) {
+            Some(id) => id.into(),
+            None => {
+                //println!("symbol {} does not exist", lv.to_string());
+                st.new_symbol(&lv.to_string(), None).into()
+            }
+        }),
+    }
 }

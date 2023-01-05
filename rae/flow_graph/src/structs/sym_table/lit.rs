@@ -4,29 +4,47 @@ use crate::structs::domain::Domain;
 use crate::structs::sym_table::r#ref::RefSymTable;
 use crate::structs::sym_table::AtomId;
 use im::{hashset, HashSet};
+use itertools::Itertools;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use std::borrow::Borrow;
-use std::convert::{TryFrom, TryInto};
+use std::fmt::Write;
 use std::ops::Deref;
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub enum Lit {
+    Exp(Vec<Lit>),
     Atom(AtomId),
     Constraint(Box<Constraint>),
-    Exp(Vec<Lit>),
+    Apply(Vec<AtomId>),
 }
 
 impl Lit {
+    pub fn apply(vec: Vec<AtomId>) -> Self {
+        Self::Apply(vec)
+    }
+
+    pub fn atom(atom: AtomId) -> Self {
+        Self::Atom(atom)
+    }
+
+    pub fn constraint(constraint: Constraint) -> Self {
+        Self::Constraint(Box::new(constraint))
+    }
+
+    pub fn exp(exp: Vec<Lit>) -> Self {
+        Self::Exp(exp)
+    }
+
     pub fn is_atom(&self) -> bool {
         matches!(self, Self::Atom(_))
     }
-    pub fn constraint(&self) -> bool {
+    pub fn is_constraint(&self) -> bool {
         matches!(self, Self::Constraint(_))
     }
-    pub fn exp(&self) -> bool {
+    pub fn is_exp(&self) -> bool {
         matches!(self, Self::Exp(_))
     }
 }
@@ -64,6 +82,7 @@ impl TryFrom<&Lit> for Vec<AtomId> {
                 }
                 Ok(e)
             }
+            Lit::Apply(vec) => Ok(vec.clone()),
         }
     }
 }
@@ -193,6 +212,17 @@ impl FormatWithSymTable for Lit {
                 str.push(')');
                 str
             }
+            Lit::Apply(vec) => {
+                let mut str = "apply(".to_string();
+                for (i, e) in vec.iter().enumerate() {
+                    if i != 0 {
+                        str.push(' ');
+                    }
+                    str.push_str(e.format(st, sym_version).as_str())
+                }
+                str.push(')');
+                str
+            }
         }
     }
 }
@@ -203,6 +233,7 @@ impl FlatBindings for Lit {
             Lit::Atom(a) => a.flat_bindings(st),
             Lit::Constraint(c) => c.flat_bindings(st),
             Lit::Exp(vec) => vec.flat_bindings(st),
+            Lit::Apply(vec) => vec.flat_bindings(st),
         }
     }
 }
@@ -219,6 +250,7 @@ impl GetVariables for Lit {
                 }
                 hashset
             }
+            Lit::Apply(vec) => vec.iter().cloned().collect(),
         }
     }
 
@@ -239,6 +271,7 @@ impl Replace for Lit {
             Lit::Atom(a) => a.replace(old, new),
             Lit::Constraint(c) => c.replace(old, new),
             Lit::Exp(e) => e.replace(old, new),
+            Lit::Apply(vec) => vec.replace(old, new),
         }
     }
 }

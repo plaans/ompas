@@ -65,6 +65,10 @@ impl Domain {
             false
         }
     }
+
+    pub fn nil() -> Domain {
+        Union(vec![False.into(), EmptyList.into()])
+    }
 }
 
 impl Display for Domain {
@@ -147,11 +151,8 @@ impl From<String> for Domain {
 impl From<bool> for Domain {
     fn from(b: bool) -> Self {
         match b {
-            true => Cst(Box::new(Boolean.into()), cst::Cst::Boolean(true)),
-            false => Cst(
-                Box::new(Union(vec![Boolean.into(), List.into()])),
-                cst::Cst::Boolean(false),
-            ),
+            true => Simple(True as usize),
+            false => Domain::nil(),
         }
     }
 }

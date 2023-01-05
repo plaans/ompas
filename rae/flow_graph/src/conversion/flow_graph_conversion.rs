@@ -1,8 +1,5 @@
-use crate::structs::chronicle::lit::lvalue_to_lit;
-use crate::structs::flow_graph::expression::Expression;
 use crate::structs::flow_graph::flow::{Flow, FlowId};
-use crate::structs::flow_graph::handle_table::Handle;
-use crate::structs::flow_graph::scope::Scope;
+use crate::structs::sym_table::lit::Lit;
 use crate::structs::sym_table::AtomId;
 use crate::{DefineTable, FlowGraph};
 use core::result::Result;
@@ -46,9 +43,9 @@ fn convert_symbol(symbol: &Arc<String>, fl: &mut FlowGraph, define_table: &Defin
     let vertice_id = match define_table.get(symbol.as_str()) {
         None => {
             let id = fl.sym_table.new_symbol(symbol, None);
-            fl.new_instantaneous_vertice(Expression::expr(id)).into()
+            fl.new_instantaneous_vertice(Lit::Atom(id)).into()
         }
-        Some(r) => fl.new_instantaneous_vertice(Expression::expr(*r)).into(),
+        Some(r) => fl.new_instantaneous_vertice(Lit::Atom(*r)).into(),
     };
 
     fl.new_vertice_flow(vertice_id)
@@ -61,13 +58,13 @@ fn convert_string(_: &Arc<String>, _: &mut FlowGraph) -> FlowId {
 
 fn convert_number(number: &LNumber, fl: &mut FlowGraph) -> FlowId {
     let id = fl.sym_table.new_number(number);
-    let vertice_id = fl.new_instantaneous_vertice(Expression::expr(id));
+    let vertice_id = fl.new_instantaneous_vertice(Lit::Atom(id));
     fl.new_vertice_flow(vertice_id)
 }
 
 fn convert_bool(bool: bool, fl: &mut FlowGraph) -> FlowId {
     let id = fl.sym_table.new_bool(bool);
-    let vertice_id = fl.new_instantaneous_vertice(Expression::expr(id));
+    let vertice_id = fl.new_instantaneous_vertice(Lit::Atom(id));
     fl.new_vertice_flow(vertice_id)
 }
 
@@ -91,12 +88,12 @@ fn convert_list(
                 let val = &list[2];
                 let mut flow_val = convert_into_flow_graph(val, fl, define_table)?;
                 let id_var = fl.sym_table.new_symbol(var, None);
-                let vertice_var = fl.new_instantaneous_vertice(Expression::expr(id_var));
+                let vertice_var = fl.new_instantaneous_vertice(Lit::Atom(id_var));
                 let flow_var = fl.new_vertice_flow(vertice_var);
                 define_table.insert(var.to_string(), fl.get_vertice_result(&vertice_var));
 
                 let id = fl.sym_table.new_bool(false);
-                let result = fl.new_instantaneous_vertice(Expression::expr(id));
+                let result = fl.new_instantaneous_vertice(Lit::Atom(id));
                 let flow_result = fl.new_vertice_flow(result);
 
                 Ok(fl.new_flow(Flow::Seq(vec![flow_val, flow_var, flow_result])))
@@ -217,7 +214,7 @@ fn convert_apply(
     }
 
     let mut results: Vec<AtomId> = seq.iter().map(|f| fl.get_flow_result(f)).collect();
-    let apply_id = fl.new_vertice(Expression::Apply(results.clone()));
+    let apply_id = fl.new_vertice(Lit::Apply(results.clone()));
     let end = *fl.get_vertice_interval(&apply_id).get_end();
     seq.push(fl.new_vertice_flow(apply_id));
     for o in results {

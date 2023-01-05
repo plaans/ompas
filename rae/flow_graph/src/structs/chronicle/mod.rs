@@ -3,17 +3,13 @@ use crate::structs::sym_table::r#ref::RefSymTable;
 use crate::structs::sym_table::AtomId;
 use std::collections::HashSet;
 
-pub mod atom;
 pub mod condition;
 pub mod constraint;
 pub mod effect;
 pub mod interval;
-pub mod lit;
 pub mod subtask;
-pub mod sym_table;
 pub mod task_template;
 pub mod template;
-pub mod type_table;
 
 impl FormatWithSymTable for Vec<AtomId> {
     fn format(&self, st: &RefSymTable, sym_version: bool) -> String {

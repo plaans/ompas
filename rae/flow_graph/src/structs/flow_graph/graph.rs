@@ -1,10 +1,9 @@
 use crate::structs::chronicle::interval::Interval;
 use crate::structs::chronicle::{FlatBindings, FormatWithSymTable};
-use crate::structs::flow_graph::expression::Expression;
 use crate::structs::flow_graph::flow::{Flow, FlowId};
 use crate::structs::flow_graph::handle_table::HandleTable;
-use crate::structs::flow_graph::scope::Scope;
 use crate::structs::flow_graph::vertice::Vertice;
+use crate::structs::sym_table::lit::Lit;
 use crate::structs::sym_table::r#ref::RefSymTable;
 use crate::structs::sym_table::AtomId;
 use std::fmt::Write;
@@ -72,7 +71,7 @@ impl FlowGraph {
         self.vertices.get(*id).unwrap().get_interval()
     }
 
-    pub fn new_instantaneous_vertice(&mut self, value: impl Into<Expression>) -> VerticeId {
+    pub fn new_instantaneous_vertice(&mut self, value: impl Into<Lit>) -> VerticeId {
         let id = self.vertices.len();
 
         let t = self.sym_table.new_timepoint();
@@ -91,7 +90,7 @@ impl FlowGraph {
         id
     }
 
-    pub fn new_vertice(&mut self, value: impl Into<Expression>) -> VerticeId {
+    pub fn new_vertice(&mut self, value: impl Into<Lit>) -> VerticeId {
         let id = self.vertices.len();
 
         let start = self.sym_table.new_timepoint();

@@ -1,27 +1,27 @@
-use crate::structs::chronicle::interval::Interval;
-use crate::structs::flow_graph::graph::VerticeId;
+use crate::structs::flow_graph::assignment::Assignment;
 use crate::structs::sym_table::AtomId;
 
 pub type FlowId = usize;
 
 #[derive(Clone)]
 pub enum FlowKind {
-    Vertice(VerticeId),
-    Seq(Vec<FlowId>),
-    //Result(Interval, AtomId),
+    Assignment(Assignment),
+    Seq(Vec<FlowId>, FlowId),
     Branching(BranchingFlow),
+    FlowResult(AtomId),
 }
 
-impl From<VerticeId> for FlowKind {
-    fn from(value: VerticeId) -> Self {
-        Self::Vertice(value)
+impl From<Assignment> for FlowKind {
+    fn from(value: Assignment) -> Self {
+        Self::Assignment(value)
     }
 }
-impl From<Vec<FlowId>> for FlowKind {
+
+/*impl From<Vec<FlowId>> for FlowKind {
     fn from(value: Vec<FlowId>) -> Self {
         Self::Seq(value)
     }
-}
+}*/
 
 impl From<BranchingFlow> for FlowKind {
     fn from(value: BranchingFlow) -> Self {

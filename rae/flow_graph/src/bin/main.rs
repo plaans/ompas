@@ -139,7 +139,10 @@ fn output_markdown(
 {}
 ```
 \n
-
+## Post processed Scheme code
+```lisp\n
+{}
+```
 ## Graph
 \n
 ![]({})
@@ -154,6 +157,7 @@ fn output_markdown(
     ",
         name,
         expression.format(0),
+        ch.debug.post_processed_lvalue.format(0),
         graph_file_name,
         ch,
         ch.sym_table

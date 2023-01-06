@@ -24,6 +24,7 @@ pub struct ChronicleDebug {
     pub kind: ChronicleKind,
     label: String,
     pub lvalue: LValue,
+    pub post_processed_lvalue: LValue,
     pub flow_graph: FlowGraph,
 }
 
@@ -63,6 +64,7 @@ impl ChronicleTemplate {
                 kind: chronicle_kind,
                 label: label.to_string(),
                 lvalue: Default::default(),
+                post_processed_lvalue: Default::default(),
                 flow_graph: Default::default(),
             },
             name: Default::default(),

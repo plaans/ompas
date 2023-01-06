@@ -33,7 +33,7 @@ impl Domain {
                         if i != 0 {
                             str.push(',');
                         }
-                        write!(str, "{}", d.format(dc));
+                        write!(str, "{}", d.format(dc)).unwrap();
                     }
                     str
                 })
@@ -89,7 +89,7 @@ impl Display for Domain {
                     if i != 0 {
                         str.push(',');
                     }
-                    write!(str, "{d}",);
+                    write!(str, "{d}").unwrap();
                 }
                 str
             }),

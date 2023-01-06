@@ -82,7 +82,7 @@ pub async fn transform_lambda_expression(lv: &LValue, env: LEnv, avoid: &[String
                         } else {
                             args.into()
                         };
-                        lisp.push_str(format!("(define {} '{})", param, arg).as_str());
+                        lisp.push_str(format!("(define {} {})", param, arg).as_str());
                     }
                     LambdaArgs::List(params) => {
                         if params.len() != args.len() {
@@ -95,7 +95,7 @@ pub async fn transform_lambda_expression(lv: &LValue, env: LEnv, avoid: &[String
                             .chain(TRANSFORM_LAMBDA_EXPRESSION));
                         }
                         for (param, arg) in params.iter().zip(args) {
-                            lisp.push_str(format!("(define {} '{})", param, arg).as_str());
+                            lisp.push_str(format!("(define {} {})", param, arg).as_str());
                         }
                     }
                     LambdaArgs::Nil => {

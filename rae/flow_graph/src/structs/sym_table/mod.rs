@@ -25,7 +25,6 @@ use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use std::fmt::Display;
 use std::fmt::Write;
-use std::ops::DerefMut;
 
 pub const RESULT_PREFIX: char = 'r';
 pub const HANDLE_PREFIX: char = 'h';
@@ -57,7 +56,7 @@ pub enum EmptyDomains {
 }
 
 impl EmptyDomains {
-    pub fn append(&mut self, mut other: Self) {
+    pub fn append(&mut self, other: Self) {
         match other {
             EmptyDomains::None => {}
             EmptyDomains::Some(mut vec2) => {
@@ -548,7 +547,7 @@ impl SymTable {
         let domain = &self.domains[*id];
         let mut str = format!("domain = {}", domain.domain.format(&self.lattice));
         if !domain.union.is_empty() {
-            write!(str, ", union = {{");
+            write!(str, ", union = {{").unwrap();
             for (i, id) in domain.union.iter().enumerate() {
                 if i != 0 {
                     str.push(',');
@@ -556,7 +555,7 @@ impl SymTable {
                 write!(str, "{}", self.format_variable(id));
             }
 
-            write!(str, "}}");
+            write!(str, "}}").unwrap();
         }
 
         if !domain.parents.is_empty() {
@@ -565,10 +564,10 @@ impl SymTable {
                 if i != 0 {
                     str.push(',');
                 }
-                write!(str, "{}", self.format_variable(id));
+                write!(str, "{}", self.format_variable(id)).unwrap();
             }
 
-            write!(str, "}}");
+            write!(str, "}}").unwrap();
         }
         str
     }

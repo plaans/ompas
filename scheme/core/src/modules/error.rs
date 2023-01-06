@@ -10,8 +10,9 @@ pub struct ModError {}
 impl From<ModError> for LModule {
     fn from(m: ModError) -> LModule {
         let mut module = LModule::new(m, MOD_ERROR, DOC_MOD_ERROR);
-        module.add_fn(CHECK, check, DOC_CHECK, true);
+        //module.add_fn(CHECK, check, DOC_CHECK, true);
         //module.add_fn(FN_ERR, fn_err, DOC_FN_ERR, true);
+        module.add_lambda(CHECK, LAMBDA_CHECK, DOC_CHECK);
         module.add_fn(IS_ERR, is_err, DOC_IS_ERR, true);
         module.add_fn(IS_INTERRUPTED, is_interrupted, DOC_IS_INTERRUPTED, true);
         module
@@ -21,7 +22,7 @@ impl From<ModError> for LModule {
 #[scheme_fn]
 pub fn check(b: bool) -> LValue {
     match b {
-        true => LValue::True,
+        true => LValue::Nil,
         false => LValue::Err(Arc::new(LValue::Nil)),
     }
 }

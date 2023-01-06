@@ -206,7 +206,7 @@ impl RefSymTable {
         RefCell::borrow_mut(&self.0).set_domain(id, domain)
     }
 
-    pub fn add_union_dependency(&mut self, id: &AtomId, mut union: Vec<AtomId>) {
+    pub fn add_union_dependency(&mut self, id: &AtomId, union: Vec<AtomId>) {
         RefCell::borrow_mut(&self.0).add_union_dependency(id, union)
     }
 

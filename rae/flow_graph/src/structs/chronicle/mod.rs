@@ -63,7 +63,7 @@ impl FormatWithSymTable for &[AtomId] {
 }
 
 impl FormatWithSymTable for AtomId {
-    fn format(&self, st: &RefSymTable, sym_version: bool) -> String {
+    fn format(&self, st: &RefSymTable, _: bool) -> String {
         st.format_variable(self).to_string()
         /*st.get_domain(self, sym_version)
         .unwrap()

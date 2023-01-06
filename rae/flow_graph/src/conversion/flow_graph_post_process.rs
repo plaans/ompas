@@ -1,6 +1,6 @@
 use crate::structs::chronicle::FlatBindings;
 use crate::structs::domain::root_type::RootType;
-use crate::structs::domain::root_type::RootType::False;
+use crate::structs::domain::root_type::RootType::{False, True};
 use crate::structs::flow_graph::flow::{FlowId, FlowKind};
 use crate::structs::flow_graph::graph::FlowGraph;
 use crate::structs::sym_table::lit::Lit;
@@ -51,24 +51,27 @@ pub fn binding(graph: &mut FlowGraph) -> Result<(), LRuntimeError> {
 
     while let Some(flow_id) = flows_queue.pop_front() {
         let flow = graph.flows[flow_id].clone();
-        match flow.kind {
-            FlowKind::Vertice(v) => {
-                let vertice = graph.vertices[v].clone();
-                if let Lit::Atom(a) = &vertice.lit {
+        match &flow.kind {
+            FlowKind::Assignment(ass) => {
+                if let Lit::Atom(a) = &ass.lit {
                     if let EmptyDomains::Some(emptys) =
-                        graph.sym_table.try_union_atom(&vertice.result, &a)
+                        graph.sym_table.try_union_atom(&ass.result, &a)
                     {
                         println!("invalid flow(s)");
                         for e in &emptys {
                             invalid_flows(graph, e)?;
                         }
                     } else {
+                        let parent_flow = &mut graph.flows[flow.parent.unwrap()];
+                        if let FlowKind::Seq(s, _) = &mut parent_flow.kind {
+                            s.retain(|f| *f != flow_id)
+                        }
                     }
                 }
             }
-            FlowKind::Seq(s) => {
+            FlowKind::Seq(s, _) => {
                 for f in s {
-                    flows_queue.push_back(f)
+                    flows_queue.push_back(*f)
                 }
             }
             FlowKind::Branching(b) => {
@@ -76,7 +79,8 @@ pub fn binding(graph: &mut FlowGraph) -> Result<(), LRuntimeError> {
                 flows_queue.push_back(b.true_flow);
                 flows_queue.push_back(b.false_flow);
                 flows_queue.push_back(b.result);
-            } //FlowKind::Result(_, _) => {}
+            }
+            FlowKind::FlowResult(_) => {}
         }
     }
 
@@ -85,12 +89,11 @@ pub fn binding(graph: &mut FlowGraph) -> Result<(), LRuntimeError> {
 }
 
 pub fn invalid_flows(graph: &mut FlowGraph, invalid_atom: &AtomId) -> Result<(), LRuntimeError> {
-    let vertices = graph.map_atom_id_flow_id.get(invalid_atom).unwrap();
-    let mut flows: Vec<FlowId> = vertices
-        .iter()
-        .map(|id| graph.map_vertice_id_flow_id.get(id).unwrap())
-        .cloned()
-        .collect();
+    let mut flows = graph
+        .map_atom_id_flow_id
+        .get(invalid_atom)
+        .unwrap_or(&vec![])
+        .clone();
 
     let mut sym_table = graph.sym_table.clone();
 
@@ -99,9 +102,10 @@ pub fn invalid_flows(graph: &mut FlowGraph, invalid_atom: &AtomId) -> Result<(),
         flow.valid = false;
 
         if let Some(parent) = flow.parent {
-            match &graph.flows[parent].kind {
-                FlowKind::Vertice(_) => unreachable!(),
-                FlowKind::Seq(_) => {
+            let flow = graph.flows[parent].clone();
+            match &flow.kind {
+                FlowKind::Assignment(_) => unreachable!(),
+                FlowKind::Seq(_, _) => {
                     flows.push(parent);
                 }
                 FlowKind::Branching(branching) => {
@@ -116,31 +120,57 @@ pub fn invalid_flows(graph: &mut FlowGraph, invalid_atom: &AtomId) -> Result<(),
                                 invalid_flows(graph, &e)?;
                             }
                         } else {
-                            graph.flows[parent].kind = FlowKind::Seq(vec![
+                            let new_flow = graph.merge_flows(vec![
                                 branching.cond_flow,
                                 branching.false_flow,
                                 branching.result,
                             ]);
+                            let grand_parent = &mut graph.flows[flow.parent.unwrap()];
+
+                            //Awful code
+                            if let FlowKind::Seq(vec, _) = &mut grand_parent.kind {
+                                for f in vec.iter_mut() {
+                                    if *f == parent {
+                                        *f = new_flow;
+                                        break;
+                                    }
+                                }
+                            } else {
+                                unreachable!()
+                            }
                         }
                     } else if flow_id == branching.false_flow {
                         let cond_result = &graph.get_flow_result(&branching.cond_flow);
-                        let emptys = sym_table.meet_to_domain(cond_result, False);
+                        let emptys = sym_table.meet_to_domain(cond_result, True);
 
                         if let EmptyDomains::Some(vec) = emptys {
                             for e in vec {
                                 invalid_flows(graph, &e)?;
                             }
                         } else {
-                            graph.flows[parent].kind = FlowKind::Seq(vec![
+                            let new_flow = graph.merge_flows(vec![
                                 branching.cond_flow,
                                 branching.true_flow,
                                 branching.result,
                             ]);
+                            let grand_parent = &mut graph.flows[flow.parent.unwrap()];
+
+                            if let FlowKind::Seq(vec, _) = &mut grand_parent.kind {
+                                for f in vec.iter_mut() {
+                                    if *f == parent {
+                                        *f = new_flow;
+                                        break;
+                                    }
+                                }
+                            } else {
+                                unreachable!()
+                            }
                         }
                     } else {
                         panic!("flow is not part of one of the branch");
                     }
-                } //FlowKind::Result(_, _) => {}
+                }
+                FlowKind::FlowResult(_) => {}
             }
         }
     }

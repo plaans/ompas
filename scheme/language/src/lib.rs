@@ -640,6 +640,7 @@ pub mod error {
     pub const DOC_MOD_ERROR: &str = "Collection of functions to manipulate LValue::Err.";
 
     pub const CHECK: &str = "check";
+    pub const LAMBDA_CHECK: &str = "(lambda (a) (if a nil (err nil)))";
     pub const DOC_CHECK: &str = "Return an LValue::Err if the LValue if false";
 
     pub const FN_ERR: &str = "err";

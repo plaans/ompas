@@ -1,12 +1,12 @@
 use crate::structs::chronicle::interval::Interval;
 use crate::structs::chronicle::{FlatBindings, FormatWithSymTable, GetVariables};
-use crate::structs::flow_graph::flow::{Flow, FlowId, FlowKind};
+use crate::structs::flow_graph::assignment::Assignment;
+use crate::structs::flow_graph::flow::{BranchingFlow, Flow, FlowId, FlowKind};
 use crate::structs::flow_graph::handle_table::HandleTable;
-use crate::structs::flow_graph::vertice::Vertice;
 use crate::structs::sym_table::lit::Lit;
 use crate::structs::sym_table::r#ref::RefSymTable;
 use crate::structs::sym_table::AtomId;
-use im::{hashset, HashSet};
+use im::hashset;
 use std::collections::HashMap;
 use std::fmt::Write;
 
@@ -18,10 +18,8 @@ pub type HandleId = usize;
 #[derive(Clone, Default)]
 pub struct FlowGraph {
     pub sym_table: RefSymTable,
-    pub(crate) vertices: Vec<Vertice>,
     pub(crate) flows: Vec<Flow>,
-    pub(crate) map_atom_id_flow_id: HashMap<AtomId, HashSet<VerticeId>>,
-    pub(crate) map_vertice_id_flow_id: HashMap<VerticeId, FlowId>,
+    pub(crate) map_atom_id_flow_id: HashMap<VerticeId, Vec<FlowId>>,
     pub(crate) handles: HandleTable,
     pub(crate) flow: FlowId,
 }
@@ -30,38 +28,28 @@ impl FlowGraph {
     pub fn new(sym_table: RefSymTable) -> Self {
         Self {
             sym_table,
-            vertices: vec![],
             flows: vec![],
             map_atom_id_flow_id: Default::default(),
-            map_vertice_id_flow_id: Default::default(),
             handles: Default::default(),
             flow: 0,
         }
     }
 
-    /*pub(crate) fn vertices(&self) -> &Vec<Vertice> {
-        &self.vertices
-    }*/
-
-    pub fn get_vertice_result(&self, id: &VerticeId) -> AtomId {
-        self.vertices.get(*id).unwrap().get_result()
-    }
-
     pub fn get_flow_result(&self, flow: &FlowId) -> AtomId {
         let flow = &self.flows[*flow];
         match &flow.kind {
-            FlowKind::Vertice(v) => self.get_vertice_result(v),
-            FlowKind::Seq(s) => self.get_flow_result(&s.last().unwrap()),
+            FlowKind::Assignment(v) => v.result,
+            FlowKind::Seq(_, r) => self.get_flow_result(r),
             FlowKind::Branching(branching) => self.get_flow_result(&branching.result),
-            //FlowKind::Result(_, r) => *r,
+            FlowKind::FlowResult(fr) => *fr,
         }
     }
 
     pub fn get_flow_interval(&self, flow: &FlowId) -> Interval {
         let flow = &self.flows[*flow];
         match &flow.kind {
-            FlowKind::Vertice(v) => *self.get_vertice_interval(v),
-            FlowKind::Seq(seq) => {
+            FlowKind::Assignment(v) => v.interval,
+            FlowKind::Seq(seq, _) => {
                 let start = *self.get_flow_interval(&seq.first().unwrap()).get_start();
                 let end = *self.get_flow_interval(&seq.last().unwrap()).get_end();
                 Interval::new(&start, &end)
@@ -70,72 +58,48 @@ impl FlowGraph {
                 let start = *self.get_flow_interval(&branching.cond_flow).get_start();
                 let end = *self.get_flow_interval(&branching.result).get_end();
                 Interval::new(&start, &end)
-            } //FlowKind::Result(i, _) => *i,
+            }
+            FlowKind::FlowResult(_) => unreachable!(),
         }
     }
 
-    pub fn get_vertice_interval(&self, id: &VerticeId) -> &Interval {
-        self.vertices.get(*id).unwrap().get_interval()
-    }
-
-    pub fn new_instantaneous_vertice(&mut self, value: impl Into<Lit>) -> VerticeId {
-        let id = self.vertices.len();
-
+    pub fn new_instantaneous_assignment(&mut self, value: impl Into<Lit>) -> FlowId {
         let t = self.sym_table.new_timepoint();
         let r = self.sym_table.new_result();
 
         self.sym_table.new_scope(&r, &t);
 
-        let vertice = Vertice {
-            id,
+        let vertice = Assignment {
             interval: Interval::new_instantaneous(&t),
             result: r,
             lit: value.into(),
         };
 
-        self.vertices.push(vertice);
-        id
+        self.new_flow(vertice)
     }
 
-    pub fn new_vertice(&mut self, value: impl Into<Lit>) -> VerticeId {
-        let id = self.vertices.len();
-
+    pub fn new_assignment(&mut self, value: impl Into<Lit>) -> FlowId {
         let start = self.sym_table.new_timepoint();
         let end = self.sym_table.new_timepoint();
         let r = self.sym_table.new_result();
 
         self.sym_table.new_scope(&r, &end);
 
-        let vertice = Vertice {
-            id,
+        let vertice = Assignment {
             interval: Interval::new(&start, &end),
             result: r,
             lit: value.into(),
         };
 
-        let mut atoms = hashset![start, end, r];
-        atoms = atoms.union(vertice.lit.get_variables());
-        for atom in atoms {
-            match self.map_atom_id_flow_id.get_mut(&atom) {
-                None => {
-                    self.map_atom_id_flow_id.insert(atom, hashset![id]);
-                }
-                Some(set) => {
-                    set.insert(id);
-                }
-            }
-        }
-
-        self.vertices.push(vertice);
-        id
+        self.new_flow(vertice)
     }
 
     pub fn get_atom_of_flow(&self, flow: &FlowId) -> im::HashSet<AtomId> {
         let flow = &self.flows[*flow];
 
         match &flow.kind {
-            FlowKind::Vertice(id) => self.get_atom_of_vertice(id),
-            FlowKind::Seq(seq) => {
+            FlowKind::Assignment(a) => a.get_variables(),
+            FlowKind::Seq(seq, _) => {
                 let mut set = im::HashSet::default();
                 for f in seq {
                     set = set.union(self.get_atom_of_flow(f));
@@ -146,31 +110,45 @@ impl FlowGraph {
                 let mut set = self.get_atom_of_flow(&branching.cond_flow);
                 set = set.union(self.get_atom_of_flow(&branching.result));
                 set
-            } /*FlowKind::Result(i, r) => {
-                  hashset![*i.get_start(), *i.get_end(), *r]
-              }*/
+            }
+            FlowKind::FlowResult(fr) => hashset![*fr],
         }
     }
 
-    pub fn get_atom_of_vertice(&self, vertice: &VerticeId) -> im::HashSet<AtomId> {
-        let vertice = &self.vertices[*vertice];
-        let mut set = vertice.interval.get_variables();
-        set.insert(vertice.result);
-        let set = set.union(vertice.lit.get_variables());
-        set
+    pub fn new_seq(&mut self, seq: Vec<FlowId>) -> FlowId {
+        assert!(!seq.is_empty());
+        self.merge_flows(seq)
     }
 
-    pub fn new_flow(&mut self, flow: impl Into<Flow>) -> FlowId {
+    pub fn new_branching(&mut self, branching: BranchingFlow) -> FlowId {
+        self.new_flow(FlowKind::Branching(branching))
+    }
+
+    pub fn new_result(&mut self, result: AtomId) -> FlowId {
+        self.new_flow(FlowKind::FlowResult(result))
+    }
+
+    fn new_flow(&mut self, flow: impl Into<Flow>) -> FlowId {
         let id = self.flows.len();
         let flow = flow.into();
         match &flow.kind {
-            FlowKind::Vertice(v) => {
-                self.map_vertice_id_flow_id.insert(*v, id);
+            FlowKind::Assignment(v) => {
+                for v in v.get_variables() {
+                    match self.map_atom_id_flow_id.get_mut(&v) {
+                        None => {
+                            self.map_atom_id_flow_id.insert(v, vec![id]);
+                        }
+                        Some(set) => {
+                            set.push(id);
+                        }
+                    };
+                }
             }
-            FlowKind::Seq(seq) => {
+            FlowKind::Seq(seq, result) => {
                 for f in seq {
                     self.flows[*f].parent = Some(id);
                 }
+                self.flows[*result].parent = Some(id);
             }
             FlowKind::Branching(branching) => {
                 self.flows[branching.cond_flow].parent = Some(id);
@@ -178,22 +156,41 @@ impl FlowGraph {
                 self.flows[branching.true_flow].parent = Some(id);
                 self.flows[branching.result].parent = Some(id);
             } //FlowKind::Result(_, _) => unreachable!(),
+            FlowKind::FlowResult(fr) => {
+                match self.map_atom_id_flow_id.get_mut(fr) {
+                    None => {
+                        self.map_atom_id_flow_id.insert(*fr, vec![id]);
+                    }
+                    Some(set) => {
+                        set.push(id);
+                    }
+                };
+            }
         }
         self.flows.push(flow.into());
         id
     }
 
-    pub fn new_vertice_flow(&mut self, vertice_id: VerticeId) -> FlowId {
-        self.new_flow(FlowKind::Vertice(vertice_id))
-    }
+    pub fn merge_flows(&mut self, flows: Vec<FlowId>) -> FlowId {
+        let mut seq = vec![];
+        let mut result = 0;
 
-    pub fn new_seq_flow(&mut self, seq: Vec<FlowId>) -> FlowId {
-        let id = self.flows.len();
-        for f in &seq {
-            self.flows[*f].parent = Some(id)
+        for (i, flow_id) in flows.iter().enumerate() {
+            let flow = &self.flows[*flow_id];
+            if let FlowKind::Seq(s, r) = &flow.kind {
+                seq.append(&mut s.clone());
+                if i == flows.len() - 1 {
+                    result = *r;
+                }
+            } else {
+                seq.push(*flow_id);
+                if i == flows.len() - 1 {
+                    result = self.new_result(self.get_flow_result(flow_id));
+                }
+            }
         }
-        self.flows.push(FlowKind::Seq(seq).into());
-        id
+
+        self.new_flow(FlowKind::Seq(seq, result))
     }
 
     pub fn merge_flow(&mut self, f1_id: &FlowId, f2_id: &FlowId) -> FlowId {
@@ -201,87 +198,70 @@ impl FlowGraph {
         let f2 = &self.flows[*f2_id];
 
         let flow: FlowKind = match (&f1.kind, &f2.kind) {
-            (FlowKind::Seq(s1), FlowKind::Seq(s2)) => {
+            (FlowKind::Seq(s1, _), FlowKind::Seq(s2, r)) => {
                 let mut seq = s1.clone();
                 seq.append(&mut s2.clone());
-                FlowKind::Seq(seq)
+                FlowKind::Seq(seq, *r)
             }
-            (FlowKind::Seq(s1), _) => {
+            (FlowKind::Seq(s1, _), _) => {
                 let mut seq = s1.clone();
                 seq.push(*f2_id);
-                FlowKind::Seq(seq)
+                let result = self.get_flow_result(f2_id);
+                let result = self.new_result(result);
+                FlowKind::Seq(seq, result)
             }
-            (_, FlowKind::Seq(s2)) => {
+            (_, FlowKind::Seq(s2, r)) => {
                 let mut seq = vec![*f1_id];
                 seq.append(&mut s2.clone());
-                FlowKind::Seq(seq)
+                FlowKind::Seq(seq, *r)
             }
-            (_, _) => FlowKind::Seq(vec![*f1_id, *f2_id]),
+            (_, _) => {
+                let result = self.get_flow_result(f2_id);
+                let result = self.new_result(result);
+                FlowKind::Seq(vec![*f1_id, *f2_id], result)
+            }
         };
 
         self.new_flow(flow)
     }
 
-    pub fn remove_flow(&mut self, flow: &FlowId) {
-        if let Some(parent_id) = self.flows[*flow].parent {
-            let parent = &mut self.flows[parent_id];
-            match &mut parent.kind {
-                FlowKind::Seq(seq) => {
-                    seq.retain(|f| f != flow);
-                    if seq.is_empty() {
-                        self.remove_flow(&parent_id)
-                    }
-                }
-                FlowKind::Branching(_b) => {}
-                _ => unreachable!(),
-            }
-        }
+    pub fn get(&self, id: &VerticeId) -> Option<&Flow> {
+        self.flows.get(*id)
     }
 
-    /*pub fn new_handle(&mut self, handle: Handle) -> VerticeId {
-        let id = self.sym_table.new_handle();
-        self.handles.insert(id, handle);
-        self.new_vertice(Expression::Handle(id))
-    }*/
-
-    pub fn get(&self, id: &VerticeId) -> Option<&Vertice> {
-        self.vertices.get(*id)
-    }
-
-    pub fn get_mut(&mut self, id: &VerticeId) -> Option<&mut Vertice> {
-        self.vertices.get_mut(*id)
+    pub fn get_mut(&mut self, id: &VerticeId) -> Option<&mut Flow> {
+        self.flows.get_mut(*id)
     }
 
     /*
     Dot export
      */
 
-    pub fn export_flow(&self, id: &FlowId) -> (Dot, (VerticeId, VerticeId)) {
+    pub fn export_flow(&self, id: &FlowId) -> (Dot, (FlowId, FlowId)) {
         let sym_table = &self.sym_table;
         let mut dot = "".to_string();
         let mut start = None;
-        let mut end = None;
+        let end;
 
         match &self.flows[*id].kind {
-            FlowKind::Vertice(v) => {
-                let vertice: &Vertice = &self.vertices[*v];
+            FlowKind::Assignment(v) => {
                 dot.push_str(
                     format!(
-                        "V{v} [label= \"{}: {} <- {}\"]\n",
-                        vertice.interval.format(sym_table, false),
-                        vertice.result.format(sym_table, false),
-                        vertice.lit.format(sym_table, false),
+                        "V{id} [label= \"{}: {} <- {}\"]\n",
+                        v.interval.format(sym_table, false),
+                        v.result.format(sym_table, false),
+                        v.lit.format(sym_table, false),
                     )
                     .as_str(),
                 );
-                start = Some(*v);
-                end = Some(*v);
+                start = Some(*id);
+                end = Some(*id);
             }
             FlowKind::Branching(branching) => {
                 let (cond_dot, (cond_start, cond_end)) = self.export_flow(&branching.cond_flow);
                 let cond = self
                     .sym_table
-                    .format_variable(&self.get_vertice_result(&cond_end));
+                    .format_variable(&self.get_flow_result(&cond_end));
                 start = Some(cond_start);
 
                 let (true_dot, (true_start, true_end)) = self.export_flow(&branching.true_flow);
@@ -294,10 +274,12 @@ impl FlowGraph {
                 write!(dot, "V{false_end}-> V{result_start}\n").unwrap();
                 end = Some(result_end);
             }
-            FlowKind::Seq(seq) => {
+            FlowKind::Seq(seq, r) => {
                 let mut previous_end = None;
-                for f in seq {
-                    let (f_dot, (f_start, f_end)) = self.export_flow(f);
+                let mut seq = seq.clone();
+                seq.push(*r);
+                for f in &seq {
+                    let (f_dot, (f_start, f_end)) = self.export_flow(&f);
                     write!(dot, "{}", f_dot).unwrap();
                     if let Some(end) = previous_end {
                         write!(dot, "V{end} -> V{f_start}\n").unwrap();
@@ -308,18 +290,14 @@ impl FlowGraph {
                     previous_end = Some(f_end);
                 }
                 end = previous_end;
-            } /*FlowKind::Result(i, r) => {
-                  dot.push_str(
-                      format!(
-                          "{v} [label= \"{}: {}\"]\n",
-                          i.format(sym_table, false),
-                          r.format(sym_table, false),
-                      )
-                      .as_str(),
-                  );
-                  start = Some(*v);
-                  end = Some(*v);
-              }*/
+            }
+            FlowKind::FlowResult(fr) => {
+                dot.push_str(
+                    format!("V{id} [label= \"{}\"]\n", fr.format(sym_table, false),).as_str(),
+                );
+                start = Some(*id);
+                end = Some(*id);
+            }
         }
 
         (dot, (start.unwrap(), end.unwrap()))
@@ -342,10 +320,18 @@ impl FlowGraph {
 
 impl FlatBindings for FlowGraph {
     fn flat_bindings(&mut self, st: &RefSymTable) {
-        for v in &mut self.vertices {
-            v.result.flat_bindings(st);
-            v.lit.flat_bindings(st);
-            v.interval.flat_bindings(st);
+        for f in &mut self.flows {
+            match &mut f.kind {
+                FlowKind::Assignment(v) => {
+                    v.result.flat_bindings(st);
+                    v.lit.flat_bindings(st);
+                    v.interval.flat_bindings(st);
+                }
+                FlowKind::FlowResult(fr) => {
+                    fr.flat_bindings(st);
+                }
+                _ => {}
+            }
         }
     }
 }

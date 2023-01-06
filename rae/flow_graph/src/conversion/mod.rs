@@ -25,6 +25,7 @@ pub async fn convert(lv: &LValue, env: &LEnv) -> Result<ChronicleTemplate, LRunt
     //flow_graph_post_processing(&mut graph)?;
     let mut ch = ChronicleTemplate::new("debug", ChronicleKind::Method, graph.sym_table.clone());
     ch.debug.flow_graph = graph;
+    ch.debug.post_processed_lvalue = lv;
     Ok(ch)
 
     //convert_method(&graph, graph.scope)

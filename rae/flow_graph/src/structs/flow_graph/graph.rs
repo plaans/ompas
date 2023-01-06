@@ -1,6 +1,6 @@
 use crate::structs::chronicle::interval::Interval;
 use crate::structs::chronicle::{FlatBindings, FormatWithSymTable, GetVariables};
-use crate::structs::flow_graph::flow::{BranchingFlow, Flow, FlowId, FlowKind};
+use crate::structs::flow_graph::flow::{Flow, FlowId, FlowKind};
 use crate::structs::flow_graph::handle_table::HandleTable;
 use crate::structs::flow_graph::vertice::Vertice;
 use crate::structs::sym_table::lit::Lit;
@@ -14,8 +14,6 @@ pub type Dot = String;
 
 pub type VerticeId = usize;
 pub type HandleId = usize;
-pub type BlockId = usize;
-pub type EdgeId = usize;
 
 #[derive(Clone, Default)]
 pub struct FlowGraph {
@@ -55,6 +53,7 @@ impl FlowGraph {
             FlowKind::Vertice(v) => self.get_vertice_result(v),
             FlowKind::Seq(s) => self.get_flow_result(&s.last().unwrap()),
             FlowKind::Branching(branching) => self.get_flow_result(&branching.result),
+            //FlowKind::Result(_, r) => *r,
         }
     }
 
@@ -71,7 +70,7 @@ impl FlowGraph {
                 let start = *self.get_flow_interval(&branching.cond_flow).get_start();
                 let end = *self.get_flow_interval(&branching.result).get_end();
                 Interval::new(&start, &end)
-            }
+            } //FlowKind::Result(i, _) => *i,
         }
     }
 
@@ -147,7 +146,9 @@ impl FlowGraph {
                 let mut set = self.get_atom_of_flow(&branching.cond_flow);
                 set = set.union(self.get_atom_of_flow(&branching.result));
                 set
-            }
+            } /*FlowKind::Result(i, r) => {
+                  hashset![*i.get_start(), *i.get_end(), *r]
+              }*/
         }
     }
 
@@ -176,7 +177,7 @@ impl FlowGraph {
                 self.flows[branching.false_flow].parent = Some(id);
                 self.flows[branching.true_flow].parent = Some(id);
                 self.flows[branching.result].parent = Some(id);
-            }
+            } //FlowKind::Result(_, _) => unreachable!(),
         }
         self.flows.push(flow.into());
         id
@@ -231,6 +232,7 @@ impl FlowGraph {
                         self.remove_flow(&parent_id)
                     }
                 }
+                FlowKind::Branching(_b) => {}
                 _ => unreachable!(),
             }
         }
@@ -279,7 +281,7 @@ impl FlowGraph {
                 let (cond_dot, (cond_start, cond_end)) = self.export_flow(&branching.cond_flow);
                 let cond = self
                     .sym_table
-                    .get_debug(&self.get_vertice_result(&cond_end));
+                    .format_variable(&self.get_vertice_result(&cond_end));
                 start = Some(cond_start);
 
                 let (true_dot, (true_start, true_end)) = self.export_flow(&branching.true_flow);
@@ -306,10 +308,18 @@ impl FlowGraph {
                     previous_end = Some(f_end);
                 }
                 end = previous_end;
-            }
-            _ => {
-                todo!()
-            }
+            } /*FlowKind::Result(i, r) => {
+                  dot.push_str(
+                      format!(
+                          "{v} [label= \"{}: {}\"]\n",
+                          i.format(sym_table, false),
+                          r.format(sym_table, false),
+                      )
+                      .as_str(),
+                  );
+                  start = Some(*v);
+                  end = Some(*v);
+              }*/
         }
 
         (dot, (start.unwrap(), end.unwrap()))
@@ -320,8 +330,8 @@ impl FlowGraph {
 
         write!(dot, "{}", self.export_flow(&self.flow).0).unwrap();
         for (id, handle) in self.handles.inner() {
-            let (f_dot, (start, end)) = self.export_flow(&handle.flow);
-            write!(dot, "{} -> V{start}\n", self.sym_table.get_debug(id)).unwrap();
+            let (f_dot, (start, _end)) = self.export_flow(&handle.flow);
+            write!(dot, "{} -> V{start}\n", self.sym_table.format_variable(id)).unwrap();
             write!(dot, "{f_dot}").unwrap();
         }
 

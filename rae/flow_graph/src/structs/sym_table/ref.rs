@@ -2,7 +2,8 @@ use crate::structs::chronicle::interval::Interval;
 use crate::structs::domain::basic_type::BasicType;
 use crate::structs::domain::Domain;
 use crate::structs::sym_table::forest::Node;
-use crate::structs::sym_table::{AtomId, SymTable};
+use crate::structs::sym_table::var_domain::VarDomain;
+use crate::structs::sym_table::{AtomId, EmptyDomains, SymTable};
 use sompas_structs::lnumber::LNumber;
 use std::borrow::Borrow;
 use std::cell::RefCell;
@@ -79,7 +80,7 @@ impl RefSymTable {
     /*
     GETTERS
     */
-    pub fn get_node(&self, id: &AtomId) -> Option<Node<Domain>> {
+    pub fn get_node(&self, id: &AtomId) -> Option<Node<VarDomain>> {
         RefCell::borrow(&self.0).get_node(id).cloned()
     }
 
@@ -146,8 +147,8 @@ impl RefSymTable {
         RefCell::borrow_mut(&self.0).new_chronicle_result()
     }
 
-    pub fn new_symbol(&mut self, sym: impl Display, domain: Option<Domain>) -> AtomId {
-        RefCell::borrow_mut(&self.0).new_symbol(sym, domain)
+    pub fn new_symbol(&mut self, sym: impl Display) -> AtomId {
+        RefCell::borrow_mut(&self.0).new_symbol(sym)
     }
 
     pub fn new_parameter(&mut self, symbol: impl ToString, domain: Domain) -> AtomId {
@@ -158,27 +159,59 @@ impl RefSymTable {
         RefCell::borrow(&self.0).get_parent(a)
     }
 
-    pub fn get_debug(&self, id: &AtomId) -> String {
+    /*pub fn get_debug(&self, id: &AtomId) -> String {
         RefCell::borrow(&self.0).get_debug(id).to_string()
-    }
+    }*/
     /*
     Domain operators
      */
 
-    pub fn meet_domain(&self, d1: &Domain, d2: &Domain) -> Domain {
-        RefCell::borrow(&self.0).meet_domain(d1, d2)
+    pub fn meet(&self, d1: &Domain, d2: &Domain) -> Domain {
+        RefCell::borrow(&self.0).meet(d1, d2)
     }
 
-    pub fn union_domain(&self, d1: &Domain, d2: &Domain) -> Domain {
-        RefCell::borrow(&self.0).union_domain(d1, d2)
+    pub fn union(&self, d1: &Domain, d2: &Domain) -> Domain {
+        RefCell::borrow(&self.0).union(d1, d2)
     }
 
-    pub fn substract_domain(&self, d1: &Domain, d2: &Domain) -> Domain {
-        RefCell::borrow(&self.0).substract_domain(d1, d2)
+    pub fn substract(&self, d1: &Domain, d2: &Domain) -> Domain {
+        RefCell::borrow(&self.0).substract(d1, d2)
     }
 
-    pub fn set_domain(&mut self, id: &AtomId, domain: Domain) -> bool {
+    pub fn meet_domains(&self, id_d1: &AtomId, id_d2: &AtomId) -> Domain {
+        RefCell::borrow(&self.0).meet_domains(id_d1, id_d2)
+    }
+
+    pub fn union_domains(&self, id_d1: &AtomId, id_d2: &AtomId) -> Domain {
+        RefCell::borrow(&self.0).union_domains(id_d1, id_d2)
+    }
+
+    pub fn substract_domains(&self, id_d1: &AtomId, id_d2: &AtomId) -> Domain {
+        RefCell::borrow(&self.0).substract_domains(id_d1, id_d2)
+    }
+
+    pub fn meet_to_domain(&mut self, id_d1: &AtomId, domain: impl Into<Domain>) -> EmptyDomains {
+        RefCell::borrow_mut(&self.0).meet_to_domain(id_d1, domain)
+    }
+
+    pub fn substract_to_domain(
+        &mut self,
+        id_d1: &AtomId,
+        domain: impl Into<Domain>,
+    ) -> EmptyDomains {
+        RefCell::borrow_mut(&self.0).substract_to_domain(id_d1, domain)
+    }
+
+    pub fn set_domain(&mut self, id: &AtomId, domain: impl Into<Domain>) -> EmptyDomains {
         RefCell::borrow_mut(&self.0).set_domain(id, domain)
+    }
+
+    pub fn add_union_dependency(&mut self, id: &AtomId, mut union: Vec<AtomId>) {
+        RefCell::borrow_mut(&self.0).add_union_dependency(id, union)
+    }
+
+    pub fn add_parent_dependency(&mut self, id: &AtomId, parent: AtomId) {
+        RefCell::borrow_mut(&self.0).add_parent_dependency(id, parent)
     }
 
     pub fn contained_in_domain(&self, d1: &Domain, d2: &Domain) -> bool {
@@ -196,8 +229,20 @@ impl RefSymTable {
         RefCell::borrow_mut(&self.0).flat_bindings()
     }
 
-    pub fn try_union_atom(&mut self, id1: &AtomId, id2: &AtomId) -> bool {
+    pub fn try_union_atom(&mut self, id1: &AtomId, id2: &AtomId) -> EmptyDomains {
         RefCell::borrow_mut(&self.0).try_union_atom(id1, id2)
+    }
+
+    /*
+    FORMAT Function
+      */
+
+    pub fn format_variable(&self, id: &AtomId) -> String {
+        RefCell::borrow(&self.0).format_variable(id)
+    }
+
+    pub fn format_domain(&self, id: &AtomId) -> String {
+        RefCell::borrow(&self.0).format_domain(id)
     }
 }
 
@@ -212,7 +257,7 @@ impl Display for RefSymTable {
 
         for x in 0..st.domains.len() {
             if x == st.get_parent(&x) {
-                let domain = st.domains.get_value(&x).unwrap();
+                let domain = &st.domains[x].domain;
                 let constant = domain.is_constant();
                 match (domain, constant) {
                     (Domain::Simple(1), true) => constant_untyped.push(x),
@@ -231,8 +276,8 @@ impl Display for RefSymTable {
                     format!(
                         "- ({}){}({})\n",
                         e,
-                        self.get_debug(&e),
-                        self.get_domain(&e, true).unwrap().format(&st.lattice),
+                        self.format_variable(&e),
+                        self.format_domain(&e),
                     )
                     .as_str(),
                 );

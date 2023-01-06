@@ -1,6 +1,7 @@
 use std::clone::Clone;
 use std::collections::{HashMap, VecDeque};
 use std::fmt::{Debug, Display, Formatter};
+use std::ops::{Index, IndexMut};
 
 pub type NodeId = usize;
 
@@ -54,6 +55,26 @@ impl<T: Display + Clone + Default> Node<T> {
 #[derive(Default, Debug, Clone)]
 pub struct Forest<T: Display + Default + Clone> {
     inner: Vec<Node<T>>,
+}
+
+impl<T> Index<NodeId> for Forest<T>
+where
+    T: Display + Default + Clone + Default,
+{
+    type Output = T;
+
+    fn index(&self, index: NodeId) -> &Self::Output {
+        &self.inner[index].value
+    }
+}
+
+impl<T> IndexMut<NodeId> for Forest<T>
+where
+    T: Display + Default + Clone + Default,
+{
+    fn index_mut(&mut self, index: NodeId) -> &mut Self::Output {
+        &mut self.inner[index].value
+    }
 }
 
 impl<T: Display + Default + Clone> Forest<T> {

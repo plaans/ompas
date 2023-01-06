@@ -66,6 +66,14 @@ impl Domain {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self == &Simple(0)
+    }
+
+    pub fn empty() -> Self {
+        Simple(0)
+    }
+
     pub fn nil() -> Domain {
         Union(vec![False.into(), EmptyList.into()])
     }
@@ -145,6 +153,12 @@ impl From<f64> for Domain {
 impl From<String> for Domain {
     fn from(s: String) -> Self {
         Cst(Box::new(Symbol.into()), cst::Cst::Symbol(s))
+    }
+}
+
+impl From<&str> for Domain {
+    fn from(s: &str) -> Self {
+        Cst(Box::new(Symbol.into()), cst::Cst::Symbol(s.to_string()))
     }
 }
 

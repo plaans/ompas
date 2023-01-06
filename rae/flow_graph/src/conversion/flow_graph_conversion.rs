@@ -13,7 +13,6 @@ use sompas_structs::lnumber::LNumber;
 use sompas_structs::lprimitives::LPrimitives;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
-use std::borrow::Borrow;
 use std::sync::Arc;
 
 pub fn convert_into_flow_graph(
@@ -43,7 +42,7 @@ pub fn convert_into_flow_graph(
 fn convert_symbol(symbol: &Arc<String>, fl: &mut FlowGraph, define_table: &DefineTable) -> FlowId {
     let vertice_id = match define_table.get(symbol.as_str()) {
         None => {
-            let id = fl.sym_table.new_symbol(symbol, None);
+            let id = fl.sym_table.new_symbol(symbol);
             fl.new_instantaneous_vertice(Lit::Atom(id)).into()
         }
         Some(r) => fl.new_instantaneous_vertice(Lit::Atom(*r)).into(),
@@ -109,17 +108,20 @@ fn convert_list(
                  */
                 let cond_flow = convert_into_flow_graph(cond, fl, define_table)?;
                 let cond_result = fl.get_flow_result(&cond_flow);
-                let domain = fl.sym_table.meet_domain(
+                fl.sym_table.meet_to_domain(&cond_result, Boolean);
+
+                /*let domain = fl.sym_table.meet_domain(
                     &fl.sym_table.get_domain(&cond_result, false).unwrap(),
                     &Boolean.into(),
                 );
-                fl.sym_table.set_domain(&cond_result, domain);
+                fl.sym_table.set_domain(&cond_result, domain);*/
                 let true_flow = convert_into_flow_graph(true_branch, fl, define_table)?;
                 let false_flow = convert_into_flow_graph(false_branch, fl, define_table)?;
 
-                let vertice_id = fl.new_instantaneous_vertice(fl.get_flow_result(&true_flow));
-                let vertice_id_2 = fl.new_instantaneous_vertice(fl.get_flow_result(&false_flow));
-                let vertice_result = fl.get_vertice_result(&vertice_id);
+                let true_result = fl.get_flow_result(&true_flow);
+                let false_result = fl.get_flow_result(&false_flow);
+
+                /*let vertice_result = fl.get_vertice_result(&vertice_id);
                 let interval = *fl.get_vertice_interval(&vertice_id);
                 let mut vertice = &mut fl.vertices[vertice_id_2];
                 vertice.result = vertice_result;
@@ -129,9 +131,15 @@ fn convert_list(
                 let true_flow = fl.merge_flow(&true_flow, &true_result_flow);
 
                 let false_result_flow = fl.new_flow(vertice_id_2);
-                let false_flow = fl.merge_flow(&false_flow, &false_result_flow);
+                let false_flow = fl.merge_flow(&false_flow, &false_result_flow);*/
 
-                let vertice_id = fl.new_vertice(vertice_result);
+                let result = fl.sym_table.new_result();
+                fl.sym_table
+                    .add_union_dependency(&result, vec![true_result, false_result]);
+                fl.sym_table.add_parent_dependency(&true_result, result);
+                fl.sym_table.add_parent_dependency(&false_result, result);
+
+                let vertice_id = fl.new_instantaneous_vertice(result);
                 let result = fl.new_flow(vertice_id);
 
                 let branching = BranchingFlow {
@@ -184,11 +192,14 @@ fn convert_list(
                 let define_table = &mut define_table.clone();
                 let mut h = convert_into_flow_graph(&list[1], fl, define_table)?;
                 let result = fl.get_flow_result(&h);
-                let domain = fl.sym_table.meet_domain(
+
+                fl.sym_table.meet_to_domain(&result, RootType::Handle);
+
+                /*let domain = fl.sym_table.meet_domain(
                     &fl.sym_table.get_domain(&result, false).unwrap(),
                     &RootType::Handle.into(),
                 );
-                fl.sym_table.set_domain(&result, domain);
+                fl.sym_table.set_domain(&result, domain);*/
                 let a = fl.new_vertice(Lit::Await(result));
                 let flow_await = fl.new_vertice_flow(a);
                 out_of_scope.push(fl.get_flow_result(&h));
@@ -199,11 +210,10 @@ fn convert_list(
                 let define_table = &mut define_table.clone();
                 let err = convert_into_flow_graph(&list[1], fl, define_table)?;
                 let result_err = fl.get_flow_result(&err);
-                let atom_err = fl.sym_table.new_symbol(ERR, None);
+                let atom_err = fl.sym_table.new_symbol(ERR);
                 let vertice_id = fl.new_vertice(vec![atom_err, result_err]);
                 let result_vertice = fl.get_vertice_result(&vertice_id);
-                fl.sym_table
-                    .set_domain(&result_vertice, RootType::Err.into());
+                fl.sym_table.set_domain(&result_vertice, RootType::Err);
                 Ok(fl.new_flow(vertice_id))
             }
             LPrimitives::Race => {

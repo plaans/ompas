@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use flow_graph::config::GraphConvertConfig;
 use flow_graph::conversion::convert;
+use flow_graph::conversion::flow_graph_post_process::flow_graph_post_processing;
 use flow_graph::structs::chronicle::template::ChronicleTemplate;
 use sompas_core::{get_root_env, parse};
 use sompas_structs::lenv::LEnv;
@@ -68,7 +69,7 @@ Graph flow converter for SOMPAS code!\n
             .await
             .unwrap_or_else(|r| panic!("{}", r.to_string()));
 
-        let ch: ChronicleTemplate = convert(&lv, &env).await?;
+        let mut ch: ChronicleTemplate = convert(&lv, &env).await?;
 
         //println!("symbol types: {}", ch.sym_table.format_types());
         //println!("types forest: {}", ch.sym_table.format_types_forest());
@@ -80,6 +81,16 @@ Graph flow converter for SOMPAS code!\n
 
         output_markdown(
             p.to_str().unwrap(),
+            &lv,
+            &ch,
+            config.output_path.clone().unwrap(),
+            true,
+        );
+
+        flow_graph_post_processing(&mut ch.debug.flow_graph)?;
+
+        output_markdown(
+            format!("{}_post", p.to_str().unwrap()).as_str(),
             &lv,
             &ch,
             config.output_path.clone().unwrap(),

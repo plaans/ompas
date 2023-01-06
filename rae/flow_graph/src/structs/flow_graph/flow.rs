@@ -1,4 +1,6 @@
+use crate::structs::chronicle::interval::Interval;
 use crate::structs::flow_graph::graph::VerticeId;
+use crate::structs::sym_table::AtomId;
 
 pub type FlowId = usize;
 
@@ -6,6 +8,7 @@ pub type FlowId = usize;
 pub enum FlowKind {
     Vertice(VerticeId),
     Seq(Vec<FlowId>),
+    //Result(Interval, AtomId),
     Branching(BranchingFlow),
 }
 

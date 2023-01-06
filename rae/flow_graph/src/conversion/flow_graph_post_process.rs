@@ -1,12 +1,10 @@
 use crate::structs::chronicle::FlatBindings;
 use crate::structs::domain::root_type::RootType;
-use crate::structs::domain::root_type::RootType::{False, True};
-use crate::structs::domain::Domain;
+use crate::structs::domain::root_type::RootType::False;
 use crate::structs::flow_graph::flow::{FlowId, FlowKind};
-use crate::structs::flow_graph::graph::{BlockId, FlowGraph};
+use crate::structs::flow_graph::graph::FlowGraph;
 use crate::structs::sym_table::lit::Lit;
-use crate::structs::sym_table::AtomId;
-use log::Level::Debug;
+use crate::structs::sym_table::{AtomId, EmptyDomains};
 use sompas_structs::lruntimeerror::LRuntimeError;
 use std::collections::VecDeque;
 
@@ -15,25 +13,34 @@ const INVALID_FLOWS: &str = "invalid_flows";
 
 pub fn flow_graph_post_processing(graph: &mut FlowGraph) -> Result<(), LRuntimeError> {
     let result_graph = graph.get_flow_result(&graph.flow);
-    let domain_result = graph.sym_table.get_domain(&result_graph, false).unwrap();
+    /*let domain_result = graph.sym_table.get_domain(&result_graph, false).unwrap();
     let new_domain = graph
         .sym_table
-        .substract_domain(&domain_result, &RootType::Err.into());
-    if !graph.sym_table.set_domain(&result_graph, new_domain) {
+        .substract_domain(&domain_result, &RootType::Err.into());*/
+
+    let emptys = graph
+        .sym_table
+        .substract_to_domain(&result_graph, RootType::Err);
+
+    if let EmptyDomains::Some(empty) = emptys {
         return Err(LRuntimeError::new(
             FLOW_GRAPH_POST_PROCESS,
             format!(
-                "{} has an empty domain",
-                graph.sym_table.get_debug(&result_graph)
+                "{:?} have an empty domain",
+                empty
+                    .iter()
+                    .map(|id| graph.sym_table.format_variable(id))
+                    .collect::<Vec<String>>()
             ),
         ));
     }
     binding(graph).map_err(|e| e.chain(FLOW_GRAPH_POST_PROCESS))
 }
 
-pub enum PostProcessConstraint {
+pub enum PostProcess {
     Binding(AtomId, AtomId),
-    Invalidation(BlockId),
+    Invalidation(FlowId),
+    RemoveFlow(FlowId),
     UnionBinding(AtomId, (AtomId, AtomId)),
 }
 
@@ -48,10 +55,14 @@ pub fn binding(graph: &mut FlowGraph) -> Result<(), LRuntimeError> {
             FlowKind::Vertice(v) => {
                 let vertice = graph.vertices[v].clone();
                 if let Lit::Atom(a) = &vertice.lit {
-                    if graph.sym_table.try_union_atom(&vertice.result, &a) {
-                        graph.remove_flow(&flow_id);
+                    if let EmptyDomains::Some(emptys) =
+                        graph.sym_table.try_union_atom(&vertice.result, &a)
+                    {
+                        println!("invalid flow(s)");
+                        for e in &emptys {
+                            invalid_flows(graph, e)?;
+                        }
                     } else {
-                        invalid_flows(graph, &vertice.result)?;
                     }
                 }
             }
@@ -65,7 +76,7 @@ pub fn binding(graph: &mut FlowGraph) -> Result<(), LRuntimeError> {
                 flows_queue.push_back(b.true_flow);
                 flows_queue.push_back(b.false_flow);
                 flows_queue.push_back(b.result);
-            }
+            } //FlowKind::Result(_, _) => {}
         }
     }
 
@@ -98,12 +109,12 @@ pub fn invalid_flows(graph: &mut FlowGraph, invalid_atom: &AtomId) -> Result<(),
                         flows.push(parent)
                     } else if flow_id == branching.true_flow {
                         let cond_result = &graph.get_flow_result(&branching.cond_flow);
-                        let domain = sym_table.meet_domain(
-                            &sym_table.get_domain(cond_result, true).unwrap(),
-                            &False.into(),
-                        );
-                        if !sym_table.set_domain(cond_result, domain) {
-                            invalid_flows(graph, cond_result)?;
+                        let emptys = sym_table.meet_to_domain(cond_result, False);
+
+                        if let EmptyDomains::Some(vec) = emptys {
+                            for e in vec {
+                                invalid_flows(graph, &e)?;
+                            }
                         } else {
                             graph.flows[parent].kind = FlowKind::Seq(vec![
                                 branching.cond_flow,
@@ -113,12 +124,12 @@ pub fn invalid_flows(graph: &mut FlowGraph, invalid_atom: &AtomId) -> Result<(),
                         }
                     } else if flow_id == branching.false_flow {
                         let cond_result = &graph.get_flow_result(&branching.cond_flow);
-                        let domain = sym_table.meet_domain(
-                            &sym_table.get_domain(cond_result, true).unwrap(),
-                            &True.into(),
-                        );
-                        if !sym_table.set_domain(cond_result, domain) {
-                            invalid_flows(graph, cond_result)?;
+                        let emptys = sym_table.meet_to_domain(cond_result, False);
+
+                        if let EmptyDomains::Some(vec) = emptys {
+                            for e in vec {
+                                invalid_flows(graph, &e)?;
+                            }
                         } else {
                             graph.flows[parent].kind = FlowKind::Seq(vec![
                                 branching.cond_flow,
@@ -129,7 +140,7 @@ pub fn invalid_flows(graph: &mut FlowGraph, invalid_atom: &AtomId) -> Result<(),
                     } else {
                         panic!("flow is not part of one of the branch");
                     }
-                }
+                } //FlowKind::Result(_, _) => {}
             }
         }
     }

@@ -64,7 +64,7 @@ impl FormatWithSymTable for &[AtomId] {
 
 impl FormatWithSymTable for AtomId {
     fn format(&self, st: &RefSymTable, sym_version: bool) -> String {
-        st.get_debug(self).to_string()
+        st.format_variable(self).to_string()
         /*st.get_domain(self, sym_version)
         .unwrap()
         .format(st.)*/

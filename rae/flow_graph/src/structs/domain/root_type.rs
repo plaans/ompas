@@ -22,6 +22,9 @@ pub enum RootType {
     False = 13,
 }
 
+pub const TRUE_ID: usize = 12;
+pub const FALSE_ID: usize = 13;
+
 impl TryFrom<TypeId> for RootType {
     type Error = ();
 

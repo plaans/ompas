@@ -190,7 +190,7 @@ pub fn lvalue_to_lit(lv: &LValue, st: &mut RefSymTable) -> lruntimeerror::Result
             Some(id) => id.into(),
             None => {
                 //println!("symbol {} does not exist", lv.to_string());
-                st.new_symbol(&lv.to_string(), None).into()
+                st.new_symbol(&lv.to_string()).into()
             }
         }),
     }

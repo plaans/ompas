@@ -1,4 +1,5 @@
 use crate::structs::domain::Domain;
+use crate::structs::sym_table::closure::{ConstraintClosure, UpdateClosure};
 use crate::structs::sym_table::AtomId;
 use std::fmt::{Debug, Display, Formatter};
 
@@ -6,8 +7,9 @@ use std::fmt::{Debug, Display, Formatter};
 pub struct VarDomain {
     pub label: String,
     pub domain: Domain,
-    pub union: Vec<AtomId>,
-    pub parents: Vec<AtomId>,
+    pub constraints: Vec<ConstraintClosure>,
+    pub updates: Vec<UpdateClosure>,
+    pub depends: Vec<AtomId>,
 }
 
 impl VarDomain {
@@ -15,8 +17,9 @@ impl VarDomain {
         Self {
             label: label.to_string(),
             domain: domain.into(),
-            union: vec![],
-            parents: vec![],
+            constraints: vec![],
+            updates: vec![],
+            depends: vec![],
         }
     }
 }
@@ -29,10 +32,6 @@ impl Display for VarDomain {
 
 impl Debug for VarDomain {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}, union: {:?}, parent: {:?}",
-            self, self.union, self.parents
-        )
+        write!(f, "{}", self)
     }
 }

@@ -2,17 +2,20 @@ use crate::structs::domain::root_type::RootType;
 use crate::structs::domain::root_type::RootType::Boolean;
 use crate::structs::flow_graph::flow::{BranchingFlow, FlowId};
 use crate::structs::flow_graph::handle_table::Handle;
+use crate::structs::sym_table::closure::ConstraintClosure;
 use crate::structs::sym_table::lit::{lvalue_to_lit, Lit};
-use crate::structs::sym_table::AtomId;
+use crate::structs::sym_table::{closure, AtomId};
 use crate::{DefineTable, FlowGraph};
 use core::result::Result;
 use core::result::Result::{Err, Ok};
 use ompas_rae_language::exec::state::{ASSERT, ASSERT_SHORT};
+use sompas_language::error::IS_ERR;
 use sompas_language::kind::ERR;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lprimitives::LPrimitives;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
+use std::rc::Rc;
 use std::sync::Arc;
 
 pub fn convert_into_flow_graph(
@@ -133,12 +136,11 @@ fn convert_list(
 
                 let result = fl.sym_table.new_result();
                 fl.sym_table
-                    .add_union_dependency(&result, vec![true_result, false_result]);
-                fl.sym_table.add_parent_dependency(&true_result, result);
-                fl.sym_table.add_parent_dependency(&false_result, result);
+                    .add_union_constraint(&result, vec![true_result, false_result]);
+                fl.sym_table.add_dependent(&true_result, result);
+                fl.sym_table.add_dependent(&false_result, result);
 
-                let result = fl.new_instantaneous_assignment(result);
-                let result = fl.new_seq(vec![result]);
+                let result = fl.new_result(result);
 
                 let branching = BranchingFlow {
                     cond_flow,
@@ -170,8 +172,17 @@ fn convert_list(
                 let define_table = &mut define_table.clone();
                 let e = &list[1];
                 let async_flow_id = convert_into_flow_graph(e, fl, define_table)?;
+                let r_async = fl.get_flow_result(&async_flow_id);
 
                 let handle_id = fl.sym_table.new_handle();
+
+                fl.sym_table.add_constraint(
+                    &handle_id,
+                    closure::composed_constraint(r_async),
+                    closure::composed_update(r_async),
+                );
+
+                fl.sym_table.add_dependent(&r_async, handle_id);
 
                 let handle = Handle {
                     result: fl.get_flow_result(&async_flow_id),
@@ -202,13 +213,22 @@ fn convert_list(
             }
             LPrimitives::Err => {
                 let define_table = &mut define_table.clone();
-                let err = convert_into_flow_graph(&list[1], fl, define_table)?;
-                let result_err = fl.get_flow_result(&err);
+                let arg_err = convert_into_flow_graph(&list[1], fl, define_table)?;
+                let arg_err_result = fl.get_flow_result(&arg_err);
                 let atom_err = fl.sym_table.new_symbol(ERR);
-                let flow = fl.new_assignment(vec![atom_err, result_err]);
-                let result_vertice = fl.get_flow_result(&flow);
-                fl.sym_table.set_domain(&result_vertice, RootType::Err);
-                Ok(flow)
+                let flow = fl.new_instantaneous_assignment(vec![atom_err, arg_err_result]);
+                let err_result = fl.get_flow_result(&flow);
+
+                fl.sym_table.set_domain(&err_result, RootType::Err);
+
+                fl.sym_table.add_constraint(
+                    &err_result,
+                    closure::composed_constraint(arg_err_result),
+                    closure::composed_update(arg_err_result),
+                );
+
+                fl.sym_table.add_dependent(&arg_err_result, err_result);
+                Ok(fl.new_seq(vec![arg_err, flow]))
             }
             LPrimitives::Race => {
                 todo!()
@@ -235,19 +255,37 @@ fn convert_apply(
 
     let mut seq: Vec<FlowId> = vec![];
 
+    let proc = expr.first().unwrap().to_string();
+
     for e in expr {
         seq.push(convert_into_flow_graph(e, fl, &mut define_table)?);
     }
 
     let results: Vec<AtomId> = seq.iter().map(|f| fl.get_flow_result(f)).collect();
     let flow_apply = fl.new_assignment(Lit::Apply(results.clone()));
+
+    match proc.as_str() {
+        IS_ERR => {
+            let result_is_err = fl.get_flow_result(&flow_apply);
+            fl.sym_table.set_domain(&result_is_err, Boolean);
+            assert_eq!(seq.len(), 2);
+            let arg_is_err = fl.get_flow_result(&seq[1]);
+            fl.sym_table
+                .add_update(&arg_is_err, closure::arg_is_err_update(result_is_err));
+            fl.sym_table.add_dependent(&result_is_err, arg_is_err);
+            fl.sym_table
+                .add_update(&result_is_err, closure::result_is_err_update(arg_is_err));
+            fl.sym_table.add_dependent(&arg_is_err, result_is_err);
+        }
+        _ => {}
+    }
+
     let end = *fl.get_flow_interval(&flow_apply).get_end();
     seq.push(flow_apply);
     for o in results {
         fl.sym_table.set_end(&o, &end);
     }
     Ok(fl.new_seq(seq))
-
     /*let scope = match proc_symbol.as_str() {
         EXEC_COMMAND | EXEC_TASK => {
             let exec_scope: Scope = fl

@@ -1,6 +1,7 @@
 use crate::structs::chronicle::interval::Interval;
 use crate::structs::domain::basic_type::BasicType;
 use crate::structs::domain::Domain;
+use crate::structs::sym_table::closure::{ConstraintClosure, UpdateClosure};
 use crate::structs::sym_table::forest::Node;
 use crate::structs::sym_table::var_domain::VarDomain;
 use crate::structs::sym_table::{AtomId, EmptyDomains, SymTable};
@@ -199,19 +200,32 @@ impl RefSymTable {
         id_d1: &AtomId,
         domain: impl Into<Domain>,
     ) -> EmptyDomains {
-        RefCell::borrow_mut(&self.0).substract_to_domain(id_d1, domain)
+        RefCell::borrow_mut(&self.0).subtract_to_domain(id_d1, domain)
     }
 
     pub fn set_domain(&mut self, id: &AtomId, domain: impl Into<Domain>) -> EmptyDomains {
         RefCell::borrow_mut(&self.0).set_domain(id, domain)
     }
 
-    pub fn add_union_dependency(&mut self, id: &AtomId, union: Vec<AtomId>) {
-        RefCell::borrow_mut(&self.0).add_union_dependency(id, union)
+    pub fn add_constraint(
+        &mut self,
+        id: &AtomId,
+        constraint: ConstraintClosure,
+        update: UpdateClosure,
+    ) {
+        RefCell::borrow_mut(&self.0).add_constraint(id, constraint, update)
     }
 
-    pub fn add_parent_dependency(&mut self, id: &AtomId, parent: AtomId) {
-        RefCell::borrow_mut(&self.0).add_parent_dependency(id, parent)
+    pub fn add_update(&mut self, id: &AtomId, update: UpdateClosure) {
+        RefCell::borrow_mut(&self.0).add_update(id, update)
+    }
+
+    pub fn add_union_constraint(&mut self, id: &AtomId, union: Vec<AtomId>) {
+        RefCell::borrow_mut(&self.0).add_union_constraint(id, union)
+    }
+
+    pub fn add_dependent(&mut self, id: &AtomId, parent: AtomId) {
+        RefCell::borrow_mut(&self.0).add_dependent(id, parent)
     }
 
     pub fn contained_in_domain(&self, d1: &Domain, d2: &Domain) -> bool {
@@ -230,7 +244,7 @@ impl RefSymTable {
     }
 
     pub fn try_union_atom(&mut self, id1: &AtomId, id2: &AtomId) -> EmptyDomains {
-        RefCell::borrow_mut(&self.0).try_union_atom(id1, id2)
+        RefCell::borrow_mut(&self.0).union_atom(id1, id2)
     }
 
     /*
@@ -248,47 +262,22 @@ impl RefSymTable {
 
 impl Display for RefSymTable {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut str = "#SYM TABLE: \n\n".to_string();
-        let mut constant_typed = vec![];
-        let mut constant_untyped = vec![];
-        let mut var_typed = vec![];
-        let mut var_untyped = vec![];
         let st = RefCell::borrow(Rc::borrow(&self.0));
 
-        for x in 0..st.domains.len() {
-            if x == st.get_parent(&x) {
-                let domain = &st.domains[x].domain;
-                let constant = domain.is_constant();
-                match (domain, constant) {
-                    (Domain::Simple(1), true) => constant_untyped.push(x),
-                    (Domain::Simple(1), false) => var_untyped.push(x),
-                    (_, true) => constant_typed.push(x),
-                    (_, false) => var_typed.push(x),
-                }
+        write!(f, "## SYM TABLE \n").unwrap();
+
+        for e in 0..st.domains.len() {
+            if e == st.get_parent(&e) {
+                assert_eq!(e, self.get_parent(&e));
+                write!(
+                    f,
+                    "- ({}){}({})\n",
+                    e,
+                    self.format_variable(&e),
+                    self.format_domain(&e),
+                )?;
             }
         }
-
-        let mut c = |vec: Vec<AtomId>, preambule: &str| {
-            str.push_str(format!("\n## {}:\n", preambule).as_str());
-            for e in vec {
-                assert_eq!(e, self.get_parent(&e));
-                str.push_str(
-                    format!(
-                        "- ({}){}({})\n",
-                        e,
-                        self.format_variable(&e),
-                        self.format_domain(&e),
-                    )
-                    .as_str(),
-                );
-            }
-        };
-
-        c(constant_typed, "CONSTANT TYPED");
-        c(constant_untyped, "CONSTANT UNTYPED");
-        c(var_typed, "VAR TYPED");
-        c(var_untyped, "VAR UNTYPED");
-
-        write!(f, "{}", str)
+        Ok(())
     }
 }

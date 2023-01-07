@@ -145,6 +145,13 @@ impl TypeLattice {
                 let childs_t2 = self.get_all_childs(t2);
                 childs_t2.contains(top1)
             }
+            (Cst(d1, c1), Cst(d2, c2)) => {
+                if self.contained_in(d1, d2) {
+                    c1 == c2
+                } else {
+                    false
+                }
+            }
             (Composed(top1, comp1), Composed(top2, comp2)) => {
                 if top1 == top2 && comp1.len() == comp2.len() {
                     for (d1, d2) in comp1.iter().zip(comp2) {
@@ -177,13 +184,7 @@ impl TypeLattice {
             }
             (Substract(_, _), _) => todo!(),
             (_, Substract(_, _)) => todo!(),
-            (Cst(d1, c1), Cst(d2, c2)) => {
-                if self.contained_in(d1, d2) {
-                    c1 == c2
-                } else {
-                    false
-                }
-            }
+
             (Cst(d1, _), t2) => self.contained_in(d1, t2),
             (_, Cst(_, _)) => false,
         }
@@ -260,24 +261,26 @@ impl TypeLattice {
                 };
             }
             (Union(ua), t) => {
+                let mut meets: HashSet<Domain> = Default::default();
                 let mut meet = Simple(Empty as usize);
                 for tu in ua {
                     meet = self.__meet(tu, t);
                     if meet != Simple(Empty as usize) {
-                        break;
+                        meets.insert(meet);
                     }
                 }
-                return meet;
+                return self.simplify_union(meets);
             }
             (t, Union(ub)) => {
+                let mut meets: HashSet<Domain> = Default::default();
                 let mut meet = Simple(Empty as usize);
                 for tu in ub {
                     meet = self.__meet(t, tu);
                     if meet != Simple(Empty as usize) {
-                        break;
+                        meets.insert(meet);
                     }
                 }
-                return meet;
+                return self.simplify_union(meets);
             }
             (Substract(t1, t2), t3) => self.__substract(&self.__meet(t1, t3), &self.__meet(t2, t3)),
             (t1, Substract(t2, t3)) => self.__substract(&self.__meet(t1, t2), &self.__meet(t1, t3)),
@@ -310,48 +313,96 @@ impl TypeLattice {
     }
 
     pub(crate) fn __union(&self, t1: &Domain, t2: &Domain) -> Domain {
-        match (t1, t2) {
-            (Simple(t1), Simple(t2)) => {
-                if t1 == t2 {
-                    Simple(*t1)
-                } else {
-                    let parents_t1 = self.get_all_parents(t1);
-                    if parents_t1.contains(t2) {
-                        return Simple(*t2);
+        if t1.is_any() || t2.is_any() {
+            Domain::any()
+        } else if t1.is_empty() {
+            t2.clone()
+        } else if t2.is_empty() {
+            t1.clone()
+        } else {
+            match (t1, t2) {
+                (Cst(d1, c1), Cst(d2, c2)) => {
+                    if c1 == c2 {
+                        Cst(Box::new(self.__union(d1, d2)), c1.clone())
+                    } else {
+                        Union(vec![t1.clone(), t2.clone()])
                     }
-                    let parents_t2 = self.get_all_parents(t2);
-                    if parents_t2.contains(t1) {
-                        return Simple(*t1);
-                    }
+                }
+                (Simple(t1), Simple(t2)) => {
+                    if t1 == t2 {
+                        Simple(*t1)
+                    } else {
+                        let parents_t1 = self.get_all_parents(t1);
+                        if parents_t1.contains(t2) {
+                            return Simple(*t2);
+                        }
+                        let parents_t2 = self.get_all_parents(t2);
+                        if parents_t2.contains(t1) {
+                            return Simple(*t1);
+                        }
 
-                    return self.simplify_union(vec![Simple(*t1), Simple(*t2)].drain(..).collect());
-                }
-            }
-            (Simple(_), Composed(top2, _)) => {
-                let nt2 = Simple(*top2);
-                self.__union(t1, &nt2)
-            }
-            (Composed(top1, _), Simple(_)) => {
-                let nt1 = Simple(*top1);
-                self.__union(&nt1, t2)
-            }
-            (Composed(top1, comp1), Composed(top2, comp2)) => {
-                if top1 == top2 && comp1.len() == comp2.len() {
-                    let mut comp = vec![];
-                    for (t1, t2) in comp1.iter().zip(comp2) {
-                        let meet = self.__union(t1, t2);
-                        comp.push(meet)
+                        return self
+                            .simplify_union(vec![Simple(*t1), Simple(*t2)].drain(..).collect());
                     }
-                    Composed(top1.clone(), comp)
-                } else {
-                    Union(vec![t1.clone(), t2.clone()])
                 }
-            }
-            (Union(ua), Union(ub)) => {
-                let mut types = ua.clone();
-                types.append(&mut ub.clone());
-                let mut types: HashSet<Domain> = types.drain(..).collect();
-                for ta in ua {
+                (Simple(_), Composed(top2, _)) => {
+                    let nt2 = Simple(*top2);
+                    self.__union(t1, &nt2)
+                }
+                (Composed(top1, _), Simple(_)) => {
+                    let nt1 = Simple(*top1);
+                    self.__union(&nt1, t2)
+                }
+                (Composed(top1, comp1), Composed(top2, comp2)) => {
+                    if top1 == top2 && comp1.len() == comp2.len() {
+                        let mut comp = vec![];
+                        for (t1, t2) in comp1.iter().zip(comp2) {
+                            let meet = self.__union(t1, t2);
+                            comp.push(meet)
+                        }
+                        Composed(top1.clone(), comp)
+                    } else {
+                        Union(vec![t1.clone(), t2.clone()])
+                    }
+                }
+                (Union(ua), Union(ub)) => {
+                    let mut types = ua.clone();
+                    types.append(&mut ub.clone());
+                    let mut types: HashSet<Domain> = types.drain(..).collect();
+                    for ta in ua {
+                        for tb in ub {
+                            match self.__union(ta, tb) {
+                                Union(_) => {}
+                                t => {
+                                    types.remove(ta);
+                                    types.remove(tb);
+                                    types.insert(t);
+                                }
+                            }
+                        }
+                    }
+                    self.simplify_union(types)
+                }
+                (Union(ua), tb) => {
+                    let mut types = ua.clone();
+                    types.push(tb.clone());
+                    let mut types: HashSet<Domain> = types.drain(..).collect();
+                    for ta in ua {
+                        match self.__union(ta, tb) {
+                            Union(_) => {}
+                            t => {
+                                types.remove(ta);
+                                types.remove(tb);
+                                types.insert(t);
+                            }
+                        }
+                    }
+                    self.simplify_union(types)
+                }
+                (ta, Union(ub)) => {
+                    let mut types = ub.clone();
+                    types.push(ta.clone());
+                    let mut types: HashSet<Domain> = types.drain(..).collect();
                     for tb in ub {
                         match self.__union(ta, tb) {
                             Union(_) => {}
@@ -362,98 +413,60 @@ impl TypeLattice {
                             }
                         }
                     }
+                    self.simplify_union(types)
                 }
-                self.simplify_union(types)
-            }
-            (Union(ua), tb) => {
-                let mut types = ua.clone();
-                types.push(tb.clone());
-                let mut types: HashSet<Domain> = types.drain(..).collect();
-                for ta in ua {
-                    match self.__union(ta, tb) {
-                        Union(_) => {}
-                        t => {
-                            types.remove(ta);
-                            types.remove(tb);
-                            types.insert(t);
-                        }
+                (Substract(t1, t2), t3) => {
+                    /*println!(
+                        "debug: ({}/{})|{} = ({}|{})/({}/({}^{}))",
+                        t1.format(&self),
+                        t2.format(&self),
+                        t3.format(&self),
+                        t1.format(&self),
+                        t3.format(&self),
+                        t2.format(&self),
+                        t2.format(&self),
+                        t3.format(&self)
+                    );*/
+                    self.__substract(
+                        &self.__union(t1.deref(), t3),
+                        &self.__substract(&t2.deref(), &self.__meet(&t2.deref(), t3)),
+                    )
+                }
+                (t1, Substract(t2, t3)) => {
+                    /*println!(
+                        "debug: {}|({}/{})| = ({}|{})/({}/({}^{}))",
+                        t1.format(&self),
+                        t2.format(&self),
+                        t3.format(&self),
+                        t1.format(&self),
+                        t2.format(&self),
+                        t3.format(&self),
+                        t3.format(&self),
+                        t1.format(&self)
+                    );*/
+                    self.__substract(
+                        &self.__union(t1, t2.deref()),
+                        &self.__substract(&t3.deref(), &self.__meet(t3.deref(), t1)),
+                    )
+                }
+
+                (Cst(d1, _), t2) => {
+                    let union = self.__union(d1, t1);
+
+                    if &union == t2 {
+                        t2.clone()
+                    } else {
+                        Union(vec![t1.clone(), t2.clone()])
                     }
                 }
-                self.simplify_union(types)
-            }
-            (ta, Union(ub)) => {
-                let mut types = ub.clone();
-                types.push(ta.clone());
-                let mut types: HashSet<Domain> = types.drain(..).collect();
-                for tb in ub {
-                    match self.__union(ta, tb) {
-                        Union(_) => {}
-                        t => {
-                            types.remove(ta);
-                            types.remove(tb);
-                            types.insert(t);
-                        }
+                (t1, Cst(d2, _)) => {
+                    let union = self.__union(t1, d2);
+
+                    if &union == t1 {
+                        t1.clone()
+                    } else {
+                        Union(vec![t1.clone(), t2.clone()])
                     }
-                }
-                self.simplify_union(types)
-            }
-            (Substract(t1, t2), t3) => {
-                /*println!(
-                    "debug: ({}/{})|{} = ({}|{})/({}/({}^{}))",
-                    t1.format(&self),
-                    t2.format(&self),
-                    t3.format(&self),
-                    t1.format(&self),
-                    t3.format(&self),
-                    t2.format(&self),
-                    t2.format(&self),
-                    t3.format(&self)
-                );*/
-                self.__substract(
-                    &self.__union(t1.deref(), t3),
-                    &self.__substract(&t2.deref(), &self.__meet(&t2.deref(), t3)),
-                )
-            }
-            (t1, Substract(t2, t3)) => {
-                /*println!(
-                    "debug: {}|({}/{})| = ({}|{})/({}/({}^{}))",
-                    t1.format(&self),
-                    t2.format(&self),
-                    t3.format(&self),
-                    t1.format(&self),
-                    t2.format(&self),
-                    t3.format(&self),
-                    t3.format(&self),
-                    t1.format(&self)
-                );*/
-                self.__substract(
-                    &self.__union(t1, t2.deref()),
-                    &self.__substract(&t3.deref(), &self.__meet(t3.deref(), t1)),
-                )
-            }
-            (Cst(d1, c1), Cst(d2, c2)) => {
-                if c1 == c2 {
-                    Cst(Box::new(self.__union(d1, d2)), c1.clone())
-                } else {
-                    Union(vec![t1.clone(), t2.clone()])
-                }
-            }
-            (Cst(d1, _), t2) => {
-                let union = self.__union(d1, t1);
-
-                if &union == t2 {
-                    t2.clone()
-                } else {
-                    Union(vec![t1.clone(), t2.clone()])
-                }
-            }
-            (t1, Cst(d2, _)) => {
-                let union = self.__union(t1, d2);
-
-                if &union == t1 {
-                    t1.clone()
-                } else {
-                    Union(vec![t1.clone(), t2.clone()])
                 }
             }
         }
@@ -602,7 +615,7 @@ impl TypeLattice {
             types.push(Simple(s))
         }
         match types.len() {
-            0 => unreachable!(),
+            0 => Domain::empty(),
             1 => types.pop().unwrap(),
             _ => Union(types),
         }

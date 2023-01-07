@@ -1,1 +1,1 @@
-(if cond a b)
+(if (= 1 2) a b)

@@ -1,5 +1,5 @@
-use crate::structs::domain::root_type::RootType;
 use crate::structs::domain::root_type::RootType::*;
+use crate::structs::domain::root_type::{RootType, FALSE_ID, TRUE_ID};
 use crate::structs::domain::type_lattice::TypeLattice;
 use crate::structs::domain::Domain::*;
 use std::fmt::Write;
@@ -70,8 +70,28 @@ impl Domain {
         self == &Simple(0)
     }
 
+    pub fn is_any(&self) -> bool {
+        self == &Simple(1)
+    }
+
+    pub fn any() -> Self {
+        Domain::Simple(1)
+    }
+
+    pub fn is_true(&self) -> bool {
+        self == &Simple(TRUE_ID)
+    }
+
+    pub fn is_false(&self) -> bool {
+        self == &Simple(FALSE_ID)
+    }
+
     pub fn empty() -> Self {
         Simple(0)
+    }
+
+    pub fn composed(t: TypeId, mut composition: Vec<impl Into<Domain>>) -> Domain {
+        Composed(t.into(), composition.drain(..).map(|t| t.into()).collect())
     }
 
     pub fn nil() -> Domain {

@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use flow_graph::structs::domain::cst;
 use flow_graph::structs::domain::domain_test::DomainTest;
 use flow_graph::structs::domain::domain_test::DomainTest::*;
 use flow_graph::structs::domain::domain_test::DomainTest::{Boolean, Int};
@@ -38,6 +39,11 @@ fn main() {
     println!("Hello, world!");
     //let tn = &TypeNetwork::default();
     let dc = &TypeLattice::default();
+    meet(
+        dc,
+        sub(dc, Any, Err(None)),
+        union(dc, "a".to_string(), "b".to_string()),
+    );
 
     /*let union = (: &TypeNetwork, ta: Type, tb: Type) {
         println!("{} | {} = {}", ta, tb, dc.union(&ta, &tb))
@@ -72,7 +78,7 @@ fn main() {
     //meet(dc, Substract(Box::new(Any), Box::new(Err(None))), Err(None));
     //meet(dc, dc.substract(&Any, &Err(None)), Int);
     //sub(dc, Err(None), Err(Some(Box::new(Int))));
-    union(dc, Boolean, false);
+    /*union(dc, Boolean, false);
     union(dc, Boolean, true);
     meet(dc, Boolean, false);
     meet(dc, true, false);
@@ -85,7 +91,7 @@ fn main() {
     sub(dc, Boolean, false);
     union(dc, false, sub(dc, Boolean, false));
     sub(dc, 1, Int);
-    meet(dc, Err(None), Err(Some(Box::new(1.into()))));
+    meet(dc, Err(None), Err(Some(Box::new(1.into()))));*/
     /*union(dc, Err(Some(Box::new(Int))), Err(None));
     sub(dc, sub(dc, Any, Err(None)), Err(Some(Box::new(Int))));
     sub(dc, sub(dc, Any, Err(Some(Box::new(Int)))), Err(None));
@@ -126,7 +132,7 @@ fn main() {
         ]),
     );*/
 
-    output_domain_collection("/home/jeremy/Bureau/domain".into(), dc, true);
+    //output_domain_collection("/home/jeremy/Bureau/domain".into(), dc, true);
     //output_markdown("/home/jeremy/Bureau".into(), tn, true);
 }
 

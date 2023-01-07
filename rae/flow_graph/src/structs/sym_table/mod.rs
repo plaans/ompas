@@ -1,9 +1,10 @@
+pub(crate) mod closure;
 pub mod forest;
 pub mod id;
 pub mod lit;
 pub mod meta_data;
 pub mod r#ref;
-pub mod var_domain;
+pub(crate) mod var_domain;
 
 use crate::structs::chronicle::interval::Interval;
 use crate::structs::domain::root_type::RootType::{Any, Boolean, Handle};
@@ -17,6 +18,7 @@ use crate::structs::sym_table::meta_data::SymTableMetaData;
 //use sompas_language::primitives::DO;
 use crate::structs::domain::basic_type::BasicType;
 use crate::structs::domain::root_type::RootType;
+use crate::structs::sym_table::closure::{ConstraintClosure, Proc, UpdateClosure};
 use crate::structs::sym_table::r#ref::RefSymTable;
 use crate::structs::sym_table::var_domain::VarDomain;
 use sompas_structs::lnumber::LNumber;
@@ -76,9 +78,8 @@ impl Default for EmptyDomains {
     }
 }
 
-pub(crate) struct SymTable {
+pub struct SymTable {
     domains: Forest<VarDomain>,
-    //variable_symbols: HashMap<AtomId, String>,
     lattice: TypeLattice,
     ids: SymbolTableId,
     meta_data: SymTableMetaData,
@@ -231,7 +232,10 @@ impl SymTable {
     pub fn new_handle(&mut self) -> AtomId {
         let index = self.meta_data.new_handle_index();
         let sym = &format!("_{HANDLE_PREFIX}{index}_");
-        let id = self.domains.new_node(VarDomain::new(sym, Handle));
+        let id = self.domains.new_node(VarDomain::new(
+            sym,
+            Domain::composed(Handle as usize, vec![Any]),
+        ));
         self.ids.insert(&sym, &id);
         id
     }
@@ -272,19 +276,6 @@ impl SymTable {
         id
     }
 
-    /*pub fn new_typed_symbol(&mut self, sym: impl Display, domain: Domain) {
-        let sym = &sym.to_string();
-        if self.it_exists(sym) {
-            self.id(sym).unwrap()
-        } else {
-            let sym: String = sym.to_string();
-            let id = self.domains.new_node(domain);
-            self.variable_symbols.insert(id, sym.to_string());
-            self.ids.insert(&sym, &id);
-            id
-        }
-    }*/
-
     pub fn new_symbol(&mut self, sym: impl Display) -> AtomId {
         let sym = &sym.to_string();
         if self.it_exists(sym) {
@@ -296,19 +287,6 @@ impl SymTable {
             id
         }
     }
-
-    /*pub fn new_variable(&mut self, sym: impl Display) -> AtomId {
-        let sym = &sym.to_string();
-        if self.it_exists(sym) {
-            self.id(sym).unwrap()
-        } else {
-            let sym: String = sym.to_string();
-            let id = self.domains.new_node(Domain::default());
-            self.variable_symbols.insert(id, sym.to_string());
-            self.ids.insert(&sym, &id);
-            id
-        }
-    }*/
 
     pub fn new_parameter(&mut self, symbol: impl ToString, domain: Domain) -> AtomId {
         let symbol = symbol.to_string();
@@ -384,104 +362,135 @@ impl SymTable {
         self.substract(d1, d2)
     }
 
-    pub fn update_domain(&mut self, id_d1: &AtomId) -> EmptyDomains {
-        if !self.domains[*id_d1].union.is_empty() {
-            let mut domain = Domain::empty();
-            for d in &self.domains[*id_d1].union {
-                domain = self.union(&self.domains[*d].domain, &domain);
-            }
-            let domain = self.meet(&self.domains[*id_d1].domain, &domain);
-            self.domains[*id_d1].domain = domain;
-
-            if self.domains[*id_d1].domain.is_empty() {
-                EmptyDomains::Some(vec![*id_d1])
-            } else {
-                EmptyDomains::None
-            }
-        } else {
-            EmptyDomains::None
-        }
-    }
-
-    pub fn meet_to_domain(&mut self, id_d1: &AtomId, domain: impl Into<Domain>) -> EmptyDomains {
-        let var_domain = self.domains[*id_d1].clone();
+    pub fn update_domain(&mut self, id: &AtomId) -> EmptyDomains {
+        let id = &self.get_parent(id);
         let mut emptys = EmptyDomains::None;
 
-        if !var_domain.union.is_empty() {
-            let domain = domain.into();
-            for d in &var_domain.union {
-                emptys.append(self.meet_to_domain(d, domain.clone()));
-            }
-
-            emptys.append(self.update_domain(id_d1));
-        } else {
-            let d1 = &self.domains[*id_d1].domain;
-
-            let d = self.meet(d1, &domain.into());
-            if d.is_empty() {
-                emptys.append(EmptyDomains::Some(vec![*id_d1]));
-            }
-
-            self.domains[*id_d1].domain = d;
+        for update in self.domains[*id].updates.clone() {
+            emptys.append(update(self, id));
         }
-
-        for id_parent in &var_domain.parents {
-            emptys.append(self.update_domain(&id_parent));
-        }
-
         emptys
     }
 
-    pub fn substract_to_domain(
-        &mut self,
-        id_d1: &AtomId,
-        domain: impl Into<Domain>,
-    ) -> EmptyDomains {
-        let var_domain = self.domains[*id_d1].clone();
+    pub fn meet_to_domain(&mut self, id: &AtomId, domain: impl Into<Domain>) -> EmptyDomains {
+        let id = &self.get_parent(id);
+
         let mut emptys = EmptyDomains::None;
 
-        if !var_domain.union.is_empty() {
-            let domain = domain.into();
-            for d in &var_domain.union {
-                emptys.append(self.substract_to_domain(d, domain.clone()));
+        let var_domain = self.domains[*id].clone();
+        let domain = domain.into();
+        if var_domain.constraints.is_empty() {
+            let d1 = &self.domains[*id].domain;
+
+            let d = self.meet(d1, &domain.into());
+            if d.is_empty() {
+                emptys.append(EmptyDomains::Some(vec![*id]));
             }
 
-            emptys.append(self.update_domain(id_d1));
+            self.domains[*id].domain = d;
         } else {
-            let d1 = &self.domains[*id_d1].domain;
+            for constraint in var_domain.constraints {
+                emptys.append(constraint(
+                    self,
+                    id,
+                    domain.clone(),
+                    closure::meet_to_domain,
+                ))
+            }
+        }
+
+        emptys.append(self.update_domain(id));
+
+        for depend in &var_domain.depends {
+            emptys.append(self.update_domain(depend));
+        }
+        emptys
+    }
+
+    pub fn subtract_to_domain(&mut self, id: &AtomId, domain: impl Into<Domain>) -> EmptyDomains {
+        let id = &self.get_parent(id);
+
+        let mut emptys = EmptyDomains::None;
+
+        let var_domain = self.domains[*id].clone();
+        let domain = domain.into();
+        if var_domain.constraints.is_empty() {
+            let d1 = &self.domains[*id].domain;
 
             let d = self.substract(d1, &domain.into());
             if d.is_empty() {
-                emptys.append(EmptyDomains::Some(vec![*id_d1]));
+                emptys.append(EmptyDomains::Some(vec![*id]));
             }
 
-            self.domains[*id_d1].domain = d;
+            self.domains[*id].domain = d;
+        } else {
+            for constraint in var_domain.constraints {
+                emptys.append(constraint(
+                    self,
+                    id,
+                    domain.clone(),
+                    closure::substract_to_domain,
+                ))
+            }
         }
 
-        for id_parent in var_domain.parents {
-            emptys.append(self.update_domain(&id_parent));
-        }
+        emptys.append(self.update_domain(id));
 
+        for depend in &var_domain.depends {
+            emptys.append(self.update_domain(depend));
+        }
         emptys
     }
 
     pub fn set_domain(&mut self, id: &AtomId, domain: impl Into<Domain>) -> EmptyDomains {
+        let id = &self.get_parent(id);
+        let mut emptys = EmptyDomains::None;
+
+        let var_domain = self.domains[*id].clone();
         let domain = domain.into();
-        let empty = domain.is_empty();
-        self.domains[*id].domain = domain;
-        if empty {
-            EmptyDomains::Some(vec![*id])
+        if var_domain.constraints.is_empty() {
+            if domain.is_empty() {
+                emptys.append(EmptyDomains::Some(vec![*id]));
+            }
+
+            self.domains[*id].domain = domain;
         } else {
-            EmptyDomains::None
+            for constraint in var_domain.constraints {
+                emptys.append(constraint(self, id, domain.clone(), closure::set_domain))
+            }
         }
+
+        emptys.append(self.update_domain(id));
+
+        for depend in &var_domain.depends {
+            emptys.append(self.update_domain(depend));
+        }
+        emptys
     }
 
-    pub fn add_union_dependency(&mut self, id: &AtomId, mut union: Vec<AtomId>) {
-        self.domains[*id].union.append(&mut union)
+    pub fn add_constraint(
+        &mut self,
+        id: &AtomId,
+        constraint: ConstraintClosure,
+        update: UpdateClosure,
+    ) {
+        self.domains[*id].constraints.push(constraint);
+        self.domains[*id].updates.push(update);
     }
 
-    pub fn add_parent_dependency(&mut self, id: &AtomId, parent: AtomId) {
-        self.domains[*id].parents.push(parent);
+    pub fn add_update(&mut self, id: &AtomId, update: UpdateClosure) {
+        self.domains[*id].updates.push(update);
+    }
+
+    pub fn add_union_constraint(&mut self, id: &AtomId, union: Vec<AtomId>) {
+        self.domains[*id]
+            .constraints
+            .push(closure::union_constraint(union.clone()));
+        self.domains[*id].updates.push(closure::union_update(union));
+    }
+
+    pub fn add_dependent(&mut self, id: &AtomId, parent: AtomId) {
+        self.domains[*id].depends.push(parent);
     }
 
     pub fn contained_in_domain(&self, d1: &Domain, d2: &Domain) -> bool {
@@ -509,17 +518,20 @@ impl SymTable {
         self.domains.flat_bindings();
     }
 
-    pub fn try_union_atom(&mut self, id1: &AtomId, id2: &AtomId) -> EmptyDomains {
+    pub fn union_atom(&mut self, id1: &AtomId, id2: &AtomId) -> EmptyDomains {
         let p1 = self.get_parent(id1);
         let p2 = self.get_parent(id2);
         let d2 = self.domains[p2].domain.clone();
-        let mut union = self.domains[p1].union.clone();
-        union.append(&mut self.domains[p2].union.clone());
-        let mut parents = self.domains[p1].parents.clone();
-        parents.append(&mut self.domains[p2].parents.clone());
+        let mut constraints = self.domains[p1].constraints.clone();
+        constraints.append(&mut self.domains[p2].constraints.clone());
+        let mut updates = self.domains[p1].updates.clone();
+        updates.append(&mut self.domains[p2].updates.clone());
+        let mut depends = self.domains[p1].depends.clone();
+        depends.append(&mut self.domains[p2].depends.clone());
 
-        self.domains[p1].union = union.clone();
-        self.domains[p1].parents = parents.clone();
+        self.domains[p1].constraints = constraints.clone();
+        self.domains[p1].updates = updates.clone();
+        self.domains[p1].depends = depends.clone();
         self.domains.union_ordered(&p1, &p2);
 
         let r = self.meet_to_domain(&p1, d2);
@@ -546,21 +558,10 @@ impl SymTable {
     pub fn format_domain(&self, id: &AtomId) -> String {
         let domain = &self.domains[*id];
         let mut str = format!("domain = {}", domain.domain.format(&self.lattice));
-        if !domain.union.is_empty() {
-            write!(str, ", union = {{").unwrap();
-            for (i, id) in domain.union.iter().enumerate() {
-                if i != 0 {
-                    str.push(',');
-                }
-                write!(str, "{}", self.format_variable(id));
-            }
 
-            write!(str, "}}").unwrap();
-        }
-
-        if !domain.parents.is_empty() {
-            write!(str, ", parents = {{");
-            for (i, id) in domain.parents.iter().enumerate() {
+        if !domain.depends.is_empty() {
+            write!(str, ", depends = {{");
+            for (i, id) in domain.depends.iter().enumerate() {
                 if i != 0 {
                     str.push(',');
                 }
@@ -571,10 +572,6 @@ impl SymTable {
         }
         str
     }
-
-    /*pub fn format_symbols_forest(&self) -> String {
-        self.domains.to_string()
-    }*/
 }
 
 pub fn lvalue_to_domain(lv: &LValue, st: &mut RefSymTable) -> Result<Domain, LRuntimeError> {

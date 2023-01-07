@@ -35,6 +35,30 @@ impl FlowGraph {
         }
     }
 
+    pub fn is_valid(&self, flow: &FlowId) -> bool {
+        self.flows[*flow].valid
+    }
+
+    pub fn invalidate(&mut self, flow: &FlowId) {
+        self.flows[*flow].valid = false
+    }
+
+    pub fn get_kind(&self, flow: &FlowId) -> &FlowKind {
+        &self.flows[*flow].kind
+    }
+
+    pub fn set_kind(&mut self, flow: &FlowId, kind: FlowKind) {
+        self.flows[*flow].kind = kind
+    }
+
+    pub fn get_parent(&self, flow: &FlowId) -> &Option<FlowId> {
+        &self.flows[*flow].parent
+    }
+
+    pub fn set_parent(&mut self, flow: &FlowId, parent: &FlowId) {
+        self.flows[*flow].parent = Some(*parent)
+    }
+
     pub fn get_flow_result(&self, flow: &FlowId) -> AtomId {
         let flow = &self.flows[*flow];
         match &flow.kind {
@@ -74,8 +98,8 @@ impl FlowGraph {
             result: r,
             lit: value.into(),
         };
-
-        self.new_flow(vertice)
+        let id = self.new_flow(vertice);
+        self.new_seq(vec![id])
     }
 
     pub fn new_assignment(&mut self, value: impl Into<Lit>) -> FlowId {
@@ -90,8 +114,8 @@ impl FlowGraph {
             result: r,
             lit: value.into(),
         };
-
-        self.new_flow(vertice)
+        let id = self.new_flow(vertice);
+        self.new_seq(vec![id])
     }
 
     pub fn get_atom_of_flow(&self, flow: &FlowId) -> im::HashSet<AtomId> {
@@ -117,11 +141,13 @@ impl FlowGraph {
 
     pub fn new_seq(&mut self, seq: Vec<FlowId>) -> FlowId {
         assert!(!seq.is_empty());
-        self.merge_flows(seq)
+        let flow = self.merge_flows(seq);
+        self.new_flow(flow)
     }
 
     pub fn new_branching(&mut self, branching: BranchingFlow) -> FlowId {
-        self.new_flow(FlowKind::Branching(branching))
+        let id = self.new_flow(FlowKind::Branching(branching));
+        self.new_seq(vec![id])
     }
 
     pub fn new_result(&mut self, result: AtomId) -> FlowId {
@@ -171,7 +197,17 @@ impl FlowGraph {
         id
     }
 
-    pub fn merge_flows(&mut self, flows: Vec<FlowId>) -> FlowId {
+    pub fn update_flow(&mut self, id: &FlowId) {
+        let kind = if let FlowKind::Seq(seq, r) = self.flows[*id].kind.clone() {
+            self.merge_flows(seq)
+        } else {
+            self.flows[*id].kind.clone()
+        };
+
+        self.flows[*id].kind = kind
+    }
+
+    pub fn merge_flows(&mut self, flows: Vec<FlowId>) -> FlowKind {
         let mut seq = vec![];
         let mut result = 0;
 
@@ -190,10 +226,10 @@ impl FlowGraph {
             }
         }
 
-        self.new_flow(FlowKind::Seq(seq, result))
+        FlowKind::Seq(seq, result)
     }
 
-    pub fn merge_flow(&mut self, f1_id: &FlowId, f2_id: &FlowId) -> FlowId {
+    /*pub fn merge_flow(&mut self, f1_id: &FlowId, f2_id: &FlowId) -> FlowId {
         let f1 = &self.flows[*f1_id];
         let f2 = &self.flows[*f2_id];
 
@@ -221,9 +257,7 @@ impl FlowGraph {
                 FlowKind::Seq(vec![*f1_id, *f2_id], result)
             }
         };
-
-        self.new_flow(flow)
-    }
+    }*/
 
     pub fn get(&self, id: &VerticeId) -> Option<&Flow> {
         self.flows.get(*id)
@@ -247,7 +281,7 @@ impl FlowGraph {
             FlowKind::Assignment(v) => {
                 dot.push_str(
                     format!(
-                        "V{id} [label= \"{}: {} <- {}\"]\n",
+                        "V{id} [label= \"{}: {} <- {}\"];\n",
                         v.interval.format(sym_table, false),
                         v.result.format(sym_table, false),
                         v.lit.format(sym_table, false),
@@ -258,6 +292,13 @@ impl FlowGraph {
                 end = Some(*id);
             }
             FlowKind::Branching(branching) => {
+                write!(
+                    dot,
+                    "subgraph cluster_{id} {{\n
+                    label = \"branching_{id}\";
+                    color=blue;
+                    \n"
+                );
                 let (cond_dot, (cond_start, cond_end)) = self.export_flow(&branching.cond_flow);
                 let cond = self
                     .sym_table
@@ -268,13 +309,25 @@ impl FlowGraph {
                 let (false_dot, (false_start, false_end)) = self.export_flow(&branching.false_flow);
                 let (result_dot, (result_start, result_end)) = self.export_flow(&branching.result);
                 write!(dot, "{cond_dot}{true_dot}{false_dot}{result_dot}").unwrap();
-                write!(dot, "V{cond_end} -> V{true_start} [label = \"{cond}\"]\n",).unwrap();
-                write!(dot, "V{cond_end} -> V{false_start} [label = \"!{cond}\"]\n",).unwrap();
-                write!(dot, "V{true_end} -> V{result_start}\n").unwrap();
-                write!(dot, "V{false_end}-> V{result_start}\n").unwrap();
+                write!(dot, "V{cond_end} -> V{true_start} [label = \"{cond}\"];\n",).unwrap();
+                write!(
+                    dot,
+                    "V{cond_end} -> V{false_start} [label = \"!{cond}\"];\n",
+                )
+                .unwrap();
+                write!(dot, "V{true_end} -> V{result_start};\n").unwrap();
+                write!(dot, "V{false_end}-> V{result_start};\n").unwrap();
                 end = Some(result_end);
+                write!(dot, "}}\n");
             }
             FlowKind::Seq(seq, r) => {
+                write!(
+                    dot,
+                    "subgraph cluster_{id} {{\n
+                    label = \"seq_{id}\";
+                    color=black;
+                    \n"
+                );
                 let mut previous_end = None;
                 let mut seq = seq.clone();
                 seq.push(*r);
@@ -282,7 +335,7 @@ impl FlowGraph {
                     let (f_dot, (f_start, f_end)) = self.export_flow(&f);
                     write!(dot, "{}", f_dot).unwrap();
                     if let Some(end) = previous_end {
-                        write!(dot, "V{end} -> V{f_start}\n").unwrap();
+                        write!(dot, "V{end} -> V{f_start};\n").unwrap();
                     }
                     if start == None {
                         start = Some(f_start)
@@ -290,10 +343,11 @@ impl FlowGraph {
                     previous_end = Some(f_end);
                 }
                 end = previous_end;
+                write!(dot, "}}\n");
             }
             FlowKind::FlowResult(fr) => {
                 dot.push_str(
-                    format!("V{id} [label= \"{}\"]\n", fr.format(sym_table, false),).as_str(),
+                    format!("V{id} [label= \"{}\"];\n", fr.format(sym_table, false),).as_str(),
                 );
                 start = Some(*id);
                 end = Some(*id);
@@ -309,17 +363,16 @@ impl FlowGraph {
         write!(dot, "{}", self.export_flow(&self.flow).0).unwrap();
         for (id, handle) in self.handles.inner() {
             let (f_dot, (start, _end)) = self.export_flow(&handle.flow);
-            write!(dot, "{} -> V{start}\n", self.sym_table.format_variable(id)).unwrap();
+            write!(dot, "{} -> V{start};\n", self.sym_table.format_variable(id)).unwrap();
             write!(dot, "{f_dot}").unwrap();
         }
 
         dot.push('}');
         dot
     }
-}
 
-impl FlatBindings for FlowGraph {
-    fn flat_bindings(&mut self, st: &RefSymTable) {
+    pub fn flat_bindings(&mut self) {
+        let st = &self.sym_table.clone();
         for f in &mut self.flows {
             match &mut f.kind {
                 FlowKind::Assignment(v) => {

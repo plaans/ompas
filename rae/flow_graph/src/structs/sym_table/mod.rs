@@ -480,18 +480,22 @@ impl SymTable {
 
     pub fn add_update(&mut self, elements: Vec<AtomId>, update: Update) {
         for element in elements {
-            self.domains[element].updates.push(update.clone());
+            if element != update.id {
+                self.domains[element].updates.push(update.clone());
+            }
         }
 
         self.update_domains(vec![update].into());
     }
 
-    /*pub fn add_union_constraint(&mut self, id: &AtomId, union: Vec<AtomId>) {
-        self.domains[*id]
-            .constraints
-            .push(closure::union_constraint(union.clone()));
-        self.domains[*id].updates.push(closure::union_update(union));
-    }*/
+    pub fn remove_update(&mut self, id: &AtomId, dependent: &AtomId) {
+        let id = self.get_parent(id);
+        let dependent = self.get_parent(dependent);
+
+        let mut updates = self.domains[id].updates.clone();
+        updates.retain(|up| self.get_parent(&up.id) != dependent);
+        self.domains[id].updates = updates;
+    }
 
     pub fn contained_in_domain(&self, d1: &Domain, d2: &Domain) -> bool {
         self.lattice.contained_in(d1, d2)
@@ -527,6 +531,7 @@ impl SymTable {
 
         self.domains[p1].updates = updates.clone();
         self.domains.union_ordered(&p1, &p2);
+        self.remove_update(&p1, &p1);
 
         let r = self.meet_to_domain(&p1, d2);
         self.domains[p2] = self.domains[p1].clone();

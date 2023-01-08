@@ -86,22 +86,32 @@ pub fn propagate(
                                 && graph.is_valid(&branching.false_flow)
                             {
                                 let cond_result = &graph.get_flow_result(&branching.cond_flow);
-                                queue.push_back(Meet(*cond_result, False.into()));
-                                graph.set_branch(id, false);
-                                /*let new_flow = graph
-                                    .merge_flows(vec![branching.cond_flow, branching.false_flow]);
+                                let true_result = graph.get_flow_result(&branching.true_flow);
+                                let result = graph.get_flow_result(&branching.result);
+                                graph.sym_table.remove_update(&result, &true_result);
+                                graph.sym_table.remove_update(&true_result, &result);
+                                queue.push_back(Bind(
+                                    result,
+                                    graph.get_flow_result(&branching.false_flow),
+                                ));
 
-                                graph.set_kind(id, new_flow);*/
-                                //graph.update_flow(&flow.parent.unwrap());
+                                graph.set_branch(id, false);
+                                queue.push_back(Meet(*cond_result, False.into()));
                             } else if graph.is_valid(&branching.true_flow)
                                 && !graph.is_valid(&branching.false_flow)
                             {
                                 let cond_result = &graph.get_flow_result(&branching.cond_flow);
+                                let false_resut = graph.get_flow_result(&branching.false_flow);
+                                let result = graph.get_flow_result(&branching.result);
+                                graph.sym_table.remove_update(&result, &false_resut);
+                                graph.sym_table.remove_update(&false_resut, &result);
+                                queue.push_back(Bind(
+                                    result,
+                                    graph.get_flow_result(&branching.true_flow),
+                                ));
+
                                 graph.set_branch(id, true);
                                 queue.push_back(Meet(*cond_result, True.into()));
-                                /*let new_flow = graph
-                                    .merge_flows(vec![branching.cond_flow, branching.true_flow]);
-                                graph.set_kind(id, new_flow);*/
                             } else {
                                 queue.push_back(Invalid(graph.get_parent(id).unwrap()));
                             }
@@ -159,116 +169,3 @@ pub fn binding_constraints(graph: &mut FlowGraph) -> VecDeque<PostProcess> {
     }
     post_process
 }
-
-/*
-pub fn binding(graph: &mut FlowGraph) -> Result<(), LRuntimeError> {
-    let sym_table = graph.sym_table.clone();
-    let mut flows_queue: VecDeque<FlowId> = Default::default();
-    flows_queue.push_back(graph.flow);
-
-    while let Some(flow_id) = flows_queue.pop_front() {
-        let flow = graph.flows[flow_id].clone();
-        match &flow.kind {
-            FlowKind::Assignment(ass) => {
-                if let Lit::Atom(a) = &ass.lit {
-                    if let EmptyDomains::Some(emptys) =
-                        graph.sym_table.try_union_atom(&ass.result, &a)
-                    {
-                        println!("invalid flow(s)");
-                        for e in &emptys {
-                            invalid_flows(graph, e)?;
-                        }
-                    } else {
-                        let parent_flow = &mut graph.flows[flow.parent.unwrap()];
-                        if let FlowKind::Seq(s, _) = &mut parent_flow.kind {
-                            s.retain(|f| *f != flow_id)
-                        }
-                    }
-                }
-            }
-            FlowKind::Seq(s, _) => {
-                for f in s {
-                    flows_queue.push_back(*f)
-                }
-            }
-            FlowKind::Branching(b) => {
-                flows_queue.push_back(b.cond_flow);
-                flows_queue.push_back(b.true_flow);
-                flows_queue.push_back(b.false_flow);
-                flows_queue.push_back(b.result);
-            }
-            FlowKind::FlowResult(_) => {}
-        }
-    }
-
-    graph.flat_bindings(&sym_table);
-    Ok(())
-}
-
-pub fn invalid_flows(graph: &mut FlowGraph, invalid_atom: &AtomId) -> Result<(), LRuntimeError> {
-    let mut flows = graph
-        .map_atom_id_flow_id
-        .get(invalid_atom)
-        .unwrap_or(&vec![])
-        .clone();
-
-    let mut sym_table = graph.sym_table.clone();
-
-    while let Some(flow_id) = flows.pop() {
-        let flow = &mut graph.flows[flow_id];
-        flow.valid = false;
-
-        if let Some(parent) = flow.parent {
-            let flow = graph.flows[parent].clone();
-            match &flow.kind {
-                FlowKind::Assignment(_) => unreachable!(),
-                FlowKind::Seq(_, _) => {
-                    flows.push(parent);
-                }
-                FlowKind::Branching(branching) => {
-                    if flow_id == branching.cond_flow || flow_id == branching.result {
-                        flows.push(parent)
-                    } else if flow_id == branching.true_flow {
-                        let cond_result = &graph.get_flow_result(&branching.cond_flow);
-                        let emptys = sym_table.meet_to_domain(cond_result, False);
-
-                        if let EmptyDomains::Some(vec) = emptys {
-                            for e in vec {
-                                invalid_flows(graph, &e)?;
-                            }
-                        } else {
-                            let new_flow =
-                                graph.merge_flows(vec![branching.cond_flow, branching.false_flow]);
-
-                            graph.flows[parent].kind = new_flow;
-
-                            graph.update_flow(&flow.parent.unwrap());
-                        }
-                    } else if flow_id == branching.false_flow {
-                        let cond_result = &graph.get_flow_result(&branching.cond_flow);
-                        let emptys = sym_table.meet_to_domain(cond_result, True);
-
-                        if let EmptyDomains::Some(vec) = emptys {
-                            for e in vec {
-                                invalid_flows(graph, &e)?;
-                            }
-                        } else {
-                            let new_flow =
-                                graph.merge_flows(vec![branching.cond_flow, branching.true_flow]);
-
-                            graph.flows[parent].kind = new_flow;
-
-                            graph.update_flow(&flow.parent.unwrap());
-                        }
-                    } else {
-                        panic!("flow is not part of one of the branch");
-                    }
-                }
-                FlowKind::FlowResult(_) => {}
-            }
-        }
-    }
-
-    Ok(())
-}
-*/

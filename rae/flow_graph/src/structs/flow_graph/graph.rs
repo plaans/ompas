@@ -302,10 +302,16 @@ impl FlowGraph {
                 end = Some(*id);
             }
             FlowKind::Branching(branching) => {
+                let label = match branching.branch {
+                    None => format!("branching_{id}"),
+                    Some(true) => format!("branching_{id}(branch = true)"),
+                    Some(false) => format!("branching_{id}(branch = false)"),
+                };
+
                 write!(
                     dot,
                     "subgraph cluster_{id} {{\n
-                    label = \"branching_{id}\";
+                    label = \"{label}\";
                     color=blue;
                     \n"
                 );

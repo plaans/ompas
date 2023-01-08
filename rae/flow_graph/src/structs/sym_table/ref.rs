@@ -204,6 +204,10 @@ impl RefSymTable {
         RefCell::borrow_mut(&self.0).add_update(elements, update);
     }
 
+    pub fn remove_update(&mut self, id: &AtomId, dependent: &AtomId) {
+        RefCell::borrow_mut(&self.0).remove_update(id, dependent);
+    }
+
     pub fn contained_in_domain(&self, d1: &Domain, d2: &Domain) -> bool {
         RefCell::borrow(&self.0).contained_in_domain(d1, d2)
     }

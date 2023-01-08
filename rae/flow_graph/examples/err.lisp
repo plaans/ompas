@@ -1,1 +1,3 @@
-(err 1)
+(begin
+    (err 1)
+    nil)

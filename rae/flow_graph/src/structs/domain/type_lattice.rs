@@ -40,6 +40,7 @@ impl Default for TypeLattice {
         dc.add_type(EmptyList, vec![List as usize]);
         dc.add_type(True, vec![Boolean as usize]);
         dc.add_type(False, vec![Boolean as usize]);
+        dc.add_type(Nil, vec![False as usize, EmptyList as usize]);
         dc.add_decomposition(Boolean as usize, vec![True as usize, False as usize]);
         dc.add_decomposition(
             Any as usize,

@@ -22,6 +22,7 @@ pub enum DomainTest {
     Symbol,
     Boolean,
     True,
+    False,
     Nil,
     Number,
     Int,
@@ -131,6 +132,7 @@ impl Display for DomainTest {
             Cst(d1, c) => write!(f, "{d1}[{c}]"),
             True => write!(f, "true"),
             Nil => write!(f, "nil"),
+            False => write!(f, "false"),
         }
     }
 }
@@ -209,7 +211,8 @@ impl DomainTest {
                     RootType::Symbol => Symbol,
                     RootType::EmptyList => Nil,
                     RootType::True => True,
-                    RootType::False => Nil,
+                    RootType::False => False,
+                    RootType::Nil => Nil,
                 },
                 Result::Err(_) => Empty,
             },

@@ -5,12 +5,12 @@ use std::rc::Rc;
 
 pub(crate) type Proc = fn(&mut SymTable, &AtomId, Domain) -> EmptyDomains;
 
-pub(crate) type ConstraintClosure =
-    Rc<Box<dyn Fn(&mut SymTable, &AtomId, Domain, Proc) -> EmptyDomains>>;
+/*pub(crate) type ConstraintClosure =
+Rc<Box<dyn Fn(&mut SymTable, &AtomId, Domain, Proc) -> EmptyDomains>>;*/
 
 pub(crate) type UpdateClosure = Rc<Box<dyn Fn(&mut SymTable, &AtomId) -> EmptyDomains>>;
 
-pub(crate) fn union_constraint(vec: Vec<AtomId>) -> ConstraintClosure {
+/*pub(crate) fn union_constraint(vec: Vec<AtomId>) -> ConstraintClosure {
     Rc::new(Box::new(move |st, id: &AtomId, domain, proc| {
         let mut emptys = EmptyDomains::None;
         for d in &vec {
@@ -20,18 +20,33 @@ pub(crate) fn union_constraint(vec: Vec<AtomId>) -> ConstraintClosure {
 
         emptys
     }))
+}*/
+
+pub(crate) fn in_union_update(union_atom: AtomId) -> UpdateClosure {
+    Rc::new(Box::new(move |st, id: &AtomId| {
+        let union_atom = st.get_parent(&union_atom);
+        let union_domain = &st.domains[union_atom].domain;
+        let in_union_domain = &st.domains[*id].domain;
+        let domain = st.meet(union_domain, in_union_domain);
+        st.domains[*id].domain = domain;
+        if st.domains[*id].domain.is_empty() {
+            EmptyDomains::Some(vec![*id])
+        } else {
+            EmptyDomains::None
+        }
+    }))
 }
 
-pub(crate) fn union_update(vec: Vec<AtomId>) -> UpdateClosure {
+pub(crate) fn union_update(union: Vec<AtomId>) -> UpdateClosure {
     Rc::new(Box::new(move |st, id: &AtomId| {
         let mut emptys = EmptyDomains::None;
-        let mut domain = Domain::empty();
-        for d in &vec {
+        let mut new_domain = Domain::empty();
+        for d in &union {
             let sub_domain = &st.domains[*d].domain;
-            domain = st.union(&sub_domain, &domain);
+            new_domain = st.union(&sub_domain, &new_domain);
         }
         let ancient_domain = &st.domains[*id].domain;
-        let new_domain = st.meet(ancient_domain, &domain);
+        let new_domain = st.meet(ancient_domain, &new_domain);
         st.domains[*id].domain = new_domain;
 
         if st.domains[*id].domain.is_empty() {
@@ -41,19 +56,30 @@ pub(crate) fn union_update(vec: Vec<AtomId>) -> UpdateClosure {
     }))
 }
 
-pub(crate) fn composed_constraint(atom: AtomId) -> ConstraintClosure {
-    Rc::new(Box::new(move |st, id: &AtomId, domain, proc| {
-        let mut emptys = EmptyDomains::None;
-        let d = st.get_domain(id, false).unwrap().clone();
-        if let Domain::Composed(t1, _) = d {
-            if let Domain::Composed(t2, subtypes) = domain {
-                if t1 == t2 {
-                    emptys.append(proc(st, &atom, subtypes[0].clone()));
-                }
-            }
-        }
+pub(crate) fn in_composed_update(composed: AtomId) -> UpdateClosure {
+    Rc::new(Box::new(move |st, id: &AtomId| {
+        let composed = st.get_parent(&composed);
+        let composed = st.domains[composed].domain.clone();
 
-        emptys
+        if composed.is_empty() {
+            st.domains[*id].domain = Domain::empty();
+            EmptyDomains::Some(vec![*id])
+        } else if let Domain::Composed(t, s) = composed {
+            let sub = s[0].clone();
+            let ancient_domain = &st.domains[*id].domain;
+            let new_domain = st.meet(&sub, ancient_domain);
+            let r = if new_domain.is_empty() {
+                st.domains[*id].domain = Domain::empty();
+                EmptyDomains::Some(vec![*id])
+            } else {
+                EmptyDomains::None
+            };
+            st.domains[*id].domain = new_domain;
+
+            r
+        } else {
+            unreachable!()
+        }
     }))
 }
 
@@ -62,18 +88,23 @@ pub(crate) fn composed_update(atom: AtomId) -> UpdateClosure {
         let atom = st.get_parent(&atom);
         let sub = st.domains[atom].domain.clone();
 
-        if sub.is_empty() {
-            st.domains[*id].domain = Domain::empty();
-            return EmptyDomains::Some(vec![*id]);
-        }
-        let d = match st.domains[*id].domain.clone() {
-            Domain::Simple(t) => Domain::composed(t, vec![sub]),
-            Domain::Composed(t, _) => Domain::composed(t, vec![sub]),
+        let ancient_domain = &st.domains[*id].domain;
+
+        let d = match ancient_domain {
+            Domain::Simple(t) => Domain::composed(*t, vec![sub]),
+            Domain::Composed(t, _) => Domain::composed(*t, vec![sub]),
             _ => unreachable!(),
         };
+        let new_domain = st.meet(&d, &ancient_domain);
 
-        st.domains[*id].domain = d;
-        EmptyDomains::None
+        let r = if new_domain.is_empty() {
+            EmptyDomains::Some(vec![*id])
+        } else {
+            EmptyDomains::None
+        };
+
+        st.domains[*id].domain = new_domain;
+        r
     }))
 }
 

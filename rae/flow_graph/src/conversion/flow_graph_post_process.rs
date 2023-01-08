@@ -9,6 +9,7 @@ use crate::structs::sym_table::lit::Lit;
 use crate::structs::sym_table::{AtomId, EmptyDomains};
 use sompas_structs::lruntimeerror::LRuntimeError;
 use std::collections::VecDeque;
+use std::rc::Rc;
 
 const FLOW_GRAPH_POST_PROCESS: &str = "flow_graph_post_process";
 const INVALID_FLOWS: &str = "invalid_flows";
@@ -35,6 +36,8 @@ pub fn propagate(
     while let Some(post_process) = queue.pop_front() {
         match post_process {
             Subtract(id, d) => {
+                let id = graph.sym_table.get_parent(&id);
+                println!("Subtract({id}, {})", graph.sym_table.format_domain(&d));
                 let emptys = graph.sym_table.substract_to_domain(&id, d);
                 if let EmptyDomains::Some(emptys) = emptys {
                     println!("[Subtract] Domains of {:?} are empty.", emptys);
@@ -46,6 +49,9 @@ pub fn propagate(
                 }
             }
             Meet(id, d) => {
+                let id = graph.sym_table.get_parent(&id);
+                println!("Meet({id}, {})", graph.sym_table.format_domain(&d));
+
                 let emptys = graph.sym_table.meet_to_domain(&id, d);
                 if let EmptyDomains::Some(emptys) = emptys {
                     println!("[Meet] Domains of {:?} are empty.", emptys);
@@ -57,6 +63,9 @@ pub fn propagate(
                 }
             }
             Bind(id1, id2) => {
+                let id1 = graph.sym_table.get_parent(&id1);
+                let id2 = graph.sym_table.get_parent(&id2);
+                println!("Bind({id1}, {id2})");
                 if let EmptyDomains::Some(emptys) = graph.sym_table.try_union_atom(&id1, &id2) {
                     println!("[Bind] Domains of {:?} are empty.", emptys);
                     for e in &emptys {
@@ -67,6 +76,7 @@ pub fn propagate(
                 }
             }
             Invalid(ref id) => {
+                println!("Invalid({id})");
                 if graph.is_valid(id) {
                     graph.invalidate(id);
                     let kind = graph.get_kind(id).clone();
@@ -103,6 +113,7 @@ pub fn propagate(
                 }
             }
         }
+        println!("{}", graph.sym_table);
     }
     graph.flat_bindings();
 

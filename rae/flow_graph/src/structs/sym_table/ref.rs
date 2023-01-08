@@ -1,13 +1,14 @@
 use crate::structs::chronicle::interval::Interval;
 use crate::structs::domain::basic_type::BasicType;
 use crate::structs::domain::Domain;
-use crate::structs::sym_table::closure::{ConstraintClosure, UpdateClosure};
+use crate::structs::sym_table::closure::UpdateClosure;
 use crate::structs::sym_table::forest::Node;
 use crate::structs::sym_table::var_domain::VarDomain;
 use crate::structs::sym_table::{AtomId, EmptyDomains, SymTable};
 use sompas_structs::lnumber::LNumber;
 use std::borrow::Borrow;
 use std::cell::RefCell;
+use std::collections::VecDeque;
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 
@@ -64,6 +65,10 @@ impl RefSymTable {
 
     pub fn new_bool(&mut self, b: bool) -> AtomId {
         RefCell::borrow_mut(&self.0).new_bool(b)
+    }
+
+    pub fn new_nil(&mut self) -> AtomId {
+        RefCell::borrow_mut(&self.0).new_nil()
     }
 
     pub fn new_int(&mut self, i: i64) -> AtomId {
@@ -207,25 +212,21 @@ impl RefSymTable {
         RefCell::borrow_mut(&self.0).set_domain(id, domain)
     }
 
-    pub fn add_constraint(
+    /*pub fn add_constraint(
         &mut self,
         id: &AtomId,
         constraint: ConstraintClosure,
         update: UpdateClosure,
     ) {
         RefCell::borrow_mut(&self.0).add_constraint(id, constraint, update)
-    }
+    }*/
 
-    pub fn add_update(&mut self, id: &AtomId, update: UpdateClosure) {
-        RefCell::borrow_mut(&self.0).add_update(id, update)
-    }
-
-    pub fn add_union_constraint(&mut self, id: &AtomId, union: Vec<AtomId>) {
-        RefCell::borrow_mut(&self.0).add_union_constraint(id, union)
-    }
-
-    pub fn add_dependent(&mut self, id: &AtomId, parent: AtomId) {
-        RefCell::borrow_mut(&self.0).add_dependent(id, parent)
+    pub fn add_update(&mut self, id: &AtomId, depends_on: Vec<AtomId>, update: UpdateClosure) {
+        RefCell::borrow_mut(&self.0).add_update(id, update);
+        for depends in depends_on {
+            RefCell::borrow_mut(&self.0).add_dependent(&depends, *id);
+        }
+        RefCell::borrow_mut(&self.0).update_domains(vec![*id].into());
     }
 
     pub fn contained_in_domain(&self, d1: &Domain, d2: &Domain) -> bool {
@@ -255,8 +256,12 @@ impl RefSymTable {
         RefCell::borrow(&self.0).format_variable(id)
     }
 
-    pub fn format_domain(&self, id: &AtomId) -> String {
-        RefCell::borrow(&self.0).format_domain(id)
+    pub fn format_domain(&self, domain: &Domain) -> String {
+        RefCell::borrow(&self.0).format_domain(domain)
+    }
+
+    pub fn format_atom_domain(&self, id: &AtomId) -> String {
+        RefCell::borrow(&self.0).format_atom_domain(id)
     }
 }
 
@@ -274,7 +279,7 @@ impl Display for RefSymTable {
                     "- ({}){}({})\n",
                     e,
                     self.format_variable(&e),
-                    self.format_domain(&e),
+                    self.format_atom_domain(&e),
                 )?;
             }
         }

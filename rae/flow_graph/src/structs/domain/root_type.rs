@@ -20,10 +20,12 @@ pub enum RootType {
     EmptyList = 11,
     True = 12,
     False = 13,
+    Nil = 14,
 }
 
 pub const TRUE_ID: usize = 12;
 pub const FALSE_ID: usize = 13;
+pub const NIL_ID: usize = 14;
 
 impl TryFrom<TypeId> for RootType {
     type Error = ();
@@ -44,6 +46,7 @@ impl TryFrom<TypeId> for RootType {
             11 => EmptyList,
             12 => True,
             13 => False,
+            14 => Nil,
             _ => return Result::Err(()),
         })
     }
@@ -66,6 +69,7 @@ impl Display for RootType {
             EmptyList => write!(f, "EmptyList"),
             True => write!(f, "True"),
             False => write!(f, "False"),
+            Nil => write!(f, "Nil"),
         }
     }
 }

@@ -2,7 +2,6 @@ use crate::structs::domain::root_type::RootType;
 use crate::structs::domain::root_type::RootType::Boolean;
 use crate::structs::flow_graph::flow::{BranchingFlow, FlowId};
 use crate::structs::flow_graph::handle_table::Handle;
-use crate::structs::sym_table::closure::ConstraintClosure;
 use crate::structs::sym_table::lit::{lvalue_to_lit, Lit};
 use crate::structs::sym_table::{closure, AtomId};
 use crate::{DefineTable, FlowGraph};
@@ -30,7 +29,7 @@ pub fn convert_into_flow_graph(
         LValue::Primitive(co) => convert_core_operator(co, fl),
         LValue::List(l) => convert_list(l, fl, define_table)?,
         LValue::True => convert_bool(true, fl),
-        LValue::Nil => convert_bool(false, fl),
+        LValue::Nil => convert_nil(fl),
         lv => {
             return Err(LRuntimeError::new(
                 "convert",
@@ -64,6 +63,11 @@ fn convert_number(number: &LNumber, fl: &mut FlowGraph) -> FlowId {
 
 fn convert_bool(bool: bool, fl: &mut FlowGraph) -> FlowId {
     let id = fl.sym_table.new_bool(bool);
+    fl.new_instantaneous_assignment(Lit::Atom(id))
+}
+
+fn convert_nil(fl: &mut FlowGraph) -> FlowId {
+    let id = fl.sym_table.new_nil();
     fl.new_instantaneous_assignment(Lit::Atom(id))
 }
 
@@ -110,11 +114,6 @@ fn convert_list(
                 let cond_result = fl.get_flow_result(&cond_flow);
                 fl.sym_table.meet_to_domain(&cond_result, Boolean);
 
-                /*let domain = fl.sym_table.meet_domain(
-                    &fl.sym_table.get_domain(&cond_result, false).unwrap(),
-                    &Boolean.into(),
-                );
-                fl.sym_table.set_domain(&cond_result, domain);*/
                 let true_flow = convert_into_flow_graph(true_branch, fl, define_table)?;
                 let true_flow = fl.new_seq(vec![true_flow]);
                 let false_flow = convert_into_flow_graph(false_branch, fl, define_table)?;
@@ -122,23 +121,27 @@ fn convert_list(
                 let true_result = fl.get_flow_result(&true_flow);
                 let false_result = fl.get_flow_result(&false_flow);
 
-                /*let vertice_result = fl.get_vertice_result(&vertice_id);
-                let interval = *fl.get_vertice_interval(&vertice_id);
-                let mut vertice = &mut fl.vertices[vertice_id_2];
-                vertice.result = vertice_result;
-                vertice.interval = interval;
-
-                let true_result_flow = fl.new_flow(vertice_id);
-                let true_flow = fl.merge_flow(&true_flow, &true_result_flow);
-
-                let false_result_flow = fl.new_flow(vertice_id_2);
-                let false_flow = fl.merge_flow(&false_flow, &false_result_flow);*/
-
                 let result = fl.sym_table.new_result();
-                fl.sym_table
+
+                fl.sym_table.add_update(
+                    &result,
+                    vec![true_result, false_result],
+                    closure::union_update(vec![true_result, false_result]),
+                );
+                fl.sym_table.add_update(
+                    &true_result,
+                    vec![result],
+                    closure::in_union_update(result),
+                );
+                fl.sym_table.add_update(
+                    &false_result,
+                    vec![result],
+                    closure::in_union_update(result),
+                );
+                /*fl.sym_table
                     .add_union_constraint(&result, vec![true_result, false_result]);
                 fl.sym_table.add_dependent(&true_result, result);
-                fl.sym_table.add_dependent(&false_result, result);
+                fl.sym_table.add_dependent(&false_result, result);*/
 
                 let result = fl.new_result(result);
 
@@ -176,13 +179,24 @@ fn convert_list(
 
                 let handle_id = fl.sym_table.new_handle();
 
-                fl.sym_table.add_constraint(
+                /*fl.sym_table.add_constraint(
                     &handle_id,
                     closure::composed_constraint(r_async),
                     closure::composed_update(r_async),
+                );*/
+
+                fl.sym_table.add_update(
+                    &handle_id,
+                    vec![r_async],
+                    closure::composed_update(r_async),
+                );
+                fl.sym_table.add_update(
+                    &r_async,
+                    vec![handle_id],
+                    closure::in_composed_update(handle_id),
                 );
 
-                fl.sym_table.add_dependent(&r_async, handle_id);
+                //fl.sym_table.add_dependent(&r_async, handle_id);
 
                 let handle = Handle {
                     result: fl.get_flow_result(&async_flow_id),
@@ -221,13 +235,17 @@ fn convert_list(
 
                 fl.sym_table.set_domain(&err_result, RootType::Err);
 
-                fl.sym_table.add_constraint(
+                fl.sym_table.add_update(
                     &err_result,
-                    closure::composed_constraint(arg_err_result),
+                    vec![arg_err_result],
                     closure::composed_update(arg_err_result),
                 );
+                fl.sym_table.add_update(
+                    &arg_err_result,
+                    vec![err_result],
+                    closure::in_composed_update(err_result),
+                );
 
-                fl.sym_table.add_dependent(&arg_err_result, err_result);
                 Ok(fl.new_seq(vec![arg_err, flow]))
             }
             LPrimitives::Race => {
@@ -270,12 +288,16 @@ fn convert_apply(
             fl.sym_table.set_domain(&result_is_err, Boolean);
             assert_eq!(seq.len(), 2);
             let arg_is_err = fl.get_flow_result(&seq[1]);
-            fl.sym_table
-                .add_update(&arg_is_err, closure::arg_is_err_update(result_is_err));
-            fl.sym_table.add_dependent(&result_is_err, arg_is_err);
-            fl.sym_table
-                .add_update(&result_is_err, closure::result_is_err_update(arg_is_err));
-            fl.sym_table.add_dependent(&arg_is_err, result_is_err);
+            fl.sym_table.add_update(
+                &arg_is_err,
+                vec![result_is_err],
+                closure::arg_is_err_update(result_is_err),
+            );
+            fl.sym_table.add_update(
+                &result_is_err,
+                vec![arg_is_err],
+                closure::result_is_err_update(arg_is_err),
+            );
         }
         _ => {}
     }

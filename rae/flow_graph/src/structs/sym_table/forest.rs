@@ -199,6 +199,7 @@ impl<T: Display + Default + Clone> Forest<T> {
             self.set_parent(&y_root, &x_root);
             self.set_rank(&x_root, self.get_rank(&x_root) + 1)
         }
+        self.flat_bindings()
     }
 
     pub fn find(&mut self, x: &NodeId) -> &NodeId {

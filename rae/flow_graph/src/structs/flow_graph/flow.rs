@@ -51,6 +51,7 @@ where
 
 #[derive(Clone)]
 pub struct BranchingFlow {
+    pub branch: Option<bool>,
     pub cond_flow: FlowId,
     pub true_flow: FlowId,
     pub false_flow: FlowId,

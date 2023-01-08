@@ -2,6 +2,7 @@ use crate::structs::domain::root_type::RootType;
 use crate::structs::domain::root_type::RootType::Boolean;
 use crate::structs::flow_graph::flow::{BranchingFlow, FlowId};
 use crate::structs::flow_graph::handle_table::Handle;
+use crate::structs::sym_table::closure::Update;
 use crate::structs::sym_table::lit::{lvalue_to_lit, Lit};
 use crate::structs::sym_table::{closure, AtomId};
 use crate::{DefineTable, FlowGraph};
@@ -124,19 +125,19 @@ fn convert_list(
                 let result = fl.sym_table.new_result();
 
                 fl.sym_table.add_update(
-                    &result,
                     vec![true_result, false_result],
-                    closure::union_update(vec![true_result, false_result]),
+                    Update::new(
+                        result,
+                        closure::union_update(result, vec![true_result, false_result]),
+                    ),
                 );
                 fl.sym_table.add_update(
-                    &true_result,
                     vec![result],
-                    closure::in_union_update(result),
+                    Update::new(true_result, closure::in_union_update(true_result, result)),
                 );
                 fl.sym_table.add_update(
-                    &false_result,
                     vec![result],
-                    closure::in_union_update(result),
+                    Update::new(false_result, closure::in_union_update(false_result, result)),
                 );
                 /*fl.sym_table
                     .add_union_constraint(&result, vec![true_result, false_result]);
@@ -146,6 +147,7 @@ fn convert_list(
                 let result = fl.new_result(result);
 
                 let branching = BranchingFlow {
+                    branch: None,
                     cond_flow,
                     true_flow,
                     false_flow,
@@ -186,14 +188,12 @@ fn convert_list(
                 );*/
 
                 fl.sym_table.add_update(
-                    &handle_id,
                     vec![r_async],
-                    closure::composed_update(r_async),
+                    Update::new(handle_id, closure::composed_update(handle_id, r_async)),
                 );
                 fl.sym_table.add_update(
-                    &r_async,
                     vec![handle_id],
-                    closure::in_composed_update(handle_id),
+                    Update::new(r_async, closure::in_composed_update(r_async, handle_id)),
                 );
 
                 //fl.sym_table.add_dependent(&r_async, handle_id);
@@ -236,14 +236,18 @@ fn convert_list(
                 fl.sym_table.set_domain(&err_result, RootType::Err);
 
                 fl.sym_table.add_update(
-                    &err_result,
                     vec![arg_err_result],
-                    closure::composed_update(arg_err_result),
+                    Update::new(
+                        err_result,
+                        closure::composed_update(err_result, arg_err_result),
+                    ),
                 );
                 fl.sym_table.add_update(
-                    &arg_err_result,
                     vec![err_result],
-                    closure::in_composed_update(err_result),
+                    Update::new(
+                        arg_err_result,
+                        closure::in_composed_update(arg_err_result, err_result),
+                    ),
                 );
 
                 Ok(fl.new_seq(vec![arg_err, flow]))
@@ -289,14 +293,18 @@ fn convert_apply(
             assert_eq!(seq.len(), 2);
             let arg_is_err = fl.get_flow_result(&seq[1]);
             fl.sym_table.add_update(
-                &arg_is_err,
                 vec![result_is_err],
-                closure::arg_is_err_update(result_is_err),
+                Update::new(
+                    arg_is_err,
+                    closure::arg_is_err_update(arg_is_err, result_is_err),
+                ),
             );
             fl.sym_table.add_update(
-                &result_is_err,
                 vec![arg_is_err],
-                closure::result_is_err_update(arg_is_err),
+                Update::new(
+                    result_is_err,
+                    closure::result_is_err_update(result_is_err, arg_is_err),
+                ),
             );
         }
         _ => {}

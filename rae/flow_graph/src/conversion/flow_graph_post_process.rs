@@ -87,19 +87,21 @@ pub fn propagate(
                             {
                                 let cond_result = &graph.get_flow_result(&branching.cond_flow);
                                 queue.push_back(Meet(*cond_result, False.into()));
-                                let new_flow = graph
+                                graph.set_branch(id, false);
+                                /*let new_flow = graph
                                     .merge_flows(vec![branching.cond_flow, branching.false_flow]);
 
-                                graph.set_kind(id, new_flow);
+                                graph.set_kind(id, new_flow);*/
                                 //graph.update_flow(&flow.parent.unwrap());
                             } else if graph.is_valid(&branching.true_flow)
                                 && !graph.is_valid(&branching.false_flow)
                             {
                                 let cond_result = &graph.get_flow_result(&branching.cond_flow);
+                                graph.set_branch(id, true);
                                 queue.push_back(Meet(*cond_result, True.into()));
-                                let new_flow = graph
+                                /*let new_flow = graph
                                     .merge_flows(vec![branching.cond_flow, branching.true_flow]);
-                                graph.set_kind(id, new_flow);
+                                graph.set_kind(id, new_flow);*/
                             } else {
                                 queue.push_back(Invalid(graph.get_parent(id).unwrap()));
                             }

@@ -1,14 +1,13 @@
 use crate::structs::chronicle::interval::Interval;
 use crate::structs::domain::basic_type::BasicType;
 use crate::structs::domain::Domain;
-use crate::structs::sym_table::closure::UpdateClosure;
+use crate::structs::sym_table::closure::{Update, UpdateClosure};
 use crate::structs::sym_table::forest::Node;
 use crate::structs::sym_table::var_domain::VarDomain;
 use crate::structs::sym_table::{AtomId, EmptyDomains, SymTable};
 use sompas_structs::lnumber::LNumber;
 use std::borrow::Borrow;
 use std::cell::RefCell;
-use std::collections::VecDeque;
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 
@@ -16,26 +15,6 @@ use std::rc::Rc;
 pub struct RefSymTable(Rc<RefCell<SymTable>>);
 
 impl RefSymTable {
-    /*fn add_basic_types(&mut self) {
-        RefCell::borrow_mut(&self.0).add_basic_types();
-    }*/
-
-    /*pub fn get_type_id(&self, symbol: impl ToString) -> Option<TypeId> {
-        RefCell::borrow(&self.0).get_type_id(symbol)
-    }
-
-    pub fn get_type_string(&self, id: &TypeId) -> Option<String> {
-        RefCell::borrow(&self.0).get_type_string(id)
-    }*/
-
-    /*pub fn add_list_of_symbols_of_same_type(
-        &mut self,
-        list: Vec<&str>,
-        sym_type: Option<AtomType>,
-    ) -> lruntimeerror::Result<()> {
-        RefCell::borrow_mut(&self.0).add_list_of_symbols_of_same_type(list, sym_type)
-    }*/
-
     /*
     SCOPES FUNCTIONS
      */
@@ -221,12 +200,8 @@ impl RefSymTable {
         RefCell::borrow_mut(&self.0).add_constraint(id, constraint, update)
     }*/
 
-    pub fn add_update(&mut self, id: &AtomId, depends_on: Vec<AtomId>, update: UpdateClosure) {
-        RefCell::borrow_mut(&self.0).add_update(id, update);
-        for depends in depends_on {
-            RefCell::borrow_mut(&self.0).add_dependent(&depends, *id);
-        }
-        RefCell::borrow_mut(&self.0).update_domains(vec![*id].into());
+    pub fn add_update(&mut self, elements: Vec<AtomId>, update: Update) {
+        RefCell::borrow_mut(&self.0).add_update(elements, update);
     }
 
     pub fn contained_in_domain(&self, d1: &Domain, d2: &Domain) -> bool {

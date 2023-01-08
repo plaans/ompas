@@ -47,6 +47,16 @@ impl FlowGraph {
         &self.flows[*flow].kind
     }
 
+    pub fn get_mut_kind(&mut self, flow: &FlowId) -> &mut FlowKind {
+        &mut self.flows[*flow].kind
+    }
+
+    pub fn set_branch(&mut self, flow: &FlowId, branch: bool) {
+        if let FlowKind::Branching(br) = &mut self.flows[*flow].kind {
+            br.branch = Some(branch)
+        }
+    }
+
     pub fn set_kind(&mut self, flow: &FlowId, kind: FlowKind) {
         self.flows[*flow].kind = kind
     }
@@ -198,7 +208,7 @@ impl FlowGraph {
     }
 
     pub fn update_flow(&mut self, id: &FlowId) {
-        let kind = if let FlowKind::Seq(seq, r) = self.flows[*id].kind.clone() {
+        let kind = if let FlowKind::Seq(seq, _) = self.flows[*id].kind.clone() {
             self.merge_flows(seq)
         } else {
             self.flows[*id].kind.clone()

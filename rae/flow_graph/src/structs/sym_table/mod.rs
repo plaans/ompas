@@ -15,11 +15,12 @@ use crate::structs::sym_table::forest::{Forest, Node, NodeId};
 use crate::structs::sym_table::id::SymbolTableId;
 use crate::structs::sym_table::meta_data::SymTableMetaData;
 use std::collections::VecDeque;
+use std::env::var;
 //use ompas_rae_language::exec::state::{ASSERT, INSTANCE, RETRACT};
 //use sompas_language::primitives::DO;
 use crate::structs::domain::basic_type::BasicType;
 use crate::structs::domain::root_type::RootType;
-use crate::structs::sym_table::closure::{Proc, UpdateClosure};
+use crate::structs::sym_table::closure::{Update, UpdateClosure};
 use crate::structs::sym_table::r#ref::RefSymTable;
 use crate::structs::sym_table::var_domain::VarDomain;
 use sompas_language::kind::NIL;
@@ -57,6 +58,11 @@ pub type AtomId = NodeId;
 pub enum EmptyDomains {
     None,
     Some(Vec<AtomId>),
+}
+
+pub struct UpdateDomain {
+    id: AtomId,
+    modified: Vec<AtomId>,
 }
 
 impl EmptyDomains {
@@ -369,23 +375,18 @@ impl SymTable {
         self.substract(d1, d2)
     }
 
-    pub fn update_domains(&mut self, mut queue: VecDeque<AtomId>) -> EmptyDomains {
+    pub fn update_domains(&mut self, mut queue: VecDeque<Update>) -> EmptyDomains {
         let mut emptys = EmptyDomains::None;
 
-        while let Some(id) = queue.pop_front() {
-            let id = self.get_parent(&id);
+        while let Some(update) = queue.pop_front() {
+            let id = self.get_parent(&update.id);
             let d = self.domains[id].domain.clone();
 
-            for update in self.domains[id].updates.clone() {
-                emptys.append(update(self, &id));
-            }
+            emptys.append((update.closure)(self));
 
             if d != self.domains[id].domain {
                 //queue.push_back()
-                for depend in &self.domains[id].dependents.clone() {
-                    queue.push_back(self.get_parent(depend));
-                    //emptys.append(self.update_domain(depend));
-                }
+                queue.append(&mut self.domains[id].updates.clone().into());
             }
         }
 
@@ -422,7 +423,7 @@ impl SymTable {
 
         self.domains[*id].domain = d;
 
-        emptys.append(self.update_domains(var_domain.dependents.clone().into()));
+        emptys.append(self.update_domains(var_domain.updates.clone().into()));
 
         emptys
     }
@@ -444,7 +445,7 @@ impl SymTable {
 
         self.domains[*id].domain = d;
 
-        emptys.append(self.update_domains(var_domain.dependents.clone().into()));
+        emptys.append(self.update_domains(var_domain.updates.clone().into()));
 
         emptys
     }
@@ -462,7 +463,7 @@ impl SymTable {
 
         self.domains[*id].domain = domain;
 
-        emptys.append(self.update_domains(var_domain.dependents.clone().into()));
+        emptys.append(self.update_domains(var_domain.updates.clone().into()));
 
         emptys
     }
@@ -477,8 +478,12 @@ impl SymTable {
         self.domains[*id].updates.push(update);
     }*/
 
-    pub fn add_update(&mut self, id: &AtomId, update: UpdateClosure) {
-        self.domains[*id].updates.push(update);
+    pub fn add_update(&mut self, elements: Vec<AtomId>, update: Update) {
+        for element in elements {
+            self.domains[element].updates.push(update.clone());
+        }
+
+        self.update_domains(vec![update].into());
     }
 
     /*pub fn add_union_constraint(&mut self, id: &AtomId, union: Vec<AtomId>) {
@@ -487,10 +492,6 @@ impl SymTable {
             .push(closure::union_constraint(union.clone()));
         self.domains[*id].updates.push(closure::union_update(union));
     }*/
-
-    pub fn add_dependent(&mut self, id: &AtomId, dependent: AtomId) {
-        self.domains[*id].dependents.push(dependent);
-    }
 
     pub fn contained_in_domain(&self, d1: &Domain, d2: &Domain) -> bool {
         self.lattice.contained_in(d1, d2)
@@ -523,11 +524,8 @@ impl SymTable {
         let d2 = self.domains[p2].domain.clone();
         let mut updates = self.domains[p1].updates.clone();
         updates.append(&mut self.domains[p2].updates.clone());
-        let mut depends = self.domains[p1].dependents.clone();
-        depends.append(&mut self.domains[p2].dependents.clone());
 
         self.domains[p1].updates = updates.clone();
-        self.domains[p1].dependents = depends.clone();
         self.domains.union_ordered(&p1, &p2);
 
         let r = self.meet_to_domain(&p1, d2);
@@ -560,13 +558,13 @@ impl SymTable {
         let domain = &self.domains[*id];
         let mut str = format!("domain = {}", domain.domain.format(&self.lattice));
 
-        if !domain.dependents.is_empty() {
+        if !domain.updates.is_empty() {
             write!(str, ", dependent(s) = {{");
-            for (i, id) in domain.dependents.iter().enumerate() {
+            for (i, up) in domain.updates.iter().enumerate() {
                 if i != 0 {
                     str.push(',');
                 }
-                write!(str, "{}", self.get_parent(id)).unwrap();
+                write!(str, "{}", self.get_parent(&up.id)).unwrap();
             }
 
             write!(str, "}}").unwrap();

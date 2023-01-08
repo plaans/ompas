@@ -263,9 +263,8 @@ impl TypeLattice {
             }
             (Union(ua), t) => {
                 let mut meets: HashSet<Domain> = Default::default();
-                let mut meet = Simple(Empty as usize);
                 for tu in ua {
-                    meet = self.__meet(tu, t);
+                    let meet = self.__meet(tu, t);
                     if meet != Simple(Empty as usize) {
                         meets.insert(meet);
                     }
@@ -274,9 +273,8 @@ impl TypeLattice {
             }
             (t, Union(ub)) => {
                 let mut meets: HashSet<Domain> = Default::default();
-                let mut meet = Simple(Empty as usize);
                 for tu in ub {
-                    meet = self.__meet(t, tu);
+                    let meet = self.__meet(t, tu);
                     if meet != Simple(Empty as usize) {
                         meets.insert(meet);
                     }

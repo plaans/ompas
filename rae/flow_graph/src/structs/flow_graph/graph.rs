@@ -239,36 +239,6 @@ impl FlowGraph {
         FlowKind::Seq(seq, result)
     }
 
-    /*pub fn merge_flow(&mut self, f1_id: &FlowId, f2_id: &FlowId) -> FlowId {
-        let f1 = &self.flows[*f1_id];
-        let f2 = &self.flows[*f2_id];
-
-        let flow: FlowKind = match (&f1.kind, &f2.kind) {
-            (FlowKind::Seq(s1, _), FlowKind::Seq(s2, r)) => {
-                let mut seq = s1.clone();
-                seq.append(&mut s2.clone());
-                FlowKind::Seq(seq, *r)
-            }
-            (FlowKind::Seq(s1, _), _) => {
-                let mut seq = s1.clone();
-                seq.push(*f2_id);
-                let result = self.get_flow_result(f2_id);
-                let result = self.new_result(result);
-                FlowKind::Seq(seq, result)
-            }
-            (_, FlowKind::Seq(s2, r)) => {
-                let mut seq = vec![*f1_id];
-                seq.append(&mut s2.clone());
-                FlowKind::Seq(seq, *r)
-            }
-            (_, _) => {
-                let result = self.get_flow_result(f2_id);
-                let result = self.new_result(result);
-                FlowKind::Seq(vec![*f1_id, *f2_id], result)
-            }
-        };
-    }*/
-
     pub fn get(&self, id: &VerticeId) -> Option<&Flow> {
         self.flows.get(*id)
     }
@@ -286,12 +256,18 @@ impl FlowGraph {
         let mut dot = "".to_string();
         let mut start = None;
         let end;
+        let flow = &self.flows[*id];
+
+        let color = match flow.valid {
+            true => VALID_COLOR,
+            false => INVALID_COLOR,
+        };
 
         match &self.flows[*id].kind {
             FlowKind::Assignment(v) => {
                 dot.push_str(
                     format!(
-                        "V{id} [label= \"{}: {} <- {}\"];\n",
+                        "V{id} [label= \"{}: {} <- {}\", color = {color}];\n",
                         v.interval.format(sym_table, false),
                         v.result.format(sym_table, false),
                         v.lit.format(sym_table, false),
@@ -302,19 +278,45 @@ impl FlowGraph {
                 end = Some(*id);
             }
             FlowKind::Branching(branching) => {
-                let label = match branching.branch {
-                    None => format!("branching_{id}"),
-                    Some(true) => format!("branching_{id}(branch = true)"),
-                    Some(false) => format!("branching_{id}(branch = false)"),
+                let cond_result = self.get_flow_result(&branching.cond_flow);
+                let val = self.sym_table.get_domain(&cond_result, true).unwrap();
+
+                let branch = if val.is_true() {
+                    Some(true)
+                } else if val.is_false() {
+                    Some(false)
+                } else {
+                    None
                 };
+
+                let (label, color_branch_true, color_branch_false) = match branch {
+                    None => (format!("branching_{id}"), "black", "black"),
+                    Some(true) => (
+                        format!("branching_{id}(branch = true)"),
+                        GOOD_BRANCH,
+                        BAD_BRANCH,
+                    ),
+                    Some(false) => (
+                        format!("branching_{id}(branch = false)",),
+                        BAD_BRANCH,
+                        GOOD_BRANCH,
+                    ),
+                };
+
+                /*write!(
+                    dot,
+                    "subgraph cluster_{id} {{\n
+                    label = \"{label}\";
+                    color={color};
+                    \n"
+                );*/
 
                 write!(
                     dot,
                     "subgraph cluster_{id} {{\n
-                    label = \"{label}\";
-                    color=blue;
                     \n"
                 );
+
                 let (cond_dot, (cond_start, cond_end)) = self.export_flow(&branching.cond_flow);
                 let cond = self
                     .sym_table
@@ -325,23 +327,41 @@ impl FlowGraph {
                 let (false_dot, (false_start, false_end)) = self.export_flow(&branching.false_flow);
                 let (result_dot, (result_start, result_end)) = self.export_flow(&branching.result);
                 write!(dot, "{cond_dot}{true_dot}{false_dot}{result_dot}").unwrap();
-                write!(dot, "V{cond_end} -> V{true_start} [label = \"{cond}\"];\n",).unwrap();
                 write!(
                     dot,
-                    "V{cond_end} -> V{false_start} [label = \"!{cond}\"];\n",
+                    "V{cond_end} -> V{true_start} [label = \"{cond}\", {color_branch_true}];\n",
                 )
                 .unwrap();
-                write!(dot, "V{true_end} -> V{result_start};\n").unwrap();
-                write!(dot, "V{false_end}-> V{result_start};\n").unwrap();
+                write!(
+                    dot,
+                    "V{cond_end} -> V{false_start} [label = \"!{cond}\", {color_branch_false}];\n",
+                )
+                .unwrap();
+                write!(
+                    dot,
+                    "V{true_end} -> V{result_start} [{color_branch_true}];\n"
+                )
+                .unwrap();
+                write!(
+                    dot,
+                    "V{false_end}-> V{result_start} [{color_branch_false}];\n"
+                )
+                .unwrap();
                 end = Some(result_end);
                 write!(dot, "}}\n");
             }
             FlowKind::Seq(seq, r) => {
-                write!(
+                /*write!(
                     dot,
                     "subgraph cluster_{id} {{\n
                     label = \"seq_{id}\";
-                    color=black;
+                    color={color};
+                    \n"
+                );*/
+
+                write!(
+                    dot,
+                    "subgraph cluster_{id} {{\n
                     \n"
                 );
                 let mut previous_end = None;
@@ -351,7 +371,7 @@ impl FlowGraph {
                     let (f_dot, (f_start, f_end)) = self.export_flow(&f);
                     write!(dot, "{}", f_dot).unwrap();
                     if let Some(end) = previous_end {
-                        write!(dot, "V{end} -> V{f_start};\n").unwrap();
+                        write!(dot, "V{end} -> V{f_start} [color = {color}];\n").unwrap();
                     }
                     if start == None {
                         start = Some(f_start)
@@ -363,7 +383,11 @@ impl FlowGraph {
             }
             FlowKind::FlowResult(fr) => {
                 dot.push_str(
-                    format!("V{id} [label= \"{}\"];\n", fr.format(sym_table, false),).as_str(),
+                    format!(
+                        "V{id} [label= \"{}\", color = {color}];\n",
+                        fr.format(sym_table, false),
+                    )
+                    .as_str(),
                 );
                 start = Some(*id);
                 end = Some(*id);
@@ -413,3 +437,7 @@ pub const TIMEPOINT_PREFIX: char = 't';
 pub const BRANCHING_ARROW: &str = "->";
 pub const DASHED_ATTRIBUTE: &str = "[style = dashed]";
 pub const PAR_ARROW: &str = "->";
+pub const GOOD_BRANCH: &str = "color= green";
+pub const BAD_BRANCH: &str = "color= red, style =dashed";
+pub const VALID_COLOR: &str = "green";
+pub const INVALID_COLOR: &str = "red";

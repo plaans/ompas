@@ -1,3 +1,4 @@
+use crate::structs::domain::root_type::RootType::{False, True};
 use crate::structs::domain::root_type::{RootType, FALSE_ID, TRUE_ID};
 use crate::structs::domain::Domain;
 use crate::structs::sym_table::{AtomId, EmptyDomains, SymTable};
@@ -175,5 +176,60 @@ pub(crate) fn arg_is_err_update(id: AtomId, result_err: AtomId) -> UpdateClosure
 
         st.domains[id].domain = d;
         r
+    }))
+}
+
+pub(crate) fn result_branch_cond_update(
+    cond: AtomId,
+    result_branch: AtomId,
+    branch: bool,
+) -> UpdateClosure {
+    Rc::new(Box::new(move |st| {
+        let cond = st.get_parent(&cond);
+        let result_branch = st.get_parent(&result_branch);
+
+        let mut empty = EmptyDomains::None;
+
+        if st.domains[result_branch].domain.is_empty() {
+            let branch = match branch {
+                true => False.into(),
+                false => True.into(),
+            };
+            let domain = st.meet(&branch, &st.domains[cond].domain);
+            if domain.is_empty() {
+                empty.append(EmptyDomains::Some(vec![cond]))
+            }
+            st.domains[cond].domain = domain
+        }
+
+        empty
+    }))
+}
+
+pub(crate) fn cond_result_branching_update(
+    cond: AtomId,
+    result_branching: AtomId,
+    true_result: AtomId,
+    false_result: AtomId,
+) -> UpdateClosure {
+    Rc::new(Box::new(move |st| {
+        let cond = st.get_parent(&cond);
+        let true_result = st.get_parent(&true_result);
+        let false_result = st.get_parent(&false_result);
+        let result_branching = st.get_parent(&result_branching);
+
+        let mut empty = EmptyDomains::None;
+
+        if st.domains[cond].domain.is_true() {
+            st.remove_update(&false_result, &result_branching);
+            st.remove_update(&result_branching, &false_result);
+            empty.append(st.union_atom(&true_result, &result_branching));
+        } else if st.domains[cond].domain.is_false() {
+            st.remove_update(&true_result, &result_branching);
+            st.remove_update(&result_branching, &true_result);
+            empty.append(st.union_atom(&false_result, &result_branching));
+        }
+
+        empty
     }))
 }

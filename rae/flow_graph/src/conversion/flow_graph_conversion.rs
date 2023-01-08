@@ -139,6 +139,35 @@ fn convert_list(
                     vec![result],
                     Update::new(false_result, closure::in_union_update(false_result, result)),
                 );
+
+                fl.sym_table.add_update(
+                    vec![true_result],
+                    Update::new(
+                        cond_result,
+                        closure::result_branch_cond_update(cond_result, true_result, true),
+                    ),
+                );
+
+                fl.sym_table.add_update(
+                    vec![false_result],
+                    Update::new(
+                        cond_result,
+                        closure::result_branch_cond_update(cond_result, false_result, false),
+                    ),
+                );
+
+                fl.sym_table.add_update(
+                    vec![cond_result],
+                    Update::new(
+                        result,
+                        closure::cond_result_branching_update(
+                            cond_result,
+                            result,
+                            true_result,
+                            false_result,
+                        ),
+                    ),
+                );
                 /*fl.sym_table
                     .add_union_constraint(&result, vec![true_result, false_result]);
                 fl.sym_table.add_dependent(&true_result, result);

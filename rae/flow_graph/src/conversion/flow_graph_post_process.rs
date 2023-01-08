@@ -78,48 +78,19 @@ pub fn propagate(
             Invalid(ref id) => {
                 println!("Invalid({id})");
                 if graph.is_valid(id) {
-                    graph.invalidate(id);
-                    let kind = graph.get_kind(id).clone();
-                    match kind {
-                        FlowKind::Branching(branching) => {
-                            if !graph.is_valid(&branching.true_flow)
-                                && graph.is_valid(&branching.false_flow)
-                            {
-                                let cond_result = &graph.get_flow_result(&branching.cond_flow);
-                                let true_result = graph.get_flow_result(&branching.true_flow);
-                                let result = graph.get_flow_result(&branching.result);
-                                graph.sym_table.remove_update(&result, &true_result);
-                                graph.sym_table.remove_update(&true_result, &result);
-                                queue.push_back(Bind(
-                                    result,
-                                    graph.get_flow_result(&branching.false_flow),
-                                ));
-
-                                graph.set_branch(id, false);
-                                queue.push_back(Meet(*cond_result, False.into()));
-                            } else if graph.is_valid(&branching.true_flow)
-                                && !graph.is_valid(&branching.false_flow)
-                            {
-                                let cond_result = &graph.get_flow_result(&branching.cond_flow);
-                                let false_resut = graph.get_flow_result(&branching.false_flow);
-                                let result = graph.get_flow_result(&branching.result);
-                                graph.sym_table.remove_update(&result, &false_resut);
-                                graph.sym_table.remove_update(&false_resut, &result);
-                                queue.push_back(Bind(
-                                    result,
-                                    graph.get_flow_result(&branching.true_flow),
-                                ));
-
-                                graph.set_branch(id, true);
-                                queue.push_back(Meet(*cond_result, True.into()));
-                            } else {
-                                queue.push_back(Invalid(graph.get_parent(id).unwrap()));
-                            }
+                    if let FlowKind::Branching(br) = graph.get_kind(id) {
+                        if !graph.is_valid(&br.cond_flow)
+                            || !graph.is_valid(&br.result)
+                            || (!graph.is_valid(&br.false_flow) && !graph.is_valid(&br.true_flow))
+                        {
+                            graph.invalidate(id);
                         }
-                        _ => {
-                            if let Some(parent) = graph.get_parent(id) {
-                                queue.push_back(Invalid(*parent))
-                            }
+                    } else {
+                        graph.invalidate(id);
+                    }
+                    if !graph.is_valid(id) {
+                        if let Some(parent) = graph.get_parent(id) {
+                            queue.push_back(Invalid(*parent))
                         }
                     }
                 }

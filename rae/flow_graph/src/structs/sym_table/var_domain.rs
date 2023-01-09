@@ -1,5 +1,7 @@
+use crate::structs::chronicle::interval::Interval;
 use crate::structs::domain::Domain;
 use crate::structs::sym_table::closure::Update;
+use crate::structs::sym_table::AtomId;
 use std::fmt::{Debug, Display, Formatter};
 
 pub type UpdateId = usize;
@@ -8,6 +10,8 @@ pub struct VarDomain {
     pub label: String,
     pub domain: Domain,
     pub updates: Vec<Update>,
+    pub declarations: Vec<AtomId>,
+    pub drops: Vec<AtomId>,
 }
 
 impl VarDomain {
@@ -16,6 +20,8 @@ impl VarDomain {
             label: label.to_string(),
             domain: domain.into(),
             updates: vec![],
+            declarations: vec![],
+            drops: vec![],
         }
     }
 }

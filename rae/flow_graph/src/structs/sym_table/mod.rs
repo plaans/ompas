@@ -85,7 +85,6 @@ pub struct SymTable {
     lattice: TypeLattice,
     ids: SymbolTableId,
     meta_data: SymTableMetaData,
-    scopes: im::HashMap<AtomId, Interval>,
 }
 
 impl Default for SymTable {
@@ -94,7 +93,6 @@ impl Default for SymTable {
             domains: Default::default(),
             ids: Default::default(),
             meta_data: Default::default(),
-            scopes: Default::default(),
             lattice: Default::default(),
         };
 
@@ -116,28 +114,25 @@ impl SymTable {
     /*
     SCOPES FUNCTIONS
      */
-    pub fn scopes(&self) -> im::HashMap<AtomId, Interval> {
-        self.scopes.clone()
+
+    pub fn add_declaration(&mut self, id: &AtomId, start: &AtomId) {
+        let id = self.get_parent(id);
+        self.domains[id].declarations.push(*start);
     }
 
-    pub fn get_scope(&self, id: &AtomId) -> Option<&Interval> {
-        self.scopes.get(id)
+    pub fn add_drop(&mut self, id: &AtomId, end: &AtomId) {
+        let id = self.get_parent(id);
+        self.domains[id].drops.push(*end);
     }
 
-    pub fn get_start(&self, id: &AtomId) -> Option<&AtomId> {
-        self.scopes.get(id).map(|i| i.get_start())
+    pub fn get_declarations(&self, id: &AtomId) -> &Vec<AtomId> {
+        let id = self.get_parent(id);
+        &self.domains[id].declarations
     }
 
-    pub fn get_end(&self, id: &AtomId) -> Option<&AtomId> {
-        self.scopes.get(id).map(|i| i.get_end())
-    }
-
-    pub fn new_scope(&mut self, id: &AtomId, start: &AtomId) {
-        self.scopes.insert(*id, Interval::new_instantaneous(start));
-    }
-
-    pub fn set_end(&mut self, id: &AtomId, end: &AtomId) {
-        self.scopes.get_mut(id).unwrap().set_end(end);
+    pub fn get_drops(&self, id: &AtomId) -> &Vec<AtomId> {
+        let id = self.get_parent(id);
+        &self.domains[id].drops
     }
 
     /*
@@ -383,20 +378,6 @@ impl SymTable {
                 queue.append(&mut self.domains[id].updates.clone().into());
             }
         }
-
-        /*let id = &self.get_parent(id);
-        let mut emptys = EmptyDomains::None;
-        let d = self.domains[*id].domain.clone();
-
-        for update in self.domains[*id].updates.clone() {
-            emptys.append(update(self, id));
-        }
-
-        if d != self.domains[*id].domain {
-            for depend in &self.domains[*id].dependents.clone() {
-                emptys.append(self.update_domain(depend));
-            }
-        }*/
         emptys
     }
 
@@ -462,16 +443,6 @@ impl SymTable {
         emptys
     }
 
-    /*pub fn add_constraint(
-        &mut self,
-        id: &AtomId,
-        constraint: ConstraintClosure,
-        update: UpdateClosure,
-    ) {
-        self.domains[*id].constraints.push(constraint);
-        self.domains[*id].updates.push(update);
-    }*/
-
     pub fn add_update(&mut self, elements: Vec<AtomId>, update: Update) {
         for element in elements {
             if element != update.id {
@@ -522,8 +493,14 @@ impl SymTable {
         let d2 = self.domains[p2].domain.clone();
         let mut updates = self.domains[p1].updates.clone();
         updates.append(&mut self.domains[p2].updates.clone());
+        let mut declarations = self.domains[p1].declarations.clone();
+        declarations.append(&mut self.domains[p2].declarations.clone());
+        let mut drops = self.domains[p1].drops.clone();
+        drops.append(&mut self.domains[p2].drops.clone());
 
         self.domains[p1].updates = updates.clone();
+        self.domains[p1].declarations = declarations;
+        self.domains[p1].drops = drops;
         self.domains.union_ordered(&p1, &p2);
         self.remove_update(&p1, &p1);
 

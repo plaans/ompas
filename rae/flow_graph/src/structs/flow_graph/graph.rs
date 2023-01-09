@@ -2,7 +2,6 @@ use crate::structs::chronicle::interval::Interval;
 use crate::structs::chronicle::{FlatBindings, FormatWithSymTable, GetVariables};
 use crate::structs::flow_graph::assignment::Assignment;
 use crate::structs::flow_graph::flow::{BranchingFlow, Flow, FlowId, FlowKind, FlowResult};
-use crate::structs::flow_graph::handle_table::HandleTable;
 use crate::structs::sym_table::lit::Lit;
 use crate::structs::sym_table::r#ref::RefSymTable;
 use crate::structs::sym_table::AtomId;
@@ -20,7 +19,7 @@ pub struct FlowGraph {
     pub sym_table: RefSymTable,
     pub(crate) flows: Vec<Flow>,
     pub(crate) map_atom_id_flow_id: HashMap<VerticeId, Vec<FlowId>>,
-    pub(crate) handles: HandleTable,
+    pub(crate) handles: HashMap<AtomId, FlowId>,
     pub(crate) flow: FlowId,
 }
 
@@ -33,6 +32,23 @@ impl FlowGraph {
             handles: Default::default(),
             flow: 0,
         }
+    }
+
+    pub fn get_handle(&self, atom: &AtomId) -> Option<&FlowId> {
+        let atom = self.sym_table.get_parent(atom);
+        let vec: Vec<&FlowId> = self
+            .handles
+            .iter()
+            .filter_map(|(k, v)| {
+                if self.sym_table.get_parent(k) == atom {
+                    Some(v)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        assert_eq!(vec.len(), 1);
+        vec.first().cloned()
     }
 
     pub fn is_valid(&self, flow: &FlowId) -> bool {
@@ -121,7 +137,7 @@ impl FlowGraph {
         let t = self.sym_table.new_timepoint();
         let r = self.sym_table.new_result();
 
-        self.sym_table.new_scope(&r, &t);
+        self.sym_table.add_declaration(&r, &t);
 
         let vertice = Assignment {
             interval: Interval::new_instantaneous(&t),
@@ -137,7 +153,7 @@ impl FlowGraph {
         let end = self.sym_table.new_timepoint();
         let r = self.sym_table.new_result();
 
-        self.sym_table.new_scope(&r, &end);
+        self.sym_table.add_declaration(&r, &end);
 
         let vertice = Assignment {
             interval: Interval::new(&start, &end),
@@ -290,6 +306,11 @@ impl FlowGraph {
 
         match &self.flows[*id].kind {
             FlowKind::Assignment(v) => {
+                if let Lit::Async(f) = &v.lit {
+                    let (f_dot, (start, _end)) = self.export_flow(f);
+                    write!(dot, "Async_{f} -> V{start};\n",).unwrap();
+                    write!(dot, "{f_dot}").unwrap();
+                }
                 dot.push_str(
                     format!(
                         "V{id} [label= \"{}: {} <- {}\", color = {color}];\n",
@@ -429,11 +450,11 @@ impl FlowGraph {
         let mut dot: Dot = "digraph {\n".to_string();
 
         write!(dot, "{}", self.export_flow(&self.flow).0).unwrap();
-        for (id, handle) in self.handles.inner() {
+        /*for (id, handle) in self.handles.inner() {
             let (f_dot, (start, _end)) = self.export_flow(&handle.flow);
             write!(dot, "{} -> V{start};\n", self.sym_table.format_variable(id)).unwrap();
             write!(dot, "{f_dot}").unwrap();
-        }
+        }*/
 
         dot.push('}');
         dot

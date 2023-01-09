@@ -2,7 +2,6 @@ use crate::conversion::flow::apply::convert_apply;
 use crate::structs::domain::root_type::RootType;
 use crate::structs::domain::root_type::RootType::Boolean;
 use crate::structs::flow_graph::flow::{BranchingFlow, FlowId};
-use crate::structs::flow_graph::handle_table::Handle;
 use crate::structs::sym_table::closure::Update;
 use crate::structs::sym_table::lit::{lvalue_to_lit, Lit};
 use crate::structs::sym_table::{closure, AtomId};
@@ -210,24 +209,31 @@ fn convert_list(
 
                 let handle_id = fl.sym_table.new_handle();
 
-                fl.sym_table.add_update(
+                /*fl.sym_table.add_update(
                     vec![r_async],
                     Update::new(handle_id, closure::composed_update(handle_id, r_async)),
                 );
                 fl.sym_table.add_update(
                     vec![handle_id],
                     Update::new(r_async, closure::in_composed_update(r_async, handle_id)),
+                );*/
+
+                let handle_flow = fl.new_instantaneous_assignment(Lit::Async(async_flow_id));
+
+                let handle = fl.get_flow_result(&handle_flow);
+
+                fl.handles.insert(handle, handle_flow);
+
+                fl.sym_table.add_update(
+                    vec![r_async],
+                    Update::new(handle, closure::composed_update(handle, r_async)),
+                );
+                fl.sym_table.add_update(
+                    vec![handle_id],
+                    Update::new(r_async, closure::in_composed_update(r_async, handle)),
                 );
 
-                let handle = Handle {
-                    result: fl.get_flow_result(&async_flow_id),
-                    flow: async_flow_id,
-                    ends: vec![],
-                };
-
-                fl.handles.insert(&handle_id, handle);
-
-                Ok(fl.new_instantaneous_assignment(Lit::Atom(handle_id)))
+                Ok(handle_flow)
             }
             LPrimitives::Await => {
                 let define_table = &mut define_table.clone();

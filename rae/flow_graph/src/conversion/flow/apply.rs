@@ -79,7 +79,7 @@ pub fn convert_apply(
     let end = fl.get_flow_end(&flow_apply);
 
     for o in results {
-        fl.sym_table.set_end(&o, &end);
+        fl.sym_table.add_drop(&o, &end);
     }
     Ok(flow_apply)
 }

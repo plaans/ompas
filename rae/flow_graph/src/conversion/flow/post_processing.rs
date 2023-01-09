@@ -103,8 +103,8 @@ pub fn propagate(
 pub fn binding_constraints(graph: &mut FlowGraph) -> VecDeque<PostProcess> {
     let mut flows_queue: VecDeque<FlowId> = Default::default();
     flows_queue.push_back(graph.flow);
-    for handle in graph.handles.inner().values() {
-        flows_queue.push_back(handle.flow)
+    for handle in graph.handles.values() {
+        flows_queue.push_back(*handle)
     }
 
     let mut post_process = VecDeque::new();

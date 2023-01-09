@@ -18,24 +18,21 @@ impl RefSymTable {
     /*
     SCOPES FUNCTIONS
      */
-    pub fn get_scope(&self, id: &AtomId) -> Option<Interval> {
-        RefCell::borrow(&self.0).get_scope(id).cloned()
+
+    pub fn add_declaration(&mut self, id: &AtomId, start: &AtomId) {
+        RefCell::borrow_mut(&self.0).add_declaration(id, start)
     }
 
-    pub fn get_start(&self, id: &AtomId) -> Option<AtomId> {
-        RefCell::borrow(&self.0).get_start(id).cloned()
+    pub fn add_drop(&mut self, id: &AtomId, end: &AtomId) {
+        RefCell::borrow_mut(&self.0).add_drop(id, end)
     }
 
-    pub fn get_end(&self, id: &AtomId) -> Option<AtomId> {
-        RefCell::borrow(&self.0).get_end(id).cloned()
+    pub fn get_declarations(&self, id: &AtomId) -> Vec<AtomId> {
+        RefCell::borrow(&self.0).get_declarations(id).clone()
     }
 
-    pub fn new_scope(&mut self, id: &AtomId, start: &AtomId) {
-        RefCell::borrow_mut(&self.0).new_scope(id, start)
-    }
-
-    pub fn set_end(&mut self, id: &AtomId, end: &AtomId) {
-        RefCell::borrow_mut(&self.0).set_end(id, end)
+    pub fn get_drops(&self, id: &AtomId) -> Vec<AtomId> {
+        RefCell::borrow(&self.0).get_drops(id).clone()
     }
 
     /*

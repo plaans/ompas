@@ -1,7 +1,7 @@
 use crate::structs::chronicle::interval::Interval;
 use crate::structs::chronicle::{FlatBindings, FormatWithSymTable, GetVariables};
 use crate::structs::flow_graph::assignment::Assignment;
-use crate::structs::flow_graph::flow::{BranchingFlow, Flow, FlowId, FlowKind};
+use crate::structs::flow_graph::flow::{BranchingFlow, Flow, FlowId, FlowKind, FlowResult};
 use crate::structs::flow_graph::handle_table::HandleTable;
 use crate::structs::sym_table::lit::Lit;
 use crate::structs::sym_table::r#ref::RefSymTable;
@@ -69,7 +69,7 @@ impl FlowGraph {
             FlowKind::Assignment(v) => v.result,
             FlowKind::Seq(_, r) => self.get_flow_result(r),
             FlowKind::Branching(branching) => self.get_flow_result(&branching.result),
-            FlowKind::FlowResult(fr) => *fr,
+            FlowKind::FlowResult(fr) => fr.result,
         }
     }
 
@@ -77,17 +77,43 @@ impl FlowGraph {
         let flow = &self.flows[*flow];
         match &flow.kind {
             FlowKind::Assignment(v) => v.interval,
-            FlowKind::Seq(seq, _) => {
-                let start = *self.get_flow_interval(&seq.first().unwrap()).get_start();
-                let end = *self.get_flow_interval(&seq.last().unwrap()).get_end();
+            FlowKind::Seq(seq, r) => {
+                let start = match seq.first() {
+                    Some(first) => self.get_flow_start(first),
+                    None => self.get_flow_start(r),
+                };
+                let end = self.get_flow_end(r);
                 Interval::new(&start, &end)
             }
             FlowKind::Branching(branching) => {
-                let start = *self.get_flow_interval(&branching.cond_flow).get_start();
+                let start = *self.get_flow_interval(&branching.cond).get_start();
                 let end = *self.get_flow_interval(&branching.result).get_end();
                 Interval::new(&start, &end)
             }
-            FlowKind::FlowResult(_) => unreachable!(),
+            FlowKind::FlowResult(r) => Interval::new_instantaneous(&r.timepoint),
+        }
+    }
+
+    pub fn get_flow_start(&self, flow: &FlowId) -> AtomId {
+        let flow = &self.flows[*flow];
+        match &flow.kind {
+            FlowKind::Assignment(v) => *v.interval.get_start(),
+            FlowKind::Seq(seq, r) => match seq.first() {
+                Some(first) => self.get_flow_start(first),
+                None => self.get_flow_start(r),
+            },
+            FlowKind::Branching(branching) => self.get_flow_start(&branching.cond),
+            FlowKind::FlowResult(r) => r.timepoint,
+        }
+    }
+
+    pub fn get_flow_end(&self, flow: &FlowId) -> AtomId {
+        let flow = &self.flows[*flow];
+        match &flow.kind {
+            FlowKind::Assignment(v) => *v.interval.get_end(),
+            FlowKind::Seq(_, r) => self.get_flow_end(r),
+            FlowKind::Branching(branching) => self.get_flow_end(&branching.result),
+            FlowKind::FlowResult(r) => r.timepoint,
         }
     }
 
@@ -135,11 +161,11 @@ impl FlowGraph {
                 set
             }
             FlowKind::Branching(branching) => {
-                let mut set = self.get_atom_of_flow(&branching.cond_flow);
+                let mut set = self.get_atom_of_flow(&branching.cond);
                 set = set.union(self.get_atom_of_flow(&branching.result));
                 set
             }
-            FlowKind::FlowResult(fr) => hashset![*fr],
+            FlowKind::FlowResult(fr) => hashset![fr.result, fr.timepoint],
         }
     }
 
@@ -154,8 +180,8 @@ impl FlowGraph {
         self.new_seq(vec![id])
     }
 
-    pub fn new_result(&mut self, result: AtomId) -> FlowId {
-        self.new_flow(FlowKind::FlowResult(result))
+    pub fn new_result(&mut self, result: AtomId, timepoint: AtomId) -> FlowId {
+        self.new_flow(FlowKind::FlowResult(FlowResult { result, timepoint }))
     }
 
     fn new_flow(&mut self, flow: impl Into<Flow>) -> FlowId {
@@ -181,20 +207,24 @@ impl FlowGraph {
                 self.flows[*result].parent = Some(id);
             }
             FlowKind::Branching(branching) => {
-                self.flows[branching.cond_flow].parent = Some(id);
+                self.flows[branching.cond].parent = Some(id);
                 self.flows[branching.false_flow].parent = Some(id);
                 self.flows[branching.true_flow].parent = Some(id);
                 self.flows[branching.result].parent = Some(id);
             } //FlowKind::Result(_, _) => unreachable!(),
             FlowKind::FlowResult(fr) => {
-                match self.map_atom_id_flow_id.get_mut(fr) {
-                    None => {
-                        self.map_atom_id_flow_id.insert(*fr, vec![id]);
-                    }
-                    Some(set) => {
-                        set.push(id);
-                    }
-                };
+                let var = vec![fr.timepoint, fr.result];
+
+                for v in var {
+                    match self.map_atom_id_flow_id.get_mut(&v) {
+                        None => {
+                            self.map_atom_id_flow_id.insert(v, vec![id]);
+                        }
+                        Some(set) => {
+                            set.push(id);
+                        }
+                    };
+                }
             }
         }
         self.flows.push(flow.into());
@@ -225,7 +255,8 @@ impl FlowGraph {
             } else {
                 seq.push(*flow_id);
                 if i == flows.len() - 1 {
-                    result = self.new_result(self.get_flow_result(flow_id));
+                    result =
+                        self.new_result(self.get_flow_result(flow_id), self.get_flow_end(flow_id));
                 }
             }
         }
@@ -272,7 +303,7 @@ impl FlowGraph {
                 end = Some(*id);
             }
             FlowKind::Branching(branching) => {
-                let cond_result = self.get_flow_result(&branching.cond_flow);
+                let cond_result = self.get_flow_result(&branching.cond);
                 let val = self.sym_table.get_domain(&cond_result, true).unwrap();
 
                 let branch = if val.is_true() {
@@ -312,7 +343,7 @@ impl FlowGraph {
                 )
                 .unwrap();
 
-                let (cond_dot, (cond_start, cond_end)) = self.export_flow(&branching.cond_flow);
+                let (cond_dot, (cond_start, cond_end)) = self.export_flow(&branching.cond);
                 let cond = self
                     .sym_table
                     .format_variable(&self.get_flow_result(&cond_end));
@@ -380,8 +411,9 @@ impl FlowGraph {
             FlowKind::FlowResult(fr) => {
                 dot.push_str(
                     format!(
-                        "V{id} [label= \"{}\", color = {color}];\n",
-                        fr.format(sym_table, false),
+                        "V{id} [label= \"{}:{}\", color = {color}];\n",
+                        fr.timepoint.format(sym_table, false),
+                        fr.result.format(sym_table, false),
                     )
                     .as_str(),
                 );
@@ -417,7 +449,8 @@ impl FlowGraph {
                     v.interval.flat_bindings(st);
                 }
                 FlowKind::FlowResult(fr) => {
-                    fr.flat_bindings(st);
+                    fr.timepoint.flat_bindings(st);
+                    fr.result.flat_bindings(st);
                 }
                 _ => {}
             }

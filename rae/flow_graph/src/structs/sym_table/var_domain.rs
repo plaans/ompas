@@ -1,7 +1,5 @@
 use crate::structs::domain::Domain;
 use crate::structs::sym_table::closure::Update;
-use crate::structs::sym_table::AtomId;
-use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 
 pub type UpdateId = usize;

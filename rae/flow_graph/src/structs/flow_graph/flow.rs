@@ -8,7 +8,13 @@ pub enum FlowKind {
     Assignment(Assignment),
     Seq(Vec<FlowId>, FlowId),
     Branching(BranchingFlow),
-    FlowResult(AtomId),
+    FlowResult(FlowResult),
+}
+
+impl From<FlowResult> for FlowKind {
+    fn from(value: FlowResult) -> Self {
+        Self::FlowResult(value)
+    }
 }
 
 impl From<Assignment> for FlowKind {
@@ -51,8 +57,14 @@ where
 
 #[derive(Clone)]
 pub struct BranchingFlow {
-    pub cond_flow: FlowId,
+    pub cond: FlowId,
     pub true_flow: FlowId,
     pub false_flow: FlowId,
     pub result: FlowId,
+}
+
+#[derive(Clone)]
+pub struct FlowResult {
+    pub result: AtomId,
+    pub timepoint: AtomId,
 }

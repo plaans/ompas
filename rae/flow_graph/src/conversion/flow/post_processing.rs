@@ -1,4 +1,4 @@
-use crate::conversion::flow_graph_post_process::PostProcess::*;
+use crate::conversion::flow::post_processing::PostProcess::{Bind, Invalid, Meet, Subtract};
 use crate::structs::domain::root_type::RootType;
 use crate::structs::domain::Domain;
 use crate::structs::flow_graph::flow::{FlowId, FlowKind};
@@ -63,7 +63,7 @@ pub fn propagate(
                 let id1 = graph.sym_table.get_parent(&id1);
                 let id2 = graph.sym_table.get_parent(&id2);
                 //println!("Bind({id1}, {id2})");
-                if let EmptyDomains::Some(emptys) = graph.sym_table.try_union_atom(&id1, &id2) {
+                if let EmptyDomains::Some(emptys) = graph.sym_table.union_atom(&id1, &id2) {
                     //println!("[Bind] Domains of {:?} are empty.", emptys);
                     for e in &emptys {
                         for f in graph.map_atom_id_flow_id.get(e).unwrap() {
@@ -76,7 +76,7 @@ pub fn propagate(
                 //println!("Invalid({id})");
                 if graph.is_valid(id) {
                     if let FlowKind::Branching(br) = graph.get_kind(id) {
-                        if !graph.is_valid(&br.cond_flow)
+                        if !graph.is_valid(&br.cond)
                             || !graph.is_valid(&br.result)
                             || (!graph.is_valid(&br.false_flow) && !graph.is_valid(&br.true_flow))
                         {
@@ -127,7 +127,7 @@ pub fn binding_constraints(graph: &mut FlowGraph) -> VecDeque<PostProcess> {
                 }
             }
             FlowKind::Branching(b) => {
-                flows_queue.push_back(b.cond_flow);
+                flows_queue.push_back(b.cond);
                 flows_queue.push_back(b.true_flow);
                 flows_queue.push_back(b.false_flow);
                 flows_queue.push_back(b.result);

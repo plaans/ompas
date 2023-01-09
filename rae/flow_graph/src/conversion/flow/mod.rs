@@ -1,3 +1,4 @@
+use crate::conversion::flow::apply::convert_apply;
 use crate::structs::domain::root_type::RootType;
 use crate::structs::domain::root_type::RootType::Boolean;
 use crate::structs::flow_graph::flow::{BranchingFlow, FlowId};
@@ -16,6 +17,10 @@ use sompas_structs::lprimitives::LPrimitives;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use std::sync::Arc;
+
+pub mod apply;
+pub mod post_processing;
+pub mod pre_processing;
 
 pub fn convert_into_flow_graph(
     lv: &LValue,
@@ -84,7 +89,7 @@ fn convert_list(
     let mut out_of_scope: Vec<AtomId> = vec![];
 
     let r = match proc {
-        LValue::Symbol(_) => convert_apply(list.as_slice(), fl, define_table),
+        LValue::Symbol(s) => convert_apply(s.as_str(), list.as_slice(), fl, define_table),
         LValue::Primitive(co) => match co {
             LPrimitives::Define => {
                 let var = &list[1].to_string();
@@ -110,7 +115,6 @@ fn convert_list(
                  */
 
                 let cond_flow = convert_into_flow_graph(cond, fl, define_table)?;
-                let cond_flow = fl.new_seq(vec![cond_flow]);
                 let cond_result = fl.get_flow_result(&cond_flow);
                 fl.sym_table.meet_to_domain(&cond_result, Boolean);
 
@@ -122,6 +126,7 @@ fn convert_list(
                 let false_result = fl.get_flow_result(&false_flow);
 
                 let result = fl.sym_table.new_result();
+                let timepoint = fl.sym_table.new_timepoint();
 
                 fl.sym_table.add_update(
                     vec![true_result, false_result],
@@ -167,21 +172,18 @@ fn convert_list(
                         ),
                     ),
                 );
-                /*fl.sym_table
-                    .add_union_constraint(&result, vec![true_result, false_result]);
-                fl.sym_table.add_dependent(&true_result, result);
-                fl.sym_table.add_dependent(&false_result, result);*/
 
-                let result = fl.new_result(result);
+                let result = fl.new_result(result, timepoint);
+                let cond = fl.new_result(cond_result, fl.get_flow_end(&cond_flow));
 
                 let branching = BranchingFlow {
-                    cond_flow,
+                    cond,
                     true_flow,
                     false_flow,
                     result,
                 };
-
-                Ok(fl.new_branching(branching))
+                let flow_branch = fl.new_branching(branching);
+                Ok(fl.new_seq(vec![cond_flow, flow_branch]))
             }
             LPrimitives::Quote => {
                 let lit = lvalue_to_lit(&list[1], &mut fl.sym_table)?;
@@ -208,12 +210,6 @@ fn convert_list(
 
                 let handle_id = fl.sym_table.new_handle();
 
-                /*fl.sym_table.add_constraint(
-                    &handle_id,
-                    closure::composed_constraint(r_async),
-                    closure::composed_update(r_async),
-                );*/
-
                 fl.sym_table.add_update(
                     vec![r_async],
                     Update::new(handle_id, closure::composed_update(handle_id, r_async)),
@@ -222,8 +218,6 @@ fn convert_list(
                     vec![handle_id],
                     Update::new(r_async, closure::in_composed_update(r_async, handle_id)),
                 );
-
-                //fl.sym_table.add_dependent(&r_async, handle_id);
 
                 let handle = Handle {
                     result: fl.get_flow_result(&async_flow_id),
@@ -242,11 +236,6 @@ fn convert_list(
 
                 fl.sym_table.meet_to_domain(&result, RootType::Handle);
 
-                /*let domain = fl.sym_table.meet_domain(
-                    &fl.sym_table.get_domain(&result, false).unwrap(),
-                    &RootType::Handle.into(),
-                );
-                fl.sym_table.set_domain(&result, domain);*/
                 let flow_await = fl.new_assignment(Lit::Await(result));
                 out_of_scope.push(fl.get_flow_result(&h));
 
@@ -293,92 +282,4 @@ fn convert_list(
         fl.sym_table.set_end(o, &end_scope);
     }*/
     r
-}
-
-fn convert_apply(
-    expr: &[LValue],
-    fl: &mut FlowGraph,
-    define_table: &mut DefineTable,
-) -> Result<FlowId, LRuntimeError> {
-    let mut define_table = define_table.clone();
-
-    let mut seq: Vec<FlowId> = vec![];
-
-    let proc = expr.first().unwrap().to_string();
-
-    for e in expr {
-        seq.push(convert_into_flow_graph(e, fl, &mut define_table)?);
-    }
-
-    let results: Vec<AtomId> = seq.iter().map(|f| fl.get_flow_result(f)).collect();
-    let flow_apply = fl.new_assignment(Lit::Apply(results.clone()));
-
-    match proc.as_str() {
-        IS_ERR => {
-            let result_is_err = fl.get_flow_result(&flow_apply);
-            fl.sym_table.set_domain(&result_is_err, Boolean);
-            assert_eq!(seq.len(), 2);
-            let arg_is_err = fl.get_flow_result(&seq[1]);
-            fl.sym_table.add_update(
-                vec![result_is_err],
-                Update::new(
-                    arg_is_err,
-                    closure::arg_is_err_update(arg_is_err, result_is_err),
-                ),
-            );
-            fl.sym_table.add_update(
-                vec![arg_is_err],
-                Update::new(
-                    result_is_err,
-                    closure::result_is_err_update(result_is_err, arg_is_err),
-                ),
-            );
-        }
-        _ => {}
-    }
-
-    let end = *fl.get_flow_interval(&flow_apply).get_end();
-    seq.push(flow_apply);
-    for o in results {
-        fl.sym_table.set_end(&o, &end);
-    }
-    Ok(fl.new_seq(seq))
-    /*let scope = match proc_symbol.as_str() {
-        EXEC_COMMAND | EXEC_TASK => {
-            let exec_scope: Scope = fl
-                .new_vertice(Expression::exec(args_result.to_vec()))
-                .into();
-            fl.set_parent(exec_scope.start(), arg_scope.get_end());
-            arg_scope.end = exec_scope.end;
-            arg_scope
-        }
-        ASSERT | ASSERT_SHORT => {
-            let id = fl.new_instantaneous_vertice(Expression::write(args_result.to_vec()));
-            fl.set_parent(&id, arg_scope.get_end());
-            arg_scope.end = id;
-            arg_scope
-        }
-        READ_STATE => {
-            let id = fl.new_instantaneous_vertice(Expression::read(args_result.to_vec()));
-            fl.set_parent(&id, arg_scope.get_end());
-            arg_scope.end = id;
-            arg_scope
-        }
-        _ => {
-            fl.set_child(proc_scope.get_end(), arg_scope.start());
-
-            results.push(*fl.get_result(proc_scope.get_end()));
-            let mut vec = vec![*fl.get_result(proc_scope.get_end())];
-            vec.append(&mut args_result);
-
-            let id = fl.new_instantaneous_vertice(Expression::apply(vec));
-            fl.set_parent(&id, arg_scope.get_end());
-            out_of_scope.push(*fl.get_scope_result(&proc_scope));
-
-            Scope {
-                start: proc_scope.start,
-                end: id,
-            }
-        }
-    };*/
 }

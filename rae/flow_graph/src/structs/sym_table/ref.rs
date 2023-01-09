@@ -1,7 +1,7 @@
 use crate::structs::chronicle::interval::Interval;
 use crate::structs::domain::basic_type::BasicType;
 use crate::structs::domain::Domain;
-use crate::structs::sym_table::closure::{Update, UpdateClosure};
+use crate::structs::sym_table::closure::Update;
 use crate::structs::sym_table::forest::Node;
 use crate::structs::sym_table::var_domain::VarDomain;
 use crate::structs::sym_table::{AtomId, EmptyDomains, SymTable};
@@ -223,7 +223,7 @@ impl RefSymTable {
         RefCell::borrow_mut(&self.0).flat_bindings()
     }
 
-    pub fn try_union_atom(&mut self, id1: &AtomId, id2: &AtomId) -> EmptyDomains {
+    pub fn union_atom(&mut self, id1: &AtomId, id2: &AtomId) -> EmptyDomains {
         RefCell::borrow_mut(&self.0).union_atom(id1, id2)
     }
 

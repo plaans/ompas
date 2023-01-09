@@ -16,6 +16,9 @@ pub enum Lit {
     Exp(Vec<Lit>),
     Atom(AtomId),
     Await(AtomId),
+    Read(Vec<AtomId>),
+    Write(Vec<AtomId>),
+    Exec(Vec<AtomId>),
     Constraint(Box<Constraint>),
     Apply(Vec<AtomId>),
 }
@@ -81,7 +84,7 @@ impl TryFrom<&Lit> for Vec<AtomId> {
                 }
                 Ok(e)
             }
-            Lit::Apply(vec) => Ok(vec.clone()),
+            Lit::Apply(vec) | Lit::Read(vec) | Lit::Write(vec) | Lit::Exec(vec) => Ok(vec.clone()),
             Lit::Await(a) => Ok(vec![*a]),
         }
     }
@@ -226,6 +229,39 @@ impl FormatWithSymTable for Lit {
             Lit::Await(a) => {
                 format!("await({})", a.format(st, sym_version))
             }
+            Lit::Read(vec) => {
+                let mut str = "read(".to_string();
+                for (i, e) in vec.iter().enumerate() {
+                    if i != 0 {
+                        str.push(' ');
+                    }
+                    str.push_str(e.format(st, sym_version).as_str())
+                }
+                str.push(')');
+                str
+            }
+            Lit::Write(vec) => {
+                let mut str = "write(".to_string();
+                for (i, e) in vec.iter().enumerate() {
+                    if i != 0 {
+                        str.push(' ');
+                    }
+                    str.push_str(e.format(st, sym_version).as_str())
+                }
+                str.push(')');
+                str
+            }
+            Lit::Exec(vec) => {
+                let mut str = "exec(".to_string();
+                for (i, e) in vec.iter().enumerate() {
+                    if i != 0 {
+                        str.push(' ');
+                    }
+                    str.push_str(e.format(st, sym_version).as_str())
+                }
+                str.push(')');
+                str
+            }
         }
     }
 }
@@ -236,7 +272,9 @@ impl FlatBindings for Lit {
             Lit::Atom(a) => a.flat_bindings(st),
             Lit::Constraint(c) => c.flat_bindings(st),
             Lit::Exp(vec) => vec.flat_bindings(st),
-            Lit::Apply(vec) => vec.flat_bindings(st),
+            Lit::Apply(vec) | Lit::Read(vec) | Lit::Write(vec) | Lit::Exec(vec) => {
+                vec.flat_bindings(st)
+            }
             Lit::Await(a) => a.flat_bindings(st),
         }
     }
@@ -254,7 +292,9 @@ impl GetVariables for Lit {
                 }
                 hashset
             }
-            Lit::Apply(vec) => vec.iter().cloned().collect(),
+            Lit::Apply(vec) | Lit::Read(vec) | Lit::Write(vec) | Lit::Exec(vec) => {
+                vec.iter().cloned().collect()
+            }
             Lit::Await(a) => hashset![*a],
         }
     }
@@ -276,7 +316,9 @@ impl Replace for Lit {
             Lit::Atom(a) => a.replace(old, new),
             Lit::Constraint(c) => c.replace(old, new),
             Lit::Exp(e) => e.replace(old, new),
-            Lit::Apply(vec) => vec.replace(old, new),
+            Lit::Apply(vec) | Lit::Read(vec) | Lit::Write(vec) | Lit::Exec(vec) => {
+                vec.replace(old, new)
+            }
             Lit::Await(a) => a.replace(old, new),
         }
     }

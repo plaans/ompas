@@ -51,12 +51,6 @@ impl FlowGraph {
         &mut self.flows[*flow].kind
     }
 
-    pub fn set_branch(&mut self, flow: &FlowId, branch: bool) {
-        if let FlowKind::Branching(br) = &mut self.flows[*flow].kind {
-            br.branch = Some(branch)
-        }
-    }
-
     pub fn set_kind(&mut self, flow: &FlowId, kind: FlowKind) {
         self.flows[*flow].kind = kind
     }
@@ -289,8 +283,8 @@ impl FlowGraph {
                     None
                 };
 
-                let (label, color_branch_true, color_branch_false) = match branch {
-                    None => (format!("branching_{id}"), "black", "black"),
+                let (_label, color_branch_true, color_branch_false) = match branch {
+                    None => (format!("branching_{id}"), NEUTRAL_BRANCH, NEUTRAL_BRANCH),
                     Some(true) => (
                         format!("branching_{id}(branch = true)"),
                         GOOD_BRANCH,
@@ -315,7 +309,8 @@ impl FlowGraph {
                     dot,
                     "subgraph cluster_{id} {{\n
                     \n"
-                );
+                )
+                .unwrap();
 
                 let (cond_dot, (cond_start, cond_end)) = self.export_flow(&branching.cond_flow);
                 let cond = self
@@ -348,7 +343,7 @@ impl FlowGraph {
                 )
                 .unwrap();
                 end = Some(result_end);
-                write!(dot, "}}\n");
+                write!(dot, "}}\n").unwrap();
             }
             FlowKind::Seq(seq, r) => {
                 /*write!(
@@ -363,7 +358,8 @@ impl FlowGraph {
                     dot,
                     "subgraph cluster_{id} {{\n
                     \n"
-                );
+                )
+                .unwrap();
                 let mut previous_end = None;
                 let mut seq = seq.clone();
                 seq.push(*r);
@@ -379,7 +375,7 @@ impl FlowGraph {
                     previous_end = Some(f_end);
                 }
                 end = previous_end;
-                write!(dot, "}}\n");
+                write!(dot, "}}\n").unwrap();
             }
             FlowKind::FlowResult(fr) => {
                 dot.push_str(
@@ -438,6 +434,7 @@ pub const BRANCHING_ARROW: &str = "->";
 pub const DASHED_ATTRIBUTE: &str = "[style = dashed]";
 pub const PAR_ARROW: &str = "->";
 pub const GOOD_BRANCH: &str = "color= green";
+pub const NEUTRAL_BRANCH: &str = "color = black";
 pub const BAD_BRANCH: &str = "color= red, style =dashed";
 pub const VALID_COLOR: &str = "green";
 pub const INVALID_COLOR: &str = "red";

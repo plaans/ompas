@@ -15,7 +15,6 @@ use sompas_structs::lnumber::LNumber;
 use sompas_structs::lprimitives::LPrimitives;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
-use std::rc::Rc;
 use std::sync::Arc;
 
 pub fn convert_into_flow_graph(
@@ -176,7 +175,6 @@ fn convert_list(
                 let result = fl.new_result(result);
 
                 let branching = BranchingFlow {
-                    branch: None,
                     cond_flow,
                     true_flow,
                     false_flow,

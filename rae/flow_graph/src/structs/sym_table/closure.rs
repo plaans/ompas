@@ -1,27 +1,10 @@
+use crate::structs::domain::root_type::RootType;
 use crate::structs::domain::root_type::RootType::{False, True};
-use crate::structs::domain::root_type::{RootType, FALSE_ID, TRUE_ID};
 use crate::structs::domain::Domain;
 use crate::structs::sym_table::{AtomId, EmptyDomains, SymTable};
 use std::rc::Rc;
 
-pub(crate) type Proc = fn(&mut SymTable, &AtomId, Domain) -> EmptyDomains;
-
-/*pub(crate) type ConstraintClosure =
-Rc<Box<dyn Fn(&mut SymTable, &AtomId, Domain, Proc) -> EmptyDomains>>;*/
-
 pub(crate) type UpdateClosure = Rc<Box<dyn Fn(&mut SymTable) -> EmptyDomains>>;
-
-/*pub(crate) fn union_constraint(vec: Vec<AtomId>) -> ConstraintClosure {
-    Rc::new(Box::new(move |st, id: &AtomId, domain, proc| {
-        let mut emptys = EmptyDomains::None;
-        for d in &vec {
-            emptys.append(proc(st, d, domain.clone()));
-        }
-        let emptys = emptys;
-
-        emptys
-    }))
-}*/
 
 #[derive(Clone)]
 pub struct Update {
@@ -51,7 +34,7 @@ pub(crate) fn in_union_update(id: AtomId, union_atom: AtomId) -> UpdateClosure {
     }))
 }
 
-pub(crate) fn union_update(id: AtomId, mut union: Vec<AtomId>) -> UpdateClosure {
+pub(crate) fn union_update(id: AtomId, union: Vec<AtomId>) -> UpdateClosure {
     Rc::new(Box::new(move |st| {
         let id = st.get_parent(&id);
         let union: Vec<AtomId> = union.iter().map(|id| st.get_parent(id)).collect();
@@ -82,7 +65,7 @@ pub(crate) fn in_composed_update(id: AtomId, composed: AtomId) -> UpdateClosure 
         if composed.is_empty() {
             st.domains[id].domain = Domain::empty();
             EmptyDomains::Some(vec![id])
-        } else if let Domain::Composed(t, s) = composed {
+        } else if let Domain::Composed(_, s) = composed {
             let sub = s[0].clone();
             let ancient_domain = &st.domains[id].domain;
             let new_domain = st.meet(&sub, ancient_domain);

@@ -15,12 +15,11 @@ use crate::structs::sym_table::forest::{Forest, Node, NodeId};
 use crate::structs::sym_table::id::SymbolTableId;
 use crate::structs::sym_table::meta_data::SymTableMetaData;
 use std::collections::VecDeque;
-use std::env::var;
 //use ompas_rae_language::exec::state::{ASSERT, INSTANCE, RETRACT};
 //use sompas_language::primitives::DO;
 use crate::structs::domain::basic_type::BasicType;
 use crate::structs::domain::root_type::RootType;
-use crate::structs::sym_table::closure::{Update, UpdateClosure};
+use crate::structs::sym_table::closure::Update;
 use crate::structs::sym_table::r#ref::RefSymTable;
 use crate::structs::sym_table::var_domain::VarDomain;
 use sompas_language::kind::NIL;
@@ -58,11 +57,6 @@ pub type AtomId = NodeId;
 pub enum EmptyDomains {
     None,
     Some(Vec<AtomId>),
-}
-
-pub struct UpdateDomain {
-    id: AtomId,
-    modified: Vec<AtomId>,
 }
 
 impl EmptyDomains {
@@ -564,7 +558,7 @@ impl SymTable {
         let mut str = format!("domain = {}", domain.domain.format(&self.lattice));
 
         if !domain.updates.is_empty() {
-            write!(str, ", dependent(s) = {{");
+            write!(str, ", dependent(s) = {{").unwrap();
             for (i, up) in domain.updates.iter().enumerate() {
                 if i != 0 {
                     str.push(',');

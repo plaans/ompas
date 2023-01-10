@@ -6,7 +6,6 @@ pub mod meta_data;
 pub mod r#ref;
 pub(crate) mod var_domain;
 
-use crate::structs::chronicle::interval::Interval;
 use crate::structs::domain::root_type::RootType::{Any, Boolean, Handle};
 use crate::structs::domain::root_type::{FALSE_ID, NIL_ID, TRUE_ID};
 use crate::structs::domain::type_lattice::TypeLattice;

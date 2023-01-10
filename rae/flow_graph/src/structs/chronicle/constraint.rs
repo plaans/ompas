@@ -6,7 +6,7 @@ use crate::structs::sym_table::r#ref::RefSymTable;
 use im::HashSet;
 use std::fmt::Write;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Constraint {
     Await(Lit),
     Not(Lit),

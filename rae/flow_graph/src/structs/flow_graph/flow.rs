@@ -9,6 +9,7 @@ pub enum FlowKind {
     Seq(Vec<FlowId>, FlowId),
     Branching(BranchingFlow),
     FlowResult(FlowResult),
+    FlowAsync(FlowAsync),
 }
 
 impl From<FlowResult> for FlowKind {
@@ -23,15 +24,15 @@ impl From<Assignment> for FlowKind {
     }
 }
 
-/*impl From<Vec<FlowId>> for FlowKind {
-    fn from(value: Vec<FlowId>) -> Self {
-        Self::Seq(value)
-    }
-}*/
-
 impl From<BranchingFlow> for FlowKind {
     fn from(value: BranchingFlow) -> Self {
         Self::Branching(value)
+    }
+}
+
+impl From<FlowAsync> for FlowKind {
+    fn from(value: FlowAsync) -> Self {
+        Self::FlowAsync(value)
     }
 }
 
@@ -67,4 +68,11 @@ pub struct BranchingFlow {
 pub struct FlowResult {
     pub result: AtomId,
     pub timepoint: AtomId,
+}
+
+#[derive(Clone)]
+pub struct FlowAsync {
+    pub result: AtomId,
+    pub timepoint: AtomId,
+    pub flow: FlowId,
 }

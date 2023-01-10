@@ -1,7 +1,9 @@
 use crate::structs::chronicle::interval::Interval;
 use crate::structs::chronicle::{FlatBindings, FormatWithSymTable, GetVariables};
 use crate::structs::flow_graph::assignment::Assignment;
-use crate::structs::flow_graph::flow::{BranchingFlow, Flow, FlowId, FlowKind, FlowResult};
+use crate::structs::flow_graph::flow::{
+    BranchingFlow, Flow, FlowAsync, FlowId, FlowKind, FlowResult,
+};
 use crate::structs::sym_table::lit::Lit;
 use crate::structs::sym_table::r#ref::RefSymTable;
 use crate::structs::sym_table::AtomId;
@@ -81,17 +83,19 @@ impl FlowGraph {
 
     pub fn get_flow_result(&self, flow: &FlowId) -> AtomId {
         let flow = &self.flows[*flow];
-        match &flow.kind {
+        let r = match &flow.kind {
             FlowKind::Assignment(v) => v.result,
             FlowKind::Seq(_, r) => self.get_flow_result(r),
             FlowKind::Branching(branching) => self.get_flow_result(&branching.result),
             FlowKind::FlowResult(fr) => fr.result,
-        }
+            FlowKind::FlowAsync(f) => f.result,
+        };
+        self.sym_table.get_parent(&r)
     }
 
     pub fn get_flow_interval(&self, flow: &FlowId) -> Interval {
         let flow = &self.flows[*flow];
-        match &flow.kind {
+        let mut i = match &flow.kind {
             FlowKind::Assignment(v) => v.interval,
             FlowKind::Seq(seq, r) => {
                 let start = match seq.first() {
@@ -107,12 +111,18 @@ impl FlowGraph {
                 Interval::new(&start, &end)
             }
             FlowKind::FlowResult(r) => Interval::new_instantaneous(&r.timepoint),
-        }
+            FlowKind::FlowAsync(f) => Interval::new_instantaneous(&f.timepoint),
+        };
+
+        Interval::new(
+            &self.sym_table.get_parent(&i.get_start()),
+            &self.sym_table.get_parent(&i.get_end()),
+        )
     }
 
     pub fn get_flow_start(&self, flow: &FlowId) -> AtomId {
         let flow = &self.flows[*flow];
-        match &flow.kind {
+        let s = match &flow.kind {
             FlowKind::Assignment(v) => *v.interval.get_start(),
             FlowKind::Seq(seq, r) => match seq.first() {
                 Some(first) => self.get_flow_start(first),
@@ -120,17 +130,50 @@ impl FlowGraph {
             },
             FlowKind::Branching(branching) => self.get_flow_start(&branching.cond),
             FlowKind::FlowResult(r) => r.timepoint,
-        }
+            FlowKind::FlowAsync(f) => f.timepoint,
+        };
+
+        self.sym_table.get_parent(&s)
     }
 
     pub fn get_flow_end(&self, flow: &FlowId) -> AtomId {
         let flow = &self.flows[*flow];
-        match &flow.kind {
+        let e = match &flow.kind {
             FlowKind::Assignment(v) => *v.interval.get_end(),
             FlowKind::Seq(_, r) => self.get_flow_end(r),
             FlowKind::Branching(branching) => self.get_flow_end(&branching.result),
             FlowKind::FlowResult(r) => r.timepoint,
-        }
+            FlowKind::FlowAsync(f) => f.timepoint,
+        };
+
+        self.sym_table.get_parent(&e)
+    }
+
+    pub fn get_atom_of_flow(&self, flow: &FlowId) -> im::HashSet<AtomId> {
+        let flow = &self.flows[*flow];
+
+        let set = match &flow.kind {
+            FlowKind::Assignment(a) => a.get_variables(),
+            FlowKind::Seq(seq, _) => {
+                let mut set = im::HashSet::default();
+                for f in seq {
+                    set = set.union(self.get_atom_of_flow(f));
+                }
+                set
+            }
+            FlowKind::Branching(branching) => {
+                let mut set = self.get_atom_of_flow(&branching.cond);
+                set = set.union(self.get_atom_of_flow(&branching.result));
+                set
+            }
+            FlowKind::FlowResult(fr) => hashset![fr.result, fr.timepoint],
+            FlowKind::FlowAsync(f) => {
+                let set = hashset![f.result, f.timepoint];
+                set.union(self.get_atom_of_flow(&f.flow))
+            }
+        };
+
+        set.iter().map(|a| self.sym_table.get_parent(a)).collect()
     }
 
     pub fn new_instantaneous_assignment(&mut self, value: impl Into<Lit>) -> FlowId {
@@ -164,29 +207,9 @@ impl FlowGraph {
         self.new_seq(vec![id])
     }
 
-    pub fn get_atom_of_flow(&self, flow: &FlowId) -> im::HashSet<AtomId> {
-        let flow = &self.flows[*flow];
-
-        match &flow.kind {
-            FlowKind::Assignment(a) => a.get_variables(),
-            FlowKind::Seq(seq, _) => {
-                let mut set = im::HashSet::default();
-                for f in seq {
-                    set = set.union(self.get_atom_of_flow(f));
-                }
-                set
-            }
-            FlowKind::Branching(branching) => {
-                let mut set = self.get_atom_of_flow(&branching.cond);
-                set = set.union(self.get_atom_of_flow(&branching.result));
-                set
-            }
-            FlowKind::FlowResult(fr) => hashset![fr.result, fr.timepoint],
-        }
-    }
-
     pub fn new_seq(&mut self, seq: Vec<FlowId>) -> FlowId {
         assert!(!seq.is_empty());
+
         let flow = self.merge_flows(seq);
         self.new_flow(flow)
     }
@@ -196,8 +219,20 @@ impl FlowGraph {
         self.new_seq(vec![id])
     }
 
-    pub fn new_result(&mut self, result: AtomId, timepoint: AtomId) -> FlowId {
+    pub fn new_result(&mut self, result: AtomId, timepoint: Option<AtomId>) -> FlowId {
+        let timepoint = timepoint.unwrap_or(self.sym_table.new_timepoint());
+
         self.new_flow(FlowKind::FlowResult(FlowResult { result, timepoint }))
+    }
+
+    pub fn new_async(&mut self, flow: FlowId) -> FlowId {
+        let timepoint = self.sym_table.new_timepoint();
+        let result = self.sym_table.new_handle();
+        self.new_flow(FlowKind::FlowAsync(FlowAsync {
+            result,
+            timepoint,
+            flow,
+        }))
     }
 
     fn new_flow(&mut self, flow: impl Into<Flow>) -> FlowId {
@@ -242,6 +277,10 @@ impl FlowGraph {
                     };
                 }
             }
+            FlowKind::FlowAsync(a) => {
+                self.flows[a.flow].parent = Some(id)
+                //
+            }
         }
         self.flows.push(flow.into());
         id
@@ -271,11 +310,23 @@ impl FlowGraph {
             } else {
                 seq.push(*flow_id);
                 if i == flows.len() - 1 {
-                    result =
-                        self.new_result(self.get_flow_result(flow_id), self.get_flow_end(flow_id));
+                    result = self.new_result(
+                        self.get_flow_result(flow_id),
+                        Some(self.get_flow_end(flow_id)),
+                    );
                 }
             }
         }
+
+        /*let mut previous_end: Option<AtomId> = None;
+
+        for f in &seq {
+            if let Some(prev) = previous_end {
+                self.sym_table.union_atom(&prev, &self.get_flow_start(&f));
+            }
+
+            previous_end = Some(self.get_flow_end(&f))
+        }*/
 
         FlowKind::Seq(seq, result)
     }
@@ -306,11 +357,6 @@ impl FlowGraph {
 
         match &self.flows[*id].kind {
             FlowKind::Assignment(v) => {
-                if let Lit::Async(f) = &v.lit {
-                    let (f_dot, (start, _end)) = self.export_flow(f);
-                    write!(dot, "Async_{f} -> V{start};\n",).unwrap();
-                    write!(dot, "{f_dot}").unwrap();
-                }
                 dot.push_str(
                     format!(
                         "V{id} [label= \"{}: {} <- {}\", color = {color}];\n",
@@ -441,6 +487,23 @@ impl FlowGraph {
                 start = Some(*id);
                 end = Some(*id);
             }
+            FlowKind::FlowAsync(f) => {
+                let async_flow = f.flow;
+                let (f_dot, (async_start, _)) = self.export_flow(&async_flow);
+                write!(dot, "Async_{async_flow} -> V{async_start};\n",).unwrap();
+                write!(dot, "{f_dot}").unwrap();
+                dot.push_str(
+                    format!(
+                        "V{id} [label= \"{}: {} <- async({async_flow})\", color = {color}];\n",
+                        f.timepoint.format(sym_table, false),
+                        f.result.format(sym_table, false),
+                    )
+                    .as_str(),
+                );
+
+                start = Some(*id);
+                end = Some(*id);
+            }
         }
 
         (dot, (start.unwrap(), end.unwrap()))
@@ -473,7 +536,12 @@ impl FlowGraph {
                     fr.timepoint.flat_bindings(st);
                     fr.result.flat_bindings(st);
                 }
-                _ => {}
+                FlowKind::Seq(_, _) => {}
+                FlowKind::Branching(_) => {}
+                FlowKind::FlowAsync(f) => {
+                    f.result.flat_bindings(st);
+                    f.timepoint.flat_bindings(st);
+                }
             }
         }
     }

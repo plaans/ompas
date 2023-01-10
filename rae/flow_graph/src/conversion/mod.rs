@@ -20,11 +20,11 @@ pub async fn convert(lv: &LValue, env: &LEnv) -> Result<ChronicleTemplate, LRunt
 
     let flow = convert_into_flow_graph(&lv, &mut graph, &mut Default::default())?;
     graph.flow = flow;
-    flow_graph_post_processing(&mut graph)?;
-    /*let mut ch = ChronicleTemplate::new("debug", ChronicleKind::Method, graph.sym_table.clone());
-    ch.debug.flow_graph = graph;
-    ch.debug.post_processed_lvalue = lv;*/
-    let mut ch = convert_method(&mut graph, &flow)?;
+    //flow_graph_post_processing(&mut graph)?;
+    let mut ch = ChronicleTemplate::new("debug", ChronicleKind::Method, graph.sym_table.clone());
+    //ch.debug.flow_graph = graph;
+    //ch.debug.post_processed_lvalue = lv;
+    //let mut ch = convert_method(&mut graph, &flow)?;
 
     ch.debug.flow_graph = graph;
     ch.debug.post_processed_lvalue = lv;

@@ -100,29 +100,39 @@ pub fn propagate(
     Ok(())
 }
 
-pub fn binding_constraints(graph: &mut FlowGraph) -> VecDeque<PostProcess> {
+pub fn binding_constraints(fl: &mut FlowGraph) -> VecDeque<PostProcess> {
     let mut flows_queue: VecDeque<FlowId> = Default::default();
-    flows_queue.push_back(graph.flow);
-    for handle in graph.handles.values() {
+    flows_queue.push_back(fl.flow);
+    for handle in fl.handles.values() {
         flows_queue.push_back(*handle)
     }
 
     let mut post_process = VecDeque::new();
 
     while let Some(flow_id) = flows_queue.pop_front() {
-        let flow = graph.flows[flow_id].clone();
+        let flow = fl.flows[flow_id].clone();
         match &flow.kind {
             FlowKind::Assignment(ass) => {
                 if let Lit::Atom(a) = &ass.lit {
                     post_process.push_back(Bind(ass.result, *a));
-                    let parent_flow = &mut graph.flows[flow.parent.unwrap()];
+                    let parent_flow = &mut fl.flows[flow.parent.unwrap()];
                     if let FlowKind::Seq(s, _) = &mut parent_flow.kind {
                         s.retain(|f| *f != flow_id)
                     }
                 }
             }
-            FlowKind::Seq(s, _) => {
-                for f in s {
+            FlowKind::Seq(seq, _) => {
+                let mut previous_end: Option<AtomId> = None;
+
+                for f in seq {
+                    if let Some(prev) = previous_end {
+                        post_process.push_back(Bind(prev, fl.get_flow_start(f)))
+                    }
+
+                    previous_end = Some(fl.get_flow_end(&f))
+                }
+
+                for f in seq {
                     flows_queue.push_back(*f)
                 }
             }
@@ -133,6 +143,7 @@ pub fn binding_constraints(graph: &mut FlowGraph) -> VecDeque<PostProcess> {
                 flows_queue.push_back(b.result);
             }
             FlowKind::FlowResult(_) => {}
+            FlowKind::FlowAsync(f) => flows_queue.push_back(f.flow),
         }
     }
     post_process

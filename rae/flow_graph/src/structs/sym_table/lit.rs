@@ -1,7 +1,6 @@
 use crate::structs::chronicle::constraint::Constraint;
 use crate::structs::chronicle::{FlatBindings, FormatWithSymTable, GetVariables, Replace};
 use crate::structs::domain::Domain;
-use crate::structs::flow_graph::flow::FlowId;
 use crate::structs::sym_table::r#ref::RefSymTable;
 use crate::structs::sym_table::AtomId;
 use im::{hashset, HashSet};
@@ -12,10 +11,9 @@ use sompas_structs::lvalue::LValue;
 use std::borrow::Borrow;
 use std::ops::Deref;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Lit {
     Exp(Vec<Lit>),
-    Async(FlowId),
     Atom(AtomId),
     Await(AtomId),
     Read(Vec<AtomId>),
@@ -77,7 +75,7 @@ impl TryFrom<&Lit> for Vec<AtomId> {
 
     fn try_from(value: &Lit) -> Result<Self, Self::Error> {
         match value {
-            Lit::Atom(a) | Lit::Async(a) | Lit::Await(a) => Ok(vec![*a]),
+            Lit::Atom(a) | Lit::Await(a) => Ok(vec![*a]),
             Lit::Constraint(_) => Err(Default::default()),
             Lit::Exp(l) => {
                 let mut e = vec![];
@@ -204,7 +202,6 @@ impl FormatWithSymTable for Lit {
     fn format(&self, st: &RefSymTable, sym_version: bool) -> String {
         match self {
             Lit::Atom(a) => a.format(st, sym_version),
-            Lit::Async(a) => format!("async({})", a.format(st, sym_version)),
             Lit::Await(a) => {
                 format!("await({})", a.format(st, sym_version))
             }
@@ -272,7 +269,7 @@ impl FormatWithSymTable for Lit {
 impl FlatBindings for Lit {
     fn flat_bindings(&mut self, st: &RefSymTable) {
         match self {
-            Lit::Atom(a) | Lit::Async(a) | Lit::Await(a) => a.flat_bindings(st),
+            Lit::Atom(a) | Lit::Await(a) => a.flat_bindings(st),
             Lit::Constraint(c) => c.flat_bindings(st),
             Lit::Exp(vec) => vec.flat_bindings(st),
             Lit::Apply(vec) | Lit::Read(vec) | Lit::Write(vec) | Lit::Exec(vec) => {
@@ -285,7 +282,7 @@ impl FlatBindings for Lit {
 impl GetVariables for Lit {
     fn get_variables(&self) -> HashSet<AtomId> {
         match self {
-            Lit::Atom(a) | Lit::Async(a) | Lit::Await(a) => hashset!(*a),
+            Lit::Atom(a) | Lit::Await(a) => hashset!(*a),
             Lit::Constraint(c) => c.get_variables(),
             Lit::Exp(vec) => {
                 let mut hashset: im::HashSet<AtomId> = Default::default();
@@ -314,7 +311,7 @@ impl GetVariables for Lit {
 impl Replace for Lit {
     fn replace(&mut self, old: &AtomId, new: &AtomId) {
         match self {
-            Lit::Atom(a) | Lit::Async(a) | Lit::Await(a) => a.replace(old, new),
+            Lit::Atom(a) | Lit::Await(a) => a.replace(old, new),
             Lit::Constraint(c) => c.replace(old, new),
             Lit::Exp(e) => e.replace(old, new),
             Lit::Apply(vec) | Lit::Read(vec) | Lit::Write(vec) | Lit::Exec(vec) => {

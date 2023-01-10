@@ -1,4 +1,3 @@
-use crate::structs::chronicle::interval::Interval;
 use crate::structs::domain::basic_type::BasicType;
 use crate::structs::domain::Domain;
 use crate::structs::sym_table::closure::Update;

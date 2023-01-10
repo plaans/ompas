@@ -189,6 +189,7 @@ impl<T: Display + Default + Clone> Forest<T> {
                 }
             }
         }
+        self.flat_bindings()
     }
 
     /// x becomes the parent of y

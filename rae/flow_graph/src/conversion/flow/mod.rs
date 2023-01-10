@@ -8,8 +8,6 @@ use crate::structs::sym_table::{closure, AtomId};
 use crate::{DefineTable, FlowGraph};
 use core::result::Result;
 use core::result::Result::{Err, Ok};
-use ompas_rae_language::exec::state::{ASSERT, ASSERT_SHORT};
-use sompas_language::error::IS_ERR;
 use sompas_language::kind::ERR;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lprimitives::LPrimitives;
@@ -88,17 +86,17 @@ fn convert_list(
     let mut out_of_scope: Vec<AtomId> = vec![];
 
     let r = match proc {
-        LValue::Symbol(s) => convert_apply(s.as_str(), list.as_slice(), fl, define_table),
+        LValue::Symbol(s) => convert_apply(s.as_str(), list.as_slice(), fl, define_table)?,
         LValue::Primitive(co) => match co {
             LPrimitives::Define => {
                 let var = &list[1].to_string();
                 let val = &list[2];
                 let flow_val = convert_into_flow_graph(val, fl, define_table)?;
                 define_table.insert(var.to_string(), fl.get_flow_result(&flow_val));
-                let id = fl.sym_table.new_bool(false);
+                let id = fl.sym_table.new_nil();
                 let flow_result = fl.new_instantaneous_assignment(Lit::Atom(id));
 
-                Ok(fl.new_seq(vec![flow_val, flow_result]))
+                fl.new_seq(vec![flow_val, flow_result])
             }
             LPrimitives::If => {
                 let define_table = &mut define_table.clone();
@@ -125,7 +123,6 @@ fn convert_list(
                 let false_result = fl.get_flow_result(&false_flow);
 
                 let result = fl.sym_table.new_result();
-                let timepoint = fl.sym_table.new_timepoint();
 
                 fl.sym_table.add_update(
                     vec![true_result, false_result],
@@ -172,8 +169,9 @@ fn convert_list(
                     ),
                 );
 
-                let result = fl.new_result(result, timepoint);
-                let cond = fl.new_result(cond_result, fl.get_flow_end(&cond_flow));
+                let result = fl.new_result(result, None);
+
+                let cond = fl.new_result(cond_result, Some(fl.get_flow_end(&cond_flow)));
 
                 let branching = BranchingFlow {
                     cond,
@@ -182,11 +180,11 @@ fn convert_list(
                     result,
                 };
                 let flow_branch = fl.new_branching(branching);
-                Ok(fl.new_seq(vec![cond_flow, flow_branch]))
+                fl.new_seq(vec![cond_flow, flow_branch])
             }
             LPrimitives::Quote => {
                 let lit = lvalue_to_lit(&list[1], &mut fl.sym_table)?;
-                Ok(fl.new_instantaneous_assignment(lit))
+                fl.new_instantaneous_assignment(lit)
             }
             LPrimitives::Begin => {
                 let mut define_table = define_table.clone();
@@ -199,41 +197,31 @@ fn convert_list(
                 }
                 out_of_scope.append(&mut results);
 
-                Ok(fl.new_seq(seq))
+                fl.new_seq(seq)
             }
             LPrimitives::Async => {
                 let define_table = &mut define_table.clone();
                 let e = &list[1];
-                let async_flow_id = convert_into_flow_graph(e, fl, define_table)?;
-                let r_async = fl.get_flow_result(&async_flow_id);
+                let async_flow = convert_into_flow_graph(e, fl, define_table)?;
+                let r_async = fl.get_flow_result(&async_flow);
 
-                let handle_id = fl.sym_table.new_handle();
-
-                /*fl.sym_table.add_update(
-                    vec![r_async],
-                    Update::new(handle_id, closure::composed_update(handle_id, r_async)),
-                );
-                fl.sym_table.add_update(
-                    vec![handle_id],
-                    Update::new(r_async, closure::in_composed_update(r_async, handle_id)),
-                );*/
-
-                let handle_flow = fl.new_instantaneous_assignment(Lit::Async(async_flow_id));
+                let handle_flow = fl.new_async(async_flow);
 
                 let handle = fl.get_flow_result(&handle_flow);
 
-                fl.handles.insert(handle, handle_flow);
+                fl.handles.insert(handle, async_flow);
 
                 fl.sym_table.add_update(
                     vec![r_async],
                     Update::new(handle, closure::composed_update(handle, r_async)),
                 );
+
                 fl.sym_table.add_update(
-                    vec![handle_id],
+                    vec![handle],
                     Update::new(r_async, closure::in_composed_update(r_async, handle)),
                 );
 
-                Ok(handle_flow)
+                handle_flow
             }
             LPrimitives::Await => {
                 let define_table = &mut define_table.clone();
@@ -245,7 +233,7 @@ fn convert_list(
                 let flow_await = fl.new_assignment(Lit::Await(result));
                 out_of_scope.push(fl.get_flow_result(&h));
 
-                Ok(fl.new_seq(vec![h, flow_await]))
+                fl.new_seq(vec![h, flow_await])
             }
             LPrimitives::Err => {
                 let define_table = &mut define_table.clone();
@@ -272,7 +260,7 @@ fn convert_list(
                     ),
                 );
 
-                Ok(fl.new_seq(vec![arg_err, flow]))
+                fl.new_seq(vec![arg_err, flow])
             }
             LPrimitives::Race => {
                 todo!()
@@ -282,10 +270,10 @@ fn convert_list(
         _ => panic!(""),
     };
 
-    /*out_of_scope.append(&mut define_table.inner().values().copied().collect());
+    out_of_scope.append(&mut define_table.inner().values().copied().collect());
 
     for o in &out_of_scope {
-        fl.sym_table.set_end(o, &end_scope);
-    }*/
-    r
+        fl.sym_table.add_drop(o, &fl.get_flow_end(&r));
+    }
+    Ok(r)
 }

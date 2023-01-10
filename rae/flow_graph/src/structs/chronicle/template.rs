@@ -301,7 +301,8 @@ impl ChronicleTemplate {
                 format!(
                     "{}({})",
                     id.format(st, sym_version),
-                    st.get_domain(id, sym_version).unwrap()
+                    st.format_domain(st.get_domain(id, false).as_ref().unwrap()),
+                    //st.get_domain(id, sym_version).unwrap()
                 )
             })
             .collect::<Vec<String>>();
@@ -357,10 +358,10 @@ impl ChronicleTemplate {
         s
     }
 
-    pub fn format_with_parent(&mut self) {
+    pub fn flat_bindings(&mut self) {
         let st = &self.sym_table;
-        self.name.flat_bindings(st.borrow());
-        self.task.flat_bindings(st.borrow());
+        self.name.flat_bindings(st);
+        self.task.flat_bindings(st);
         let old_variables = self.variables.clone();
         let mut new_variables: HashSet<AtomId> = Default::default();
         for v in &old_variables {
@@ -370,12 +371,13 @@ impl ChronicleTemplate {
         }
 
         self.variables = new_variables;
-        self.interval.flat_bindings(st.borrow());
-        self.presence.flat_bindings(st.borrow());
-        self.constraints.flat_bindings(st.borrow());
-        self.conditions.flat_bindings(st.borrow());
-        self.effects.flat_bindings(st.borrow());
-        self.subtasks.flat_bindings(st.borrow());
+        self.interval.flat_bindings(st);
+        self.result.flat_bindings(st);
+        self.presence.flat_bindings(st);
+        self.constraints.flat_bindings(st);
+        self.conditions.flat_bindings(st);
+        self.effects.flat_bindings(st);
+        self.subtasks.flat_bindings(st);
     }
 }
 

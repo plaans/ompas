@@ -30,12 +30,12 @@ pub struct ChronicleDebug {
 
 pub struct ChronicleTemplate {
     pub sym_table: RefSymTable,
-    name: Vec<AtomId>,
-    task: Vec<AtomId>,
-    presence: AtomId,
+    name: Vec<VarId>,
+    task: Vec<VarId>,
+    presence: VarId,
     interval: Interval,
-    result: AtomId,
-    pub(crate) variables: HashSet<AtomId>,
+    result: VarId,
+    pub(crate) variables: HashSet<VarId>,
     constraints: Vec<Constraint>,
     conditions: Vec<Condition>,
     effects: Vec<Effect>,
@@ -89,7 +89,7 @@ impl ChronicleTemplate {
     /*
     GETTERS
      */
-    pub fn get_presence(&self) -> &AtomId {
+    pub fn get_presence(&self) -> &VarId {
         &self.presence
     }
 
@@ -97,7 +97,7 @@ impl ChronicleTemplate {
         &self.interval
     }
 
-    pub fn get_result(&self) -> &AtomId {
+    pub fn get_result(&self) -> &VarId {
         &self.result
     }
 
@@ -109,8 +109,8 @@ impl ChronicleTemplate {
         &self.constraints
     }
 
-    fn build_hashset<T: GetVariables>(vec: &[T]) -> im::HashSet<AtomId> {
-        let mut hashset: HashSet<AtomId> = Default::default();
+    fn build_hashset<T: GetVariables>(vec: &[T]) -> im::HashSet<VarId> {
+        let mut hashset: HashSet<VarId> = Default::default();
         for e in vec {
             hashset = hashset.union(e.get_variables());
         }
@@ -118,7 +118,7 @@ impl ChronicleTemplate {
         hashset
     }
 
-    pub fn get_variables_in_set(&self, set: ChronicleSet) -> im::HashSet<AtomId> {
+    pub fn get_variables_in_set(&self, set: ChronicleSet) -> im::HashSet<VarId> {
         match set {
             ChronicleSet::Effect => Self::build_hashset(&self.effects),
             ChronicleSet::Constraint => Self::build_hashset(&self.constraints),
@@ -127,7 +127,7 @@ impl ChronicleTemplate {
         }
     }
 
-    pub fn get_variables_in_sets(&self, sets: Vec<ChronicleSet>) -> im::HashSet<AtomId> {
+    pub fn get_variables_in_sets(&self, sets: Vec<ChronicleSet>) -> im::HashSet<VarId> {
         let mut hashset = HashSet::default();
         for set in sets {
             hashset = hashset.union(self.get_variables_in_set(set))
@@ -135,7 +135,7 @@ impl ChronicleTemplate {
         hashset
     }
 
-    pub fn get_all_variables_in_sets(&self) -> im::HashSet<AtomId> {
+    pub fn get_all_variables_in_sets(&self) -> im::HashSet<VarId> {
         self.get_variables_in_sets(vec![
             ChronicleSet::Effect,
             ChronicleSet::Constraint,
@@ -144,15 +144,13 @@ impl ChronicleTemplate {
         ])
     }
 
-    pub fn get_symbol_variables(&self, sym_table: &RefSymTable) -> HashSet<AtomId> {
+    pub fn get_symbol_variables(&self, sym_table: &RefSymTable) -> HashSet<VarId> {
         let variables = self.get_variables();
         variables
             .iter()
             .filter(|a| {
-                sym_table.contained_in_domain(
-                    &sym_table.get_domain(a, true).unwrap(),
-                    &RootType::Symbol.into(),
-                )
+                sym_table
+                    .contained_in_domain(&sym_table.get_domain_of_var(a), &RootType::Symbol.into())
             })
             .cloned()
             .collect()
@@ -162,22 +160,22 @@ impl ChronicleTemplate {
         &self.debug
     }
 
-    pub fn get_name(&self) -> &Vec<AtomId> {
+    pub fn get_name(&self) -> &Vec<VarId> {
         &self.name
     }
 
-    pub fn get_task(&self) -> &Vec<AtomId> {
+    pub fn get_task(&self) -> &Vec<VarId> {
         &self.task
     }
 
     /*
     REMOVERS
      */
-    pub fn rm_var(&mut self, sym_id: &AtomId) {
+    pub fn rm_var(&mut self, sym_id: &VarId) {
         self.variables.remove(sym_id);
     }
 
-    pub fn rm_set_var(&mut self, ids: Vec<AtomId>) {
+    pub fn rm_set_var(&mut self, ids: Vec<VarId>) {
         for id in ids {
             self.rm_var(&id);
         }
@@ -202,7 +200,7 @@ impl ChronicleTemplate {
     /*
     ADDERS
      */
-    pub fn add_var(&mut self, sym_id: &AtomId) {
+    pub fn add_var(&mut self, sym_id: &VarId) {
         self.variables.insert(*sym_id);
     }
 
@@ -251,10 +249,10 @@ impl ChronicleTemplate {
         self.syntactic_chronicles.push(task)
     }
 
-    pub fn add_task_parameter(&mut self, param: &AtomId) {
+    pub fn add_task_parameter(&mut self, param: &VarId) {
         self.task.push(*param)
     }
-    pub fn add_method_parameter(&mut self, param: &AtomId) {
+    pub fn add_method_parameter(&mut self, param: &VarId) {
         self.name.push(*param)
     }
 
@@ -262,11 +260,11 @@ impl ChronicleTemplate {
     SETTERS
      */
 
-    pub fn set_name(&mut self, name: Vec<AtomId>) {
+    pub fn set_name(&mut self, name: Vec<VarId>) {
         self.name = name;
     }
 
-    pub fn set_task(&mut self, task: Vec<AtomId>) {
+    pub fn set_task(&mut self, task: Vec<VarId>) {
         self.task = task;
     }
 
@@ -301,8 +299,7 @@ impl ChronicleTemplate {
                 format!(
                     "{}({})",
                     id.format(st, sym_version),
-                    st.format_domain(st.get_domain(id, false).as_ref().unwrap()),
-                    //st.get_domain(id, sym_version).unwrap()
+                    st.format_var_domain(&st.get_domain_id(id)),
                 )
             })
             .collect::<Vec<String>>();
@@ -363,7 +360,7 @@ impl ChronicleTemplate {
         self.name.flat_bindings(st);
         self.task.flat_bindings(st);
         let old_variables = self.variables.clone();
-        let mut new_variables: HashSet<AtomId> = Default::default();
+        let mut new_variables: HashSet<VarId> = Default::default();
         for v in &old_variables {
             let mut v = *v;
             v.flat_bindings(st.borrow());
@@ -382,23 +379,21 @@ impl ChronicleTemplate {
 }
 
 impl GetVariables for ChronicleTemplate {
-    fn get_variables(&self) -> HashSet<AtomId> {
+    fn get_variables(&self) -> HashSet<VarId> {
         self.variables.clone()
     }
 
-    fn get_variables_in_domain(&self, sym_table: &RefSymTable, domain: &Domain) -> HashSet<AtomId> {
+    fn get_variables_in_domain(&self, sym_table: &RefSymTable, domain: &Domain) -> HashSet<VarId> {
         self.variables
             .iter()
-            .filter(|v| {
-                sym_table.contained_in_domain(&sym_table.get_domain(v, true).unwrap(), domain)
-            })
+            .filter(|v| sym_table.contained_in_domain(&sym_table.get_domain_of_var(v), domain))
             .cloned()
             .collect()
     }
 }
 
 impl Replace for ChronicleTemplate {
-    fn replace(&mut self, old: &AtomId, new: &AtomId) {
+    fn replace(&mut self, old: &VarId, new: &VarId) {
         self.variables.remove(old);
         self.variables.insert(*new);
         self.conditions.replace(old, new);

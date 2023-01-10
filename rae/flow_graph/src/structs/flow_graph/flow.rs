@@ -1,5 +1,5 @@
 use crate::structs::flow_graph::assignment::Assignment;
-use crate::structs::sym_table::AtomId;
+use crate::structs::sym_table::VarId;
 
 pub type FlowId = usize;
 
@@ -66,13 +66,13 @@ pub struct BranchingFlow {
 
 #[derive(Clone)]
 pub struct FlowResult {
-    pub result: AtomId,
-    pub timepoint: AtomId,
+    pub result: VarId,
+    pub timepoint: VarId,
 }
 
 #[derive(Clone)]
 pub struct FlowAsync {
-    pub result: AtomId,
-    pub timepoint: AtomId,
+    pub result: VarId,
+    pub timepoint: VarId,
     pub flow: FlowId,
 }

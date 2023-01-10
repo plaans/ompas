@@ -3,7 +3,8 @@ use crate::structs::domain::Domain;
 use crate::structs::sym_table::closure::Update;
 use crate::structs::sym_table::forest::Node;
 use crate::structs::sym_table::var_domain::VarDomain;
-use crate::structs::sym_table::{AtomId, EmptyDomains, SymTable};
+use crate::structs::sym_table::variable::Variable;
+use crate::structs::sym_table::{DomainId, EmptyDomains, SymTable, VarId};
 use sompas_structs::lnumber::LNumber;
 use std::borrow::Borrow;
 use std::cell::RefCell;
@@ -18,63 +19,90 @@ impl RefSymTable {
     SCOPES FUNCTIONS
      */
 
-    pub fn add_declaration(&mut self, id: &AtomId, start: &AtomId) {
-        RefCell::borrow_mut(&self.0).add_declaration(id, start)
+    pub fn set_declaration(&mut self, id: &VarId, timepoint: &VarId) {
+        RefCell::borrow_mut(&self.0).set_declaration(id, timepoint)
     }
 
-    pub fn add_drop(&mut self, id: &AtomId, end: &AtomId) {
-        RefCell::borrow_mut(&self.0).add_drop(id, end)
+    pub fn set_drop(&mut self, id: &VarId, timepoint: &VarId) {
+        RefCell::borrow_mut(&self.0).set_drop(id, timepoint)
     }
 
-    pub fn get_declarations(&self, id: &AtomId) -> Vec<AtomId> {
-        RefCell::borrow(&self.0).get_declarations(id).clone()
+    pub fn get_declaration(&self, id: &VarId) -> Option<VarId> {
+        RefCell::borrow(&self.0).get_declaration(id)
     }
 
-    pub fn get_drops(&self, id: &AtomId) -> Vec<AtomId> {
-        RefCell::borrow(&self.0).get_drops(id).clone()
+    pub fn get_drop(&self, id: &VarId) -> Option<VarId> {
+        RefCell::borrow(&self.0).get_drop(id)
+    }
+
+    pub fn get_domain_vars(&self, d: &DomainId) -> Vec<VarId> {
+        RefCell::borrow(&self.0).get_domain_vars(d)
     }
 
     /*
     NEW SIMPLE ATOMS FUNCTIONS
      */
 
-    pub fn new_bool(&mut self, b: bool) -> AtomId {
+    pub fn new_bool(&mut self, b: bool) -> VarId {
         RefCell::borrow_mut(&self.0).new_bool(b)
     }
 
-    pub fn new_nil(&mut self) -> AtomId {
+    pub fn new_nil(&mut self) -> VarId {
         RefCell::borrow_mut(&self.0).new_nil()
     }
 
-    pub fn new_int(&mut self, i: i64) -> AtomId {
+    pub fn new_int(&mut self, i: i64) -> VarId {
         RefCell::borrow_mut(&self.0).new_int(i)
     }
 
-    pub fn new_float(&mut self, f: f64) -> AtomId {
+    pub fn new_float(&mut self, f: f64) -> VarId {
         RefCell::borrow_mut(&self.0).new_float(f)
     }
 
-    pub fn new_number(&mut self, n: &LNumber) -> AtomId {
+    pub fn new_number(&mut self, n: &LNumber) -> VarId {
         RefCell::borrow_mut(&self.0).new_number(n)
     }
 
     /*
     GETTERS
     */
-    pub fn get_node(&self, id: &AtomId) -> Option<Node<VarDomain>> {
-        RefCell::borrow(&self.0).get_node(id).cloned()
+
+    //VarDomain
+    pub fn get_var_domain(&self, id: &DomainId) -> VarDomain {
+        RefCell::borrow(&self.0).get_var_domain(id).clone()
     }
 
-    pub fn get_domain(&self, id: &AtomId, parent: bool) -> Option<Domain> {
-        RefCell::borrow(&self.0).get_domain(id, parent).cloned()
+    pub fn get_domain(&self, id: &DomainId) -> Domain {
+        RefCell::borrow(&self.0).get_domain(id).clone()
     }
 
-    /*pub fn get_type_of(&self, id: &AtomId) -> AtomType {
-        RefCell::borrow(&self.0).get_type_of(id)
-    }*/
+    pub fn get_domain_parent(&self, id: &DomainId) -> DomainId {
+        RefCell::borrow(&self.0).get_domain_parent(id)
+    }
 
-    pub fn id(&self, atom: &str) -> Option<AtomId> {
-        RefCell::borrow(&self.0).id(atom)
+    //Variable
+    pub fn get_variable(&self, id: &VarId) -> Variable {
+        RefCell::borrow(&self.0).get_variable(id).clone()
+    }
+
+    pub fn get_domain_id(&self, v: &VarId) -> DomainId {
+        RefCell::borrow(&self.0).get_domain_id(v)
+    }
+
+    pub fn get_label(&self, id: &VarId, parent: bool) -> String {
+        RefCell::borrow(&self.0).get_label(id, parent).to_string()
+    }
+
+    pub fn get_var_parent(&self, v: &VarId) -> VarId {
+        RefCell::borrow(&self.0).get_var_parent(v)
+    }
+
+    pub fn get_domain_of_var(&self, v: &VarId) -> Domain {
+        RefCell::borrow(&self.0).get_domain_of_var(v).clone()
+    }
+
+    pub fn get_sym_id(&self, sym: &str) -> Option<VarId> {
+        RefCell::borrow(&self.0).get_sym_id(sym)
     }
 
     /*pub fn get_symbols_of_type(&self, _symbol_type: &AtomType) -> HashSet<AtomId> {
@@ -96,53 +124,46 @@ impl RefSymTable {
 
     //Declare a new return value
     //The name of the return value will be format!("r_{}", last_return_index)
-    pub fn new_result(&mut self) -> AtomId {
+    pub fn new_result(&mut self) -> VarId {
         RefCell::borrow_mut(&self.0).new_result()
     }
 
-    pub fn new_timepoint(&mut self) -> AtomId {
+    pub fn new_timepoint(&mut self) -> VarId {
         RefCell::borrow_mut(&self.0).new_timepoint()
     }
 
-    pub fn new_if(&mut self) -> (AtomId, AtomId, AtomId) {
+    pub fn new_if(&mut self) -> (VarId, VarId, VarId) {
         RefCell::borrow_mut(&self.0).new_if()
     }
 
-    pub fn new_handle(&mut self) -> AtomId {
+    pub fn new_handle(&mut self) -> VarId {
         RefCell::borrow_mut(&self.0).new_handle()
     }
 
-    pub fn new_start(&mut self) -> AtomId {
+    pub fn new_start(&mut self) -> VarId {
         RefCell::borrow_mut(&self.0).new_start()
     }
 
-    pub fn new_end(&mut self) -> AtomId {
+    pub fn new_end(&mut self) -> VarId {
         RefCell::borrow_mut(&self.0).new_end()
     }
 
-    pub fn new_presence(&mut self) -> AtomId {
+    pub fn new_presence(&mut self) -> VarId {
         RefCell::borrow_mut(&self.0).new_presence()
     }
 
-    pub fn new_chronicle_result(&mut self) -> AtomId {
+    pub fn new_chronicle_result(&mut self) -> VarId {
         RefCell::borrow_mut(&self.0).new_chronicle_result()
     }
 
-    pub fn new_symbol(&mut self, sym: impl Display) -> AtomId {
+    pub fn new_symbol(&mut self, sym: impl Display) -> VarId {
         RefCell::borrow_mut(&self.0).new_symbol(sym)
     }
 
-    pub fn new_parameter(&mut self, symbol: impl ToString, domain: Domain) -> AtomId {
+    pub fn new_parameter(&mut self, symbol: impl ToString, domain: impl Into<Domain>) -> VarId {
         RefCell::borrow_mut(&self.0).new_parameter(symbol, domain)
     }
 
-    pub fn get_parent(&self, a: &AtomId) -> AtomId {
-        RefCell::borrow(&self.0).get_parent(a)
-    }
-
-    /*pub fn get_debug(&self, id: &AtomId) -> String {
-        RefCell::borrow(&self.0).get_debug(id).to_string()
-    }*/
     /*
     Domain operators
      */
@@ -159,48 +180,39 @@ impl RefSymTable {
         RefCell::borrow(&self.0).substract(d1, d2)
     }
 
-    pub fn meet_domains(&self, id_d1: &AtomId, id_d2: &AtomId) -> Domain {
+    pub fn meet_domains(&self, id_d1: &DomainId, id_d2: &DomainId) -> Domain {
         RefCell::borrow(&self.0).meet_domains(id_d1, id_d2)
     }
 
-    pub fn union_domains(&self, id_d1: &AtomId, id_d2: &AtomId) -> Domain {
+    pub fn union_domains(&self, id_d1: &DomainId, id_d2: &DomainId) -> Domain {
         RefCell::borrow(&self.0).union_domains(id_d1, id_d2)
     }
 
-    pub fn substract_domains(&self, id_d1: &AtomId, id_d2: &AtomId) -> Domain {
+    pub fn substract_domains(&self, id_d1: &DomainId, id_d2: &DomainId) -> Domain {
         RefCell::borrow(&self.0).substract_domains(id_d1, id_d2)
     }
 
-    pub fn meet_to_domain(&mut self, id_d1: &AtomId, domain: impl Into<Domain>) -> EmptyDomains {
+    pub fn meet_to_domain(&mut self, id_d1: &DomainId, domain: impl Into<Domain>) -> EmptyDomains {
         RefCell::borrow_mut(&self.0).meet_to_domain(id_d1, domain)
     }
 
     pub fn substract_to_domain(
         &mut self,
-        id_d1: &AtomId,
+        id_d1: &DomainId,
         domain: impl Into<Domain>,
     ) -> EmptyDomains {
         RefCell::borrow_mut(&self.0).subtract_to_domain(id_d1, domain)
     }
 
-    pub fn set_domain(&mut self, id: &AtomId, domain: impl Into<Domain>) -> EmptyDomains {
+    pub fn set_domain(&mut self, id: &DomainId, domain: impl Into<Domain>) -> EmptyDomains {
         RefCell::borrow_mut(&self.0).set_domain(id, domain)
     }
 
-    /*pub fn add_constraint(
-        &mut self,
-        id: &AtomId,
-        constraint: ConstraintClosure,
-        update: UpdateClosure,
-    ) {
-        RefCell::borrow_mut(&self.0).add_constraint(id, constraint, update)
-    }*/
-
-    pub fn add_update(&mut self, elements: Vec<AtomId>, update: Update) {
+    pub fn add_update(&mut self, elements: Vec<VarId>, update: Update) {
         RefCell::borrow_mut(&self.0).add_update(elements, update);
     }
 
-    pub fn remove_update(&mut self, id: &AtomId, dependent: &AtomId) {
+    pub fn remove_update(&mut self, id: &VarId, dependent: &VarId) {
         RefCell::borrow_mut(&self.0).remove_update(id, dependent);
     }
 
@@ -219,15 +231,18 @@ impl RefSymTable {
         RefCell::borrow_mut(&self.0).flat_bindings()
     }
 
-    pub fn union_atom(&mut self, id1: &AtomId, id2: &AtomId) -> EmptyDomains {
-        RefCell::borrow_mut(&self.0).union_atom(id1, id2)
+    pub fn union_var(&mut self, id1: &VarId, id2: &VarId) -> EmptyDomains {
+        RefCell::borrow_mut(&self.0).union_var(id1, id2)
     }
 
+    pub fn union_domain(&mut self, id1: &DomainId, id2: &DomainId) -> EmptyDomains {
+        RefCell::borrow_mut(&self.0).union_domain(id1, id2)
+    }
     /*
     FORMAT Function
       */
 
-    pub fn format_variable(&self, id: &AtomId) -> String {
+    pub fn format_variable(&self, id: &VarId) -> String {
         RefCell::borrow(&self.0).format_variable(id)
     }
 
@@ -235,8 +250,8 @@ impl RefSymTable {
         RefCell::borrow(&self.0).format_domain(domain)
     }
 
-    pub fn format_atom_domain(&self, id: &AtomId) -> String {
-        RefCell::borrow(&self.0).format_atom_domain(id)
+    pub fn format_var_domain(&self, id: &DomainId) -> String {
+        RefCell::borrow(&self.0).format_var_domain(id)
     }
 }
 
@@ -247,16 +262,13 @@ impl Display for RefSymTable {
         write!(f, "## SYM TABLE \n").unwrap();
 
         for e in 0..st.domains.len() {
-            if e == st.get_parent(&e) {
-                assert_eq!(e, self.get_parent(&e));
-                write!(
-                    f,
-                    "- ({}){}({})\n",
-                    e,
-                    self.format_variable(&e),
-                    self.format_atom_domain(&e),
-                )?;
-            }
+            write!(
+                f,
+                "- ({}){}({})\n",
+                e,
+                self.format_variable(&e),
+                self.format_var_domain(&self.get_domain_id(&e)),
+            )?;
         }
         Ok(())
     }

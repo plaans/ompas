@@ -1,7 +1,7 @@
 use crate::structs::domain::root_type::RootType;
 use crate::structs::domain::root_type::RootType::{False, True};
 use crate::structs::domain::Domain;
-use crate::structs::sym_table::{AtomId, EmptyDomains, SymTable};
+use crate::structs::sym_table::{EmptyDomains, SymTable, VarId};
 use std::rc::Rc;
 
 pub(crate) type UpdateClosure = Rc<Box<dyn Fn(&mut SymTable) -> EmptyDomains>>;
@@ -9,19 +9,19 @@ pub(crate) type UpdateClosure = Rc<Box<dyn Fn(&mut SymTable) -> EmptyDomains>>;
 #[derive(Clone)]
 pub struct Update {
     pub closure: UpdateClosure,
-    pub id: AtomId,
+    pub id: VarId,
 }
 
 impl Update {
-    pub fn new(id: AtomId, closure: UpdateClosure) -> Self {
+    pub fn new(id: VarId, closure: UpdateClosure) -> Self {
         Self { closure, id }
     }
 }
 
-pub(crate) fn in_union_update(id: AtomId, union_atom: AtomId) -> UpdateClosure {
+pub(crate) fn in_union_update(id: VarId, union_atom: VarId) -> UpdateClosure {
     Rc::new(Box::new(move |st| {
-        let id = st.get_parent(&id);
-        let union_atom = st.get_parent(&union_atom);
+        let id = st.get_var_parent(&id);
+        let union_atom = st.get_var_parent(&union_atom);
         let union_domain = &st.domains[union_atom].domain;
         let in_union_domain = &st.domains[id].domain;
         let domain = st.meet(union_domain, in_union_domain);
@@ -34,10 +34,10 @@ pub(crate) fn in_union_update(id: AtomId, union_atom: AtomId) -> UpdateClosure {
     }))
 }
 
-pub(crate) fn union_update(id: AtomId, union: Vec<AtomId>) -> UpdateClosure {
+pub(crate) fn union_update(id: VarId, union: Vec<VarId>) -> UpdateClosure {
     Rc::new(Box::new(move |st| {
-        let id = st.get_parent(&id);
-        let union: Vec<AtomId> = union.iter().map(|id| st.get_parent(id)).collect();
+        let id = st.get_var_parent(&id);
+        let union: Vec<VarId> = union.iter().map(|id| st.get_var_parent(id)).collect();
 
         let mut emptys = EmptyDomains::None;
         let mut new_domain = Domain::empty();
@@ -56,10 +56,10 @@ pub(crate) fn union_update(id: AtomId, union: Vec<AtomId>) -> UpdateClosure {
     }))
 }
 
-pub(crate) fn in_composed_update(id: AtomId, composed: AtomId) -> UpdateClosure {
+pub(crate) fn in_composed_update(id: VarId, composed: VarId) -> UpdateClosure {
     Rc::new(Box::new(move |st| {
-        let id = st.get_parent(&id);
-        let composed = st.get_parent(&composed);
+        let id = st.get_var_parent(&id);
+        let composed = st.get_var_parent(&composed);
         let composed = st.domains[composed].domain.clone();
 
         if composed.is_empty() {
@@ -84,10 +84,10 @@ pub(crate) fn in_composed_update(id: AtomId, composed: AtomId) -> UpdateClosure 
     }))
 }
 
-pub(crate) fn composed_update(id: AtomId, atom: AtomId) -> UpdateClosure {
+pub(crate) fn composed_update(id: VarId, atom: VarId) -> UpdateClosure {
     Rc::new(Box::new(move |st| {
-        let id = st.get_parent(&id);
-        let atom = st.get_parent(&atom);
+        let id = st.get_var_parent(&id);
+        let atom = st.get_var_parent(&atom);
         let sub = st.domains[atom].domain.clone();
 
         let ancient_domain = &st.domains[id].domain;
@@ -110,11 +110,11 @@ pub(crate) fn composed_update(id: AtomId, atom: AtomId) -> UpdateClosure {
     }))
 }
 
-pub(crate) fn result_is_err_update(id: AtomId, arg_err: AtomId) -> UpdateClosure {
+pub(crate) fn result_is_err_update(id: VarId, arg_err: VarId) -> UpdateClosure {
     Rc::new(Box::new(move |st| {
-        let id = st.get_parent(&id);
-        let arg_err = st.get_parent(&arg_err);
-        let d = st.get_domain(&arg_err, false).unwrap().clone();
+        let id = st.get_var_parent(&id);
+        let arg_err = st.get_var_parent(&arg_err);
+        let d = st.get_domain_of_var(&arg_err).clone();
 
         if d.is_empty() {
             EmptyDomains::Some(vec![id])
@@ -138,11 +138,11 @@ pub(crate) fn result_is_err_update(id: AtomId, arg_err: AtomId) -> UpdateClosure
     }))
 }
 
-pub(crate) fn arg_is_err_update(id: AtomId, result_err: AtomId) -> UpdateClosure {
+pub(crate) fn arg_is_err_update(id: VarId, result_err: VarId) -> UpdateClosure {
     Rc::new(Box::new(move |st| {
-        let id = st.get_parent(&id);
-        let result_err = st.get_parent(&result_err);
-        let d = st.get_domain(&result_err, false).unwrap().clone();
+        let id = st.get_var_parent(&id);
+        let result_err = st.get_var_parent(&result_err);
+        let d = st.get_domain_of_var(&result_err).clone();
         let d = if d.is_true() {
             st.meet(&st.domains[id].domain, &RootType::Err.into())
         } else if d.is_false() {
@@ -163,13 +163,13 @@ pub(crate) fn arg_is_err_update(id: AtomId, result_err: AtomId) -> UpdateClosure
 }
 
 pub(crate) fn result_branch_cond_update(
-    cond: AtomId,
-    result_branch: AtomId,
+    cond: VarId,
+    result_branch: VarId,
     branch: bool,
 ) -> UpdateClosure {
     Rc::new(Box::new(move |st| {
-        let cond = st.get_parent(&cond);
-        let result_branch = st.get_parent(&result_branch);
+        let cond = st.get_var_parent(&cond);
+        let result_branch = st.get_var_parent(&result_branch);
 
         let mut empty = EmptyDomains::None;
 
@@ -190,27 +190,27 @@ pub(crate) fn result_branch_cond_update(
 }
 
 pub(crate) fn cond_result_branching_update(
-    cond: AtomId,
-    result_branching: AtomId,
-    true_result: AtomId,
-    false_result: AtomId,
+    cond: VarId,
+    result_branching: VarId,
+    true_result: VarId,
+    false_result: VarId,
 ) -> UpdateClosure {
     Rc::new(Box::new(move |st| {
-        let cond = st.get_parent(&cond);
-        let true_result = st.get_parent(&true_result);
-        let false_result = st.get_parent(&false_result);
-        let result_branching = st.get_parent(&result_branching);
+        let cond = st.get_var_parent(&cond);
+        let true_result = st.get_var_parent(&true_result);
+        let false_result = st.get_var_parent(&false_result);
+        let result_branching = st.get_var_parent(&result_branching);
 
         let mut empty = EmptyDomains::None;
 
         if st.domains[cond].domain.is_true() {
             st.remove_update(&false_result, &result_branching);
             st.remove_update(&result_branching, &false_result);
-            empty.append(st.union_atom(&true_result, &result_branching));
+            empty.append(st.union_var(&true_result, &result_branching));
         } else if st.domains[cond].domain.is_false() {
             st.remove_update(&true_result, &result_branching);
             st.remove_update(&result_branching, &true_result);
-            empty.append(st.union_atom(&false_result, &result_branching));
+            empty.append(st.union_var(&false_result, &result_branching));
         }
 
         empty

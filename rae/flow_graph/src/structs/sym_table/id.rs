@@ -1,4 +1,4 @@
-use crate::structs::sym_table::AtomId;
+use crate::structs::sym_table::VarId;
 use std::collections::HashMap;
 
 pub type Version = usize;
@@ -9,7 +9,7 @@ pub struct SymbolTableId {
 }
 
 impl SymbolTableId {
-    pub fn insert(&mut self, symbol: &str, id: &AtomId) -> Version {
+    pub fn insert(&mut self, symbol: &str, id: &VarId) -> Version {
         match self.inner.get_mut(symbol) {
             None => {
                 self.inner.insert(symbol.to_string(), Id::unique(id));
@@ -35,7 +35,7 @@ impl SymbolTableId {
         }
     }
 
-    pub fn get_id(&self, symbol: &str) -> Option<AtomId> {
+    pub fn get_id(&self, symbol: &str) -> Option<VarId> {
         self.inner.get(symbol).map(|id| *id.get_id())
     }
 
@@ -46,20 +46,20 @@ impl SymbolTableId {
 
 #[derive(Clone)]
 pub enum Id {
-    Unique(AtomId),
-    Several(Vec<AtomId>),
+    Unique(VarId),
+    Several(Vec<VarId>),
 }
 
 impl Id {
-    pub fn unique(id: &AtomId) -> Self {
+    pub fn unique(id: &VarId) -> Self {
         Self::Unique(*id)
     }
 
-    pub fn several(id: &AtomId) -> Self {
+    pub fn several(id: &VarId) -> Self {
         Self::Several(vec![*id])
     }
 
-    pub fn get_id(&self) -> &AtomId {
+    pub fn get_id(&self) -> &VarId {
         match self {
             Id::Unique(id) => id,
             Id::Several(vec) => vec.last().unwrap(),

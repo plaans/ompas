@@ -4,7 +4,7 @@ use crate::structs::domain::root_type::RootType::Boolean;
 use crate::structs::flow_graph::flow::{BranchingFlow, FlowId};
 use crate::structs::sym_table::closure::Update;
 use crate::structs::sym_table::lit::{lvalue_to_lit, Lit};
-use crate::structs::sym_table::{closure, AtomId};
+use crate::structs::sym_table::{closure, VarId};
 use crate::{DefineTable, FlowGraph};
 use core::result::Result;
 use core::result::Result::{Err, Ok};
@@ -83,7 +83,7 @@ fn convert_list(
     define_table: &mut DefineTable,
 ) -> Result<FlowId, LRuntimeError> {
     let proc = &list[0];
-    let mut out_of_scope: Vec<AtomId> = vec![];
+    let mut out_of_scope: Vec<VarId> = vec![];
 
     let r = match proc {
         LValue::Symbol(s) => convert_apply(s.as_str(), list.as_slice(), fl, define_table)?,
@@ -273,7 +273,7 @@ fn convert_list(
     out_of_scope.append(&mut define_table.inner().values().copied().collect());
 
     for o in &out_of_scope {
-        fl.sym_table.add_drop(o, &fl.get_flow_end(&r));
+        fl.sym_table.set_drop(o, &fl.get_flow_end(&r));
     }
     Ok(r)
 }

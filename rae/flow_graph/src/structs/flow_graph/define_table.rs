@@ -1,20 +1,20 @@
-use crate::structs::sym_table::AtomId;
+use crate::structs::sym_table::VarId;
 
 #[derive(Default, Clone)]
 pub struct DefineTable {
-    inner: im::HashMap<String, AtomId>,
+    inner: im::HashMap<String, VarId>,
 }
 
 impl DefineTable {
-    pub fn insert(&mut self, var: String, atom_id: AtomId) {
+    pub fn insert(&mut self, var: String, atom_id: VarId) {
         self.inner.insert(var, atom_id);
     }
 
-    pub fn get(&self, var: &str) -> Option<&AtomId> {
+    pub fn get(&self, var: &str) -> Option<&VarId> {
         self.inner.get(var)
     }
 
-    pub fn inner(&self) -> &im::HashMap<String, AtomId> {
+    pub fn inner(&self) -> &im::HashMap<String, VarId> {
         &self.inner
     }
 }

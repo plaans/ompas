@@ -1,7 +1,7 @@
 use crate::structs::chronicle::template::ChronicleTemplate;
-use crate::structs::chronicle::AtomId;
+use crate::structs::chronicle::VarId;
 
 pub struct TaskTemplate {
-    pub name: Vec<AtomId>,
+    pub name: Vec<VarId>,
     pub methods: Vec<ChronicleTemplate>,
 }

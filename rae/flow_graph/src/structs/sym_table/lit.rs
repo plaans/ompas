@@ -2,7 +2,7 @@ use crate::structs::chronicle::constraint::Constraint;
 use crate::structs::chronicle::{FlatBindings, FormatWithSymTable, GetVariables, Replace};
 use crate::structs::domain::Domain;
 use crate::structs::sym_table::r#ref::RefSymTable;
-use crate::structs::sym_table::AtomId;
+use crate::structs::sym_table::VarId;
 use im::{hashset, HashSet};
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lruntimeerror;
@@ -14,21 +14,21 @@ use std::ops::Deref;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Lit {
     Exp(Vec<Lit>),
-    Atom(AtomId),
-    Await(AtomId),
-    Read(Vec<AtomId>),
-    Write(Vec<AtomId>),
-    Exec(Vec<AtomId>),
+    Atom(VarId),
+    Await(VarId),
+    Read(Vec<VarId>),
+    Write(Vec<VarId>),
+    Exec(Vec<VarId>),
     Constraint(Box<Constraint>),
-    Apply(Vec<AtomId>),
+    Apply(Vec<VarId>),
 }
 
 impl Lit {
-    pub fn apply(vec: Vec<AtomId>) -> Self {
+    pub fn apply(vec: Vec<VarId>) -> Self {
         Self::Apply(vec)
     }
 
-    pub fn atom(atom: AtomId) -> Self {
+    pub fn atom(atom: VarId) -> Self {
         Self::Atom(atom)
     }
 
@@ -51,7 +51,7 @@ impl Lit {
     }
 }
 
-impl TryFrom<Lit> for AtomId {
+impl TryFrom<Lit> for VarId {
     type Error = LRuntimeError;
 
     fn try_from(value: Lit) -> Result<Self, Self::Error> {
@@ -59,7 +59,7 @@ impl TryFrom<Lit> for AtomId {
     }
 }
 
-impl TryFrom<&Lit> for AtomId {
+impl TryFrom<&Lit> for VarId {
     type Error = LRuntimeError;
 
     fn try_from(value: &Lit) -> Result<Self, Self::Error> {
@@ -70,7 +70,7 @@ impl TryFrom<&Lit> for AtomId {
     }
 }
 
-impl TryFrom<&Lit> for Vec<AtomId> {
+impl TryFrom<&Lit> for Vec<VarId> {
     type Error = LRuntimeError;
 
     fn try_from(value: &Lit) -> Result<Self, Self::Error> {
@@ -80,7 +80,7 @@ impl TryFrom<&Lit> for Vec<AtomId> {
             Lit::Exp(l) => {
                 let mut e = vec![];
                 for a in l {
-                    e.push(AtomId::try_from(a)?);
+                    e.push(VarId::try_from(a)?);
                 }
                 Ok(e)
             }
@@ -89,7 +89,7 @@ impl TryFrom<&Lit> for Vec<AtomId> {
     }
 }
 
-impl TryFrom<Lit> for Vec<AtomId> {
+impl TryFrom<Lit> for Vec<VarId> {
     type Error = LRuntimeError;
 
     fn try_from(value: Lit) -> Result<Self, Self::Error> {
@@ -131,14 +131,14 @@ impl Default for Lit {
     }
 }
 
-impl From<&AtomId> for Lit {
-    fn from(s: &AtomId) -> Self {
+impl From<&VarId> for Lit {
+    fn from(s: &VarId) -> Self {
         Self::Atom(*s)
     }
 }
 
-impl From<AtomId> for Lit {
-    fn from(s: AtomId) -> Self {
+impl From<VarId> for Lit {
+    fn from(s: VarId) -> Self {
         s.borrow().into()
     }
 }
@@ -188,7 +188,7 @@ pub fn lvalue_to_lit(lv: &LValue, st: &mut RefSymTable) -> lruntimeerror::Result
         },
         LValue::True => Ok(st.new_bool(true).into()),
         LValue::Nil => Ok(st.new_bool(false).into()),
-        lv => Ok(match st.id(&lv.to_string()) {
+        lv => Ok(match st.get_sym_id(&lv.to_string()) {
             Some(id) => id.into(),
             None => {
                 //println!("symbol {} does not exist", lv.to_string());
@@ -280,12 +280,12 @@ impl FlatBindings for Lit {
 }
 
 impl GetVariables for Lit {
-    fn get_variables(&self) -> HashSet<AtomId> {
+    fn get_variables(&self) -> HashSet<VarId> {
         match self {
             Lit::Atom(a) | Lit::Await(a) => hashset!(*a),
             Lit::Constraint(c) => c.get_variables(),
             Lit::Exp(vec) => {
-                let mut hashset: im::HashSet<AtomId> = Default::default();
+                let mut hashset: im::HashSet<VarId> = Default::default();
                 for e in vec {
                     hashset = hashset.union(e.get_variables())
                 }
@@ -297,19 +297,17 @@ impl GetVariables for Lit {
         }
     }
 
-    fn get_variables_in_domain(&self, sym_table: &RefSymTable, domain: &Domain) -> HashSet<AtomId> {
+    fn get_variables_in_domain(&self, sym_table: &RefSymTable, domain: &Domain) -> HashSet<VarId> {
         self.get_variables()
             .iter()
-            .filter(|v| {
-                sym_table.contained_in_domain(&sym_table.get_domain(v, true).unwrap(), domain)
-            })
+            .filter(|v| sym_table.contained_in_domain(&sym_table.get_domain_of_var(v), domain))
             .cloned()
             .collect()
     }
 }
 
 impl Replace for Lit {
-    fn replace(&mut self, old: &AtomId, new: &AtomId) {
+    fn replace(&mut self, old: &VarId, new: &VarId) {
         match self {
             Lit::Atom(a) | Lit::Await(a) => a.replace(old, new),
             Lit::Constraint(c) => c.replace(old, new),

@@ -6,7 +6,7 @@ use crate::structs::flow_graph::flow::{
 };
 use crate::structs::sym_table::lit::Lit;
 use crate::structs::sym_table::r#ref::RefSymTable;
-use crate::structs::sym_table::AtomId;
+use crate::structs::sym_table::VarId;
 use im::hashset;
 use std::collections::HashMap;
 use std::fmt::Write;
@@ -21,7 +21,7 @@ pub struct FlowGraph {
     pub sym_table: RefSymTable,
     pub(crate) flows: Vec<Flow>,
     pub(crate) map_atom_id_flow_id: HashMap<VerticeId, Vec<FlowId>>,
-    pub(crate) handles: HashMap<AtomId, FlowId>,
+    pub(crate) handles: HashMap<VarId, FlowId>,
     pub(crate) flow: FlowId,
 }
 
@@ -36,13 +36,13 @@ impl FlowGraph {
         }
     }
 
-    pub fn get_handle(&self, atom: &AtomId) -> Option<&FlowId> {
-        let atom = self.sym_table.get_parent(atom);
+    pub fn get_handle(&self, atom: &VarId) -> Option<&FlowId> {
+        let atom = self.sym_table.get_var_parent(atom);
         let vec: Vec<&FlowId> = self
             .handles
             .iter()
             .filter_map(|(k, v)| {
-                if self.sym_table.get_parent(k) == atom {
+                if self.sym_table.get_var_parent(k) == atom {
                     Some(v)
                 } else {
                     None
@@ -81,7 +81,7 @@ impl FlowGraph {
         self.flows[*flow].parent = Some(*parent)
     }
 
-    pub fn get_flow_result(&self, flow: &FlowId) -> AtomId {
+    pub fn get_flow_result(&self, flow: &FlowId) -> VarId {
         let flow = &self.flows[*flow];
         let r = match &flow.kind {
             FlowKind::Assignment(v) => v.result,
@@ -90,7 +90,7 @@ impl FlowGraph {
             FlowKind::FlowResult(fr) => fr.result,
             FlowKind::FlowAsync(f) => f.result,
         };
-        self.sym_table.get_parent(&r)
+        self.sym_table.get_var_parent(&r)
     }
 
     pub fn get_flow_interval(&self, flow: &FlowId) -> Interval {
@@ -115,12 +115,12 @@ impl FlowGraph {
         };
 
         Interval::new(
-            &self.sym_table.get_parent(&i.get_start()),
-            &self.sym_table.get_parent(&i.get_end()),
+            &self.sym_table.get_var_parent(&i.get_start()),
+            &self.sym_table.get_var_parent(&i.get_end()),
         )
     }
 
-    pub fn get_flow_start(&self, flow: &FlowId) -> AtomId {
+    pub fn get_flow_start(&self, flow: &FlowId) -> VarId {
         let flow = &self.flows[*flow];
         let s = match &flow.kind {
             FlowKind::Assignment(v) => *v.interval.get_start(),
@@ -133,10 +133,10 @@ impl FlowGraph {
             FlowKind::FlowAsync(f) => f.timepoint,
         };
 
-        self.sym_table.get_parent(&s)
+        self.sym_table.get_var_parent(&s)
     }
 
-    pub fn get_flow_end(&self, flow: &FlowId) -> AtomId {
+    pub fn get_flow_end(&self, flow: &FlowId) -> VarId {
         let flow = &self.flows[*flow];
         let e = match &flow.kind {
             FlowKind::Assignment(v) => *v.interval.get_end(),
@@ -146,10 +146,10 @@ impl FlowGraph {
             FlowKind::FlowAsync(f) => f.timepoint,
         };
 
-        self.sym_table.get_parent(&e)
+        self.sym_table.get_var_parent(&e)
     }
 
-    pub fn get_atom_of_flow(&self, flow: &FlowId) -> im::HashSet<AtomId> {
+    pub fn get_atom_of_flow(&self, flow: &FlowId) -> im::HashSet<VarId> {
         let flow = &self.flows[*flow];
 
         let set = match &flow.kind {
@@ -173,14 +173,16 @@ impl FlowGraph {
             }
         };
 
-        set.iter().map(|a| self.sym_table.get_parent(a)).collect()
+        set.iter()
+            .map(|a| self.sym_table.get_var_parent(a))
+            .collect()
     }
 
     pub fn new_instantaneous_assignment(&mut self, value: impl Into<Lit>) -> FlowId {
         let t = self.sym_table.new_timepoint();
         let r = self.sym_table.new_result();
 
-        self.sym_table.add_declaration(&r, &t);
+        self.sym_table.set_declaration(&r, &t);
 
         let vertice = Assignment {
             interval: Interval::new_instantaneous(&t),
@@ -196,7 +198,7 @@ impl FlowGraph {
         let end = self.sym_table.new_timepoint();
         let r = self.sym_table.new_result();
 
-        self.sym_table.add_declaration(&r, &end);
+        self.sym_table.set_declaration(&r, &end);
 
         let vertice = Assignment {
             interval: Interval::new(&start, &end),
@@ -219,7 +221,7 @@ impl FlowGraph {
         self.new_seq(vec![id])
     }
 
-    pub fn new_result(&mut self, result: AtomId, timepoint: Option<AtomId>) -> FlowId {
+    pub fn new_result(&mut self, result: VarId, timepoint: Option<VarId>) -> FlowId {
         let timepoint = timepoint.unwrap_or(self.sym_table.new_timepoint());
 
         self.new_flow(FlowKind::FlowResult(FlowResult { result, timepoint }))
@@ -371,7 +373,7 @@ impl FlowGraph {
             }
             FlowKind::Branching(branching) => {
                 let cond_result = self.get_flow_result(&branching.cond);
-                let val = self.sym_table.get_domain(&cond_result, true).unwrap();
+                let val = self.sym_table.get_domain_of_var(&cond_result);
 
                 let branch = if val.is_true() {
                     Some(true)

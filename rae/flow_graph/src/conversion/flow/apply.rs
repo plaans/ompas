@@ -6,7 +6,7 @@ use crate::structs::flow_graph::flow::FlowId;
 use crate::structs::flow_graph::graph::FlowGraph;
 use crate::structs::sym_table::closure::Update;
 use crate::structs::sym_table::lit::Lit;
-use crate::structs::sym_table::{closure, AtomId};
+use crate::structs::sym_table::{closure, VarId};
 use ompas_rae_language::exec::platform::EXEC_COMMAND;
 use ompas_rae_language::exec::refinement::EXEC_TASK;
 use ompas_rae_language::exec::state::{ASSERT, ASSERT_SHORT, READ_STATE};
@@ -66,7 +66,7 @@ pub fn convert_apply(
         seq.push(convert_into_flow_graph(e, fl, &mut define_table)?);
     }
 
-    let results: Vec<AtomId> = seq.iter().map(|f| fl.get_flow_result(f)).collect();
+    let results: Vec<VarId> = seq.iter().map(|f| fl.get_flow_result(f)).collect();
 
     let flow_apply = match conv_collection.get_conversion(&proc) {
         Some(proc) => proc(fl, seq)?,
@@ -79,7 +79,7 @@ pub fn convert_apply(
     let end = fl.get_flow_end(&flow_apply);
 
     for o in results {
-        fl.sym_table.add_drop(&o, &end);
+        fl.sym_table.set_drop(&o, &end);
     }
     Ok(flow_apply)
 }

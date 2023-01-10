@@ -1,35 +1,35 @@
-use crate::structs::chronicle::{AtomId, FlatBindings, FormatWithSymTable, GetVariables, Replace};
+use crate::structs::chronicle::{FlatBindings, FormatWithSymTable, GetVariables, Replace, VarId};
 use crate::structs::domain::Domain;
 use crate::structs::sym_table::r#ref::RefSymTable;
 use im::{hashset, HashSet};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Interval {
-    start: AtomId,
-    end: AtomId,
+    start: VarId,
+    end: VarId,
 }
 
 impl Interval {
-    pub fn new(start: &AtomId, end: &AtomId) -> Self {
+    pub fn new(start: &VarId, end: &VarId) -> Self {
         Self {
             start: *start,
             end: *end,
         }
     }
 
-    pub fn new_instantaneous(t: &AtomId) -> Self {
+    pub fn new_instantaneous(t: &VarId) -> Self {
         Self { start: *t, end: *t }
     }
 
-    pub fn get_start(&self) -> &AtomId {
+    pub fn get_start(&self) -> &VarId {
         &self.start
     }
 
-    pub fn get_end(&self) -> &AtomId {
+    pub fn get_end(&self) -> &VarId {
         &self.end
     }
 
-    pub fn set_end(&mut self, end: &AtomId) {
+    pub fn set_end(&mut self, end: &VarId) {
         self.end = *end;
     }
 
@@ -60,23 +60,21 @@ impl FlatBindings for Interval {
 }
 
 impl GetVariables for Interval {
-    fn get_variables(&self) -> HashSet<AtomId> {
+    fn get_variables(&self) -> HashSet<VarId> {
         hashset![self.start, self.end]
     }
 
-    fn get_variables_in_domain(&self, sym_table: &RefSymTable, domain: &Domain) -> HashSet<AtomId> {
+    fn get_variables_in_domain(&self, sym_table: &RefSymTable, domain: &Domain) -> HashSet<VarId> {
         self.get_variables()
             .iter()
-            .filter(|v| {
-                sym_table.contained_in_domain(&sym_table.get_domain(v, true).unwrap(), domain)
-            })
+            .filter(|v| sym_table.contained_in_domain(&sym_table.get_domain_of_var(v), domain))
             .cloned()
             .collect()
     }
 }
 
 impl Replace for Interval {
-    fn replace(&mut self, old: &AtomId, new: &AtomId) {
+    fn replace(&mut self, old: &VarId, new: &VarId) {
         self.end.replace(old, new);
         self.start.replace(old, new);
     }

@@ -1,5 +1,5 @@
 use crate::structs::chronicle::interval::Interval;
-use crate::structs::chronicle::{AtomId, FlatBindings, FormatWithSymTable, GetVariables, Replace};
+use crate::structs::chronicle::{FlatBindings, FormatWithSymTable, GetVariables, Replace, VarId};
 use crate::structs::domain::Domain;
 use crate::structs::sym_table::lit::Lit;
 use crate::structs::sym_table::r#ref::RefSymTable;
@@ -96,7 +96,7 @@ impl Constraint {
 }
 
 impl GetVariables for Constraint {
-    fn get_variables(&self) -> im::HashSet<AtomId> {
+    fn get_variables(&self) -> im::HashSet<VarId> {
         match self {
             Constraint::Leq(l1, l2)
             | Constraint::Eq(l1, l2)
@@ -108,7 +108,7 @@ impl GetVariables for Constraint {
             | Constraint::Or(vec)
             | Constraint::Max(vec)
             | Constraint::Min(vec) => {
-                let mut vars: im::HashSet<AtomId> = Default::default();
+                let mut vars: im::HashSet<VarId> = Default::default();
                 for lit in vec {
                     vars = vars.union(lit.get_variables())
                 }
@@ -118,12 +118,10 @@ impl GetVariables for Constraint {
         }
     }
 
-    fn get_variables_in_domain(&self, sym_table: &RefSymTable, domain: &Domain) -> HashSet<AtomId> {
+    fn get_variables_in_domain(&self, sym_table: &RefSymTable, domain: &Domain) -> HashSet<VarId> {
         self.get_variables()
             .iter()
-            .filter(|v| {
-                sym_table.contained_in_domain(&sym_table.get_domain(v, true).unwrap(), &domain)
-            })
+            .filter(|v| sym_table.contained_in_domain(&sym_table.get_domain_of_var(v), &domain))
             .cloned()
             .collect()
     }
@@ -291,7 +289,7 @@ pub fn equal(a: &Interval, b: &Interval) -> Constraint {
 }
 
 impl Replace for Constraint {
-    fn replace(&mut self, old: &AtomId, new: &AtomId) {
+    fn replace(&mut self, old: &VarId, new: &VarId) {
         match self {
             Constraint::Leq(l1, l2)
             | Constraint::Eq(l1, l2)

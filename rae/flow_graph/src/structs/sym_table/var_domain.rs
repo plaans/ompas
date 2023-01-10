@@ -1,33 +1,34 @@
 use crate::structs::domain::Domain;
 use crate::structs::sym_table::closure::Update;
-use crate::structs::sym_table::AtomId;
+use crate::structs::sym_table::VarId;
 use std::fmt::{Debug, Display, Formatter};
 
 pub type UpdateId = usize;
+
 #[derive(Clone, Default)]
 pub struct VarDomain {
-    pub label: String,
     pub domain: Domain,
     pub updates: Vec<Update>,
-    pub declarations: Vec<AtomId>,
-    pub drops: Vec<AtomId>,
+    pub vars: Vec<VarId>,
 }
 
 impl VarDomain {
-    pub fn new(label: impl Display, domain: impl Into<Domain>) -> Self {
+    pub fn new(domain: impl Into<Domain>) -> Self {
         Self {
-            label: label.to_string(),
             domain: domain.into(),
             updates: vec![],
-            declarations: vec![],
-            drops: vec![],
+            vars: vec![],
         }
+    }
+
+    pub fn add_var(&mut self, var: VarId) {
+        self.vars.push(var)
     }
 }
 
 impl Display for VarDomain {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}({})", self.label, self.domain)
+        write!(f, "{}", self.domain)
     }
 }
 

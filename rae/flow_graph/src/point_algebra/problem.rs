@@ -4,7 +4,7 @@ use crate::structs::chronicle::constraint::Constraint;
 use crate::structs::chronicle::FormatWithSymTable;
 use crate::structs::sym_table::lit::Lit;
 use crate::structs::sym_table::r#ref::RefSymTable;
-use crate::structs::sym_table::{AtomId, TIMEPOINT_TYPE};
+use crate::structs::sym_table::{VarId, TIMEPOINT_TYPE};
 use cli_table::{print_stdout, Cell, Table};
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
@@ -21,7 +21,7 @@ pub struct Relation<T> {
 pub fn try_into_pa_relation(
     constraint: &Constraint,
     sym_table: &RefSymTable,
-) -> lruntimeerror::Result<Relation<AtomId>> {
+) -> lruntimeerror::Result<Relation<VarId>> {
     let relation_type = match constraint {
         Constraint::Eq(_, _) => RelationType::Eq,
         Constraint::Leq(_, _) => RelationType::LEq,
@@ -33,17 +33,14 @@ pub fn try_into_pa_relation(
     let timepoint_domain = sym_table.get_type_as_domain(TIMEPOINT_TYPE);
 
     if let Ok(i) = constraint.get_left().try_into() {
-        let p_i = sym_table.get_parent(&i);
+        let p_i = sym_table.get_var_parent(&i);
         if let Ok(j) = constraint.get_right().try_into() {
-            let p_j = sym_table.get_parent(&j);
-            if sym_table.contained_in_domain(
-                &sym_table.get_domain(&p_i, false).unwrap(),
-                &timepoint_domain,
-            ) {
-                if sym_table.contained_in_domain(
-                    &sym_table.get_domain(&p_j, false).unwrap(),
-                    &timepoint_domain,
-                ) {
+            let p_j = sym_table.get_var_parent(&j);
+            if sym_table.contained_in_domain(&sym_table.get_domain_of_var(&p_i), &timepoint_domain)
+            {
+                if sym_table
+                    .contained_in_domain(&sym_table.get_domain_of_var(&p_j), &timepoint_domain)
+                {
                     Ok(Relation::new(p_i, p_j, relation_type))
                 } else {
                     Err(Default::default())
@@ -69,8 +66,8 @@ impl<T> Relation<T> {
     }
 }
 
-impl From<&Relation<AtomId>> for Constraint {
-    fn from(r: &Relation<AtomId>) -> Self {
+impl From<&Relation<VarId>> for Constraint {
+    fn from(r: &Relation<VarId>) -> Self {
         match &r.relation_type {
             RelationType::Eq => Constraint::Eq(r.i.into(), r.j.into()),
             RelationType::GT => Constraint::Lt(r.j.into(), r.i.into()),

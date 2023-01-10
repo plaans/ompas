@@ -4,7 +4,7 @@ use crate::structs::domain::Domain;
 use crate::structs::flow_graph::flow::{FlowId, FlowKind};
 use crate::structs::flow_graph::graph::FlowGraph;
 use crate::structs::sym_table::lit::Lit;
-use crate::structs::sym_table::{AtomId, EmptyDomains};
+use crate::structs::sym_table::{EmptyDomains, VarId};
 use sompas_structs::lruntimeerror::LRuntimeError;
 use std::collections::VecDeque;
 
@@ -20,9 +20,9 @@ pub fn flow_graph_post_processing(graph: &mut FlowGraph) -> Result<(), LRuntimeE
 }
 
 pub enum PostProcess {
-    Subtract(AtomId, Domain),
-    Meet(AtomId, Domain),
-    Bind(AtomId, AtomId),
+    Subtract(VarId, Domain),
+    Meet(VarId, Domain),
+    Bind(VarId, VarId),
     Invalid(FlowId),
 }
 
@@ -33,9 +33,10 @@ pub fn propagate(
     while let Some(post_process) = queue.pop_front() {
         match post_process {
             Subtract(id, d) => {
-                let id = graph.sym_table.get_parent(&id);
+                let id = graph.sym_table.get_var_parent(&id);
+                let domain_id = graph.sym_table.get_domain_id(&id);
                 //println!("Subtract({id}, {})", graph.sym_table.format_domain(&d));
-                let emptys = graph.sym_table.substract_to_domain(&id, d);
+                let emptys = graph.sym_table.substract_to_domain(&domain_id, d);
                 if let EmptyDomains::Some(emptys) = emptys {
                     //println!("[Subtract] Domains of {:?} are empty.", emptys);
                     for e in &emptys {
@@ -46,10 +47,11 @@ pub fn propagate(
                 }
             }
             Meet(id, d) => {
-                let id = graph.sym_table.get_parent(&id);
+                let id = graph.sym_table.get_var_parent(&id);
+                let domain_id = graph.sym_table.get_domain_id(&id);
                 //println!("Meet({id}, {})", graph.sym_table.format_domain(&d));
 
-                let emptys = graph.sym_table.meet_to_domain(&id, d);
+                let emptys = graph.sym_table.meet_to_domain(&domain_id, d);
                 if let EmptyDomains::Some(emptys) = emptys {
                     //println!("[Meet] Domains of {:?} are empty.", emptys);
                     for e in &emptys {
@@ -60,10 +62,10 @@ pub fn propagate(
                 }
             }
             Bind(id1, id2) => {
-                let id1 = graph.sym_table.get_parent(&id1);
-                let id2 = graph.sym_table.get_parent(&id2);
+                let id1 = graph.sym_table.get_var_parent(&id1);
+                let id2 = graph.sym_table.get_var_parent(&id2);
                 //println!("Bind({id1}, {id2})");
-                if let EmptyDomains::Some(emptys) = graph.sym_table.union_atom(&id1, &id2) {
+                if let EmptyDomains::Some(emptys) = graph.sym_table.union_var(&id1, &id2) {
                     //println!("[Bind] Domains of {:?} are empty.", emptys);
                     for e in &emptys {
                         for f in graph.map_atom_id_flow_id.get(e).unwrap() {
@@ -122,7 +124,7 @@ pub fn binding_constraints(fl: &mut FlowGraph) -> VecDeque<PostProcess> {
                 }
             }
             FlowKind::Seq(seq, _) => {
-                let mut previous_end: Option<AtomId> = None;
+                let mut previous_end: Option<VarId> = None;
 
                 for f in seq {
                     if let Some(prev) = previous_end {

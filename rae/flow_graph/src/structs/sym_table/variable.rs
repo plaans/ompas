@@ -1,4 +1,3 @@
-use crate::structs::sym_table::var_domain::VarDomain;
 use crate::structs::sym_table::{DomainId, VarId};
 use std::fmt::{Display, Formatter};
 

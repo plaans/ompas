@@ -3,8 +3,6 @@ use crate::structs::sym_table::closure::Update;
 use crate::structs::sym_table::VarId;
 use std::fmt::{Debug, Display, Formatter};
 
-pub type UpdateId = usize;
-
 #[derive(Clone, Default)]
 pub struct VarDomain {
     pub domain: Domain,

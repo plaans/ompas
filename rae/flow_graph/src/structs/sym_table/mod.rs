@@ -11,7 +11,7 @@ use crate::structs::domain::root_type::RootType::{Any, Boolean, Handle};
 use crate::structs::domain::root_type::{FALSE_ID, NIL_ID, TRUE_ID};
 use crate::structs::domain::type_lattice::TypeLattice;
 use crate::structs::domain::Domain;
-use crate::structs::sym_table::forest::{Forest, Node, NodeId};
+use crate::structs::sym_table::forest::{Forest, NodeId};
 use crate::structs::sym_table::id::SymbolTableId;
 use crate::structs::sym_table::meta_data::SymTableMetaData;
 use std::collections::VecDeque;
@@ -529,8 +529,8 @@ impl SymTable {
         }
     }
 
-    pub fn format_domain(&self, domain: &Domain) -> String {
-        domain.format(&self.lattice)
+    pub fn format_domain(&self, domain: &DomainId) -> String {
+        self.domains[*domain].domain.format(&self.lattice)
     }
 
     pub fn format_var_domain(&self, id: &DomainId) -> String {

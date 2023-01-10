@@ -299,7 +299,7 @@ impl ChronicleTemplate {
                 format!(
                     "{}({})",
                     id.format(st, sym_version),
-                    st.format_var_domain(&st.get_domain_id(id)),
+                    st.format_domain(&st.get_domain_id(id)),
                 )
             })
             .collect::<Vec<String>>();

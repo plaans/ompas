@@ -95,7 +95,7 @@ impl FlowGraph {
 
     pub fn get_flow_interval(&self, flow: &FlowId) -> Interval {
         let flow = &self.flows[*flow];
-        let mut i = match &flow.kind {
+        let i = match &flow.kind {
             FlowKind::Assignment(v) => v.interval,
             FlowKind::Seq(seq, r) => {
                 let start = match seq.first() {

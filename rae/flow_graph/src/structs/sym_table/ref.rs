@@ -1,7 +1,6 @@
 use crate::structs::domain::basic_type::BasicType;
 use crate::structs::domain::Domain;
 use crate::structs::sym_table::closure::Update;
-use crate::structs::sym_table::forest::Node;
 use crate::structs::sym_table::var_domain::VarDomain;
 use crate::structs::sym_table::variable::Variable;
 use crate::structs::sym_table::{DomainId, EmptyDomains, SymTable, VarId};
@@ -246,7 +245,7 @@ impl RefSymTable {
         RefCell::borrow(&self.0).format_variable(id)
     }
 
-    pub fn format_domain(&self, domain: &Domain) -> String {
+    pub fn format_domain(&self, domain: &DomainId) -> String {
         RefCell::borrow(&self.0).format_domain(domain)
     }
 
@@ -266,7 +265,7 @@ impl Display for RefSymTable {
                 f,
                 "- ({}){}({})\n",
                 e,
-                self.format_variable(&e),
+                self.get_label(&e, false),
                 self.format_var_domain(&self.get_domain_id(&e)),
             )?;
         }

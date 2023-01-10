@@ -4,7 +4,7 @@ use crate::structs::chronicle::effect::Effect;
 use crate::structs::chronicle::subtask::SubTask;
 use crate::structs::chronicle::task_template::TaskTemplate;
 use crate::structs::chronicle::template::{ChronicleKind, ChronicleTemplate};
-use crate::structs::chronicle::GetVariables;
+use crate::structs::chronicle::{GetVariables, Replace};
 use crate::structs::domain::root_type::RootType::Boolean;
 use crate::structs::flow_graph::flow::{FlowId, FlowKind};
 use crate::structs::flow_graph::graph::FlowGraph;
@@ -137,18 +137,21 @@ pub fn convert_into_chronicle(
                         let mut branch_params: HashMap<VarId, VarId> = Default::default();
                         let mut method = convert_into_chronicle(fl, flow)?;
                         for v in &method.get_variables() {
-                            /*if let Some(interval) = ch.sym_table.get_scope(v) {
+                            if let Some(declaration) = st.get_declaration(v) {
                                 //It means the variable has been created before the method, and shall be transformed into a parameter
-                                /*if interval.get_start() < //graph.get_flow_interval(scope).get_start()
-                                {
-                                    let param = ch.sym_table.new_parameter(
-                                        ch.sym_table.get_atom(v, false).unwrap().to_string(),
-                                        ch.sym_table.get_type_of(v),
+                                if declaration < fl.get_flow_start(&flow_id) {
+                                    let param = st.new_parameter(
+                                        st.get_label(v, false),
+                                        st.get_domain_of_var(v),
+                                    );
+                                    st.union_domain(
+                                        &st.get_domain_id(&param),
+                                        &st.get_domain_id(&v),
                                     );
                                     method.replace(v, &param);
                                     branch_params.insert(*v, param);
-                                }*/
-                            }*/
+                                }
+                            }
                         }
                         let cond = ch.sym_table.new_parameter(COND, branch);
                         method.set_task(vec![t_if, cond]);
@@ -184,41 +187,42 @@ pub fn convert_into_chronicle(
                     - create a new parameter if the parameter is not present in the method,
                     but needed by the other method of the synthetic task
                      */
-                    /*let mut modify_and_convert_branch =
-                        |mut partial: PartialConversion,
-                         method_params: HashMap<AtomId, AtomId>|
+                    let mut modify_and_convert_branch =
+                        |mut method: ChronicleTemplate,
+                         method_params: HashMap<VarId, VarId>|
                          -> Result<ChronicleTemplate, LRuntimeError> {
-                            let method = &mut partial.chronicle;
                             for p in &task_params {
                                 let id = match method_params.get(p) {
                                     None => {
                                         let id = ch.sym_table.new_parameter(
-                                            ch.sym_table.get_atom(p, false).unwrap().to_string(),
-                                            ch.sym_table.get_type_of(p),
+                                            ch.sym_table.get_label(&p, false),
+                                            ch.sym_table.get_domain_of_var(p),
                                         );
                                         method.add_var(&id);
                                         id
                                     }
                                     Some(id) => *id,
                                 };
-                                ch.sym_table.union_types(p, &id);
+                                st.union_domain(&st.get_domain_id(&p), &st.get_domain_id(&id));
                                 method.add_task_parameter(&id);
                                 method.add_method_parameter(&id);
                             }
                             //We enforce that the return types are the same
-                            let m_result = *method.get_result();
-                            ch.sym_table.union_types(&m_result, &vertice.result);
+                            /*let m_result = *method.get_result();
+                            st.union_domain(
+                                &st.get_domain_id(&m_result),
+                                &st.get_domain_id(&vertice.result),
+                            );*/
                             /*println!(
                                 "union type(id)s {} and {}",
                                 ch.sym_table.get_type_id_of(&m_result),
                                 ch.sym_table.get_type_id_of(&vertice.result)
                             );*/
-                            post_processing(partial)
+                            Ok(method)
                         };
 
-                    let method_true = modify_and_convert_branch(partial_method_true, true_params)?;
-                    let method_false =
-                        modify_and_convert_branch(partial_method_false, false_params)?;*/
+                    let method_true = modify_and_convert_branch(method_true, true_params)?;
+                    let method_false = modify_and_convert_branch(method_false, false_params)?;
 
                     let task = TaskTemplate {
                         name: task,

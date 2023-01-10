@@ -2,7 +2,6 @@ use crate::structs::domain::basic_type::BasicType;
 use crate::structs::domain::root_type::RootType::*;
 use crate::structs::domain::Domain::{Composed, Cst, Simple, Substract, Union};
 use crate::structs::domain::{Domain, TypeId};
-use sompas_language::primitives::DO;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Write;
 use std::ops::Deref;

@@ -2,6 +2,7 @@ use crate::structs::domain::basic_type::BasicType;
 use crate::structs::domain::root_type::RootType::*;
 use crate::structs::domain::Domain::{Composed, Cst, Simple, Substract, Union};
 use crate::structs::domain::{Domain, TypeId};
+use sompas_language::primitives::DO;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Write;
 use std::ops::Deref;
@@ -33,14 +34,15 @@ impl Default for TypeLattice {
         dc.add_type(Err, vec![]);
         dc.add_type(Handle, vec![]);
         dc.add_type(Number, vec![]);
+        dc.add_type(Nil, vec![]);
         dc.add_type(Int, vec![Number as usize]);
         dc.add_type(Float, vec![Number as usize]);
         dc.add_decomposition(Number as usize, vec![Int as usize, Float as usize]);
         dc.add_type(Symbol, vec![]);
-        dc.add_type(EmptyList, vec![List as usize]);
+        dc.add_type(EmptyList, vec![List as usize, Nil as usize]);
         dc.add_type(True, vec![Boolean as usize]);
-        dc.add_type(False, vec![Boolean as usize]);
-        dc.add_type(Nil, vec![False as usize, EmptyList as usize]);
+        dc.add_type(False, vec![Boolean as usize, Nil as usize]);
+        dc.add_decomposition(Nil as usize, vec![False as usize, EmptyList as usize]);
         dc.add_decomposition(Boolean as usize, vec![True as usize, False as usize]);
         dc.add_decomposition(
             Any as usize,
@@ -247,39 +249,28 @@ impl TypeLattice {
             }
             (Union(ua), Union(_)) => {
                 //println!("Meet {ta} and {tb}.");
-                let mut union = vec![];
+                let mut meet = Domain::empty();
                 for ta in ua {
                     //println!("Meet {ta} and {tb}.");
-                    let meet = self.__meet(ta, t2);
-                    if meet != Simple(Empty as usize) {
-                        union.push(meet);
-                    }
+                    meet = self.__union(&self.__meet(ta, t2), &meet);
                 }
-                return match union.len() {
-                    0 => Simple(Empty as usize),
-                    1 => union.pop().unwrap(),
-                    _ => Union(union),
-                };
+                meet
+
+                //return self.__union(&Union(meets.drain().collect()), &Domain::empty());
             }
             (Union(ua), t) => {
-                let mut meets: HashSet<Domain> = Default::default();
+                let mut meet = Domain::empty();
                 for tu in ua {
-                    let meet = self.__meet(tu, t);
-                    if meet != Simple(Empty as usize) {
-                        meets.insert(meet);
-                    }
+                    meet = self.__union(&self.__meet(tu, t), &meet);
                 }
-                return self.simplify_union(meets);
+                meet
             }
             (t, Union(ub)) => {
-                let mut meets: HashSet<Domain> = Default::default();
+                let mut meet = Domain::empty();
                 for tu in ub {
-                    let meet = self.__meet(t, tu);
-                    if meet != Simple(Empty as usize) {
-                        meets.insert(meet);
-                    }
+                    meet = self.__union(&self.__meet(t, tu), &meet);
                 }
-                return self.simplify_union(meets);
+                meet
             }
             (Substract(t1, t2), t3) => self.__substract(&self.__meet(t1, t3), &self.__meet(t2, t3)),
             (t1, Substract(t2, t3)) => self.__substract(&self.__meet(t1, t2), &self.__meet(t1, t3)),

@@ -14,18 +14,18 @@ pub enum RootType {
     Err = 5,
     Handle = 6,
     Number = 7,
-    Int = 8,
-    Float = 9,
-    Symbol = 10,
-    EmptyList = 11,
-    True = 12,
-    False = 13,
-    Nil = 14,
+    Nil = 8,
+    Int = 9,
+    Float = 10,
+    Symbol = 11,
+    EmptyList = 12,
+    True = 13,
+    False = 14,
 }
 
-pub const TRUE_ID: usize = 12;
-pub const FALSE_ID: usize = 13;
-pub const NIL_ID: usize = 14;
+pub const TRUE_ID: usize = 13;
+pub const FALSE_ID: usize = 14;
+pub const NIL_ID: usize = 8;
 
 impl TryFrom<TypeId> for RootType {
     type Error = ();
@@ -40,13 +40,13 @@ impl TryFrom<TypeId> for RootType {
             5 => Err,
             6 => Handle,
             7 => Number,
-            8 => Int,
-            9 => Float,
-            10 => Symbol,
-            11 => EmptyList,
-            12 => True,
-            13 => False,
-            14 => Nil,
+            8 => Nil,
+            9 => Int,
+            10 => Float,
+            11 => Symbol,
+            12 => EmptyList,
+            13 => True,
+            14 => False,
             _ => return Result::Err(()),
         })
     }

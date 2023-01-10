@@ -152,7 +152,9 @@ fn output_markdown(
 ```
 
 ## Sym Table
+```
 {}
+```
     ",
         name,
         expression.format(0),

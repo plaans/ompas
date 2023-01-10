@@ -45,6 +45,8 @@ fn main() {
         union(dc, "a".to_string(), "b".to_string()),
     );
 
+    meet(dc, union(dc, True, Nil), union(dc, True, Nil));
+
     /*let union = (: &TypeNetwork, ta: Type, tb: Type) {
         println!("{} | {} = {}", ta, tb, dc.union(&ta, &tb))
     };*/
@@ -132,7 +134,7 @@ fn main() {
         ]),
     );*/
 
-    //output_domain_collection("/home/jeremy/Bureau/domain".into(), dc, true);
+    output_domain_collection("/home/jeremy/Bureau/domain".into(), dc, true);
     //output_markdown("/home/jeremy/Bureau".into(), tn, true);
 }
 

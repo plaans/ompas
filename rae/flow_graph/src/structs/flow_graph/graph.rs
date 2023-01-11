@@ -2,7 +2,7 @@ use crate::structs::chronicle::interval::Interval;
 use crate::structs::chronicle::{FlatBindings, FormatWithSymTable, GetVariables};
 use crate::structs::flow_graph::assignment::Assignment;
 use crate::structs::flow_graph::flow::{
-    BranchingFlow, Flow, FlowAsync, FlowId, FlowKind, FlowResult,
+    BranchingFlow, Flow, FlowAsync, FlowId, FlowKind, FlowResult, FlowWait,
 };
 use crate::structs::sym_table::lit::Lit;
 use crate::structs::sym_table::r#ref::RefSymTable;
@@ -89,6 +89,7 @@ impl FlowGraph {
             FlowKind::Branching(branching) => self.get_flow_result(&branching.result),
             FlowKind::FlowResult(fr) => fr.result,
             FlowKind::FlowAsync(f) => f.result,
+            FlowKind::FlowWait(fw) => unreachable!(),
         };
         self.sym_table.get_var_parent(&r)
     }
@@ -112,6 +113,7 @@ impl FlowGraph {
             }
             FlowKind::FlowResult(r) => Interval::new_instantaneous(&r.timepoint),
             FlowKind::FlowAsync(f) => Interval::new_instantaneous(&f.timepoint),
+            FlowKind::FlowWait(fw) => fw.interval,
         };
 
         Interval::new(
@@ -131,6 +133,7 @@ impl FlowGraph {
             FlowKind::Branching(branching) => self.get_flow_start(&branching.cond),
             FlowKind::FlowResult(r) => r.timepoint,
             FlowKind::FlowAsync(f) => f.timepoint,
+            FlowKind::FlowWait(fw) => *fw.interval.get_start(),
         };
 
         self.sym_table.get_var_parent(&s)
@@ -144,6 +147,7 @@ impl FlowGraph {
             FlowKind::Branching(branching) => self.get_flow_end(&branching.result),
             FlowKind::FlowResult(r) => r.timepoint,
             FlowKind::FlowAsync(f) => f.timepoint,
+            FlowKind::FlowWait(fw) => *fw.interval.get_end(),
         };
 
         self.sym_table.get_var_parent(&e)
@@ -170,6 +174,13 @@ impl FlowGraph {
             FlowKind::FlowAsync(f) => {
                 let set = hashset![f.result, f.timepoint];
                 set.union(self.get_atom_of_flow(&f.flow))
+            }
+            FlowKind::FlowWait(fw) => {
+                let mut set = hashset![*fw.interval.get_start(), *fw.interval.get_end()];
+                if let Some(duration) = fw.duration {
+                    set.insert(duration);
+                }
+                set
             }
         };
 
@@ -237,6 +248,14 @@ impl FlowGraph {
         }))
     }
 
+    pub fn new_wait(&mut self, duration: Option<VarId>) -> FlowId {
+        let interval = Interval::new(
+            &self.sym_table.new_timepoint(),
+            &self.sym_table.new_timepoint(),
+        );
+        self.new_flow(FlowKind::FlowWait(FlowWait { interval, duration }))
+    }
+
     fn new_flow(&mut self, flow: impl Into<Flow>) -> FlowId {
         let id = self.flows.len();
         let flow = flow.into();
@@ -282,6 +301,23 @@ impl FlowGraph {
             FlowKind::FlowAsync(a) => {
                 self.flows[a.flow].parent = Some(id)
                 //
+            }
+            FlowKind::FlowWait(fw) => {
+                let mut var = vec![*fw.interval.get_start(), *fw.interval.get_end()];
+                if let Some(duration) = fw.duration {
+                    var.push(duration);
+                }
+
+                for v in var {
+                    match self.map_atom_id_flow_id.get_mut(&v) {
+                        None => {
+                            self.map_atom_id_flow_id.insert(v, vec![id]);
+                        }
+                        Some(set) => {
+                            set.push(id);
+                        }
+                    };
+                }
             }
         }
         self.flows.push(flow.into());
@@ -506,6 +542,31 @@ impl FlowGraph {
                 start = Some(*id);
                 end = Some(*id);
             }
+            FlowKind::FlowWait(fw) => {
+                match &fw.duration {
+                    Some(duration) => {
+                        write!(
+                            dot,
+                            "V{id} [label= \"{}:{}={}+{}\", color = {color}];\n",
+                            fw.interval.format(sym_table, false),
+                            fw.interval.get_end().format(sym_table, false),
+                            fw.interval.get_start().format(sym_table, false),
+                            duration.format(sym_table, false),
+                        )
+                        .unwrap();
+                    }
+                    None => {
+                        write!(
+                            dot,
+                            "V{id} [label= \"{}\", color = {color}];\n",
+                            fw.interval.format(sym_table, false),
+                        )
+                        .unwrap();
+                    }
+                }
+                start = Some(*id);
+                end = Some(*id);
+            }
         }
 
         (dot, (start.unwrap(), end.unwrap()))
@@ -543,6 +604,13 @@ impl FlowGraph {
                 FlowKind::FlowAsync(f) => {
                     f.result.flat_bindings(st);
                     f.timepoint.flat_bindings(st);
+                }
+                FlowKind::FlowWait(fw) => {
+                    fw.interval.flat_bindings(st);
+
+                    if let Some(duration) = &mut fw.duration {
+                        duration.flat_bindings(st)
+                    }
                 }
             }
         }

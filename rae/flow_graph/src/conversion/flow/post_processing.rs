@@ -144,8 +144,8 @@ pub fn binding_constraints(fl: &mut FlowGraph) -> VecDeque<PostProcess> {
                 flows_queue.push_back(b.false_flow);
                 flows_queue.push_back(b.result);
             }
-            FlowKind::FlowResult(_) => {}
             FlowKind::FlowAsync(f) => flows_queue.push_back(f.flow),
+            _ => {}
         }
     }
     post_process

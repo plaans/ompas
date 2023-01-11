@@ -226,7 +226,7 @@ impl SymTable {
     pub fn new_start(&mut self) -> VarId {
         let index = self.meta_data.new_start_index();
         let sym = &format!("_{START_PREFIX}{index}_");
-        let id = self.new_variable(sym, self.get_type_as_domain(TIMEPOINT_TYPE));
+        let id = self.new_parameter(sym, self.get_type_as_domain(TIMEPOINT_TYPE));
         self.ids.insert(&sym, &id);
         id
     }
@@ -234,7 +234,7 @@ impl SymTable {
     pub fn new_end(&mut self) -> VarId {
         let index = self.meta_data.new_end_index();
         let sym = &format!("_{END_PREFIX}{index}_");
-        let id = self.new_variable(sym, self.get_type_as_domain(TIMEPOINT_TYPE));
+        let id = self.new_parameter(sym, self.get_type_as_domain(TIMEPOINT_TYPE));
         self.ids.insert(&sym, &id);
         id
     }
@@ -242,7 +242,7 @@ impl SymTable {
     pub fn new_presence(&mut self) -> VarId {
         let index = self.meta_data.new_presence_index();
         let sym = &format!("_{PRESENCE_PREFIX}{index}_");
-        let id = self.new_variable(sym, Boolean);
+        let id = self.new_parameter(sym, Boolean);
         self.ids.insert(&sym, &id);
         id
     }
@@ -250,7 +250,7 @@ impl SymTable {
     pub fn new_chronicle_result(&mut self) -> VarId {
         let index = self.meta_data.new_chronicle_result_index();
         let sym = &format!("_{CHRONICLE_RESULT_PREFIX}{index}_");
-        let id = self.new_variable(sym, Domain::any());
+        let id = self.new_parameter(sym, Domain::any());
         self.ids.insert(&sym, &id);
         id
     }
@@ -271,7 +271,11 @@ impl SymTable {
         let symbol = symbol.to_string();
         let version = self.ids.version(&symbol);
         let sym = format!("{symbol}_{version}");
-        let id = self.new_variable(&sym, domain);
+        let domain_id = self.domains.new_node(VarDomain::new(domain));
+        let id = self
+            .variables
+            .new_node(Variable::new_parameter(&sym, domain_id));
+        self.add_var_to_domain(&domain_id, &id);
         self.ids.insert(&sym, &id);
         id
     }
@@ -490,6 +494,12 @@ impl SymTable {
     pub fn union_var(&mut self, v1: &VarId, v2: &VarId) -> EmptyDomains {
         let v1 = self.get_var_parent(v1);
         let v2 = self.get_var_parent(v2);
+
+        let (v1, v2) = if self.variables[v2].parameter {
+            (v2, v1)
+        } else {
+            (v1, v2)
+        };
 
         let r = self.union_domain(&self.get_domain_id(&v1), &self.get_domain_id(&v2));
         self.variables.union_ordered(&v1, &v2);

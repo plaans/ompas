@@ -184,7 +184,7 @@ impl TypeLattice {
                 }
                 false
             }
-            (Substract(_, _), _) => todo!(),
+            (Substract(t1, _), t2) => self.contained_in(t1.deref(), t2),
             (_, Substract(_, _)) => todo!(),
 
             (Cst(d1, _), t2) => self.contained_in(d1, t2),

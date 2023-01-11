@@ -4,6 +4,7 @@ use std::fmt::{Display, Formatter};
 #[derive(Clone, Default)]
 pub struct Variable {
     pub domain: DomainId,
+    pub parameter: bool,
     pub label: String,
     pub declaration: Option<VarId>,
     pub drop: Option<VarId>,
@@ -13,6 +14,17 @@ impl Variable {
     pub fn new(label: impl Display, domain: VarId) -> Self {
         Self {
             domain,
+            parameter: false,
+            label: label.to_string(),
+            declaration: None,
+            drop: None,
+        }
+    }
+
+    pub fn new_parameter(label: impl Display, domain: VarId) -> Self {
+        Self {
+            domain,
+            parameter: true,
             label: label.to_string(),
             declaration: None,
             drop: None,

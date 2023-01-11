@@ -643,6 +643,19 @@ pub mod error {
     pub const LAMBDA_CHECK: &str = "(lambda (a) (if a nil (err nil)))";
     pub const DOC_CHECK: &str = "Return an LValue::Err if the LValue if false";
 
+    pub const DO_T: &str = "do_t";
+    pub const MACRO_DO_T: &str = "(lambda args
+    (if (= (len args) 1)
+        (car args)
+        `(begin
+            (define __r__ ,(car args))
+            (if (err? __r__)
+                __r__
+                ,(cons do_t (cdr args))
+            ))))";
+
+    pub const DOC_DO_T: &str = "Macro to test do expansion";
+
     pub const FN_ERR: &str = "err";
     pub const DOC_FN_ERR: &str = "Return a LValue::Err";
 

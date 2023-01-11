@@ -59,66 +59,101 @@ pub fn convert_into_chronicle(
     while let Some(flow_id) = queue.pop() {
         let flow = fl.flows[flow_id].clone();
         let interval = fl.get_flow_interval(&flow_id);
-        let result = fl.get_flow_result(&flow_id);
+        let start = interval.get_start();
+        let end = interval.get_end();
+
+        if start != end {
+            ch.add_constraint(Constraint::leq(start, end))
+        }
 
         match flow.kind {
-            FlowKind::Assignment(ass) => match &ass.lit {
-                Lit::Exp(_) => {}
-                Lit::Atom(_) => {}
-                Lit::Await(a) => {
-                    let handle = fl.get_handle(a).unwrap();
+            FlowKind::Assignment(ass) => {
+                let result = fl.get_flow_result(&flow_id);
 
-                    ch.add_constraint(Constraint::leq(
-                        fl.get_flow_end(&handle),
-                        interval.get_end(),
-                    ));
-                    //ch.add_constraint(Constraint::eq(fl.get_flow_result(handle), result));
-                    st.union_var(&fl.get_flow_result(&handle), &result);
+                match &ass.lit {
+                    Lit::Exp(_) => {}
+                    Lit::Atom(_) => {}
+                    Lit::Await(a) => {
+                        let handle = fl.get_handle(a).unwrap();
+
+                        ch.add_constraint(Constraint::leq(
+                            fl.get_flow_end(&handle),
+                            interval.get_end(),
+                        ));
+                        //ch.add_constraint(Constraint::eq(fl.get_flow_result(handle), result));
+                        st.union_var(&fl.get_flow_result(&handle), &result);
+                    }
+                    Lit::Constraint(c) => ch.add_constraint(Constraint::eq(result, c.deref())),
+                    Lit::Apply(app) => {}
+                    Lit::Read(read) => {
+                        let condition = Condition {
+                            interval,
+                            sv: read.clone(),
+                            value: result,
+                        };
+
+                        ch.add_condition(condition);
+                    }
+                    Lit::Write(write) => {
+                        let sv = write[0..write.len() - 1].to_vec();
+                        let value = *write.last().unwrap();
+                        let effect = Effect {
+                            interval,
+                            sv,
+                            value,
+                        };
+
+                        ch.add_effect(effect);
+
+                        let result = ch.sym_table.new_nil();
+                        st.union_var(&result, &result);
+                    }
+                    Lit::Exec(exec) => {
+                        let subtask = SubTask {
+                            interval,
+                            lit: exec.into(),
+                            result,
+                        };
+
+                        ch.add_subtask(subtask);
+                        /*let subtask_result = ch.sym_table.new_nil();
+                        st.union_atom(&subtask_result, &result);*/
+                    }
                 }
-                Lit::Constraint(c) => ch.add_constraint(Constraint::eq(result, c.deref())),
-                Lit::Apply(app) => {}
-                Lit::Read(read) => {
-                    let condition = Condition {
-                        interval,
-                        sv: read.clone(),
-                        value: result,
-                    };
-
-                    ch.add_condition(condition);
-                }
-                Lit::Write(write) => {
-                    let sv = write[0..write.len() - 1].to_vec();
-                    let value = *write.last().unwrap();
-                    let effect = Effect {
-                        interval,
-                        sv,
-                        value,
-                    };
-
-                    ch.add_effect(effect);
-
-                    let result = ch.sym_table.new_nil();
-                    st.union_var(&result, &result);
-                }
-                Lit::Exec(exec) => {
-                    let subtask = SubTask {
-                        interval,
-                        lit: exec.into(),
-                        result,
-                    };
-
-                    ch.add_subtask(subtask);
-                    /*let subtask_result = ch.sym_table.new_nil();
-                    st.union_atom(&subtask_result, &result);*/
-                }
-            },
+            }
             FlowKind::Seq(mut seq, _) => queue.append(&mut seq),
             FlowKind::Branching(branching) => {
+                let result = fl.get_flow_result(&flow_id);
+
                 let cond = fl.get_flow_result(&branching.cond);
                 let cond_domain = st.get_domain_of_var(&cond);
                 if cond_domain.is_true() {
+                    st.union_var(
+                        &fl.get_flow_end(&branching.cond),
+                        &fl.get_flow_start(&branching.true_flow),
+                    );
+                    st.union_var(
+                        &fl.get_flow_end(&branching.true_flow),
+                        &fl.get_flow_start(&branching.result),
+                    );
+                    st.union_var(
+                        &fl.get_flow_result(&branching.true_flow),
+                        &fl.get_flow_result(&branching.result),
+                    );
                     queue.push(branching.true_flow)
                 } else if cond_domain.is_false() {
+                    st.union_var(
+                        &fl.get_flow_end(&branching.cond),
+                        &fl.get_flow_start(&branching.false_flow),
+                    );
+                    st.union_var(
+                        &fl.get_flow_end(&branching.false_flow),
+                        &fl.get_flow_start(&branching.result),
+                    );
+                    st.union_var(
+                        &fl.get_flow_result(&branching.false_flow),
+                        &fl.get_flow_result(&branching.result),
+                    );
                     queue.push(branching.false_flow)
                 } else {
                     let (t_if, m_true, m_false) = ch.sym_table.new_if();
@@ -257,6 +292,19 @@ pub fn convert_into_chronicle(
                     .collect();
                 ch.add_constraint(Constraint::leq(fl.get_flow_end(&h), Constraint::Max(drops)))
             }
+            FlowKind::FlowWait(fw) => match fw.duration {
+                Some(duration) => {
+                    ch.add_constraint(Constraint::add(
+                        fw.interval.get_end(),
+                        duration,
+                        fw.interval.get_start(),
+                    ));
+                }
+                None => ch.add_constraint(Constraint::leq(
+                    fw.interval.get_start(),
+                    fw.interval.get_end(),
+                )),
+            },
         }
     }
 

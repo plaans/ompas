@@ -1,3 +1,4 @@
+use crate::structs::chronicle::interval::Interval;
 use crate::structs::flow_graph::assignment::Assignment;
 use crate::structs::sym_table::VarId;
 
@@ -10,6 +11,7 @@ pub enum FlowKind {
     Branching(BranchingFlow),
     FlowResult(FlowResult),
     FlowAsync(FlowAsync),
+    FlowWait(FlowWait),
 }
 
 impl From<FlowResult> for FlowKind {
@@ -75,4 +77,10 @@ pub struct FlowAsync {
     pub result: VarId,
     pub timepoint: VarId,
     pub flow: FlowId,
+}
+
+#[derive(Clone)]
+pub struct FlowWait {
+    pub interval: Interval,
+    pub duration: Option<VarId>,
 }

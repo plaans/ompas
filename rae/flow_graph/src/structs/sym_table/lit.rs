@@ -1,6 +1,7 @@
 use crate::structs::chronicle::constraint::Constraint;
 use crate::structs::chronicle::{FlatBindings, FormatWithSymTable, GetVariables, Replace};
 use crate::structs::domain::Domain;
+use crate::structs::sym_table::computation::Computation;
 use crate::structs::sym_table::r#ref::RefSymTable;
 use crate::structs::sym_table::VarId;
 use im::{hashset, HashSet};
@@ -22,6 +23,7 @@ pub enum Lit {
     Exec(Vec<VarId>),
     Constraint(Box<Constraint>),
     Apply(Vec<VarId>),
+    Computation(Box<Computation>),
 }
 
 impl Lit {
@@ -35,6 +37,10 @@ impl Lit {
 
     pub fn constraint(constraint: Constraint) -> Self {
         Self::Constraint(Box::new(constraint))
+    }
+
+    pub fn computation(computation: Computation) -> Self {
+        Self::Computation(Box::new(computation))
     }
 
     pub fn exp(exp: Vec<Lit>) -> Self {
@@ -90,6 +96,7 @@ impl TryFrom<&Lit> for Vec<VarId> {
                 Ok(e)
             }
             Lit::Apply(vec) | Lit::Read(vec) | Lit::Write(vec) | Lit::Exec(vec) => Ok(vec.clone()),
+            Lit::Computation(_) => Err(Default::default()),
         }
     }
 }
@@ -156,6 +163,18 @@ impl From<&Constraint> for Lit {
 
 impl From<Constraint> for Lit {
     fn from(c: Constraint) -> Self {
+        c.borrow().into()
+    }
+}
+
+impl From<&Computation> for Lit {
+    fn from(c: &Computation) -> Self {
+        Self::Computation(Box::new(c.clone()))
+    }
+}
+
+impl From<Computation> for Lit {
+    fn from(c: Computation) -> Self {
         c.borrow().into()
     }
 }
@@ -270,6 +289,7 @@ impl FormatWithSymTable for Lit {
             Lit::Release(rh) => {
                 format!("release({})", rh.format(st, sym_version))
             }
+            Lit::Computation(c) => c.format(st, sym_version),
         }
     }
 }
@@ -283,6 +303,7 @@ impl FlatBindings for Lit {
             Lit::Apply(vec) | Lit::Read(vec) | Lit::Write(vec) | Lit::Exec(vec) => {
                 vec.flat_bindings(st)
             }
+            Lit::Computation(c) => c.flat_bindings(st),
         }
     }
 }
@@ -302,6 +323,7 @@ impl GetVariables for Lit {
             Lit::Apply(vec) | Lit::Read(vec) | Lit::Write(vec) | Lit::Exec(vec) => {
                 vec.iter().cloned().collect()
             }
+            Lit::Computation(c) => c.get_variables(),
         }
     }
 
@@ -323,6 +345,7 @@ impl Replace for Lit {
             Lit::Apply(vec) | Lit::Read(vec) | Lit::Write(vec) | Lit::Exec(vec) => {
                 vec.replace(old, new)
             }
+            Lit::Computation(c) => c.replace(old, new),
         }
     }
 }

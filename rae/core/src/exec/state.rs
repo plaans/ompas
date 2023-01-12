@@ -20,6 +20,7 @@ use sompas_structs::lswitch::new_interruption_handler;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalues::LValueS;
 use sompas_structs::{lruntimeerror, wrong_type};
+use std::ops::Index;
 
 pub struct ModState {
     pub state: WorldState,
@@ -72,9 +73,15 @@ impl From<ModState> for LModule {
 
 ///Add a fact to fact state
 #[async_scheme_fn]
-async fn assert(env: &LEnv, key: LValueS, value: LValueS) -> Result<(), LRuntimeError> {
+async fn assert(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
     let state = env.get_context::<ModState>(MOD_STATE)?;
-    state.state.add_fact(key, value).await;
+    let key: LValue = if args.len() > 2 {
+        args[0..args.len() - 1].into()
+    } else {
+        args[0].clone()
+    };
+    let value = args.last().unwrap();
+    state.state.add_fact(key.into(), value.into()).await;
     Ok(())
 }
 

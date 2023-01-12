@@ -14,13 +14,11 @@ pub enum Constraint {
     Neq(Lit, Lit),
     Lt(Lit, Lit),
     Type(Lit, Lit),
-    Arbitrary(Lit, Lit),
+    Arbitrary(Lit),
     Min(Vec<Lit>),
     Max(Vec<Lit>),
     And(Vec<Lit>),
     Or(Vec<Lit>),
-    Add(Lit, Lit, Lit),
-    Sub(Lit, Lit, Lit),
 }
 
 impl Constraint {
@@ -55,16 +53,8 @@ impl Constraint {
     pub fn _type(a: impl Into<Lit>, b: impl Into<Lit>) -> Constraint {
         Constraint::Type(a.into(), b.into())
     }
-    pub fn arbitrary(a: impl Into<Lit>, b: impl Into<Lit>) -> Constraint {
-        Constraint::Arbitrary(a.into(), b.into())
-    }
-
-    pub fn add(mut a: impl Into<Lit>, b: impl Into<Lit>, c: impl Into<Lit>) -> Constraint {
-        Constraint::Add(a.into(), b.into(), c.into())
-    }
-
-    pub fn sub(mut a: impl Into<Lit>, b: impl Into<Lit>, c: impl Into<Lit>) -> Constraint {
-        Constraint::Sub(a.into(), b.into(), c.into())
+    pub fn arbitrary(a: impl Into<Lit>) -> Constraint {
+        Constraint::Arbitrary(a.into())
     }
 }
 
@@ -75,14 +65,12 @@ impl Constraint {
             | Constraint::Eq(l1, _)
             | Constraint::Lt(l1, _)
             | Constraint::Type(l1, _)
-            | Constraint::Neq(l1, _)
-            | Constraint::Arbitrary(l1, _) => l1.clone(),
-            Constraint::Not(l) => l.clone(),
+            | Constraint::Neq(l1, _) => l1.clone(),
+            Constraint::Not(l) | Constraint::Arbitrary(l) => l.clone(),
             Constraint::Min(vec)
             | Constraint::Max(vec)
             | Constraint::And(vec)
             | Constraint::Or(vec) => vec.into(),
-            Constraint::Add(a, _, _) | Constraint::Sub(a, _, _) => a.clone(),
         }
     }
 
@@ -92,15 +80,12 @@ impl Constraint {
             | Constraint::Eq(_, l2)
             | Constraint::Lt(_, l2)
             | Constraint::Type(_, l2)
-            | Constraint::Neq(_, l2)
-            | Constraint::Arbitrary(_, l2) => l2.clone(),
-            Constraint::Not(l) => l.clone(),
+            | Constraint::Neq(_, l2) => l2.clone(),
+            Constraint::Not(l) | Constraint::Arbitrary(l) => l.clone(),
             Constraint::Min(vec)
             | Constraint::Max(vec)
             | Constraint::And(vec)
             | Constraint::Or(vec) => vec.into(),
-
-            Constraint::Add(_, b, _) | Constraint::Sub(_, b, _) => b.clone(),
         }
     }
 }
@@ -112,8 +97,7 @@ impl GetVariables for Constraint {
             | Constraint::Eq(l1, l2)
             | Constraint::Neq(l1, l2)
             | Constraint::Lt(l1, l2)
-            | Constraint::Type(l1, l2)
-            | Constraint::Arbitrary(l1, l2) => l1.get_variables().union(l2.get_variables()),
+            | Constraint::Type(l1, l2) => l1.get_variables().union(l2.get_variables()),
             Constraint::Min(vec)
             | Constraint::Max(vec)
             | Constraint::And(vec)
@@ -124,10 +108,7 @@ impl GetVariables for Constraint {
                 }
                 vars
             }
-            Constraint::Add(a, b, c) | Constraint::Sub(a, b, c) => a
-                .get_variables()
-                .union(b.get_variables().union(c.get_variables())),
-            Constraint::Not(l) => l.get_variables(),
+            Constraint::Not(l) | Constraint::Arbitrary(l) => l.get_variables(),
         }
     }
 
@@ -169,12 +150,8 @@ impl FormatWithSymTable for Constraint {
                     l2.format(st, sym_version)
                 )
             }
-            Constraint::Arbitrary(l1, l2) => {
-                format!(
-                    "({} in {})",
-                    l1.format(st, sym_version),
-                    l2.format(st, sym_version)
-                )
+            Constraint::Arbitrary(l1) => {
+                format!("arbitrary({})", l1.format(st, sym_version),)
             }
             Constraint::Neq(l1, l2) => format!(
                 "({} != {})",
@@ -233,22 +210,6 @@ impl FormatWithSymTable for Constraint {
                 }
                 format!("or({})", str)
             }
-            Constraint::Add(a, b, c) => {
-                format!(
-                    "{} = {} + {}",
-                    a.format(st, sym_version),
-                    b.format(st, sym_version),
-                    c.format(st, sym_version)
-                )
-            }
-            Constraint::Sub(a, b, c) => {
-                format!(
-                    "{} = {} - {}",
-                    a.format(st, sym_version),
-                    b.format(st, sym_version),
-                    c.format(st, sym_version)
-                )
-            }
         }
     }
 }
@@ -260,20 +221,14 @@ impl FlatBindings for Constraint {
             | Constraint::Eq(l1, l2)
             | Constraint::Lt(l1, l2)
             | Constraint::Type(l1, l2)
-            | Constraint::Neq(l1, l2)
-            | Constraint::Arbitrary(l1, l2) => {
+            | Constraint::Neq(l1, l2) => {
                 l1.flat_bindings(st);
                 l2.flat_bindings(st);
             }
-            Constraint::Not(a) => a.flat_bindings(st),
+            Constraint::Not(a) | Constraint::Arbitrary(a) => a.flat_bindings(st),
 
             Constraint::Min(a) | Constraint::Max(a) | Constraint::And(a) | Constraint::Or(a) => {
                 a.flat_bindings(st)
-            }
-            Constraint::Add(a, b, c) | Constraint::Sub(a, b, c) => {
-                a.flat_bindings(st);
-                b.flat_bindings(st);
-                c.flat_bindings(st);
             }
         }
     }
@@ -326,8 +281,7 @@ impl Replace for Constraint {
             | Constraint::Eq(l1, l2)
             | Constraint::Neq(l1, l2)
             | Constraint::Lt(l1, l2)
-            | Constraint::Type(l1, l2)
-            | Constraint::Arbitrary(l1, l2) => {
+            | Constraint::Type(l1, l2) => {
                 l1.replace(old, new);
                 l2.replace(old, new);
             }
@@ -337,13 +291,7 @@ impl Replace for Constraint {
             | Constraint::Or(vec) => {
                 vec.replace(old, new);
             }
-
-            Constraint::Add(a, b, c) | Constraint::Sub(a, b, c) => {
-                a.replace(old, new);
-                b.replace(old, new);
-                c.replace(old, new);
-            }
-            Constraint::Not(l) => l.replace(old, new),
+            Constraint::Not(l) | Constraint::Arbitrary(l) => l.replace(old, new),
         }
     }
 }

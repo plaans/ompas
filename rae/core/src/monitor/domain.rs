@@ -929,15 +929,15 @@ mod test {
                             (= (carry ?gripper) no_ball))
                           (:effects
                             (begin
-                                (assert `(carry ,?gripper) ?obj)
-                                (assert `(at ,?obj) no_place))))",
+                                (assert 'carry ?gripper ?obj)
+                                (assert 'at ?obj no_place))))",
             expected: "(add-task-model\
                 (map '(\
                     (:name pick)\
                     (:model-type pddl)\
                     (:params ((?obj ball) (?room room) (?gripper gripper)))\
                     (:pre-conditions ((= (at ?obj) ?room) (= (at-robby) ?room) (= (carry ?gripper) no_ball)))\
-                    (:effects ((begin (assert `(carry ,?gripper) ?obj) (assert `(at ,?obj) no_place)))))))",
+                    (:effects ((begin (assert 'carry ?gripper ?obj) (assert `at ?obj no_place)))))))",
             result: "nil",
         };
 

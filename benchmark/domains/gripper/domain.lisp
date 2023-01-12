@@ -28,8 +28,8 @@
         (= (carry ?gripper) no_ball))
       (:effects
         (begin
-            (assert `(carry ,?gripper) ?obj)
-            (assert `(at ,?obj) no_place))))
+            (assert 'carry ?gripper ?obj)
+            (assert 'at ?obj no_place))))
 
     (def-command drop (:params (?obj ball) (?room room) (?gripper gripper)))
     (def-command-pddl-model drop
@@ -39,8 +39,8 @@
         (= (at-robby) ?room))
       (:effects
         (begin
-            (assert `(carry ,?gripper) no_ball)
-            (assert `(at ,?obj) ?room ))))
+            (assert 'carry ?gripper no_ball)
+            (assert 'at ?obj ?room ))))
 
     ;task with their methods
     (def-task pick-and-drop (:params (?ball ball) (?room room)))

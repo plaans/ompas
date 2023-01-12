@@ -1,4 +1,5 @@
 pub(crate) mod closure;
+pub mod computation;
 pub mod forest;
 pub mod id;
 pub mod lit;

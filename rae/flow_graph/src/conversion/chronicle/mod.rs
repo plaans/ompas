@@ -8,6 +8,7 @@ use crate::structs::chronicle::{GetVariables, Replace};
 use crate::structs::domain::root_type::RootType::Boolean;
 use crate::structs::flow_graph::flow::{FlowId, FlowKind};
 use crate::structs::flow_graph::graph::FlowGraph;
+use crate::structs::sym_table::computation::Computation;
 use crate::structs::sym_table::lit::Lit;
 use crate::structs::sym_table::{VarId, COND};
 use itertools::Itertools;
@@ -83,6 +84,7 @@ pub fn convert_into_chronicle(
                         st.union_var(&fl.get_flow_result(&handle), &result);
                     }
                     Lit::Constraint(c) => ch.add_constraint(Constraint::eq(result, c.deref())),
+                    Lit::Computation(c) => ch.add_constraint(Constraint::eq(result, c.deref())),
                     Lit::Apply(app) => ch.add_constraint(Constraint::eq(result, app)),
                     Lit::Read(read) => {
                         let condition = Condition {
@@ -294,7 +296,7 @@ pub fn convert_into_chronicle(
             }
             FlowKind::FlowPause(fw) => {
                 if let Some(duration) = fw.duration {
-                    ch.add_constraint(Constraint::add(end, duration, start));
+                    ch.add_constraint(Constraint::eq(end, Computation::add(vec![start, duration])));
                 }
             }
             FlowKind::FlowResourceHandle(h) => {

@@ -1,6 +1,6 @@
 use async_recursion::async_recursion;
 use ompas_rae_language::exec::refinement::EXEC_TASK;
-use ompas_utils::blocking_async;
+use ompas_rae_language::exec::resource::ACQUIRE;
 use sompas_core::*;
 use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lenv::LEnv;
@@ -8,12 +8,16 @@ use sompas_structs::llambda::LambdaArgs;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::{lruntimeerror, wrong_n_args, wrong_type};
+use std::fmt::Write;
 
 pub const TRANSFORM_LAMBDA_EXPRESSION: &str = "transform-lambda-expression";
+pub const MAX_Q: &str = "max-q";
+pub const QUANTITY: &str = "quantity";
 
 pub async fn pre_processing(lv: &LValue, env: &LEnv) -> LResult {
     let avoid = vec![EXEC_TASK.to_string()];
     let lv = lambda_expansion(lv, env, &avoid).await?;
+    let lv = acquire_expansion(&lv, env).await?;
 
     Ok(lv)
 }
@@ -113,8 +117,7 @@ pub async fn transform_lambda_expression(lv: &LValue, env: LEnv, avoid: &[String
 
                 let mut c_env = env;
 
-                blocking_async!(parse(&lisp, &mut c_env).await)
-                    .expect("error in thread parsing string")
+                parse(&lisp, &mut c_env).await
             } else {
                 Err(wrong_type!(
                     TRANSFORM_LAMBDA_EXPRESSION,
@@ -135,5 +138,45 @@ pub async fn transform_lambda_expression(lv: &LValue, env: LEnv, avoid: &[String
             lv,
             KindLValue::List
         ))
+    }
+}
+
+#[async_recursion]
+pub async fn acquire_expansion(lv: &LValue, env: &LEnv) -> LResult {
+    if let LValue::List(list) = &lv {
+        let mut result: Vec<LValue> = vec![];
+        for lv in list.iter() {
+            result.push(acquire_expansion(lv, env).await?);
+        }
+
+        if result[0].to_string().as_str() == ACQUIRE {
+            let mut lisp = "(begin ".to_string();
+            match result.len() {
+                2 => {
+                    write!(lisp, "(define __r__ {})", result[1]).unwrap();
+                    write!(lisp, "(define __q__ (read-state {MAX_Q} __r__))").unwrap();
+                }
+                3 => {
+                    write!(lisp, "(define __r__ {})", result[1]).unwrap();
+                    write!(lisp, "(define __q__ {}", result[2]).unwrap();
+                }
+                _ => unreachable!(),
+            }
+
+            write!(lisp, "(wait-for (<= __q__ (read-state {QUANTITY} __r__)))").unwrap();
+            write!(
+                lisp,
+                "(assert '({QUANTITY} __r__) (+ (read-state {QUANTITY} __r__) __q__))"
+            )
+            .unwrap();
+            write!(lisp, "(ressource-handle '(assert ({QUANTITY} __r__) (- (read-state {QUANTITY} __r__) __q__))))").unwrap();
+            let mut c_env = env.clone();
+
+            parse(&lisp, &mut c_env).await
+        } else {
+            Ok(result.into())
+        }
+    } else {
+        Ok(lv.clone())
     }
 }

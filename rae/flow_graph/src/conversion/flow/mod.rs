@@ -19,7 +19,7 @@ pub mod apply;
 pub mod post_processing;
 pub mod pre_processing;
 
-pub fn convert_into_flow_graph(
+pub fn convert_lv(
     lv: &LValue,
     fl: &mut FlowGraph,
     define_table: &mut DefineTable,
@@ -46,7 +46,7 @@ pub fn convert_into_flow_graph(
 fn convert_symbol(symbol: &Arc<String>, fl: &mut FlowGraph, define_table: &DefineTable) -> FlowId {
     match define_table.get(symbol.as_str()) {
         None => {
-            let id = fl.sym_table.new_symbol(symbol);
+            let id = fl.st.new_symbol(symbol);
             fl.new_instantaneous_assignment(Lit::Atom(id)).into()
         }
         Some(r) => fl.new_instantaneous_assignment(Lit::Atom(*r)).into(),
@@ -59,17 +59,17 @@ fn convert_string(_: &Arc<String>, _: &mut FlowGraph) -> FlowId {
 }
 
 fn convert_number(number: &LNumber, fl: &mut FlowGraph) -> FlowId {
-    let id = fl.sym_table.new_number(number);
+    let id = fl.st.new_number(number);
     fl.new_instantaneous_assignment(Lit::Atom(id))
 }
 
 fn convert_bool(bool: bool, fl: &mut FlowGraph) -> FlowId {
-    let id = fl.sym_table.new_bool(bool);
+    let id = fl.st.new_bool(bool);
     fl.new_instantaneous_assignment(Lit::Atom(id))
 }
 
 fn convert_nil(fl: &mut FlowGraph) -> FlowId {
-    let id = fl.sym_table.new_nil();
+    let id = fl.st.new_nil();
     fl.new_instantaneous_assignment(Lit::Atom(id))
 }
 
@@ -84,7 +84,7 @@ fn convert_list(
 ) -> Result<FlowId, LRuntimeError> {
     let proc = &list[0];
     let mut out_of_scope: Vec<VarId> = vec![];
-    let mut st = fl.sym_table.clone();
+    let mut st = fl.st.clone();
 
     let r = match proc {
         LValue::Symbol(s) => convert_apply(s.as_str(), list.as_slice(), fl, define_table)?,
@@ -92,7 +92,7 @@ fn convert_list(
             LPrimitives::Define => {
                 let var = &list[1].to_string();
                 let val = &list[2];
-                let flow_val = convert_into_flow_graph(val, fl, define_table)?;
+                let flow_val = convert_lv(val, fl, define_table)?;
                 define_table.insert(var.to_string(), fl.get_flow_result(&flow_val));
                 let id = st.new_nil();
                 let flow_result = fl.new_instantaneous_assignment(Lit::Atom(id));
@@ -112,18 +112,27 @@ fn convert_list(
                 Conversion of each parts
                  */
 
-                let cond_flow = convert_into_flow_graph(cond, fl, define_table)?;
+                let cond_flow = convert_lv(cond, fl, define_table)?;
                 let cond_result = st.get_domain_id(&fl.get_flow_result(&cond_flow));
                 st.meet_to_domain(&cond_result, Boolean);
+                let br_cond_flow = fl.new_instantaneous_assignment(fl.get_flow_result(&cond_flow));
+                let cond_result = st.get_domain_id(&fl.get_flow_result(&cond_flow));
 
-                let true_flow = convert_into_flow_graph(true_branch, fl, define_table)?;
+                let true_flow = convert_lv(true_branch, fl, define_table)?;
                 let true_flow = fl.new_seq(vec![true_flow]);
-                let false_flow = convert_into_flow_graph(false_branch, fl, define_table)?;
+                let false_flow = convert_lv(false_branch, fl, define_table)?;
                 let false_flow = fl.new_seq(vec![false_flow]);
                 let true_result = st.get_domain_id(&fl.get_flow_result(&true_flow));
                 let false_result = st.get_domain_id(&fl.get_flow_result(&false_flow));
 
-                let result = st.new_result();
+                let branching = BranchingFlow {
+                    cond_flow: br_cond_flow,
+                    true_flow,
+                    false_flow,
+                };
+                let flow_branch = fl.new_branching(branching);
+
+                let result = fl.get_flow_result(&flow_branch);
                 let result = st.get_domain_id(&result);
 
                 st.add_update(
@@ -171,17 +180,6 @@ fn convert_list(
                     ),
                 );
 
-                let result = fl.new_result(result, None);
-
-                let cond = fl.new_result(cond_result, Some(fl.get_flow_end(&cond_flow)));
-
-                let branching = BranchingFlow {
-                    cond,
-                    true_flow,
-                    false_flow,
-                    result,
-                };
-                let flow_branch = fl.new_branching(branching);
                 fl.new_seq(vec![cond_flow, flow_branch])
             }
             LPrimitives::Quote => {
@@ -193,7 +191,7 @@ fn convert_list(
                 let mut results = vec![];
                 let mut seq = vec![];
                 for e in &list[1..] {
-                    let e_flow = convert_into_flow_graph(e, fl, &mut define_table)?;
+                    let e_flow = convert_lv(e, fl, &mut define_table)?;
                     results.push(fl.get_flow_result(&e_flow));
                     seq.push(e_flow);
                 }
@@ -204,7 +202,7 @@ fn convert_list(
             LPrimitives::Async => {
                 let define_table = &mut define_table.clone();
                 let e = &list[1];
-                let async_flow = convert_into_flow_graph(e, fl, define_table)?;
+                let async_flow = convert_lv(e, fl, define_table)?;
                 let r_async = st.get_domain_id(&fl.get_flow_result(&async_flow));
 
                 let handle_flow = fl.new_async(async_flow);
@@ -227,7 +225,7 @@ fn convert_list(
             }
             LPrimitives::Await => {
                 let define_table = &mut define_table.clone();
-                let h = convert_into_flow_graph(&list[1], fl, define_table)?;
+                let h = convert_lv(&list[1], fl, define_table)?;
                 let result = fl.get_flow_result(&h);
 
                 st.meet_to_domain(&result, RootType::Handle);
@@ -239,7 +237,7 @@ fn convert_list(
             }
             LPrimitives::Err => {
                 let define_table = &mut define_table.clone();
-                let arg_err = convert_into_flow_graph(&list[1], fl, define_table)?;
+                let arg_err = convert_lv(&list[1], fl, define_table)?;
                 let arg_err_result = st.get_domain_id(&fl.get_flow_result(&arg_err));
                 let atom_err = st.new_symbol(ERR);
                 let flow = fl.new_instantaneous_assignment(vec![atom_err, arg_err_result]);

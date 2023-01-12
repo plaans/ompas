@@ -12,11 +12,11 @@ pub struct Effect {
 }
 
 impl Effect {
-    pub fn get_start(&self) -> &VarId {
+    pub fn get_start(&self) -> VarId {
         self.interval.get_start()
     }
 
-    pub fn get_end(&self) -> &VarId {
+    pub fn get_end(&self) -> VarId {
         self.interval.get_end()
     }
 }

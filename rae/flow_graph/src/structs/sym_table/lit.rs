@@ -16,6 +16,7 @@ pub enum Lit {
     Exp(Vec<Lit>),
     Atom(VarId),
     Await(VarId),
+    Release(VarId),
     Read(Vec<VarId>),
     Write(Vec<VarId>),
     Exec(Vec<VarId>),
@@ -38,6 +39,10 @@ impl Lit {
 
     pub fn exp(exp: Vec<Lit>) -> Self {
         Self::Exp(exp)
+    }
+
+    pub fn release(rh: VarId) -> Self {
+        Self::Release(rh)
     }
 
     pub fn is_atom(&self) -> bool {
@@ -75,7 +80,7 @@ impl TryFrom<&Lit> for Vec<VarId> {
 
     fn try_from(value: &Lit) -> Result<Self, Self::Error> {
         match value {
-            Lit::Atom(a) | Lit::Await(a) => Ok(vec![*a]),
+            Lit::Atom(a) | Lit::Await(a) | Lit::Release(a) => Ok(vec![*a]),
             Lit::Constraint(_) => Err(Default::default()),
             Lit::Exp(l) => {
                 let mut e = vec![];
@@ -262,6 +267,9 @@ impl FormatWithSymTable for Lit {
                 str.push(')');
                 str
             }
+            Lit::Release(rh) => {
+                format!("release({})", rh.format(st, sym_version))
+            }
         }
     }
 }
@@ -269,7 +277,7 @@ impl FormatWithSymTable for Lit {
 impl FlatBindings for Lit {
     fn flat_bindings(&mut self, st: &RefSymTable) {
         match self {
-            Lit::Atom(a) | Lit::Await(a) => a.flat_bindings(st),
+            Lit::Atom(a) | Lit::Await(a) | Lit::Release(a) => a.flat_bindings(st),
             Lit::Constraint(c) => c.flat_bindings(st),
             Lit::Exp(vec) => vec.flat_bindings(st),
             Lit::Apply(vec) | Lit::Read(vec) | Lit::Write(vec) | Lit::Exec(vec) => {
@@ -282,7 +290,7 @@ impl FlatBindings for Lit {
 impl GetVariables for Lit {
     fn get_variables(&self) -> HashSet<VarId> {
         match self {
-            Lit::Atom(a) | Lit::Await(a) => hashset!(*a),
+            Lit::Atom(a) | Lit::Await(a) | Lit::Release(a) => hashset!(*a),
             Lit::Constraint(c) => c.get_variables(),
             Lit::Exp(vec) => {
                 let mut hashset: im::HashSet<VarId> = Default::default();
@@ -309,7 +317,7 @@ impl GetVariables for Lit {
 impl Replace for Lit {
     fn replace(&mut self, old: &VarId, new: &VarId) {
         match self {
-            Lit::Atom(a) | Lit::Await(a) => a.replace(old, new),
+            Lit::Atom(a) | Lit::Await(a) | Lit::Release(a) => a.replace(old, new),
             Lit::Constraint(c) => c.replace(old, new),
             Lit::Exp(e) => e.replace(old, new),
             Lit::Apply(vec) | Lit::Read(vec) | Lit::Write(vec) | Lit::Exec(vec) => {

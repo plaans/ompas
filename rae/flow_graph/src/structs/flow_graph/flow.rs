@@ -5,19 +5,22 @@ use crate::structs::sym_table::VarId;
 pub type FlowId = usize;
 
 #[derive(Clone)]
-pub enum FlowKind {
-    Assignment(Assignment),
-    Seq(Vec<FlowId>, FlowId),
-    Branching(BranchingFlow),
-    FlowResult(FlowResult),
-    FlowAsync(FlowAsync),
-    FlowWait(FlowWait),
+pub struct Flow {
+    pub valid: bool,
+    pub interval: Interval,
+    pub result: VarId,
+    pub parent: Option<FlowId>,
+    pub kind: FlowKind,
 }
 
-impl From<FlowResult> for FlowKind {
-    fn from(value: FlowResult) -> Self {
-        Self::FlowResult(value)
-    }
+#[derive(Clone)]
+pub enum FlowKind {
+    Assignment(Assignment),
+    Seq(Vec<FlowId>),
+    Branching(BranchingFlow),
+    FlowHandle(FlowId),
+    FlowResourceHandle(FlowId),
+    FlowPause(FlowPause),
 }
 
 impl From<Assignment> for FlowKind {
@@ -32,55 +35,14 @@ impl From<BranchingFlow> for FlowKind {
     }
 }
 
-impl From<FlowAsync> for FlowKind {
-    fn from(value: FlowAsync) -> Self {
-        Self::FlowAsync(value)
-    }
-}
-
-#[derive(Clone)]
-pub struct Flow {
-    pub valid: bool,
-    pub parent: Option<FlowId>,
-    pub kind: FlowKind,
-}
-
-impl<T> From<T> for Flow
-where
-    T: Into<FlowKind>,
-{
-    fn from(value: T) -> Self {
-        Self {
-            valid: true,
-            parent: None,
-            kind: value.into(),
-        }
-    }
-}
-
 #[derive(Clone)]
 pub struct BranchingFlow {
-    pub cond: FlowId,
+    pub cond_flow: FlowId,
     pub true_flow: FlowId,
     pub false_flow: FlowId,
-    pub result: FlowId,
 }
 
 #[derive(Clone)]
-pub struct FlowResult {
-    pub result: VarId,
-    pub timepoint: VarId,
-}
-
-#[derive(Clone)]
-pub struct FlowAsync {
-    pub result: VarId,
-    pub timepoint: VarId,
-    pub flow: FlowId,
-}
-
-#[derive(Clone)]
-pub struct FlowWait {
-    pub interval: Interval,
+pub struct FlowPause {
     pub duration: Option<VarId>,
 }

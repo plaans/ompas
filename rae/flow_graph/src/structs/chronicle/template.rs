@@ -50,13 +50,13 @@ impl ChronicleTemplate {
         chronicle_kind: ChronicleKind,
         mut sym_table: RefSymTable,
     ) -> Self {
-        let interval = Interval::new(&sym_table.new_start(), &sym_table.new_end());
+        let interval = Interval::new(sym_table.new_start(), sym_table.new_end());
 
         let presence = sym_table.new_presence();
 
         let result = sym_table.new_chronicle_result();
 
-        let init_var = vec![presence, result, *interval.get_start(), *interval.get_end()];
+        let init_var = vec![presence, result, interval.get_start(), interval.get_end()];
 
         let mut chronicle = Self {
             sym_table,
@@ -205,8 +205,8 @@ impl ChronicleTemplate {
     }
 
     pub fn add_interval(&mut self, interval: Interval) {
-        self.variables.insert(*interval.get_start());
-        self.variables.insert(*interval.get_end());
+        self.variables.insert(interval.get_start());
+        self.variables.insert(interval.get_end());
     }
 
     pub fn add_constraint(&mut self, constraint: Constraint) {

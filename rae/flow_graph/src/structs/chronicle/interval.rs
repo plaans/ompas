@@ -10,27 +10,24 @@ pub struct Interval {
 }
 
 impl Interval {
-    pub fn new(start: &VarId, end: &VarId) -> Self {
-        Self {
-            start: *start,
-            end: *end,
-        }
+    pub fn new(start: VarId, end: VarId) -> Self {
+        Self { start, end }
     }
 
-    pub fn new_instantaneous(t: &VarId) -> Self {
-        Self { start: *t, end: *t }
+    pub fn new_instantaneous(t: VarId) -> Self {
+        Self { start: t, end: t }
     }
 
-    pub fn get_start(&self) -> &VarId {
-        &self.start
+    pub fn get_start(&self) -> VarId {
+        self.start
     }
 
-    pub fn get_end(&self) -> &VarId {
-        &self.end
+    pub fn get_end(&self) -> VarId {
+        self.end
     }
 
-    pub fn set_end(&mut self, end: &VarId) {
-        self.end = *end;
+    pub fn set_end(&mut self, end: VarId) {
+        self.end = end;
     }
 
     pub fn is_instantaneous(&self) -> bool {

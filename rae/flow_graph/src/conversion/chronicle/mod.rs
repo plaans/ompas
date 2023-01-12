@@ -31,9 +31,9 @@ pub fn convert_into_chronicle(
     fl: &mut FlowGraph,
     flow: &FlowId,
 ) -> Result<ChronicleTemplate, LRuntimeError> {
-    let mut st = fl.sym_table.clone();
+    let mut st = fl.st.clone();
 
-    let mut ch = ChronicleTemplate::new("template", ChronicleKind::Method, fl.sym_table.clone());
+    let mut ch = ChronicleTemplate::new("template", ChronicleKind::Method, fl.st.clone());
 
     ch.add_constraint(Constraint::leq(
         ch.get_interval().get_start(),
@@ -42,14 +42,14 @@ pub fn convert_into_chronicle(
 
     //Bind the flow start timepoint with the chronicle start timepoint
     st.union_var(
-        ch.get_interval().get_start(),
-        fl.get_flow_interval(flow).get_start(),
+        &ch.get_interval().get_start(),
+        &fl.get_flow_interval(flow).get_start(),
     );
 
     //Bind the flow end timepoint with the chronicle end timepoint
     st.union_var(
-        ch.get_interval().get_end(),
-        fl.get_flow_interval(flow).get_end(),
+        &ch.get_interval().get_end(),
+        &fl.get_flow_interval(flow).get_end(),
     );
 
     st.union_var(&ch.get_result(), &fl.get_flow_result(flow));
@@ -59,6 +59,7 @@ pub fn convert_into_chronicle(
     while let Some(flow_id) = queue.pop() {
         let flow = fl.flows[flow_id].clone();
         let interval = fl.get_flow_interval(&flow_id);
+        let result = fl.get_flow_result(&flow_id);
         let start = interval.get_start();
         let end = interval.get_end();
 
@@ -68,8 +69,6 @@ pub fn convert_into_chronicle(
 
         match flow.kind {
             FlowKind::Assignment(ass) => {
-                let result = fl.get_flow_result(&flow_id);
-
                 match &ass.lit {
                     Lit::Exp(_) => {}
                     Lit::Atom(_) => {}
@@ -84,7 +83,7 @@ pub fn convert_into_chronicle(
                         st.union_var(&fl.get_flow_result(&handle), &result);
                     }
                     Lit::Constraint(c) => ch.add_constraint(Constraint::eq(result, c.deref())),
-                    Lit::Apply(app) => {}
+                    Lit::Apply(app) => ch.add_constraint(Constraint::eq(result, app)),
                     Lit::Read(read) => {
                         let condition = Condition {
                             interval,
@@ -119,40 +118,46 @@ pub fn convert_into_chronicle(
                         /*let subtask_result = ch.sym_table.new_nil();
                         st.union_atom(&subtask_result, &result);*/
                     }
+                    Lit::Release(release) => {
+                        let handle = fl.get_handle(release).unwrap();
+
+                        ch.add_constraint(Constraint::eq(
+                            fl.get_flow_end(&handle),
+                            interval.get_end(),
+                        ));
+                    }
                 }
             }
-            FlowKind::Seq(mut seq, _) => queue.append(&mut seq),
+            FlowKind::Seq(mut seq) => queue.append(&mut seq),
             FlowKind::Branching(branching) => {
-                let result = fl.get_flow_result(&flow_id);
-
-                let cond = fl.get_flow_result(&branching.cond);
+                let cond = fl.get_flow_result(&branching.cond_flow);
                 let cond_domain = st.get_domain_of_var(&cond);
                 if cond_domain.is_true() {
                     st.union_var(
-                        &fl.get_flow_end(&branching.cond),
+                        &fl.get_flow_end(&branching.cond_flow),
                         &fl.get_flow_start(&branching.true_flow),
                     );
                     st.union_var(
                         &fl.get_flow_end(&branching.true_flow),
-                        &fl.get_flow_start(&branching.result),
+                        &fl.get_flow_start(&result),
                     );
                     st.union_var(
                         &fl.get_flow_result(&branching.true_flow),
-                        &fl.get_flow_result(&branching.result),
+                        &fl.get_flow_result(&result),
                     );
                     queue.push(branching.true_flow)
                 } else if cond_domain.is_false() {
                     st.union_var(
-                        &fl.get_flow_end(&branching.cond),
+                        &fl.get_flow_end(&branching.cond_flow),
                         &fl.get_flow_start(&branching.false_flow),
                     );
                     st.union_var(
                         &fl.get_flow_end(&branching.false_flow),
-                        &fl.get_flow_start(&branching.result),
+                        &fl.get_flow_start(&result),
                     );
                     st.union_var(
                         &fl.get_flow_result(&branching.false_flow),
-                        &fl.get_flow_result(&branching.result),
+                        &fl.get_flow_result(&result),
                     );
                     queue.push(branching.false_flow)
                 } else {
@@ -274,37 +279,35 @@ pub fn convert_into_chronicle(
                     })
                 }
             }
-            FlowKind::FlowResult(_) => {
-                unreachable!()
-            }
-            FlowKind::FlowAsync(fa) => {
-                let h = fa.flow;
-                let result = fa.result;
+            FlowKind::FlowHandle(h) => {
                 queue.push(h);
-                ch.add_constraint(Constraint::leq(fa.timepoint, fl.get_flow_start(&h)));
+                ch.add_constraint(Constraint::leq(start, fl.get_flow_start(&h)));
                 //sym_table.union_atom(&ass.get_start(), &fl.get_flow_start(&h));
                 let domain_id = st.get_domain_id(&result);
                 let drops: Vec<Lit> = st
                     .get_domain_vars(&domain_id)
                     .drain(..)
-                    .map(|a| st.get_var_parent(&a).into())
+                    .filter_map(|a| st.get_drop(&st.get_var_parent(&a)).map(|d| Lit::from(d)))
                     .unique()
                     .collect();
                 ch.add_constraint(Constraint::leq(fl.get_flow_end(&h), Constraint::Max(drops)))
             }
-            FlowKind::FlowWait(fw) => match fw.duration {
-                Some(duration) => {
-                    ch.add_constraint(Constraint::add(
-                        fw.interval.get_end(),
-                        duration,
-                        fw.interval.get_start(),
-                    ));
+            FlowKind::FlowPause(fw) => {
+                if let Some(duration) = fw.duration {
+                    ch.add_constraint(Constraint::add(end, duration, start));
                 }
-                None => ch.add_constraint(Constraint::leq(
-                    fw.interval.get_start(),
-                    fw.interval.get_end(),
-                )),
-            },
+            }
+            FlowKind::FlowResourceHandle(h) => {
+                queue.push(h);
+                let domain_id = st.get_domain_id(&result);
+                let drops: Vec<Lit> = st
+                    .get_domain_vars(&domain_id)
+                    .drain(..)
+                    .filter_map(|a| st.get_drop(&st.get_var_parent(&a)).map(|d| Lit::from(d)))
+                    .unique()
+                    .collect();
+                ch.add_constraint(Constraint::eq(fl.get_flow_end(&h), Constraint::Max(drops)))
+            }
         }
     }
 

@@ -106,7 +106,7 @@ pub fn convert_into_chronicle(
 
                         ch.add_effect(effect);
 
-                        let result = ch.sym_table.new_nil();
+                        let result = ch.st.new_nil();
                         st.union_var(&result, &result);
                     }
                     Lit::Exec(exec) => {
@@ -163,7 +163,7 @@ pub fn convert_into_chronicle(
                     );
                     queue.push(branching.false_flow)
                 } else {
-                    let (t_if, m_true, m_false) = ch.sym_table.new_if();
+                    let (t_if, m_true, m_false) = ch.st.new_if();
 
                     /*
                     Partially converts the a branch of 'if', getting by the mean time the variables necessary in computation of the branch that have been defined previously.
@@ -195,7 +195,7 @@ pub fn convert_into_chronicle(
                                 }
                             }
                         }
-                        let cond = ch.sym_table.new_parameter(COND, branch);
+                        let cond = ch.st.new_parameter(COND, branch);
                         method.set_task(vec![t_if, cond]);
                         method.set_name(vec![label, cond]);
                         Ok((method, branch_params))
@@ -212,15 +212,14 @@ pub fn convert_into_chronicle(
                         true_params_id.union(&false_params_id).cloned().collect();
 
                     let mut task_params: Vec<VarId> = task_params.drain().collect();
-                    let cond_if = ch.sym_table.new_parameter(COND, Boolean);
+                    let cond_if = ch.st.new_parameter(COND, Boolean);
 
                     let mut task = vec![t_if, cond_if];
                     for p in &task_params {
                         let p = st.get_var_parent(p);
-                        let id = ch.sym_table.new_parameter(
-                            ch.sym_table.get_label(&p, false),
-                            ch.sym_table.get_domain_of_var(&p),
-                        );
+                        let id = ch
+                            .st
+                            .new_parameter(ch.st.get_label(&p, false), ch.st.get_domain_of_var(&p));
                         task.push(id);
                     }
 
@@ -236,9 +235,9 @@ pub fn convert_into_chronicle(
                             for p in &task_params {
                                 let id = match method_params.get(p) {
                                     None => {
-                                        let id = ch.sym_table.new_parameter(
-                                            ch.sym_table.get_label(&p, false),
-                                            ch.sym_table.get_domain_of_var(p),
+                                        let id = ch.st.new_parameter(
+                                            ch.st.get_label(&p, false),
+                                            ch.st.get_domain_of_var(p),
                                         );
                                         method.add_var(&id);
                                         id

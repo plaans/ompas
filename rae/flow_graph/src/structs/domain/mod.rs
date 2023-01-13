@@ -1,5 +1,5 @@
 use crate::structs::domain::root_type::RootType::*;
-use crate::structs::domain::root_type::{RootType, FALSE_ID, TRUE_ID};
+use crate::structs::domain::root_type::{RootType, FALSE_ID, NIL_ID, TRUE_ID};
 use crate::structs::domain::type_lattice::TypeLattice;
 use crate::structs::domain::Domain::*;
 use std::fmt::Write;
@@ -59,10 +59,9 @@ impl Domain {
     }
 
     pub fn is_constant(&self) -> bool {
-        if let Self::Cst(_, _) = &self {
-            true
-        } else {
-            false
+        match self {
+            Cst(_, _) | Simple(TRUE_ID | FALSE_ID | NIL_ID) => true,
+            _ => false,
         }
     }
 

@@ -79,11 +79,7 @@ pub fn simplify_constraints(
     Ok(())
 }
 
-pub fn merge_conditions(
-    c: &mut ChronicleTemplate,
-    _: &ConversionContext,
-    ch: &mut ConversionCollection,
-) -> Result<(), LRuntimeError> {
+pub fn merge_conditions(c: &mut ChronicleTemplate) -> Result<(), LRuntimeError> {
     let mut c_to_remove: HashSet<usize> = Default::default();
 
     for (i, c1) in c.get_conditions().iter().enumerate() {
@@ -98,7 +94,7 @@ pub fn merge_conditions(
                     c2.format(&ch.sym_table, true),
                     index
                 );*/
-                bind_atoms(&c1.value, &c2.value, &mut ch.sym_table)?;
+                //bind_atoms(&c1.value, &c2.value, &mut ch.sym_table)?;
                 c_to_remove.insert(index);
             }
         }

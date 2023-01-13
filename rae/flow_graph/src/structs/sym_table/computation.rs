@@ -4,7 +4,6 @@ use crate::structs::sym_table::lit::Lit;
 use crate::structs::sym_table::r#ref::RefSymTable;
 use crate::structs::sym_table::VarId;
 use im::HashSet;
-use log::Level::Debug;
 use std::fmt::Write;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

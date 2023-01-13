@@ -29,14 +29,14 @@ pub struct ChronicleDebug {
 }
 
 pub struct ChronicleTemplate {
-    pub sym_table: RefSymTable,
+    pub st: RefSymTable,
     name: Vec<VarId>,
     task: Vec<VarId>,
     presence: VarId,
     interval: Interval,
     result: VarId,
     pub(crate) variables: HashSet<VarId>,
-    constraints: Vec<Constraint>,
+    pub constraints: Vec<Constraint>,
     conditions: Vec<Condition>,
     effects: Vec<Effect>,
     subtasks: Vec<SubTask>,
@@ -59,7 +59,7 @@ impl ChronicleTemplate {
         let init_var = vec![presence, result, interval.get_start(), interval.get_end()];
 
         let mut chronicle = Self {
-            sym_table,
+            st: sym_table,
             debug: ChronicleDebug {
                 kind: chronicle_kind,
                 label: label.to_string(),
@@ -107,6 +107,18 @@ impl ChronicleTemplate {
 
     pub fn get_constraints(&self) -> &Vec<Constraint> {
         &self.constraints
+    }
+
+    pub fn get_conditions(&self) -> &Vec<Condition> {
+        &self.conditions
+    }
+
+    pub fn get_effects(&self) -> &Vec<Effect> {
+        &self.effects
+    }
+
+    pub fn get_subtasks(&self) -> &Vec<SubTask> {
+        &self.subtasks
     }
 
     fn build_hashset<T: GetVariables>(vec: &[T]) -> im::HashSet<VarId> {
@@ -273,7 +285,7 @@ impl ChronicleTemplate {
      */
 
     pub fn format(&self, sym_version: bool) -> String {
-        let st = &self.sym_table;
+        let st = &self.st;
         let mut s = String::new();
         //name
         s.push_str(
@@ -356,7 +368,7 @@ impl ChronicleTemplate {
     }
 
     pub fn flat_bindings(&mut self) {
-        let st = &self.sym_table;
+        let st = &self.st;
         self.name.flat_bindings(st);
         self.task.flat_bindings(st);
         let old_variables = self.variables.clone();

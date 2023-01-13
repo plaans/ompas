@@ -1,5 +1,6 @@
 use crate::structs::domain::basic_type::BasicType;
 use crate::structs::domain::Domain;
+use crate::structs::flow_graph::graph::Dot;
 use crate::structs::sym_table::closure::Update;
 use crate::structs::sym_table::var_domain::VarDomain;
 use crate::structs::sym_table::variable::Variable;
@@ -251,6 +252,10 @@ impl RefSymTable {
 
     pub fn format_var_domain(&self, id: &DomainId) -> String {
         RefCell::borrow(&self.0).format_var_domain(id)
+    }
+
+    pub fn export_lattice_dot(&self) -> Dot {
+        RefCell::borrow(&self.0).export_lattice_dot()
     }
 }
 

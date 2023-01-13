@@ -30,6 +30,10 @@ impl Variable {
             drop: None,
         }
     }
+
+    pub fn is_parameter(&self) -> bool {
+        self.parameter
+    }
 }
 
 impl Display for Variable {

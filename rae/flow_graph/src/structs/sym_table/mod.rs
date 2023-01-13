@@ -8,19 +8,17 @@ pub mod r#ref;
 pub(crate) mod var_domain;
 pub mod variable;
 
+use crate::structs::domain::basic_type::BasicType;
+use crate::structs::domain::root_type::RootType;
 use crate::structs::domain::root_type::RootType::{Any, Boolean, Handle};
 use crate::structs::domain::root_type::{FALSE_ID, NIL_ID, TRUE_ID};
 use crate::structs::domain::type_lattice::TypeLattice;
 use crate::structs::domain::Domain;
+use crate::structs::flow_graph::graph::Dot;
+use crate::structs::sym_table::closure::Update;
 use crate::structs::sym_table::forest::{Forest, NodeId};
 use crate::structs::sym_table::id::SymbolTableId;
 use crate::structs::sym_table::meta_data::SymTableMetaData;
-use std::collections::VecDeque;
-//use ompas_rae_language::exec::state::{ASSERT, INSTANCE, RETRACT};
-//use sompas_language::primitives::DO;
-use crate::structs::domain::basic_type::BasicType;
-use crate::structs::domain::root_type::RootType;
-use crate::structs::sym_table::closure::Update;
 use crate::structs::sym_table::r#ref::RefSymTable;
 use crate::structs::sym_table::var_domain::VarDomain;
 use crate::structs::sym_table::variable::Variable;
@@ -29,6 +27,7 @@ use sompas_structs::lnumber::LNumber;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
+use std::collections::VecDeque;
 use std::fmt::Display;
 use std::fmt::Write;
 
@@ -52,6 +51,7 @@ pub const IF_TASK_PROTOTYPE: &str = "t_if";
 pub const TIMEPOINT_TYPE: &str = "Timepoint";
 pub const TASK_TYPE: &str = "Task";
 pub const METHOD_TYPE: &str = "Method";
+pub const RESOURCE_HANDLE_TYPE: &str = "ResourceHandle";
 
 pub type VarId = NodeId;
 pub type DomainId = NodeId;
@@ -108,6 +108,8 @@ impl Default for SymTable {
             .add_type(TASK_TYPE, vec![RootType::Symbol as usize]);
         st.lattice
             .add_type(METHOD_TYPE, vec![RootType::Symbol as usize]);
+
+        st.lattice.add_type(RESOURCE_HANDLE_TYPE, vec![]);
 
         //Symbols of lisp functions that are useful
         //Not exhaustive
@@ -560,6 +562,10 @@ impl SymTable {
             write!(str, "}}").unwrap();
         }
         str
+    }
+
+    pub fn export_lattice_dot(&self) -> Dot {
+        self.lattice.export_dot()
     }
 }
 

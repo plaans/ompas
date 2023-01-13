@@ -3,21 +3,23 @@ use crate::structs::chronicle::constraint::Constraint;
 use crate::structs::domain::root_type::RootType::{Boolean, True};
 use crate::structs::domain::Domain;
 use crate::structs::flow_graph::define_table::DefineTable;
-use crate::structs::flow_graph::flow::{FlowId, FlowKind};
+use crate::structs::flow_graph::flow::FlowId;
 use crate::structs::flow_graph::graph::FlowGraph;
 use crate::structs::sym_table::closure::Update;
 use crate::structs::sym_table::computation::Computation;
 use crate::structs::sym_table::lit::Lit;
-use crate::structs::sym_table::{closure, VarId};
+use crate::structs::sym_table::{closure, VarId, RESOURCE_HANDLE_TYPE};
 use ompas_rae_language::exec::platform::EXEC_COMMAND;
 use ompas_rae_language::exec::refinement::EXEC_TASK;
 use ompas_rae_language::exec::resource::RELEASE;
-use ompas_rae_language::exec::state::{ASSERT, ASSERT_SHORT, READ_STATE, WAIT_FOR};
+use ompas_rae_language::exec::state::{
+    ASSERT, ASSERT_SHORT, INSTANCE, INSTANCES, READ_STATE, WAIT_FOR,
+};
+use ompas_rae_language::exec::ARBITRARY;
 use sompas_language::basic_math::{ADD, EQ, GEQ, GT, LEQ, LT, NOT, NOT_SHORT, SUB};
 use sompas_language::error::IS_ERR;
 use sompas_language::time::SLEEP;
 use sompas_language::utils::{AND, OR};
-use sompas_structs::lprimitives::LPrimitives::Do;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use std::collections::HashMap;
@@ -69,6 +71,9 @@ impl Default for ApplyConversionCollection {
         d.add_conversion(RELEASE, convert_release);
         d.add_conversion(ADD, convert_add);
         d.add_conversion(SUB, convert_sub);
+        d.add_conversion(INSTANCE, convert_instance);
+        d.add_conversion(INSTANCES, convert_instances);
+        d.add_conversion(ARBITRARY, convert_arbitrary);
         d
     }
 }
@@ -331,27 +336,45 @@ fn convert_sleep(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRu
     Ok(fl.new_seq(seq))
 }
 
-fn convert_ressource_handle(
-    fl: &mut FlowGraph,
-    mut seq: Vec<FlowId>,
-) -> Result<FlowId, LRuntimeError> {
+fn convert_ressource_handle(fl: &mut FlowGraph, seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
     let rh = fl.new_resource_handle(seq[1]);
     fl.handles.insert(fl.get_flow_result(&rh), seq[1]);
 
     Ok(rh)
 }
 
-fn convert_release(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
+fn convert_release(fl: &mut FlowGraph, seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
     let rh = seq[1];
     let result = fl.get_flow_result(&rh);
+    let result_domain = fl.st.get_domain_id(&result);
+    fl.st.set_domain(
+        &result_domain,
+        fl.st.get_type_as_domain(RESOURCE_HANDLE_TYPE),
+    );
 
-    let flow_release = fl.new_assignment(Lit::Release(result));
+    let flow_release = fl.new_instantaneous_assignment(Lit::Release(result));
     fl.st
         .set_domain(&fl.get_flow_result(&flow_release), Domain::nil());
 
     Ok(fl.new_seq(vec![rh, flow_release]))
 }
 
+fn convert_instance(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
+    let flow_read = fl.new_instantaneous_assignment(Lit::Read(seq[..2].to_vec()));
+    let flow_equal = fl.new_instantaneous_assignment(Lit::constraint(Constraint::eq(
+        fl.get_flow_result(&flow_read),
+        fl.get_flow_result(&seq[2]),
+    )));
+    seq.push(flow_read);
+    seq.push(flow_equal);
+    Ok(fl.new_seq(seq))
+}
+
+fn convert_instances(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
+    let flow_read = fl.new_instantaneous_assignment(Lit::Read(seq[..2].to_vec()));
+    seq.push(flow_read);
+    Ok(fl.new_seq(seq))
+}
 /*fn convert_acquire(
     fl: &mut FlowGraph,
     dt: &mut DefineTable,

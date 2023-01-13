@@ -5,6 +5,7 @@ use crate::structs::flow_graph::flow::{BranchingFlow, Flow, FlowId, FlowKind, Fl
 use crate::structs::sym_table::lit::Lit;
 use crate::structs::sym_table::r#ref::RefSymTable;
 use crate::structs::sym_table::VarId;
+use crate::structs::sym_table::RESOURCE_HANDLE_TYPE;
 use im::HashSet;
 use std::collections::HashMap;
 use std::fmt::Write;
@@ -199,6 +200,11 @@ impl FlowGraph {
     pub fn new_resource_handle(&mut self, flow: FlowId) -> FlowId {
         let interval = Interval::new_instantaneous(self.st.new_timepoint());
         let result = self.st.new_result();
+        let domain_result = self.st.get_domain_id(&result);
+        self.st.set_domain(
+            &domain_result,
+            self.st.get_type_as_domain(RESOURCE_HANDLE_TYPE),
+        );
         self.new_flow(FlowKind::FlowResourceHandle(flow), interval, result)
     }
 
@@ -381,7 +387,7 @@ impl FlowGraph {
                 //let (result_dot, (result_start, result_end)) = self.export_flow(&branching.result);
 
                 write!(dot, "{cond_dot}{true_dot}{false_dot}").unwrap();
-                write!(dot, "V{id} [label = \"{}\"]", result.format(st, false));
+                write!(dot, "V{id} [label = \"{}\"]", result.format(st, false)).unwrap();
                 write!(
                     dot,
                     "V{cond_end} -> V{true_start} [label = \"{cond}\",{color_branch_true}];\n",
@@ -422,7 +428,7 @@ impl FlowGraph {
                 )
                 .unwrap();
                 let mut previous_end = None;
-                let mut seq = seq.clone();
+                let seq = seq.clone();
                 write!(dot, "V{id} [label = \"{}\"]", result.format(st, false)).unwrap();
 
                 for f in &seq {

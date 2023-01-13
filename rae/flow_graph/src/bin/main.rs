@@ -68,7 +68,7 @@ Graph flow converter for SOMPAS code!\n
             .await
             .unwrap_or_else(|r| panic!("{}", r.to_string()));
 
-        let mut ch: ChronicleTemplate = convert(&lv, &env).await?;
+        let ch: ChronicleTemplate = convert(&lv, &env).await?;
 
         //println!("symbol types: {}", ch.sym_table.format_types());
         //println!("types forest: {}", ch.sym_table.format_types_forest());
@@ -111,6 +111,7 @@ fn output_markdown(
     let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
     path.push(format!("graph-flow-output_{}", string_date));
     fs::create_dir_all(&path).unwrap();
+
     let mut path_dot = path.clone();
     let dot_file_name = format!("{}.dot", name);
     path_dot.push(&dot_file_name);
@@ -118,13 +119,29 @@ fn output_markdown(
     let dot = ch.debug.flow_graph.export_dot();
     file.write_all(dot.as_bytes()).unwrap();
     set_current_dir(&path).unwrap();
-    let graph_file_name = format!("{}.png", name);
+    let flow_file_name = format!("{}.png", name);
     Command::new("dot")
-        .args(["-Tpng", &dot_file_name, "-o", &graph_file_name])
+        .args(["-Tpng", &dot_file_name, "-o", &flow_file_name])
         .spawn()
         .unwrap()
         .wait()
         .unwrap();
+
+    let mut path_dot = path.clone();
+    let dot_file_name = "lattice.dot";
+    path_dot.push(&dot_file_name);
+    let mut file = File::create(&path_dot).unwrap();
+    let dot = ch.st.export_lattice_dot();
+    file.write_all(dot.as_bytes()).unwrap();
+    set_current_dir(&path).unwrap();
+    let lattice_file_name = "lattice.png";
+    Command::new("dot")
+        .args(["-Tpng", &dot_file_name, "-o", &lattice_file_name])
+        .spawn()
+        .unwrap()
+        .wait()
+        .unwrap();
+
     let mut md_path = path.clone();
     let md_file_name = format!("{}-output.md", name);
     md_path.push(&md_file_name);
@@ -151,6 +168,11 @@ fn output_markdown(
 {}
 ```
 
+## Type Lattice
+\n
+![]({})
+\n
+
 ## Sym Table
 ```
 {}
@@ -159,9 +181,10 @@ fn output_markdown(
         name,
         expression.format(0),
         ch.debug.post_processed_lvalue.format(0),
-        graph_file_name,
+        flow_file_name,
         ch,
-        ch.sym_table
+        lattice_file_name,
+        ch.st
     );
 
     md_file.write_all(md.as_bytes()).unwrap();

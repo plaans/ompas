@@ -1,6 +1,8 @@
-use crate::domain::type_hierarchy::TypeHierarchy;
 use crate::state::partial_state::PartialState;
 use crate::state::world_state::StateType;
+use crate::sym_table::domain::ref_type_lattice::RefTypeLattice;
+use crate::sym_table::domain::type_lattice::TypeLattice;
+use crate::sym_table::TYPE_OBJECT;
 use ompas_rae_language::exec::state::INSTANCE;
 use sompas_structs::list;
 use sompas_structs::lvalue::LValue;
@@ -9,7 +11,7 @@ use std::collections::{HashMap, HashSet};
 
 #[derive(Clone, Default, Debug)]
 pub struct InstanceCollection {
-    pub type_hierarchy: TypeHierarchy,
+    pub lattice: RefTypeLattice,
     pub inner: HashMap<String, HashSet<String>>,
 }
 
@@ -28,19 +30,28 @@ impl From<InstanceCollection> for PartialState {
 }
 
 impl InstanceCollection {
-    pub fn add_type(&mut self, t: &str, p: Option<&str>) {
-        self.type_hierarchy
-            .add_type(t.to_string(), p.map(|s| s.to_string()));
+    pub async fn add_type(&mut self, t: &str, p: Option<&str>) {
+        let parents = if let Some(t) = p {
+            vec![self.lattice.get_type_id(t).await.unwrap()]
+        } else {
+            vec![self.lattice.get_type_id(TYPE_OBJECT).await.unwrap()]
+        };
+        self.lattice.add_type(t.to_string(), parents).await;
         self.inner.insert(t.to_string(), Default::default());
     }
 
-    pub fn add_instance(&mut self, i: &str, t: &str) {
+    pub async fn add_instance(&mut self, i: &str, t: &str) {
         match self.inner.get_mut(t) {
             None => {
                 let mut set = HashSet::new();
                 set.insert(i.to_string());
                 self.inner.insert(t.to_string(), set);
-                self.type_hierarchy.add_type(t.to_string(), None);
+                self.lattice
+                    .add_type(
+                        t.to_string(),
+                        vec![self.lattice.get_type_id(TYPE_OBJECT).await.unwrap()],
+                    )
+                    .await;
             }
             Some(set) => {
                 set.insert(i.to_string());
@@ -60,5 +71,13 @@ impl InstanceCollection {
             Some(set) => set.iter().cloned().collect(),
             None => vec![],
         }
+    }
+
+    pub async fn get_lattice(&self) -> TypeLattice {
+        self.lattice.get_lattice().await
+    }
+
+    pub fn get_ref_lattice(&self) -> RefTypeLattice {
+        self.lattice.clone()
     }
 }

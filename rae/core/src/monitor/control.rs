@@ -3,18 +3,19 @@ use crate::monitor::{ModMonitor, TOKIO_CHANNEL_SIZE};
 use crate::rae;
 use ompas_middleware::logger::LogClient;
 use ompas_middleware::ProcessInterface;
+use ompas_rae_flow_graph::conversion::convert_acting_domain;
 use ompas_rae_interface::platform::Platform;
 use ompas_rae_interface::platform_config::PlatformConfig;
 use ompas_rae_language::exec::task::DOC_GET_TASK_ID;
 use ompas_rae_language::monitor::control::*;
 use ompas_rae_language::process::{LOG_TOPIC_OMPAS, PROCESS_STOP_OMPAS, PROCESS_TOPIC_OMPAS};
 use ompas_rae_language::select::*;
-use ompas_rae_planning::aries::conversion::convert_domain_to_chronicle_hierarchy;
-use ompas_rae_planning::aries::structs::{ConversionCollection, ConversionContext};
+use ompas_rae_structs::acting_domain::OMPASDomain;
 use ompas_rae_structs::agenda::Agenda;
-use ompas_rae_structs::domain::OMPASDomain;
+use ompas_rae_structs::conversion::context::ConversionContext;
 use ompas_rae_structs::job::Job;
 use ompas_rae_structs::monitor::{task_check_wait_for, MonitorCollection};
+use ompas_rae_structs::planning::domain::PlanningDomain;
 use ompas_rae_structs::rae_command::OMPASJob;
 use ompas_rae_structs::rae_options::OMPASOptions;
 use ompas_rae_structs::resource::ResourceCollection;
@@ -53,7 +54,7 @@ pub struct ModControl {
     pub(crate) platform: Platform,
     pub(crate) ompas_domain: Arc<RwLock<OMPASDomain>>,
     pub(crate) tasks_to_execute: Arc<RwLock<Vec<Job>>>,
-    pub(crate) cc: Arc<RwLock<Option<ConversionCollection>>>,
+    pub(crate) pd: Arc<RwLock<Option<PlanningDomain>>>,
     pub(crate) triggers: TriggerCollection,
 }
 
@@ -70,7 +71,7 @@ impl ModControl {
             platform: monitor.platform.clone(),
             ompas_domain: monitor.ompas_domain.clone(),
             tasks_to_execute: monitor.tasks_to_execute.clone(),
-            cc: Arc::new(Default::default()),
+            pd: Arc::new(Default::default()),
             triggers: Default::default(),
         }
     }
@@ -78,14 +79,17 @@ impl ModControl {
     pub async fn convert_domain(&self) {
         let select_mode = *self.options.read().await.get_select_mode();
 
-        let cc: Option<ConversionCollection> =
+        let pd: Option<PlanningDomain> =
             if matches!(select_mode, SelectMode::Planning(Planner::Aries(_))) {
                 let instant = Instant::now();
-                match convert_domain_to_chronicle_hierarchy(ConversionContext {
-                    domain: self.ompas_domain.read().await.clone(),
-                    env: self.get_exec_env().await,
-                    state: self.state.get_snapshot().await,
-                }) {
+                match convert_acting_domain(&ConversionContext::new(
+                    self.ompas_domain.read().await.clone(),
+                    self.state.get_lattice().await,
+                    self.state.get_snapshot().await,
+                    self.get_exec_env().await,
+                ))
+                .await
+                {
                     Ok(r) => {
                         self.log
                             .info(format!(
@@ -109,7 +113,7 @@ impl ModControl {
             } else {
                 None
             };
-        *self.cc.write().await = cc;
+        *self.pd.write().await = pd;
     }
 
     pub async fn get_exec_env(&self) -> LEnv {
@@ -559,8 +563,7 @@ pub async fn get_task_network(env: &LEnv) -> String {
 #[async_scheme_fn]
 pub async fn get_type_hierarchy(env: &LEnv) -> String {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
-
-    ctx.ompas_domain.read().await.types.format_hierarchy()
+    format!("{:?}", ctx.state.get_lattice().await)
 }
 
 #[async_scheme_fn]

@@ -1,13 +1,14 @@
 use crate::conversion::flow::apply::convert_apply;
-use crate::structs::domain::root_type::RootType;
-use crate::structs::domain::root_type::RootType::Boolean;
-use crate::structs::flow_graph::flow::{BranchingFlow, FlowId};
-use crate::structs::sym_table::closure::Update;
-use crate::structs::sym_table::lit::{lvalue_to_lit, Lit};
-use crate::structs::sym_table::{closure, VarId};
-use crate::{DefineTable, FlowGraph};
 use core::result::Result;
 use core::result::Result::{Err, Ok};
+use ompas_rae_structs::conversion::flow_graph::define_table::DefineTable;
+use ompas_rae_structs::conversion::flow_graph::flow::{BranchingFlow, FlowId};
+use ompas_rae_structs::conversion::flow_graph::graph::FlowGraph;
+use ompas_rae_structs::sym_table::closure::Update;
+use ompas_rae_structs::sym_table::domain::basic_type::BasicType;
+use ompas_rae_structs::sym_table::domain::basic_type::BasicType::Boolean;
+use ompas_rae_structs::sym_table::lit::{lvalue_to_lit, Lit};
+use ompas_rae_structs::sym_table::{closure, VarId};
 use sompas_language::kind::ERR;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lprimitives::LPrimitives;
@@ -228,7 +229,7 @@ fn convert_list(
                 let h = convert_lv(&list[1], fl, define_table)?;
                 let result = fl.get_flow_result(&h);
 
-                st.meet_to_domain(&result, RootType::Handle);
+                st.meet_to_domain(&result, BasicType::Handle);
 
                 let flow_await = fl.new_assignment(Lit::Await(result));
                 out_of_scope.push(fl.get_flow_result(&h));
@@ -243,7 +244,7 @@ fn convert_list(
                 let flow = fl.new_instantaneous_assignment(vec![atom_err, arg_err_result]);
                 let err_result = st.get_domain_id(&fl.get_flow_result(&flow));
 
-                st.set_domain(&err_result, RootType::Err);
+                st.set_domain(&err_result, BasicType::Err);
 
                 st.add_update(
                     vec![arg_err_result],

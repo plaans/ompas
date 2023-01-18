@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
-use flow_graph::config::GraphConvertConfig;
-use flow_graph::conversion::convert;
-use flow_graph::structs::chronicle::template::ChronicleTemplate;
+use ompas_rae_flow_graph::config::GraphConvertConfig;
+use ompas_rae_flow_graph::conversion::convert;
+use ompas_rae_structs::conversion::chronicle::template::ChronicleTemplate;
 use sompas_core::{get_root_env, parse};
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lruntimeerror::LRuntimeError;

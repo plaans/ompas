@@ -12,10 +12,10 @@ use ompas_rae_interface::platform::Platform;
 use ompas_rae_language::exec::mode::DOC_CTX_MODE;
 use ompas_rae_language::exec::{ARBITRARY, DOC_ARBITRARY, DOC_MOD_EXEC, MOD_EXEC};
 use ompas_rae_language::process::LOG_TOPIC_OMPAS;
-use ompas_rae_planning::aries::structs::ConversionCollection;
+use ompas_rae_structs::acting_domain::OMPASDomain;
 use ompas_rae_structs::agenda::Agenda;
-use ompas_rae_structs::domain::OMPASDomain;
 use ompas_rae_structs::monitor::MonitorCollection;
+use ompas_rae_structs::planning::domain::PlanningDomain;
 use ompas_rae_structs::rae_options::OMPASOptions;
 use ompas_rae_structs::resource::ResourceCollection;
 use ompas_rae_structs::state::world_state::WorldState;
@@ -60,7 +60,7 @@ pub struct ModExec {
     resources: ResourceCollection,
     platform: Platform,
     log: LogClient,
-    _cc: Arc<RwLock<Option<ConversionCollection>>>,
+    _pd: Arc<RwLock<Option<PlanningDomain>>>,
 }
 
 impl ModExec {
@@ -74,7 +74,7 @@ impl ModExec {
             resources: monitor.resources.clone(),
             platform: monitor.platform.clone(),
             log: LogClient::new("exec-ompas", LOG_TOPIC_OMPAS).await,
-            _cc: monitor.cc.clone(),
+            _pd: monitor.pd.clone(),
         }
     }
 }

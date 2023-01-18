@@ -1,14 +1,17 @@
 use crate::monitor::ModMonitor;
 use ompas_rae_language::exec::state::INSTANCE;
 use ompas_rae_language::monitor::domain::*;
-use ompas_rae_structs::domain::command::Command;
-use ompas_rae_structs::domain::method::Method;
-use ompas_rae_structs::domain::parameters::Parameters;
-use ompas_rae_structs::domain::state_function::StateFunction;
-use ompas_rae_structs::domain::task::Task;
-use ompas_rae_structs::domain::OMPASDomain;
+use ompas_rae_structs::acting_domain::command::Command;
+use ompas_rae_structs::acting_domain::method::Method;
+use ompas_rae_structs::acting_domain::parameters::Parameters;
+use ompas_rae_structs::acting_domain::state_function::StateFunction;
+use ompas_rae_structs::acting_domain::task::Task;
+use ompas_rae_structs::acting_domain::OMPASDomain;
+use ompas_rae_structs::conversion::context::ConversionContext;
 use ompas_rae_structs::state::partial_state::PartialState;
-use ompas_rae_structs::state::world_state::{StateType, WorldState};
+use ompas_rae_structs::state::world_state::{StateType, WorldState, WorldStateSnapshot};
+use ompas_rae_structs::sym_table::domain::ref_type_lattice::RefTypeLattice;
+use ompas_rae_structs::sym_table::domain::Domain;
 use sompas_core::modules::list::{car, cons, first};
 use sompas_core::{eval, expand, get_root_env, parse};
 use sompas_language::kind::*;
@@ -44,6 +47,13 @@ impl ModDomain {
 
     pub fn get_empty_env(&self) -> LEnv {
         self.empty_env.clone()
+    }
+
+    pub async fn get_conversion_context(&self) -> ConversionContext {
+        let state: WorldStateSnapshot = self.state.get_snapshot().await;
+        let lattice = state.instance.lattice.get_lattice().await;
+        let domain: OMPASDomain = self.domain.read().await.clone();
+        ConversionContext::new(domain, lattice, state, self.empty_env.clone())
     }
 }
 
@@ -218,12 +228,14 @@ pub async fn add_state_function(
     map: im::HashMap<LValue, LValue>,
 ) -> Result<(), LRuntimeError> {
     let ctx = env.get_context::<ModDomain>(MOD_DOMAIN)?;
+    let lattice: RefTypeLattice = ctx.state.get_ref_lattice().await;
     let mut new_env = ctx.get_empty_env();
     let label = map.get(&NAME.into()).unwrap();
-    let params: Parameters = map
-        .get(&PARAMETERS.into())
-        .unwrap_or(&Default::default())
-        .try_into()?;
+    let params: Parameters = Parameters::try_from_lvalue(
+        map.get(&PARAMETERS.into()).unwrap_or(&Default::default()),
+        &lattice,
+    )
+    .await?;
     let result = car(
         env,
         &[map
@@ -232,8 +244,9 @@ pub async fn add_state_function(
                 LRuntimeError::new(ADD_STATE_FUNCTION, format!("No a :result for {}", label))
             })?
             .clone()],
-    )?
-    .try_into()?;
+    )?;
+
+    let result: Domain = Domain::Simple(lattice.get_type_id(result.to_string()).await.unwrap());
     let expr = format!(
         "(lambda {}
                 (read-state '{} {})))",
@@ -258,6 +271,11 @@ pub async fn add_state_function(
 }
 
 async fn create_model(env: &mut LEnv, model: im::HashMap<LValue, LValue>) -> LResult {
+    let lattice: RefTypeLattice = env
+        .get_context::<ModDomain>(MOD_DOMAIN)?
+        .state
+        .get_ref_lattice()
+        .await;
     let model_type: ModelType = model
         .get(&MODEL_TYPE.into())
         .unwrap()
@@ -266,10 +284,13 @@ async fn create_model(env: &mut LEnv, model: im::HashMap<LValue, LValue>) -> LRe
         .try_into()?;
     let str = match model_type {
         ModelType::PDDL => {
-            let params: Parameters = model
-                .get(&PARAMETERS.into())
-                .ok_or_else(|| LRuntimeError::new("create_model", "missing :params"))?
-                .try_into()?;
+            let params: Parameters = Parameters::try_from_lvalue(
+                model
+                    .get(&PARAMETERS.into())
+                    .ok_or_else(|| LRuntimeError::new("create_model", "missing :params"))?,
+                &lattice,
+            )
+            .await?;
             let conds = model
                 .get(&PRE_CONDITIONS.into())
                 .ok_or_else(|| LRuntimeError::new("create_model", "missing :pre-conditions"))?;
@@ -298,10 +319,13 @@ async fn create_model(env: &mut LEnv, model: im::HashMap<LValue, LValue>) -> LRe
             )
         }
         ModelType::OM => {
-            let params: Parameters = model
-                .get(&PARAMETERS.into())
-                .ok_or_else(|| LRuntimeError::new("create_model", "missing :params"))?
-                .try_into()?;
+            let params: Parameters = Parameters::try_from_lvalue(
+                model
+                    .get(&PARAMETERS.into())
+                    .ok_or_else(|| LRuntimeError::new("create_model", "missing :params"))?,
+                &lattice,
+            )
+            .await?;
             let body = car(env, &[model.get(&BODY.into()).unwrap().clone()])?;
             let test =
                 generate_test_type_expr(env, &[model.get(&PARAMETERS.into()).unwrap().clone()])
@@ -332,10 +356,13 @@ pub async fn add_command(
         ));
     }
     let ctx = env.get_context::<ModDomain>(MOD_DOMAIN)?;
+    let lattice: RefTypeLattice = ctx.state.get_ref_lattice().await;
     let mut env = ctx.get_empty_env();
     let mut command = Command::default();
     command.set_label(map.get(&NAME.into()).unwrap().to_string());
-    command.set_parameters(map.get(&PARAMETERS.into()).unwrap().try_into()?);
+    command.set_parameters(
+        Parameters::try_from_lvalue(&map.get(&PARAMETERS.into()).unwrap(), &lattice).await?,
+    );
     let params = command.get_parameters().get_params_as_lvalue();
     let params_list = command.get_parameters().get_params();
     let lv_exec: LValue = parse(
@@ -406,14 +433,18 @@ pub async fn add_task(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<()
         ));
     }
     let ctx = env.get_context::<ModDomain>(MOD_DOMAIN)?;
+    let lattice: RefTypeLattice = ctx.state.get_ref_lattice().await;
+
     let mut env = ctx.get_empty_env();
 
     let mut task = Task::default();
     task.set_label(map.get(&NAME.into()).unwrap().to_string());
     task.set_parameters(
-        map.get(&PARAMETERS.into())
-            .unwrap_or(&LValue::Nil)
-            .try_into()?,
+        Parameters::try_from_lvalue(
+            map.get(&PARAMETERS.into()).unwrap_or(&LValue::Nil),
+            &lattice,
+        )
+        .await?,
     );
     let params = task.get_parameters().get_params_as_lvalue();
     let params_list = task.get_parameters().get_params();
@@ -475,6 +506,7 @@ pub async fn add_method(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<
         ));
     }
     let ctx = env.get_context::<ModDomain>(MOD_DOMAIN)?;
+    let lattice: RefTypeLattice = ctx.state.get_ref_lattice().await;
     let mut new_env = ctx.get_empty_env();
     let parameters = map.get(&PARAMETERS.into()).unwrap_or(&LValue::Nil).clone();
     let task_label = car(
@@ -507,7 +539,7 @@ pub async fn add_method(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<
     let mut method = Method {
         label,
         task_label,
-        parameters: parameters.clone().try_into()?,
+        parameters: Parameters::try_from_lvalue(&parameters, &lattice).await?,
         ..Default::default()
     };
     let conds = match map.get(&PRE_CONDITIONS.into()) {

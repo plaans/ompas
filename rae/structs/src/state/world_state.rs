@@ -1,5 +1,7 @@
 use crate::state::instance::InstanceCollection;
 use crate::state::partial_state::PartialState;
+use crate::sym_table::domain::ref_type_lattice::RefTypeLattice;
+use crate::sym_table::domain::type_lattice::TypeLattice;
 use sompas_core::modules::map::union_map;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
@@ -76,11 +78,15 @@ const RAE_STATE_SEM_UPDATE_CHANNEL_SIZE: usize = 64;
 
 impl WorldState {
     pub async fn add_type(&self, t: &str, p: Option<&str>) {
-        self.instance.write().await.add_type(t, p);
+        self.instance.write().await.add_type(t, p).await;
     }
 
     pub async fn add_instance(&self, instance: &str, r#type: &str) {
-        self.instance.write().await.add_instance(instance, r#type);
+        self.instance
+            .write()
+            .await
+            .add_instance(instance, r#type)
+            .await;
     }
 
     pub async fn instance(&self, i: &str, t: &str) -> LValue {
@@ -228,5 +234,13 @@ impl WorldState {
                 }
             }
         }
+    }
+
+    pub async fn get_lattice(&self) -> TypeLattice {
+        self.instance.read().await.get_lattice().await
+    }
+
+    pub async fn get_ref_lattice(&self) -> RefTypeLattice {
+        self.instance.read().await.get_ref_lattice()
     }
 }

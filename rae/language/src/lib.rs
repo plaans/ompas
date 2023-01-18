@@ -373,13 +373,11 @@ pub mod monitor {
         pub const MOD_DEBUG_CONVERSION: &str = "debug-conversion";
         pub const DOC_MOD_DEBUG_CONVERSION: &str= "Collection of functions to debug the conversion of SOMPAS expressions and try Aries planning features.";
 
-        /*pub const CONVERT_EXPR: &str = "convert-expr";
         pub const CONVERT_DOMAIN: &str = "convert-domain";
-        pub const PRE_PROCESS_LAMBDA: &str = "pre-process-lambda";
-        pub const PRE_PROCESS_EXPR: &str = "pre-process-expr";
-        pub const PRE_PROCESS_DOMAIN: &str = "pre-process-domain";
-        pub const CONVERT_COND_EXPR: &str = "convert-cond-expr";
-        pub const PLAN_TASK: &str = "plan-task";*/
+        pub const DOC_CONVERT_DOMAIN: &str =
+            "Return the planning domain corresponding to the acting domain defined";
+        pub const PLAN_TASK: &str = "plan-task";
+        pub const DOC_PLAN_TASK: &str= "Plan a task using the defined planner with the acting domain defined in the environment";
     }
 
     pub mod domain {

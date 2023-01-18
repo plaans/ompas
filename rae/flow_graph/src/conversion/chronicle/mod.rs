@@ -1,17 +1,17 @@
-use crate::structs::chronicle::condition::Condition;
-use crate::structs::chronicle::constraint::Constraint;
-use crate::structs::chronicle::effect::Effect;
-use crate::structs::chronicle::subtask::SubTask;
-use crate::structs::chronicle::task_template::TaskTemplate;
-use crate::structs::chronicle::template::{ChronicleKind, ChronicleTemplate};
-use crate::structs::chronicle::{GetVariables, Replace};
-use crate::structs::domain::root_type::RootType::Boolean;
-use crate::structs::flow_graph::flow::{FlowId, FlowKind};
-use crate::structs::flow_graph::graph::FlowGraph;
-use crate::structs::sym_table::computation::Computation;
-use crate::structs::sym_table::lit::Lit;
-use crate::structs::sym_table::{VarId, COND};
 use itertools::Itertools;
+use ompas_rae_structs::conversion::chronicle::condition::Condition;
+use ompas_rae_structs::conversion::chronicle::constraint::Constraint;
+use ompas_rae_structs::conversion::chronicle::effect::Effect;
+use ompas_rae_structs::conversion::chronicle::subtask::SubTask;
+use ompas_rae_structs::conversion::chronicle::task_template::TaskTemplate;
+use ompas_rae_structs::conversion::chronicle::template::{ChronicleKind, ChronicleTemplate};
+use ompas_rae_structs::conversion::chronicle::{GetVariables, Replace};
+use ompas_rae_structs::conversion::flow_graph::flow::{FlowId, FlowKind};
+use ompas_rae_structs::conversion::flow_graph::graph::FlowGraph;
+use ompas_rae_structs::sym_table::computation::Computation;
+use ompas_rae_structs::sym_table::domain::basic_type::BasicType::Boolean;
+use ompas_rae_structs::sym_table::lit::Lit;
+use ompas_rae_structs::sym_table::{VarId, COND};
 use sompas_structs::lruntimeerror::LRuntimeError;
 use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
@@ -19,22 +19,25 @@ use std::ops::Deref;
 pub mod post_processing;
 
 pub fn convert_method(
+    ch: Option<ChronicleTemplate>,
     fl: &mut FlowGraph,
     flow: &FlowId,
 ) -> Result<ChronicleTemplate, LRuntimeError> {
-    convert_into_chronicle(fl, flow)
-    //let partial = convert_into_chronicle(graph, flow)?;
-
-    //post_processing(partial)
+    convert_into_chronicle(ch, fl, flow)
 }
 
 pub fn convert_into_chronicle(
+    ch: Option<ChronicleTemplate>,
     fl: &mut FlowGraph,
     flow: &FlowId,
 ) -> Result<ChronicleTemplate, LRuntimeError> {
-    let mut st = fl.st.clone();
+    let st = fl.st.clone();
 
-    let mut ch = ChronicleTemplate::new("template", ChronicleKind::Method, fl.st.clone());
+    let mut ch = ch.unwrap_or(ChronicleTemplate::new(
+        "template",
+        ChronicleKind::Method,
+        fl.st.clone(),
+    ));
 
     ch.add_constraint(Constraint::leq(
         ch.get_interval().get_start(),
@@ -177,7 +180,7 @@ pub fn convert_into_chronicle(
                         LRuntimeError,
                     > {
                         let mut branch_params: HashMap<VarId, VarId> = Default::default();
-                        let mut method = convert_into_chronicle(fl, flow)?;
+                        let mut method = convert_into_chronicle(None, fl, flow)?;
                         for v in &method.get_variables() {
                             if let Some(declaration) = st.get_declaration(v) {
                                 //It means the variable has been created before the method, and shall be transformed into a parameter
@@ -228,7 +231,7 @@ pub fn convert_into_chronicle(
                     - create a new parameter if the parameter is not present in the method,
                     but needed by the other method of the synthetic task
                      */
-                    let mut modify_and_convert_branch =
+                    let modify_and_convert_branch =
                         |mut method: ChronicleTemplate,
                          method_params: HashMap<VarId, VarId>|
                          -> Result<ChronicleTemplate, LRuntimeError> {
@@ -239,7 +242,7 @@ pub fn convert_into_chronicle(
                                             ch.st.get_label(&p, false),
                                             ch.st.get_domain_of_var(p),
                                         );
-                                        method.add_var(&id);
+                                        method.add_var(id);
                                         id
                                     }
                                     Some(id) => *id,

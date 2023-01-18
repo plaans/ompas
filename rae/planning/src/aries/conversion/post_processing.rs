@@ -18,14 +18,8 @@ pub fn post_processing(
     context: &ConversionContext,
     ch: &mut ConversionCollection,
 ) -> Result<(), LRuntimeError> {
-    //add_constraint_on_end_timepoint(c, context, ch);
     unify_equal(c, ch, context);
     ch.sym_table.flat_bindings();
-    //panic!("for no fucking reason");
-    /*println!(
-        "before timepoint simplification: {}",
-        c.format(&ch.sym_table, true)
-    );*/
     simplify_timepoints(c, ch, context)?;
     rm_useless_var(c, ch, context);
     /*println!(

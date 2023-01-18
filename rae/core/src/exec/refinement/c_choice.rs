@@ -3,7 +3,7 @@ use crate::exec::state::ModState;
 use crate::exec::ModExec;
 use ompas_rae_language::exec::c_choice::*;
 use ompas_rae_language::exec::state::MOD_STATE;
-use ompas_rae_structs::domain::OMPASDomain;
+use ompas_rae_structs::acting_domain::OMPASDomain;
 use ompas_rae_structs::select_mode::{CChoiceConfig, Planner, SelectMode};
 use ompas_rae_structs::state::action_state::RefinementMetaData;
 use ompas_rae_structs::state::world_state::WorldStateSnapshot;

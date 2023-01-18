@@ -1,21 +1,20 @@
 use crate::conversion::flow::post_processing::PostProcess::{Bind, Invalid, Meet, Subtract};
-use crate::structs::domain::root_type::RootType;
-use crate::structs::domain::Domain;
-use crate::structs::flow_graph::flow::{FlowId, FlowKind};
-use crate::structs::flow_graph::graph::FlowGraph;
-use crate::structs::sym_table::lit::Lit;
-use crate::structs::sym_table::{EmptyDomains, VarId};
+use ompas_rae_structs::conversion::flow_graph::flow::{FlowId, FlowKind};
+use ompas_rae_structs::conversion::flow_graph::graph::FlowGraph;
+use ompas_rae_structs::sym_table::domain::basic_type::BasicType;
+use ompas_rae_structs::sym_table::domain::Domain;
+use ompas_rae_structs::sym_table::lit::Lit;
+use ompas_rae_structs::sym_table::{EmptyDomains, VarId};
 use sompas_structs::lruntimeerror::LRuntimeError;
 use std::collections::VecDeque;
 
 const FLOW_GRAPH_POST_PROCESS: &str = "flow_graph_post_process";
-const INVALID_FLOWS: &str = "invalid_flows";
 
 pub fn flow_graph_post_processing(graph: &mut FlowGraph) -> Result<(), LRuntimeError> {
     let result_graph = graph.get_flow_result(&graph.flow);
 
     let mut post_process = binding_constraints(graph);
-    post_process.push_front(Subtract(result_graph, RootType::Err.into()));
+    post_process.push_front(Subtract(result_graph, BasicType::Err.into()));
     propagate(graph, post_process).map_err(|e| e.chain(FLOW_GRAPH_POST_PROCESS))
 }
 

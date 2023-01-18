@@ -1,13 +1,13 @@
 use crate::point_algebra::problem::{try_into_pa_relation, PAGraph, PAProblem};
 use crate::point_algebra::remove_useless_timepoints;
-use crate::structs::chronicle::constraint::Constraint;
-use crate::structs::chronicle::template::{ChronicleSet, ChronicleTemplate};
-use crate::structs::chronicle::GetVariables;
-use crate::structs::domain::root_type::RootType;
-use crate::structs::sym_table::lit::Lit;
-use crate::structs::sym_table::r#ref::RefSymTable;
-use crate::structs::sym_table::{VarId, TIMEPOINT_TYPE};
+
 use im::HashSet;
+use ompas_rae_structs::conversion::chronicle::constraint::Constraint;
+use ompas_rae_structs::conversion::chronicle::template::{ChronicleSet, ChronicleTemplate};
+use ompas_rae_structs::conversion::chronicle::GetVariables;
+use ompas_rae_structs::sym_table::domain::basic_type::BasicType;
+use ompas_rae_structs::sym_table::lit::Lit;
+use ompas_rae_structs::sym_table::{VarId, TYPE_TIMEPOINT};
 use sompas_structs::lruntimeerror::LRuntimeError;
 use std::borrow::Borrow;
 use std::ops::Deref;
@@ -63,7 +63,7 @@ pub fn rm_useless_var(c: &mut ChronicleTemplate) {
         assert_eq!(*v, c.st.get_var_parent(v));
     }
     for v in new_vars {
-        c.add_var(&v)
+        c.add_var(v)
     }
 }
 
@@ -78,8 +78,8 @@ pub fn simplify_timepoints(c: &mut ChronicleTemplate) -> Result<(), LRuntimeErro
         string
     };*/
 
-    let mut st = c.st.clone();
-    let timepoint_domain = st.get_type_as_domain(TIMEPOINT_TYPE);
+    let st = c.st.clone();
+    let timepoint_domain = st.get_type_as_domain(TYPE_TIMEPOINT);
 
     let timepoints: HashSet<VarId> = c
         .get_variables()
@@ -167,12 +167,12 @@ pub fn simplify_constraints(c: &mut ChronicleTemplate) -> Result<(), LRuntimeErr
         if let Constraint::Eq(a, b) = c {
             match (a, b) {
                 (Lit::Atom(a), Lit::Constraint(b)) => {
-                    if st.contained_in_domain(&st.get_domain_of_var(&a), &RootType::True.into()) {
+                    if st.contained_in_domain(&st.get_domain_of_var(&a), &BasicType::True.into()) {
                         vec.push((i, b.deref().clone()));
                     }
                 }
                 (Lit::Constraint(b), Lit::Atom(a)) => {
-                    if st.contained_in_domain(&st.get_domain_of_var(&a), &RootType::True.into()) {
+                    if st.contained_in_domain(&st.get_domain_of_var(&a), &BasicType::True.into()) {
                         vec.push((i, b.deref().clone()));
                     }
                 }
@@ -186,7 +186,7 @@ pub fn simplify_constraints(c: &mut ChronicleTemplate) -> Result<(), LRuntimeErr
 }
 
 pub fn merge_conditions(c: &mut ChronicleTemplate) -> Result<(), LRuntimeError> {
-    let mut st = c.st.clone();
+    let st = c.st.clone();
 
     let mut c_to_remove: HashSet<usize> = Default::default();
 

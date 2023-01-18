@@ -1,5 +1,5 @@
 [package]
-name = "flow_graph"
+name = "ompas-rae-flow-graph"
 version = "0.1.0"
 edition = "2021"
 
@@ -17,7 +17,7 @@ sompas-macros = {path = "../../scheme/macros"}
 
 #OMPAS bindings
 ompas-rae-language = {path = "../language"}
-#ompas-rae-structs = {path = "../structs"}
+ompas-rae-structs = {path = "../structs"}
 
 # aries bindings
 aries_core = {path = "../../aries/core"}
@@ -29,6 +29,7 @@ aries_solver = {path = "../../aries/solver"}
 aries_planners = {path = "../../aries/planners"}
 aries_stn = {path = "../../aries/reasoners/stn"}
 
+anyhow = "1.0.40"
 tokio = { version = "1.17.0", features = ["full", "time"] }
 log =  { version = "0.4.16", features = ["std"] }
 im = "15.0.0"

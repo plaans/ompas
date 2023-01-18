@@ -1,14 +1,4 @@
 use crate::conversion::flow::convert_lv;
-use crate::structs::chronicle::constraint::Constraint;
-use crate::structs::domain::root_type::RootType::{Boolean, True};
-use crate::structs::domain::Domain;
-use crate::structs::flow_graph::define_table::DefineTable;
-use crate::structs::flow_graph::flow::FlowId;
-use crate::structs::flow_graph::graph::FlowGraph;
-use crate::structs::sym_table::closure::Update;
-use crate::structs::sym_table::computation::Computation;
-use crate::structs::sym_table::lit::Lit;
-use crate::structs::sym_table::{closure, VarId, RESOURCE_HANDLE_TYPE};
 use ompas_rae_language::exec::platform::EXEC_COMMAND;
 use ompas_rae_language::exec::refinement::EXEC_TASK;
 use ompas_rae_language::exec::resource::RELEASE;
@@ -16,6 +6,16 @@ use ompas_rae_language::exec::state::{
     ASSERT, ASSERT_SHORT, INSTANCE, INSTANCES, READ_STATE, WAIT_FOR,
 };
 use ompas_rae_language::exec::ARBITRARY;
+use ompas_rae_structs::conversion::chronicle::constraint::Constraint;
+use ompas_rae_structs::conversion::flow_graph::define_table::DefineTable;
+use ompas_rae_structs::conversion::flow_graph::flow::FlowId;
+use ompas_rae_structs::conversion::flow_graph::graph::FlowGraph;
+use ompas_rae_structs::sym_table::closure::Update;
+use ompas_rae_structs::sym_table::computation::Computation;
+use ompas_rae_structs::sym_table::domain::basic_type::BasicType::{Boolean, True};
+use ompas_rae_structs::sym_table::domain::Domain;
+use ompas_rae_structs::sym_table::lit::Lit;
+use ompas_rae_structs::sym_table::{closure, VarId, TYPE_RESSOURCE_HANDLE};
 use sompas_language::basic_math::{ADD, EQ, GEQ, GT, LEQ, LT, NOT, NOT_SHORT, SUB};
 use sompas_language::error::IS_ERR;
 use sompas_language::time::SLEEP;
@@ -349,7 +349,7 @@ fn convert_release(fl: &mut FlowGraph, seq: Vec<FlowId>) -> Result<FlowId, LRunt
     let result_domain = fl.st.get_domain_id(&result);
     fl.st.set_domain(
         &result_domain,
-        fl.st.get_type_as_domain(RESOURCE_HANDLE_TYPE),
+        fl.st.get_type_as_domain(TYPE_RESSOURCE_HANDLE),
     );
 
     let flow_release = fl.new_instantaneous_assignment(Lit::Release(result));

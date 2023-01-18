@@ -1,6 +1,7 @@
 use async_recursion::async_recursion;
 use ompas_rae_language::exec::refinement::EXEC_TASK;
 use ompas_rae_language::exec::resource::ACQUIRE;
+use ompas_rae_structs::sym_table::{MAX_Q, QUANTITY};
 use sompas_core::*;
 use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lenv::LEnv;
@@ -11,8 +12,6 @@ use sompas_structs::{lruntimeerror, wrong_n_args, wrong_type};
 use std::fmt::Write;
 
 pub const TRANSFORM_LAMBDA_EXPRESSION: &str = "transform-lambda-expression";
-pub const MAX_Q: &str = "max-q";
-pub const QUANTITY: &str = "quantity";
 
 pub async fn pre_processing(lv: &LValue, env: &LEnv) -> LResult {
     let avoid = vec![EXEC_TASK.to_string()];

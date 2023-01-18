@@ -1,11 +1,11 @@
 use crate::point_algebra::relation_type::RelationType::Tautology;
 use crate::point_algebra::relation_type::{RelationType, RelationTypeBit};
-use crate::structs::chronicle::constraint::Constraint;
-use crate::structs::chronicle::FormatWithSymTable;
-use crate::structs::sym_table::lit::Lit;
-use crate::structs::sym_table::r#ref::RefSymTable;
-use crate::structs::sym_table::{VarId, TIMEPOINT_TYPE};
 use cli_table::{print_stdout, Cell, Table};
+use ompas_rae_structs::conversion::chronicle::constraint::Constraint;
+use ompas_rae_structs::conversion::chronicle::FormatWithSymTable;
+use ompas_rae_structs::sym_table::lit::Lit;
+use ompas_rae_structs::sym_table::r#ref::RefSymTable;
+use ompas_rae_structs::sym_table::{VarId, TYPE_TIMEPOINT};
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use std::fmt::{Debug, Display, Formatter};
@@ -30,7 +30,7 @@ pub fn try_into_pa_relation(
         _ => return Err(LRuntimeError::default()),
     };
 
-    let timepoint_domain = sym_table.get_type_as_domain(TIMEPOINT_TYPE);
+    let timepoint_domain = sym_table.get_type_as_domain(TYPE_TIMEPOINT);
 
     if let Ok(i) = constraint.get_left().try_into() {
         let p_i = sym_table.get_var_parent(&i);

@@ -2,21 +2,22 @@ use crate::exec::refinement::greedy_select;
 use crate::exec::task::ModTask;
 use crate::exec::ModExec;
 use ompas_middleware::logger::LogClient;
+use ompas_rae_flow_graph::aries::solver::run_solver_for_htn;
+use ompas_rae_flow_graph::aries::{generate_templates, solver};
 use ompas_rae_language::exec::aries::*;
 use ompas_rae_language::exec::task::MOD_TASK;
-use ompas_rae_planning::aries::binding::solver::run_solver_for_htn;
-use ompas_rae_planning::aries::binding::{generate_chronicles, solver};
-use ompas_rae_planning::aries::structs::{ConversionCollection, ConversionContext, Problem};
+use ompas_rae_structs::acting_domain::OMPASDomain;
 use ompas_rae_structs::agenda::Agenda;
-use ompas_rae_structs::domain::OMPASDomain;
 use ompas_rae_structs::plan::AbstractTaskInstance;
+use ompas_rae_structs::planning::domain::PlanningDomain;
+use ompas_rae_structs::planning::instance::PlanningInstance;
+use ompas_rae_structs::planning::problem::PlanningProblem;
 use ompas_rae_structs::select_mode::{Planner, SelectMode};
 use ompas_rae_structs::state::action_state::{RefinementMetaData, TaskMetaData};
 use ompas_rae_structs::state::world_state::WorldStateSnapshot;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lvalue::LValue;
-use std::borrow::Borrow;
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::RwLock;
@@ -24,8 +25,8 @@ use tokio::sync::RwLock;
 pub struct CtxAries {
     log: LogClient,
     agenda: Agenda,
-    domain: Arc<RwLock<OMPASDomain>>,
-    cc: Arc<RwLock<ConversionCollection>>,
+    _domain: Arc<RwLock<OMPASDomain>>,
+    pd: Arc<RwLock<Option<PlanningDomain>>>,
 }
 
 impl CtxAries {
@@ -33,8 +34,8 @@ impl CtxAries {
         Self {
             log: exec.log.clone(),
             agenda: exec.agenda.clone(),
-            domain: exec.domain.clone(),
-            cc: Arc::new(Default::default()),
+            _domain: exec.domain.clone(),
+            pd: Arc::new(Default::default()),
         }
     }
 }
@@ -126,19 +127,16 @@ pub async fn aries_select(
         None => println!("Root task, a plan is needed."),
     };
 
-    let context = ConversionContext {
-        domain: ctx.domain.read().await.clone(),
-        env: env.clone(),
-        state,
+    let problem = PlanningProblem {
+        domain: ctx.pd.read().await.clone().unwrap(),
+        instance: PlanningInstance {
+            state,
+            tasks: vec![LValue::from(task).try_into()?],
+        },
+        st: Default::default(),
     };
 
-    let mut problem: Problem = context.borrow().into();
-    //let cc = convert_domain_to_chronicle_hierarchy(context)?;
-    //println!("cc: {}", cc);
-    problem.cc = ctx.cc.as_ref().read().await.clone();
-    problem.goal_tasks.push(LValue::from(task).try_into()?);
-
-    let mut aries_problem = generate_chronicles(&problem)?;
+    let mut aries_problem = generate_templates(&problem)?;
     let instant = Instant::now();
     let result = run_solver_for_htn(&mut aries_problem, optimize);
 

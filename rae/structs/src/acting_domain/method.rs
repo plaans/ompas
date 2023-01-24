@@ -30,6 +30,9 @@ impl Method {
         &self.lambda_body
     }
 
+    pub fn get_label(&self) -> &str {
+        &self.label
+    }
     /*pub fn get_lambda(&self) -> LValue {
         let l1: LLambda = self.lambda_pre_conditions.borrow().try_into().expect("");
         let l2: LLambda = self.lambda_body.borrow().try_into().expect("");

@@ -3,7 +3,7 @@ pub mod solver;
 use super::structs::atom::Atom;
 use super::structs::constraint::Constraint;
 use super::structs::lit::Lit;
-use super::structs::symbol_table::{AtomId, SymTable};
+use super::structs::symbol_table::{SymTable, VarId};
 use super::structs::traits::FormatWithSymTable;
 use super::structs::type_table::AtomKind;
 use super::structs::{ConversionCollection, Problem};
@@ -402,21 +402,21 @@ fn initialize_goal_task(init_ch: &mut aChronicle, goal_tasks: &[LValueS], ctx: &
 
 #[derive(Default)]
 pub struct BindingAriesAtoms {
-    inner: im::HashMap<AtomId, Variable>,
-    reverse: im::HashMap<Variable, AtomId>,
+    inner: im::HashMap<VarId, Variable>,
+    reverse: im::HashMap<Variable, VarId>,
 }
 
 impl BindingAriesAtoms {
-    pub fn add_binding(&mut self, id: &AtomId, var: &Variable) {
+    pub fn add_binding(&mut self, id: &VarId, var: &Variable) {
         self.inner.insert(*id, *var);
         self.reverse.insert(*var, *id);
     }
 
-    pub fn get_var(&self, id: &AtomId) -> Option<&Variable> {
+    pub fn get_var(&self, id: &VarId) -> Option<&Variable> {
         self.inner.get(id)
     }
 
-    pub fn get_id(&self, var: &Variable) -> Option<&AtomId> {
+    pub fn get_id(&self, var: &Variable) -> Option<&VarId> {
         self.reverse.get(var)
     }
 }
@@ -447,12 +447,12 @@ fn convert_constraint(
     st: &SymTable,
     ctx: &mut Ctx,
 ) -> lruntimeerror::Result<Vec<aConstraint>> {
-    let get_atom = |a: &AtomId, ctx| -> aAtom { atom_id_into_atom(a, st, bindings, ctx) };
+    let get_atom = |a: &VarId, ctx| -> aAtom { atom_id_into_atom(a, st, bindings, ctx) };
     let mut constraints = vec![];
     match x {
         Constraint::Leq(a, b) => {
-            let a: AtomId = a.try_into()?;
-            let b: AtomId = b.try_into()?;
+            let a: VarId = a.try_into()?;
+            let b: VarId = b.try_into()?;
             let lt = ctx
                 .model
                 .new_optional_bvar(prez, container / Reification)
@@ -486,12 +486,12 @@ fn convert_constraint(
             }
         }
         Constraint::Not(a) => {
-            let a: AtomId = a.try_into()?;
+            let a: VarId = a.try_into()?;
             constraints.push(aConstraint::eq(get_atom(&a, ctx), aLit::FALSE))
         }
         Constraint::Lt(a, b) => {
-            let a: AtomId = a.try_into()?;
-            let b: AtomId = b.try_into()?;
+            let a: VarId = a.try_into()?;
+            let b: VarId = b.try_into()?;
             constraints.push(aConstraint::lt(get_atom(&a, ctx), get_atom(&b, ctx)))
         }
         Constraint::And(_, _)
@@ -499,7 +499,7 @@ fn convert_constraint(
         | Constraint::Type(_, _)
         | Constraint::Arbitrary(_, _) => Err(LRuntimeError::default())?,
         Constraint::Neq(a, b) => {
-            let a: AtomId = a.try_into()?;
+            let a: VarId = a.try_into()?;
             match b {
                 Lit::Atom(b) => {
                     constraints.push(aConstraint::neq(get_atom(&a, ctx), get_atom(b, ctx)));
@@ -522,7 +522,7 @@ fn convert_constraint(
 
 #[allow(dead_code)]
 fn atom_id_into_atom(
-    a: &AtomId,
+    a: &VarId,
     sym_table: &SymTable,
     bindings: &BindingAriesAtoms,
     context: &Ctx,

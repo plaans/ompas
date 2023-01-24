@@ -5,7 +5,7 @@ use crate::aries::structs::effect::Effect;
 use crate::aries::structs::expression::Expression;
 use crate::aries::structs::interval::Interval;
 use crate::aries::structs::lit::Lit;
-use crate::aries::structs::symbol_table::{AtomId, SymTable};
+use crate::aries::structs::symbol_table::{SymTable, VarId};
 use crate::aries::structs::traits::{Absorb, FormatWithParent, FormatWithSymTable, GetVariables};
 use crate::aries::structs::type_table::PlanningAtomType;
 use im::{hashset, HashSet};
@@ -14,10 +14,10 @@ use std::ops::Deref;
 
 #[derive(Clone)]
 pub struct PartialChronicle {
-    pub presence: AtomId,
+    pub presence: VarId,
     pub interval: Interval,
     pub result: ChronicleResult,
-    pub variables: HashSet<AtomId>,
+    pub variables: HashSet<VarId>,
     pub constraints: Vec<Constraint>,
     pub conditions: Vec<Condition>,
     pub effects: Vec<Effect>,
@@ -50,7 +50,7 @@ impl PartialChronicle {
 }
 
 impl PartialChronicle {
-    pub fn get_presence(&self) -> &AtomId {
+    pub fn get_presence(&self) -> &VarId {
         &self.presence
     }
 
@@ -62,7 +62,7 @@ impl PartialChronicle {
         &self.result
     }
 
-    pub fn get_result_id(&self) -> &AtomId {
+    pub fn get_result_id(&self) -> &VarId {
         self.result.get_id()
     }
 
@@ -72,11 +72,11 @@ impl PartialChronicle {
 }
 
 impl PartialChronicle {
-    pub fn rm_var(&mut self, sym_id: &AtomId) {
+    pub fn rm_var(&mut self, sym_id: &VarId) {
         self.variables.remove(sym_id);
     }
 
-    pub fn rm_set_var(&mut self, ids: Vec<AtomId>) {
+    pub fn rm_set_var(&mut self, ids: Vec<VarId>) {
         for id in ids {
             self.rm_var(&id);
         }
@@ -100,7 +100,7 @@ impl PartialChronicle {
 }
 
 impl PartialChronicle {
-    pub fn add_var(&mut self, sym_id: &AtomId) {
+    pub fn add_var(&mut self, sym_id: &VarId) {
         self.variables.insert(*sym_id);
     }
     pub fn add_interval(&mut self, interval: &Interval) {
@@ -218,7 +218,7 @@ impl FormatWithSymTable for PartialChronicle {
 impl FormatWithParent for PartialChronicle {
     fn format_with_parent(&mut self, st: &SymTable) {
         let old_variables = self.variables.clone();
-        let mut new_variables: HashSet<AtomId> = Default::default();
+        let mut new_variables: HashSet<VarId> = Default::default();
         for v in &old_variables {
             let mut v = *v;
             v.format_with_parent(st);
@@ -247,7 +247,7 @@ impl Absorb for PartialChronicle {
 }
 
 impl GetVariables for PartialChronicle {
-    fn get_variables(&self) -> HashSet<AtomId> {
+    fn get_variables(&self) -> HashSet<VarId> {
         self.variables.clone()
     }
 
@@ -255,7 +255,7 @@ impl GetVariables for PartialChronicle {
         &self,
         sym_table: &SymTable,
         atom_type: &Option<PlanningAtomType>,
-    ) -> HashSet<AtomId> {
+    ) -> HashSet<VarId> {
         self.variables
             .iter()
             .filter(|v| sym_table.get_type_of(v).unwrap().a_type == *atom_type)

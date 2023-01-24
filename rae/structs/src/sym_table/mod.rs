@@ -6,6 +6,7 @@ pub mod id;
 pub mod lit;
 pub mod meta_data;
 pub mod r#ref;
+pub mod r#trait;
 pub mod var_domain;
 pub mod variable;
 
@@ -83,6 +84,10 @@ impl EmptyDomains {
                 }
             }
         }
+    }
+
+    pub fn is_none(&self) -> bool {
+        matches!(&self, &Self::None)
     }
 }
 
@@ -299,7 +304,7 @@ impl SymTable {
             .variables
             .new_node(Variable::new_parameter(&sym, domain_id));
         self.add_var_to_domain(&domain_id, &id);
-        self.ids.insert(&sym, &id);
+        self.ids.insert(&symbol, &id);
         id
     }
 

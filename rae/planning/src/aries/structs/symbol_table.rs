@@ -12,15 +12,15 @@ use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Display, Formatter};
 
-pub type AtomId = NodeId;
+pub type VarId = NodeId;
 
-impl FormatWithSymTable for AtomId {
+impl FormatWithSymTable for VarId {
     fn format(&self, st: &SymTable, sym_version: bool) -> String {
         st.get_atom(self, true).unwrap().format(st, sym_version)
     }
 }
 
-impl FormatWithParent for AtomId {
+impl FormatWithParent for VarId {
     fn format_with_parent(&mut self, st: &SymTable) {
         *self = *st.get_parent(self);
     }
@@ -29,11 +29,11 @@ impl FormatWithParent for AtomId {
 #[derive(Clone)]
 pub struct SymTable {
     symbols: Forest<Atom>,
-    ids: im::HashMap<Sym, AtomId>,
+    ids: im::HashMap<Sym, VarId>,
     types: TypeTable,
     symbol_types: SymbolTypes,
     meta_data: SymTableMetaData,
-    multiple_def: HashMap<String, Vec<AtomId>>,
+    multiple_def: HashMap<String, Vec<VarId>>,
     pointer_to_ver: Vec<HashMap<String, usize>>,
 }
 
@@ -56,7 +56,7 @@ impl Display for SymTable {
             }
         }
 
-        let mut c = |vec: Vec<&AtomId>, preambule: &str| {
+        let mut c = |vec: Vec<&VarId>, preambule: &str| {
             str.push_str(format!("\n## {}:\n", preambule).as_str());
             for e in vec {
                 assert_eq!(e, self.get_parent(e));
@@ -198,7 +198,7 @@ impl SymTable {
 NEW SIMPLE ATOMS FUNCTIONS
  */
 impl SymTable {
-    pub fn new_bool(&mut self, b: bool) -> AtomId {
+    pub fn new_bool(&mut self, b: bool) -> VarId {
         let id = self.symbols.new_node(b.into());
         self.symbol_types.add_new_atom(
             &id,
@@ -210,7 +210,7 @@ impl SymTable {
         id
     }
 
-    pub fn new_int(&mut self, i: i32) -> AtomId {
+    pub fn new_int(&mut self, i: i32) -> VarId {
         let id = self.symbols.new_node(i.into());
         self.symbol_types.add_new_atom(
             &id,
@@ -222,7 +222,7 @@ impl SymTable {
         id
     }
 
-    pub fn new_float(&mut self, f: f32) -> AtomId {
+    pub fn new_float(&mut self, f: f32) -> VarId {
         let id = self.symbols.new_node(f.into());
         self.symbol_types.add_new_atom(
             &id,
@@ -239,22 +239,22 @@ impl SymTable {
 GETTERS
  */
 impl SymTable {
-    pub fn get_node(&self, id: &AtomId) -> Option<&Node<Atom>> {
+    pub fn get_node(&self, id: &VarId) -> Option<&Node<Atom>> {
         self.symbols.get_node(id)
     }
 
-    pub fn get_atom(&self, id: &AtomId, parent: bool) -> Option<&Atom> {
+    pub fn get_atom(&self, id: &VarId, parent: bool) -> Option<&Atom> {
         match parent {
             true => self.symbols.get_value(self.get_parent(id)),
             false => self.symbols.get_value(id),
         }
     }
 
-    pub fn get_type_of(&self, id: &AtomId) -> Option<&AtomType> {
+    pub fn get_type_of(&self, id: &VarId) -> Option<&AtomType> {
         self.symbol_types.get_type(id)
     }
 
-    pub fn id(&self, atom: &str) -> Option<&AtomId> {
+    pub fn id(&self, atom: &str) -> Option<&VarId> {
         //Look before in the multiple_def table, and then looking in self.ids
         if self.multiple_def.contains_key(atom) {
             let ver = match self.pointer_to_ver.last().unwrap().get(atom) {
@@ -268,7 +268,7 @@ impl SymTable {
         }
     }
 
-    pub fn get_symbols_of_type(&self, _symbol_type: &AtomType) -> HashSet<AtomId> {
+    pub fn get_symbols_of_type(&self, _symbol_type: &AtomType) -> HashSet<VarId> {
         todo!()
     }
 
@@ -318,7 +318,7 @@ impl SymTable {
 
     //Declare a new return value
     //The name of the return value will be format!("r_{}", last_return_index)
-    pub fn declare_new_result(&mut self, a_type: Option<PlanningAtomType>) -> AtomId {
+    pub fn declare_new_result(&mut self, a_type: Option<PlanningAtomType>) -> VarId {
         let n = self.meta_data.new_result_index();
         let sym: Sym = format!("r_{}", n).into();
         let id = self.symbols.new_node(sym.borrow().into());
@@ -333,7 +333,7 @@ impl SymTable {
         id
     }
 
-    pub fn declare_new_presence(&mut self) -> AtomId {
+    pub fn declare_new_presence(&mut self) -> VarId {
         let n = self.meta_data.new_presence_index();
         let sym: Sym = format!("p_{}", n).into();
         let id = self.symbols.new_node((&sym).into());
@@ -367,7 +367,7 @@ impl SymTable {
         Interval::new(&id_1, &id_2)
     }
 
-    pub fn declare_new_timepoint(&mut self) -> AtomId {
+    pub fn declare_new_timepoint(&mut self) -> VarId {
         let n = self.meta_data.new_timepoint_index();
         let sym: Sym = format!("t_{}", n).into();
         let id = self.symbols.new_node((&sym).into());
@@ -382,11 +382,7 @@ impl SymTable {
         id
     }
 
-    pub fn declare_symbol(
-        &mut self,
-        sym: impl Display,
-        a_type: Option<PlanningAtomType>,
-    ) -> AtomId {
+    pub fn declare_symbol(&mut self, sym: impl Display, a_type: Option<PlanningAtomType>) -> VarId {
         let sym = &sym.to_string();
         if self.it_exists(sym) {
             *self.id(sym).unwrap()
@@ -410,7 +406,7 @@ impl SymTable {
         symbol: impl ToString,
         var_type: Option<PlanningAtomType>,
         var_kind: VariableKind,
-    ) -> AtomId {
+    ) -> VarId {
         let symbol = symbol.to_string();
 
         let var_type = AtomType {
@@ -453,7 +449,7 @@ impl SymTable {
         symbol: impl ToString,
         if_it_exists_create_new: bool,
         var_type: Option<PlanningAtomType>,
-    ) -> AtomId {
+    ) -> VarId {
         let var_type = AtomType {
             a_type: var_type,
             kind: AtomKind::Variable(VariableKind::Parameter),
@@ -529,7 +525,7 @@ SETTERS
  */
 
 impl SymTable {
-    pub fn set_type_of(&mut self, atom_id: &AtomId, atom_type: &Option<PlanningAtomType>) {
+    pub fn set_type_of(&mut self, atom_id: &VarId, atom_type: &Option<PlanningAtomType>) {
         self.symbol_types.inner.get_mut(atom_id).unwrap().a_type = *atom_type;
     }
 }
@@ -538,15 +534,15 @@ impl SymTable {
 FOREST FUNCTIONS
  */
 impl SymTable {
-    pub fn union_atom(&mut self, a: &AtomId, b: &AtomId) {
+    pub fn union_atom(&mut self, a: &VarId, b: &VarId) {
         self.symbols.union_ordered(a, b);
     }
 
-    pub fn find_parent(&mut self, a: &AtomId) -> &AtomId {
+    pub fn find_parent(&mut self, a: &VarId) -> &VarId {
         self.symbols.find(a)
     }
 
-    pub fn get_parent(&self, a: &AtomId) -> &AtomId {
+    pub fn get_parent(&self, a: &VarId) -> &VarId {
         self.symbols.get_parent(a)
     }
 
@@ -561,19 +557,19 @@ impl SymTable {
 
 #[derive(Default, Clone)]
 struct SymbolTypes {
-    inner: HashMap<AtomId, AtomType>,
+    inner: HashMap<VarId, AtomType>,
     //types_number: TypesNumber,
     //kind_number: KindNumber,
 }
 
 impl SymbolTypes {
-    pub fn get_type(&self, atom_id: &AtomId) -> Option<&AtomType> {
+    pub fn get_type(&self, atom_id: &VarId) -> Option<&AtomType> {
         self.inner.get(atom_id)
     }
 }
 
 impl SymbolTypes {
-    pub fn add_new_atom(&mut self, id: &AtomId, atom_type: AtomType) {
+    pub fn add_new_atom(&mut self, id: &VarId, atom_type: AtomType) {
         self.inner.insert(*id, atom_type);
     }
 }

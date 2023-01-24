@@ -1,7 +1,7 @@
-use crate::conversion::chronicle::GetVariables;
 use crate::sym_table::domain::Domain;
 use crate::sym_table::lit::Lit;
 use crate::sym_table::r#ref::RefSymTable;
+use crate::sym_table::r#trait::GetVariables;
 use crate::sym_table::VarId;
 use im::HashSet;
 

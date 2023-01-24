@@ -3,6 +3,7 @@ use ompas_rae_language::exec::refinement::EXEC_TASK;
 use ompas_rae_language::exec::resource::ACQUIRE;
 use ompas_rae_structs::sym_table::{MAX_Q, QUANTITY};
 use sompas_core::*;
+use sompas_language::primitives::DO;
 use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::llambda::LambdaArgs;
@@ -17,6 +18,8 @@ pub async fn pre_processing(lv: &LValue, env: &LEnv) -> LResult {
     let avoid = vec![EXEC_TASK.to_string()];
     let lv = lambda_expansion(lv, env, &avoid).await?;
     let lv = acquire_expansion(&lv, env).await?;
+    let lv = do_expansion(&lv, env).await?;
+    //println!("{}", lv.format(0));
 
     Ok(lv)
 }
@@ -169,6 +172,44 @@ pub async fn acquire_expansion(lv: &LValue, env: &LEnv) -> LResult {
             )
             .unwrap();
             write!(lisp, "(ressource-handle (assert {QUANTITY} __r__ (- (read-state {QUANTITY} __r__) __q__))))").unwrap();
+            let mut c_env = env.clone();
+
+            parse(&lisp, &mut c_env).await
+        } else {
+            Ok(result.into())
+        }
+    } else {
+        Ok(lv.clone())
+    }
+}
+
+#[async_recursion]
+pub async fn do_expansion(lv: &LValue, env: &LEnv) -> LResult {
+    if let LValue::List(list) = &lv {
+        let mut result: Vec<LValue> = vec![];
+        for lv in list.iter() {
+            result.push(do_expansion(lv, env).await?);
+        }
+
+        if result[0].to_string().as_str() == DO {
+            let mut lisp = "".to_string();
+
+            let n = result.len() - 1;
+            for (i, e) in result[1..].iter().enumerate() {
+                if i == n - 1 {
+                    write!(lisp, "{e}").unwrap();
+                } else {
+                    write!(
+                        lisp,
+                        "(begin\
+                    (define __r__ {e})\
+                    (if (err? __r__) __r__ "
+                    )
+                    .unwrap();
+                }
+            }
+            write!(lisp, "{}", ")".repeat((n - 1) * 2)).unwrap();
+
             let mut c_env = env.clone();
 
             parse(&lisp, &mut c_env).await

@@ -6,7 +6,7 @@ use crate::aries::structs::expression::Expression;
 use crate::aries::structs::interval::Interval;
 use crate::aries::structs::lit::Lit;
 use crate::aries::structs::partial_chronicle::PartialChronicle;
-use crate::aries::structs::symbol_table::{AtomId, SymTable};
+use crate::aries::structs::symbol_table::{SymTable, VarId};
 use crate::aries::structs::traits::{Absorb, FormatWithSymTable, GetVariables};
 use crate::aries::structs::type_table::PlanningAtomType;
 use im::HashSet;
@@ -19,11 +19,11 @@ pub struct ExpressionChronicle {
 }
 
 impl ExpressionChronicle {
-    pub fn rm_var(&mut self, sym_id: &AtomId) {
+    pub fn rm_var(&mut self, sym_id: &VarId) {
         self.pc.rm_var(sym_id);
     }
 
-    pub fn rm_set_var(&mut self, ids: Vec<AtomId>) {
+    pub fn rm_set_var(&mut self, ids: Vec<VarId>) {
         self.pc.rm_set_var(ids)
     }
 
@@ -41,13 +41,13 @@ impl ExpressionChronicle {
 }
 
 impl ExpressionChronicle {
-    pub fn add_variables(&mut self, variables: HashSet<AtomId>) {
+    pub fn add_variables(&mut self, variables: HashSet<VarId>) {
         self.pc.variables = self.pc.variables.clone().union(variables);
     }
 }
 
 impl ExpressionChronicle {
-    pub fn get_presence(&self) -> &AtomId {
+    pub fn get_presence(&self) -> &VarId {
         &self.pc.presence
     }
 
@@ -55,11 +55,11 @@ impl ExpressionChronicle {
         self.pc.get_interval()
     }
 
-    pub fn get_start(&self) -> &AtomId {
+    pub fn get_start(&self) -> &VarId {
         self.pc.interval.start()
     }
 
-    pub fn get_end(&self) -> &AtomId {
+    pub fn get_end(&self) -> &VarId {
         self.pc.interval.end()
     }
 
@@ -71,7 +71,7 @@ impl ExpressionChronicle {
         self.pc.get_result()
     }
 
-    pub fn get_result_id(&self) -> &AtomId {
+    pub fn get_result_id(&self) -> &VarId {
         self.pc.get_result_id()
     }
 
@@ -85,8 +85,8 @@ impl ExpressionChronicle {
 }
 
 impl ExpressionChronicle {
-    fn build_hashset<T: GetVariables>(vec: &[T]) -> im::HashSet<AtomId> {
-        let mut hashset: HashSet<AtomId> = Default::default();
+    fn build_hashset<T: GetVariables>(vec: &[T]) -> im::HashSet<VarId> {
+        let mut hashset: HashSet<VarId> = Default::default();
         for e in vec {
             hashset = hashset.union(e.get_variables());
         }
@@ -94,7 +94,7 @@ impl ExpressionChronicle {
         hashset
     }
 
-    pub fn get_variables_in_set(&self, set: ChronicleSet) -> im::HashSet<AtomId> {
+    pub fn get_variables_in_set(&self, set: ChronicleSet) -> im::HashSet<VarId> {
         match set {
             ChronicleSet::Effect => Self::build_hashset(&self.pc.effects),
             ChronicleSet::Constraint => Self::build_hashset(&self.pc.constraints),
@@ -103,7 +103,7 @@ impl ExpressionChronicle {
         }
     }
 
-    pub fn get_variables_in_sets(&self, sets: Vec<ChronicleSet>) -> im::HashSet<AtomId> {
+    pub fn get_variables_in_sets(&self, sets: Vec<ChronicleSet>) -> im::HashSet<VarId> {
         let mut hashset = HashSet::default();
         for set in sets {
             hashset = hashset.union(self.get_variables_in_set(set))
@@ -111,7 +111,7 @@ impl ExpressionChronicle {
         hashset
     }
 
-    pub fn get_all_variables_in_sets(&self) -> im::HashSet<AtomId> {
+    pub fn get_all_variables_in_sets(&self) -> im::HashSet<VarId> {
         self.get_variables_in_sets(vec![
             ChronicleSet::Effect,
             ChronicleSet::Constraint,
@@ -125,7 +125,7 @@ impl ExpressionChronicle {
 }
 
 impl GetVariables for ExpressionChronicle {
-    fn get_variables(&self) -> HashSet<AtomId> {
+    fn get_variables(&self) -> HashSet<VarId> {
         let mut hashset = self.pc.get_variables();
         hashset.insert(*self.pc.result.get_id());
         hashset.union(self.pc.interval.get_variables())
@@ -135,7 +135,7 @@ impl GetVariables for ExpressionChronicle {
         &self,
         sym_table: &SymTable,
         atom_type: &Option<PlanningAtomType>,
-    ) -> HashSet<AtomId> {
+    ) -> HashSet<VarId> {
         self.get_variables()
             .iter()
             .filter(|v| sym_table.get_type_of(v).unwrap().a_type == *atom_type)
@@ -149,7 +149,7 @@ impl ExpressionChronicle {
         todo!()
     }*/
 
-    pub fn get_symbol_variables(&self, sym_table: &SymTable) -> HashSet<AtomId> {
+    pub fn get_symbol_variables(&self, sym_table: &SymTable) -> HashSet<VarId> {
         let variables = self.get_variables();
         variables
             .iter()
@@ -178,7 +178,7 @@ impl ExpressionChronicle {
 }
 
 impl ExpressionChronicle {
-    pub fn add_var(&mut self, sym_id: &AtomId) {
+    pub fn add_var(&mut self, sym_id: &VarId) {
         self.pc.add_var(sym_id);
     }
     pub fn add_interval(&mut self, interval: &Interval) {

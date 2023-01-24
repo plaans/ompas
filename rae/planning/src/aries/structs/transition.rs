@@ -1,5 +1,5 @@
 use crate::aries::structs::lit::Lit;
-use crate::aries::structs::symbol_table::{AtomId, SymTable};
+use crate::aries::structs::symbol_table::{SymTable, VarId};
 use crate::aries::structs::traits::{FormatWithParent, FormatWithSymTable, GetVariables};
 use crate::aries::structs::type_table::PlanningAtomType;
 use im::HashSet;
@@ -37,7 +37,7 @@ impl FormatWithParent for Transition {
 }
 
 impl GetVariables for Transition {
-    fn get_variables(&self) -> HashSet<AtomId> {
+    fn get_variables(&self) -> HashSet<VarId> {
         self.variable
             .get_variables()
             .union(self.value.get_variables())
@@ -47,7 +47,7 @@ impl GetVariables for Transition {
         &self,
         sym_table: &SymTable,
         atom_type: &Option<PlanningAtomType>,
-    ) -> HashSet<AtomId> {
+    ) -> HashSet<VarId> {
         self.get_variables()
             .iter()
             .filter(|v| sym_table.get_type_of(v).unwrap().a_type == *atom_type)

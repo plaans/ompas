@@ -2,7 +2,7 @@ use super::conversion::post_processing::post_processing;
 use super::conversion::pre_processing::pre_processing;
 use super::conversion::processing::{convert_lvalue_to_expression_chronicle, MetaData};
 use super::structs::chronicle::ChronicleTemplate;
-use super::structs::symbol_table::{AtomId, SymTable};
+use super::structs::symbol_table::{SymTable, VarId};
 use super::structs::type_table::PlanningAtomType;
 use super::structs::{ConversionCollection, ConversionContext};
 use aries_planning::chronicles::ChronicleKind;
@@ -207,7 +207,7 @@ pub fn convert_abstract_task_to_chronicle(
     chronicle.set_name(name.clone());
     chronicle.set_task(match task {
         Some(task) => {
-            let mut task_name: Vec<AtomId> =
+            let mut task_name: Vec<VarId> =
                 name[0..task.get_parameters().get_number() + 1].to_vec();
             task_name[0] = *ch.sym_table.id(task.get_label()).unwrap();
             task_name
@@ -300,7 +300,7 @@ pub fn convert_lvalue_to_chronicle(
     Ok(chronicle)
 }
 
-pub fn declare_task(task: &Task, st: &mut SymTable) -> Vec<AtomId> {
+pub fn declare_task(task: &Task, st: &mut SymTable) -> Vec<VarId> {
     let task_label_id = *st
         .id(task.get_label())
         .expect("symbol of task should be defined");
@@ -312,7 +312,7 @@ pub fn declare_task(task: &Task, st: &mut SymTable) -> Vec<AtomId> {
     let result = st.declare_new_parameter(RESULT, true, Some(PlanningAtomType::Bool));*/
 
     //let mut task_lit: Vec<AtomId> = vec![prez, result, start, end, task_label_id];
-    let mut task_lit: Vec<AtomId> = vec![task_label_id];
+    let mut task_lit: Vec<VarId> = vec![task_label_id];
 
     for (param, _t) in task.get_parameters().inner() {
         task_lit.push(st.declare_new_parameter(param, true, None))

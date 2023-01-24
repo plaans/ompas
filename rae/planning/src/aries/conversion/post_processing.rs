@@ -4,7 +4,7 @@ use crate::aries::structs::atom::Atom;
 use crate::aries::structs::chronicle::{ChronicleSet, ChronicleTemplate};
 use crate::aries::structs::constraint::Constraint;
 use crate::aries::structs::lit::Lit;
-use crate::aries::structs::symbol_table::{AtomId, SymTable};
+use crate::aries::structs::symbol_table::{SymTable, VarId};
 use crate::aries::structs::traits::{FormatWithParent, GetVariables};
 use crate::aries::structs::type_table::{AtomKind, PlanningAtomType, VariableKind};
 use crate::aries::structs::{ConversionCollection, ConversionContext};
@@ -112,7 +112,7 @@ pub fn add_constraint_on_end_timepoint(
     _: &ConversionContext,
     ch: &mut ConversionCollection,
 ) {
-    let timepoints: HashSet<AtomId> = c
+    let timepoints: HashSet<VarId> = c
         .get_variables()
         .iter()
         .map(|a| *ch.sym_table.get_parent(a))
@@ -127,7 +127,7 @@ pub fn add_constraint_on_end_timepoint(
 }
 
 /// Returns true if the constraint can be safely deleted
-fn bind_atoms(id_1: &AtomId, id_2: &AtomId, st: &mut SymTable) -> Result<bool, LRuntimeError> {
+fn bind_atoms(id_1: &VarId, id_2: &VarId, st: &mut SymTable) -> Result<bool, LRuntimeError> {
     let id_1 = *st.get_parent(id_1);
     let id_2 = *st.get_parent(id_2);
     let id_1 = &id_1;
@@ -290,7 +290,7 @@ pub fn rm_useless_var(
 ) {
     //Variables in expressions
     c.format_with_parent(&ch.sym_table);
-    let parameters: HashSet<AtomId> = c
+    let parameters: HashSet<VarId> = c
         .get_variables()
         .iter()
         .filter_map(|v| {
@@ -303,7 +303,7 @@ pub fn rm_useless_var(
             }
         })
         .collect();
-    let used_vars: HashSet<AtomId> = c
+    let used_vars: HashSet<VarId> = c
         .get_all_variables_in_sets()
         .iter()
         .filter_map(|v| {
@@ -338,7 +338,7 @@ pub fn simplify_timepoints(
         string
     };*/
 
-    let timepoints: HashSet<AtomId> = c
+    let timepoints: HashSet<VarId> = c
         .get_variables()
         .iter()
         .map(|a| *ch.sym_table.get_parent(a))
@@ -349,7 +349,7 @@ pub fn simplify_timepoints(
 
     //println!("timepoints: {}", format_hash(&timepoints));
 
-    let used_timepoints: HashSet<AtomId> = c
+    let used_timepoints: HashSet<VarId> = c
         .get_variables_in_sets(vec![
             ChronicleSet::Effect,
             ChronicleSet::Condition,
@@ -364,7 +364,7 @@ pub fn simplify_timepoints(
 
     // println!("used timepoints: {}", format_hash(&used_timepoints));
 
-    let hard_timepoints: HashSet<AtomId> = c
+    let hard_timepoints: HashSet<VarId> = c
         .get_variables()
         .iter()
         .map(|a| *ch.sym_table.get_parent(a))
@@ -379,7 +379,7 @@ pub fn simplify_timepoints(
 
     let used_timepoints = used_timepoints.union(hard_timepoints);
 
-    let optional_timepoints: HashSet<AtomId> = timepoints.clone().difference(used_timepoints);
+    let optional_timepoints: HashSet<VarId> = timepoints.clone().difference(used_timepoints);
     //println!("optional_timepoints: {}", format_hash(&optional_timepoints));
     let mut relations = vec![];
     let mut index_temporal_constraints = vec![];
@@ -393,7 +393,7 @@ pub fn simplify_timepoints(
 
     c.rm_set_constraint(index_temporal_constraints);
 
-    let mut timepoints: Vec<AtomId> = timepoints.iter().cloned().collect();
+    let mut timepoints: Vec<VarId> = timepoints.iter().cloned().collect();
     timepoints.sort();
     let timepoints = timepoints
         .iter()
@@ -401,16 +401,16 @@ pub fn simplify_timepoints(
         .collect();
     //println!("st: {}", ch.sym_table);
 
-    let problem: PAProblem<AtomId> = PAProblem::new(timepoints, relations);
+    let problem: PAProblem<VarId> = PAProblem::new(timepoints, relations);
 
     //println!("problem: {:?}", problem);
 
-    let graph: Graph<AtomId> = problem.borrow().into();
+    let graph: Graph<VarId> = problem.borrow().into();
     //graph.print();
     let new_graph = remove_useless_timepoints(graph)?;
     //new_graph.print();
 
-    let problem: PAProblem<AtomId> = new_graph.into();
+    let problem: PAProblem<VarId> = new_graph.into();
     for r in problem.get_relations() {
         c.add_constraint(r.into())
     }

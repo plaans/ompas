@@ -1,4 +1,4 @@
-use crate::aries::structs::symbol_table::{AtomId, SymTable};
+use crate::aries::structs::symbol_table::{SymTable, VarId};
 use crate::aries::structs::type_table::PlanningAtomType;
 
 pub trait Absorb {
@@ -10,13 +10,13 @@ pub trait FormatWithSymTable {
 }
 
 pub trait GetVariables {
-    fn get_variables(&self) -> im::HashSet<AtomId>;
+    fn get_variables(&self) -> im::HashSet<VarId>;
 
     fn get_variables_of_type(
         &self,
         sym_table: &SymTable,
         atom_type: &Option<PlanningAtomType>,
-    ) -> im::HashSet<AtomId>;
+    ) -> im::HashSet<VarId>;
 }
 
 /*

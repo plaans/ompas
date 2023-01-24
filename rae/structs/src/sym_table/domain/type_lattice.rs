@@ -1,4 +1,5 @@
 use crate::sym_table::domain::basic_type::BasicType::*;
+use crate::sym_table::domain::basic_type::TYPE_ID_EMPTY;
 use crate::sym_table::domain::simple_type::SimpleType;
 use crate::sym_table::domain::Domain::{Composed, Cst, Simple, Substract, Union};
 use crate::sym_table::domain::{Domain, TypeId};
@@ -267,7 +268,9 @@ impl TypeLattice {
             (Simple(_), Composed(top2, _)) => {
                 let nt2 = Simple(*top2);
                 let meet = self.__meet(t1, &nt2);
-                if nt2 == meet {
+                if meet.is_empty() {
+                    meet
+                } else if nt2 == meet {
                     t2.clone()
                 } else {
                     meet
@@ -276,19 +279,24 @@ impl TypeLattice {
             (Composed(top1, _), Simple(_)) => {
                 let nt1 = Simple(*top1);
                 let meet = self.__meet(&nt1, t2);
-                if nt1 == meet {
+                if meet.is_empty() {
+                    meet
+                } else if nt1 == meet {
                     t1.clone()
                 } else {
                     meet
                 }
             }
             (Composed(top1, comp1), Composed(top2, comp2)) => {
+                if top1 == &TYPE_ID_EMPTY || top2 == &TYPE_ID_EMPTY {
+                    return Domain::empty();
+                }
                 if top1 == top2 && comp1.len() == comp2.len() {
                     let mut comp = vec![];
                     for (t1, t2) in comp1.iter().zip(comp2) {
                         let meet = self.__meet(t1, t2);
                         if meet == Simple(Empty as usize) {
-                            return Simple(Empty as usize);
+                            return Domain::empty();
                         }
                         comp.push(meet)
                     }

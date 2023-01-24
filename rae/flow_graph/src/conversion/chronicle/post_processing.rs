@@ -4,30 +4,27 @@ use crate::point_algebra::remove_useless_timepoints;
 use im::HashSet;
 use ompas_rae_structs::conversion::chronicle::constraint::Constraint;
 use ompas_rae_structs::conversion::chronicle::template::{ChronicleSet, ChronicleTemplate};
-use ompas_rae_structs::conversion::chronicle::GetVariables;
 use ompas_rae_structs::sym_table::domain::basic_type::BasicType;
-use ompas_rae_structs::sym_table::lit::Lit;
-use ompas_rae_structs::sym_table::{VarId, TYPE_TIMEPOINT};
+use ompas_rae_structs::sym_table::lit::{lvalue_to_lit, Lit};
+use ompas_rae_structs::sym_table::r#trait::{FlatBindings, FormatWithSymTable, GetVariables};
+use ompas_rae_structs::sym_table::{EmptyDomains, VarId, TYPE_TIMEPOINT};
+use ompas_utils::blocking_async;
+use sompas_core::{eval, parse};
+use sompas_structs::lenv::LEnv;
 use sompas_structs::lruntimeerror::LRuntimeError;
+use sompas_structs::lvalue::LValue;
 use std::borrow::Borrow;
 use std::ops::Deref;
 
-pub fn post_processing(c: &mut ChronicleTemplate) -> Result<(), LRuntimeError> {
-    //add_constraint_on_end_timepoint(c, context, ch);
-    c.st.flat_bindings();
-    //unify_equal(c);
+const TRY_EVAL_APPLY: &str = "try_eval_apply";
 
-    //ch.sym_table.flat_bindings();
-    //panic!("for no fucking reason");
-    /*println!(
-        "before timepoint simplification: {}",
-        c.format(&ch.sym_table, true)
-    );*/
+pub fn post_processing(c: &mut ChronicleTemplate, env: LEnv) -> Result<(), LRuntimeError> {
+    c.st.flat_bindings();
     simplify_timepoints(c)?;
     rm_useless_var(c);
     merge_conditions(c)?;
+    try_eval_apply(c, env)?;
     simplify_constraints(c)?;
-
     Ok(())
 }
 
@@ -68,16 +65,6 @@ pub fn rm_useless_var(c: &mut ChronicleTemplate) {
 }
 
 pub fn simplify_timepoints(c: &mut ChronicleTemplate) -> Result<(), LRuntimeError> {
-    /*let format_hash = |h: &HashSet<VarId>| -> String {
-        let mut string = "{".to_string();
-        for e in h {
-            string.push_str(e.to_string().as_str());
-            string.push(' ');
-        }
-        string.push('}');
-        string
-    };*/
-
     let st = c.st.clone();
     let timepoint_domain = st.get_type_as_domain(TYPE_TIMEPOINT);
 
@@ -162,25 +149,53 @@ pub fn simplify_timepoints(c: &mut ChronicleTemplate) -> Result<(), LRuntimeErro
 pub fn simplify_constraints(c: &mut ChronicleTemplate) -> Result<(), LRuntimeError> {
     //simple case where
     let st = c.st.clone();
-    let mut vec: Vec<(usize, Constraint)> = vec![];
-    for (i, c) in c.constraints.iter().enumerate() {
-        if let Constraint::Eq(a, b) = c {
-            match (a, b) {
-                (Lit::Atom(a), Lit::Constraint(b)) => {
-                    if st.contained_in_domain(&st.get_domain_of_var(&a), &BasicType::True.into()) {
-                        vec.push((i, b.deref().clone()));
+
+    loop {
+        let mut vec: Vec<(usize, Constraint)> = vec![];
+        let mut to_remove = vec![];
+        for (i, c) in c.constraints.iter().enumerate() {
+            if let Constraint::Eq(a, b) = c {
+                match (a, b) {
+                    //Simplify equality constraints between atoms
+                    (Lit::Atom(a), Lit::Atom(b)) => {
+                        /*println!(
+                            "remove ({} = {})",
+                            a.format(&st, true),
+                            b.format(&st, false)
+                        );*/
+                        let r = st.union_var(a, b);
+                        if r.is_none() {
+                            to_remove.push(i);
+                        } else {
+                            LRuntimeError::new("", "");
+                        }
                     }
-                }
-                (Lit::Constraint(b), Lit::Atom(a)) => {
-                    if st.contained_in_domain(&st.get_domain_of_var(&a), &BasicType::True.into()) {
-                        vec.push((i, b.deref().clone()));
+                    (Lit::Atom(a), Lit::Constraint(b)) => {
+                        if st
+                            .contained_in_domain(&st.get_domain_of_var(&a), &BasicType::True.into())
+                        {
+                            vec.push((i, b.deref().clone()));
+                        }
                     }
+                    (Lit::Constraint(b), Lit::Atom(a)) => {
+                        if st
+                            .contained_in_domain(&st.get_domain_of_var(&a), &BasicType::True.into())
+                        {
+                            vec.push((i, b.deref().clone()));
+                        }
+                    }
+                    _ => {}
                 }
-                _ => {}
             }
         }
+
+        if vec.is_empty() && to_remove.is_empty() {
+            break;
+        }
+        vec.drain(..).for_each(|(i, cons)| c.constraints[i] = cons);
+
+        c.rm_set_constraint(to_remove);
     }
-    vec.drain(..).for_each(|(i, cons)| c.constraints[i] = cons);
 
     Ok(())
 }
@@ -195,13 +210,6 @@ pub fn merge_conditions(c: &mut ChronicleTemplate) -> Result<(), LRuntimeError> 
         for (j, c2) in c.get_conditions()[next..].iter().enumerate() {
             let index = j + next;
             if c1.interval == c2.interval && c1.sv == c2.sv {
-                /*println!(
-                    "merging {}({}) and {}({})",
-                    c1.format(&ch.sym_table, true),
-                    i,
-                    c2.format(&ch.sym_table, true),
-                    index
-                );*/
                 st.union_var(&c1.value, &c2.value);
                 c_to_remove.insert(index);
             }
@@ -210,11 +218,8 @@ pub fn merge_conditions(c: &mut ChronicleTemplate) -> Result<(), LRuntimeError> 
 
     let mut vec: Vec<usize> = c_to_remove.iter().copied().collect();
 
-    //println!("condition to remove: {:?}", vec);
     vec.sort_unstable();
-    //println!("condition to remove(sorted): {:?}", vec);
     vec.reverse();
-    //println!("condition to remove(reversed): {:?}", vec);
     vec.iter().for_each(|i| c.rm_condition(*i));
 
     c.st.flat_bindings();
@@ -222,149 +227,62 @@ pub fn merge_conditions(c: &mut ChronicleTemplate) -> Result<(), LRuntimeError> 
     Ok(())
 }
 
-/*pub fn add_constraint_on_end_timepoint(
-    c: &mut ChronicleTemplate,
-    _: &ConversionContext,
-    ch: &mut ConversionCollection,
-) {
-    let timepoints: HashSet<VarId> = c
-        .get_variables()
-        .iter()
-        .map(|a| *ch.sym_table.get_parent(a))
-        .filter(|a| ch.sym_table.get_type_of(a).unwrap() == Some(AtomType::Timepoint))
-        .collect();
-    let end = *c.get_end();
-    for t in &timepoints {
-        c.add_constraint(Constraint::leq(t, end));
-    }
-}*/
+pub fn try_eval_apply(c: &mut ChronicleTemplate, env: LEnv) -> Result<(), LRuntimeError> {
+    let st = c.st.clone();
 
-/*
-pub fn unify_equal(c: &mut ChronicleTemplate) {
-    //println!("before binding: {}", c.format(true));
-    c.sym_table.flat_bindings();
+    let mut c_to_remove: Vec<usize> = Default::default();
 
-    let mut vec_constraint_to_rm = vec![];
-    let constraints = c.get_constraints().clone();
+    'loop_constraint: for (i, constraint) in c.constraints.iter_mut().enumerate() {
+        if let Constraint::Eq(r_c, b) = constraint {
+            if let Lit::Atom(r_c) = r_c {
+                if let Lit::Apply(args) = b {
+                    let mut args = args.clone();
+                    args.flat_bindings(&st);
+                    for arg in &args {
+                        if !st.get_domain_of_var(&arg).is_constant() {
+                            continue 'loop_constraint;
+                        }
+                    }
+                    let expr = args.format(&st, true);
+                    //print!("apply{expr})");
+                    let mut env = env.clone();
+                    let lv: LValue = blocking_async!({
+                        let lv = parse(expr.as_str(), &mut env).await?;
+                        eval(&lv, &mut env, None).await
+                    })
+                    .unwrap()?;
+                    //println!("=> {lv}");
 
-    for (index, constraint) in constraints.iter().enumerate() {
-        if let Constraint::Eq(a, b) = constraint {
-            if let (Lit::Atom(id_1), Lit::Atom(id_2)) = (a, b) {
-                if let Ok(true) = bind_atoms(id_1, id_2, &mut c.sym_table) {
-                    vec_constraint_to_rm.push(index);
+                    let lit = lvalue_to_lit(&lv, &st)?;
+                    match lit {
+                        Lit::Atom(a) => {
+                            if let EmptyDomains::Some(_) = st.union_var(r_c, &a) {
+                                return Err(LRuntimeError::new(
+                                    TRY_EVAL_APPLY,
+                                    format!(
+                                        "Simplification of {} did not worked, empty domain of result.",
+                                        b.format(&st, true)
+                                    ),
+                                ));
+                            } else {
+                                c_to_remove.push(i)
+                            }
+                        }
+                        _ => {
+                            *b = lit;
+                        }
+                    }
                 }
             }
         }
     }
 
-    //println!("after binding: {}", c.format(true));
+    let mut vec: Vec<usize> = c_to_remove.iter().copied().collect();
 
-    /*println!(
-        "constraints to rm after binding: {:?}",
-        vec_constraint_to_rm
-    );*/
+    vec.reverse();
+    vec.iter().for_each(|i| c.rm_constraint(*i));
 
-    c.rm_set_constraint(vec_constraint_to_rm);
-    c.sym_table.flat_bindings();
+    c.st.flat_bindings();
+    c.flat_bindings();
+    Ok(())
 }
-
-/// Returns true if the constraint can be safely deleted
-pub fn bind_atoms(
-    id_1: &VarId,
-    id_2: &VarId,
-    st: &mut RefSymTable,
-) -> Result<bool, LRuntimeError> {
-    let id_1 = st.get_parent(id_1);
-    let id_2 = st.get_parent(id_2);
-    let id_1 = &id_1;
-    let id_2 = &id_2;
-
-    let (id_1, id_2) = if id_1 < id_2 {
-        (id_1, id_2)
-    } else {
-        (id_2, id_1)
-    };
-
-    let type_1 = st.get_type_of(id_1);
-    let type_2 = st.get_type_of(id_2);
-
-    let atom_1 = st.get_atom(id_1, false).unwrap();
-    let atom_2 = st.get_atom(id_2, false).unwrap();
-
-    let constant_1 = atom_1.is_constant();
-    let constant_2 = atom_2.is_constant();
-
-    match (constant_1, constant_2) {
-        (true, true) => {
-            if type_1 != type_2 {
-                return Err(Default::default());
-            }
-            if st.get_atom(id_1, false).unwrap() != st.get_atom(id_2, false).unwrap() {
-                return Err(Default::default());
-            }
-            st.union_atom(id_1, id_2);
-            Ok(true)
-        }
-        (true, false) => {
-            match &type_2 {
-                AtomType::Untyped => {} //st.set_type_of(id_2, &type_1),
-                t => {
-                    if t != &type_1 {
-                        return Err(Default::default());
-                    }
-                }
-            }
-
-            if atom_2.is_parameter() {
-                Ok(false)
-            } else {
-                st.union_atom(id_1, id_2);
-                Ok(true)
-            }
-        }
-        (false, true) => {
-            match &type_1 {
-                AtomType::Untyped => {} //st.set_type_of(id_1, &type_2),
-                t => {
-                    if t != &type_1 {
-                        return Err(Default::default());
-                    }
-                }
-            }
-
-            if atom_1.is_parameter() {
-                Ok(false)
-            } else {
-                st.union_atom(id_2, id_1);
-                Ok(true)
-            }
-        }
-        (false, false) => {
-            let parameter_1 = atom_1.is_parameter();
-            let parameter_2 = atom_2.is_parameter();
-
-            match (type_1, type_2) {
-                (AtomType::Untyped, AtomType::Untyped) => {
-                    //
-                }
-                (AtomType::Untyped, _) => {} // st.set_type_of(id_1, &t),
-                (_, AtomType::Untyped) => {} // st.set_type_of(id_2, &t),
-                (t1, t2) => {
-                    if t1 != t2 {
-                        return Err(Default::default());
-                    }
-                }
-            }
-
-            let (parent, child) = match (parameter_1, parameter_2) {
-                (true, true) => (id_1, id_2),
-                (true, false) => (id_1, id_2),
-                (false, true) => (id_2, id_1),
-                (false, false) => (id_1, id_2),
-            };
-
-            st.union_atom(parent, child);
-            Ok(true)
-        }
-    }
-}*/

@@ -4,19 +4,19 @@ use crate::conversion::chronicle::effect::Effect;
 use crate::conversion::chronicle::interval::Interval;
 use crate::conversion::chronicle::subtask::SubTask;
 use crate::conversion::chronicle::task_template::TaskTemplate;
-use crate::conversion::chronicle::FormatWithSymTable;
-use crate::conversion::chronicle::{FlatBindings, GetVariables, Replace};
 use crate::conversion::flow_graph::graph::FlowGraph;
 use crate::sym_table::domain::basic_type::BasicType;
 use crate::sym_table::domain::Domain;
 use crate::sym_table::lit::Lit;
 use crate::sym_table::r#ref::RefSymTable;
+use crate::sym_table::r#trait::{FlatBindings, FormatWithSymTable, GetVariables, Replace};
 use crate::sym_table::VarId;
 use im::hashset::HashSet;
 use sompas_structs::lvalue::LValue;
 use std::borrow::Borrow;
 use std::fmt::Write;
 use std::fmt::{Display, Formatter};
+use std::time::Duration;
 
 #[derive(Copy, Clone)]
 pub enum ChronicleKind {
@@ -31,6 +31,7 @@ pub struct ChronicleDebug {
     pub lvalue: LValue,
     pub post_processed_lvalue: LValue,
     pub flow_graph: FlowGraph,
+    pub convert_time: Duration,
 }
 
 #[derive(Clone)]
@@ -68,6 +69,7 @@ impl ChronicleTemplate {
                 lvalue: Default::default(),
                 post_processed_lvalue: Default::default(),
                 flow_graph: Default::default(),
+                convert_time: Duration::from_secs(0),
             },
             name: Default::default(),
             task: Default::default(),

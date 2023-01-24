@@ -1,5 +1,5 @@
 use crate::aries::structs::chronicle::ChronicleTemplate;
-use crate::aries::structs::symbol_table::{AtomId, SymTable};
+use crate::aries::structs::symbol_table::{SymTable, VarId};
 use crate::aries::structs::traits::FormatWithSymTable;
 use crate::aries::structs::type_table::AtomType;
 use im::{hashmap, HashMap, HashSet};
@@ -124,10 +124,10 @@ pub struct ConversionContext {
 }
 
 pub fn get_variables_of_type(
-    variables: im::HashSet<AtomId>,
+    variables: im::HashSet<VarId>,
     symbol_table: &SymTable,
     atom_type: AtomType,
-) -> HashSet<AtomId> {
+) -> HashSet<VarId> {
     variables
         .iter()
         .filter(|var| {
@@ -143,7 +143,7 @@ pub fn get_variables_of_type(
 #[derive(Clone, Default)]
 pub struct ConversionCollection {
     pub state_function: Vec<StateFunction>,
-    pub tasks: Vec<Vec<AtomId>>,
+    pub tasks: Vec<Vec<VarId>>,
     pub chronicle_templates: Vec<ChronicleTemplate>,
     pub local_tasks: TaskTypeMetaDataCollection,
     pub sym_table: SymTable,
@@ -215,7 +215,7 @@ impl From<&ConversionContext> for Problem {
 impl ConversionCollection {
     pub fn new(
         templates: Vec<ChronicleTemplate>,
-        tasks: Vec<Vec<AtomId>>,
+        tasks: Vec<Vec<VarId>>,
         sym_table: SymTable,
     ) -> Self {
         Self {

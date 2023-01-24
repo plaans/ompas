@@ -9,7 +9,7 @@ use crate::aries::structs::expression::Expression;
 use crate::aries::structs::expression_chronicle::ExpressionChronicle;
 use crate::aries::structs::interval::Interval;
 use crate::aries::structs::lit::{lvalue_to_lit, Lit};
-use crate::aries::structs::symbol_table::{AtomId, ExpressionType};
+use crate::aries::structs::symbol_table::{ExpressionType, VarId};
 use crate::aries::structs::traits::{Absorb, FormatWithSymTable, GetVariables};
 use crate::aries::structs::type_table::{AtomKind, PlanningAtomType, VariableKind};
 use crate::aries::structs::{ConversionCollection, ConversionContext, TaskType};
@@ -258,7 +258,7 @@ pub fn convert_lvalue_to_expression_chronicle(
                                     constraint: bind_result(&ec, &fluent),
                                 });*/
 
-                                let r: Vec<AtomId> = fluent.get_result_as_lit().try_into()?;
+                                let r: Vec<VarId> = fluent.get_result_as_lit().try_into()?;
 
                                 ec.add_condition(Condition {
                                     interval: Interval::new_instantaneous(ec.get_end()),
@@ -891,7 +891,7 @@ pub fn convert_if(
 
     let b_true_lit = lvalue_to_lit(b_true, &mut ch.sym_table)?;
     let b_false_lit = lvalue_to_lit(b_false, &mut ch.sym_table)?;
-    let b_true_variables: im::HashSet<AtomId> = b_true_lit
+    let b_true_variables: im::HashSet<VarId> = b_true_lit
         .get_variables()
         .iter()
         .filter(|a| {
@@ -900,7 +900,7 @@ pub fn convert_if(
         .cloned()
         .collect();
 
-    let b_false_variables: im::HashSet<AtomId> = b_false_lit
+    let b_false_variables: im::HashSet<VarId> = b_false_lit
         .get_variables()
         .iter()
         .filter(|a| {
@@ -909,7 +909,7 @@ pub fn convert_if(
         .cloned()
         .collect();
 
-    let union: im::HashSet<AtomId> = b_true_variables.union(b_false_variables);
+    let union: im::HashSet<VarId> = b_true_variables.union(b_false_variables);
 
     //CREATION OF THE TASK
     let mut types = vec![
@@ -942,7 +942,7 @@ pub fn convert_if(
 
     let ec_cond = convert_lvalue_to_expression_chronicle(cond, context, ch, Default::default())?;
 
-    let mut task_lit: Vec<AtomId> = vec![
+    let mut task_lit: Vec<VarId> = vec![
         /* *ec.get_presence(),
          *ec.get_start(),
          *ec.get_end(),
@@ -978,7 +978,7 @@ pub fn convert_if(
     });
     ec.add_interval(&sub_task_interval);
 
-    let mut task_lit: Vec<AtomId> = vec![];
+    let mut task_lit: Vec<VarId> = vec![];
     for (i, s) in task_string.iter().enumerate() {
         if i == 0 {
             task_lit.push(*ch.sym_table.id(s).unwrap());
@@ -1004,7 +1004,7 @@ pub fn convert_if(
         let method_cond_var =
             ch.sym_table
                 .declare_new_parameter(COND, true, Some(PlanningAtomType::Bool));
-        let mut name: Vec<AtomId> = vec![
+        let mut name: Vec<VarId> = vec![
             /* *method.get_presence(),
              *method.get_start(),
              *method.get_end(),
@@ -1044,7 +1044,7 @@ pub fn convert_if(
             ),
         });*/
 
-        let mut task: Vec<AtomId> = name[0..task_string.len()].to_vec();
+        let mut task: Vec<VarId> = name[0..task_string.len()].to_vec();
         task[0] = *ch.sym_table.id(&task_label).unwrap();
 
         method.set_debug(Some(debug));

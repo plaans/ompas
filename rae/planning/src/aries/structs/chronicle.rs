@@ -6,7 +6,7 @@ use crate::aries::structs::expression_chronicle::ExpressionChronicle;
 use crate::aries::structs::interval::Interval;
 use crate::aries::structs::lit::Lit;
 use crate::aries::structs::partial_chronicle::PartialChronicle;
-use crate::aries::structs::symbol_table::{AtomId, SymTable};
+use crate::aries::structs::symbol_table::{SymTable, VarId};
 use crate::aries::structs::traits::{Absorb, FormatWithParent, FormatWithSymTable, GetVariables};
 use crate::aries::structs::type_table::PlanningAtomType;
 use crate::aries::structs::{ConversionCollection, END, PREZ, RESULT, START};
@@ -16,7 +16,7 @@ use sompas_structs::lvalue::LValue;
 use std::borrow::Borrow;
 use std::fmt::Display;
 
-impl FormatWithSymTable for Vec<AtomId> {
+impl FormatWithSymTable for Vec<VarId> {
     fn format(&self, st: &SymTable, sym_version: bool) -> String {
         let mut str = "(".to_string();
         let mut first = true;
@@ -37,8 +37,8 @@ impl FormatWithSymTable for Vec<AtomId> {
 pub struct ChronicleTemplate {
     pub chronicle_kind: ChronicleKind,
     label: String,
-    pub name: Vec<AtomId>,
-    pub task: Vec<AtomId>,
+    pub name: Vec<VarId>,
+    pub task: Vec<VarId>,
     pub pc: PartialChronicle,
     debug: Option<LValue>,
 }
@@ -161,14 +161,14 @@ impl ChronicleTemplate {
 ADDERS
  */
 impl ChronicleTemplate {
-    pub fn add_var(&mut self, sym_id: &AtomId) {
+    pub fn add_var(&mut self, sym_id: &VarId) {
         self.pc.add_var(sym_id);
     }
     pub fn add_interval(&mut self, interval: &Interval) {
         self.pc.add_interval(interval);
     }
 
-    pub fn add_variables(&mut self, variables: HashSet<AtomId>) {
+    pub fn add_variables(&mut self, variables: HashSet<VarId>) {
         self.pc.variables = self.pc.variables.clone().union(variables);
     }
 
@@ -192,11 +192,11 @@ impl ChronicleTemplate {
 SETTERS
  */
 impl ChronicleTemplate {
-    pub fn set_name(&mut self, name: Vec<AtomId>) {
+    pub fn set_name(&mut self, name: Vec<VarId>) {
         self.name = name;
     }
 
-    pub fn set_task(&mut self, task: Vec<AtomId>) {
+    pub fn set_task(&mut self, task: Vec<VarId>) {
         self.task = task;
     }
 }
@@ -206,11 +206,11 @@ REMOVERS
  */
 
 impl ChronicleTemplate {
-    pub fn rm_var(&mut self, sym_id: &AtomId) {
+    pub fn rm_var(&mut self, sym_id: &VarId) {
         self.pc.rm_var(sym_id);
     }
 
-    pub fn rm_set_var(&mut self, ids: Vec<AtomId>) {
+    pub fn rm_set_var(&mut self, ids: Vec<VarId>) {
         self.pc.rm_set_var(ids)
     }
 
@@ -231,19 +231,19 @@ impl ChronicleTemplate {
 GETTERS
  */
 impl ChronicleTemplate {
-    pub fn get_presence(&self) -> &AtomId {
+    pub fn get_presence(&self) -> &VarId {
         &self.pc.presence
     }
 
-    pub fn get_start(&self) -> &AtomId {
+    pub fn get_start(&self) -> &VarId {
         self.get_interval().start()
     }
 
-    pub fn get_end(&self) -> &AtomId {
+    pub fn get_end(&self) -> &VarId {
         self.get_interval().end()
     }
 
-    pub fn get_result(&self) -> &AtomId {
+    pub fn get_result(&self) -> &VarId {
         self.pc.result.get_id()
     }
 
@@ -267,8 +267,8 @@ impl ChronicleTemplate {
         &self.pc.subtasks
     }
 
-    fn build_hashset<T: GetVariables>(vec: &[T]) -> im::HashSet<AtomId> {
-        let mut hashset: HashSet<AtomId> = Default::default();
+    fn build_hashset<T: GetVariables>(vec: &[T]) -> im::HashSet<VarId> {
+        let mut hashset: HashSet<VarId> = Default::default();
         for e in vec {
             hashset = hashset.union(e.get_variables());
         }
@@ -276,7 +276,7 @@ impl ChronicleTemplate {
         hashset
     }
 
-    pub fn get_variables_in_set(&self, set: ChronicleSet) -> im::HashSet<AtomId> {
+    pub fn get_variables_in_set(&self, set: ChronicleSet) -> im::HashSet<VarId> {
         match set {
             ChronicleSet::Effect => Self::build_hashset(&self.pc.effects),
             ChronicleSet::Constraint => Self::build_hashset(&self.pc.constraints),
@@ -285,7 +285,7 @@ impl ChronicleTemplate {
         }
     }
 
-    pub fn get_variables_in_sets(&self, sets: Vec<ChronicleSet>) -> im::HashSet<AtomId> {
+    pub fn get_variables_in_sets(&self, sets: Vec<ChronicleSet>) -> im::HashSet<VarId> {
         let mut hashset = HashSet::default();
         for set in sets {
             hashset = hashset.union(self.get_variables_in_set(set))
@@ -293,7 +293,7 @@ impl ChronicleTemplate {
         hashset
     }
 
-    pub fn get_all_variables_in_sets(&self) -> im::HashSet<AtomId> {
+    pub fn get_all_variables_in_sets(&self) -> im::HashSet<VarId> {
         self.get_variables_in_sets(vec![
             ChronicleSet::Effect,
             ChronicleSet::Constraint,
@@ -304,7 +304,7 @@ impl ChronicleTemplate {
 }
 
 impl GetVariables for ChronicleTemplate {
-    fn get_variables(&self) -> HashSet<AtomId> {
+    fn get_variables(&self) -> HashSet<VarId> {
         self.pc.get_variables()
     }
 
@@ -312,7 +312,7 @@ impl GetVariables for ChronicleTemplate {
         &self,
         sym_table: &SymTable,
         atom_type: &Option<PlanningAtomType>,
-    ) -> HashSet<AtomId> {
+    ) -> HashSet<VarId> {
         self.pc.get_variables_of_type(sym_table, atom_type)
     }
 }
@@ -323,7 +323,7 @@ GETTERs
 
 #[derive(Clone, Default)]
 pub struct ChronicleResult {
-    id: AtomId,
+    id: VarId,
     pure: Option<Lit>,
 }
 
@@ -336,20 +336,20 @@ impl FormatWithSymTable for ChronicleResult {
     }
 }
 
-impl From<AtomId> for ChronicleResult {
-    fn from(a: AtomId) -> Self {
+impl From<VarId> for ChronicleResult {
+    fn from(a: VarId) -> Self {
         Self { id: a, pure: None }
     }
 }
 
 impl ChronicleResult {
-    pub fn new(id: AtomId, pure: Option<Lit>) -> Self {
+    pub fn new(id: VarId, pure: Option<Lit>) -> Self {
         Self { id, pure }
     }
 }
 
 impl ChronicleResult {
-    pub fn get_id(&self) -> &AtomId {
+    pub fn get_id(&self) -> &VarId {
         &self.id
     }
 

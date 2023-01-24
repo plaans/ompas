@@ -258,8 +258,8 @@ impl OMPASDomain {
         str
     }
 
-    pub fn print_actions(&self) -> String {
-        let mut str = "*ACTIONS:\n".to_string();
+    pub fn print_commands(&self) -> String {
+        let mut str = "*COMMANDS:\n".to_string();
         for (label, value) in &self.commands {
             str.push_str(format!("\t-{}:\n{}\n\n", label, value).as_str())
         }
@@ -348,7 +348,7 @@ impl OMPASDomain {
         env
     }
 
-    pub fn get_sim_env(&self) -> LEnvSymbols {
+    pub fn get_convert_env(&self) -> LEnvSymbols {
         let mut env = LEnvSymbols::default();
         let mut map_task_method: HashMap<LValue, LValue> = Default::default();
         let mut map_method_pre_conditions: HashMap<LValue, LValue> = Default::default();
@@ -378,7 +378,7 @@ impl OMPASDomain {
 
         //Add all actions to env:
         for (label, action) in self.get_commands() {
-            env.insert(label.clone(), action.get_model().clone());
+            env.insert(label.clone(), action.get_convert_model().clone());
         }
 
         //Add all state functions to env:
@@ -427,7 +427,7 @@ impl Display for OMPASDomain {
         str.push_str(format!("\n{}", self.print_tasks()).as_str());
         str.push_str(format!("\n{}", self.print_methods()).as_str());
         str.push_str(format!("\n{}", self.print_state_functions()).as_str());
-        str.push_str(format!("\n{}", self.print_actions()).as_str());
+        str.push_str(format!("\n{}", self.print_commands()).as_str());
         str.push_str(format!("\n{}", self.print_lambdas()).as_str());
 
         write!(f, "{}", str)

@@ -1,8 +1,8 @@
 use crate::conversion::chronicle::constraint::Constraint;
-use crate::conversion::chronicle::{FlatBindings, FormatWithSymTable, GetVariables, Replace};
 use crate::sym_table::computation::Computation;
 use crate::sym_table::domain::Domain;
 use crate::sym_table::r#ref::RefSymTable;
+use crate::sym_table::r#trait::{FlatBindings, FormatWithSymTable, GetVariables, Replace};
 use crate::sym_table::VarId;
 use im::{hashset, HashSet};
 use sompas_structs::lnumber::LNumber;
@@ -191,7 +191,7 @@ impl<T: Clone + Into<Lit>> From<Vec<T>> for Lit {
     }
 }
 
-pub fn lvalue_to_lit(lv: &LValue, st: &mut RefSymTable) -> lruntimeerror::Result<Lit> {
+pub fn lvalue_to_lit(lv: &LValue, st: &RefSymTable) -> lruntimeerror::Result<Lit> {
     //println!("in lvalue_to_lit:\n{}", lv.format(0));
     //stdout().flush();
     match lv {

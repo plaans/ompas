@@ -9,7 +9,7 @@
     (:params (?t truck) (?to location))
     (:pre-conditions (= (connected (at ?t) ?to) yes))
     (:effects
-          (assert `(at ,?t) ?to)))
+          (assert 'at ?t ?to)))
     
 
   (def-task t_move (:params (?t truck) (?to location)))
@@ -27,9 +27,10 @@
       (!= (at ?t) ?to)
       (= (connected (at ?t) ?intermediaire) yes))
     (:score 0)
-    (:body 
-      (do 
+    (:body
+      (do
           (drive ?t ?intermediaire)
           (t_move ?t ?to))))
+
   (set-select rae-plan)
 )

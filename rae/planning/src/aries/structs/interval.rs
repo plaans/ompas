@@ -1,33 +1,33 @@
-use crate::aries::structs::symbol_table::{AtomId, SymTable};
+use crate::aries::structs::symbol_table::{SymTable, VarId};
 use crate::aries::structs::traits::{FormatWithParent, FormatWithSymTable, GetVariables};
 use crate::aries::structs::type_table::PlanningAtomType;
 use im::{hashset, HashSet};
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub struct Interval {
-    start: AtomId,
-    end: AtomId,
+    start: VarId,
+    end: VarId,
 }
 
 impl Interval {
-    pub fn new(start: &AtomId, end: &AtomId) -> Self {
+    pub fn new(start: &VarId, end: &VarId) -> Self {
         Self {
             start: *start,
             end: *end,
         }
     }
 
-    pub fn new_instantaneous(t: &AtomId) -> Self {
+    pub fn new_instantaneous(t: &VarId) -> Self {
         Self { start: *t, end: *t }
     }
 }
 
 impl Interval {
-    pub fn start(&self) -> &AtomId {
+    pub fn start(&self) -> &VarId {
         &self.start
     }
 
-    pub fn end(&self) -> &AtomId {
+    pub fn end(&self) -> &VarId {
         &self.end
     }
 }
@@ -50,7 +50,7 @@ impl FormatWithParent for Interval {
 }
 
 impl GetVariables for Interval {
-    fn get_variables(&self) -> HashSet<AtomId> {
+    fn get_variables(&self) -> HashSet<VarId> {
         hashset![self.start, self.end]
     }
 
@@ -58,7 +58,7 @@ impl GetVariables for Interval {
         &self,
         sym_table: &SymTable,
         atom_type: &Option<PlanningAtomType>,
-    ) -> HashSet<AtomId> {
+    ) -> HashSet<VarId> {
         self.get_variables()
             .iter()
             .filter(|v| sym_table.get_type_of(v).unwrap().a_type == *atom_type)

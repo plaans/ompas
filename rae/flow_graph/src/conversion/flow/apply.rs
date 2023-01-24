@@ -16,7 +16,7 @@ use ompas_rae_structs::sym_table::domain::basic_type::BasicType::{Boolean, True}
 use ompas_rae_structs::sym_table::domain::Domain;
 use ompas_rae_structs::sym_table::lit::Lit;
 use ompas_rae_structs::sym_table::{closure, VarId, TYPE_RESSOURCE_HANDLE};
-use sompas_language::basic_math::{ADD, EQ, GEQ, GT, LEQ, LT, NOT, NOT_SHORT, SUB};
+use sompas_language::basic_math::{ADD, EQ, GEQ, GT, LEQ, LT, NEQ, NOT, NOT_SHORT, SUB};
 use sompas_language::error::IS_ERR;
 use sompas_language::time::SLEEP;
 use sompas_language::utils::{AND, OR};
@@ -63,6 +63,7 @@ impl Default for ApplyConversionCollection {
         d.add_conversion(GT, convert_gt);
         d.add_conversion(NOT, convert_not);
         d.add_conversion(NOT_SHORT, convert_not);
+        d.add_conversion(NEQ, convert_neq);
         d.add_conversion(AND, convert_and);
         d.add_conversion(OR, convert_or);
         d.add_conversion(WAIT_FOR, convert_wait_for);
@@ -256,6 +257,19 @@ fn convert_not(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRunt
     Ok(fl.new_seq(seq))
 }
 
+fn convert_neq(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
+    seq.remove(0);
+
+    let a = fl.get_flow_result(&seq[0]);
+    let b = fl.get_flow_result(&seq[1]);
+
+    let flow_apply =
+        fl.new_instantaneous_assignment(Lit::Constraint(Box::new(Constraint::neq(a, b))));
+
+    seq.push(flow_apply);
+    Ok(fl.new_seq(seq))
+}
+
 fn convert_and(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
     seq.remove(0);
 
@@ -360,7 +374,8 @@ fn convert_release(fl: &mut FlowGraph, seq: Vec<FlowId>) -> Result<FlowId, LRunt
 }
 
 fn convert_instance(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
-    let flow_read = fl.new_instantaneous_assignment(Lit::Read(seq[..2].to_vec()));
+    let args: Vec<VarId> = seq[..2].iter().map(|f| fl.get_flow_result(f)).collect();
+    let flow_read = fl.new_instantaneous_assignment(Lit::Read(args));
     let flow_equal = fl.new_instantaneous_assignment(Lit::constraint(Constraint::eq(
         fl.get_flow_result(&flow_read),
         fl.get_flow_result(&seq[2]),
@@ -371,7 +386,9 @@ fn convert_instance(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, 
 }
 
 fn convert_instances(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
-    let flow_read = fl.new_instantaneous_assignment(Lit::Read(seq[..2].to_vec()));
+    let args: Vec<VarId> = seq[..2].iter().map(|f| fl.get_flow_result(f)).collect();
+
+    let flow_read = fl.new_instantaneous_assignment(Lit::Read(args));
     seq.push(flow_read);
     Ok(fl.new_seq(seq))
 }

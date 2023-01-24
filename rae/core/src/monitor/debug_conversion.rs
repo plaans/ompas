@@ -6,6 +6,7 @@ use ompas_rae_language::monitor::debug_conversion::{
     CONVERT_DOMAIN, DOC_CONVERT_DOMAIN, DOC_MOD_DEBUG_CONVERSION, DOC_PLAN_TASK,
     MOD_DEBUG_CONVERSION, PLAN_TASK,
 };
+use ompas_rae_language::monitor::domain::MOD_DOMAIN;
 use ompas_rae_structs::conversion::context::ConversionContext;
 use ompas_rae_structs::planning::domain::PlanningDomain;
 use ompas_rae_structs::planning::instance::PlanningInstance;
@@ -62,7 +63,7 @@ pub async fn convert_expr(env: &LEnv, expr: &LValue) -> Result<String, LRuntimeE
 
 #[async_scheme_fn]
 pub async fn convert_domain(env: &LEnv) -> Result<String, LRuntimeError> {
-    let ctx = env.get_context::<ModDomain>(MOD_DEBUG_CONVERSION)?;
+    let ctx = env.get_context::<ModDomain>(MOD_DOMAIN)?;
     let context: ConversionContext = ctx.get_conversion_context().await;
     let time = SystemTime::now();
     let pd: PlanningDomain = convert_acting_domain(&context).await?;
@@ -74,7 +75,7 @@ pub async fn convert_domain(env: &LEnv) -> Result<String, LRuntimeError> {
 pub async fn plan_task(env: &LEnv, args: &[LValue]) -> LResult {
     let task: LValue = args.into();
     println!("task to plan: {}", task);
-    let ctx = env.get_context::<ModDomain>(MOD_DEBUG_CONVERSION)?;
+    let ctx = env.get_context::<ModDomain>(MOD_DOMAIN)?;
     let context: ConversionContext = ctx.get_conversion_context().await;
     let pd: PlanningDomain = convert_acting_domain(&context).await?;
 

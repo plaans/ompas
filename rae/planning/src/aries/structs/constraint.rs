@@ -1,7 +1,7 @@
 use crate::aries::structs::expression_chronicle::ExpressionChronicle;
 use crate::aries::structs::interval::Interval;
 use crate::aries::structs::lit::Lit;
-use crate::aries::structs::symbol_table::{AtomId, SymTable};
+use crate::aries::structs::symbol_table::{SymTable, VarId};
 use crate::aries::structs::traits::{FormatWithParent, FormatWithSymTable, GetVariables};
 use crate::aries::structs::type_table::PlanningAtomType;
 use im::HashSet;
@@ -80,7 +80,7 @@ impl Constraint {
 }
 
 impl GetVariables for Constraint {
-    fn get_variables(&self) -> im::HashSet<AtomId> {
+    fn get_variables(&self) -> im::HashSet<VarId> {
         match self {
             Constraint::Leq(l1, l2)
             | Constraint::Eq(l1, l2)
@@ -98,7 +98,7 @@ impl GetVariables for Constraint {
         &self,
         sym_table: &SymTable,
         atom_type: &Option<PlanningAtomType>,
-    ) -> HashSet<AtomId> {
+    ) -> HashSet<VarId> {
         self.get_variables()
             .iter()
             .filter(|v| sym_table.get_type_of(v).unwrap().a_type == *atom_type)

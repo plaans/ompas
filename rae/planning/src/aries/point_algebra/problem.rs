@@ -2,7 +2,7 @@ use crate::aries::point_algebra::relation_type::RelationType::Tautology;
 use crate::aries::point_algebra::relation_type::{RelationType, RelationTypeBit};
 use crate::aries::structs::constraint::Constraint;
 use crate::aries::structs::lit::Lit;
-use crate::aries::structs::symbol_table::{AtomId, SymTable};
+use crate::aries::structs::symbol_table::{SymTable, VarId};
 use crate::aries::structs::traits::FormatWithSymTable;
 use crate::aries::structs::type_table::PlanningAtomType;
 use cli_table::{print_stdout, Cell, Table};
@@ -21,7 +21,7 @@ pub struct Relation<T> {
 pub fn try_into_pa_relation(
     constraint: &Constraint,
     sym_table: &SymTable,
-) -> lruntimeerror::Result<Relation<AtomId>> {
+) -> lruntimeerror::Result<Relation<VarId>> {
     let relation_type = match constraint {
         Constraint::Eq(_, _) => RelationType::Eq,
         Constraint::Leq(_, _) => RelationType::LEq,
@@ -61,8 +61,8 @@ impl<T> Relation<T> {
     }
 }
 
-impl From<&Relation<AtomId>> for Constraint {
-    fn from(r: &Relation<AtomId>) -> Self {
+impl From<&Relation<VarId>> for Constraint {
+    fn from(r: &Relation<VarId>) -> Self {
         match &r.relation_type {
             RelationType::Eq => Constraint::Eq(r.i.into(), r.j.into()),
             RelationType::GT => Constraint::Lt(r.j.into(), r.i.into()),

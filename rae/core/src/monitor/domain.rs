@@ -18,7 +18,7 @@ use sompas_language::kind::*;
 use sompas_language::predicate::*;
 use sompas_macros::*;
 use sompas_structs::kindlvalue::KindLValue;
-use sompas_structs::lenv::LEnv;
+use sompas_structs::lenv::{LEnv, LEnvSymbols};
 use sompas_structs::lmodule::{InitScheme, LModule};
 use sompas_structs::lprimitives::LPrimitives;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
@@ -53,7 +53,10 @@ impl ModDomain {
         let state: WorldStateSnapshot = self.state.get_snapshot().await;
         let lattice = state.instance.lattice.get_lattice().await;
         let domain: OMPASDomain = self.domain.read().await.clone();
-        ConversionContext::new(domain, lattice, state, self.empty_env.clone())
+        let env_symbols: LEnvSymbols = self.domain.read().await.get_convert_env();
+        let mut env = self.empty_env.clone();
+        env.set_new_top_symbols(env_symbols);
+        ConversionContext::new(domain, lattice, state, env)
     }
 }
 
@@ -270,12 +273,11 @@ pub async fn add_state_function(
     Ok(())
 }
 
-async fn create_model(env: &mut LEnv, model: im::HashMap<LValue, LValue>) -> LResult {
-    let lattice: RefTypeLattice = env
-        .get_context::<ModDomain>(MOD_DOMAIN)?
-        .state
-        .get_ref_lattice()
-        .await;
+async fn create_model(env: &LEnv, model: im::HashMap<LValue, LValue>) -> LResult {
+    let ctx = env.get_context::<ModDomain>(MOD_DOMAIN)?;
+
+    let lattice: RefTypeLattice = ctx.state.get_ref_lattice().await;
+    let env = &mut ctx.get_empty_env();
     let model_type: ModelType = model
         .get(&MODEL_TYPE.into())
         .unwrap()
@@ -372,7 +374,7 @@ pub async fn add_command(
             command.get_label(),
             {
                 let mut str = String::new();
-                for p in params_list {
+                for p in &params_list {
                     str.push_str(p.as_str());
                     str.push(' ');
                 }
@@ -386,6 +388,29 @@ pub async fn add_command(
     let exec = eval(&expand(&lv_exec, true, &mut env).await?, &mut env, None).await?;
 
     command.set_body(exec);
+
+    let lv_convert: LValue = parse(
+        &format!(
+            "(lambda {} (exec-command '{} {}))",
+            params,
+            command.get_label(),
+            {
+                let mut str = String::new();
+                for p in &params_list {
+                    str.push_str(p.as_str());
+                    str.push(' ');
+                }
+                str
+            }
+        ),
+        &mut env,
+    )
+    .await?;
+
+    let convert_model = eval(&expand(&lv_convert, true, &mut env).await?, &mut env, None).await?;
+
+    command.set_convert_model(convert_model);
+
     let lv_model: LValue = match map.get(&MODEL.into()) {
         None => parse(&format!("(lambda {} nil)", params), &mut env).await?,
         Some(model) => parse(&format!("(lambda {} {})", params, model), &mut env).await?,
@@ -417,9 +442,8 @@ pub async fn add_command_model(
     model: im::HashMap<LValue, LValue>,
 ) -> Result<(), LRuntimeError> {
     let ctx = env.get_context::<ModDomain>(MOD_DOMAIN)?;
-    let mut env = ctx.get_empty_env();
     let label: String = model.get(&NAME.into()).unwrap().try_into()?;
-    let model = create_model(&mut env, model).await?;
+    let model = create_model(&env, model).await?;
     ctx.domain.write().await.add_command_model(label, model)?;
     Ok(())
 }
@@ -488,9 +512,8 @@ pub async fn add_task_model(
     model: im::HashMap<LValue, LValue>,
 ) -> Result<(), LRuntimeError> {
     let ctx = env.get_context::<ModDomain>(MOD_DOMAIN)?;
-    let mut env = ctx.get_empty_env();
     let label: String = model.get(&NAME.into()).unwrap().try_into()?;
-    let model = create_model(&mut env, model).await?;
+    let model = create_model(&env, model).await?;
     ctx.domain.write().await.add_task_model(label, model)?;
     Ok(())
 }

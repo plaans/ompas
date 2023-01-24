@@ -5,13 +5,14 @@ use ompas_rae_structs::conversion::chronicle::effect::Effect;
 use ompas_rae_structs::conversion::chronicle::subtask::SubTask;
 use ompas_rae_structs::conversion::chronicle::task_template::TaskTemplate;
 use ompas_rae_structs::conversion::chronicle::template::{ChronicleKind, ChronicleTemplate};
-use ompas_rae_structs::conversion::chronicle::{GetVariables, Replace};
 use ompas_rae_structs::conversion::flow_graph::flow::{FlowId, FlowKind};
 use ompas_rae_structs::conversion::flow_graph::graph::FlowGraph;
 use ompas_rae_structs::sym_table::computation::Computation;
 use ompas_rae_structs::sym_table::domain::basic_type::BasicType::Boolean;
 use ompas_rae_structs::sym_table::lit::Lit;
+use ompas_rae_structs::sym_table::r#trait::{GetVariables, Replace};
 use ompas_rae_structs::sym_table::{VarId, COND};
+use sompas_structs::lenv::LEnv;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
@@ -22,14 +23,16 @@ pub fn convert_method(
     ch: Option<ChronicleTemplate>,
     fl: &mut FlowGraph,
     flow: &FlowId,
+    env: &LEnv,
 ) -> Result<ChronicleTemplate, LRuntimeError> {
-    convert_into_chronicle(ch, fl, flow)
+    convert_into_chronicle(ch, fl, flow, env)
 }
 
 pub fn convert_into_chronicle(
     ch: Option<ChronicleTemplate>,
     fl: &mut FlowGraph,
     flow: &FlowId,
+    env: &LEnv,
 ) -> Result<ChronicleTemplate, LRuntimeError> {
     let st = fl.st.clone();
 
@@ -83,12 +86,11 @@ pub fn convert_into_chronicle(
                             fl.get_flow_end(&handle),
                             interval.get_end(),
                         ));
-                        //ch.add_constraint(Constraint::eq(fl.get_flow_result(handle), result));
                         st.union_var(&fl.get_flow_result(&handle), &result);
                     }
                     Lit::Constraint(c) => ch.add_constraint(Constraint::eq(result, c.deref())),
                     Lit::Computation(c) => ch.add_constraint(Constraint::eq(result, c.deref())),
-                    Lit::Apply(app) => ch.add_constraint(Constraint::eq(result, app)),
+                    Lit::Apply(_) => ch.add_constraint(Constraint::eq(result, ass.lit)),
                     Lit::Read(read) => {
                         let condition = Condition {
                             interval,
@@ -142,28 +144,16 @@ pub fn convert_into_chronicle(
                         &fl.get_flow_end(&branching.cond_flow),
                         &fl.get_flow_start(&branching.true_flow),
                     );
-                    st.union_var(
-                        &fl.get_flow_end(&branching.true_flow),
-                        &fl.get_flow_start(&result),
-                    );
-                    st.union_var(
-                        &fl.get_flow_result(&branching.true_flow),
-                        &fl.get_flow_result(&result),
-                    );
+                    st.union_var(&fl.get_flow_end(&branching.true_flow), &end);
+                    st.union_var(&fl.get_flow_result(&branching.true_flow), &result);
                     queue.push(branching.true_flow)
                 } else if cond_domain.is_false() {
                     st.union_var(
                         &fl.get_flow_end(&branching.cond_flow),
                         &fl.get_flow_start(&branching.false_flow),
                     );
-                    st.union_var(
-                        &fl.get_flow_end(&branching.false_flow),
-                        &fl.get_flow_start(&result),
-                    );
-                    st.union_var(
-                        &fl.get_flow_result(&branching.false_flow),
-                        &fl.get_flow_result(&result),
-                    );
+                    st.union_var(&fl.get_flow_end(&branching.false_flow), &end);
+                    st.union_var(&fl.get_flow_result(&branching.false_flow), &result);
                     queue.push(branching.false_flow)
                 } else {
                     let (t_if, m_true, m_false) = ch.st.new_if();
@@ -180,7 +170,7 @@ pub fn convert_into_chronicle(
                         LRuntimeError,
                     > {
                         let mut branch_params: HashMap<VarId, VarId> = Default::default();
-                        let mut method = convert_into_chronicle(None, fl, flow)?;
+                        let mut method = convert_into_chronicle(None, fl, flow, env)?;
                         for v in &method.get_variables() {
                             if let Some(declaration) = st.get_declaration(v) {
                                 //It means the variable has been created before the method, and shall be transformed into a parameter

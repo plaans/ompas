@@ -69,4 +69,8 @@ impl RefTypeLattice {
     pub async fn export_dot(&self) -> String {
         self.0.read().await.export_dot()
     }
+
+    pub fn new() -> Self {
+        RefTypeLattice(Arc::new(RwLock::new(TypeLattice::new())))
+    }
 }

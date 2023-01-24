@@ -1,9 +1,9 @@
 use crate::conversion::chronicle::interval::Interval;
-use crate::conversion::chronicle::{FlatBindings, FormatWithSymTable, GetVariables};
 use crate::conversion::flow_graph::assignment::Assignment;
 use crate::conversion::flow_graph::flow::{BranchingFlow, Flow, FlowId, FlowKind, FlowPause};
 use crate::sym_table::lit::Lit;
 use crate::sym_table::r#ref::RefSymTable;
+use crate::sym_table::r#trait::{FlatBindings, FormatWithSymTable, GetVariables};
 use crate::sym_table::VarId;
 use crate::sym_table::TYPE_RESSOURCE_HANDLE;
 use im::HashSet;
@@ -217,6 +217,8 @@ impl FlowGraph {
         let id = self.flows.len();
         let kind = flow_kind.into();
 
+        let mut vars = vec![result, interval.get_start(), interval.get_end()];
+
         self.st.set_declaration(&result, &interval.get_end());
         let flow = Flow {
             valid: true,
@@ -228,16 +230,7 @@ impl FlowGraph {
 
         match &flow.kind {
             FlowKind::Assignment(v) => {
-                for v in v.get_variables() {
-                    match self.map_atom_id_flow_id.get_mut(&v) {
-                        None => {
-                            self.map_atom_id_flow_id.insert(v, vec![id]);
-                        }
-                        Some(set) => {
-                            set.push(id);
-                        }
-                    };
-                }
+                vars.append(&mut v.get_variables().iter().cloned().collect())
             }
             FlowKind::Seq(seq) => {
                 for f in seq {
@@ -247,24 +240,24 @@ impl FlowGraph {
             FlowKind::Branching(branching) => {
                 self.flows[branching.false_flow].parent = Some(id);
                 self.flows[branching.true_flow].parent = Some(id);
-            } //FlowKind::Result(_, _) => unreachable!(),
-            FlowKind::FlowHandle(h) => {
-                self.flows[*h].parent = Some(id)
-                //
             }
+            FlowKind::FlowHandle(h) => self.flows[*h].parent = Some(id),
             FlowKind::FlowPause(fw) => {
                 if let Some(duration) = fw.duration {
-                    match self.map_atom_id_flow_id.get_mut(&duration) {
-                        None => {
-                            self.map_atom_id_flow_id.insert(duration, vec![id]);
-                        }
-                        Some(set) => {
-                            set.push(id);
-                        }
-                    };
+                    vars.push(duration)
                 }
             }
             FlowKind::FlowResourceHandle(rh) => self.flows[*rh].parent = Some(id),
+        }
+        for v in vars {
+            match self.map_atom_id_flow_id.get_mut(&v) {
+                None => {
+                    self.map_atom_id_flow_id.insert(v, vec![id]);
+                }
+                Some(set) => {
+                    set.push(id);
+                }
+            };
         }
         self.flows.push(flow.into());
         id

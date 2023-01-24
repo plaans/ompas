@@ -9,10 +9,19 @@ use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalues::LValueS;
 use std::collections::{HashMap, HashSet};
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Debug)]
 pub struct InstanceCollection {
     pub lattice: RefTypeLattice,
     pub inner: HashMap<String, HashSet<String>>,
+}
+
+impl Default for InstanceCollection {
+    fn default() -> Self {
+        Self {
+            lattice: RefTypeLattice::new(),
+            inner: Default::default(),
+        }
+    }
 }
 
 impl From<InstanceCollection> for PartialState {

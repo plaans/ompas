@@ -1,5 +1,5 @@
 use crate::aries::structs::constraint::Constraint;
-use crate::aries::structs::symbol_table::{AtomId, SymTable};
+use crate::aries::structs::symbol_table::{SymTable, VarId};
 use crate::aries::structs::traits::{FormatWithParent, FormatWithSymTable, GetVariables};
 use crate::aries::structs::type_table::PlanningAtomType;
 use im::{hashset, HashSet};
@@ -13,7 +13,7 @@ use std::ops::Deref;
 
 #[derive(Clone, Debug)]
 pub enum Lit {
-    Atom(AtomId),
+    Atom(VarId),
     Constraint(Box<Constraint>),
     Exp(Vec<Lit>),
 }
@@ -30,7 +30,7 @@ impl Lit {
     }
 }
 
-impl TryFrom<Lit> for AtomId {
+impl TryFrom<Lit> for VarId {
     type Error = LRuntimeError;
 
     fn try_from(value: Lit) -> Result<Self, Self::Error> {
@@ -38,7 +38,7 @@ impl TryFrom<Lit> for AtomId {
     }
 }
 
-impl TryFrom<&Lit> for AtomId {
+impl TryFrom<&Lit> for VarId {
     type Error = LRuntimeError;
 
     fn try_from(value: &Lit) -> Result<Self, Self::Error> {
@@ -49,7 +49,7 @@ impl TryFrom<&Lit> for AtomId {
     }
 }
 
-impl TryFrom<&Lit> for Vec<AtomId> {
+impl TryFrom<&Lit> for Vec<VarId> {
     type Error = LRuntimeError;
 
     fn try_from(value: &Lit) -> Result<Self, Self::Error> {
@@ -59,7 +59,7 @@ impl TryFrom<&Lit> for Vec<AtomId> {
             Lit::Exp(l) => {
                 let mut e = vec![];
                 for a in l {
-                    e.push(AtomId::try_from(a)?);
+                    e.push(VarId::try_from(a)?);
                 }
                 Ok(e)
             }
@@ -67,7 +67,7 @@ impl TryFrom<&Lit> for Vec<AtomId> {
     }
 }
 
-impl TryFrom<Lit> for Vec<AtomId> {
+impl TryFrom<Lit> for Vec<VarId> {
     type Error = LRuntimeError;
 
     fn try_from(value: Lit) -> Result<Self, Self::Error> {
@@ -109,14 +109,14 @@ impl Default for Lit {
     }
 }
 
-impl From<&AtomId> for Lit {
-    fn from(s: &AtomId) -> Self {
+impl From<&VarId> for Lit {
+    fn from(s: &VarId) -> Self {
         Self::Atom(*s)
     }
 }
 
-impl From<AtomId> for Lit {
-    fn from(s: AtomId) -> Self {
+impl From<VarId> for Lit {
+    fn from(s: VarId) -> Self {
         s.borrow().into()
     }
 }
@@ -207,12 +207,12 @@ impl FormatWithParent for Lit {
 }
 
 impl GetVariables for Lit {
-    fn get_variables(&self) -> HashSet<AtomId> {
+    fn get_variables(&self) -> HashSet<VarId> {
         match self {
             Lit::Atom(a) => hashset!(*a),
             Lit::Constraint(c) => c.get_variables(),
             Lit::Exp(vec) => {
-                let mut hashset: im::HashSet<AtomId> = Default::default();
+                let mut hashset: im::HashSet<VarId> = Default::default();
                 for e in vec {
                     hashset = hashset.union(e.get_variables())
                 }
@@ -225,7 +225,7 @@ impl GetVariables for Lit {
         &self,
         sym_table: &SymTable,
         atom_type: &Option<PlanningAtomType>,
-    ) -> HashSet<AtomId> {
+    ) -> HashSet<VarId> {
         self.get_variables()
             .iter()
             .filter(|v| sym_table.get_type_of(v).unwrap().a_type == *atom_type)

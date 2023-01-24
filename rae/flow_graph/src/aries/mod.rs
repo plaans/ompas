@@ -21,7 +21,6 @@ use aries_utils::input::Sym;
 use ompas_rae_language::exec::state::{INSTANCE, INSTANCES};
 use ompas_rae_structs::conversion::chronicle::constraint::Constraint;
 use ompas_rae_structs::conversion::chronicle::template::ChronicleTemplate;
-use ompas_rae_structs::conversion::chronicle::{FormatWithSymTable, GetVariables};
 use ompas_rae_structs::planning::problem::PlanningProblem;
 use ompas_rae_structs::state::partial_state::PartialState;
 use ompas_rae_structs::state::world_state::WorldStateSnapshot;
@@ -33,6 +32,7 @@ use ompas_rae_structs::sym_table::domain::type_lattice::TypeLattice;
 use ompas_rae_structs::sym_table::domain::Domain;
 use ompas_rae_structs::sym_table::lit::Lit;
 use ompas_rae_structs::sym_table::r#ref::RefSymTable;
+use ompas_rae_structs::sym_table::r#trait::{FormatWithSymTable, GetVariables};
 use ompas_rae_structs::sym_table::{
     VarId, MAX_Q, QUANTITY, TYPE_ABSTRACT_TASK, TYPE_COMMAND, TYPE_METHOD, TYPE_OBJECT,
     TYPE_OBJECT_TYPE, TYPE_PREDICATE, TYPE_PRESENCE, TYPE_STATE_FUNCTION, TYPE_TASK,

@@ -1,7 +1,7 @@
 use crate::sym_table::domain::basic_type::BasicType::*;
 use crate::sym_table::domain::basic_type::TYPE_ID_EMPTY;
 use crate::sym_table::domain::simple_type::SimpleType;
-use crate::sym_table::domain::Domain::{Composed, Cst, Simple, Substract, Union};
+use crate::sym_table::domain::Domain::{Application, Composed, Cst, Simple, Substract, Union};
 use crate::sym_table::domain::{Domain, TypeId};
 use crate::sym_table::*;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -241,6 +241,23 @@ impl TypeLattice {
 
             (Cst(d1, _), t2) => self.contained_in(d1, t2),
             (_, Cst(_, _)) => false,
+            (Application(t1, params_1, r_1), Application(t2, params_2, r_2)) => {
+                if self.contained_in(t1, t2) {
+                    if params_1.len() == params_2.len() {
+                        for (p_1, p_2) in params_1.iter().zip(params_2) {
+                            if !self.contained_in(p_1, p_2) {
+                                return false;
+                            }
+                        }
+                        self.contained_in(r_1, r_2)
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            }
+            _ => false,
         }
     }
 
@@ -357,6 +374,19 @@ impl TypeLattice {
                     Empty.into()
                 }
             }
+            (Application(t1, params_1, r_1), Application(t2, params_2, r_2)) => {
+                todo!()
+            }
+            (Application(t_app, params, r), Simple(t2))
+            | (Simple(t2), Application(t_app, params, r)) => {
+                let t = self.__meet(t_app, &Simple(*t2));
+                if t.is_empty() {
+                    t
+                } else {
+                    Application(Box::new(t), params.clone(), r.clone())
+                }
+            }
+            _ => todo!(),
         }
     }
 
@@ -516,6 +546,7 @@ impl TypeLattice {
                         Union(vec![t1.clone(), t2.clone()])
                     }
                 }
+                _ => todo!(),
             }
         }
     }
@@ -607,6 +638,7 @@ impl TypeLattice {
                 }
                 //(t1, Substract(t2, t3)) => Substract(Box::new(self.__union(t1, t2)), t3.clone()),
                 _ => Substract(Box::new(t1.clone()), Box::new(meet)),
+                _ => todo!(),
             }
         }
     }

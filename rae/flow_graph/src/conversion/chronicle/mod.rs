@@ -9,6 +9,7 @@ use ompas_rae_structs::conversion::flow_graph::flow::{FlowId, FlowKind};
 use ompas_rae_structs::conversion::flow_graph::graph::FlowGraph;
 use ompas_rae_structs::sym_table::computation::Computation;
 use ompas_rae_structs::sym_table::domain::basic_type::BasicType::Boolean;
+use ompas_rae_structs::sym_table::domain::Domain;
 use ompas_rae_structs::sym_table::lit::Lit;
 use ompas_rae_structs::sym_table::r#trait::{GetVariables, Replace};
 use ompas_rae_structs::sym_table::{VarId, COND};
@@ -98,6 +99,22 @@ pub fn convert_into_chronicle(
                             value: result,
                         };
 
+                        let sf = read[0];
+                        let d = st.get_domain_of_var(&sf);
+                        if let Domain::Cst(t, _) = d {
+                            if let Domain::Application(_, types, r) = t.deref() {
+                                //println!("setting types");
+                                let mut types = types.clone();
+                                types.push(*r.clone());
+                                for (f, t) in read[1..].iter().zip(types) {
+                                    let r = fl.st.get_domain_id(&f);
+                                    if !fl.st.set_domain(&r, t).is_none() {
+                                        panic!("brrruuuuuh")
+                                    };
+                                }
+                            }
+                        }
+
                         ch.add_condition(condition);
                     }
                     Lit::Write(write) => {
@@ -108,6 +125,22 @@ pub fn convert_into_chronicle(
                             sv,
                             value,
                         };
+
+                        let sf = write[0];
+                        let d = st.get_domain_of_var(&sf);
+                        if let Domain::Cst(t, _) = d {
+                            if let Domain::Application(_, types, r) = t.deref() {
+                                //println!("setting types");
+                                let mut types = types.clone();
+                                types.push(*r.clone());
+                                for (f, t) in write[1..].iter().zip(types) {
+                                    let r = fl.st.get_domain_id(&f);
+                                    if !fl.st.set_domain(&r, t).is_none() {
+                                        panic!("brrruuuuuh")
+                                    };
+                                }
+                            }
+                        }
 
                         ch.add_effect(effect);
 
@@ -120,6 +153,22 @@ pub fn convert_into_chronicle(
                             lit: exec.into(),
                             result,
                         };
+
+                        let task = exec[0];
+                        let d = st.get_domain_of_var(&task);
+                        if let Domain::Cst(t, _) = d {
+                            if let Domain::Application(_, types, r) = t.deref() {
+                                //println!("setting types");
+                                let mut types = types.clone();
+                                types.push(*r.clone());
+                                for (f, t) in exec[1..].iter().zip(types) {
+                                    let r = fl.st.get_domain_id(&f);
+                                    if !fl.st.set_domain(&r, t).is_none() {
+                                        panic!("brrruuuuuh")
+                                    };
+                                }
+                            }
+                        }
 
                         ch.add_subtask(subtask);
                         /*let subtask_result = ch.sym_table.new_nil();

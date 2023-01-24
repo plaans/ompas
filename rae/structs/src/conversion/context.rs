@@ -1,6 +1,7 @@
 use crate::acting_domain::OMPASDomain;
 use crate::state::world_state::WorldStateSnapshot;
 use crate::sym_table::domain::type_lattice::TypeLattice;
+use crate::sym_table::domain::Domain;
 use crate::sym_table::r#ref::RefSymTable;
 use crate::sym_table::*;
 use sompas_structs::lenv::LEnv;
@@ -21,20 +22,40 @@ impl ConversionContext {
     ) -> Self {
         let mut st = SymTable::new_from(lattice);
 
-        for command in domain.commands.keys() {
-            st.new_constant_symbol(command, st.get_type_as_domain(TYPE_COMMAND));
+        for command in domain.commands.values() {
+            let domain = Domain::Application(
+                Box::new(st.get_type_as_domain(TYPE_COMMAND)),
+                command.get_parameters().get_type_domain(),
+                Box::new(Domain::nil()),
+            );
+            st.new_constant_symbol(command.get_label(), domain);
         }
 
-        for task in domain.tasks.keys() {
-            st.new_constant_symbol(task, st.get_type_as_domain(TYPE_ABSTRACT_TASK));
+        for task in domain.tasks.values() {
+            let domain = Domain::Application(
+                Box::new(st.get_type_as_domain(TYPE_ABSTRACT_TASK)),
+                task.get_parameters().get_type_domain(),
+                Box::new(Domain::nil()),
+            );
+            st.new_constant_symbol(task.get_label(), domain);
         }
 
-        for method in domain.methods.keys() {
-            st.new_constant_symbol(method, st.get_type_as_domain(TYPE_METHOD));
+        for method in domain.methods.values() {
+            let domain = Domain::Application(
+                Box::new(st.get_type_as_domain(TYPE_ABSTRACT_TASK)),
+                method.get_parameters().get_type_domain(),
+                Box::new(Domain::nil()),
+            );
+            st.new_constant_symbol(method.get_label(), domain);
         }
 
-        for sf in domain.state_functions.keys() {
-            st.new_constant_symbol(sf, st.get_type_as_domain(TYPE_STATE_FUNCTION));
+        for sf in domain.state_functions.values() {
+            let domain = Domain::Application(
+                Box::new(st.get_type_as_domain(TYPE_STATE_FUNCTION)),
+                sf.parameters.get_type_domain(),
+                Box::new(sf.result.clone()),
+            );
+            st.new_constant_symbol(sf.get_label(), domain);
         }
 
         for (t, instances) in state.instance.inner.iter() {

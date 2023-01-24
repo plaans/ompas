@@ -15,7 +15,9 @@ use ompas_rae_structs::sym_table::computation::Computation;
 use ompas_rae_structs::sym_table::domain::basic_type::BasicType::{Boolean, True};
 use ompas_rae_structs::sym_table::domain::Domain;
 use ompas_rae_structs::sym_table::lit::Lit;
-use ompas_rae_structs::sym_table::{closure, VarId, TYPE_RESSOURCE_HANDLE};
+use ompas_rae_structs::sym_table::{
+    closure, VarId, TYPE_OBJECT, TYPE_OBJECT_TYPE, TYPE_RESSOURCE_HANDLE,
+};
 use sompas_language::basic_math::{ADD, EQ, GEQ, GT, LEQ, LT, NEQ, NOT, NOT_SHORT, SUB};
 use sompas_language::error::IS_ERR;
 use sompas_language::time::SLEEP;
@@ -24,6 +26,7 @@ use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use std::collections::HashMap;
 use std::fmt::Display;
+use std::ops::Deref;
 
 pub const RESSOURCE_HANDLE: &str = "ressource-handle";
 
@@ -374,11 +377,16 @@ fn convert_release(fl: &mut FlowGraph, seq: Vec<FlowId>) -> Result<FlowId, LRunt
 }
 
 fn convert_instance(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
-    let args: Vec<VarId> = seq[..2].iter().map(|f| fl.get_flow_result(f)).collect();
+    let results: Vec<VarId> = seq.iter().map(|f| fl.get_flow_result(f)).collect();
+    fl.st
+        .set_domain(&results[1], fl.st.get_type_as_domain(TYPE_OBJECT));
+    fl.st
+        .set_domain(&results[2], fl.st.get_type_as_domain(TYPE_OBJECT_TYPE));
+    let args = results[..2].to_vec();
     let flow_read = fl.new_instantaneous_assignment(Lit::Read(args));
     let flow_equal = fl.new_instantaneous_assignment(Lit::constraint(Constraint::eq(
         fl.get_flow_result(&flow_read),
-        fl.get_flow_result(&seq[2]),
+        results[2],
     )));
     seq.push(flow_read);
     seq.push(flow_equal);

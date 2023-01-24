@@ -21,6 +21,7 @@ pub enum Domain {
     Union(Vec<Domain>),
     Substract(Box<Domain>, Box<Domain>),
     Cst(Box<Domain>, cst::Cst),
+    Application(Box<Domain>, Vec<Domain>, Box<Domain>),
 }
 
 impl Domain {
@@ -56,6 +57,17 @@ impl Domain {
             Cst(t, c) => {
                 format!("{}[{c}]", t.format(dc))
             }
+            Application(t, params, r) => {
+                let mut str = "(".to_string();
+                for (i, d) in params.iter().enumerate() {
+                    if i != 0 {
+                        str.push(',');
+                    }
+                    write!(str, "{}", d.format(dc)).unwrap();
+                }
+                str.push(')');
+                format!("{}:{str} -> {}", t.format(dc), r.format(dc))
+            }
         }
     }
 
@@ -68,6 +80,10 @@ impl Domain {
 
     pub fn is_empty(&self) -> bool {
         self == &Simple(0)
+    }
+
+    pub fn is_application(&self) -> bool {
+        matches!(self, Self::Application(_, _, _))
     }
 
     pub fn is_any(&self) -> bool {
@@ -129,6 +145,17 @@ impl Display for Domain {
             }
             Cst(t, c) => {
                 write!(f, "{t}[{c}]")
+            }
+            Application(t, params, r) => {
+                let mut str = "(".to_string();
+                for (i, d) in params.iter().enumerate() {
+                    if i != 0 {
+                        str.push(',');
+                    }
+                    write!(str, "{d}")?;
+                }
+                str.push(')');
+                write!(f, "{t}:{str} -> {r}")
             }
         }
     }

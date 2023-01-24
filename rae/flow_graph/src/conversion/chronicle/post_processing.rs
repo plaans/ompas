@@ -21,10 +21,10 @@ const TRY_EVAL_APPLY: &str = "try_eval_apply";
 pub fn post_processing(c: &mut ChronicleTemplate, env: LEnv) -> Result<(), LRuntimeError> {
     c.st.flat_bindings();
     simplify_timepoints(c)?;
-    rm_useless_var(c);
     merge_conditions(c)?;
     try_eval_apply(c, env)?;
     simplify_constraints(c)?;
+    rm_useless_var(c);
     Ok(())
 }
 
@@ -170,14 +170,7 @@ pub fn simplify_constraints(c: &mut ChronicleTemplate) -> Result<(), LRuntimeErr
                             LRuntimeError::new("", "");
                         }
                     }
-                    (Lit::Atom(a), Lit::Constraint(b)) => {
-                        if st
-                            .contained_in_domain(&st.get_domain_of_var(&a), &BasicType::True.into())
-                        {
-                            vec.push((i, b.deref().clone()));
-                        }
-                    }
-                    (Lit::Constraint(b), Lit::Atom(a)) => {
+                    (Lit::Atom(a), Lit::Constraint(b)) | (Lit::Constraint(b), Lit::Atom(a)) => {
                         if st
                             .contained_in_domain(&st.get_domain_of_var(&a), &BasicType::True.into())
                         {

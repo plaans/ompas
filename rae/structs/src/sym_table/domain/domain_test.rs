@@ -34,6 +34,7 @@ pub enum DomainTest {
     Primitive,
     Fn,
     Lambda,
+    Application(Box<DomainTest>, Vec<DomainTest>, Box<DomainTest>),
 }
 
 impl From<i64> for DomainTest {
@@ -141,6 +142,17 @@ impl Display for DomainTest {
             Primitive => write!(f, "primitive"),
             Fn => write!(f, "fn"),
             Lambda => write!(f, "lambda"),
+            Application(t, params, r) => {
+                let mut str = "(".to_string();
+                for (i, d) in params.iter().enumerate() {
+                    if i != 0 {
+                        str.push(',');
+                    }
+                    write!(str, "{d}")?;
+                }
+                str.push(')');
+                write!(f, "{t}:{str} -> {r}")
+            }
         }
     }
 }
@@ -256,6 +268,14 @@ impl DomainTest {
                 Box::new(DomainTest::from_domain(dc, t2)),
             ),
             Domain::Cst(t, c) => Cst(Box::new(DomainTest::from_domain(dc, t)), c.clone()),
+            Domain::Application(t, params, r) => Application(
+                Box::new(DomainTest::from_domain(dc, t)),
+                params
+                    .iter()
+                    .map(|t| DomainTest::from_domain(dc, t))
+                    .collect(),
+                Box::new(DomainTest::from_domain(dc, r)),
+            ),
         }
     }
 

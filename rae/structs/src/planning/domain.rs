@@ -43,7 +43,7 @@ impl Display for PlanningDomain {
         }
 
         write!(f, "# COMMAND TEMPLATES: \n\n")?;
-        for (id, command) in self.methods.iter().enumerate() {
+        for (id, command) in self.commands.iter().enumerate() {
             write!(
                 f,
                 "#{}\n\

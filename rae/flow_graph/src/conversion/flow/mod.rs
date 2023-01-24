@@ -45,13 +45,21 @@ pub fn convert_lv(
 }
 
 fn convert_symbol(symbol: &Arc<String>, fl: &mut FlowGraph, define_table: &DefineTable) -> FlowId {
-    match define_table.get(symbol.as_str()) {
+    let var_id = match define_table.get(symbol.as_str()) {
         None => {
             let id = fl.st.new_symbol(symbol);
-            fl.new_instantaneous_assignment(Lit::Atom(id)).into()
+            id
         }
-        Some(r) => fl.new_instantaneous_assignment(Lit::Atom(*r)).into(),
-    }
+        Some(r) => *r,
+    };
+
+    let f_id: FlowId = fl.new_instantaneous_assignment(Lit::Atom(var_id)).into();
+
+    //let r = fl.get_flow_result(&f_id);
+
+    //fl.st.union_var(&r, &var_id);
+
+    f_id
 }
 
 fn convert_string(_: &Arc<String>, _: &mut FlowGraph) -> FlowId {
@@ -61,17 +69,26 @@ fn convert_string(_: &Arc<String>, _: &mut FlowGraph) -> FlowId {
 
 fn convert_number(number: &LNumber, fl: &mut FlowGraph) -> FlowId {
     let id = fl.st.new_number(number);
-    fl.new_instantaneous_assignment(Lit::Atom(id))
+    let f_id = fl.new_instantaneous_assignment(Lit::Atom(id));
+    //let r = fl.get_flow_result(&f_id);
+    //fl.st.union_var(&r, &id);
+    f_id
 }
 
 fn convert_bool(bool: bool, fl: &mut FlowGraph) -> FlowId {
     let id = fl.st.new_bool(bool);
-    fl.new_instantaneous_assignment(Lit::Atom(id))
+    let f_id = fl.new_instantaneous_assignment(Lit::Atom(id));
+    //let r = fl.get_flow_result(&f_id);
+    //fl.st.union_var(&r, &id);
+    f_id
 }
 
 fn convert_nil(fl: &mut FlowGraph) -> FlowId {
     let id = fl.st.new_nil();
-    fl.new_instantaneous_assignment(Lit::Atom(id))
+    let f_id = fl.new_instantaneous_assignment(Lit::Atom(id));
+    //let r = fl.get_flow_result(&f_id);
+    //fl.st.union_var(&r, &id);
+    f_id
 }
 
 fn convert_core_operator(_: &LPrimitives, _: &mut FlowGraph) -> FlowId {

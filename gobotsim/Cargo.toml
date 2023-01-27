@@ -15,10 +15,10 @@ ompas-utils = {path = "../utils"}
 ompas-middleware = {path = "../middleware"}
 sompas-language= {path = "../scheme/language"}
 sompas-macros = {path = "../scheme/macros"}
-ompas-rae-core = {path = "../rae/core"}
-ompas-rae-structs = {path = "../rae/structs"}
-ompas-rae-interface = {path = "../rae/interface"}
-ompas-rae-language = {path = "../rae/language"}
+ompas-core = {path = "../acting/core"}
+ompas-structs = {path = "../acting/structs"}
+ompas-interface = {path = "../acting/interface"}
+ompas-language = {path = "../acting/language"}
 aries_planning = {path = "../aries/planning"}
 im = "15.0.0"
 structopt = { version = "0.3", default-features = false }

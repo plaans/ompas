@@ -1,0 +1,31 @@
+[package]
+name = "ompas-core"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+sompas-structs = {path = "../../scheme/structs"}
+sompas-modules = {path = "../../scheme/modules"}
+sompas-core = {path = "../../scheme/core"}
+sompas-language = {path = "../../scheme/language"}
+sompas-macros = {path = "../../scheme/macros"}
+
+ompas-utils = {path= "../../utils" }
+ompas-structs= {path = "../structs"}
+ompas-interface = {path = "../interface"}
+ompas-flow-graph = {path = "../flow_graph"}
+ompas-language = {path = "../language"}
+#ompas-rae-log = {path = "../log"}
+tokio = { version = "1.17.0", features = ["full", "time"] }
+im = "15.0.0"
+chrono = "0.4.19"
+macro_rules_attribute = "0.0.2"
+async-trait = "0.1.51"
+aries_planning = {path = "../../aries/planning"}
+rand = "0.8.5"
+itertools = { default-features = false, version = "0.10" }
+futures = "0.3.17"
+ompas-middleware = {path = "../../middleware"}
+map-macro = "0.2.4"

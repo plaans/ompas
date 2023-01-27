@@ -129,7 +129,7 @@ impl Error for LRuntimeError {}
 
 impl Display for LRuntimeError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        writeln!(f, "message: {}", self.message).expect("");
+        writeln!(f, "message:\n{}", self.message).expect("");
         writeln!(f, "\nbacktrace:").expect("");
         for a in &self.backtrace {
             writeln!(f, "- from {}", a).expect("");

@@ -4,7 +4,7 @@
     (t1 t2 truck)
     (s l1 l2 l3 l4 l5 l6 l7 e location))
 
-  (def-initial-state
+  (def-facts
     ((at t1) s)
     ((at t2) s)
     ((connected s l1) yes)

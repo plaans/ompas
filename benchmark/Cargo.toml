@@ -10,12 +10,12 @@ default-run = "bench"
 [dependencies]
 sompas-modules = {path = "../scheme/modules"}
 sompas-repl = {path = "../scheme/repl"}
-ompas-rae-core = {path = "../rae/core"}
-ompas-rae-structs = {path = "../rae/structs"}
+ompas-core = {path = "../acting/core"}
+ompas-structs = {path = "../acting/structs"}
 ompas-gobotsim = {path = "../gobotsim"}
-ompas-rae-language = {path = "../rae/language"}
+ompas-language = {path = "../acting/language"}
 ompas-middleware = {path = "../middleware"}
-ompas-rae-interface = {path = "../rae/interface"}
+ompas-interface = {path = "../acting/interface"}
 
 
 tokio = { version = "1.17.0", features = ["full", "time"] }

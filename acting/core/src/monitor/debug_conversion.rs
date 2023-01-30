@@ -1,12 +1,12 @@
 use crate::monitor::domain::ModDomain;
-use ompas_flow_graph::aries::solver::run_solver_for_htn;
-use ompas_flow_graph::aries::{generate_chronicles, generate_templates, solver};
-use ompas_flow_graph::conversion::convert_acting_domain;
 use ompas_language::monitor::debug_conversion::{
     CONVERT_DOMAIN, DOC_CONVERT_DOMAIN, DOC_MOD_DEBUG_CONVERSION, DOC_PLAN_TASK,
     MOD_DEBUG_CONVERSION, PLAN_TASK,
 };
 use ompas_language::monitor::domain::MOD_DOMAIN;
+use ompas_planning::aries::solver::run_solver_for_htn;
+use ompas_planning::aries::{generate_chronicles, solver};
+use ompas_planning::conversion::convert_acting_domain;
 use ompas_structs::conversion::context::ConversionContext;
 use ompas_structs::planning::domain::PlanningDomain;
 use ompas_structs::planning::instance::PlanningInstance;

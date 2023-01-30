@@ -1,11 +1,11 @@
 use crate::exec::refinement::greedy_select;
 use crate::exec::task::ModTask;
 use crate::exec::ModExec;
-use ompas_flow_graph::aries::solver::run_solver_for_htn;
-use ompas_flow_graph::aries::{generate_templates, solver};
 use ompas_language::exec::aries::*;
 use ompas_language::exec::task::MOD_TASK;
 use ompas_middleware::logger::LogClient;
+use ompas_planning::aries::solver::run_solver_for_htn;
+use ompas_planning::aries::{generate_templates, solver};
 use ompas_structs::acting_domain::OMPASDomain;
 use ompas_structs::agenda::Agenda;
 use ompas_structs::plan::AbstractTaskInstance;

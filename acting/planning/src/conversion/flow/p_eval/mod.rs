@@ -1,5 +1,8 @@
-use crate::{expand_quasi_quote, get_debug, parse_into_lvalue};
+pub mod r#struct;
+
+use crate::conversion::flow::p_eval::r#struct::PLValue;
 use anyhow::anyhow;
+use sompas_core::{expand_quasi_quote, get_debug, parse_into_lvalue};
 use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::llambda::{LLambda, LambdaArgs};
@@ -8,7 +11,6 @@ use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::{lruntimeerror, wrong_type};
 use std::convert::{TryFrom, TryInto};
-use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -16,70 +18,11 @@ pub const EVAL_STATIC: &str = "eval-static";
 pub const EXPAND_STATIC: &str = "expand-static";
 pub const PARSE_STATIC: &str = "parse_static";
 
-#[derive(Clone, Debug)]
-pub struct PLValue {
-    lvalue: LValue,
-    pure: bool,
-}
-
-pub struct PEnv {}
-
-impl PLValue {
-    pub fn is_pure(&self) -> bool {
-        self.pure
-    }
-}
-
-impl PLValue {
-    pub fn get_lvalue(&self) -> &LValue {
-        &self.lvalue
-    }
-}
-
-impl PLValue {
-    pub fn into_pure(lv: &LValue) -> PLValue {
-        PLValue {
-            lvalue: lv.clone(),
-            pure: true,
-        }
-    }
-
-    pub fn into_unpure(lv: &LValue) -> PLValue {
-        PLValue {
-            lvalue: lv.clone(),
-            pure: false,
-        }
-    }
-}
-
-impl Default for PLValue {
-    fn default() -> Self {
-        Self {
-            lvalue: LValue::Nil,
-            pure: true,
-        }
-    }
-}
-
-impl Display for PLValue {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.lvalue)
-    }
-}
-
-impl From<PLValue> for LValue {
-    fn from(pl: PLValue) -> Self {
-        pl.lvalue
-    }
-}
-
-impl From<&PLValue> for LValue {
-    fn from(pl: &PLValue) -> Self {
-        pl.clone().into()
-    }
-}
-
-pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::Result<PLValue> {
+pub fn expand_static(
+    x: &LValue,
+    top_level: bool,
+    env: &mut LEnv,
+) -> lruntimeerror::Result<PLValue> {
     match x {
         LValue::List(list) => {
             if let Ok(co) = LPrimitives::try_from(&list[0]) {
@@ -104,7 +47,7 @@ pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::R
                                     let mut new_body = vec![LPrimitives::DefLambda.into()];
                                     new_body.append(&mut args.to_vec());
                                     new_body.append(&mut body.to_vec());
-                                    return p_expand(
+                                    return expand_static(
                                         &vec![def.into(), f.clone(), new_body.into()].into(),
                                         top_level,
                                         env,
@@ -119,7 +62,7 @@ pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::R
                                         3..3,
                                     ));
                                 }
-                                let exp = p_expand(&list[2], top_level, env)?;
+                                let exp = expand_static(&list[2], top_level, env)?;
                                 if !exp.is_pure() {
                                     return Ok(PLValue::into_unpure(x));
                                 }
@@ -131,7 +74,7 @@ pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::R
                                             format!("{}: defmacro only allowed at top level", x)
                                         ));
                                     }
-                                    let proc = p_eval(&exp.into(), &mut env.clone())?;
+                                    let proc = eval_static(&exp.into(), &mut env.clone())?;
                                     //println!("new macro: {}", proc);
                                     if !matches!(proc.lvalue, LValue::Lambda(_)) {
                                         return Err(lruntimeerror!(
@@ -191,7 +134,7 @@ pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::R
                             vec.append(&mut body.to_vec());
                             LValue::List(Arc::new(vec))
                         };
-                        let result = p_expand(&exp, top_level, env)?;
+                        let result = expand_static(&exp, top_level, env)?;
                         if result.is_pure() {
                             return Ok(PLValue::into_unpure(x));
                         }
@@ -215,7 +158,7 @@ pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::R
                         //return map(expand, x)
                         let mut expanded_list = vec![LPrimitives::If.into()];
                         for x in &list[1..] {
-                            let result = p_expand(x, false, env)?;
+                            let result = expand_static(x, false, env)?;
                             if !result.is_pure() {
                                 return Ok(PLValue::into_unpure(x));
                             }
@@ -242,7 +185,7 @@ pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::R
                         } else {
                             let mut expanded_list = vec![co.into()];
                             for e in &list[1..] {
-                                let result = p_expand(e, top_level, env)?;
+                                let result = expand_static(e, top_level, env)?;
                                 if !result.is_pure() {
                                     return Ok(PLValue::into_unpure(x));
                                 }
@@ -263,7 +206,7 @@ pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::R
                             //println!("{}", expanded);
                             //to expand quasiquote recursively
                             expand(&expanded, top_level, env, ctxs);*/
-                            p_expand(&expand_quasi_quote(&list[1], env)?, top_level, env)
+                            expand_static(&expand_quasi_quote(&list[1], env)?, top_level, env)
                             //Ok(expanded)
                         };
                     }
@@ -282,7 +225,7 @@ pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::R
                             ))
                         } else {
                             let mut expanded = vec![LPrimitives::Async.into()];
-                            let result = p_expand(&list[1], top_level, env)?;
+                            let result = expand_static(&list[1], top_level, env)?;
 
                             if !result.is_pure() {
                                 return Ok(PLValue::into_unpure(x));
@@ -300,7 +243,7 @@ pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::R
                             ))
                         } else {
                             let mut expanded = vec![LPrimitives::Await.into()];
-                            let result = p_expand(&list[1], top_level, env)?;
+                            let result = expand_static(&list[1], top_level, env)?;
 
                             if !result.is_pure() {
                                 return Ok(PLValue::into_unpure(x));
@@ -318,7 +261,7 @@ pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::R
                             ))
                         } else {
                             let mut expanded = vec![LPrimitives::Eval.into()];
-                            let result = p_expand(&list[1], top_level, env)?;
+                            let result = expand_static(&list[1], top_level, env)?;
                             if !result.is_pure() {
                                 return Ok(PLValue::into_unpure(x));
                             }
@@ -335,7 +278,7 @@ pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::R
                             ))
                         } else {
                             let mut expanded = vec![LPrimitives::Parse.into()];
-                            let result = p_expand(&list[1], top_level, env)?;
+                            let result = expand_static(&list[1], top_level, env)?;
 
                             if !result.is_pure() {
                                 return Ok(PLValue::into_unpure(x));
@@ -353,7 +296,7 @@ pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::R
                             ))
                         } else {
                             let mut expanded = vec![LPrimitives::Expand.into()];
-                            let result = p_expand(&list[1], top_level, env)?;
+                            let result = expand_static(&list[1], top_level, env)?;
 
                             if !result.is_pure() {
                                 return Ok(PLValue::into_unpure(x));
@@ -370,12 +313,12 @@ pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::R
                     None => {}
                     Some(m) => {
                         let mut new_env = m.get_new_env(env.clone(), &list[1..])?;
-                        let result = p_eval(m.get_body(), &mut new_env)?;
+                        let result = eval_static(m.get_body(), &mut new_env)?;
                         if !result.is_pure() {
                             return Ok(PLValue::into_unpure(x));
                         }
 
-                        let expanded = p_expand(&result.lvalue, top_level, env)?;
+                        let expanded = expand_static(&result.lvalue, top_level, env)?;
                         if get_debug() {
                             println!("In expand: macro expanded: {:?}", expanded);
                         }
@@ -386,7 +329,7 @@ pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::R
 
             let mut expanded_list: Vec<LValue> = vec![];
             for e in list.iter() {
-                let result = p_expand(e, false, env)?;
+                let result = expand_static(e, false, env)?;
                 if result.is_pure() {
                     expanded_list.push(result.lvalue);
                 } else {
@@ -404,9 +347,9 @@ pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::R
     }
 }
 
-pub fn p_parse(str: &str, env: &mut LEnv) -> lruntimeerror::Result<PLValue> {
+pub fn parse_static(str: &str, env: &mut LEnv) -> lruntimeerror::Result<PLValue> {
     match aries_planning::parsing::sexpr::parse(str) {
-        Ok(se) => p_expand(&parse_into_lvalue(&se), true, env),
+        Ok(se) => expand_static(&parse_into_lvalue(&se), true, env),
         Err(e) => Err(lruntimeerror!(
             PARSE_STATIC,
             format!("Error in command: {}", e)
@@ -414,7 +357,7 @@ pub fn p_parse(str: &str, env: &mut LEnv) -> lruntimeerror::Result<PLValue> {
     }
 }
 
-pub fn p_eval(lv: &LValue, env: &mut LEnv) -> lruntimeerror::Result<PLValue> {
+pub fn eval_static(lv: &LValue, env: &mut LEnv) -> lruntimeerror::Result<PLValue> {
     let mut lv = lv.clone();
     let mut temp_env: LEnv;
     let mut env = env;
@@ -452,7 +395,7 @@ pub fn p_eval(lv: &LValue, env: &mut LEnv) -> lruntimeerror::Result<PLValue> {
                     LPrimitives::Define => {
                         return match &args[0] {
                             LValue::Symbol(s) => {
-                                let result = p_eval(&args[1], env)?;
+                                let result = eval_static(&args[1], env)?;
                                 return if result.pure {
                                     env.insert(s.to_string(), result.lvalue);
                                     if get_debug() {
@@ -515,7 +458,7 @@ pub fn p_eval(lv: &LValue, env: &mut LEnv) -> lruntimeerror::Result<PLValue> {
                         let test = &args[0];
                         let conseq = &args[1];
                         let alt = &args[2];
-                        let result = p_eval(test, env)?;
+                        let result = eval_static(test, env)?;
                         if result.pure {
                             lv = match result.lvalue {
                                 LValue::True => conseq.clone(),
@@ -547,7 +490,7 @@ pub fn p_eval(lv: &LValue, env: &mut LEnv) -> lruntimeerror::Result<PLValue> {
 
                         for e in args {
                             if all_pure {
-                                let result = p_eval(e, env)?;
+                                let result = eval_static(e, env)?;
                                 all_pure = result.pure;
                                 if result.pure && _do && matches!(result.lvalue, LValue::Err(_)){
                                     return Ok(result)
@@ -571,9 +514,9 @@ pub fn p_eval(lv: &LValue, env: &mut LEnv) -> lruntimeerror::Result<PLValue> {
                     }
                     LPrimitives::Eval => {
                         let arg = &args[0];
-                        let result = p_eval(arg, env)?;
+                        let result = eval_static(arg, env)?;
                         lv = if result.is_pure() {
-                            let result = p_expand(&result.lvalue, true, env)?;
+                            let result = expand_static(&result.lvalue, true, env)?;
                             if  result.is_pure() {
                                 result.lvalue
                             }else {
@@ -584,10 +527,10 @@ pub fn p_eval(lv: &LValue, env: &mut LEnv) -> lruntimeerror::Result<PLValue> {
                         };
                     }
                     LPrimitives::Parse => {
-                        let result = p_eval(&args[0], env)?;
+                        let result = eval_static(&args[0], env)?;
                         return if result.is_pure() {
                             if let LValue::String(s) = result.lvalue {
-                                p_parse(s.as_str(), env)
+                                parse_static(s.as_str(), env)
                             } else {
                                 Err(wrong_type!(
                                     EVAL_STATIC,
@@ -603,9 +546,9 @@ pub fn p_eval(lv: &LValue, env: &mut LEnv) -> lruntimeerror::Result<PLValue> {
                     }
                     LPrimitives::Expand => {
                         let arg = &args[0];
-                        let result = p_eval(arg, env)?;
+                        let result = eval_static(arg, env)?;
                         return if result.is_pure() {
-                            p_expand(&result.lvalue, true, env)
+                            expand_static(&result.lvalue, true, env)
                         }else {
                             Ok(PLValue::into_unpure(&lv))
                         }
@@ -618,7 +561,7 @@ pub fn p_eval(lv: &LValue, env: &mut LEnv) -> lruntimeerror::Result<PLValue> {
                 let mut all_pure = true;
 
                 for x in list {
-                    let result = p_eval(x, env)?;
+                    let result = eval_static(x, env)?;
                     all_pure &= result.is_pure();
                     exps.push(result);
                 }

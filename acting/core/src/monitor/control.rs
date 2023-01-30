@@ -1,7 +1,6 @@
 use crate::exec::ModExec;
 use crate::monitor::{ModMonitor, TOKIO_CHANNEL_SIZE};
 use crate::rae;
-use ompas_flow_graph::conversion::convert_acting_domain;
 use ompas_interface::platform::Platform;
 use ompas_interface::platform_config::PlatformConfig;
 use ompas_language::exec::task::DOC_GET_TASK_ID;
@@ -10,6 +9,7 @@ use ompas_language::process::{LOG_TOPIC_OMPAS, PROCESS_STOP_OMPAS, PROCESS_TOPIC
 use ompas_language::select::*;
 use ompas_middleware::logger::LogClient;
 use ompas_middleware::ProcessInterface;
+use ompas_planning::conversion::convert_acting_domain;
 use ompas_structs::acting_domain::OMPASDomain;
 use ompas_structs::agenda::Agenda;
 use ompas_structs::conversion::context::ConversionContext;

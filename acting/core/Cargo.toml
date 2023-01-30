@@ -15,7 +15,7 @@ sompas-macros = {path = "../../scheme/macros"}
 ompas-utils = {path= "../../utils" }
 ompas-structs= {path = "../structs"}
 ompas-interface = {path = "../interface"}
-ompas-flow-graph = {path = "../flow_graph"}
+ompas-planning = {path = "../planning"}
 ompas-language = {path = "../language"}
 #ompas-rae-log = {path = "../log"}
 tokio = { version = "1.17.0", features = ["full", "time"] }

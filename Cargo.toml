@@ -20,7 +20,6 @@ members = [
     "acting/log",
     "acting/planning",
     "acting/structs",
-    "acting/flow_graph",
     "acting/interface",
     "gobotsim",
     "benchmark",

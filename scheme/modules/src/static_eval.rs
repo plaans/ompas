@@ -1,6 +1,6 @@
 use crate::advanced_math::ModAdvancedMath;
 use crate::utils::ModUtils;
-use sompas_core::static_eval::{eval_static, expand_static};
+use sompas_core::static_eval::{p_eval, p_expand};
 use sompas_core::{eval_init, get_root_env};
 use sompas_language::eval_static::*;
 use sompas_macros::async_scheme_fn;
@@ -71,9 +71,9 @@ pub async fn scheme_eval_static<'a>(env: &'a LEnv, lv: &LValue) -> LResult {
 
     let mut env = ctx.get_env().await;
 
-    let result = expand_static(lv, true, &mut env)?;
+    let result = p_expand(lv, true, &mut env)?;
 
-    let result = eval_static(result.get_lvalue(), &mut env)?;
+    let result = p_eval(result.get_lvalue(), &mut env)?;
 
     println!("static evaluation returned: {}", result.get_lvalue());
 

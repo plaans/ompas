@@ -2,6 +2,7 @@ use crate::sym_table::domain::simple_type::SimpleType;
 use crate::sym_table::domain::type_lattice::TypeLattice;
 use crate::sym_table::domain::{Domain, TypeId};
 use std::collections::HashSet;
+use std::fmt::Display;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -17,7 +18,7 @@ impl RefTypeLattice {
         self.0.read().await.format_type(id)
     }
 
-    pub async fn get_type_id(&self, r#type: impl Into<SimpleType>) -> Option<TypeId> {
+    pub async fn get_type_id(&self, r#type: impl Display) -> Option<TypeId> {
         self.0.read().await.get_type_id(r#type).cloned()
     }
 

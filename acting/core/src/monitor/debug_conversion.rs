@@ -1,18 +1,24 @@
+use crate::exec::state::ModState;
 use crate::monitor::domain::ModDomain;
+use ompas_language::exec::refinement::EXEC_TASK;
 use ompas_language::monitor::debug_conversion::{
-    CONVERT_DOMAIN, DOC_CONVERT_DOMAIN, DOC_MOD_DEBUG_CONVERSION, DOC_PLAN_TASK,
-    MOD_DEBUG_CONVERSION, PLAN_TASK,
+    CONVERT_DOMAIN, DOC_CONVERT_DOMAIN, DOC_MOD_DEBUG_CONVERSION, DOC_PLAN_TASK, DOC_PRE_EVAL_EXPR,
+    DOC_PRE_EVAL_TASK, MOD_DEBUG_CONVERSION, PLAN_TASK, PRE_EVAL_EXPR, PRE_EVAL_TASK,
 };
 use ompas_language::monitor::domain::MOD_DOMAIN;
 use ompas_planning::aries::solver::run_solver_for_htn;
 use ompas_planning::aries::{generate_chronicles, solver};
 use ompas_planning::conversion::convert_acting_domain;
+use ompas_planning::conversion::flow::p_eval::r#struct::{PConfig, PLValue};
+use ompas_planning::conversion::flow::p_eval::{p_eval, p_expand};
 use ompas_structs::conversion::context::ConversionContext;
 use ompas_structs::planning::domain::PlanningDomain;
 use ompas_structs::planning::instance::PlanningInstance;
 use ompas_structs::planning::problem::PlanningProblem;
+use sompas_core::expand;
 use sompas_macros::async_scheme_fn;
 use sompas_structs::lenv::LEnv;
+use sompas_structs::llambda::LLambda;
 use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
@@ -27,39 +33,11 @@ impl From<ModDebugConversion> for LModule {
         let mut m = LModule::new(m, MOD_DEBUG_CONVERSION, DOC_MOD_DEBUG_CONVERSION);
         m.add_async_fn(CONVERT_DOMAIN, convert_domain, DOC_CONVERT_DOMAIN, false);
         m.add_async_fn(PLAN_TASK, plan_task, DOC_PLAN_TASK, false);
+        m.add_async_fn(PRE_EVAL_TASK, pre_eval_task, DOC_PRE_EVAL_TASK, false);
+        m.add_async_fn(PRE_EVAL_EXPR, pre_eval_expr, DOC_PRE_EVAL_EXPR, false);
         m
     }
 }
-
-/*
-#[async_scheme_fn]
-pub async fn convert_expr(env: &LEnv, expr: &LValue) -> Result<String, LRuntimeError> {
-    let ctx = env.get_context::<ModDomain>(MOD_DEBUG_CONVERSION).unwrap();
-    let mut context: ConversionContext = ctx.get_conversion_context().await;
-
-    let lv = expand(expr, true, &mut context.env).await?;
-
-    let mut ch = ConversionCollection::default();
-
-    let time = SystemTime::now();
-    let mut chronicle = ChronicleTemplate::new(&mut ch, "unnamed_chronicle", ChronicleKind::Method);
-
-    let pre_processed = pre_processing(&lv, &context, &mut ch)?;
-    let ec = convert_lvalue_to_expression_chronicle(
-        &pre_processed,
-        &context,
-        &mut ch,
-        MetaData::new(true, false),
-    )?;
-
-    chronicle.absorb_expression_chronicle(ec);
-
-    post_processing(&mut chronicle, &context, &mut ch)?;
-    let time = time.elapsed().expect("could not get time").as_micros();
-    let string = chronicle.format(&ch.sym_table, true);
-
-    Ok(format!("{}\n\n Time to convert: {} µs.", string, time))
-}*/
 
 #[async_scheme_fn]
 pub async fn convert_domain(env: &LEnv) -> Result<String, LRuntimeError> {
@@ -111,4 +89,72 @@ pub async fn plan_task(env: &LEnv, args: &[LValue]) -> LResult {
     };
 
     Ok(result)
+}
+
+#[async_scheme_fn]
+pub async fn pre_eval_task(env: &LEnv, task: &[LValue]) -> Result<(), LRuntimeError> {
+    let ctx = env.get_context::<ModDomain>(MOD_DOMAIN)?;
+    let mut context: ConversionContext = ctx.get_conversion_context().await;
+    context
+        .env
+        .update_context(ModState::new_from_snapshot(context.state.clone()));
+
+    let t = context
+        .domain
+        .tasks
+        .get(task[0].to_string().as_str())
+        .unwrap();
+
+    let params = t.get_parameters().get_params();
+    let mut pc = PConfig::default();
+    pc.avoid.insert(EXEC_TASK.to_string());
+    //pc.avoid.insert(CHECK.to_string());
+    assert_eq!(params.len(), task.len() - 1);
+    for (param, value) in params.iter().zip(task[1..].iter()) {
+        pc.p_table
+            .add_instantiated(param.to_string(), value.clone());
+    }
+
+    for m_label in t.get_methods() {
+        let mut pc = pc.clone();
+        let method = context.domain.methods.get(m_label).unwrap();
+        for param in &method.parameters.get_params()[params.len()..] {
+            pc.p_table.add_param(param.to_string());
+        }
+        let body = method.get_body();
+        let mut env = context.env.clone();
+        let lambda: LLambda = body.try_into()?;
+        let lv = lambda.get_body();
+        let plv = p_eval(lv, &mut env, &pc).await?;
+        println!(
+            "Pre eval method {m_label} of task {}:\n{}\n->\n{}",
+            LValue::from(task).format(0),
+            lv.format(0),
+            plv.get_lvalue().format(0),
+        )
+    }
+    Ok(())
+}
+
+#[async_scheme_fn]
+pub async fn pre_eval_expr(env: &LEnv, lv: LValue) -> Result<(), LRuntimeError> {
+    let ctx = env.get_context::<ModDomain>(MOD_DOMAIN)?;
+    let mut context: ConversionContext = ctx.get_conversion_context().await;
+    context
+        .env
+        .update_context(ModState::new_from_snapshot(context.state.clone()));
+
+    let mut pc = PConfig::default();
+    pc.avoid.insert(EXEC_TASK.to_string());
+    //pc.avoid.insert(CHECK.to_string());
+    let mut env = context.env.clone();
+    let plv: PLValue = p_expand(&lv, true, &mut env, &pc).await?;
+    let plv: PLValue = p_eval(&plv.get_lvalue(), &mut env, &pc).await?;
+    println!(
+        "Pre eval expr:\n{}\n->\n{}",
+        lv.format(0),
+        plv.get_lvalue().format(0),
+    );
+
+    Ok(())
 }

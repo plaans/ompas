@@ -1,11 +1,11 @@
 use crate::{PROCESS_TOPIC_GOBOT_SIM, TOKIO_CHANNEL_SIZE};
 use async_trait::async_trait;
-use ompas_middleware::{LogLevel, ProcessInterface};
-use ompas_rae_interface::platform_interface::platform_interface_server::PlatformInterface;
-use ompas_rae_interface::platform_interface::{
+use ompas_interface::platform_interface::platform_interface_server::PlatformInterface;
+use ompas_interface::platform_interface::{
     CommandRequest, CommandResponse, InitGetUpdate, PlatformUpdate,
 };
-use ompas_rae_language::interface::*;
+use ompas_language::interface::*;
+use ompas_middleware::{LogLevel, ProcessInterface};
 use tokio::sync::{broadcast, mpsc};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::Response;

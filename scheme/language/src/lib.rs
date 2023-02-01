@@ -453,7 +453,7 @@ pub mod utils {
     pub const LAMBDA_MAPF: &str = "(lambda (f seq)
          (if (null? seq)
          nil
-         (cons (eval (cons f (car seq))) (mapf f (cdr seq)))))";
+         (cons (eval (cons f (list (car seq)))) (mapf f (cdr seq)))))";
 
     /*pub const LAMBDA_ARBITRARY: &str = "(define arbitrary
     (lambda args

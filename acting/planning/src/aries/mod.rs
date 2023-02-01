@@ -49,7 +49,6 @@ use std::borrow::Borrow;
 use std::convert::TryInto;
 use std::ops::Deref;
 use std::sync::Arc;
-use std::time::Instant;
 
 static BUILD_CHRONICLES: &str = "build_chronicles";
 pub const FLOAT_SCALE: IntCst = 2;
@@ -530,8 +529,8 @@ impl FormatWithSymTable for BindingAriesAtoms {
 #[allow(dead_code)]
 fn convert_constraint(
     c: &Constraint,
-    prez: aLit,
-    container: Container,
+    _prez: aLit,
+    _container: Container,
     bindings: &BindingAriesAtoms,
     st: &RefSymTable,
     ctx: &mut Ctx,

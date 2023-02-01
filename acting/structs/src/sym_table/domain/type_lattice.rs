@@ -1,5 +1,5 @@
 use crate::sym_table::domain::basic_type::BasicType::*;
-use crate::sym_table::domain::basic_type::TYPE_ID_EMPTY;
+use crate::sym_table::domain::basic_type::{TYPE_BOOL, TYPE_BOOLEAN, TYPE_ID_EMPTY};
 use crate::sym_table::domain::simple_type::SimpleType;
 use crate::sym_table::domain::Domain::{Application, Composed, Cst, Simple, Substract, Union};
 use crate::sym_table::domain::{Domain, TypeId};
@@ -18,14 +18,14 @@ pub struct TypeLattice {
     childs: Vec<Vec<TypeId>>,
     parents: Vec<Vec<TypeId>>,
     decomposition: Vec<Vec<TypeId>>,
-    ids: HashMap<SimpleType, TypeId>,
+    ids: HashMap<String, TypeId>,
 }
 
 impl Default for TypeLattice {
     fn default() -> Self {
-        let mut ids: HashMap<SimpleType, TypeId> = Default::default();
-        ids.insert(SimpleType::Basic(Empty), 0);
-        ids.insert(SimpleType::Basic(Any), 0);
+        let mut ids: HashMap<String, TypeId> = Default::default();
+        ids.insert(SimpleType::Basic(Empty).to_string().to_ascii_lowercase(), 0);
+        ids.insert(SimpleType::Basic(Any).to_string().to_ascii_lowercase(), 0);
         let mut dc = Self {
             types: vec![SimpleType::Basic(Empty), SimpleType::Basic(Any)],
             childs: vec![vec![], vec![]],
@@ -35,6 +35,7 @@ impl Default for TypeLattice {
         };
 
         dc.add_type(Boolean, vec![]);
+        dc.add_alias(TYPE_BOOLEAN, TYPE_BOOL);
         dc.add_type(List, vec![]);
         dc.add_type(Map, vec![]);
         dc.add_type(Err, vec![]);
@@ -52,6 +53,8 @@ impl Default for TypeLattice {
         dc.add_type(Primitive, vec![Proc as usize]);
         dc.add_type(Fn, vec![Proc as usize]);
         dc.add_type(Lambda, vec![Proc as usize]);
+        dc.add_type(Vector, vec![List as usize]);
+        dc.add_type(Tuple, vec![List as usize]);
         dc.add_decomposition(
             Proc as usize,
             vec![Primitive as usize, Fn as usize, Lambda as usize],
@@ -108,12 +111,17 @@ impl TypeLattice {
         lt
     }
 
+    pub fn add_alias(&mut self, t: impl Display, alias: impl Display) {
+        let id = *self.ids.get(t.to_string().as_str()).unwrap();
+        self.ids.insert(alias.to_string(), id);
+    }
+
     pub fn format_type(&self, id: &TypeId) -> String {
         self.types[*id].to_string()
     }
 
-    pub fn get_type_id(&self, r#type: impl Into<SimpleType>) -> Option<&TypeId> {
-        self.ids.get(&r#type.into())
+    pub fn get_type_id(&self, r#type: impl Display) -> Option<&TypeId> {
+        self.ids.get(&r#type.to_string().to_ascii_lowercase())
     }
 
     pub fn get_parent(&self, id: &TypeId) -> Vec<TypeId> {
@@ -124,7 +132,7 @@ impl TypeLattice {
         let r#type = r#type.into();
         let id = self.types.len();
         self.types.push(r#type.clone());
-        self.ids.insert(r#type, id);
+        self.ids.insert(r#type.to_string().to_ascii_lowercase(), id);
         self.childs.push(vec![]);
         self.parents.push(vec![]);
         self.decomposition.push(vec![]);

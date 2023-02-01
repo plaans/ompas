@@ -56,8 +56,8 @@ impl From<ModState> for LModule {
         module.add_async_fn(RETRACT, retract, DOC_RETRACT, false);
         module.add_async_fn(RETRACT_SHORT, retract, DOC_RETRACT_SHORT, false);
         module.add_async_fn(READ_STATE, read_state, DOC_READ_STATE, false);
-        module.add_async_fn(INSTANCE, instance, DOC_INSTANCE, false);
-        module.add_async_fn(INSTANCES, instances, DOC_INSTANCES, false);
+        module.add_async_fn(INSTANCE, instance, DOC_INSTANCE, true);
+        module.add_async_fn(INSTANCES, instances, DOC_INSTANCES, true);
         module.add_async_fn(__WAIT_FOR__, __wait_for__, DOC___WAIT_FOR__, false);
 
         //Macros

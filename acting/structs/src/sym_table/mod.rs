@@ -16,7 +16,6 @@ use crate::sym_table::domain::basic_type::BasicType::{Any, Boolean, Handle};
 use crate::sym_table::domain::basic_type::{BasicType, TYPE_ID_NUMBER};
 use crate::sym_table::domain::basic_type::{TYPE_ID_FALSE, TYPE_ID_NIL, TYPE_ID_TRUE};
 use crate::sym_table::domain::cst::Cst;
-use crate::sym_table::domain::simple_type::SimpleType;
 use crate::sym_table::domain::type_lattice::TypeLattice;
 use crate::sym_table::domain::Domain;
 use crate::sym_table::forest::{Forest, NodeId};
@@ -517,7 +516,7 @@ impl SymTable {
         self.lattice.contained_in(d1, d2)
     }
 
-    pub fn get_type_as_domain(&self, r#type: impl Into<SimpleType>) -> Domain {
+    pub fn get_type_as_domain(&self, r#type: impl Display) -> Domain {
         self.lattice.get_type_id(r#type).unwrap().into()
     }
 

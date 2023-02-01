@@ -1,4 +1,5 @@
 (begin
+    (read godot_domain/types.lisp)
     (read godot_domain/commands.lisp)
     ;(read godot_domain/actions_models.lisp)
     (read godot_domain/state_functions.lisp)
@@ -8,6 +9,6 @@
     ;(read godot_domain/jobshop_greedy.lisp)
     ;(read godot_domain/jobshop_advanced.lisp)
     (read godot_domain/jobshop_advanced_lrpt.lisp)
-    (read godot_domain/problems/ft06.lisp)
+    (read godot_domain/problems/j06.lisp)
     ;(set-select c-choice)
 )

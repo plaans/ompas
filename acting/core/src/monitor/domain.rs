@@ -3,7 +3,7 @@ use ompas_language::exec::state::INSTANCE;
 use ompas_language::monitor::domain::*;
 use ompas_structs::acting_domain::command::Command;
 use ompas_structs::acting_domain::method::Method;
-use ompas_structs::acting_domain::parameters::Parameters;
+use ompas_structs::acting_domain::parameters::{try_domain_from_lvalue, Parameters};
 use ompas_structs::acting_domain::state_function::StateFunction;
 use ompas_structs::acting_domain::task::Task;
 use ompas_structs::acting_domain::OMPASDomain;
@@ -19,6 +19,7 @@ use sompas_language::predicate::*;
 use sompas_macros::*;
 use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lenv::{LEnv, LEnvSymbols};
+use sompas_structs::llambda::LLambda;
 use sompas_structs::lmodule::{InitScheme, LModule};
 use sompas_structs::lprimitives::LPrimitives;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
@@ -249,7 +250,7 @@ pub async fn add_state_function(
             .clone()],
     )?;
 
-    let result: Domain = Domain::Simple(lattice.get_type_id(result.to_string()).await.unwrap());
+    let result: Domain = try_domain_from_lvalue(&lattice, &result).await?;
     let expr = format!(
         "(lambda {}
                 (read-state '{} {})))",
@@ -613,18 +614,20 @@ pub async fn add_method(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<
     };
     method.lambda_score = score;
 
-    let conds = cons(
+    /*let conds = cons(
         &LEnv::default(),
         &[
             method.lambda_pre_conditions.clone(),
             method.parameters.get_params_as_lvalue(),
         ],
-    )?;
+    )?;*/
 
     let expr = format!(
         "(lambda {} (do {} {}))",
         method.parameters.get_params_as_lvalue(),
-        conds,
+        LLambda::try_from(&method.lambda_pre_conditions)
+            .unwrap()
+            .get_body(),
         body
     );
 

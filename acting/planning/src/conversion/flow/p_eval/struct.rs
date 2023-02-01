@@ -1,25 +1,24 @@
+use im::HashSet;
 use sompas_structs::lvalue::LValue;
+use sompas_structs::symbol;
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 
 #[derive(Clone, Debug)]
 pub struct PLValue {
-    pub lvalue: LValue,
-    pub pure: bool,
+    pub(crate) lvalue: LValue,
+    pure: bool,
 }
 
 impl PLValue {
     pub fn is_pure(&self) -> bool {
         self.pure
     }
-}
 
-impl PLValue {
     pub fn get_lvalue(&self) -> &LValue {
         &self.lvalue
     }
-}
 
-impl PLValue {
     pub fn into_pure(lv: &LValue) -> PLValue {
         PLValue {
             lvalue: lv.clone(),
@@ -60,4 +59,32 @@ impl From<&PLValue> for LValue {
     fn from(pl: &PLValue) -> Self {
         pl.clone().into()
     }
+}
+
+#[derive(Default, Clone)]
+pub struct ParameterTable {
+    pub inner: HashMap<String, PLValue>,
+}
+
+impl ParameterTable {
+    pub fn add_param(&mut self, param: String) {
+        self.inner.insert(
+            param.to_string(),
+            PLValue::into_unpure(&symbol!(param.into())),
+        );
+    }
+    pub fn add_instantiated(&mut self, param: String, value: LValue) {
+        self.inner
+            .insert(param.to_string(), PLValue::into_pure(&value));
+    }
+
+    pub fn try_get_param(&self, param: &str) -> Option<&PLValue> {
+        self.inner.get(param)
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct PConfig {
+    pub avoid: HashSet<String>,
+    pub p_table: ParameterTable,
 }

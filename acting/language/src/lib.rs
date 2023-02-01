@@ -378,6 +378,12 @@ pub mod monitor {
             "Return the planning domain corresponding to the acting domain defined";
         pub const PLAN_TASK: &str = "plan-task";
         pub const DOC_PLAN_TASK: &str= "Plan a task using the defined planner with the acting domain defined in the environment";
+
+        pub const PRE_EVAL_TASK: &str = "pre-eval-task";
+        pub const DOC_PRE_EVAL_TASK: &str = "Pre evaluate a task";
+
+        pub const PRE_EVAL_EXPR: &str = "pre-eval-expr";
+        pub const DOC_PRE_EVAL_EXPR: &str = "Pre evaluate an expression.";
     }
 
     pub mod domain {

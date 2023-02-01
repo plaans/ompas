@@ -3,16 +3,16 @@ use crate::tcp::task_tcp_connection;
 use crate::PROCESS_TOPIC_GOBOT_SIM;
 use crate::{DEFAULT_PATH_PROJECT_GODOT, TOKIO_CHANNEL_SIZE};
 use async_trait::async_trait;
-use ompas_middleware::logger::LogClient;
-use ompas_middleware::ProcessInterface;
-use ompas_rae_interface::lisp_domain::LispDomain;
-use ompas_rae_interface::platform_config::{InnerPlatformConfig, PlatformConfig};
-use ompas_rae_interface::platform_interface::platform_interface_server::PlatformInterfaceServer;
-use ompas_rae_interface::PlatformDescriptor;
-use ompas_rae_language::interface::{
+use ompas_interface::lisp_domain::LispDomain;
+use ompas_interface::platform_config::{InnerPlatformConfig, PlatformConfig};
+use ompas_interface::platform_interface::platform_interface_server::PlatformInterfaceServer;
+use ompas_interface::PlatformDescriptor;
+use ompas_language::interface::{
     DEFAULT_PLATFORM_SERVICE_IP, DEFAULT_PLATFROM_SERVICE_PORT, LOG_TOPIC_PLATFORM,
     PROCESS_TOPIC_PLATFORM,
 };
+use ompas_middleware::logger::LogClient;
+use ompas_middleware::ProcessInterface;
 use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::LResult;
 use sompas_structs::lvalue::LValue;

@@ -93,6 +93,7 @@ impl Parameters {
     }
 }
 
+#[named]
 #[async_recursion]
 pub async fn try_domain_from_lvalue(
     lattice: &RefTypeLattice,
@@ -107,7 +108,18 @@ pub async fn try_domain_from_lvalue(
             }
             Domain::Composed(t, composition)
         }
-        LValue::Symbol(t) => Domain::Simple(lattice.get_type_id(t.as_str()).await.unwrap()),
+        LValue::Symbol(t) => {
+            let t = match t.to_string().to_ascii_lowercase().as_str() {
+                "object" | "any" => TYPE_OBJECT,
+                _ => t,
+            };
+            Domain::Simple(lattice.get_type_id(t).await.ok_or_else(|| {
+                LRuntimeError::new(
+                    function_name!(),
+                    format!("type {} has not been declared", t),
+                )
+            })?)
+        }
         _ => Default::default(),
     };
 

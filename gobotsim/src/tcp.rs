@@ -2,16 +2,16 @@ use crate::serde::{
     GodotMessageSerde, GodotMessageSerdeData, GodotMessageType, SerdeCancelRequest, SerdeCommand,
 };
 use crate::PROCESS_TOPIC_GOBOT_SIM;
-use ompas_middleware::ProcessInterface;
-use ompas_rae_interface::platform_interface::command_request::Request;
-use ompas_rae_interface::platform_interface::CommandCancelled;
-use ompas_rae_interface::platform_interface::{
+use ompas_interface::platform_interface::command_request::Request;
+use ompas_interface::platform_interface::CommandCancelled;
+use ompas_interface::platform_interface::{
     Atom, CommandAccepted, CommandCancelRequest, CommandExecutionRequest, CommandProgress,
     CommandRejected, CommandRequest, CommandResponse, CommandResult, Instance, PlatformUpdate,
     StateUpdate, StateVariable, StateVariableType,
 };
-use ompas_rae_language::interface::*;
-use ompas_rae_structs::state::partial_state::PartialState;
+use ompas_language::interface::*;
+use ompas_middleware::ProcessInterface;
+use ompas_structs::state::partial_state::PartialState;
 use sompas_structs::lvalues::LValueS;
 use std::convert::TryFrom;
 use std::convert::TryInto;

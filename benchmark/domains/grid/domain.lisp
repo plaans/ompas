@@ -18,7 +18,7 @@
     (:params (?t truck) (?to location))
     (:pre-conditions (= (at ?t) ?to))
     (:score 0)
-    (:body true))
+    (:body ))
 
   (def-method m_recursive
     (:task t_move)

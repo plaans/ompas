@@ -68,7 +68,7 @@ pub fn rm_useless_var(c: &mut ChronicleTemplate) {
 
 pub fn simplify_timepoints(c: &mut ChronicleTemplate) -> Result<(), LRuntimeError> {
     let st = c.st.clone();
-    let format_hash = |set: &HashSet<VarId>| -> String {
+    let _format_hash = |set: &HashSet<VarId>| -> String {
         let mut str = "{".to_string();
         for (i, e) in set.iter().enumerate() {
             if i != 0 {

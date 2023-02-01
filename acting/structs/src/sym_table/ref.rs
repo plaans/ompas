@@ -1,6 +1,5 @@
 use crate::conversion::flow_graph::graph::Dot;
 use crate::sym_table::closure::Update;
-use crate::sym_table::domain::simple_type::SimpleType;
 use crate::sym_table::domain::type_lattice::TypeLattice;
 use crate::sym_table::domain::Domain;
 use crate::sym_table::var_domain::VarDomain;
@@ -215,7 +214,7 @@ impl RefSymTable {
         self.0.read().unwrap().contained_in_domain(d1, d2)
     }
 
-    pub fn get_type_as_domain(&self, r#type: impl Into<SimpleType>) -> Domain {
+    pub fn get_type_as_domain(&self, r#type: impl Display) -> Domain {
         self.0.read().unwrap().get_type_as_domain(r#type)
     }
 

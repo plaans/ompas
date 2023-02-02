@@ -20,7 +20,7 @@ use sompas_language::utils::*;
 use sompas_macros::scheme_fn;
 use sompas_structs::lmodule::LModule;
 use sompas_structs::lnumber::LNumber;
-use sompas_structs::lprimitives::LPrimitives;
+use sompas_structs::lprimitive::LPrimitive;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::{list, lruntimeerror};
@@ -61,6 +61,8 @@ impl From<ModUtils> for LModule {
             ),
             true,
         );
+
+        module.add_fn(RANGE, range, DOC_RANGE, true);
 
         module.add_macro(AND, MACRO_AND, DOC_AND);
         module.add_macro(OR, MACRO_OR, DOC_OR);
@@ -222,7 +224,7 @@ pub fn quote_list(mut list: Vec<LValue>) -> Vec<LValue> {
     //let mut vec: Vec<LValue> = vec![];
     let mut vec = vec![];
     for e in list.drain(..) {
-        vec.push(list![LPrimitives::Quote.into(), e])
+        vec.push(list![LPrimitive::Quote.into(), e])
         //vec.push(vec![LCoreOperator::Quote.into(), e.clone()].into());
     }
     vec
@@ -233,6 +235,11 @@ pub fn transform_in_singleton_list(args: &[LValue]) -> Vec<LValue> {
     args.iter()
         .map(|lv| list![lv.clone()])
         .collect::<Vec<LValue>>()
+}
+
+#[scheme_fn]
+pub fn range(start: i64, end: i64) -> Vec<i64> {
+    (start..end + 1).collect()
 }
 
 #[cfg(test)]

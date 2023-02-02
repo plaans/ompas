@@ -21,7 +21,7 @@ use std::fmt::{Display, Formatter};
 /// - Eval: Evaluates an expression.
 #[derive(Hash, Copy, Clone, PartialOrd, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[serde(untagged, rename_all = "lowercase")]
-pub enum LPrimitives {
+pub enum LPrimitive {
     Define,
     DefLambda,
     If,
@@ -45,66 +45,66 @@ pub enum LPrimitives {
     Race,
 }
 
-impl Display for LPrimitives {
+impl Display for LPrimitive {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         let str = match self {
-            LPrimitives::Define => DEFINE,
-            LPrimitives::DefLambda => FN_LAMBDA,
-            LPrimitives::If => IF,
-            LPrimitives::Quote => QUOTE,
-            LPrimitives::QuasiQuote => QUASI_QUOTE,
-            LPrimitives::UnQuote => UNQUOTE,
-            LPrimitives::DefMacro => DEF_MACRO,
-            LPrimitives::Begin => BEGIN,
-            LPrimitives::Async => ASYNC,
-            LPrimitives::Await => AWAIT,
-            LPrimitives::Eval => EVAL,
-            LPrimitives::Expand => EXPAND,
-            LPrimitives::Parse => PARSE,
-            LPrimitives::Do => DO,
-            LPrimitives::Interrupt => INTERRUPT,
-            LPrimitives::Interruptible => INTERRUPTIBLE,
-            LPrimitives::Uninterruptible => UNINTERRUPTIBLE,
-            LPrimitives::Race => RACE,
-            LPrimitives::Enr => ENR,
-            LPrimitives::Err => ERR,
+            LPrimitive::Define => DEFINE,
+            LPrimitive::DefLambda => FN_LAMBDA,
+            LPrimitive::If => IF,
+            LPrimitive::Quote => QUOTE,
+            LPrimitive::QuasiQuote => QUASI_QUOTE,
+            LPrimitive::UnQuote => UNQUOTE,
+            LPrimitive::DefMacro => DEF_MACRO,
+            LPrimitive::Begin => BEGIN,
+            LPrimitive::Async => ASYNC,
+            LPrimitive::Await => AWAIT,
+            LPrimitive::Eval => EVAL,
+            LPrimitive::Expand => EXPAND,
+            LPrimitive::Parse => PARSE,
+            LPrimitive::Do => DO,
+            LPrimitive::Interrupt => INTERRUPT,
+            LPrimitive::Interruptible => INTERRUPTIBLE,
+            LPrimitive::Uninterruptible => UNINTERRUPTIBLE,
+            LPrimitive::Race => RACE,
+            LPrimitive::Enr => ENR,
+            LPrimitive::Err => ERR,
         };
 
         write!(f, "{}", str)
     }
 }
 
-impl From<LPrimitives> for RefLValue {
-    fn from(co: LPrimitives) -> Self {
+impl From<LPrimitive> for RefLValue {
+    fn from(co: LPrimitive) -> Self {
         LValue::from(co).into_ref()
     }
 }
 
-impl TryFrom<&str> for LPrimitives {
+impl TryFrom<&str> for LPrimitive {
     type Error = LRuntimeError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
-            DEFINE => Ok(LPrimitives::Define),
-            FN_LAMBDA => Ok(LPrimitives::DefLambda),
-            IF => Ok(LPrimitives::If),
-            QUOTE => Ok(LPrimitives::Quote),
-            QUASI_QUOTE => Ok(LPrimitives::QuasiQuote),
-            UNQUOTE => Ok(LPrimitives::UnQuote),
-            DEF_MACRO => Ok(LPrimitives::DefMacro),
-            BEGIN => Ok(LPrimitives::Begin),
-            ASYNC => Ok(LPrimitives::Async),
-            AWAIT => Ok(LPrimitives::Await),
-            EVAL => Ok(LPrimitives::Eval),
-            PARSE => Ok(LPrimitives::Parse),
-            EXPAND => Ok(LPrimitives::Expand),
-            DO => Ok(LPrimitives::Do),
-            INTERRUPT => Ok(LPrimitives::Interrupt),
-            INTERRUPTIBLE | INTERRUPTIBLE_SHORT => Ok(LPrimitives::Interruptible),
-            UNINTERRUPTIBLE | UNINTERRUPTIBLE_SHORT => Ok(LPrimitives::Uninterruptible),
-            RACE => Ok(LPrimitives::Race),
-            ENR => Ok(LPrimitives::Enr),
-            ERR => Ok(LPrimitives::Err),
+            DEFINE => Ok(LPrimitive::Define),
+            FN_LAMBDA => Ok(LPrimitive::DefLambda),
+            IF => Ok(LPrimitive::If),
+            QUOTE => Ok(LPrimitive::Quote),
+            QUASI_QUOTE => Ok(LPrimitive::QuasiQuote),
+            UNQUOTE => Ok(LPrimitive::UnQuote),
+            DEF_MACRO => Ok(LPrimitive::DefMacro),
+            BEGIN => Ok(LPrimitive::Begin),
+            ASYNC => Ok(LPrimitive::Async),
+            AWAIT => Ok(LPrimitive::Await),
+            EVAL => Ok(LPrimitive::Eval),
+            PARSE => Ok(LPrimitive::Parse),
+            EXPAND => Ok(LPrimitive::Expand),
+            DO => Ok(LPrimitive::Do),
+            INTERRUPT => Ok(LPrimitive::Interrupt),
+            INTERRUPTIBLE | INTERRUPTIBLE_SHORT => Ok(LPrimitive::Interruptible),
+            UNINTERRUPTIBLE | UNINTERRUPTIBLE_SHORT => Ok(LPrimitive::Uninterruptible),
+            RACE => Ok(LPrimitive::Race),
+            ENR => Ok(LPrimitive::Enr),
+            ERR => Ok(LPrimitive::Err),
             //QUASI_INTERRUPTIBLE => Ok(LCoreOperator::QuasiInterruptible),
             _ => Err(LRuntimeError::new(
                 "LCoreOperator::TryFrom<str>",

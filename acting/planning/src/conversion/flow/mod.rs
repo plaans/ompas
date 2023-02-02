@@ -11,7 +11,7 @@ use ompas_structs::sym_table::lit::{lvalue_to_lit, Lit};
 use ompas_structs::sym_table::{closure, VarId};
 use sompas_language::kind::ERR;
 use sompas_structs::lnumber::LNumber;
-use sompas_structs::lprimitives::LPrimitives;
+use sompas_structs::lprimitive::LPrimitive;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use std::sync::Arc;
@@ -92,7 +92,7 @@ fn convert_nil(fl: &mut FlowGraph) -> FlowId {
     f_id
 }
 
-fn convert_core_operator(_: &LPrimitives, _: &mut FlowGraph) -> FlowId {
+fn convert_core_operator(_: &LPrimitive, _: &mut FlowGraph) -> FlowId {
     todo!()
 }
 
@@ -108,7 +108,7 @@ fn convert_list(
     let r = match proc {
         LValue::Symbol(s) => convert_apply(s.as_str(), list.as_slice(), fl, define_table)?,
         LValue::Primitive(co) => match co {
-            LPrimitives::Define => {
+            LPrimitive::Define => {
                 let var = &list[1].to_string();
                 let val = &list[2];
                 let flow_val = convert_lv(val, fl, define_table)?;
@@ -118,7 +118,7 @@ fn convert_list(
 
                 fl.new_seq(vec![flow_val, flow_result])
             }
-            LPrimitives::If => {
+            LPrimitive::If => {
                 let define_table = &mut define_table.clone();
 
                 /*
@@ -201,11 +201,11 @@ fn convert_list(
 
                 fl.new_seq(vec![cond_flow, flow_branch])
             }
-            LPrimitives::Quote => {
+            LPrimitive::Quote => {
                 let lit = lvalue_to_lit(&list[1], &mut st)?;
                 fl.new_instantaneous_assignment(lit)
             }
-            LPrimitives::Begin => {
+            LPrimitive::Begin => {
                 let mut define_table = define_table.clone();
                 let mut results = vec![];
                 let mut seq = vec![];
@@ -218,7 +218,7 @@ fn convert_list(
 
                 fl.new_seq(seq)
             }
-            LPrimitives::Async => {
+            LPrimitive::Async => {
                 let define_table = &mut define_table.clone();
                 let e = &list[1];
                 let async_flow = convert_lv(e, fl, define_table)?;
@@ -242,7 +242,7 @@ fn convert_list(
 
                 handle_flow
             }
-            LPrimitives::Await => {
+            LPrimitive::Await => {
                 let define_table = &mut define_table.clone();
                 let h = convert_lv(&list[1], fl, define_table)?;
                 let result = fl.get_flow_result(&h);
@@ -254,7 +254,7 @@ fn convert_list(
 
                 fl.new_seq(vec![h, flow_await])
             }
-            LPrimitives::Err => {
+            LPrimitive::Err => {
                 let define_table = &mut define_table.clone();
                 let arg_err = convert_lv(&list[1], fl, define_table)?;
                 let arg_err_result = st.get_domain_id(&fl.get_flow_result(&arg_err));
@@ -281,7 +281,7 @@ fn convert_list(
 
                 fl.new_seq(vec![arg_err, flow])
             }
-            LPrimitives::Race => {
+            LPrimitive::Race => {
                 todo!()
             }
             co => panic!("Conversion of {} not supported.", co),

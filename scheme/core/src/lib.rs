@@ -22,7 +22,7 @@ use sompas_structs::lenv::{ImportType, LEnv};
 use sompas_structs::lfuture::{FutureResult, LFuture};
 use sompas_structs::llambda::{LLambda, LambdaArgs};
 use sompas_structs::lnumber::LNumber;
-use sompas_structs::lprimitives::LPrimitives;
+use sompas_structs::lprimitive::LPrimitive;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lswitch::{new_interruption_handler, InterruptionReceiver};
 use sompas_structs::lvalue::LValue;
@@ -154,9 +154,9 @@ pub fn parse_into_lvalue(se: &SExpr) -> LValue {
 pub async fn expand(x: &LValue, top_level: bool, env: &mut LEnv) -> LResult {
     match x {
         LValue::List(list) => {
-            if let Ok(co) = LPrimitives::try_from(&list[0]) {
+            if let Ok(co) = LPrimitive::try_from(&list[0]) {
                 match co {
-                    LPrimitives::Define | LPrimitives::DefMacro => {
+                    LPrimitive::Define | LPrimitive::DefMacro => {
                         //eprintln!("expand: define: Ok!");
                         if list.len() < 3 {
                             return Err(LRuntimeError::wrong_number_of_args(
@@ -165,7 +165,7 @@ pub async fn expand(x: &LValue, top_level: bool, env: &mut LEnv) -> LResult {
                                 3..usize::MAX,
                             ));
                         }
-                        let def = LPrimitives::try_from(&list[0])?;
+                        let def = LPrimitive::try_from(&list[0])?;
                         let v = &list[1];
                         let body = &list[2..];
                         match v {
@@ -173,7 +173,7 @@ pub async fn expand(x: &LValue, top_level: bool, env: &mut LEnv) -> LResult {
                                 if v_list.len() >= 2 {
                                     let f = &v_list[0];
                                     let args = &v_list[1..];
-                                    let mut new_body = vec![LPrimitives::DefLambda.into()];
+                                    let mut new_body = vec![LPrimitive::DefLambda.into()];
                                     new_body.append(&mut args.to_vec());
                                     new_body.append(&mut body.to_vec());
                                     return expand(
@@ -190,7 +190,7 @@ pub async fn expand(x: &LValue, top_level: bool, env: &mut LEnv) -> LResult {
                                 }
                                 let exp = expand(&list[2], top_level, env).await?;
                                 //println!("after expansion: {}", exp);
-                                if def == LPrimitives::DefMacro {
+                                if def == LPrimitive::DefMacro {
                                     if !top_level {
                                         return Err(anyhow!(
                                             "{}: defmacro only allowed at top level",
@@ -212,12 +212,12 @@ pub async fn expand(x: &LValue, top_level: bool, env: &mut LEnv) -> LResult {
                                     return Ok(LValue::Nil);
                                 }
                                 //We add to the list the expanded body
-                                return Ok(vec![LPrimitives::Define.into(), v.clone(), exp].into());
+                                return Ok(vec![LPrimitive::Define.into(), v.clone(), exp].into());
                             }
                             _ => return Err(wrong_type!("expand", x, KindLValue::Symbol)),
                         }
                     }
-                    LPrimitives::DefLambda => {
+                    LPrimitive::DefLambda => {
                         if list.len() < 3 {
                             return Err(LRuntimeError::wrong_number_of_args(
                                 "expand",
@@ -250,18 +250,18 @@ pub async fn expand(x: &LValue, top_level: bool, env: &mut LEnv) -> LResult {
                         let exp = if body.len() == 1 {
                             body[0].clone()
                         } else {
-                            let mut vec = vec![LPrimitives::Begin.into()];
+                            let mut vec = vec![LPrimitive::Begin.into()];
                             vec.append(&mut body.to_vec());
                             LValue::List(Arc::new(vec))
                         };
                         return Ok(vec![
-                            LPrimitives::DefLambda.into(),
+                            LPrimitive::DefLambda.into(),
                             vars.clone(),
                             expand(&exp, top_level, env).await?,
                         ]
                         .into());
                     }
-                    LPrimitives::If => {
+                    LPrimitive::If => {
                         let mut list = list.deref().clone();
                         if list.len() == 3 {
                             list.push(LValue::Nil);
@@ -270,20 +270,20 @@ pub async fn expand(x: &LValue, top_level: bool, env: &mut LEnv) -> LResult {
                             return Err(wrong_n_args!("expand", list.as_slice(), 4));
                         }
                         //return map(expand, x)
-                        let mut expanded_list = vec![LPrimitives::If.into()];
+                        let mut expanded_list = vec![LPrimitive::If.into()];
                         for x in &list[1..] {
                             expanded_list.push(expand(x, false, env).await?)
                         }
                         return Ok(expanded_list.into());
                     }
-                    LPrimitives::Quote => {
+                    LPrimitive::Quote => {
                         //println!("expand: quote: Ok!");
                         if list.len() != 2 {
                             return Err(wrong_n_args!("expand", list.as_slice(), 2));
                         }
-                        return Ok(vec![LPrimitives::Quote.into(), list[1].clone()].into());
+                        return Ok(vec![LPrimitive::Quote.into(), list[1].clone()].into());
                     }
-                    LPrimitives::Begin | LPrimitives::Do => {
+                    LPrimitive::Begin | LPrimitive::Do => {
                         return if list.len() == 1 {
                             Ok(LValue::Nil)
                         } else {
@@ -294,94 +294,94 @@ pub async fn expand(x: &LValue, top_level: bool, env: &mut LEnv) -> LResult {
                             Ok(expanded_list.into())
                         }
                     }
-                    LPrimitives::QuasiQuote => {
+                    LPrimitive::QuasiQuote => {
                         return if list.len() != 2 {
                             return Err(wrong_n_args!("expand", list, 2));
                         } else {
                             expand(&expand_quasi_quote(&list[1], env)?, top_level, env).await
                         };
                     }
-                    LPrimitives::UnQuote => {
+                    LPrimitive::UnQuote => {
                         return Err(anyhow!("unquote must be inside a quasiquote expression").into())
                     }
-                    LPrimitives::Async => {
+                    LPrimitive::Async => {
                         return if list.len() != 2 {
                             Err(wrong_n_args!("expand", list.as_slice(), 2))
                         } else {
-                            let mut expanded = vec![LPrimitives::Async.into()];
+                            let mut expanded = vec![LPrimitive::Async.into()];
                             expanded.push(expand(&list[1], top_level, env).await?);
                             Ok(expanded.into())
                         }
                     }
-                    LPrimitives::Await => {
+                    LPrimitive::Await => {
                         return if list.len() != 2 {
                             Err(wrong_n_args!("expand", list.as_slice(), 2))
                         } else {
-                            let mut expanded = vec![LPrimitives::Await.into()];
+                            let mut expanded = vec![LPrimitive::Await.into()];
                             expanded.push(expand(&list[1], top_level, env).await?);
                             Ok(expanded.into())
                         }
                     }
-                    LPrimitives::Eval => {
+                    LPrimitive::Eval => {
                         return if list.len() != 2 {
                             Err(wrong_n_args!("expand", list, 2))
                         } else {
-                            let mut expanded = vec![LPrimitives::Eval.into()];
+                            let mut expanded = vec![LPrimitive::Eval.into()];
                             expanded.push(expand(&list[1], top_level, env).await?);
                             Ok(expanded.into())
                         }
                     }
-                    LPrimitives::Enr => {
+                    LPrimitive::Enr => {
                         return if list.len() != 2 {
                             Err(wrong_n_args!("expand", list, 2))
                         } else {
-                            let mut expanded = vec![LPrimitives::Enr.into()];
+                            let mut expanded = vec![LPrimitive::Enr.into()];
                             expanded.push(expand(&list[1], top_level, env).await?);
                             Ok(expanded.into())
                         }
                     }
-                    LPrimitives::Parse => {
+                    LPrimitive::Parse => {
                         return if list.len() != 2 {
                             Err(wrong_n_args!("expand", list, 2))
                         } else {
-                            let mut expanded = vec![LPrimitives::Parse.into()];
+                            let mut expanded = vec![LPrimitive::Parse.into()];
                             expanded.push(expand(&list[1], top_level, env).await?);
                             Ok(expanded.into())
                         }
                     }
-                    LPrimitives::Expand => {
+                    LPrimitive::Expand => {
                         return if list.len() != 2 {
                             Err(wrong_n_args!("expand", list, 2))
                         } else {
-                            let mut expanded = vec![LPrimitives::Expand.into()];
+                            let mut expanded = vec![LPrimitive::Expand.into()];
                             expanded.push(expand(&list[1], top_level, env).await?);
                             Ok(expanded.into())
                         }
                     }
-                    LPrimitives::Interrupt => {
+                    LPrimitive::Interrupt => {
                         return if list.len() != 2 {
                             Err(wrong_n_args!("expand", list, 2))
                         } else {
-                            let mut expanded = vec![LPrimitives::Interrupt.into()];
+                            let mut expanded = vec![LPrimitive::Interrupt.into()];
                             expanded.push(expand(&list[1], top_level, env).await?);
                             Ok(expanded.into())
                         }
                     }
-                    LPrimitives::Interruptible => {
+                    LPrimitive::Interruptible => {
                         return if list.len() != 2 {
                             Err(wrong_n_args!("expand", list, 2))
                         } else {
-                            let mut expanded = vec![LPrimitives::Interruptible.into()];
+                            let mut expanded = vec![LPrimitive::Interruptible.into()];
                             expanded.push(expand(&list[1], top_level, env).await?);
                             Ok(expanded.into())
                         }
                     }
-                    LPrimitives::Uninterruptible => {
+                    LPrimitive::Uninterruptible => {
                         return if list.len() != 2 {
                             Err(wrong_n_args!("expand", list, 2)
                                 .chain(format!("{} must have one arg", UNINTERRUPTIBLE)))
                         } else {
-                            let mut expanded = vec![LPrimitives::Uninterruptible.into()];
+                            let mut expanded = vec![LPrimitive::Uninterruptible.into()];
                             expanded.push(expand(&list[1], top_level, env).await?);
                             Ok(expanded.into())
                         }
@@ -394,24 +394,24 @@ pub async fn expand(x: &LValue, top_level: bool, env: &mut LEnv) -> LResult {
                     Ok(expanded.into())
                     }
                     }*/
-                    LPrimitives::Race => {
+                    LPrimitive::Race => {
                         return if list.len() != 3 {
                             Err(wrong_n_args!("expand", list, 3)
                                 .chain(format!("{} must have 2 args.", RACE)))
                         } else {
-                            let mut expanded = vec![LPrimitives::Race.into()];
+                            let mut expanded = vec![LPrimitive::Race.into()];
                             for e in &list[1..] {
                                 expanded.push(expand(e, top_level, env).await?);
                             }
                             Ok(expanded.into())
                         }
                     }
-                    LPrimitives::Err => {
+                    LPrimitive::Err => {
                         return if list.len() != 2 {
                             Err(wrong_n_args!("expand", list, 2)
                                 .chain(format!("{} must have one arg", primitives::ERR)))
                         } else {
-                            let mut expanded = vec![LPrimitives::Err.into()];
+                            let mut expanded = vec![LPrimitive::Err.into()];
                             expanded.push(expand(&list[1], top_level, env).await?);
                             Ok(expanded.into())
                         }
@@ -458,8 +458,8 @@ pub fn expand_quasi_quote(x: &LValue, env: &LEnv) -> LResult {
             } else {
                 let first = &list[0];
                 if let LValue::Symbol(s) = first {
-                    if let Ok(co) = LPrimitives::try_from(s.as_str()) {
-                        if co == LPrimitives::UnQuote {
+                    if let Ok(co) = LPrimitive::try_from(s.as_str()) {
+                        if co == LPrimitive::UnQuote {
                             if list.len() != 2 {
                                 return Err(wrong_n_args!("expand_quasi_quote", list, 2));
                             }
@@ -476,7 +476,7 @@ pub fn expand_quasi_quote(x: &LValue, env: &LEnv) -> LResult {
                 .into())
             }
         }
-        _ => Ok(vec![LPrimitives::Quote.into(), x.clone()].into()),
+        _ => Ok(vec![LPrimitive::Quote.into(), x.clone()].into()),
     }
     //Verify if has unquotesplicing here
 }
@@ -629,7 +629,7 @@ pub async fn eval(
                         let args = &list[1..];
                         if let LValue::Primitive(co) = proc {
                             match co {
-                                LPrimitives::Define => {
+                                LPrimitive::Define => {
                                     match &args[0] {
                                         LValue::Symbol(s) => {
                                             queue.push(StackFrame::new(
@@ -652,7 +652,7 @@ pub async fn eval(
                                         }
                                     };
                                 }
-                                LPrimitives::DefLambda => {
+                                LPrimitive::DefLambda => {
                                     let params = match &args[0] {
                                         LValue::List(list) => {
                                             let mut vec_sym = Vec::new();
@@ -691,7 +691,7 @@ pub async fn eval(
                                     )));
                                     debug.log_last_result(&results).await;
                                 }
-                                LPrimitives::If => {
+                                LPrimitive::If => {
                                     scopes.new_scope();
                                     let stack = IfFrame {
                                         conseq: args[1].clone(),
@@ -704,23 +704,23 @@ pub async fn eval(
                                         interruptibility,
                                     ));
                                 }
-                                LPrimitives::Quote => {
+                                LPrimitive::Quote => {
                                     results.push(args[0].clone());
                                 }
-                                LPrimitives::Err => {
+                                LPrimitive::Err => {
                                     results.push(LValue::Err(args[0].clone().into_ref()));
                                     debug.log_last_result(&results).await;
                                 }
-                                LPrimitives::QuasiQuote => {
+                                LPrimitive::QuasiQuote => {
                                     panic!("quasiquote not allowed")
                                 }
-                                LPrimitives::UnQuote => {
+                                LPrimitive::UnQuote => {
                                     panic!("unquote not allowed")
                                 }
-                                LPrimitives::DefMacro => {
+                                LPrimitive::DefMacro => {
                                     panic!("defmacro not allowed")
                                 }
-                                LPrimitives::Begin => {
+                                LPrimitive::Begin => {
                                     scopes.new_scope();
                                     let stack = BeginFrame { n: args.len() };
                                     queue.push(StackFrame::new(stack, interruptibility));
@@ -732,7 +732,7 @@ pub async fn eval(
                                             .collect(),
                                     );
                                 }
-                                LPrimitives::Do => {
+                                LPrimitive::Do => {
                                     scopes.new_scope();
                                     let stack = DoFrame {
                                         results: vec![],
@@ -745,14 +745,14 @@ pub async fn eval(
                                         interruptibility,
                                     ));
                                 }
-                                LPrimitives::Async => {
+                                LPrimitive::Async => {
                                     let result =
                                         async_eval(args[0].clone(), scopes.get_last().clone());
 
                                     results.push(result.into());
                                     debug.log_last_result(&results).await;
                                 }
-                                LPrimitives::Await => {
+                                LPrimitive::Await => {
                                     //println!("awaiting on async evaluation");
                                     queue.push(StackFrame::new(
                                         CoreOperatorFrame::Await,
@@ -763,7 +763,7 @@ pub async fn eval(
                                         interruptibility,
                                     ));
                                 }
-                                LPrimitives::Eval => {
+                                LPrimitive::Eval => {
                                     queue.push(StackFrame::new(
                                         CoreOperatorFrame::Eval,
                                         interruptibility,
@@ -777,7 +777,7 @@ pub async fn eval(
                                         interruptibility,
                                     ));
                                 }
-                                LPrimitives::Enr => {
+                                LPrimitive::Enr => {
                                     queue.push(StackFrame::new(
                                         CoreOperatorFrame::Enr,
                                         interruptibility,
@@ -787,7 +787,7 @@ pub async fn eval(
                                         interruptibility,
                                     ));
                                 }
-                                LPrimitives::Expand => {
+                                LPrimitive::Expand => {
                                     queue.push(StackFrame::new(
                                         CoreOperatorFrame::Expand,
                                         interruptibility,
@@ -797,7 +797,7 @@ pub async fn eval(
                                         interruptibility,
                                     ));
                                 }
-                                LPrimitives::Parse => {
+                                LPrimitive::Parse => {
                                     queue.push(StackFrame::new(
                                         CoreOperatorFrame::Parse,
                                         interruptibility,
@@ -808,7 +808,7 @@ pub async fn eval(
                                     ));
                                 }
 
-                                LPrimitives::Interrupt => {
+                                LPrimitive::Interrupt => {
                                     queue.push(StackFrame::new(
                                         CoreOperatorFrame::Interrupt,
                                         interruptibility,
@@ -818,18 +818,18 @@ pub async fn eval(
                                         interruptibility,
                                     ));
                                 }
-                                LPrimitives::Interruptible => {
+                                LPrimitive::Interruptible => {
                                     unreachable!();
                                     //queue.push(StackFrame::interruptible(args[0].clone()))
                                 }
-                                LPrimitives::Uninterruptible => {
+                                LPrimitive::Uninterruptible => {
                                     unreachable!();
                                     //queue.push(StackFrame::uninterruptible(args[0].clone()))
                                 }
                                 /*LCoreOperator::QuasiInterruptible => {
                                     queue.push(StackFrame::quasiinterruptible(args[0].clone()))
                                 }*/
-                                LPrimitives::Race => {
+                                LPrimitive::Race => {
                                     let handler_1 =
                                         async_eval(args[0].clone(), scopes.get_last().clone());
                                     let handler_2 =
@@ -1025,7 +1025,7 @@ pub async fn eval(
                         }
                         lv => {
                             let e = wrong_type!("eval", &lv, KindLValue::Bool);
-                            expression_error = list![LPrimitives::If.into(), lv, i.conseq, i.alt];
+                            expression_error = list![LPrimitive::If.into(), lv, i.conseq, i.alt];
                             break Err(e.chain("if condition must return a boolean."));
                         }
                     };
@@ -1081,13 +1081,13 @@ pub async fn eval(
 
                         match r {
                             Err(e) => {
-                                expression_error = list![LPrimitives::Await.into(), result];
+                                expression_error = list![LPrimitive::Await.into(), result];
                                 break Err(e);
                             }
                             Ok(lv) => results.push(lv),
                         }
                     } else {
-                        expression_error = list![LPrimitives::Await.into(), result.clone()];
+                        expression_error = list![LPrimitive::Await.into(), result.clone()];
                         break Err(wrong_type!(EVAL, &result, KindLValue::Handler)
                             .chain("Await argument must be a LValue::Handler."));
                     };
@@ -1097,14 +1097,14 @@ pub async fn eval(
                     if let LValue::Handle(ref mut h) = result {
                         match h.interrupt().await {
                             Err(e) => {
-                                expression_error = list![LPrimitives::Await.into(), result];
+                                expression_error = list![LPrimitive::Await.into(), result];
                                 break Err(e);
                             }
                             Ok(lv) => results.push(lv),
                         }
                     } else {
                         let e = wrong_type!(EVAL, &result, KindLValue::Handler);
-                        expression_error = list![LPrimitives::Await.into(), result];
+                        expression_error = list![LPrimitive::Await.into(), result];
                         break Err(e.chain("Interrupt argument must be a LValue::Handler."));
                     };
                 }
@@ -1122,7 +1122,7 @@ pub async fn eval(
                 CoreOperatorFrame::Expand => {
                     let result = results.pop().unwrap();
                     results.push(expand(&result, true, scopes.get_last_mut()).await?);
-                    debug.push(Unininterruptible, list!(LPrimitives::Expand.into(), result));
+                    debug.push(Unininterruptible, list!(LPrimitive::Expand.into(), result));
                     debug.log_last_result(&results).await;
                 }
                 CoreOperatorFrame::Parse => {
@@ -1132,7 +1132,7 @@ pub async fn eval(
                         debug.log_last_result(&results).await;
                     } else {
                         let e = wrong_type!("eval", &result, KindLValue::String);
-                        expression_error = list![LPrimitives::Parse.into(), result];
+                        expression_error = list![LPrimitive::Parse.into(), result];
                         break Err(e.chain("Parse argument must be a string."));
                     };
                 }
@@ -1142,7 +1142,7 @@ pub async fn eval(
                         LValue::List(list) => {
                             let mut new_expr = vec![list[0].clone()];
                             for e in &list.as_slice()[1..] {
-                                new_expr.push(list!(LPrimitives::Quote.into(), e.clone()))
+                                new_expr.push(list!(LPrimitive::Quote.into(), e.clone()))
                             }
                             new_expr.into()
                         }

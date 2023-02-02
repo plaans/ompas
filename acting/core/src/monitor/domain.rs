@@ -21,7 +21,7 @@ use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lenv::{LEnv, LEnvSymbols};
 use sompas_structs::llambda::LLambda;
 use sompas_structs::lmodule::{InitScheme, LModule};
-use sompas_structs::lprimitives::LPrimitives;
+use sompas_structs::lprimitive::LPrimitive;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::{lruntimeerror, wrong_n_args, wrong_type};
@@ -309,7 +309,7 @@ async fn create_model(env: &LEnv, model: im::HashMap<LValue, LValue>) -> LResult
             let effects = model
                 .get(&EFFECTS.into())
                 .ok_or_else(|| LRuntimeError::new("create_model", "missing :effects"))?;
-            let effects = cons(env, &[LPrimitives::Do.into(), effects.clone()])?;
+            let effects = cons(env, &[LPrimitive::Do.into(), effects.clone()])?;
             let test =
                 generate_test_type_expr(env, &[model.get(&PARAMETERS.into()).unwrap().clone()])
                     .await?;

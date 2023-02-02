@@ -3,7 +3,7 @@ use anyhow::anyhow;
 use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::llambda::{LLambda, LambdaArgs};
-use sompas_structs::lprimitives::LPrimitives;
+use sompas_structs::lprimitive::LPrimitive;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::{lruntimeerror, wrong_type};
@@ -82,9 +82,9 @@ impl From<&PLValue> for LValue {
 pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::Result<PLValue> {
     match x {
         LValue::List(list) => {
-            if let Ok(co) = LPrimitives::try_from(&list[0]) {
+            if let Ok(co) = LPrimitive::try_from(&list[0]) {
                 match co {
-                    LPrimitives::Define | LPrimitives::DefMacro => {
+                    LPrimitive::Define | LPrimitive::DefMacro => {
                         //eprintln!("expand: define: Ok!");
                         if list.len() < 3 {
                             return Err(LRuntimeError::wrong_number_of_args(
@@ -93,7 +93,7 @@ pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::R
                                 3..std::usize::MAX,
                             ));
                         }
-                        let def = LPrimitives::try_from(&list[0])?;
+                        let def = LPrimitive::try_from(&list[0])?;
                         let v = &list[1];
                         let body = &list[2..];
                         match v {
@@ -101,7 +101,7 @@ pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::R
                                 if v_list.len() >= 2 {
                                     let f = &v_list[0];
                                     let args = &v_list[1..];
-                                    let mut new_body = vec![LPrimitives::DefLambda.into()];
+                                    let mut new_body = vec![LPrimitive::DefLambda.into()];
                                     new_body.append(&mut args.to_vec());
                                     new_body.append(&mut body.to_vec());
                                     return p_expand(
@@ -124,7 +124,7 @@ pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::R
                                     return Ok(PLValue::into_unpure(x));
                                 }
                                 //println!("after expansion: {}", exp);
-                                if def == LPrimitives::DefMacro {
+                                if def == LPrimitive::DefMacro {
                                     if !top_level {
                                         return Err(lruntimeerror!(
                                             EXPAND_STATIC,
@@ -147,13 +147,13 @@ pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::R
                                 }
                                 //We add to the list the expanded body
                                 return Ok(PLValue::into_pure(
-                                    &vec![LPrimitives::Define.into(), v.clone(), exp.lvalue].into(),
+                                    &vec![LPrimitive::Define.into(), v.clone(), exp.lvalue].into(),
                                 ));
                             }
                             _ => return Err(wrong_type!(EXPAND_STATIC, x, KindLValue::Symbol)),
                         }
                     }
-                    LPrimitives::DefLambda => {
+                    LPrimitive::DefLambda => {
                         if list.len() < 3 {
                             return Err(LRuntimeError::wrong_number_of_args(
                                 EXPAND_STATIC,
@@ -187,7 +187,7 @@ pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::R
                         let exp = if body.len() == 1 {
                             body[0].clone()
                         } else {
-                            let mut vec = vec![LPrimitives::Begin.into()];
+                            let mut vec = vec![LPrimitive::Begin.into()];
                             vec.append(&mut body.to_vec());
                             LValue::List(Arc::new(vec))
                         };
@@ -196,11 +196,10 @@ pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::R
                             return Ok(PLValue::into_unpure(x));
                         }
                         return Ok(PLValue::into_pure(
-                            &vec![LPrimitives::DefLambda.into(), vars.clone(), result.lvalue]
-                                .into(),
+                            &vec![LPrimitive::DefLambda.into(), vars.clone(), result.lvalue].into(),
                         ));
                     }
-                    LPrimitives::If => {
+                    LPrimitive::If => {
                         let mut list = list.deref().clone();
                         if list.len() == 3 {
                             list.push(LValue::Nil);
@@ -213,7 +212,7 @@ pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::R
                             ));
                         }
                         //return map(expand, x)
-                        let mut expanded_list = vec![LPrimitives::If.into()];
+                        let mut expanded_list = vec![LPrimitive::If.into()];
                         for x in &list[1..] {
                             let result = p_expand(x, false, env)?;
                             if !result.is_pure() {
@@ -223,7 +222,7 @@ pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::R
                         }
                         return Ok(PLValue::into_pure(&expanded_list.into()));
                     }
-                    LPrimitives::Quote => {
+                    LPrimitive::Quote => {
                         //println!("expand: quote: Ok!");
                         if list.len() != 2 {
                             return Err(LRuntimeError::wrong_number_of_args(
@@ -233,10 +232,10 @@ pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::R
                             ));
                         }
                         return Ok(PLValue::into_pure(
-                            &vec![LPrimitives::Quote.into(), list[1].clone()].into(),
+                            &vec![LPrimitive::Quote.into(), list[1].clone()].into(),
                         ));
                     }
-                    LPrimitives::Begin | LPrimitives::Do => {
+                    LPrimitive::Begin | LPrimitive::Do => {
                         return if list.len() == 1 {
                             Ok(PLValue::into_pure(&LValue::Nil))
                         } else {
@@ -251,7 +250,7 @@ pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::R
                             Ok(PLValue::into_pure(&expanded_list.into()))
                         }
                     }
-                    LPrimitives::QuasiQuote => {
+                    LPrimitive::QuasiQuote => {
                         return if list.len() != 2 {
                             Err(LRuntimeError::wrong_number_of_args(
                                 EXPAND_STATIC,
@@ -267,13 +266,13 @@ pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::R
                             //Ok(expanded)
                         };
                     }
-                    LPrimitives::UnQuote => {
+                    LPrimitive::UnQuote => {
                         return Err(anyhow!(
                             "unquote must be inside a quasiquote expression".to_string(),
                         )
                         .into())
                     }
-                    LPrimitives::Async => {
+                    LPrimitive::Async => {
                         return if list.len() != 2 {
                             Err(LRuntimeError::wrong_number_of_args(
                                 EXPAND_STATIC,
@@ -281,7 +280,7 @@ pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::R
                                 2..2,
                             ))
                         } else {
-                            let mut expanded = vec![LPrimitives::Async.into()];
+                            let mut expanded = vec![LPrimitive::Async.into()];
                             let result = p_expand(&list[1], top_level, env)?;
 
                             if !result.is_pure() {
@@ -291,7 +290,7 @@ pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::R
                             Ok(PLValue::into_unpure(&expanded.into()))
                         }
                     }
-                    LPrimitives::Await => {
+                    LPrimitive::Await => {
                         return if list.len() != 2 {
                             Err(LRuntimeError::wrong_number_of_args(
                                 EXPAND_STATIC,
@@ -299,7 +298,7 @@ pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::R
                                 2..2,
                             ))
                         } else {
-                            let mut expanded = vec![LPrimitives::Await.into()];
+                            let mut expanded = vec![LPrimitive::Await.into()];
                             let result = p_expand(&list[1], top_level, env)?;
 
                             if !result.is_pure() {
@@ -309,7 +308,7 @@ pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::R
                             Ok(PLValue::into_pure(&expanded.into()))
                         }
                     }
-                    LPrimitives::Eval => {
+                    LPrimitive::Eval => {
                         return if list.len() != 2 {
                             Err(LRuntimeError::wrong_number_of_args(
                                 EXPAND_STATIC,
@@ -317,7 +316,7 @@ pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::R
                                 2..2,
                             ))
                         } else {
-                            let mut expanded = vec![LPrimitives::Eval.into()];
+                            let mut expanded = vec![LPrimitive::Eval.into()];
                             let result = p_expand(&list[1], top_level, env)?;
                             if !result.is_pure() {
                                 return Ok(PLValue::into_unpure(x));
@@ -326,7 +325,7 @@ pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::R
                             Ok(PLValue::into_pure(&expanded.into()))
                         }
                     }
-                    LPrimitives::Parse => {
+                    LPrimitive::Parse => {
                         return if list.len() != 2 {
                             Err(LRuntimeError::wrong_number_of_args(
                                 EXPAND_STATIC,
@@ -334,7 +333,7 @@ pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::R
                                 2..2,
                             ))
                         } else {
-                            let mut expanded = vec![LPrimitives::Parse.into()];
+                            let mut expanded = vec![LPrimitive::Parse.into()];
                             let result = p_expand(&list[1], top_level, env)?;
 
                             if !result.is_pure() {
@@ -344,7 +343,7 @@ pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::R
                             Ok(PLValue::into_pure(&expanded.into()))
                         }
                     }
-                    LPrimitives::Expand => {
+                    LPrimitive::Expand => {
                         return if list.len() != 2 {
                             Err(LRuntimeError::wrong_number_of_args(
                                 EXPAND_STATIC,
@@ -352,7 +351,7 @@ pub fn p_expand(x: &LValue, top_level: bool, env: &mut LEnv) -> lruntimeerror::R
                                 2..2,
                             ))
                         } else {
-                            let mut expanded = vec![LPrimitives::Expand.into()];
+                            let mut expanded = vec![LPrimitive::Expand.into()];
                             let result = p_expand(&list[1], top_level, env)?;
 
                             if !result.is_pure() {
@@ -449,7 +448,7 @@ pub fn p_eval(lv: &LValue, env: &mut LEnv) -> lruntimeerror::Result<PLValue> {
             //assert!(args.len() >= 2, "Checked in expansion");
             if let LValue::Primitive(co) = proc {
                 match co {
-                    LPrimitives::Define => {
+                    LPrimitive::Define => {
                         return match &args[0] {
                             LValue::Symbol(s) => {
                                 let result = p_eval(&args[1], env)?;
@@ -474,7 +473,7 @@ pub fn p_eval(lv: &LValue, env: &mut LEnv) -> lruntimeerror::Result<PLValue> {
                         };
 
                     }
-                    LPrimitives::DefLambda => {
+                    LPrimitive::DefLambda => {
                         //println!("it is a lambda");
                         let params = match &args[0] {
                             LValue::List(list) => {
@@ -511,7 +510,7 @@ pub fn p_eval(lv: &LValue, env: &mut LEnv) -> lruntimeerror::Result<PLValue> {
                         }
                         return Ok(PLValue::into_pure(&r_lvalue));
                     }
-                    LPrimitives::If => {
+                    LPrimitive::If => {
                         let test = &args[0];
                         let conseq = &args[1];
                         let alt = &args[2];
@@ -534,14 +533,14 @@ pub fn p_eval(lv: &LValue, env: &mut LEnv) -> lruntimeerror::Result<PLValue> {
                         }
 
                     }
-                    LPrimitives::Quote => {
+                    LPrimitive::Quote => {
                         if get_debug() {
                             println!("{} => {}", str, &args[0].clone());
                         }
                         return Ok(PLValue::into_pure(&args[0]));
                     }
-                    LPrimitives::Begin | LPrimitives::Do => {
-                        let _do = *co == LPrimitives::Do;
+                    LPrimitive::Begin | LPrimitive::Do => {
+                        let _do = *co == LPrimitive::Do;
                         let mut elements = vec![];
                         let mut all_pure = true;
 
@@ -563,13 +562,13 @@ pub fn p_eval(lv: &LValue, env: &mut LEnv) -> lruntimeerror::Result<PLValue> {
                             Ok(PLValue::into_unpure(&elements.into()))
                         };
                     }
-                    LPrimitives::QuasiQuote
-                    | LPrimitives::UnQuote
-                    | LPrimitives::DefMacro => return Err(lruntimeerror!(EVAL_STATIC, "quasiquote, unquote and defmacro should not be prensent in exanded expressions")),
-                    LPrimitives::Async | LPrimitives::Await => {
+                    LPrimitive::QuasiQuote
+                    | LPrimitive::UnQuote
+                    | LPrimitive::DefMacro => return Err(lruntimeerror!(EVAL_STATIC, "quasiquote, unquote and defmacro should not be prensent in exanded expressions")),
+                    LPrimitive::Async | LPrimitive::Await => {
                         return Ok(PLValue::into_unpure(&lv));
                     }
-                    LPrimitives::Eval => {
+                    LPrimitive::Eval => {
                         let arg = &args[0];
                         let result = p_eval(arg, env)?;
                         lv = if result.is_pure() {
@@ -583,7 +582,7 @@ pub fn p_eval(lv: &LValue, env: &mut LEnv) -> lruntimeerror::Result<PLValue> {
                             return Ok(PLValue::into_unpure(&lv))
                         };
                     }
-                    LPrimitives::Parse => {
+                    LPrimitive::Parse => {
                         let result = p_eval(&args[0], env)?;
                         return if result.is_pure() {
                             if let LValue::String(s) = result.lvalue {
@@ -601,7 +600,7 @@ pub fn p_eval(lv: &LValue, env: &mut LEnv) -> lruntimeerror::Result<PLValue> {
                         }
 
                     }
-                    LPrimitives::Expand => {
+                    LPrimitive::Expand => {
                         let arg = &args[0];
                         let result = p_eval(arg, env)?;
                         return if result.is_pure() {

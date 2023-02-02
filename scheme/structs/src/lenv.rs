@@ -2,20 +2,51 @@ use crate::contextcollection::{Context, ContextCollection};
 use crate::documentation::{Doc, DocCollection};
 use crate::llambda::LLambda;
 use crate::lmodule::{InitScheme, LModule};
+use crate::lprimitive::LPrimitive::*;
 use crate::lruntimeerror;
 use crate::lvalue::LValue;
 use crate::purefonction::PureFonctionCollection;
-use im::HashSet;
+use im::{hashmap, HashSet};
 use ompas_middleware::logger::LogClient;
 use std::any::Any;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 use std::sync::Arc;
 
-#[derive(Default, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct LEnvSymbols {
     inner: im::HashMap<String, LValue>,
     outer: Arc<Option<LEnvSymbols>>,
+}
+
+impl Default for LEnvSymbols {
+    fn default() -> Self {
+        Self {
+            inner: hashmap! {
+                Define.to_string() => Define.into(),
+                DefLambda.to_string() => DefLambda.into(),
+                If.to_string() => If.into(),
+                Quote.to_string() => Quote.into(),
+                QuasiQuote.to_string() => QuasiQuote.into(),
+                UnQuote.to_string() => UnQuote.into(),
+                DefMacro.to_string() => DefMacro.into(),
+                Begin.to_string() => Begin.into(),
+                Do.to_string() => Do.into(),
+                Async.to_string() => Async.into(),
+                Await.to_string() => Await.into(),
+                Parse.to_string() => Parse.into(),
+                Expand.to_string() => Expand.into(),
+                Eval.to_string() => Eval.into(),
+                Interrupt.to_string() => Interrupt.into(),
+                Interruptible.to_string() => Interruptible.into(),
+                Uninterruptible.to_string() => Uninterruptible.into(),
+                Err.to_string() => Err.into(),
+                Enr.to_string() => Enr.into(),
+                Race.to_string() => Race.into(),
+            },
+            outer: Arc::new(None),
+        }
+    }
 }
 
 impl LEnvSymbols {

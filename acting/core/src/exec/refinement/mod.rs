@@ -33,7 +33,7 @@ use sompas_modules::utils::enumerate;
 use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lmodule::LModule;
-use sompas_structs::lprimitives::LPrimitives;
+use sompas_structs::lprimitive::LPrimitive;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::{list, lruntimeerror, wrong_type};
@@ -392,10 +392,7 @@ pub async fn greedy_select(
             let arg = cons(env, &[pre_conditions_lambda.clone(), i_vec[1..].into()])?;
             let arg_debug = arg.to_string();
             let lv: LValue = eval(
-                &list!(
-                    LPrimitives::Enr.into(),
-                    list!(LPrimitives::Quote.into(), arg)
-                ),
+                &list!(LPrimitive::Enr.into(), list!(LPrimitive::Quote.into(), arg)),
                 &mut env.clone(),
                 None,
             )
@@ -405,10 +402,7 @@ pub async fn greedy_select(
                 let arg = cons(env, &[score_lambda.clone(), i_vec[1..].into()])?;
                 let arg_debug = arg.to_string();
                 let score: i64 = eval(
-                    &list!(
-                        LPrimitives::Enr.into(),
-                        list!(LPrimitives::Quote.into(), arg)
-                    ),
+                    &list!(LPrimitive::Enr.into(), list!(LPrimitive::Quote.into(), arg)),
                     &mut env.clone(),
                     None,
                 )

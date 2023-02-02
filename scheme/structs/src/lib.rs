@@ -10,7 +10,7 @@ pub mod lfuture;
 pub mod llambda;
 pub mod lmodule;
 pub mod lnumber;
-pub mod lprimitives;
+pub mod lprimitive;
 pub mod lruntimeerror;
 pub mod lswitch;
 pub mod lvalue;

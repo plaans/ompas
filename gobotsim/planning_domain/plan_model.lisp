@@ -6,8 +6,11 @@
         (:body
             (do
                 (define list_packages (instances package))
-                (define list-h (mapf (lambda (?p) (async (t_process_package ?p))) list_packages))
-                list-h
+                (define tasks (mapf (lambda (?p) `(async (t_process_package ,?p))) list_packages))
+                (eval (cons par tasks))
+                ;list-h
+                ;(mapf await (list (async test)))
+                ;(mapf await (mapf (lambda (?p) (async (t_process_package ?p))) list_packages))
                 (mapf await list-h)
             )))
 

@@ -45,7 +45,10 @@ impl Default for PLValue {
 
 impl Display for PLValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.lvalue)
+        match self.pure {
+            true => write!(f, "{}", self.lvalue),
+            false => write!(f, "u:{}", self.lvalue),
+        }
     }
 }
 

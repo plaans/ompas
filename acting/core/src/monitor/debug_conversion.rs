@@ -15,7 +15,6 @@ use ompas_structs::conversion::context::ConversionContext;
 use ompas_structs::planning::domain::PlanningDomain;
 use ompas_structs::planning::instance::PlanningInstance;
 use ompas_structs::planning::problem::PlanningProblem;
-use sompas_core::expand;
 use sompas_macros::async_scheme_fn;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::llambda::LLambda;

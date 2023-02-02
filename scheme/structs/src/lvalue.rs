@@ -3,7 +3,7 @@ use crate::kindlvalue::KindLValue;
 use crate::lasynchandler::LAsyncHandle;
 use crate::llambda::LLambda;
 use crate::lnumber::LNumber;
-use crate::lprimitives::LPrimitives;
+use crate::lprimitive::LPrimitive;
 use crate::lruntimeerror::LRuntimeError;
 use crate::{lruntimeerror, string, symbol, wrong_type};
 use function_name::named;
@@ -40,7 +40,7 @@ pub enum LValue {
     //#[serde(skip)]
     Lambda(LLambda),
     //#[serde(skip)]
-    Primitive(LPrimitives),
+    Primitive(LPrimitive),
     //#[serde(skip)]
     Handle(LAsyncHandle),
     //Future(LFuture),
@@ -141,8 +141,8 @@ impl LValue {
             LValue::List(list) => {
                 if !list.is_empty() {
                     match &list[0] {
-                        LValue::Primitive(LPrimitives::Begin)
-                        | LValue::Primitive(LPrimitives::Do) => {
+                        LValue::Primitive(LPrimitive::Begin)
+                        | LValue::Primitive(LPrimitive::Do) => {
                             let indent = indent + TAB_SIZE;
                             let mut string = format!("({}", list[0]);
                             for (i, element) in list.iter().enumerate() {
@@ -160,7 +160,7 @@ impl LValue {
                             string.push(')');
                             string
                         }
-                        LValue::Primitive(LPrimitives::If) => {
+                        LValue::Primitive(LPrimitive::If) => {
                             LValue::pretty_print_list_aligned(IF, &list[1..], indent)
                         }
                         LValue::Symbol(s) => match s.as_str() {
@@ -482,7 +482,7 @@ impl TryFrom<LValue> for bool {
     }
 }
 
-impl TryFrom<&LValue> for LPrimitives {
+impl TryFrom<&LValue> for LPrimitive {
     type Error = LRuntimeError;
 
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
@@ -498,7 +498,7 @@ impl TryFrom<&LValue> for LPrimitives {
     }
 }
 
-impl TryFrom<LValue> for LPrimitives {
+impl TryFrom<LValue> for LPrimitive {
     type Error = LRuntimeError;
 
     fn try_from(value: LValue) -> Result<Self, Self::Error> {
@@ -816,14 +816,14 @@ impl<T: Clone + Into<LValue>> From<Vec<T>> for LValue {
     }
 }
 
-impl From<&LPrimitives> for LValue {
-    fn from(co: &LPrimitives) -> Self {
+impl From<&LPrimitive> for LValue {
+    fn from(co: &LPrimitive) -> Self {
         (*co).into()
     }
 }
 
-impl From<LPrimitives> for LValue {
-    fn from(co: LPrimitives) -> Self {
+impl From<LPrimitive> for LValue {
+    fn from(co: LPrimitive) -> Self {
         LValue::Primitive(co)
     }
 }

@@ -27,7 +27,7 @@ use sompas_structs::lenv::LEnv;
 use sompas_structs::lfuture::{FutureResult, LFuture};
 use sompas_structs::list;
 use sompas_structs::lmodule::LModule;
-use sompas_structs::lprimitives::LPrimitives;
+use sompas_structs::lprimitive::LPrimitive;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lswitch::new_interruption_handler;
 use sompas_structs::lvalue::LValue;
@@ -172,7 +172,7 @@ pub async fn arbitrary(env: &LEnv, args: &[LValue]) -> LResult {
             eval(
                 &vec![
                     args[1].clone(),
-                    vec![LPrimitives::Quote.into(), args[0].clone()].into(),
+                    vec![LPrimitive::Quote.into(), args[0].clone()].into(),
                 ]
                 .into(),
                 &mut env.clone(),

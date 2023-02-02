@@ -252,6 +252,9 @@ pub mod utils {
     pub const DOC_TRANSFORM_IN_SINGLETON_LIST_VERBOSE: &str =
         "Example: (transform-in-singleton-list 1 2 3) => ((1)(2)(3))";
 
+    pub const RANGE: &str = "range";
+    pub const DOC_RANGE: &str = "Generates a range of elements";
+
     //MACROS
     pub const AND: &str = "and";
     pub const DOC_AND: &str = "Return true if all expressions are true.";
@@ -450,10 +453,45 @@ pub mod utils {
     pub const DOC_MAPF: &str =
         "Apply a function to all elements of a list, and return a list of all the results";
     pub const DOC_MAPF_VERBOSE: &str = "Example: (mapf square '(1 2 3)) => (1 4 9)";
-    pub const LAMBDA_MAPF: &str = "(lambda (f seq)
-         (if (null? seq)
-         nil
-         (cons (eval (cons f (list (car seq)))) (mapf f (cdr seq)))))";
+    /*pub const LAMBDA_MAPF: &str = "(lambda (f seq)
+    (if (null? seq)
+    nil
+    (cons (eval (cons f (list (car seq)))) (mapf f (cdr seq)))))";*/
+
+    pub const LAMBDA_MAPF: &str = "(lambda args
+    (let ((f (car args))
+          (seq (cdr args)))
+        (begin
+            (define firsts 
+                (lambda (lists)
+                    (if (null? lists)
+                        nil
+                        (cons (caar lists)
+                                (firsts (cdr lists))))))
+                (define rests 
+                    (lambda (lists)
+                        (if (null? lists)
+                            nil
+                            (begin
+                                (define _r_ (cdar lists))
+                                (if (null? _r_)
+                                    nil
+                                    (cons _r_ (rests (cdr lists))))))))
+            (define g_seq
+                (lambda (seq)
+                    (if (null? seq)
+                        nil
+                        (begin
+                            (cons (firsts seq) (g_seq (rests seq)))))))
+            (define args (g_seq seq))
+            ;args
+            (define _proc_ (lambda (f seq)
+                (if (null? seq)
+                    nil
+                    (cons (eval (cons f (car seq))) (_proc_ f (cdr seq)))))
+            )
+            (_proc_ f args)
+    )))";
 
     /*pub const LAMBDA_ARBITRARY: &str = "(define arbitrary
     (lambda args
@@ -466,9 +504,17 @@ pub mod utils {
               (else nil)))) ; error cases";*/
 
     pub const PAR: &str = "par";
-    pub const DOC_PAR: &str = "Not yet implemented!";
-    /*pub const LAMBDA_PAR: &str = "(define par (lambda l
-    (mapf await (mapf async l))))";*/
+    pub const DOC_PAR: &str = "Executes in parallel threads several expressions";
+    pub const LAMBDA_PAR: &str = "(lambda _list_
+        (begin
+            (define _n_ (len _list_))
+            (define _handle_symbols_ (mapf (lambda (n) (string::concatenate _h n _)) (range 0 (- _n_ 1))))
+            ;(print _handle_symbols_)
+            (define _tasks_ (mapf (lambda (_t_ _h_) `(define ,_h_ (async ,_t_))) _list_ _handle_symbols_))
+            ;(print _handle_symbols_)
+            (define _awaits_ (mapf (lambda (_h_) `(await ,_h_)) _handle_symbols_))
+            (cons begin (append _tasks_ _awaits_))
+        ))";
 
     pub const REPEAT: &str = "repeat";
     pub const DOC_REPEAT: &str = "Repeat the evaluation of an expression n times.";

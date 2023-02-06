@@ -28,7 +28,7 @@ use ompas_structs::conversion::chronicle::template::ChronicleTemplate;
 use ompas_structs::planning::instance::PlanningInstance;
 use ompas_structs::planning::problem::PlanningProblem;
 use ompas_structs::state::partial_state::PartialState;
-use ompas_structs::state::world_state::WorldStateSnapshot;
+use ompas_structs::state::world_state::{StateType, WorldStateSnapshot};
 use ompas_structs::sym_table::computation::Computation;
 use ompas_structs::sym_table::domain::basic_type::{
     TYPE_ID_BOOLEAN, TYPE_ID_EMPTY, TYPE_ID_FALSE, TYPE_ID_FLOAT, TYPE_ID_INT, TYPE_ID_NIL,
@@ -402,7 +402,7 @@ fn initialize_state(init_ch: &mut aChronicle, state: &WorldStateSnapshot, ctx: &
     Initialisation of static state variables
      */
     //We suppose for the moment that all args of state variable are objects
-    for (key, value) in &state._static.inner {
+    for (key, value) in &state.get_state(Some(StateType::Static)).inner {
         let key: Vec<SAtom> = match key {
             LValueS::List(vec) => vec.iter().map(|lv| satom_from_lvalues(ctx, lv)).collect(),
             LValueS::Symbol(_) => vec![satom_from_lvalues(ctx, key)],
@@ -421,27 +421,7 @@ fn initialize_state(init_ch: &mut aChronicle, state: &WorldStateSnapshot, ctx: &
     /*
     Initialisation of dynamic state variables
      */
-
-    for (key, value) in &state.dynamic.inner {
-        let key: Vec<SAtom> = match key {
-            LValueS::List(vec) => vec.iter().map(|lv| satom_from_lvalues(ctx, lv)).collect(),
-            LValueS::Symbol(_) => vec![satom_from_lvalues(ctx, key)],
-            _ => panic!("state variable is either a symbol or a list of symbols"),
-        };
-        let value = atom_from_lvalues(ctx, value);
-        init_ch.effects.push(Effect {
-            transition_start: init_ch.start,
-            persistence_start: init_ch.start,
-            min_persistence_end: vec![],
-            state_var: key,
-            value,
-        });
-    }
-
-    /*
-    Initilisation of inner world
-    */
-    for (key, value) in &state.inner_world.inner {
+    for (key, value) in &state.get_state(Some(StateType::Dynamic)).inner {
         let key: Vec<SAtom> = match key {
             LValueS::List(vec) => vec.iter().map(|lv| satom_from_lvalues(ctx, lv)).collect(),
             LValueS::Symbol(_) => vec![satom_from_lvalues(ctx, key)],

@@ -6,15 +6,17 @@ use ompas_language::monitor::debug_conversion::{
     DOC_PRE_EVAL_TASK, MOD_DEBUG_CONVERSION, PLAN_TASK, PRE_EVAL_EXPR, PRE_EVAL_TASK,
 };
 use ompas_language::monitor::domain::MOD_DOMAIN;
+use ompas_middleware::logger::LogClient;
 use ompas_planning::aries::solver::run_solver_for_htn;
 use ompas_planning::aries::{generate_chronicles, solver};
 use ompas_planning::conversion::convert_acting_domain;
 use ompas_planning::conversion::flow::p_eval::r#struct::{PConfig, PLValue};
-use ompas_planning::conversion::flow::p_eval::{p_eval, p_expand};
+use ompas_planning::conversion::flow::p_eval::{p_eval, p_expand, P_EVAL};
 use ompas_structs::conversion::context::ConversionContext;
 use ompas_structs::planning::domain::PlanningDomain;
 use ompas_structs::planning::instance::PlanningInstance;
 use ompas_structs::planning::problem::PlanningProblem;
+use sompas_language::LOG_TOPIC_INTERPRETER;
 use sompas_macros::async_scheme_fn;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::llambda::LLambda;
@@ -122,6 +124,7 @@ pub async fn pre_eval_task(env: &LEnv, task: &[LValue]) -> Result<(), LRuntimeEr
         }
         let body = method.get_body();
         let mut env = context.env.clone();
+        env.log = LogClient::new(P_EVAL, LOG_TOPIC_INTERPRETER).await;
         let lambda: LLambda = body.try_into()?;
         let lv = lambda.get_body();
         let plv = p_eval(lv, &mut env, &pc).await?;
@@ -147,6 +150,7 @@ pub async fn pre_eval_expr(env: &LEnv, lv: LValue) -> Result<(), LRuntimeError> 
     pc.avoid.insert(EXEC_TASK.to_string());
     //pc.avoid.insert(CHECK.to_string());
     let mut env = context.env.clone();
+    env.log = LogClient::new(P_EVAL, LOG_TOPIC_INTERPRETER).await;
     let plv: PLValue = p_expand(&lv, true, &mut env, &pc).await?;
     let plv: PLValue = p_eval(&plv.get_lvalue(), &mut env, &pc).await?;
     println!(

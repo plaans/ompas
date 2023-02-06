@@ -3,6 +3,7 @@ use crate::monitor::{ModMonitor, TOKIO_CHANNEL_SIZE};
 use crate::rae;
 use ompas_interface::platform::Platform;
 use ompas_interface::platform_config::PlatformConfig;
+use ompas_language::exec::state::{DYNAMIC, INNER_DYNAMIC, INNER_STATIC, INSTANCE, STATIC};
 use ompas_language::exec::task::DOC_GET_TASK_ID;
 use ompas_language::monitor::control::*;
 use ompas_language::process::{LOG_TOPIC_OMPAS, PROCESS_STOP_OMPAS, PROCESS_TOPIC_OMPAS};
@@ -28,10 +29,11 @@ use sompas_core::{eval_init, get_root_env};
 use sompas_macros::*;
 use sompas_modules::advanced_math::ModAdvancedMath;
 use sompas_modules::io::{LogOutput, ModIO};
+use sompas_modules::string::ModString;
 use sompas_modules::time::ModTime;
 use sompas_modules::utils::ModUtils;
 use sompas_structs::kindlvalue::KindLValue;
-use sompas_structs::lenv::ImportType::WithoutPrefix;
+use sompas_structs::lenv::ImportType::{WithPrefix, WithoutPrefix};
 use sompas_structs::lenv::{LEnv, LEnvSymbols};
 use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
@@ -129,6 +131,8 @@ impl ModControl {
         env.import_module(ModUtils::default(), WithoutPrefix);
 
         env.import_module(ModAdvancedMath::default(), WithoutPrefix);
+
+        env.import_module(ModString::default(), WithPrefix);
 
         let mut ctx_io = ModIO::default();
         ctx_io.set_log_output(LogOutput::Log(self.log.clone()));
@@ -529,17 +533,15 @@ pub async fn get_state(env: &LEnv, args: &[LValue]) -> LResult {
         1 => {
             if let LValue::Symbol(sym) = &args[0] {
                 match sym.as_str() {
-                    KEY_STATIC => Some(StateType::Static),
-                    KEY_DYNAMIC => Some(StateType::Dynamic),
-                    KEY_INNER_WORLD => Some(StateType::InnerWorld),
-                    KEY_INSTANCE => Some(StateType::Instance),
+                    STATIC => Some(StateType::Static),
+                    DYNAMIC => Some(StateType::Dynamic),
+                    INNER_STATIC => Some(StateType::InnerStatic),
+                    INNER_DYNAMIC => Some(StateType::Dynamic),
+                    INSTANCE => Some(StateType::Instance),
                     _ => {
                         return Err(lruntimeerror!(
                             GET_STATE,
-                            format!(
-                                "was expecting keys {}, {}, {}",
-                                KEY_STATIC, KEY_DYNAMIC, KEY_INNER_WORLD
-                            )
+                            format!("was expecting keys {:?}", [STATIC, DYNAMIC])
                         ))
                     }
                 }

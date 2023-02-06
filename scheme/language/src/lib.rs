@@ -322,12 +322,6 @@ pub mod utils {
     pub const DOC_AWAIT_ASYNC: &str = "Combine await and async";
     pub const MACRO_AWAIT_ASYNC: &str = "(lambda (x) `(await (async ,x)))";
 
-    pub const APPLY: &str = "apply";
-    pub const DOC_APPLY: &str = "apply a function to a list of args";
-    pub const DOC_APPLY_VERBOSE: &str = "Example: (apply + '(1 2 3)) => (+ 1 2 3)";
-    pub const MACRO_APPLY: &str = "(lambda (f args)
-                                          (cons f args))";
-
     pub const COND: &str = "cond";
     pub const DOC_COND: &str ="List of tuples {boolean expression, expression}, where if the boolean expression is true, then the expression is evaluated and is result of the whole expression.";
     pub const DOC_COND_VERBOSE: &str =
@@ -415,6 +409,14 @@ pub mod utils {
                 (f (list (car x) (car y))
                 ((combine f) (cdr x) (cdr y)))))))";*/
 
+    //Lambdas
+
+    pub const APPLY: &str = "apply";
+    pub const DOC_APPLY: &str = "apply a function to a list of args";
+    pub const DOC_APPLY_VERBOSE: &str = "Example: (apply + '(1 2 3)) => (+ 1 2 3)";
+    pub const LAMBDA_APPLY: &str = "(lambda args
+        (enr (append (butlast args) (car (last args)))))";
+
     pub const ZIP: &str = "zip";
     pub const DOC_ZIP: &str =
         "Zip two lists together by combining elements of the two lists by pair.";
@@ -488,7 +490,7 @@ pub mod utils {
             (define _proc_ (lambda (f seq)
                 (if (null? seq)
                     nil
-                    (cons (eval (cons f (car seq))) (_proc_ f (cdr seq)))))
+                    (cons (enr (cons f (car seq))) (_proc_ f (cdr seq)))))
             )
             (_proc_ f args)
     )))";
@@ -509,12 +511,15 @@ pub mod utils {
         (begin
             (define _n_ (len _list_))
             (define _handle_symbols_ (mapf (lambda (n) (string::concatenate _h n _)) (range 0 (- _n_ 1))))
-            ;(print _handle_symbols_)
             (define _tasks_ (mapf (lambda (_t_ _h_) `(define ,_h_ (async ,_t_))) _list_ _handle_symbols_))
-            ;(print _handle_symbols_)
             (define _awaits_ (mapf (lambda (_h_) `(await ,_h_)) _handle_symbols_))
             (cons begin (append _tasks_ _awaits_))
         ))";
+
+    pub const SEQ: &str = "seq";
+    pub const DOC_SEQ: &str = "Evaluates sequentially a list of expression";
+    pub const LAMBDA_SEQ: &str = "(lambda args
+    (cons begin args)))";
 
     pub const REPEAT: &str = "repeat";
     pub const DOC_REPEAT: &str = "Repeat the evaluation of an expression n times.";
@@ -577,8 +582,7 @@ pub mod list {
     pub const DOC_APPEND: &str = "Takes two list and return a list merging both.";
 
     pub const LAST: &str = "last";
-    pub const DOC_LAST: &str =
-        "Takes a list of at least one element and return the last element. Nil otherwise";
+    pub const DOC_LAST: &str = "Return a list with the last element of the a list. Nil otherwise";
 
     pub const MEMBER: &str = "member";
     pub const DOC_MEMBER: &str = "Takes two arguments of which the second must be a list. \
@@ -608,6 +612,9 @@ and then it returns the remainder of the list beginning with the first argument.
     pub const INTERSECTION: &str = "intersection";
     pub const DOC_INTERSECTION: &str = "Return the common elements of the given lists.";
     pub const DOC_INTERSECTION_VERBOSE: &str = "Example: (intersection (1 2 3) (3 4) (3 5)) => (3)";
+
+    pub const BUTLAST: &str = "butlast";
+    pub const DOC_BUTLAST: &str = "Return a list without the last element.";
 }
 
 pub mod set {
@@ -931,3 +938,6 @@ pub mod io {
     pub const MACRO_READ: &str = "(lambda (x)\
         `(eval (parse (__read__ ,x))))";
 }
+
+pub const PROCESS_TOPIC_INTERPRETER: &str = "__PROCESS_TOPIC_INTERPRETER__";
+pub const LOG_TOPIC_INTERPRETER: &str = "__LOG_TOPIC_INTERPRETER__";

@@ -77,7 +77,6 @@ impl From<ModUtils> for LModule {
         module.add_macro(CADADR, MACRO_CADADR, DOC_CADADR);
         module.add_macro(CADADDR, MACRO_CADADDR, DOC_CADADDR);
         module.add_macro(AWAIT_ASYNC, MACRO_AWAIT_ASYNC, DOC_AWAIT_ASYNC);
-        module.add_macro(APPLY, MACRO_APPLY, (DOC_APPLY, DOC_APPLY_VERBOSE));
         module.add_macro(COND, MACRO_COND, (DOC_COND, DOC_COND_VERBOSE));
         //todo:
         module.add_doc(FOR, DOC_FOR, "Lambda");
@@ -92,11 +91,13 @@ impl From<ModUtils> for LModule {
         );
 
         //Lambdas
+        module.add_lambda(APPLY, LAMBDA_APPLY, (DOC_APPLY, DOC_APPLY_VERBOSE));
         module.add_lambda(ZIP, LAMBDA_ZIP, (DOC_ZIP, DOC_ZIP_VERBOSE));
         module.add_lambda(UNZIP, LAMBDA_UNZIP, (DOC_UNZIP, DOC_UNZIP_VERBOSE));
         module.add_lambda(MAPF, LAMBDA_MAPF, (DOC_MAPF, DOC_MAPF_VERBOSE));
         //todo:
-        module.add_doc(PAR, DOC_PAR, "Lambda");
+        module.add_lambda(PAR, LAMBDA_PAR, DOC_PAR);
+        module.add_lambda(SEQ, LAMBDA_SEQ, DOC_SEQ);
         module.add_lambda(REPEAT, LAMBDA_REPEAT, DOC_REPEAT);
         module.add_lambda(RETRY_ONCE, LAMBDA_RETRY_ONCE, DOC_RETRY_ONCE);
         module.add_lambda(AWAIT_INTERRUPT, LAMBDA_AWAIT_INTERRUPT, DOC_AWAIT_INTERRUPT);

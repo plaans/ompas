@@ -1,5 +1,4 @@
 use ompas_middleware::logger::LogClient;
-use ompas_middleware::LogLevel;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::list;
 use sompas_structs::lprimitive::LPrimitive;
@@ -342,14 +341,11 @@ impl LDebug {
     pub async fn log_last_result(&mut self, results: &Results) {
         //if get_debug() {
         self.log
-            .log(
-                format!(
-                    "{} => {}",
-                    self.inner.pop().unwrap(),
-                    results.last().unwrap()
-                ),
-                LogLevel::Trace,
-            )
+            .debug(format!(
+                "{} => {}",
+                self.inner.pop().unwrap(),
+                results.last().unwrap()
+            ))
             .await
         //}
     }

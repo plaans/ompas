@@ -4,7 +4,7 @@ use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
-use sompas_structs::{lruntimeerror, wrong_type};
+use sompas_structs::{list, lruntimeerror, wrong_type};
 use std::ops::Deref;
 
 #[derive(Default)]
@@ -43,6 +43,7 @@ impl From<ModList> for LModule {
             (DOC_INTERSECTION, DOC_INTERSECTION_VERBOSE),
             true,
         );
+        module.add_fn(BUTLAST, butlast, DOC_BUTLAST, true);
         module
     }
 }
@@ -174,7 +175,7 @@ pub fn append(args: &[LValue]) -> Result<Vec<LValue>, LRuntimeError> {
 #[scheme_fn]
 pub fn last(list: Vec<LValue>) -> LValue {
     if !list.is_empty() {
-        list.last().unwrap().clone()
+        list!(list.last().unwrap().clone())
     } else {
         LValue::Nil
     }
@@ -270,4 +271,12 @@ pub fn intersection(lists: Vec<Vec<LValue>>) -> Vec<LValue> {
     }
 
     intersec
+}
+
+#[scheme_fn]
+pub fn butlast(mut args: Vec<LValue>) -> LValue {
+    match args.pop() {
+        Some(_) => args.into(),
+        None => LValue::Nil,
+    }
 }

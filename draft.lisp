@@ -96,3 +96,20 @@
         
 
 (mapf + '(1 2) '(3 4)))
+
+
+(define apply 
+    (lambda args
+        (enr (append (butlast args) (car (last args))))
+))
+
+(apply + '(1 2))
+
+(defmacro apply 
+    (lambda args
+        (append (butlast args) (car (last args)))
+))
+
+(define seq (lambda args)
+    (eval (cons begin args))
+)

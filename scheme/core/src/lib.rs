@@ -11,7 +11,6 @@ use aries_planning::parsing::sexpr::SExpr;
 use async_recursion::async_recursion;
 use futures::FutureExt;
 use lazy_static::lazy_static;
-use ompas_middleware::LogLevel;
 use sompas_language::kind::*;
 use sompas_language::list::CONS;
 use sompas_language::primitives::*;
@@ -32,11 +31,9 @@ use std::convert::TryInto;
 use std::fmt::Write;
 use std::ops::Deref;
 use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 pub mod modules;
-pub mod static_eval;
 pub mod structs;
 pub mod test_utils;
 lazy_static! {
@@ -81,18 +78,6 @@ pub async fn eval_init(env: &mut LEnv) {
         }
         panic!("Errors loading libraries:\n {}", str);
     }
-}
-//}
-
-/// Enables debugging
-/// DEBUG <- true
-pub fn activate_debug() {
-    DEBUG.store(true, Ordering::Relaxed);
-}
-
-/// Returns the value of debug
-pub fn get_debug() -> bool {
-    DEBUG.load(Ordering::Relaxed)
 }
 
 /// Parse an str and returns an expanded LValue
@@ -427,10 +412,7 @@ pub async fn expand(x: &LValue, top_level: bool, env: &mut LEnv) -> LResult {
                         let expanded = expand(&eval(lv, env, None).await?, top_level, env).await?;
                         //if get_debug() {
                         env.log
-                            .log(
-                                format!("In expand: macro expanded: {:?}", expanded),
-                                LogLevel::Trace,
-                            )
+                            .debug(format!("In expand: macro expanded: {:?}", expanded))
                             .await;
                         //}
                         return Ok(expanded);
@@ -528,11 +510,8 @@ pub async fn eval(
         if let Some(r) = &mut int {
             interrupted = r.is_interrupted();
             if interrupted {
-                log.log(
-                    format!("interrupted! last result!: {:?}", results.last()),
-                    LogLevel::Trace,
-                )
-                .await;
+                log.debug(format!("interrupted! last result!: {:?}", results.last()))
+                    .await;
             }
         }
 

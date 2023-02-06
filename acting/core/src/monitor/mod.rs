@@ -33,7 +33,7 @@ use sompas_modules::advanced_math::ModAdvancedMath;
 use sompas_modules::string::ModString;
 use sompas_modules::time::ModTime;
 use sompas_modules::utils::ModUtils;
-use sompas_structs::lenv::ImportType::WithoutPrefix;
+use sompas_structs::lenv::ImportType::{WithPrefix, WithoutPrefix};
 use sompas_structs::lenv::LEnv;
 
 //LANGUAGE
@@ -125,6 +125,8 @@ impl ModMonitor {
         env.import_module(ModString::default(), WithoutPrefix);
         env.import_module(ModTime::new(2), WithoutPrefix);
         env.import_module(ModUtils::default(), WithoutPrefix);
+        env.import_module(ModString::default(), WithPrefix);
+
         env.import_module(
             ModExec::new(&ModControl::new(&ModMonitor::default())).await,
             WithoutPrefix,

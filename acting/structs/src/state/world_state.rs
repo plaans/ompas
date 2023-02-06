@@ -11,16 +11,12 @@ use std::ops::Deref;
 use std::sync::Arc;
 use tokio::sync::{broadcast, Mutex, RwLock};
 
-pub const KEY_DYNAMIC: &str = "dynamic";
-pub const KEY_STATIC: &str = "static";
-pub const KEY_INNER_WORLD: &str = "inner-world";
-pub const KEY_INSTANCE: &str = "instance";
-
 #[derive(Clone, Debug, PartialOrd, PartialEq, Eq)]
 pub enum StateType {
     Static,
     Dynamic,
-    InnerWorld,
+    InnerStatic,
+    InnerDynamic,
     Instance,
 }
 
@@ -28,25 +24,51 @@ pub enum StateType {
 pub struct WorldState {
     r#static: Arc<RwLock<PartialState>>,
     dynamic: Arc<RwLock<PartialState>>,
-    inner_world: Arc<RwLock<PartialState>>,
+    inner_static: Arc<RwLock<PartialState>>,
+    inner_dynamic: Arc<RwLock<PartialState>>,
     instance: Arc<RwLock<InstanceCollection>>,
     sem_update: Arc<Mutex<Option<broadcast::Sender<bool>>>>,
 }
 
 #[derive(Default, Clone, Debug)]
 pub struct WorldStateSnapshot {
-    pub _static: PartialState,
+    pub r#static: PartialState,
     pub dynamic: PartialState,
-    pub inner_world: PartialState,
+    pub inner_static: PartialState,
+    pub inner_dynamic: PartialState,
     pub instance: InstanceCollection,
+}
+
+impl WorldStateSnapshot {
+    pub fn get_state(&self, _type: Option<StateType>) -> PartialState {
+        match _type {
+            None => self.inner_static.union(
+                &self.inner_dynamic.union(
+                    &self.r#static.union(
+                        &self
+                            .dynamic
+                            .union(&PartialState::from(self.instance.clone())),
+                    ),
+                ),
+            ),
+            Some(_type) => match _type {
+                StateType::Static => self.r#static.union(&self.inner_static.clone()),
+                StateType::Dynamic => self.dynamic.union(&self.inner_dynamic.clone()),
+                StateType::Instance => self.instance.clone().into(),
+                StateType::InnerStatic => self.inner_static.clone(),
+                StateType::InnerDynamic => self.inner_dynamic.clone(),
+            },
+        }
+    }
 }
 
 impl From<WorldStateSnapshot> for WorldState {
     fn from(w: WorldStateSnapshot) -> Self {
         Self {
-            r#static: Arc::new(RwLock::new(w._static)),
+            r#static: Arc::new(RwLock::new(w.r#static)),
             dynamic: Arc::new(RwLock::new(w.dynamic)),
-            inner_world: Arc::new(RwLock::new(w.inner_world)),
+            inner_static: Arc::new(RwLock::new(w.inner_static)),
+            inner_dynamic: Arc::new(RwLock::new(w.inner_dynamic)),
             instance: Arc::new(RwLock::new(w.instance)),
             sem_update: Arc::new(Mutex::new(None)),
         }
@@ -62,12 +84,23 @@ impl From<WorldStateSnapshot> for LValue {
                 union_map(
                     &env,
                     &[
-                        PartialState::from(r.instance).into_map(),
-                        r.dynamic.into_map(),
+                        union_map(
+                            &env,
+                            &[
+                                PartialState::from(r.instance).into_map(),
+                                r.dynamic.into_map(),
+                            ],
+                        )
+                        .unwrap(),
+                        r.r#static.into_map(),
                     ],
                 )
                 .unwrap(),
-                union_map(&env, &[r._static.into_map(), r.inner_world.into_map()]).unwrap(),
+                union_map(
+                    &env,
+                    &[r.inner_static.into_map(), r.inner_dynamic.into_map()],
+                )
+                .unwrap(),
             ],
         )
         .unwrap()
@@ -101,14 +134,16 @@ impl WorldState {
         self.r#static.write().await.inner = Default::default();
         self.dynamic.write().await.inner = Default::default();
         *self.instance.write().await = Default::default();
-        self.inner_world.write().await.inner = Default::default();
+        self.inner_static.write().await.inner = Default::default();
+        self.inner_dynamic.write().await.inner = Default::default();
     }
 
     pub async fn get_snapshot(&self) -> WorldStateSnapshot {
         WorldStateSnapshot {
-            _static: self.r#static.read().await.clone(),
+            r#static: self.r#static.read().await.clone(),
             dynamic: self.dynamic.read().await.clone(),
-            inner_world: self.inner_world.read().await.clone(),
+            inner_static: self.inner_static.read().await.clone(),
+            inner_dynamic: self.inner_dynamic.read().await.clone(),
             instance: self.instance.read().await.clone(),
         }
     }
@@ -133,20 +168,31 @@ impl WorldState {
 
     pub async fn get_state(&self, _type: Option<StateType>) -> PartialState {
         match _type {
-            None => self.inner_world.read().await.union(
-                &self.r#static.read().await.union(
-                    &self
-                        .dynamic
-                        .read()
-                        .await
-                        .union(&PartialState::from(self.instance.read().await.clone())),
+            None => self.inner_static.read().await.union(
+                &self.inner_dynamic.read().await.union(
+                    &self.r#static.read().await.union(
+                        &self
+                            .dynamic
+                            .read()
+                            .await
+                            .union(&PartialState::from(self.instance.read().await.clone())),
+                    ),
                 ),
             ),
             Some(_type) => match _type {
-                StateType::Static => self.r#static.read().await.clone(),
-                StateType::Dynamic => self.dynamic.read().await.clone(),
-                StateType::InnerWorld => self.inner_world.read().await.clone(),
+                StateType::Static => self
+                    .r#static
+                    .read()
+                    .await
+                    .union(&self.inner_static.read().await.clone()),
+                StateType::Dynamic => self
+                    .dynamic
+                    .read()
+                    .await
+                    .union(&self.inner_dynamic.read().await.clone()),
                 StateType::Instance => self.instance.read().await.clone().into(),
+                StateType::InnerStatic => self.inner_static.read().await.clone(),
+                StateType::InnerDynamic => self.inner_dynamic.read().await.clone(),
             },
         }
     }
@@ -169,8 +215,15 @@ impl WorldState {
                         dynamic.insert(k, v);
                     }
                 }
-                StateType::InnerWorld => {
-                    let mut inner_world = self.inner_world.write().await;
+                StateType::InnerStatic => {
+                    let mut inner_world = self.inner_static.write().await;
+                    let inner_world = &mut inner_world.inner;
+                    for (k, v) in state.inner {
+                        inner_world.insert(k, v);
+                    }
+                }
+                StateType::InnerDynamic => {
+                    let mut inner_world = self.inner_dynamic.write().await;
                     let inner_world = &mut inner_world.inner;
                     for (k, v) in state.inner {
                         inner_world.insert(k, v);
@@ -198,8 +251,12 @@ impl WorldState {
                     let mut _ref = self.dynamic.write().await;
                     _ref.inner = state.inner;
                 }
-                StateType::InnerWorld => {
-                    let mut _ref = self.inner_world.write().await;
+                StateType::InnerStatic => {
+                    let mut _ref = self.inner_static.write().await;
+                    _ref.inner = state.inner;
+                }
+                StateType::InnerDynamic => {
+                    let mut _ref = self.inner_dynamic.write().await;
                     _ref.inner = state.inner;
                 }
                 StateType::Instance => {
@@ -212,11 +269,11 @@ impl WorldState {
     }
 
     pub async fn add_fact(&self, key: LValueS, value: LValueS) {
-        self.inner_world.write().await.insert(key, value)
+        self.inner_dynamic.write().await.insert(key, value)
     }
 
     pub async fn retract_fact(&self, key: LValueS, value: LValueS) -> Result<(), LRuntimeError> {
-        let old_value = self.inner_world.read().await.get(&key).cloned();
+        let old_value = self.inner_dynamic.read().await.get(&key).cloned();
         match old_value {
             None => Err(lruntimeerror!(
                 "RAEState::retract_fact",
@@ -224,7 +281,7 @@ impl WorldState {
             )),
             Some(old_value) => {
                 if old_value == value {
-                    self.inner_world.write().await.remove(&key);
+                    self.inner_dynamic.write().await.remove(&key);
                     Ok(())
                 } else {
                     Err(lruntimeerror!(

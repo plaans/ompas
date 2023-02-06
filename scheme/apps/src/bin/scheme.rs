@@ -3,11 +3,9 @@ use std::fs;
 use std::path::PathBuf;
 
 use ompas_middleware::logger::FileDescriptor;
-use ompas_middleware::Master;
-use sompas_core::activate_debug;
+use ompas_middleware::{LogLevel, Master};
 use sompas_modules::advanced_math::ModAdvancedMath;
 use sompas_modules::io::{LogOutput, ModIO};
-use sompas_modules::static_eval::ModStaticEval;
 use sompas_modules::string::ModString;
 use sompas_modules::time::ModTime;
 use sompas_modules::utils::ModUtils;
@@ -36,7 +34,7 @@ async fn main() {
     let opt: Opt = Opt::from_args();
     println!("{:?}", opt);
     if opt.debug {
-        activate_debug();
+        Master::set_log_level(LogLevel::Debug).await
     }
 
     //test_lib_model(&opt);
@@ -53,7 +51,6 @@ pub async fn lisp_interpreter(log: Option<PathBuf>, root: bool) {
         let ctx_utils = ModUtils::default();
         let ctx_string = ModString::default();
 
-        let ctx_eval_static: ModStaticEval = ModStaticEval::new().await;
         let ctx_time: ModTime = ModTime::new(2);
 
         //Add the sender of the channel.
@@ -70,7 +67,6 @@ pub async fn lisp_interpreter(log: Option<PathBuf>, root: bool) {
         li.import_namespace(ctx_math);
 
         li.import(ctx_string);
-        li.import_namespace(ctx_eval_static);
         li.import(ctx_time);
     }
 

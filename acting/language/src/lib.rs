@@ -153,6 +153,9 @@ pub mod exec {
         pub const READ_STATE: &str = "read-state";
         pub const DOC_READ_STATE: &str = "Read a state variable.";
 
+        pub const READ_STATIC_STATE: &str = "read-static-state";
+        pub const DOC_READ_STATIC_STATE: &str = "Read the value of a static state variable.";
+
         pub const GET_STATE: &str = "get-state";
         pub const DOC_GET_STATE: &str = "Return the state as a map";
 
@@ -185,7 +188,8 @@ pub mod exec {
         //keywords
         pub const STATIC: &str = "static";
         pub const DYNAMIC: &str = "dynamic";
-        pub const INNER_WORLD: &str = "inner-world";
+        pub const INNER_STATIC: &str = "inner_static";
+        pub const INNER_DYNAMIC: &str = "inner_dynamic";
     }
 
     pub mod task {
@@ -398,6 +402,9 @@ pub mod monitor {
         pub const ADD_STATE_FUNCTION: &str = "add-state-function";
         pub const DOC_ADD_STATE_FUNCTION: &str = "Add a state function to the domain. The state-function is defined by a label, typed parameters and a type for the result.";
 
+        pub const ADD_STATIC_STATE_FUNCTION: &str = "add-static-state-function";
+        pub const DOC_ADD_STATIC_STATE_FUNCTION: &str = "Add a state function to the domain. The state-function is defined by a label, typed parameters and a type for the result.";
+
         pub const ADD_COMMAND: &str = "add-command";
         pub const DOC_ADD_COMMAND: &str= "Add a command to the domain. A command is defined by a label, typed parameters and an optional model.";
 
@@ -420,7 +427,11 @@ pub mod monitor {
         pub const DOC_ADD_LAMBDA: &str = "Add a lambda to the execution environment.";
 
         pub const ADD_FACTS: &str = "add-facts";
-        pub const DOC_ADD_FACTS: &str = "Add a list of facts to the inner world of the system.";
+        pub const DOC_ADD_FACTS: &str = "Add a list of facts to the inner state of the system.";
+
+        pub const ADD_STATIC_FACTS: &str = "add-static-facts";
+        pub const DOC_ADD_STATIC_FACTS: &str =
+            "Add a list of facts to the static inner state of the system.";
 
         /*pub const ADD_CONSTANT: &str = "add-constant";
         pub const DOC_ADD_CONSTANT: &str = "Add a new constant in the list of instance.";*/
@@ -456,6 +467,25 @@ pub mod monitor {
                         (cons (caar l) (list (cdar l)))
                         (__l__ (cdr l))))))
             `(add-state-function (map 
+                (quote ,(cons (cons ':name label) (__l__ attributes))))))))";
+
+        pub const DEF_STATIC_STATE_FUNCTION: &str = "def-static-state-function";
+        pub const DOC_DEF_STATIC_STATE_FUNCTION: &str =
+            "Wrapper around add-state-function to ease the definition of new state-function.";
+        pub const DOC_DEF_STATIC_STATE_FUNCTION_VERBOSE: &str =
+            "Example: (def-state-function at (:params (?r robot)) (:result location))";
+        pub const MACRO_DEF_STATIC_STATE_FUNCTION: &str = "(lambda attributes
+        (let ((label (car attributes))
+                (attributes (cdr attributes)))
+
+        (begin
+            (define __l__ (lambda (l)
+                (if (null? l)
+                nil
+                 (cons 
+                        (cons (caar l) (list (cdar l)))
+                        (__l__ (cdr l))))))
+            `(add-static-state-function (map 
                 (quote ,(cons (cons ':name label) (__l__ attributes))))))))";
 
         pub const DEF_COMMAND: &str = "def-command";
@@ -591,6 +621,12 @@ pub mod monitor {
     ((connected l2 e) yes))";
         pub const MACRO_DEF_FACTS: &str = "(lambda args
     `(add-facts (map ',args)))";
+
+        pub const DEF_STATIC_FACTS: &str = "def-static-facts";
+        pub const DOC_DEF_STATIC_FACTS: &str =
+            "Wrapper to ease definition of initial facts for the system.";
+        pub const MACRO_DEF_STATIC_FACTS: &str = "(lambda args
+    `(add-static-facts (map ',args)))";
 
         pub const DEF_TYPES: &str = "def-types";
         pub const DOC_DEF_TYPES: &str= "Wrapper to ease the definition of new types. Types can be defined as subtypes of other types.";

@@ -56,6 +56,12 @@ impl From<ModState> for LModule {
         module.add_async_fn(RETRACT, retract, DOC_RETRACT, false);
         module.add_async_fn(RETRACT_SHORT, retract, DOC_RETRACT_SHORT, false);
         module.add_async_fn(READ_STATE, read_state, DOC_READ_STATE, false);
+        module.add_async_fn(
+            READ_STATIC_STATE,
+            read_static_state,
+            DOC_READ_STATIC_STATE,
+            true,
+        );
         module.add_async_fn(INSTANCE, instance, DOC_INSTANCE, true);
         module.add_async_fn(INSTANCES, instances, DOC_INSTANCES, true);
         module.add_async_fn(__WAIT_FOR__, __wait_for__, DOC___WAIT_FOR__, false);
@@ -115,6 +121,33 @@ async fn read_state(env: &LEnv, args: &[LValue]) -> LResult {
     get_map(env, &[facts, key])
 }
 
+#[async_scheme_fn]
+async fn read_static_state(env: &LEnv, args: &[LValue]) -> LResult {
+    if args.is_empty() {
+        return Err(LRuntimeError::wrong_number_of_args(
+            READ_STATE,
+            args,
+            1..usize::MAX,
+        ));
+    }
+
+    let ctx = env.get_context::<ModState>(MOD_STATE)?;
+
+    let state = ctx
+        .state
+        .get_state(Some(StateType::Static))
+        .await
+        .into_map();
+
+    let key: LValue = if args.len() > 1 {
+        args.into()
+    } else {
+        args[0].clone()
+    };
+
+    get_map(env, &[state, key])
+}
+
 ///2 args: check if an instance is of a certain type
 #[async_scheme_fn]
 pub async fn instance(env: &LEnv, object: String, r#type: String) -> LResult {
@@ -152,14 +185,15 @@ async fn get_state(env: &LEnv, args: &[LValue]) -> LResult {
                 match sym.as_str() {
                     STATIC => Some(StateType::Static),
                     DYNAMIC => Some(StateType::Dynamic),
-                    INNER_WORLD => Some(StateType::InnerWorld),
+                    INNER_STATIC => Some(StateType::Static),
+                    INNER_DYNAMIC => Some(StateType::Dynamic),
                     INSTANCE => Some(StateType::Instance),
                     _ => {
                         return Err(lruntimeerror!(
                             GET_STATE,
                             format!(
-                                "was expecting keys {}, {}, {}, {}",
-                                STATIC, DYNAMIC, INNER_WORLD, INSTANCE
+                                "was expecting keys {:?}",
+                                [STATIC, DYNAMIC, INNER_STATIC, INNER_DYNAMIC, INSTANCE]
                             )
                         ))
                     }

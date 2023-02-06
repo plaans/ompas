@@ -77,6 +77,12 @@ impl From<ModDomain> for LModule {
             DOC_ADD_STATE_FUNCTION,
             false,
         );
+        module.add_async_fn(
+            ADD_STATIC_STATE_FUNCTION,
+            add_static_state_function,
+            DOC_ADD_STATIC_STATE_FUNCTION,
+            false,
+        );
         module.add_async_fn(ADD_COMMAND, add_command, DOC_ADD_COMMAND, false);
         module.add_async_fn(
             ADD_COMMAND_MODEL,
@@ -89,6 +95,12 @@ impl From<ModDomain> for LModule {
         module.add_async_fn(ADD_METHOD, add_method, DOC_ADD_METHOD, false);
         module.add_async_fn(ADD_LAMBDA, add_lambda, DOC_ADD_LAMBDA, false);
         module.add_async_fn(ADD_FACTS, add_facts, DOC_ADD_FACTS, false);
+        module.add_async_fn(
+            ADD_STATIC_FACTS,
+            add_static_facts,
+            DOC_ADD_STATIC_FACTS,
+            false,
+        );
         module.add_async_fn(ADD_TYPE, add_type, DOC_ADD_TYPE, false);
         module.add_async_fn(ADD_TYPES, add_types, DOC_ADD_TYPES, false);
         module.add_async_fn(ADD_OBJECT, add_object, DOC_ADD_OBJECT, false);
@@ -98,6 +110,12 @@ impl From<ModDomain> for LModule {
         module.add_macro(
             DEF_STATE_FUNCTION,
             MACRO_DEF_STATE_FUNCTION,
+            (DOC_DEF_STATE_FUNCTION, DOC_DEF_STATE_FUNCTION_VERBOSE),
+        );
+
+        module.add_macro(
+            DEF_STATIC_STATE_FUNCTION,
+            MACRO_DEF_STATIC_STATE_FUNCTION,
             (DOC_DEF_STATE_FUNCTION, DOC_DEF_STATE_FUNCTION_VERBOSE),
         );
         module.add_macro(
@@ -152,6 +170,12 @@ impl From<ModDomain> for LModule {
             DEF_FACTS,
             MACRO_DEF_FACTS,
             (DOC_DEF_FACTS, DOC_DEF_FACTS_VERBOSE),
+        );
+
+        module.add_macro(
+            DEF_STATIC_FACTS,
+            MACRO_DEF_STATIC_FACTS,
+            DOC_DEF_STATIC_FACTS,
         );
         module.add_macro(
             DEF_TYPES,
@@ -254,6 +278,55 @@ pub async fn add_state_function(
     let expr = format!(
         "(lambda {}
                 (read-state '{} {})))",
+        params.get_params_as_lvalue(),
+        label,
+        {
+            let mut str = String::new();
+            for p in params.get_params() {
+                str.push_str(p.as_str());
+                str.push(' ');
+            }
+            str
+        }
+    );
+    let body = eval(&parse(&expr, &mut new_env).await?, &mut new_env, None).await?;
+    let state_function = StateFunction::new(label.to_string(), params, result, body);
+    ctx.domain
+        .write()
+        .await
+        .add_state_function(label.to_string(), state_function)?;
+    Ok(())
+}
+
+/// Defines a state function in RAE environment.
+#[async_scheme_fn]
+pub async fn add_static_state_function(
+    env: &LEnv,
+    map: im::HashMap<LValue, LValue>,
+) -> Result<(), LRuntimeError> {
+    let ctx = env.get_context::<ModDomain>(MOD_DOMAIN)?;
+    let lattice: RefTypeLattice = ctx.state.get_ref_lattice().await;
+    let mut new_env = ctx.get_empty_env();
+    let label = map.get(&NAME.into()).unwrap();
+    let params: Parameters = Parameters::try_from_lvalue(
+        map.get(&PARAMETERS.into()).unwrap_or(&Default::default()),
+        &lattice,
+    )
+    .await?;
+    let result = car(
+        env,
+        &[map
+            .get(&RESULT.into())
+            .ok_or_else(|| {
+                LRuntimeError::new(ADD_STATE_FUNCTION, format!("No a :result for {}", label))
+            })?
+            .clone()],
+    )?;
+
+    let result: Domain = try_domain_from_lvalue(&lattice, &result).await?;
+    let expr = format!(
+        "(lambda {}
+                (read-static-state '{} {})))",
         params.get_params_as_lvalue(),
         label,
         {
@@ -677,9 +750,9 @@ pub async fn add_lambda(env: &LEnv, label: String, lambda: &LValue) -> Result<()
 pub async fn add_facts(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<(), LRuntimeError> {
     let state = &env.get_context::<ModDomain>(MOD_DOMAIN)?.state;
 
-    let mut inner_world = PartialState {
+    let mut inner_dynamic = PartialState {
         inner: Default::default(),
-        _type: Some(StateType::InnerWorld),
+        _type: Some(StateType::InnerDynamic),
     };
 
     for (k, v) in &map {
@@ -696,11 +769,47 @@ pub async fn add_facts(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<(
             }
         }
         if !is_instance {
-            inner_world.insert(k.try_into()?, v.try_into()?);
+            inner_dynamic.insert(k.try_into()?, v.try_into()?);
         }
     }
 
-    state.update_state(inner_world).await;
+    state.update_state(inner_dynamic).await;
+
+    Ok(())
+}
+
+///Takes in input a list of initial facts that will be stored in the inner world part of the State.
+#[async_scheme_fn]
+pub async fn add_static_facts(
+    env: &LEnv,
+    map: im::HashMap<LValue, LValue>,
+) -> Result<(), LRuntimeError> {
+    let state = &env.get_context::<ModDomain>(MOD_DOMAIN)?.state;
+
+    let mut inner_static = PartialState {
+        inner: Default::default(),
+        _type: Some(StateType::InnerStatic),
+    };
+
+    for (k, v) in &map {
+        let mut is_instance: bool = false;
+        if let LValue::List(key) = k {
+            if key[0] == LValue::from(INSTANCE) {
+                let instances: Vec<LValue> = v.try_into()?;
+                for e in instances {
+                    state
+                        .add_instance(&key[1].to_string(), &e.to_string())
+                        .await
+                }
+                is_instance = true;
+            }
+        }
+        if !is_instance {
+            inner_static.insert(k.try_into()?, v.try_into()?);
+        }
+    }
+
+    state.update_state(inner_static).await;
 
     Ok(())
 }

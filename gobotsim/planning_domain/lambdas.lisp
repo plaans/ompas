@@ -9,28 +9,16 @@
             (lambda (?process)
                 (begin
                     (define __process__
-                        (lambda (?p seq)
+                        (lambda (?px seq)
                             (if (null? seq)
                                 nil
-                                (if (contains (machine.processes_list (car seq)) ?p)
-                                    (cons (car seq) (__process__ ?p (cdr seq)))
-                                    (__process__ ?p (cdr seq))))))
+                                (if (contains (machine.processes_list (car seq)) ?px)
+                                    (cons (car seq) (__process__ ?px (cdr seq)))
+                                    (__process__ ?px (cdr seq))))))
                     (define machines (instances machine))
                     (define result (__process__ ?process machines))
                     result)))
 
-
-    (def-lambda available_robots
-        (lambda nil
-            (begin
-                (define __l_available_robots__
-                    (lambda (l)
-                        (if (null? l)
-                            nil
-                            (if (not (locked? (car l)))
-                                (cons (car l) (__l_available_robots__ (cdr l)))
-                                (__l_available_robots__ (cdr l))))))
-                (__l_available_robots__ (instances robot)))))
 
     (def-lambda find_output_machine 
         (lambda nil

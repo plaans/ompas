@@ -1,13 +1,13 @@
-use crate::LOG_TOPIC_INTERPRETER;
-use crate::PROCESS_TOPIC_INTERPRETER;
 use crate::TOKIO_CHANNEL_SIZE;
 use chrono::{DateTime, Utc};
 use im::HashMap;
-use ompas_middleware::logger::FileDescriptor;
+use ompas_middleware::logger::{FileDescriptor, LogClient};
 use ompas_middleware::{Master, ProcessInterface, PROCESS_TOPIC_ALL};
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use sompas_core::{eval, eval_init, get_root_env, parse};
+use sompas_language::LOG_TOPIC_INTERPRETER;
+use sompas_language::PROCESS_TOPIC_INTERPRETER;
 use sompas_structs::lenv::{ImportType, LEnv};
 use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::LResult;
@@ -122,9 +122,7 @@ impl LispInterpreter {
     pub fn set_config(&mut self, config: LispInterpreterConfig) {
         self.config = config;
     }
-}
 
-impl LispInterpreter {
     pub fn import_namespace(&mut self, ctx: impl Into<LModule>) {
         self.env.import_module(ctx, ImportType::WithoutPrefix)
     }
@@ -147,7 +145,7 @@ impl LispInterpreter {
         )
         .await;
 
-        process_interface.log_debug("initiate interpreter").await;
+        process_interface.log_info("initiate interpreter").await;
 
         eval_init(&mut self.env).await;
 
@@ -232,8 +230,8 @@ impl LispInterpreter {
 
 impl LispInterpreter {
     pub async fn new() -> Self {
-        let env = get_root_env().await;
-
+        let mut env: LEnv = get_root_env().await;
+        env.log = LogClient::new(PROCESS_INTERPRETER, LOG_TOPIC_INTERPRETER).await;
         Self {
             env,
             li_channel: Default::default(),

@@ -55,7 +55,7 @@ impl LEnvSymbols {
     }
 
     pub fn insert(&mut self, label: impl Into<String>, lv: LValue) {
-        self.inner = self.inner.update(label.into(), lv);
+        self.inner.insert(label.into(), lv);
     }
     pub fn get(&self, label: &str) -> Option<LValue> {
         match self.inner.get(label) {

@@ -32,6 +32,13 @@
                )))
 
    (def-task t_process_on_machine (:params (?p package) (?m machine) (?d float)))
+   (def-task-om-model t_process_on_machine
+        (:params (?p package) (?m machine) (?d float))
+        (:body
+            (do
+                (define rh (acquire ?m))
+                (sleep ?d)
+                (release rh))))
 
    (def-task test)
     (def-method m_test

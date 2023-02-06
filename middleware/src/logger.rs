@@ -331,6 +331,7 @@ impl Logger {
         let file = OpenOptions::new()
             .read(true)
             .write(true)
+            .append(true)
             .create(true)
             .open(path.clone())
             .unwrap_or_else(|e| {

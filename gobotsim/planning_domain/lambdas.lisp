@@ -9,12 +9,12 @@
             (lambda (?process)
                 (begin
                     (define __process__
-                        (lambda (?px seq)
+                        (lambda (?p seq)
                             (if (null? seq)
                                 nil
-                                (if (contains (machine.processes_list (car seq)) ?px)
-                                    (cons (car seq) (__process__ ?px (cdr seq)))
-                                    (__process__ ?px (cdr seq))))))
+                                (if (contains (machine.processes_list (car seq)) ?p)
+                                    (cons (car seq) (__process__ ?p (cdr seq)))
+                                    (__process__ ?p (cdr seq))))))
                     (define machines (instances machine))
                     (define result (__process__ ?process machines))
                     result)))

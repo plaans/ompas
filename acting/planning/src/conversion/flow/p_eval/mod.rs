@@ -34,7 +34,15 @@ pub async fn p_eval(lv: &LValue, env: &mut LEnv, pc: &PConfig) -> lruntimeerror:
             break 'main if pc.avoid.contains(str) {
                 Ok(PLValue::into_unpure(&lv))
             } else {
-                let result = match pc.p_table.try_get_param(s.as_str()) {
+                let result = match env.get_symbol(s.as_str()) {
+                    None => match pc.p_table.try_get_param(s.as_str()) {
+                        None => PLValue::into_pure(&lv.clone()),
+                        Some(plv) => plv.clone(),
+                    },
+                    Some(lv) => PLValue::into_pure(&lv),
+                };
+
+                /*let result = match pc.p_table.try_get_param(s.as_str()) {
                     None => {
                         let result = match env.get_symbol(s.as_str()) {
                             None => lv.clone(),
@@ -44,7 +52,7 @@ pub async fn p_eval(lv: &LValue, env: &mut LEnv, pc: &PConfig) -> lruntimeerror:
                         PLValue::into_pure(&result)
                     }
                     Some(plv) => plv.clone(),
-                };
+                };*/
                 Ok(result)
             };
         } else if let LValue::List(list) = &lv {

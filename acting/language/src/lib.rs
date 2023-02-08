@@ -132,6 +132,8 @@ pub mod exec {
         //Keywords
         pub const PRIORITY: &str = ":priority";
         pub const LOCKED: &str = "locked";
+        pub const MAX_Q: &str = "max-q";
+        pub const QUANTITY: &str = "quantity";
     }
 
     pub mod state {
@@ -448,6 +450,12 @@ pub mod monitor {
         pub const ADD_OBJECTS: &str = "add-objects";
         pub const DOC_ADD_OBJECTS: &str = "Add a list of objets in the list of instance.";
 
+        pub const ADD_RESOURCE: &str = "add-resource";
+        pub const DOC_ADD_RESOURCE: &str = "Declare a new resource";
+
+        pub const ADD_RESOURCES: &str = "add-resources";
+        pub const DOC_ADD_RESOUCES: &str = "Declare a list of new resources";
+
         //Macros
 
         pub const DEF_STATE_FUNCTION: &str = "def-state-function";
@@ -641,6 +649,13 @@ pub mod monitor {
             "Example: (def-objects (b1 b2 b3 ball) (d1 d2 door) (o1 o2 obj))";
         pub const MACRO_DEF_OBJECTS: &str = "(lambda args
     (cons 'add-objects (quote-list args)))";
+
+        pub const DEF_RESOURCES: &str = "def-resources";
+        pub const DOC_DEF_RESOURCES: &str =
+            "Wrapper to ease the definition of new objects. Objects are defined with their types.";
+        pub const DOC_DEF_RESOURCES_VERBOSE: &str = "Example: (def-objects (b1 4) (b2 5) b3)";
+        pub const MACRO_DEF_RESOURCES: &str = "(lambda args
+    (cons 'add-resources (quote-list args)))";
 
         //Fields in the description
         pub const NAME: &str = ":name";

@@ -1,5 +1,4 @@
 use crate::conversion::chronicle::interval::Interval;
-use crate::conversion::flow_graph::assignment::Assignment;
 use crate::conversion::flow_graph::flow::{BranchingFlow, Flow, FlowId, FlowKind, FlowPause};
 use crate::sym_table::lit::Lit;
 use crate::sym_table::r#ref::RefSymTable;
@@ -105,11 +104,25 @@ impl FlowGraph {
         self.st.get_var_parent(end)
     }
 
+    pub fn try_get_flow_lit(&self, flow: &FlowId) -> Option<Lit> {
+        match &self.flows[*flow].kind {
+            FlowKind::Lit(lit) => Some(lit.clone()),
+            FlowKind::Seq(vec) => {
+                if vec.len() == 1 {
+                    self.try_get_flow_lit(&vec[0])
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+
     pub fn get_atom_of_flow(&self, flow: &FlowId) -> im::HashSet<VarId> {
         let flow = &self.flows[*flow];
 
         let mut set = match &flow.kind {
-            FlowKind::Assignment(a) => a.get_variables(),
+            FlowKind::Lit(lit) => lit.get_variables(),
             FlowKind::Seq(seq) => {
                 let mut set = im::HashSet::default();
                 for f in seq {
@@ -145,13 +158,13 @@ impl FlowGraph {
         let interval = Interval::new_instantaneous(self.st.new_timepoint());
         let result = self.st.new_result();
 
-        let vertice = Assignment { lit: value.into() };
+        let vertice = value.into();
         let id = self.new_flow(vertice, interval, result);
         self.new_seq(vec![id])
     }
 
     pub fn new_assignment(&mut self, value: impl Into<Lit>) -> FlowId {
-        let vertice = Assignment { lit: value.into() };
+        let vertice = value.into();
         let result = self.st.new_result();
         let interval = Interval::new(self.st.new_timepoint(), self.st.new_timepoint());
         let id = self.new_flow(vertice, interval, result);
@@ -203,7 +216,7 @@ impl FlowGraph {
         let domain_result = self.st.get_domain_id(&result);
         self.st.set_domain(
             &domain_result,
-            self.st.get_type_as_domain(TYPE_RESSOURCE_HANDLE),
+            self.st.get_type_as_domain(TYPE_RESSOURCE_HANDLE).unwrap(),
         );
         self.new_flow(FlowKind::FlowResourceHandle(flow), interval, result)
     }
@@ -229,9 +242,7 @@ impl FlowGraph {
         };
 
         match &flow.kind {
-            FlowKind::Assignment(v) => {
-                vars.append(&mut v.get_variables().iter().cloned().collect())
-            }
+            FlowKind::Lit(lit) => vars.append(&mut lit.get_variables().iter().cloned().collect()),
             FlowKind::Seq(seq) => {
                 for f in seq {
                     self.flows[*f].parent = Some(id);
@@ -317,13 +328,13 @@ impl FlowGraph {
         let result = flow.result;
 
         match &self.flows[*id].kind {
-            FlowKind::Assignment(v) => {
+            FlowKind::Lit(lit) => {
                 dot.push_str(
                     format!(
                         "V{id} [label= \"{}: {} <- {}\", color = {color}];\n",
                         interval.format(st, false),
                         result.format(st, false),
-                        v.lit.format(st, false),
+                        lit.format(st, false),
                     )
                     .as_str(),
                 );
@@ -524,8 +535,8 @@ impl FlowGraph {
             f.interval.flat_bindings(st);
             f.result.flat_bindings(st);
             match &mut f.kind {
-                FlowKind::Assignment(v) => {
-                    v.lit.flat_bindings(st);
+                FlowKind::Lit(lit) => {
+                    lit.flat_bindings(st);
                 }
                 FlowKind::FlowPause(fw) => {
                     if let Some(duration) = &mut fw.duration {

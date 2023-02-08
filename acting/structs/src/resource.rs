@@ -1,5 +1,11 @@
+use crate::state::partial_state::PartialState;
+use crate::state::world_state::{StateType, WorldStateSnapshot};
+use ompas_language::exec::resource::{MAX_Q, QUANTITY};
 use ompas_utils::other::get_and_update_id_counter;
+use sompas_structs::list;
 use sompas_structs::lruntimeerror::LRuntimeError;
+use sompas_structs::lvalue::LValue;
+use sompas_structs::lvalues::LValueS;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
@@ -9,7 +15,6 @@ use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::sync::Mutex;
 
 const UNARY: &str = "unary";
-//const DIVISIBLE: &str = "divisible";
 const ALL: &str = "all";
 const NONE: &str = "none";
 
@@ -35,6 +40,17 @@ impl Display for Capacity {
 impl From<usize> for Capacity {
     fn from(u: usize) -> Self {
         Self::Some(u)
+    }
+}
+
+impl From<Capacity> for usize {
+    fn from(value: Capacity) -> Self {
+        match value {
+            Capacity::Unary => 1,
+            Capacity::All => 1,
+            Capacity::None => 0,
+            Capacity::Some(u) => u,
+        }
     }
 }
 
@@ -349,5 +365,42 @@ impl ResourceCollection {
             );
         }
         str
+    }
+
+    pub async fn get_snapshot(&self) -> WorldStateSnapshot {
+        let mut r#static: im::HashMap<LValueS, LValueS> = Default::default();
+        let mut r#dynamic: im::HashMap<LValueS, LValueS> = Default::default();
+        for (_, resource) in self.inner.lock().await.iter() {
+            r#static.insert(
+                list![MAX_Q.into(), resource.label.clone().into()]
+                    .try_into()
+                    .unwrap(),
+                LValue::from(usize::from(resource.max_capacity))
+                    .try_into()
+                    .unwrap(),
+            );
+            r#dynamic.insert(
+                list![QUANTITY.into(), resource.label.clone().into()]
+                    .try_into()
+                    .unwrap(),
+                LValue::from(usize::from(resource.capacity))
+                    .try_into()
+                    .unwrap(),
+            );
+        }
+
+        WorldStateSnapshot {
+            r#static: Default::default(),
+            dynamic: Default::default(),
+            inner_static: PartialState {
+                inner: r#static,
+                _type: Some(StateType::InnerStatic),
+            },
+            inner_dynamic: PartialState {
+                inner: r#dynamic,
+                _type: Some(StateType::InnerDynamic),
+            },
+            instance: Default::default(),
+        }
     }
 }

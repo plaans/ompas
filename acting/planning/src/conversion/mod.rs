@@ -1,9 +1,12 @@
 use crate::conversion::chronicle::convert_method;
 use crate::conversion::chronicle::post_processing::post_processing;
 use crate::conversion::flow::convert_lv;
+use crate::conversion::flow::p_eval::p_eval;
+use crate::conversion::flow::p_eval::r#struct::PConfig;
 use crate::conversion::flow::post_processing::flow_graph_post_processing;
 use crate::conversion::flow::pre_processing::pre_processing;
 use chrono::{DateTime, Utc};
+use ompas_language::exec::refinement::EXEC_TASK;
 use ompas_structs::acting_domain::parameters::Parameters;
 use ompas_structs::acting_domain::task::Task;
 use ompas_structs::conversion::chronicle::template::{ChronicleKind, ChronicleTemplate};
@@ -19,6 +22,7 @@ use sompas_structs::llambda::{LLambda, LambdaArgs};
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
+use std::collections::HashSet;
 use std::env::set_current_dir;
 use std::fmt::Display;
 use std::fs;
@@ -31,7 +35,7 @@ use std::time::SystemTime;
 pub mod chronicle;
 pub mod flow;
 
-const DEBUG_CHRONICLE: bool = false;
+const DEBUG_CHRONICLE: bool = true;
 
 pub async fn convert(
     lv: &LValue,
@@ -60,16 +64,178 @@ pub async fn convert(
     Ok(ch)
 }
 
+pub async fn p_convert_task(
+    task: &[LValue],
+    context: &ConversionContext,
+) -> Result<Vec<ChronicleTemplate>, LRuntimeError> {
+    let t = context
+        .domain
+        .tasks
+        .get(task[0].to_string().as_str())
+        .unwrap();
+
+    let params = t.get_parameters().get_params();
+    let mut pc = PConfig::default();
+    assert_eq!(params.len(), task.len() - 1);
+    for (param, value) in params.iter().zip(task[1..].iter()) {
+        pc.p_table
+            .add_instantiated(param.to_string(), value.clone());
+    }
+
+    let mut instances = vec![];
+
+    for m_label in t.get_methods() {
+        let mut pc = pc.clone();
+        let method = context.domain.methods.get(m_label).unwrap();
+        for param in &method.parameters.get_params()[params.len()..] {
+            pc.p_table.add_param(param.to_string());
+        }
+
+        let method_lambda: LLambda = method.get_body().try_into().expect("");
+
+        let instance = convert_abstract_task_to_chronicle(
+            &method_lambda,
+            &method.label,
+            Some(t),
+            method.get_parameters(),
+            &context,
+            ChronicleKind::Method,
+            pc.clone(),
+        )
+        .await?;
+
+        instances.push(instance);
+    }
+
+    Ok(instances)
+}
+
 #[allow(unused)]
 const CONVERT_LVALUE_TO_CHRONICLE: &str = "convert_lvalue_to_chronicle";
 #[allow(unused)]
 const CONVERT_DOMAIN_TO_CHRONICLE_HIERARCHY: &str = "convert_domain_to_chronicle_hierarchy";
 
+pub async fn p_convert(
+    instances: &Vec<ChronicleTemplate>,
+    cc: &ConversionContext,
+) -> lruntimeerror::Result<PlanningDomain> {
+    //for each action: translate to chronicle
+    let st = cc.st.clone();
+
+    let mut pc = PConfig::default();
+    pc.avoid.insert(EXEC_TASK.to_string());
+
+    let mut label_tasks: HashSet<String> = Default::default();
+    let mut label_sf: HashSet<String> = Default::default();
+
+    for instance in instances {
+        for condition in instance.get_conditions() {
+            label_sf.insert(st.get_label(&condition.sv[0], true));
+        }
+        for effect in instance.get_effects() {
+            label_sf.insert(st.get_label(&effect.sv[0], true));
+        }
+        for subtask in instance.get_subtasks() {
+            label_tasks.insert(st.get_label(&subtask.lit[0], true));
+        }
+    }
+
+    //add new types to list of types.
+    //panic!("for no fucking reason");
+    //Add actions, tasks and methods symbols to ch.sym_table:
+
+    //Add tasks to domain
+
+    let mut tasks = vec![];
+    let mut commands = vec![];
+    let mut methods = vec![];
+    let sf = cc.domain.get_state_functions().values().cloned().collect();
+
+    //println!("Start task declaration.");
+    for task in cc
+        .domain
+        .get_tasks()
+        .values()
+        .filter(|t| label_tasks.contains(t.get_label()))
+    {
+        //println!("Declaring task: {}", task.get_label());
+        tasks.push(declare_task(task, st.clone()));
+        for method in task.get_methods() {
+            let mut pc = pc.clone();
+
+            let method = cc.domain.get_methods().get(method).unwrap();
+            let method_lambda: LLambda = method.get_body().try_into().expect("");
+
+            for param in &method.parameters.get_params() {
+                pc.p_table.add_param(param.to_string());
+            }
+
+            let template = convert_abstract_task_to_chronicle(
+                &method_lambda,
+                &method.label,
+                Some(task),
+                method.get_parameters(),
+                &cc,
+                ChronicleKind::Method,
+                pc.clone(),
+            )
+            .await?;
+
+            methods.push(MethodChronicle {
+                method: method.clone(),
+                template,
+            });
+        }
+    }
+    //println!("End task declaration.");
+
+    //println!("Start command declaration.");
+    for command in cc
+        .domain
+        .get_commands()
+        .values()
+        .filter(|c| label_tasks.contains(c.get_label()))
+    {
+        let mut pc = pc.clone();
+
+        for param in &command.get_parameters().get_params() {
+            pc.p_table.add_param(param.to_string());
+        }
+        //evaluate the lambda sim.
+        //println!("Converting command {}", command.get_label());
+        let template = convert_abstract_task_to_chronicle(
+            &command.get_model().try_into()?,
+            command.get_label(),
+            None,
+            command.get_parameters(),
+            &cc,
+            ChronicleKind::Command,
+            pc,
+        )
+        .await?;
+
+        commands.push(CommandChronicle {
+            command: command.clone(),
+            template,
+        });
+    }
+    //println!("End method declaration.");
+
+    Ok(PlanningDomain {
+        sf,
+        tasks,
+        methods,
+        commands,
+        st,
+    })
+}
+
 pub async fn convert_acting_domain(
     cc: &ConversionContext,
 ) -> lruntimeerror::Result<PlanningDomain> {
     //for each action: translate to chronicle
-    //for each method: translate to chronicle
+
+    let pc = PConfig::default();
 
     let st = cc.st.clone();
 
@@ -93,6 +259,11 @@ pub async fn convert_acting_domain(
 
     //println!("Start command declaration.");
     for command in cc.domain.get_commands().values() {
+        let mut pc = pc.clone();
+
+        for param in &command.get_parameters().get_params() {
+            pc.p_table.add_param(param.to_string());
+        }
         //evaluate the lambda sim.
         //println!("Converting command {}", command.get_label());
         let template = convert_abstract_task_to_chronicle(
@@ -102,6 +273,7 @@ pub async fn convert_acting_domain(
             command.get_parameters(),
             &cc,
             ChronicleKind::Command,
+            pc,
         )
         .await?;
 
@@ -117,6 +289,12 @@ pub async fn convert_acting_domain(
     for method in cc.domain.get_methods().values() {
         //println!("Converting method {}", method.get_label());
 
+        let mut pc = pc.clone();
+
+        for param in &method.parameters.get_params() {
+            pc.p_table.add_param(param.to_string());
+        }
+
         let task = cc.domain.get_tasks().get(method.get_task_label()).unwrap();
 
         let method_lambda: LLambda = method.get_body().try_into().expect("");
@@ -128,6 +306,7 @@ pub async fn convert_acting_domain(
             method.get_parameters(),
             &cc,
             ChronicleKind::Method,
+            pc,
         )
         .await?;
 
@@ -156,6 +335,7 @@ pub async fn convert_abstract_task_to_chronicle(
     parameters: &Parameters,
     cc: &ConversionContext,
     kind: ChronicleKind,
+    pc: PConfig,
 ) -> lruntimeerror::Result<ChronicleTemplate> {
     let time = SystemTime::now();
 
@@ -200,12 +380,21 @@ pub async fn convert_abstract_task_to_chronicle(
     let lv = lambda.get_body();
     ch.debug.lvalue = lv.clone();
 
-    let lv = pre_processing(lv, &cc.env).await?;
+    let lv = p_eval(lv, &mut cc.env.clone(), &mut pc.clone())
+        .await?
+        .lvalue;
+    //println!("lv: {}", lv.format(4));
+    //panic!();
+    let lv = pre_processing(&lv, &cc.env).await?;
 
     let mut graph = FlowGraph::new(st);
 
     let flow = convert_lv(&lv, &mut graph, &mut Default::default())?;
     graph.flow = flow;
+    if DEBUG_CHRONICLE && task.is_some() {
+        ch.debug.flow_graph = graph.clone();
+        debug_with_markdown(label.to_string().as_str(), &ch, "/tmp".into(), true);
+    }
     flow_graph_post_processing(&mut graph)?;
     let mut ch = convert_method(Some(ch), &mut graph, &flow, &cc.env)?;
     post_processing(&mut ch, cc.env.clone())?;

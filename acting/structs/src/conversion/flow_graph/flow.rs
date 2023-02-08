@@ -1,5 +1,5 @@
 use crate::conversion::chronicle::interval::Interval;
-use crate::conversion::flow_graph::assignment::Assignment;
+use crate::sym_table::lit::Lit;
 use crate::sym_table::VarId;
 
 pub type FlowId = usize;
@@ -15,7 +15,7 @@ pub struct Flow {
 
 #[derive(Clone)]
 pub enum FlowKind {
-    Assignment(Assignment),
+    Lit(Lit),
     Seq(Vec<FlowId>),
     Branching(BranchingFlow),
     FlowHandle(FlowId),
@@ -23,9 +23,9 @@ pub enum FlowKind {
     FlowPause(FlowPause),
 }
 
-impl From<Assignment> for FlowKind {
-    fn from(value: Assignment) -> Self {
-        Self::Assignment(value)
+impl From<Lit> for FlowKind {
+    fn from(value: Lit) -> Self {
+        Self::Lit(value)
     }
 }
 

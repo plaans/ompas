@@ -18,6 +18,7 @@ pub struct TypeLattice {
     childs: Vec<Vec<TypeId>>,
     parents: Vec<Vec<TypeId>>,
     decomposition: Vec<Vec<TypeId>>,
+    pub(crate) aliases: HashMap<TypeId, TypeId>,
     ids: HashMap<String, TypeId>,
 }
 
@@ -31,11 +32,11 @@ impl Default for TypeLattice {
             childs: vec![vec![], vec![]],
             parents: vec![vec![], vec![]],
             decomposition: vec![vec![], vec![]],
+            aliases: Default::default(),
             ids,
         };
 
         dc.add_type(Boolean, vec![]);
-        dc.add_alias(TYPE_BOOLEAN, TYPE_BOOL);
         dc.add_type(List, vec![]);
         dc.add_type(Map, vec![]);
         dc.add_type(Err, vec![]);
@@ -73,6 +74,8 @@ impl Default for TypeLattice {
                 Number as usize,
             ],
         );
+        dc.add_alias(TYPE_BOOLEAN, TYPE_BOOL);
+
         dc
     }
 }
@@ -84,12 +87,9 @@ impl TypeLattice {
         lt.add_type(TYPE_RESSOURCE_HANDLE, vec![]);
 
         //Type linked to the planning objects
-        let timepoint_id = lt.add_type(TYPE_TIMEPOINT, vec![Number as usize]);
+        lt.add_alias(Number, TYPE_TIMEPOINT);
 
-        lt.add_parent(Float as usize, timepoint_id);
-        lt.add_parent(Int as usize, timepoint_id);
-
-        lt.add_type(TYPE_PRESENCE, vec![Boolean as usize]);
+        lt.add_alias(Boolean, TYPE_PRESENCE);
 
         lt.add_type(TYPE_ABSTRACT_TASK, vec![Symbol as usize]);
         lt.add_type(
@@ -111,9 +111,17 @@ impl TypeLattice {
         lt
     }
 
-    pub fn add_alias(&mut self, t: impl Display, alias: impl Display) {
-        let id = *self.ids.get(t.to_string().as_str()).unwrap();
-        self.ids.insert(alias.to_string(), id);
+    pub fn add_alias(&mut self, t: impl Display, alias: impl Display) -> TypeId {
+        let alias: SimpleType = alias.to_string().into();
+        let id = self.types.len();
+        self.types.push(alias.clone());
+        self.ids.insert(alias.to_string().to_ascii_lowercase(), id);
+        self.childs.push(vec![]);
+        self.parents.push(vec![]);
+        self.decomposition.push(vec![]);
+        let p_id = *self.ids.get(t.to_string().as_str()).unwrap();
+        self.aliases.insert(id, p_id);
+        id
     }
 
     pub fn format_type(&self, id: &TypeId) -> String {
@@ -723,14 +731,47 @@ impl TypeLattice {
 
         for (id, domain) in self.types[1..].iter().enumerate() {
             let id = id + 1;
-            writeln!(dot, "{VERTICE_PREFIX}{} [label = \"{}\"]", id, domain).unwrap();
+            if !self.aliases.contains_key(&id) {
+                let aliases: Vec<SimpleType> = self
+                    .aliases
+                    .iter()
+                    .filter_map(|(k, v)| {
+                        if *v == id {
+                            Some(self.types[*k].clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
 
-            let childs = &self.childs[id];
-            if childs.is_empty() {
-                writeln!(dot, "{VERTICE_PREFIX}{id} -> NONE",).unwrap();
-            } else {
-                for child in childs {
-                    writeln!(dot, "{VERTICE_PREFIX}{id} -> {VERTICE_PREFIX}{child}",).unwrap();
+                let aliases_str = if aliases.is_empty() {
+                    "".to_string()
+                } else {
+                    let mut str = "\n(".to_string();
+                    for (i, alias) in aliases.iter().enumerate() {
+                        if i != 0 {
+                            str.push(',');
+                        }
+                        str.push_str(alias.to_string().as_str())
+                    }
+                    str.push(')');
+                    str
+                };
+
+                writeln!(
+                    dot,
+                    "{VERTICE_PREFIX}{} [label = \"{}{}\"]",
+                    id, domain, aliases_str
+                )
+                .unwrap();
+
+                let childs = &self.childs[id];
+                if childs.is_empty() {
+                    writeln!(dot, "{VERTICE_PREFIX}{id} -> NONE",).unwrap();
+                } else {
+                    for child in childs {
+                        writeln!(dot, "{VERTICE_PREFIX}{id} -> {VERTICE_PREFIX}{child}",).unwrap();
+                    }
                 }
             }
         }

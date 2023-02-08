@@ -1,7 +1,7 @@
+use crate::conversion::flow::p_eval::r#struct::PConfig;
 use async_recursion::async_recursion;
 use ompas_language::exec::refinement::EXEC_TASK;
-use ompas_language::exec::resource::ACQUIRE;
-use ompas_structs::sym_table::{MAX_Q, QUANTITY};
+use ompas_language::exec::resource::{ACQUIRE, MAX_Q, QUANTITY};
 use sompas_core::*;
 use sompas_language::primitives::DO;
 use sompas_structs::kindlvalue::KindLValue;
@@ -15,8 +15,10 @@ use std::fmt::Write;
 pub const TRANSFORM_LAMBDA_EXPRESSION: &str = "transform-lambda-expression";
 
 pub async fn pre_processing(lv: &LValue, env: &LEnv) -> LResult {
-    let avoid = vec![EXEC_TASK.to_string()];
-    let lv = lambda_expansion(lv, env, &avoid).await?;
+    let env = &mut env.clone();
+    let mut pc = PConfig::default();
+    pc.avoid.insert(EXEC_TASK.to_string());
+    let lv = lambda_expansion(&lv, env, &pc.avoid).await?;
     let lv = acquire_expansion(&lv, env).await?;
     let lv = do_expansion(&lv, env).await?;
     //println!("{}", lv.format(0));
@@ -32,7 +34,7 @@ pub async fn pre_processing(lv: &LValue, env: &LEnv) -> LResult {
 }*/
 
 #[async_recursion]
-pub async fn lambda_expansion(lv: &LValue, env: &LEnv, avoid: &Vec<String>) -> LResult {
+pub async fn lambda_expansion(lv: &LValue, env: &LEnv, avoid: &im::HashSet<String>) -> LResult {
     let mut lv = match transform_lambda_expression(lv, env.clone(), avoid).await {
         Ok(lv) => lv,
         Err(_) => lv.clone(),
@@ -50,7 +52,11 @@ pub async fn lambda_expansion(lv: &LValue, env: &LEnv, avoid: &Vec<String>) -> L
     Ok(lv)
 }
 
-pub async fn transform_lambda_expression(lv: &LValue, env: LEnv, avoid: &[String]) -> LResult {
+pub async fn transform_lambda_expression(
+    lv: &LValue,
+    env: LEnv,
+    avoid: &im::HashSet<String>,
+) -> LResult {
     //println!("in transform lambda");
 
     if let LValue::List(list) = lv {

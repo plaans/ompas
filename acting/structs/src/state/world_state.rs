@@ -60,6 +60,13 @@ impl WorldStateSnapshot {
             },
         }
     }
+
+    pub fn absorb(&mut self, other: Self) {
+        self.inner_static = self.inner_static.union(&other.inner_static);
+        self.inner_dynamic = self.inner_dynamic.union(&other.inner_dynamic);
+        self.r#static = self.r#static.union(&other.r#static);
+        self.dynamic = self.dynamic.union(&other.dynamic);
+    }
 }
 
 impl From<WorldStateSnapshot> for WorldState {

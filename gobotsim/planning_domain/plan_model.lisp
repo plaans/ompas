@@ -2,15 +2,34 @@
 
 
 
-    (def-task t_jobshop)
-    (def-method m1
-        (:task t_jobshop)
-        (:score 0)
-        (:body
-            (do
-                (define tasks (mapf (lambda (?p) `(t_process_package ,?p)) (instances package)))
-                (apply par tasks)   
-            )))
+   (def-task t_jobshop)
+   (def-method m1
+       (:task t_jobshop)
+       (:score 0)
+       (:body
+           (do
+               (define tasks 
+                   (mapf (lambda (?p) 
+                       (do
+                           (define tasks (mapf (lambda (process)
+                               `(t_process_on_machine ,?p 
+                                   (arbitrary ',(find_machines_for_process (car process)))
+                                   ,(cadr process)))
+                               (package.processes_list ?p)))
+                           (apply seq tasks)))
+                   (instances package)))
+               (apply par tasks))))
+
+    ; (def-method m2
+    ;     (:task t_jobshop)
+    ;     (:score 0)
+    ;     (:body
+    ;         (do
+    ;         (define tasks 
+    ;             (mapf (lambda (?p) 
+    ;                 `(t_process_package ,?p))
+    ;             (instances package)))
+    ;         (apply par tasks))))
 
     
 

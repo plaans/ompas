@@ -4,6 +4,7 @@ pub mod domain;
 pub mod forest;
 pub mod id;
 pub mod lit;
+pub mod litset;
 pub mod meta_data;
 pub mod r#ref;
 pub mod r#trait;
@@ -24,6 +25,7 @@ use crate::sym_table::meta_data::SymTableMetaData;
 use crate::sym_table::r#ref::RefSymTable;
 use crate::sym_table::var_domain::VarDomain;
 use crate::sym_table::variable::Variable;
+use ompas_language::exec::resource::{MAX_Q, QUANTITY};
 use ompas_language::exec::state::INSTANCE;
 use ompas_language::sym_table::*;
 use sompas_language::kind::NIL;
@@ -110,26 +112,26 @@ impl SymTable {
         st.new_constant_symbol(
             INSTANCE,
             Domain::Application(
-                Box::new(st.get_type_as_domain(TYPE_STATE_FUNCTION)),
-                vec![st.get_type_as_domain(TYPE_OBJECT)],
-                Box::new(st.get_type_as_domain(TYPE_OBJECT_TYPE)),
+                Box::new(st.get_type_as_domain(TYPE_STATE_FUNCTION).unwrap()),
+                vec![st.get_type_as_domain(TYPE_OBJECT).unwrap()],
+                Box::new(st.get_type_as_domain(TYPE_OBJECT_TYPE).unwrap()),
             ),
         );
 
         st.new_constant_symbol(
             INSTANCE,
             Domain::Application(
-                Box::new(st.get_type_as_domain(TYPE_STATE_FUNCTION)),
-                vec![st.get_type_as_domain(TYPE_OBJECT)],
-                Box::new(st.get_type_as_domain(TYPE_OBJECT_TYPE)),
+                Box::new(st.get_type_as_domain(TYPE_STATE_FUNCTION).unwrap()),
+                vec![st.get_type_as_domain(TYPE_OBJECT).unwrap()],
+                Box::new(st.get_type_as_domain(TYPE_OBJECT_TYPE).unwrap()),
             ),
         );
 
         st.new_constant_symbol(
             QUANTITY,
             Domain::Application(
-                Box::new(st.get_type_as_domain(TYPE_STATE_FUNCTION)),
-                vec![st.get_type_as_domain(TYPE_OBJECT)],
+                Box::new(st.get_type_as_domain(TYPE_STATE_FUNCTION).unwrap()),
+                vec![st.get_type_as_domain(TYPE_OBJECT).unwrap()],
                 Box::new(Domain::Simple(TYPE_ID_NUMBER)),
             ),
         );
@@ -137,8 +139,8 @@ impl SymTable {
         st.new_constant_symbol(
             MAX_Q,
             Domain::Application(
-                Box::new(st.get_type_as_domain(TYPE_STATE_FUNCTION)),
-                vec![st.get_type_as_domain(TYPE_OBJECT)],
+                Box::new(st.get_type_as_domain(TYPE_STATE_FUNCTION).unwrap()),
+                vec![st.get_type_as_domain(TYPE_OBJECT).unwrap()],
                 Box::new(Domain::Simple(TYPE_ID_NUMBER)),
             ),
         );
@@ -223,7 +225,7 @@ impl SymTable {
     pub fn new_timepoint(&mut self) -> VarId {
         let index = self.meta_data.new_timepoint_index();
         let sym = format!("_{TIMEPOINT_PREFIX}{index}_");
-        let id = self.new_variable(&sym, self.get_type_as_domain(TYPE_TIMEPOINT));
+        let id = self.new_variable(&sym, self.get_type_as_domain(TYPE_TIMEPOINT).unwrap());
         self.ids.insert(&sym, &id);
         id
     }
@@ -232,15 +234,17 @@ impl SymTable {
         let index = self.meta_data.new_if_index();
 
         let sym_if = &format!("_{IF_PREFIX}{index}_");
-        let id_if = self.new_variable(sym_if, self.get_type_as_domain(TYPE_TASK));
+        let id_if = self.new_variable(sym_if, self.get_type_as_domain(TYPE_TASK).unwrap());
         self.ids.insert(sym_if, &id_if);
 
         let sym_m_true = &format!("m_{}_true", sym_if);
-        let id_m_true = self.new_variable(sym_m_true, self.get_type_as_domain(TYPE_METHOD));
+        let id_m_true =
+            self.new_variable(sym_m_true, self.get_type_as_domain(TYPE_METHOD).unwrap());
         self.ids.insert(sym_m_true, &id_m_true);
 
         let sym_m_false = &format!("m_{}_false", sym_if);
-        let id_m_false = self.new_variable(sym_m_true, self.get_type_as_domain(TYPE_METHOD));
+        let id_m_false =
+            self.new_variable(sym_m_true, self.get_type_as_domain(TYPE_METHOD).unwrap());
         self.ids.insert(sym_m_false, &id_m_false);
 
         (id_if, id_m_true, id_m_false)
@@ -257,7 +261,7 @@ impl SymTable {
     pub fn new_start(&mut self) -> VarId {
         let index = self.meta_data.new_start_index();
         let sym = &format!("_{START_PREFIX}{index}_");
-        let id = self.new_parameter(sym, self.get_type_as_domain(TYPE_TIMEPOINT));
+        let id = self.new_parameter(sym, self.get_type_as_domain(TYPE_TIMEPOINT).unwrap());
         self.ids.insert(sym, &id);
         id
     }
@@ -265,7 +269,7 @@ impl SymTable {
     pub fn new_end(&mut self) -> VarId {
         let index = self.meta_data.new_end_index();
         let sym = &format!("_{END_PREFIX}{index}_");
-        let id = self.new_parameter(sym, self.get_type_as_domain(TYPE_TIMEPOINT));
+        let id = self.new_parameter(sym, self.get_type_as_domain(TYPE_TIMEPOINT).unwrap());
         self.ids.insert(sym, &id);
         id
     }
@@ -516,8 +520,8 @@ impl SymTable {
         self.lattice.contained_in(d1, d2)
     }
 
-    pub fn get_type_as_domain(&self, r#type: impl Display) -> Domain {
-        self.lattice.get_type_id(r#type).unwrap().into()
+    pub fn get_type_as_domain(&self, r#type: impl Display) -> Option<Domain> {
+        self.lattice.get_type_id(r#type).map(|t| t.into())
     }
 
     /*pub fn get_symbols_of_type(&self, _symbol_type: &AtomType) -> HashSet<AtomId> {
@@ -646,6 +650,3 @@ pub fn lvalue_to_domain(lv: &LValue, st: &mut RefSymTable) -> Result<Domain, LRu
         }),
     }
 }
-
-pub const MAX_Q: &str = "max-q";
-pub const QUANTITY: &str = "quantity";

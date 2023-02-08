@@ -29,3 +29,4 @@ itertools = { default-features = false, version = "0.10" }
 futures = "0.3.17"
 ompas-middleware = {path = "../../middleware"}
 map-macro = "0.2.4"
+function_name = "0.3.0"

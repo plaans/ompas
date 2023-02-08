@@ -460,39 +460,39 @@ pub mod utils {
     nil
     (cons (eval (cons f (list (car seq)))) (mapf f (cdr seq)))))";*/
 
-    pub const LAMBDA_MAPF: &str = "(lambda args
-    (let ((f (car args))
-          (seq (cdr args)))
+    pub const LAMBDA_MAPF: &str = "(lambda _args_
+    (let ((f (car _args_))
+          (_seq_ (cdr _args_)))
         (begin
-            (define firsts 
-                (lambda (lists)
-                    (if (null? lists)
+            (define _firsts_ 
+                (lambda (_lists_)
+                    (if (null? _lists_)
                         nil
-                        (cons (caar lists)
-                                (firsts (cdr lists))))))
-                (define rests 
-                    (lambda (lists)
-                        (if (null? lists)
+                        (cons (caar _lists_)
+                                (_firsts_ (cdr _lists_))))))
+                (define _rests_ 
+                    (lambda (_lists_)
+                        (if (null? _lists_)
                             nil
                             (begin
-                                (define _r_ (cdar lists))
+                                (define _r_ (cdar _lists_))
                                 (if (null? _r_)
                                     nil
-                                    (cons _r_ (rests (cdr lists))))))))
-            (define g_seq
-                (lambda (seq)
-                    (if (null? seq)
+                                    (cons _r_ (_rests_ (cdr _lists_))))))))
+            (define _g_seq__
+                (lambda (_seq_)
+                    (if (null? _seq_)
                         nil
                         (begin
-                            (cons (firsts seq) (g_seq (rests seq)))))))
-            (define args (g_seq seq))
-            ;args
-            (define _proc_ (lambda (f seq)
-                (if (null? seq)
+                            (cons (_firsts_ _seq_) (_g_seq__ (_rests_ _seq_)))))))
+            (define _args_ (_g_seq__ _seq_))
+            ;_args_
+            (define _proc_ (lambda (f _seq_)
+                (if (null? _seq_)
                     nil
-                    (cons (enr (cons f (car seq))) (_proc_ f (cdr seq)))))
+                    (cons (enr (cons f (car _seq_))) (_proc_ f (cdr _seq_)))))
             )
-            (_proc_ f args)
+            (_proc_ f _args_)
     )))";
 
     /*pub const LAMBDA_ARBITRARY: &str = "(define arbitrary
@@ -510,16 +510,17 @@ pub mod utils {
     pub const LAMBDA_PAR: &str = "(lambda _list_
         (begin
             (define _n_ (len _list_))
-            (define _handle_symbols_ (mapf (lambda (n) (string::concatenate _h n _)) (range 0 (- _n_ 1))))
+            (define _handle_symbols_ (mapf (lambda (_n_) (string::concatenate _h _n_ _)) (range 0 (- _n_ 1))))
             (define _tasks_ (mapf (lambda (_t_ _h_) `(define ,_h_ (async ,_t_))) _list_ _handle_symbols_))
             (define _awaits_ (mapf (lambda (_h_) `(await ,_h_)) _handle_symbols_))
-            (cons begin (append _tasks_ _awaits_))
-        ))";
+            (eval (cons begin (append _tasks_ _awaits_))))
+        )
+    )";
 
     pub const SEQ: &str = "seq";
     pub const DOC_SEQ: &str = "Evaluates sequentially a list of expression";
-    pub const LAMBDA_SEQ: &str = "(lambda args
-    (cons begin args)))";
+    pub const LAMBDA_SEQ: &str = "(lambda _args_
+    (cons begin _args_)))";
 
     pub const REPEAT: &str = "repeat";
     pub const DOC_REPEAT: &str = "Repeat the evaluation of an expression n times.";

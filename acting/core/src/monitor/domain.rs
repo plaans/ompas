@@ -8,6 +8,7 @@ use ompas_structs::acting_domain::state_function::StateFunction;
 use ompas_structs::acting_domain::task::Task;
 use ompas_structs::acting_domain::OMPASDomain;
 use ompas_structs::conversion::context::ConversionContext;
+use ompas_structs::resource::{Capacity, ResourceCollection};
 use ompas_structs::state::partial_state::PartialState;
 use ompas_structs::state::world_state::{StateType, WorldState, WorldStateSnapshot};
 use ompas_structs::sym_table::domain::ref_type_lattice::RefTypeLattice;
@@ -18,6 +19,7 @@ use sompas_language::kind::*;
 use sompas_language::predicate::*;
 use sompas_macros::*;
 use sompas_structs::kindlvalue::KindLValue;
+use sompas_structs::kindlvalue::KindLValue::{List, Symbol};
 use sompas_structs::lenv::{LEnv, LEnvSymbols};
 use sompas_structs::llambda::LLambda;
 use sompas_structs::lmodule::{InitScheme, LModule};
@@ -31,6 +33,7 @@ use tokio::sync::RwLock;
 
 pub struct ModDomain {
     state: WorldState,
+    resources: ResourceCollection,
     empty_env: LEnv,
     domain_description: InitScheme,
     domain: Arc<RwLock<OMPASDomain>>,
@@ -40,6 +43,7 @@ impl ModDomain {
     pub fn new(monitor: &ModMonitor) -> Self {
         Self {
             state: monitor.state.clone(),
+            resources: monitor.resources.clone(),
             empty_env: monitor.empty_env.clone(),
             domain_description: monitor.platform.domain().into(),
             domain: monitor.ompas_domain.clone(),
@@ -51,7 +55,9 @@ impl ModDomain {
     }
 
     pub async fn get_conversion_context(&self) -> ConversionContext {
-        let state: WorldStateSnapshot = self.state.get_snapshot().await;
+        let mut state: WorldStateSnapshot = self.state.get_snapshot().await;
+        let snap_resource: WorldStateSnapshot = self.resources.get_snapshot().await;
+        state.absorb(snap_resource);
         let lattice = state.instance.lattice.get_lattice().await;
         let domain: OMPASDomain = self.domain.read().await.clone();
         let env_symbols: LEnvSymbols = self.domain.read().await.get_convert_env();
@@ -105,6 +111,8 @@ impl From<ModDomain> for LModule {
         module.add_async_fn(ADD_TYPES, add_types, DOC_ADD_TYPES, false);
         module.add_async_fn(ADD_OBJECT, add_object, DOC_ADD_OBJECT, false);
         module.add_async_fn(ADD_OBJECTS, add_objects, DOC_ADD_OBJECTS, false);
+        module.add_async_fn(ADD_RESOURCE, add_resource, DOC_ADD_RESOURCE, false);
+        module.add_async_fn(ADD_RESOURCES, add_resources, DOC_ADD_RESOUCES, false);
 
         //Macros
         module.add_macro(
@@ -187,6 +195,8 @@ impl From<ModDomain> for LModule {
             MACRO_DEF_OBJECTS,
             (DOC_DEF_OBJECTS, DOC_DEF_OBJECTS_VERBOSE),
         );
+        module.add_macro(DEF_RESOURCES, MACRO_DEF_RESOURCES, DOC_DEF_RESOURCES);
+
         module.add_prelude(prelude);
         module
     }
@@ -880,6 +890,48 @@ pub async fn add_objects(env: &LEnv, args: Vec<Vec<LValue>>) -> Result<(), LRunt
             add_object(env, &[obj.clone(), last.clone()]).await?;
         }
     }
+    Ok(())
+}
+
+#[async_scheme_fn]
+pub async fn add_resource(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
+    let ctx = env.get_context::<ModDomain>(MOD_DOMAIN).unwrap();
+
+    let label: String = args
+        .get(0)
+        .ok_or_else(|| LRuntimeError::wrong_number_of_args(ADD_RESOURCE, args, 1..2))?
+        .try_into()?;
+
+    let capacity: Option<Capacity> = match args.get(1) {
+        None => None,
+        Some(lv) => Some(Capacity::Some(lv.try_into()?)),
+    };
+
+    ctx.resources.new_resource(label, capacity).await;
+
+    Ok(())
+}
+
+#[async_scheme_fn]
+pub async fn add_resources(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
+    for lv in args {
+        match lv {
+            LValue::Symbol(s) => {
+                add_resource(env, &[s.clone().into()]).await?;
+            }
+            LValue::List(list) => {
+                add_resource(env, list.as_slice()).await?;
+            }
+            _ => {
+                return Err(LRuntimeError::not_in_list_of_expected_types(
+                    ADD_RESOURCES,
+                    lv,
+                    vec![Symbol, List],
+                ));
+            }
+        }
+    }
+
     Ok(())
 }
 

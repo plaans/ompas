@@ -1,4 +1,5 @@
 use crate::conversion::flow::convert_lv;
+use function_name::named;
 use ompas_language::exec::platform::EXEC_COMMAND;
 use ompas_language::exec::refinement::EXEC_TASK;
 use ompas_language::exec::resource::RELEASE;
@@ -16,6 +17,8 @@ use ompas_structs::sym_table::computation::Computation;
 use ompas_structs::sym_table::domain::basic_type::BasicType::{Boolean, True};
 use ompas_structs::sym_table::domain::Domain;
 use ompas_structs::sym_table::lit::Lit;
+use ompas_structs::sym_table::litset::LitSet;
+use ompas_structs::sym_table::r#trait::FormatWithSymTable;
 use ompas_structs::sym_table::{closure, VarId};
 use sompas_language::basic_math::{ADD, EQ, GEQ, GT, LEQ, LT, NEQ, NOT, NOT_SHORT, SUB};
 use sompas_language::error::IS_ERR;
@@ -328,16 +331,56 @@ fn convert_wait_for(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, 
     Ok(fl.new_seq(seq))
 }
 
-fn convert_arbitrary(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
-    seq.remove(0);
+#[named]
+fn convert_arbitrary(fl: &mut FlowGraph, seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
+    let lit = fl
+        .try_get_flow_lit(&seq[1])
+        .ok_or_else(|| LRuntimeError::new(function_name!(), "arg of arbitrary is not a lit"))?;
 
-    let args: Vec<VarId> = seq.iter().map(|f| fl.get_flow_result(f)).collect();
+    match lit {
+        Lit::Set(set) => {
+            let flow_apply = fl.new_instantaneous_assignment(Lit::Constraint(Box::new(
+                Constraint::arbitrary(set),
+            )));
+            //seq.push(flow_apply);
+            Ok(fl.new_seq(vec![flow_apply]))
+        }
+        Lit::Exp(exp) => {
+            let mut set = vec![];
+            let mut domain = Domain::any();
+            for e in exp {
+                if let Lit::Atom(a) = e {
+                    set.push(a);
+                    let d_var = fl.st.get_domain_of_var(&a).get_type();
+                    domain = fl.st.meet(&domain, &d_var);
+                    if domain.is_empty() {
+                        return Err(LRuntimeError::new(
+                            function_name!(),
+                            "Variables of set do not have the same type",
+                        ));
+                    }
+                } else {
+                    return Err(LRuntimeError::new(
+                        function_name!(),
+                        format!("{} is not an atom", e.format(&fl.st, true)),
+                    ));
+                }
+            }
 
-    let flow_apply =
-        fl.new_instantaneous_assignment(Lit::Constraint(Box::new(Constraint::arbitrary(args))));
+            let flow_apply = fl.new_instantaneous_assignment(Lit::Constraint(Box::new(
+                Constraint::arbitrary(LitSet::Finite(set)),
+            )));
+            let r_flow_apply = fl.get_flow_result(&flow_apply);
+            fl.st
+                .meet_to_domain(&fl.st.get_domain_id(&r_flow_apply), domain);
 
-    seq.push(flow_apply);
-    Ok(fl.new_seq(seq))
+            Ok(fl.new_seq(vec![flow_apply]))
+        }
+        _ => Err(LRuntimeError::new(
+            function_name!(),
+            "arg of arbitrary is not a set",
+        )),
+    }
 }
 
 fn convert_sleep(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
@@ -364,7 +407,7 @@ fn convert_release(fl: &mut FlowGraph, seq: Vec<FlowId>) -> Result<FlowId, LRunt
     let result_domain = fl.st.get_domain_id(&result);
     fl.st.set_domain(
         &result_domain,
-        fl.st.get_type_as_domain(TYPE_RESSOURCE_HANDLE),
+        fl.st.get_type_as_domain(TYPE_RESSOURCE_HANDLE).unwrap(),
     );
 
     let flow_release = fl.new_assignment(Lit::Release(result));
@@ -377,9 +420,11 @@ fn convert_release(fl: &mut FlowGraph, seq: Vec<FlowId>) -> Result<FlowId, LRunt
 fn convert_instance(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
     let results: Vec<VarId> = seq.iter().map(|f| fl.get_flow_result(f)).collect();
     fl.st
-        .set_domain(&results[1], fl.st.get_type_as_domain(TYPE_OBJECT));
-    fl.st
-        .set_domain(&results[2], fl.st.get_type_as_domain(TYPE_OBJECT_TYPE));
+        .set_domain(&results[1], fl.st.get_type_as_domain(TYPE_OBJECT).unwrap());
+    fl.st.set_domain(
+        &results[2],
+        fl.st.get_type_as_domain(TYPE_OBJECT_TYPE).unwrap(),
+    );
     let args = results[..2].to_vec();
     let flow_read = fl.new_instantaneous_assignment(Lit::Read(args));
     let flow_equal = fl.new_instantaneous_assignment(Lit::constraint(Constraint::eq(
@@ -391,10 +436,17 @@ fn convert_instance(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, 
     Ok(fl.new_seq(seq))
 }
 
-fn convert_instances(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
-    let args: Vec<VarId> = seq[..2].iter().map(|f| fl.get_flow_result(f)).collect();
+#[named]
+fn convert_instances(fl: &mut FlowGraph, seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
+    let d = fl
+        .try_get_flow_lit(&seq[1])
+        .ok_or_else(|| LRuntimeError::new(function_name!(), ""))?;
 
-    let flow_read = fl.new_instantaneous_assignment(Lit::Read(args));
-    seq.push(flow_read);
-    Ok(fl.new_seq(seq))
+    if let Lit::Atom(d) = d {
+        let flow_domain = fl.new_instantaneous_assignment(Lit::Set(LitSet::Domain(d)));
+
+        Ok(flow_domain)
+    } else {
+        Err(LRuntimeError::new(function_name!(), ""))?
+    }
 }

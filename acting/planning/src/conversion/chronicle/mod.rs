@@ -1,3 +1,4 @@
+use function_name::named;
 use ompas_language::sym_table::COND;
 use ompas_structs::conversion::chronicle::condition::Condition;
 use ompas_structs::conversion::chronicle::constraint::Constraint;
@@ -11,6 +12,8 @@ use ompas_structs::sym_table::computation::Computation;
 use ompas_structs::sym_table::domain::basic_type::BasicType::Boolean;
 use ompas_structs::sym_table::domain::Domain;
 use ompas_structs::sym_table::lit::Lit;
+use ompas_structs::sym_table::litset::LitSet;
+use ompas_structs::sym_table::r#trait::FormatWithSymTable;
 use ompas_structs::sym_table::r#trait::{GetVariables, Replace};
 use ompas_structs::sym_table::VarId;
 use sompas_structs::lenv::LEnv;
@@ -120,6 +123,7 @@ pub fn convert_method(
     Ok(ch)
 }
 
+#[named]
 pub fn convert_into_chronicle(
     ch: Option<ChronicleTemplate>,
     ht: &mut HandleTable,
@@ -169,8 +173,8 @@ pub fn convert_into_chronicle(
         }
 
         match flow.kind {
-            FlowKind::Assignment(ass) => {
-                match &ass.lit {
+            FlowKind::Lit(lit) => {
+                match &lit {
                     Lit::Exp(_) => {}
                     Lit::Atom(_) => {}
                     Lit::Await(a) => {
@@ -192,9 +196,33 @@ pub fn convert_into_chronicle(
                             interval.get_end(),
                         ));*/
                     }
-                    Lit::Constraint(c) => ch.add_constraint(Constraint::eq(result, c.deref())),
+                    Lit::Constraint(c) => match c.deref() {
+                        Constraint::Arbitrary(set) => match set {
+                            LitSet::Finite(set) => {
+                                let mut constraints = vec![];
+                                for e in set {
+                                    constraints.push(Constraint::eq(result, e))
+                                }
+
+                                ch.add_constraint(Constraint::or(constraints))
+                            }
+                            LitSet::Domain(d) => {
+                                let id = st.new_parameter("_arbitrary_", Domain::any());
+                                let r#type: String = d.format(&st, true);
+                                let domain = st.get_type_as_domain(&r#type).ok_or_else(|| {
+                                    LRuntimeError::new(
+                                        function_name!(),
+                                        format!("{} is not a defined type", r#type),
+                                    )
+                                })?;
+                                st.meet_to_domain(&st.get_domain_id(&result), domain);
+                                st.union_var(&id, &result);
+                            }
+                        },
+                        _ => ch.add_constraint(Constraint::eq(result, c.deref())),
+                    },
                     Lit::Computation(c) => ch.add_constraint(Constraint::eq(result, c.deref())),
-                    Lit::Apply(_) => ch.add_constraint(Constraint::eq(result, ass.lit)),
+                    Lit::Apply(_) => ch.add_constraint(Constraint::eq(result, lit)),
                     Lit::Read(read) => {
                         let condition = Condition {
                             interval,
@@ -258,7 +286,7 @@ pub fn convert_into_chronicle(
                     Lit::Exec(exec) => {
                         let subtask = SubTask {
                             interval,
-                            lit: exec.into(),
+                            lit: exec.clone(),
                             result,
                         };
 
@@ -273,9 +301,9 @@ pub fn convert_into_chronicle(
                                 types.push(*r.clone());
                                 for (f, t) in args.iter().zip(types) {
                                     let r = fl.st.get_domain_id(&f);
-                                    if !fl.st.meet_to_domain(&r, t).is_none() {
+                                    /*if !fl.st.meet_to_domain(&r, t).is_none() {
                                         panic!("brrruuuuuh")
-                                    };
+                                    };*/
                                 }
                             }
                         }
@@ -284,6 +312,7 @@ pub fn convert_into_chronicle(
                         /*let subtask_result = ch.sym_table.new_nil();
                         st.union_atom(&subtask_result, &result);*/
                     }
+                    Lit::Set(_) => panic!("set not supported yet"),
                 }
             }
             FlowKind::Seq(seq) => queue.append(&mut VecDeque::from(seq)),

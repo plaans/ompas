@@ -59,7 +59,7 @@ pub async fn new_resource(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeErr
 
     let label: String = args
         .get(0)
-        .ok_or_else(|| LRuntimeError::wrong_number_of_args(ACQUIRE, args, 1..2))?
+        .ok_or_else(|| LRuntimeError::wrong_number_of_args(NEW_RESOURCE, args, 1..2))?
         .try_into()?;
 
     let capacity: Option<Capacity> = match args.get(1) {

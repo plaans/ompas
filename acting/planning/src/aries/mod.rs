@@ -9,7 +9,7 @@ use aries_model::lang::{
 use aries_model::symbols::SymbolTable;
 use aries_model::types::TypeHierarchy;
 use aries_planning::chronicles;
-use aries_planning::chronicles::constraints::Constraint as aConstraint;
+use aries_planning::chronicles::constraints::{Constraint as aConstraint, Sum};
 use aries_planning::chronicles::printer::Printer;
 use aries_planning::chronicles::{
     Chronicle as aChronicle, ChronicleInstance, ChronicleKind, ChronicleOrigin,
@@ -18,7 +18,8 @@ use aries_planning::chronicles::{
 };
 use aries_planning::parsing::pddl::TypedSymbol;
 use aries_utils::input::Sym;
-use ompas_language::exec::state::{INSTANCE, INSTANCES};
+use ompas_language::exec::resource::{MAX_Q, QUANTITY};
+use ompas_language::exec::state::INSTANCE;
 use ompas_language::sym_table::{
     EPSILON, TYPE_ABSTRACT_TASK, TYPE_COMMAND, TYPE_METHOD, TYPE_OBJECT, TYPE_OBJECT_TYPE,
     TYPE_PREDICATE, TYPE_PRESENCE, TYPE_STATE_FUNCTION, TYPE_TASK, TYPE_TIMEPOINT,
@@ -41,7 +42,7 @@ use ompas_structs::sym_table::domain::{cst, Domain, TypeId};
 use ompas_structs::sym_table::lit::Lit;
 use ompas_structs::sym_table::r#ref::RefSymTable;
 use ompas_structs::sym_table::r#trait::{FormatWithSymTable, GetVariables};
-use ompas_structs::sym_table::{VarId, MAX_Q, QUANTITY};
+use ompas_structs::sym_table::VarId;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalues::LValueS;
@@ -123,7 +124,6 @@ pub fn generate_templates(problem: &PlanningProblem) -> anyhow::Result<chronicle
 
     //Adding custom state functions
     symbols.push(TypedSymbol::new(INSTANCE, TYPE_STATE_FUNCTION));
-    symbols.push(TypedSymbol::new(INSTANCES, TYPE_STATE_FUNCTION));
     symbols.push(TypedSymbol::new(QUANTITY, TYPE_STATE_FUNCTION));
     symbols.push(TypedSymbol::new(MAX_Q, TYPE_STATE_FUNCTION));
     //symbols.push(TypedSymbol::new(NIL_OBJECT, OBJECT_TYPE));
@@ -557,24 +557,43 @@ fn convert_constraint(
                     constraints.push(aConstraint::eq(get_atom(a, ctx), get_atom(b, ctx)))
                 }
                 (Lit::Atom(_), Lit::Constraint(_)) => {}
-                (Lit::Atom(a), Lit::Computation(c)) => {
-                    if let Computation::Add(vec) = c.deref() {
+                (Lit::Atom(a), Lit::Computation(c)) => match c.deref() {
+                    Computation::Add(vec) => {
                         let a = get_atom(a, ctx);
-                        let mut b = get_atom(&vec[0].clone().try_into()?, ctx);
-                        if vec[1].format(st, true).as_str() == EPSILON {
+                        if vec.len() == 2 && vec[1].format(st, true).as_str() == EPSILON {
+                            let mut b = get_atom(&vec[0].clone().try_into()?, ctx);
                             b = (FAtom::try_from(b).map_err(|c| {
                                 LRuntimeError::new("conversion_error", c.to_string())
                             })? + FAtom::EPSILON)
                                 .into();
+                            constraints.push(aConstraint::eq(a, b))
+                        } else {
+                            let mut signs = vec![true];
+                            let mut variables = vec![a];
+                            for var in vec {
+                                signs.push(false);
+                                let a: VarId = var.try_into()?;
+                                variables.push(get_atom(&a, ctx))
+                            }
+
+                            constraints.push(aConstraint::sum(variables, Sum { signs, value: 0 }));
                         }
-                        constraints.push(aConstraint::eq(a, b))
-                    } else {
-                        return Err(LRuntimeError::new(
-                            "convert_constraint",
-                            format!("{} not supported yet.", c.format(st, true)),
-                        ));
                     }
-                }
+                    Computation::Sub(vec) => {
+                        let a = get_atom(a, ctx);
+                        let b: VarId = vec[0].borrow().try_into()?;
+                        let b = get_atom(&b, ctx);
+                        let mut signs = vec![true, false];
+                        let mut variables = vec![a, b];
+                        for var in &vec[1..] {
+                            signs.push(true);
+                            let a: VarId = var.try_into()?;
+                            variables.push(get_atom(&a, ctx))
+                        }
+
+                        constraints.push(aConstraint::sum(variables, Sum { signs, value: 0 }));
+                    }
+                },
                 _ => Err(LRuntimeError::default().chain("constraint::eq"))?,
             }
         }
@@ -864,13 +883,10 @@ fn read_chronicle(
     for s in ch.get_subtasks() {
         let start: FAtom = get_atom(&s.interval.get_start(), ctx).try_into()?;
         let end: FAtom = get_atom(&s.interval.get_end(), ctx).try_into()?;
-        let e: Vec<Lit> = s.lit.borrow().try_into()?;
-        let e: Vec<SAtom> = e
+        let e: Vec<SAtom> = s
+            .lit
             .iter()
-            .map(|l| {
-                let a: VarId = l.try_into().expect("");
-                get_atom(&a, ctx).try_into().expect("")
-            })
+            .map(|a| get_atom(&a, ctx).try_into().expect(""))
             .collect();
         let st = SubTask {
             id: None,

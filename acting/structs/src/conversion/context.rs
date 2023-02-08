@@ -27,7 +27,7 @@ impl ConversionContext {
 
         for command in domain.commands.values() {
             let domain = Domain::Application(
-                Box::new(st.get_type_as_domain(TYPE_COMMAND)),
+                Box::new(st.get_type_as_domain(TYPE_COMMAND).unwrap()),
                 command.get_parameters().get_type_domain(),
                 Box::new(Domain::nil()),
             );
@@ -36,7 +36,7 @@ impl ConversionContext {
 
         for task in domain.tasks.values() {
             let domain = Domain::Application(
-                Box::new(st.get_type_as_domain(TYPE_ABSTRACT_TASK)),
+                Box::new(st.get_type_as_domain(TYPE_ABSTRACT_TASK).unwrap()),
                 task.get_parameters().get_type_domain(),
                 Box::new(Domain::nil()),
             );
@@ -45,7 +45,7 @@ impl ConversionContext {
 
         for method in domain.methods.values() {
             let domain = Domain::Application(
-                Box::new(st.get_type_as_domain(TYPE_ABSTRACT_TASK)),
+                Box::new(st.get_type_as_domain(TYPE_ABSTRACT_TASK).unwrap()),
                 method.get_parameters().get_type_domain(),
                 Box::new(Domain::nil()),
             );
@@ -54,7 +54,7 @@ impl ConversionContext {
 
         for sf in domain.state_functions.values() {
             let domain = Domain::Application(
-                Box::new(st.get_type_as_domain(TYPE_STATE_FUNCTION)),
+                Box::new(st.get_type_as_domain(TYPE_STATE_FUNCTION).unwrap()),
                 sf.parameters.get_type_domain(),
                 Box::new(sf.result.clone()),
             );
@@ -63,9 +63,9 @@ impl ConversionContext {
 
         for (t, instances) in state.instance.inner.iter() {
             for instance in instances {
-                st.new_constant_symbol(instance, st.get_type_as_domain(t.to_string()));
+                st.new_constant_symbol(instance, st.get_type_as_domain(t.to_string()).unwrap());
             }
-            st.new_constant_symbol(t, st.get_type_as_domain(TYPE_OBJECT_TYPE));
+            st.new_constant_symbol(t, st.get_type_as_domain(TYPE_OBJECT_TYPE).unwrap());
         }
 
         let st = st.into();

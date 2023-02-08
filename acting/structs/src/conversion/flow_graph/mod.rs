@@ -1,4 +1,3 @@
-pub mod assignment;
 pub mod define_table;
 pub mod flow;
 pub mod graph;

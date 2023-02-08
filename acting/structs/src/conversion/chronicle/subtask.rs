@@ -1,6 +1,5 @@
 use crate::conversion::chronicle::interval::Interval;
 use crate::sym_table::domain::Domain;
-use crate::sym_table::lit::Lit;
 use crate::sym_table::r#ref::RefSymTable;
 use crate::sym_table::r#trait::{FlatBindings, FormatWithSymTable, GetVariables, Replace};
 use crate::sym_table::VarId;
@@ -9,7 +8,7 @@ use im::HashSet;
 #[derive(Clone)]
 pub struct SubTask {
     pub interval: Interval,
-    pub lit: Lit,
+    pub lit: Vec<VarId>,
     pub result: VarId,
 }
 
@@ -36,7 +35,7 @@ impl GetVariables for SubTask {
     fn get_variables(&self) -> HashSet<VarId> {
         let mut hashet = self.interval.get_variables();
         hashet.insert(self.result);
-        hashet.union(self.lit.get_variables())
+        hashet.union(self.lit.iter().cloned().collect())
     }
 
     fn get_variables_in_domain(&self, sym_table: &RefSymTable, domain: &Domain) -> HashSet<VarId> {

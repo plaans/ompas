@@ -1,6 +1,7 @@
 use crate::conversion::chronicle::interval::Interval;
 use crate::sym_table::domain::Domain;
 use crate::sym_table::lit::Lit;
+use crate::sym_table::litset::LitSet;
 use crate::sym_table::r#ref::RefSymTable;
 use crate::sym_table::r#trait::{FlatBindings, FormatWithSymTable, GetVariables, Replace};
 use crate::sym_table::VarId;
@@ -15,7 +16,7 @@ pub enum Constraint {
     Neq(Lit, Lit),
     Lt(Lit, Lit),
     Type(Lit, Lit),
-    Arbitrary(Lit),
+    Arbitrary(LitSet),
     Min(Vec<Lit>),
     Max(Vec<Lit>),
     And(Vec<Lit>),
@@ -54,7 +55,7 @@ impl Constraint {
     pub fn _type(a: impl Into<Lit>, b: impl Into<Lit>) -> Constraint {
         Constraint::Type(a.into(), b.into())
     }
-    pub fn arbitrary(a: impl Into<Lit>) -> Constraint {
+    pub fn arbitrary(a: impl Into<LitSet>) -> Constraint {
         Constraint::Arbitrary(a.into())
     }
 }
@@ -67,7 +68,8 @@ impl Constraint {
             | Constraint::Lt(l1, _)
             | Constraint::Type(l1, _)
             | Constraint::Neq(l1, _) => l1.clone(),
-            Constraint::Not(l) | Constraint::Arbitrary(l) => l.clone(),
+            Constraint::Not(l) => l.clone(),
+            Constraint::Arbitrary(l) => Lit::Set(l.clone()),
             Constraint::Min(vec)
             | Constraint::Max(vec)
             | Constraint::And(vec)
@@ -82,7 +84,8 @@ impl Constraint {
             | Constraint::Lt(_, l2)
             | Constraint::Type(_, l2)
             | Constraint::Neq(_, l2) => l2.clone(),
-            Constraint::Not(l) | Constraint::Arbitrary(l) => l.clone(),
+            Constraint::Not(l) => l.clone(),
+            Constraint::Arbitrary(l) => Lit::Set(l.clone()),
             Constraint::Min(vec)
             | Constraint::Max(vec)
             | Constraint::And(vec)
@@ -109,7 +112,8 @@ impl GetVariables for Constraint {
                 }
                 vars
             }
-            Constraint::Not(l) | Constraint::Arbitrary(l) => l.get_variables(),
+            Constraint::Not(l) => l.get_variables(),
+            Constraint::Arbitrary(l) => l.get_variables(),
         }
     }
 
@@ -226,7 +230,8 @@ impl FlatBindings for Constraint {
                 l1.flat_bindings(st);
                 l2.flat_bindings(st);
             }
-            Constraint::Not(a) | Constraint::Arbitrary(a) => a.flat_bindings(st),
+            Constraint::Not(a) => a.flat_bindings(st),
+            Constraint::Arbitrary(a) => a.flat_bindings(st),
 
             Constraint::Min(a) | Constraint::Max(a) | Constraint::And(a) | Constraint::Or(a) => {
                 a.flat_bindings(st)
@@ -292,7 +297,8 @@ impl Replace for Constraint {
             | Constraint::Or(vec) => {
                 vec.replace(old, new);
             }
-            Constraint::Not(l) | Constraint::Arbitrary(l) => l.replace(old, new),
+            Constraint::Not(l) => l.replace(old, new),
+            Constraint::Arbitrary(l) => l.replace(old, new),
         }
     }
 }

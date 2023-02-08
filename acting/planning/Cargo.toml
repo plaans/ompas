@@ -40,6 +40,7 @@ rand = "0.8.5"
 yaml-rust = "0.4"
 async-recursion = "1.0.0"
 itertools = { default-features = false, version = "0.10" }
+function_name = "0.3.0"
 
 [[bin]]
 name = "flow-graph"

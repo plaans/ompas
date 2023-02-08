@@ -214,7 +214,7 @@ impl RefSymTable {
         self.0.read().unwrap().contained_in_domain(d1, d2)
     }
 
-    pub fn get_type_as_domain(&self, r#type: impl Display) -> Domain {
+    pub fn get_type_as_domain(&self, r#type: impl Display) -> Option<Domain> {
         self.0.read().unwrap().get_type_as_domain(r#type)
     }
 

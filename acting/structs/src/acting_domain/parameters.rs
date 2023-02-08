@@ -110,7 +110,7 @@ pub async fn try_domain_from_lvalue(
         }
         LValue::Symbol(t) => {
             let t = match t.to_string().to_ascii_lowercase().as_str() {
-                "object" | "any" => TYPE_OBJECT,
+                "object" => TYPE_OBJECT,
                 _ => t,
             };
             Domain::Simple(lattice.get_type_id(t).await.ok_or_else(|| {

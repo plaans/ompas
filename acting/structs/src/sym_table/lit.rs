@@ -1,6 +1,7 @@
 use crate::conversion::chronicle::constraint::Constraint;
 use crate::sym_table::computation::Computation;
 use crate::sym_table::domain::Domain;
+use crate::sym_table::litset::LitSet;
 use crate::sym_table::r#ref::RefSymTable;
 use crate::sym_table::r#trait::{FlatBindings, FormatWithSymTable, GetVariables, Replace};
 use crate::sym_table::VarId;
@@ -14,6 +15,7 @@ use std::ops::Deref;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Lit {
+    Set(LitSet),
     Exp(Vec<Lit>),
     Atom(VarId),
     Await(VarId),
@@ -97,6 +99,10 @@ impl TryFrom<&Lit> for Vec<VarId> {
             }
             Lit::Apply(vec) | Lit::Read(vec) | Lit::Write(vec) | Lit::Exec(vec) => Ok(vec.clone()),
             Lit::Computation(_) => Err(Default::default()),
+            Lit::Set(set) => match set {
+                LitSet::Finite(set) => Ok(set.clone()),
+                LitSet::Domain(d) => Ok(vec![*d]),
+            },
         }
     }
 }
@@ -290,6 +296,7 @@ impl FormatWithSymTable for Lit {
                 format!("release({})", rh.format(st, sym_version))
             }
             Lit::Computation(c) => c.format(st, sym_version),
+            Lit::Set(set) => set.format(st, sym_version),
         }
     }
 }
@@ -304,6 +311,7 @@ impl FlatBindings for Lit {
                 vec.flat_bindings(st)
             }
             Lit::Computation(c) => c.flat_bindings(st),
+            Lit::Set(set) => set.flat_bindings(st),
         }
     }
 }
@@ -324,6 +332,7 @@ impl GetVariables for Lit {
                 vec.iter().cloned().collect()
             }
             Lit::Computation(c) => c.get_variables(),
+            Lit::Set(set) => set.get_variables(),
         }
     }
 
@@ -346,6 +355,7 @@ impl Replace for Lit {
                 vec.replace(old, new)
             }
             Lit::Computation(c) => c.replace(old, new),
+            Lit::Set(_) => {}
         }
     }
 }

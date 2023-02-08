@@ -9,9 +9,10 @@ use ompas_language::monitor::domain::MOD_DOMAIN;
 use ompas_middleware::logger::LogClient;
 use ompas_planning::aries::solver::run_solver_for_htn;
 use ompas_planning::aries::{generate_chronicles, solver};
-use ompas_planning::conversion::convert_acting_domain;
 use ompas_planning::conversion::flow::p_eval::r#struct::{PConfig, PLValue};
 use ompas_planning::conversion::flow::p_eval::{p_eval, p_expand, P_EVAL};
+use ompas_planning::conversion::{convert, convert_acting_domain, p_convert, p_convert_task};
+use ompas_structs::conversion::chronicle::template::ChronicleTemplate;
 use ompas_structs::conversion::context::ConversionContext;
 use ompas_structs::planning::domain::PlanningDomain;
 use ompas_structs::planning::instance::PlanningInstance;
@@ -55,8 +56,12 @@ pub async fn plan_task(env: &LEnv, args: &[LValue]) -> LResult {
     let task: LValue = args.into();
     println!("task to plan: {}", task);
     let ctx = env.get_context::<ModDomain>(MOD_DOMAIN)?;
-    let context: ConversionContext = ctx.get_conversion_context().await;
-    let pd: PlanningDomain = convert_acting_domain(&context).await?;
+    let mut context: ConversionContext = ctx.get_conversion_context().await;
+    context
+        .env
+        .update_context(ModState::new_from_snapshot(context.state.clone()));
+    let instances: Vec<ChronicleTemplate> = p_convert_task(args, &context).await?;
+    let pd: PlanningDomain = p_convert(&instances, &context).await?;
 
     let st = pd.st.clone();
     let problem: PlanningProblem = PlanningProblem {
@@ -64,6 +69,7 @@ pub async fn plan_task(env: &LEnv, args: &[LValue]) -> LResult {
         instance: PlanningInstance {
             state: context.state,
             tasks: vec![task.try_into()?],
+            instances,
         },
         st,
     };
@@ -127,7 +133,7 @@ pub async fn pre_eval_task(env: &LEnv, task: &[LValue]) -> Result<(), LRuntimeEr
         env.log = LogClient::new(P_EVAL, LOG_TOPIC_INTERPRETER).await;
         let lambda: LLambda = body.try_into()?;
         let lv = lambda.get_body();
-        let plv = p_eval(lv, &mut env, &pc).await?;
+        let plv = p_eval(lv, &mut env, &mut pc).await?;
         println!(
             "Pre eval method {m_label} of task {}:\n{}\n->\n{}",
             LValue::from(task).format(0),
@@ -152,7 +158,7 @@ pub async fn pre_eval_expr(env: &LEnv, lv: LValue) -> Result<(), LRuntimeError> 
     let mut env = context.env.clone();
     env.log = LogClient::new(P_EVAL, LOG_TOPIC_INTERPRETER).await;
     let plv: PLValue = p_expand(&lv, true, &mut env, &pc).await?;
-    let plv: PLValue = p_eval(&plv.get_lvalue(), &mut env, &pc).await?;
+    let plv: PLValue = p_eval(&plv.get_lvalue(), &mut env, &mut pc).await?;
     println!(
         "Pre eval expr:\n{}\n->\n{}",
         lv.format(0),

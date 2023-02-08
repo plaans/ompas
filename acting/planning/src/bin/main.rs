@@ -1,5 +1,5 @@
-use ompas_flow_graph::config::GraphConvertConfig;
-use ompas_flow_graph::conversion::{convert, debug_with_markdown};
+use ompas_planning::config::GraphConvertConfig;
+use ompas_planning::conversion::{convert, debug_with_markdown};
 use ompas_structs::conversion::chronicle::template::ChronicleTemplate;
 use ompas_structs::sym_table::domain::type_lattice::TypeLattice;
 use ompas_structs::sym_table::r#ref::RefSymTable;

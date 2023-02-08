@@ -79,7 +79,7 @@ pub fn simplify_timepoints(c: &mut ChronicleTemplate) -> Result<(), LRuntimeErro
         write!(str, "}}").unwrap();
         str
     };
-    let timepoint_domain = st.get_type_as_domain(TYPE_TIMEPOINT);
+    let timepoint_domain = st.get_type_as_domain(TYPE_TIMEPOINT).unwrap();
 
     let mut relations = vec![];
     let mut index_temporal_constraints = vec![];

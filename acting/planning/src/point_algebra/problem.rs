@@ -31,7 +31,7 @@ pub fn try_into_pa_relation(
         _ => return Err(LRuntimeError::default()),
     };
 
-    let timepoint_domain = sym_table.get_type_as_domain(TYPE_TIMEPOINT);
+    let timepoint_domain = sym_table.get_type_as_domain(TYPE_TIMEPOINT).unwrap();
 
     if let Ok(i) = constraint.get_left().try_into() {
         let p_i = sym_table.get_var_parent(&i);

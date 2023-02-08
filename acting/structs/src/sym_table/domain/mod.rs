@@ -4,6 +4,7 @@ use crate::sym_table::domain::type_lattice::TypeLattice;
 use crate::sym_table::domain::Domain::*;
 use std::fmt::Write;
 use std::fmt::{Display, Formatter};
+use std::ops::Deref;
 
 pub mod basic_type;
 pub mod cst;
@@ -68,6 +69,44 @@ impl Domain {
                 str.push(')');
                 format!("{}:{str} -> {}", t.format(dc), r.format(dc))
             }
+        }
+    }
+
+    pub fn flat(&mut self, tl: &TypeLattice) {
+        match self {
+            Simple(s) => {
+                if let Some(alias) = tl.aliases.get(s) {
+                    *s = *alias
+                }
+            }
+            Composed(s, vec) => {
+                if let Some(alias) = tl.aliases.get(s) {
+                    *s = *alias
+                }
+                vec.iter_mut().for_each(|s| s.flat(tl));
+            }
+            Union(set) => {
+                set.iter_mut().for_each(|s| s.flat(tl));
+            }
+            Substract(d, s) => {
+                d.flat(tl);
+                s.flat(tl);
+            }
+            Cst(t, _) => {
+                t.flat(tl);
+            }
+            Application(a, args, r) => {
+                a.flat(tl);
+                args.iter_mut().for_each(|s| s.flat(tl));
+                r.flat(tl);
+            }
+        }
+    }
+
+    pub fn get_type(&self) -> Domain {
+        match self {
+            Cst(t, _) => t.deref().clone(),
+            _ => self.clone(),
         }
     }
 

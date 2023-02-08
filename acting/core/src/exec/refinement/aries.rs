@@ -132,6 +132,7 @@ pub async fn aries_select(
         instance: PlanningInstance {
             state,
             tasks: vec![LValue::from(task).try_into()?],
+            instances: vec![],
         },
         st: Default::default(),
     };

@@ -203,8 +203,11 @@ pub fn convert_into_chronicle(
                                 for e in set {
                                     constraints.push(Constraint::eq(result, e))
                                 }
-
-                                ch.add_constraint(Constraint::or(constraints))
+                                if constraints.len() > 1 {
+                                    ch.add_constraint(Constraint::or(constraints))
+                                } else {
+                                    ch.add_constraint(constraints[0].clone());
+                                }
                             }
                             LitSet::Domain(d) => {
                                 let id = st.new_parameter("_arbitrary_", Domain::any());
@@ -286,7 +289,7 @@ pub fn convert_into_chronicle(
                     Lit::Exec(exec) => {
                         let subtask = SubTask {
                             interval,
-                            lit: exec.clone(),
+                            task: exec.clone(),
                             result,
                         };
 
@@ -448,7 +451,7 @@ pub fn convert_into_chronicle(
                     task.append(&mut task_params);
                     ch.add_subtask(SubTask {
                         interval,
-                        lit: task.into(),
+                        task: task.into(),
                         result,
                     })
                 }

@@ -11,11 +11,11 @@ use ompas_planning::aries::solver::run_solver_for_htn;
 use ompas_planning::aries::{generate_chronicles, solver};
 use ompas_planning::conversion::flow::p_eval::r#struct::{PConfig, PLValue};
 use ompas_planning::conversion::flow::p_eval::{p_eval, p_expand, P_EVAL};
-use ompas_planning::conversion::{convert, convert_acting_domain, p_convert, p_convert_task};
+use ompas_planning::conversion::{convert_acting_domain, p_convert, p_convert_task};
 use ompas_structs::conversion::chronicle::template::ChronicleTemplate;
 use ompas_structs::conversion::context::ConversionContext;
 use ompas_structs::planning::domain::PlanningDomain;
-use ompas_structs::planning::instance::PlanningInstance;
+use ompas_structs::planning::instance::{ChronicleInstance, PlanningInstance};
 use ompas_structs::planning::problem::PlanningProblem;
 use sompas_language::LOG_TOPIC_INTERPRETER;
 use sompas_macros::async_scheme_fn;
@@ -25,8 +25,8 @@ use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::string;
+use std::fmt::Write;
 use std::time::SystemTime;
-
 #[derive(Default)]
 pub struct ModDebugConversion {}
 
@@ -60,24 +60,23 @@ pub async fn plan_task(env: &LEnv, args: &[LValue]) -> LResult {
     context
         .env
         .update_context(ModState::new_from_snapshot(context.state.clone()));
-    let instances: Vec<ChronicleTemplate> = p_convert_task(args, &context).await?;
-    let pd: PlanningDomain = p_convert(&instances, &context).await?;
+    let mut pp: PlanningProblem = p_convert_task(args, &context).await?;
+    println!("instances: {}", {
+        let mut str = "".to_string();
+        for instance in &pp.instance.instances {
+            writeln!(str, "{}", instance.template.format(true)).unwrap();
+        }
+        str
+    });
+    p_convert(&mut pp, &context).await?;
 
-    let st = pd.st.clone();
-    let problem: PlanningProblem = PlanningProblem {
-        domain: pd,
-        instance: PlanningInstance {
-            state: context.state,
-            tasks: vec![task.try_into()?],
-            instances,
-        },
-        st,
-    };
+    for template in &pp.domain.templates {
+        println!("{}", template)
+    }
 
-    let mut aries_problem = generate_chronicles(&problem)?;
+    let mut aries_problem = generate_chronicles(&pp)?;
 
-    //println!("{}", aries_problem)
-    let result = run_solver_for_htn(&mut aries_problem, true);
+    let result = run_solver_for_htn(&mut aries_problem, false);
     // println!("{}", format_partial_plan(&pb, &x)?);
 
     let result: LValue = if let Some(x) = &result {
@@ -112,7 +111,7 @@ pub async fn pre_eval_task(env: &LEnv, task: &[LValue]) -> Result<(), LRuntimeEr
         .get(task[0].to_string().as_str())
         .unwrap();
 
-    let params = t.get_parameters().get_params();
+    let params = t.get_parameters().get_labels();
     let mut pc = PConfig::default();
     pc.avoid.insert(EXEC_TASK.to_string());
     //pc.avoid.insert(CHECK.to_string());
@@ -125,7 +124,7 @@ pub async fn pre_eval_task(env: &LEnv, task: &[LValue]) -> Result<(), LRuntimeEr
     for m_label in t.get_methods() {
         let mut pc = pc.clone();
         let method = context.domain.methods.get(m_label).unwrap();
-        for param in &method.parameters.get_params()[params.len()..] {
+        for param in &method.parameters.get_labels()[params.len()..] {
             pc.p_table.add_param(param.to_string());
         }
         let body = method.get_body();

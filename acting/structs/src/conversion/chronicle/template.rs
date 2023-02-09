@@ -22,6 +22,7 @@ use std::time::Duration;
 pub enum ChronicleKind {
     Command,
     Method,
+    Task,
 }
 
 #[derive(Clone)]

@@ -5,14 +5,14 @@ use std::fmt::{Display, Formatter};
 #[derive(Default, Debug, Clone)]
 pub struct Task {
     body: LValue,
-    model: LValue,
+    model: Option<LValue>,
     label: String,
     parameters: Parameters,
     methods: Vec<String>,
 }
 
 impl Task {
-    pub fn new(label: String, parameters: Parameters, body: LValue, model: LValue) -> Self {
+    pub fn new(label: String, parameters: Parameters, body: LValue, model: Option<LValue>) -> Self {
         Self {
             body,
             model,
@@ -28,7 +28,7 @@ impl Task {
     pub fn get_body(&self) -> &LValue {
         &self.body
     }
-    pub fn get_model(&self) -> &LValue {
+    pub fn get_model(&self) -> &Option<LValue> {
         &self.model
     }
 
@@ -52,7 +52,7 @@ impl Task {
     }
 
     pub fn set_model(&mut self, model: LValue) {
-        self.model = model
+        self.model = Some(model)
     }
 
     pub fn set_parameters(&mut self, parameters: Parameters) {
@@ -88,7 +88,10 @@ impl Display for Task {
             self.parameters,
             self.body.format("- body: ".len()),
             str_methods,
-            self.model.format("- model: ".len())
+            match &self.model {
+                Some(model) => model.format("- model: ".len()),
+                None => "none".to_string(),
+            }
         )
     }
 }

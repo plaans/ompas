@@ -14,7 +14,7 @@ pub mod variable;
 use crate::conversion::flow_graph::graph::Dot;
 use crate::sym_table::closure::Update;
 use crate::sym_table::domain::basic_type::BasicType::{Any, Boolean, Handle};
-use crate::sym_table::domain::basic_type::{BasicType, TYPE_ID_NUMBER};
+use crate::sym_table::domain::basic_type::{BasicType, TYPE_ID_INT, TYPE_ID_NUMBER};
 use crate::sym_table::domain::basic_type::{TYPE_ID_FALSE, TYPE_ID_NIL, TYPE_ID_TRUE};
 use crate::sym_table::domain::cst::Cst;
 use crate::sym_table::domain::type_lattice::TypeLattice;
@@ -132,7 +132,7 @@ impl SymTable {
             Domain::Application(
                 Box::new(st.get_type_as_domain(TYPE_STATE_FUNCTION).unwrap()),
                 vec![st.get_type_as_domain(TYPE_OBJECT).unwrap()],
-                Box::new(Domain::Simple(TYPE_ID_NUMBER)),
+                Box::new(Domain::Simple(TYPE_ID_INT)),
             ),
         );
 
@@ -141,7 +141,7 @@ impl SymTable {
             Domain::Application(
                 Box::new(st.get_type_as_domain(TYPE_STATE_FUNCTION).unwrap()),
                 vec![st.get_type_as_domain(TYPE_OBJECT).unwrap()],
-                Box::new(Domain::Simple(TYPE_ID_NUMBER)),
+                Box::new(Domain::Simple(TYPE_ID_INT)),
             ),
         );
 

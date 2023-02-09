@@ -265,7 +265,7 @@ pub async fn c_choice_env(mut env: LEnv, domain: &OMPASDomain) -> LEnv {
     for (label, command) in &domain.commands {
         let lv_params = command.get_parameters().get_params_as_lvalue();
         let mut params = "".to_string();
-        for param in command.get_parameters().get_params() {
+        for param in command.get_parameters().get_labels() {
             params.push_str(param.to_string().as_str());
             params.push(' ');
         }
@@ -289,7 +289,7 @@ pub async fn c_choice_env(mut env: LEnv, domain: &OMPASDomain) -> LEnv {
     for (label, task) in &domain.tasks {
         let lv_params = task.get_parameters().get_params_as_lvalue();
         let mut params = "".to_string();
-        for param in task.get_parameters().get_params() {
+        for param in task.get_parameters().get_labels() {
             params.push_str(param.to_string().as_str());
             params.push(' ');
         }

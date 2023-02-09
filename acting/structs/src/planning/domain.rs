@@ -4,51 +4,33 @@ use crate::acting_domain::state_function::StateFunction;
 use crate::acting_domain::task::Task;
 use crate::conversion::chronicle::template::ChronicleTemplate;
 use crate::sym_table::r#ref::RefSymTable;
-use crate::sym_table::r#trait::FormatWithSymTable;
 use crate::sym_table::VarId;
 use std::fmt::{Display, Formatter};
 #[derive(Clone)]
 pub struct PlanningDomain {
     pub sf: Vec<StateFunction>,
-    pub tasks: Vec<TaskChronicle>,
-    pub methods: Vec<MethodChronicle>,
-    pub commands: Vec<CommandChronicle>,
+    pub methods: Vec<String>,
+    pub tasks: Vec<String>,
+    pub commands: Vec<String>,
+    pub templates: Vec<ChronicleTemplate>,
     pub st: RefSymTable,
 }
 
 impl Display for PlanningDomain {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let st = &self.st;
-
         write!(f, "# DOMAIN:\n\n")?;
-
-        //actions
-        write!(f, "# METHOD TEMPLATES: \n\n")?;
-        for (id, method) in self.methods.iter().enumerate() {
-            write!(
-                f,
-                "#{}\n\
-                {}\n\n\n",
-                id,
-                method.template.format(false)
-            )?;
-        }
-
         //tasks
-        write!(f, "# TASKS: \n\n")?;
-        for task in &self.tasks {
-            write!(f, "{}\n\n\n", task.convert.format(st, true))?;
-        }
+        write!(f, "# TASKS: {:?}", self.tasks)?;
 
-        write!(f, "# COMMAND TEMPLATES: \n\n")?;
-        for (id, command) in self.commands.iter().enumerate() {
-            write!(
-                f,
-                "#{}\n\
-                    {}\n\n\n",
-                id,
-                command.template.format(false)
-            )?;
+        //methods
+        write!(f, "# METHODS: {:?}\n\n", self.methods)?;
+
+        //commands
+        write!(f, "# COMMANDS: {:?}", self.commands)?;
+
+        write!(f, "# STATE FUNCTIONS: \n\n")?;
+        for sf in &self.sf {
+            write!(f, "{}", sf)?;
         }
         Ok(())
 
@@ -60,6 +42,7 @@ impl Display for PlanningDomain {
 pub struct TaskChronicle {
     pub task: Task,
     pub convert: Vec<VarId>,
+    pub template: Option<ChronicleTemplate>,
 }
 #[derive(Clone)]
 

@@ -127,7 +127,7 @@ pub async fn try_domain_from_lvalue(
 }
 
 impl Parameters {
-    pub fn get_params(&self) -> Vec<Arc<Sym>> {
+    pub fn get_labels(&self) -> Vec<Arc<Sym>> {
         self.inner.iter().map(|tuple| tuple.0.clone()).collect()
     }
 

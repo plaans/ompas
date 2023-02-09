@@ -5,7 +5,8 @@ use ompas_language::exec::aries::*;
 use ompas_language::exec::task::MOD_TASK;
 use ompas_middleware::logger::LogClient;
 use ompas_planning::aries::solver::run_solver_for_htn;
-use ompas_planning::aries::{generate_templates, solver};
+use ompas_planning::aries::template::generate_templates;
+use ompas_planning::aries::{solver, BindingAriesAtoms};
 use ompas_structs::acting_domain::OMPASDomain;
 use ompas_structs::agenda::Agenda;
 use ompas_structs::plan::AbstractTaskInstance;
@@ -137,7 +138,9 @@ pub async fn aries_select(
         st: Default::default(),
     };
 
-    let mut aries_problem = generate_templates(&problem)?;
+    let mut bindings = BindingAriesAtoms::default();
+
+    let mut aries_problem = generate_templates(&problem, &mut bindings)?;
     let instant = Instant::now();
     let result = run_solver_for_htn(&mut aries_problem, optimize);
 

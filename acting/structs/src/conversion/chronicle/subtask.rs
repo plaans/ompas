@@ -8,7 +8,7 @@ use im::HashSet;
 #[derive(Clone)]
 pub struct SubTask {
     pub interval: Interval,
-    pub lit: Vec<VarId>,
+    pub task: Vec<VarId>,
     pub result: VarId,
 }
 
@@ -18,7 +18,7 @@ impl FormatWithSymTable for SubTask {
             "{} {} <- {}",
             self.interval.format(st, sym_version),
             self.result.format(st, sym_version),
-            self.lit.format(st, sym_version)
+            self.task.format(st, sym_version)
         )
     }
 }
@@ -27,7 +27,7 @@ impl FlatBindings for SubTask {
     fn flat_bindings(&mut self, st: &RefSymTable) {
         self.interval.flat_bindings(st);
         self.result.flat_bindings(st);
-        self.lit.flat_bindings(st);
+        self.task.flat_bindings(st);
     }
 }
 
@@ -35,7 +35,7 @@ impl GetVariables for SubTask {
     fn get_variables(&self) -> HashSet<VarId> {
         let mut hashet = self.interval.get_variables();
         hashet.insert(self.result);
-        hashet.union(self.lit.iter().cloned().collect())
+        hashet.union(self.task.iter().cloned().collect())
     }
 
     fn get_variables_in_domain(&self, sym_table: &RefSymTable, domain: &Domain) -> HashSet<VarId> {
@@ -50,7 +50,7 @@ impl GetVariables for SubTask {
 impl Replace for SubTask {
     fn replace(&mut self, old: &VarId, new: &VarId) {
         self.interval.replace(old, new);
-        self.lit.replace(old, new);
+        self.task.replace(old, new);
         self.result.replace(old, new);
     }
 }

@@ -1,7 +1,8 @@
 use crate::kindlvalue::KindLValue;
 use crate::lvalue::LValue;
+use anyhow::anyhow;
 use std::error::Error;
-use std::fmt::{Display, Formatter};
+use std::fmt::{format, Display, Formatter};
 use std::ops::Range;
 
 /// Error struct for Scheme
@@ -142,7 +143,7 @@ impl From<anyhow::Error> for LRuntimeError {
     fn from(a: anyhow::Error) -> Self {
         Self {
             backtrace: vec!["anyhow".to_string()],
-            message: a.to_string(),
+            message: format!("{:?}", a),
         }
     }
 }
@@ -151,7 +152,7 @@ impl From<std::io::Error> for LRuntimeError {
     fn from(e: std::io::Error) -> Self {
         Self {
             backtrace: vec!["std::io::Error".to_string()],
-            message: e.to_string(),
+            message: format!("{:?}", e),
         }
     }
 }

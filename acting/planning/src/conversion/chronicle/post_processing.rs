@@ -27,6 +27,7 @@ pub fn post_processing(c: &mut ChronicleTemplate, env: LEnv) -> Result<(), LRunt
     rm_useless_var(c);
     simplify_timepoints(c)?;
     rm_useless_var(c);
+    c.flat_bindings();
     Ok(())
 }
 
@@ -190,6 +191,11 @@ pub fn simplify_constraints(c: &mut ChronicleTemplate) -> Result<(), LRuntimeErr
                     _ => {}
                 }
             }
+            /*if let Constraint::Or(or) = c {
+                if or.len() == 1 {
+                    vec.push()
+                }
+            }*/
         }
 
         if vec.is_empty() && to_remove.is_empty() {

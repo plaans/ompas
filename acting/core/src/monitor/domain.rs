@@ -1,5 +1,4 @@
 use crate::monitor::ModMonitor;
-use ompas_language::exec::state::INSTANCE;
 use ompas_language::monitor::domain::*;
 use ompas_structs::acting_domain::command::Command;
 use ompas_structs::acting_domain::method::Method;
@@ -292,7 +291,7 @@ pub async fn add_state_function(
         label,
         {
             let mut str = String::new();
-            for p in params.get_params() {
+            for p in params.get_labels() {
                 str.push_str(p.as_str());
                 str.push(' ');
             }
@@ -341,7 +340,7 @@ pub async fn add_static_state_function(
         label,
         {
             let mut str = String::new();
-            for p in params.get_params() {
+            for p in params.get_labels() {
                 str.push_str(p.as_str());
                 str.push(' ');
             }
@@ -450,7 +449,7 @@ pub async fn add_command(
         Parameters::try_from_lvalue(&map.get(&PARAMETERS.into()).unwrap(), &lattice).await?,
     );
     let params = command.get_parameters().get_params_as_lvalue();
-    let params_list = command.get_parameters().get_params();
+    let params_list = command.get_parameters().get_labels();
     let lv_exec: LValue = parse(
         &format!(
             "(lambda {} (await (exec-command '{} {})))",
@@ -555,7 +554,7 @@ pub async fn add_task(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<()
         .await?,
     );
     let params = task.get_parameters().get_params_as_lvalue();
-    let params_list = task.get_parameters().get_params();
+    let params_list = task.get_parameters().get_labels();
     let lv_exec: LValue = parse(
         &format!(
             "(lambda {} (exec-task '{} {}))",
@@ -766,7 +765,7 @@ pub async fn add_facts(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<(
     };
 
     for (k, v) in &map {
-        let mut is_instance: bool = false;
+        /*let mut is_instance: bool = false;
         if let LValue::List(key) = k {
             if key[0] == LValue::from(INSTANCE) {
                 let instances: Vec<LValue> = v.try_into()?;
@@ -780,7 +779,8 @@ pub async fn add_facts(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<(
         }
         if !is_instance {
             inner_dynamic.insert(k.try_into()?, v.try_into()?);
-        }
+        }*/
+        inner_dynamic.insert(k.try_into()?, v.try_into()?);
     }
 
     state.update_state(inner_dynamic).await;
@@ -802,21 +802,7 @@ pub async fn add_static_facts(
     };
 
     for (k, v) in &map {
-        let mut is_instance: bool = false;
-        if let LValue::List(key) = k {
-            if key[0] == LValue::from(INSTANCE) {
-                let instances: Vec<LValue> = v.try_into()?;
-                for e in instances {
-                    state
-                        .add_instance(&key[1].to_string(), &e.to_string())
-                        .await
-                }
-                is_instance = true;
-            }
-        }
-        if !is_instance {
-            inner_static.insert(k.try_into()?, v.try_into()?);
-        }
+        inner_static.insert(k.try_into()?, v.try_into()?);
     }
 
     state.update_state(inner_static).await;

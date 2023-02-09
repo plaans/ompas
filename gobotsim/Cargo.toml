@@ -3,6 +3,7 @@ name = "ompas-gobotsim"
 version = "0.1.0"
 authors = ["Yirmandias <turi@insa-toulouse.fr>"]
 edition = "2018"
+default-run= "gobot-ompas"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -36,4 +37,8 @@ map-macro = "0.2.4"
 [[bin]]
 name = "gobot-ompas"
 path = "src/bin/main.rs"
+
+[[bin]]
+name = "gobot-plan"
+path = "src/bin/plan_jobshop.rs"
 

@@ -7,6 +7,7 @@ use aries_planning::chronicles::{
     Chronicle, ChronicleInstance, ChronicleKind as aChronicleKind, ChronicleOrigin, Container, Ctx,
     Effect, SubTask, VarType, TIME_SCALE,
 };
+use ompas_language::exec::resource::{MAX_Q, QUANTITY};
 use ompas_language::exec::state::INSTANCE;
 use ompas_structs::planning::problem::PlanningProblem;
 use ompas_structs::state::partial_state::PartialState;
@@ -16,12 +17,14 @@ use std::convert::TryInto;
 
 pub fn create_initial_chronicle(problem: &PlanningProblem, ctx: &mut Ctx) -> ChronicleInstance {
     let instance = &problem.instance;
-    let present_sf: Vec<String> = problem
+    let mut present_sf: Vec<String> = problem
         .domain
         .sf
         .iter()
         .map(|sf| sf.get_label().to_string())
         .collect();
+
+    present_sf.append(&mut vec![QUANTITY.to_string(), MAX_Q.to_string()]);
     let _init_container = Container::Instance(0);
     // Initial chronicle construction
     let mut init_ch = Chronicle {

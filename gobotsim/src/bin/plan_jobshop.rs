@@ -13,7 +13,6 @@ use sompas_modules::string::ModString;
 use sompas_modules::utils::ModUtils;
 use sompas_repl::lisp_interpreter::{ChannelToLispInterpreter, LispInterpreter};
 use sompas_structs::lruntimeerror;
-use sompas_structs::lruntimeerror::LRuntimeError;
 use std::path::PathBuf;
 use structopt::StructOpt;
 

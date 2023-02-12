@@ -302,7 +302,8 @@ fn convert_constraint(
                             + FAtom::EPSILON)
                             .into();
                         constraints.push(aConstraint::eq(a, b))
-                    } else if vec.len() == 2 {
+                    }
+                    /*else if vec.len() == 2 {
                         if let Lit::Atom(c) = &vec[1] {
                             let c = get_atom(c, ctx);
                             let mut b = get_atom(&vec[0].clone().try_into().expect(""), ctx);
@@ -332,7 +333,8 @@ fn convert_constraint(
                                 .into();
                             constraints.push(aConstraint::eq(a, b))
                         }
-                    } else {
+                    }*/
+                    else {
                         let mut signs = vec![true];
                         let mut variables = vec![a];
                         for var in vec {

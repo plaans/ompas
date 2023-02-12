@@ -147,7 +147,6 @@ pub fn try_variable_into_fvar(variable: Variable) -> anyhow::Result<FVar, Conver
     if let Variable::Fixed(fvar) = variable {
         Ok(fvar)
     } else {
-        panic!();
         Err(ConversionError::TypeError)
     }
 }

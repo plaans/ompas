@@ -11,7 +11,7 @@ sompas-structs = {path = "../structs"}
 sompas-language = {path = "../language"}
 sompas-macros = {path = "../macros"}
 ompas-middleware = {path = "../../middleware"}
-aries_planning = {path = "../../aries/planning"}
+aries_planning = {path = "../../aries/planning/planning"}
 async-trait = "0.1.53"
 async-recursion = "0.3.2"
 anyhow = "1.0.40"

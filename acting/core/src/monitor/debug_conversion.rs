@@ -12,10 +12,8 @@ use ompas_planning::aries::{generate_chronicles, solver};
 use ompas_planning::conversion::flow::p_eval::r#struct::{PConfig, PLValue};
 use ompas_planning::conversion::flow::p_eval::{p_eval, p_expand, P_EVAL};
 use ompas_planning::conversion::{convert_acting_domain, p_convert, p_convert_task};
-use ompas_structs::conversion::chronicle::template::ChronicleTemplate;
 use ompas_structs::conversion::context::ConversionContext;
 use ompas_structs::planning::domain::PlanningDomain;
-use ompas_structs::planning::instance::{ChronicleInstance, PlanningInstance};
 use ompas_structs::planning::problem::PlanningProblem;
 use sompas_language::LOG_TOPIC_INTERPRETER;
 use sompas_macros::async_scheme_fn;
@@ -27,6 +25,7 @@ use sompas_structs::lvalue::LValue;
 use sompas_structs::string;
 use std::fmt::Write;
 use std::time::SystemTime;
+
 #[derive(Default)]
 pub struct ModDebugConversion {}
 

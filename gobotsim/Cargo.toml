@@ -20,7 +20,7 @@ ompas-core = {path = "../acting/core"}
 ompas-structs = {path = "../acting/structs"}
 ompas-interface = {path = "../acting/interface"}
 ompas-language = {path = "../acting/language"}
-aries_planning = {path = "../aries/planning"}
+aries_planning = {path = "../aries/planning/planning"}
 im = "15.0.0"
 structopt = { version = "0.3", default-features = false }
 serde = { version = "1.0", features = ["derive"]}

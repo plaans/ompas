@@ -1,3 +1,4 @@
+use aries_cp::Cp;
 use aries_model::extensions::{AssignmentExt, SavedAssignment};
 use aries_model::lang::SAtom;
 use aries_planners::encode::{
@@ -26,6 +27,7 @@ fn init_solver(pb: &FiniteProblem) -> Box<Solver> {
 
     let mut solver = Box::new(aries_solver::solver::Solver::new(model.0));
     solver.add_theory(|tok| StnTheory::new(tok, stn_config));
+    solver.add_theory(Cp::new);
     solver
 }
 

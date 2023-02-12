@@ -304,9 +304,9 @@ pub fn convert_into_chronicle(
                                 types.push(*r.clone());
                                 for (f, t) in args.iter().zip(types) {
                                     let r = fl.st.get_domain_id(&f);
-                                    /*if !fl.st.meet_to_domain(&r, t).is_none() {
+                                    if !fl.st.meet_to_domain(&r, t).is_none() {
                                         panic!("brrruuuuuh")
-                                    };*/
+                                    };
                                 }
                             }
                         }

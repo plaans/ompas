@@ -13,7 +13,6 @@ use ompas_structs::planning::problem::PlanningProblem;
 use ompas_structs::sym_table::r#ref::RefSymTable;
 use ompas_structs::sym_table::r#trait::FormatWithSymTable;
 use ompas_structs::sym_table::VarId;
-static BUILD_CHRONICLES: &str = "build_chronicles";
 pub const FLOAT_SCALE: IntCst = 2;
 
 pub fn generate_chronicles(problem: &PlanningProblem) -> Result<chronicles::Problem> {

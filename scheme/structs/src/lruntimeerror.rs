@@ -1,8 +1,7 @@
 use crate::kindlvalue::KindLValue;
 use crate::lvalue::LValue;
-use anyhow::anyhow;
 use std::error::Error;
-use std::fmt::{format, Display, Formatter};
+use std::fmt::{Display, Formatter};
 use std::ops::Range;
 
 /// Error struct for Scheme

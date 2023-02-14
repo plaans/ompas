@@ -25,7 +25,8 @@
             (do
                 (define rh (acquire ?m))
                 ;(sleep 1)
-                (release rh))))
+                (release rh)
+                )))
 
    (def-task test)
     (def-method m_test

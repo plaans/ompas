@@ -9,11 +9,12 @@ use aries_core::IntCst;
 use aries_model::lang::{Atom as aAtom, Variable};
 use aries_planning::chronicles;
 use aries_planning::chronicles::printer::Printer;
+use aries_planning::chronicles::TIME_SCALE;
 use ompas_structs::planning::problem::PlanningProblem;
 use ompas_structs::sym_table::r#ref::RefSymTable;
 use ompas_structs::sym_table::r#trait::FormatWithSymTable;
 use ompas_structs::sym_table::VarId;
-pub const FLOAT_SCALE: IntCst = 2;
+pub const FLOAT_SCALE: IntCst = TIME_SCALE;
 
 pub fn generate_chronicles(problem: &PlanningProblem) -> Result<chronicles::Problem> {
     /*println!("# SYMBOL TABLE: \n{:?}", ctx.model.get_symbol_table());
@@ -28,6 +29,10 @@ pub fn generate_chronicles(problem: &PlanningProblem) -> Result<chronicles::Prob
     let mut bindings = BindingAriesAtoms::default();
 
     let mut p = template::generate_templates(problem, &mut bindings)?;
+
+    for template in &p.templates {
+        Printer::print_chronicle(&template.chronicle, &p.context.model);
+    }
 
     let init_ch = create_initial_chronicle(&problem, &mut p.context);
 

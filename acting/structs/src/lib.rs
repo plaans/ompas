@@ -14,6 +14,7 @@ pub mod rae_options;
 pub mod resource;
 pub mod select_mode;
 pub mod state;
+pub mod supervisor;
 pub mod sym_table;
 pub mod trigger_collection;
 

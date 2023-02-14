@@ -672,10 +672,6 @@ pub async fn p_expand(
                 }
             }
 
-            /*let expanded_list: Vec<LValue> = list
-            .iter()
-            .map(|x| expand(x, false, env, ctxs))
-            .collect::<Result<_, _>>()?;*/
             Ok(PLValue::into_pure(expanded_list.into()))
         }
         lv => Ok(PLValue::into_pure(lv.clone())),

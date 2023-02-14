@@ -1,9 +1,9 @@
-use crate::aries::{useful, BindingAriesAtoms, FLOAT_SCALE};
-use anyhow::{anyhow, Context};
-use aries_core::{IntCst, Lit as aLit, INT_CST_MAX, INT_CST_MIN};
+use crate::aries::{useful, BindingAriesAtoms};
+use anyhow::anyhow;
+use aries_core::{Lit as aLit, INT_CST_MAX, INT_CST_MIN};
 use aries_model::extensions::Shaped;
 use aries_model::lang::{
-    Atom as aAtom, Atom, ConversionError, FAtom, FVar, IAtom, SAtom, SVar, Type as aType, Variable,
+    Atom as aAtom, ConversionError, FAtom, FVar, SAtom, SVar, Type as aType, Variable,
 };
 use aries_model::symbols::SymbolTable;
 use aries_model::types::TypeHierarchy;
@@ -231,7 +231,7 @@ pub fn generate_templates(
     let cont = Container::Template(domain.templates.len());
 
     for template in &domain.templates {
-        let mut template = read_chronicle(&mut ctx, bindings, &template, cont.clone())?;
+        let template = read_chronicle(&mut ctx, bindings, &template, cont.clone())?;
         Printer::print_chronicle(&template.chronicle, &ctx.model);
         templates.push(template);
     }

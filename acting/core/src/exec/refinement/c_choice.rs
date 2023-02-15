@@ -4,7 +4,7 @@ use crate::exec::ModExec;
 use ompas_language::exec::c_choice::*;
 use ompas_language::exec::state::MOD_STATE;
 use ompas_structs::acting_domain::OMPASDomain;
-use ompas_structs::select_mode::{CChoiceConfig, Planner, SelectMode};
+use ompas_structs::interface::select_mode::{CChoiceConfig, Planner, SelectMode};
 use ompas_structs::state::action_state::RefinementMetaData;
 use ompas_structs::state::world_state::WorldStateSnapshot;
 use rand::prelude::SliceRandom;

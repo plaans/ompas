@@ -1,13 +1,12 @@
 use crate::error::RaeExecError;
+use crate::exec::context::ModContext;
 use crate::exec::mode::{CtxMode, RAEMode};
-use crate::exec::task::ModTask;
 use crate::exec::*;
 use ompas_interface::platform::Platform;
+use ompas_language::exec::context::MOD_CONTEXT;
 use ompas_language::exec::mode::CTX_MODE;
 use ompas_language::exec::platform::*;
-use ompas_language::exec::task::MOD_TASK;
 use ompas_middleware::logger::LogClient;
-use ompas_structs::agenda::Agenda;
 use ompas_structs::state::action_status::ActionStatus;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lruntimeerror::LResult;
@@ -15,7 +14,7 @@ use sompas_structs::lvalue::LValue;
 
 pub struct ModPlatform {
     platform: Platform,
-    agenda: Agenda,
+    supervisor: Supervisor,
     pub(crate) log: LogClient,
 }
 
@@ -23,7 +22,7 @@ impl ModPlatform {
     pub fn new(exec: &ModExec) -> Self {
         Self {
             platform: exec.platform.clone(),
-            agenda: exec.agenda.clone(),
+            supervisor: exec.supervisor.clone(),
             log: exec.log.clone(),
         }
     }
@@ -55,11 +54,14 @@ pub async fn exec_command(env: &LEnv, command: &[LValue]) -> LAsyncHandle {
     let f = (Box::pin(async move {
         let command = command.as_slice();
 
-        let parent_task = env.get_context::<ModTask>(MOD_TASK)?.get_task_id().await;
+        let parent_task = env
+            .get_context::<ModContext>(MOD_CONTEXT)?
+            .get_task_id()
+            .await;
         let mod_platform = env.get_context::<ModPlatform>(MOD_PLATFORM)?;
         let log = mod_platform.log.clone();
         let (command_id, mut rx) = mod_platform
-            .agenda
+            .supervisor
             .add_command(command.into(), parent_task)
             .await;
         let debug: LValue = command.into();
@@ -95,7 +97,7 @@ pub async fn exec_command(env: &LEnv, command: &[LValue]) -> LAsyncHandle {
                             ActionStatus::Rejected => {
                                 log.error(format!("Command {command_id} is a rejected."))
                                     .await;
-                                mod_platform.agenda.set_end_time(&command_id).await;
+                                mod_platform.supervisor.set_end_time(&command_id).await;
                                 return Ok(RaeExecError::ActionFailure.into());
                             }
                             ActionStatus::Accepted => {}
@@ -108,19 +110,19 @@ pub async fn exec_command(env: &LEnv, command: &[LValue]) -> LAsyncHandle {
                             ActionStatus::Failure => {
                                 log.error(format!("Command {command_id} is a failure."))
                                     .await;
-                                mod_platform.agenda.set_end_time(&command_id).await;
+                                mod_platform.supervisor.set_end_time(&command_id).await;
                                 return Ok(RaeExecError::ActionFailure.into());
                             }
                             ActionStatus::Success => {
                                 log.info(format!("Command {command_id} is a success."))
                                     .await;
-                                mod_platform.agenda.set_end_time(&command_id).await;
+                                mod_platform.supervisor.set_end_time(&command_id).await;
                                 return Ok(true.into());
                             }
                             ActionStatus::Cancelled(_) => {
                                 log.info(format!("Command {command_id} has been cancelled."))
                                     .await;
-                                mod_platform.agenda.set_end_time(&command_id).await;
+                                mod_platform.supervisor.set_end_time(&command_id).await;
                                 return Ok(true.into());
                             }
                         }

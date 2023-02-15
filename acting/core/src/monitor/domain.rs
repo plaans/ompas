@@ -7,7 +7,7 @@ use ompas_structs::acting_domain::state_function::StateFunction;
 use ompas_structs::acting_domain::task::Task;
 use ompas_structs::acting_domain::OMPASDomain;
 use ompas_structs::conversion::context::ConversionContext;
-use ompas_structs::resource::{Capacity, ResourceCollection};
+use ompas_structs::execution::resource::{Capacity, ResourceCollection};
 use ompas_structs::state::partial_state::PartialState;
 use ompas_structs::state::world_state::{StateType, WorldState, WorldStateSnapshot};
 use ompas_structs::sym_table::domain::ref_type_lattice::RefTypeLattice;

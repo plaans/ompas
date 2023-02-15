@@ -3,8 +3,8 @@ use crate::monitor::{ModMonitor, TOKIO_CHANNEL_SIZE};
 use crate::rae;
 use ompas_interface::platform::Platform;
 use ompas_interface::platform_config::PlatformConfig;
+use ompas_language::exec::context::DOC_GET_TASK_ID;
 use ompas_language::exec::state::{DYNAMIC, INNER_DYNAMIC, INNER_STATIC, INSTANCE, STATIC};
-use ompas_language::exec::task::DOC_GET_TASK_ID;
 use ompas_language::monitor::control::*;
 use ompas_language::process::{LOG_TOPIC_OMPAS, PROCESS_STOP_OMPAS, PROCESS_TOPIC_OMPAS};
 use ompas_language::select::*;
@@ -12,19 +12,19 @@ use ompas_middleware::logger::LogClient;
 use ompas_middleware::ProcessInterface;
 use ompas_planning::conversion::convert_acting_domain;
 use ompas_structs::acting_domain::OMPASDomain;
-use ompas_structs::agenda::Agenda;
 use ompas_structs::conversion::context::ConversionContext;
-use ompas_structs::job::Job;
-use ompas_structs::monitor::{task_check_wait_for, MonitorCollection};
+use ompas_structs::execution::monitor::{task_check_wait_for, MonitorCollection};
+use ompas_structs::execution::resource::ResourceCollection;
+use ompas_structs::interface::job::Job;
+use ompas_structs::interface::rae_command::OMPASJob;
+use ompas_structs::interface::rae_options::OMPASOptions;
+use ompas_structs::interface::select_mode::{Planner, SelectMode};
+use ompas_structs::interface::trigger_collection::{Response, TaskTrigger, TriggerCollection};
 use ompas_structs::planning::domain::PlanningDomain;
-use ompas_structs::rae_command::OMPASJob;
-use ompas_structs::rae_options::OMPASOptions;
-use ompas_structs::resource::ResourceCollection;
-use ompas_structs::select_mode::{Planner, SelectMode};
-use ompas_structs::state::action_state::*;
-use ompas_structs::state::action_status::*;
-use ompas_structs::state::world_state::*;
-use ompas_structs::trigger_collection::{Response, TaskTrigger, TriggerCollection};
+use ompas_structs::state::action_state::{TaskFilter, TaskType};
+use ompas_structs::state::action_status::ActionStatus;
+use ompas_structs::state::world_state::{StateType, WorldState};
+use ompas_structs::supervisor::Supervisor;
 use sompas_core::{eval_init, get_root_env};
 use sompas_macros::*;
 use sompas_modules::advanced_math::ModAdvancedMath;
@@ -50,7 +50,7 @@ pub struct ModControl {
     pub state: WorldState,
     pub resources: ResourceCollection,
     pub monitors: MonitorCollection,
-    pub agenda: Agenda,
+    pub supervisor: Supervisor,
     pub log: LogClient,
     pub task_stream: Arc<RwLock<Option<tokio::sync::mpsc::Sender<OMPASJob>>>>,
     pub(crate) platform: Platform,
@@ -67,7 +67,7 @@ impl ModControl {
             state: monitor.state.clone(),
             resources: monitor.resources.clone(),
             monitors: monitor.monitors.clone(),
-            agenda: monitor.agenda.clone(),
+            supervisor: monitor.supervisor.clone(),
             log: monitor.log.clone(),
             task_stream: monitor.task_stream.clone(),
             platform: monitor.platform.clone(),
@@ -303,7 +303,7 @@ pub async fn stop(env: &LEnv) {
     tokio::time::sleep(Duration::from_secs(1)).await; //hardcoded moment to wait for all process to be killed.
     *ctx.task_stream.write().await = None;
     ctx.state.clear().await;
-    ctx.agenda.clear().await;
+    ctx.supervisor.clear().await;
     ctx.resources.clear().await;
     ctx.monitors.clear().await;
 }
@@ -559,7 +559,7 @@ pub async fn get_state(env: &LEnv, args: &[LValue]) -> LResult {
 pub async fn get_task_network(env: &LEnv) -> String {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
 
-    ctx.agenda.format_task_network().await
+    ctx.supervisor.format_task_network().await
 }
 
 #[async_scheme_fn]
@@ -603,7 +603,7 @@ pub async fn get_agenda(env: &LEnv, args: &[LValue]) -> LResult {
         }
     }
 
-    let string = ctx.agenda.format_task_collection(task_filter).await;
+    let string = ctx.supervisor.format_task_collection(task_filter).await;
     Ok(string.into())
 }
 
@@ -679,7 +679,7 @@ pub async fn get_domain(env: &LEnv, args: &[LValue]) -> LResult {
 #[async_scheme_fn]
 pub async fn get_stats(env: &LEnv) -> LValue {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
-    ctx.agenda.get_stats().await
+    ctx.supervisor.get_stats().await
 }
 
 #[async_scheme_fn]
@@ -690,6 +690,6 @@ pub async fn export_stats(env: &LEnv, args: &[LValue]) -> LResult {
     } else {
         None
     };
-    ctx.agenda.export_to_csv(None, file).await;
+    ctx.supervisor.export_to_csv(None, file).await;
     Ok(LValue::Nil)
 }

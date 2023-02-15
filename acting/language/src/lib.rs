@@ -194,21 +194,51 @@ pub mod exec {
         pub const INNER_DYNAMIC: &str = "inner_dynamic";
     }
 
-    pub mod task {
-        pub const MOD_TASK: &str = "task";
-        pub const DOC_MOD_TASK: &str =
+    pub mod context {
+        pub const MOD_CONTEXT: &str = "context";
+        pub const DOC_MOD_CONTEXT: &str =
             "Module that contains the Task Context that contains the id of the parent task.";
 
-        pub const DEFINE_TASK_ID: &str = "define-task-id";
-        pub const DOC_DEFINE_TASK_ID: &str = "Set in the task id of the current executed task.";
+        pub const DEF_PROCESS_ID: &str = "def_process_id";
+        pub const DOC_DEF_PROCESS_ID: &str = "Define the id of the process";
 
-        pub const GET_TASK_ID: &str = "get-task-id";
-        pub const DOC_GET_TASK_ID: &str = "Return the id of the current executed task.";
+        pub const DEF_LABEL: &str = "def-label";
+        pub const DOC_DEF_LABEL: &str = "Define the label of the context";
 
-        //Keywords
-        pub const LABEL_TASK: &str = "task";
+        pub const CTX_ARBITRARY: &str = "ctx-arbitrary";
+        pub const DOC_CTX_ARBITRARY: &str = "Evaluates an arbitrary in an assigned context";
+        pub const MACRO_ARBITRARY: &str = "(lambda (id arbitrary)
+            (begin
+                (def-label 'arbitrary ,id)
+                ,arbitrary
+            )
+        )";
+        pub const CTX_ACQUIRE: &str = "ctx-arbitrary";
+        pub const DOC_CTX_ACQUIRE: &str = "Evaluates an acquire in an assigned context";
+        pub const MACRO_ACQUIRE: &str = "(lambda (id acquire)
+            (begin
+                (def-label 'acquire ,id)
+                ,acquire
+            )
+        )";
 
-        //RAE Interface with a platform
+        pub const CTX_COMMAND: &str = "ctx-arbitrary";
+        pub const DOC_CTX_COMMAND: &str = "Evaluates a command in an assigned context";
+        pub const MACRO_COMMAND: &str = "(lambda (id command)
+            (begin
+                (def-label 'command ,id)
+                ,command
+            )
+        )";
+
+        pub const CTX_SUBTASK: &str = "ctx-subtask";
+        pub const DOC_CTX_SUBTASK: &str = "Evaluates a task in an assigned context";
+        pub const MACRO_SUBTASK: &str = "(lambda (id subtask)
+            (begin
+                (def-label 'subtask ,id)
+                ,subtask
+            )
+        )";
     }
 
     pub mod refinement {
@@ -218,8 +248,11 @@ pub mod exec {
         pub const REFINE: &str = "refine";
         pub const DOC_REFINE: &str = "Refine a task and by returning an instantiated method.";
 
-        pub const SET_SUCCESS_FOR_TASK: &str = "set-success-for-task";
-        pub const DOC_SET_SUCCESS_FOR_TASK: &str = "Set the task status as success.";
+        pub const _RETRY: &str = "_retry";
+        pub const DOC__RETRY: &str = "Retry the current task";
+
+        pub const SET_SUCCESS: &str = "set-success-for-task";
+        pub const DOC_SET_SUCCESS: &str = "Set the task status as success.";
 
         pub const IS_SUCCESS: &str = "success?";
         pub const DOC_IS_SUCCESS: &str = "Return true if the LValue is a success";
@@ -239,23 +272,22 @@ pub mod exec {
                       (__task_id__ (second __result__)))
 
                     (begin
-                        (define-task-id __task_id__)
-                        (print \"Trying \" __method__ \" for \" __task_id__)
+                        ;(print \"Trying \" __method__ \" for \" __task_id__)
                         (if (err? (enr __method__))
-                            (retry __task_id__)
-                            (set-success-for-task __task_id__)))))))";
+                            (retry)
+                            (set-success-for-task)))))))";
 
         pub const RETRY: &str = "retry";
         pub const DOC_RETRY: &str = "Retry a given task.";
-        pub const LAMBDA_RETRY: &str = "(lambda (__task_id__)
+        pub const LAMBDA_RETRY: &str = "(lambda nil
         (begin
-            (define __result__ (retry __task_id__))
+            (define __result__ (_retry))
             (if (err? __result__)
                 __result__
                 (begin
                     (if (err? (enr __result__))
-                        (retry __task_id__)
-                        (set-success-for-task __task_id__))))))";
+                        (retry)
+                        (success))))))";
 
         pub const __GET_PRECONDITIONS__: &str = "__get_preconditions__";
         pub const DOC___GET_PRECONDITIONS__: &str =

@@ -1,4 +1,4 @@
-use crate::trigger_collection::Response;
+use crate::interface::trigger_collection::Response;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use std::fmt::{Display, Formatter};

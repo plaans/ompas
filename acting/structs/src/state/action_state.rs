@@ -1,8 +1,8 @@
-use crate::interval::{Duration, Interval, Timepoint};
-use crate::plan::Plan;
-use crate::select_mode::SelectMode;
+use crate::interface::select_mode::SelectMode;
 use crate::state::action_status::ActionStatus;
+use crate::supervisor::interval::{Duration, Interval, Timepoint};
 //use crate::state::task_status::TaskStatus;
+use crate::planning::plan::Plan;
 use crate::ActionId;
 use itertools::Itertools;
 use sompas_structs::lruntimeerror::LRuntimeError;

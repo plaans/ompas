@@ -1,4 +1,4 @@
-use crate::select_mode::SelectMode;
+use crate::interface::select_mode::SelectMode;
 
 #[derive(Debug, Default, Clone)]
 pub struct OMPASOptions {

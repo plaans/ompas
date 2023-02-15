@@ -25,10 +25,16 @@ use ompas_language::monitor::*;
 use ompas_language::process::{LOG_TOPIC_OMPAS, OMPAS};
 use ompas_structs::acting_domain::OMPASDomain;
 use ompas_structs::agenda::Agenda;
+use ompas_structs::execution::monitor::MonitorCollection;
+use ompas_structs::execution::resource::ResourceCollection;
+use ompas_structs::interface::job::Job;
+use ompas_structs::interface::rae_command::OMPASJob;
+use ompas_structs::interface::rae_options::OMPASOptions;
 use ompas_structs::monitor::MonitorCollection;
 use ompas_structs::rae_command::OMPASJob;
 use ompas_structs::resource::ResourceCollection;
 use ompas_structs::state::world_state::WorldState;
+use ompas_structs::supervisor::Supervisor;
 use sompas_modules::advanced_math::ModAdvancedMath;
 use sompas_modules::string::ModString;
 use sompas_modules::time::ModTime;
@@ -46,7 +52,7 @@ pub struct ModMonitor {
     pub state: WorldState,
     pub resources: ResourceCollection,
     pub monitors: MonitorCollection,
-    pub agenda: Agenda,
+    pub supervisor: Supervisor,
     pub log: LogClient,
     pub task_stream: Arc<RwLock<Option<tokio::sync::mpsc::Sender<OMPASJob>>>>,
     pub(crate) platform: Platform,
@@ -89,12 +95,12 @@ impl ModMonitor {
                 let lisp_domain = exec.read().await.domain().await;
                 Platform::new(
                     module.ompas_domain.clone(),
-                    module.agenda.clone(),
+                    module.supervisor.clone(),
                     Some(
                         ExecPlatform::new(
                             exec,
                             module.state.clone(),
-                            module.agenda.clone(),
+                            module.supervisor.clone(),
                             Arc::new(Default::default()),
                             module.log.clone(),
                             Arc::new(Default::default()),
@@ -104,9 +110,12 @@ impl ModMonitor {
                     lisp_domain,
                 )
             }
-            PlatformDeclaration::Simu(s) => {
-                Platform::new(module.ompas_domain.clone(), module.agenda.clone(), None, s)
-            }
+            PlatformDeclaration::Simu(s) => Platform::new(
+                module.ompas_domain.clone(),
+                module.supervisor.clone(),
+                None,
+                s,
+            ),
         };
 
         module.platform = platform;

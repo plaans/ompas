@@ -2,8 +2,10 @@ use crate::exec::*;
 use ompas_language::exec::mode::*;
 use ompas_language::exec::resource::*;
 use ompas_middleware::logger::LogClient;
+use ompas_structs::execution::resource::{
+    AcquireResponse, Capacity, ResourceCollection, ResourceHandler,
+};
 use ompas_structs::mutex::Wait;
-use ompas_structs::resource::{AcquireResponse, Capacity, ResourceCollection, ResourceHandler};
 use ompas_utils::dyn_async;
 use ompas_utils::other::generic_race;
 use rand::{thread_rng, Rng};

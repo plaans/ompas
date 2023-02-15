@@ -1,9 +1,9 @@
+use crate::exec::context::ModContext;
 use crate::exec::mode::{CtxMode, RAEMode};
 use crate::exec::platform::ModPlatform;
 use crate::exec::refinement::*;
 use crate::exec::resource::ModResource;
 use crate::exec::state::ModState;
-use crate::exec::task::ModTask;
 use crate::monitor::control::ModControl;
 use ::macro_rules_attribute::macro_rules_attribute;
 use futures::FutureExt;
@@ -13,12 +13,12 @@ use ompas_language::exec::{ARBITRARY, DOC_ARBITRARY, DOC_MOD_EXEC, MOD_EXEC};
 use ompas_language::process::LOG_TOPIC_OMPAS;
 use ompas_middleware::logger::LogClient;
 use ompas_structs::acting_domain::OMPASDomain;
-use ompas_structs::agenda::Agenda;
-use ompas_structs::monitor::MonitorCollection;
+use ompas_structs::execution::monitor::MonitorCollection;
+use ompas_structs::execution::resource::ResourceCollection;
+use ompas_structs::interface::rae_options::OMPASOptions;
 use ompas_structs::planning::domain::PlanningDomain;
-use ompas_structs::rae_options::OMPASOptions;
-use ompas_structs::resource::ResourceCollection;
 use ompas_structs::state::world_state::WorldState;
+use ompas_structs::supervisor::Supervisor;
 use sompas_core::eval;
 use sompas_core::modules::list::car;
 use sompas_macros::{async_scheme_fn, scheme_fn};
@@ -35,12 +35,12 @@ use std::string::String;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+pub mod context;
 pub mod mode;
 pub mod platform;
 pub mod refinement;
 pub mod resource;
 pub mod state;
-pub mod task;
 
 /*
 LANGUAGE
@@ -51,7 +51,7 @@ pub const LABEL_ENUMERATE_PARAMS: &str = "enumerate-params";
 ///Context that will contains primitives for the RAE executive
 pub struct ModExec {
     options: Arc<RwLock<OMPASOptions>>,
-    agenda: Agenda,
+    supervisor: Supervisor,
     state: WorldState,
     domain: Arc<RwLock<OMPASDomain>>,
     monitors: MonitorCollection,
@@ -65,7 +65,7 @@ impl ModExec {
     pub async fn new(monitor: &ModControl) -> Self {
         Self {
             options: monitor.options.clone(),
-            agenda: monitor.agenda.clone(),
+            supervisor: monitor.supervisor.clone(),
             state: monitor.state.clone(),
             domain: monitor.ompas_domain.clone(),
             monitors: monitor.monitors.clone(),
@@ -89,7 +89,7 @@ impl From<ModExec> for LModule {
         module.add_submodule(mod_platform);
         module.add_submodule(mod_resource);
         module.add_submodule(mod_state);
-        module.add_submodule(ModTask::default());
+        module.add_submodule(ModContext::default());
         module.add_submodule(mod_refinement);
         module.add_async_fn(ARBITRARY, arbitrary, DOC_ARBITRARY, false);
         module

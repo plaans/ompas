@@ -1,13 +1,14 @@
 use crate::error::RaeExecError;
-use crate::exec::task::ModTask;
+use crate::exec::context::ModContext;
 use futures::FutureExt;
 use ompas_language::process::{LOG_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS};
 use ompas_middleware::logger::LogClient;
 use ompas_middleware::LogLevel;
 use ompas_middleware::ProcessInterface;
-use ompas_structs::job::JobType;
-use ompas_structs::rae_command::OMPASJob;
-use ompas_structs::trigger_collection::{Response, TaskTrigger};
+use ompas_structs::interface::job::JobType;
+use ompas_structs::interface::rae_command::OMPASJob;
+use ompas_structs::interface::trigger_collection::{Response, TaskTrigger};
+use ompas_structs::supervisor::{ActingProcessId, Supervisor};
 use sompas_core::{eval, parse};
 use sompas_structs::lasynchandler::LAsyncHandle;
 use sompas_structs::lenv::LEnv;
@@ -32,6 +33,7 @@ pub const PROCESS_MAIN: &str = "__PROCESS_MAIN__";
 /// Receives Job to handle in separate tasks.
 pub async fn rae(
     //domain: RAEDomain,
+    supervisor: Supervisor,
     log: LogClient,
     env: LEnv,
     mut command_rx: Receiver<OMPASJob>,
@@ -47,30 +49,28 @@ pub async fn rae(
                 match command {
                     None => break,
                     Some(OMPASJob::Job(job)) => {
-                        log.info("new job received!").await;
+                        log.debug("new job received!").await;
 
                         let mut new_env = env.clone();
 
-                        let mut arc_task_id = None;
+                        let mut task_id: ActingProcessId = 0;
 
                         let job_type = job.r#type;
                         let job_expr = &job.expr;
 
                         match job_type {
                             JobType::Task => {
-                                log.info(format!("new triggered method: {}", job_expr)).await;
-                                let mod_task = ModTask::default();
-                                arc_task_id = Some(mod_task.get_pointer());
-                                new_env.update_context(mod_task);
+                                log.debug(format!("new triggered task: {}", job_expr)).await;
+                                let id: ActingProcessId = supervisor.inner.write().await.new_high_level_task(job_expr.to_string());
+                                let mod_context: ModContext = ModContext::new(id.into());
+                                task_id = id;
+                                new_env.update_context(mod_context);
 
                             },
                             JobType::Debug => {
-                                log.info(format!("new triggered debug: {}", job_expr)).await;
-
+                                log.debug(format!("new triggered debug: {}", job_expr)).await;
                             },
                         }
-
-
 
                         let job_lvalue = match parse(job_expr, &mut new_env).await {
                             Ok(l) => l,
@@ -120,7 +120,7 @@ pub async fn rae(
 
                         let response: Response = match job_type {
                             JobType::Task => {
-                                Response::Trigger(TaskTrigger::new(arc_task_id.unwrap(), async_handle))
+                                Response::Trigger(TaskTrigger::new(task_id.unwrap(), async_handle))
                             }
                             JobType::Debug => {
                                 Response::Handle(async_handle)

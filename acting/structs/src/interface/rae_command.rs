@@ -1,4 +1,4 @@
-use crate::job::Job;
+use crate::interface::job::Job;
 use tokio::sync::mpsc::{Receiver, Sender};
 
 #[derive(Clone, Debug)]

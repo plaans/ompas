@@ -1,10 +1,10 @@
-use crate::interval::{Duration, Timepoint};
-use crate::select_mode::SelectMode;
+use crate::interface::select_mode::SelectMode;
 use crate::state::action_state::{
     ActionCollection, ActionMetaData, ActionMetaDataView, CommandMetaData, TaskFilter, TaskMetaData,
 };
 use crate::state::action_status::ActionStatus;
 use crate::state::task_network::TaskNetwork;
+use crate::supervisor::interval::{Duration, Timepoint};
 use crate::ActionId;
 use chrono::{DateTime, Utc};
 use core::convert::Into;

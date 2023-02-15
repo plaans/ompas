@@ -1,21 +1,21 @@
+use crate::exec::context::ModContext;
 use crate::exec::refinement::greedy_select;
-use crate::exec::task::ModTask;
 use crate::exec::ModExec;
 use ompas_language::exec::aries::*;
-use ompas_language::exec::task::MOD_TASK;
+use ompas_language::exec::context::MOD_CONTEXT;
 use ompas_middleware::logger::LogClient;
 use ompas_planning::aries::solver::run_solver_for_htn;
 use ompas_planning::aries::template::generate_templates;
 use ompas_planning::aries::{solver, BindingAriesAtoms};
 use ompas_structs::acting_domain::OMPASDomain;
-use ompas_structs::agenda::Agenda;
-use ompas_structs::plan::AbstractTaskInstance;
+use ompas_structs::interface::select_mode::{Planner, SelectMode};
 use ompas_structs::planning::domain::PlanningDomain;
 use ompas_structs::planning::instance::PlanningInstance;
+use ompas_structs::planning::plan::AbstractTaskInstance;
 use ompas_structs::planning::problem::PlanningProblem;
-use ompas_structs::select_mode::{Planner, SelectMode};
 use ompas_structs::state::action_state::{RefinementMetaData, TaskMetaData};
 use ompas_structs::state::world_state::WorldStateSnapshot;
+use ompas_structs::supervisor::Supervisor;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lvalue::LValue;
@@ -25,7 +25,7 @@ use tokio::sync::RwLock;
 
 pub struct CtxAries {
     log: LogClient,
-    agenda: Agenda,
+    supervisor: Supervisor,
     _domain: Arc<RwLock<OMPASDomain>>,
     pd: Arc<RwLock<Option<PlanningDomain>>>,
 }
@@ -34,7 +34,7 @@ impl CtxAries {
     pub fn new(exec: &ModExec) -> Self {
         Self {
             log: exec.log.clone(),
-            agenda: exec.agenda.clone(),
+            supervisor: exec.supervisor.clone(),
             _domain: exec.domain.clone(),
             pd: Arc::new(Default::default()),
         }
@@ -59,11 +59,14 @@ pub async fn aries_select(
     println!("\t*tried: {}", LValue::from(tried));
     println!("\t*greedy: {}", LValue::from(&greedy.applicable_methods));
 
-    let parent_task = env.get_context::<ModTask>(MOD_TASK)?.get_task_id().await;
+    let parent_task = env
+        .get_context::<ModContext>(MOD_CONTEXT)?
+        .get_task_id()
+        .await;
     match parent_task {
         Some(parent_id) => {
-            let parent_stack: TaskMetaData = ctx.agenda.get_task(&parent_id).await?;
-            let n = ctx.agenda.get_number_of_subtasks(&parent_id).await - 1;
+            let parent_stack: TaskMetaData = ctx.supervisor.get_task(&parent_id).await?;
+            let n = ctx.supervisor.get_number_of_subtasks(&parent_id).await - 1;
             println!("{} subtask of {}", n + 1, parent_id);
             println!("Searching for a generated plan...");
             if let Some(plan) = &parent_stack.get_last_refinement().unwrap().plan {
@@ -114,7 +117,7 @@ pub async fn aries_select(
                     greedy.plan = Some(subtask_plan);
                     greedy.choosed = applicable_methods.get(0).cloned().unwrap_or(LValue::Nil);
                     greedy.applicable_methods = applicable_methods;
-                    greedy.interval.set_end(ctx.agenda.get_instant());
+                    greedy.interval.set_end(ctx.supervisor.get_instant());
                     greedy.refinement_type = SelectMode::Planning(Planner::Aries(optimize));
                     return Ok(greedy);
                 } else {
@@ -187,7 +190,7 @@ pub async fn aries_select(
 
         greedy.choosed = applicable_methods.get(0).cloned().unwrap_or(LValue::Nil);
         greedy.applicable_methods = applicable_methods;
-        greedy.interval.set_end(ctx.agenda.get_instant());
+        greedy.interval.set_end(ctx.supervisor.get_instant());
         greedy.refinement_type = SelectMode::Planning(Planner::Aries(optimize));
         Ok(greedy)
     } else {

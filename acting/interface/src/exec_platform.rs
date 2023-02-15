@@ -17,10 +17,10 @@ use async_trait::async_trait;
 use ompas_language::process::PROCESS_TOPIC_OMPAS;
 use ompas_middleware::logger::LogClient;
 use ompas_middleware::{Master, ProcessInterface};
-use ompas_structs::agenda::Agenda;
 use ompas_structs::state::action_status::ActionStatus;
 use ompas_structs::state::partial_state::PartialState;
 use ompas_structs::state::world_state::{StateType, WorldState};
+use ompas_structs::supervisor::Supervisor;
 use platform_interface::platform_update::Update;
 use sompas_structs::lmodule::LModule;
 use sompas_structs::lvalue::LValue;
@@ -34,7 +34,7 @@ use tokio::sync::{Mutex, RwLock};
 pub struct ExecPlatform {
     inner: Arc<RwLock<dyn PlatformDescriptor>>,
     state: WorldState,
-    agenda: Agenda,
+    supervisor: Supervisor,
     command_stream: Arc<Mutex<Option<tokio::sync::mpsc::Sender<CommandRequest>>>>,
     log: LogClient,
     pub config: Arc<RwLock<PlatformConfig>>,
@@ -44,7 +44,7 @@ impl ExecPlatform {
     pub async fn new(
         inner: Arc<RwLock<dyn PlatformDescriptor>>,
         state: WorldState,
-        agenda: Agenda,
+        supervisor: Supervisor,
         command_stream: Arc<Mutex<Option<tokio::sync::mpsc::Sender<CommandRequest>>>>,
         log: LogClient,
         config: Arc<RwLock<PlatformConfig>>,
@@ -55,7 +55,7 @@ impl ExecPlatform {
         Self {
             inner,
             state,
-            agenda,
+            supervisor,
             command_stream,
             log,
             config,
@@ -197,7 +197,7 @@ impl ExecPlatform {
 
     async fn send_commands(
         mut client: PlatformInterfaceClient<tonic::transport::Channel>,
-        agenda: Agenda,
+        supervisor: Supervisor,
         command_stream: tokio::sync::mpsc::Receiver<CommandRequest>,
     ) {
         let mut process = ProcessInterface::new(
@@ -241,39 +241,39 @@ impl ExecPlatform {
                             match command_response.response {
                                 None => {}
                                 Some(Response::Accepted(r)) => {
-                                    agenda
-                                        .update_status(&(r.command_id as usize), ActionStatus::Accepted)
+                                    supervisor
+                                        .update_command_status(r.command_id as usize, ActionStatus::Accepted)
                                         .await;
                                 }
                                 Some(Response::Rejected(r)) => {
-                                    agenda
-                                        .update_status(&(r.command_id as usize), ActionStatus::Rejected)
+                                    supervisor
+                                        .update_command_status(r.command_id as usize, ActionStatus::Rejected)
                                         .await;
                                 }
                                 Some(Response::Progress(f)) => {
-                                    agenda
-                                        .update_status(
-                                            &(f.command_id as usize),
+                                    supervisor
+                                        .update_command_status(
+                                            f.command_id as usize,
                                             ActionStatus::Running(Some(f.progress)),
                                         )
                                         .await;
                                 }
                                 Some(Response::Result(r)) => match r.result {
                                     true => {
-                                        agenda
-                                            .update_status(&(r.command_id as usize), ActionStatus::Success)
+                                        supervisor
+                                            .update_command_status(r.command_id as usize, ActionStatus::Success)
                                             .await
                                     }
                                     false => {
-                                        agenda
-                                            .update_status(&(r.command_id as usize), ActionStatus::Failure)
+                                        supervisor
+                                            .update_command_status(r.command_id as usize, ActionStatus::Failure)
                                             .await
                                     }
                                 },
                                 Some(Response::Cancelled(c)) => {
-                                    agenda
-                                        .update_status(
-                                            &(c.command_id as usize),
+                                    supervisor
+                                        .update_command_status(
+                                            c.command_id as usize,
                                             ActionStatus::Cancelled(c.result),
                                         )
                                         .await;
@@ -326,11 +326,11 @@ impl PlatformDescriptor for ExecPlatform {
             ExecPlatform::get_updates(client, state).await;
         });
 
-        let agenda = self.agenda.clone();
+        let supervisor = self.supervisor.clone();
         let (tx, command_stream) = tokio::sync::mpsc::channel(TOKIO_CHANNEL_SIZE);
         *self.command_stream.lock().await = Some(tx);
         tokio::spawn(async move {
-            ExecPlatform::send_commands(client2, agenda, command_stream).await;
+            ExecPlatform::send_commands(client2, supervisor, command_stream).await;
         });
     }
 

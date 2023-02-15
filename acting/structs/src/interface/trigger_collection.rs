@@ -1,3 +1,4 @@
+use crate::supervisor::ActingProcessId;
 use crate::ActionId;
 use ompas_utils::other::get_and_update_id_counter;
 use sompas_structs::lasynchandler::LAsyncHandle;
@@ -38,17 +39,17 @@ pub enum Response {
 
 #[derive(Clone, Debug)]
 pub struct TaskTrigger {
-    task_id: Arc<RwLock<Option<ActionId>>>,
+    task_id: ActingProcessId,
     handle: LAsyncHandle,
 }
 
 impl TaskTrigger {
-    pub fn new(task_id: Arc<RwLock<Option<ActionId>>>, handle: LAsyncHandle) -> Self {
+    pub fn new(task_id: ActingProcessId, handle: LAsyncHandle) -> Self {
         Self { task_id, handle }
     }
 
-    pub async fn get_task_id(&self) -> Option<ActionId> {
-        *self.task_id.read().await
+    pub async fn get_task_id(&self) -> ActingProcessId {
+        self.task_id
     }
 
     pub fn get_handle(&self) -> LAsyncHandle {

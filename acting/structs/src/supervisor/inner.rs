@@ -1,3 +1,4 @@
+use crate::conversion::flow_graph::graph::Dot;
 use crate::supervisor::action_status::ActionStatus;
 use crate::supervisor::interval::Timepoint;
 use crate::supervisor::process::acquire::AcquireProcess;
@@ -5,13 +6,34 @@ use crate::supervisor::process::arbitrary::ArbitraryProcess;
 use crate::supervisor::process::command::CommandProcess;
 use crate::supervisor::process::method::MethodProcess;
 use crate::supervisor::process::process_ref::{Label, MethodLabel, ProcessRef};
+use crate::supervisor::process::root_task::RootProcess;
 use crate::supervisor::process::task::{Refinement, RefinementTrace, TaskProcess};
 use crate::supervisor::process::{ActingProcess, ActingProcessInner, ProcessOrigin};
 use crate::supervisor::ActingProcessId;
+use chrono::{DateTime, Utc};
 use sompas_structs::lvalue::LValue;
+use std::env::set_current_dir;
+use std::fmt::Write;
+use std::fs;
+use std::fs::File;
+use std::io::Write as ioWrite;
+use std::path::PathBuf;
 use tokio::sync::watch;
 use tokio::sync::watch::Receiver;
 use tokio::time::Instant;
+
+const COLOR_PLANNING: &str = "red";
+const COLOR_EXECUTION: &str = "blue";
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum ProcessKind {
+    Method,
+    Acquire,
+    Arbitrary,
+    Command,
+    Task,
+    RootTask,
+}
 
 pub struct InnerSupervisor {
     inner: Vec<ActingProcess>,
@@ -63,6 +85,14 @@ impl InnerSupervisor {
                                 return None;
                             }
                         }
+                        Label::HighLevelTask(rank) => {
+                            id = self.inner[0]
+                                .inner
+                                .as_root()
+                                .unwrap()
+                                .nth_task(rank)
+                                .unwrap()
+                        }
                     }
                 }
                 Some(id)
@@ -70,19 +100,23 @@ impl InnerSupervisor {
         }
     }
 
+    pub fn get_kind(&self, id: ActingProcessId) -> Option<ProcessKind> {
+        self.get(id).map(|ap| ap.inner.kind())
+    }
+
     //New processes
-    pub fn new_high_level_task(&mut self, value: LValue) -> ActingProcessId {
+    pub fn new_high_level_task(&mut self, value: LValue) -> ProcessRef {
         let id = self.inner.len();
         self.inner.push(ActingProcess::new(
             ProcessOrigin::Execution,
             TaskProcess::new(id, 0, value, Some(self.get_instant())),
         ));
-        self.inner[0]
-            .inner
-            .as_mut_root()
-            .unwrap()
-            .add_top_level_task(id);
-        id
+
+        let root: &mut RootProcess = self.inner[0].inner.as_mut_root().unwrap();
+        let rank = root.n_task();
+        root.add_top_level_task(id);
+
+        ProcessRef::Relative(0, vec![Label::HighLevelTask(rank)])
     }
 
     pub fn new_task(
@@ -113,6 +147,7 @@ impl InnerSupervisor {
     pub fn new_method(
         &mut self,
         parent: ActingProcessId,
+        debug: String,
         value: LValue,
         trace: RefinementTrace,
         planned: bool,
@@ -125,7 +160,7 @@ impl InnerSupervisor {
         let id = self.inner.len();
         self.inner.push(ActingProcess::new(
             origin,
-            MethodProcess::new(id, parent, value, start),
+            MethodProcess::new(id, parent, debug, value, start),
         ));
         self.inner[parent]
             .inner
@@ -256,6 +291,94 @@ impl InnerSupervisor {
                     .clone()
             })
             .collect()
+    }
+
+    pub fn export_trace_dot_graph(&self) -> Dot {
+        let mut dot: Dot = "digraph {\n".to_string();
+        let mut queue = vec![0];
+
+        while let Some(id) = queue.pop() {
+            let ap = &self.inner[id];
+            let label = ap.inner.to_string();
+            let color = match ap.origin {
+                ProcessOrigin::Execution => COLOR_EXECUTION,
+                ProcessOrigin::Planning => COLOR_PLANNING,
+            };
+
+            writeln!(dot, "P{id} [label = \"{label}\", color = {color}];").unwrap();
+            match &ap.inner {
+                ActingProcessInner::RootTask(rt) => {
+                    for st in &rt.tasks {
+                        writeln!(dot, "P{id} -> P{st};").unwrap();
+                        queue.push(*st)
+                    }
+                }
+                ActingProcessInner::Command(_) => {}
+                ActingProcessInner::Task(t) => {
+                    for r in t.refinements.iter().map(|p| p.method) {
+                        writeln!(dot, "P{id} -> P{};", r).unwrap();
+                        queue.push(r)
+                    }
+                }
+                ActingProcessInner::Method(m) => {
+                    for sub in m.process_set.values() {
+                        writeln!(dot, "P{id} -> P{sub};").unwrap();
+                        queue.push(*sub)
+                    }
+                }
+                ActingProcessInner::Arbitrary(_) => {}
+                ActingProcessInner::Acquire(_) => {}
+            }
+        }
+
+        dot.push('}');
+        dot
+    }
+
+    pub fn dump_trace(&self, path: Option<PathBuf>) {
+        let mut path = match path {
+            None => "/tmp".into(),
+            Some(p) => p,
+        };
+        let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
+        let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
+        path.push(format!("supervisor-trace_{}", string_date));
+        fs::create_dir_all(&path).unwrap();
+
+        let mut path_dot = path.clone();
+        let dot_file_name = "trace.dot";
+        path_dot.push(&dot_file_name);
+        let mut file = File::create(&path_dot).unwrap();
+        let dot = self.export_trace_dot_graph();
+        file.write_all(dot.as_bytes()).unwrap();
+        set_current_dir(&path).unwrap();
+        let trace = "trace.png";
+        std::process::Command::new("dot")
+            .args(["-Tpng", &dot_file_name, "-o", &trace])
+            .spawn()
+            .unwrap()
+            .wait()
+            .unwrap();
+
+        let mut md_path = path.clone();
+        let md_file_name = "trace.md";
+        md_path.push(&md_file_name);
+        let mut md_file = File::create(&md_path).unwrap();
+        let md: String = format!(
+            "
+## Trace
+\n
+![]({})
+\n",
+            trace
+        );
+
+        md_file.write_all(md.as_bytes()).unwrap();
+
+        std::process::Command::new("google-chrome")
+            .arg(&md_file_name)
+            .spawn()
+            .unwrap();
     }
 }
 /*

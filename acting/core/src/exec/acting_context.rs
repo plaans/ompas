@@ -28,7 +28,7 @@ impl From<ModActingContext> for Context {
 impl From<ModActingContext> for LModule {
     fn from(m: ModActingContext) -> Self {
         let mut module = LModule::new(m, MOD_ACTING_CONTEXT, DOC_MOD_CONTEXT);
-        module.add_async_mut_fn(DOC_DEF_PROCESS_ID, def_process_id, DOC_DEF_PROCESS_ID);
+        module.add_async_mut_fn(DEF_PROCESS_ID, def_process_id, DOC_DEF_PROCESS_ID);
         module.add_async_mut_fn(DEF_LABEL, def_label, DOC_DEF_LABEL);
         module
     }

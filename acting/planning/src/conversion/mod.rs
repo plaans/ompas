@@ -2,7 +2,7 @@ use crate::conversion::chronicle::convert_method;
 use crate::conversion::chronicle::post_processing::post_processing;
 use crate::conversion::flow::convert_lv;
 use crate::conversion::flow::p_eval::p_eval;
-use crate::conversion::flow::p_eval::r#struct::PConfig;
+use crate::conversion::flow::p_eval::r#struct::{PConfig, PLEnv};
 use crate::conversion::flow::post_processing::flow_graph_post_processing;
 use crate::conversion::flow::pre_processing::pre_processing;
 use aries_planning::chronicles::ChronicleOrigin;
@@ -462,9 +462,13 @@ pub async fn convert_abstract_task_to_chronicle(
     let lv = lambda.get_body();
     ch.debug.lvalue = lv.clone();
 
-    let lv = p_eval(lv, &mut cc.env.clone(), &mut pc.clone())
-        .await?
-        .lvalue;
+    let mut p_env = PLEnv {
+        env: cc.env.clone(),
+        unpure_binding: Default::default(),
+        pc: pc.clone(),
+    };
+
+    let lv = p_eval(lv, &mut p_env).await?;
     //println!("lv: {}", lv.format(4));
     //panic!();
     let lv = pre_processing(&lv, &cc.env).await?;

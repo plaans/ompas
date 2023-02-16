@@ -1,4 +1,4 @@
-use crate::supervisor::ActingProcessId;
+use crate::supervisor::process::process_ref::ProcessRef;
 use crate::ActionId;
 use ompas_utils::other::get_and_update_id_counter;
 use sompas_structs::lasynchandler::LAsyncHandle;
@@ -39,17 +39,17 @@ pub enum Response {
 
 #[derive(Clone, Debug)]
 pub struct TaskTrigger {
-    task_id: ActingProcessId,
+    pr: ProcessRef,
     handle: LAsyncHandle,
 }
 
 impl TaskTrigger {
-    pub fn new(task_id: ActingProcessId, handle: LAsyncHandle) -> Self {
-        Self { task_id, handle }
+    pub fn new(pr: ProcessRef, handle: LAsyncHandle) -> Self {
+        Self { pr, handle }
     }
 
-    pub async fn get_task_id(&self) -> ActingProcessId {
-        self.task_id
+    pub fn get_ref(&self) -> ProcessRef {
+        self.pr.clone()
     }
 
     pub fn get_handle(&self) -> LAsyncHandle {

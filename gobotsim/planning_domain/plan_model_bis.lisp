@@ -14,7 +14,9 @@
                                    ;,(cadr process)
                                    ))
                                (package.processes_list ?p)))
-                           (apply seq tasks)))
+                           (apply seq tasks)
+                           
+                           ))
                    (instances package)))
                (apply par tasks))))
 

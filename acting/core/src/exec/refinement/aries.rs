@@ -1,15 +1,8 @@
 use crate::exec::refinement::greedy_select;
 use crate::exec::ModExec;
 use ompas_middleware::logger::LogClient;
-use ompas_planning::aries::solver::run_solver_for_htn;
-use ompas_planning::aries::template::generate_templates;
-use ompas_planning::aries::{solver, BindingAriesAtoms};
 use ompas_structs::acting_domain::OMPASDomain;
-use ompas_structs::interface::select_mode::{Planner, SelectMode};
 use ompas_structs::planning::domain::PlanningDomain;
-use ompas_structs::planning::instance::PlanningInstance;
-use ompas_structs::planning::plan::AbstractTaskInstance;
-use ompas_structs::planning::problem::PlanningProblem;
 use ompas_structs::state::world_state::WorldStateSnapshot;
 use ompas_structs::supervisor::process::task::RefinementTrace;
 use ompas_structs::supervisor::Supervisor;
@@ -17,23 +10,22 @@ use sompas_structs::lenv::LEnv;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lvalue::LValue;
 use std::sync::Arc;
-use std::time::Instant;
 use tokio::sync::RwLock;
 
 pub struct CtxAries {
-    log: LogClient,
-    supervisor: Supervisor,
+    _log: LogClient,
+    _supervisor: Supervisor,
     _domain: Arc<RwLock<OMPASDomain>>,
-    pd: Arc<RwLock<Option<PlanningDomain>>>,
+    _pd: Arc<RwLock<Option<PlanningDomain>>>,
 }
 
 impl CtxAries {
     pub fn new(exec: &ModExec) -> Self {
         Self {
-            log: exec.log.clone(),
-            supervisor: exec.supervisor.clone(),
+            _log: exec.log.clone(),
+            _supervisor: exec.supervisor.clone(),
             _domain: exec.domain.clone(),
-            pd: Arc::new(Default::default()),
+            _pd: Arc::new(Default::default()),
         }
     }
 }
@@ -44,10 +36,9 @@ pub async fn aries_select(
     tried: &Vec<LValue>,
     task: Vec<LValue>,
     env: &LEnv,
-    optimize: bool,
+    _optimize: bool,
 ) -> lruntimeerror::Result<RefinementTrace> {
-    let mut greedy: RefinementTrace =
-        greedy_select(state.clone(), tried, task.clone(), env).await?;
+    let greedy: RefinementTrace = greedy_select(state.clone(), tried, task.clone(), env).await?;
     Ok(greedy)
     /*let ctx = env.get_context::<CtxAries>(CTX_ARIES)?;
     let log = ctx.log.clone();

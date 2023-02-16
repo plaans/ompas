@@ -520,7 +520,7 @@ pub mod utils {
     pub const SEQ: &str = "seq";
     pub const DOC_SEQ: &str = "Evaluates sequentially a list of expression";
     pub const LAMBDA_SEQ: &str = "(lambda _args_
-    (cons begin _args_)))";
+    (eval (cons begin _args_)))";
 
     pub const REPEAT: &str = "repeat";
     pub const DOC_REPEAT: &str = "Repeat the evaluation of an expression n times.";

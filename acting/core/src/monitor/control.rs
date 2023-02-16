@@ -23,7 +23,8 @@ use ompas_structs::interface::trigger_collection::{Response, TaskTrigger, Trigge
 use ompas_structs::planning::domain::PlanningDomain;
 use ompas_structs::state::world_state::{StateType, WorldState};
 use ompas_structs::supervisor::action_status::ActionStatus;
-use ompas_structs::supervisor::filter::{ProcessFilter, ProcessKind};
+use ompas_structs::supervisor::filter::ProcessFilter;
+use ompas_structs::supervisor::inner::ProcessKind;
 use ompas_structs::supervisor::Supervisor;
 use sompas_core::{eval_init, get_root_env};
 use sompas_macros::*;
@@ -234,6 +235,7 @@ impl From<ModControl> for LModule {
         );
         module.add_async_fn(GET_STATS, get_stats, DOC_GET_STATS, false);
         module.add_async_fn(EXPORT_STATS, export_stats, DOC_EXPORT_STATS, false);
+        module.add_async_fn(DUMP_TRACE, dump_trace, DOC_DUMP_TRACE, false);
         module.add_macro(DEBUG_OMPAS, MACRO_DEBUG_OMPAS, DOC_DEBUG_OMPAS);
 
         module
@@ -425,7 +427,7 @@ pub async fn get_task_id(env: &LEnv, task_id: usize) -> LResult {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
     let trigger: Option<TaskTrigger> = ctx.triggers.get_task(task_id).await;
     match trigger {
-        Some(trigger) => Ok(trigger.get_task_id().await.into()),
+        Some(trigger) => Ok(format!("{:?}", trigger.get_ref()).into()),
         None => Err(LRuntimeError::new(
             WAIT_TASK,
             format!("{} is not the id of a triggered task", task_id),
@@ -575,6 +577,9 @@ pub async fn print_processes(env: &LEnv, args: &[LValue]) -> LResult {
         match arg.to_string().as_str() {
             TASK => task_filter.task_type = Some(ProcessKind::Task),
             COMMAND => task_filter.task_type = Some(ProcessKind::Command),
+            ARBITRARY => task_filter.task_type = Some(ProcessKind::Arbitrary),
+            ACQUIRE => task_filter.task_type = Some(ProcessKind::Acquire),
+            METHOD => task_filter.task_type = Some(ProcessKind::Method),
             STATUS_PENDING => task_filter.status = Some(ActionStatus::Pending),
             STATUS_ACCEPTED => task_filter.status = Some(ActionStatus::Accepted),
             STATUS_REJECTED => task_filter.status = Some(ActionStatus::Rejected),
@@ -690,4 +695,14 @@ pub async fn export_stats(env: &LEnv, args: &[LValue]) -> LResult {
     };
     ctx.supervisor.export_to_csv(None, file).await;
     Ok(LValue::Nil)
+}
+
+#[async_scheme_fn]
+pub async fn dump_trace(env: &LEnv) -> Result<(), LRuntimeError> {
+    env.get_context::<ModControl>(MOD_CONTROL)?
+        .supervisor
+        .dump_trace(None)
+        .await;
+
+    Ok(())
 }

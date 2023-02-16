@@ -341,7 +341,7 @@ impl LDebug {
     pub async fn log_last_result(&mut self, results: &Results) {
         //if get_debug() {
         self.log
-            .debug(format!(
+            .trace(format!(
                 "{} => {}",
                 self.inner.pop().unwrap(),
                 results.last().unwrap()

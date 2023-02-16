@@ -1,5 +1,5 @@
 use crate::error::RaeExecError;
-use crate::exec::context::ModActingContext;
+use crate::exec::acting_context::ModActingContext;
 use crate::exec::mode::{CtxMode, RAEMode};
 use crate::exec::*;
 use ompas_interface::platform::Platform;
@@ -13,7 +13,6 @@ use ompas_structs::supervisor::ActingProcessId;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lruntimeerror::LResult;
 use sompas_structs::lvalue::LValue;
-use std::sync::mpsc::Receiver;
 use tokio::sync::watch;
 
 pub struct ModPlatform {
@@ -72,7 +71,7 @@ pub async fn exec_command(env: &LEnv, command: &[LValue]) -> LAsyncHandle {
                     .await
             }
             ProcessRef::Relative(id, labels) => match supervisor.get_id(pr.clone()).await {
-                Some(id) => {
+                Some(_id) => {
                     todo!()
                 }
                 None => {

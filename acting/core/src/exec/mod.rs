@@ -1,4 +1,4 @@
-use crate::exec::context::ModActingContext;
+use crate::exec::acting_context::ModActingContext;
 use crate::exec::mode::{CtxMode, RAEMode};
 use crate::exec::platform::ModPlatform;
 use crate::exec::refinement::*;
@@ -35,7 +35,7 @@ use std::string::String;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-pub mod context;
+pub mod acting_context;
 pub mod mode;
 pub mod platform;
 pub mod refinement;

@@ -1,5 +1,6 @@
 use crate::supervisor::action_status::ActionStatus;
 use crate::supervisor::filter::ProcessFilter;
+use crate::supervisor::inner::ProcessKind;
 use crate::supervisor::interval::Timepoint;
 use crate::supervisor::process::process_ref::{MethodLabel, ProcessRef};
 use crate::supervisor::process::task::RefinementTrace;
@@ -43,11 +44,15 @@ impl Supervisor {
         todo!()
     }
 
+    pub async fn dump_trace(&self, path: Option<PathBuf>) {
+        self.inner.read().await.dump_trace(path)
+    }
+
     pub async fn format_task_network(&self) -> String {
         todo!()
     }
 
-    pub async fn print_processes(&self, pf: ProcessFilter) -> String {
+    pub async fn print_processes(&self, _pf: ProcessFilter) -> String {
         todo!()
     }
 
@@ -57,8 +62,8 @@ impl Supervisor {
 
     pub async fn export_to_csv(
         &self,
-        working_dir: Option<PathBuf>,
-        file: Option<String>,
+        _working_dir: Option<PathBuf>,
+        _file: Option<String>,
     ) -> LValue {
         todo!()
     }
@@ -69,6 +74,10 @@ impl Supervisor {
 
     pub async fn get_origin(&self, id: ActingProcessId) -> Option<ProcessOrigin> {
         self.inner.read().await.get(id).map(|ap| ap.origin)
+    }
+
+    pub async fn get_kind(&self, id: ActingProcessId) -> Option<ProcessKind> {
+        self.inner.read().await.get_kind(id)
     }
 
     pub async fn update_task_status(&self, id: impl Into<ProcessRef>, status: ActionStatus) {
@@ -90,9 +99,23 @@ impl Supervisor {
         self.inner.read().await.get_tried_method(id)
     }
 
+    pub async fn new_task(
+        &self,
+        label: MethodLabel,
+        parent: ActingProcessId,
+        value: LValue,
+        planned: bool,
+    ) -> ActingProcessId {
+        self.inner
+            .write()
+            .await
+            .new_task(label, parent, value, planned)
+    }
+
     pub async fn new_method(
         &self,
         parent: ActingProcessId,
+        debug: String,
         value: LValue,
         trace: RefinementTrace,
         planned: bool,
@@ -100,7 +123,7 @@ impl Supervisor {
         self.inner
             .write()
             .await
-            .new_method(parent, value, trace, planned)
+            .new_method(parent, debug, value, trace, planned)
     }
 
     //Command methods

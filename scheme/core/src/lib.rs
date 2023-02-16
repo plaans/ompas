@@ -412,7 +412,7 @@ pub async fn expand(x: &LValue, top_level: bool, env: &mut LEnv) -> LResult {
                         let expanded = expand(&eval(lv, env, None).await?, top_level, env).await?;
                         //if get_debug() {
                         env.log
-                            .debug(format!("In expand: macro expanded: {:?}", expanded))
+                            .trace(format!("In expand: macro expanded: {:?}", expanded))
                             .await;
                         //}
                         return Ok(expanded);
@@ -510,7 +510,7 @@ pub async fn eval(
         if let Some(r) = &mut int {
             interrupted = r.is_interrupted();
             if interrupted {
-                log.debug(format!("interrupted! last result!: {:?}", results.last()))
+                log.trace(format!("interrupted! last result!: {:?}", results.last()))
                     .await;
             }
         }
@@ -1144,7 +1144,7 @@ pub async fn eval(
     }
 }
 
-pub fn unstack(
+fn unstack(
     current: LValue,
     e: LRuntimeError,
     mut results: Results,

@@ -18,6 +18,7 @@ sompas-macros = {path = "../../scheme/macros"}
 ompas-utils = {path= "../../utils"}
 ompas-language = {path = "../language"}
 ompas-structs = {path = "../structs"}
+ompas-middleware= {path = "../../middleware"}
 
 # aries bindings
 aries_core = {path = "../../aries/cp/core"}

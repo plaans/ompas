@@ -7,9 +7,10 @@ use sompas_language::primitives::DO;
 use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::llambda::LambdaArgs;
+use sompas_structs::lprimitive::LPrimitive;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
-use sompas_structs::{lruntimeerror, wrong_n_args, wrong_type};
+use sompas_structs::{list, lruntimeerror, wrong_n_args, wrong_type};
 use std::fmt::Write;
 
 pub const TRANSFORM_LAMBDA_EXPRESSION: &str = "transform-lambda-expression";
@@ -35,7 +36,7 @@ pub async fn pre_processing(lv: &LValue, env: &LEnv) -> LResult {
 
 #[async_recursion]
 pub async fn lambda_expansion(lv: &LValue, env: &LEnv, avoid: &im::HashSet<String>) -> LResult {
-    let mut lv = match transform_lambda_expression(lv, env.clone(), avoid).await {
+    let mut lv = match transform_lambda_expression(lv, &mut env.clone(), avoid).await {
         Ok(lv) => lv,
         Err(_) => lv.clone(),
     };
@@ -54,7 +55,7 @@ pub async fn lambda_expansion(lv: &LValue, env: &LEnv, avoid: &im::HashSet<Strin
 
 pub async fn transform_lambda_expression(
     lv: &LValue,
-    env: LEnv,
+    env: &mut LEnv,
     avoid: &im::HashSet<String>,
 ) -> LResult {
     //println!("in transform lambda");
@@ -69,15 +70,14 @@ pub async fn transform_lambda_expression(
         }
 
         let arg = list[0].clone();
-        let mut c_env = env.clone();
 
         if !avoid.contains(&arg.to_string()) {
-            let lambda = eval(&expand(&arg, true, &mut c_env).await?, &mut c_env, None)
+            let lambda = eval(&expand(&arg, true, env).await?, env, None)
                 .await
                 .expect("Error in thread evaluating lambda");
             //println!("evaluating is a success");
             if let LValue::Lambda(l) = lambda {
-                let mut lisp = "(begin".to_string();
+                let mut lisp = vec![LPrimitive::Begin.into()];
 
                 let args = &list[1..];
 
@@ -94,7 +94,7 @@ pub async fn transform_lambda_expression(
                         } else {
                             args.into()
                         };
-                        lisp.push_str(format!("(define {} {})", param, arg).as_str());
+                        lisp.push(list![LPrimitive::Define.into(), param.into(), arg]);
                     }
                     LambdaArgs::List(params) => {
                         if params.len() != args.len() {
@@ -107,7 +107,7 @@ pub async fn transform_lambda_expression(
                             .chain(TRANSFORM_LAMBDA_EXPRESSION));
                         }
                         for (param, arg) in params.iter().zip(args) {
-                            lisp.push_str(format!("(define {} {})", param, arg).as_str());
+                            lisp.push(list![LPrimitive::Define.into(), param.into(), arg.clone()]);
                         }
                     }
                     LambdaArgs::Nil => {
@@ -119,13 +119,9 @@ pub async fn transform_lambda_expression(
                         }
                     }
                 };
+                lisp.push(body.clone());
 
-                lisp.push_str(body.to_string().as_str());
-                lisp.push(')');
-
-                let mut c_env = env;
-
-                parse(&lisp, &mut c_env).await
+                Ok(lisp.into())
             } else {
                 Err(wrong_type!(
                     TRANSFORM_LAMBDA_EXPRESSION,

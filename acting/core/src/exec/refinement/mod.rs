@@ -2,7 +2,7 @@ pub mod aries;
 pub mod c_choice;
 pub mod rae_plan;
 
-use crate::exec::context::ModActingContext;
+use crate::exec::acting_context::ModActingContext;
 use crate::exec::refinement::aries::aries_select;
 use crate::exec::refinement::c_choice::c_choice_select;
 use crate::exec::refinement::rae_plan::rae_plan_select;
@@ -13,12 +13,16 @@ use ompas_language::exec::acting_context::DEF_PROCESS_ID;
 use ompas_language::exec::acting_context::MOD_ACTING_CONTEXT;
 use ompas_language::exec::refinement::*;
 use ompas_middleware::logger::LogClient;
+use ompas_planning::conversion::flow::p_eval::p_eval;
+use ompas_planning::conversion::flow::p_eval::r#struct::PLEnv;
 use ompas_structs::acting_domain::OMPASDomain;
 use ompas_structs::interface::rae_options::OMPASOptions;
 use ompas_structs::interface::select_mode::{Planner, SelectMode};
 use ompas_structs::state::world_state::{WorldState, WorldStateSnapshot};
 use ompas_structs::supervisor::action_status::ActionStatus;
+use ompas_structs::supervisor::inner::ProcessKind;
 use ompas_structs::supervisor::interval::Interval;
+use ompas_structs::supervisor::process::process_ref::{MethodLabel, ProcessRef};
 use ompas_structs::supervisor::process::task::{RefinementTrace, TaskProcess};
 use ompas_structs::supervisor::{ActingProcessId, Supervisor};
 use rand::prelude::SliceRandom;
@@ -116,13 +120,32 @@ impl From<ModRefinement> for LModule {
 pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
     let task: LValue = args.into();
     let ctx = env.get_context::<ModRefinement>(MOD_REFINEMENT)?;
+    let supervisor = &ctx.supervisor;
     let log = ctx.log.clone();
-    let task_id: ActingProcessId = env
+
+    let pr = &env
         .get_context::<ModActingContext>(MOD_ACTING_CONTEXT)
         .unwrap()
-        .process_ref
-        .as_id()
-        .unwrap();
+        .process_ref;
+    let task_id: ActingProcessId = match pr {
+        ProcessRef::Id(id) => {
+            if supervisor.get_kind(*id).await.unwrap() == ProcessKind::Method {
+                supervisor
+                    .new_task(MethodLabel::Subtask(0), *id, task.clone(), false)
+                    .await
+            } else {
+                panic!()
+            }
+        }
+        ProcessRef::Relative(id, _) => match supervisor.get_id(pr.clone()).await {
+            Some(id) => id,
+            None => {
+                supervisor
+                    .new_task(MethodLabel::Subtask(0), *id, task.clone(), false)
+                    .await
+            }
+        },
+    };
 
     let rt: RefinementTrace = select(task.clone(), task_id, env)
         .await
@@ -144,16 +167,24 @@ pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
         task_process.set_end(instant);
         RaeExecError::NoApplicableMethod.into()
     } else {
+        let debug = method.to_string();
+        let mut p_env = PLEnv {
+            env: env.clone(),
+            unpure_binding: Default::default(),
+            pc: Default::default(),
+        };
+        let method: LValue = p_eval(&method, &mut p_env).await?;
+        log.debug(format!("p_eval({}) => {}", debug, method)).await;
         task_process.set_status(ActionStatus::Running(None));
         drop(task_process);
-        let id: ActingProcessId = ctx
-            .supervisor
-            .new_method(task_id, method.clone(), rt, false)
-            .await;
+        let id: ActingProcessId = inner.new_method(task_id, debug, method.clone(), rt, false);
         list!(
-            LPrimitive::Begin.into(),
-            list!(DEF_PROCESS_ID.into(), id.into()),
-            list!(LPrimitive::Enr.into(), method)
+            list!(
+                LPrimitive::Begin.into(),
+                list!(DEF_PROCESS_ID.into(), id.into()),
+                list!(LPrimitive::Enr.into(), method)
+            ),
+            task_id.into()
         )
     };
 
@@ -196,7 +227,7 @@ pub async fn _retry(env: &LEnv) -> LResult {
         .as_id()
         .unwrap();
     let log = ctx.log.clone();
-    let mut task: LValue = ctx
+    let task: LValue = ctx
         .supervisor
         .inner
         .read()
@@ -230,9 +261,17 @@ pub async fn _retry(env: &LEnv) -> LResult {
         RaeExecError::NoApplicableMethod.into()
     } else {
         drop(tp);
+        let debug = new_method.to_string();
+        /*let new_method: LValue = p_eval(&new_method, &mut env.clone(), &mut PConfig::default())
+        .await
+        .unwrap_or_else(|e| panic!("{e}"))
+        .get_lvalue()
+        .clone();*/
+        log.debug(format!("p_eval({}) => {}", debug, new_method))
+            .await;
         let id: ActingProcessId = ctx
             .supervisor
-            .new_method(task_id, new_method.clone(), rt, false)
+            .new_method(task_id, debug, new_method.clone(), rt, false)
             .await;
         list!(
             LPrimitive::Begin.into(),
@@ -298,7 +337,7 @@ pub async fn select(
     };
 
     log.debug(format!(
-        "sorted_methods for {}({}): {}",
+        "Sorted_methods for {}({}): {}",
         task,
         task_id,
         LValue::from(&rt.applicable_methods)

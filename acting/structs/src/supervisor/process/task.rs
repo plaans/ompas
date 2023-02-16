@@ -75,6 +75,20 @@ impl From<TaskProcess> for ActingProcessInner {
     }
 }
 
+impl Display for TaskProcess {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let interval = match &self.interval {
+            None => "[..]".to_string(),
+            Some(interval) => interval.to_string(),
+        };
+        write!(
+            f,
+            "({}) {}{}({})",
+            self.id, interval, self.value, self.status
+        )
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct RefinementTrace {
     pub refinement_type: SelectMode,

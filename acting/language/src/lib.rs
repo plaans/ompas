@@ -265,15 +265,14 @@ pub mod exec {
         pub const DOC_EXEC_TASK: &str = "Execute a task.";
         pub const LAMBDA_EXEC_TASK: &str = "(lambda __task__
         (begin
-            (define __result__ (enr (cons 'refine __task__)))
-            (if (err? __result__)
-                __result__
-                (let ((__method__ (first __result__))
-                      (__task_id__ (second __result__)))
-
+            (define _r_ (enr (cons 'refine __task__)))
+            (if (err? _r_)
+                _r_
+                (let ((_m_ (first _r_))
+                      (_id_ (second _r_)))
                     (begin
-                        ;(print \"Trying \" __method__ \" for \" __task_id__)
-                        (if (err? (enr __method__))
+                        (def_process_id _id_)
+                        (if (err? (eval _m_))
                             (retry)
                             (set-success-for-task)))))))";
 
@@ -826,6 +825,10 @@ pub mod monitor {
         pub const EXPORT_STATS: &str = "export-stats";
         pub const DOC_EXPORT_STATS: &str = "Export the statistics in csv format in a given file.";
 
+        pub const DUMP_TRACE: &str = "dump_trace";
+        pub const DOC_DUMP_TRACE: &str =
+            "Dump in a markdown the graph representing the execution trace.\n[Unstable] The markdown is shown in google-chrome if the right extension is installed.";
+
         pub const DEBUG_OMPAS: &str = "debug_ompas";
         pub const DOC_DEBUG_OMPAS: &str = "Wrapper around __debug_ompas__";
         pub const MACRO_DEBUG_OMPAS: &str = "(lambda (arg)
@@ -841,8 +844,13 @@ pub mod supervisor {
     pub const STATUS_SUCCESS: &str = "success";
     pub const STATUS_FAILURE: &str = "failure";
     pub const STATUS_CANCELLED: &str = "cancelled";
+
     pub const TASK: &str = "task";
     pub const COMMAND: &str = "command";
+    pub const ROOT_TASK: &str = "root_task";
+    pub const METHOD: &str = "method";
+    pub const ARBITRARY: &str = "arbitrary";
+    pub const ACQUIRE: &str = "acquire";
 }
 
 pub const ACTION_TYPE: &str = "action_type";

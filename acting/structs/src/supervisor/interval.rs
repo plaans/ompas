@@ -32,6 +32,10 @@ impl Interval {
         Self { start, end }
     }
 
+    pub fn new_instant(start: Timepoint) -> Self {
+        Self { start, end: None }
+    }
+
     /// Returns end - start if end is defined.
     pub fn duration(&self) -> Duration {
         match &self.end {

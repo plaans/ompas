@@ -1,9 +1,11 @@
+use crate::supervisor::inner::ProcessKind;
 use crate::supervisor::process::acquire::AcquireProcess;
 use crate::supervisor::process::arbitrary::ArbitraryProcess;
 use crate::supervisor::process::command::CommandProcess;
 use crate::supervisor::process::method::MethodProcess;
 use crate::supervisor::process::root_task::RootProcess;
 use crate::supervisor::process::task::TaskProcess;
+use std::fmt::{Display, Formatter};
 
 pub mod acquire;
 pub mod arbitrary;
@@ -57,7 +59,31 @@ pub enum ActingProcessInner {
     Acquire(AcquireProcess),
 }
 
+impl Display for ActingProcessInner {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ActingProcessInner::RootTask(r) => write!(f, "{r}"),
+            ActingProcessInner::Command(r) => write!(f, "{r}"),
+            ActingProcessInner::Task(r) => write!(f, "{r}"),
+            ActingProcessInner::Method(r) => write!(f, "{r}"),
+            ActingProcessInner::Arbitrary(r) => write!(f, "{r}"),
+            ActingProcessInner::Acquire(r) => write!(f, "{r}"),
+        }
+    }
+}
+
 impl ActingProcessInner {
+    pub fn kind(&self) -> ProcessKind {
+        match self {
+            ActingProcessInner::RootTask(_) => ProcessKind::RootTask,
+            ActingProcessInner::Command(_) => ProcessKind::Command,
+            ActingProcessInner::Task(_) => ProcessKind::Task,
+            ActingProcessInner::Method(_) => ProcessKind::Method,
+            ActingProcessInner::Arbitrary(_) => ProcessKind::Arbitrary,
+            ActingProcessInner::Acquire(_) => ProcessKind::Acquire,
+        }
+    }
+
     pub fn as_mut_command(&mut self) -> Option<&mut CommandProcess> {
         if let Self::Command(command) = self {
             Some(command)
@@ -67,6 +93,14 @@ impl ActingProcessInner {
     }
 
     pub fn as_mut_root(&mut self) -> Option<&mut RootProcess> {
+        if let Self::RootTask(root) = self {
+            Some(root)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_root(&self) -> Option<&RootProcess> {
         if let Self::RootTask(root) = self {
             Some(root)
         } else {

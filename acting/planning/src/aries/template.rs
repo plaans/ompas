@@ -372,10 +372,10 @@ fn convert_constraint(
             let b: VarId = b.try_into().expect("");
             constraints.push(aConstraint::lt(get_atom(&a, ctx), get_atom(&b, ctx)))
         }
-        Constraint::And(and) => {
+        Constraint::And(_and) => {
             todo!()
         }
-        Constraint::Or(or) => {
+        Constraint::Or(_or) => {
             todo!()
         }
         Constraint::Type(_, _) => {

@@ -9,12 +9,13 @@ use ompas_language::monitor::domain::MOD_DOMAIN;
 use ompas_middleware::logger::LogClient;
 use ompas_planning::aries::solver::run_solver_for_htn;
 use ompas_planning::aries::{generate_chronicles, solver};
-use ompas_planning::conversion::flow::p_eval::r#struct::{PConfig, PLValue};
-use ompas_planning::conversion::flow::p_eval::{p_eval, p_expand, P_EVAL};
+use ompas_planning::conversion::flow::p_eval::r#struct::{PConfig, PLEnv};
+use ompas_planning::conversion::flow::p_eval::{p_eval, P_EVAL};
 use ompas_planning::conversion::{convert_acting_domain, p_convert, p_convert_task};
 use ompas_structs::conversion::context::ConversionContext;
 use ompas_structs::planning::domain::PlanningDomain;
 use ompas_structs::planning::problem::PlanningProblem;
+use sompas_core::expand;
 use sompas_language::LOG_TOPIC_INTERPRETER;
 use sompas_macros::async_scheme_fn;
 use sompas_structs::lenv::LEnv;
@@ -131,12 +132,17 @@ pub async fn pre_eval_task(env: &LEnv, task: &[LValue]) -> Result<(), LRuntimeEr
         env.log = LogClient::new(P_EVAL, LOG_TOPIC_INTERPRETER).await;
         let lambda: LLambda = body.try_into()?;
         let lv = lambda.get_body();
-        let plv = p_eval(lv, &mut env, &mut pc).await?;
+        let mut p_env = PLEnv {
+            env,
+            unpure_binding: Default::default(),
+            pc: pc,
+        };
+        let plv = p_eval(lv, &mut p_env).await?;
         println!(
             "Pre eval method {m_label} of task {}:\n{}\n->\n{}",
             LValue::from(task).format(0),
             lv.format(0),
-            plv.get_lvalue().format(0),
+            plv.format(0),
         )
     }
     Ok(())
@@ -154,14 +160,15 @@ pub async fn pre_eval_expr(env: &LEnv, lv: LValue) -> Result<(), LRuntimeError> 
     pc.avoid.insert(EXEC_TASK.to_string());
     //pc.avoid.insert(CHECK.to_string());
     let mut env = context.env.clone();
+    let mut p_env = PLEnv {
+        env: context.env.clone(),
+        unpure_binding: Default::default(),
+        pc,
+    };
     env.log = LogClient::new(P_EVAL, LOG_TOPIC_INTERPRETER).await;
-    let plv: PLValue = p_expand(&lv, true, &mut env, &pc).await?;
-    let plv: PLValue = p_eval(&plv.get_lvalue(), &mut env, &mut pc).await?;
-    println!(
-        "Pre eval expr:\n{}\n->\n{}",
-        lv.format(0),
-        plv.get_lvalue().format(0),
-    );
+    let plv: LValue = expand(&lv, true, &mut p_env.env).await?;
+    let plv: LValue = p_eval(&plv, &mut p_env).await?;
+    println!("Pre eval expr:\n{}\n->\n{}", lv.format(0), plv.format(0),);
 
     Ok(())
 }

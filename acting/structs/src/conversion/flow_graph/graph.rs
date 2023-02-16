@@ -519,11 +519,6 @@ impl FlowGraph {
         let mut dot: Dot = "digraph {\n".to_string();
 
         write!(dot, "{}", self.export_flow(&self.flow).0).unwrap();
-        /*for (id, handle) in self.handles.inner() {
-            let (f_dot, (start, _end)) = self.export_flow(&handle.flow);
-            write!(dot, "{} -> V{start};\n", self.sym_table.format_variable(id)).unwrap();
-            write!(dot, "{f_dot}").unwrap();
-        }*/
 
         dot.push('}');
         dot

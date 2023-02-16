@@ -1,30 +1,52 @@
-use crate::supervisor::interval::Timepoint;
+use crate::supervisor::interval::{Interval, Timepoint};
 use crate::supervisor::process::ActingProcessInner;
 use crate::supervisor::ActingProcessId;
 use sompas_structs::lvalue::LValue;
+use std::fmt::{Display, Formatter};
 
 pub struct ArbitraryProcess {
     id: ActingProcessId,
-    parent: ActingProcessId,
+    _parent: ActingProcessId,
     suggested: Option<LValue>,
     chosen: Option<LValue>,
-    timepoint: Option<Timepoint>,
+    interval: Option<Interval>,
+}
+
+impl Display for ArbitraryProcess {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let timepoint = match &self.interval {
+            None => "".to_string(),
+            Some(timepoint) => timepoint.to_string(),
+        };
+
+        let chosen = match &self.chosen {
+            None => "".to_string(),
+            Some(lv) => lv.to_string(),
+        };
+
+        let suggested = match &self.suggested {
+            None => "".to_string(),
+            Some(lv) => format!("({lv})"),
+        };
+
+        write!(f, "({}){}{}{}", self.id, timepoint, chosen, suggested)
+    }
 }
 
 impl ArbitraryProcess {
     pub fn new(
         id: ActingProcessId,
-        parent: ActingProcessId,
+        _parent: ActingProcessId,
         suggested: Option<LValue>,
         chosen: Option<LValue>,
         timepoint: Option<Timepoint>,
     ) -> Self {
         Self {
             id,
-            parent,
+            _parent,
             suggested,
             chosen,
-            timepoint,
+            interval: timepoint.map(|t| Interval::new_instant(t)),
         }
     }
 }

@@ -1,6 +1,6 @@
 use crate::supervisor::ActingProcessId;
 
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub enum ProcessRef {
     Id(ActingProcessId),
     Relative(ActingProcessId, Vec<Label>),
@@ -32,9 +32,10 @@ impl From<ActingProcessId> for ProcessRef {
     }
 }
 
-#[derive(Copy, Clone, Eq, Hash, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub enum Label {
     Method(usize),
+    HighLevelTask(usize),
     MethodProcess(MethodLabel),
 }
 
@@ -48,7 +49,7 @@ impl Label {
     }
 }
 
-#[derive(Copy, Clone, Eq, Hash, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub enum MethodLabel {
     Subtask(usize),
     Arbitrary(usize),

@@ -3,12 +3,13 @@ use crate::supervisor::interval::{Interval, Timepoint};
 use crate::supervisor::process::ActingProcessInner;
 use crate::supervisor::ActingProcessId;
 use sompas_structs::lvalue::LValue;
+use std::fmt::{Display, Formatter};
 use tokio::sync::watch;
 
 #[derive(Debug)]
 pub struct CommandProcess {
     id: ActingProcessId,
-    parent: ActingProcessId,
+    _parent: ActingProcessId,
     value: LValue,
     status: ActionStatus,
     interval: Option<Interval>,
@@ -18,13 +19,13 @@ pub struct CommandProcess {
 impl CommandProcess {
     pub fn new(
         id: ActingProcessId,
-        parent: ActingProcessId,
+        _parent: ActingProcessId,
         value: LValue,
         start: Option<Timepoint>,
     ) -> Self {
         Self {
             id,
-            parent,
+            _parent,
             value,
             status: ActionStatus::Pending,
             interval: start.map(|s| Interval::new(s, None)),
@@ -59,5 +60,19 @@ impl CommandProcess {
 impl From<CommandProcess> for ActingProcessInner {
     fn from(value: CommandProcess) -> Self {
         Self::Command(value)
+    }
+}
+
+impl Display for CommandProcess {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let interval = match &self.interval {
+            None => "[..]".to_string(),
+            Some(interval) => interval.to_string(),
+        };
+        write!(
+            f,
+            "({}) {} {}({})",
+            self.id, interval, self.value, self.status
+        )
     }
 }

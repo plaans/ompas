@@ -1,5 +1,5 @@
 use crate::error::RaeExecError;
-use crate::exec::context::ModActingContext;
+use crate::exec::acting_context::ModActingContext;
 use futures::FutureExt;
 use ompas_language::process::{LOG_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS};
 use ompas_middleware::logger::LogClient;
@@ -8,7 +8,8 @@ use ompas_middleware::ProcessInterface;
 use ompas_structs::interface::job::JobType;
 use ompas_structs::interface::rae_command::OMPASJob;
 use ompas_structs::interface::trigger_collection::{Response, TaskTrigger};
-use ompas_structs::supervisor::{ActingProcessId, Supervisor};
+use ompas_structs::supervisor::process::process_ref::ProcessRef;
+use ompas_structs::supervisor::Supervisor;
 use sompas_core::{eval, parse};
 use sompas_structs::lasynchandler::LAsyncHandle;
 use sompas_structs::lenv::LEnv;
@@ -53,7 +54,7 @@ pub async fn rae(
 
                         let mut new_env = env.clone();
 
-                        let mut task_id: ActingProcessId = 0;
+                        let mut pr: ProcessRef = ProcessRef::Id(0);
 
                         let job_type = job.r#type;
                         let job_expr = &job.expr;
@@ -72,9 +73,9 @@ pub async fn rae(
                         match job_type {
                             JobType::Task => {
                                 log.debug(format!("new triggered task: {}", job_expr)).await;
-                                let id: ActingProcessId = supervisor.inner.write().await.new_high_level_task(job_lvalue.clone());
-                                let mod_context: ModActingContext = ModActingContext::new(id.into());
-                                task_id = id;
+                                let id: ProcessRef = supervisor.inner.write().await.new_high_level_task(job_lvalue.clone());
+                                let mod_context: ModActingContext = ModActingContext::new(id.clone());
+                                pr = id;
                                 new_env.update_context(mod_context);
 
                             },
@@ -88,6 +89,7 @@ pub async fn rae(
                         let (tx, rx) = new_interruption_handler();
                         killers.push(tx.clone());
                         let log2 = log.clone();
+                        let pr2 = pr.clone();
                         let future = (Box::pin(async move {
                             let result = eval(&job_lvalue, &mut new_env, Some(rx)).await;
                             match &result {
@@ -106,7 +108,7 @@ pub async fn rae(
                                         lv => lv.to_string(),
                                     }
                                 )).await,
-                                Err(e) => log2.error(format!("Error in asynchronous task: {}", e)).await,
+                                Err(e) => log2.error(format!("Error evaluating task {job_lvalue}({:?}): {e}", pr2)).await,
                             }
 
                             result
@@ -122,7 +124,7 @@ pub async fn rae(
 
                         let response: Response = match job_type {
                             JobType::Task => {
-                                Response::Trigger(TaskTrigger::new(task_id, async_handle))
+                                Response::Trigger(TaskTrigger::new(pr, async_handle))
                             }
                             JobType::Debug => {
                                 Response::Handle(async_handle)

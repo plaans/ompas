@@ -1,4 +1,4 @@
-use crate::state::action_status::ActionStatus;
+use crate::supervisor::action_status::ActionStatus;
 use crate::supervisor::interval::{Interval, Timepoint};
 use crate::supervisor::process::ActingProcessInner;
 use crate::supervisor::ActingProcessId;
@@ -47,7 +47,12 @@ impl CommandProcess {
     }
 
     pub fn set_status(&mut self, status: ActionStatus) {
-        self.status = status
+        self.status = status;
+        if let Some(tx) = &self.sender_to_watcher {
+            if tx.send(self.status).is_err() {
+                self.sender_to_watcher = None;
+            }
+        }
     }
 }
 

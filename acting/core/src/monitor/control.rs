@@ -3,11 +3,11 @@ use crate::monitor::{ModMonitor, TOKIO_CHANNEL_SIZE};
 use crate::rae;
 use ompas_interface::platform::Platform;
 use ompas_interface::platform_config::PlatformConfig;
-use ompas_language::exec::context::DOC_GET_TASK_ID;
 use ompas_language::exec::state::{DYNAMIC, INNER_DYNAMIC, INNER_STATIC, INSTANCE, STATIC};
 use ompas_language::monitor::control::*;
 use ompas_language::process::{LOG_TOPIC_OMPAS, PROCESS_STOP_OMPAS, PROCESS_TOPIC_OMPAS};
 use ompas_language::select::*;
+use ompas_language::supervisor::*;
 use ompas_middleware::logger::LogClient;
 use ompas_middleware::ProcessInterface;
 use ompas_planning::conversion::convert_acting_domain;
@@ -21,9 +21,9 @@ use ompas_structs::interface::rae_options::OMPASOptions;
 use ompas_structs::interface::select_mode::{Planner, SelectMode};
 use ompas_structs::interface::trigger_collection::{Response, TaskTrigger, TriggerCollection};
 use ompas_structs::planning::domain::PlanningDomain;
-use ompas_structs::state::action_state::{TaskFilter, TaskType};
-use ompas_structs::state::action_status::ActionStatus;
 use ompas_structs::state::world_state::{StateType, WorldState};
+use ompas_structs::supervisor::action_status::ActionStatus;
+use ompas_structs::supervisor::filter::{ProcessFilter, ProcessKind};
 use ompas_structs::supervisor::Supervisor;
 use sompas_core::{eval_init, get_root_env};
 use sompas_macros::*;
@@ -205,7 +205,7 @@ impl From<ModControl> for LModule {
         );
         module.add_async_fn(
             GET_TASK_NETWORK,
-            get_task_network,
+            print_process_network,
             DOC_GET_TASK_NETWORK,
             false,
         );
@@ -217,7 +217,7 @@ impl From<ModControl> for LModule {
         );
         module.add_async_fn(
             GET_AGENDA,
-            get_agenda,
+            print_processes,
             (DOC_GET_AGENDA, DOC_GET_AGENDA_VERBOSE),
             false,
         );
@@ -244,6 +244,7 @@ impl From<ModControl> for LModule {
 #[async_scheme_fn]
 pub async fn start(env: &LEnv) -> Result<String, LRuntimeError> {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
+    let supervisor = ctx.supervisor.clone();
     let mut tasks_to_execute: Vec<Job> = vec![];
     mem::swap(
         &mut *ctx.tasks_to_execute.write().await,
@@ -268,7 +269,7 @@ pub async fn start(env: &LEnv) -> Result<String, LRuntimeError> {
     });
 
     tokio::spawn(async move {
-        rae(log, env, rx).await;
+        rae(supervisor, log, env, rx).await;
     });
 
     /*if ctx.interface.log.display {
@@ -424,10 +425,7 @@ pub async fn get_task_id(env: &LEnv, task_id: usize) -> LResult {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
     let trigger: Option<TaskTrigger> = ctx.triggers.get_task(task_id).await;
     match trigger {
-        Some(trigger) => match trigger.get_task_id().await {
-            Some(task_id) => Ok(task_id.into()),
-            None => Ok(LValue::Nil),
-        },
+        Some(trigger) => Ok(trigger.get_task_id().await.into()),
         None => Err(LRuntimeError::new(
             WAIT_TASK,
             format!("{} is not the id of a triggered task", task_id),
@@ -556,7 +554,7 @@ pub async fn get_state(env: &LEnv, args: &[LValue]) -> LResult {
 }
 
 #[async_scheme_fn]
-pub async fn get_task_network(env: &LEnv) -> String {
+pub async fn print_process_network(env: &LEnv) -> String {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
 
     ctx.supervisor.format_task_network().await
@@ -569,14 +567,14 @@ pub async fn get_type_hierarchy(env: &LEnv) -> String {
 }
 
 #[async_scheme_fn]
-pub async fn get_agenda(env: &LEnv, args: &[LValue]) -> LResult {
+pub async fn print_processes(env: &LEnv, args: &[LValue]) -> LResult {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
-    let mut task_filter = TaskFilter::default();
+    let mut task_filter = ProcessFilter::default();
 
     for arg in args {
         match arg.to_string().as_str() {
-            TASK => task_filter.task_type = Some(TaskType::Task),
-            COMMAND => task_filter.task_type = Some(TaskType::Command),
+            TASK => task_filter.task_type = Some(ProcessKind::Task),
+            COMMAND => task_filter.task_type = Some(ProcessKind::Command),
             STATUS_PENDING => task_filter.status = Some(ActionStatus::Pending),
             STATUS_ACCEPTED => task_filter.status = Some(ActionStatus::Accepted),
             STATUS_REJECTED => task_filter.status = Some(ActionStatus::Rejected),
@@ -603,7 +601,7 @@ pub async fn get_agenda(env: &LEnv, args: &[LValue]) -> LResult {
         }
     }
 
-    let string = ctx.supervisor.format_task_collection(task_filter).await;
+    let string = ctx.supervisor.print_processes(task_filter).await;
     Ok(string.into())
 }
 

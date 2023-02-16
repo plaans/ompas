@@ -5,8 +5,8 @@ use ompas_language::exec::c_choice::*;
 use ompas_language::exec::state::MOD_STATE;
 use ompas_structs::acting_domain::OMPASDomain;
 use ompas_structs::interface::select_mode::{CChoiceConfig, Planner, SelectMode};
-use ompas_structs::state::action_state::RefinementMetaData;
 use ompas_structs::state::world_state::WorldStateSnapshot;
+use ompas_structs::supervisor::process::task::RefinementTrace;
 use rand::prelude::SliceRandom;
 use sompas_core::{eval, parse};
 use sompas_language::time::MOD_TIME;
@@ -308,11 +308,11 @@ pub async fn c_choice_env(mut env: LEnv, domain: &OMPASDomain) -> LEnv {
 
 pub async fn c_choice_select(
     state: WorldStateSnapshot,
-    tried: &[LValue],
+    tried: &Vec<LValue>,
     task: Vec<LValue>,
     env: &LEnv,
     config: CChoiceConfig,
-) -> lruntimeerror::Result<RefinementMetaData> {
+) -> lruntimeerror::Result<RefinementTrace> {
     let new_env = env.clone();
     let ctx = env.get_context::<ModCChoice>(MOD_C_CHOICE).unwrap();
 
@@ -320,7 +320,7 @@ pub async fn c_choice_select(
     new_env.import_module(ModCChoice::new_from_tried(tried.to_vec(), 0), WithoutPrefix);
     new_env.update_context(ModState::new_from_snapshot(state.clone()));
 
-    let mut greedy: RefinementMetaData = greedy_select(state, tried, task.clone(), env).await?;
+    let mut greedy: RefinementTrace = greedy_select(state, tried, task.clone(), env).await?;
     greedy.refinement_type = SelectMode::Planning(Planner::CChoice(config));
 
     let method: LValue = eval(&task.into(), &mut new_env, None).await?;

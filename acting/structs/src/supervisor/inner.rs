@@ -1,51 +1,265 @@
-use crate::interface::select_mode::SelectMode;
-use crate::state::action_state::{
-    ActionCollection, ActionMetaData, ActionMetaDataView, CommandMetaData, TaskFilter, TaskMetaData,
-};
-use crate::state::action_status::ActionStatus;
-use crate::state::task_network::TaskNetwork;
-use crate::supervisor::interval::{Duration, Timepoint};
-use crate::ActionId;
-use chrono::{DateTime, Utc};
-use core::convert::Into;
-use core::default::Default;
-use core::option::Option;
-use core::option::Option::{None, Some};
-use core::result::Result;
-use core::result::Result::{Err, Ok};
-use core::sync::atomic::AtomicUsize;
-use ompas_utils::other::get_and_update_id_counter;
-use sompas_structs::lruntimeerror::LRuntimeError;
+use crate::supervisor::action_status::ActionStatus;
+use crate::supervisor::interval::Timepoint;
+use crate::supervisor::process::acquire::AcquireProcess;
+use crate::supervisor::process::arbitrary::ArbitraryProcess;
+use crate::supervisor::process::command::CommandProcess;
+use crate::supervisor::process::method::MethodProcess;
+use crate::supervisor::process::process_ref::{Label, MethodLabel, ProcessRef};
+use crate::supervisor::process::task::{Refinement, RefinementTrace, TaskProcess};
+use crate::supervisor::process::{ActingProcess, ActingProcessInner, ProcessOrigin};
+use crate::supervisor::ActingProcessId;
 use sompas_structs::lvalue::LValue;
-use sompas_structs::{lruntimeerror, string};
-use std::fs::OpenOptions;
-use std::io::Write;
-use std::path::PathBuf;
-use std::sync::atomic::Ordering;
-use std::sync::Arc;
-use std::time::Instant;
-use std::{env, fs};
 use tokio::sync::watch;
+use tokio::sync::watch::Receiver;
+use tokio::time::Instant;
 
-const TASK_NAME: &str = "name of the task";
-const TASK_STATUS: &str = "status";
-const TASK_EXECUTION_TIME: &str = "execution time (s)";
-const REFINEMENT_METHOD: &str = "method of refinement ";
-const REFINEMENT_NUMBER: &str = "number of refinement";
-const TOTAL_REFINEMENT_TIME: &str = "total refinement time (s)";
-const SUBTASK_NUMBER: &str = "number of subtask";
-const ACTION_NUMBER: &str = "number of actions";
-const RAE_STATS: &str = "rae_stats";
-
-#[derive(Clone)]
-pub struct Agenda {
-    pub trc: ActionCollection,
-    tn: TaskNetwork,
-    next_id: Arc<AtomicUsize>,
+pub struct InnerSupervisor {
+    inner: Vec<ActingProcess>,
     time_reference: Instant,
 }
 
-impl Agenda {
+impl InnerSupervisor {
+    pub fn new(time_reference: Instant) -> Self {
+        Self {
+            inner: vec![ActingProcess::root()],
+            time_reference,
+        }
+    }
+
+    pub fn get_instant(&self) -> Timepoint {
+        self.time_reference.elapsed().as_micros()
+    }
+
+    pub fn get_id(&self, pr: impl Into<ProcessRef>) -> Option<ActingProcessId> {
+        let pr = pr.into();
+        match pr {
+            ProcessRef::Id(id) => Some(id),
+            ProcessRef::Relative(id, mut labels) => {
+                let mut id = id;
+                labels.reverse();
+                while let Some(label) = labels.pop() {
+                    let obj = &self.inner[id];
+                    match label {
+                        Label::MethodProcess(m) => {
+                            if let ActingProcessInner::Method(mp) = &obj.inner {
+                                id = if let Some(id) = mp.process_set.get(&m) {
+                                    *id
+                                } else {
+                                    return None;
+                                }
+                            } else {
+                                return None;
+                            }
+                        }
+
+                        Label::Method(m) => {
+                            if let ActingProcessInner::Task(t) = &obj.inner {
+                                id = if let Some(r) = t.refinements.get(m) {
+                                    r.method
+                                } else {
+                                    return None;
+                                }
+                            } else {
+                                return None;
+                            }
+                        }
+                    }
+                }
+                Some(id)
+            }
+        }
+    }
+
+    //New processes
+    pub fn new_high_level_task(&mut self, value: LValue) -> ActingProcessId {
+        let id = self.inner.len();
+        self.inner.push(ActingProcess::new(
+            ProcessOrigin::Execution,
+            TaskProcess::new(id, 0, value, Some(self.get_instant())),
+        ));
+        self.inner[0]
+            .inner
+            .as_mut_root()
+            .unwrap()
+            .add_top_level_task(id);
+        id
+    }
+
+    pub fn new_task(
+        &mut self,
+        label: MethodLabel,
+        parent: ActingProcessId,
+        value: LValue,
+        planned: bool,
+    ) -> ActingProcessId {
+        let (origin, start) = match planned {
+            true => (ProcessOrigin::Planning, None),
+            false => (ProcessOrigin::Execution, Some(self.get_instant())),
+        };
+
+        let id = self.inner.len();
+        self.inner.push(ActingProcess::new(
+            origin,
+            TaskProcess::new(id, parent, value, start),
+        ));
+        self.inner[parent]
+            .inner
+            .as_mut_method()
+            .unwrap()
+            .add_process(label, id);
+        id
+    }
+
+    pub fn new_method(
+        &mut self,
+        parent: ActingProcessId,
+        value: LValue,
+        trace: RefinementTrace,
+        planned: bool,
+    ) -> ActingProcessId {
+        let (origin, start) = match planned {
+            true => (ProcessOrigin::Planning, None),
+            false => (ProcessOrigin::Execution, Some(self.get_instant())),
+        };
+
+        let id = self.inner.len();
+        self.inner.push(ActingProcess::new(
+            origin,
+            MethodProcess::new(id, parent, value, start),
+        ));
+        self.inner[parent]
+            .inner
+            .as_mut_task()
+            .unwrap()
+            .add_refinement(Refinement { method: id, trace });
+        id
+    }
+
+    pub fn new_arbitrary(
+        &mut self,
+        label: MethodLabel,
+        parent: ActingProcessId,
+        value: LValue,
+        planned: bool,
+    ) -> ActingProcessId {
+        let (origin, timepoint, suggested, chosen) = match planned {
+            true => (ProcessOrigin::Planning, None, Some(value), None),
+            false => (
+                ProcessOrigin::Execution,
+                Some(self.get_instant()),
+                None,
+                Some(value),
+            ),
+        };
+
+        let id = self.inner.len();
+        self.inner.push(ActingProcess::new(
+            origin,
+            ArbitraryProcess::new(id, parent, suggested, chosen, timepoint),
+        ));
+        self.inner[parent]
+            .inner
+            .as_mut_method()
+            .unwrap()
+            .add_process(label, id);
+        id
+    }
+
+    pub fn new_acquire(
+        &mut self,
+        label: MethodLabel,
+        parent: ActingProcessId,
+        planned: bool,
+    ) -> ActingProcessId {
+        let (origin, request_date) = match planned {
+            true => (ProcessOrigin::Planning, None),
+            false => (ProcessOrigin::Execution, Some(self.get_instant())),
+        };
+
+        let id = self.inner.len();
+        self.inner.push(ActingProcess::new(
+            origin,
+            AcquireProcess::new(id, parent, request_date),
+        ));
+        self.inner[parent]
+            .inner
+            .as_mut_method()
+            .unwrap()
+            .add_process(label, id);
+        id
+    }
+
+    pub fn new_command(
+        &mut self,
+        label: MethodLabel,
+        parent: ActingProcessId,
+        value: LValue,
+        planned: bool,
+    ) -> (ActingProcessId, Option<Receiver<ActionStatus>>) {
+        let (origin, start) = match planned {
+            true => (ProcessOrigin::Planning, None),
+            false => (ProcessOrigin::Execution, Some(self.get_instant())),
+        };
+
+        let id = self.inner.len();
+        self.inner.push(ActingProcess::new(
+            origin,
+            CommandProcess::new(id, parent, value, start),
+        ));
+
+        let watch = if planned {
+            None
+        } else {
+            let (tx, rx) = watch::channel(ActionStatus::Pending);
+            self.inner[id].inner.as_mut_command().unwrap().set_watch(tx);
+            Some(rx)
+        };
+
+        self.inner[parent]
+            .inner
+            .as_mut_method()
+            .unwrap()
+            .add_process(label, id);
+        (id, watch)
+    }
+
+    /*
+    Get process inner struct
+     */
+    pub fn get(&self, process_ref: impl Into<ProcessRef>) -> Option<&ActingProcess> {
+        self.get_id(process_ref.into()).map(|id| &self.inner[id])
+    }
+
+    pub fn get_mut(&mut self, process_ref: impl Into<ProcessRef>) -> Option<&mut ActingProcess> {
+        self.get_id(process_ref.into())
+            .map(|id| &mut self.inner[id])
+    }
+
+    pub fn get_tried_method(&self, id: ActingProcessId) -> Vec<LValue> {
+        let mut methods = self
+            .get(id)
+            .unwrap()
+            .inner
+            .as_task()
+            .unwrap()
+            .get_tried_method();
+
+        methods
+            .drain(..)
+            .map(|m| {
+                self.get(m)
+                    .unwrap()
+                    .inner
+                    .as_method()
+                    .unwrap()
+                    .value
+                    .clone()
+            })
+            .collect()
+    }
+}
+/*
+impl InnerSupervisor {
     pub async fn clear(&self) {
         *self.trc.inner.write().await = Default::default();
         *self.tn.subtasks.write().await = Default::default();
@@ -60,20 +274,7 @@ impl Agenda {
             }
         }
     }
-}
 
-impl Default for Agenda {
-    fn default() -> Self {
-        Self {
-            trc: Default::default(),
-            tn: Default::default(),
-            next_id: Arc::new(Default::default()),
-            time_reference: Instant::now(),
-        }
-    }
-}
-
-impl Agenda {
     /*
     GETTERS
      */
@@ -173,7 +374,7 @@ impl Agenda {
                     Some(s) => s.to_string(),
                     None => "none".to_string(),
                 }
-                .into(),
+                    .into(),
             );
             task_stats.insert(
                 string!(REFINEMENT_NUMBER),
@@ -226,7 +427,7 @@ impl Agenda {
                 },
                 RAE_STATS
             )
-            .into(),
+                .into(),
         };
 
         fs::create_dir_all(&dir_path).expect("could not create stats directory");
@@ -281,9 +482,9 @@ impl Agenda {
                     self.get_number_of_subtasks_recursive(p).await,
                     self.get_number_of_actions(p).await,
                 )
-                .as_bytes(),
+                    .as_bytes(),
             )
-            .expect("could not write to stat file")
+                .expect("could not write to stat file")
         }
     }
 
@@ -379,3 +580,4 @@ impl Agenda {
         get_and_update_id_counter(self.next_id.clone())
     }
 }
+*/

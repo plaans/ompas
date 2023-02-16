@@ -3,7 +3,7 @@ use crate::exec::ModExec;
 use futures::FutureExt;
 use ompas_language::exec::resource::LOCKED;
 use ompas_language::exec::state::*;
-use ompas_structs::monitor::MonitorCollection;
+use ompas_structs::execution::monitor::MonitorCollection;
 use ompas_structs::state::world_state::{StateType, WorldState, WorldStateSnapshot};
 use sompas_core::eval;
 use sompas_core::modules::map::get_map;

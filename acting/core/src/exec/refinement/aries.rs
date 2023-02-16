@@ -1,8 +1,5 @@
-use crate::exec::context::ModContext;
 use crate::exec::refinement::greedy_select;
 use crate::exec::ModExec;
-use ompas_language::exec::aries::*;
-use ompas_language::exec::context::MOD_CONTEXT;
 use ompas_middleware::logger::LogClient;
 use ompas_planning::aries::solver::run_solver_for_htn;
 use ompas_planning::aries::template::generate_templates;
@@ -13,8 +10,8 @@ use ompas_structs::planning::domain::PlanningDomain;
 use ompas_structs::planning::instance::PlanningInstance;
 use ompas_structs::planning::plan::AbstractTaskInstance;
 use ompas_structs::planning::problem::PlanningProblem;
-use ompas_structs::state::action_state::{RefinementMetaData, TaskMetaData};
 use ompas_structs::state::world_state::WorldStateSnapshot;
+use ompas_structs::supervisor::process::task::RefinementTrace;
 use ompas_structs::supervisor::Supervisor;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lruntimeerror;
@@ -44,15 +41,15 @@ impl CtxAries {
 //Returns the method to do.
 pub async fn aries_select(
     state: WorldStateSnapshot,
-    tried: &[LValue],
+    tried: &Vec<LValue>,
     task: Vec<LValue>,
     env: &LEnv,
     optimize: bool,
-) -> lruntimeerror::Result<RefinementMetaData> {
-    let mut greedy: RefinementMetaData =
+) -> lruntimeerror::Result<RefinementTrace> {
+    let mut greedy: RefinementTrace =
         greedy_select(state.clone(), tried, task.clone(), env).await?;
-
-    let ctx = env.get_context::<CtxAries>(CTX_ARIES)?;
+    Ok(greedy)
+    /*let ctx = env.get_context::<CtxAries>(CTX_ARIES)?;
     let log = ctx.log.clone();
 
     println!("\n\nTask to plan: {}", LValue::from(task.clone()));
@@ -60,7 +57,7 @@ pub async fn aries_select(
     println!("\t*greedy: {}", LValue::from(&greedy.applicable_methods));
 
     let parent_task = env
-        .get_context::<ModContext>(MOD_CONTEXT)?
+        .get_context::<ModActingContext>(MOD_ACTING_CONTEXT)?
         .get_task_id()
         .await;
     match parent_task {
@@ -155,7 +152,7 @@ pub async fn aries_select(
     .await;
     // println!("{}", format_partial_plan(&pb, &x)?);
 
-    let mut greedy: RefinementMetaData = greedy;
+    let mut greedy: RefinementTrace = greedy;
 
     if let Some(x) = &result {
         let plan = solver::extract_plan(x);
@@ -195,5 +192,5 @@ pub async fn aries_select(
         Ok(greedy)
     } else {
         Ok(greedy)
-    }
+    }*/
 }

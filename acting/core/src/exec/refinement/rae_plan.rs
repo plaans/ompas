@@ -5,9 +5,9 @@ use crate::exec::ModExec;
 use ompas_language::exec::rae_plan::*;
 use ompas_language::exec::state::MOD_STATE;
 use ompas_structs::acting_domain::OMPASDomain;
-use ompas_structs::select_mode::{Planner, RAEPlanConfig, SelectMode};
-use ompas_structs::state::action_state::RefinementMetaData;
+use ompas_structs::interface::select_mode::{Planner, RAEPlanConfig, SelectMode};
 use ompas_structs::state::world_state::WorldStateSnapshot;
+use ompas_structs::supervisor::process::task::RefinementTrace;
 use rand::prelude::SliceRandom;
 use sompas_core::{eval, parse};
 use sompas_language::time::MOD_TIME;
@@ -333,11 +333,11 @@ pub async fn rae_plan_env(mut env: LEnv, domain: &OMPASDomain) -> LEnv {
 
 pub async fn rae_plan_select(
     state: WorldStateSnapshot,
-    tried: &[LValue],
+    tried: &Vec<LValue>,
     task: Vec<LValue>,
     env: &LEnv,
     config: RAEPlanConfig,
-) -> lruntimeerror::Result<RefinementMetaData> {
+) -> lruntimeerror::Result<RefinementTrace> {
     let new_env = env.clone();
     let ctx = env.get_context::<ModRaePlan>(MOD_RAE_PLAN).unwrap();
 
@@ -345,7 +345,7 @@ pub async fn rae_plan_select(
     new_env.import_module(ctx.new_from_tried(tried.to_vec(), 0), WithoutPrefix);
     new_env.update_context(ModState::new_from_snapshot(state.clone()));
 
-    let mut greedy: RefinementMetaData = greedy_select(state, tried, task.clone(), env).await?;
+    let mut greedy: RefinementTrace = greedy_select(state, tried, task.clone(), env).await?;
     greedy.refinement_type = SelectMode::Planning(Planner::RAEPlan(config));
 
     let method: LValue = eval(&task.into(), &mut new_env, None).await?;

@@ -5,7 +5,7 @@ use crate::PlatformDescriptor;
 use ompas_language::interface::{LOG_TOPIC_PLATFORM, PROCESS_TOPIC_PLATFORM};
 use ompas_middleware::ProcessInterface;
 use ompas_structs::acting_domain::OMPASDomain;
-use ompas_structs::state::action_status::ActionStatus;
+use ompas_structs::supervisor::action_status::ActionStatus;
 use ompas_structs::supervisor::Supervisor;
 use ompas_structs::ActionId;
 use sompas_core::eval;

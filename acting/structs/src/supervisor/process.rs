@@ -1,10 +1,19 @@
-use crate::supervisor::acquire::AcquireProcess;
-use crate::supervisor::arbitrary::ArbitraryProcess;
-use crate::supervisor::command::CommandProcess;
-use crate::supervisor::method::MethodProcess;
-use crate::supervisor::root_task::RootProcess;
-use crate::supervisor::task::TaskProcess;
+use crate::supervisor::process::acquire::AcquireProcess;
+use crate::supervisor::process::arbitrary::ArbitraryProcess;
+use crate::supervisor::process::command::CommandProcess;
+use crate::supervisor::process::method::MethodProcess;
+use crate::supervisor::process::root_task::RootProcess;
+use crate::supervisor::process::task::TaskProcess;
 
+pub mod acquire;
+pub mod arbitrary;
+pub mod command;
+pub mod method;
+pub mod process_ref;
+pub mod root_task;
+pub mod task;
+
+#[derive(Copy, Clone)]
 pub enum ProcessOrigin {
     Execution,
     Planning,

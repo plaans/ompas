@@ -1,6 +1,6 @@
 use crate::supervisor::interval::{Interval, Timepoint};
+use crate::supervisor::process::process_ref::MethodLabel;
 use crate::supervisor::process::ActingProcessInner;
-use crate::supervisor::process_ref::MethodLabel;
 use crate::supervisor::ActingProcessId;
 use sompas_structs::lvalue::LValue;
 use std::collections::HashMap;

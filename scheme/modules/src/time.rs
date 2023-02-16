@@ -39,7 +39,7 @@ impl ModTime {
     }
 
     pub async fn get_instant(&self) -> u128 {
-        self.start.read().await.elapsed().as_nanos()
+        self.start.read().await.elapsed().as_micros()
     }
 }
 

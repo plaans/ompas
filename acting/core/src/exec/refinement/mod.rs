@@ -2,47 +2,40 @@ pub mod aries;
 pub mod c_choice;
 pub mod rae_plan;
 
-use crate::exec::context::ModContext;
+use crate::exec::context::ModActingContext;
 use crate::exec::refinement::aries::aries_select;
 use crate::exec::refinement::c_choice::c_choice_select;
 use crate::exec::refinement::rae_plan::rae_plan_select;
 use crate::exec::state::{instance, ModState};
 use crate::exec::ModExec;
 use crate::RaeExecError;
-use ompas_language::exec::context::MOD_CONTEXT;
+use ompas_language::exec::acting_context::DEF_PROCESS_ID;
+use ompas_language::exec::acting_context::MOD_ACTING_CONTEXT;
 use ompas_language::exec::refinement::*;
 use ompas_middleware::logger::LogClient;
 use ompas_structs::acting_domain::OMPASDomain;
-use ompas_structs::agenda::Agenda;
 use ompas_structs::interface::rae_options::OMPASOptions;
 use ompas_structs::interface::select_mode::{Planner, SelectMode};
-use ompas_structs::interval::Interval;
-use ompas_structs::rae_options::OMPASOptions;
-use ompas_structs::select_mode::{Planner, SelectMode};
-use ompas_structs::state::action_state::{
-    ActionMetaData, ActionMetaDataView, RefinementMetaData, TaskMetaData,
-};
-use ompas_structs::state::action_status::ActionStatus;
 use ompas_structs::state::world_state::{WorldState, WorldStateSnapshot};
-use ompas_structs::supervisor::task::TaskProcess;
+use ompas_structs::supervisor::action_status::ActionStatus;
+use ompas_structs::supervisor::interval::Interval;
+use ompas_structs::supervisor::process::task::{RefinementTrace, TaskProcess};
 use ompas_structs::supervisor::{ActingProcessId, Supervisor};
 use rand::prelude::SliceRandom;
 use sompas_core::eval;
 use sompas_core::modules::list::cons;
 use sompas_language::time::MOD_TIME;
 use sompas_macros::async_scheme_fn;
-use sompas_macros::*;
 use sompas_modules::time::ModTime;
 use sompas_modules::utils::enumerate;
-use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lmodule::LModule;
 use sompas_structs::lprimitive::LPrimitive;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
-use sompas_structs::{list, lruntimeerror, wrong_type};
+use sompas_structs::{list, lruntimeerror};
 use std::borrow::Borrow;
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryInto;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -73,8 +66,6 @@ impl From<ModRefinement> for LModule {
         module.add_async_fn(REFINE, refine, DOC_REFINE, false);
         module.add_async_fn(SET_SUCCESS, set_success, DOC_SET_SUCCESS, false);
         module.add_async_fn(_RETRY, _retry, DOC__RETRY, false);
-        module.add_fn(IS_SUCCESS, is_success, DOC_IS_SUCCESS, false);
-        module.add_fn(IS_FAILURE, is_failure, DOC_IS_FAILURE, false);
 
         //Lambdas
         module.add_lambda(EXEC_TASK, LAMBDA_EXEC_TASK, DOC_EXEC_TASK);
@@ -123,44 +114,47 @@ impl From<ModRefinement> for LModule {
 
 #[async_scheme_fn]
 pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
-    let task_label: LValue = args.into();
+    let task: LValue = args.into();
     let ctx = env.get_context::<ModRefinement>(MOD_REFINEMENT)?;
     let log = ctx.log.clone();
     let task_id: ActingProcessId = env
-        .get_context::<ModContext>(MOD_CONTEXT)
+        .get_context::<ModActingContext>(MOD_ACTING_CONTEXT)
         .unwrap()
         .process_ref
         .as_id()
         .unwrap();
 
-    let result: LValue = select(task_id, env)
+    let rt: RefinementTrace = select(task.clone(), task_id, env)
         .await
         .map_err(|e: LRuntimeError| e.chain("select"))?;
 
-    let first_m = result;
+    let method = rt.choosed.clone();
 
-    let instant = ctx.supervisor.get_instant().await;
+    let instant = ctx.supervisor.get_instant();
 
-    let task: &mut TaskProcess = ctx
-        .supervisor
-        .inner
-        .write()
-        .await
-        .get_mut(task_id)
-        .unwrap()
-        .try_task();
+    let mut inner = ctx.supervisor.inner.write().await;
 
-    let result: LValue = if first_m == LValue::Nil {
-        log.error(format!(
-            "No applicable method for task {task_label}({task_id})"
-        ))
-        .await;
-        task.set_status(ActionStatus::Failure);
-        task.set_end(instant);
+    let task_process: &mut TaskProcess =
+        inner.get_mut(task_id).unwrap().inner.as_mut_task().unwrap();
+
+    let result: LValue = if method == LValue::Nil {
+        log.error(format!("No applicable method for task {task}({task_id})"))
+            .await;
+        task_process.set_status(ActionStatus::Failure);
+        task_process.set_end(instant);
         RaeExecError::NoApplicableMethod.into()
     } else {
-        task.update_status(ActionStatus::Running(None));
-        first_m
+        task_process.set_status(ActionStatus::Running(None));
+        drop(task_process);
+        let id: ActingProcessId = ctx
+            .supervisor
+            .new_method(task_id, method.clone(), rt, false)
+            .await;
+        list!(
+            LPrimitive::Begin.into(),
+            list!(DEF_PROCESS_ID.into(), id.into()),
+            list!(LPrimitive::Enr.into(), method)
+        )
     };
 
     Ok(result)
@@ -175,23 +169,17 @@ pub async fn set_success(env: &LEnv) -> LResult {
      */
 
     let task_id = env
-        .get_context::<ModContext>(MOD_CONTEXT)?
+        .get_context::<ModActingContext>(MOD_ACTING_CONTEXT)?
         .process_ref
         .as_id()
         .unwrap();
 
     let ctx = env.get_context::<ModRefinement>(MOD_REFINEMENT)?;
 
-    let instant = ctx.supervisor.get_instant().await;
+    let instant = ctx.supervisor.get_instant();
 
-    let task: &mut TaskProcess = ctx
-        .supervisor
-        .inner
-        .write()
-        .await
-        .get_mut(task_id)
-        .unwrap()
-        .try_task();
+    let mut inner = ctx.supervisor.inner.write().await;
+    let task: &mut TaskProcess = inner.get_mut(task_id).unwrap().inner.as_mut_task().unwrap();
 
     task.set_status(ActionStatus::Success);
     task.set_end(instant);
@@ -202,27 +190,55 @@ pub async fn set_success(env: &LEnv) -> LResult {
 #[async_scheme_fn]
 pub async fn _retry(env: &LEnv) -> LResult {
     let ctx = env.get_context::<ModRefinement>(MOD_REFINEMENT)?;
+    let task_id = env
+        .get_context::<ModActingContext>(MOD_ACTING_CONTEXT)?
+        .process_ref
+        .as_id()
+        .unwrap();
     let log = ctx.log.clone();
-    let mut task: TaskMetaData = ctx.agenda.get_task(&(task_id as usize)).await?;
-    let task_label = task.get_label().clone();
-    log.error(format!("Retrying task {task_label}({task_id})"))
-        .await;
-    task.add_tried_method(task.get_current_method().clone());
-    task.set_current_method(LValue::Nil);
-    let new_method: LValue = select(&mut task, env).await?;
+    let mut task: LValue = ctx
+        .supervisor
+        .inner
+        .read()
+        .await
+        .get(task_id)
+        .unwrap()
+        .inner
+        .as_task()
+        .unwrap()
+        .value
+        .clone();
+
+    log.error(format!("Retrying task {task}({task_id})")).await;
+
+    let rt: RefinementTrace = select(task.clone(), task_id, env).await?;
+
+    let new_method = rt.choosed.clone();
+
+    let instant = ctx.supervisor.get_instant();
+
+    let mut inner = ctx.supervisor.inner.write().await;
+    let tp: &mut TaskProcess = inner.get_mut(task_id).unwrap().inner.as_mut_task().unwrap();
+
     let result: LValue = if new_method == LValue::Nil {
         log.error(format!(
-            "No more method for task {task_label}({task_id}). Task is a failure!",
+            "No more method for task {task}({task_id}). Task is a failure!",
         ))
         .await;
-        task.update_status(ActionStatus::Failure);
-        task.set_end_timepoint(ctx.agenda.get_instant());
-        ctx.agenda.update_task(&task_id, task).await;
+        tp.set_status(ActionStatus::Failure);
+        tp.set_end(instant);
         RaeExecError::NoApplicableMethod.into()
     } else {
-        task.set_current_method(new_method.clone());
-        ctx.agenda.update_task(&task_id, task).await;
-        new_method
+        drop(tp);
+        let id: ActingProcessId = ctx
+            .supervisor
+            .new_method(task_id, new_method.clone(), rt, false)
+            .await;
+        list!(
+            LPrimitive::Begin.into(),
+            list!(DEF_PROCESS_ID.into(), id.into()),
+            list!(LPrimitive::Enr.into(), new_method)
+        )
     };
 
     Ok(result)
@@ -234,7 +250,11 @@ pub async fn _retry(env: &LEnv) -> LResult {
     (sim_block
     (rae-select task (generate_applicable_instances task)))))))";*/
 
-pub async fn select(task: LValue, task_id: task_id, env: &LEnv) -> LResult {
+pub async fn select(
+    task: LValue,
+    task_id: ActingProcessId,
+    env: &LEnv,
+) -> Result<RefinementTrace, LRuntimeError> {
     /*
     Each function return an ordered list of methods
      */
@@ -244,37 +264,33 @@ pub async fn select(task: LValue, task_id: task_id, env: &LEnv) -> LResult {
     let state: WorldStateSnapshot = mod_refinement.state.get_snapshot().await;
     let select_mode: SelectMode = *mod_refinement.options.read().await.get_select_mode();
 
-    let task: Vec<LValue> = task.try_into()?;
-    let tried = supervisor.get_tried_method(task_id);
-    let rmd: RefinementMetaData = match &select_mode {
+    let task_slice: Vec<LValue> = task.clone().try_into()?;
+    let tried: Vec<LValue> = supervisor.get_tried_method(task_id).await;
+    let rt: RefinementTrace = match &select_mode {
         SelectMode::Greedy => {
             /*
             Returns all applicable methods sorted by their score
              */
-            log.debug(format!("select greedy for {}", stack.get_label()))
-                .await;
-            greedy_select(state, tried, task, env)
+            log.debug(format!("select greedy for {task}")).await;
+            greedy_select(state, &tried, task_slice, env)
                 .await
                 .map_err(|e| e.chain("greedy_select"))?
         }
         SelectMode::Planning(Planner::Aries(bool)) => {
-            log.debug(format!("select with aries for {}", stack.get_label()))
-                .await;
-            aries_select(state, tried, task, env, *bool)
+            log.debug(format!("select with aries for {task}")).await;
+            aries_select(state, &tried, task_slice, env, *bool)
                 .await
                 .map_err(|e| e.chain("planning_select"))?
         }
         SelectMode::Planning(Planner::CChoice(config)) => {
-            log.debug(format!("select with c-choice for {}", stack.get_label()))
-                .await;
-            c_choice_select(state, tried, task, env, *config)
+            log.debug(format!("select with c-choice for {task}")).await;
+            c_choice_select(state, &tried, task_slice, env, *config)
                 .await
                 .map_err(|e| e.chain("planning_select"))?
         }
         SelectMode::Planning(Planner::RAEPlan(config)) => {
-            log.debug(format!("select with c-choice for {}", stack.get_label()))
-                .await;
-            rae_plan_select(state, tried, task, env, *config)
+            log.debug(format!("select with c-choice for {task}")).await;
+            rae_plan_select(state, &tried, task_slice, env, *config)
                 .await
                 .map_err(|e| e.chain("planning_select"))?
         }
@@ -283,68 +299,21 @@ pub async fn select(task: LValue, task_id: task_id, env: &LEnv) -> LResult {
 
     log.debug(format!(
         "sorted_methods for {}({}): {}",
-        stack.get_label(),
+        task,
         task_id,
-        LValue::from(&rmd.applicable_methods)
+        LValue::from(&rt.applicable_methods)
     ))
     .await;
 
-    let method = rmd.choosed.clone();
-
-    stack.set_current_method(method.clone());
-    stack.add_refinement(rmd);
-    Ok(method)
-}
-
-#[scheme_fn]
-pub fn success(args: &[LValue]) -> LValue {
-    list![LValue::from(SET_SUCCESS), args.into()]
-}
-#[scheme_fn]
-pub fn failure(args: &[LValue]) -> LValue {
-    list![LValue::from(FAILURE), args.into()]
-}
-
-#[scheme_fn]
-pub fn is_failure(list: Vec<LValue>) -> Result<bool, LRuntimeError> {
-    if let LValue::Symbol(s) = &list[0] {
-        match s.as_str() {
-            SET_SUCCESS => Ok(false),
-            FAILURE => Ok(true),
-            _ => Err(wrong_type!(
-                IS_FAILURE,
-                &list[0],
-                KindLValue::Other("{success,failure}".to_string())
-            )),
-        }
-    } else {
-        Err(wrong_type!(IS_FAILURE, &list[0], KindLValue::Symbol))
-    }
-}
-
-#[scheme_fn]
-pub fn is_success(list: Vec<LValue>) -> Result<bool, LRuntimeError> {
-    if let LValue::Symbol(s) = &list[0] {
-        match s.as_str() {
-            SET_SUCCESS => Ok(true),
-            FAILURE => Ok(false),
-            _ => Err(wrong_type!(
-                IS_SUCCESS,
-                &list[0],
-                KindLValue::Other("{success,failure}".to_string())
-            )),
-        }
-    } else {
-        Err(wrong_type!(IS_FAILURE, &list[0], KindLValue::Symbol))
-    }
+    Ok(rt)
 }
 
 pub async fn greedy_select(
     state: WorldStateSnapshot,
-    tried: &[LValue],
+    tried: &Vec<LValue>,
     task: Vec<LValue>,
     env: &LEnv,
-) -> lruntimeerror::Result<RefinementMetaData> {
+) -> lruntimeerror::Result<RefinementTrace> {
     /*
     Steps:
     - Create a new entry in the agenda
@@ -449,11 +418,11 @@ pub async fn greedy_select(
     methods.retain(|m| !tried.contains(m));
     let choosed = methods.get(0).cloned().unwrap_or(LValue::Nil);
 
-    Ok(RefinementMetaData {
+    Ok(RefinementTrace {
         refinement_type: SelectMode::Greedy,
         applicable_methods: methods,
         choosed,
         plan: None,
-        interval: Interval::new(start, Some(ctx.agenda.get_instant())),
+        interval: Interval::new(start, Some(ctx.supervisor.get_instant())),
     })
 }

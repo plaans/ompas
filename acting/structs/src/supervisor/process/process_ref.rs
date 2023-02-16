@@ -14,6 +14,10 @@ impl ProcessRef {
             None
         }
     }
+
+    pub fn is_relative(&self) -> bool {
+        matches!(self, Self::Relative(..))
+    }
 }
 
 impl Default for ProcessRef {
@@ -32,6 +36,16 @@ impl From<ActingProcessId> for ProcessRef {
 pub enum Label {
     Method(usize),
     MethodProcess(MethodLabel),
+}
+
+impl Label {
+    pub fn as_method_label(&self) -> Option<&MethodLabel> {
+        if let Self::MethodProcess(mp) = self {
+            Some(mp)
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]

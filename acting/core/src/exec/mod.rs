@@ -1,4 +1,4 @@
-use crate::exec::context::ModContext;
+use crate::exec::context::ModActingContext;
 use crate::exec::mode::{CtxMode, RAEMode};
 use crate::exec::platform::ModPlatform;
 use crate::exec::refinement::*;
@@ -89,7 +89,7 @@ impl From<ModExec> for LModule {
         module.add_submodule(mod_platform);
         module.add_submodule(mod_resource);
         module.add_submodule(mod_state);
-        module.add_submodule(ModContext::default());
+        module.add_submodule(ModActingContext::default());
         module.add_submodule(mod_refinement);
         module.add_async_fn(ARBITRARY, arbitrary, DOC_ARBITRARY, false);
         module

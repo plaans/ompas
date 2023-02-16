@@ -194,8 +194,8 @@ pub mod exec {
         pub const INNER_DYNAMIC: &str = "inner_dynamic";
     }
 
-    pub mod context {
-        pub const MOD_CONTEXT: &str = "context";
+    pub mod acting_context {
+        pub const MOD_ACTING_CONTEXT: &str = "acting_context";
         pub const DOC_MOD_CONTEXT: &str =
             "Module that contains the Task Context that contains the id of the parent task.";
 
@@ -756,7 +756,7 @@ pub mod monitor {
         pub const DOC_WAIT_TASK: &str = "Wait on the result of a triggered task.";
 
         pub const GET_TASK_ID: &str = "get_task_id";
-        pub const DOC_TASK_ID: &str = "Get the internal id of the triggered task.";
+        pub const DOC_GET_TASK_ID: &str = "Get the internal id of the triggered task.";
 
         pub const CANCEL_TASK: &str = "cancel-task";
         pub const DOC_CANCEL_TASK: &str = "Cancel a triggered task.";
@@ -831,6 +831,18 @@ pub mod monitor {
         pub const MACRO_DEBUG_OMPAS: &str = "(lambda (arg)
     `(__debug_ompas__ ',arg)))";
     }
+}
+
+pub mod supervisor {
+    pub const STATUS_PENDING: &str = "pending";
+    pub const STATUS_ACCEPTED: &str = "accepted";
+    pub const STATUS_REJECTED: &str = "rejected";
+    pub const STATUS_RUNNING: &str = "running";
+    pub const STATUS_SUCCESS: &str = "success";
+    pub const STATUS_FAILURE: &str = "failure";
+    pub const STATUS_CANCELLED: &str = "cancelled";
+    pub const TASK: &str = "task";
+    pub const COMMAND: &str = "command";
 }
 
 pub const ACTION_TYPE: &str = "action_type";

@@ -93,18 +93,6 @@
                 )))
 
     (def-task t_jobshop)
-    ; (def-method m1
-    ;     (:task t_jobshop)
-    ;     (:params )
-    ;     (:pre-conditions true)
-    ;     (:score 0)
-    ;     (:body
-    ;         (do
-    ;             (mapf new-resource (instances robot))
-    ;             (mapf new-resource (instances machine))
-    ;             (define f1 (async (t_process_packages)))
-    ;             (define f2 (async (t_check_rob_bat)))
-    ;             (await f1))))
 
     (def-method m1
        (:task t_jobshop)
@@ -122,45 +110,45 @@
                                    (arbitrary ',(find_machines_for_process (car process)))
                                    ;,(cadr process)
                                    ))
-                               (package.processes_list ?p)))
+                               (package.all_processes ?p)))
                             (define last_task
                                 `(begin
                                     (define h_r (acquire-in-list (instances robot)))
                                     (define ?r (first h_r))
                                     (t_carry_to_machine ?r ,?p ,(find_output_machine))))
                             (define tasks (append tasks (list last_task)))
-                            ;(print tasks)
+                            (print tasks)
                             `(apply seq ,tasks)))
                         (instances package)))
                (define h (apply par tasks)))))
     
-    (def-task test)
-    (def-method m_test
-       (:task test)
-       (:body
-           (do
-               ; (mapf new-resource (instances robot))
-               ; (instances machine)
-               ; (mapf new-resource (instances machine))
-               ;(define f2 (async (t_check_rob_bat)))
-               (define tasks 
-                   (mapf (lambda (?p) 
-                       (do
-                           (define tasks (mapf (lambda (process)
-                               `(t_process_on_machine ,?p 
-                                   (arbitrary ',(find_machines_for_process (car process)))
-                                   ;,(cadr process)
-                                   ))
-                               (package.processes_list ?p)))
-                            (define last_task
-                                `(begin
-                                    (define h_r (acquire-in-list (instances robot)))
-                                    (define ?r (first h_r))
-                                    (t_carry_to_machine ?r ,?p ,(find_output_machine))))
-                            (define tasks (append tasks (list last_task)))
-                            ;(print tasks)
-                            `(apply seq ,tasks)))
-                        '(p1 p2)))
-            ;     (define h (apply par tasks))
-            )))
+    ; (def-task test)
+    ; (def-method m_test
+    ;    (:task test)
+    ;    (:body
+    ;        (do
+    ;            ; (mapf new-resource (instances robot))
+    ;            ; (instances machine)
+    ;            ; (mapf new-resource (instances machine))
+    ;            ;(define f2 (async (t_check_rob_bat)))
+    ;            (define tasks 
+    ;                (mapf (lambda (?p) 
+    ;                    (do
+    ;                        (define tasks (mapf (lambda (process)
+    ;                            `(t_process_on_machine ,?p 
+    ;                                (arbitrary ',(find_machines_for_process (car process)))
+    ;                                ;,(cadr process)
+    ;                                ))
+    ;                            (package.processes_list ?p)))
+    ;                         (define last_task
+    ;                             `(begin
+    ;                                 (define h_r (acquire-in-list (instances robot)))
+    ;                                 (define ?r (first h_r))
+    ;                                 (t_carry_to_machine ?r ,?p ,(find_output_machine))))
+    ;                         (define tasks (append tasks (list last_task)))
+    ;                         ;(print tasks)
+    ;                         `(apply seq ',tasks)))
+    ;                     '(p1 p2)))
+    ;         ;     (define h (apply par tasks))
+    ;         )))
 )

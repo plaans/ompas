@@ -3,7 +3,7 @@ use crate::exec::acting_context::ModActingContext;
 use crate::exec::mode::{CtxMode, RAEMode};
 use crate::exec::*;
 use ompas_interface::platform::Platform;
-use ompas_language::exec::acting_context::MOD_ACTING_CONTEXT;
+use ompas_language::exec::acting_context::*;
 use ompas_language::exec::mode::CTX_MODE;
 use ompas_language::exec::platform::*;
 use ompas_middleware::logger::LogClient;
@@ -43,6 +43,14 @@ impl From<ModPlatform> for LModule {
             false,
         );
         module.add_async_fn(START_PLATFORM, start_platform, DOC_START_PLATFORM, false);
+        module.add_lambda(CTX_ACQUIRE, LAMBDA_CTX_ACQUIRE, DOC_CTX_ACQUIRE);
+        module.add_lambda(
+            CTX_EXEC_COMMAND,
+            LAMBDA_CTX_EXEC_COMMAND,
+            DOC_CTX_EXEC_COMMAND,
+        );
+        module.add_lambda(CTX_ARBITRARY, LAMBDA_CTX_ARBITRARY, DOC_CTX_ARBITRARY);
+        module.add_lambda(CTX_EXEC_TASK, LAMBDA_CTX_EXEC_TASK, DOC_CTX_EXEC_TASK);
         module
     }
 }

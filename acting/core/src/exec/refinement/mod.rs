@@ -168,13 +168,13 @@ pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
         RaeExecError::NoApplicableMethod.into()
     } else {
         let debug = method.to_string();
-        let mut p_env = PLEnv {
+        /*let mut p_env = PLEnv {
             env: env.clone(),
             unpure_binding: Default::default(),
             pc: Default::default(),
         };
         let method: LValue = p_eval(&method, &mut p_env).await?;
-        log.debug(format!("p_eval({}) => {}", debug, method)).await;
+        log.debug(format!("p_eval({}) => {}", debug, method)).await;*/
         task_process.set_status(ActionStatus::Running(None));
         drop(task_process);
         let id: ActingProcessId = inner.new_method(task_id, debug, method.clone(), rt, false);

@@ -16,6 +16,7 @@ use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use std::sync::Arc;
 
+pub mod annotate;
 pub mod apply;
 pub mod p_eval;
 pub mod post_processing;

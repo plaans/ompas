@@ -4,7 +4,16 @@ use crate::conversion::flow::p_eval::r#struct::*;
 use crate::conversion::flow::pre_processing::transform_lambda_expression;
 use anyhow::anyhow;
 use async_recursion::async_recursion;
+use ompas_language::exec::acting_context::{
+    CTX_ACQUIRE, CTX_ARBITRARY, CTX_EXEC_COMMAND, CTX_EXEC_TASK,
+};
+use ompas_language::exec::aries::CTX_ARIES;
+use ompas_language::exec::platform::EXEC_COMMAND;
+use ompas_language::exec::refinement::EXEC_TASK;
+use ompas_language::exec::resource::ACQUIRE;
+use ompas_language::exec::ARBITRARY;
 use sompas_core::{expand_quasi_quote, parse_into_lvalue};
+use sompas_language::kind::LIST;
 use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::llambda::{LLambda, LambdaArgs};
 use sompas_structs::lprimitive::LPrimitive;

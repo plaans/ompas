@@ -218,8 +218,7 @@ async fn __wait_for__(env: &LEnv, lv: LValue) -> Result<LAsyncHandle, LRuntimeEr
     let mut env = env.clone();
     let f: LFuture = (Box::pin(async move {
         //println!("wait-for: {}", lv);
-        if let LValue::True = eval(&lv, &mut env, None).await.unwrap() {
-            //println!("wait-for: {} already true", lv);
+        if let LValue::True = eval(&lv, &mut env, None).await? {
             Ok(LValue::Nil)
         } else {
             let handler = monitors.add_waiter(lv.clone()).await;

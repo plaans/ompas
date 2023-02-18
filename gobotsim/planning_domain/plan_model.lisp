@@ -15,7 +15,7 @@
                                `(t_process_on_machine ,?p 
                                    (arbitrary ',(find_machines_for_process (car process)))
                                    ,(cadr process)))
-                               (package.processes_list ?p)))
+                               (package.all_processes ?p)))
                            (apply seq tasks)))
                    (instances package)))
                (apply par tasks))))

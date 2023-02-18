@@ -207,36 +207,36 @@ pub mod exec {
 
         pub const CTX_ARBITRARY: &str = "ctx-arbitrary";
         pub const DOC_CTX_ARBITRARY: &str = "Evaluates an arbitrary in an assigned context";
-        pub const MACRO_ARBITRARY: &str = "(lambda (id arbitrary)
+        pub const LAMBDA_CTX_ARBITRARY: &str = "(lambda (id arbitrary)
             (begin
-                (def-label 'arbitrary ,id)
-                ,arbitrary
+                (def-label 'arbitrary id)
+                (apply arbitrary args)
             )
         )";
-        pub const CTX_ACQUIRE: &str = "ctx-arbitrary";
+        pub const CTX_ACQUIRE: &str = "ctx-acquire";
         pub const DOC_CTX_ACQUIRE: &str = "Evaluates an acquire in an assigned context";
-        pub const MACRO_ACQUIRE: &str = "(lambda (id acquire)
+        pub const LAMBDA_CTX_ACQUIRE: &str = "(lambda (id args)
             (begin
-                (def-label 'acquire ,id)
-                ,acquire
+                (def-label 'acquire id)
+                (apply acquire args)
             )
         )";
 
-        pub const CTX_COMMAND: &str = "ctx-arbitrary";
-        pub const DOC_CTX_COMMAND: &str = "Evaluates a command in an assigned context";
-        pub const MACRO_COMMAND: &str = "(lambda (id command)
+        pub const CTX_EXEC_COMMAND: &str = "ctx-exec-command";
+        pub const DOC_CTX_EXEC_COMMAND: &str = "Evaluates a command in an assigned context";
+        pub const LAMBDA_CTX_EXEC_COMMAND: &str = "(lambda (id args)
             (begin
-                (def-label 'command ,id)
-                ,command
+                (def-label 'command id)
+                (apply exec-command args)
             )
         )";
 
-        pub const CTX_SUBTASK: &str = "ctx-subtask";
-        pub const DOC_CTX_SUBTASK: &str = "Evaluates a task in an assigned context";
-        pub const MACRO_SUBTASK: &str = "(lambda (id subtask)
+        pub const CTX_EXEC_TASK: &str = "ctx-exec-task";
+        pub const DOC_CTX_EXEC_TASK: &str = "Evaluates a task in an assigned context";
+        pub const LAMBDA_CTX_EXEC_TASK: &str = "(lambda (id subtask)
             (begin
-                (def-label 'subtask ,id)
-                ,subtask
+                (def-label 'subtask id)
+                (apply exec-task args)
             )
         )";
     }

@@ -55,3 +55,7 @@ path = "src/bin/type_network.rs"
 [[bin]]
 name = "domain"
 path = "src/bin/domain_collection.rs"
+
+[[bin]]
+name = "annotate"
+path = "src/bin/annotate.rs"

@@ -1,9 +1,5 @@
 use chrono::{DateTime, Utc};
-use flow_graph::structs::domains::SimpleType::*;
-use flow_graph::structs::domains::{DomainCollection, SimpleType};
-//use flow_graph::structs::r#type::Type::*;
-//use flow_graph::structs::r#type::{Type, TypeNetwork};
-use flow_graph::structs::domains::SimpleType::Boolean;
+use ompas_structs::sym_table::domain::type_lattice::TypeLattice;
 use std::env::set_current_dir;
 use std::fs;
 use std::fs::File;
@@ -101,7 +97,7 @@ fn test_union(tn: &TypeNetwork, ta: Type, tb: Type) {
     }
 }*/
 
-fn output_markdown(path: PathBuf, network: &TypeNetwork, view: bool) {
+fn output_markdown(path: PathBuf, network: &TypeLattice, view: bool) {
     let mut path = path;
     let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
     let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();

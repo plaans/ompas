@@ -1,4 +1,3 @@
-use sompas_core::activate_debug;
 use sompas_modules::advanced_math::ModAdvancedMath;
 use sompas_modules::io::ModIO;
 use sompas_modules::string::ModString;
@@ -39,9 +38,6 @@ async fn main() {
 
     let opt: Opt = Opt::from_args();
     println!("{:?}", opt);
-    if opt.view {
-        activate_debug();
-    }
     //test_lib_model(&opt);
     lisp_interpreter(&opt).await;
 }

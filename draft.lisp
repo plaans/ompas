@@ -36,13 +36,8 @@
                             (retry)
                             (set-success-for-task)))))))
 
-((t_process_on_machine package0 (arbitrary (quote (machine2))))
- (t_process_on_machine package0 (arbitrary (quote (machine0))))
- (t_process_on_machine package0 (arbitrary (quote (machine1))))
- (t_process_on_machine package0 (arbitrary (quote (machine3))))
- (t_process_on_machine package0 (arbitrary (quote (machine5))))
- (t_process_on_machine package0 (arbitrary (quote (machine4))))
- (begin 
-    (define h_r (acquire-in-list (instances robot)))
-    (define ?r (first h_r))
-    (t_carry_to_machine ?r package0 output_machine0)))
+(define _loop_
+    (lambda _body_
+        (begin
+            (define _r_ (eval _body_))
+            (_loop_ _body_))))

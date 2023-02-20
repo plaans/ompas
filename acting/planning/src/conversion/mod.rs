@@ -464,7 +464,7 @@ pub async fn convert_abstract_task_to_chronicle(
 
     let mut p_env = PLEnv {
         env: cc.env.clone(),
-        unpure_binding: Default::default(),
+        unpure_bindings: Default::default(),
         pc: pc.clone(),
     };
 

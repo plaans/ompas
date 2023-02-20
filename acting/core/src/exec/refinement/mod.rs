@@ -13,6 +13,7 @@ use ompas_language::exec::acting_context::DEF_PROCESS_ID;
 use ompas_language::exec::acting_context::MOD_ACTING_CONTEXT;
 use ompas_language::exec::refinement::*;
 use ompas_middleware::logger::LogClient;
+use ompas_planning::conversion::flow::annotate::annotate;
 use ompas_planning::conversion::flow::p_eval::p_eval;
 use ompas_planning::conversion::flow::p_eval::r#struct::PLEnv;
 use ompas_structs::acting_domain::OMPASDomain;
@@ -36,7 +37,7 @@ use sompas_structs::lenv::LEnv;
 use sompas_structs::lmodule::LModule;
 use sompas_structs::lprimitive::LPrimitive;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
-use sompas_structs::lvalue::LValue;
+use sompas_structs::lvalue::{LValue, Sym};
 use sompas_structs::{list, lruntimeerror};
 use std::borrow::Borrow;
 use std::convert::TryInto;
@@ -168,24 +169,43 @@ pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
         RaeExecError::NoApplicableMethod.into()
     } else {
         let debug = method.to_string();
-        /*let mut p_env = PLEnv {
+        let mut p_env = PLEnv {
             env: env.clone(),
-            unpure_binding: Default::default(),
             pc: Default::default(),
+            unpure_bindings: Default::default(),
         };
-        let method: LValue = p_eval(&method, &mut p_env).await?;
-        log.debug(format!("p_eval({}) => {}", debug, method)).await;*/
+        let (label, params_values) = if let LValue::List(method) = &method {
+            (method[0].to_string(), method[1..].to_vec())
+        } else {
+            panic!()
+        };
+        let p_method: LValue = p_eval(&method, &mut p_env).await?;
+        let p_method: LValue = annotate(p_method);
+        log.debug(format!("p_eval({}) => {}", debug, method)).await;
         task_process.set_status(ActionStatus::Running(None));
         drop(task_process);
         let id: ActingProcessId = inner.new_method(task_id, debug, method.clone(), rt, false);
-        list!(
-            list!(
-                LPrimitive::Begin.into(),
-                list!(DEF_PROCESS_ID.into(), id.into()),
-                list!(LPrimitive::Enr.into(), method)
-            ),
-            task_id.into()
-        )
+        let mut body = vec![
+            LPrimitive::Begin.into(),
+            list!(DEF_PROCESS_ID.into(), id.into()),
+        ];
+
+        let labels: Vec<Arc<Sym>> = ctx
+            .domain
+            .read()
+            .await
+            .get_methods()
+            .get(&label)
+            .unwrap()
+            .parameters
+            .get_labels();
+
+        for (param, value) in labels.iter().zip(params_values) {
+            body.push(list![LPrimitive::Define.into(), param.into(), value]);
+        }
+
+        body.push(p_method);
+        list!(body.into(), task_id.into())
     };
 
     Ok(result)

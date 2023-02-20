@@ -366,14 +366,15 @@ pub mod utils {
 
     pub const LOOP: &str = "loop";
     pub const DOC_LOOP: &str = "Evaluate infinitely an expression.";
-    pub const MACRO_LOOP: &str = "(lambda (b)
-        `(begin 
-            (define __loop__
-                (lambda nil 
-                    (begin 
-                        ,b
-                        (__loop__))))
-            (__loop__)))";
+    pub const MACRO_LOOP: &str = "(lambda (_body_)
+        `(_loop_ ',_body_))";
+
+    pub const _LOOP_: &str = "_loop_";
+    pub const DOC__LOOP_: &str = "Evaluate infinetely an expression";
+    pub const LAMBDA__LOOP_: &str = "(lambda (_body_)
+        (begin
+            (define _r_ (eval _body_))
+            (_loop_ _body_))))";
 
     pub const LET: &str = "let";
     pub const DOC_LET: &str = "Abstract variable binding in functional programming.";

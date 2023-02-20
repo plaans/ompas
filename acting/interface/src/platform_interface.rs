@@ -127,7 +127,7 @@ pub struct CommandCancelled {
 pub struct InitGetUpdate {}
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Event {
-    #[prost(oneof = "event::Event", tags = "1")]
+    #[prost(oneof = "event::Event", tags = "1, 2")]
     pub event: ::core::option::Option<event::Event>,
 }
 /// Nested message and enum types in `Event`.
@@ -136,6 +136,8 @@ pub mod event {
     pub enum Event {
         #[prost(message, tag = "1")]
         Instance(super::Instance),
+        #[prost(message, tag = "2")]
+        Resource(super::Resource),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -144,6 +146,15 @@ pub struct Instance {
     pub r#type: ::prost::alloc::string::String,
     #[prost(string, tag = "2")]
     pub object: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct Resource {
+    #[prost(string, tag = "1")]
+    pub label: ::prost::alloc::string::String,
+    #[prost(enumeration = "ResourceKind", tag = "2")]
+    pub resource_kind: i32,
+    #[prost(uint64, tag = "3")]
+    pub quantity: u64,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PlatformUpdate {
@@ -175,6 +186,24 @@ impl StateVariableType {
         match self {
             StateVariableType::Static => "STATIC",
             StateVariableType::Dynamic => "DYNAMIC",
+        }
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+#[repr(i32)]
+pub enum ResourceKind {
+    Unary = 0,
+    Divisible = 1,
+}
+impl ResourceKind {
+    /// String value of the enum field names used in the ProtoBuf definition.
+    ///
+    /// The values are not transformed in any way and thus are considered stable
+    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
+    pub fn as_str_name(&self) -> &'static str {
+        match self {
+            ResourceKind::Unary => "Unary",
+            ResourceKind::Divisible => "Divisible",
         }
     }
 }

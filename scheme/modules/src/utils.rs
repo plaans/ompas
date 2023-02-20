@@ -89,6 +89,7 @@ impl From<ModUtils> for LModule {
             MACRO_LET_STAR,
             (DOC_LET_STAR, DOC_LET_STAR_VERBOSE),
         );
+        module.add_lambda(_LOOP_, LAMBDA__LOOP_, DOC__LOOP_);
 
         //Lambdas
         module.add_lambda(APPLY, LAMBDA_APPLY, (DOC_APPLY, DOC_APPLY_VERBOSE));

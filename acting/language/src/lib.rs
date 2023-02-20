@@ -207,7 +207,7 @@ pub mod exec {
 
         pub const CTX_ARBITRARY: &str = "ctx-arbitrary";
         pub const DOC_CTX_ARBITRARY: &str = "Evaluates an arbitrary in an assigned context";
-        pub const LAMBDA_CTX_ARBITRARY: &str = "(lambda (id arbitrary)
+        pub const LAMBDA_CTX_ARBITRARY: &str = "(lambda (id args)
             (begin
                 (def-label 'arbitrary id)
                 (apply arbitrary args)
@@ -233,7 +233,7 @@ pub mod exec {
 
         pub const CTX_EXEC_TASK: &str = "ctx-exec-task";
         pub const DOC_CTX_EXEC_TASK: &str = "Evaluates a task in an assigned context";
-        pub const LAMBDA_CTX_EXEC_TASK: &str = "(lambda (id subtask)
+        pub const LAMBDA_CTX_EXEC_TASK: &str = "(lambda (id args)
             (begin
                 (def-label 'subtask id)
                 (apply exec-task args)
@@ -421,6 +421,10 @@ pub mod monitor {
 
         pub const PRE_EVAL_EXPR: &str = "pre-eval-expr";
         pub const DOC_PRE_EVAL_EXPR: &str = "Pre evaluate an expression.";
+
+        pub const ANNOTATE_TASK: &str = "annotate-task";
+        pub const DOC_ANNOTATE_TASK: &str =
+            "Pre eval a task and annotate each acting process with a unique id";
     }
 
     pub mod domain {

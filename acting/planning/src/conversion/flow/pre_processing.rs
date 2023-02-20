@@ -1,8 +1,8 @@
 use crate::conversion::flow::p_eval::r#struct::PConfig;
 use async_recursion::async_recursion;
-use ompas_language::exec::refinement::EXEC_TASK;
 use ompas_language::exec::resource::{ACQUIRE, MAX_Q, QUANTITY};
 use sompas_core::*;
+use sompas_language::list::FN_LIST;
 use sompas_language::primitives::DO;
 use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lenv::LEnv;
@@ -17,8 +17,7 @@ pub const TRANSFORM_LAMBDA_EXPRESSION: &str = "transform-lambda-expression";
 
 pub async fn pre_processing(lv: &LValue, env: &LEnv) -> LResult {
     let env = &mut env.clone();
-    let mut pc = PConfig::default();
-    pc.avoid.insert(EXEC_TASK.to_string());
+    let pc = PConfig::default();
     let lv = lambda_expansion(&lv, env, &pc.avoid).await?;
     let lv = acquire_expansion(&lv, env).await?;
     let lv = do_expansion(&lv, env).await?;
@@ -89,10 +88,16 @@ pub async fn transform_lambda_expression(
                         let arg = if args.len() == 1 {
                             match &args[0] {
                                 LValue::Nil => LValue::Nil,
-                                _ => vec![args[0].clone()].into(),
+                                _ => {
+                                    //vec![args[0].clone()].into()
+                                    vec![FN_LIST.into(), args[0].clone()].into()
+                                }
                             }
                         } else {
-                            args.into()
+                            //let mut vec = vec![];
+                            let mut vec = vec![FN_LIST.into()];
+                            vec.append(&mut args.to_vec());
+                            vec.into()
                         };
                         lisp.push(list![LPrimitive::Define.into(), param.into(), arg]);
                     }

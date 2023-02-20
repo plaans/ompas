@@ -87,6 +87,7 @@ message InitGetUpdate {}
 message Event {
   oneof event {
     Instance instance = 1;
+    Resource resource = 2;
   }
 }
 
@@ -94,6 +95,19 @@ message Instance {
   string type = 1;
   string object = 2;
 }
+
+message Resource {
+  string label = 1;
+  ResourceKind resource_kind = 2;
+  uint64 quantity = 3;
+}
+
+enum ResourceKind {
+  Unary = 0;
+  Divisible = 1;
+}
+
+
 
 message PlatformUpdate {
   oneof update {

@@ -3,7 +3,7 @@ use crate::platform_interface::atom::Kind;
 use crate::platform_interface::{
     atom, command_response, event, platform_update, Atom, CommandAccepted, CommandCancelled,
     CommandProgress, CommandRejected, CommandResponse, CommandResult, Event, Expression, Instance,
-    PlatformUpdate, StateUpdate,
+    PlatformUpdate, Resource, StateUpdate,
 };
 use async_trait::async_trait;
 use lisp_domain::LispDomain;
@@ -175,6 +175,16 @@ impl From<Instance> for PlatformUpdate {
         Self {
             update: Some(platform_update::Update::Event(Event {
                 event: Some(event::Event::Instance(i)),
+            })),
+        }
+    }
+}
+
+impl From<Resource> for PlatformUpdate {
+    fn from(r: Resource) -> Self {
+        Self {
+            update: Some(platform_update::Update::Event(Event {
+                event: Some(event::Event::Resource(r)),
             })),
         }
     }

@@ -4,6 +4,7 @@ use ompas_language::exec::refinement::EXEC_TASK;
 use ompas_language::exec::resource::{ACQUIRE, RELEASE};
 use ompas_language::exec::state::WAIT_FOR;
 use sompas_language::time::SLEEP;
+use sompas_language::utils::{LOOP, _LOOP_};
 use sompas_structs::lprimitive::LPrimitive;
 use sompas_structs::lvalue::{LValue, Sym};
 use sompas_structs::{list, symbol};
@@ -12,19 +13,24 @@ use std::fmt::{Display, Formatter};
 #[derive(Clone)]
 pub struct PLEnv {
     pub env: LEnv,
-    pub unpure_binding: im::HashMap<String, PLValue>,
+    pub unpure_bindings: im::HashMap<String, PLValue>,
     pub pc: PConfig,
 }
 
 impl PLEnv {
-    pub fn add_unpure_binding(&mut self, symbol: String) {
-        self.unpure_binding
+    pub fn add_unpure(&mut self, symbol: String) {
+        self.unpure_bindings
             .insert(symbol.to_string(), PLValue::unpure(symbol.into()));
     }
 
-    pub fn get_unpure(&self, symbol: &str) -> Option<&PLValue> {
-        self.unpure_binding.get(symbol)
+    pub fn remove_unpure(&mut self, symbol: &str) {
+        self.unpure_bindings.remove(symbol);
     }
+
+    pub fn get_unpure(&self, symbol: &str) -> Option<&PLValue> {
+        self.unpure_bindings.get(symbol)
+    }
+
     pub fn get_env(&self) -> &LEnv {
         &self.env
     }
@@ -141,6 +147,8 @@ impl Default for PConfig {
     fn default() -> Self {
         Self {
             avoid: hashset![
+                _LOOP_.to_string(),
+                LOOP.to_string(),
                 EXEC_COMMAND.to_string(),
                 EXEC_TASK.to_string(),
                 SLEEP.to_string(),
@@ -198,6 +206,8 @@ pub enum PCoreOperatorFrame {
     Expand,
     Parse,
     Async,
+    Interruptible,
+    Uninterruptible,
 }
 
 impl PUnstack for PCoreOperatorFrame {
@@ -255,6 +265,18 @@ impl PUnstack for PCoreOperatorFrame {
             }
             PCoreOperatorFrame::Async => {
                 list!(LPrimitive::Async.into(), results.pop().unwrap().lvalue)
+            }
+            PCoreOperatorFrame::Interruptible => {
+                list!(
+                    LPrimitive::Interruptible.into(),
+                    results.pop().unwrap().lvalue
+                )
+            }
+            PCoreOperatorFrame::Uninterruptible => {
+                list!(
+                    LPrimitive::Uninterruptible.into(),
+                    results.pop().unwrap().lvalue
+                )
             }
         })
     }

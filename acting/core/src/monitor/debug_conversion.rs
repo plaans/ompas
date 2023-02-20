@@ -2,13 +2,15 @@ use crate::exec::state::ModState;
 use crate::monitor::domain::ModDomain;
 use ompas_language::exec::refinement::EXEC_TASK;
 use ompas_language::monitor::debug_conversion::{
-    CONVERT_DOMAIN, DOC_CONVERT_DOMAIN, DOC_MOD_DEBUG_CONVERSION, DOC_PLAN_TASK, DOC_PRE_EVAL_EXPR,
-    DOC_PRE_EVAL_TASK, MOD_DEBUG_CONVERSION, PLAN_TASK, PRE_EVAL_EXPR, PRE_EVAL_TASK,
+    ANNOTATE_TASK, CONVERT_DOMAIN, DOC_ANNOTATE_TASK, DOC_CONVERT_DOMAIN, DOC_MOD_DEBUG_CONVERSION,
+    DOC_PLAN_TASK, DOC_PRE_EVAL_EXPR, DOC_PRE_EVAL_TASK, MOD_DEBUG_CONVERSION, PLAN_TASK,
+    PRE_EVAL_EXPR, PRE_EVAL_TASK,
 };
 use ompas_language::monitor::domain::MOD_DOMAIN;
 use ompas_middleware::logger::LogClient;
 use ompas_planning::aries::solver::run_solver_for_htn;
 use ompas_planning::aries::{generate_chronicles, solver};
+use ompas_planning::conversion::flow::annotate::annotate;
 use ompas_planning::conversion::flow::p_eval::r#struct::{PConfig, PLEnv};
 use ompas_planning::conversion::flow::p_eval::{p_eval, P_EVAL};
 use ompas_planning::conversion::{convert_acting_domain, p_convert, p_convert_task};
@@ -37,6 +39,7 @@ impl From<ModDebugConversion> for LModule {
         m.add_async_fn(PLAN_TASK, plan_task, DOC_PLAN_TASK, false);
         m.add_async_fn(PRE_EVAL_TASK, pre_eval_task, DOC_PRE_EVAL_TASK, false);
         m.add_async_fn(PRE_EVAL_EXPR, pre_eval_expr, DOC_PRE_EVAL_EXPR, false);
+        m.add_async_fn(ANNOTATE_TASK, annotate_task, DOC_ANNOTATE_TASK, false);
         m
     }
 }
@@ -134,7 +137,7 @@ pub async fn pre_eval_task(env: &LEnv, task: &[LValue]) -> Result<(), LRuntimeEr
         let lv = lambda.get_body();
         let mut p_env = PLEnv {
             env,
-            unpure_binding: Default::default(),
+            unpure_bindings: Default::default(),
             pc: pc,
         };
         let plv = p_eval(lv, &mut p_env).await?;
@@ -143,6 +146,58 @@ pub async fn pre_eval_task(env: &LEnv, task: &[LValue]) -> Result<(), LRuntimeEr
             LValue::from(task).format(0),
             lv.format(0),
             plv.format(0),
+        )
+    }
+    Ok(())
+}
+
+#[async_scheme_fn]
+pub async fn annotate_task(env: &LEnv, task: &[LValue]) -> Result<(), LRuntimeError> {
+    let ctx = env.get_context::<ModDomain>(MOD_DOMAIN)?;
+    let mut context: ConversionContext = ctx.get_conversion_context().await;
+    context
+        .env
+        .update_context(ModState::new_from_snapshot(context.state.clone()));
+
+    let t = context
+        .domain
+        .tasks
+        .get(task[0].to_string().as_str())
+        .unwrap();
+
+    let params = t.get_parameters().get_labels();
+    let mut pc = PConfig::default();
+    pc.avoid.insert(EXEC_TASK.to_string());
+    //pc.avoid.insert(CHECK.to_string());
+    assert_eq!(params.len(), task.len() - 1);
+    for (param, value) in params.iter().zip(task[1..].iter()) {
+        pc.p_table
+            .add_instantiated(param.to_string(), value.clone());
+    }
+
+    for m_label in t.get_methods() {
+        let mut pc = pc.clone();
+        let method = context.domain.methods.get(m_label).unwrap();
+        for param in &method.parameters.get_labels()[params.len()..] {
+            pc.p_table.add_param(param.to_string());
+        }
+        let body = method.get_body();
+        let mut env = context.env.clone();
+        env.log = LogClient::new(P_EVAL, LOG_TOPIC_INTERPRETER).await;
+        let lambda: LLambda = body.try_into()?;
+        let lv = lambda.get_body();
+        let mut p_env = PLEnv {
+            env,
+            unpure_bindings: Default::default(),
+            pc: pc,
+        };
+        let lv = p_eval(lv, &mut p_env).await?;
+        let lv = annotate(lv);
+        println!(
+            "annotate(p_eval({m_label}/task({}))):\n{}\n->\n{}",
+            LValue::from(task).format(0),
+            lv.format(0),
+            lv.format(0),
         )
     }
     Ok(())
@@ -162,7 +217,7 @@ pub async fn pre_eval_expr(env: &LEnv, lv: LValue) -> Result<(), LRuntimeError> 
     let mut env = context.env.clone();
     let mut p_env = PLEnv {
         env: context.env.clone(),
-        unpure_binding: Default::default(),
+        unpure_bindings: Default::default(),
         pc,
     };
     env.log = LogClient::new(P_EVAL, LOG_TOPIC_INTERPRETER).await;

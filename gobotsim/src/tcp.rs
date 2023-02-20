@@ -3,12 +3,12 @@ use crate::serde::{
 };
 use crate::PROCESS_TOPIC_GOBOT_SIM;
 use ompas_interface::platform_interface::command_request::Request;
-use ompas_interface::platform_interface::CommandCancelled;
 use ompas_interface::platform_interface::{
     Atom, CommandAccepted, CommandCancelRequest, CommandExecutionRequest, CommandProgress,
     CommandRejected, CommandRequest, CommandResponse, CommandResult, Instance, PlatformUpdate,
-    StateUpdate, StateVariable, StateVariableType,
+    Resource, StateUpdate, StateVariable, StateVariableType,
 };
+use ompas_interface::platform_interface::{CommandCancelled, ResourceKind};
 use ompas_language::interface::*;
 use ompas_middleware::ProcessInterface;
 use ompas_structs::state::partial_state::PartialState;
@@ -213,9 +213,10 @@ async fn async_read_socket(
 
                                                 let state_function = state_function.to_string();
                                                 if state_function.contains(".instance") {
+                                                    let obj_label = parameters[0].to_string();
                                                     let instance = Instance {
                                                         r#type: v.to_string(),
-                                                        object: parameters[0].to_string()
+                                                        object: obj_label.to_string()
                                                     };
                                                     if state_update_sender.send(instance.into()).is_err()
                                                     {
@@ -223,6 +224,19 @@ async fn async_read_socket(
                                                         //process.die().await;
                                                         break 'outer;
                                                     }
+                                                    let resource: Resource = Resource {
+                                                            label: obj_label.to_string(),
+                                                            resource_kind: ResourceKind::Unary.into(),
+                                                            quantity: 0
+                                                    };
+
+                                                    if state_update_sender.send(resource.into()).is_err()
+                                                    {
+                                                        process.kill(PROCESS_TOPIC_PLATFORM).await;
+                                                        //process.die().await;
+                                                        break 'outer;
+                                                    }
+
                                          };
 
                                                 state_variables.push(StateVariable {

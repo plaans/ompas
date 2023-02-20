@@ -611,6 +611,7 @@ pub async fn eval(
                                 LPrimitive::Define => {
                                     match &args[0] {
                                         LValue::Symbol(s) => {
+                                            scopes.new_scope();
                                             queue.push(StackFrame::new(
                                                 DefineFrame { symbol: s.clone() },
                                                 interruptibility,
@@ -986,6 +987,7 @@ pub async fn eval(
             }
             StackKind::CoreOperator(cos) => match cos {
                 CoreOperatorFrame::Define(d) => {
+                    scopes.revert_scope();
                     let env = scopes.get_last_mut();
                     let value = results.pop().unwrap();
                     env.insert(d.symbol.as_ref(), value);

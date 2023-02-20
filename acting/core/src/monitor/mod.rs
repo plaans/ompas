@@ -95,6 +95,7 @@ impl ModMonitor {
                             exec,
                             module.state.clone(),
                             module.supervisor.clone(),
+                            module.resources.clone(),
                             Arc::new(Default::default()),
                             module.log.clone(),
                             Arc::new(Default::default()),

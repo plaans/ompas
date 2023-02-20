@@ -4,16 +4,7 @@ use crate::conversion::flow::p_eval::r#struct::*;
 use crate::conversion::flow::pre_processing::transform_lambda_expression;
 use anyhow::anyhow;
 use async_recursion::async_recursion;
-use ompas_language::exec::acting_context::{
-    CTX_ACQUIRE, CTX_ARBITRARY, CTX_EXEC_COMMAND, CTX_EXEC_TASK,
-};
-use ompas_language::exec::aries::CTX_ARIES;
-use ompas_language::exec::platform::EXEC_COMMAND;
-use ompas_language::exec::refinement::EXEC_TASK;
-use ompas_language::exec::resource::ACQUIRE;
-use ompas_language::exec::ARBITRARY;
 use sompas_core::{expand_quasi_quote, parse_into_lvalue};
-use sompas_language::kind::LIST;
 use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::llambda::{LLambda, LambdaArgs};
 use sompas_structs::lprimitive::LPrimitive;
@@ -87,6 +78,7 @@ pub async fn p_eval(lv: &LValue, root_env: &mut PLEnv) -> LResult {
                                 LPrimitive::Define => {
                                     match &args[0] {
                                         LValue::Symbol(s) => {
+                                            scopes.new_scope();
                                             queue.push(PDefineFrame { symbol: s.clone() });
                                             queue.push(args[1].clone());
                                         }
@@ -214,6 +206,16 @@ pub async fn p_eval(lv: &LValue, root_env: &mut PLEnv) -> LResult {
                                     queue.push(PCoreOperatorFrame::Parse);
                                     queue.push(args[0].clone());
                                 }
+                                LPrimitive::Interruptible => {
+                                    queue.push(PCoreOperatorFrame::Interruptible);
+                                    queue.push(args[0].clone());
+                                }
+                                LPrimitive::Uninterruptible => {
+                                    queue.push(PCoreOperatorFrame::Uninterruptible);
+                                    queue.push(args[0].clone());
+                                }
+                                //LPrimitive::Race => {}
+                                //LPrimitive::Interrupt => {}
                                 co => panic!("p-eval of {} not supported yet", co),
                             }
                         } else {
@@ -229,12 +231,16 @@ pub async fn p_eval(lv: &LValue, root_env: &mut PLEnv) -> LResult {
                 }
             }
             PStackFrame::Procedure(ref pro) => {
-                let exps: Vec<PLValue> = results.pop_n(pro.n);
+                let mut exps: Vec<PLValue> = results.pop_n(pro.n);
                 let proc = &exps[0];
                 let proc_is_pure: bool = proc.is_pure();
                 let args = &exps[1..];
                 let mut all_pure = true;
-                args.iter().for_each(|plv| all_pure &= plv.is_pure());
+                let mut all_unpure = true;
+                args.iter().for_each(|plv| {
+                    all_pure &= plv.is_pure();
+                    all_unpure &= !plv.is_pure();
+                });
                 if proc_is_pure {
                     match &proc.lvalue {
                         LValue::Lambda(l) => {
@@ -260,15 +266,33 @@ pub async fn p_eval(lv: &LValue, root_env: &mut PLEnv) -> LResult {
                                 p_temp_env.env = temp_env;
                                 scopes.new_defined_scope(p_temp_env);
                             } else {
-                                queue.push(
-                                    transform_lambda_expression(
-                                        &exps.into(),
-                                        &mut p_env.env.clone(),
-                                        &p_env.pc.avoid,
-                                    )
-                                    .await?,
-                                );
-                                scopes.new_scope();
+                                if all_unpure {
+                                    results.push(PLValue::unpure(
+                                        exps.drain(..)
+                                            .map(|plv| plv.lvalue)
+                                            .collect::<Vec<LValue>>()
+                                            .into(),
+                                    ));
+                                } else {
+                                    let mut new_exps = vec![];
+                                    for (i, exp) in exps.drain(..).enumerate() {
+                                        if i != 0 {
+                                            new_exps.push(exp.lvalue_as_quote())
+                                        } else {
+                                            new_exps.push(exp.lvalue)
+                                        }
+                                    }
+                                    queue.push(PCoreOperatorFrame::Lambda);
+                                    queue.push(
+                                        transform_lambda_expression(
+                                            &new_exps.into(),
+                                            &mut p_env.env.clone(),
+                                            &p_env.pc.avoid,
+                                        )
+                                        .await?,
+                                    );
+                                    scopes.new_scope();
+                                }
                             }
                         }
                         LValue::Fn(fun) => {
@@ -363,14 +387,16 @@ pub async fn p_eval(lv: &LValue, root_env: &mut PLEnv) -> LResult {
             }
             PStackFrame::CoreOperator(cos) => match cos {
                 PCoreOperatorFrame::Define(d) => {
+                    scopes.revert_scope();
                     let p_env = scopes.get_last_mut();
                     let result = results.pop().unwrap();
                     let s = d.symbol.as_ref();
                     if result.is_pure() {
+                        p_env.remove_unpure(s);
                         p_env.env.insert(s, result.lvalue);
                         results.push(LValue::Nil.into());
                     } else {
-                        p_env.add_unpure_binding(s.to_string());
+                        p_env.add_unpure(s.to_string());
                         results.push(PLValue::unpure(list![
                             LPrimitive::Define.into(),
                             s.into(),
@@ -541,6 +567,22 @@ pub async fn p_eval(lv: &LValue, root_env: &mut PLEnv) -> LResult {
                     }
 
                     debug.pop();
+                }
+                PCoreOperatorFrame::Interruptible => {
+                    let last_result = results.pop().unwrap();
+                    results.push(PLValue::unpure(list![
+                        LPrimitive::Interruptible.into(),
+                        last_result.lvalue_as_quote()
+                    ]));
+                    debug.log_last_result(&results).await;
+                }
+                PCoreOperatorFrame::Uninterruptible => {
+                    let last_result = results.pop().unwrap();
+                    results.push(PLValue::unpure(list![
+                        LPrimitive::Uninterruptible.into(),
+                        last_result.lvalue_as_quote()
+                    ]));
+                    debug.log_last_result(&results).await;
                 }
                 PCoreOperatorFrame::EvalEnd | PCoreOperatorFrame::EnrEnd => {
                     debug.log_last_result(&results).await;

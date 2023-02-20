@@ -10,13 +10,14 @@ use crate::platform_interface::command_response::Response;
 use crate::platform_interface::platform_interface_client::PlatformInterfaceClient;
 use crate::platform_interface::{
     event, CommandCancelRequest, CommandExecutionRequest, CommandRequest, CommandResponse,
-    Expression, InitGetUpdate, PlatformUpdate, StateVariableType,
+    Expression, InitGetUpdate, PlatformUpdate, ResourceKind, StateVariableType,
 };
 use crate::{platform_interface, PlatformDescriptor, TOKIO_CHANNEL_SIZE};
 use async_trait::async_trait;
 use ompas_language::process::PROCESS_TOPIC_OMPAS;
 use ompas_middleware::logger::LogClient;
 use ompas_middleware::{Master, ProcessInterface};
+use ompas_structs::execution::resource::{Capacity, ResourceCollection};
 use ompas_structs::state::partial_state::PartialState;
 use ompas_structs::state::world_state::{StateType, WorldState};
 use ompas_structs::supervisor::action_status::ActionStatus;
@@ -34,6 +35,7 @@ use tokio::sync::{Mutex, RwLock};
 pub struct ExecPlatform {
     inner: Arc<RwLock<dyn PlatformDescriptor>>,
     state: WorldState,
+    resources: ResourceCollection,
     supervisor: Supervisor,
     command_stream: Arc<Mutex<Option<tokio::sync::mpsc::Sender<CommandRequest>>>>,
     log: LogClient,
@@ -45,6 +47,7 @@ impl ExecPlatform {
         inner: Arc<RwLock<dyn PlatformDescriptor>>,
         state: WorldState,
         supervisor: Supervisor,
+        resources: ResourceCollection,
         command_stream: Arc<Mutex<Option<tokio::sync::mpsc::Sender<CommandRequest>>>>,
         log: LogClient,
         config: Arc<RwLock<PlatformConfig>>,
@@ -55,6 +58,7 @@ impl ExecPlatform {
         Self {
             inner,
             state,
+            resources,
             supervisor,
             command_stream,
             log,
@@ -107,6 +111,7 @@ impl ExecPlatform {
     async fn get_updates(
         mut client: PlatformInterfaceClient<tonic::transport::Channel>,
         world_state: WorldState,
+        resources: ResourceCollection,
     ) {
         let mut process_interface: ProcessInterface = ProcessInterface::new(
             PROCESS_GET_UPDATES,
@@ -181,6 +186,21 @@ impl ExecPlatform {
                                     Update::Event(event) => {
                                         match event.event {
                                             None => {}
+                                            Some(event::Event::Resource(resource)) => {
+                                                let label = resource.label;
+                                                let capacity: Option<Capacity> = match ResourceKind::from_i32(resource.resource_kind) {
+                                                    Some(ResourceKind::Unary) => {
+                                                        None
+                                                    }
+                                                    Some(ResourceKind::Divisible) => {
+                                                        Some((resource.quantity as usize).into())
+                                                    }
+                                                    None => {
+                                                        panic!()
+                                                    }
+                                                };
+                                                resources.new_resource(label , capacity).await
+                                            }
                                             Some(event::Event::Instance(instance)) => {
                                                 world_state.add_instance(&instance.object, &instance.r#type).await;
                                             }
@@ -322,8 +342,9 @@ impl PlatformDescriptor for ExecPlatform {
 
         let client2 = client.clone();
         let state = self.state.clone();
+        let resources = self.resources.clone();
         tokio::spawn(async move {
-            ExecPlatform::get_updates(client, state).await;
+            ExecPlatform::get_updates(client, state, resources).await;
         });
 
         let supervisor = self.supervisor.clone();

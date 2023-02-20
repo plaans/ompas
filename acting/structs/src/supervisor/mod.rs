@@ -126,6 +126,66 @@ impl Supervisor {
             .new_method(parent, debug, value, trace, planned)
     }
 
+    pub async fn get_number_arbitrary(&self, method_id: ActingProcessId) -> usize {
+        self.inner
+            .read()
+            .await
+            .get(method_id)
+            .unwrap()
+            .inner
+            .as_method()
+            .unwrap()
+            .process_set
+            .keys()
+            .filter(|p| matches!(p, MethodLabel::Arbitrary(_)))
+            .count()
+    }
+
+    pub async fn get_number_subtask(&self, method_id: ActingProcessId) -> usize {
+        self.inner
+            .read()
+            .await
+            .get(method_id)
+            .unwrap()
+            .inner
+            .as_method()
+            .unwrap()
+            .process_set
+            .keys()
+            .filter(|p| matches!(p, MethodLabel::Subtask(_)))
+            .count()
+    }
+
+    pub async fn get_number_command(&self, method_id: ActingProcessId) -> usize {
+        self.inner
+            .read()
+            .await
+            .get(method_id)
+            .unwrap()
+            .inner
+            .as_method()
+            .unwrap()
+            .process_set
+            .keys()
+            .filter(|p| matches!(p, MethodLabel::Command(_)))
+            .count()
+    }
+
+    pub async fn get_number_acquire(&self, method_id: ActingProcessId) -> usize {
+        self.inner
+            .read()
+            .await
+            .get(method_id)
+            .unwrap()
+            .inner
+            .as_method()
+            .unwrap()
+            .process_set
+            .keys()
+            .filter(|p| matches!(p, MethodLabel::Acquire(_)))
+            .count()
+    }
+
     //Command methods
     pub async fn new_command(
         &self,
@@ -161,5 +221,29 @@ impl Supervisor {
             .as_mut_command()
             .unwrap()
             .set_end(self.get_instant())
+    }
+
+    // Arbitrary methods
+    pub async fn new_arbitrary(
+        &self,
+        label: MethodLabel,
+        parent: ActingProcessId,
+        value: LValue,
+        planned: bool,
+    ) -> ActingProcessId {
+        self.inner
+            .write()
+            .await
+            .new_arbitrary(label, parent, value, planned)
+    }
+
+    // Arbitrary methods
+    pub async fn new_acquire(
+        &self,
+        label: MethodLabel,
+        parent: ActingProcessId,
+        planned: bool,
+    ) -> ActingProcessId {
+        self.inner.write().await.new_acquire(label, parent, planned)
     }
 }

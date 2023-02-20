@@ -23,7 +23,7 @@ use ompas_structs::state::world_state::{WorldState, WorldStateSnapshot};
 use ompas_structs::supervisor::action_status::ActionStatus;
 use ompas_structs::supervisor::inner::ProcessKind;
 use ompas_structs::supervisor::interval::Interval;
-use ompas_structs::supervisor::process::process_ref::{MethodLabel, ProcessRef};
+use ompas_structs::supervisor::process::process_ref::{Label, MethodLabel, ProcessRef};
 use ompas_structs::supervisor::process::task::{RefinementTrace, TaskProcess};
 use ompas_structs::supervisor::{ActingProcessId, Supervisor};
 use rand::prelude::SliceRandom;
@@ -138,13 +138,16 @@ pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
                 panic!()
             }
         }
-        ProcessRef::Relative(id, _) => match supervisor.get_id(pr.clone()).await {
+        ProcessRef::Relative(id, labels) => match supervisor.get_id(pr.clone()).await {
             Some(id) => id,
-            None => {
-                supervisor
-                    .new_task(MethodLabel::Subtask(0), *id, task.clone(), false)
-                    .await
-            }
+            None => match labels[0] {
+                Label::MethodProcess(MethodLabel::Subtask(s)) => {
+                    supervisor
+                        .new_task(MethodLabel::Subtask(s), *id, task.clone(), false)
+                        .await
+                }
+                _ => panic!(),
+            },
         },
     };
 

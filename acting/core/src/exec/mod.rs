@@ -8,6 +8,7 @@ use crate::monitor::control::ModControl;
 use ::macro_rules_attribute::macro_rules_attribute;
 use futures::FutureExt;
 use ompas_interface::platform::Platform;
+use ompas_language::exec::acting_context::MOD_ACTING_CONTEXT;
 use ompas_language::exec::mode::DOC_CTX_MODE;
 use ompas_language::exec::{ARBITRARY, DOC_ARBITRARY, DOC_MOD_EXEC, MOD_EXEC};
 use ompas_language::process::LOG_TOPIC_OMPAS;
@@ -18,7 +19,10 @@ use ompas_structs::execution::resource::ResourceCollection;
 use ompas_structs::interface::rae_options::OMPASOptions;
 use ompas_structs::planning::domain::PlanningDomain;
 use ompas_structs::state::world_state::WorldState;
-use ompas_structs::supervisor::Supervisor;
+use ompas_structs::supervisor::inner::ProcessKind;
+use ompas_structs::supervisor::inner::ProcessKind::Arbitrary;
+use ompas_structs::supervisor::process::process_ref::{Label, MethodLabel, ProcessRef};
+use ompas_structs::supervisor::{ActingProcessId, Supervisor};
 use sompas_core::eval;
 use sompas_core::modules::list::car;
 use sompas_macros::{async_scheme_fn, scheme_fn};
@@ -166,7 +170,12 @@ fn get_instantiated_methods(env: &LEnv, args: &[LValue]) -> LResult {
 
 #[async_scheme_fn]
 pub async fn arbitrary(env: &LEnv, args: &[LValue]) -> LResult {
-    match args.len() {
+    let pr = &env
+        .get_context::<ModActingContext>(MOD_ACTING_CONTEXT)?
+        .process_ref;
+    let supervisor = &env.get_context::<ModExec>(MOD_EXEC)?.supervisor;
+
+    let greedy = match args.len() {
         1 => car(env, &[args[0].clone()]),
         2 => {
             eval(
@@ -181,5 +190,37 @@ pub async fn arbitrary(env: &LEnv, args: &[LValue]) -> LResult {
             .await
         }
         _ => Err(LRuntimeError::wrong_number_of_args(ARBITRARY, args, 1..2)),
-    }
+    }?;
+
+    let value = match pr {
+        ProcessRef::Id(id) => {
+            if supervisor.get_kind(*id).await.unwrap() == ProcessKind::Method {
+                supervisor
+                    .new_arbitrary(
+                        MethodLabel::Arbitrary(supervisor.get_number_arbitrary(*id).await),
+                        *id,
+                        greedy.clone(),
+                        false,
+                    )
+                    .await;
+                greedy
+            } else {
+                panic!()
+            }
+        }
+        ProcessRef::Relative(id, labels) => match supervisor.get_id(pr.clone()).await {
+            Some(id) => todo!(),
+            None => match labels[0] {
+                Label::MethodProcess(MethodLabel::Arbitrary(s)) => {
+                    supervisor
+                        .new_arbitrary(MethodLabel::Arbitrary(s), *id, greedy.clone(), false)
+                        .await;
+                    greedy
+                }
+                _ => panic!(),
+            },
+        },
+    };
+
+    Ok(value)
 }

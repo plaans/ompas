@@ -78,6 +78,37 @@ pub async fn new_resource(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeErr
 #[async_scheme_fn]
 pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LRuntimeError> {
     let ctx = env.get_context::<ModResource>(MOD_RESOURCE)?;
+    let pr = &env
+        .get_context::<ModActingContext>(MOD_ACTING_CONTEXT)?
+        .process_ref;
+    let supervisor = &env.get_context::<ModExec>(MOD_EXEC)?.supervisor;
+
+    let id: ActingProcessId = match pr {
+        ProcessRef::Id(id) => {
+            if supervisor.get_kind(*id).await.unwrap() == ProcessKind::Method {
+                supervisor
+                    .new_acquire(
+                        MethodLabel::Acquire(supervisor.get_number_acquire(*id).await),
+                        *id,
+                        false,
+                    )
+                    .await
+            } else {
+                panic!()
+            }
+        }
+        ProcessRef::Relative(id, labels) => match supervisor.get_id(pr.clone()).await {
+            Some(id) => todo!(),
+            None => match labels[0] {
+                Label::MethodProcess(MethodLabel::Acquire(s)) => {
+                    supervisor
+                        .new_acquire(MethodLabel::Acquire(s), *id, false)
+                        .await
+                }
+                _ => panic!(),
+            },
+        },
+    };
 
     let log = ctx.log.clone();
 

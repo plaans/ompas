@@ -1,9 +1,25 @@
 use crate::supervisor::ActingProcessId;
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub enum ProcessRef {
     Id(ActingProcessId),
     Relative(ActingProcessId, Vec<Label>),
+}
+
+impl Display for ProcessRef {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ProcessRef::Id(id) => write!(f, "{id}"),
+            ProcessRef::Relative(id, labels) => {
+                write!(f, "{id}")?;
+                for label in labels {
+                    write!(f, "/{label}")?;
+                }
+                Ok(())
+            }
+        }
+    }
 }
 
 impl ProcessRef {
@@ -39,6 +55,22 @@ pub enum Label {
     MethodProcess(MethodLabel),
 }
 
+impl Display for Label {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Label::Method(m) => {
+                write!(f, "m({m})")
+            }
+            Label::HighLevelTask(id) => {
+                write!(f, "s({id})")
+            }
+            Label::MethodProcess(m) => {
+                write!(f, "{m}")
+            }
+        }
+    }
+}
+
 impl Label {
     pub fn as_method_label(&self) -> Option<&MethodLabel> {
         if let Self::MethodProcess(mp) = self {
@@ -55,6 +87,25 @@ pub enum MethodLabel {
     Arbitrary(usize),
     Command(usize),
     Acquire(usize),
+}
+
+impl Display for MethodLabel {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MethodLabel::Subtask(s) => {
+                write!(f, "s({s})")
+            }
+            MethodLabel::Arbitrary(a) => {
+                write!(f, "arb({a})")
+            }
+            MethodLabel::Command(c) => {
+                write!(f, "c({c})")
+            }
+            MethodLabel::Acquire(a) => {
+                write!(f, "acq({a})")
+            }
+        }
+    }
 }
 
 impl From<MethodLabel> for Label {

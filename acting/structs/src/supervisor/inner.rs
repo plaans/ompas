@@ -180,14 +180,15 @@ impl InnerSupervisor {
             origin,
             MethodProcess::new(id, parent, debug, refinement.method_value.clone(), start),
         ));
-        self.inner[parent]
-            .inner
-            .as_mut_task()
-            .unwrap()
-            .add_refinement(Refinement {
-                method_id: id,
-                inner: refinement,
-            });
+
+        let task: &mut TaskProcess = self.inner[parent].inner.as_mut_task().unwrap();
+        task.add_refinement(Refinement {
+            method_id: id,
+            inner: refinement,
+        });
+        if !planned {
+            task.set_last_refinement_as_current()
+        }
         id
     }
 

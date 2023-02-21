@@ -76,6 +76,10 @@ impl TaskProcess {
         self.refinements.push(refinement)
     }
 
+    pub fn set_last_refinement_as_current(&mut self) {
+        self.current_refinement = Some(self.refinements.len() - 1);
+    }
+
     pub fn update_last_refinement(&mut self, refinement: Refinement) {
         *self.refinements.last_mut().unwrap() = refinement;
     }

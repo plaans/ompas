@@ -58,12 +58,13 @@
           (:pre-conditions true)
           (:score 0)
           (:body
-             (loop
                  (do
                      (wait-for `(< (robot.battery ,?r) 0.4))
                      (define h (acquire ?r '(:priority 1000)))
                      (go_charge ?r)
-                     (wait-for `(> (robot.battery ,?r) 0.9))))))
+                     (wait-for `(> (robot.battery ,?r) 0.9))
+                     (release h)
+                     (t_check_battery ?r))))
                             
     (def-task t_check_rob_bat)
     (def-method m_check_initial_robots_batteries

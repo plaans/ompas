@@ -91,35 +91,53 @@ pub struct Acquire {
 
 pub const PLANNER_PRIORITY: usize = 10;
 
-#[derive(Copy, Clone, PartialEq, Eq, Ord)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum WaiterPriority {
     Planner(usize),
     Execution(usize),
 }
 
-#[derive(PartialEq, Eq, Copy, Clone, Ord)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub struct WaiterTicket {
     id: AcquisitionId,
     priority: WaiterPriority,
 }
 
+impl WaiterTicket {
+    pub fn new(id: AcquisitionId, priority: WaiterPriority) -> Self {
+        Self { id, priority }
+    }
+}
+
+impl Ord for WaiterTicket {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match self.priority.cmp(&other.priority) {
+            Ordering::Equal => other.id.cmp(&self.id),
+            other => other,
+        }
+    }
+}
+
 impl PartialOrd for WaiterTicket {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match self.priority.partial_cmp(&other.priority) {
-            Some(Ordering::Equal) => self.id.partial_cmp(&other.id),
-            other => other,
+        Some(self.cmp(&other))
+    }
+}
+
+impl Ord for WaiterPriority {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (self, other) {
+            (Planner(o1), Planner(o2)) => o2.cmp(o1),
+            (Planner(o), Execution(e)) => PLANNER_PRIORITY.cmp(e),
+            (Execution(e), Planner(o)) => e.cmp(&PLANNER_PRIORITY),
+            (Execution(e1), Execution(e2)) => e1.cmp(e2),
         }
     }
 }
 
 impl PartialOrd for WaiterPriority {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match (self, other) {
-            (Planner(o1), Planner(o2)) => o2.partial_cmp(o1),
-            (Planner(o), Execution(e)) => PLANNER_PRIORITY.partial_cmp(e),
-            (Execution(e), Planner(o)) => e.partial_cmp(&PLANNER_PRIORITY),
-            (Execution(e1), Execution(e2)) => e1.partial_cmp(e2),
-        }
+        Some(self.cmp(&other))
     }
 }
 

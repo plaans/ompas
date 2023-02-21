@@ -227,6 +227,7 @@ impl InnerSupervisor {
     pub fn new_acquire(
         &mut self,
         label: MethodLabel,
+        resource_label: String,
         parent: ActingProcessId,
         planned: bool,
     ) -> ActingProcessId {
@@ -238,7 +239,7 @@ impl InnerSupervisor {
         let id = self.inner.len();
         self.inner.push(ActingProcess::new(
             origin,
-            AcquireProcess::new(id, parent, request_date),
+            AcquireProcess::new(id, parent, resource_label, request_date),
         ));
         self.inner[parent]
             .inner

@@ -1,3 +1,4 @@
+use crate::execution::resource::WaiterPriority::{Execution, Planner};
 use crate::state::partial_state::PartialState;
 use crate::state::world_state::{StateType, WorldStateSnapshot};
 use ompas_language::exec::resource::{MAX_Q, QUANTITY};
@@ -9,6 +10,7 @@ use sompas_structs::lvalues::LValueS;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
+use std::mem;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
@@ -68,24 +70,126 @@ impl ResourceHandler {
     }
 }
 
+pub type AcquisitionId = usize;
+
 pub struct Resource {
     label: String,
     id: ResourceId,
     max_capacity: Capacity,
     capacity: Capacity,
-    acquirers: HashMap<usize, Capacity>,
-    acquire_id: usize,
-    waiters: HashMap<usize, Waiter>,
-    waiter_id: usize,
+    acquirers: HashMap<AcquisitionId, Acquire>,
+    waiter_queue: Vec<WaiterTicket>,
+    waiters: HashMap<AcquisitionId, Waiter>,
+    n_acquisition: usize,
+}
+
+pub struct Acquire {
+    pub kind: AcquireKind,
+    id: AcquisitionId,
+    pub capacity: Capacity,
+}
+
+pub const PLANNER_PRIORITY: usize = 10;
+
+#[derive(Copy, Clone, PartialEq, Eq, Ord)]
+pub enum WaiterPriority {
+    Planner(usize),
+    Execution(usize),
+}
+
+#[derive(PartialEq, Eq, Copy, Clone, Ord)]
+pub struct WaiterTicket {
+    id: AcquisitionId,
+    priority: WaiterPriority,
+}
+
+impl PartialOrd for WaiterTicket {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match self.priority.partial_cmp(&other.priority) {
+            Some(Ordering::Equal) => self.id.partial_cmp(&other.id),
+            other => other,
+        }
+    }
+}
+
+impl PartialOrd for WaiterPriority {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match (self, other) {
+            (Planner(o1), Planner(o2)) => o2.partial_cmp(o1),
+            (Planner(o), Execution(e)) => PLANNER_PRIORITY.partial_cmp(e),
+            (Execution(e), Planner(o)) => e.partial_cmp(&PLANNER_PRIORITY),
+            (Execution(e1), Execution(e2)) => e1.partial_cmp(e2),
+        }
+    }
+}
+
+impl Display for WaiterPriority {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            WaiterPriority::Planner(id) => {
+                write!(f, "planner({id})")
+            }
+            WaiterPriority::Execution(p) => {
+                write!(f, "execution({p})")
+            }
+        }
+    }
 }
 
 impl Resource {
+    pub fn _acquire(
+        &mut self,
+        capacity: Capacity,
+        priority: WaiterPriority,
+        kind: AcquireKind,
+    ) -> Result<AcquireResponse, LRuntimeError> {
+        let acquisition_id = self.n_acquisition;
+        self.n_acquisition += 1;
+
+        let response = match (self.capacity, capacity) {
+            (Capacity::Unary, Capacity::All) => {
+                AcquireResponse::Ok(self.add_acquire(acquisition_id, kind, capacity))
+            }
+
+            (Capacity::None, Capacity::All) => {
+                AcquireResponse::Wait(self.add_waiter(acquisition_id, kind, capacity, priority)?)
+            }
+
+            (Capacity::Some(u1), Capacity::Some(u2)) => {
+                if u1 >= u2 {
+                    AcquireResponse::Ok(self.add_acquire(acquisition_id, kind, capacity))
+                } else {
+                    AcquireResponse::Wait(self.add_waiter(
+                        acquisition_id,
+                        kind,
+                        capacity,
+                        priority,
+                    )?)
+                }
+            }
+            (Capacity::Some(_), Capacity::All) => {
+                if self.capacity == self.max_capacity {
+                    AcquireResponse::Ok(self.add_acquire(acquisition_id, kind, capacity))
+                } else {
+                    AcquireResponse::Wait(self.add_waiter(
+                        acquisition_id,
+                        kind,
+                        capacity,
+                        priority,
+                    )?)
+                }
+            }
+            _ => Err(LRuntimeError::new("acquire", "acquisition illegal"))?,
+        };
+        Ok(response)
+    }
+
     pub fn update_remaining_capacity(&mut self) -> Result<(), LRuntimeError> {
         let mut capacity = self.max_capacity;
         //let old_capacity = self.capacity;
 
         for c in self.acquirers.values() {
-            match c {
+            match c.capacity {
                 Capacity::Unary => panic!("An acquire cannot have acquired Unary"),
                 Capacity::All => {
                     assert_eq!(self.acquirers.len(), 1);
@@ -108,44 +212,50 @@ impl Resource {
         Ok(())
     }
 
+    pub fn update_waiter_queue(&mut self) {
+        self.waiter_queue.sort_by(|k1, k2| k1.cmp(k2))
+    }
+
     pub async fn update_waiters(&mut self) {
-        let waiters: Vec<_> = self.waiters.iter_mut().map(|(k, v)| (k, v)).collect();
-        let mut waiters: Vec<_> = waiters
-            .iter()
-            .filter(|(_, w)| match (self.capacity, w.capacity) {
+        let mut queue = mem::take(&mut self.waiter_queue);
+
+        while let Some(ticket) = queue.pop() {
+            let waiter = self.waiters.get(&ticket.id).unwrap();
+
+            let can_acquire = match (self.capacity, waiter.capacity) {
                 (Capacity::Unary, Capacity::All) => true,
                 (Capacity::Some(u1), Capacity::Some(u2)) => u1 >= u2,
                 _ => false,
-            })
-            .collect();
+            };
 
-        if !waiters.is_empty() {
-            waiters.sort_by(|(k1, w1), (k2, w2)| match w2.priority.cmp(&w1.priority) {
-                Ordering::Equal => k1.cmp(k2),
-                o => o,
-            });
-            //waiters.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
-            let keys: Vec<usize> = waiters.iter().map(|(k, _)| **k).collect();
-            drop(waiters);
-            for key in &keys {
-                let waiter = self.waiters.remove(key).unwrap();
-                let acquire: ResourceHandler = self.add_acquire(waiter.capacity);
-                let acquire_id = acquire.acquire_id;
+            if can_acquire {
+                let waiter = self.waiters.remove(&ticket.id).unwrap();
+                let acquire: ResourceHandler =
+                    self.add_acquire(ticket.id, waiter.kind, waiter.capacity);
+                let acquire_id = ticket.id;
                 match waiter.tx.send(acquire).await {
                     Ok(()) => break,
                     Err(_) => {
                         self.remove_acquire(acquire_id);
                         self.update_remaining_capacity().expect("");
+                        continue;
                     }
                 }
+            } else {
+                queue.push(ticket);
+                break;
             }
         }
+        self.waiter_queue = queue
     }
 
-    pub fn add_acquire(&mut self, capacity: Capacity) -> ResourceHandler {
-        let id = self.acquire_id;
-        self.acquire_id += 1;
-        self.acquirers.insert(id, capacity);
+    pub fn add_acquire(
+        &mut self,
+        id: AcquisitionId,
+        kind: AcquireKind,
+        capacity: Capacity,
+    ) -> ResourceHandler {
+        self.acquirers.insert(id, Acquire { kind, id, capacity });
         self.update_remaining_capacity().unwrap();
         ResourceHandler {
             label: self.label.clone(),
@@ -154,27 +264,36 @@ impl Resource {
         }
     }
 
+    pub fn remove_ticket(&mut self, id: AcquisitionId) {
+        self.waiter_queue.retain(|t| t.id != id)
+    }
+
     pub fn remove_acquire(&mut self, acquire_id: usize) {
         self.acquirers.remove(&acquire_id);
     }
 
     pub fn add_waiter(
         &mut self,
+        id: AcquisitionId,
+        kind: AcquireKind,
         capacity: Capacity,
-        priority: usize,
+        priority: WaiterPriority,
     ) -> Result<WaitAcquire, LRuntimeError> {
-        let id = self.waiter_id;
-        self.waiter_id += 1;
         let (tx, rx) = channel(1);
 
         self.waiters.insert(
             id,
             Waiter {
+                kind,
                 capacity,
                 priority,
                 tx,
             },
         );
+
+        self.waiter_queue.push(WaiterTicket { id, priority });
+
+        self.update_waiter_queue();
 
         Ok(WaitAcquire {
             rx,
@@ -191,12 +310,19 @@ impl Resource {
             }
             Some(_) => {}
         }
+        self.remove_ticket(wa.waiter_id);
     }
 }
 
+pub enum AcquireKind {
+    Direct,
+    Reservation,
+}
+
 pub struct Waiter {
+    kind: AcquireKind,
     capacity: Capacity,
-    priority: usize,
+    priority: WaiterPriority,
     tx: Sender<ResourceHandler>,
 }
 
@@ -246,9 +372,9 @@ impl ResourceCollection {
             max_capacity: capacity,
             capacity,
             acquirers: Default::default(),
-            acquire_id: 0,
             waiters: Default::default(),
-            waiter_id: 0,
+            n_acquisition: 0,
+            waiter_queue: Default::default(),
         };
         map.insert(id, resource);
     }
@@ -257,7 +383,8 @@ impl ResourceCollection {
         &self,
         label: String,
         capacity: Capacity,
-        priority: usize,
+        priority: WaiterPriority,
+        kind: AcquireKind,
     ) -> Result<AcquireResponse, LRuntimeError> {
         let labels = self.labels.lock().await;
         let id = *labels.get(&label).ok_or_else(|| {
@@ -266,30 +393,7 @@ impl ResourceCollection {
         drop(labels);
         let mut map = self.inner.lock().await;
         let resource: &mut Resource = map.get_mut(&id).unwrap();
-        let response: AcquireResponse = match (resource.capacity, capacity) {
-            (Capacity::Unary, Capacity::All) => AcquireResponse::Ok(resource.add_acquire(capacity)),
-
-            (Capacity::None, Capacity::All) => {
-                AcquireResponse::Wait(resource.add_waiter(capacity, priority)?)
-            }
-
-            (Capacity::Some(u1), Capacity::Some(u2)) => {
-                if u1 >= u2 {
-                    AcquireResponse::Ok(resource.add_acquire(capacity))
-                } else {
-                    AcquireResponse::Wait(resource.add_waiter(capacity, priority)?)
-                }
-            }
-            (Capacity::Some(_), Capacity::All) => {
-                if resource.capacity == resource.max_capacity {
-                    AcquireResponse::Ok(resource.add_acquire(capacity))
-                } else {
-                    AcquireResponse::Wait(resource.add_waiter(capacity, priority)?)
-                }
-            }
-            _ => Err(LRuntimeError::new("acquire", "acquisition illegal"))?,
-        };
-        Ok(response)
+        resource._acquire(capacity, priority, kind)
     }
 
     pub async fn is_locked(&self, label: String) -> Result<bool, LRuntimeError> {

@@ -1,3 +1,4 @@
+use crate::execution::resource::AcquireResponse;
 use crate::supervisor::interval::{Interval, Timepoint};
 use crate::supervisor::process::ActingProcessInner;
 use crate::supervisor::ActingProcessId;
@@ -6,22 +7,27 @@ use std::fmt::{Display, Formatter};
 #[derive()]
 pub struct AcquireProcess {
     id: ActingProcessId,
+    label: String,
     _parent: ActingProcessId,
     request_date: Option<Timepoint>,
     acquisition: Option<Interval>,
+    reservation: Option<AcquireResponse>,
 }
 
 impl AcquireProcess {
     pub fn new(
         id: ActingProcessId,
         _parent: ActingProcessId,
+        label: String,
         request_date: Option<Timepoint>,
     ) -> Self {
         Self {
             id,
+            label,
             _parent,
             request_date,
             acquisition: None,
+            reservation: None,
         }
     }
 
@@ -57,6 +63,10 @@ impl Display for AcquireProcess {
             None => "[..,..]".to_string(),
             Some(interval) => interval.to_string(),
         };
-        write!(f, "({}){} => {}", self.id, request, acquisition)
+        write!(
+            f,
+            "({})acq({}): {} => {}",
+            self.label, self.id, request, acquisition
+        )
     }
 }

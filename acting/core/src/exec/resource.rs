@@ -3,7 +3,7 @@ use ompas_language::exec::mode::*;
 use ompas_language::exec::resource::*;
 use ompas_middleware::logger::LogClient;
 use ompas_structs::execution::resource::{
-    AcquireResponse, Capacity, ResourceCollection, ResourceHandler,
+    AcquireKind, AcquireResponse, Capacity, ResourceCollection, ResourceHandler, WaiterPriority,
 };
 use ompas_structs::mutex::Wait;
 use ompas_utils::dyn_async;
@@ -82,12 +82,16 @@ pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LR
         .get_context::<ModActingContext>(MOD_ACTING_CONTEXT)?
         .process_ref;
     let supervisor = env.get_context::<ModExec>(MOD_EXEC)?.supervisor.clone();
-
+    let label: String = args
+        .get(0)
+        .ok_or_else(|| LRuntimeError::wrong_number_of_args(ACQUIRE, args, 1..2))?
+        .try_into()?;
     let id: ActingProcessId = match pr {
         ProcessRef::Id(id) => {
             if supervisor.get_kind(*id).await.unwrap() == ProcessKind::Method {
                 supervisor
                     .new_acquire(
+                        label.clone(),
                         MethodLabel::Acquire(supervisor.get_number_acquire(*id).await),
                         *id,
                         false,
@@ -102,7 +106,7 @@ pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LR
             None => match labels[0] {
                 Label::MethodProcess(MethodLabel::Acquire(s)) => {
                     supervisor
-                        .new_acquire(MethodLabel::Acquire(s), *id, false)
+                        .new_acquire(label.to_string(), MethodLabel::Acquire(s), *id, false)
                         .await
                 }
                 _ => panic!(),
@@ -115,11 +119,6 @@ pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LR
     let resources = ctx.resources.clone();
 
     let (tx, mut rx) = new_interruption_handler();
-
-    let label: String = args
-        .get(0)
-        .ok_or_else(|| LRuntimeError::wrong_number_of_args(ACQUIRE, args, 1..2))?
-        .try_into()?;
 
     let mut priority: usize = 0;
     let mut capacity = Capacity::All;
@@ -159,7 +158,14 @@ pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LR
         .await;
 
         supervisor.set_acquire_request_timepoint(&id).await;
-        let rh: ResourceHandler = match resources.acquire(label.clone(), capacity, priority).await?
+        let rh: ResourceHandler = match resources
+            .acquire(
+                label.clone(),
+                capacity,
+                WaiterPriority::Execution(priority),
+                AcquireKind::Direct,
+            )
+            .await?
         {
             AcquireResponse::Ok(rh) => rh,
             AcquireResponse::Wait(mut wait) => {

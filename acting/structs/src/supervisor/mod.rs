@@ -383,11 +383,15 @@ impl Supervisor {
     // Acquire methods
     pub async fn new_acquire(
         &self,
+        resource_label: String,
         label: MethodLabel,
         parent: ActingProcessId,
         planned: bool,
     ) -> ActingProcessId {
-        self.inner.write().await.new_acquire(label, parent, planned)
+        self.inner
+            .write()
+            .await
+            .new_acquire(label, resource_label, parent, planned)
     }
 
     pub async fn set_acquire_request_timepoint(&self, acquire_id: &ActingProcessId) {

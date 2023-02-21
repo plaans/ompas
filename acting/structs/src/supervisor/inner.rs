@@ -2,18 +2,19 @@ use crate::conversion::flow_graph::graph::Dot;
 use crate::supervisor::action_status::ActionStatus;
 use crate::supervisor::interval::Timepoint;
 use crate::supervisor::process::acquire::AcquireProcess;
-use crate::supervisor::process::arbitrary::ArbitraryProcess;
+use crate::supervisor::process::arbitrary::{ArbitraryChoice, ArbitraryProcess, ArbitraryTrace};
 use crate::supervisor::process::command::CommandProcess;
 use crate::supervisor::process::method::MethodProcess;
 use crate::supervisor::process::process_ref::{Label, MethodLabel, ProcessRef};
 use crate::supervisor::process::root_task::RootProcess;
-use crate::supervisor::process::task::{Refinement, RefinementTrace, TaskProcess};
-use crate::supervisor::process::{ActingProcess, ActingProcessInner, ProcessOrigin};
+use crate::supervisor::process::task::{Refinement, RefinementInner, TaskProcess};
+use crate::supervisor::process::{ActingProcess, ActingProcessInner, ProcessStatus};
 use crate::supervisor::ActingProcessId;
 use chrono::{DateTime, Utc};
+use ompas_language::supervisor::*;
 use sompas_structs::lvalue::LValue;
 use std::env::set_current_dir;
-use std::fmt::Write;
+use std::fmt::{Display, Formatter, Write};
 use std::fs;
 use std::fs::File;
 use std::io::Write as ioWrite;
@@ -35,6 +36,23 @@ pub enum ProcessKind {
     RootTask,
 }
 
+impl Display for ProcessKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                ProcessKind::Task => TASK,
+                ProcessKind::Command => COMMAND,
+                ProcessKind::Method => METHOD,
+                ProcessKind::Acquire => ACQUIRE,
+                ProcessKind::Arbitrary => ARBITRARY,
+                ProcessKind::RootTask => ROOT_TASK,
+            }
+        )
+    }
+}
+
 pub struct InnerSupervisor {
     inner: Vec<ActingProcess>,
     time_reference: Instant,
@@ -48,8 +66,8 @@ impl InnerSupervisor {
         }
     }
 
-    pub fn get_instant(&self) -> Timepoint {
-        self.time_reference.elapsed().as_micros()
+    pub fn get_timepoint(&self) -> Timepoint {
+        self.time_reference.elapsed().as_millis().into()
     }
 
     pub fn get_id(&self, pr: impl Into<ProcessRef>) -> Option<ActingProcessId> {
@@ -77,7 +95,7 @@ impl InnerSupervisor {
                         Label::Method(m) => {
                             if let ActingProcessInner::Task(t) = &obj.inner {
                                 id = if let Some(r) = t.refinements.get(m) {
-                                    r.method
+                                    r.method_id
                                 } else {
                                     return None;
                                 }
@@ -108,8 +126,8 @@ impl InnerSupervisor {
     pub fn new_high_level_task(&mut self, value: LValue) -> ProcessRef {
         let id = self.inner.len();
         self.inner.push(ActingProcess::new(
-            ProcessOrigin::Execution,
-            TaskProcess::new(id, 0, value, Some(self.get_instant())),
+            ProcessStatus::Executed,
+            TaskProcess::new(id, 0, value, Some(self.get_timepoint())),
         ));
 
         let root: &mut RootProcess = self.inner[0].inner.as_mut_root().unwrap();
@@ -119,6 +137,7 @@ impl InnerSupervisor {
         ProcessRef::Relative(0, vec![Label::HighLevelTask(rank)])
     }
 
+    //Task methods
     pub fn new_task(
         &mut self,
         label: MethodLabel,
@@ -127,8 +146,8 @@ impl InnerSupervisor {
         planned: bool,
     ) -> ActingProcessId {
         let (origin, start) = match planned {
-            true => (ProcessOrigin::Planning, None),
-            false => (ProcessOrigin::Execution, Some(self.get_instant())),
+            true => (ProcessStatus::Planned, None),
+            false => (ProcessStatus::Executed, Some(self.get_timepoint())),
         };
 
         let id = self.inner.len();
@@ -148,25 +167,27 @@ impl InnerSupervisor {
         &mut self,
         parent: ActingProcessId,
         debug: String,
-        value: LValue,
-        trace: RefinementTrace,
+        refinement: RefinementInner,
         planned: bool,
     ) -> ActingProcessId {
         let (origin, start) = match planned {
-            true => (ProcessOrigin::Planning, None),
-            false => (ProcessOrigin::Execution, Some(self.get_instant())),
+            true => (ProcessStatus::Planned, None),
+            false => (ProcessStatus::Executed, Some(self.get_timepoint())),
         };
 
         let id = self.inner.len();
         self.inner.push(ActingProcess::new(
             origin,
-            MethodProcess::new(id, parent, debug, value, start),
+            MethodProcess::new(id, parent, debug, refinement.method_value.clone(), start),
         ));
         self.inner[parent]
             .inner
             .as_mut_task()
             .unwrap()
-            .add_refinement(Refinement { method: id, trace });
+            .add_refinement(Refinement {
+                method_id: id,
+                inner: refinement,
+            });
         id
     }
 
@@ -174,23 +195,26 @@ impl InnerSupervisor {
         &mut self,
         label: MethodLabel,
         parent: ActingProcessId,
-        value: LValue,
-        planned: bool,
+        possibilities: Vec<LValue>,
+        choice: ArbitraryChoice,
     ) -> ActingProcessId {
-        let (origin, timepoint, suggested, chosen) = match planned {
-            true => (ProcessOrigin::Planning, None, Some(value), None),
-            false => (
-                ProcessOrigin::Execution,
-                Some(self.get_instant()),
-                None,
-                Some(value),
-            ),
+        let origin = match choice.is_planned() {
+            true => ProcessStatus::Planned,
+            false => ProcessStatus::Executed,
         };
 
         let id = self.inner.len();
         self.inner.push(ActingProcess::new(
             origin,
-            ArbitraryProcess::new(id, parent, suggested, chosen, timepoint),
+            ArbitraryProcess::new(
+                id,
+                parent,
+                ArbitraryTrace {
+                    possibilities,
+                    choice,
+                    instant: self.get_timepoint(),
+                },
+            ),
         ));
         self.inner[parent]
             .inner
@@ -207,8 +231,8 @@ impl InnerSupervisor {
         planned: bool,
     ) -> ActingProcessId {
         let (origin, request_date) = match planned {
-            true => (ProcessOrigin::Planning, None),
-            false => (ProcessOrigin::Execution, Some(self.get_instant())),
+            true => (ProcessStatus::Planned, None),
+            false => (ProcessStatus::Executed, Some(self.get_timepoint())),
         };
 
         let id = self.inner.len();
@@ -232,8 +256,8 @@ impl InnerSupervisor {
         planned: bool,
     ) -> (ActingProcessId, Option<Receiver<ActionStatus>>) {
         let (origin, start) = match planned {
-            true => (ProcessOrigin::Planning, None),
-            false => (ProcessOrigin::Execution, Some(self.get_instant())),
+            true => (ProcessStatus::Planned, None),
+            false => (ProcessStatus::Executed, Some(self.get_timepoint())),
         };
 
         let id = self.inner.len();
@@ -271,26 +295,12 @@ impl InnerSupervisor {
     }
 
     pub fn get_tried_method(&self, id: ActingProcessId) -> Vec<LValue> {
-        let mut methods = self
-            .get(id)
+        self.get(id)
             .unwrap()
             .inner
             .as_task()
             .unwrap()
-            .get_tried_method();
-
-        methods
-            .drain(..)
-            .map(|m| {
-                self.get(m)
-                    .unwrap()
-                    .inner
-                    .as_method()
-                    .unwrap()
-                    .value
-                    .clone()
-            })
-            .collect()
+            .get_tried_methods()
     }
 
     pub fn export_trace_dot_graph(&self) -> Dot {
@@ -300,9 +310,9 @@ impl InnerSupervisor {
         while let Some(id) = queue.pop() {
             let ap = &self.inner[id];
             let label = ap.inner.to_string();
-            let color = match ap.origin {
-                ProcessOrigin::Execution => COLOR_EXECUTION,
-                ProcessOrigin::Planning => COLOR_PLANNING,
+            let color = match ap.status {
+                ProcessStatus::Planned => COLOR_EXECUTION,
+                ProcessStatus::Executed => COLOR_PLANNING,
             };
 
             writeln!(dot, "P{id} [label = \"{label}\", color = {color}];").unwrap();
@@ -315,7 +325,7 @@ impl InnerSupervisor {
                 }
                 ActingProcessInner::Command(_) => {}
                 ActingProcessInner::Task(t) => {
-                    for r in t.refinements.iter().map(|p| p.method) {
+                    for r in t.refinements.iter().map(|p| p.method_id) {
                         writeln!(dot, "P{id} -> P{};", r).unwrap();
                         queue.push(r)
                     }

@@ -28,7 +28,7 @@ impl CommandProcess {
             _parent,
             value,
             status: ActionStatus::Pending,
-            interval: start.map(|s| Interval::new(s, None)),
+            interval: start.map(|s| Interval::new(s, None::<Timepoint>)),
             sender_to_watcher: None,
         }
     }
@@ -38,7 +38,7 @@ impl CommandProcess {
     }
 
     pub fn set_start(&mut self, start: Timepoint) {
-        self.interval = Some(Interval::new(start, None))
+        self.interval = Some(Interval::new(start, None::<Timepoint>))
     }
 
     pub fn set_end(&mut self, end: Timepoint) {

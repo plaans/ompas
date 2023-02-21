@@ -3,15 +3,14 @@ use crate::exec::state::ModState;
 use crate::exec::ModExec;
 use ompas_language::exec::c_choice::*;
 use ompas_language::exec::state::MOD_STATE;
+use ompas_language::exec::MOD_EXEC;
 use ompas_structs::acting_domain::OMPASDomain;
 use ompas_structs::interface::select_mode::{CChoiceConfig, Planner, SelectMode};
 use ompas_structs::state::world_state::WorldStateSnapshot;
-use ompas_structs::supervisor::process::task::RefinementTrace;
+use ompas_structs::supervisor::process::task::{RTSelect, RefinementInner, SelectTrace};
 use rand::prelude::SliceRandom;
 use sompas_core::{eval, parse};
-use sompas_language::time::MOD_TIME;
 use sompas_macros::async_scheme_fn;
-use sompas_modules::time::ModTime;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::lenv::ImportType::WithoutPrefix;
 use sompas_structs::lenv::LEnv;
@@ -199,9 +198,9 @@ pub async fn c_choice(env: &LEnv, task: &[LValue]) -> LResult {
     let ctx = env.get_context::<ModCChoice>(MOD_C_CHOICE)?;
     let level = ctx.level.load(Ordering::Relaxed);
 
-    let mut methods: Vec<LValue> = greedy_select(state.clone(), &ctx.tried, task.to_vec(), env)
+    let mut methods: Vec<LValue> = greedy_select(&state, &ctx.tried, task.to_vec(), env)
         .await?
-        .applicable_methods;
+        .possibilities;
     if let Some(b) = ctx.config.get_b() {
         if b < methods.len() {
             async {
@@ -307,28 +306,33 @@ pub async fn c_choice_env(mut env: LEnv, domain: &OMPASDomain) -> LEnv {
 }
 
 pub async fn c_choice_select(
-    state: WorldStateSnapshot,
-    tried: &Vec<LValue>,
-    task: Vec<LValue>,
+    state: &WorldStateSnapshot,
+    mut greedy: RefinementInner,
     env: &LEnv,
     config: CChoiceConfig,
-) -> lruntimeerror::Result<RefinementTrace> {
+) -> lruntimeerror::Result<RefinementInner> {
     let new_env = env.clone();
     let ctx = env.get_context::<ModCChoice>(MOD_C_CHOICE).unwrap();
 
     let mut new_env: LEnv = c_choice_env(new_env, &ctx.domain.read().await.clone()).await;
-    new_env.import_module(ModCChoice::new_from_tried(tried.to_vec(), 0), WithoutPrefix);
+    new_env.import_module(
+        ModCChoice::new_from_tried(greedy.tried.to_vec(), 0),
+        WithoutPrefix,
+    );
     new_env.update_context(ModState::new_from_snapshot(state.clone()));
 
-    let mut greedy: RefinementTrace = greedy_select(state, tried, task.clone(), env).await?;
-    greedy.refinement_type = SelectMode::Planning(Planner::CChoice(config));
+    greedy.select = SelectTrace::RealTime(RTSelect {
+        refinement_type: SelectMode::Planning(Planner::CChoice(config)),
+    });
+    let method: LValue = eval(&greedy.task_value, &mut new_env, None).await?;
 
-    let method: LValue = eval(&task.into(), &mut new_env, None).await?;
-
-    greedy.choosed = method;
-    greedy
-        .interval
-        .set_end(env.get_context::<ModTime>(MOD_TIME)?.get_instant().await);
+    greedy.method_value = method;
+    greedy.interval.set_end(
+        env.get_context::<ModExec>(MOD_EXEC)
+            .unwrap()
+            .supervisor
+            .get_timepoint(),
+    );
 
     Ok(greedy)
 }

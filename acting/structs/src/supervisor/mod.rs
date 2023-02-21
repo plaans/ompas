@@ -2,15 +2,18 @@ use crate::supervisor::action_status::ActionStatus;
 use crate::supervisor::filter::ProcessFilter;
 use crate::supervisor::inner::ProcessKind;
 use crate::supervisor::interval::Timepoint;
+use crate::supervisor::process::arbitrary::ArbitraryChoice::Planning;
+use crate::supervisor::process::arbitrary::{ArbitraryChoice, ArbitraryProcess, ArbitraryTrace};
+use crate::supervisor::process::command::CommandProcess;
 use crate::supervisor::process::process_ref::{MethodLabel, ProcessRef};
-use crate::supervisor::process::task::RefinementTrace;
-use crate::supervisor::process::ProcessOrigin;
+use crate::supervisor::process::task::{Refinement, RefinementInner};
+use crate::supervisor::process::{ActingProcess, ProcessStatus};
 use inner::InnerSupervisor;
 use sompas_structs::lvalue::LValue;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::watch::Receiver;
-use tokio::sync::RwLock;
+use tokio::sync::{watch, RwLock};
 use tokio::time::Instant;
 
 pub mod filter;
@@ -72,8 +75,8 @@ impl Supervisor {
         self.inner.read().await.get_id(pr)
     }
 
-    pub async fn get_origin(&self, id: ActingProcessId) -> Option<ProcessOrigin> {
-        self.inner.read().await.get(id).map(|ap| ap.origin)
+    pub async fn get_status(&self, id: ActingProcessId) -> Option<ProcessStatus> {
+        self.inner.read().await.get(id).map(|ap| ap.status)
     }
 
     pub async fn get_kind(&self, id: ActingProcessId) -> Option<ProcessKind> {
@@ -91,14 +94,15 @@ impl Supervisor {
             .set_status(status);
     }
 
-    pub fn get_instant(&self) -> Timepoint {
-        self.instant.elapsed().as_micros()
+    pub fn get_timepoint(&self) -> Timepoint {
+        self.instant.elapsed().as_millis().into()
     }
 
     pub async fn get_tried_method(&self, id: ActingProcessId) -> Vec<LValue> {
         self.inner.read().await.get_tried_method(id)
     }
 
+    //Task methods
     pub async fn new_task(
         &self,
         label: MethodLabel,
@@ -112,18 +116,107 @@ impl Supervisor {
             .new_task(label, parent, value, planned)
     }
 
+    pub async fn get_task_value(&self, id: &ActingProcessId) -> LValue {
+        self.inner
+            .read()
+            .await
+            .get(*id)
+            .unwrap()
+            .inner
+            .as_task()
+            .unwrap()
+            .value
+            .clone()
+    }
+
+    pub async fn get_task_planned_refinement(
+        &self,
+        task_id: &ActingProcessId,
+    ) -> Option<Refinement> {
+        self.inner
+            .read()
+            .await
+            .get(*task_id)
+            .unwrap()
+            .inner
+            .as_task()
+            .unwrap()
+            .get_planned_refinement()
+            .cloned()
+    }
+
+    pub async fn update_task_last_refinement(
+        &self,
+        task_id: &ActingProcessId,
+        refinement: Refinement,
+    ) {
+        self.inner
+            .write()
+            .await
+            .get_mut(*task_id)
+            .unwrap()
+            .inner
+            .as_mut_task()
+            .unwrap()
+            .update_last_refinement(refinement);
+    }
+
+    pub async fn set_task_last_refinement_end(
+        &self,
+        task_id: &ActingProcessId,
+        status: ActionStatus,
+    ) {
+        let method_id = self
+            .inner
+            .read()
+            .await
+            .get(*task_id)
+            .unwrap()
+            .inner
+            .as_task()
+            .unwrap()
+            .get_id_current_method()
+            .unwrap();
+
+        self.set_method_end(&method_id).await;
+        self.set_method_status(&method_id, status).await;
+    }
+
     pub async fn new_method(
         &self,
         parent: ActingProcessId,
         debug: String,
-        value: LValue,
-        trace: RefinementTrace,
+        refinement: RefinementInner,
         planned: bool,
     ) -> ActingProcessId {
         self.inner
             .write()
             .await
-            .new_method(parent, debug, value, trace, planned)
+            .new_method(parent, debug, refinement, planned)
+    }
+
+    pub async fn set_method_end(&self, method_id: &ActingProcessId) {
+        self.inner
+            .write()
+            .await
+            .get_mut(*method_id)
+            .unwrap()
+            .inner
+            .as_mut_method()
+            .unwrap()
+            .set_end(self.get_timepoint())
+    }
+
+    pub async fn set_method_status(&self, method_id: &ActingProcessId, status: ActionStatus) {
+        self.inner
+            .write()
+            .await
+            .get_mut(*method_id)
+            .unwrap()
+            .inner
+            .as_mut_method()
+            .unwrap()
+            .set_status(status)
     }
 
     pub async fn get_number_arbitrary(&self, method_id: ActingProcessId) -> usize {
@@ -200,6 +293,20 @@ impl Supervisor {
             .new_command(label, parent, value, planned)
     }
 
+    pub async fn start_planned_command(
+        &self,
+        id_command: &ActingProcessId,
+    ) -> watch::Receiver<ActionStatus> {
+        let mut lock = self.inner.write().await;
+        let process: &mut ActingProcess = lock.get_mut(*id_command).unwrap();
+        process.status = ProcessStatus::Executed;
+        let command: &mut CommandProcess = process.inner.as_mut_command().unwrap();
+        command.set_start(self.get_timepoint());
+        let (tx, rx) = watch::channel(ActionStatus::Pending);
+        command.set_watch(tx);
+        rx
+    }
+
     pub async fn update_command_status(&self, id: impl Into<ProcessRef>, status: ActionStatus) {
         let mut inner = self.inner.write().await;
         inner
@@ -220,7 +327,7 @@ impl Supervisor {
             .inner
             .as_mut_command()
             .unwrap()
-            .set_end(self.get_instant())
+            .set_end(self.get_timepoint())
     }
 
     // Arbitrary methods
@@ -228,16 +335,52 @@ impl Supervisor {
         &self,
         label: MethodLabel,
         parent: ActingProcessId,
-        value: LValue,
-        planned: bool,
+        possibilities: Vec<LValue>,
+        choice: ArbitraryChoice,
     ) -> ActingProcessId {
         self.inner
             .write()
             .await
-            .new_arbitrary(label, parent, value, planned)
+            .new_arbitrary(label, parent, possibilities, choice)
     }
 
-    // Arbitrary methods
+    pub async fn try_set_planned_arbitrary(
+        &self,
+        id_arbitrary: &ActingProcessId,
+        possibilities: Vec<LValue>,
+        other: LValue,
+    ) -> LValue {
+        let mut lock = self.inner.write().await;
+        let process: &mut ActingProcess = lock.get_mut(*id_arbitrary).unwrap();
+        process.status = ProcessStatus::Executed;
+        let arbitrary: &mut ArbitraryProcess = process.inner.as_mut_arbitrary().unwrap();
+        let trace = arbitrary.get_last_trace();
+
+        let default = ArbitraryTrace {
+            possibilities: possibilities.clone(),
+            choice: ArbitraryChoice::Execution(other),
+            instant: self.get_timepoint(),
+        };
+
+        let trace = if let Planning(planned) = &trace.choice {
+            if possibilities.contains(planned) {
+                ArbitraryTrace {
+                    possibilities,
+                    choice: trace.choice.clone(),
+                    instant: self.get_timepoint(),
+                }
+            } else {
+                default
+            }
+        } else {
+            default
+        };
+        let choosed = trace.choice.inner().clone();
+        arbitrary.add_trace(trace);
+        choosed
+    }
+
+    // Acquire methods
     pub async fn new_acquire(
         &self,
         label: MethodLabel,
@@ -245,5 +388,41 @@ impl Supervisor {
         planned: bool,
     ) -> ActingProcessId {
         self.inner.write().await.new_acquire(label, parent, planned)
+    }
+
+    pub async fn set_acquire_request_timepoint(&self, acquire_id: &ActingProcessId) {
+        self.inner
+            .write()
+            .await
+            .get_mut(*acquire_id)
+            .unwrap()
+            .inner
+            .as_mut_acquire()
+            .unwrap()
+            .set_request(self.get_timepoint());
+    }
+
+    pub async fn set_acquire_acquisition_start(&self, acquire_id: &ActingProcessId) {
+        self.inner
+            .write()
+            .await
+            .get_mut(*acquire_id)
+            .unwrap()
+            .inner
+            .as_mut_acquire()
+            .unwrap()
+            .set_acquisition_start(self.get_timepoint());
+    }
+
+    pub async fn set_acquire_acquisition_end(&self, acquire_id: &ActingProcessId) {
+        self.inner
+            .write()
+            .await
+            .get_mut(*acquire_id)
+            .unwrap()
+            .inner
+            .as_mut_acquire()
+            .unwrap()
+            .set_acquisition_start(self.get_timepoint());
     }
 }

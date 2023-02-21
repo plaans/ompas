@@ -16,27 +16,27 @@ pub mod root_task;
 pub mod task;
 
 #[derive(Copy, Clone)]
-pub enum ProcessOrigin {
-    Execution,
-    Planning,
+pub enum ProcessStatus {
+    Executed,
+    Planned,
 }
 
 pub struct ActingProcess {
-    pub origin: ProcessOrigin,
+    pub status: ProcessStatus,
     pub inner: ActingProcessInner,
 }
 
 impl ActingProcess {
     pub fn root() -> Self {
         Self {
-            origin: ProcessOrigin::Execution,
+            status: ProcessStatus::Executed,
             inner: ActingProcessInner::RootTask(RootProcess::new()),
         }
     }
 
-    pub fn new(origin: ProcessOrigin, kind: impl Into<ActingProcessInner>) -> Self {
+    pub fn new(status: ProcessStatus, kind: impl Into<ActingProcessInner>) -> Self {
         Self {
-            origin,
+            status,
             inner: kind.into(),
         }
     }
@@ -84,6 +84,14 @@ impl ActingProcessInner {
         }
     }
 
+    pub fn as_command(&self) -> Option<&CommandProcess> {
+        if let Self::Command(command) = self {
+            Some(command)
+        } else {
+            None
+        }
+    }
+
     pub fn as_mut_command(&mut self) -> Option<&mut CommandProcess> {
         if let Self::Command(command) = self {
             Some(command)
@@ -92,7 +100,7 @@ impl ActingProcessInner {
         }
     }
 
-    pub fn as_mut_root(&mut self) -> Option<&mut RootProcess> {
+    pub fn as_root(&self) -> Option<&RootProcess> {
         if let Self::RootTask(root) = self {
             Some(root)
         } else {
@@ -100,7 +108,7 @@ impl ActingProcessInner {
         }
     }
 
-    pub fn as_root(&self) -> Option<&RootProcess> {
+    pub fn as_mut_root(&mut self) -> Option<&mut RootProcess> {
         if let Self::RootTask(root) = self {
             Some(root)
         } else {
@@ -124,6 +132,14 @@ impl ActingProcessInner {
         }
     }
 
+    pub fn as_arbitrary(&self) -> Option<&ArbitraryProcess> {
+        if let Self::Arbitrary(arbitrary) = self {
+            Some(arbitrary)
+        } else {
+            None
+        }
+    }
+
     pub fn as_mut_arbitrary(&mut self) -> Option<&mut ArbitraryProcess> {
         if let Self::Arbitrary(arbitrary) = self {
             Some(arbitrary)
@@ -132,7 +148,15 @@ impl ActingProcessInner {
         }
     }
 
-    pub fn as_mut_resource(&mut self) -> Option<&AcquireProcess> {
+    pub fn as_acquire(&self) -> Option<&AcquireProcess> {
+        if let Self::Acquire(acquire) = self {
+            Some(acquire)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_mut_acquire(&mut self) -> Option<&mut AcquireProcess> {
         if let Self::Acquire(acquire) = self {
             Some(acquire)
         } else {

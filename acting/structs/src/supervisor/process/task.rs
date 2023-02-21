@@ -1,5 +1,4 @@
 use crate::interface::select_mode::SelectMode;
-use crate::planning::plan::Plan;
 use crate::supervisor::action_status::ActionStatus;
 use crate::supervisor::interval::{Interval, Timepoint};
 use crate::supervisor::process::ActingProcessInner;
@@ -14,14 +13,45 @@ pub struct TaskProcess {
     pub status: ActionStatus,
     pub value: LValue,
     pub refinements: Vec<Refinement>,
-    pub current_method: Option<usize>,
+    pub current_refinement: Option<usize>,
     pub interval: Option<Interval>,
+}
+
+impl TaskProcess {
+    pub fn get_planned_refinement(&self) -> Option<&Refinement> {
+        match self.current_refinement {
+            Some(n) => {
+                if n == self.refinements.len() - 1 {
+                    None
+                } else {
+                    self.refinements.last()
+                }
+            }
+            None => self.refinements.last(),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
 pub struct Refinement {
-    pub method: ActingProcessId,
-    pub trace: RefinementTrace,
+    pub method_id: ActingProcessId,
+    pub inner: RefinementInner,
+}
+
+#[derive(Clone, Debug)]
+pub struct RefinementInner {
+    pub task_value: LValue,
+    pub method_value: LValue,
+    pub tried: Vec<LValue>,
+    pub possibilities: Vec<LValue>,
+    pub interval: Interval,
+    pub select: SelectTrace,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum SelectTrace {
+    ContinuousPlanning,
+    RealTime(RTSelect),
 }
 
 impl TaskProcess {
@@ -37,8 +67,8 @@ impl TaskProcess {
             status: ActionStatus::Pending,
             value,
             refinements: vec![],
-            current_method: None,
-            interval: start.map(|start| Interval::new(start, None)),
+            current_refinement: None,
+            interval: start.map(|start| Interval::new(start, None::<Timepoint>)),
         }
     }
 
@@ -46,8 +76,17 @@ impl TaskProcess {
         self.refinements.push(refinement)
     }
 
+    pub fn update_last_refinement(&mut self, refinement: Refinement) {
+        *self.refinements.last_mut().unwrap() = refinement;
+    }
+
+    pub fn get_id_current_method(&self) -> Option<ActingProcessId> {
+        self.current_refinement
+            .map(|n| self.refinements[n].method_id)
+    }
+
     pub fn set_start(&mut self, start: Timepoint) {
-        self.interval = Some(Interval::new(start, None))
+        self.interval = Some(Interval::new(start, None::<Timepoint>))
     }
 
     pub fn set_end(&mut self, end: Timepoint) {
@@ -60,12 +99,11 @@ impl TaskProcess {
         self.status = status
     }
 
-    pub fn get_executed_method(&self) -> Option<ActingProcessId> {
-        self.refinements.last().map(|r| r.method)
-    }
-
-    pub fn get_tried_method(&self) -> Vec<ActingProcessId> {
-        self.refinements.iter().map(|r| r.method).collect()
+    pub fn get_tried_methods(&self) -> Vec<LValue> {
+        self.refinements
+            .iter()
+            .map(|r| r.inner.method_value.clone())
+            .collect()
     }
 }
 
@@ -89,27 +127,13 @@ impl Display for TaskProcess {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct RefinementTrace {
+#[derive(Copy, Clone, Debug)]
+pub struct RTSelect {
     pub refinement_type: SelectMode,
-    pub applicable_methods: Vec<LValue>,
-    pub choosed: LValue,
-    pub plan: Option<Plan>,
-    pub interval: Interval,
 }
 
-impl Display for RefinementTrace {
+impl Display for RTSelect {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "refinement mode: {}\
-            choosed: {}\
-        applicable: {}\
-        time: {}\n",
-            self.refinement_type,
-            self.choosed,
-            LValue::from(&self.applicable_methods),
-            self.interval.duration()
-        )
+        writeln!(f, "refinement mode: {}", self.refinement_type)
     }
 }

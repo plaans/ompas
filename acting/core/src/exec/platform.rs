@@ -72,30 +72,29 @@ pub async fn exec_command(env: &LEnv, command: &[LValue]) -> LAsyncHandle {
 
         let supervisor = &env.get_context::<ModPlatform>(MOD_PLATFORM)?.supervisor;
 
-        let (command_id, rx): (ActingProcessId, Option<watch::Receiver<ActionStatus>>) = match &pr {
+        let (command_id, mut rx): (ActingProcessId, watch::Receiver<ActionStatus>) = match &pr {
             ProcessRef::Id(id) => {
-                supervisor
+                let r = supervisor
                     .new_command(MethodLabel::Command(0), *id, command.clone().into(), false)
-                    .await
+                    .await;
+                (r.0, r.1.unwrap())
             }
+
             ProcessRef::Relative(id, labels) => match supervisor.get_id(pr.clone()).await {
-                Some(_id) => {
-                    todo!()
-                }
+                Some(id) => (id, supervisor.start_planned_command(&id).await),
                 None => {
-                    supervisor
+                    let r = supervisor
                         .new_command(
                             labels.last().unwrap().as_method_label().unwrap().clone(),
                             *id,
                             command.clone().into(),
                             false,
                         )
-                        .await
+                        .await;
+                    (r.0, r.1.unwrap())
                 }
             },
         };
-
-        let mut rx = rx.unwrap();
 
         let mod_platform = env.get_context::<ModPlatform>(MOD_PLATFORM)?;
         let log = mod_platform.log.clone();

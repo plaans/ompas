@@ -25,15 +25,15 @@ impl AcquireProcess {
         }
     }
 
-    pub fn set_request_date(&mut self, request_date: Timepoint) {
+    pub fn set_request(&mut self, request_date: Timepoint) {
         self.request_date = Some(request_date)
     }
 
-    pub fn set_start_acquisition(&mut self, start: Timepoint) {
-        self.acquisition = Some(Interval::new(start, None))
+    pub fn set_acquisition_start(&mut self, start: Timepoint) {
+        self.acquisition = Some(Interval::new(start, None::<Timepoint>))
     }
 
-    pub fn set_end_acquisition(&mut self, end: Timepoint) {
+    pub fn set_acquisition_end(&mut self, end: Timepoint) {
         if let Some(interval) = &mut self.acquisition {
             interval.end = Some(end)
         }
@@ -49,8 +49,8 @@ impl From<AcquireProcess> for ActingProcessInner {
 impl Display for AcquireProcess {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let request = match &self.request_date {
-            None => "[..]".to_string(),
-            Some(timepoint) => Interval::new_instant(*timepoint).to_string(),
+            None => "..".to_string(),
+            Some(timepoint) => timepoint.as_secs().to_string(),
         };
 
         let acquisition = match &self.acquisition {

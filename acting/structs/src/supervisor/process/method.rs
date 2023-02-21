@@ -1,3 +1,4 @@
+use crate::supervisor::action_status::ActionStatus;
 use crate::supervisor::interval::{Interval, Timepoint};
 use crate::supervisor::process::process_ref::MethodLabel;
 use crate::supervisor::process::ActingProcessInner;
@@ -9,10 +10,12 @@ use std::fmt::{Display, Formatter};
 pub struct MethodProcess {
     pub id: ActingProcessId,
     pub parent: ActingProcessId,
+    pub status: ActionStatus,
     pub process_set: HashMap<MethodLabel, ActingProcessId>,
     pub debug: String,
     pub interval: Option<Interval>,
     pub value: LValue,
+    pub expanded: LValue,
 }
 
 impl MethodProcess {
@@ -26,10 +29,12 @@ impl MethodProcess {
         Self {
             id,
             parent,
+            status: ActionStatus::Pending,
             process_set: Default::default(),
             debug,
-            interval: start.map(|s| Interval::new(s, None)),
+            interval: start.map(|s| Interval::new(s, None::<Timepoint>)),
             value,
+            expanded: Default::default(),
         }
     }
 
@@ -39,6 +44,31 @@ impl MethodProcess {
 
     pub fn get_process(&mut self, label: MethodLabel) -> Option<ActingProcessId> {
         self.process_set.get(&label).copied()
+    }
+
+    pub fn set_expanded(&mut self, expanded: LValue) {
+        self.expanded = expanded
+    }
+
+    pub fn get_expanded(&self) -> &LValue {
+        &self.expanded
+    }
+
+    pub fn set_start(&mut self, timepoint: Timepoint) {
+        match &mut self.interval {
+            Some(interval) => interval.start = timepoint,
+            None => self.interval = Some(Interval::new_instant(timepoint)),
+        }
+    }
+
+    pub fn set_status(&mut self, status: ActionStatus) {
+        self.status = status
+    }
+
+    pub fn set_end(&mut self, timepoint: Timepoint) {
+        if let Some(interval) = &mut self.interval {
+            interval.set_end(timepoint)
+        }
     }
 }
 

@@ -81,7 +81,7 @@ pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LR
     let pr = &env
         .get_context::<ModActingContext>(MOD_ACTING_CONTEXT)?
         .process_ref;
-    let supervisor = &env.get_context::<ModExec>(MOD_EXEC)?.supervisor;
+    let supervisor = env.get_context::<ModExec>(MOD_EXEC)?.supervisor.clone();
 
     let id: ActingProcessId = match pr {
         ProcessRef::Id(id) => {
@@ -158,6 +158,7 @@ pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LR
         ))
         .await;
 
+        supervisor.set_acquire_request_timepoint(&id).await;
         let rh: ResourceHandler = match resources.acquire(label.clone(), capacity, priority).await?
         {
             AcquireResponse::Ok(rh) => rh,
@@ -178,6 +179,8 @@ pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LR
             }
         };
 
+        supervisor.set_acquire_acquisition_start(&id).await;
+
         let rc = resources.clone();
         let (tx, mut rx) = new_interruption_handler();
 
@@ -185,6 +188,7 @@ pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LR
 
         let f: LFuture = (Box::pin(async move {
             rx.recv().await;
+            supervisor.set_acquire_acquisition_end(&id).await;
             log2.info(format!("Releasing {}", rh.get_label())).await;
             rc.release(rh).await.map(|_| LValue::Nil)
         }) as FutureResult)

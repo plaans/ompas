@@ -38,8 +38,12 @@ impl ModTime {
         (self.start.read().await.elapsed().as_micros() as f64) / 1_000_000.0
     }
 
-    pub async fn get_instant(&self) -> u128 {
+    pub async fn get_micros(&self) -> u128 {
         self.start.read().await.elapsed().as_micros()
+    }
+
+    pub async fn get_millis(&self) -> u128 {
+        self.start.read().await.elapsed().as_millis()
     }
 }
 

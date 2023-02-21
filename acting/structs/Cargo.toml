@@ -25,3 +25,4 @@ itertools = { default-features = false, version = "0.10" }
 function_name = "0.2.1"
 ompas-middleware = {path = "../../middleware"}
 async-recursion = "1.0.0"
+num-integer = "0.1.45"

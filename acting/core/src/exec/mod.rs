@@ -20,7 +20,7 @@ use ompas_structs::interface::rae_options::OMPASOptions;
 use ompas_structs::planning::domain::PlanningDomain;
 use ompas_structs::state::world_state::WorldState;
 use ompas_structs::supervisor::inner::ProcessKind;
-use ompas_structs::supervisor::inner::ProcessKind::Arbitrary;
+use ompas_structs::supervisor::process::arbitrary::ArbitraryChoice;
 use ompas_structs::supervisor::process::process_ref::{Label, MethodLabel, ProcessRef};
 use ompas_structs::supervisor::{ActingProcessId, Supervisor};
 use sompas_core::eval;
@@ -192,6 +192,8 @@ pub async fn arbitrary(env: &LEnv, args: &[LValue]) -> LResult {
         _ => Err(LRuntimeError::wrong_number_of_args(ARBITRARY, args, 1..2)),
     }?;
 
+    let possibilities = args[0].clone().try_into()?;
+
     let value = match pr {
         ProcessRef::Id(id) => {
             if supervisor.get_kind(*id).await.unwrap() == ProcessKind::Method {
@@ -199,8 +201,8 @@ pub async fn arbitrary(env: &LEnv, args: &[LValue]) -> LResult {
                     .new_arbitrary(
                         MethodLabel::Arbitrary(supervisor.get_number_arbitrary(*id).await),
                         *id,
-                        greedy.clone(),
-                        false,
+                        possibilities,
+                        ArbitraryChoice::Execution(greedy.clone()),
                     )
                     .await;
                 greedy
@@ -209,11 +211,20 @@ pub async fn arbitrary(env: &LEnv, args: &[LValue]) -> LResult {
             }
         }
         ProcessRef::Relative(id, labels) => match supervisor.get_id(pr.clone()).await {
-            Some(id) => todo!(),
+            Some(id) => {
+                supervisor
+                    .try_set_planned_arbitrary(&id, possibilities, greedy)
+                    .await
+            }
             None => match labels[0] {
                 Label::MethodProcess(MethodLabel::Arbitrary(s)) => {
                     supervisor
-                        .new_arbitrary(MethodLabel::Arbitrary(s), *id, greedy.clone(), false)
+                        .new_arbitrary(
+                            MethodLabel::Arbitrary(s),
+                            *id,
+                            possibilities,
+                            ArbitraryChoice::Execution(greedy.clone()),
+                        )
                         .await;
                     greedy
                 }

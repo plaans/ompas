@@ -3,6 +3,7 @@ use crate::supervisor::interval::{Interval, Timepoint};
 use crate::supervisor::process::ActingProcessInner;
 use crate::supervisor::ActingProcessId;
 use std::fmt::{Display, Formatter};
+use std::mem;
 
 #[derive()]
 pub struct AcquireProcess {
@@ -43,6 +44,10 @@ impl AcquireProcess {
         if let Some(interval) = &mut self.acquisition {
             interval.end = Some(end)
         }
+    }
+
+    pub fn move_response(&mut self) -> Option<AcquireResponse> {
+        mem::take(&mut self.reservation)
     }
 }
 

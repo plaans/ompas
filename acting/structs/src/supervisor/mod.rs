@@ -1,3 +1,4 @@
+use crate::execution::resource::AcquireResponse;
 use crate::supervisor::action_status::ActionStatus;
 use crate::supervisor::filter::ProcessFilter;
 use crate::supervisor::inner::ProcessKind;
@@ -392,6 +393,21 @@ impl Supervisor {
             .write()
             .await
             .new_acquire(label, resource_label, parent, planned)
+    }
+
+    pub async fn get_acquire_response(
+        &self,
+        acquire_id: &ActingProcessId,
+    ) -> Option<AcquireResponse> {
+        self.inner
+            .write()
+            .await
+            .get_mut(*acquire_id)
+            .unwrap()
+            .inner
+            .as_mut_acquire()
+            .unwrap()
+            .move_response()
     }
 
     pub async fn set_acquire_request_timepoint(&self, acquire_id: &ActingProcessId) {

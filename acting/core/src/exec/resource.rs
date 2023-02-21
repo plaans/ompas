@@ -86,29 +86,33 @@ pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LR
         .get(0)
         .ok_or_else(|| LRuntimeError::wrong_number_of_args(ACQUIRE, args, 1..2))?
         .try_into()?;
-    let id: ActingProcessId = match pr {
+    let (id, ar): (ActingProcessId, Option<AcquireResponse>) = match pr {
         ProcessRef::Id(id) => {
             if supervisor.get_kind(*id).await.unwrap() == ProcessKind::Method {
-                supervisor
-                    .new_acquire(
-                        label.clone(),
-                        MethodLabel::Acquire(supervisor.get_number_acquire(*id).await),
-                        *id,
-                        false,
-                    )
-                    .await
+                (
+                    supervisor
+                        .new_acquire(
+                            label.clone(),
+                            MethodLabel::Acquire(supervisor.get_number_acquire(*id).await),
+                            *id,
+                            false,
+                        )
+                        .await,
+                    None,
+                )
             } else {
                 panic!()
             }
         }
         ProcessRef::Relative(id, labels) => match supervisor.get_id(pr.clone()).await {
-            Some(id) => todo!(),
+            Some(id) => (id, supervisor.get_acquire_response(&id).await),
             None => match labels[0] {
-                Label::MethodProcess(MethodLabel::Acquire(s)) => {
+                Label::MethodProcess(MethodLabel::Acquire(s)) => (
                     supervisor
                         .new_acquire(label.to_string(), MethodLabel::Acquire(s), *id, false)
-                        .await
-                }
+                        .await,
+                    None,
+                ),
                 _ => panic!(),
             },
         },
@@ -158,15 +162,22 @@ pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LR
         .await;
 
         supervisor.set_acquire_request_timepoint(&id).await;
-        let rh: ResourceHandler = match resources
-            .acquire(
-                label.clone(),
-                capacity,
-                WaiterPriority::Execution(priority),
-                AcquireKind::Direct,
-            )
-            .await?
-        {
+
+        let ar = match ar {
+            Some(ar) => ar,
+            None => {
+                resources
+                    .acquire(
+                        label.clone(),
+                        capacity,
+                        WaiterPriority::Execution(priority),
+                        AcquireKind::Direct,
+                    )
+                    .await?
+            }
+        };
+
+        let rh: ResourceHandler = match ar {
             AcquireResponse::Ok(rh) => rh,
             AcquireResponse::Wait(mut wait) => {
                 log.info(format!("Waiting on resource {label}")).await;

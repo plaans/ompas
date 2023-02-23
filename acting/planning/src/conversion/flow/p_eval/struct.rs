@@ -1,14 +1,18 @@
 use im::{hashset, HashSet};
+use ompas_language::exec::acting_context::*;
 use ompas_language::exec::platform::EXEC_COMMAND;
 use ompas_language::exec::refinement::EXEC_TASK;
 use ompas_language::exec::resource::{ACQUIRE, RELEASE};
 use ompas_language::exec::state::WAIT_FOR;
+use ompas_middleware::logger::LogClient;
 use sompas_language::time::SLEEP;
 use sompas_language::utils::{LOOP, _LOOP_};
+use sompas_structs::lenv::LEnv;
 use sompas_structs::lprimitive::LPrimitive;
 use sompas_structs::lvalue::{LValue, Sym};
 use sompas_structs::{list, symbol};
 use std::fmt::{Display, Formatter};
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct PLEnv {
@@ -132,6 +136,10 @@ impl ParameterTable {
         self.inner.insert(param.to_string(), PLValue::pure(value));
     }
 
+    pub fn add(&mut self, param: String, plv: PLValue) {
+        self.inner.insert(param, plv);
+    }
+
     pub fn try_get_param(&self, param: &str) -> Option<&PLValue> {
         self.inner.get(param)
     }
@@ -147,6 +155,10 @@ impl Default for PConfig {
     fn default() -> Self {
         Self {
             avoid: hashset![
+                CTX_EXEC_COMMAND.to_string(),
+                CTX_ACQUIRE.to_string(),
+                CTX_EXEC_TASK.to_string(),
+                CTX_ARBITRARY.to_string(),
                 _LOOP_.to_string(),
                 LOOP.to_string(),
                 EXEC_COMMAND.to_string(),
@@ -160,10 +172,6 @@ impl Default for PConfig {
         }
     }
 }
-
-use ompas_middleware::logger::LogClient;
-use sompas_structs::lenv::LEnv;
-use std::sync::Arc;
 
 pub trait PUnstack {
     fn unstack(self, results: &mut PResults) -> PLValue;

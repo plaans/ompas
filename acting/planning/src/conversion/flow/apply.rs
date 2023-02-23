@@ -1,5 +1,8 @@
 use crate::conversion::flow::convert_lv;
 use function_name::named;
+use ompas_language::exec::acting_context::{
+    CTX_ACQUIRE, CTX_ARBITRARY, CTX_EXEC_COMMAND, CTX_EXEC_TASK,
+};
 use ompas_language::exec::platform::EXEC_COMMAND;
 use ompas_language::exec::refinement::EXEC_TASK;
 use ompas_language::exec::resource::RELEASE;
@@ -7,16 +10,18 @@ use ompas_language::exec::state::{
     ASSERT, ASSERT_SHORT, INSTANCE, INSTANCES, READ_STATE, WAIT_FOR,
 };
 use ompas_language::exec::ARBITRARY;
+use ompas_language::supervisor::ACQUIRE;
 use ompas_language::sym_table::{EPSILON, TYPE_OBJECT, TYPE_OBJECT_TYPE, TYPE_RESSOURCE_HANDLE};
 use ompas_structs::conversion::chronicle::constraint::Constraint;
 use ompas_structs::conversion::flow_graph::define_table::DefineTable;
 use ompas_structs::conversion::flow_graph::flow::FlowId;
 use ompas_structs::conversion::flow_graph::graph::FlowGraph;
+use ompas_structs::supervisor::process::process_ref::{Label, MethodLabel};
 use ompas_structs::sym_table::closure::Update;
 use ompas_structs::sym_table::computation::Computation;
 use ompas_structs::sym_table::domain::basic_type::BasicType::{Boolean, True};
 use ompas_structs::sym_table::domain::Domain;
-use ompas_structs::sym_table::lit::Lit;
+use ompas_structs::sym_table::lit::{AcquireLit, Lit};
 use ompas_structs::sym_table::litset::LitSet;
 use ompas_structs::sym_table::r#trait::FormatWithSymTable;
 use ompas_structs::sym_table::{closure, VarId};
@@ -72,6 +77,7 @@ impl Default for ApplyConversionCollection {
         d.add_conversion(OR, convert_or);
         d.add_conversion(WAIT_FOR, convert_wait_for);
         d.add_conversion(SLEEP, convert_sleep);
+        d.add_conversion(ACQUIRE, convert_acquire);
         d.add_conversion(RESSOURCE_HANDLE, convert_ressource_handle);
         d.add_conversion(RELEASE, convert_release);
         d.add_conversion(ADD, convert_add);
@@ -79,6 +85,10 @@ impl Default for ApplyConversionCollection {
         d.add_conversion(INSTANCE, convert_instance);
         d.add_conversion(INSTANCES, convert_instances);
         d.add_conversion(ARBITRARY, convert_arbitrary);
+        d.add_conversion(CTX_ARBITRARY, convert_ctx_arbitrary);
+        d.add_conversion(CTX_EXEC_TASK, convert_ctx_exec_task);
+        d.add_conversion(CTX_EXEC_COMMAND, convert_ctx_exec_command);
+        d.add_conversion(CTX_ACQUIRE, convert_ctx_acquire);
         d
     }
 }
@@ -394,6 +404,31 @@ fn convert_sleep(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRu
     Ok(fl.new_seq(seq))
 }
 
+fn convert_acquire(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
+    seq.remove(0);
+
+    let release_time = fl.st.new_timepoint();
+    let resource = fl.get_flow_result(&seq[0]);
+    let capacity = seq.get(1).map(|f| fl.get_flow_result(f));
+    let acquire = fl.new_assignment(Lit::Acquire(AcquireLit {
+        resource,
+        capacity,
+        release_time,
+    }));
+
+    let acquire_result = fl.get_flow_result(&acquire);
+    let acquire_domain = fl.st.get_domain_id(&acquire_result);
+    fl.st.set_domain(
+        &acquire_domain,
+        fl.st.get_type_as_domain(TYPE_RESSOURCE_HANDLE).unwrap(),
+    );
+    fl.resource_handles
+        .insert(fl.get_flow_result(&acquire), release_time);
+
+    seq.push(acquire);
+    Ok(fl.new_seq(seq))
+}
+
 fn convert_ressource_handle(fl: &mut FlowGraph, seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
     let rh = fl.new_resource_handle(seq[1]);
     fl.handles.insert(fl.get_flow_result(&rh), seq[1]);
@@ -410,7 +445,7 @@ fn convert_release(fl: &mut FlowGraph, seq: Vec<FlowId>) -> Result<FlowId, LRunt
         fl.st.get_type_as_domain(TYPE_RESSOURCE_HANDLE).unwrap(),
     );
 
-    let flow_release = fl.new_assignment(Lit::Release(result));
+    let flow_release = fl.new_instantaneous_assignment(Lit::Release(result));
     fl.st
         .set_domain(&fl.get_flow_result(&flow_release), Domain::nil());
 
@@ -449,4 +484,76 @@ fn convert_instances(fl: &mut FlowGraph, seq: Vec<FlowId>) -> Result<FlowId, LRu
     } else {
         Err(LRuntimeError::new(function_name!(), ""))?
     }
+}
+
+fn extract_index(fl: &mut FlowGraph, seq: &mut Vec<FlowId>) -> usize {
+    let flow_index = seq.remove(1);
+    let lit = fl.try_get_flow_lit(&flow_index).unwrap();
+    let index = if let Lit::Atom(v) = lit {
+        //println!("{}", fl.st.format_variable(&v));
+        fl.st
+            .get_domain_of_var(&v)
+            .as_constant()
+            .unwrap()
+            .as_int()
+            .unwrap()
+    } else {
+        panic!()
+    };
+    index as usize
+}
+
+//(ctx-arbitrary <id> (list args))
+fn convert_ctx_arbitrary(
+    fl: &mut FlowGraph,
+    mut seq: Vec<FlowId>,
+) -> Result<FlowId, LRuntimeError> {
+    let index = extract_index(fl, &mut seq);
+    let flow_id = convert_arbitrary(fl, seq)?;
+    let flow_arbitrary = fl.try_get_last_flow(&flow_id).unwrap();
+
+    fl.set_label(
+        &flow_arbitrary,
+        Label::MethodProcess(MethodLabel::Arbitrary(index as usize)),
+    );
+    Ok(flow_id)
+}
+
+fn convert_ctx_exec_command(
+    fl: &mut FlowGraph,
+    mut seq: Vec<FlowId>,
+) -> Result<FlowId, LRuntimeError> {
+    let index = extract_index(fl, &mut seq);
+    let flow_id = convert_exec(fl, seq)?;
+    let flow_exec = fl.try_get_last_flow(&flow_id).unwrap();
+    fl.set_label(
+        &flow_exec,
+        Label::MethodProcess(MethodLabel::Command(index as usize)),
+    );
+    Ok(flow_id)
+}
+
+fn convert_ctx_exec_task(
+    fl: &mut FlowGraph,
+    mut seq: Vec<FlowId>,
+) -> Result<FlowId, LRuntimeError> {
+    let index = extract_index(fl, &mut seq);
+    let flow_id = convert_exec(fl, seq)?;
+    let flow_exec = fl.try_get_last_flow(&flow_id).unwrap();
+    fl.set_label(
+        &flow_exec,
+        Label::MethodProcess(MethodLabel::Subtask(index as usize)),
+    );
+    Ok(flow_id)
+}
+
+fn convert_ctx_acquire(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
+    let index = extract_index(fl, &mut seq);
+    let flow_id = convert_acquire(fl, seq)?;
+    let flow_acquire = fl.try_get_last_flow(&flow_id).unwrap();
+    fl.set_label(
+        &flow_acquire,
+        Label::MethodProcess(MethodLabel::Acquire(index as usize)),
+    );
+    Ok(flow_id)
 }

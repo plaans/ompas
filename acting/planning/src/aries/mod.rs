@@ -1,4 +1,5 @@
 pub mod instance;
+pub mod problem_generation;
 pub mod solver;
 pub mod template;
 pub mod useful;

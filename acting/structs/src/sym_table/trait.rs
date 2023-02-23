@@ -55,8 +55,12 @@ impl FormatWithSymTable for &[VarId] {
 }
 
 impl FormatWithSymTable for VarId {
-    fn format(&self, st: &RefSymTable, _: bool) -> String {
-        st.format_variable(self)
+    fn format(&self, st: &RefSymTable, sym_version: bool) -> String {
+        let id = match sym_version {
+            true => st.get_var_parent(self),
+            false => *self,
+        };
+        st.format_variable(&id)
     }
 }
 

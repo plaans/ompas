@@ -1,4 +1,5 @@
 use crate::conversion::chronicle::interval::Interval;
+use crate::supervisor::process::process_ref::Label;
 use crate::sym_table::lit::Lit;
 use crate::sym_table::VarId;
 
@@ -10,6 +11,7 @@ pub struct Flow {
     pub interval: Interval,
     pub result: VarId,
     pub parent: Option<FlowId>,
+    pub label: Option<Label>,
     pub kind: FlowKind,
 }
 

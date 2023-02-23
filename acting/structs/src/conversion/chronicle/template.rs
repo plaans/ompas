@@ -5,6 +5,7 @@ use crate::conversion::chronicle::interval::Interval;
 use crate::conversion::chronicle::subtask::SubTask;
 use crate::conversion::chronicle::task_template::TaskTemplate;
 use crate::conversion::flow_graph::graph::FlowGraph;
+use crate::planning::om_binding::OperationalModelBindings;
 use crate::sym_table::domain::basic_type::BasicType;
 use crate::sym_table::domain::Domain;
 use crate::sym_table::lit::Lit;
@@ -49,6 +50,7 @@ pub struct ChronicleTemplate {
     effects: Vec<Effect>,
     subtasks: Vec<SubTask>,
     pub debug: ChronicleDebug,
+    pub bindings: OperationalModelBindings,
     pub syntactic_chronicles: Vec<TaskTemplate>,
 }
 
@@ -83,6 +85,7 @@ impl ChronicleTemplate {
             effects: vec![],
             subtasks: vec![],
             syntactic_chronicles: vec![],
+            bindings: Default::default(),
         };
         for v in init_var {
             chronicle.add_var(v);
@@ -363,6 +366,7 @@ impl ChronicleTemplate {
             }
         }
         s.push_str("}\n");
+        write!(s, "{}", self.bindings.format(st, sym_version)).unwrap();
 
         //Debug
         /*if let Some(exp) = &self.debug {

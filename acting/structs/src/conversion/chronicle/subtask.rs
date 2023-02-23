@@ -1,4 +1,5 @@
 use crate::conversion::chronicle::interval::Interval;
+use crate::supervisor::process::process_ref::Label;
 use crate::sym_table::domain::Domain;
 use crate::sym_table::r#ref::RefSymTable;
 use crate::sym_table::r#trait::{FlatBindings, FormatWithSymTable, GetVariables, Replace};
@@ -10,6 +11,7 @@ pub struct SubTask {
     pub interval: Interval,
     pub task: Vec<VarId>,
     pub result: VarId,
+    pub label: Option<Label>,
 }
 
 impl FormatWithSymTable for SubTask {

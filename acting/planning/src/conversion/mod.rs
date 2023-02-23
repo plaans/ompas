@@ -1,4 +1,4 @@
-use crate::conversion::chronicle::convert_method;
+use crate::conversion::chronicle::convert_graph;
 use crate::conversion::chronicle::post_processing::post_processing;
 use crate::conversion::flow::convert_lv;
 use crate::conversion::flow::p_eval::p_eval;
@@ -54,7 +54,7 @@ pub async fn convert(
     let flow = convert_lv(&pp_lv, &mut graph, &mut Default::default())?;
     graph.flow = flow;
     flow_graph_post_processing(&mut graph)?;
-    let mut ch = convert_method(None, &mut graph, &flow, env)?;
+    let mut ch = convert_graph(None, &mut graph, &flow, env)?;
     //let mut ch = ChronicleTemplate::new("debug", ChronicleKind::Method, st);
     post_processing(&mut ch, env.clone())?;
     graph.flat_bindings();
@@ -86,34 +86,64 @@ pub async fn p_convert_task(
 
     let mut instances = vec![];
     let mut methods = vec![];
-    for m_label in t.get_methods() {
-        methods.push(m_label.to_string());
-        let mut pc = pc.clone();
-        let method = context.domain.methods.get(m_label).unwrap();
-        for param in &method.parameters.get_labels()[params.len()..] {
-            pc.p_table.add_param(param.to_string());
+    match t.get_model() {
+        Some(model) => {
+            let method_lambda: LLambda = model.try_into().expect("");
+
+            let template = convert_abstract_task_to_chronicle(
+                &method_lambda,
+                t.get_label(),
+                None,
+                t.get_parameters(),
+                &context,
+                ChronicleKind::Method,
+                pc.clone(),
+            )
+            .await?;
+
+            instances.push(ChronicleInstance {
+                origin: ChronicleOrigin::Refinement {
+                    instance_id: 0,
+                    task_id: 0,
+                },
+                template,
+                value: Default::default(),
+                pr: Default::default(),
+            });
         }
+        None => {
+            for m_label in t.get_methods() {
+                methods.push(m_label.to_string());
+                let mut pc = pc.clone();
+                let method = context.domain.methods.get(m_label).unwrap();
+                for param in &method.parameters.get_labels()[params.len()..] {
+                    pc.p_table.add_param(param.to_string());
+                }
 
-        let method_lambda: LLambda = method.get_body().try_into().expect("");
+                let method_lambda: LLambda = method.get_body().try_into().expect("");
 
-        let template = convert_abstract_task_to_chronicle(
-            &method_lambda,
-            &method.label,
-            Some(t),
-            method.get_parameters(),
-            &context,
-            ChronicleKind::Method,
-            pc.clone(),
-        )
-        .await?;
+                let template = convert_abstract_task_to_chronicle(
+                    &method_lambda,
+                    &method.label,
+                    Some(t),
+                    method.get_parameters(),
+                    &context,
+                    ChronicleKind::Method,
+                    pc.clone(),
+                )
+                .await?;
 
-        instances.push(ChronicleInstance {
-            origin: ChronicleOrigin::Refinement {
-                instance_id: 0,
-                task_id: 0,
-            },
-            template,
-        });
+                instances.push(ChronicleInstance {
+                    origin: ChronicleOrigin::Refinement {
+                        instance_id: 0,
+                        task_id: 0,
+                    },
+                    template,
+                    value: Default::default(),
+                    pr: Default::default(),
+                });
+            }
+        }
     }
 
     Ok(PlanningProblem {
@@ -482,7 +512,7 @@ pub async fn convert_abstract_task_to_chronicle(
         debug_with_markdown(label.to_string().as_str(), &ch, "/tmp".into(), true);
     }
     flow_graph_post_processing(&mut graph)?;
-    let mut ch = convert_method(Some(ch), &mut graph, &flow, &cc.env)?;
+    let mut ch = convert_graph(Some(ch), &mut graph, &flow, &cc.env)?;
     post_processing(&mut ch, cc.env.clone())?;
 
     graph.flat_bindings();
@@ -515,6 +545,7 @@ pub fn declare_task(task: &Task, st: RefSymTable) -> TaskChronicle {
 }
 
 pub fn debug_with_markdown(label: &str, ch: &ChronicleTemplate, path: PathBuf, view: bool) {
+    let label = label.replace("/", "_");
     let mut path = path;
     let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
     let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();

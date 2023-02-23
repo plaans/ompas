@@ -1,15 +1,16 @@
 use aries_cp::Cp;
 use aries_model::extensions::{AssignmentExt, SavedAssignment};
-use aries_model::lang::SAtom;
+use aries_model::lang::Atom;
 use aries_planners::encode::{
     encode, populate_with_task_network, populate_with_template_instances,
 };
 use aries_planners::fmt::{format_hddl_plan, format_partial_plan, format_pddl_plan};
-use aries_planners::solver::Strat;
+use aries_planners::solver::{SolverResult, Strat};
 use aries_planners::Solver;
 use aries_planning::chronicles;
 use aries_planning::chronicles::analysis::hierarchical_is_non_recursive;
 use aries_planning::chronicles::{ChronicleKind, ChronicleOrigin, FiniteProblem};
+use aries_solver::parallel_solver::Solution;
 use aries_stn::theory::{StnConfig, StnTheory, TheoryPropagationLevel};
 use im::HashMap;
 use ompas_structs::planning::plan::{AbstractTaskInstance, ActionInstance, Plan, TaskInstance};
@@ -36,7 +37,7 @@ const HTN_DEFAULT_STRATEGIES: [Strat; 2] = [Strat::Activity, Strat::Forward];
 /// Default set of strategies for generative (flat) problems.
 //const GEN_DEFAULT_STRATEGIES: [Strat; 1] = [Strat::Activity];
 
-fn solve_htn(pb: &FiniteProblem, optimize: bool) -> Option<std::sync::Arc<SavedAssignment>> {
+fn solve_htn(pb: &FiniteProblem, optimize: bool) -> Option<Solution> {
     let solver = init_solver(pb);
     let strats: &[Strat] = &HTN_DEFAULT_STRATEGIES;
 
@@ -45,11 +46,18 @@ fn solve_htn(pb: &FiniteProblem, optimize: bool) -> Option<std::sync::Arc<SavedA
             strats[id].adapt_solver(s, pb)
         });
 
-    let found_plan = if optimize {
-        let res = solver.minimize(pb.horizon.num).unwrap();
-        res.map(|tup| tup.1)
+    let found_plan: Option<Solution> = if optimize {
+        let res = solver.minimize(pb.horizon.num, None);
+        match res {
+            SolverResult::Sol(sol) => Some(sol),
+            _ => None,
+        }
     } else {
-        solver.solve().unwrap()
+        if let SolverResult::Sol(sol) = solver.solve(None) {
+            Some(sol)
+        } else {
+            None
+        }
     };
 
     if let Some(solution) = found_plan {
@@ -168,11 +176,26 @@ pub fn extract_plan(pr: &PlanResult) -> Plan {
         let sym = ass.sym_domain_of(*x).into_singleton().unwrap();
         problem.model.shape.symbols.symbol(sym).to_string().into()
     };*/
-    let fmt = |name: &[SAtom]| -> LValue {
+    let fmt = |name: &[Atom]| -> LValue {
         let syms: Vec<LValue> = name
             .iter()
-            .map(|x| ass.sym_domain_of(*x).into_singleton().unwrap())
-            .map(|s| problem.model.shape.symbols.symbol(s).to_string().into())
+            .map(
+                |x| match x {
+                    Atom::Bool(b) => ass.value_of_literal(*b).unwrap().into(),
+                    Atom::Int(i) => ass.var_domain(*i).lb.into(),
+                    Atom::Fixed(f) => {
+                        let float: f64 = ass.f_domain(*f).to_string().parse().unwrap();
+                        float.into()
+                    }
+                    Atom::Sym(s) => problem
+                        .model
+                        .shape
+                        .symbols
+                        .symbol(ass.sym_domain_of(*s).into_singleton().unwrap())
+                        .to_string()
+                        .into(),
+                }, //ass.sym_domain_of(*x).into_singleton().unwrap()
+            )
             .collect();
         syms.into()
     };
@@ -245,9 +268,22 @@ pub fn extract_instantiated_methods(pr: &PlanResult) -> LResult {
         })
         .collect();
 
-    let fmt1 = |x: &SAtom| -> LValue {
-        let sym = ass.sym_domain_of(*x).into_singleton().unwrap();
-        problem.model.shape.symbols.symbol(sym).to_string().into()
+    let fmt1 = |x: &Atom| -> LValue {
+        match x {
+            Atom::Bool(b) => ass.value_of_literal(*b).unwrap().into(),
+            Atom::Int(i) => ass.var_domain(*i).lb.into(),
+            Atom::Fixed(f) => {
+                let float: f64 = ass.f_domain(*f).to_string().parse().unwrap();
+                float.into()
+            }
+            Atom::Sym(s) => problem
+                .model
+                .shape
+                .symbols
+                .symbol(ass.sym_domain_of(*s).into_singleton().unwrap())
+                .to_string()
+                .into(),
+        }
     };
     let mut lv_methods: Vec<LValue> = vec![];
     for m in methods {

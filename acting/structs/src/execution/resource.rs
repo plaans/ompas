@@ -85,7 +85,7 @@ pub struct Resource {
 
 pub struct Acquire {
     pub kind: AcquireKind,
-    id: AcquisitionId,
+    _id: AcquisitionId,
     pub capacity: Capacity,
 }
 
@@ -128,8 +128,8 @@ impl Ord for WaiterPriority {
     fn cmp(&self, other: &Self) -> Ordering {
         match (self, other) {
             (Planner(o1), Planner(o2)) => o2.cmp(o1),
-            (Planner(o), Execution(e)) => PLANNER_PRIORITY.cmp(e),
-            (Execution(e), Planner(o)) => e.cmp(&PLANNER_PRIORITY),
+            (Planner(_), Execution(e)) => PLANNER_PRIORITY.cmp(e),
+            (Execution(e), Planner(_)) => e.cmp(&PLANNER_PRIORITY),
             (Execution(e1), Execution(e2)) => e1.cmp(e2),
         }
     }
@@ -273,7 +273,14 @@ impl Resource {
         kind: AcquireKind,
         capacity: Capacity,
     ) -> ResourceHandler {
-        self.acquirers.insert(id, Acquire { kind, id, capacity });
+        self.acquirers.insert(
+            id,
+            Acquire {
+                kind,
+                _id: id,
+                capacity,
+            },
+        );
         self.update_remaining_capacity().unwrap();
         ResourceHandler {
             label: self.label.clone(),

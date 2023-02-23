@@ -1,10 +1,9 @@
 use crate::aries::{useful, BindingAriesAtoms};
 use anyhow::anyhow;
-use aries_core::{Lit as aLit, INT_CST_MAX, INT_CST_MIN};
+use aries_core::{IntCst, Lit as aLit, INT_CST_MAX, INT_CST_MIN};
 use aries_model::extensions::Shaped;
-use aries_model::lang::{
-    Atom as aAtom, ConversionError, FAtom, FVar, SAtom, SVar, Type as aType, Variable,
-};
+use aries_model::lang::linear::{LinearSum, LinearTerm};
+use aries_model::lang::{Atom as aAtom, ConversionError, FAtom, FVar, Type as aType, Variable};
 use aries_model::symbols::SymbolTable;
 use aries_model::types::TypeHierarchy;
 use aries_planning::chronicles;
@@ -18,6 +17,7 @@ use aries_planning::chronicles::{
 use aries_planning::parsing::pddl::TypedSymbol;
 use aries_utils::input::Sym;
 use function_name::named;
+use num_integer::Integer;
 use ompas_language::exec::resource::{MAX_Q, QUANTITY};
 use ompas_language::exec::state::INSTANCE;
 use ompas_language::sym_table::{
@@ -41,7 +41,6 @@ use ompas_structs::sym_table::r#trait::{FormatWithSymTable, GetVariables};
 use ompas_structs::sym_table::VarId;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
-use std::borrow::Borrow;
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -292,16 +291,16 @@ fn convert_constraint(
                 constraints.push(aConstraint::eq(get_atom(a, ctx), get_atom(b, ctx)))
             }
             (Lit::Atom(_), Lit::Constraint(_)) => {}
-            (Lit::Atom(a), Lit::Computation(c)) => match c.deref() {
+            (Lit::Atom(value), Lit::Computation(c)) => match c.deref() {
                 Computation::Add(vec) => {
-                    let a = get_atom(a, ctx);
+                    let value = get_atom(value, ctx);
                     if vec.len() == 2 && vec[1].format(st, true).as_str() == EPSILON {
                         let mut b = get_atom(&vec[0].clone().try_into().expect(""), ctx);
                         b = (FAtom::try_from(b)
                             .map_err(|c| LRuntimeError::new("conversion_error", c.to_string()))?
                             + FAtom::EPSILON)
                             .into();
-                        constraints.push(aConstraint::eq(a, b))
+                        constraints.push(aConstraint::eq(value, b))
                     }
                     /*else if vec.len() == 2 {
                         if let Lit::Atom(c) = &vec[1] {
@@ -335,30 +334,78 @@ fn convert_constraint(
                         }
                     }*/
                     else {
-                        let mut signs = vec![true];
-                        let mut variables = vec![a];
+                        let mut factor: IntCst = 1;
+                        let mut variables = vec![];
+                        let mut lsum = LinearSum::zero();
+                        variables.push(value);
                         for var in vec {
-                            signs.push(false);
-                            let a: VarId = var.try_into().expect("");
-                            variables.push(get_atom(&a, ctx))
+                            let var: VarId = var.try_into().expect("");
+                            variables.push(get_atom(&var, ctx))
+                        }
+                        for var in &variables {
+                            if let aAtom::Fixed(f) = var {
+                                factor = factor.lcm(&f.denom);
+                            }
                         }
 
-                        constraints.push(aConstraint::sum(variables, Sum { signs, value: 0 }));
+                        for (i, var) in variables.iter().enumerate() {
+                            let factor = if i == 0 { -factor } else { factor };
+                            match var {
+                                aAtom::Int(i) => {
+                                    lsum += LinearTerm::new(factor, i.var, false);
+                                    lsum = lsum + factor * i.shift;
+                                }
+                                aAtom::Fixed(f) => {
+                                    let factor = factor / f.denom;
+                                    lsum += LinearTerm::new(factor, f.num.var, false);
+                                    lsum = lsum + factor * f.num.shift;
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+
+                        constraints.push(aConstraint::sum(Sum {
+                            sum: lsum,
+                            value: 0,
+                        }));
                     }
                 }
                 Computation::Sub(vec) => {
-                    let a = get_atom(a, ctx);
-                    let b: VarId = vec[0].borrow().try_into().expect("");
-                    let b = get_atom(&b, ctx);
-                    let mut signs = vec![true, false];
-                    let mut variables = vec![a, b];
-                    for var in &vec[1..] {
-                        signs.push(true);
-                        let a: VarId = var.try_into().expect("");
-                        variables.push(get_atom(&a, ctx))
+                    let value = get_atom(value, ctx);
+                    let mut factor: IntCst = 1;
+                    let mut variables = vec![];
+                    let mut lsum = LinearSum::zero();
+                    variables.push(value);
+                    for var in vec {
+                        let var: VarId = var.try_into().expect("");
+                        variables.push(get_atom(&var, ctx))
+                    }
+                    for var in &variables {
+                        if let aAtom::Fixed(f) = var {
+                            factor = factor.lcm(&f.denom);
+                        }
                     }
 
-                    constraints.push(aConstraint::sum(variables, Sum { signs, value: 0 }));
+                    for (i, var) in variables.iter().enumerate() {
+                        let factor = if i != 1 { -factor } else { factor };
+                        match var {
+                            aAtom::Int(i) => {
+                                lsum += LinearTerm::new(factor, i.var, false);
+                                lsum = lsum + factor * i.shift;
+                            }
+                            aAtom::Fixed(f) => {
+                                let factor = factor / f.denom;
+                                lsum += LinearTerm::new(factor, f.num.var, false);
+                                lsum = lsum + factor * f.num.shift;
+                            }
+                            _ => unreachable!(),
+                        }
+                    }
+
+                    constraints.push(aConstraint::sum(Sum {
+                        sum: lsum,
+                        value: 0,
+                    }));
                 }
             },
             _ => Err(LRuntimeError::default().chain("constraint::eq"))?,
@@ -545,35 +592,12 @@ pub fn read_chronicle(
 
     //End declaration of the variables
 
+    let get_atom =
+        |a: &VarId, context: &Ctx| -> aAtom { useful::var_id_into_atom(a, &st, bindings, context) };
     /*
     CREATION of the name
      */
     //For the moment lacking the fact that we can add any kind of variables
-    print!("init name...");
-    let mut name: Vec<SAtom> = vec![];
-    for (i, p) in ch.get_name().iter().enumerate() {
-        if i == 0 {
-            name.push(
-                ctx.typed_sym(
-                    ctx.model
-                        .get_symbol_table()
-                        .id(&st.format_variable(p).to_string())
-                        .unwrap(),
-                )
-                .into(),
-            )
-        } else {
-            name.push(
-                SVar::try_from(*bindings.get_var(p).unwrap())
-                    .unwrap_or_else(|e| panic!("{e}"))
-                    .into(),
-            )
-        }
-    }
-    println!("ok!");
-
-    let get_atom =
-        |a: &VarId, context| -> aAtom { useful::var_id_into_atom(a, &st, bindings, context) };
 
     for x in ch.get_constraints() {
         let mut x = convert_constraint(x, prez, container, bindings, &st, ctx)?;
@@ -642,11 +666,7 @@ pub fn read_chronicle(
         let end: FAtom = get_atom(&s.interval.get_end(), ctx)
             .try_into()
             .unwrap_or_else(|t| panic!("{:?}", t));
-        let e: Vec<SAtom> = s
-            .task
-            .iter()
-            .map(|a| get_atom(&a, ctx).try_into().expect(""))
-            .collect();
+        let e: Vec<aAtom> = s.task.iter().map(|a| get_atom(&a, ctx)).collect();
         let st = SubTask {
             id: None,
             start,
@@ -673,12 +693,12 @@ pub fn read_chronicle(
     )?;
     let end = FAtom::from(end);
 
+    print!("init name...");
+    let mut name: Vec<aAtom> = ch.get_name().iter().map(|a| get_atom(a, ctx)).collect();
+    println!("ok!");
+
     print!("init task...");
-    let task: Vec<SAtom> = ch
-        .get_task()
-        .iter()
-        .map(|a| get_atom(a, ctx).try_into().expect(""))
-        .collect();
+    let task: Vec<aAtom> = ch.get_task().iter().map(|a| get_atom(a, ctx)).collect();
     println!("ok!");
     print!("\n\n");
 

@@ -5,8 +5,6 @@ use ompas_language::exec::platform::EXEC_COMMAND;
 use ompas_language::exec::refinement::EXEC_TASK;
 use ompas_language::exec::resource::ACQUIRE;
 use ompas_language::exec::ARBITRARY;
-use sompas_language::kind::LIST;
-use sompas_structs::list;
 use sompas_structs::lvalue::LValue;
 
 #[derive(Clone)]
@@ -31,8 +29,9 @@ pub fn annotate(lv: LValue) -> LValue {
     stack.frames.push(AnnotateFrame::Lv(lv));
 
     let ctx_expr = |ctx: &str, id: i32, mut args: Vec<LValue>| -> LValue {
-        args.insert(0, LIST.into());
-        list![ctx.into(), id.into(), args.into()]
+        let mut list = vec![ctx.into(), id.into()];
+        list.append(&mut args);
+        list.into()
     };
 
     while let Some(frame) = stack.frames.pop() {

@@ -1,5 +1,7 @@
 use crate::conversion::chronicle::interval::Interval;
 use crate::conversion::flow_graph::flow::{BranchingFlow, Flow, FlowId, FlowKind, FlowPause};
+use crate::planning::om_binding::OperationalModelBindings;
+use crate::supervisor::process::process_ref::Label;
 use crate::sym_table::lit::Lit;
 use crate::sym_table::r#ref::RefSymTable;
 use crate::sym_table::r#trait::{FlatBindings, FormatWithSymTable, GetVariables};
@@ -20,7 +22,9 @@ pub struct FlowGraph {
     pub flows: Vec<Flow>,
     pub map_atom_id_flow_id: HashMap<VerticeId, Vec<FlowId>>,
     pub handles: HashMap<VarId, FlowId>,
+    pub resource_handles: HashMap<VarId, VarId>,
     pub flow: FlowId,
+    pub bindings: OperationalModelBindings,
 }
 
 impl FlowGraph {
@@ -30,7 +34,9 @@ impl FlowGraph {
             flows: vec![],
             map_atom_id_flow_id: Default::default(),
             handles: Default::default(),
+            resource_handles: Default::default(),
             flow: 0,
+            bindings: Default::default(),
         }
     }
 
@@ -38,6 +44,23 @@ impl FlowGraph {
         let atom = self.st.get_var_parent(atom);
         let vec: Vec<&FlowId> = self
             .handles
+            .iter()
+            .filter_map(|(k, v)| {
+                if self.st.get_var_parent(k) == atom {
+                    Some(v)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        assert_eq!(vec.len(), 1);
+        vec.first().cloned()
+    }
+
+    pub fn get_resource_handle(&self, atom: &VarId) -> Option<&VarId> {
+        let atom = self.st.get_var_parent(atom);
+        let vec: Vec<&VarId> = self
+            .resource_handles
             .iter()
             .filter_map(|(k, v)| {
                 if self.st.get_var_parent(k) == atom {
@@ -102,6 +125,14 @@ impl FlowGraph {
         let end = &self.flows[*flow].interval.get_end();
 
         self.st.get_var_parent(end)
+    }
+
+    pub fn try_get_last_flow(&self, flow: &FlowId) -> Option<FlowId> {
+        match &self.flows[*flow].kind {
+            FlowKind::Lit(_) => Some(*flow),
+            FlowKind::Seq(s) => s.last().copied(),
+            _ => None,
+        }
     }
 
     pub fn try_get_flow_lit(&self, flow: &FlowId) -> Option<Lit> {
@@ -238,6 +269,7 @@ impl FlowGraph {
             interval,
             result,
             parent: None,
+            label: None,
             kind,
         };
 
@@ -272,6 +304,10 @@ impl FlowGraph {
         }
         self.flows.push(flow);
         id
+    }
+
+    pub fn set_label(&mut self, id: &FlowId, label: Label) {
+        self.flows[*id].label = Some(label)
     }
 
     pub fn update_flow(&mut self, id: &FlowId) {

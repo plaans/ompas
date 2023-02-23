@@ -1,4 +1,6 @@
 use crate::sym_table::domain::cst::Cst::*;
+use sompas_structs::lvalue::LValue;
+use sompas_structs::lvalues::LValueS;
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 
@@ -10,6 +12,62 @@ pub enum Cst {
     Float(f64),
     Symbol(String),
     Bool(bool),
+}
+
+impl From<Cst> for LValue {
+    fn from(value: Cst) -> Self {
+        match value {
+            Cst::Int(i) => i.into(),
+            Cst::Float(f) => f.into(),
+            Cst::Symbol(s) => s.into(),
+            Cst::Bool(b) => b.into(),
+        }
+    }
+}
+
+impl From<Cst> for LValueS {
+    fn from(value: Cst) -> Self {
+        match value {
+            Cst::Int(i) => i.into(),
+            Cst::Float(f) => f.into(),
+            Cst::Symbol(s) => s.into(),
+            Cst::Bool(b) => b.into(),
+        }
+    }
+}
+
+impl Cst {
+    pub fn as_int(&self) -> Option<i64> {
+        if let Self::Int(i) = self {
+            Some(*i)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_float(&self) -> Option<f64> {
+        if let Self::Float(f) = self {
+            Some(*f)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_symbol(&self) -> Option<&str> {
+        if let Self::Symbol(s) = self {
+            Some(s.as_str())
+        } else {
+            None
+        }
+    }
+
+    pub fn as_bool(&self) -> Option<bool> {
+        if let Self::Bool(b) = self {
+            Some(*b)
+        } else {
+            None
+        }
+    }
 }
 
 impl PartialEq for Cst {

@@ -207,36 +207,36 @@ pub mod exec {
 
         pub const CTX_ARBITRARY: &str = "ctx-arbitrary";
         pub const DOC_CTX_ARBITRARY: &str = "Evaluates an arbitrary in an assigned context";
-        pub const LAMBDA_CTX_ARBITRARY: &str = "(lambda (id args)
+        pub const LAMBDA_CTX_ARBITRARY: &str = "(lambda args
             (begin
-                (def-label 'arbitrary id)
-                (apply arbitrary args)
+                (def-label 'arbitrary (car args))
+                (enr (cons arbitrary (cdr args)))
             )
         )";
         pub const CTX_ACQUIRE: &str = "ctx-acquire";
         pub const DOC_CTX_ACQUIRE: &str = "Evaluates an acquire in an assigned context";
-        pub const LAMBDA_CTX_ACQUIRE: &str = "(lambda (id args)
+        pub const LAMBDA_CTX_ACQUIRE: &str = "(lambda args
             (begin
-                (def-label 'acquire id)
-                (apply acquire args)
+                (def-label 'acquire (car args))
+                (enr (cons acquire (cdr args)))
             )
         )";
 
         pub const CTX_EXEC_COMMAND: &str = "ctx-exec-command";
         pub const DOC_CTX_EXEC_COMMAND: &str = "Evaluates a command in an assigned context";
-        pub const LAMBDA_CTX_EXEC_COMMAND: &str = "(lambda (id args)
+        pub const LAMBDA_CTX_EXEC_COMMAND: &str = "(lambda args
             (begin
-                (def-label 'command id)
-                (apply exec-command args)
+                (def-label 'command (car args))
+                (enr (cons exec-command (cdr args)))
             )
         )";
 
         pub const CTX_EXEC_TASK: &str = "ctx-exec-task";
         pub const DOC_CTX_EXEC_TASK: &str = "Evaluates a task in an assigned context";
-        pub const LAMBDA_CTX_EXEC_TASK: &str = "(lambda (id args)
+        pub const LAMBDA_CTX_EXEC_TASK: &str = "(lambda args
             (begin
-                (def-label 'subtask id)
-                (apply exec-task args)
+                (def-label 'subtask (car args))
+                (enr (cons exec-task (cdr args)))
             )
         )";
     }

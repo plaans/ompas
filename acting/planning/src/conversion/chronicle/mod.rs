@@ -1,15 +1,22 @@
 use function_name::named;
-use ompas_language::sym_table::COND;
+use ompas_language::exec::resource::{MAX_Q, QUANTITY};
+use ompas_language::sym_table::{COND, EPSILON};
 use ompas_structs::conversion::chronicle::condition::Condition;
 use ompas_structs::conversion::chronicle::constraint::Constraint;
 use ompas_structs::conversion::chronicle::effect::Effect;
+use ompas_structs::conversion::chronicle::interval::Interval;
 use ompas_structs::conversion::chronicle::subtask::SubTask;
 use ompas_structs::conversion::chronicle::task_template::TaskTemplate;
 use ompas_structs::conversion::chronicle::template::{ChronicleKind, ChronicleTemplate};
 use ompas_structs::conversion::flow_graph::flow::{FlowId, FlowKind};
 use ompas_structs::conversion::flow_graph::graph::FlowGraph;
+use ompas_structs::planning::om_binding::{
+    AcquireBinding, ArbitraryBinding, ChronicleBinding, CommandBinding, SubTaskBinding,
+};
+use ompas_structs::supervisor::process::process_ref::{Label, MethodLabel};
 use ompas_structs::sym_table::computation::Computation;
 use ompas_structs::sym_table::domain::basic_type::BasicType::Boolean;
+use ompas_structs::sym_table::domain::basic_type::TYPE_ID_INT;
 use ompas_structs::sym_table::domain::Domain;
 use ompas_structs::sym_table::lit::Lit;
 use ompas_structs::sym_table::litset::LitSet;
@@ -25,52 +32,77 @@ pub mod post_processing;
 
 #[derive(Default, Clone)]
 pub struct HandleTable {
-    map: HashMap<FlowId, HandleMeta>,
+    asyncs: HashMap<FlowId, AsyncHandle>,
+    resources: HashMap<VarId, ResourceHandle>,
+}
+
+#[derive(Default, Clone)]
+pub struct AsyncHandle {
+    drops: HashSet<VarId>,
+    awaits: HashSet<VarId>,
+}
+
+#[derive(Default, Clone)]
+pub struct ResourceHandle {
+    drops: HashSet<VarId>,
+    releases: HashSet<VarId>,
 }
 
 impl HandleTable {
-    pub fn add_handle(&mut self, flow: FlowId, kind: HandleKind) {
-        self.map.insert(
+    pub fn add_handle(&mut self, flow: FlowId) {
+        self.asyncs.insert(
             flow,
-            HandleMeta {
-                kind,
+            AsyncHandle {
                 drops: Default::default(),
-                release: Default::default(),
+                awaits: Default::default(),
             },
         );
     }
 
-    pub fn add_drop(&mut self, flow: &FlowId, drop: VarId) {
-        if let Some(handle) = self.map.get_mut(&flow) {
+    pub fn add_resource_handle(&mut self, var_id: VarId) {
+        self.resources.insert(
+            var_id,
+            ResourceHandle {
+                drops: Default::default(),
+                releases: Default::default(),
+            },
+        );
+    }
+
+    pub fn add_async_drop(&mut self, flow: &FlowId, drop: VarId) {
+        if let Some(handle) = self.asyncs.get_mut(&flow) {
             handle.drops.insert(drop);
         } else {
             panic!("");
         }
     }
 
-    pub fn add_release(&mut self, flow: &FlowId, release: VarId) {
-        if let Some(handle) = self.map.get_mut(&flow) {
-            handle.release.insert(release);
+    pub fn add_resource_drop(&mut self, var_id: &VarId, drop: VarId) {
+        if let Some(handle) = self.resources.get_mut(var_id) {
+            handle.drops.insert(drop);
+        } else {
+            panic!("");
+        }
+    }
+
+    pub fn add_await(&mut self, flow: &FlowId, r#await: VarId) {
+        if let Some(handle) = self.asyncs.get_mut(&flow) {
+            handle.awaits.insert(r#await);
+        } else {
+            panic!("");
+        }
+    }
+
+    pub fn add_release(&mut self, var_id: &VarId, release: VarId) {
+        if let Some(handle) = self.resources.get_mut(var_id) {
+            handle.releases.insert(release);
         } else {
             panic!("");
         }
     }
 }
 
-#[derive(Clone)]
-pub enum HandleKind {
-    Async,
-    Ressource,
-}
-
-#[derive(Clone)]
-pub struct HandleMeta {
-    kind: HandleKind,
-    drops: HashSet<VarId>,
-    release: HashSet<VarId>,
-}
-
-pub fn convert_method(
+pub fn convert_graph(
     ch: Option<ChronicleTemplate>,
     fl: &mut FlowGraph,
     flow: &FlowId,
@@ -80,7 +112,7 @@ pub fn convert_method(
 
     let mut ch = convert_into_chronicle(ch, ht, fl, flow, env)?;
 
-    for (flow, handle) in ht.map.iter() {
+    for (flow, handle) in &ht.asyncs {
         let drops: Vec<VarId> = handle
             .drops
             .iter()
@@ -95,28 +127,47 @@ pub fn convert_method(
                 t_drop
             }
         };
-        let mut release = handle.release.clone();
-        release.insert(t_drop);
-        let release: Vec<VarId> = release.drain().map(|v| ch.st.get_var_parent(&v)).collect();
-        let lit: Option<Lit> = match release.len() {
+        let mut awaits = handle.awaits.clone();
+        awaits.insert(t_drop);
+        let awaits: Vec<VarId> = awaits.drain().map(|v| ch.st.get_var_parent(&v)).collect();
+        let lit: Option<Lit> = match awaits.len() {
             0 => None,
-            1 => Some(release.first().unwrap().into()),
-            _ => Some(Constraint::min(release).into()),
+            1 => Some(awaits.first().unwrap().into()),
+            _ => Some(Constraint::min(awaits).into()),
         };
 
         if let Some(lit) = lit {
             let end = fl.st.get_var_parent(&fl.get_flow_end(flow));
-            match handle.kind {
-                HandleKind::Async => ch.add_constraint(Constraint::leq(end, lit)),
-                HandleKind::Ressource => match lit {
-                    /*Lit::Atom(a) => {
-                        ch.st.union_var(&a, &end);
-                    }*/
-                    _ => {
-                        ch.add_constraint(Constraint::eq(end, lit));
-                    }
-                },
+            ch.add_constraint(Constraint::leq(end, lit));
+        }
+    }
+
+    for (release_time, handle) in &ht.resources {
+        let drops: Vec<VarId> = handle
+            .drops
+            .iter()
+            .map(|v| ch.st.get_var_parent(v))
+            .collect();
+        let t_drop = match drops.len() {
+            0 => panic!(),
+            1 => *drops.first().unwrap(),
+            _ => {
+                let t_drop = fl.st.new_timepoint();
+                ch.add_constraint(Constraint::eq(t_drop, Constraint::max(drops)));
+                t_drop
             }
+        };
+        let mut releases = handle.releases.clone();
+        releases.insert(t_drop);
+        let releases: Vec<VarId> = releases.drain().map(|v| ch.st.get_var_parent(&v)).collect();
+        let lit: Option<Lit> = match releases.len() {
+            0 => None,
+            1 => Some(releases.first().unwrap().into()),
+            _ => Some(Constraint::min(releases).into()),
+        };
+
+        if let Some(lit) = lit {
+            ch.add_constraint(Constraint::eq(release_time, lit));
         }
     }
 
@@ -179,7 +230,7 @@ pub fn convert_into_chronicle(
                     Lit::Atom(_) => {}
                     Lit::Await(a) => {
                         let handle = fl.get_handle(a).unwrap();
-                        ht.add_release(handle, interval.get_end());
+                        ht.add_await(handle, interval.get_end());
 
                         /*ch.add_constraint(Constraint::leq(
                             fl.get_flow_end(&handle),
@@ -187,41 +238,159 @@ pub fn convert_into_chronicle(
                         ));*/
                         st.union_var(&fl.get_flow_result(&handle), &result);
                     }
-                    Lit::Release(release) => {
-                        let handle = fl.get_handle(release).unwrap();
-                        ht.add_release(handle, interval.get_end());
+                    Lit::Acquire(acq) => {
+                        let quantity_symbol = st.new_symbol(QUANTITY);
+                        let max_q_symbol = st.new_symbol(MAX_Q);
+                        let epsilon = st.new_symbol(EPSILON);
+                        let resource = acq.resource;
+                        let t_prime = st.new_timepoint();
+                        let t_release_prime = st.new_timepoint();
+                        let t_release = acq.release_time;
+                        let int_domain: Domain = Domain::Simple(TYPE_ID_INT);
 
+                        let new_q = st.new_result();
+                        st.set_domain(&st.get_domain_id(&new_q), int_domain.clone());
+                        let new_q_prime = st.new_result();
+                        st.set_domain(&st.get_domain_id(&new_q_prime), int_domain.clone());
+                        let current_release_quantity = st.new_result();
+                        st.set_domain(
+                            &st.get_domain_id(&current_release_quantity),
+                            int_domain.clone(),
+                        );
+                        let current_quantity = st.new_result();
+                        st.set_domain(&st.get_domain_id(&current_quantity), int_domain.clone());
+
+                        ht.add_resource_handle(t_release);
+
+                        let domain_id = st.get_domain_id(&result);
+
+                        let drops: Vec<VarId> = st
+                            .get_domain_vars(&domain_id)
+                            .drain(..)
+                            .filter_map(|a| st.get_drop(&st.get_var_parent(&a)))
+                            .collect();
+
+                        for drop in drops {
+                            ht.add_resource_drop(&t_release, drop)
+                        }
+
+                        //Add all conditions
+                        // Current quantity
+                        ch.add_condition(Condition {
+                            interval: Interval::new_instantaneous(t_prime),
+                            sv: vec![quantity_symbol, resource],
+                            value: current_quantity,
+                        });
+
+                        ch.add_condition(Condition {
+                            interval: Interval::new_instantaneous(t_release),
+                            sv: vec![quantity_symbol, resource],
+                            value: current_release_quantity,
+                        });
+
+                        let capacity = if let Some(capacity) = acq.capacity {
+                            capacity
+                        } else {
+                            let max_q_result = st.new_result();
+                            st.set_domain(&st.get_domain_id(&max_q_result), int_domain.clone());
+                            ch.add_condition(Condition {
+                                interval: Interval::new_instantaneous(interval.get_start()),
+                                sv: vec![max_q_symbol, resource],
+                                value: max_q_result,
+                            });
+
+                            max_q_result
+                        };
+
+                        //Add all constraints on acquisition and release of constraint
+                        ch.add_constraint(Constraint::leq(interval.get_start(), t_prime));
+                        ch.add_constraint(Constraint::eq(
+                            interval.get_end(),
+                            Computation::add(vec![t_prime, epsilon]),
+                        ));
+                        ch.add_constraint(Constraint::eq(
+                            t_release_prime,
+                            Computation::add(vec![t_release, epsilon]),
+                        ));
+                        ch.add_constraint(Constraint::eq(
+                            new_q,
+                            Computation::sub(vec![current_quantity, capacity]),
+                        ));
+                        ch.add_constraint(Constraint::eq(
+                            new_q_prime,
+                            Computation::add(vec![current_release_quantity, capacity]),
+                        ));
+                        ch.add_constraint(Constraint::leq(interval.get_end(), t_release));
+                        ch.add_constraint(Constraint::leq(st.new_int(0), new_q));
+                        ch.add_constraint(Constraint::leq(st.new_int(0), new_q_prime));
+
+                        ch.add_effect(Effect {
+                            interval: Interval::new_instantaneous(interval.get_end()),
+                            sv: vec![quantity_symbol, resource],
+                            value: new_q,
+                        });
+                        ch.add_effect(Effect {
+                            interval: Interval::new_instantaneous(t_release_prime),
+                            sv: vec![quantity_symbol, resource],
+                            value: new_q_prime,
+                        });
+
+                        if let Some(label) = flow.label {
+                            ch.bindings.add_binding(
+                                label,
+                                ChronicleBinding::Acquire(AcquireBinding {
+                                    start,
+                                    acquisition: end,
+                                    end: t_release,
+                                }),
+                            )
+                        }
+                    }
+                    Lit::Release(release) => {
+                        let handle = fl.get_resource_handle(release).unwrap();
+                        ht.add_release(handle, interval.get_end());
                         /*ch.add_constraint(Constraint::eq(
                             fl.get_flow_end(&handle),
                             interval.get_end(),
                         ));*/
                     }
                     Lit::Constraint(c) => match c.deref() {
-                        Constraint::Arbitrary(set) => match set {
-                            LitSet::Finite(set) => {
-                                let mut constraints = vec![];
-                                for e in set {
-                                    constraints.push(Constraint::eq(result, e))
+                        Constraint::Arbitrary(set) => {
+                            match set {
+                                LitSet::Finite(set) => {
+                                    let mut constraints = vec![];
+                                    for e in set {
+                                        constraints.push(Constraint::eq(result, e))
+                                    }
+                                    if constraints.len() > 1 {
+                                        ch.add_constraint(Constraint::or(constraints));
+                                    } else {
+                                        ch.add_constraint(constraints[0].clone());
+                                    }
                                 }
-                                if constraints.len() > 1 {
-                                    ch.add_constraint(Constraint::or(constraints))
-                                } else {
-                                    ch.add_constraint(constraints[0].clone());
+                                LitSet::Domain(d) => {
+                                    let id = st.new_parameter("_arbitrary_", Domain::any());
+                                    let r#type: String = d.format(&st, true);
+                                    let domain =
+                                        st.get_type_as_domain(&r#type).ok_or_else(|| {
+                                            LRuntimeError::new(
+                                                function_name!(),
+                                                format!("{} is not a defined type", r#type),
+                                            )
+                                        })?;
+                                    st.meet_to_domain(&st.get_domain_id(&result), domain);
+                                    st.union_var(&id, &result);
                                 }
+                            };
+                            if let Some(label) = flow.label {
+                                ch.bindings.add_binding(
+                                    label,
+                                    ChronicleBinding::Arbitrary(ArbitraryBinding {
+                                        var_id: flow.result,
+                                    }),
+                                );
                             }
-                            LitSet::Domain(d) => {
-                                let id = st.new_parameter("_arbitrary_", Domain::any());
-                                let r#type: String = d.format(&st, true);
-                                let domain = st.get_type_as_domain(&r#type).ok_or_else(|| {
-                                    LRuntimeError::new(
-                                        function_name!(),
-                                        format!("{} is not a defined type", r#type),
-                                    )
-                                })?;
-                                st.meet_to_domain(&st.get_domain_id(&result), domain);
-                                st.union_var(&id, &result);
-                            }
-                        },
+                        }
                         _ => ch.add_constraint(Constraint::eq(result, c.deref())),
                     },
                     Lit::Computation(c) => ch.add_constraint(Constraint::eq(result, c.deref())),
@@ -291,6 +460,7 @@ pub fn convert_into_chronicle(
                             interval,
                             task: exec.clone(),
                             result,
+                            label: flow.label.clone(),
                         };
 
                         let mut args = exec[1..].to_vec();
@@ -309,6 +479,24 @@ pub fn convert_into_chronicle(
                                     };
                                 }
                             }
+                        }
+                        if let Some(label) = flow.label {
+                            let binding = match &label {
+                                Label::MethodProcess(MethodLabel::Command(_)) => {
+                                    ChronicleBinding::Command(CommandBinding {
+                                        index: ch.get_subtasks().len(),
+                                        interval,
+                                    })
+                                }
+                                Label::MethodProcess(MethodLabel::Subtask(_)) => {
+                                    ChronicleBinding::Subtask(SubTaskBinding {
+                                        index: ch.get_subtasks().len(),
+                                        interval,
+                                    })
+                                }
+                                _ => unreachable!(),
+                            };
+                            ch.bindings.add_binding(label, binding);
                         }
 
                         ch.add_subtask(subtask);
@@ -453,13 +641,14 @@ pub fn convert_into_chronicle(
                         interval,
                         task: task.into(),
                         result,
+                        label: None,
                     })
                 }
             }
             FlowKind::FlowHandle(h) => {
                 queue.push_back(h);
                 st.union_var(&start, &fl.get_flow_start(&h));
-                ht.add_handle(h, HandleKind::Async);
+                ht.add_handle(h);
                 //sym_table.union_atom(&ass.get_start(), &fl.get_flow_start(&h));
                 let domain_id = st.get_domain_id(&result);
                 let drops: Vec<VarId> = st
@@ -469,7 +658,7 @@ pub fn convert_into_chronicle(
                     .collect();
 
                 for drop in drops {
-                    ht.add_drop(&h, drop)
+                    ht.add_async_drop(&h, drop)
                 }
 
                 //ch.add_constraint(Constraint::leq(fl.get_flow_end(&h), Constraint::Max(drops)))
@@ -479,10 +668,11 @@ pub fn convert_into_chronicle(
                     ch.add_constraint(Constraint::eq(end, Computation::add(vec![start, duration])));
                 }
             }
-            FlowKind::FlowResourceHandle(h) => {
-                queue.push_back(h);
+            FlowKind::FlowResourceHandle(_) => {
+                unreachable!()
+                /*queue.push_back(h);
                 let domain_id = st.get_domain_id(&result);
-                ht.add_handle(h, HandleKind::Ressource);
+
                 ch.add_constraint(Constraint::leq(start, fl.get_flow_start(&h)));
 
                 let drops: Vec<VarId> = st
@@ -493,7 +683,7 @@ pub fn convert_into_chronicle(
 
                 for drop in drops {
                     ht.add_drop(&h, drop)
-                }
+                }*/
 
                 /*let drops: Vec<Lit> = st
                     .get_domain_vars(&domain_id)

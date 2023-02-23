@@ -1,5 +1,6 @@
 use crate::exec::state::ModState;
 use crate::monitor::domain::ModDomain;
+use aries_planning::chronicles::ChronicleOrigin;
 use ompas_language::exec::refinement::EXEC_TASK;
 use ompas_language::monitor::debug_conversion::{
     ANNOTATE_TASK, CONVERT_DOMAIN, DOC_ANNOTATE_TASK, DOC_CONVERT_DOMAIN, DOC_MOD_DEBUG_CONVERSION,
@@ -8,15 +9,17 @@ use ompas_language::monitor::debug_conversion::{
 };
 use ompas_language::monitor::domain::MOD_DOMAIN;
 use ompas_middleware::logger::LogClient;
+use ompas_planning::aries::problem_generation::{finite_problem, PAction, TaskParam};
 use ompas_planning::aries::solver::run_solver_for_htn;
 use ompas_planning::aries::{generate_chronicles, solver};
+use ompas_planning::conversion::convert_acting_domain;
 use ompas_planning::conversion::flow::annotate::annotate;
-use ompas_planning::conversion::flow::p_eval::r#struct::{PConfig, PLEnv};
+use ompas_planning::conversion::flow::p_eval::r#struct::{PConfig, PLEnv, PLValue};
 use ompas_planning::conversion::flow::p_eval::{p_eval, P_EVAL};
-use ompas_planning::conversion::{convert_acting_domain, p_convert, p_convert_task};
 use ompas_structs::conversion::context::ConversionContext;
 use ompas_structs::planning::domain::PlanningDomain;
 use ompas_structs::planning::problem::PlanningProblem;
+use ompas_structs::supervisor::process::process_ref::{Label, ProcessRef};
 use sompas_core::expand;
 use sompas_language::LOG_TOPIC_INTERPRETER;
 use sompas_macros::async_scheme_fn;
@@ -63,7 +66,20 @@ pub async fn plan_task(env: &LEnv, args: &[LValue]) -> LResult {
     context
         .env
         .update_context(ModState::new_from_snapshot(context.state.clone()));
-    let mut pp: PlanningProblem = p_convert_task(args, &context).await?;
+
+    let actions = vec![PAction {
+        args: args
+            .iter()
+            .map(|lv| TaskParam::Instantiated(lv.try_into().unwrap()))
+            .collect(),
+        origin: ChronicleOrigin::Refinement {
+            instance_id: 0,
+            task_id: 0,
+        },
+        pr: ProcessRef::Relative(0, vec![Label::HighLevelTask(0)]),
+    }];
+    let pp: PlanningProblem = finite_problem(actions, &context).await?;
+
     println!("instances: {}", {
         let mut str = "".to_string();
         for instance in &pp.instance.instances {
@@ -71,7 +87,6 @@ pub async fn plan_task(env: &LEnv, args: &[LValue]) -> LResult {
         }
         str
     });
-    p_convert(&mut pp, &context).await?;
 
     for template in &pp.domain.templates {
         println!("{}", template)

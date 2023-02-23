@@ -156,6 +156,14 @@ impl Domain {
     pub fn nil() -> Domain {
         Union(vec![False.into(), EmptyList.into()])
     }
+
+    pub fn as_constant(&self) -> Option<&cst::Cst> {
+        if let Self::Cst(_, cst) = &self {
+            Some(cst)
+        } else {
+            None
+        }
+    }
 }
 
 impl Display for Domain {

@@ -19,6 +19,7 @@ pub enum Lit {
     Exp(Vec<Lit>),
     Atom(VarId),
     Await(VarId),
+    Acquire(AcquireLit),
     Release(VarId),
     Read(Vec<VarId>),
     Write(Vec<VarId>),
@@ -26,6 +27,13 @@ pub enum Lit {
     Constraint(Box<Constraint>),
     Apply(Vec<VarId>),
     Computation(Box<Computation>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct AcquireLit {
+    pub resource: VarId,
+    pub capacity: Option<VarId>,
+    pub release_time: VarId,
 }
 
 impl Lit {
@@ -103,6 +111,7 @@ impl TryFrom<&Lit> for Vec<VarId> {
                 LitSet::Finite(set) => Ok(set.clone()),
                 LitSet::Domain(d) => Ok(vec![*d]),
             },
+            Lit::Acquire(_) => Err(Default::default()),
         }
     }
 }
@@ -297,6 +306,17 @@ impl FormatWithSymTable for Lit {
             }
             Lit::Computation(c) => c.format(st, sym_version),
             Lit::Set(set) => set.format(st, sym_version),
+            Lit::Acquire(acq) => {
+                format!(
+                    "acquire({},{}) ->{}",
+                    acq.resource.format(st, sym_version),
+                    match acq.capacity {
+                        Some(c) => c.format(st, sym_version),
+                        None => "..".to_string(),
+                    },
+                    acq.release_time.format(st, sym_version)
+                )
+            }
         }
     }
 }
@@ -312,6 +332,13 @@ impl FlatBindings for Lit {
             }
             Lit::Computation(c) => c.flat_bindings(st),
             Lit::Set(set) => set.flat_bindings(st),
+            Lit::Acquire(acq) => {
+                acq.resource.flat_bindings(st);
+                if let Some(capacity) = &mut acq.capacity {
+                    capacity.flat_bindings(st)
+                }
+                acq.release_time.flat_bindings(st);
+            }
         }
     }
 }
@@ -333,6 +360,13 @@ impl GetVariables for Lit {
             }
             Lit::Computation(c) => c.get_variables(),
             Lit::Set(set) => set.get_variables(),
+            Lit::Acquire(acq) => {
+                let mut vec = vec![acq.resource, acq.release_time];
+                if let Some(capacity) = acq.capacity {
+                    vec.push(capacity)
+                }
+                vec.into()
+            }
         }
     }
 
@@ -356,6 +390,7 @@ impl Replace for Lit {
             }
             Lit::Computation(c) => c.replace(old, new),
             Lit::Set(_) => {}
+            _ => {}
         }
     }
 }

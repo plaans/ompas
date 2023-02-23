@@ -133,9 +133,9 @@ fn initialize_goal_task(init_ch: &mut Chronicle, goal_tasks: &[LValueS], ctx: &m
     let c = Container::Instance(0);
     for t in goal_tasks {
         let t: Vec<LValueS> = t.try_into().expect("");
-        let task_name: Vec<SAtom> = t
+        let task_name: Vec<aAtom> = t
             .iter()
-            .map(|v| useful::satom_from_lvalues(ctx, v))
+            .map(|v| useful::atom_from_lvalues(ctx, v))
             .collect();
 
         let prez = init_ch.presence;

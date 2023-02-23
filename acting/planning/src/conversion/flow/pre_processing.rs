@@ -19,7 +19,7 @@ pub async fn pre_processing(lv: &LValue, env: &LEnv) -> LResult {
     let env = &mut env.clone();
     let pc = PConfig::default();
     let lv = lambda_expansion(&lv, env, &pc.avoid).await?;
-    let lv = acquire_expansion(&lv, env).await?;
+    //let lv = acquire_expansion(&lv, env).await?;
     let lv = do_expansion(&lv, env).await?;
     //println!("{}", lv.format(0));
 
@@ -175,10 +175,10 @@ pub async fn acquire_expansion(lv: &LValue, env: &LEnv) -> LResult {
             write!(lisp, "(wait-for (<= __q__ (read-state {QUANTITY} __r__)))").unwrap();
             write!(
                 lisp,
-                "(assert {QUANTITY} __r__ (+ (read-state {QUANTITY} __r__) __q__))"
+                "(assert {QUANTITY} __r__ (- (read-state {QUANTITY} __r__) __q__))"
             )
             .unwrap();
-            write!(lisp, "(ressource-handle (assert {QUANTITY} __r__ (- (read-state {QUANTITY} __r__) __q__))))").unwrap();
+            write!(lisp, "(ressource-handle (assert {QUANTITY} __r__ (+ (read-state {QUANTITY} __r__) __q__))))").unwrap();
             let mut c_env = env.clone();
 
             parse(&lisp, &mut c_env).await

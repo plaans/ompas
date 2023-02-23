@@ -7,3 +7,10 @@
         )
     )
 )
+
+(lambda args
+            (begin
+                (def-label 'arbitrary (car args))
+                (enr (cons arbitrary (cdr args)))
+            )
+        )

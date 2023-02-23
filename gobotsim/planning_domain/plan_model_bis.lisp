@@ -16,14 +16,14 @@
                                `(t_process_on_machine ,?p 
                                    (arbitrary ',(find_machines_for_process (car process)))                                   ))
                                (package.all_processes ?p)))
-                            (define last_task
-                                `(begin
-                                    (define ?r (arbitrary (instances robot)))
-                                    (define h_r (acquire ?r))
-                                    ,(define ?m (find_output_machine))
-                                    ,?m
-                                    (t_carry_to_machine ?r ,?p ,?m)))
-                            (define tasks (append tasks (list last_task)))
+                            ; (define last_task
+                            ;     `(begin
+                            ;         (define ?r (arbitrary (instances robot)))
+                            ;         (define h_r (acquire ?r))
+                            ;         ,(define ?m (find_output_machine))
+                            ;         ,?m
+                            ;         (t_carry_to_machine ?r ,?p ,?m)))
+                            ; (define tasks (append tasks (list last_task)))
                             ;(print tasks)
                             `(apply seq ',tasks)))
                         (instances package)))
@@ -37,7 +37,7 @@
             (:body
                 (do
                     (define rh (acquire ?m))
-                    ;(sleep 1)
+                    (sleep 1)
                     (release rh)
                     )))
 

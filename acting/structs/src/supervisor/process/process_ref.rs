@@ -7,22 +7,14 @@ pub enum ProcessRef {
     Relative(ActingProcessId, Vec<Label>),
 }
 
-impl Display for ProcessRef {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl ProcessRef {
+    pub fn push(&mut self, label: Label) {
         match self {
-            ProcessRef::Id(id) => write!(f, "{id}"),
-            ProcessRef::Relative(id, labels) => {
-                write!(f, "{id}")?;
-                for label in labels {
-                    write!(f, "/{label}")?;
-                }
-                Ok(())
-            }
+            ProcessRef::Id(id) => *self = ProcessRef::Relative(*id, vec![label]),
+            ProcessRef::Relative(_, vec) => vec.push(label),
         }
     }
-}
 
-impl ProcessRef {
     pub fn as_id(&self) -> Option<ActingProcessId> {
         if let Self::Id(id) = self {
             Some(*id)
@@ -39,6 +31,21 @@ impl ProcessRef {
 impl Default for ProcessRef {
     fn default() -> Self {
         Self::Id(0)
+    }
+}
+
+impl Display for ProcessRef {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ProcessRef::Id(id) => write!(f, "{id}"),
+            ProcessRef::Relative(id, labels) => {
+                write!(f, "{id}")?;
+                for label in labels {
+                    write!(f, "/{label}")?;
+                }
+                Ok(())
+            }
+        }
     }
 }
 

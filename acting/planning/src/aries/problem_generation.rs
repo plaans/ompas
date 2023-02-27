@@ -9,8 +9,7 @@ use crate::conversion::flow::pre_processing::pre_processing;
 use aries_planning::chronicles::ChronicleOrigin;
 use function_name::named;
 use ompas_structs::acting_domain::parameters::Parameters;
-use ompas_structs::acting_domain::task::Task;
-use ompas_structs::conversion::chronicle::template::{ChronicleKind, ChronicleTemplate};
+use ompas_structs::conversion::chronicle::{Chronicle, ChronicleKind};
 use ompas_structs::conversion::context::ConversionContext;
 use ompas_structs::conversion::flow_graph::graph::FlowGraph;
 use ompas_structs::planning::domain::PlanningDomain;
@@ -22,18 +21,17 @@ use ompas_structs::sym_table::VarId;
 use sompas_structs::llambda::{LLambda, LambdaArgs};
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
-use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalues::LValueS;
 use std::collections::HashSet;
-use std::fmt::Display;
 use std::time::SystemTime;
 
-pub enum TaskParam {
+#[derive(Clone)]
+pub enum ActionParam {
     Instantiated(LValueS),
     Uninstantiated(LValueS),
 }
 
-impl TaskParam {
+impl ActionParam {
     pub fn lvalues(&self) -> &LValueS {
         match self {
             Self::Instantiated(lv) => lv,
@@ -42,18 +40,22 @@ impl TaskParam {
     }
 }
 
+#[derive(Clone)]
 pub struct PAction {
-    pub args: Vec<TaskParam>,
+    //Partially instantiated action
+    pub args: Vec<ActionParam>,
+    //Encoding of the origin of the chronicle
     pub origin: ChronicleOrigin,
+    //Process reference regarding the execution trace
     pub pr: ProcessRef,
 }
 
 pub async fn finite_problem(
-    mut actions: Vec<PAction>,
+    mut goal_actions: Vec<PAction>,
     context: &ConversionContext,
 ) -> Result<PlanningProblem, LRuntimeError> {
     let st = context.st.clone();
-    let high_level_actions: Vec<LValueS> = actions
+    let high_level_actions: Vec<LValueS> = goal_actions
         .iter()
         .map(|action| LValueS::List(action.args.iter().map(|tp| tp.lvalues().clone()).collect()))
         .collect();
@@ -65,18 +67,21 @@ pub async fn finite_problem(
     let mut instances: Vec<ChronicleInstance> = vec![];
 
     let mut update_domain =
-        |tasks: &mut Vec<PAction>, template: &ChronicleTemplate, instance_n: usize| {
-            for (id, subtask) in template.get_subtasks().iter().enumerate() {
-                let mut value: Vec<TaskParam> = vec![];
+        |tasks: &mut Vec<PAction>, instance: &ChronicleInstance, instance_n: usize| {
+            for (id, subtask) in instance.chronicle.get_subtasks().iter().enumerate() {
+                let mut value: Vec<ActionParam> = vec![];
                 for e in &subtask.task {
                     let domain = st.get_domain_of_var(&e);
 
                     let val = match domain.as_constant() {
-                        Some(cst) => TaskParam::Instantiated(cst.clone().into()),
-                        None => TaskParam::Uninstantiated(st.format_variable(&e).into()),
+                        Some(cst) => ActionParam::Instantiated(cst.clone().into()),
+                        None => ActionParam::Uninstantiated(st.format_variable(&e).into()),
                     };
                     value.push(val)
                 }
+
+                let mut pr = instance.pr.clone();
+                pr.push(Label::Subtask(0));
 
                 tasks.push(PAction {
                     args: value,
@@ -84,20 +89,20 @@ pub async fn finite_problem(
                         instance_id: instance_n,
                         task_id: id,
                     },
-                    pr: Default::default(),
+                    pr,
                 })
             }
 
-            for effect in template.get_effects() {
+            for effect in instance.chronicle.get_effects() {
                 sf_labels.insert(effect.sv[0].format(&st, true));
             }
 
-            for condition in template.get_conditions() {
+            for condition in instance.chronicle.get_conditions() {
                 sf_labels.insert(condition.sv[0].format(&st, true));
             }
         };
 
-    while let Some(action) = actions.pop() {
+    while let Some(action) = goal_actions.pop() {
         let tps = &action.args;
         let instance_n = instances.len() + 1;
         if let Some(task) = context
@@ -108,14 +113,13 @@ pub async fn finite_problem(
             tasks.insert(task.get_label().to_string());
 
             let params = task.get_parameters().get_labels();
-            let mut pc = PConfig::default();
             assert_eq!(params.len(), tps.len() - 1);
 
             match task.get_model() {
                 Some(model) => {
                     let model_lambda: LLambda = model.try_into().expect("");
 
-                    let mut instance: ChronicleInstance = convert_into_chronicle_instance(
+                    let instance: ChronicleInstance = convert_into_chronicle_instance(
                         &model_lambda,
                         action,
                         None,
@@ -124,37 +128,39 @@ pub async fn finite_problem(
                         ChronicleKind::Task,
                     )
                     .await?;
-                    update_domain(&mut actions, &instance.template, instance_n);
+                    update_domain(&mut goal_actions, &instance, instance_n);
 
                     instances.push(instance)
                 }
                 None => {
-                    todo!();
-                    /*for (id, m_label) in task.get_methods().iter().enumerate() {
+                    for (id, m_label) in task.get_methods().iter().enumerate() {
                         methods.insert(m_label.to_string());
-                        let mut pc = pc.clone();
-                        let method = context.domain.methods.get(m_label).unwrap();
-                        for param in &method.parameters.get_labels()[params.len()..] {
-                            pc.p_table.add_param(param.to_string());
-                        }
-
+                        let method = context.domain.get_methods().get(m_label).unwrap();
                         let method_lambda: LLambda = method.get_body().try_into().expect("");
 
+                        let mut p_method: PAction = action.clone();
+                        p_method.args[0] = ActionParam::Instantiated(m_label.clone().into());
+                        for param in
+                            &method.parameters.get_labels()[task.get_parameters().inner().len()..]
+                        {
+                            p_method
+                                .args
+                                .push(ActionParam::Uninstantiated(param.to_string().into()))
+                        }
                         let mut instance: ChronicleInstance = convert_into_chronicle_instance(
                             &method_lambda,
-                            &method.label,
-                            Some(task),
+                            p_method,
+                            Some(&action.args),
                             method.get_parameters(),
                             &context,
                             ChronicleKind::Method,
-                            pc.clone(),
                         )
                         .await?;
-                        update_domain(&mut actions, &instance.template, instance_n);
-                        instance.pr = action.pr.clone();
-                        instance.pr.push(Label::Method(id));
+                        update_domain(&mut goal_actions, &instance, instance_n);
+
+                        instance.pr.push(Label::Refinement(id));
                         instances.push(instance);
-                    }*/
+                    }
                 }
             }
         } else if let Some(command) = context
@@ -166,7 +172,7 @@ pub async fn finite_problem(
 
             let model_lambda: LLambda = command.get_model().try_into().expect("");
 
-            let mut instance: ChronicleInstance = convert_into_chronicle_instance(
+            let instance: ChronicleInstance = convert_into_chronicle_instance(
                 &model_lambda,
                 action,
                 None,
@@ -175,7 +181,7 @@ pub async fn finite_problem(
                 ChronicleKind::Command,
             )
             .await?;
-            update_domain(&mut actions, &instance.template, instance_n);
+            update_domain(&mut goal_actions, &instance, instance_n);
 
             instances.push(instance)
         } else {
@@ -217,7 +223,7 @@ pub async fn finite_problem(
 pub async fn convert_into_chronicle_instance(
     lambda: &LLambda,
     p_action: PAction,
-    task: Option<&[TaskParam]>,
+    task: Option<&[ActionParam]>,
     parameters: &Parameters,
     cc: &ConversionContext,
     kind: ChronicleKind,
@@ -235,7 +241,7 @@ pub async fn convert_into_chronicle_instance(
 
     let symbol_id = st.get_sym_id(&label).unwrap();
 
-    let mut ch = ChronicleTemplate::new(label.to_string(), kind, st.clone());
+    let mut ch = Chronicle::new(label.to_string(), kind, st.clone());
     let mut name: Vec<VarId> = vec![symbol_id];
     if let LambdaArgs::List(l) = lambda.get_params() {
         if l.len() != parameters.get_number() {
@@ -254,7 +260,7 @@ pub async fn convert_into_chronicle_instance(
             l.iter().zip(parameters.inner().iter().zip(params))
         {
             let id = match task_param {
-                TaskParam::Instantiated(lv) => {
+                ActionParam::Instantiated(lv) => {
                     pc.p_table
                         .add_instantiated(lambda_param.to_string(), lv.into());
                     match lv {
@@ -265,7 +271,7 @@ pub async fn convert_into_chronicle_instance(
                         _ => unreachable!(),
                     }
                 }
-                TaskParam::Uninstantiated(lv) => {
+                ActionParam::Uninstantiated(lv) => {
                     let symbol = lv.to_string();
                     pc.p_table.add(
                         lambda_param.to_string(),
@@ -290,7 +296,7 @@ pub async fn convert_into_chronicle_instance(
     });
 
     let lv = lambda.get_body();
-    ch.debug.lvalue = lv.clone();
+    ch.meta_data.lvalue = lv.clone();
 
     let mut p_env = PLEnv {
         env: cc.env.clone(),
@@ -314,14 +320,14 @@ pub async fn convert_into_chronicle_instance(
     post_processing(&mut ch, cc.env.clone())?;
 
     graph.flat_bindings();
-    ch.debug.flow_graph = graph;
-    ch.debug.post_processed_lvalue = lv;
-    ch.debug.convert_time = time.elapsed().unwrap();
+    ch.meta_data.flow_graph = graph;
+    ch.meta_data.post_processed_lvalue = lv;
+    ch.meta_data.convert_time = time.elapsed().unwrap();
 
     Ok(ChronicleInstance {
         origin: p_action.origin,
-        template: ch,
-        value: lv_om,
+        chronicle: ch,
+        om: lv_om,
         pr: p_action.pr,
     })
 }

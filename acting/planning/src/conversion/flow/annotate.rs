@@ -21,9 +21,8 @@ pub struct AnnotateStack {
 
 pub fn annotate(lv: LValue) -> LValue {
     let mut n_acquire = -1;
-    let mut n_command = -1;
     let mut n_arbitrary = -1;
-    let mut n_exec_task = -1;
+    let mut n_sub_task = -1;
 
     let mut stack = AnnotateStack::default();
     stack.frames.push(AnnotateFrame::Lv(lv));
@@ -50,8 +49,8 @@ pub fn annotate(lv: LValue) -> LValue {
                 let mut results = stack.results.split_off(stack.results.len() - n);
                 let result = match results[0].to_string().as_str() {
                     EXEC_COMMAND => {
-                        n_command += 1;
-                        ctx_expr(CTX_EXEC_COMMAND, n_command, results.split_off(1))
+                        n_sub_task += 1;
+                        ctx_expr(CTX_EXEC_COMMAND, n_sub_task, results.split_off(1))
                     }
                     ACQUIRE => {
                         n_acquire += 1;
@@ -62,8 +61,8 @@ pub fn annotate(lv: LValue) -> LValue {
                         ctx_expr(CTX_ARBITRARY, n_arbitrary, results.split_off(1))
                     }
                     EXEC_TASK => {
-                        n_exec_task += 1;
-                        ctx_expr(CTX_EXEC_TASK, n_exec_task, results.split_off(1))
+                        n_sub_task += 1;
+                        ctx_expr(CTX_EXEC_TASK, n_sub_task, results.split_off(1))
                     }
                     _ => results.into(),
                 };

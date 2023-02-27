@@ -11,12 +11,12 @@ use ompas_language::exec::state::{
 };
 use ompas_language::exec::ARBITRARY;
 use ompas_language::supervisor::ACQUIRE;
-use ompas_language::sym_table::{EPSILON, TYPE_OBJECT, TYPE_OBJECT_TYPE, TYPE_RESSOURCE_HANDLE};
+use ompas_language::sym_table::{TYPE_OBJECT, TYPE_OBJECT_TYPE, TYPE_RESSOURCE_HANDLE};
 use ompas_structs::conversion::chronicle::constraint::Constraint;
 use ompas_structs::conversion::flow_graph::define_table::DefineTable;
 use ompas_structs::conversion::flow_graph::flow::FlowId;
 use ompas_structs::conversion::flow_graph::graph::FlowGraph;
-use ompas_structs::supervisor::process::process_ref::{Label, MethodLabel};
+use ompas_structs::supervisor::process::process_ref::Label;
 use ompas_structs::sym_table::closure::Update;
 use ompas_structs::sym_table::computation::Computation;
 use ompas_structs::sym_table::domain::basic_type::BasicType::{Boolean, True};
@@ -182,14 +182,12 @@ fn convert_read_state(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId
 fn convert_assert(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
     seq.remove(0);
 
-    let flow_apply = fl.new_instantaneous_assignment(Lit::Write(
+    let flow_apply = fl.new_assignment(Lit::Write(
         seq.iter().map(|f| fl.get_flow_result(f)).collect(),
     ));
-    let eps = fl.st.new_symbol(EPSILON);
 
     fl.st
         .set_domain(&fl.get_flow_result(&flow_apply), Domain::nil());
-    seq.push(fl.new_wait(Some(eps)));
     seq.push(flow_apply);
     Ok(fl.new_seq(seq))
 }
@@ -512,10 +510,7 @@ fn convert_ctx_arbitrary(
     let flow_id = convert_arbitrary(fl, seq)?;
     let flow_arbitrary = fl.try_get_last_flow(&flow_id).unwrap();
 
-    fl.set_label(
-        &flow_arbitrary,
-        Label::MethodProcess(MethodLabel::Arbitrary(index as usize)),
-    );
+    fl.set_label(&flow_arbitrary, Label::Arbitrary(index as usize));
     Ok(flow_id)
 }
 
@@ -526,10 +521,7 @@ fn convert_ctx_exec_command(
     let index = extract_index(fl, &mut seq);
     let flow_id = convert_exec(fl, seq)?;
     let flow_exec = fl.try_get_last_flow(&flow_id).unwrap();
-    fl.set_label(
-        &flow_exec,
-        Label::MethodProcess(MethodLabel::Command(index as usize)),
-    );
+    fl.set_label(&flow_exec, Label::Subtask(index as usize));
     Ok(flow_id)
 }
 
@@ -540,10 +532,7 @@ fn convert_ctx_exec_task(
     let index = extract_index(fl, &mut seq);
     let flow_id = convert_exec(fl, seq)?;
     let flow_exec = fl.try_get_last_flow(&flow_id).unwrap();
-    fl.set_label(
-        &flow_exec,
-        Label::MethodProcess(MethodLabel::Subtask(index as usize)),
-    );
+    fl.set_label(&flow_exec, Label::Subtask(index as usize));
     Ok(flow_id)
 }
 
@@ -551,9 +540,6 @@ fn convert_ctx_acquire(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowI
     let index = extract_index(fl, &mut seq);
     let flow_id = convert_acquire(fl, seq)?;
     let flow_acquire = fl.try_get_last_flow(&flow_id).unwrap();
-    fl.set_label(
-        &flow_acquire,
-        Label::MethodProcess(MethodLabel::Acquire(index as usize)),
-    );
+    fl.set_label(&flow_acquire, Label::Acquire(index as usize));
     Ok(flow_id)
 }

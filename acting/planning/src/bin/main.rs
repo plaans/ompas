@@ -1,6 +1,6 @@
 use ompas_planning::config::GraphConvertConfig;
 use ompas_planning::conversion::{convert, debug_with_markdown};
-use ompas_structs::conversion::chronicle::template::ChronicleTemplate;
+use ompas_structs::conversion::chronicle::Chronicle;
 use ompas_structs::sym_table::domain::type_lattice::TypeLattice;
 use ompas_structs::sym_table::r#ref::RefSymTable;
 use ompas_structs::sym_table::SymTable;
@@ -64,7 +64,7 @@ Graph flow converter for SOMPAS code!\n
             .unwrap_or_else(|r| panic!("{}", r.to_string()));
 
         let st: RefSymTable = SymTable::new_from(TypeLattice::new()).into();
-        let ch: ChronicleTemplate = convert(&lv, &env, st).await?;
+        let ch: Chronicle = convert(&lv, &env, st).await?;
 
         debug_with_markdown(
             p.to_str().unwrap(),

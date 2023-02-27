@@ -7,13 +7,12 @@ use ompas_structs::conversion::chronicle::effect::Effect;
 use ompas_structs::conversion::chronicle::interval::Interval;
 use ompas_structs::conversion::chronicle::subtask::SubTask;
 use ompas_structs::conversion::chronicle::task_template::TaskTemplate;
-use ompas_structs::conversion::chronicle::template::{ChronicleKind, ChronicleTemplate};
+use ompas_structs::conversion::chronicle::{Chronicle, ChronicleKind};
 use ompas_structs::conversion::flow_graph::flow::{FlowId, FlowKind};
 use ompas_structs::conversion::flow_graph::graph::FlowGraph;
 use ompas_structs::planning::om_binding::{
-    AcquireBinding, ArbitraryBinding, ChronicleBinding, CommandBinding, SubTaskBinding,
+    AcquireBinding, ArbitraryBinding, ChronicleBinding, SubTaskBinding,
 };
-use ompas_structs::supervisor::process::process_ref::{Label, MethodLabel};
 use ompas_structs::sym_table::computation::Computation;
 use ompas_structs::sym_table::domain::basic_type::BasicType::Boolean;
 use ompas_structs::sym_table::domain::basic_type::TYPE_ID_INT;
@@ -103,11 +102,11 @@ impl HandleTable {
 }
 
 pub fn convert_graph(
-    ch: Option<ChronicleTemplate>,
+    ch: Option<Chronicle>,
     fl: &mut FlowGraph,
     flow: &FlowId,
     env: &LEnv,
-) -> Result<ChronicleTemplate, LRuntimeError> {
+) -> Result<Chronicle, LRuntimeError> {
     let ht = &mut HandleTable::default();
 
     let mut ch = convert_into_chronicle(ch, ht, fl, flow, env)?;
@@ -176,15 +175,15 @@ pub fn convert_graph(
 
 #[named]
 pub fn convert_into_chronicle(
-    ch: Option<ChronicleTemplate>,
+    ch: Option<Chronicle>,
     ht: &mut HandleTable,
     fl: &mut FlowGraph,
     flow: &FlowId,
     env: &LEnv,
-) -> Result<ChronicleTemplate, LRuntimeError> {
+) -> Result<Chronicle, LRuntimeError> {
     let st = fl.st.clone();
 
-    let mut ch = ch.unwrap_or(ChronicleTemplate::new(
+    let mut ch = ch.unwrap_or(Chronicle::new(
         "template",
         ChronicleKind::Method,
         fl.st.clone(),
@@ -325,12 +324,12 @@ pub fn convert_into_chronicle(
                         ch.add_constraint(Constraint::leq(st.new_int(0), new_q_prime));
 
                         ch.add_effect(Effect {
-                            interval: Interval::new_instantaneous(interval.get_end()),
+                            interval: Interval::new(t_prime, interval.get_end()),
                             sv: vec![quantity_symbol, resource],
                             value: new_q,
                         });
                         ch.add_effect(Effect {
-                            interval: Interval::new_instantaneous(t_release_prime),
+                            interval: Interval::new(t_release, t_release_prime),
                             sv: vec![quantity_symbol, resource],
                             value: new_q_prime,
                         });
@@ -433,7 +432,6 @@ pub fn convert_into_chronicle(
                         };
 
                         let args = write[1..].to_vec();
-
                         let sf = st.get_var_parent(&write[0]);
                         let d = st.get_domain_of_var(&sf);
                         if let Domain::Cst(t, _) = d {
@@ -451,6 +449,11 @@ pub fn convert_into_chronicle(
                         }
 
                         ch.add_effect(effect);
+                        let eps = st.new_symbol(EPSILON);
+                        ch.add_constraint(Constraint::eq(
+                            interval.get_end(),
+                            Computation::add(vec![interval.get_start(), eps]),
+                        ));
 
                         let result = ch.st.new_nil();
                         st.union_var(&result, &result);
@@ -481,21 +484,10 @@ pub fn convert_into_chronicle(
                             }
                         }
                         if let Some(label) = flow.label {
-                            let binding = match &label {
-                                Label::MethodProcess(MethodLabel::Command(_)) => {
-                                    ChronicleBinding::Command(CommandBinding {
-                                        index: ch.get_subtasks().len(),
-                                        interval,
-                                    })
-                                }
-                                Label::MethodProcess(MethodLabel::Subtask(_)) => {
-                                    ChronicleBinding::Subtask(SubTaskBinding {
-                                        index: ch.get_subtasks().len(),
-                                        interval,
-                                    })
-                                }
-                                _ => unreachable!(),
-                            };
+                            let binding = ChronicleBinding::Subtask(SubTaskBinding {
+                                index: ch.get_subtasks().len(),
+                                interval,
+                            });
                             ch.bindings.add_binding(label, binding);
                         }
 
@@ -537,7 +529,7 @@ pub fn convert_into_chronicle(
                                               branch: bool,
                                               label: VarId|
                      -> Result<
-                        (ChronicleTemplate, HashMap<VarId, VarId>),
+                        (Chronicle, HashMap<VarId, VarId>),
                         LRuntimeError,
                     > {
                         let mut branch_params: HashMap<VarId, VarId> = Default::default();
@@ -593,9 +585,9 @@ pub fn convert_into_chronicle(
                     but needed by the other method of the synthetic task
                      */
                     let modify_and_convert_branch =
-                        |mut method: ChronicleTemplate,
+                        |mut method: Chronicle,
                          method_params: HashMap<VarId, VarId>|
-                         -> Result<ChronicleTemplate, LRuntimeError> {
+                         -> Result<Chronicle, LRuntimeError> {
                             for p in &task_params {
                                 let id = match method_params.get(p) {
                                     None => {

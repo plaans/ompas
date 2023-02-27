@@ -2,11 +2,12 @@ use crate::aries::{BindingAriesAtoms, FLOAT_SCALE};
 use aries_core::Lit as aLit;
 use aries_model::extensions::Shaped;
 use aries_model::lang::{
-    Atom as aAtom, ConversionError, FAtom, FVar, IAtom, SAtom, Type as aType, Variable,
+    Atom as aAtom, ConversionError, FAtom, FVar, IAtom, IVar, SAtom, Type as aType, Variable,
 };
 use aries_model::symbols::SymbolTable;
 use aries_planning::chronicles::Ctx;
 use function_name::named;
+use ompas_language::sym_table::EPSILON;
 use ompas_structs::sym_table::domain::basic_type::{TYPE_ID_BOOLEAN, TYPE_ID_FLOAT, TYPE_ID_INT};
 use ompas_structs::sym_table::domain::cst::Cst;
 use ompas_structs::sym_table::domain::type_lattice::TypeLattice;
@@ -122,14 +123,19 @@ pub fn var_id_into_atom(
                 let f: i32 = (f * FLOAT_SCALE as f64) as i32;
                 FAtom::new(IAtom::from(f), FLOAT_SCALE).into()
             }
-            Cst::Symbol(s) => ctx
-                .typed_sym(
-                    ctx.model
-                        .get_symbol_table()
-                        .id(s)
-                        .unwrap_or_else(|| panic!("{} is not defined in symbol table", s)),
-                )
-                .into(),
+            Cst::Symbol(s) => {
+                if s.as_str() == EPSILON {
+                    (FVar::new(IVar::ZERO, FLOAT_SCALE) + FAtom::EPSILON).into()
+                } else {
+                    ctx.typed_sym(
+                        ctx.model
+                            .get_symbol_table()
+                            .id(s)
+                            .unwrap_or_else(|| panic!("{} is not defined in symbol table", s)),
+                    )
+                    .into()
+                }
+            }
             Cst::Bool(b) => match b {
                 true => aLit::TRUE.into(),
                 false => aLit::FALSE.into(),

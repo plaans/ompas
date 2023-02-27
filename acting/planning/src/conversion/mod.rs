@@ -10,7 +10,7 @@ use chrono::{DateTime, Utc};
 use ompas_language::exec::refinement::EXEC_TASK;
 use ompas_structs::acting_domain::parameters::Parameters;
 use ompas_structs::acting_domain::task::Task;
-use ompas_structs::conversion::chronicle::template::{ChronicleKind, ChronicleTemplate};
+use ompas_structs::conversion::chronicle::{Chronicle, ChronicleKind};
 use ompas_structs::conversion::context::ConversionContext;
 use ompas_structs::conversion::flow_graph::graph::FlowGraph;
 use ompas_structs::planning::domain::{PlanningDomain, TaskChronicle};
@@ -39,11 +39,7 @@ pub mod flow;
 
 const DEBUG_CHRONICLE: bool = false;
 
-pub async fn convert(
-    lv: &LValue,
-    env: &LEnv,
-    st: RefSymTable,
-) -> Result<ChronicleTemplate, LRuntimeError> {
+pub async fn convert(lv: &LValue, env: &LEnv, st: RefSymTable) -> Result<Chronicle, LRuntimeError> {
     let time = SystemTime::now();
     let pp_lv = pre_processing(lv, env).await?;
 
@@ -58,10 +54,10 @@ pub async fn convert(
     //let mut ch = ChronicleTemplate::new("debug", ChronicleKind::Method, st);
     post_processing(&mut ch, env.clone())?;
     graph.flat_bindings();
-    ch.debug.flow_graph = graph;
-    ch.debug.post_processed_lvalue = pp_lv;
-    ch.debug.lvalue = lv.clone();
-    ch.debug.convert_time = time.elapsed().unwrap();
+    ch.meta_data.flow_graph = graph;
+    ch.meta_data.post_processed_lvalue = pp_lv;
+    ch.meta_data.lvalue = lv.clone();
+    ch.meta_data.convert_time = time.elapsed().unwrap();
 
     Ok(ch)
 }
@@ -106,8 +102,8 @@ pub async fn p_convert_task(
                     instance_id: 0,
                     task_id: 0,
                 },
-                template,
-                value: Default::default(),
+                chronicle: template,
+                om: Default::default(),
                 pr: Default::default(),
             });
         }
@@ -138,8 +134,8 @@ pub async fn p_convert_task(
                         instance_id: 0,
                         task_id: 0,
                     },
-                    template,
-                    value: Default::default(),
+                    chronicle: template,
+                    om: Default::default(),
                     pr: Default::default(),
                 });
             }
@@ -184,18 +180,18 @@ pub async fn p_convert(
     let mut converted: HashSet<String> = Default::default();
 
     for instance in &pp.instance.instances {
-        for subtask in instance.template.get_subtasks() {
+        for subtask in instance.chronicle.get_subtasks() {
             let label = subtask.task[0].format(&st, true);
             if !converted.contains(&label) {
                 tasks_to_convert.insert(label);
             }
         }
 
-        for effect in instance.template.get_effects() {
+        for effect in instance.chronicle.get_effects() {
             label_sf.insert(effect.sv[0].format(&st, true));
         }
 
-        for condition in instance.template.get_conditions() {
+        for condition in instance.chronicle.get_conditions() {
             label_sf.insert(condition.sv[0].format(&st, true));
         }
     }
@@ -226,7 +222,7 @@ pub async fn p_convert(
                         pc.p_table.add_param(param.to_string());
                     }
 
-                    let template: ChronicleTemplate = convert_abstract_task_to_chronicle(
+                    let template: Chronicle = convert_abstract_task_to_chronicle(
                         &task_lambda,
                         task.get_label(),
                         None,
@@ -448,14 +444,14 @@ pub async fn convert_abstract_task_to_chronicle(
     cc: &ConversionContext,
     kind: ChronicleKind,
     pc: PConfig,
-) -> lruntimeerror::Result<ChronicleTemplate> {
+) -> lruntimeerror::Result<Chronicle> {
     let time = SystemTime::now();
 
     let st = cc.st.clone();
 
     let symbol_id = st.get_sym_id(&label.to_string()).unwrap();
 
-    let mut ch = ChronicleTemplate::new(label.to_string(), kind, st.clone());
+    let mut ch = Chronicle::new(label.to_string(), kind, st.clone());
     let mut name: Vec<VarId> = vec![symbol_id];
     if let LambdaArgs::List(l) = lambda.get_params() {
         if l.len() != parameters.get_number() {
@@ -490,7 +486,7 @@ pub async fn convert_abstract_task_to_chronicle(
     });
 
     let lv = lambda.get_body();
-    ch.debug.lvalue = lv.clone();
+    ch.meta_data.lvalue = lv.clone();
 
     let mut p_env = PLEnv {
         env: cc.env.clone(),
@@ -508,7 +504,7 @@ pub async fn convert_abstract_task_to_chronicle(
     let flow = convert_lv(&lv, &mut graph, &mut Default::default())?;
     graph.flow = flow;
     if DEBUG_CHRONICLE && task.is_some() {
-        ch.debug.flow_graph = graph.clone();
+        ch.meta_data.flow_graph = graph.clone();
         debug_with_markdown(label.to_string().as_str(), &ch, "/tmp".into(), true);
     }
     flow_graph_post_processing(&mut graph)?;
@@ -516,9 +512,9 @@ pub async fn convert_abstract_task_to_chronicle(
     post_processing(&mut ch, cc.env.clone())?;
 
     graph.flat_bindings();
-    ch.debug.flow_graph = graph;
-    ch.debug.post_processed_lvalue = lv;
-    ch.debug.convert_time = time.elapsed().unwrap();
+    ch.meta_data.flow_graph = graph;
+    ch.meta_data.post_processed_lvalue = lv;
+    ch.meta_data.convert_time = time.elapsed().unwrap();
 
     if DEBUG_CHRONICLE {
         debug_with_markdown(label.to_string().as_str(), &ch, "/tmp".into(), true);
@@ -544,7 +540,7 @@ pub fn declare_task(task: &Task, st: RefSymTable) -> TaskChronicle {
     }
 }
 
-pub fn debug_with_markdown(label: &str, ch: &ChronicleTemplate, path: PathBuf, view: bool) {
+pub fn debug_with_markdown(label: &str, ch: &Chronicle, path: PathBuf, view: bool) {
     let label = label.replace("/", "_");
     let mut path = path;
     let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
@@ -556,7 +552,7 @@ pub fn debug_with_markdown(label: &str, ch: &ChronicleTemplate, path: PathBuf, v
     let dot_file_name = format!("{}.dot", label);
     path_dot.push(&dot_file_name);
     let mut file = File::create(&path_dot).unwrap();
-    let dot = ch.debug.flow_graph.export_dot();
+    let dot = ch.meta_data.flow_graph.export_dot();
     file.write_all(dot.as_bytes()).unwrap();
     set_current_dir(&path).unwrap();
     let flow_file_name = format!("{}.png", label);
@@ -623,10 +619,10 @@ pub fn debug_with_markdown(label: &str, ch: &ChronicleTemplate, path: PathBuf, v
 ```
     ",
         label,
-        ch.debug.convert_time.as_micros(),
+        ch.meta_data.convert_time.as_micros(),
         ch,
-        ch.debug.lvalue.format(0),
-        ch.debug.post_processed_lvalue.format(0),
+        ch.meta_data.lvalue.format(0),
+        ch.meta_data.post_processed_lvalue.format(0),
         flow_file_name,
         lattice_file_name,
         ch.st

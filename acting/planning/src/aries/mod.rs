@@ -1,5 +1,6 @@
 pub mod instance;
 pub mod problem_generation;
+pub mod result;
 pub mod solver;
 pub mod template;
 pub mod useful;
@@ -15,9 +16,14 @@ use ompas_structs::planning::problem::PlanningProblem;
 use ompas_structs::sym_table::r#ref::RefSymTable;
 use ompas_structs::sym_table::r#trait::FormatWithSymTable;
 use ompas_structs::sym_table::VarId;
-pub const FLOAT_SCALE: IntCst = TIME_SCALE;
+//pub const FLOAT_SCALE: IntCst = TIME_SCALE;
+/// Resolution of ms
+pub const OMPAS_TIME_SCALE: IntCst = TIME_SCALE;
+pub const FLOAT_SCALE: IntCst = OMPAS_TIME_SCALE;
 
-pub fn generate_chronicles(problem: &PlanningProblem) -> Result<chronicles::Problem> {
+pub fn generate_chronicles(
+    problem: &PlanningProblem,
+) -> Result<(chronicles::Problem, BindingAriesAtoms)> {
     /*println!("# SYMBOL TABLE: \n{:?}", ctx.model.get_symbol_table());
     println!("{}", bindings.format(&problem.cc.sym_table, false));
     println!("initial chronicle: {:?}", init_ch.chronicle);*/
@@ -49,7 +55,7 @@ pub fn generate_chronicles(problem: &PlanningProblem) -> Result<chronicles::Prob
         "Generation of the planning problem: {:.3} ms",
         instant.elapsed().as_micros() as f64 / 1000.0
     );*/
-    Ok(p)
+    Ok((p, bindings))
 }
 
 #[derive(Default)]

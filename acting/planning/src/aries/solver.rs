@@ -1,6 +1,5 @@
+use crate::aries::result::PlanResult;
 use aries_cp::Cp;
-use aries_model::extensions::{AssignmentExt, SavedAssignment};
-use aries_model::lang::Atom;
 use aries_planners::encode::{
     encode, populate_with_task_network, populate_with_template_instances,
 };
@@ -9,14 +8,9 @@ use aries_planners::solver::{SolverResult, Strat};
 use aries_planners::Solver;
 use aries_planning::chronicles;
 use aries_planning::chronicles::analysis::hierarchical_is_non_recursive;
-use aries_planning::chronicles::{ChronicleKind, ChronicleOrigin, FiniteProblem};
+use aries_planning::chronicles::FiniteProblem;
 use aries_solver::parallel_solver::Solution;
 use aries_stn::theory::{StnConfig, StnTheory, TheoryPropagationLevel};
-use im::HashMap;
-use ompas_structs::planning::plan::{AbstractTaskInstance, ActionInstance, Plan, TaskInstance};
-use sompas_structs::lruntimeerror::LResult;
-use sompas_structs::lvalue::LValue;
-use std::sync::Arc;
 use std::time::Instant;
 
 fn init_solver(pb: &FiniteProblem) -> Box<Solver> {
@@ -66,11 +60,6 @@ fn solve_htn(pb: &FiniteProblem, optimize: bool) -> Option<Solution> {
     } else {
         None
     }
-}
-
-pub struct PlanResult {
-    pub ass: Arc<SavedAssignment>,
-    pub fp: FiniteProblem,
 }
 
 /// This function mimics the instantiation of the subproblem of the given `depth`, run the propagation
@@ -150,6 +139,7 @@ pub fn run_solver_for_htn(problem: &mut chronicles::Problem, optimize: bool) -> 
                 format_hddl_plan(&pb, &x).unwrap(),
                 format_pddl_plan(&pb, &x).unwrap()
             );
+
             result = Some(PlanResult { ass: x, fp: pb });
             break;
         } else {
@@ -168,128 +158,3 @@ root 1
 4 (t_move t1 l4) -> m_recursive 6 7
 7 (t_move t1 l4) -> m_already_there
 */
-pub fn extract_plan(pr: &PlanResult) -> Plan {
-    let ass = &pr.ass;
-    let problem = &pr.fp;
-
-    /*let fmt1 = |x: &SAtom| -> LValue {
-        let sym = ass.sym_domain_of(*x).into_singleton().unwrap();
-        problem.model.shape.symbols.symbol(sym).to_string().into()
-    };*/
-    let fmt = |name: &[Atom]| -> LValue {
-        let syms: Vec<LValue> = name
-            .iter()
-            .map(
-                |x| match x {
-                    Atom::Bool(b) => ass.value_of_literal(*b).unwrap().into(),
-                    Atom::Int(i) => ass.var_domain(*i).lb.into(),
-                    Atom::Fixed(f) => {
-                        let float: f64 = ass.f_domain(*f).to_string().parse().unwrap();
-                        float.into()
-                    }
-                    Atom::Sym(s) => problem
-                        .model
-                        .shape
-                        .symbols
-                        .symbol(ass.sym_domain_of(*s).into_singleton().unwrap())
-                        .to_string()
-                        .into(),
-                }, //ass.sym_domain_of(*x).into_singleton().unwrap()
-            )
-            .collect();
-        syms.into()
-    };
-
-    let chronicles: Vec<_> = problem
-        .chronicles
-        .iter()
-        .enumerate()
-        .filter(|ch| ass.boolean_value_of(ch.1.chronicle.presence) == Some(true))
-        .collect();
-    // sort by start times
-    //chronicles.sort_by_key(|ch| ass.f_domain(ch.1.chronicle.start).num.lb);
-
-    let get_subtasks_ids = |chronicle_id: usize| -> Vec<usize> {
-        let mut vec = vec![];
-        for &(i, ch) in &chronicles {
-            match ch.origin {
-                ChronicleOrigin::Refinement { instance_id, .. } if instance_id == chronicle_id => {
-                    vec.push(i);
-                }
-                _ => (),
-            }
-        }
-        vec
-    };
-
-    let mut map: HashMap<usize, TaskInstance> = Default::default();
-
-    for &(i, ch) in &chronicles {
-        match ch.chronicle.kind {
-            ChronicleKind::Problem => {
-                let instance = AbstractTaskInstance {
-                    task: "root".into(),
-                    method: "root".into(),
-                    subtasks: get_subtasks_ids(i),
-                };
-                map.insert(i, instance.into());
-            }
-            ChronicleKind::Method => {
-                let instance = AbstractTaskInstance {
-                    task: fmt(ch.chronicle.task.as_ref().unwrap()),
-                    method: fmt(&ch.chronicle.name),
-                    subtasks: get_subtasks_ids(i),
-                };
-                map.insert(i, instance.into());
-            }
-            ChronicleKind::Action | ChronicleKind::DurativeAction => {
-                let instance = ActionInstance {
-                    inner: fmt(&ch.chronicle.name),
-                };
-                map.insert(i, instance.into());
-            }
-        }
-    }
-
-    Plan { chronicles: map }
-}
-
-pub fn extract_instantiated_methods(pr: &PlanResult) -> LResult {
-    let ass = &pr.ass;
-    let problem = &pr.fp;
-
-    let methods: Vec<_> = pr
-        .fp
-        .chronicles
-        .iter()
-        .filter(|ch| {
-            ass.boolean_value_of(ch.chronicle.presence) == Some(true)
-                && ch.chronicle.kind == ChronicleKind::Method
-        })
-        .collect();
-
-    let fmt1 = |x: &Atom| -> LValue {
-        match x {
-            Atom::Bool(b) => ass.value_of_literal(*b).unwrap().into(),
-            Atom::Int(i) => ass.var_domain(*i).lb.into(),
-            Atom::Fixed(f) => {
-                let float: f64 = ass.f_domain(*f).to_string().parse().unwrap();
-                float.into()
-            }
-            Atom::Sym(s) => problem
-                .model
-                .shape
-                .symbols
-                .symbol(ass.sym_domain_of(*s).into_singleton().unwrap())
-                .to_string()
-                .into(),
-        }
-    };
-    let mut lv_methods: Vec<LValue> = vec![];
-    for m in methods {
-        let name: Vec<LValue> = m.chronicle.name.iter().map(|s| fmt1(s)).collect::<_>();
-        lv_methods.push(name.into());
-    }
-
-    Ok(lv_methods.into())
-}

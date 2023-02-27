@@ -4,7 +4,7 @@ use crate::point_algebra::remove_useless_timepoints;
 use im::HashSet;
 use ompas_language::sym_table::TYPE_TIMEPOINT;
 use ompas_structs::conversion::chronicle::constraint::Constraint;
-use ompas_structs::conversion::chronicle::template::{ChronicleSet, ChronicleTemplate};
+use ompas_structs::conversion::chronicle::{Chronicle, ChronicleSet};
 use ompas_structs::sym_table::domain::basic_type::BasicType;
 use ompas_structs::sym_table::lit::{lvalue_to_lit, Lit};
 use ompas_structs::sym_table::r#trait::{FlatBindings, FormatWithSymTable, GetVariables};
@@ -17,9 +17,10 @@ use sompas_structs::lvalue::LValue;
 use std::borrow::Borrow;
 use std::fmt::Write;
 use std::ops::Deref;
+
 const TRY_EVAL_APPLY: &str = "try_eval_apply";
 
-pub fn post_processing(c: &mut ChronicleTemplate, env: LEnv) -> Result<(), LRuntimeError> {
+pub fn post_processing(c: &mut Chronicle, env: LEnv) -> Result<(), LRuntimeError> {
     c.st.flat_bindings();
     merge_conditions(c)?;
     try_eval_apply(c, env)?;
@@ -31,7 +32,7 @@ pub fn post_processing(c: &mut ChronicleTemplate, env: LEnv) -> Result<(), LRunt
     Ok(())
 }
 
-pub fn rm_useless_var(c: &mut ChronicleTemplate) {
+pub fn rm_useless_var(c: &mut Chronicle) {
     //Variables in expressions
     c.flat_bindings();
     let parameters: HashSet<VarId> = c
@@ -67,7 +68,7 @@ pub fn rm_useless_var(c: &mut ChronicleTemplate) {
     }
 }
 
-pub fn simplify_timepoints(c: &mut ChronicleTemplate) -> Result<(), LRuntimeError> {
+pub fn simplify_timepoints(c: &mut Chronicle) -> Result<(), LRuntimeError> {
     let st = c.st.clone();
     let _format_hash = |set: &HashSet<VarId>| -> String {
         let mut str = "{".to_string();
@@ -162,7 +163,7 @@ pub fn simplify_timepoints(c: &mut ChronicleTemplate) -> Result<(), LRuntimeErro
     Ok(())
 }
 
-pub fn simplify_constraints(c: &mut ChronicleTemplate) -> Result<(), LRuntimeError> {
+pub fn simplify_constraints(c: &mut Chronicle) -> Result<(), LRuntimeError> {
     //simple case where
     let st = c.st.clone();
 
@@ -209,7 +210,7 @@ pub fn simplify_constraints(c: &mut ChronicleTemplate) -> Result<(), LRuntimeErr
     Ok(())
 }
 
-pub fn merge_conditions(c: &mut ChronicleTemplate) -> Result<(), LRuntimeError> {
+pub fn merge_conditions(c: &mut Chronicle) -> Result<(), LRuntimeError> {
     let st = c.st.clone();
 
     let mut c_to_remove: HashSet<usize> = Default::default();
@@ -236,7 +237,7 @@ pub fn merge_conditions(c: &mut ChronicleTemplate) -> Result<(), LRuntimeError> 
     Ok(())
 }
 
-pub fn try_eval_apply(c: &mut ChronicleTemplate, env: LEnv) -> Result<(), LRuntimeError> {
+pub fn try_eval_apply(c: &mut Chronicle, env: LEnv) -> Result<(), LRuntimeError> {
     let st = c.st.clone();
 
     let mut c_to_remove: Vec<usize> = Default::default();

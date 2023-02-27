@@ -9,12 +9,12 @@ use ompas_language::monitor::debug_conversion::{
 };
 use ompas_language::monitor::domain::MOD_DOMAIN;
 use ompas_middleware::logger::LogClient;
-use ompas_planning::aries::problem_generation::{finite_problem, PAction, TaskParam};
+use ompas_planning::aries::problem_generation::{finite_problem, ActionParam, PAction};
 use ompas_planning::aries::solver::run_solver_for_htn;
-use ompas_planning::aries::{generate_chronicles, solver};
+use ompas_planning::aries::{generate_chronicles, result};
 use ompas_planning::conversion::convert_acting_domain;
 use ompas_planning::conversion::flow::annotate::annotate;
-use ompas_planning::conversion::flow::p_eval::r#struct::{PConfig, PLEnv, PLValue};
+use ompas_planning::conversion::flow::p_eval::r#struct::{PConfig, PLEnv};
 use ompas_planning::conversion::flow::p_eval::{p_eval, P_EVAL};
 use ompas_structs::conversion::context::ConversionContext;
 use ompas_structs::planning::domain::PlanningDomain;
@@ -70,20 +70,20 @@ pub async fn plan_task(env: &LEnv, args: &[LValue]) -> LResult {
     let actions = vec![PAction {
         args: args
             .iter()
-            .map(|lv| TaskParam::Instantiated(lv.try_into().unwrap()))
+            .map(|lv| ActionParam::Instantiated(lv.try_into().unwrap()))
             .collect(),
         origin: ChronicleOrigin::Refinement {
             instance_id: 0,
             task_id: 0,
         },
-        pr: ProcessRef::Relative(0, vec![Label::HighLevelTask(0)]),
+        pr: ProcessRef::Relative(0, vec![Label::Subtask(0)]),
     }];
     let pp: PlanningProblem = finite_problem(actions, &context).await?;
 
     println!("instances: {}", {
         let mut str = "".to_string();
         for instance in &pp.instance.instances {
-            writeln!(str, "{}", instance.template.format(true)).unwrap();
+            writeln!(str, "{}", instance.chronicle.format(true)).unwrap();
         }
         str
     });
@@ -92,14 +92,19 @@ pub async fn plan_task(env: &LEnv, args: &[LValue]) -> LResult {
         println!("{}", template)
     }
 
-    let mut aries_problem = generate_chronicles(&pp)?;
+    let (mut aries_problem, bindings) = generate_chronicles(&pp)?;
 
     let result = run_solver_for_htn(&mut aries_problem, false);
     // println!("{}", format_partial_plan(&pb, &x)?);
 
-    let result: LValue = if let Some(x) = &result {
-        let plan = solver::extract_plan(x);
-        println!("plan:\n{}\n{}", plan.format(), plan.format_hierarchy());
+    let result: LValue = if let Some(pr) = &result {
+        //result::print_chronicles(pr);
+        let solved = result::instantiate_chronicles(&pp, &pr, &bindings);
+        for chronicle in &solved {
+            print!("{}", chronicle)
+        }
+        /*let plan = result::extract_plan(x);
+        println!("plan:\n{}\n{}", plan.format(), plan.format_hierarchy());*/
         //let first_task_id = plan.get_first_subtask().unwrap();
         /*let subplan = plan.extract_sub_plan(first_task_id);
         println!(
@@ -107,7 +112,8 @@ pub async fn plan_task(env: &LEnv, args: &[LValue]) -> LResult {
             subplan.format(),
             subplan.format_hierarchy()
         );*/
-        solver::extract_instantiated_methods(x)?
+        //result::extract_instantiated_methods(x)?
+        LValue::Nil
     } else {
         string!("no solution found".to_string())
     };

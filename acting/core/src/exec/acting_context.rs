@@ -1,5 +1,5 @@
 use ompas_language::exec::acting_context::*;
-use ompas_structs::supervisor::process::process_ref::{Label, MethodLabel, ProcessRef};
+use ompas_structs::supervisor::process::process_ref::{Label, ProcessRef};
 use ompas_structs::supervisor::ActingProcessId;
 use sompas_macros::async_scheme_fn;
 use sompas_structs::contextcollection::Context;
@@ -51,10 +51,9 @@ pub async fn def_label(env: &mut LEnv, kind: String, id: usize) {
         .unwrap()
         .clone();
     let label = match kind.as_str() {
-        ARBITRARY => MethodLabel::Arbitrary(id),
-        ACQUIRE => MethodLabel::Acquire(id),
-        COMMAND => MethodLabel::Command(id),
-        SUBTASK => MethodLabel::Subtask(id),
+        ARBITRARY => Label::Arbitrary(id),
+        ACQUIRE => Label::Acquire(id),
+        COMMAND | SUBTASK => Label::Subtask(id),
         _ => panic!("wrong label definition"),
     };
 
@@ -63,16 +62,15 @@ pub async fn def_label(env: &mut LEnv, kind: String, id: usize) {
         ProcessRef::Relative(id, labels) => {
             let mut new_labels = labels.clone();
             match labels.last().unwrap() {
-                Label::Method(_) | Label::MethodProcess(MethodLabel::Subtask(_)) => {
+                Label::Refinement(_) | Label::Subtask(_) => {
                     new_labels.push(label.into());
-                    ProcessRef::Relative(id, new_labels)
                 }
                 _ => {
                     new_labels.pop();
                     new_labels.push(label.into());
-                    ProcessRef::Relative(id, new_labels)
                 }
             }
+            ProcessRef::Relative(id, new_labels)
         }
     };
 

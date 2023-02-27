@@ -6,7 +6,7 @@ use crate::supervisor::interval::Timepoint;
 use crate::supervisor::process::arbitrary::ArbitraryChoice::Planning;
 use crate::supervisor::process::arbitrary::{ArbitraryChoice, ArbitraryProcess, ArbitraryTrace};
 use crate::supervisor::process::command::CommandProcess;
-use crate::supervisor::process::process_ref::{MethodLabel, ProcessRef};
+use crate::supervisor::process::process_ref::{Label, ProcessRef};
 use crate::supervisor::process::task::{Refinement, RefinementInner};
 use crate::supervisor::process::{ActingProcess, ProcessStatus};
 use inner::InnerSupervisor;
@@ -106,7 +106,7 @@ impl Supervisor {
     //Task methods
     pub async fn new_task(
         &self,
-        label: MethodLabel,
+        label: Label,
         parent: ActingProcessId,
         value: LValue,
         planned: bool,
@@ -231,7 +231,7 @@ impl Supervisor {
             .unwrap()
             .process_set
             .keys()
-            .filter(|p| matches!(p, MethodLabel::Arbitrary(_)))
+            .filter(|p| matches!(p, Label::Arbitrary(_)))
             .count()
     }
 
@@ -246,22 +246,7 @@ impl Supervisor {
             .unwrap()
             .process_set
             .keys()
-            .filter(|p| matches!(p, MethodLabel::Subtask(_)))
-            .count()
-    }
-
-    pub async fn get_number_command(&self, method_id: ActingProcessId) -> usize {
-        self.inner
-            .read()
-            .await
-            .get(method_id)
-            .unwrap()
-            .inner
-            .as_method()
-            .unwrap()
-            .process_set
-            .keys()
-            .filter(|p| matches!(p, MethodLabel::Command(_)))
+            .filter(|p| matches!(p, Label::Subtask(_)))
             .count()
     }
 
@@ -276,14 +261,14 @@ impl Supervisor {
             .unwrap()
             .process_set
             .keys()
-            .filter(|p| matches!(p, MethodLabel::Acquire(_)))
+            .filter(|p| matches!(p, Label::Acquire(_)))
             .count()
     }
 
     //Command methods
     pub async fn new_command(
         &self,
-        label: MethodLabel,
+        label: Label,
         parent: ActingProcessId,
         value: LValue,
         planned: bool,
@@ -334,7 +319,7 @@ impl Supervisor {
     // Arbitrary methods
     pub async fn new_arbitrary(
         &self,
-        label: MethodLabel,
+        label: Label,
         parent: ActingProcessId,
         possibilities: Vec<LValue>,
         choice: ArbitraryChoice,
@@ -385,7 +370,7 @@ impl Supervisor {
     pub async fn new_acquire(
         &self,
         resource_label: String,
-        label: MethodLabel,
+        label: Label,
         parent: ActingProcessId,
         planned: bool,
     ) -> ActingProcessId {

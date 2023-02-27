@@ -97,7 +97,7 @@ impl Display for Cst {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Int(i) => write!(f, "{i}"),
-            Float(fl) => write!(f, "{fl}"),
+            Float(fl) => write!(f, "{:.3}", fl),
             Symbol(s) => write!(f, "{s}"),
             Bool(b) => write!(f, "{b}"),
         }

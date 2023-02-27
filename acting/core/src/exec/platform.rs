@@ -8,7 +8,7 @@ use ompas_language::exec::mode::CTX_MODE;
 use ompas_language::exec::platform::*;
 use ompas_middleware::logger::LogClient;
 use ompas_structs::supervisor::action_status::ActionStatus;
-use ompas_structs::supervisor::process::process_ref::{MethodLabel, ProcessRef};
+use ompas_structs::supervisor::process::process_ref::ProcessRef;
 use ompas_structs::supervisor::ActingProcessId;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lruntimeerror::LResult;
@@ -75,7 +75,12 @@ pub async fn exec_command(env: &LEnv, command: &[LValue]) -> LAsyncHandle {
         let (command_id, mut rx): (ActingProcessId, watch::Receiver<ActionStatus>) = match &pr {
             ProcessRef::Id(id) => {
                 let r = supervisor
-                    .new_command(MethodLabel::Command(0), *id, command.clone().into(), false)
+                    .new_command(
+                        Label::Subtask(supervisor.get_number_subtask(*id).await),
+                        *id,
+                        command.clone().into(),
+                        false,
+                    )
                     .await;
                 (r.0, r.1.unwrap())
             }
@@ -85,7 +90,7 @@ pub async fn exec_command(env: &LEnv, command: &[LValue]) -> LAsyncHandle {
                 None => {
                     let r = supervisor
                         .new_command(
-                            labels.last().unwrap().as_method_label().unwrap().clone(),
+                            labels.last().unwrap().clone(),
                             *id,
                             command.clone().into(),
                             false,

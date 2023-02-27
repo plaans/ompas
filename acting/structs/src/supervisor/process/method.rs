@@ -1,6 +1,6 @@
 use crate::supervisor::action_status::ActionStatus;
 use crate::supervisor::interval::{Interval, Timepoint};
-use crate::supervisor::process::process_ref::MethodLabel;
+use crate::supervisor::process::process_ref::Label;
 use crate::supervisor::process::ActingProcessInner;
 use crate::supervisor::ActingProcessId;
 use sompas_structs::lvalue::LValue;
@@ -11,7 +11,7 @@ pub struct MethodProcess {
     pub id: ActingProcessId,
     pub parent: ActingProcessId,
     pub status: ActionStatus,
-    pub process_set: HashMap<MethodLabel, ActingProcessId>,
+    pub process_set: HashMap<Label, ActingProcessId>,
     pub debug: String,
     pub interval: Option<Interval>,
     pub value: LValue,
@@ -38,11 +38,11 @@ impl MethodProcess {
         }
     }
 
-    pub fn add_process(&mut self, label: MethodLabel, id: ActingProcessId) {
+    pub fn add_process(&mut self, label: Label, id: ActingProcessId) {
         self.process_set.insert(label, id);
     }
 
-    pub fn get_process(&mut self, label: MethodLabel) -> Option<ActingProcessId> {
+    pub fn get_process(&mut self, label: Label) -> Option<ActingProcessId> {
         self.process_set.get(&label).copied()
     }
 

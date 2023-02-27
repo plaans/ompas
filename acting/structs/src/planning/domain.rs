@@ -2,17 +2,23 @@ use crate::acting_domain::command::Command;
 use crate::acting_domain::method::Method;
 use crate::acting_domain::state_function::StateFunction;
 use crate::acting_domain::task::Task;
-use crate::conversion::chronicle::template::ChronicleTemplate;
+use crate::conversion::chronicle::Chronicle;
 use crate::sym_table::r#ref::RefSymTable;
 use crate::sym_table::VarId;
 use std::fmt::{Display, Formatter};
 #[derive(Clone)]
 pub struct PlanningDomain {
+    /// State functions of the domain.
     pub sf: Vec<StateFunction>,
+    /// List of method symbols
     pub methods: Vec<String>,
+    ///List of task symbols
     pub tasks: Vec<String>,
+    ///List of command symbols
     pub commands: Vec<String>,
-    pub templates: Vec<ChronicleTemplate>,
+    /// All available templates
+    pub templates: Vec<Chronicle>,
+    /// Symbol table
     pub st: RefSymTable,
 }
 
@@ -42,17 +48,17 @@ impl Display for PlanningDomain {
 pub struct TaskChronicle {
     pub task: Task,
     pub convert: Vec<VarId>,
-    pub template: Option<ChronicleTemplate>,
+    pub template: Option<Chronicle>,
 }
 #[derive(Clone)]
 
 pub struct MethodChronicle {
     pub method: Method,
-    pub template: ChronicleTemplate,
+    pub template: Chronicle,
 }
 #[derive(Clone)]
 
 pub struct CommandChronicle {
     pub command: Command,
-    pub template: ChronicleTemplate,
+    pub template: Chronicle,
 }

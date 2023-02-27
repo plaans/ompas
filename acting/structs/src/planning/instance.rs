@@ -1,4 +1,4 @@
-use crate::conversion::chronicle::template::ChronicleTemplate;
+use crate::conversion::chronicle::Chronicle;
 use crate::state::world_state::WorldStateSnapshot;
 use crate::supervisor::process::process_ref::ProcessRef;
 use aries_planning::chronicles::ChronicleOrigin;
@@ -13,7 +13,7 @@ pub struct PlanningInstance {
 
 pub struct ChronicleInstance {
     pub origin: ChronicleOrigin,
-    pub template: ChronicleTemplate,
-    pub value: LValue,
+    pub chronicle: Chronicle,
+    pub om: LValue,
     pub pr: ProcessRef,
 }

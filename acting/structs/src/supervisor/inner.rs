@@ -5,7 +5,7 @@ use crate::supervisor::process::acquire::AcquireProcess;
 use crate::supervisor::process::arbitrary::{ArbitraryChoice, ArbitraryProcess, ArbitraryTrace};
 use crate::supervisor::process::command::CommandProcess;
 use crate::supervisor::process::method::MethodProcess;
-use crate::supervisor::process::process_ref::{Label, MethodLabel, ProcessRef};
+use crate::supervisor::process::process_ref::{Label, ProcessRef};
 use crate::supervisor::process::root_task::RootProcess;
 use crate::supervisor::process::task::{Refinement, RefinementInner, TaskProcess};
 use crate::supervisor::process::{ActingProcess, ActingProcessInner, ProcessStatus};
@@ -79,37 +79,39 @@ impl InnerSupervisor {
                 labels.reverse();
                 while let Some(label) = labels.pop() {
                     let obj = &self.inner[id];
-                    match label {
-                        Label::MethodProcess(m) => {
-                            if let ActingProcessInner::Method(mp) = &obj.inner {
-                                id = if let Some(id) = mp.process_set.get(&m) {
+                    match &label {
+                        Label::Subtask(s) => {
+                            if id == 0 {
+                                id = if let Some(id) = obj.inner.as_root().unwrap().nth_task(*s) {
+                                    id
+                                } else {
+                                    return None;
+                                }
+                            } else {
+                                id = if let Some(id) =
+                                    obj.inner.as_method().unwrap().process_set.get(&label)
+                                {
                                     *id
                                 } else {
                                     return None;
                                 }
+                            }
+                        }
+                        Label::Refinement(m) => {
+                            id = if let Some(r) = obj.inner.as_task().unwrap().refinements.get(*m) {
+                                r.method_id
                             } else {
                                 return None;
                             }
                         }
-
-                        Label::Method(m) => {
-                            if let ActingProcessInner::Task(t) = &obj.inner {
-                                id = if let Some(r) = t.refinements.get(m) {
-                                    r.method_id
-                                } else {
-                                    return None;
-                                }
+                        Label::Acquire(_) | Label::Arbitrary(_) => {
+                            id = if let Some(id) =
+                                obj.inner.as_method().unwrap().process_set.get(&label)
+                            {
+                                *id
                             } else {
                                 return None;
                             }
-                        }
-                        Label::HighLevelTask(rank) => {
-                            id = self.inner[0]
-                                .inner
-                                .as_root()
-                                .unwrap()
-                                .nth_task(rank)
-                                .unwrap()
                         }
                     }
                 }
@@ -134,13 +136,13 @@ impl InnerSupervisor {
         let rank = root.n_task();
         root.add_top_level_task(id);
 
-        ProcessRef::Relative(0, vec![Label::HighLevelTask(rank)])
+        ProcessRef::Relative(0, vec![Label::Subtask(rank)])
     }
 
     //Task methods
     pub fn new_task(
         &mut self,
-        label: MethodLabel,
+        label: Label,
         parent: ActingProcessId,
         value: LValue,
         planned: bool,
@@ -194,7 +196,7 @@ impl InnerSupervisor {
 
     pub fn new_arbitrary(
         &mut self,
-        label: MethodLabel,
+        label: Label,
         parent: ActingProcessId,
         possibilities: Vec<LValue>,
         choice: ArbitraryChoice,
@@ -227,7 +229,7 @@ impl InnerSupervisor {
 
     pub fn new_acquire(
         &mut self,
-        label: MethodLabel,
+        label: Label,
         resource_label: String,
         parent: ActingProcessId,
         planned: bool,
@@ -252,7 +254,7 @@ impl InnerSupervisor {
 
     pub fn new_command(
         &mut self,
-        label: MethodLabel,
+        label: Label,
         parent: ActingProcessId,
         value: LValue,
         planned: bool,

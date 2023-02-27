@@ -105,15 +105,15 @@ async fn lisp_interpreter(opt: Opt) -> lruntimeerror::Result<()> {
         )
     });
 
-    channel
-        .send("(plan-task t_process_on_machine package1 machine0)".to_string())
-        .await
-        .unwrap();
-
     /*channel
-    .send("(plan-task t_jobshop)".to_string())
+    .send("(plan-task t_process_on_machine package1 machine0)".to_string())
     .await
     .unwrap();*/
+
+    channel
+        .send("(plan-task t_jobshop)".to_string())
+        .await
+        .unwrap();
     channel.recv().await.unwrap()?;
 
     Master::end().await;

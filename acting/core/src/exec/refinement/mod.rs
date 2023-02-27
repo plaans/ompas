@@ -25,7 +25,7 @@ use ompas_structs::supervisor::action_status::ActionStatus;
 use ompas_structs::supervisor::inner::ProcessKind;
 use ompas_structs::supervisor::interval::Interval;
 use ompas_structs::supervisor::process::method::MethodProcess;
-use ompas_structs::supervisor::process::process_ref::{Label, MethodLabel, ProcessRef};
+use ompas_structs::supervisor::process::process_ref::{Label, ProcessRef};
 use ompas_structs::supervisor::process::task::{
     RTSelect, Refinement, RefinementInner, SelectTrace, TaskProcess,
 };
@@ -137,7 +137,7 @@ pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
             if supervisor.get_kind(*id).await.unwrap() == ProcessKind::Method {
                 supervisor
                     .new_task(
-                        MethodLabel::Subtask(supervisor.get_number_subtask(*id).await),
+                        Label::Subtask(supervisor.get_number_subtask(*id).await),
                         *id,
                         task.clone(),
                         false,
@@ -150,9 +150,9 @@ pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
         ProcessRef::Relative(id, labels) => match supervisor.get_id(pr.clone()).await {
             Some(id) => id,
             None => match labels[0] {
-                Label::MethodProcess(MethodLabel::Subtask(s)) => {
+                Label::Subtask(s) => {
                     supervisor
-                        .new_task(MethodLabel::Subtask(s), *id, task.clone(), false)
+                        .new_task(Label::Subtask(s), *id, task.clone(), false)
                         .await
                 }
                 _ => panic!(),

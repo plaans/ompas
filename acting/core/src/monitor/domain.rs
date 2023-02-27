@@ -25,7 +25,7 @@ use sompas_structs::lmodule::{InitScheme, LModule};
 use sompas_structs::lprimitive::LPrimitive;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
-use sompas_structs::{lruntimeerror, wrong_n_args, wrong_type};
+use sompas_structs::{list, lruntimeerror, wrong_n_args, wrong_type};
 use std::convert::TryInto;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -575,12 +575,13 @@ pub async fn add_task(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<()
     let exec = eval(&expand(&lv_exec, true, &mut env).await?, &mut env, None).await?;
 
     task.set_body(exec);
-    let lv_model: LValue = match map.get(&MODEL.into()) {
-        None => parse(&format!("(lambda {} nil)", params), &mut env).await?,
-        Some(model) => parse(&format!("(lambda {} {})", params, model), &mut env).await?,
-    };
-    let model = eval(&expand(&lv_model, true, &mut env).await?, &mut env, None).await?;
-    task.set_model(model);
+
+    if let Some(model) = map.get(&MODEL.into()) {
+        let lv = list![LPrimitive::DefLambda.into(), params, model.clone()];
+        let model = eval(&expand(&lv, true, &mut env).await?, &mut env, None).await?;
+        task.set_model(model);
+    }
+
     ctx.domain
         .write()
         .await

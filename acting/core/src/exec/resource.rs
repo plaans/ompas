@@ -93,7 +93,7 @@ pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LR
                     supervisor
                         .new_acquire(
                             label.clone(),
-                            MethodLabel::Acquire(supervisor.get_number_acquire(*id).await),
+                            Label::Acquire(supervisor.get_number_acquire(*id).await),
                             *id,
                             false,
                         )
@@ -107,9 +107,9 @@ pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LR
         ProcessRef::Relative(id, labels) => match supervisor.get_id(pr.clone()).await {
             Some(id) => (id, supervisor.get_acquire_response(&id).await),
             None => match labels[0] {
-                Label::MethodProcess(MethodLabel::Acquire(s)) => (
+                Label::Acquire(s) => (
                     supervisor
-                        .new_acquire(label.to_string(), MethodLabel::Acquire(s), *id, false)
+                        .new_acquire(label.to_string(), Label::Acquire(s), *id, false)
                         .await,
                     None,
                 ),

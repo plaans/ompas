@@ -15,7 +15,6 @@ pub enum Constraint {
     Eq(Lit, Lit),
     Neq(Lit, Lit),
     Lt(Lit, Lit),
-    Type(Lit, Lit),
     Arbitrary(LitSet),
     Min(Vec<Lit>),
     Max(Vec<Lit>),
@@ -52,9 +51,6 @@ impl Constraint {
     pub fn max(mut vec: Vec<impl Into<Lit>>) -> Constraint {
         Constraint::Max(vec.drain(..).map(|e| e.into()).collect())
     }
-    pub fn _type(a: impl Into<Lit>, b: impl Into<Lit>) -> Constraint {
-        Constraint::Type(a.into(), b.into())
-    }
     pub fn arbitrary(a: impl Into<LitSet>) -> Constraint {
         Constraint::Arbitrary(a.into())
     }
@@ -66,7 +62,6 @@ impl Constraint {
             Constraint::Leq(l1, _)
             | Constraint::Eq(l1, _)
             | Constraint::Lt(l1, _)
-            | Constraint::Type(l1, _)
             | Constraint::Neq(l1, _) => l1.clone(),
             Constraint::Not(l) => l.clone(),
             Constraint::Arbitrary(l) => Lit::Set(l.clone()),
@@ -82,7 +77,6 @@ impl Constraint {
             Constraint::Leq(_, l2)
             | Constraint::Eq(_, l2)
             | Constraint::Lt(_, l2)
-            | Constraint::Type(_, l2)
             | Constraint::Neq(_, l2) => l2.clone(),
             Constraint::Not(l) => l.clone(),
             Constraint::Arbitrary(l) => Lit::Set(l.clone()),
@@ -100,8 +94,7 @@ impl GetVariables for Constraint {
             Constraint::Leq(l1, l2)
             | Constraint::Eq(l1, l2)
             | Constraint::Neq(l1, l2)
-            | Constraint::Lt(l1, l2)
-            | Constraint::Type(l1, l2) => l1.get_variables().union(l2.get_variables()),
+            | Constraint::Lt(l1, l2) => l1.get_variables().union(l2.get_variables()),
             Constraint::Min(vec)
             | Constraint::Max(vec)
             | Constraint::And(vec)
@@ -144,13 +137,6 @@ impl FormatWithSymTable for Constraint {
             Constraint::Leq(l1, l2) => {
                 format!(
                     "({} <= {})",
-                    l1.format(st, sym_version),
-                    l2.format(st, sym_version)
-                )
-            }
-            Constraint::Type(l1, l2) => {
-                format!(
-                    "(type({}) = {})",
                     l1.format(st, sym_version),
                     l2.format(st, sym_version)
                 )
@@ -225,7 +211,6 @@ impl FlatBindings for Constraint {
             Constraint::Leq(l1, l2)
             | Constraint::Eq(l1, l2)
             | Constraint::Lt(l1, l2)
-            | Constraint::Type(l1, l2)
             | Constraint::Neq(l1, l2) => {
                 l1.flat_bindings(st);
                 l2.flat_bindings(st);
@@ -286,8 +271,7 @@ impl Replace for Constraint {
             Constraint::Leq(l1, l2)
             | Constraint::Eq(l1, l2)
             | Constraint::Neq(l1, l2)
-            | Constraint::Lt(l1, l2)
-            | Constraint::Type(l1, l2) => {
+            | Constraint::Lt(l1, l2) => {
                 l1.replace(old, new);
                 l2.replace(old, new);
             }

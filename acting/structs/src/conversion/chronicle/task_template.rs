@@ -1,8 +1,8 @@
-use crate::conversion::chronicle::template::ChronicleTemplate;
+use crate::conversion::chronicle::Chronicle;
 use crate::sym_table::VarId;
 
 #[derive(Clone)]
 pub struct TaskTemplate {
     pub name: Vec<VarId>,
-    pub methods: Vec<ChronicleTemplate>,
+    pub methods: Vec<Chronicle>,
 }

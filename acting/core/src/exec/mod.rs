@@ -21,7 +21,7 @@ use ompas_structs::planning::domain::PlanningDomain;
 use ompas_structs::state::world_state::WorldState;
 use ompas_structs::supervisor::inner::ProcessKind;
 use ompas_structs::supervisor::process::arbitrary::ArbitraryChoice;
-use ompas_structs::supervisor::process::process_ref::{Label, MethodLabel, ProcessRef};
+use ompas_structs::supervisor::process::process_ref::{Label, ProcessRef};
 use ompas_structs::supervisor::{ActingProcessId, Supervisor};
 use sompas_core::eval;
 use sompas_core::modules::list::car;
@@ -199,7 +199,7 @@ pub async fn arbitrary(env: &LEnv, args: &[LValue]) -> LResult {
             if supervisor.get_kind(*id).await.unwrap() == ProcessKind::Method {
                 supervisor
                     .new_arbitrary(
-                        MethodLabel::Arbitrary(supervisor.get_number_arbitrary(*id).await),
+                        Label::Arbitrary(supervisor.get_number_arbitrary(*id).await),
                         *id,
                         possibilities,
                         ArbitraryChoice::Execution(greedy.clone()),
@@ -217,10 +217,10 @@ pub async fn arbitrary(env: &LEnv, args: &[LValue]) -> LResult {
                     .await
             }
             None => match labels[0] {
-                Label::MethodProcess(MethodLabel::Arbitrary(s)) => {
+                Label::Arbitrary(s) => {
                     supervisor
                         .new_arbitrary(
-                            MethodLabel::Arbitrary(s),
+                            Label::Arbitrary(s),
                             *id,
                             possibilities,
                             ArbitraryChoice::Execution(greedy.clone()),

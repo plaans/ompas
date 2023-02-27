@@ -14,7 +14,7 @@
                        (do
                            (define tasks (mapf (lambda (process)
                                `(t_process_on_machine ,?p 
-                                   (arbitrary ',(find_machines_for_process (car process)))                                   ))
+                                   (arbitrary ',(find_machines_for_process (car process))) ,(cadr process)))
                                (package.all_processes ?p)))
                             ; (define last_task
                             ;     `(begin
@@ -31,13 +31,13 @@
 
     (def-task t_carry_to_machine (:params (?r robot) (?p package) (?m machine)))
 
-    (def-task t_process_on_machine (:params (?p package) (?m machine)))
+    (def-task t_process_on_machine (:params (?p package) (?m machine) (?d int)))
     (def-task-om-model t_process_on_machine
-            (:params (?p package) (?m machine))
+            (:params (?p package) (?m machine) (?d int))
             (:body
                 (do
                     (define rh (acquire ?m))
-                    (sleep 1)
+                    (sleep ?d)
                     (release rh)
                     )))
 

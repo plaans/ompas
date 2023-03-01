@@ -11,7 +11,7 @@ pub const STATUS_FAILURE: &str = "failure";
 pub const STATUS_CANCELLED: &str = "cancelled";
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum ActionStatus {
+pub enum ProcessStatus {
     Pending,
     Accepted,
     Rejected,
@@ -21,19 +21,19 @@ pub enum ActionStatus {
     Cancelled(bool), //True the action has been successfully stopped, false it was a failure to cancel
 }
 
-impl Display for ActionStatus {
+impl Display for ProcessStatus {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            ActionStatus::Accepted => write!(f, "accepted"),
-            ActionStatus::Running(progress) => match progress {
+            ProcessStatus::Accepted => write!(f, "accepted"),
+            ProcessStatus::Running(progress) => match progress {
                 Some(p) => write!(f, "running: {}", p),
                 None => write!(f, "none"),
             },
-            ActionStatus::Success => write!(f, "success"),
-            ActionStatus::Cancelled(r) => write!(f, "cancelled: {}", r),
-            ActionStatus::Rejected => write!(f, "rejected"),
-            ActionStatus::Failure => write!(f, "failure"),
-            ActionStatus::Pending => write!(f, "pending"),
+            ProcessStatus::Success => write!(f, "success"),
+            ProcessStatus::Cancelled(r) => write!(f, "cancelled: {}", r),
+            ProcessStatus::Rejected => write!(f, "rejected"),
+            ProcessStatus::Failure => write!(f, "failure"),
+            ProcessStatus::Pending => write!(f, "pending"),
         }
     }
 }
@@ -41,7 +41,7 @@ impl Display for ActionStatus {
 #[derive(Default, Debug, Clone)]
 pub struct ActionStatusSet {
     pub server_id_internal_id: Arc<RwLock<im::HashMap<usize, usize>>>,
-    pub status: Arc<RwLock<im::HashMap<usize, ActionStatus>>>,
+    pub status: Arc<RwLock<im::HashMap<usize, ProcessStatus>>>,
     next_id: Arc<AtomicUsize>,
 }
 
@@ -59,11 +59,11 @@ impl ActionStatusSet {
         }
     }
 
-    pub async fn set_status(&mut self, internal_id: usize, status: ActionStatus) {
+    pub async fn set_status(&mut self, internal_id: usize, status: ProcessStatus) {
         self.status.write().await.insert(internal_id, status);
     }
 
-    pub async fn set_status_from_server(&mut self, server_id: usize, status: ActionStatus) {
+    pub async fn set_status_from_server(&mut self, server_id: usize, status: ProcessStatus) {
         let id = *self
             .server_id_internal_id
             .read()
@@ -73,11 +73,11 @@ impl ActionStatusSet {
         self.status.write().await.insert(id, status);
     }
 
-    pub async fn get_status(&self, internal_id: &usize) -> Option<ActionStatus> {
+    pub async fn get_status(&self, internal_id: &usize) -> Option<ProcessStatus> {
         self.status.read().await.get(internal_id).cloned()
     }
 
-    pub async fn get_status_from_server(&self, server_id: usize) -> Option<ActionStatus> {
+    pub async fn get_status_from_server(&self, server_id: usize) -> Option<ProcessStatus> {
         match self.server_id_internal_id.read().await.get(&server_id) {
             None => None,
             Some(id) => self.status.read().await.get(id).cloned(),

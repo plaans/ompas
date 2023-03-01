@@ -1,10 +1,10 @@
 use crate::exec::ModExec;
 use ompas_middleware::logger::LogClient;
 use ompas_structs::acting_domain::OMPASDomain;
+use ompas_structs::acting_manager::process::task::RefinementInner;
+use ompas_structs::acting_manager::ActingManager;
 use ompas_structs::planning::domain::PlanningDomain;
 use ompas_structs::state::world_state::WorldStateSnapshot;
-use ompas_structs::supervisor::process::task::RefinementInner;
-use ompas_structs::supervisor::Supervisor;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lruntimeerror;
 use std::sync::Arc;
@@ -12,7 +12,7 @@ use tokio::sync::RwLock;
 
 pub struct CtxAries {
     _log: LogClient,
-    _supervisor: Supervisor,
+    _acting_manager: ActingManager,
     _domain: Arc<RwLock<OMPASDomain>>,
     _pd: Arc<RwLock<Option<PlanningDomain>>>,
 }
@@ -21,7 +21,7 @@ impl CtxAries {
     pub fn new(exec: &ModExec) -> Self {
         Self {
             _log: exec.log.clone(),
-            _supervisor: exec.supervisor.clone(),
+            _acting_manager: exec.acting_manager.clone(),
             _domain: exec.domain.clone(),
             _pd: Arc::new(Default::default()),
         }

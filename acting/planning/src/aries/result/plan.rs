@@ -1,73 +1,11 @@
-use crate::aries::BindingAriesAtoms;
-use aries_model::extensions::{AssignmentExt, SavedAssignment, Shaped};
-use aries_model::lang::{Atom, Variable};
-use aries_planning::chronicles::{printer, ChronicleKind, ChronicleOrigin, FiniteProblem};
+use crate::aries::result::PlanResult;
+use aries_model::extensions::AssignmentExt;
+use aries_model::lang::Atom;
+use aries_planning::chronicles::{ChronicleKind, ChronicleOrigin};
 use im::HashMap;
-use ompas_structs::conversion::chronicle::{Chronicle, Instantiation};
 use ompas_structs::planning::plan::{AbstractTaskInstance, ActionInstance, Plan, TaskInstance};
-use ompas_structs::planning::problem::PlanningProblem;
 use sompas_structs::lruntimeerror::LResult;
 use sompas_structs::lvalue::LValue;
-use std::sync::Arc;
-
-pub struct PlanResult {
-    pub ass: Arc<SavedAssignment>,
-    pub fp: FiniteProblem,
-}
-
-pub fn print_chronicles(pr: &PlanResult) {
-    let ass = &pr.ass;
-    let problem = &pr.fp;
-    let model = &problem.model;
-
-    for chronicle in problem.chronicles.iter().filter_map(|ci| {
-        if let Some(true) = ass.boolean_value_of(ci.chronicle.presence) {
-            Some(&ci.chronicle)
-        } else {
-            None
-        }
-    }) {
-        printer::Printer::print_chronicle(&chronicle, model)
-    }
-}
-
-pub fn instantiate_chronicles(
-    pp: &PlanningProblem,
-    pr: &PlanResult,
-    bindings: &BindingAriesAtoms,
-) -> Vec<Chronicle> {
-    let mut instances = vec![];
-    let ass = &pr.ass;
-    let model = &pr.fp.model;
-    let st = pp.st.clone();
-    for chronicle in &pp.instance.instances {
-        let mut instantiations = vec![];
-
-        for var in &chronicle.chronicle.variables {
-            let value = match bindings.get_var(var).unwrap() {
-                Variable::Bool(b) => st.new_bool(ass.boolean_value_of(*b).unwrap()),
-                Variable::Int(i) => {
-                    let value = ass.var_domain(*i).lb;
-                    st.new_int(value as i64)
-                }
-                Variable::Fixed(f) => {
-                    let value = ass.f_domain(*f).lb();
-                    st.new_float(value as f64)
-                }
-                Variable::Sym(s) => {
-                    let sym = ass.sym_domain_of(*s).into_singleton().unwrap();
-                    let value = model.get_symbol(sym);
-                    st.new_symbol(value)
-                }
-            };
-            instantiations.push(Instantiation::new(*var, value));
-        }
-
-        instances.push(chronicle.chronicle.instantiate(instantiations))
-    }
-
-    instances
-}
 
 pub fn extract_plan(pr: &PlanResult) -> Plan {
     let ass = &pr.ass;

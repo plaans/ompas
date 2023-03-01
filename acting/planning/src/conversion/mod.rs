@@ -1,5 +1,6 @@
 use crate::conversion::chronicle::convert_graph;
 use crate::conversion::chronicle::post_processing::post_processing;
+use crate::conversion::flow::annotate::annotate;
 use crate::conversion::flow::convert_lv;
 use crate::conversion::flow::p_eval::p_eval;
 use crate::conversion::flow::p_eval::r#struct::{PConfig, PLEnv};
@@ -10,6 +11,7 @@ use chrono::{DateTime, Utc};
 use ompas_language::exec::refinement::EXEC_TASK;
 use ompas_structs::acting_domain::parameters::Parameters;
 use ompas_structs::acting_domain::task::Task;
+use ompas_structs::acting_manager::operational_model::ActingModel;
 use ompas_structs::conversion::chronicle::{Chronicle, ChronicleKind};
 use ompas_structs::conversion::context::ConversionContext;
 use ompas_structs::conversion::flow_graph::graph::FlowGraph;
@@ -19,7 +21,6 @@ use ompas_structs::planning::problem::PlanningProblem;
 use ompas_structs::sym_table::r#ref::RefSymTable;
 use ompas_structs::sym_table::r#trait::FormatWithSymTable;
 use ompas_structs::sym_table::VarId;
-use sompas_structs::lenv::LEnv;
 use sompas_structs::llambda::{LLambda, LambdaArgs};
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
@@ -37,11 +38,21 @@ use std::time::SystemTime;
 pub mod chronicle;
 pub mod flow;
 
+#[allow(dead_code)]
 const DEBUG_CHRONICLE: bool = false;
 
-pub async fn convert(lv: &LValue, env: &LEnv, st: RefSymTable) -> Result<Chronicle, LRuntimeError> {
+pub async fn convert(
+    ch: Option<Chronicle>,
+    lv: &LValue,
+    p_env: &mut PLEnv,
+    st: RefSymTable,
+) -> Result<ActingModel, LRuntimeError> {
     let time = SystemTime::now();
-    let pp_lv = pre_processing(lv, env).await?;
+
+    let p_eval_lv = p_eval(lv, p_env).await?;
+    let lv_om = annotate(p_eval_lv);
+
+    let pp_lv = pre_processing(lv, &p_env.env).await?;
 
     //let sym_table = RefCell::new(SymTable::default());
 
@@ -50,16 +61,19 @@ pub async fn convert(lv: &LValue, env: &LEnv, st: RefSymTable) -> Result<Chronic
     let flow = convert_lv(&pp_lv, &mut graph, &mut Default::default())?;
     graph.flow = flow;
     flow_graph_post_processing(&mut graph)?;
-    let mut ch = convert_graph(None, &mut graph, &flow, env)?;
+    let mut ch = convert_graph(ch, &mut graph, &flow, &p_env.env)?;
     //let mut ch = ChronicleTemplate::new("debug", ChronicleKind::Method, st);
-    post_processing(&mut ch, env.clone())?;
+    post_processing(&mut ch, &p_env.env)?;
     graph.flat_bindings();
     ch.meta_data.flow_graph = graph;
-    ch.meta_data.post_processed_lvalue = pp_lv;
-    ch.meta_data.lvalue = lv.clone();
     ch.meta_data.convert_time = time.elapsed().unwrap();
 
-    Ok(ch)
+    Ok(ActingModel {
+        lv: lv.clone(),
+        lv_om,
+        lv_expanded: pp_lv,
+        chronicle: ch,
+    })
 }
 
 pub async fn p_convert_task(
@@ -86,7 +100,7 @@ pub async fn p_convert_task(
         Some(model) => {
             let method_lambda: LLambda = model.try_into().expect("");
 
-            let template = convert_abstract_task_to_chronicle(
+            let om: ActingModel = convert_abstract_task_to_chronicle(
                 &method_lambda,
                 t.get_label(),
                 None,
@@ -102,8 +116,7 @@ pub async fn p_convert_task(
                     instance_id: 0,
                     task_id: 0,
                 },
-                chronicle: template,
-                om: Default::default(),
+                om,
                 pr: Default::default(),
             });
         }
@@ -118,7 +131,7 @@ pub async fn p_convert_task(
 
                 let method_lambda: LLambda = method.get_body().try_into().expect("");
 
-                let template = convert_abstract_task_to_chronicle(
+                let om: ActingModel = convert_abstract_task_to_chronicle(
                     &method_lambda,
                     &method.label,
                     Some(t),
@@ -134,8 +147,7 @@ pub async fn p_convert_task(
                         instance_id: 0,
                         task_id: 0,
                     },
-                    chronicle: template,
-                    om: Default::default(),
+                    om,
                     pr: Default::default(),
                 });
             }
@@ -180,18 +192,18 @@ pub async fn p_convert(
     let mut converted: HashSet<String> = Default::default();
 
     for instance in &pp.instance.instances {
-        for subtask in instance.chronicle.get_subtasks() {
-            let label = subtask.task[0].format(&st, true);
+        for subtask in instance.om.chronicle.get_subtasks() {
+            let label = subtask.name[0].format(&st, true);
             if !converted.contains(&label) {
                 tasks_to_convert.insert(label);
             }
         }
 
-        for effect in instance.chronicle.get_effects() {
+        for effect in instance.om.chronicle.get_effects() {
             label_sf.insert(effect.sv[0].format(&st, true));
         }
 
-        for condition in instance.chronicle.get_conditions() {
+        for condition in instance.om.chronicle.get_conditions() {
             label_sf.insert(condition.sv[0].format(&st, true));
         }
     }
@@ -222,7 +234,7 @@ pub async fn p_convert(
                         pc.p_table.add_param(param.to_string());
                     }
 
-                    let template: Chronicle = convert_abstract_task_to_chronicle(
+                    let om: ActingModel = convert_abstract_task_to_chronicle(
                         &task_lambda,
                         task.get_label(),
                         None,
@@ -233,21 +245,21 @@ pub async fn p_convert(
                     )
                     .await?;
 
-                    for subtask in template.get_subtasks() {
-                        let label = subtask.task[0].format(&st, true);
+                    for subtask in om.chronicle.get_subtasks() {
+                        let label = subtask.name[0].format(&st, true);
                         if !converted.contains(&label) {
                             new_tasks.insert(label);
                         }
                     }
 
-                    for effect in template.get_effects() {
+                    for effect in om.chronicle.get_effects() {
                         label_sf.insert(effect.sv[0].format(&st, true));
                     }
 
-                    for condition in template.get_conditions() {
+                    for condition in om.chronicle.get_conditions() {
                         label_sf.insert(condition.sv[0].format(&st, true));
                     }
-                    pp.domain.templates.push(template)
+                    pp.domain.templates.push(om)
                 } else {
                     for method in task.get_methods() {
                         let mut pc = pc.clone();
@@ -259,7 +271,7 @@ pub async fn p_convert(
                             pc.p_table.add_param(param.to_string());
                         }
 
-                        let template = convert_abstract_task_to_chronicle(
+                        let om: ActingModel = convert_abstract_task_to_chronicle(
                             &method_lambda,
                             &method.label,
                             Some(task),
@@ -270,22 +282,22 @@ pub async fn p_convert(
                         )
                         .await?;
 
-                        for subtask in template.get_subtasks() {
-                            let label = subtask.task[0].format(&st, true);
+                        for subtask in om.chronicle.get_subtasks() {
+                            let label = subtask.name[0].format(&st, true);
                             if !converted.contains(&label) {
                                 new_tasks.insert(label);
                             }
                         }
 
-                        for effect in template.get_effects() {
+                        for effect in om.chronicle.get_effects() {
                             label_sf.insert(effect.sv[0].format(&st, true));
                         }
 
-                        for condition in template.get_conditions() {
+                        for condition in om.chronicle.get_conditions() {
                             label_sf.insert(condition.sv[0].format(&st, true));
                         }
 
-                        pp.domain.templates.push(template);
+                        pp.domain.templates.push(om);
                     }
                 }
             } else if let Some(command) = cc.domain.get_commands().get(&t_label) {
@@ -296,7 +308,7 @@ pub async fn p_convert(
                 }
                 //evaluate the lambda sim.
                 //println!("Converting command {}", command.get_label());
-                let template = convert_abstract_task_to_chronicle(
+                let om: ActingModel = convert_abstract_task_to_chronicle(
                     &command.get_model().try_into()?,
                     command.get_label(),
                     None,
@@ -307,15 +319,15 @@ pub async fn p_convert(
                 )
                 .await?;
 
-                for effect in template.get_effects() {
+                for effect in om.chronicle.get_effects() {
                     label_sf.insert(effect.sv[0].format(&st, true));
                 }
 
-                for condition in template.get_conditions() {
+                for condition in om.chronicle.get_conditions() {
                     label_sf.insert(condition.sv[0].format(&st, true));
                 }
 
-                pp.domain.templates.push(template);
+                pp.domain.templates.push(om);
             }
         }
 
@@ -444,9 +456,7 @@ pub async fn convert_abstract_task_to_chronicle(
     cc: &ConversionContext,
     kind: ChronicleKind,
     pc: PConfig,
-) -> lruntimeerror::Result<Chronicle> {
-    let time = SystemTime::now();
-
+) -> lruntimeerror::Result<ActingModel> {
     let st = cc.st.clone();
 
     let symbol_id = st.get_sym_id(&label.to_string()).unwrap();
@@ -486,7 +496,6 @@ pub async fn convert_abstract_task_to_chronicle(
     });
 
     let lv = lambda.get_body();
-    ch.meta_data.lvalue = lv.clone();
 
     let mut p_env = PLEnv {
         env: cc.env.clone(),
@@ -494,7 +503,9 @@ pub async fn convert_abstract_task_to_chronicle(
         pc: pc.clone(),
     };
 
-    let lv = p_eval(lv, &mut p_env).await?;
+    let om = convert(Some(ch), lv, &mut p_env, st).await?;
+
+    /*let lv = p_eval(lv, &mut p_env).await?;
     //println!("lv: {}", lv.format(4));
     //panic!();
     let lv = pre_processing(&lv, &cc.env).await?;
@@ -518,9 +529,9 @@ pub async fn convert_abstract_task_to_chronicle(
 
     if DEBUG_CHRONICLE {
         debug_with_markdown(label.to_string().as_str(), &ch, "/tmp".into(), true);
-    }
+    }*/
 
-    Ok(ch)
+    Ok(om)
 }
 
 pub fn declare_task(task: &Task, st: RefSymTable) -> TaskChronicle {
@@ -540,7 +551,8 @@ pub fn declare_task(task: &Task, st: RefSymTable) -> TaskChronicle {
     }
 }
 
-pub fn debug_with_markdown(label: &str, ch: &Chronicle, path: PathBuf, view: bool) {
+pub fn debug_with_markdown(label: &str, om: &ActingModel, path: PathBuf, view: bool) {
+    let ch = &om.chronicle;
     let label = label.replace("/", "_");
     let mut path = path;
     let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
@@ -621,8 +633,8 @@ pub fn debug_with_markdown(label: &str, ch: &Chronicle, path: PathBuf, view: boo
         label,
         ch.meta_data.convert_time.as_micros(),
         ch,
-        ch.meta_data.lvalue.format(0),
-        ch.meta_data.post_processed_lvalue.format(0),
+        om.lv.format(0),
+        om.lv_expanded.format(0),
         flow_file_name,
         lattice_file_name,
         ch.st

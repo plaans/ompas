@@ -11,7 +11,7 @@ use ompas_structs::conversion::chronicle::{Chronicle, ChronicleKind};
 use ompas_structs::conversion::flow_graph::flow::{FlowId, FlowKind};
 use ompas_structs::conversion::flow_graph::graph::FlowGraph;
 use ompas_structs::planning::om_binding::{
-    AcquireBinding, ArbitraryBinding, ChronicleBinding, SubTaskBinding,
+    AcquireBinding, ActionBinding, ArbitraryBinding, ChronicleBinding,
 };
 use ompas_structs::sym_table::computation::Computation;
 use ompas_structs::sym_table::domain::basic_type::BasicType::Boolean;
@@ -287,7 +287,7 @@ pub fn convert_into_chronicle(
                             value: current_release_quantity,
                         });
 
-                        let capacity = if let Some(capacity) = acq.capacity {
+                        let quantity = if let Some(capacity) = acq.capacity {
                             capacity
                         } else {
                             let max_q_result = st.new_result();
@@ -313,11 +313,11 @@ pub fn convert_into_chronicle(
                         ));
                         ch.add_constraint(Constraint::eq(
                             new_q,
-                            Computation::sub(vec![current_quantity, capacity]),
+                            Computation::sub(vec![current_quantity, quantity]),
                         ));
                         ch.add_constraint(Constraint::eq(
                             new_q_prime,
-                            Computation::add(vec![current_release_quantity, capacity]),
+                            Computation::add(vec![current_release_quantity, quantity]),
                         ));
                         ch.add_constraint(Constraint::leq(interval.get_end(), t_release));
                         ch.add_constraint(Constraint::leq(st.new_int(0), new_q));
@@ -338,9 +338,10 @@ pub fn convert_into_chronicle(
                             ch.bindings.add_binding(
                                 label,
                                 ChronicleBinding::Acquire(AcquireBinding {
-                                    start,
-                                    acquisition: end,
-                                    end: t_release,
+                                    resource,
+                                    quantity,
+                                    request: start,
+                                    acquisition: Interval::new(end, t_release),
                                 }),
                             )
                         }
@@ -385,6 +386,7 @@ pub fn convert_into_chronicle(
                                 ch.bindings.add_binding(
                                     label,
                                     ChronicleBinding::Arbitrary(ArbitraryBinding {
+                                        timepoint: flow.interval.get_start(),
                                         var_id: flow.result,
                                     }),
                                 );
@@ -461,7 +463,7 @@ pub fn convert_into_chronicle(
                     Lit::Exec(exec) => {
                         let subtask = SubTask {
                             interval,
-                            task: exec.clone(),
+                            name: exec.clone(),
                             result,
                             label: flow.label.clone(),
                         };
@@ -484,7 +486,8 @@ pub fn convert_into_chronicle(
                             }
                         }
                         if let Some(label) = flow.label {
-                            let binding = ChronicleBinding::Subtask(SubTaskBinding {
+                            let binding = ChronicleBinding::Action(ActionBinding {
+                                name: exec.clone(),
                                 index: ch.get_subtasks().len(),
                                 interval,
                             });
@@ -631,7 +634,7 @@ pub fn convert_into_chronicle(
                     task.append(&mut task_params);
                     ch.add_subtask(SubTask {
                         interval,
-                        task: task.into(),
+                        name: task.into(),
                         result,
                         label: None,
                     })

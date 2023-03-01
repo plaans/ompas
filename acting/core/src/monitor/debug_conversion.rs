@@ -9,17 +9,18 @@ use ompas_language::monitor::debug_conversion::{
 };
 use ompas_language::monitor::domain::MOD_DOMAIN;
 use ompas_middleware::logger::LogClient;
+use ompas_planning::aries::generate_chronicles;
 use ompas_planning::aries::problem_generation::{finite_problem, ActionParam, PAction};
+use ompas_planning::aries::result::{acting, instance};
 use ompas_planning::aries::solver::run_solver_for_htn;
-use ompas_planning::aries::{generate_chronicles, result};
 use ompas_planning::conversion::convert_acting_domain;
 use ompas_planning::conversion::flow::annotate::annotate;
 use ompas_planning::conversion::flow::p_eval::r#struct::{PConfig, PLEnv};
 use ompas_planning::conversion::flow::p_eval::{p_eval, P_EVAL};
+use ompas_structs::acting_manager::process::process_ref::{Label, ProcessRef};
 use ompas_structs::conversion::context::ConversionContext;
 use ompas_structs::planning::domain::PlanningDomain;
 use ompas_structs::planning::problem::PlanningProblem;
-use ompas_structs::supervisor::process::process_ref::{Label, ProcessRef};
 use sompas_core::expand;
 use sompas_language::LOG_TOPIC_INTERPRETER;
 use sompas_macros::async_scheme_fn;
@@ -29,7 +30,6 @@ use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::string;
-use std::fmt::Write;
 use std::time::SystemTime;
 
 #[derive(Default)]
@@ -76,21 +76,21 @@ pub async fn plan_task(env: &LEnv, args: &[LValue]) -> LResult {
             instance_id: 0,
             task_id: 0,
         },
-        pr: ProcessRef::Relative(0, vec![Label::Subtask(0)]),
+        pr: ProcessRef::Relative(0, vec![Label::Action(0)]),
     }];
     let pp: PlanningProblem = finite_problem(actions, &context).await?;
 
-    println!("instances: {}", {
+    /*println!("instances: {}", {
         let mut str = "".to_string();
         for instance in &pp.instance.instances {
             writeln!(str, "{}", instance.chronicle.format(true)).unwrap();
         }
         str
-    });
+    });*/
 
-    for template in &pp.domain.templates {
+    /*for template in &pp.domain.templates {
         println!("{}", template)
-    }
+    }*/
 
     let (mut aries_problem, bindings) = generate_chronicles(&pp)?;
 
@@ -99,10 +99,13 @@ pub async fn plan_task(env: &LEnv, args: &[LValue]) -> LResult {
 
     let result: LValue = if let Some(pr) = &result {
         //result::print_chronicles(pr);
-        let solved = result::instantiate_chronicles(&pp, &pr, &bindings);
-        for chronicle in &solved {
-            print!("{}", chronicle)
-        }
+        let solved = instance::instantiate_chronicles(&pp, &pr, &bindings);
+        /*for chronicle in &solved {
+            print!("{}", chronicle.chronicle)
+        }*/
+
+        let raw_plan = acting::extract_raw_plan(&solved);
+        println!("RAW PLAN:\n{}", raw_plan);
         /*let plan = result::extract_plan(x);
         println!("plan:\n{}\n{}", plan.format(), plan.format_hierarchy());*/
         //let first_task_id = plan.get_first_subtask().unwrap();

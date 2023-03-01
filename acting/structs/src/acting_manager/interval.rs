@@ -14,8 +14,8 @@ pub struct Timepoint {
 }
 
 impl Timepoint {
-    const MICROS_FACTOR: u64 = 1_000_000;
-    const MILLIS_FACTOR: u64 = 1_000;
+    pub const MICROS_FACTOR: u64 = 1_000_000;
+    pub const MILLIS_FACTOR: u64 = 1_000;
 
     pub fn as_secs(&self) -> f64 {
         self.instant as f64 / self.factor as f64
@@ -37,6 +37,10 @@ impl Timepoint {
             factor: Self::MICROS_FACTOR,
             instant,
         }
+    }
+
+    pub fn new_with_factor(instant: u128, factor: u64) -> Self {
+        Self { factor, instant }
     }
 }
 

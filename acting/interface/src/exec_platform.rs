@@ -17,11 +17,11 @@ use async_trait::async_trait;
 use ompas_language::process::PROCESS_TOPIC_OMPAS;
 use ompas_middleware::logger::LogClient;
 use ompas_middleware::{Master, ProcessInterface};
-use ompas_structs::execution::resource::{Capacity, ResourceCollection};
+use ompas_structs::acting_manager::action_status::ProcessStatus;
+use ompas_structs::acting_manager::ActingManager;
+use ompas_structs::execution::resource::{Capacity, ResourceManager};
 use ompas_structs::state::partial_state::PartialState;
 use ompas_structs::state::world_state::{StateType, WorldState};
-use ompas_structs::supervisor::action_status::ActionStatus;
-use ompas_structs::supervisor::Supervisor;
 use platform_interface::platform_update::Update;
 use sompas_structs::lmodule::LModule;
 use sompas_structs::lvalue::LValue;
@@ -35,8 +35,8 @@ use tokio::sync::{Mutex, RwLock};
 pub struct ExecPlatform {
     inner: Arc<RwLock<dyn PlatformDescriptor>>,
     state: WorldState,
-    resources: ResourceCollection,
-    supervisor: Supervisor,
+    resources: ResourceManager,
+    supervisor: ActingManager,
     command_stream: Arc<Mutex<Option<tokio::sync::mpsc::Sender<CommandRequest>>>>,
     log: LogClient,
     pub config: Arc<RwLock<PlatformConfig>>,
@@ -46,8 +46,8 @@ impl ExecPlatform {
     pub async fn new(
         inner: Arc<RwLock<dyn PlatformDescriptor>>,
         state: WorldState,
-        supervisor: Supervisor,
-        resources: ResourceCollection,
+        supervisor: ActingManager,
+        resources: ResourceManager,
         command_stream: Arc<Mutex<Option<tokio::sync::mpsc::Sender<CommandRequest>>>>,
         log: LogClient,
         config: Arc<RwLock<PlatformConfig>>,
@@ -111,7 +111,7 @@ impl ExecPlatform {
     async fn get_updates(
         mut client: PlatformInterfaceClient<tonic::transport::Channel>,
         world_state: WorldState,
-        resources: ResourceCollection,
+        resources: ResourceManager,
     ) {
         let mut process_interface: ProcessInterface = ProcessInterface::new(
             PROCESS_GET_UPDATES,
@@ -188,18 +188,18 @@ impl ExecPlatform {
                                             None => {}
                                             Some(event::Event::Resource(resource)) => {
                                                 let label = resource.label;
-                                                let capacity: Option<Capacity> = match ResourceKind::from_i32(resource.resource_kind) {
+                                                let capacity: Capacity = match ResourceKind::from_i32(resource.resource_kind) {
                                                     Some(ResourceKind::Unary) => {
-                                                        None
+                                                        1
                                                     }
                                                     Some(ResourceKind::Divisible) => {
-                                                        Some((resource.quantity as usize).into())
+                                                        resource.quantity as usize
                                                     }
                                                     None => {
                                                         panic!()
                                                     }
                                                 };
-                                                resources.new_resource(label , capacity).await
+                                                resources.new_resource(label , Some(capacity)).await
                                             }
                                             Some(event::Event::Instance(instance)) => {
                                                 world_state.add_instance(&instance.object, &instance.r#type).await;
@@ -217,7 +217,7 @@ impl ExecPlatform {
 
     async fn send_commands(
         mut client: PlatformInterfaceClient<tonic::transport::Channel>,
-        supervisor: Supervisor,
+        supervisor: ActingManager,
         command_stream: tokio::sync::mpsc::Receiver<CommandRequest>,
     ) {
         let mut process = ProcessInterface::new(
@@ -258,46 +258,41 @@ impl ExecPlatform {
                         }
                         Ok(Some(command_response)) => {
                             let command_response: CommandResponse = command_response;
-                            match command_response.response {
-                                None => {}
-                                Some(Response::Accepted(r)) => {
-                                    supervisor
-                                        .update_command_status(r.command_id as usize, ActionStatus::Accepted)
-                                        .await;
+                            if let Some(response) = command_response.response {
+                                let (id, status) = match response {
+                                    Response::Accepted(r) => {
+                                    (r.command_id as usize, ProcessStatus::Accepted)
+
                                 }
-                                Some(Response::Rejected(r)) => {
-                                    supervisor
-                                        .update_command_status(r.command_id as usize, ActionStatus::Rejected)
-                                        .await;
+                                Response::Rejected(r) => {
+                                    (r.command_id as usize, ProcessStatus::Rejected)
+
                                 }
-                                Some(Response::Progress(f)) => {
-                                    supervisor
-                                        .update_command_status(
+                                Response::Progress(f) => {
+                                    (
                                             f.command_id as usize,
-                                            ActionStatus::Running(Some(f.progress)),
+                                            ProcessStatus::Running(Some(f.progress)),
                                         )
-                                        .await;
                                 }
-                                Some(Response::Result(r)) => match r.result {
+                                Response::Result(r) => match r.result {
                                     true => {
-                                        supervisor
-                                            .update_command_status(r.command_id as usize, ActionStatus::Success)
-                                            .await
+                                        (r.command_id as usize, ProcessStatus::Success)
+
                                     }
                                     false => {
-                                        supervisor
-                                            .update_command_status(r.command_id as usize, ActionStatus::Failure)
-                                            .await
+                                        (r.command_id as usize, ProcessStatus::Failure)
+
                                     }
                                 },
-                                Some(Response::Cancelled(c)) => {
-                                    supervisor
-                                        .update_command_status(
+                                Response::Cancelled(c) => {
+                                    (
                                             c.command_id as usize,
-                                            ActionStatus::Cancelled(c.result),
+                                            ProcessStatus::Cancelled(c.result),
                                         )
-                                        .await;
+
                                 }
+                                };
+                                supervisor.set_status(&id, status).await;
                             }
                         }
                     }

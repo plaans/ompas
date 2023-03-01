@@ -13,7 +13,6 @@ use crate::sym_table::r#ref::RefSymTable;
 use crate::sym_table::r#trait::{FlatBindings, FormatWithSymTable, GetVariables, Replace};
 use crate::sym_table::VarId;
 use im::HashSet;
-use sompas_structs::lvalue::LValue;
 use std::borrow::Borrow;
 use std::fmt::Write;
 use std::fmt::{Display, Formatter};
@@ -25,10 +24,10 @@ pub mod effect;
 pub mod interval;
 pub mod subtask;
 pub mod task_template;
-pub mod template;
 
 #[derive(Copy, Clone)]
 pub enum ChronicleKind {
+    Root,
     Command,
     Method,
     Task,
@@ -38,8 +37,6 @@ pub enum ChronicleKind {
 pub struct ChronicleMetaData {
     pub kind: ChronicleKind,
     label: String,
-    pub lvalue: LValue,
-    pub post_processed_lvalue: LValue,
     pub flow_graph: FlowGraph,
     pub convert_time: Duration,
 }
@@ -50,7 +47,7 @@ pub struct Chronicle {
     name: Vec<VarId>,
     pub task: Vec<VarId>,
     presence: VarId,
-    interval: Interval,
+    pub interval: Interval,
     result: VarId,
     pub variables: HashSet<VarId>,
     pub constraints: Vec<Constraint>,
@@ -77,8 +74,6 @@ impl Chronicle {
             meta_data: ChronicleMetaData {
                 kind,
                 label: label.to_string(),
-                lvalue: Default::default(),
-                post_processed_lvalue: Default::default(),
                 flow_graph: Default::default(),
                 convert_time: Duration::from_secs(0),
             },
@@ -445,6 +440,15 @@ impl GetVariables for Chronicle {
 
 impl Replace for Chronicle {
     fn replace(&mut self, old: &VarId, new: &VarId) {
+        self.interval.replace(old, new);
+        self.name.replace(old, new);
+        self.task.replace(old, new);
+        for sub in &mut self.sub_chronicles {
+            sub.name.replace(old, new);
+            for method in &mut sub.methods {
+                method.replace(old, new);
+            }
+        }
         self.variables.remove(old);
         self.variables.insert(*new);
         self.conditions.replace(old, new);

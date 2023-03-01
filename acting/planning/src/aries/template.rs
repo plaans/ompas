@@ -232,7 +232,7 @@ pub fn generate_templates(
     let cont = Container::Template(domain.templates.len());
 
     for template in &domain.templates {
-        let template = read_chronicle(&mut ctx, bindings, &template, cont.clone())?;
+        let template = read_chronicle(&mut ctx, bindings, &template.chronicle, cont.clone())?;
         Printer::print_chronicle(&template.chronicle, &ctx.model);
         templates.push(template);
     }
@@ -607,7 +607,7 @@ pub fn read_chronicle(
     let prez = prez_var.true_lit();
     params.push(prez_var.into());
 
-    print!("init params...");
+    //print!("init params...");
     //TODO: handle case where some parameters are already instantiated.
     for var in &ch.get_variables() {
         let var_domain = st.get_var_domain(var);
@@ -711,7 +711,7 @@ pub fn read_chronicle(
 
         params.push(param);
     }
-    println!("ok!");
+    //println!("ok!");
 
     //End declaration of the variables
 
@@ -727,7 +727,7 @@ pub fn read_chronicle(
         constraints.append(&mut x);
     }
 
-    print!("init conditions...");
+    //print!("init conditions...");
     for c in ch.get_conditions() {
         let sv =
             c.sv.iter()
@@ -752,9 +752,9 @@ pub fn read_chronicle(
         };
         conditions.push(condition);
     }
-    println!("ok!");
+    //println!("ok!");
 
-    print!("init effects...");
+    //print!("init effects...");
     for e in ch.get_effects() {
         let sv =
             e.sv.iter()
@@ -779,9 +779,9 @@ pub fn read_chronicle(
         };
         effects.push(effect);
     }
-    println!("ok!");
+    //println!("ok!");
 
-    print!("init subtasks...");
+    //print!("init subtasks...");
     for s in ch.get_subtasks() {
         let start: FAtom = get_atom(&s.interval.get_start(), ctx)
             .try_into()
@@ -789,7 +789,7 @@ pub fn read_chronicle(
         let end: FAtom = get_atom(&s.interval.get_end(), ctx)
             .try_into()
             .unwrap_or_else(|t| panic!("{:?}", t));
-        let e: Vec<aAtom> = s.task.iter().map(|a| get_atom(&a, ctx)).collect();
+        let e: Vec<aAtom> = s.name.iter().map(|a| get_atom(&a, ctx)).collect();
         let st = SubTask {
             id: None,
             start,
@@ -799,7 +799,7 @@ pub fn read_chronicle(
 
         subtasks.push(st);
     }
-    println!("ok!");
+    //println!("ok!");
 
     let start = useful::try_variable_into_fvar(
         bindings
@@ -816,20 +816,21 @@ pub fn read_chronicle(
     )?;
     let end = FAtom::from(end);
 
-    print!("init name...");
+    //print!("init name...");
     let name: Vec<aAtom> = ch.get_name().iter().map(|a| get_atom(a, ctx)).collect();
-    println!("ok!");
+    //println!("ok!");
 
-    print!("init task...");
+    //print!("init task...");
     let task: Vec<aAtom> = ch.get_task().iter().map(|a| get_atom(a, ctx)).collect();
-    println!("ok!");
-    print!("\n\n");
+    //println!("ok!");
+    //print!("\n\n");
 
     let template = aChronicle {
         kind: match ch.meta_data.kind {
             ChronicleKind::Command => aChronicleKind::Action,
             ChronicleKind::Method => aChronicleKind::Method,
             ChronicleKind::Task => aChronicleKind::Action,
+            ChronicleKind::Root => aChronicleKind::Problem,
         },
         presence: prez,
         start,

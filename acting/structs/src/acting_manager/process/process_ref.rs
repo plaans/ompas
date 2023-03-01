@@ -1,4 +1,4 @@
-use crate::supervisor::ActingProcessId;
+use crate::acting_manager::ActingProcessId;
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
@@ -12,6 +12,20 @@ impl ProcessRef {
         match self {
             ProcessRef::Id(id) => *self = ProcessRef::Relative(*id, vec![label]),
             ProcessRef::Relative(_, vec) => vec.push(label),
+        }
+    }
+
+    pub fn pop(&mut self) -> Option<Label> {
+        match self {
+            ProcessRef::Id(_) => None,
+            ProcessRef::Relative(id, vec) => match vec.len() {
+                1 => {
+                    let r = vec.pop();
+                    *self = ProcessRef::Id(*id);
+                    r
+                }
+                _ => vec.pop(),
+            },
         }
     }
 
@@ -58,7 +72,7 @@ impl From<ActingProcessId> for ProcessRef {
 #[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub enum Label {
     Refinement(usize),
-    Subtask(usize),
+    Action(usize),
     Acquire(usize),
     Arbitrary(usize),
 }
@@ -69,14 +83,14 @@ impl Display for Label {
             Label::Refinement(m) => {
                 write!(f, "refinement({m})")
             }
-            Label::Subtask(id) => {
-                write!(f, "s({id})")
+            Label::Action(id) => {
+                write!(f, "action({id})")
             }
             Label::Acquire(acq) => {
-                write!(f, "{acq}")
+                write!(f, "acquire({acq})")
             }
             Label::Arbitrary(arb) => {
-                write!(f, "{arb}")
+                write!(f, "arbitrary({arb})")
             }
         }
     }

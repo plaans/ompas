@@ -5,11 +5,12 @@ use ompas_language::process::{LOG_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS};
 use ompas_middleware::logger::LogClient;
 use ompas_middleware::LogLevel;
 use ompas_middleware::ProcessInterface;
+use ompas_structs::acting_manager::process::plan_var::AsCst;
+use ompas_structs::acting_manager::process::process_ref::ProcessRef;
+use ompas_structs::acting_manager::ActingManager;
 use ompas_structs::interface::job::JobType;
 use ompas_structs::interface::rae_command::OMPASJob;
 use ompas_structs::interface::trigger_collection::{Response, TaskTrigger};
-use ompas_structs::supervisor::process::process_ref::ProcessRef;
-use ompas_structs::supervisor::Supervisor;
 use sompas_core::{eval, parse};
 use sompas_structs::lasynchandler::LAsyncHandle;
 use sompas_structs::lenv::LEnv;
@@ -33,8 +34,7 @@ pub const PROCESS_MAIN: &str = "__PROCESS_MAIN__";
 /// Main RAE Loop:
 /// Receives Job to handle in separate tasks.
 pub async fn rae(
-    //domain: RAEDomain,
-    supervisor: Supervisor,
+    acting_manager: ActingManager,
     log: LogClient,
     env: LEnv,
     mut command_rx: Receiver<OMPASJob>,
@@ -73,7 +73,12 @@ pub async fn rae(
                         match job_type {
                             JobType::Task => {
                                 log.debug(format!("new triggered task: {}", job_expr)).await;
-                                let id: ProcessRef = supervisor.inner.write().await.new_high_level_task(job_lvalue.clone());
+                                let vec: Vec<LValue> = job_lvalue.clone().try_into().unwrap();
+                                let mut vec_cst = vec![];
+                                for e in vec {
+                                    vec_cst.push(e.as_cst())
+                                }
+                                let id: ProcessRef = acting_manager.new_high_level_task(job_lvalue.to_string(),vec_cst).await;
                                 let mod_context: ModActingContext = ModActingContext::new(id.clone());
                                 pr = id;
                                 new_env.update_context(mod_context);

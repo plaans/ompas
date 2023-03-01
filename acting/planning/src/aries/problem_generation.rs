@@ -1,21 +1,15 @@
-use crate::conversion::chronicle::convert_graph;
-use crate::conversion::chronicle::post_processing::post_processing;
-use crate::conversion::flow::annotate::annotate;
-use crate::conversion::flow::convert_lv;
-use crate::conversion::flow::p_eval::p_eval;
+use crate::conversion::convert;
 use crate::conversion::flow::p_eval::r#struct::{PConfig, PLEnv, PLValue};
-use crate::conversion::flow::post_processing::flow_graph_post_processing;
-use crate::conversion::flow::pre_processing::pre_processing;
 use aries_planning::chronicles::ChronicleOrigin;
 use function_name::named;
 use ompas_structs::acting_domain::parameters::Parameters;
+use ompas_structs::acting_manager::operational_model::ActingModel;
+use ompas_structs::acting_manager::process::process_ref::{Label, ProcessRef};
 use ompas_structs::conversion::chronicle::{Chronicle, ChronicleKind};
 use ompas_structs::conversion::context::ConversionContext;
-use ompas_structs::conversion::flow_graph::graph::FlowGraph;
 use ompas_structs::planning::domain::PlanningDomain;
 use ompas_structs::planning::instance::{ChronicleInstance, PlanningInstance};
 use ompas_structs::planning::problem::PlanningProblem;
-use ompas_structs::supervisor::process::process_ref::{Label, ProcessRef};
 use ompas_structs::sym_table::r#trait::FormatWithSymTable;
 use ompas_structs::sym_table::VarId;
 use sompas_structs::llambda::{LLambda, LambdaArgs};
@@ -23,7 +17,6 @@ use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalues::LValueS;
 use std::collections::HashSet;
-use std::time::SystemTime;
 
 #[derive(Clone)]
 pub enum ActionParam {
@@ -68,9 +61,9 @@ pub async fn finite_problem(
 
     let mut update_domain =
         |tasks: &mut Vec<PAction>, instance: &ChronicleInstance, instance_n: usize| {
-            for (id, subtask) in instance.chronicle.get_subtasks().iter().enumerate() {
+            for (id, subtask) in instance.om.chronicle.get_subtasks().iter().enumerate() {
                 let mut value: Vec<ActionParam> = vec![];
-                for e in &subtask.task {
+                for e in &subtask.name {
                     let domain = st.get_domain_of_var(&e);
 
                     let val = match domain.as_constant() {
@@ -81,7 +74,7 @@ pub async fn finite_problem(
                 }
 
                 let mut pr = instance.pr.clone();
-                pr.push(Label::Subtask(0));
+                pr.push(subtask.label.unwrap());
 
                 tasks.push(PAction {
                     args: value,
@@ -93,11 +86,11 @@ pub async fn finite_problem(
                 })
             }
 
-            for effect in instance.chronicle.get_effects() {
+            for effect in instance.om.chronicle.get_effects() {
                 sf_labels.insert(effect.sv[0].format(&st, true));
             }
 
-            for condition in instance.chronicle.get_conditions() {
+            for condition in instance.om.chronicle.get_conditions() {
                 sf_labels.insert(condition.sv[0].format(&st, true));
             }
         };
@@ -156,9 +149,9 @@ pub async fn finite_problem(
                             ChronicleKind::Method,
                         )
                         .await?;
+                        instance.pr.push(Label::Refinement(id));
                         update_domain(&mut goal_actions, &instance, instance_n);
 
-                        instance.pr.push(Label::Refinement(id));
                         instances.push(instance);
                     }
                 }
@@ -232,8 +225,6 @@ pub async fn convert_into_chronicle_instance(
 
     let action = &p_action.args;
 
-    let time = SystemTime::now();
-
     let st = cc.st.clone();
 
     let label = action[0].lvalues().to_string();
@@ -296,7 +287,6 @@ pub async fn convert_into_chronicle_instance(
     });
 
     let lv = lambda.get_body();
-    ch.meta_data.lvalue = lv.clone();
 
     let mut p_env = PLEnv {
         env: cc.env.clone(),
@@ -304,16 +294,18 @@ pub async fn convert_into_chronicle_instance(
         pc: pc.clone(),
     };
 
-    let lv = p_eval(lv, &mut p_env).await?;
-    let lv_om = annotate(lv);
-    println!("{}", lv_om.format(0));
+    let om: ActingModel = convert(Some(ch), lv, &mut p_env, st).await?;
+
+    /*let p_eval_lv = p_eval(lv, &mut p_env).await?;
+    let lv_om = annotate(p_eval_lv);
+    //println!("{}", lv_om.format(0));
     //println!("lv: {}", lv.format(4));
     //panic!();
-    let lv = pre_processing(&lv_om, &cc.env).await?;
+    let lv_expanded = pre_processing(&lv_om, &cc.env).await?;
 
     let mut graph = FlowGraph::new(st);
 
-    let flow = convert_lv(&lv, &mut graph, &mut Default::default())?;
+    let flow = convert_lv(&lv_expanded, &mut graph, &mut Default::default())?;
     graph.flow = flow;
     flow_graph_post_processing(&mut graph)?;
     let mut ch = convert_graph(Some(ch), &mut graph, &flow, &cc.env)?;
@@ -321,13 +313,11 @@ pub async fn convert_into_chronicle_instance(
 
     graph.flat_bindings();
     ch.meta_data.flow_graph = graph;
-    ch.meta_data.post_processed_lvalue = lv;
-    ch.meta_data.convert_time = time.elapsed().unwrap();
+    ch.meta_data.convert_time = time.elapsed().unwrap();*/
 
     Ok(ChronicleInstance {
         origin: p_action.origin,
-        chronicle: ch,
-        om: lv_om,
+        om,
         pr: p_action.pr,
     })
 }

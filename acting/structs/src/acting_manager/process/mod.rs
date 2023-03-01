@@ -1,44 +1,112 @@
-use crate::supervisor::inner::ProcessKind;
-use crate::supervisor::process::acquire::AcquireProcess;
-use crate::supervisor::process::arbitrary::ArbitraryProcess;
-use crate::supervisor::process::command::CommandProcess;
-use crate::supervisor::process::method::MethodProcess;
-use crate::supervisor::process::root_task::RootProcess;
-use crate::supervisor::process::task::TaskProcess;
+use crate::acting_manager::action_status::ProcessStatus;
+use crate::acting_manager::action_status::ProcessStatus::Pending;
+use crate::acting_manager::inner::ProcessKind;
+use crate::acting_manager::interval::Timepoint;
+use crate::acting_manager::process::acquire::AcquireProcess;
+use crate::acting_manager::process::arbitrary::ArbitraryProcess;
+use crate::acting_manager::process::command::CommandProcess;
+use crate::acting_manager::process::method::RefinementProcess;
+use crate::acting_manager::process::plan_var::ExecutionVar;
+use crate::acting_manager::process::root_task::RootProcess;
+use crate::acting_manager::process::task::TaskProcess;
+use crate::acting_manager::{ActingProcessId, OMId};
 use std::fmt::{Display, Formatter};
+use tokio::sync::watch;
 
 pub mod acquire;
 pub mod arbitrary;
 pub mod command;
 pub mod method;
+pub mod plan_var;
 pub mod process_ref;
 pub mod root_task;
 pub mod task;
 
-#[derive(Copy, Clone)]
-pub enum ProcessStatus {
-    Executed,
-    Planned,
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub enum ProcessOrigin {
+    Planner,
+    Execution,
+    PlannerDropped,
+    ExecPlanInherited,
+}
+
+impl ProcessOrigin {
+    pub fn is_exec(&self) -> bool {
+        matches!(self, Self::ExecPlanInherited | Self::Execution)
+    }
 }
 
 pub struct ActingProcess {
+    id: ActingProcessId,
+    _parent: ActingProcessId,
+    om_id: OMId,
+    debug: Option<String>,
+    pub origin: ProcessOrigin,
     pub status: ProcessStatus,
+    pub start: ExecutionVar<Timepoint>,
+    pub end: ExecutionVar<Timepoint>,
     pub inner: ActingProcessInner,
+    pub status_update: Option<watch::Sender<ProcessStatus>>,
 }
 
 impl ActingProcess {
-    pub fn root() -> Self {
+    pub fn new(
+        id: ActingProcessId,
+        _parent: ActingProcessId,
+        origin: ProcessOrigin,
+        om_id: OMId,
+        debug: Option<String>,
+        start: ExecutionVar<Timepoint>,
+        end: ExecutionVar<Timepoint>,
+        inner: impl Into<ActingProcessInner>,
+    ) -> Self {
         Self {
-            status: ProcessStatus::Executed,
-            inner: ActingProcessInner::RootTask(RootProcess::new()),
+            id,
+            _parent,
+            om_id,
+            debug,
+            origin,
+            status: Pending,
+            start,
+            end,
+            inner: inner.into(),
+            status_update: None,
         }
     }
 
-    pub fn new(status: ProcessStatus, kind: impl Into<ActingProcessInner>) -> Self {
-        Self {
-            status,
-            inner: kind.into(),
+    pub fn id(&self) -> ActingProcessId {
+        self.id
+    }
+
+    pub fn parent(&self) -> ActingProcessId {
+        self._parent
+    }
+
+    pub fn om_id(&self) -> OMId {
+        self.om_id
+    }
+
+    pub fn debug(&self) -> &Option<String> {
+        &self.debug
+    }
+
+    pub fn set_status(&mut self, status: ProcessStatus) {
+        self.status = status;
+        if let Some(sender) = &mut self.status_update {
+            sender.send(status).unwrap_or_else(|e| panic!("{}", e));
         }
+    }
+
+    pub fn dropped(&mut self) {
+        self.origin = ProcessOrigin::PlannerDropped;
+    }
+
+    pub fn executed(&mut self) {
+        self.origin = ProcessOrigin::ExecPlanInherited;
+    }
+
+    pub fn get_om_id(&self) -> OMId {
+        self.om_id
     }
 
     pub fn get_inner(&self) -> &ActingProcessInner {
@@ -54,7 +122,7 @@ pub enum ActingProcessInner {
     RootTask(RootProcess),
     Command(CommandProcess),
     Task(TaskProcess),
-    Method(MethodProcess),
+    Method(RefinementProcess),
     Arbitrary(ArbitraryProcess),
     Acquire(AcquireProcess),
 }
@@ -116,7 +184,7 @@ impl ActingProcessInner {
         }
     }
 
-    pub fn as_method(&self) -> Option<&MethodProcess> {
+    pub fn as_method(&self) -> Option<&RefinementProcess> {
         if let Self::Method(method) = self {
             Some(method)
         } else {
@@ -124,7 +192,7 @@ impl ActingProcessInner {
         }
     }
 
-    pub fn as_mut_method(&mut self) -> Option<&mut MethodProcess> {
+    pub fn as_mut_method(&mut self) -> Option<&mut RefinementProcess> {
         if let Self::Method(method) = self {
             Some(method)
         } else {

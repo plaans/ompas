@@ -1,7 +1,8 @@
+use crate::conversion::chronicle::interval;
 use crate::conversion::flow_graph::graph::Dot;
 use crate::sym_table::closure::Update;
 use crate::sym_table::domain::type_lattice::TypeLattice;
-use crate::sym_table::domain::Domain;
+use crate::sym_table::domain::{cst, Domain};
 use crate::sym_table::var_domain::VarDomain;
 use crate::sym_table::variable::Variable;
 use crate::sym_table::{DomainId, EmptyDomains, SymTable, VarId};
@@ -59,6 +60,14 @@ impl RefSymTable {
 
     pub fn new_number(&self, n: &LNumber) -> VarId {
         self.0.write().unwrap().new_number(n)
+    }
+
+    pub fn new_interval(&self) -> interval::Interval {
+        self.0.write().unwrap().new_interval()
+    }
+
+    pub fn new_cst(&self, cst: cst::Cst) -> VarId {
+        self.0.write().unwrap().new_cst(cst)
     }
 
     /*

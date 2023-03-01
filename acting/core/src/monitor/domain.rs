@@ -7,7 +7,7 @@ use ompas_structs::acting_domain::state_function::StateFunction;
 use ompas_structs::acting_domain::task::Task;
 use ompas_structs::acting_domain::OMPASDomain;
 use ompas_structs::conversion::context::ConversionContext;
-use ompas_structs::execution::resource::{Capacity, ResourceCollection};
+use ompas_structs::execution::resource::{Capacity, ResourceManager};
 use ompas_structs::state::partial_state::PartialState;
 use ompas_structs::state::world_state::{StateType, WorldState, WorldStateSnapshot};
 use ompas_structs::sym_table::domain::ref_type_lattice::RefTypeLattice;
@@ -32,7 +32,7 @@ use tokio::sync::RwLock;
 
 pub struct ModDomain {
     state: WorldState,
-    resources: ResourceCollection,
+    resources: ResourceManager,
     empty_env: LEnv,
     domain_description: InitScheme,
     domain: Arc<RwLock<OMPASDomain>>,
@@ -889,12 +889,12 @@ pub async fn add_resource(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeErr
         .ok_or_else(|| LRuntimeError::wrong_number_of_args(ADD_RESOURCE, args, 1..2))?
         .try_into()?;
 
-    let capacity: Option<Capacity> = match args.get(1) {
-        None => None,
-        Some(lv) => Some(Capacity::Some(lv.try_into()?)),
+    let capacity: Capacity = match args.get(1) {
+        None => 1,
+        Some(lv) => lv.try_into()?,
     };
 
-    ctx.resources.new_resource(label, capacity).await;
+    ctx.resources.new_resource(label, Some(capacity)).await;
 
     Ok(())
 }

@@ -12,11 +12,11 @@ use ompas_language::exec::state::{
 use ompas_language::exec::ARBITRARY;
 use ompas_language::supervisor::ACQUIRE;
 use ompas_language::sym_table::{TYPE_OBJECT, TYPE_OBJECT_TYPE, TYPE_RESSOURCE_HANDLE};
+use ompas_structs::acting_manager::process::process_ref::Label;
 use ompas_structs::conversion::chronicle::constraint::Constraint;
 use ompas_structs::conversion::flow_graph::define_table::DefineTable;
 use ompas_structs::conversion::flow_graph::flow::FlowId;
 use ompas_structs::conversion::flow_graph::graph::FlowGraph;
-use ompas_structs::supervisor::process::process_ref::Label;
 use ompas_structs::sym_table::closure::Update;
 use ompas_structs::sym_table::computation::Computation;
 use ompas_structs::sym_table::domain::basic_type::BasicType::{Boolean, True};
@@ -521,7 +521,7 @@ fn convert_ctx_exec_command(
     let index = extract_index(fl, &mut seq);
     let flow_id = convert_exec(fl, seq)?;
     let flow_exec = fl.try_get_last_flow(&flow_id).unwrap();
-    fl.set_label(&flow_exec, Label::Subtask(index as usize));
+    fl.set_label(&flow_exec, Label::Action(index as usize));
     Ok(flow_id)
 }
 
@@ -532,7 +532,7 @@ fn convert_ctx_exec_task(
     let index = extract_index(fl, &mut seq);
     let flow_id = convert_exec(fl, seq)?;
     let flow_exec = fl.try_get_last_flow(&flow_id).unwrap();
-    fl.set_label(&flow_exec, Label::Subtask(index as usize));
+    fl.set_label(&flow_exec, Label::Action(index as usize));
     Ok(flow_id)
 }
 

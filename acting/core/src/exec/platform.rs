@@ -7,9 +7,9 @@ use ompas_language::exec::acting_context::*;
 use ompas_language::exec::mode::CTX_MODE;
 use ompas_language::exec::platform::*;
 use ompas_middleware::logger::LogClient;
-use ompas_structs::supervisor::action_status::ActionStatus;
-use ompas_structs::supervisor::process::process_ref::ProcessRef;
-use ompas_structs::supervisor::ActingProcessId;
+use ompas_structs::acting_manager::action_status::ProcessStatus;
+use ompas_structs::acting_manager::process::process_ref::ProcessRef;
+use ompas_structs::acting_manager::ActingProcessId;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lruntimeerror::LResult;
 use sompas_structs::lvalue::LValue;
@@ -17,7 +17,7 @@ use tokio::sync::watch;
 
 pub struct ModPlatform {
     platform: Platform,
-    supervisor: Supervisor,
+    acting_manager: ActingManager,
     pub(crate) log: LogClient,
 }
 
@@ -25,7 +25,7 @@ impl ModPlatform {
     pub fn new(exec: &ModExec) -> Self {
         Self {
             platform: exec.platform.clone(),
-            supervisor: exec.supervisor.clone(),
+            acting_manager: exec.acting_manager.clone(),
             log: exec.log.clone(),
         }
     }
@@ -58,54 +58,55 @@ impl From<ModPlatform> for LModule {
 #[async_scheme_fn]
 pub async fn exec_command(env: &LEnv, command: &[LValue]) -> LAsyncHandle {
     let env = env.clone();
-    let command = command.to_vec();
+    let command_slice = command.to_vec();
+    let debug = LValue::from(command).to_string();
 
     let (tx, mut int_rx) = new_interruption_handler();
 
     let f = (Box::pin(async move {
-        let command_slice = command.as_slice();
+        let command_slice = command_slice.as_slice();
 
         let pr: ProcessRef = env
             .get_context::<ModActingContext>(MOD_ACTING_CONTEXT)?
             .process_ref
             .clone();
 
-        let supervisor = &env.get_context::<ModPlatform>(MOD_PLATFORM)?.supervisor;
+        let supervisor = &env.get_context::<ModPlatform>(MOD_PLATFORM)?.acting_manager;
 
-        let (command_id, mut rx): (ActingProcessId, watch::Receiver<ActionStatus>) = match &pr {
+        let command_id: ActingProcessId = match &pr {
             ProcessRef::Id(id) => {
-                let r = supervisor
+                supervisor
                     .new_command(
-                        Label::Subtask(supervisor.get_number_subtask(*id).await),
-                        *id,
-                        command.clone().into(),
-                        false,
+                        Label::Action(supervisor.get_number_subtask(*id).await),
+                        id,
+                        debug,
+                        ProcessOrigin::Execution,
                     )
-                    .await;
-                (r.0, r.1.unwrap())
+                    .await
             }
 
             ProcessRef::Relative(id, labels) => match supervisor.get_id(pr.clone()).await {
-                Some(id) => (id, supervisor.start_planned_command(&id).await),
+                Some(id) => id,
                 None => {
-                    let r = supervisor
+                    supervisor
                         .new_command(
                             labels.last().unwrap().clone(),
-                            *id,
-                            command.clone().into(),
-                            false,
+                            id,
+                            debug,
+                            ProcessOrigin::Execution,
                         )
-                        .await;
-                    (r.0, r.1.unwrap())
+                        .await
                 }
             },
         };
+
+        let mut rx: watch::Receiver<ProcessStatus> = supervisor.subscribe(&command_id).await;
 
         let mod_platform = env.get_context::<ModPlatform>(MOD_PLATFORM)?;
         let log = mod_platform.log.clone();
         log.info(format!(
             "Exec command {command_id}: {}.",
-            LValue::from(command.clone())
+            LValue::from(command_slice.clone())
         ))
         .await;
 
@@ -135,35 +136,47 @@ pub async fn exec_command(env: &LEnv, command: &[LValue]) -> LAsyncHandle {
                         //println!("waiting on status:");
                         let action_status = *rx.borrow();
                         match action_status {
-                            ActionStatus::Rejected => {
+                            ProcessStatus::Rejected => {
                                 log.error(format!("Command {command_id} is a rejected."))
                                     .await;
-                                mod_platform.supervisor.set_command_end(command_id).await;
+                                mod_platform
+                                    .acting_manager
+                                    .set_end(&command_id, None, action_status)
+                                    .await;
                                 return Ok(RaeExecError::ActionFailure.into());
                             }
-                            ActionStatus::Accepted => {}
-                            ActionStatus::Pending => {
+                            ProcessStatus::Accepted => {}
+                            ProcessStatus::Pending => {
                                 //println!("not triggered");
                             }
-                            ActionStatus::Running(_) => {
+                            ProcessStatus::Running(_) => {
                                 //println!("running");
                             }
-                            ActionStatus::Failure => {
+                            ProcessStatus::Failure => {
                                 log.error(format!("Command {command_id} is a failure."))
                                     .await;
-                                mod_platform.supervisor.set_command_end(command_id).await;
+                                mod_platform
+                                    .acting_manager
+                                    .set_end(&command_id, None, action_status)
+                                    .await;
                                 return Ok(RaeExecError::ActionFailure.into());
                             }
-                            ActionStatus::Success => {
+                            ProcessStatus::Success => {
                                 log.info(format!("Command {command_id} is a success."))
                                     .await;
-                                mod_platform.supervisor.set_command_end(command_id).await;
+                                mod_platform
+                                    .acting_manager
+                                    .set_end(&command_id, None, action_status)
+                                    .await;
                                 return Ok(true.into());
                             }
-                            ActionStatus::Cancelled(_) => {
+                            ProcessStatus::Cancelled(_) => {
                                 log.info(format!("Command {command_id} has been cancelled."))
                                     .await;
-                                mod_platform.supervisor.set_command_end(command_id).await;
+                                mod_platform
+                                    .acting_manager
+                                    .set_end(&command_id, None, action_status)
+                                    .await;
                                 return Ok(true.into());
                             }
                         }
@@ -186,7 +199,7 @@ pub async fn exec_command(env: &LEnv, command: &[LValue]) -> LAsyncHandle {
             RAEMode::Simu => {
                 mod_platform
                     .platform
-                    .sim_command(env.clone(), &command)
+                    .sim_command(env.clone(), &command_slice)
                     .await
             }
         }

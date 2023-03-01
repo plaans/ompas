@@ -14,15 +14,15 @@ use ompas_language::exec::{ARBITRARY, DOC_ARBITRARY, DOC_MOD_EXEC, MOD_EXEC};
 use ompas_language::process::LOG_TOPIC_OMPAS;
 use ompas_middleware::logger::LogClient;
 use ompas_structs::acting_domain::OMPASDomain;
+use ompas_structs::acting_manager::inner::ProcessKind;
+use ompas_structs::acting_manager::process::process_ref::{Label, ProcessRef};
+use ompas_structs::acting_manager::process::ProcessOrigin;
+use ompas_structs::acting_manager::{ActingManager, ActingProcessId};
 use ompas_structs::execution::monitor::MonitorCollection;
-use ompas_structs::execution::resource::ResourceCollection;
+use ompas_structs::execution::resource::ResourceManager;
 use ompas_structs::interface::rae_options::OMPASOptions;
 use ompas_structs::planning::domain::PlanningDomain;
 use ompas_structs::state::world_state::WorldState;
-use ompas_structs::supervisor::inner::ProcessKind;
-use ompas_structs::supervisor::process::arbitrary::ArbitraryChoice;
-use ompas_structs::supervisor::process::process_ref::{Label, ProcessRef};
-use ompas_structs::supervisor::{ActingProcessId, Supervisor};
 use sompas_core::eval;
 use sompas_core::modules::list::car;
 use sompas_macros::{async_scheme_fn, scheme_fn};
@@ -55,11 +55,11 @@ pub const LABEL_ENUMERATE_PARAMS: &str = "enumerate-params";
 ///Context that will contains primitives for the RAE executive
 pub struct ModExec {
     options: Arc<RwLock<OMPASOptions>>,
-    supervisor: Supervisor,
+    acting_manager: ActingManager,
     state: WorldState,
     domain: Arc<RwLock<OMPASDomain>>,
     monitors: MonitorCollection,
-    resources: ResourceCollection,
+    resources: ResourceManager,
     platform: Platform,
     log: LogClient,
     _pd: Arc<RwLock<Option<PlanningDomain>>>,
@@ -69,7 +69,7 @@ impl ModExec {
     pub async fn new(monitor: &ModControl) -> Self {
         Self {
             options: monitor.options.clone(),
-            supervisor: monitor.supervisor.clone(),
+            acting_manager: monitor.acting_manager.clone(),
             state: monitor.state.clone(),
             domain: monitor.ompas_domain.clone(),
             monitors: monitor.monitors.clone(),
@@ -173,7 +173,7 @@ pub async fn arbitrary(env: &LEnv, args: &[LValue]) -> LResult {
     let pr = &env
         .get_context::<ModActingContext>(MOD_ACTING_CONTEXT)?
         .process_ref;
-    let supervisor = &env.get_context::<ModExec>(MOD_EXEC)?.supervisor;
+    let supervisor = &env.get_context::<ModExec>(MOD_EXEC)?.acting_manager;
 
     let greedy = match args.len() {
         1 => car(env, &[args[0].clone()]),
@@ -192,46 +192,36 @@ pub async fn arbitrary(env: &LEnv, args: &[LValue]) -> LResult {
         _ => Err(LRuntimeError::wrong_number_of_args(ARBITRARY, args, 1..2)),
     }?;
 
-    let possibilities = args[0].clone().try_into()?;
+    let set: Vec<LValue> = args[0].clone().try_into()?;
 
-    let value = match pr {
+    let id: ActingProcessId = match pr {
         ProcessRef::Id(id) => {
-            if supervisor.get_kind(*id).await.unwrap() == ProcessKind::Method {
+            if supervisor.get_kind(id).await == ProcessKind::Method {
                 supervisor
                     .new_arbitrary(
                         Label::Arbitrary(supervisor.get_number_arbitrary(*id).await),
-                        *id,
-                        possibilities,
-                        ArbitraryChoice::Execution(greedy.clone()),
+                        id,
+                        ProcessOrigin::Execution,
                     )
-                    .await;
-                greedy
+                    .await
             } else {
                 panic!()
             }
         }
         ProcessRef::Relative(id, labels) => match supervisor.get_id(pr.clone()).await {
-            Some(id) => {
-                supervisor
-                    .try_set_planned_arbitrary(&id, possibilities, greedy)
-                    .await
-            }
+            Some(id) => id,
             None => match labels[0] {
                 Label::Arbitrary(s) => {
                     supervisor
-                        .new_arbitrary(
-                            Label::Arbitrary(s),
-                            *id,
-                            possibilities,
-                            ArbitraryChoice::Execution(greedy.clone()),
-                        )
-                        .await;
-                    greedy
+                        .new_arbitrary(Label::Arbitrary(s), id, ProcessOrigin::Execution)
+                        .await
                 }
                 _ => panic!(),
             },
         },
     };
+
+    let value = supervisor.set_arbitrary_value(&id, set, greedy).await;
 
     Ok(value)
 }

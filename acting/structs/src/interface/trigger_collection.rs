@@ -1,4 +1,4 @@
-use crate::supervisor::process::process_ref::ProcessRef;
+use crate::acting_manager::process::process_ref::ProcessRef;
 use crate::ActionId;
 use ompas_utils::other::get_and_update_id_counter;
 use sompas_structs::lasynchandler::LAsyncHandle;

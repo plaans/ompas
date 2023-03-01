@@ -1,7 +1,7 @@
+use crate::acting_manager::process::process_ref::Label;
 use crate::conversion::chronicle::interval::Interval;
 use crate::conversion::flow_graph::flow::{BranchingFlow, Flow, FlowId, FlowKind, FlowPause};
 use crate::planning::om_binding::OperationalModelBindings;
-use crate::supervisor::process::process_ref::Label;
 use crate::sym_table::lit::Lit;
 use crate::sym_table::r#ref::RefSymTable;
 use crate::sym_table::r#trait::{FlatBindings, FormatWithSymTable, GetVariables};

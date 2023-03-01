@@ -2,7 +2,6 @@ use crate::aries::template::read_chronicle;
 use crate::aries::{useful, BindingAriesAtoms};
 use aries_core::{Lit as aLit, INT_CST_MAX};
 use aries_model::lang::{Atom as aAtom, FAtom, SAtom};
-use aries_planning::chronicles::printer::Printer;
 use aries_planning::chronicles::{
     Chronicle, ChronicleInstance, ChronicleKind as aChronicleKind, ChronicleOrigin, Container, Ctx,
     Effect, SubTask, VarType, TIME_SCALE,
@@ -172,10 +171,10 @@ pub fn generate_instances(
         let template = read_chronicle(
             ctx,
             bindings,
-            &instance.chronicle,
+            &instance.om.chronicle,
             Container::Instance(id + 1),
         )?;
-        Printer::print_chronicle(&template.chronicle, &ctx.model);
+        //Printer::print_chronicle(&template.chronicle, &ctx.model);
 
         instances.push(ChronicleInstance {
             parameters: template

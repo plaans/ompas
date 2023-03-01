@@ -2,10 +2,12 @@ use crate::acting_domain::command::Command;
 use crate::acting_domain::method::Method;
 use crate::acting_domain::state_function::StateFunction;
 use crate::acting_domain::task::Task;
+use crate::acting_manager::operational_model::ActingModel;
 use crate::conversion::chronicle::Chronicle;
 use crate::sym_table::r#ref::RefSymTable;
 use crate::sym_table::VarId;
 use std::fmt::{Display, Formatter};
+
 #[derive(Clone)]
 pub struct PlanningDomain {
     /// State functions of the domain.
@@ -17,7 +19,7 @@ pub struct PlanningDomain {
     ///List of command symbols
     pub commands: Vec<String>,
     /// All available templates
-    pub templates: Vec<Chronicle>,
+    pub templates: Vec<ActingModel>,
     /// Symbol table
     pub st: RefSymTable,
 }

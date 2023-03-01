@@ -1,18 +1,14 @@
-use crate::supervisor::process::ActingProcessInner;
-use crate::supervisor::ActingProcessId;
+use crate::acting_manager::process::ActingProcessInner;
+use crate::acting_manager::ActingProcessId;
 use std::fmt::{Display, Formatter};
 
 pub struct RootProcess {
-    _id: ActingProcessId,
     pub tasks: Vec<ActingProcessId>,
 }
 
 impl RootProcess {
     pub fn new() -> Self {
-        Self {
-            _id: 0,
-            tasks: vec![],
-        }
+        Self { tasks: vec![] }
     }
 
     pub fn n_task(&self) -> usize {

@@ -2,8 +2,9 @@ use crate::exec::*;
 use ompas_language::exec::mode::*;
 use ompas_language::exec::resource::*;
 use ompas_middleware::logger::LogClient;
+use ompas_structs::acting_manager::action_status::ProcessStatus;
 use ompas_structs::execution::resource::{
-    AcquireKind, AcquireResponse, Capacity, ResourceCollection, ResourceHandler, WaiterPriority,
+    Capacity, Quantity, ResourceHandler, ResourceManager, WaitAcquire, WaiterPriority,
 };
 use ompas_structs::mutex::Wait;
 use ompas_utils::dyn_async;
@@ -17,7 +18,7 @@ use std::borrow::Borrow;
 use std::convert::{TryFrom, TryInto};
 
 pub struct ModResource {
-    resources: ResourceCollection,
+    resources: ResourceManager,
     log: LogClient,
 }
 
@@ -64,12 +65,12 @@ pub async fn new_resource(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeErr
         .ok_or_else(|| LRuntimeError::wrong_number_of_args(NEW_RESOURCE, args, 1..2))?
         .try_into()?;
 
-    let capacity: Option<Capacity> = match args.get(1) {
-        None => None,
-        Some(lv) => Some(Capacity::Some(lv.try_into()?)),
+    let capacity: Capacity = match args.get(1) {
+        None => 1,
+        Some(lv) => lv.try_into()?,
     };
 
-    ctx.resources.new_resource(label, capacity).await;
+    ctx.resources.new_resource(label, Some(capacity)).await;
     Ok(())
 }
 
@@ -81,38 +82,33 @@ pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LR
     let pr = &env
         .get_context::<ModActingContext>(MOD_ACTING_CONTEXT)?
         .process_ref;
-    let supervisor = env.get_context::<ModExec>(MOD_EXEC)?.supervisor.clone();
+    let supervisor = env.get_context::<ModExec>(MOD_EXEC)?.acting_manager.clone();
     let label: String = args
         .get(0)
         .ok_or_else(|| LRuntimeError::wrong_number_of_args(ACQUIRE, args, 1..2))?
         .try_into()?;
-    let (id, ar): (ActingProcessId, Option<AcquireResponse>) = match pr {
+    let id: ActingProcessId = match pr {
         ProcessRef::Id(id) => {
-            if supervisor.get_kind(*id).await.unwrap() == ProcessKind::Method {
-                (
-                    supervisor
-                        .new_acquire(
-                            label.clone(),
-                            Label::Acquire(supervisor.get_number_acquire(*id).await),
-                            *id,
-                            false,
-                        )
-                        .await,
-                    None,
-                )
+            if supervisor.get_kind(id).await == ProcessKind::Method {
+                supervisor
+                    .new_acquire(
+                        Label::Acquire(supervisor.get_number_acquire(*id).await),
+                        id,
+                        ProcessOrigin::Execution,
+                    )
+                    .await
             } else {
                 panic!()
             }
         }
         ProcessRef::Relative(id, labels) => match supervisor.get_id(pr.clone()).await {
-            Some(id) => (id, supervisor.get_acquire_response(&id).await),
+            Some(id) => id,
             None => match labels[0] {
-                Label::Acquire(s) => (
+                Label::Acquire(s) => {
                     supervisor
-                        .new_acquire(label.to_string(), Label::Acquire(s), *id, false)
-                        .await,
-                    None,
-                ),
+                        .new_acquire(Label::Acquire(s), id, ProcessOrigin::Execution)
+                        .await
+                }
                 _ => panic!(),
             },
         },
@@ -124,79 +120,66 @@ pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LR
 
     let (tx, mut rx) = new_interruption_handler();
 
-    let mut priority: usize = 0;
-    let mut capacity = Capacity::All;
     //init of capacity and
-    match args.len() {
-        1 => {}
+    let (quantity, priority): (Quantity, WaiterPriority) = match args.len() {
+        1 => (Quantity::All, WaiterPriority::Execution(0)),
         2 => {
             if let LValue::List(l) = &args[1] {
                 if l.get(0).unwrap() == &PRIORITY.into() && l.len() == 2 {
-                    priority = l.get(1).unwrap().try_into()?;
+                    let priority = l.get(1).unwrap().try_into()?;
+                    (Quantity::All, WaiterPriority::Execution(priority))
                 } else {
                     Err(LRuntimeError::new("", ""))?
                 }
             } else {
-                capacity = Capacity::Some(args[1].borrow().try_into()?);
+                let quantity = Quantity::Some(args[1].borrow().try_into()?);
+                (quantity, WaiterPriority::Execution(0))
             }
         }
         3 => {
-            capacity = Capacity::Some(args[1].borrow().try_into()?);
-            if let LValue::List(l) = &args[1] {
+            let quantity = Quantity::Some(args[1].borrow().try_into()?);
+            let priority = if let LValue::List(l) = &args[1] {
                 if l.get(0).unwrap() == &PRIORITY.into() && l.len() == 2 {
-                    priority = l.get(1).unwrap().try_into()?;
+                    WaiterPriority::Execution(l.get(1).unwrap().try_into()?)
                 } else {
                     Err(LRuntimeError::new("", ""))?
                 }
             } else {
                 Err(LRuntimeError::new("", ""))?
-            }
+            };
+
+            (quantity, priority)
         }
-        _ => {}
-    }
+        _ => {
+            panic!()
+        }
+    };
 
     let f: LFuture = (Box::pin(async move {
         log.info(format!(
-            "Acquiring {label}; capacity = {capacity}; priority = {priority}"
+            "Acquiring {label}; capacity = {quantity}; priority = {priority}"
         ))
         .await;
 
-        supervisor.set_acquire_request_timepoint(&id).await;
+        supervisor.set_start(&id, None).await;
 
-        let ar = match ar {
-            Some(ar) => ar,
-            None => {
-                resources
-                    .acquire(
-                        label.clone(),
-                        capacity,
-                        WaiterPriority::Execution(priority),
-                        AcquireKind::Direct,
-                    )
-                    .await?
+        let mut wait: WaitAcquire = supervisor
+            .acquire(&id, label.to_string(), quantity, priority)
+            .await?;
+
+        let rh: ResourceHandler = tokio::select! {
+            _ = rx.recv() => {
+                log.info(format!("Acquisition of {label} cancelled.")).await;
+                resources.remove_waiter(wait).await;
+                return Ok(LValue::Err(LValue::Nil.into()))
+            }
+            rh = wait.recv() => {
+                log.info(format!("Resource {label} unlocked !!!")).await;
+                rh
             }
         };
 
-        let rh: ResourceHandler = match ar {
-            AcquireResponse::Ok(rh) => rh,
-            AcquireResponse::Wait(mut wait) => {
-                log.info(format!("Waiting on resource {label}")).await;
-
-                tokio::select! {
-                    _ = rx.recv() => {
-                        log.info(format!("Acquisition of {label} cancelled.")).await;
-                        resources.remove_waiter(wait).await;
-                        return Ok(LValue::Err(LValue::Nil.into()))
-                    }
-                    rh = wait.recv() => {
-                        log.info(format!("Resource {label} unlocked !!!")).await;
-                        rh
-                    }
-                }
-            }
-        };
-
-        supervisor.set_acquire_acquisition_start(&id).await;
+        supervisor.set_s_acq(&id, None).await;
 
         let rc = resources.clone();
         let (tx, mut rx) = new_interruption_handler();
@@ -205,9 +188,11 @@ pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LR
 
         let f: LFuture = (Box::pin(async move {
             rx.recv().await;
-            supervisor.set_acquire_acquisition_end(&id).await;
-            log2.info(format!("Releasing {}", rh.get_label())).await;
-            rc.release(rh).await.map(|_| LValue::Nil)
+            let label = rh.get_label().to_string();
+            let r = rc.release(rh).await.map(|_| LValue::Nil);
+            log2.info(format!("Released {}", label)).await;
+            supervisor.set_end(&id, None, ProcessStatus::Success).await;
+            r
         }) as FutureResult)
             .shared();
 
@@ -215,7 +200,7 @@ pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LR
 
         tokio::spawn(f);
 
-        log.info(format!("{label} acquired with {capacity} capacity."))
+        log.info(format!("{label} acquired with {quantity} capacity."))
             .await;
 
         Ok(LAsyncHandle::new(f2, tx).into())

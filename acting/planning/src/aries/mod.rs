@@ -10,7 +10,6 @@ use anyhow::Result;
 use aries_core::IntCst;
 use aries_model::lang::{Atom as aAtom, Variable};
 use aries_planning::chronicles;
-use aries_planning::chronicles::printer::Printer;
 use aries_planning::chronicles::TIME_SCALE;
 use ompas_structs::planning::problem::PlanningProblem;
 use ompas_structs::sym_table::r#ref::RefSymTable;
@@ -37,13 +36,13 @@ pub fn generate_chronicles(
 
     let mut p = template::generate_templates(problem, &mut bindings)?;
 
-    for template in &p.templates {
+    /*for template in &p.templates {
         Printer::print_chronicle(&template.chronicle, &p.context.model);
-    }
+    }*/
 
     let init_ch = create_initial_chronicle(&problem, &mut p.context);
 
-    Printer::print_chronicle(&init_ch.chronicle, &p.context.model);
+    //Printer::print_chronicle(&init_ch.chronicle, &p.context.model);
 
     p.chronicles.push(init_ch);
 

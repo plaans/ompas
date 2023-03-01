@@ -1,5 +1,5 @@
+use crate::acting_manager::process::process_ref::Label;
 use crate::conversion::chronicle::interval::Interval;
-use crate::supervisor::process::process_ref::Label;
 use crate::sym_table::lit::Lit;
 use crate::sym_table::VarId;
 

@@ -11,6 +11,7 @@ pub mod r#trait;
 pub mod var_domain;
 pub mod variable;
 
+use crate::conversion::chronicle;
 use crate::conversion::flow_graph::graph::Dot;
 use crate::sym_table::closure::Update;
 use crate::sym_table::domain::basic_type::BasicType::{Any, Boolean, Handle};
@@ -18,7 +19,7 @@ use crate::sym_table::domain::basic_type::{BasicType, TYPE_ID_INT, TYPE_ID_NUMBE
 use crate::sym_table::domain::basic_type::{TYPE_ID_FALSE, TYPE_ID_NIL, TYPE_ID_TRUE};
 use crate::sym_table::domain::cst::Cst;
 use crate::sym_table::domain::type_lattice::TypeLattice;
-use crate::sym_table::domain::Domain;
+use crate::sym_table::domain::{cst, Domain};
 use crate::sym_table::forest::{Forest, NodeId};
 use crate::sym_table::id::SymbolTableId;
 use crate::sym_table::meta_data::SymTableMetaData;
@@ -205,6 +206,19 @@ impl SymTable {
         match n {
             LNumber::Int(i) => self.new_int(*i),
             LNumber::Float(f) => self.new_float(*f),
+        }
+    }
+
+    pub fn new_interval(&mut self) -> chronicle::interval::Interval {
+        chronicle::interval::Interval::new(self.new_timepoint(), self.new_timepoint())
+    }
+
+    pub fn new_cst(&mut self, cst: cst::Cst) -> VarId {
+        match cst {
+            Cst::Int(i) => self.new_int(i),
+            Cst::Float(f) => self.new_float(f),
+            Cst::Symbol(s) => self.new_symbol(s),
+            Cst::Bool(b) => self.new_bool(b),
         }
     }
 

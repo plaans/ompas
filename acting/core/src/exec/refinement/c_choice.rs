@@ -5,9 +5,9 @@ use ompas_language::exec::c_choice::*;
 use ompas_language::exec::state::MOD_STATE;
 use ompas_language::exec::MOD_EXEC;
 use ompas_structs::acting_domain::OMPASDomain;
+use ompas_structs::acting_manager::process::task::{RTSelect, RefinementInner, SelectTrace};
 use ompas_structs::interface::select_mode::{CChoiceConfig, Planner, SelectMode};
 use ompas_structs::state::world_state::WorldStateSnapshot;
-use ompas_structs::supervisor::process::task::{RTSelect, RefinementInner, SelectTrace};
 use rand::prelude::SliceRandom;
 use sompas_core::{eval, parse};
 use sompas_macros::async_scheme_fn;
@@ -198,7 +198,7 @@ pub async fn c_choice(env: &LEnv, task: &[LValue]) -> LResult {
     let ctx = env.get_context::<ModCChoice>(MOD_C_CHOICE)?;
     let level = ctx.level.load(Ordering::Relaxed);
 
-    let mut methods: Vec<LValue> = greedy_select(&state, &ctx.tried, task.to_vec(), env)
+    let mut methods: Vec<LValue> = greedy_select(&state, &ctx.tried, &task.to_vec(), env)
         .await?
         .possibilities;
     if let Some(b) = ctx.config.get_b() {
@@ -330,8 +330,8 @@ pub async fn c_choice_select(
     greedy.interval.set_end(
         env.get_context::<ModExec>(MOD_EXEC)
             .unwrap()
-            .supervisor
-            .get_timepoint(),
+            .acting_manager
+            .instant(),
     );
 
     Ok(greedy)

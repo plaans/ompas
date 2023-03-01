@@ -1,17 +1,25 @@
+use crate::acting_manager::action_status::ProcessStatus;
+use crate::acting_manager::interval::Timepoint;
+use crate::acting_manager::operational_model::{ActingModel, ROOT};
+use crate::acting_manager::process::acquire::AcquireProcess;
+use crate::acting_manager::process::arbitrary::ArbitraryProcess;
+use crate::acting_manager::process::command::CommandProcess;
+use crate::acting_manager::process::method::RefinementProcess;
+use crate::acting_manager::process::plan_var::{AsCst, ExecutionVar, PlanVal, PlanVar, PlanVarId};
+use crate::acting_manager::process::process_ref::{Label, ProcessRef};
+use crate::acting_manager::process::root_task::RootProcess;
+use crate::acting_manager::process::task::TaskProcess;
+use crate::acting_manager::process::{ActingProcess, ActingProcessInner, ProcessOrigin};
+use crate::acting_manager::{ActingProcessId, OMId};
 use crate::conversion::flow_graph::graph::Dot;
-use crate::supervisor::action_status::ActionStatus;
-use crate::supervisor::interval::Timepoint;
-use crate::supervisor::process::acquire::AcquireProcess;
-use crate::supervisor::process::arbitrary::{ArbitraryChoice, ArbitraryProcess, ArbitraryTrace};
-use crate::supervisor::process::command::CommandProcess;
-use crate::supervisor::process::method::MethodProcess;
-use crate::supervisor::process::process_ref::{Label, ProcessRef};
-use crate::supervisor::process::root_task::RootProcess;
-use crate::supervisor::process::task::{Refinement, RefinementInner, TaskProcess};
-use crate::supervisor::process::{ActingProcess, ActingProcessInner, ProcessStatus};
-use crate::supervisor::ActingProcessId;
+use crate::execution::resource::{Quantity, ResourceManager, WaitAcquire, WaiterPriority};
+use crate::sym_table::domain::cst;
+use crate::sym_table::domain::cst::Cst;
+use crate::sym_table::r#ref::RefSymTable;
+use crate::sym_table::VarId;
 use chrono::{DateTime, Utc};
 use ompas_language::supervisor::*;
+use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use std::env::set_current_dir;
 use std::fmt::{Display, Formatter, Write};
@@ -20,11 +28,11 @@ use std::fs::File;
 use std::io::Write as ioWrite;
 use std::path::PathBuf;
 use tokio::sync::watch;
-use tokio::sync::watch::Receiver;
 use tokio::time::Instant;
 
 const COLOR_PLANNING: &str = "red";
 const COLOR_EXECUTION: &str = "blue";
+const COLOR_DEFAULT: &str = "black";
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ProcessKind {
@@ -53,21 +61,69 @@ impl Display for ProcessKind {
     }
 }
 
-pub struct InnerSupervisor {
-    inner: Vec<ActingProcess>,
+pub struct InnerActingManager {
+    processes: Vec<ActingProcess>,
+    models: Vec<ActingModel>,
+    plan_vars: Vec<PlanVar>,
+    st: RefSymTable,
+    resource_manager: ResourceManager,
     time_reference: Instant,
 }
 
-impl InnerSupervisor {
-    pub fn new(time_reference: Instant) -> Self {
+impl InnerActingManager {
+    pub fn new(
+        resource_manager: ResourceManager,
+        time_reference: Instant,
+        st: RefSymTable,
+    ) -> Self {
+        let model = ActingModel::root(st.clone());
+        let start = PlanVar::new(model.chronicle.interval.get_start(), 0);
+        let end = PlanVar::new(model.chronicle.interval.get_end(), 0);
+
+        let root = ActingProcess::new(
+            0,
+            0,
+            ProcessOrigin::Execution,
+            0,
+            Some(ROOT.to_string()),
+            ExecutionVar::new(0),
+            ExecutionVar::new(1),
+            RootProcess::new(),
+        );
         Self {
-            inner: vec![ActingProcess::root()],
+            st,
+            processes: vec![root],
+            models: vec![model],
+            resource_manager,
             time_reference,
+            plan_vars: vec![start, end],
         }
     }
 
-    pub fn get_timepoint(&self) -> Timepoint {
+    pub fn st(&self) -> RefSymTable {
+        self.st.clone()
+    }
+
+    pub fn instant(&self) -> Timepoint {
         self.time_reference.elapsed().as_millis().into()
+    }
+
+    fn new_model(&mut self, model: ActingModel) -> OMId {
+        self.models.push(model);
+        self.models.len() - 1
+    }
+
+    fn new_plan_var(&mut self, var_id: VarId, om_id: OMId) -> PlanVarId {
+        self.plan_vars.push(PlanVar::new(var_id, om_id));
+        self.plan_vars.len() - 1
+    }
+
+    fn new_execution_var<T: Display + Clone + AsCst>(
+        &mut self,
+        var_id: VarId,
+        om_id: OMId,
+    ) -> ExecutionVar<T> {
+        ExecutionVar::new(self.new_plan_var(var_id, om_id))
     }
 
     pub fn get_id(&self, pr: impl Into<ProcessRef>) -> Option<ActingProcessId> {
@@ -78,9 +134,9 @@ impl InnerSupervisor {
                 let mut id = id;
                 labels.reverse();
                 while let Some(label) = labels.pop() {
-                    let obj = &self.inner[id];
+                    let obj = &self.processes[id];
                     match &label {
-                        Label::Subtask(s) => {
+                        Label::Action(s) => {
                             if id == 0 {
                                 id = if let Some(id) = obj.inner.as_root().unwrap().nth_task(*s) {
                                     id
@@ -89,7 +145,7 @@ impl InnerSupervisor {
                                 }
                             } else {
                                 id = if let Some(id) =
-                                    obj.inner.as_method().unwrap().process_set.get(&label)
+                                    obj.inner.as_method().unwrap().childs.get(&label)
                                 {
                                     *id
                                 } else {
@@ -99,14 +155,13 @@ impl InnerSupervisor {
                         }
                         Label::Refinement(m) => {
                             id = if let Some(r) = obj.inner.as_task().unwrap().refinements.get(*m) {
-                                r.method_id
+                                *r
                             } else {
                                 return None;
                             }
                         }
                         Label::Acquire(_) | Label::Arbitrary(_) => {
-                            id = if let Some(id) =
-                                obj.inner.as_method().unwrap().process_set.get(&label)
+                            id = if let Some(id) = obj.inner.as_method().unwrap().childs.get(&label)
                             {
                                 *id
                             } else {
@@ -120,44 +175,148 @@ impl InnerSupervisor {
         }
     }
 
-    pub fn get_kind(&self, id: ActingProcessId) -> Option<ProcessKind> {
-        self.get(id).map(|ap| ap.inner.kind())
+    pub fn get_kind(&self, id: &ActingProcessId) -> ProcessKind {
+        self.processes[*id].inner.kind()
+    }
+
+    pub fn get_status(&self, id: &ActingProcessId) -> ProcessStatus {
+        self.processes[*id].status
+    }
+
+    pub fn get_origin(&self, id: &ActingProcessId) -> ProcessOrigin {
+        self.processes[*id].origin
+    }
+
+    pub fn get_debug(&self, id: &ActingProcessId) -> &Option<String> {
+        self.processes[*id].debug()
+    }
+
+    fn get_om_id(&self, id: &ActingProcessId) -> OMId {
+        self.processes[*id].om_id()
+    }
+
+    fn set_plan_var(&mut self, plan_var_id: &PlanVarId, val: cst::Cst) {
+        self.plan_vars[*plan_var_id].set_execution_val(val)
+    }
+
+    fn get_plan_var_val(&mut self, plan_var_id: &PlanVarId) -> &PlanVal {
+        self.plan_vars[*plan_var_id].get_val()
+    }
+
+    pub fn set_start(&mut self, id: &ActingProcessId, t: Option<Timepoint>) {
+        let instant = t.unwrap_or(self.instant());
+        let (id, cst) = self.processes[*id].start.set_val(instant);
+        self.set_plan_var(&id, cst);
+    }
+
+    pub fn set_end(&mut self, id: &ActingProcessId, t: Option<Timepoint>, status: ProcessStatus) {
+        let instant = t.unwrap_or(self.instant());
+        let (plan_var_id, cst) = self.processes[*id].end.set_val(instant);
+        self.set_plan_var(&plan_var_id, cst);
+
+        if self.get_kind(&id) == ProcessKind::Task {
+            if let Some(refinement) = self.processes[*id]
+                .inner
+                .as_task()
+                .unwrap()
+                .refinements
+                .last()
+                .cloned()
+            {
+                self.set_end(&refinement, Some(instant), status);
+            }
+        }
+        self.set_status(id, status)
+    }
+
+    pub fn get_task_args(&self, id: &ActingProcessId) -> &Vec<cst::Cst> {
+        self.processes[*id].inner.as_task().unwrap().get_args()
+    }
+
+    pub fn set_moment(&mut self, id: &ActingProcessId, t: Option<Timepoint>) {
+        let instant = t.unwrap_or(self.instant());
+        self.set_start(id, Some(instant));
+        self.set_end(id, Some(instant), self.get_status(id));
+    }
+
+    pub fn set_status(&mut self, id: &ActingProcessId, status: ProcessStatus) {
+        self.processes[*id].set_status(status);
+        if self.get_kind(&id) == ProcessKind::Task {
+            if let Some(refinement) = self.processes[*id]
+                .inner
+                .as_task()
+                .unwrap()
+                .refinements
+                .last()
+                .cloned()
+            {
+                self.set_status(&refinement, status);
+            }
+        }
     }
 
     //New processes
-    pub fn new_high_level_task(&mut self, value: LValue) -> ProcessRef {
-        let id = self.inner.len();
-        self.inner.push(ActingProcess::new(
-            ProcessStatus::Executed,
-            TaskProcess::new(id, 0, value, Some(self.get_timepoint())),
+    pub fn new_high_level_task(&mut self, debug: String, args: Vec<Cst>) -> ProcessRef {
+        let id = self.processes.len();
+        let (start, end) = self.models[0].add_subtask(args.clone());
+
+        let start = self.new_execution_var(start, 0);
+        let end = self.new_execution_var(end, 0);
+
+        self.processes.push(ActingProcess::new(
+            id,
+            0,
+            ProcessOrigin::Execution,
+            0,
+            Some(debug),
+            start,
+            end,
+            TaskProcess::new(args),
         ));
 
-        let root: &mut RootProcess = self.inner[0].inner.as_mut_root().unwrap();
+        let root: &mut RootProcess = self.processes[0].inner.as_mut_root().unwrap();
         let rank = root.n_task();
         root.add_top_level_task(id);
 
-        ProcessRef::Relative(0, vec![Label::Subtask(rank)])
+        ProcessRef::Relative(0, vec![Label::Action(rank)])
     }
 
     //Task methods
     pub fn new_task(
         &mut self,
         label: Label,
-        parent: ActingProcessId,
-        value: LValue,
-        planned: bool,
+        parent: &ActingProcessId,
+        args: Vec<Cst>,
+        debug: String,
+        origin: ProcessOrigin,
     ) -> ActingProcessId {
-        let (origin, start) = match planned {
-            true => (ProcessStatus::Planned, None),
-            false => (ProcessStatus::Executed, Some(self.get_timepoint())),
-        };
+        let id = self.processes.len();
 
-        let id = self.inner.len();
-        self.inner.push(ActingProcess::new(
+        let om_id = self.processes[*parent].om_id();
+        let model = &self.models[om_id];
+        let interval = model
+            .chronicle
+            .bindings
+            .get_binding(&label)
+            .unwrap()
+            .as_action()
+            .unwrap()
+            .interval;
+        let start = self.new_execution_var(interval.get_start(), om_id);
+        let end = self.new_execution_var(interval.get_end(), om_id);
+
+        self.processes.push(ActingProcess::new(
+            id,
+            *parent,
             origin,
-            TaskProcess::new(id, parent, value, start),
+            om_id,
+            Some(debug),
+            start,
+            end,
+            TaskProcess::new(args),
         ));
-        self.inner[parent]
+
+        self.processes[*parent]
             .inner
             .as_mut_method()
             .unwrap()
@@ -165,61 +324,70 @@ impl InnerSupervisor {
         id
     }
 
-    pub fn new_method(
+    pub fn new_refinement(
         &mut self,
-        parent: ActingProcessId,
+        parent: &ActingProcessId,
         debug: String,
-        refinement: RefinementInner,
-        planned: bool,
+        model: ActingModel,
+        origin: ProcessOrigin,
     ) -> ActingProcessId {
-        let (origin, start) = match planned {
-            true => (ProcessStatus::Planned, None),
-            false => (ProcessStatus::Executed, Some(self.get_timepoint())),
-        };
-
-        let id = self.inner.len();
-        self.inner.push(ActingProcess::new(
+        let id = self.processes.len();
+        let interval = model.chronicle.interval;
+        let om_id = self.new_model(model);
+        let start = self.new_execution_var(interval.get_start(), om_id);
+        let end = self.new_execution_var(interval.get_end(), om_id);
+        self.processes.push(ActingProcess::new(
+            id,
+            *parent,
             origin,
-            MethodProcess::new(id, parent, debug, refinement.method_value.clone(), start),
+            om_id,
+            Some(debug),
+            start,
+            end,
+            RefinementProcess::new(),
         ));
 
-        let task: &mut TaskProcess = self.inner[parent].inner.as_mut_task().unwrap();
-        task.add_refinement(Refinement {
-            method_id: id,
-            inner: refinement,
-        });
-        if !planned {
-            task.set_last_refinement_as_current()
-        }
+        let task: &mut TaskProcess = self.processes[*parent].inner.as_mut_task().unwrap();
+        task.add_refinement(id);
         id
     }
 
     pub fn new_arbitrary(
         &mut self,
         label: Label,
-        parent: ActingProcessId,
-        possibilities: Vec<LValue>,
-        choice: ArbitraryChoice,
+        parent: &ActingProcessId,
+        origin: ProcessOrigin,
     ) -> ActingProcessId {
-        let origin = match choice.is_planned() {
-            true => ProcessStatus::Planned,
-            false => ProcessStatus::Executed,
-        };
+        let id = self.processes.len();
 
-        let id = self.inner.len();
-        self.inner.push(ActingProcess::new(
+        let om_id = self.processes[*parent].om_id();
+        let model = &self.models[om_id];
+        let binding = model
+            .chronicle
+            .bindings
+            .get_binding(&label)
+            .unwrap()
+            .as_arbitrary()
+            .unwrap();
+        let timepoint = binding.timepoint;
+        let var_id = binding.var_id;
+
+        let start: ExecutionVar<Timepoint> = self.new_execution_var(timepoint, om_id);
+        let end = start.clone();
+        let var = self.new_execution_var(var_id, om_id);
+
+        self.processes.push(ActingProcess::new(
+            id,
+            *parent,
             origin,
-            ArbitraryProcess::new(
-                id,
-                parent,
-                ArbitraryTrace {
-                    possibilities,
-                    choice,
-                    instant: self.get_timepoint(),
-                },
-            ),
+            om_id,
+            None,
+            start,
+            end,
+            ArbitraryProcess::new(var),
         ));
-        self.inner[parent]
+
+        self.processes[*parent]
             .inner
             .as_mut_method()
             .unwrap()
@@ -230,21 +398,37 @@ impl InnerSupervisor {
     pub fn new_acquire(
         &mut self,
         label: Label,
-        resource_label: String,
-        parent: ActingProcessId,
-        planned: bool,
+        parent: &ActingProcessId,
+        origin: ProcessOrigin,
     ) -> ActingProcessId {
-        let (origin, request_date) = match planned {
-            true => (ProcessStatus::Planned, None),
-            false => (ProcessStatus::Executed, Some(self.get_timepoint())),
-        };
+        let id = self.processes.len();
+        let om_id = self.processes[*parent].om_id();
+        let model = &self.models[om_id];
+        let binding = *model
+            .chronicle
+            .bindings
+            .get_binding(&label)
+            .unwrap()
+            .as_acquire()
+            .unwrap();
 
-        let id = self.inner.len();
-        self.inner.push(ActingProcess::new(
+        let start = self.new_execution_var(binding.request, om_id);
+        let s_acq = self.new_execution_var(binding.acquisition.get_start(), om_id);
+        let end = self.new_execution_var(binding.acquisition.get_end(), om_id);
+        let resource = self.new_execution_var(binding.resource, om_id);
+        let quantity = self.new_execution_var(binding.quantity, om_id);
+
+        self.processes.push(ActingProcess::new(
+            id,
+            *parent,
             origin,
-            AcquireProcess::new(id, parent, resource_label, request_date),
+            om_id,
+            None,
+            start,
+            end,
+            AcquireProcess::new(resource, quantity, s_acq),
         ));
-        self.inner[parent]
+        self.processes[*parent]
             .inner
             .as_mut_method()
             .unwrap()
@@ -255,56 +439,254 @@ impl InnerSupervisor {
     pub fn new_command(
         &mut self,
         label: Label,
-        parent: ActingProcessId,
-        value: LValue,
-        planned: bool,
-    ) -> (ActingProcessId, Option<Receiver<ActionStatus>>) {
-        let (origin, start) = match planned {
-            true => (ProcessStatus::Planned, None),
-            false => (ProcessStatus::Executed, Some(self.get_timepoint())),
-        };
+        parent: &ActingProcessId,
+        debug: String,
+        origin: ProcessOrigin,
+    ) -> ActingProcessId {
+        let id = self.processes.len();
 
-        let id = self.inner.len();
-        self.inner.push(ActingProcess::new(
+        let om_id = self.processes[*parent].om_id();
+        let model = &self.models[om_id];
+        let interval = model
+            .chronicle
+            .bindings
+            .get_binding(&label)
+            .unwrap()
+            .as_action()
+            .unwrap()
+            .interval;
+        let start = self.new_execution_var(interval.get_start(), om_id);
+        let end = self.new_execution_var(interval.get_end(), om_id);
+
+        self.processes.push(ActingProcess::new(
+            id,
+            *parent,
             origin,
-            CommandProcess::new(id, parent, value, start),
+            om_id,
+            Some(debug),
+            start,
+            end,
+            CommandProcess::new(),
         ));
 
-        let watch = if planned {
-            None
-        } else {
-            let (tx, rx) = watch::channel(ActionStatus::Pending);
-            self.inner[id].inner.as_mut_command().unwrap().set_watch(tx);
-            Some(rx)
-        };
-
-        self.inner[parent]
+        self.processes[*parent]
             .inner
             .as_mut_method()
             .unwrap()
             .add_process(label, id);
-        (id, watch)
+        id
+    }
+
+    pub fn subscribe(&mut self, id: &ActingProcessId) -> watch::Receiver<ProcessStatus> {
+        let p = &mut self.processes[*id];
+        match &p.status_update {
+            Some(update) => update.subscribe(),
+            None => {
+                let (tx, rx) = watch::channel(ProcessStatus::Pending);
+                p.status_update = Some(tx);
+                rx
+            }
+        }
     }
 
     /*
     Get process inner struct
      */
     pub fn get(&self, process_ref: impl Into<ProcessRef>) -> Option<&ActingProcess> {
-        self.get_id(process_ref.into()).map(|id| &self.inner[id])
+        self.get_id(process_ref.into())
+            .map(|id| &self.processes[id])
     }
 
     pub fn get_mut(&mut self, process_ref: impl Into<ProcessRef>) -> Option<&mut ActingProcess> {
         self.get_id(process_ref.into())
-            .map(|id| &mut self.inner[id])
+            .map(|id| &mut self.processes[id])
     }
 
-    pub fn get_tried_method(&self, id: ActingProcessId) -> Vec<LValue> {
-        self.get(id)
-            .unwrap()
+    pub fn get_last_planned_refinement(&self, id: &ActingProcessId) -> Option<ActingProcessId> {
+        match self.processes[*id]
             .inner
             .as_task()
             .unwrap()
-            .get_tried_methods()
+            .refinements
+            .last()
+        {
+            Some(id) => {
+                if self.get_origin(id) == ProcessOrigin::Planner {
+                    Some(*id)
+                } else {
+                    None
+                }
+            }
+            None => None,
+        }
+    }
+
+    pub fn get_last_executed_refinement(&self, id: &ActingProcessId) -> Option<ActingProcessId> {
+        match self.processes[*id]
+            .inner
+            .as_task()
+            .unwrap()
+            .refinements
+            .last()
+        {
+            Some(id) => {
+                if self.get_origin(id) == ProcessOrigin::Execution {
+                    Some(*id)
+                } else {
+                    None
+                }
+            }
+            None => None,
+        }
+    }
+
+    pub fn executed(&mut self, id: &ActingProcessId) {
+        let origin = &mut self.processes[*id].origin;
+        if ProcessOrigin::Planner == *origin {
+            *origin = ProcessOrigin::ExecPlanInherited
+        }
+    }
+
+    pub fn dropped(&mut self, id: &ActingProcessId) {
+        let origin = &mut self.processes[*id].origin;
+        if ProcessOrigin::Planner == *origin {
+            *origin = ProcessOrigin::PlannerDropped
+        }
+    }
+
+    pub fn get_lv(&self, id: &ActingProcessId) -> LValue {
+        if self.get_kind(id) == ProcessKind::Method {
+            let om_id = self.get_om_id(id);
+            self.models[om_id].lv.clone()
+        } else {
+            panic!()
+        }
+    }
+
+    pub fn get_om(&self, id: &ActingProcessId) -> LValue {
+        if self.get_kind(id) == ProcessKind::Method {
+            let om_id = self.get_om_id(id);
+            self.models[om_id].lv_om.clone()
+        } else {
+            panic!()
+        }
+    }
+
+    pub fn get_tried(&self, id: &ActingProcessId) -> Vec<LValue> {
+        let refinements = self.processes[*id]
+            .inner
+            .as_task()
+            .unwrap()
+            .get_refinements();
+
+        refinements
+            .iter()
+            .filter_map(|id| {
+                if self.processes[*id].origin.is_exec() {
+                    Some(self.processes[*id].om_id())
+                } else {
+                    None
+                }
+            })
+            .map(|id| self.models[id].lv.clone())
+            .collect()
+    }
+
+    pub fn set_s_acq(&mut self, id: &ActingProcessId, instant: Option<Timepoint>) {
+        let instant = instant.unwrap_or(self.instant());
+        let (id, cst) = self.processes[*id]
+            .inner
+            .as_mut_acquire()
+            .unwrap()
+            .set_s_acq(instant);
+        self.set_plan_var(&id, cst)
+    }
+
+    pub fn set_arbitrary_value(
+        &mut self,
+        id: &ActingProcessId,
+        set: Vec<LValue>,
+        greedy: LValue,
+    ) -> LValue {
+        let plan_var_id = &self.processes[*id]
+            .inner
+            .as_arbitrary()
+            .unwrap()
+            .get_plan_var_id();
+
+        let value = match self.get_plan_var_val(plan_var_id) {
+            PlanVal::Planned(val) => {
+                let value: LValue = val.clone().into();
+                if set.contains(&value) {
+                    value
+                } else {
+                    greedy
+                }
+            }
+            PlanVal::None => greedy,
+            _ => unreachable!(),
+        };
+
+        let arbitrary = self.processes[*id].inner.as_mut_arbitrary().unwrap();
+        arbitrary.set_set(set);
+        let (var_id, cst) = arbitrary.set_var(value.clone());
+        self.set_plan_var(&var_id, cst);
+        self.executed(id);
+        value
+    }
+
+    pub async fn acquire(
+        &mut self,
+        id: &ActingProcessId,
+        resource: String,
+        quantity: Quantity,
+        priority: WaiterPriority,
+    ) -> Result<WaitAcquire, LRuntimeError> {
+        let mut updates: Vec<(PlanVarId, cst::Cst)> = vec![];
+        self.executed(id);
+        let acquire = self.processes[*id].inner.as_mut_acquire().unwrap();
+        let r = match acquire.move_reservation() {
+            Some(reservation) => Ok(reservation),
+            None => {
+                updates.push(acquire.set_resource(resource.to_string()));
+                let waiter: WaitAcquire = self
+                    .resource_manager
+                    .acquire(resource.to_string(), quantity, priority)
+                    .await?;
+
+                let quantity = self
+                    .resource_manager
+                    .get_client_quantity(&waiter.get_resource_id(), &waiter.get_client_id())
+                    .await;
+
+                updates.push(acquire.set_quantity(quantity));
+
+                acquire.set_acquire_id(&waiter);
+                Ok(waiter)
+            }
+        };
+
+        for update in updates {
+            self.set_plan_var(&update.0, update.1);
+        }
+
+        r
+    }
+
+    pub async fn reserve(
+        &mut self,
+        id: &ActingProcessId,
+        resource: String,
+        quantity: Quantity,
+        priority: WaiterPriority,
+    ) -> Result<(), LRuntimeError> {
+        let acquire = self.processes[*id].inner.as_mut_acquire().unwrap();
+        acquire.set_reservation(
+            self.resource_manager
+                .reserve(resource, quantity, priority)
+                .await?,
+        );
+        Ok(())
     }
 
     pub fn export_trace_dot_graph(&self) -> Dot {
@@ -312,11 +694,12 @@ impl InnerSupervisor {
         let mut queue = vec![0];
 
         while let Some(id) = queue.pop() {
-            let ap = &self.inner[id];
+            let ap = &self.processes[id];
             let label = ap.inner.to_string();
-            let color = match ap.status {
-                ProcessStatus::Planned => COLOR_EXECUTION,
-                ProcessStatus::Executed => COLOR_PLANNING,
+            let color = match ap.origin {
+                ProcessOrigin::Planner => COLOR_EXECUTION,
+                ProcessOrigin::Execution => COLOR_PLANNING,
+                _ => COLOR_DEFAULT,
             };
 
             writeln!(dot, "P{id} [label = \"{label}\", color = {color}];").unwrap();
@@ -329,13 +712,13 @@ impl InnerSupervisor {
                 }
                 ActingProcessInner::Command(_) => {}
                 ActingProcessInner::Task(t) => {
-                    for r in t.refinements.iter().map(|p| p.method_id) {
+                    for r in &t.refinements {
                         writeln!(dot, "P{id} -> P{};", r).unwrap();
-                        queue.push(r)
+                        queue.push(*r)
                     }
                 }
                 ActingProcessInner::Method(m) => {
-                    for sub in m.process_set.values() {
+                    for sub in m.childs.values() {
                         writeln!(dot, "P{id} -> P{sub};").unwrap();
                         queue.push(*sub)
                     }

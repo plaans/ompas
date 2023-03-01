@@ -1,8 +1,8 @@
 use aries_planning::parsing::sexpr::SExpr;
+use ompas_structs::acting_manager::action_status::ProcessStatus;
+use ompas_structs::acting_manager::action_status::ProcessStatus::Rejected;
 use ompas_structs::state::partial_state::PartialState;
 use ompas_structs::state::world_state::StateType;
-use ompas_structs::supervisor::action_status::ActionStatus;
-use ompas_structs::supervisor::action_status::ActionStatus::Rejected;
 use serde::{Deserialize, Serialize, Serializer};
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
@@ -172,13 +172,13 @@ impl TryFrom<GodotMessageSerde> for PartialState {
     }
 }
 
-impl TryFrom<GodotMessageSerde> for (usize, ActionStatus) {
+impl TryFrom<GodotMessageSerde> for (usize, ProcessStatus) {
     type Error = LRuntimeError;
 
     fn try_from(value: GodotMessageSerde) -> Result<Self, Self::Error> {
         #![allow(unused_assignments)]
         let mut id = 0;
-        let mut status: ActionStatus = ActionStatus::Accepted;
+        let mut status: ProcessStatus = ProcessStatus::Accepted;
 
         match value._type {
             GodotMessageType::ActionResponse => {
@@ -194,7 +194,7 @@ impl TryFrom<GodotMessageSerde> for (usize, ActionStatus) {
                                     "action response is not in {-1} + N"
                                 ));
                             } else {
-                                ActionStatus::Accepted
+                                ProcessStatus::Accepted
                             }
                         }
                     }
@@ -212,7 +212,7 @@ impl TryFrom<GodotMessageSerde> for (usize, ActionStatus) {
             GodotMessageType::ActionFeedback => {
                 if let GodotMessageSerdeData::ActionFeedback(af) = value.data {
                     id = af.action_id;
-                    status = ActionStatus::Running(Some(af.feedback));
+                    status = ProcessStatus::Running(Some(af.feedback));
                 } else {
                     unreachable!("{:?} and expected ActionFeedback", value.data)
                 }
@@ -221,8 +221,8 @@ impl TryFrom<GodotMessageSerde> for (usize, ActionStatus) {
                 if let GodotMessageSerdeData::ActionResult(ar) = value.data {
                     id = ar.action_id;
                     status = match ar.result {
-                        true => ActionStatus::Success,
-                        false => ActionStatus::Failure,
+                        true => ProcessStatus::Success,
+                        false => ProcessStatus::Failure,
                     };
                 } else {
                     unreachable!("{:?} and expected ActionResult", value.data)
@@ -231,7 +231,7 @@ impl TryFrom<GodotMessageSerde> for (usize, ActionStatus) {
             GodotMessageType::ActionPreempt => {
                 if let GodotMessageSerdeData::ActionId(ai) = value.data {
                     id = ai.action_id;
-                    status = ActionStatus::Pending;
+                    status = ProcessStatus::Pending;
                 } else {
                     unreachable!("{:?} and expected ActionId", value.data)
                 }
@@ -239,7 +239,7 @@ impl TryFrom<GodotMessageSerde> for (usize, ActionStatus) {
             GodotMessageType::ActionCancel => {
                 if let GodotMessageSerdeData::ActionCancel(ac) = value.data {
                     id = ac.action_id;
-                    status = ActionStatus::Cancelled(ac.cancelled);
+                    status = ProcessStatus::Cancelled(ac.cancelled);
                 } else {
                     unreachable!("{:?} and expected ActionCancel", value.data)
                 }

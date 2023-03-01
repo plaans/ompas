@@ -5,8 +5,8 @@ use crate::PlatformDescriptor;
 use ompas_language::interface::{LOG_TOPIC_PLATFORM, PROCESS_TOPIC_PLATFORM};
 use ompas_middleware::ProcessInterface;
 use ompas_structs::acting_domain::OMPASDomain;
-use ompas_structs::supervisor::action_status::ActionStatus;
-use ompas_structs::supervisor::Supervisor;
+use ompas_structs::acting_manager::action_status::ProcessStatus;
+use ompas_structs::acting_manager::ActingManager;
 use ompas_structs::ActionId;
 use sompas_core::eval;
 use sompas_structs::lenv::LEnv;
@@ -21,7 +21,7 @@ use tokio::sync::RwLock;
 #[derive(Default, Clone)]
 pub struct Platform {
     ompas_domain: Arc<RwLock<OMPASDomain>>,
-    supervisor: Supervisor,
+    acting_manager: ActingManager,
     exec: Option<ExecPlatform>,
     lisp_domain: LispDomain,
     interrupters: Arc<RwLock<HashMap<ActionId, InterruptionSender>>>,
@@ -30,13 +30,13 @@ pub struct Platform {
 impl Platform {
     pub fn new(
         ompas_domain: Arc<RwLock<OMPASDomain>>,
-        supervisor: Supervisor,
+        acting_manager: ActingManager,
         exec: Option<ExecPlatform>,
         lisp_domain: LispDomain,
     ) -> Self {
         Self {
             ompas_domain,
-            supervisor,
+            acting_manager,
             exec,
             lisp_domain,
             interrupters: Arc::new(Default::default()),
@@ -63,19 +63,19 @@ impl Platform {
 
         let label = command[0].to_string();
         let command = LValue::from(command);
-        let supervisor = self.supervisor.clone();
+        let supervisor = self.acting_manager.clone();
         let interrupters = self.interrupters.clone();
 
         let model: LValue = match self.ompas_domain.read().await.commands.get(&label) {
             Some(command) => {
                 supervisor
-                    .update_command_status(command_id, ActionStatus::Accepted)
+                    .set_status(&command_id, ProcessStatus::Accepted)
                     .await;
                 command.get_model().clone()
             }
             None => {
                 supervisor
-                    .update_command_status(command_id, ActionStatus::Rejected)
+                    .set_status(&command_id, ProcessStatus::Rejected)
                     .await;
                 return;
             }
@@ -92,7 +92,7 @@ impl Platform {
             match eval(&command, &mut env, Some(rx)).await {
                 Err(err) => {
                     supervisor
-                        .update_command_status(command_id, ActionStatus::Failure)
+                        .set_status(&command_id, ProcessStatus::Failure)
                         .await;
                     process
                         .log_error(format!("Eval error executing command {}: {}", command, err))
@@ -101,7 +101,7 @@ impl Platform {
                 }
                 Ok(LValue::Err(err)) => {
                     supervisor
-                        .update_command_status(command_id, ActionStatus::Failure)
+                        .set_status(&command_id, ProcessStatus::Failure)
                         .await;
                     process
                         .log_error(format!(
@@ -112,7 +112,7 @@ impl Platform {
                 }
                 Ok(_) => {
                     supervisor
-                        .update_command_status(command_id, ActionStatus::Success)
+                        .set_status(&command_id, ProcessStatus::Success)
                         .await
                 }
             };

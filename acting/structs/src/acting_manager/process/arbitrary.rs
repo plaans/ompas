@@ -1,15 +1,44 @@
-use crate::supervisor::interval::Timepoint;
-use crate::supervisor::process::ActingProcessInner;
-use crate::supervisor::ActingProcessId;
+use crate::acting_manager::process::plan_var::{ExecutionVar, PlanVarId};
+use crate::acting_manager::process::ActingProcessInner;
+use crate::sym_table::domain::cst;
 use sompas_structs::lvalue::LValue;
 use std::fmt::{Display, Formatter};
 
 pub struct ArbitraryProcess {
-    pub id: ActingProcessId,
-    _parent: ActingProcessId,
-    traces: Vec<ArbitraryTrace>,
+    var: ExecutionVar<LValue>,
+    set: Vec<LValue>,
 }
 
+impl ArbitraryProcess {
+    pub fn new(var: ExecutionVar<LValue>) -> Self {
+        Self { var, set: vec![] }
+    }
+    pub fn set_set(&mut self, set: Vec<LValue>) {
+        self.set = set
+    }
+
+    pub fn set_var(&mut self, var: LValue) -> (PlanVarId, cst::Cst) {
+        self.var.set_val(var)
+    }
+
+    pub fn get_plan_var_id(&self) -> PlanVarId {
+        self.var.get_plan_var_id()
+    }
+}
+
+impl From<ArbitraryProcess> for ActingProcessInner {
+    fn from(value: ArbitraryProcess) -> Self {
+        Self::Arbitrary(value)
+    }
+}
+
+impl Display for ArbitraryProcess {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "")
+    }
+}
+
+/*
 #[derive(Clone)]
 pub struct ArbitraryTrace {
     pub possibilities: Vec<LValue>,
@@ -54,34 +83,4 @@ impl Display for ArbitraryTrace {
             self.choice
         )
     }
-}
-
-impl ArbitraryProcess {
-    pub fn new(id: ActingProcessId, _parent: ActingProcessId, trace: ArbitraryTrace) -> Self {
-        Self {
-            id,
-            _parent,
-            traces: vec![trace],
-        }
-    }
-
-    pub fn add_trace(&mut self, trace: ArbitraryTrace) {
-        self.traces.push(trace)
-    }
-
-    pub fn get_last_trace(&self) -> &ArbitraryTrace {
-        self.traces.last().unwrap()
-    }
-}
-
-impl From<ArbitraryProcess> for ActingProcessInner {
-    fn from(value: ArbitraryProcess) -> Self {
-        Self::Arbitrary(value)
-    }
-}
-
-impl Display for ArbitraryProcess {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({}){}", self.id, self.traces.last().unwrap())
-    }
-}
+}*/

@@ -20,10 +20,10 @@ use std::ops::Deref;
 
 const TRY_EVAL_APPLY: &str = "try_eval_apply";
 
-pub fn post_processing(c: &mut Chronicle, env: LEnv) -> Result<(), LRuntimeError> {
+pub fn post_processing(c: &mut Chronicle, env: &LEnv) -> Result<(), LRuntimeError> {
     c.st.flat_bindings();
     merge_conditions(c)?;
-    try_eval_apply(c, env)?;
+    try_eval_apply(c, &env)?;
     simplify_constraints(c)?;
     rm_useless_var(c);
     simplify_timepoints(c)?;
@@ -237,7 +237,8 @@ pub fn merge_conditions(c: &mut Chronicle) -> Result<(), LRuntimeError> {
     Ok(())
 }
 
-pub fn try_eval_apply(c: &mut Chronicle, env: LEnv) -> Result<(), LRuntimeError> {
+pub fn try_eval_apply(c: &mut Chronicle, env: &LEnv) -> Result<(), LRuntimeError> {
+    let env = env.clone();
     let st = c.st.clone();
 
     let mut c_to_remove: Vec<usize> = Default::default();

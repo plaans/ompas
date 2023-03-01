@@ -12,9 +12,13 @@ use ompas_middleware::logger::LogClient;
 use ompas_middleware::ProcessInterface;
 use ompas_planning::conversion::convert_acting_domain;
 use ompas_structs::acting_domain::OMPASDomain;
+use ompas_structs::acting_manager::action_status::ProcessStatus;
+use ompas_structs::acting_manager::filter::ProcessFilter;
+use ompas_structs::acting_manager::inner::ProcessKind;
+use ompas_structs::acting_manager::ActingManager;
 use ompas_structs::conversion::context::ConversionContext;
 use ompas_structs::execution::monitor::{task_check_wait_for, MonitorCollection};
-use ompas_structs::execution::resource::ResourceCollection;
+use ompas_structs::execution::resource::ResourceManager;
 use ompas_structs::interface::job::Job;
 use ompas_structs::interface::rae_command::OMPASJob;
 use ompas_structs::interface::rae_options::OMPASOptions;
@@ -22,10 +26,6 @@ use ompas_structs::interface::select_mode::{Planner, SelectMode};
 use ompas_structs::interface::trigger_collection::{Response, TaskTrigger, TriggerCollection};
 use ompas_structs::planning::domain::PlanningDomain;
 use ompas_structs::state::world_state::{StateType, WorldState};
-use ompas_structs::supervisor::action_status::ActionStatus;
-use ompas_structs::supervisor::filter::ProcessFilter;
-use ompas_structs::supervisor::inner::ProcessKind;
-use ompas_structs::supervisor::Supervisor;
 use sompas_core::{eval_init, get_root_env};
 use sompas_macros::*;
 use sompas_modules::advanced_math::ModAdvancedMath;
@@ -49,9 +49,9 @@ use tokio::sync::{mpsc, RwLock};
 pub struct ModControl {
     pub(crate) options: Arc<RwLock<OMPASOptions>>,
     pub state: WorldState,
-    pub resources: ResourceCollection,
+    pub resources: ResourceManager,
     pub monitors: MonitorCollection,
-    pub supervisor: Supervisor,
+    pub acting_manager: ActingManager,
     pub log: LogClient,
     pub task_stream: Arc<RwLock<Option<tokio::sync::mpsc::Sender<OMPASJob>>>>,
     pub(crate) platform: Platform,
@@ -68,7 +68,7 @@ impl ModControl {
             state: monitor.state.clone(),
             resources: monitor.resources.clone(),
             monitors: monitor.monitors.clone(),
-            supervisor: monitor.supervisor.clone(),
+            acting_manager: monitor.acting_manager.clone(),
             log: monitor.log.clone(),
             task_stream: monitor.task_stream.clone(),
             platform: monitor.platform.clone(),
@@ -246,7 +246,7 @@ impl From<ModControl> for LModule {
 #[async_scheme_fn]
 pub async fn start(env: &LEnv) -> Result<String, LRuntimeError> {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
-    let supervisor = ctx.supervisor.clone();
+    let supervisor = ctx.acting_manager.clone();
     let mut tasks_to_execute: Vec<Job> = vec![];
     mem::swap(
         &mut *ctx.tasks_to_execute.write().await,
@@ -306,7 +306,7 @@ pub async fn stop(env: &LEnv) {
     tokio::time::sleep(Duration::from_secs(1)).await; //hardcoded moment to wait for all process to be killed.
     *ctx.task_stream.write().await = None;
     ctx.state.clear().await;
-    ctx.supervisor.clear().await;
+    ctx.acting_manager.clear().await;
     ctx.resources.clear().await;
     ctx.monitors.clear().await;
 }
@@ -559,7 +559,7 @@ pub async fn get_state(env: &LEnv, args: &[LValue]) -> LResult {
 pub async fn print_process_network(env: &LEnv) -> String {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
 
-    ctx.supervisor.format_task_network().await
+    ctx.acting_manager.format_task_network().await
 }
 
 #[async_scheme_fn]
@@ -580,13 +580,13 @@ pub async fn print_processes(env: &LEnv, args: &[LValue]) -> LResult {
             ARBITRARY => task_filter.task_type = Some(ProcessKind::Arbitrary),
             ACQUIRE => task_filter.task_type = Some(ProcessKind::Acquire),
             METHOD => task_filter.task_type = Some(ProcessKind::Method),
-            STATUS_PENDING => task_filter.status = Some(ActionStatus::Pending),
-            STATUS_ACCEPTED => task_filter.status = Some(ActionStatus::Accepted),
-            STATUS_REJECTED => task_filter.status = Some(ActionStatus::Rejected),
-            STATUS_RUNNING => task_filter.status = Some(ActionStatus::Running(None)),
-            STATUS_SUCCESS => task_filter.status = Some(ActionStatus::Success),
-            STATUS_FAILURE => task_filter.status = Some(ActionStatus::Failure),
-            STATUS_CANCELLED => task_filter.status = Some(ActionStatus::Cancelled(true)),
+            STATUS_PENDING => task_filter.status = Some(ProcessStatus::Pending),
+            STATUS_ACCEPTED => task_filter.status = Some(ProcessStatus::Accepted),
+            STATUS_REJECTED => task_filter.status = Some(ProcessStatus::Rejected),
+            STATUS_RUNNING => task_filter.status = Some(ProcessStatus::Running(None)),
+            STATUS_SUCCESS => task_filter.status = Some(ProcessStatus::Success),
+            STATUS_FAILURE => task_filter.status = Some(ProcessStatus::Failure),
+            STATUS_CANCELLED => task_filter.status = Some(ProcessStatus::Cancelled(true)),
 
             str => {
                 return Err(lruntimeerror!(
@@ -606,7 +606,7 @@ pub async fn print_processes(env: &LEnv, args: &[LValue]) -> LResult {
         }
     }
 
-    let string = ctx.supervisor.print_processes(task_filter).await;
+    let string = ctx.acting_manager.print_processes(task_filter).await;
     Ok(string.into())
 }
 
@@ -682,7 +682,7 @@ pub async fn get_domain(env: &LEnv, args: &[LValue]) -> LResult {
 #[async_scheme_fn]
 pub async fn get_stats(env: &LEnv) -> LValue {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
-    ctx.supervisor.get_stats().await
+    ctx.acting_manager.get_stats().await
 }
 
 #[async_scheme_fn]
@@ -693,14 +693,14 @@ pub async fn export_stats(env: &LEnv, args: &[LValue]) -> LResult {
     } else {
         None
     };
-    ctx.supervisor.export_to_csv(None, file).await;
+    ctx.acting_manager.export_to_csv(None, file).await;
     Ok(LValue::Nil)
 }
 
 #[async_scheme_fn]
 pub async fn dump_trace(env: &LEnv) -> Result<(), LRuntimeError> {
     env.get_context::<ModControl>(MOD_CONTROL)?
-        .supervisor
+        .acting_manager
         .dump_trace(None)
         .await;
 

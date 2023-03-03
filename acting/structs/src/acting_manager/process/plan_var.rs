@@ -14,6 +14,16 @@ pub struct PlanVar {
     value: ActingVal,
 }
 
+impl Display for PlanVar {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match &self.value {
+            ActingVal::Execution(e) => write!(f, "e({e})"),
+            ActingVal::Planned(p) => write!(f, "p({p})"),
+            ActingVal::None => write!(f, ""),
+        }
+    }
+}
+
 impl PlanVar {
     pub fn new(var_id: VarId, om_id: AMId) -> PlanVar {
         Self {
@@ -52,8 +62,8 @@ pub struct PlanVal {
 
 #[derive(Clone, Default)]
 pub struct ExecutionVar<T: Display + Clone + AsCst> {
-    plan_var_id: Option<PlanVarId>,
-    val: Option<T>,
+    pub(crate) plan_var_id: Option<PlanVarId>,
+    pub(crate) val: Option<T>,
 }
 
 pub trait AsCst {

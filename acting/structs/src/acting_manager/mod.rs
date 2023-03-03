@@ -3,6 +3,7 @@ use crate::acting_manager::filter::ProcessFilter;
 use crate::acting_manager::inner::ProcessKind;
 use crate::acting_manager::interval::Timepoint;
 use crate::acting_manager::operational_model::ActingModel;
+use crate::acting_manager::planner_manager::{ActingPlanResult, RefBindingPlanner};
 use crate::acting_manager::process::process_ref::{Label, ProcessRef};
 use crate::acting_manager::process::ProcessOrigin;
 use crate::execution::monitor::MonitorManager;
@@ -24,6 +25,7 @@ pub mod filter;
 pub mod inner;
 pub mod interval;
 pub mod operational_model;
+pub mod planner_manager;
 pub mod process;
 pub mod task_network;
 
@@ -63,7 +65,7 @@ impl ActingManager {
         self.monitor_manager.clear().await;
         self.resource_manager.clear().await;
         self.state.clear().await;
-        self.inner.write().await.clear();
+        self.inner.write().await.clear().await;
     }
 
     pub async fn dump_trace(&self, path: Option<PathBuf>) {
@@ -339,5 +341,13 @@ impl ActingManager {
 
     pub async fn get_debug(&self, id: &ActingProcessId) -> Option<String> {
         self.inner.read().await.get_debug(id).clone()
+    }
+
+    pub async fn get_ref_bindings_planner(&self) -> RefBindingPlanner {
+        self.inner.read().await.planner_manager.bindings.clone()
+    }
+
+    pub async fn absorb_plan_result(&self, result: ActingPlanResult) {
+        self.inner.write().await.absorb_planner_result(result)
     }
 }

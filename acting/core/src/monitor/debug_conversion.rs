@@ -1,7 +1,9 @@
 use crate::exec::state::ModState;
+use crate::monitor::control::ModControl;
 use crate::monitor::domain::ModDomain;
 use aries_planning::chronicles::ChronicleOrigin;
 use ompas_language::exec::refinement::EXEC_TASK;
+use ompas_language::monitor::control::MOD_CONTROL;
 use ompas_language::monitor::debug_conversion::{
     ANNOTATE_TASK, CONVERT_DOMAIN, DOC_ANNOTATE_TASK, DOC_CONVERT_DOMAIN, DOC_MOD_DEBUG_CONVERSION,
     DOC_PLAN_TASK, DOC_PRE_EVAL_EXPR, DOC_PRE_EVAL_TASK, MOD_DEBUG_CONVERSION, PLAN_TASK,
@@ -17,6 +19,7 @@ use ompas_planning::conversion::convert_acting_domain;
 use ompas_planning::conversion::flow::annotate::annotate;
 use ompas_planning::conversion::flow::p_eval::r#struct::{PConfig, PLEnv};
 use ompas_planning::conversion::flow::p_eval::{p_eval, P_EVAL};
+use ompas_structs::acting_manager::planner_manager::ActingPlanResult;
 use ompas_structs::acting_manager::process::process_ref::{Label, ProcessRef};
 use ompas_structs::conversion::context::ConversionContext;
 use ompas_structs::planning::domain::PlanningDomain;
@@ -61,6 +64,10 @@ pub async fn convert_domain(env: &LEnv) -> Result<String, LRuntimeError> {
 pub async fn plan_task(env: &LEnv, args: &[LValue]) -> LResult {
     let task: LValue = args.into();
     println!("task to plan: {}", task);
+    let acting_manager = env
+        .get_context::<ModControl>(MOD_CONTROL)?
+        .acting_manager
+        .clone();
     let ctx = env.get_context::<ModDomain>(MOD_DOMAIN)?;
     let mut context: ConversionContext = ctx.get_conversion_context().await;
     context
@@ -80,32 +87,31 @@ pub async fn plan_task(env: &LEnv, args: &[LValue]) -> LResult {
     }];
     let pp: PlanningProblem = finite_problem(actions, &context).await?;
 
-    /*println!("instances: {}", {
-        let mut str = "".to_string();
-        for instance in &pp.instance.instances {
-            writeln!(str, "{}", instance.chronicle.format(true)).unwrap();
-        }
-        str
-    });*/
+    let bindings = acting_manager.get_ref_bindings_planner().await;
 
-    /*for template in &pp.domain.templates {
-        println!("{}", template)
-    }*/
-
-    let (mut aries_problem, bindings) = generate_chronicles(&pp)?;
+    let mut aries_problem = generate_chronicles(&bindings, &pp).await?;
 
     let result = run_solver_for_htn(&mut aries_problem, false);
     // println!("{}", format_partial_plan(&pb, &x)?);
 
-    let result: LValue = if let Some(pr) = &result {
+    let result: LValue = if let Some(pr) = result {
         //result::print_chronicles(pr);
-        let solved = instance::instantiate_chronicles(&pp, &pr, &bindings);
+        let solved = instance::instantiate_chronicles(&pp, &pr, &bindings).await;
         /*for chronicle in &solved {
             print!("{}", chronicle.chronicle)
         }*/
 
         let raw_plan = acting::extract_raw_plan(&solved);
         println!("RAW PLAN:\n{}", raw_plan);
+
+        let plan_result = ActingPlanResult {
+            instances: pp.instance.instances,
+            assignements: pr.ass.clone(),
+            finite_problem: pr.fp,
+        };
+
+        acting_manager.absorb_plan_result(plan_result).await;
+
         /*let plan = result::extract_plan(x);
         println!("plan:\n{}\n{}", plan.format(), plan.format_hierarchy());*/
         //let first_task_id = plan.get_first_subtask().unwrap();

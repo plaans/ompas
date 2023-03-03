@@ -10,6 +10,7 @@ use crate::acting_manager::process::plan_var::ExecutionVar;
 use crate::acting_manager::process::root_task::RootProcess;
 use crate::acting_manager::process::task::TaskProcess;
 use crate::acting_manager::{AMId, ActingProcessId};
+use log::debug;
 use std::fmt::{Display, Formatter};
 use tokio::sync::watch;
 
@@ -47,6 +48,41 @@ pub struct ActingProcess {
     pub end: ExecutionVar<Timepoint>,
     pub inner: ActingProcessInner,
     pub status_update: Option<watch::Sender<ProcessStatus>>,
+}
+
+impl Display for ActingProcess {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "({}, {})[{},{}]",
+            self.id, self.status, self.start, self.end
+        )?;
+        let debug = if let Some(debug) = &self.debug {
+            debug.to_string()
+        } else {
+            "".to_string()
+        };
+        match &self.inner {
+            ActingProcessInner::RootTask(r) => {
+                write!(f, "root")
+            }
+            ActingProcessInner::Command(c) => {
+                write!(f, "{}", debug)
+            }
+            ActingProcessInner::Task(t) => {
+                write!(f, "{}", debug)
+            }
+            ActingProcessInner::Method(m) => {
+                write!(f, "{}", debug)
+            }
+            ActingProcessInner::Arbitrary(arb) => {
+                write!(f, "arb({})", arb.var)
+            }
+            ActingProcessInner::Acquire(acq) => {
+                write!(f, "{}: acq({},{})", acq.s_acq, acq.resource, acq.quantity)
+            }
+        }
+    }
 }
 
 impl ActingProcess {

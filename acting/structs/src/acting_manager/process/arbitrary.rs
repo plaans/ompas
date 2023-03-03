@@ -4,8 +4,8 @@ use sompas_structs::lvalue::LValue;
 use std::fmt::{Display, Formatter};
 
 pub struct ArbitraryProcess {
-    var: ExecutionVar<LValue>,
-    set: Vec<LValue>,
+    pub(crate) var: ExecutionVar<LValue>,
+    pub(crate) set: Vec<LValue>,
 }
 
 impl ArbitraryProcess {

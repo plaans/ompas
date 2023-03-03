@@ -254,13 +254,13 @@ pub async fn try_eval_apply(c: &mut Chronicle, env: &LEnv) -> Result<(), LRuntim
                         }
                     }
                     let expr = args.format(&st, true);
-                    print!("apply{expr}");
+                    //print!("apply{expr}");
                     let mut env = env.clone();
                     let lv: LValue = {
                         let lv = parse(expr.as_str(), &mut env).await?;
                         eval(&lv, &mut env, None).await
                     }?;
-                    println!("=> {lv}");
+                    //println!("=> {lv}");
 
                     let lit = lvalue_to_lit(&lv, &st)?;
                     match lit {

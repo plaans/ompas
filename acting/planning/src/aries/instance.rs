@@ -1,5 +1,5 @@
 use crate::aries::template::read_chronicle;
-use crate::aries::{useful, BindingAriesAtoms};
+use crate::aries::useful;
 use aries_core::{Lit as aLit, INT_CST_MAX};
 use aries_model::lang::{Atom as aAtom, FAtom, SAtom};
 use aries_planning::chronicles::{
@@ -8,6 +8,7 @@ use aries_planning::chronicles::{
 };
 use ompas_language::exec::resource::{MAX_Q, QUANTITY};
 use ompas_language::exec::state::INSTANCE;
+use ompas_structs::acting_manager::planner_manager::BindingPlanner;
 use ompas_structs::planning::problem::PlanningProblem;
 use ompas_structs::state::partial_state::PartialState;
 use ompas_structs::state::world_state::{StateType, WorldStateSnapshot};
@@ -164,7 +165,7 @@ fn initialize_goal_task(init_ch: &mut Chronicle, goal_tasks: &[LValueS], ctx: &m
 pub fn generate_instances(
     problem: &PlanningProblem,
     ctx: &mut Ctx,
-    bindings: &mut BindingAriesAtoms,
+    bindings: &mut BindingPlanner,
 ) -> anyhow::Result<Vec<ChronicleInstance>> {
     let mut instances = vec![];
     for (id, instance) in problem.instance.instances.iter().enumerate() {

@@ -80,20 +80,20 @@ pub async fn _convert(
     p_env: &mut PLEnv,
     st: RefSymTable,
 ) -> Result<Chronicle, LRuntimeError> {
-    let n_conversion = N_CONVERSION.fetch_add(1, Ordering::Relaxed);
+    //let n_conversion = N_CONVERSION.fetch_add(1, Ordering::Relaxed);
     let mut graph = FlowGraph::new(st);
-    debug_println!("conversion n{n_conversion}...");
+    //debug_println!("conversion n{n_conversion}...");
     let flow = convert_lv(&lv, &mut graph, &mut Default::default())?;
-    debug_println!("convert({n_conversion}) = ok!");
+    //debug_println!("convert({n_conversion}) = ok!");
     let time = SystemTime::now();
     graph.flow = flow;
     flow_graph_post_processing(&mut graph)?;
-    debug_println!("flow_graph_post_processing({n_conversion}) = ok!");
+    //debug_println!("flow_graph_post_processing({n_conversion}) = ok!");
     let mut ch = convert_graph(ch, &mut graph, &flow, &p_env.env)?;
-    debug_println!("convert_graph({n_conversion}) = ok!");
-    debug_println!("lv: {}\nchronicle: {}", lv.format(4), ch);
+    //debug_println!("convert_graph({n_conversion}) = ok!");
+    //debug_println!("lv: {}\nchronicle: {}", lv.format(4), ch);
     post_processing(&mut ch, &p_env.env).await?;
-    debug_println!("post_processing({n_conversion}) = ok!");
+    //debug_println!("post_processing({n_conversion}) = ok!");
     graph.flat_bindings();
     ch.meta_data.flow_graph = graph;
     ch.meta_data.convert_time = time.elapsed().unwrap();
@@ -136,6 +136,7 @@ pub async fn p_convert_task(
             .await?;
 
             instances.push(ChronicleInstance {
+                generated: true,
                 origin: ChronicleOrigin::Refinement {
                     instance_id: 0,
                     task_id: 0,
@@ -167,6 +168,7 @@ pub async fn p_convert_task(
                 .await?;
 
                 instances.push(ChronicleInstance {
+                    generated: true,
                     origin: ChronicleOrigin::Refinement {
                         instance_id: 0,
                         task_id: 0,

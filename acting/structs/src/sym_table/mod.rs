@@ -585,6 +585,14 @@ impl SymTable {
     }
 
     /*
+    OTHER
+     */
+
+    pub fn var_as_cst(&self, var_id: &VarId) -> Option<Cst> {
+        self.get_domain_of_var(var_id).as_constant().cloned()
+    }
+
+    /*
     FORMAT Function
       */
 

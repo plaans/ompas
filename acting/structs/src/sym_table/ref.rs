@@ -1,6 +1,7 @@
 use crate::conversion::chronicle::interval;
 use crate::conversion::flow_graph::graph::Dot;
 use crate::sym_table::closure::Update;
+use crate::sym_table::domain::cst::Cst;
 use crate::sym_table::domain::type_lattice::TypeLattice;
 use crate::sym_table::domain::{cst, Domain};
 use crate::sym_table::var_domain::VarDomain;
@@ -241,6 +242,15 @@ impl RefSymTable {
     pub fn union_domain(&self, id1: &DomainId, id2: &DomainId) -> EmptyDomains {
         self.0.write().unwrap().union_domain(id1, id2)
     }
+
+    /*
+    OTHER
+     */
+
+    pub fn var_as_cst(&self, var_id: &VarId) -> Option<Cst> {
+        self.0.read().unwrap().var_as_cst(var_id)
+    }
+
     /*
     FORMAT Function
       */

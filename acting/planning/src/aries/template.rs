@@ -1,4 +1,4 @@
-use crate::aries::{useful, BindingAriesAtoms, OMPAS_TIME_SCALE};
+use crate::aries::{useful, OMPAS_TIME_SCALE};
 use anyhow::anyhow;
 use aries_core::{IntCst, Lit as aLit, INT_CST_MAX, INT_CST_MIN};
 use aries_model::extensions::Shaped;
@@ -26,6 +26,7 @@ use ompas_language::sym_table::{
     TYPE_ABSTRACT_TASK, TYPE_COMMAND, TYPE_METHOD, TYPE_OBJECT, TYPE_OBJECT_TYPE, TYPE_PREDICATE,
     TYPE_PRESENCE, TYPE_STATE_FUNCTION, TYPE_TASK, TYPE_TIMEPOINT,
 };
+use ompas_structs::acting_manager::planner_manager::BindingPlanner;
 use ompas_structs::conversion::chronicle::constraint::Constraint;
 use ompas_structs::conversion::chronicle::{Chronicle, ChronicleKind};
 use ompas_structs::planning::problem::PlanningProblem;
@@ -49,7 +50,7 @@ use std::sync::Arc;
 #[named]
 pub fn generate_templates(
     problem: &PlanningProblem,
-    bindings: &mut BindingAriesAtoms,
+    bindings: &mut BindingPlanner,
 ) -> anyhow::Result<chronicles::Problem> {
     let st = problem.st.clone();
     let lattice = st.get_lattice();
@@ -254,7 +255,7 @@ fn convert_constraint(
     c: &Constraint,
     _prez: aLit,
     _container: Container,
-    bindings: &BindingAriesAtoms,
+    bindings: &BindingPlanner,
     st: &RefSymTable,
     ctx: &mut Ctx,
     reified: Option<aLit>,
@@ -587,7 +588,7 @@ fn convert_constraint(
 
 pub fn read_chronicle(
     ctx: &mut Ctx,
-    bindings: &mut BindingAriesAtoms,
+    bindings: &mut BindingPlanner,
     ch: &Chronicle,
     container: Container,
 ) -> anyhow::Result<aChronicleTemplate> {

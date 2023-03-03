@@ -77,14 +77,17 @@ pub async fn finite_problem(
                 let mut pr = instance.pr.clone();
                 pr.push(subtask.label.unwrap());
 
-                tasks.push(PAction {
-                    args: value,
-                    origin: ChronicleOrigin::Refinement {
-                        instance_id: instance_n,
-                        task_id: id,
+                tasks.insert(
+                    0,
+                    PAction {
+                        args: value,
+                        origin: ChronicleOrigin::Refinement {
+                            instance_id: instance_n,
+                            task_id: id,
+                        },
+                        pr,
                     },
-                    pr,
-                })
+                )
             }
 
             for effect in chronicle.get_effects() {
@@ -113,7 +116,7 @@ pub async fn finite_problem(
                 Some(model) => {
                     let model_lambda: LLambda = model.try_into().expect("");
 
-                    let instance: ChronicleInstance = convert_into_chronicle_instance(
+                    let mut instance: ChronicleInstance = convert_into_chronicle_instance(
                         &model_lambda,
                         action,
                         None,
@@ -122,12 +125,13 @@ pub async fn finite_problem(
                         ChronicleKind::Task,
                     )
                     .await?;
+                    instance.pr.push(Label::Refinement(0));
                     update_domain(&mut goal_actions, &instance, instance_n);
 
                     instances.push(instance)
                 }
                 None => {
-                    for (id, m_label) in task.get_methods().iter().enumerate() {
+                    for (_, m_label) in task.get_methods().iter().enumerate() {
                         methods.insert(m_label.to_string());
                         let method = context.domain.get_methods().get(m_label).unwrap();
                         let method_lambda: LLambda = method.get_body().try_into().expect("");
@@ -150,7 +154,7 @@ pub async fn finite_problem(
                             ChronicleKind::Method,
                         )
                         .await?;
-                        instance.pr.push(Label::Refinement(id));
+                        instance.pr.push(Label::Refinement(0));
                         update_domain(&mut goal_actions, &instance, instance_n);
 
                         instances.push(instance);
@@ -298,6 +302,7 @@ pub async fn convert_into_chronicle_instance(
     let om: ActingModel = convert(Some(ch), lv, &mut p_env, st).await?;
 
     Ok(ChronicleInstance {
+        generated: true,
         origin: p_action.origin,
         om,
         pr: p_action.pr,

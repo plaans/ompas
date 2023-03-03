@@ -7,9 +7,9 @@ use std::mem;
 
 #[derive()]
 pub struct AcquireProcess {
-    resource: ExecutionVar<String>,
-    quantity: ExecutionVar<usize>,
-    s_acq: ExecutionVar<Timepoint>,
+    pub(crate) resource: ExecutionVar<String>,
+    pub(crate) quantity: ExecutionVar<usize>,
+    pub(crate) s_acq: ExecutionVar<Timepoint>,
     pub(crate) reservation: Option<WaitAcquire>,
     waiter_id: usize,
     resource_id: usize,

@@ -1,6 +1,7 @@
 use crate::acting_manager::action_status::ProcessStatus;
 use crate::acting_manager::interval::Timepoint;
 use crate::acting_manager::operational_model::{ActingModel, ROOT};
+use crate::acting_manager::planner_manager::{ActingPlanResult, PlannerManager};
 use crate::acting_manager::process::acquire::AcquireProcess;
 use crate::acting_manager::process::arbitrary::ArbitraryProcess;
 use crate::acting_manager::process::command::CommandProcess;
@@ -15,14 +16,19 @@ use crate::acting_manager::process::{ActingProcess, ActingProcessInner, ProcessO
 use crate::acting_manager::{AMId, ActingProcessId};
 use crate::conversion::flow_graph::graph::Dot;
 use crate::execution::resource::{Quantity, ResourceManager, WaitAcquire, WaiterPriority};
+use crate::planning::instance::ChronicleInstance;
+use crate::planning::om_binding::ChronicleBinding;
 use crate::sym_table::domain::cst;
 use crate::sym_table::domain::cst::Cst;
 use crate::sym_table::r#ref::RefSymTable;
+use crate::sym_table::r#trait::FormatWithSymTable;
 use crate::sym_table::VarId;
+use aries_planning::chronicles::Chronicle;
 use chrono::{DateTime, Utc};
 use ompas_language::supervisor::*;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
+use std::collections::HashMap;
 use std::env::set_current_dir;
 use std::fmt::{Display, Formatter, Write};
 use std::fs;
@@ -66,7 +72,7 @@ impl Display for ProcessKind {
 pub struct InnerActingManager {
     processes: Vec<ActingProcess>,
     models: Vec<ActingModel>,
-    plan_vars: Vec<PlanVar>,
+    pub planner_manager: PlannerManager,
     st: RefSymTable,
     resource_manager: ResourceManager,
     time_reference: Instant,
@@ -99,14 +105,17 @@ impl InnerActingManager {
             models: vec![model],
             resource_manager,
             time_reference,
-            plan_vars: vec![start, end],
+            planner_manager: PlannerManager {
+                plan_vars: vec![start, end],
+                bindings: Default::default(),
+            },
         }
     }
 
-    pub fn clear(&mut self) {
+    pub async fn clear(&mut self) {
         self.processes.clear();
         self.models.clear();
-        self.plan_vars.clear();
+        self.planner_manager.clear().await;
         self.st = RefSymTable::default();
     }
 
@@ -124,8 +133,10 @@ impl InnerActingManager {
     }
 
     fn new_plan_var(&mut self, var_id: VarId, om_id: AMId) -> PlanVarId {
-        self.plan_vars.push(PlanVar::new(var_id, om_id));
-        self.plan_vars.len() - 1
+        self.planner_manager
+            .plan_vars
+            .push(PlanVar::new(var_id, om_id));
+        self.planner_manager.plan_vars.len() - 1
     }
 
     fn new_execution_var<T: Display + Clone + AsCst>(
@@ -207,12 +218,12 @@ impl InnerActingManager {
 
     fn set_plan_var(&mut self, val: Option<PlanVal>) {
         if let Some(val) = val {
-            self.plan_vars[val.plan_var_id].set_execution_val(val.val)
+            self.planner_manager.plan_vars[val.plan_var_id].set_execution_val(val.val)
         }
     }
 
     fn get_plan_var_val(&mut self, plan_var_id: &PlanVarId) -> &ActingVal {
-        self.plan_vars[*plan_var_id].get_val()
+        self.planner_manager.plan_vars[*plan_var_id].get_val()
     }
 
     pub fn set_start(&mut self, id: &ActingProcessId, t: Option<Timepoint>) {
@@ -738,7 +749,7 @@ impl InnerActingManager {
 
         while let Some(id) = queue.pop() {
             let ap = &self.processes[id];
-            let label = ap.inner.to_string();
+            let label = format_acting_process(&self.planner_manager, &ap);
             let color = match ap.origin {
                 ProcessOrigin::Planner => COLOR_EXECUTION,
                 ProcessOrigin::Execution => COLOR_PLANNING,
@@ -820,7 +831,130 @@ impl InnerActingManager {
             .spawn()
             .unwrap();
     }
+
+    fn add_processes_from_chronicles(&mut self, instances: Vec<ChronicleInstance>) {
+        let table: HashMap<ProcessRef, usize> = instances
+            .iter()
+            .enumerate()
+            .map(|(i, c)| (c.pr.clone(), i))
+            .collect();
+
+        for instance in instances {
+            if instance.generated {
+                let chronicle = instance.om.chronicle.as_ref().unwrap();
+                let bindings = chronicle.bindings.clone();
+                let st = &chronicle.st;
+                let mut pr = instance.pr.clone();
+                let m_label = pr.pop().unwrap();
+                let parent = match self.get_id(pr.clone()) {
+                    Some(id) => id,
+                    None =>
+                    //We need to create the task before adding the method
+                    {
+                        let label = pr.pop().unwrap();
+                        let parent = self.get_id(pr).unwrap();
+                        let task = chronicle.get_task();
+                        let debug = task.format(st, true);
+                        let args = chronicle
+                            .get_task()
+                            .iter()
+                            .map(|var_id| st.var_as_cst(var_id).unwrap())
+                            .collect();
+                        match parent {
+                            0 => {
+                                let pr = self.new_high_level_task(debug, args);
+                                let id = self.get_id(pr).unwrap();
+                                self.processes[id].origin = ProcessOrigin::Planner;
+                                id
+                            }
+                            _ => {
+                                let id = self.new_task(
+                                    label,
+                                    &parent,
+                                    args,
+                                    debug,
+                                    ProcessOrigin::Planner,
+                                );
+                                id
+                            }
+                        }
+                    }
+                };
+
+                let debug = chronicle.get_name().format(st, true);
+
+                let parent =
+                    self.new_refinement(&parent, debug, instance.om, ProcessOrigin::Planner);
+
+                for (label, binding) in bindings.inner {
+                    match binding {
+                        ChronicleBinding::Arbitrary(_) => {
+                            self.new_arbitrary(label, &parent, ProcessOrigin::Planner);
+                        }
+                        ChronicleBinding::Action(_) => {}
+                        ChronicleBinding::Acquire(_) => {
+                            self.new_acquire(label, &parent, ProcessOrigin::Planner);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn absorb_planner_result(&mut self, result: ActingPlanResult) {
+        self.add_processes_from_chronicles(result.instances);
+    }
 }
+
+fn format_acting_process(
+    planner_manager: &PlannerManager,
+    acting_process: &ActingProcess,
+) -> String {
+    let mut f = String::new();
+    write!(
+        f,
+        "({}, {})[{},{}]",
+        acting_process.id(),
+        acting_process.status,
+        planner_manager.format_execution_var(&acting_process.start),
+        planner_manager.format_execution_var(&acting_process.end),
+    )
+    .unwrap();
+    let debug = if let Some(debug) = acting_process.debug() {
+        debug.to_string()
+    } else {
+        "".to_string()
+    };
+    match &acting_process.inner {
+        ActingProcessInner::RootTask(r) => {
+            write!(f, "root").unwrap();
+        }
+        ActingProcessInner::Command(c) => {
+            write!(f, "{}", debug).unwrap();
+        }
+        ActingProcessInner::Task(t) => {
+            write!(f, "{}", debug).unwrap();
+        }
+        ActingProcessInner::Method(m) => {
+            write!(f, "{}", debug).unwrap();
+        }
+        ActingProcessInner::Arbitrary(arb) => {
+            write!(f, "arb({})", planner_manager.format_execution_var(&arb.var)).unwrap();
+        }
+        ActingProcessInner::Acquire(acq) => {
+            write!(
+                f,
+                "{}: acq({},{})",
+                planner_manager.format_execution_var(&acq.s_acq),
+                planner_manager.format_execution_var(&acq.resource),
+                planner_manager.format_execution_var(&acq.quantity)
+            )
+            .unwrap();
+        }
+    }
+    f
+}
+
 /*
 impl InnerSupervisor {
     pub async fn clear(&self) {

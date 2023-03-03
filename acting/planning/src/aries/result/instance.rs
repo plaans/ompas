@@ -1,17 +1,19 @@
 use crate::aries::result::PlanResult;
-use crate::aries::BindingAriesAtoms;
 use aries_model::extensions::{AssignmentExt, Shaped};
 use aries_model::lang::Variable;
 use ompas_structs::acting_manager::operational_model::ActingModel;
+use ompas_structs::acting_manager::planner_manager::RefBindingPlanner;
 use ompas_structs::conversion::chronicle::Instantiation;
 use ompas_structs::planning::instance::ChronicleInstance;
 use ompas_structs::planning::problem::PlanningProblem;
 
-pub fn instantiate_chronicles(
+pub async fn instantiate_chronicles(
     pp: &PlanningProblem,
     pr: &PlanResult,
-    bindings: &BindingAriesAtoms,
+    bindings: &RefBindingPlanner,
 ) -> Vec<ChronicleInstance> {
+    let bindings = bindings.inner.read().await;
+
     let mut instances = vec![];
     let ass = &pr.ass;
     let model = &pr.fp.model;
@@ -47,6 +49,7 @@ pub fn instantiate_chronicles(
             chronicle: Some(instantiated),
         };
         let instance = ChronicleInstance {
+            generated: true,
             origin: instance.origin,
             om,
             pr: instance.pr.clone(),

@@ -11,6 +11,7 @@ pub struct PlanningInstance {
 }
 
 pub struct ChronicleInstance {
+    pub generated: bool,
     pub origin: ChronicleOrigin,
     pub om: ActingModel,
     pub pr: ProcessRef,

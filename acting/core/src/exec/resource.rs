@@ -18,14 +18,14 @@ use std::borrow::Borrow;
 use std::convert::{TryFrom, TryInto};
 
 pub struct ModResource {
-    resources: ResourceManager,
+    resource_manager: ResourceManager,
     log: LogClient,
 }
 
 impl ModResource {
     pub fn new(exec: &ModExec) -> Self {
         Self {
-            resources: exec.resources.clone(),
+            resource_manager: exec.acting_manager.resource_manager.clone(),
             log: exec.log.clone(),
         }
     }
@@ -70,7 +70,9 @@ pub async fn new_resource(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeErr
         Some(lv) => lv.try_into()?,
     };
 
-    ctx.resources.new_resource(label, Some(capacity)).await;
+    ctx.resource_manager
+        .new_resource(label, Some(capacity))
+        .await;
     Ok(())
 }
 
@@ -116,7 +118,7 @@ pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LR
 
     let log = ctx.log.clone();
 
-    let resources = ctx.resources.clone();
+    let resources = ctx.resource_manager.clone();
 
     let (tx, mut rx) = new_interruption_handler();
 
@@ -304,7 +306,7 @@ pub async fn is_locked(env: &LEnv, args: &[LValue]) -> LResult {
 
     match mode.as_str() {
         SYMBOL_EXEC_MODE => Ok(ctx
-            .resources
+            .resource_manager
             .is_locked(args[0].borrow().try_into()?)
             .await?
             .into()),
@@ -331,5 +333,5 @@ pub async fn is_locked(env: &LEnv, args: &[LValue]) -> LResult {
 pub async fn resources(env: &LEnv) -> Result<Vec<String>, LRuntimeError> {
     let ctx = env.get_context::<ModResource>(MOD_RESOURCE)?;
 
-    Ok(ctx.resources.get_list_resources().await)
+    Ok(ctx.resource_manager.get_list_resources().await)
 }

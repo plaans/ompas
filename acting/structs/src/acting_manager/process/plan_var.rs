@@ -1,5 +1,5 @@
 use crate::acting_manager::interval::Timepoint;
-use crate::acting_manager::OMId;
+use crate::acting_manager::AMId;
 use crate::sym_table::domain::cst;
 use crate::sym_table::domain::cst::Cst;
 use crate::sym_table::VarId;
@@ -10,34 +10,34 @@ use std::fmt::{Display, Formatter};
 #[derive(Clone)]
 pub struct PlanVar {
     var_id: VarId,
-    om_id: OMId,
-    value: PlanVal,
+    om_id: AMId,
+    value: ActingVal,
 }
 
 impl PlanVar {
-    pub fn new(var_id: VarId, om_id: OMId) -> PlanVar {
+    pub fn new(var_id: VarId, om_id: AMId) -> PlanVar {
         Self {
             var_id,
             om_id,
-            value: PlanVal::None,
+            value: ActingVal::None,
         }
     }
 
     pub fn set_execution_val(&mut self, val: cst::Cst) {
-        self.value = PlanVal::Execution(val)
+        self.value = ActingVal::Execution(val)
     }
 
-    pub fn get_val(&self) -> &PlanVal {
+    pub fn get_val(&self) -> &ActingVal {
         &self.value
     }
 
     pub fn set_planned_val(&mut self, val: cst::Cst) {
-        self.value = PlanVal::Planned(val)
+        self.value = ActingVal::Planned(val)
     }
 }
 
 #[derive(Clone)]
-pub enum PlanVal {
+pub enum ActingVal {
     Execution(cst::Cst),
     Planned(cst::Cst),
     None,
@@ -45,9 +45,14 @@ pub enum PlanVal {
 
 pub type PlanVarId = usize;
 
-#[derive(Clone)]
+pub struct PlanVal {
+    pub(crate) plan_var_id: PlanVarId,
+    pub(crate) val: cst::Cst,
+}
+
+#[derive(Clone, Default)]
 pub struct ExecutionVar<T: Display + Clone + AsCst> {
-    plan_var_id: PlanVarId,
+    plan_var_id: Option<PlanVarId>,
     val: Option<T>,
 }
 
@@ -56,21 +61,28 @@ pub trait AsCst {
 }
 
 impl<T: Display + Clone + AsCst> ExecutionVar<T> {
-    pub fn new(plan_var_id: PlanVarId) -> Self {
+    pub fn new(plan_var_id: Option<PlanVarId>) -> Self {
         Self {
             plan_var_id,
             val: None,
         }
     }
 
-    pub fn get_plan_var_id(&self) -> PlanVarId {
+    pub fn get_plan_var_id(&self) -> Option<PlanVarId> {
         self.plan_var_id
     }
 
-    pub fn set_val(&mut self, val: T) -> (PlanVarId, cst::Cst) {
+    pub fn set_val(&mut self, val: T) -> Option<PlanVal> {
         let cst = val.as_cst();
         self.val = Some(val);
-        (self.plan_var_id, cst)
+        if let Some(plan_var_id) = self.plan_var_id {
+            Some(PlanVal {
+                plan_var_id,
+                val: cst,
+            })
+        } else {
+            None
+        }
     }
 
     pub fn get_val(&mut self) -> &Option<T> {

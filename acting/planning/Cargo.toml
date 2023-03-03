@@ -44,6 +44,7 @@ async-recursion = "1.0.0"
 itertools = { default-features = false, version = "0.10" }
 function_name = "0.3.0"
 num-integer = "0.1.45"
+debug_print = "1.0.0"
 
 [[bin]]
 name = "flow-graph"

@@ -1,41 +1,29 @@
-use crate::conversion::flow::p_eval::r#struct::PConfig;
+use crate::conversion::flow::p_eval::r#struct::PLEnv;
 use async_recursion::async_recursion;
-use ompas_language::exec::resource::{ACQUIRE, MAX_Q, QUANTITY};
 use sompas_core::*;
+use sompas_language::error::IS_ERR;
 use sompas_language::list::FN_LIST;
 use sompas_language::primitives::DO;
 use sompas_structs::kindlvalue::KindLValue;
-use sompas_structs::lenv::LEnv;
 use sompas_structs::llambda::LambdaArgs;
 use sompas_structs::lprimitive::LPrimitive;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::{list, lruntimeerror, wrong_n_args, wrong_type};
-use std::fmt::Write;
 
 pub const TRANSFORM_LAMBDA_EXPRESSION: &str = "transform-lambda-expression";
 
-pub async fn pre_processing(lv: &LValue, env: &LEnv) -> LResult {
-    let env = &mut env.clone();
-    let pc = PConfig::default();
-    let lv = lambda_expansion(&lv, env, &pc.avoid).await?;
-    //let lv = acquire_expansion(&lv, env).await?;
-    let lv = do_expansion(&lv, env).await?;
+pub async fn pre_processing(lv: &LValue, _: &PLEnv) -> LResult {
+    //let lv = lambda_expansion(&lv, p_env).await?;
+    let lv = do_expansion(lv.clone());
     //println!("{}", lv.format(0));
 
     Ok(lv)
 }
 
-/*pub fn pre_eval(lv: &LValue, _context: &ConversionContext) -> LResult {
-    //let mut env = context.env.clone();
-    //let plv = eval_static(lv, &mut env)?;
-    //Ok(plv.get_lvalue().clone());
-    Ok(lv.clone())
-}*/
-
 #[async_recursion]
-pub async fn lambda_expansion(lv: &LValue, env: &LEnv, avoid: &im::HashSet<String>) -> LResult {
-    let mut lv = match transform_lambda_expression(lv, &mut env.clone(), avoid).await {
+pub async fn lambda_expansion(lv: &LValue, p_env: &PLEnv) -> LResult {
+    let mut lv = match transform_lambda_expression(lv, p_env).await {
         Ok(lv) => lv,
         Err(_) => lv.clone(),
     };
@@ -43,7 +31,7 @@ pub async fn lambda_expansion(lv: &LValue, env: &LEnv, avoid: &im::HashSet<Strin
     if let LValue::List(list) = &lv {
         let mut result = vec![];
         for lv in list.iter() {
-            result.push(lambda_expansion(lv, env, avoid).await?)
+            result.push(lambda_expansion(lv, p_env).await?)
         }
 
         lv = result.into()
@@ -52,11 +40,7 @@ pub async fn lambda_expansion(lv: &LValue, env: &LEnv, avoid: &im::HashSet<Strin
     Ok(lv)
 }
 
-pub async fn transform_lambda_expression(
-    lv: &LValue,
-    env: &mut LEnv,
-    avoid: &im::HashSet<String>,
-) -> LResult {
+pub async fn transform_lambda_expression(lv: &LValue, p_env: &PLEnv) -> LResult {
     //println!("in transform lambda");
 
     if let LValue::List(list) = lv {
@@ -70,7 +54,8 @@ pub async fn transform_lambda_expression(
 
         let arg = list[0].clone();
 
-        if !avoid.contains(&arg.to_string()) {
+        if !p_env.get_p_config().avoid.contains(&arg.to_string()) {
+            let env = &mut p_env.env.clone();
             let lambda = eval(&expand(&arg, true, env).await?, env, None)
                 .await
                 .expect("Error in thread evaluating lambda");
@@ -150,6 +135,45 @@ pub async fn transform_lambda_expression(
     }
 }
 
+pub fn do_expansion(lv: LValue) -> LValue {
+    if let LValue::List(list) = lv {
+        let mut result: Vec<LValue> = vec![];
+        for lv in list.iter() {
+            result.push(do_expansion(lv.clone()));
+        }
+
+        if result[0].to_string().as_str() == DO {
+            result.remove(0);
+
+            let mut last: Option<LValue> = None;
+            let __r__: LValue = "__r__".into();
+            let is_err: LValue = IS_ERR.into();
+            while let Some(e) = result.pop() {
+                last = if let Some(last) = last {
+                    Some(list![
+                        LPrimitive::Begin.into(),
+                        list![LPrimitive::Define.into(), __r__.clone(), e],
+                        list![
+                            LPrimitive::If.into(),
+                            list![is_err.clone(), __r__.clone()],
+                            __r__.clone(),
+                            last
+                        ]
+                    ])
+                } else {
+                    Some(e)
+                };
+            }
+            last.unwrap()
+        } else {
+            result.into()
+        }
+    } else {
+        lv
+    }
+}
+
+/*
 #[async_recursion]
 pub async fn acquire_expansion(lv: &LValue, env: &LEnv) -> LResult {
     if let LValue::List(list) = &lv {
@@ -188,42 +212,4 @@ pub async fn acquire_expansion(lv: &LValue, env: &LEnv) -> LResult {
     } else {
         Ok(lv.clone())
     }
-}
-
-#[async_recursion]
-pub async fn do_expansion(lv: &LValue, env: &LEnv) -> LResult {
-    if let LValue::List(list) = &lv {
-        let mut result: Vec<LValue> = vec![];
-        for lv in list.iter() {
-            result.push(do_expansion(lv, env).await?);
-        }
-
-        if result[0].to_string().as_str() == DO {
-            let mut lisp = "".to_string();
-
-            let n = result.len() - 1;
-            for (i, e) in result[1..].iter().enumerate() {
-                if i == n - 1 {
-                    write!(lisp, "{e}").unwrap();
-                } else {
-                    write!(
-                        lisp,
-                        "(begin\
-                    (define __r__ {e})\
-                    (if (err? __r__) __r__ "
-                    )
-                    .unwrap();
-                }
-            }
-            write!(lisp, "{}", ")".repeat((n - 1) * 2)).unwrap();
-
-            let mut c_env = env.clone();
-
-            parse(&lisp, &mut c_env).await
-        } else {
-            Ok(result.into())
-        }
-    } else {
-        Ok(lv.clone())
-    }
-}
+}*/

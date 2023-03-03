@@ -378,7 +378,7 @@ impl OMPASDomain {
 
         //Add all actions to env:
         for (label, action) in self.get_commands() {
-            env.insert(label.clone(), action.get_convert_model().clone());
+            env.insert(label.clone(), action.get_model().clone());
         }
 
         //Add all state functions to env:

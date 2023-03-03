@@ -8,7 +8,6 @@ pub struct Command {
     parameters: Parameters,
     body: LValue,
     model: LValue,
-    convert_model: LValue,
     cost: LValue,
 }
 
@@ -18,7 +17,6 @@ impl Command {
         parameters: Parameters,
         body: LValue,
         model: LValue,
-        convert_model: LValue,
         cost: LValue,
     ) -> Self {
         Self {
@@ -26,7 +24,6 @@ impl Command {
             parameters,
             body,
             model,
-            convert_model,
             cost,
         }
     }
@@ -45,10 +42,6 @@ impl Command {
 
     pub fn get_model(&self) -> &LValue {
         &self.model
-    }
-
-    pub fn get_convert_model(&self) -> &LValue {
-        &self.convert_model
     }
 
     pub fn get_label(&self) -> &String {
@@ -73,10 +66,6 @@ impl Command {
 
     pub fn set_model(&mut self, model: LValue) {
         self.model = model
-    }
-
-    pub fn set_convert_model(&mut self, model: LValue) {
-        self.convert_model = model;
     }
 
     pub fn set_label(&mut self, label: String) {

@@ -1,9 +1,7 @@
 use crate::acting_manager::interval::Timepoint;
-use crate::acting_manager::process::plan_var::{ExecutionVar, PlanVarId};
+use crate::acting_manager::process::plan_var::{ExecutionVar, PlanVal};
 use crate::acting_manager::process::ActingProcessInner;
 use crate::execution::resource::WaitAcquire;
-use crate::sym_table::domain::cst;
-use crate::sym_table::domain::cst::Cst;
 use std::fmt::{Display, Formatter};
 use std::mem;
 
@@ -33,11 +31,11 @@ impl AcquireProcess {
         }
     }
 
-    pub fn set_resource(&mut self, resource: String) -> (PlanVarId, cst::Cst) {
+    pub fn set_resource(&mut self, resource: String) -> Option<PlanVal> {
         self.resource.set_val(resource)
     }
 
-    pub fn set_quantity(&mut self, quantity: usize) -> (PlanVarId, cst::Cst) {
+    pub fn set_quantity(&mut self, quantity: usize) -> Option<PlanVal> {
         self.quantity.set_val(quantity)
     }
     pub fn set_acquire_id(&mut self, waiter: &WaitAcquire) {
@@ -54,7 +52,7 @@ impl AcquireProcess {
         mem::replace(&mut self.reservation, None)
     }
 
-    pub fn set_s_acq(&mut self, val: Timepoint) -> (PlanVarId, Cst) {
+    pub fn set_s_acq(&mut self, val: Timepoint) -> Option<PlanVal> {
         self.s_acq.set_val(val)
     }
 }

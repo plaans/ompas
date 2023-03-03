@@ -1,6 +1,7 @@
 use crate::conversion::flow::apply::convert_apply;
 use core::result::Result;
 use core::result::Result::{Err, Ok};
+use function_name::named;
 use ompas_structs::conversion::flow_graph::define_table::DefineTable;
 use ompas_structs::conversion::flow_graph::flow::{BranchingFlow, FlowId};
 use ompas_structs::conversion::flow_graph::graph::FlowGraph;
@@ -72,24 +73,18 @@ fn convert_string(_: &Arc<String>, _: &mut FlowGraph) -> FlowId {
 fn convert_number(number: &LNumber, fl: &mut FlowGraph) -> FlowId {
     let id = fl.st.new_number(number);
     let f_id = fl.new_instantaneous_assignment(Lit::Atom(id));
-    //let r = fl.get_flow_result(&f_id);
-    //fl.st.union_var(&r, &id);
     f_id
 }
 
 fn convert_bool(bool: bool, fl: &mut FlowGraph) -> FlowId {
     let id = fl.st.new_bool(bool);
     let f_id = fl.new_instantaneous_assignment(Lit::Atom(id));
-    //let r = fl.get_flow_result(&f_id);
-    //fl.st.union_var(&r, &id);
     f_id
 }
 
 fn convert_nil(fl: &mut FlowGraph) -> FlowId {
     let id = fl.st.new_nil();
     let f_id = fl.new_instantaneous_assignment(Lit::Atom(id));
-    //let r = fl.get_flow_result(&f_id);
-    //fl.st.union_var(&r, &id);
     f_id
 }
 
@@ -97,6 +92,7 @@ fn convert_core_operator(_: &LPrimitive, _: &mut FlowGraph) -> FlowId {
     todo!()
 }
 
+#[named]
 fn convert_list(
     list: &Arc<Vec<LValue>>,
     fl: &mut FlowGraph,
@@ -285,9 +281,15 @@ fn convert_list(
             LPrimitive::Race => {
                 todo!()
             }
-            co => panic!("Conversion of {} not supported.", co),
+            co => Err(LRuntimeError::new(
+                function_name!(),
+                format!("Conversion of {} not supported.", co),
+            ))?,
         },
-        _ => panic!(""),
+        lv => Err(LRuntimeError::new(
+            function_name!(),
+            format!("Conversion of {} not supported", lv.get_kind()),
+        ))?,
     };
 
     out_of_scope.append(&mut define_table.inner().values().copied().collect());

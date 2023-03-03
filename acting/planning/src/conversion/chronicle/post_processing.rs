@@ -9,7 +9,6 @@ use ompas_structs::sym_table::domain::basic_type::BasicType;
 use ompas_structs::sym_table::lit::{lvalue_to_lit, Lit};
 use ompas_structs::sym_table::r#trait::{FlatBindings, FormatWithSymTable, GetVariables};
 use ompas_structs::sym_table::{EmptyDomains, VarId};
-use ompas_utils::blocking_async;
 use sompas_core::{eval, parse};
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lruntimeerror::LRuntimeError;
@@ -20,10 +19,10 @@ use std::ops::Deref;
 
 const TRY_EVAL_APPLY: &str = "try_eval_apply";
 
-pub fn post_processing(c: &mut Chronicle, env: &LEnv) -> Result<(), LRuntimeError> {
+pub async fn post_processing(c: &mut Chronicle, env: &LEnv) -> Result<(), LRuntimeError> {
     c.st.flat_bindings();
     merge_conditions(c)?;
-    try_eval_apply(c, &env)?;
+    try_eval_apply(c, &env).await?;
     simplify_constraints(c)?;
     rm_useless_var(c);
     simplify_timepoints(c)?;
@@ -237,7 +236,7 @@ pub fn merge_conditions(c: &mut Chronicle) -> Result<(), LRuntimeError> {
     Ok(())
 }
 
-pub fn try_eval_apply(c: &mut Chronicle, env: &LEnv) -> Result<(), LRuntimeError> {
+pub async fn try_eval_apply(c: &mut Chronicle, env: &LEnv) -> Result<(), LRuntimeError> {
     let env = env.clone();
     let st = c.st.clone();
 
@@ -255,14 +254,13 @@ pub fn try_eval_apply(c: &mut Chronicle, env: &LEnv) -> Result<(), LRuntimeError
                         }
                     }
                     let expr = args.format(&st, true);
-                    //print!("apply{expr})");
+                    print!("apply{expr}");
                     let mut env = env.clone();
-                    let lv: LValue = blocking_async!({
+                    let lv: LValue = {
                         let lv = parse(expr.as_str(), &mut env).await?;
                         eval(&lv, &mut env, None).await
-                    })
-                    .unwrap()?;
-                    //println!("=> {lv}");
+                    }?;
+                    println!("=> {lv}");
 
                     let lit = lvalue_to_lit(&lv, &st)?;
                     match lit {

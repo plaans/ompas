@@ -16,16 +16,16 @@ use sompas_structs::lvalue::LValue;
 use tokio::sync::watch;
 
 pub struct ModPlatform {
-    platform: Platform,
     acting_manager: ActingManager,
+    platform: Platform,
     pub(crate) log: LogClient,
 }
 
 impl ModPlatform {
     pub fn new(exec: &ModExec) -> Self {
         Self {
-            platform: exec.platform.clone(),
             acting_manager: exec.acting_manager.clone(),
+            platform: exec.platform.clone(),
             log: exec.log.clone(),
         }
     }
@@ -34,7 +34,7 @@ impl ModPlatform {
 impl From<ModPlatform> for LModule {
     fn from(m: ModPlatform) -> Self {
         let mut module = LModule::new(m, MOD_PLATFORM, DOC_MOD_PLATFORM);
-        module.add_async_fn(EXEC_COMMAND, exec_command, DOC_EXEC_COMMAND, false);
+        module.add_async_fn(_EXEC_COMMAND, exec_command, DOC__EXEC_COMMAND, false);
         module.add_async_fn(CANCEL_COMMAND, cancel_command, DOC_CANCEL_COMMAND, false);
         module.add_fn(
             IS_PLATFORM_DEFINED,
@@ -43,6 +43,7 @@ impl From<ModPlatform> for LModule {
             false,
         );
         module.add_async_fn(START_PLATFORM, start_platform, DOC_START_PLATFORM, false);
+        module.add_lambda(EXEC_COMMAND, LAMBDA_EXEC_COMMAND, DOC_EXEC_COMMAND);
         module.add_lambda(CTX_ACQUIRE, LAMBDA_CTX_ACQUIRE, DOC_CTX_ACQUIRE);
         module.add_lambda(
             CTX_EXEC_COMMAND,
@@ -71,13 +72,13 @@ pub async fn exec_command(env: &LEnv, command: &[LValue]) -> LAsyncHandle {
             .process_ref
             .clone();
 
-        let supervisor = &env.get_context::<ModPlatform>(MOD_PLATFORM)?.acting_manager;
+        let acting_manager = &env.get_context::<ModPlatform>(MOD_PLATFORM)?.acting_manager;
 
         let command_id: ActingProcessId = match &pr {
             ProcessRef::Id(id) => {
-                supervisor
+                acting_manager
                     .new_command(
-                        Label::Action(supervisor.get_number_subtask(*id).await),
+                        Label::Action(acting_manager.get_number_subtask(*id).await),
                         id,
                         debug,
                         ProcessOrigin::Execution,
@@ -85,10 +86,10 @@ pub async fn exec_command(env: &LEnv, command: &[LValue]) -> LAsyncHandle {
                     .await
             }
 
-            ProcessRef::Relative(id, labels) => match supervisor.get_id(pr.clone()).await {
+            ProcessRef::Relative(id, labels) => match acting_manager.get_id(pr.clone()).await {
                 Some(id) => id,
                 None => {
-                    supervisor
+                    acting_manager
                         .new_command(
                             labels.last().unwrap().clone(),
                             id,
@@ -100,7 +101,7 @@ pub async fn exec_command(env: &LEnv, command: &[LValue]) -> LAsyncHandle {
             },
         };
 
-        let mut rx: watch::Receiver<ProcessStatus> = supervisor.subscribe(&command_id).await;
+        let mut rx: watch::Receiver<ProcessStatus> = acting_manager.subscribe(&command_id).await;
 
         let mod_platform = env.get_context::<ModPlatform>(MOD_PLATFORM)?;
         let log = mod_platform.log.clone();

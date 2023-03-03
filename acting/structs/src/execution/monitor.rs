@@ -9,7 +9,7 @@ use std::sync::Arc;
 use tokio::sync::{broadcast, oneshot, Mutex};
 
 #[derive(Default, Clone)]
-pub struct MonitorCollection {
+pub struct MonitorManager {
     inner: Arc<Mutex<MonitorCollectionInner>>,
 }
 
@@ -27,7 +27,7 @@ impl MonitorCollectionInner {
     }
 }
 
-impl MonitorCollection {
+impl MonitorManager {
     pub async fn add_waiter(&self, lambda: LValue) -> WaitForReceiver {
         let (tx, rx) = oneshot::channel();
         let mut inner = self.inner.lock().await;
@@ -113,7 +113,7 @@ impl WaitForReceiver {
 
 pub async fn task_check_wait_for(
     mut update: broadcast::Receiver<bool>,
-    monitors: MonitorCollection,
+    monitors: MonitorManager,
     env: LEnv,
 ) {
     let mut process: ProcessInterface =

@@ -3,7 +3,7 @@ use crate::exec::ModExec;
 use futures::FutureExt;
 use ompas_language::exec::resource::LOCKED;
 use ompas_language::exec::state::*;
-use ompas_structs::execution::monitor::MonitorCollection;
+use ompas_structs::execution::monitor::MonitorManager;
 use ompas_structs::state::world_state::{StateType, WorldState, WorldStateSnapshot};
 use sompas_core::eval;
 use sompas_core::modules::map::get_map;
@@ -23,14 +23,14 @@ use sompas_structs::{lruntimeerror, wrong_type};
 
 pub struct ModState {
     pub state: WorldState,
-    pub monitors: MonitorCollection,
+    pub monitors: MonitorManager,
 }
 
 impl ModState {
     pub fn new(exec: &ModExec) -> Self {
         Self {
-            state: exec.state.clone(),
-            monitors: exec.monitors.clone(),
+            state: exec.acting_manager.state.clone(),
+            monitors: exec.acting_manager.monitor_manager.clone(),
         }
     }
 

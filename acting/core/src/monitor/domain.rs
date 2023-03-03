@@ -32,7 +32,7 @@ use tokio::sync::RwLock;
 
 pub struct ModDomain {
     state: WorldState,
-    resources: ResourceManager,
+    resource_manager: ResourceManager,
     empty_env: LEnv,
     domain_description: InitScheme,
     domain: Arc<RwLock<OMPASDomain>>,
@@ -41,8 +41,8 @@ pub struct ModDomain {
 impl ModDomain {
     pub fn new(monitor: &ModMonitor) -> Self {
         Self {
-            state: monitor.state.clone(),
-            resources: monitor.resources.clone(),
+            state: monitor.acting_manager.state.clone(),
+            resource_manager: monitor.acting_manager.resource_manager.clone(),
             empty_env: monitor.empty_env.clone(),
             domain_description: monitor.platform.domain().into(),
             domain: monitor.ompas_domain.clone(),
@@ -55,7 +55,7 @@ impl ModDomain {
 
     pub async fn get_conversion_context(&self) -> ConversionContext {
         let mut state: WorldStateSnapshot = self.state.get_snapshot().await;
-        let snap_resource: WorldStateSnapshot = self.resources.get_snapshot().await;
+        let snap_resource: WorldStateSnapshot = self.resource_manager.get_snapshot().await;
         state.absorb(snap_resource);
         let lattice = state.instance.lattice.get_lattice().await;
         let domain: OMPASDomain = self.domain.read().await.clone();
@@ -452,7 +452,7 @@ pub async fn add_command(
     let params_list = command.get_parameters().get_labels();
     let lv_exec: LValue = parse(
         &format!(
-            "(lambda {} (await (exec-command '{} {})))",
+            "(lambda {} (exec-command '{} {}))",
             params,
             command.get_label(),
             {
@@ -471,28 +471,6 @@ pub async fn add_command(
     let exec = eval(&expand(&lv_exec, true, &mut env).await?, &mut env, None).await?;
 
     command.set_body(exec);
-
-    let lv_convert: LValue = parse(
-        &format!(
-            "(lambda {} (exec-command '{} {}))",
-            params,
-            command.get_label(),
-            {
-                let mut str = String::new();
-                for p in &params_list {
-                    str.push_str(p.as_str());
-                    str.push(' ');
-                }
-                str
-            }
-        ),
-        &mut env,
-    )
-    .await?;
-
-    let convert_model = eval(&expand(&lv_convert, true, &mut env).await?, &mut env, None).await?;
-
-    command.set_convert_model(convert_model);
 
     let lv_model: LValue = match map.get(&MODEL.into()) {
         None => parse(&format!("(lambda {} nil)", params), &mut env).await?,
@@ -894,7 +872,9 @@ pub async fn add_resource(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeErr
         Some(lv) => lv.try_into()?,
     };
 
-    ctx.resources.new_resource(label, Some(capacity)).await;
+    ctx.resource_manager
+        .new_resource(label, Some(capacity))
+        .await;
 
     Ok(())
 }

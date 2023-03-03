@@ -232,7 +232,12 @@ pub fn generate_templates(
     let cont = Container::Template(domain.templates.len());
 
     for template in &domain.templates {
-        let template = read_chronicle(&mut ctx, bindings, &template.chronicle, cont.clone())?;
+        let template = read_chronicle(
+            &mut ctx,
+            bindings,
+            template.chronicle.as_ref().unwrap(),
+            cont.clone(),
+        )?;
         Printer::print_chronicle(&template.chronicle, &ctx.model);
         templates.push(template);
     }

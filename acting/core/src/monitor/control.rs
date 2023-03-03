@@ -17,15 +17,14 @@ use ompas_structs::acting_manager::filter::ProcessFilter;
 use ompas_structs::acting_manager::inner::ProcessKind;
 use ompas_structs::acting_manager::ActingManager;
 use ompas_structs::conversion::context::ConversionContext;
-use ompas_structs::execution::monitor::{task_check_wait_for, MonitorCollection};
-use ompas_structs::execution::resource::ResourceManager;
+use ompas_structs::execution::monitor::task_check_wait_for;
 use ompas_structs::interface::job::Job;
 use ompas_structs::interface::rae_command::OMPASJob;
 use ompas_structs::interface::rae_options::OMPASOptions;
 use ompas_structs::interface::select_mode::{Planner, SelectMode};
 use ompas_structs::interface::trigger_collection::{Response, TaskTrigger, TriggerCollection};
 use ompas_structs::planning::domain::PlanningDomain;
-use ompas_structs::state::world_state::{StateType, WorldState};
+use ompas_structs::state::world_state::StateType;
 use sompas_core::{eval_init, get_root_env};
 use sompas_macros::*;
 use sompas_modules::advanced_math::ModAdvancedMath;
@@ -48,9 +47,6 @@ use tokio::sync::{mpsc, RwLock};
 
 pub struct ModControl {
     pub(crate) options: Arc<RwLock<OMPASOptions>>,
-    pub state: WorldState,
-    pub resources: ResourceManager,
-    pub monitors: MonitorCollection,
     pub acting_manager: ActingManager,
     pub log: LogClient,
     pub task_stream: Arc<RwLock<Option<tokio::sync::mpsc::Sender<OMPASJob>>>>,
@@ -65,9 +61,6 @@ impl ModControl {
     pub fn new(monitor: &ModMonitor) -> Self {
         Self {
             options: monitor.options.clone(),
-            state: monitor.state.clone(),
-            resources: monitor.resources.clone(),
-            monitors: monitor.monitors.clone(),
             acting_manager: monitor.acting_manager.clone(),
             log: monitor.log.clone(),
             task_stream: monitor.task_stream.clone(),
@@ -87,8 +80,8 @@ impl ModControl {
                 let instant = Instant::now();
                 match convert_acting_domain(&ConversionContext::new(
                     self.ompas_domain.read().await.clone(),
-                    self.state.get_lattice().await,
-                    self.state.get_snapshot().await,
+                    self.acting_manager.state.get_lattice().await,
+                    self.acting_manager.state.get_snapshot().await,
                     self.get_exec_env().await,
                 ))
                 .await
@@ -246,7 +239,7 @@ impl From<ModControl> for LModule {
 #[async_scheme_fn]
 pub async fn start(env: &LEnv) -> Result<String, LRuntimeError> {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
-    let supervisor = ctx.acting_manager.clone();
+    let acting_manager = ctx.acting_manager.clone();
     let mut tasks_to_execute: Vec<Job> = vec![];
     mem::swap(
         &mut *ctx.tasks_to_execute.write().await,
@@ -262,16 +255,15 @@ pub async fn start(env: &LEnv) -> Result<String, LRuntimeError> {
     let env = ctx.get_exec_env().await;
     let log = ctx.log.clone();
 
-    let state = ctx.state.clone();
-    let receiver_event_update_state = state.subscribe_on_update().await;
+    let receiver_event_update_state = acting_manager.state.subscribe_on_update().await;
     let env_clone = env.clone();
-    let monitors = ctx.monitors.clone();
+    let monitors = acting_manager.monitor_manager.clone();
     tokio::spawn(async move {
         task_check_wait_for(receiver_event_update_state, monitors, env_clone).await
     });
 
     tokio::spawn(async move {
-        rae(supervisor, log, env, rx).await;
+        rae(acting_manager, log, env, rx).await;
     });
 
     /*if ctx.interface.log.display {
@@ -305,10 +297,7 @@ pub async fn stop(env: &LEnv) {
 
     tokio::time::sleep(Duration::from_secs(1)).await; //hardcoded moment to wait for all process to be killed.
     *ctx.task_stream.write().await = None;
-    ctx.state.clear().await;
     ctx.acting_manager.clear().await;
-    ctx.resources.clear().await;
-    ctx.monitors.clear().await;
 }
 
 /// Sends via a channel a task to execute.
@@ -551,7 +540,7 @@ pub async fn get_state(env: &LEnv, args: &[LValue]) -> LResult {
         }
         _ => return Err(LRuntimeError::wrong_number_of_args(GET_STATE, args, 0..1)),
     };
-    let state = ctx.state.get_state(_type).await;
+    let state = ctx.acting_manager.state.get_state(_type).await;
     Ok(state.into_map())
 }
 
@@ -565,7 +554,7 @@ pub async fn print_process_network(env: &LEnv) -> String {
 #[async_scheme_fn]
 pub async fn get_type_hierarchy(env: &LEnv) -> String {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
-    format!("{:?}", ctx.state.get_lattice().await)
+    format!("{:?}", ctx.acting_manager.state.get_lattice().await)
 }
 
 #[async_scheme_fn]
@@ -615,13 +604,13 @@ pub async fn print_processes(env: &LEnv, args: &[LValue]) -> LResult {
 #[async_scheme_fn]
 pub async fn get_resources(env: &LEnv) -> LResult {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
-    Ok(ctx.resources.get_debug().await.into())
+    Ok(ctx.acting_manager.resource_manager.get_debug().await.into())
 }
 
 #[async_scheme_fn]
 pub async fn get_monitors(env: &LEnv) -> LResult {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
-    Ok(ctx.monitors.get_debug().await.into())
+    Ok(ctx.acting_manager.monitor_manager.get_debug().await.into())
 }
 
 ///Get the list of actions in the environment

@@ -480,7 +480,7 @@ impl ResourceManager {
     pub async fn release(&self, rh: ResourceHandler) -> Result<(), LRuntimeError> {
         let mut map = self.inner.lock().await;
         let resource: &mut Resource = map.get_mut(&rh.resource_id).unwrap();
-        resource._remove_client(&rh.client_id);
+        resource.remove_in_service(&rh.client_id);
         resource.update_remaining_capacity()?;
         resource.update_waiters().await;
         Ok(())
@@ -508,7 +508,7 @@ impl ResourceManager {
         resource_id: &ResourceId,
         client_id: &ClientId,
     ) -> usize {
-        let mut map = self.inner.lock().await;
+        let map = self.inner.lock().await;
         let resource: &Resource = map.get(&resource_id).unwrap();
         resource.get_client_quantity(client_id)
     }

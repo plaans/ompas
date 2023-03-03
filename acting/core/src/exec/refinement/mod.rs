@@ -29,7 +29,7 @@ use ompas_structs::acting_manager::{ActingManager, ActingProcessId};
 use ompas_structs::conversion::chronicle::{Chronicle, ChronicleKind};
 use ompas_structs::interface::rae_options::OMPASOptions;
 use ompas_structs::interface::select_mode::{Planner, SelectMode};
-use ompas_structs::state::world_state::{WorldState, WorldStateSnapshot};
+use ompas_structs::state::world_state::WorldStateSnapshot;
 use ompas_structs::sym_table::r#ref::RefSymTable;
 use rand::prelude::SliceRandom;
 use sompas_core::eval;
@@ -53,7 +53,6 @@ pub struct ModRefinement {
     //pub env: LEnv,
     pub domain: Arc<RwLock<OMPASDomain>>,
     pub acting_manager: ActingManager,
-    pub state: WorldState,
     pub options: Arc<RwLock<OMPASOptions>>,
     pub log: LogClient,
 }
@@ -64,7 +63,6 @@ impl ModRefinement {
             domain: exec.domain.clone(),
             log: exec.log.clone(),
             acting_manager: exec.acting_manager.clone(),
-            state: exec.state.clone(),
             options: exec.options.clone(),
         }
     }
@@ -167,7 +165,9 @@ pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
         .await
         .map_err(|e: LRuntimeError| e.chain("select"))?;
 
-    check_select_response(env, &ctx, &task_id, sr).await
+    check_select_response(env, &ctx, &task_id, sr)
+        .await
+        .map_err(|e| e.chain("check_select_response"))
 
     /*let result: LValue = match sr {
         SelectResponse::Planned(refinement_id) => {
@@ -551,7 +551,7 @@ pub async fn select(task_id: ActingProcessId, env: &LEnv) -> Result<SelectRespon
         .map(|cst| LValue::from(cst.clone()))
         .collect();
     let debug: String = supervisor.get_debug(&task_id).await.unwrap();
-    let state: WorldStateSnapshot = mod_refinement.state.get_snapshot().await;
+    let state: WorldStateSnapshot = mod_refinement.acting_manager.state.get_snapshot().await;
     let select_mode: SelectMode = *mod_refinement.options.read().await.get_select_mode();
 
     let tried: Vec<LValue> = supervisor.get_tried(&task_id).await;

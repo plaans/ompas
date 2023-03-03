@@ -16,9 +16,10 @@ pub fn instantiate_chronicles(
     let ass = &pr.ass;
     let model = &pr.fp.model;
     let st = pp.st.clone();
-    for chronicle in &pp.instance.instances {
+    for instance in &pp.instance.instances {
+        let chronicle = instance.om.chronicle.as_ref().unwrap();
         let mut instantiations = vec![];
-        for var in &chronicle.om.chronicle.variables {
+        for var in &chronicle.variables {
             let value = match bindings.get_var(var).unwrap() {
                 Variable::Bool(b) => st.new_bool(ass.boolean_value_of(*b).unwrap()),
                 Variable::Int(i) => {
@@ -38,17 +39,17 @@ pub fn instantiate_chronicles(
             instantiations.push(Instantiation::new(*var, value));
         }
 
-        let instantiated = chronicle.om.chronicle.instantiate(instantiations);
+        let instantiated = chronicle.instantiate(instantiations);
         let om = ActingModel {
-            lv: chronicle.om.lv.clone(),
-            lv_om: chronicle.om.lv_om.clone(),
-            lv_expanded: chronicle.om.lv_expanded.clone(),
-            chronicle: instantiated,
+            lv: instance.om.lv.clone(),
+            lv_om: instance.om.lv_om.clone(),
+            lv_expanded: instance.om.lv_expanded.clone(),
+            chronicle: Some(instantiated),
         };
         let instance = ChronicleInstance {
-            origin: chronicle.origin,
+            origin: instance.origin,
             om,
-            pr: chronicle.pr.clone(),
+            pr: instance.pr.clone(),
         };
 
         instances.push(instance)

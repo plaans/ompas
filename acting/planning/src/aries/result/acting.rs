@@ -98,11 +98,10 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
 
     for instance in instances {
         let pr = instance.pr.clone();
-        let st = &instance.om.chronicle.st;
+        let chronicle = instance.om.chronicle.as_ref().unwrap();
+        let st = &chronicle.st;
 
-        let lv: Vec<LValue> = instance
-            .om
-            .chronicle
+        let lv: Vec<LValue> = chronicle
             .get_name()
             .iter()
             .map(|var_id| {
@@ -115,7 +114,7 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
             .collect();
         let lv = lv.into();
 
-        let interval = instance.om.chronicle.interval;
+        let interval = chronicle.interval;
 
         let start = st
             .get_domain_of_var(&interval.get_start())
@@ -145,7 +144,7 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
             RawChoice::Refinement(RawRefinement { lv, interval }),
         );
 
-        'choice: for (label, binding) in &instance.om.chronicle.bindings.inner {
+        'choice: for (label, binding) in &chronicle.bindings.inner {
             let mut pr = pr.clone();
             pr.push(*label);
             let choice: RawChoice = match binding {

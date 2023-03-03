@@ -23,12 +23,9 @@ use ompas_language::monitor::*;
 use ompas_language::process::{LOG_TOPIC_OMPAS, OMPAS};
 use ompas_structs::acting_domain::OMPASDomain;
 use ompas_structs::acting_manager::ActingManager;
-use ompas_structs::execution::monitor::MonitorCollection;
-use ompas_structs::execution::resource::ResourceManager;
 use ompas_structs::interface::job::Job;
 use ompas_structs::interface::rae_command::OMPASJob;
 use ompas_structs::interface::rae_options::OMPASOptions;
-use ompas_structs::state::world_state::WorldState;
 use sompas_modules::advanced_math::ModAdvancedMath;
 use sompas_modules::string::ModString;
 use sompas_modules::time::ModTime;
@@ -43,9 +40,6 @@ pub const TOKIO_CHANNEL_SIZE: usize = 100;
 #[derive(Default)]
 pub struct ModMonitor {
     pub(crate) options: Arc<RwLock<OMPASOptions>>,
-    pub state: WorldState,
-    pub resources: ResourceManager,
-    pub monitors: MonitorCollection,
     pub acting_manager: ActingManager,
     pub log: LogClient,
     pub task_stream: Arc<RwLock<Option<tokio::sync::mpsc::Sender<OMPASJob>>>>,
@@ -93,9 +87,7 @@ impl ModMonitor {
                     Some(
                         ExecPlatform::new(
                             exec,
-                            module.state.clone(),
                             module.acting_manager.clone(),
-                            module.resources.clone(),
                             Arc::new(Default::default()),
                             module.log.clone(),
                             Arc::new(Default::default()),

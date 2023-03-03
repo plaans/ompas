@@ -15,7 +15,7 @@ pub struct ActingModel {
     pub lv: LValue,
     pub lv_om: LValue,
     pub lv_expanded: LValue,
-    pub chronicle: Chronicle,
+    pub chronicle: Option<Chronicle>,
 }
 
 impl ActingModel {
@@ -26,27 +26,29 @@ impl ActingModel {
             lv: LValue::Nil,
             lv_om: LValue::Nil,
             lv_expanded: LValue::Nil,
-            chronicle,
+            chronicle: Some(chronicle),
         }
     }
 
     pub fn add_subtask(&mut self, mut task: Vec<cst::Cst>) -> (VarId, VarId) {
+        let chronicle = self.chronicle.as_mut().unwrap();
+
         let interval = chronicle::interval::Interval::new(
-            self.chronicle.st.new_timepoint(),
-            self.chronicle.st.new_timepoint(),
+            chronicle.st.new_timepoint(),
+            chronicle.st.new_timepoint(),
         );
 
         let start = interval.get_start();
         let end = interval.get_end();
 
-        let result = self.chronicle.st.new_result();
+        let result = chronicle.st.new_result();
 
         let name: Vec<VarId> = task
             .drain(..)
-            .map(|cst| self.chronicle.st.new_cst(cst))
+            .map(|cst| chronicle.st.new_cst(cst))
             .collect();
 
-        let n_subtask = self.chronicle.get_subtasks().len();
+        let n_subtask = chronicle.get_subtasks().len();
         let label = Label::Action(n_subtask);
 
         let subtask = SubTask {
@@ -58,12 +60,12 @@ impl ActingModel {
 
         let binding = ActionBinding {
             name,
-            index: self.chronicle.get_subtasks().len(),
+            index: chronicle.get_subtasks().len(),
             interval,
         };
 
-        self.chronicle.add_subtask(subtask);
-        self.chronicle.bindings.add_binding(label, binding);
+        chronicle.add_subtask(subtask);
+        chronicle.bindings.add_binding(label, binding);
 
         (start, end)
     }

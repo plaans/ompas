@@ -30,3 +30,4 @@ futures = "0.3.17"
 ompas-middleware = {path = "../../middleware"}
 map-macro = "0.2.4"
 function_name = "0.3.0"
+debug_print = "1.0.0"

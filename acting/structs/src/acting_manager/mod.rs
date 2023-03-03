@@ -5,9 +5,9 @@ use crate::acting_manager::interval::Timepoint;
 use crate::acting_manager::operational_model::ActingModel;
 use crate::acting_manager::process::process_ref::{Label, ProcessRef};
 use crate::acting_manager::process::ProcessOrigin;
-use crate::execution::resource::{
-    AcquireResponse, Quantity, ResourceManager, WaitAcquire, WaiterPriority,
-};
+use crate::execution::monitor::MonitorManager;
+use crate::execution::resource::{Quantity, ResourceManager, WaitAcquire, WaiterPriority};
+use crate::state::world_state::WorldState;
 use crate::sym_table::domain::cst;
 use crate::sym_table::domain::cst::Cst;
 use crate::sym_table::r#ref::RefSymTable;
@@ -29,10 +29,13 @@ pub mod task_network;
 
 //Ids of element of the acting manager
 pub type ActingProcessId = usize;
-pub type OMId = usize;
+pub type AMId = usize;
 
 #[derive(Clone)]
 pub struct ActingManager {
+    pub resource_manager: ResourceManager,
+    pub monitor_manager: MonitorManager,
+    pub state: WorldState,
     pub inner: Arc<RwLock<InnerActingManager>>,
     instant: Instant,
 }
@@ -40,9 +43,13 @@ pub struct ActingManager {
 impl Default for ActingManager {
     fn default() -> Self {
         let instant = Instant::now();
+        let resource_manager = ResourceManager::default();
         Self {
+            resource_manager: resource_manager.clone(),
+            monitor_manager: Default::default(),
+            state: Default::default(),
             inner: Arc::new(RwLock::new(InnerActingManager::new(
-                ResourceManager::default(),
+                resource_manager,
                 instant.clone(),
                 RefSymTable::default(),
             ))),
@@ -53,7 +60,10 @@ impl Default for ActingManager {
 
 impl ActingManager {
     pub async fn clear(&self) {
-        todo!()
+        self.monitor_manager.clear().await;
+        self.resource_manager.clear().await;
+        self.state.clear().await;
+        self.inner.write().await.clear();
     }
 
     pub async fn dump_trace(&self, path: Option<PathBuf>) {

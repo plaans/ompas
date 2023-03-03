@@ -19,9 +19,9 @@ use ompas_middleware::logger::LogClient;
 use ompas_middleware::{Master, ProcessInterface};
 use ompas_structs::acting_manager::action_status::ProcessStatus;
 use ompas_structs::acting_manager::ActingManager;
-use ompas_structs::execution::resource::{Capacity, ResourceManager};
+use ompas_structs::execution::resource::Capacity;
 use ompas_structs::state::partial_state::PartialState;
-use ompas_structs::state::world_state::{StateType, WorldState};
+use ompas_structs::state::world_state::StateType;
 use platform_interface::platform_update::Update;
 use sompas_structs::lmodule::LModule;
 use sompas_structs::lvalue::LValue;
@@ -34,9 +34,7 @@ use tokio::sync::{Mutex, RwLock};
 #[derive(Clone)]
 pub struct ExecPlatform {
     inner: Arc<RwLock<dyn PlatformDescriptor>>,
-    state: WorldState,
-    resources: ResourceManager,
-    supervisor: ActingManager,
+    acting_manager: ActingManager,
     command_stream: Arc<Mutex<Option<tokio::sync::mpsc::Sender<CommandRequest>>>>,
     log: LogClient,
     pub config: Arc<RwLock<PlatformConfig>>,
@@ -45,9 +43,7 @@ pub struct ExecPlatform {
 impl ExecPlatform {
     pub async fn new(
         inner: Arc<RwLock<dyn PlatformDescriptor>>,
-        state: WorldState,
-        supervisor: ActingManager,
-        resources: ResourceManager,
+        acting_manager: ActingManager,
         command_stream: Arc<Mutex<Option<tokio::sync::mpsc::Sender<CommandRequest>>>>,
         log: LogClient,
         config: Arc<RwLock<PlatformConfig>>,
@@ -57,9 +53,7 @@ impl ExecPlatform {
 
         Self {
             inner,
-            state,
-            resources,
-            supervisor,
+            acting_manager,
             command_stream,
             log,
             config,
@@ -110,8 +104,7 @@ impl ExecPlatform {
 
     async fn get_updates(
         mut client: PlatformInterfaceClient<tonic::transport::Channel>,
-        world_state: WorldState,
-        resources: ResourceManager,
+        acting_manager: ActingManager,
     ) {
         let mut process_interface: ProcessInterface = ProcessInterface::new(
             PROCESS_GET_UPDATES,
@@ -180,8 +173,8 @@ impl ExecPlatform {
                                             }
                                         }
                                             //println!("[PlatformClient] updating state");
-                                            world_state.update_state(r#static).await;
-                                            world_state.update_state(dynamic).await;
+                                            acting_manager.state.update_state(r#static).await;
+                                            acting_manager.state.update_state(dynamic).await;
                                     }
                                     Update::Event(event) => {
                                         match event.event {
@@ -199,10 +192,10 @@ impl ExecPlatform {
                                                         panic!()
                                                     }
                                                 };
-                                                resources.new_resource(label , Some(capacity)).await
+                                                acting_manager.resource_manager.new_resource(label , Some(capacity)).await
                                             }
                                             Some(event::Event::Instance(instance)) => {
-                                                world_state.add_instance(&instance.object, &instance.r#type).await;
+                                                acting_manager.state.add_instance(&instance.object, &instance.r#type).await;
                                             }
                                         }
                                     }
@@ -217,7 +210,7 @@ impl ExecPlatform {
 
     async fn send_commands(
         mut client: PlatformInterfaceClient<tonic::transport::Channel>,
-        supervisor: ActingManager,
+        acting_manager: ActingManager,
         command_stream: tokio::sync::mpsc::Receiver<CommandRequest>,
     ) {
         let mut process = ProcessInterface::new(
@@ -292,7 +285,7 @@ impl ExecPlatform {
 
                                 }
                                 };
-                                supervisor.set_status(&id, status).await;
+                                acting_manager.set_status(&id, status).await;
                             }
                         }
                     }
@@ -336,17 +329,16 @@ impl PlatformDescriptor for ExecPlatform {
             };
 
         let client2 = client.clone();
-        let state = self.state.clone();
-        let resources = self.resources.clone();
+        let acting_manager = self.acting_manager.clone();
         tokio::spawn(async move {
-            ExecPlatform::get_updates(client, state, resources).await;
+            ExecPlatform::get_updates(client, acting_manager).await;
         });
 
-        let supervisor = self.supervisor.clone();
+        let acting_manager = self.acting_manager.clone();
         let (tx, command_stream) = tokio::sync::mpsc::channel(TOKIO_CHANNEL_SIZE);
         *self.command_stream.lock().await = Some(tx);
         tokio::spawn(async move {
-            ExecPlatform::send_commands(client2, supervisor, command_stream).await;
+            ExecPlatform::send_commands(client2, acting_manager, command_stream).await;
         });
     }
 

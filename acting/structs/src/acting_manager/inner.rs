@@ -5,12 +5,14 @@ use crate::acting_manager::process::acquire::AcquireProcess;
 use crate::acting_manager::process::arbitrary::ArbitraryProcess;
 use crate::acting_manager::process::command::CommandProcess;
 use crate::acting_manager::process::method::RefinementProcess;
-use crate::acting_manager::process::plan_var::{AsCst, ExecutionVar, PlanVal, PlanVar, PlanVarId};
+use crate::acting_manager::process::plan_var::{
+    ActingVal, AsCst, ExecutionVar, PlanVal, PlanVar, PlanVarId,
+};
 use crate::acting_manager::process::process_ref::{Label, ProcessRef};
 use crate::acting_manager::process::root_task::RootProcess;
 use crate::acting_manager::process::task::TaskProcess;
 use crate::acting_manager::process::{ActingProcess, ActingProcessInner, ProcessOrigin};
-use crate::acting_manager::{ActingProcessId, OMId};
+use crate::acting_manager::{AMId, ActingProcessId};
 use crate::conversion::flow_graph::graph::Dot;
 use crate::execution::resource::{Quantity, ResourceManager, WaitAcquire, WaiterPriority};
 use crate::sym_table::domain::cst;
@@ -77,8 +79,9 @@ impl InnerActingManager {
         st: RefSymTable,
     ) -> Self {
         let model = ActingModel::root(st.clone());
-        let start = PlanVar::new(model.chronicle.interval.get_start(), 0);
-        let end = PlanVar::new(model.chronicle.interval.get_end(), 0);
+        let chronicle = model.chronicle.as_ref().unwrap();
+        let start = PlanVar::new(chronicle.interval.get_start(), 0);
+        let end = PlanVar::new(chronicle.interval.get_end(), 0);
 
         let root = ActingProcess::new(
             0,
@@ -86,8 +89,8 @@ impl InnerActingManager {
             ProcessOrigin::Execution,
             0,
             Some(ROOT.to_string()),
-            ExecutionVar::new(0),
-            ExecutionVar::new(1),
+            ExecutionVar::new(Some(0)),
+            ExecutionVar::new(Some(1)),
             RootProcess::new(),
         );
         Self {
@@ -100,6 +103,13 @@ impl InnerActingManager {
         }
     }
 
+    pub fn clear(&mut self) {
+        self.processes.clear();
+        self.models.clear();
+        self.plan_vars.clear();
+        self.st = RefSymTable::default();
+    }
+
     pub fn st(&self) -> RefSymTable {
         self.st.clone()
     }
@@ -108,12 +118,12 @@ impl InnerActingManager {
         self.time_reference.elapsed().as_millis().into()
     }
 
-    fn new_model(&mut self, model: ActingModel) -> OMId {
+    fn new_model(&mut self, model: ActingModel) -> AMId {
         self.models.push(model);
         self.models.len() - 1
     }
 
-    fn new_plan_var(&mut self, var_id: VarId, om_id: OMId) -> PlanVarId {
+    fn new_plan_var(&mut self, var_id: VarId, om_id: AMId) -> PlanVarId {
         self.plan_vars.push(PlanVar::new(var_id, om_id));
         self.plan_vars.len() - 1
     }
@@ -121,9 +131,9 @@ impl InnerActingManager {
     fn new_execution_var<T: Display + Clone + AsCst>(
         &mut self,
         var_id: VarId,
-        om_id: OMId,
+        om_id: AMId,
     ) -> ExecutionVar<T> {
-        ExecutionVar::new(self.new_plan_var(var_id, om_id))
+        ExecutionVar::new(Some(self.new_plan_var(var_id, om_id)))
     }
 
     pub fn get_id(&self, pr: impl Into<ProcessRef>) -> Option<ActingProcessId> {
@@ -191,28 +201,30 @@ impl InnerActingManager {
         self.processes[*id].debug()
     }
 
-    fn get_om_id(&self, id: &ActingProcessId) -> OMId {
+    fn get_om_id(&self, id: &ActingProcessId) -> AMId {
         self.processes[*id].om_id()
     }
 
-    fn set_plan_var(&mut self, plan_var_id: &PlanVarId, val: cst::Cst) {
-        self.plan_vars[*plan_var_id].set_execution_val(val)
+    fn set_plan_var(&mut self, val: Option<PlanVal>) {
+        if let Some(val) = val {
+            self.plan_vars[val.plan_var_id].set_execution_val(val.val)
+        }
     }
 
-    fn get_plan_var_val(&mut self, plan_var_id: &PlanVarId) -> &PlanVal {
+    fn get_plan_var_val(&mut self, plan_var_id: &PlanVarId) -> &ActingVal {
         self.plan_vars[*plan_var_id].get_val()
     }
 
     pub fn set_start(&mut self, id: &ActingProcessId, t: Option<Timepoint>) {
         let instant = t.unwrap_or(self.instant());
-        let (id, cst) = self.processes[*id].start.set_val(instant);
-        self.set_plan_var(&id, cst);
+        let val = self.processes[*id].start.set_val(instant);
+        self.set_plan_var(val);
     }
 
     pub fn set_end(&mut self, id: &ActingProcessId, t: Option<Timepoint>, status: ProcessStatus) {
         let instant = t.unwrap_or(self.instant());
-        let (plan_var_id, cst) = self.processes[*id].end.set_val(instant);
-        self.set_plan_var(&plan_var_id, cst);
+        let val = self.processes[*id].end.set_val(instant);
+        self.set_plan_var(val);
 
         if self.get_kind(&id) == ProcessKind::Task {
             if let Some(refinement) = self.processes[*id]
@@ -294,16 +306,22 @@ impl InnerActingManager {
 
         let om_id = self.processes[*parent].om_id();
         let model = &self.models[om_id];
-        let interval = model
-            .chronicle
-            .bindings
-            .get_binding(&label)
-            .unwrap()
-            .as_action()
-            .unwrap()
-            .interval;
-        let start = self.new_execution_var(interval.get_start(), om_id);
-        let end = self.new_execution_var(interval.get_end(), om_id);
+        let (start, end) = if let Some(chronicle) = &model.chronicle {
+            let interval = chronicle
+                .bindings
+                .get_binding(&label)
+                .unwrap()
+                .as_action()
+                .unwrap()
+                .interval;
+            let start = self.new_execution_var(interval.get_start(), om_id);
+            let end = self.new_execution_var(interval.get_end(), om_id);
+            (start, end)
+        } else {
+            let start = ExecutionVar::new(None);
+            let end = ExecutionVar::new(None);
+            (start, end)
+        };
 
         self.processes.push(ActingProcess::new(
             id,
@@ -332,10 +350,17 @@ impl InnerActingManager {
         origin: ProcessOrigin,
     ) -> ActingProcessId {
         let id = self.processes.len();
-        let interval = model.chronicle.interval;
+        let interval = model.chronicle.as_ref().map(|c| c.interval);
         let om_id = self.new_model(model);
-        let start = self.new_execution_var(interval.get_start(), om_id);
-        let end = self.new_execution_var(interval.get_end(), om_id);
+        let (start, end) = match interval {
+            Some(interval) => {
+                let start = self.new_execution_var(interval.get_start(), om_id);
+                let end = self.new_execution_var(interval.get_end(), om_id);
+                (start, end)
+            }
+            None => Default::default(),
+        };
+
         self.processes.push(ActingProcess::new(
             id,
             *parent,
@@ -362,19 +387,24 @@ impl InnerActingManager {
 
         let om_id = self.processes[*parent].om_id();
         let model = &self.models[om_id];
-        let binding = model
-            .chronicle
-            .bindings
-            .get_binding(&label)
-            .unwrap()
-            .as_arbitrary()
-            .unwrap();
-        let timepoint = binding.timepoint;
-        let var_id = binding.var_id;
+        let (start, end, var) = match &model.chronicle {
+            Some(chronicle) => {
+                let binding = chronicle
+                    .bindings
+                    .get_binding(&label)
+                    .unwrap()
+                    .as_arbitrary()
+                    .unwrap();
+                let timepoint = binding.timepoint;
+                let var_id = binding.var_id;
 
-        let start: ExecutionVar<Timepoint> = self.new_execution_var(timepoint, om_id);
-        let end = start.clone();
-        let var = self.new_execution_var(var_id, om_id);
+                let start: ExecutionVar<Timepoint> = self.new_execution_var(timepoint, om_id);
+                let end = start.clone();
+                let var = self.new_execution_var(var_id, om_id);
+                (start, end, var)
+            }
+            None => Default::default(),
+        };
 
         self.processes.push(ActingProcess::new(
             id,
@@ -404,19 +434,24 @@ impl InnerActingManager {
         let id = self.processes.len();
         let om_id = self.processes[*parent].om_id();
         let model = &self.models[om_id];
-        let binding = *model
-            .chronicle
-            .bindings
-            .get_binding(&label)
-            .unwrap()
-            .as_acquire()
-            .unwrap();
+        let (start, end, s_acq, resource, quantity) = match &model.chronicle {
+            Some(chronicle) => {
+                let binding = *chronicle
+                    .bindings
+                    .get_binding(&label)
+                    .unwrap()
+                    .as_acquire()
+                    .unwrap();
 
-        let start = self.new_execution_var(binding.request, om_id);
-        let s_acq = self.new_execution_var(binding.acquisition.get_start(), om_id);
-        let end = self.new_execution_var(binding.acquisition.get_end(), om_id);
-        let resource = self.new_execution_var(binding.resource, om_id);
-        let quantity = self.new_execution_var(binding.quantity, om_id);
+                let start = self.new_execution_var(binding.request, om_id);
+                let s_acq = self.new_execution_var(binding.acquisition.get_start(), om_id);
+                let end = self.new_execution_var(binding.acquisition.get_end(), om_id);
+                let resource = self.new_execution_var(binding.resource, om_id);
+                let quantity = self.new_execution_var(binding.quantity, om_id);
+                (start, end, s_acq, resource, quantity)
+            }
+            None => Default::default(),
+        };
 
         self.processes.push(ActingProcess::new(
             id,
@@ -447,16 +482,22 @@ impl InnerActingManager {
 
         let om_id = self.processes[*parent].om_id();
         let model = &self.models[om_id];
-        let interval = model
-            .chronicle
-            .bindings
-            .get_binding(&label)
-            .unwrap()
-            .as_action()
-            .unwrap()
-            .interval;
-        let start = self.new_execution_var(interval.get_start(), om_id);
-        let end = self.new_execution_var(interval.get_end(), om_id);
+
+        let (start, end) = match &model.chronicle {
+            Some(chronicle) => {
+                let interval = chronicle
+                    .bindings
+                    .get_binding(&label)
+                    .unwrap()
+                    .as_action()
+                    .unwrap()
+                    .interval;
+                let start = self.new_execution_var(interval.get_start(), om_id);
+                let end = self.new_execution_var(interval.get_end(), om_id);
+                (start, end)
+            }
+            None => Default::default(),
+        };
 
         self.processes.push(ActingProcess::new(
             id,
@@ -594,12 +635,12 @@ impl InnerActingManager {
 
     pub fn set_s_acq(&mut self, id: &ActingProcessId, instant: Option<Timepoint>) {
         let instant = instant.unwrap_or(self.instant());
-        let (id, cst) = self.processes[*id]
+        let val = self.processes[*id]
             .inner
             .as_mut_acquire()
             .unwrap()
             .set_s_acq(instant);
-        self.set_plan_var(&id, cst)
+        self.set_plan_var(val);
     }
 
     pub fn set_arbitrary_value(
@@ -613,24 +654,26 @@ impl InnerActingManager {
             .as_arbitrary()
             .unwrap()
             .get_plan_var_id();
-
-        let value = match self.get_plan_var_val(plan_var_id) {
-            PlanVal::Planned(val) => {
-                let value: LValue = val.clone().into();
-                if set.contains(&value) {
-                    value
-                } else {
-                    greedy
+        let value = match plan_var_id {
+            None => greedy,
+            Some(var_id) => match self.get_plan_var_val(var_id) {
+                ActingVal::Planned(val) => {
+                    let value: LValue = val.clone().into();
+                    if set.contains(&value) {
+                        value
+                    } else {
+                        greedy
+                    }
                 }
-            }
-            PlanVal::None => greedy,
-            _ => unreachable!(),
+                ActingVal::None => greedy,
+                _ => unreachable!(),
+            },
         };
 
         let arbitrary = self.processes[*id].inner.as_mut_arbitrary().unwrap();
         arbitrary.set_set(set);
-        let (var_id, cst) = arbitrary.set_var(value.clone());
-        self.set_plan_var(&var_id, cst);
+        let val = arbitrary.set_var(value.clone());
+        self.set_plan_var(val);
         self.executed(id);
         value
     }
@@ -642,7 +685,7 @@ impl InnerActingManager {
         quantity: Quantity,
         priority: WaiterPriority,
     ) -> Result<WaitAcquire, LRuntimeError> {
-        let mut updates: Vec<(PlanVarId, cst::Cst)> = vec![];
+        let mut updates: Vec<_> = vec![];
         self.executed(id);
         let acquire = self.processes[*id].inner.as_mut_acquire().unwrap();
         let r = match acquire.move_reservation() {
@@ -667,7 +710,7 @@ impl InnerActingManager {
         };
 
         for update in updates {
-            self.set_plan_var(&update.0, update.1);
+            self.set_plan_var(update);
         }
 
         r

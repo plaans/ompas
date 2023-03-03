@@ -8,6 +8,7 @@ use crate::conversion::flow::post_processing::flow_graph_post_processing;
 use crate::conversion::flow::pre_processing::pre_processing;
 use aries_planning::chronicles::ChronicleOrigin;
 use chrono::{DateTime, Utc};
+use debug_print::debug_println;
 use ompas_language::exec::refinement::EXEC_TASK;
 use ompas_structs::acting_domain::parameters::Parameters;
 use ompas_structs::acting_domain::task::Task;
@@ -33,6 +34,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::SystemTime;
 
 pub mod chronicle;
@@ -40,6 +42,7 @@ pub mod flow;
 
 #[allow(dead_code)]
 const DEBUG_CHRONICLE: bool = false;
+static N_CONVERSION: AtomicU32 = AtomicU32::new(0);
 
 pub async fn convert(
     ch: Option<Chronicle>,
@@ -47,33 +50,54 @@ pub async fn convert(
     p_env: &mut PLEnv,
     st: RefSymTable,
 ) -> Result<ActingModel, LRuntimeError> {
-    let time = SystemTime::now();
-
     let p_eval_lv = p_eval(lv, p_env).await?;
+    //debug_println!("{}\n=>\n{}", lv.format(0), p_eval_lv.format(0));
     let lv_om = annotate(p_eval_lv);
+    //debug_println!("=>{}", lv_om.format(0));
 
-    let pp_lv = pre_processing(lv, &p_env.env).await?;
+    let pp_lv = pre_processing(&lv_om, &p_env).await?;
+    //debug_println!("=>{}", pp_lv.format(0));
 
-    //let sym_table = RefCell::new(SymTable::default());
-
-    let mut graph = FlowGraph::new(st.clone());
-
-    let flow = convert_lv(&pp_lv, &mut graph, &mut Default::default())?;
-    graph.flow = flow;
-    flow_graph_post_processing(&mut graph)?;
-    let mut ch = convert_graph(ch, &mut graph, &flow, &p_env.env)?;
-    //let mut ch = ChronicleTemplate::new("debug", ChronicleKind::Method, st);
-    post_processing(&mut ch, &p_env.env)?;
-    graph.flat_bindings();
-    ch.meta_data.flow_graph = graph;
-    ch.meta_data.convert_time = time.elapsed().unwrap();
+    let chronicle = match _convert(ch, &pp_lv, p_env, st).await {
+        Ok(ch) => Some(ch),
+        Err(e) => {
+            println!("{}", e);
+            None
+        }
+    };
 
     Ok(ActingModel {
         lv: lv.clone(),
         lv_om,
         lv_expanded: pp_lv,
-        chronicle: ch,
+        chronicle,
     })
+}
+
+pub async fn _convert(
+    ch: Option<Chronicle>,
+    lv: &LValue,
+    p_env: &mut PLEnv,
+    st: RefSymTable,
+) -> Result<Chronicle, LRuntimeError> {
+    let n_conversion = N_CONVERSION.fetch_add(1, Ordering::Relaxed);
+    let mut graph = FlowGraph::new(st);
+    debug_println!("conversion n{n_conversion}...");
+    let flow = convert_lv(&lv, &mut graph, &mut Default::default())?;
+    debug_println!("convert({n_conversion}) = ok!");
+    let time = SystemTime::now();
+    graph.flow = flow;
+    flow_graph_post_processing(&mut graph)?;
+    debug_println!("flow_graph_post_processing({n_conversion}) = ok!");
+    let mut ch = convert_graph(ch, &mut graph, &flow, &p_env.env)?;
+    debug_println!("convert_graph({n_conversion}) = ok!");
+    debug_println!("lv: {}\nchronicle: {}", lv.format(4), ch);
+    post_processing(&mut ch, &p_env.env).await?;
+    debug_println!("post_processing({n_conversion}) = ok!");
+    graph.flat_bindings();
+    ch.meta_data.flow_graph = graph;
+    ch.meta_data.convert_time = time.elapsed().unwrap();
+    Ok(ch)
 }
 
 pub async fn p_convert_task(
@@ -192,18 +216,19 @@ pub async fn p_convert(
     let mut converted: HashSet<String> = Default::default();
 
     for instance in &pp.instance.instances {
-        for subtask in instance.om.chronicle.get_subtasks() {
+        let chronicle = instance.om.chronicle.as_ref().unwrap();
+        for subtask in chronicle.get_subtasks() {
             let label = subtask.name[0].format(&st, true);
             if !converted.contains(&label) {
                 tasks_to_convert.insert(label);
             }
         }
 
-        for effect in instance.om.chronicle.get_effects() {
+        for effect in chronicle.get_effects() {
             label_sf.insert(effect.sv[0].format(&st, true));
         }
 
-        for condition in instance.om.chronicle.get_conditions() {
+        for condition in chronicle.get_conditions() {
             label_sf.insert(condition.sv[0].format(&st, true));
         }
     }
@@ -245,18 +270,19 @@ pub async fn p_convert(
                     )
                     .await?;
 
-                    for subtask in om.chronicle.get_subtasks() {
+                    let chronicle = om.chronicle.as_ref().unwrap();
+                    for subtask in chronicle.get_subtasks() {
                         let label = subtask.name[0].format(&st, true);
                         if !converted.contains(&label) {
                             new_tasks.insert(label);
                         }
                     }
 
-                    for effect in om.chronicle.get_effects() {
+                    for effect in chronicle.get_effects() {
                         label_sf.insert(effect.sv[0].format(&st, true));
                     }
 
-                    for condition in om.chronicle.get_conditions() {
+                    for condition in chronicle.get_conditions() {
                         label_sf.insert(condition.sv[0].format(&st, true));
                     }
                     pp.domain.templates.push(om)
@@ -282,18 +308,20 @@ pub async fn p_convert(
                         )
                         .await?;
 
-                        for subtask in om.chronicle.get_subtasks() {
+                        let chronicle = om.chronicle.as_ref().unwrap();
+
+                        for subtask in chronicle.get_subtasks() {
                             let label = subtask.name[0].format(&st, true);
                             if !converted.contains(&label) {
                                 new_tasks.insert(label);
                             }
                         }
 
-                        for effect in om.chronicle.get_effects() {
+                        for effect in chronicle.get_effects() {
                             label_sf.insert(effect.sv[0].format(&st, true));
                         }
 
-                        for condition in om.chronicle.get_conditions() {
+                        for condition in chronicle.get_conditions() {
                             label_sf.insert(condition.sv[0].format(&st, true));
                         }
 
@@ -319,11 +347,13 @@ pub async fn p_convert(
                 )
                 .await?;
 
-                for effect in om.chronicle.get_effects() {
+                let chronicle = om.chronicle.as_ref().unwrap();
+
+                for effect in chronicle.get_effects() {
                     label_sf.insert(effect.sv[0].format(&st, true));
                 }
 
-                for condition in om.chronicle.get_conditions() {
+                for condition in chronicle.get_conditions() {
                     label_sf.insert(condition.sv[0].format(&st, true));
                 }
 
@@ -552,7 +582,7 @@ pub fn declare_task(task: &Task, st: RefSymTable) -> TaskChronicle {
 }
 
 pub fn debug_with_markdown(label: &str, om: &ActingModel, path: PathBuf, view: bool) {
-    let ch = &om.chronicle;
+    let ch = om.chronicle.as_ref().unwrap();
     let label = label.replace("/", "_");
     let mut path = path;
     let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);

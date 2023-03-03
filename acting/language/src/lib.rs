@@ -48,7 +48,11 @@ pub mod exec {
         pub const DOC_MOD_PLATFORM: &str = "Collection of functions using the robotic platform.";
 
         pub const EXEC_COMMAND: &str = "exec-command";
-        pub const DOC_EXEC_COMMAND: &str = "Send a execution request to the platform.";
+        pub const LAMBDA_EXEC_COMMAND: &str = "(lambda args (await (apply _exec_command args)))";
+        pub const DOC_EXEC_COMMAND: &str = "Lambda to execute a command on the platform.";
+
+        pub const _EXEC_COMMAND: &str = "_exec_command";
+        pub const DOC__EXEC_COMMAND: &str = "Send a execution request to the platform.";
 
         pub const CANCEL_COMMAND: &str = "cancel-command";
         pub const DOC_CANCEL_COMMAND: &str = "Send a cancel request to the platform.";

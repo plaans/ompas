@@ -284,12 +284,8 @@ pub async fn p_eval(lv: &LValue, root_env: &mut PLEnv) -> LResult {
                                     }
                                     queue.push(PCoreOperatorFrame::Lambda);
                                     queue.push(
-                                        transform_lambda_expression(
-                                            &new_exps.into(),
-                                            &mut p_env.env.clone(),
-                                            &p_env.pc.avoid,
-                                        )
-                                        .await?,
+                                        transform_lambda_expression(&new_exps.into(), p_env)
+                                            .await?,
                                     );
                                     scopes.new_scope();
                                 }

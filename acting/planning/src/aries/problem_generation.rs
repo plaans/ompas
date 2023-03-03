@@ -61,7 +61,8 @@ pub async fn finite_problem(
 
     let mut update_domain =
         |tasks: &mut Vec<PAction>, instance: &ChronicleInstance, instance_n: usize| {
-            for (id, subtask) in instance.om.chronicle.get_subtasks().iter().enumerate() {
+            let chronicle = instance.om.chronicle.as_ref().unwrap();
+            for (id, subtask) in chronicle.get_subtasks().iter().enumerate() {
                 let mut value: Vec<ActionParam> = vec![];
                 for e in &subtask.name {
                     let domain = st.get_domain_of_var(&e);
@@ -86,11 +87,11 @@ pub async fn finite_problem(
                 })
             }
 
-            for effect in instance.om.chronicle.get_effects() {
+            for effect in chronicle.get_effects() {
                 sf_labels.insert(effect.sv[0].format(&st, true));
             }
 
-            for condition in instance.om.chronicle.get_conditions() {
+            for condition in chronicle.get_conditions() {
                 sf_labels.insert(condition.sv[0].format(&st, true));
             }
         };
@@ -295,25 +296,6 @@ pub async fn convert_into_chronicle_instance(
     };
 
     let om: ActingModel = convert(Some(ch), lv, &mut p_env, st).await?;
-
-    /*let p_eval_lv = p_eval(lv, &mut p_env).await?;
-    let lv_om = annotate(p_eval_lv);
-    //println!("{}", lv_om.format(0));
-    //println!("lv: {}", lv.format(4));
-    //panic!();
-    let lv_expanded = pre_processing(&lv_om, &cc.env).await?;
-
-    let mut graph = FlowGraph::new(st);
-
-    let flow = convert_lv(&lv_expanded, &mut graph, &mut Default::default())?;
-    graph.flow = flow;
-    flow_graph_post_processing(&mut graph)?;
-    let mut ch = convert_graph(Some(ch), &mut graph, &flow, &cc.env)?;
-    post_processing(&mut ch, cc.env.clone())?;
-
-    graph.flat_bindings();
-    ch.meta_data.flow_graph = graph;
-    ch.meta_data.convert_time = time.elapsed().unwrap();*/
 
     Ok(ChronicleInstance {
         origin: p_action.origin,

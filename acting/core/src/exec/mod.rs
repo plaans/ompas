@@ -18,11 +18,8 @@ use ompas_structs::acting_manager::inner::ProcessKind;
 use ompas_structs::acting_manager::process::process_ref::{Label, ProcessRef};
 use ompas_structs::acting_manager::process::ProcessOrigin;
 use ompas_structs::acting_manager::{ActingManager, ActingProcessId};
-use ompas_structs::execution::monitor::MonitorCollection;
-use ompas_structs::execution::resource::ResourceManager;
 use ompas_structs::interface::rae_options::OMPASOptions;
 use ompas_structs::planning::domain::PlanningDomain;
-use ompas_structs::state::world_state::WorldState;
 use sompas_core::eval;
 use sompas_core::modules::list::car;
 use sompas_macros::{async_scheme_fn, scheme_fn};
@@ -56,10 +53,7 @@ pub const LABEL_ENUMERATE_PARAMS: &str = "enumerate-params";
 pub struct ModExec {
     options: Arc<RwLock<OMPASOptions>>,
     acting_manager: ActingManager,
-    state: WorldState,
     domain: Arc<RwLock<OMPASDomain>>,
-    monitors: MonitorCollection,
-    resources: ResourceManager,
     platform: Platform,
     log: LogClient,
     _pd: Arc<RwLock<Option<PlanningDomain>>>,
@@ -70,10 +64,7 @@ impl ModExec {
         Self {
             options: monitor.options.clone(),
             acting_manager: monitor.acting_manager.clone(),
-            state: monitor.state.clone(),
             domain: monitor.ompas_domain.clone(),
-            monitors: monitor.monitors.clone(),
-            resources: monitor.resources.clone(),
             platform: monitor.platform.clone(),
             log: LogClient::new("exec-ompas", LOG_TOPIC_OMPAS).await,
             _pd: monitor.pd.clone(),

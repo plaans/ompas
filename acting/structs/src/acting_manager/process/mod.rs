@@ -9,7 +9,7 @@ use crate::acting_manager::process::method::RefinementProcess;
 use crate::acting_manager::process::plan_var::ExecutionVar;
 use crate::acting_manager::process::root_task::RootProcess;
 use crate::acting_manager::process::task::TaskProcess;
-use crate::acting_manager::{ActingProcessId, OMId};
+use crate::acting_manager::{AMId, ActingProcessId};
 use std::fmt::{Display, Formatter};
 use tokio::sync::watch;
 
@@ -39,7 +39,7 @@ impl ProcessOrigin {
 pub struct ActingProcess {
     id: ActingProcessId,
     _parent: ActingProcessId,
-    om_id: OMId,
+    om_id: AMId,
     debug: Option<String>,
     pub origin: ProcessOrigin,
     pub status: ProcessStatus,
@@ -54,7 +54,7 @@ impl ActingProcess {
         id: ActingProcessId,
         _parent: ActingProcessId,
         origin: ProcessOrigin,
-        om_id: OMId,
+        om_id: AMId,
         debug: Option<String>,
         start: ExecutionVar<Timepoint>,
         end: ExecutionVar<Timepoint>,
@@ -82,7 +82,7 @@ impl ActingProcess {
         self._parent
     }
 
-    pub fn om_id(&self) -> OMId {
+    pub fn om_id(&self) -> AMId {
         self.om_id
     }
 
@@ -105,7 +105,7 @@ impl ActingProcess {
         self.origin = ProcessOrigin::ExecPlanInherited;
     }
 
-    pub fn get_om_id(&self) -> OMId {
+    pub fn get_om_id(&self) -> AMId {
         self.om_id
     }
 

@@ -171,7 +171,7 @@ pub fn generate_instances(
         let template = read_chronicle(
             ctx,
             bindings,
-            &instance.om.chronicle,
+            &instance.om.chronicle.as_ref().unwrap(),
             Container::Instance(id + 1),
         )?;
         //Printer::print_chronicle(&template.chronicle, &ctx.model);

@@ -71,7 +71,7 @@ impl From<ActingProcessId> for ProcessRef {
 
 #[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub enum Label {
-    Refinement(usize),
+    Refinement(Option<usize>),
     Action(usize),
     Acquire(usize),
     Arbitrary(usize),
@@ -81,7 +81,14 @@ impl Display for Label {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Label::Refinement(m) => {
-                write!(f, "refinement({m})")
+                write!(
+                    f,
+                    "refinement{}",
+                    match m {
+                        None => "".to_string(),
+                        Some(m) => format!("({m})"),
+                    }
+                )
             }
             Label::Action(id) => {
                 write!(f, "action({id})")

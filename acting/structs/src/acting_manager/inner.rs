@@ -175,10 +175,22 @@ impl InnerActingManager {
                             }
                         }
                         Label::Refinement(m) => {
-                            id = if let Some(r) = obj.inner.as_task().unwrap().refinements.get(*m) {
-                                *r
-                            } else {
-                                return None;
+                            let task = obj.inner.as_task().unwrap();
+                            id = match m {
+                                Some(m) => {
+                                    if let Some(r) = task.refinements.get(*m) {
+                                        *r
+                                    } else {
+                                        return None;
+                                    }
+                                }
+                                None => {
+                                    if let Some(id) = task.refinements.last() {
+                                        *id
+                                    } else {
+                                        return None;
+                                    }
+                                }
                             }
                         }
                         Label::Acquire(_) | Label::Arbitrary(_) => {

@@ -125,7 +125,7 @@ pub async fn finite_problem(
                         ChronicleKind::Task,
                     )
                     .await?;
-                    instance.pr.push(Label::Refinement(0));
+                    instance.pr.push(Label::Refinement(None));
                     update_domain(&mut goal_actions, &instance, instance_n);
 
                     instances.push(instance)
@@ -154,7 +154,7 @@ pub async fn finite_problem(
                             ChronicleKind::Method,
                         )
                         .await?;
-                        instance.pr.push(Label::Refinement(0));
+                        instance.pr.push(Label::Refinement(None));
                         update_domain(&mut goal_actions, &instance, instance_n);
 
                         instances.push(instance);

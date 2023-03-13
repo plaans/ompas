@@ -31,11 +31,11 @@ impl AcquireProcess {
         }
     }
 
-    pub fn set_resource(&mut self, resource: String) -> Option<PlanVal> {
+    pub fn set_resource(&mut self, resource: String) -> Vec<PlanVal> {
         self.resource.set_val(resource)
     }
 
-    pub fn set_quantity(&mut self, quantity: usize) -> Option<PlanVal> {
+    pub fn set_quantity(&mut self, quantity: usize) -> Vec<PlanVal> {
         self.quantity.set_val(quantity)
     }
     pub fn set_acquire_id(&mut self, waiter: &WaitAcquire) {
@@ -52,7 +52,7 @@ impl AcquireProcess {
         mem::replace(&mut self.reservation, None)
     }
 
-    pub fn set_s_acq(&mut self, val: Timepoint) -> Option<PlanVal> {
+    pub fn set_s_acq(&mut self, val: Timepoint) -> Vec<PlanVal> {
         self.s_acq.set_val(val)
     }
 }

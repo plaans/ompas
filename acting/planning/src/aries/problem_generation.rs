@@ -4,6 +4,7 @@ use aries_planning::chronicles::ChronicleOrigin;
 use function_name::named;
 use ompas_structs::acting_domain::parameters::Parameters;
 use ompas_structs::acting_manager::operational_model::ActingModel;
+use ompas_structs::acting_manager::process::plan_var::AsCst;
 use ompas_structs::acting_manager::process::process_ref::{Label, ProcessRef};
 use ompas_structs::conversion::chronicle::{Chronicle, ChronicleKind};
 use ompas_structs::conversion::context::ConversionContext;
@@ -67,7 +68,7 @@ pub async fn finite_problem(
                 for e in &subtask.name {
                     let domain = st.get_domain_of_var(&e);
 
-                    let val = match domain.as_constant() {
+                    let val = match domain.as_cst() {
                         Some(cst) => ActionParam::Instantiated(cst.clone().into()),
                         None => ActionParam::Uninstantiated(st.format_variable(&e).into()),
                     };

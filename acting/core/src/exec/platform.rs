@@ -8,6 +8,7 @@ use ompas_language::exec::mode::CTX_MODE;
 use ompas_language::exec::platform::*;
 use ompas_middleware::logger::LogClient;
 use ompas_structs::acting_manager::action_status::ProcessStatus;
+use ompas_structs::acting_manager::process::plan_var::AsCst;
 use ompas_structs::acting_manager::process::process_ref::ProcessRef;
 use ompas_structs::acting_manager::ActingProcessId;
 use sompas_structs::lenv::LEnv;
@@ -66,6 +67,10 @@ pub async fn exec_command(env: &LEnv, command: &[LValue]) -> LAsyncHandle {
 
     let f = (Box::pin(async move {
         let command_slice = command_slice.as_slice();
+        let args = command_slice
+            .iter()
+            .map(|lv| lv.as_cst().unwrap())
+            .collect();
 
         let pr: ProcessRef = env
             .get_context::<ModActingContext>(MOD_ACTING_CONTEXT)?
@@ -77,9 +82,10 @@ pub async fn exec_command(env: &LEnv, command: &[LValue]) -> LAsyncHandle {
         let command_id: ActingProcessId = match &pr {
             ProcessRef::Id(id) => {
                 acting_manager
-                    .new_command(
+                    .new_action(
                         Label::Action(acting_manager.get_number_subtask(*id).await),
                         id,
+                        args,
                         debug,
                         ProcessOrigin::Execution,
                     )
@@ -90,9 +96,10 @@ pub async fn exec_command(env: &LEnv, command: &[LValue]) -> LAsyncHandle {
                 Some(id) => id,
                 None => {
                     acting_manager
-                        .new_command(
+                        .new_action(
                             labels.last().unwrap().clone(),
                             id,
+                            args,
                             debug,
                             ProcessOrigin::Execution,
                         )

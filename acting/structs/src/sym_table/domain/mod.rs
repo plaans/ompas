@@ -1,3 +1,4 @@
+use crate::acting_manager::process::plan_var::AsCst;
 use crate::sym_table::domain::basic_type::BasicType::*;
 use crate::sym_table::domain::basic_type::{BasicType, TYPE_ID_FALSE, TYPE_ID_NIL, TYPE_ID_TRUE};
 use crate::sym_table::domain::type_lattice::TypeLattice;
@@ -156,10 +157,12 @@ impl Domain {
     pub fn nil() -> Domain {
         Union(vec![False.into(), EmptyList.into()])
     }
+}
 
-    pub fn as_constant(&self) -> Option<&cst::Cst> {
+impl AsCst for Domain {
+    fn as_cst(&self) -> Option<cst::Cst> {
         if let Self::Cst(_, cst) = &self {
-            Some(cst)
+            Some(cst.clone())
         } else {
             None
         }

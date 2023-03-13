@@ -853,8 +853,7 @@ pub mod supervisor {
     pub const STATUS_FAILURE: &str = "failure";
     pub const STATUS_CANCELLED: &str = "cancelled";
 
-    pub const TASK: &str = "task";
-    pub const COMMAND: &str = "command";
+    pub const ACTION: &str = "action";
     pub const ROOT_TASK: &str = "root_task";
     pub const METHOD: &str = "method";
     pub const ARBITRARY: &str = "arbitrary";

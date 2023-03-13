@@ -76,7 +76,7 @@ pub async fn rae(
                                 let vec: Vec<LValue> = job_lvalue.clone().try_into().unwrap();
                                 let mut vec_cst = vec![];
                                 for e in vec {
-                                    vec_cst.push(e.as_cst())
+                                    vec_cst.push(e.as_cst().unwrap())
                                 }
                                 let id: ProcessRef = acting_manager.new_high_level_task(job_lvalue.to_string(),vec_cst).await;
                                 let mod_context: ModActingContext = ModActingContext::new(id.clone());

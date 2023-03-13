@@ -11,6 +11,7 @@ pub mod r#trait;
 pub mod var_domain;
 pub mod variable;
 
+use crate::acting_manager::process::plan_var::AsCst;
 use crate::conversion::chronicle;
 use crate::conversion::flow_graph::graph::Dot;
 use crate::sym_table::closure::Update;
@@ -589,7 +590,7 @@ impl SymTable {
      */
 
     pub fn var_as_cst(&self, var_id: &VarId) -> Option<Cst> {
-        self.get_domain_of_var(var_id).as_constant().cloned()
+        self.get_domain_of_var(var_id).as_cst()
     }
 
     /*

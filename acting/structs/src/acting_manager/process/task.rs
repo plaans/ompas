@@ -1,5 +1,4 @@
 use crate::acting_manager::interval::Interval;
-use crate::acting_manager::process::ActingProcessInner;
 use crate::acting_manager::ActingProcessId;
 use crate::interface::select_mode::SelectMode;
 use crate::sym_table::domain::cst;
@@ -34,12 +33,6 @@ impl TaskProcess {
 
     pub fn get_refinements(&self) -> &Vec<ActingProcessId> {
         &self.refinements
-    }
-}
-
-impl From<TaskProcess> for ActingProcessInner {
-    fn from(value: TaskProcess) -> Self {
-        Self::Task(value)
     }
 }
 

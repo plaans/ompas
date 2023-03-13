@@ -127,7 +127,7 @@ impl ActingManager {
     }
 
     //Task methods
-    pub async fn new_task(
+    pub async fn new_action(
         &self,
         label: Label,
         parent: &ActingProcessId,
@@ -138,7 +138,7 @@ impl ActingManager {
         self.inner
             .write()
             .await
-            .new_task(label, parent, args, debug, origin)
+            .new_action(label, parent, args, debug, origin)
     }
 
     pub async fn new_refinement(
@@ -177,7 +177,7 @@ impl ActingManager {
     }
 
     //Command methods
-    pub async fn new_command(
+    /*pub async fn new_command(
         &self,
         label: Label,
         parent: &ActingProcessId,
@@ -188,7 +188,7 @@ impl ActingManager {
             .write()
             .await
             .new_command(label, parent, debug, origin)
-    }
+    }*/
 
     pub async fn subscribe(&self, id: &ActingProcessId) -> watch::Receiver<ProcessStatus> {
         self.inner.write().await.subscribe(id)

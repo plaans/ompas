@@ -564,8 +564,7 @@ pub async fn print_processes(env: &LEnv, args: &[LValue]) -> LResult {
 
     for arg in args {
         match arg.to_string().as_str() {
-            TASK => task_filter.task_type = Some(ProcessKind::Task),
-            COMMAND => task_filter.task_type = Some(ProcessKind::Command),
+            ACTION => task_filter.task_type = Some(ProcessKind::Action),
             ARBITRARY => task_filter.task_type = Some(ProcessKind::Arbitrary),
             ACQUIRE => task_filter.task_type = Some(ProcessKind::Acquire),
             METHOD => task_filter.task_type = Some(ProcessKind::Method),
@@ -581,14 +580,8 @@ pub async fn print_processes(env: &LEnv, args: &[LValue]) -> LResult {
                 return Err(lruntimeerror!(
                     GET_AGENDA,
                     format!(
-                        "{} is not a valid filter option, expecting ({}, {}, {}, {}, {}, {})",
-                        str,
-                        TASK,
-                        COMMAND,
-                        STATUS_PENDING,
-                        STATUS_RUNNING,
-                        STATUS_SUCCESS,
-                        STATUS_FAILURE
+                        "{} is not a valid filter option, expecting ({}, {}, {}, {}, {})",
+                        str, ACTION, STATUS_PENDING, STATUS_RUNNING, STATUS_SUCCESS, STATUS_FAILURE
                     )
                 ))
             }

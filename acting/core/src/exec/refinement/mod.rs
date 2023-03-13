@@ -124,7 +124,7 @@ impl From<ModRefinement> for LModule {
 pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
     let task: LValue = args.into();
     let debug = task.to_string();
-    let args = args.iter().map(|lv| lv.as_cst()).collect();
+    let args = args.iter().map(|lv| lv.as_cst().unwrap()).collect();
     let ctx = env.get_context::<ModRefinement>(MOD_REFINEMENT)?;
     let supervisor = &ctx.acting_manager;
 
@@ -136,7 +136,7 @@ pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
         ProcessRef::Id(id) => {
             if supervisor.get_kind(id).await == ProcessKind::Method {
                 supervisor
-                    .new_task(
+                    .new_action(
                         Label::Action(supervisor.get_number_subtask(*id).await),
                         id,
                         args,
@@ -153,7 +153,7 @@ pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
             None => match labels[0] {
                 Label::Action(s) => {
                     supervisor
-                        .new_task(Label::Action(s), id, args, debug, ProcessOrigin::Execution)
+                        .new_action(Label::Action(s), id, args, debug, ProcessOrigin::Execution)
                         .await
                 }
                 _ => panic!(),

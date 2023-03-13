@@ -12,6 +12,7 @@ use ompas_language::exec::state::{
 use ompas_language::exec::ARBITRARY;
 use ompas_language::supervisor::ACQUIRE;
 use ompas_language::sym_table::{TYPE_OBJECT, TYPE_OBJECT_TYPE, TYPE_RESSOURCE_HANDLE};
+use ompas_structs::acting_manager::process::plan_var::AsCst;
 use ompas_structs::acting_manager::process::process_ref::Label;
 use ompas_structs::conversion::chronicle::constraint::Constraint;
 use ompas_structs::conversion::flow_graph::define_table::DefineTable;
@@ -491,7 +492,7 @@ fn extract_index(fl: &mut FlowGraph, seq: &mut Vec<FlowId>) -> usize {
         //println!("{}", fl.st.format_variable(&v));
         fl.st
             .get_domain_of_var(&v)
-            .as_constant()
+            .as_cst()
             .unwrap()
             .as_int()
             .unwrap()

@@ -16,12 +16,12 @@ impl ArbitraryProcess {
         self.set = set
     }
 
-    pub fn set_var(&mut self, var: LValue) -> Option<PlanVal> {
+    pub fn set_var(&mut self, var: LValue) -> Vec<PlanVal> {
         self.var.set_val(var)
     }
 
-    pub fn get_plan_var_id(&self) -> Option<PlanVarId> {
-        self.var.get_plan_var_id()
+    pub fn get_plan_var_ids(&self) -> &Vec<PlanVarId> {
+        self.var.get_plan_var_ids()
     }
 }
 

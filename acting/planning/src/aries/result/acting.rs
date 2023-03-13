@@ -1,6 +1,7 @@
 use crate::aries::OMPAS_TIME_SCALE;
 use itertools::Itertools;
 use ompas_structs::acting_manager::interval::{Interval, Timepoint};
+use ompas_structs::acting_manager::process::plan_var::AsCst;
 use ompas_structs::acting_manager::process::process_ref::ProcessRef;
 use ompas_structs::execution::resource::WaiterPriority;
 use ompas_structs::planning::instance::ChronicleInstance;
@@ -106,7 +107,7 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
             .iter()
             .map(|var_id| {
                 st.get_domain_of_var(var_id)
-                    .as_constant()
+                    .as_cst()
                     .unwrap()
                     .clone()
                     .into()
@@ -118,7 +119,7 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
 
         let start = st
             .get_domain_of_var(&interval.get_start())
-            .as_constant()
+            .as_cst()
             .unwrap()
             .as_float()
             .unwrap();
@@ -128,7 +129,7 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
         );
         let end = st
             .get_domain_of_var(&interval.get_end())
-            .as_constant()
+            .as_cst()
             .unwrap()
             .as_float()
             .unwrap();
@@ -151,7 +152,7 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
                 ChronicleBinding::Arbitrary(a) => {
                     let lv: LValue = st
                         .get_domain_of_var(&a.var_id)
-                        .as_constant()
+                        .as_cst()
                         .unwrap()
                         .clone()
                         .into();
@@ -163,7 +164,7 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
                         .iter()
                         .map(|var_id| {
                             st.get_domain_of_var(var_id)
-                                .as_constant()
+                                .as_cst()
                                 .unwrap()
                                 .clone()
                                 .into()
@@ -173,7 +174,7 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
 
                     let start = st
                         .get_domain_of_var(&s.interval.get_start())
-                        .as_constant()
+                        .as_cst()
                         .unwrap()
                         .as_float()
                         .unwrap();
@@ -183,7 +184,7 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
                     );
                     let end = st
                         .get_domain_of_var(&s.interval.get_end())
-                        .as_constant()
+                        .as_cst()
                         .unwrap()
                         .as_float()
                         .unwrap();
@@ -200,13 +201,13 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
                     let resource: String = a.resource.format(st, true);
                     let quantity: usize = st
                         .get_domain_of_var(&a.quantity)
-                        .as_constant()
+                        .as_cst()
                         .unwrap()
                         .as_int()
                         .unwrap() as usize;
                     let request = st
                         .get_domain_of_var(&a.request)
-                        .as_constant()
+                        .as_cst()
                         .unwrap()
                         .as_float()
                         .unwrap();
@@ -217,7 +218,7 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
 
                     let start_acquisition = st
                         .get_domain_of_var(&a.acquisition.get_start())
-                        .as_constant()
+                        .as_cst()
                         .unwrap()
                         .as_float()
                         .unwrap();
@@ -228,7 +229,7 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
 
                     let end_acq = st
                         .get_domain_of_var(&a.acquisition.get_end())
-                        .as_constant()
+                        .as_cst()
                         .unwrap()
                         .as_float()
                         .unwrap();

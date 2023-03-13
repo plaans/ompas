@@ -62,37 +62,36 @@ pub struct PlanVal {
 
 #[derive(Clone, Default)]
 pub struct ExecutionVar<T: Display + Clone + AsCst> {
-    pub(crate) plan_var_id: Option<PlanVarId>,
+    pub(crate) plan_var_ids: Vec<PlanVarId>,
     pub(crate) val: Option<T>,
 }
 
 pub trait AsCst {
-    fn as_cst(&self) -> cst::Cst;
+    fn as_cst(&self) -> Option<cst::Cst>;
 }
 
 impl<T: Display + Clone + AsCst> ExecutionVar<T> {
-    pub fn new(plan_var_id: Option<PlanVarId>) -> Self {
+    pub fn new(plan_var_ids: Vec<PlanVarId>) -> Self {
         Self {
-            plan_var_id,
+            plan_var_ids,
             val: None,
         }
     }
 
-    pub fn get_plan_var_id(&self) -> Option<PlanVarId> {
-        self.plan_var_id
+    pub fn get_plan_var_ids(&self) -> &Vec<PlanVarId> {
+        &self.plan_var_ids
     }
 
-    pub fn set_val(&mut self, val: T) -> Option<PlanVal> {
-        let cst = val.as_cst();
+    pub fn set_val(&mut self, val: T) -> Vec<PlanVal> {
+        let cst = val.as_cst().unwrap();
         self.val = Some(val);
-        if let Some(plan_var_id) = self.plan_var_id {
-            Some(PlanVal {
+        self.plan_var_ids
+            .iter()
+            .map(|&plan_var_id| PlanVal {
                 plan_var_id,
-                val: cst,
+                val: cst.clone(),
             })
-        } else {
-            None
-        }
+            .collect()
     }
 
     pub fn get_val(&mut self) -> &Option<T> {
@@ -110,8 +109,8 @@ impl<T: Display + Clone + AsCst> Display for ExecutionVar<T> {
 }
 
 impl AsCst for LValue {
-    fn as_cst(&self) -> Cst {
-        match self {
+    fn as_cst(&self) -> Option<Cst> {
+        Some(match self {
             LValue::Symbol(s) => Cst::Symbol(s.to_string()),
             LValue::Number(n) => match n {
                 LNumber::Int(i) => Cst::Int(*i),
@@ -120,25 +119,25 @@ impl AsCst for LValue {
             LValue::True => Cst::Bool(true),
             LValue::Nil => Cst::Bool(false),
             lv => panic!("{} cannot be converted as cst", lv),
-        }
+        })
     }
 }
 
 impl AsCst for Timepoint {
     ///Transform the timepoint as float representing seconds
-    fn as_cst(&self) -> Cst {
-        Cst::Float(self.as_secs())
+    fn as_cst(&self) -> Option<Cst> {
+        Some(Cst::Float(self.as_secs()))
     }
 }
 
 impl AsCst for usize {
-    fn as_cst(&self) -> Cst {
-        Cst::Int(*self as i64)
+    fn as_cst(&self) -> Option<Cst> {
+        Some(Cst::Int(*self as i64))
     }
 }
 
 impl AsCst for String {
-    fn as_cst(&self) -> Cst {
-        Cst::Symbol(self.to_string())
+    fn as_cst(&self) -> Option<Cst> {
+        Some(Cst::Symbol(self.to_string()))
     }
 }

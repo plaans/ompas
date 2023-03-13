@@ -21,11 +21,13 @@ impl PlannerManager {
         execution_var: &ExecutionVar<T>,
     ) -> String {
         if let Some(val) = &execution_var.val {
-            val.as_cst().to_string()
-        } else if let Some(var_id) = &execution_var.plan_var_id {
-            self.plan_vars[*var_id].to_string()
+            val.as_cst().unwrap().to_string()
         } else {
-            "".to_string()
+            if let Some(var) = execution_var.plan_var_ids.first() {
+                self.plan_vars[*var].to_string()
+            } else {
+                "".to_string()
+            }
         }
     }
 

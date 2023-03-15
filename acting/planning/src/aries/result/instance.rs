@@ -1,11 +1,18 @@
 use crate::aries::result::PlanResult;
-use aries_model::extensions::{AssignmentExt, Shaped};
+use aries_model::extensions::{AssignmentExt, SavedAssignment, Shaped};
 use aries_model::lang::Variable;
+use aries_model::Model;
+use aries_planning::chronicles::VarLabel;
 use ompas_structs::acting_manager::operational_model::ActingModel;
-use ompas_structs::acting_manager::planner_manager::RefBindingPlanner;
+use ompas_structs::acting_manager::planner_manager::{
+    get_var_as_cst, BindingPlanner, RefBindingPlanner,
+};
 use ompas_structs::conversion::chronicle::Instantiation;
 use ompas_structs::planning::instance::ChronicleInstance;
 use ompas_structs::planning::problem::PlanningProblem;
+use ompas_structs::sym_table::domain::cst::Cst;
+use ompas_structs::sym_table::VarId;
+use std::sync::Arc;
 
 pub async fn instantiate_chronicles(
     pp: &PlanningProblem,
@@ -22,22 +29,8 @@ pub async fn instantiate_chronicles(
         let chronicle = instance.om.chronicle.as_ref().unwrap();
         let mut instantiations = vec![];
         for var in &chronicle.variables {
-            let value = match bindings.get_var(var).unwrap() {
-                Variable::Bool(b) => st.new_bool(ass.boolean_value_of(*b).unwrap()),
-                Variable::Int(i) => {
-                    let value = ass.var_domain(*i).lb;
-                    st.new_int(value as i64)
-                }
-                Variable::Fixed(f) => {
-                    let value = ass.f_domain(*f).lb();
-                    st.new_float(value as f64)
-                }
-                Variable::Sym(s) => {
-                    let sym = ass.sym_domain_of(*s).into_singleton().unwrap();
-                    let value = model.get_symbol(sym);
-                    st.new_symbol(value)
-                }
-            };
+            let cst = get_var_as_cst(&bindings, ass, model, var);
+            let value = st.new_cst(cst);
             instantiations.push(Instantiation::new(*var, value));
         }
 

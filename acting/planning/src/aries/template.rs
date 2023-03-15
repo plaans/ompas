@@ -610,7 +610,7 @@ pub fn read_chronicle(
     //Declaration of the variables
     let prez_var = ctx.model.new_bvar(container / VarType::Presence);
     bindings.add_binding(ch.get_presence(), &prez_var.into());
-    let prez = prez_var.true_lit();
+    let prez: aLit = prez_var.into();
     params.push(prez_var.into());
 
     //print!("init params...");
@@ -838,7 +838,7 @@ pub fn read_chronicle(
             ChronicleKind::Task => aChronicleKind::Action,
             ChronicleKind::Root => aChronicleKind::Problem,
         },
-        presence: prez,
+        presence: prez_var.into(),
         start,
         end,
         name,

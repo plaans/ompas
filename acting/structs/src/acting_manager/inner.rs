@@ -1,7 +1,9 @@
 use crate::acting_manager::action_status::ProcessStatus;
 use crate::acting_manager::interval::Timepoint;
 use crate::acting_manager::operational_model::{ActingModel, ROOT};
-use crate::acting_manager::planner_manager::{ActingPlanResult, PlannerManager};
+use crate::acting_manager::planner_manager::{
+    extract_raw_plan, ActingChoice, ActingPlan, ActingPlanResult, PlannerManager,
+};
 use crate::acting_manager::process::acquire::AcquireProcess;
 use crate::acting_manager::process::action::ActionProcess;
 use crate::acting_manager::process::arbitrary::ArbitraryProcess;
@@ -854,14 +856,8 @@ impl InnerActingManager {
 
                 for (label, binding) in bindings.inner {
                     match binding {
-                        ChronicleBinding::Arbitrary(arbitrary) => {
-                            let val = st.var_as_cst(&arbitrary.var_id).unwrap();
-                            let id = self.new_arbitrary(label, &parent, ProcessOrigin::Planner);
-                            let arbitrary = self.processes[id].inner.as_arbitrary().unwrap();
-                            plan_vals.push(PlanVal {
-                                plan_var_id: *arbitrary.get_plan_var_ids().first().unwrap(),
-                                val,
-                            });
+                        ChronicleBinding::Arbitrary(_arbitrary) => {
+                            let _id = self.new_arbitrary(label, &parent, ProcessOrigin::Planner);
                         }
                         ChronicleBinding::Action(action_binding) => {
                             let action = &action_binding.name;
@@ -870,57 +866,16 @@ impl InnerActingManager {
                                 .iter()
                                 .map(|var_id| st.var_as_cst(var_id).unwrap())
                                 .collect();
-                            let id = self.new_action(
+                            let _id = self.new_action(
                                 label,
                                 &parent,
                                 args,
                                 debug,
                                 ProcessOrigin::Planner,
                             );
-
-                            let process = &self.processes[id];
-                            let start =
-                                st.var_as_cst(&action_binding.interval.get_start()).unwrap();
-                            let end = st.var_as_cst(&action_binding.interval.get_end()).unwrap();
-                            plan_vals.push(PlanVal {
-                                plan_var_id: *process.start.get_plan_var_ids().first().unwrap(),
-                                val: start,
-                            });
-                            plan_vals.push(PlanVal {
-                                plan_var_id: *process.end.get_plan_var_ids().first().unwrap(),
-                                val: end,
-                            });
                         }
-                        ChronicleBinding::Acquire(acq) => {
-                            let id = self.new_acquire(label, &parent, ProcessOrigin::Planner);
-                            let process = &self.processes[id];
-                            let acquire = process.inner.as_acquire().unwrap();
-                            let quantity = st.var_as_cst(&acq.quantity).unwrap();
-                            let resource = st.var_as_cst(&acq.resource).unwrap();
-                            let start = st.var_as_cst(&acq.request).unwrap();
-                            let s_acq = st.var_as_cst(&acq.acquisition.get_start()).unwrap();
-                            let end = st.var_as_cst(&acq.acquisition.get_end()).unwrap();
-
-                            plan_vals.push(PlanVal {
-                                plan_var_id: *acquire.quantity.get_plan_var_ids().first().unwrap(),
-                                val: quantity,
-                            });
-                            plan_vals.push(PlanVal {
-                                plan_var_id: *acquire.resource.get_plan_var_ids().first().unwrap(),
-                                val: resource,
-                            });
-                            plan_vals.push(PlanVal {
-                                plan_var_id: *process.start.plan_var_ids.first().unwrap(),
-                                val: start,
-                            });
-                            plan_vals.push(PlanVal {
-                                plan_var_id: *acquire.s_acq.get_plan_var_ids().first().unwrap(),
-                                val: s_acq,
-                            });
-                            plan_vals.push(PlanVal {
-                                plan_var_id: *process.end.plan_var_ids.first().unwrap(),
-                                val: end,
-                            })
+                        ChronicleBinding::Acquire(_acq) => {
+                            let _id = self.new_acquire(label, &parent, ProcessOrigin::Planner);
                         }
                     }
                 }
@@ -930,8 +885,60 @@ impl InnerActingManager {
         self.set_planner_vals(plan_vals);
     }
 
-    pub fn absorb_planner_result(&mut self, result: ActingPlanResult) {
+    pub async fn absorb_planner_result(&mut self, result: ActingPlanResult) {
+        let acting_plan: ActingPlan = extract_raw_plan(&result).await;
         self.add_processes_from_chronicles(result.instances);
+
+        let mut updates: Vec<PlanVal> = vec![];
+        let mut reservations: Vec<(ActingProcessId, String, Quantity, WaiterPriority)> = vec![];
+
+        let mut update = |slice: &[PlanVarId], val: Cst| {
+            slice.iter().for_each(|&plan_var_id| {
+                updates.push(PlanVal {
+                    plan_var_id,
+                    val: val.clone(),
+                })
+            })
+        };
+
+        for (pr, choice) in acting_plan.inner {
+            let id = self
+                .get_id(pr.clone())
+                .unwrap_or_else(|| panic!("path {pr} does not exist."));
+            let process = &self.processes[id];
+            match choice {
+                ActingChoice::Arbitrary(a) => {
+                    let arb = process.inner.as_arbitrary().unwrap();
+                    update(arb.get_plan_var_ids(), a.val);
+                }
+                ActingChoice::Acquire(a) => {
+                    reservations.push((
+                        id,
+                        a.resource.to_string(),
+                        Quantity::Some(a.quantity.as_int().unwrap() as usize),
+                        a.priority,
+                    ));
+                    let acq = process.inner.as_acquire().unwrap();
+                    update(acq.resource.get_plan_var_ids(), a.resource);
+                    update(acq.quantity.get_plan_var_ids(), a.quantity);
+                    update(acq.s_acq.get_plan_var_ids(), a.s_acq);
+                    update(process.start.get_plan_var_ids(), a.request);
+                    update(process.end.get_plan_var_ids(), a.e_acq);
+                }
+                ActingChoice::SubTask(s) => {
+                    update(process.start.get_plan_var_ids(), s.start);
+                    update(process.end.get_plan_var_ids(), s.end);
+                }
+                ActingChoice::Refinement(r) => {
+                    update(process.start.get_plan_var_ids(), r.start);
+                    update(process.end.get_plan_var_ids(), r.end);
+                }
+            }
+        }
+        for (id, resource, quantity, priority) in reservations {
+            self.reserve(&id, resource, quantity, priority).await;
+        }
+        self.set_planner_vals(updates)
     }
 }
 

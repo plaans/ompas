@@ -440,6 +440,7 @@ impl GetVariables for Chronicle {
 
 impl Replace for Chronicle {
     fn replace(&mut self, old: &VarId, new: &VarId) {
+        self.presence.replace(old, new);
         self.interval.replace(old, new);
         self.name.replace(old, new);
         self.task.replace(old, new);

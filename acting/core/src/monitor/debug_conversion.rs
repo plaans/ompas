@@ -1,4 +1,4 @@
-use crate::exec::state::ModState;
+use crate::exec::state::{instances, ModState};
 use crate::monitor::control::ModControl;
 use crate::monitor::domain::ModDomain;
 use aries_planning::chronicles::ChronicleOrigin;
@@ -19,11 +19,15 @@ use ompas_planning::conversion::convert_acting_domain;
 use ompas_planning::conversion::flow::annotate::annotate;
 use ompas_planning::conversion::flow::p_eval::r#struct::{PConfig, PLEnv};
 use ompas_planning::conversion::flow::p_eval::{p_eval, P_EVAL};
-use ompas_structs::acting_manager::planner_manager::ActingPlanResult;
+use ompas_structs::acting_manager::planner_manager::{
+    get_var_as_cst, ActingPlanResult, RefBindingPlanner,
+};
 use ompas_structs::acting_manager::process::process_ref::{Label, ProcessRef};
 use ompas_structs::conversion::context::ConversionContext;
 use ompas_structs::planning::domain::PlanningDomain;
+use ompas_structs::planning::instance::ChronicleInstance;
 use ompas_structs::planning::problem::PlanningProblem;
+use ompas_structs::sym_table::domain::cst::Cst;
 use sompas_core::expand;
 use sompas_language::LOG_TOPIC_INTERPRETER;
 use sompas_macros::async_scheme_fn;
@@ -85,9 +89,13 @@ pub async fn plan_task(env: &LEnv, args: &[LValue]) -> LResult {
         },
         pr: ProcessRef::Relative(0, vec![Label::Action(0)]),
     }];
-    let pp: PlanningProblem = finite_problem(actions, &context).await?;
+    let mut pp: PlanningProblem = finite_problem(actions, &context).await?;
 
-    let bindings = acting_manager.get_ref_bindings_planner().await;
+    for instance in &pp.instance.instances {
+        print!("{}", instance.om.chronicle.as_ref().unwrap())
+    }
+
+    let bindings: RefBindingPlanner = acting_manager.get_ref_bindings_planner().await;
 
     let mut aries_problem = generate_chronicles(&bindings, &pp).await?;
 
@@ -96,16 +104,37 @@ pub async fn plan_task(env: &LEnv, args: &[LValue]) -> LResult {
 
     let result: LValue = if let Some(pr) = result {
         //result::print_chronicles(pr);
-        let solved = instance::instantiate_chronicles(&pp, &pr, &bindings).await;
-        /*for chronicle in &solved {
-            print!("{}", chronicle.chronicle)
-        }*/
+        let solved: Vec<ChronicleInstance> =
+            instance::instantiate_chronicles(&pp, &pr, &bindings).await;
+        for instance in &solved {
+            print!("{}", instance.om.chronicle.as_ref().unwrap())
+        }
 
         let raw_plan = acting::extract_raw_plan(&solved);
         println!("RAW PLAN:\n{}", raw_plan);
 
+        let locked = bindings.inner.read().await;
+
+        //println!("len = {}", pp.instance.instances.len());
+        // Filter instances to keep only those that are present in the solution, removing chronicles of unused methods
+        let instances: Vec<_> = pp
+            .instance
+            .instances
+            .drain(..)
+            .filter(|c| {
+                let presence = c.om.chronicle.as_ref().unwrap().get_presence();
+                let cst = get_var_as_cst(&locked, &pr.ass, &pr.fp.model, presence);
+                //println!("{cst}");
+                Cst::Bool(true) == cst
+            })
+            .collect();
+
+        //println!("len = {}", instances.len());
+
+        drop(locked);
         let plan_result = ActingPlanResult {
-            instances: pp.instance.instances,
+            instances,
+            bindings,
             assignements: pr.ass.clone(),
             finite_problem: pr.fp,
         };

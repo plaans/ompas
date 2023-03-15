@@ -17,8 +17,8 @@ pub struct PlanVar {
 impl Display for PlanVar {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self.value {
-            ActingVal::Execution(e) => write!(f, "e({e})"),
-            ActingVal::Planned(p) => write!(f, "p({p})"),
+            ActingVal::Execution(e) => write!(f, "{e}"),
+            ActingVal::Planned(p) => write!(f, "~{p}"),
             ActingVal::None => write!(f, ""),
         }
     }

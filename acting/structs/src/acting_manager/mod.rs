@@ -348,6 +348,6 @@ impl ActingManager {
     }
 
     pub async fn absorb_plan_result(&self, result: ActingPlanResult) {
-        self.inner.write().await.absorb_planner_result(result)
+        self.inner.write().await.absorb_planner_result(result).await
     }
 }

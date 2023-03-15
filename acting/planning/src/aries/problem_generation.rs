@@ -11,7 +11,7 @@ use ompas_structs::conversion::context::ConversionContext;
 use ompas_structs::planning::domain::PlanningDomain;
 use ompas_structs::planning::instance::{ChronicleInstance, PlanningInstance};
 use ompas_structs::planning::problem::PlanningProblem;
-use ompas_structs::sym_table::r#trait::FormatWithSymTable;
+use ompas_structs::sym_table::r#trait::{FormatWithSymTable, Replace};
 use ompas_structs::sym_table::VarId;
 use sompas_structs::llambda::{LLambda, LambdaArgs};
 use sompas_structs::lruntimeerror;
@@ -291,6 +291,8 @@ pub async fn convert_into_chronicle_instance(
         }
         None => name,
     });
+    let presence = *ch.get_presence();
+    ch.replace(&presence, &st.new_bool(true));
 
     let lv = lambda.get_body();
 

@@ -11,17 +11,6 @@ use sompas_structs::lvalue::LValue;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 
-pub struct ActingPoint {
-    pr: ProcessRef,
-    choice: ActingChoice,
-}
-
-impl Display for ActingPoint {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}:{}", self.pr, self.choice)
-    }
-}
-
 pub struct RawArbitrary {
     lv: LValue,
 }
@@ -281,30 +270,4 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
     }
 
     raw_plan
-}
-
-pub enum ActingChoice {
-    Arbitrary(LValue),
-    Acquire(String, WaiterPriority),
-    SubTask(String),
-    Refinement(LValue),
-}
-
-impl Display for ActingChoice {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ActingChoice::Arbitrary(arb) => {
-                write!(f, "{}", arb)
-            }
-            ActingChoice::Acquire(res, prio) => {
-                write!(f, "{},{}", res, prio)
-            }
-            ActingChoice::SubTask(s) => {
-                write!(f, "{}", s)
-            }
-            ActingChoice::Refinement(r) => {
-                write!(f, "{}", r)
-            }
-        }
-    }
 }

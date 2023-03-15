@@ -27,10 +27,10 @@
                 (t_carry_to_machine ?r ?p (find_output_machine))
                 )))
     
-    (def-task t_process_on_machine (:params (?p package) (?m machine)))
+    (def-task t_process_on_machine (:params (?p package) (?m machine) (?d int)))
     (def-method m_process_on_machine
         (:task t_process_on_machine)
-        (:params (?p package) (?m machine))
+        (:params (?p package) (?m machine) (?d int))
         (:pre-conditions true)
         (:score 0)
         (:body 
@@ -40,5 +40,15 @@
                 (define h2 (await (acquire ?r)))
                 (t_carry_to_machine ?r ?p ?m)
                 (release h2)
-                (process ?m ?p))))
+                (t_process ?m ?p ?d))))
+
+    (def-task t_process (:params (?m machine) (?p package) (?d int)))
+    (def-task-om-model t_process
+        (:params (?m machine) (?p package) (?d int))
+        (:body (sleep ?d)))
+    
+    (def-method m_process 
+        (:task t_process)
+        (:params (?m machine) (?p package) (?d int))
+        (:body (process ?m ?p)))
 )

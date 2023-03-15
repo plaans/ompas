@@ -1,7 +1,8 @@
 use crate::aries::template::read_chronicle;
 use crate::aries::useful;
-use aries_core::{Lit as aLit, INT_CST_MAX};
-use aries_model::lang::{Atom as aAtom, FAtom, SAtom};
+use aries::core::Lit as aLit;
+use aries::core::INT_CST_MAX;
+use aries::model::lang::{Atom as aAtom, FAtom, SAtom};
 use aries_planning::chronicles::{
     Chronicle, ChronicleInstance, ChronicleKind as aChronicleKind, ChronicleOrigin, Container, Ctx,
     Effect, SubTask, VarType, TIME_SCALE,

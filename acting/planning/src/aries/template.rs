@@ -1,13 +1,14 @@
 use crate::aries::{useful, OMPAS_TIME_SCALE};
 use anyhow::anyhow;
-use aries_core::{IntCst, Lit as aLit, INT_CST_MAX, INT_CST_MIN};
-use aries_model::extensions::Shaped;
-use aries_model::lang::linear::{LinearSum, LinearTerm};
-use aries_model::lang::{
+use aries::core::{IntCst, Lit as aLit, INT_CST_MAX, INT_CST_MIN};
+use aries::model::extensions::Shaped;
+use aries::model::lang::linear::{LinearSum, LinearTerm};
+use aries::model::lang::{
     Atom as aAtom, ConversionError, FAtom, FVar, IVar, Type as aType, Variable,
 };
-use aries_model::symbols::SymbolTable;
-use aries_model::types::TypeHierarchy;
+use aries::model::symbols::SymbolTable;
+use aries::model::types::TypeHierarchy;
+use aries::utils::input::Sym;
 use aries_planning::chronicles;
 use aries_planning::chronicles::constraints::{Constraint as aConstraint, ConstraintType, Sum};
 use aries_planning::chronicles::printer::Printer;
@@ -17,7 +18,6 @@ use aries_planning::chronicles::{
     Problem as aProblem, StateFun, SubTask, VarType,
 };
 use aries_planning::parsing::pddl::TypedSymbol;
-use aries_utils::input::Sym;
 use function_name::named;
 use num_integer::Integer;
 use ompas_language::exec::resource::{MAX_Q, QUANTITY};

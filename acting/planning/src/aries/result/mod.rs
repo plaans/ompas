@@ -1,4 +1,4 @@
-use aries_model::extensions::{AssignmentExt, SavedAssignment};
+use aries::model::extensions::{AssignmentExt, SavedAssignment};
 use aries_planning::chronicles::{printer, FiniteProblem};
 use std::sync::Arc;
 
@@ -8,7 +8,7 @@ pub mod plan;
 
 pub struct PlanResult {
     pub ass: Arc<SavedAssignment>,
-    pub fp: FiniteProblem,
+    pub fp: Arc<FiniteProblem>,
 }
 
 pub fn print_chronicles(pr: &PlanResult) {

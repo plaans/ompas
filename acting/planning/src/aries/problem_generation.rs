@@ -269,12 +269,10 @@ pub async fn convert_into_chronicle_instance(
                     }
                 }
                 ActionParam::Uninstantiated(lv) => {
-                    let symbol = lv.to_string();
-                    pc.p_table.add(
-                        lambda_param.to_string(),
-                        PLValue::unpure(symbol.as_str().into()),
-                    );
-                    let id = st.new_parameter(symbol, pt.get_domain().clone());
+                    let str = lambda_param.to_string();
+                    pc.p_table
+                        .add(str.to_string(), PLValue::unpure(str.to_string().into()));
+                    let id = st.new_parameter(str, pt.get_domain().clone());
                     ch.add_var(id);
                     id
                 }

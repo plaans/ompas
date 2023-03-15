@@ -7,7 +7,7 @@ pub mod useful;
 
 use crate::aries::instance::{create_initial_chronicle, generate_instances};
 use anyhow::Result;
-use aries_core::IntCst;
+use aries::core::IntCst;
 use aries_planning::chronicles;
 use aries_planning::chronicles::TIME_SCALE;
 use ompas_structs::acting_manager::planner_manager::RefBindingPlanner;

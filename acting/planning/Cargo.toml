@@ -21,15 +21,9 @@ ompas-structs = {path = "../structs"}
 ompas-middleware= {path = "../../middleware"}
 
 # aries bindings
-aries_core = {path = "../../aries/cp/core"}
-aries_model = {path = "../../aries/cp/model"}
-aries_cp = {path = "../../aries/cp/reasoners/cp"}
+aries = {path = "../../aries/solver"}
 aries_planning = {path = "../../aries/planning/planning"}
-aries_utils = {path = "../../aries/cp/utils"}
-aries_collections = {path = "../../aries/cp/collections"}
-aries_solver = {path = "../../aries/cp/solver"}
 aries_planners = {path = "../../aries/planning/planners"}
-aries_stn = {path = "../../aries/cp/reasoners/stn"}
 
 anyhow = "1.0.40"
 tokio = { version = "1.17.0", features = ["full", "time"] }

@@ -1,6 +1,6 @@
 use crate::aries::result::PlanResult;
-use aries_model::extensions::AssignmentExt;
-use aries_model::lang::Atom;
+use aries::model::extensions::AssignmentExt;
+use aries::model::lang::Atom;
 use aries_planning::chronicles::{ChronicleKind, ChronicleOrigin};
 use im::HashMap;
 use ompas_structs::planning::plan::{AbstractTaskInstance, ActionInstance, Plan, TaskInstance};

@@ -1,18 +1,9 @@
 use crate::aries::result::PlanResult;
-use aries_model::extensions::{AssignmentExt, SavedAssignment, Shaped};
-use aries_model::lang::Variable;
-use aries_model::Model;
-use aries_planning::chronicles::VarLabel;
 use ompas_structs::acting_manager::operational_model::ActingModel;
-use ompas_structs::acting_manager::planner_manager::{
-    get_var_as_cst, BindingPlanner, RefBindingPlanner,
-};
+use ompas_structs::acting_manager::planner_manager::{get_var_as_cst, RefBindingPlanner};
 use ompas_structs::conversion::chronicle::Instantiation;
 use ompas_structs::planning::instance::ChronicleInstance;
 use ompas_structs::planning::problem::PlanningProblem;
-use ompas_structs::sym_table::domain::cst::Cst;
-use ompas_structs::sym_table::VarId;
-use std::sync::Arc;
 
 pub async fn instantiate_chronicles(
     pp: &PlanningProblem,

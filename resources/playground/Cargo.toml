@@ -13,7 +13,7 @@ ompas-utils={path = "../../utils"}
 ompas-gobotsim = {path = "../../gobotsim"}
 ompas-core = {path = "../../acting/core"}
 ompas-structs = {path = "../../acting/structs"}
-aries_utils = {path = "../../aries/cp/utils"}
+aries = {path = "../../aries/solver"}
 
 tokio = { version = "1.17.0", features = ["full", "time"] }
 rustyline = "7.1.0"

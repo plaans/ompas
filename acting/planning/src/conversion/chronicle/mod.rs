@@ -287,17 +287,17 @@ pub fn convert_into_chronicle(
                             value: current_release_quantity,
                         });
 
+                        let max_q_result = st.new_result();
+                        st.set_domain(&st.get_domain_id(&max_q_result), int_domain.clone());
+                        ch.add_condition(Condition {
+                            interval: Interval::new_instantaneous(interval.get_start()),
+                            sv: vec![max_q_symbol, resource],
+                            value: max_q_result,
+                        });
+
                         let quantity = if let Some(capacity) = acq.capacity {
                             capacity
                         } else {
-                            let max_q_result = st.new_result();
-                            st.set_domain(&st.get_domain_id(&max_q_result), int_domain.clone());
-                            ch.add_condition(Condition {
-                                interval: Interval::new_instantaneous(interval.get_start()),
-                                sv: vec![max_q_symbol, resource],
-                                value: max_q_result,
-                            });
-
                             max_q_result
                         };
 
@@ -322,6 +322,8 @@ pub fn convert_into_chronicle(
                         ch.add_constraint(Constraint::leq(interval.get_end(), t_release));
                         ch.add_constraint(Constraint::leq(st.new_int(0), new_q));
                         ch.add_constraint(Constraint::leq(st.new_int(0), new_q_prime));
+                        ch.add_constraint(Constraint::leq(new_q, max_q_result));
+                        ch.add_constraint(Constraint::leq(new_q_prime, max_q_result));
 
                         ch.add_effect(Effect {
                             interval: Interval::new(t_prime, interval.get_end()),

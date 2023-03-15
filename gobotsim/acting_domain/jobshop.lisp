@@ -9,6 +9,10 @@
                 (face_belt ?r ?b 5))))
 
     (def-task t_carry_to_machine (:params (?r robot) (?p package) (?m machine)))
+    (def-task-om-model t_carry_to_machine
+        (:params (?r robot) (?p package) (?m machine))
+        (:body (sleep 1))
+    )
     (def-method m_carry_to_machine
             (:task t_carry_to_machine)
             (:params (?r robot) (?p package) (?m machine))
@@ -67,6 +71,9 @@
                      (t_check_battery ?r))))
                             
     (def-task t_check_rob_bat)
+    (def-task-om-model t_check_rob_bat
+            (:params )
+            (:body nil))
     (def-method m_check_initial_robots_batteries
         (:task t_check_rob_bat)
         (:params)
@@ -108,7 +115,9 @@
                        (do
                            (define tasks (mapf (lambda (process)
                                `(t_process_on_machine ,?p 
-                                   (arbitrary ',(find_machines_for_process (car process)))                                   ))
+                                   (arbitrary ',(find_machines_for_process (car process)))
+                                   (cdar process)
+                                   ))
                                (package.all_processes ?p)))
                             (define last_task
                                 `(begin

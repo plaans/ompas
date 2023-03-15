@@ -1,10 +1,10 @@
 use crate::aries::FLOAT_SCALE;
-use aries_core::Lit as aLit;
-use aries_model::extensions::Shaped;
-use aries_model::lang::{
+use aries::core::Lit as aLit;
+use aries::model::extensions::Shaped;
+use aries::model::lang::{
     Atom as aAtom, ConversionError, FAtom, FVar, IAtom, IVar, SAtom, Type as aType, Variable,
 };
-use aries_model::symbols::SymbolTable;
+use aries::model::symbols::SymbolTable;
 use aries_planning::chronicles::Ctx;
 use function_name::named;
 use ompas_language::sym_table::EPSILON;

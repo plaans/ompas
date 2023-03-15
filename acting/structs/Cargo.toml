@@ -19,7 +19,7 @@ ompas-utils = {path= "../../utils" }
 ompas-language = {path = "../language"}
 
 # aries dependencies
-aries_model = {path = "../../aries/cp/model"}
+aries = {path = "../../aries/solver"}
 
 
 tokio = { version = "1.17.0", features = ["full", "time"] }

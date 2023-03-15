@@ -343,7 +343,7 @@ impl Chronicle {
         s.push_str("}\n");
 
         //conditions
-        s.push_str("-conditon(s): {");
+        s.push_str("-condition(s): {");
         for c in &self.conditions {
             write!(s, "\n\t{}", c.format(st.borrow(), sym_version)).unwrap();
         }

@@ -1,4 +1,4 @@
-use crate::exec::state::{instances, ModState};
+use crate::exec::state::ModState;
 use crate::monitor::control::ModControl;
 use crate::monitor::domain::ModDomain;
 use aries_planning::chronicles::ChronicleOrigin;
@@ -14,7 +14,7 @@ use ompas_middleware::logger::LogClient;
 use ompas_planning::aries::generate_chronicles;
 use ompas_planning::aries::problem_generation::{finite_problem, ActionParam, PAction};
 use ompas_planning::aries::result::{acting, instance};
-use ompas_planning::aries::solver::run_solver_for_htn;
+use ompas_planning::aries::solver::run_solver;
 use ompas_planning::conversion::convert_acting_domain;
 use ompas_planning::conversion::flow::annotate::annotate;
 use ompas_planning::conversion::flow::p_eval::r#struct::{PConfig, PLEnv};
@@ -97,12 +97,12 @@ pub async fn plan_task(env: &LEnv, args: &[LValue]) -> LResult {
 
     let bindings: RefBindingPlanner = acting_manager.get_ref_bindings_planner().await;
 
-    let mut aries_problem = generate_chronicles(&bindings, &pp).await?;
+    let aries_problem = generate_chronicles(&bindings, &pp).await?;
 
-    let result = run_solver_for_htn(&mut aries_problem, false);
+    let result = run_solver(aries_problem, None);
     // println!("{}", format_partial_plan(&pb, &x)?);
 
-    let result: LValue = if let Some(pr) = result {
+    let result: LValue = if let Ok(Some(pr)) = result {
         //result::print_chronicles(pr);
         let solved: Vec<ChronicleInstance> =
             instance::instantiate_chronicles(&pp, &pr, &bindings).await;

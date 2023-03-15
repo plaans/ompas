@@ -7,9 +7,9 @@ use crate::sym_table::domain::cst::Cst;
 use crate::sym_table::r#ref::RefSymTable;
 use crate::sym_table::r#trait::FormatWithSymTable;
 use crate::sym_table::VarId;
-use aries_model::extensions::{AssignmentExt, SavedAssignment, Shaped};
-use aries_model::lang::{Atom, Variable};
-use aries_model::Model;
+use aries::model::extensions::{AssignmentExt, SavedAssignment, Shaped};
+use aries::model::lang::{Atom, Variable};
+use aries::model::Model;
 use aries_planning::chronicles::{FiniteProblem, VarLabel};
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -91,7 +91,7 @@ pub struct ActingPlanResult {
     pub instances: Vec<ChronicleInstance>,
     pub bindings: RefBindingPlanner,
     pub assignements: Arc<SavedAssignment>,
-    pub finite_problem: FiniteProblem,
+    pub finite_problem: Arc<FiniteProblem>,
 }
 
 #[derive(Default)]

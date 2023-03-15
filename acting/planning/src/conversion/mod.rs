@@ -42,6 +42,7 @@ pub mod flow;
 
 #[allow(dead_code)]
 const DEBUG_CHRONICLE: bool = false;
+#[allow(dead_code)]
 static N_CONVERSION: AtomicU32 = AtomicU32::new(0);
 
 pub async fn convert(
@@ -51,12 +52,12 @@ pub async fn convert(
     st: RefSymTable,
 ) -> Result<ActingModel, LRuntimeError> {
     let p_eval_lv = p_eval(lv, p_env).await?;
-    //debug_println!("{}\n=>\n{}", lv.format(0), p_eval_lv.format(0));
+    //debug_println!("{}\np_eval =>\n{}", lv.format(0), p_eval_lv.format(0));
     let lv_om = annotate(p_eval_lv);
-    //debug_println!("=>{}", lv_om.format(0));
+    //debug_println!("annotate =>\n{}", lv_om.format(0));
 
     let pp_lv = pre_processing(&lv_om, &p_env).await?;
-    //debug_println!("=>{}", pp_lv.format(0));
+    //debug_println!("pre_processing =>\n{}", pp_lv.format(0));
 
     let chronicle = match _convert(ch, &pp_lv, p_env, st).await {
         Ok(ch) => Some(ch),

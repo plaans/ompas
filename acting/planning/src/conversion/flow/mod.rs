@@ -30,6 +30,10 @@ pub fn convert_lv(
 ) -> Result<FlowId, LRuntimeError> {
     let node_id = match lv {
         LValue::Symbol(s) => convert_symbol(s, fl, define_table),
+        LValue::Fn(f) => convert_symbol(f.get_label(), fl, define_table),
+        LValue::MutFn(f) => convert_symbol(f.get_label(), fl, define_table),
+        LValue::AsyncFn(f) => convert_symbol(f.get_label(), fl, define_table),
+        LValue::AsyncMutFn(f) => convert_symbol(f.get_label(), fl, define_table),
         LValue::String(s) => convert_string(s, fl),
         LValue::Number(n) => convert_number(n, fl),
         LValue::Primitive(co) => convert_core_operator(co, fl),
@@ -47,8 +51,8 @@ pub fn convert_lv(
     Ok(node_id)
 }
 
-fn convert_symbol(symbol: &Arc<String>, fl: &mut FlowGraph, define_table: &DefineTable) -> FlowId {
-    let var_id = match define_table.get(symbol.as_str()) {
+fn convert_symbol(symbol: &str, fl: &mut FlowGraph, define_table: &DefineTable) -> FlowId {
+    let var_id = match define_table.get(symbol) {
         None => {
             let id = fl.st.new_symbol(symbol);
             id
@@ -57,10 +61,6 @@ fn convert_symbol(symbol: &Arc<String>, fl: &mut FlowGraph, define_table: &Defin
     };
 
     let f_id: FlowId = fl.new_instantaneous_assignment(Lit::Atom(var_id)).into();
-
-    //let r = fl.get_flow_result(&f_id);
-
-    //fl.st.union_var(&r, &var_id);
 
     f_id
 }
@@ -104,6 +104,10 @@ fn convert_list(
 
     let r = match proc {
         LValue::Symbol(s) => convert_apply(s.as_str(), list.as_slice(), fl, define_table)?,
+        LValue::Fn(f) => convert_apply(f.get_label(), list.as_slice(), fl, define_table)?,
+        LValue::MutFn(f) => convert_apply(f.get_label(), list.as_slice(), fl, define_table)?,
+        LValue::AsyncFn(f) => convert_apply(f.get_label(), list.as_slice(), fl, define_table)?,
+        LValue::AsyncMutFn(f) => convert_apply(f.get_label(), list.as_slice(), fl, define_table)?,
         LValue::Primitive(co) => match co {
             LPrimitive::Define => {
                 let var = &list[1].to_string();
@@ -288,7 +292,7 @@ fn convert_list(
         },
         lv => Err(LRuntimeError::new(
             function_name!(),
-            format!("Conversion of {} not supported", lv.get_kind()),
+            format!("Conversion of {}({}) not supported.", lv, lv.get_kind()),
         ))?,
     };
 

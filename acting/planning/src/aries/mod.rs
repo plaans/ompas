@@ -7,11 +7,16 @@ pub mod useful;
 
 use crate::aries::instance::{create_initial_chronicle, generate_instances};
 use anyhow::Result;
-use aries::core::IntCst;
+use aries::core::{IntCst, VarRef};
+use aries::model::extensions::Shaped;
+use aries::model::lang::{Atom, Variable};
 use aries_planning::chronicles;
-use aries_planning::chronicles::TIME_SCALE;
+use aries_planning::chronicles::printer::Printer;
+use aries_planning::chronicles::{ChronicleOrigin, Sub, Substitute, TIME_SCALE};
 use ompas_structs::acting_manager::planner_manager::RefBindingPlanner;
 use ompas_structs::planning::problem::PlanningProblem;
+use std::process::exit;
+
 //pub const FLOAT_SCALE: IntCst = TIME_SCALE;
 /// Resolution of ms
 pub const OMPAS_TIME_SCALE: IntCst = TIME_SCALE;
@@ -41,12 +46,20 @@ pub async fn generate_chronicles(
     let init_ch = create_initial_chronicle(&problem, &mut p.context);
 
     //Printer::print_chronicle(&init_ch.chronicle, &p.context.model);
+    //exit(0);
 
     p.chronicles.push(init_ch);
 
-    let mut instances = generate_instances(&problem, &mut p.context, &mut bindings)?;
+    generate_instances(
+        &mut p.context,
+        &mut bindings,
+        &mut p.chronicles,
+        &problem.instance,
+    )?;
 
-    p.chronicles.append(&mut instances);
+    /*for instance in &p.chronicles[1..] {
+        Printer::print_chronicle(&instance.chronicle, &p.context.model);
+    }*/
 
     /*info!(
         "Generation of the planning problem: {:.3} ms",

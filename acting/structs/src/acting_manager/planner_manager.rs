@@ -30,7 +30,7 @@ impl PlannerManager {
         if let Some(val) = &execution_var.val {
             val.as_cst().unwrap().to_string()
         } else {
-            if let Some(var) = execution_var.plan_var_ids.first() {
+            if let Some(var) = &execution_var.plan_var_id {
                 self.plan_vars[*var].to_string()
             } else {
                 "".to_string()
@@ -64,6 +64,10 @@ impl BindingPlanner {
     pub fn add_binding(&mut self, id: &VarId, var: &Variable) {
         self.inner.insert(*id, *var);
         self.reverse.insert(*var, *id);
+    }
+
+    pub fn contains(&mut self, id: &VarId) -> bool {
+        self.inner.contains_key(id)
     }
 
     pub fn get_var(&self, id: &VarId) -> Option<&Variable> {
@@ -273,7 +277,12 @@ pub fn get_var_as_cst(
         .get_var(var)
         .unwrap_or_else(|| panic!("{var} has no binding in the planner"))
     {
-        Variable::Bool(b) => Cst::Bool(ass.boolean_value_of(*b).unwrap()),
+        Variable::Bool(b) => {
+            let lit = b.true_lit();
+            let value = ass.value(lit).unwrap();
+            //println!("{:?}, {:?}, value: {}", b, lit, value);
+            Cst::Bool(value)
+        }
         Variable::Int(i) => Cst::Int(ass.var_domain(*i).lb as i64),
         Variable::Fixed(f) => Cst::Float(ass.f_domain(*f).lb() as f64),
         Variable::Sym(s) => {

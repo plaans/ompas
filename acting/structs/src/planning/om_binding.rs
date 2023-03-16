@@ -28,7 +28,10 @@ impl Replace for OperationalModelBindings {
         for e in self.inner.values_mut() {
             match e {
                 ChronicleBinding::Arbitrary(a) => a.var_id.replace(old, new),
-                ChronicleBinding::Action(s) => s.interval.replace(old, new),
+                ChronicleBinding::Action(s) => {
+                    s.name.replace(old, new);
+                    s.interval.replace(old, new);
+                }
                 ChronicleBinding::Acquire(acq) => {
                     acq.request.replace(old, new);
                     acq.acquisition.replace(old, new);
@@ -45,7 +48,10 @@ impl FlatBindings for OperationalModelBindings {
         for e in self.inner.values_mut() {
             match e {
                 ChronicleBinding::Arbitrary(a) => a.var_id.flat_bindings(st),
-                ChronicleBinding::Action(s) => s.interval.flat_bindings(st),
+                ChronicleBinding::Action(s) => {
+                    s.name.flat_bindings(st);
+                    s.interval.flat_bindings(st);
+                }
                 ChronicleBinding::Acquire(acq) => {
                     acq.request.flat_bindings(st);
                     acq.acquisition.flat_bindings(st);
@@ -126,7 +132,14 @@ impl FormatWithSymTable for ChronicleBinding {
                 write!(str, "{}", a.var_id.format(st, sym_version)).unwrap();
             }
             ChronicleBinding::Action(s) => {
-                write!(str, "({}){}", s.index, s.interval.format(st, sym_version)).unwrap();
+                write!(
+                    str,
+                    "({}){}: {}",
+                    s.index,
+                    s.interval.format(st, sym_version),
+                    s.name.format(st, sym_version)
+                )
+                .unwrap();
             }
             ChronicleBinding::Acquire(acq) => {
                 write!(

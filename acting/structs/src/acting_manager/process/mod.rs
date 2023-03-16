@@ -61,13 +61,13 @@ impl Display for ActingProcess {
             "".to_string()
         };
         match &self.inner {
-            ActingProcessInner::RootTask(r) => {
+            ActingProcessInner::RootTask(_) => {
                 write!(f, "root")
             }
-            ActingProcessInner::Action(t) => {
+            ActingProcessInner::Action(_) => {
                 write!(f, "{}", debug)
             }
-            ActingProcessInner::Method(m) => {
+            ActingProcessInner::Method(_) => {
                 write!(f, "{}", debug)
             }
             ActingProcessInner::Arbitrary(arb) => {

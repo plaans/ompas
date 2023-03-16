@@ -10,6 +10,7 @@ use aries_planning::chronicles::{
 use ompas_language::exec::resource::{MAX_Q, QUANTITY};
 use ompas_language::exec::state::INSTANCE;
 use ompas_structs::acting_manager::planner_manager::BindingPlanner;
+use ompas_structs::planning::instance::PlanningInstance;
 use ompas_structs::planning::problem::PlanningProblem;
 use ompas_structs::state::partial_state::PartialState;
 use ompas_structs::state::world_state::{StateType, WorldStateSnapshot};
@@ -164,17 +165,24 @@ fn initialize_goal_task(init_ch: &mut Chronicle, goal_tasks: &[LValueS], ctx: &m
 }
 
 pub fn generate_instances(
-    problem: &PlanningProblem,
     ctx: &mut Ctx,
     bindings: &mut BindingPlanner,
-) -> anyhow::Result<Vec<ChronicleInstance>> {
-    let mut instances = vec![];
-    for (id, instance) in problem.instance.instances.iter().enumerate() {
+    instances: &mut Vec<ChronicleInstance>,
+    instance: &PlanningInstance,
+) -> anyhow::Result<()> {
+    for (id, instance) in instance.instances.iter().enumerate() {
+        let scope = match instance.origin {
+            ChronicleOrigin::Refinement { instance_id, .. } => {
+                instances[instance_id].chronicle.presence
+            }
+            _ => panic!(),
+        };
         let template = read_chronicle(
             ctx,
             bindings,
             &instance.om.chronicle.as_ref().unwrap(),
             Container::Instance(id + 1),
+            Some(scope),
         )?;
         //Printer::print_chronicle(&template.chronicle, &ctx.model);
 
@@ -188,6 +196,5 @@ pub fn generate_instances(
             chronicle: template.chronicle,
         });
     }
-
-    Ok(instances)
+    Ok(())
 }

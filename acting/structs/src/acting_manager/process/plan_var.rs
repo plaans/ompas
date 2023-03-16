@@ -7,10 +7,15 @@ use sompas_structs::lnumber::LNumber;
 use sompas_structs::lvalue::LValue;
 use std::fmt::{Display, Formatter};
 
+#[derive(Copy, Clone)]
+pub struct PlanRef {
+    var_id: VarId,
+    am_id: AMId,
+}
+
 #[derive(Clone)]
 pub struct PlanVar {
-    var_id: VarId,
-    om_id: AMId,
+    refs: Vec<PlanRef>,
     value: ActingVal,
 }
 
@@ -25,12 +30,25 @@ impl Display for PlanVar {
 }
 
 impl PlanVar {
-    pub fn new(var_id: VarId, om_id: AMId) -> PlanVar {
+    pub fn new() -> PlanVar {
         Self {
-            var_id,
-            om_id,
+            refs: vec![],
             value: ActingVal::None,
         }
+    }
+
+    pub fn new_with_ref(var_id: &VarId, am_id: &AMId) -> Self {
+        Self {
+            refs: vec![PlanRef {
+                var_id: *var_id,
+                am_id: *am_id,
+            }],
+            value: ActingVal::None,
+        }
+    }
+
+    pub fn add_ref(&mut self, var_id: VarId, am_id: AMId) {
+        self.refs.push(PlanRef { var_id, am_id })
     }
 
     pub fn set_execution_val(&mut self, val: cst::Cst) {
@@ -55,14 +73,14 @@ pub enum ActingVal {
 
 pub type PlanVarId = usize;
 
-pub struct PlanVal {
+pub struct PlanValUpdate {
     pub(crate) plan_var_id: PlanVarId,
     pub(crate) val: cst::Cst,
 }
 
-#[derive(Clone, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct ExecutionVar<T: Display + Clone + AsCst> {
-    pub(crate) plan_var_ids: Vec<PlanVarId>,
+    pub(crate) plan_var_id: Option<PlanVarId>,
     pub(crate) val: Option<T>,
 }
 
@@ -70,28 +88,37 @@ pub trait AsCst {
     fn as_cst(&self) -> Option<cst::Cst>;
 }
 
+impl AsCst for Cst {
+    fn as_cst(&self) -> Option<Cst> {
+        Some(self.clone())
+    }
+}
+
 impl<T: Display + Clone + AsCst> ExecutionVar<T> {
-    pub fn new(plan_var_ids: Vec<PlanVarId>) -> Self {
+    pub fn new() -> Self {
         Self {
-            plan_var_ids,
+            plan_var_id: None,
+            val: None,
+        }
+    }
+    pub fn new_with_ref(plan_var_id: PlanVarId) -> Self {
+        Self {
+            plan_var_id: Some(plan_var_id),
             val: None,
         }
     }
 
-    pub fn get_plan_var_ids(&self) -> &Vec<PlanVarId> {
-        &self.plan_var_ids
+    pub fn get_plan_var_id(&self) -> &Option<PlanVarId> {
+        &self.plan_var_id
     }
 
-    pub fn set_val(&mut self, val: T) -> Vec<PlanVal> {
+    pub fn set_val(&mut self, val: T) -> Option<PlanValUpdate> {
         let cst = val.as_cst().unwrap();
         self.val = Some(val);
-        self.plan_var_ids
-            .iter()
-            .map(|&plan_var_id| PlanVal {
-                plan_var_id,
-                val: cst.clone(),
-            })
-            .collect()
+        self.plan_var_id.as_ref().map(|&plan_var_id| PlanValUpdate {
+            plan_var_id,
+            val: cst.clone(),
+        })
     }
 
     pub fn get_val(&mut self) -> &Option<T> {

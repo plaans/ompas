@@ -131,7 +131,7 @@ impl ActingManager {
         &self,
         label: Label,
         parent: &ActingProcessId,
-        args: Vec<Cst>,
+        args: Vec<Option<Cst>>,
         debug: String,
         origin: ProcessOrigin,
     ) -> ActingProcessId {
@@ -327,7 +327,7 @@ impl ActingManager {
         self.inner.write().await.set_s_acq(acquire_id, instant)
     }
 
-    pub async fn get_task_args(&self, id: &ActingProcessId) -> Vec<cst::Cst> {
+    pub async fn get_task_args(&self, id: &ActingProcessId) -> Vec<Cst> {
         self.inner.read().await.get_task_args(id).clone()
     }
 

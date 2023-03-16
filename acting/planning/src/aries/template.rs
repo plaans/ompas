@@ -238,6 +238,7 @@ pub fn generate_templates(
             bindings,
             template.chronicle.as_ref().unwrap(),
             cont.clone(),
+            None,
         )?;
         Printer::print_chronicle(&template.chronicle, &ctx.model);
         templates.push(template);
@@ -253,8 +254,8 @@ pub fn generate_templates(
 #[allow(dead_code)]
 fn convert_constraint(
     c: &Constraint,
-    _prez: aLit,
-    _container: Container,
+    prez: aLit,
+    container: Container,
     bindings: &BindingPlanner,
     st: &RefSymTable,
     ctx: &mut Ctx,
@@ -281,17 +282,10 @@ fn convert_constraint(
             (Lit::Atom(a), Lit::Constraint(c)) => {
                 let value = ctx
                     .model
-                    .new_optional_bvar(_prez, _container / VarType::Reification)
+                    .new_optional_bvar(prez, container / VarType::Reification)
                     .into();
-                let mut cs = convert_constraint(
-                    c.deref(),
-                    _prez,
-                    _container,
-                    bindings,
-                    st,
-                    ctx,
-                    Some(value),
-                )?;
+                let mut cs =
+                    convert_constraint(c.deref(), prez, container, bindings, st, ctx, Some(value))?;
                 constraints.append(&mut cs);
                 aConstraint::neq(get_atom(&a, ctx), value)
             }
@@ -338,7 +332,7 @@ fn convert_constraint(
                     cst += factor * shift;
                     match var {
                         IVar::ZERO => {}
-                        _ => terms.push(LinearTerm::new(factor, var, false)),
+                        _ => terms.push(LinearTerm::new(factor, var, true)),
                     }
                 }
 
@@ -375,91 +369,6 @@ fn convert_constraint(
                         })
                     }
                 }
-
-                /*match c.deref() {
-                    Computation::Add(vec) => {
-                        if vec.len() == 2 && vec[1].format(st, true).as_str() == EPSILON {
-                            let mut b = get_atom(&vec[0].clone().try_into().expect(""), ctx);
-                            b = (FAtom::try_from(b).map_err(|c| {
-                                LRuntimeError::new("conversion_error", c.to_string())
-                            })? + FAtom::EPSILON)
-                                .into();
-                            aConstraint::eq(value, b)
-                        }
-                        else {
-                            let mut factor: IntCst = 1;
-                            let mut variables = vec![];
-                            let mut lsum = LinearSum::zero();
-                            variables.push(value);
-                            for var in vec {
-                                let var: VarId = var.try_into().expect("");
-                                variables.push(get_atom(&var, ctx))
-                            }
-                            for var in &variables {
-                                if let aAtom::Fixed(f) = var {
-                                    factor = factor.lcm(&f.denom);
-                                }
-                            }
-
-                            for (i, var) in variables.iter().enumerate() {
-                                let factor = if i == 0 { -factor } else { factor };
-                                match var {
-                                    aAtom::Int(i) => {
-                                        lsum += LinearTerm::new(factor, i.var, false);
-                                        lsum = lsum + factor * i.shift;
-                                    }
-                                    aAtom::Fixed(f) => {
-                                        let factor = factor / f.denom;
-                                        lsum += LinearTerm::new(factor, f.num.var, false);
-                                        lsum = lsum + factor * f.num.shift;
-                                    }
-                                    _ => unreachable!(),
-                                }
-                            }
-
-                            aConstraint::sum(Sum {
-                                sum: lsum,
-                                value: 0,
-                            })
-                        }
-                    }
-                    Computation::Sub(vec) => {
-                        let mut factor: IntCst = 1;
-                        let mut variables = vec![];
-                        let mut lsum = LinearSum::zero();
-                        variables.push(value);
-                        for var in vec {
-                            let var: VarId = var.try_into().expect("");
-                            variables.push(get_atom(&var, ctx))
-                        }
-                        for var in &variables {
-                            if let aAtom::Fixed(f) = var {
-                                factor = factor.lcm(&f.denom);
-                            }
-                        }
-
-                        for (i, var) in variables.iter().enumerate() {
-                            let factor = if i != 1 { -factor } else { factor };
-                            match var {
-                                aAtom::Int(i) => {
-                                    lsum += LinearTerm::new(factor, i.var, false);
-                                    lsum = lsum + factor * i.shift;
-                                }
-                                aAtom::Fixed(f) => {
-                                    let factor = factor / f.denom;
-                                    lsum += LinearTerm::new(factor, f.num.var, false);
-                                    lsum = lsum + factor * f.num.shift;
-                                }
-                                _ => unreachable!(),
-                            }
-                        }
-
-                        aConstraint::sum(Sum {
-                            sum: lsum,
-                            value: 0,
-                        })
-                    }
-                }*/
             }
             _ => Err(LRuntimeError::default().chain("constraint::eq"))?,
         },
@@ -483,12 +392,12 @@ fn convert_constraint(
                     Lit::Constraint(c) => {
                         let value: aLit = ctx
                             .model
-                            .new_optional_bvar(_prez, _container / VarType::Reification)
+                            .new_optional_bvar(prez, container / VarType::Reification)
                             .into();
                         let mut cs = convert_constraint(
                             &c,
-                            _prez,
-                            _container,
+                            prez,
+                            container,
                             bindings,
                             st,
                             ctx,
@@ -521,12 +430,12 @@ fn convert_constraint(
                     Lit::Constraint(c) => {
                         let value: aLit = ctx
                             .model
-                            .new_optional_bvar(_prez, _container / VarType::Reification)
+                            .new_optional_bvar(prez, container / VarType::Reification)
                             .into();
                         let mut cs = convert_constraint(
                             &c,
-                            _prez,
-                            _container,
+                            prez,
+                            container,
                             bindings,
                             st,
                             ctx,
@@ -552,12 +461,12 @@ fn convert_constraint(
                 Lit::Constraint(_c) => {
                     let value = ctx
                         .model
-                        .new_optional_bvar(_prez, _container / VarType::Reification)
+                        .new_optional_bvar(prez, container / VarType::Reification)
                         .into();
                     let mut cs = convert_constraint(
                         c.deref(),
-                        _prez,
-                        _container,
+                        prez,
+                        container,
                         bindings,
                         st,
                         ctx,
@@ -591,6 +500,7 @@ pub fn read_chronicle(
     bindings: &mut BindingPlanner,
     ch: &Chronicle,
     container: Container,
+    scope: Option<aLit>,
 ) -> anyhow::Result<aChronicleTemplate> {
     /*println!(
         "reading chronicle: {}",
@@ -608,14 +518,22 @@ pub fn read_chronicle(
     // Declaration of the presence variable
 
     //Declaration of the variables
-    let prez_var = ctx.model.new_bvar(container / VarType::Presence);
-    bindings.add_binding(ch.get_presence(), &prez_var.into());
-    let prez: aLit = prez_var.into();
-    params.push(prez_var.into());
-
+    let prez_var = match scope {
+        Some(scope) => ctx
+            .model
+            .new_presence_variable(scope, container / VarType::Presence),
+        None => ctx.model.new_bvar(container / VarType::Presence),
+    };
+    let variable: Variable = prez_var.into();
+    bindings.add_binding(ch.get_presence(), &variable);
+    params.push(variable);
+    let prez: aLit = prez_var.true_lit();
     //print!("init params...");
     //TODO: handle case where some parameters are already instantiated.
     for var in &ch.get_variables() {
+        if bindings.contains(var) {
+            continue;
+        }
         let var_domain = st.get_var_domain(var);
         let domain = &var_domain.domain;
         let label = st.get_label(var, false);
@@ -838,7 +756,7 @@ pub fn read_chronicle(
             ChronicleKind::Task => aChronicleKind::Action,
             ChronicleKind::Root => aChronicleKind::Problem,
         },
-        presence: prez_var.into(),
+        presence: prez,
         start,
         end,
         name,

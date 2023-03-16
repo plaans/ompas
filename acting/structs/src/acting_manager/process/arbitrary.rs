@@ -1,4 +1,4 @@
-use crate::acting_manager::process::plan_var::{ExecutionVar, PlanVal, PlanVarId};
+use crate::acting_manager::process::plan_var::{ExecutionVar, PlanValUpdate, PlanVarId};
 use crate::acting_manager::process::ActingProcessInner;
 use sompas_structs::lvalue::LValue;
 use std::fmt::{Display, Formatter};
@@ -16,12 +16,12 @@ impl ArbitraryProcess {
         self.set = set
     }
 
-    pub fn set_var(&mut self, var: LValue) -> Vec<PlanVal> {
+    pub fn set_var(&mut self, var: LValue) -> Option<PlanValUpdate> {
         self.var.set_val(var)
     }
 
-    pub fn get_plan_var_ids(&self) -> &Vec<PlanVarId> {
-        self.var.get_plan_var_ids()
+    pub fn get_plan_var_id(&self) -> &Option<PlanVarId> {
+        self.var.get_plan_var_id()
     }
 }
 

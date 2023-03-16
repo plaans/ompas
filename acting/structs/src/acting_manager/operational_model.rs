@@ -18,6 +18,12 @@ pub struct ActingModel {
     pub chronicle: Option<Chronicle>,
 }
 
+pub struct TaskRef {
+    pub start: VarId,
+    pub end: VarId,
+    pub name: Vec<VarId>,
+}
+
 impl ActingModel {
     pub fn root(st: RefSymTable) -> Self {
         let chronicle = Chronicle::new(ROOT, ChronicleKind::Root, st);
@@ -30,7 +36,7 @@ impl ActingModel {
         }
     }
 
-    pub fn add_subtask(&mut self, mut task: Vec<cst::Cst>) -> (VarId, VarId) {
+    pub fn add_subtask(&mut self, mut task: Vec<cst::Cst>) -> TaskRef {
         let chronicle = self.chronicle.as_mut().unwrap();
 
         let interval = chronicle::interval::Interval::new(
@@ -59,7 +65,7 @@ impl ActingModel {
         };
 
         let binding = ActionBinding {
-            name,
+            name: name.clone(),
             index: chronicle.get_subtasks().len(),
             interval,
         };
@@ -67,6 +73,6 @@ impl ActingModel {
         chronicle.add_subtask(subtask);
         chronicle.bindings.add_binding(label, binding);
 
-        (start, end)
+        TaskRef { start, end, name }
     }
 }

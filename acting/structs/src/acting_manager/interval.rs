@@ -101,7 +101,7 @@ impl Display for Interval {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut str = format!("[{:.3},", self.start.as_secs());
         match &self.end {
-            Some(end) => str.push_str(format!("{:^3}]", end.as_secs()).as_str()),
+            Some(end) => str.push_str(format!("{:.3}]", end.as_secs()).as_str()),
             None => str.push_str("...]"),
         }
 

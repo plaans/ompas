@@ -1,17 +1,20 @@
+use crate::acting_manager::process::plan_var::ExecutionVar;
 use crate::acting_manager::process::ActingProcessInner;
 use crate::acting_manager::{AMId, ActingProcessId};
 use crate::sym_table::domain::cst;
+use crate::sym_table::domain::cst::Cst;
+use sompas_structs::lruntimeerror::LRuntimeError;
 use std::fmt::{Display, Formatter};
 
 #[derive(Clone, Debug)]
 pub struct ActionProcess {
     pub abstract_am_id: Option<AMId>,
-    pub args: Vec<cst::Cst>,
+    pub args: Vec<ExecutionVar<Cst>>,
     pub refinements: Vec<ActingProcessId>,
 }
 
 impl ActionProcess {
-    pub fn new(args: Vec<cst::Cst>) -> Self {
+    pub fn new(mut args: Vec<ExecutionVar<Cst>>) -> Self {
         Self {
             abstract_am_id: None,
             args,
@@ -19,8 +22,16 @@ impl ActionProcess {
         }
     }
 
-    pub fn get_args(&self) -> &Vec<cst::Cst> {
-        &self.args
+    pub fn get_args(&self) -> Vec<Cst> {
+        let mut args = vec![];
+        for arg in &self.args {
+            if let Some(val) = &arg.val {
+                args.push(val.clone())
+            } else {
+                panic!("ActionProcess::get_args: val is not a cst")
+            }
+        }
+        args
     }
 
     pub fn add_abstract_am_id(&mut self, am_id: &AMId) {

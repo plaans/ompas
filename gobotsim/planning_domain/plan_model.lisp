@@ -21,11 +21,11 @@
                                    ,(cadr process)
                                    ))
                                (package.all_processes ?p)))
-                            ; (define last_task
-                            ;     `(begin
-                            ;         (define ?r (arbitrary (instances robot)))
-                            ;         (define h_r (acquire ?r))
-                            ;         (t_carry_to_machine ?r ,?p ,(find_output_machine))))
+                            (define last_task
+                                 `(begin
+                                     (define ?r (arbitrary (instances robot)))
+                                     (define h_r (acquire ?r))
+                                     (t_carry_to_machine ?r ,?p ,(find_output_machine))))
                             (define tasks (append tasks (list last_task)))
                             ;(print tasks)
                             `(apply seq ',tasks)))
@@ -49,10 +49,10 @@
         (:body 
             (begin
                 (define ?r (arbitrary (instances robot) rand-element))
-                ;(define h1 (acquire ?m))
-                ;(define h2 (acquire ?r))
+                (define h1 (acquire ?m))
+                (define h2 (acquire ?r))
                 (t_carry_to_machine ?r ?p ?m)
-                ;(release h2)
+                (release h2)
                 (t_process ?m ?p ?d)
                 )))
 

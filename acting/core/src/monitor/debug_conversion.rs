@@ -7,8 +7,8 @@ use ompas_language::exec::refinement::EXEC_TASK;
 use ompas_language::monitor::control::MOD_CONTROL;
 use ompas_language::monitor::debug_conversion::{
     ANNOTATE_TASK, CONVERT_DOMAIN, DOC_ANNOTATE_TASK, DOC_CONVERT_DOMAIN, DOC_MOD_DEBUG_CONVERSION,
-    DOC_PLAN_TASK, DOC_PRE_EVAL_EXPR, DOC_PRE_EVAL_TASK, MOD_DEBUG_CONVERSION, PLAN_TASK,
-    PRE_EVAL_EXPR, PRE_EVAL_TASK,
+    DOC_PLAN_TASK, DOC_PLAN_TASK_OPT, DOC_PRE_EVAL_EXPR, DOC_PRE_EVAL_TASK, MOD_DEBUG_CONVERSION,
+    PLAN_TASK, PLAN_TASK_OPT, PRE_EVAL_EXPR, PRE_EVAL_TASK,
 };
 use ompas_language::monitor::domain::MOD_DOMAIN;
 use ompas_middleware::logger::LogClient;
@@ -48,6 +48,7 @@ impl From<ModDebugConversion> for LModule {
         let mut m = LModule::new(m, MOD_DEBUG_CONVERSION, DOC_MOD_DEBUG_CONVERSION);
         m.add_async_fn(CONVERT_DOMAIN, convert_domain, DOC_CONVERT_DOMAIN, false);
         m.add_async_fn(PLAN_TASK, plan_task, DOC_PLAN_TASK, false);
+        m.add_async_fn(PLAN_TASK_OPT, plan_task_opt, DOC_PLAN_TASK_OPT, false);
         m.add_async_fn(PRE_EVAL_TASK, pre_eval_task, DOC_PRE_EVAL_TASK, false);
         m.add_async_fn(PRE_EVAL_EXPR, pre_eval_expr, DOC_PRE_EVAL_EXPR, false);
         m.add_async_fn(ANNOTATE_TASK, annotate_task, DOC_ANNOTATE_TASK, false);
@@ -65,8 +66,7 @@ pub async fn convert_domain(env: &LEnv) -> Result<String, LRuntimeError> {
     Ok(format!("{}\n\nTime to convert: {} µs.", pd, time))
 }
 
-#[async_scheme_fn]
-pub async fn plan_task(env: &LEnv, args: &[LValue]) -> LResult {
+async fn _plan_task(env: &LEnv, args: &[LValue], opt: bool) -> LResult {
     let task: LValue = args.into();
     println!("task to plan: {}", task);
     let acting_manager = env
@@ -111,19 +111,25 @@ pub async fn plan_task(env: &LEnv, args: &[LValue]) -> LResult {
         );
     }*/
 
-    let result = run_solver(aries_problem, None);
-    // println!("{}", format_partial_plan(&pb, &x)?);
+    let result = run_solver(
+        aries_problem,
+        match opt {
+            true => Some(ompas_planning::aries::solver::PMetric::Makespan),
+            false => None,
+        },
+    );
+    //println!("{}", format_partial_plan(&pb, &x)?);
 
     let result: LValue = if let Ok(Some(pr)) = result {
         //result::print_chronicles(&pr);
         let solved: Vec<ChronicleInstance> =
             instance::instantiate_chronicles(&pp, &pr, &bindings).await;
-        for instance in &solved {
+        /*for instance in &solved {
             print!("{}", instance.om.chronicle.as_ref().unwrap())
-        }
+        }*/
 
         let raw_plan = acting::extract_raw_plan(&solved);
-        //println!("RAW PLAN:\n{}", raw_plan);
+        println!("RAW PLAN:\n{}", raw_plan);
 
         let locked = bindings.inner.read().await;
 
@@ -169,6 +175,16 @@ pub async fn plan_task(env: &LEnv, args: &[LValue]) -> LResult {
     };
 
     Ok(result)
+}
+
+#[async_scheme_fn]
+pub async fn plan_task(env: &LEnv, args: &[LValue]) -> LResult {
+    _plan_task(env, args, false).await
+}
+
+#[async_scheme_fn]
+pub async fn plan_task_opt(env: &LEnv, args: &[LValue]) -> LResult {
+    _plan_task(env, args, true).await
 }
 
 #[async_scheme_fn]

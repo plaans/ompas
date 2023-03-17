@@ -11,9 +11,11 @@ const STRATEGIES: [Strat; 2] = [ActivityNonTemporalFirst, Strat::Forward];
 const MIN_DEPTH: u32 = 0;
 const MAX_DEPTH: u32 = u32::MAX;
 
+pub type PMetric = Metric;
+
 pub fn run_solver(
     problem: chronicles::Problem,
-    optimize: Option<Metric>,
+    optimize: Option<PMetric>,
 ) -> Result<Option<PlanResult>> {
     let start = Instant::now();
     let max_depth = MAX_DEPTH;
@@ -50,6 +52,9 @@ pub fn run_solver(
             );
 
             Some(PlanResult { ass, fp })
+        } else if let SolverResult::Unsat = r {
+            println!("No solution");
+            None
         } else {
             None
         }

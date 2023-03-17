@@ -420,6 +420,9 @@ pub mod monitor {
         pub const PLAN_TASK: &str = "plan-task";
         pub const DOC_PLAN_TASK: &str= "Plan a task using the defined planner with the acting domain defined in the environment";
 
+        pub const PLAN_TASK_OPT: &str = "plan-task-opt";
+        pub const DOC_PLAN_TASK_OPT: &str= "Plan a task using the defined planner with the acting domain defined in the environment, and returns the optimal solution in terms of makespan";
+
         pub const PRE_EVAL_TASK: &str = "pre-eval-task";
         pub const DOC_PRE_EVAL_TASK: &str = "Pre evaluate a task";
 

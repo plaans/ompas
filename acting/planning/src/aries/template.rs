@@ -47,6 +47,9 @@ use sompas_structs::lruntimeerror::LRuntimeError;
 use std::ops::Deref;
 use std::sync::Arc;
 
+/// Custom upper bound to handle LinearSum overflow
+const INT_UB: IntCst = 10000;
+
 #[named]
 pub fn generate_templates(
     problem: &PlanningProblem,
@@ -365,7 +368,19 @@ fn convert_constraint(
                         lsum = lsum + cst;
                         aConstraint::sum(Sum {
                             sum: lsum,
-                            value: 0,
+                            value: ctx
+                                .model
+                                .new_optional_ivar(
+                                    0,
+                                    0,
+                                    prez,
+                                    container
+                                        / VarType::Parameter(format!(
+                                            "r_sum_{}",
+                                            constraints.len()
+                                        )),
+                                )
+                                .into(),
                         })
                     }
                 }
@@ -581,7 +596,7 @@ pub fn read_chronicle(
         } else if *t == TYPE_ID_INT {
             let ivar = ctx.model.new_optional_ivar(
                 INT_CST_MIN,
-                INT_CST_MAX,
+                INT_UB,
                 prez,
                 container / VarType::Parameter(label),
             );

@@ -19,7 +19,6 @@ use crate::conversion::flow_graph::graph::Dot;
 use crate::execution::resource::{Quantity, ResourceManager, WaitAcquire, WaiterPriority};
 use crate::planning::instance::ChronicleInstance;
 use crate::planning::om_binding::ChronicleBinding;
-use crate::sym_table::domain::cst;
 use crate::sym_table::domain::cst::Cst;
 use crate::sym_table::r#ref::RefSymTable;
 use crate::sym_table::r#trait::FormatWithSymTable;

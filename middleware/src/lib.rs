@@ -69,7 +69,7 @@ impl Default for Master {
 }
 
 impl Master {
-    pub fn new() -> Self {
+    fn new() -> Self {
         let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
         let (tx_death, rx_death) = mpsc::channel(TOKIO_CHANNEL_SIZE);
         let (tx_end, rx_end) = broadcast::channel(TOKIO_CHANNEL_SIZE);
@@ -344,7 +344,7 @@ impl Master {
         self.topic_id.read().await.get(&topic.to_string()).copied()
     }
 
-    pub async fn subscribe_new_process(
+    async fn subscribe_new_process(
         &self,
         label: impl Display,
         process_topic: impl Display,

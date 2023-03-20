@@ -1,26 +1,13 @@
-use crate::platform_config::PlatformConfig;
 use crate::platform_interface::atom::Kind;
 use crate::platform_interface::{
     atom, command_response, event, platform_update, Atom, CommandAccepted, CommandCancelled,
     CommandProgress, CommandRejected, CommandResponse, CommandResult, Event, Expression, Instance,
     PlatformUpdate, Resource, StateUpdate,
 };
-use async_trait::async_trait;
-use lisp_domain::LispDomain;
-use sompas_structs::lmodule::LModule;
 use sompas_structs::lvalues::LValueS;
-use std::any::Any;
 use std::fmt::{Display, Formatter};
-use std::net::SocketAddr;
 
-pub mod exec_platform;
-pub mod lisp_domain;
-pub mod platform;
-pub mod platform_config;
-pub mod platform_declaration;
 pub mod platform_interface;
-
-const TOKIO_CHANNEL_SIZE: usize = 100;
 
 impl TryFrom<LValueS> for Atom {
     type Error = ();
@@ -196,23 +183,4 @@ impl From<StateUpdate> for PlatformUpdate {
             update: Some(platform_update::Update::State(su)),
         }
     }
-}
-
-/// Trait that a platform needs to implement to be able to be used as execution platform in RAE.
-#[async_trait]
-pub trait PlatformDescriptor: Any + Send + Sync {
-    ///Launch the platform (such as the simulation in godot) and open communication
-    async fn start(&self, config: PlatformConfig);
-
-    ///Stops the platform.
-    async fn stop(&self);
-
-    ///Returns the domain of the platform
-    async fn domain(&self) -> LispDomain;
-
-    ///Returns a module loaded into the evaluation environment with other bindings
-    async fn module(&self) -> Option<LModule>;
-
-    ///Returns the server info in order to connect OMPAS to the platform using grpc services
-    async fn socket(&self) -> SocketAddr;
 }

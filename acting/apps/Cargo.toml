@@ -7,7 +7,6 @@ edition = "2021"
 
 [dependencies]
 ompas-core = {path = "../core"}
-ompas-structs = {path = "../structs"}
 sompas-language= {path = "../../scheme/language"}
 sompas-core = {path = "../../scheme/core"}
 sompas-repl = {path = "../../scheme/repl"}

@@ -1,11 +1,9 @@
-use std::fs;
 //use ompas_gobotsim::mod_godot::CtxGodot;
-use ompas_core::monitor::ModMonitor;
+use ompas_core::ompas::scheme::exec::platform::lisp_domain::LispDomain;
+use ompas_core::ompas::scheme::monitor::ModMonitor;
 use ompas_gobotsim::platform::PlatformGobotSim;
-use ompas_interface::lisp_domain::LispDomain;
 use ompas_language::interface::{LOG_TOPIC_PLATFORM, PLATFORM_CLIENT};
-use ompas_language::process::LOG_TOPIC_OMPAS;
-use ompas_middleware::logger::{FileDescriptor, LogClient};
+use ompas_middleware::logger::LogClient;
 use ompas_middleware::{LogLevel, Master};
 use sompas_modules::advanced_math::ModAdvancedMath;
 use sompas_modules::io::ModIO;
@@ -44,7 +42,7 @@ async fn main() -> lruntimeerror::Result<()> {
 async fn lisp_interpreter(opt: Opt) -> lruntimeerror::Result<()> {
     let mut li = LispInterpreter::new().await;
 
-    let mut ctx_io = ModIO::default();
+    let ctx_io = ModIO::default();
     let ctx_math = ModAdvancedMath::default();
     let ctx_utils = ModUtils::default();
     let ctx_string = ModString::default();
@@ -73,7 +71,7 @@ async fn lisp_interpreter(opt: Opt) -> lruntimeerror::Result<()> {
 
     //li.set_config(LispInterpreterConfig::new(true));
 
-    tokio::spawn({ li.run(None) });
+    tokio::spawn(li.run(None));
 
     let command = match opt.opt {
         false => "(plan-task t_jobshop)".to_string(),

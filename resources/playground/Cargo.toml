@@ -12,7 +12,6 @@ sompas-repl = {path = "../../scheme/repl"}
 ompas-utils={path = "../../utils"}
 ompas-gobotsim = {path = "../../gobotsim"}
 ompas-core = {path = "../../acting/core"}
-ompas-structs = {path = "../../acting/structs"}
 aries = {path = "../../aries/solver"}
 
 tokio = { version = "1.17.0", features = ["full", "time"] }

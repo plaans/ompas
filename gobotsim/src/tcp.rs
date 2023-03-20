@@ -2,6 +2,7 @@ use crate::serde::{
     GodotMessageSerde, GodotMessageSerdeData, GodotMessageType, SerdeCancelRequest, SerdeCommand,
 };
 use crate::PROCESS_TOPIC_GOBOT_SIM;
+use ompas_core::ompas::manager::state::partial_state::PartialState;
 use ompas_interface::platform_interface::command_request::Request;
 use ompas_interface::platform_interface::{
     Atom, CommandAccepted, CommandCancelRequest, CommandExecutionRequest, CommandProgress,
@@ -11,7 +12,6 @@ use ompas_interface::platform_interface::{
 use ompas_interface::platform_interface::{CommandCancelled, ResourceKind};
 use ompas_language::interface::*;
 use ompas_middleware::ProcessInterface;
-use ompas_structs::state::partial_state::PartialState;
 use sompas_structs::lvalues::LValueS;
 use std::convert::TryFrom;
 use std::convert::TryInto;

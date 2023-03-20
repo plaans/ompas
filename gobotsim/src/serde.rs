@@ -1,8 +1,8 @@
 use aries_planning::parsing::sexpr::SExpr;
-use ompas_structs::acting_manager::action_status::ProcessStatus;
-use ompas_structs::acting_manager::action_status::ProcessStatus::Rejected;
-use ompas_structs::state::partial_state::PartialState;
-use ompas_structs::state::world_state::StateType;
+use ompas_core::ompas::manager::state::action_status::ProcessStatus;
+use ompas_core::ompas::manager::state::action_status::ProcessStatus::Rejected;
+use ompas_core::ompas::manager::state::partial_state::PartialState;
+use ompas_core::ompas::manager::state::world_state::StateType;
 use serde::{Deserialize, Serialize, Serializer};
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;

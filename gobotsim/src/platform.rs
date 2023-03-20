@@ -3,10 +3,12 @@ use crate::tcp::task_tcp_connection;
 use crate::PROCESS_TOPIC_GOBOT_SIM;
 use crate::{DEFAULT_PATH_PROJECT_GODOT, TOKIO_CHANNEL_SIZE};
 use async_trait::async_trait;
-use ompas_interface::lisp_domain::LispDomain;
-use ompas_interface::platform_config::{InnerPlatformConfig, PlatformConfig};
+use ompas_core::ompas::scheme::exec::platform::lisp_domain::LispDomain;
+use ompas_core::ompas::scheme::exec::platform::platform_config::{
+    InnerPlatformConfig, PlatformConfig,
+};
+use ompas_core::ompas::scheme::exec::platform::PlatformDescriptor;
 use ompas_interface::platform_interface::platform_interface_server::PlatformInterfaceServer;
-use ompas_interface::PlatformDescriptor;
 use ompas_language::interface::{
     DEFAULT_PLATFORM_SERVICE_IP, DEFAULT_PLATFROM_SERVICE_PORT, LOG_TOPIC_PLATFORM,
     PROCESS_TOPIC_PLATFORM,

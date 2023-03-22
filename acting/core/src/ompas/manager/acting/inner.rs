@@ -1,6 +1,6 @@
 use crate::model::acting_domain::model::{ActingModel, ROOT};
 use crate::model::chronicle::acting_binding::ActingBinding;
-use crate::model::chronicle::{Chronicle, Instantiation};
+use crate::model::chronicle::{Chronicle, ChronicleKind, Instantiation};
 use crate::model::process_ref::{Label, ProcessRef};
 use crate::model::sym_domain::cst::Cst;
 use crate::model::sym_table::r#ref::RefSymTable;
@@ -365,6 +365,7 @@ impl InnerActingManager {
         let root: &mut RootProcess = self.processes[0].inner.as_mut_root().unwrap();
         let rank = root.n_task();
         root.add_top_level_task(id);
+        self.notify(ActingUpdateNotification::NewProcess(id)).await;
 
         ProcessRef::Relative(0, vec![Label::Action(rank)])
     }
@@ -440,10 +441,11 @@ impl InnerActingManager {
             .as_mut_method()
             .unwrap()
             .add_process(label, id);
+        self.notify(ActingUpdateNotification::NewProcess(id)).await;
         id
     }
 
-    pub fn new_refinement(
+    pub async fn new_refinement(
         &mut self,
         parent: &ActingProcessId,
         debug: String,
@@ -475,10 +477,12 @@ impl InnerActingManager {
 
         let action: &mut ActionProcess = self.processes[*parent].inner.as_mut_action().unwrap();
         action.add_refinement(id);
+        self.notify(ActingUpdateNotification::NewProcess(id)).await;
+
         id
     }
 
-    pub fn new_arbitrary(
+    pub async fn new_arbitrary(
         &mut self,
         label: Label,
         parent: &ActingProcessId,
@@ -523,10 +527,11 @@ impl InnerActingManager {
             .as_mut_method()
             .unwrap()
             .add_process(label, id);
+        self.notify(ActingUpdateNotification::NewProcess(id)).await;
         id
     }
 
-    pub fn new_acquire(
+    pub async fn new_acquire(
         &mut self,
         label: Label,
         parent: &ActingProcessId,
@@ -569,6 +574,7 @@ impl InnerActingManager {
             .as_mut_method()
             .unwrap()
             .add_process(label, id);
+        self.notify(ActingUpdateNotification::NewProcess(id)).await;
         id
     }
 
@@ -1017,31 +1023,51 @@ impl InnerActingManager {
 
                 let debug = chronicle.get_name().format(&st, true);
 
-                let parent =
-                    self.new_refinement(&parent, debug, instance.am, ProcessOrigin::Planner);
+                match chronicle.meta_data.kind {
+                    ChronicleKind::Command | ChronicleKind::Task => {
+                        let am_id = self.new_model(instance.am);
+                        self.processes[parent]
+                            .inner
+                            .as_mut_action()
+                            .unwrap()
+                            .abstract_am_id = Some(am_id);
+                    }
+                    ChronicleKind::Method => {
+                        let parent = self
+                            .new_refinement(&parent, debug, instance.am, ProcessOrigin::Planner)
+                            .await;
 
-                for (label, binding) in bindings.inner {
-                    match binding {
-                        ActingBinding::Arbitrary(_arbitrary) => {
-                            let _id = self.new_arbitrary(label, &parent, ProcessOrigin::Planner);
-                        }
-                        ActingBinding::Action(action_binding) => {
-                            let action = &action_binding.name;
-                            let debug = action.format(&st, true);
-                            let args: Vec<_> =
-                                action.iter().map(|var_id| st.var_as_cst(var_id)).collect();
-                            let _id = self.new_action(
-                                label,
-                                &parent,
-                                args,
-                                debug,
-                                ProcessOrigin::Planner,
-                            );
-                        }
-                        ActingBinding::Acquire(_acq) => {
-                            let _id = self.new_acquire(label, &parent, ProcessOrigin::Planner);
+                        for (label, binding) in bindings.inner {
+                            match binding {
+                                ActingBinding::Arbitrary(_arbitrary) => {
+                                    let _id = self
+                                        .new_arbitrary(label, &parent, ProcessOrigin::Planner)
+                                        .await;
+                                }
+                                ActingBinding::Action(action_binding) => {
+                                    let action = &action_binding.name;
+                                    let debug = action.format(&st, true);
+                                    let args: Vec<_> =
+                                        action.iter().map(|var_id| st.var_as_cst(var_id)).collect();
+                                    let _id = self
+                                        .new_action(
+                                            label,
+                                            &parent,
+                                            args,
+                                            debug,
+                                            ProcessOrigin::Planner,
+                                        )
+                                        .await;
+                                }
+                                ActingBinding::Acquire(_acq) => {
+                                    let _id = self
+                                        .new_acquire(label, &parent, ProcessOrigin::Planner)
+                                        .await;
+                                }
+                            }
                         }
                     }
+                    _ => {}
                 }
             }
         }

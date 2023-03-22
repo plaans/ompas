@@ -163,6 +163,7 @@ impl ActingManager {
             .write()
             .await
             .new_refinement(parent, debug, model, origin)
+            .await
     }
 
     pub async fn new_arbitrary(
@@ -175,6 +176,7 @@ impl ActingManager {
             .write()
             .await
             .new_arbitrary(label, parent, origin)
+            .await
     }
 
     // Acquire methods
@@ -184,22 +186,12 @@ impl ActingManager {
         parent: &ActingProcessId,
         origin: ProcessOrigin,
     ) -> ActingProcessId {
-        self.inner.write().await.new_acquire(label, parent, origin)
-    }
-
-    //Command methods
-    /*pub async fn new_command(
-        &self,
-        label: Label,
-        parent: &ActingProcessId,
-        debug: String,
-        origin: ProcessOrigin,
-    ) -> ActingProcessId {
         self.inner
             .write()
             .await
-            .new_command(label, parent, debug, origin)
-    }*/
+            .new_acquire(label, parent, origin)
+            .await
+    }
 
     pub async fn subscribe(&self, id: &ActingProcessId) -> watch::Receiver<ProcessStatus> {
         self.inner.write().await.subscribe(id)

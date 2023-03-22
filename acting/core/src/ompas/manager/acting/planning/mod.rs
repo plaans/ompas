@@ -262,7 +262,7 @@ pub async fn populate_problem(
                 Some(model) => {
                     let model_lambda: LLambda = model.try_into().expect("");
 
-                    let mut instance: ChronicleInstance = convert_into_chronicle_instance(
+                    let instance: ChronicleInstance = convert_into_chronicle_instance(
                         &model_lambda,
                         action,
                         None,
@@ -272,7 +272,7 @@ pub async fn populate_problem(
                         ChronicleKind::Task,
                     )
                     .await?;
-                    instance.pr.push(Label::Refinement(None));
+                    //instance.pr.push(Label::Refinement(None));
                     update_problem(&mut p_actions, &vec![], &instance, instance_id);
 
                     instances.push(instance)

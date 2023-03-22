@@ -12,8 +12,6 @@ use sompas_modules::utils::ModUtils;
 use sompas_repl::lisp_interpreter::{LispInterpreter, LispInterpreterConfig};
 use structopt::StructOpt;
 
-pub const TOKIO_CHANNEL_SIZE: usize = 100;
-
 #[derive(Debug, StructOpt)]
 #[structopt(name = "Scheme", about = "A Scheme REPL")]
 struct Opt {

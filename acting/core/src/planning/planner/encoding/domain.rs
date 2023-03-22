@@ -56,7 +56,6 @@ const INT_UB: IntCst = 10000;
 
 #[named]
 pub fn encode_ctx(
-    table: &mut ActingVarRefTable,
     st: &RefSymTable,
     domain: &PlannerDomain,
     instance: &InstanceCollection,
@@ -211,7 +210,6 @@ pub fn encode_ctx(
     Ok(Ctx::new(Arc::new(symbol_table), state_functions))
 }
 
-#[named]
 pub fn generate_templates(
     table: &mut ActingVarRefTable,
     ctx: &mut Ctx,

@@ -34,8 +34,6 @@ use sompas_structs::lenv::LEnv;
 
 //LANGUAGE
 
-pub const TOKIO_CHANNEL_SIZE: usize = 100;
-
 #[derive(Default)]
 pub struct ModMonitor {
     pub(crate) options: Arc<RwLock<OMPASOptions>>,

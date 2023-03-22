@@ -11,8 +11,8 @@ pub type ActingVarId = usize;
 
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
 pub struct ActingVarRef {
-    var_id: VarId,
-    am_id: AMId,
+    pub(in crate::ompas::manager::acting) var_id: VarId,
+    pub(in crate::ompas::manager::acting) am_id: AMId,
 }
 
 impl From<VarId> for ActingVarRef {
@@ -66,6 +66,10 @@ impl ActingVar {
             refs,
             value: ActingVal::None,
         }
+    }
+
+    pub fn refs(&self) -> &Vec<ActingVarRef> {
+        &self.refs
     }
 
     pub fn add_ref(&mut self, var_id: VarId, am_id: AMId) {

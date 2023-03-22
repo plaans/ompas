@@ -6,12 +6,10 @@ use crate::model::sym_domain::type_lattice::TypeLattice;
 use crate::model::sym_domain::Domain;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::VarId;
-use crate::ompas::interface::job::JobType::Debug;
 use crate::ompas::manager::acting::planning::ActingVarRefTable;
-use crate::ompas::manager::state::instance::InstanceCollection;
 use crate::ompas::manager::state::world_state::WorldStateSnapshot;
 use crate::planning::planner::encoding::domain::encode_ctx;
-use crate::planning::planner::encoding::instance::{create_initial_chronicle, generate_instances};
+use crate::planning::planner::encoding::instance::generate_instances;
 use crate::planning::planner::problem::ChronicleInstance;
 use anyhow::Result;
 use aries::core::IntCst;
@@ -70,7 +68,7 @@ pub async fn encode_chronicles(
 
     let domain = &problem.domain;
 
-    let mut ctx = encode_ctx(table, st, domain, &problem.state.instance)?;
+    let mut ctx = encode_ctx(st, domain, &problem.state.instance)?;
 
     let templates = domain::generate_templates(table, &mut ctx, &problem.templates)?;
 

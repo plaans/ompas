@@ -417,6 +417,7 @@ impl Chronicle {
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct Instantiation {
     var: VarId,
     value: VarId,

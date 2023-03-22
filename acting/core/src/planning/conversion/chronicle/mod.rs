@@ -489,7 +489,7 @@ pub fn convert_into_chronicle(
                         if let Some(label) = flow.label {
                             let binding = ActingBinding::Action(ActionBinding {
                                 name: exec.clone(),
-                                index: ch.get_subtasks().len(),
+                                task_id: ch.get_subtasks().len(),
                                 interval,
                             });
                             ch.bindings.add_binding(label, binding);

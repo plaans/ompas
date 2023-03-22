@@ -27,6 +27,7 @@ pub async fn instantiate_chronicles(
             lv: instance.am.lv.clone(),
             lv_om: instance.am.lv_om.clone(),
             lv_expanded: instance.am.lv_expanded.clone(),
+            instantiations: vec![],
             chronicle: Some(instantiated),
         };
         let instance = ChronicleInstance {

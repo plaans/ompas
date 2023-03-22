@@ -7,7 +7,9 @@ use crate::ompas::manager::acting::filter::ProcessFilter;
 use crate::ompas::manager::acting::inner::ProcessKind;
 use crate::ompas::manager::acting::interval::Timepoint;
 use crate::ompas::manager::acting::planning::plan_update::PlanUpdateManager;
-use crate::ompas::manager::acting::planning::problem_update::ProblemUpdateManager;
+use crate::ompas::manager::acting::planning::problem_update::{
+    ExecutionProblem, ProblemUpdateManager,
+};
 use crate::ompas::manager::acting::planning::{run_continuous_planning, ContinuousPlanningConfig};
 use crate::ompas::manager::acting::process::ProcessOrigin;
 use crate::ompas::manager::monitor::MonitorManager;
@@ -127,7 +129,11 @@ impl ActingManager {
     //ActingProcess declaration
 
     pub async fn new_high_level_task(&self, debug: String, args: Vec<Cst>) -> ProcessRef {
-        self.inner.write().await.new_high_level_task(debug, args)
+        self.inner
+            .write()
+            .await
+            .new_high_level_task(debug, args)
+            .await
     }
 
     //Task methods
@@ -143,6 +149,7 @@ impl ActingManager {
             .write()
             .await
             .new_action(label, parent, args, debug, origin)
+            .await
     }
 
     pub async fn new_refinement(
@@ -201,7 +208,7 @@ impl ActingManager {
     // Setters
     //ActingProcess methods
     pub async fn set_start(&self, id: &ActingProcessId, instant: Option<Timepoint>) {
-        self.inner.write().await.set_start(id, instant)
+        self.inner.write().await.set_start(id, instant).await
     }
 
     pub async fn set_end(
@@ -210,7 +217,7 @@ impl ActingManager {
         instant: Option<Timepoint>,
         status: ProcessStatus,
     ) {
-        self.inner.write().await.set_end(id, instant, status)
+        self.inner.write().await.set_end(id, instant, status).await
     }
 
     pub async fn set_status(&self, id: &ActingProcessId, status: ProcessStatus) {
@@ -218,7 +225,7 @@ impl ActingManager {
     }
 
     pub async fn set_moment(&self, id: &ActingProcessId, instant: Option<Timepoint>) {
-        self.inner.write().await.set_moment(id, instant)
+        self.inner.write().await.set_moment(id, instant).await
     }
 
     pub async fn get_last_planned_refinement(
@@ -297,6 +304,7 @@ impl ActingManager {
             .write()
             .await
             .set_arbitrary_value(id_arbitrary, set, greedy)
+            .await
     }
 
     pub async fn acquire(
@@ -328,7 +336,11 @@ impl ActingManager {
     }
 
     pub async fn set_s_acq(&self, acquire_id: &ActingProcessId, instant: Option<Timepoint>) {
-        self.inner.write().await.set_s_acq(acquire_id, instant)
+        self.inner
+            .write()
+            .await
+            .set_s_acq(acquire_id, instant)
+            .await
     }
 
     pub async fn get_task_args(&self, id: &ActingProcessId) -> Vec<Cst> {
@@ -350,8 +362,8 @@ impl ActingManager {
     pub async fn start_continuous_planning(&self, domain: OMPASDomain, st: RefSymTable, env: LEnv) {
         let mut locked = self.inner.write().await;
         let (plan_update_manager, tx) = PlanUpdateManager::new(self.clone());
-        let (problem_update_manager, rx) = ProblemUpdateManager::new();
-        locked.add_problem_update_manager(problem_update_manager);
+        let (problem_update_manager, rx, tx_notif) = ProblemUpdateManager::new(self.clone());
+        locked.set_update_notifier(tx_notif);
         let config = ContinuousPlanningConfig {
             problem_receiver: rx,
             plan_sender: tx,
@@ -359,11 +371,22 @@ impl ActingManager {
             st,
             env,
         };
-        tokio::spawn(run_continuous_planning(config));
         tokio::spawn(async {
-            let mut manager = plan_update_manager;
+            let manager = problem_update_manager;
             manager.run().await;
         });
+        tokio::spawn(async {
+            let manager = plan_update_manager;
+            manager.run().await;
+        });
+        tokio::spawn(run_continuous_planning(config));
+    }
+
+    pub async fn get_execution_problem(&self) -> ExecutionProblem {
+        ExecutionProblem {
+            state: self.state.get_snapshot().await,
+            chronicles: self.inner.read().await.get_current_chronicles(),
+        }
     }
 
     /*pub async fn absorb_plan_result(&self, result: ActingPlanResult) {

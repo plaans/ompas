@@ -366,7 +366,7 @@ pub async fn encode(
     pp: &PlannerProblem,
 ) -> anyhow::Result<chronicles::Problem> {
     let domain = &pp.domain;
-    let mut context = encode_ctx(table, st, domain, &pp.state.instance)?;
+    let mut context = encode_ctx(st, domain, &pp.state.instance)?;
     let mut chronicles = generate_instances(&mut context, table, &pp.instances)?;
     let mut present_sf: Vec<String> = pp
         .domain

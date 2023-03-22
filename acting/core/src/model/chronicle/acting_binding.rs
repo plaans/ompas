@@ -18,6 +18,45 @@ impl ActingBindingCollection {
         }
     }
 
+    pub fn get_actions(&self) -> Vec<&ActionBinding> {
+        self.inner
+            .values()
+            .filter_map(|b| {
+                if let ActingBinding::Action(a) = b {
+                    Some(a)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    pub fn get_arbitraries(&self) -> Vec<&ArbitraryBinding> {
+        self.inner
+            .values()
+            .filter_map(|b| {
+                if let ActingBinding::Arbitrary(a) = b {
+                    Some(a)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    pub fn get_acquires(&self) -> Vec<&AcquireBinding> {
+        self.inner
+            .values()
+            .filter_map(|b| {
+                if let ActingBinding::Acquire(a) = b {
+                    Some(a)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
     pub fn get_binding(&self, label: &Label) -> Option<&ActingBinding> {
         self.inner.get(label)
     }
@@ -135,7 +174,7 @@ impl FormatWithSymTable for ActingBinding {
                 write!(
                     str,
                     "({}){}: {}",
-                    s.index,
+                    s.task_id,
                     s.interval.format(st, sym_version),
                     s.name.format(st, sym_version)
                 )
@@ -165,7 +204,7 @@ pub struct ArbitraryBinding {
 #[derive(Clone)]
 pub struct ActionBinding {
     pub name: Vec<VarId>,
-    pub index: usize,
+    pub task_id: usize,
     pub interval: Interval,
 }
 

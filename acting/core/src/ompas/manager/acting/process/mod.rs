@@ -4,7 +4,7 @@ use crate::ompas::manager::acting::interval::Timepoint;
 use crate::ompas::manager::acting::process::acquire::AcquireProcess;
 use crate::ompas::manager::acting::process::action::ActionProcess;
 use crate::ompas::manager::acting::process::arbitrary::ArbitraryProcess;
-use crate::ompas::manager::acting::process::method::RefinementProcess;
+use crate::ompas::manager::acting::process::refinement::RefinementProcess;
 use crate::ompas::manager::acting::process::root_task::RootProcess;
 use crate::ompas::manager::acting::{AMId, ActingProcessId};
 use crate::ompas::manager::state::action_status::ProcessStatus;
@@ -16,7 +16,7 @@ pub mod acquire;
 
 pub mod action;
 pub mod arbitrary;
-pub mod method;
+pub mod refinement;
 pub mod root_task;
 pub mod task;
 
@@ -112,7 +112,7 @@ impl ActingProcess {
         self._parent
     }
 
-    pub fn om_id(&self) -> AMId {
+    pub fn am_id(&self) -> AMId {
         self.am_id
     }
 
@@ -135,7 +135,7 @@ impl ActingProcess {
         self.origin = ProcessOrigin::ExecPlanInherited;
     }
 
-    pub fn get_om_id(&self) -> AMId {
+    pub fn get_am_id(&self) -> AMId {
         self.am_id
     }
 

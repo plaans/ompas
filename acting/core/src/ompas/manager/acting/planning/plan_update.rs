@@ -141,7 +141,7 @@ impl PlanUpdateManager {
         )
     }
 
-    pub async fn run(&mut self) {
+    pub async fn run(mut self) {
         let mut process: ProcessInterface =
             ProcessInterface::new(UPDATE_PLAN, PROCESS_TOPIC_OMPAS, LOG_TOPIC_OMPAS).await;
 
@@ -159,7 +159,7 @@ impl PlanUpdateManager {
                             choices,
                         } = update;
                         let mut locked = acting_manager.inner.write().await;
-                        locked.add_processes_from_chronicles(acting_models);
+                        locked.add_processes_from_chronicles(acting_models).await;
                         locked.absorb_choices(choices).await;
                     }else {
                         break 'main

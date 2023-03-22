@@ -14,8 +14,6 @@ use std::time::Duration;
 use std::{env, fs};
 use structopt::StructOpt;
 
-pub const TOKIO_CHANNEL_SIZE: usize = 65_384;
-
 #[derive(Debug, StructOpt)]
 #[structopt(name = "OMPAS", about = "An acting engine based on RAE.")]
 pub struct Opt {

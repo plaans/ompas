@@ -7,6 +7,7 @@ use crate::ompas::interface::trigger_collection::TaskTrigger;
 use crate::ompas::manager::acting::acting_var::AsCst;
 use crate::ompas::manager::acting::ActingManager;
 use crate::ompas::scheme::exec::acting_context::ModActingContext;
+use crate::TOKIO_CHANNEL_SIZE;
 use futures::FutureExt;
 use ompas_language::process::{LOG_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS};
 use ompas_middleware::logger::LogClient;
@@ -28,8 +29,6 @@ pub mod manager;
 pub mod scheme;
 
 pub type ReactiveTriggerId = usize;
-
-pub const TOKIO_CHANNEL_SIZE: usize = 100;
 
 pub const PROCESS_MAIN: &str = "__PROCESS_MAIN__";
 

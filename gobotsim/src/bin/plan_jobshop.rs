@@ -13,8 +13,6 @@ use sompas_repl::lisp_interpreter::{ChannelToLispInterpreter, LispInterpreter};
 use sompas_structs::lruntimeerror;
 use std::path::PathBuf;
 use structopt::StructOpt;
-
-pub const TOKIO_CHANNEL_SIZE: usize = 100;
 pub const LOG_LEVEL: LogLevel = LogLevel::Debug;
 
 #[derive(Debug, StructOpt)]

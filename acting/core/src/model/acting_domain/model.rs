@@ -1,7 +1,7 @@
 use crate::model::chronicle;
 use crate::model::chronicle::acting_binding::ActionBinding;
 use crate::model::chronicle::subtask::SubTask;
-use crate::model::chronicle::{Chronicle, ChronicleKind};
+use crate::model::chronicle::{Chronicle, ChronicleKind, Instantiation};
 use crate::model::process_ref::Label;
 use crate::model::sym_domain::cst;
 use crate::model::sym_table::r#ref::RefSymTable;
@@ -15,7 +15,16 @@ pub struct ActingModel {
     pub lv: LValue,
     pub lv_om: LValue,
     pub lv_expanded: LValue,
+    pub instantiations: Vec<Instantiation>,
     pub chronicle: Option<Chronicle>,
+}
+
+impl ActingModel {
+    pub fn get_instantiated_chronicle(&self) -> Option<Chronicle> {
+        self.chronicle
+            .as_ref()
+            .map(|c| c.instantiate(self.instantiations.clone()))
+    }
 }
 
 pub struct TaskRef {
@@ -32,6 +41,7 @@ impl ActingModel {
             lv: LValue::Nil,
             lv_om: LValue::Nil,
             lv_expanded: LValue::Nil,
+            instantiations: vec![],
             chronicle: Some(chronicle),
         }
     }
@@ -66,7 +76,7 @@ impl ActingModel {
 
         let binding = ActionBinding {
             name: name.clone(),
-            index: chronicle.get_subtasks().len(),
+            task_id: chronicle.get_subtasks().len(),
             interval,
         };
 

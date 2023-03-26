@@ -13,7 +13,6 @@ pub mod control;
 pub mod debug_conversion;
 pub mod domain;
 pub mod log;
-use crate::model::acting_domain::OMPASDomain;
 use crate::ompas::interface::job::Job;
 use crate::ompas::interface::rae_command::OMPASJob;
 use crate::ompas::interface::rae_options::OMPASOptions;
@@ -41,7 +40,6 @@ pub struct ModMonitor {
     pub log: LogClient,
     pub task_stream: Arc<RwLock<Option<tokio::sync::mpsc::Sender<OMPASJob>>>>,
     pub(crate) platform: Platform,
-    pub(crate) ompas_domain: Arc<RwLock<OMPASDomain>>,
     pub(crate) empty_env: LEnv,
     pub(crate) tasks_to_execute: Arc<RwLock<Vec<Job>>>,
 }
@@ -79,7 +77,7 @@ impl ModMonitor {
             PlatformDeclaration::Exec(exec) => {
                 let lisp_domain = exec.read().await.domain().await;
                 Platform::new(
-                    module.ompas_domain.clone(),
+                    module.acting_manager.domain.clone(),
                     module.acting_manager.clone(),
                     Some(
                         ExecPlatform::new(
@@ -95,7 +93,7 @@ impl ModMonitor {
                 )
             }
             PlatformDeclaration::Simu(s) => Platform::new(
-                module.ompas_domain.clone(),
+                module.acting_manager.domain.clone(),
                 module.acting_manager.clone(),
                 None,
                 s,

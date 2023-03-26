@@ -76,11 +76,17 @@ impl ProblemUpdateManager {
                     let notification: ActingUpdateNotification = notification;
                     match notification {
                         ActingUpdateNotification::VarUpdate(_) => {}
-                        ActingUpdateNotification::NewProcess(_) => {}
+                        ActingUpdateNotification::NewProcess(_) => {
+                             let em: ExecutionProblem = acting_manager.get_execution_problem().await;
+                            /*for i in &em.chronicles {
+                                println!("{}", i.am.chronicle.as_ref().unwrap())
+                            }*/
+                            //exit(0);
+                            updater.send(ProblemUpdate::ExecutionProblem(em)).await.unwrap_or_else(|_| panic!(""));
+                        }
                     }
 
-                    let em = acting_manager.get_execution_problem().await;
-                    updater.send(ProblemUpdate::ExecutionProblem(em)).await.unwrap_or_else(|_| panic!(""));
+
                     //Construction of the instances
                     // In the current implementation we do not take into account the local modifications,
 

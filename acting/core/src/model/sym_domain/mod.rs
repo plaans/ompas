@@ -136,7 +136,7 @@ impl Domain {
     }
 
     pub fn any() -> Self {
-        Domain::Simple(1)
+        Domain::Simple(TYPE_ID_ANY)
     }
 
     pub fn is_true(&self) -> bool {
@@ -157,6 +157,10 @@ impl Domain {
 
     pub fn nil() -> Domain {
         Union(vec![BasicType::False.into(), BasicType::EmptyList.into()])
+    }
+
+    pub fn d_true() -> Domain {
+        Simple(TYPE_ID_TRUE)
     }
 }
 

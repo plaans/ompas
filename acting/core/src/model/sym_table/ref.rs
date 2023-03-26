@@ -1,7 +1,8 @@
 use crate::model::chronicle::interval;
 use crate::model::sym_domain::cst::Cst;
+use crate::model::sym_domain::simple_type::SimpleType;
 use crate::model::sym_domain::type_lattice::TypeLattice;
-use crate::model::sym_domain::Domain;
+use crate::model::sym_domain::{Domain, TypeId};
 use crate::model::sym_table::closure::Update;
 use crate::model::sym_table::var_domain::VarDomain;
 use crate::model::sym_table::variable::Variable;
@@ -18,6 +19,10 @@ impl RefSymTable {
     /*
     SCOPES FUNCTIONS
      */
+
+    pub fn inner(&self) -> SymTable {
+        self.0.read().unwrap().clone()
+    }
 
     pub fn set_declaration(&self, id: &VarId, timepoint: &VarId) {
         self.0.write().unwrap().set_declaration(id, timepoint)
@@ -69,6 +74,10 @@ impl RefSymTable {
 
     pub fn new_cst(&self, cst: Cst) -> VarId {
         self.0.write().unwrap().new_cst(cst)
+    }
+
+    pub fn new_constant_symbol(&self, symbol: impl Display, domain: impl Into<Domain>) -> VarId {
+        self.0.write().unwrap().new_constant_symbol(symbol, domain)
     }
 
     /*
@@ -269,6 +278,18 @@ impl RefSymTable {
 
     pub fn format_var_domain(&self, id: &DomainId) -> String {
         self.0.read().unwrap().format_var_domain(id)
+    }
+
+    /*
+    LATTICE METHODS
+     */
+
+    pub fn add_type(&self, r#type: impl Into<SimpleType>, parents: Vec<TypeId>) -> TypeId {
+        self.0.write().unwrap().lattice.add_type(r#type, parents)
+    }
+
+    pub fn get_type_id(&self, r#type: impl Display) -> Option<TypeId> {
+        self.0.read().unwrap().lattice.get_type_id(r#type).copied()
     }
 
     pub fn get_lattice(&self) -> TypeLattice {

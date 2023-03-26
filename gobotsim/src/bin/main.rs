@@ -1,8 +1,8 @@
 use std::fs;
 //use ompas_gobotsim::mod_godot::CtxGodot;
-use ompas_core::monitor::ModMonitor;
+use ompas_core::ompas::scheme::exec::platform::lisp_domain::LispDomain;
+use ompas_core::ompas::scheme::monitor::ModMonitor;
 use ompas_gobotsim::platform::PlatformGobotSim;
-use ompas_interface::lisp_domain::LispDomain;
 use ompas_language::interface::{LOG_TOPIC_PLATFORM, PLATFORM_CLIENT};
 use ompas_language::process::LOG_TOPIC_OMPAS;
 use ompas_middleware::logger::{FileDescriptor, LogClient};

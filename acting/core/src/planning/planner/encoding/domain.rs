@@ -15,7 +15,7 @@ use crate::model::sym_table::VarId;
 use crate::ompas::manager::acting::planning::ActingVarRefTable;
 
 use crate::model::acting_domain::model::ActingModel;
-use crate::ompas::manager::state::instance::InstanceCollection;
+use crate::ompas::manager::state::instance::InstanceCollectionSnapshot;
 use crate::planning::planner::encoding::{
     atom_from_cst, get_type, try_variable_into_fvar, var_id_into_atom, PlannerDomain,
     OMPAS_TIME_SCALE,
@@ -34,8 +34,8 @@ use aries_planning::chronicles::constraints::{Constraint as aConstraint, Constra
 use aries_planning::chronicles::printer::Printer;
 use aries_planning::chronicles::{
     Chronicle as aChronicle, ChronicleKind as aChronicleKind,
-    ChronicleTemplate as aChronicleTemplate, Condition, Container, Ctx, Effect,
-    Problem as aProblem, StateFun, SubTask, VarType,
+    ChronicleTemplate as aChronicleTemplate, Condition, Container, Ctx, Effect, StateFun, SubTask,
+    VarType,
 };
 use aries_planning::parsing::pddl::TypedSymbol;
 use function_name::named;
@@ -58,7 +58,7 @@ const INT_UB: IntCst = 10000;
 pub fn encode_ctx(
     st: &RefSymTable,
     domain: &PlannerDomain,
-    instance: &InstanceCollection,
+    instance: &InstanceCollectionSnapshot,
 ) -> anyhow::Result<Ctx> {
     let st = st.clone();
     let lattice = st.get_lattice();
@@ -497,22 +497,29 @@ pub fn read_chronicle(
     // Declaration of the presence variable
 
     //Declaration of the variables
-    let prez_var = match scope {
-        Some(scope) => ctx
-            .model
-            .new_presence_variable(scope, container / VarType::Presence),
-        None => ctx.model.new_bvar(container / VarType::Presence),
+
+    let presence = ch.get_presence();
+    let d_presence = st.get_domain_of_var(presence);
+    let prez = if d_presence.is_true() {
+        let lit = aLit::TRUE;
+        lit
+    } else {
+        let prez_var = match scope {
+            Some(scope) => ctx
+                .model
+                .new_presence_variable(scope, container / VarType::Presence),
+            None => ctx.model.new_bvar(container / VarType::Presence),
+        };
+        let variable: Variable = prez_var.into();
+        table.add_binding(*ch.get_presence(), variable.clone());
+        params.push(variable);
+        let prez: aLit = prez_var.true_lit();
+        prez
     };
-    let variable: Variable = prez_var.into();
-    table.add_binding(*ch.get_presence(), variable.clone());
-    params.push(variable);
-    let prez: aLit = prez_var.true_lit();
+
     //print!("init params...");
     //TODO: handle case where some parameters are already instantiated.
     for var in &ch.get_variables() {
-        if table.contains(*var) {
-            continue;
-        }
         let var_domain = st.get_var_domain(var);
         let domain = &var_domain.domain;
         let label = st.get_label(var, false);
@@ -540,79 +547,83 @@ pub fn read_chronicle(
             }
         };
 
-        let param: Variable = if t == lattice.get_type_id(TYPE_TIMEPOINT).unwrap() {
-            let fvar = ctx.model.new_optional_fvar(
-                0,
-                INT_CST_MAX,
-                OMPAS_TIME_SCALE,
-                prez,
-                container / VarType::Parameter(label),
-            );
-
-            table.add_binding(*var, fvar.into());
-            fvar.into()
-        } else if t == lattice.get_type_id(TYPE_PRESENCE).unwrap() {
-            if let Some(var) = table.get_var(*var) {
-                *var
-            } else {
-                panic!()
-            }
-        } else if *t == TYPE_ID_INT {
-            let ivar = ctx.model.new_optional_ivar(
-                INT_CST_MIN,
-                INT_UB,
-                prez,
-                container / VarType::Parameter(label),
-            );
-            table.add_binding(*var, ivar.into());
-            ivar.into()
-        } else if *t == TYPE_ID_FLOAT || *t == TYPE_ID_NUMBER {
-            let fvar = ctx.model.new_optional_fvar(
-                INT_CST_MIN,
-                INT_CST_MAX,
-                OMPAS_TIME_SCALE, //Not sure of that
-                prez,
-                container / VarType::Parameter(label),
-            );
-            table.add_binding(var, fvar.into());
-            fvar.into()
-        } else if *t == TYPE_ID_BOOLEAN {
-            let bvar = ctx
-                .model
-                .new_optional_bvar(prez, container / VarType::Parameter(label));
-            //context.model.
-            table.add_binding(*var, bvar.into());
-            bvar.into()
-        } else if *t == TYPE_ID_NIL {
-            unreachable!()
-            /*let bvar = context
-                .model
-                .new_optional_bvar(prez, container / VarType::Parameter(label));
-            bindings.add_binding(var, &bvar.into());
-            bvar.into()*/
+        let param = if let Some(var) = table.get_var(*var) {
+            var.clone()
         } else {
-            let str = domain.format(&lattice);
-            let t = ctx
-                .model
-                .get_symbol_table()
-                .types
-                .id_of(&str)
-                .unwrap_or_else(|| panic!("{str} should be defined in type hierarchy"));
-            //let s = ch.sym_table.get_atom(var, true).unwrap();
-            let svar =
-                ctx.model
-                    .new_optional_sym_var(t, prez, container / VarType::Parameter(label));
-            table.add_binding(*var, svar.into());
-            svar.into()
-        };
+            if t == lattice.get_type_id(TYPE_TIMEPOINT).unwrap() {
+                let fvar = ctx.model.new_optional_fvar(
+                    0,
+                    INT_CST_MAX,
+                    OMPAS_TIME_SCALE,
+                    prez,
+                    container / VarType::Parameter(label),
+                );
 
+                table.add_binding(*var, fvar.into());
+                fvar.into()
+            } else if t == lattice.get_type_id(TYPE_PRESENCE).unwrap() {
+                if let Some(var) = table.get_var(*var) {
+                    *var
+                } else {
+                    panic!()
+                }
+            } else if *t == TYPE_ID_INT {
+                let ivar = ctx.model.new_optional_ivar(
+                    INT_CST_MIN,
+                    INT_UB,
+                    prez,
+                    container / VarType::Parameter(label),
+                );
+                table.add_binding(*var, ivar.into());
+                ivar.into()
+            } else if *t == TYPE_ID_FLOAT || *t == TYPE_ID_NUMBER {
+                let fvar = ctx.model.new_optional_fvar(
+                    INT_CST_MIN,
+                    INT_CST_MAX,
+                    OMPAS_TIME_SCALE, //Not sure of that
+                    prez,
+                    container / VarType::Parameter(label),
+                );
+                table.add_binding(var, fvar.into());
+                fvar.into()
+            } else if *t == TYPE_ID_BOOLEAN {
+                let bvar = ctx
+                    .model
+                    .new_optional_bvar(prez, container / VarType::Parameter(label));
+                //context.model.
+                table.add_binding(*var, bvar.into());
+                bvar.into()
+            } else if *t == TYPE_ID_NIL {
+                unreachable!()
+                /*let bvar = context
+                    .model
+                    .new_optional_bvar(prez, container / VarType::Parameter(label));
+                bindings.add_binding(var, &bvar.into());
+                bvar.into()*/
+            } else {
+                let str = domain.format(&lattice);
+                let t = ctx
+                    .model
+                    .get_symbol_table()
+                    .types
+                    .id_of(&str)
+                    .unwrap_or_else(|| panic!("{str} should be defined in type hierarchy"));
+                //let s = ch.sym_table.get_atom(var, true).unwrap();
+                let svar =
+                    ctx.model
+                        .new_optional_sym_var(t, prez, container / VarType::Parameter(label));
+                table.add_binding(*var, svar.into());
+                svar.into()
+            }
+        };
         if let Some(cst) = cst {
             let cst = atom_from_cst(ctx, &cst);
 
             constraints.push(aConstraint::eq(param, cst));
         }
-
-        params.push(param);
+        if !params.contains(&param) {
+            params.push(param);
+        }
     }
     //println!("ok!");
 

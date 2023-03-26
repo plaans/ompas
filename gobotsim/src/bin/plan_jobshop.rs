@@ -78,8 +78,8 @@ async fn lisp_interpreter(opt: Opt) -> lruntimeerror::Result<()> {
 
     channel.send(command).await.unwrap();
     channel.recv().await.unwrap()?;
-    channel.send("(dump_trace)".to_string()).await.unwrap();
-    channel.recv().await.unwrap()?;
+    //channel.send("(dump_trace)".to_string()).await.unwrap();
+    //channel.recv().await.unwrap()?;
 
     Master::end().await;
 

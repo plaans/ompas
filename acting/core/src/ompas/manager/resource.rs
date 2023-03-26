@@ -215,7 +215,7 @@ impl Resource {
         priority: WaiterPriority,
     ) -> Result<WaitAcquire, LRuntimeError> {
         let r = self.new_ticket(quantity, priority, TicketKind::Reservation)?;
-        self.update_waiters().await;
+        self.update_queue().await;
         Ok(r)
     }
 
@@ -246,7 +246,7 @@ impl Resource {
             .collect();
     }
 
-    pub async fn update_waiters(&mut self) {
+    pub async fn update_queue(&mut self) {
         let mut queue = mem::take(&mut self.queue);
 
         while let Some(ticket_id) = queue.pop() {
@@ -408,6 +408,11 @@ impl ResourceManager {
         println!("mutex map cleared");
     }
 
+    async fn get_id(&self, label: &str) -> Option<ResourceId> {
+        let labels = self.labels.lock().await;
+        labels.get(label).copied()
+    }
+
     pub async fn new_resource(&self, label: String, capacity: Option<Capacity>) {
         let id = get_and_update_id_counter(self.id.clone());
         let mut labels = self.labels.lock().await;
@@ -430,15 +435,13 @@ impl ResourceManager {
 
     pub async fn acquire(
         &self,
-        label: String,
+        label: &str,
         quantity: Quantity,
         priority: WaiterPriority,
     ) -> Result<WaitAcquire, LRuntimeError> {
-        let labels = self.labels.lock().await;
-        let id = *labels.get(&label).ok_or_else(|| {
+        let id = self.get_id(&label).await.ok_or_else(|| {
             LRuntimeError::new("acquire", format!("Resource {} does not exist.", label))
         })?;
-        drop(labels);
         let mut map = self.inner.lock().await;
         let resource: &mut Resource = map.get_mut(&id).unwrap();
         resource._acquire(quantity, priority).await
@@ -446,27 +449,36 @@ impl ResourceManager {
 
     pub async fn reserve(
         &self,
-        label: String,
+        label: &str,
         quantity: Quantity,
         priority: WaiterPriority,
     ) -> Result<WaitAcquire, LRuntimeError> {
-        let labels = self.labels.lock().await;
-        let id = *labels.get(&label).ok_or_else(|| {
+        let id = self.get_id(&label).await.ok_or_else(|| {
             LRuntimeError::new("acquire", format!("Resource {} does not exist.", label))
         })?;
-        drop(labels);
         let mut map = self.inner.lock().await;
         let resource: &mut Resource = map.get_mut(&id).unwrap();
         resource._reserve(quantity, priority)
     }
 
-    pub async fn is_locked(&self, label: String) -> Result<bool, LRuntimeError> {
-        let id = *self
-            .labels
+    pub async fn update_queue(&self, resource: &str) -> Result<(), LRuntimeError> {
+        let id = self.get_id(resource).await.ok_or_else(|| {
+            LRuntimeError::new("acquire", format!("Resource {} does not exist.", resource))
+        })?;
+        self.inner
             .lock()
             .await
-            .get(&label)
-            .ok_or_else(|| LRuntimeError::new("is_locked", "resource does not exist"))?;
+            .get_mut(&id)
+            .unwrap()
+            .update_queue()
+            .await;
+        Ok(())
+    }
+
+    pub async fn is_locked(&self, label: &str) -> Result<bool, LRuntimeError> {
+        let id = self.get_id(&label).await.ok_or_else(|| {
+            LRuntimeError::new("acquire", format!("Resource {} does not exist.", label))
+        })?;
         Ok(!self
             .inner
             .lock()
@@ -482,7 +494,7 @@ impl ResourceManager {
         let resource: &mut Resource = map.get_mut(&rh.resource_id).unwrap();
         resource.remove_in_service(&rh.client_id);
         resource.update_remaining_capacity()?;
-        resource.update_waiters().await;
+        resource.update_queue().await;
         Ok(())
     }
 

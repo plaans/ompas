@@ -1,6 +1,5 @@
-use crate::model::sym_domain::ref_type_lattice::RefTypeLattice;
-use crate::model::sym_domain::type_lattice::TypeLattice;
-use crate::ompas::manager::state::instance::InstanceCollection;
+use crate::model::sym_table::r#ref::RefSymTable;
+use crate::ompas::manager::state::instance::{InstanceCollection, InstanceCollectionSnapshot};
 use crate::ompas::manager::state::partial_state::PartialState;
 use sompas_core::modules::map::union_map;
 use sompas_structs::lruntimeerror;
@@ -20,7 +19,7 @@ pub enum StateType {
     Instance,
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Clone)]
 pub struct WorldState {
     r#static: Arc<RwLock<PartialState>>,
     dynamic: Arc<RwLock<PartialState>>,
@@ -30,13 +29,32 @@ pub struct WorldState {
     sem_update: Arc<Mutex<Option<broadcast::Sender<bool>>>>,
 }
 
+impl Default for WorldState {
+    fn default() -> Self {
+        Self::new(RefSymTable::default())
+    }
+}
+
+impl WorldState {
+    pub fn new(st: RefSymTable) -> Self {
+        Self {
+            r#static: Arc::new(Default::default()),
+            dynamic: Arc::new(Default::default()),
+            inner_static: Arc::new(Default::default()),
+            inner_dynamic: Arc::new(Default::default()),
+            instance: Arc::new(RwLock::new(InstanceCollection::new(st))),
+            sem_update: Arc::new(Default::default()),
+        }
+    }
+}
+
 #[derive(Default, Clone, Debug)]
 pub struct WorldStateSnapshot {
     pub r#static: PartialState,
     pub dynamic: PartialState,
     pub inner_static: PartialState,
     pub inner_dynamic: PartialState,
-    pub instance: InstanceCollection,
+    pub instance: InstanceCollectionSnapshot,
 }
 
 impl WorldStateSnapshot {
@@ -76,7 +94,7 @@ impl From<WorldStateSnapshot> for WorldState {
             dynamic: Arc::new(RwLock::new(w.dynamic)),
             inner_static: Arc::new(RwLock::new(w.inner_static)),
             inner_dynamic: Arc::new(RwLock::new(w.inner_dynamic)),
-            instance: Arc::new(RwLock::new(w.instance)),
+            instance: Arc::new(RwLock::new(w.instance.into())),
             sem_update: Arc::new(Mutex::new(None)),
         }
     }
@@ -118,29 +136,25 @@ const RAE_STATE_SEM_UPDATE_CHANNEL_SIZE: usize = 64;
 
 impl WorldState {
     pub async fn add_type(&self, t: &str, p: Option<&str>) {
-        self.instance.write().await.add_type(t, p).await;
+        self.instance.write().await.add_type(t, p);
     }
 
     pub async fn add_instance(&self, instance: &str, r#type: &str) {
-        self.instance
-            .write()
-            .await
-            .add_instance(instance, r#type)
-            .await;
+        self.instance.write().await.add_instance(instance, r#type);
     }
 
     pub async fn instance(&self, i: &str, t: &str) -> LValue {
-        self.instance.read().await.is_of_type(i, t).await.into()
+        self.instance.read().await.is_of_type(i, t).into()
     }
 
     pub async fn instances(&self, t: &str) -> LValue {
-        self.instance.read().await.get_instances(t).await.into()
+        self.instance.read().await.get_instances(t).into()
     }
 
     pub async fn clear(&self) {
         self.r#static.write().await.inner = Default::default();
         self.dynamic.write().await.inner = Default::default();
-        *self.instance.write().await = Default::default();
+        self.instance.write().await.clear();
         self.inner_static.write().await.inner = Default::default();
         self.inner_dynamic.write().await.inner = Default::default();
     }
@@ -151,7 +165,7 @@ impl WorldState {
             dynamic: self.dynamic.read().await.clone(),
             inner_static: self.inner_static.read().await.clone(),
             inner_dynamic: self.inner_dynamic.read().await.clone(),
-            instance: self.instance.read().await.clone(),
+            instance: self.instance.read().await.get_snapshot(),
         }
     }
 
@@ -298,13 +312,5 @@ impl WorldState {
                 }
             }
         }
-    }
-
-    pub async fn get_lattice(&self) -> TypeLattice {
-        self.instance.read().await.get_lattice().await
-    }
-
-    pub async fn get_ref_lattice(&self) -> RefTypeLattice {
-        self.instance.read().await.get_ref_lattice()
     }
 }

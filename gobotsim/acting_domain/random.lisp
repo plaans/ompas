@@ -36,8 +36,8 @@
         (:body 
             (do
                 (define ?r (arbitrary (instances robot) rand-element))
-                (define h1 (await (acquire ?m)))
-                (define h2 (await (acquire ?r)))
+                (define h1 (acquire ?m))
+                (define h2 (acquire ?r))
                 (t_carry_to_machine ?r ?p ?m)
                 (release h2)
                 (t_process ?m ?p ?d))))

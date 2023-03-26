@@ -1,3 +1,4 @@
+use crate::ompas::manager::acting::acting_var::AsCst;
 use crate::ompas::scheme::exec::state::ModState;
 use crate::ompas::scheme::monitor::control::ModControl;
 use crate::ompas::scheme::monitor::domain::ModDomain;
@@ -60,10 +61,18 @@ async fn _plan_task(env: &LEnv, args: &[LValue], opt: bool) -> LResult {
         .acting_manager
         .clone();
     let ctx = env.get_context::<ModDomain>(MOD_DOMAIN)?;
-    let mut context: ConversionContext = ctx.get_conversion_context().await;
-    context
-        .env
-        .update_context(ModState::new_from_snapshot(context.state.clone()));
+    //let mut context: ConversionContext = ctx.get_conversion_context().await;
+    let mut env: LEnv = ctx.get_plan_env().await;
+    let state = ctx.get_plan_state().await;
+
+    env.update_context(ModState::new_from_snapshot(state));
+
+    acting_manager.start_continuous_planning(env).await;
+
+    let debug = LValue::from(args).to_string();
+    let args = args.iter().map(|lv| lv.as_cst().unwrap()).collect();
+
+    let pr = acting_manager.new_high_level_task(debug, args).await;
     /*
     let actions = vec![PAction {
         args: args

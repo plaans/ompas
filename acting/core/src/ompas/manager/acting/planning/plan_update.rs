@@ -161,6 +161,7 @@ impl PlanUpdateManager {
                         let mut locked = acting_manager.inner.write().await;
                         locked.add_processes_from_chronicles(acting_models).await;
                         locked.absorb_choices(choices).await;
+                        locked.dump_trace(None)
                     }else {
                         break 'main
                     }

@@ -1,4 +1,3 @@
-use crate::model::acting_domain::OMPASDomain;
 use crate::ompas::interface::job::Job;
 use crate::ompas::interface::rae_command::OMPASJob;
 use crate::ompas::interface::rae_options::OMPASOptions;
@@ -51,7 +50,6 @@ pub struct ModControl {
     pub log: LogClient,
     pub task_stream: Arc<RwLock<Option<tokio::sync::mpsc::Sender<OMPASJob>>>>,
     pub(crate) platform: Platform,
-    pub(crate) ompas_domain: Arc<RwLock<OMPASDomain>>,
     pub(crate) tasks_to_execute: Arc<RwLock<Vec<Job>>>,
     pub(crate) pd: Arc<RwLock<Option<PlanningDomain>>>,
     pub(crate) triggers: TriggerCollection,
@@ -65,7 +63,6 @@ impl ModControl {
             log: monitor.log.clone(),
             task_stream: monitor.task_stream.clone(),
             platform: monitor.platform.clone(),
-            ompas_domain: monitor.ompas_domain.clone(),
             tasks_to_execute: monitor.tasks_to_execute.clone(),
             pd: Arc::new(Default::default()),
             triggers: Default::default(),
@@ -79,8 +76,8 @@ impl ModControl {
             if matches!(select_mode, SelectMode::Planning(Planner::Aries(_))) {
                 let instant = Instant::now();
                 match convert_acting_domain(&ConversionContext::new(
-                    self.ompas_domain.read().await.clone(),
-                    self.acting_manager.state.get_lattice().await,
+                    self.acting_manager.domain.read().await.clone(),
+                    self.acting_manager.st.clone(),
                     self.acting_manager.state.get_snapshot().await,
                     self.get_exec_env().await,
                 ))
@@ -137,7 +134,8 @@ impl ModControl {
         env.import_module(ModExec::new(self).await, WithoutPrefix);
         eval_init(&mut env).await;
 
-        let domain_exec_symbols: LEnvSymbols = self.ompas_domain.read().await.get_exec_env();
+        let domain_exec_symbols: LEnvSymbols =
+            self.acting_manager.domain.read().await.get_exec_env();
 
         env.set_new_top_symbols(domain_exec_symbols);
 
@@ -336,7 +334,7 @@ pub async fn trigger_task(env: &LEnv, args: &[LValue]) -> Result<usize, LRuntime
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
     let (tx, mut rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
     let task = args[0].to_string();
-    if !ctx.ompas_domain.read().await.is_task(&task) {
+    if !ctx.acting_manager.domain.read().await.is_task(&task) {
         return Err(LRuntimeError::new(
             TRIGGER_TASK,
             format!("{} is not a task.", task),
@@ -373,7 +371,7 @@ pub async fn add_task_to_execute(env: &LEnv, args: &[LValue]) -> Result<(), LRun
     let (tx, _) = mpsc::channel(TOKIO_CHANNEL_SIZE);
     let task = args[0].to_string();
 
-    if !ctx.ompas_domain.read().await.is_task(&task) {
+    if !ctx.acting_manager.domain.read().await.is_task(&task) {
         return Err(LRuntimeError::new(
             ADD_TASK_TO_EXECUTE,
             format!("{} is not a task.", task),
@@ -554,7 +552,7 @@ pub async fn print_process_network(env: &LEnv) -> String {
 #[async_scheme_fn]
 pub async fn get_type_hierarchy(env: &LEnv) -> String {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
-    format!("{:?}", ctx.acting_manager.state.get_lattice().await)
+    format!("{:?}", ctx.acting_manager.st.get_lattice())
 }
 
 #[async_scheme_fn]
@@ -610,28 +608,32 @@ pub async fn get_monitors(env: &LEnv) -> LResult {
 #[async_scheme_fn]
 pub async fn get_commands(env: &LEnv) -> LResult {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
-    Ok(ctx.ompas_domain.read().await.get_list_commands())
+    Ok(ctx.acting_manager.domain.read().await.get_list_commands())
 }
 
 ///Get the list of tasks in the environment
 #[async_scheme_fn]
 pub async fn get_tasks(env: &LEnv) -> LResult {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
-    Ok(ctx.ompas_domain.read().await.get_list_tasks())
+    Ok(ctx.acting_manager.domain.read().await.get_list_tasks())
 }
 
 ///Get the methods of a given task
 #[async_scheme_fn]
 pub async fn get_methods(env: &LEnv) -> LResult {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
-    Ok(ctx.ompas_domain.read().await.get_list_methods())
+    Ok(ctx.acting_manager.domain.read().await.get_list_methods())
 }
 
 ///Get the list of state functions in the environment
 #[async_scheme_fn]
 pub async fn get_state_functions(env: &LEnv) -> LValue {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
-    ctx.ompas_domain.read().await.get_list_state_functions()
+    ctx.acting_manager
+        .domain
+        .read()
+        .await
+        .get_list_state_functions()
 }
 
 /// Returns the whole RAE environment if no arg et the entry corresponding to the symbol passed in args.
@@ -651,9 +653,10 @@ pub async fn get_domain(env: &LEnv, args: &[LValue]) -> LResult {
 
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
     match key {
-        None => Ok(ctx.ompas_domain.read().await.to_string().into()),
+        None => Ok(ctx.acting_manager.domain.read().await.to_string().into()),
         Some(key) => Ok(ctx
-            .ompas_domain
+            .acting_manager
+            .domain
             .read()
             .await
             .get_element_description(key.as_ref())

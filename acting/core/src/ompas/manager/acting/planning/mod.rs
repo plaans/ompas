@@ -27,6 +27,7 @@ use aries::model::extensions::{AssignmentExt, SavedAssignment, Shaped};
 use aries::model::lang::{Atom, Variable};
 use aries::model::Model;
 use aries_planning::chronicles;
+use aries_planning::chronicles::printer::Printer;
 use aries_planning::chronicles::{ChronicleOrigin, FiniteProblem, VarLabel};
 use itertools::Itertools;
 use ompas_language::exec::resource::{MAX_Q, QUANTITY};
@@ -127,9 +128,15 @@ pub async fn run_continuous_planning(config: ContinuousPlanningConfig) {
                     let p: ProblemUpdate = p;
                     match p {
                         ProblemUpdate::ExecutionProblem(ep) => {
-
                             let pp: PlannerProblem = populate_problem(&domain, &env, &st, ep).await.unwrap();
+                            for (origin, chronicle) in pp.instances.iter().map(|i| (i.origin, i.am.chronicle.as_ref().unwrap())) {
+                                println!("{:?}:{}", origin, chronicle)
+                            }
                             let aries_problem: chronicles::Problem = encode(&mut table, &st, &pp).await.unwrap();
+                            for instance in &aries_problem.chronicles {
+                                Printer::print_chronicle(&instance.chronicle, &aries_problem.context.model);
+                            }
+
                             let result = run_solver(
                                 aries_problem,
                                 OPT,
@@ -137,6 +144,7 @@ pub async fn run_continuous_planning(config: ContinuousPlanningConfig) {
                             //println!("{}", format_partial_plan(&pb, &x)?);
 
                             if let Ok(Some(pr)) = result {
+                                println!("Plan found");
                                 //result::print_chronicles(&pr);
                                 let PlanResult {
                                     ass,
@@ -146,6 +154,9 @@ pub async fn run_continuous_planning(config: ContinuousPlanningConfig) {
                                 let choices = extract_choices(&table, &ass, &fp.model, &pp);
                                 let new_ams = extract_new_acting_models(&table, &ass, &fp.model, pp);
 
+                                for choice in &choices {
+                                    println!("{}:{}", choice.process_ref, choice.choice_inner)
+                                }
 
                                 //We update the plan with new acting models and choices extracted from the instanciation of variables of the planner.
                                 let pu = PlanUpdate {
@@ -160,8 +171,6 @@ pub async fn run_continuous_planning(config: ContinuousPlanningConfig) {
                             } else {
                                 println!("No solution found for planner")
                             };
-
-                            todo!()
                         }
                         ProblemUpdate::UpdateState(_) => {
                             todo!()
@@ -208,7 +217,7 @@ pub async fn populate_problem(
                 task_id,
             };
 
-            if em.iter().find(|ci| ci.origin == origin).is_some() {
+            if em.iter().find(|ci| ci.origin == origin).is_none() {
                 let mut value: Vec<ActionParam> = vec![];
                 for e in &subtask.name {
                     let domain = st.get_domain_of_var(&e);
@@ -251,7 +260,7 @@ pub async fn populate_problem(
 
     while let Some(action) = p_actions.pop() {
         let tps = &action.args;
-        let instance_id = instances.len() + 1;
+        let instance_id = instances.len();
         if let Some(task) = domain.tasks.get(tps[0].lvalues().to_string().as_str()) {
             tasks.insert(task.get_label().to_string());
 

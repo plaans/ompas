@@ -116,7 +116,7 @@
                            (define tasks (mapf (lambda (process)
                                `(t_process_on_machine ,?p 
                                    (arbitrary ',(find_machines_for_process (car process)))
-                                   (cdar process)
+                                   ,(cadr process)
                                    ))
                                (package.all_processes ?p)))
                             (define last_task
@@ -127,7 +127,7 @@
                                     ,?m
                                     (t_carry_to_machine ?r ,?p ,?m)))
                             (define tasks (append tasks (list last_task)))
-                            ;(print tasks)
+                            (print tasks)
                             `(apply seq ',tasks)))
                         (instances package)))
                (define h (apply par tasks)))))

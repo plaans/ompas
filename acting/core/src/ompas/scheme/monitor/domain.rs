@@ -4,8 +4,8 @@ use crate::model::acting_domain::parameters::{try_domain_from_lvalue, Parameters
 use crate::model::acting_domain::state_function::StateFunction;
 use crate::model::acting_domain::task::Task;
 use crate::model::acting_domain::OMPASDomain;
-use crate::model::sym_domain::ref_type_lattice::RefTypeLattice;
 use crate::model::sym_domain::Domain;
+use crate::model::sym_table::r#ref::RefSymTable;
 use crate::ompas::manager::resource::{Capacity, ResourceManager};
 use crate::ompas::manager::state::partial_state::PartialState;
 use crate::ompas::manager::state::world_state::{StateType, WorldState, WorldStateSnapshot};
@@ -32,6 +32,7 @@ use tokio::sync::RwLock;
 
 pub struct ModDomain {
     state: WorldState,
+    st: RefSymTable,
     resource_manager: ResourceManager,
     empty_env: LEnv,
     domain_description: InitScheme,
@@ -42,10 +43,11 @@ impl ModDomain {
     pub fn new(monitor: &ModMonitor) -> Self {
         Self {
             state: monitor.acting_manager.state.clone(),
+            st: monitor.acting_manager.st.clone(),
             resource_manager: monitor.acting_manager.resource_manager.clone(),
             empty_env: monitor.empty_env.clone(),
             domain_description: monitor.platform.domain().into(),
-            domain: monitor.ompas_domain.clone(),
+            domain: monitor.acting_manager.domain.clone(),
         }
     }
 
@@ -54,15 +56,24 @@ impl ModDomain {
     }
 
     pub async fn get_conversion_context(&self) -> ConversionContext {
-        let mut state: WorldStateSnapshot = self.state.get_snapshot().await;
-        let snap_resource: WorldStateSnapshot = self.resource_manager.get_snapshot().await;
-        state.absorb(snap_resource);
-        let lattice = state.instance.lattice.get_lattice().await;
+        let state: WorldStateSnapshot = self.get_plan_state().await;
         let domain: OMPASDomain = self.domain.read().await.clone();
+        let env = self.get_plan_env().await;
+        ConversionContext::new(domain, self.st.clone(), state, env)
+    }
+
+    pub async fn get_plan_env(&self) -> LEnv {
         let env_symbols: LEnvSymbols = self.domain.read().await.get_convert_env();
         let mut env = self.empty_env.clone();
         env.set_new_top_symbols(env_symbols);
-        ConversionContext::new(domain, lattice, state, env)
+        env
+    }
+
+    pub async fn get_plan_state(&self) -> WorldStateSnapshot {
+        let mut state = self.state.get_snapshot().await;
+        let snap_resource: WorldStateSnapshot = self.resource_manager.get_snapshot().await;
+        state.absorb(snap_resource);
+        state
     }
 }
 
@@ -265,12 +276,12 @@ pub async fn add_state_function(
     map: im::HashMap<LValue, LValue>,
 ) -> Result<(), LRuntimeError> {
     let ctx = env.get_context::<ModDomain>(MOD_DOMAIN)?;
-    let lattice: RefTypeLattice = ctx.state.get_ref_lattice().await;
+    let st: RefSymTable = ctx.st.clone();
     let mut new_env = ctx.get_empty_env();
     let label = map.get(&NAME.into()).unwrap();
     let params: Parameters = Parameters::try_from_lvalue(
         map.get(&PARAMETERS.into()).unwrap_or(&Default::default()),
-        &lattice,
+        &st,
     )
     .await?;
     let result = car(
@@ -283,7 +294,7 @@ pub async fn add_state_function(
             .clone()],
     )?;
 
-    let result: Domain = try_domain_from_lvalue(&lattice, &result).await?;
+    let result: Domain = try_domain_from_lvalue(&st, &result).await?;
     let expr = format!(
         "(lambda {}
                 (read-state '{} {})))",
@@ -314,12 +325,12 @@ pub async fn add_static_state_function(
     map: im::HashMap<LValue, LValue>,
 ) -> Result<(), LRuntimeError> {
     let ctx = env.get_context::<ModDomain>(MOD_DOMAIN)?;
-    let lattice: RefTypeLattice = ctx.state.get_ref_lattice().await;
+    let st: RefSymTable = ctx.st.clone();
     let mut new_env = ctx.get_empty_env();
     let label = map.get(&NAME.into()).unwrap();
     let params: Parameters = Parameters::try_from_lvalue(
         map.get(&PARAMETERS.into()).unwrap_or(&Default::default()),
-        &lattice,
+        &st,
     )
     .await?;
     let result = car(
@@ -332,7 +343,7 @@ pub async fn add_static_state_function(
             .clone()],
     )?;
 
-    let result: Domain = try_domain_from_lvalue(&lattice, &result).await?;
+    let result: Domain = try_domain_from_lvalue(&st, &result).await?;
     let expr = format!(
         "(lambda {}
                 (read-static-state '{} {})))",
@@ -359,7 +370,7 @@ pub async fn add_static_state_function(
 async fn create_model(env: &LEnv, model: im::HashMap<LValue, LValue>) -> LResult {
     let ctx = env.get_context::<ModDomain>(MOD_DOMAIN)?;
 
-    let lattice: RefTypeLattice = ctx.state.get_ref_lattice().await;
+    let st: RefSymTable = ctx.st.clone();
     let env = &mut ctx.get_empty_env();
     let model_type: ModelType = model
         .get(&MODEL_TYPE.into())
@@ -373,7 +384,7 @@ async fn create_model(env: &LEnv, model: im::HashMap<LValue, LValue>) -> LResult
                 model
                     .get(&PARAMETERS.into())
                     .ok_or_else(|| LRuntimeError::new("create_model", "missing :params"))?,
-                &lattice,
+                &st,
             )
             .await?;
             let conds = model
@@ -408,7 +419,7 @@ async fn create_model(env: &LEnv, model: im::HashMap<LValue, LValue>) -> LResult
                 model
                     .get(&PARAMETERS.into())
                     .ok_or_else(|| LRuntimeError::new("create_model", "missing :params"))?,
-                &lattice,
+                &st,
             )
             .await?;
             let body = car(env, &[model.get(&BODY.into()).unwrap().clone()])?;
@@ -441,12 +452,12 @@ pub async fn add_command(
         ));
     }
     let ctx = env.get_context::<ModDomain>(MOD_DOMAIN)?;
-    let lattice: RefTypeLattice = ctx.state.get_ref_lattice().await;
+    let st: RefSymTable = ctx.st.clone();
     let mut env = ctx.get_empty_env();
     let mut command = Command::default();
     command.set_label(map.get(&NAME.into()).unwrap().to_string());
     command.set_parameters(
-        Parameters::try_from_lvalue(&map.get(&PARAMETERS.into()).unwrap(), &lattice).await?,
+        Parameters::try_from_lvalue(&map.get(&PARAMETERS.into()).unwrap(), &st).await?,
     );
     let params = command.get_parameters().get_params_as_lvalue();
     let params_list = command.get_parameters().get_labels();
@@ -518,18 +529,15 @@ pub async fn add_task(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<()
         ));
     }
     let ctx = env.get_context::<ModDomain>(MOD_DOMAIN)?;
-    let lattice: RefTypeLattice = ctx.state.get_ref_lattice().await;
+    let st: RefSymTable = ctx.st.clone();
 
     let mut env = ctx.get_empty_env();
 
     let mut task = Task::default();
     task.set_label(map.get(&NAME.into()).unwrap().to_string());
     task.set_parameters(
-        Parameters::try_from_lvalue(
-            map.get(&PARAMETERS.into()).unwrap_or(&LValue::Nil),
-            &lattice,
-        )
-        .await?,
+        Parameters::try_from_lvalue(map.get(&PARAMETERS.into()).unwrap_or(&LValue::Nil), &st)
+            .await?,
     );
     let params = task.get_parameters().get_params_as_lvalue();
     let params_list = task.get_parameters().get_labels();
@@ -591,7 +599,7 @@ pub async fn add_method(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<
         ));
     }
     let ctx = env.get_context::<ModDomain>(MOD_DOMAIN)?;
-    let lattice: RefTypeLattice = ctx.state.get_ref_lattice().await;
+    let st: RefSymTable = ctx.st.clone();
     let mut new_env = ctx.get_empty_env();
     let parameters = map.get(&PARAMETERS.into()).unwrap_or(&LValue::Nil).clone();
     let task_label = car(
@@ -624,7 +632,7 @@ pub async fn add_method(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<
     let mut method = Method {
         label,
         task_label,
-        parameters: Parameters::try_from_lvalue(&parameters, &lattice).await?,
+        parameters: Parameters::try_from_lvalue(&parameters, &st).await?,
         ..Default::default()
     };
     let conds = match map.get(&PRE_CONDITIONS.into()) {

@@ -5,7 +5,15 @@
             (:params )
             (:body nil))
 
+    
+
     (def-task t_jobshop)
+    ; (def-task-om-model t_jobshop
+    ;     (:params )
+    ;     (:body
+    ;         (do
+    ;             (sleep 1)))
+    ; )
     (def-method m1
        (:task t_jobshop)
        (:score 0)
@@ -27,7 +35,6 @@
                                      (define h_r (acquire ?r))
                                      (t_carry_to_machine ?r ,?p ,(find_output_machine))))
                             (define tasks (append tasks (list last_task)))
-                            ;(print tasks)
                             `(apply seq ',tasks)))
                         (instances package)))
                (define h (apply par tasks)))))

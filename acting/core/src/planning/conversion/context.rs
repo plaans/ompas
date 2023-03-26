@@ -1,8 +1,6 @@
 use crate::model::acting_domain::OMPASDomain;
-use crate::model::sym_domain::type_lattice::TypeLattice;
 use crate::model::sym_domain::Domain;
 use crate::model::sym_table::r#ref::RefSymTable;
-use crate::model::sym_table::SymTable;
 use crate::ompas::manager::state::world_state::WorldStateSnapshot;
 use ompas_language::sym_table::{
     TYPE_ABSTRACT_TASK, TYPE_COMMAND, TYPE_OBJECT_TYPE, TYPE_STATE_FUNCTION,
@@ -17,13 +15,8 @@ pub struct ConversionContext {
 }
 
 impl ConversionContext {
-    pub fn new(
-        domain: OMPASDomain,
-        lattice: TypeLattice,
-        state: WorldStateSnapshot,
-        env: LEnv,
-    ) -> Self {
-        let mut st = SymTable::new_from(lattice);
+    pub fn new(domain: OMPASDomain, st: RefSymTable, state: WorldStateSnapshot, env: LEnv) -> Self {
+        let mut st = st.inner();
 
         for command in domain.commands.values() {
             let domain = Domain::Application(

@@ -315,7 +315,7 @@ pub async fn is_locked(env: &LEnv, args: &[LValue]) -> LResult {
     match mode.as_str() {
         SYMBOL_EXEC_MODE => Ok(ctx
             .resource_manager
-            .is_locked(args[0].borrow().try_into()?)
+            .is_locked(&String::try_from(&args[0])?)
             .await?
             .into()),
         SYMBOL_SIMU_MODE => {

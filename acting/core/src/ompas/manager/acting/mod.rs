@@ -1,5 +1,6 @@
 use crate::model::acting_domain::model::ActingModel;
 use crate::model::acting_domain::OMPASDomain;
+use crate::model::add_domain_symbols;
 use crate::model::process_ref::{Label, ProcessRef};
 use crate::model::sym_domain::cst::Cst;
 use crate::model::sym_table::r#ref::RefSymTable;
@@ -41,28 +42,38 @@ pub type AMId = usize;
 
 #[derive(Clone)]
 pub struct ActingManager {
+    pub st: RefSymTable,
     pub resource_manager: ResourceManager,
     pub monitor_manager: MonitorManager,
+    pub domain: Arc<RwLock<OMPASDomain>>,
     pub state: WorldState,
     pub inner: Arc<RwLock<InnerActingManager>>,
     instant: Instant,
 }
 
-impl Default for ActingManager {
-    fn default() -> Self {
+impl ActingManager {
+    pub fn new(st: RefSymTable) -> Self {
         let instant = Instant::now();
         let resource_manager = ResourceManager::default();
         Self {
+            st: st.clone(),
             resource_manager: resource_manager.clone(),
             monitor_manager: Default::default(),
-            state: Default::default(),
+            domain: Arc::new(Default::default()),
+            state: WorldState::new(st.clone()),
             inner: Arc::new(RwLock::new(InnerActingManager::new(
                 resource_manager,
                 instant.clone(),
-                RefSymTable::default(),
+                st,
             ))),
             instant,
         }
+    }
+}
+
+impl Default for ActingManager {
+    fn default() -> Self {
+        Self::new(RefSymTable::default())
     }
 }
 
@@ -313,20 +324,6 @@ impl ActingManager {
             .await
     }
 
-    pub async fn reserve(
-        &mut self,
-        id: &ActingProcessId,
-        resource: String,
-        quantity: Quantity,
-        priority: WaiterPriority,
-    ) -> Result<(), LRuntimeError> {
-        self.inner
-            .write()
-            .await
-            .reserve(id, resource, quantity, priority)
-            .await
-    }
-
     pub async fn set_s_acq(&self, acquire_id: &ActingProcessId, instant: Option<Timepoint>) {
         self.inner
             .write()
@@ -351,8 +348,12 @@ impl ActingManager {
         self.inner.read().await.get_debug(id).clone()
     }
 
-    pub async fn start_continuous_planning(&self, domain: OMPASDomain, st: RefSymTable, env: LEnv) {
+    pub async fn start_continuous_planning(&self, env: LEnv) {
         let mut locked = self.inner.write().await;
+        let st = self.st.clone();
+        let domain = self.domain.read().await.clone();
+        add_domain_symbols(&st, &domain);
+
         let (plan_update_manager, tx) = PlanUpdateManager::new(self.clone());
         let (problem_update_manager, rx, tx_notif) = ProblemUpdateManager::new(self.clone());
         locked.set_update_notifier(tx_notif);
@@ -375,8 +376,11 @@ impl ActingManager {
     }
 
     pub async fn get_execution_problem(&self) -> ExecutionProblem {
+        let mut state = self.state.get_snapshot().await;
+        let resource_state = self.resource_manager.get_snapshot().await;
+        state.absorb(resource_state);
         ExecutionProblem {
-            state: self.state.get_snapshot().await,
+            state,
             chronicles: self.inner.read().await.get_current_chronicles(),
         }
     }

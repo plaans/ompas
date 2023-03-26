@@ -1,5 +1,4 @@
-use crate::model::sym_domain::ref_type_lattice::RefTypeLattice;
-use crate::model::sym_domain::type_lattice::TypeLattice;
+use crate::model::sym_table::r#ref::RefSymTable;
 use crate::ompas::manager::state::partial_state::PartialState;
 use crate::ompas::manager::state::world_state::StateType;
 use ompas_language::exec::state::INSTANCE;
@@ -9,17 +8,64 @@ use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalues::LValueS;
 use std::collections::{HashMap, HashSet};
 
-#[derive(Clone, Debug)]
-pub struct InstanceCollection {
-    pub lattice: RefTypeLattice,
+#[derive(Default, Clone, Debug)]
+pub struct InstanceCollectionSnapshot {
     pub inner: HashMap<String, HashSet<String>>,
+}
+
+impl From<InstanceCollectionSnapshot> for PartialState {
+    fn from(i: InstanceCollectionSnapshot) -> Self {
+        let mut p = PartialState {
+            inner: Default::default(),
+            _type: Some(StateType::Instance),
+        };
+        for (t, set) in i.inner {
+            let v: LValueS = set.iter().cloned().collect::<Vec<_>>().into();
+            p.insert(list![INSTANCE.into(), t.into()].try_into().unwrap(), v);
+        }
+        p
+    }
+}
+
+#[derive(Clone)]
+pub struct InstanceCollection {
+    pub st: RefSymTable,
+    pub inner: HashMap<String, HashSet<String>>,
+}
+
+impl From<InstanceCollectionSnapshot> for InstanceCollection {
+    fn from(value: InstanceCollectionSnapshot) -> Self {
+        Self {
+            st: RefSymTable::default(),
+            inner: value.inner,
+        }
+    }
 }
 
 impl Default for InstanceCollection {
     fn default() -> Self {
         Self {
-            lattice: RefTypeLattice::new(),
+            st: Default::default(),
             inner: Default::default(),
+        }
+    }
+}
+
+impl InstanceCollection {
+    pub fn new(st: RefSymTable) -> Self {
+        Self {
+            st,
+            inner: Default::default(),
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.inner.clear()
+    }
+
+    pub fn get_snapshot(&self) -> InstanceCollectionSnapshot {
+        InstanceCollectionSnapshot {
+            inner: self.inner.clone(),
         }
     }
 }
@@ -39,54 +85,46 @@ impl From<InstanceCollection> for PartialState {
 }
 
 impl InstanceCollection {
-    pub async fn add_type(&mut self, t: &str, p: Option<&str>) {
+    pub fn add_type(&mut self, t: &str, p: Option<&str>) {
         let parents = if let Some(t) = p {
-            vec![self.lattice.get_type_id(t).await.unwrap()]
+            vec![self.st.get_type_id(t).unwrap()]
         } else {
-            vec![self.lattice.get_type_id(TYPE_OBJECT).await.unwrap()]
+            vec![self.st.get_type_id(TYPE_OBJECT).unwrap()]
         };
-        self.lattice.add_type(t.to_string(), parents).await;
+        self.st.add_type(t.to_string(), parents);
         self.inner.insert(t.to_string(), Default::default());
     }
 
-    pub async fn add_instance(&mut self, i: &str, t: &str) {
+    pub fn add_instance(&mut self, i: &str, t: &str) {
         match self.inner.get_mut(t) {
             None => {
                 let mut set = HashSet::new();
                 set.insert(i.to_string());
                 self.inner.insert(t.to_string(), set);
-                self.lattice
-                    .add_type(
-                        t.to_string(),
-                        vec![self.lattice.get_type_id(TYPE_OBJECT).await.unwrap()],
-                    )
-                    .await;
+                self.st.add_type(
+                    t.to_string(),
+                    vec![self.st.get_type_id(TYPE_OBJECT).unwrap()],
+                );
             }
             Some(set) => {
                 set.insert(i.to_string());
             }
         }
+        let domain = self.st.get_type_as_domain(t).unwrap();
+        self.st.new_constant_symbol(i, domain);
     }
 
-    pub async fn is_of_type(&self, i: &str, t: &str) -> bool {
+    pub fn is_of_type(&self, i: &str, t: &str) -> bool {
         match self.inner.get(t) {
             Some(set) => set.contains(i),
             None => false,
         }
     }
 
-    pub async fn get_instances(&self, t: &str) -> Vec<String> {
+    pub fn get_instances(&self, t: &str) -> Vec<String> {
         match self.inner.get(t) {
             Some(set) => set.iter().cloned().collect(),
             None => vec![],
         }
-    }
-
-    pub async fn get_lattice(&self) -> TypeLattice {
-        self.lattice.get_lattice().await
-    }
-
-    pub fn get_ref_lattice(&self) -> RefTypeLattice {
-        self.lattice.clone()
     }
 }

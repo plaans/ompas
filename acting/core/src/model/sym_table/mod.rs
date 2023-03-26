@@ -70,23 +70,18 @@ impl Default for EmptyDomains {
     }
 }
 
+#[derive(Clone)]
 pub struct SymTable {
     domains: Forest<VarDomain>,
     variables: Forest<Variable>,
-    lattice: TypeLattice,
+    pub(in crate::model::sym_table) lattice: TypeLattice,
     ids: SymbolTableId,
     meta_data: SymTableMetaData,
 }
 
 impl Default for SymTable {
     fn default() -> Self {
-        Self {
-            domains: Default::default(),
-            ids: Default::default(),
-            meta_data: Default::default(),
-            lattice: TypeLattice::new(),
-            variables: Default::default(),
-        }
+        Self::new_from(TypeLattice::new())
     }
 }
 

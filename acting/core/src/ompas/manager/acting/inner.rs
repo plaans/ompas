@@ -26,6 +26,7 @@ use crate::planning::planner::problem::ChronicleInstance;
 use aries_planning::chronicles::ChronicleOrigin;
 use async_recursion::async_recursion;
 use chrono::{DateTime, Utc};
+use im::HashSet;
 use ompas_language::supervisor::*;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
@@ -42,6 +43,13 @@ use tokio::time::Instant;
 const COLOR_PLANNING: &str = "red";
 const COLOR_EXECUTION: &str = "blue";
 const COLOR_DEFAULT: &str = "black";
+
+struct Reservation {
+    id: ActingProcessId,
+    resource: String,
+    quantity: Quantity,
+    priority: WaiterPriority,
+}
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ProcessKind {
@@ -72,7 +80,7 @@ pub struct InnerActingManager {
     processes: Vec<ActingProcess>,
     models: Vec<ActingModel>,
     acting_vars: ActingVarCollection,
-    st: RefSymTable,
+    pub(in crate::ompas::manager::acting) st: RefSymTable,
     resource_manager: ResourceManager,
     time_reference: Instant,
     update_notifier: Option<Sender<ActingUpdateNotification>>,
@@ -384,16 +392,16 @@ impl InnerActingManager {
         let om_id = self.processes[*parent].am_id();
         let model = &self.models[om_id];
         let (start, end, name) = if let Some(chronicle) = &model.chronicle {
-            let interval = chronicle
+            let binding = chronicle
                 .bindings
                 .get_binding(&label)
                 .unwrap()
                 .as_action()
                 .unwrap()
-                .interval;
-            let name = chronicle.get_name().clone();
-            let start = self.new_execution_var(&interval.get_start(), &om_id);
-            let end = self.new_execution_var(&interval.get_end(), &om_id);
+                .clone();
+            let name = binding.name;
+            let start = self.new_execution_var(&binding.interval.get_start(), &om_id);
+            let end = self.new_execution_var(&binding.interval.get_end(), &om_id);
             let mut new_name = vec![];
 
             for (cst, var_id) in args.drain(..).zip(name) {
@@ -441,7 +449,9 @@ impl InnerActingManager {
             .as_mut_method()
             .unwrap()
             .add_process(label, id);
-        self.notify(ActingUpdateNotification::NewProcess(id)).await;
+        if origin != ProcessOrigin::Planner {
+            self.notify(ActingUpdateNotification::NewProcess(id)).await;
+        }
         id
     }
 
@@ -477,8 +487,9 @@ impl InnerActingManager {
 
         let action: &mut ActionProcess = self.processes[*parent].inner.as_mut_action().unwrap();
         action.add_refinement(id);
-        self.notify(ActingUpdateNotification::NewProcess(id)).await;
-
+        if origin != ProcessOrigin::Planner {
+            self.notify(ActingUpdateNotification::NewProcess(id)).await;
+        }
         id
     }
 
@@ -527,7 +538,9 @@ impl InnerActingManager {
             .as_mut_method()
             .unwrap()
             .add_process(label, id);
-        self.notify(ActingUpdateNotification::NewProcess(id)).await;
+        if origin != ProcessOrigin::Planner {
+            self.notify(ActingUpdateNotification::NewProcess(id)).await;
+        }
         id
     }
 
@@ -574,7 +587,9 @@ impl InnerActingManager {
             .as_mut_method()
             .unwrap()
             .add_process(label, id);
-        self.notify(ActingUpdateNotification::NewProcess(id)).await;
+        if origin != ProcessOrigin::Planner {
+            self.notify(ActingUpdateNotification::NewProcess(id)).await;
+        }
         id
     }
 
@@ -760,7 +775,7 @@ impl InnerActingManager {
                 }
                 let waiter: WaitAcquire = self
                     .resource_manager
-                    .acquire(resource.to_string(), quantity, priority)
+                    .acquire(&resource, quantity, priority)
                     .await?;
 
                 let quantity = self
@@ -782,20 +797,33 @@ impl InnerActingManager {
         r
     }
 
-    pub async fn reserve(
+    async fn reserve(
         &mut self,
-        id: &ActingProcessId,
-        resource: String,
-        quantity: Quantity,
-        priority: WaiterPriority,
+        Reservation {
+            id,
+            resource,
+            quantity,
+            priority,
+        }: Reservation,
     ) -> Result<(), LRuntimeError> {
-        let acquire = self.processes[*id].inner.as_mut_acquire().unwrap();
+        let acquire = self.processes[id].inner.as_mut_acquire().unwrap();
         acquire.set_reservation(
             self.resource_manager
-                .reserve(resource, quantity, priority)
+                .reserve(&resource, quantity, priority)
                 .await?,
         );
         Ok(())
+    }
+
+    async fn reserve_all(&mut self, reservations: Vec<Reservation>) {
+        let mut resources: HashSet<String> = Default::default();
+        for reservation in reservations {
+            resources.insert(reservation.resource.to_string());
+            self.reserve(reservation).await.unwrap();
+        }
+        for resource in resources {
+            self.resource_manager.update_queue(&resource).await.unwrap();
+        }
     }
 
     pub fn get_current_chronicles(&self) -> Vec<ChronicleInstance> {
@@ -810,7 +838,7 @@ impl InnerActingManager {
         }];
 
         let mut chronicles = vec![];
-        while let Some(ExecChronicle { id, origin }) = exec_chronicles.pop() {
+        'main: while let Some(ExecChronicle { id, origin }) = exec_chronicles.pop() {
             let instance_id = chronicles.len();
             let process = &self.processes[id];
             let chronicle: Chronicle = match &process.inner {
@@ -836,8 +864,9 @@ impl InnerActingManager {
                     if let Some(am_id) = &a.abstract_am_id {
                         //An abstract model is used, meaning that no subtask is present.
                         self.models[*am_id].chronicle.clone().unwrap()
-                    } else {
-                        let refinement = *a.refinements.last().unwrap();
+                    }
+                    //Otherwise we check if there is a refinement
+                    else if let Some(&refinement) = a.refinements.last() {
                         let method_process = &self.processes[refinement];
                         let model = self.models[method_process.get_am_id()]
                             .get_instantiated_chronicle()
@@ -864,6 +893,8 @@ impl InnerActingManager {
                             }
                         }
                         model
+                    } else {
+                        continue 'main;
                     }
                 }
                 _ => panic!(),
@@ -984,7 +1015,9 @@ impl InnerActingManager {
                 let bindings = chronicle.bindings.clone();
                 let st = chronicle.st.clone();
                 let mut pr = instance.pr.clone();
-                let _ = pr.pop().unwrap();
+                if chronicle.meta_data.kind == ChronicleKind::Method {
+                    let _ = pr.pop().unwrap();
+                }
                 let parent = match self.get_id(pr.clone()) {
                     Some(id) => id,
                     None =>
@@ -1075,7 +1108,7 @@ impl InnerActingManager {
 
     pub(crate) async fn absorb_choices(&mut self, choices: Vec<Choice>) {
         let mut updates: Vec<ActingValUpdate> = vec![];
-        let mut reservations: Vec<(ActingProcessId, String, Quantity, WaiterPriority)> = vec![];
+        let mut reservations: Vec<Reservation> = vec![];
 
         let mut update = |plan_var_id: &Option<ActingVarId>, val: Cst| {
             updates.push(ActingValUpdate {
@@ -1099,12 +1132,12 @@ impl InnerActingManager {
                     update(arb.get_plan_var_id(), a.val);
                 }
                 ChoiceInner::Acquire(a) => {
-                    reservations.push((
+                    reservations.push(Reservation {
                         id,
-                        a.resource.to_string(),
-                        Quantity::Some(a.quantity.as_int().unwrap() as usize),
-                        a.priority,
-                    ));
+                        resource: a.resource.to_string(),
+                        quantity: Quantity::Some(a.quantity.as_int().unwrap() as usize),
+                        priority: a.priority,
+                    });
                     let acq = process.inner.as_acquire().unwrap();
                     update(acq.resource.get_plan_var_id(), a.resource);
                     update(acq.quantity.get_plan_var_id(), a.quantity);
@@ -1122,11 +1155,7 @@ impl InnerActingManager {
                 }
             }
         }
-        for (id, resource, quantity, priority) in reservations {
-            self.reserve(&id, resource, quantity, priority)
-                .await
-                .unwrap();
-        }
+        self.reserve_all(reservations).await;
         self.set_planner_vals(updates)
     }
 }

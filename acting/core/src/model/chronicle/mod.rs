@@ -29,7 +29,7 @@ pub mod lit;
 pub mod subtask;
 pub mod task_template;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ChronicleKind {
     Root,
     Command,
@@ -227,8 +227,11 @@ impl Chronicle {
     /*
     ADDERS
      */
-    pub fn add_var(&mut self, sym_id: VarId) {
-        self.variables.insert(sym_id);
+    pub fn add_var(&mut self, var_id: VarId) {
+        let domain = self.st.get_domain_of_var(&var_id);
+        if !domain.is_constant() {
+            self.variables.insert(var_id);
+        }
     }
 
     pub fn add_interval(&mut self, interval: Interval) {
@@ -409,8 +412,10 @@ impl Chronicle {
     pub fn instantiate(&self, instantiations: Vec<Instantiation>) -> Self {
         let mut new = self.clone();
 
-        for instantiation in instantiations {
-            new.replace(&instantiation.var, &instantiation.value)
+        for Instantiation { var, value } in instantiations {
+            new.replace(&var, &value);
+            new.variables.remove(&var);
+            new.variables.remove(&value);
         }
 
         new

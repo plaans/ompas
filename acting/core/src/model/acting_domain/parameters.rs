@@ -1,5 +1,5 @@
-use crate::model::sym_domain::ref_type_lattice::RefTypeLattice;
 use crate::model::sym_domain::Domain;
+use crate::model::sym_table::r#ref::RefSymTable;
 use async_recursion::async_recursion;
 use function_name::named;
 use ompas_language::sym_table::TYPE_OBJECT;
@@ -41,10 +41,7 @@ impl Parameters {
     }
 
     #[named]
-    pub async fn try_from_lvalue(
-        lv: &LValue,
-        lattice: &RefTypeLattice,
-    ) -> Result<Self, LRuntimeError> {
+    pub async fn try_from_lvalue(lv: &LValue, st: &RefSymTable) -> Result<Self, LRuntimeError> {
         let mut vec: Vec<(Arc<Sym>, ParameterType)> = vec![];
 
         if let LValue::List(list) = lv {
@@ -57,7 +54,7 @@ impl Parameters {
                                     .map_err(|e| e.chain(function_name!()))?,
                                 ParameterType::new(
                                     description[1].clone(),
-                                    try_domain_from_lvalue(lattice, &description[1])
+                                    try_domain_from_lvalue(st, &description[1])
                                         .await
                                         .map_err(|e| e.chain(function_name!()))?,
                                 ),
@@ -71,7 +68,7 @@ impl Parameters {
                             s.clone(),
                             ParameterType::new(
                                 symbol!(TYPE_OBJECT.to_string()),
-                                lattice.get_type_id(TYPE_OBJECT).await.unwrap().into(),
+                                st.get_type_id(TYPE_OBJECT).unwrap().into(),
                             ),
                         ));
                     }
@@ -96,15 +93,15 @@ impl Parameters {
 #[named]
 #[async_recursion]
 pub async fn try_domain_from_lvalue(
-    lattice: &RefTypeLattice,
+    st: &RefSymTable,
     lv: &LValue,
 ) -> Result<Domain, LRuntimeError> {
     let domain: Domain = match lv {
         LValue::List(list) => {
-            let t = lattice.get_type_id(list[0].to_string()).await.unwrap();
+            let t = st.get_type_id(list[0].to_string()).unwrap();
             let mut composition = vec![];
             for t in &list[1..] {
-                composition.push(try_domain_from_lvalue(lattice, t).await?)
+                composition.push(try_domain_from_lvalue(st, t).await?)
             }
             Domain::Composed(t, composition)
         }
@@ -113,7 +110,7 @@ pub async fn try_domain_from_lvalue(
                 "object" => TYPE_OBJECT,
                 _ => t,
             };
-            Domain::Simple(lattice.get_type_id(t).await.ok_or_else(|| {
+            Domain::Simple(st.get_type_id(t).ok_or_else(|| {
                 LRuntimeError::new(
                     function_name!(),
                     format!("type {} has not been declared", t),

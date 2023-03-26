@@ -4,8 +4,8 @@ use crate::ompas::manager::state::world_state::{StateType, WorldStateSnapshot};
 use crate::planning::planner::encoding::domain::read_chronicle;
 use crate::planning::planner::encoding::{atom_from_lvalues, satom_from_lvalues};
 use crate::planning::planner::problem::{ChronicleInstance, PlanningProblem};
-use aries::core::Lit as aLit;
 use aries::core::INT_CST_MAX;
+use aries::core::{Lit as aLit, Lit};
 use aries::model::lang::{Atom as aAtom, FAtom, SAtom};
 use aries_planning::chronicles::{
     Chronicle, ChronicleInstance as ACI, ChronicleKind as aChronicleKind, ChronicleOrigin,
@@ -162,9 +162,12 @@ pub fn encode_init(
     ctx: &Ctx,
     state: &WorldStateSnapshot,
     present_sf: &Vec<String>,
-    init_ch: &mut ACI,
+    init: &mut ACI,
 ) {
-    initialize_state(&ctx, state, present_sf, &mut init_ch.chronicle)
+    initialize_state(&ctx, state, present_sf, &mut init.chronicle);
+    init.parameters = vec![];
+    init.chronicle.start = ctx.origin();
+    init.chronicle.end = ctx.horizon();
 }
 
 pub fn generate_instances(
@@ -179,13 +182,14 @@ pub fn generate_instances(
             ChronicleOrigin::Refinement { instance_id, .. } => {
                 new_instances[instance_id].chronicle.presence
             }
+            ChronicleOrigin::Original => Lit::TRUE,
             _ => panic!(),
         };
         let template = read_chronicle(
             ctx,
             table,
             &instance.am.chronicle.as_ref().unwrap(),
-            Container::Instance(id + 1),
+            Container::Instance(id),
             Some(scope),
         )?;
         //Printer::print_chronicle(&template.chronicle, &ctx.model);

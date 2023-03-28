@@ -44,17 +44,6 @@
                         (wait-for `(< (len (belt.packages_list ,?b)) (len (belt.cells ,?b))))
                         (place ?r)))))
 
-    (def-task t_charge (:params (?r robot)))
-    (def-method m_charge
-        (:task t_charge)
-            (:params (?r robot))
-            (:pre-conditions true)
-            (:score 0)
-            (:body
-                (do
-                    (go_charge ?r)
-                    (wait-for `(= (robot.battery ,?r) 1)))))
-
     (def-task t_check_battery (:params (?r robot)))
     (def-method m_check_battery
          (:task t_check_battery)
@@ -81,10 +70,10 @@
         (:score 0)
         (:body 
             (do
-                (define list_robots (instances robot))
-                (define list-h (mapf (lambda (?r) (async (t_check_battery ?r))) list_robots))
-                (print "launched all tasks for initial robots")
-                (mapf await list-h))))
+                (define tasks (mapf (lambda (?r) `(t_check_battery ,?r)) (instances robot)))
+                (define h (apply par tasks))
+                (print "end check batteries")
+                )))
 
 
     (def-task t_process_packages)
@@ -100,6 +89,16 @@
                 (mapf await list-h)
                 )))
 
+    (def-task t_process (:params (?m machine) (?p package) (?d int)))
+    (def-task-om-model t_process
+        (:params (?m machine) (?p package) (?d int))
+        (:body (sleep ?d)))
+    
+    (def-method m_process 
+        (:task t_process)
+        (:params (?m machine) (?p package) (?d int))
+        (:body (process ?m ?p)))
+
     (def-task t_jobshop)
 
     (def-method m1
@@ -107,8 +106,6 @@
        (:score 0)
        (:body
            (do
-               ;(mapf new-resource (instances robot))
-               ;(mapf new-resource (instances machine))
                (define f2 (async (t_check_rob_bat)))
                (define tasks 
                    (mapf (lambda (?p) 

@@ -1,3 +1,11 @@
+use ompas_apps::config::GraphConvertConfig;
+use ompas_core::model::acting_domain::model::ActingModel;
+use ompas_core::model::chronicle::Chronicle;
+use ompas_core::model::sym_domain::type_lattice::TypeLattice;
+use ompas_core::model::sym_table::r#ref::RefSymTable;
+use ompas_core::model::sym_table::SymTable;
+use ompas_core::planning::conversion::flow_graph::algo::p_eval::r#struct::PLEnv;
+use ompas_core::planning::conversion::{convert, debug_with_markdown};
 use ompas_planning::config::GraphConvertConfig;
 use ompas_planning::conversion::{convert, debug_with_markdown};
 use ompas_structs::conversion::chronicle::Chronicle;
@@ -64,7 +72,17 @@ Graph flow converter for SOMPAS code!\n
             .unwrap_or_else(|r| panic!("{}", r.to_string()));
 
         let st: RefSymTable = SymTable::new_from(TypeLattice::new()).into();
-        let ch: Chronicle = convert(&lv, &env, st).await?;
+        let ch: ActingModel = convert(
+            None,
+            &lv,
+            &mut PLEnv {
+                env,
+                unpure_bindings: Default::default(),
+                pc: Default::default(),
+            },
+            st,
+        )
+        .await?;
 
         debug_with_markdown(
             p.to_str().unwrap(),

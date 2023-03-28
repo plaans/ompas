@@ -1,5 +1,5 @@
 use crate::model::sym_domain::cst::Cst;
-use crate::ompas::manager::acting::acting_var::ExecutionVar;
+use crate::ompas::manager::acting::acting_var::{ActingValUpdate, ExecutionVar};
 use crate::ompas::manager::acting::process::ActingProcessInner;
 use crate::ompas::manager::acting::{AMId, ActingProcessId};
 use std::fmt::{Display, Formatter};
@@ -23,13 +23,23 @@ impl ActionProcess {
     pub fn get_args(&self) -> Vec<Cst> {
         let mut args = vec![];
         for arg in &self.args {
-            if let Some(val) = &arg.val {
+            if let Some(val) = &arg.get_val() {
                 args.push(val.clone())
             } else {
                 panic!("ActionProcess::get_args: val is not a cst")
             }
         }
         args
+    }
+
+    pub fn set_args(&mut self, args: Vec<Cst>) -> Vec<ActingValUpdate> {
+        let mut updates = vec![];
+        for (arg, value) in self.args.iter_mut().zip(args) {
+            if let Some(u) = arg.set_val(value) {
+                updates.push(u)
+            }
+        }
+        updates
     }
 
     pub fn add_abstract_am_id(&mut self, am_id: &AMId) {

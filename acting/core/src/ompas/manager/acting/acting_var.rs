@@ -136,17 +136,21 @@ impl<T: Display + Clone + AsCst> ExecutionVar<T> {
     }
 
     pub fn set_val(&mut self, val: T) -> Option<ActingValUpdate> {
-        let cst = val.as_cst().unwrap();
-        self.val = Some(val);
-        self.plan_var_id
-            .as_ref()
-            .map(|&plan_var_id| ActingValUpdate {
-                plan_var_id,
-                val: cst.clone(),
-            })
+        if self.val.is_none() {
+            let cst = val.as_cst().unwrap();
+            self.val = Some(val);
+            self.plan_var_id
+                .as_ref()
+                .map(|&plan_var_id| ActingValUpdate {
+                    plan_var_id,
+                    val: cst.clone(),
+                })
+        } else {
+            None
+        }
     }
 
-    pub fn get_val(&mut self) -> &Option<T> {
+    pub fn get_val(&self) -> &Option<T> {
         &self.val
     }
 }

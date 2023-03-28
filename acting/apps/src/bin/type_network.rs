@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use ompas_structs::sym_table::domain::type_lattice::TypeLattice;
+use ompas_core::model::sym_domain::type_lattice::TypeLattice;
 use std::env::set_current_dir;
 use std::fs;
 use std::fs::File;
@@ -9,6 +9,8 @@ use std::process::Command;
 
 fn main() {
     println!("Hello, world!");
+    let tn = TypeLattice::new();
+    output_markdown("/tmp".into(), &tn, true);
     //let tn = &TypeNetwork::default();
 
     /*test_meet(tn, List, Map);

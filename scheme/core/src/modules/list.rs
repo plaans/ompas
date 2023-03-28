@@ -44,6 +44,8 @@ impl From<ModList> for LModule {
             true,
         );
         module.add_fn(BUTLAST, butlast, DOC_BUTLAST, true);
+        module.add_fn(FIRSTS, firsts, DOC_FIRSTS, true);
+        module.add_fn(SECONDS, seconds, DOC_SECONDS, true);
         module
     }
 }
@@ -279,4 +281,33 @@ pub fn butlast(mut args: Vec<LValue>) -> LValue {
         Some(_) => args.into(),
         None => LValue::Nil,
     }
+}
+
+#[scheme_fn]
+pub fn firsts(lists: Vec<LValue>) -> Vec<LValue> {
+    //println!("args: {:?}", lists);
+    lists
+        .iter()
+        .map(|lv| {
+            if let LValue::List(list) = lv {
+                list.get(0).cloned().unwrap_or(LValue::Nil)
+            } else {
+                LValue::Nil
+            }
+        })
+        .collect()
+}
+
+#[scheme_fn]
+pub fn seconds(lists: Vec<LValue>) -> Vec<LValue> {
+    lists
+        .iter()
+        .map(|lv| {
+            if let LValue::List(list) = lv {
+                list.get(1).cloned().unwrap_or(LValue::Nil)
+            } else {
+                LValue::Nil
+            }
+        })
+        .collect()
 }

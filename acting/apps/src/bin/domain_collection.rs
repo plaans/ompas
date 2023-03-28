@@ -1,9 +1,7 @@
 use chrono::{DateTime, Utc};
+use ompas_core::model::sym_domain::domain_test::DomainTest;
+use ompas_core::model::sym_domain::type_lattice::TypeLattice;
 use ompas_language::sym_table::TYPE_OBJECT;
-use ompas_structs::sym_table::domain::cst;
-use ompas_structs::sym_table::domain::domain_test::DomainTest;
-use ompas_structs::sym_table::domain::domain_test::DomainTest::*;
-use ompas_structs::sym_table::domain::type_lattice::TypeLattice;
 use std::env::set_current_dir;
 use std::fs;
 use std::fs::File;

@@ -1,6 +1,6 @@
 use ompas_language::process::*;
 use ompas_middleware::logger::LogClient;
-use ompas_middleware::ProcessInterface;
+use ompas_middleware::{LogLevel, ProcessInterface};
 use sompas_core::eval;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lvalue::LValue;
@@ -118,11 +118,14 @@ pub async fn task_check_wait_for(
 ) {
     let mut process: ProcessInterface =
         ProcessInterface::new(PROCESS_CHECK_WAIT_FOR, PROCESS_TOPIC_OMPAS, LOG_TOPIC_OMPAS).await;
+    process.log("check wait for launched", LogLevel::Info).await;
+    //println!("wait for working");
     loop {
         tokio::select! {
             _ = update.recv() => {
                 let n_wait_on = monitors.inner.lock().await.map.len();
                 if n_wait_on != 0 {
+                    //println!("updating wait for");
                     monitors.check_wait_for(env.clone(), process.get_log_client()).await;
                 }
             }

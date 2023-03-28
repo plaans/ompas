@@ -26,10 +26,10 @@
                 (define ?r (first h_r))
                 (t_carry_to_machine ?r ?p (find_output_machine)))))
     
-    (def-task t_process_on_machine (:params (?p package) (?m machine)))
+    (def-task t_process_on_machine (:params (?p package) (?m machine) (?d int)))
     (def-method m_process_on_machine
         (:task t_process_on_machine)
-        (:params (?p package) (?m machine))
+        (:params (?p package) (?m machine) (?d int))
         (:pre-conditions true)
         (:score 0)
         (:body 
@@ -39,6 +39,6 @@
                 (define ?r (first h_r))
                 (t_carry_to_machine ?r ?p ?m)
                 (release (second h_r))
-                (process ?m ?p))))
+                (t_process ?m ?p ?d))))
 
 )

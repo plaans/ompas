@@ -20,7 +20,7 @@ pub mod refinement;
 pub mod root_task;
 pub mod task;
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum ProcessOrigin {
     Planner,
     Execution,
@@ -123,7 +123,9 @@ impl ActingProcess {
     pub fn set_status(&mut self, status: ProcessStatus) {
         self.status = status;
         if let Some(sender) = &mut self.status_update {
-            sender.send(status).unwrap_or_else(|e| panic!("{}", e));
+            if sender.send(status).is_err() {
+                self.status_update = None;
+            }
         }
     }
 

@@ -23,6 +23,7 @@ use crate::ompas::manager::resource::{Quantity, ResourceManager, WaitAcquire, Wa
 use crate::ompas::manager::state::action_status::ProcessStatus;
 use crate::planning::conversion::flow_graph::graph::Dot;
 use crate::planning::planner::problem::ChronicleInstance;
+use crate::TOKIO_CHANNEL_SIZE;
 use aries_planning::chronicles::ChronicleOrigin;
 use async_recursion::async_recursion;
 use chrono::{DateTime, Utc};
@@ -37,7 +38,7 @@ use std::fs::File;
 use std::io::Write as ioWrite;
 use std::path::PathBuf;
 use tokio::sync::mpsc::Sender;
-use tokio::sync::watch;
+use tokio::sync::{broadcast, mpsc, watch};
 use tokio::time::Instant;
 
 const COLOR_PLANNING: &str = "red";
@@ -76,14 +77,29 @@ impl Display for ProcessKind {
     }
 }
 
+pub struct PlannerManager {
+    update_notifier: Sender<ActingUpdateNotification>,
+    watcher: (broadcast::Sender<bool>, broadcast::Receiver<bool>),
+}
+
+impl PlannerManager {
+    pub fn new(update_notifier: mpsc::Sender<ActingUpdateNotification>) -> Self {
+        let (tx, rx) = broadcast::channel(TOKIO_CHANNEL_SIZE);
+        Self {
+            update_notifier,
+            watcher: (tx, rx),
+        }
+    }
+}
+
 pub struct InnerActingManager {
-    processes: Vec<ActingProcess>,
-    models: Vec<ActingModel>,
+    pub(in crate::ompas::manager::acting) processes: Vec<ActingProcess>,
+    pub(in crate::ompas::manager::acting) models: Vec<ActingModel>,
     acting_vars: ActingVarCollection,
     pub(in crate::ompas::manager::acting) st: RefSymTable,
     resource_manager: ResourceManager,
     time_reference: Instant,
-    update_notifier: Option<Sender<ActingUpdateNotification>>,
+    planner_manager: Option<PlannerManager>,
 }
 
 impl InnerActingManager {
@@ -117,21 +133,34 @@ impl InnerActingManager {
             resource_manager,
             time_reference,
             acting_vars,
-            update_notifier: None,
+            planner_manager: None,
         }
     }
 
-    pub fn set_update_notifier(&mut self, notifier: Sender<ActingUpdateNotification>) {
-        self.update_notifier = Some(notifier)
+    pub fn set_planner_manager(&mut self, planner_manager: PlannerManager) {
+        self.planner_manager = Some(planner_manager)
     }
 
-    pub async fn notify(&mut self, notification: ActingUpdateNotification) {
-        if let Some(notifier) = &self.update_notifier {
+    pub async fn notify_planner(&mut self, notification: ActingUpdateNotification) {
+        if let Some(notifier) = &self.planner_manager {
             notifier
+                .update_notifier
                 .send(notification)
                 .await
                 .unwrap_or_else(|_| panic!());
         }
+    }
+
+    pub async fn notify_plan_update(&mut self) {
+        if let Some(notifier) = &self.planner_manager {
+            notifier.watcher.0.send(true).unwrap_or_else(|_| panic!());
+        }
+    }
+
+    pub async fn subscribe_on_plan_update(&self) -> Option<broadcast::Receiver<bool>> {
+        self.planner_manager
+            .as_ref()
+            .map(|pm| pm.watcher.0.subscribe())
     }
 
     pub async fn clear(&mut self) {
@@ -256,7 +285,7 @@ impl InnerActingManager {
                 .instantiations
                 .push(Instantiation::new(var_id, self.st.new_cst(val.clone())))
         }
-        self.notify(ActingUpdateNotification::VarUpdate(plan_var_id))
+        self.notify_planner(ActingUpdateNotification::VarUpdate(plan_var_id))
             .await;
     }
 
@@ -321,6 +350,12 @@ impl InnerActingManager {
         self.processes[*id].inner.as_action().unwrap().get_args()
     }
 
+    pub async fn set_action_args(&mut self, id: &ActingProcessId, args: Vec<Cst>) {
+        let action = self.processes[*id].inner.as_mut_action().unwrap();
+        let updates = action.set_args(args);
+        self.set_execution_vals(updates).await
+    }
+
     pub async fn set_moment(&mut self, id: &ActingProcessId, t: Option<Timepoint>) {
         let instant = t.unwrap_or(self.instant());
         self.set_start(id, Some(instant)).await;
@@ -373,7 +408,8 @@ impl InnerActingManager {
         let root: &mut RootProcess = self.processes[0].inner.as_mut_root().unwrap();
         let rank = root.n_task();
         root.add_top_level_task(id);
-        self.notify(ActingUpdateNotification::NewProcess(id)).await;
+        self.notify_planner(ActingUpdateNotification::NewProcess(id))
+            .await;
 
         ProcessRef::Relative(0, vec![Label::Action(rank)])
     }
@@ -450,7 +486,8 @@ impl InnerActingManager {
             .unwrap()
             .add_process(label, id);
         if origin != ProcessOrigin::Planner {
-            self.notify(ActingUpdateNotification::NewProcess(id)).await;
+            /*self.notify_planner(ActingUpdateNotification::NewProcess(id))
+            .await;*/
         }
         id
     }
@@ -459,36 +496,65 @@ impl InnerActingManager {
         &mut self,
         parent: &ActingProcessId,
         debug: String,
+        mut args: Vec<Option<Cst>>,
         model: ActingModel,
         origin: ProcessOrigin,
     ) -> ActingProcessId {
         let id = self.processes.len();
-        let interval = model.chronicle.as_ref().map(|c| c.interval);
-        let om_id = self.new_model(model);
-        let (start, end) = match interval {
-            Some(interval) => {
-                let start = self.new_execution_var(&interval.get_start(), &om_id);
-                let end = self.new_execution_var(&interval.get_end(), &om_id);
-                (start, end)
-            }
-            None => Default::default(),
-        };
+        let am_id = self.new_model(model);
+        let model = &self.models[am_id];
 
+        let (start, end, args) = if let Some(chronicle) = &model.chronicle {
+            let name = chronicle.get_name().clone();
+            let interval = chronicle.interval;
+            let start = self.new_execution_var(&interval.get_start(), &am_id);
+            let end = self.new_execution_var(&interval.get_end(), &am_id);
+            let mut new_name = vec![];
+
+            for (cst, var_id) in args.drain(..).zip(name) {
+                let mut exec = self.new_execution_var(&var_id, &am_id);
+                if let Some(val) = cst {
+                    let update = exec.set_val(val).unwrap();
+                    if origin == ProcessOrigin::Planner {
+                        self.set_planner_val(update)
+                    } else {
+                        self.set_execution_val(update).await
+                    }
+                }
+                new_name.push(exec)
+            }
+            (start, end, new_name)
+        } else {
+            let start = ExecutionVar::new();
+            let end = ExecutionVar::new();
+            let name = args
+                .drain(..)
+                .map(|cst| {
+                    let mut exec = ExecutionVar::new();
+                    if let Some(val) = cst {
+                        exec.set_val(val);
+                    }
+                    exec
+                })
+                .collect();
+            (start, end, name)
+        };
         self.processes.push(ActingProcess::new(
             id,
             *parent,
             origin,
-            om_id,
+            am_id,
             Some(debug),
             start,
             end,
-            RefinementProcess::new(),
+            RefinementProcess::new(args),
         ));
 
         let action: &mut ActionProcess = self.processes[*parent].inner.as_mut_action().unwrap();
         action.add_refinement(id);
         if origin != ProcessOrigin::Planner {
-            self.notify(ActingUpdateNotification::NewProcess(id)).await;
+            /*self.notify_planner(ActingUpdateNotification::NewProcess(id))
+            .await;*/
         }
         id
     }
@@ -539,7 +605,8 @@ impl InnerActingManager {
             .unwrap()
             .add_process(label, id);
         if origin != ProcessOrigin::Planner {
-            self.notify(ActingUpdateNotification::NewProcess(id)).await;
+            /*self.notify_planner(ActingUpdateNotification::NewProcess(id))
+            .await;*/
         }
         id
     }
@@ -588,7 +655,8 @@ impl InnerActingManager {
             .unwrap()
             .add_process(label, id);
         if origin != ProcessOrigin::Planner {
-            self.notify(ActingUpdateNotification::NewProcess(id)).await;
+            /*self.notify_planner(ActingUpdateNotification::NewProcess(id))
+            .await;*/
         }
         id
     }
@@ -619,15 +687,13 @@ impl InnerActingManager {
     }
 
     pub fn get_last_planned_refinement(&self, id: &ActingProcessId) -> Option<ActingProcessId> {
-        match self.processes[*id]
-            .inner
-            .as_action()
-            .unwrap()
-            .refinements
-            .last()
-        {
+        let refinements = &self.processes[*id].inner.as_action().unwrap().refinements;
+        //println!("{}.refinements = {:?}", id, refinements);
+        match refinements.last() {
             Some(id) => {
-                if self.get_origin(id) == ProcessOrigin::Planner {
+                let origin = self.get_origin(id);
+                //println!("{id}.origin = {:?}", origin);
+                if origin == ProcessOrigin::Planner {
                     Some(*id)
                 } else {
                     None
@@ -677,6 +743,14 @@ impl InnerActingManager {
         } else {
             panic!()
         }
+    }
+
+    pub fn get_refinement_lv(&self, id: &ActingProcessId) -> LValue {
+        self.processes[*id]
+            .inner
+            .as_method()
+            .unwrap()
+            .get_name_as_lvalue()
     }
 
     pub fn get_om(&self, id: &ActingProcessId) -> LValue {
@@ -736,6 +810,7 @@ impl InnerActingManager {
                 ActingVal::Planned(val) => {
                     let value: LValue = val.clone().into();
                     if set.contains(&value) {
+                        println!("{}.arb = {}", id, value);
                         value
                     } else {
                         greedy
@@ -768,7 +843,10 @@ impl InnerActingManager {
         self.executed(id);
         let acquire = self.processes[*id].inner.as_mut_acquire().unwrap();
         let r = match acquire.move_reservation() {
-            Some(reservation) => Ok(reservation),
+            Some(reservation) => {
+                println!("{} reserved", resource);
+                Ok(reservation)
+            }
             None => {
                 if let Some(val) = acquire.set_resource(resource.to_string()) {
                     updates.push(val);
@@ -905,7 +983,7 @@ impl InnerActingManager {
                 am: ActingModel {
                     lv: LValue::Nil,
                     lv_om: LValue::Nil,
-                    lv_expanded: LValue::Nil,
+                    lv_expanded: Some(LValue::Nil),
                     instantiations: vec![],
                     chronicle: Some(chronicle),
                 },
@@ -1066,8 +1144,19 @@ impl InnerActingManager {
                             .abstract_am_id = Some(am_id);
                     }
                     ChronicleKind::Method => {
+                        let args: Vec<Option<Cst>> = chronicle
+                            .get_name()
+                            .iter()
+                            .map(|var_id| st.var_as_cst(var_id))
+                            .collect();
                         let parent = self
-                            .new_refinement(&parent, debug, instance.am, ProcessOrigin::Planner)
+                            .new_refinement(
+                                &parent,
+                                debug,
+                                args,
+                                instance.am,
+                                ProcessOrigin::Planner,
+                            )
                             .await;
 
                         for (label, binding) in bindings.inner {

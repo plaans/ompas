@@ -73,7 +73,7 @@ pub async fn convert(
     Ok(ActingModel {
         lv: lv.clone(),
         lv_om,
-        lv_expanded: pp_lv,
+        lv_expanded: Some(pp_lv),
         instantiations: vec![],
         chronicle,
     })
@@ -671,7 +671,7 @@ pub fn debug_with_markdown(label: &str, om: &ActingModel, path: PathBuf, view: b
         ch.meta_data.convert_time.as_micros(),
         ch,
         om.lv.format(0),
-        om.lv_expanded.format(0),
+        om.lv_expanded.as_ref().unwrap().format(0),
         flow_file_name,
         lattice_file_name,
         ch.st

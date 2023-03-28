@@ -15,7 +15,7 @@ pub(crate) const ROOT: &str = "ROOT";
 pub struct ActingModel {
     pub lv: LValue,
     pub lv_om: LValue,
-    pub lv_expanded: LValue,
+    pub lv_expanded: Option<LValue>,
     pub instantiations: Vec<Instantiation>,
     pub chronicle: Option<Chronicle>,
 }
@@ -46,7 +46,7 @@ impl ActingModel {
         Self {
             lv: LValue::Nil,
             lv_om: LValue::Nil,
-            lv_expanded: LValue::Nil,
+            lv_expanded: Some(LValue::Nil),
             instantiations: vec![],
             chronicle: Some(chronicle),
         }

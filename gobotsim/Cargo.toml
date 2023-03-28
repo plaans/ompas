@@ -41,5 +41,9 @@ path = "src/bin/main.rs"
 
 [[bin]]
 name = "gobot-plan"
-path = "src/bin/plan_jobshop.rs"
+path = "src/bin/plan.rs"
+
+[[bin]]
+name = "gobot-plan-exec"
+path = "src/bin/plan_exec.rs"
 

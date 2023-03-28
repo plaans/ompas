@@ -8,6 +8,7 @@ use crate::planning::conversion::flow_graph::algo::annotate::annotate;
 use crate::planning::conversion::flow_graph::algo::p_eval::r#struct::{PConfig, PLEnv};
 use crate::planning::conversion::flow_graph::algo::p_eval::{p_eval, P_EVAL};
 use crate::planning::planner::problem::PlanningDomain;
+use crate::planning::planner::solver::PMetric;
 use ompas_language::exec::refinement::EXEC_TASK;
 use ompas_language::monitor::control::MOD_CONTROL;
 use ompas_language::monitor::debug_conversion::{
@@ -67,12 +68,14 @@ async fn _plan_task(env: &LEnv, args: &[LValue], opt: bool) -> LResult {
 
     env.update_context(ModState::new_from_snapshot(state));
 
-    acting_manager.start_continuous_planning(env).await;
+    acting_manager
+        .start_continuous_planning(env, if opt { Some(PMetric::Makespan) } else { None })
+        .await;
 
     let debug = LValue::from(args).to_string();
     let args = args.iter().map(|lv| lv.as_cst().unwrap()).collect();
 
-    let pr = acting_manager.new_high_level_task(debug, args).await;
+    let _pr = acting_manager.new_high_level_task(debug, args).await;
     /*
     let actions = vec![PAction {
         args: args

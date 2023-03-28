@@ -1,18 +1,32 @@
 use crate::model::process_ref::Label;
+use crate::model::sym_domain::cst::Cst;
+use crate::ompas::manager::acting::acting_var::ExecutionVar;
 use crate::ompas::manager::acting::process::ActingProcessInner;
 use crate::ompas::manager::acting::ActingProcessId;
+use sompas_structs::lvalue::LValue;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 
 pub struct RefinementProcess {
+    pub args: Vec<ExecutionVar<Cst>>,
     pub childs: HashMap<Label, ActingProcessId>,
 }
 
 impl RefinementProcess {
-    pub fn new() -> Self {
+    pub fn new(args: Vec<ExecutionVar<Cst>>) -> Self {
         Self {
+            args,
             childs: Default::default(),
         }
+    }
+
+    pub fn get_name_as_lvalue(&self) -> LValue {
+        let vec: Vec<LValue> = self
+            .args
+            .iter()
+            .map(|e| LValue::from(e.get_val().clone().unwrap()))
+            .collect();
+        vec.into()
     }
 
     pub fn add_process(&mut self, label: Label, id: ActingProcessId) {

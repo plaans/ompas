@@ -436,22 +436,24 @@ pub mod utils {
     pub const DOC_UNZIP: &str = "Unzip a zipped list.";
     pub const DOC_UNZIP_VERBOSE: &str =
         "Example: (unzip '((1 6) (2 7) (3 8) (4 9) (5 10))) => ((1 2 3 4 5) (6 7 8 9 10))";
-    pub const LAMBDA_UNZIP: &str = "(lambda (lists)
-                (begin
-                    (define firsts 
-                        (lambda (lists)
-                            (if (null? lists)
-                                nil
-                                (cons (caar lists)
-                                        (firsts (cdr lists))))))
-                    (define seconds 
-                        (lambda (lists)
-                            (if (null? lists)
-                            nil
-                            (cons (cadar lists)
-                                    (seconds (cdr lists))))))
-                    (list (firsts lists) (seconds lists))))";
+    /*pub const LAMBDA_UNZIP: &str = "(lambda (lists)
+    (begin
+        (define firsts
+            (lambda (lists)
+                (if (null? lists)
+                    nil
+                    (cons (caar lists)
+                            (firsts (cdr lists))))))
+        (define seconds
+            (lambda (lists)
+                (if (null? lists)
+                nil
+                (cons (cadar lists)
+                        (seconds (cdr lists))))))
+        (list (firsts lists) (seconds lists))))";*/
 
+    pub const LAMBDA_UNZIP: &str = "(lambda (lists)
+    (list (firsts lists) (seconds lists)))";
     pub const MAPF: &str = "mapf";
     pub const DOC_MAPF: &str =
         "Apply a function to all elements of a list, and return a list of all the results";
@@ -617,6 +619,12 @@ and then it returns the remainder of the list beginning with the first argument.
 
     pub const BUTLAST: &str = "butlast";
     pub const DOC_BUTLAST: &str = "Return a list without the last element.";
+
+    pub const FIRSTS: &str = "firsts";
+    pub const DOC_FIRSTS: &str = "Return a list of the first element of each list.";
+
+    pub const SECONDS: &str = "seconds";
+    pub const DOC_SECONDS: &str = "Return a list of the second element of each list.";
 }
 
 pub mod set {

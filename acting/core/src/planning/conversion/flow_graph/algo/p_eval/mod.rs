@@ -237,18 +237,18 @@ pub async fn p_eval(lv: &LValue, root_env: &mut PLEnv) -> LResult {
                 let proc = &exps[0];
                 let proc_is_pure: bool = proc.is_pure();
                 let args = &exps[1..];
-                let mut all_pure = true;
-                let mut all_unpure = true;
+                let mut args_pure = true;
+                let mut args_unpure = true;
                 args.iter().for_each(|plv| {
-                    all_pure &= plv.is_pure();
-                    all_unpure &= !plv.is_pure();
+                    args_pure &= plv.is_pure();
+                    args_unpure &= !plv.is_pure();
                 });
                 if proc_is_pure {
                     match &proc.lvalue {
                         LValue::Lambda(l) => {
                             let p_env = scopes.get_last();
 
-                            if all_pure {
+                            if args_pure {
                                 queue.push(PCoreOperatorFrame::Lambda);
                                 queue.push(l.get_body().clone());
                                 let temp_env = match l.get_new_env(
@@ -295,7 +295,7 @@ pub async fn p_eval(lv: &LValue, root_env: &mut PLEnv) -> LResult {
                         LValue::Fn(fun) => {
                             scopes.revert_scope();
                             let env = &scopes.get_last().env;
-                            let r_lvalue = if !(all_pure && env.get_pfc().is_pure(fun.get_label()))
+                            let r_lvalue = if !(args_pure && env.get_pfc().is_pure(fun.get_label()))
                             {
                                 let mut vec = vec![proc.lvalue.clone()];
                                 vec.append(
@@ -329,7 +329,7 @@ pub async fn p_eval(lv: &LValue, root_env: &mut PLEnv) -> LResult {
                         LValue::AsyncFn(fun) => {
                             scopes.revert_scope();
                             let env = &scopes.get_last().env;
-                            let r_lvalue = if !(all_pure && env.get_pfc().is_pure(fun.get_label()))
+                            let r_lvalue = if !(args_pure && env.get_pfc().is_pure(fun.get_label()))
                             {
                                 let mut vec = vec![proc.lvalue.clone()];
                                 vec.append(

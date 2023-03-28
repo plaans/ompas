@@ -3,9 +3,7 @@ pub mod c_choice;
 pub mod rae_plan;
 use crate::model::acting_domain::model::ActingModel;
 use crate::model::acting_domain::OMPASDomain;
-use crate::model::chronicle::{Chronicle, ChronicleKind};
 use crate::model::process_ref::{Label, ProcessRef};
-use crate::model::sym_table::r#ref::RefSymTable;
 use crate::ompas::error::RaeExecError;
 use crate::ompas::interface::rae_options::OMPASOptions;
 use crate::ompas::interface::select_mode::{Planner, SelectMode};
@@ -23,9 +21,7 @@ use crate::ompas::scheme::exec::refinement::c_choice::c_choice_select;
 use crate::ompas::scheme::exec::refinement::rae_plan::rae_plan_select;
 use crate::ompas::scheme::exec::state::{instance, ModState};
 use crate::ompas::scheme::exec::ModExec;
-use crate::planning::conversion::convert;
 use crate::planning::conversion::flow_graph::algo::p_eval::r#struct::PLEnv;
-use ompas_language::exec::acting_context::DEF_PROCESS_ID;
 use ompas_language::exec::acting_context::MOD_ACTING_CONTEXT;
 use ompas_language::exec::refinement::*;
 use ompas_language::exec::MOD_EXEC;
@@ -41,7 +37,7 @@ use sompas_structs::lenv::LEnv;
 use sompas_structs::lmodule::LModule;
 use sompas_structs::lprimitive::LPrimitive;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
-use sompas_structs::lvalue::{LValue, Sym};
+use sompas_structs::lvalue::LValue;
 use sompas_structs::{list, lruntimeerror};
 use std::borrow::Borrow;
 use std::convert::TryInto;
@@ -123,7 +119,7 @@ impl From<ModRefinement> for LModule {
 pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
     let task: LValue = args.into();
     let debug = task.to_string();
-    let args = args.iter().map(|lv| lv.as_cst()).collect();
+    let mut args = args.iter().map(|lv| lv.as_cst()).collect();
     let ctx = env.get_context::<ModRefinement>(MOD_REFINEMENT)?;
     let supervisor = &ctx.acting_manager;
 
@@ -148,7 +144,12 @@ pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
             }
         }
         ProcessRef::Relative(id, labels) => match supervisor.get_id(pr.clone()).await {
-            Some(id) => id,
+            Some(id) => {
+                supervisor
+                    .set_action_args(&id, args.drain(..).map(|c| c.unwrap()).collect())
+                    .await;
+                id
+            }
             None => match labels[0] {
                 Label::Action(s) => {
                     supervisor
@@ -167,111 +168,6 @@ pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
     check_select_response(env, &ctx, &task_id, sr)
         .await
         .map_err(|e| e.chain("check_select_response"))
-
-    /*let result: LValue = match sr {
-        SelectResponse::Planned(refinement_id) => {
-            supervisor
-                .set_status(&task_id, ProcessStatus::Running(None))
-                .await;
-            supervisor.set_start(&refinement_id, None).await;
-            supervisor
-                .set_status(&refinement_id, ProcessStatus::Running(None))
-                .await;
-            let value: LValue = supervisor.get_lv(&refinement_id).await;
-            let value_as_slice: Vec<LValue> = value.try_into()?;
-            let label = value_as_slice[0].to_string();
-            let params_values = &value_as_slice[1..];
-            let om = supervisor.get_om(&refinement_id).await;
-            let mut body = vec![
-                LPrimitive::Begin.into(),
-                list!(DEF_PROCESS_ID.into(), refinement_id.into()),
-            ];
-
-            let labels: Vec<Arc<Sym>> = ctx
-                .domain
-                .read()
-                .await
-                .get_methods()
-                .get(&label)
-                .unwrap()
-                .parameters
-                .get_labels();
-
-            for (param, value) in labels.iter().zip(params_values) {
-                body.push(list![
-                    LPrimitive::Define.into(),
-                    param.into(),
-                    value.clone()
-                ]);
-            }
-
-            body.push(om);
-            list!(body.into(), task_id.into())
-        }
-        SelectResponse::Generated(r) => {
-            let method = r.method_value.clone();
-
-            if method == LValue::Nil {
-                log.error(format!("No applicable method for task {task}({task_id})"))
-                    .await;
-                supervisor
-                    .set_end(&task_id, None, ProcessStatus::Failure)
-                    .await;
-                RaeExecError::NoApplicableMethod.into()
-            } else {
-                let debug = method.to_string();
-                let mut p_env = PLEnv {
-                    env: env.clone(),
-                    pc: Default::default(),
-                    unpure_bindings: Default::default(),
-                };
-                let (label, params_values) = if let LValue::List(method) = &method {
-                    (method[0].to_string(), method[1..].to_vec())
-                } else {
-                    panic!()
-                };
-
-                let st: RefSymTable = supervisor.st().await;
-
-                let ch = Chronicle::new(debug.to_string(), ChronicleKind::Method, st.clone());
-
-                let model: ActingModel = convert(Some(ch), &method, &mut p_env, st).await?;
-
-                //log.debug(format!("p_eval({}) => {}", debug, method)).await;
-                supervisor
-                    .set_status(&task_id, ProcessStatus::Running(None))
-                    .await;
-
-                let lv_om = model.lv_om.clone();
-                let method_id = supervisor
-                    .new_refinement(&task_id, debug, model, ProcessOrigin::Execution)
-                    .await;
-                let mut body = vec![
-                    LPrimitive::Begin.into(),
-                    list!(DEF_PROCESS_ID.into(), method_id.into()),
-                ];
-
-                let labels: Vec<Arc<Sym>> = ctx
-                    .domain
-                    .read()
-                    .await
-                    .get_methods()
-                    .get(&label)
-                    .unwrap()
-                    .parameters
-                    .get_labels();
-
-                for (param, value) in labels.iter().zip(params_values) {
-                    body.push(list![LPrimitive::Define.into(), param.into(), value]);
-                }
-
-                body.push(lv_om);
-                list!(body.into(), task_id.into())
-            }
-        }
-    };
-
-    Ok(result)*/
 }
 
 async fn check_select_response(
@@ -283,45 +179,10 @@ async fn check_select_response(
     let log = ctx.log.clone();
     let acting_manager = &ctx.acting_manager;
     let debug = acting_manager.get_debug(task_id).await.unwrap();
-    let result = match sr {
+    let method_id = match sr {
         SelectResponse::Planned(refinement_id) => {
-            acting_manager
-                .set_status(&task_id, ProcessStatus::Running(None))
-                .await;
-            acting_manager.set_start(&refinement_id, None).await;
-            acting_manager
-                .set_status(&refinement_id, ProcessStatus::Running(None))
-                .await;
-            let value: LValue = acting_manager.get_lv(&refinement_id).await;
-            let value_as_slice: Vec<LValue> = value.try_into()?;
-            let label = value_as_slice[0].to_string();
-            let params_values = &value_as_slice[1..];
-            let om = acting_manager.get_om(&refinement_id).await;
-            let mut body = vec![
-                LPrimitive::Begin.into(),
-                list!(DEF_PROCESS_ID.into(), refinement_id.into()),
-            ];
-
-            let labels: Vec<Arc<Sym>> = ctx
-                .domain
-                .read()
-                .await
-                .get_methods()
-                .get(&label)
-                .unwrap()
-                .parameters
-                .get_labels();
-
-            for (param, value) in labels.iter().zip(params_values) {
-                body.push(list![
-                    LPrimitive::Define.into(),
-                    param.into(),
-                    value.clone()
-                ]);
-            }
-
-            body.push(om);
-            list!(body.into(), (*task_id).into())
+            log.debug(format!("Planned refinement for {debug}")).await;
+            refinement_id
         }
         SelectResponse::Generated(r) => {
             let method = r.method_value.clone();
@@ -332,61 +193,44 @@ async fn check_select_response(
                 acting_manager
                     .set_end(&task_id, None, ProcessStatus::Failure)
                     .await;
-                RaeExecError::NoApplicableMethod.into()
+                return Ok(RaeExecError::NoApplicableMethod.into());
             } else {
                 let debug = method.to_string();
-                let mut p_env = PLEnv {
+                let p_env = PLEnv {
                     env: env.clone(),
                     pc: Default::default(),
                     unpure_bindings: Default::default(),
                 };
-                let (label, params_values) = if let LValue::List(method) = &method {
-                    (method[0].to_string(), method[1..].to_vec())
+
+                let model: ActingModel = acting_manager
+                    .generate_acting_model_for_method(&method, p_env)
+                    .await?;
+
+                let args = if let LValue::List(list) = method {
+                    list.iter().map(|lv| lv.as_cst()).collect()
                 } else {
                     panic!()
                 };
 
-                let st: RefSymTable = acting_manager.st().await;
-
-                let ch = Chronicle::new(debug.to_string(), ChronicleKind::Method, st.clone());
-
-                let model: ActingModel = convert(Some(ch), &method, &mut p_env, st).await?;
-
-                //log.debug(format!("p_eval({}) => {}", debug, method)).await;
-                acting_manager
-                    .set_status(&task_id, ProcessStatus::Running(None))
-                    .await;
-
-                let lv_om = model.lv_om.clone();
                 let method_id = acting_manager
-                    .new_refinement(&task_id, debug, model, ProcessOrigin::Execution)
+                    .new_refinement(&task_id, debug, args, model, ProcessOrigin::Execution)
                     .await;
-                let mut body = vec![
-                    LPrimitive::Begin.into(),
-                    list!(DEF_PROCESS_ID.into(), method_id.into()),
-                ];
 
-                let labels: Vec<Arc<Sym>> = ctx
-                    .domain
-                    .read()
-                    .await
-                    .get_methods()
-                    .get(&label)
-                    .unwrap()
-                    .parameters
-                    .get_labels();
-
-                for (param, value) in labels.iter().zip(params_values) {
-                    body.push(list![LPrimitive::Define.into(), param.into(), value]);
-                }
-
-                body.push(lv_om);
-                list!(body.into(), (*task_id).into())
+                method_id
             }
         }
     };
 
-    Ok(result)
+    acting_manager
+        .set_status(&task_id, ProcessStatus::Running(None))
+        .await;
+    acting_manager.set_start(&method_id, None).await;
+    acting_manager
+        .set_status(&method_id, ProcessStatus::Running(None))
+        .await;
+
+    let program = acting_manager.get_om_lvalue(&method_id).await;
+    Ok(program)
 }
 
 #[async_scheme_fn]
@@ -437,92 +281,6 @@ pub async fn _retry(env: &LEnv) -> LResult {
     let sr: SelectResponse = select(task_id, env).await?;
 
     check_select_response(env, ctx, &task_id, sr).await
-
-    /*let result: LValue = match sr {
-        SelectResponse::Planned(id) => {
-            let mut inner = ctx.acting_manager.inner.write().await;
-
-            let task_process: &mut TaskProcess =
-                inner.get_mut(task_id).unwrap().inner.as_mut_task().unwrap();
-            task_process.set_status(ProcessStatus::Running(None));
-
-            drop(task_process);
-            let method: &mut RefinementProcess =
-                inner.get_mut(id).unwrap().inner.as_mut_method().unwrap();
-
-            method.set_start(supervisor.instant());
-            method.status = ProcessStatus::Running(None);
-            let value = method.value.clone();
-            let value_as_slice: Vec<LValue> = value.try_into()?;
-            let label = value_as_slice[0].to_string();
-            let params_values = &value_as_slice[1..];
-            let expanded = method.expanded.clone();
-            let mut body = vec![
-                LPrimitive::Begin.into(),
-                list!(DEF_PROCESS_ID.into(), id.into()),
-            ];
-
-            let labels: Vec<Arc<Sym>> = ctx
-                .domain
-                .read()
-                .await
-                .get_methods()
-                .get(&label)
-                .unwrap()
-                .parameters
-                .get_labels();
-
-            for (param, value) in labels.iter().zip(params_values) {
-                body.push(list![
-                    LPrimitive::Define.into(),
-                    param.into(),
-                    value.clone()
-                ]);
-            }
-
-            body.push(expanded);
-            list!(body.into(), task_id.into())
-        }
-        SelectResponse::Generated(r) => {
-            let new_method = r.method_value.clone();
-
-            let instant = ctx.acting_manager.instant();
-
-            let mut inner = ctx.acting_manager.inner.write().await;
-            let tp: &mut TaskProcess = inner.get_mut(task_id).unwrap().inner.as_mut_task().unwrap();
-
-            if new_method == LValue::Nil {
-                log.error(format!(
-                    "No more method for task {task}({task_id}). Task is a failure!",
-                ))
-                .await;
-                tp.set_status(ProcessStatus::Failure);
-                tp.set_end(instant);
-                RaeExecError::NoApplicableMethod.into()
-            } else {
-                drop(tp);
-                let debug = new_method.to_string();
-                /*let new_method: LValue = p_eval(&new_method, &mut env.clone(), &mut PConfig::default())
-                .await
-                .unwrap_or_else(|e| panic!("{e}"))
-                .get_lvalue()
-                .clone();*/
-                log.debug(format!("p_eval({}) => {}", debug, new_method))
-                    .await;
-                let id: ActingProcessId = ctx
-                    .acting_manager
-                    .new_refinement(task_id, debug, r, false)
-                    .await;
-                list!(
-                    LPrimitive::Begin.into(),
-                    list!(DEF_PROCESS_ID.into(), id.into()),
-                    list!(LPrimitive::Enr.into(), new_method)
-                )
-            }
-        }
-    };
-
-    Ok(result)*/
 }
 
 /*const LAMBDA_SELECT: &str = "
@@ -564,8 +322,17 @@ pub async fn select(task_id: ActingProcessId, env: &LEnv) -> Result<SelectRespon
 
     match planned_refinement {
         Some(refinement) => {
-            let lv: LValue = supervisor.get_lv(&refinement).await;
-            if greedy_refinement.possibilities.contains(&lv) {
+            let lv: LValue = supervisor.get_refinement_lv(&refinement).await;
+            let possibilities = &greedy_refinement.possibilities;
+            println!(
+                "{}.refinement = planned({}) = {}\napplicable = {}",
+                task_id,
+                refinement,
+                lv,
+                LValue::from(possibilities.clone())
+            );
+            if possibilities.contains(&lv) {
+                println!("selecting planned refinement!");
                 Ok(SelectResponse::Planned(refinement))
             } else {
                 Ok(SelectResponse::Generated(greedy_refinement))

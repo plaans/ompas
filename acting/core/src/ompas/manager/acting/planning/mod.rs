@@ -13,6 +13,7 @@ use crate::ompas::manager::acting::planning::plan_update::{
 };
 use crate::ompas::manager::acting::planning::problem_update::{ExecutionProblem, ProblemUpdate};
 use crate::ompas::manager::resource::WaiterPriority;
+use crate::ompas::scheme::exec::state::ModState;
 use crate::planning::planner::encoding::domain::encode_ctx;
 use crate::planning::planner::encoding::instance::{encode_init, generate_instances};
 use crate::planning::planner::encoding::problem_generation::{
@@ -103,6 +104,7 @@ pub struct ContinuousPlanningConfig {
     pub domain: OMPASDomain,
     pub st: RefSymTable,
     pub env: LEnv,
+    pub opt: Option<PMetric>,
 }
 
 pub async fn run_continuous_planning(config: ContinuousPlanningConfig) {
@@ -116,6 +118,7 @@ pub async fn run_continuous_planning(config: ContinuousPlanningConfig) {
         domain,
         st,
         env,
+        opt,
     } = config;
 
     'main: loop {
@@ -128,6 +131,8 @@ pub async fn run_continuous_planning(config: ContinuousPlanningConfig) {
                     let p: ProblemUpdate = p;
                     match p {
                         ProblemUpdate::ExecutionProblem(ep) => {
+                            let mut env = env.clone();
+                            env.update_context(ModState::new_from_snapshot(ep.state.clone()));
                             let pp: PlannerProblem = populate_problem(&domain, &env, &st, ep).await.unwrap();
                             for (origin, chronicle) in pp.instances.iter().map(|i| (i.origin, i.am.chronicle.as_ref().unwrap())) {
                                 println!("{:?}:{}", origin, chronicle)
@@ -139,7 +144,7 @@ pub async fn run_continuous_planning(config: ContinuousPlanningConfig) {
 
                             let result = run_solver(
                                 aries_problem,
-                                OPT,
+                                opt,
                             );
                             //println!("{}", format_partial_plan(&pb, &x)?);
 

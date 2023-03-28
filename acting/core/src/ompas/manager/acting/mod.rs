@@ -1,11 +1,12 @@
 use crate::model::acting_domain::model::ActingModel;
 use crate::model::acting_domain::OMPASDomain;
 use crate::model::add_domain_symbols;
+use crate::model::chronicle::{Chronicle, ChronicleKind};
 use crate::model::process_ref::{Label, ProcessRef};
 use crate::model::sym_domain::cst::Cst;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::ompas::manager::acting::filter::ProcessFilter;
-use crate::ompas::manager::acting::inner::ProcessKind;
+use crate::ompas::manager::acting::inner::{PlannerManager, ProcessKind};
 use crate::ompas::manager::acting::interval::Timepoint;
 use crate::ompas::manager::acting::planning::plan_update::PlanUpdateManager;
 use crate::ompas::manager::acting::planning::problem_update::{
@@ -17,13 +18,23 @@ use crate::ompas::manager::monitor::MonitorManager;
 use crate::ompas::manager::resource::{Quantity, ResourceManager, WaitAcquire, WaiterPriority};
 use crate::ompas::manager::state::action_status::ProcessStatus;
 use crate::ompas::manager::state::world_state::WorldState;
+use crate::planning::conversion::_convert;
+use crate::planning::conversion::flow_graph::algo::annotate::annotate;
+use crate::planning::conversion::flow_graph::algo::p_eval::p_eval;
+use crate::planning::conversion::flow_graph::algo::p_eval::r#struct::PLEnv;
+use crate::planning::conversion::flow_graph::algo::pre_processing::pre_processing;
+use crate::planning::planner::solver::PMetric;
 use inner::InnerActingManager;
+use ompas_language::exec::acting_context::DEF_PROCESS_ID;
 use sompas_structs::lenv::LEnv;
+use sompas_structs::list;
+use sompas_structs::lprimitive::LPrimitive;
 use sompas_structs::lruntimeerror::LRuntimeError;
-use sompas_structs::lvalue::LValue;
+use sompas_structs::lvalue::{LValue, Sym};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tokio::sync::{watch, RwLock};
+use tokio::sync::{broadcast, watch, RwLock};
 use tokio::time::Instant;
 
 pub mod acting_var;
@@ -49,6 +60,7 @@ pub struct ActingManager {
     pub state: WorldState,
     pub inner: Arc<RwLock<InnerActingManager>>,
     instant: Instant,
+    planning: Arc<AtomicBool>,
 }
 
 impl ActingManager {
@@ -67,6 +79,7 @@ impl ActingManager {
                 st,
             ))),
             instant,
+            planning: Arc::new(AtomicBool::new(false)),
         }
     }
 }
@@ -167,13 +180,14 @@ impl ActingManager {
         &self,
         parent: &ActingProcessId,
         debug: String,
+        args: Vec<Option<Cst>>,
         model: ActingModel,
         origin: ProcessOrigin,
     ) -> ActingProcessId {
         self.inner
             .write()
             .await
-            .new_refinement(parent, debug, model, origin)
+            .new_refinement(parent, debug, args, model, origin)
             .await
     }
 
@@ -336,8 +350,16 @@ impl ActingManager {
         self.inner.read().await.get_task_args(id).clone()
     }
 
+    pub async fn set_action_args(&self, id: &ActingProcessId, args: Vec<Cst>) {
+        self.inner.write().await.set_action_args(id, args).await;
+    }
+
     pub async fn get_lv(&self, id: &ActingProcessId) -> LValue {
         self.inner.read().await.get_lv(id)
+    }
+
+    pub async fn get_refinement_lv(&self, id: &ActingProcessId) -> LValue {
+        self.inner.read().await.get_refinement_lv(id)
     }
 
     pub async fn get_om(&self, id: &ActingProcessId) -> LValue {
@@ -348,7 +370,9 @@ impl ActingManager {
         self.inner.read().await.get_debug(id).clone()
     }
 
-    pub async fn start_continuous_planning(&self, env: LEnv) {
+    pub async fn start_continuous_planning(&self, env: LEnv, opt: Option<PMetric>) {
+        self.planning
+            .compare_exchange(true, false, Ordering::Relaxed, Ordering::Relaxed);
         let mut locked = self.inner.write().await;
         let st = self.st.clone();
         let domain = self.domain.read().await.clone();
@@ -356,13 +380,14 @@ impl ActingManager {
 
         let (plan_update_manager, tx) = PlanUpdateManager::new(self.clone());
         let (problem_update_manager, rx, tx_notif) = ProblemUpdateManager::new(self.clone());
-        locked.set_update_notifier(tx_notif);
+        locked.set_planner_manager(PlannerManager::new(tx_notif));
         let config = ContinuousPlanningConfig {
             problem_receiver: rx,
             plan_sender: tx,
             domain,
             st,
             env,
+            opt,
         };
         tokio::spawn(async {
             let manager = problem_update_manager;
@@ -383,6 +408,88 @@ impl ActingManager {
             state,
             chronicles: self.inner.read().await.get_current_chronicles(),
         }
+    }
+
+    pub async fn subscribe_on_plan_update(&self) -> Option<broadcast::Receiver<bool>> {
+        self.inner.read().await.subscribe_on_plan_update().await
+    }
+
+    pub async fn get_om_lvalue(&self, id: &ActingProcessId) -> LValue {
+        let locked = self.inner.read().await;
+        let am_id = locked.processes[*id].am_id();
+        let action_id = locked.processes[*id].parent();
+
+        let model: &ActingModel = &locked.models[am_id];
+        let lv: LValue = locked.get_refinement_lv(id);
+        let lv_om: LValue = model.lv_om.clone();
+
+        let (label, params_values) = if let LValue::List(list) = lv {
+            (list[0].to_string(), list[1..].to_vec())
+        } else {
+            panic!()
+        };
+
+        let mut body = vec![
+            LPrimitive::Begin.into(),
+            list!(DEF_PROCESS_ID.into(), (*id).into()),
+        ];
+
+        let labels: Vec<Arc<Sym>> = self
+            .domain
+            .read()
+            .await
+            .get_methods()
+            .get(&label)
+            .unwrap()
+            .parameters
+            .get_labels();
+
+        for (param, value) in labels.iter().zip(params_values) {
+            body.push(list![LPrimitive::Define.into(), param.into(), value]);
+        }
+
+        body.push(lv_om);
+        list!(body.into(), (action_id).into())
+    }
+
+    pub async fn generate_acting_model_for_method(
+        &self,
+        lv: &LValue,
+        mut p_env: PLEnv,
+    ) -> Result<ActingModel, LRuntimeError> {
+        let debug = lv.to_string();
+
+        let p_eval_lv = p_eval(lv, &mut p_env).await?;
+        //debug_println!("{}\np_eval =>\n{}", lv.format(0), p_eval_lv.format(0));
+        let lv_om = annotate(p_eval_lv);
+
+        let mut lv_expanded = None;
+        let mut chronicle = None;
+
+        if self.planning.load(Ordering::Relaxed) {
+            let st = self.st.clone();
+            let ch = Some(Chronicle::new(debug, ChronicleKind::Method, st.clone()));
+            let pp_lv = pre_processing(&lv_om, &p_env).await?;
+            //debug_println!("pre_processing =>\n{}", pp_lv.format(0));
+
+            chronicle = match _convert(ch, &pp_lv, &mut p_env, st).await {
+                Ok(ch) => Some(ch),
+                Err(e) => {
+                    println!("{}", e);
+                    None
+                }
+            };
+
+            lv_expanded = Some(pp_lv);
+        }
+
+        Ok(ActingModel {
+            lv: lv.clone(),
+            lv_om,
+            lv_expanded,
+            instantiations: vec![],
+            chronicle,
+        })
     }
 
     /*pub async fn absorb_plan_result(&self, result: ActingPlanResult) {

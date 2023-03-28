@@ -1,3 +1,4 @@
+use ompas_core::ompas::manager::resource::{Ticket, WaiterPriority};
 use ompas_structs::execution::resource::{Ticket, WaiterPriority};
 
 pub fn main() {

@@ -748,6 +748,9 @@ pub mod monitor {
         pub const START: &str = "start";
         pub const DOC_START: &str = "Start the acting system.";
 
+        pub const START_WITH_PLANNER: &str = "start-with-planner";
+        pub const DOC_START_WITH_PLANNER: &str = "Start the acting system.";
+
         pub const STOP: &str = "stop";
         pub const DOC_STOP: &str = "Stop the acting system.";
 

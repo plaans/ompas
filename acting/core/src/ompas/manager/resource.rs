@@ -160,44 +160,6 @@ impl Resource {
         } else {
             Err(LRuntimeError::new("acquire", "acquisition illegal"))
         }
-
-        /*
-        let response = match (self.capacity, quantity) {
-            (Quantity::Unary, Quantity::All) => {
-                AcquireResponse::Ok(self.add_acquire(acquisition_id, kind, quantity))
-            }
-
-            (Quantity::None, Quantity::All) => {
-                AcquireResponse::Wait(self.add_waiter(acquisition_id, kind, quantity, priority)?)
-            }
-
-            (Quantity::Some(u1), Quantity::Some(u2)) => {
-                if u1 >= u2 {
-                    AcquireResponse::Ok(self.add_acquire(acquisition_id, kind, quantity))
-                } else {
-                    AcquireResponse::Wait(self.add_waiter(
-                        acquisition_id,
-                        kind,
-                        quantity,
-                        priority,
-                    )?)
-                }
-            }
-            (Quantity::Some(_), Quantity::All) => {
-                if self.capacity == self.max_capacity {
-                    AcquireResponse::Ok(self.add_acquire(acquisition_id, kind, quantity))
-                } else {
-                    AcquireResponse::Wait(self.add_waiter(
-                        acquisition_id,
-                        kind,
-                        quantity,
-                        priority,
-                    )?)
-                }
-            }
-            _ => Err(LRuntimeError::new("acquire", "acquisition illegal"))?,
-        };
-        Ok(response)*/
     }
 
     pub fn _reserve(

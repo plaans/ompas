@@ -12,13 +12,16 @@ use crate::ompas::manager::state::world_state::StateType;
 use crate::ompas::scheme::exec::platform::platform::Platform;
 use crate::ompas::scheme::exec::platform::platform_config::PlatformConfig;
 use crate::ompas::scheme::exec::ModExec;
+use crate::ompas::scheme::monitor::domain::ModDomain;
 use crate::ompas::scheme::monitor::ModMonitor;
 use crate::ompas::{rae, TOKIO_CHANNEL_SIZE};
 use crate::planning::conversion::context::ConversionContext;
 use crate::planning::conversion::convert_acting_domain;
 use crate::planning::planner::problem::PlanningDomain;
+use crate::planning::planner::solver::PMetric;
 use ompas_language::exec::state::{DYNAMIC, INNER_DYNAMIC, INNER_STATIC, INSTANCE, STATIC};
 use ompas_language::monitor::control::*;
+use ompas_language::monitor::domain::MOD_DOMAIN;
 use ompas_language::process::{LOG_TOPIC_OMPAS, PROCESS_STOP_OMPAS, PROCESS_TOPIC_OMPAS};
 use ompas_language::select::*;
 use ompas_language::supervisor::*;
@@ -151,6 +154,12 @@ impl From<ModControl> for LModule {
     fn from(m: ModControl) -> Self {
         let mut module = LModule::new(m, MOD_CONTROL, DOC_MOD_CONTROL);
         module.add_async_fn(START, start, DOC_START, false);
+        module.add_async_fn(
+            START_WITH_PLANNER,
+            start_with_planner,
+            DOC_START_WITH_PLANNER,
+            false,
+        );
         module.add_async_fn(STOP, stop, DOC_STOP, false);
         module.add_async_fn(
             __DEBUG_OMPAS__,
@@ -238,6 +247,61 @@ impl From<ModControl> for LModule {
 pub async fn start(env: &LEnv) -> Result<String, LRuntimeError> {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
     let acting_manager = ctx.acting_manager.clone();
+    let mut tasks_to_execute: Vec<Job> = vec![];
+    mem::swap(
+        &mut *ctx.tasks_to_execute.write().await,
+        &mut tasks_to_execute,
+    );
+
+    let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+
+    *ctx.task_stream.write().await = Some(tx);
+
+    let start_result: String = ctx.platform.start(Default::default()).await?;
+
+    let env = ctx.get_exec_env().await;
+    let log = ctx.log.clone();
+
+    let receiver_event_update_state = acting_manager.state.subscribe_on_update().await;
+    let env_clone = env.clone();
+    let monitors = acting_manager.monitor_manager.clone();
+    tokio::spawn(async move {
+        task_check_wait_for(receiver_event_update_state, monitors, env_clone).await
+    });
+
+    tokio::spawn(async move {
+        rae(acting_manager, log, env, rx).await;
+    });
+
+    /*if ctx.interface.log.display {
+        ompas_log::display_logger(killer.subscribe(), ctx.interface.log.path.clone());
+    }*/
+
+    for t in tasks_to_execute {
+        ctx.task_stream
+            .read()
+            .await
+            .as_ref()
+            .unwrap()
+            .send(t.into())
+            .await
+            .expect("error sending job")
+    }
+
+    Ok(format!("OMPAS launched successfully. {}", start_result))
+}
+
+/// Launch main loop of rae in an other asynchronous task.
+#[async_scheme_fn]
+pub async fn start_with_planner(env: &LEnv, opt: bool) -> Result<String, LRuntimeError> {
+    let ctx = env.get_context::<ModDomain>(MOD_DOMAIN)?;
+    //let mut context: ConversionContext = ctx.get_conversion_context().await;
+    let plan_env: LEnv = ctx.get_plan_env().await;
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
+    let acting_manager = ctx.acting_manager.clone();
+    acting_manager
+        .start_continuous_planning(plan_env, if opt { Some(PMetric::Makespan) } else { None })
+        .await;
     let mut tasks_to_execute: Vec<Job> = vec![];
     mem::swap(
         &mut *ctx.tasks_to_execute.write().await,

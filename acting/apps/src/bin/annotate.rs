@@ -1,3 +1,4 @@
+use ompas_core::planning::conversion::flow_graph::algo::annotate::annotate;
 use ompas_planning::config::GraphConvertConfig;
 use ompas_planning::conversion::flow::annotate::annotate;
 use ompas_planning::conversion::{convert, debug_with_markdown};

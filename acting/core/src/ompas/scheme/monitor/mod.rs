@@ -59,15 +59,12 @@ impl From<ModMonitor> for LModule {
 }
 
 impl ModMonitor {
-    pub async fn new(
-        platform: impl Into<PlatformDeclaration>,
-        working_dir: Option<PathBuf>,
-    ) -> Self {
+    pub async fn new(platform: impl Into<PlatformDeclaration>, log_dir: Option<PathBuf>) -> Self {
         let mut module = Self::default();
 
         Master::new_log_topic(
             LOG_TOPIC_OMPAS,
-            working_dir.map(|p| FileDescriptor::AbsolutePath(p.canonicalize().unwrap())),
+            log_dir.map(|p| FileDescriptor::Directory(p.canonicalize().unwrap())),
         )
         .await;
 

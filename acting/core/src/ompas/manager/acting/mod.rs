@@ -116,10 +116,15 @@ impl ActingManager {
 
     pub async fn export_to_csv(
         &self,
-        _working_dir: Option<PathBuf>,
-        _file: Option<String>,
+        working_dir: Option<PathBuf>,
+        file: Option<String>,
     ) -> LValue {
-        todo!()
+        self.inner
+            .read()
+            .await
+            .export_to_csv(working_dir, file)
+            .await;
+        LValue::Nil
     }
 
     pub async fn st(&self) -> RefSymTable {

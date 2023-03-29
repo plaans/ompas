@@ -8,11 +8,13 @@ use ompas_middleware::{LogLevel, Master};
 use sompas_modules::advanced_math::ModAdvancedMath;
 use sompas_modules::io::ModIO;
 use sompas_modules::string::ModString;
+use sompas_modules::time::ModTime;
 use sompas_modules::utils::ModUtils;
 use sompas_repl::lisp_interpreter::{ChannelToLispInterpreter, LispInterpreter};
 use sompas_structs::lruntimeerror;
 use std::path::PathBuf;
 use structopt::StructOpt;
+
 pub const LOG_LEVEL: LogLevel = LogLevel::Debug;
 
 #[derive(Debug, StructOpt)]
@@ -51,6 +53,7 @@ async fn lisp_interpreter(opt: Opt) -> lruntimeerror::Result<()> {
     li.import_namespace(ctx_io);
     li.import_namespace(ctx_math);
     li.import(ctx_string);
+    li.import_namespace(ModTime::new(2));
 
     let ctx_rae = ModMonitor::new(
         PlatformGobotSim::new(

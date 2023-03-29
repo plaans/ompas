@@ -765,8 +765,12 @@ pub mod monitor {
         pub const DOC_ADD_TASK_TO_EXECUTE: &str =
             "Add a task in the list of tasks that will be sent to the system after it launches.";
 
+        pub const _WAIT_TASK: &str = "_wait_task";
+        pub const DOC__WAIT_TASK: &str = "Wait on the result of a triggered task.";
+
         pub const WAIT_TASK: &str = "wait-task";
-        pub const DOC_WAIT_TASK: &str = "Wait on the result of a triggered task.";
+        pub const LAMBDA_WAIT_TASK: &str = "(lambda (_id_) (await (_wait_task _id_)))";
+        pub const DOC_WAIT_TASK: &str = "wrapper of _wait_task";
 
         pub const GET_TASK_ID: &str = "get_task_id";
         pub const DOC_GET_TASK_ID: &str = "Get the internal id of the triggered task.";

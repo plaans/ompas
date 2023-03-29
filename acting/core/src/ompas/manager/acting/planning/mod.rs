@@ -44,8 +44,6 @@ use tokio::sync::mpsc;
 pub mod plan_update;
 pub mod problem_update;
 
-const OPT: Option<PMetric> = None;
-
 #[derive(Default)]
 pub struct ActingVarRefTable {
     inner: im::HashMap<ActingVarRef, Variable>,

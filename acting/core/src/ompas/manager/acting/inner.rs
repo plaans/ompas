@@ -9,7 +9,7 @@ use crate::model::sym_table::VarId;
 use crate::ompas::manager::acting::acting_var::{
     ActingVal, ActingValUpdate, ActingVarCollection, ActingVarId, ActingVarRef, AsCst, ExecutionVar,
 };
-use crate::ompas::manager::acting::interval::Timepoint;
+use crate::ompas::manager::acting::interval::{Interval, Timepoint};
 use crate::ompas::manager::acting::planning::plan_update::{Choice, ChoiceInner};
 use crate::ompas::manager::acting::planning::problem_update::ActingUpdateNotification;
 use crate::ompas::manager::acting::process::acquire::AcquireProcess;
@@ -33,10 +33,10 @@ use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use std::env::set_current_dir;
 use std::fmt::{Display, Formatter, Write};
-use std::fs;
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io::Write as ioWrite;
 use std::path::PathBuf;
+use std::{env, fs};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{broadcast, mpsc, watch};
 use tokio::time::Instant;
@@ -44,6 +44,11 @@ use tokio::time::Instant;
 const COLOR_PLANNING: &str = "red";
 const COLOR_EXECUTION: &str = "blue";
 const COLOR_DEFAULT: &str = "black";
+
+const TASK_NAME: &str = "task_name";
+const TASK_STATUS: &str = "task_status";
+const TASK_EXECUTION_TIME: &str = "task_exec_time";
+const OMPAS_STATS: &str = "ompas_stats";
 
 struct Reservation {
     id: ActingProcessId,
@@ -1247,6 +1252,72 @@ impl InnerActingManager {
         self.reserve_all(reservations).await;
         self.set_planner_vals(updates)
     }
+
+    pub async fn export_to_csv(&self, working_dir: Option<PathBuf>, file: Option<String>) {
+        let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
+        let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
+
+        let dir_path: PathBuf = match working_dir {
+            Some(wd) => {
+                let mut dir_path = wd;
+                dir_path.push(OMPAS_STATS);
+                dir_path
+            }
+            None => format!(
+                "{}/ompas/{}",
+                match env::var("HOME") {
+                    Ok(val) => val,
+                    Err(_) => ".".to_string(),
+                },
+                OMPAS_STATS
+            )
+            .into(),
+        };
+
+        fs::create_dir_all(&dir_path).expect("could not create stats directory");
+        let mut file_path = dir_path.clone();
+        file_path.push(match file {
+            Some(f) => format!("{}.csv", f),
+            None => format!("{}{}.csv", OMPAS_STATS, string_date),
+        });
+        let mut file = OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open(&file_path)
+            .expect("error creating stat file");
+        let header = format!(
+            "\"{}\";\"{}\";\"{}\"\n",
+            TASK_NAME, TASK_STATUS, TASK_EXECUTION_TIME,
+        );
+        if file.metadata().unwrap().len() == 0 {
+            file.write_all(header.as_bytes())
+                .expect("could not write to stat file");
+        }
+        let parent: Vec<ActingProcessId> = self.processes[0].inner.as_root().unwrap().tasks.clone();
+        for p in &parent {
+            let process = &self.processes[*p];
+            file.write_all(
+                format!(
+                    "\"{}\";\"{}\";\"{}\"\n", //";\"{}\";\"{}\";\"{}\";\"{}\";\"{}\"\n",
+                    process.debug().clone().unwrap(),
+                    process.status,
+                    {
+                        let start = process.start.get_val().unwrap();
+                        let end = process.end.get_val().clone();
+                        let interval = Interval::new(start, end);
+                        let duration = interval.duration();
+                        if duration.is_finite() {
+                            duration.as_secs().to_string()
+                        } else {
+                            duration.to_string()
+                        }
+                    },
+                )
+                .as_bytes(),
+            )
+            .expect("could not write to stat file")
+        }
+    }
 }
 
 fn format_acting_process(
@@ -1524,97 +1595,5 @@ impl InnerSupervisor {
                 .expect("could not write to stat file")
         }
     }
-
-    pub fn reset_time_reference(&mut self) {
-        self.time_reference = Instant::now();
     }
-
-    pub fn get_instant(&self) -> Timepoint {
-        self.time_reference.elapsed().as_micros()
-    }
-
-    pub async fn format_task_collection(&self, filter: TaskFilter) -> String {
-        self.trc.format(filter).await
-    }
-
-    pub async fn format_task_network(&self) -> String {
-        self.tn.format().await
-    }
-
-    pub async fn add_task(&self, task: LValue, parent_task: Option<usize>) -> TaskMetaData {
-        let task_id = self.get_next_id();
-        let start = self.time_reference.elapsed().as_micros();
-        let stack = TaskMetaData::new(task, task_id, parent_task, start);
-        self.trc.insert(task_id, stack.clone()).await;
-        if let Some(parent_task) = parent_task {
-            self.tn.add_task_to_parent(parent_task, task_id).await;
-        } else {
-            self.tn.add_new_root_task(task_id).await;
-        }
-        stack
-    }
-
-    pub async fn add_command(
-        &self,
-        action: LValue,
-        parent_task: Option<usize>,
-    ) -> (ActionId, watch::Receiver<ActionStatus>) {
-        let task_id = self.get_next_id();
-        let start = self.time_reference.elapsed().as_micros();
-        let mut parent = false;
-        let parent_task = match parent_task {
-            None => task_id,
-            Some(id) => {
-                parent = true;
-                id
-            }
-        };
-
-        let (action, rx) = CommandMetaData::new(task_id, parent_task, action, start);
-        self.trc.insert(task_id, action).await;
-        if parent {
-            self.tn.add_task_to_parent(parent_task, task_id).await;
-        }
-        (task_id, rx)
-    }
-
-    #[function_name::named]
-    pub async fn get_task(&self, task_id: &ActionId) -> Result<TaskMetaData, LRuntimeError> {
-        match self.trc.get(task_id).await {
-            ActionMetaData::Task(a) => Ok(a),
-            ActionMetaData::Command(_) => Err(lruntimeerror!(
-                function_name!(),
-                format!("{} does not exist", task_id)
-            )),
-        }
-    }
-
-    pub async fn update_task(&self, id: &ActionId, task: impl Into<ActionMetaData>) {
-        //println!("in update stack\n stack: {}", rs);
-        self.trc.update(id, task).await
-    }
-
-    pub async fn update_status(&self, id: &ActionId, status: ActionStatus) {
-        self.trc.update_status(id, status).await
-    }
-
-    pub async fn get_status(&self, id: &ActionId) -> ActionStatus {
-        self.trc.get_status(id).await
-    }
-
-    pub async fn get_action_collection(&self) -> im::HashMap<ActionId, ActionMetaData> {
-        self.trc.get_inner().await
-    }
-
-    pub async fn set_end_time(&self, id: &ActionId) {
-        let end = self.time_reference.elapsed().as_micros();
-        let mut task: ActionMetaData = self.trc.get(id).await;
-        task.set_end_timepoint(end);
-        self.trc.update(id, task).await;
-    }
-
-    pub fn get_next_id(&self) -> usize {
-        get_and_update_id_counter(self.next_id.clone())
-    }
-}
-*/
+ */

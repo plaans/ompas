@@ -1,11 +1,14 @@
+use chrono::{DateTime, Utc};
+use ompas_core::ompas::scheme::exec::platform::lisp_domain::LispDomain;
+use ompas_core::ompas::scheme::monitor::ModMonitor;
 use ompas_gobotsim::platform::PlatformGobotSim;
+use ompas_language::interface::{LOG_TOPIC_PLATFORM, PLATFORM_CLIENT};
 use ompas_middleware::logger::{FileDescriptor, LogClient};
-use ompas_rae_core::monitor::ModMonitor;
-use ompas_rae_interface::lisp_domain::LispDomain;
-use ompas_rae_language::interface::{LOG_TOPIC_PLATFORM, PLATFORM_CLIENT};
+use ompas_middleware::Master;
 use sompas_modules::advanced_math::ModAdvancedMath;
 use sompas_modules::io::ModIO;
 use sompas_modules::string::ModString;
+use sompas_modules::time::ModTime;
 use sompas_modules::utils::ModUtils;
 use sompas_repl::lisp_interpreter::{
     ChannelToLispInterpreter, LispInterpreter, LispInterpreterConfig,
@@ -26,11 +29,17 @@ pub struct Opt {
     #[structopt(short = "p", long = "problem")]
     problem: Option<PathBuf>,
 
-    #[structopt(short = "a", long = "advanced")]
-    advanced: bool,
+    #[structopt(short = "f", long = "fa")]
+    fa: bool,
 
     #[structopt(short = "L", long = "lrpt")]
     lrpt: bool,
+
+    #[structopt(short = "a", long = "aries")]
+    aries: bool,
+
+    #[structopt(short = "o", long = "aries-opt")]
+    aries_opt: bool,
 
     #[structopt(short = "v", long = "view")]
     view: bool,
@@ -74,7 +83,7 @@ pub async fn lisp_interpreter(opt: Opt) {
         pb.clone()
     } else {
         let home = env::var("HOME").unwrap();
-        PathBuf::from(format!("{}/ompas/benchmark", home))
+        PathBuf::from(format!("{}/ompas_benchmark", home))
     };
 
     //println!("log path: {:?}", log);
@@ -85,6 +94,7 @@ pub async fn lisp_interpreter(opt: Opt) {
     let ctx_math = ModAdvancedMath::default();
     let ctx_utils = ModUtils::default();
     let ctx_string = ModString::default();
+    let mod_time = ModTime::new(2);
 
     //Insert the doc for the different contexts.
 
@@ -95,15 +105,22 @@ pub async fn lisp_interpreter(opt: Opt) {
     li.import_namespace(ctx_utils);
     li.import_namespace(ctx_io);
     li.import_namespace(ctx_math);
+    li.import_namespace(mod_time);
 
     li.import(ctx_string);
 
-    let log = if let Some(pb) = &opt.log {
+    let mut log = if let Some(pb) = &opt.log {
         pb.clone()
     } else {
         let home = env::var("HOME").unwrap();
-        PathBuf::from(format!("{}/ompas/benchmark", home))
+        PathBuf::from(format!("{}/ompas_benchmark", home))
     };
+
+    let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
+    let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
+
+    log.push(string_date);
+    fs::create_dir_all(log.clone()).unwrap();
 
     let ctx_rae = ModMonitor::new(
         PlatformGobotSim::new(
@@ -123,39 +140,39 @@ pub async fn lisp_interpreter(opt: Opt) {
 
     li.set_config(LispInterpreterConfig::new(false));
     tokio::spawn(async move {
-        li.run(Some(FileDescriptor::AbsolutePath(
-            log.canonicalize().unwrap(),
-        )))
-        .await;
+        li.run(Some(FileDescriptor::Directory(log.canonicalize().unwrap())))
+            .await;
     });
 
-    //tokio::time::sleep(Duration::from_secs(time)).await;
-    //com.send(domain_lisp).await.expect("could not send to LI");
     com.send(problem_lisp).await.expect("could not send to LI");
-    com.recv().await;
-    com.send("(launch)".to_string()).await.expect("error on LI");
+    let r = com.recv().await.unwrap();
+    println!(
+        "{}",
+        match r {
+            Ok(lv) => lv.to_string(),
+            Err(e) => e.to_string(),
+        }
+    );
+    let start = if opt.aries {
+        "(start-with-planner false)"
+    } else if opt.aries_opt {
+        "(start-with-planner true)"
+    } else {
+        "(start)"
+    };
+    com.send(start.to_string()).await.expect("error on LI");
     com.recv().await;
     println!("bench: task starts");
     tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-    /*com.send("(await (trigger-task t_jobshop))".to_string())
-    .await
-    .expect("error on LI");*/
 
-    com.send(format!(
-        "(await (race (await (trigger-task t_jobshop)) (await (sleep {}))))",
+    //let trigger = "(trigger-task t_jobshop)".to_string();
+    let trigger = format!(
+        "(await (race (wait-task (trigger-task t_jobshop)) (sleep {})))",
         opt.time.unwrap_or(1)
-    ))
-    .await
-    .expect("error on LI");
+    );
+    //println!("trigger = {}", trigger);
 
-    /*select! {
-        _ = com.recv() => {
-            println!("task finished")
-        }
-        _ = tokio::time::sleep(Duration::from_secs()=> {
-            println!("Benchmark stopped before completion")
-        }
-    }*/
+    com.send(trigger).await.expect("error on LI");
     com.recv().await;
 
     println!("bench: task ends");
@@ -163,10 +180,14 @@ pub async fn lisp_interpreter(opt: Opt) {
     let problem_name = problem_name.replace(".lisp", "");
     com.send(format!(
         "(export-stats gobot-sim_{}_{})",
-        if opt.advanced {
+        if opt.fa {
             "advanced"
         } else if opt.lrpt {
             "lrpt"
+        } else if opt.aries {
+            "aries"
+        } else if opt.aries_opt {
+            "aries_opt"
         } else {
             "greedy"
         },
@@ -189,40 +210,36 @@ pub async fn lisp_interpreter(opt: Opt) {
         "end of the benchmark :  {} for domain gobot-sim",
         problem_name
     );
+
+    Master::end().await
 }
 
 pub fn domain(opt: &Opt) -> LispDomain {
     let domain = opt.domain.clone();
-    let mut commands = domain.clone();
-    commands.push("commands.lisp");
-    let mut state_functions = domain.clone();
-    state_functions.push("state_functions.lisp");
     let mut om = domain.clone();
-    om.push(if opt.advanced {
-        "jobshop_advanced.lisp"
+    om.push(if opt.fa {
+        "fa.lisp"
     } else if opt.lrpt {
-        "jobshop_advanced_lrpt.lisp"
+        "falrpt.lisp"
     } else {
-        "jobshop_greedy.lisp"
+        "greedy.lisp"
     });
-    let mut common = domain.clone();
-    common.push("jobshop_common.lisp");
+    let mut base = domain.clone();
+    base.push("base.lisp");
 
-    let mut lambdas = domain;
-    lambdas.push("lambdas.lisp");
+    let mut jobshop = domain.clone();
+    jobshop.push("jobshop.lisp");
 
-    format!(
+    let domain = format!(
         "(begin
         (read \"{}\")
         (read \"{}\")
-        (read \"{}\")
-        (read \"{}\")
         (read \"{}\"))",
-        commands.to_str().unwrap(),
-        state_functions.to_str().unwrap(),
-        lambdas.to_str().unwrap(),
-        common.to_str().unwrap(),
-        om.to_str().unwrap()
-    )
-    .into()
+        base.to_str().unwrap(),
+        jobshop.to_str().unwrap(),
+        om.to_str().unwrap(),
+    );
+
+    //println!("{domain}");
+    domain.into()
 }

@@ -36,9 +36,10 @@ impl GobotConfig {
             .map(|t| {
                 match t {
                     GobotTechnique::Greedy => "",
-                    GobotTechnique::Advanced => "-a",
-                    GobotTechnique::Lrptf => "-l",
-                    GobotTechnique::Lptf => "",
+                    GobotTechnique::FA => "-f",
+                    GobotTechnique::Lrptf => "-L",
+                    GobotTechnique::Aries => "-a",
+                    GobotTechnique::AriesOpt => "-o",
                 }
                 .to_string()
             })
@@ -47,15 +48,17 @@ impl GobotConfig {
 }
 
 const GREEDY: &str = "greedy";
-const ADVANCED: &str = "advanced";
+const FA: &str = "fa";
 const LRPTF: &str = "lrptf";
-const LPTF: &str = "lptf";
+const ARIES: &str = "aries";
+const ARIES_OPT: &str = "aries-opt";
 
 pub enum GobotTechnique {
     Greedy,
-    Advanced,
+    FA,
     Lrptf,
-    Lptf,
+    Aries,
+    AriesOpt,
 }
 
 impl TryFrom<&str> for GobotTechnique {
@@ -64,9 +67,10 @@ impl TryFrom<&str> for GobotTechnique {
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
             GREEDY => Ok(Self::Greedy),
-            ADVANCED => Ok(Self::Advanced),
+            FA => Ok(Self::FA),
             LRPTF => Ok(Self::Lrptf),
-            LPTF => Ok(Self::Lptf),
+            ARIES => Ok(Self::Aries),
+            ARIES_OPT => Ok(Self::AriesOpt),
             t => Err(format!("{} is not a valid technique", t)),
         }
     }
@@ -79,9 +83,10 @@ impl Display for GobotTechnique {
             "{}",
             match self {
                 GobotTechnique::Greedy => GREEDY,
-                GobotTechnique::Advanced => ADVANCED,
+                GobotTechnique::FA => FA,
                 GobotTechnique::Lrptf => LRPTF,
-                GobotTechnique::Lptf => LPTF,
+                GobotTechnique::Aries => ARIES,
+                GobotTechnique::AriesOpt => ARIES_OPT,
             }
         )
     }

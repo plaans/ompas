@@ -304,13 +304,7 @@ impl Logger {
                 self.current_log_dir,
                 rp.to_str().unwrap()
             ),
-            Some(FileDescriptor::Directory(d)) => format!(
-                "{}/{}/{}/{}.txt",
-                DEFAULT_LOG_DIRECTORY,
-                self.current_log_dir,
-                d.to_str().unwrap(),
-                name
-            ),
+            Some(FileDescriptor::Directory(d)) => format!("{}/{}.txt", d.to_str().unwrap(), name),
             Some(FileDescriptor::Name(n)) => format!(
                 "{}/{}/{}.txt",
                 DEFAULT_LOG_DIRECTORY, self.current_log_dir, n

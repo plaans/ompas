@@ -121,7 +121,7 @@ pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
     let debug = task.to_string();
     let mut args = args.iter().map(|lv| lv.as_cst()).collect();
     let ctx = env.get_context::<ModRefinement>(MOD_REFINEMENT)?;
-    let supervisor = &ctx.acting_manager;
+    let acting_manager = &ctx.acting_manager;
 
     let pr = &env
         .get_context::<ModActingContext>(MOD_ACTING_CONTEXT)
@@ -129,10 +129,10 @@ pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
         .process_ref;
     let task_id: ActingProcessId = match pr {
         ProcessRef::Id(id) => {
-            if supervisor.get_kind(id).await == ProcessKind::Method {
-                supervisor
+            if acting_manager.get_kind(id).await == ProcessKind::Method {
+                acting_manager
                     .new_action(
-                        Label::Action(supervisor.get_number_subtask(*id).await),
+                        Label::Action(acting_manager.get_number_subtask(*id).await),
                         id,
                         args,
                         debug,
@@ -143,16 +143,16 @@ pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
                 panic!()
             }
         }
-        ProcessRef::Relative(id, labels) => match supervisor.get_id(pr.clone()).await {
+        ProcessRef::Relative(id, labels) => match acting_manager.get_id(pr.clone()).await {
             Some(id) => {
-                supervisor
+                acting_manager
                     .set_action_args(&id, args.drain(..).map(|c| c.unwrap()).collect())
                     .await;
                 id
             }
             None => match labels[0] {
                 Label::Action(s) => {
-                    supervisor
+                    acting_manager
                         .new_action(Label::Action(s), id, args, debug, ProcessOrigin::Execution)
                         .await
                 }
@@ -161,6 +161,7 @@ pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
         },
     };
 
+    acting_manager.set_start(&task_id, None).await;
     let sr: SelectResponse = select(task_id, env)
         .await
         .map_err(|e: LRuntimeError| e.chain("select"))?;

@@ -39,7 +39,7 @@ fn main() {
         .progress_chars("##-"),
     );
 
-    bar.println("GOBOT-SIM+RAE BENCHMARK v0.1");
+    bar.println("GOBOT-SIM+OMPAS BENCHMARK v0.2");
     //Installation of the last version of benchmark
     install_binary(config.get_bin_name(), config.bin_path.clone());
 
@@ -65,7 +65,7 @@ fn main() {
         for p in &mut problems {
             //println!("problem: {:#?}", p);
             //println!("parent:{:#?}", p.parent());
-            if p.parent().is_none() {
+            if p.parent().unwrap().parent().is_none() {
                 println!("gonna transform into a complete path");
                 let mut new_path = problem_path.clone();
                 new_path.push(p.clone());

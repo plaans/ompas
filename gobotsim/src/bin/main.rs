@@ -10,6 +10,7 @@ use ompas_middleware::{LogLevel, Master};
 use sompas_modules::advanced_math::ModAdvancedMath;
 use sompas_modules::io::ModIO;
 use sompas_modules::string::ModString;
+use sompas_modules::time::ModTime;
 use sompas_modules::utils::ModUtils;
 use sompas_repl::lisp_interpreter::{LispInterpreter, LispInterpreterConfig};
 use std::path::PathBuf;
@@ -71,6 +72,7 @@ async fn lisp_interpreter(opt: Opt) {
     li.import_namespace(ctx_io);
     li.import_namespace(ctx_math);
     li.import(ctx_string);
+    li.import_namespace(ModTime::new(2));
 
     if opt.godot {
         //li.import_namespace(CtxGodot::default());
@@ -78,7 +80,7 @@ async fn lisp_interpreter(opt: Opt) {
         let ctx_rae = ModMonitor::new(
             PlatformGobotSim::new(
                 LispDomain::File(opt.file.unwrap_or(
-                    "/home/jeremy/CLionProjects/ompas/gobotsim/acting_domain/domain.lisp".into(),
+                    "/home/jeremy/CLionProjects/ompas/gobotsim/test_domain/domain.lisp".into(),
                 )),
                 false,
                 LogClient::new(PLATFORM_CLIENT, LOG_TOPIC_PLATFORM).await,

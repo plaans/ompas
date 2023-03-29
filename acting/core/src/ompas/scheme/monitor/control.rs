@@ -179,7 +179,8 @@ impl From<ModControl> for LModule {
             DOC_ADD_TASK_TO_EXECUTE,
             false,
         );
-        module.add_async_fn(WAIT_TASK, wait_task, DOC_WAIT_TASK, false);
+        module.add_async_fn(_WAIT_TASK, _wait_task, DOC__WAIT_TASK, false);
+        module.add_lambda(WAIT_TASK, LAMBDA_WAIT_TASK, DOC_WAIT_TASK);
         module.add_async_fn(GET_TASK_ID, get_task_id, DOC_GET_TASK_ID, false);
         module.add_async_fn(CANCEL_TASK, cancel_task, DOC_CANCEL_TASK, false);
 
@@ -461,11 +462,11 @@ pub async fn add_task_to_execute(env: &LEnv, args: &[LValue]) -> Result<(), LRun
 }
 
 #[async_scheme_fn]
-pub async fn wait_task(env: &LEnv, task_id: usize) -> LResult {
+pub async fn _wait_task(env: &LEnv, task_id: usize) -> LResult {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
     let trigger: Option<TaskTrigger> = ctx.triggers.get_task(task_id).await;
     match trigger {
-        Some(trigger) => trigger.get_handle().get_future().await,
+        Some(trigger) => Ok(LValue::Handle(trigger.get_handle())),
         None => Err(LRuntimeError::new(
             WAIT_TASK,
             format!("{} is not the id of a triggered task", task_id),

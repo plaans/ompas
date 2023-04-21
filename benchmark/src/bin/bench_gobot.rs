@@ -35,6 +35,9 @@ pub struct Opt {
     #[structopt(short = "L", long = "lrpt")]
     lrpt: bool,
 
+    #[structopt(short = "r", long = "random")]
+    random: bool,
+
     #[structopt(short = "a", long = "aries")]
     aries: bool,
 
@@ -181,15 +184,15 @@ pub async fn lisp_interpreter(opt: Opt) {
     com.send(format!(
         "(export-stats gobot-sim_{}_{})",
         if opt.fa {
-            "advanced"
+            "fa"
         } else if opt.lrpt {
-            "lrpt"
+            "falrpt"
         } else if opt.aries {
             "aries"
         } else if opt.aries_opt {
             "aries_opt"
         } else {
-            "greedy"
+            "random"
         },
         problem_name
     ))
@@ -221,6 +224,8 @@ pub fn domain(opt: &Opt) -> LispDomain {
         "fa.lisp"
     } else if opt.lrpt {
         "falrpt.lisp"
+    } else if opt.aries_opt || opt.aries {
+        "aries.lisp"
     } else {
         "greedy.lisp"
     });

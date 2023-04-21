@@ -20,6 +20,7 @@ use sompas_structs::lswitch::new_interruption_handler;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalues::LValueS;
 use sompas_structs::{lruntimeerror, wrong_type};
+use std::time::Duration;
 
 pub struct ModState {
     pub state: WorldState,
@@ -53,6 +54,12 @@ impl From<ModState> for LModule {
         let mut module = LModule::new(m, MOD_STATE, DOC_MOD_STATE);
         module.add_async_fn(ASSERT, assert, DOC_ASSERT, false);
         module.add_async_fn(ASSERT_SHORT, assert, DOC_ASSERT_SHORT, false);
+        module.add_async_fn(
+            TRANSITIVE_ASSERT,
+            transitive_assert,
+            DOC_TRANSITIVE_ASSERT,
+            false,
+        );
         module.add_async_fn(RETRACT, retract, DOC_RETRACT, false);
         module.add_async_fn(RETRACT_SHORT, retract, DOC_RETRACT_SHORT, false);
         module.add_async_fn(READ_STATE, read_state, DOC_READ_STATE, false);
@@ -78,18 +85,38 @@ impl From<ModState> for LModule {
 
 ///Add a fact to fact state
 #[async_scheme_fn]
-async fn assert(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
+async fn assert(env: &LEnv, key: LValue, value: LValue) -> Result<(), LRuntimeError> {
     let state = env.get_context::<ModState>(MOD_STATE)?;
-    let key: LValue = if args.len() > 2 {
+    /*let key: LValue = if args.len() > 2 {
         args[0..args.len() - 1].into()
     } else {
         args[0].clone()
     };
-    let value = args.last().unwrap();
+    let value = args.last().unwrap();*/
     state
         .state
         .add_fact(key.try_into()?, value.try_into()?)
         .await;
+    Ok(())
+}
+
+#[async_scheme_fn]
+async fn transitive_assert(
+    env: &LEnv,
+    key: LValueS,
+    value: LValueS,
+    duration: f64,
+) -> Result<(), LRuntimeError> {
+    let state = env.get_context::<ModState>(MOD_STATE)?;
+    /*let key: LValue = if args.len() > 2 {
+        args[0..args.len() - 1].into()
+    } else {
+        args[0].clone()
+    };
+    let value = args.last().unwrap();*/
+    state.state.add_fact(key.clone(), UNKNOWN.into()).await;
+    tokio::time::sleep(Duration::from_micros((duration * 1_000_000.0) as u64)).await;
+    state.state.add_fact(key, value).await;
     Ok(())
 }
 

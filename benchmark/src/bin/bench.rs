@@ -118,12 +118,13 @@ fn main() {
                 .stdout(unsafe { Stdio::from_raw_fd(f1.into_raw_fd()) })
                 .stderr(unsafe { Stdio::from_raw_fd(f2.into_raw_fd()) });
             if !select.is_empty() {
-                command.arg(select);
+                command.args(select);
             }
-            //let debug = format!("{:?}", command);
+
+            //println!("{:?}", command);
             if let Ok(mut c) = command.spawn() {
                 bar.println(format!(
-                    "{} {} {}, config: {}",
+                    "{} {} {}, config: {:#?}",
                     "[benchmark]".bold().green(),
                     config.get_bin_name(),
                     problem.file_name().unwrap().to_str().unwrap(),

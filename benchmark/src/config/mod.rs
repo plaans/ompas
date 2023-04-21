@@ -30,11 +30,11 @@ pub struct BenchConfig {
 }
 
 pub trait GetSpecific {
-    fn get_specific(&self) -> Vec<String>;
+    fn get_specific(&self) -> Vec<Vec<String>>;
 }
 
 impl BenchConfig {
-    pub fn get_specific(&self) -> Vec<String> {
+    pub fn get_specific(&self) -> Vec<Vec<String>> {
         self.specific.get_specific()
     }
 
@@ -52,7 +52,7 @@ pub enum SpecificConfig {
 }
 
 impl GetSpecific for SpecificConfig {
-    fn get_specific(&self) -> Vec<String> {
+    fn get_specific(&self) -> Vec<Vec<String>> {
         match &self {
             SpecificConfig::Sim(s) => s.get_specific(),
             SpecificConfig::Gobot(s) => s.get_specific(),

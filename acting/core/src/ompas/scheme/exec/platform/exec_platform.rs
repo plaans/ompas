@@ -86,8 +86,7 @@ impl ExecPlatform {
             .as_ref()
             .unwrap()
             .send(request)
-            .await
-            .unwrap_or_else(|_| todo!());
+            .await;
     }
 
     pub async fn cancel_command(&self, command_id: usize) {

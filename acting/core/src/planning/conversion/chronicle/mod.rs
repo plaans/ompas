@@ -216,9 +216,14 @@ pub fn convert_into_chronicle(
         let result = fl.get_flow_result(&flow_id);
         let start = interval.get_start();
         let end = interval.get_end();
+        let duration = interval.get_duration();
 
         if start != end {
-            ch.add_constraint(Constraint::leq(start, end))
+            if let Some(duration) = duration {
+                ch.add_constraint(Constraint::eq(end, Computation::add(vec![start, duration])));
+            } else {
+                ch.add_constraint(Constraint::leq(start, end))
+            }
         }
 
         match flow.kind {
@@ -350,10 +355,6 @@ pub fn convert_into_chronicle(
                     Lit::Release(release) => {
                         let handle = fl.get_resource_handle(release).unwrap();
                         ht.add_release(handle, interval.get_end());
-                        /*ch.add_constraint(Constraint::eq(
-                            fl.get_flow_end(&handle),
-                            interval.get_end(),
-                        ));*/
                     }
                     Lit::Constraint(c) => match c.deref() {
                         Constraint::Arbitrary(set) => {
@@ -452,11 +453,13 @@ pub fn convert_into_chronicle(
                         }
 
                         ch.add_effect(effect);
-                        let eps = st.new_symbol(EPSILON);
-                        ch.add_constraint(Constraint::eq(
-                            interval.get_end(),
-                            Computation::add(vec![interval.get_start(), eps]),
-                        ));
+                        if duration.is_none() {
+                            let eps = st.new_symbol(EPSILON);
+                            ch.add_constraint(Constraint::eq(
+                                interval.get_end(),
+                                Computation::add(vec![interval.get_start(), eps]),
+                            ));
+                        }
 
                         let result = ch.st.new_nil();
                         st.union_var(&result, &result);

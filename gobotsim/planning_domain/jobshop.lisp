@@ -124,7 +124,7 @@
                                     ,?m
                                     (t_carry_to_machine ?r ,?p ,?m)))
                             (define tasks (append tasks (list last_task)))
-                            ;(print tasks)
+                            (print tasks)
                             `(apply seq ',tasks)))
                         (instances package)))
                (define h (apply par tasks)))))

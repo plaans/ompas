@@ -8,8 +8,8 @@ pub struct SimConfig {
 }
 
 impl GetSpecific for SimConfig {
-    fn get_specific(&self) -> Vec<String> {
-        self.get_techniques()
+    fn get_specific(&self) -> Vec<Vec<String>> {
+        self.get_techniques().drain(..).map(|t| vec![t]).collect()
     }
 }
 

@@ -150,6 +150,9 @@ pub mod exec {
         pub const ASSERT_SHORT: &str = "+>";
         pub const DOC_ASSERT_SHORT: &str = "Short version of assert.";
 
+        pub const TRANSITIVE_ASSERT: &str = "transitive_assert";
+        pub const DOC_TRANSITIVE_ASSERT: &str= "Update of a fact that takes a given duration. During the transition, the fact is considered as unknown.";
+
         pub const RETRACT: &str = "retract";
         pub const DOC_RETRACT: &str = "Remove a fact from the inner world.";
 
@@ -196,6 +199,8 @@ pub mod exec {
         pub const DYNAMIC: &str = "dynamic";
         pub const INNER_STATIC: &str = "inner_static";
         pub const INNER_DYNAMIC: &str = "inner_dynamic";
+
+        pub const UNKNOWN: &str = "unk";
     }
 
     pub mod acting_context {

@@ -20,13 +20,14 @@ use ompas_language::exec::platform::EXEC_COMMAND;
 use ompas_language::exec::refinement::EXEC_TASK;
 use ompas_language::exec::resource::RELEASE;
 use ompas_language::exec::state::{
-    ASSERT, ASSERT_SHORT, INSTANCE, INSTANCES, READ_STATE, WAIT_FOR,
+    ASSERT, ASSERT_SHORT, INSTANCE, INSTANCES, READ_STATE, TRANSITIVE_ASSERT, WAIT_FOR,
 };
 use ompas_language::exec::ARBITRARY;
 use ompas_language::supervisor::ACQUIRE;
 use ompas_language::sym_table::{TYPE_OBJECT, TYPE_OBJECT_TYPE, TYPE_RESSOURCE_HANDLE};
-use sompas_language::basic_math::{ADD, EQ, GEQ, GT, LEQ, LT, NEQ, NOT, NOT_SHORT, SUB};
+use sompas_language::basic_math::{ADD, DIV, EQ, GEQ, GT, LEQ, LT, MUL, NEQ, NOT, NOT_SHORT, SUB};
 use sompas_language::error::IS_ERR;
+use sompas_language::io::PRINT;
 use sompas_language::time::SLEEP;
 use sompas_language::utils::{AND, OR};
 use sompas_structs::lruntimeerror::LRuntimeError;
@@ -64,6 +65,7 @@ impl Default for ApplyConversionCollection {
         d.add_conversion(EXEC_TASK, convert_exec);
         d.add_conversion(ASSERT, convert_assert);
         d.add_conversion(ASSERT_SHORT, convert_assert);
+        d.add_conversion(TRANSITIVE_ASSERT, convert_transitive_assert);
         d.add_conversion(READ_STATE, convert_read_state);
         d.add_conversion(EQ, convert_eq);
         d.add_conversion(LEQ, convert_leq);
@@ -82,6 +84,8 @@ impl Default for ApplyConversionCollection {
         d.add_conversion(RELEASE, convert_release);
         d.add_conversion(ADD, convert_add);
         d.add_conversion(SUB, convert_sub);
+        d.add_conversion(MUL, convert_mul);
+        d.add_conversion(DIV, convert_div);
         d.add_conversion(INSTANCE, convert_instance);
         d.add_conversion(INSTANCES, convert_instances);
         d.add_conversion(ARBITRARY, convert_arbitrary);
@@ -89,6 +93,7 @@ impl Default for ApplyConversionCollection {
         d.add_conversion(CTX_EXEC_TASK, convert_ctx_exec_task);
         d.add_conversion(CTX_EXEC_COMMAND, convert_ctx_exec_command);
         d.add_conversion(CTX_ACQUIRE, convert_ctx_acquire);
+        d.add_conversion(PRINT, convert_print);
         d
     }
 }
@@ -163,7 +168,7 @@ fn convert_exec(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRun
     let flow_result = fl.get_flow_result(&flow_apply);
 
     fl.st.set_domain(&flow_result, Domain::nil());
-    seq.push(fl.new_wait(None));
+    seq.push(fl.new_assignment(fl.st.new_nil()));
     seq.push(flow_apply);
     Ok(fl.new_seq(seq))
 }
@@ -188,6 +193,25 @@ fn convert_assert(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LR
 
     fl.st
         .set_domain(&fl.get_flow_result(&flow_apply), Domain::nil());
+    seq.push(flow_apply);
+    Ok(fl.new_seq(seq))
+}
+
+fn convert_transitive_assert(
+    fl: &mut FlowGraph,
+    mut seq: Vec<FlowId>,
+) -> Result<FlowId, LRuntimeError> {
+    seq.remove(0);
+    let duration = seq.pop().unwrap();
+
+    let flow_apply = fl.new_assignment(Lit::Write(
+        seq.iter().map(|f| fl.get_flow_result(f)).collect(),
+    ));
+
+    fl.st
+        .set_domain(&fl.get_flow_result(&flow_apply), Domain::nil());
+    fl.set_duration(&flow_apply, fl.get_flow_result(&duration));
+    seq.push(duration);
     seq.push(flow_apply);
     Ok(fl.new_seq(seq))
 }
@@ -328,8 +352,30 @@ fn convert_sub(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRunt
     Ok(fl.new_seq(seq))
 }
 
+fn convert_mul(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
+    seq.remove(0);
+
+    let args: Vec<VarId> = seq.iter().map(|f| fl.get_flow_result(f)).collect();
+
+    let flow_apply = fl.new_instantaneous_assignment(Lit::computation(Computation::mul(args)));
+
+    seq.push(flow_apply);
+    Ok(fl.new_seq(seq))
+}
+
+fn convert_div(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
+    seq.remove(0);
+
+    let args: Vec<VarId> = seq.iter().map(|f| fl.get_flow_result(f)).collect();
+
+    let flow_apply = fl.new_instantaneous_assignment(Lit::computation(Computation::div(args)));
+
+    seq.push(flow_apply);
+    Ok(fl.new_seq(seq))
+}
+
 fn convert_wait_for(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
-    seq[0] = fl.new_wait(None);
+    seq[0] = fl.new_assignment(fl.st.new_nil());
     let last = fl.get_flow_result(&seq.last().unwrap());
     fl.st.set_domain(&fl.st.get_domain_id(&last), True);
     let nil = fl.st.new_nil();
@@ -393,11 +439,15 @@ fn convert_arbitrary(fl: &mut FlowGraph, seq: Vec<FlowId>) -> Result<FlowId, LRu
 
 fn convert_sleep(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
     seq.remove(0);
-    let wait = fl.new_wait(Some(fl.get_flow_result(&seq.last().unwrap())));
+    /*let wait = fl.new_wait(Some(fl.get_flow_result(&seq.last().unwrap())));
     seq.push(wait);
     let nil = fl.st.new_nil();
     let r = fl.new_instantaneous_assignment(nil);
-    seq.push(r);
+    seq.push(r);*/
+
+    let sleep = fl.new_assignment(fl.st.new_nil());
+    fl.set_duration(&sleep, fl.get_flow_result(&seq.last().unwrap()));
+    seq.push(sleep);
 
     Ok(fl.new_seq(seq))
 }
@@ -541,5 +591,10 @@ fn convert_ctx_acquire(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowI
     let flow_id = convert_acquire(fl, seq)?;
     let flow_acquire = fl.try_get_last_flow(&flow_id).unwrap();
     fl.set_label(&flow_acquire, Label::Acquire(index as usize));
+    Ok(flow_id)
+}
+
+fn convert_print(fl: &mut FlowGraph, _: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
+    let flow_id = fl.new_instantaneous_assignment(fl.st.new_nil());
     Ok(flow_id)
 }

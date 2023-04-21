@@ -1,6 +1,5 @@
 //modules of the crate
 pub mod language;
-pub mod mod_godot;
 pub mod platform;
 mod platform_server;
 pub mod serde;

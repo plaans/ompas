@@ -9,10 +9,14 @@ pub struct GobotConfig {
 }
 
 impl GetSpecific for GobotConfig {
-    fn get_specific(&self) -> Vec<String> {
-        let mut techniques = self.get_techniques();
+    fn get_specific(&self) -> Vec<Vec<String>> {
+        let mut techniques: Vec<Vec<String>> = self
+            .get_techniques()
+            .drain(..)
+            .map(|t| vec![t.to_string()])
+            .collect();
         if self.view {
-            let _ = techniques.iter_mut().map(|t| t.push_str(" -v"));
+            techniques.iter_mut().for_each(|t| t.push("-v".to_string()));
         }
         techniques
     }
@@ -35,7 +39,7 @@ impl GobotConfig {
             .iter()
             .map(|t| {
                 match t {
-                    GobotTechnique::Greedy => "",
+                    GobotTechnique::Greedy => "-r",
                     GobotTechnique::FA => "-f",
                     GobotTechnique::Lrptf => "-L",
                     GobotTechnique::Aries => "-a",

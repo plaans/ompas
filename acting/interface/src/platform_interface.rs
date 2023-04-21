@@ -1,4 +1,3 @@
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct StateVariable {
     #[prost(enumeration = "StateVariableType", tag = "1")]
@@ -10,13 +9,11 @@ pub struct StateVariable {
     #[prost(message, optional, tag = "4")]
     pub value: ::core::option::Option<Expression>,
 }
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct StateUpdate {
     #[prost(message, repeated, tag = "1")]
     pub state_variables: ::prost::alloc::vec::Vec<StateVariable>,
 }
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Atom {
     #[prost(oneof = "atom::Kind", tags = "1, 2, 3, 4")]
@@ -24,7 +21,6 @@ pub struct Atom {
 }
 /// Nested message and enum types in `Atom`.
 pub mod atom {
-    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Kind {
         #[prost(string, tag = "1")]
@@ -37,7 +33,6 @@ pub mod atom {
         Boolean(bool),
     }
 }
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Expression {
     /// For instance `3`, `+`, `kitchen`, `at-robot`, ...
@@ -49,7 +44,6 @@ pub struct Expression {
     #[prost(message, repeated, tag = "2")]
     pub list: ::prost::alloc::vec::Vec<Expression>,
 }
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CommandRequest {
     #[prost(oneof = "command_request::Request", tags = "1, 2")]
@@ -57,7 +51,6 @@ pub struct CommandRequest {
 }
 /// Nested message and enum types in `CommandRequest`.
 pub mod command_request {
-    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Request {
         #[prost(message, tag = "1")]
@@ -66,7 +59,6 @@ pub mod command_request {
         Cancel(super::CommandCancelRequest),
     }
 }
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CommandExecutionRequest {
     #[prost(message, repeated, tag = "1")]
@@ -74,13 +66,11 @@ pub struct CommandExecutionRequest {
     #[prost(uint64, tag = "2")]
     pub command_id: u64,
 }
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CommandCancelRequest {
     #[prost(uint64, tag = "1")]
     pub command_id: u64,
 }
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CommandResponse {
     #[prost(oneof = "command_response::Response", tags = "1, 2, 3, 4, 5")]
@@ -88,7 +78,6 @@ pub struct CommandResponse {
 }
 /// Nested message and enum types in `CommandResponse`.
 pub mod command_response {
-    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Response {
         #[prost(message, tag = "1")]
@@ -103,19 +92,16 @@ pub mod command_response {
         Cancelled(super::CommandCancelled),
     }
 }
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CommandRejected {
     #[prost(uint64, tag = "1")]
     pub command_id: u64,
 }
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CommandAccepted {
     #[prost(uint64, tag = "1")]
     pub command_id: u64,
 }
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CommandProgress {
     #[prost(uint64, tag = "1")]
@@ -123,7 +109,6 @@ pub struct CommandProgress {
     #[prost(double, tag = "2")]
     pub progress: f64,
 }
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CommandResult {
     #[prost(uint64, tag = "1")]
@@ -131,7 +116,6 @@ pub struct CommandResult {
     #[prost(bool, tag = "2")]
     pub result: bool,
 }
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CommandCancelled {
     #[prost(uint64, tag = "1")]
@@ -139,10 +123,8 @@ pub struct CommandCancelled {
     #[prost(bool, tag = "2")]
     pub result: bool,
 }
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct InitGetUpdate {}
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Event {
     #[prost(oneof = "event::Event", tags = "1, 2")]
@@ -150,7 +132,6 @@ pub struct Event {
 }
 /// Nested message and enum types in `Event`.
 pub mod event {
-    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Event {
         #[prost(message, tag = "1")]
@@ -159,7 +140,6 @@ pub mod event {
         Resource(super::Resource),
     }
 }
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Instance {
     #[prost(string, tag = "1")]
@@ -167,7 +147,6 @@ pub struct Instance {
     #[prost(string, tag = "2")]
     pub object: ::prost::alloc::string::String,
 }
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Resource {
     #[prost(string, tag = "1")]
@@ -177,7 +156,6 @@ pub struct Resource {
     #[prost(uint64, tag = "3")]
     pub quantity: u64,
 }
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PlatformUpdate {
     #[prost(oneof = "platform_update::Update", tags = "1, 2")]
@@ -185,7 +163,6 @@ pub struct PlatformUpdate {
 }
 /// Nested message and enum types in `PlatformUpdate`.
 pub mod platform_update {
-    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Update {
         #[prost(message, tag = "1")]
@@ -211,14 +188,6 @@ impl StateVariableType {
             StateVariableType::Dynamic => "DYNAMIC",
         }
     }
-    /// Creates an enum from field names used in the ProtoBuf definition.
-    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
-        match value {
-            "STATIC" => Some(Self::Static),
-            "DYNAMIC" => Some(Self::Dynamic),
-            _ => None,
-        }
-    }
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
@@ -235,14 +204,6 @@ impl ResourceKind {
         match self {
             ResourceKind::Unary => "Unary",
             ResourceKind::Divisible => "Divisible",
-        }
-    }
-    /// Creates an enum from field names used in the ProtoBuf definition.
-    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
-        match value {
-            "Unary" => Some(Self::Unary),
-            "Divisible" => Some(Self::Divisible),
-            _ => None,
         }
     }
 }
@@ -365,10 +326,10 @@ pub mod platform_interface_client {
 pub mod platform_interface_server {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
-    /// Generated trait containing gRPC methods that should be implemented for use with PlatformInterfaceServer.
+    ///Generated trait containing gRPC methods that should be implemented for use with PlatformInterfaceServer.
     #[async_trait]
     pub trait PlatformInterface: Send + Sync + 'static {
-        /// Server streaming response type for the GetUpdates method.
+        ///Server streaming response type for the GetUpdates method.
         type GetUpdatesStream: futures_core::Stream<
                 Item = Result<super::PlatformUpdate, tonic::Status>,
             >
@@ -378,7 +339,7 @@ pub mod platform_interface_server {
             &self,
             request: tonic::Request<super::InitGetUpdate>,
         ) -> Result<tonic::Response<Self::GetUpdatesStream>, tonic::Status>;
-        /// Server streaming response type for the SendCommands method.
+        ///Server streaming response type for the SendCommands method.
         type SendCommandsStream: futures_core::Stream<
                 Item = Result<super::CommandResponse, tonic::Status>,
             >

@@ -9,6 +9,31 @@ use std::fmt::{Display, Formatter};
 
 pub mod platform_interface;
 
+impl From<String> for Atom {
+    fn from(value: String) -> Self {
+        Atom {
+            kind: Some(Kind::Symbol(value)),
+        }
+    }
+}
+
+impl From<f64> for Atom {
+    fn from(value: f64) -> Self {
+        Atom {
+            kind: Some(Kind::Float(value)),
+        }
+    }
+}
+
+impl From<Atom> for Expression {
+    fn from(value: Atom) -> Self {
+        Expression {
+            atom: Some(value),
+            list: vec![],
+        }
+    }
+}
+
 impl TryFrom<LValueS> for Atom {
     type Error = ();
 

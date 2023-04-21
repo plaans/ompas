@@ -2,6 +2,7 @@ use crate::serde::{
     GodotMessageSerde, GodotMessageSerdeData, GodotMessageType, SerdeCancelRequest, SerdeCommand,
 };
 use crate::PROCESS_TOPIC_GOBOT_SIM;
+use im::HashSet;
 use ompas_core::ompas::manager::state::partial_state::PartialState;
 use ompas_interface::platform_interface::command_request::Request;
 use ompas_interface::platform_interface::{
@@ -15,6 +16,7 @@ use ompas_middleware::ProcessInterface;
 use sompas_structs::lvalues::LValueS;
 use std::convert::TryFrom;
 use std::convert::TryInto;
+use std::fmt::{Display, Formatter};
 use std::net::SocketAddr;
 use tokio::io::{self, AsyncReadExt, AsyncWriteExt, BufReader, ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
@@ -155,6 +157,8 @@ async fn async_read_socket(
     )
     .await;
 
+    let mut global = Global::default();
+
     let mut buf_reader = BufReader::new(stream);
 
     let mut buf = [0; BUFFER_SIZE];
@@ -200,96 +204,26 @@ async fn async_read_socket(
                     match message._type {
                         GodotMessageType::StaticState => {
                             let temps_state: PartialState = PartialState::try_from(message).unwrap();
-                                    let mut state_variables = vec![];
-                                    for (k, v) in &temps_state.inner {
-                                        match k {
-                                            LValueS::List(list) => {
-                                                let mut list = list.clone();
-                                                let state_function = list.remove(0);
-                                                let mut parameters: Vec<Atom> = vec![];
-                                                for e in list.drain(..) {
-                                                    parameters.push(e.try_into().unwrap())
-                                                }
 
-                                                let state_function = state_function.to_string();
-                                                if state_function.contains(".instance") {
-                                                    let obj_label = parameters[0].to_string();
-                                                    let instance = Instance {
-                                                        r#type: v.to_string(),
-                                                        object: obj_label.to_string()
-                                                    };
-                                                    if state_update_sender.send(instance.into()).is_err()
-                                                    {
-                                                        process.kill(PROCESS_TOPIC_PLATFORM).await;
-                                                        //process.die().await;
-                                                        break 'outer;
-                                                    }
-                                                    let resource: Resource = Resource {
-                                                            label: obj_label.to_string(),
-                                                            resource_kind: ResourceKind::Unary.into(),
-                                                            quantity: 0
-                                                    };
-
-                                                    if state_update_sender.send(resource.into()).is_err()
-                                                    {
-                                                        process.kill(PROCESS_TOPIC_PLATFORM).await;
-                                                        //process.die().await;
-                                                        break 'outer;
-                                                    }
-
-                                         };
-
-                                                state_variables.push(StateVariable {
-                                                    r#type: StateVariableType::Static.into(),
-                                                    state_function,
-                                                    parameters,
-                                                    value: Some(v.clone().try_into().unwrap())
-                                                })
-                                            }
-                                    _=> todo!()
-                                        }
-                                    }
-
-                                    if state_update_sender.send(StateUpdate {
-                                        state_variables
-                                    }.into()).is_err()
-                                    {
-                                        process.kill(PROCESS_TOPIC_PLATFORM).await;
-                                        //process.die().await;
-                                        break 'outer;
-                                    }
+                            let updates = post_process_state(temps_state, StateVariableType::Static, &mut global);
+                            for update in updates {
+                                if state_update_sender.send(update).is_err()
+                                {
+                                    process.kill(PROCESS_TOPIC_PLATFORM).await;
+                                    break 'outer;
+                                }
+                            }
                         }
                         GodotMessageType::DynamicState => {
                             let temps_state: PartialState = PartialState::try_from(message).unwrap();
-                            let mut state_variables = vec![];
-                            for (k, v) in &temps_state.inner {
-                                match k {
-                                    LValueS::List(list) => {
-                                        let mut list = list.clone();
-                                        let state_function = list.remove(0);
-                                        let mut parameters: Vec<Atom> = vec![];
-                                                for e in list.drain(..) {
-                                            parameters.push(e.try_into().unwrap())
-                                        }
-
-                                                 state_variables.push(StateVariable {
-                                            r#type: StateVariableType::Dynamic.into(),
-                                            state_function: state_function.to_string(),
-                                            parameters,
-                                            value: Some(v.clone().try_into().unwrap())
-                                        })
-                                            }
-                                    _ => todo!()
-                                        }
-                                    }
-                                    if state_update_sender.send(StateUpdate {
-                                        state_variables
-                                    }.into()).is_err()
-                                    {
-                                        process.kill(PROCESS_TOPIC_PLATFORM).await;
-                                        //process.die().await;
-                                        break 'outer;
-                                    }
+                            let updates = post_process_state(temps_state, StateVariableType::Dynamic, &mut global);
+                            for update in updates {
+                                if state_update_sender.send(update).is_err()
+                                {
+                                    process.kill(PROCESS_TOPIC_PLATFORM).await;
+                                    break 'outer;
+                                }
+                            }
                         },
                         GodotMessageType::ActionResponse => {
                             if let GodotMessageSerdeData::ActionResponse(ar) = message.data {
@@ -383,6 +317,195 @@ async fn async_read_socket(
             }
         }
     }
+}
+
+const LOCATION_TILE: &str = "location_tile";
+const TILE_PREFIX: &str = "tile";
+
+const TRAVEL_DISTANCE: &str = "travel_distance";
+const TRAVEL_TIME: &str = "travel_time";
+
+#[derive(Eq, Hash, PartialEq, Clone)]
+struct Tile {
+    x: i64,
+    y: i64,
+}
+
+impl Display for Tile {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}_{}_{}", TILE_PREFIX, self.x, self.y)
+    }
+}
+
+#[derive(Default)]
+struct Global {
+    tiles: HashSet<Tile>,
+}
+
+fn post_process_state(
+    state: PartialState,
+    r#type: StateVariableType,
+    global: &mut Global,
+) -> Vec<PlatformUpdate> {
+    fn update_tiles(new: Tile, tiles: &mut HashSet<Tile>) -> Vec<StateVariable> {
+        let mut state_variables = vec![];
+
+        if !tiles.contains(&new) {
+            for tile in tiles.iter() {
+                let distance: f64 =
+                    ((new.x - tile.x).pow(2) as f64 + (new.y - tile.y).pow(2) as f64).sqrt();
+
+                state_variables.push(StateVariable {
+                    r#type: StateVariableType::Static.into(),
+                    state_function: TRAVEL_DISTANCE.to_string(),
+                    parameters: vec![tile.to_string().into(), new.to_string().clone().into()],
+                    value: Some(Atom::from(distance).into()),
+                });
+                state_variables.push(StateVariable {
+                    r#type: StateVariableType::Static.into(),
+                    state_function: TRAVEL_TIME.to_string(),
+                    parameters: vec![new.to_string().into(), tile.to_string().into()],
+                    value: Some(Atom::from(distance).into()),
+                });
+            }
+            tiles.insert(new);
+        }
+
+        state_variables
+    }
+
+    let mut updates = vec![];
+    let mut state_variables = vec![];
+    for (k, v) in &state.inner {
+        match k {
+            LValueS::List(list) => {
+                let mut list = list.clone();
+                let state_function = list.remove(0);
+                let mut parameters: Vec<Atom> = vec![];
+                for e in list.drain(..) {
+                    parameters.push(e.try_into().unwrap())
+                }
+
+                let state_function = state_function.to_string();
+                if state_function.contains(".instance") {
+                    let obj_label = parameters[0].to_string();
+                    let instance = Instance {
+                        r#type: v.to_string(),
+                        object: obj_label.to_string(),
+                    };
+
+                    //Creation of a new instance
+                    updates.push(instance.into());
+                    let resource: Resource = Resource {
+                        label: obj_label.to_string(),
+                        resource_kind: ResourceKind::Unary.into(),
+                        quantity: 0,
+                    };
+
+                    //Creation of a unary resource corresponding to the instance.
+                    updates.push(resource.into());
+                };
+
+                //Create synthetic task to represent tile position of belts, robots and machines
+                if state_function.contains(".coordinates_tile") {
+                    //coordinates_tile is a pair of coordinates
+                    let coordinates: Vec<LValueS> = v.try_into().unwrap();
+                    let tile = Tile {
+                        x: (&coordinates[0]).try_into().unwrap(),
+                        y: (&coordinates[1]).try_into().unwrap(),
+                    };
+
+                    let value = tile.to_string();
+
+                    state_variables.append(&mut update_tiles(tile, &mut global.tiles));
+
+                    state_variables.push(StateVariable {
+                        r#type: r#type.into(),
+                        state_function: LOCATION_TILE.to_string(),
+                        parameters: parameters.clone(),
+                        value: Some(LValueS::from(value).try_into().unwrap()),
+                    })
+                }
+
+                //Computation of a median tile for an area
+                if state_function.contains(".cells") {
+                    let mut cells: Vec<LValueS> = v.try_into().unwrap();
+                    let cells: Vec<(i64, i64)> = cells
+                        .drain(..)
+                        .map(|val| {
+                            let coordinates: Vec<LValueS> = (&val).try_into().unwrap();
+                            (
+                                (&coordinates[0]).try_into().unwrap(),
+                                (&coordinates[1]).try_into().unwrap(),
+                            )
+                        })
+                        .collect();
+
+                    //computation of the geometric center
+                    let mut median_x = 0;
+                    let mut median_y = 0;
+
+                    for cell in cells.iter() {
+                        median_x += cell.0;
+                        median_y += cell.1;
+                    }
+
+                    median_x = median_x / cells.len() as i64;
+                    median_y = median_y / cells.len() as i64;
+
+                    //finding the closest point;
+                    let mut shortest_distance = None;
+                    let mut closest_cell = None;
+                    for cell in cells.iter() {
+                        let d: i64 = (cell.0 - median_x).pow(2) + (cell.1 - median_y).pow(2);
+                        if closest_cell.is_none() {
+                            closest_cell = Some(cell);
+                            shortest_distance = Some(d);
+                        } else if let Some(sd) = shortest_distance {
+                            if sd > d {
+                                closest_cell = Some(cell);
+                                shortest_distance = Some(d);
+                            }
+                        }
+                    }
+
+                    let cell = closest_cell.unwrap();
+
+                    let tile = Tile {
+                        x: cell.0,
+                        y: cell.1,
+                    };
+
+                    let value = tile.to_string();
+
+                    state_variables.append(&mut update_tiles(tile, &mut global.tiles));
+
+                    state_variables.push(StateVariable {
+                        r#type: r#type.into(),
+                        state_function: LOCATION_TILE.to_string(),
+                        parameters: parameters.clone(),
+                        value: Some(LValueS::from(value).try_into().unwrap()),
+                    })
+                }
+
+                //Post processing to create synthetic function that return the travel-time between two positions.
+
+                state_variables.push(StateVariable {
+                    r#type: r#type.into(),
+                    state_function,
+                    parameters,
+                    value: Some(v.clone().try_into().unwrap()),
+                })
+            }
+            _ => {
+                todo!()
+            }
+        }
+    }
+
+    updates.push(StateUpdate { state_variables }.into());
+
+    updates
 }
 
 /// Transforms slice of u8 (received characters) into a usize giving the size of the following message.

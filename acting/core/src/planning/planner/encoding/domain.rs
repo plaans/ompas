@@ -25,7 +25,7 @@ use aries::core::{IntCst, Lit as aLit, INT_CST_MAX, INT_CST_MIN};
 use aries::model::extensions::Shaped;
 use aries::model::lang::linear::{LinearSum, LinearTerm};
 use aries::model::lang::{
-    Atom as aAtom, ConversionError, FAtom, FVar, IVar, Type as aType, Variable,
+    Atom as aAtom, Atom, ConversionError, FAtom, FVar, IAtom, IVar, Type as aType, Variable,
 };
 use aries::model::symbols::SymbolTable;
 use aries::model::types::TypeHierarchy;
@@ -287,6 +287,105 @@ fn convert_constraint(
                             let var: VarId = var.try_into().expect("");
                             variables.push((if i == 0 { 1 } else { -1 }, get_atom(&var, ctx)))
                         }
+                    }
+                    //Only supported for multiplication by a constant
+                    Computation::Mul(mul) => {
+                        let mut num = 1;
+                        let mut denom = 1;
+                        let mut iatom: Option<IAtom> = None;
+                        for v in mul {
+                            let v: VarId = v.try_into().expect("");
+                            let atom = get_atom(&v, ctx);
+                            match atom {
+                                Atom::Int(i) => {
+                                    if i.var == IVar::ZERO {
+                                        num *= i.shift;
+                                    } else if iatom.is_none() {
+                                        iatom = Some(i);
+                                    } else {
+                                        panic!(
+                                            "Multiplication between variables not supported yet."
+                                        )
+                                    }
+                                }
+                                Atom::Fixed(f) => {
+                                    denom *= f.denom;
+                                    if f.num.var == IVar::ZERO {
+                                        num *= f.num.shift;
+                                    } else if iatom.is_none() {
+                                        iatom = Some(f.num)
+                                    } else {
+                                        panic!(
+                                            "Multiplication between variables not supported yet."
+                                        )
+                                    }
+                                }
+                                _ => {
+                                    todo!()
+                                }
+                            }
+                        }
+
+                        let iatom = iatom.unwrap_or(IAtom::new(IVar::ZERO, 1));
+
+                        let atom = if denom != 1 {
+                            Atom::Fixed(FAtom::new(iatom, denom))
+                        } else {
+                            Atom::Int(iatom)
+                        };
+
+                        variables.push((num, atom))
+                    }
+                    //Only supported for division by a constant
+                    Computation::Div(div) => {
+                        let mut num = 1;
+                        let mut denom = 1;
+                        let mut iatom: Option<IAtom> = None;
+                        for (i, v) in div.iter().enumerate() {
+                            let v: VarId = v.try_into().expect("");
+                            let atom = get_atom(&v, ctx);
+                            if i == 0 {
+                                match atom {
+                                    Atom::Int(i) => iatom = Some(i),
+                                    Atom::Fixed(f) => {
+                                        iatom = Some(f.num);
+                                        denom *= f.denom;
+                                    }
+                                    _ => panic!(),
+                                }
+                            } else {
+                                match atom {
+                                    Atom::Int(i) => {
+                                        if i.var == IVar::ZERO {
+                                            denom *= i.shift;
+                                        } else {
+                                            panic!("Variables as denominator is not supported.")
+                                        }
+                                    }
+                                    Atom::Fixed(f) => {
+                                        num *= f.denom;
+                                        if f.num.var == IVar::ZERO {
+                                            denom *= f.num.shift;
+                                        } else {
+                                            panic!("Variables as denominator is not supported.")
+                                        }
+                                    }
+                                    _ => {
+                                        panic!()
+                                    }
+                                }
+                            }
+                        }
+
+                        let iatom = iatom.unwrap_or(IAtom::new(IVar::ZERO, 1));
+
+                        let atom = if denom != 1 {
+                            Atom::Fixed(FAtom::new(iatom, denom))
+                        } else {
+                            Atom::Int(iatom)
+                        };
+
+                        variables.push((num, atom))
                     }
                 }
 

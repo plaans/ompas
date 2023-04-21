@@ -1,8 +1,26 @@
 (begin
     ;types declaration
-    (def-types machine robot package belt parking_area interact_area)
+    (def-types machine robot package belt (parking_area interact_area area) tile)
+
+
+
+    ;globals
+    (def-static-state-function globals.robot_default_battery_capacity (:result float))
+    (def-static-state-function globals.robot_battery_charge_rate (:result float))
+    (def-static-state-function globals.robot_battery_drain_rate (:result float))
+    (def-static-state-function globals.robot_battery_drain_rate_idle (:result float))
+    (def-static-state-function globals.robot_standard_velocity (:result float))
+    (def-static-state-function globals.robot_battery_charge_rate_percentage (:result float))
+    (def-static-state-function globals.robot_battery_drain_rate_percentage (:result float))
+    (def-static-state-function globals.robot_battery_drain_rate_idle_percentage (:result float))
+
+    ;synthetic state functions
+    (def-static-state-function travel_distance (:params (?t1 tile) (?t2 tile))(:result float))
+    (def-static-state-function position_tile (:params object) (:result tile))
+
 
     ;state function declaration
+    ;robot state functions
     (def-state-function robot.coordinates (:params (?r robot)) (:result (tuple int int)))
     (def-static-state-function robot.instance (:params (?r robot)) (:result symbol))
     (def-state-function robot.coordinates_tile (:params (?r robot)) (:result (tuple int int)))
@@ -11,6 +29,12 @@
     (def-state-function robot.rotation_speed (:params (?r robot)) (:result float))
     (def-state-function robot.in_station (:params (?r robot)) (:result bool))
     (def-state-function robot.in_interact_areas (:params (?r robot)) (:result (list interact_area)))
+    (def-static-state-function robot.default_velocity (:params (?r robot)) (:result int))
+    (def-static-state-function robot.drain_rate (:params (?r robot)) (:result float))
+    (def-static-state-function robot.recharge_rate (:params (?r robot)) (:result float))
+    (def-state-function robot.closest_area (:params (?r robot)) (:result area))
+    
+    ;machine state functions
     (def-static-state-function machine.instance (:params (?m machine)) (:result  symbol))
     (def-static-state-function machine.coordinates (:params (?m machine)) (:result (tuple int int)))
     (def-static-state-function machine.coordinates_tile (:params (?m machine)) (:result (tuple int int)))
@@ -20,19 +44,28 @@
     (def-static-state-function machine.type (:params (?m machine)) (:result symbol))
     (def-state-function machine.progress_rate (:params (?m machine)) (:result float))
     (def-state-function machine.package_processed (:params (?m machine)) (:result package))
+    
+    ;package state function
     (def-static-state-function package.instance (:params (?p package)) (:result symbol))
     (def-state-function package.location (:params (?p package)) (:result symbol))
     (def-state-function package.processes_list (:params (?p package)) (:result (list (tuple int float))))
     (def-static-state-function package.all_processes (:params (?p package)) (:result (list (tuple int float))))
+    (def-state-function package.closest_interact_area (:params (?p package)) (:result interact_area))
+    
+    ;belt state function
     (def-static-state-function belt.instance (:params (?b belt)) (:result symbol))
     (def-static-state-function belt.belt_type (:params (?b belt)) (:result symbol))
     (def-static-state-function belt.polygons (:params (?b belt)) (:result (list (tuple int int))))
     (def-static-state-function belt.cells (:params (?b belt)) (:result (list (tuple int int))))
     (def-static-state-function belt.interact_areas (:params (?b belt)) (:result (list interact_area)))
     (def-state-function belt.packages_list (:params (?b belt)) (:result (list package)))
+    
+    ;parking_area state functions
     (def-static-state-function parking_area.instance (:params (?pa parking_area)) (:result symbol))
     (def-static-state-function parking_area.polygons (:params (?pa parking_area)) (:result (list (tuple int int))))
     (def-static-state-function parking_area.cells (:params (?pa parking_area)) (:result (list (tuple int int))))
+    
+    ;interact_areas state functions
     (def-static-state-function interact_area.instance (:params (?pa parking_area)) (:result symbol))
     (def-static-state-function interact_area.polygons (:params (?pa parking_area)) (:result (list (tuple int int))))
     (def-static-state-function interact_area.cells (:params (?pa parking_area)) (:result (list (tuple int int))))

@@ -6,12 +6,13 @@
         (:pre-conditions true)
         (:score 0)
         (:body 
-            (do
-                (define h_m (acquire ?m))
-                (define h_r (acquire-in-list (instances robot)))
-                (define ?r (first h_r))
+            (begin
+                (define ?r (arbitrary (instances robot) rand-element))
+                (define h1 (acquire ?m))
+                (define h2 (acquire ?r))
                 (t_carry_to_machine ?r ?p ?m)
-                (release (second h_r))
-                (t_process ?m ?p ?d))))
-
+                (release h2)
+                (t_process ?m ?p ?d)
+                (wait-for `(!= (package.location ,?p) ,?m))
+    )))
 )

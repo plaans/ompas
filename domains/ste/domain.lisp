@@ -90,8 +90,7 @@
         (:body
             (do
                 (call_taxi a x)
-                (ride_taxi a y)
-            )))
+                (ride_taxi a y))))
 
     (def-task ride_taxi (:params (a agent) (y location)))
 
@@ -104,8 +103,6 @@
                 (enter_taxi a)
                 (taxi_carry a y)
                 (pay_driver a)
-                (leave_taxi a)
-            )
-        ))
+                (leave_taxi a))))
 
 )

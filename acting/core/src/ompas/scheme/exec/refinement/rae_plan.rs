@@ -1,3 +1,4 @@
+use crate::model::acting_domain::model::ModelKind;
 use crate::model::acting_domain::OMPASDomain;
 use crate::ompas::interface::select_mode::{Planner, RAEPlanConfig, SelectMode};
 use crate::ompas::manager::acting::interval::Timepoint;
@@ -298,9 +299,9 @@ pub async fn rae_plan_env(mut env: LEnv, domain: &OMPASDomain) -> LEnv {
         let model_expr = format!(
             "(lambda {} (do ({} {}) (compose_efficiency ({} {}))))",
             lv_params,
-            command.get_model(),
+            command.get_model(&ModelKind::SimModel).unwrap(),
             params,
-            command.get_cost(),
+            command.get_model(&ModelKind::CostModel).unwrap(),
             params,
         );
         let model = eval(

@@ -45,7 +45,7 @@ pub const LABEL_ENUMERATE_PARAMS: &str = "enumerate-params";
 ///Context that will contains primitives for the RAE executive
 pub struct ModExec {
     options: Arc<RwLock<OMPASOptions>>,
-    acting_manager: ActingManager,
+    pub acting_manager: ActingManager,
     domain: Arc<RwLock<OMPASDomain>>,
     platform: Platform,
     log: LogClient,

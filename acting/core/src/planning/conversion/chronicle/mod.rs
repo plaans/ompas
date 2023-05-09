@@ -11,13 +11,13 @@ use crate::model::chronicle::subtask::SubTask;
 use crate::model::chronicle::task_template::TaskTemplate;
 use crate::model::chronicle::{Chronicle, ChronicleKind};
 use crate::model::sym_domain::basic_type::BasicType::Boolean;
-use crate::model::sym_domain::basic_type::TYPE_ID_INT;
 use crate::model::sym_domain::Domain;
 use crate::model::sym_table::r#trait::FormatWithSymTable;
 use crate::model::sym_table::r#trait::{GetVariables, Replace};
 use crate::model::sym_table::VarId;
 use crate::planning::conversion::flow_graph::flow::{FlowId, FlowKind};
 use crate::planning::conversion::flow_graph::graph::FlowGraph;
+use crate::planning::conversion::ConvertParameters;
 use function_name::named;
 use ompas_language::exec::resource::{MAX_Q, QUANTITY};
 use ompas_language::sym_table::{COND, EPSILON};
@@ -105,10 +105,11 @@ pub fn convert_graph(
     fl: &mut FlowGraph,
     flow: &FlowId,
     env: &LEnv,
+    cv: &ConvertParameters,
 ) -> Result<Chronicle, LRuntimeError> {
     let ht = &mut HandleTable::default();
 
-    let mut ch = convert_into_chronicle(ch, ht, fl, flow, env)?;
+    let mut ch = convert_into_chronicle(ch, ht, fl, flow, env, cv)?;
 
     for (flow, handle) in &ht.asyncs {
         let drops: Vec<VarId> = handle
@@ -179,6 +180,7 @@ pub fn convert_into_chronicle(
     fl: &mut FlowGraph,
     flow: &FlowId,
     env: &LEnv,
+    cv: &ConvertParameters,
 ) -> Result<Chronicle, LRuntimeError> {
     let st = fl.st.clone();
 
@@ -249,19 +251,26 @@ pub fn convert_into_chronicle(
                         let t_prime = st.new_timepoint();
                         let t_release_prime = st.new_timepoint();
                         let t_release = acq.release_time;
-                        let int_domain: Domain = Domain::Simple(TYPE_ID_INT);
+                        let quantity_domain: Domain = Domain::IntRange(
+                            0,
+                            cv.max_capacity, //Bound::Inc(Cst::Int(MAX_QUANTITY_VALUE)),
+                        );
+                        //let int_domain: Domain = Domain::Simple(TYPE_ID_INT);
 
                         let new_q = st.new_result();
-                        st.set_domain(&st.get_domain_id(&new_q), int_domain.clone());
+                        st.set_domain(&st.get_domain_id(&new_q), quantity_domain.clone());
                         let new_q_prime = st.new_result();
-                        st.set_domain(&st.get_domain_id(&new_q_prime), int_domain.clone());
+                        st.set_domain(&st.get_domain_id(&new_q_prime), quantity_domain.clone());
                         let current_release_quantity = st.new_result();
                         st.set_domain(
                             &st.get_domain_id(&current_release_quantity),
-                            int_domain.clone(),
+                            quantity_domain.clone(),
                         );
                         let current_quantity = st.new_result();
-                        st.set_domain(&st.get_domain_id(&current_quantity), int_domain.clone());
+                        st.set_domain(
+                            &st.get_domain_id(&current_quantity),
+                            quantity_domain.clone(),
+                        );
 
                         ht.add_resource_handle(t_release);
 
@@ -292,7 +301,7 @@ pub fn convert_into_chronicle(
                         });
 
                         let max_q_result = st.new_result();
-                        st.set_domain(&st.get_domain_id(&max_q_result), int_domain.clone());
+                        st.set_domain(&st.get_domain_id(&max_q_result), quantity_domain.clone());
                         ch.add_condition(Condition {
                             interval: Interval::new_instantaneous(interval.get_start()),
                             sv: vec![max_q_symbol, resource],
@@ -540,7 +549,7 @@ pub fn convert_into_chronicle(
                         LRuntimeError,
                     > {
                         let mut branch_params: HashMap<VarId, VarId> = Default::default();
-                        let mut method = convert_into_chronicle(None, ht, fl, flow, env)?;
+                        let mut method = convert_into_chronicle(None, ht, fl, flow, env, cv)?;
                         for v in &method.get_variables() {
                             if let Some(declaration) = st.get_declaration(v) {
                                 //It means the variable has been created before the method, and shall be transformed into a parameter

@@ -1,21 +1,27 @@
+use crate::model::acting_domain::model::{ModelCollection, ModelKind};
 use crate::model::acting_domain::parameters::Parameters;
 use sompas_structs::lvalue::LValue;
 use std::fmt::{Display, Formatter};
 
 #[derive(Default, Debug, Clone)]
 pub struct Task {
-    body: LValue,
-    model: Option<LValue>,
     label: String,
     parameters: Parameters,
     methods: Vec<String>,
+    body: LValue,
+    models: ModelCollection,
 }
 
 impl Task {
-    pub fn new(label: String, parameters: Parameters, body: LValue, model: Option<LValue>) -> Self {
+    pub fn new(
+        label: String,
+        parameters: Parameters,
+        body: LValue,
+        models: ModelCollection,
+    ) -> Self {
         Self {
             body,
-            model,
+            models,
             label,
             parameters,
             methods: vec![],
@@ -28,8 +34,8 @@ impl Task {
     pub fn get_body(&self) -> &LValue {
         &self.body
     }
-    pub fn get_model(&self) -> &Option<LValue> {
-        &self.model
+    pub fn get_model(&self, kind: &ModelKind) -> Option<LValue> {
+        self.models.get(kind)
     }
 
     pub fn get_parameters(&self) -> &Parameters {
@@ -51,8 +57,8 @@ impl Task {
         self.body = body
     }
 
-    pub fn set_model(&mut self, model: LValue) {
-        self.model = Some(model)
+    pub fn set_model(&mut self, model: LValue, kind: ModelKind) {
+        self.models.insert(model, kind)
     }
 
     pub fn set_parameters(&mut self, parameters: Parameters) {
@@ -88,10 +94,11 @@ impl Display for Task {
             self.parameters,
             self.body.format("- body: ".len()),
             str_methods,
-            match &self.model {
+            self.models,
+            /*match &self.model {
                 Some(model) => model.format("- model: ".len()),
                 None => "none".to_string(),
-            }
+            }*/
         )
     }
 }

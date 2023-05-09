@@ -1,5 +1,6 @@
 use crate::model::acting_domain::command::Command;
 use crate::model::acting_domain::method::Method;
+use crate::model::acting_domain::model::ModelKind;
 use crate::model::acting_domain::state_function::StateFunction;
 use crate::model::acting_domain::task::Task;
 use im::HashMap;
@@ -26,6 +27,7 @@ pub struct OMPASDomain {
     pub commands: HashMap<String, Command>,
     pub lambdas: HashMap<String, LValue>,
     pub map_symbol_type: HashMap<String, String>,
+    pub env: LEnvSymbols,
 }
 
 impl OMPASDomain {
@@ -118,7 +120,12 @@ impl OMPASDomain {
         Ok(())
     }
 
-    pub fn add_command_model(&mut self, label: String, value: LValue) -> Result<(), LRuntimeError> {
+    pub fn add_command_model(
+        &mut self,
+        label: String,
+        value: LValue,
+        kind: ModelKind,
+    ) -> Result<(), LRuntimeError> {
         match self.commands.get_mut(&label) {
             None => Err(lruntimeerror!(
                 "add_action_sample_fn",
@@ -126,13 +133,18 @@ impl OMPASDomain {
             )),
             Some(action) => {
                 //println!("updating sim of {} with {}", label, value);
-                action.set_model(value);
+                action.set_model(value, kind);
                 Ok(())
             }
         }
     }
 
-    pub fn add_task_model(&mut self, label: String, value: LValue) -> Result<(), LRuntimeError> {
+    pub fn add_task_model(
+        &mut self,
+        label: String,
+        value: LValue,
+        kind: ModelKind,
+    ) -> Result<(), LRuntimeError> {
         match self.tasks.get_mut(&label) {
             None => Err(lruntimeerror!(
                 "add_action_sample_fn",
@@ -140,7 +152,7 @@ impl OMPASDomain {
             )),
             Some(task) => {
                 //println!("updating sim of {} with {}", label, value);
-                task.set_model(value);
+                task.set_model(value, kind);
                 Ok(())
             }
         }
@@ -149,6 +161,10 @@ impl OMPASDomain {
     pub fn add_lambda(&mut self, label: String, value: LValue) {
         self.lambdas.insert(label.clone(), value);
         self.map_symbol_type.insert(label, LAMBDA_TYPE.into());
+    }
+
+    pub fn add_env(&mut self, label: String, value: LValue) {
+        self.env.insert(label, value);
     }
 
     /*pub async fn add_type(&mut self, t: String, p: Option<String>) {
@@ -276,7 +292,7 @@ impl OMPASDomain {
     }
 
     pub fn get_exec_env(&self) -> LEnvSymbols {
-        let mut env = LEnvSymbols::default();
+        let mut env = self.env.clone();
         let mut map_task_method: HashMap<LValue, LValue> = Default::default();
         let mut map_method_pre_conditions: HashMap<LValue, LValue> = Default::default();
         let mut map_method_score: HashMap<LValue, LValue> = Default::default();
@@ -307,7 +323,10 @@ impl OMPASDomain {
         //Add all actions to env:
         for (label, action) in self.get_commands() {
             env.insert(label.clone(), action.get_body().clone());
-            map_action_model.insert(label.into(), action.get_model().clone());
+            map_action_model.insert(
+                label.into(),
+                action.get_model(&ModelKind::PlantModel).unwrap().clone(),
+            );
         }
 
         //Add all state functions to env:
@@ -350,7 +369,7 @@ impl OMPASDomain {
     }
 
     pub fn get_convert_env(&self) -> LEnvSymbols {
-        let mut env = LEnvSymbols::default();
+        let mut env = self.env.clone();
         let mut map_task_method: HashMap<LValue, LValue> = Default::default();
         let mut map_method_pre_conditions: HashMap<LValue, LValue> = Default::default();
         let mut map_method_score: HashMap<LValue, LValue> = Default::default();
@@ -379,7 +398,10 @@ impl OMPASDomain {
 
         //Add all actions to env:
         for (label, action) in self.get_commands() {
-            env.insert(label.clone(), action.get_model().clone());
+            env.insert(
+                label.clone(),
+                action.get_model(&ModelKind::PlanModel).unwrap().clone(),
+            );
         }
 
         //Add all state functions to env:

@@ -1,10 +1,11 @@
-use crate::model::acting_domain::model::ActingModel;
+use crate::model::acting_domain::model::{ActingModel, ModelKind};
 use crate::model::acting_domain::parameters::Parameters;
 use crate::model::acting_domain::task::Task;
 use crate::model::chronicle::{Chronicle, ChronicleKind};
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::r#trait::FormatWithSymTable;
 use crate::model::sym_table::VarId;
+use crate::ompas::scheme::exec::ModExec;
 use crate::planning::conversion::chronicle::convert_graph;
 use crate::planning::conversion::chronicle::post_processing::post_processing;
 use crate::planning::conversion::context::ConversionContext;
@@ -23,6 +24,7 @@ use chrono::{DateTime, Utc};
 #[allow(unused)]
 use debug_print::debug_println;
 use ompas_language::exec::refinement::EXEC_TASK;
+use ompas_language::exec::MOD_EXEC;
 use sompas_structs::llambda::{LLambda, LambdaArgs};
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
@@ -47,6 +49,19 @@ pub mod point_algebra;
 const DEBUG_CHRONICLE: bool = false;
 #[allow(dead_code)]
 static N_CONVERSION: AtomicU32 = AtomicU32::new(0);
+const MAX_QUANTITY_VALUE: i64 = 1000;
+
+pub struct ConvertParameters {
+    pub max_capacity: i64,
+}
+
+impl Default for ConvertParameters {
+    fn default() -> Self {
+        Self {
+            max_capacity: MAX_QUANTITY_VALUE,
+        }
+    }
+}
 
 pub async fn convert(
     ch: Option<Chronicle>,
@@ -94,7 +109,18 @@ pub async fn _convert(
     graph.flow = flow;
     flow_graph_post_processing(&mut graph)?;
     //debug_println!("flow_graph_post_processing({n_conversion}) = ok!");
-    let mut ch = convert_graph(ch, &mut graph, &flow, &p_env.env)?;
+
+    let cv = &ConvertParameters {
+        max_capacity: p_env
+            .env
+            .get_context::<ModExec>(MOD_EXEC)
+            .unwrap()
+            .acting_manager
+            .resource_manager
+            .get_max_capacity() as i64,
+    };
+
+    let mut ch = convert_graph(ch, &mut graph, &flow, &p_env.env, cv)?;
     //debug_println!("convert_graph({n_conversion}) = ok!");
     //debug_println!("lv: {}\nchronicle: {}", lv.format(4), ch);
     post_processing(&mut ch, &p_env.env).await?;
@@ -125,7 +151,7 @@ pub async fn p_convert_task(
 
     let mut instances = vec![];
     let mut methods = vec![];
-    match t.get_model() {
+    match t.get_model(&ModelKind::PlanModel) {
         Some(model) => {
             let method_lambda: LLambda = model.try_into().expect("");
 
@@ -259,7 +285,7 @@ pub async fn p_convert(
 
                 pp.domain.tasks.push(task.get_label().to_string());
                 //println!("Declaring task: {}", task.get_label());
-                if let Some(model) = task.get_model() {
+                if let Some(model) = task.get_model(&ModelKind::PlanModel) {
                     let task_lambda = model.try_into()?;
 
                     for param in &task.get_parameters().get_labels() {
@@ -344,7 +370,10 @@ pub async fn p_convert(
                 //evaluate the lambda sim.
                 //println!("Converting command {}", command.get_label());
                 let om: ActingModel = convert_abstract_task_to_chronicle(
-                    &command.get_model().try_into()?,
+                    &command
+                        .get_model(&ModelKind::PlanModel)
+                        .unwrap()
+                        .try_into()?,
                     command.get_label(),
                     None,
                     command.get_parameters(),
@@ -427,7 +456,10 @@ pub async fn convert_acting_domain(
         //evaluate the lambda sim.
         //println!("Converting command {}", command.get_label());
         let template = convert_abstract_task_to_chronicle(
-            &command.get_model().try_into()?,
+            &command
+                .get_model(&ModelKind::PlanModel)
+                .unwrap()
+                .try_into()?,
             command.get_label(),
             None,
             command.get_parameters(),

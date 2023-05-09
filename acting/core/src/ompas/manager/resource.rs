@@ -14,7 +14,7 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::mem;
 use std::sync::atomic::AtomicUsize;
-use std::sync::Arc;
+use std::sync::{atomic, Arc};
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::sync::Mutex;
 
@@ -334,6 +334,7 @@ pub struct ResourceManager {
     labels: Arc<Mutex<HashMap<String, ResourceId>>>,
     inner: Arc<Mutex<HashMap<ResourceId, Resource>>>,
     id: Arc<AtomicUsize>,
+    max_capacity: Arc<AtomicUsize>,
 }
 
 pub enum AcquireResponse {
@@ -375,6 +376,10 @@ impl ResourceManager {
         labels.get(label).copied()
     }
 
+    pub fn get_max_capacity(&self) -> usize {
+        self.max_capacity.load(atomic::Ordering::Relaxed)
+    }
+
     pub async fn new_resource(&self, label: String, capacity: Option<Capacity>) {
         let id = get_and_update_id_counter(self.id.clone());
         let mut labels = self.labels.lock().await;
@@ -393,6 +398,15 @@ impl ResourceManager {
             queue: Default::default(),
         };
         map.insert(id, resource);
+        let value = self.max_capacity.load(atomic::Ordering::Relaxed);
+        if capacity > value {
+            self.max_capacity.compare_exchange(
+                value,
+                capacity,
+                atomic::Ordering::Release,
+                atomic::Ordering::Acquire,
+            );
+        }
     }
 
     pub async fn acquire(

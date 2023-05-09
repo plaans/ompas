@@ -8,8 +8,42 @@ use crate::model::sym_domain::{cst, Domain};
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::VarId;
 use sompas_structs::lvalue::LValue;
+use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
 
 pub(crate) const ROOT: &str = "ROOT";
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum ModelKind {
+    PlantModel,
+    PlanModel,
+    SimModel,
+    CostModel,
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct ModelCollection {
+    inner: HashMap<ModelKind, LValue>,
+}
+
+impl ModelCollection {
+    pub fn insert(&mut self, model: LValue, kind: ModelKind) {
+        self.inner.insert(kind, model);
+    }
+
+    pub fn get(&self, kind: &ModelKind) -> Option<LValue> {
+        self.inner.get(kind).cloned()
+    }
+}
+
+impl Display for ModelCollection {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        for (kind, model) in &self.inner {
+            writeln!(f, "{:?} : {}", kind, model)?
+        }
+        Ok(())
+    }
+}
 
 #[derive(Clone)]
 pub struct ActingModel {

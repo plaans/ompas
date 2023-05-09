@@ -101,7 +101,7 @@ impl FlowGraph {
         &self.flows[*flow].parent
     }
 
-    pub fn set_duration(&self, flow: &FlowId, duration: VarId) {
+    pub fn set_duration(&mut self, flow: &FlowId, duration: VarId) {
         self.flows[*flow].interval.set_duration(duration);
     }
 

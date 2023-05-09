@@ -1,3 +1,4 @@
+use crate::model::acting_domain::model::ModelKind;
 use crate::model::acting_domain::OMPASDomain;
 use crate::ompas::interface::select_mode::{CChoiceConfig, Planner, SelectMode};
 use crate::ompas::manager::acting::process::task::{RTSelect, RefinementInner, SelectTrace};
@@ -271,9 +272,9 @@ pub async fn c_choice_env(mut env: LEnv, domain: &OMPASDomain) -> LEnv {
         let model_expr = format!(
             "(lambda {} (do ({} {}) (increase_cost ({} {}))))",
             lv_params,
-            command.get_model(),
+            command.get_model(&ModelKind::SimModel).unwrap(),
             params,
-            command.get_cost(),
+            command.get_cost().unwrap(),
             params,
         );
         let model = eval(

@@ -1,7 +1,7 @@
 use crate::ompas::manager::acting::acting_var::AsCst;
 use crate::ompas::scheme::exec::state::ModState;
 use crate::ompas::scheme::monitor::control::ModControl;
-use crate::ompas::scheme::monitor::domain::ModDomain;
+use crate::ompas::scheme::monitor::model::ModModel;
 use crate::planning::conversion::context::ConversionContext;
 use crate::planning::conversion::convert_acting_domain;
 use crate::planning::conversion::flow_graph::algo::annotate::annotate;
@@ -16,7 +16,7 @@ use ompas_language::monitor::debug_conversion::{
     DOC_PLAN_TASK, DOC_PLAN_TASK_OPT, DOC_PRE_EVAL_EXPR, DOC_PRE_EVAL_TASK, MOD_DEBUG_CONVERSION,
     PLAN_TASK, PLAN_TASK_OPT, PRE_EVAL_EXPR, PRE_EVAL_TASK,
 };
-use ompas_language::monitor::domain::MOD_DOMAIN;
+use ompas_language::monitor::model::MOD_DOMAIN;
 use ompas_middleware::logger::LogClient;
 use sompas_core::expand;
 use sompas_language::LOG_TOPIC_INTERPRETER;
@@ -46,7 +46,7 @@ impl From<ModDebugConversion> for LModule {
 
 #[async_scheme_fn]
 pub async fn convert_domain(env: &LEnv) -> Result<String, LRuntimeError> {
-    let ctx = env.get_context::<ModDomain>(MOD_DOMAIN)?;
+    let ctx = env.get_context::<ModModel>(MOD_DOMAIN)?;
     let context: ConversionContext = ctx.get_conversion_context().await;
     let time = SystemTime::now();
     let pd: PlanningDomain = convert_acting_domain(&context).await?;
@@ -61,7 +61,7 @@ async fn _plan_task(env: &LEnv, args: &[LValue], opt: bool) -> LResult {
         .get_context::<ModControl>(MOD_CONTROL)?
         .acting_manager
         .clone();
-    let ctx = env.get_context::<ModDomain>(MOD_DOMAIN)?;
+    let ctx = env.get_context::<ModModel>(MOD_DOMAIN)?;
     //let mut context: ConversionContext = ctx.get_conversion_context().await;
     let mut env: LEnv = ctx.get_plan_env().await;
     let state = ctx.get_plan_state().await;
@@ -187,7 +187,7 @@ pub async fn plan_task_opt(env: &LEnv, args: &[LValue]) -> LResult {
 
 #[async_scheme_fn]
 pub async fn pre_eval_task(env: &LEnv, task: &[LValue]) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<ModDomain>(MOD_DOMAIN)?;
+    let ctx = env.get_context::<ModModel>(MOD_DOMAIN)?;
     let mut context: ConversionContext = ctx.get_conversion_context().await;
     context
         .env
@@ -238,7 +238,7 @@ pub async fn pre_eval_task(env: &LEnv, task: &[LValue]) -> Result<(), LRuntimeEr
 
 #[async_scheme_fn]
 pub async fn annotate_task(env: &LEnv, task: &[LValue]) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<ModDomain>(MOD_DOMAIN)?;
+    let ctx = env.get_context::<ModModel>(MOD_DOMAIN)?;
     let mut context: ConversionContext = ctx.get_conversion_context().await;
     context
         .env
@@ -290,7 +290,7 @@ pub async fn annotate_task(env: &LEnv, task: &[LValue]) -> Result<(), LRuntimeEr
 
 #[async_scheme_fn]
 pub async fn pre_eval_expr(env: &LEnv, lv: LValue) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<ModDomain>(MOD_DOMAIN)?;
+    let ctx = env.get_context::<ModModel>(MOD_DOMAIN)?;
     let mut context: ConversionContext = ctx.get_conversion_context().await;
     context
         .env

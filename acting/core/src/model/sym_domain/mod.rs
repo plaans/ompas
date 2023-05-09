@@ -18,12 +18,20 @@ pub mod type_lattice;
 pub type TypeId = usize;
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum Bound {
+    Inc(cst::Cst),
+    Exc(cst::Cst),
+}
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Domain {
     Simple(TypeId),
     Composed(TypeId, Vec<Domain>),
     Union(Vec<Domain>),
     Substract(Box<Domain>, Box<Domain>),
     Cst(Box<Domain>, cst::Cst),
+    //Range(Bound, Bound),
+    IntRange(i64, i64),
     Application(Box<Domain>, Vec<Domain>, Box<Domain>),
 }
 
@@ -71,6 +79,22 @@ impl Domain {
                 str.push(')');
                 format!("{}:{str} -> {}", t.format(dc), r.format(dc))
             }
+            IntRange(l, u) => {
+                /*let mut str = "".to_string();
+                match l {
+                    Bound::Inc(d) => write!(str, "[{}", d),
+                    Bound::Exc(d) => write!(str, "]{}", d),
+                }
+                .unwrap();
+                match u {
+                    Bound::Inc(d) => write!(str, "{}]", d),
+                    Bound::Exc(d) => write!(str, "{}[", d),
+                }
+                .unwrap();
+                str*/
+
+                format!("[{l},{u}]")
+            }
         }
     }
 
@@ -102,6 +126,7 @@ impl Domain {
                 args.iter_mut().for_each(|s| s.flat(tl));
                 r.flat(tl);
             }
+            IntRange(_, _) => {}
         }
     }
 
@@ -215,6 +240,19 @@ impl Display for Domain {
                 }
                 str.push(')');
                 write!(f, "{t}:{str} -> {r}")
+            }
+            IntRange(l, u) => {
+                write!(f, "[{l},{u}]")
+
+                /*match l {
+                    Bound::Inc(d) => write!(f, "[{}", d),
+                    Bound::Exc(d) => write!(f, "]{}", d),
+                }
+                .unwrap();
+                match u {
+                    Bound::Inc(d) => write!(f, "{}]", d),
+                    Bound::Exc(d) => write!(f, "{}[", d),
+                }*/
             }
         }
     }

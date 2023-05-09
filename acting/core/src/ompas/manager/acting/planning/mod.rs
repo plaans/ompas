@@ -1,3 +1,4 @@
+use crate::model::acting_domain::model::ModelKind;
 use crate::model::acting_domain::OMPASDomain;
 use crate::model::chronicle::acting_binding::ActingBinding;
 use crate::model::chronicle::ChronicleKind;
@@ -14,6 +15,7 @@ use crate::ompas::manager::acting::planning::plan_update::{
 use crate::ompas::manager::acting::planning::problem_update::{ExecutionProblem, ProblemUpdate};
 use crate::ompas::manager::resource::WaiterPriority;
 use crate::ompas::scheme::exec::state::ModState;
+use crate::ompas::scheme::exec::ModExec;
 use crate::planning::planner::encoding::domain::encode_ctx;
 use crate::planning::planner::encoding::instance::{encode_init, generate_instances};
 use crate::planning::planner::encoding::problem_generation::{
@@ -32,6 +34,7 @@ use aries_planning::chronicles::printer::Printer;
 use aries_planning::chronicles::{ChronicleOrigin, FiniteProblem, VarLabel};
 use itertools::Itertools;
 use ompas_language::exec::resource::{MAX_Q, QUANTITY};
+use ompas_language::exec::MOD_EXEC;
 use ompas_language::process::{LOG_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS};
 use ompas_middleware::ProcessInterface;
 use sompas_structs::lenv::LEnv;
@@ -131,6 +134,7 @@ pub async fn run_continuous_planning(config: ContinuousPlanningConfig) {
                         ProblemUpdate::ExecutionProblem(ep) => {
                             let mut env = env.clone();
                             env.update_context(ModState::new_from_snapshot(ep.state.clone()));
+
                             let pp: PlannerProblem = populate_problem(&domain, &env, &st, ep).await.unwrap();
                             for (origin, chronicle) in pp.instances.iter().map(|i| (i.origin, i.am.chronicle.as_ref().unwrap())) {
                                 println!("{:?}:{}", origin, chronicle)
@@ -270,7 +274,7 @@ pub async fn populate_problem(
             let params = task.get_parameters().get_labels();
             assert_eq!(params.len(), tps.len() - 1);
 
-            match task.get_model() {
+            match task.get_model(&ModelKind::PlanModel) {
                 Some(model) => {
                     let model_lambda: LLambda = model.try_into().expect("");
 
@@ -327,7 +331,11 @@ pub async fn populate_problem(
         {
             commands.insert(command.get_label().to_string());
 
-            let model_lambda: LLambda = command.get_model().try_into().expect("");
+            let model_lambda: LLambda = command
+                .get_model(&ModelKind::PlanModel)
+                .unwrap()
+                .try_into()
+                .expect("");
 
             let instance: ChronicleInstance = convert_into_chronicle_instance(
                 &model_lambda,

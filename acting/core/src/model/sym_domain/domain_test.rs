@@ -277,6 +277,7 @@ impl DomainTest {
                     .collect(),
                 Box::new(DomainTest::from_domain(_dc, r)),
             ),
+            Domain::IntRange(_, _) => todo!(),
         }
     }
 

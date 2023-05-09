@@ -1,3 +1,4 @@
+use crate::model::acting_domain::model::ModelKind;
 use crate::model::acting_domain::OMPASDomain;
 use crate::ompas::manager::acting::{ActingManager, ActionId};
 use crate::ompas::manager::state::action_status::ProcessStatus;
@@ -47,7 +48,7 @@ impl Platform {
         let command = LValue::from(command);
 
         let model: LValue = match self.ompas_domain.read().await.commands.get(&label) {
-            Some(command) => command.get_model().clone(),
+            Some(command) => command.get_model(&ModelKind::SimModel).unwrap().clone(),
             None => {
                 return Err(Default::default());
             }
@@ -70,7 +71,7 @@ impl Platform {
                 supervisor
                     .set_status(&command_id, ProcessStatus::Accepted)
                     .await;
-                command.get_model().clone()
+                command.get_model(&ModelKind::PlantModel).unwrap().clone()
             }
             None => {
                 supervisor

@@ -6,8 +6,31 @@
         (spring ordinary d_type)
         (empty h object))
 
+    (def-prob 
+        (unlatch (0.8 0.2))
+        (unlatch_2 (0.5 0.5))
+        (take (1 0))
+        (put (1 0))
+        (move (0.95 0.05)))
 
-    (def-lambda sense (lambda nil nil))
+
+    (def-prob-exec
+        (pass_door 
+            (begin
+                (define d (car args))
+            (if (= rae_mode rea_exec)
+                (if (= (door_type d) 'spring)
+                    (= (door_status d) 'held)
+                    (= (door_status d) 'closed))
+                (if (= (door_type d) 'unk)
+                    (if (= (door_status) 'held)
+                        true
+                        (if (= (door_status) 'closed)
+                            nil
+                            (rand-element '(true nil))))
+                    (if (= (door_type d) 'spring)
+                        (= (door_status d) 'held)
+                        (= (door_status d) 'closed)))))))
 
     ;state functions
     (def-state-function loc (:params (r robot)) (:result location))
@@ -30,151 +53,124 @@
     
     (def-command unlatch_1
         (:params (r robot) (d door))
-        (:model (om-model
+        (:plant-model (om-plant-model
             (:body
                 (if (!= (door_status d) closed)
                     (print "Door " d " is already open.")
                     (if (! (load r))
                         (begin 
-                            (define res (sense 'unlatch_1))
+                            (define res (prob-exec 'unlatch_1))
                             (if (res)
                                 (begin
-                                    (print "Robot " r " has opened door " d ".")
-                                    (assert `(door_status ,d) opened))
-                                (print "Unlatching has failed due to an interval error.")))
-                        (begin
-                            (print "Robot " r " is not free to open door " d ".")
-                            (err nil)))))
+                                    (assert `(door_status ,d) opened)
+                                    (success "Robot " r " has opened door " d "."))
+                                (failure "Unlatching has failed due to an interval error.")))
+                        (failure "Robot " r " is not free to open door " d ".")
+                        ))))
         )))
 
     (def-command unlatch_2
         (:params (r robot) (d door))
-        (:model (om-model
+        (:plant-model (om-plant-model
             (:body
                 (if (!= (door_status d) closed)
                     (print "Door " d " is already open.")
                     (if (! (load r))
                         (begin 
-                            (define res (sense 'unlatch_2))
+                            (define res (prob-exec 'unlatch_2))
                             (if (res)
                                 (begin
                                     (print "Robot " r " has opened door " d ".")
                                     (assert `(door_status ,d) opened))
-                                (print "Unlatching has failed due to an interval error.")))
-                        (begin
-                            (print "Robot " r " is not free to open door " d ".")
-                            (err nil))))))))
+                                (failure "Unlatching has failed due to an interval error.")))
+                        (failure "Robot " r " is not free to open door " d ".")
+                            ))))))
 
     (def-command pass_door
         (:params (r robot) (d door) (l location))
-        (:model (om-model
+        (:plant-model (om-plant-model
            (:body
                 (if (or (= (door_status d) opened) (= (door_status d) held))
-                    (if (sense 'pass_door d)
+                    (if (prob-exec 'pass_door d)
                         (begin
-                            (print "Robot " r " has passed the door " d ".")
-                            (assert `(loc r) l))
-                        (begin
-                            (print "Robot " r " is not able to pass the door " d ".")
-                            (err nil)))
-                    (begin
-                        (print "Robot " r "is not able to pass the door " d ".")
-                        (err nil)
-                            ))))))
+                            (assert `(loc r) l)
+                            (success "Robot " r " has passed the door " d "."))
+                        (failure "Robot " r " is not able to pass the door " d "."))
+                    (failure "Robot " r "is not able to pass the door " d ".")))))
 
     (def-command hold_door
         (:params (r robot) (d door))
-        (:model (om-model
+        (:plant-model (om-plant-model
             (:body
                 (if (and (!=(door_status) closed) (=(load r) empty))
                     (begin
                         (assert `(load ,r) h)
-                        (assert `(door_status ,d) held))
+                        (assert `(door_status ,d) held)
+                        (success "Robot " r " is holding the door " d "."))
                     (if (=(door_status) closed)
-                        (begin
-                            (print "Door " d " is closed and cannot be held by " r ".")
-                            (err nil))
+                        (failure "Door " d " is closed and cannot be held by " r ".")
                         (if (! (load r))
-                            (print "Robot " r " is not free to hold the door " r "."))))))))
+                            (failure "Robot " r " is not free to hold the door " r "."))))))))
 
     (def-command release_door
         (:params (r robot) (d door))
-        (:model (om-model
+        (:plant-model (om-plant-model
             (:body
                 (if (!=(door_status) held)
-                    OMPAS_SUCCESS
+                    (success)
                     (if (and (= (door_status d) held) (=(load r) h))
                         (begin
-                            (print "Robot " r " has released the door " d ".")
                             (assert `(load ,r) 'empty)
-                            (assert `(door_status ,d) closed))
-                        (begin
-                            (print "Robot " r " is not holding the door " d ".")
-                            (err nil)
-                        )))))))
+                            (assert `(door_status ,d) closed)
+                            (success "Robot " r " has released the door " d ".")) 
+                        (failure "Robot " r " is not holding the door " d ".")
+                        ))))))
 
     (def-command move
         (:params (r robot) (l1 location) (l2 location))
-        (:model (om-model
+        (:plant-model (om-plant-model
             (:body
                 (if (l1 == l2)
                     (print "Robot " r " is already at location " l2 ".")
                     (if (= (loc r) l1)
                         (if (!= (door_location l1 l2) nil)
-                            (begin
-                                (print "Robot " r " cannot move. There is a door between " l1 " and " l2 ".")
-                                (err nil))
-                            (if (sense 'move)
+                            (failure "Robot " r " cannot move. There is a door between " l1 " and " l2 ".")
+                            (if (prob-exec 'move)
                                 (begin
-                                    (print "Robot " r "has moved from " l1 " to " l2 ".")
-                                    (assert `(loc ,r) l2))
-                                (begin
-                                    (print "Move has failed due to some internal failure.")
-                                    (err nil))))
-                        (begin
-                            (print "Invalid move by robot " r ".")
-                            (err nil)))))
-                    )))
+                                    (assert `(loc ,r) l2)
+                                    (success "Robot " r "has moved from " l1 " to " l2 "."))
+                                (failure "Move has failed due to some internal failure.")))
+                    
+                        (failure "Invalid move by robot " r ".")))))))
 
     (def-command put 
         (:params (r robot) (o object))
-        (:model (om-model
+        (:plant-model (om-plant-model
             (:body
                 (if ( = (pos o) r)
-                    (if (sense 'put)
+                    (if (prob-exec 'put)
                         (begin
-                            (print "Robot " r " has put object " o " at location" (loc r))
                             (assert `(pos o) (loc r))
-                            (assert `(load r) 'empty))
-                        (begin
-                            (print "Put has failed due to some internal failure.")
-                            (err nil)))
-                    (begin
-                        (print "Object " o " is not with robot " r ".")
-                        (err nil))
-        )))))
+                            (assert `(load r) 'empty)
+                            (success "Robot " r " has put object " o " at location" (loc r)))
+                        (failure "Put has failed due to some internal failure."))
+                    
+                    (failure "Object " o " is not with robot " r "."))))))
 
     (def-command take
         (:params (r robot) (o object))
-        (:model (om-model 
+        (:plant-model (om-plant-model 
             (:body
                 (if (= (load r) empty)
                     (if (= (loc r) (pos o))
-                        (if (sense 'take)
+                        (if (prob-exec 'take)
                             (begin
                                 (print "Robot " r " has picked up object " o)
                                 (assert `(pos o) r)
                                 (assert `(load r) o))
-                            (begin
-                                (print "take failed due to some internal error.")
-                                (err nil)))
-                        (begin
-                            (print "Robot " r " is not at object " o "'s location.")
-                            (err nil)))
-                    (begin
-                        (print "Robot " r " is not free to take anything.")
-                        (err nil))
-        )))))
+                            (failure "take failed due to some internal error."))
+                        (failure "Robot " r " is not at object " o "'s location."))
+                    (failure "Robot " r " is not free to take anything."))))))
 
     ;tasks
     (def-task fetch (:params (r robot) (o object) (l location)))
@@ -270,9 +266,7 @@
                 (define obj (load r))
                 (if (!= obj 'h)
                     (put r obj)
-                    (begin
-                        (print r " is holding another door.")
-                        (err nil)))
+                    (failure r " is holding another door."))
                 (unlatch r d)
                 (take r obj)
                 (pass_door r d l))))

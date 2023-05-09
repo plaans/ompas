@@ -1,7 +1,7 @@
 //! Module containing the Scheme library to setup RAE environment
 use control::*;
 use debug_conversion::*;
-use domain::*;
+use model::*;
 use ompas_middleware::logger::{FileDescriptor, LogClient};
 use ompas_middleware::Master;
 use sompas_core::{eval_init, get_root_env};
@@ -11,8 +11,8 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 pub mod control;
 pub mod debug_conversion;
-pub mod domain;
 pub mod log;
+pub mod model;
 use crate::ompas::interface::job::Job;
 use crate::ompas::interface::rae_command::OMPASJob;
 use crate::ompas::interface::rae_options::OMPASOptions;
@@ -46,7 +46,7 @@ pub struct ModMonitor {
 
 impl From<ModMonitor> for LModule {
     fn from(m: ModMonitor) -> Self {
-        let mod_domain = ModDomain::new(&m);
+        let mod_domain = ModModel::new(&m);
         let mod_control = ModControl::new(&m);
         let mut module = LModule::new(m, MOD_MONITOR, DOC_MOD_MONITOR);
         module.add_submodule(mod_domain);

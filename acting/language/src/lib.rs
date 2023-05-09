@@ -408,6 +408,18 @@ pub mod exec {
     pub const DEFINE_ERR_NO_APPLICABLE_METHOD: &str = "(define err::no-applicable-method 0)";
     pub const DEFINE_ERR_ACTION_FAILURE: &str = "(define err::action_failure 1)";
     pub const MOD_RAE_DESCRIPTION: &str = "rae-description";
+
+    pub const RAE_SUCCESS: &str = "success";
+    pub const LAMBDA_RAE_SUCCESS: &str = "(lambda args
+    (begin
+        (print args)
+        nil))";
+
+    pub const RAE_FAILURE: &str = "failure";
+    pub const LAMBDA_RAE_FAILURE: &str = "(lambda args
+    (begin
+        (print args)
+        (err nil)))";
 }
 
 pub mod monitor {
@@ -439,7 +451,7 @@ pub mod monitor {
             "Pre eval a task and annotate each acting process with a unique id";
     }
 
-    pub mod domain {
+    pub mod model {
 
         pub const MOD_DOMAIN: &str = "domain";
         pub const DOC_MOD_DOMAIN: &str =
@@ -474,6 +486,9 @@ pub mod monitor {
 
         pub const ADD_LAMBDA: &str = "add-lambda";
         pub const DOC_ADD_LAMBDA: &str = "Add a lambda to the execution environment.";
+
+        pub const ADD_ENV: &str = "add-env";
+        pub const DOC_ADD_ENV: &str = "Add a LValue in the execution environment.";
 
         pub const ADD_FACTS: &str = "add-facts";
         pub const DOC_ADD_FACTS: &str = "Add a list of facts to the inner state of the system.";
@@ -610,6 +625,13 @@ pub mod monitor {
         pub const MACRO_DEF_LAMBDA: &str = "(lambda (label lambda)
             `(add-lambda ',label ',lambda))";
 
+        pub const DEF_ENV: &str = "def-env";
+        pub const DOC_DEF_ENV: &str =
+            "Wrapper around add-env to ease definition of a LValue in the execution environment.";
+        pub const DOC_DEF_ENV_VERBOSE: &str = "Example: (def-env x 2)";
+        pub const MACRO_DEF_ENV: &str = "(lambda (label value)
+            `(add-lambda ',label ',value))";
+
         pub const OM_MODEL: &str = "om-model";
         pub const DOC_OM_MODEL: &str =
             "Ease the definition of command, task and method models in operational model fashion.";
@@ -711,6 +733,9 @@ pub mod monitor {
         pub const PRE_CONDITIONS: &str = ":pre-conditions";
         pub const BODY: &str = ":body";
         pub const MODEL: &str = ":model";
+        pub const PLANT_MODEL: &str = ":plant-model";
+        pub const SIM_MODEL: &str = ":sim-model";
+        pub const PLAN_MODEL: &str = ":plan-model";
         pub const MODEL_TYPE: &str = ":model-type";
         pub const EFFECTS: &str = ":effects";
         pub const RESULT: &str = ":result";

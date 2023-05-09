@@ -585,6 +585,11 @@ pub fn read_chronicle(
         chronicle.format_with_sym_table(&ch.sym_table, false)
     );*/
 
+    enum VarVal {
+        Range(i64, i64),
+        Val(Cst),
+    }
+
     let st = ch.st.clone();
     let lattice = st.get_lattice();
 
@@ -623,20 +628,23 @@ pub fn read_chronicle(
         let domain = &var_domain.domain;
         let label = st.get_label(var, false);
 
-        let (t, cst) = &match domain {
-            Simple(TYPE_ID_NIL | TYPE_ID_FALSE) => (TYPE_ID_BOOLEAN, Some(Cst::Bool(false))),
-            Simple(TYPE_ID_TRUE) => (TYPE_ID_BOOLEAN, Some(Cst::Bool(true))),
+        let (t, var_val) = &match domain {
+            Simple(TYPE_ID_NIL | TYPE_ID_FALSE) => {
+                (TYPE_ID_BOOLEAN, Some(VarVal::Val(Cst::Bool(false))))
+            }
+            Simple(TYPE_ID_TRUE) => (TYPE_ID_BOOLEAN, Some(VarVal::Val(Cst::Bool(true)))),
             Simple(t) => (*t, None),
+            Domain::IntRange(l, u) => (TYPE_ID_INT, Some(VarVal::Range(*l, *u))),
             Domain::Cst(t, c) => {
                 if let Simple(t) = t.deref() {
-                    (*t, Some(c.clone()))
+                    (*t, Some(VarVal::Val(c.clone())))
                 } else {
                     unreachable!()
                 }
             }
             d => {
                 if d == &Domain::Union(vec![TYPE_ID_FALSE.into(), TYPE_ID_EMPTY_LIST.into()]) {
-                    (TYPE_ID_BOOLEAN, Some(Cst::Bool(false)))
+                    (TYPE_ID_BOOLEAN, Some(VarVal::Val(Cst::Bool(false))))
                 } else {
                     panic!(
                         "{} is not supported in domaine def",
@@ -667,9 +675,15 @@ pub fn read_chronicle(
                     panic!()
                 }
             } else if *t == TYPE_ID_INT {
+                let (lb, ub): (IntCst, IntCst) = if let Some(VarVal::Range(l, u)) = var_val {
+                    (*l as IntCst, *u as IntCst)
+                } else {
+                    (INT_CST_MIN, INT_UB)
+                };
+
                 let ivar = ctx.model.new_optional_ivar(
-                    INT_CST_MIN,
-                    INT_UB,
+                    lb,
+                    ub,
                     prez,
                     container / VarType::Parameter(label),
                 );
@@ -715,10 +729,14 @@ pub fn read_chronicle(
                 svar.into()
             }
         };
-        if let Some(cst) = cst {
-            let cst = atom_from_cst(ctx, &cst);
-
-            constraints.push(aConstraint::eq(param, cst));
+        if let Some(var_val) = var_val {
+            match var_val {
+                VarVal::Range(_, _) => {}
+                VarVal::Val(cst) => {
+                    let cst = atom_from_cst(ctx, &cst);
+                    constraints.push(aConstraint::eq(param, cst));
+                }
+            }
         }
         if !params.contains(&param) {
             params.push(param);

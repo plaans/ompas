@@ -10,8 +10,8 @@ pub mod gobot_config;
 pub mod mail_config;
 pub mod sim_config;
 
-const BENCH_SIM_BIN_NAME: &str = "bench_sim";
-const BENCH_GOBOT_BIN_NAME: &str = "bench_gobot";
+const BENCH_SIM_BIN_NAME: &str = "bench-sim";
+const BENCH_GOBOT_BIN_NAME: &str = "bench-gobot-sim";
 
 pub const TYPE_GOBOT: &str = "gobot";
 pub const TYPE_SIM: &str = "sim";

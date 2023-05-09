@@ -26,11 +26,11 @@ indicatif = "0.17.0"
 colored = "2.0.0"
 
 [[bin]]
-name = "bench_sim"
+name = "bench-sim"
 path = "src/bin/bench_sim.rs"
 
 [[bin]]
-name = "bench_gobot"
+name = "bench-gobot-sim"
 path = "src/bin/bench_gobot.rs"
 
 [[bin]]

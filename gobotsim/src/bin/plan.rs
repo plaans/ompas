@@ -20,10 +20,10 @@ pub const LOG_LEVEL: LogLevel = LogLevel::Debug;
 #[derive(Debug, StructOpt)]
 #[structopt(name = "OMPAS", about = "An acting engine based on RAE.")]
 struct Opt {
-    #[structopt(short = "f", long = "file")]
+    #[structopt(short = "D", long = "domain")]
     file: Option<PathBuf>,
 
-    #[structopt(short = "o", long = "opt")]
+    #[structopt(short = "o", long = "optimal")]
     opt: bool,
 }
 

@@ -51,14 +51,14 @@ impl GobotConfig {
     }
 }
 
-const GREEDY: &str = "greedy";
+const RANDOM: &str = "random";
 const FA: &str = "fa";
 const LRPTF: &str = "lrptf";
 const ARIES: &str = "aries";
 const ARIES_OPT: &str = "aries-opt";
 
 pub enum GobotTechnique {
-    Greedy,
+    Random,
     FA,
     Lrptf,
     Aries,
@@ -70,7 +70,7 @@ impl TryFrom<&str> for GobotTechnique {
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
-            GREEDY => Ok(Self::Greedy),
+            RANDOM => Ok(Self::Random),
             FA => Ok(Self::FA),
             LRPTF => Ok(Self::Lrptf),
             ARIES => Ok(Self::Aries),
@@ -86,7 +86,7 @@ impl Display for GobotTechnique {
             f,
             "{}",
             match self {
-                GobotTechnique::Greedy => GREEDY,
+                GobotTechnique::Random => RANDOM,
                 GobotTechnique::FA => FA,
                 GobotTechnique::Lrptf => LRPTF,
                 GobotTechnique::Aries => ARIES,

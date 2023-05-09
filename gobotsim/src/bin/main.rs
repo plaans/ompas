@@ -24,16 +24,16 @@ pub const LOG_LEVEL: LogLevel = LogLevel::Debug;
 struct Opt {
     #[structopt(short = "d", long = "debug")]
     debug: bool,
-    #[structopt(short = "p", long = "log-path")]
+    #[structopt(short = "l", long = "log-path")]
     log: Option<PathBuf>,
 
-    #[structopt(short = "G", long = "godot")]
+    #[structopt(short = "G", long = "gobot-sim")]
     godot: bool,
 
     #[structopt(short = "r", long = "rae-log")]
     rae_log: bool,
 
-    #[structopt(short = "f", long = "file")]
+    #[structopt(short = "D", long = "domain")]
     file: Option<PathBuf>,
 }
 

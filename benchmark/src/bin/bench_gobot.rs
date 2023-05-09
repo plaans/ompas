@@ -32,7 +32,7 @@ pub struct Opt {
     #[structopt(short = "f", long = "fa")]
     fa: bool,
 
-    #[structopt(short = "L", long = "lrpt")]
+    #[structopt(short = "L", long = "lrptf")]
     lrpt: bool,
 
     #[structopt(short = "r", long = "random")]

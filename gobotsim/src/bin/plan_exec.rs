@@ -33,7 +33,7 @@ struct Opt {
     #[structopt(short = "r", long = "rae-log")]
     rae_log: bool,
 
-    #[structopt(short = "f", long = "file")]
+    #[structopt(short = "D", long = "domain")]
     file: Option<PathBuf>,
 }
 

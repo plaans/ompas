@@ -1,5 +1,4 @@
 use ompas_core::ompas::manager::resource::{Ticket, WaiterPriority};
-use ompas_structs::execution::resource::{Ticket, WaiterPriority};
 
 pub fn main() {
     let t1 = Ticket::new(0, WaiterPriority::Execution(1000));
@@ -14,7 +13,7 @@ pub fn main() {
 
     println!("{:?}", priorities);
 
-    priorities.sort_by(|k1, k2| k1.cmp(&k2));
+    priorities.sort();
 
     println!("{:?}", priorities);
 }

@@ -5,7 +5,7 @@ use crate::logger::{
 };
 use lazy_static::lazy_static;
 use log::Level;
-use map_macro::{map, set};
+use map_macro::{hash_map, hash_set};
 use ompas_utils::other::get_and_update_id_counter;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
@@ -78,14 +78,14 @@ impl Master {
 
         let master = Self {
             processes: Arc::new(Default::default()),
-            topic_id: Arc::new(RwLock::new(map! {
+            topic_id: Arc::new(RwLock::new(hash_map! {
                 PROCESS_TOPIC_ALL.to_string() => TOPIC_ALL_ID,
             })),
-            topics: Arc::new(RwLock::new(map! {
+            topics: Arc::new(RwLock::new(hash_map! {
                 TOPIC_ALL_ID => ProcessTopic {
                     label: PROCESS_TOPIC_ALL.to_string(),
-                    processes: set!{},
-                    childs: set!{}
+                    processes: hash_set!{},
+                    childs: hash_set!{}
                 }
             })),
             sender_kill: Arc::new(tx),
@@ -294,7 +294,7 @@ impl Master {
                                 ProcessTopic {
                                     label: parent.to_string(),
                                     processes: Default::default(),
-                                    childs: set! {id},
+                                    childs: hash_set! {id},
                                 },
                             );
                             topics

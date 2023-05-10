@@ -86,7 +86,8 @@ impl ExecPlatform {
             .as_ref()
             .unwrap()
             .send(request)
-            .await;
+            .await
+            .unwrap_or_else(|_| eprintln!("Error on sending request."));
     }
 
     pub async fn cancel_command(&self, command_id: usize) {

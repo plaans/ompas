@@ -53,16 +53,11 @@ pub fn convert_lv(
 
 fn convert_symbol(symbol: &str, fl: &mut FlowGraph, define_table: &DefineTable) -> FlowId {
     let var_id = match define_table.get(symbol) {
-        None => {
-            let id = fl.st.new_symbol(symbol);
-            id
-        }
+        None => fl.st.new_symbol(symbol),
         Some(r) => *r,
     };
 
-    let f_id: FlowId = fl.new_instantaneous_assignment(Lit::Atom(var_id)).into();
-
-    f_id
+    fl.new_instantaneous_assignment(Lit::Atom(var_id))
 }
 
 fn convert_string(_: &Arc<String>, _: &mut FlowGraph) -> FlowId {
@@ -72,20 +67,17 @@ fn convert_string(_: &Arc<String>, _: &mut FlowGraph) -> FlowId {
 
 fn convert_number(number: &LNumber, fl: &mut FlowGraph) -> FlowId {
     let id = fl.st.new_number(number);
-    let f_id = fl.new_instantaneous_assignment(Lit::Atom(id));
-    f_id
+    fl.new_instantaneous_assignment(Lit::Atom(id))
 }
 
 fn convert_bool(bool: bool, fl: &mut FlowGraph) -> FlowId {
     let id = fl.st.new_bool(bool);
-    let f_id = fl.new_instantaneous_assignment(Lit::Atom(id));
-    f_id
+    fl.new_instantaneous_assignment(Lit::Atom(id))
 }
 
 fn convert_nil(fl: &mut FlowGraph) -> FlowId {
     let id = fl.st.new_nil();
-    let f_id = fl.new_instantaneous_assignment(Lit::Atom(id));
-    f_id
+    fl.new_instantaneous_assignment(Lit::Atom(id))
 }
 
 fn convert_core_operator(_: &LPrimitive, _: &mut FlowGraph) -> FlowId {
@@ -100,7 +92,7 @@ fn convert_list(
 ) -> Result<FlowId, LRuntimeError> {
     let proc = &list[0];
     let mut out_of_scope: Vec<VarId> = vec![];
-    let mut st = fl.st.clone();
+    let st = fl.st.clone();
 
     let r = match proc {
         LValue::Symbol(s) => convert_apply(s.as_str(), list.as_slice(), fl, define_table)?,
@@ -203,7 +195,7 @@ fn convert_list(
                 fl.new_seq(vec![cond_flow, flow_branch])
             }
             LPrimitive::Quote => {
-                let lit = lvalue_to_lit(&list[1], &mut st)?;
+                let lit = lvalue_to_lit(&list[1], &st)?;
                 fl.new_instantaneous_assignment(lit)
             }
             LPrimitive::Begin => {

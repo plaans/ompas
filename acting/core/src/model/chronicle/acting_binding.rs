@@ -13,7 +13,7 @@ pub struct ActingBindingCollection {
 
 impl ActingBindingCollection {
     pub fn add_binding(&mut self, label: Label, binding: impl Into<ActingBinding>) {
-        if let Some(_) = self.inner.insert(label, binding.into()) {
+        if self.inner.insert(label, binding.into()).is_some() {
             panic!()
         }
     }

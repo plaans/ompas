@@ -4,6 +4,7 @@ use sompas_core::{eval_init, get_root_env, parse};
 use sompas_modules::utils::ModUtils;
 use sompas_structs::lenv::{ImportType, LEnv};
 
+#[allow(unused)]
 const EXPR: &str = "(begin \
     (define square (lambda (x) (* x x)))\
     (square a))";

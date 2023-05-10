@@ -68,7 +68,7 @@ impl HandleTable {
     }
 
     pub fn add_async_drop(&mut self, flow: &FlowId, drop: VarId) {
-        if let Some(handle) = self.asyncs.get_mut(&flow) {
+        if let Some(handle) = self.asyncs.get_mut(flow) {
             handle.drops.insert(drop);
         } else {
             panic!("");
@@ -84,7 +84,7 @@ impl HandleTable {
     }
 
     pub fn add_await(&mut self, flow: &FlowId, r#await: VarId) {
-        if let Some(handle) = self.asyncs.get_mut(&flow) {
+        if let Some(handle) = self.asyncs.get_mut(flow) {
             handle.awaits.insert(r#await);
         } else {
             panic!("");
@@ -179,7 +179,7 @@ pub fn convert_into_chronicle(
     ht: &mut HandleTable,
     fl: &mut FlowGraph,
     flow: &FlowId,
-    env: &LEnv,
+    _env: &LEnv,
     cv: &ConvertParameters,
 ) -> Result<Chronicle, LRuntimeError> {
     let st = fl.st.clone();
@@ -207,7 +207,7 @@ pub fn convert_into_chronicle(
         &fl.get_flow_interval(flow).get_end(),
     );
 
-    st.union_var(&ch.get_result(), &fl.get_flow_result(flow));
+    st.union_var(ch.get_result(), &fl.get_flow_result(flow));
 
     let mut queue = VecDeque::new();
     queue.push_back(*flow);
@@ -241,7 +241,7 @@ pub fn convert_into_chronicle(
                             fl.get_flow_end(&handle),
                             interval.get_end(),
                         ));*/
-                        st.union_var(&fl.get_flow_result(&handle), &result);
+                        st.union_var(&fl.get_flow_result(handle), &result);
                     }
                     Lit::Acquire(acq) => {
                         let quantity_symbol = st.new_symbol(QUANTITY);
@@ -425,7 +425,7 @@ pub fn convert_into_chronicle(
                                 let mut types = types.clone();
                                 types.push(*r.clone());
                                 for (f, t) in args.iter().zip(types) {
-                                    let r = fl.st.get_domain_id(&f);
+                                    let r = fl.st.get_domain_id(f);
                                     if !fl.st.meet_to_domain(&r, t).is_none() {
                                         panic!("brrruuuuuh")
                                     };
@@ -453,7 +453,7 @@ pub fn convert_into_chronicle(
                                 let mut types = types.clone();
                                 types.push(*r.clone());
                                 for (f, t) in args.iter().zip(types) {
-                                    let r = fl.st.get_domain_id(&f);
+                                    let r = fl.st.get_domain_id(f);
                                     if !fl.st.meet_to_domain(&r, t).is_none() {
                                         panic!("brrruuuuuh")
                                     };
@@ -478,7 +478,7 @@ pub fn convert_into_chronicle(
                             interval,
                             name: exec.clone(),
                             result,
-                            label: flow.label.clone(),
+                            label: flow.label,
                         };
 
                         let mut args = exec[1..].to_vec();
@@ -491,7 +491,7 @@ pub fn convert_into_chronicle(
                                 let mut types = types.clone();
                                 types.push(*r.clone());
                                 for (f, t) in args.iter().zip(types) {
-                                    let r = fl.st.get_domain_id(&f);
+                                    let r = fl.st.get_domain_id(f);
                                     if !fl.st.meet_to_domain(&r, t).is_none() {
                                         panic!("brrruuuuuh")
                                     };
@@ -549,7 +549,7 @@ pub fn convert_into_chronicle(
                         LRuntimeError,
                     > {
                         let mut branch_params: HashMap<VarId, VarId> = Default::default();
-                        let mut method = convert_into_chronicle(None, ht, fl, flow, env, cv)?;
+                        let mut method = convert_into_chronicle(None, ht, fl, flow, _env, cv)?;
                         for v in &method.get_variables() {
                             if let Some(declaration) = st.get_declaration(v) {
                                 //It means the variable has been created before the method, and shall be transformed into a parameter
@@ -560,7 +560,7 @@ pub fn convert_into_chronicle(
                                     );
                                     st.union_domain(
                                         &st.get_domain_id(&param),
-                                        &st.get_domain_id(&v),
+                                        &st.get_domain_id(v),
                                     );
                                     method.replace(v, &param);
                                     branch_params.insert(*v, param);
@@ -608,7 +608,7 @@ pub fn convert_into_chronicle(
                                 let id = match method_params.get(p) {
                                     None => {
                                         let id = ch.st.new_parameter(
-                                            ch.st.get_label(&p, false),
+                                            ch.st.get_label(p, false),
                                             ch.st.get_domain_of_var(p),
                                         );
                                         method.add_var(id);
@@ -616,7 +616,7 @@ pub fn convert_into_chronicle(
                                     }
                                     Some(id) => *id,
                                 };
-                                st.union_domain(&st.get_domain_id(&p), &st.get_domain_id(&id));
+                                st.union_domain(&st.get_domain_id(p), &st.get_domain_id(&id));
                                 method.add_task_parameter(&id);
                                 method.add_method_parameter(&id);
                             }
@@ -647,7 +647,7 @@ pub fn convert_into_chronicle(
                     task.append(&mut task_params);
                     ch.add_subtask(SubTask {
                         interval,
-                        name: task.into(),
+                        name: task,
                         result,
                         label: None,
                     })

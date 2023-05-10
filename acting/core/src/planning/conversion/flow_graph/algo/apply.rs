@@ -116,7 +116,7 @@ pub fn convert_apply(
 
     let results: Vec<VarId> = seq.iter().map(|f| fl.get_flow_result(f)).collect();
 
-    let flow_apply = match conv_collection.get_conversion(&proc) {
+    let flow_apply = match conv_collection.get_conversion(proc) {
         Some(proc) => proc(fl, seq)?,
         None => {
             seq.push(fl.new_assignment(Lit::Apply(results.clone())));
@@ -376,7 +376,7 @@ fn convert_div(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRunt
 
 fn convert_wait_for(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
     seq[0] = fl.new_assignment(fl.st.new_nil());
-    let last = fl.get_flow_result(&seq.last().unwrap());
+    let last = fl.get_flow_result(seq.last().unwrap());
     fl.st.set_domain(&fl.st.get_domain_id(&last), True);
     let nil = fl.st.new_nil();
     let result = fl.new_instantaneous_assignment(nil);
@@ -446,7 +446,7 @@ fn convert_sleep(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRu
     seq.push(r);*/
 
     let sleep = fl.new_assignment(fl.st.new_nil());
-    fl.set_duration(&sleep, fl.get_flow_result(&seq.last().unwrap()));
+    fl.set_duration(&sleep, fl.get_flow_result(seq.last().unwrap()));
     seq.push(sleep);
 
     Ok(fl.new_seq(seq))
@@ -560,7 +560,7 @@ fn convert_ctx_arbitrary(
     let flow_id = convert_arbitrary(fl, seq)?;
     let flow_arbitrary = fl.try_get_last_flow(&flow_id).unwrap();
 
-    fl.set_label(&flow_arbitrary, Label::Arbitrary(index as usize));
+    fl.set_label(&flow_arbitrary, Label::Arbitrary(index));
     Ok(flow_id)
 }
 
@@ -571,7 +571,7 @@ fn convert_ctx_exec_command(
     let index = extract_index(fl, &mut seq);
     let flow_id = convert_exec(fl, seq)?;
     let flow_exec = fl.try_get_last_flow(&flow_id).unwrap();
-    fl.set_label(&flow_exec, Label::Action(index as usize));
+    fl.set_label(&flow_exec, Label::Action(index));
     Ok(flow_id)
 }
 
@@ -582,7 +582,7 @@ fn convert_ctx_exec_task(
     let index = extract_index(fl, &mut seq);
     let flow_id = convert_exec(fl, seq)?;
     let flow_exec = fl.try_get_last_flow(&flow_id).unwrap();
-    fl.set_label(&flow_exec, Label::Action(index as usize));
+    fl.set_label(&flow_exec, Label::Action(index));
     Ok(flow_id)
 }
 
@@ -590,7 +590,7 @@ fn convert_ctx_acquire(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowI
     let index = extract_index(fl, &mut seq);
     let flow_id = convert_acquire(fl, seq)?;
     let flow_acquire = fl.try_get_last_flow(&flow_id).unwrap();
-    fl.set_label(&flow_acquire, Label::Acquire(index as usize));
+    fl.set_label(&flow_acquire, Label::Acquire(index));
     Ok(flow_id)
 }
 

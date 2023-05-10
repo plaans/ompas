@@ -64,7 +64,7 @@ Add initial state from RAEStateSnapshot
 fn initialize_state(
     ctx: &Ctx,
     state: &WorldStateSnapshot,
-    present_sf: &Vec<String>,
+    present_sf: &[String],
     init_ch: &mut Chronicle,
 ) {
     /*
@@ -158,13 +158,8 @@ fn initialize_goal_task(init_ch: &mut Chronicle, goal_tasks: &[LValueS], ctx: &m
     }
 }
 
-pub fn encode_init(
-    ctx: &Ctx,
-    state: &WorldStateSnapshot,
-    present_sf: &Vec<String>,
-    init: &mut ACI,
-) {
-    initialize_state(&ctx, state, present_sf, &mut init.chronicle);
+pub fn encode_init(ctx: &Ctx, state: &WorldStateSnapshot, present_sf: &[String], init: &mut ACI) {
+    initialize_state(ctx, state, present_sf, &mut init.chronicle);
     init.parameters = vec![];
     init.chronicle.start = ctx.origin();
     init.chronicle.end = ctx.horizon();
@@ -173,7 +168,7 @@ pub fn encode_init(
 pub fn generate_instances(
     ctx: &mut Ctx,
     table: &mut ActingVarRefTable,
-    instances: &Vec<ChronicleInstance>,
+    instances: &[ChronicleInstance],
 ) -> anyhow::Result<Vec<ACI>> {
     let mut new_instances: Vec<ACI> = vec![];
 
@@ -188,7 +183,7 @@ pub fn generate_instances(
         let template = read_chronicle(
             ctx,
             table,
-            &instance.am.chronicle.as_ref().unwrap(),
+            instance.am.chronicle.as_ref().unwrap(),
             Container::Instance(id),
             Some(scope),
         )?;

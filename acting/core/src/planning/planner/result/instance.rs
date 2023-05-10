@@ -17,7 +17,7 @@ pub async fn instantiate_chronicles(
         let chronicle = instance.am.chronicle.as_ref().unwrap();
         let mut instantiations = vec![];
         for var in &chronicle.variables {
-            let cst = get_var_as_cst(&table, ass, model, var);
+            let cst = get_var_as_cst(table, ass, model, var);
             let value = st.new_cst(cst);
             instantiations.push(Instantiation::new(*var, value));
         }

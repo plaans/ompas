@@ -23,7 +23,7 @@ const TRY_EVAL_APPLY: &str = "try_eval_apply";
 pub async fn post_processing(c: &mut Chronicle, env: &LEnv) -> Result<(), LRuntimeError> {
     c.st.flat_bindings();
     merge_conditions(c)?;
-    try_eval_apply(c, &env).await?;
+    try_eval_apply(c, env).await?;
     simplify_constraints(c)?;
     rm_useless_var(c);
     simplify_timepoints(c)?;
@@ -183,8 +183,7 @@ pub fn simplify_constraints(c: &mut Chronicle) -> Result<(), LRuntimeError> {
                         }
                     }
                     (Lit::Atom(a), Lit::Constraint(b)) | (Lit::Constraint(b), Lit::Atom(a)) => {
-                        if st
-                            .contained_in_domain(&st.get_domain_of_var(&a), &BasicType::True.into())
+                        if st.contained_in_domain(&st.get_domain_of_var(a), &BasicType::True.into())
                         {
                             vec.push((i, b.deref().clone()));
                         }
@@ -244,50 +243,48 @@ pub async fn try_eval_apply(c: &mut Chronicle, env: &LEnv) -> Result<(), LRuntim
     let mut c_to_remove: Vec<usize> = Default::default();
 
     'loop_constraint: for (i, constraint) in c.constraints.iter_mut().enumerate() {
-        if let Constraint::Eq(r_c, b) = constraint {
-            if let Lit::Atom(r_c) = r_c {
-                if let Lit::Apply(args) = b {
-                    let mut args = args.clone();
-                    args.flat_bindings(&st);
-                    for arg in &args {
-                        if !st.get_domain_of_var(&arg).is_constant() {
-                            continue 'loop_constraint;
+        if let Constraint::Eq(Lit::Atom(r_c), b) = constraint {
+            if let Lit::Apply(args) = b {
+                let mut args = args.clone();
+                args.flat_bindings(&st);
+                for arg in &args {
+                    if !st.get_domain_of_var(arg).is_constant() {
+                        continue 'loop_constraint;
+                    }
+                }
+                let expr = args.format(&st, true);
+                //print!("apply{expr}");
+                let mut env = env.clone();
+                let lv: LValue = {
+                    let lv = parse(expr.as_str(), &mut env).await?;
+                    eval(&lv, &mut env, None).await
+                }?;
+                //println!("=> {lv}");
+
+                let lit = lvalue_to_lit(&lv, &st)?;
+                match lit {
+                    Lit::Atom(a) => {
+                        if let EmptyDomains::Some(_) = st.union_var(r_c, &a) {
+                            return Err(LRuntimeError::new(
+                                TRY_EVAL_APPLY,
+                                format!(
+                                    "Simplification of {} did not worked, empty domain of result.",
+                                    b.format(&st, true)
+                                ),
+                            ));
+                        } else {
+                            c_to_remove.push(i)
                         }
                     }
-                    let expr = args.format(&st, true);
-                    //print!("apply{expr}");
-                    let mut env = env.clone();
-                    let lv: LValue = {
-                        let lv = parse(expr.as_str(), &mut env).await?;
-                        eval(&lv, &mut env, None).await
-                    }?;
-                    //println!("=> {lv}");
-
-                    let lit = lvalue_to_lit(&lv, &st)?;
-                    match lit {
-                        Lit::Atom(a) => {
-                            if let EmptyDomains::Some(_) = st.union_var(r_c, &a) {
-                                return Err(LRuntimeError::new(
-                                    TRY_EVAL_APPLY,
-                                    format!(
-                                        "Simplification of {} did not worked, empty domain of result.",
-                                        b.format(&st, true)
-                                    ),
-                                ));
-                            } else {
-                                c_to_remove.push(i)
-                            }
-                        }
-                        _ => {
-                            *b = lit;
-                        }
+                    _ => {
+                        *b = lit;
                     }
                 }
             }
         }
     }
 
-    let mut vec: Vec<usize> = c_to_remove.iter().copied().collect();
+    let mut vec: Vec<usize> = c_to_remove.to_vec();
 
     vec.reverse();
     vec.iter().for_each(|i| c.rm_constraint(*i));

@@ -23,6 +23,6 @@ pub fn print_chronicles(pr: &PlanResult) {
             None
         }
     }) {
-        printer::Printer::print_chronicle(&chronicle, model)
+        printer::Printer::print_chronicle(chronicle, model)
     }
 }

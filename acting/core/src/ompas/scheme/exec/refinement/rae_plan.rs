@@ -226,7 +226,7 @@ pub async fn rae_plan(env: &LEnv, task: &[LValue]) -> LResult {
     let ctx = env.get_context::<ModRaePlan>(MOD_RAE_PLAN)?;
     let level = ctx.level.load(Ordering::Relaxed);
 
-    let mut methods: Vec<LValue> = greedy_select(&state, &ctx.tried, &task.to_vec(), env)
+    let mut methods: Vec<LValue> = greedy_select(&state, &ctx.tried, task, env)
         .await?
         .possibilities;
     if let Some(b) = ctx.config.get_b() {

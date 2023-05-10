@@ -27,7 +27,23 @@ impl From<InstanceCollectionSnapshot> for PartialState {
     }
 }
 
-#[derive(Clone)]
+impl InstanceCollectionSnapshot {
+    pub fn is_of_type(&self, i: &str, t: &str) -> bool {
+        match self.inner.get(t) {
+            Some(set) => set.contains(i),
+            None => false,
+        }
+    }
+
+    pub fn get_instances(&self, t: &str) -> Vec<String> {
+        match self.inner.get(t) {
+            Some(set) => set.iter().cloned().collect(),
+            None => vec![],
+        }
+    }
+}
+
+#[derive(Clone, Default)]
 pub struct InstanceCollection {
     pub st: RefSymTable,
     pub inner: HashMap<String, HashSet<String>>,
@@ -38,15 +54,6 @@ impl From<InstanceCollectionSnapshot> for InstanceCollection {
         Self {
             st: RefSymTable::default(),
             inner: value.inner,
-        }
-    }
-}
-
-impl Default for InstanceCollection {
-    fn default() -> Self {
-        Self {
-            st: Default::default(),
-            inner: Default::default(),
         }
     }
 }

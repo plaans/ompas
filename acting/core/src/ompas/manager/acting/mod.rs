@@ -75,7 +75,7 @@ impl ActingManager {
             state: WorldState::new(st.clone()),
             inner: Arc::new(RwLock::new(InnerActingManager::new(
                 resource_manager,
-                instant.clone(),
+                instant,
                 st,
             ))),
             instant,
@@ -352,7 +352,7 @@ impl ActingManager {
     }
 
     pub async fn get_task_args(&self, id: &ActingProcessId) -> Vec<Cst> {
-        self.inner.read().await.get_task_args(id).clone()
+        self.inner.read().await.get_task_args(id)
     }
 
     pub async fn set_action_args(&self, id: &ActingProcessId, args: Vec<Cst>) {
@@ -377,7 +377,11 @@ impl ActingManager {
 
     pub async fn start_continuous_planning(&self, env: LEnv, opt: Option<PMetric>) {
         self.planning
-            .compare_exchange(true, false, Ordering::Relaxed, Ordering::Relaxed);
+            .compare_exchange(true, false, Ordering::Relaxed, Ordering::Relaxed)
+            .unwrap_or_else(|_| {
+                eprintln!("error compare exchange in start_continuous_planning");
+                false
+            });
         let mut locked = self.inner.write().await;
         let st = self.st.clone();
         let domain = self.domain.read().await.clone();

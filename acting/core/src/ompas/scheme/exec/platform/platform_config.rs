@@ -6,17 +6,12 @@ pub trait ConfigTrait: Any + Display + Send + Sync {}
 
 impl<T> ConfigTrait for T where T: Any + Display + Send + Sync {}
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub enum PlatformConfig {
     String(String),
     Any(Arc<dyn ConfigTrait>),
+    #[default]
     None,
-}
-
-impl Default for PlatformConfig {
-    fn default() -> Self {
-        PlatformConfig::None
-    }
 }
 
 pub enum InnerPlatformConfig<'a, T> {

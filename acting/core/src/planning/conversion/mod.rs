@@ -74,7 +74,7 @@ pub async fn convert(
     let lv_om = annotate(p_eval_lv);
     //debug_println!("annotate =>\n{}", lv_om.format(0));
 
-    let pp_lv = pre_processing(&lv_om, &p_env).await?;
+    let pp_lv = pre_processing(&lv_om, p_env).await?;
     //debug_println!("pre_processing =>\n{}", pp_lv.format(0));
 
     let chronicle = match _convert(ch, &pp_lv, p_env, st).await {
@@ -103,7 +103,7 @@ pub async fn _convert(
     //let n_conversion = N_CONVERSION.fetch_add(1, Ordering::Relaxed);
     let mut graph = FlowGraph::new(st);
     //debug_println!("conversion n{n_conversion}...");
-    let flow = convert_lv(&lv, &mut graph, &mut Default::default())?;
+    let flow = convert_lv(lv, &mut graph, &mut Default::default())?;
     //debug_println!("convert({n_conversion}) = ok!");
     let time = SystemTime::now();
     graph.flow = flow;
@@ -160,7 +160,7 @@ pub async fn p_convert_task(
                 t.get_label(),
                 None,
                 t.get_parameters(),
-                &context,
+                context,
                 ChronicleKind::Method,
                 pc.clone(),
             )
@@ -192,7 +192,7 @@ pub async fn p_convert_task(
                     &method.label,
                     Some(t),
                     method.get_parameters(),
-                    &context,
+                    context,
                     ChronicleKind::Method,
                     pc.clone(),
                 )
@@ -297,7 +297,7 @@ pub async fn p_convert(
                         task.get_label(),
                         None,
                         task.get_parameters(),
-                        &cc,
+                        cc,
                         ChronicleKind::Task,
                         pc.clone(),
                     )
@@ -335,7 +335,7 @@ pub async fn p_convert(
                             &method.label,
                             Some(task),
                             method.get_parameters(),
-                            &cc,
+                            cc,
                             ChronicleKind::Method,
                             pc.clone(),
                         )
@@ -377,7 +377,7 @@ pub async fn p_convert(
                     command.get_label(),
                     None,
                     command.get_parameters(),
-                    &cc,
+                    cc,
                     ChronicleKind::Command,
                     pc,
                 )
@@ -463,7 +463,7 @@ pub async fn convert_acting_domain(
             command.get_label(),
             None,
             command.get_parameters(),
-            &cc,
+            cc,
             ChronicleKind::Command,
             pc,
         )
@@ -494,7 +494,7 @@ pub async fn convert_acting_domain(
             &method.label,
             Some(task),
             method.get_parameters(),
-            &cc,
+            cc,
             ChronicleKind::Method,
             pc,
         )
@@ -622,7 +622,7 @@ pub fn declare_task(task: &Task, st: RefSymTable) -> TaskChronicle {
 
 pub fn debug_with_markdown(label: &str, om: &ActingModel, path: PathBuf, view: bool) {
     let ch = om.chronicle.as_ref().unwrap();
-    let label = label.replace("/", "_");
+    let label = label.replace('/', "_");
     let mut path = path;
     let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
     let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
@@ -646,14 +646,14 @@ pub fn debug_with_markdown(label: &str, om: &ActingModel, path: PathBuf, view: b
 
     let mut path_dot = path.clone();
     let dot_file_name = "lattice.dot";
-    path_dot.push(&dot_file_name);
+    path_dot.push(dot_file_name);
     let mut file = File::create(&path_dot).unwrap();
     let dot = ch.st.export_lattice_dot();
     file.write_all(dot.as_bytes()).unwrap();
     set_current_dir(&path).unwrap();
     let lattice_file_name = "lattice.png";
     Command::new("dot")
-        .args(["-Tpng", &dot_file_name, "-o", &lattice_file_name])
+        .args(["-Tpng", dot_file_name, "-o", lattice_file_name])
         .spawn()
         .unwrap()
         .wait()

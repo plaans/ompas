@@ -223,7 +223,7 @@ pub async fn pre_eval_task(env: &LEnv, task: &[LValue]) -> Result<(), LRuntimeEr
         let mut p_env = PLEnv {
             env,
             unpure_bindings: Default::default(),
-            pc: pc,
+            pc,
         };
         let plv = p_eval(lv, &mut p_env).await?;
         println!(
@@ -274,7 +274,7 @@ pub async fn annotate_task(env: &LEnv, task: &[LValue]) -> Result<(), LRuntimeEr
         let mut p_env = PLEnv {
             env,
             unpure_bindings: Default::default(),
-            pc: pc,
+            pc,
         };
         let lv = p_eval(lv, &mut p_env).await?;
         let lv = annotate(lv);

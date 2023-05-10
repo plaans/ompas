@@ -6,6 +6,12 @@ pub struct RootProcess {
     pub tasks: Vec<ActingProcessId>,
 }
 
+impl Default for RootProcess {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RootProcess {
     pub fn new() -> Self {
         Self { tasks: vec![] }

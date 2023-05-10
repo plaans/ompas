@@ -169,7 +169,7 @@ pub async fn run_continuous_planning(config: ContinuousPlanningConfig) {
                                     choices,
                                 };
 
-                                if let Err(_) = plan_sender.send(pu).await {
+                                if plan_sender.send(pu).await.is_err() {
                                     panic!("error sending plan update")
                                 }
 
@@ -222,14 +222,14 @@ pub async fn populate_problem(
                 task_id,
             };
 
-            if em.iter().find(|ci| ci.origin == origin).is_none() {
+            if !em.iter().any(|ci| ci.origin == origin) {
                 let mut value: Vec<ActionParam> = vec![];
                 for e in &subtask.name {
-                    let domain = st.get_domain_of_var(&e);
+                    let domain = st.get_domain_of_var(e);
 
                     let val = match domain.as_cst() {
                         Some(cst) => ActionParam::Instantiated(cst.clone().into()),
-                        None => ActionParam::Uninstantiated(st.format_variable(&e).into()),
+                        None => ActionParam::Uninstantiated(st.format_variable(e).into()),
                     };
                     value.push(val)
                 }
@@ -248,11 +248,11 @@ pub async fn populate_problem(
             }
 
             for effect in chronicle.get_effects() {
-                sf_labels.insert(effect.sv[0].format(&st, true));
+                sf_labels.insert(effect.sv[0].format(st, true));
             }
 
             for condition in chronicle.get_conditions() {
-                sf_labels.insert(condition.sv[0].format(&st, true));
+                sf_labels.insert(condition.sv[0].format(st, true));
             }
         }
     };
@@ -281,8 +281,8 @@ pub async fn populate_problem(
                         action,
                         None,
                         task.get_parameters(),
-                        &st,
-                        &env,
+                        st,
+                        env,
                         ChronicleKind::Task,
                     )
                     .await?;
@@ -311,8 +311,8 @@ pub async fn populate_problem(
                             p_method,
                             Some(&action.args),
                             method.get_parameters(),
-                            &st,
-                            &env,
+                            st,
+                            env,
                             ChronicleKind::Method,
                         )
                         .await?;
@@ -340,8 +340,8 @@ pub async fn populate_problem(
                 action,
                 None,
                 command.get_parameters(),
-                &st,
-                &env,
+                st,
+                env,
                 ChronicleKind::Command,
             )
             .await?;

@@ -94,13 +94,7 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
         let lv: Vec<LValue> = chronicle
             .get_name()
             .iter()
-            .map(|var_id| {
-                st.get_domain_of_var(var_id)
-                    .as_cst()
-                    .unwrap()
-                    .clone()
-                    .into()
-            })
+            .map(|var_id| st.get_domain_of_var(var_id).as_cst().unwrap().into())
             .collect();
         let lv = lv.into();
 
@@ -151,13 +145,7 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
                     let lv: Vec<LValue> = s
                         .name
                         .iter()
-                        .map(|var_id| {
-                            st.get_domain_of_var(var_id)
-                                .as_cst()
-                                .unwrap()
-                                .clone()
-                                .into()
-                        })
+                        .map(|var_id| st.get_domain_of_var(var_id).as_cst().unwrap().into())
                         .collect();
                     let lv = lv.into();
 

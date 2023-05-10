@@ -82,7 +82,10 @@ pub async fn rae(
                                 let id: ProcessRef = acting_manager.new_high_level_task(job_lvalue.to_string(),vec_cst).await;
                                 if let Some(mut watcher) = acting_manager.subscribe_on_plan_update().await {
                                     println!("waiting on plan update");
-                                    watcher.recv().await;
+                                    watcher.recv().await.unwrap_or_else(|_| {
+                                        eprintln!("error on watcher");
+                                        false
+                                    });
                                     println!("plan available, going to execute now");
                                 }
 

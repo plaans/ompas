@@ -36,7 +36,7 @@ impl ProcessOrigin {
 
 pub struct ActingProcess {
     id: ActingProcessId,
-    _parent: ActingProcessId,
+    parent: ActingProcessId,
     am_id: AMId,
     debug: Option<String>,
     pub origin: ProcessOrigin,
@@ -80,9 +80,10 @@ impl Display for ActingProcess {
 }
 
 impl ActingProcess {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         id: ActingProcessId,
-        _parent: ActingProcessId,
+        parent: ActingProcessId,
         origin: ProcessOrigin,
         om_id: AMId,
         debug: Option<String>,
@@ -92,7 +93,7 @@ impl ActingProcess {
     ) -> Self {
         Self {
             id,
-            _parent,
+            parent,
             am_id: om_id,
             debug,
             origin,
@@ -109,7 +110,7 @@ impl ActingProcess {
     }
 
     pub fn parent(&self) -> ActingProcessId {
-        self._parent
+        self.parent
     }
 
     pub fn am_id(&self) -> AMId {

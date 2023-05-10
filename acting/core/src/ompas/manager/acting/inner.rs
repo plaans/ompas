@@ -212,11 +212,7 @@ impl InnerActingManager {
                     match &label {
                         Label::Action(s) => {
                             if id == 0 {
-                                id = if let Some(id) = obj.inner.as_root().unwrap().nth_task(*s) {
-                                    id
-                                } else {
-                                    return None;
-                                }
+                                id = obj.inner.as_root().unwrap().nth_task(*s)?;
                             } else {
                                 id = if let Some(id) =
                                     obj.inner.as_method().unwrap().childs.get(&label)
@@ -336,7 +332,7 @@ impl InnerActingManager {
             self.set_execution_vals(vec![val]).await;
         }
 
-        if self.get_kind(&id) == ProcessKind::Action {
+        if self.get_kind(id) == ProcessKind::Action {
             if let Some(refinement) = self.processes[*id]
                 .inner
                 .as_action()
@@ -369,7 +365,7 @@ impl InnerActingManager {
 
     pub fn set_status(&mut self, id: &ActingProcessId, status: ProcessStatus) {
         self.processes[*id].set_status(status);
-        if self.get_kind(&id) == ProcessKind::Action {
+        if self.get_kind(id) == ProcessKind::Action {
             if let Some(refinement) = self.processes[*id]
                 .inner
                 .as_action()
@@ -1006,7 +1002,7 @@ impl InnerActingManager {
 
         while let Some(id) = queue.pop() {
             let ap = &self.processes[id];
-            let label = format_acting_process(&self.acting_vars, &ap);
+            let label = format_acting_process(&self.acting_vars, ap);
             let color = match ap.origin {
                 ProcessOrigin::Planner => COLOR_EXECUTION,
                 ProcessOrigin::Execution => COLOR_PLANNING,
@@ -1054,14 +1050,14 @@ impl InnerActingManager {
 
         let mut path_dot = path.clone();
         let dot_file_name = "trace.dot";
-        path_dot.push(&dot_file_name);
+        path_dot.push(dot_file_name);
         let mut file = File::create(&path_dot).unwrap();
         let dot = self.export_trace_dot_graph();
         file.write_all(dot.as_bytes()).unwrap();
         set_current_dir(&path).unwrap();
         let trace = "trace.png";
         std::process::Command::new("dot")
-            .args(["-Tpng", &dot_file_name, "-o", &trace])
+            .args(["-Tpng", dot_file_name, "-o", trace])
             .spawn()
             .unwrap()
             .wait()
@@ -1069,7 +1065,7 @@ impl InnerActingManager {
 
         let mut md_path = path.clone();
         let md_file_name = "trace.md";
-        md_path.push(&md_file_name);
+        md_path.push(md_file_name);
         let mut md_file = File::create(&md_path).unwrap();
         let md: String = format!(
             "
@@ -1083,7 +1079,7 @@ impl InnerActingManager {
         md_file.write_all(md.as_bytes()).unwrap();
 
         std::process::Command::new("google-chrome")
-            .arg(&md_file_name)
+            .arg(md_file_name)
             .spawn()
             .unwrap();
     }
@@ -1128,10 +1124,8 @@ impl InnerActingManager {
                                 id
                             }
                             _ => {
-                                let id = self
-                                    .new_action(label, &parent, args, debug, ProcessOrigin::Planner)
-                                    .await;
-                                id
+                                self.new_action(label, &parent, args, debug, ProcessOrigin::Planner)
+                                    .await
                             }
                         }
                     }
@@ -1207,7 +1201,7 @@ impl InnerActingManager {
         let mut update = |plan_var_id: &Option<ActingVarId>, val: Cst| {
             updates.push(ActingValUpdate {
                 plan_var_id: plan_var_id.unwrap(),
-                val: val.clone(),
+                val,
             })
         };
 
@@ -1275,7 +1269,7 @@ impl InnerActingManager {
         };
 
         fs::create_dir_all(&dir_path).expect("could not create stats directory");
-        let mut file_path = dir_path.clone();
+        let mut file_path = dir_path;
         file_path.push(match file {
             Some(f) => format!("{}.csv", f),
             None => format!("{}{}.csv", OMPAS_STATS, string_date),
@@ -1303,7 +1297,7 @@ impl InnerActingManager {
                     process.status,
                     {
                         let start = process.start.get_val().unwrap();
-                        let end = process.end.get_val().clone();
+                        let end = *process.end.get_val();
                         let interval = Interval::new(start, end);
                         let duration = interval.duration();
                         if duration.is_finite() {

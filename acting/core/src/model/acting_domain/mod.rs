@@ -4,7 +4,6 @@ use crate::model::acting_domain::model::ModelKind;
 use crate::model::acting_domain::state_function::StateFunction;
 use crate::model::acting_domain::task::Task;
 use im::HashMap;
-use ompas_language::exec::refinement::*;
 use ompas_language::*;
 use sompas_structs::lenv::LEnvSymbols;
 use sompas_structs::lruntimeerror;

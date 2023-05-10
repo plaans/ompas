@@ -109,7 +109,7 @@ impl Ord for Ticket {
 
 impl PartialOrd for Ticket {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(&other))
+        Some(self.cmp(other))
     }
 }
 
@@ -126,7 +126,7 @@ impl Ord for WaiterPriority {
 
 impl PartialOrd for WaiterPriority {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(&other))
+        Some(self.cmp(other))
     }
 }
 
@@ -199,9 +199,9 @@ impl Resource {
         self.queue = self
             .queue
             .iter()
-            .map(|id| (id, self.clients.get(&id).unwrap().priority))
-            .sorted_by(|(id1, p1), (id2, p2)| match p1.cmp(&p2) {
-                Ordering::Equal => id1.cmp(&id2),
+            .map(|id| (id, self.clients.get(id).unwrap().priority))
+            .sorted_by(|(id1, p1), (id2, p2)| match p1.cmp(p2) {
+                Ordering::Equal => id1.cmp(id2),
                 other => other,
             })
             .map(|(id, _)| *id)
@@ -214,7 +214,6 @@ impl Resource {
         while let Some(ticket_id) = queue.pop() {
             let waiter = self.clients.get(&ticket_id).unwrap();
             if waiter.quantity <= self.capacity {
-                drop(waiter);
                 let acquire: ResourceHandler = self.add_acquire(&ticket_id);
                 let waiter = self.clients.get(&ticket_id).unwrap();
                 match waiter.tx.send(acquire).await {
@@ -253,7 +252,7 @@ impl Resource {
     }
 
     pub fn _remove_client(&mut self, acquire_id: &ClientId) {
-        self.clients.remove(&acquire_id);
+        self.clients.remove(acquire_id);
     }
 
     pub fn quantity_as_usize(&self, quantity: &Quantity) -> usize {
@@ -400,12 +399,17 @@ impl ResourceManager {
         map.insert(id, resource);
         let value = self.max_capacity.load(atomic::Ordering::Relaxed);
         if capacity > value {
-            self.max_capacity.compare_exchange(
-                value,
-                capacity,
-                atomic::Ordering::Release,
-                atomic::Ordering::Acquire,
-            );
+            self.max_capacity
+                .compare_exchange(
+                    value,
+                    capacity,
+                    atomic::Ordering::Release,
+                    atomic::Ordering::Acquire,
+                )
+                .unwrap_or_else(|b| {
+                    eprintln!("error on compare_exchange in new_resource");
+                    b
+                });
         }
     }
 
@@ -415,7 +419,7 @@ impl ResourceManager {
         quantity: Quantity,
         priority: WaiterPriority,
     ) -> Result<WaitAcquire, LRuntimeError> {
-        let id = self.get_id(&label).await.ok_or_else(|| {
+        let id = self.get_id(label).await.ok_or_else(|| {
             LRuntimeError::new("acquire", format!("Resource {} does not exist.", label))
         })?;
         let mut map = self.inner.lock().await;
@@ -429,7 +433,7 @@ impl ResourceManager {
         quantity: Quantity,
         priority: WaiterPriority,
     ) -> Result<WaitAcquire, LRuntimeError> {
-        let id = self.get_id(&label).await.ok_or_else(|| {
+        let id = self.get_id(label).await.ok_or_else(|| {
             LRuntimeError::new("acquire", format!("Resource {} does not exist.", label))
         })?;
         let mut map = self.inner.lock().await;
@@ -452,7 +456,7 @@ impl ResourceManager {
     }
 
     pub async fn is_locked(&self, label: &str) -> Result<bool, LRuntimeError> {
-        let id = self.get_id(&label).await.ok_or_else(|| {
+        let id = self.get_id(label).await.ok_or_else(|| {
             LRuntimeError::new("acquire", format!("Resource {} does not exist.", label))
         })?;
         Ok(!self
@@ -487,7 +491,7 @@ impl ResourceManager {
         priority: WaiterPriority,
     ) {
         let mut map = self.inner.lock().await;
-        let resource: &mut Resource = map.get_mut(&resource_id).unwrap();
+        let resource: &mut Resource = map.get_mut(resource_id).unwrap();
         resource.update_priority(client_id, priority)
     }
 
@@ -497,7 +501,7 @@ impl ResourceManager {
         client_id: &ClientId,
     ) -> usize {
         let map = self.inner.lock().await;
-        let resource: &Resource = map.get(&resource_id).unwrap();
+        let resource: &Resource = map.get(resource_id).unwrap();
         resource.get_client_quantity(client_id)
     }
 
@@ -552,17 +556,13 @@ impl ResourceManager {
                 list![MAX_Q.into(), resource.label.clone().into()]
                     .try_into()
                     .unwrap(),
-                LValue::from(usize::from(resource.max_capacity))
-                    .try_into()
-                    .unwrap(),
+                LValue::from(resource.max_capacity).try_into().unwrap(),
             );
             r#dynamic.insert(
                 list![QUANTITY.into(), resource.label.clone().into()]
                     .try_into()
                     .unwrap(),
-                LValue::from(usize::from(resource.capacity))
-                    .try_into()
-                    .unwrap(),
+                LValue::from(resource.capacity).try_into().unwrap(),
             );
         }
 

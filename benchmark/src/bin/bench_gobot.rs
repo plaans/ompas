@@ -35,6 +35,7 @@ pub struct Opt {
     #[structopt(short = "L", long = "lrptf")]
     lrpt: bool,
 
+    #[allow(dead_code)]
     #[structopt(short = "r", long = "random")]
     random: bool,
 
@@ -227,12 +228,12 @@ pub fn domain(opt: &Opt) -> LispDomain {
     } else if opt.aries_opt || opt.aries {
         "aries.lisp"
     } else {
-        "greedy.lisp"
+        "random.lisp"
     });
     let mut base = domain.clone();
     base.push("base.lisp");
 
-    let mut jobshop = domain.clone();
+    let mut jobshop = domain;
     jobshop.push("jobshop.lisp");
 
     let domain = format!(

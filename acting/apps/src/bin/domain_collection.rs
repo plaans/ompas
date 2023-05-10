@@ -1,5 +1,7 @@
 use chrono::{DateTime, Utc};
+use ompas_core::model::sym_domain::cst;
 use ompas_core::model::sym_domain::domain_test::DomainTest;
+use ompas_core::model::sym_domain::domain_test::DomainTest::*;
 use ompas_core::model::sym_domain::type_lattice::TypeLattice;
 use ompas_language::sym_table::TYPE_OBJECT;
 use std::env::set_current_dir;
@@ -17,6 +19,7 @@ fn meet(dc: &TypeLattice, ta: impl Into<DomainTest>, tb: impl Into<DomainTest>) 
     r
 }
 
+#[allow(unused)]
 fn union(dc: &TypeLattice, ta: impl Into<DomainTest>, tb: impl Into<DomainTest>) -> DomainTest {
     let ta = ta.into();
     let tb = tb.into();
@@ -25,6 +28,7 @@ fn union(dc: &TypeLattice, ta: impl Into<DomainTest>, tb: impl Into<DomainTest>)
     r
 }
 
+#[allow(unused)]
 fn sub(dc: &TypeLattice, ta: impl Into<DomainTest>, tb: impl Into<DomainTest>) -> DomainTest {
     let ta = ta.into();
     let tb = tb.into();
@@ -65,21 +69,21 @@ fn output_domain_collection(path: PathBuf, dc: &TypeLattice, view: bool) {
     fs::create_dir_all(&path).unwrap();
     let mut path_dot = path.clone();
     let dot_file_name = "type_network.dot";
-    path_dot.push(&dot_file_name);
+    path_dot.push(dot_file_name);
     let mut file = File::create(&path_dot).unwrap();
     let dot = dc.export_dot();
     file.write_all(dot.as_bytes()).unwrap();
     set_current_dir(&path).unwrap();
     let graph_file_name = "type_network.png";
     Command::new("dot")
-        .args(["-Tpng", &dot_file_name, "-o", &graph_file_name])
+        .args(["-Tpng", dot_file_name, "-o", graph_file_name])
         .spawn()
         .unwrap()
         .wait()
         .unwrap();
     let mut md_path = path.clone();
     let md_file_name = "type_network.md";
-    md_path.push(&md_file_name);
+    md_path.push(md_file_name);
     let mut md_file = File::create(&md_path).unwrap();
     let md: String = format!(
         "# Type Network : \n
@@ -92,7 +96,7 @@ fn output_domain_collection(path: PathBuf, dc: &TypeLattice, view: bool) {
 
     if view {
         Command::new("google-chrome")
-            .arg(&md_file_name)
+            .arg(md_file_name)
             .spawn()
             .unwrap();
     }

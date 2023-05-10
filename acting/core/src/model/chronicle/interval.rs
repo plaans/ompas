@@ -69,14 +69,11 @@ impl FormatWithSymTable for Interval {
             match self.duration {
                 Some(duration) => {
                     format!(
-                        "[{},{}{}]",
+                        "[{},{}={}+{}]",
                         self.start.format(st, sym_version),
                         self.end.format(st, sym_version),
-                        format!(
-                            "={}+{}",
-                            self.start.format(st, sym_version),
-                            duration.format(st, sym_version)
-                        )
+                        self.start.format(st, sym_version),
+                        duration.format(st, sym_version)
                     )
                 }
                 None => {

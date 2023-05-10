@@ -450,8 +450,8 @@ fn post_process_state(
                         median_y += cell.1;
                     }
 
-                    median_x = median_x / cells.len() as i64;
-                    median_y = median_y / cells.len() as i64;
+                    median_x /= cells.len() as i64;
+                    median_y /= cells.len() as i64;
 
                     //finding the closest point;
                     let mut shortest_distance = None;

@@ -78,7 +78,7 @@ impl PartialOrd for Timepoint {
 
 impl Display for Timepoint {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.as_secs().to_string())
+        write!(f, "{}", self.as_secs())
     }
 }
 
@@ -134,7 +134,7 @@ impl Interval {
 
     pub fn set_end(&mut self, end: Timepoint) {
         assert!(self.start <= end);
-        self.end = Some(end.into())
+        self.end = Some(end)
     }
 }
 #[derive(Copy, Clone)]

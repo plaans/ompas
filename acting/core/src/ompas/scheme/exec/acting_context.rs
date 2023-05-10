@@ -58,16 +58,16 @@ pub async fn def_label(env: &mut LEnv, kind: String, id: usize) {
     };
 
     let process_ref = match ctx.process_ref {
-        ProcessRef::Id(id) => ProcessRef::Relative(id, vec![label.into()]),
+        ProcessRef::Id(id) => ProcessRef::Relative(id, vec![label]),
         ProcessRef::Relative(id, labels) => {
             let mut new_labels = labels.clone();
             match labels.last().unwrap() {
                 Label::Refinement(_) | Label::Action(_) => {
-                    new_labels.push(label.into());
+                    new_labels.push(label);
                 }
                 _ => {
                     new_labels.pop();
-                    new_labels.push(label.into());
+                    new_labels.push(label);
                 }
             }
             ProcessRef::Relative(id, new_labels)

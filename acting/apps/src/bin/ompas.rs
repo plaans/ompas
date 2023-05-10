@@ -6,7 +6,7 @@ use sompas_repl::lisp_interpreter::{LispInterpreter, LispInterpreterConfig};
 use std::fs;
 use std::path::PathBuf;
 
-use ompas_core::monitor::ModMonitor;
+use ompas_core::ompas::scheme::monitor::ModMonitor;
 use ompas_language::process::LOG_TOPIC_OMPAS;
 use ompas_middleware::logger::FileDescriptor;
 use ompas_middleware::Master;
@@ -17,8 +17,6 @@ pub const TOKIO_CHANNEL_SIZE: usize = 65_384;
 #[derive(Debug, StructOpt)]
 #[structopt(name = "OMPAS", about = "An acting engine based on RAE.")]
 struct Opt {
-    #[structopt(short = "v", long = "view")]
-    view: bool,
     #[structopt(short = "l", long = "log-path")]
     log: Option<PathBuf>,
 

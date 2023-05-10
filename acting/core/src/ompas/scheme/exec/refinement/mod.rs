@@ -166,7 +166,7 @@ pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
         .await
         .map_err(|e: LRuntimeError| e.chain("select"))?;
 
-    check_select_response(env, &ctx, &task_id, sr)
+    check_select_response(env, ctx, &task_id, sr)
         .await
         .map_err(|e| e.chain("check_select_response"))
 }
@@ -192,7 +192,7 @@ async fn check_select_response(
                 log.error(format!("No applicable method for task {debug}({task_id})"))
                     .await;
                 acting_manager
-                    .set_end(&task_id, None, ProcessStatus::Failure)
+                    .set_end(task_id, None, ProcessStatus::Failure)
                     .await;
                 return Ok(RaeExecError::NoApplicableMethod.into());
             } else {
@@ -213,17 +213,15 @@ async fn check_select_response(
                     panic!()
                 };
 
-                let method_id = acting_manager
-                    .new_refinement(&task_id, debug, args, model, ProcessOrigin::Execution)
-                    .await;
-
-                method_id
+                acting_manager
+                    .new_refinement(task_id, debug, args, model, ProcessOrigin::Execution)
+                    .await
             }
         }
     };
 
     acting_manager
-        .set_status(&task_id, ProcessStatus::Running(None))
+        .set_status(task_id, ProcessStatus::Running(None))
         .await;
     acting_manager.set_start(&method_id, None).await;
     acting_manager
@@ -385,8 +383,8 @@ pub async fn select(task_id: ActingProcessId, env: &LEnv) -> Result<SelectRespon
 
 pub async fn greedy_select(
     state: &WorldStateSnapshot,
-    tried: &Vec<LValue>,
-    task: &Vec<LValue>,
+    tried: &[LValue],
+    task: &[LValue],
     env: &LEnv,
 ) -> lruntimeerror::Result<RefinementInner> {
     /*

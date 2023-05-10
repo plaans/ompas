@@ -130,10 +130,10 @@ pub struct ParameterTable {
 impl ParameterTable {
     pub fn add_param(&mut self, param: String) {
         self.inner
-            .insert(param.to_string(), PLValue::unpure(symbol!(param.into())));
+            .insert(param.to_string(), PLValue::unpure(symbol!(param)));
     }
     pub fn add_instantiated(&mut self, param: String, value: LValue) {
-        self.inner.insert(param.to_string(), PLValue::pure(value));
+        self.inner.insert(param, PLValue::pure(value));
     }
 
     pub fn add(&mut self, param: String, plv: PLValue) {

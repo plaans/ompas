@@ -85,8 +85,8 @@ pub fn encode_ctx(
         .collect();
     //Add TypeHierarchy
     for t in &new_types {
-        let sym = lattice.format_type(&t);
-        let parent = lattice.format_type(&lattice.get_parent(&t).first().unwrap());
+        let sym = lattice.format_type(t);
+        let parent = lattice.format_type(lattice.get_parent(t).first().unwrap());
         types.push((sym.to_string().into(), Some(parent.into())));
         symbols.push(TypedSymbol::new(sym, TYPE_OBJECT_TYPE));
     }
@@ -219,13 +219,8 @@ pub fn generate_templates(
     let cont = Container::Template(templates.len());
 
     for template in templates {
-        let template = read_chronicle(
-            ctx,
-            table,
-            template.chronicle.as_ref().unwrap(),
-            cont.clone(),
-            None,
-        )?;
+        let template =
+            read_chronicle(ctx, table, template.chronicle.as_ref().unwrap(), cont, None)?;
         Printer::print_chronicle(&template.chronicle, &ctx.model);
         planner_templates.push(template);
     }
@@ -268,7 +263,7 @@ fn convert_constraint(
                 let mut cs =
                     convert_constraint(c.deref(), prez, container, table, st, ctx, Some(value))?;
                 constraints.append(&mut cs);
-                aConstraint::neq(get_atom(&a, ctx), value)
+                aConstraint::neq(get_atom(a, ctx), value)
             }
             (Lit::Atom(value), Lit::Computation(c)) => {
                 let value = get_atom(value, ctx);
@@ -440,7 +435,7 @@ fn convert_constraint(
                     _ => {
                         let mut lsum = LinearSum::zero();
                         for term in terms {
-                            lsum = lsum + term;
+                            lsum += term;
                         }
                         lsum = lsum + cst;
                         aConstraint::sum(Sum {
@@ -478,7 +473,7 @@ fn convert_constraint(
             for arg in args {
                 match arg {
                     Lit::Atom(id) => {
-                        let atom = get_atom(&id, ctx);
+                        let atom = get_atom(id, ctx);
                         or_args.push(atom)
                     }
                     Lit::Constraint(c) => {
@@ -487,7 +482,7 @@ fn convert_constraint(
                             .new_optional_bvar(prez, container / VarType::Reification)
                             .into();
                         let mut cs =
-                            convert_constraint(&c, prez, container, table, st, ctx, Some(value))?;
+                            convert_constraint(c, prez, container, table, st, ctx, Some(value))?;
 
                         constraints.append(&mut cs);
                         or_args.push(value.into())
@@ -509,7 +504,7 @@ fn convert_constraint(
             for arg in args {
                 match arg {
                     Lit::Atom(id) => {
-                        let atom = get_atom(&id, ctx);
+                        let atom = get_atom(id, ctx);
                         or_args.push(atom)
                     }
                     Lit::Constraint(c) => {
@@ -518,7 +513,7 @@ fn convert_constraint(
                             .new_optional_bvar(prez, container / VarType::Reification)
                             .into();
                         let mut cs =
-                            convert_constraint(&c, prez, container, table, st, ctx, Some(value))?;
+                            convert_constraint(c, prez, container, table, st, ctx, Some(value))?;
 
                         constraints.append(&mut cs);
                         or_args.push(value.into())
@@ -535,7 +530,7 @@ fn convert_constraint(
         Constraint::Neq(a, b) => {
             let a: VarId = a.try_into().expect("");
             match b {
-                Lit::Atom(b) => aConstraint::neq(get_atom(&a, ctx), get_atom(&b, ctx)),
+                Lit::Atom(b) => aConstraint::neq(get_atom(&a, ctx), get_atom(b, ctx)),
                 Lit::Constraint(_c) => {
                     let value = ctx
                         .model
@@ -605,8 +600,7 @@ pub fn read_chronicle(
     let presence = ch.get_presence();
     let d_presence = st.get_domain_of_var(presence);
     let prez = if d_presence.is_true() {
-        let lit = aLit::TRUE;
-        lit
+        aLit::TRUE
     } else {
         let prez_var = match scope {
             Some(scope) => ctx
@@ -615,7 +609,7 @@ pub fn read_chronicle(
             None => ctx.model.new_bvar(container / VarType::Presence),
         };
         let variable: Variable = prez_var.into();
-        table.add_binding(*ch.get_presence(), variable.clone());
+        table.add_binding(*ch.get_presence(), variable);
         params.push(variable);
         let prez: aLit = prez_var.true_lit();
         prez
@@ -655,85 +649,80 @@ pub fn read_chronicle(
         };
 
         let param = if let Some(var) = table.get_var(*var) {
-            var.clone()
-        } else {
-            if t == lattice.get_type_id(TYPE_TIMEPOINT).unwrap() {
-                let fvar = ctx.model.new_optional_fvar(
-                    0,
-                    INT_CST_MAX,
-                    OMPAS_TIME_SCALE,
-                    prez,
-                    container / VarType::Parameter(label),
-                );
+            *var
+        } else if t == lattice.get_type_id(TYPE_TIMEPOINT).unwrap() {
+            let fvar = ctx.model.new_optional_fvar(
+                0,
+                INT_CST_MAX,
+                OMPAS_TIME_SCALE,
+                prez,
+                container / VarType::Parameter(label),
+            );
 
-                table.add_binding(*var, fvar.into());
-                fvar.into()
-            } else if t == lattice.get_type_id(TYPE_PRESENCE).unwrap() {
-                if let Some(var) = table.get_var(*var) {
-                    *var
-                } else {
-                    panic!()
-                }
-            } else if *t == TYPE_ID_INT {
-                let (lb, ub): (IntCst, IntCst) = if let Some(VarVal::Range(l, u)) = var_val {
-                    (*l as IntCst, *u as IntCst)
-                } else {
-                    (INT_CST_MIN, INT_UB)
-                };
-
-                let ivar = ctx.model.new_optional_ivar(
-                    lb,
-                    ub,
-                    prez,
-                    container / VarType::Parameter(label),
-                );
-                table.add_binding(*var, ivar.into());
-                ivar.into()
-            } else if *t == TYPE_ID_FLOAT || *t == TYPE_ID_NUMBER {
-                let fvar = ctx.model.new_optional_fvar(
-                    INT_CST_MIN,
-                    INT_CST_MAX,
-                    OMPAS_TIME_SCALE, //Not sure of that
-                    prez,
-                    container / VarType::Parameter(label),
-                );
-                table.add_binding(var, fvar.into());
-                fvar.into()
-            } else if *t == TYPE_ID_BOOLEAN {
-                let bvar = ctx
-                    .model
-                    .new_optional_bvar(prez, container / VarType::Parameter(label));
-                //context.model.
-                table.add_binding(*var, bvar.into());
-                bvar.into()
-            } else if *t == TYPE_ID_NIL {
-                unreachable!()
-                /*let bvar = context
-                    .model
-                    .new_optional_bvar(prez, container / VarType::Parameter(label));
-                bindings.add_binding(var, &bvar.into());
-                bvar.into()*/
+            table.add_binding(*var, fvar.into());
+            fvar.into()
+        } else if t == lattice.get_type_id(TYPE_PRESENCE).unwrap() {
+            if let Some(var) = table.get_var(*var) {
+                *var
             } else {
-                let str = domain.format(&lattice);
-                let t = ctx
-                    .model
-                    .get_symbol_table()
-                    .types
-                    .id_of(&str)
-                    .unwrap_or_else(|| panic!("{str} should be defined in type hierarchy"));
-                //let s = ch.sym_table.get_atom(var, true).unwrap();
-                let svar =
-                    ctx.model
-                        .new_optional_sym_var(t, prez, container / VarType::Parameter(label));
-                table.add_binding(*var, svar.into());
-                svar.into()
+                panic!()
             }
+        } else if *t == TYPE_ID_INT {
+            let (lb, ub): (IntCst, IntCst) = if let Some(VarVal::Range(l, u)) = var_val {
+                (*l as IntCst, *u as IntCst)
+            } else {
+                (INT_CST_MIN, INT_UB)
+            };
+
+            let ivar =
+                ctx.model
+                    .new_optional_ivar(lb, ub, prez, container / VarType::Parameter(label));
+            table.add_binding(*var, ivar.into());
+            ivar.into()
+        } else if *t == TYPE_ID_FLOAT || *t == TYPE_ID_NUMBER {
+            let fvar = ctx.model.new_optional_fvar(
+                INT_CST_MIN,
+                INT_CST_MAX,
+                OMPAS_TIME_SCALE, //Not sure of that
+                prez,
+                container / VarType::Parameter(label),
+            );
+            table.add_binding(var, fvar.into());
+            fvar.into()
+        } else if *t == TYPE_ID_BOOLEAN {
+            let bvar = ctx
+                .model
+                .new_optional_bvar(prez, container / VarType::Parameter(label));
+            //context.model.
+            table.add_binding(*var, bvar.into());
+            bvar.into()
+        } else if *t == TYPE_ID_NIL {
+            unreachable!()
+            /*let bvar = context
+                .model
+                .new_optional_bvar(prez, container / VarType::Parameter(label));
+            bindings.add_binding(var, &bvar.into());
+            bvar.into()*/
+        } else {
+            let str = domain.format(&lattice);
+            let t = ctx
+                .model
+                .get_symbol_table()
+                .types
+                .id_of(&str)
+                .unwrap_or_else(|| panic!("{str} should be defined in type hierarchy"));
+            //let s = ch.sym_table.get_atom(var, true).unwrap();
+            let svar =
+                ctx.model
+                    .new_optional_sym_var(t, prez, container / VarType::Parameter(label));
+            table.add_binding(*var, svar.into());
+            svar.into()
         };
         if let Some(var_val) = var_val {
             match var_val {
                 VarVal::Range(_, _) => {}
                 VarVal::Val(cst) => {
-                    let cst = atom_from_cst(ctx, &cst);
+                    let cst = atom_from_cst(ctx, cst);
                     constraints.push(aConstraint::eq(param, cst));
                 }
             }
@@ -768,9 +757,9 @@ pub fn read_chronicle(
                 })
                 .collect();
         let value = get_atom(&c.value, ctx);
-        let start: FVar = try_variable_into_fvar(table.get_var(&c.get_start()).cloned().unwrap())?;
+        let start: FVar = try_variable_into_fvar(table.get_var(c.get_start()).cloned().unwrap())?;
         let start = FAtom::from(start);
-        let end: FVar = try_variable_into_fvar(table.get_var(&c.get_end()).cloned().unwrap())?;
+        let end: FVar = try_variable_into_fvar(table.get_var(c.get_end()).cloned().unwrap())?;
         let end = FAtom::from(end);
         let condition = Condition {
             start,
@@ -793,9 +782,9 @@ pub fn read_chronicle(
                 })
                 .collect();
         let value = get_atom(&e.value, ctx);
-        let start: FVar = try_variable_into_fvar(*table.get_var(&e.get_start()).unwrap())?;
+        let start: FVar = try_variable_into_fvar(*table.get_var(e.get_start()).unwrap())?;
         let start = FAtom::from(start);
-        let end: FVar = try_variable_into_fvar(*table.get_var(&e.get_end()).unwrap())?;
+        let end: FVar = try_variable_into_fvar(*table.get_var(e.get_end()).unwrap())?;
         let end = FAtom::from(end);
         let effect = Effect {
             transition_start: start, // + FAtom::EPSILON,
@@ -816,7 +805,7 @@ pub fn read_chronicle(
         let end: FAtom = get_atom(&s.interval.get_end(), ctx)
             .try_into()
             .unwrap_or_else(|t| panic!("{:?}", t));
-        let e: Vec<aAtom> = s.name.iter().map(|a| get_atom(&a, ctx)).collect();
+        let e: Vec<aAtom> = s.name.iter().map(|a| get_atom(a, ctx)).collect();
         let st = SubTask {
             id: None,
             start,
@@ -828,14 +817,9 @@ pub fn read_chronicle(
     }
     //println!("ok!");
 
-    let start = try_variable_into_fvar(
-        table
-            .get_var(&ch.get_interval().get_start())
-            .unwrap()
-            .clone(),
-    )?;
+    let start = try_variable_into_fvar(*table.get_var(ch.get_interval().get_start()).unwrap())?;
     let start = FAtom::from(start);
-    let end = try_variable_into_fvar(table.get_var(&ch.get_interval().get_end()).unwrap().clone())?;
+    let end = try_variable_into_fvar(*table.get_var(ch.get_interval().get_end()).unwrap())?;
     let end = FAtom::from(end);
 
     //print!("init name...");

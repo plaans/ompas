@@ -410,12 +410,8 @@ pub async fn p_eval(lv: &LValue, root_env: &mut PLEnv) -> LResult {
                             LValue::Nil => queue.push(i.alt.clone()),
                             lv => {
                                 let e = wrong_type!("eval", &lv, KindLValue::Bool);
-                                expression_error = list![
-                                    LPrimitive::If.into(),
-                                    lv,
-                                    i.conseq.clone(),
-                                    i.alt.clone()
-                                ];
+                                expression_error =
+                                    list![LPrimitive::If.into(), lv, i.conseq.clone(), i.alt];
                                 break Err(e.chain("if condition must return a boolean."));
                             }
                         };
@@ -527,7 +523,7 @@ pub async fn p_eval(lv: &LValue, root_env: &mut PLEnv) -> LResult {
                     let result = results.pop().unwrap();
                     if result.is_pure() {
                         if let LValue::String(s) = &result.lvalue {
-                            results.push(p_parse(s.as_str(), &mut scopes.get_last_mut()).await?);
+                            results.push(p_parse(s.as_str(), scopes.get_last_mut()).await?);
                             debug.log_last_result(&results).await;
                         } else {
                             let e = wrong_type!("p_eval", &result.lvalue, KindLValue::String);
@@ -686,12 +682,8 @@ pub async fn p_expand(
                                 }
                                 //We add to the list the expanded body
                                 return Ok(PLValue::pure(
-                                    vec![
-                                        LPrimitive::Define.into(),
-                                        v.clone(),
-                                        exp.get_lvalue().clone(),
-                                    ]
-                                    .into(),
+                                    vec![LPrimitive::Define.into(), v.clone(), exp.get_lvalue()]
+                                        .into(),
                                 ));
                             }
                             _ => return Err(wrong_type!(P_EXPAND, lv, KindLValue::Symbol)),
@@ -808,12 +800,8 @@ pub async fn p_expand(
                             //println!("{}", expanded);
                             //to expand quasiquote recursively
                             expand(&expanded, top_level, env, ctxs);*/
-                            p_expand(
-                                &expand_quasi_quote(&list[1], &mut p_env.env)?,
-                                top_level,
-                                p_env,
-                            )
-                            .await
+                            p_expand(&expand_quasi_quote(&list[1], &p_env.env)?, top_level, p_env)
+                                .await
                             //Ok(expanded)
                         };
                     }

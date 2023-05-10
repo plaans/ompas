@@ -462,7 +462,7 @@ pub async fn add_command(
     let mut command = Command::default();
     command.set_label(map.get(&NAME.into()).unwrap().to_string());
     command.set_parameters(
-        Parameters::try_from_lvalue(&map.get(&PARAMETERS.into()).unwrap(), &st).await?,
+        Parameters::try_from_lvalue(map.get(&PARAMETERS.into()).unwrap(), &st).await?,
     );
     let params = command.get_parameters().get_params_as_lvalue();
     let params_list = command.get_parameters().get_labels();
@@ -520,7 +520,7 @@ pub async fn add_command_model(
 ) -> Result<(), LRuntimeError> {
     let ctx = env.get_context::<ModModel>(MOD_DOMAIN)?;
     let label: String = model.get(&NAME.into()).unwrap().try_into()?;
-    let model = create_model(&env, model).await?;
+    let model = create_model(env, model).await?;
     let kind = ModelKind::PlanModel;
     ctx.domain
         .write()
@@ -580,7 +580,7 @@ pub async fn add_task(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<()
     } else if let Some(model) = map.get(&PLAN_MODEL.into()) {
         let lv = list![LPrimitive::DefLambda.into(), params, model.clone()];
         let model = eval(&expand(&lv, true, &mut env).await?, &mut env, None).await?;
-        task.set_model(model.clone(), ModelKind::PlanModel);
+        task.set_model(model, ModelKind::PlanModel);
     } else if let Some(model) = map.get(&PLANT_MODEL.into()) {
         let lv = list![LPrimitive::DefLambda.into(), params, model.clone()];
         let model = eval(&expand(&lv, true, &mut env).await?, &mut env, None).await?;
@@ -606,7 +606,7 @@ pub async fn add_task_model(
 ) -> Result<(), LRuntimeError> {
     let ctx = env.get_context::<ModModel>(MOD_DOMAIN)?;
     let label: String = model.get(&NAME.into()).unwrap().try_into()?;
-    let model = create_model(&env, model).await?;
+    let model = create_model(env, model).await?;
     let kind = ModelKind::PlanModel;
     ctx.domain
         .write()

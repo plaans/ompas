@@ -80,7 +80,7 @@ async fn lisp_interpreter(opt: Opt) {
         let ctx_rae = ModMonitor::new(
             PlatformGobotSim::new(
                 LispDomain::File(opt.file.unwrap_or(
-                    "/home/jeremy/CLionProjects/ompas/gobotsim/test_domain/domain.lisp".into(),
+                    "/home/jeremy/CLionProjects/ompas/ompas-gobot-sim/test_domain/domain.lisp".into(),
                 )),
                 false,
                 LogClient::new(PLATFORM_CLIENT, LOG_TOPIC_PLATFORM).await,

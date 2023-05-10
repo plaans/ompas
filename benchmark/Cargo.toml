@@ -11,7 +11,7 @@ default-run = "bench"
 sompas-modules = {path = "../scheme/modules"}
 sompas-repl = {path = "../scheme/repl"}
 ompas-core = {path = "../acting/core"}
-ompas-gobotsim = {path = "../gobotsim"}
+ompas-gobotsim = {path = "../ompas-gobot-sim"}
 ompas-language = {path = "../acting/language"}
 ompas-middleware = {path = "../middleware"}
 ompas-interface = {path = "../acting/interface"}

@@ -10,7 +10,7 @@ sompas-structs = {path = "../../scheme/structs"}
 sompas-core = {path = "../../scheme/core"}
 sompas-repl = {path = "../../scheme/repl"}
 ompas-utils={path = "../../utils"}
-ompas-gobotsim = {path = "../../gobotsim"}
+ompas-gobotsim = {path = "../../ompas-gobot-sim"}
 ompas-core = {path = "../../acting/core"}
 aries = {path = "../../aries/solver"}
 

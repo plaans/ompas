@@ -15,7 +15,6 @@ use crate::ompas::manager::acting::planning::plan_update::{
 use crate::ompas::manager::acting::planning::problem_update::{ExecutionProblem, ProblemUpdate};
 use crate::ompas::manager::resource::WaiterPriority;
 use crate::ompas::scheme::exec::state::ModState;
-use crate::ompas::scheme::exec::ModExec;
 use crate::planning::planner::encoding::domain::encode_ctx;
 use crate::planning::planner::encoding::instance::{encode_init, generate_instances};
 use crate::planning::planner::encoding::problem_generation::{
@@ -34,7 +33,6 @@ use aries_planning::chronicles::printer::Printer;
 use aries_planning::chronicles::{ChronicleOrigin, FiniteProblem, VarLabel};
 use itertools::Itertools;
 use ompas_language::exec::resource::{MAX_Q, QUANTITY};
-use ompas_language::exec::MOD_EXEC;
 use ompas_language::process::{LOG_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS};
 use ompas_middleware::ProcessInterface;
 use sompas_structs::lenv::LEnv;

@@ -2,7 +2,7 @@
 
 
 members = [
-    "craft-bots/ompas-binding",
+    "craft-bots/ompas-craft-bots",
     "scheme/core",
     "scheme/macros",
     "utils",
@@ -18,7 +18,7 @@ members = [
     "acting/core",
     "acting/language",
     "acting/interface",
-    "gobotsim",
+    "ompas-gobot-sim",
     "benchmark",
 
 ]

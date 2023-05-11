@@ -10,7 +10,6 @@ use anyhow::anyhow;
 use aries_planning::parsing::sexpr::SExpr;
 use async_recursion::async_recursion;
 use futures::FutureExt;
-use lazy_static::lazy_static;
 use sompas_language::kind::*;
 use sompas_language::list::CONS;
 use sompas_language::primitives::*;
@@ -30,17 +29,13 @@ use std::convert::TryFrom;
 use std::convert::TryInto;
 use std::fmt::Write;
 use std::ops::Deref;
-use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 pub mod modules;
 pub mod structs;
 pub mod test_utils;
-lazy_static! {
-    ///Global variable used to enable debug println.
-    /// Mainly used during development.
-    static ref DEBUG: AtomicBool = AtomicBool::new(false);
-}
+
+pub const SOMPAS_DEBUG: &str = "SOMPAS_DEBUG";
 
 pub async fn get_root_env() -> LEnv {
     // let map = im::hashmap::HashMap::new();

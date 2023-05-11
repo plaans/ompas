@@ -947,6 +947,12 @@ pub mod io {
     pub const DOC_READ: &str = "Wrapper around __read__";
     pub const MACRO_READ: &str = "(lambda (x)\
         `(eval (parse (__read__ ,x))))";
+
+    pub const GET_CURRENT_DIR: &str = "get-current-dir";
+    pub const DOC_GET_CURRENT_DIR: &str = "Returns the current working dir.";
+
+    pub const SET_CURRENT_DIR: &str = "set-current-dir";
+    pub const DOC_SET_CURRENT_DIR: &str = "Set the current working dir.";
 }
 
 pub const PROCESS_TOPIC_INTERPRETER: &str = "__PROCESS_TOPIC_INTERPRETER__";

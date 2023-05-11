@@ -104,6 +104,14 @@ impl Master {
     }
 
     pub async fn end() {
+        MASTER
+            .sender_kill
+            .send(KillRequest::end())
+            .await
+            .unwrap_or_else(|_| panic!("Error while sending end message"));
+    }
+
+    pub async fn wait_end() {
         let mut end = MASTER.end_receiver.resubscribe();
         let _ = end.recv().await;
     }
@@ -435,6 +443,13 @@ pub struct DeathNotification {
 impl KillRequest {
     pub fn new(requestor: String, topic: ProcessTopicLabel) -> Self {
         Self { requestor, topic }
+    }
+
+    pub fn end() -> Self {
+        Self {
+            requestor: "".to_string(),
+            topic: PROCESS_TOPIC_ALL.to_string(),
+        }
     }
 }
 

@@ -156,6 +156,15 @@ impl From<std::io::Error> for LRuntimeError {
     }
 }
 
+impl From<String> for LRuntimeError {
+    fn from(s: String) -> Self {
+        Self {
+            backtrace: vec![],
+            message: s,
+        }
+    }
+}
+
 impl From<LValue> for LResult {
     fn from(lv: LValue) -> Self {
         Ok(lv)

@@ -47,7 +47,6 @@ fn main() {
     );*/
 
     //output_domain_collection("/temp".into(), dc, true);
-    //output_markdown("/home/jeremy/Bureau".into(), tn, true);
 }
 
 /*fn test_meet(tn: &TypeNetwork, ta: Type, tb: Type) {

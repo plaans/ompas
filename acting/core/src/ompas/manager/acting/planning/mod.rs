@@ -25,6 +25,7 @@ use crate::planning::planner::problem::ChronicleInstance;
 use crate::planning::planner::result::PlanResult;
 use crate::planning::planner::solver::run_solver;
 use crate::planning::planner::solver::PMetric;
+use crate::{OMPAS_CHRONICLE_DEBUG_ON, OMPAS_PLAN_OUTPUT_ON};
 use aries::model::extensions::{AssignmentExt, SavedAssignment, Shaped};
 use aries::model::lang::{Atom, Variable};
 use aries::model::Model;
@@ -134,12 +135,17 @@ pub async fn run_continuous_planning(config: ContinuousPlanningConfig) {
                             env.update_context(ModState::new_from_snapshot(ep.state.clone()));
 
                             let pp: PlannerProblem = populate_problem(&domain, &env, &st, ep).await.unwrap();
-                            for (origin, chronicle) in pp.instances.iter().map(|i| (i.origin, i.am.chronicle.as_ref().unwrap())) {
-                                println!("{:?}:{}", origin, chronicle)
+                            if OMPAS_CHRONICLE_DEBUG_ON.get() {
+                                for (origin, chronicle) in pp.instances.iter().map(|i| (i.origin, i.am.chronicle.as_ref().unwrap())) {
+                                    println!("{:?}:{}", origin, chronicle)
+                                }
                             }
+
                             let aries_problem: chronicles::Problem = encode(&mut table, &st, &pp).await.unwrap();
-                            for instance in &aries_problem.chronicles {
-                                Printer::print_chronicle(&instance.chronicle, &aries_problem.context.model);
+                            if OMPAS_CHRONICLE_DEBUG_ON.get() {
+                                for instance in &aries_problem.chronicles {
+                                    Printer::print_chronicle(&instance.chronicle, &aries_problem.context.model);
+                                }
                             }
 
                             let result = run_solver(
@@ -149,7 +155,7 @@ pub async fn run_continuous_planning(config: ContinuousPlanningConfig) {
                             //println!("{}", format_partial_plan(&pb, &x)?);
 
                             if let Ok(Some(pr)) = result {
-                                println!("Plan found");
+
                                 //result::print_chronicles(&pr);
                                 let PlanResult {
                                     ass,
@@ -159,8 +165,12 @@ pub async fn run_continuous_planning(config: ContinuousPlanningConfig) {
                                 let choices = extract_choices(&table, &ass, &fp.model, &pp);
                                 let new_ams = extract_new_acting_models(&table, &ass, &fp.model, pp);
 
-                                for choice in &choices {
-                                    println!("{}:{}", choice.process_ref, choice.choice_inner)
+
+                                if OMPAS_PLAN_OUTPUT_ON.get() {
+                                    println!("Plan found");
+                                    for choice in &choices {
+                                        println!("{}:{}", choice.process_ref, choice.choice_inner)
+                                    }
                                 }
 
                                 //We update the plan with new acting models and choices extracted from the instanciation of variables of the planner.

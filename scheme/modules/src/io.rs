@@ -6,6 +6,7 @@ use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::{LValue, Sym};
 use sompas_structs::{lruntimeerror, string};
+use std::env;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::PathBuf;
@@ -65,6 +66,8 @@ impl From<ModIO> for LModule {
             false,
         );
         module.add_fn(WRITE, write, DOC_WRITE, false);
+        module.add_fn(GET_CURRENT_DIR, get_current_dir, DOC_GET_CURRENT_DIR, false);
+        module.add_fn(SET_CURRENT_DIR, set_current_dir, DOC_SET_CURRENT_DIR, false);
         module.add_macro(READ, MACRO_READ, DOC_READ);
 
         module
@@ -137,6 +140,25 @@ pub fn write(s: Sym, lv: &LValue) -> Result<(), std::io::Error> {
     let mut f = File::create(s)?;
     f.write_all(lv.to_string().as_bytes())?;
     Ok(())
+}
+
+#[scheme_fn]
+pub fn get_current_dir() -> Result<String, String> {
+    match env::current_dir() {
+        Ok(dir) => match dir.to_str() {
+            Some(d) => Ok(d.to_string()),
+            None => Err("Could not format PathBuf".to_string()),
+        },
+        Err(e) => Err(format!("Error getting current_dir: {e}")),
+    }
+}
+
+#[scheme_fn]
+pub fn set_current_dir(dir: String) -> Result<(), String> {
+    match env::set_current_dir(dir) {
+        Ok(_) => Ok(()),
+        Err(e) => Err(format!("Error setting current dir: {e}")),
+    }
 }
 
 //TODO: finish writing tests for io

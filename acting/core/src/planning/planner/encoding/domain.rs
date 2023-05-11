@@ -668,11 +668,16 @@ pub fn read_chronicle(
                 panic!()
             }
         } else if *t == TYPE_ID_INT {
-            let (lb, ub): (IntCst, IntCst) = if let Some(VarVal::Range(l, u)) = var_val {
+            /*let (lb, ub): (IntCst, IntCst) = if let Some(VarVal::Range(l, u)) = var_val {
                 (*l as IntCst, *u as IntCst)
             } else {
                 (INT_CST_MIN, INT_UB)
             };
+
+            println!("{} in [{},{}]", ch.st.format_variable(var), lb, ub);*/
+
+            let lb = INT_CST_MIN;
+            let ub = INT_UB;
 
             let ivar =
                 ctx.model

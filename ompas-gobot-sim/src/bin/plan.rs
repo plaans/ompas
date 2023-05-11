@@ -1,6 +1,7 @@
 //use ompas_gobotsim::mod_godot::CtxGodot;
 use ompas_core::ompas::scheme::exec::platform::lisp_domain::LispDomain;
 use ompas_core::ompas::scheme::monitor::ModMonitor;
+use ompas_gobotsim::default_gobot_sim_plan_domain;
 use ompas_gobotsim::platform::PlatformGobotSim;
 use ompas_language::interface::{LOG_TOPIC_PLATFORM, PLATFORM_CLIENT};
 use ompas_middleware::logger::LogClient;
@@ -12,6 +13,7 @@ use sompas_modules::time::ModTime;
 use sompas_modules::utils::ModUtils;
 use sompas_repl::lisp_interpreter::{ChannelToLispInterpreter, LispInterpreter};
 use sompas_structs::lruntimeerror;
+use sompas_structs::lvalue::LValue;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -20,8 +22,8 @@ pub const LOG_LEVEL: LogLevel = LogLevel::Debug;
 #[derive(Debug, StructOpt)]
 #[structopt(name = "OMPAS", about = "An acting engine based on RAE.")]
 struct Opt {
-    #[structopt(short = "D", long = "domain")]
-    file: Option<PathBuf>,
+    #[structopt(short = "d", long = "domain")]
+    domain: Option<PathBuf>,
 
     #[structopt(short = "o", long = "optimal")]
     opt: bool,
@@ -57,9 +59,7 @@ async fn lisp_interpreter(opt: Opt) -> lruntimeerror::Result<()> {
 
     let ctx_rae = ModMonitor::new(
         PlatformGobotSim::new(
-            LispDomain::File(opt.file.unwrap_or(
-                "/home/jeremy/CLionProjects/ompas/gobotsim/planning_domain/domain_plan.lisp".into(),
-            )),
+            LispDomain::File(opt.domain.unwrap_or(default_gobot_sim_plan_domain().into())),
             false,
             LogClient::new(PLATFORM_CLIENT, LOG_TOPIC_PLATFORM).await,
         ),
@@ -80,11 +80,11 @@ async fn lisp_interpreter(opt: Opt) -> lruntimeerror::Result<()> {
     };
 
     channel.send(command).await.unwrap();
-    channel.recv().await.unwrap()?;
-    //channel.send("(dump_trace)".to_string()).await.unwrap();
-    //channel.recv().await.unwrap()?;
+    let result: LValue = channel.recv().await.unwrap()?;
+    println!("finished: {}", result);
 
     Master::end().await;
+    Master::wait_end().await;
 
     Ok(())
 }

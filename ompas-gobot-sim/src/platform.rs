@@ -1,7 +1,7 @@
 use crate::platform_server::PlatformGobotSimService;
 use crate::tcp::task_tcp_connection;
-use crate::PROCESS_TOPIC_GOBOT_SIM;
-use crate::{DEFAULT_PATH_PROJECT_GODOT, TOKIO_CHANNEL_SIZE};
+use crate::{default_gobot_sim_path, PROCESS_TOPIC_GOBOT_SIM};
+use crate::{GODOT_HEADLESS_PATH, GODOT_PATH, TOKIO_CHANNEL_SIZE};
 use async_trait::async_trait;
 use ompas_core::ompas::scheme::exec::platform::lisp_domain::LispDomain;
 use ompas_core::ompas::scheme::exec::platform::platform_config::{
@@ -18,6 +18,7 @@ use ompas_middleware::ProcessInterface;
 use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::LResult;
 use sompas_structs::lvalue::LValue;
+use std::env;
 use std::fs::File;
 use std::net::SocketAddr;
 use std::os::unix::io::{FromRawFd, IntoRawFd};
@@ -83,8 +84,20 @@ impl PlatformGobotSim {
 
     pub async fn start_platform(&self, config: Option<String>) -> LResult {
         let godot = match self.headless {
-            true => "godot3-headless",
-            false => "godot3",
+            true => {
+                if let Ok(s) = env::var(GODOT_HEADLESS_PATH) {
+                    s
+                } else {
+                    "godot3-headless".to_string()
+                }
+            }
+            false => {
+                if let Ok(s) = env::var(GODOT_PATH) {
+                    s
+                } else {
+                    "godot3".to_string()
+                }
+            }
         };
 
         let f1 = File::create("gobotsim.log").expect("couldn't create file");
@@ -100,7 +113,7 @@ impl PlatformGobotSim {
             None => match self.config.is_empty() {
                 true => Command::new(godot)
                     .arg("--path")
-                    .arg(DEFAULT_PATH_PROJECT_GODOT)
+                    .arg(default_gobot_sim_path())
                     .stdout(unsafe { Stdio::from_raw_fd(f1.into_raw_fd()) })
                     .stderr(unsafe { Stdio::from_raw_fd(f2.into_raw_fd()) })
                     .spawn()

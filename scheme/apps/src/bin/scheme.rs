@@ -72,5 +72,5 @@ pub async fn lisp_interpreter(log: Option<PathBuf>, root: bool) {
 
     li.run(log.map(|p| FileDescriptor::AbsolutePath(fs::canonicalize(p).unwrap())))
         .await;
-    Master::end().await;
+    Master::wait_end().await;
 }

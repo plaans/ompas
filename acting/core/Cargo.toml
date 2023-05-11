@@ -23,6 +23,7 @@ async-trait = "0.1.51"
 aries_planning = {path = "../../aries/planning/planning"}
 aries_planners = {path = "../../aries/planning/planners"}
 aries = {path = "../../aries/solver"}
+env_param = {path = "../../aries/env_param"}
 rand = "0.8.5"
 itertools = { default-features = false, version = "0.10" }
 futures = "0.3.17"

@@ -27,6 +27,7 @@ use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use std::time::SystemTime;
+use tokio::sync::broadcast;
 
 #[derive(Default)]
 pub struct ModDebugConversion {}
@@ -171,7 +172,11 @@ async fn _plan_task(env: &LEnv, args: &[LValue], opt: bool) -> LResult {
     };
 
     Ok(result)*/
-
+    let mut recv: broadcast::Receiver<bool> =
+        acting_manager.subscribe_on_plan_update().await.unwrap();
+    recv.recv()
+        .await
+        .expect("Error while waiting on plan update.");
     Ok(LValue::Nil)
 }
 

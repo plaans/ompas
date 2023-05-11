@@ -7,6 +7,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use ompas_core::ompas::scheme::monitor::ModMonitor;
+use ompas_core::OMPAS_LOG_ON;
 use ompas_language::process::LOG_TOPIC_OMPAS;
 use ompas_middleware::logger::FileDescriptor;
 use ompas_middleware::Master;
@@ -25,9 +26,6 @@ struct Opt {
 
     #[structopt(short = "d", long = "domain")]
     domain: PathBuf,
-
-    #[structopt(short = "r", long = "rae-log")]
-    rae_log: bool,
 }
 
 #[tokio::main]
@@ -85,7 +83,7 @@ async fn lisp_interpreter(opt: &Opt) {
 
     let ctx_rae = ModMonitor::new("nil", opt.log.clone()).await;
 
-    if opt.rae_log {
+    if OMPAS_LOG_ON.get() {
         Master::start_display_log_topic(LOG_TOPIC_OMPAS).await;
     }
 
@@ -99,5 +97,5 @@ async fn lisp_interpreter(opt: &Opt) {
             .map(|p| FileDescriptor::AbsolutePath(fs::canonicalize(p).unwrap())),
     )
     .await;
-    Master::end().await;
+    Master::wait_end().await;
 }

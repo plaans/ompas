@@ -46,8 +46,6 @@ pub mod flow_graph;
 pub mod point_algebra;
 
 #[allow(dead_code)]
-const DEBUG_CHRONICLE: bool = false;
-#[allow(dead_code)]
 static N_CONVERSION: AtomicU32 = AtomicU32::new(0);
 const MAX_QUANTITY_VALUE: i64 = 1000;
 

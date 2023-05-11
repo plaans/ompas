@@ -215,7 +215,7 @@ pub async fn lisp_interpreter(opt: Opt) {
         problem_name
     );
 
-    Master::end().await
+    Master::wait_end().await
 }
 
 pub fn domain(opt: &Opt) -> LispDomain {

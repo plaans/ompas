@@ -8,6 +8,8 @@ default-run= "ompas-gobot-sim"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+
+# SOMPAS dependencies
 sompas-modules = {path = "../scheme/modules"}
 sompas-structs = {path = "../scheme/structs"}
 sompas-core= {path = "../scheme/core"}
@@ -15,12 +17,16 @@ sompas-repl = {path = "../scheme/repl"}
 sompas-language= {path = "../scheme/language"}
 sompas-macros = {path = "../scheme/macros"}
 
+# OMPAS dependencies
 ompas-middleware = {path = "../middleware"}
 ompas-utils = {path = "../utils"}
 ompas-core = {path = "../acting/core"}
 ompas-interface = {path = "../acting/interface"}
 ompas-language = {path = "../acting/language"}
+
+# Aries dependencies
 aries_planning = {path = "../aries/planning/planning"}
+env_param = {path = "../aries/env_param"}
 
 im = "15.0.0"
 structopt = { version = "0.3", default-features = false }

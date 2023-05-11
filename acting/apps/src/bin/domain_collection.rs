@@ -57,8 +57,7 @@ fn main() {
 
     //meet(dc, Symbol, New(TYPE_OBJECT.to_string()));
 
-    output_domain_collection("/home/jeremy/Bureau/domain".into(), dc, true);
-    //output_markdown("/home/jeremy/Bureau".into(), tn, true);
+    output_domain_collection("/tmp/domain".into(), dc, true);
 }
 
 fn output_domain_collection(path: PathBuf, dc: &TypeLattice, view: bool) {

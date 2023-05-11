@@ -1,3 +1,5 @@
+use ompas_core::ompas_path;
+
 //modules of the crate
 pub mod language;
 pub mod platform;
@@ -7,5 +9,30 @@ pub mod tcp;
 
 /// Const defining the size of the channels.
 const TOKIO_CHANNEL_SIZE: usize = 100;
-const DEFAULT_PATH_PROJECT_GODOT: &str = "/home/jeremy/CLionProjects/ompas/ompas-gobot-sim/gobot-sim/simu";
 const PROCESS_TOPIC_GOBOT_SIM: &str = "__PROCESS_TOPIC_GOBOT_SIM__";
+
+pub const GODOT_PATH: &str = "GODOT3_PATH";
+pub const GODOT_HEADLESS_PATH: &str = "GODOT3_HEADLESS_PATH";
+pub const GODOT_BINARY_PATH: &str = "GODOT_BINARY_PATH";
+
+pub fn default_gobot_sim_path() -> String {
+    format!("{}/ompas-gobot-sim/gobot-sim/simu", ompas_path())
+}
+
+pub fn default_gobot_sim_domain() -> String {
+    format!("{}/ompas-gobot-sim/test_domain/domain.lisp", ompas_path())
+}
+
+pub fn default_gobot_sim_plan_domain() -> String {
+    format!(
+        "{}/ompas-gobot-sim/planning_domain/domain_plan.lisp",
+        ompas_path()
+    )
+}
+
+pub fn default_gobot_sim_plan_exec_domain() -> String {
+    format!(
+        "{}/ompas-gobot-sim/planning_domain/domain.lisp",
+        ompas_path()
+    )
+}

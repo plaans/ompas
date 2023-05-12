@@ -447,6 +447,8 @@ fn convert_sleep(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRu
 
     let sleep = fl.new_assignment(fl.st.new_nil());
     fl.set_duration(&sleep, fl.get_flow_result(seq.last().unwrap()));
+    let duration = fl.get_flow_interval(&sleep).get_duration();
+    assert!(duration.is_some());
     seq.push(sleep);
 
     Ok(fl.new_seq(seq))

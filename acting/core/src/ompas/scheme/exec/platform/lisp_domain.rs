@@ -10,9 +10,11 @@ pub enum LispDomain {
 
 impl From<LispDomain> for InitScheme {
     fn from(l: LispDomain) -> Self {
-        match l {
+        match &l {
             LispDomain::String(s) => vec![s].into(),
-            LispDomain::File(f) => vec![fs::read_to_string(f).unwrap()].into(),
+            LispDomain::File(f) => vec![fs::read_to_string(f)
+                .unwrap_or_else(|e| panic!("Error loading file {:?}:\n{}", f, e))]
+            .into(),
         }
     }
 }

@@ -113,10 +113,12 @@ pub fn binding_constraints(fl: &mut FlowGraph) -> VecDeque<PostProcess> {
         let flow = fl.flows[flow_id].clone();
         match &flow.kind {
             FlowKind::Lit(Lit::Atom(a)) => {
-                post_process.push_back(Bind(flow.result, *a));
-                let parent_flow = &mut fl.flows[flow.parent.unwrap()];
-                if let FlowKind::Seq(s) = &mut parent_flow.kind {
-                    s.retain(|f| *f != flow_id)
+                if flow.interval.get_duration().is_none() {
+                    post_process.push_back(Bind(flow.result, *a));
+                    let parent_flow = &mut fl.flows[flow.parent.unwrap()];
+                    if let FlowKind::Seq(s) = &mut parent_flow.kind {
+                        s.retain(|f| *f != flow_id)
+                    }
                 }
             }
             FlowKind::Seq(seq) => {

@@ -20,6 +20,7 @@ use crate::planning::planner::encoding::{
     atom_from_cst, get_type, try_variable_into_fvar, var_id_into_atom, PlannerDomain,
     OMPAS_TIME_SCALE,
 };
+use crate::{OMPAS_CHRONICLE_DEBUG_ON, OMPAS_PLAN_ENCODING_OPTIMIZATION_ON};
 use anyhow::anyhow;
 use aries::core::{IntCst, Lit as aLit, INT_CST_MAX, INT_CST_MIN};
 use aries::model::extensions::Shaped;
@@ -50,9 +51,6 @@ use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use std::ops::Deref;
 use std::sync::Arc;
-
-/// Custom upper bound to handle LinearSum overflow
-const INT_UB: IntCst = 10000;
 
 #[named]
 pub fn encode_ctx(
@@ -437,7 +435,7 @@ fn convert_constraint(
                         for term in terms {
                             lsum += term;
                         }
-                        lsum = lsum + cst;
+                        lsum += cst;
                         aConstraint::sum(Sum {
                             sum: lsum,
                             value: ctx
@@ -668,16 +666,16 @@ pub fn read_chronicle(
                 panic!()
             }
         } else if *t == TYPE_ID_INT {
-            /*let (lb, ub): (IntCst, IntCst) = if let Some(VarVal::Range(l, u)) = var_val {
-                (*l as IntCst, *u as IntCst)
+            let (lb, ub): (IntCst, IntCst) = if OMPAS_PLAN_ENCODING_OPTIMIZATION_ON.get() {
+                if let Some(VarVal::Range(l, u)) = var_val {
+                    (*l as IntCst, *u as IntCst)
+                } else {
+                    (INT_CST_MIN, INT_CST_MAX)
+                }
             } else {
-                (INT_CST_MIN, INT_UB)
+                (INT_CST_MIN, INT_CST_MAX)
             };
 
-            println!("{} in [{},{}]", ch.st.format_variable(var), lb, ub);*/
-
-            let lb = INT_CST_MIN;
-            let ub = INT_UB;
 
             let ivar =
                 ctx.model

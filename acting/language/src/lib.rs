@@ -150,7 +150,7 @@ pub mod exec {
         pub const ASSERT_SHORT: &str = "+>";
         pub const DOC_ASSERT_SHORT: &str = "Short version of assert.";
 
-        pub const TRANSITIVE_ASSERT: &str = "transitive_assert";
+        pub const TRANSITIVE_ASSERT: &str = "transitive-assert";
         pub const DOC_TRANSITIVE_ASSERT: &str= "Update of a fact that takes a given duration. During the transition, the fact is considered as unknown.";
 
         pub const RETRACT: &str = "retract";

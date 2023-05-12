@@ -128,7 +128,7 @@
     (def-task t_process (:params (?m machine) (?p package) (?d int)))
     (def-task-om-model t_process
         (:params (?m machine) (?p package) (?d int))
-        (:body (begin (sleep ?d))))
+        (:body (sleep ?d)))
     (def-method m_process
         (:task t_process)
         (:params (?m machine) (?p package) (?d int))

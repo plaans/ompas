@@ -106,7 +106,6 @@ impl ModMonitor {
     /// Initialize the libraries to load inside Scheme env.
     /// Takes as argument the execution platform.
     ///
-
     async fn init_empty_env(&mut self) {
         let mut env: LEnv = get_root_env().await;
         env.import_module(ModAdvancedMath::default(), WithoutPrefix);
@@ -115,10 +114,7 @@ impl ModMonitor {
         env.import_module(ModUtils::default(), WithoutPrefix);
         env.import_module(ModString::default(), WithPrefix);
 
-        env.import_module(
-            ModExec::new(&ModControl::new(&ModMonitor::default())).await,
-            WithoutPrefix,
-        );
+        env.import_module(ModExec::new(&ModControl::new(self)).await, WithoutPrefix);
         eval_init(&mut env).await;
         self.empty_env = env;
     }

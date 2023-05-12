@@ -18,6 +18,7 @@ use crate::model::sym_table::VarId;
 use crate::planning::conversion::flow_graph::flow::{FlowId, FlowKind};
 use crate::planning::conversion::flow_graph::graph::FlowGraph;
 use crate::planning::conversion::ConvertParameters;
+use crate::OMPAS_CHRONICLE_DEBUG_ON;
 use function_name::named;
 use ompas_language::exec::resource::{MAX_Q, QUANTITY};
 use ompas_language::sym_table::{COND, EPSILON};
@@ -222,6 +223,9 @@ pub fn convert_into_chronicle(
 
         if start != end {
             if let Some(duration) = duration {
+                if OMPAS_CHRONICLE_DEBUG_ON.get() {
+                    println!("duration encoded");
+                }
                 ch.add_constraint(Constraint::eq(end, Computation::add(vec![start, duration])));
             } else {
                 ch.add_constraint(Constraint::leq(start, end))
@@ -232,7 +236,7 @@ pub fn convert_into_chronicle(
             FlowKind::Lit(lit) => {
                 match &lit {
                     Lit::Exp(_) => {}
-                    Lit::Atom(_) => {}
+                    Lit::Atom(a) => ch.add_constraint(Constraint::eq(result, a)),
                     Lit::Await(a) => {
                         let handle = fl.get_handle(a).unwrap();
                         ht.add_await(handle, interval.get_end());
@@ -251,6 +255,7 @@ pub fn convert_into_chronicle(
                         let t_prime = st.new_timepoint();
                         let t_release_prime = st.new_timepoint();
                         let t_release = acq.release_time;
+                        //println!("convert_into_chronicle/max_capacity = {}", cv.max_capacity);
                         let quantity_domain: Domain = Domain::IntRange(
                             0,
                             cv.max_capacity, //Bound::Inc(Cst::Int(MAX_QUANTITY_VALUE)),
@@ -671,10 +676,8 @@ pub fn convert_into_chronicle(
 
                 //ch.add_constraint(Constraint::leq(fl.get_flow_end(&h), Constraint::Max(drops)))
             }
-            FlowKind::FlowPause(fw) => {
-                if let Some(duration) = fw.duration {
-                    ch.add_constraint(Constraint::eq(end, Computation::add(vec![start, duration])));
-                }
+            FlowKind::FlowPause(_) => {
+                unreachable!("flow pause should no longer be used");
             }
             FlowKind::FlowResourceHandle(_) => {
                 unreachable!()

@@ -114,12 +114,15 @@ impl FlowGraph {
     }
 
     pub fn get_flow_interval(&self, flow: &FlowId) -> Interval {
-        let i = &self.flows[*flow].interval;
+        let mut i = self.flows[*flow].interval;
 
-        Interval::new(
+        i.flat_bindings(&self.st);
+
+        /*Interval::new(
             self.st.get_var_parent(&i.get_start()),
             self.st.get_var_parent(&i.get_end()),
-        )
+        )*/
+        i
     }
 
     pub fn get_flow_start(&self, flow: &FlowId) -> VarId {
@@ -205,8 +208,7 @@ impl FlowGraph {
         let vertice = value.into();
         let result = self.st.new_result();
         let interval = Interval::new(self.st.new_timepoint(), self.st.new_timepoint());
-        let id = self.new_flow(vertice, interval, result);
-        self.new_seq(vec![id])
+        self.new_flow(vertice, interval, result)
     }
 
     pub fn new_seq(&mut self, seq: Vec<FlowId>) -> FlowId {

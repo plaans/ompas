@@ -107,16 +107,14 @@ pub async fn _convert(
     graph.flow = flow;
     flow_graph_post_processing(&mut graph)?;
     //debug_println!("flow_graph_post_processing({n_conversion}) = ok!");
-
-    let cv = &ConvertParameters {
-        max_capacity: p_env
-            .env
-            .get_context::<ModExec>(MOD_EXEC)
-            .unwrap()
-            .acting_manager
-            .resource_manager
-            .get_max_capacity() as i64,
+    let max_capacity = match p_env.env.get_context::<ModExec>(MOD_EXEC) {
+        Ok(m) => m.acting_manager.resource_manager.get_max_capacity() as i64,
+        Err(_) => 1,
     };
+
+    //println!("_convert/max_capacity = {}", max_capacity);
+
+    let cv = &ConvertParameters { max_capacity };
 
     let mut ch = convert_graph(ch, &mut graph, &flow, &p_env.env, cv)?;
     //debug_println!("convert_graph({n_conversion}) = ok!");
